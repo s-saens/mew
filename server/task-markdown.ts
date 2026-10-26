@@ -49,19 +49,22 @@ export function readTaskDocuments(workspace: string): TaskDocument[] {
   return [TASK_DOCUMENT_DIRECTORY, TASK_DONE_DIRECTORY, 'tasks'].flatMap(relative => {
     const dir = directory(workspace, relative)
     if (!fs.existsSync(dir)) return []
-    return fs.readdirSync(dir).filter(name => name.endsWith('.md') && !TASK_GUIDE_FILENAMES.has(name.toLowerCase())).sort().map(name => {
+    return fs.readdirSync(dir).filter(name => name.endsWith('.md') && !TASK_GUIDE_FILENAMES.has(name.toLowerCase())).sort().flatMap(name => {
       const file = path.join(dir, name)
       if (!fs.lstatSync(file).isFile() || fs.lstatSync(file).isSymbolicLink()) throw new Error('Invalid task file')
       const raw = fs.readFileSync(file, 'utf8')
+      const relativePath = `${relative}/${name}`
+      const stat = fs.statSync(file)
+      const identity = identities.find(item => item.path === relativePath) ?? identities.find(item => stat.ino !== 0 && item.device === stat.dev && item.inode === stat.ino)
       const match = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(raw)
-      if (!match) throw new Error('Missing task frontmatter')
+      if (!match) {
+        if (identity || raw.startsWith('---\n') || raw.startsWith('---\r\n')) throw new Error('Missing task frontmatter')
+        return []
+      }
       const yaml = parseDocument(match[1])
       if (yaml.errors.length) throw new Error('Invalid task frontmatter')
       const value = yaml.toJS() as Record<string, unknown>
       if (!value || typeof value !== 'object') throw new Error('Invalid task frontmatter')
-      const relativePath = `${relative}/${name}`
-      const stat = fs.statSync(file)
-      const identity = identities.find(item => item.path === relativePath) ?? identities.find(item => stat.ino !== 0 && item.device === stat.dev && item.inode === stat.ino)
       const id = identity?.id ?? value.id ?? createHash('sha256').update(stat.ino ? `${stat.dev}:${stat.ino}` : relativePath).digest('hex')
       const tags = taskDocumentTags(value.tags)
       const assignees = taskDocumentTags(value.assignees)
@@ -69,7 +72,7 @@ export function readTaskDocuments(workspace: string): TaskDocument[] {
       const task = { id, text: value.title, done,
         ...(tags != null ? { tags } : {}), ...(assignees != null ? { assignees } : {}), ...(value.date != null ? { date: value.date } : {}),
         ...(value.startDate != null ? { startDate: value.startDate } : {}), path: relativePath } as TaskItem
-      return { task, raw, body: raw.slice(match[0].length), yaml }
+      return [{ task, raw, body: raw.slice(match[0].length), yaml }]
     })
   })
 }
