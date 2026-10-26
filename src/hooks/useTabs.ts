@@ -206,6 +206,9 @@ export function useTabs(
   const statesRef = useRef<Record<string, ProjectTabs>>({})
   // 디바운스가 걸려 있는 저장 — 예약할 때의 프로젝트를 함께 붙들어 둔다
   const inFlightSaves = useRef(new Set<Promise<unknown>>())
+  const fileSaveRequests = useRef(new Map<string, Promise<unknown>>())
+  const queuedAutosaves = useRef(new Map<string, { epoch: number; project: string; path: string }>())
+  const [saveQueueVersion, setSaveQueueVersion] = useState(0)
   const pageMutationRef = useRef<number | null>(null)
   const pageMutationCompletionRef = useRef<{ epoch: number; token: symbol; done: Promise<void> } | null>(null)
   const pageMutationProjectRef = useRef('docs')
@@ -775,6 +778,12 @@ export function useTabs(
   // 실행하지 않는다 — StrictMode가 업데이터 함수를 두 번 호출해 fetch가 중복 발생하는 것을 방지
   const autosave = useCallback(
     (p: string, path: string) => {
+      const saveKey = JSON.stringify([workspaceRequestRef.current.epoch, p, path])
+      const pending = fileSaveRequests.current.get(saveKey)
+      if (pending) {
+        queuedAutosaves.current.set(saveKey, { epoch: workspaceRequestRef.current.epoch, project: p, path })
+        return
+      }
       const tab = findTab(p, path)
       const file = editorFile(path, p)
       if ((pageMutationProjectRef.current === '*' || file.project === pageMutationProjectRef.current) && pageMutationRef.current === workspaceRequestRef.current.epoch) return
@@ -791,17 +800,34 @@ export function useTabs(
           mapTabsAtPath(p, path, (t) =>
             t.content === content ? { ...t, content: saved, savedContent: saved, status: 'saved', statusMessage: 'Saved' }
               : saved !== content ? { ...t, content: savedBuffer(t.content, content, saved), savedContent: saved, status: 'idle' }
-                : isExternalTabPath(path) && t.savedContent === tab.savedContent ? { ...t, savedContent: content, status: 'idle' } : t,
+                : t.savedContent === tab.savedContent ? { ...t, savedContent: content, status: 'idle' } : t,
           )
         })
         .catch((err) => {
           mapTabsAtPath(p, path, (t) => ({ ...t, status: 'error', statusMessage: err instanceof Error ? err.message : String(err) }))
         })
-        .finally(() => inFlightSaves.current.delete(request))
+        .finally(() => {
+          inFlightSaves.current.delete(request)
+          if (fileSaveRequests.current.get(saveKey) === request) fileSaveRequests.current.delete(saveKey)
+          if (queuedAutosaves.current.has(saveKey)) setSaveQueueVersion(version => version + 1)
+        })
+      fileSaveRequests.current.set(saveKey, request)
       inFlightSaves.current.add(request)
     },
     [mapTabsAtPath],
   )
+
+  useEffect(() => {
+    for (const [key, queued] of queuedAutosaves.current) {
+      if (fileSaveRequests.current.has(key)) continue
+      queuedAutosaves.current.delete(key)
+      if (workspaceRequestRef.current.epoch === queued.epoch && findTab(queued.project, queued.path)?.status !== 'error') {
+        autosave(queued.project, queued.path)
+      }
+    }
+    // The state mirror effect runs first, so queued saves use the acknowledged baseline.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [states, saveQueueVersion, autosave])
 
   /**
    * 예약돼 있던 저장을 정리한다 — 지금 다루려는 탭(p/path) 것이면 취소만 하고(호출부가 곧
