@@ -8,6 +8,12 @@ import { writeBrowserStorage } from '@mew/ui/browser-storage'
 
 type TaskApi = { read: () => Promise<TaskBoard>; save: (changes: TaskChange[], colors?: TaskTagColorChange[], deletedTags?: string[]) => Promise<TaskBoard> }
 type State = TaskBoard & { tagColors: TaskTagColors; loading: boolean; saving: boolean; error: string | null; draft: string; draftTags: string[]; draftAssignees: string[] }
+type PendingSave = { sent: TaskItem[]; changes: TaskChange[]; sentColors: TaskTagColors; colors: TaskTagColorChange[]; deleted: string[] }
+
+function transientTaskError(error: unknown): boolean {
+  const status = (error as { status?: number } | null)?.status
+  return !(error instanceof TaskConflict || error instanceof SyntaxError) && (status == null || status < 400 || status >= 500)
+}
 
 /** Lives above the project-keyed dock so closing/remounting a panel cannot discard pending edits. */
 export class TaskListSession {
@@ -17,9 +23,12 @@ export class TaskListSession {
   private deletedTags = new Set<string>()
   private listeners = new Set<() => void>()
   private timer: ReturnType<typeof setTimeout> | undefined
+  private readTimer: ReturnType<typeof setTimeout> | undefined
   private reading = false
-  private pendingSave?: { sent: TaskItem[]; changes: TaskChange[]; sentColors: TaskTagColors; colors: TaskTagColorChange[]; deleted: string[] }
+  private pendingSave?: PendingSave
   private saveRetries = 0
+  private readRetries = 0
+  private readError = false
   private disposed = false
   private api: TaskApi
   private draftKey?: string
@@ -72,7 +81,8 @@ export class TaskListSession {
   setDraftAssignees(draftAssignees: string[]) { if (this.state.canEdit && validAssignees(draftAssignees)) this.publish({ draftAssignees }) }
   setDraftTags(draftTags: string[]) { if (this.state.canEdit) this.publish({ draftTags }) }
   async refresh() {
-    if (this.disposed || this.reading || this.state.saving || this.pendingSave || this.state.error || (!this.state.loading && this.deletedTags.size) || (!this.state.loading && (taskChanges(this.baseline, this.state.tasks).length || tagColorChanges(this.baselineColors, this.state.tagColors).length))) return
+    if (this.disposed || this.reading || this.readTimer !== undefined || this.state.saving || this.pendingSave || (this.state.error && !this.readError)
+      || (!this.readError && !this.state.loading && (this.deletedTags.size || taskChanges(this.baseline, this.state.tasks).length || tagColorChanges(this.baselineColors, this.state.tagColors).length))) return
     this.reading = true
     // Edits made while a polling request is in flight must also survive its response.
     const before = this.baseline
@@ -86,10 +96,43 @@ export class TaskListSession {
       const tagColors = removeTagColors(applyTagColorChanges(board.tagColors ?? {}, pendingColors), this.deletedTags)
       this.baseline = board.tasks
       this.baselineColors = board.tagColors ?? {}
+      this.readRetries = 0
+      this.readError = false
       this.publish({ ...board, tags: board.tags?.filter(tag => !this.deletedTags.has(tag)), tasks, tagColors, loading: false, error: null })
       if ((pending.length || pendingColors.length || this.deletedTags.size) && board.canEdit) this.schedule()
-    } catch (error) { this.publish({ loading: false, error: (error as Error).message }) }
+    } catch (error) {
+      if (this.disposed) return
+      this.readError = !(error instanceof TaskConflict)
+      if (transientTaskError(error) && this.readRetries < 2) {
+        const delay = [1000, 3000][this.readRetries++]
+        this.readTimer = setTimeout(() => { this.readTimer = undefined; void this.refresh() }, delay)
+      } else this.publish({ loading: false, error: (error as Error).message })
+    }
     finally { this.reading = false }
+  }
+  private acceptSave(board: TaskBoard, request: PendingSave) {
+    for (const tag of request.deleted) this.deletedTags.delete(tag)
+    const pending = this.changes(request.sent, this.state.tasks)
+    const tasks = removeTaskTags(applyTaskChanges(removeTaskTags(board.tasks, this.deletedTags), pending), this.deletedTags)
+    const pendingColors = tagColorChanges(request.sentColors, this.state.tagColors)
+    const tagColors = removeTagColors(applyTagColorChanges(board.tagColors ?? {}, pendingColors), this.deletedTags)
+    this.baseline = board.tasks
+    this.baselineColors = board.tagColors ?? {}
+    this.pendingSave = undefined
+    this.saveRetries = 0
+    this.readRetries = 0
+    this.readError = false
+    clearTimeout(this.readTimer)
+    this.readTimer = undefined
+    this.publish({ ...board, tags: board.tags?.filter(tag => !this.deletedTags.has(tag)), tasks, tagColors, saving: false, error: null })
+    if (pending.length || pendingColors.length || this.deletedTags.size) this.schedule()
+  }
+  private saveApplied(board: TaskBoard, request: PendingSave): boolean {
+    try {
+      if (taskChanges(board.tasks, applyTaskChanges(board.tasks, request.changes)).length) return false
+      if (tagColorChanges(board.tagColors ?? {}, applyTagColorChanges(board.tagColors ?? {}, request.colors)).length) return false
+      return request.deleted.every(tag => !board.tags?.includes(tag) && tagColor(board.tagColors ?? {}, tag) === null && board.tasks.every(task => !taskTags(task).includes(tag)))
+    } catch { return false }
   }
   async flush() {
     clearTimeout(this.timer)
@@ -105,31 +148,34 @@ export class TaskListSession {
     try {
       const board = await this.api.save(changes, colors, deleted)
       if (this.disposed) return
-      for (const tag of deleted) this.deletedTags.delete(tag)
-      const pending = this.changes(sent, this.state.tasks)
-      const tasks = removeTaskTags(applyTaskChanges(removeTaskTags(board.tasks, this.deletedTags), pending), this.deletedTags)
-      const pendingColors = tagColorChanges(sentColors, this.state.tagColors)
-      const tagColors = removeTagColors(applyTagColorChanges(board.tagColors ?? {}, pendingColors), this.deletedTags)
-      this.baseline = board.tasks
-      this.baselineColors = board.tagColors ?? {}
-      this.pendingSave = undefined
-      this.saveRetries = 0
-      this.publish({ ...board, tags: board.tags?.filter(tag => !this.deletedTags.has(tag)), tasks, tagColors, saving: false })
-      if (pending.length || pendingColors.length || this.deletedTags.size) this.schedule()
+      this.acceptSave(board, this.pendingSave)
     } catch (error) {
       if (this.disposed) return
-      const status = (error as Error & { status?: number }).status
-      const transient = !(error instanceof TaskConflict) && (status == null || status >= 500)
+      const transient = transientTaskError(error)
       if (transient && this.saveRetries < 2) {
         // Resend the identical batch if the server saved it but its response was lost.
         const delay = [1000, 3000][this.saveRetries++]
         this.publish({ saving: false })
         this.timer = setTimeout(() => { void this.flush() }, delay)
-      } else this.publish({ saving: false, error: (error as Error).message })
+      } else {
+        if (transient) try {
+          // A failed response does not prove that the write failed. Confirm the batch before warning.
+          const board = await this.api.read()
+          if (this.disposed) return
+          if (this.pendingSave && this.saveApplied(board, this.pendingSave)) {
+            this.acceptSave(board, this.pendingSave)
+            return
+          }
+        } catch { /* Preserve the pending batch if confirmation is unavailable or conflicts. */ }
+        this.readError = false
+        this.publish({ saving: false, error: (error as Error).message })
+      }
     }
   }
   async retry() {
     if (this.disposed || this.reading || this.state.saving) return
+    clearTimeout(this.readTimer)
+    this.readTimer = undefined
     this.reading = true
     try {
       const board = await this.api.read()
@@ -155,10 +201,12 @@ export class TaskListSession {
       this.baseline = board.tasks
       this.pendingSave = undefined
       this.saveRetries = 0
+      this.readRetries = 0
+      this.readError = false
       this.publish({ ...board, tags: board.tags?.filter(tag => !this.deletedTags.has(tag)), tasks, tagColors, error: null, loading: false })
     } catch (error) { this.publish({ error: (error as Error).message }) }
     finally { this.reading = false }
     await this.flush()
   }
-  dispose() { this.disposed = true; clearTimeout(this.timer); this.listeners.clear() }
+  dispose() { this.disposed = true; clearTimeout(this.timer); clearTimeout(this.readTimer); this.listeners.clear() }
 }

@@ -1001,16 +1001,7 @@ export interface CommitResult {
   hash: string | null
 }
 
-export async function fetchTaskList(workspace: string, email: string): Promise<import('../../shared/task-list').TaskBoard> {
-  return json(await mewFetch(`/api/task-list?workspace=${encodeURIComponent(workspace)}`, { headers: { 'X-Mew-Task-Owner': encodeURIComponent(email) } }))
-}
-async function taskListJson(res: Response): Promise<import('../../shared/task-list').TaskBoard> {
-  try { return await json(res) }
-  catch (error) { throw Object.assign(error as Error, { status: res.status }) }
-}
-export async function patchTaskList(workspace: string, changes: import('../../shared/task-list').TaskChange[], email: string, tagColorChanges: import('../../shared/task-tag-colors').TaskTagColorChange[] = [], deletedTags: string[] = []): Promise<import('../../shared/task-list').TaskBoard> {
-  return taskListJson(await mewFetch('/api/task-list', { method: 'PATCH', headers: { 'Content-Type': 'application/json', 'X-Mew-Task-Owner': encodeURIComponent(email) }, body: JSON.stringify({ workspace, changes, tagColorChanges, deletedTags }) }))
-}
+export { fetchTaskList, patchTaskList } from './task-list.ts'
 
 export interface MemberProfile {
   email: string
