@@ -129,9 +129,12 @@ export function ProjectSwitcher({ paths, activePath, fallbackLabel, canOpen, can
       </button> : <div data-project-switcher data-current-project={activePath ?? ''} title={activePath ?? label} className="flex h-full min-w-0 items-center gap-1.5 px-2.5 text-xs text-ink">{content}</div>}
     </div>
     {canOpen && menu && <ActionMenu variant="header" x={menu.x} y={menu.y} label={t('project.choose')} trigger={trigger.current} outsideIgnore={() => contextMenuElement.current} onClose={() => { setContextMenu(null); setMenu(null) }}>
-      <ProjectOrder paths={paths} onReorder={onReorder} renderItem={(path, move) => <ActionMenuItem style={{ flex: 1, minWidth: 0, width: 'auto' }} data-project-option={path} title={path} role="menuitemradio" checked={path === activePath}
+      <ProjectOrder paths={paths} onReorder={onReorder} renderItem={(path, move, index) => <ActionMenuItem style={{ flex: 1, minWidth: 0, width: 'auto' }} data-project-option={path} title={path} aria-keyshortcuts={index < 9 ? `Alt+${index + 1}` : undefined} role="menuitemradio" checked={path === activePath}
         icon={<span className="flex h-4 w-4 shrink-0 items-center justify-center" aria-hidden="true"><ProjectIcon icon={icons[path] ?? 'i:folder'} size={16} /></span>}
-        hint={<span className="flex h-4 w-4 items-center justify-center">{path === activePath && <Check aria-hidden="true" />}</span>}
+        hint={<span className="flex items-center gap-1.5">
+          {index < 9 && <kbd className="whitespace-nowrap font-sans text-[11px]">Alt+{index + 1}</kbd>}
+          <span className="flex h-4 w-4 items-center justify-center">{path === activePath && <Check aria-hidden="true" />}</span>
+        </span>}
         onPointerEnter={() => { if (path !== activePath) onPreview?.(path) }} onFocus={() => { if (path !== activePath) onPreview?.(path) }}
         onClick={() => { if (path !== activePath) onActivate(path) }}
         onContextMenu={event => { if (canChangeIcon) { event.preventDefault(); openContextMenu(path, event.clientX, event.clientY, event.currentTarget) } }}
@@ -162,7 +165,7 @@ export function ProjectSwitcher({ paths, activePath, fallbackLabel, canOpen, can
 function ProjectOrder({ paths, onReorder, renderItem }: {
   paths: string[]
   onReorder?: (paths: string[]) => void
-  renderItem: (path: string, move: (direction: number) => void) => React.ReactNode
+  renderItem: (path: string, move: (direction: number) => void, index: number) => React.ReactNode
 }) {
   const { t } = useI18n()
   function reorder(from: number, to: number) {
@@ -190,7 +193,7 @@ function ProjectOrder({ paths, onReorder, renderItem }: {
           <circle cx="4" cy="11" r="1" /><circle cx="8" cy="11" r="1" />
         </svg>
       </button>}
-      {renderItem(path, direction => reorder(index, index + direction))}
+      {renderItem(path, direction => reorder(index, index + direction), index)}
     </div>
   })
 }
