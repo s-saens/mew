@@ -21,7 +21,7 @@ function Fixture(){
 const [paths,setPaths]=useState(['/alpha','/beta','/gamma','/delta']);
 const [active,setActive]=useState('/alpha');const [enabled,setEnabled]=useState(true);const [dialog,setDialog]=useState(false);const [icons,setIcons]=useState({});
 window.setPaths=setPaths;window.active=active;window.setEnabled=setEnabled;window.setDialog=setDialog;
-return <main className="h-screen bg-surface text-ink"><header className="flex h-9 border-b border-edge"><ProjectSwitcher paths={paths} activePath={active} fallbackLabel="work" canOpen={enabled} canChangeIcon={enabled} icons={icons} onActivate={p=>{window.activations.push(p);setActive(p)}} onIconChange={(p,icon)=>setIcons(s=>({...s,[p]:icon}))} onRemove={p=>{window.removals.push(p);setPaths(s=>s.filter(x=>x!==p))}} onOpen={()=>window.opens++} onPreview={p=>window.previews.push(p)}/></header><textarea id="project-input"/><div role="dialog" hidden={!dialog}><input id="project-modal"/><div id="remote-keys" tabIndex={0}/></div><button id="outside" style={{position:"fixed",right:8,bottom:8}} onClick={()=>window.outsideClicks=(window.outsideClicks??0)+1}>Outside</button></main>}
+return <main className="h-screen bg-surface text-ink"><header className="flex h-9 border-b border-edge"><ProjectSwitcher paths={paths} activePath={active} fallbackLabel="work" canOpen={enabled} canChangeIcon={enabled} icons={icons} onActivate={p=>{window.activations.push(p);setActive(p)}} onIconChange={(p,icon)=>setIcons(s=>({...s,[p]:icon}))} onReorder={setPaths} onRemove={p=>{window.removals.push(p);setPaths(s=>s.filter(x=>x!==p))}} onOpen={()=>window.opens++} onPreview={p=>window.previews.push(p)}/></header><textarea id="project-input"/><div role="dialog" hidden={!dialog}><input id="project-modal"/><div id="remote-keys" tabIndex={0}/></div><button id="outside" style={{position:"fixed",right:8,bottom:8}} onClick={()=>window.outsideClicks=(window.outsideClicks??0)+1}>Outside</button></main>}
 createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18nProvider>);`
   const bundle = await build({ input: 'virtual:switcher.tsx', write: false, platform: 'browser', output: { format: 'iife' }, transform: { jsx: 'react-jsx', define: { 'process.env.NODE_ENV': JSON.stringify('test') } }, plugins: [{ name: 'fixture', resolveId(id) { if (id === 'virtual:switcher.tsx') return id; if (id.endsWith('.css')) return 'virtual:style' }, async load(id) { if (id === 'virtual:switcher.tsx') return source; if (id === 'virtual:style') return ''; if (id.endsWith('?raw')) return 'export default ' + JSON.stringify(await fs.readFile(id.slice(0, -4), 'utf8')) } }] })
   const chunk = bundle.output.find(item => item.type === 'chunk')!
@@ -77,6 +77,24 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     await trigger.click(); await page.locator('#outside').click()
     assert.equal(await menu.count(), 0)
     assert.equal(await page.evaluate('window.outsideClicks??0'), 0, 'dismissal does not click through the popup')
+
+    const order = () => page.locator('[data-project-option]').evaluateAll(elements => elements.map(el => el.getAttribute('data-project-option')))
+    await trigger.click()
+    const handle = page.locator('[data-project-drag-handle="/alpha"]')
+    const start = await handle.boundingBox(); const end = await option('/gamma').boundingBox()
+    assert.ok(start && end)
+    await page.mouse.move(start.x + start.width / 2, start.y + start.height / 2)
+    await page.mouse.down()
+    await page.mouse.move(start.x + start.width / 2, end.y + end.height - 2, { steps: 12 })
+    await page.mouse.up()
+    assert.deepEqual(await order(), ['/beta', '/gamma', '/alpha', '/delta'])
+    assert.equal(await active(), '/beta', 'dragging a handle does not activate a project')
+    await option('/alpha').focus(); await page.keyboard.press('Shift+ArrowUp')
+    assert.deepEqual(await order(), ['/beta', '/alpha', '/gamma', '/delta'])
+    await page.keyboard.press('Escape'); await trigger.click()
+    assert.deepEqual(await order(), ['/beta', '/alpha', '/gamma', '/delta'], 'reopening preserves the order')
+    await page.keyboard.press('Escape')
+    await page.evaluate('window.setPaths(["/alpha","/beta","/gamma","/delta"])')
 
     await page.evaluate('window.setDialog(true)')
     for (const width of [1100, 390]) {
@@ -142,6 +160,21 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
       }
     }
     const cdp = await context.newCDPSession(page)
+    await trigger.tap()
+    const touchHandle = await page.locator('[data-project-drag-handle="/alpha"]').boundingBox()
+    const touchTarget = await option('/gamma').boundingBox()
+    assert.ok(touchHandle && touchTarget)
+    const touchX = touchHandle.x + touchHandle.width / 2
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: touchX, y: touchHandle.y + touchHandle.height / 2, id: 2 }] })
+    for (let step = 1; step <= 10; step++) {
+      const y = touchHandle.y + touchHandle.height / 2 + (touchTarget.y + touchTarget.height - 2 - touchHandle.y - touchHandle.height / 2) * step / 10
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: touchX, y, id: 2 }] })
+    }
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+    assert.deepEqual(await order(), ['/beta', '/gamma', '/alpha'])
+    assert.equal(await active(), '/gamma')
+    await page.keyboard.press('Escape')
+    await page.waitForTimeout(550)
     const box = await trigger.boundingBox(); assert.ok(box)
     const touch = { x: box.x + box.width / 2, y: box.y + box.height / 2, id: 1 }
     await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [touch] })

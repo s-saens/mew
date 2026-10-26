@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { Check, EditPencil, Plus, Trash, Xmark } from 'iconoir-react'
-import { ActionMenu, ActionMenuItem, ActionMenuSeparator, DialogFrame } from '@mew/ui'
+import { ActionMenu, ActionMenuItem, ActionMenuSeparator, DialogFrame, useDragReorder } from '@mew/ui'
 import { projectTabIndex } from '@mew/shortcuts'
 import { useI18n } from '../i18n'
 import { ProjectIcon } from './ProjectIcon'
@@ -12,7 +12,7 @@ function labelOf(projectPath: string): string {
   return parts.at(-1) || projectPath
 }
 
-export function ProjectSwitcher({ paths, activePath, fallbackLabel, canOpen, canChangeIcon, icons, onActivate, onIconChange, onOpen, onPreview, onRemove }: {
+export function ProjectSwitcher({ paths, activePath, fallbackLabel, canOpen, canChangeIcon, icons, onActivate, onIconChange, onOpen, onPreview, onRemove, onReorder }: {
   paths: string[]
   activePath: string | null
   fallbackLabel: string
@@ -24,6 +24,7 @@ export function ProjectSwitcher({ paths, activePath, fallbackLabel, canOpen, can
   onOpen: () => void
   onPreview?: (path: string) => void
   onRemove?: (path: string) => void
+  onReorder?: (paths: string[]) => void
 }) {
   const { t } = useI18n()
   const trigger = useRef<HTMLButtonElement>(null)
@@ -128,17 +129,17 @@ export function ProjectSwitcher({ paths, activePath, fallbackLabel, canOpen, can
       </button> : <div data-project-switcher data-current-project={activePath ?? ''} title={activePath ?? label} className="flex h-full min-w-0 items-center gap-1.5 px-2.5 text-xs text-ink">{content}</div>}
     </div>
     {canOpen && menu && <ActionMenu variant="header" x={menu.x} y={menu.y} label={t('project.choose')} trigger={trigger.current} onClose={() => setMenu(null)}>
-      {paths.map(path => <ActionMenuItem key={path} data-project-option={path} title={path} role="menuitemradio" checked={path === activePath}
+      <ProjectOrder paths={paths} onReorder={onReorder} renderItem={(path, move) => <ActionMenuItem style={{ flex: 1, minWidth: 0, width: 'auto' }} data-project-option={path} title={path} role="menuitemradio" checked={path === activePath}
         icon={<span className="flex h-4 w-4 shrink-0 items-center justify-center" aria-hidden="true"><ProjectIcon icon={icons[path] ?? 'i:folder'} size={16} /></span>}
         hint={<span className="flex h-4 w-4 items-center justify-center">{path === activePath && <Check aria-hidden="true" />}</span>}
         onPointerEnter={() => { if (path !== activePath) onPreview?.(path) }} onFocus={() => { if (path !== activePath) onPreview?.(path) }}
         onClick={() => { if (path !== activePath) onActivate(path) }}
         onContextMenu={event => { if (canChangeIcon) { event.preventDefault(); openContextMenu(path, event.clientX, event.clientY) } }}
-        onKeyDown={event => { if (canChangeIcon && (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10'))) { event.preventDefault(); const box = event.currentTarget.getBoundingClientRect(); openContextMenu(path, box.left, box.bottom) } }}>
+        onKeyDown={event => { if (onReorder && event.shiftKey && (event.key === 'ArrowUp' || event.key === 'ArrowDown')) { event.preventDefault(); event.stopPropagation(); move(event.key === 'ArrowUp' ? -1 : 1); return } if (canChangeIcon && (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10'))) { event.preventDefault(); const box = event.currentTarget.getBoundingClientRect(); openContextMenu(path, box.left, box.bottom) } }}>
         <span className="min-w-0 flex-1 text-left"><span className="block truncate">{labelOf(path)}</span>
           {(labels.get(labelOf(path)) ?? 0) > 1 && <span className="block truncate text-[10px] text-ink-muted">{path}</span>}
         </span>
-      </ActionMenuItem>)}
+      </ActionMenuItem>} />
       {paths.length > 0 && <ActionMenuSeparator />}
       <ActionMenuItem icon={<Plus />} onClick={onOpen}>{t('project.add')}</ActionMenuItem>
     </ActionMenu>}
@@ -156,4 +157,40 @@ export function ProjectSwitcher({ paths, activePath, fallbackLabel, canOpen, can
       </div>
     </DialogFrame>}
   </>
+}
+
+function ProjectOrder({ paths, onReorder, renderItem }: {
+  paths: string[]
+  onReorder?: (paths: string[]) => void
+  renderItem: (path: string, move: (direction: number) => void) => React.ReactNode
+}) {
+  const { t } = useI18n()
+  function reorder(from: number, to: number) {
+    if (!onReorder || from === to || to < 0 || to >= paths.length) return
+    const next = [...paths]
+    next.splice(to, 0, next.splice(from, 1)[0])
+    onReorder(next)
+  }
+  const drag = useDragReorder({ axis: 'y', handleOnly: true, onReorder: reorder })
+  return paths.map((path, index) => {
+    const { ref, ...handleProps } = drag.getItemProps(index)
+    return <div key={path} ref={ref} role="none" data-project-row={path} className={`flex items-center ${drag.dragIndex === index ? 'opacity-60' : ''}`}>
+      {renderItem(path, direction => reorder(index, index + direction))}
+      {onReorder && paths.length > 1 && <button type="button" {...handleProps}
+        data-project-drag-handle={path} aria-label={`${labelOf(path)} · ${t('project.reorder')}`} data-tip={t('project.reorder')}
+        onClick={event => { event.stopPropagation(); drag.consumeClick() }}
+        onKeyDown={event => {
+          if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return
+          event.preventDefault(); event.stopPropagation()
+          reorder(index, index + (event.key === 'ArrowUp' ? -1 : 1))
+        }}
+        className="flex h-8 w-7 shrink-0 touch-none cursor-grab items-center justify-center rounded text-ink-muted hover:bg-surface-raised hover:text-ink active:cursor-grabbing focus-visible:outline-2 focus-visible:outline-accent">
+        <svg width="12" height="14" viewBox="0 0 12 14" fill="currentColor" aria-hidden="true">
+          <circle cx="4" cy="3" r="1" /><circle cx="8" cy="3" r="1" />
+          <circle cx="4" cy="7" r="1" /><circle cx="8" cy="7" r="1" />
+          <circle cx="4" cy="11" r="1" /><circle cx="8" cy="11" r="1" />
+        </svg>
+      </button>}
+    </div>
+  })
 }

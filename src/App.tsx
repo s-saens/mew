@@ -2070,6 +2070,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
             onActivate={(projectPath) => void openRootProject(projectPath)}
             onPreview={previewRootProject}
             onIconChange={changeRootProjectIcon}
+            onReorder={setOpenProjectPaths}
             onRemove={async path => {
               if (!canOpenProjects || projectOpeningRef.current) return
               if (path === projectUiPath) {
