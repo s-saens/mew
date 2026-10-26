@@ -8,7 +8,7 @@ updated: "2026-10-26"
 status_hash: "8b1758c7281118da18b267a2c001213bb7c463d4dbd018bb221e192d83f43ec3"
 files: ["server/mewpet-skins.ts", "server/mewpet-skin-routes.ts", "shared/mewpet-skins.ts", "src/components/header-notifications.tsx", "src/components/header-resources.tsx", "src/utils/mewcat-notifications.ts", "src/components/Mewcat.tsx", "src/components/mewcat-skin-settings.tsx", "src/components/mewcat-size-settings.tsx", "src/utils/mewcat-size-preferences.ts", "src/utils/mewcat-sprites.ts", "src/utils/mewcat-sprite-storage.ts", "src/components/mewcat-fullscreen-guide.tsx", "src/hooks/use-startup-guide.ts", "src/utils/app-install.ts", "src/components/mewcat-resources.tsx", "src/components/SettingsModal.tsx", "src/components/mewcat-notifications.tsx", "src/hooks/use-mewcat-notifications.ts", "src/utils/mewcat-notification-rules.ts", "src/components/mewcat-break.tsx", "src/hooks/use-mewcat-break.ts", "src/utils/mewcat-break-rules.ts"]
 commits: []
-description: "최상단 바의 작고 둥근 C·R·G 세로 게이지와 중앙 라벨·아래부터 차오르는 테마색 사용량·툴팁 수치·접근성 설명, 전체화면 오른쪽 알림 버튼과 시스템 자원 권한·조회·상세창 연결을 정의한다. 승인 요청의 기본 자동 탭 전환·설정과 토스트 알림, 카피바라만 제공하는 내장 스킨과 검은 카피바라 사용자 스킨의 밝기 조정·제거된 내장 선택의 복귀·이미지의 로컬 Git 기록 정리, 전역 파일 스킨 등록·16개 모션 이미지의 저장 제한과 오류 구분·WebP 압축·브라우저 이관·빌드 없는 갱신과 Mew 배포와 분리한 외부 생성 MCP의 선택적 연결을 정의한다. 스킨 로딩 중 뮤펫 숨김과 독립 토스트 표시, 화면 바닥·모바일 설정창·기본 크기, 필수 Idle·걷기·Struggle과 선택 모션·전환의 프레임 수·재생 시간·활성화 및 스킨별 이동 속도·보폭 동기화·공통 바닥 앵커와 주기 경계 전환, 모션 감소에서도 유지하는 기본 프레임 재생·낙하의 좁은 기울기 순환, 이동·끌기·던지기·설치 우선 시작 안내와 전체화면 안내의 개별 영구 숨김·최근 알림 목록과 토스트·선택적 거대 휴식의 저장·입력 계약도 설명한다."
+description: "최상단 바의 작고 둥근 C·R·G 세로 게이지와 중앙 라벨·아래부터 차오르는 테마색 사용량·툴팁 수치·접근성 설명, 전체화면 오른쪽 알림 버튼과 시스템 자원 권한·조회·상세창 연결을 정의한다. 승인 요청의 기본 자동 탭 전환·설정과 토스트 알림, 카피바라만 제공하는 내장 스킨과 검은 카피바라 사용자 스킨의 밝기 조정·멍한 검은 고양이의 눈만 남긴 얼굴과 얇은 흰색 테두리·제거된 내장 선택의 복귀·이미지의 로컬 Git 기록 정리, 전역 파일 스킨 등록·16개 모션 이미지의 저장 제한과 오류 구분·WebP 압축·브라우저 이관·빌드 없는 갱신과 Mew 배포와 분리한 외부 생성 MCP의 선택적 연결을 정의한다. 스킨 로딩 중 뮤펫 숨김과 독립 토스트 표시, 화면 바닥·모바일 설정창·기본 크기, 필수 Idle·걷기·Struggle과 선택 모션·전환의 프레임 수·재생 시간·활성화 및 스킨별 이동 속도·보폭 동기화·공통 바닥 앵커와 주기 경계 전환, 모션 감소에서도 유지하는 기본 프레임 재생·낙하의 좁은 기울기 순환, 이동·끌기·던지기·설치 우선 시작 안내와 전체화면 안내의 개별 영구 숨김·최근 알림 목록과 토스트·선택적 거대 휴식의 저장·입력 계약도 설명한다."
 상위파일:
   - "MOC.md"
   - "_화면·계정·운영.md"
@@ -243,6 +243,8 @@ node --test src/utils/mewcat-sprites.test.ts src/utils/mewcatSkin.test.ts server
 설치마다 하나인 `DATA_DIR/mewpet/skins/` 아래에 스킨 폴더를 만든다. 현재 설치는 기존 `.data/`를 DATA_DIR로 사용하며, 다른 설치의 기본 위치·`MEW_DATA_DIR`는 [서버 상태 계약](../../development/architecture.md#서버-상태-파일-data)을 따른다. 프로젝트의 Documents·작업 폴더에는 스킨을 저장하지 않는다.
 
 현재 설치의 사용자 스킨 `black-capybara`(검은 카피바라)는 2026-10-26에 몸 색을 짙은 회색으로 조금 밝혔다. 16개 모션·74프레임과 동작 설정은 유지하며, 이전 이미지 버전도 스킨 폴더에 보존한다.
+
+현재 설치의 `dopey-black-cat`(멍한 검은 고양이)는 2026-10-26에 모든 프레임의 입·코를 없애고 눈 두 개만 남겼으며, 몸·귀·발·꼬리 바깥에 얇은 흰색 테두리를 넣었다. 16개 모션·74프레임과 동작 설정은 유지하고 이전 이미지 버전을 보존한다.
 
 폴더에 일곱 동작의 PNG·WebP와 아래 `skin.json`을 넣는다. `id`는 영문·숫자로 시작하는 1~80자 ID이며 영문·숫자·밑줄·하이픈을 받는다. 옛 `custom:<id>`도 호환한다. `name`은 1~40자이고 `frames`는 이미지별 실제 프레임 수다. 파일 경로는 해당 스킨 폴더 안의 상대 경로를 사용한다.
 
