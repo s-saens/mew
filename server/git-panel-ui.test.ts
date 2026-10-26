@@ -106,6 +106,8 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     let worktreeTarget: string | undefined
     const branchRefs = [
       { name: 'main', ref: 'refs/heads/main', kind: 'local' },
+      { name: 'master', ref: 'refs/heads/master', kind: 'local' },
+      { name: 'aaa/delete', ref: 'refs/heads/aaa/delete', kind: 'local' },
       { name: 'feature/searchable', ref: 'refs/heads/feature/searchable', kind: 'local' },
       { name: 'origin/remote-topic', ref: 'refs/remotes/origin/remote-topic', kind: 'remote' },
       { name: 'v1', ref: 'refs/tags/v1', kind: 'tag' },
@@ -131,6 +133,11 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
           if (route.request().method() === 'GET') { reads.push(url.pathname + url.search); return route.fulfill({ json: { branches: branchRefs } }) }
           const body = route.request().postDataJSON(); branchRequests.push(body)
           if (branchFailure) return route.fulfill({ status: 409, json: { error: 'Local changes would be overwritten' } })
+          if (body.action === 'delete') {
+            const index = branchRefs.findIndex(ref => ref.ref === body.ref)
+            if (index >= 0) branchRefs.splice(index, 1)
+            return route.fulfill({ json: branchInfo() })
+          }
           if (worktreeTarget) return route.fulfill({ json: { ...branchInfo(), worktreePath: worktreeTarget } })
           repositoryBranch = body.action === 'create' ? body.name : body.ref.replace('refs/heads/', '').replace('refs/remotes/origin/', '')
           if (!branchRefs.some(ref => ref.ref === `refs/heads/${repositoryBranch}`)) branchRefs.push({ name: repositoryBranch, ref: `refs/heads/${repositoryBranch}`, kind: 'local' })
@@ -732,12 +739,24 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
       await branchButton.click()
       const branchPopup = page.getByRole('dialog', { name: '브랜치 선택', exact: true })
       const branchSearch = branchPopup.getByRole('combobox', { name: '브랜치 검색' })
-      await branchPopup.getByRole('option', { name: 'main', exact: true }).waitFor()
+      await branchPopup.getByRole('row', { name: 'main', exact: true }).waitFor()
       const box = await bounds(branchPopup)
       assert.ok(box.x >= 0 && box.x + box.width <= width, 'branch dropdown fits the viewport')
-      assert.equal(await branchPopup.getByRole('option').count(), 3, 'tags are bases, not branch checkout entries')
+      assert.equal(await branchPopup.getByRole('row').count(), 5, 'tags are bases, not branch checkout entries')
+      assert.deepEqual(await branchPopup.getByRole('row').allTextContents(), ['main', 'master', 'aaa/delete', 'feature/searchable', 'origin/remote-topic원격'])
+      for (const name of ['main', 'master', 'origin/remote-topic']) assert.equal(await branchPopup.getByRole('button', { name: `브랜치 삭제: ${name}`, exact: true }).count(), 0)
+      await branchSearch.fill('aaa')
+      await branchSearch.press('ArrowRight')
+      const deleteButton = branchPopup.getByRole('button', { name: '브랜치 삭제: aaa/delete', exact: true })
+      assert.equal(await deleteButton.evaluate(el => el === el.ownerDocument.activeElement), true)
+      await deleteButton.press('Enter')
+      await branchPopup.getByText('브랜치를 삭제할까요?', { exact: true }).waitFor()
+      assert.equal(await branchPopup.getByRole('button', { name: '취소', exact: true }).evaluate(el => el === el.ownerDocument.activeElement), true, 'deletion confirmation initially focuses Cancel')
+      await screenshot(`branch-delete-${width}`)
+      await branchPopup.getByRole('button', { name: '취소', exact: true }).click()
+      assert.equal(branchRequests.length, 0, 'canceling deletion does not switch or delete a branch')
       await branchSearch.fill('SEARCHABLE')
-      assert.equal(await branchPopup.getByRole('option').count(), 1)
+      assert.equal(await branchPopup.getByRole('row').count(), 1)
       await branchSearch.fill('no-match')
       await branchPopup.getByText('브랜치가 없습니다', { exact: true }).waitFor()
       await branchSearch.fill('')
@@ -752,7 +771,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     await branchButton.click()
     const branchPopup = page.getByRole('dialog', { name: '브랜치 선택', exact: true })
     const branchSearch = branchPopup.getByRole('combobox', { name: '브랜치 검색' })
-    await branchPopup.getByRole('option', { name: 'main', exact: true }).waitFor()
+    await branchPopup.getByRole('row', { name: 'main', exact: true }).waitFor()
     await branchSearch.fill('searchable')
     await branchSearch.press('Enter')
     await branchPopup.waitFor({ state: 'hidden' })
@@ -771,9 +790,24 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
       { path: '', action: 'switch', ref: 'refs/heads/feature/searchable', workspace: '/fixture' },
       { path: '', action: 'create', ref: 'refs/tags/v1', name: 'feature/new', workspace: '/fixture' },
     ])
+    await branchButton.click()
+    assert.equal(await branchPopup.getByRole('button', { name: '브랜치 삭제: feature/new', exact: true }).isDisabled(), true, 'the current branch cannot be deleted')
+    await branchPopup.getByRole('button', { name: '브랜치 삭제: aaa/delete', exact: true }).click()
+    branchFailure = true
+    await branchPopup.getByRole('button', { name: '삭제', exact: true }).click()
+    await branchPopup.getByRole('alert').getByText('Local changes would be overwritten').waitFor()
+    assert.equal(await branchPopup.isVisible(), true, 'failed deletion keeps the confirmation and error available')
+    branchFailure = false
+    await branchPopup.getByRole('button', { name: '삭제', exact: true }).click()
+    await branchPopup.waitFor({ state: 'hidden' })
+    assert.equal(repositoryBranch, 'feature/new', 'deletion never switches branches')
+    assert.equal(branchRefs.some(ref => ref.name === 'aaa/delete'), false)
+    await branchButton.click()
+    await branchPopup.getByRole('row', { name: 'aaa/delete', exact: true }).waitFor({ state: 'detached' })
+    await page.keyboard.press('Escape')
     branchFailure = true
     await branchButton.click()
-    await branchPopup.getByRole('option', { name: 'main', exact: true }).click()
+    await branchPopup.getByRole('row', { name: 'main', exact: true }).click()
     await branchPopup.getByRole('alert').getByText('Local changes would be overwritten').waitFor()
     assert.equal(await branchPopup.isVisible(), true, 'failed switch keeps recovery controls open')
     assert.equal(await branchButton.textContent(), 'feature/new')
@@ -782,7 +816,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     assert.equal(await page.getByLabel('커밋 제목', { exact: true }).inputValue(), 'MOBILE DRAFT')
     worktreeTarget = '/fixture/.worktrees/main'
     await branchButton.click()
-    await branchPopup.getByRole('option', { name: 'main', exact: true }).click()
+    await branchPopup.getByRole('row', { name: 'main', exact: true }).click()
     await branchPopup.waitFor({ state: 'hidden' })
     assert.equal(await page.evaluate('window.openedWorktree'), worktreeTarget)
     assert.equal(repositoryBranch, 'feature/new', 'worktree navigation does not switch the source branch')
@@ -860,7 +894,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     assert.equal(submitted.description, 'Commit from the title row')
     assert.deepEqual(submitted.files, workingFiles.map(file => file.path))
     await composer.waitFor({ state: 'hidden' })
-    assert.deepEqual(writes, [...Array(3).fill('/api/git/remote'), ...Array(4).fill('/api/git/branches'), '/api/git/commit'], 'writes are intercepted by the fixture')
+    assert.deepEqual(writes, [...Array(3).fill('/api/git/remote'), ...Array(6).fill('/api/git/branches'), '/api/git/commit'], 'writes are intercepted by the fixture')
     const discardButton = page.getByRole('button', { name: '선택한 변경사항 취소', exact: true })
     await page.getByRole('checkbox', { name: '변경 파일 전체 선택' }).uncheck()
     assert.equal(await discardButton.isDisabled(), true)

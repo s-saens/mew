@@ -77,12 +77,15 @@ export async function repositoryBranches(project: string, relPath: string): Prom
     if (symbolic) return []
     const kind = ref.startsWith('refs/heads/') ? 'local' : ref.startsWith('refs/remotes/') ? 'remote' : 'tag'
     return [{ ref, kind, name: ref.replace(/^refs\/(heads|remotes|tags)\//, '') } as GitBranchRef]
+  }).sort((left, right) => {
+    const rank = (item: GitBranchRef) => item.kind === 'remote' ? 3 : item.kind === 'tag' ? 2 : /^(main|master)$/.test(item.name) ? 0 : 1
+    return rank(left) - rank(right) || left.name.localeCompare(right.name, 'en')
   })
 }
 
 /** Local operations only: never fetch, force checkout, stash or discard changes. */
 export async function runBranchAction(project: string, relPath: string, action: unknown, refInput: unknown, nameInput?: unknown): Promise<GitRepositoryInfo & { worktreePath?: string }> {
-  if (action !== 'switch' && action !== 'create') throw new GitWorkbenchError('지원하지 않는 Git 작업입니다')
+  if (action !== 'switch' && action !== 'create' && action !== 'delete') throw new GitWorkbenchError('지원하지 않는 Git 작업입니다')
   const { abs, git } = repository(project, relPath)
   const key = fs.realpathSync(abs)
   if (remoteOperations.has(key)) throw new GitWorkbenchError('Git 원격 작업이 이미 실행 중입니다')
@@ -90,7 +93,14 @@ export async function runBranchAction(project: string, relPath: string, action: 
   try {
     const refs = await repositoryBranches(project, relPath)
     const selected = refs.find(item => item.ref === refInput)
-    if (action === 'switch') {
+    if (action === 'delete') {
+      if (!selected || selected.kind !== 'local' || /^(main|master)$/.test(selected.name)) throw new GitWorkbenchError('main·master와 원격 브랜치는 삭제할 수 없습니다')
+      const entries = (await git.raw(['worktree', 'list', '--porcelain', '-z'])).split('\0')
+      if (entries.includes(`branch ${selected.ref}`)) throw new GitWorkbenchError('현재 폴더나 다른 worktree에서 사용 중인 브랜치는 삭제할 수 없습니다')
+      const merged = await git.raw(['for-each-ref', '--merged=HEAD', '--format=%(refname)', 'refs/heads/'])
+      if (!merged.trim().split('\n').includes(selected.ref)) throw new GitWorkbenchError('현재 브랜치에 병합되지 않은 커밋이 있어 삭제할 수 없습니다')
+      await git.raw(['branch', '-d', '--', selected.name])
+    } else if (action === 'switch') {
       if (!selected || selected.kind === 'tag') throw new GitWorkbenchError('전환할 브랜치를 선택하세요')
       if (selected.kind === 'local') {
         const entries = (await git.raw(['worktree', 'list', '--porcelain', '-z'])).split('\0\0')

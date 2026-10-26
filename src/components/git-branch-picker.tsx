@@ -3,12 +3,12 @@ import { createPortal } from 'react-dom'
 import { openDropdownOnArrow, canAutoFocusInput, SelectField, useOverlayDismiss } from '@mew/ui'
 import { uiText } from '@mew/ui/i18n-core'
 import { useUiLocale } from '@mew/ui/i18n'
-import { Check, GitBranch, NavArrowDown, Plus, Search } from 'iconoir-react'
+import { Check, GitBranch, NavArrowDown, Plus, Search, Xmark } from 'iconoir-react'
 import { fetchGitBranches, type GitBranchRef, type GitRepositoryInfo } from '../api/client'
 
 export function GitBranchPicker({ info, project, path, disabled, busy, onAction }: {
   info: GitRepositoryInfo | null; project: string; path: string; disabled: boolean; busy: boolean
-  onAction: (action: 'switch' | 'create', ref: string, name?: string) => Promise<void>
+  onAction: (action: 'switch' | 'create' | 'delete', ref: string, name?: string) => Promise<void>
 }) {
   useUiLocale()
   const id = useId()
@@ -16,6 +16,9 @@ export function GitBranchPicker({ info, project, path, disabled, busy, onAction 
   const [open, setOpen] = useState(false), [creating, setCreating] = useState(false)
   const [query, setQuery] = useState(''), [name, setName] = useState(''), [base, setBase] = useState('HEAD')
   const [refs, setRefs] = useState<GitBranchRef[]>([]), [loading, setLoading] = useState(false)
+  const [deleting, setDeleting] = useState<GitBranchRef | null>(null)
+  const deleteCancel = useRef<HTMLButtonElement>(null)
+  useEffect(() => { if (deleting) deleteCancel.current?.focus({ preventScroll: true }) }, [deleting])
   const [error, setError] = useState(''), [active, setActive] = useState(0)
   const [position, setPosition] = useState<CSSProperties | null>(null)
   useEffect(() => { if (creating && canAutoFocusInput()) nameField.current?.focus({ preventScroll: true }) }, [creating])
@@ -65,7 +68,7 @@ export function GitBranchPicker({ info, project, path, disabled, busy, onAction 
   const show = async () => {
     if (disabled || busy) return
     const version = ++request.current
-    setOpen(true); setCreating(false); setQuery(''); setName(''); setBase('HEAD'); setError(''); setActive(0); setLoading(true)
+    setOpen(true); setCreating(false); setDeleting(null); setQuery(''); setName(''); setBase('HEAD'); setError(''); setActive(0); setLoading(true)
     try {
       const result = await fetchGitBranches(path, project)
       if (request.current === version) setRefs(result.branches)
@@ -74,8 +77,8 @@ export function GitBranchPicker({ info, project, path, disabled, busy, onAction 
   }
   const branches = refs.filter(ref => ref.kind !== 'tag' && ref.name.toLocaleLowerCase().includes(query.toLocaleLowerCase()))
   const activeIndex = Math.min(active, Math.max(0, branches.length - 1))
-  useEffect(() => { if (open && !creating) popup.current?.querySelector(`[id="${id}-${activeIndex}"]`)?.scrollIntoView({ block: 'nearest' }) }, [open, creating, id, activeIndex])
-  const execute = async (action: 'switch' | 'create', ref: string, branchName?: string) => {
+  useEffect(() => { if (open && !creating && !deleting) popup.current?.querySelector(`[id="${id}-${activeIndex}"]`)?.scrollIntoView({ block: 'nearest' }) }, [open, creating, deleting, id, activeIndex])
+  const execute = async (action: 'switch' | 'create' | 'delete', ref: string, branchName?: string) => {
     if (busy || pending.current || loading) return
     pending.current = true
     const version = request.current
@@ -95,6 +98,9 @@ export function GitBranchPicker({ info, project, path, disabled, busy, onAction 
     if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key) && !event.ctrlKey && !event.metaKey) {
       event.preventDefault()
       setActive(event.key === 'Home' ? 0 : event.key === 'End' ? branches.length - 1 : Math.max(0, Math.min(branches.length - 1, activeIndex + (event.key === 'ArrowDown' ? 1 : -1))))
+    } else if (event.key === 'ArrowRight') {
+      const row = branches[activeIndex]
+      if (row?.kind === 'local' && !/^(main|master)$/.test(row.name)) { event.preventDefault(); popup.current?.querySelector<HTMLButtonElement>(`[id="${id}-${activeIndex}-delete"]`)?.focus() }
     } else if (event.key === 'Enter') { event.preventDefault(); if (branches[activeIndex]) pick(branches[activeIndex]) }
   }
   const bases = [{ value: 'HEAD', label: uiText('현재 HEAD') }, ...refs.map(ref => ({ value: ref.kind === 'tag' ? `tag:${ref.name}` : ref.name, label: ref.kind === 'tag' ? `tag: ${ref.name}` : ref.name }))]
@@ -109,10 +115,17 @@ export function GitBranchPicker({ info, project, path, disabled, busy, onAction 
       <NavArrowDown width={12} height={12} className="shrink-0" aria-hidden="true" />
     </button>
     {open && position && createPortal(<div ref={popup} id={id} role="dialog" aria-label={uiText('브랜치 선택')} style={position}
-      onKeyDown={event => { if (event.key === 'Tab') { const target = event.target as Element; if (event.shiftKey && target === popup.current?.querySelector('input') || !event.shiftKey && target === popup.current?.querySelector('[data-branch-last]')) close(false) } }}
+      onKeyDown={event => { if (event.key === 'Tab') { const target = event.target as Element; if (event.shiftKey && target === (popup.current?.querySelector('input') ?? deleteCancel.current) || !event.shiftKey && target === popup.current?.querySelector('[data-branch-last]')) close(false) } }}
       className="fixed z-[1200] flex flex-col overflow-y-auto overscroll-contain rounded-lg border border-edge-bright bg-surface-raised text-xs text-ink">
       {error && <p role="alert" className="break-words border-b border-edge px-2.5 py-2 text-danger">{error}</p>}
-      {creating ? <form className="flex flex-col gap-2 p-2" onSubmit={event => { event.preventDefault(); if (name.trim() && base.trim()) void execute('create', baseRef, name.trim()) }}>
+      {deleting ? <div className="flex flex-col gap-2 p-2.5">
+        <p className="font-medium">{uiText('브랜치를 삭제할까요?')}</p>
+        <p className="break-all text-ink-secondary">{deleting.name}</p>
+        <div className="flex justify-end gap-2">
+          <button ref={deleteCancel} type="button" disabled={busy} onClick={() => { setDeleting(null); setError(''); if (canAutoFocusInput()) window.setTimeout(() => search.current?.focus(), 0) }} className="min-h-8 rounded px-2 hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:min-h-10">{uiText('취소')}</button>
+          <button data-branch-last type="button" disabled={busy} onClick={() => void execute('delete', deleting.ref)} className="min-h-8 rounded bg-danger-strong px-2 text-ink-on-danger hover:bg-danger focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-40 pointer-coarse:min-h-10">{uiText('삭제')}</button>
+        </div>
+      </div> : creating ? <form className="flex flex-col gap-2 p-2" onSubmit={event => { event.preventDefault(); if (name.trim() && base.trim()) void execute('create', baseRef, name.trim()) }}>
         <label className="flex flex-col gap-1">{uiText('새 브랜치 이름')}<input aria-label={uiText('새 브랜치 이름')} value={name} disabled={busy} spellCheck={false} autoComplete="off"
           ref={nameField}
           onChange={event => setName(event.target.value)} className="h-8 min-w-0 rounded border border-edge-strong bg-surface px-2 text-xs focus-visible:outline-2 focus-visible:outline-accent" /></label>
@@ -124,18 +137,23 @@ export function GitBranchPicker({ info, project, path, disabled, busy, onAction 
         </div>
       </form> : <>
         <div className="shrink-0 border-b border-edge p-1.5"><div className="flex items-center gap-1.5 rounded border border-edge-strong bg-surface px-2 focus-within:border-accent">
-          <Search width={13} height={13} className="shrink-0 text-ink-muted" aria-hidden="true" /><input ref={search} role="combobox" aria-label={uiText('브랜치 검색')} aria-expanded="true" aria-controls={`${id}-list`} aria-autocomplete="list"
+          <Search width={13} height={13} className="shrink-0 text-ink-muted" aria-hidden="true" /><input ref={search} role="combobox" aria-haspopup="grid" aria-label={uiText('브랜치 검색')} aria-expanded="true" aria-controls={`${id}-list`} aria-autocomplete="list"
           aria-activedescendant={branches.length ? `${id}-${activeIndex}` : undefined} disabled={busy} value={query} spellCheck={false} autoComplete="off" placeholder={uiText('브랜치 검색')}
           onChange={event => { setQuery(event.target.value); setActive(0) }} onKeyDown={onKeyDown}
           className="h-7 min-w-0 flex-1 bg-transparent text-xs placeholder:text-ink-muted focus-visible:outline-none pointer-coarse:h-9" /></div></div>
-        <div id={`${id}-list`} role="listbox" data-inline-listbox aria-label={uiText('브랜치')} aria-busy={loading} className="max-h-60 min-h-0 overflow-y-auto overscroll-contain p-1">
-          {branches.map((ref, index) => <button type="button" tabIndex={-1} key={ref.ref} id={`${id}-${index}`} role="option" aria-selected={!info?.detached && ref.ref === `refs/heads/${info?.branch}`} disabled={busy || loading}
-            onPointerDown={event => event.preventDefault()} onClick={() => pick(ref)} title={ref.name}
-            className={`flex min-h-7 w-full items-center gap-1.5 rounded px-1.5 text-left hover:bg-surface-hover pointer-coarse:min-h-10 ${index === activeIndex ? 'bg-surface-hover' : ''}`}>
-            <span className="flex w-3.5 shrink-0 items-center text-accent">{!info?.detached && ref.ref === `refs/heads/${info?.branch}` ? <Check width={14} height={14} aria-hidden="true" /> : <GitBranch width={13} height={13} className="text-ink-muted" aria-hidden="true" />}</span>
-            <span className={`min-w-0 flex-1 truncate ${!info?.detached && ref.ref === `refs/heads/${info?.branch}` ? 'font-medium text-accent' : ''}`}>{ref.name}</span>
-            {ref.kind === 'remote' && <span className="shrink-0 rounded bg-surface px-1 text-[10px] leading-4 text-ink-secondary">{uiText('원격')}</span>}
-          </button>)}
+        <div id={`${id}-list`} role="grid" data-inline-listbox aria-label={uiText('브랜치')} aria-busy={loading} className="max-h-60 min-h-0 overflow-y-auto overscroll-contain p-1">
+          {branches.map((ref, index) => <div key={ref.ref} id={`${id}-${index}`} role="row" aria-label={ref.name} aria-selected={!info?.detached && ref.ref === `refs/heads/${info?.branch}`} className={`flex min-h-7 items-center rounded hover:bg-surface-hover pointer-coarse:min-h-10 ${index === activeIndex ? 'bg-surface-hover' : ''}`}>
+            <div role="gridcell" className="min-w-0 flex-1">
+              <button type="button" tabIndex={-1} disabled={busy || loading} onPointerDown={event => event.preventDefault()} onClick={() => pick(ref)} title={ref.name} className="flex min-h-7 w-full items-center gap-1.5 rounded px-1.5 text-left focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:min-h-10">
+                <span className="flex w-3.5 shrink-0 items-center text-accent">{!info?.detached && ref.ref === `refs/heads/${info?.branch}` ? <Check width={14} height={14} aria-hidden="true" /> : <GitBranch width={13} height={13} className="text-ink-muted" aria-hidden="true" />}</span>
+                <span className={`min-w-0 flex-1 truncate ${!info?.detached && ref.ref === `refs/heads/${info?.branch}` ? 'font-medium text-accent' : ''}`}>{ref.name}</span>
+                {ref.kind === 'remote' && <span className="shrink-0 rounded bg-surface px-1 text-[10px] leading-4 text-ink-secondary">{uiText('원격')}</span>}
+              </button>
+            </div>
+            <div role="gridcell" className="shrink-0">
+              {ref.kind === 'local' && !/^(main|master)$/.test(ref.name) && <button id={`${id}-${index}-delete`} type="button" aria-label={uiText('브랜치 삭제: {name}', { name: ref.name })} data-tip={uiText('브랜치 삭제: {name}', { name: ref.name })} disabled={busy || loading || (!info?.detached && ref.ref === `refs/heads/${info?.branch}`)} onClick={() => { setDeleting(ref); setError('') }} onKeyDown={event => { if (event.key === 'ArrowLeft') { event.preventDefault(); search.current?.focus() } }} className="mr-0.5 flex h-7 w-7 items-center justify-center rounded text-ink-secondary hover:bg-surface-hover hover:text-danger focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-40 pointer-coarse:h-10 pointer-coarse:w-10"><Xmark width={13} height={13} aria-hidden="true" /></button>}
+            </div>
+          </div>)}
           {(loading || !branches.length) && <p role="status" className="px-2 py-2 text-ink-secondary">{loading ? uiText('브랜치를 불러오는 중…') : uiText('브랜치가 없습니다')}</p>}
         </div>
         <button data-branch-last type="button" disabled={busy || loading || !!error} onClick={() => setCreating(true)} className="flex min-h-8 shrink-0 items-center gap-1.5 border-t border-edge px-2.5 text-left hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:min-h-10">

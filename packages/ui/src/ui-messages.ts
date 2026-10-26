@@ -465,6 +465,8 @@ export const uiMessages = {
   "확인 중…": ["Confirming…", "正在确认…", "確認中…"],
   "Git 진행 상황 연결이 끊겼습니다. 저장소 상태를 확인하세요.": ["Git progress connection was lost. Check the repository state.", "Git 进度连接已断开。请检查仓库状态。", "Git の進捗接続が切れました。リポジトリの状態を確認してください。"],
 
+  "브랜치를 삭제할까요?": ["Delete this branch?", "删除此分支？", "このブランチを削除しますか？"],
+  "브랜치 삭제: {name}": ["Delete branch: {name}", "删除分支：{name}", "ブランチを削除: {name}"],
   "브랜치 선택": ["Select branch", "选择分支", "ブランチを選択"],
   "브랜치 검색": ["Search branches", "搜索分支", "ブランチを検索"],
   "커밋 기록 검색": ["Search commit history", "搜索提交历史", "コミット履歴を検索"],

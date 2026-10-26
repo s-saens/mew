@@ -595,7 +595,7 @@ export function GitWorkbench({ project, repositoryPath, onNotice, onBack, onOpen
         ? detail?.subject ?? uiText("커밋 상세")
         : view.file.path
 
-  const changeBranch = async (action: 'switch' | 'create', ref: string, name?: string) => {
+  const changeBranch = async (action: 'switch' | 'create' | 'delete', ref: string, name?: string) => {
     if (busy || remotePending.current || loading || aiOpen || !info?.workspace) throw new Error(uiText('Git 작업이 이미 실행 중입니다'))
     remotePending.current = true
     refreshVersion.current++

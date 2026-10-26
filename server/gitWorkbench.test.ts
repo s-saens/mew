@@ -288,7 +288,7 @@ test('branch picker lists refs, creates from explicit bases and switches without
   await git.raw(['update-ref', 'refs/remotes/origin/topic', base])
   await git.raw(['symbolic-ref', 'refs/remotes/origin/HEAD', 'refs/remotes/origin/topic'])
   const refs = await repositoryBranches(paths.WORKSPACE_PROJECT, rel)
-  assert.deepEqual(refs.map(ref => ref.ref), ['refs/heads/main', 'refs/remotes/origin/topic', 'refs/tags/v1'])
+  assert.deepEqual(refs.map(ref => ref.ref), ['refs/heads/main', 'refs/tags/v1', 'refs/remotes/origin/topic'])
   const created = await runBranchAction(paths.WORKSPACE_PROJECT, rel, 'create', 'refs/tags/v1', 'feature/from-tag')
   assert.equal(created.branch, 'feature/from-tag'); assert.equal((await git.revparse(['HEAD'])).trim(), base)
   fs.writeFileSync(path.join(cwd, 'note.txt'), 'unsaved changes\n'); await git.add('note.txt')

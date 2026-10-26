@@ -562,7 +562,7 @@ export function fetchGitBranches(path: string, project: string): Promise<{ branc
   return mewFetch(`/api/git/branches?path=${encodeURIComponent(path)}&${projectQs(project)}`).then(json<{ branches: GitBranchRef[] }>)
 }
 
-export function runGitBranchAction(path: string, action: 'switch' | 'create', ref: string, name: string | undefined, project: string, workspace: string): Promise<GitRepositoryInfo & { worktreePath?: string }> {
+export function runGitBranchAction(path: string, action: 'switch' | 'create' | 'delete', ref: string, name: string | undefined, project: string, workspace: string): Promise<GitRepositoryInfo & { worktreePath?: string }> {
   return gitFetch(`/api/git/branches?${projectQs(project)}`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ path, action, ref, name, workspace }),

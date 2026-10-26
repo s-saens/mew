@@ -8,7 +8,7 @@ updated: "2026-10-26"
 status_hash: "ad2d450aae96362a9d082f3989ccd04643632b17559700c16044ef32ca54d690"
 files: ["src/components/GitWorkbench.tsx", "src/utils/git-graph.ts", "src/components/git-diff-editor.tsx", "src/components/git-changes-menu.tsx", "src/utils/git-diff-tabs.ts", "src/components/git-branch-picker.tsx", "src/components/git-panel.tsx", "src/components/github-account.tsx", "server/github-auth.ts", "server/github-auth-routes.ts", "src/components/git-ai-commit-dialog.tsx", "server/gitWorkbench.ts", "server/git-ai-commit.ts", "server/git-commit-analysis.ts", "server/git-commit-packets.ts", "server/git-diff-codec.ts", "server/git-change-intent.ts", "server/git-change-intent-cli.ts", "server/git-ai-commit-runner.ts", "server/git-ai-commit-routes.ts"]
 commits: []
-description: "Ctrl/Cmd+G로 여는 현재 프로젝트의 변경 파일·현재 브랜치 커밋 기록의 기본 50:50 배치·와일드카드 검색·일반선택과 커밋대상선택·에디터 diff·분기와 합류의 연결선·열·색상을 유지하는 커밋 그래프, 선택 변경 커밋·취소, 햄버거 메뉴와 표면을 맞춘 타이틀바의 조밀한 브랜치 검색·선택·생성, 기존 worktree로의 프로젝트 전환과 Pull·Push를 다루는 기능 계약. 계정 연결과 AI 작업 단위 커밋의 승인·범위·JSON 응답 자동 복구 규칙을 포함한다."
+description: "Ctrl/Cmd+G로 여는 현재 프로젝트의 변경 파일·현재 브랜치 커밋 기록의 기본 50:50 배치·와일드카드 검색·일반선택과 커밋대상선택·에디터 diff·분기와 합류의 연결선·열·색상을 유지하는 커밋 그래프, 선택 변경 커밋·취소, 햄버거 메뉴와 표면을 맞춘 타이틀바의 조밀한 브랜치 검색·선택·생성·안전한 로컬 삭제, 기존 worktree로의 프로젝트 전환과 Pull·Push를 다루는 기능 계약. 계정 연결과 AI 작업 단위 커밋의 승인·범위·JSON 응답 자동 복구 규칙을 포함한다."
 상위파일:
   - "MOC.md"
   - "_Git·변경 이력.md"
@@ -64,6 +64,8 @@ description: "Ctrl/Cmd+G로 여는 현재 프로젝트의 변경 파일·현재 
 - AI 자동 커밋은 선택 범위 밖 변경을 포함하거나 push하지 않는다.
 - AI 자동 커밋은 Git과 에이전트 기능 권한이 모두 필요하다.
 - 선택한 로컬 브랜치가 다른 worktree에서 체크아웃되어 있으면 해당 절대 경로를 기존 프로젝트 열기 절차로 연다. 프로젝트 전환은 owner 권한을 따르며, 파일 탐색기·에디터·Git 패널이 대상 프로젝트로 함께 전환된다. 현재 폴더의 브랜치와 양쪽 미커밋 변경은 그대로 유지한다. 대상 폴더가 없거나 열기에 실패하면 오류를 표시하고 현재 프로젝트를 유지한다. 다른 worktree가 없으면 기존처럼 현재 폴더에서 브랜치를 전환한다.
+- 브랜치 선택 목록은 로컬 `main`·`master`를 먼저, 나머지 로컬 브랜치를 그다음, 원격 브랜치를 마지막에 표시하며 그룹 안에서는 이름순으로 정렬한다. 로컬 `main`·`master`와 모든 원격 브랜치에는 삭제 버튼을 두지 않는다. 나머지 로컬 브랜치 오른쪽 X에서 이름을 확인하고 삭제하며, 현재 브랜치의 X는 비활성화한다. 검색·위아래 키로 행을 선택하고 오른쪽 키로 삭제 버튼에 접근하며 왼쪽 키로 검색창에 돌아간다. 삭제 확인은 취소에 초점을 두고, 실패 시 확인 화면과 오류를 유지한다.
+- 로컬 삭제도 기존 Git 권한·프로젝트 범위 검사를 따른다. 서버는 보호 브랜치·원격·태그·없는 ref, 현재 폴더나 다른 worktree에서 사용 중인 브랜치, 현재 HEAD에 병합되지 않은 커밋이 있는 브랜치를 거부한다. upstream에 같은 커밋이 있어도 HEAD 미통합이면 거부하며, 강제 삭제·worktree 삭제·원격 변경은 수행하지 않는다. 성공 시 목록을 갱신하고 현재 브랜치·미커밋 변경·커밋 초안은 유지한다.
 - 브랜치 생성·전환은 Git 권한과 프로젝트 전체 파일 접근이 필요하다. 로컬 작업이라 GitHub 연결·fetch를 요구하지 않는다. 강제 전환·자동 stash·변경 폐기는 하지 않으며 Git이 전환을 거부하면 작업 내용과 입력을 유지하고 오류를 표시한다.
 - Pull/Push는 Git 권한과 프로젝트 전체 파일 접근, 원격 추적 브랜치가 필요하다. Pull은 fast-forward만 허용하며 Push는 현재 브랜치만 강제 덮어쓰기 없이 보낸다.
 
@@ -139,6 +141,8 @@ description: "Ctrl/Cmd+G로 여는 현재 프로젝트의 변경 파일·현재 
 
 - 2026-10-06: 서버·번역·권한·Git 패널 Chromium 총 13개 검사를 통과했다. 선택 범위 밖 stage 보존, 삭제·이름 변경·새 파일·최초 커밋 전 취소, 잘못된 경로/폴더/미선택 원래 경로 거부, workspace·권한 차단, 확인 전 무요청·취소·Esc·실패 후 선택 유지·성공 후 목록 갱신을 확인했다. PC·모바일 확인창 캡처와 타입·대상 lint·UI detector·문서 경계/링크 검사도 통과했다.
 ## 검증
+
+- 2026-10-26: 브랜치 정렬·로컬 삭제와 기존 Git 이력·작업 회귀 12개 및 Git 패널 Chromium 검사 1개를 통과했다. 1440·320px 라이트·다크 화면에서 보호 브랜치·원격의 X 제외, 검색·키보드 접근, 삭제 확인·취소·오류 재시도, 현재 브랜치·초안 보존을 확인했다. 서버는 활성 worktree·HEAD 미병합 커밋과 upstream만 일치하는 미통합 커밋의 삭제를 거부했다. 타입·대상 린트(기존 경고)·UI 정적·diff 검사를 통과했다. 문서 description은 통과했으며 전체 링크 검사는 기존 태스크 목록의 누락된 문서 링크 1개로 실패했다. 앱 빌드·서버 재시작은 수행하지 않았다.
 
 - 2026-10-06: 화면을 포함하는 방문 이력에 대해 Git 패널 Chromium·패널 닫기 훅·모바일 패널 스택 13개 검사를 통과했다. TypeScript·대상 lint·UI detector·문서 링크 검사도 통과했다. 별도 `workspace-switch-ui.test.ts`는 모바일 `Select extra.md` 선택 대기에서 실패했으며 변경 전 `f5663ee`에서도 동일하게 재현했다.
 
