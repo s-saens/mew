@@ -20,6 +20,7 @@ export type ActionMenuProps = {
   label?: string
   trigger?: HTMLElement | SVGElement | null
   portalContainer?: HTMLElement | null
+  outsideIgnore?: () => Element | null
   ref?: Ref<HTMLDivElement>
   /** Compatibility marker for file explorer integrations. */
   fileMenu?: boolean
@@ -27,7 +28,7 @@ export type ActionMenuProps = {
 }
 
 /** Shared action popup. Feature wrappers supply actions, never menu styles. */
-export function ActionMenu({ x, y, onClose, children, label, trigger, portalContainer, ref: forwardedRef, fileMenu = false, variant = 'default' }: ActionMenuProps) {
+export function ActionMenu({ x, y, onClose, children, label, trigger, portalContainer, ref: forwardedRef, fileMenu = false, variant = 'default', outsideIgnore }: ActionMenuProps) {
   const marker = useRef<HTMLSpanElement>(null)
   const [container, setContainer] = useState<HTMLElement | null>(null)
   const previous = useRef<HTMLElement | SVGElement | null>(trigger ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null))
@@ -47,10 +48,13 @@ export function ActionMenu({ x, y, onClose, children, label, trigger, portalCont
   // 렌더된 실측 크기로 보이는 화면과 모바일 독 사이에 배치한다.
   const [pos, setPos] = useState<CSSProperties>({ left: x, top: y, maxHeight: 0, maxWidth: 0 })
 
+  const outsideIgnoreRef = useRef(outsideIgnore)
+  outsideIgnoreRef.current = outsideIgnore
+
   useEffect(() => {
     if (!container) return
     function onDown(e: PointerEvent) {
-      if (!ref.current || ref.current.contains(e.target as Node)) return
+      if (!ref.current || ref.current.contains(e.target as Node) || outsideIgnoreRef.current?.()?.contains(e.target as Node)) return
       e.preventDefault()
       e.stopPropagation()
       close()

@@ -28,8 +28,9 @@ export function ProjectSwitcher({ paths, activePath, fallbackLabel, canOpen, can
 }) {
   const { t } = useI18n()
   const trigger = useRef<HTMLButtonElement>(null)
+  const contextMenuElement = useRef<HTMLDivElement>(null)
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
-  const [contextMenu, setContextMenu] = useState<{ path: string; x: number; y: number } | null>(null)
+  const [contextMenu, setContextMenu] = useState<{ path: string; x: number; y: number; trigger: HTMLElement | null } | null>(null)
   const [editingPath, setEditingPath] = useState<string | null>(null)
   const iconTitleId = useId()
   const hold = useRef<{ timer: ReturnType<typeof setTimeout>; x: number; y: number } | null>(null)
@@ -51,10 +52,9 @@ export function ProjectSwitcher({ paths, activePath, fallbackLabel, canOpen, can
     trigger.current?.focus({ preventScroll: true })
     setEditingPath(path)
   }
-  function openContextMenu(path: string, x: number, y: number) {
+  function openContextMenu(path: string, x: number, y: number, origin: HTMLElement | null = trigger.current) {
     cancelHold()
-    setMenu(null)
-    setContextMenu({ path, x, y })
+    setContextMenu({ path, x, y, trigger: origin })
   }
   function openMenu() {
     if (!canOpen || !trigger.current) return
@@ -128,14 +128,14 @@ export function ProjectSwitcher({ paths, activePath, fallbackLabel, canOpen, can
         {content}
       </button> : <div data-project-switcher data-current-project={activePath ?? ''} title={activePath ?? label} className="flex h-full min-w-0 items-center gap-1.5 px-2.5 text-xs text-ink">{content}</div>}
     </div>
-    {canOpen && menu && <ActionMenu variant="header" x={menu.x} y={menu.y} label={t('project.choose')} trigger={trigger.current} onClose={() => setMenu(null)}>
+    {canOpen && menu && <ActionMenu variant="header" x={menu.x} y={menu.y} label={t('project.choose')} trigger={trigger.current} outsideIgnore={() => contextMenuElement.current} onClose={() => { setContextMenu(null); setMenu(null) }}>
       <ProjectOrder paths={paths} onReorder={onReorder} renderItem={(path, move) => <ActionMenuItem style={{ flex: 1, minWidth: 0, width: 'auto' }} data-project-option={path} title={path} role="menuitemradio" checked={path === activePath}
         icon={<span className="flex h-4 w-4 shrink-0 items-center justify-center" aria-hidden="true"><ProjectIcon icon={icons[path] ?? 'i:folder'} size={16} /></span>}
         hint={<span className="flex h-4 w-4 items-center justify-center">{path === activePath && <Check aria-hidden="true" />}</span>}
         onPointerEnter={() => { if (path !== activePath) onPreview?.(path) }} onFocus={() => { if (path !== activePath) onPreview?.(path) }}
         onClick={() => { if (path !== activePath) onActivate(path) }}
-        onContextMenu={event => { if (canChangeIcon) { event.preventDefault(); openContextMenu(path, event.clientX, event.clientY) } }}
-        onKeyDown={event => { if (onReorder && event.shiftKey && (event.key === 'ArrowUp' || event.key === 'ArrowDown')) { event.preventDefault(); event.stopPropagation(); move(event.key === 'ArrowUp' ? -1 : 1); return } if (canChangeIcon && (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10'))) { event.preventDefault(); const box = event.currentTarget.getBoundingClientRect(); openContextMenu(path, box.left, box.bottom) } }}>
+        onContextMenu={event => { if (canChangeIcon) { event.preventDefault(); openContextMenu(path, event.clientX, event.clientY, event.currentTarget) } }}
+        onKeyDown={event => { if (onReorder && event.shiftKey && (event.key === 'ArrowUp' || event.key === 'ArrowDown')) { event.preventDefault(); event.stopPropagation(); move(event.key === 'ArrowUp' ? -1 : 1); return } if (canChangeIcon && (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10'))) { event.preventDefault(); const box = event.currentTarget.getBoundingClientRect(); openContextMenu(path, box.left, box.bottom, event.currentTarget) } }}>
         <span className="min-w-0 flex-1 text-left"><span className="block truncate">{labelOf(path)}</span>
           {(labels.get(labelOf(path)) ?? 0) > 1 && <span className="block truncate text-[10px] text-ink-muted">{path}</span>}
         </span>
@@ -143,7 +143,7 @@ export function ProjectSwitcher({ paths, activePath, fallbackLabel, canOpen, can
       {paths.length > 0 && <ActionMenuSeparator />}
       <ActionMenuItem icon={<Plus />} onClick={onOpen}>{t('project.add')}</ActionMenuItem>
     </ActionMenu>}
-    {contextMenu && canChangeIcon && <ActionMenu key="project-actions" x={contextMenu.x} y={contextMenu.y} label={labelOf(contextMenu.path)} trigger={trigger.current} onClose={() => setContextMenu(null)}>
+    {contextMenu && canChangeIcon && <ActionMenu key="project-actions" x={contextMenu.x} y={contextMenu.y} label={labelOf(contextMenu.path)} ref={contextMenuElement} trigger={contextMenu.trigger} onClose={() => setContextMenu(null)}>
       <ActionMenuItem icon={<EditPencil />} onClick={() => editIcon(contextMenu.path)}>{t('project.edit')}</ActionMenuItem>
       {canOpen && onRemove && <ActionMenuItem icon={<Trash />} danger disabled={contextMenu.path === activePath && !paths.some(path => path !== activePath)} onClick={() => onRemove(contextMenu.path)}>{t('common.delete')}</ActionMenuItem>}
     </ActionMenu>}
@@ -175,7 +175,6 @@ function ProjectOrder({ paths, onReorder, renderItem }: {
   return paths.map((path, index) => {
     const { ref, ...handleProps } = drag.getItemProps(index)
     return <div key={path} ref={ref} role="none" data-project-row={path} className={`flex items-center ${drag.dragIndex === index ? 'opacity-60' : ''}`}>
-      {renderItem(path, direction => reorder(index, index + direction))}
       {onReorder && paths.length > 1 && <button type="button" {...handleProps}
         data-project-drag-handle={path} aria-label={`${labelOf(path)} · ${t('project.reorder')}`} data-tip={t('project.reorder')}
         onClick={event => { event.stopPropagation(); drag.consumeClick() }}
@@ -191,6 +190,7 @@ function ProjectOrder({ paths, onReorder, renderItem }: {
           <circle cx="4" cy="11" r="1" /><circle cx="8" cy="11" r="1" />
         </svg>
       </button>}
+      {renderItem(path, direction => reorder(index, index + direction))}
     </div>
   })
 }
