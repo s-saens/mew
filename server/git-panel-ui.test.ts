@@ -64,7 +64,7 @@ function Fixture(){
         registerHandle={noop} registerElement={noop} registerTabBar={noop} onFocus={noop} onActivate={editor.setActivePath} onPin={editor.pinTab} onCloseTab={editor.closeTab} onReorder={editor.reorderTabs} onSetViewMode={editor.setTabViewMode} onChangeContent={editor.updateTabContent}
         onOpenLink={noop} onOpenHistory={noop} onSetTocOpen={noop} onOpenSidebar={noop} onTabDragMove={noop} onTabDrop={noop}
         onOpenDiffFile={(project,path)=>{window.openedFile={project,path};editor.setActivePath(null);setForeground(null)}} /> : <><div className="h-9 shrink-0 border-b border-edge px-3 text-xs">README.md</div><textarea aria-label="편집기" className="h-full w-full bg-surface-deep p-3" defaultValue="문서 편집 중"/></>}</DockPanel>
-      <GitPanel visible={open} initialState={git} onChange={saveGit} navigation={{view:screen,onChange:setScreen,back}} onOpenDiff={target=>{window.openedDiff=target;editor.openFile(gitDiffTabPath(target),{preview:false,forceNewTab:true});setForeground(null)}} onNotice={message=>window.notices.push(message)} onClose={dismiss} onPanelFocus={()=>setForeground('git')} nextTabSignal={next} previousTabSignal={previous} closeTabSignal={close}/>
+      <GitPanel visible={open} initialState={git} onChange={saveGit} onOpenWorktree={async path=>{window.openedWorktree=path}} navigation={{view:screen,onChange:setScreen,back}} onOpenDiff={target=>{window.openedDiff=target;editor.openFile(gitDiffTabPath(target),{preview:false,forceNewTab:true});setForeground(null)}} onNotice={message=>window.notices.push(message)} onClose={dismiss} onPanelFocus={()=>setForeground('git')} nextTabSignal={next} previousTabSignal={previous} closeTabSignal={close}/>
     </DockWorkspace>
   </div>
 }
@@ -103,6 +103,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     })
     const branchRequests: { action: string; ref: string; name?: string; workspace: string; path: string }[] = []
     let branchFailure = false
+    let worktreeTarget: string | undefined
     const branchRefs = [
       { name: 'main', ref: 'refs/heads/main', kind: 'local' },
       { name: 'feature/searchable', ref: 'refs/heads/feature/searchable', kind: 'local' },
@@ -130,6 +131,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
           if (route.request().method() === 'GET') { reads.push(url.pathname + url.search); return route.fulfill({ json: { branches: branchRefs } }) }
           const body = route.request().postDataJSON(); branchRequests.push(body)
           if (branchFailure) return route.fulfill({ status: 409, json: { error: 'Local changes would be overwritten' } })
+          if (worktreeTarget) return route.fulfill({ json: { ...branchInfo(), worktreePath: worktreeTarget } })
           repositoryBranch = body.action === 'create' ? body.name : body.ref.replace('refs/heads/', '').replace('refs/remotes/origin/', '')
           if (!branchRefs.some(ref => ref.ref === `refs/heads/${repositoryBranch}`)) branchRefs.push({ name: repositoryBranch, ref: `refs/heads/${repositoryBranch}`, kind: 'local' })
           return route.fulfill({ json: branchInfo() })
@@ -778,6 +780,14 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     await page.keyboard.press('Escape')
     branchFailure = false
     assert.equal(await page.getByLabel('커밋 제목', { exact: true }).inputValue(), 'MOBILE DRAFT')
+    worktreeTarget = '/fixture/.worktrees/main'
+    await branchButton.click()
+    await branchPopup.getByRole('option', { name: 'main', exact: true }).click()
+    await branchPopup.waitFor({ state: 'hidden' })
+    assert.equal(await page.evaluate('window.openedWorktree'), worktreeTarget)
+    assert.equal(repositoryBranch, 'feature/new', 'worktree navigation does not switch the source branch')
+    assert.equal(await page.getByLabel('커밋 제목', { exact: true }).inputValue(), 'MOBILE DRAFT')
+    worktreeTarget = undefined
     const emitRemote = (event: unknown) => page.evaluate('window.gitStreamPush(' + JSON.stringify(JSON.stringify(event) + '\n') + ')')
     await page.evaluate('window.remoteStream=true')
     await push.click()
@@ -850,7 +860,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     assert.equal(submitted.description, 'Commit from the title row')
     assert.deepEqual(submitted.files, workingFiles.map(file => file.path))
     await composer.waitFor({ state: 'hidden' })
-    assert.deepEqual(writes, [...Array(3).fill('/api/git/remote'), ...Array(3).fill('/api/git/branches'), '/api/git/commit'], 'writes are intercepted by the fixture')
+    assert.deepEqual(writes, [...Array(3).fill('/api/git/remote'), ...Array(4).fill('/api/git/branches'), '/api/git/commit'], 'writes are intercepted by the fixture')
     const discardButton = page.getByRole('button', { name: '선택한 변경사항 취소', exact: true })
     await page.getByRole('checkbox', { name: '변경 파일 전체 선택' }).uncheck()
     assert.equal(await discardButton.isDisabled(), true)

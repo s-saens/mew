@@ -333,6 +333,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
   const [agentOpen, setAgentOpen] = useState(() => caps.agent && scopedBrowserStorage().getItem(AGENT_OPEN_KEY) === '1')
   const gitMounted = useRef(false)
   const [gitOpen, setGitOpen] = useState(() => caps.git && scopedBrowserStorage().getItem(GIT_OPEN_KEY) === '1')
+  const [gitWorktreeTarget, setGitWorktreeTarget] = useState<string | null>(null)
   const [remoteDesktopOpen, setRemoteDesktopOpen] = useState(false)
   const [requestedAgentTab, setRequestedAgentTab] = useState<AgentTab | null>(null)
   const [tasksOpen, setTasksOpen] = useState(false)
@@ -1422,6 +1423,13 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
   }, [agentOpen, terminalOpen, androidOpen, gitOpen, debuggerOpen, memoOpen, tasksOpen, canDebug, caps, auth.email, chatOpen, isGuest, rootProjectPath, sidebarOpen, sidebarView, tocOpen, workspaceUi.chrome, workspaceUiLoaded, workspacePanelSetters])
 
   useEffect(() => {
+    if (!gitWorktreeTarget || gitWorktreeTarget !== rootProjectPath || !workspaceUiLoaded
+      || chromeStateLoadedRootRef.current !== rootProjectPath) return
+    openWorkspacePanel('git')
+    setGitWorktreeTarget(null)
+  }, [gitWorktreeTarget, rootProjectPath, workspaceUiLoaded, openWorkspacePanel])
+
+  useEffect(() => {
     if (!noticeTarget || !workspaceUiLoaded || chromeStateLoadedRootRef.current !== rootProjectPath
       || (noticeTarget.workspacePath ?? noticeTarget.cwd) !== rootProjectPath) return
     // Project chrome restoration must finish before revealing the requested tab.
@@ -2302,6 +2310,10 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
           nextTabSignal={agentNextTabSignal} previousTabSignal={agentPreviousTabSignal}
         />}
         {caps.git && workspaceUiLoaded && gitMounted.current && <GitPanel visible={gitOpen} initialState={workspaceUi.git} onChange={saveGitPanelState}
+          onOpenWorktree={async path => {
+            if (!await openRootProject(path)) throw new Error(uiText('프로젝트를 열 수 없습니다'))
+            setGitWorktreeTarget(path)
+          }}
           navigation={{ view: gitView, onChange: changeGitView, back: navigateWorkspaceBack }}
           onNotice={showToast} onOpenDiff={target => {
             openFile(gitDiffTabPath(target), { preview: false, forceNewTab: true })

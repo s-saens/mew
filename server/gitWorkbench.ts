@@ -81,7 +81,7 @@ export async function repositoryBranches(project: string, relPath: string): Prom
 }
 
 /** Local operations only: never fetch, force checkout, stash or discard changes. */
-export async function runBranchAction(project: string, relPath: string, action: unknown, refInput: unknown, nameInput?: unknown): Promise<GitRepositoryInfo> {
+export async function runBranchAction(project: string, relPath: string, action: unknown, refInput: unknown, nameInput?: unknown): Promise<GitRepositoryInfo & { worktreePath?: string }> {
   if (action !== 'switch' && action !== 'create') throw new GitWorkbenchError('지원하지 않는 Git 작업입니다')
   const { abs, git } = repository(project, relPath)
   const key = fs.realpathSync(abs)
@@ -92,7 +92,17 @@ export async function runBranchAction(project: string, relPath: string, action: 
     const selected = refs.find(item => item.ref === refInput)
     if (action === 'switch') {
       if (!selected || selected.kind === 'tag') throw new GitWorkbenchError('전환할 브랜치를 선택하세요')
-      if (selected.kind === 'local') await git.raw(['switch', '--no-guess', '--', selected.name])
+      if (selected.kind === 'local') {
+        const entries = (await git.raw(['worktree', 'list', '--porcelain', '-z'])).split('\0\0')
+        for (const entry of entries) {
+          const fields = entry.split('\0')
+          const worktreePath = fields.find(field => field.startsWith('worktree '))?.slice(9)
+          if (worktreePath && fields.includes(`branch ${selected.ref}`) && fs.realpathSync(worktreePath) !== key) {
+            return { ...await repositoryInfo(project, relPath), worktreePath }
+          }
+        }
+        await git.raw(['switch', '--no-guess', '--', selected.name])
+      }
       else {
         const name = selected.name.slice(selected.name.indexOf('/') + 1)
         await git.raw(['switch', '--track', '-c', name, selected.ref])

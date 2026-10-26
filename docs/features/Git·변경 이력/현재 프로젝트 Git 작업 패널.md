@@ -4,11 +4,11 @@ parent: "mew-git"
 title: "현재 프로젝트 Git 작업 패널"
 status: "implemented"
 created: "2026-09-18"
-updated: "2026-10-23"
+updated: "2026-10-26"
 status_hash: "ad2d450aae96362a9d082f3989ccd04643632b17559700c16044ef32ca54d690"
 files: ["src/components/GitWorkbench.tsx", "src/utils/git-graph.ts", "src/components/git-diff-editor.tsx", "src/components/git-changes-menu.tsx", "src/utils/git-diff-tabs.ts", "src/components/git-branch-picker.tsx", "src/components/git-panel.tsx", "src/components/github-account.tsx", "server/github-auth.ts", "server/github-auth-routes.ts", "src/components/git-ai-commit-dialog.tsx", "server/gitWorkbench.ts", "server/git-ai-commit.ts", "server/git-commit-analysis.ts", "server/git-commit-packets.ts", "server/git-diff-codec.ts", "server/git-change-intent.ts", "server/git-change-intent-cli.ts", "server/git-ai-commit-runner.ts", "server/git-ai-commit-routes.ts"]
 commits: []
-description: "Ctrl/Cmd+G로 여는 현재 프로젝트의 변경 파일·커밋 기록의 기본 50:50 배치·와일드카드 검색·일반선택과 커밋대상선택·에디터 diff·분기와 합류의 연결선·열·색상을 유지하는 커밋 그래프, 선택 변경 커밋·취소, 햄버거 메뉴와 표면을 맞춘 타이틀바의 조밀한 브랜치 검색·선택·생성과 Pull·Push를 다루는 기능 계약. 계정 연결과 AI 작업 단위 커밋의 승인·범위·JSON 응답 자동 복구 규칙을 포함한다."
+description: "Ctrl/Cmd+G로 여는 현재 프로젝트의 변경 파일·커밋 기록의 기본 50:50 배치·와일드카드 검색·일반선택과 커밋대상선택·에디터 diff·분기와 합류의 연결선·열·색상을 유지하는 커밋 그래프, 선택 변경 커밋·취소, 햄버거 메뉴와 표면을 맞춘 타이틀바의 조밀한 브랜치 검색·선택·생성, 기존 worktree로의 프로젝트 전환과 Pull·Push를 다루는 기능 계약. 계정 연결과 AI 작업 단위 커밋의 승인·범위·JSON 응답 자동 복구 규칙을 포함한다."
 상위파일:
   - "MOC.md"
   - "_Git·변경 이력.md"
@@ -61,6 +61,7 @@ description: "Ctrl/Cmd+G로 여는 현재 프로젝트의 변경 파일·커밋 
 - AI 자동 커밋 실행은 선택 파일의 실제 분할 커밋을 승인하는 동작이다.
 - AI 자동 커밋은 선택 범위 밖 변경을 포함하거나 push하지 않는다.
 - AI 자동 커밋은 Git과 에이전트 기능 권한이 모두 필요하다.
+- 선택한 로컬 브랜치가 다른 worktree에서 체크아웃되어 있으면 해당 절대 경로를 기존 프로젝트 열기 절차로 연다. 프로젝트 전환은 owner 권한을 따르며, 파일 탐색기·에디터·Git 패널이 대상 프로젝트로 함께 전환된다. 현재 폴더의 브랜치와 양쪽 미커밋 변경은 그대로 유지한다. 대상 폴더가 없거나 열기에 실패하면 오류를 표시하고 현재 프로젝트를 유지한다. 다른 worktree가 없으면 기존처럼 현재 폴더에서 브랜치를 전환한다.
 - 브랜치 생성·전환은 Git 권한과 프로젝트 전체 파일 접근이 필요하다. 로컬 작업이라 GitHub 연결·fetch를 요구하지 않는다. 강제 전환·자동 stash·변경 폐기는 하지 않으며 Git이 전환을 거부하면 작업 내용과 입력을 유지하고 오류를 표시한다.
 - Pull/Push는 Git 권한과 프로젝트 전체 파일 접근, 원격 추적 브랜치가 필요하다. Pull은 fast-forward만 허용하며 Push는 현재 브랜치만 강제 덮어쓰기 없이 보낸다.
 

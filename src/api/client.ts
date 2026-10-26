@@ -562,11 +562,11 @@ export function fetchGitBranches(path: string, project: string): Promise<{ branc
   return mewFetch(`/api/git/branches?path=${encodeURIComponent(path)}&${projectQs(project)}`).then(json<{ branches: GitBranchRef[] }>)
 }
 
-export function runGitBranchAction(path: string, action: 'switch' | 'create', ref: string, name: string | undefined, project: string, workspace: string): Promise<GitRepositoryInfo> {
+export function runGitBranchAction(path: string, action: 'switch' | 'create', ref: string, name: string | undefined, project: string, workspace: string): Promise<GitRepositoryInfo & { worktreePath?: string }> {
   return gitFetch(`/api/git/branches?${projectQs(project)}`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ path, action, ref, name, workspace }),
-  }, project).then(json<GitRepositoryInfo>)
+  }, project).then(json<GitRepositoryInfo & { worktreePath?: string }>)
 }
 
 export async function runGitRemoteAction(path: string, action: 'pull' | 'push', project: string, workspace: string, onProgress?: (progress: GitRemoteProgress) => void): Promise<{ ok: true }> {

@@ -480,6 +480,7 @@ export const uiMessages = {
   "현재 HEAD": ["Current HEAD", "当前 HEAD", "現在の HEAD"],
   "생성 후 전환": ["Create and switch", "创建并切换", "作成して切り替え"],
   "전환 중…": ["Switching…", "正在切换…", "切り替え中…"],
+  "프로젝트를 열 수 없습니다": ["Unable to open the project", "无法打开项目", "プロジェクトを開けません"],
   "원격": ["Remote", "远程", "リモート"],
   "브랜치를 불러오는 중…": ["Loading branches…", "正在加载分支…", "ブランチを読み込み中…"],
   "브랜치가 없습니다": ["No branches found", "未找到分支", "ブランチが見つかりません"],

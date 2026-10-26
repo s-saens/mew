@@ -10,12 +10,13 @@ import { GitWorkbench } from './GitWorkbench'
 import type { GitWorkbenchNavigation } from '../utils/git-workbench-navigation'
 import { GitHubAccount } from './github-account'
 
-export function GitPanel({ visible, initialState, onChange, onNotice, onOpenDiff, onClose, onPanelFocus, closeTabSignal = 0, navigation }: {
+export function GitPanel({ visible, initialState, onChange, onNotice, onOpenDiff, onOpenWorktree, onClose, onPanelFocus, closeTabSignal = 0, navigation }: {
   visible: boolean
   initialState: unknown
   onChange: (state: GitPanelState) => void
   onNotice: (message: string) => void
   onOpenDiff?: (target: GitDiffTarget) => void
+  onOpenWorktree?: (path: string) => Promise<void>
   onClose: () => void
   onPanelFocus: () => void
   nextTabSignal?: number
@@ -51,7 +52,7 @@ export function GitPanel({ visible, initialState, onChange, onNotice, onOpenDiff
     </DockPanel>
     <DockBody group={group} active onFocus={onPanelFocus}>
       <GitShortcutScope onClose={onClose} className="flex h-full min-h-0 min-w-0 flex-col">
-        <GitWorkbench project={tab.project} repositoryPath={tab.path} onNotice={onNotice} onOpenDiff={onOpenDiff} branchHost={branchHost} actionsHost={actionsHost} navigation={navigation}
+        <GitWorkbench project={tab.project} repositoryPath={tab.path} onNotice={onNotice} onOpenDiff={onOpenDiff} onOpenWorktree={onOpenWorktree} branchHost={branchHost} actionsHost={actionsHost} navigation={navigation}
           visible={visible && (!dock || (dock.desktop ? !dock.maximized || dock.maximized === group : dock.foreground === 'git'))} />
       </GitShortcutScope>
     </DockBody>

@@ -322,12 +322,13 @@ function GitComposer({ id, children, onSubmit }: { id: string; children: ReactNo
   </form>
 }
 
-export function GitWorkbench({ project, repositoryPath, onNotice, onBack, onOpenDiff, branchHost, actionsHost, visible = true, navigation }: {
+export function GitWorkbench({ project, repositoryPath, onNotice, onBack, onOpenDiff, onOpenWorktree, branchHost, actionsHost, visible = true, navigation }: {
   project: string
   repositoryPath: string
   onNotice: (message: string) => void
   onBack?: () => void
   onOpenDiff?: (target: GitDiffTarget) => void
+  onOpenWorktree?: (path: string) => Promise<void>
   branchHost?: HTMLElement | null
   actionsHost?: HTMLElement | null
   visible?: boolean
@@ -601,7 +602,12 @@ export function GitWorkbench({ project, repositoryPath, onNotice, onBack, onOpen
     setActionRunning(true)
     setError(null)
     try {
-      await runGitBranchAction(repositoryPath, action, ref, name, project, info.workspace)
+      const result = await runGitBranchAction(repositoryPath, action, ref, name, project, info.workspace)
+      if (result.worktreePath) {
+        if (!onOpenWorktree) throw new Error(uiText('프로젝트를 열 수 없습니다'))
+        await onOpenWorktree(result.worktreePath)
+        return
+      }
       setView({ kind: 'graph' })
       await refresh()
     } finally {
