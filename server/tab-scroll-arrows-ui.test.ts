@@ -9,7 +9,7 @@ import { domBrowserExecutable } from './browser-dom-executable.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 
-test('tab chevrons overlay overflowing edges and scroll half the strip without changing focus or selection', { skip: !domBrowserExecutable(), timeout: 30_000 }, async t => {
+test('tab chevrons overlay overflowing edges and scroll while held without changing focus or selection', { skip: !domBrowserExecutable(), timeout: 30_000 }, async t => {
   const source = `import React from '${root}/node_modules/react/index.js';
 import {createRoot} from '${root}/node_modules/react-dom/client.js';
 import {TabBar} from '${root}/src/components/TabBar.tsx';
@@ -74,9 +74,18 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><Fixture/><
       assert.equal(appearance.border, '0px')
       assert.match(appearance.shadow, /drop-shadow/)
       await input.focus()
-      if (width < 500) await right.tap(); else await right.click()
-      await until(() => viewport.evaluate((el, target) => el.scrollLeft > 0 && el.scrollLeft < target - 1, stripWidth * 0.5))
-      await until(() => viewport.evaluate((el, target) => Math.abs(el.scrollLeft - target) < 1, stripWidth * 0.5))
+      const hold = async (button: typeof right, duration: number) => {
+        const box = (await button.boundingBox())!
+        await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+        await page.mouse.down()
+        await page.waitForTimeout(duration)
+        await page.mouse.up()
+      }
+      await hold(right, 400)
+      const heldOffset = await viewport.evaluate(el => el.scrollLeft)
+      assert.ok(heldOffset > 90 && heldOffset < 180, 'holding scrolls at 320px/s')
+      await page.waitForTimeout(100)
+      assert.equal(await viewport.evaluate(el => el.scrollLeft), heldOffset, 'release stops immediately')
       assert.equal(await left.isVisible(), true)
       assert.equal(await right.isVisible(), true)
       assert.equal(await input.evaluate(el => el.ownerDocument.activeElement === el), true, 'pointer navigation preserves the draft focus')
@@ -85,17 +94,16 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><Fixture/><
       await page.mouse.move(10, 10)
       await page.screenshot({ path: `/tmp/mew-tab-arrows-${width}.png` })
 
-      await left.click()
+      await hold(left, 650)
       await until(() => viewport.evaluate(el => el.scrollLeft < 1))
       await until(async () => !await left.isVisible())
-      const maximum = await viewport.evaluate(el => el.scrollWidth - el.clientWidth)
-      while (await right.isVisible()) {
-        const before = await viewport.evaluate(el => el.scrollLeft)
-        const target = Math.min(maximum, before + stripWidth * 0.5)
-        await right.click()
-        await until(() => viewport.evaluate((el, target) => Math.abs(el.scrollLeft - target) < 1, target))
-        if (target === maximum) break
-      }
+      await viewport.hover()
+      await page.mouse.wheel(0, 120)
+      await until(() => viewport.evaluate(el => el.scrollLeft >= 119))
+      const beforeZoom = await viewport.evaluate(el => el.scrollLeft)
+      await viewport.dispatchEvent('wheel', { deltaY: 120, ctrlKey: true })
+      assert.equal(await viewport.evaluate(el => el.scrollLeft), beforeZoom, 'zoom gestures are not converted')
+      await viewport.dispatchEvent('wheel', { deltaY: 10000 })
       await until(async () => !await right.isVisible())
       assert.equal(await left.isVisible(), true, 'the rightmost position offers only a left arrow')
 
@@ -114,13 +122,19 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><Fixture/><
 
       await page.emulateMedia({ reducedMotion: 'reduce' })
       await input.focus()
-      await right.click()
-      await viewport.evaluate(el => new Promise<void>(resolve => el.ownerDocument.defaultView!.requestAnimationFrame(() => resolve())))
-      assert.ok(Math.abs(await viewport.evaluate(el => el.scrollLeft) - stripWidth * 0.5) < 1, 'reduced motion uses immediate half-width scrolling')
+      await hold(right, 250)
+      assert.ok(await viewport.evaluate(el => el.scrollLeft) > 40, 'reduced motion retains direct held scrolling')
       await page.evaluate('window.setLocale("en")')
       await until(async () => await right.getAttribute('aria-label') === 'Scroll tabs right')
       await right.focus()
-      await page.keyboard.press('Enter')
+      const beforeKey = await viewport.evaluate(el => el.scrollLeft)
+      await page.keyboard.down('Enter')
+      await page.waitForTimeout(200)
+      await page.keyboard.up('Enter')
+      assert.ok(await viewport.evaluate(el => el.scrollLeft) > beforeKey + 30)
+      const stopped = await viewport.evaluate(el => el.scrollLeft)
+      await page.waitForTimeout(100)
+      assert.equal(await viewport.evaluate(el => el.scrollLeft), stopped)
       assert.equal(await viewport.locator('[aria-selected="true"]').getAttribute('data-editor-tab-id'), '1', 'keyboard navigation does not select a different tab')
       assert.deepEqual(errors, [])
       await page.close()
