@@ -1,6 +1,6 @@
 ---
 title: "앱 시작과 서버 구조·상태 파일"
-description: "인증 대기 전 시작 화면·병렬 다운로드·초기/인증/작업 화면 청크 묶음·현재 P2P 인증 재사용과 작업 화면·편집기의 일반 state 렌더링을 설명한다. 신원·권한별 비동기 로딩, 서버·CLI·OS 실행 계층, 상태 파일과 격리 시작 검증·운영 적용의 경계를 구분한다."
+description: "owner·manager의 계정별 프로젝트 전환과 인증 대기 전 시작 화면·병렬 다운로드·초기/인증/작업 화면 청크 묶음·현재 P2P 인증 재사용과 작업 화면·편집기의 일반 state 렌더링을 설명한다. 신원·권한별 비동기 로딩, 서버·CLI·OS 실행 계층, 상태 파일과 격리 시작 검증·운영 적용의 경계를 구분한다."
 updated: "2026-10-24"
 상위파일:
   - "../MOC.md"
@@ -99,7 +99,7 @@ Owner 전용 `POST /api/project-icons/read`는 절대경로 목록의 현재 아
 
 [ADR 0200](../history/decisions/0200-mew-account-active-workspace.md)에 따라 마지막 활성 프로젝트는 `user-ui-state.json`의 계정별 `activeWorkspace`가 소유한다. `server/account-workspace.ts`는 인증된 계정의 루트를 읽고 `paths.ts`의 `AsyncLocalStorage` 컨텍스트에 요청 수명 동안 고정한다. `workspacePaths`와 `projectRoot` 등 경로 함수는 이 컨텍스트를 읽으며, 계정 없는 CLI·서버 초기화는 기존 서버 기본 루트를 사용한다. 저장값이 없거나 경로가 삭제되면 기본 루트로 복원한다.
 
-`POST /api/workspace`, `/api/fs/open-project`, `/api/subprojects/open`은 기존 owner 권한을 유지하고 요청 계정의 루트만 저장한다. `workspace` presence 알림은 같은 인증 계정에만 전달한다. 서버 기본 루트·`MEW_WORKSPACE` 설정·다른 계정의 watcher·공동 편집 방은 바꾸지 않는다. 기존 에이전트 작업 경로는 고정된 채 유지하고 새 터미널의 기본 경로는 요청 계정의 루트를 따른다. Documents 폴더 설정은 기존처럼 프로젝트 설정 파일이 소유한다.
+`POST /api/workspace`, `/api/fs/open-project`, `/api/subprojects/open`은 owner·manager에게 허용하고 요청 계정의 루트만 저장한다. `workspace` presence 알림은 같은 인증 계정에만 전달한다. 서버 기본 루트·`MEW_WORKSPACE` 설정·다른 계정의 watcher·공동 편집 방은 바꾸지 않는다. 기존 에이전트 작업 경로는 고정된 채 유지하고 새 터미널의 기본 경로는 요청 계정의 루트를 따른다. Documents 폴더 설정은 기존처럼 프로젝트 설정 파일이 소유한다.
 
 파일 카탈로그와 검색 상태·트리 감시자는 실제 프로젝트 경로, 검색 SQLite 핸들은 루트별 DB 경로로 분리한다. 프로젝트 WebSocket 연결은 연결 시 계정 루트를 사용하며 공동 편집 방은 서버 내부 키에 루트를 포함한다. 와이어의 `프로젝트:상대경로`와 서버 공통 메모 방은 유지한다. 같은 실제 루트를 보는 계정끼리는 공동 편집을 공유하며 다른 루트의 동명 파일과는 분리한다.
 

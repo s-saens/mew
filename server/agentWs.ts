@@ -397,6 +397,7 @@ export function attachAgentWebSocket(
           const bindingOptions = { account, browser, runtime,
             authorized: () => ws.readyState === ws.OPEN && (opts.authorize?.(req) ?? false),
             owner: () => resolveAuth(req).role === 'owner',
+            canManageProjects: () => ['owner', 'manager'].includes(resolveAuth(req).role),
             superseded: () => ws.close(),
             send: (message: MewcatActionRequest) => send(ws, message),
           }

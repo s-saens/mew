@@ -73,6 +73,23 @@ test('Mewcat MCP isolates accounts, checks revoked access, awaits browser result
   assert.notEqual(binding.cwd, other.cwd)
 })
 
+test('manager Mewcat can create and open projects while document setup stays owner-only', async t => {
+  let canManageProjects = true
+  const binding = await bindMewcat({
+    account: 'manager@test', browser: 'manager', runtime: 'codex', authorized: () => true,
+    owner: () => false, canManageProjects: () => canManageProjects,
+    send(message) { binding.handle({ type: 'mewcat_action_result', id: message.id, ok: true }) },
+  })
+  t.after(() => { binding.disconnect(); binding.server.close() })
+  assert.equal((await binding.tool('mew_get_context', {}) as { canManageProjects: boolean }).canManageProjects, true)
+  const created = await binding.tool('mew_create_project', { parent: dir, name: 'manager-project' }) as { path: string }
+  assert.deepEqual(await binding.tool('mew_open_project', { path: created.path }), { path: created.path, opened: true })
+  await assert.rejects(binding.tool('mew_setup_documents', { projectRoot: created.path }), /MEWCAT_FORBIDDEN/)
+  canManageProjects = false
+  await assert.rejects(binding.tool('mew_open_project', { path: created.path }), /MEWCAT_FORBIDDEN/)
+  await assert.rejects(binding.tool('mew_create_project', { parent: dir, name: 'revoked' }), /MEWCAT_FORBIDDEN/)
+})
+
 test('Mewcat MCP stdio handles concurrent JSON-RPC messages without touching runtime settings', async t => {
   const binding = await bindMewcat({ account: 'stdio@test', browser: 'stdio', runtime: 'claude', authorized: () => true, owner: () => true, send() {} })
   t.after(() => { binding.disconnect(); binding.server.close() })

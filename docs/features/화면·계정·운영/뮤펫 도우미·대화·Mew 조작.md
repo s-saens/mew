@@ -4,10 +4,10 @@ parent: "mew-settings"
 title: "뮤펫 도우미·대화·Mew 조작"
 status: "changed"
 created: "2026-09-30"
-updated: "2026-10-17"
+updated: "2026-10-26"
 files: ["src/components/mewcat-assistant.tsx", "src/hooks/use-mewcat-assistant.ts", "server/mewcat-assistant.ts", "server/mewcat-mcp-stdio.ts", "src/App.tsx"]
 commits: []
-description: "뮤펫 팝업의 독립 에이전트 대화·스트리밍·중지·기록 초기화·복원과 말풍선 위의 런타임 선택 목록, 햄버거 메뉴와 같은 75% 배경·6px 블러와 내부 단색, 자동 내장 MCP를 다루는 기능 계약. 프로젝트 생성·Documents 준비·화면 열기·작업 초안, 권한과 실제 UI 결과 확인을 설명한다."
+description: "뮤펫 팝업의 독립 에이전트 대화·스트리밍·중지·기록 초기화·복원과 말풍선 위의 런타임 선택 목록, 햄버거 메뉴와 같은 75% 배경·6px 블러와 내부 단색, 자동 내장 MCP를 다루는 기능 계약. 프로젝트 생성·Documents 준비·화면 열기·작업 초안, owner·manager의 프로젝트 생성·열기 권한과 실제 UI 결과 확인을 설명한다."
 상위파일:
   - "MOC.md"
   - "_화면·계정·운영.md"
@@ -28,7 +28,7 @@ description: "뮤펫 팝업의 독립 에이전트 대화·스트리밍·중지�
 
 ### 경계와 제한
 
-- 프로젝트 관리 작업은 owner 전용이고 agent 권한이 없는 계정은 대화 영역을 사용하지 않는다.
+- 프로젝트 생성·열기는 owner·manager에게 허용하고 Documents 준비는 owner 전용이다. agent 권한이 없는 계정은 대화 영역을 사용하지 않는다.
 - 기존 런타임 MCP 설정을 수정하지 않는다. 도구 실패·연결 종료를 완료로 표시하지 않는다.
 - 삭제·배포·앱 빌드·업데이트는 도구 범위 밖이다. 프로젝트 작업 초안은 사용자가 전송한다.
 - 세션 복원과 실제 도구 연결은 ACP 런타임 지원에 의존하며 실제 공급자 계정 검증은 별도다.
@@ -65,7 +65,7 @@ description: "뮤펫 팝업의 독립 에이전트 대화·스트리밍·중지�
 
 Mew 자체의 stdio MCP 브리지를 session/new·session/load에 주입한다. 사용자에게 MCP 주소·토큰·설치·설정 파일 편집을 요구하지 않는다. 전역·프로젝트 MCP 원본 설정과 기존 [MCP 관리창](../../configuration/agent-harness.md)은 변경하지 않는다. 인증 재시도·새 대화·복원용 ACP 재시작도 같은 MCP 정보를 사용한다.
 
-브리지는 도우미 전용 Unix socket으로 서버에 요청한다. 폴더는 0700, 소켓은 0600이며 브라우저에 별도 인증 비밀을 전달하지 않는다. 서버는 각 호출과 화면 작업 결과 수신 때 원래 웹 세션의 인증·agent 권한을 재검사한다. 프로젝트 생성·열기·문서 초기화는 owner 전용이다. 화면별 기능 권한·파일 접근은 기존 UI/API를 따른다.
+브리지는 도우미 전용 Unix socket으로 서버에 요청한다. 폴더는 0700, 소켓은 0600이며 브라우저에 별도 인증 비밀을 전달하지 않는다. 서버는 각 호출과 화면 작업 결과 수신 때 원래 웹 세션의 인증·agent 권한을 재검사한다. 프로젝트 생성·열기는 owner·manager에게 허용하며 문서 초기화는 owner 전용이다. 화면별 기능 권한·파일 접근은 기존 UI/API를 따른다.
 
 | 도구 | 동작 |
 | --- | --- |

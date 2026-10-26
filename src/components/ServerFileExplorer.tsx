@@ -63,13 +63,13 @@ function TreeEntry({
 }
 
 export function ServerFileExplorer({
-  isOwner,
+  canOpenProjects,
   onOpenFile,
   onRenamed,
   onDeleted,
   onClose,
 }: {
-  isOwner: boolean
+  canOpenProjects: boolean
   onOpenFile: (path: string) => void
   onRenamed: (oldPath: string, newPath: string, type: 'file' | 'dir') => void
   onDeleted: (path: string, type: 'file' | 'dir') => void
@@ -161,7 +161,7 @@ export function ServerFileExplorer({
           if (directories.includes(current)) navigate(current)
           else for (const directory of directories) if (children[directory]) void loadDir(directory)
         }}
-        onRenamed={onRenamed} onDeleted={onDeleted} onOpenProject={isOwner ? openProject : undefined}
+        onRenamed={onRenamed} onDeleted={onDeleted} onOpenProject={canOpenProjects ? openProject : undefined}
         renderEntry={(entry, onMenu) => <TreeEntry key={entry.path} entry={entry} depth={0} expanded={expanded} directoryResults={children} loading={loading} onToggle={toggle} onOpen={(path) => { onOpenFile(path); onClose() }} onMenu={onMenu} />}
       />
 

@@ -497,7 +497,21 @@ for (const mode of ['keyboard', 'workspace', 'documents', 'permissions', 'panels
       await page.keyboard.press('Escape')
       await page.getByRole('dialog').waitFor({ state: 'detached' })
       await page.keyboard.press('Control+Shift+o')
-      assert.equal(await page.getByRole('dialog').count(), 0, 'project opening remains owner-only')
+      await page.getByRole('dialog', { name: '새 프로젝트 열기', exact: true }).waitFor()
+      await page.keyboard.press('Escape')
+      await page.getByRole('dialog').waitFor({ state: 'detached' })
+      await page.locator('button[data-project-switcher]').click()
+      await page.locator('[data-project-option="/beta"]').click()
+      await page.locator('[data-test-content]').getByText('Content of /beta', { exact: true }).waitFor()
+      await page.keyboard.press('Alt+1')
+      await page.locator('[data-test-content]').getByText('Content of /alpha', { exact: true }).waitFor()
+      role = 'member'
+      await page.reload()
+      await page.locator('[data-test-content]').getByText('Content of /alpha', { exact: true }).waitFor()
+      assert.equal(await page.locator('button[data-project-switcher]').count(), 0, 'member cannot switch projects')
+      await page.keyboard.press('Control+Shift+o')
+      assert.equal(await page.getByRole('dialog').count(), 0, 'member cannot open the project picker')
+      role = 'manager'
       serverFiles = false
       await page.reload()
       await page.locator('[data-test-content]').getByText('Content of /alpha', { exact: true }).waitFor()

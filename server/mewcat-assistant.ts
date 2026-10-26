@@ -21,6 +21,7 @@ const starting = new Map<string, Promise<MewcatBinding>>()
 export interface MewcatBindingOptions {
   account: string; browser: string; runtime: string
   authorized: () => boolean; owner: () => boolean
+  canManageProjects?: () => boolean
   superseded?: () => void
   send: (message: { type: 'mewcat_action'; id: string; action: MewcatAction }) => void
 }
@@ -62,6 +63,10 @@ export class MewcatBinding {
   assertAccess(owner = false) {
     if (!this.active || !this.options.authorized()) throw new MewcatToolError('MEWCAT_DISCONNECTED')
     if (owner && !this.options.owner()) throw new MewcatToolError('MEWCAT_FORBIDDEN')
+  }
+  assertProjectAccess() {
+    this.assertAccess()
+    if (!(this.options.canManageProjects ?? this.options.owner)()) throw new MewcatToolError('MEWCAT_FORBIDDEN')
   }
   handle(message: MewcatClientMessage) {
     this.assertAccess()
@@ -122,7 +127,7 @@ export class MewcatBinding {
       return args[key] as string
     }
     const project = () => resolveExistingPath(string('projectRoot'))
-    if (name === 'mew_get_context') return { ...this.context, canManageProjects: this.options.owner(), defaultProjectParent: path.dirname(this.context.projectRoot ?? workspacePaths.root), tools: MEWCAT_TOOLS.map(tool => tool.name) }
+    if (name === 'mew_get_context') return { ...this.context, canManageProjects: (this.options.canManageProjects ?? this.options.owner)(), defaultProjectParent: path.dirname(this.context.projectRoot ?? workspacePaths.root), tools: MEWCAT_TOOLS.map(tool => tool.name) }
     if (name === 'mew_get_help') {
       const topic = MEWCAT_HELP_TOPICS.indexOf(string('topic') as typeof MEWCAT_HELP_TOPICS[number])
       if (topic < 0) throw new MewcatToolError('MEWCAT_INVALID_ARGUMENT')
@@ -130,7 +135,7 @@ export class MewcatBinding {
       return { source, text: fs.readFileSync(path.join(APP_ROOT, source), 'utf8').slice(0, 24_000) }
     }
     if (name === 'mew_create_project') {
-      this.assertAccess(true)
+      this.assertProjectAccess()
       return { path: createExternalFolder(string('parent'), string('name', 255)) }
     }
     if (name === 'mew_setup_documents') {
@@ -143,7 +148,7 @@ export class MewcatBinding {
       return { projectRoot, files: result.files }
     }
     if (name === 'mew_open_project') {
-      this.assertAccess(true)
+      this.assertProjectAccess()
       const projectPath = resolveExistingPath(string('path'))
       await this.view({ kind: 'open_project', path: projectPath })
       return { path: projectPath, opened: true }

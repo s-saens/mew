@@ -1,6 +1,6 @@
 // 워크스페이스 **밖** 폴더를 고르는 창 — 네이티브 파일 대화상자가 아니라 서버(/api/fs/dirs)가
 // 내려주는 목록을 그린다. 브라우저는 서버가 도는 기계의 파일시스템을 볼 수 없기 때문이다.
-// docs 가져오기·내보내기와 워크스페이스 바꾸기가 같이 쓴다. owner 전용 API라 owner에게만 보인다.
+// docs 가져오기·내보내기와 워크스페이스 바꾸기가 같이 쓴다. 프로젝트 선택은 owner·manager에게, docs 관리는 owner에게 제공한다.
 import { useEffect, useState } from 'react'
 import { useOverlayDismiss } from '@mew/ui'
 import { browseDirs, type BrowseResult } from '../api/client'

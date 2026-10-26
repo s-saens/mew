@@ -491,12 +491,12 @@ export function createApiApp() {
     } catch (err) { handleError(res, err) }
   })
 
-  app.get('/user-ui/root-projects', requireRole('owner'), (req, res) => {
+  app.get('/user-ui/root-projects', requireRole('owner', 'manager'), (req, res) => {
     const state = readRootProjects(authOf(req).email!)
     res.json({ state: state ? { ...state, icons: readRootProjectIcons(state.paths, state.icons) } : null })
   })
 
-  app.put('/user-ui/root-projects', requireRole('owner'), (req, res) => {
+  app.put('/user-ui/root-projects', requireRole('owner', 'manager'), (req, res) => {
     try {
       res.json({ state: writeRootProjects(authOf(req).email!, { ...req.body, icons: {} }) })
     } catch (err) {
@@ -697,12 +697,12 @@ export function createApiApp() {
     } finally { if (reserved) mewActionStarting = false }
   })
 
-  app.post('/project-icons/read', requireRole('owner'), (req, res) => {
+  app.post('/project-icons/read', requireRole('owner', 'manager'), (req, res) => {
     try { res.json({ icons: readRootProjectIcons(req.body.paths) }) }
     catch (err) { res.status(400).json({ error: String(err) }) }
   })
 
-  app.put('/project-icons', requireRole('owner'), (req, res) => {
+  app.put('/project-icons', requireRole('owner', 'manager'), (req, res) => {
     try {
       const { path: root, icon } = req.body
       if (typeof root !== 'string' || !path.isAbsolute(root) || (icon !== null && typeof icon !== 'string')) {
@@ -766,8 +766,8 @@ export function createApiApp() {
     }
   })
 
-  // ── 워크스페이스 자체 갈아끼우기 (owner 전용) ──────────────────────────────
-  // 어느 폴더를 열고 있는지 = 서버 기계의 경로다. owner 밖으로 내보내지 않는다.
+  // ── 워크스페이스 자체 갈아끼우기 (owner·manager) ──────────────────────────────
+  // 프로젝트 전환은 셸과 같은 OS 사용자 범위를 사용하는 owner·manager에게 허용한다.
   app.get('/workspace', requireAuthenticated, (_req, res) => {
     try {
       res.json(currentWorkspace())
@@ -776,7 +776,7 @@ export function createApiApp() {
     }
   })
 
-  app.post('/workspace', requireRole('owner'), async (req, res) => {
+  app.post('/workspace', requireRole('owner', 'manager'), async (req, res) => {
     const { path: target } = req.body as { path?: unknown }
     try {
       if (typeof target !== 'string' || !target.trim()) {
@@ -821,9 +821,9 @@ export function createApiApp() {
     }
   })
 
-  // ── docs 특별 레포와 워크스페이스 밖 폴더 고르기 (owner 전용) ────────────────
-  // /fs/dirs는 워크스페이스 경계 밖을 그대로 보여준다 — 역할을 낮추지 말 것.
-  app.get('/fs/dirs', requireRole('owner'), (req, res) => {
+  // ── docs 특별 레포와 워크스페이스 밖 폴더 고르기 (owner·manager) ────────────────
+  // /fs/dirs는 셸과 같은 OS 사용자 범위를 노출하므로 owner·manager만 쓴다.
+  app.get('/fs/dirs', requireRole('owner', 'manager'), (req, res) => {
     try {
       res.json(listDirs(resolveBrowsePath(String(req.query.path ?? ''))))
     } catch (err) {
@@ -831,7 +831,7 @@ export function createApiApp() {
     }
   })
 
-  app.get('/fs/cloud-storage', requireRole('owner'), async (_req, res) => {
+  app.get('/fs/cloud-storage', requireRole('owner', 'manager'), async (_req, res) => {
     try {
       res.json({ folders: await discoverCloudStorage() })
     } catch (err) {
@@ -926,7 +926,7 @@ export function createApiApp() {
     }
   })
 
-  app.post('/fs/folder', requireRole('owner'), (req, res) => {
+  app.post('/fs/folder', requireRole('owner', 'manager'), (req, res) => {
     try {
       res.json({ ok: true, path: createExternalFolder(req.body?.parent, req.body?.name) })
     } catch (err) {
@@ -934,13 +934,13 @@ export function createApiApp() {
     }
   })
 
-  app.post('/fs/directory', requireRole('owner'), async (req, res) => {
+  app.post('/fs/directory', requireRole('owner', 'manager'), async (req, res) => {
     try {
       res.json({ ok: true, path: await createExternalDirectory(req.body?.path) })
     } catch (err) { handleError(res, err) }
   })
 
-  app.post('/fs/git/init', requireRole('owner'), async (req, res) => {
+  app.post('/fs/git/init', requireRole('owner', 'manager'), async (req, res) => {
     try {
       res.json({ ok: true, path: await initializeExternalRepository(req.body?.path) })
     } catch (err) {
@@ -948,7 +948,7 @@ export function createApiApp() {
     }
   })
 
-  app.post('/fs/git/clone', requireRole('owner'), async (req, res) => {
+  app.post('/fs/git/clone', requireRole('owner', 'manager'), async (req, res) => {
     try {
       res.json({ ok: true, path: await cloneExternalRepository(req.body?.parent, req.body?.url, req.body?.name) })
     } catch (err) {
@@ -979,7 +979,7 @@ export function createApiApp() {
     }
   })
 
-  app.post('/fs/open-project', requireRole('owner'), (req, res) => {
+  app.post('/fs/open-project', requireRole('owner', 'manager'), (req, res) => {
     try {
       const abs = resolveExistingPath((req.body as { path?: unknown }).path)
       if (!fs.statSync(abs).isDirectory()) throw new BrowseError(`폴더가 아닙니다: ${abs}`)
@@ -997,7 +997,7 @@ export function createApiApp() {
     try { res.json(await repositoryInfo(projectOf(req), String(req.query.path ?? ''))) } catch (err) { handleError(res, err) }
   })
 
-  app.post('/subprojects/open', requireRole('owner'), (req, res) => {
+  app.post('/subprojects/open', requireRole('owner', 'manager'), (req, res) => {
     try {
       if (req.body?.workspace !== workspacePaths.root) {
         res.status(409).json({ error: '프로젝트가 변경되었습니다. 현재 목록에서 다시 선택하세요.' })

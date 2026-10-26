@@ -239,6 +239,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
   const { role, email: authEmail } = auth
   const isGuest = role === 'guest'
   const isOwner = role === 'owner'
+  const canOpenProjects = isOwner || role === 'manager'
   const caps = useMemo(() => auth.capabilities ?? defaultCapabilities(role), [auth.capabilities, role])
   const canUseTerminal = caps.terminal
   const canDebug = caps.terminal && (auth.role === 'owner' || auth.role === 'manager')
@@ -280,23 +281,22 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
   const readWorkspaceUi = useCallback(async (path: string) => restoreDeviceLayout(authEmail ?? 'guest', path, (await fetchWorkspaceUi(path)).state ?? {}), [authEmail])
   const prepareWorkspaceUi = useCallback((path: string) => workspaceUiCache.current.load(path, () => readWorkspaceUi(path)), [readWorkspaceUi])
   const previewRootProject = useCallback((path: string) => {
-    if (!isOwner || path === rootProjectPathRef.current) return
+    if (!canOpenProjects || path === rootProjectPathRef.current) return
     // Only explicitly root-keyed UI metadata is safe before the handoff. Do not
     // let sweeping the list flood the connection used by an actual selection.
     void workspaceUiCache.current.prefetch(path, () => readWorkspaceUi(path))?.catch(() => {})
-  }, [isOwner, readWorkspaceUi])
+  }, [canOpenProjects, readWorkspaceUi])
   const persistWorkspaceUi = useCallback((path: string, state: WorkspaceUiState) => {
     saveDeviceLayout(authEmail ?? 'guest', path, state)
     workspaceUiSaveQueue.current = workspaceUiSaveQueue.current.catch(() => {})
       .then(() => workspaceUiOwnerAlive.current ? saveWorkspaceUi(path, state) : undefined).catch(console.error)
   }, [authEmail])
-  // 절대경로 탭 목록은 owner UI에만 노출한다. manager는 셸 권한상 현재 경로를 볼 수 있지만 다른
-  // 브라우저 사용자가 남긴 owner 전용 목록까지 물려받지는 않는다.
-  const [openProjectPaths, setOpenProjectPaths] = useState<string[]>(() => (isOwner ? loadOpenProjectPaths() : []))
+  // 프로젝트 목록은 owner·manager가 사용하며 계정별로 저장한다.
+  const [openProjectPaths, setOpenProjectPaths] = useState<string[]>(() => (canOpenProjects ? loadOpenProjectPaths() : []))
   const projectPaths = useMemo(() => [...new Set([...openProjectPaths, ...(projectUiPath ? [projectUiPath] : [])])], [openProjectPaths, projectUiPath])
   const [rootProjectIcons, setRootProjectIcons] = useState<Record<string, string>>({})
   const rootProjectSaveQueue = useRef<Promise<unknown>>(Promise.resolve())
-  const [rootProjectTabsSynced, setRootProjectTabsSynced] = useState(!isOwner)
+  const [rootProjectTabsSynced, setRootProjectTabsSynced] = useState(!canOpenProjects)
   const [openProjectDialog, setOpenProjectDialog] = useState(false)
   const [switchingRootProject, setSwitchingRootProject] = useState(false)
   const projectOpeningRef = useRef(false)
@@ -713,7 +713,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
   }, [])
 
   useEffect(() => {
-    if (!isOwner || !rootProjectTabsSynced) return
+    if (!canOpenProjects || !rootProjectTabsSynced) return
     let alive = true
     const epoch = workspaceEpochRef.current
     const paths = [...new Set([...openProjectPaths, ...(projectUiPath ? [projectUiPath] : [])])]
@@ -722,12 +722,12 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
       if (alive && epoch === workspaceEpochRef.current) setRootProjectIcons(icons)
     }).catch(console.error)
     return () => { alive = false }
-  }, [isOwner, rootProjectTabsSynced, openProjectPaths, projectUiPath, workspaceEpoch])
+  }, [canOpenProjects, rootProjectTabsSynced, openProjectPaths, projectUiPath, workspaceEpoch])
 
   // 서버 상태가 비어 있을 때만 이 브라우저의 기존 localStorage를 최초 값으로 올린다. 시크릿 창의
   // 빈 저장소가 이미 쓰고 있던 계정 상태를 덮어쓰지 않도록, 내려받기 전에는 저장하지 않는다.
   useEffect(() => {
-    if (!isOwner) return
+    if (!canOpenProjects) return
     let alive = true
     void trackRefresh(fetchRootProjectTabs())
       .then(({ state }) => {
@@ -740,10 +740,10 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
       })
       .catch(console.error)
     return () => { alive = false }
-  }, [isOwner, trackRefresh])
+  }, [canOpenProjects, trackRefresh])
 
   useEffect(() => {
-    if (!isOwner) return
+    if (!canOpenProjects) return
     const paths = [...new Set(openProjectPaths)]
     writeBrowserStorage(OPEN_PROJECTS_KEY, JSON.stringify(paths))
     if (!rootProjectTabsSynced) return
@@ -754,7 +754,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
       .then(() => current ? saveRootProjectTabs({ paths, icons: {}, groups: [] }) : undefined)
       .catch(console.error)
     return () => { current = false }
-  }, [isOwner, openProjectPaths, rootProjectTabsSynced])
+  }, [canOpenProjects, openProjectPaths, rootProjectTabsSynced])
 
   const rememberProjectPath = useCallback((projectPath: string) => {
     setOpenProjectPaths(previous => previous.includes(projectPath) ? previous : [...previous, projectPath])
@@ -832,7 +832,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
   }, [applyWorkspace, trackRefresh])
 
   const openRootProject = useCallback(async (projectPath: string) => {
-    if (!isOwner || projectOpeningRef.current) return
+    if (!canOpenProjects || projectOpeningRef.current) return
     if (projectPath === projectUiPath) {
       setProject(WORKSPACE_PROJECT)
       setActiveProject(WORKSPACE_PROJECT)
@@ -867,7 +867,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
         handleWorkspaceBroadcast()
       }
     }
-  }, [applyWorkspace, caps.agent, caps.terminal, handleWorkspaceBroadcast, isOwner, projectUiPath, showToast, prepareWorkspaceUi])
+  }, [applyWorkspace, caps.agent, caps.terminal, handleWorkspaceBroadcast, canOpenProjects, projectUiPath, showToast, prepareWorkspaceUi])
 
   useEffect(() => {
     const open = (event: Event) => {
@@ -877,17 +877,17 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
       else if (notice.target && typeof notice.target === 'object' && caps.agent) {
         const target = notice.target
         const workspace = target.workspacePath ?? target.cwd
-        if (workspace !== projectUiPath && workspace !== rootProjectPath && !isOwner) return
+        if (workspace !== projectUiPath && workspace !== rootProjectPath && !canOpenProjects) return
         setNoticeTarget(target)
         if (workspace !== projectUiPath && workspace !== rootProjectPath) void openRootProject(workspace)
       }
     }
     window.addEventListener(OPEN_NOTICE_EVENT, open)
     return () => window.removeEventListener(OPEN_NOTICE_EVENT, open)
-  }, [caps.system, caps.agent, projectUiPath, rootProjectPath, isOwner, openRootProject])
+  }, [caps.system, caps.agent, projectUiPath, rootProjectPath, canOpenProjects, openRootProject])
 
   const openSidebarProject = useCallback(async (scope: string, path: string) => {
-    if (!isOwner || !rootProjectPath || projectOpeningRef.current) return
+    if (!canOpenProjects || !rootProjectPath || projectOpeningRef.current) return
     projectOpeningRef.current = true
     workspaceReadSequence.current++
     setSwitchingRootProject(true)
@@ -904,7 +904,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
         handleWorkspaceBroadcast()
       }
     }
-  }, [applyWorkspace, handleWorkspaceBroadcast, isOwner, rootProjectPath, showToast])
+  }, [applyWorkspace, handleWorkspaceBroadcast, canOpenProjects, rootProjectPath, showToast])
 
   const syncedAccountTabs = useMemo(() => accountTabs(workspaceUi.tabs), [workspaceUi.tabs])
   const saveAccountTabs = useCallback((tabProject: string, state: StoredTabs) => {
@@ -1572,7 +1572,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
       if (e.target instanceof Element && e.target.closest('[data-login-desktop]')) return
       // Esc는 모달·팝업 스택 또는 패널 콘텐츠에서 처리한다.
       if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.isComposing && e.key.toLowerCase() === 'o') {
-        if (e.shiftKey ? !isOwner : !caps.serverFiles) return
+        if (e.shiftKey ? !canOpenProjects : !caps.serverFiles) return
         e.preventDefault()
         if (e.shiftKey) setOpenProjectDialog(true)
         else setServerFileExplorerOpen(true)
@@ -1672,7 +1672,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     // 보조창 열림 상태는 Ctrl+L이 어디로 보낼지 고를 때 읽는다 — 닫힌 창으로 보내지 않게 최신 값이어야 한다
   }, [
     saveCurrentTab, closeTab, activePath, activeTab, activeRelativePath, activeFile.path, activeFile.project, tabs, setActivePath,
-    caps, canUseTerminal, rootProjectPath, auth.email, focusedEditor, isGuest, isOwner, project, sidebarOpen, chatOpen, agentOpen, terminalOpen,
+    caps, canUseTerminal, rootProjectPath, auth.email, focusedEditor, isGuest, canOpenProjects, project, sidebarOpen, chatOpen, agentOpen, terminalOpen,
     androidOpen, mobilePanelStack, openWorkspacePanel, docsExpanded, sidebarCreate,
     toggleWorkspacePanel, switchCurrentWindowTabRight, switchCurrentWindowTabLeft,
   ])
@@ -1719,7 +1719,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     }
     if (action.kind === 'open_project') { await ensureProject(action.path); return }
     if (action.kind === 'open_panel') {
-      if (action.panel === 'projects') { if (!isOwner) throw new Error('MEWCAT_FORBIDDEN'); setOpenProjectDialog(true) }
+      if (action.panel === 'projects') { if (!canOpenProjects) throw new Error('MEWCAT_FORBIDDEN'); setOpenProjectDialog(true) }
       else if (action.panel === 'settings') setSettingsOpen(true)
       else if (action.panel === 'documents') { setDocsExpanded(true); openWorkspacePanel('sidebar') }
       else { if (!caps[action.panel]) throw new Error('MEWCAT_FORBIDDEN'); openWorkspacePanel(action.panel) }
@@ -1746,7 +1746,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     openWorkspacePanel('agent')
     await waitForView(() => mewcatHandledTab.current === id)
     showToast(t('mewcat.assistant.draftReady'))
-  }, [applyWorkspace, caps, isOwner, openWorkspacePanel, refreshTree, showToast, t])
+  }, [applyWorkspace, caps, canOpenProjects, openWorkspacePanel, refreshTree, showToast, t])
 
   // 프로젝트 검색 결과 클릭 — 파일을 열고, 위치 점프 정보를 대기시킨다 (내용 로드 후 아래 effect가 처리)
   const openSearchResult = useCallback(
@@ -2064,8 +2064,8 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
             paths={projectPaths}
             activePath={projectUiPath}
             fallbackLabel={projectLabel(projectUiPath)}
-            canOpen={isOwner}
-            canChangeIcon={isOwner}
+            canOpen={canOpenProjects}
+            canChangeIcon={canOpenProjects}
             icons={rootProjectIcons}
             onActivate={(projectPath) => void openRootProject(projectPath)}
             onPreview={previewRootProject}
@@ -2230,7 +2230,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
                       readOnly={isGuest || !caps.filesRead || !caps.filesWrite}
                       canUseCommands={canUseTerminal && !isGuest}
                       onOpenProject={(path) => void openSidebarProject(isGuest || docsExpanded ? DEFAULT_PROJECT : WORKSPACE_PROJECT, path)}
-                      canOpenProjects={isOwner}
+                      canOpenProjects={canOpenProjects}
                       canUseGit={caps.git}
                       loadChildren={isGuest || docsExpanded ? loadDocsTreeChildren : loadWorkspaceTreeChildren}
                       treeInvalidation={treeInvalidation}
@@ -2320,7 +2320,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
             } catch (error) { setWorkspaceChanging(false); throw error }
           }}
           onOpenWorktree={async path => {
-            if (!isOwner || projectOpeningRef.current || !rootProjectPathRef.current) throw new Error(uiText('프로젝트를 열 수 없습니다'))
+            if (!canOpenProjects || projectOpeningRef.current || !rootProjectPathRef.current) throw new Error(uiText('프로젝트를 열 수 없습니다'))
             projectOpeningRef.current = true
             workspaceReadSequence.current++
             try {
@@ -2455,7 +2455,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
         />
       )}
 
-      {openProjectDialog && isOwner && (
+      {openProjectDialog && canOpenProjects && (
         <OpenProjectDialog
           basePath={rootProjectPath ?? ''}
           onOpen={async path => { await openRootProject(path) }}
@@ -2465,7 +2465,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
 
       {serverFileExplorerOpen && caps.serverFiles && (
         <ServerFileExplorer
-          isOwner={isOwner}
+          canOpenProjects={canOpenProjects}
           onOpenFile={(path) => {
             showMobileEditor()
             openExternalFile(path)

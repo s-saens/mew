@@ -10,7 +10,7 @@ import { createApiApp } from './api.ts'
 import { WORKSPACE_ROOT, setWorkspaceRoot } from './paths.ts'
 import { readRootProjects, writeRootProjects } from './userUiState.ts'
 
-test('shared icon API enforces owner access, persists project data and excludes icons from account saves', async () => {
+test('shared icon API allows owner and manager access, persists project data and excludes icons from account saves', async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mew-icon-api-'))
   const child = path.join(root, 'child')
   fs.mkdirSync(path.join(child, '.mew'), { recursive: true })
@@ -34,12 +34,12 @@ test('shared icon API enforces owner access, persists project data and excludes 
   try {
     const restored = await (await fetch(base + '/user-ui/root-projects')).json() as { state: { icons: Record<string, string> } }
     assert.equal(restored.state.icons[child], 'i:book')
-    for (const denied of ['manager', 'member', 'guest']) {
+    for (const denied of ['member', 'guest']) {
       role = denied
       assert.equal((await request('/project-icons', { path: child, icon: '🌱' })).status, 403)
       assert.equal((await request('/project-icons/read', { paths: [child] }, 'POST')).status, 403)
     }
-    role = 'owner'
+    role = 'manager'
     assert.equal((await request('/project-icons', { path: child, icon: '🌱' })).status, 200)
     const icons = await (await request('/project-icons/read', { paths: [child] }, 'POST')).json() as { icons: Record<string, string> }
     assert.equal(icons.icons[child], '🌱')
