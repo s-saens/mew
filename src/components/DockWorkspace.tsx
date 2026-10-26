@@ -1,4 +1,4 @@
-import { useFloatingPanel } from '../hooks/use-floating-panel'
+import { useFloatingPanel, type ResizeEdge } from '../hooks/use-floating-panel'
 import { uiText } from '@mew/ui/i18n-core'
 import { Expand } from 'iconoir-react'
 import { useI18n } from '../i18n'
@@ -249,6 +249,15 @@ function DockSeparators({ tree, rect, onResize }: { tree: DockNode | null; rect:
     <DockSeparators tree={tree.first} rect={first} onResize={onResize} /><DockSeparators tree={tree.second} rect={second} onResize={onResize} />
   </>
 }
+const popupResizeHandles: Array<{ edge: ResizeEdge; className: string }> = [
+  { edge: 'n', className: 'inset-x-3 top-0 h-1.5 cursor-n-resize' },
+  { edge: 'e', className: 'inset-y-3 right-0 w-1.5 cursor-e-resize' },
+  { edge: 's', className: 'inset-x-3 bottom-0 h-1.5 cursor-s-resize' },
+  { edge: 'w', className: 'inset-y-3 left-0 w-1.5 cursor-w-resize' },
+  { edge: 'nw', className: 'left-0 top-0 h-3 w-3 cursor-nw-resize' },
+  { edge: 'ne', className: 'right-0 top-0 h-3 w-3 cursor-ne-resize' },
+  { edge: 'sw', className: 'bottom-0 left-0 h-3 w-3 cursor-sw-resize' },
+]
 /** All surfaces portal into the same host. Moving a split changes geometry, not component ownership. */
 export function DockPanel({ id, floating = false, storageKey = `mew:popup:${id}`, kind, visible = true, children, onFocus, mobileSelected, tabs = [] }: { floating?: boolean; storageKey?: string; tabs?: string[]; mobileSelected?: boolean; id: string; kind: DockKind; visible?: boolean; children: ReactNode; onFocus?: () => void }) {
   const dock = useDock(), register = dock?.register
@@ -287,7 +296,8 @@ export function DockPanel({ id, floating = false, storageKey = `mew:popup:${id}`
     className={`flex min-h-0 min-w-0 flex-col overflow-hidden bg-surface-deep ${floats ? 'rounded-lg shadow-lg' : ''}`}
     style={floats ? { ...popup.style, display: visible ? 'flex' : 'none', ...(covered ? { visibility: 'hidden' } : {}) } : dock.desktop ? { ...rectStyle(expanded ? dock.expandedRect : dock.rects[id]), ...(covered ? { visibility: 'hidden' } : {}) } : { position: 'absolute', inset: 0, display: mobileVisible ? 'flex' : 'none', zIndex: kind === 'editor' ? 0 : 10 }}>
     {children}
-    {floats && <button type="button" aria-label={uiText('크기 조절')} data-tip={uiText('크기 조절')} className="absolute bottom-0 right-0 flex h-6 w-6 cursor-nwse-resize touch-none items-center justify-center rounded-tl bg-surface-raised text-ink-muted hover:text-ink focus-visible:outline-2 focus-visible:outline-accent" {...popup.controls('resize')}><Expand width={14} height={14} /></button>}
+    {floats && popupResizeHandles.map(({ edge, className }) => <div key={edge} data-popup-resize={edge} aria-hidden="true" className={`absolute z-10 touch-none ${className}`} {...popup.controls(edge)} />)}
+    {floats && <button data-popup-resize="se" type="button" aria-label={uiText('크기 조절')} data-tip={uiText('크기 조절')} className="absolute bottom-0 right-0 flex h-6 w-6 cursor-nwse-resize touch-none items-center justify-center rounded-tl bg-surface-raised text-ink-muted hover:text-ink focus-visible:outline-2 focus-visible:outline-accent" {...popup.controls('se')}><Expand width={14} height={14} /></button>}
   </section>, dock.host, id)
 }
 function isPanelTab(target: EventTarget, panel: HTMLElement): boolean {

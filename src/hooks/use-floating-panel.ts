@@ -1,5 +1,7 @@
 import { scopedBrowserStorage } from '@mew/ui/browser-storage-scope'
 import { useEffect, useRef, useState, type PointerEvent, type CSSProperties } from 'react'
+export type ResizeEdge = 'n' | 'e' | 's' | 'w' | 'ne' | 'nw' | 'se' | 'sw'
+type GestureMode = 'move' | ResizeEdge
 type Geometry = { x: number; y: number; width: number; height: number }
 const initial: Geometry = { x: 24, y: 24, width: 420, height: 480 }
 export function loadFloatingRect(key: string): Geometry {
@@ -43,7 +45,7 @@ export function useFloatingPanel(key: string, host: HTMLElement | null, enabled 
       if (index !== -1) floatingLayers.splice(index, 1)
     }
   }, [enabled])
-  const drag = useRef<{ pointer: number; x: number; y: number; mode: 'move' | 'resize'; rect: Geometry } | null>(null)
+  const drag = useRef<{ pointer: number; x: number; y: number; mode: GestureMode; rect: Geometry } | null>(null)
   useEffect(() => {
     if (!host || !enabled) return
     const area = workspaceBounds ? host.closest<HTMLElement>('.mew-workspace-content') ?? host : host
@@ -62,12 +64,22 @@ export function useFloatingPanel(key: string, host: HTMLElement | null, enabled 
     const height = Math.min(Math.max(160, value.height), Math.max(1, size.height))
     return { width, height, x: Math.max(size.x, Math.min(value.x, size.x + size.width - width)), y: Math.max(size.y, Math.min(value.y, size.y + size.height - height)) }
   }
+  const resize = (current: Geometry, edge: ResizeEdge, dx: number, dy: number): Geometry => {
+    let left = current.x, top = current.y
+    let right = left + current.width, bottom = top + current.height
+    const minWidth = Math.min(240, size.width), minHeight = Math.min(160, size.height)
+    if (edge.includes('w')) left = Math.max(size.x, Math.min(right - minWidth, left + dx))
+    if (edge.includes('e')) right = Math.min(size.x + size.width, Math.max(left + minWidth, right + dx))
+    if (edge.includes('n')) top = Math.max(size.y, Math.min(bottom - minHeight, top + dy))
+    if (edge.includes('s')) bottom = Math.min(size.y + size.height, Math.max(top + minHeight, bottom + dy))
+    return { x: left, y: top, width: right - left, height: bottom - top }
+  }
   const update = (value: Geometry) => {
     const next = clamp(value)
     setGeometry({ key, rect: next })
     try { scopedBrowserStorage().setItem(key, JSON.stringify(next)) } catch { /* session-only geometry */ }
   }
-  const start = (event: PointerEvent<HTMLElement>, mode: 'move' | 'resize') => {
+  const start = (event: PointerEvent<HTMLElement>, mode: GestureMode) => {
     if (event.button !== 0 || !event.isPrimary) return
     event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId)
     drag.current = { pointer: event.pointerId, x: event.clientX, y: event.clientY, mode, rect: clamp(rectRef.current) }
@@ -76,14 +88,14 @@ export function useFloatingPanel(key: string, host: HTMLElement | null, enabled 
     const active = drag.current
     if (!active || active.pointer !== event.pointerId) return
     const dx = event.clientX - active.x, dy = event.clientY - active.y
-    update(active.mode === 'move' ? { ...active.rect, x: active.rect.x + dx, y: active.rect.y + dy } : { ...active.rect, width: active.rect.width + dx, height: active.rect.height + dy })
+    update(active.mode === 'move' ? { ...active.rect, x: active.rect.x + dx, y: active.rect.y + dy } : resize(active.rect, active.mode, dx, dy))
   }
   const end = (event: PointerEvent<HTMLElement>) => {
     if (drag.current?.pointer !== event.pointerId) return
     drag.current = null
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
   }
-  const controls = (mode: 'move' | 'resize') => ({
+  const controls = (mode: GestureMode) => ({
     onPointerDown: (event: PointerEvent<HTMLElement>) => start(event, mode), onPointerMove: move, onPointerUp: end, onPointerCancel: end, onLostPointerCapture: end,
     onKeyDown: (event: React.KeyboardEvent<HTMLElement>) => {
       const dx = event.key === 'ArrowRight' ? 12 : event.key === 'ArrowLeft' ? -12 : 0
@@ -91,7 +103,7 @@ export function useFloatingPanel(key: string, host: HTMLElement | null, enabled 
       if (!dx && !dy) return
       event.preventDefault()
       const current = clamp(rectRef.current)
-      update(mode === 'move' ? { ...current, x: current.x + dx, y: current.y + dy } : { ...current, width: current.width + dx, height: current.height + dy })
+      update(mode === 'move' ? { ...current, x: current.x + dx, y: current.y + dy } : resize(current, mode, dx, dy))
     },
   })
   const bounded = clamp(rect)

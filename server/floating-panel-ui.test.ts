@@ -16,7 +16,7 @@ import {DockWorkspace,DockPanel,DockGrip} from '${root}/src/components/DockWorks
 import {useToolPresentation} from '${root}/src/hooks/use-tool-presentation.ts';
 import {ToolPresentationToggle} from '${root}/src/components/tool-presentation-toggle.tsx';
 import {SettingsModal} from '${root}/src/components/SettingsModal.tsx';
-function Fixture(){ const [state,setState]=useState(null),[settings,setSettings]=useState(false),[memoClosed,setMemoClosed]=useState(false),ref=useRef(null),modes=useToolPresentation(); return <div className="flex h-dvh flex-col bg-surface text-ink"><button onClick={()=>setSettings(true)}>Settings</button><div className="mew-workspace-content relative flex min-h-0 flex-1 overflow-hidden"><aside data-sidebar className="hidden w-64 shrink-0 bg-surface md:block">Documents</aside><DockWorkspace apiRef={ref} value={state} onChange={setState} foreground="memo" onEditorDrop={()=>'main'}><DockPanel id="editor:main" kind="editor" tabs={['a']}><div>editor</div></DockPanel><DockPanel id="memo" kind="memo" visible={!memoClosed} floating={modes.memo==='popup'} storageKey="fixture:popup" tabs={['memo']} mobileSelected><div className="shared-memo flex h-full flex-col"><header data-dock-tab-bar className="flex h-9 shrink-0"><div role="tab" tabIndex={0} className="flex-1">메모</div><ToolPresentationToggle tool="memo"/><button aria-label="닫기" onClick={()=>setMemoClosed(true)}>×</button></header><textarea className="min-h-0 flex-1" defaultValue="draft" /></div></DockPanel><DockPanel id="tasks" kind="tasks" floating={modes.tasks==='popup'} storageKey="fixture:tasks" tabs={['tasks']}><div data-dock-tab-bar className="flex h-9 shrink-0"><DockGrip group="tasks"/><div role="tab" tabIndex={0} className="flex-1">태스크</div><ToolPresentationToggle tool="tasks"/></div><textarea defaultValue="task draft" /></DockPanel></DockWorkspace></div>{settings&&<SettingsModal email={null} displayName={null} avatarDataUrl={null} canEditIgnore={false} theme="dark" fontPreferences={{ui:'Arial',markdown:'Arial',mono:'monospace'}} themeColor="#9082da" mewcatSkin={null} mewcatHideDesktop={false} onClose={()=>setSettings(false)} onLoggedOut={()=>{}} onProfileChanged={()=>{}} onToggleTheme={()=>{}} onFontPreferencesChange={()=>{}} onThemeColorChange={()=>{}} onMewcatSkinChange={()=>{}} onMewcatHideDesktopChange={()=>{}}/>}</div>};createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18nProvider>);`
+function Fixture(){ const [state,setState]=useState(null),[settings,setSettings]=useState(false),[memoClosed,setMemoClosed]=useState(false),ref=useRef(null),modes=useToolPresentation(); return <div className="flex h-dvh flex-col bg-surface text-ink"><button onClick={()=>setSettings(true)}>Settings</button><div className="mew-workspace-content relative flex min-h-0 flex-1 overflow-hidden"><aside data-sidebar className="hidden w-64 shrink-0 bg-surface md:block">Documents</aside><DockWorkspace apiRef={ref} value={state} onChange={setState} foreground="memo" onEditorDrop={()=>'main'}><DockPanel id="editor:main" kind="editor" tabs={['a']}><div>editor</div></DockPanel><DockPanel id="memo" kind="memo" visible={!memoClosed} floating={modes.memo==='popup'} storageKey="fixture:popup" tabs={['memo']} mobileSelected><div className="shared-memo flex h-full flex-col"><header data-dock-tab-bar className="flex h-9 shrink-0"><div role="tab" tabIndex={0} className="flex-1">메모</div><ToolPresentationToggle tool="memo"/><button className="mx-1 h-6 w-6 shrink-0 self-center" aria-label="닫기" onClick={()=>setMemoClosed(true)}>×</button></header><textarea className="min-h-0 flex-1" defaultValue="draft" /></div></DockPanel><DockPanel id="tasks" kind="tasks" floating={modes.tasks==='popup'} storageKey="fixture:tasks" tabs={['tasks']}><div data-dock-tab-bar className="flex h-9 shrink-0"><DockGrip group="tasks"/><div role="tab" tabIndex={0} className="flex-1">태스크</div><ToolPresentationToggle tool="tasks"/></div><textarea defaultValue="task draft" /></DockPanel></DockWorkspace></div>{settings&&<SettingsModal email={null} displayName={null} avatarDataUrl={null} canEditIgnore={false} theme="dark" fontPreferences={{ui:'Arial',markdown:'Arial',mono:'monospace'}} themeColor="#9082da" mewcatSkin={null} mewcatHideDesktop={false} onClose={()=>setSettings(false)} onLoggedOut={()=>{}} onProfileChanged={()=>{}} onToggleTheme={()=>{}} onFontPreferencesChange={()=>{}} onThemeColorChange={()=>{}} onMewcatSkinChange={()=>{}} onMewcatHideDesktopChange={()=>{}}/>}</div>};createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18nProvider>);`
   const bundle = await build({ input: 'virtual:fixture.tsx', write: false, platform: 'browser', output: { format: 'iife', codeSplitting: false }, transform: { jsx: 'react-jsx', define: { 'process.env.NODE_ENV': JSON.stringify('test') } }, plugins: [{ name: 'fixture', async resolveId(id, importer) { if (id.endsWith('?raw')) { const resolved = await this.resolve(id.slice(0, -4), importer, {skipSelf:true}); if (resolved) return resolved.id+'?raw' } if (id === 'virtual:fixture.tsx') return id; if(id.endsWith('.css')) return 'virtual:style' }, async load(id) { if(id.endsWith('?raw')) return 'export default '+JSON.stringify(await fs.readFile(id.slice(0,-4),'utf8')); if (id === 'virtual:fixture.tsx') return source; if(id==='virtual:style') return '' } }] })
   const content = source + (await Promise.all(['src/components/DockWorkspace.tsx', 'src/components/tool-presentation-toggle.tsx', 'src/components/SettingsModal.tsx', 'packages/ui/src/select-field.tsx'].map(file => fs.readFile(`${root}/${file}`, 'utf8')))).join('\n')
   const compiler = await compile(await fs.readFile(`${root}/src/index.css`, 'utf8'), { base: `${root}/src`, onDependency() {} })
@@ -32,6 +32,7 @@ function Fixture(){ const [state,setState]=useState(null),[settings,setSettings]
     await memo.getByRole('button', { name: '팝업으로 전환', exact: true }).click()
     await page.locator('[data-floating-panel]').waitFor()
     assert.equal(await memo.locator('textarea').inputValue(), 'preserved draft')
+    assert.equal(await memo.locator('[data-popup-resize]').count(), 8, 'memo shares all eight resize directions')
     await memo.evaluate(el => el.ownerDocument.documentElement.classList.add('theme-gradient'))
     const appearance = () => memo.evaluate(el => ({ opacity: el.ownerDocument.defaultView!.getComputedStyle(el).opacity, blur: el.ownerDocument.defaultView!.getComputedStyle(el).backdropFilter }))
     assert.equal((await appearance()).opacity, '1', 'focused popup retains full opacity')
@@ -63,7 +64,7 @@ function Fixture(){ const [state,setState]=useState(null),[settings,setSettings]
     const overSidebar = (await memo.boundingBox())!
     const dockBounds = (await page.locator('[data-dock-workspace]').boundingBox())!
     assert.ok(overSidebar.x < dockBounds.x, 'memo can move over the sidebar outside the dock')
-    assert.equal(await handle.evaluate(el => { const r = el.getBoundingClientRect(); return el.contains(el.ownerDocument.elementFromPoint(r.x + 10, r.y + 10)) }), true, 'popup remains visible and interactive over the sidebar')
+    assert.equal(await handle.evaluate(el => { const r = el.getBoundingClientRect(); return el.contains(el.ownerDocument.elementFromPoint(r.x + 30, r.y + 18)) }), true, 'popup remains visible and interactive over the sidebar')
     assert.equal(await memo.locator('textarea').inputValue(), 'preserved draft')
     const resized = (await memo.boundingBox())!
     assert.ok(resized.width > moved.width && resized.height > moved.height)
@@ -96,12 +97,58 @@ function Fixture(){ const [state,setState]=useState(null),[settings,setSettings]
     await page.mouse.move(taskTitleBox.x + 30, taskTitleBox.y + 18)
     await page.mouse.down(); await page.mouse.move(100, taskTitleBox.y + 68); await page.mouse.up()
     assert.ok((await tasks.boundingBox())!.x < dockBounds.x, 'tasks can move over the sidebar too')
-    assert.equal(await taskTitle.evaluate(el => { const r = el.getBoundingClientRect(); return el.contains(el.ownerDocument.elementFromPoint(r.x + 10, r.y + 10)) }), true)
+    assert.equal(await taskTitle.evaluate(el => { const r = el.getBoundingClientRect(); return el.contains(el.ownerDocument.elementFromPoint(r.x + 30, r.y + 18)) }), true)
     await tasks.getByRole('button', { name: '크기 조절', exact: true }).focus()
     await page.keyboard.press('ArrowRight')
     const taskResized = (await tasks.boundingBox())!
     await page.screenshot({ path: '/tmp/mew-shared-panel-popups.png' })
     assert.equal(taskResized.width, taskBefore.width + 12)
+    const resetTaskRect = async (rect: { x: number; y: number; width: number; height: number }) => {
+      await tasks.evaluate((el, rect) => new Promise<void>(resolve => {
+        const view = el.ownerDocument.defaultView!
+        view.dispatchEvent(new CustomEvent('mew:popup-layout', { detail: { key: 'fixture:tasks', rect } }))
+        const check = () => {
+          if (el.style.left === `${rect.x}px` && el.style.top === `${rect.y}px` && el.style.width === `${rect.width}px` && el.style.height === `${rect.height}px`) resolve()
+          else view.requestAnimationFrame(check)
+        }
+        check()
+      }), rect)
+    }
+    const workspace = (await page.locator('.mew-workspace-content').boundingBox())!
+    for (const edge of ['n', 'e', 's', 'w', 'nw', 'ne', 'sw', 'se']) {
+      for (const distance of [24, 2000, -2000]) {
+        await resetTaskRect({ x: 80, y: 80, width: 420, height: 300 })
+        const before = (await tasks.boundingBox())!
+        const grip = tasks.locator(`[data-popup-resize="${edge}"]`)
+        const gripBox = (await grip.boundingBox())!
+        const dx = edge.includes('w') ? distance : edge.includes('e') ? -distance : 0
+        const dy = edge.includes('n') ? distance : edge.includes('s') ? -distance : 0
+        await page.mouse.move(gripBox.x + gripBox.width / 2, gripBox.y + gripBox.height / 2)
+        await page.mouse.down()
+        await page.mouse.move(gripBox.x + gripBox.width / 2 + dx, gripBox.y + gripBox.height / 2 + dy)
+        await page.mouse.up()
+        const after = (await tasks.boundingBox())!
+        if (edge.includes('w')) assert.equal(after.x + after.width, before.x + before.width, `${edge}: right stays fixed`)
+        else assert.equal(after.x, before.x, `${edge}: left stays fixed`)
+        if (edge.includes('n')) assert.equal(after.y + after.height, before.y + before.height, `${edge}: bottom stays fixed`)
+        else assert.equal(after.y, before.y, `${edge}: top stays fixed`)
+        if (distance === 24) {
+          assert.equal(after.width, before.width - (dx ? 24 : 0), `${edge}: horizontal resize`)
+          assert.equal(after.height, before.height - (dy ? 24 : 0), `${edge}: vertical resize`)
+        } else if (distance > 0) {
+          assert.equal(after.width, dx ? 240 : before.width, `${edge}: minimum width`)
+          assert.equal(after.height, dy ? 160 : before.height, `${edge}: minimum height`)
+        } else {
+          if (edge.includes('w')) assert.equal(after.x, workspace.x)
+          if (edge.includes('e')) assert.equal(after.x + after.width, workspace.x + workspace.width)
+          if (edge.includes('n')) assert.equal(after.y, workspace.y)
+          if (edge.includes('s')) assert.equal(after.y + after.height, workspace.y + workspace.height)
+        }
+      }
+    }
+    const host = (await page.locator('[data-dock-workspace]').boundingBox())!
+    await resetTaskRect({ x: taskResized.x - host.x, y: taskResized.y - host.y, width: taskResized.width, height: taskResized.height })
+    assert.equal(await tasks.locator('textarea').inputValue(), 'task draft', 'resizing preserves content')
     await tasks.getByRole('button', { name: '패널로 전환', exact: true }).click()
     assert.equal(await tasks.locator('[data-dock-grip]').isVisible(), true)
     assert.equal(await tasks.evaluate(el => el.ownerDocument.defaultView!.getComputedStyle(el).opacity), '1', 'docked panels do not dim')
@@ -129,6 +176,7 @@ function Fixture(){ const [state,setState]=useState(null),[settings,setSettings]
     await page.setViewportSize({ width: 390, height: 720 })
     await memo.evaluate(el => new Promise<void>(resolve => { const check = () => { if (!el.hasAttribute('data-floating-panel')) resolve(); else setTimeout(check, 10) }; check() }))
     assert.ok((await memo.boundingBox())!.width <= 390)
+    assert.equal(await page.locator('[data-popup-resize]').count(), 0, 'mobile panels have no floating resize handles')
     assert.equal(await memo.getByRole('button', { name: '패널로 전환', exact: true }).isVisible(), false)
     await page.getByRole('button', { name: 'Settings', exact: true }).click()
     await settings.getByRole('button', { name: '화면', exact: true }).click()
