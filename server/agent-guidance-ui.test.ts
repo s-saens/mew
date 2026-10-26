@@ -7,6 +7,7 @@ import { compile } from '@tailwindcss/node'
 import { chromium } from 'playwright-core'
 import { domBrowserExecutable } from './browser-dom-executable.ts'
 import { defaultBranchGuidance, type BranchGuidanceSettings } from '../shared/branch-guidance.ts'
+import { documentationGuidanceKeys, type DocumentationGuidanceKey } from '../shared/agent-guidance.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 
@@ -37,7 +38,8 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
       let projectDenied = true, projectConflict = false, projectWrongRoot = false, projectUpdates = 0, projectTransient = false
       let releaseSave: (() => void) | undefined, releaseLoad: (() => void) | undefined
       let heldLoad = false
-      let state = { path: '/data/agent-guidance.md', content: '# Guidance', instructions: '', revision: 'first', settings: { commit: 'inherit', commitLanguage: 'en', language: 'inherit', detail: 'custom', subagents: 'inherit', debugger: 'enabled', testing: 'required' }, branch: { value: { ...defaultBranchGuidance }, custom: false } }
+      const documentationSettings = Object.fromEntries(documentationGuidanceKeys.map(key => [key, 'required'])) as Record<DocumentationGuidanceKey, string>
+      let state = { path: '/data/agent-guidance.md', content: '# Guidance', instructions: '', revision: 'first', settings: { commit: 'inherit', commitLanguage: 'en', language: 'inherit', detail: 'custom', subagents: 'inherit', debugger: 'enabled', testing: 'required', ...documentationSettings }, branch: { value: { ...defaultBranchGuidance }, custom: false } }
       let projectState = { projectRoot: '/project', revision: 'project1', settings: { version: 1, enabled: true, docsDir: 'notes', entrypoints: ['AGENTS.md'], instructions: 'Existing project rule' } }
       const errors: string[] = []
       page.on('pageerror', error => errors.push(error.message))
@@ -51,7 +53,7 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
           }
           if (route.request().method() === 'PUT') {
             const input = route.request().postDataJSON()
-            if (!heldPreset && input.key !== 'instructions') {
+            if (!heldPreset && input.key === 'language') {
               heldPreset = true
               await new Promise<void>(resolve => { releaseSave = resolve })
             }
@@ -273,6 +275,42 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
       await projectInstructions.waitFor()
       assert.equal(await projectInstructions.inputValue(), 'Project draft for this folder only', 'reopening reads saved instructions rather than a discarded draft')
       await globalScope.click()
+      const documentation = dialog.locator('details').filter({ has: page.locator('summary', { hasText: /^문서$/ }) })
+      await documentation.locator('summary').click()
+      const documentationFields = ['기준 문서 갱신', '결정 기록 (ADR)', '작업·검증 기록', '문서 작성 방식', '문서 description', '문서 링크 관리', '문서 검사']
+      await assertInlineFields(documentationFields)
+      for (const [index, key] of documentationGuidanceKeys.entries()) {
+        assert.equal(await field(documentationFields[index]).textContent(), '기본 지침 적용')
+        await choose(documentationFields[index], '프로젝트 지침에 따름')
+        await page.getByRole('status').filter({ hasText: '저장했습니다.' }).waitFor()
+        assert.equal(state.settings[key], 'project')
+        assert.equal(state.settings.testing, 'required')
+      }
+      await page.getByRole('button', { name: '다시 불러오기' }).click()
+      await field('문서 검사').filter({ hasText: '프로젝트 지침에 따름' }).waitFor()
+      for (const [index, key] of documentationGuidanceKeys.entries()) {
+        assert.equal(await field(documentationFields[index]).textContent(), '프로젝트 지침에 따름')
+        await choose(documentationFields[index], '기본 지침 적용')
+        await page.getByRole('status').filter({ hasText: '저장했습니다.' }).waitFor()
+        assert.equal(state.settings[key], 'required')
+      }
+      state = { ...state, revision: 'custom-docs', settings: { ...state.settings, decisionRecords: 'custom' } }
+      await page.getByRole('button', { name: '다시 불러오기' }).click()
+      await field('결정 기록 (ADR)').filter({ hasText: '직접 편집한 지침' }).waitFor()
+      await field('결정 기록 (ADR)').click()
+      assert.equal(await page.getByRole('option', { name: '직접 편집한 지침', exact: true }).getAttribute('aria-disabled'), 'true')
+      await page.getByRole('option', { name: '기본 지침 적용', exact: true }).click()
+      await page.getByRole('status').filter({ hasText: '저장했습니다.' }).waitFor()
+      await field('문서 검사').click()
+      for (const dark of [false, true]) {
+        await page.evaluate(`window.fixtureTheme(${dark})`)
+        await page.screenshot({ path: `/tmp/mew-documentation-guidance-${width}-${dark ? 'dark' : 'light'}.png` })
+        const bounds = (await page.getByRole('listbox', { name: '문서 검사' }).boundingBox())!
+        assert.ok(bounds.x >= 0 && bounds.x + bounds.width <= width && bounds.y >= 0 && bounds.y + bounds.height <= 844, JSON.stringify({ width, bounds }))
+      }
+      await page.keyboard.press('Escape')
+      await page.evaluate('window.fixtureTheme(false)')
+      await documentation.locator('summary').click()
       if (width === 320) {
         await field('커밋 언어').tap()
         const commitMenu = page.getByRole('listbox', { name: '커밋 언어' })

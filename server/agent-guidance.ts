@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { agentSettingsPath } from './agent-account-settings.ts'
 import { DATA_DIR, writeFileAtomic } from './dataDir.ts'
-import { guidanceOptions, type GuidanceKey, type GuidanceSnapshot } from '../shared/agent-guidance.ts'
+import { documentationGuidanceKeys, guidanceOptions, type GuidanceKey, type GuidanceSnapshot } from '../shared/agent-guidance.ts'
 import { branchGuidanceText, branchGuidanceValidationError, defaultBranchGuidance, type BranchGuidanceSettings, type BranchGuidanceSnapshot } from '../shared/branch-guidance.ts'
 import { legacyBranchGuidanceKeys, legacyBranchGuidanceText, type LegacyBranchGuidanceSettings } from '../shared/branch-guidance-v1.ts'
 import { previousBranchGuidanceText } from '../shared/branch-guidance-v2.ts'
@@ -50,7 +50,8 @@ export function readAgentGuidance(locale?: string): string {
 }
 
 function effectiveGuidance(content: string, locale?: string): string {
-  let defaults = withBranchDefault(withTestingDefault(withDebuggerDefault(withCommitLanguageDefault(currentDocumentationGuidance(content)))))
+  let defaults = withDocumentationDefaults(currentDocumentationGuidance(content))
+  defaults = withBranchDefault(withTestingDefault(withDebuggerDefault(withCommitLanguageDefault(defaults))))
   const branch = branchSnapshot(defaults)
   if (!branch.custom) {
     const block = region(defaults, 'branch')
@@ -162,7 +163,8 @@ function resolveCommitLanguage(content: string, locale?: string): string {
 function currentDocumentationGuidance(content: string): string {
   return content
     .replace('Use Documents entrypoints and maps to find only the current documents relevant to the task.', 'Use Documents entrypoints, then scan document paths and frontmatter description fields to select only the current documents relevant to the task before reading their bodies. Do not use MOC navigation or require map registration.')
-    .replace('Update map links for new or moved documents.', 'Give every new or changed document an accurate frontmatter description, and update existing links when paths move; no MOC update is required.')
+    .replace('Update map links for new or moved documents.', 'For new or moved documents, no MOC update is required.')
+    .replace('using the supplied Change intent recorder, after updating canonical docs.', 'using the supplied Change intent recorder, after any required canonical documentation updates.')
 }
 
 export class GuidanceError extends Error {
@@ -174,6 +176,39 @@ const revisionOf = (content: string) => createHash('sha256').update(content).dig
 type GuidanceRegionKey = GuidanceKey | 'branch' | 'instructions'
 const regionKeys: GuidanceRegionKey[] = [...Object.keys(guidanceOptions) as GuidanceKey[], 'branch', 'instructions']
 const markers = (key: GuidanceRegionKey) => [`<!-- mew:agent-setting:${key} -->`, `<!-- /mew:agent-setting:${key} -->`]
+
+function withDocumentationDefaults(content: string): string {
+  // Replace only complete former default paragraphs outside setting blocks.
+  // The stored file, custom prose, examples, and explicit settings stay intact.
+  const legacy = 'When code, features, or operating procedures change, update the owning canonical documentation in the same task. Give every new or changed document an accurate frontmatter description, and update existing links when paths move; no MOC update is required. Preserve historical sources; keep secrets and temporary debugging logs out of docs.'
+  const legacyMetadata = 'Give every new or changed document an accurate frontmatter description, and update existing links when paths move; no MOC update is required.'
+  let regions: ReturnType<typeof region>[] | undefined
+  try { regions = regionKeys.map(key => region(content, key)) } catch { /* Preserve damaged files for editor repair. */ }
+  if (regions) {
+    const protectedRegions = regions
+    let offset = 0, fence: string | undefined
+    content = content.split('\n').map(line => {
+      const from = offset
+      offset += line.length + 1
+      const marker = /^ {0,3}(`{3,}|~{3,})/.exec(line)?.[1]
+      if (marker) {
+        if (!fence) fence = marker
+        else if (marker[0] === fence[0] && marker.length >= fence.length) fence = undefined
+        return line
+      }
+      if (fence || protectedRegions.some(block => block && block.from <= from && from < block.to)) return line
+      const text = line.replace(/\r$/, '')
+      if (text === legacy) return 'Preserve historical sources; keep secrets and temporary debugging logs out of docs.'
+      if (text === legacyMetadata) return ''
+      return line
+    }).join('\n')
+  }
+  for (const key of documentationGuidanceKeys) {
+    const [start, end] = markers(key)
+    if (!content.includes(start) && !content.includes(end)) content += `${content ? '\n\n' : ''}${start}\n${guidanceOptions[key].required}\n${end}`
+  }
+  return content
+}
 
 function withCommitLanguageDefault(content: string): string {
   const [start, end] = markers('commitLanguage')
@@ -253,7 +288,7 @@ function snapshot(content: string): GuidanceSnapshot {
   for (const key of Object.keys(guidanceOptions) as GuidanceKey[]) {
     try {
       const block = region(content, key)
-      settings[key] = block ? Object.entries(guidanceOptions[key]).find(([, text]) => text === block.text)?.[0] ?? 'custom' : key === 'testing' ? 'required' : key === 'debugger' ? 'enabled' : key === 'commitLanguage' ? 'en' : 'inherit'
+      settings[key] = block ? Object.entries(guidanceOptions[key]).find(([, text]) => text === block.text)?.[0] ?? 'custom' : key === 'testing' || documentationGuidanceKeys.some(docKey => docKey === key) ? 'required' : key === 'debugger' ? 'enabled' : key === 'commitLanguage' ? 'en' : 'inherit'
     } catch { settings[key] = 'custom' }
   }
   let instructions = ''

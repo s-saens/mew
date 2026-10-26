@@ -3,11 +3,12 @@ import { useEffect, useId, useRef, useState } from 'react'
 import { Settings, Xmark, PageEdit, RefreshDouble, Globe, Folder } from 'iconoir-react'
 import { ConfirmDialog, DialogFrame, HoverTipLayer, SelectField } from '@mew/ui'
 import { useI18n } from '../i18n'
-import { guidanceOptions, type GuidanceKey, type GuidanceSnapshot } from '../../shared/agent-guidance'
+import { documentationGuidanceKeys, guidanceOptions, type GuidanceKey, type GuidanceSnapshot } from '../../shared/agent-guidance'
 import type { BranchGuidanceSettings } from '../../shared/branch-guidance'
 import { BranchGuidanceFields } from './agent-branch-guidance'
 import { GuidanceRow } from './agent-guidance-row'
 import { guidanceScopeCopy } from './agent-guidance-scope-copy'
+import { documentationGuidanceCopy } from './agent-documentation-guidance-copy'
 import { fetchProjectSetup, saveProjectGuidance } from '../api/project-setup'
 import type { ProjectGuidanceSnapshot } from '../../shared/project-agent-context'
 import './agent-guidance-settings.css'
@@ -20,6 +21,7 @@ const copy = {
 }
 const button = 'inline-flex min-h-7 shrink-0 items-center justify-center gap-1.5 rounded px-2 text-xs text-ink-secondary hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-40 pointer-coarse:min-h-9'
 const generalCopy = { ko: '일반', en: 'General', ja: '一般', 'zh-CN': '常规' }
+const documentationKeys = new Set<GuidanceKey>(documentationGuidanceKeys)
 const managedCommitCopy = {
   ko: '자동 처리에 커밋이 포함됩니다. 수동 모드에서 바꿀 수 있습니다.',
   en: 'Automation includes commits. Change this setting in manual mode.',
@@ -44,7 +46,7 @@ export function AgentGuidanceButton({ onOpenFile, workspacePath }: { onOpenFile:
 }
 
 export function AgentGuidanceSettings({ onClose, onOpenFile, workspacePath }: { onClose: () => void; onOpenFile: (path: string) => void; workspacePath?: string | null }) {
-  const { locale } = useI18n(), text = copy[locale], scopeText = guidanceScopeCopy[locale]
+  const { locale } = useI18n(), text = copy[locale], scopeText = guidanceScopeCopy[locale], docText = documentationGuidanceCopy[locale]
   const titleId = useId()
   const [data, setData] = useState<GuidanceSnapshot | null>(null)
   const [scope, setScope] = useState<'global' | 'project'>('global')
@@ -134,11 +136,12 @@ export function AgentGuidanceSettings({ onClose, onOpenFile, workspacePath }: { 
   }
   const labels: Record<string, string> = { ...text, ko: '한국어', en: 'English', ja: '日本語', zh: '简体中文' }
   const managedCommit = data && data.settings.commit !== 'custom' && !data.branch.custom && data.branch.value.strategy !== 'inherit' && data.branch.value.workflow !== 'manual'
-  const guidanceField = (key: GuidanceKey) => data && <GuidanceRow key={key} label={text[key]} hint={key === 'commit' && (managedCommit ? managedCommitCopy[locale] : data.settings.commit === 'custom' ? text.customHint : undefined)}>
-    <SelectField compact portalContainer={panel} popupWidth={key === 'commitLanguage' ? 280 : undefined} label={text[key]} value={data.settings[key]} disabled={busy || !!error || (key === 'commit' && !!managedCommit)} onChange={value => void update(key, value)}
+  const settingLabels: Record<GuidanceKey, string> = { ...text, ...docText }
+  const guidanceField = (key: GuidanceKey) => data && <GuidanceRow key={key} label={settingLabels[key]} hint={key === 'commit' && (managedCommit ? managedCommitCopy[locale] : data.settings.commit === 'custom' ? text.customHint : undefined)}>
+    <SelectField compact portalContainer={panel} popupWidth={key === 'commitLanguage' ? 280 : undefined} label={settingLabels[key]} value={data.settings[key]} disabled={busy || !!error || (key === 'commit' && !!managedCommit)} onChange={value => void update(key, value)}
       options={[
         ...(data.settings[key] === 'custom' ? [{ value: 'custom', label: text.custom, disabled: true }] : []),
-        ...Object.keys(guidanceOptions[key]).map(value => ({ value, label: labels[value] })),
+        ...Object.keys(guidanceOptions[key]).map(value => ({ value, label: value === 'required' && documentationKeys.has(key) ? docText.required : labels[value] })),
       ]} />
   </GuidanceRow>
   return <DialogFrame labelledBy={titleId} onClose={close} busy={saving} size="settings" className="agent-guidance-dialog flex flex-col text-ink">
@@ -158,13 +161,17 @@ export function AgentGuidanceSettings({ onClose, onOpenFile, workspacePath }: { 
           <div hidden={scope !== 'global'}>
           {data && <section role="group" aria-label={generalCopy[locale]}>
             <h3 className="mb-1 text-xs font-semibold">{generalCopy[locale]}</h3>
-            {(Object.keys(guidanceOptions) as GuidanceKey[]).filter(key => key !== 'commit' && key !== 'commitLanguage').map(guidanceField)}
+            {(Object.keys(guidanceOptions) as GuidanceKey[]).filter(key => key !== 'commit' && key !== 'commitLanguage' && !documentationKeys.has(key)).map(guidanceField)}
           </section>}
-          {data && Object.entries(data.settings).some(([key, value]) => key !== 'commit' && key !== 'commitLanguage' && value === 'custom') && <p className="mt-1 text-xs leading-4 text-ink-secondary">{text.customHint}</p>}
+          {data && Object.entries(data.settings).some(([key, value]) => key !== 'commit' && key !== 'commitLanguage' && !documentationKeys.has(key as GuidanceKey) && value === 'custom') && <p className="mt-1 text-xs leading-4 text-ink-secondary">{text.customHint}</p>}
           {data && <section role="group" aria-label="Git" className="mt-2 border-t border-edge pt-2">
             <h3 className="mb-1 text-xs font-semibold">Git</h3>
             <BranchGuidanceFields key={reloadVersion} branch={data.branch} disabled={busy || !!error} portalContainer={panel} onSave={value => void update('branch', value)} commitField={<>{guidanceField('commit')}{guidanceField('commitLanguage')}</>} />
           </section>}
+          {data && <details className="agent-guidance-extra"><summary>{docText.title}</summary>
+            <section role="group" aria-label={docText.title}>{documentationGuidanceKeys.map(guidanceField)}</section>
+            {documentationGuidanceKeys.some(key => data.settings[key] === 'custom') && <p className="mt-1 text-xs leading-4 text-ink-secondary">{text.customHint}</p>}
+          </details>}
           {data && <details className="agent-guidance-extra"><summary>{scopeText.instructions}</summary>
             <textarea aria-label={`${scopeText.global} ${scopeText.instructions}`} className="agent-guidance-text" rows={5} maxLength={8000} disabled={busy} value={globalDraft} onChange={event => { setGlobalDraft(event.target.value); setNotice('') }} />
             <div className="mt-1 flex justify-end"><button type="button" className={button} disabled={busy || !globalDirty} onClick={() => void update('instructions', globalDraft)}>{scopeText.save}</button></div>

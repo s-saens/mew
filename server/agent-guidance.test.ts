@@ -9,7 +9,7 @@ import { agentContextText } from './agent-context.ts'
 import { describeAgentContext } from './project-context-text.ts'
 import { defaultAgentSettings, writeProjectAgentSettings } from './project-agent-settings.ts'
 import { readExternalFile, writeExternalFile } from './fsBrowse.ts'
-import { guidanceOptions } from '../shared/agent-guidance.ts'
+import { documentationGuidanceKeys, guidanceOptions } from '../shared/agent-guidance.ts'
 import { runWithAgentAccount } from './agent-account-settings.ts'
 
 test('shared guidance survives initialization and editor changes reach every project on the next request', () => {
@@ -269,6 +269,118 @@ test('test-writing guidance defaults to required without rewriting existing inst
     assert.throws(() => updateAgentGuidance({ key: 'testing', value: 'required', revision: state.revision }), GuidanceError)
     assert.equal(fs.readFileSync(AGENT_GUIDANCE_PATH, 'utf8'), broken)
   }
+})
+
+for (const key of documentationGuidanceKeys) test(`${key} defaults on and preserves independent choices, custom text and damaged blocks`, async () => {
+  const { agentGuidanceSettings, updateAgentGuidance, GuidanceError } = await import('./agent-guidance.ts')
+  fs.rmSync(AGENT_GUIDANCE_PATH, { force: true })
+  assert.equal(readAgentGuidance().split(guidanceOptions[key].required).length - 1, 1, 'fresh template and runtime default agree')
+  assert.equal(fs.existsSync(AGENT_GUIDANCE_PATH), false)
+  assert.equal(agentGuidanceSettings().settings[key], 'required')
+  const original = '# Handwritten instructions\n\nKeep this rule.\n'
+  fs.writeFileSync(AGENT_GUIDANCE_PATH, original)
+  let state = agentGuidanceSettings()
+  assert.equal(state.settings[key], 'required')
+  const roots = ['docs-setting-a', 'docs-setting-b'].map(name => path.join(DATA_DIR, name))
+  const contexts = () => roots.map(root => {
+    fs.mkdirSync(root, { recursive: true })
+    return agentContextText({ projectRoot: root, docsRoot: path.join(root, 'docs') }, root)
+  })
+  for (const context of contexts()) assert.ok(context.includes(guidanceOptions[key].required))
+  assert.equal(fs.readFileSync(AGENT_GUIDANCE_PATH, 'utf8'), original, 'default injection is read-only')
+  for (const value of ['project', 'required', 'project'] as const) {
+    const previousRevision = state.revision
+    state = updateAgentGuidance({ key, value, revision: previousRevision })
+    assert.equal(state.settings[key], value)
+    assert.ok(state.content.startsWith(original))
+    for (const context of contexts()) {
+      assert.equal(context.split(guidanceOptions[key][value]).length - 1, 1)
+      assert.ok(!context.includes(guidanceOptions[key][value === 'project' ? 'required' : 'project']))
+    }
+    for (const other of documentationGuidanceKeys.filter(other => other !== key)) assert.equal(state.settings[other], 'required')
+    assert.throws(() => updateAgentGuidance({ key, value, revision: previousRevision }), GuidanceError)
+    assert.equal(agentGuidanceSettings().settings[key], value)
+  }
+  state = updateAgentGuidance({ key: 'detail', value: 'concise', revision: state.revision })
+  assert.equal(state.settings[key], 'project')
+  assert.throws(() => updateAgentGuidance({ key, value: 'invalid', revision: state.revision }), GuidanceError)
+  const custom = state.content.replace(guidanceOptions[key].project, 'Keep my custom documentation rule.')
+  fs.writeFileSync(AGENT_GUIDANCE_PATH, custom)
+  state = agentGuidanceSettings()
+  assert.equal(state.settings[key], 'custom')
+  assert.ok(readAgentGuidance().includes('Keep my custom documentation rule.'))
+  assert.ok(!readAgentGuidance().includes(guidanceOptions[key].required))
+  state = updateAgentGuidance({ key: 'language', value: 'ko', revision: state.revision })
+  assert.equal(state.settings[key], 'custom')
+  assert.ok(state.content.includes('Keep my custom documentation rule.'))
+  for (const broken of [
+    `<!-- mew:agent-setting:${key} -->Missing end`,
+    `<!-- /mew:agent-setting:${key} -->`,
+    `<!-- mew:agent-setting:${key} --><!-- mew:agent-setting:language -->x<!-- /mew:agent-setting:${key} --><!-- /mew:agent-setting:language -->`,
+  ]) {
+    fs.writeFileSync(AGENT_GUIDANCE_PATH, broken)
+    state = agentGuidanceSettings()
+    assert.ok(!readAgentGuidance().includes(guidanceOptions[key].required))
+    assert.throws(() => updateAgentGuidance({ key, value: 'required', revision: state.revision }), GuidanceError)
+    assert.equal(fs.readFileSync(AGENT_GUIDANCE_PATH, 'utf8'), broken)
+  }
+})
+
+test('former fixed documentation defaults cannot override project-only options, while custom rules and examples survive', async () => {
+  const { agentGuidanceSettings, updateAgentGuidance } = await import('./agent-guidance.ts')
+  const legacy = 'When code, features, or operating procedures change, update the owning canonical documentation in the same task. Give every new or changed document an accurate frontmatter description, and update existing links when paths move; no MOC update is required. Preserve historical sources; keep secrets and temporary debugging logs out of docs.'
+  const legacyMetadata = 'Give every new or changed document an accurate frontmatter description, and update existing links when paths move; no MOC update is required.'
+  const stored = `Keep my handwritten rules.\n\n${legacy}\n\nBefore an authorized commit, record a brief task purpose and explicit changed file paths using the supplied Change intent recorder, after updating canonical docs.\n`
+  for (const original of ['', stored.replace(/\n/g, '\r\n'), legacyMetadata]) {
+    fs.writeFileSync(AGENT_GUIDANCE_PATH, original)
+    const context = readAgentGuidance()
+    assert.ok(!context.includes(legacy))
+    assert.ok(!context.includes(legacyMetadata))
+    for (const key of documentationGuidanceKeys) assert.ok(context.includes(guidanceOptions[key].required))
+    assert.equal(fs.readFileSync(AGENT_GUIDANCE_PATH, 'utf8'), original)
+  }
+  fs.writeFileSync(AGENT_GUIDANCE_PATH, stored)
+  assert.ok(!readAgentGuidance().includes(legacy))
+  assert.equal(fs.readFileSync(AGENT_GUIDANCE_PATH, 'utf8'), stored)
+  let state = agentGuidanceSettings()
+  for (const key of documentationGuidanceKeys) state = updateAgentGuidance({ key, value: 'project', revision: state.revision })
+  const context = readAgentGuidance()
+  for (const key of documentationGuidanceKeys) {
+    assert.ok(context.includes(guidanceOptions[key].project))
+    assert.ok(!context.includes(guidanceOptions[key].required))
+  }
+  assert.ok(!context.includes(legacy))
+  assert.ok(!context.includes('after updating canonical docs.'))
+  assert.match(context, /Preserve historical sources; keep secrets/)
+  assert.ok(state.content.startsWith(stored), 'saving a selection never rewrites free text')
+  for (const custom of [
+    `${legacy} My extra rule.`,
+    `\`\`\`text\n${legacy}\n\`\`\``,
+    `<!-- mew:agent-setting:instructions -->\n${legacy}\n<!-- /mew:agent-setting:instructions -->`,
+  ]) {
+    fs.writeFileSync(AGENT_GUIDANCE_PATH, custom)
+    assert.ok(readAgentGuidance().includes(custom), 'custom prose, fenced examples and explicit blocks are preserved')
+  }
+})
+
+test('documentation preferences are account-wide and never change another account', async () => {
+  const { agentGuidanceSettings, updateAgentGuidance } = await import('./agent-guidance.ts')
+  runWithAgentAccount('documentation-a@example.test', () => {
+    let state = agentGuidanceSettings()
+    for (const key of documentationGuidanceKeys) state = updateAgentGuidance({ key, value: 'project', revision: state.revision })
+    for (const key of documentationGuidanceKeys) assert.ok(readAgentGuidance().includes(guidanceOptions[key].project))
+  })
+  runWithAgentAccount('documentation-b@example.test', () => {
+    const state = agentGuidanceSettings()
+    for (const key of documentationGuidanceKeys) {
+      assert.equal(state.settings[key], 'required')
+      assert.ok(readAgentGuidance().includes(guidanceOptions[key].required))
+      assert.ok(!readAgentGuidance().includes(guidanceOptions[key].project))
+    }
+  })
+  runWithAgentAccount('documentation-a@example.test', () => {
+    for (const key of documentationGuidanceKeys) assert.equal(agentGuidanceSettings().settings[key], 'project')
+  })
 })
 
 
