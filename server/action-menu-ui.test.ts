@@ -28,7 +28,8 @@ function Fixture(){
  const [open,setOpen]=useState(null),[modal,setModal]=useState(false),[outside,setOutside]=useState(0);
  const origin=useRef(null),table=useRef(null);const close=()=>setOpen(null),action=()=>window.actions.push('selected');
  const x=innerWidth-2,y=innerHeight-2;
- const editor={state:{doc:{nodeAt:()=>({}),type:{create:()=>({})}}},storage:{markdown:{serializer:{serialize:()=> '|셀|'}}}};
+ const tableNode={type:{name:'table'}};
+ const editor={extensionManager:{extensions:[]},view:{get dom(){return table.current},posAtDOM:()=>0},state:{doc:{nodeAt:()=>tableNode,resolve:()=>({depth:1,node:()=>tableNode}),type:{create:()=>({})}}},storage:{markdown:{serializer:{serialize:()=> '|셀|'}}}};
  const controls=<><button id="outside" onClick={()=>setOutside(v=>v+1)}>Outside {outside}</button>
  <button ref={origin} id="shared" onClick={()=>setOpen('shared')}>공용</button>
  {['file','tab','git','task','table'].map(name=><button key={name} id={name} onClick={()=>setOpen(name)}>{name}</button>)}
@@ -178,6 +179,11 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><I18nProvid
       const dialog = page.getByRole('dialog', { name: '테스트 모달' })
       await dialog.locator('#shared').click()
       await dialog.getByRole('menu').waitFor()
+      const modalMenu = dialog.getByRole('menu')
+      assert.equal(await modalMenu.evaluate(element => {
+        const rect = element.getBoundingClientRect()
+        return element.contains(element.ownerDocument.elementFromPoint(rect.left + rect.width / 2, rect.top + Math.min(12, rect.height / 2)))
+      }), true, 'the modal menu is positioned within its visible clip and can receive clicks')
       await page.keyboard.press('Escape')
       assert.equal(await dialog.isVisible(), true, 'Esc dismisses the menu above the modal')
       assert.equal(await dialog.locator('#shared').evaluate(el => el === el.ownerDocument.activeElement), true)

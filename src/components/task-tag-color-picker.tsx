@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
 import { Check } from 'iconoir-react'
-import { useOverlayDismiss } from '@mew/ui'
+import { getFixedPopupLayout, useOverlayDismiss } from '@mew/ui'
 import { uiText } from '@mew/ui/i18n-core'
 import { TASK_TAG_PALETTE } from '../../shared/task-tag-colors'
 
@@ -13,17 +13,30 @@ export function TaskTagColorPicker({ tag, hue, anchor, onChange, onClose }: {
   useOverlayDismiss(close, { escapePhase: 'capture', outside: () => popup.current })
   useLayoutEffect(() => {
     const place = () => {
-      const rect = anchor.getBoundingClientRect(), box = popup.current!.getBoundingClientRect(), viewport = window.visualViewport
-      const left = viewport?.offsetLeft ?? 0, top = viewport?.offsetTop ?? 0
-      const right = left + (viewport?.width ?? innerWidth), bottom = top + (viewport?.height ?? innerHeight)
-      setPosition({ left: Math.max(left + 8, Math.min(rect.left, right - box.width - 8)),
-        top: Math.max(top + 8, Math.min(rect.bottom + box.height + 12 <= bottom ? rect.bottom + 4 : rect.top - box.height - 4, bottom - box.height - 8)) })
+      const menu = popup.current!, rect = anchor.getBoundingClientRect()
+      const layout = getFixedPopupLayout(menu.parentElement)
+      const { left, top, right, bottom, width, height } = layout.bounds
+      const limits = layout.toStyle({ maxWidth: Math.max(0, width - 16), maxHeight: Math.max(0, height - 16) })
+      menu.style.maxWidth = `${limits.maxWidth}px`
+      menu.style.maxHeight = `${limits.maxHeight}px`
+      const box = menu.getBoundingClientRect()
+      setPosition({ ...limits, ...layout.toStyle({ left: Math.max(left + 8, Math.min(rect.left, right - box.width - 8)),
+        top: Math.max(top + 8, Math.min(rect.bottom + box.height + 12 <= bottom ? rect.bottom + 4 : rect.top - box.height - 4, bottom - box.height - 8)) }), overflowY: 'auto' })
     }
     place()
     popup.current?.querySelector<HTMLButtonElement>('[aria-pressed="true"]')?.focus({ preventScroll: true })
+    const observer = new ResizeObserver(place)
+    observer.observe(popup.current!)
+    observer.observe(anchor)
+    const host = getFixedPopupLayout(popup.current!.parentElement).host
+    if (host) observer.observe(host)
+    const mutations = new MutationObserver(place)
+    mutations.observe(anchor.ownerDocument.documentElement, { attributes: true, attributeFilter: ['style', 'class'] })
+    if (host) mutations.observe(host, { attributes: true, attributeFilter: ['style', 'class'] })
     window.addEventListener('resize', place); window.addEventListener('scroll', place, true)
     window.visualViewport?.addEventListener('resize', place); window.visualViewport?.addEventListener('scroll', place)
     return () => {
+      observer.disconnect(); mutations.disconnect()
       window.removeEventListener('resize', place); window.removeEventListener('scroll', place, true)
       window.visualViewport?.removeEventListener('resize', place); window.visualViewport?.removeEventListener('scroll', place)
     }

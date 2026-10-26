@@ -7,6 +7,7 @@
 // 터치에서는 뜨지 않는다 — 손가락엔 hover가 없고, 그 자리는 탭·길게누르기가 이미 쓰고 있다.
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
+import { getFixedPopupLayout } from './fixed-popup-layout'
 
 /** 버튼과 이름표 사이 간격 */
 const GAP_PX = 6
@@ -36,22 +37,17 @@ export function HoverTipLayer({ className, children, placement = 'top', portalTa
   useLayoutEffect(() => {
     const el = tipRef.current
     if (!el || !tip) return
+    const layout = getFixedPopupLayout(el.parentElement)
     const y = placement === 'bottom' ? '0%' : '-100%'
-    el.style.left = `${tip.centerX}px`
-    el.style.top = `${tip.top}px`
+    const position = layout.toStyle({ left: tip.centerX, top: tip.top })
+    el.style.left = `${position.left}px`
+    el.style.top = `${position.top}px`
     el.style.transform = `translate(-50%, ${y})`
-    const initial = el.getBoundingClientRect()
-    const offsetX = initial.left + initial.width / 2 - tip.centerX
-    const offsetY = (placement === 'bottom' ? initial.top : initial.bottom) - tip.top
-    if (offsetX || offsetY) {
-      el.style.left = `${tip.centerX - offsetX}px`
-      el.style.top = `${tip.top - offsetY}px`
-    }
     const r = el.getBoundingClientRect()
     let dx = 0
-    if (r.left < MARGIN_PX) dx = MARGIN_PX - r.left
-    else if (r.right > window.innerWidth - MARGIN_PX) dx = window.innerWidth - MARGIN_PX - r.right
-    if (dx !== 0) el.style.transform = `translate(calc(-50% + ${dx}px), ${y})`
+    if (r.left < layout.bounds.left + MARGIN_PX) dx = layout.bounds.left + MARGIN_PX - r.left
+    else if (r.right > layout.bounds.right - MARGIN_PX) dx = layout.bounds.right - MARGIN_PX - r.right
+    if (dx !== 0) el.style.transform = `translate(calc(-50% + ${layout.toStyle({ width: dx }).width}px), ${y})`
   }, [tip, placement])
 
   function onPointerOver(e: React.PointerEvent) {

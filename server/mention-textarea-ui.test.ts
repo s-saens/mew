@@ -171,6 +171,35 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
         await assertMenuBounds()
         await input.press('Escape')
         assert.equal(await menu.count(), 0)
+
+        const dialog = page.locator('[data-clipped-panel]')
+        await dialog.evaluate(el => {
+          el.setAttribute('role', 'dialog')
+          Object.assign(el.style, { height: '340px', borderWidth: '3px', backdropFilter: 'blur(6px)' })
+        })
+        await page.locator('[data-input-shell]').evaluate(el => { el.style.height = '72px' })
+        await input.fill('')
+        await input.fill('@')
+        await first.waitFor()
+        assert.equal(await menu.evaluate(el => el.parentElement?.getAttribute('role')), 'dialog', 'modal candidates retain their focus boundary')
+        const modalBounds = await assertMenuBounds()
+        const dialogBox = (await dialog.boundingBox())!, inputBox = (await input.boundingBox())!
+        assert.ok(modalBounds.top >= dialogBox.y + 3 && modalBounds.left >= dialogBox.x + 3 && modalBounds.right <= dialogBox.x + dialogBox.width - 3,
+          `blurred modal candidates fit the clipped panel: ${JSON.stringify({ modalBounds, dialogBox })}`)
+        assert.ok(Math.abs(modalBounds.bottom - inputBox.y + 4) <= 1, 'blurred modal candidates remain attached above the input')
+        assert.equal(await first.evaluate(el => {
+          const bounds = el.getBoundingClientRect()
+          return el.contains(el.ownerDocument.elementFromPoint(bounds.left + 8, bounds.top + bounds.height / 2))
+        }), true, 'corrected candidates are clickable inside the blurred panel')
+        await dialog.evaluate(el => { el.style.backdropFilter = 'none' })
+        await menu.evaluate(async el => {
+          const view = el.ownerDocument.defaultView!
+          await new Promise<void>(resolve => view.requestAnimationFrame(() => view.requestAnimationFrame(() => resolve())))
+        })
+        const unblurredBounds = await assertMenuBounds()
+        assert.ok(Math.abs(unblurredBounds.bottom - inputBox.y + 4) <= 1, 'removing the containing block keeps the open menu anchored')
+        await first.click()
+        assert.equal(await input.inputValue(), '[[docs:reference-01.md]] ')
         assert.deepEqual(errors, [])
       } finally { await page.close() }
     }

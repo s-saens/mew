@@ -1,6 +1,7 @@
-import { cloneElement, isValidElement, createContext, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode, type ReactElement, type SVGProps, type Ref, type ButtonHTMLAttributes, type HTMLAttributes } from 'react'
+import { cloneElement, isValidElement, createContext, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode, type ReactElement, type SVGProps, type Ref, type ButtonHTMLAttributes, type HTMLAttributes, type CSSProperties } from 'react'
 import { createPortal } from 'react-dom'
 import { useOverlayDismiss } from './useOverlayDismiss'
+import { getFixedPopupLayout } from './fixed-popup-layout'
 
 const MenuContext = createContext<(() => void) | null>(null)
 
@@ -44,7 +45,7 @@ export function ActionMenu({ x, y, onClose, children, label, trigger, portalCont
   const ref = useRef<HTMLDivElement>(null)
   // 항목 개수(파일/폴더/루트)마다 실제 높이가 달라 고정 상수로는 못 잡는다 —
   // 렌더된 실측 크기로 보이는 화면과 모바일 독 사이에 배치한다.
-  const [pos, setPos] = useState({ left: x, top: y, maxHeight: 0, maxWidth: 0 })
+  const [pos, setPos] = useState<CSSProperties>({ left: x, top: y, maxHeight: 0, maxWidth: 0 })
 
   useEffect(() => {
     if (!container) return
@@ -78,10 +79,11 @@ export function ActionMenu({ x, y, onClose, children, label, trigger, portalCont
     if (!menu) return
     const viewport = window.visualViewport
     const place = () => {
-      const left = (viewport?.offsetLeft ?? 0) + 4
-      const top = (viewport?.offsetTop ?? 0) + 4
-      const right = left + (viewport?.width ?? window.innerWidth) - 8
-      let bottom = top + (viewport?.height ?? window.innerHeight) - 8
+      const layout = getFixedPopupLayout(container)
+      const left = layout.bounds.left + 4
+      const top = layout.bounds.top + 4
+      const right = layout.bounds.right - 4
+      let bottom = layout.bounds.bottom - 4
       if (window.matchMedia('(width < 768px)').matches) {
         const dock = document.querySelector('.mobile-dock:not([hidden])')?.getBoundingClientRect()
         if (dock && dock.width > 0 && dock.height > 0 && dock.bottom > top) {
@@ -91,30 +93,36 @@ export function ActionMenu({ x, y, onClose, children, label, trigger, portalCont
       const maxHeight = Math.max(0, bottom - top)
       const maxWidth = Math.max(0, right - left)
       // Apply limits before measuring so a tall menu scrolls above the dock.
-      menu.style.maxHeight = `${maxHeight}px`
-      menu.style.maxWidth = `${maxWidth}px`
-      menu.style.minWidth = `${Math.min(parseFloat(getComputedStyle(menu).getPropertyValue('--mew-action-menu-min-width')) || 168, maxWidth)}px`
+      const limits = layout.toStyle({ maxHeight, maxWidth,
+        minWidth: Math.min(parseFloat(getComputedStyle(menu).getPropertyValue('--mew-action-menu-min-width')) || 168, maxWidth) })
+      for (const key of ['maxHeight', 'maxWidth', 'minWidth'] as const) menu.style[key] = `${limits[key]}px`
       const rect = menu.getBoundingClientRect()
-      const next = {
+      const next = layout.toStyle({
         left: Math.max(left, Math.min(x, right - rect.width)),
         top: Math.max(top, Math.min(y, bottom - rect.height)),
         maxHeight,
         maxWidth,
-      }
+      })
       setPos(previous => previous.left === next.left && previous.top === next.top
-        && previous.maxHeight === maxHeight && previous.maxWidth === maxWidth ? previous : next)
+        && previous.maxHeight === next.maxHeight && previous.maxWidth === next.maxWidth ? previous : next)
     }
     place()
     const observer = new ResizeObserver(place)
     observer.observe(menu)
+    if (container) observer.observe(container)
+    const mutations = new MutationObserver(place)
+    mutations.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'style'] })
+    if (container) mutations.observe(container, { attributes: true, attributeFilter: ['class', 'style'] })
     const dock = document.querySelector('.mobile-dock')
     if (dock) observer.observe(dock, { box: 'border-box' })
     window.addEventListener('resize', place)
+    window.addEventListener('scroll', place, true)
     viewport?.addEventListener('resize', place)
     viewport?.addEventListener('scroll', place)
     return () => {
-      observer.disconnect()
+      observer.disconnect(); mutations.disconnect()
       window.removeEventListener('resize', place)
+      window.removeEventListener('scroll', place, true)
       viewport?.removeEventListener('resize', place)
       viewport?.removeEventListener('scroll', place)
     }

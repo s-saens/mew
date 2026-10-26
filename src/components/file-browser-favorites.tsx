@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { Cloud, Folder, HomeSimple, RefreshDouble, Star, Xmark, NavArrowDown } from 'iconoir-react'
 import { createPortal } from 'react-dom'
-import { useOverlayDismiss } from '@mew/ui'
+import { getFixedPopupLayout, useOverlayDismiss } from '@mew/ui'
 import { fetchFileFavorites, setFileFavorite, FILE_FAVORITES_CHANGED } from '../api/client'
 import { useI18n } from '../i18n'
 import type { FileFavorite } from '../../shared/file-favorites'
@@ -100,15 +100,15 @@ function FavoritesDropdown({ id, label, disabled, children }: {
   useLayoutEffect(() => {
     if (!expanded) return
     const place = () => {
-      const rect = trigger.current!.getBoundingClientRect(), viewport = window.visualViewport
-      const left = viewport?.offsetLeft ?? 0, top = viewport?.offsetTop ?? 0
-      const width = viewport?.width ?? window.innerWidth, height = viewport?.height ?? window.innerHeight
+      const rect = trigger.current!.getBoundingClientRect()
+      const layout = getFixedPopupLayout(trigger.current?.closest('.mew-dialog'))
+      const { left, top, width, height } = layout.bounds
       const below = top + height - rect.bottom - 8, above = rect.top - top - 8
       const down = below >= Math.min(280, above)
-      const popupWidth = Math.min(360, width - 16)
-      setPosition({ width: popupWidth, left: Math.max(left + 8, Math.min(rect.left, left + width - popupWidth - 8)),
+      const popupWidth = Math.max(0, Math.min(360, width - 16))
+      setPosition(layout.toStyle({ width: popupWidth, left: Math.max(left + 8, Math.min(rect.left, left + width - popupWidth - 8)),
         maxHeight: Math.max(0, Math.min(280, down ? below : above)),
-        ...(down ? { top: rect.bottom + 4 } : { bottom: window.innerHeight - rect.top + 4 }) })
+        ...(down ? { top: rect.bottom + 4 } : { bottom: window.innerHeight - rect.top + 4 }) }))
     }
     const outside = (event: PointerEvent) => {
       if (trigger.current?.contains(event.target as Node) || menu.current?.contains(event.target as Node)) return
@@ -130,6 +130,13 @@ function FavoritesDropdown({ id, label, disabled, children }: {
       if (!trigger.current?.contains(event.target as Node) && !menu.current?.contains(event.target as Node)) setOpen(false)
     }
     place()
+    const observer = new ResizeObserver(place)
+    observer.observe(trigger.current!)
+    const host = trigger.current?.closest('.mew-dialog')
+    if (host) observer.observe(host)
+    const mutations = new MutationObserver(place)
+    mutations.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'style'] })
+    if (host) mutations.observe(host, { attributes: true, attributeFilter: ['class', 'style'] })
     document.addEventListener('pointerdown', outside, true)
     document.addEventListener('focusin', focusOutside)
     window.addEventListener('resize', place)
@@ -137,6 +144,7 @@ function FavoritesDropdown({ id, label, disabled, children }: {
     window.visualViewport?.addEventListener('resize', place)
     window.visualViewport?.addEventListener('scroll', place)
     return () => {
+      observer.disconnect(); mutations.disconnect()
       document.removeEventListener('pointerdown', outside, true)
       document.removeEventListener('focusin', focusOutside)
       window.removeEventListener('resize', place)

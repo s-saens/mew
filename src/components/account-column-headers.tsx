@@ -1,7 +1,7 @@
 import { useId, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Group, Trash, User, Xmark } from 'iconoir-react'
-import { useOverlayDismiss } from '@mew/ui'
+import { getFixedPopupLayout, useOverlayDismiss } from '@mew/ui'
 import type { AccessRow } from '../../shared/access-policy'
 import { uiText } from '@mew/ui/i18n-core'
 import { useI18n } from '../i18n'
@@ -33,23 +33,23 @@ function AccountIcon({ account, onRoleChange, onDelete, disabled, lastOwner }: {
     const element = popup.current!
     const place = () => {
       const rect = trigger.current!.getBoundingClientRect()
-      const viewport = window.visualViewport
+      const layout = getFixedPopupLayout(portalContainer)
       const host = portalContainer?.getBoundingClientRect()
-      const viewportLeft = viewport?.offsetLeft ?? 0, viewportTop = viewport?.offsetTop ?? 0
-      const left = Math.max(viewportLeft, host?.left ?? viewportLeft) + 8
-      const top = Math.max(viewportTop, host?.top ?? viewportTop) + 8
-      const right = Math.min(viewportLeft + (viewport?.width ?? window.innerWidth), host?.right ?? Infinity) - 8
-      const bottom = Math.min(viewportTop + (viewport?.height ?? window.innerHeight), host?.bottom ?? Infinity) - 8
+      const left = Math.max(layout.bounds.left, host?.left ?? -Infinity) + 8
+      const top = Math.max(layout.bounds.top, host?.top ?? -Infinity) + 8
+      const right = Math.min(layout.bounds.right, host?.right ?? Infinity) - 8
+      const bottom = Math.min(layout.bounds.bottom, host?.bottom ?? Infinity) - 8
       const width = Math.min(288, Math.max(0, right - left))
-      Object.assign(element.style, { width: `${width}px`, maxHeight: `${Math.max(0, bottom - top)}px`, left: '0px', top: '0px' })
-      // Measure the real fixed origin: a blurred dialog establishes its own containing block.
-      const origin = element.getBoundingClientRect()
+      const limits = layout.toStyle({ width, maxHeight: Math.max(0, bottom - top) })
+      Object.assign(element.style, { width: `${limits.width}px`, maxHeight: `${limits.maxHeight}px` })
       const below = bottom - rect.bottom - 4, above = rect.top - top - 4
-      const down = below >= origin.height || below >= above
-      element.style.maxHeight = `${Math.max(0, down ? below : above)}px`
+      const down = below >= element.getBoundingClientRect().height || below >= above
+      element.style.maxHeight = `${layout.toStyle({ maxHeight: Math.max(0, down ? below : above) }).maxHeight}px`
       const height = element.getBoundingClientRect().height
-      element.style.left = `${Math.max(left, Math.min(rect.left + rect.width / 2 - width / 2, right - width)) - origin.left}px`
-      element.style.top = `${Math.max(top, Math.min(down ? rect.bottom + 4 : rect.top - height - 4, bottom - height)) - origin.top}px`
+      const position = layout.toStyle({ left: Math.max(left, Math.min(rect.left + rect.width / 2 - width / 2, right - width)),
+        top: Math.max(top, Math.min(down ? rect.bottom + 4 : rect.top - height - 4, bottom - height)) })
+      element.style.left = `${position.left}px`
+      element.style.top = `${position.top}px`
     }
     place()
     const observer = new ResizeObserver(place)

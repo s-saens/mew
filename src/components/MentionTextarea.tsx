@@ -1,4 +1,4 @@
-import { canAutoFocusInput } from '@mew/ui'
+import { canAutoFocusInput, getFixedPopupLayout } from '@mew/ui'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type CSSProperties, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
 import { AgentComposerInput, type MentionInputHandle } from './agent-composer-input'
@@ -156,31 +156,38 @@ export function MentionTextarea({
     const viewport = win.visualViewport
     const placeMenu = () => {
       const bounds = container.getBoundingClientRect()
+      const layout = getFixedPopupLayout(menu.parentElement)
       const gap = 4
-      const viewportTop = viewport?.offsetTop ?? 0
-      const viewportLeft = viewport?.offsetLeft ?? 0
-      const viewportBottom = viewportTop + (viewport?.height ?? win.innerHeight)
-      const viewportRight = viewportLeft + (viewport?.width ?? win.innerWidth)
+      const { left, top, right, bottom: viewportBottom, width } = layout.bounds
       const bottom = Math.min(bounds.top, viewportBottom) - gap
-      const maxWidth = Math.max(0, viewportRight - viewportLeft - gap * 2)
+      const maxWidth = Math.max(0, width - gap * 2)
       const minWidth = Math.min(224, maxWidth)
-      menu.style.minWidth = `${minWidth}px`
-      menu.style.maxWidth = `${Math.min(Math.max(minWidth, bounds.width), maxWidth)}px`
-      menu.style.maxHeight = `${Math.max(0, Math.min(224, bottom - viewportTop - gap))}px`
-      menu.style.bottom = `${win.innerHeight - bottom}px`
-      menu.style.left = `${Math.max(viewportLeft + gap, Math.min(bounds.left, viewportRight - menu.getBoundingClientRect().width - gap))}px`
+      const size = layout.toStyle({ minWidth, maxWidth: Math.min(Math.max(minWidth, bounds.width), maxWidth),
+        maxHeight: Math.max(0, Math.min(224, bottom - top - gap)) })
+      menu.style.minWidth = `${size.minWidth}px`
+      menu.style.maxWidth = `${size.maxWidth}px`
+      menu.style.maxHeight = `${size.maxHeight}px`
+      const position = layout.toStyle({ bottom: win.innerHeight - bottom,
+        left: Math.max(left + gap, Math.min(bounds.left, right - menu.getBoundingClientRect().width - gap)) })
+      menu.style.bottom = `${position.bottom}px`
+      menu.style.left = `${position.left}px`
     }
     placeMenu()
     const observer = new ResizeObserver(placeMenu)
     observer.observe(menu)
     // Ancestor resizing can move the input without changing its own size.
     for (let ancestor: HTMLElement | null = container; ancestor; ancestor = ancestor.parentElement) observer.observe(ancestor)
+    const mutations = new MutationObserver(placeMenu)
+    mutations.observe(container.ownerDocument.documentElement, { attributes: true, attributeFilter: ['style', 'class'] })
+    const host = getFixedPopupLayout(menu.parentElement).host
+    if (host) mutations.observe(host, { attributes: true, attributeFilter: ['style', 'class'] })
     win.addEventListener('resize', placeMenu)
     win.addEventListener('scroll', placeMenu, true)
     viewport?.addEventListener('resize', placeMenu)
     viewport?.addEventListener('scroll', placeMenu)
     return () => {
       observer.disconnect()
+      mutations.disconnect()
       win.removeEventListener('resize', placeMenu)
       win.removeEventListener('scroll', placeMenu, true)
       viewport?.removeEventListener('resize', placeMenu)

@@ -1,5 +1,5 @@
-import { canAutoFocusInput, useOverlayDismiss } from '@mew/ui'
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { canAutoFocusInput, getFixedPopupLayout, useOverlayDismiss } from '@mew/ui'
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 
 /** Field menus share viewport placement, dismissal and keyboard navigation. */
@@ -7,22 +7,23 @@ export function FrontmatterPopover({ anchor, label, onClose, children, initialFo
   anchor: HTMLElement; label: string; onClose: () => void; children: ReactNode; initialFocus?: 'input'; ignoreAnchor?: boolean
 }) {
   const ref = useRef<HTMLDivElement>(null)
-  const [position, setPosition] = useState({ left: 0, top: 0, maxHeight: 280, visibility: 'hidden' as 'hidden' | 'visible' })
+  const [position, setPosition] = useState<CSSProperties>({ left: 0, top: 0, maxHeight: 280, visibility: 'hidden' })
   const close = () => { onClose(); if (anchor.isConnected) anchor.focus({ preventScroll: true }) }
   useOverlayDismiss(close, { outside: () => ref.current, outsideIgnore: () => ignoreAnchor ? anchor : null })
   useLayoutEffect(() => {
     const place = () => {
-      const viewport = window.visualViewport
-      const left = viewport?.offsetLeft ?? 0, top = viewport?.offsetTop ?? 0
-      const width = viewport?.width ?? window.innerWidth, height = viewport?.height ?? window.innerHeight
       const rect = anchor.getBoundingClientRect()
       const menu = ref.current!
-      const below = top + height - rect.bottom - 8, above = rect.top - top - 8
+      const layout = getFixedPopupLayout(menu.parentElement)
+      const { left, top, right, bottom, width, height } = layout.bounds
+      const maxWidth = Math.max(0, width - 16)
+      menu.style.maxWidth = `${layout.toStyle({ maxWidth }).maxWidth}px`
+      const below = bottom - rect.bottom - 8, above = rect.top - top - 8
       const down = below >= Math.min(menu.scrollHeight, 280) || below >= above
       const maxHeight = Math.max(0, Math.min(height - 16, down ? below : above))
-      setPosition({ left: Math.max(left + 8, Math.min(rect.left, left + width - menu.offsetWidth - 8)),
+      setPosition({ ...layout.toStyle({ left: Math.max(left + 8, Math.min(rect.left, right - menu.getBoundingClientRect().width - 8)),
         top: down ? Math.max(top + 8, rect.bottom + 4) : Math.max(top + 8, rect.top - Math.min(menu.scrollHeight, maxHeight) - 4),
-        maxHeight, visibility: 'visible' })
+        maxHeight, maxWidth }), visibility: 'visible' })
     }
     place()
     window.addEventListener('resize', place)
@@ -31,12 +32,19 @@ export function FrontmatterPopover({ anchor, label, onClose, children, initialFo
     window.visualViewport?.addEventListener('scroll', place)
     const observer = new ResizeObserver(place)
     observer.observe(ref.current!)
+    observer.observe(anchor)
+    const host = getFixedPopupLayout(ref.current!.parentElement).host
+    if (host) observer.observe(host)
+    const mutations = new MutationObserver(place)
+    mutations.observe(anchor.ownerDocument.documentElement, { attributes: true, attributeFilter: ['style', 'class'] })
+    if (host) mutations.observe(host, { attributes: true, attributeFilter: ['style', 'class'] })
     return () => {
       window.removeEventListener('resize', place)
       window.removeEventListener('scroll', place, true)
       window.visualViewport?.removeEventListener('resize', place)
       window.visualViewport?.removeEventListener('scroll', place)
       observer.disconnect()
+      mutations.disconnect()
     }
   }, [anchor])
   useEffect(() => {

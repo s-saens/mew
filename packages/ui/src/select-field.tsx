@@ -2,6 +2,7 @@ import { canAutoFocusInput } from './input-focus'
 import { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { useOverlayDismiss } from './useOverlayDismiss'
+import { getFixedPopupLayout } from './fixed-popup-layout'
 
 export type SelectOption = { value: string; label: string; disabled?: boolean; leading?: ReactNode }
 
@@ -12,17 +13,6 @@ type SelectFieldProps = {
   placeholder?: string
 } & ({ multiple?: false; editable?: boolean; value: string; onChange: (value: string) => void }
   | { multiple: true; editable?: false; value: string[]; onChange: (value: string[]) => void })
-
-const FIXED_CONTAINERS = new Set(['transform', 'perspective', 'filter', 'backdrop-filter'])
-function fixedContainingBlock(container?: Element | null) {
-  for (let el = container instanceof HTMLElement ? container : container?.parentElement ?? null; el && el !== el.ownerDocument.documentElement; el = el.parentElement) {
-    const style = el.ownerDocument.defaultView!.getComputedStyle(el)
-    const backdrop = style.backdropFilter || style.getPropertyValue('-webkit-backdrop-filter')
-    if (style.transform !== 'none' || style.perspective !== 'none' || style.filter !== 'none' || (backdrop && backdrop !== 'none') ||
-      /\b(paint|layout|strict|content)\b/.test(style.contain) || style.willChange.split(',').some(value => FIXED_CONTAINERS.has(value.trim()))) return el
-  }
-  return null
-}
 
 /** Themed selection. Focus stays on the trigger, including inside dialogs. */
 export function SelectField({ id: fieldId, label, value, options, disabled = false, editable = false, compact = false, className = 'w-full min-w-0', portalContainer, onChange, multiple, triggerContent, triggerClassName, popupWidth, popupClassName, placeholder }: SelectFieldProps) {
@@ -41,12 +31,11 @@ export function SelectField({ id: fieldId, label, value, options, disabled = fal
     if (!expanded) return
     const place = () => {
       let rect = field.current!.getBoundingClientRect()
-      const viewport = window.visualViewport
       const transform = portalContainer && getComputedStyle(portalContainer).transform
-      const local = !!transform && transform !== 'none'
-      if (local && portalContainer) {
+      const matrix = transform && transform !== 'none' ? new DOMMatrixReadOnly(transform) : null
+      const local = !!matrix && (matrix.b !== 0 || matrix.c !== 0)
+      if (local && portalContainer && matrix) {
         const area = portalContainer.getBoundingClientRect()
-        const matrix = new DOMMatrixReadOnly(transform)
         // Only invert the linear part: layout coordinates are centered in the container.
         const inverse = new DOMMatrixReadOnly([matrix.a, matrix.b, matrix.c, matrix.d, 0, 0]).inverse()
         const corners = [[rect.left, rect.top], [rect.right, rect.top], [rect.left, rect.bottom], [rect.right, rect.bottom]].map(([x, y]) => {
@@ -56,20 +45,17 @@ export function SelectField({ id: fieldId, label, value, options, disabled = fal
         const x = Math.min(...corners.map(point => point.x)), y = Math.min(...corners.map(point => point.y))
         rect = new DOMRect(x, y, Math.max(...corners.map(point => point.x)) - x, Math.max(...corners.map(point => point.y)) - y)
       }
-      const fixedHost = local ? null : fixedContainingBlock(portalContainer)
-      const hostBox = fixedHost?.getBoundingClientRect()
-      const originLeft = hostBox ? hostBox.left + fixedHost!.clientLeft : 0
-      const originTop = hostBox ? hostBox.top + fixedHost!.clientTop : 0
-      const originBottom = local ? portalContainer!.clientHeight : hostBox ? originTop + fixedHost!.clientHeight : window.innerHeight
-      const left = local ? 0 : viewport?.offsetLeft ?? 0, top = local ? 0 : viewport?.offsetTop ?? 0
-      const width = local ? portalContainer!.clientWidth : viewport?.width ?? window.innerWidth
-      const height = local ? portalContainer!.clientHeight : viewport?.height ?? window.innerHeight
+      const layout = getFixedPopupLayout(portalContainer)
+      const left = local ? 0 : layout.bounds.left, top = local ? 0 : layout.bounds.top
+      const width = local ? portalContainer!.clientWidth : layout.bounds.width
+      const height = local ? portalContainer!.clientHeight : layout.bounds.height
       const below = top + height - rect.bottom - 8, above = rect.top - top - 8
       const down = below >= Math.min(280, menu.current?.scrollHeight ?? options.length * 44 + 8) || below >= above
-      const menuWidth = Math.min(popupWidth ?? rect.width, width - 16)
-      setPosition({ position: local ? 'absolute' : 'fixed', left: Math.max(left + 8, Math.min(rect.left, left + width - menuWidth - 8)) - originLeft,
+      const menuWidth = Math.max(0, Math.min(popupWidth ?? rect.width, width - 16))
+      const position = { left: Math.max(left + 8, Math.min(rect.left, left + width - menuWidth - 8)),
         width: menuWidth, maxHeight: Math.max(0, Math.min(280, down ? below : above)),
-        ...(down ? { top: rect.bottom + 4 - originTop } : { bottom: originBottom - rect.top + 4 }) })
+        ...(down ? { top: rect.bottom + 4 } : { bottom: (local ? height : window.innerHeight) - rect.top + 4 }) }
+      setPosition(local ? { ...position, position: 'absolute' } : layout.toStyle(position))
     }
     const outside = (event: PointerEvent) => {
       const target = event.target as Node
@@ -78,7 +64,7 @@ export function SelectField({ id: fieldId, label, value, options, disabled = fal
     place()
     const observer = new ResizeObserver(place)
     observer.observe(field.current!)
-    const fixedHost = fixedContainingBlock(portalContainer)
+    const fixedHost = getFixedPopupLayout(portalContainer).host
     if (portalContainer) observer.observe(portalContainer)
     if (fixedHost && fixedHost !== portalContainer) observer.observe(fixedHost)
     const mutations = new MutationObserver(place)

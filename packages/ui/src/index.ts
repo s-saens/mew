@@ -31,5 +31,6 @@ export { DateCalendar } from './date-calendar'
 export { ActionMenu, ActionMenuItem, ActionMenuSeparator, type ActionMenuProps, type ActionMenuItemProps } from './action-menu'
 
 export { openDropdownOnArrow } from './dropdown-keyboard'
+export { getFixedPopupLayout } from './fixed-popup-layout'
 
 export { LoadingIndicator } from './loading-indicator'
