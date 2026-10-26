@@ -28,6 +28,10 @@
   0%, 70%, 100% { transform: scale(.55); opacity: .45; }
   35% { transform: scale(1); opacity: 1; }
 }
+.mew-loading-logo-shadow {
+  display: inline-flex;
+  filter: drop-shadow(0 3px 4px rgb(0 0 0 / .8)) drop-shadow(0 8px 14px rgb(0 0 0 / .6));
+}
 .mew-loading-logo {
   background: linear-gradient(135deg, #77758f, #617a8d 55%, #6c8790);
   mask: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2064%2064%22%20fill%3D%22none%22%3E%3Crect%20x%3D%222%22%20y%3D%222%22%20width%3D%2260%22%20height%3D%2260%22%20stroke%3D%22white%22%20stroke-width%3D%224%22%2F%3E%3Cpath%20d%3D%22M46%2029.75C46%2018.5%2046%2014%2039%2014C32%2014%2032%2018.5%2032%2029.75C32%2018.5%2032%2014%2025%2014C18%2014%2018%2018.5%2018%2029.75L21.5%2032L18%2034.25C18.0002%2045.5%2018%2050%2025%2050C32%2050%2032%2045.5%2032%2034.25C32%2045.5%2032%2050%2039%2050C46%2050%2046%2045.5%2046%2034.25%22%20stroke%3D%22white%22%20stroke-width%3D%224%22%2F%3E%3C%2Fsvg%3E") center / contain no-repeat;

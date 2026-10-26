@@ -9,7 +9,7 @@ export function PanelLoading() {
 
 export function StartupScreen() {
   return <div data-startup-screen role="status" aria-label={uiText('접속 중…')} aria-busy="true" className="mew-workspace flex h-dvh items-center justify-center overflow-hidden px-4 text-center text-sm text-ink">
-    <LoadingIndicator variant="logo" size={56} />
+    <span className="mew-loading-logo-shadow"><LoadingIndicator variant="logo" size={56} /></span>
     <span className="sr-only">{uiText('접속 중…')}</span>
   </div>
 }
