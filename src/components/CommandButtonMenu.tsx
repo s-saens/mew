@@ -17,6 +17,7 @@ import { fetchCmdButtons, killTmuxSession, runCmdButton, saveCmdButtons, type Cm
 import { SessionTerminalPopup } from './SessionTerminalPopup'
 import { WORKSPACE_PROJECT } from '../utils/active-project'
 import { captureCommandMenuShortcut, focusFirstCommand, navigateCommandMenu } from '../utils/command-menu-keyboard'
+import { portPreviewUrl } from '../utils/port-preview-url'
 
 const LONG_PRESS_MS = 500
 const MENU_WIDTH = 220
@@ -177,6 +178,15 @@ export function CommandButtonMenu({
     }
   }
 
+  function openPort(port: number) {
+    try {
+      window.open(portPreviewUrl(port), '_blank', 'noopener,noreferrer')
+      setError(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : uiText("미리보기를 열지 못했습니다."))
+    }
+  }
+
   /** 추가·수정·삭제 모두 목록 전체 저장 한 경로로 처리한다 */
   async function commit(next: { name: string; command: string; oneShot?: boolean }[]) {
     const res = await saveCmdButtons(project, next, directory)
@@ -203,7 +213,7 @@ export function CommandButtonMenu({
         <div className="px-3 py-3 text-xs text-ink-muted">{uiText("불러오는 중…")}</div>
       ) : (
         list.map((b, i) => (
-          <CmdRow key={`${b.name}-${i}`} button={b} busy={busyName === b.name} onRun={() => run(b)} onStop={() => stop(b)} onOpenSession={() => { setPopup(b); setOpen(false) }} onEdit={() => startEditing({ index: i, name: b.name, command: b.command, oneShot: b.oneShot })} />
+          <CmdRow key={`${b.name}-${i}`} button={b} busy={busyName === b.name} onRun={() => run(b)} onStop={() => stop(b)} onOpenPort={openPort} onOpenSession={() => { setPopup(b); setOpen(false) }} onEdit={() => startEditing({ index: i, name: b.name, command: b.command, oneShot: b.oneShot })} />
         ))
       )}
       {buttons !== null && list.length === 0 && !error && <div className="px-3 py-2 text-xs text-ink-muted">{uiText("아직 명령이 없습니다.")}</div>}
@@ -288,6 +298,7 @@ function CmdRow({
   busy,
   onRun,
   onStop,
+  onOpenPort,
   onOpenSession,
   onEdit,
 }: {
@@ -296,6 +307,7 @@ function CmdRow({
   onRun: () => void
   /** 실행 중일 때 재생 버튼이 하는 일 — 이 명령의 세션 종료 */
   onStop: () => void
+  onOpenPort: (port: number) => void
   onOpenSession: () => void
   onEdit: () => void
 }) {
@@ -348,6 +360,16 @@ function CmdRow({
         <span className="truncate">{button.name}</span>
       </button>
       {button.running && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-blue-500" title={uiText("실행 세션 있음")} />}
+      {button.running && !!button.ports?.length && <HoverTipLayer className="mew-action-menu-ports">
+        {button.ports.map(port => <button
+          key={port}
+          type="button"
+          onClick={() => onOpenPort(port)}
+          className="mew-action-menu-item mew-action-menu-port"
+          data-tip={uiText("포트 {p0} 미리보기 열기", { p0: port })}
+          aria-label={uiText("{p0}: 포트 {p1} 미리보기 열기", { p0: button.name, p1: port })}
+        >{port}</button>)}
+      </HoverTipLayer>}
       {/* 실행 중이면 같은 자리가 정지 버튼이 된다 — 누르면 이 명령의 세션이 죽는다 */}
       <button
         type="button"

@@ -1,8 +1,8 @@
 ---
 title: "Mewlink 기기 등록과 로컬 사용자 인증 P2P 접속 계약"
-description: "Mewlink 공개 기기 주소·로컬 인증·브라우저 신뢰와 회수·재접속을 정의한다. 단회 증명·RTC와 비추출 키 사전 준비·native wrapper 수명·비동기 NAT 조회·현재 자원 검증·공개 앱 preconnect·빠른 복구의 보안·운영 경계를 설명한다."
+description: "Mewlink 공개 기기 주소·포트 링크용 공개 base 전달·로컬 인증·브라우저 신뢰와 회수·재접속을 정의한다. 단회 증명·RTC와 비추출 키 사전 준비·native wrapper 수명·비동기 NAT 조회·현재 자원 검증·공개 앱 preconnect·빠른 복구의 보안·운영 경계를 설명한다."
 created: 2026-10-07
-updated: 2026-10-24
+updated: "2026-10-27"
 ---
 
 [작업·출시 기준](<../work/remote-access.md>) · [중앙 서비스 설치](../deployment/remote-central.md) · [ADR 0195](../history/decisions/0195-mew-account-based-p2p-remote-access.md) · [후속 ADR 0203](../history/decisions/0203-mewlink-workers-p2p-ui.md) · [로컬 인증 ADR 0207](../history/decisions/0207-mewlink-device-access-local-auth.md) · [권한](access-control.md)
@@ -14,6 +14,8 @@ updated: 2026-10-24
 ## 도메인 이전과 기기 대시보드
 
 기기 주소는 `https://mew.run/{username}/{device}`, 관리 대시보드는 `https://mew.run/{username}`이다. 대시보드는 중앙 로그인한 본인에게만 기기 목록을 보여준다. 다른 계정의 대시보드는 404이며, 비로그인 상태에서는 기기 목록을 요청하지 않고 로그인 화면을 표시한다. `/`와 이전 `/dashboard`는 로그인 후 본인의 사용자 주소로 이동한다. 공개 기기 주소의 연결 시작에는 중앙 로그인을 요구하지 않는다.
+
+명령어 포트 버튼은 앱 프레임의 origin 대신 공개 기기 주소에 `/<port>`를 붙인다. 부모·launcher가 전달하는 `previewBaseUrl`과 구버전 중앙의 오류 처리, 프리뷰 도메인 준비는 [포트 프리뷰 계약](port-preview.md#mewlink)을 따른다. 중앙 변경은 호스트 앱 업데이트와 별도로 적용한다.
 
 내부 실행 origin은 `https://app.mew.run`이다. 관리 화면과 같은 site 안의 다른 origin으로 분리해 모바일 브라우저의 cross-site 저장소 제한을 줄이고 중앙 쿠키·API 격리를 유지한다. 이전 `mew.saens.kr`의 화면 주소는 새 도메인으로 이동하지만 등록·상시 WSS·서명 키·기기 ID는 유지한다. 중앙은 설정한 이전 origin만 허용하며 host 증명의 audience와 ticket issuer는 실제 연결한 host의 origin으로 검증한다. 새 브라우저는 중앙이 설정으로 허용한 현재·이전 origin 목록에 한정해 ticket issuer를 검증하며, 같은 서명 키·instance audience 검증도 유지한다. launch는 기존 Durable Object에 새 RPC 메서드를 요구하지 않는다. 승인된 로컬 Mewlink 신원의 issuer는 해당 host의 origin으로 유지하고, 직접 이메일 계정의 신원 namespace도 이전 값을 고정해 같은 이메일로 다른 계정이 생기지 않게 한다.
 

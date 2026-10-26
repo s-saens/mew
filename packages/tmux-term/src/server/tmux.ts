@@ -20,8 +20,8 @@ function assertValidName(name: string) {
   }
 }
 
-async function run(args: string[]): Promise<string> {
-  const { stdout } = await exec(terminalBackend.binary, terminalBackend.controlArgs(args))
+async function run(args: string[], timeout?: number): Promise<string> {
+  const { stdout } = await exec(terminalBackend.binary, terminalBackend.controlArgs(args), { timeout })
   return stdout
 }
 
@@ -40,6 +40,8 @@ export interface TmuxManagerOptions {
 export interface TmuxManager {
   cwd: string
   list: () => Promise<TmuxSession[]>
+  /** 실행 세션의 수신 포트를 찾을 때 사용하는 pane 셸의 OS 프로세스 ID. */
+  listPanePids: () => Promise<Array<{ session: string; pid: number }>>
   create: (name: string, cwd?: string) => Promise<void>
   kill: (name: string) => Promise<void>
   rename: (oldName: string, newName: string) => Promise<void>
@@ -84,6 +86,15 @@ export function createTmuxManager({ cwd }: TmuxManagerOptions): TmuxManager {
     cwd,
 
     list: listTmuxSessions,
+
+    async listPanePids() {
+      const stdout = await run(['list-panes', '-a', '-F', '#{session_name}\t#{pane_pid}'], 5_000)
+      return stdout.split('\n').flatMap(line => {
+        const [session, rawPid] = line.trimEnd().split('\t'), pid = Number(rawPid)
+        return SESSION_NAME_RE.test(session) && /^[1-9]\d*$/.test(rawPid ?? '') && Number.isSafeInteger(pid)
+          ? [{ session, pid }] : []
+      })
+    },
 
     async create(name, sessionCwd) {
       assertValidName(name)

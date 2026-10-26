@@ -1685,6 +1685,8 @@ export interface CmdButtonState {
   session: string
   /** 그 세션이 지금 떠 있는지 */
   running: boolean
+  /** 이 명령 세션의 프로세스가 실제로 연 localhost TCP 수신 포트. 구버전 서버는 생략한다. */
+  ports?: number[]
 }
 
 /** 저장 대상 — 실행 상태(session·running)는 서버가 계산해 붙여주는 값이라 보내지 않는다 */

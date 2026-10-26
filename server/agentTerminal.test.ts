@@ -11,6 +11,7 @@ function fakeTmux() {
   const manager: TmuxManager = {
     cwd: '/workspace',
     list: async () => sessions,
+    listPanePids: async () => [],
     create: async (name, cwd) => {
       creates.push({ name, cwd })
       sessions.push({ name, createdAt: 1, attached: false, windows: 1 })

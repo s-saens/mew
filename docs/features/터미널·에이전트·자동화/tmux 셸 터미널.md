@@ -4,11 +4,11 @@ parent: "mew-agents"
 title: "tmux 셸 터미널"
 status: "implemented"
 created: "2026-09-18"
-updated: "2026-10-26"
+updated: "2026-10-27"
 status_hash: "b19a2771f0bfb2f727bc14539350c69b524d222b67a2322b322f359fefd6a804"
-files: ["src/components/AgentPanel.tsx", "src/components/TermButtonBar.tsx", "server/termButtons.ts", "packages/tmux-term/src/TmuxTerminal.tsx", "packages/tmux-term/src/server/tmuxWs.ts"]
+files: ["src/components/AgentPanel.tsx", "src/components/TermButtonBar.tsx", "src/components/CommandButtonMenu.tsx", "server/termButtons.ts", "server/command-ports.ts", "packages/tmux-term/src/TmuxTerminal.tsx", "packages/tmux-term/src/server/tmuxWs.ts"]
 commits: []
-description: "프로젝트별 일반 셸 탭의 생성·입력·재연결·종료와 명령 버튼, 포커스별 새 탭·닫힌 탭 복원·탭 더블클릭 이름 변경·우클릭 메뉴와 패널 핸들 더블클릭 최대화/복귀를 다루며 명령 입력란의 접근성 이름을 네 언어로 제공한다. Linux·macOS의 tmux와 Windows의 psmux·PowerShell backend, 투명한 터미널 기본 배경·에이전트와 통일한 입력 영역과 에이전트 TUI·테마·패널 닫기의 경계 및 실제 검증 조건을 구분한다."
+description: "프로젝트별 셸 탭의 생성·입력·재연결·종료, 명령 버튼과 실행 명령의 수신 포트 자동 감지·미리보기 버튼, 포커스별 새 탭·닫힌 탭 복원·이름 변경·우클릭 메뉴와 패널 최대화/복귀를 다룬다. Linux·macOS tmux와 Windows psmux·PowerShell, 투명한 배경·공통 입력 영역·접근성 이름 및 실제 검증 경계를 정의한다."
 상위파일:
   - "MOC.md"
   - "_터미널·에이전트·자동화.md"
@@ -23,6 +23,7 @@ description: "프로젝트별 일반 셸 탭의 생성·입력·재연결·종�
 - 터미널 기본 배경은 투명해 패널 바탕이 비친다. 글씨·커서·ANSI 팔레트와 선택 모드 화면은 mew의 라이트·다크 테마를 따른다.
 
 - 일반 셸 탭 생성·재연결·입력·세션 종료와 터미널 명령 버튼을 제공한다.
+- 프로젝트 명령이 연 localhost TCP 수신 포트를 감지해 같은 명령 줄에서 앱을 연다.
 - 입력 영역의 배경·입력칸·전송 버튼 디자인을 에이전트 패널과 통일한다.
 
 ### 경계와 제한
@@ -38,6 +39,9 @@ description: "프로젝트별 일반 셸 탭의 생성·입력·재연결·종�
 ## 구현 내용
 
 - Linux·macOS는 기존 tmux, Windows 네이티브는 psmux·PowerShell을 사용한다. backend가 생성·명령·attach·입력·capture·clipboard 제어의 실행 파일과 argv를 소유하며 기존 tmux API·세션 ID는 유지한다. Windows 상태 경로별 namespace로 사용자 세션과 분리한다. 구현과 Windows CI·공개 지원 게이트는 [OS 실행 계약](../../development/windows-native.md)을 따른다.
+
+- 프로젝트 명령 메뉴는 실행 세션의 `ports`를 정지·터미널 아이콘 왼쪽의 번호 버튼으로 표시한다. 포트가 여러 개면 오름차순으로 나열하고 해당 영역만 가로로 스크롤한다. 공통 툴팁과 네 언어의 접근성 이름을 제공하며 기존 좌우 방향키로 포트 버튼에도 접근한다. 클릭은 새 탭만 열고 실행·중지·터미널 팝업을 호출하지 않는다.
+- `GET/PUT /api/cmd-buttons`는 실행 중인 버튼에 한해 pane PID와 자손 프로세스의 실제 수신 포트를 연결한다. 포트 미리보기 권한이 없거나 감지에 실패하면 `ports: []`를 반환하고 명령 목록과 실행 상태는 유지한다. 메뉴가 열린 동안의 3초 폴링에서 포트 개방·종료를 반영한다. 구버전 서버가 `ports`를 생략해도 기존 명령 조작은 유지한다. OS별 감지·URL·프리뷰 경계는 [포트 프리뷰 계약](../../development/port-preview.md#명령어-버튼의-포트-감지)을 따른다.
 
 - `Ctrl/Cmd+N/T`와 `Alt+N`은 일반 셸 탭 줄·본문의 포커스 등록으로 해당 그룹의 `+`와 같은 새 터미널 흐름을 사용한다. 공용 `TmuxTerminalPanel`은 같은 이름 입력을 연다. 키를 PTY·새 파일 생성으로 보내지 않으며 반복·IME·모달은 생성하지 않는다. 브라우저 예약키 조건·탭 닫기·순환은 [공통 단축키 계약](../../development/ui-contracts.md#포커스-기반-탭-단축키)을 따른다.
 
@@ -64,6 +68,8 @@ description: "프로젝트별 일반 셸 탭의 생성·입력·재연결·종�
 
 <!-- mew:validation:start -->
 ## 검증
+
+- 2026-10-27: 실제 Linux 자손 프로세스의 IPv4/IPv6·다중 수신 포트·종료·다른 세션 분리, 명령 목록 GET/PUT의 권한·조회 실패, 1100/390px·양 테마의 포트 버튼 위치·키보드·가로 스크롤·새 탭 URL·명령 재실행 방지를 확인했다. 실행한 검사와 OS·운영 적용 한계는 [작업 기록](../../work/command-port-previews.md)에 남긴다.
 
 - 2026-10-26: 명령 입력란의 기본 접근성 이름에 빠진 공통 번역 키를 추가해 타입 오류를 해소했다.
 

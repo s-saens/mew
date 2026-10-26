@@ -1,8 +1,8 @@
 ---
 title: "인증된 localhost 앱 프리뷰"
-description: "도메인·Tailscale·Mewlink의 /포트번호 진입과 미리보기 권한·실패 안내, 호스트 loopback HTTP·WebSocket 전달과 로그인·포트 capability, 직접 opaque sandbox·원격 raw 전송의 출처 격리·호환 한계 및 HTTPS 터널 검증 범위를 정의한다."
+description: "명령 세션의 실제 수신 포트 감지와 도메인·Tailscale·Mewlink의 /포트번호 링크, 원격 공개 기기 주소 전달과 권한·실패 경계를 정의한다. localhost HTTP·WebSocket 프리뷰의 로그인·포트 capability, 출처 격리·호환 한계와 HTTPS 터널 검증 범위도 설명한다."
 created: "2026-10-20"
-updated: "2026-10-26"
+updated: "2026-10-27"
 ---
 
 ## 진입과 실행
@@ -13,6 +13,16 @@ updated: "2026-10-26"
 
 앱의 HTML·JavaScript·스타일과 API 응답은 접속한 기기에서 실행한다. 직접 프록시는 URL·스크립트·CookieJar·storage를 재작성하고 `allow-same-origin` 없는 sandbox를 강제한다. 호스트 Chrome이나 DOM 재생 화면을 사용하지 않는다. Android gateway도 `GET /api/android-url`과 같은 loopback 프록시 경계를 사용한다.
 
+## 명령어 버튼의 포트 감지
+
+`GET/PUT /api/cmd-buttons`의 버튼별 `ports: number[]`는 해당 실행 세션의 pane PID와 자손 프로세스가 연 실제 TCP LISTEN 소켓에서 계산한다. 명령 문자열·터미널 로그의 URL이나 기본 포트는 추측하지 않는다. 여러 pane의 포트를 합쳐 중복을 제거하고 오름차순으로 반환한다. 세션이 없거나 `portPreview` 권한이 없으면 빈 배열이며, 조회 권한은 기존 `terminal` 권한을 유지한다. 설정 파일에는 실행 상태·포트를 저장하지 않는다.
+
+Linux는 `/proc`의 프로세스·TCP 표와 대상 프로세스 FD를 읽고, macOS는 `ps`·`lsof`, Windows는 PowerShell의 프로세스·TCP 표를 사용한다. 프로세스·소켓 표는 한 요청에서 일괄 조회한다. 포트 검사는 5초 안에 끝내고 실패·시간 초과는 빈 배열로 처리한다. pane PID 조회도 별도의 5초 제한을 둔다. 도구가 없거나 OS가 조회를 거부해도 명령 실행·터미널 보기는 유지한다.
+
+대상은 `127.0.0.1`·`::1` 및 wildcard 수신 소켓이다. LAN 전용 바인딩이나 pane의 자손에서 벗어난 daemon·컨테이너의 별도 프로세스는 자동 연결하지 않는다. 감지한 TCP 포트가 HTTP 앱인지까지 판별하지 않으므로 HTTP가 아닌 서비스는 프리뷰로 열 수 없다. Mew 자체 수신 포트는 기존 프리뷰 경계에서 계속 차단한다.
+
+명령 메뉴의 포트 번호는 `src/utils/port-preview-url.ts`로 새 탭 URL을 만든다. 직접 접속은 현재 origin의 `/<port>`, Mewlink는 아래의 공개 기기 base에 `/<port>`를 붙인다. 버튼 위치·갱신과 조작은 [셸 터미널 기능 계약](../features/터미널·에이전트·자동화/tmux%20셸%20터미널.md), 사용 순서는 [명령 버튼 안내](../guides/commands.md)가 소유한다.
+
 ## 권한과 포트 경계
 
 `POST /api/port-preview/session`은 `{port, path?}`를 받아 해당 포트에 한정한 토큰·URL을 발급한다. 서명 토큰은 계정과 원래 Mew 인증 세션에 결합한다. 매 요청·열린 소켓에서 로그인·현재 권한·만료를 확인하고 로그아웃·권한 회수에서 전달을 중단한다. 토큰은 30분 뒤 만료하며 자동 갱신하지 않으므로 계속 사용할 때는 진입 주소를 다시 연다. 토큰만으로 다른 포트나 Mew API를 열 수 없다. Mew 자체 수신 포트는 차단한다.
@@ -22,6 +32,8 @@ updated: "2026-10-26"
 ## Mewlink
 
 Mewlink는 기존 기기 연결·Mew 로그인을 거친 뒤 포트에 한정한 HTTP·WS 브리지를 만든다. `shared/remote-access.ts`의 `capability: 'port-preview'`는 프리뷰 raw/cookie/WS 경로만 허용한다. 앱에 Mew 전체 API 전송이나 인증 토큰을 전달하지 않는다. 원격 앱 본문·자원은 기존 직접 전송을 사용하며 중앙은 실행용 launcher·Service Worker만 제공한다.
+
+공개 기기 부모 화면은 중앙 origin과 현재 사용자·기기 이름으로 `previewBaseUrl`을 만들고, launcher가 출처를 확인해 기존 MessagePort의 `mew-app-context`로 앱에 전달한다. 값은 `https://mew.run/<user>/<device>` 형태이며 토큰·쿼리·앱 프레임 경로를 포함하지 않는다. 기존 포트 하위 경로에서 진입하거나 재접속한 뒤에도 같은 기기 base를 유지한다. 이 필드를 보내지 않는 구버전 중앙에서는 포트 번호 클릭 시 오류를 표시하고 앱 origin으로 잘못 이동하지 않는다. [ADR 0076](../decisions/0076-command-port-previews.md)을 따른다.
 
 raw HTML과 앱 쿠키 API는 검증된 P2P dispatcher가 해당 요청의 `port-preview` capability를 부여한 연결에서만 허용한다. 유효한 로컬 로그인·프리뷰 토큰이 있어도 직접 HTTP는 403으로 거부하며, 일반 Mew 원격 요청은 전송 프로토콜에서 거부한다. HTTP 헤더로 capability를 지정할 수 없다. 따라서 직접 주소는 계속 opaque sandbox 프록시를 사용하고, 원격 raw HTML은 분리된 preview origin에서만 실행한다.
 

@@ -64,6 +64,20 @@
   padding: 0;
   justify-content: center;
 }
+.mew-action-menu-ports {
+  display: flex;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 45%;
+  overflow-x: auto;
+}
+.mew-action-menu-ports .mew-action-menu-item.mew-action-menu-port {
+  flex: 0 0 auto;
+  width: auto;
+  padding-inline: 6px;
+  color: var(--color-accent-strong, var(--color-accent));
+  font-variant-numeric: tabular-nums;
+}
 @media (pointer: coarse) {
   .mew-action-menu[data-menu-variant="header"] .mew-action-menu-item { min-height: 40px; }
 }

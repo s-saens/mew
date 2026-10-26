@@ -1,4 +1,5 @@
 import { configureRemotePortPreview } from './port-preview-remote.ts'
+import { configurePortPreviewBaseUrl } from './port-preview-url.ts'
 import { setBrowserStorageScope } from '@mew/ui/browser-storage-scope'
 import { installHostedKeyboard } from '@mew/ui/virtual-keyboard'
 import { DataChannelTransport, setRemoteTransport } from './remote-transport.ts'
@@ -30,11 +31,12 @@ export function reloadRemoteAppForIdentity(email: string | null) {
 
 /** Installed app code only receives a frame-bound port, never the central session or launch token. */
 export async function initializeRemoteApp() {
+  configurePortPreviewBaseUrl(null)
   setRemoteTransport(null)
   const token = /^\/__mew_ui\/([A-Za-z0-9_-]{20,64})\//.exec(location.pathname)?.[1]
   if (!token || parent === window) throw new Error('P2P 연결 페이지에서 mew를 다시 열어 주세요.')
   const channel = new MessageChannel()
-  const context = await new Promise<{ instance: string; reconnecting?: boolean; initialAuth?: AuthStatus; authStatusPending?: boolean; previewDomain?: string; previewPort?: number; previewPath?: string }>((resolve, reject) => {
+  const context = await new Promise<{ instance: string; reconnecting?: boolean; initialAuth?: AuthStatus; authStatusPending?: boolean; previewDomain?: string; previewPort?: number; previewPath?: string; previewBaseUrl?: string }>((resolve, reject) => {
     const timer = setTimeout(() => { channel.port1.close(); reject(new Error('앱 연결 시간이 초과됐습니다. 다시 연결해 주세요.')) }, 10000)
     channel.port1.onmessage = ({ data }) => {
       if (data?.type === 'mew-app-disconnected') { clearTimeout(timer); channel.port1.close(); reject(new Error('기기 연결이 종료됐습니다. 다시 연결해 주세요.')); return }
@@ -44,6 +46,7 @@ export async function initializeRemoteApp() {
     parent.postMessage({ type: 'mew-app-ready', token }, location.origin, [channel.port2])
   })
   configureRemotePortPreview(context.previewDomain)
+  configurePortPreviewBaseUrl(context.previewBaseUrl ?? null)
   if (Number.isInteger(context.previewPort) && context.previewPort! >= 1 && context.previewPort! <= 65535) {
     const address = new URL(location.href)
     address.searchParams.set('preview', String(context.previewPort))

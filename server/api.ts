@@ -61,6 +61,7 @@ import { ASSET_DIR, isLocalAssetPath, moveAssetIntoProject } from './localAssets
 import { DATA_DIR } from './dataDir.ts'
 import { createTmuxManager, createTmuxRouter } from '@mew/tmux-term/server'
 import { CmdButtonError, commandSessionName, normalizeCmdButtons, oneShotCommand, readCmdButtons, writeCmdButtons } from './cmdButtons.ts'
+import { commandSessionPorts } from './command-ports.ts'
 import { normalizeTermButtons, readTermButtons, TermButtonError, writeTermButtons } from './termButtons.ts'
 import { readTableLayout, TableLayoutError, writeTableLayout } from './tableLayout.ts'
 import { readFrontmatterOptions, readFrontmatterOptionColors, updateFrontmatterOptions, FrontmatterOptionsError } from './frontmatter-options.ts'
@@ -160,6 +161,22 @@ Object.defineProperty(tmuxManager, 'cwd', {
   get: () => workspaceContext.getStore() ? workspacePaths.root : defaultTerminalCwd,
   set: (value: string) => { defaultTerminalCwd = value },
 })
+
+async function commandButtonStates(req: express.Request, project: string, directory: string, buttons: ReturnType<typeof readCmdButtons>, running: Set<string>) {
+  const states = buttons.map(button => {
+    const session = commandSessionName(project, button.name, directory)
+    return { ...button, oneShot: !!button.oneShot, session, running: running.has(session), ports: [] as number[] }
+  })
+  const active = new Set(states.filter(button => button.running).map(button => button.session))
+  if (active.size && canUse(authOf(req), 'portPreview')) {
+    // 포트 조회 실패·종료 경쟁은 실행 상태나 명령 목록 조회를 막지 않는다.
+    const ports = await tmuxManager.listPanePids()
+      .then(panes => commandSessionPorts(panes.filter(pane => active.has(pane.session))))
+      .catch(() => new Map<string, number[]>())
+    for (const button of states) button.ports = (ports.get(button.session) ?? []).filter(port => port !== req.socket.localPort)
+  }
+  return states
+}
 
 const AGENT_TAB_ID = /^[A-Za-z0-9_-]{1,64}$/
 const ANCHOR_PREVIEW_MIN_BYTES = 512 * 1024
@@ -2698,10 +2715,7 @@ export function createApiApp() {
       const directory = req.query.path ?? req.body?.path ?? ''
       projectDirectory(project, directory) // 경로·폴더 검증
       const running = new Set((await tmuxManager.list()).map((s) => s.name))
-      const buttons = readCmdButtons(project, directory as string).map((b) => {
-        const session = commandSessionName(project, b.name, directory as string)
-        return { name: b.name, command: b.command, oneShot: !!b.oneShot, session, running: running.has(session) }
-      })
+      const buttons = await commandButtonStates(req, project, directory as string, readCmdButtons(project, directory as string), running)
       res.json({ buttons })
     } catch (err) {
       handleError(res, err)
@@ -2720,10 +2734,7 @@ export function createApiApp() {
       writeCmdButtons(project, buttons, directory as string)
       const running = new Set((await tmuxManager.list()).map((s) => s.name))
       res.json({
-        buttons: buttons.map((b) => {
-          const session = commandSessionName(project, b.name, directory as string)
-          return { name: b.name, command: b.command, oneShot: !!b.oneShot, session, running: running.has(session) }
-        }),
+        buttons: await commandButtonStates(req, project, directory as string, buttons, running),
       })
     } catch (err) {
       if (err instanceof CmdButtonError) {
