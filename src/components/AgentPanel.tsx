@@ -15,6 +15,7 @@ import { mergeHistoryPage, appendHistoryEventInPlace } from '../utils/agent-hist
 import { useAgentWorkHistory } from '../hooks/use-agent-work-history'
 import { AgentStartupQueue } from '../utils/agent-startup-queue'
 import { AgentStartupQueueView } from './agent-startup-queue'
+import { AgentCapacityRetryNotice } from './agent-capacity-retry-notice'
 import { expandHistoryWork } from '../../shared/agent-history'
 import type { HistoryPreview } from '../../shared/agent-history'
 import { PanelTitle } from './panel-title'
@@ -3975,6 +3976,7 @@ function AgentSessionView({
       {errorDetail && <AgentErrorDialog title={errorDetail.title} detail={errorDetail.detail} onClose={() => setErrorDetail(null)} />}
       {commandPopup && <AgentCommandPopup key={commandPopup.id} command={commandPopup} onClose={() => setCommandPopupId(null)} onCancel={() => send({ type: 'cancel' })} onChanged={() => { void cli.refresh().catch(() => {}) }} />}
 
+      {!historyPreview && connected && meta?.capacityRetry && <AgentCapacityRetryNotice state={meta.capacityRetry} now={now} onCancel={() => send({ type: 'cancel' })} />}
       <AgentStartupQueueView entries={startupPrompts} onCancel={cancelStartupPrompt} />
       {(queued.length > 0 || scheduled.length > 0) && (
         <div data-agent-queue className="relative z-10 max-h-[109px] shrink-0 space-y-1 overflow-y-auto overscroll-contain border-t border-edge bg-surface px-3 py-1.5 text-xs">

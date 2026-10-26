@@ -27,6 +27,8 @@ import { stripMewContext } from './project-context-text.ts'
 import type { AgentContextBinding } from '../shared/project-agent-context.ts'
 import { antigravityAuthUrl } from './antigravityAcp.ts'
 import { accessIssueFromError, type AccessIssue } from '../shared/agent-access.ts'
+import { readAgentCapacityRetrySettings } from './agent-guidance.ts'
+import { capacityContinuationPrompt, isModelCapacityError, terminalCapacityMessage, waitForCapacityRetry } from './agent-capacity.ts'
 import {
   ClientSideConnection,
   ndJsonStream,
@@ -162,6 +164,8 @@ export type SessionMeta = {
   queuedSettings?: (AgentMessageSettings | null)[]
   activeTask?: 'cli' | null
   accessIssue?: AccessIssue | null
+  capacityRetry?: { attempt: number; maxRetries: number; retryAt: number } | null
+  capacityPaused?: boolean
   memoryPaused?: boolean
   usage: Usage | null
   canLoad: boolean
@@ -256,7 +260,7 @@ export function describeError(err: unknown): string {
 }
 
 function isAuthRequiredError(err: unknown): boolean {
-  if (accessIssueFromError(err)) return false
+  if (accessIssueFromError(err) || isModelCapacityError(err)) return false
   if (err && typeof err === 'object' && (err as { code?: unknown }).code === -32000) return true
   const message = err instanceof Error ? err.message : String(err)
   return /authentication required|auth_required|not logged in|please (?:run \/login|log in|sign in)/i.test(message)
@@ -365,6 +369,10 @@ export class AgentSession {
   #rejectStartup: ((err: Error) => void) | null = null
   #sessionId = ''
   #accessIssue: AccessIssue | null = null
+  #capacityPaused = false
+  #capacityRetry: SessionMeta['capacityRetry'] = null
+  #capacityAttempt: { reply: string; chunks: string[]; progressed: boolean } | null = null
+  #promptAbort: AbortController | null = null
   #events: AgentEvent[] = []
   /** session/load가 성공하기 전까지 전사를 숨겨 두는 임시 버퍼 — 실패한 세션이 현재 대화를 오염시키지 않게 한다. */
   #loadingEvents: AgentEvent[] | null = null
@@ -379,6 +387,9 @@ export class AgentSession {
   #modes: SessionModeState | null = null
   #thinking: ThinkingState | null = null
   #promptSettingsActive = false
+  #capacitySettingsOverride = false
+  #draftSettingsRevision = 0
+  #draftSettingsPending = new Set<Promise<void>>()
   #caps: AgentCapabilities = {}
   #authMethods: AuthMethodInternal[] = []
   #authRequired = false
@@ -650,6 +661,7 @@ export class AgentSession {
     this.#sessionId = sessionId
     this.#clearFailed = false
     this.#accessIssue = null
+    this.#capacityPaused = false
     this.#reader = runWithAgentAccount(this.#account, () => new UsageReader(this.cwd, sessionId))
     this.#usage = null
     if (models) this.#useModels(models)
@@ -710,6 +722,15 @@ export class AgentSession {
   #client(): Client {
     return {
       sessionUpdate: async (params: SessionNotification) => {
+        const attempt = this.#capacityAttempt
+        if (attempt) {
+          const update = params.update
+          if (update.sessionUpdate === 'agent_message_chunk' && update.content.type === 'text') {
+            attempt.reply = (attempt.reply + update.content.text).slice(-16_000)
+            attempt.chunks.push(update.content.text)
+            if (attempt.chunks.length > 128) attempt.chunks.shift()
+          } else if (['agent_thought_chunk', 'tool_call', 'tool_call_update'].includes(update.sessionUpdate)) attempt.progressed = true
+        }
         // Per-message execution overrides must not replace the settings for the next draft.
         if (this.#promptSettingsActive && (params.update.sessionUpdate === 'current_mode_update'
           || params.update.sessionUpdate === 'config_option_update')) return
@@ -957,9 +978,10 @@ export class AgentSession {
     }
     const memoryResumed = automatic ? false : this.#admitMemory()
     // Explicit new submission resumes a quota-paused queue; edits/reconnects do not.
-    const resume = memoryResumed || !this.busy && this.#accessIssue !== null
+    const resume = memoryResumed || !this.busy && (this.#accessIssue !== null || !automatic && this.#capacityPaused)
     if (resume) this.#accessIssue = null
-    if (this.busy || this.#queue.length > 0 || this.#memoryContinuation || this.#clearFailed) {
+    if (resume && !automatic) this.#capacityPaused = false
+    if (this.busy || this.#queue.length > 0 || this.#memoryContinuation || this.#clearFailed || this.#capacityPaused) {
       this.#queue.push({ kind: 'prompt', text, promptText, images, imageRefs, settings, attachments })
       this.#broadcast(this.#metaEvent())
       if (resume) this.#drainQueue()
@@ -1145,7 +1167,11 @@ export class AgentSession {
 
   #run(text: string, promptText = text, images: AgentImage[] = [], imageRefs: AgentImageRef[] = [], settings?: AgentMessageSettings, attachments?: AgentAttachmentRef[]) {
     let context: string
-    try { context = runWithAgentAccount(this.#account, () => agentContextText(this.#context, this.cwd, settings?.uiLocale)) }
+    let retrySettings: ReturnType<typeof readAgentCapacityRetrySettings>
+    try {
+      context = runWithAgentAccount(this.#account, () => agentContextText(this.#context, this.cwd, settings?.uiLocale))
+      retrySettings = runWithAgentAccount(this.#account, () => readAgentCapacityRetrySettings())
+    }
     catch (error) {
       this.#emit({ type: 'error', message: describeError(error) })
       // Keep queued work available for editing/retry; do not silently discard CLI tasks.
@@ -1160,6 +1186,8 @@ export class AgentSession {
     this.busy = true
     this.#activePrompt = true
     this.#activePromptSettings = settings
+    const abort = new AbortController()
+    this.#promptAbort = abort
     this.#turns += 1
     const turnStartedAt = Date.now()
     // 사용자 발화도 이벤트 버퍼에 남긴다 — 재접속한 창이 대화를 그대로 복원하려면 여기 있어야 한다
@@ -1179,10 +1207,60 @@ export class AgentSession {
       .some(key => settings[key] !== undefined && settings[key] !== currentSettings[key])
     Promise.resolve().then(async () => {
       if (this.#promptSettingsActive && settings) await this.#applyMessageSettings(settings)
-      return this.#conn.prompt({ sessionId: this.#sessionId, prompt })
+      let progressed = false
+      for (let retries = 0; ; retries++) {
+        if (abort.signal.aborted || this.#disposed) return { stopReason: 'cancelled' }
+        if (retries > 0 && settings) {
+          // Retry the captured model even if the next draft's controls changed while waiting.
+          await Promise.allSettled([...this.#draftSettingsPending])
+          if (abort.signal.aborted || this.#disposed) return { stopReason: 'cancelled' }
+          this.#promptSettingsActive = true
+          await this.#applyMessageSettings(settings)
+        }
+        if (abort.signal.aborted || this.#disposed) return { stopReason: 'cancelled' }
+        const attempt = { reply: '', chunks: [] as string[], progressed: false }
+        this.#capacityAttempt = attempt
+        let failure: unknown
+        let terminal: string | null = null
+        try {
+          const content = progressed ? [
+            { type: 'text' as const, text: capacityContinuationPrompt },
+            ...(context ? [{ type: 'text' as const, text: context }] : []),
+          ] : prompt
+          const response = await this.#conn.prompt({ sessionId: this.#sessionId, prompt: content })
+          if (abort.signal.aborted || response.stopReason === 'cancelled') return { stopReason: 'cancelled' }
+          terminal = terminalCapacityMessage(attempt.reply, attempt.chunks)
+          if (!terminal) return response
+          failure = new Error(terminal)
+        } catch (error) {
+          if (abort.signal.aborted) return { stopReason: 'cancelled' }
+          if (!isModelCapacityError(error)) throw error
+          terminal = terminalCapacityMessage(attempt.reply, attempt.chunks)
+          failure = error
+        } finally { this.#capacityAttempt = null }
+        progressed ||= attempt.progressed || !!(terminal ? attempt.reply.slice(0, attempt.reply.lastIndexOf(terminal)) : attempt.reply).trim()
+        if (retries >= retrySettings.maxRetries) {
+          this.#capacityPaused = true
+          throw failure
+        }
+        this.#capacitySettingsOverride = true
+        this.#promptSettingsActive = true
+        this.#capacityRetry = { attempt: retries + 1, maxRetries: retrySettings.maxRetries, retryAt: Date.now() + retrySettings.delaySeconds * 1_000 }
+        this.#broadcast(this.#metaEvent())
+        const ready = await waitForCapacityRetry(retrySettings.delaySeconds * 1_000, abort.signal)
+        this.#capacityRetry = null
+        if (!this.#disposed) this.#broadcast(this.#metaEvent())
+        if (!ready || this.#disposed) return { stopReason: 'cancelled' }
+        const pressure = this.#memoryProblem()
+        if (pressure) {
+          this.#pauseForMemory(pressure)
+          return { stopReason: 'cancelled' }
+        }
+      }
     })
-      .then((res) => this.#emit({ type: 'turn_end', stopReason: res.stopReason, durationMs: Date.now() - turnStartedAt }))
+      .then((res) => { if (!this.#disposed) this.#emit({ type: 'turn_end', stopReason: res.stopReason, durationMs: Date.now() - turnStartedAt }) })
       .catch((err: unknown) => {
+        if (this.#disposed) return
         const accessIssue = accessIssueFromError(err)
         if (accessIssue) {
           this.#accessIssue = accessIssue
@@ -1196,15 +1274,29 @@ export class AgentSession {
           return
         }
         // ACP 오류는 JSON-RPC 오류 객체(plain object)로도 온다 — String()하면 "[object Object]"만 남는다
-        this.#emit({ type: 'error', message: describeError(err) })
+        const message = this.#capacityPaused
+          ? `${describeError(err)}\n${retrySettings.maxRetries > 0 ? `자동 재시도 ${retrySettings.maxRetries}회를 마쳤습니다.` : '자동 재시도가 비활성화되어 있습니다.'} 대기열을 보류했습니다. 새 메시지를 보내면 다시 진행합니다.`
+          : describeError(err)
+        this.#emit({ type: 'error', message })
         this.#emit({ type: 'turn_end', stopReason: 'error', durationMs: Date.now() - turnStartedAt })
       })
       .finally(async () => {
-        if (this.#promptSettingsActive) {
-          try { await this.#applyMessageSettings(this.#currentMessageSettings()) }
+        if (this.#promptSettingsActive && !this.#disposed) {
+          try {
+            await Promise.allSettled([...this.#draftSettingsPending])
+            let revision: number
+            do {
+              revision = this.#draftSettingsRevision
+              await this.#applyMessageSettings(this.#currentMessageSettings())
+            } while (this.#capacitySettingsOverride && revision !== this.#draftSettingsRevision && !this.#disposed)
+          }
           catch (error) { this.#emit({ type: 'error', message: describeError(error) }) }
           finally { this.#promptSettingsActive = false }
         }
+        this.#capacitySettingsOverride = false
+        this.#promptAbort = null
+        this.#capacityRetry = null
+        this.#capacityAttempt = null
         this.#activePrompt = false
         this.#activePromptSettings = undefined
         this.busy = false
@@ -1219,7 +1311,7 @@ export class AgentSession {
   /** 큐의 다음 항목 하나만 시작한다. clear 뒤의 프롬프트는 새 세션에서 시작한다. */
   #drainQueue() {
     if (this.#disposed || this.busy || this.#clearFailed) return
-    if (this.#authRequired || this.#accessIssue || this.#memoryPaused) {
+    if (this.#authRequired || this.#accessIssue || this.#memoryPaused || this.#capacityPaused) {
       this.#broadcast(this.#metaEvent())
       this.#armIdleTimer()
       return
@@ -1376,11 +1468,14 @@ export class AgentSession {
 
   /** 권한 모드 전환 — `bypassPermissions`면 승인 프롬프트 없이 돈다(ADR 0037) */
   async setMode(modeId: string) {
-    await this.#conn.setSessionMode({ sessionId: this.#sessionId, modeId })
-    if (this.#modes) {
-      this.#modes = { ...this.#modes, currentModeId: modeId }
-      this.#emit({ type: 'modes', modes: this.#modes })
-    }
+    if (this.#capacitySettingsOverride && !this.#modes?.availableModes.some(mode => mode.id === modeId)) throw new Error(`지원하지 않는 권한 모드입니다: ${modeId}`)
+    await this.#draftSettingChange(async () => {
+      if (!this.#capacitySettingsOverride) await this.#conn.setSessionMode({ sessionId: this.#sessionId, modeId })
+      if (this.#modes) {
+        this.#modes = { ...this.#modes, currentModeId: modeId }
+        this.#emit({ type: 'modes', modes: this.#modes })
+      }
+    })
   }
 
   async setModel(modelId: string) {
@@ -1395,8 +1490,11 @@ export class AgentSession {
         ?? variants[0]
       if (preferred) modelId = preferred.modelId
     }
-    await this.#conn.unstable_setSessionModel({ sessionId: this.#sessionId, modelId })
-    if (this.#models) this.#useModels({ ...this.#models, currentModelId: modelId })
+    if (this.#capacitySettingsOverride && !this.#models?.availableModels.some(model => model.modelId === modelId)) throw new Error(`지원하지 않는 모델입니다: ${modelId}`)
+    await this.#draftSettingChange(async () => {
+      if (!this.#capacitySettingsOverride) await this.#conn.unstable_setSessionModel({ sessionId: this.#sessionId, modelId })
+      if (this.#models) this.#useModels({ ...this.#models, currentModelId: modelId })
+    })
   }
 
   async setThinking(configId: string, value: string) {
@@ -1404,8 +1502,20 @@ export class AgentSession {
       await this.setModel(this.#effortModelId(this.#models?.currentModelId ?? '', value))
       return
     }
-    const result = await this.#conn.setSessionConfigOption({ sessionId: this.#sessionId, configId, value })
-    this.#useConfigOptions(result.configOptions, this.#thinking?.configId === configId ? { ...this.#thinking, currentValue: value } : null)
+    const thinking = this.#thinking
+    if (this.#capacitySettingsOverride && (thinking?.configId !== configId || !thinking.options.some(option => option.id === value))) throw new Error(`지원하지 않는 추론 설정입니다: ${value}`)
+    await this.#draftSettingChange(async () => {
+      const result = this.#capacitySettingsOverride ? { configOptions: [] }
+        : await this.#conn.setSessionConfigOption({ sessionId: this.#sessionId, configId, value })
+      this.#useConfigOptions(result.configOptions, this.#thinking?.configId === configId ? { ...this.#thinking, currentValue: value } : null)
+    })
+  }
+
+  async #draftSettingChange(operation: () => Promise<void>) {
+    const pending = operation().then(() => { this.#draftSettingsRevision++ })
+    this.#draftSettingsPending.add(pending)
+    try { await pending }
+    finally { this.#draftSettingsPending.delete(pending) }
   }
 
   #useConfigOptions(configOptions: SessionConfigOption[], fallback: ThinkingState | null = null) {
@@ -1529,6 +1639,7 @@ export class AgentSession {
 
   /** Cancel only active work; memory protection preserves the waiting queue. */
   #cancelActive() {
+    this.#promptAbort?.abort()
     for (const [id, resolve] of this.#pending) {
       resolve({ outcome: { outcome: 'cancelled' } })
       this.#emit({ type: 'permission_done', id })
@@ -1592,6 +1703,8 @@ export class AgentSession {
           ? (item.attachments ?? []).map(({ project, path, mimeType }) => ({ project, path, mimeType })) : []),
         activeTask: this.#activeTask ? 'cli' : null,
         accessIssue: this.#accessIssue,
+        capacityRetry: this.#capacityRetry,
+        capacityPaused: this.#capacityPaused,
         memoryPaused: this.#memoryPaused,
         usage: this.#usage,
         canLoad: this.#caps.loadSession === true,
@@ -1646,6 +1759,8 @@ export class AgentSession {
     if (this.#disposed) return
     this.#saveTranscript()
     this.#disposed = true
+    this.#promptAbort?.abort()
+    this.#capacityRetry = null
     clearInterval(this.#memoryTimer)
     for (const item of this.#queue) if (item.kind === 'cli') item.cancel()
     this.#queue = []

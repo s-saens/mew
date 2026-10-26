@@ -26,7 +26,7 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
     name: 'fixture', resolveId(id) { if (id === 'virtual:guidance.tsx') return id; if (id.endsWith('.css')) return 'virtual:style' }, load(id) { if (id === 'virtual:guidance.tsx') return source; if (id === 'virtual:style') return '' },
   }] })
   const chunk = bundle.output.find(item => item.type === 'chunk')!
-  const content = (await Promise.all(['src/components/agent-guidance-settings.tsx', 'src/components/agent-branch-guidance.tsx', 'src/components/agent-guidance-row.tsx', 'packages/ui/src/dialog-frame.tsx', 'packages/ui/src/select-field.tsx', 'packages/ui/src/HoverTipLayer.tsx', 'packages/ui/src/ConfirmDialog.tsx'].map(file => fs.readFile(`${root}/${file}`, 'utf8')))).join('\n')
+  const content = (await Promise.all(['src/components/agent-guidance-settings.tsx', 'src/components/agent-capacity-retry-fields.tsx', 'src/components/agent-branch-guidance.tsx', 'src/components/agent-guidance-row.tsx', 'packages/ui/src/dialog-frame.tsx', 'packages/ui/src/select-field.tsx', 'packages/ui/src/HoverTipLayer.tsx', 'packages/ui/src/ConfirmDialog.tsx'].map(file => fs.readFile(`${root}/${file}`, 'utf8')))).join('\n')
   const compiler = await compile(await fs.readFile(`${root}/src/index.css`, 'utf8'), { base: `${root}/src`, onDependency() {} })
   const css = compiler.build([...new Set((source + content).match(/[A-Za-z0-9_@:/.[\]()%,-]+/g))]) + await fs.readFile(`${root}/src/components/agent-guidance-settings.css`, 'utf8')
   const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
@@ -34,12 +34,12 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
     for (const width of [1100, 390, 320]) {
       const page = await browser.newPage({ viewport: { width, height: 844 }, locale: 'ko-KR', reducedMotion: 'reduce', hasTouch: width < 768, isMobile: width < 768 })
       page.setDefaultTimeout(4000)
-      let fail = true, conflict = false, updates = 0, heldPreset = false, globalTransient = false
+      let fail = true, conflict = false, updates = 0, heldPreset = false, globalTransient = false, retryTransient = false
       let projectDenied = true, projectConflict = false, projectWrongRoot = false, projectUpdates = 0, projectTransient = false
       let releaseSave: (() => void) | undefined, releaseLoad: (() => void) | undefined
       let heldLoad = false
       const documentationSettings = Object.fromEntries(documentationGuidanceKeys.map(key => [key, 'required'])) as Record<DocumentationGuidanceKey, string>
-      let state = { path: '/data/agent-guidance.md', content: '# Guidance', instructions: '', revision: 'first', settings: { commit: 'inherit', commitLanguage: 'en', language: 'inherit', detail: 'custom', subagents: 'inherit', debugger: 'enabled', testing: 'required', ...documentationSettings }, branch: { value: { ...defaultBranchGuidance }, custom: false } }
+      let state = { path: '/data/agent-guidance.md', content: '# Guidance', instructions: '', revision: 'first', capacityRetry: { delaySeconds: 30, maxRetries: 20 }, settings: { commit: 'inherit', commitLanguage: 'en', language: 'inherit', detail: 'custom', subagents: 'inherit', debugger: 'enabled', testing: 'required', ...documentationSettings }, branch: { value: { ...defaultBranchGuidance }, custom: false } }
       let projectState = { projectRoot: '/project', revision: 'project1', settings: { version: 1, enabled: true, docsDir: 'notes', entrypoints: ['AGENTS.md'], instructions: 'Existing project rule' } }
       const errors: string[] = []
       page.on('pageerror', error => errors.push(error.message))
@@ -62,11 +62,18 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
               globalTransient = false
               return route.fulfill({ status: 503, json: { error: '일시적으로 전역 지침을 저장할 수 없습니다.' } })
             }
+            if (retryTransient && input.key === 'capacityRetry') {
+              retryTransient = false
+              return route.fulfill({ status: 503, json: { error: '일시적으로 재시도 설정을 저장할 수 없습니다.' } })
+            }
             assert.equal(input.revision, state.revision)
             updates++
             if (input.key === 'branch') {
               assert.deepEqual(Object.keys(input.value).sort(), Object.keys(defaultBranchGuidance).sort(), 'branch writes include the entire preference object')
               state = { ...state, revision: `updated-${updates}`, branch: { value: input.value, custom: false } }
+            } else if (input.key === 'capacityRetry') {
+              assert.deepEqual(Object.keys(input.value).sort(), ['delaySeconds', 'maxRetries'])
+              state = { ...state, revision: `updated-${updates}`, capacityRetry: input.value }
             } else if (input.key === 'instructions') state = { ...state, revision: `updated-${updates}`, instructions: input.value.trim() }
             else state = { ...state, revision: `updated-${updates}`, settings: { ...state.settings, [input.key]: input.value } }
           }
@@ -120,7 +127,7 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
       assert.equal(closeBounds.width, width >= 768 ? 24 : 32)
       assert.equal(closeBounds.height, width >= 768 ? 24 : 32)
       assert.equal(await dialog.getByRole('button', { name: '닫기', exact: true }).locator('svg').getAttribute('width'), '14')
-      const assertInlineFields = async (names: string[], role: 'combobox' | 'textbox' = 'combobox') => {
+      const assertInlineFields = async (names: string[], role: 'combobox' | 'textbox' | 'spinbutton' = 'combobox') => {
         for (const name of names) {
           const label = (await dialog.locator('[data-guidance-label]').filter({ hasText: name }).boundingBox())!
           const control = (await page.getByRole(role, { name, exact: true }).boundingBox())!
@@ -131,6 +138,7 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
         }
       }
       await assertInlineFields(['응답 언어', '답변 길이', '서브에이전트 위임', '디버거 활용', '테스트 작성', '브랜치 전략', 'Git 자동 처리', '커밋 방식', '커밋 언어'])
+      await assertInlineFields(['재시도 간격 (초)', '최대 재시도 횟수'], 'spinbutton')
       const languageBounds = (await field('응답 언어').boundingBox())!, debuggerBounds = (await field('디버거 활용').boundingBox())!
       assert.ok(debuggerBounds.y - languageBounds.y <= (width >= 768 ? 120 : 168), 'ordinary settings use a compact, consistently spaced list')
       if (width >= 768) {
@@ -161,6 +169,51 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
       const projectInstructions = page.getByRole('textbox', { name: '현재 프로젝트 추가 지침', exact: true })
       const instructionSave = page.getByRole('button', { name: '지침 저장', exact: true })
       const discard = page.getByRole('dialog', { name: '저장하지 않은 지침을 버릴까요?', exact: true })
+      const delay = page.getByRole('spinbutton', { name: '재시도 간격 (초)', exact: true })
+      const attempts = page.getByRole('spinbutton', { name: '최대 재시도 횟수', exact: true })
+      const retrySave = page.getByRole('button', { name: '재시도 설정 저장', exact: true })
+      assert.equal(await delay.inputValue(), '30')
+      assert.equal(await attempts.inputValue(), '20')
+      assert.equal(await retrySave.isDisabled(), true)
+      const beforeRetryEdits = updates
+      await delay.fill('45')
+      await attempts.fill('0')
+      assert.deepEqual(state.capacityRetry, { delaySeconds: 30, maxRetries: 20 }, 'number edits remain a draft until Save')
+      await page.getByRole('button', { name: '닫기', exact: true }).click()
+      await discard.getByRole('button', { name: '취소', exact: true }).click()
+      assert.equal(await delay.inputValue(), '45', 'canceling close preserves retry drafts')
+      for (const [field, value] of [[delay, '0'], [delay, '3601'], [delay, '1.5'], [attempts, '-1'], [attempts, '101'], [attempts, '1.5']] as const) {
+        await delay.fill('45'); await attempts.fill('0'); await field.fill(value)
+        await retrySave.click()
+        assert.equal(updates, beforeRetryEdits, 'invalid retry values never reach the API')
+      }
+      await delay.fill('45'); await attempts.fill('0')
+      retryTransient = true
+      await retrySave.click()
+      await page.getByRole('alert').filter({ hasText: '일시적으로 재시도 설정' }).waitFor()
+      assert.equal(await delay.inputValue(), '45')
+      assert.equal(await attempts.inputValue(), '0')
+      assert.equal(await retrySave.isDisabled(), false, 'a failed retry save remains retryable')
+      await retrySave.click()
+      await page.getByRole('status').filter({ hasText: '저장했습니다.' }).waitFor()
+      assert.deepEqual(state.capacityRetry, { delaySeconds: 45, maxRetries: 0 })
+      assert.equal(state.settings.language, 'inherit')
+      assert.equal(await retrySave.isDisabled(), true)
+      await delay.fill('90')
+      await page.getByRole('button', { name: '다시 불러오기' }).click()
+      await discard.getByRole('button', { name: '취소', exact: true }).click()
+      assert.equal(await delay.inputValue(), '90', 'canceling reload preserves retry drafts')
+      await page.getByRole('button', { name: '다시 불러오기' }).click()
+      await discard.getByRole('button', { name: '변경 버리기', exact: true }).click()
+      await delay.and(page.locator(':enabled')).waitFor()
+      assert.equal(await delay.inputValue(), '45', 'reloading resets retry drafts to the saved policy')
+      assert.equal(await retrySave.isDisabled(), true)
+      await retrySave.scrollIntoViewIfNeeded()
+      for (const dark of [false, true]) {
+        await page.evaluate(`window.fixtureTheme(${dark})`)
+        await page.screenshot({ path: `/tmp/mew-capacity-retry-settings-${width}-${dark ? 'dark' : 'light'}.png` })
+      }
+      await page.evaluate('window.fixtureTheme(false)')
       assert.equal(await globalScope.getAttribute('aria-pressed'), 'true')
       assert.equal(await projectScope.getAttribute('aria-pressed'), 'false')
       await page.locator('summary', { hasText: '추가 지침' }).click()

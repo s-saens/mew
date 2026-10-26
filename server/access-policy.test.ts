@@ -80,6 +80,19 @@ test('account capabilities and canonical file rules are enforced across HTTP and
     assert.equal((await request('/fs/agent-guidance', 'PUT', settingChange, 'owner')).status, 200)
     assert.equal((await request('/fs/agent-guidance', 'PUT', settingChange, 'owner')).status, 409)
     assert.equal((await request('/fs/agent-guidance', 'PUT', { ...settingChange, key: 'invalid' }, 'owner')).status, 400)
+    const retrySettings = await (await request('/fs/agent-guidance', 'GET', undefined, 'owner')).json() as { revision: string; capacityRetry: { delaySeconds: number; maxRetries: number } }
+    assert.deepEqual(retrySettings.capacityRetry, { delaySeconds: 30, maxRetries: 20 })
+    const retryChange = { key: 'capacityRetry', value: { delaySeconds: 15, maxRetries: 0 }, revision: retrySettings.revision }
+    assert.equal((await request('/fs/agent-guidance', 'PUT', retryChange)).status, 403)
+    assert.equal((await request('/fs/agent-guidance', 'PUT', retryChange, 'owner')).status, 200)
+    assert.equal((await request('/fs/agent-guidance', 'PUT', retryChange, 'owner')).status, 409)
+    const savedRetrySettings = await (await request('/fs/agent-guidance', 'GET', undefined, 'owner')).json() as typeof retrySettings
+    assert.deepEqual(savedRetrySettings.capacityRetry, retryChange.value)
+    const beforeInvalidRetry = fs.readFileSync(guidancePath, 'utf8')
+    for (const value of [{ delaySeconds: 0, maxRetries: 1 }, { delaySeconds: 30, maxRetries: 101 }, { delaySeconds: 30, maxRetries: 20, extra: true }]) {
+      assert.equal((await request('/fs/agent-guidance', 'PUT', { ...retryChange, value, revision: savedRetrySettings.revision }, 'owner')).status, 400)
+    }
+    assert.equal(fs.readFileSync(guidancePath, 'utf8'), beforeInvalidRetry)
     assert.equal((await request('/fs/file', 'PUT', { path: guidancePath, content: 'stale', expectedContent: 'Shared instructions' }, 'owner')).status, 409)
 
     assert.deepEqual(policy.fileAccess(guest, 'docs', 'public/readme.md'), { view: true, edit: true })

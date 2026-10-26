@@ -5,6 +5,8 @@ import { ConfirmDialog, DialogFrame, HoverTipLayer, SelectField } from '@mew/ui'
 import { useI18n } from '../i18n'
 import { documentationGuidanceKeys, guidanceOptions, type GuidanceKey, type GuidanceSnapshot } from '../../shared/agent-guidance'
 import type { BranchGuidanceSettings } from '../../shared/branch-guidance'
+import { defaultAgentCapacityRetrySettings, type AgentCapacityRetrySettings } from '../../shared/agent-capacity-retry'
+import { AgentCapacityRetryFields, type CapacityRetryDraft } from './agent-capacity-retry-fields'
 import { BranchGuidanceFields } from './agent-branch-guidance'
 import { GuidanceRow } from './agent-guidance-row'
 import { guidanceScopeCopy } from './agent-guidance-scope-copy'
@@ -21,6 +23,7 @@ const copy = {
 }
 const button = 'inline-flex min-h-7 shrink-0 items-center justify-center gap-1.5 rounded px-2 text-xs text-ink-secondary hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-40 pointer-coarse:min-h-9'
 const generalCopy = { ko: '일반', en: 'General', ja: '一般', 'zh-CN': '常规' }
+const capacityRetryDraft = (value: AgentCapacityRetrySettings): CapacityRetryDraft => ({ delaySeconds: String(value.delaySeconds), maxRetries: String(value.maxRetries) })
 const documentationKeys = new Set<GuidanceKey>(documentationGuidanceKeys)
 const managedCommitCopy = {
   ko: '자동 처리에 커밋이 포함됩니다. 수동 모드에서 바꿀 수 있습니다.',
@@ -51,6 +54,7 @@ export function AgentGuidanceSettings({ onClose, onOpenFile, workspacePath }: { 
   const [data, setData] = useState<GuidanceSnapshot | null>(null)
   const [scope, setScope] = useState<'global' | 'project'>('global')
   const [globalDraft, setGlobalDraft] = useState('')
+  const [retryDraft, setRetryDraft] = useState(() => capacityRetryDraft(defaultAgentCapacityRetrySettings))
   const [projectData, setProjectData] = useState<ProjectGuidanceSnapshot | null>(null)
   const [projectDraft, setProjectDraft] = useState(''), [projectEnabled, setProjectEnabled] = useState(true)
   const [discardAction, setDiscardAction] = useState<(() => void) | null>(null)
@@ -74,8 +78,9 @@ export function AgentGuidanceSettings({ onClose, onOpenFile, workspacePath }: { 
     if (document.activeElement === closeButton.current && previous?.isConnected && !previous.matches(':disabled')) previous.focus()
   }, [busy])
   const globalDirty = !!data && globalDraft !== (data.instructions ?? '')
+  const retryDirty = !!data && JSON.stringify(retryDraft) !== JSON.stringify(capacityRetryDraft(data.capacityRetry ?? defaultAgentCapacityRetrySettings))
   const projectDirty = !!projectData && (projectDraft !== projectData.settings.instructions || projectEnabled !== projectData.settings.enabled)
-  const guard = (action: () => void) => { if (!pending.current) { if (globalDirty || projectDirty) setDiscardAction(() => action); else action() } }
+  const guard = (action: () => void) => { if (!pending.current) { if (globalDirty || projectDirty || retryDirty) setDiscardAction(() => action); else action() } }
   const close = () => guard(onClose)
   const load = async (target = scope) => {
     const version = ++generation.current
@@ -90,6 +95,7 @@ export function AgentGuidanceSettings({ onClose, onOpenFile, workspacePath }: { 
         const next = await request()
         if (generation.current === version) {
           setData(next); setGlobalDraft(next.instructions ?? '')
+          setRetryDraft(capacityRetryDraft(next.capacityRetry ?? defaultAgentCapacityRetrySettings))
           setReloadVersion(current => current + 1)
           window.dispatchEvent(new CustomEvent('mew:external-file-updated', { detail: { path: next.path, content: next.content } }))
         }
@@ -105,7 +111,7 @@ export function AgentGuidanceSettings({ onClose, onOpenFile, workspacePath }: { 
     // Read current account guidance on every open; project guidance loads on selection.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-  async function update(key: GuidanceKey | 'branch' | 'instructions', value: string | BranchGuidanceSettings) {
+  async function update(key: GuidanceKey | 'branch' | 'instructions' | 'capacityRetry', value: string | BranchGuidanceSettings | AgentCapacityRetrySettings) {
     if (!data || pending.current || busy) return
     pending.current = true
     parkFocus()
@@ -114,7 +120,12 @@ export function AgentGuidanceSettings({ onClose, onOpenFile, workspacePath }: { 
     try {
       const next = await request({ method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key, value, revision: data.revision }) })
       window.dispatchEvent(new CustomEvent('mew:external-file-updated', { detail: { path: next.path, content: next.content } }))
-      if (generation.current === version) { setData(next); if (key === 'instructions') setGlobalDraft(next.instructions ?? ''); setNotice(text.saved) }
+      if (generation.current === version) {
+        setData(next)
+        if (key === 'instructions') setGlobalDraft(next.instructions ?? '')
+        if (key === 'capacityRetry') setRetryDraft(capacityRetryDraft(next.capacityRetry ?? defaultAgentCapacityRetrySettings))
+        setNotice(text.saved)
+      }
     } catch (cause) { if (generation.current === version) setError(cause instanceof Error ? cause.message : text.error) }
     finally { pending.current = false; if (generation.current === version) { setBusy(false); setSaving(false) } }
   }
@@ -162,6 +173,7 @@ export function AgentGuidanceSettings({ onClose, onOpenFile, workspacePath }: { 
           {data && <section role="group" aria-label={generalCopy[locale]}>
             <h3 className="mb-1 text-xs font-semibold">{generalCopy[locale]}</h3>
             {(Object.keys(guidanceOptions) as GuidanceKey[]).filter(key => key !== 'commit' && key !== 'commitLanguage' && !documentationKeys.has(key)).map(guidanceField)}
+            <AgentCapacityRetryFields key={reloadVersion} draft={retryDraft} dirty={retryDirty} disabled={busy} onChange={value => { setRetryDraft(value); setNotice('') }} onSave={value => void update('capacityRetry', value)} />
           </section>}
           {data && Object.entries(data.settings).some(([key, value]) => key !== 'commit' && key !== 'commitLanguage' && !documentationKeys.has(key as GuidanceKey) && value === 'custom') && <p className="mt-1 text-xs leading-4 text-ink-secondary">{text.customHint}</p>}
           {data && <section role="group" aria-label="Git" className="mt-2 border-t border-edge pt-2">

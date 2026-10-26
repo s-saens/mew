@@ -42,6 +42,8 @@ export type SessionMeta = {
   activeTask?: 'cli' | null
   accessIssue?: AccessIssue | null
   memoryPaused?: boolean
+  capacityRetry?: { attempt: number; maxRetries: number; retryAt: number } | null
+  capacityPaused?: boolean
   usage: Usage | null
   canLoad: boolean
   canList: boolean

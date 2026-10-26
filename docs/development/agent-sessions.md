@@ -1,7 +1,7 @@
 ---
 title: "에이전트 세션과 통신 계약"
-description: "계정 전역·프로젝트 지침의 저장·우선순위·revision API, 문서 갱신·ADR·기록·작성·description·링크·검사 및 테스트·커밋 언어·디버거 설정과 기존 고정 문구의 읽기 시 이전을 정의한다. 런타임·히스토리·탭·큐·worktree·첨부·Git AI Commit·CLI·메모리·뮤펫·MCP의 서버 계약도 다룬다."
-updated: "2026-10-26"
+description: "계정 전역·프로젝트 지침의 저장·우선순위·revision API와 문서·테스트·언어·디버거 설정, 모델 공급자의 일시적 용량 부족 재시도 설정·취소·큐 보존 계약을 정의한다. 런타임·히스토리·탭·worktree·첨부·Git AI Commit·CLI·메모리·뮤펫·MCP의 서버 계약도 다룬다."
+updated: "2026-10-27"
 상위파일:
   - "../MOC.md"
   - "MOC.md"
@@ -16,7 +16,7 @@ updated: "2026-10-26"
 
 [사용법과 설정 계약](../guides/project-setup.md) · [ADR 0155](../history/decisions/0155-mew-project-agent-context.md).
 
-- 계정별 원문은 `DATA_DIR/agent-accounts/<정규화 계정 ID SHA-256>/agent-guidance.md`, 최초 생성은 같은 계정 폴더의 `agent-guidance.txt` → `server/prompts/agent-guidance.txt` 순서다. 기존 MD·TXT를 덮어쓰지 않으며 미리보기는 생성 없이 같은 우선순위로 읽는다. `GET /api/fs/agent-guidance`는 `serverFiles` 권한으로 `{ path, content, revision, settings, branch, instructions }`를 반환한다. `PUT`은 `{ key, value, revision }`으로 MD의 해당 설정 구간만 원자적으로 교체한다. key는 `commit`·`commitLanguage`·`language`·`detail`·`subagents`·`debugger`·`testing`·`branch`·`instructions`, 알 수 없는 값은 400, 원문 revision 불일치·설정 구간 손상은 409다. 설정의 별도 JSON 사본은 없으며 원문에서 값을 읽는다. `instructions`는 최대 8,000자의 문자열로 `mew:agent-setting:instructions` 구간만 바꾼다. 다른 설정 표시를 포함한 입력은 거부하고 빈 값은 해당 구간만 지운다. 기존 자유 지침은 이 필드로 이동하거나 삭제하지 않는다. `subagents`는 `inherit`·`automatic`·`explicit`·`never`를 받으며 `mew:agent-setting:subagents` 구간만 바꾼다. 구간이 없으면 `inherit`, 직접 편집한 문구는 `custom`으로 읽는다. 자동 위임은 독립적인 작업 분담·공유 파일 조율·결과 검토를 안내하고, 런타임 설정이나 권한은 변경하지 않는다. 편집은 기존 `/api/fs/file`과 외부 파일 탭을 사용한다. 해당 MD의 에디터 저장은 `expectedContent`가 전달되면 원문과 비교해 오래된 초안의 덮어쓰기를 409로 막는다. 설정창 읽기·저장은 `mew:external-file-updated`로 열린 깨끗한 탭을 갱신하고 미저장 탭은 보존한다. 공통 파일 저장은 원자적 교체로 독립 감독이 저장 도중 빈 내용을 읽지 않게 한다. 진입은 에이전트 패널 Skills·MCP 옆 기본 지침 버튼이며 저장·적용 범위는 [공통 안내 파일](../guides/project-setup.md#공통-안내-파일-편집)을 따른다.
+- 계정별 원문은 `DATA_DIR/agent-accounts/<정규화 계정 ID SHA-256>/agent-guidance.md`, 최초 생성은 같은 계정 폴더의 `agent-guidance.txt` → `server/prompts/agent-guidance.txt` 순서다. 기존 MD·TXT를 덮어쓰지 않으며 미리보기는 생성 없이 같은 우선순위로 읽는다. `GET /api/fs/agent-guidance`는 `serverFiles` 권한으로 `{ path, content, revision, settings, branch, instructions, capacityRetry }`를 반환한다. `PUT`은 `{ key, value, revision }`으로 MD의 해당 설정 구간만 원자적으로 교체한다. key는 `commit`·`commitLanguage`·`language`·`detail`·`subagents`·`debugger`·`testing`·`branch`·`instructions`·`capacityRetry`와 아래 문서 항목이며 알 수 없는 값은 400, 원문 revision 불일치·설정 구간 손상은 409다. 설정의 별도 JSON 사본은 없으며 원문에서 값을 읽는다. `instructions`는 최대 8,000자의 문자열로 `mew:agent-setting:instructions` 구간만 바꾼다. 다른 설정 표시를 포함한 입력은 거부하고 빈 값은 해당 구간만 지운다. 기존 자유 지침은 이 필드로 이동하거나 삭제하지 않는다. `subagents`는 `inherit`·`automatic`·`explicit`·`never`를 받으며 `mew:agent-setting:subagents` 구간만 바꾼다. 구간이 없으면 `inherit`, 직접 편집한 문구는 `custom`으로 읽는다. 자동 위임은 독립적인 작업 분담·공유 파일 조율·결과 검토를 안내하고, 런타임 설정이나 권한은 변경하지 않는다. 편집은 기존 `/api/fs/file`과 외부 파일 탭을 사용한다. 해당 MD의 에디터 저장은 `expectedContent`가 전달되면 원문과 비교해 오래된 초안의 덮어쓰기를 409로 막는다. 설정창 읽기·저장은 `mew:external-file-updated`로 열린 깨끗한 탭을 갱신하고 미저장 탭은 보존한다. 공통 파일 저장은 원자적 교체로 독립 감독이 저장 도중 빈 내용을 읽지 않게 한다. 진입은 에이전트 패널 Skills·MCP 옆 기본 지침 버튼이며 저장·적용 범위는 [공통 안내 파일](../guides/project-setup.md#공통-안내-파일-편집)을 따른다.
 - [ADR 0202](../history/decisions/0202-mew-account-agent-settings.md)에 따라 기본 지침·`agent-defaults.json`·`agent-settings.json`은 같은 계정 폴더에 저장한다. 인증된 HTTP·WS의 서버 계정 컨텍스트를 사용하고 프로젝트 경로와 무관하게 같은 계정에서 공유한다. 첫 초기화 때 가장 먼저 생성된 owner에만 기존 공용 MD·TXT·JSON을 복사하고 원본은 보존한다. 다른 계정은 기본값으로 시작하며 초기화 후 설정 삭제·초기화로 공용 값을 다시 가져오지 않는다. 최초 이전 대상은 `.legacy-owner`로 고정해 owner 변경 때 시크릿이 재이전되지 않는다. 계정 없는 CLI는 기존 공용 파일을 사용한다.
 - 독립 감독은 `MEW_AGENT_ACCOUNT`로 시작 계정을 상속하고 ACP 자식에게 해당 내부 변수를 전달하지 않는다. `AgentSession`은 시작 계정을 고정하여 다른 계정의 재접속·콜백으로 지침과 기본값을 바꾸지 않는다. 모델·노력도 후보 및 계정 상태의 동시 조회 캐시도 계정별이다. 새 일회성 예약은 생성 계정을 저장하고 조회·변경·취소에 적용하며 실행 시 복원한다. 새 반복 예약은 서버가 계정을 고정하고 runner의 `--account`로 전달한다. Git AI Commit은 저장된 `input.owner`의 설정으로 세션을 시작한다. 계정 정보가 없는 이전 예약은 기존 공용 조회·실행을 유지하고 다시 저장하면 저장 계정을 고정한다. 공급자 CLI의 OS 홈 인증·설치는 별도로 격리하지 않는다. 기존 감독은 사용자가 변경을 반영한 뒤 탭을 다시 열어야 새 저장 계약을 사용한다.
 - 응답 언어 목록 맨 위의 **mew 언어 설정에 따름**을 선택하면 요청을 보낸 화면의 언어(한국어·영어·일본어·중국어 간체)를 따른다. `language: mew` 선택은 지침 원문에 저장하고, 요청의 `settings.uiLocale`로 전달된 화면 언어를 실행 시 실제 응답 언어 지침으로 바꾼다. 직접 지정한 언어와 직접 편집한 지침은 유지한다. 화면 언어가 없는 CLI·예약 요청은 사용자 메시지의 언어를 따르며, 기존의 **별도 지정 안 함**은 언어 지침을 추가하지 않는다.
@@ -25,6 +25,7 @@ updated: "2026-10-26"
 - 문서 항목 `documentation`·`decisionRecords`·`workRecords`·`documentWriting`·`documentDescriptions`·`documentLinks`·`documentChecks`도 `PUT`의 key로 받는다. 값은 각각 `required`(기본값)·`project`이며 같은 이름의 `mew:agent-setting:<key>` 구간만 교체한다. 범위는 기준 문서 갱신·ADR·작업 및 검증 기록·작성 방식·description·링크·검사 순이다. 구간이 없는 계정·빈 원문도 조회에서 `required`로 표시하고 요청 시 기본 안내를 보충한다. 저장 원문·revision을 바꾸지 않으며 항목별 선택은 다른 문서 항목과 테스트·언어·Git 설정을 바꾸지 않는다. `project`는 해당 문서 항목의 Mew 별도 요구를 추가하지 않으며 기존 프로젝트 지침은 유지한다.
 - 기존 기본 템플릿의 정확히 일치하는 독립 문서 갱신 문구는 컨텍스트 전달 시에만 설정형 문구로 대체한다. 원문의 사용자 수정 문장, 설정 구간 내부, 코드 펜스의 예시는 보존한다. 설정 구간이 손상되면 구문을 자동 삭제하지 않으며 해당 항목의 기본 지침도 중복 삽입하지 않는다. 이전 기본 Change intent 문구의 문서 갱신 순서 표현도 선택값이 요구하는 갱신에 한정한다. 저장 API는 기존과 같이 손상·겹침 구간·오래된 revision을 409, 알 수 없는 값을 400으로 거부한다. UI의 접힌 **문서** 그룹은 같은 API를 사용한다. 지침의 상세 범위는 [문서 지침 사용법](../guides/project-setup.md#문서-지침), 선택 근거는 [결정 0073](../decisions/0073-documentation-guidance-options.md), 실제 검증은 [작업 기록](../work/agent-documentation-guidance.md)이 소유한다.
 - `debugger`는 `enabled`·`disabled`를 받으며 `mew:agent-setting:debugger` 구간만 교체한다. 구간이 없으면 설정 조회에서 `enabled`로 표시하고 컨텍스트 읽기에서 기본 영어 지침을 보충하되 저장 원문과 revision은 바꾸지 않는다. 빈 원문도 같은 기본값을 적용한다. 비활성화·직접 편집 구간은 보존하고 손상된 표시가 있으면 기본 안내를 중복 삽입하지 않는다. 선택값은 디버거 활용 지침이며 어댑터 설치·시작이나 권한 변경을 수행하지 않는다.
+- `capacityRetry`는 `{ delaySeconds, maxRetries }`를 받는다. `delaySeconds`는 1~3,600의 정수(기본 30), `maxRetries`는 0~100의 정수(기본 20)이며 0회는 자동 재시도를 끈다. 기존 `PUT /api/fs/agent-guidance`의 revision 검사로 같은 이름의 설정 구간에 `<!-- mew:agent-capacity-retry:v1 {"delaySeconds":30,"maxRetries":20} -->` 형식의 메타데이터를 저장한다. 구간이 없거나 메타데이터 값이 잘못된 계정은 조회·실행에서 기본값을 사용하며 저장 파일·revision은 바꾸지 않는다. 구간 표시 자체가 손상된 경우에는 기존 409·수동 수정 경로를 유지한다. 이 값은 Mew 실행 정책이므로 에이전트에게 보내는 텍스트에서 제외하고 프로젝트 자동 안내의 사용 여부와 분리한다. 설정 UI는 [모델 혼잡 재시도 사용법](../guides/project-setup.md#모델-혼잡-재시도), 실행 경계는 [모델 용량 부족 자동 재시도](#모델-용량-부족-자동-재시도)를 따른다.
 - 기본 템플릿은 도입부·진행 메시지의 스킬 사용 예고를 생략하고, 최종 답변 맨 끝에 실제 사용한 스킬만 중복 없이 한 줄로 표시하도록 안내한다. 한국어는 `사용된 스킬: <이름 목록>`, 영어는 `Used skills: <names>`, 다른 언어는 응답 언어에 맞는 표제를 쓴다. 사용한 스킬이 없으면 줄을 생략한다. 기존 MD·TXT와 빈 원문에도 컨텍스트를 읽을 때 같은 지침을 한 번만 보충하며 저장 파일·revision은 바꾸지 않는다. 런타임의 상위 지침이 스킬 사전 안내를 요구하면 그 지침이 우선한다.
 - `AgentSession.#run`은 사용자 프롬프트·첨부와 별도의 ACP 텍스트 블록으로 mew 안내를 보낸다. `agent-context.ts`가 세션에 고정된 프로젝트·Documents 경로와 실행 시점의 설정을 조합한다. 큐·예약·단발 runner도 이 경로를 공유한다.
 - 분리 감독을 띄우기 전에 부모가 연결 정보를 캡처해 `MEW_AGENT_CONTEXT`로 전달한다. 하위 ACP 프로세스에는 그 환경변수를 제거한다. 반복 예약 명령은 `--context`로 연결을 전달한다.
@@ -128,6 +129,18 @@ updated: "2026-10-26"
 - `GET /api/agent-cwd?path=&base=`는 주소창 입력을 서버 파일시스템 기준 절대 디렉터리로 검증한다 (owner/manager). 빈 `path`는 현재 워크스페이스, 상대경로는 `base` 기준이다.
 
 - `GET /api/agent-cwd/suggestions?input=&base=&entered=`는 입력 중인 마지막 경로 조각의 접두어와 맞는 하위 디렉터리, 또는 이미 들어간 디렉터리의 하위를 돌려준다(owner/manager).
+
+### 모델 용량 부족 자동 재시도
+
+ACP 채팅의 `AgentSession`은 공급자가 명시한 일시적 모델 용량 부족·과부하를 감지하면 같은 논리 턴 안에서 기다렸다가 재요청한다. 예시는 `Selected model is at capacity. Please try a different model.`이다. RPC 실패뿐 아니라 Codex ACP가 답변 말미에 용량 오류를 보내고 정상 `end_turn`을 반환하는 경로도 감지한다. 일반적인 429·속도 제한만으로 판정하지 않으며 실제 사용량 소진·구독·결제·인증 오류에는 기존 오류와 큐 보류 처리를 유지한다.
+
+논리 턴을 시작할 때 세션 시작 계정의 `readAgentCapacityRetrySettings` 값을 한 번 읽는다. 해당 턴의 재시도는 같은 ACP 세션·모델·노력도·권한과 재시도 설정을 유지하며, 대기 중 설정 변경은 다음 턴부터 적용한다. 기본값은 매번 30초 뒤 최대 20회 추가 시도이며 최초 요청은 횟수에 포함하지 않는다. 자동 모델 전환이나 CLI 명령 재실행은 하지 않는다.
+
+용량 재시도를 시작한 뒤 모델·노력도·권한을 바꾸면 런타임이 광고한 후보인지 검증하고 다음 메시지용 선택만 갱신한다. 현재 턴의 어댑터 설정은 고정하며 턴 종료 때 최신 선택을 복원한다.
+
+대기 중에는 busy와 진행 중 턴을 유지하고 대기열을 앞당기지 않는다. `meta.capacityRetry`는 `{ attempt, maxRetries, retryAt }` 또는 `null`이며 `attempt`는 다음 재시도의 순번(1부터), `retryAt`은 예정 시각이다. 화면은 이 상태로 남은 시간·횟수와 중단 동작을 표시한다. 실제 재요청을 보내면 대기 상태를 비운다. 이미 받은 답변·도구 실행 기록을 보존하며 진행한 작업이 있으면 완료된 원래 지시를 다시 시작하도록 보내지 않고 이어서 수행하도록 요청한다. 사용자 중단은 대기를 즉시 취소하고 기존 취소 후 FIFO 규칙을 따른다. 탭 종료·dispose는 대기와 후속 재요청을 취소한다.
+
+성공하면 해당 턴을 마친 뒤 다음 큐를 실행한다. 횟수를 소진하거나 0회로 끈 상태에서 발생한 용량 오류는 최종 오류로 표시하고 대기 메시지는 보류한다. 사용자가 명시적으로 새 메시지를 보내야 재개하며 자동 제출·재연결·큐 편집은 보류를 해제하지 않는다. 공식 TUI·일반 터미널과 CLI 명령 재실행은 범위에 포함하지 않는다. 서버 실행 정책의 선택 근거는 [결정 0074](../decisions/0074-agent-capacity-retry.md), 검증·적용 상태는 [작업 기록](../work/agent-capacity-retry.md)이 소유한다.
 
 ## 대화의 CLI 명령 기록
 

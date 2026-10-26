@@ -8,6 +8,7 @@ import { documentationGuidanceKeys, guidanceOptions, type GuidanceKey, type Guid
 import { branchGuidanceText, branchGuidanceValidationError, defaultBranchGuidance, type BranchGuidanceSettings, type BranchGuidanceSnapshot } from '../shared/branch-guidance.ts'
 import { legacyBranchGuidanceKeys, legacyBranchGuidanceText, type LegacyBranchGuidanceSettings } from '../shared/branch-guidance-v1.ts'
 import { previousBranchGuidanceText } from '../shared/branch-guidance-v2.ts'
+import { agentCapacityRetryMetadata, agentCapacityRetryValidationError, defaultAgentCapacityRetrySettings, type AgentCapacityRetrySettings } from '../shared/agent-capacity-retry.ts'
 
 export const AGENT_GUIDANCE_PATH = path.join(DATA_DIR, 'agent-guidance.md')
 export const agentGuidancePath = () => agentSettingsPath('agent-guidance.md')
@@ -49,7 +50,21 @@ export function readAgentGuidance(locale?: string): string {
   }
 }
 
+/** Runtime policy is account-scoped and reread for each new request. */
+export function readAgentCapacityRetrySettings(): AgentCapacityRetrySettings {
+  try { return capacityRetrySettings(fs.readFileSync(agentGuidancePath(), 'utf8')) }
+  catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+    return capacityRetrySettings(seed().toString('utf8'))
+  }
+}
+
 function effectiveGuidance(content: string, locale?: string): string {
+  // Retry timing belongs to the supervisor, not the agent's instruction text.
+  try {
+    const retry = isolatedRegion(content, 'capacityRetry')
+    if (retry) content = content.slice(0, retry.from) + content.slice(retry.to)
+  } catch { /* Preserve handwritten text surrounding damaged markers. */ }
   let defaults = withDocumentationDefaults(currentDocumentationGuidance(content))
   defaults = withBranchDefault(withTestingDefault(withDebuggerDefault(withCommitLanguageDefault(defaults))))
   const branch = branchSnapshot(defaults)
@@ -173,8 +188,8 @@ export class GuidanceError extends Error {
 }
 
 const revisionOf = (content: string) => createHash('sha256').update(content).digest('hex')
-type GuidanceRegionKey = GuidanceKey | 'branch' | 'instructions'
-const regionKeys: GuidanceRegionKey[] = [...Object.keys(guidanceOptions) as GuidanceKey[], 'branch', 'instructions']
+type GuidanceRegionKey = GuidanceKey | 'branch' | 'instructions' | 'capacityRetry'
+const regionKeys: GuidanceRegionKey[] = [...Object.keys(guidanceOptions) as GuidanceKey[], 'branch', 'instructions', 'capacityRetry']
 const markers = (key: GuidanceRegionKey) => [`<!-- mew:agent-setting:${key} -->`, `<!-- /mew:agent-setting:${key} -->`]
 
 function withDocumentationDefaults(content: string): string {
@@ -283,6 +298,16 @@ function branchSnapshot(content: string): BranchGuidanceSnapshot {
   } catch { return fallback() }
 }
 
+function capacityRetrySettings(content: string): AgentCapacityRetrySettings {
+  try {
+    const block = isolatedRegion(content, 'capacityRetry')
+    const metadata = block?.text.match(/^<!-- mew:agent-capacity-retry:v1 (.+) -->$/)
+    const value: unknown = metadata && JSON.parse(metadata[1])
+    if (value && !agentCapacityRetryValidationError(value)) return { ...value as AgentCapacityRetrySettings }
+  } catch { /* Invalid or damaged metadata uses the safe default policy. */ }
+  return { ...defaultAgentCapacityRetrySettings }
+}
+
 function snapshot(content: string): GuidanceSnapshot {
   const settings = {} as GuidanceSnapshot['settings']
   for (const key of Object.keys(guidanceOptions) as GuidanceKey[]) {
@@ -293,7 +318,7 @@ function snapshot(content: string): GuidanceSnapshot {
   }
   let instructions = ''
   try { instructions = region(content, 'instructions')?.text ?? '' } catch { /* Keep file editing available for damaged markers. */ }
-  return { path: agentGuidancePath(), content, revision: revisionOf(content), instructions, settings, branch: branchSnapshot(content) }
+  return { path: agentGuidancePath(), content, revision: revisionOf(content), instructions, settings, branch: branchSnapshot(content), capacityRetry: capacityRetrySettings(content) }
 }
 
 export function agentGuidanceSettings(): GuidanceSnapshot {
@@ -302,13 +327,17 @@ export function agentGuidanceSettings(): GuidanceSnapshot {
 
 export function updateAgentGuidance(input: unknown): GuidanceSnapshot {
   const value = input as { key?: unknown; value?: unknown; revision?: unknown } | null
-  if (!value || typeof value.key !== 'string' || (!['branch', 'instructions'].includes(value.key) && !Object.hasOwn(guidanceOptions, value.key))) throw new GuidanceError('올바른 설정 항목을 선택하세요.')
+  if (!value || typeof value.key !== 'string' || (!['branch', 'instructions', 'capacityRetry'].includes(value.key) && !Object.hasOwn(guidanceOptions, value.key))) throw new GuidanceError('올바른 설정 항목을 선택하세요.')
   const key = value.key as GuidanceRegionKey
   if (typeof value.revision !== 'string') throw new GuidanceError('올바른 설정값을 선택하세요.')
   let text: string
   if (key === 'instructions') {
     if (typeof value.value !== 'string' || value.value.length > 8000 || /<!--\s*\/?mew:agent-setting:/.test(value.value)) throw new GuidanceError('추가 지침은 설정 구간 표시 없이 최대 8,000자로 입력하세요.')
     text = value.value.trim()
+  } else if (key === 'capacityRetry') {
+    const validationError = agentCapacityRetryValidationError(value.value)
+    if (validationError) throw new GuidanceError(validationError)
+    text = agentCapacityRetryMetadata(value.value as AgentCapacityRetrySettings)
   } else if (key === 'branch') {
     const validationError = branchGuidanceValidationError(value.value)
     if (validationError) throw new GuidanceError(validationError)
