@@ -117,6 +117,7 @@ export interface DocumentBacklinksData {
 
 export interface EditorApi {
   resolveImageUrl?: (src: string, documentPath: string) => string
+  fetchFileCandidates?: (signal?: AbortSignal) => Promise<string[]>
   fetchBacklinks?: (path: string, signal?: AbortSignal) => Promise<DocumentBacklinksData>
   fetchFile: (path: string) => Promise<{ path: string; content: string; editable: boolean }>
   uploadAsset: (file: File) => Promise<{ url: string; name: string; mimetype: string }>

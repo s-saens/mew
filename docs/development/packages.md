@@ -1,7 +1,7 @@
 ---
 title: "공용 패키지"
-description: "공용 ActionMenu·헤더 메뉴·editor·ui 등 소스 패키지의 책임과 초기 로딩을 위한 순수 검색·tmux 세션 진입점과 에디터 우클릭 대상·클립보드 경계를 정의한다. Hotview 블록 직렬화 캐시·Pretext 기반 DOM 표시 범위, YAML 속성·태그 보존과 호스트 API·번역·이미지 URL 주입, Mermaid 편집·렌더링 경계와 모바일 댓글 버튼의 호스트 연결을 설명한다."
-updated: 2026-10-22
+description: "공용 ActionMenu·헤더 메뉴·editor·ui 등 소스 패키지의 책임과 순수 검색·tmux 세션 진입점, 에디터 우클릭·클립보드 경계를 정의한다. Hotview 계산·표시 범위, YAML 보존과 전체 파일 멘션 후보·이미지 URL의 호스트 API 주입, 번역·Mermaid·모바일 댓글 연결을 설명한다."
+updated: 2026-10-26
 상위파일:
   - "../MOC.md"
   - "MOC.md"
@@ -17,6 +17,7 @@ Hotview는 에디터 패키지 내부의 블록별 Markdown·줄 번호 캐시�
 공용 화면 문구는 `@mew/ui/i18n-core`의 `uiText`와 `@mew/ui/i18n`의 `useUiLocale`로 번역한다. 호스트는 `setUiLocale`로 언어를 전달하며, Mew는 기존 `I18nProvider`와 연결한다. 편집기·모바일 보조키·터미널·단축키 오류·확인창이 같은 언어를 사용한다. Node에서 사용하는 유틸은 React를 불러오지 않는 `i18n-core` 진입점을 사용한다. 사전·구독·검증 기준은 [UI 번역 계약](ui-contracts.md#ui-번역)을 따른다.
 
 - `@mew/editor` — TipTap 마크다운 에디터(`Editor`). frontmatter 패널·표·링크/멘션 툴팁· 미디어 업로드 포함. `EditorApi`(fetchFile·uploadAsset·fetchLinkPreview) 주입. 선택적 `resolveImageUrl(src, documentPath)`은 호스트의 프로젝트·문서 경로를 기준으로 이미지 표시 주소를 계산한다. 이미지 노드뷰는 context로 현재 경로를 받아 원본 Markdown `src`를 바꾸지 않으며, 주입하지 않은 호스트는 기존 `src`를 사용한다. fuzzy 검색·frontmatter 유틸도 여기서 export. `@`**·**`/` **입력 감지는** `keydown`**이 아니라** `onUpdate`**/**`onSelectionUpdate`**(트랜잭션 기반)로 한다** — keydown 스페이스 트리거는 모바일에서 조용히 실패한다(`SlashMenu.tsx`가 현재 구현).
+  - 선택적 `EditorApi.fetchFileCandidates(signal)`은 현재 프로젝트 전체의 열람 가능한 파일 경로를 반환한다. 에디터는 `@` 메뉴를 열 때 조회하고 입력 중에는 파일명 접두어로 필터링한다. 닫기·API 변경 때 요청을 취소하며, 메서드가 없거나 조회가 실패하면 `tree` prop의 후보를 사용한다. Mew 호스트는 `fetchFullTree(project)`와 순수 `@mew/editor/fuzzy`의 `flattenFiles`를 연결해 탐색기의 지연 로딩 상태와 후보 조회를 분리한다.
   - `prepareContextMenu(x, y)`가 반환하는 `EditorContextTarget`은 문서 변경에 맞춰 선택 범위를 매핑하며, 메뉴와 비동기 클립보드 작업이 끝나면 호스트가 `dispose()`로 해제한다. 호스트는 메뉴 UI·권한·수명 경계를 소유하고, 대상 타입과 클립보드 읽기·쓰기 유틸은 에디터 UI를 초기화하지 않는 `@mew/editor/context-target`에서 가져온다([본문 우클릭 계약](ui-contracts.md#에디터-본문-우클릭-메뉴)).
   - **왼쪽 거터의 줄 번호가 드래그 핸들을 대신한다.** 번호는 호버와 상관없이 늘 떠 있고(`LineFocus`의 `data-mew-line-numbers`), 핸들 엘리먼트는 그 숫자 위에 포개지는 **투명한 손잡이**다(클릭=블록 선택). 블록 이동은 **0.7초 동안 움직이지 않고 누른 뒤**에만 시작한다. 그 전에 드래그를 시작하면 이동으로 승격되지 않고 기존 드래그/스크롤 제스처로 끝까지 처리한다. 밝기 3단: 평소 → 지금 잡히는 줄(`mew-line--hover`, DragHandle의 `onNodeChange`가 붙임) → 커서가 있는 줄(`mew-line--focus`, `editor/lineFocus.ts`의 장식).
   - 세는 단위는 핸들이 잡는 단위와 같아야 한다 — **최상위 블록 하나가 한 줄, 리스트는 항목이 한 줄**이고 `ul`/`ol` 자체는 줄이 아니다. 목록 padding은 한 단 24px이며 `LineFocus`가 `listLevel`로 계산한 `--mew-list-depth`를 번호 장식에 전달한다. CSS의 `li[data-mew-line-numbers]::before`는 깊이만큼 들여쓰기를 되돌려 모든 중첩 단계의 줄번호를 같은 거터에 맞춘다. JS의 투명 손잡이도 한 단 24px을 써야 숫자 위에 남는다 — 한쪽만 고치지 말 것.

@@ -20,6 +20,7 @@ import type { FileVersion } from '../../shared/file-version'
 export type { FileVersion } from '../../shared/file-version'
 import type { MissingDirectory } from '../../shared/external-path'
 import type { EditorApi, EditorDbApi, DbColumn, DbColumnType, DbRow, DbSummary, DbView, TableWidths } from '@mew/editor'
+import { flattenFiles } from '@mew/editor/fuzzy'
 import type { TmuxPanelApi, TmuxSession } from '@mew/tmux-term'
 import { isHiddenTmuxSession } from '@mew/tmux-term/command-session'
 import { subscribeDb } from './dbSocket'
@@ -1929,6 +1930,7 @@ export const editorApi: EditorApi = { fetchFile, uploadAsset, fetchLinkPreview, 
 /** Capture a pane's file scope so background callbacks cannot follow another pane's focus. */
 export function createEditorApi(project: string, ownerPath?: string): EditorApi {
   return {
+    fetchFileCandidates: signal => fetchFullTree(project, signal).then(flattenFiles),
     fetchBacklinks: (path, signal) => mewFetch(`/api/docs/backlinks?path=${encodeURIComponent(path)}&${projectQs(project)}`, { signal })
       .then(json<import('@mew/editor').DocumentBacklinksData>),
     fetchFile: path => fetchFile(path, project),

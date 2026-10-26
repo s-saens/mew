@@ -1563,30 +1563,50 @@ export const Editor = forwardRef<
     }
   }, [tooltip])
 
+  const mentionOpen = mention !== null
+  const [mentionFiles, setMentionFiles] = useState<{ api: EditorApi; paths: string[] | null } | null>(null)
+  useEffect(() => {
+    if (!mentionOpen || !api.fetchFileCandidates) { setMentionFiles(null); return }
+    const controller = new AbortController()
+    setMentionFiles({ api, paths: null })
+    void api.fetchFileCandidates(controller.signal).then(paths => {
+      if (!controller.signal.aborted) setMentionFiles({ api, paths })
+    }).catch(() => {
+      if (!controller.signal.aborted) setMentionFiles({ api, paths: [] })
+    })
+    return () => controller.abort()
+  }, [api, mentionOpen])
+  const mentionLoading = !!api.fetchFileCandidates && (mentionFiles?.api !== api || mentionFiles.paths === null)
+
   const mentionResults = useMemo<MentionResult[]>(() => {
     if (!mention) return []
-    return flattenFiles(tree)
+    const complete = mentionFiles?.api === api ? mentionFiles.paths ?? [] : []
+    return [...new Set([...flattenFiles(tree), ...complete])]
       // 목록에 보이는 파일명 기준의 접두어 자동완성이다. 프로젝트 전체를 찾는 파일 트리 검색은
       // 별도로 fuzzyScore를 써서 부분 일치를 계속 지원한다.
       .filter((p) => prefixMatch(mention.query, p.split('/').pop() ?? p))
       .sort((a, b) => a.localeCompare(b, 'ko-KR'))
       .slice(0, 8)
       .map((p) => ({ path: p, label: p.split('/').pop()?.replace(/\.[^.]+$/, '') ?? p }))
-  }, [tree, mention])
+  }, [tree, mention, mentionFiles, api])
 
   const selectMention = useCallback(
     (result: MentionResult) => {
       if (!mention || !editor) return
       const { from } = mention
       const to = from + 1 + mention.query.length
-      const href = relativeLinkPath(path, result.path)
+      const href = encodeURI(relativeLinkPath(path, result.path)).replace(/[#?()]/g, char => '%' + char.charCodeAt(0).toString(16).toUpperCase())
       setMention(null)
       // 내부 링크의 표시 텍스트는 대상 문서의 title — 파일명은 title을 못 읽을 때의 폴백
       api.fetchFile(result.path)
         .then(({ content }) => splitFrontmatter(content).frontmatter?.title || result.label)
         .catch(() => result.label)
         .then((label) => {
-          editor.chain().focus().deleteRange({ from, to }).insertContent(`[${label}](${href}) `).run()
+          if (editor.isDestroyed || editorRef.current !== editor || pathRef.current !== path || readOnlyRef.current) return
+          editor.chain().focus().deleteRange({ from, to }).insertContent([
+            { type: 'text', text: label, marks: [{ type: 'link', attrs: { href } }] },
+            { type: 'text', text: ' ' },
+          ]).run()
         })
     },
     [mention, editor, path, api],
@@ -2195,6 +2215,7 @@ export const Editor = forwardRef<
         <MentionTooltip
           position={mention.position}
           results={mentionResults}
+          loading={mentionLoading}
           selectedIndex={mention.selectedIndex}
           onSelect={selectMention}
         />
