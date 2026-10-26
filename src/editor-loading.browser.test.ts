@@ -32,8 +32,9 @@ test('editor module completion uses the current scope without a lazy retry', { s
     createRoot(document.getElementById('root')).render(<Fixture/>);`
   const result = await build({ input: 'virtual:editor-loading.tsx', write: false, platform: 'browser', transform: { jsx: 'react-jsx', define: { 'process.env.NODE_ENV': '"production"', 'import.meta.hot': 'false' } }, output: { format: 'esm', minify: true }, plugins: [{
     name: 'controlled-editor-module',
-    resolveId(id) { if (id === 'virtual:editor-loading.tsx') return id },
+    resolveId(id) { if (id.endsWith('.css')) return 'virtual:style'; if (id === 'virtual:editor-loading.tsx') return id },
     async load(id) {
+      if (id === 'virtual:style') return ''
       if (id === 'virtual:editor-loading.tsx') return source
       if (id === component) {
         const code = await fs.readFile(id, 'utf8')
@@ -83,6 +84,8 @@ test('editor module completion uses the current scope without a lazy retry', { s
     })
     await page.goto('http://mew-editor.test/' + query, { waitUntil: 'domcontentloaded' })
     await page.waitForFunction(() => (window as unknown as { fixtureLoadCount(): number }).fixtureLoadCount?.() === 1)
+    assert.equal(await page.locator('[role=status] .mew-loading-dot').count(), 3, 'editor preparation uses three dots')
+    assert.equal(await page.locator('.mew-loading-logo').count(), 0, 'editor preparation never displays the full-screen logo')
     return { page, errors }
   }
   const settle = (page: Page, index: number, reject = false) => page.evaluate(({ index, reject }) => {

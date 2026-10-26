@@ -9,14 +9,18 @@ import { domBrowserExecutable } from '../../../server/browser-dom-executable.ts'
 const root = path.resolve(import.meta.dirname, '../../..')
 const sizes = [12, 14, 16, 28, 48, 56]
 
-test('shared loading indicators keep the Mew logo fixed while a gradient highlight moves with accessible alternatives', { skip: !domBrowserExecutable(), timeout: 30_000 }, async t => {
+test('shared loading indicators use quiet pulsing dots inside panels and a fixed highlighted logo for startup', { skip: !domBrowserExecutable(), timeout: 30_000 }, async t => {
   const source = `
 import React from '${root}/node_modules/react/index.js';
 import {createRoot} from '${root}/node_modules/react-dom/client.js';
 import {LoadingIndicator} from '${root}/packages/ui/src/loading-indicator.tsx';
 createRoot(document.getElementById('react')).render(React.createElement(React.Fragment,null,
-  ...${JSON.stringify(sizes)}.map(size=>React.createElement(LoadingIndicator,{key:size,size,className:'size-'+size})),
-  React.createElement(LoadingIndicator,{active:false,className:'inactive'})
+  ...${JSON.stringify(sizes)}.flatMap(size=>[
+    React.createElement(LoadingIndicator,{key:'logo-'+size,variant:'logo',size,className:'size-'+size}),
+    React.createElement(LoadingIndicator,{key:'dots-'+size,size,className:'dots-size-'+size})
+  ]),
+  React.createElement(LoadingIndicator,{variant:'logo',active:false,className:'inactive'}),
+  React.createElement(LoadingIndicator,{active:false,className:'inactive-dots'})
 ));`
   const bundle = await build({
     input: 'virtual:loading-indicator.ts', write: false, platform: 'browser',
@@ -45,7 +49,10 @@ createRoot(document.getElementById('react')).render(React.createElement(React.Fr
   await page.emulateMedia({ reducedMotion: 'no-preference', forcedColors: 'none' })
   await page.setContent(`<!doctype html><style>${css}</style>
     <div id="react" style="color:#7a65db"></div>
-    <div id="mewlink"><span class="mew-loading-indicator" aria-hidden="true"></span></div>`)
+    <div id="mewlink">
+      <span class="mew-loading-indicator mew-loading-logo" aria-hidden="true"></span>
+      <span class="mew-loading-indicator mew-loading-dots" aria-hidden="true"><span class="mew-loading-dot"></span><span class="mew-loading-dot"></span><span class="mew-loading-dot"></span></span>
+    </div>`)
   await page.addScriptTag({ content: code })
   await page.locator('.size-56').waitFor()
 
@@ -66,6 +73,7 @@ createRoot(document.getElementById('react')).render(React.createElement(React.Fr
     assert.equal(snapshot.tag, 'SPAN')
     assert.equal(snapshot.children, 0, 'React and plain HTML share one empty decorative element')
     assert.equal(snapshot.hidden, 'true')
+    assert.ok(await page.locator(`.size-${size}`).evaluate(el => el.classList.contains('mew-loading-logo')))
     assert.equal(snapshot.width, size)
     assert.equal(snapshot.height, size)
     assert.equal(snapshot.rootTransform, 'none', 'the logo must stay fixed while its highlight moves')
@@ -79,6 +87,85 @@ createRoot(document.getElementById('react')).render(React.createElement(React.Fr
     assert.ok(new Set(snapshot.highlight.match(/rgb\([^)]+\)/g)).size >= 5, 'the highlight spans distinct gradient colors')
     assert.ok(snapshot.highlightWidth >= size * Math.SQRT2, 'the rotating highlight covers the square logo corners')
     assert.ok(snapshot.highlightHeight >= size * Math.SQRT2)
+  }
+
+  for (const size of sizes) {
+    const snapshot = await page.locator(`.dots-size-${size}`).evaluate(el => {
+      const view = el.ownerDocument.defaultView!
+      const style = view.getComputedStyle(el)
+      return {
+        tag: el.tagName, children: el.childElementCount, hidden: el.getAttribute('aria-hidden'),
+        variant: el.classList.contains('mew-loading-dots'),
+        width: parseFloat(style.width), height: parseFloat(style.height),
+        rootTransform: style.transform, rootAnimation: style.animationName,
+        mask: style.maskImage, background: style.backgroundImage,
+        color: style.color,
+        dots: Array.from(el.children, dot => {
+          const dotStyle = view.getComputedStyle(dot)
+          return {
+            tag: dot.tagName, className: dot.className, children: dot.childElementCount,
+            width: parseFloat(dotStyle.width), height: parseFloat(dotStyle.height),
+            color: dotStyle.backgroundColor, background: dotStyle.backgroundImage,
+            radius: dotStyle.borderRadius,
+          }
+        }),
+      }
+    })
+    assert.equal(snapshot.tag, 'SPAN')
+    assert.equal(snapshot.hidden, 'true')
+    assert.equal(snapshot.variant, true, 'the default variant is the compact dots indicator')
+    assert.equal(snapshot.width, size * 1.5)
+    assert.equal(snapshot.height, size)
+    assert.equal(snapshot.rootTransform, 'none')
+    assert.equal(snapshot.rootAnimation, 'none')
+    assert.equal(snapshot.mask, 'none', 'panel loading does not reuse the logo mask')
+    assert.equal(snapshot.background, 'none')
+    assert.equal(snapshot.children, 3)
+    for (const dot of snapshot.dots) {
+      assert.equal(dot.tag, 'SPAN')
+      assert.equal(dot.className, 'mew-loading-dot')
+      assert.equal(dot.children, 0)
+      assert.equal(dot.color, snapshot.color, 'dots inherit the surrounding text color')
+      assert.equal(dot.background, 'none', 'compact loading uses solid monochrome dots')
+      assert.equal(dot.radius, '50%')
+      assert.ok(dot.width > 0 && dot.width <= size / 3, 'three dots fit inside the requested size')
+      assert.equal(dot.width, dot.height)
+    }
+  }
+
+  const dotMotion = await page.locator('.dots-size-16').evaluate(el => {
+    const view = el.ownerDocument.defaultView!
+    return Array.from(el.children, dot => {
+      const style = view.getComputedStyle(dot)
+      return {
+        name: style.animationName, duration: style.animationDuration, delay: style.animationDelay,
+        effects: dot.getAnimations().map(animation => {
+          const effect = animation.effect
+          if (!(effect instanceof view.KeyframeEffect)) throw new Error('Expected a CSS dot keyframe animation')
+          return {
+            iterations: effect.getTiming().iterations,
+            frames: effect.getKeyframes().map(frame => ({
+              keys: Object.keys(frame), transform: frame.transform, opacity: frame.opacity,
+            })),
+          }
+        }),
+      }
+    })
+  })
+  assert.deepEqual(dotMotion.map(dot => dot.name), Array(3).fill('mew-loading-dot-pulse'))
+  assert.deepEqual(dotMotion.map(dot => dot.duration), Array(3).fill('1.2s'))
+  assert.deepEqual(dotMotion.map(dot => dot.delay), ['-0.32s', '-0.16s', '0s'], 'the dots pulse in sequence')
+  const dotAllowedKeys = new Set(['offset', 'computedOffset', 'easing', 'composite', 'transform', 'opacity'])
+  for (const dot of dotMotion) {
+    assert.equal(dot.effects.length, 1)
+    assert.equal(dot.effects[0].iterations, Infinity)
+    for (const frame of dot.effects[0].frames) {
+      for (const property of frame.keys) assert.ok(dotAllowedKeys.has(property), `${property} is not an allowed animated dot property`)
+      assert.match(String(frame.transform), /^scale\([\d.]+\)$/, 'dots change size without moving out of position')
+      assert.ok(Number(frame.opacity) >= 0.45 && Number(frame.opacity) <= 1)
+    }
+    assert.ok(dot.effects[0].frames.some(frame => frame.transform === 'scale(0.55)'))
+    assert.ok(dot.effects[0].frames.some(frame => frame.transform === 'scale(1)'))
   }
 
   const indicator = page.locator('.size-16')
@@ -140,14 +227,24 @@ createRoot(document.getElementById('react')).render(React.createElement(React.Fr
     const view = el.ownerDocument.defaultView!
     return [view.getComputedStyle(el).animationPlayState, view.getComputedStyle(el, '::after').animationPlayState]
   })
+  const dotPlayStates = (selector: string) => page.locator(selector).evaluate(el => {
+    const view = el.ownerDocument.defaultView!
+    return Array.from(el.children, dot => view.getComputedStyle(dot).animationPlayState)
+  })
   assert.deepEqual(await playStates('.inactive'), ['paused', 'paused'], 'active=false pauses the moving highlight')
-  assert.deepEqual(await playStates('#mewlink .mew-loading-indicator'), ['running', 'running'], 'plain HTML needs no React state attribute')
+  assert.deepEqual(await dotPlayStates('.inactive-dots'), Array(3).fill('paused'), 'active=false pauses all three dots')
+  assert.deepEqual(await playStates('#mewlink .mew-loading-logo'), ['running', 'running'], 'plain HTML needs no React state attribute')
+  assert.deepEqual(await dotPlayStates('#mewlink .mew-loading-dots'), Array(3).fill('running'))
   await page.locator('#mewlink').evaluate(el => el.setAttribute('data-paused', ''))
-  assert.deepEqual(await playStates('#mewlink .mew-loading-indicator'), ['paused', 'paused'], 'hidden Mewlink pages pause the highlight')
+  assert.deepEqual(await playStates('#mewlink .mew-loading-logo'), ['paused', 'paused'], 'hidden Mewlink pages pause the highlight')
+  assert.deepEqual(await dotPlayStates('#mewlink .mew-loading-dots'), Array(3).fill('paused'), 'hidden Mewlink pages pause all dots')
   await page.locator('#mewlink').evaluate(el => el.removeAttribute('data-paused'))
-  assert.deepEqual(await playStates('#mewlink .mew-loading-indicator'), ['running', 'running'])
+  assert.deepEqual(await playStates('#mewlink .mew-loading-logo'), ['running', 'running'])
+  assert.deepEqual(await dotPlayStates('#mewlink .mew-loading-dots'), Array(3).fill('running'))
   await page.locator('.inactive').evaluate(el => el.setAttribute('data-active', 'true'))
   assert.deepEqual(await playStates('.inactive'), ['running', 'running'], 'reactivating an indicator resumes its highlight')
+  await page.locator('.inactive-dots').evaluate(el => el.setAttribute('data-active', 'true'))
+  assert.deepEqual(await dotPlayStates('.inactive-dots'), Array(3).fill('running'), 'reactivating an indicator resumes each dot')
 
   await page.emulateMedia({ reducedMotion: 'reduce' })
   const reducedMotion = await indicator.evaluate(el => {
@@ -167,6 +264,21 @@ createRoot(document.getElementById('react')).render(React.createElement(React.Fr
   assert.notEqual(reducedMotion.highlightTransform, 'none')
   assert.equal(reducedMotion.rootTransform, 'none')
   assert.match(reducedMotion.mask, /data:image\/svg\+xml,/)
+  const reducedDots = await page.locator('.dots-size-16').evaluate(el => {
+    const view = el.ownerDocument.defaultView!
+    return {
+      animations: el.getAnimations({ subtree: true }).length,
+      dots: Array.from(el.children, dot => {
+        const style = view.getComputedStyle(dot)
+        return { name: style.animationName, opacity: style.opacity, width: parseFloat(style.width) }
+      }),
+    }
+  })
+  assert.equal(reducedDots.animations, 0, 'reduced motion stops all dot animations')
+  for (const dot of reducedDots.dots) {
+    assert.equal(dot.name, 'none')
+    assert.ok(Number(dot.opacity) >= 0.45 && dot.width > 0, 'the three dots remain visible without motion')
+  }
 
   await page.emulateMedia({ reducedMotion: 'no-preference', forcedColors: 'active' })
   const forcedColors = await indicator.evaluate(el => {
@@ -188,5 +300,16 @@ createRoot(document.getElementById('react')).render(React.createElement(React.Fr
   assert.equal(forcedColors.mask, reducedMotion.mask, 'high contrast retains the Mew logo geometry')
   assert.equal(forcedColors.colorAdjust, 'none')
   assert.equal(forcedColors.highlight, 'none')
+  const forcedDots = await page.locator('.dots-size-16').evaluate(el => {
+    const view = el.ownerDocument.defaultView!
+    return Array.from(el.children, dot => ({
+      color: view.getComputedStyle(dot).backgroundColor,
+      image: view.getComputedStyle(dot).backgroundImage,
+    }))
+  })
+  for (const dot of forcedDots) {
+    assert.equal(dot.color, forcedColors.systemText, 'forced colors retain all dots in the system text color')
+    assert.equal(dot.image, 'none')
+  }
   assert.deepEqual(errors, [])
 })

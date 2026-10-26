@@ -1,3 +1,5 @@
+import { LoadingIndicator } from '@mew/ui'
+
 export function AgentLoadingBubbles({ label, active = true, compact = false }: {
   label: string
   active?: boolean
@@ -5,12 +7,7 @@ export function AgentLoadingBubbles({ label, active = true, compact = false }: {
 }) {
   return (
     <div className="agent-loading-bubbles" data-active={active} data-compact={compact} role="status" aria-label={label}>
-      <div aria-hidden="true" className="agent-loading-bubbles__shapes">
-        <div className="agent-loading-bubbles__bubble" />
-        <div className="agent-loading-bubbles__bubble" />
-        <div className="agent-loading-bubbles__bubble" />
-        {!compact && <div className="agent-loading-bubbles__bubble" />}
-      </div>
+      <LoadingIndicator size={compact ? 16 : 20} active={active} />
     </div>
   )
 }

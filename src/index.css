@@ -7,66 +7,18 @@
 @variant dark (&:where(.dark, .dark *));
 
 .agent-loading-bubbles {
-  padding: 12px;
-}
-.agent-loading-bubbles__shapes {
   display: flex;
-  flex-direction: column;
-  gap: 12px;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  height: 100%;
+  color: var(--color-ink-muted);
 }
-.agent-loading-bubbles__bubble {
-  position: relative;
-  overflow: hidden;
-  width: 66%;
-  height: 40px;
-  flex-shrink: 0;
-  align-self: flex-end;
-  border-radius: 8px;
-  background: var(--color-surface-raised);
-}
-.agent-loading-bubbles__bubble:nth-child(2) {
-  width: 92%;
-  height: 72px;
-  align-self: flex-start;
-}
-.agent-loading-bubbles__bubble:nth-child(3) { width: 52%; }
-.agent-loading-bubbles__bubble:nth-child(4) {
-  width: 82%;
-  height: 96px;
-  align-self: flex-start;
-}
-.agent-loading-bubbles__bubble::after {
-  content: '';
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: 40%;
-  background: linear-gradient(90deg,
-    transparent 0%,
-    color-mix(in srgb, var(--color-ink) 11%, transparent) 25%,
-    color-mix(in srgb, var(--color-ink) 22%, transparent) 50%,
-    color-mix(in srgb, var(--color-ink) 11%, transparent) 75%,
-    transparent 100%);
-  animation: agent-bubble-shimmer 1.4s ease-in-out infinite alternate;
-}
-.agent-loading-bubbles__bubble:nth-child(2)::after { animation-delay: -200ms; }
-.agent-loading-bubbles__bubble:nth-child(3)::after { animation-delay: -400ms; }
-.agent-loading-bubbles__bubble:nth-child(4)::after { animation-delay: -600ms; }
-.agent-loading-bubbles[data-active='false'] .agent-loading-bubbles__bubble::after { animation-play-state: paused; }
-.agent-loading-bubbles[data-compact='true'] .agent-loading-bubbles__bubble { height: 28px; }
-@keyframes agent-bubble-shimmer {
-  0% { transform: translateX(0); }
-  100% { transform: translateX(150%); }
-}
-@keyframes agent-bubble-breathe {
-  from { opacity: .35; }
-  to { opacity: .8; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .agent-loading-bubbles__bubble::after {
-    transform: translateX(75%);
-    animation-name: agent-bubble-breathe;
-    animation-duration: 2s;
-  }
+.agent-loading-bubbles[data-compact='true'] {
+  flex: none;
+  height: auto;
+  padding: 8px;
 }
 
 /*

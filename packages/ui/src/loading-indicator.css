@@ -6,22 +6,45 @@
   height: var(--mew-loading-size, 16px);
   flex-shrink: 0;
   vertical-align: middle;
-  background: linear-gradient(135deg, #8b5cf6, #2563eb 55%, #0891b2);
+}
+.mew-loading-dots {
+  display: inline-flex;
+  width: calc(var(--mew-loading-size, 16px) * 1.5);
+  align-items: center;
+  justify-content: space-between;
+}
+.mew-loading-dot {
+  width: calc(var(--mew-loading-size, 16px) * .24);
+  height: calc(var(--mew-loading-size, 16px) * .24);
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: currentColor;
+  animation: mew-loading-dot-pulse 1.2s ease-in-out infinite;
+  animation-play-state: inherit;
+}
+.mew-loading-dot:nth-child(1) { animation-delay: -320ms; }
+.mew-loading-dot:nth-child(2) { animation-delay: -160ms; }
+@keyframes mew-loading-dot-pulse {
+  0%, 70%, 100% { transform: scale(.55); opacity: .45; }
+  35% { transform: scale(1); opacity: 1; }
+}
+.mew-loading-logo {
+  background: linear-gradient(135deg, #77758f, #617a8d 55%, #6c8790);
   mask: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2064%2064%22%20fill%3D%22none%22%3E%3Crect%20x%3D%222%22%20y%3D%222%22%20width%3D%2260%22%20height%3D%2260%22%20stroke%3D%22white%22%20stroke-width%3D%224%22%2F%3E%3Cpath%20d%3D%22M46%2029.75C46%2018.5%2046%2014%2039%2014C32%2014%2032%2018.5%2032%2029.75C32%2018.5%2032%2014%2025%2014C18%2014%2018%2018.5%2018%2029.75L21.5%2032L18%2034.25C18.0002%2045.5%2018%2050%2025%2050C32%2050%2032%2045.5%2032%2034.25C32%2045.5%2032%2050%2039%2050C46%2050%2046%2045.5%2046%2034.25%22%20stroke%3D%22white%22%20stroke-width%3D%224%22%2F%3E%3C%2Fsvg%3E") center / contain no-repeat;
   mask-mode: alpha;
 }
-.mew-loading-indicator::after {
+.mew-loading-logo::after {
   content: '';
   position: absolute;
   inset: -25%;
   background: conic-gradient(from -45deg,
     transparent 0deg 150deg,
-    #7c3aed 195deg,
-    #d946ef 230deg,
-    #f0abfc 255deg,
-    #e0f2fe 275deg,
-    #67e8f9 290deg,
-    #38bdf8 310deg,
+    #77718e 195deg,
+    #a094ad 230deg,
+    #c0b8cb 255deg,
+    #d3dde2 275deg,
+    #9ebac2 290deg,
+    #809aa9 310deg,
     transparent 335deg 360deg);
   animation: mew-logo-highlight 2.4s linear infinite;
   animation-play-state: inherit;
@@ -30,15 +53,11 @@
 [data-paused] .mew-loading-indicator { animation-play-state: paused; }
 @keyframes mew-logo-highlight { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) {
-  .mew-loading-indicator::after {
-    animation: none;
-    transform: rotate(35deg);
-  }
+  .mew-loading-dot { animation: none; transform: scale(.7); opacity: .65; }
+  .mew-loading-logo::after { animation: none; transform: rotate(35deg); }
 }
 @media (forced-colors: active) {
-  .mew-loading-indicator {
-    forced-color-adjust: none;
-    background: CanvasText;
-  }
-  .mew-loading-indicator::after { display: none; }
+  .mew-loading-logo { forced-color-adjust: none; background: CanvasText; }
+  .mew-loading-logo::after { display: none; }
+  .mew-loading-dot { forced-color-adjust: none; background: CanvasText; }
 }

@@ -27,6 +27,7 @@ test('authenticated workspace mounts without waiting for the lazy retry deadline
   const result = await build({ input: 'virtual:app-bootstrap.tsx', write: false, platform: 'browser', transform: { jsx: 'react-jsx', define: { 'process.env.NODE_ENV': '"production"', 'import.meta.hot': 'false' } }, output: { format: 'esm', minify: true }, plugins: [{
     name: 'controlled-workspace-module',
     resolveId(id) {
+      if (id.endsWith('.css')) return 'virtual:style'
       if (id === 'virtual:app-bootstrap.tsx') return id
       if (id.endsWith('/utils/remote-transport') || id.endsWith('/utils/remote-transport.ts')) return 'virtual:transport'
       if (id.endsWith('/utils/contentCache')) return 'virtual:content-identity'
@@ -34,6 +35,7 @@ test('authenticated workspace mounts without waiting for the lazy retry deadline
       if (id.endsWith('/components/PortPreviewPage.tsx')) return 'virtual:preview.tsx'
     },
     load(id) {
+      if (id === 'virtual:style') return ''
       if (id === 'virtual:app-bootstrap.tsx') return source
       if (id === 'virtual:transport') return 'export const isRemoteMode=()=>true; export const mewFetch=(...args)=>fetch(...args); export const setRemoteTransport=()=>{}; export class DataChannelTransport {}'
       if (id === 'virtual:content-identity') return 'export function clearFileContentCache(){}; export function setContentIdentity(value){window.fixtureContentIdentity=value}'
@@ -113,6 +115,8 @@ test('authenticated workspace mounts without waiting for the lazy retry deadline
     const actual = await fixture()
     try {
       await actual.page.locator('[data-startup-screen]').waitFor()
+      assert.equal(await actual.page.locator('[data-startup-screen] .mew-loading-logo').count(), 1, 'full workspace entry uses the logo')
+      assert.equal(await actual.page.locator('[data-startup-screen] .mew-loading-dots').count(), 0)
       assert.equal(actual.moduleRequests(), 0, 'unverified status cannot evaluate or request the workspace')
       actual.releaseAuth(owner)
       await actual.page.waitForRequest(request => new URL(request.url()).pathname === '/' + workspaceChunk.fileName)

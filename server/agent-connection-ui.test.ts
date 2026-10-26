@@ -68,6 +68,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
   const compiler = await compile(await fs.readFile(`${root}/src/index.css`, 'utf8'), { base: `${root}/src`, onDependency() {} })
   const content = (await Promise.all(['src/components/AgentPanel.tsx', 'src/components/MentionTextarea.tsx', 'src/components/DockWorkspace.tsx'].map(file => fs.readFile(`${root}/${file}`, 'utf8')))).join('\n')
   const css = compiler.build([...new Set((source + content).match(/[A-Za-z0-9_@!:/.[\]()%,-]+/g))])
+    + await fs.readFile(`${root}/packages/ui/src/loading-indicator.css`, 'utf8')
   const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
   try {
     for (const width of [1100, 390]) for (const dark of [true, false]) {
@@ -106,61 +107,39 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
       await overlay.waitFor().catch(error => { throw new Error(`${error.message}\n${JSON.stringify(errors)}`) })
       assert.equal(await overlay.evaluate(el => el.ownerDocument.defaultView!.getComputedStyle(el).backgroundColor), 'rgba(0, 0, 0, 0)', 'loading overlay lets the panel background show through')
       assert.equal(await overlay.getByRole('status').getAttribute('aria-label'), '연결 중…')
-      assert.equal(await overlay.locator('.agent-loading-bubbles__bubble').count(), 4)
+      assert.equal(await overlay.locator('.mew-loading-dot').count(), 3)
+      assert.equal(await overlay.locator('.mew-loading-logo').count(), 0, 'conversation loading uses quiet dots instead of the entry logo')
       assert.equal(await overlay.locator('.animate-spin').count(), 0)
       assert.equal(await page.getByText('Cached text must not flash', { exact: true }).isVisible(), false)
       // The restored dock group has no input focus yet. Its visible loading must still move.
-      const motion = await overlay.locator('.agent-loading-bubbles__bubble').first().evaluate(async element => {
+      const dots = overlay.locator('.mew-loading-dot')
+      const dot = dots.first()
+      const motion = await dot.evaluate(async element => {
         const view = element.ownerDocument.defaultView!
-        const animation = element.getAnimations({ subtree: true })[0]
+        const animation = element.getAnimations()[0]
         const before = Number(animation.currentTime)
-        const x = () => view.getComputedStyle(element, '::after').transform
-        const initial = x()
+        const transform = () => view.getComputedStyle(element).transform
+        const initial = transform()
         await new Promise<void>(resolve => view.setTimeout(resolve, 150))
         const advanced = Number(animation.currentTime) > before
-        const moved = x() !== initial
-        const sample = async (time: number) => {
+        const moved = transform() !== initial
+        animation.pause()
+        const scales: number[] = []
+        for (let time = 0; time < 1200; time += 150) {
           animation.currentTime = time
-          await new Promise<void>(resolve => view.requestAnimationFrame(() => resolve()))
-          return Number(x().split(',')[4])
+          scales.push(Number(transform().slice(7).split(',')[0]))
         }
-        const outwardStart = await sample(280), outwardEnd = await sample(1120)
-        const returnStart = await sample(1680), returnEnd = await sample(2520)
-        return { advanced, moved, outward: outwardEnd > outwardStart, returning: returnEnd < returnStart, state: animation.playState }
+        animation.play()
+        return { advanced, moved, growsAndShrinks: Math.max(...scales) - Math.min(...scales) > .3, state: animation.playState }
       })
-      assert.deepEqual(motion, { advanced: true, moved: true, outward: true, returning: true, state: 'running' })
-      // Check painted pixels, not just CSS coordinates: the band must stay visible and cross the bubble.
-      const shimmer = overlay.locator('.agent-loading-bubbles__bubble').first()
-      const paintedBand = async (time: number) => {
-        await shimmer.evaluate((element, time) => {
-          const animation = element.getAnimations({ subtree: true })[0]
-          animation.pause()
-          animation.currentTime = time
-        }, time)
-        const png = await shimmer.screenshot({ path: `/tmp/mew-shimmer-${width}-${dark ? 'dark' : 'light'}-${time}.png` })
-        return page.evaluate<{ left: number; right: number; base: number; profiles: number[][] }>(`(async () => {
-          const img = new Image(); img.src = 'data:image/png;base64,${png.toString('base64')}'; await img.decode();
-          const canvas = document.createElement('canvas'); canvas.width = img.width; canvas.height = img.height;
-          const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0);
-          const sample = fraction => ctx.getImageData(Math.floor(img.width * fraction), Math.floor(img.height / 2), 1, 1).data[0];
-          return { left: sample(.2), right: sample(.8), base: sample(.9),
-            profiles: [.15, .5, .85].map(y => [.3, .4, .5, .6, .7].map(x =>
-              ctx.getImageData(Math.floor(img.width * x), Math.floor(img.height * y), 1, 1).data[0])) };
-        })()`)
-      }
-      const left = await paintedBand(0), right = await paintedBand(1400), returned = await paintedBand(2800)
-      const polarity = dark ? 1 : -1
-      assert.ok((left.left - left.right) * polarity >= 25, 'left band visibly contrasts with its surface')
-      assert.ok((right.right - right.left) * polarity >= 25, 'right band visibly contrasts with its surface')
-      assert.ok((returned.left - returned.right) * polarity >= 25, 'painted band returns to the left')
-      const centered = await paintedBand(700)
-      for (const row of centered.profiles) {
-        const peak = (row[2] - centered.base) * polarity
-        const expected = [0, .5, 1, .5, 0]
-        row.forEach((pixel, index) => assert.ok(Math.abs((pixel - centered.base) * polarity / peak - expected[index]) < .07,
-          'the painted gradient fades continuously through 0/50/100/50/0 at every height'))
-      }
-      await shimmer.evaluate(element => element.getAnimations({ subtree: true })[0].play())
+      assert.deepEqual(motion, { advanced: true, moved: true, growsAndShrinks: true, state: 'running' })
+      const phases = await dots.evaluateAll(elements => elements.map(element => element.ownerDocument.defaultView!.getComputedStyle(element).animationDelay))
+      assert.equal(new Set(phases).size, 3, 'each dot has a distinct pulse phase')
+      const placement = await overlay.locator('.mew-loading-dots').evaluate(element => {
+        const box = element.getBoundingClientRect(), panel = element.parentElement!.getBoundingClientRect()
+        return { x: Math.abs(box.x + box.width / 2 - panel.x - panel.width / 2), y: Math.abs(box.y + box.height / 2 - panel.y - panel.height / 2) }
+      })
+      assert.ok(placement.x < 1 && placement.y < 1, 'compact dots stay centered in the available conversation area')
       const session = page.locator('[data-agent-session]:visible')
       const draft = session.locator('[contenteditable="true"][aria-placeholder="텍스트 입력"]')
       const send = session.getByRole('button', { name: '전송', exact: true })
@@ -314,22 +293,14 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
       await assertOverlayBounds()
       assert.equal(await overlay.evaluate(element => element.ownerDocument.defaultView!.getComputedStyle(element).backgroundColor), 'rgba(0, 0, 0, 0)', 'loading stays transparent after resizing the composer')
       await page.emulateMedia({ reducedMotion: 'reduce' })
-      assert.equal(await overlay.locator('.agent-loading-bubbles__bubble').first().evaluate(element => element.ownerDocument.defaultView!.getComputedStyle(element, '::after').animationName), 'agent-bubble-breathe')
-      const reduced = await shimmer.evaluate(element => {
+      const reduced = await dots.evaluateAll(elements => elements.map(element => {
         const view = element.ownerDocument.defaultView!
-        const animation = element.getAnimations({ subtree: true })[0]
-        animation.pause(); animation.currentTime = 0
-        const from = view.getComputedStyle(element, '::after')
-        const position = from.transform, opacity = Number(from.opacity)
-        animation.currentTime = 2000
-        const to = view.getComputedStyle(element, '::after')
-        const result = { stationary: to.transform === position, brightnessChanged: Number(to.opacity) - opacity > .4 }
-        animation.play()
-        return result
-      })
-      assert.deepEqual(reduced, { stationary: true, brightnessChanged: true })
+        const style = view.getComputedStyle(element)
+        return { stationary: element.getAnimations().length === 0, visible: Number(style.opacity) > 0 && element.getBoundingClientRect().width > 0 }
+      }))
+      assert.deepEqual(reduced, Array(3).fill({ stationary: true, visible: true }), 'reduced motion preserves three visible static dots')
       await page.emulateMedia({ reducedMotion: 'no-preference' })
-      assert.equal(await overlay.locator('.agent-loading-bubbles__bubble').first().evaluate(element => element.ownerDocument.defaultView!.getComputedStyle(element, '::after').animationName), 'agent-bubble-shimmer')
+      assert.equal(await dot.evaluate(element => element.getAnimations().length), 1)
       assert.equal(await session.locator('[inert]').count(), 2)
       assert.equal(await draft.evaluate(element => element.closest('[inert]') === null), true)
       assert.equal(await send.isDisabled(), true)
@@ -348,7 +319,8 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
       await page.getByRole('tab', { name: 'second', exact: false }).click()
       await page.evaluate('window.fail=false;window.sockets.second.open()')
       await overlay.waitFor({ state: 'hidden' })
-      assert.equal(await page.locator('[data-agent-loading]').count(), 1, 'the disconnected background tab keeps its own skeleton')
+      assert.equal(await page.locator('[data-agent-loading]').count(), 1, 'the disconnected background tab keeps its own loading state')
+      assert.deepEqual(await page.locator('[data-agent-loading] .mew-loading-dot').evaluateAll(elements => elements.map(element => element.ownerDocument.defaultView!.getComputedStyle(element).animationPlayState)), Array(3).fill('paused'), 'hidden conversation dots stop animating')
       await page.getByRole('tab', { name: 'first', exact: false }).click()
       await overlay.waitFor()
       await page.evaluate('window.sockets.first.open()')
