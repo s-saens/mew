@@ -1486,7 +1486,6 @@ function RuntimePicker({ onSelect, onSelectSet }: { onSelect: (runtime: string) 
                   </button>
                   <span className="pointer-events-none relative flex h-6 w-6 shrink-0 items-center justify-center text-ink-secondary"><runtime.Glyph /></span>
                   <div className="pointer-events-none relative min-w-0 flex-1 truncate text-sm text-ink">{runtime.label}</div>
-                  {index < 9 && <kbd aria-hidden="true" className="pointer-events-none relative text-xs tabular-nums text-ink-muted">{index + 1}</kbd>}
                   {!status?.installed && (
                     <button
                       type="button"
@@ -1497,6 +1496,7 @@ function RuntimePicker({ onSelect, onSelectSet }: { onSelect: (runtime: string) 
                       {busy ? uiText("설치 중…") : uiText("설치")}
                     </button>
                   )}
+                  {index < 9 && <kbd aria-hidden="true" className="pointer-events-none relative text-xs tabular-nums text-ink-muted">{index + 1}</kbd>}
                   <div className="relative shrink-0"><RuntimeSettingsButton runtimeId={runtime.id} label={runtime.label} /></div>
                   <RuntimeInstallProgress runtimeId={runtime.id} busy={busy} installation={status?.installation} />
                   {error?.id === runtime.id && (
