@@ -10,6 +10,7 @@ type EntryMenu = (entry: ExternalEntry, x: number, y: number) => void
 
 export const fileBrowserButton = 'inline-flex min-h-8 shrink-0 items-center justify-center gap-1.5 rounded-md px-2 text-xs font-medium text-ink-secondary hover:bg-surface-hover disabled:opacity-40'
 export const fileBrowserInput = 'min-h-9 w-full min-w-0 rounded-md border border-edge-strong bg-surface-deep px-2 text-sm text-ink'
+const fileBrowserRow = 'group flex min-h-7 w-full items-center gap-2 rounded-md px-2 text-left text-sm text-ink hover:bg-surface-raised disabled:opacity-40 [@media(pointer:coarse)]:min-h-9'
 
 export function FileBrowserHeader({ id, title, hint, busy, onClose, initialFocus = false }: {
   id: string; title: string; hint?: string; busy?: boolean; onClose: () => void; initialFocus?: boolean
@@ -53,7 +54,7 @@ export function FileBrowserEntry({ entry, busy, depth = 0, expanded, onClick, on
       touch.pressProps.onContextMenu(event)
     }}
     aria-expanded={entry.type === 'dir' ? expanded : undefined}
-    className="group flex min-h-9 w-full items-center gap-2 rounded-md px-2 text-left text-sm text-ink hover:bg-surface-raised disabled:opacity-40"
+    className={fileBrowserRow}
     style={depth ? { paddingLeft: depth * 16 + 8 } : undefined} title={entry.path}>
     <Icon width={16} height={16} className="shrink-0 text-ink-secondary" />
     <span className="min-w-0 flex-1 truncate font-medium">{entry.name}</span>
@@ -101,7 +102,6 @@ export function FileBrowser({ result, error, draft, onDraftChange, onNavigate, b
     <FileBrowserFavorites currentPath={result?.canonicalPath ?? result?.path} disabled={locked} onSelect={navigate} />
     <form noValidate className="flex shrink-0 gap-1 px-3 pb-2 sm:px-4" onSubmit={(event) => { event.preventDefault(); if (!locked) navigate(draft) }}>
       <button type="button" disabled={locked} onClick={() => navigate('')} className={`${fileBrowserButton} px-2`} aria-label={t('project.home')} title={t('project.home')}><HomeSimple width={18} height={18} /></button>
-      <button type="button" disabled={locked || !result?.parent} onClick={() => { if (result?.parent) navigate(result.parent) }} className={`${fileBrowserButton} px-2`} aria-label={t('project.parent')} title={t('project.parent')}><ArrowUp width={18} height={18} /></button>
       <div className="relative min-w-0 flex-1" onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setFocused(false) }}>
         <input data-dialog-autofocus={autoFocusPath || undefined} value={draft} disabled={locked} onChange={(event) => { onDraftChange(event.target.value); setFocused(true) }} onFocus={() => setFocused(true)} spellCheck={false} autoComplete="off" className={`${fileBrowserInput} font-mono !text-xs`} aria-label={t(foldersOnly ? 'project.path' : 'fileExplorer.pathPlaceholder')} />
         {focused && suggestions.length > 0 && <div className="absolute inset-x-0 top-full z-20 mt-1 max-h-52 overflow-y-auto rounded-md border border-edge bg-surface-raised py-1 shadow-lg">
@@ -118,6 +118,10 @@ export function FileBrowser({ result, error, draft, onDraftChange, onNavigate, b
       <label className="ml-auto flex min-w-0 max-w-56 items-center gap-2 text-ink-secondary"><Search width={15} height={15} className="shrink-0" /><input value={filter} onChange={(event) => setFilter(event.target.value)} disabled={!result || locked} aria-label={filterLabel} placeholder={filterLabel} className="min-h-8 w-full min-w-0 rounded-md bg-transparent px-1 text-xs text-ink" /></label>
     </div>
     <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-1 pb-1 sm:px-2" aria-busy={!result && !error}>
+      {result && <button type="button" disabled={locked || !result.parent} onClick={() => { if (result.parent) navigate(result.parent) }} className={fileBrowserRow}>
+        <ArrowUp width={16} height={16} className="shrink-0 text-ink-secondary" aria-hidden="true" />
+        <span className="min-w-0 flex-1 truncate font-medium">{t('project.parent')}</span>
+      </button>}
       {error && <div role="alert" className="mx-2 rounded-lg bg-danger-surface p-4 text-sm text-danger-ink"><p className="whitespace-pre-wrap break-words">{error}</p><button type="button" disabled={locked} onClick={() => navigate(draft)} className={`${fileBrowserButton} mt-2 !text-danger-ink`}><RefreshDouble width={16} height={16} />{t('project.retry')}</button></div>}
       {!result ? !error && <div role="status" className="px-3 py-6 text-center text-sm text-ink-secondary">{t('common.loading')}</div>
         : visible.length === 0 ? <div className="flex flex-col items-center px-3 py-6 text-center"><Folder width={28} height={28} className="mb-3 text-ink-secondary" /><p className="text-sm font-medium text-ink">{t(filter ? (foldersOnly ? 'project.noMatches' : 'fileExplorer.noMatches') : (foldersOnly ? 'folder.empty' : 'fileExplorer.empty'))}</p>{foldersOnly && <p className="mt-2 text-xs text-ink-secondary">{t(filter ? 'project.filterHint' : 'project.emptyHint')}</p>}</div>

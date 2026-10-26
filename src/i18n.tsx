@@ -81,7 +81,7 @@ const messages = {
     'project.cloning': '저장소를 복제하고 있습니다. 완료될 때까지 기다려 주세요.',
     'project.working': '처리 중…',
     'project.home': '홈 폴더',
-    'project.parent': '상위 폴더',
+    'project.parent': '상위경로',
     'project.gitRepository': 'Git 저장소',
     'project.folders': '폴더',
     'project.filter': '폴더 이름으로 필터',

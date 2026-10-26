@@ -9,7 +9,7 @@ import { domBrowserExecutable } from './browser-dom-executable.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 
-test('project browser and app dialogs preserve input, focus and operation boundaries', { skip: !domBrowserExecutable(), timeout: 45_000 }, async () => {
+for (const compact of [false, true]) test(compact ? 'file browsers keep compact rows and parent navigation in empty and filtered lists' : 'project browser and app dialogs preserve input, focus and operation boundaries', { skip: !domBrowserExecutable(), timeout: 45_000 }, async () => {
   const source = `import React,{useState} from '${root}/node_modules/react/index.js';
 import {createRoot} from '${root}/node_modules/react-dom/client.js';
 import {OpenProjectDialog} from '${root}/src/components/OpenProjectDialog.tsx';
@@ -113,6 +113,56 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     const openFavorites = async (owner: typeof dialog) => {
       const button = owner.getByRole('button', { name: '즐겨찾기', exact: true })
       if (await button.getAttribute('aria-expanded') !== 'true') await button.click()
+    }
+    const checkParentNavigation = async (owner: typeof dialog, pathLabel: string, filterLabel: string) => {
+      const parent = owner.getByRole('button', { name: '상위경로', exact: true })
+      const address = owner.getByRole('textbox', { name: pathLabel, exact: true })
+      const filter = owner.getByRole('textbox', { name: filterLabel, exact: true })
+      await parent.waitFor()
+      assert.equal(await parent.evaluate(el => el.parentElement?.querySelector('button') === el), true, 'parent navigation is the first list row')
+      assert.equal(await owner.locator('form').getByRole('button', { name: '상위경로', exact: true }).count(), 0)
+      await filter.fill('no-matching-folder')
+      await parent.focus()
+      await parent.press('Enter')
+      await owner.getByRole('button', { name: 'mew Git', exact: true }).waitFor()
+      assert.equal(await filter.inputValue(), '')
+      await address.fill('/empty')
+      await address.press('Enter')
+      await owner.getByText(pathLabel === '프로젝트 경로' ? '하위 폴더가 없습니다' : '이 폴더는 비어 있습니다', { exact: true }).waitFor()
+      await parent.click()
+      await owner.getByRole('button', { name: 'mew Git', exact: true }).waitFor()
+      assert.equal(await address.inputValue(), '/home/test')
+      await address.fill('/')
+      await address.press('Enter')
+      await parent.waitFor()
+      assert.equal(await parent.isDisabled(), true, 'root retains a disabled parent row')
+      await address.fill('/home/test')
+      await address.press('Enter')
+      const entry = owner.getByRole('button', { name: 'mew Git', exact: true })
+      await entry.waitFor()
+      const cdp = await context.newCDPSession(page)
+      try {
+        await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: false })
+        assert.equal(await entry.evaluate(el => el.getBoundingClientRect().height), 28)
+        assert.equal(await parent.evaluate(el => el.getBoundingClientRect().height), 28)
+        await page.screenshot({ path: `/tmp/mew-compact-${pathLabel === '프로젝트 경로' ? 'project' : 'server'}.png` })
+        await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 1 })
+        assert.equal(await entry.evaluate(el => el.getBoundingClientRect().height), 36)
+      } finally { await cdp.detach() }
+    }
+    if (compact) {
+      for (const [width, dark] of [[1200, true], [390, false]] as const) {
+        await page.setViewportSize({ width, height: 850 })
+        await page.evaluate(`document.documentElement.classList.toggle('dark', ${dark})`)
+        await trigger.click()
+        await checkParentNavigation(dialog, '프로젝트 경로', '폴더 이름으로 필터')
+        await page.keyboard.press('Escape')
+        await page.getByRole('button', { name: '파일 탐색', exact: true }).click()
+        await checkParentNavigation(page.getByRole('dialog', { name: '서버 파일 탐색기' }), '서버 경로 입력', '이름으로 필터')
+        await page.keyboard.press('Escape')
+      }
+      assert.deepEqual(errors, [])
+      return
     }
     for (const [width, dark] of [[1200, true], [390, true], [1200, false], [390, false]] as const) {
       await page.setViewportSize({ width, height: 850 })
