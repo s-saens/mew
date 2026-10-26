@@ -11,7 +11,7 @@ const root = path.resolve(import.meta.dirname, '..')
 test('image previews escape panel stacking; command dialogs remain legible above the dock', { skip: !domBrowserExecutable(), timeout: 60_000 }, async () => {
   const source = `import React,{useState} from 'react';
 import {createRoot} from 'react-dom/client';
-import {AgentImagePreviewDialog} from '${root}/src/components/agent-image-preview-dialog.tsx';
+import {AgentMediaPreviewDialog} from '${root}/src/components/agent-media-preview-dialog.tsx';
 import {CommandButtonMenu} from '${root}/src/components/CommandButtonMenu.tsx';
 import {I18nProvider} from '${root}/src/i18n.tsx';
 import {applyThemePalette} from '${root}/src/utils/theme-color.ts';
@@ -19,7 +19,7 @@ import {useFloatingPanel} from '${root}/src/hooks/use-floating-panel.ts';
 localStorage.setItem('mew:locale','ko');
 window.setTheme=light=>applyThemePalette({background:light?'#ffffff':'#101020',text:light?'#202020':'#eeeeee',primary:light?'#5642c7':'#9082da',gradient:{colors:light?['#eeeeff','#ffeeee']:['#102030','#302040'],angle:135,animated:false}});
 window.setTheme(false);
-function Fixture(){const [image,setImage]=useState(false);const a=useFloatingPanel('a',null),b=useFloatingPanel('b',null);window.focusMany=()=>{for(let i=0;i<1500;i++){a.focus();b.focus()}};return <main className="mew-workspace"><div style={{position:'relative',zIndex:10,transform:'translateZ(0)'}}><button onClick={()=>setImage(true)}>Preview</button><header><CommandButtonMenu project="test"/></header>{image&&<AgentImagePreviewDialog src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Crect width='100' height='100' fill='red'/%3E%3C/svg%3E" name="sample" onClose={()=>setImage(false)}/>}</div><nav className="mobile-dock" style={{height:48}}>Dock</nav><div id="floating-a" style={{...a.style,pointerEvents:'none'}}/><div id="floating-b" style={{...b.style,pointerEvents:'none'}}/><div className="mewcat-notifications" style={{width:80,height:30}}>Notice</div></main>}
+function Fixture(){const [image,setImage]=useState(false);const a=useFloatingPanel('a',null),b=useFloatingPanel('b',null);window.focusMany=()=>{for(let i=0;i<1500;i++){a.focus();b.focus()}};return <main className="mew-workspace"><div style={{position:'relative',zIndex:10,transform:'translateZ(0)'}}><button onClick={()=>setImage(true)}>Preview</button><header><CommandButtonMenu project="test"/></header>{image&&<AgentMediaPreviewDialog kind="image" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Crect width='100' height='100' fill='red'/%3E%3C/svg%3E" name="sample" onClose={()=>setImage(false)}/>}</div><nav className="mobile-dock" style={{height:48}}>Dock</nav><div id="floating-a" style={{...a.style,pointerEvents:'none'}}/><div id="floating-b" style={{...b.style,pointerEvents:'none'}}/><div className="mewcat-notifications" style={{width:80,height:30}}>Notice</div></main>}
 createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18nProvider>);`
   const bundle = await build({ input: 'virtual:layers.tsx', write: false, platform: 'browser', output: { format: 'iife' }, transform: { jsx: 'react-jsx', define: { 'process.env.NODE_ENV': JSON.stringify('test') } }, plugins: [{ name: 'fixture', resolveId(id) {
     if (id === 'virtual:layers.tsx') return id
@@ -32,7 +32,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
   } }] })
   const chunk = bundle.output.find(item => item.type === 'chunk'); assert.ok(chunk)
   const compiler = await compile(await fs.readFile(`${root}/src/index.css`, 'utf8'), { base: `${root}/src`, onDependency() {} })
-  const files = ['src/components/agent-image-preview-dialog.tsx', 'src/components/CommandButtonMenu.tsx']
+  const files = ['src/components/agent-media-preview-dialog.tsx', 'src/components/CommandButtonMenu.tsx']
   const content = source + (await Promise.all(files.map(file => fs.readFile(`${root}/${file}`, 'utf8')))).join('\n')
   const css = compiler.build([...new Set(content.match(/[A-Za-z0-9_@!&:/.[\]()%,-]+/g))])
   const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })

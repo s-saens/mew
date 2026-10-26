@@ -3,7 +3,7 @@ import { HeaderSelect } from './agent-header-select'
 import { RuntimeInstallProgress } from './RuntimeInstallProgress'
 import { AgentAttachmentIcon } from './agent-attachment-icon'
 import { attachmentKind, conversationAttachments, uploadedAttachmentTokens, withoutAttachmentTokens } from '../utils/agent-attachments'
-import { AgentImagePreviewDialog } from './agent-image-preview-dialog'
+import { AgentMediaPreviewDialog } from './agent-media-preview-dialog'
 import { scopedBrowserStorage } from '@mew/ui/browser-storage-scope'
 import { workspaceViewportBottom } from '../utils/workspace-viewport'
 import { openMewSocket } from '../utils/remote-transport.ts'
@@ -394,8 +394,8 @@ function AgentAttachmentTag({ attachment, onPreview }: {
 }) {
   return (
     <span data-agent-attachment title={attachment.relPath.split('/').pop()} className="mx-0.5 inline-flex h-6 items-center rounded-md bg-surface p-1 align-middle text-xs text-ink-secondary">
-      {attachment.isImage ? <button type="button" onClick={() => onPreview(attachment)}
-        className="flex h-4 items-center justify-center rounded hover:text-ink focus-visible:outline-2 focus-visible:outline-accent" aria-label={uiText("{p0} 사진 미리보기", { p0: attachment.relPath.split('/').pop() })} title={uiText("사진 미리보기")}>
+      {(attachment.isImage || attachmentKind(attachment.mimeType, attachment.relPath) === 'video') ? <button type="button" onClick={() => onPreview(attachment)}
+        className="flex h-4 items-center justify-center rounded hover:text-ink focus-visible:outline-2 focus-visible:outline-accent" aria-label={attachment.isImage ? uiText("{p0} 사진 미리보기", { p0: attachment.relPath.split('/').pop() }) : uiText("{p0} 동영상 미리보기", { p0: attachment.relPath.split('/').pop() })} title={attachment.isImage ? uiText("사진 미리보기") : uiText("동영상 미리보기")}>
         <AgentAttachmentIcon mimeType={attachment.mimeType} path={attachment.relPath} />
       </button> : <a href={rawUrl(attachment.relPath, attachment.project)} target="_blank" rel="noreferrer" aria-label={attachment.relPath.split('/').pop()} className="flex h-4 items-center justify-center rounded hover:text-ink focus-visible:outline-2 focus-visible:outline-accent">
         <AgentAttachmentIcon mimeType={attachment.mimeType} path={attachment.relPath} />
@@ -4249,8 +4249,8 @@ function AgentSessionView({
               const file = (editingQueued?.attachments ?? attachments).find(file => file.project === ref.project && file.relPath === ref.path)
                 ?? { project: ref.project, relPath: ref.path, mimeType: '', extension: attachmentExtension(ref.path), isImage: attachmentKind('', ref.path) === 'image' }
               return { name: file.relPath.split('/').pop() ?? file.relPath, mimeType: file.mimeType,
-                preview: file.isImage ? () => setPreviewAttachment(file) : undefined,
-                href: file.isImage ? undefined : rawUrl(file.relPath, file.project) }
+                preview: (file.isImage || attachmentKind(file.mimeType, file.relPath) === 'video') ? () => setPreviewAttachment(file) : undefined,
+                href: (file.isImage || attachmentKind(file.mimeType, file.relPath) === 'video') ? undefined : rawUrl(file.relPath, file.project) }
             }}
             onChange={(next) => {
               if (editingQueued) {
@@ -4353,7 +4353,8 @@ function AgentSessionView({
         </div>
       </div>
       {previewAttachment && (
-        <AgentImagePreviewDialog
+        <AgentMediaPreviewDialog
+          kind={previewAttachment.isImage ? 'image' : 'video'}
           src={rawUrl(previewAttachment.relPath, previewAttachment.project)}
           name={previewAttachment.relPath.split('/').pop() ?? previewAttachment.relPath}
           onClose={() => setPreviewAttachment(null)}
@@ -4711,7 +4712,7 @@ const AgentConversationItem = memo(function AgentConversationItem({ item, expand
         )}
         {/* 설정줄은 작업 버블과 같은 전체 폭, 사용자 발화만 오른쪽으로 들여쓴다. */}
         <div className="ml-6 space-y-2">
-        {preview && <AgentImagePreviewDialog src={rawUrl(preview.relPath, preview.project)} name={preview.relPath.split('/').pop() ?? preview.relPath} onClose={() => setPreview(null)} />}
+        {preview && <AgentMediaPreviewDialog kind={preview.isImage ? 'image' : 'video'} src={rawUrl(preview.relPath, preview.project)} name={preview.relPath.split('/').pop() ?? preview.relPath} onClose={() => setPreview(null)} />}
         {(questionText || files.length > 0) && (
           <div className="flex items-start gap-1">
             {questionText && <CopyButton text={questionText} label={uiText("이 질문 복사")} />}

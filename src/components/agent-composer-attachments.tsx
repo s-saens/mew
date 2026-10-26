@@ -4,6 +4,7 @@ import { isolateHistory } from '@codemirror/commands'
 import { createRoot, type Root } from 'react-dom/client'
 import { LoadingIndicator } from '@mew/ui'
 import { uiText } from '@mew/ui/i18n-core'
+import { attachmentKind } from '../utils/agent-attachments'
 import { AgentAttachmentIcon } from './agent-attachment-icon'
 
 export type ComposerAttachment = {
@@ -43,12 +44,13 @@ class AttachmentWidget extends WidgetType {
       view.dispatch({ changes: { from, to: from + this.token.length }, selection: { anchor: from }, userEvent: 'delete', annotations: isolateHistory.of('full') })
       view.focus()
     }
-    const label = uiText('{p0} 사진 미리보기', { p0: this.file.name })
+    const video = attachmentKind(this.file.mimeType, this.file.name) === 'video'
+    const label = video ? uiText('{p0} 동영상 미리보기', { p0: this.file.name }) : uiText('{p0} 사진 미리보기', { p0: this.file.name })
     this.root.render(<>
       {this.file.pending ? <span role="status" aria-label={uiText('첨부 중…')} className="mew-composer-upload"><LoadingIndicator size={12} /></span>
         : this.file.href ? <a href={this.file.href} target="_blank" rel="noreferrer" aria-label={this.file.name}>
           <AgentAttachmentIcon mimeType={this.file.mimeType} path={this.file.name} />
-        </a> : <button type="button" aria-label={label} title={uiText('사진 미리보기')} onClick={() => this.resolve(this.token)?.preview?.()}>
+        </a> : <button type="button" aria-label={label} title={video ? uiText('동영상 미리보기') : uiText('사진 미리보기')} onClick={() => this.resolve(this.token)?.preview?.()}>
           <AgentAttachmentIcon mimeType={this.file.mimeType} path={this.file.name} />
         </button>}
       <button type="button" data-attachment-remove aria-label={uiText('{p0} 첨부 제거', { p0: this.file.name.split('.').at(-1) ?? this.file.name })} title={uiText('첨부 제거')} onClick={remove}>

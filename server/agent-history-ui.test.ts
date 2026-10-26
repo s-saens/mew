@@ -60,12 +60,13 @@ createRoot(document.getElementById('root')).render(<I18nProvider><div style={{he
       page.setDefaultTimeout(6000)
       const errors: string[] = []
       page.on('pageerror', error => errors.push(error.message))
-      await page.route('http://mew-history.test/**', route => {
+      await page.route('http://mew-history.test/**', async route => {
         const pathname = new URL(route.request().url()).pathname
         if (pathname === '/app.js') return route.fulfill({ contentType: 'text/javascript', body: chunk.code })
         if (pathname === '/api/user-ui/agent-tabs') return route.fulfill({ json: { state: { tabs: [{ id: 'history', label: 'History', renamed: true, runtime: 'codex', cwd: '/workspace', sessionIds: { [JSON.stringify(['codex', '/workspace'])]: 'conversation' } }], activeId: 'history' }, claims: [] } })
         if (pathname === '/api/agent-cwd') return route.fulfill({ json: { cwd: '/workspace' } })
         if (pathname === '/api/projects') return route.fulfill({ json: [] })
+        if (pathname === '/api/raw' && new URL(route.request().url()).searchParams.get('path')?.endsWith('.webm')) return route.fulfill({ contentType: 'video/webm', body: await fs.readFile(`${root}/server/fixtures/agent-preview.webm`) })
         if (pathname === '/api/raw' && new URL(route.request().url()).searchParams.get('path')?.endsWith('.png')) return route.fulfill({ contentType: 'image/png', body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aB1kAAAAASUVORK5CYII=', 'base64') })
         if (pathname.startsWith('/api/')) return route.fulfill({ json: { settings: null, skills: [], jobs: [], commands: [], runtimes: [] } })
         return route.fulfill({ contentType: 'text/html', body: `<!doctype html><html class="${dark ? 'dark' : ''}"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}html,body,#root{height:100%;margin:0}</style><div id="root"></div><script src="/app.js"></script></html>` })
@@ -433,7 +434,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><div style={{he
       const attachments = [
         { project: '.workspace', path: '.mew/assets/photo.png', mimeType: 'image/png' },
         { project: '.workspace', path: '.mew/assets/voice.mp3', mimeType: 'audio/mpeg' },
-        { project: 'docs', path: 'clip.mp4', mimeType: 'video/mp4' },
+        { project: 'docs', path: 'clip.webm', mimeType: 'video/webm' },
         { project: '.workspace', path: '.mew/assets/notes.pdf', mimeType: 'application/pdf' },
       ]
       await page.evaluate(files => {
@@ -446,7 +447,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><div style={{he
       const media = page.locator('[data-agent-attachments]').last()
       await media.getByRole('link', { name: 'notes.pdf', exact: true }).waitFor()
       const verifyMedia = async () => {
-        for (const file of attachments.filter(file => !file.mimeType.startsWith('image/'))) {
+        for (const file of attachments.filter(file => !/^(image|video)\//.test(file.mimeType))) {
           const link = media.getByRole('link', { name: file.path.split('/').at(-1)!, exact: true }).last()
           const url = new URL((await link.getAttribute('href'))!, page.url())
           assert.equal(url.searchParams.get('path'), file.path)
@@ -477,6 +478,37 @@ createRoot(document.getElementById('root')).render(<I18nProvider><div style={{he
           await preview.waitFor({ state: 'detached' })
           assert.equal(await disclosure.getAttribute('aria-expanded'), expanded, 'preview keyboard activation preserves disclosure state')
         }
+        const clip = media.getByRole('button', { name: 'clip.webm 동영상 미리보기', exact: true })
+        const videoDialog = page.getByRole('dialog', { name: 'clip.webm 동영상 미리보기', exact: true })
+        for (const activation of ['click', 'Enter', 'Space']) {
+          if (activation === 'click') await clip.click()
+          else await clip.press(activation)
+          const video = videoDialog.locator('video')
+          const videoUrl = new URL((await video.getAttribute('src'))!, page.url())
+          assert.equal(videoUrl.searchParams.get('project'), 'docs')
+          assert.equal(videoUrl.searchParams.get('path'), 'clip.webm')
+          assert.equal(await video.getAttribute('controls'), '')
+          assert.equal(await video.getAttribute('playsinline'), '')
+          await video.evaluate(async el => { await el.play() })
+          await page.waitForFunction(() => (globalThis as any).document.querySelector('video')?.currentTime > 0)
+          const box = await video.boundingBox()
+          assert.ok(box && box.width <= width && box.height <= 820)
+          await videoDialog.screenshot({ path: `/tmp/mew-agent-video-${width}-${dark ? 'dark' : 'light'}.png` })
+          if (activation === 'click') await videoDialog.getByRole('button', { name: '동영상 미리보기 닫기', exact: true }).click()
+          else if (activation === 'Enter') await videoDialog.press('Escape')
+          else await page.mouse.click(2, 2)
+          await videoDialog.waitFor({ state: 'detached' })
+          assert.equal(await page.locator('video').count(), 0, 'closing removes playback')
+          assert.equal(await disclosure.getAttribute('aria-expanded'), expanded)
+          assert.equal(page.context().pages().length, 1, 'video opens without a new browser tab')
+        }
+        await draft.fill('[[docs:.mew/assets/clip.webm]]')
+        await draft.getByRole('button', { name: 'clip.webm 동영상 미리보기', exact: true }).click()
+        await videoDialog.locator('video').evaluate(async el => { await el.play() })
+        assert.match(await videoDialog.locator('video').getAttribute('src') ?? '', /clip.webm/)
+        await videoDialog.press('Escape')
+        await videoDialog.waitFor({ state: 'detached' })
+        await draft.fill('')
         const link = media.getByRole('link', { name: 'notes.pdf', exact: true })
         await link.evaluate(el => el.addEventListener('click', (event: { preventDefault(): void }) => event.preventDefault(), { once: true }))
         await link.click()

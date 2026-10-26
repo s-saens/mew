@@ -4,7 +4,7 @@ import { useOverlayDismiss } from '@mew/ui'
 import { uiText } from '@mew/ui/i18n-core'
 import { useUiLocale } from '@mew/ui/i18n'
 
-export function AgentImagePreviewDialog({ src, name, onClose }: { src: string; name: string; onClose: () => void }) {
+export function AgentMediaPreviewDialog({ src, name, kind, onClose }: { src: string; name: string; kind: 'image' | 'video'; onClose: () => void }) {
   useUiLocale()
   useOverlayDismiss(onClose)
 
@@ -13,16 +13,19 @@ export function AgentImagePreviewDialog({ src, name, onClose }: { src: string; n
       <div
         role="dialog"
         aria-modal="true"
-        aria-label={uiText("{p0} 사진 미리보기", { p0: name })}
+        aria-label={kind === 'video' ? uiText("{p0} 동영상 미리보기", { p0: name }) : uiText("{p0} 사진 미리보기", { p0: name })}
         className="relative flex max-h-full max-w-full items-center justify-center"
         onMouseDown={(event) => event.stopPropagation()}
       >
-        <img src={src} alt={name} className="max-h-[calc(100vh-2rem)] max-w-[calc(100vw-2rem)] rounded object-contain shadow-2xl" />
+        {kind === 'video' ? (
+          // eslint-disable-next-line jsx-a11y/media-has-caption
+          <video src={src} controls playsInline preload="metadata" aria-label={name} className="w-[min(60rem,calc(100vw-2rem))] max-h-[calc(100dvh-2rem)] max-w-[calc(100vw-2rem)] rounded bg-black shadow-2xl" />
+        ) : <img src={src} alt={name} className="max-h-[calc(100vh-2rem)] max-w-[calc(100vw-2rem)] rounded object-contain shadow-2xl" />}
         <button
           type="button"
           onClick={onClose}
           className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-black/55 text-white hover:bg-black/80"
-          aria-label={uiText("사진 미리보기 닫기")}
+          aria-label={kind === 'video' ? uiText("동영상 미리보기 닫기") : uiText("사진 미리보기 닫기")}
           title={uiText("닫기")}
         >
           <Xmark width={20} height={20} aria-hidden="true" />
