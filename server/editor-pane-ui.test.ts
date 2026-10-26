@@ -195,7 +195,7 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><I18nProvid
     const release = hold('loading.md')
     await page.getByRole('button', { name: 'Open slow', exact: true }).click()
     await overlay.waitFor()
-    assert.match(await overlay.evaluate(el => el.ownerDocument.defaultView!.getComputedStyle(el).backgroundColor), /^(?:rgba\(0, 0, 0, 0\.5\)|oklab\(0 0 0 \/ 0\.5\))$/)
+    assert.equal(await overlay.evaluate(el => el.ownerDocument.defaultView!.getComputedStyle(el).backgroundColor), 'rgba(0, 0, 0, 0)', 'loading keeps the editor background visible')
     assert.equal(await overlay.locator('..').getAttribute('aria-busy'), 'true')
     assert.equal(await overlay.locator('..').locator('[inert]').count(), 1)
     const cover = await overlay.boundingBox(), body = await overlay.locator('..').boundingBox()

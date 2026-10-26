@@ -1132,8 +1132,8 @@ export function EditorPane({
         {dropZone && <DropHint zone={dropZone} />}
         </div>
         {loading && <div data-editor-loading role="status" aria-label={t('common.loading')}
-          className="absolute inset-0 z-50 flex cursor-wait items-center justify-center bg-black/50">
-          <LoadingIndicator size={20} className="text-white" />
+          className="absolute inset-0 z-50 flex cursor-wait items-center justify-center bg-transparent text-ink-secondary">
+          <LoadingIndicator size={20} />
           <span className="sr-only">{t('common.loading')}</span>
         </div>}
         {databasePopup && <DatabaseListModal api={databasePopup.api} project={databasePopup.project}
