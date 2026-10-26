@@ -167,6 +167,15 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
       await page.setViewportSize({ width, height: 600 })
       for (const theme of ['dark', 'light']) {
         await page.locator('html').evaluate((element, theme) => { element.className = theme }, theme)
+        const insets = await trigger.evaluate(element => {
+          const button = element.getBoundingClientRect()
+          const icon = element.firstElementChild!.firstElementChild!.getBoundingClientRect()
+          const label = element.lastElementChild!.getBoundingClientRect()
+          const style = element.ownerDocument.defaultView!.getComputedStyle(element)
+          return { left: icon.left - button.left, right: button.right - label.right, paddingLeft: style.paddingLeft, paddingRight: style.paddingRight }
+        })
+        assert.equal(insets.paddingLeft, insets.paddingRight, 'project trigger uses equal horizontal padding')
+        assert.ok(Math.abs(insets.left - insets.right) < 0.5, 'icon and label have matching outer insets')
         await trigger.tap()
         const box = await menu.boundingBox(); assert.ok(box)
         assert.ok(box.x >= 0 && box.y >= 0 && box.x + box.width <= width && box.y + box.height <= 600)

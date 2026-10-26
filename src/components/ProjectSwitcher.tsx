@@ -96,7 +96,7 @@ export function ProjectSwitcher({ paths, activePath, fallbackLabel, canOpen, can
   }, [])
 
   const content = <>
-    <span className="flex h-5 w-5 shrink-0 items-center justify-center" aria-hidden="true"><ProjectIcon icon={activePath ? icons[activePath] ?? 'i:folder' : 'i:folder'} size={15} /></span>
+    <span className="flex h-4 w-4 shrink-0 items-center justify-center" aria-hidden="true"><ProjectIcon icon={activePath ? icons[activePath] ?? 'i:folder' : 'i:folder'} size={16} /></span>
     <span className="max-w-[min(18rem,50vw)] truncate">{label}</span>
   </>
 
