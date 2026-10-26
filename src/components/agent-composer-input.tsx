@@ -107,6 +107,8 @@ export function AgentComposerInput(props: {
             '&.cm-focused': { outline: 'none' },
             '.cm-scroller': { overflow: 'auto', fontFamily: 'inherit', lineHeight: 'inherit' },
             '.cm-content': { padding: '0', minHeight: '100%', caretColor: 'var(--color-ink)' },
+            // CodeMirror's plaintext-only default prevents Android keyboards from offering images.
+            '.cm-content[contenteditable=true]': { WebkitUserModify: 'read-write' },
             '.cm-line': { padding: '0' },
             '.cm-placeholder': { color: 'var(--color-ink-muted)' },
           }),
