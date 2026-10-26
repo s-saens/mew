@@ -9,7 +9,7 @@ import { domBrowserExecutable } from './browser-dom-executable.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 
-test('file tabs reveal lazy rows, repeat selection and explicitly reveal newly mounted Documents', { skip: !domBrowserExecutable(), timeout: 30_000 }, async () => {
+test('file tab reveals preserve manual navigation across tree refreshes and lazy mounting', { skip: !domBrowserExecutable(), timeout: 30_000 }, async () => {
   const source = `import React from '${root}/node_modules/react/index.js';
 import {createRoot} from '${root}/node_modules/react-dom/client.js';
 import {FileTree} from '${root}/src/components/FileTree.tsx';
@@ -23,15 +23,18 @@ const tree=[...Array.from({length:35},(_,i)=>file('filler-'+i+'.md')),dir('folde
 const saved={openDirs:[],scrollTop:0};
 window.loads=[];window.handled=0;window.pins=0;window.closes=0;
 function Fixture(){
+  const [entries,setEntries]=React.useState(tree);
   const [signal,setSignal]=React.useState(0);
   const [selected,setSelected]=React.useState(target);
   const [mounted,setMounted]=React.useState(true);
   const [pending,setPending]=React.useState(false);
   const [compact,setCompact]=React.useState(false);
-  const props={project:'.workspace',tree,selectedPath:selected,readOnly:true,searchFocusSignal:0,newFileSignal:{n:0,parentPath:null},revealSignal:signal,presence:{},onSelect:noop,onFileCreated:noop,onFolderCreated:noop,onRenamed:noop,onDeleted:noop,onNotice:noop,registerSearchCancel:noop,accountState:saved};
+  const props={project:'.workspace',tree:entries,selectedPath:selected,readOnly:true,searchFocusSignal:0,newFileSignal:{n:0,parentPath:null},revealSignal:signal,presence:{},onSelect:noop,onFileCreated:noop,onFolderCreated:noop,onRenamed:noop,onDeleted:noop,onNotice:noop,registerSearchCancel:noop,accountState:saved};
   const activate=path=>{setSelected(path);setSignal(n=>n+1);setPending(true);setMounted(true)};
   return <><TabBar tabs={[{path:target,preview:false},{path:'filler-0.md',preview:false}]} activePath={selected} presence={{}} onActivate={activate} onPin={()=>window.pins++} onClose={()=>window.closes++} onReorder={noop}/>
   <button onClick={()=>{setMounted(false);setCompact(true)}}>Hide Documents</button>
+  <button onClick={()=>setEntries([...tree])}>Refresh tree</button>
+  <button onClick={()=>setEntries([])}>Clear tree</button>
   {mounted&&<div style={{height:240,width:300}}>{compact
     ? <FileTree {...props} selectedPath={null} roots={<FileTree {...props} compact revealOnMount={pending} onRevealHandled={()=>{setPending(false);window.handled++}} loadChildren={load}/>}/>
     : <FileTree {...props} revealOnMount={pending} onRevealHandled={()=>{setPending(false);window.handled++}} loadChildren={load}/>}
@@ -75,7 +78,25 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><I18nProvid
     assert.equal(await tab.getAttribute('aria-selected'), 'true')
     assert.equal(await page.evaluate('window.pins'), 0, 'single click does not pin')
 
+    const refresh = page.getByRole('button', { name: 'Refresh tree' })
+    const clear = page.getByRole('button', { name: 'Clear tree' })
+    const deepFolder = page.locator('button[data-path="folder/deep"]')
+    const handledAfterReveal = await page.evaluate('window.handled')
+    await scroller.dispatchEvent('wheel')
     await scroller.evaluate(el => { el.scrollTop = 0 })
+    await refresh.click()
+    await page.waitForTimeout(100)
+    assert.equal(await scroller.evaluate(el => el.scrollTop), 0, 'a refreshed listing preserves manual scrolling after a reveal')
+    assert.equal(await page.evaluate('window.handled'), handledAfterReveal, 'a completed reveal is only handled once')
+
+    await tab.click()
+    await visible()
+    await deepFolder.click()
+    await row.waitFor({ state: 'detached' })
+    await refresh.click()
+    await page.waitForTimeout(100)
+    assert.equal(await row.count(), 0, 'a refreshed listing keeps the active file parent collapsed')
+
     await tab.click()
     await visible()
     assert.deepEqual(await page.evaluate('window.loads'), ['folder', 'folder/deep'], 'repeat selection reuses loaded children')
@@ -91,6 +112,16 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><I18nProvid
     await visible()
     await row.waitFor()
     assert.deepEqual(await page.evaluate('window.loads'), ['folder', 'folder/deep', 'folder', 'folder/deep'])
+    await scroller.dispatchEvent('wheel')
+    await scroller.evaluate(el => { el.scrollTop = 0 })
+    await refresh.click()
+    await page.waitForTimeout(100)
+    assert.equal(await scroller.evaluate(el => el.scrollTop), 0, 'nested Documents also preserves manual scrolling across refreshes')
+    await deepFolder.click()
+    await row.waitFor({ state: 'detached' })
+    await refresh.click()
+    await page.waitForTimeout(100)
+    assert.equal(await row.count(), 0, 'nested Documents keeps the active file parent collapsed across refreshes')
 
     // A background mobile sidebar waits until it is visible before scrolling.
     await page.reload()
@@ -117,9 +148,29 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><I18nProvid
     await tab.waitFor()
     await tab.click()
     await scroller.dispatchEvent('wheel')
+    const handledAfterCancel = await page.evaluate('window.handled')
+    await refresh.click()
     await row.waitFor()
     await page.waitForTimeout(100)
     assert.equal(await scroller.evaluate(el => el.scrollTop), 0)
+    assert.equal(await page.evaluate('window.handled'), handledAfterCancel, 'a refreshed listing does not restart a cancelled reveal')
+
+    // An event waits for the initial listing, then stays consumed if that listing disappears.
+    await page.reload()
+    await tab.waitFor()
+    await clear.click()
+    await tab.click()
+    assert.deepEqual(await page.evaluate('window.loads'), [])
+    await refresh.click()
+    await visible()
+    const handledAfterLoad = await page.evaluate('window.handled')
+    await scroller.evaluate(el => { el.scrollTop = 0 })
+    await clear.click()
+    await refresh.click()
+    await row.waitFor()
+    await page.waitForTimeout(100)
+    assert.equal(await scroller.evaluate(el => el.scrollTop), 0, 'restoring the listing does not restart a completed reveal')
+    assert.equal(await page.evaluate('window.handled'), handledAfterLoad)
     assert.deepEqual(errors, [])
   } finally { await browser.close() }
 })

@@ -735,7 +735,9 @@ export function FileTree({
   const restoringScrollRef = useRef(!compact)
   const pageOpenSequence = useRef(0)
   useEffect(() => () => { pageOpenSequence.current++ }, [persistedProject])
-  const initialRevealRef = useRef({ selectedPath, revealSignal: revealOnMount ? -1 : revealSignal })
+  const revealRequestRef = useRef({
+    selectedPath, revealSignal, pending: revealOnMount || (!compact && !hadSavedOpenDirs),
+  })
   const onRevealHandledRef = useRef(onRevealHandled)
   onRevealHandledRef.current = onRevealHandled
   const recordScrollRef = useRef(() => {})
@@ -886,15 +888,16 @@ export function FileTree({
     }
   }, [compact])
 
-  // 활성 탭이 바뀌면 사이드바에서도 해당 파일이 보이게 부모 폴더 체인을 열고 스크롤한다.
-  // 사이드바가 닫혀 있으면 이 컴포넌트는 언마운트 상태 — 다시 열릴 때 이 이펙트가 반영한다.
-  // revealSignal도 함께 본다 — **이미 열린 탭을 다시 눌렀을 때**는 경로가 그대로라 그 신호만이 유일한 단서다.
+  const treeReady = tree.length > 0
+  // 파일 선택·탭 재선택은 일회성 요청이다. 완료·취소 뒤 목록 갱신으로 다시 실행하지 않는다.
+  // 초기 복원은 저장 상태를 유지하되, 닫힌 트리를 탭 클릭으로 열었다면 요청을 이어받는다.
   useEffect(() => {
-    if (!selectedPath || tree.length === 0) return
-    // 하위 프로젝트·Documents는 처음 펼칠 때 저장 상태(없으면 모두 접힘)를 유지한다.
-    // 이후 사용자가 문서 탭을 선택하면 기존대로 해당 경로를 펼친다.
-    if ((compact || hadSavedOpenDirs) && initialRevealRef.current.selectedPath === selectedPath
-      && initialRevealRef.current.revealSignal === revealSignal) return
+    const previous = revealRequestRef.current
+    if (previous.selectedPath !== selectedPath || previous.revealSignal !== revealSignal) {
+      revealRequestRef.current = { selectedPath, revealSignal, pending: true }
+    }
+    const request = revealRequestRef.current
+    if (!request.pending || !selectedPath || !treeReady) return
     restoringScrollRef.current = false
     const list = listRef.current
     if (!list) return
@@ -904,9 +907,9 @@ export function FileTree({
     // 지연 로딩된 자식이 실제로 나타날 때까지 기다린다. 캐시 갱신마다 재스크롤하지 않는다.
     let raf = 0
     const stop = () => {
-      cancelAnimationFrame(raf)
-      observer.disconnect()
-      resize.disconnect()
+      if (!request.pending) return
+      request.pending = false
+      cleanup()
       onRevealHandledRef.current?.()
     }
     const reveal = () => {
@@ -928,16 +931,19 @@ export function FileTree({
     // 모바일에서 에디터 뒤에 숨겨진 트리는 사이드바를 실제로 열 때 스크롤한다.
     const resize = new ResizeObserver(schedule)
     resize.observe(list)
-    raf = requestAnimationFrame(reveal)
-    for (const event of ['wheel', 'pointerdown', 'touchstart', 'keydown', 'mew:scrollbar-drag-start']) list.addEventListener(event, stop, { passive: true })
-    return () => {
+    const navigationEvents = ['wheel', 'pointerdown', 'touchstart', 'keydown', 'mew:scrollbar-drag-start']
+    const cleanup = () => {
       cancelAnimationFrame(raf)
       observer.disconnect()
       resize.disconnect()
-      for (const event of ['wheel', 'pointerdown', 'touchstart', 'keydown', 'mew:scrollbar-drag-start']) list.removeEventListener(event, stop)
+      for (const event of navigationEvents) list.removeEventListener(event, stop)
     }
+    raf = requestAnimationFrame(reveal)
+    for (const event of navigationEvents) list.addEventListener(event, stop, { passive: true })
+    // StrictMode의 효과 재설정은 요청을 소비하지 않는다.
+    return cleanup
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedPath, tree, revealSignal])
+  }, [selectedPath, treeReady, revealSignal])
 
   const requestDir = useCallback((path: string, refresh = false): Promise<TreeNode[] | undefined> => {
     if (!loadChildren) return Promise.resolve(undefined)
