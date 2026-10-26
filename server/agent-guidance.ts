@@ -50,7 +50,7 @@ export function readAgentGuidance(locale?: string): string {
 }
 
 function effectiveGuidance(content: string, locale?: string): string {
-  let defaults = withBranchDefault(withDebuggerDefault(withCommitLanguageDefault(currentDocumentationGuidance(content))))
+  let defaults = withBranchDefault(withTestingDefault(withDebuggerDefault(withCommitLanguageDefault(currentDocumentationGuidance(content)))))
   const branch = branchSnapshot(defaults)
   if (!branch.custom) {
     const block = region(defaults, 'branch')
@@ -181,6 +181,12 @@ function withCommitLanguageDefault(content: string): string {
   return `${content}${content ? '\n\n' : ''}${start}\n${guidanceOptions.commitLanguage.en}\n${end}`
 }
 
+function withTestingDefault(content: string): string {
+  const [start, end] = markers('testing')
+  if (content.includes(start) || content.includes(end)) return content
+  return `${content}${content ? '\n\n' : ''}${start}\n${guidanceOptions.testing.required}\n${end}`
+}
+
 function withDebuggerDefault(content: string): string {
   const [start, end] = markers('debugger')
   // Preserve explicit/custom blocks, including damaged markers, for editor repair.
@@ -247,7 +253,7 @@ function snapshot(content: string): GuidanceSnapshot {
   for (const key of Object.keys(guidanceOptions) as GuidanceKey[]) {
     try {
       const block = region(content, key)
-      settings[key] = block ? Object.entries(guidanceOptions[key]).find(([, text]) => text === block.text)?.[0] ?? 'custom' : key === 'debugger' ? 'enabled' : key === 'commitLanguage' ? 'en' : 'inherit'
+      settings[key] = block ? Object.entries(guidanceOptions[key]).find(([, text]) => text === block.text)?.[0] ?? 'custom' : key === 'testing' ? 'required' : key === 'debugger' ? 'enabled' : key === 'commitLanguage' ? 'en' : 'inherit'
     } catch { settings[key] = 'custom' }
   }
   let instructions = ''

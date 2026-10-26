@@ -37,6 +37,10 @@ export const guidanceOptions = {
     enabled: 'Use an available debugger when logs and tests do not adequately explain a bug or runtime behavior. Inspect variables and call stacks at relevant breakpoints. Follow existing execution and permission restrictions, and clean up debug connections and temporary processes afterward.',
     disabled: 'Use a debugger only when the user explicitly requests it.',
   },
+  testing: {
+    required: 'When adding or changing behavior or fixing a bug, you must write or update automated tests that verify the affected behavior. For bug fixes, include a regression test. Run the relevant tests before completing the task, following project execution restrictions. If tests cannot run, report the blocker and do not claim they passed. Documentation-only changes do not require new tests.',
+    project: 'Follow the project’s requirements for writing and running tests. Mew adds no separate test-writing requirement in this mode.',
+  },
 } as const
 
 export type GuidanceKey = keyof typeof guidanceOptions

@@ -37,7 +37,7 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
       let projectDenied = true, projectConflict = false, projectWrongRoot = false, projectUpdates = 0, projectTransient = false
       let releaseSave: (() => void) | undefined, releaseLoad: (() => void) | undefined
       let heldLoad = false
-      let state = { path: '/data/agent-guidance.md', content: '# Guidance', instructions: '', revision: 'first', settings: { commit: 'inherit', commitLanguage: 'en', language: 'inherit', detail: 'custom', subagents: 'inherit', debugger: 'enabled' }, branch: { value: { ...defaultBranchGuidance }, custom: false } }
+      let state = { path: '/data/agent-guidance.md', content: '# Guidance', instructions: '', revision: 'first', settings: { commit: 'inherit', commitLanguage: 'en', language: 'inherit', detail: 'custom', subagents: 'inherit', debugger: 'enabled', testing: 'required' }, branch: { value: { ...defaultBranchGuidance }, custom: false } }
       let projectState = { projectRoot: '/project', revision: 'project1', settings: { version: 1, enabled: true, docsDir: 'notes', entrypoints: ['AGENTS.md'], instructions: 'Existing project rule' } }
       const errors: string[] = []
       page.on('pageerror', error => errors.push(error.message))
@@ -128,14 +128,17 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
           assert.ok(control.x >= 0 && control.x + control.width <= width, `${name} stays inside a ${width}px viewport`)
         }
       }
-      await assertInlineFields(['응답 언어', '답변 길이', '서브에이전트 위임', '디버거 활용', '브랜치 전략', 'Git 자동 처리', '커밋 방식', '커밋 언어'])
+      await assertInlineFields(['응답 언어', '답변 길이', '서브에이전트 위임', '디버거 활용', '테스트 작성', '브랜치 전략', 'Git 자동 처리', '커밋 방식', '커밋 언어'])
       const languageBounds = (await field('응답 언어').boundingBox())!, debuggerBounds = (await field('디버거 활용').boundingBox())!
       assert.ok(debuggerBounds.y - languageBounds.y <= (width >= 768 ? 120 : 168), 'ordinary settings use a compact, consistently spaced list')
       if (width >= 768) {
-        const saveBounds = (await page.getByRole('button', { name: 'Git 설정 저장', exact: true }).boundingBox())!
+        const gitSave = page.getByRole('button', { name: 'Git 설정 저장', exact: true })
+        await gitSave.scrollIntoViewIfNeeded()
+        const saveBounds = (await gitSave.boundingBox())!
         const footerBounds = (await dialog.locator('footer').boundingBox())!
-        assert.ok(saveBounds.y + saveBounds.height <= footerBounds.y, 'the initial desktop view includes the Git save action above its fixed footer')
+        assert.ok(saveBounds.y + saveBounds.height <= footerBounds.y + 1, 'the Git save action stays reachable above its fixed footer, allowing subpixel rounding')
       }
+      await field('응답 언어').scrollIntoViewIfNeeded()
       for (const dark of [false, true]) {
         await page.evaluate(`window.fixtureTheme(${dark})`)
         await page.screenshot({ path: `/tmp/mew-guidance-polish-${width}-${dark ? 'dark' : 'light'}.png` })
@@ -371,6 +374,12 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
         assert.equal(state.settings.language, 'ko')
         assert.equal(state.settings.detail, 'custom')
       }
+      assert.equal(await field('테스트 작성').textContent(), '필수 작성')
+      for (const [option, value] of [['프로젝트 지침에 따름', 'project'], ['필수 작성', 'required']]) {
+        await choose('테스트 작성', option)
+        await page.getByRole('status').filter({ hasText: '저장했습니다.' }).waitFor()
+        assert.equal(state.settings.testing, value)
+      }
       assert.equal(await field('디버거 활용').textContent(), '활성화')
       for (const [option, value] of [['비활성화', 'disabled'], ['활성화', 'enabled']]) {
         await choose('디버거 활용', option)
@@ -582,6 +591,7 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
       await page.getByLabel('응답 언어', { exact: true }).waitFor()
       assert.equal(await field('응답 언어').textContent(), '한국어')
       assert.equal(await field('서브에이전트 위임').textContent(), '필요할 때 자동 위임')
+      assert.equal(await field('테스트 작성').textContent(), '필수 작성')
       assert.equal(await field('디버거 활용').textContent(), '활성화')
       await page.keyboard.press('Escape')
       assert.equal(await dialog.count(), 0)

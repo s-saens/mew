@@ -8,6 +8,10 @@ Follow existing documentation ownership and decision records. Do not recursively
 
 When code, features, or operating procedures change, update the owning canonical documentation in the same task. Give every new or changed document an accurate frontmatter description, and update existing links when paths move; no MOC update is required. Preserve historical sources; keep secrets and temporary debugging logs out of docs.
 
+<!-- mew:agent-setting:testing -->
+When adding or changing behavior or fixing a bug, you must write or update automated tests that verify the affected behavior. For bug fixes, include a regression test. Run the relevant tests before completing the task, following project execution restrictions. If tests cannot run, report the blocker and do not claim they passed. Documentation-only changes do not require new tests.
+<!-- /mew:agent-setting:testing -->
+
 <!-- mew:agent-setting:debugger -->
 Use an available debugger when logs and tests do not adequately explain a bug or runtime behavior. Inspect variables and call stacks at relevant breakpoints. Follow existing execution and permission restrictions, and clean up debug connections and temporary processes afterward.
 <!-- /mew:agent-setting:debugger -->

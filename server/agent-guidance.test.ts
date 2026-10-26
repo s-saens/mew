@@ -219,6 +219,59 @@ test('debugger guidance defaults on without rewriting existing instructions and 
 })
 
 
+test('test-writing guidance defaults to required without rewriting existing instructions and honors saved preferences', async () => {
+  const { agentGuidanceSettings, updateAgentGuidance, GuidanceError } = await import('./agent-guidance.ts')
+  fs.rmSync(AGENT_GUIDANCE_PATH, { force: true })
+  assert.ok(readAgentGuidance().includes(guidanceOptions.testing.required))
+  assert.equal(fs.existsSync(AGENT_GUIDANCE_PATH), false, 'preview stays read-only')
+  assert.equal(agentGuidanceSettings().settings.testing, 'required')
+  const original = '# Handwritten instructions\n\nKeep existing rules.\n'
+  fs.writeFileSync(AGENT_GUIDANCE_PATH, original)
+  let state = agentGuidanceSettings()
+  assert.equal(state.settings.testing, 'required')
+  assert.equal(state.content, original)
+  const roots = ['testing-a', 'testing-b'].map(name => path.join(DATA_DIR, name))
+  const contexts = () => roots.map(root => {
+    fs.mkdirSync(root, { recursive: true })
+    return agentContextText({ projectRoot: root, docsRoot: path.join(root, 'docs') }, root)
+  })
+  for (const context of contexts()) assert.ok(context.includes(guidanceOptions.testing.required))
+  assert.equal(fs.readFileSync(AGENT_GUIDANCE_PATH, 'utf8'), original, 'defaults do not overwrite handwritten state')
+  for (const value of ['project', 'required', 'project'] as const) {
+    state = updateAgentGuidance({ key: 'testing', value, revision: state.revision })
+    assert.equal(state.settings.testing, value)
+    assert.ok(state.content.startsWith(original))
+    for (const context of contexts()) {
+      assert.ok(context.includes(guidanceOptions.testing[value]))
+      assert.ok(!context.includes(guidanceOptions.testing[value === 'required' ? 'project' : 'required']))
+    }
+    ensureAgentGuidance()
+    assert.equal(agentGuidanceSettings().settings.testing, value)
+  }
+  state = updateAgentGuidance({ key: 'language', value: 'ko', revision: state.revision })
+  assert.equal(state.settings.testing, 'project', 'other settings cannot restore the test-writing requirement')
+  const custom = state.content.replace(guidanceOptions.testing.project, 'Write tests for storage changes only.')
+  fs.writeFileSync(AGENT_GUIDANCE_PATH, custom)
+  state = agentGuidanceSettings()
+  assert.equal(state.settings.testing, 'custom')
+  assert.ok(!readAgentGuidance().includes(guidanceOptions.testing.required))
+  state = updateAgentGuidance({ key: 'detail', value: 'concise', revision: state.revision })
+  assert.match(state.content, /Write tests for storage changes only/)
+  assert.equal(state.settings.testing, 'custom')
+  for (const broken of [
+    '<!-- mew:agent-setting:testing -->Missing end',
+    '<!-- /mew:agent-setting:testing -->',
+    '<!-- mew:agent-setting:testing --><!-- mew:agent-setting:language -->x<!-- /mew:agent-setting:testing --><!-- /mew:agent-setting:language -->',
+  ]) {
+    fs.writeFileSync(AGENT_GUIDANCE_PATH, broken)
+    state = agentGuidanceSettings()
+    assert.ok(!readAgentGuidance().includes(guidanceOptions.testing.required))
+    assert.throws(() => updateAgentGuidance({ key: 'testing', value: 'required', revision: state.revision }), GuidanceError)
+    assert.equal(fs.readFileSync(AGENT_GUIDANCE_PATH, 'utf8'), broken)
+  }
+})
+
+
 test('mew response language follows each request locale without rewriting saved guidance', async () => {
   const { agentGuidanceSettings, updateAgentGuidance } = await import('./agent-guidance.ts')
   fs.writeFileSync(AGENT_GUIDANCE_PATH, '# Keep my rules\n')
