@@ -1,5 +1,4 @@
 .mew-loading-indicator {
-  --mew-loading-stroke: clamp(1.25px, calc(var(--mew-loading-size, 16px) * .075), 2.5px);
   position: relative;
   display: inline-block;
   box-sizing: border-box;
@@ -7,58 +6,39 @@
   height: var(--mew-loading-size, 16px);
   flex-shrink: 0;
   vertical-align: middle;
-  border-radius: 50%;
-  background: radial-gradient(circle, currentColor 0 7%, transparent 9%);
-  animation: mew-loading-spin 1.6s linear infinite;
+  background: linear-gradient(135deg, #8b5cf6, #2563eb 55%, #0891b2);
+  mask: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2064%2064%22%20fill%3D%22none%22%3E%3Crect%20x%3D%222%22%20y%3D%222%22%20width%3D%2260%22%20height%3D%2260%22%20stroke%3D%22white%22%20stroke-width%3D%224%22%2F%3E%3Cpath%20d%3D%22M46%2029.75C46%2018.5%2046%2014%2039%2014C32%2014%2032%2018.5%2032%2029.75C32%2018.5%2032%2014%2025%2014C18%2014%2018%2018.5%2018%2029.75L21.5%2032L18%2034.25C18.0002%2045.5%2018%2050%2025%2050C32%2050%2032%2045.5%2032%2034.25C32%2045.5%2032%2050%2039%2050C46%2050%2046%2045.5%2046%2034.25%22%20stroke%3D%22white%22%20stroke-width%3D%224%22%2F%3E%3C%2Fsvg%3E") center / contain no-repeat;
+  mask-mode: alpha;
 }
-.mew-loading-indicator::before,
 .mew-loading-indicator::after {
   content: '';
   position: absolute;
-  box-sizing: border-box;
-  inset: 0;
-  border: var(--mew-loading-stroke) solid currentColor;
-  border-left-color: transparent;
-  border-radius: 50%;
-}
-.mew-loading-indicator::after {
-  inset: 26%;
-  border-width: max(1px, calc(var(--mew-loading-stroke) * .65));
-  opacity: .7;
-  animation: mew-loading-spin 1s linear infinite reverse;
+  inset: -25%;
+  background: conic-gradient(from -45deg,
+    transparent 0deg 150deg,
+    #7c3aed 195deg,
+    #d946ef 230deg,
+    #f0abfc 255deg,
+    #e0f2fe 275deg,
+    #67e8f9 290deg,
+    #38bdf8 310deg,
+    transparent 335deg 360deg);
+  animation: mew-logo-highlight 2.4s linear infinite;
   animation-play-state: inherit;
-}
-@supports (background: conic-gradient(transparent, currentColor)) and (mask: radial-gradient(black, transparent)) {
-  .mew-loading-indicator::before,
-  .mew-loading-indicator::after {
-    border: 0;
-    background: conic-gradient(from -60deg,
-      color-mix(in srgb, currentColor 8%, transparent) 0deg 45deg,
-      color-mix(in srgb, currentColor 15%, transparent) 90deg,
-      color-mix(in srgb, currentColor 45%, transparent) 180deg,
-      currentColor 270deg 292deg,
-      transparent 294deg 360deg);
-    mask: radial-gradient(farthest-side, transparent calc(100% - var(--mew-loading-stroke)), black calc(100% - var(--mew-loading-stroke) + .5px));
-  }
-  .mew-loading-indicator::after {
-    --mew-loading-stroke: 1px;
-    background: conic-gradient(from 120deg, transparent, currentColor 250deg 290deg, transparent 292deg);
-  }
 }
 .mew-loading-indicator[data-active='false'],
 [data-paused] .mew-loading-indicator { animation-play-state: paused; }
-@keyframes mew-loading-spin { to { transform: rotate(360deg); } }
+@keyframes mew-logo-highlight { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) {
-  .mew-loading-indicator,
-  .mew-loading-indicator::after { animation: none; }
+  .mew-loading-indicator::after {
+    animation: none;
+    transform: rotate(35deg);
+  }
 }
 @media (forced-colors: active) {
-  .mew-loading-indicator { background: none; }
-  .mew-loading-indicator::before {
-    background: none;
-    mask: none;
-    border: var(--mew-loading-stroke) solid CanvasText;
-    border-left-color: transparent;
+  .mew-loading-indicator {
+    forced-color-adjust: none;
+    background: CanvasText;
   }
   .mew-loading-indicator::after { display: none; }
 }

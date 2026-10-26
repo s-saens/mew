@@ -7,9 +7,9 @@ import { chromium } from 'playwright-core'
 import { domBrowserExecutable } from '../../../server/browser-dom-executable.ts'
 
 const root = path.resolve(import.meta.dirname, '../../..')
-const sizes = [12, 14, 16, 28, 36]
+const sizes = [12, 14, 16, 28, 48, 56]
 
-test('shared loading indicators preserve their geometry, inexpensive motion and accessible alternatives', { skip: !domBrowserExecutable(), timeout: 30_000 }, async t => {
+test('shared loading indicators keep the Mew logo fixed while a gradient highlight moves with accessible alternatives', { skip: !domBrowserExecutable(), timeout: 30_000 }, async t => {
   const source = `
 import React from '${root}/node_modules/react/index.js';
 import {createRoot} from '${root}/node_modules/react-dom/client.js';
@@ -36,6 +36,7 @@ createRoot(document.getElementById('react')).render(React.createElement(React.Fr
   })
   const code = bundle.output.filter(item => item.type === 'chunk').map(item => item.code).join('\n')
   const css = await fs.readFile(new URL('./loading-indicator.css', import.meta.url), 'utf8')
+  const favicon = await fs.readFile(new URL('../../../public/favicon.svg', import.meta.url), 'utf8')
   const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
   t.after(() => browser.close())
   const page = await browser.newPage()
@@ -46,21 +47,20 @@ createRoot(document.getElementById('react')).render(React.createElement(React.Fr
     <div id="react" style="color:#7a65db"></div>
     <div id="mewlink"><span class="mew-loading-indicator" aria-hidden="true"></span></div>`)
   await page.addScriptTag({ content: code })
-  await page.locator('.size-36').waitFor()
+  await page.locator('.size-56').waitFor()
 
   for (const size of sizes) {
     const snapshot = await page.locator(`.size-${size}`).evaluate(el => {
       const view = el.ownerDocument.defaultView!
       const style = view.getComputedStyle(el)
-      const outer = view.getComputedStyle(el, '::before')
-      const inner = view.getComputedStyle(el, '::after')
+      const highlight = view.getComputedStyle(el, '::after')
       return {
         tag: el.tagName, children: el.childElementCount, hidden: el.getAttribute('aria-hidden'),
-        width: parseFloat(style.width), height: parseFloat(style.height), color: style.color,
-        core: style.backgroundImage, outer: outer.backgroundImage, inner: inner.backgroundImage,
-        outerWidth: parseFloat(outer.width), innerWidth: parseFloat(inner.width),
-        outerMask: outer.maskImage, innerMask: inner.maskImage,
-        generated: [outer.content, inner.content],
+        width: parseFloat(style.width), height: parseFloat(style.height),
+        base: style.backgroundImage, mask: style.maskImage, maskMode: style.maskMode,
+        rootTransform: style.transform, rootAnimation: style.animationName,
+        highlight: highlight.backgroundImage, highlightContent: highlight.content,
+        highlightWidth: parseFloat(highlight.width), highlightHeight: parseFloat(highlight.height),
       }
     })
     assert.equal(snapshot.tag, 'SPAN')
@@ -68,18 +68,48 @@ createRoot(document.getElementById('react')).render(React.createElement(React.Fr
     assert.equal(snapshot.hidden, 'true')
     assert.equal(snapshot.width, size)
     assert.equal(snapshot.height, size)
-    assert.equal(snapshot.color, 'rgb(122, 101, 219)', 'the indicator inherits its surrounding color')
-    assert.deepEqual(snapshot.generated, ['""', '""'])
-    assert.match(snapshot.core, /radial-gradient/)
-    assert.match(snapshot.outer, /conic-gradient/)
-    assert.match(snapshot.inner, /conic-gradient/)
-    assert.match(snapshot.outerMask, /radial-gradient/)
-    assert.match(snapshot.innerMask, /radial-gradient/)
-    assert.equal(snapshot.outerWidth, size)
-    assert.ok(snapshot.innerWidth > 0 && snapshot.innerWidth < size, `${size}px keeps a distinct inner orbit`)
+    assert.equal(snapshot.rootTransform, 'none', 'the logo must stay fixed while its highlight moves')
+    assert.equal(snapshot.rootAnimation, 'none')
+    assert.match(snapshot.mask, /^url\("data:image\/svg\+xml,/)
+    assert.equal(snapshot.maskMode, 'alpha')
+    assert.match(snapshot.base, /linear-gradient/)
+    assert.ok(new Set(snapshot.base.match(/rgb\([^)]+\)/g)).size >= 3, 'the logo has a multicolor base')
+    assert.equal(snapshot.highlightContent, '""')
+    assert.match(snapshot.highlight, /conic-gradient/)
+    assert.ok(new Set(snapshot.highlight.match(/rgb\([^)]+\)/g)).size >= 5, 'the highlight spans distinct gradient colors')
+    assert.ok(snapshot.highlightWidth >= size * Math.SQRT2, 'the rotating highlight covers the square logo corners')
+    assert.ok(snapshot.highlightHeight >= size * Math.SQRT2)
   }
 
   const indicator = page.locator('.size-16')
+  const geometry = await indicator.evaluate((el, source) => {
+    const view = el.ownerDocument.defaultView!
+    const mask = view.getComputedStyle(el).maskImage
+    const dataUrl = mask.match(/^url\("(.*)"\)$/)?.[1]
+    if (!dataUrl?.startsWith('data:image/svg+xml,')) throw new Error('Expected an embedded SVG logo mask')
+    const parser = new view.DOMParser()
+    const original = parser.parseFromString(source, 'image/svg+xml').documentElement
+    const logo = parser.parseFromString(decodeURIComponent(dataUrl.slice(dataUrl.indexOf(',') + 1)), 'image/svg+xml').documentElement
+    const shapes = (svg: typeof logo) => Array.from(svg.querySelectorAll('rect,path'), shape => ({
+      tag: shape.localName,
+      attributes: Object.fromEntries(Array.from(shape.attributes)
+        .filter(attribute => attribute.name !== 'stroke')
+        .map(attribute => [attribute.name, attribute.value])),
+    }))
+    return {
+      actual: shapes(logo), expected: shapes(original),
+      viewBox: logo.getAttribute('viewBox'), originalViewBox: original.getAttribute('viewBox'),
+      fill: logo.getAttribute('fill'), originalFill: original.getAttribute('fill'),
+      strokes: Array.from(logo.querySelectorAll('rect,path'), shape => shape.getAttribute('stroke')),
+    }
+  }, favicon)
+  assert.deepEqual(geometry.actual, geometry.expected, 'the mask preserves the original Mew rectangle and path geometry')
+  assert.equal(geometry.actual.length, 2)
+  assert.equal(geometry.viewBox, geometry.originalViewBox)
+  assert.equal(geometry.fill, geometry.originalFill)
+  assert.equal(geometry.fill, 'none', 'the logo mask contains strokes rather than solid filled shapes')
+  assert.deepEqual(geometry.strokes, ['white', 'white'])
+
   const motion = await indicator.evaluate(el => {
     const view = el.ownerDocument.defaultView!
     return {
@@ -96,8 +126,8 @@ createRoot(document.getElementById('react')).render(React.createElement(React.Fr
     }
   })
   assert.deepEqual(motion.states, ['running', 'running'])
-  assert.ok(motion.effects.length >= 2, 'the two orbits animate independently')
-  const allowedKeys = new Set(['offset', 'computedOffset', 'easing', 'composite', 'transform', 'opacity'])
+  assert.equal(motion.effects.length, 1, 'only the highlight animates')
+  const allowedKeys = new Set(['offset', 'computedOffset', 'easing', 'composite', 'transform'])
   for (const effect of motion.effects) {
     assert.equal(effect.iterations, Infinity)
     for (const frame of effect.keyframes) for (const property of frame) {
@@ -110,19 +140,33 @@ createRoot(document.getElementById('react')).render(React.createElement(React.Fr
     const view = el.ownerDocument.defaultView!
     return [view.getComputedStyle(el).animationPlayState, view.getComputedStyle(el, '::after').animationPlayState]
   })
-  assert.deepEqual(await playStates('.inactive'), ['paused', 'paused'], 'active=false pauses both orbit animations')
+  assert.deepEqual(await playStates('.inactive'), ['paused', 'paused'], 'active=false pauses the moving highlight')
   assert.deepEqual(await playStates('#mewlink .mew-loading-indicator'), ['running', 'running'], 'plain HTML needs no React state attribute')
   await page.locator('#mewlink').evaluate(el => el.setAttribute('data-paused', ''))
-  assert.deepEqual(await playStates('#mewlink .mew-loading-indicator'), ['paused', 'paused'], 'hidden Mewlink pages pause both orbits')
+  assert.deepEqual(await playStates('#mewlink .mew-loading-indicator'), ['paused', 'paused'], 'hidden Mewlink pages pause the highlight')
   await page.locator('#mewlink').evaluate(el => el.removeAttribute('data-paused'))
   assert.deepEqual(await playStates('#mewlink .mew-loading-indicator'), ['running', 'running'])
+  await page.locator('.inactive').evaluate(el => el.setAttribute('data-active', 'true'))
+  assert.deepEqual(await playStates('.inactive'), ['running', 'running'], 'reactivating an indicator resumes its highlight')
 
   await page.emulateMedia({ reducedMotion: 'reduce' })
-  assert.deepEqual(await indicator.evaluate(el => {
+  const reducedMotion = await indicator.evaluate(el => {
     const view = el.ownerDocument.defaultView!
-    return [null, '::before', '::after'].map(pseudo => view.getComputedStyle(el, pseudo).animationName)
-  }), ['none', 'none', 'none'], 'reduced motion leaves no animated pseudo-element behind')
-  assert.match(await indicator.evaluate(el => el.ownerDocument.defaultView!.getComputedStyle(el, '::before').backgroundImage), /conic-gradient/, 'the static loading shape remains visible')
+    return {
+      animations: [null, '::before', '::after'].map(pseudo => view.getComputedStyle(el, pseudo).animationName),
+      runningAnimations: el.getAnimations({ subtree: true }).length,
+      highlight: view.getComputedStyle(el, '::after').backgroundImage,
+      highlightTransform: view.getComputedStyle(el, '::after').transform,
+      rootTransform: view.getComputedStyle(el).transform,
+      mask: view.getComputedStyle(el).maskImage,
+    }
+  })
+  assert.deepEqual(reducedMotion.animations, ['none', 'none', 'none'], 'reduced motion leaves no animated pseudo-element behind')
+  assert.equal(reducedMotion.runningAnimations, 0)
+  assert.match(reducedMotion.highlight, /conic-gradient/, 'reduced motion retains a static colored highlight')
+  assert.notEqual(reducedMotion.highlightTransform, 'none')
+  assert.equal(reducedMotion.rootTransform, 'none')
+  assert.match(reducedMotion.mask, /data:image\/svg\+xml,/)
 
   await page.emulateMedia({ reducedMotion: 'no-preference', forcedColors: 'active' })
   const forcedColors = await indicator.evaluate(el => {
@@ -132,19 +176,17 @@ createRoot(document.getElementById('react')).render(React.createElement(React.Fr
     doc.body.append(probe)
     const systemText = view.getComputedStyle(probe).color
     probe.remove()
-    const outer = view.getComputedStyle(el, '::before')
+    const style = view.getComputedStyle(el)
     return {
-      systemText, color: outer.borderTopColor, width: parseFloat(outer.borderTopWidth),
-      border: outer.borderTopStyle, mask: outer.maskImage, outerBackground: outer.backgroundImage,
-      core: view.getComputedStyle(el).backgroundImage, inner: view.getComputedStyle(el, '::after').display,
+      systemText, background: style.backgroundColor, backgroundImage: style.backgroundImage,
+      mask: style.maskImage, colorAdjust: style.forcedColorAdjust,
+      highlight: view.getComputedStyle(el, '::after').display,
     }
   })
-  assert.equal(forcedColors.color, forcedColors.systemText)
-  assert.ok(forcedColors.width >= 1, 'forced colors retain a visible system-color boundary')
-  assert.equal(forcedColors.border, 'solid')
-  assert.equal(forcedColors.mask, 'none')
-  assert.equal(forcedColors.outerBackground, 'none')
-  assert.equal(forcedColors.core, 'none')
-  assert.equal(forcedColors.inner, 'none')
+  assert.equal(forcedColors.background, forcedColors.systemText, 'forced colors retain the full logo in the system text color')
+  assert.equal(forcedColors.backgroundImage, 'none')
+  assert.equal(forcedColors.mask, reducedMotion.mask, 'high contrast retains the Mew logo geometry')
+  assert.equal(forcedColors.colorAdjust, 'none')
+  assert.equal(forcedColors.highlight, 'none')
   assert.deepEqual(errors, [])
 })
