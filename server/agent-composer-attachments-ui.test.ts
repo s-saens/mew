@@ -114,6 +114,7 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
   assert.ok(chunk)
   const compiler = await compile(await fs.readFile(path.join(root, 'src/index.css'), 'utf8'), { base: path.join(root, 'src'), onDependency() {} })
   const css = compiler.build([...new Set(candidates.join('\n').match(/[A-Za-z0-9_@!&:/.[\]()%,-]+/g))])
+    + await fs.readFile(path.join(root, 'packages/ui/src/loading-indicator.css'), 'utf8')
   const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
   t.after(() => browser.close())
   for (const width of [1100, 390]) for (const dark of [true, false]) {
@@ -172,6 +173,10 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
         await select(page, 5)
         await page.evaluate(`window.composerFixture.insert(${JSON.stringify(pendingToken)})`)
         await input.getByRole('status', { name: '첨부 중…', exact: true }).waitFor()
+        const uploading = input.getByRole('status', { name: '첨부 중…', exact: true })
+        assert.equal(await uploading.locator('.mew-loading-spinner').count(), 1, 'attachment upload uses the circular indicator')
+        assert.equal(await uploading.locator('.mew-loading-dot, .mew-loading-logo').count(), 0, 'attachment upload does not use dots or the startup logo')
+        assert.equal(await uploading.locator('.mew-loading-spinner').evaluate(el => el.getBoundingClientRect().width), 12)
         await select(page, 0)
         await page.keyboard.type('new ')
         await page.evaluate(`window.composerFixture.replace(${JSON.stringify(pendingToken)},${JSON.stringify(photoToken)})`)

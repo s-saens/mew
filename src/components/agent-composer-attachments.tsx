@@ -47,7 +47,7 @@ class AttachmentWidget extends WidgetType {
     const video = attachmentKind(this.file.mimeType, this.file.name) === 'video'
     const label = video ? uiText('{p0} 동영상 미리보기', { p0: this.file.name }) : uiText('{p0} 사진 미리보기', { p0: this.file.name })
     this.root.render(<>
-      {this.file.pending ? <span role="status" aria-label={uiText('첨부 중…')} className="mew-composer-upload"><LoadingIndicator size={12} /></span>
+      {this.file.pending ? <span role="status" aria-label={uiText('첨부 중…')} className="mew-composer-upload"><LoadingIndicator variant="spinner" size={12} /></span>
         : this.file.href ? <a href={this.file.href} target="_blank" rel="noreferrer" aria-label={this.file.name}>
           <AgentAttachmentIcon mimeType={this.file.mimeType} path={this.file.name} />
         </a> : <button type="button" aria-label={label} title={video ? uiText('동영상 미리보기') : uiText('사진 미리보기')} onClick={() => this.resolve(this.token)?.preview?.()}>

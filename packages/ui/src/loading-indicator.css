@@ -13,6 +13,13 @@
   align-items: center;
   justify-content: space-between;
 }
+.mew-loading-spinner {
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: mew-loading-spin .8s linear infinite;
+}
+@keyframes mew-loading-spin { to { transform: rotate(360deg); } }
 .mew-loading-dot {
   width: calc(var(--mew-loading-size, 16px) * .24);
   height: calc(var(--mew-loading-size, 16px) * .24);
@@ -57,10 +64,12 @@
 [data-paused] .mew-loading-indicator { animation-play-state: paused; }
 @keyframes mew-logo-highlight { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) {
+  .mew-loading-spinner { animation: none; }
   .mew-loading-dot { animation: none; transform: scale(.7); opacity: .65; }
   .mew-loading-logo::after { animation: none; transform: rotate(35deg); }
 }
 @media (forced-colors: active) {
+  .mew-loading-spinner { forced-color-adjust: none; color: CanvasText; }
   .mew-loading-logo { forced-color-adjust: none; background: CanvasText; }
   .mew-loading-logo::after { display: none; }
   .mew-loading-dot { forced-color-adjust: none; background: CanvasText; }

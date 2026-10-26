@@ -9,7 +9,7 @@ import { domBrowserExecutable } from '../../../server/browser-dom-executable.ts'
 const root = path.resolve(import.meta.dirname, '../../..')
 const sizes = [12, 14, 16, 28, 48, 56]
 
-test('shared loading indicators use quiet pulsing dots inside panels and a fixed highlighted logo for startup', { skip: !domBrowserExecutable(), timeout: 30_000 }, async t => {
+test('shared loading indicators support dots, startup logos and circular attachment spinners', { skip: !domBrowserExecutable(), timeout: 30_000 }, async t => {
   const source = `
 import React from '${root}/node_modules/react/index.js';
 import {createRoot} from '${root}/node_modules/react-dom/client.js';
@@ -17,10 +17,12 @@ import {LoadingIndicator} from '${root}/packages/ui/src/loading-indicator.tsx';
 createRoot(document.getElementById('react')).render(React.createElement(React.Fragment,null,
   ...${JSON.stringify(sizes)}.flatMap(size=>[
     React.createElement(LoadingIndicator,{key:'logo-'+size,variant:'logo',size,className:'size-'+size}),
-    React.createElement(LoadingIndicator,{key:'dots-'+size,size,className:'dots-size-'+size})
+    React.createElement(LoadingIndicator,{key:'dots-'+size,size,className:'dots-size-'+size}),
+    React.createElement(LoadingIndicator,{key:'spinner-'+size,variant:'spinner',size,className:'spinner-size-'+size})
   ]),
   React.createElement(LoadingIndicator,{variant:'logo',active:false,className:'inactive'}),
-  React.createElement(LoadingIndicator,{active:false,className:'inactive-dots'})
+  React.createElement(LoadingIndicator,{active:false,className:'inactive-dots'}),
+  React.createElement(LoadingIndicator,{variant:'spinner',active:false,className:'inactive-spinner'})
 ));`
   const bundle = await build({
     input: 'virtual:loading-indicator.ts', write: false, platform: 'browser',
@@ -55,6 +57,39 @@ createRoot(document.getElementById('react')).render(React.createElement(React.Fr
     </div>`)
   await page.addScriptTag({ content: code })
   await page.locator('.size-56').waitFor()
+
+  for (const size of sizes) {
+    const spinner = await page.locator(`.spinner-size-${size}`).evaluate(el => {
+      const style = el.ownerDocument.defaultView!.getComputedStyle(el)
+      return {
+        width: parseFloat(style.width), height: parseFloat(style.height),
+        hidden: el.getAttribute('aria-hidden'), children: el.childElementCount,
+        border: style.borderRightWidth, borderColor: style.borderRightColor, color: style.color,
+        gap: style.borderTopColor, radius: style.borderRadius,
+        animation: style.animationName, duration: style.animationDuration, easing: style.animationTimingFunction,
+      }
+    })
+    assert.equal(spinner.width, size)
+    assert.equal(spinner.height, size)
+    assert.equal(spinner.hidden, 'true')
+    assert.equal(spinner.children, 0, 'the circular indicator does not render dots')
+    assert.equal(spinner.border, '2px')
+    assert.equal(spinner.borderColor, spinner.color)
+    assert.equal(spinner.gap, 'rgba(0, 0, 0, 0)')
+    assert.equal(spinner.radius, '50%')
+    assert.equal(spinner.animation, 'mew-loading-spin')
+    assert.equal(spinner.duration, '0.8s')
+    assert.equal(spinner.easing, 'linear')
+  }
+  const spinnerState = () => page.locator('.inactive-spinner').evaluate(el =>
+    el.ownerDocument.defaultView!.getComputedStyle(el).animationPlayState)
+  assert.equal(await spinnerState(), 'paused')
+  await page.locator('.inactive-spinner').evaluate(el => el.setAttribute('data-active', 'true'))
+  assert.equal(await spinnerState(), 'running')
+  await page.locator('#react').evaluate(el => el.setAttribute('data-paused', ''))
+  assert.equal(await spinnerState(), 'paused')
+  await page.locator('#react').evaluate(el => el.removeAttribute('data-paused'))
+  assert.equal(await spinnerState(), 'running')
 
   for (const size of sizes) {
     const snapshot = await page.locator(`.size-${size}`).evaluate(el => {
@@ -247,6 +282,7 @@ createRoot(document.getElementById('react')).render(React.createElement(React.Fr
   assert.deepEqual(await dotPlayStates('.inactive-dots'), Array(3).fill('running'), 'reactivating an indicator resumes each dot')
 
   await page.emulateMedia({ reducedMotion: 'reduce' })
+  assert.equal(await page.locator('.spinner-size-12').evaluate(el => el.getAnimations().length), 0, 'reduced motion stops circular rotation')
   const reducedMotion = await indicator.evaluate(el => {
     const view = el.ownerDocument.defaultView!
     return {
@@ -300,6 +336,12 @@ createRoot(document.getElementById('react')).render(React.createElement(React.Fr
   assert.equal(forcedColors.mask, reducedMotion.mask, 'high contrast retains the Mew logo geometry')
   assert.equal(forcedColors.colorAdjust, 'none')
   assert.equal(forcedColors.highlight, 'none')
+  const forcedSpinner = await page.locator('.spinner-size-12').evaluate(el => {
+    const style = el.ownerDocument.defaultView!.getComputedStyle(el)
+    return { border: style.borderRightColor, gap: style.borderTopColor }
+  })
+  assert.equal(forcedSpinner.border, forcedColors.systemText)
+  assert.equal(forcedSpinner.gap, 'rgba(0, 0, 0, 0)', 'the circular gap stays visible in high contrast')
   const forcedDots = await page.locator('.dots-size-16').evaluate(el => {
     const view = el.ownerDocument.defaultView!
     return Array.from(el.children, dot => ({
