@@ -8,13 +8,15 @@ updated: "2026-10-26"
 status_hash: "ad2d450aae96362a9d082f3989ccd04643632b17559700c16044ef32ca54d690"
 files: ["src/components/GitWorkbench.tsx", "src/utils/git-graph.ts", "src/components/git-diff-editor.tsx", "src/components/git-changes-menu.tsx", "src/utils/git-diff-tabs.ts", "src/components/git-branch-picker.tsx", "src/components/git-panel.tsx", "src/components/github-account.tsx", "server/github-auth.ts", "server/github-auth-routes.ts", "src/components/git-ai-commit-dialog.tsx", "server/gitWorkbench.ts", "server/git-ai-commit.ts", "server/git-commit-analysis.ts", "server/git-commit-packets.ts", "server/git-diff-codec.ts", "server/git-change-intent.ts", "server/git-change-intent-cli.ts", "server/git-ai-commit-runner.ts", "server/git-ai-commit-routes.ts"]
 commits: []
-description: "Ctrl/Cmd+G로 여는 현재 프로젝트의 변경 파일·커밋 기록의 기본 50:50 배치·와일드카드 검색·일반선택과 커밋대상선택·에디터 diff·분기와 합류의 연결선·열·색상을 유지하는 커밋 그래프, 선택 변경 커밋·취소, 햄버거 메뉴와 표면을 맞춘 타이틀바의 조밀한 브랜치 검색·선택·생성, 기존 worktree로의 프로젝트 전환과 Pull·Push를 다루는 기능 계약. 계정 연결과 AI 작업 단위 커밋의 승인·범위·JSON 응답 자동 복구 규칙을 포함한다."
+description: "Ctrl/Cmd+G로 여는 현재 프로젝트의 변경 파일·현재 브랜치 커밋 기록의 기본 50:50 배치·와일드카드 검색·일반선택과 커밋대상선택·에디터 diff·분기와 합류의 연결선·열·색상을 유지하는 커밋 그래프, 선택 변경 커밋·취소, 햄버거 메뉴와 표면을 맞춘 타이틀바의 조밀한 브랜치 검색·선택·생성, 기존 worktree로의 프로젝트 전환과 Pull·Push를 다루는 기능 계약. 계정 연결과 AI 작업 단위 커밋의 승인·범위·JSON 응답 자동 복구 규칙을 포함한다."
 상위파일:
   - "MOC.md"
   - "_Git·변경 이력.md"
 ---
 
 ## 요구사항
+
+- 커밋 기록은 현재 체크아웃의 `HEAD`에서 도달 가능한 커밋만 표시한다. 다른 브랜치·태그·원격 추적 ref에만 있는 미통합 커밋은 포함하지 않는다. 브랜치 전환·별도 worktree·detached HEAD에서도 해당 체크아웃의 이력을 사용하며, 아직 커밋이 없는 브랜치는 빈 목록을 표시한다.
 
 - Git 변경 목록은 현재 접속 IP에서 Mew로 저장한 내용과 일치하는 파일만 기본 선택한다. 다른 IP와 출처가 확인되지 않는 변경은 수동으로 선택한다.
 

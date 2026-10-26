@@ -242,7 +242,7 @@ export async function repositoryLog(project: string, relPath: string, limit = 30
   const count = Math.max(1, Math.min(1000, Math.floor(limit)))
   let raw: string
   try {
-    raw = await git.raw(['log', '--all', '--topo-order', `--max-count=${count}`, '--date=iso-strict', '--pretty=format:%x1e%H%x1f%P%x1f%D%x1f%s%x1f%an%x1f%ae%x1f%aI'])
+    raw = await git.raw(['log', '--topo-order', `--max-count=${count}`, '--date=iso-strict', '--pretty=format:%x1e%H%x1f%P%x1f%D%x1f%s%x1f%an%x1f%ae%x1f%aI'])
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     if (/does not have any commits|unknown revision|bad default revision/i.test(message)) return []
