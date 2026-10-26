@@ -251,6 +251,10 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     return initial
   })
   const [rootProjectPath, setRootProjectPath] = useState<string | null>(null)
+  const [projectUiPath, setProjectUiPath] = useState<string | null>(null)
+  const [workspaceChanging, setWorkspaceChanging] = useState(false)
+  const projectUiPathRef = useRef(projectUiPath)
+  projectUiPathRef.current = projectUiPath
   const rootProjectPathRef = useRef(rootProjectPath)
   rootProjectPathRef.current = rootProjectPath
   const toolPresentation = useToolPresentation()
@@ -264,7 +268,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
   const [preparedAgentTabs, setPreparedAgentTabs] = useState<ReturnType<typeof fetchAgentTabs>>()
   const rootTreeCache = useRef(new WorkspaceSnapshotCache<TreeNode[]>(24))
   const rootProjectIconsCache = useRef(new WorkspaceSnapshotCache<Record<string, string>>(4))
-  const workspaceInfoRef = useRef<{ path: string; docsPath?: string } | null>(null)
+  const workspaceInfoRef = useRef<{ path: string; projectPath?: string; docsPath?: string } | null>(null)
   const workspaceEpochRef = useRef(0)
   const [workspaceEpoch, setWorkspaceEpoch] = useState(0)
 
@@ -289,7 +293,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
   // 절대경로 탭 목록은 owner UI에만 노출한다. manager는 셸 권한상 현재 경로를 볼 수 있지만 다른
   // 브라우저 사용자가 남긴 owner 전용 목록까지 물려받지는 않는다.
   const [openProjectPaths, setOpenProjectPaths] = useState<string[]>(() => (isOwner ? loadOpenProjectPaths() : []))
-  const projectPaths = useMemo(() => [...new Set([...openProjectPaths, ...(rootProjectPath ? [rootProjectPath] : [])])], [openProjectPaths, rootProjectPath])
+  const projectPaths = useMemo(() => [...new Set([...openProjectPaths, ...(projectUiPath ? [projectUiPath] : [])])], [openProjectPaths, projectUiPath])
   const [rootProjectIcons, setRootProjectIcons] = useState<Record<string, string>>({})
   const rootProjectSaveQueue = useRef<Promise<unknown>>(Promise.resolve())
   const [rootProjectTabsSynced, setRootProjectTabsSynced] = useState(!isOwner)
@@ -333,7 +337,6 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
   const [agentOpen, setAgentOpen] = useState(() => caps.agent && scopedBrowserStorage().getItem(AGENT_OPEN_KEY) === '1')
   const gitMounted = useRef(false)
   const [gitOpen, setGitOpen] = useState(() => caps.git && scopedBrowserStorage().getItem(GIT_OPEN_KEY) === '1')
-  const [gitWorktreeTarget, setGitWorktreeTarget] = useState<string | null>(null)
   const [remoteDesktopOpen, setRemoteDesktopOpen] = useState(false)
   const [requestedAgentTab, setRequestedAgentTab] = useState<AgentTab | null>(null)
   const [tasksOpen, setTasksOpen] = useState(false)
@@ -432,17 +435,17 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
   const openWorkspacePanel = useCallback((panel: WorkspacePanelId) => {
     workspacePanelSetters[panel](true)
     setMobilePanelStack((stack) => bringMobilePanelToFront(stack, panel))
-    if (!isDesktop()) saveMobileForegroundPanel(rootProjectPath, panel)
-  }, [rootProjectPath, workspacePanelSetters])
+    if (!isDesktop()) saveMobileForegroundPanel(projectUiPath, panel)
+  }, [projectUiPath, workspacePanelSetters])
 
   const closeWorkspacePanel = useCallback((panel: WorkspacePanelId) => {
     workspacePanelSetters[panel](false)
     setMobilePanelStack((stack) => {
       const next = closeMobilePanel(stack, panel)
-      if (!isDesktop()) saveMobileForegroundPanel(rootProjectPath, next.at(-1) ?? 'editor')
+      if (!isDesktop()) saveMobileForegroundPanel(projectUiPath, next.at(-1) ?? 'editor')
       return next
     })
-  }, [rootProjectPath, workspacePanelSetters])
+  }, [projectUiPath, workspacePanelSetters])
 
   const toggleWorkspacePanel = useCallback((panel: WorkspacePanelId) => {
     const open = workspacePanelOpen[panel]
@@ -456,15 +459,15 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     const next = selectMobilePanel(mobilePanelStack, panel, open)
     workspacePanelSetters[panel](next.open)
     setMobilePanelStack(next.stack)
-    saveMobileForegroundPanel(rootProjectPath, next.stack.at(-1) ?? 'editor')
-  }, [mobilePanelStack, rootProjectPath, workspacePanelOpen, workspacePanelSetters])
+    saveMobileForegroundPanel(projectUiPath, next.stack.at(-1) ?? 'editor')
+  }, [mobilePanelStack, projectUiPath, workspacePanelOpen, workspacePanelSetters])
 
   const bringWorkspacePanelToFront = useCallback((panel: WorkspacePanelId) => {
     if (!isDesktop() && mobileForegroundPanel !== panel) {
       setMobilePanelStack((stack) => bringMobilePanelToFront(stack, panel))
-      saveMobileForegroundPanel(rootProjectPath, panel)
+      saveMobileForegroundPanel(projectUiPath, panel)
     }
-  }, [mobileForegroundPanel, rootProjectPath])
+  }, [mobileForegroundPanel, projectUiPath])
 
   const changeMemoOpen = useCallback((open: boolean) => {
     if (open) { setRemoteDesktopOpen(false); dockRef.current?.restore(); openWorkspacePanel('memo'); setFocusedWorkspacePanel('memo') }
@@ -479,9 +482,9 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     setEditorOpen(true)
     if (!isDesktop()) {
       setMobilePanelStack([])
-      saveMobileForegroundPanel(rootProjectPath, 'editor')
+      saveMobileForegroundPanel(projectUiPath, 'editor')
     }
-  }, [rootProjectPath])
+  }, [projectUiPath])
 
   const mobilePanelLayer = useCallback((panel: WorkspacePanelId) => {
     // 스택에 전면 패널이 없으면 에디터를 보여 준다. 패널은 열려 있는 채라 데스크톱으로
@@ -614,19 +617,19 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
   const loadDocsTreeChildren = useCallback((path: string) => fetchTreeEntries(DEFAULT_PROJECT, path), [])
 
   useEffect(() => {
-    if (!rootProjectPath || isGuest) {
+    if (!projectUiPath || isGuest) {
       setWorkspaceUi({})
       setWorkspaceUiLoaded(isGuest)
       return
     }
     let alive = true
-    const cached = workspaceUiCache.current.get(rootProjectPath)
+    const cached = workspaceUiCache.current.get(projectUiPath)
     if (cached) {
       setWorkspaceUi(cached)
       setWorkspaceUiLoaded(true)
     } else {
       setWorkspaceUiLoaded(false)
-      void trackRefresh(prepareWorkspaceUi(rootProjectPath))
+      void trackRefresh(prepareWorkspaceUi(projectUiPath))
         .then(state => {
           if (!alive) return
           setWorkspaceUi(state)
@@ -636,45 +639,45 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
         .catch(console.error)
     }
     return () => { alive = false }
-  }, [isGuest, rootProjectPath, workspaceEpoch, prepareWorkspaceUi, trackRefresh])
+  }, [isGuest, projectUiPath, workspaceEpoch, prepareWorkspaceUi, trackRefresh])
 
   useEffect(() => {
-    if (!rootProjectPath || isGuest || !workspaceUiLoaded) return
-    workspaceUiCache.current.set(rootProjectPath, workspaceUi)
+    if (!projectUiPath || isGuest || !workspaceUiLoaded) return
+    workspaceUiCache.current.set(projectUiPath, workspaceUi)
     let saved = false
     const save = () => {
       if (saved) return
       saved = true
-      persistWorkspaceUi(rootProjectPath, workspaceUi)
+      persistWorkspaceUi(projectUiPath, workspaceUi)
     }
     const timer = window.setTimeout(save, 500)
     return () => {
       window.clearTimeout(timer)
       // Leaving before the debounce fires must not discard the outgoing tab layout.
-      if (rootProjectPathRef.current !== rootProjectPath) save()
+      if (projectUiPathRef.current !== projectUiPath) save()
     }
-  }, [isGuest, rootProjectPath, workspaceUi, workspaceUiLoaded, persistWorkspaceUi])
+  }, [isGuest, projectUiPath, workspaceUi, workspaceUiLoaded, persistWorkspaceUi])
 
   useEffect(() => {
     if (!workspaceUiLoaded) return
-    if (sidebarStateLoadedRootRef.current === rootProjectPath) return
+    if (sidebarStateLoadedRootRef.current === projectUiPath) return
     const saved = accountSidebar(workspaceUi.sidebar)
-    const state = saved ?? loadSidebarState(rootProjectPath)
-    if (!saved && rootProjectPath && !isGuest) setWorkspaceUi((previous) => ({ ...previous, sidebar: state }))
-    sidebarStateLoadedRootRef.current = rootProjectPath
-    sidebarStateRestorePendingRef.current = rootProjectPath
+    const state = saved ?? loadSidebarState(projectUiPath)
+    if (!saved && projectUiPath && !isGuest) setWorkspaceUi((previous) => ({ ...previous, sidebar: state }))
+    sidebarStateLoadedRootRef.current = projectUiPath
+    sidebarStateRestorePendingRef.current = projectUiPath
     setDocsExpanded(state.docsExpanded)
-  }, [isGuest, rootProjectPath, workspaceUi.sidebar, workspaceUiLoaded])
+  }, [isGuest, projectUiPath, workspaceUi.sidebar, workspaceUiLoaded])
 
   useEffect(() => {
-    if (!rootProjectPath || !workspaceUiLoaded || sidebarStateLoadedRootRef.current !== rootProjectPath) return
-    if (sidebarStateRestorePendingRef.current === rootProjectPath) {
+    if (!projectUiPath || !workspaceUiLoaded || sidebarStateLoadedRootRef.current !== projectUiPath) return
+    if (sidebarStateRestorePendingRef.current === projectUiPath) {
       sidebarStateRestorePendingRef.current = null
       return
     }
-    saveSidebarState(rootProjectPath, { explorerScope: docsExpanded ? 'docs' : 'files', docsExpanded, expandedSubprojects: [] })
+    saveSidebarState(projectUiPath, { explorerScope: docsExpanded ? 'docs' : 'files', docsExpanded, expandedSubprojects: [] })
     if (!isGuest) setWorkspaceUi((previous) => ({ ...previous, sidebar: { explorerScope: docsExpanded ? 'docs' : 'files', docsExpanded, expandedSubprojects: [] } }))
-  }, [docsExpanded, isGuest, rootProjectPath, workspaceUiLoaded])
+  }, [docsExpanded, isGuest, projectUiPath, workspaceUiLoaded])
 
   const refreshTree = useCallback((signal?: { project?: string; version?: number; parents?: string[] }) => {
     const epoch = workspaceEpochRef.current
@@ -713,13 +716,13 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     if (!isOwner || !rootProjectTabsSynced) return
     let alive = true
     const epoch = workspaceEpochRef.current
-    const paths = [...new Set([...openProjectPaths, ...(rootProjectPath ? [rootProjectPath] : [])])]
+    const paths = [...new Set([...openProjectPaths, ...(projectUiPath ? [projectUiPath] : [])])]
     const key = JSON.stringify([...paths].sort())
     void rootProjectIconsCache.current.load(key, async () => (await fetchRootProjectIcons(paths)).icons).then(icons => {
       if (alive && epoch === workspaceEpochRef.current) setRootProjectIcons(icons)
     }).catch(console.error)
     return () => { alive = false }
-  }, [isOwner, rootProjectTabsSynced, openProjectPaths, rootProjectPath, workspaceEpoch])
+  }, [isOwner, rootProjectTabsSynced, openProjectPaths, projectUiPath, workspaceEpoch])
 
   // 서버 상태가 비어 있을 때만 이 브라우저의 기존 localStorage를 최초 값으로 올린다. 시크릿 창의
   // 빈 저장소가 이미 쓰고 있던 계정 상태를 덮어쓰지 않도록, 내려받기 전에는 저장하지 않는다.
@@ -773,43 +776,49 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     } catch (err) { showToast(err instanceof Error ? err.message : String(err)) }
   }, [showToast])
 
-  const applyWorkspace = useCallback((info: { path: string; docsPath?: string }) => {
+  const applyWorkspace = useCallback((info: { path: string; projectPath?: string; docsPath?: string }) => {
     const previous = workspaceInfoRef.current
     // The POST response and its presence broadcast describe the same handoff.
     // Update refs synchronously so either arrival order applies it exactly once.
-    if (previous?.path === info.path && previous.docsPath === info.docsPath) return
+    const uiPath = info.projectPath ?? info.path
+    const sameProject = (previous?.projectPath ?? previous?.path) === uiPath
+    if (previous?.path === info.path && previous.docsPath === info.docsPath && sameProject) return
     if (previous?.path === info.path) rootTreeCache.current.clear()
-    setPreparedAgentTabs(agentTabsPrefetch.current?.path === info.path ? agentTabsPrefetch.current.promise : undefined)
+    if (!sameProject) setPreparedAgentTabs(agentTabsPrefetch.current?.path === uiPath ? agentTabsPrefetch.current.promise : undefined)
     agentTabsPrefetch.current = null
     workspaceInfoRef.current = info
     rootProjectPathRef.current = info.path
     workspaceEpochRef.current++
     setWorkspaceEpoch(workspaceEpochRef.current)
-    const cachedUi = workspaceUiCache.current.get(info.path)
-    setWorkspaceUi(cachedUi ?? {})
-    setWorkspaceUiLoaded(cachedUi !== undefined)
+    if (!sameProject) {
+      const cachedUi = workspaceUiCache.current.get(uiPath)
+      setWorkspaceUi(cachedUi ?? {})
+      setWorkspaceUiLoaded(cachedUi !== undefined)
+    }
+    projectUiPathRef.current = uiPath
+    setProjectUiPath(uiPath)
     // 서버 API의 `.workspace`/`docs` 이름은 모든 루트에서 같으므로, 절대 경로를 클라이언트
     // 탭·본문 캐시의 실제 경계로 사용한다.
     setProject(WORKSPACE_PROJECT)
     setContentWorkspace(info.path)
     setActiveProject(WORKSPACE_PROJECT)
     setRootProjectPath(info.path)
-    setDebuggerOpen(false)
+    if (!sameProject) setDebuggerOpen(false)
     // 계정 UI·탭 복원을 기다리지 않고, 워크스페이스를 받은 첫 렌더부터 직전 모바일
     // 전면 화면을 올린다. 그렇지 않으면 빈 에디터의 자동 사이드바가 잠깐 보인다.
-    if (!isDesktop()) {
-      const foreground = loadMobileForegroundPanel(info.path)
+    if (!sameProject && !isDesktop()) {
+      const foreground = loadMobileForegroundPanel(uiPath)
       setMobilePanelStack(foreground && foreground !== 'editor' ? [foreground] : [])
       if (foreground && foreground !== 'editor') workspacePanelSetters[foreground](true)
     }
-    rememberProjectPath(info.path)
+    rememberProjectPath(uiPath)
     const cachedRoot = rootTreeCache.current.get(`${info.path}\0${WORKSPACE_PROJECT}`) ?? []
     const cachedDocs = previous?.path === info.path ? [] : rootTreeCache.current.get(`${info.path}\0${DEFAULT_PROJECT}`) ?? []
     setTree(cachedRoot)
     setRootTree(cachedRoot)
     setDocsTree(cachedDocs)
     setPendingOpen(null)
-    setRequestedAgentTab(null)
+    if (!sameProject) setRequestedAgentTab(null)
   }, [rememberProjectPath, workspacePanelSetters])
 
   const handleWorkspaceBroadcast = useCallback(() => {
@@ -824,7 +833,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
 
   const openRootProject = useCallback(async (projectPath: string) => {
     if (!isOwner || projectOpeningRef.current) return
-    if (projectPath === rootProjectPath) {
+    if (projectPath === projectUiPath) {
       setProject(WORKSPACE_PROJECT)
       setActiveProject(WORKSPACE_PROJECT)
       setOpenProjectDialog(false)
@@ -858,7 +867,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
         handleWorkspaceBroadcast()
       }
     }
-  }, [applyWorkspace, caps.agent, caps.terminal, handleWorkspaceBroadcast, isOwner, rootProjectPath, showToast, prepareWorkspaceUi])
+  }, [applyWorkspace, caps.agent, caps.terminal, handleWorkspaceBroadcast, isOwner, projectUiPath, showToast, prepareWorkspaceUi])
 
   useEffect(() => {
     const open = (event: Event) => {
@@ -868,14 +877,14 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
       else if (notice.target && typeof notice.target === 'object' && caps.agent) {
         const target = notice.target
         const workspace = target.workspacePath ?? target.cwd
-        if (workspace !== rootProjectPath && !isOwner) return
+        if (workspace !== projectUiPath && workspace !== rootProjectPath && !isOwner) return
         setNoticeTarget(target)
-        if (workspace !== rootProjectPath) void openRootProject(workspace)
+        if (workspace !== projectUiPath && workspace !== rootProjectPath) void openRootProject(workspace)
       }
     }
     window.addEventListener(OPEN_NOTICE_EVENT, open)
     return () => window.removeEventListener(OPEN_NOTICE_EVENT, open)
-  }, [caps.system, caps.agent, rootProjectPath, isOwner, openRootProject])
+  }, [caps.system, caps.agent, projectUiPath, rootProjectPath, isOwner, openRootProject])
 
   const openSidebarProject = useCallback(async (scope: string, path: string) => {
     if (!isOwner || !rootProjectPath || projectOpeningRef.current) return
@@ -942,6 +951,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     workspaceUiLoaded,
     workspaceInfoRef.current?.docsPath,
     authEmail ?? undefined,
+    projectUiPath ?? undefined,
   )
 
   const sidebarOpenPaths = useMemo(() => {
@@ -963,12 +973,12 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     // 파일이 있는 프로젝트에서 사이드바가 잘못 열리지 않는다.
     // 첫 렌더에는 아직 어느 루트 프로젝트의 상태를 읽을지 모른다. 이때 사이드바를
     // 기본으로 열면 저장된 전면 패널이 도착하기 전 잠깐 번쩍인다.
-    if (!tabsHydrated || hasOpenFiles || !rootProjectPath) return
+    if (!tabsHydrated || hasOpenFiles || !projectUiPath) return
     // 빈 에디터의 첫 진입점은 사이드바지만, 모바일에서 직전 전면 상태를 따로 기억한
     // 경우에는 그 상태를 덮지 않는다. `editor`도 명시 상태라 빈 스택과 구별한다.
-    if (!isDesktop() && loadMobileForegroundPanel(rootProjectPath) !== null) return
+    if (!isDesktop() && loadMobileForegroundPanel(projectUiPath) !== null) return
     openWorkspacePanel('sidebar')
-  }, [project, tabsHydrated, hasOpenFiles, openWorkspacePanel, rootProjectPath])
+  }, [project, tabsHydrated, hasOpenFiles, openWorkspacePanel, rootProjectPath, projectUiPath])
 
   const registerPaneHandle = useCallback((id: string, handle: PaneHandle | null) => {
     if (handle) paneHandles.current.set(id, handle)
@@ -1069,16 +1079,16 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
   // + 서버 watcher의 트리 변경 알림 — 다른 세션·에이전트가 만든 파일도 사이드바에 바로 반영
   const [agentActivity, setAgentActivity] = useState<{ workspace: string | null; count: number } | null>(null)
   const reportRunningAgents = useCallback((count: number) => {
-    setAgentActivity(previous => previous?.workspace === rootProjectPath && previous.count === count ? previous : { workspace: rootProjectPath, count })
-  }, [rootProjectPath])
+    setAgentActivity(previous => previous?.workspace === projectUiPath && previous.count === count ? previous : { workspace: projectUiPath, count })
+  }, [projectUiPath])
   const { participants: tabPresence, activeSessions } = usePresence(
     activeFile.project,
     activePath && !isExternalTabPath(activePath) && !gitDiffTarget(activePath) ? activeFile.path : null,
     authEmail,
     refreshTree,
     handleWorkspaceBroadcast,
-    rootProjectPath ? projectLabel(rootProjectPath) : null,
-    agentActivity?.workspace === rootProjectPath ? agentActivity.count : 0,
+    projectUiPath ? projectLabel(projectUiPath) : null,
+    agentActivity?.workspace === projectUiPath ? agentActivity.count : 0,
   )
 
   const editorPresence = useMemo(() => Object.fromEntries(Object.entries(tabPresence).map(([path, colors]) => [editorTabPath(activeFile.project, path, project), colors])), [tabPresence, activeFile.project, project])
@@ -1095,7 +1105,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     invert: true,
   })
 
-  const popupKey = (tool: 'memo' | 'tasks') => `mew:popup:${authEmail}:${rootProjectPath}:${tool}`
+  const popupKey = (tool: 'memo' | 'tasks') => `mew:popup:${authEmail}:${projectUiPath}:${tool}`
   const captureLayout = (): LayoutSnapshot => normalizeLayoutSnapshot({
     version: 1, dock: dockRef.current?.snapshot() ?? workspaceUi.dock,
     open: { ...workspacePanelOpen, editor: editorOpen }, sidebarWidth, androidWidth,
@@ -1146,7 +1156,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     debugger: { open: debuggerOpen, close: () => closeWorkspacePanel('debugger') },
   }, mobileForegroundPanel, {
     enabled: !isDesktop() && workspaceUiLoaded,
-    scope: `${auth.email}:${rootProjectPath}`,
+    scope: `${auth.email}:${projectUiPath}`,
     screens: {
       git: { key: gitWorkbenchScreenKey(gitView), restore: () => changeGitView(gitView) },
     },
@@ -1351,13 +1361,13 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
   }, [mewcatSkin])
 
   useEffect(() => {
-    if (!workspaceUiLoaded || chromeStateLoadedRootRef.current === rootProjectPath) return
+    if (!workspaceUiLoaded || chromeStateLoadedRootRef.current === projectUiPath) return
     const value = workspaceUi.chrome
     // 계정 원장은 debounce 저장이라 새로고침 직전의 마지막 패널 조작보다 늦을 수 있다.
     // 모바일 전면 패널은 조작 순간 로컬에 동기 저장하므로, 그 패널만큼은 원장보다 우선해
     // 열림 상태까지 함께 복원한다.
-    const savedMobileForeground = rootProjectPath && !isDesktop()
-      ? loadMobileForegroundPanel(rootProjectPath)
+    const savedMobileForeground = projectUiPath && !isDesktop()
+      ? loadMobileForegroundPanel(projectUiPath)
       : null
     const restoredOpen: Record<WorkspacePanelId, boolean> = {
       sidebar: sidebarOpen,
@@ -1403,7 +1413,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
           restoredOpen.android = chrome.androidOpen
         }
       }
-    } else if (rootProjectPath && !isGuest) {
+    } else if (projectUiPath && !isGuest) {
       // 계정 원장이 처음 비어 있을 때만 이 기기의 기존 화면 상태를 이관한다.
       setWorkspaceUi((previous) => ({
         ...previous,
@@ -1414,42 +1424,35 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
       restoredOpen[savedMobileForeground] = true
       workspacePanelSetters[savedMobileForeground](true)
     }
-    if (rootProjectPath && !isDesktop()) {
+    if (projectUiPath && !isDesktop()) {
       setMobilePanelStack(restoreMobilePanelStack(restoredOpen, savedMobileForeground))
       // 다음 렌더에서 복원한 스택을 저장한다. 지금의 초기 스택으로 기존 기억을 덮지 않는다.
-      mobilePanelStackRestorePendingRef.current = rootProjectPath
+      mobilePanelStackRestorePendingRef.current = projectUiPath
     }
-    chromeStateLoadedRootRef.current = rootProjectPath
-    chromeStateRestorePendingRef.current = rootProjectPath
-  }, [agentOpen, terminalOpen, androidOpen, gitOpen, debuggerOpen, memoOpen, tasksOpen, canDebug, caps, auth.email, chatOpen, isGuest, rootProjectPath, sidebarOpen, sidebarView, tocOpen, workspaceUi.chrome, workspaceUiLoaded, workspacePanelSetters])
+    chromeStateLoadedRootRef.current = projectUiPath
+    chromeStateRestorePendingRef.current = projectUiPath
+  }, [agentOpen, terminalOpen, androidOpen, gitOpen, debuggerOpen, memoOpen, tasksOpen, canDebug, caps, auth.email, chatOpen, isGuest, projectUiPath, sidebarOpen, sidebarView, tocOpen, workspaceUi.chrome, workspaceUiLoaded, workspacePanelSetters])
 
   useEffect(() => {
-    if (!gitWorktreeTarget || gitWorktreeTarget !== rootProjectPath || !workspaceUiLoaded
-      || chromeStateLoadedRootRef.current !== rootProjectPath) return
-    openWorkspacePanel('git')
-    setGitWorktreeTarget(null)
-  }, [gitWorktreeTarget, rootProjectPath, workspaceUiLoaded, openWorkspacePanel])
-
-  useEffect(() => {
-    if (!noticeTarget || !workspaceUiLoaded || chromeStateLoadedRootRef.current !== rootProjectPath
-      || (noticeTarget.workspacePath ?? noticeTarget.cwd) !== rootProjectPath) return
+    if (!noticeTarget || !workspaceUiLoaded || chromeStateLoadedRootRef.current !== projectUiPath
+      || ![projectUiPath, rootProjectPath].includes(noticeTarget.workspacePath ?? noticeTarget.cwd)) return
     // Project chrome restoration must finish before revealing the requested tab.
     setRemoteDesktopOpen(false)
     openWorkspacePanel('agent')
     setReadyNoticeTarget(noticeTarget)
-  }, [noticeTarget, rootProjectPath, workspaceUiLoaded, openWorkspacePanel])
+  }, [noticeTarget, projectUiPath, rootProjectPath, workspaceUiLoaded, openWorkspacePanel])
 
   useEffect(() => {
-    if (!rootProjectPath || !workspaceUiLoaded || isDesktop()) return
-    if (mobilePanelStackRestorePendingRef.current === rootProjectPath) {
+    if (!projectUiPath || !workspaceUiLoaded || isDesktop()) return
+    if (mobilePanelStackRestorePendingRef.current === projectUiPath) {
       mobilePanelStackRestorePendingRef.current = null
-      mobilePanelStackRestoredRootRef.current = rootProjectPath
+      mobilePanelStackRestoredRootRef.current = projectUiPath
       return
     }
-    if (mobilePanelStackRestoredRootRef.current !== rootProjectPath) return
+    if (mobilePanelStackRestoredRootRef.current !== projectUiPath) return
     const foreground = mobilePanelStack.at(-1)
-    saveMobileForegroundPanel(rootProjectPath, foreground ?? 'editor')
-  }, [mobilePanelStack, rootProjectPath, workspaceUiLoaded])
+    saveMobileForegroundPanel(projectUiPath, foreground ?? 'editor')
+  }, [mobilePanelStack, projectUiPath, workspaceUiLoaded])
 
   useEffect(() => {
     writeBrowserStorage(TOC_KEY, tocOpen ? '1' : '0')
@@ -1518,8 +1521,8 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
   }, [androidOpen])
 
   useEffect(() => {
-    if (!rootProjectPath || isGuest || !workspaceUiLoaded) return
-    if (chromeStateRestorePendingRef.current === rootProjectPath) {
+    if (!projectUiPath || isGuest || !workspaceUiLoaded) return
+    if (chromeStateRestorePendingRef.current === projectUiPath) {
       chromeStateRestorePendingRef.current = null
       return
     }
@@ -1527,7 +1530,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
       ...previous,
       chrome: { tocOpen, sidebarOpen, sidebarView, agentOpen, terminalOpen, gitOpen, androidOpen, debuggerOpen, memoOpen, tasksOpen },
     }))
-  }, [agentOpen, terminalOpen, androidOpen, gitOpen, debuggerOpen, memoOpen, tasksOpen, isGuest, rootProjectPath, sidebarOpen, sidebarView, tocOpen, workspaceUiLoaded])
+  }, [agentOpen, terminalOpen, androidOpen, gitOpen, debuggerOpen, memoOpen, tasksOpen, isGuest, projectUiPath, sidebarOpen, sidebarView, tocOpen, workspaceUiLoaded])
 
   const handleRenamed = useCallback(
     (oldPath: string, newPath: string, type: 'file' | 'dir') => {
@@ -1810,7 +1813,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
         <EditorPane
           key={pane.id}
           accessVersion={JSON.stringify([auth.email, auth.role, auth.accessRevision, auth.capabilities])}
-          pane={pane}
+          pane={workspaceChanging ? { ...pane, tabs: pane.tabs.map(tab => ({ ...tab, editable: false })) } : pane}
           role={role}
           authEmail={authEmail}
           project={project}
@@ -1847,7 +1850,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
           onClosePanel={desktopMode ? () => setEditorOpen(false) : undefined}
           onReorder={(from, to) => reorderTabs(from, to, pane.id)}
           onSetViewMode={(path, viewMode) => setTabViewMode(path, viewMode, pane.id)}
-          onChangeContent={updateTabContent}
+          onChangeContent={(...args) => { if (rootProjectPathRef.current === rootProjectPath) updateTabContent(...args) }}
           diffVisible={!desktopMode || editorOpen}
           onOpenDiffFile={(fileProject, path) => {
             openFile(editorTabPath(fileProject, path, project), { preview: false, forceNewTab: true, paneId: pane.id })
@@ -2059,8 +2062,8 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
         <header className="flex h-9 items-stretch border-b border-edge pr-2 md:h-11">
           <ProjectSwitcher
             paths={projectPaths}
-            activePath={rootProjectPath}
-            fallbackLabel={projectLabel(rootProjectPath)}
+            activePath={projectUiPath}
+            fallbackLabel={projectLabel(projectUiPath)}
             canOpen={isOwner}
             canChangeIcon={isOwner}
             icons={rootProjectIcons}
@@ -2093,7 +2096,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
             {caps.system && <HeaderResources key={authEmail} onOpen={() => setSysStatsOpen(true)} />}
             <RuntimeControls />
             {!isGuest && <ActiveSessionsButton presence={activeSessions} profile={{ email: authEmail, displayName: auth.displayName, avatarDataUrl: auth.avatarDataUrl }} />}
-            {desktopMode && rootProjectPath && workspaceUiLoaded && tabsHydrated && <LayoutPresets key={`${authEmail}:${rootProjectPath}`} storageKey={layoutPresetsKey(authEmail ?? 'guest')} legacyStorageKey={legacyLayoutPresetsKey(authEmail ?? 'guest', rootProjectPath)} factory={layoutFactory} capture={captureLayout} onApply={applyLayoutPreset} />}
+            {desktopMode && projectUiPath && workspaceUiLoaded && tabsHydrated && <LayoutPresets key={`${authEmail}:${projectUiPath}`} storageKey={layoutPresetsKey(authEmail ?? 'guest')} legacyStorageKey={legacyLayoutPresetsKey(authEmail ?? 'guest', projectUiPath)} factory={layoutFactory} capture={captureLayout} onApply={applyLayoutPreset} />}
             {(!isGuest || canEditActiveTab) && <HoverTipLayer className="contents" placement="bottom">
               <button type="button" aria-label={uiText("전체화면")} data-tip={uiText("전체화면")} onClick={toggleFullscreen}
                 className={headerIconControlClassName}>
@@ -2186,7 +2189,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
                     <path d="m19.4 19.4 1.6 1.6" />
                   </svg>
                 </button>
-                {!isGuest && caps.filesRead && caps.filesWrite && <SidebarCreateButtons documents={docsExpanded} onCreate={sidebarCreate.create} disabled={!workspaceUiLoaded || sidebarStateLoadedRootRef.current !== rootProjectPath} />}
+                {!isGuest && caps.filesRead && caps.filesWrite && <SidebarCreateButtons documents={docsExpanded} onCreate={sidebarCreate.create} disabled={!workspaceUiLoaded || sidebarStateLoadedRootRef.current !== projectUiPath} />}
                 <PanelCloseButton onClick={() => closeWorkspacePanel('sidebar')} className={isGuest ? 'ml-auto' : ''} aria-label={uiText("사이드바 닫기")} />
               </div>
               <div className="min-h-0 flex-1">
@@ -2213,14 +2216,14 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
                     </div>
                   </div>}
                   <div className="min-h-0 flex-1">
-                    {(isGuest || (workspaceUiLoaded && sidebarStateLoadedRootRef.current === rootProjectPath)) && <FileTree
+                    {(isGuest || (workspaceUiLoaded && sidebarStateLoadedRootRef.current === projectUiPath)) && <FileTree
                       key={`${isGuest || docsExpanded ? DEFAULT_PROJECT : WORKSPACE_PROJECT}:${rootProjectPath ?? ''}:${workspaceUiRevision}`}
                       {...sidebarCreate.treeProps(isGuest || docsExpanded ? 'docs' : 'root')}
                       tree={isGuest || docsExpanded ? docsTree : rootNodes}
                       project={isGuest || docsExpanded ? DEFAULT_PROJECT : WORKSPACE_PROJECT}
-                      stateKey={rootProjectPath ? `sidebar-tree:${isGuest || docsExpanded ? 'docs' : 'root'}:${rootProjectPath}` : undefined}
-                      accountState={rootProjectPath ? accountTreeStates[`sidebar-tree:${isGuest || docsExpanded ? 'docs' : 'root'}:${rootProjectPath}`] : undefined}
-                      onAccountStateChange={rootProjectPath ? (state) => saveAccountTreeState(`sidebar-tree:${isGuest || docsExpanded ? 'docs' : 'root'}:${rootProjectPath}`, state) : undefined}
+                      stateKey={rootProjectPath ? `sidebar-tree:${isGuest || docsExpanded ? 'docs' : 'root'}:${projectUiPath}` : undefined}
+                      accountState={rootProjectPath ? accountTreeStates[`sidebar-tree:${isGuest || docsExpanded ? 'docs' : 'root'}:${projectUiPath}`] : undefined}
+                      onAccountStateChange={rootProjectPath ? (state) => saveAccountTreeState(`sidebar-tree:${isGuest || docsExpanded ? 'docs' : 'root'}:${projectUiPath}`, state) : undefined}
                       workspacePath={rootProjectPath}
                       documentsPath={workspaceInfoRef.current?.docsPath}
                       openPaths={sidebarOpenPaths[isGuest || docsExpanded ? DEFAULT_PROJECT : WORKSPACE_PROJECT]}
@@ -2288,7 +2291,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
         )}
 
         {/* 편집 칸들 — 분할 배치 그대로다. 칸마다 자기 탭 줄·자기 문서·자기 협업 세션을 가진다 */}
-        <DockWorkspace key={rootProjectPath ?? 'pending-workspace'} apiRef={dockRef} initialLayout={layout} value={workspaceUi.dock} onChange={saveDockLayout} onEditorDrop={handleDockEditorDrop} foreground={mobileForegroundPanel}>
+        <DockWorkspace key={projectUiPath ?? 'pending-workspace'} apiRef={dockRef} initialLayout={layout} value={workspaceUi.dock} onChange={saveDockLayout} onEditorDrop={handleDockEditorDrop} foreground={mobileForegroundPanel}>
         {panes.map(renderEditorPane)}
 
         {(caps.agent || caps.terminal) && <AgentPanel
@@ -2299,9 +2302,9 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
           cacheAccount={auth.email ?? 'guest'}
           notificationFocused={!remoteDesktopOpen && (desktopMode ? focusedDockPanel === 'agent' : mobileForegroundPanel === 'agent')}
           onRunningAgentsChange={reportRunningAgents}
-          requestedNoticeTab={noticeTarget === readyNoticeTarget && (readyNoticeTarget?.workspacePath ?? readyNoticeTarget?.cwd) === rootProjectPath ? readyNoticeTarget?.tabId : undefined}
+          requestedNoticeTab={noticeTarget === readyNoticeTarget && [projectUiPath, rootProjectPath].includes(readyNoticeTarget?.workspacePath ?? readyNoticeTarget?.cwd ?? null) ? readyNoticeTarget?.tabId : undefined}
           onNoticeHandled={() => { setNoticeTarget(undefined); setReadyNoticeTarget(undefined) }}
-          key={rootProjectPath ?? 'pending-workspace'} project={activeFile.project} workspacePath={rootProjectPath} tree={activeFileTree}
+          key={projectUiPath ?? 'pending-workspace'} project={activeFile.project} workspacePath={projectUiPath} workingPath={rootProjectPath} tree={activeFileTree}
           trackRestore={trackRefresh}
           focusedFilePath={activeTab && !isExternalTabPath(activeTab.path) && !gitDiffTarget(activeTab.path) ? activeFile.path : null}
           getSelectedText={getSelectedText} renderCommandButtons={renderTermButtons} onOpenFile={openMentionedFile}
@@ -2311,10 +2314,27 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
           onClose={() => closeWorkspacePanel('agent')} onCloseTerminal={() => closeWorkspacePanel('terminal')}
           nextTabSignal={agentNextTabSignal} previousTabSignal={agentPreviousTabSignal}
         />}
-        {caps.git && workspaceUiLoaded && gitMounted.current && <GitPanel visible={gitOpen} initialState={workspaceUi.git} onChange={saveGitPanelState}
+        {caps.git && workspaceUiLoaded && gitMounted.current && <GitPanel visible={gitOpen} initialState={workspaceUi.git} workspacePath={rootProjectPath ?? undefined} onChange={saveGitPanelState}
+          onPrepareBranchChange={async () => {
+            setWorkspaceChanging(true)
+            try {
+              const release = await prepareDocumentPageMutation('*', true, false)
+              return () => { release(); setWorkspaceChanging(false) }
+            } catch (error) { setWorkspaceChanging(false); throw error }
+          }}
           onOpenWorktree={async path => {
-            if (!await openRootProject(path)) throw new Error(uiText('프로젝트를 열 수 없습니다'))
-            setGitWorktreeTarget(path)
+            if (!isOwner || projectOpeningRef.current || !rootProjectPathRef.current) throw new Error(uiText('프로젝트를 열 수 없습니다'))
+            projectOpeningRef.current = true
+            workspaceReadSequence.current++
+            try {
+              applyWorkspace(await switchWorkspace(path, rootProjectPathRef.current))
+            } finally {
+              projectOpeningRef.current = false
+              if (workspaceBroadcastPending.current) {
+                workspaceBroadcastPending.current = false
+                handleWorkspaceBroadcast()
+              }
+            }
           }}
           navigation={{ view: gitView, onChange: changeGitView, back: navigateWorkspaceBack }}
           onNotice={showToast} onOpenDiff={target => {
@@ -2329,13 +2349,13 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
         {rootProjectPath && canDebug && auth.email && <DockPanel id="debugger" kind="debugger" visible={debuggerOpen} mobileSelected onFocus={() => bringWorkspacePanelToFront('debugger')}>
           {debuggerOpen && <Suspense fallback={<div role="status" className="p-2 text-xs text-ink-secondary">…</div>}><DebuggerPanel key={`${auth.email}:${rootProjectPath}`} root={rootProjectPath} onClose={() => closeWorkspacePanel('debugger')} onSettings={() => { setDebuggerSettingsRequested(true); setSettingsOpen(true) }} onOpenFile={(file, line) => { const relative = file.startsWith(rootProjectPath + '/') ? file.slice(rootProjectPath.length + 1) : file; if (!relative.startsWith('/')) openMentionedFile(WORKSPACE_PROJECT, relative, line) }} /></Suspense>}
         </DockPanel>}
-        {rootProjectPath && caps.filesRead && auth.email && <DockPanel floating={toolPresentation.tasks === 'popup'} storageKey={`mew:popup:${authEmail}:${rootProjectPath}:tasks`} id="tasks" kind="tasks" visible={tasksOpen} tabs={['tasks']} mobileSelected onFocus={() => { activeTabbedSurfaceRef.current = 'tasks'; bringWorkspacePanelToFront('tasks') }}>
+        {rootProjectPath && caps.filesRead && auth.email && <DockPanel floating={toolPresentation.tasks === 'popup'} storageKey={`mew:popup:${authEmail}:${projectUiPath}:tasks`} id="tasks" kind="tasks" visible={tasksOpen} tabs={['tasks']} mobileSelected onFocus={() => { activeTabbedSurfaceRef.current = 'tasks'; bringWorkspacePanelToFront('tasks') }}>
           {tasksMounted.current && <TaskPanel workspace={rootProjectPath} onOpenFile={path => {
             const file = workspaceDocumentFile(path, workspaceInfoRef.current)
             openMentionedFile(file.project, file.path)
           }} session={taskSession} nextTabSignal={taskNextTabSignal} previousTabSignal={taskPreviousTabSignal} onClose={() => closeWorkspacePanel('tasks')} />}
         </DockPanel>}
-        {caps.collaboration && auth.email && <DockPanel floating={toolPresentation.memo === 'popup'} storageKey={`mew:popup:${authEmail}:${rootProjectPath}:memo`} id="memo" kind="memo" visible={memoOpen} tabs={['memo']} mobileSelected onFocus={() => bringWorkspacePanelToFront('memo')}>
+        {caps.collaboration && auth.email && <DockPanel floating={toolPresentation.memo === 'popup'} storageKey={`mew:popup:${authEmail}:${projectUiPath}:memo`} id="memo" kind="memo" visible={memoOpen} tabs={['memo']} mobileSelected onFocus={() => bringWorkspacePanelToFront('memo')}>
           {memoMounted.current && <SharedMemo session={memoSession} open={memoOpen} />}
         </DockPanel>}
         </DockWorkspace>

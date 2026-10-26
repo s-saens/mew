@@ -190,6 +190,7 @@ export function useTabs(
   accountHydrated = true,
   workspaceDocsPath?: string,
   accountScope?: string,
+  presentationScope = workspaceScope,
 ) {
   const { t } = useI18n()
   const unsupportedNoticeRef = useRef('')
@@ -209,6 +210,7 @@ export function useTabs(
   const fileSaveRequests = useRef(new Map<string, Promise<unknown>>())
   const queuedAutosaves = useRef(new Map<string, { epoch: number; project: string; path: string }>())
   const [saveQueueVersion, setSaveQueueVersion] = useState(0)
+  const saveFailureRef = useRef<unknown>(null)
   const pageMutationRef = useRef<number | null>(null)
   const pageMutationCompletionRef = useRef<{ epoch: number; token: symbol; done: Promise<void> } | null>(null)
   const pageMutationProjectRef = useRef('docs')
@@ -219,6 +221,7 @@ export function useTabs(
   projectRef.current = project
   const hydratedRef = useRef<string | null>(null)
   const hydratedWorkspaceRef = useRef(workspaceScope)
+  const hydratedPresentationRef = useRef(presentationScope)
   const [hydratedSession, setHydratedSession] = useState<string | null>(null)
   // 탭 껍데기를 setState로 세운 직후에는 statesRef가 아직 옛 상태다. 활성 탭의 실제 로드는
   // 다음 렌더 effect로 넘겨야 existing 탭을 다시 만들지 않고 deferredLoad만 해제할 수 있다.
@@ -226,8 +229,9 @@ export function useTabs(
   const persistedTabsRef = useRef(new Map<string, string>())
   const notifiedTabsRef = useRef(new Map<string, string>())
 
-  const sessionKey = `${project}\u0000${workspaceScope ?? ''}`
-  const state = hydratedSession === sessionKey ? states[project] ?? EMPTY : EMPTY
+  const sessionKey = `${project}\u0000${workspaceScope ?? ''}\u0000${presentationScope ?? ''}`
+  const carryLayout = hydratedPresentationRef.current === presentationScope && hydratedWorkspaceRef.current !== workspaceScope ? states[project] : undefined
+  const state = hydratedSession === sessionKey ? states[project] ?? EMPTY : carryLayout ? { ...carryLayout, panes: carryLayout.panes.map(pane => ({ ...pane, tabs: pane.tabs.map(tab => ({ ...tab, content: '', savedContent: '', committedContent: '', editable: false, revalidating: true })) })) } : EMPTY
   const { panes, layout, focusedPaneId } = state
   const focusedPane = panes.find((p) => p.id === focusedPaneId) ?? panes[0]
   const { tabs, activePath } = focusedPane
@@ -499,7 +503,7 @@ export function useTabs(
         if (!isCurrentWorkspace()) return
         // 열 수 없는 파일(게스트 권한 밖 등)은 빈 탭만 남아 "아무 일도 안 일어난" 것처럼 보인다 — 이유를 띄운다
         if (!external) dropCachedFile(p, path)
-        mapTabsAtPath(p, path, tab => ({ ...tab, content: '', savedContent: '', committedContent: '', editable: false, loading: false, revalidating: false, anchorPreview: undefined }))
+        mapTabsAtPath(p, path, tab => ({ ...tab, content: '', savedContent: '', committedContent: '', editable: false, loading: false, revalidating: false, status: 'error', statusMessage: err instanceof Error ? err.message : String(err), anchorPreview: undefined }))
         console.error(err)
         onNoticeRef.current(err instanceof Error ? err.message : String(err))
       }
@@ -605,7 +609,7 @@ export function useTabs(
         let saved = content
         if (isExternalTabPath(active.path)) await saveExternalFile(externalAbsolutePath(active.path), content, active.savedContent)
         else {
-          const result = await saveFile(file.path, content, false, file.project, active.savedContent)
+          const result = await saveFile(file.path, content, false, file.project, active.savedContent, workspaceScope)
           saved = result.content ?? content
         }
         if (workspaceRequestRef.current.epoch !== epoch) return
@@ -617,7 +621,7 @@ export function useTabs(
         .finally(() => inFlightSaves.current.delete(navigation))
       inFlightSaves.current.add(navigation)
     },
-    [openFileIn, mapTabsAtPath],
+    [openFileIn, mapTabsAtPath, workspaceScope],
   )
 
   const navigateTab = useCallback((direction: -1 | 1, paneId?: string) => {
@@ -644,8 +648,10 @@ export function useTabs(
     // 계정 원장이 기준이다. 새 기기에서 로컬 빈 상태가 서버 복원값을 덮기 전에 응답을 기다린다.
     if (workspaceScope && !accountHydrated) return
     hydratedRef.current = sessionKey
-    if (hydratedWorkspaceRef.current !== workspaceScope) {
+    const carry = hydratedPresentationRef.current === presentationScope && hydratedWorkspaceRef.current !== workspaceScope ? statesRef.current[project] : undefined
+    if (hydratedWorkspaceRef.current !== workspaceScope || hydratedPresentationRef.current !== presentationScope) {
       hydratedWorkspaceRef.current = workspaceScope
+      hydratedPresentationRef.current = presentationScope
       setStates({})
       pendingRestoreLoadsRef.current.clear()
       fileReadSequenceRef.current.clear()
@@ -654,8 +660,8 @@ export function useTabs(
     // 메모리에서도 즉시 버린다. 저장분은 workspaceScope별 키에 남아 다시 돌아올 때 복원된다.
     setHydratedSession(null)
     // 첫 도입 때만 기존 공용 키를 읽는다. 다음 저장부터는 루트별 키로 옮겨져 서로 덮지 않는다.
-    const legacy = (scope: string) => accountTabs?.[scope] ?? loadStoredTabs(scope, workspaceScope) ?? (workspaceScope ? loadStoredTabs(scope) : null)
-    const stored = project === '.workspace' ? mergeEditorTabs(legacy(project), legacy('docs')) : legacy(project)
+    const legacy = (scope: string) => accountTabs?.[scope] ?? loadStoredTabs(scope, presentationScope) ?? (presentationScope ? loadStoredTabs(scope) : null)
+    const stored = carry ? { ...carry, panes: carry.panes.map(pane => ({ ...pane, tabs: pane.tabs.map(tab => ({ path: tab.path, preview: tab.preview, viewMode: tab.viewMode })) })) } : project === '.workspace' ? mergeEditorTabs(legacy(project), legacy('docs')) : legacy(project)
     if (!stored) {
       patch(project, () => EMPTY) // 빈 상태라도 만들어 둬야 이후 저장이 이 프로젝트를 기록한다
       setHydratedSession(sessionKey)
@@ -686,7 +692,7 @@ export function useTabs(
     })
     pendingRestoreLoadsRef.current.set(sessionKey, activeLoads)
     setHydratedSession(sessionKey)
-  }, [accountHydrated, accountTabs, project, sessionKey, workspaceScope, patch])
+  }, [accountHydrated, accountTabs, project, sessionKey, workspaceScope, presentationScope, patch])
 
   // 위 hydration effect가 만든 모든 탭이 상태에 붙은 뒤 활성 탭만 읽는다. statesRef 동기화 effect가
   // 선언 순서상 먼저 돌기 때문에 openFileIn은 deferred tab을 찾아 본문 요청만 시작한다.
@@ -722,10 +728,10 @@ export function useTabs(
         focusedPaneId: s.focusedPaneId,
       }
       const serialized = JSON.stringify(payload)
-      const cacheKey = `${workspaceScope ?? ''}\0${p}`
+      const cacheKey = `${presentationScope ?? ''}\0${p}`
       if (persistedTabsRef.current.get(cacheKey) !== serialized) {
         try {
-          if (writeBrowserStorage(openTabsKey(p, workspaceScope), serialized)) persistedTabsRef.current.set(cacheKey, serialized)
+          if (writeBrowserStorage(openTabsKey(p, presentationScope), serialized)) persistedTabsRef.current.set(cacheKey, serialized)
         } catch {
           // 로컬 복원은 fallback이다. 저장 실패는 이후 갱신 때 재시도한다.
         }
@@ -735,7 +741,7 @@ export function useTabs(
         notifiedTabsRef.current.set(cacheKey, serialized)
       }
     }
-  }, [states, sessionKey, hydratedSession, workspaceScope, onAccountTabsChange])
+  }, [states, sessionKey, hydratedSession, presentationScope, onAccountTabsChange])
 
   const pinTab = useCallback(
     (path: string, paneId?: string, tabId?: string) => {
@@ -778,6 +784,8 @@ export function useTabs(
   // 실행하지 않는다 — StrictMode가 업데이터 함수를 두 번 호출해 fetch가 중복 발생하는 것을 방지
   const autosave = useCallback(
     (p: string, path: string) => {
+      if (workspaceRequestRef.current.scope !== workspaceScope) return
+      const epoch = workspaceRequestRef.current.epoch
       const saveKey = JSON.stringify([workspaceRequestRef.current.epoch, p, path])
       const pending = fileSaveRequests.current.get(saveKey)
       if (pending) {
@@ -792,9 +800,10 @@ export function useTabs(
       mapTabsAtPath(p, path, (t) => ({ ...t, status: 'saving' }))
       const save = isExternalTabPath(path)
         ? saveExternalFile(externalAbsolutePath(path), content, tab.savedContent).then(() => ({ ok: true as const, commit: null, content }))
-        : saveFile(file.path, content, false, file.project, tab.savedContent)
+        : saveFile(file.path, content, false, file.project, tab.savedContent, workspaceScope)
       const request = save
         .then(result => {
+          if (workspaceRequestRef.current.epoch !== epoch) return
           const saved = result.content ?? content
           if (!isExternalTabPath(path)) putCachedFile(p, path, { content: saved, editable: tab.editable })
           mapTabsAtPath(p, path, (t) =>
@@ -804,6 +813,8 @@ export function useTabs(
           )
         })
         .catch((err) => {
+          if (workspaceRequestRef.current.epoch !== epoch) return
+          saveFailureRef.current = err
           mapTabsAtPath(p, path, (t) => ({ ...t, status: 'error', statusMessage: err instanceof Error ? err.message : String(err) }))
         })
         .finally(() => {
@@ -814,7 +825,7 @@ export function useTabs(
       fileSaveRequests.current.set(saveKey, request)
       inFlightSaves.current.add(request)
     },
-    [mapTabsAtPath],
+    [mapTabsAtPath, workspaceScope],
   )
 
   useEffect(() => {
@@ -899,7 +910,7 @@ export function useTabs(
     (path: string, content: string, paneId?: string) => {
       const p = projectRef.current
       const tab = matchingPaneTab(paneOf(p, paneId), path)
-      if (!tab || tab.revalidating) return
+      if (!tab || tab.revalidating || workspaceRequestRef.current.scope !== workspaceScope || pageMutationRef.current === workspaceRequestRef.current.epoch) return
       // 편집이 시작되면 미리보기 탭을 고정 탭으로 승격 (VSCode와 동일)
       mapTabsAtPath(p, path, (t) => ({ ...t, content, preview: false }))
       if (workspaceScope && !isExternalTabPath(path) && !isGitTabPath(path)) {
@@ -934,6 +945,7 @@ export function useTabs(
 
   const saveCurrentTab = useCallback(
     async (commit = false) => {
+      const epoch = workspaceRequestRef.current.epoch
       const p = projectRef.current
       const pane = paneOf(p)
       const tab = activePaneTab(pane) ?? null
@@ -949,9 +961,10 @@ export function useTabs(
         const external = isExternalTabPath(tab.path)
         const request = external
           ? saveExternalFile(externalAbsolutePath(tab.path), tab.content, tab.savedContent).then(result => ({ ...result, commit: null, content: tab.content }))
-          : saveFile(file.path, tab.content, commit, file.project, tab.savedContent)
+          : saveFile(file.path, tab.content, commit, file.project, tab.savedContent, workspaceScope)
         inFlightSaves.current.add(request)
         const result = await request.finally(() => inFlightSaves.current.delete(request))
+        if (workspaceRequestRef.current.epoch !== epoch) return
         const saved = result.content ?? tab.content
         if (!external) putCachedFile(p, tab.path, { content: saved, editable: tab.editable })
         const message = commit
@@ -968,14 +981,15 @@ export function useTabs(
         if (commit && !external) {
           onCommitted()
           fetchRules(file.path, file.project)
-            .then((rules) => mapTabsAtPath(p, tab.path, (t) => ({ ...t, rules })))
+            .then((rules) => { if (workspaceRequestRef.current.epoch === epoch) mapTabsAtPath(p, tab.path, (t) => ({ ...t, rules })) })
             .catch(console.error)
         }
       } catch (err) {
+        if (workspaceRequestRef.current.epoch !== epoch) return
         mapTabsAtPath(p, tab.path, (t) => ({ ...t, status: 'error', statusMessage: err instanceof Error ? err.message : String(err) }))
       }
     },
-    [settlePendingSave, mapTabsAtPath, onCommitted],
+    [settlePendingSave, mapTabsAtPath, onCommitted, workspaceScope],
   )
 
   // 서버에서 이미 쓰기+커밋까지 끝낸 내용(히스토리 되돌리기)을 탭 상태에 반영 — saveFile을 다시
@@ -1095,11 +1109,12 @@ export function useTabs(
     [patch, workspaceScope, workspaceDocsPath],
   )
 
-  const prepareDocumentPageMutation = useCallback(async (fileProject = 'docs') => {
+  const prepareDocumentPageMutation = useCallback(async (fileProject = 'docs', includeExternal = false, resumeAutosave = true) => {
     const p = projectRef.current
     const epoch = workspaceRequestRef.current.epoch
     while (pageMutationCompletionRef.current?.epoch === epoch) await pageMutationCompletionRef.current.done
     if (workspaceRequestRef.current.epoch !== epoch) throw new Error('프로젝트가 변경되었습니다. 다시 시도하세요.')
+    const previousSaveFailure = saveFailureRef.current
     const token = Symbol()
     let complete!: () => void
     const done = new Promise<void>(resolve => { complete = resolve })
@@ -1111,7 +1126,7 @@ export function useTabs(
       if (pageMutationCompletionRef.current?.token !== token) return
       pageMutationCompletionRef.current = null
       pageMutationRef.current = null
-      for (const tab of stateOf(p).panes.flatMap(pane => pane.tabs)) {
+      if (resumeAutosave) for (const tab of stateOf(p).panes.flatMap(pane => pane.tabs)) {
         if (fileProject === '*' || editorFile(tab.path, p).project === fileProject) setTimeout(() => { if (workspaceRequestRef.current.epoch === epoch) autosave(p, tab.path) }, 500)
       }
     }
@@ -1122,11 +1137,14 @@ export function useTabs(
         if (fileProject !== '*' && editorFile(pending.path, pending.project).project !== fileProject) autosave(pending.project, pending.path)
       }
       await Promise.all([...inFlightSaves.current])
+      if (saveFailureRef.current !== previousSaveFailure) throw saveFailureRef.current
       if (workspaceRequestRef.current.epoch !== epoch) throw new Error('프로젝트가 변경되었습니다. 다시 시도하세요.')
-      const dirty = new Map(stateOf(p).panes.flatMap(pane => pane.tabs).filter(tab => !isExternalTabPath(tab.path) && !isGitTabPath(tab.path) && (fileProject === '*' || editorFile(tab.path, p).project === fileProject) && tab.content !== tab.savedContent && tab.editable).map(tab => [tab.path, tab]))
+      const dirty = new Map(stateOf(p).panes.flatMap(pane => pane.tabs).filter(tab => (includeExternal || !isExternalTabPath(tab.path)) && !isGitTabPath(tab.path) && (fileProject === '*' || editorFile(tab.path, p).project === fileProject) && tab.content !== tab.savedContent && tab.editable).map(tab => [tab.path, tab]))
       const saves = await Promise.allSettled([...dirty.values()].map(async tab => {
         const file = editorFile(tab.path, p), content = tab.content
-        const result = await saveFile(file.path, content, false, file.project, tab.savedContent)
+        const result = isExternalTabPath(tab.path)
+          ? await saveExternalFile(externalAbsolutePath(tab.path), content, tab.savedContent).then(() => ({ content }))
+          : await saveFile(file.path, content, false, file.project, tab.savedContent, workspaceScope)
         if (workspaceRequestRef.current.epoch !== epoch) return
         const saved = result.content ?? content
         mapTabsAtPath(p, tab.path, current => ({ ...current, content: savedBuffer(current.content, content, saved), savedContent: saved, status: 'saved' }))
@@ -1136,7 +1154,7 @@ export function useTabs(
       if (workspaceRequestRef.current.epoch !== epoch) throw new Error('프로젝트가 변경되었습니다. 다시 시도하세요.')
       return release
     } catch (error) { release(); throw error }
-  }, [mapTabsAtPath, autosave])
+  }, [mapTabsAtPath, autosave, workspaceScope])
 
   const applyDocumentPageMutation = useCallback(async (result: DocumentPageMutation, fileProject = 'docs') => {
     const p = projectRef.current

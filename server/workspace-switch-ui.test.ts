@@ -10,7 +10,7 @@ import { applyTaskChanges, type TaskItem } from '../shared/task-list.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 
-for (const mode of ['keyboard', 'workspace', 'documents', 'permissions', 'panels'] as const) test(mode === 'panels' ? 'App restores Tasks with Alt+T and task sessions survive close and reload' : mode === 'permissions' ? 'permission invalidation replaces pending workspace metadata and ignores the old response' : mode === 'documents' ? 'Files opens Documents as a filesystem folder with a separate navigation arrow' : mode === 'keyboard' ? 'App keyboard aliases open files and projects and create files and folders in the current explorer scope' : 'App overlaps workspace metadata, restores warm roots and ignores duplicate handoffs', { skip: !domBrowserExecutable(), timeout: 45_000 }, async () => {
+for (const mode of ['keyboard', 'workspace', 'documents', 'permissions', 'panels', 'worktree'] as const) test(mode === 'worktree' ? 'linked worktree swaps retain project layout and sessions and settle outgoing file saves' : mode === 'panels' ? 'App restores Tasks with Alt+T and task sessions survive close and reload' : mode === 'permissions' ? 'permission invalidation replaces pending workspace metadata and ignores the old response' : mode === 'documents' ? 'Files opens Documents as a filesystem folder with a separate navigation arrow' : mode === 'keyboard' ? 'App keyboard aliases open files and projects and create files and folders in the current explorer scope' : 'App overlaps workspace metadata, restores warm roots and ignores duplicate handoffs', { skip: !domBrowserExecutable(), timeout: 60_000 }, async () => {
   const keyboardOnly = mode === 'keyboard'
   const appSource = await fs.readFile(`${root}/src/App.tsx`, 'utf8')
   // Keep App, useTabs, FileTree, project switching and docking real. Unrelated panels and the
@@ -27,8 +27,9 @@ for (const mode of ['keyboard', 'workspace', 'documents', 'permissions', 'panels
     if (names.some(({ exported, local }) => keep.has(exported) || keep.has(local))) continue
     stubs.set(match[2], names.map(({ exported, local }) => {
       const stub = local === 'EditorPane'
-        ? `function EditorPane({pane,onCloseTab,onActivate}) { const active=pane.tabs.find(t=>t.path===pane.activePath);return React.createElement('div',{'data-test-editor':true,'data-test-active':pane.activePath},React.createElement('span',{'data-test-content':true},active?.content||''),...pane.tabs.flatMap(t=>[React.createElement('button',{key:'select:'+t.path,onClick:()=>onActivate(t.path)},'Select '+t.path),React.createElement('button',{key:t.path,onClick:()=>onCloseTab(t.path)},'Close '+t.path)])); }`
-        : local === 'AgentPanel' ? `function AgentPanel({preparedTabs}) { React.useEffect(()=>{preparedTabs?.then(value=>{window.preparedAgentRoot=value.workspace})},[preparedTabs]);return null }`
+        ? `function EditorPane({pane,onCloseTab,onActivate,onChangeContent,workspace}) { const active=pane.tabs.find(t=>t.path===pane.activePath);React.useEffect(()=>{window.fixtureEditors??={};window.fixtureEditors[pane.id]={pane,workspace,onChangeContent};window.fixtureEditorCallbacks??={};window.fixtureEditorCallbacks[(workspace?.path||'')+':'+pane.id]=onChangeContent},[pane,workspace,onChangeContent]);return React.createElement('div',{'data-test-editor':pane.id,'data-test-active':pane.activePath,'data-test-root':workspace?.path,'data-test-revalidating':!!active?.revalidating},React.createElement('span',{'data-test-content':true},active?.content||''),...pane.tabs.flatMap(t=>[React.createElement('button',{key:'select:'+t.path,onClick:()=>onActivate(t.path)},'Select '+t.path),React.createElement('button',{key:t.path,onClick:()=>onCloseTab(t.path)},'Close '+t.path)])); }`
+        : local === 'AgentPanel' ? `${mode === 'worktree' ? `import {DockPanel} from '${root}/src/components/DockWorkspace.tsx';` : ''}function AgentPanel({preparedTabs,workspacePath,agentOpen,terminalOpen}) { React.useEffect(()=>{window.fixtureAgentMounts=(window.fixtureAgentMounts||0)+1},[]);React.useEffect(()=>{window.fixtureAgentRoot=workspacePath},[workspacePath]);React.useEffect(()=>{const prepared=preparedTabs${mode === 'worktree' ? `??(workspacePath?fetch('/api/user-ui/agent-tabs?workspace='+encodeURIComponent(workspacePath)).then(response=>response.json()):undefined)` : ''};prepared?.then(value=>{window.preparedAgentRoot=value.workspace})},[preparedTabs,workspacePath]);return ${mode === 'worktree' ? `React.createElement(React.Fragment,null,React.createElement(DockPanel,{id:'agent',kind:'agent',visible:agentOpen,tabs:['fixture-agent']},React.createElement('div',{'data-test-agent-root':workspacePath},'Existing agent')),React.createElement(DockPanel,{id:'terminal',kind:'terminal',visible:terminalOpen,tabs:['fixture-terminal']},React.createElement('div',{'data-test-terminal-root':workspacePath},'Existing terminal')))` : 'null'} }`
+        : local === 'GitPanel' && mode === 'worktree' ? `import {DockPanel} from '${root}/src/components/DockWorkspace.tsx';function GitPanel({onPrepareBranchChange,onOpenWorktree,visible}) {React.useEffect(()=>{window.openFixtureWorktree=async path=>{window.worktreeError=null;try {const release=await onPrepareBranchChange();try {await onOpenWorktree(path);return true}finally{release()}}catch(error){window.worktreeError=error.message;return false}}},[onPrepareBranchChange,onOpenWorktree]);return React.createElement(DockPanel,{id:'git',kind:'git',visible,tabs:[]},React.createElement('button',{'data-test-worktree-trigger':true,onClick:()=>{window.openFixtureWorktree('/alpha-worktree')}},'Open linked worktree'))}`
         : local === 'RemoteDesktop' ? `function RemoteDesktop({onClose,dockHostRef}) { return React.createElement('div',{'role':'dialog','aria-label':'Remote desktop fixture',style:{position:'fixed',inset:0,zIndex:100,background:'var(--color-surface)'}},React.createElement('button',{onClick:onClose},'Close remote desktop'),React.createElement('div',{ref:dockHostRef})); }`
         : `function ${local}(){return null}`
       return `${stub}\nexport { ${local} as ${exported} }`
@@ -57,7 +58,7 @@ for (const mode of ['keyboard', 'workspace', 'documents', 'permissions', 'panels
     page.setDefaultTimeout(3000)
     const errors: string[] = []
     page.on('pageerror', error => errors.push(error.message))
-    let active = '/alpha'
+    let active = '/alpha', projectPath = '/alpha'
     let role = 'owner', serverFiles = keyboardOnly
     let failSwitch = false
     const requests: { path: string; method: string; root: string; time: number }[] = []
@@ -73,7 +74,12 @@ for (const mode of ['keyboard', 'workspace', 'documents', 'permissions', 'panels
     const treeWaiters: (() => void)[] = []
     const fileWaiters: (() => void)[] = []
     let blockFileRoot: string | null = null
-    const stateFor = (name: string) => ({ sidebar: { docsExpanded: false, expandedSubprojects: [] }, chrome: { sidebarOpen: true, sidebarView: 'tree', ragOpen: true }, tabs: { '.workspace': { panes: [{ id: 'main', tabs: [{ path: 'README.md', preview: false, viewMode: 'plain' }, { path: 'extra.md', preview: false, viewMode: 'plain' }], activePath: 'README.md' }], layout: { kind: 'leaf', pane: 'main' }, focusedPaneId: 'main' } }, label: name })
+    let blockFileSave = false, failFileSave = false
+    const saveWaiters: (() => void)[] = []
+    const fileWrites: { root: string; path: string; content: string; expectedContent?: string }[] = []
+    const fileContents = new Map<string, string>()
+    const workspacePosts: { path: string; worktree?: boolean; workspace?: string }[] = []
+    const stateFor = (name: string) => ({ sidebar: { docsExpanded: false, expandedSubprojects: [] }, chrome: { sidebarOpen: true, sidebarView: 'tree', ragOpen: true, ...(mode === 'worktree' ? { agentOpen: true, terminalOpen: true, gitOpen: true } : {}) }, tabs: { '.workspace': { panes: [{ id: 'main', tabs: [{ path: 'README.md', preview: false, viewMode: 'plain' }, { path: 'extra.md', preview: false, viewMode: 'plain' }], activePath: 'README.md' }, ...(mode === 'worktree' && name === '/alpha' ? [{ id: 'side', tabs: [{ path: 'side.md', preview: false, viewMode: 'plain' }], activePath: 'side.md' }] : [])], layout: mode === 'worktree' && name === '/alpha' ? { kind: 'split', dir: 'row', kids: [{ kind: 'leaf', pane: 'main' }, { kind: 'leaf', pane: 'side' }] } : { kind: 'leaf', pane: 'main' }, focusedPaneId: 'main' } }, label: name })
     await page.addInitScript(() => {
       localStorage.setItem('mew:locale', 'ko')
       localStorage.setItem('mew:mobile-dock-hidden', '["browser"]')
@@ -107,17 +113,20 @@ for (const mode of ['keyboard', 'workspace', 'documents', 'permissions', 'panels
       }
       if (url.pathname === '/api/workspace') {
         if (method === 'POST') {
+          const body = route.request().postDataJSON()
+          workspacePosts.push(body)
           if (blockSwitch) await new Promise<void>(resolve => { releaseSwitch = resolve })
           if (failSwitch) return route.fulfill({ status: 400, json: { error: 'missing folder' } })
-          active = route.request().postDataJSON().path
+          active = body.path
+          if (!body.worktree) projectPath = active
           // Real presence can arrive before the POST response. Both must share one hydration.
           await page.evaluate(() => (globalThis as unknown as { presence: { onmessage: (e: { data: string }) => void } }).presence.onmessage({ data: JSON.stringify({ type: 'workspace' }) }))
           await new Promise(resolve => setTimeout(resolve, 40))
         }
-        return json({ path: active, docs: 'docs', docsPath: active + '/docs', projects: [] })
+        return json({ path: active, projectPath: mode === 'worktree' ? projectPath : active, docs: 'docs', docsPath: active + '/docs', projects: [] })
       }
       if (url.pathname === '/api/project-icons/read') return json({ icons: {} })
-      if (url.pathname === '/api/user-ui/root-projects') return json({ state: { paths: ['/alpha', '/beta'], icons: {}, groups: [] } })
+      if (url.pathname === '/api/user-ui/root-projects') return json({ state: { paths: ['/alpha', '/beta', ...(mode === 'worktree' ? ['/alpha-worktree'] : [])], icons: {}, groups: [] } })
       if (url.pathname === '/api/user-ui/agent-tabs') return json({ state: null, claims: [], workspace: url.searchParams.get('workspace') })
       if (url.pathname === '/api/user-ui/workspace') {
         if (method === 'PUT') { const body = route.request().postDataJSON(); persisted.set(body.workspacePath, body.state); return json({ state: body.state }) }
@@ -140,9 +149,18 @@ for (const mode of ['keyboard', 'workspace', 'documents', 'permissions', 'panels
         return json({ version: 1, state: 'ready', entries: [...(url.searchParams.get('project') === 'docs' ? [{ name: 'MOC.md', path: 'MOC.md', type: 'file' }] : [{ name: 'assets', path: 'assets', type: 'dir' }, { name: 'docs', path: 'docs', type: 'dir' }, { name: 'src', path: 'src', type: 'dir', project: true }]), { name: captured.slice(1) + '.md', path: captured.slice(1) + '.md', type: 'file' }] })
       }
       if (url.pathname === '/api/file') {
+        if (method === 'PUT') {
+          const body = route.request().postDataJSON()
+          fileWrites.push({ root: captured, ...body })
+          if (blockFileSave) await new Promise<void>(resolve => saveWaiters.push(resolve))
+          if (failFileSave) return route.fulfill({ status: 409, json: { error: 'fixture save conflict' } })
+          fileContents.set(`${captured}:${body.path}`, body.content)
+          return json({ ok: true, content: body.content, commit: null })
+        }
         const delayed = captured === blockFileRoot
         if (delayed) await new Promise<void>(resolve => fileWaiters.push(resolve))
-        return json({ path: url.searchParams.get('path'), content: delayed ? 'Late response from ' + captured : 'Content of ' + captured, editable: true })
+        const filePath = url.searchParams.get('path')!
+        return json({ path: filePath, content: delayed ? 'Late response from ' + captured : fileContents.get(`${captured}:${filePath}`) ?? 'Content of ' + captured + (mode === 'worktree' && filePath !== 'README.md' ? ` / ${filePath}` : ''), editable: true })
       }
       if (url.pathname === '/api/fs/favorites') return json({ folders: [] })
       if (url.pathname === '/api/fs/entries') {
@@ -183,6 +201,135 @@ for (const mode of ['keyboard', 'workspace', 'documents', 'permissions', 'panels
     }
     releaseUi(); blockUi = false
     await page.locator('[data-test-content]').getByText('Content of /alpha', { exact: true }).waitFor()
+    if (mode === 'worktree') {
+      const main = page.locator('[data-test-editor="main"]')
+      const side = page.locator('[data-test-editor="side"]')
+      await page.locator('[data-test-worktree-trigger]').waitFor()
+      await side.getByText('Content of /alpha / side.md', { exact: true }).waitFor()
+      await page.waitForFunction('window.fixtureAgentRoot === "/alpha" && window.preparedAgentRoot === "/alpha"')
+      persisted.set('/alpha-worktree', {
+        chrome: { sidebarOpen: false, agentOpen: false, terminalOpen: false, gitOpen: false },
+        tabs: { '.workspace': { panes: [{ id: 'target', tabs: [{ path: 'target-only.md', preview: false, viewMode: 'plain' }], activePath: 'target-only.md' }], layout: { kind: 'leaf', pane: 'target' }, focusedPaneId: 'target' } },
+      })
+      const layoutSnapshot = async () => ({
+        sidebar: await page.locator('[data-sidebar]').boundingBox(),
+        panels: await page.locator('[data-dock-panel]').evaluateAll(elements => elements.map(element => {
+          const bounds = element.getBoundingClientRect()
+          return { id: element.getAttribute('data-dock-panel'), x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height }
+        }).sort((a, b) => a.id!.localeCompare(b.id!))),
+        tabs: await page.locator('[data-test-editor]').evaluateAll(elements => elements.map(element => ({
+          id: element.getAttribute('data-test-editor'), active: element.getAttribute('data-test-active'), tabs: Array.from(element.querySelectorAll('button')).map(button => (button as { textContent: string | null }).textContent),
+        }))),
+      })
+      const before = await layoutSnapshot()
+      assert.equal(before.tabs.length, 2, 'the fixture starts with two independently restored editor panes')
+      const agentMounts = await page.evaluate('window.fixtureAgentMounts')
+      const metadataReads = () => requests.filter(request => request.method === 'GET' && (request.path === '/api/user-ui/workspace' || request.path === '/api/user-ui/agent-tabs')).length
+      const metadataBefore = metadataReads()
+      const startSwap = async (path: string) => {
+        await page.evaluate(`window.worktreeResult=null;void window.openFixtureWorktree(${JSON.stringify(path)}).then(value=>{window.worktreeResult=value})`)
+      }
+      const waitForSave = async () => {
+        const deadline = Date.now() + 3000
+        while (!saveWaiters.length && Date.now() < deadline) await page.waitForTimeout(10)
+        assert.ok(saveWaiters.length, 'outgoing edits begin saving before the workspace handoff')
+      }
+      const assertKeptWorkspace = async () => {
+        assert.equal(await page.locator('[data-current-project="/alpha"]').count(), 1, 'the project selector retains the logical project')
+        assert.equal(await page.locator('[data-current-project="/alpha"]').innerText(), 'alpha')
+        assert.deepEqual(await layoutSnapshot(), before, 'worktree navigation preserves panel geometry, pane placement and open tab order')
+        assert.equal(await page.evaluate('window.fixtureAgentMounts'), agentMounts, 'existing agents and terminals are not remounted')
+        assert.equal(await page.locator('[data-test-agent-root]').getAttribute('data-test-agent-root'), '/alpha')
+        assert.equal(await page.locator('[data-test-terminal-root]').getAttribute('data-test-terminal-root'), '/alpha')
+        assert.equal(await page.evaluate('window.preparedAgentRoot'), '/alpha')
+        assert.equal(metadataReads(), metadataBefore, 'linked worktrees do not load another project layout or reclaim its sessions')
+      }
+
+      blockFileSave = true
+      await page.evaluate('window.fixtureEditors.main.onChangeContent("README.md", "Draft saved in alpha", "main")')
+      await main.getByText('Draft saved in alpha', { exact: true }).waitFor()
+      await startSwap('/alpha-worktree')
+      await waitForSave()
+      assert.equal(workspacePosts.length, 0, 'the handoff waits for the outgoing pending autosave')
+      assert.equal(active, '/alpha')
+      for (const release of saveWaiters.splice(0)) release()
+      blockFileSave = false
+      await page.waitForFunction('window.worktreeResult === true')
+      await main.getByText('Content of /alpha-worktree', { exact: true }).waitFor()
+      await side.getByText('Content of /alpha-worktree / side.md', { exact: true }).waitFor()
+      assert.equal(active, '/alpha-worktree')
+      assert.equal(projectPath, '/alpha')
+      assert.deepEqual(workspacePosts, [{ path: '/alpha-worktree', worktree: true, workspace: '/alpha' }])
+      assert.equal(fileContents.get('/alpha:README.md'), 'Draft saved in alpha')
+      assert.equal(fileContents.has('/alpha-worktree:README.md'), false, 'opening the worktree never writes the previous root body into its same-named file')
+      await assertKeptWorkspace()
+
+      // A renderer from the previous root may finish an edit after the swap. Its
+      // old callback must not edit or autosave the target root's same-named file.
+      await page.evaluate('window.fixtureEditorCallbacks["/alpha:main"]("README.md", "Late edit from alpha", "main")')
+      await page.waitForTimeout(600)
+      assert.equal(await main.locator('[data-test-content]').textContent(), 'Content of /alpha-worktree')
+      assert.equal(fileWrites.filter(write => write.root === '/alpha-worktree').length, 0)
+
+      await page.evaluate('window.fixtureEditors.main.onChangeContent("README.md", "Draft saved in worktree", "main")')
+      await main.getByText('Draft saved in worktree', { exact: true }).waitFor()
+      await startSwap('/alpha')
+      await page.waitForFunction('window.worktreeResult === true')
+      await main.getByText('Draft saved in alpha', { exact: true }).waitFor()
+      await side.getByText('Content of /alpha / side.md', { exact: true }).waitFor()
+      assert.equal(fileContents.get('/alpha-worktree:README.md'), 'Draft saved in worktree')
+      assert.deepEqual(workspacePosts.at(-1), { path: '/alpha', worktree: true, workspace: '/alpha-worktree' })
+      await assertKeptWorkspace()
+
+      // Once a save has started, switching must wait for its result as well.
+      // A failed save leaves the unsaved draft and original workspace intact.
+      blockFileSave = true
+      failFileSave = true
+      await page.evaluate('window.fixtureEditors.main.onChangeContent("README.md", "Unsaved conflict in alpha", "main")')
+      await waitForSave()
+      const postsBeforeFailedSave = workspacePosts.length
+      await startSwap('/alpha-worktree')
+      await page.waitForTimeout(80)
+      assert.equal(workspacePosts.length, postsBeforeFailedSave, 'an already running autosave also blocks the handoff')
+      for (const release of saveWaiters.splice(0)) release()
+      blockFileSave = false
+      await page.waitForFunction('window.worktreeResult === false')
+      assert.equal(workspacePosts.length, postsBeforeFailedSave, 'a save conflict prevents the workspace mutation')
+      assert.equal(active, '/alpha')
+      assert.equal(await main.locator('[data-test-content]').textContent(), 'Unsaved conflict in alpha')
+      assert.equal(fileContents.get('/alpha:README.md'), 'Draft saved in alpha')
+      await assertKeptWorkspace()
+
+      failFileSave = false
+      failSwitch = true
+      await startSwap('/alpha-worktree')
+      await page.waitForFunction('window.worktreeResult === false')
+      assert.equal(active, '/alpha', 'a rejected workspace handoff retains the original file root')
+      assert.equal(await main.locator('[data-test-content]').textContent(), 'Unsaved conflict in alpha')
+      assert.equal(fileContents.get('/alpha:README.md'), 'Unsaved conflict in alpha', 'the retry saves only to the outgoing root before the rejected handoff')
+      await assertKeptWorkspace()
+      assert.deepEqual(fileWrites.map(write => ({ root: write.root, content: write.content })), [
+        { root: '/alpha', content: 'Draft saved in alpha' },
+        { root: '/alpha-worktree', content: 'Draft saved in worktree' },
+        { root: '/alpha', content: 'Unsaved conflict in alpha' },
+        { root: '/alpha', content: 'Unsaved conflict in alpha' },
+      ])
+      // Explicitly opening the current worktree as a separate project restores
+      // that project's own tabs even though the filesystem root stays the same.
+      failSwitch = false
+      await startSwap('/alpha-worktree')
+      await page.waitForFunction('window.worktreeResult === true')
+      await assertKeptWorkspace()
+      await page.locator('button[data-project-switcher]').click()
+      await page.locator('[data-project-option="/alpha-worktree"]').click()
+      await page.locator('[data-test-editor="target"]').getByText('Content of /alpha-worktree / target-only.md', { exact: true }).waitFor()
+      assert.equal(active, '/alpha-worktree')
+      assert.equal(projectPath, '/alpha-worktree')
+      assert.equal(await side.count(), 0, 'a separate project restores its own pane layout')
+      assert.equal(await page.getByRole('button', { name: 'Select README.md', exact: true }).count(), 0)
+      assert.deepEqual(errors, [])
+      return
+    }
     if (mode === 'panels') {
       for (const width of [1100, 390]) {
         await page.setViewportSize({ width, height: 800 })

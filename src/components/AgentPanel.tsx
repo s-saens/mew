@@ -1513,7 +1513,7 @@ function RuntimePicker({ onSelect, onSelectSet }: { onSelect: (runtime: string) 
   )
 }
 
-export function AgentPanel({ requestedPicker = false, onPickerRuntimeChosen, onRuntimeReady, cacheAccount = 'local', notificationFocused = false, trackRestore, onRunningAgentsChange, requestedNoticeTab, onNoticeHandled, preparedTabs, requestedTab, onRequestedTabHandled, allowAgent = true, allowTerminal = true, project, workspacePath, tree, focusedFilePath, getSelectedText, renderCommandButtons, onOpenFile, onOpenGuidanceFile, onClose, nextTabSignal = 0, previousTabSignal = 0, closeTabSignal = 0, agentOpen = true, terminalOpen = false, onCloseTerminal, onPanelFocus, foregroundKind }: { requestedPicker?: boolean; onPickerRuntimeChosen?: (runtime: string) => void; onRuntimeReady?: (runtime: string) => void; cacheAccount?: string; notificationFocused?: boolean; trackRestore?: <T>(request: Promise<T>) => Promise<T>; onRunningAgentsChange?: (count: number) => void; requestedNoticeTab?: string; onNoticeHandled?: () => void; preparedTabs?: ReturnType<typeof fetchAgentTabs>; requestedTab?: AgentTab | null; onRequestedTabHandled?: () => void; allowAgent?: boolean; allowTerminal?: boolean; foregroundKind?: string | null; agentOpen?: boolean; terminalOpen?: boolean; onCloseTerminal?: () => void; onPanelFocus?: (kind: 'agent' | 'terminal') => void; project: string; workspacePath: string | null; tree: TreeNode[]; focusedFilePath: string | null; getSelectedText?: () => string | null; renderCommandButtons?: (run: (command: string) => void) => ReactNode; onOpenFile: OpenWorkspaceFile; onOpenGuidanceFile?: (path: string) => void; onClose: () => void; nextTabSignal?: number; previousTabSignal?: number; closeTabSignal?: number }) {
+export function AgentPanel({ requestedPicker = false, onPickerRuntimeChosen, onRuntimeReady, cacheAccount = 'local', notificationFocused = false, trackRestore, onRunningAgentsChange, requestedNoticeTab, onNoticeHandled, preparedTabs, requestedTab, onRequestedTabHandled, allowAgent = true, allowTerminal = true, project, workspacePath, workingPath = workspacePath, tree, focusedFilePath, getSelectedText, renderCommandButtons, onOpenFile, onOpenGuidanceFile, onClose, nextTabSignal = 0, previousTabSignal = 0, closeTabSignal = 0, agentOpen = true, terminalOpen = false, onCloseTerminal, onPanelFocus, foregroundKind }: { requestedPicker?: boolean; onPickerRuntimeChosen?: (runtime: string) => void; onRuntimeReady?: (runtime: string) => void; cacheAccount?: string; notificationFocused?: boolean; trackRestore?: <T>(request: Promise<T>) => Promise<T>; onRunningAgentsChange?: (count: number) => void; requestedNoticeTab?: string; onNoticeHandled?: () => void; preparedTabs?: ReturnType<typeof fetchAgentTabs>; requestedTab?: AgentTab | null; onRequestedTabHandled?: () => void; allowAgent?: boolean; allowTerminal?: boolean; foregroundKind?: string | null; agentOpen?: boolean; terminalOpen?: boolean; onCloseTerminal?: () => void; onPanelFocus?: (kind: 'agent' | 'terminal') => void; project: string; workspacePath: string | null; workingPath?: string | null; tree: TreeNode[]; focusedFilePath: string | null; getSelectedText?: () => string | null; renderCommandButtons?: (run: (command: string) => void) => ReactNode; onOpenFile: OpenWorkspaceFile; onOpenGuidanceFile?: (path: string) => void; onClose: () => void; nextTabSignal?: number; previousTabSignal?: number; closeTabSignal?: number }) {
   useUiLocale()
   const { t } = useI18n()
   const dock = useDock()
@@ -1555,7 +1555,7 @@ export function AgentPanel({ requestedPicker = false, onPickerRuntimeChosen, onR
   const sessionClaimsRefreshRef = useRef<{ workspacePath: string; promise: Promise<void> } | null>(null)
   // 새 탭 cwd는 이미 App이 정한 현재 루트 워크스페이스다. 별도 API 확인이 끝날 때까지 null로
   // 두면 사용자가 먼저 런타임을 고른 순간 렌더 대상에서 빠진 빈 탭이 생긴다.
-  const [defaultCwd, setDefaultCwd] = useState<string | null>(workspacePath)
+  const [defaultCwd, setDefaultCwd] = useState<string | null>(workingPath)
   const [openingRuntime, setOpeningRuntime] = useState<string | null>(null)
   const [openRuntimeError, setOpenRuntimeError] = useState<string | null>(null)
   // 브라우저를 껐다 켜도 보던 탭에서 이어 하도록 마지막으로 본 탭을 기억한다.
@@ -1606,7 +1606,7 @@ export function AgentPanel({ requestedPicker = false, onPickerRuntimeChosen, onR
 
   useEffect(() => {
     let alive = true
-    void resolveAgentCwd(workspacePath ?? '')
+    void resolveAgentCwd(workingPath ?? '')
       .then(({ cwd }) => {
         if (!alive) return
         setDefaultCwd(cwd)
@@ -1617,7 +1617,7 @@ export function AgentPanel({ requestedPicker = false, onPickerRuntimeChosen, onR
         setOpenRuntimeError(err instanceof Error ? err.message : String(err))
       })
     return () => { alive = false }
-  }, [workspacePath])
+  }, [workingPath])
 
   useEffect(() => {
     try {
@@ -1720,9 +1720,9 @@ export function AgentPanel({ requestedPicker = false, onPickerRuntimeChosen, onR
     if (openingRuntime) return
     setOpeningRuntime(runtime)
     setOpenRuntimeError(null)
-    // workspacePath는 즉시 쓸 수 있지만 서버에서 실제 디렉터리인지 다시 확인한다. 최초 확인이
+    // 선택한 worktree 경로는 즉시 쓸 수 있지만 서버에서 실제 디렉터리인지 다시 확인한다. 최초 확인이
     // 일시적으로 실패했어도 "사용"을 다시 누르면 복구되며, null cwd 탭은 절대 만들지 않는다.
-    void resolveAgentCwd(workspacePath ?? defaultCwd ?? '')
+    void resolveAgentCwd(workingPath ?? defaultCwd ?? '')
       .then(({ cwd }) => {
         const tab = newTab(runtime, preset?.name ?? runtimeOf(runtime).label, cwd, preset)
         setDefaultCwd(cwd)
@@ -1746,7 +1746,7 @@ export function AgentPanel({ requestedPicker = false, onPickerRuntimeChosen, onR
     return () => window.removeEventListener('mew:open-agent-runtime', open)
   // addRuntimeTab deliberately reads current defaultCwd and creates a fresh tab for each settings click.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [defaultCwd])
+  }, [defaultCwd, workingPath])
 
   const addSetTab = (set: AgentSet, destination = pickerGroup) => {
     try { writeBrowserStorage(RUNTIME_KEY, set.runtime) } catch { /* 최근 런타임 기억은 선택을 막지 않는다 */ }

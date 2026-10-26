@@ -43,6 +43,7 @@ function Fixture(){
   const noop=()=>{};
   const [dock,setDock]=useState(JSON.parse(localStorage.getItem('fixture:dock')||'null'));
   const [git,setGit]=useState(JSON.parse(localStorage.getItem('fixture:git')||'null'));
+  const [workspacePath,setWorkspacePath]=useState('/fixture');window.setGitWorkspace=setWorkspacePath;
   const [open,setOpen]=useState(true),[foreground,setForeground]=useState('git');
   const [screen,setScreen]=useState({kind:'graph'}),[desktop,setDesktop]=useState(innerWidth>=768);
   useEffect(()=>{const query=matchMedia('(min-width: 768px)'),update=()=>setDesktop(query.matches);query.addEventListener('change',update);return()=>query.removeEventListener('change',update)},[]);
@@ -64,7 +65,7 @@ function Fixture(){
         registerHandle={noop} registerElement={noop} registerTabBar={noop} onFocus={noop} onActivate={editor.setActivePath} onPin={editor.pinTab} onCloseTab={editor.closeTab} onReorder={editor.reorderTabs} onSetViewMode={editor.setTabViewMode} onChangeContent={editor.updateTabContent}
         onOpenLink={noop} onOpenHistory={noop} onSetTocOpen={noop} onOpenSidebar={noop} onTabDragMove={noop} onTabDrop={noop}
         onOpenDiffFile={(project,path)=>{window.openedFile={project,path};editor.setActivePath(null);setForeground(null)}} /> : <><div className="h-9 shrink-0 border-b border-edge px-3 text-xs">README.md</div><textarea aria-label="편집기" className="h-full w-full bg-surface-deep p-3" defaultValue="문서 편집 중"/></>}</DockPanel>
-      <GitPanel visible={open} initialState={git} onChange={saveGit} onOpenWorktree={async path=>{window.openedWorktree=path}} navigation={{view:screen,onChange:setScreen,back}} onOpenDiff={target=>{window.openedDiff=target;editor.openFile(gitDiffTabPath(target),{preview:false,forceNewTab:true});setForeground(null)}} onNotice={message=>window.notices.push(message)} onClose={dismiss} onPanelFocus={()=>setForeground('git')} nextTabSignal={next} previousTabSignal={previous} closeTabSignal={close}/>
+      <GitPanel visible={open} initialState={git} workspacePath={workspacePath} onChange={saveGit} onOpenWorktree={async path=>{window.openedWorktree=path}} navigation={{view:screen,onChange:setScreen,back}} onOpenDiff={target=>{window.openedDiff=target;editor.openFile(gitDiffTabPath(target),{preview:false,forceNewTab:true});setForeground(null)}} onNotice={message=>window.notices.push(message)} onClose={dismiss} onPanelFocus={()=>setForeground('git')} nextTabSignal={next} previousTabSignal={previous} closeTabSignal={close}/>
     </DockWorkspace>
   </div>
 }
@@ -91,13 +92,14 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     let delayWorking = false
     let liveReads = 0
     const stamp = Date.now()
+    let displayedWorkspace = '/fixture'
     await installLiveFixture(page, async resource => {
       liveReads++
       if (delayWorking) await new Promise<void>(resolve => { finishWorking = resolve })
       if (workingFailure) throw new Error('상태 조회에 실패했습니다')
       if (resource.kind === 'git-diff') return { diff: workingFiles.some(file => file.path === resource.file) ? `diff --git a/file.ts b/file.ts\n--- a/file.ts\n+++ b/file.ts\n@@ -1 +1 @@\n-old\n+${diffLine}\n` : '', deleted: false }
       return {
-        info: { repository: repositoryExists, workspace: '/fixture', remotes: ['origin'], originUrl: 'https://github.com/owner/repo', branch: repositoryBranch, ahead: 0, behind: 0 },
+        info: { repository: repositoryExists, workspace: displayedWorkspace, remotes: ['origin'], originUrl: 'https://github.com/owner/repo', branch: repositoryBranch, ahead: 0, behind: 0 },
         commits: Array.from({ length: 80 }, (_, index) => ({ hash: `abc12345${index}`, parents: index < 79 ? [`abc12345${index === 0 ? 2 : index + 1}`] : [], subject: index === 0 && externalCommit ? '외부 터미널에서 만든 새 커밋' : index === 0 ? '패널 작업: 긴 커밋 제목도 메타데이터를 밀어내지 않고 한 줄로 표시합니다' : `패널 작업 ${index}`, author: 'Tester with a long name', date: new Date(stamp - index * 3_600_000 - 10_000).toISOString(), refs: index === 0 ? ['main', 'tag: v1'] : [], branches: graphBranchMode ? index === 0 ? [{ name: 'main', ref: 'refs/heads/main', kind: 'local' }, { name: 'origin/remote-topic', ref: 'refs/remotes/origin/remote-topic', kind: 'remote' }] : index === 1 ? [{ name: 'feature/searchable', ref: 'refs/heads/feature/searchable', kind: 'local' }] : [] : [] })),
         workingTree: { files: workingFiles },
       }
@@ -113,7 +115,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
       { name: 'origin/remote-topic', ref: 'refs/remotes/origin/remote-topic', kind: 'remote' },
       { name: 'v1', ref: 'refs/tags/v1', kind: 'tag' },
     ]
-    const branchInfo = () => ({ repository: repositoryExists, workspace: '/fixture', remotes: ['origin'], originUrl: 'https://github.com/owner/repo', branch: repositoryBranch, ahead: 0, behind: 0 })
+    const branchInfo = () => ({ repository: repositoryExists, workspace: displayedWorkspace, remotes: ['origin'], originUrl: 'https://github.com/owner/repo', branch: repositoryBranch, ahead: 0, behind: 0 })
     const remoteRequests: unknown[] = []
     const discardRequests: { files: string[]; workspace: string; path: string }[] = []
     let discardFailure = false
@@ -157,7 +159,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
         }
         const payload = p === '/api/git-connections/github' ? { available: true, login: null, environmentToken: false, busy: false, job: null }
           : p === '/api/git/repositories' ? { repositories: url.searchParams.get('project') === 'docs' ? [{ path: '' }] : [{ path: '' }, { path: 'tools/a-very-long-repository-name-for-layout-checking' }] }
-          : p === '/api/git/repository' ? { repository: repositoryExists, workspace: '/fixture', remotes: ['origin'], originUrl: 'https://github.com/owner/repo', branch: repositoryBranch, ahead: 0, behind: 0 }
+          : p === '/api/git/repository' ? { repository: repositoryExists, workspace: displayedWorkspace, remotes: ['origin'], originUrl: 'https://github.com/owner/repo', branch: repositoryBranch, ahead: 0, behind: 0 }
             : p === '/api/git/log' ? { commits: Array.from({ length: 80 }, (_, index) => ({ hash: `abc12345${index}`, parents: index < 79 ? [`abc12345${index === 0 ? 2 : index + 1}`] : [], subject: index === 0 && externalCommit ? '외부 터미널에서 만든 새 커밋' : index === 0 ? '패널 작업: 긴 커밋 제목도 메타데이터를 밀어내지 않고 한 줄로 표시합니다' : `패널 작업 ${index}`, author: 'Tester with a long name', date: new Date(Date.now() - index * 3_600_000 - 10_000).toISOString(), refs: index === 0 ? ['main', 'tag: v1'] : [] })) }
               : p === '/api/git/commit' ? { hash: 'abc123450', subject: 'fixture commit', body: '', author: 'Tester', email: 'test@example.com', date: new Date().toISOString(), files: workingFiles }
               : p.endsWith('/diff') ? { diff: `diff --git a/file.ts b/file.ts\n--- a/file.ts\n+++ b/file.ts\n@@ -1 +1 @@\n-old\n+${diffLine}\n` }
@@ -1029,6 +1031,17 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     await page.getByRole('menuitem', { name: 'main', exact: true }).click()
     await page.waitForFunction('window.openedWorktree === "/fixture/.worktrees/main"')
     assert.equal(repositoryBranch, 'remote-topic', 'graph switching uses the existing worktree navigation path')
+    await commitButton.click()
+    await composer.waitFor()
+    await page.getByLabel('커밋 제목', { exact: true }).fill('Draft retained across worktrees')
+    const beforeRootSwap = await bounds(changes)
+    displayedWorkspace = '/fixture/.worktrees/topic'
+    repositoryBranch = 'worktree-topic'
+    await page.evaluate('window.setGitWorkspace("/fixture/.worktrees/topic")')
+    await branchButton.getByText('worktree-topic', { exact: true }).waitFor()
+    assert.equal(await page.getByLabel('커밋 제목', { exact: true }).inputValue(), 'Draft retained across worktrees')
+    const afterRootSwap = await bounds(changes)
+    assert.ok(Math.abs(beforeRootSwap.height - afterRootSwap.height) < 2, 'worktree reload preserves the Git panel split and composer size')
     assert.deepEqual(errors, [])
   } finally { await browser.close() }
 })

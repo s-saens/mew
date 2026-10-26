@@ -1,4 +1,4 @@
-import { writeActiveWorkspace } from './userUiState.ts'
+import { readActiveProjectPath, readActiveWorkspace, writeActiveWorkspace } from './userUiState.ts'
 import { broadcastAccount } from './presence.ts'
 import { workspaceContext } from './paths.ts'
 // 로그인 사용자의 활성 루트는 계정 원장과 요청 컨텍스트에 저장한다.
@@ -11,11 +11,17 @@ import { ensureDocsRoot, listProjects, setDocsDir, setWorkspaceRoot, workspacePa
 import { resetTreeWatchers, watchDocsTree } from './watcher.ts'
 import { closeAllRooms } from './collab.ts'
 import { broadcast } from './presence.ts'
+import { simpleGit } from 'simple-git'
 
-export class WorkspaceError extends Error {}
+export class WorkspaceError extends Error {
+  readonly status: number
+  constructor(message: string, status = 400) { super(message); this.status = status }
+}
 
 export interface WorkspaceInfo {
   path: string
+  /** 화면 배치와 실행 중 세션을 유지하는 프로젝트 경로. 파일 작업은 path를 사용한다. */
+  projectPath?: string
   /** 이 폴더 안에서 프로젝트로 잡히는 것들 — 폴더 하나가 프로젝트 하나다 */
   projects: string[]
   /** docs로 쓰는 폴더 — 워크스페이스 루트 기준 상대 경로 */
@@ -25,7 +31,9 @@ export interface WorkspaceInfo {
 }
 
 export function currentWorkspace(): WorkspaceInfo {
-  return { path: workspacePaths.root, projects: listProjects(), docs: workspacePaths.docsDir, docsPath: workspacePaths.docsRoot }
+  const account = workspaceContext.getStore()?.account
+  const projectPath = account ? readActiveProjectPath(account, workspacePaths.root) : workspacePaths.root
+  return { path: workspacePaths.root, projectPath, projects: listProjects(), docs: workspacePaths.docsDir, docsPath: workspacePaths.docsRoot }
 }
 
 /** 설정 파일에 그대로 쓸 수 있는 경로인지 — 셸(`. config.env`)과 Node(loadEnvFile) 둘 다 읽는 파일이다 */
@@ -68,7 +76,7 @@ function persist(key: string, value: string) {
  * 워크스페이스를 바꾼다. 성공하면 새 워크스페이스 정보를 돌려준다.
  * 로그인 사용자의 전환은 같은 계정에만 알리며 다른 계정의 작업 경로와 협업 방을 유지한다.
  */
-export function switchWorkspace(target: string, initialProject?: string): WorkspaceInfo {
+export function switchWorkspace(target: string, initialProject?: string, projectPath = target): WorkspaceInfo {
   const abs = path.resolve(target)
   assertStorable(abs)
   let stat: fs.Stats
@@ -82,7 +90,7 @@ export function switchWorkspace(target: string, initialProject?: string): Worksp
   if (context?.account) {
     setWorkspaceRoot(abs)
     ensureDocsRoot()
-    writeActiveWorkspace(context.account, abs)
+    writeActiveWorkspace(context.account, abs, path.resolve(projectPath))
     watchDocsTree()
     broadcastAccount(context.account, { type: 'workspace', ...(initialProject ? { project: initialProject } : {}) })
     return currentWorkspace()
@@ -102,6 +110,46 @@ export function switchWorkspace(target: string, initialProject?: string): Worksp
   broadcast({ type: 'workspace', ...(initialProject ? { project: initialProject } : {}) })
 
   return currentWorkspace()
+}
+
+/** Keep the project identity while selecting an existing worktree of this repository. */
+export async function switchWorktree(target: string, expectedWorkspace: unknown): Promise<WorkspaceInfo> {
+  const root = workspacePaths.root
+  if (expectedWorkspace !== root) throw new WorkspaceError('프로젝트가 변경되었습니다. 다시 시도하세요.', 409)
+  const account = workspaceContext.getStore()?.account
+  const savedWorkspace = account ? readActiveWorkspace(account) : null
+  const projectPath = account ? readActiveProjectPath(account, root) : root
+  const abs = path.resolve(target)
+  assertStorable(abs)
+  let targetRoot: string
+  try {
+    targetRoot = fs.realpathSync(abs)
+    const currentRoot = fs.realpathSync(root)
+    const git = simpleGit(currentRoot)
+    const targetGit = simpleGit(targetRoot)
+    const [currentTop, targetTop, common, targetCommon, worktrees] = await Promise.all([
+      git.raw(['rev-parse', '--show-toplevel']),
+      targetGit.raw(['rev-parse', '--show-toplevel']),
+      git.raw(['rev-parse', '--git-common-dir']),
+      targetGit.raw(['rev-parse', '--git-common-dir']),
+      git.raw(['worktree', 'list', '--porcelain', '-z']),
+    ])
+    const registered = worktrees.split('\0').filter(field => field.startsWith('worktree ')).some(field => {
+      try { return fs.realpathSync(field.slice(9)) === targetRoot } catch { return false }
+    })
+    if (fs.realpathSync(currentTop.trim()) !== currentRoot || fs.realpathSync(targetTop.trim()) !== targetRoot
+      || fs.realpathSync(path.resolve(currentRoot, common.trim())) !== fs.realpathSync(path.resolve(targetRoot, targetCommon.trim())) || !registered) {
+      throw new WorkspaceError('현재 저장소에 연결된 worktree만 선택할 수 있습니다.')
+    }
+  } catch (error) {
+    if (error instanceof WorkspaceError) throw error
+    throw new WorkspaceError('현재 저장소에 연결된 worktree를 열 수 없습니다.')
+  }
+  // Git validation is asynchronous; another browser may have selected a project meanwhile.
+  if (account && (readActiveWorkspace(account) !== savedWorkspace || readActiveProjectPath(account, root) !== projectPath)) {
+    throw new WorkspaceError('프로젝트가 변경되었습니다. 다시 시도하세요.', 409)
+  }
+  return switchWorkspace(abs, undefined, projectPath)
 }
 
 /**

@@ -620,6 +620,7 @@ export function openExternalProject(path: string): Promise<WorkspaceInfo & { pro
 
 export interface WorkspaceInfo {
   path: string
+  projectPath?: string
   /** 그 폴더 안에서 프로젝트로 잡히는 것들 — 폴더 하나가 프로젝트 하나 */
   projects: string[]
   /** docs로 쓰는 폴더 — 워크스페이스 루트 기준 상대 경로 */
@@ -634,11 +635,11 @@ export function fetchWorkspace(): Promise<WorkspaceInfo> {
 }
 
 /** 워크스페이스를 통째로 바꾼다 — owner 전용. 성공하면 클라이언트가 새 루트 상태로 교체한다. */
-export function switchWorkspace(path: string): Promise<WorkspaceInfo> {
+export function switchWorkspace(path: string, workspace?: string): Promise<WorkspaceInfo> {
   return mewFetch('/api/workspace', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ path }),
+    body: JSON.stringify({ path, ...(workspace ? { worktree: true, workspace } : {}) }),
   }).then(json<WorkspaceInfo>)
 }
 
@@ -1273,11 +1274,12 @@ export function saveFile(
   commit = false,
   project: string = currentProject,
   expectedContent?: string,
+  workspace?: string,
 ): Promise<{ ok: true; commit: CommitResult | null; content?: string }> {
   return gitFetch('/api/file', {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ path, content, commit, project, expectedContent }),
+    body: JSON.stringify({ path, content, commit, project, expectedContent, workspace }),
   }, project).then(json<{ ok: true; commit: CommitResult | null; content?: string }>)
 }
 

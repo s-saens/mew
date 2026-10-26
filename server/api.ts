@@ -90,7 +90,7 @@ import {
 import { previewForRequest, createPortPreviewRoutes } from './port-preview.ts'
 import { createLoginDesktopAuthSession, createLoginDesktopRoutes, closeLoginDesktopJob } from './login-desktop.ts'
 import { createTodo, deleteTodo, listTodos, TodoError, updateTodo, type TodoChange } from './todos.ts'
-import { currentWorkspace, switchDocsRoot, switchWorkspace, WorkspaceError } from './workspace.ts'
+import { currentWorkspace, switchDocsRoot, switchWorkspace, switchWorktree, WorkspaceError } from './workspace.ts'
 import { collectSystemStats } from './sysStats.ts'
 import { MEW_APP_ROOT, MEW_UPDATE_SESSION, mewUpdateStatus, mewUpdateRunning, readMewUpdateJob, needsMewUpdate, writeMewUpdateJob, isReleaseDistribution, RELEASE_UPDATE_MESSAGE } from './mewUpdate.ts'
 import { androidCommandById, collectAndroidEnvStatus } from './androidEnv.ts'
@@ -776,14 +776,16 @@ export function createApiApp() {
     }
   })
 
-  app.post('/workspace', requireRole('owner'), (req, res) => {
+  app.post('/workspace', requireRole('owner'), async (req, res) => {
     const { path: target } = req.body as { path?: unknown }
     try {
       if (typeof target !== 'string' || !target.trim()) {
         res.status(400).json({ error: '열 폴더 경로가 없습니다' })
         return
       }
-      const info = switchWorkspace(resolveBrowsePath(target))
+      const info = req.body?.worktree === true
+        ? await switchWorktree(resolveBrowsePath(target), req.body?.workspace)
+        : switchWorkspace(resolveBrowsePath(target))
       res.json(info)
     } catch (err) {
       handleError(res, err)
@@ -1460,6 +1462,10 @@ export function createApiApp() {
   }
 
   app.put('/file', async (req, res) => {
+    if (req.body?.workspace !== undefined && req.body.workspace !== workspacePaths.root) {
+      res.status(409).json({ error: '프로젝트가 변경되었습니다. 다시 시도하세요.' })
+      return
+    }
     const { path: relPath, content: submittedContent, commit, expectedContent } = req.body as { path: string; content: string; commit?: boolean; expectedContent?: string }
     let content = submittedContent
     const project = projectOf(req)
@@ -2840,7 +2846,11 @@ function handleError(res: express.Response, err: unknown) {
     res.status(400).json({ error: err.message })
     return
   }
-  if (err instanceof TodoError || err instanceof WorkspaceError) {
+  if (err instanceof WorkspaceError) {
+    res.status(err.status).json({ error: err.message })
+    return
+  }
+  if (err instanceof TodoError) {
     res.status(400).json({ error: err.message })
     return
   }

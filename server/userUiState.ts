@@ -32,6 +32,7 @@ export type StoredWorkspaceUi = Record<string, unknown>
 type UserUiState = {
   theme?: ThemeSettings
   activeWorkspace?: string
+  activeProjectPath?: string
   fileFavorites?: FileFavoritePreferences
   rootProjects?: StoredRootProjects
   agentTabs?: Record<string, StoredAgentTabs>
@@ -230,9 +231,14 @@ export function readActiveWorkspace(email: string): string | null {
   return validPath(value) ? value : null
 }
 
-export function writeActiveWorkspace(email: string, root: string): void {
-  if (!validPath(root)) throw new Error('프로젝트 경로가 올바르지 않습니다')
+export function readActiveProjectPath(email: string, workspaceRoot: string): string {
+  const state = userState(readAll(), email)
+  return state.activeWorkspace === workspaceRoot && validPath(state.activeProjectPath) ? state.activeProjectPath : workspaceRoot
+}
+
+export function writeActiveWorkspace(email: string, root: string, projectPath = root): void {
+  if (!validPath(root) || !validPath(projectPath)) throw new Error('프로젝트 경로가 올바르지 않습니다')
   const all = readAll(), key = normalizeEmail(email)
-  all[key] = { ...userState(all, key), activeWorkspace: root }
+  all[key] = { ...userState(all, key), activeWorkspace: root, activeProjectPath: projectPath }
   writeAll(all)
 }

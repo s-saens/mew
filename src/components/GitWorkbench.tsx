@@ -331,13 +331,15 @@ function GitComposer({ id, children, onSubmit }: { id: string; children: ReactNo
   </form>
 }
 
-export function GitWorkbench({ project, repositoryPath, onNotice, onBack, onOpenDiff, onOpenWorktree, branchHost, actionsHost, visible = true, navigation }: {
+export function GitWorkbench({ project, repositoryPath, onNotice, onBack, onOpenDiff, onOpenWorktree, onPrepareBranchChange, workspacePath, branchHost, actionsHost, visible = true, navigation }: {
   project: string
   repositoryPath: string
   onNotice: (message: string) => void
   onBack?: () => void
   onOpenDiff?: (target: GitDiffTarget) => void
   onOpenWorktree?: (path: string) => Promise<void>
+  onPrepareBranchChange?: () => Promise<() => void>
+  workspacePath?: string
   branchHost?: HTMLElement | null
   actionsHost?: HTMLElement | null
   visible?: boolean
@@ -371,7 +373,7 @@ export function GitWorkbench({ project, repositoryPath, onNotice, onBack, onOpen
     setRemoteAction(null)
     remotePending.current = false
     return invalidate
-  }, [project, repositoryPath])
+  }, [project, repositoryPath, workspacePath])
   useEffect(() => {
     if (!remoteFeedback?.complete) return
     const timer = window.setTimeout(() => setRemoteFeedback(null), 3000)
@@ -408,31 +410,32 @@ export function GitWorkbench({ project, repositoryPath, onNotice, onBack, onOpen
   const graphWidth = 16 + (graph.lanes - 1) * LANE_GAP
 
   const refresh = useCallback(async (selectAll = false) => {
-    refreshVersion.current += 1
+    const version = ++refreshVersion.current
     setLoading(true)
     setError(null)
     setRefreshError(null)
     try {
       const nextInfo = await fetchGitRepository(repositoryPath, project)
+      if (version !== refreshVersion.current) return
       setInfo(nextInfo)
       if (!nextInfo.repository) { setCommits([]); setWorkingTree({ files: [] }); setView({ kind: 'graph' }); return }
       const [log, nextWorkingTree] = await Promise.all([
         fetchGitLog(repositoryPath, project),
         fetchGitWorkingTree(repositoryPath, project),
       ])
+      if (version !== refreshVersion.current) return
       setNow(Date.now())
       setCommits(log.commits)
       setWorkingTree(nextWorkingTree)
       setSelectedFiles(current => new Set(nextWorkingTree.files.filter(file => selectAll ? file.currentIp === true : current.has(file.path)).map(file => file.path)))
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
+      if (version === refreshVersion.current) setError(err instanceof Error ? err.message : String(err))
     } finally {
-      setLoading(false)
+      if (version === refreshVersion.current) setLoading(false)
     }
-  }, [project, repositoryPath, setView])
+  }, [project, repositoryPath, setView, workspacePath])
 
   useEffect(() => {
-    setView({ kind: 'graph' })
     setCommitTitle('')
     setCommitDescription('')
     setComposerOpen(false)
@@ -444,7 +447,15 @@ export function GitWorkbench({ project, repositoryPath, onNotice, onBack, onOpen
     setHistoryQuery('')
     setSplitRatio(0.5)
     setAiOpen(false)
+  }, [project, repositoryPath])
+
+  useEffect(() => {
+    setView({ kind: 'graph' })
+    setInfo(null)
+    setCommits([])
+    setWorkingTree({ files: [] })
     void refresh(true)
+    return () => { refreshVersion.current++ }
   }, [refresh, setView])
 
   useEffect(() => {
@@ -460,7 +471,7 @@ export function GitWorkbench({ project, repositoryPath, onNotice, onBack, onOpen
       })
       setRefreshError(null)
     }, err => setRefreshError(err.message))
-  }, [visible, loading, busy, project, repositoryPath])
+  }, [visible, loading, busy, project, repositoryPath, workspacePath])
 
   useEffect(() => {
     if (view.kind !== 'commit') return
@@ -473,7 +484,7 @@ export function GitWorkbench({ project, repositoryPath, onNotice, onBack, onOpen
       .catch((err: unknown) => { if (alive) setError(err instanceof Error ? err.message : String(err)) })
       .finally(() => { if (alive) setDetailLoading(false) })
     return () => { alive = false }
-  }, [project, repositoryPath, view])
+  }, [project, repositoryPath, workspacePath, view])
 
   useEffect(() => {
     const paths = new Set(workingTree.files.map(file => file.path))
@@ -612,7 +623,9 @@ export function GitWorkbench({ project, repositoryPath, onNotice, onBack, onOpen
     refreshVersion.current++
     setActionRunning(true)
     setError(null)
+    let release: (() => void) | undefined
     try {
+      if (action !== 'delete') release = await onPrepareBranchChange?.()
       const result = await runGitBranchAction(repositoryPath, action, ref, name, project, info.workspace)
       if (result.worktreePath) {
         if (!onOpenWorktree) throw new Error(uiText('프로젝트를 열 수 없습니다'))
@@ -622,6 +635,7 @@ export function GitWorkbench({ project, repositoryPath, onNotice, onBack, onOpen
       setView({ kind: 'graph' })
       await refresh()
     } finally {
+      release?.()
       remotePending.current = false
       setActionRunning(false)
     }
@@ -681,7 +695,7 @@ export function GitWorkbench({ project, repositoryPath, onNotice, onBack, onOpen
     <div className="mew-panel-surface @container flex h-full min-h-0 min-w-0 flex-1 flex-col bg-surface">
       {dialogs.dialog}
       {branchHost && createPortal(
-        <GitBranchPicker key={`${project}:${repositoryPath}`} info={info} project={project} path={repositoryPath}
+        <GitBranchPicker key={`${workspacePath ?? ''}:${project}:${repositoryPath}`} info={info} project={project} path={repositoryPath}
           disabled={!visible || loading || aiOpen || !info?.repository || !info.workspace} busy={busy} onAction={changeBranch} />, branchHost)}
       {actionsHost && createPortal(<>
         {(['pull', 'push'] as const).map(action => {
