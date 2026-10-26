@@ -67,6 +67,7 @@ test('common project icons paint without the catalog; deferred icons keep their 
   await page.locator('[data-rare] svg').waitFor()
   assert.deepEqual(await page.locator('[data-rare] > span').boundingBox(), before, 'loading the icon cannot shift its allocated space')
   await page.locator('[data-current-project]').click({ button: 'right' })
+  await page.getByRole('menuitem', { name: /편집|Edit/, exact: true }).click()
   await page.getByRole('dialog').waitFor()
   await page.getByRole('button', { name: 'book', exact: true }).click()
   await page.getByRole('dialog').waitFor({ state: 'detached' })

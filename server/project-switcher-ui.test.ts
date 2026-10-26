@@ -15,13 +15,13 @@ import {createRoot} from '${root}/node_modules/react-dom/client.js';
 import {ProjectSwitcher} from '${root}/src/components/ProjectSwitcher.tsx';
 import {I18nProvider} from '${root}/src/i18n.tsx';
 import {captureDesktopKeyboard} from '${root}/src/utils/desktop-keyboard.ts';
-window.activations=[];window.remoteKeys=[];window.previews=[];window.opens=0;
+window.activations=[];window.remoteKeys=[];window.previews=[];window.opens=0;window.removals=[];
 window.startRemote=()=>captureDesktopKeyboard({input:{key:(...args)=>window.remoteKeys.push(args),release(){}},target:el=>el===document.querySelector('#remote-keys'),detected(){},copy:async()=>{},paste:async()=>{},status(){}});
 function Fixture(){
 const [paths,setPaths]=useState(['/alpha','/beta','/gamma','/delta']);
 const [active,setActive]=useState('/alpha');const [enabled,setEnabled]=useState(true);const [dialog,setDialog]=useState(false);const [icons,setIcons]=useState({});
 window.setPaths=setPaths;window.active=active;window.setEnabled=setEnabled;window.setDialog=setDialog;
-return <main className="h-screen bg-surface text-ink"><header className="flex h-9 border-b border-edge"><ProjectSwitcher paths={paths} activePath={active} fallbackLabel="work" canOpen={enabled} canChangeIcon={enabled} icons={icons} onActivate={p=>{window.activations.push(p);setActive(p)}} onIconChange={(p,icon)=>setIcons(s=>({...s,[p]:icon}))} onOpen={()=>window.opens++} onPreview={p=>window.previews.push(p)}/></header><textarea id="project-input"/><div role="dialog" hidden={!dialog}><input id="project-modal"/><div id="remote-keys" tabIndex={0}/></div><button id="outside" style={{position:"fixed",right:8,bottom:8}} onClick={()=>window.outsideClicks=(window.outsideClicks??0)+1}>Outside</button></main>}
+return <main className="h-screen bg-surface text-ink"><header className="flex h-9 border-b border-edge"><ProjectSwitcher paths={paths} activePath={active} fallbackLabel="work" canOpen={enabled} canChangeIcon={enabled} icons={icons} onActivate={p=>{window.activations.push(p);setActive(p)}} onIconChange={(p,icon)=>setIcons(s=>({...s,[p]:icon}))} onRemove={p=>{window.removals.push(p);setPaths(s=>s.filter(x=>x!==p))}} onOpen={()=>window.opens++} onPreview={p=>window.previews.push(p)}/></header><textarea id="project-input"/><div role="dialog" hidden={!dialog}><input id="project-modal"/><div id="remote-keys" tabIndex={0}/></div><button id="outside" style={{position:"fixed",right:8,bottom:8}} onClick={()=>window.outsideClicks=(window.outsideClicks??0)+1}>Outside</button></main>}
 createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18nProvider>);`
   const bundle = await build({ input: 'virtual:switcher.tsx', write: false, platform: 'browser', output: { format: 'iife' }, transform: { jsx: 'react-jsx', define: { 'process.env.NODE_ENV': JSON.stringify('test') } }, plugins: [{ name: 'fixture', resolveId(id) { if (id === 'virtual:switcher.tsx') return id; if (id.endsWith('.css')) return 'virtual:style' }, async load(id) { if (id === 'virtual:switcher.tsx') return source; if (id === 'virtual:style') return ''; if (id.endsWith('?raw')) return 'export default ' + JSON.stringify(await fs.readFile(id.slice(0, -4), 'utf8')) } }] })
   const chunk = bundle.output.find(item => item.type === 'chunk')!
@@ -103,15 +103,31 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
 
     await page.setViewportSize({ width: 1100, height: 600 })
     await trigger.click({ button: 'right' })
+    await page.getByRole('menuitem', { name: '편집', exact: true }).click()
     await page.getByRole('dialog', { name: '프로젝트 아이콘' }).waitFor()
     await page.keyboard.press('Escape')
     await trigger.focus(); await page.keyboard.press('Shift+F10')
+    await page.getByRole('menuitem', { name: '편집', exact: true }).click()
     await page.getByRole('dialog', { name: '프로젝트 아이콘' }).waitFor()
     await page.keyboard.press('Escape')
     await trigger.click(); await option('/beta').click({ button: 'right' })
+    await page.getByRole('menuitem', { name: '편집', exact: true }).click()
     await page.getByRole('dialog', { name: '프로젝트 아이콘' }).waitFor()
     assert.equal(await menu.count(), 0)
     await page.keyboard.press('Escape')
+
+    await trigger.click(); await option('/delta').click({ button: 'right' })
+    assert.equal(await active(), '/alpha', 'context actions do not switch projects')
+    await page.getByRole('menuitem', { name: '삭제', exact: true }).click()
+    assert.deepEqual(await page.evaluate('window.removals'), ['/delta'])
+    await trigger.click()
+    assert.equal(await option('/delta').count(), 0)
+    await page.keyboard.press('Escape')
+    await page.evaluate('window.setPaths(["/alpha"])')
+    await trigger.click({ button: 'right' })
+    assert.equal(await page.getByRole('menuitem', { name: '삭제', exact: true }).isDisabled(), true)
+    await page.keyboard.press('Escape')
+    await page.evaluate('window.setPaths(["/alpha","/beta","/gamma"])')
 
     for (const width of [1100, 320]) {
       await page.setViewportSize({ width, height: 600 })
@@ -131,6 +147,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [touch] })
     await page.waitForTimeout(650)
     await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+    await page.getByRole('menuitem', { name: '편집', exact: true }).click()
     await page.getByRole('dialog', { name: '프로젝트 아이콘' }).waitFor()
     await page.getByRole('dialog', { name: '프로젝트 아이콘' }).getByRole('button', { name: '닫기', exact: true }).tap()
     assert.equal(await menu.count(), 0, 'long press does not also open project selection')

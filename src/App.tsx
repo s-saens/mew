@@ -2070,6 +2070,14 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
             onActivate={(projectPath) => void openRootProject(projectPath)}
             onPreview={previewRootProject}
             onIconChange={changeRootProjectIcon}
+            onRemove={async path => {
+              if (!canOpenProjects || projectOpeningRef.current) return
+              if (path === projectUiPath) {
+                const next = projectPaths.find(candidate => candidate !== path)
+                if (!next || !(await openRootProject(next))) return
+              }
+              setOpenProjectPaths(previous => previous.filter(candidate => candidate !== path))
+            }}
             onOpen={() => setOpenProjectDialog(true)}
           />
           {canUseTerminal && !isGuest && <div className="flex shrink-0 items-center">

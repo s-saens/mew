@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useId, useMemo, useRef, useState } from 'react'
-import { Check, Plus, Xmark } from 'iconoir-react'
+import { Check, EditPencil, Plus, Trash, Xmark } from 'iconoir-react'
 import { ActionMenu, ActionMenuItem, ActionMenuSeparator, DialogFrame } from '@mew/ui'
 import { projectTabIndex } from '@mew/shortcuts'
 import { useI18n } from '../i18n'
@@ -12,7 +12,7 @@ function labelOf(projectPath: string): string {
   return parts.at(-1) || projectPath
 }
 
-export function ProjectSwitcher({ paths, activePath, fallbackLabel, canOpen, canChangeIcon, icons, onActivate, onIconChange, onOpen, onPreview }: {
+export function ProjectSwitcher({ paths, activePath, fallbackLabel, canOpen, canChangeIcon, icons, onActivate, onIconChange, onOpen, onPreview, onRemove }: {
   paths: string[]
   activePath: string | null
   fallbackLabel: string
@@ -23,10 +23,12 @@ export function ProjectSwitcher({ paths, activePath, fallbackLabel, canOpen, can
   onIconChange: (path: string, icon: string) => void
   onOpen: () => void
   onPreview?: (path: string) => void
+  onRemove?: (path: string) => void
 }) {
   const { t } = useI18n()
   const trigger = useRef<HTMLButtonElement>(null)
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
+  const [contextMenu, setContextMenu] = useState<{ path: string; x: number; y: number } | null>(null)
   const [editingPath, setEditingPath] = useState<string | null>(null)
   const iconTitleId = useId()
   const hold = useRef<{ timer: ReturnType<typeof setTimeout>; x: number; y: number } | null>(null)
@@ -47,6 +49,11 @@ export function ProjectSwitcher({ paths, activePath, fallbackLabel, canOpen, can
     setMenu(null)
     trigger.current?.focus({ preventScroll: true })
     setEditingPath(path)
+  }
+  function openContextMenu(path: string, x: number, y: number) {
+    cancelHold()
+    setMenu(null)
+    setContextMenu({ path, x, y })
   }
   function openMenu() {
     if (!canOpen || !trigger.current) return
@@ -72,6 +79,7 @@ export function ProjectSwitcher({ paths, activePath, fallbackLabel, canOpen, can
 
   useEffect(() => {
     setMenu(null)
+    setContextMenu(null)
     cancelHold()
   }, [activePath, canOpen, canChangeIcon])
   useEffect(() => {
@@ -98,10 +106,10 @@ export function ProjectSwitcher({ paths, activePath, fallbackLabel, canOpen, can
         title={activePath ?? label} className="flex h-full min-w-0 select-none items-center gap-1.5 px-2.5 text-xs text-ink hover:bg-surface-raised focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
         style={{ WebkitTouchCallout: 'none' }}
         onClick={() => { if (Date.now() >= suppressClickUntil.current) openMenu() }}
-        onContextMenu={event => { if (canChangeIcon && activePath) { event.preventDefault(); editIcon(activePath) } }}
+        onContextMenu={event => { if (canChangeIcon && activePath) { event.preventDefault(); openContextMenu(activePath, event.clientX, event.clientY) } }}
         onKeyDown={event => {
           if ((event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) && canChangeIcon && activePath) {
-            event.preventDefault(); editIcon(activePath)
+            event.preventDefault(); const box = event.currentTarget.getBoundingClientRect(); openContextMenu(activePath, box.left, box.bottom)
           } else if (canOpen && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) { event.preventDefault(); openMenu() }
         }}
         onPointerDown={event => {
@@ -110,7 +118,8 @@ export function ProjectSwitcher({ paths, activePath, fallbackLabel, canOpen, can
           const path = activePath
           hold.current = { x: event.clientX, y: event.clientY, timer: setTimeout(() => {
             suppressClickUntil.current = Date.now() + 1000
-            editIcon(path)
+            const box = trigger.current?.getBoundingClientRect()
+            openContextMenu(path, box?.left ?? event.clientX, (box?.bottom ?? event.clientY) + 4)
           }, 550) }
         }}
         onPointerMove={event => { if (hold.current && Math.hypot(event.clientX - hold.current.x, event.clientY - hold.current.y) > 10) cancelHold() }}
@@ -124,14 +133,18 @@ export function ProjectSwitcher({ paths, activePath, fallbackLabel, canOpen, can
         hint={<span className="flex h-4 w-4 items-center justify-center">{path === activePath && <Check aria-hidden="true" />}</span>}
         onPointerEnter={() => { if (path !== activePath) onPreview?.(path) }} onFocus={() => { if (path !== activePath) onPreview?.(path) }}
         onClick={() => { if (path !== activePath) onActivate(path) }}
-        onContextMenu={event => { if (canChangeIcon) { event.preventDefault(); editIcon(path) } }}
-        onKeyDown={event => { if (canChangeIcon && (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10'))) { event.preventDefault(); editIcon(path) } }}>
+        onContextMenu={event => { if (canChangeIcon) { event.preventDefault(); openContextMenu(path, event.clientX, event.clientY) } }}
+        onKeyDown={event => { if (canChangeIcon && (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10'))) { event.preventDefault(); const box = event.currentTarget.getBoundingClientRect(); openContextMenu(path, box.left, box.bottom) } }}>
         <span className="min-w-0 flex-1 text-left"><span className="block truncate">{labelOf(path)}</span>
           {(labels.get(labelOf(path)) ?? 0) > 1 && <span className="block truncate text-[10px] text-ink-muted">{path}</span>}
         </span>
       </ActionMenuItem>)}
       {paths.length > 0 && <ActionMenuSeparator />}
       <ActionMenuItem icon={<Plus />} onClick={onOpen}>{t('project.add')}</ActionMenuItem>
+    </ActionMenu>}
+    {contextMenu && canChangeIcon && <ActionMenu key="project-actions" x={contextMenu.x} y={contextMenu.y} label={labelOf(contextMenu.path)} trigger={trigger.current} onClose={() => setContextMenu(null)}>
+      <ActionMenuItem icon={<EditPencil />} onClick={() => editIcon(contextMenu.path)}>{t('project.edit')}</ActionMenuItem>
+      {canOpen && onRemove && <ActionMenuItem icon={<Trash />} danger disabled={contextMenu.path === activePath && !paths.some(path => path !== activePath)} onClick={() => onRemove(contextMenu.path)}>{t('common.delete')}</ActionMenuItem>}
     </ActionMenu>}
     {editingPath && canChangeIcon && <DialogFrame labelledBy={iconTitleId} onClose={() => setEditingPath(null)}>
       <div className="p-3">
