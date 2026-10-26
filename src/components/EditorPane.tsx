@@ -307,10 +307,11 @@ export function EditorPane({
 
   const collabPath = canCollaborate ? primaryCollabPath(activeTab, role, project) : null
   // The socket authorizes independently. Prepare it alongside the file read, but
-  // attach the document only after that read confirms the body and edit access.
+  // attach only after that read confirms access and the document has synchronized.
   const preparedCollabPath = canCollaborate ? primaryCollabPath(activeTab, role, project, true) : null
   const collabSession = useCollab(project, preparedCollabPath, authEmail)
-  const collab = collabPath ? collabSession : null
+  const collab = collabPath && collabSession?.synced ? collabSession : null
+  const collaborationPending = !!collabPath && !collab
 
   // 하단 상태줄 — 파일 종류를 가리지 않아야 하므로 뷰어(Editor)가 아니라 칸이 그린다.
   const [selChars, setSelChars] = useState(0)
@@ -990,7 +991,7 @@ export function EditorPane({
                     debuggerContext={workspace?.path && authEmail && (role === 'owner' || role === 'manager') && (project === '.workspace' || activeTab.path.startsWith('/')) ? { root: workspace.path, account: authEmail } : undefined}
                     value={activeTab.content}
                     onChange={(content) => onChangeContent(activeTab.path, content)}
-                    readOnly={loading || revalidating || !activeTab.editable || isArchivedPath(activeTab.path, project) || !!activeTab.anchorPreview}
+                    readOnly={loading || revalidating || collaborationPending || !activeTab.editable || isArchivedPath(activeTab.path, project) || !!activeTab.anchorPreview}
                     collab={collab}
                     commentThreads={threads}
                     onCommentClick={openThread}
@@ -1009,7 +1010,7 @@ export function EditorPane({
                       value={activeTab.content}
                       api={editorApi}
                       onChange={(content) => onChangeContent(activeTab.path, content)}
-                      readOnly={loading || revalidating || !activeTab.editable || isArchivedPath(activeTab.path, project)}
+                      readOnly={loading || revalidating || collaborationPending || !activeTab.editable || isArchivedPath(activeTab.path, project)}
                       path={externalAbsolutePath(activeTab.path)}
                       fileLinkContext={workspace?.docsPath ? {
                         path: isExternalTabPath(activeTab.path) ? externalAbsolutePath(activeTab.path) : `${project === 'docs' ? workspace.docsPath : project === '.workspace' ? workspace.path : `${workspace.path}/${project}`}/${activeTab.path}`,

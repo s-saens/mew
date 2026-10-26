@@ -772,7 +772,7 @@ export const Editor = forwardRef<
       IncrementalMarkdown,
       VirtualBlocks,
       // 방을 처음 만든 클라이언트가 이미 로드해 둔 탭 내용으로 fragment를 시딩하는 건 아래
-      // useEffect가 담당한다 — 여기 content는 collab이 없을 때만 유효한 초기값
+      // layout effect가 담당한다 — 여기 content는 collab이 없을 때만 유효한 초기값
       ...(collab
         ? [
             Collaboration.configure({ document: collab.ydoc, field: COLLAB_FIELD }),
@@ -1686,8 +1686,11 @@ export const Editor = forwardRef<
   // 방을 처음 만든 클라이언트가 이미 로드해 둔 탭 내용(body)으로 Y.XmlFragment를 시딩한다
   // (디스크 재조회 아님) — 이미 누군가 협업 중이던 방이면 fragment가 비어 있지 않으므로
   // _forceRerender가 이미 그 내용을 로드해 둔 상태고, 여기서는 아무 일도 하지 않는다
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!editor || editor.isDestroyed || !collab || !collab.synced) return
+    // useEditor replaces its instance in a passive effect; never seed the previous view.
+    const document = editor.extensionManager.extensions.find(extension => extension.name === 'collaboration')?.options.document
+    if (document !== collab.ydoc) return
     const fragment = collab.ydoc.getXmlFragment(COLLAB_FIELD)
     if (fragment.length === 0 && body) {
       // SEED_ORIGIN으로 감싸 이 시딩이 undo 스택에 올라가지 않게 한다 (위 SEED_ORIGIN 선언부 주석 참고)
@@ -1698,7 +1701,7 @@ export const Editor = forwardRef<
   }, [editor, collab?.synced, collab?.ydoc, body])
 
   useEffect(() => {
-    if (!editor || editor.isDestroyed || collab && !collab.synced || !continuity.current) return
+    if (!editor || editor.isDestroyed || readOnly || collab && !collab.synced || !continuity.current) return
     const frame = requestAnimationFrame(() => {
       const previous = continuity.current, container = containerRef.current
       if (!previous || !container || editor.isDestroyed) return
@@ -1710,7 +1713,7 @@ export const Editor = forwardRef<
       container.scrollTop = previous.scrollTop
     })
     return () => cancelAnimationFrame(frame)
-  }, [editor, collab?.synced, body])
+  }, [editor, readOnly, collab?.synced, body])
 
   useEffect(() => {
     pathRef.current = path
