@@ -910,7 +910,7 @@ export function useTabs(
     (path: string, content: string, paneId?: string) => {
       const p = projectRef.current
       const tab = matchingPaneTab(paneOf(p, paneId), path)
-      if (!tab || tab.revalidating || workspaceRequestRef.current.scope !== workspaceScope || pageMutationRef.current === workspaceRequestRef.current.epoch) return
+      if (!tab || tab.revalidating || workspaceRequestRef.current.scope !== workspaceScope) return
       // 편집이 시작되면 미리보기 탭을 고정 탭으로 승격 (VSCode와 동일)
       mapTabsAtPath(p, path, (t) => ({ ...t, content, preview: false }))
       if (workspaceScope && !isExternalTabPath(path) && !isGitTabPath(path)) {
@@ -1294,14 +1294,15 @@ export function useTabs(
     workspace: workspaceScope ?? '', prepare: () => prepareDocumentPageMutation('*'), apply: refreshTaskDocuments,
   }), [workspaceScope, prepareDocumentPageMutation, refreshTaskDocuments])
 
-  const createChildPage = useCallback(async (path: string, name: string) => {
+  const createChildPage = useCallback(async (path: string, name: string, onCreated?: (result: DocumentPageMutation) => void) => {
     const p = projectRef.current, epoch = workspaceRequestRef.current.epoch
     const file = editorFile(path, p)
     const release = await prepareDocumentPageMutation(file.project)
     try {
       const result = await mutateDocumentPage('create', file.path, name, '', file.project, true)
       if (workspaceRequestRef.current.epoch !== epoch) return
-      await applyDocumentPageMutation(result, file.project)
+      // Insert into the current editor before remapping its path and collaboration room.
+      try { onCreated?.(result) } finally { await applyDocumentPageMutation(result, file.project) }
       return result
     } finally { release() }
   }, [prepareDocumentPageMutation, applyDocumentPageMutation])

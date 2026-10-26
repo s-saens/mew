@@ -4,11 +4,11 @@ parent: "mew-projects"
 title: "Documents·문서 지도 관리"
 status: "implemented"
 created: "2026-09-18"
-updated: "2026-10-16"
+updated: "2026-10-26"
 status_hash: "67f36d128f8ff98f55ff2f44e2197710413f6968309439a998bd606dad06b477"
 files: ["src/components/DocsSettingsModal.tsx", "src/components/FileTree.tsx", "server/docsRepo.ts", "src/components/DocumentGraph.tsx", "server/document-graph.ts", "src/utils/document-graph-layout.ts", "server/document-pages.ts", "src/hooks/useTabs.ts"]
 commits: []
-description: "Documents 대표·하위 문서의 파일·폴더 전환, 목록 캐시·가상화, 그래프와 가져오기·내보내기를 다루는 기능 계약. Markdown /page의 하위 페이지 이름 입력·생성 후 부모 화면 유지과 열린 탭·초안 보존 및 프로젝트 경계를 설명한다."
+description: "Documents 대표·하위 문서의 파일·폴더 전환, 목록 캐시·가상화, 그래프와 가져오기·내보내기를 다루는 기능 계약. Markdown /page의 명령 위치 링크 삽입·생성 중 입력과 부모 화면 유지, 열린 탭·초안 보존 및 프로젝트 경계를 설명한다."
 상위파일:
   - "MOC.md"
   - "_프로젝트·파일·검색.md"
@@ -29,7 +29,7 @@ description: "Documents 대표·하위 문서의 파일·폴더 전환, 목록 �
 - 폴더를 상위 문서로 표시하며 이름을 누르면 `_폴더이름.md` 대표 본문을 연다. 대표 파일은 하위 목록에 중복 표시하지 않는다.
 - 하위 항목이 없는 문서는 펼침 꺾쇠 자리에 작은 불렛을 표시한다. 불렛은 장식이며 탭 정지점이나 접근성 이름을 추가하지 않는다. 아직 하위 목록을 조회하지 않은 폴더는 기존 꺾쇠를 유지한다.
 - 자식 없는 문서는 `이름.md`로 저장하며 첫 자식 추가·마지막 자식 제거 때 저장 구조를 전환한다.
-- 편집 가능한 프로젝트 Markdown의 Hotview에서 `/page`를 실행하면 **+**와 같은 구조 변경으로 이름을 먼저 입력받아 하위 페이지를 만들고 부모 문서에 머무른다. 생성한 페이지는 목록이나 링크를 눌러 연다. 취소하면 생성하지 않는다. 같은 이름이 있으면 번호를 붙인다. 생성 전 초안을 저장하고 부모·참조 문서의 열린 탭과 자동저장 경로를 보정하며 중첩 생성을 지원한다. 게스트·읽기 전용·archives·프로젝트 밖 파일에는 명령을 제공하지 않는다.
+- 편집 가능한 프로젝트 Markdown의 Hotview에서 `/page`를 실행하면 **+**와 같은 구조 변경으로 이름을 먼저 입력받아 하위 페이지를 만들고, 명령 위치에 링크를 넣은 뒤 부모 문서에 머무른다. 생성한 페이지는 목록이나 링크를 눌러 연다. 취소·실패 때는 링크를 넣지 않는다. 같은 이름이 있으면 번호를 붙이고 링크에도 확정된 이름을 쓴다. 생성 전 초안을 저장하며 생성 중 입력도 보존한다. 부모·참조 문서의 열린 탭과 자동저장 경로를 보정하고 커서·포커스·스크롤 유지와 중첩 생성을 지원한다. 게스트·읽기 전용·archives·프로젝트 밖 파일에는 명령을 제공하지 않는다.
 - 일반 클릭은 현재 탭에서 열고 Ctrl/Cmd+클릭은 새 탭을 유지한다.
 - 탐색기 상단 전체 너비 문서/Documents 토글에서 문서 목록만 표시한다. 파일 보기와 전환해도 열린 에디터 탭은 유지한다.
 - Docs 루트의 문서 홈 위에 그래프 보기 진입점을 제공하고 내부 문서 링크를 빠르게 탐색한다.
@@ -68,7 +68,7 @@ description: "Documents 대표·하위 문서의 파일·폴더 전환, 목록 �
 - 기존 Documents·일반 파일의 저장된 탭은 한 번 합치며, 같은 이름의 파일과 편집 칸 ID를 보존한다. 통합 후 닫은 탭을 옛 Documents 저장분에서 다시 복원하지 않는다.
 
 - Docs 상단은 새 문서만 제공하고 각 문서의 +에서 하위를 만든다. 일반 파일 보기는 새 파일·새 폴더를 유지한다.
-- `Editor`의 `/page`는 호스트가 주입한 생성 콜백으로 `useTabs.createChildPage`를 실행한다. Documents와 일반 프로젝트 모두 기존 `DocumentPages` 엔진을 재사용하고 입력한 이름으로 생성하고 현재 부모 문서를 유지한다. 상세 저장·권한·중복 이름 처리는 [상위·하위 문서 계약](../../development/document-pages.md)을 따른다.
+- `Editor`의 `/page`는 호스트가 주입한 생성 콜백으로 `useTabs.createChildPage`를 실행한다. 성공 시 경로를 보정하기 전에 추적한 명령 위치에 링크를 삽입한다. Documents와 일반 프로젝트 모두 기존 `DocumentPages` 엔진을 재사용하며 생성 중 입력을 편집 버퍼에 반영하고 새 경로로 자동저장한다. 상세 저장·권한·중복 이름 처리는 [상위·하위 문서 계약](../../development/document-pages.md)을 따른다.
 
 <!-- mew:implementation:end -->
 
@@ -84,6 +84,8 @@ description: "Documents 대표·하위 문서의 파일·폴더 전환, 목록 �
 
 - 2026-10-06: 격리 Chromium 임시 fixture에서 파일·문서 트리의 세 단계 가이드선 수·14px 간격·연속 높이·접기 제거·클릭 통과를 검증하고 PC/모바일·양 테마 캡처를 확인했다. `server/document-pages-ui.test.ts`, `server/sidebar-tab-reveal-ui.test.ts`, `npx tsc -b`, `npm run lint`(기존 경고), 문서 배치·워크스페이스 링크 검사를 통과했다. 빌드·서버 재시작은 수행하지 않았다.
 ## 검증
+
+- 2026-10-26: `server/editor-page-command-ui.test.ts`에서 PC·모바일과 협업 유무별 명령 위치 링크 삽입·중복 이름·중첩 생성, 지연 응답 중 입력과 경로 변경 뒤 커서·포커스·긴 본문 스크롤 보존을 확인했다. 파일 API와 협업 소켓은 격리 테스트 대역이며 실행 중인 앱의 빌드·서버 적용은 수행하지 않았다.
 
 - 2026-10-04: Documents 대표 문서들을 상위 페이지 홈처럼 보이도록 정리하고, 트리·탭 표시명 변환을 추가했다. `MEW_DATA_DIR="${TMPDIR:-/tmp}/mew-test-data" node --test server/document-pages.test.ts server/document-pages-ui.test.ts`, `npm run lint`, `npx tsc -b`, `python3 ../.mew/docs/.github/scripts/check_doc_links.py --workspace`를 통과했다. `python3 ../.mew/docs/.github/scripts/check_repo_docs.py`는 종료 코드 0이었지만 이번 변경과 무관한 `todo/docs/*` 배치 경고를 출력했다. 전체 `npm test -- --runTestsByPath ...`는 스크립트가 전체 패턴을 함께 실행해 관련 없는 에이전트 UI 시간초과·환경 실패가 섞여 중단했다.
 

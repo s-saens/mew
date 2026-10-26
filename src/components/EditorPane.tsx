@@ -24,7 +24,7 @@ import {
   type Role,
   type TreeNode,
 } from '../api/client'
-import { AnnotationPopover, readSourceAnnotations, Editor, splitFrontmatter, type CommentAnchor, type EditorContextTarget, type EditorDbApi, type EditorHandle, type EditorOpenLink, type EditorOpenLinkOptions, type EditorViewAnchor } from '@mew/editor'
+import { AnnotationPopover, readSourceAnnotations, Editor, relativeLinkPath, splitFrontmatter, type CommentAnchor, type EditorContextTarget, type EditorDbApi, type EditorHandle, type EditorOpenLink, type EditorOpenLinkOptions, type EditorViewAnchor } from '@mew/editor'
 import { DatabaseListModal } from './DatabaseListModal'
 import type { DatabaseLink } from '../utils/database-links'
 import { CodePane, type CodePaneHandle } from './CodePane'
@@ -44,7 +44,7 @@ import { useCollab } from '../hooks/useCollab'
 import type { Pane, Tab } from '../hooks/useTabs'
 import type { DropZone } from '../utils/paneTree'
 import { externalAbsolutePath, isExternalTabPath } from '../utils/externalFiles'
-import { documentPageLabel, documentPageTarget } from '../../shared/document-pages'
+import { documentPageLabel, documentPageTarget, type DocumentPageMutation } from '../../shared/document-pages'
 import { afterFirstPaint, markFileOpen } from '../utils/fileOpenPerformance'
 import { MarkdownErrorBoundary } from './markdown-error-boundary'
 import { useI18n } from '../i18n'
@@ -172,7 +172,7 @@ export interface EditorPaneProps {
   onChangeContent: (path: string, content: string, paneId?: string) => void
   onOpenLink: EditorOpenLink
   onNavigateTab?: (direction: -1 | 1) => void
-  onCreateChildPage?: (path: string, name: string) => Promise<void>
+  onCreateChildPage?: (path: string, name: string, onCreated: (result: DocumentPageMutation) => void) => Promise<void>
   onOpenHistory: () => void
   onSetTocOpen: (open: boolean) => void
   onOpenSidebar: () => void
@@ -1019,13 +1019,18 @@ export function EditorPane({
                       } : undefined}
                       tree={tree}
                       onOpenLink={onOpenLink}
-                      onCreateChildPage={!isGuest && !isExternalTabPath(activeTab.path) && onCreateChildPage ? async () => {
+                      onCreateChildPage={!isGuest && !isExternalTabPath(activeTab.path) && onCreateChildPage ? async insert => {
                         const sourcePath = pane.activePath
                         const name = await pageDialogs.prompt({ message: uiText('새 하위 페이지 만들기'), label: uiText('새 문서 이름'), confirmLabel: uiText('만들기') })
-                        if (name && activeKeyRef.current === sourcePath) await onCreateChildPage(toTabPath(activeTab.path), name)
+                        if (name && activeKeyRef.current === sourcePath) await onCreateChildPage(toTabPath(activeTab.path), name, result => {
+                          if (activeKeyRef.current !== sourcePath) return
+                          const href = encodeURI(relativeLinkPath(activeTab.path, result.path)).replace(/[#?()]/g, char => '%' + char.charCodeAt(0).toString(16).toUpperCase())
+                          insert({ href, label: result.path.split('/').pop()!.replace(/\.md$/i, '') })
+                        })
                       } : undefined}
                       onSelectionChars={setSelChars}
                       collab={collab}
+                      collaborationPending={!!collabPath && !collab?.synced}
                       commentThreads={threads}
                       onCommentClick={openThread}
                       onAnnotationOpen={openAnnotation}

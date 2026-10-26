@@ -24,7 +24,7 @@ import { MarkdownTable } from './editor/tableMarkdown'
 import DragHandle from '@tiptap/extension-drag-handle'
 import { Collaboration } from '@tiptap/extension-collaboration'
 import { CollaborationCaret } from '@tiptap/extension-collaboration-caret'
-import { NodeSelection, TextSelection } from '@tiptap/pm/state'
+import { NodeSelection, TextSelection, type Transaction } from '@tiptap/pm/state'
 import { Fragment, type Node as PMNode } from '@tiptap/pm/model'
 import { findTable, selectionCell, TableMap } from '@tiptap/pm/tables'
 import type { EditorView } from '@tiptap/pm/view'
@@ -296,11 +296,12 @@ export const Editor = forwardRef<
     fileLinkContext?: FileLinkContext
     tree?: TreeNode[]
     onOpenLink?: EditorOpenLink
-    onCreateChildPage?: () => Promise<void>
+    onCreateChildPage?: (insert: (link: { href: string; label: string }) => void) => Promise<void>
     /** 선택 글자 수를 호스트 상태줄에 넘긴다 — 상태줄은 파일 종류를 가리지 않으므로 에디터 밖(EditorPane)에 있다 */
     onSelectionChars?: (count: number) => void
     /** 있으면 이 방의 Y.XmlFragment가 본문의 진실 원천이 된다 — value/onChange는 그 결과를 반영만 한다 */
     collab?: EditorCollab | null
+    collaborationPending?: boolean
     /** 파일 댓글 스레드 — 본문 위 장식(하이라이트)으로만 그린다. 저장·해석은 호스트 몫 */
     commentThreads?: CommentThreadInput[]
     onCommentClick?: (id: string, x: number, y: number) => void
@@ -311,7 +312,7 @@ export const Editor = forwardRef<
     showMobileKeyBar?: boolean
   }
 >(function Editor(
-  { value, onChange, api, readOnly, path = '', fileLinkContext, tree = [], onOpenLink, onCreateChildPage, onSelectionChars, collab, commentThreads, onCommentClick, onAnnotationOpen, onStartComment, showMobileKeyBar = true },
+  { value, onChange, api, readOnly, path = '', fileLinkContext, tree = [], onOpenLink, onCreateChildPage, onSelectionChars, collab, collaborationPending, commentThreads, onCommentClick, onAnnotationOpen, onStartComment, showMobileKeyBar = true },
   ref,
 ) {
   useUiLocale()
@@ -1602,10 +1603,19 @@ export const Editor = forwardRef<
         if (creatingPageRef.current) return
         creatingPageRef.current = true
         e.chain().focus().deleteRange(r).run()
+        let pos = e.state.selection.from
+        const trackPosition = ({ transaction }: { transaction: Transaction }) => { pos = transaction.mapping.map(pos, -1) }
+        e.on('transaction', trackPosition)
         setUploadError(null)
-        void onCreateChildPage().catch(error => {
+        void onCreateChildPage(({ href, label }) => {
+          if (e.isDestroyed || editorRef.current !== e || readOnlyRef.current) return
+          e.commands.insertContentAt(pos, { type: 'text', text: label, marks: [{ type: 'link', attrs: { href } }] }, { updateSelection: false })
+          const active = e.view.dom.ownerDocument.activeElement
+          const { from, to } = e.state.selection
+          continuity.current = { from, to, focused: e.isFocused || active === e.view.dom.ownerDocument.body, scrollTop: containerRef.current?.scrollTop ?? 0 }
+        }).catch(error => {
           setUploadError(error instanceof Error ? error.message : uiText("하위 페이지 생성 실패"))
-        }).finally(() => { creatingPageRef.current = false })
+        }).finally(() => { e.off('transaction', trackPosition); creatingPageRef.current = false })
       },
     }] : []),
     { id: 'diagram', title: uiText("다이어그램"), description: uiText("Mermaid 다이어그램 삽입"), keywords: ['diagram', 'mermaid', '다이어그램', '흐름도'], run: (e, r) => e.chain().focus().deleteRange(r).insertContent({ type: 'codeBlock', attrs: { language: 'mermaid' }, content: [{ type: 'text', text: 'flowchart LR\n  A[시작] --> B[완료]' }] }).run() },
@@ -1669,8 +1679,12 @@ export const Editor = forwardRef<
       if (local?.editor === editor && local.doc === editor.state.doc && local.body === body) return
       const current = (editor.storage as any).markdown?.getMarkdown() ?? ''
       if (current !== body) {
+        const selection = editor.state.selection.getBookmark()
+        const scrollTop = containerRef.current?.scrollTop
         // 프로그램적 로드는 onUpdate를 발생시키지 않아야 함 (탭 dirty/승격 오작동 방지)
         editor.commands.setContent(body, { emitUpdate: false })
+        try { editor.view.dispatch(editor.state.tr.setSelection(selection.resolve(editor.state.doc))) } catch { /* The new body may have removed the selection. */ }
+        if (containerRef.current && scrollTop !== undefined) containerRef.current.scrollTop = scrollTop
       }
       localMarkdownRef.current = null
       editor.view.dispatch(editor.state.tr.setMeta(lineFocusSourceKey, { source: body }))
@@ -1701,7 +1715,7 @@ export const Editor = forwardRef<
   }, [editor, collab?.synced, collab?.ydoc, body])
 
   useEffect(() => {
-    if (!editor || editor.isDestroyed || readOnly || collab && !collab.synced || !continuity.current) return
+    if (!editor || editor.isDestroyed || readOnly || collaborationPending || collab && !collab.synced || !continuity.current) return
     const frame = requestAnimationFrame(() => {
       const previous = continuity.current, container = containerRef.current
       if (!previous || !container || editor.isDestroyed) return
@@ -1713,7 +1727,7 @@ export const Editor = forwardRef<
       container.scrollTop = previous.scrollTop
     })
     return () => cancelAnimationFrame(frame)
-  }, [editor, readOnly, collab?.synced, body])
+  }, [editor, readOnly, collaborationPending, collab?.synced, body])
 
   useEffect(() => {
     pathRef.current = path

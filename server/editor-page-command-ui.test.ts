@@ -12,7 +12,7 @@ import { DocumentPages } from './document-pages.ts'
 
 const repo = path.resolve(import.meta.dirname, '..')
 
-test('/page names child pages before creation and keeps the parent open on desktop and mobile', { skip: !domBrowserExecutable(), timeout: 60_000 }, async t => {
+test('/page inserts child links and preserves editing across path changes on desktop and mobile', { skip: !domBrowserExecutable(), timeout: 60_000 }, async t => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mew-page-command-'))
   t.after(() => fs.rmSync(root, { recursive: true, force: true }))
   const source = `
@@ -34,10 +34,10 @@ test('/page names child pages before creation and keeps the parent open on deskt
           <button onClick={()=>setGuest(value=>!value)}>Guest</button></nav>
         <div data-active={tabs.activePath||''} data-tabs={JSON.stringify(tabs.tabs.map(tab=>tab.path))}/>
         {tabs.panes.map(pane=><EditorPane key={pane.id} {...callbacks} pane={pane} role={guest?'guest':'owner'} authEmail={null} project=".workspace"
-          tree={[]} presence={{}} focused isGuest={guest} canCollaborate={false} showSidebarButton={false} tocOpen={false} dropZone={null}
+          tree={[]} presence={{}} focused isGuest={guest} canCollaborate={location.search.includes('collab')} showSidebarButton={false} tocOpen={false} dropZone={null}
           onFocus={()=>tabs.focusPane(pane.id)} onActivate={path=>tabs.setActivePath(path,pane.id)} onSetViewMode={tabs.setTabViewMode}
           onChangeContent={tabs.updateTabContent} onOpenLink={path=>tabs.openFile(path,{preview:false,paneId:pane.id})}
-          onCreateChildPage={async (path,name)=>{await tabs.createChildPage(path,name)}}/>)}
+          onCreateChildPage={async (path,name,onCreated)=>{await tabs.createChildPage(path,name,onCreated)}}/>)}
         <span role="status">{notice}</span>
       </div>
     }
@@ -66,10 +66,10 @@ test('/page names child pages before creation and keeps the parent open on deskt
   const css = compiler.build([...new Set(candidates.join('\n').match(/[A-Za-z0-9_@!:/.[\]()%,-]+/g))]) + styles.join('\n')
   const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
   t.after(() => browser.close())
-  for (const width of [1100, 390]) {
-    const workspace = path.join(root, String(width)), docs = path.join(workspace, 'docs')
+  for (const collaborative of [false, true]) for (const width of [1100, 390]) {
+    const workspace = path.join(root, `${width}-${collaborative}`), docs = path.join(workspace, 'docs')
     fs.mkdirSync(docs, { recursive: true })
-    fs.writeFileSync(path.join(docs, 'abc.md'), '# ABC\n\nOriginal body\n\n[회의 기록](abc/회의%20기록.md)\n')
+    fs.writeFileSync(path.join(docs, 'abc.md'), '# ABC\n\n[참고](readonly.md)\n\n' + Array.from({ length: 30 }, (_, i) => `Earlier paragraph ${i}`).join('\n\n') + '\n\nOriginal body\n\nAfter command\n')
     fs.writeFileSync(path.join(docs, 'readonly.md'), 'Readonly body')
     fs.writeFileSync(path.join(workspace, 'notes.md'), 'Workspace body')
     const pages = { docs: new DocumentPages(docs), '.workspace': new DocumentPages(workspace) }
@@ -101,15 +101,31 @@ test('/page names child pages before creation and keeps the parent open on deskt
       }
       if (url.pathname === '/api/rules') return json({ violations: [], archived: false })
       if (url.pathname === '/api/file-access') return json({ view: true, edit: true })
+      if (url.pathname === '/api/comments') return json({ threads: [] })
+      if (url.pathname === '/api/members') return json({ members: [] })
+      if (url.pathname === '/api/table-layout') return json({ tables: [] })
       if (url.pathname.startsWith('/api/')) return json([])
       if (url.pathname === '/app.js' || scripts.has(url.pathname)) return route.fulfill({ contentType: 'text/javascript', body: url.pathname === '/app.js' ? entry.code : scripts.get(url.pathname)! })
       return route.fulfill({ contentType: 'text/html', body: `<!doctype html><html class="${width > 768 ? 'dark' : ''}"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}</style><div id="root"></div><script type="module" src="/app.js"></script></html>` })
     })
-    await page.goto('http://mew-page-command.test/')
+    await page.routeWebSocket('**/api/collab?**', ws => {
+      ws.onMessage(message => {
+        if (typeof message !== 'string' && message[0] === 0 && message[1] === 0) ws.send(Buffer.from([0, 1, 2, 0, 0]))
+      })
+    })
+    await page.goto(`http://mew-page-command.test/${collaborative ? '?collab' : ''}`)
     await page.getByRole('button', { name: 'Docs', exact: true }).click()
     const editor = page.locator('.tiptap')
     await editor.getByText('Original body', { exact: true }).waitFor()
-    await editor.click(); await page.keyboard.press('ControlOrMeta+End'); await page.keyboard.press('Enter')
+    await editor.evaluate(el => new Promise<void>(resolve => {
+      const win = el.ownerDocument.defaultView!
+      win.requestAnimationFrame(() => win.requestAnimationFrame(() => resolve()))
+    }))
+    await editor.getByText('Original body', { exact: true }).click()
+    assert.equal(await editor.evaluate(el => el.ownerDocument.getSelection()?.anchorNode?.textContent), 'Original body')
+    await page.keyboard.press('End')
+    assert.equal(await editor.evaluate(el => el.ownerDocument.getSelection()?.anchorOffset), 'Original body'.length)
+    await page.keyboard.press('Enter')
     await page.keyboard.type('Draft before command'); await page.keyboard.press('Enter'); await page.keyboard.type('/page')
     const command = page.getByRole('button', { name: '하위 페이지 새 하위 페이지 만들기', exact: true })
     await command.waitFor()
@@ -130,8 +146,11 @@ test('/page names child pages before creation and keeps the parent open on deskt
     assert.match(fs.readFileSync(path.join(docs, 'abc/_abc.md'), 'utf8'), /Draft before command/)
     assert.match(fs.readFileSync(path.join(docs, 'abc/_abc.md'), 'utf8'), /Original body/)
     assert.doesNotMatch(fs.readFileSync(path.join(docs, 'abc/_abc.md'), 'utf8'), /\/page/)
-    await editor.click(); await page.keyboard.press('ControlOrMeta+End'); await page.keyboard.insertText('During creation')
+    await editor.getByText('Original body', { exact: true }).click(); await page.keyboard.press('Home'); await page.keyboard.insertText('Before insertion ')
+    await editor.getByText('After command', { exact: true }).click(); await page.keyboard.press('End'); await page.keyboard.insertText('During creation')
     await page.waitForTimeout(600)
+    const scrollBefore = await page.locator('.editor-root').evaluate(el => el.scrollTop)
+    assert.ok(scrollBefore > 200, 'the fixture exercises promotion away from the top of a document')
     assert.equal(fs.existsSync(path.join(docs, 'abc.md')), false, 'pending autosave does not recreate the old path')
     releaseCreation!()
     await page.locator('[data-active$="abc/_abc.md"]').waitFor({ state: 'attached' })
@@ -139,6 +158,17 @@ test('/page names child pages before creation and keeps the parent open on deskt
     assert.match(fs.readFileSync(path.join(docs, 'abc/_abc.md'), 'utf8'), /During creation/)
     assert.equal(fs.existsSync(path.join(docs, 'abc.md')), false)
     assert.equal(fs.existsSync(path.join(docs, 'abc/회의 기록.md')), true)
+    const childLink = editor.getByRole('link', { name: '회의 기록', exact: true })
+    await childLink.waitFor()
+    assert.equal(await childLink.getAttribute('href'), '%ED%9A%8C%EC%9D%98%20%EA%B8%B0%EB%A1%9D.md')
+    assert.match(fs.readFileSync(path.join(docs, 'abc/_abc.md'), 'utf8'), /\[회의 기록\]\(%ED%9A%8C%EC%9D%98%20%EA%B8%B0%EB%A1%9D\.md\)/)
+    assert.match((await editor.innerText()).replace(/\u200b/g, ''), /Before insertion Original body\s+Draft before command\s+회의 기록\s+After command/)
+    assert.equal(await editor.getByRole('link', { name: '참고', exact: true }).getAttribute('href'), '../readonly.md')
+    assert.equal(await editor.evaluate(el => el.ownerDocument.activeElement === el), true, 'path changes retain editor focus')
+    assert.ok(Math.abs(await page.locator('.editor-root').evaluate(el => el.scrollTop) - scrollBefore) < 2, 'path changes retain scroll position')
+    await page.keyboard.insertText(' after creation')
+    await page.waitForTimeout(650)
+    assert.match(fs.readFileSync(path.join(docs, 'abc/_abc.md'), 'utf8'), /During creation after creation/, 'typing resumes at the same caret after promotion')
     assert.equal(await page.getByRole('tab').count(), 1, 'creation does not open a child tab')
     async function createNamed(name: string) {
       await editor.click(); await page.keyboard.press('ControlOrMeta+End'); await page.keyboard.press('Enter')
@@ -148,10 +178,11 @@ test('/page names child pages before creation and keeps the parent open on deskt
     await createNamed('회의 기록')
     await page.waitForTimeout(650)
     assert.equal(fs.existsSync(path.join(docs, 'abc/회의 기록 2.md')), true)
+    await editor.getByRole('link', { name: '회의 기록 2', exact: true }).waitFor()
     assert.equal(requests.length, 2)
     assert.match((await page.locator('[data-active]').getAttribute('data-active'))!, /abc\/_abc.md$/)
     // A document opens only after an explicit link click.
-    await editor.locator('a').filter({ hasText: '회의 기록' }).click({ modifiers: ['ControlOrMeta'] })
+    await childLink.click({ modifiers: ['ControlOrMeta'] })
     await page.waitForTimeout(300)
     assert.match((await page.locator('[data-active]').getAttribute('data-active'))!, /abc\/회의 기록.md$/, JSON.stringify({errors}))
     await page.locator('[data-editor-loading]').waitFor({ state: 'hidden' })

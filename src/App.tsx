@@ -1858,8 +1858,8 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
           }}
           onOpenLink={(linkPath, options) => openFile(linkPath, { preview: false, forceNewTab: !!options?.newTab, replaceActive: !options?.newTab, paneId: pane.id })}
           onNavigateTab={(direction) => navigateTab(direction, pane.id)}
-          onCreateChildPage={!isGuest && caps.filesRead && caps.filesWrite ? async (path, name) => {
-            const result = await createChildPage(path, name)
+          onCreateChildPage={!isGuest && caps.filesRead && caps.filesWrite ? async (path, name, onCreated) => {
+            const result = await createChildPage(path, name, onCreated)
             if (result) void refreshTree()
           } : undefined}
           onOpenHistory={() => setHistoryOpen(true)}
