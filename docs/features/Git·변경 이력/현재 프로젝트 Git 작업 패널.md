@@ -6,9 +6,9 @@ status: "implemented"
 created: "2026-09-18"
 updated: "2026-10-26"
 status_hash: "ad2d450aae96362a9d082f3989ccd04643632b17559700c16044ef32ca54d690"
-files: ["src/components/GitWorkbench.tsx", "src/utils/git-graph.ts", "src/components/git-diff-editor.tsx", "src/components/git-changes-menu.tsx", "src/utils/git-diff-tabs.ts", "src/components/git-branch-picker.tsx", "src/components/git-panel.tsx", "src/components/github-account.tsx", "server/github-auth.ts", "server/github-auth-routes.ts", "src/components/git-ai-commit-dialog.tsx", "server/gitWorkbench.ts", "server/git-ai-commit.ts", "server/git-commit-analysis.ts", "server/git-commit-packets.ts", "server/git-diff-codec.ts", "server/git-change-intent.ts", "server/git-change-intent-cli.ts", "server/git-ai-commit-runner.ts", "server/git-ai-commit-routes.ts"]
+files: ["src/components/GitWorkbench.tsx", "src/utils/git-graph.ts", "src/utils/git-graph-branches.ts", "src/components/git-diff-editor.tsx", "src/components/git-changes-menu.tsx", "src/utils/git-diff-tabs.ts", "src/components/git-branch-picker.tsx", "src/components/git-panel.tsx", "src/components/github-account.tsx", "server/github-auth.ts", "server/github-auth-routes.ts", "src/components/git-ai-commit-dialog.tsx", "server/gitWorkbench.ts", "server/git-ai-commit.ts", "server/git-commit-analysis.ts", "server/git-commit-packets.ts", "server/git-diff-codec.ts", "server/git-change-intent.ts", "server/git-change-intent-cli.ts", "server/git-ai-commit-runner.ts", "server/git-ai-commit-routes.ts"]
 commits: []
-description: "Ctrl/Cmd+G로 여는 현재 프로젝트의 변경 파일·현재 브랜치 커밋 기록의 기본 50:50 배치·와일드카드 검색·일반선택과 커밋대상선택·에디터 diff·분기와 합류의 연결선·열·색상을 유지하는 커밋 그래프, 선택 변경 커밋·취소, 햄버거 메뉴와 표면을 맞춘 타이틀바의 조밀한 브랜치 검색·선택·생성·안전한 로컬 삭제, 기존 worktree로의 프로젝트 전환과 Pull·Push를 다루는 기능 계약. 계정 연결과 AI 작업 단위 커밋의 승인·범위·JSON 응답 자동 복구 규칙을 포함한다."
+description: "Ctrl/Cmd+G로 여는 현재 프로젝트의 변경 파일·현재 브랜치 커밋 기록의 기본 50:50 배치·와일드카드 검색·일반선택과 커밋대상선택·에디터 diff·분기와 합류의 연결선·열·색상·브랜치 이름 툴팁·클릭 전환을 제공하는 커밋 그래프, 선택 변경 커밋·취소, 햄버거 메뉴와 표면을 맞춘 타이틀바의 조밀한 브랜치 검색·선택·생성·안전한 로컬 삭제, 기존 worktree로의 프로젝트 전환과 Pull·Push를 다루는 기능 계약. 계정 연결과 AI 작업 단위 커밋의 승인·범위·JSON 응답 자동 복구 규칙을 포함한다."
 상위파일:
   - "MOC.md"
   - "_Git·변경 이력.md"
@@ -27,6 +27,9 @@ description: "Ctrl/Cmd+G로 여는 현재 프로젝트의 변경 파일·현재 
 - Git 패널 열기·닫기의 기본 단축키는 `Ctrl/Cmd+G`다. 단축키 설정에서 사용자가 재지정한 조합은 유지한다.
 
 - 커밋 그래프·변경 파일·diff, 체크한 파일의 작업트리 내용 커밋을 제공한다.
+- 그래프 선·점에 마우스를 올리면 연결된 실제 브랜치 이름을 공용 툴팁으로 표시하며 클릭 또는 Enter·Space로 전환한다. 여러 브랜치가 겹치면 이름별 선택 메뉴를 연다. 현재 브랜치를 고르면 추가 Git 작업을 하지 않으며, 태그·삭제된 브랜치·연결할 ref가 없는 선에는 전환 동작을 만들지 않는다. 커밋 제목 클릭은 기존 상세 보기를 유지한다.
+- 로그의 현재 HEAD 범위는 유지하고 각 커밋에 같은 해시를 가리키는 로컬·원격 브랜치의 전체 ref·이름·종류·해시를 `branches`로 전달한다. `repositoryBranches`도 ref 해시를 포함한다. 그래프는 첫 부모 경로를 따라 이름을 연결하고 합류선은 해당 부모 경로를 사용해 열 재사용이나 검색으로 다른 브랜치를 잘못 연결하지 않는다. 전환은 기존 브랜치 API를 사용하며 다른 worktree의 브랜치는 프로젝트 열기로 이동한다. 실패 시 오류·현재 브랜치·미커밋 변경을 보존한다.
+
 - Changes(변경사항) 제목 오른쪽의 검색창에서 변경 파일을 즉시 필터링한다. 일반 입력은 대소문자를 구분하지 않는 경로 부분 검색이며, `*`는 경로 구분자를 포함한 0개 이상의 문자, `?`는 한 문자를 뜻한다. 와일드카드는 전체 상대 경로 또는 파일명과 일치해야 한다. 이름 변경 파일은 이전 경로도 검색한다. 예: `*.tsx`, `src/*`, `file-?.ts`.
 - 검색창은 기존 헤더 높이 안에 검색 아이콘·입력·결과 개수·지우기 버튼을 정렬하고 테마색 포커스 테두리를 적용한다. 좁은 패널에서는 검색 아이콘·결과 개수를 숨겨 입력 공간과 작업 버튼을 확보한다. X 또는 입력 중 Esc로 검색을 지우며 결과가 없으면 별도 빈 결과 상태를 표시한다.
 - 검색은 기존 선택과 커밋 초안을 유지한다. 전체 선택/해제와 드래그 선택은 표시된 검색 결과에만 적용하고 숨겨진 파일의 선택은 보존한다. 헤더의 선택 개수·커밋·AI 커밋·변경 취소는 숨겨진 선택까지 포함한 기존 전체 선택을 사용한다. diff 왕복·자동 새로고침·패널 닫기/재열기에도 검색을 유지하며 프로젝트·저장소를 바꾸면 초기화한다.
@@ -141,6 +144,8 @@ description: "Ctrl/Cmd+G로 여는 현재 프로젝트의 변경 파일·현재 
 
 - 2026-10-06: 서버·번역·권한·Git 패널 Chromium 총 13개 검사를 통과했다. 선택 범위 밖 stage 보존, 삭제·이름 변경·새 파일·최초 커밋 전 취소, 잘못된 경로/폴더/미선택 원래 경로 거부, workspace·권한 차단, 확인 전 무요청·취소·Esc·실패 후 선택 유지·성공 후 목록 갱신을 확인했다. PC·모바일 확인창 캡처와 타입·대상 lint·UI detector·문서 경계/링크 검사도 통과했다.
 ## 검증
+
+- 2026-10-26: 브랜치 ref·해시 기반 그래프 이름 추적과 합류·열 재사용·잘린 이력, 현재 HEAD 조회·기존 Git 작업의 단위·서버 검사 17개 및 Git 패널 Chromium 검사 1개를 통과했다. 그래프 선 hover 툴팁·점 클릭 실패와 재시도·Enter/Space·현재 브랜치 무동작·중복 이름 선택·원격 전환·worktree 프로젝트 이동을 확인했다. PC 툴팁·모바일 선택 메뉴 캡처를 검토했고 타입·대상 린트(기존 경고)·UI 정적·diff 검사도 통과했다. 문서 description은 통과했으며 전체 링크 검사는 기존 태스크의 누락된 문서 링크 1개로 실패했다. 앱 빌드·서버 적용은 수행하지 않았다.
 
 - 2026-10-26: 브랜치 정렬·로컬 삭제와 기존 Git 이력·작업 회귀 12개 및 Git 패널 Chromium 검사 1개를 통과했다. 1440·320px 라이트·다크 화면에서 보호 브랜치·원격의 X 제외, 검색·키보드 접근, 삭제 확인·취소·오류 재시도, 현재 브랜치·초안 보존을 확인했다. 서버는 활성 worktree·HEAD 미병합 커밋과 upstream만 일치하는 미통합 커밋의 삭제를 거부했다. 타입·대상 린트(기존 경고)·UI 정적·diff 검사를 통과했다. 문서 description은 통과했으며 전체 링크 검사는 기존 태스크 목록의 누락된 문서 링크 1개로 실패했다. 앱 빌드·서버 재시작은 수행하지 않았다.
 

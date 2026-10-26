@@ -81,6 +81,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     const errors: string[] = [], writes: string[] = [], reads: string[] = []
     let repositoryExists = true
     let externalCommit = false
+    let graphBranchMode = false
     let repositoryBranch = 'main'
     let remoteFailure = false
     let workingFiles = Array.from({ length: 60 }, (_, index) => ({ path: index === 0 ? 'file.ts' : `src/components/long-directory-name/changed-file-${index}.tsx`, status: index % 2 ? '??' : 'M', currentIp: index < 2 }))
@@ -97,7 +98,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
       if (resource.kind === 'git-diff') return { diff: workingFiles.some(file => file.path === resource.file) ? `diff --git a/file.ts b/file.ts\n--- a/file.ts\n+++ b/file.ts\n@@ -1 +1 @@\n-old\n+${diffLine}\n` : '', deleted: false }
       return {
         info: { repository: repositoryExists, workspace: '/fixture', remotes: ['origin'], originUrl: 'https://github.com/owner/repo', branch: repositoryBranch, ahead: 0, behind: 0 },
-        commits: Array.from({ length: 80 }, (_, index) => ({ hash: `abc12345${index}`, parents: index < 79 ? [`abc12345${index === 0 ? 2 : index + 1}`] : [], subject: index === 0 && externalCommit ? '외부 터미널에서 만든 새 커밋' : index === 0 ? '패널 작업: 긴 커밋 제목도 메타데이터를 밀어내지 않고 한 줄로 표시합니다' : `패널 작업 ${index}`, author: 'Tester with a long name', date: new Date(stamp - index * 3_600_000 - 10_000).toISOString(), refs: index === 0 ? ['main', 'tag: v1'] : [] })),
+        commits: Array.from({ length: 80 }, (_, index) => ({ hash: `abc12345${index}`, parents: index < 79 ? [`abc12345${index === 0 ? 2 : index + 1}`] : [], subject: index === 0 && externalCommit ? '외부 터미널에서 만든 새 커밋' : index === 0 ? '패널 작업: 긴 커밋 제목도 메타데이터를 밀어내지 않고 한 줄로 표시합니다' : `패널 작업 ${index}`, author: 'Tester with a long name', date: new Date(stamp - index * 3_600_000 - 10_000).toISOString(), refs: index === 0 ? ['main', 'tag: v1'] : [], branches: graphBranchMode ? index === 0 ? [{ name: 'main', ref: 'refs/heads/main', kind: 'local' }, { name: 'origin/remote-topic', ref: 'refs/remotes/origin/remote-topic', kind: 'remote' }] : index === 1 ? [{ name: 'feature/searchable', ref: 'refs/heads/feature/searchable', kind: 'local' }] : [] : [] })),
         workingTree: { files: workingFiles },
       }
     })
@@ -208,9 +209,9 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     assert.ok((await bounds(pull)).x < (await bounds(push)).x, 'pull precedes push in the title bar')
     const changes = page.locator('[data-git-scroll="changes"]')
     const history = page.locator('[data-git-scroll="history"]')
-    const graphRows = history.getByRole('button')
-    const firstGraph = graphRows.nth(0).locator('svg').first()
-    const branchGraph = graphRows.nth(1).locator('svg').first()
+    const graphRows = history.locator('[data-git-commit]')
+    const firstGraph = graphRows.nth(0).locator('..').locator('svg').first()
+    const branchGraph = graphRows.nth(1).locator('..').locator('svg').first()
     assert.equal(await firstGraph.locator('path').count(), 1, 'a branch tip has no phantom incoming line')
     assert.equal(await branchGraph.locator('circle').getAttribute('cx'), '18', 'new tips do not displace existing lanes')
     assert.deepEqual(await branchGraph.locator('path').evaluateAll(paths => paths.map(path => path.getAttribute('d'))), [
@@ -220,15 +221,15 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     const historyHeader = page.getByRole('region', { name: '커밋 기록', exact: true }).locator(':scope > div').first()
     const historySearch = historyHeader.getByRole('searchbox', { name: '커밋 기록 검색', exact: true })
     await historySearch.fill('패널 작업 ?')
-    assert.equal(await history.getByRole('button').count(), 9)
+    assert.equal(await history.locator('[data-git-commit]').count(), 9)
     assert.equal(await history.locator('svg path').count(), 0, 'filtered history does not draw misleading connections')
     await historySearch.fill('ABC123451?')
-    assert.equal(await history.getByRole('button').count(), 10)
+    assert.equal(await history.locator('[data-git-commit]').count(), 10)
     await historySearch.fill('TESTER')
-    assert.equal(await history.getByRole('button').count(), 80)
+    assert.equal(await history.locator('[data-git-commit]').count(), 80)
     await historySearch.fill('tag: v?')
-    assert.equal(await history.getByRole('button').count(), 1)
-    await history.getByRole('button').first().click()
+    assert.equal(await history.locator('[data-git-commit]').count(), 1)
+    await history.locator('[data-git-commit]').first().click()
     await page.getByRole('button', { name: '뒤로 가기', exact: true }).click()
     assert.equal(await historySearch.inputValue(), 'tag: v?')
     await historySearch.fill('no-matching-commit')
@@ -514,7 +515,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     assert.equal(await changes.getByRole('checkbox', { checked: true }).count(), 60)
     await page.getByRole('checkbox', { name: '변경 파일 전체 선택' }).uncheck()
     await firstCheck.check()
-    const rowBox = await bounds(history.getByRole('button').first())
+    const rowBox = await bounds(history.locator('[data-git-commit]').first())
     assert.equal(rowBox.height, 28)
     assert.equal(await history.locator('time').first().textContent(), '0분 전')
     assert.equal(await history.locator('time').nth(1).textContent(), '1시간 전')
@@ -631,7 +632,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     await page.getByRole('region', { name: '현재 변경사항' }).waitFor()
     assert.equal(await branchSlot.getByRole('button', { name: '브랜치 선택', exact: true }).isVisible(), true)
     assert.equal(await history.evaluate(el => el.scrollWidth > el.clientWidth), false)
-    assert.equal((await bounds(history.getByRole('button').first())).height, 28)
+    assert.equal((await bounds(history.locator('[data-git-commit]').first())).height, 28)
     await screenshot('mobile-split')
     await page.setViewportSize({ width: 1440, height: 900 })
     await page.getByLabel('커밋 제목', { exact: true }).fill('KEEP DRAFT')
@@ -976,7 +977,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     assert.deepEqual(await page.evaluate('window.openedFile'), { project: '.workspace', path: openedPath })
     await back()
     await changes.waitFor()
-    await history.getByRole('button').first().click()
+    await history.locator('[data-git-commit]').first().click()
     await page.waitForFunction("window.fixture.screen.kind === 'commit'")
     await page.locator('[data-dock-body="git"]').locator('[data-git-file-button]:visible').first().click()
     await page.locator('[data-git-diff-editor]').waitFor()
@@ -985,6 +986,49 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     await page.waitForFunction("window.fixture.screen.kind === 'commit'")
     await pick('뒤로 가기')
     await changes.waitFor()
+    graphBranchMode = true
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await history.evaluate(el => { el.scrollTop = 0 })
+    const featureGraph = history.locator('circle[data-graph-branch][aria-label="브랜치 전환: feature/searchable"]').first()
+    await featureGraph.waitFor()
+    const featurePath = history.locator('path[data-graph-branch][aria-label="브랜치 전환: feature/searchable"]').first()
+    const curvePoint = await featurePath.evaluate(el => {
+      const path = el as typeof el & { getTotalLength(): number; getPointAtLength(distance: number): { x: number; y: number }; getScreenCTM(): { a: number; b: number; c: number; d: number; e: number; f: number } }
+      const point = path.getPointAtLength(path.getTotalLength() / 2), matrix = path.getScreenCTM()
+      return { x: matrix.a * point.x + matrix.c * point.y + matrix.e, y: matrix.b * point.x + matrix.d * point.y + matrix.f }
+    })
+    await page.mouse.move(curvePoint.x, curvePoint.y)
+    await page.getByRole('tooltip', { name: 'feature/searchable', exact: true }).waitFor()
+    await screenshot('graph-branch-hover-desktop')
+    const graphRequestsBefore = branchRequests.length
+    branchFailure = true
+    await featureGraph.click()
+    await page.getByRole('alert').filter({ hasText: 'Local changes would be overwritten' }).waitFor()
+    assert.equal(repositoryBranch, 'feature/new', 'failed graph switching preserves the branch')
+    assert.equal(await page.evaluate('window.fixture.screen.kind'), 'graph', 'graph clicks never open commit detail')
+    branchFailure = false
+    await featureGraph.focus()
+    await featureGraph.press('Enter')
+    await branchButton.getByText('feature/searchable', { exact: true }).waitFor()
+    assert.equal(branchRequests.length, graphRequestsBefore + 2)
+    assert.equal(branchRequests.at(-1)?.ref, 'refs/heads/feature/searchable')
+    await featureGraph.press('Space')
+    assert.equal(branchRequests.length, graphRequestsBefore + 2, 'activating the current branch is a no-op')
+    const sharedGraph = history.locator('circle[data-graph-branch][aria-label="브랜치 전환: main, origin/remote-topic"]').first()
+    await sharedGraph.click()
+    assert.equal(branchRequests.length, graphRequestsBefore + 2, 'overlapping branch names ask for a target before switching')
+    await page.getByRole('menuitem', { name: 'origin/remote-topic', exact: true }).click()
+    await branchButton.getByText('remote-topic', { exact: true }).waitFor()
+    assert.equal(branchRequests.at(-1)?.ref, 'refs/remotes/origin/remote-topic')
+    await page.setViewportSize({ width: 390, height: 844 })
+    await history.evaluate(el => { el.scrollTop = 0 })
+    await sharedGraph.click()
+    await screenshot('graph-branch-menu-mobile')
+    await page.evaluate('window.openedWorktree = null')
+    worktreeTarget = '/fixture/.worktrees/main'
+    await page.getByRole('menuitem', { name: 'main', exact: true }).click()
+    await page.waitForFunction('window.openedWorktree === "/fixture/.worktrees/main"')
+    assert.equal(repositoryBranch, 'remote-topic', 'graph switching uses the existing worktree navigation path')
     assert.deepEqual(errors, [])
   } finally { await browser.close() }
 })

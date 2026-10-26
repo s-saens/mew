@@ -29,6 +29,7 @@ export interface GitRepositoryInfo {
 }
 
 export interface GitLogEntry {
+  branches?: GitBranchRef[]
   hash: string
   parents: string[]
   refs: string[]
@@ -67,16 +68,17 @@ export interface GitBranchRef {
   name: string
   ref: string
   kind: 'local' | 'remote' | 'tag'
+  hash?: string
 }
 
 export async function repositoryBranches(project: string, relPath: string): Promise<GitBranchRef[]> {
   const { git } = repository(project, relPath)
-  const raw = await git.raw(['for-each-ref', '--sort=refname', '--format=%(refname)%09%(symref)', 'refs/heads/', 'refs/remotes/', 'refs/tags/'])
+  const raw = await git.raw(['for-each-ref', '--sort=refname', '--format=%(refname)%09%(symref)%09%(objectname)', 'refs/heads/', 'refs/remotes/', 'refs/tags/'])
   return raw.trim().split('\n').filter(Boolean).flatMap(line => {
-    const [ref, symbolic] = line.split('\t')
+    const [ref, symbolic, hash] = line.split('\t')
     if (symbolic) return []
     const kind = ref.startsWith('refs/heads/') ? 'local' : ref.startsWith('refs/remotes/') ? 'remote' : 'tag'
-    return [{ ref, kind, name: ref.replace(/^refs\/(heads|remotes|tags)\//, '') } as GitBranchRef]
+    return [{ ref, kind, hash, name: ref.replace(/^refs\/(heads|remotes|tags)\//, '') } as GitBranchRef]
   }).sort((left, right) => {
     const rank = (item: GitBranchRef) => item.kind === 'remote' ? 3 : item.kind === 'tag' ? 2 : /^(main|master)$/.test(item.name) ? 0 : 1
     return rank(left) - rank(right) || left.name.localeCompare(right.name, 'en')
@@ -258,7 +260,15 @@ export async function repositoryLog(project: string, relPath: string, limit = 30
     if (/does not have any commits|unknown revision|bad default revision/i.test(message)) return []
     throw err
   }
-  return raw.split('\x1e').map(parseRecord).filter((entry): entry is GitLogEntry => entry !== null)
+  const branches = await repositoryBranches(project, relPath)
+  const byHash = new Map<string, GitBranchRef[]>()
+  for (const branch of branches) {
+    if (branch.kind === 'tag' || !branch.hash) continue
+    const targets = byHash.get(branch.hash) ?? []
+    targets.push(branch)
+    byHash.set(branch.hash, targets)
+  }
+  return raw.split('\x1e').map(parseRecord).filter((entry): entry is GitLogEntry => entry !== null).map(entry => ({ ...entry, branches: byHash.get(entry.hash) ?? [] }))
 }
 
 export async function commitDetail(project: string, relPath: string, hashInput: unknown): Promise<GitCommitDetail> {

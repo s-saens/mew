@@ -467,6 +467,8 @@ export const uiMessages = {
 
   "브랜치를 삭제할까요?": ["Delete this branch?", "删除此分支？", "このブランチを削除しますか？"],
   "브랜치 삭제: {name}": ["Delete branch: {name}", "删除分支：{name}", "ブランチを削除: {name}"],
+  "브랜치 그래프": ["Branch graph", "分支图", "ブランチグラフ"],
+  "브랜치 전환: {name}": ["Switch branch: {name}", "切换分支：{name}", "ブランチ切り替え: {name}"],
   "브랜치 선택": ["Select branch", "选择分支", "ブランチを選択"],
   "브랜치 검색": ["Search branches", "搜索分支", "ブランチを検索"],
   "커밋 기록 검색": ["Search commit history", "搜索提交历史", "コミット履歴を検索"],

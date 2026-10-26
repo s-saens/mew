@@ -1,12 +1,13 @@
 import type { GitRemoteProgress } from '../../shared/git-remote-progress'
 import { uiText } from '@mew/ui/i18n-core'
 import { useUiLocale } from '@mew/ui/i18n'
-import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from 'react'
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from 'react'
 import { ActionMenu, ActionMenuItem, HoverTipLayer, useDialog } from '@mew/ui'
 import { createPortal } from 'react-dom'
 import { Copy, GitBranch, GitCherryPickCommit, Label, ArrowDown, ArrowUp, Check, GitCommit, Github, OpenNewWindow, NavArrowRight, Search, SendDiagonal, Undo, Xmark } from 'iconoir-react'
 import { relativeCommitTime } from '../utils/git-time'
 import { graphLayout, type GraphRow } from '../utils/git-graph'
+import { graphBranchTargets, type GraphBranchTargets } from '../utils/git-graph-branches'
 import { subscribeLive } from '../utils/live-updates'
 import { filterGitChanges } from '../utils/git-change-filter'
 import { filterGitHistory } from '../utils/git-history-filter'
@@ -25,6 +26,7 @@ import {
   runGitCommitAction,
   runGitRemoteAction,
   runGitBranchAction,
+  type GitBranchRef,
   type GitChangedFile,
   type GitCommitAction,
   type GitCommitDetail,
@@ -37,27 +39,34 @@ const LANE_GAP = 10
 const ROW_HEIGHT = 28
 const GRAPH_COLORS = ['#5da9ff', '#f28b82', '#81c995', '#fdd663', '#c58af9', '#78d9ec', '#ff8bcb']
 
-function GraphCell({ row, width, isolated = false }: { row: GraphRow; width: number; isolated?: boolean }) {
+function GraphCell({ row, targets, width, disabled, onSelect, isolated = false }: { row: GraphRow; targets: GraphBranchTargets; width: number; disabled: boolean; onSelect: (branches: GitBranchRef[], x: number, y: number) => void; isolated?: boolean }) {
   useUiLocale()
   const x = (lane: number) => 8 + lane * LANE_GAP
   const mid = ROW_HEIGHT / 2
-  return (
-    <svg width={width} height={ROW_HEIGHT} className="block shrink-0" aria-hidden="true">
-      {!isolated && row.incoming && (
-        <path d={`M ${x(row.lane)} 0 L ${x(row.lane)} ${mid}`} stroke={GRAPH_COLORS[row.lane % GRAPH_COLORS.length]} strokeWidth="1.25" fill="none" />
-      )}
-      {(isolated ? [] : row.edges).map((edge, index) => (
-        <path
-          key={`${edge.from}-${edge.to}-${index}`}
-          d={`M ${x(edge.from)} ${edge.commit ? mid : 0} C ${x(edge.from)} ${mid}, ${x(edge.to)} ${mid}, ${x(edge.to)} ${ROW_HEIGHT}`}
-          stroke={GRAPH_COLORS[edge.from % GRAPH_COLORS.length]}
-          strokeWidth="1.25"
-          fill="none"
-        />
-      ))}
-      <circle cx={x(row.lane)} cy={mid} r="3" fill={GRAPH_COLORS[row.lane % GRAPH_COLORS.length]} stroke="var(--color-surface)" strokeWidth="1" />
-    </svg>
-  )
+  const activate = (event: ReactMouseEvent<SVGElement> | ReactKeyboardEvent<SVGElement>, branches: GitBranchRef[]) => {
+    event.stopPropagation()
+    if (disabled) return
+    const rect = event.currentTarget.getBoundingClientRect()
+    onSelect(branches, 'clientX' in event && event.detail ? event.clientX : rect.left, 'clientY' in event && event.detail ? event.clientY : rect.bottom)
+  }
+  const interaction = (branches: GitBranchRef[]) => ({
+    role: 'button', tabIndex: disabled ? -1 : 0, 'aria-disabled': disabled || undefined,
+    'aria-label': uiText('브랜치 전환: {name}', { name: branches.map(branch => branch.name).join(', ') }),
+    'data-tip': branches.map(branch => branch.name).join('\n'), 'data-graph-branch': true,
+    className: `${disabled ? '' : 'cursor-pointer'} focus-visible:outline-2 focus-visible:outline-accent`,
+    onClick: (event: ReactMouseEvent<SVGElement>) => activate(event, branches),
+    onKeyDown: (event: ReactKeyboardEvent<SVGElement>) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); activate(event, branches) } },
+  })
+  const incoming = `M ${x(row.lane)} 0 L ${x(row.lane)} ${mid}`
+  const edgePath = (edge: GraphRow['edges'][number]) => `M ${x(edge.from)} ${edge.commit ? mid : 0} C ${x(edge.from)} ${mid}, ${x(edge.to)} ${mid}, ${x(edge.to)} ${ROW_HEIGHT}`
+  return <svg width={width} height={ROW_HEIGHT} className="block shrink-0" aria-label={uiText('브랜치 그래프')}>
+    {!isolated && row.incoming && <path d={incoming} stroke={GRAPH_COLORS[row.lane % GRAPH_COLORS.length]} strokeWidth="1.25" fill="none" />}
+    {(isolated ? [] : row.edges).map((edge, index) => <path key={index} d={edgePath(edge)} stroke={GRAPH_COLORS[edge.from % GRAPH_COLORS.length]} strokeWidth="1.25" fill="none" />)}
+    <circle cx={x(row.lane)} cy={mid} r="3" fill={GRAPH_COLORS[row.lane % GRAPH_COLORS.length]} stroke="var(--color-surface)" strokeWidth="1" />
+    {!isolated && row.incoming && targets.node.length > 0 && <path d={incoming} stroke="transparent" strokeWidth="8" fill="none" {...interaction(targets.node)} />}
+    {(isolated ? [] : row.edges).map((edge, index) => targets.edges[index].length > 0 && <path key={index} d={edgePath(edge)} stroke="transparent" strokeWidth="8" fill="none" {...interaction(targets.edges[index])} />)}
+    {targets.node.length > 0 && <circle cx={x(row.lane)} cy={mid} r="5" fill="transparent" {...interaction(targets.node)} />}
+  </svg>
 }
 
 function shortDate(value: string): string {
@@ -394,6 +403,8 @@ export function GitWorkbench({ project, repositoryPath, onNotice, onBack, onOpen
   const refreshVersion = useRef(0)
   const [menu, setMenu] = useState<{ commit: GitLogEntry; x: number; y: number } | null>(null)
   const graph = useMemo(() => graphLayout(commits), [commits])
+  const graphTargets = useMemo(() => graphBranchTargets(commits, graph.rows), [commits, graph.rows])
+  const [graphMenu, setGraphMenu] = useState<{ branches: GitBranchRef[]; x: number; y: number; source: GitLogEntry[] } | null>(null)
   const graphWidth = 16 + (graph.lanes - 1) * LANE_GAP
 
   const refresh = useCallback(async (selectAll = false) => {
@@ -616,6 +627,17 @@ export function GitWorkbench({ project, repositoryPath, onNotice, onBack, onOpen
     }
   }
 
+  const switchGraphBranch = async (branch: GitBranchRef) => {
+    setGraphMenu(null)
+    if (!info?.detached && branch.ref === `refs/heads/${info?.branch}`) return
+    try { await changeBranch('switch', branch.ref) }
+    catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)) }
+  }
+  const selectGraphBranch = (branches: GitBranchRef[], x: number, y: number) => {
+    if (branches.length === 1) void switchGraphBranch(branches[0])
+    else setGraphMenu({ branches, x, y, source: commits })
+  }
+
   const syncRemote = async (action: 'pull' | 'push') => {
     if (busy || remotePending.current || loading || aiOpen || !info?.repository || info.detached || !info.workspace) return
     remotePending.current = true
@@ -689,7 +711,7 @@ export function GitWorkbench({ project, repositoryPath, onNotice, onBack, onOpen
         <span className={`min-w-0 flex-1 truncate font-semibold text-ink ${view.kind === 'diff' ? 'text-[10px]' : 'text-sm'}`} title={heading}>{heading}</span>
       </div>}
 
-      {(error || refreshError) && <div className="flex shrink-0 items-center gap-2 border-b border-edge bg-danger/10 px-3 py-2 text-xs text-danger"><span className="select-text min-w-0 flex-1">{error || refreshError}</span><button type="button" onClick={() => { setError(null); setRefreshError(null) }} aria-label={uiText("오류 닫기")}>×</button></div>}
+      {(error || refreshError) && <div role="alert" className="flex shrink-0 items-center gap-2 border-b border-edge bg-danger/10 px-3 py-2 text-xs text-danger"><span className="select-text min-w-0 flex-1">{error || refreshError}</span><button type="button" onClick={() => { setError(null); setRefreshError(null) }} aria-label={uiText("오류 닫기")}>×</button></div>}
 
       <div className={`${view.kind === 'graph' ? 'flex' : 'hidden'} min-h-0 flex-1 flex-col`}>
         {loading && !info ? (
@@ -726,30 +748,29 @@ export function GitWorkbench({ project, repositoryPath, onNotice, onBack, onOpen
                 {!!info.ahead && <span className="shrink-0 text-ink-muted">↑{info.ahead}</span>}
                 {!!info.behind && <span className="shrink-0 text-ink-muted">↓{info.behind}</span>}
               </div>
-              <div className="min-h-0 flex-1 overflow-auto overscroll-contain" data-git-scroll="history">
+              <div className="min-h-0 flex-1 overflow-auto overscroll-contain" data-git-scroll="history"><HoverTipLayer>
                 {commits.length === 0 ? (
                   <div className="p-5 text-center text-xs text-ink-muted">{uiText("아직 커밋이 없습니다")}</div>
                 ) : filteredCommits.length === 0 ? (
                   <div role="status" className="p-5 text-center text-xs text-ink-muted">{uiText("검색 결과가 없습니다")}</div>
                 ) : filteredCommits.map((entry) => (
-                  <button
-                    key={entry.hash}
-                    type="button"
+                  <div key={entry.hash} className="flex w-full items-center gap-2 pr-2 text-left text-[11px] hover:bg-surface-hover" style={{ height: ROW_HEIGHT, minWidth: graphWidth + 220 }}>
+                    <GraphCell row={graph.rows[commitIndices.get(entry.hash)!]} targets={graphTargets[commitIndices.get(entry.hash)!]} width={graphWidth} isolated={!!historyQuery.trim()} disabled={busy || loading || aiOpen || !info.workspace} onSelect={selectGraphBranch} />
+                    <button data-git-commit type="button"
                     onClick={() => setView({ kind: 'commit', hash: entry.hash })}
                     onContextMenu={(event) => { event.preventDefault(); setMenu({ commit: entry, x: event.clientX, y: event.clientY }) }}
                     title={`${entry.subject}\n${entry.author} · ${shortDate(entry.date)} · ${entry.hash}${entry.refs.length ? `\n${entry.refs.join(', ')}` : ''}`}
-                    className="flex w-full items-center gap-2 pr-2 text-left text-[11px] hover:bg-surface-hover focus-visible:outline-accent"
-                    style={{ height: ROW_HEIGHT, minWidth: graphWidth + 220 }}
+                    className="flex h-full min-w-0 flex-1 items-center gap-2 text-left focus-visible:outline-accent"
                   >
-                    <GraphCell row={graph.rows[commitIndices.get(entry.hash)!]} width={graphWidth} isolated={!!historyQuery.trim()} />
                     <span className="min-w-16 flex-1 truncate text-ink">{entry.subject}</span>
                     {entry.refs.length > 0 && <span className="hidden max-w-24 shrink-0 truncate rounded bg-surface-deep px-1 text-[9px] text-accent @min-[480px]:inline">{entry.refs[0].replace(/^HEAD -> /, '')}{entry.refs.length > 1 ? ` +${entry.refs.length - 1}` : ''}</span>}
                     <time dateTime={entry.date} className="shrink-0 whitespace-nowrap text-[10px] tabular-nums text-ink-secondary">{relativeCommitTime(entry.date, now)}</time>
                     <span className="shrink-0 font-mono text-[10px] text-ink-secondary">{entry.hash.slice(0, 7)}</span>
                     <span className="max-w-12 shrink-0 truncate text-[10px] text-ink-secondary @min-[480px]:max-w-20">{entry.author}</span>
-                  </button>
+                    </button>
+                  </div>
                 ))}
-              </div>
+              </HoverTipLayer></div>
             </section>
             <GitSplitHandle ratio={splitRatio} onChange={setSplitRatio} composerOpen={composerOpen} />
             <section aria-label={uiText("현재 변경사항")} className="flex min-h-0 flex-col overflow-hidden" style={{ flex: `${1 - splitRatio} 1 0`, minHeight: `min(${composerOpen ? 224 : CHANGES_MIN_HEIGHT}px, 75%)` }}>
@@ -841,6 +862,10 @@ export function GitWorkbench({ project, repositoryPath, onNotice, onBack, onOpen
         onInclude={() => { setSelectedFiles(current => new Set([...current, ...changesMenu.files])); setChangesMenu(null) }}
         onExclude={() => { setSelectedFiles(current => new Set([...current].filter(path => !changesMenu.files.includes(path)))); setChangesMenu(null) }}
         onDiscard={() => { void discard(changesMenu.files) }} />}
+
+      {graphMenu && graphMenu.source === commits && <ActionMenu x={graphMenu.x} y={graphMenu.y} onClose={() => setGraphMenu(null)}>
+        {graphMenu.branches.map(branch => <ActionMenuItem key={branch.ref} icon={<GitBranch />} disabled={busy || loading || aiOpen} onClick={() => void switchGraphBranch(branch)}>{branch.name}</ActionMenuItem>)}
+      </ActionMenu>}
 
       {menu && <ActionMenu x={menu.x} y={menu.y} onClose={() => setMenu(null)}>
         <ActionMenuItem icon={<Copy />} onClick={() => { void navigator.clipboard.writeText(menu.commit.hash) }}>{uiText('커밋 해시 복사')}</ActionMenuItem>

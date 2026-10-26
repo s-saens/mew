@@ -15,17 +15,17 @@ const MARGIN_PX = 8
 
 type Tip = { label: string; centerX: number; top: number }
 
-function closestTipEl(target: EventTarget | null): HTMLElement | null {
+function closestTipEl(target: EventTarget | null): Element | null {
   if (!(target instanceof Element)) return null
   const el = target.closest('[data-tip]')
-  return el instanceof HTMLElement && el.dataset.tip ? el : null
+  return el?.getAttribute('data-tip') ? el : null
 }
 
 export function HoverTipLayer({ className, children, placement = 'top', portalTarget }: { className?: string; children: ReactNode; placement?: 'top' | 'bottom'; portalTarget?: Element | null }) {
   const [tip, setTip] = useState<Tip | null>(null)
   const tipRef = useRef<HTMLDivElement>(null)
   // 지금 이름표를 띄우고 있는 버튼 — 같은 버튼 안(아이콘↔여백)을 오갈 때 깜빡이지 않게 한다
-  const shownForRef = useRef<HTMLElement | null>(null)
+  const shownForRef = useRef<Element | null>(null)
   useLayoutEffect(() => {
     shownForRef.current = null
     setTip(null)
@@ -60,7 +60,7 @@ export function HoverTipLayer({ className, children, placement = 'top', portalTa
     if (!el || el === shownForRef.current) return
     shownForRef.current = el
     const r = el.getBoundingClientRect()
-    setTip({ label: el.dataset.tip!, centerX: r.left + r.width / 2, top: placement === 'bottom' ? r.bottom + GAP_PX : r.top - GAP_PX })
+    setTip({ label: el.getAttribute('data-tip')!, centerX: r.left + r.width / 2, top: placement === 'bottom' ? r.bottom + GAP_PX : r.top - GAP_PX })
   }
 
   function onPointerOut(e: React.PointerEvent) {

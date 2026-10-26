@@ -442,6 +442,7 @@ export interface GitRepositoryInfo {
 export interface GitRepositoryEntry { path: string }
 
 export interface GitLogEntry {
+  branches?: GitBranchRef[]
   hash: string
   parents: string[]
   refs: string[]
@@ -556,7 +557,7 @@ export function runGitCommitAction(path: string, action: GitCommitAction, hash: 
   }, project).then(json<GitRepositoryInfo>)
 }
 
-export interface GitBranchRef { name: string; ref: string; kind: 'local' | 'remote' | 'tag' }
+export interface GitBranchRef { name: string; ref: string; kind: 'local' | 'remote' | 'tag'; hash?: string }
 
 export function fetchGitBranches(path: string, project: string): Promise<{ branches: GitBranchRef[] }> {
   return mewFetch(`/api/git/branches?path=${encodeURIComponent(path)}&${projectQs(project)}`).then(json<{ branches: GitBranchRef[] }>)

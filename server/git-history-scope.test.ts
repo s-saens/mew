@@ -36,6 +36,11 @@ test('history follows HEAD across branches, worktrees, detached HEAD and merges'
   const subjects = async (folder: string) => (await repositoryLog(paths.WORKSPACE_PROJECT, folder)).map(entry => entry.subject)
   assert.deepEqual(await subjects('repo'), ['base'], 'unmerged local, remote and tagged commits stay out of main history')
   assert.deepEqual(await subjects('feature'), ['feature only', 'base'], 'each worktree uses its own HEAD')
+  const featureTip = (await repositoryLog(paths.WORKSPACE_PROJECT, 'feature'))[0]
+  assert.deepEqual(featureTip.branches?.map(branch => branch.ref), ['refs/heads/feat/task', 'refs/remotes/origin/feature'])
+  assert.ok(featureTip.branches?.every(branch => branch.hash === featureHash))
+  const mainTip = (await repositoryLog(paths.WORKSPACE_PROJECT, 'repo'))[0]
+  assert.deepEqual(mainTip.branches?.map(branch => branch.ref), ['refs/heads/main'], 'unmerged refs and tags never become graph switch targets')
   await git.raw(['switch', '-c', 'review', featureHash])
   assert.deepEqual(await subjects('repo'), ['feature only', 'base'], 'switching branches changes the history scope')
   assert.equal((await repositoryLog(paths.WORKSPACE_PROJECT, 'repo', 1)).length, 1)
