@@ -6,6 +6,7 @@ import { TaskListSession } from '../utils/task-list-session'
 import { uuid } from '../utils/uuid'
 import { syncTaskDocuments, withTaskDocumentSync } from '../utils/task-document-sync'
 import type { TaskBoard, TaskItem } from '../../shared/task-list'
+import { previewDocumentTitle, useTitlePreviews } from '../utils/document-title-preview'
 
 export function useTaskList(workspace: string | null, email: string, open: boolean) {
   const [draftWindow] = useState(() => {
@@ -40,6 +41,21 @@ export function useTaskList(workspace: string | null, email: string, open: boole
     return value
   }, [email, workspace, draftWindow])
   const state = useSyncExternalStore(session.subscribe, session.snapshot)
+  const titles = useTitlePreviews()
+  const displayed = state.tasks.map(task => {
+    const title = task.path ? titles[`${workspace}/${task.path}`]?.title : undefined
+    return title !== undefined && title !== task.text ? { ...task, text: title } : task
+  })
+  const edit = (tasks: typeof state.tasks) => {
+    const next = tasks.map(task => {
+      const original = state.tasks.find(item => item.id === task.id), shown = displayed.find(item => item.id === task.id)
+      // A checkbox/tag edit must not turn an editor-owned title preview into a second task write.
+      if (original && shown && task.text === shown.text && shown.text !== original.text) return { ...task, text: original.text }
+      if (workspace && original?.path && original.text !== task.text) previewDocumentTitle(`${workspace}/${original.path}`, task.text, 'task')
+      return task
+    })
+    session.edit(next)
+  }
   useEffect(() => {
     if (!open || !workspace || !email) return
     void session.refresh()
@@ -72,5 +88,5 @@ export function useTaskList(workspace: string | null, email: string, open: boole
   useEffect(() => {
     for (const [key, value] of sessions.current) if (!key.startsWith(`${email}:`)) { value.dispose(); sessions.current.delete(key) }
   }, [email])
-  return { ...state, deleteTag: (tag: string) => session.deleteTag(tag), setTagColor: (tag: string, hue: number) => session.setTagColor(tag, hue), edit: (tasks: typeof state.tasks) => session.edit(tasks), setDraft: (text: string) => session.setDraft(text), setDraftAssignees: (assignees: string[]) => session.setDraftAssignees(assignees), setDraftTags: (tags: string[]) => session.setDraftTags(tags), flush: () => session.flush(), retry: () => session.retry() }
+  return { ...state, tasks: displayed, deleteTag: (tag: string) => session.deleteTag(tag), setTagColor: (tag: string, hue: number) => session.setTagColor(tag, hue), edit, setDraft: (text: string) => session.setDraft(text), setDraftAssignees: (assignees: string[]) => session.setDraftAssignees(assignees), setDraftTags: (tags: string[]) => session.setDraftTags(tags), flush: () => session.flush(), retry: () => session.retry() }
 }

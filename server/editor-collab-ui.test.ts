@@ -32,12 +32,15 @@ function Fixture(){
 }
 createRoot(document.getElementById('root')).render(<React.StrictMode><I18nProvider><Fixture/></I18nProvider></React.StrictMode>);`
   const bundle = await build({
+    onLog(level, log, handler) { if (log.code !== 'MODULE_LEVEL_DIRECTIVE') handler(level, log) },
     input: 'virtual:editor-recovery.tsx', write: false, platform: 'browser', output: { format: 'esm', codeSplitting: false },
     transform: { jsx: 'react-jsx', define: { 'process.env.NODE_ENV': JSON.stringify('test') } },
     plugins: [{
       name: 'editor-recovery-fixture',
       resolveId(id) {
         if (id === 'virtual:editor-recovery.tsx') return id
+        if (id === '@mew/editor') return new URL('../packages/editor/src/index.ts', import.meta.url).pathname
+        if (id === '@mew/editor/frontmatter') return new URL('../packages/editor/src/utils/frontmatter.ts', import.meta.url).pathname
         if (id.endsWith('.css')) return 'virtual:style'
       },
       load(id) {

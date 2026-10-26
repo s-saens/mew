@@ -44,9 +44,14 @@ test('/page names child pages before creation and keeps the parent open on deskt
     createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18nProvider>);
   `
   const candidates = [source], styles: string[] = []
-  const bundle = await build({ input: 'virtual:page-command.tsx', write: false, platform: 'browser',
+  const bundle = await build({
+    onLog(level, log, handler) { if (log.code !== 'MODULE_LEVEL_DIRECTIVE') handler(level, log) }, input: 'virtual:page-command.tsx', write: false, platform: 'browser',
     output: { format: 'esm' }, transform: { jsx: 'react-jsx', define: { 'process.env.NODE_ENV': JSON.stringify('test') } },
-    plugins: [{ name: 'page-command-fixture', resolveId(id) { if (id === 'virtual:page-command.tsx') return id },
+    plugins: [{ name: 'page-command-fixture', resolveId(id) {
+        if (id === 'virtual:page-command.tsx') return id
+        if (id === '@mew/editor') return path.join(repo, 'packages/editor/src/index.ts')
+        if (id === '@mew/editor/frontmatter') return path.join(repo, 'packages/editor/src/utils/frontmatter.ts')
+      },
       load(id) {
         if (id === 'virtual:page-command.tsx') return source
         if (id.endsWith('.tsx')) candidates.push(fs.readFileSync(id, 'utf8'))

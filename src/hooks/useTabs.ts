@@ -21,6 +21,8 @@ import { useI18n } from '../i18n'
 import { uiText } from '@mew/ui/i18n-core'
 import { activePaneTab, mostRecentTab, nextTabNavigation, recordPaneActivation, remapTabNavigation, type TabNavigation } from '../utils/editor-tab-navigation'
 import { registerTaskDocumentSync, type TaskDocumentChange } from '../utils/task-document-sync'
+import { splitFrontmatter } from '@mew/editor/frontmatter'
+import { clearTitlePreviews, documentAbsolutePath, previewDocumentTitle, remapTitlePreviews, subscribeTitlePreviews, titlePreviews, withDocumentTitle } from '../utils/document-title-preview'
 
 function savedBuffer(current: string, submitted: string, saved: string): string {
   if (saved === submitted) return current
@@ -30,6 +32,8 @@ function savedBuffer(current: string, submitted: string, saved: string): string 
 export type Tab = {
   /** Stable within this session, including document changes in the same tab. */
   id?: string
+  /** Navigation changes this identity; renaming the same document preserves it. */
+  documentId?: string
   path: string
   navigation?: TabNavigation
   content: string
@@ -137,6 +141,7 @@ function blankTab(): Tab {
   tabSeq += 1
   return {
     id: `tab-${tabSeq}`,
+    documentId: `document-${tabSeq}`,
     path: '',
     content: '',
     savedContent: '',
@@ -184,6 +189,7 @@ export function useTabs(
   onAccountTabsChange?: (project: string, state: StoredTabs) => void,
   accountHydrated = true,
   workspaceDocsPath?: string,
+  accountScope?: string,
 ) {
   const { t } = useI18n()
   const unsupportedNoticeRef = useRef('')
@@ -870,10 +876,35 @@ export function useTabs(
       if (!tab || tab.revalidating) return
       // 편집이 시작되면 미리보기 탭을 고정 탭으로 승격 (VSCode와 동일)
       mapTabsAtPath(p, path, (t) => ({ ...t, content, preview: false }))
+      if (workspaceScope && !isExternalTabPath(path) && !isGitTabPath(path)) {
+        const title = splitFrontmatter(content).frontmatter?.title
+        const previous = splitFrontmatter(tab.content).frontmatter?.title
+        if (title !== undefined && title !== previous) {
+          const file = editorFile(path, p)
+          previewDocumentTitle(documentAbsolutePath(workspaceScope, workspaceDocsPath, file.project, file.path), title, 'editor')
+        }
+      }
       scheduleAutosave(p, path)
     },
-    [mapTabsAtPath, scheduleAutosave],
+    [mapTabsAtPath, scheduleAutosave, workspaceScope, workspaceDocsPath],
   )
+
+  useEffect(() => {
+    const unsubscribe = subscribeTitlePreviews(() => {
+      const drafts = Object.entries(titlePreviews())
+      if (!workspaceScope || !drafts.length) return
+      const p = projectRef.current
+      patch(p, state => ({ ...state, panes: state.panes.map(pane => ({ ...pane, tabs: pane.tabs.map(tab => {
+        if (isExternalTabPath(tab.path) || isGitTabPath(tab.path)) return tab
+        const file = editorFile(tab.path, p), absolute = documentAbsolutePath(workspaceScope, workspaceDocsPath, file.project, file.path)
+        const preview = drafts.find(([path]) => path === absolute)?.[1]
+        if (!preview) return tab
+        const content = withDocumentTitle(tab.content, preview.title)
+        return content === tab.content ? tab : { ...tab, content }
+      }) })) }))
+    })
+    return () => { unsubscribe(); if (workspaceScope) clearTitlePreviews(workspaceScope) }
+  }, [workspaceScope, workspaceDocsPath, accountScope, patch])
 
   const saveCurrentTab = useCallback(
     async (commit = false) => {
@@ -1030,8 +1061,12 @@ export function useTabs(
           activePath: pane.activePath ? remap(pane.activePath) : pane.activePath,
         })),
       }))
+      if (workspaceScope) {
+        const from = editorFile(oldPath, p), to = editorFile(newPath, p)
+        remapTitlePreviews([{ from: documentAbsolutePath(workspaceScope, workspaceDocsPath, from.project, from.path), to: documentAbsolutePath(workspaceScope, workspaceDocsPath, to.project, to.path), directory: type === 'dir' }])
+      }
     },
-    [patch],
+    [patch, workspaceScope, workspaceDocsPath],
   )
 
   const prepareDocumentPageMutation = useCallback(async (fileProject = 'docs') => {
@@ -1112,6 +1147,10 @@ export function useTabs(
       const active = activePaneTab(pane)
       return activatePaneTab({ ...pane, tabs: next }, active ? next[pane.tabs.indexOf(active)] : undefined)
     }) }))
+    if (workspaceScope) {
+      remapTitlePreviews(result.moves.map(move => ({ ...move, from: documentAbsolutePath(workspaceScope, workspaceDocsPath, fileProject, move.from), to: documentAbsolutePath(workspaceScope, workspaceDocsPath, fileProject, move.to) })))
+      if (result.removed) clearTitlePreviews(documentAbsolutePath(workspaceScope, workspaceDocsPath, fileProject, result.removed.path))
+    }
     // A file fetch started before promotion cannot populate its newly mapped tab.
     // Refresh current paths while retaining edits made during the structural request.
     await Promise.all([...reads].map(async ([path, baseline]) => {
@@ -1126,12 +1165,18 @@ export function useTabs(
         const confirmed = findTab(p, path)
         if (!confirmed || confirmed.savedContent === baseline || confirmed.savedContent === content) putCachedFile(p, path, { content, editable, version })
         mapTabsAtPath(p, path, tab => tab.savedContent !== baseline && tab.savedContent !== content ? tab : ({ ...tab, content: tab.content === tab.savedContent ? content : savedBuffer(tab.content, tab.savedContent, content), savedContent: content, editable, loading: false, revalidating: false }))
+        if (workspaceScope) {
+          const absolute = documentAbsolutePath(workspaceScope, workspaceDocsPath, file.project, file.path)
+          const previousTitle = splitFrontmatter(baseline).frontmatter?.title, confirmedTitle = splitFrontmatter(content).frontmatter?.title
+          if (previousTitle !== undefined) clearTitlePreviews(absolute, previousTitle)
+          if (confirmedTitle !== undefined) clearTitlePreviews(absolute, confirmedTitle)
+        }
       } catch (error) {
         if (workspaceRequestRef.current.epoch === epoch && fileReadSequenceRef.current.get(key) === token) onNoticeRef.current(error instanceof Error ? error.message : String(error))
       }
     }))
     for (const path of reads.keys()) setTimeout(() => { if (projectRef.current === p && workspaceRequestRef.current.epoch === epoch) autosave(p, path) }, 500)
-  }, [patch, autosave, mapTabsAtPath])
+  }, [patch, autosave, mapTabsAtPath, workspaceScope, workspaceDocsPath])
 
   useEffect(() => registerDatabasePageMutations({
     prepare: prepareDocumentPageMutation,
@@ -1173,6 +1218,8 @@ export function useTabs(
       ...pane, activePath: pane.activePath ? remap(pane.activePath) : null,
       tabs: pane.tabs.map(tab => ({ ...tab, path: remap(tab.path), navigation: remapTabNavigation(tab.navigation, remap) })),
     })) }))
+    if (workspaceScope) remapTitlePreviews(changes.flatMap(change => change.before?.path && change.after.path && change.before.path !== change.after.path
+      ? [{ from: `${workspaceScope}/${change.before.path}`, to: `${workspaceScope}/${change.after.path}` }] : []))
     if (saveTimerRef.current?.project === p) {
       const pending = saveTimerRef.current
       if (match(pending.path)) {
@@ -1196,6 +1243,7 @@ export function useTabs(
     }))
     const failed = results.find(result => result.status === 'rejected')
     if (failed) throw failed.reason
+    if (workspaceScope && workspaceRequestRef.current.epoch === epoch) for (const change of changes) clearTitlePreviews(`${workspaceScope}/${change.after.path}`, change.after.text)
   }, [workspaceScope, workspaceDocsPath, patch, mapTabsAtPath, autosave])
 
   useEffect(() => registerTaskDocumentSync({
@@ -1218,6 +1266,10 @@ export function useTabs(
   const removePaths = useCallback(
     (path: string, type: 'file' | 'dir') => {
       const p = projectRef.current
+      if (workspaceScope) {
+        const file = editorFile(path, p)
+        clearTitlePreviews(documentAbsolutePath(workspaceScope, workspaceDocsPath, file.project, file.path))
+      }
       patch(p, (s) => {
         const gone = (t: Tab) => (type === 'file' ? t.path === path : t.path === path || t.path.startsWith(path + '/'))
         const removed = new Set(s.panes.flatMap((pane) => pane.tabs.filter(gone).map((t) => t.path)))
@@ -1231,7 +1283,7 @@ export function useTabs(
         })
       })
     },
-    [patch],
+    [patch, workspaceScope, workspaceDocsPath],
   )
 
   /**

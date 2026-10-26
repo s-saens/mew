@@ -29,7 +29,7 @@ import { Fragment, type Node as PMNode } from '@tiptap/pm/model'
 import { findTable, selectionCell, TableMap } from '@tiptap/pm/tables'
 import type { EditorView } from '@tiptap/pm/view'
 import { Markdown } from 'tiptap-markdown'
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { EditorApi, EditorCollab, EditorOpenLink, TableWidths, TreeNode } from './types'
 import { ResizableImage } from './ResizableImage'
 import { ImageSourceContext } from './editor/image-source-context'
@@ -1310,6 +1310,15 @@ export const Editor = forwardRef<
     // collab이 없을 때는 undefined 하나뿐인 안정된 배열이라 기존처럼 인스턴스가 유지된다.
   }, [collab?.ydoc])
 
+  const continuity = useRef<{ from: number; to: number; focused: boolean; scrollTop: number } | null>(null)
+  // Capture before useEditor destroys the old view in its passive effect.
+  useLayoutEffect(() => () => {
+    const current = editorRef.current
+    if (!current || current.isDestroyed || continuity.current) return
+    const { from, to } = current.state.selection
+    continuity.current = { from, to, focused: current.isFocused, scrollTop: containerRef.current?.scrollTop ?? 0 }
+  }, [collab?.ydoc])
+
   // handleKeyDown 안의 editorRef.current를 항상 최신 인스턴스로 유지 (위 editorRef 선언부 주석 참고)
   useEffect(() => {
     editorRef.current = editor
@@ -1527,8 +1536,8 @@ export const Editor = forwardRef<
   // 그 입력을 가로채 글자 삽입을 막고, 글쇠를 단축키로 실행한다 (한글 자모는 QWERTY 위치로 환원).
   // editor가 재생성될 때만 재등록하고, 토글 상태는 ref로 읽어 매 토글마다 재등록하지 않는다.
   useEffect(() => {
-    const dom = editor?.view.dom
-    if (!dom) return
+    if (!editor || editor.isDestroyed) return
+    const dom = editor.view.dom
     const onBeforeInput = (e: Event) => {
       if (!keyBarCtrlRef.current) return
       const ie = e as InputEvent
@@ -1655,7 +1664,7 @@ export const Editor = forwardRef<
     // collab 모드에서는 Y.XmlFragment가 본문의 진실 원천 — ySyncPlugin이 마운트 때 이미
     // 로드해 두므로 여기서 건드리면 원격 내용을 덮어써버린다. 시딩은 아래 별도 effect가 담당.
     if (collab) return
-    if (editor && body !== undefined) {
+    if (editor && !editor.isDestroyed && body !== undefined) {
       const local = localMarkdownRef.current
       if (local?.editor === editor && local.doc === editor.state.doc && local.body === body) return
       const current = (editor.storage as any).markdown?.getMarkdown() ?? ''
@@ -1678,7 +1687,7 @@ export const Editor = forwardRef<
   // (디스크 재조회 아님) — 이미 누군가 협업 중이던 방이면 fragment가 비어 있지 않으므로
   // _forceRerender가 이미 그 내용을 로드해 둔 상태고, 여기서는 아무 일도 하지 않는다
   useEffect(() => {
-    if (!editor || !collab || !collab.synced) return
+    if (!editor || editor.isDestroyed || !collab || !collab.synced) return
     const fragment = collab.ydoc.getXmlFragment(COLLAB_FIELD)
     if (fragment.length === 0 && body) {
       // SEED_ORIGIN으로 감싸 이 시딩이 undo 스택에 올라가지 않게 한다 (위 SEED_ORIGIN 선언부 주석 참고)
@@ -1689,6 +1698,21 @@ export const Editor = forwardRef<
   }, [editor, collab?.synced, collab?.ydoc, body])
 
   useEffect(() => {
+    if (!editor || editor.isDestroyed || collab && !collab.synced || !continuity.current) return
+    const frame = requestAnimationFrame(() => {
+      const previous = continuity.current, container = containerRef.current
+      if (!previous || !container || editor.isDestroyed) return
+      continuity.current = null
+      const end = editor.state.doc.content.size
+      try { editor.commands.setTextSelection({ from: Math.min(previous.from, end), to: Math.min(previous.to, end) }) } catch { /* A remote edit can remove the old selection. */ }
+      const active = container.ownerDocument.activeElement
+      if (previous.focused && (active === container.ownerDocument.body || active === editor.view.dom)) editor.commands.focus(undefined, { scrollIntoView: false })
+      container.scrollTop = previous.scrollTop
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [editor, collab?.synced, body])
+
+  useEffect(() => {
     pathRef.current = path
   }, [path])
 
@@ -1697,7 +1721,7 @@ export const Editor = forwardRef<
   }, [editor, fileLinkContext?.path, fileLinkContext?.docsRoot])
 
   useEffect(() => {
-    if (editor) {
+    if (editor && !editor.isDestroyed) {
       // emitUpdate=false: editable 토글이 onUpdate를 발생시켜 탭 상태를 오염시키지 않도록
       editor.setEditable(!readOnly, false)
     }
@@ -1730,7 +1754,7 @@ export const Editor = forwardRef<
   // 본문이 들어온 뒤에 입힌다 — 시딩 전이면 표가 없으므로 다음 body 변경에서 다시 시도한다
   useEffect(() => {
     const sync = tableSyncRef.current
-    if (!editor || !tableWidths?.length || !sync || sync.path !== path || sync.restored) return
+    if (!editor || editor.isDestroyed || !tableWidths?.length || !sync || sync.path !== path || sync.restored) return
     if (collab && !collab.synced) return
     if (!docHasTable(editor.state.doc)) return
     const apply = () => applyTableWidths(editor, tableWidths)
@@ -1744,7 +1768,7 @@ export const Editor = forwardRef<
   // 열을 끌어 놓으면(=셀 colwidth가 바뀌면) 저장한다. 타이핑 등 다른 변경에서는 값이 같아 저장되지 않는다.
   useEffect(() => {
     const saveLayout = api.saveTableLayout
-    if (!editor || !saveLayout || readOnly) return
+    if (!editor || editor.isDestroyed || !saveLayout || readOnly) return
     let timer: ReturnType<typeof setTimeout> | null = null
     const onTransaction = ({ transaction }: { transaction: { docChanged: boolean } }) => {
       if (!transaction.docChanged) return
@@ -1950,7 +1974,7 @@ export const Editor = forwardRef<
 
   // 스레드 목록이 바뀌면 하이라이트를 다시 푼다 — 문서 편집 쪽은 플러그인이 docChanged로 스스로 다시 푼다
   useEffect(() => {
-    if (!editor) return
+    if (!editor || editor.isDestroyed) return
     editor.view.dispatch(editor.state.tr.setMeta(commentRefreshKey, true))
   }, [editor, commentThreads])
 

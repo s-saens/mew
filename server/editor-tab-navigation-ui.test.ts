@@ -32,9 +32,14 @@ onOpenLink={(p,o)=>tabs.openFile(p,{preview:false,forceNewTab:!!o?.newTab,replac
 onNavigateTab={d=>tabs.navigateTab(d,'main')}/></div>}
 createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18nProvider>);`
   const styles: string[] = []
-  const bundle = await build({ input: 'virtual:editor-navigation.tsx', write: false, platform: 'browser', output: { format: 'esm', codeSplitting: false },
+  const bundle = await build({
+    onLog(level, log, handler) { if (log.code !== 'MODULE_LEVEL_DIRECTIVE') handler(level, log) }, input: 'virtual:editor-navigation.tsx', write: false, platform: 'browser', output: { format: 'esm', codeSplitting: false },
     transform: { jsx: 'react-jsx', define: { 'process.env.NODE_ENV': JSON.stringify('test') } }, plugins: [{
-      name: 'editor-navigation-fixture', resolveId(id) { if (id === 'virtual:editor-navigation.tsx') return id },
+      name: 'editor-navigation-fixture', resolveId(id) {
+        if (id === 'virtual:editor-navigation.tsx') return id
+        if (id === '@mew/editor') return path.join(root, 'packages/editor/src/index.ts')
+        if (id === '@mew/editor/frontmatter') return path.join(root, 'packages/editor/src/utils/frontmatter.ts')
+      },
       async load(id) {
         if (id === 'virtual:editor-navigation.tsx') return source
         if (id.endsWith('.css')) { styles.push(await fs.readFile(id, 'utf8')); return { code: '', moduleType: 'js' } }
@@ -56,6 +61,11 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
       await page.route('http://mew-editor-navigation.test/**', async route => {
         const url = new URL(route.request().url())
         if (url.pathname === '/api/file') {
+          if (route.request().method() === 'PUT') {
+            const body = route.request().postDataJSON()
+            files[body.path] = body.content
+            return route.fulfill({ json: { ok: true, commit: null } })
+          }
           const file = url.searchParams.get('path')!
           return route.fulfill(file in files ? { json: { path: file, content: files[file], editable: true } } : { status: 404, json: { error: `Missing fixture: ${file}` } })
         }

@@ -2,6 +2,7 @@ import { scopedBrowserStorage } from '@mew/ui/browser-storage-scope'
 import { ArrowUpRight, Download } from 'iconoir-react'
 import { useI18n } from '../i18n'
 import { pageRepresentative, documentPageLabel, documentPageTarget, remapPagePath, type DocumentPageMutation } from '../../shared/document-pages'
+import { documentAbsolutePath, useTitlePreviews } from '../utils/document-title-preview'
 import { canAutoFocusInput } from '@mew/ui'
 import { uiText } from '@mew/ui/i18n-core'
 import { useUiLocale } from '@mew/ui/i18n'
@@ -55,6 +56,7 @@ export type FileSearchResult = { path: string; project: string; scope: FileSearc
 
 interface NodeCtx {
   project: string
+  documentTitles: Readonly<Record<string, string>>
   documentPages: boolean
   openPage: (node: TreeNode, opts?: TreeOpenOptions) => void
   selectedPath: string | null
@@ -381,7 +383,8 @@ function Node({ node, depth, ctx }: { node: TreeNode; depth: number; ctx: NodeCt
     const open = hasChildren && ctx.openDirs.has(node.path)
     const pageFile = representative?.path ?? (folder && ctx.selectedPath && documentPageTarget(ctx.selectedPath) === node.path ? ctx.selectedPath : undefined)
       ?? (folder ? Array.from(ctx.openPaths ?? []).find(path => documentPageTarget(path) === node.path) : undefined)
-    const label = documentPageLabel(folder ? node.path : node.name) || (folder ? node.name : node.name.replace(/\.md$/i, ''))
+    const preview = ctx.documentTitles[pageFile ?? node.path] ?? ctx.documentTitles[node.path]
+    const label = preview !== undefined ? preview || uiText('제목 없음') : documentPageLabel(folder ? node.path : node.name) || (folder ? node.name : node.name.replace(/\.md$/i, ''))
     const active = node.path === ctx.selectedPath || pageFile === ctx.selectedPath
     const creating = ctx.editing?.mode === 'create-file' && ctx.editing.parentPath === node.path ? ctx.editing : null
     return <div className="group/page isolate" data-document-page={node.path}
@@ -435,7 +438,7 @@ function Node({ node, depth, ctx }: { node: TreeNode; depth: number; ctx: NodeCt
           }`}
           style={{ paddingLeft: `${depth * 14 + 8}px`, scrollMarginTop: `${depth * 1.75}rem` }}
         >
-          <span className="min-w-0 flex-1 truncate">{node.name}</span>
+          <span className="min-w-0 flex-1 truncate">{ctx.documentTitles[node.path] !== undefined ? `${ctx.documentTitles[node.path] || uiText('제목 없음')}.md` : node.name}</span>
           <PresenceDots colors={ctx.presence[node.path] ?? []} />
         </button>
       </div>
@@ -572,6 +575,7 @@ export function FileTree({
   accountState,
   onAccountStateChange,
   workspacePath = null,
+  documentsPath,
   rootPath = '',
   onDirectoryFocus,
   createRequest,
@@ -619,6 +623,7 @@ export function FileTree({
   onAccountStateChange?: (state: TreePersistenceState) => void
   /** 다른 루트 프로젝트로 붙여넣을 때 원본을 다시 찾는 절대경로. */
   workspacePath?: string | null
+  documentsPath?: string
   /** Project-relative directory represented by this tree's top level. */
   rootPath?: string
   onDirectoryFocus?: (parentPath: string) => void
@@ -675,6 +680,9 @@ export function FileTree({
 }) {
   const { t } = useI18n()
   const persistedProject = stateKey ?? project
+  const titleDrafts = useTitlePreviews()
+  const titleRoot = workspacePath ? documentAbsolutePath(workspacePath, documentsPath, project, '') : ''
+  const documentTitles = useMemo(() => Object.fromEntries(Object.entries(titleDrafts).filter(([path]) => titleRoot && path.startsWith(titleRoot)).map(([path, preview]) => [path.slice(titleRoot.length), preview.title])), [titleDrafts, titleRoot])
   const [query, setQuery] = useState('')
   const [focused, setFocused] = useState<Focused>(null)
   const [openDirs, setOpenDirs] = useState<Set<string>>(() => new Set(accountState?.openDirs ?? loadOpenDirs(persistedProject) ?? []))
@@ -1456,6 +1464,7 @@ export function FileTree({
 
   const ctx: NodeCtx = {
     project,
+    documentTitles,
     documentPages,
     openPage: (node, opts) => {
       const sequence = ++pageOpenSequence.current

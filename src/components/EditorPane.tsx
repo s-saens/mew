@@ -998,7 +998,7 @@ export function EditorPane({
                     onOpenPlain={() => changeViewMode('plain')}
                   >
                     <Editor
-                      key={collab?.ydoc.clientID ?? 'local'}
+                      key={activeTab.documentId ?? pane.activePath}
                       ref={editorRef}
                       value={activeTab.content}
                       api={editorApi}

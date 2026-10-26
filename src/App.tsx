@@ -941,6 +941,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     saveAccountTabs,
     workspaceUiLoaded,
     workspaceInfoRef.current?.docsPath,
+    authEmail ?? undefined,
   )
 
   const sidebarOpenPaths = useMemo(() => {
@@ -2221,6 +2222,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
                       accountState={rootProjectPath ? accountTreeStates[`sidebar-tree:${isGuest || docsExpanded ? 'docs' : 'root'}:${rootProjectPath}`] : undefined}
                       onAccountStateChange={rootProjectPath ? (state) => saveAccountTreeState(`sidebar-tree:${isGuest || docsExpanded ? 'docs' : 'root'}:${rootProjectPath}`, state) : undefined}
                       workspacePath={rootProjectPath}
+                      documentsPath={workspaceInfoRef.current?.docsPath}
                       openPaths={sidebarOpenPaths[isGuest || docsExpanded ? DEFAULT_PROJECT : WORKSPACE_PROJECT]}
                       selectedPath={activeFile.project === (isGuest || docsExpanded ? DEFAULT_PROJECT : WORKSPACE_PROJECT) ? activeFile.path || null : null}
                       revealOnMount={pendingSidebarReveal?.root === rootProjectPath && pendingSidebarReveal?.project === (isGuest || docsExpanded ? DEFAULT_PROJECT : WORKSPACE_PROJECT) && pendingSidebarReveal?.path === activeFile.path}

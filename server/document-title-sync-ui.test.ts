@@ -19,7 +19,7 @@ test('document titles stay synchronized after explorer, editor, and task edits a
   const docs = path.join(workspace, 'docs')
   fs.mkdirSync(path.join(docs, 'tasks'), { recursive: true })
   changeTaskList(workspace, [{ id: 'promotion', before: null, after: { id: 'promotion', text: '가까운 주변에 홍보하기', done: false }, afterId: null }])
-  fs.appendFileSync(path.join(docs, 'tasks/가까운 주변에 홍보하기.md'), '\nOriginal body\n')
+  fs.appendFileSync(path.join(docs, 'tasks/가까운 주변에 홍보하기.md'), '\nOriginal body\n\n' + Array.from({ length: 50 }, (_, i) => `Body paragraph ${i}`).join('\n\n') + '\n')
   fs.writeFileSync(path.join(docs, 'other.md'), 'Other document')
   const pages = new DocumentPages(docs)
   const source = `
@@ -48,7 +48,7 @@ function Fixture(){
    onFileCreated={noop} onFolderCreated={refresh} onRenamed={noop} onDeleted={noop} onNotice={noop} onOpenGit={noop} registerSearchCancel={noop}/></aside>
   <main className="flex min-w-0 flex-1">{tabs.panes.map(pane=><section key={pane.id} data-pane={pane.id} className="flex min-w-0 flex-1 flex-col">
    <EditorPane {...callbacks} pane={pane} role="owner" authEmail="owner@example.test" project=".workspace" workspace={{path:'/fixture',docsPath:'/fixture/docs'}}
-    tree={tree} presence={{}} focused={pane.id===tabs.focusedPaneId} canCollaborate={false} isGuest={false} showSidebarButton={false} tocOpen={false} dropZone={null}
+    tree={tree} presence={{}} focused={pane.id===tabs.focusedPaneId} canCollaborate={true} isGuest={false} showSidebarButton={false} tocOpen={false} dropZone={null}
     onFocus={()=>tabs.focusPane(pane.id)} onActivate={(p,id)=>tabs.setActivePath(p,pane.id,id)} onPin={p=>tabs.pinTab(p,pane.id)}
     onCloseTab={(p,id)=>tabs.closeTab(p,pane.id,id)} onReorder={(a,b)=>tabs.reorderTabs(a,b,pane.id)} onSetViewMode={(p,m)=>tabs.setTabViewMode(p,m,pane.id)}
     onChangeContent={tabs.updateTabContent} onOpenLink={noop}/></section>)}</main>
@@ -60,7 +60,12 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
   const bundle = await build({ input: 'virtual:title-sync.tsx', write: false, platform: 'browser', output: { format: 'esm', codeSplitting: false },
     onLog(level, log, handler) { if (log.code !== 'MODULE_LEVEL_DIRECTIVE') handler(level, log) },
     transform: { jsx: 'react-jsx', define: { 'process.env.NODE_ENV': JSON.stringify('test') } },
-    plugins: [{ name: 'title-sync-fixture', resolveId: id => id === 'virtual:title-sync.tsx' ? id : undefined, load(id) {
+    plugins: [{ name: 'title-sync-fixture', resolveId: id => {
+      if (id === 'virtual:title-sync.tsx') return id
+      // Workspace package symlinks may point at another checkout.
+      if (id === '@mew/editor') return path.join(repo, 'packages/editor/src/index.ts')
+      if (id === '@mew/editor/frontmatter') return path.join(repo, 'packages/editor/src/utils/frontmatter.ts')
+    }, load(id) {
       if (id === 'virtual:title-sync.tsx') return source
       if (id.endsWith('.css')) { styles.push(fs.readFileSync(id, 'utf8')); return { code: '', moduleType: 'js' } }
     } }],
@@ -87,6 +92,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     fs.rmSync(workspace, { recursive: true, force: true })
   })
   page.on('pageerror', error => errors.push(error.message))
+  page.on('console', message => { if (message.type() === 'error') errors.push(message.text()) })
   await page.addInitScript("localStorage.setItem('mew:locale','ko')")
   await page.route('http://mew-title-sync.test/**', async route => {
     const url = new URL(route.request().url()), method = route.request().method()
@@ -137,22 +143,31 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     if (url.pathname.startsWith('/api/')) return json([])
     return route.fulfill(url.pathname === '/app.js' ? { contentType: 'text/javascript', body: script } : { contentType: 'text/html', body: `<!doctype html><html class="dark"><meta charset="utf-8"><style>${css}</style><div id="root"></div><script type="module" src="/app.js"></script></html>` })
   })
+  await page.routeWebSocket('**/api/collab?**', ws => {
+    ws.onMessage(message => {
+      if (typeof message !== 'string' && message[0] === 0 && message[1] === 0) ws.send(Buffer.from([0, 1, 2, 0, 0]))
+    })
+  })
   await page.goto('http://mew-title-sync.test/')
   const taskTitle = page.getByRole('textbox', { name: '태스크 제목', exact: true })
   await taskTitle.waitFor()
   const explorer = (title: string) => page.locator(`[data-path="tasks/${title}.md"]`)
   const editorTitle = () => page.getByRole('textbox', { name: '제목', exact: true })
+  const waitForEditorTitle = () => editorTitle().waitFor().catch(async error => {
+    throw new Error(`${error.message}\nBrowser errors: ${errors.join('\n')}\nDOM: ${await page.locator('body').innerText()}`)
+  })
   const tab = (title: string) => page.getByRole('tab', { name: `${title} ×`, exact: true })
   const refreshTasks = () => page.evaluate("window.dispatchEvent(new Event('focus'))")
   const synchronized = async (title: string, count = 1) => {
     await page.waitForFunction(`window.tasks.tasks[0]?.text===${JSON.stringify(title)} && window.tasks.tasks[0]?.path===${JSON.stringify(`docs/tasks/${title}.md`)} && window.tabs.panes.flatMap(p=>p.tabs).filter(t=>t.path===${JSON.stringify(`mew:file:docs/tasks/${title}.md`)}).length===${count}`)
     await explorer(title).waitFor()
     assert.equal(await tab(title).count(), count)
+    await waitForEditorTitle()
     for (const input of await editorTitle().all()) assert.equal(await input.inputValue(), title)
     assert.equal(await taskTitle.inputValue(), title)
   }
   await explorer('가까운 주변에 홍보하기').click()
-  await editorTitle().waitFor()
+  await waitForEditorTitle()
   await explorer('가까운 주변에 홍보하기').focus()
   await page.keyboard.press('F2')
   const rename = page.locator('aside').first().getByRole('textbox').last()
@@ -164,7 +179,12 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
   assert.equal(await explorer('가까운 주변에 홍보하기').count(), 0, 'refresh never brings back the old explorer name')
 
   holdTaskRead = true
+  await waitForEditorTitle()
+  const originalTitleInput = await editorTitle().elementHandle()
   await editorTitle().fill('동네에 홍보하기')
+  assert.equal(await taskTitle.inputValue(), '동네에 홍보하기', 'the task title reflects editor input before autosave')
+  assert.ok((await explorer('주변에 홍보하기').textContent())?.includes('동네에 홍보하기'), 'the explorer previews the title without moving its action path early')
+  await editorTitle().evaluate(input => input.setSelectionRange(2, 2))
   assert.equal(await tab('동네에 홍보하기').count(), 1, 'the tab follows the edited YAML title before autosave moves the file')
   await page.waitForFunction('window.tabs.activeTab.status === "saved" && window.tabs.activeTab.content === window.tabs.activeTab.savedContent && window.tabs.activeTab.savedContent.includes("동네에 홍보하기")')
   await refreshTasks()
@@ -175,6 +195,8 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
   assert.equal(fs.existsSync(path.join(docs, 'tasks/주변에 홍보하기.md')), false, 'autosave and explicit save remain paused while GET moves the document')
   releaseTaskRead!()
   await synchronized('동네에 홍보하기')
+  assert.equal(await originalTitleInput!.evaluate(input => input.isConnected), true, 'renaming preserves the title input DOM through collaboration reconnection')
+  assert.equal(await originalTitleInput!.evaluate(input => input.ownerDocument.activeElement === input && input.selectionStart === 2), true, 'renaming preserves title focus and caret')
   await page.waitForFunction('window.tabs.activeTab.content.includes("Typed during task GET") && window.tabs.activeTab.content===window.tabs.activeTab.savedContent')
   assert.ok(fs.readFileSync(path.join(docs, 'tasks/동네에 홍보하기.md'), 'utf8').includes('Typed during task GET'))
 
@@ -186,10 +208,24 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
   await page.waitForFunction('window.tabs.panes[0].activePath==="mew:file:docs/other.md"')
   await page.evaluate("(()=>{const p=window.tabs;p.updateTabContent('mew:file:docs/tasks/동네에 홍보하기.md',p.panes[1].tabs[0].content+'Before task rename\\n',p.panes[1].id)})()")
   await taskTitle.fill('이웃에 홍보하기')
+  assert.equal(await tab('이웃에 홍보하기').count(), 2, 'task input previews both editor tabs before the request')
+  assert.ok((await explorer('동네에 홍보하기').textContent())?.includes('이웃에 홍보하기'))
   await taskSaveStarted
   await page.evaluate("(()=>{const p=window.tabs;p.updateTabContent('mew:file:docs/tasks/동네에 홍보하기.md',p.panes[1].tabs[0].content+'Typed during rename\\n',p.panes[1].id)})()")
+  const bodyEditor = page.locator('[data-pane]').nth(1).locator('.ProseMirror')
+  await bodyEditor.evaluate(element => {
+    element.focus()
+    const document = element.ownerDocument, range = document.createRange(), selection = document.getSelection()!
+    range.setStart(element.querySelector('p')!.firstChild!, 3)
+    range.collapse(true)
+    selection.removeAllRanges(); selection.addRange(range)
+  })
+  // Let ProseMirror observe the browser selection before the document path changes.
+  await page.waitForTimeout(50)
+  await bodyEditor.evaluate(element => { element.closest('.editor-root')!.scrollTop = 180 })
   releaseTaskSave!()
   await synchronized('이웃에 홍보하기', 2)
+  await page.waitForFunction(`(()=>{const element=window.document.querySelectorAll('[data-pane]')[1].querySelector('.ProseMirror');return element&&window.document.activeElement===element&&window.getSelection().anchorOffset===3&&element.closest('.editor-root').scrollTop===180})()`)
   await page.waitForFunction('window.tabs.panes.flatMap(p=>p.tabs).filter(t=>t.path.includes("이웃에 홍보하기")).every(t=>t.content.includes("Before task rename")&&t.content.includes("Typed during rename")&&t.content===t.savedContent)')
   assert.equal(fs.existsSync(path.join(docs, 'tasks/동네에 홍보하기.md')), false)
   assert.ok(fs.readFileSync(path.join(docs, 'tasks/이웃에 홍보하기.md'), 'utf8').includes('Typed during rename'))
