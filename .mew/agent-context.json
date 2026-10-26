@@ -1,0 +1,7 @@
+{
+  "version": 1,
+  "enabled": true,
+  "docsDir": "docs",
+  "entrypoints": [],
+  "instructions": "이 실행 제한은 Mew 자체 저장소에만 적용한다. 에이전트는 앱 빌드·배포, mew 런처 실행, 서버 시작·종료·재시작을 하지 않는다. 실행 중인 인스턴스의 dist를 바꾸지 않는 타입·테스트·린트·문서 검사는 허용한다. 빌드와 서버 적용은 사용자가 수행한다. 상세 기준은 docs/development/getting-started.md를 따른다."
+}

@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="mew-p2p-bootstrap" content="1" />
+    <!-- interactive-widget=resizes-content: 모바일 키보드가 뜨면 레이아웃 뷰포트(및 dvh)가 실제로 줄어들게 함 (Chromium) -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content" />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="description" content="Mew is a browser workspace for documents, code, and AI agents. Open a folder on your computer or server, edit Markdown, run terminals, and review changes in Git." />
+    <meta name="theme-color" content="#101827" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="mew" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/app-icon-180.png" />
+    <title>mew · My Easy Workspace</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="stylesheet" href="/fonts/ibm-plex/fonts.css" />
+    <!-- 저장된 라이트/다크 선호를 React가 뜨기 전에 적용해 첫 렌더에서 테마가 깜빡이는 것을 막는다 -->
+    <script>
+      try {
+        if (localStorage.getItem('mew:theme') === 'light') document.documentElement.classList.remove('dark')
+      } catch {}
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

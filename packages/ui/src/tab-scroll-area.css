@@ -1,0 +1,25 @@
+.mew-tab-scroll-area { position: relative; display: grid; min-width: 0; }
+.mew-tab-scroll-viewport { display: flex; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+.mew-tab-scroll-viewport::-webkit-scrollbar { display: none; }
+.mew-tab-scroll-button {
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  bottom: 0;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-ink);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.mew-tab-scroll-button[hidden] { display: none; }
+.mew-tab-scroll-button[data-tab-scroll-direction="left"] { left: 0; }
+.mew-tab-scroll-button[data-tab-scroll-direction="right"] { right: 0; }
+.mew-tab-scroll-button svg { filter: drop-shadow(0 1px 2px rgb(0 0 0 / 0.4)); }
+.mew-tab-scroll-button:hover { color: var(--color-accent); }
+.mew-tab-scroll-button:focus-visible { outline: 2px solid var(--color-accent); outline-offset: -2px; }
+@media (pointer: coarse) { .mew-tab-scroll-button { width: 32px; } }

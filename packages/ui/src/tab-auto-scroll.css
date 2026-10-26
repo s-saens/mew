@@ -1,0 +1,5 @@
+[data-mew-tab-auto-scroll] { scroll-behavior: smooth; }
+
+@media (prefers-reduced-motion: reduce) {
+  [data-mew-tab-auto-scroll] { scroll-behavior: auto; }
+}

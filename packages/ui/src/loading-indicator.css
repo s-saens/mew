@@ -1,0 +1,64 @@
+.mew-loading-indicator {
+  --mew-loading-stroke: clamp(1.25px, calc(var(--mew-loading-size, 16px) * .075), 2.5px);
+  position: relative;
+  display: inline-block;
+  box-sizing: border-box;
+  width: var(--mew-loading-size, 16px);
+  height: var(--mew-loading-size, 16px);
+  flex-shrink: 0;
+  vertical-align: middle;
+  border-radius: 50%;
+  background: radial-gradient(circle, currentColor 0 7%, transparent 9%);
+  animation: mew-loading-spin 1.6s linear infinite;
+}
+.mew-loading-indicator::before,
+.mew-loading-indicator::after {
+  content: '';
+  position: absolute;
+  box-sizing: border-box;
+  inset: 0;
+  border: var(--mew-loading-stroke) solid currentColor;
+  border-left-color: transparent;
+  border-radius: 50%;
+}
+.mew-loading-indicator::after {
+  inset: 26%;
+  border-width: max(1px, calc(var(--mew-loading-stroke) * .65));
+  opacity: .7;
+  animation: mew-loading-spin 1s linear infinite reverse;
+  animation-play-state: inherit;
+}
+@supports (background: conic-gradient(transparent, currentColor)) and (mask: radial-gradient(black, transparent)) {
+  .mew-loading-indicator::before,
+  .mew-loading-indicator::after {
+    border: 0;
+    background: conic-gradient(from -60deg,
+      color-mix(in srgb, currentColor 8%, transparent) 0deg 45deg,
+      color-mix(in srgb, currentColor 15%, transparent) 90deg,
+      color-mix(in srgb, currentColor 45%, transparent) 180deg,
+      currentColor 270deg 292deg,
+      transparent 294deg 360deg);
+    mask: radial-gradient(farthest-side, transparent calc(100% - var(--mew-loading-stroke)), black calc(100% - var(--mew-loading-stroke) + .5px));
+  }
+  .mew-loading-indicator::after {
+    --mew-loading-stroke: 1px;
+    background: conic-gradient(from 120deg, transparent, currentColor 250deg 290deg, transparent 292deg);
+  }
+}
+.mew-loading-indicator[data-active='false'],
+[data-paused] .mew-loading-indicator { animation-play-state: paused; }
+@keyframes mew-loading-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .mew-loading-indicator,
+  .mew-loading-indicator::after { animation: none; }
+}
+@media (forced-colors: active) {
+  .mew-loading-indicator { background: none; }
+  .mew-loading-indicator::before {
+    background: none;
+    mask: none;
+    border: var(--mew-loading-stroke) solid CanvasText;
+    border-left-color: transparent;
+  }
+  .mew-loading-indicator::after { display: none; }
+}
