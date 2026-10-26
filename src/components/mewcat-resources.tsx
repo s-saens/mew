@@ -1,11 +1,11 @@
 import type { RefObject, ReactNode } from 'react'
 import { useMewcatBubble } from '../hooks/use-mewcat-bubble'
 import { useOverlayDismiss } from '@mew/ui'
-import { Check, WarningTriangle, Xmark } from 'iconoir-react'
+import { Check, Settings, WarningTriangle, Xmark } from 'iconoir-react'
 import { useI18n } from '../i18n'
 import { dismissMewcatNotice, openMewcatNotice, useMewcatNotices } from '../utils/mewcat-notifications'
 
-export function MewcatResources({ anchorRef, onClose, assistant }: { assistant?: ReactNode; anchorRef: RefObject<HTMLDivElement | null>; onClose: () => void }) {
+export function MewcatResources({ anchorRef, onClose, assistant, onOpenSettings }: { onOpenSettings?: () => void; assistant?: ReactNode; anchorRef: RefObject<HTMLDivElement | null>; onClose: () => void }) {
   const bubbleRef = useMewcatBubble(anchorRef, true, assistant ? 340 : 260)
   const { t } = useI18n()
   const notices = useMewcatNotices()
@@ -16,7 +16,10 @@ export function MewcatResources({ anchorRef, onClose, assistant }: { assistant?:
     <div className="mewcat-notifications-content">
       <header className="mewcat-notification-header">
         <h2 className="text-xs font-medium text-ink">{t('mewcat.recent')}</h2>
-        <button type="button" className="mewcat-notification-button shrink-0 text-ink-secondary" onClick={onClose} aria-label={t('common.close')}><Xmark width={16} height={16} /></button>
+        <div className="flex items-center gap-1">
+          {onOpenSettings && <button type="button" className="mewcat-notification-button shrink-0 text-ink-secondary" onClick={onOpenSettings} aria-label={t('settings.mewcat')} data-tip={t('settings.mewcat')}><Settings width={16} height={16} /></button>}
+          <button type="button" className="mewcat-notification-button shrink-0 text-ink-secondary" onClick={onClose} aria-label={t('common.close')}><Xmark width={16} height={16} /></button>
+        </div>
       </header>
       {recent.length ? <ul className="mewcat-notification-list">
         {recent.map(notice => {

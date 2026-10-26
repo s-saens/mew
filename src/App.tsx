@@ -389,6 +389,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     window.dispatchEvent(new CustomEvent('mew:mewcat-agent-ready', { detail: runtime }))
   }, [selectMewcatRuntime])
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [mewcatSettingsRequest, setMewcatSettingsRequest] = useState(0)
   const [debuggerSettingsRequested, setDebuggerSettingsRequested] = useState(false)
   const [adminOpen, setAdminOpen] = useState(false)
   const [remoteAccessOpen, setRemoteAccessOpen] = useState(false)
@@ -2406,7 +2407,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
         )}
       </div>
 
-      <Mewcat portalTarget={settingsOpen && !desktopMode ? settingsMewcatHost : remoteDesktopOpen ? remoteMewcatHost : null} hidden={remoteDesktopOpen && mewcatHideDesktop} skin={mewcatSkin} assistant={{ account: auth.email ?? 'guest', enabled: caps.agent, runtime: mewcatRuntime, projectRoot: rootProjectPath, onAction: handleMewcatAction, onRuntimeChange: selectMewcatRuntime, onConnect: () => { setMewcatPicker(true); openWorkspacePanel('agent'); showToast(t('mewcat.assistant.guide')) } }} />
+      <Mewcat onOpenSettings={() => { setMewcatSettingsRequest(request => request + 1); setSettingsOpen(true) }} portalTarget={settingsOpen && !desktopMode ? settingsMewcatHost : remoteDesktopOpen ? remoteMewcatHost : null} hidden={remoteDesktopOpen && mewcatHideDesktop} skin={mewcatSkin} assistant={{ account: auth.email ?? 'guest', enabled: caps.agent, runtime: mewcatRuntime, projectRoot: rootProjectPath, onAction: handleMewcatAction, onRuntimeChange: selectMewcatRuntime, onConnect: () => { setMewcatPicker(true); openWorkspacePanel('agent'); showToast(t('mewcat.assistant.guide')) } }} />
 
       <MobileDock active={remoteDesktopOpen ? 'desktop' : desktopMode ? focusedDockPanel ?? '' : mobileForegroundPanel ?? 'editor'} openPanels={desktopMode ? mobileDockPanels.filter(panel => panel === 'editor' ? editorOpen : panel === 'desktop' ? remoteDesktopOpen : panel === 'memo' ? memoOpen : workspacePanelOpen[panel]) : undefined} available={mobileDockPanels} hidden={mobileKeyboardOpen} portalTarget={remoteDockHost ?? (desktopMode ? sidebarDockHost : null)}
         vertical={desktopMode && !remoteDockHost} onSelect={selectDockPanel} onNavigate={navigateMobileDock} />
@@ -2414,10 +2415,11 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
       {settingsOpen && (
         <SettingsModal
           mewcatHostRef={setSettingsMewcatHost}
+          mewcatRequest={mewcatSettingsRequest}
           dockAvailable={mobileDockPanels}
           initialDebugger={debuggerSettingsRequested}
           debuggerRoot={canDebug && auth.email ? rootProjectPath ?? undefined : undefined}
-          onOpenDebugger={() => { setSettingsOpen(false); setDebuggerSettingsRequested(false); openWorkspacePanel('debugger') }}
+          onOpenDebugger={() => { setSettingsOpen(false); setMewcatSettingsRequest(0); setDebuggerSettingsRequested(false); openWorkspacePanel('debugger') }}
           email={authEmail}
           displayName={auth.displayName}
           avatarDataUrl={auth.avatarDataUrl}
@@ -2438,6 +2440,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
           onClose={() => {
             setFontPreferences((fonts) => normalizeFontPreferences(fonts))
             setSettingsOpen(false)
+            setMewcatSettingsRequest(0)
             setDebuggerSettingsRequested(false)
           }}
           onLoggedOut={onLoggedOut}

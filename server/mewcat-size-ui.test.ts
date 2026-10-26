@@ -82,15 +82,15 @@ window.sizeStorage=scopedBrowserStorage();
 const write=Storage.prototype.setItem;
 Storage.prototype.setItem=function(key,value){if(window.blockSizeWrites&&key.endsWith('mew:mewcat-size'))throw new DOMException('Blocked','QuotaExceededError');return write.call(this,key,value)};
 function Fixture(){
- const [skin,setSkin]=useState(loadMewcatSkin),[open,setOpen]=useState(true);
+ const [skin,setSkin]=useState(loadMewcatSkin),[open,setOpen]=useState(true),[mewcatRequest,setMewcatRequest]=useState(0);
  const [settingsHost,setSettingsHost]=useState(null),[desktop,setDesktop]=useState(()=>matchMedia('(min-width:768px)').matches);
  useEffect(()=>{const query=matchMedia('(min-width:768px)'),update=()=>setDesktop(query.matches);query.addEventListener('change',update);return()=>query.removeEventListener('change',update)},[]);
  const {setLocale}=useI18n();window.changeLanguage=setLocale;
  const change=value=>{saveMewcatSkin(value);setSkin(value)};
  return <><button id="settings" onClick={()=>setOpen(true)}>Settings</button>
  <nav style={{position:'fixed',bottom:0,height:48,width:'100%',background:'var(--color-surface-raised)'}}>Dock</nav>
- <Mewcat skin={skin} portalTarget={open&&!desktop?settingsHost:new URLSearchParams(location.search).has('portal')?document.getElementById('viewer'):null}/>
- {open&&<SettingsModal mewcatHostRef={setSettingsHost} email={null} displayName={null} avatarDataUrl={null} canEditIgnore={false} theme="dark" themeColor="#4432a8" fontPreferences={loadFontPreferences()} mewcatSkin={skin} mewcatHideDesktop={false} onMewcatSkinChange={change} onMewcatHideDesktopChange={()=>{}} onFontPreferencesChange={()=>{}} onThemeColorChange={()=>{}} onToggleTheme={()=>{}} onClose={()=>setOpen(false)} onLoggedOut={()=>{}} onProfileChanged={()=>{}}/>}</>
+ <Mewcat onOpenSettings={()=>{setMewcatRequest(value=>value+1);setOpen(true)}} skin={skin} portalTarget={open&&!desktop?settingsHost:new URLSearchParams(location.search).has('portal')?document.getElementById('viewer'):null}/>
+ {open&&<SettingsModal mewcatRequest={mewcatRequest} mewcatHostRef={setSettingsHost} email={null} displayName={null} avatarDataUrl={null} canEditIgnore={false} theme="dark" themeColor="#4432a8" fontPreferences={loadFontPreferences()} mewcatSkin={skin} mewcatHideDesktop={false} onMewcatSkinChange={change} onMewcatHideDesktopChange={()=>{}} onFontPreferencesChange={()=>{}} onThemeColorChange={()=>{}} onToggleTheme={()=>{}} onClose={()=>{setOpen(false);setMewcatRequest(0)}} onLoggedOut={()=>{}} onProfileChanged={()=>{}}/>}</>
 }
 createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18nProvider>);
 if(new URLSearchParams(location.search).has('portal'))document.getElementById('root').inert=true;`
@@ -123,9 +123,28 @@ if(new URLSearchParams(location.search).has('portal'))document.getElementById('r
         await page.getByRole('dialog').locator('nav').getByRole('button', { name: '뮤펫', exact: true }).click()
         await page.getByRole('slider', { name: '기본 크기' }).waitFor()
       }
-      await openMewcat()
+      await page.keyboard.press('Escape')
+      await page.locator('.mewcat-sprite').waitFor()
+      await page.locator('.mewcat').focus()
+      await page.keyboard.press('Enter')
+      const settingsButton = page.locator('.mewcat-notifications').getByRole('button', { name: '뮤펫', exact: true })
+      await page.screenshot({ path: `/tmp/mewcat-settings-bubble-${mobile ? 'mobile' : 'desktop'}.png` })
+      await settingsButton.click()
+      await page.getByRole('slider', { name: '기본 크기' }).waitFor({ state: 'visible' })
+      assert.equal(await page.locator('.mewcat-notifications').count(), 0, 'opening settings closes the bubble')
+      assert.equal(await page.getByRole('dialog').count(), 1)
+      await page.screenshot({ path: `/tmp/mewcat-settings-shortcut-${mobile ? 'mobile' : 'desktop'}.png` })
       await page.locator('.mewcat .mewcat-sprite').waitFor()
       await expectSize(page, 48)
+      if (mobile) {
+        await page.getByRole('button', { name: '뒤로', exact: true }).click()
+        await page.getByRole('dialog').locator('nav').getByRole('button', { name: '화면', exact: true }).click()
+        await page.locator('.mewcat').focus()
+        await page.keyboard.press('Enter')
+        await settingsButton.click()
+        await page.getByRole('slider', { name: '기본 크기' }).waitFor({ state: 'visible' })
+        assert.equal(await page.getByRole('dialog').count(), 1, 'existing settings switch to Mewpet without another dialog')
+      }
       await expectSettingsLayer(page, mobile)
       if (mobile) {
         await page.setViewportSize({ width: 320, height: 720 })

@@ -43,7 +43,7 @@ const clamp = (value: number, min: number, max: number) => Math.max(min, Math.mi
 function nextActivity(): 'idle' | 'walk' | 'run' { const options = ['idle', 'walk', 'run'] as const; return options[Math.floor(Math.random() * options.length)] }
 
 /** 화면 맨 아래를 자유롭게 오가며, 눌러서 잠깐 놀아 줄 수 있는 Mew의 고양이. */
-export function Mewcat({ skin, hidden = false, portalTarget, assistant }: { hidden?: boolean; portalTarget?: HTMLElement | null; skin: MewcatSkin | null; assistant?: MewcatAssistantOptions & { onConnect: () => void; onRuntimeChange: (runtime: string) => void } }) {
+export function Mewcat({ skin, hidden = false, portalTarget, assistant, onOpenSettings }: { onOpenSettings?: () => void; hidden?: boolean; portalTarget?: HTMLElement | null; skin: MewcatSkin | null; assistant?: MewcatAssistantOptions & { onConnect: () => void; onRuntimeChange: (runtime: string) => void } }) {
   const spriteSkin = useMewcatSpriteSkin(skin)
   const [activated, setActivated] = useState(false)
   const startup = useStartupGuide()
@@ -69,7 +69,7 @@ export function Mewcat({ skin, hidden = false, portalTarget, assistant }: { hidd
     {startup.guide && approvalId === undefined ? startup.guide === 'install'
       ? <MewcatInstallGuide anchorRef={spriteSkin ? anchorRef : undefined} install={startup.install} onInstalled={startup.installed} hidden={startup.preferences.install} onHiddenChange={value => startup.setHidden('install', value)} onClose={() => startup.dismiss('install')} />
       : <MewcatFullscreenGuide anchorRef={spriteSkin ? anchorRef : undefined} hidden={startup.preferences.fullscreen} onHiddenChange={value => startup.setHidden('fullscreen', value)} onClose={() => startup.dismiss('fullscreen')} />
-      : showBubble ? <MewcatResources anchorRef={anchorRef} assistant={assistant?.enabled ? <MewcatAssistant state={helper} runtime={assistant.runtime} onConnect={() => { closeBubble(); assistant.onConnect() }} onRuntimeChange={assistant.onRuntimeChange} /> : undefined} onClose={closeBubble} /> : null}
+      : showBubble ? <MewcatResources onOpenSettings={onOpenSettings ? () => { closeBubble(); onOpenSettings() } : undefined} anchorRef={anchorRef} assistant={assistant?.enabled ? <MewcatAssistant state={helper} runtime={assistant.runtime} onConnect={() => { closeBubble(); assistant.onConnect() }} onRuntimeChange={assistant.onRuntimeChange} /> : undefined} onClose={closeBubble} /> : null}
     <MewcatNotifications hasCat={skin !== null} />
   </>
   return portalTarget ? createPortal(content, portalTarget) : content

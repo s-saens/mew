@@ -28,6 +28,7 @@ type Section = 'debugger' | 'account' | 'appearance' | 'notifications' | 'dock' 
 
 interface SettingsModalProps {
   mewcatHostRef?: Ref<HTMLDivElement>
+  mewcatRequest?: number
   initialDebugger?: boolean
   debuggerRoot?: string
   onOpenDebugger?: () => void
@@ -65,13 +66,21 @@ const SECTION_LABEL: Record<Section, TranslationKey> = {
 }
 
 /** 헤더의 계정 버튼(게스트는 톱니 버튼)으로 여는 설정 창 — 계정·화면(테마)·단축키·숨김 목록을 한곳에서 관리한다 */
-export function SettingsModal({ mewcatHostRef, initialDebugger, debuggerRoot, onOpenDebugger, dockAvailable, email, displayName, avatarDataUrl, hasPassword = true, authenticationMethod, canEditIgnore, themeSettings = { palette: DEFAULT_THEME_PALETTE, custom: [] }, fontPreferences, mewcatSkin, mewcatHideDesktop, onMewcatHideDesktopChange, onFontPreferencesChange, onThemeSettingsChange = () => {}, onMewcatSkinChange, onClose, onLoggedOut, onProfileChanged }: SettingsModalProps) {
+export function SettingsModal({ mewcatHostRef, mewcatRequest, initialDebugger, debuggerRoot, onOpenDebugger, dockAvailable, email, displayName, avatarDataUrl, hasPassword = true, authenticationMethod, canEditIgnore, themeSettings = { palette: DEFAULT_THEME_PALETTE, custom: [] }, fontPreferences, mewcatSkin, mewcatHideDesktop, onMewcatHideDesktopChange, onFontPreferencesChange, onThemeSettingsChange = () => {}, onMewcatSkinChange, onClose, onLoggedOut, onProfileChanged }: SettingsModalProps) {
   useUiLocale()
   const [portalContainer, setPortalContainer] = useState<HTMLDivElement | null>(null)
-  const [section, setSection] = useState<Section>(debuggerRoot && initialDebugger ? 'debugger' : email ? 'account' : 'appearance')
+  const [section, setSection] = useState<Section>(mewcatRequest ? 'mewcat' : debuggerRoot && initialDebugger ? 'debugger' : email ? 'account' : 'appearance')
   // Mobile begins with the category list; the selected panel is a second screen.
-  const [mobileSection, setMobileSection] = useState<Section | null>(section === 'debugger' ? 'debugger' : null)
+  const [mobileSection, setMobileSection] = useState<Section | null>(section === 'debugger' || mewcatRequest ? section : null)
   const { t } = useI18n()
+  const [previousMewcatRequest, setPreviousMewcatRequest] = useState(mewcatRequest)
+  if (previousMewcatRequest !== mewcatRequest) {
+    setPreviousMewcatRequest(mewcatRequest)
+    if (mewcatRequest) {
+      setSection('mewcat')
+      setMobileSection('mewcat')
+    }
+  }
 
   // Esc·모바일 뒤로가기로 이 창만 닫는다 (뒤의 사이드바·터미널은 그대로)
   useOverlayDismiss(onClose)
