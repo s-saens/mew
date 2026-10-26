@@ -198,7 +198,7 @@ function MewcatActive({ spriteSkin, anchorRef, attention, noticeId, giant = fals
       cat.style.transform = `translate3d(${x}px, ${y}px, 0) scaleX(${direction < 0 ? -1 : 1})`
       const strip = currentStrip()
       const frameActivity = transition?.action ?? (enabled(spriteAction(activity)) ? activity : 'idle')
-      if (spriteSvg && strip) paintSpriteFrame(spriteSvg, strip, motionFrameAt(frameActivity, performance.now() - (transition?.started ?? activityStarted), strip.frames, transition?.duration ?? cycle(frameActivity)))
+      if (spriteSvg && strip) paintSpriteFrame(spriteSvg, strip, motionFrameAt(frameActivity, performance.now() - (transition?.started ?? activityStarted), strip.frames, transition?.duration ?? cycle(frameActivity)), frameActivity)
     }
     const followPointer = () => {
       x = clamp(lastPointerX - grabX * bounds.size, bounds.minX, bounds.maxX)

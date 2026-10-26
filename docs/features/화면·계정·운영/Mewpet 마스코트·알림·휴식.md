@@ -8,7 +8,7 @@ updated: "2026-10-26"
 status_hash: "8b1758c7281118da18b267a2c001213bb7c463d4dbd018bb221e192d83f43ec3"
 files: ["server/mewpet-skins.ts", "server/mewpet-skin-routes.ts", "shared/mewpet-skins.ts", "src/components/header-notifications.tsx", "src/components/header-resources.tsx", "src/utils/mewcat-notifications.ts", "src/components/Mewcat.tsx", "src/components/mewcat-skin-settings.tsx", "src/components/mewcat-size-settings.tsx", "src/utils/mewcat-size-preferences.ts", "src/utils/mewcat-sprites.ts", "src/utils/mewcat-sprite-storage.ts", "src/components/mewcat-fullscreen-guide.tsx", "src/hooks/use-startup-guide.ts", "src/utils/app-install.ts", "src/components/mewcat-resources.tsx", "src/components/SettingsModal.tsx", "src/components/mewcat-notifications.tsx", "src/hooks/use-mewcat-notifications.ts", "src/utils/mewcat-notification-rules.ts", "src/components/mewcat-break.tsx", "src/hooks/use-mewcat-break.ts", "src/utils/mewcat-break-rules.ts"]
 commits: []
-description: "최상단 바의 작고 둥근 C·R·G 세로 게이지와 중앙 라벨·아래부터 차오르는 테마색 사용량·툴팁 수치·접근성 설명, 전체화면 오른쪽 알림 버튼과 시스템 자원 권한·조회·상세창 연결을 정의한다. 승인 요청의 기본 자동 탭 전환·설정과 토스트 알림, 카피바라만 제공하는 내장 스킨과 검은 카피바라 사용자 스킨의 밝기 조정·멍한 검은 고양이의 눈만 남긴 얼굴과 얇은 흰색 테두리·제거된 내장 선택의 복귀·이미지의 로컬 Git 기록 정리, 전역 파일 스킨 등록·16개 모션 이미지의 저장 제한과 오류 구분·WebP 압축·브라우저 이관·빌드 없는 갱신과 Mew 배포와 분리한 외부 생성 MCP의 선택적 연결을 정의한다. 스킨 로딩 중 뮤펫 숨김과 독립 토스트 표시, 화면 바닥·모바일 설정창·기본 크기, 필수 Idle·걷기·Struggle과 선택 모션·전환의 프레임 수·재생 시간·활성화 및 스킨별 이동 속도·보폭 동기화·공통 바닥 앵커와 주기 경계 전환, 모션 감소에서도 유지하는 기본 프레임 재생·낙하의 좁은 기울기 순환, 이동·끌기·던지기·설치 우선 시작 안내와 전체화면 안내의 개별 영구 숨김·최근 알림 목록과 토스트·선택적 거대 휴식의 저장·입력 계약도 설명한다."
+description: "최상단 바의 작고 둥근 C·R·G 세로 게이지와 중앙 라벨·아래부터 차오르는 테마색 사용량·툴팁 수치·접근성 설명, 전체화면 오른쪽 알림 버튼과 시스템 자원 권한·조회·상세창 연결을 정의한다. 승인 요청의 기본 자동 탭 전환·설정과 토스트 알림, 카피바라만 제공하는 내장 스킨과 검은 카피바라 사용자 스킨의 밝기 조정·멍한 검은 고양이의 눈만 남긴 얼굴과 얇은 흰색 테두리·제거된 내장 선택의 복귀·이미지의 로컬 Git 기록 정리, 전역 파일 스킨 등록·16개 모션 이미지의 저장 제한과 오류 구분·WebP 압축·브라우저 이관·빌드 없는 갱신과 Mew 배포와 분리한 외부 생성 MCP의 선택적 연결을 정의한다. 스킨 로딩 중 뮤펫 숨김과 독립 토스트 표시, 화면 바닥·모바일 설정창·기본 크기, 필수 Idle·걷기·Struggle과 선택 모션·전환의 프레임 수·재생 시간·활성화 및 스킨별 이동 속도·보폭 동기화·공통 바닥 앵커와 주기 경계 전환, 모션 감소에서도 유지하는 기본 프레임 재생·낙하의 좁은 기울기 순환·83% 표시 배율, 이동·끌기·던지기·설치 우선 시작 안내와 전체화면 안내의 개별 영구 숨김·최근 알림 목록과 토스트·선택적 거대 휴식의 저장·입력 계약도 설명한다."
 상위파일:
   - "MOC.md"
   - "_화면·계정·운영.md"
@@ -51,6 +51,8 @@ description: "최상단 바의 작고 둥근 C·R·G 세로 게이지와 중앙 
 - 팝업의 대화 기능은 [뮤펫 도우미](%EB%AE%A4%ED%8E%AB%20%EB%8F%84%EC%9A%B0%EB%AF%B8%C2%B7%EB%8C%80%ED%99%94%C2%B7Mew%20%EC%A1%B0%EC%9E%91.md)가 소유한다.
 
 ## 상세 동작
+
+하강 스프라이트는 원본의 83% 배율로 표시해 상승보다 대각선 몸길이가 커 보이는 차이를 줄인다. 가로 중앙·하단 앵커를 유지하고 실제 뮤펫·설정 미리보기·그림 클릭 판정에 같은 배율을 적용한다. 별도 착지 이미지가 없을 때 재사용하는 하강 프레임에도 이 배율을 적용한다. 원본 이미지와 이동·중력·재생 시간은 유지한다.
 
 ### 시작 시 앱 설치와 전체화면 안내
 
@@ -471,6 +473,8 @@ node --test src/utils/mewcat-break-rules.test.ts server/mewcat-break-ui.test.ts
 
 <!-- mew:validation:start -->
 ## 검증
+
+- 2026-10-26: 하강 표시를 83%로 줄이고 SVG 표시 영역·클릭 판정·프레임 클리핑을 맞췄다. 상승·기존 하강·보정 하강의 Chromium 비교 화면을 확인했으며 애니메이션·스킨 설정·다시 잡기 브라우저 테스트 3개와 타입 검사를 통과했다. 대상 린트는 기존 React 경고만 남았고 description 검사는 통과했다. 전체 문서 링크 검사는 작업 밖의 누락 대상 17개로 실패했다. 앱 빌드·서버 재시작은 수행하지 않았다.
 
 - 2026-10-26: 설치 manifest·PNG 검사 1개와 신규 설치 안내 UI 검사 14개가 통과했다. `tsc -b`와 문서 검사를 통과했으며 린트는 기존 경고만 남았다. 실제 Android·iOS 설치와 설치 모드의 뒤로가기·전체화면은 미검증이다. 호스트 앱 빌드·서버 재시작·Mewlink 중앙 배포는 수행하지 않았다.
 

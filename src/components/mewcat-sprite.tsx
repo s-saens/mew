@@ -7,13 +7,13 @@ export function MewcatSprite({ strip, action = 'idle', playing = false, classNam
   const ref = useRef<SVGSVGElement>(null)
   useEffect(() => {
     const svg = ref.current!
-    paintSpriteFrame(svg, strip, 0)
+    paintSpriteFrame(svg, strip, 0, action)
     if (!playing) return
     const cycle = duration ?? MEWCAT_CYCLE_MS[action]
     const started = performance.now()
     let frame = 0
     const tick = (now: number) => {
-      paintSpriteFrame(svg, strip, motionFrameAt(action, (now - started) % cycle, strip.frames, cycle))
+      paintSpriteFrame(svg, strip, motionFrameAt(action, (now - started) % cycle, strip.frames, cycle), action)
       frame = requestAnimationFrame(tick)
     }
     frame = requestAnimationFrame(tick)
