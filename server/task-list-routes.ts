@@ -1,6 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { taskDirectory, taskDocumentsNeedMigration } from './task-markdown.ts'
+import { taskDirectory, taskDocumentsNeedMigration, TASK_DONE_DIRECTORY } from './task-markdown.ts'
 import { taskListFile } from './task-list.ts'
 import { readJsonFile } from './dataDir.ts'
 import express from 'express'
@@ -34,7 +34,7 @@ export function createTaskListRouter() {
     }
     const notify = () => { clearTimeout(timer); timer = setTimeout(send, 75) }
     const attach = () => {
-      for (const dir of [root, path.join(root, 'docs'), path.join(root, 'tasks'), taskDirectory(root)]) {
+      for (const dir of [root, path.join(root, 'docs'), path.join(root, 'tasks'), taskDirectory(root), path.join(root, TASK_DONE_DIRECTORY)]) {
         if (!fs.existsSync(dir)) { watchers.get(dir)?.close(); watchers.delete(dir); continue }
         if (watchers.has(dir)) continue
         try {

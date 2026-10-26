@@ -28,8 +28,8 @@ test('open-document saves preserve panel tags and assignees, accept explicit rem
   const server = app.listen(0, '127.0.0.1')
   await once(server, 'listening')
   const address = server.address(); assert.ok(address && typeof address !== 'string')
-  const save = (content: string, expectedContent: string) => fetch(`http://127.0.0.1:${address.port}/file`, {
-    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ project: '.workspace', path: relative, content, expectedContent }),
+  const save = (content: string, expectedContent: string, target = relative) => fetch(`http://127.0.0.1:${address.port}/file`, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ project: '.workspace', path: target, content, expectedContent }),
   })
   try {
     const response = await save(opened + '\nEdited body\n', opened)
@@ -51,5 +51,14 @@ test('open-document saves preserve panel tags and assignees, accept explicit rem
     const conflict = await save(before.replace('done: false', 'done: false\ntags: [local]'), before)
     assert.equal(conflict.status, 409)
     assert.equal(fs.readFileSync(file, 'utf8'), preserved)
+    tasks = readTaskList(workspace)
+    tasks = changeTaskList(workspace, taskChanges(tasks, tasks.map(task => ({ ...task, done: true }))))
+    const completedPath = tasks[0].path!, completedFile = path.join(workspace, completedPath)
+    assert.equal(completedPath, 'docs/tasks/Done/Task.md')
+    const completedBase = fs.readFileSync(completedFile, 'utf8')
+    tasks = changeTaskList(workspace, taskChanges(tasks, tasks.map(task => ({ ...task, tags: ['done-tag'] }))))
+    assert.equal((await save(completedBase + '\nCompleted body edit\n', completedBase, completedPath)).status, 200)
+    assert.deepEqual(readTaskList(workspace)[0].tags, ['done-tag'])
+    assert.ok(fs.readFileSync(completedFile, 'utf8').endsWith('Completed body edit\n'))
   } finally { await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve())) }
 })

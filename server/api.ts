@@ -1478,7 +1478,7 @@ export function createApiApp() {
         return
       }
       const taskPath = path.relative(workspacePaths.root, absPath).split(path.sep).join('/')
-      if (!isNew && typeof expectedContent === 'string' && /^(?:docs\/)?tasks\/[^/]+\.md$/.test(taskPath) && !['_tasks.md', 'moc.md', '_moc.md', 'readme.md'].includes(path.basename(taskPath).toLowerCase())) {
+      if (!isNew && typeof expectedContent === 'string' && /^(?:docs\/tasks\/(?:Done\/)?|tasks\/)[^/]+\.md$/.test(taskPath) && !['_tasks.md', 'moc.md', '_moc.md', 'readme.md'].includes(path.basename(taskPath).toLowerCase())) {
         content = mergeTaskFrontmatter(expectedContent, content, fs.readFileSync(absPath, 'utf8'))
       }
       const sharedContent = await saveDatabaseRowPage(project, relPath, content, expectedContent, canUse(authOf(req), 'database') && unrestrictedFiles(authOf(req), project, true))

@@ -6,9 +6,11 @@ import { DATA_DIR, readJsonFile } from './dataDir.ts'
 import { parseDocument, Document } from 'yaml'
 import { sameTags } from '../shared/task-tags.ts'
 import type { TaskItem } from '../shared/task-list.ts'
+import { rewritePageLinks } from '../shared/document-pages.ts'
 
 export const TASK_DOCUMENT_DIRECTORY = 'docs/tasks'
-const TASK_GUIDE_FILENAMES = new Set(['_tasks.md', 'MOC.md', '_MOC.md', 'README.md'].map(name => name.toLowerCase()))
+export const TASK_DONE_DIRECTORY = `${TASK_DOCUMENT_DIRECTORY}/Done`
+const TASK_GUIDE_FILENAMES = new Set(['_tasks.md', '_Done.md', 'MOC.md', '_MOC.md', 'README.md'].map(name => name.toLowerCase()))
 export const taskDirectory = (workspace: string) => path.join(workspace, TASK_DOCUMENT_DIRECTORY)
 export type TaskDocumentIdentity = { id: string; path: string; device: number; inode: number }
 export function taskListFile(workspace: string) {
@@ -44,7 +46,7 @@ export function readTaskDocuments(workspace: string): TaskDocument[] {
   const identities = metadata?.version === 5 ? metadata.documents : []
   if (!Array.isArray(identities) || !identities.every(item => item && typeof item.id === 'string' && /^[a-zA-Z0-9_-]{1,100}$/.test(item.id) && typeof item.path === 'string' && Number.isFinite(item.device) && Number.isFinite(item.inode))
     || new Set(identities.map(item => item.id)).size !== identities.length || new Set(identities.map(item => item.path)).size !== identities.length) throw new Error('Invalid task document metadata')
-  return [TASK_DOCUMENT_DIRECTORY, 'tasks'].flatMap(relative => {
+  return [TASK_DOCUMENT_DIRECTORY, TASK_DONE_DIRECTORY, 'tasks'].flatMap(relative => {
     const dir = directory(workspace, relative)
     if (!fs.existsSync(dir)) return []
     return fs.readdirSync(dir).filter(name => name.endsWith('.md') && !TASK_GUIDE_FILENAMES.has(name.toLowerCase())).sort().map(name => {
@@ -86,9 +88,9 @@ export function taskFilename(title: string): string {
 }
 
 function documentPaths(tasks: TaskItem[]): Map<string, string> {
-  const paths = new Map<string, string>(), used = new Set([...TASK_GUIDE_FILENAMES].map(name => `${TASK_DOCUMENT_DIRECTORY}/${name}`))
+  const paths = new Map<string, string>(), used = new Set([TASK_DOCUMENT_DIRECTORY, TASK_DONE_DIRECTORY].flatMap(dir => [...TASK_GUIDE_FILENAMES].map(name => `${dir}/${name}`.toLowerCase())))
   const key = (value: string) => value.normalize('NFC').toLowerCase()
-  const base = (task: TaskItem) => `${TASK_DOCUMENT_DIRECTORY}/${taskFilename(task.text)}`
+  const base = (task: TaskItem) => `${task.done ? TASK_DONE_DIRECTORY : TASK_DOCUMENT_DIRECTORY}/${taskFilename(task.text)}`
   // Keep existing suffixes stable when siblings are deleted or reordered.
   for (const task of tasks) {
     const prefix = base(task), current = task.path
@@ -124,6 +126,11 @@ export function writeTaskDocuments(workspace: string, tasks: TaskItem[], commit:
   const documents = readTaskDocuments(workspace)
   const existing = new Map(documents.map(doc => [doc.task.id, doc]))
   const paths = documentPaths(tasks)
+  for (const file of paths.values()) directory(workspace, path.posix.dirname(file))
+  const moves = documents.flatMap(doc => {
+    const next = paths.get(doc.task.id)
+    return next && next !== doc.task.path ? [{ from: doc.task.path!, to: next }] : []
+  })
   const sourcePaths = new Set(documents.map(doc => doc.task.path))
   const writes = new Map<string, string | null>()
   for (const doc of documents) if (doc.task.path !== paths.get(doc.task.id)) writes.set(doc.task.path!, null)
@@ -146,7 +153,8 @@ export function writeTaskDocuments(workspace: string, tasks: TaskItem[], commit:
       else yaml.set(key, value)
       changed = true
     }
-    const raw = old && !changed ? old.raw : `---\n${yaml.toString()}---\n${old?.body ?? ''}`
+    const original = old && !changed ? old.raw : `---\n${yaml.toString()}---\n${old?.body ?? ''}`
+    const raw = old ? rewritePageLinks(original, old.task.path!, file, moves) : original
     if (file !== old?.task.path || raw !== old?.raw) writes.set(file, raw)
   }
   fs.mkdirSync(dir, { recursive: true })
@@ -155,11 +163,14 @@ export function writeTaskDocuments(workspace: string, tasks: TaskItem[], commit:
     const file = path.join(workspace, relative)
     return [file, fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : null] as const
   }))
+  const createdDirectories = new Set<string>()
   try {
     for (const [relative, raw] of writes) {
       const file = path.join(workspace, relative)
       if (raw === null) fs.unlinkSync(file)
       else {
+        const parent = path.dirname(file)
+        if (!fs.existsSync(parent)) { fs.mkdirSync(parent, { recursive: true }); createdDirectories.add(parent) }
         const temporary = `${file}.tmp-${process.pid}`
         let created = false
         try { fs.writeFileSync(temporary, raw, { flag: 'wx' }); created = true; fs.renameSync(temporary, file) }
@@ -172,6 +183,7 @@ export function writeTaskDocuments(workspace: string, tasks: TaskItem[], commit:
       if (raw === null) fs.rmSync(file, { force: true })
       else fs.writeFileSync(file, raw)
     }
+    for (const dir of createdDirectories) if (fs.existsSync(dir) && fs.readdirSync(dir).length === 0) fs.rmdirSync(dir)
     throw error
   }
 }

@@ -7,9 +7,11 @@ import { demoDocument, demoDocumentHash, demoFilename, demoWorkspaceFiles, loadD
 import { demoJson, requireMethod, type DemoHttpHandler } from './http.ts'
 import { DemoError, type DemoWorkspaceStore } from './workspace-store.ts'
 import { parseDocument } from 'yaml'
+import { rewritePageLinks } from '../../shared/document-pages.ts'
 
 type Identity = { id: string; path: string }
-const guides = new Set(['_tasks.md', 'readme.md', 'moc.md', '_moc.md'])
+const guides = new Set(['_tasks.md', '_done.md', 'readme.md', 'moc.md', '_moc.md'])
+const isTaskDocument = (path: string) => /^docs\/tasks\/(?:Done\/)?[^/]+\.md$/i.test(path) && !guides.has(path.split('/').at(-1)!.toLowerCase())
 const validItem = (item: unknown): item is TaskItem => {
   if (!item || typeof item !== 'object') return false
   const value = item as TaskItem
@@ -28,7 +30,7 @@ const taskDocumentList = (value: unknown): unknown => {
 
 function taskDocuments(store: DemoWorkspaceStore, workspace: string) {
   const identities = store.getState<Identity[]>(stateKey(workspace, 'identities'), [])
-  return demoWorkspaceFiles(store, workspace).filter(file => file.path.startsWith('docs/tasks/') && !file.path.slice('docs/tasks/'.length).includes('/') && /\.md$/i.test(file.path) && !guides.has(file.path.split('/').at(-1)!.toLowerCase())).map(file => {
+  return demoWorkspaceFiles(store, workspace).filter(file => isTaskDocument(file.path)).map(file => {
     const document = demoDocument(file.content), fields = document.fields
     const id = identities.find(item => item.path === file.path)?.id ?? `demo-task-${demoDocumentHash(file.path).toString(16)}`
     const tags = taskDocumentList(fields.tags), assignees = taskDocumentList(fields.assignees), done = fields.done === 'true' ? true : fields.done === 'false' ? false : fields.done
@@ -48,21 +50,21 @@ export function readDemoTaskSnapshot(store: DemoWorkspaceStore, workspace = stor
 }
 
 export function loadDemoTaskDocuments(store: DemoWorkspaceStore, workspace = store.workspaceInfo().path, signal?: AbortSignal): Promise<void> {
-  return loadDemoWorkspaceDocuments(store, workspace, path => path.startsWith('docs/tasks/') && !path.slice('docs/tasks/'.length).includes('/') && /\.md$/i.test(path) && !guides.has(path.split('/').at(-1)!.toLowerCase()), signal)
+  return loadDemoWorkspaceDocuments(store, workspace, isTaskDocument, signal)
 }
 
 function saveTasks(store: DemoWorkspaceStore, workspace: string, tasks: TaskItem[]) {
   const documents = taskDocuments(store, workspace), previous = new Map(documents.map(document => [document.task.id, document])), occupied = new Set(guides)
   const paths = new Map<string, string>(), key = (path: string) => path.normalize('NFC').toLowerCase()
   for (const task of tasks) {
-    const stem = `docs/tasks/${demoFilename(task.text)}`, old = previous.get(task.id)?.task.path
+    const stem = `docs/tasks/${task.done ? 'Done/' : ''}${demoFilename(task.text)}`, old = previous.get(task.id)?.task.path
     if (old && (old === `${stem}.md` || old.startsWith(`${stem} (`)) && !occupied.has(key(old))) { paths.set(task.id, old); occupied.add(key(old)) }
   }
   const writes: { path: string; content: string }[] = []
   for (const task of tasks) {
     let path = paths.get(task.id)
     if (!path) {
-      const stem = `docs/tasks/${demoFilename(task.text)}`
+      const stem = `docs/tasks/${task.done ? 'Done/' : ''}${demoFilename(task.text)}`
       path = `${stem}.md`; let index = 2
       while (occupied.has(key(path)) || guides.has(path.split('/').at(-1)!.toLowerCase())) path = `${stem} (${index++}).md`
       occupied.add(key(path)); paths.set(task.id, path)
@@ -78,6 +80,14 @@ function saveTasks(store: DemoWorkspaceStore, workspace: string, tasks: TaskItem
     writes.push({ path, content: `---\n${yaml.toString({ lineWidth: 0 })}---\n${old?.body ?? ''}` })
   }
   const retained = new Set(writes.map(write => write.path))
+  const moves = documents.flatMap(document => {
+    const next = paths.get(document.task.id)
+    return next && next !== document.task.path ? [{ from: document.task.path!, to: next }] : []
+  })
+  for (const write of writes) {
+    const old = documents.find(document => paths.get(document.task.id) === write.path)
+    if (old) write.content = rewritePageLinks(write.content, old.task.path!, write.path, moves)
+  }
   for (const document of documents) if (!retained.has(document.task.path!)) store.deletePath(`${workspace}/${document.task.path}`)
   for (const write of writes) store.writeFile(`${workspace}/${write.path}`, write.content)
   store.setState(stateKey(workspace, 'identities'), tasks.map(task => ({ id: task.id, path: paths.get(task.id)! })))

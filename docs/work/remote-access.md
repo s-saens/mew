@@ -10,7 +10,7 @@ description: "Mewlink 계정 기반 P2P 원격 접속의 초기 설계·구현 �
 
 아래 본문은 검토일을 2026-10-07로 기록한 기존 태스크의 초기 설계·구현·출시 조건을 보존한다. 본문의 도메인·미구현·미배포·`done` 관련 문구와 체크박스는 당시 계획과 검증 범위를 나타낸다.
 
-현재 동작과 검증 범위는 [P2P 원격 접속 계약](../development/remote-access.md), 적용 절차와 운영 확인은 [중앙 서비스 배포](../deployment/remote-central.md)가 소유한다. 완료·태그·기간·담당자는 [mew 중계 기능 만들기](<../tasks/mew 중계 기능 만들기.md>)에서 관리한다.
+현재 동작과 검증 범위는 [P2P 원격 접속 계약](../development/remote-access.md), 적용 절차와 운영 확인은 [중앙 서비스 배포](../deployment/remote-central.md)가 소유한다. 완료·태그·기간·담당자는 [mew 중계 기능 만들기](<../tasks/Done/mew%20%EC%A4%91%EA%B3%84%20%EA%B8%B0%EB%8A%A5%20%EB%A7%8C%EB%93%A4%EA%B8%B0.md>)에서 관리한다.
 
 ## 목표와 현재 상태
 

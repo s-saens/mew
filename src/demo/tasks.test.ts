@@ -31,7 +31,7 @@ test('task fields, document bodies, tag colors and deletions stay in one shared 
   const after = { ...before, text: '제목을 바꾼 작업', done: true, tags: ['디자인'], assignees: ['visitor@example.test'], startDate: '2026-10-21', date: '2026-10-24' }
   const board = await editTask(store, before, after, { tagColorChanges: [{ tag: '디자인', before: null, after: TASK_TAG_PALETTE[1] }] })
   const saved = board.tasks.find((task: TaskItem) => task.id === before.id)
-  assert.equal(saved.path, 'docs/tasks/제목을 바꾼 작업.md')
+  assert.equal(saved.path, 'docs/tasks/Done/제목을 바꾼 작업.md')
   assert.equal(saved.done, true)
   assert.equal(board.tagColors['디자인'], TASK_TAG_PALETTE[1])
   const content = store.readFile(saved.path).content
@@ -49,8 +49,8 @@ test('new task names reserve guides and preserve IDs across duplicate title chan
   const store = new DemoWorkspaceStore(), first: TaskItem = { id: 'new-task', text: 'README', done: false }
   const board = await editTask(store, null, first), saved = board.tasks.find((task: TaskItem) => task.id === first.id)
   assert.equal(saved.path, 'docs/tasks/README (2).md')
-  const again = await editTask(store, saved, { ...saved, text: 'mewlink' })
-  assert.equal(again.tasks.find((task: TaskItem) => task.id === first.id).path, 'docs/tasks/mewlink (2).md')
+  const again = await editTask(store, saved, { ...saved, text: 'mewlink', done: true })
+  assert.equal(again.tasks.find((task: TaskItem) => task.id === first.id).path, 'docs/tasks/Done/mewlink (2).md')
   assert.equal(again.tasks.filter((task: TaskItem) => task.text === 'mewlink').length, 2)
 })
 
