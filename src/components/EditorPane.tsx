@@ -234,6 +234,8 @@ export function EditorPane({
   const activePath = activeTab?.path ?? null
   const activeContent = activeTab?.content
   const loading = activeTab?.loading === true
+  const fileError = activeTab?.status === 'error' ? activeTab.statusMessage : undefined
+  const fileLoadFailed = !!fileError && !activeTab?.editable
   const revalidating = activeTab?.revalidating === true
   const activeKeyRef = useRef(pane.activePath)
   activeKeyRef.current = pane.activePath
@@ -967,7 +969,11 @@ export function EditorPane({
               {/* 뷰어는 남는 높이를 전부 차지한다 — 그래야 아래 상태줄이 짧은 문서에서도 칸 맨 밑에 선다.
                   min-h-0이 없으면 내용이 긴 문서에서 뷰어가 칸 밖으로 자라 상태줄을 밀어낸다. */}
               <div className="relative min-h-0 flex-1" onContextMenuCapture={openEditorMenu}>
-                {unsupportedFile ? (
+                {fileLoadFailed ? (
+                  <div role="alert" className="flex h-full items-center justify-center overflow-auto px-3 py-2 text-sm text-danger-ink">
+                    <p className="select-text whitespace-pre-wrap break-words">{fileError}</p>
+                  </div>
+                ) : unsupportedFile ? (
                   <div role="status" className="flex h-full items-center justify-center px-4 text-center text-sm text-ink-muted">
                     {t('editor.unsupportedFile')}
                   </div>
@@ -1027,6 +1033,11 @@ export function EditorPane({
                   </MarkdownErrorBoundary>
                 )}
               </div>
+              {fileError && !fileLoadFailed && (
+                <div role="alert" className="select-text max-h-24 shrink-0 overflow-auto whitespace-pre-wrap break-words border-t border-edge px-3 py-2 text-sm text-danger-ink">
+                  {fileError}
+                </div>
+              )}
               {/* 상태줄은 늘 떠 있다 — 가운데는 파일 크기, 오른쪽은 선택했을 때만 글자 수.
                   양옆 칸을 같은 flex-1로 둬야 가운데가 바 한가운데에 선다. */}
               <div data-editor-status-bar className="flex min-h-4 shrink-0 items-center border-t border-edge bg-surface-deep px-2 py-0.5 text-[10px] leading-none text-ink-muted">

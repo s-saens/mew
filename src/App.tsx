@@ -2090,9 +2090,6 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
                 {t('common.login')}
               </button>
             )}
-            {activeTab?.status === 'error' && (
-              <span className="select-text hidden max-w-[12rem] truncate text-danger md:inline">{activeTab.statusMessage}</span>
-            )}
             {caps.system && <HeaderResources key={authEmail} onOpen={() => setSysStatsOpen(true)} />}
             <RuntimeControls />
             {!isGuest && <ActiveSessionsButton presence={activeSessions} profile={{ email: authEmail, displayName: auth.displayName, avatarDataUrl: auth.avatarDataUrl }} />}

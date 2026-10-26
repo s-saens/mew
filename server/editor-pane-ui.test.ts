@@ -35,7 +35,7 @@ function Fixture() {
   const tabs = useTabs('docs', noop, noop, '/fixture', accountTabs, saved);
   const open = (path, viewMode) => tabs.openFile(path, {viewMode});
   window.openFixtureHtml = path => open(path, 'plain');
-  return <div className="flex h-dvh flex-col"><nav><button onClick={() => open('old.exe', 'plain')}>Open existing executable</button><button onClick={() => open('new.exe', 'plain')}>Open executable</button><button onClick={() => open('unknown.bin', 'plain')}>Open binary</button><button onClick={() => open('first.md', 'hotview')}>Open markdown</button><button onClick={() => open('second.txt', 'plain')}>Open text</button><button onClick={() => open('third.md', 'hotview')}>Open another markdown</button><button onClick={() => open('loading.md', 'hotview')}>Open slow</button><button onClick={() => open('loading-later.txt', 'plain')}>Open later</button><button onClick={() => open('loading-empty.txt', 'plain')}>Open empty</button><button onClick={() => open('loading-error.txt', 'plain')}>Open failed</button></nav><EditorPane {...callbacks} pane={tabs.panes[0]} role="guest" authEmail={null} project="docs" tree={[]} presence={{}} focused isGuest showSidebarButton={false} tocOpen={false} dropZone={null}/></div>;
+  return <div className="flex h-dvh flex-col"><nav><button onClick={() => open('old.exe', 'plain')}>Open existing executable</button><button onClick={() => open('new.exe', 'plain')}>Open executable</button><button onClick={() => open('unknown.bin', 'plain')}>Open binary</button><button onClick={() => open('first.md', 'hotview')}>Open markdown</button><button onClick={() => open('second.txt', 'plain')}>Open text</button><button onClick={() => open('third.md', 'hotview')}>Open another markdown</button><button onClick={() => open('loading.md', 'hotview')}>Open slow</button><button onClick={() => open('loading-later.txt', 'plain')}>Open later</button><button onClick={() => open('loading-empty.txt', 'plain')}>Open empty</button><button onClick={() => open('loading-error.txt', 'plain')}>Open failed</button><button onClick={() => open('missing.md', 'hotview')}>Open missing</button></nav><EditorPane {...callbacks} pane={tabs.panes[0]} role="guest" authEmail={null} project="docs" tree={[]} presence={{}} focused isGuest showSidebarButton={false} tocOpen={false} dropZone={null}/></div>;
 }
 createRoot(document.getElementById('root')).render(<React.StrictMode><I18nProvider><Fixture/></I18nProvider></React.StrictMode>);`
     } }],
@@ -70,6 +70,7 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><I18nProvid
       if (req.url.startsWith('/api/file?')) {
         fileRequests.push(file)
         await gates.get(file)
+        if (file === 'missing.md') { res.statusCode = 404; res.end(JSON.stringify({error:'Not found'})); return }
         if (file === 'loading-error.txt') { res.statusCode = 500; res.end(JSON.stringify({error:'Load failed'})); return }
       }
       res.end(req.url.startsWith('/api/file?') ? JSON.stringify({path:file, content:file === 'loading-empty.txt' ? '' : '# File content\n\nSelected file body', editable:true}) : '[]')
@@ -231,6 +232,22 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><I18nProvid
     release()
     await overlay.waitFor({ state: 'detached' })
     assert.equal(await page.locator('[inert]').count(), 0, 'empty files and load failures both release the editor')
+  }
+  await page.getByRole('alert').filter({ hasText: 'Load failed' }).waitFor()
+  assert.equal(await page.locator('.cm-content, .ProseMirror').count(), 0, 'a failed load does not show an empty editor')
+  for (const width of [1100, 390]) {
+    await page.setViewportSize({ width, height: 800 })
+    await page.getByRole('button', { name: 'Open missing', exact: true }).click()
+    const alert = page.getByRole('alert').filter({ hasText: 'Not found' })
+    await alert.waitFor()
+    assert.equal(await alert.locator('xpath=ancestor::*[@data-dock-inline-body]').count(), 1, 'the missing file error belongs to its editor pane')
+    assert.equal(await page.locator('.cm-content, .ProseMirror').count(), 0)
+    const bounds = await alert.boundingBox()
+    assert.ok(bounds && bounds.x >= 0 && bounds.x + bounds.width <= width, 'file errors remain visible on desktop and mobile')
+    await page.screenshot({ path: `/tmp/mew-file-error-${width}.png` })
+    await page.getByRole('button', { name: 'Open text', exact: true }).click()
+    await page.locator('.cm-content').filter({ hasText: 'Selected file body' }).waitFor()
+    assert.equal(await page.getByRole('alert').count(), 0, 'another tab does not inherit the file error')
   }
   assert.deepEqual(errors, [])
 })
