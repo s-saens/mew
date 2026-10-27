@@ -1,6 +1,6 @@
 ---
 title: "프로젝트 검색"
-description: "파일명·내용 검색과 치환의 범위·와일드카드·RE2 정규식·제한, description 문서 탐색과 제거된 RAG의 경계를 설명한다. Mew 소스 전용 Graphify 코드 그래프의 설치·조회·갱신·대상 범위와 한계를 안내한다."
+description: "파일명·내용 검색과 치환의 범위·와일드카드·RE2 정규식·제한, description 문서 탐색과 제거된 RAG의 경계를 설명한다. Mew 소스 전용 Graphify의 설치·조회·갱신·대상 범위, 연결 경로의 해석과 성능 비교 재현을 안내한다."
 updated: "2026-10-27"
 상위파일:
   - "../MOC.md"
@@ -70,6 +70,12 @@ upstream은 노드가 모두 예산에 들어오면 연결 관계를 전부 출�
 이 설정은 Mew 소스의 로컬 에이전트용이다. 다중 사용자 검색 API·공유 MCP로 공개하거나 다른 작업 공간을
 자동 색인하지 않는다. 제품 통합에는 별도의 권한·갱신 설계와 결정이 필요하다.
 [선택 근거](../decisions/0077-local-code-graph.md)와 [적용·검증 기록](../work/graphify-code-search.md)을 참고한다.
+
+2026-10-27의 [24개 과제 비교](../research/graphify-search-benchmark.md)에서는 일반 `query`가 `rg`보다 느렸고 출력도 늘었다.
+정의·영향 조회의 출력 감소는 과제별로 달랐다. `path`는 포함·import 관계도 연결하므로 호출 순서로 해석하지 말고
+간선 종류와 원문을 확인한다. 일반 검색을 대체하는 성능 개선은 이 측정에서 확인하지 못했다.
+`node tools/graphify-benchmark.mjs .data/benchmarks/<새 실행명> 5`로 비교를 재현할 수 있다.
+이때 `rg`와 `tiktoken`이 설치된 `python3`가 필요하며, Python은 `MEW_GRAPHIFY_TOKENIZER_PYTHON`으로 바꿀 수 있다.
 
 ## 제거 검증
 

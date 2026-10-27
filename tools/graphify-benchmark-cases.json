@@ -1,0 +1,448 @@
+[
+  {
+    "id": "lookup-search-pattern",
+    "kind": "lookup",
+    "question": "검색 정규식의 길이와 프로그램 크기를 제한하는 compileSearchPattern 정의는 어디인가?",
+    "terms": [
+      "compileSearchPattern"
+    ],
+    "rgTerms": [
+      "compileSearchPattern"
+    ],
+    "expectedFiles": [
+      "server/search-pattern.ts"
+    ],
+    "evidence": [
+      "server/search-pattern.ts:39: RE2JS 컴파일과 MAX_QUERY_LENGTH/MAX_PROGRAM_SIZE 검사"
+    ]
+  },
+  {
+    "id": "lookup-search-index",
+    "kind": "lookup",
+    "question": "FTS 후보 파일을 반환하는 exactSearchCandidates 정의는 어디인가?",
+    "terms": [
+      "exactSearchCandidates"
+    ],
+    "rgTerms": [
+      "exactSearchCandidates"
+    ],
+    "expectedFiles": [
+      "server/searchCatalog.ts"
+    ],
+    "evidence": [
+      "server/searchCatalog.ts:306: project/query/allowedPaths를 받아 검색 후보를 반환"
+    ]
+  },
+  {
+    "id": "lookup-paths",
+    "kind": "lookup",
+    "question": "프로젝트 상대 경로의 루트 탈출을 차단하는 resolveProjectPath 정의는 어디인가?",
+    "terms": [
+      "resolveProjectPath"
+    ],
+    "rgTerms": [
+      "resolveProjectPath"
+    ],
+    "expectedFiles": [
+      "server/paths.ts"
+    ],
+    "evidence": [
+      "server/paths.ts:186: projectRoot와 resolvePathFromRoot를 호출"
+    ]
+  },
+  {
+    "id": "lookup-permissions",
+    "kind": "lookup",
+    "question": "파일 읽기와 편집 권한을 계산하는 fileAccess 정의는 어디인가?",
+    "terms": [
+      "fileAccess"
+    ],
+    "rgTerms": [
+      "fileAccess"
+    ],
+    "expectedFiles": [
+      "server/access-policy.ts"
+    ],
+    "evidence": [
+      "server/access-policy.ts:108: policyPath, capabilitiesFor, 가장 긴 파일 규칙으로 권한 계산"
+    ]
+  },
+  {
+    "id": "lookup-sessions",
+    "kind": "lookup",
+    "question": "만료되거나 비밀번호 변경으로 무효화된 세션을 거부하는 getSession 정의는 어디인가?",
+    "terms": [
+      "getSession"
+    ],
+    "rgTerms": [
+      "getSession"
+    ],
+    "expectedFiles": [
+      "server/auth.ts"
+    ],
+    "evidence": [
+      "server/auth.ts:460: 만료와 passwordChangedAt를 검사"
+    ]
+  },
+  {
+    "id": "lookup-collaboration",
+    "kind": "lookup",
+    "question": "공동 편집 방과 에이전트 수명주기를 연결하는 attachCollabAgents 정의는 어디인가?",
+    "terms": [
+      "attachCollabAgents"
+    ],
+    "rgTerms": [
+      "attachCollabAgents"
+    ],
+    "expectedFiles": [
+      "server/collabAgent.ts"
+    ],
+    "evidence": [
+      "server/collabAgent.ts:310: 에디터 의존성을 예열하고 setRoomLifecycle 등록"
+    ]
+  },
+  {
+    "id": "lookup-preview",
+    "kind": "lookup",
+    "question": "localhost 미리보기 URL에 세션 토큰을 넣는 portPreviewFrameUrl 정의는 어디인가?",
+    "terms": [
+      "portPreviewFrameUrl"
+    ],
+    "rgTerms": [
+      "portPreviewFrameUrl"
+    ],
+    "expectedFiles": [
+      "server/port-preview.ts"
+    ],
+    "evidence": [
+      "server/port-preview.ts:731: loopback 검사 후 createPreviewToken과 proxyPath 호출"
+    ]
+  },
+  {
+    "id": "lookup-drawing",
+    "kind": "lookup",
+    "question": "회전된 그리기 객체의 경계 상자를 계산하는 objectBounds 정의는 어디인가?",
+    "terms": [
+      "objectBounds"
+    ],
+    "rgTerms": [
+      "objectBounds"
+    ],
+    "expectedFiles": [
+      "src/components/drawing/geometry.ts"
+    ],
+    "evidence": [
+      "src/components/drawing/geometry.ts:59: 타원·경로·일반 객체의 bounds 계산"
+    ]
+  },
+  {
+    "id": "callers-search-pattern",
+    "kind": "callers",
+    "question": "호출·영향 후보 탐색: compileSearchPattern 변경 시 내용 검색과 파일명 검색에서 영향을 받는 직접 호출 파일을 찾아라.",
+    "terms": [
+      "compileSearchPattern"
+    ],
+    "rgTerms": [
+      "compileSearchPattern"
+    ],
+    "expectedFiles": [
+      "server/search.ts",
+      "server/fileNameSearch.ts"
+    ],
+    "evidence": [
+      "server/search.ts:58,111,148: 검색·점진 검색·치환에서 호출",
+      "server/fileNameSearch.ts:46: fileNameScorer의 regex 분기에서 호출"
+    ]
+  },
+  {
+    "id": "callers-search-index",
+    "kind": "callers",
+    "question": "호출·영향 후보 탐색: exactSearchCandidates를 직접 호출하는 API 요청 처리 파일을 찾아라.",
+    "terms": [
+      "exactSearchCandidates"
+    ],
+    "rgTerms": [
+      "exactSearchCandidates"
+    ],
+    "expectedFiles": [
+      "server/api.ts"
+    ],
+    "evidence": [
+      "server/api.ts:327: indexedSearchPaths가 후보를 조회"
+    ]
+  },
+  {
+    "id": "callers-catalog",
+    "kind": "callers",
+    "question": "호출·영향 후보 탐색: createPathVisibility를 직접 호출하는 파일 카탈로그 파일을 찾아라.",
+    "terms": [
+      "createPathVisibility"
+    ],
+    "rgTerms": [
+      "createPathVisibility"
+    ],
+    "expectedFiles": [
+      "server/fileCatalog.ts"
+    ],
+    "evidence": [
+      "server/fileCatalog.ts:80: visible에서 반환된 predicate로 node를 필터링"
+    ]
+  },
+  {
+    "id": "callers-sessions",
+    "kind": "callers",
+    "question": "호출·영향 후보 탐색: verifyPassword를 직접 호출해 로그인 암호를 확인하는 라우트 파일을 찾아라.",
+    "terms": [
+      "verifyPassword"
+    ],
+    "rgTerms": [
+      "verifyPassword"
+    ],
+    "expectedFiles": [
+      "server/authRoutes.ts"
+    ],
+    "evidence": [
+      "server/authRoutes.ts:161: 로그인 처리에서 사용자 hash와 password를 검증"
+    ]
+  },
+  {
+    "id": "callers-collaboration",
+    "kind": "callers",
+    "question": "호출·영향 후보 탐색: setRoomLifecycle을 직접 호출해 공동 편집 에이전트를 등록하는 파일을 찾아라.",
+    "terms": [
+      "setRoomLifecycle"
+    ],
+    "rgTerms": [
+      "setRoomLifecycle"
+    ],
+    "expectedFiles": [
+      "server/collabAgent.ts"
+    ],
+    "evidence": [
+      "server/collabAgent.ts:316: attachCollabAgents에서 onOpen/onClose 등록"
+    ]
+  },
+  {
+    "id": "callers-preview",
+    "kind": "callers",
+    "question": "호출·영향 후보 탐색: previewForRequest를 직접 호출해 Android 미리보기 URL을 만드는 API 파일을 찾아라.",
+    "terms": [
+      "previewForRequest"
+    ],
+    "rgTerms": [
+      "previewForRequest"
+    ],
+    "expectedFiles": [
+      "server/api.ts"
+    ],
+    "evidence": [
+      "server/api.ts:610: target과 android 기능을 전달"
+    ]
+  },
+  {
+    "id": "callers-database",
+    "kind": "callers",
+    "question": "호출·영향 후보 탐색: publishDbEvent를 직접 호출해 행 변경을 알리는 DB 서비스 파일을 찾아라.",
+    "terms": [
+      "publishDbEvent"
+    ],
+    "rgTerms": [
+      "publishDbEvent"
+    ],
+    "expectedFiles": [
+      "server/db/databaseService.ts"
+    ],
+    "evidence": [
+      "server/db/databaseService.ts:158,167,177: insert/update/delete 이벤트 발행"
+    ]
+  },
+  {
+    "id": "callers-drawing",
+    "kind": "callers",
+    "question": "호출·영향 후보 탐색: objectBounds를 직접 호출하는 SVG 생성 파일과 그리기 편집기 파일을 찾아라.",
+    "terms": [
+      "objectBounds"
+    ],
+    "rgTerms": [
+      "objectBounds"
+    ],
+    "expectedFiles": [
+      "src/components/drawing/svg.ts",
+      "src/components/drawing/DrawingEditor.tsx"
+    ],
+    "evidence": [
+      "src/components/drawing/svg.ts:27: 객체 경계 계산",
+      "src/components/drawing/DrawingEditor.tsx:270: 선택 상자 안 객체 판정"
+    ]
+  },
+  {
+    "id": "path-search-path",
+    "kind": "path",
+    "question": "searchInProject에서 서버 데이터 경로 차단 검사 assertNotServerDataPath에 도달하는 호출 경로를 찾아라.",
+    "terms": [
+      "searchInProject",
+      "assertNotServerDataPath"
+    ],
+    "rgTerms": [
+      "searchInProject",
+      "assertNotServerDataPath"
+    ],
+    "expectedFiles": [
+      "server/search.ts",
+      "server/paths.ts"
+    ],
+    "evidence": [
+      "server/search.ts:70: resolveProjectPath 호출",
+      "server/paths.ts:186-187: projectRoot 및 resolvePathFromRoot에 assertNotServerDataPath 전달; projectRoot도 직접 차단 검사"
+    ],
+    "intermediateFiles": []
+  },
+  {
+    "id": "path-filename-pattern",
+    "kind": "path",
+    "question": "searchFileNames에서 검색 정규식 컴파일 compileSearchPattern에 도달하는 경로를 찾아라.",
+    "terms": [
+      "searchFileNames",
+      "compileSearchPattern"
+    ],
+    "rgTerms": [
+      "searchFileNames",
+      "compileSearchPattern"
+    ],
+    "expectedFiles": [
+      "server/fileNameSearch.ts",
+      "server/search-pattern.ts"
+    ],
+    "evidence": [
+      "server/fileNameSearch.ts:128: fileNameScorer 호출; 46: regex 모드 compileSearchPattern 호출",
+      "server/search-pattern.ts:39: 컴파일 정의"
+    ],
+    "intermediateFiles": []
+  },
+  {
+    "id": "path-permission-path",
+    "kind": "path",
+    "question": "fileAccess에서 프로젝트 경로 해석 resolveProjectPath로 이어지는 경로를 찾아라.",
+    "terms": [
+      "fileAccess",
+      "resolveProjectPath"
+    ],
+    "rgTerms": [
+      "fileAccess",
+      "resolveProjectPath"
+    ],
+    "expectedFiles": [
+      "server/access-policy.ts",
+      "server/paths.ts"
+    ],
+    "evidence": [
+      "server/access-policy.ts:110: policyPath 호출; 93: policyPath가 resolveProjectPath 호출",
+      "server/paths.ts:186: 경로 해석 정의"
+    ],
+    "intermediateFiles": []
+  },
+  {
+    "id": "path-presence-permission",
+    "kind": "path",
+    "question": "접속자 목록 computeParticipants에서 파일 권한 fileAccess까지의 호출 경로를 찾아라.",
+    "terms": [
+      "computeParticipants",
+      "fileAccess"
+    ],
+    "rgTerms": [
+      "computeParticipants",
+      "fileAccess"
+    ],
+    "expectedFiles": [
+      "server/presence.ts",
+      "server/access-policy.ts"
+    ],
+    "evidence": [
+      "server/presence.ts:65: visibleTo 호출; 59: visibleTo가 fileAccess 호출",
+      "server/access-policy.ts:108: 파일 권한 계산 정의"
+    ],
+    "intermediateFiles": []
+  },
+  {
+    "id": "path-preview-security",
+    "kind": "path",
+    "question": "previewForRequest에서 localhost 목적지 검사 assertLoopbackTarget까지의 호출 경로를 찾아라.",
+    "terms": [
+      "previewForRequest",
+      "assertLoopbackTarget"
+    ],
+    "rgTerms": [
+      "previewForRequest",
+      "assertLoopbackTarget"
+    ],
+    "expectedFiles": [
+      "server/port-preview.ts"
+    ],
+    "evidence": [
+      "server/port-preview.ts:755: portPreviewFrameUrl 호출; 738: assertLoopbackTarget 호출; 232: 검사 정의"
+    ],
+    "intermediateFiles": []
+  },
+  {
+    "id": "path-database-cell",
+    "kind": "path",
+    "question": "updateCell에서 셀 값 형변환 coerceCellValue까지의 호출 경로를 찾아라.",
+    "terms": [
+      "updateCell",
+      "coerceCellValue"
+    ],
+    "rgTerms": [
+      "updateCell",
+      "coerceCellValue"
+    ],
+    "expectedFiles": [
+      "server/db/databaseService.ts"
+    ],
+    "evidence": [
+      "server/db/databaseService.ts:164: withManagedChange 콜백에서 setCell 호출; 352: setCell에서 coerceCellValue 호출; 421: 정의"
+    ],
+    "intermediateFiles": []
+  },
+  {
+    "id": "path-database-catalog",
+    "kind": "path",
+    "question": "getView에서 DB 카탈로그의 getDatabaseRow까지 호출 경로를 찾아라.",
+    "terms": [
+      "getView",
+      "getDatabaseRow"
+    ],
+    "rgTerms": [
+      "getView",
+      "getDatabaseRow"
+    ],
+    "expectedFiles": [
+      "server/db/databaseService.ts",
+      "server/db/catalog.ts"
+    ],
+    "evidence": [
+      "server/db/databaseService.ts:136: getDatabaseOrThrow 호출; 304: catalog.getDatabaseRow 호출",
+      "server/db/catalog.ts:50: getDatabaseRow 정의"
+    ],
+    "intermediateFiles": []
+  },
+  {
+    "id": "path-drawing-rotation",
+    "kind": "path",
+    "question": "selectionBounds에서 회전 좌표 변환 rotatePoint까지의 호출 경로를 찾아라.",
+    "terms": [
+      "selectionBounds",
+      "rotatePoint"
+    ],
+    "rgTerms": [
+      "selectionBounds",
+      "rotatePoint"
+    ],
+    "expectedFiles": [
+      "src/components/drawing/geometry.ts"
+    ],
+    "evidence": [
+      "src/components/drawing/geometry.ts:83: objectBounds 호출; 75: objectLocalToWorld 호출; 19: rotatePoint 호출"
+    ],
+    "intermediateFiles": []
+  }
+]
