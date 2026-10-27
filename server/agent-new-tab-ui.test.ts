@@ -198,6 +198,7 @@ window.showTerminal=()=>{rootView.unmount();rootView=createRoot(document.getElem
       assert.equal(await page.getByRole('tab').count(), 2)
       await page.keyboard.press('2')
       await page.waitForFunction("document.querySelectorAll('[role=tab]').length===3")
+      assert.deepEqual(await page.getByRole('tab').locator('span.truncate').allTextContents(), ['first', 'second', 'Codex'])
       const composer = page.locator('[data-agent-composer] [contenteditable="true"]:visible')
       await composer.waitFor()
       assert.equal(await composer.evaluate(el => el === el.ownerDocument.activeElement), width === 1100, 'runtime number selection focuses the new desktop composer only')
@@ -210,8 +211,13 @@ window.showTerminal=()=>{rootView.unmount();rootView=createRoot(document.getElem
       await add.click()
       await page.locator('[data-runtime-id="codex"]').getByRole('button', { name: 'Codex', exact: true }).click()
       await page.waitForFunction("document.querySelectorAll('[role=tab]').length===4")
+      assert.deepEqual(await page.getByRole('tab').locator('span.truncate').allTextContents(), ['first', 'second', 'Codex', 'Codex-1'])
       await composer.waitFor()
       assert.equal(await composer.evaluate(el => el === el.ownerDocument.activeElement), width === 1100, 'runtime click also focuses the new desktop composer only')
+      await add.click()
+      await page.locator('[data-runtime-id="codex"]').getByRole('button', { name: 'Codex', exact: true }).click()
+      await page.waitForFunction("document.querySelectorAll('[role=tab]').length===5")
+      assert.deepEqual(await page.getByRole('tab').locator('span.truncate').allTextContents(), ['first', 'second', 'Codex', 'Codex-1', 'Codex-2'])
       assert.equal(await page.evaluate('window.fileCreates'), 2)
       if (width === 1100) {
         terminalMode = true
