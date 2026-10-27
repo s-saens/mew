@@ -1,5 +1,5 @@
 import { mewFetch } from '../utils/remote-transport.ts'
-import { useEffect, useId, useRef, useState } from 'react'
+import { useEffect, useEffectEvent, useId, useRef, useState } from 'react'
 import { Settings, Xmark, PageEdit, RefreshDouble, Globe, Folder } from 'iconoir-react'
 import { ConfirmDialog, DialogFrame, HoverTipLayer, SelectField } from '@mew/ui'
 import { useI18n } from '../i18n'
@@ -58,6 +58,7 @@ export function AgentGuidanceSettings({ onClose, onOpenFile, workspacePath }: { 
   const [projectData, setProjectData] = useState<ProjectGuidanceSnapshot | null>(null)
   const [projectDraft, setProjectDraft] = useState(''), [projectEnabled, setProjectEnabled] = useState(true)
   const [discardAction, setDiscardAction] = useState<(() => void) | null>(null)
+  const [branchDirty, setBranchDirty] = useState(false)
   const [reloadVersion, setReloadVersion] = useState(0)
   const [busy, setBusy] = useState(true), [saving, setSaving] = useState(false), [error, setError] = useState(''), [notice, setNotice] = useState('')
   const [panel, setPanel] = useState<HTMLDivElement | null>(null)
@@ -80,7 +81,7 @@ export function AgentGuidanceSettings({ onClose, onOpenFile, workspacePath }: { 
   const globalDirty = !!data && globalDraft !== (data.instructions ?? '')
   const retryDirty = !!data && JSON.stringify(retryDraft) !== JSON.stringify(capacityRetryDraft(data.capacityRetry ?? defaultAgentCapacityRetrySettings))
   const projectDirty = !!projectData && (projectDraft !== projectData.settings.instructions || projectEnabled !== projectData.settings.enabled)
-  const guard = (action: () => void) => { if (!pending.current) { if (globalDirty || projectDirty || retryDirty) setDiscardAction(() => action); else action() } }
+  const guard = (action: () => void) => { if (!pending.current) { if (globalDirty || projectDirty || retryDirty || branchDirty) setDiscardAction(() => action); else action() } }
   const close = () => guard(onClose)
   const load = async (target = scope) => {
     const version = ++generation.current
@@ -145,6 +146,15 @@ export function AgentGuidanceSettings({ onClose, onOpenFile, workspacePath }: { 
     } catch (cause) { if (generation.current === version) setError(cause instanceof Error ? cause.message : text.error) }
     finally { pending.current = false; if (generation.current === version) { setBusy(false); setSaving(false) } }
   }
+  const saveDrafts = useEffectEvent(() => {
+    if (globalDirty) void update('instructions', globalDraft)
+    else if (projectDirty) void saveProject()
+  })
+  useEffect(() => {
+    if (busy || error || !globalDirty && !projectDirty) return
+    const timer = window.setTimeout(saveDrafts, 400)
+    return () => window.clearTimeout(timer)
+  }, [busy, error, globalDirty, globalDraft, projectDirty, projectDraft, projectEnabled, data, projectData])
   const labels: Record<string, string> = { ...text, ko: '한국어', en: 'English', ja: '日本語', zh: '简体中文' }
   const managedCommit = data && data.settings.commit !== 'custom' && !data.branch.custom && data.branch.value.strategy !== 'inherit' && data.branch.value.workflow !== 'manual'
   const settingLabels: Record<GuidanceKey, string> = { ...text, ...docText }
@@ -173,35 +183,33 @@ export function AgentGuidanceSettings({ onClose, onOpenFile, workspacePath }: { 
           {data && <section role="group" aria-label={generalCopy[locale]}>
             <h3 className="mb-1 text-xs font-semibold">{generalCopy[locale]}</h3>
             {(Object.keys(guidanceOptions) as GuidanceKey[]).filter(key => key !== 'commit' && key !== 'commitLanguage' && !documentationKeys.has(key)).map(guidanceField)}
-            <AgentCapacityRetryFields key={reloadVersion} draft={retryDraft} dirty={retryDirty} disabled={busy} onChange={value => { setRetryDraft(value); setNotice('') }} onSave={value => void update('capacityRetry', value)} />
+            <AgentCapacityRetryFields key={reloadVersion} draft={retryDraft} dirty={retryDirty} disabled={busy || !!error} onChange={value => { setRetryDraft(value); setNotice('') }} onSave={value => void update('capacityRetry', value)} />
           </section>}
           {data && Object.entries(data.settings).some(([key, value]) => key !== 'commit' && key !== 'commitLanguage' && !documentationKeys.has(key as GuidanceKey) && value === 'custom') && <p className="mt-1 text-xs leading-4 text-ink-secondary">{text.customHint}</p>}
           {data && <section role="group" aria-label="Git" className="mt-2 border-t border-edge pt-2">
             <h3 className="mb-1 text-xs font-semibold">Git</h3>
-            <BranchGuidanceFields key={reloadVersion} branch={data.branch} disabled={busy || !!error} portalContainer={panel} onSave={value => void update('branch', value)} commitField={<>{guidanceField('commit')}{guidanceField('commitLanguage')}</>} />
+            <BranchGuidanceFields key={reloadVersion} branch={data.branch} onDirtyChange={setBranchDirty} disabled={busy || !!error} portalContainer={panel} onSave={value => void update('branch', value)} commitField={<>{guidanceField('commit')}{guidanceField('commitLanguage')}</>} />
           </section>}
           {data && <details className="agent-guidance-extra"><summary>{docText.title}</summary>
             <section role="group" aria-label={docText.title}>{documentationGuidanceKeys.map(guidanceField)}</section>
             {documentationGuidanceKeys.some(key => data.settings[key] === 'custom') && <p className="mt-1 text-xs leading-4 text-ink-secondary">{text.customHint}</p>}
           </details>}
           {data && <details className="agent-guidance-extra"><summary>{scopeText.instructions}</summary>
-            <textarea aria-label={`${scopeText.global} ${scopeText.instructions}`} className="agent-guidance-text" rows={5} maxLength={8000} disabled={busy} value={globalDraft} onChange={event => { setGlobalDraft(event.target.value); setNotice('') }} />
-            <div className="mt-1 flex justify-end"><button type="button" className={button} disabled={busy || !globalDirty} onClick={() => void update('instructions', globalDraft)}>{scopeText.save}</button></div>
+            <textarea aria-label={`${scopeText.global} ${scopeText.instructions}`} className="agent-guidance-text" rows={5} maxLength={8000} disabled={busy} value={globalDraft} onChange={event => { setGlobalDraft(event.target.value); setError(''); setNotice('') }} />
           </details>}
           </div>
           {scope === 'project' && projectData && <section aria-label={scopeText.project}>
             <p className="mb-2 truncate text-xs text-ink-secondary" title={projectData.projectRoot}>{projectData.projectRoot.split('/').filter(Boolean).at(-1)}</p>
-            <label className="mb-2 flex min-h-8 items-center gap-2 text-xs text-ink"><input type="checkbox" className="accent-accent" checked={projectEnabled} disabled={busy} onChange={event => { setProjectEnabled(event.target.checked); setNotice('') }} />{scopeText.enabled}</label>
+            <label className="mb-2 flex min-h-8 items-center gap-2 text-xs text-ink"><input type="checkbox" className="accent-accent" checked={projectEnabled} disabled={busy} onChange={event => { setProjectEnabled(event.target.checked); setError(''); setNotice('') }} />{scopeText.enabled}</label>
             {!projectEnabled && <p className="mb-2 text-xs leading-5 text-ink-secondary">{scopeText.disabled}</p>}
             <label className="mb-1 block text-xs font-medium" htmlFor={`${titleId}-project-instructions`}>{scopeText.instructions}</label>
-            <textarea id={`${titleId}-project-instructions`} aria-label={`${scopeText.project} ${scopeText.instructions}`} className="agent-guidance-text" rows={9} maxLength={8000} disabled={busy} value={projectDraft} onChange={event => { setProjectDraft(event.target.value); setNotice('') }} />
+            <textarea id={`${titleId}-project-instructions`} aria-label={`${scopeText.project} ${scopeText.instructions}`} className="agent-guidance-text" rows={9} maxLength={8000} disabled={busy} value={projectDraft} onChange={event => { setProjectDraft(event.target.value); setError(''); setNotice('') }} />
           </section>}
           {error && <p role="alert" className="mt-2 select-text text-sm text-danger">{error}</p>}
           </div>
         </div>
         <footer className="flex shrink-0 items-center gap-2 border-t border-edge px-3 py-1.5">
-          {scope === 'global' ? <button type="button" className={button} disabled={busy || !data} onClick={() => { if (data) guard(() => { onClose(); onOpenFile(data.path) }) }}><PageEdit width={14} height={14} aria-hidden />{text.file}</button>
-            : <button type="button" className={`${button} agent-guidance-save`} disabled={busy || !projectDirty} onClick={() => void saveProject()}>{scopeText.save}</button>}
+          {scope === 'global' && <button type="button" className={button} disabled={busy || !data} onClick={() => { if (data) guard(() => { onClose(); onOpenFile(data.path) }) }}><PageEdit width={14} height={14} aria-hidden />{text.file}</button>}
           <p role="status" className="min-w-0 flex-1 text-right text-xs text-ink-secondary">{busy ? saving ? text.saving : text.loading : notice}</p>
           <button type="button" className="agent-guidance-close" aria-label={text.reload} data-tip={text.reload} disabled={busy} onClick={() => guard(() => void load())}><RefreshDouble width={14} height={14} aria-hidden /></button>
         </footer>

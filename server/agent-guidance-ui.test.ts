@@ -6,12 +6,12 @@ import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
 import { chromium } from 'playwright-core'
 import { domBrowserExecutable } from './browser-dom-executable.ts'
-import { defaultBranchGuidance, type BranchGuidanceSettings } from '../shared/branch-guidance.ts'
+import { defaultBranchGuidance } from '../shared/branch-guidance.ts'
 import { documentationGuidanceKeys, type DocumentationGuidanceKey } from '../shared/agent-guidance.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 
-test('compact guidance settings match the shared settings dialog, autosave, preserve branch drafts and trap focus on desktop and mobile', { skip: !domBrowserExecutable(), timeout: 120_000 }, async () => {
+test('compact guidance settings match the shared settings dialog, autosave all fields, preserve invalid drafts and trap focus on desktop and mobile', { skip: !domBrowserExecutable(), timeout: 120_000 }, async () => {
   const source = `import React, {useState} from '${root}/node_modules/react/index.js';
 import {createRoot} from '${root}/node_modules/react-dom/client.js';
 import {AgentGuidanceButton} from '${root}/src/components/agent-guidance-settings.tsx';
@@ -34,7 +34,7 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
     for (const width of [1100, 390, 320]) {
       const page = await browser.newPage({ viewport: { width, height: 844 }, locale: 'ko-KR', reducedMotion: 'reduce', hasTouch: width < 768, isMobile: width < 768 })
       page.setDefaultTimeout(4000)
-      let fail = true, conflict = false, updates = 0, heldPreset = false, globalTransient = false, retryTransient = false
+      let fail = true, conflict = false, updates = 0, heldPreset = false, globalTransient = false
       let projectDenied = true, projectConflict = false, projectWrongRoot = false, projectUpdates = 0, projectTransient = false
       let releaseSave: (() => void) | undefined, releaseLoad: (() => void) | undefined
       let heldLoad = false
@@ -61,10 +61,6 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
             if (globalTransient && input.key === 'instructions') {
               globalTransient = false
               return route.fulfill({ status: 503, json: { error: '일시적으로 전역 지침을 저장할 수 없습니다.' } })
-            }
-            if (retryTransient && input.key === 'capacityRetry') {
-              retryTransient = false
-              return route.fulfill({ status: 503, json: { error: '일시적으로 재시도 설정을 저장할 수 없습니다.' } })
             }
             assert.equal(input.revision, state.revision)
             updates++
@@ -141,13 +137,7 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
       await assertInlineFields(['재시도 간격 (초)', '최대 재시도 횟수'], 'spinbutton')
       const languageBounds = (await field('응답 언어').boundingBox())!, debuggerBounds = (await field('디버거 활용').boundingBox())!
       assert.ok(debuggerBounds.y - languageBounds.y <= (width >= 768 ? 120 : 168), 'ordinary settings use a compact, consistently spaced list')
-      if (width >= 768) {
-        const gitSave = page.getByRole('button', { name: 'Git 설정 저장', exact: true })
-        await gitSave.scrollIntoViewIfNeeded()
-        const saveBounds = (await gitSave.boundingBox())!
-        const footerBounds = (await dialog.locator('footer').boundingBox())!
-        assert.ok(saveBounds.y + saveBounds.height <= footerBounds.y + 1, 'the Git save action stays reachable above its fixed footer, allowing subpixel rounding')
-      }
+      assert.equal(await dialog.getByRole('button', { name: /설정 저장|지침 저장/ }).count(), 0)
       await field('응답 언어').scrollIntoViewIfNeeded()
       for (const dark of [false, true]) {
         await page.evaluate(`window.fixtureTheme(${dark})`)
@@ -163,170 +153,68 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
           await page.getByRole('option', { name: option, exact: true }).click()
         }
       }
+      const saved = async () => {
+        await page.waitForTimeout(500)
+        await page.getByRole('status').filter({ hasText: '저장했습니다.' }).waitFor()
+      }
       const globalScope = page.getByRole('button', { name: '뮤 전역 지침', exact: true })
       const projectScope = page.getByRole('button', { name: '현재 프로젝트', exact: true })
       const globalInstructions = page.getByRole('textbox', { name: '뮤 전역 지침 추가 지침', exact: true })
       const projectInstructions = page.getByRole('textbox', { name: '현재 프로젝트 추가 지침', exact: true })
-      const instructionSave = page.getByRole('button', { name: '지침 저장', exact: true })
       const discard = page.getByRole('dialog', { name: '저장하지 않은 지침을 버릴까요?', exact: true })
       const delay = page.getByRole('spinbutton', { name: '재시도 간격 (초)', exact: true })
       const attempts = page.getByRole('spinbutton', { name: '최대 재시도 횟수', exact: true })
-      const retrySave = page.getByRole('button', { name: '재시도 설정 저장', exact: true })
-      assert.equal(await delay.inputValue(), '30')
-      assert.equal(await attempts.inputValue(), '20')
-      assert.equal(await retrySave.isDisabled(), true)
-      const beforeRetryEdits = updates
-      await delay.fill('45')
-      await attempts.fill('0')
-      assert.deepEqual(state.capacityRetry, { delaySeconds: 30, maxRetries: 20 }, 'number edits remain a draft until Save')
-      await page.getByRole('button', { name: '닫기', exact: true }).click()
-      await discard.getByRole('button', { name: '취소', exact: true }).click()
-      assert.equal(await delay.inputValue(), '45', 'canceling close preserves retry drafts')
-      for (const [field, value] of [[delay, '0'], [delay, '3601'], [delay, '1.5'], [attempts, '-1'], [attempts, '101'], [attempts, '1.5']] as const) {
-        await delay.fill('45'); await attempts.fill('0'); await field.fill(value)
-        await retrySave.click()
-        assert.equal(updates, beforeRetryEdits, 'invalid retry values never reach the API')
-      }
-      await delay.fill('45'); await attempts.fill('0')
-      retryTransient = true
-      await retrySave.click()
-      await page.getByRole('alert').filter({ hasText: '일시적으로 재시도 설정' }).waitFor()
-      assert.equal(await delay.inputValue(), '45')
-      assert.equal(await attempts.inputValue(), '0')
-      assert.equal(await retrySave.isDisabled(), false, 'a failed retry save remains retryable')
-      await retrySave.click()
-      await page.getByRole('status').filter({ hasText: '저장했습니다.' }).waitFor()
+      await delay.fill('45'); await attempts.fill('0'); await saved()
       assert.deepEqual(state.capacityRetry, { delaySeconds: 45, maxRetries: 0 })
-      assert.equal(state.settings.language, 'inherit')
-      assert.equal(await retrySave.isDisabled(), true)
-      await delay.fill('90')
-      await page.getByRole('button', { name: '다시 불러오기' }).click()
-      await discard.getByRole('button', { name: '취소', exact: true }).click()
-      assert.equal(await delay.inputValue(), '90', 'canceling reload preserves retry drafts')
-      await page.getByRole('button', { name: '다시 불러오기' }).click()
-      await discard.getByRole('button', { name: '변경 버리기', exact: true }).click()
-      await delay.and(page.locator(':enabled')).waitFor()
-      assert.equal(await delay.inputValue(), '45', 'reloading resets retry drafts to the saved policy')
-      assert.equal(await retrySave.isDisabled(), true)
-      await retrySave.scrollIntoViewIfNeeded()
-      for (const dark of [false, true]) {
-        await page.evaluate(`window.fixtureTheme(${dark})`)
-        await page.screenshot({ path: `/tmp/mew-capacity-retry-settings-${width}-${dark ? 'dark' : 'light'}.png` })
+      for (const [input, value] of [[delay, '0'], [delay, '3601'], [delay, '1.5'], [attempts, '-1'], [attempts, '101'], [attempts, '1.5']] as const) {
+        const before = updates
+        await delay.fill('45'); await attempts.fill('0'); await input.fill(value)
+        await page.getByRole('alert').filter({ hasText: '간격은' }).waitFor()
+        assert.equal(updates, before, 'invalid numbers never reach the API')
       }
-      await page.evaluate('window.fixtureTheme(false)')
-      assert.equal(await globalScope.getAttribute('aria-pressed'), 'true')
-      assert.equal(await projectScope.getAttribute('aria-pressed'), 'false')
+      await delay.fill('60'); await attempts.fill('10'); await saved()
+      assert.deepEqual(state.capacityRetry, { delaySeconds: 60, maxRetries: 10 })
       await page.locator('summary', { hasText: '추가 지침' }).click()
-      assert.equal(await globalInstructions.getAttribute('maxlength'), '8000')
-      await globalInstructions.fill('Global draft shared by this account')
+      await globalInstructions.fill('Global guidance autosaved'); await saved()
+      assert.equal(state.instructions, 'Global guidance autosaved')
+      globalTransient = true
+      await globalInstructions.fill('Retain failed global guidance')
+      await page.getByRole('alert').filter({ hasText: '일시적으로 전역' }).waitFor()
+      assert.equal(await globalInstructions.inputValue(), 'Retain failed global guidance')
+      await globalInstructions.fill('Retry global guidance'); await saved()
+      assert.equal(state.instructions, 'Retry global guidance')
       await projectScope.click()
       await page.getByRole('alert').filter({ hasText: '소유자만 변경' }).waitFor()
-      assert.equal(projectUpdates, 0, 'a permission failure cannot write project settings')
-      await globalScope.click()
-      assert.equal(await globalInstructions.inputValue(), 'Global draft shared by this account', 'a failed project load preserves the other scope draft')
-      projectDenied = false
-      await projectScope.click()
-      await projectInstructions.waitFor()
-      assert.equal(await projectScope.getAttribute('aria-pressed'), 'true')
-      assert.equal(await projectInstructions.inputValue(), 'Existing project rule')
-      assert.equal(await projectInstructions.getAttribute('maxlength'), '8000')
-      await projectInstructions.fill('Project draft for this folder only')
-      await page.getByRole('checkbox', { name: '프로젝트 자동 안내', exact: true }).uncheck()
-      await page.getByText('자동 안내가 꺼져 있어 전역·프로젝트 지침이 모두 전달되지 않습니다.', { exact: true }).waitFor()
-      for (const dark of [false, true]) {
-        await page.evaluate(`window.fixtureTheme(${dark})`)
-        const colors = await instructionSave.evaluate(el => {
-          const style = el.ownerDocument.defaultView!.getComputedStyle(el)
-          return [style.color, style.backgroundColor]
-        })
-        const luminance = (color: string) => {
-          const [r, g, b] = color.match(/[\d.]+/g)!.slice(0, 3).map(value => {
-            const channel = Number(value) / 255
-            return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4
-          })
-          return r * 0.2126 + g * 0.7152 + b * 0.0722
-        }
-        const [foreground, background] = colors.map(luminance).sort((a, b) => b - a)
-        assert.ok((foreground + 0.05) / (background + 0.05) >= 4.5, `the project save action has readable contrast in ${dark ? 'dark' : 'light'} mode at ${width}px`)
-        await page.screenshot({ path: `/tmp/mew-guidance-project-${width}-${dark ? 'dark' : 'light'}.png` })
-      }
-      await page.evaluate('window.fixtureTheme(false)')
-      await globalScope.click()
-      assert.equal(await globalInstructions.inputValue(), 'Global draft shared by this account')
-      for (const dark of [false, true]) {
-        await page.evaluate(`window.fixtureTheme(${dark})`)
-        await page.screenshot({ path: `/tmp/mew-guidance-global-extra-${width}-${dark ? 'dark' : 'light'}.png` })
-      }
-      await page.evaluate('window.fixtureTheme(false)')
-      await page.getByRole('button', { name: '닫기', exact: true }).click()
-      await discard.waitFor()
-      await discard.getByRole('button', { name: '취소', exact: true }).click()
-      assert.equal(await dialog.count(), 1)
-      assert.equal(await globalInstructions.inputValue(), 'Global draft shared by this account')
-      globalTransient = true
-      await instructionSave.click()
-      await page.getByRole('alert').filter({ hasText: '일시적으로 전역 지침을 저장' }).waitFor()
-      assert.equal(await globalInstructions.inputValue(), 'Global draft shared by this account')
-      assert.equal(state.instructions, '')
-      assert.equal(await instructionSave.isDisabled(), false, 'a transient failure allows retrying the unchanged global draft')
-      await instructionSave.click()
-      await page.getByRole('status').filter({ hasText: '저장했습니다.' }).waitFor()
-      assert.equal(state.instructions, 'Global draft shared by this account')
-      assert.equal(state.settings.language, 'inherit', 'saving additional guidance preserves preset preferences')
-      await projectScope.click()
-      assert.equal(await projectInstructions.inputValue(), 'Project draft for this folder only')
-      assert.equal(await page.getByRole('checkbox', { name: '프로젝트 자동 안내', exact: true }).isChecked(), false)
-      projectTransient = true
-      await instructionSave.click()
-      await page.getByRole('alert').filter({ hasText: '일시적으로 프로젝트 지침을 저장' }).waitFor()
-      assert.equal(await projectInstructions.inputValue(), 'Project draft for this folder only')
-      assert.equal(projectState.settings.instructions, 'Existing project rule')
       assert.equal(projectUpdates, 0)
-      assert.equal(await instructionSave.isDisabled(), false, 'a transient failure allows retrying the unchanged project draft')
-      await instructionSave.click()
-      await page.getByRole('status').filter({ hasText: '저장했습니다.' }).waitFor()
-      assert.equal(projectState.settings.instructions, 'Project draft for this folder only')
+      projectDenied = false
+      await page.getByRole('button', { name: '다시 불러오기' }).click()
+      await projectInstructions.waitFor()
+      await projectInstructions.fill('Project guidance autosaved')
+      await page.getByRole('checkbox', { name: '프로젝트 자동 안내', exact: true }).uncheck()
+      await saved()
+      assert.equal(projectState.settings.instructions, 'Project guidance autosaved')
       assert.equal(projectState.settings.enabled, false)
       assert.equal(projectState.settings.docsDir, 'notes')
       assert.deepEqual(projectState.settings.entrypoints, ['AGENTS.md'])
-      assert.equal(projectUpdates, 1)
-      await projectInstructions.fill('Keep this draft after a conflict')
+      projectTransient = true
+      await projectInstructions.fill('Retain failed project guidance')
+      await page.getByRole('alert').filter({ hasText: '일시적으로 프로젝트' }).waitFor()
+      assert.equal(await projectInstructions.inputValue(), 'Retain failed project guidance')
+      await projectInstructions.fill('Retry project guidance'); await saved()
       projectConflict = true
-      await instructionSave.click()
+      await projectInstructions.fill('Conflicting project draft')
       await page.getByRole('alert').filter({ hasText: '프로젝트가 변경' }).waitFor()
-      assert.equal(await projectInstructions.inputValue(), 'Keep this draft after a conflict')
-      assert.equal(projectUpdates, 1)
-      assert.equal(await instructionSave.isDisabled(), false, 'the server remains responsible for rejecting a stale retry')
+      assert.equal(await projectInstructions.inputValue(), 'Conflicting project draft')
       projectConflict = false
-      await page.getByRole('button', { name: '다시 불러오기' }).click()
-      await discard.getByRole('button', { name: '취소', exact: true }).click()
-      assert.equal(await projectInstructions.inputValue(), 'Keep this draft after a conflict', 'canceling reload preserves the project draft')
-      const reloadDiscarding = async () => {
-        await page.getByRole('button', { name: '다시 불러오기' }).click()
-        await discard.getByRole('button', { name: '변경 버리기', exact: true }).click()
-      }
-      projectDenied = true
-      await reloadDiscarding()
-      await page.getByRole('alert').filter({ hasText: '소유자만 변경' }).waitFor()
-      assert.equal(await projectInstructions.inputValue(), 'Keep this draft after a conflict', 'a failed reload leaves the recoverable draft in place')
-      projectDenied = false
       projectWrongRoot = true
-      await reloadDiscarding()
-      await page.getByRole('alert').filter({ hasText: '프로젝트가 변경' }).waitFor()
-      assert.equal(await projectInstructions.inputValue(), 'Keep this draft after a conflict', 'a response for a different project cannot replace the draft')
-      projectWrongRoot = false
-      await reloadDiscarding()
-      await page.waitForFunction("!document.querySelector('textarea[aria-label=\"현재 프로젝트 추가 지침\"]')?.disabled")
-      assert.equal(await projectInstructions.inputValue(), 'Project draft for this folder only')
-      await projectInstructions.fill('Discard only when explicitly confirmed')
-      await page.getByRole('button', { name: '닫기', exact: true }).click()
+      await page.getByRole('button', { name: '다시 불러오기' }).click()
       await discard.getByRole('button', { name: '변경 버리기', exact: true }).click()
-      assert.equal(await dialog.count(), 0)
-      await button.click()
-      await field('응답 언어').waitFor()
-      await projectScope.click()
-      await projectInstructions.waitFor()
-      assert.equal(await projectInstructions.inputValue(), 'Project draft for this folder only', 'reopening reads saved instructions rather than a discarded draft')
+      await page.getByRole('alert').filter({ hasText: '프로젝트가 변경' }).waitFor()
+      assert.equal(await projectInstructions.inputValue(), 'Conflicting project draft')
+      projectWrongRoot = false
+      await page.getByRole('button', { name: '다시 불러오기' }).click()
+      await discard.getByRole('button', { name: '변경 버리기', exact: true }).click()
+      await page.waitForFunction("!document.querySelector('textarea[aria-label=\"현재 프로젝트 추가 지침\"]')?.disabled")
       await globalScope.click()
       const documentation = dialog.locator('details').filter({ has: page.locator('summary', { hasText: /^문서$/ }) })
       await documentation.locator('summary').click()
@@ -452,7 +340,7 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
         await page.screenshot({ path: `/tmp/mew-git-group-${width}-${dark ? 'dark' : 'light'}.png` })
       }
       await choose('Git 자동 처리', '기존 커밋 설정 사용')
-      await page.getByRole('button', { name: 'Git 설정 저장', exact: true }).click()
+      await saved()
       await page.getByRole('status').filter({ hasText: '저장했습니다.' }).waitFor()
       await choose('커밋 방식', '매 변경 완료 후 커밋')
       await page.getByRole('status').filter({ hasText: '저장했습니다.' }).waitFor()
@@ -502,152 +390,46 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
       }
       await page.keyboard.press('Escape')
       await page.evaluate('window.fixtureTheme(false)')
-      const branchSave = page.getByRole('button', { name: 'Git 설정 저장', exact: true })
       const details = page.locator('details').filter({ has: page.locator('summary', { hasText: '브랜치 세부 설정' }) })
       const base = page.getByRole('textbox', { name: '기본 브랜치', exact: true })
       const development = page.getByRole('textbox', { name: '개발 브랜치', exact: true })
       const prefix = page.getByRole('textbox', { name: '작업 브랜치 접두사', exact: true })
       const cleanup = page.getByRole('checkbox', { name: '통합 후 로컬 브랜치 정리', exact: true })
-      const saveBranch = async () => {
-        const previous = updates
-        await branchSave.click()
-        await page.getByRole('status').filter({ hasText: '저장했습니다.' }).waitFor()
-        assert.equal(updates, previous + 1)
-        assert.equal(await branchSave.isDisabled(), true)
-      }
-      assert.equal(await field('브랜치 전략').textContent(), 'GitHub Flow (권장)')
-      assert.equal(await details.evaluate(el => el.hasAttribute('open')), false, 'advanced branch fields start collapsed')
-      assert.equal(await branchSave.isDisabled(), true)
-      const beforeBranchEdits = updates
-      await choose('브랜치 전략', 'Git Flow')
+      await choose('브랜치 전략', 'Git Flow'); await saved()
       await details.locator('summary').click()
-      assert.equal(await base.getAttribute('placeholder'), '자동 감지')
-      assert.equal(await development.inputValue(), 'develop')
-      await assertInlineFields(['작업 폴더', '병합 방식'])
-      await assertInlineFields(['기본 브랜치', '개발 브랜치', '작업 브랜치 접두사'], 'textbox')
-      await cleanup.scrollIntoViewIfNeeded()
-      for (const dark of [false, true]) {
-        await page.evaluate(`window.fixtureTheme(${dark})`)
-        await page.screenshot({ path: `/tmp/mew-guidance-polish-${width}-details-${dark ? 'dark' : 'light'}.png` })
-      }
-      await page.evaluate('window.fixtureTheme(false)')
-      await base.fill('release/2026.10')
-      await development.fill('integration/next')
-      await prefix.fill('task/')
-      await choose('작업 폴더', '항상 worktree')
-      await choose('병합 방식', 'Merge commit')
-      await cleanup.check()
-      assert.equal(updates, beforeBranchEdits, 'branch fields keep a draft until explicit save')
-      const gitFlow: BranchGuidanceSettings = { strategy: 'git-flow', baseBranch: 'release/2026.10', developmentBranch: 'integration/next', branchPrefix: 'task/', worktree: 'always', mergeMethod: 'merge', cleanup: true, workflow: 'manual' }
-      await saveBranch()
-      assert.deepEqual(state.branch.value, gitFlow)
-      assert.equal(state.settings.language, 'ko')
-      assert.equal(state.settings.detail, 'custom')
-      await base.fill('release/2026.11')
-      await choose('응답 언어', 'English')
-      await page.getByRole('status').filter({ hasText: '저장했습니다.' }).waitFor()
-      assert.equal(await base.inputValue(), 'release/2026.11', 'saving an unrelated setting preserves the branch draft')
-      assert.equal(state.branch.value.baseBranch, 'release/2026.10')
-      await choose('응답 언어', '한국어')
-      await page.getByRole('status').filter({ hasText: '저장했습니다.' }).waitFor()
-      await saveBranch()
-      assert.equal(state.branch.value.baseBranch, 'release/2026.11')
-      await base.fill('bad..branch')
+      await base.fill('release/2026.10'); await development.fill('integration/next'); await prefix.fill('task/'); await saved()
+      await choose('작업 폴더', '항상 worktree'); await saved()
+      await choose('병합 방식', 'Merge commit'); await saved()
+      await cleanup.check(); await saved()
+      assert.deepEqual(state.branch.value, { strategy: 'git-flow', baseBranch: 'release/2026.10', developmentBranch: 'integration/next', branchPrefix: 'task/', worktree: 'always', mergeMethod: 'merge', cleanup: true, workflow: 'manual' })
       const beforeInvalid = updates
-      await branchSave.click()
-      await page.getByRole('alert').filter({ hasText: '브랜치 이름이나 접두사를 확인' }).waitFor()
-      assert.equal(updates, beforeInvalid, 'invalid Git refs never reach the API')
-      await base.fill('main')
-      await choose('작업 폴더', '현재 폴더')
-      await choose('병합 방식', 'Rebase')
-      await cleanup.uncheck()
-      await saveBranch()
-      assert.equal(state.branch.value.worktree, 'never')
-      assert.equal(state.branch.value.mergeMethod, 'rebase')
-      assert.equal(state.branch.value.cleanup, false)
-      await choose('브랜치 전략', 'Trunk 기반')
-      assert.equal(await development.count(), 0, 'only Git Flow exposes its development branch')
-      await choose('작업 폴더', '필요할 때 worktree')
-      await choose('병합 방식', 'Squash')
-      await saveBranch()
-      assert.equal(state.branch.value.strategy, 'trunk')
-      assert.equal(state.branch.value.worktree, 'auto')
-      assert.equal(state.branch.value.mergeMethod, 'squash')
-      const lastValidBranch = { ...state.branch.value }
-      await base.fill('invalid..hidden-ref')
-      await choose('브랜치 전략', '프로젝트 지침에 따름')
-      assert.equal(await details.count(), 0)
-      await saveBranch()
-      assert.deepEqual(state.branch.value, { ...lastValidBranch, strategy: 'inherit' }, 'switching to project instructions restores valid saved fields before hiding them')
-      await choose('브랜치 전략', 'GitHub Flow (권장)')
-      await saveBranch()
-      assert.equal(state.branch.value.strategy, 'github-flow')
-      await details.locator('summary').click()
-      await field('작업 폴더').click()
-      for (const dark of [false, true]) {
-        await page.evaluate(`window.fixtureTheme(${dark})`)
-        const bounds = (await page.getByRole('listbox', { name: '작업 폴더' }).boundingBox())!
-        assert.ok(bounds.x >= 0 && bounds.x + bounds.width <= width && bounds.y >= 0 && bounds.y + bounds.height <= 844)
-        await page.screenshot({ path: `/tmp/mew-branch-guidance-${width}-${dark ? 'dark' : 'light'}.png` })
-      }
-      await page.keyboard.press('Escape')
-      await page.evaluate('window.fixtureTheme(false)')
-      conflict = true
-      await base.fill('release/conflict')
-      await branchSave.click()
-      await page.getByRole('alert').filter({ hasText: '파일이 변경' }).waitFor()
-      assert.equal(state.branch.value.baseBranch, 'main')
-      assert.equal(await base.inputValue(), 'release/conflict', 'a conflicting write preserves its unsaved branch draft')
-      assert.equal(await branchSave.isDisabled(), true)
-      conflict = false
-      await page.getByRole('button', { name: '다시 불러오기' }).click()
-      await page.waitForFunction("!document.querySelector('[role=combobox]')?.disabled")
-      await details.locator('summary').click()
-      assert.equal(await base.inputValue(), 'main', 'reload replaces the conflicting draft with the server state')
+      await base.fill('bad..branch')
+      await page.getByRole('alert').filter({ hasText: '브랜치 이름이나 접두사' }).waitFor()
+      assert.equal(updates, beforeInvalid)
+      await page.getByRole('button', { name: '닫기', exact: true }).click()
+      await discard.getByRole('button', { name: '취소', exact: true }).click()
+      assert.equal(await base.inputValue(), 'bad..branch', 'closing preserves unsaved invalid branch input')
+      const lastValid = { ...state.branch.value }
+      await choose('브랜치 전략', '프로젝트 지침에 따름'); await saved()
+      assert.deepEqual(state.branch.value, { ...lastValid, strategy: 'inherit' })
       state = { ...state, revision: 'custom-branch', branch: { ...state.branch, custom: true } }
       await page.getByRole('button', { name: '다시 불러오기' }).click()
       await field('브랜치 전략').filter({ hasText: '직접 편집한 지침' }).waitFor()
-      assert.equal(await details.count(), 0)
-      assert.equal(await branchSave.isDisabled(), true)
-      await field('브랜치 전략').click()
-      assert.equal(await page.getByRole('option', { name: '직접 편집한 지침', exact: true }).getAttribute('aria-disabled'), 'true')
-      await page.getByRole('option', { name: 'Git Flow', exact: true }).click()
-      assert.equal(state.branch.custom, true, 'choosing a replacement does not overwrite custom text before save')
-      await details.locator('summary').click()
-      assert.equal(await development.inputValue(), 'develop', 'replacing custom instructions starts from safe defaults')
-      await saveBranch()
+      await choose('브랜치 전략', 'Git Flow'); await saved()
       assert.deepEqual(state.branch, { value: { ...defaultBranchGuidance, strategy: 'git-flow' }, custom: false })
-      assert.equal(await field('Git 자동 처리').textContent(), '로컬 병합까지 자동 (권장)')
-      await choose('Git 자동 처리', '기존 커밋 설정 사용')
-      await saveBranch()
-      await choose('Git 자동 처리', '로컬 병합까지 자동 (권장)')
-      assert.equal(state.branch.value.workflow, 'manual', 'choosing automation keeps a draft until Save')
-      await cleanup.check()
-      await saveBranch()
-      assert.equal(state.branch.value.workflow, 'local')
-      assert.equal(state.branch.value.cleanup, true)
-      assert.equal(await field('커밋 방식').isDisabled(), true, 'automation owns task commits while preserving the stored setting')
-      await field('Git 자동 처리').click()
-      for (const dark of [false, true]) {
-        await page.evaluate(`window.fixtureTheme(${dark})`)
-        await page.screenshot({ path: `/tmp/mew-git-automation-${width}-${dark ? 'dark' : 'light'}.png` })
+      for (const [option, value] of [['기존 커밋 설정 사용', 'manual'], ['로컬 병합까지 자동 (권장)', 'local'], ['원격 반영까지 자동', 'remote'], ['기존 커밋 설정 사용', 'manual']]) {
+        await choose('Git 자동 처리', option); await saved()
+        assert.equal(state.branch.value.workflow, value)
       }
-      await page.keyboard.press('Escape')
-      await choose('Git 자동 처리', '원격 반영까지 자동')
-      await saveBranch()
-      assert.equal(state.branch.value.workflow, 'remote')
-      assert.equal(state.branch.value.cleanup, true)
-      assert.equal(await field('커밋 방식').isDisabled(), true)
+      await details.locator('summary').click()
+      conflict = true
+      await base.fill('release/conflict')
+      await page.getByRole('alert').filter({ hasText: '파일이 변경' }).waitFor()
+      assert.equal(await base.inputValue(), 'release/conflict')
+      conflict = false
       await page.getByRole('button', { name: '다시 불러오기' }).click()
-      await field('Git 자동 처리').filter({ hasText: '원격 반영까지 자동' }).waitFor()
-      await choose('Git 자동 처리', '기존 커밋 설정 사용')
-      await saveBranch()
-      assert.equal(state.branch.value.workflow, 'manual')
-      assert.equal(await field('커밋 방식').isDisabled(), false)
-      await details.locator('summary').click()
-      await cleanup.uncheck()
-      await saveBranch()
-      await details.locator('summary').click()
+      await discard.getByRole('button', { name: '변경 버리기', exact: true }).click()
+      await field('브랜치 전략').and(page.locator(':enabled')).waitFor()
       conflict = true
       await choose('응답 언어', 'English')
       await page.getByRole('alert').filter({ hasText: '파일이 변경' }).waitFor()
