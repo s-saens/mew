@@ -79,6 +79,7 @@ import { DeferredEditorPane as EditorPane } from './components/deferred-editor-p
 import { mediaKind } from './utils/media'
 import { setContentWorkspace } from './utils/contentCache'
 import { useTabs, type StoredTabs } from './hooks/useTabs'
+import { useMobilePanelSwipe } from './hooks/use-mobile-panel-swipe'
 import { dropZoneAt, paneIds, type DropSide, type DropZone } from './utils/paneTree'
 import { usePresence } from './hooks/usePresence'
 import { usePanelWidth } from './hooks/usePanelWidth'
@@ -1259,12 +1260,6 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
   const navigateMobileDock = (direction: -1 | 1, order: MobileDockPanel[]) => {
     const panel = remoteDesktopOpen ? 'desktop' : isDesktop() ? focusedDockPanel : mobileForegroundPanel ?? 'editor'
     if (!panel) return
-    if (panel === 'tasks' || panel === 'sidebar' || panel === 'agent' || panel === 'terminal' || panel === 'editor' && tabs.length > 0) {
-      activeTabbedSurfaceRef.current = panel
-      if (direction < 0) switchCurrentWindowTabLeft()
-      else switchCurrentWindowTabRight()
-      return
-    }
     const next = adjacentDockPanel(order, panel, direction)
     if (next) selectDockPanel(next, false)
   }
@@ -1327,6 +1322,13 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     const target = tabs[(index - 1 + tabs.length) % tabs.length]
     setActivePath(target.path, focusedPaneId, target.id)
   }, [activePath, activeTab?.id, agentOpen, terminalOpen, gitOpen, tasksOpen, focusedPaneId, setActivePath, sidebarOpen, switchSidebarTab, tabs])
+
+  const mobileSwipeRoot = useMobilePanelSwipe((panel, direction) => {
+    if (remoteDesktopOpen || panel !== (mobileForegroundPanel ?? 'editor')) return
+    activeTabbedSurfaceRef.current = panel
+    if (direction < 0) switchCurrentWindowTabLeft()
+    else switchCurrentWindowTabRight()
+  })
 
   // 터미널의 Ctrl+L이 우선 사용할 값 — 포커스된 칸의 활성 뷰(hotview/plain)에서 선택된 텍스트를
   // 읽는다. 선택이 없으면 각 패널이 activeFilePath(상대경로)로 폴백한다.
@@ -2119,6 +2121,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
       </div>
 
       <div
+        ref={mobileSwipeRoot}
         className="mew-workspace-content relative flex min-h-0 flex-1 overflow-hidden"
         onDragOverCapture={handlePathDragOver}
         onDropCapture={handlePathDrop}

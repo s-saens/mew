@@ -13,7 +13,7 @@ test('fullscreen keyboard geometry keeps the real agent composer and editor cont
   const source = `import React from 'react';import {createRoot} from 'react-dom/client';
 import {AgentPanel} from '${root}/src/components/AgentPanel.tsx';
 import {CodePane} from '${root}/src/components/CodePane.tsx';
-import {MobileKeyBar} from '@mew/mobile-keys';
+import {MobileKeyBar,useMobileLayout} from '@mew/mobile-keys';
 import {I18nProvider} from '${root}/src/i18n.tsx';
 import {useMobileKeyboard} from '${root}/src/hooks/use-mobile-keyboard.ts';
 import {observeWorkspaceViewport} from '${root}/src/utils/workspace-viewport.ts';
@@ -28,7 +28,7 @@ class Socket {
  close(){this.readyState=3;this.onclose?.()}
 }
 window.WebSocket=Socket;
-function EditorFixture(){const host=React.useRef(null);const [value,setValue]=React.useState('Mobile editing');React.useEffect(()=>observeEditorViewport(host.current,()=>{},true),[]);return <section ref={host} style={{display:'flex',flexDirection:'column',height:'100%',minHeight:0,width:'100%'}}><div style={{flex:1,minHeight:0}}><CodePane path="fixture.txt" value={value} onChange={setValue} readOnly={false}/></div><footer data-editor-status-bar style={{height:16,flexShrink:0}}>File size</footer><MobileKeyBar ctrlActive={false} shiftActive={false} onToggleCtrl={()=>{}} onToggleShift={()=>{}} onEsc={()=>{}} onTab={()=>{}} onArrow={()=>{}}/></section>}
+function EditorFixture(){const host=React.useRef(null);const mobile=useMobileLayout();const [value,setValue]=React.useState('Mobile editing');React.useEffect(()=>observeEditorViewport(host.current,()=>{},true),[]);return <section ref={host} style={{display:'flex',flexDirection:'column',height:'100%',minHeight:0,width:'100%'}}><div style={{flex:1,minHeight:0}}><CodePane path="fixture.txt" value={value} onChange={setValue} readOnly={false} showMobileKeyBar/></div><footer data-editor-status-bar style={{height:16,flexShrink:0}}>File size</footer>{!mobile&&<MobileKeyBar ctrlActive={false} shiftActive={false} onToggleCtrl={()=>{}} onToggleShift={()=>{}} onEsc={()=>{}} onTab={()=>{}} onArrow={()=>{}}/>}</section>}
 function Fixture(){
  const hidden=useMobileKeyboard(),[editor,setEditor]=React.useState(false);window.setEditor=setEditor;
  React.useEffect(()=>{const stop=observeWorkspaceViewport();window.stopViewport=stop;return stop},[]);

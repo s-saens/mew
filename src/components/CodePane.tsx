@@ -1,6 +1,7 @@
 import { insertSourceAnnotation, updateSourceAnnotation, deleteSourceAnnotation, findSourceAnnotation, sourceAnnotationIdentity } from '@mew/editor'
 import { subscribeUiLocale } from '@mew/ui/i18n-core'
-import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react'
+import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from 'react'
+import { MobileKeyBar, useMobileLayout } from '@mew/mobile-keys'
 import { Annotation, EditorState, StateEffect, StateField, type Extension } from '@codemirror/state'
 import {
   Decoration,
@@ -9,6 +10,7 @@ import {
   highlightActiveLine,
   highlightActiveLineGutter,
   keymap,
+  runScopeHandlers,
   lineNumbers,
   type DecorationSet,
 } from '@codemirror/view'
@@ -307,6 +309,8 @@ export const CodePane = forwardRef<
     value: string
     onChange: (content: string) => void
     readOnly: boolean
+    /** The file editor enables its mobile tab-swipe surface; embedded editors can omit it. */
+    showMobileKeyBar?: boolean
     /** 있으면 이 방의 Y.Text가 문서 내용의 진실 원천이 된다 — value/onChange는 그 결과를 반영만 한다 */
     collab?: Collab | null
     /** 파일 댓글 스레드 — 본문 위 장식(하이라이트)으로만 그린다. 저장·해석은 호스트 몫 */
@@ -318,9 +322,25 @@ export const CodePane = forwardRef<
     lineOffset?: number
     debuggerContext?: { root: string; account: string }
   }
->(function CodePane({ path, project, value, onChange, readOnly, collab, commentThreads, onCommentClick, onAnnotationOpen, onOpenDatabase, lineOffset = 0, debuggerContext }, ref) {
+>(function CodePane({ path, project, value, onChange, readOnly, showMobileKeyBar = false, collab, commentThreads, onCommentClick, onAnnotationOpen, onOpenDatabase, lineOffset = 0, debuggerContext }, ref) {
   const containerRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
+  const mobileLayout = useMobileLayout()
+  const [keyBarCtrl, setKeyBarCtrl] = useState(false)
+  const [keyBarShift, setKeyBarShift] = useState(false)
+  const keyBarState = useRef({ ctrl: false, shift: false })
+  useLayoutEffect(() => { keyBarState.current = { ctrl: keyBarCtrl, shift: keyBarShift } }, [keyBarCtrl, keyBarShift])
+  const resetKeyBar = () => { setKeyBarCtrl(false); setKeyBarShift(false) }
+  const runKey = (key: string, ctrl = keyBarState.current.ctrl, shift = keyBarState.current.shift) => {
+    const view = viewRef.current
+    if (!view) return
+    const primary = ctrl && key.length === 1
+    const mac = /Mac|iPhone|iPad|iPod/.test(navigator.platform)
+    view.focus()
+    runScopeHandlers(view, new KeyboardEvent('keydown', { key, ctrlKey: ctrl && !(primary && mac), metaKey: primary && mac, shiftKey: shift }), 'editor')
+    resetKeyBar()
+  }
+  useEffect(resetKeyBar, [path, mobileLayout])
   const contextSessionsRef = useRef(new Set<CodeContextSession>())
   const onChangeRef = useRef(onChange)
   const valueRef = useRef(value)
@@ -394,6 +414,14 @@ export const CodePane = forwardRef<
         // CodeMirror 기본 드롭도 text/plain을 넣지만, 전용 MIME일 때는 우리가 직접 처리해
         // hotview(tiptap)와 삽입 결과가 같도록 맞춘다.
         EditorView.domEventHandlers({
+          beforeinput(event, view) {
+            if (!keyBarState.current.ctrl || !['insertText', 'insertCompositionText'].includes(event.inputType) || !event.data || event.data.length !== 1) return false
+            const mac = /Mac|iPhone|iPad|iPod/.test(navigator.platform)
+            event.preventDefault()
+            runScopeHandlers(view, new KeyboardEvent('keydown', { key: event.data.toLowerCase(), ctrlKey: !mac, metaKey: mac, shiftKey: keyBarState.current.shift }), 'editor')
+            resetKeyBar()
+            return true
+          },
           // 댓글 하이라이트 클릭 → 스레드 팝업 (hotview의 handleClick과 같은 규칙)
           click(event) {
             const el = (event.target as HTMLElement | null)?.closest?.('[data-thread]')
@@ -608,6 +636,18 @@ export const CodePane = forwardRef<
         }}
         className="h-full w-full overflow-hidden bg-surface-deep"
       />
+      {mobileLayout && showMobileKeyBar && <MobileKeyBar
+        ctrlActive={keyBarCtrl} shiftActive={keyBarShift}
+        onToggleCtrl={() => setKeyBarCtrl(value => !value)} onToggleShift={() => setKeyBarShift(value => !value)}
+        onEsc={() => {
+          const view = viewRef.current
+          if (view && !runScopeHandlers(view, new KeyboardEvent('keydown', { key: 'Escape' }), 'editor')) view.contentDOM.blur()
+          resetKeyBar()
+        }}
+        onTab={() => runKey('Tab')}
+        onArrow={direction => runKey({ up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight' }[direction])}
+        onUndo={readOnly ? undefined : () => runKey('z', true, false)}
+        onRedo={readOnly ? undefined : () => runKey('z', true, true)} />}
     </HoverTipLayer>
   )
 })

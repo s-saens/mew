@@ -10,7 +10,7 @@ import { applyTaskChanges, type TaskItem } from '../shared/task-list.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 
-for (const mode of ['keyboard', 'workspace', 'documents', 'permissions', 'panels', 'worktree'] as const) test(mode === 'worktree' ? 'linked worktree swaps retain project layout and sessions and settle outgoing file saves' : mode === 'panels' ? 'App restores Tasks with Alt+T and task sessions survive close and reload' : mode === 'permissions' ? 'permission invalidation replaces pending workspace metadata and ignores the old response' : mode === 'documents' ? 'Files opens Documents as a filesystem folder with a separate navigation arrow' : mode === 'keyboard' ? 'App keyboard aliases open files and projects and create files and folders in the current explorer scope' : 'App overlaps workspace metadata, restores warm roots and ignores duplicate handoffs', { skip: !domBrowserExecutable(), timeout: 60_000 }, async () => {
+for (const mode of ['keyboard', 'workspace', 'documents', 'permissions', 'panels', 'worktree', 'swipes'] as const) test(mode === 'swipes' ? 'App mobile dock swipes select panels while body swipes select tabs' : mode === 'worktree' ? 'linked worktree swaps retain project layout and sessions and settle outgoing file saves' : mode === 'panels' ? 'App restores Tasks with Alt+T and task sessions survive close and reload' : mode === 'permissions' ? 'permission invalidation replaces pending workspace metadata and ignores the old response' : mode === 'documents' ? 'Files opens Documents as a filesystem folder with a separate navigation arrow' : mode === 'keyboard' ? 'App keyboard aliases open files and projects and create files and folders in the current explorer scope' : 'App overlaps workspace metadata, restores warm roots and ignores duplicate handoffs', { skip: !domBrowserExecutable(), timeout: 60_000 }, async () => {
   const keyboardOnly = mode === 'keyboard'
   const appSource = await fs.readFile(`${root}/src/App.tsx`, 'utf8')
   // Keep App, useTabs, FileTree, project switching and docking real. Unrelated panels and the
@@ -201,6 +201,41 @@ for (const mode of ['keyboard', 'workspace', 'documents', 'permissions', 'panels
     }
     releaseUi(); blockUi = false
     await page.locator('[data-test-content]').getByText('Content of /alpha', { exact: true }).waitFor()
+    if (mode === 'swipes') {
+      await page.setViewportSize({ width: 390, height: 700 })
+      const dock = page.getByRole('navigation', { name: '작업 독', exact: true })
+      await dock.locator('[data-dock-item=editor]').tap()
+      const selected = await page.locator('[data-test-editor]').getAttribute('data-test-active')
+      const cdp = await page.context().newCDPSession(page)
+      const swipe = async (selector: string, dx: number) => {
+        const box = (await page.locator(selector).boundingBox())!
+        const x = box.x + box.width / 2, y = box.y + box.height / 2
+        await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] })
+        await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x + dx, y }] })
+        await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+      }
+      const foreground = (panel: string) => page.waitForFunction(`document.querySelector('[data-dock-item="${panel}"]').getAttribute('aria-current') === 'page'`)
+      await swipe('.mobile-dock', 65)
+      await foreground('sidebar')
+      await swipe('.mobile-dock', 65)
+      await foreground('sidebar')
+      assert.equal(await page.locator('[data-test-editor]').getAttribute('data-test-active'), selected, 'dock preserves the editor tab and stops at its first panel')
+      await swipe('[data-sidebar]', -90)
+      await page.waitForFunction(`document.querySelector('[aria-label="파일명 검색"]').getAttribute('aria-pressed') === 'true'`)
+      await foreground('sidebar')
+      await swipe('[data-sidebar]', 90)
+      await page.waitForFunction(`document.querySelector('[aria-label="파일명 검색"]').getAttribute('aria-pressed') === 'false'`)
+      await swipe('.mobile-dock', -65)
+      await foreground('editor')
+      await swipe('.mobile-dock', -65)
+      await foreground('agent')
+      await swipe('.mobile-dock', 65)
+      await foreground('editor')
+      assert.equal(await page.locator('[data-test-editor]').getAttribute('data-test-active'), selected, 'tabbed panels still use dock swipes to change panels')
+      await cdp.detach()
+      assert.deepEqual(errors, [])
+      return
+    }
     if (mode === 'worktree') {
       const main = page.locator('[data-test-editor="main"]')
       const side = page.locator('[data-test-editor="side"]')
@@ -849,10 +884,12 @@ for (const mode of ['keyboard', 'workspace', 'documents', 'permissions', 'panels
     }
     const selectedDocument = await page.locator('[data-test-editor]').getAttribute('data-test-active')
     await swipe(65)
-    assert.equal(await dock.locator('[data-dock-item=editor]').getAttribute('aria-current'), 'page', 'swipe keeps the editor foreground')
-    assert.notEqual(await page.locator('[data-test-editor]').getAttribute('data-test-active'), selectedDocument, 'left-to-right swipe selects the previous document tab')
+    assert.equal(await dock.locator('[data-dock-item=sidebar]').getAttribute('aria-current'), 'page', 'left-to-right dock swipe selects the previous panel')
+    assert.equal(await page.locator('[data-test-editor]').getAttribute('data-test-active'), selectedDocument, 'dock navigation preserves the selected document tab')
+    await swipe(65)
+    assert.equal(await dock.locator('[data-dock-item=sidebar]').getAttribute('aria-current'), 'page', 'dock swipes stop at the first visible panel')
     await swipe(-65)
-    assert.equal(await page.locator('[data-test-editor]').getAttribute('data-test-active'), selectedDocument, 'right-to-left swipe returns to the next document tab')
+    assert.equal(await page.locator('[data-test-editor]').getAttribute('data-test-active'), selectedDocument, 'returning to the editor preserves its tab')
     assert.equal(await dock.locator('[data-dock-item=editor]').getAttribute('aria-current'), 'page')
     await openMenuPanel('원격 데스크톱')
     await page.getByRole('dialog', { name: 'Remote desktop fixture' }).waitFor()

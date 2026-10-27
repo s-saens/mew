@@ -22,7 +22,7 @@ function Fixture(){
  const host=React.useRef(null); React.useEffect(()=>observeEditorViewport(host.current,()=>{},true),[]);
  const handle=React.useRef(null); window.value=value; window.handle=handle;
  return <><header style={{height:40}}><button onClick={()=>setMode('hotview')}>Hotview</button><button onClick={()=>setMode('plain')}>Plain</button><button onClick={()=>setValue(${JSON.stringify(content)})}>Reset</button></header>
- <main ref={host} style={{display:'flex',flexDirection:'column',height:window.innerHeight-40,position:'relative'}}><div style={{flex:1,minHeight:0}}>{mode==='hotview'?<Editor ref={handle} value={value} onChange={setValue} api={api} path="fixture.md"/>:<CodePane ref={handle} path="fixture.md" value={value} onChange={setValue} readOnly={false}/>}</div><div data-editor-status-bar style={{flexShrink:0,height:16}}>File size · selected characters</div></main>
+ <main ref={host} style={{display:'flex',flexDirection:'column',height:window.innerHeight-40,position:'relative'}}><div style={{flex:1,minHeight:0}}>{mode==='hotview'?<Editor ref={handle} value={value} onChange={setValue} api={api} path="fixture.md"/>:<CodePane ref={handle} path="fixture.md" value={value} onChange={setValue} readOnly={false} showMobileKeyBar/>}</div><div data-editor-status-bar style={{flexShrink:0,height:16}}>File size · selected characters</div></main>
  <div id="keyboard" style={{position:'fixed',left:0,right:0,bottom:0,height:0,background:'#454545',zIndex:100,pointerEvents:'none'}}/></>;
 }
 createRoot(document.getElementById('root')).render(<Fixture/>);`

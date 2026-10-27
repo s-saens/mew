@@ -744,7 +744,7 @@ export function EditorPane({
   }, [activeTab?.openTrace, activeTab?.path])
 
   return (
-    <div onPointerDownCapture={onFocus} className="relative flex min-h-0 min-w-0 flex-1 flex-col">
+    <div onPointerDownCapture={onFocus} data-mobile-tab-swipe={isMd && activeTab?.viewMode === 'hotview' ? 'content' : 'key-bar'} className="relative flex min-h-0 min-w-0 flex-1 flex-col">
       {/* 포커스되지 않은 칸의 탭 줄은 흐리게 — 커밋·단축키가 어느 칸을 가리키는지 보이게 */}
       <div data-dock-tab-bar ref={(el) => registerTabBar(pane.id, el)} className={`flex h-9 shrink-0 items-stretch ${focused ? '' : 'opacity-60'}`}>
         <DockGrip group={`editor:${pane.id}`} />
@@ -986,6 +986,7 @@ export function EditorPane({
                 ) : activeTab.viewMode === 'plain' ? (
                   <CodePane
                     ref={codePaneRef}
+                    showMobileKeyBar
                     path={activeTab.path}
                     project={project}
                     debuggerContext={workspace?.path && authEmail && (role === 'owner' || role === 'manager') && (project === '.workspace' || activeTab.path.startsWith('/')) ? { root: workspace.path, account: authEmail } : undefined}

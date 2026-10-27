@@ -24,7 +24,7 @@ async function expectDateValue(input: Locator, expected: string) {
 
 test('calendar agenda and Gantt share persisted periods, edit by mouse/touch/keyboard and preserve read-only views', { skip: !domBrowserExecutable(), timeout: 60_000 }, async () => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'mew-task-schedule-ui-'))
-  process.env.MEW_DATA_DIR = directory
+  process.env.MEW_DATA_DIR = path.join(directory, 'data')
   process.env.MEW_WORKSPACE = path.join(directory, 'workspace')
   await fs.mkdir(process.env.MEW_WORKSPACE)
   const { createTaskListRouter } = await import('./task-list-routes.ts')
@@ -41,13 +41,16 @@ test('calendar agenda and Gantt share persisted periods, edit by mouse/touch/key
 import {TaskPanel} from '${root}/src/components/task-panel.tsx';
 import {MobileDock} from '${root}/src/components/mobile-dock.tsx';
 import {useTaskList} from '${root}/src/hooks/use-task-list.ts';
+import {useMobilePanelSwipe} from '${root}/src/hooks/use-mobile-panel-swipe.ts';
+import {adjacentDockPanel} from '${root}/src/utils/mobile-dock.ts';
 import {DockWorkspace,DockPanel} from '${root}/src/components/DockWorkspace.tsx';
 import {setUiLocale} from '${root}/packages/ui/src/i18n-core.ts';
 import {I18nProvider} from '${root}/src/i18n.tsx';
 localStorage.setItem('mew:locale','ko');
 setUiLocale('ko');
 function Fixture(){const session=useTaskList(${JSON.stringify(WORKSPACE_ROOT)},'one@example.test',true);const [dock,setDock]=useState(null),[next,setNext]=useState(0),[previous,setPrevious]=useState(0);
-return <div style={{height:'100dvh',display:'flex',flexDirection:'column'}}><div><button onClick={()=>setUiLocale('en')}>English</button><button onClick={()=>setUiLocale('ko')}>한국어</button></div><MobileDock active='tasks' available={['editor','tasks']} hidden={false} onSelect={()=>{}} onNavigate={direction=>direction>0?setNext(value=>value+1):setPrevious(value=>value+1)}/><DockWorkspace value={dock} onChange={setDock} foreground='tasks' apiRef={null} onEditorDrop={()=>''}><DockPanel id='tasks' kind='tasks' tabs={['tasks']} mobileSelected onFocus={()=>{}}><TaskPanel workspace='fixture' onOpenFile={path=>{window.openedTaskFile=path}} session={session} nextTabSignal={next} previousTabSignal={previous} onClose={()=>{}}/></DockPanel></DockWorkspace></div>}
+const swipeRoot=useMobilePanelSwipe((panel,direction)=>{if(panel==='tasks')direction>0?setNext(value=>value+1):setPrevious(value=>value+1)});
+return <div ref={swipeRoot} style={{height:'100dvh',display:'flex',flexDirection:'column'}}><div><button onClick={()=>setUiLocale('en')}>English</button><button onClick={()=>setUiLocale('ko')}>한국어</button></div><MobileDock active='tasks' available={['editor','tasks']} hidden={false} onSelect={panel=>{window.fixtureDockSelection=panel}} onNavigate={(direction,order)=>{window.fixtureDockSelection=adjacentDockPanel(order,'tasks',direction)}}/><DockWorkspace value={dock} onChange={setDock} foreground='tasks' apiRef={null} onEditorDrop={()=>''}><DockPanel id='tasks' kind='tasks' tabs={['tasks']} mobileSelected onFocus={()=>{}}><TaskPanel workspace='fixture' onOpenFile={path=>{window.openedTaskFile=path}} session={session} nextTabSignal={next} previousTabSignal={previous} onClose={()=>{}}/></DockPanel></DockWorkspace></div>}
 createRoot(document.getElementById('root')).render(<React.StrictMode><I18nProvider><Fixture/></I18nProvider></React.StrictMode>);`
   const bundle = await build({ input: 'virtual:task-schedule.tsx', write: false, platform: 'browser', output: { format: 'iife' }, transform: { jsx: 'react-jsx', define: { 'process.env.NODE_ENV': JSON.stringify('test') } }, plugins: [{ name: 'schedule-fixture', resolveId(id) { if (id === 'virtual:task-schedule.tsx') return id; if (id.endsWith('.css')) return 'virtual:style' }, load(id) { if (id === 'virtual:task-schedule.tsx') return source; if (id === 'virtual:style') return '' } }] })
   const chunk = bundle.output.find(item => item.type === 'chunk')!
@@ -317,18 +320,21 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><I18nProvid
     await mobile.screenshot({ path: `${screenshots}/mobile-calendar-light.png` })
     const dock = (await mobile.locator('.mobile-dock').boundingBox())!
     const dockX = dock.x + dock.width - 8, dockY = dock.y + dock.height / 2
-    await touchDrag(mobile, dockX, dockY, dockX - 60, dockY)
-    await mobile.locator('.task-gantt').waitFor()
-    assert.equal(await mobile.getByRole('tab', { name: '간트', exact: true }).getAttribute('aria-selected'), 'true', 'left dock swipe chooses the next task view')
     await touchDrag(mobile, dockX - 60, dockY, dockX, dockY)
-    await mobile.locator('.task-calendar').waitFor()
-    assert.equal(await mobile.getByRole('tab', { name: '달력', exact: true }).getAttribute('aria-selected'), 'true', 'right dock swipe chooses the previous task view')
-    await touchDrag(mobile, dockX, dockY, dockX - 60, dockY)
+    assert.equal(await mobile.evaluate('window.fixtureDockSelection'), 'editor', 'dock swipe selects the adjacent panel')
+    assert.equal(await mobile.getByRole('tab', { name: '달력', exact: true }).getAttribute('aria-selected'), 'true', 'dock swipe preserves the task view')
+    await swipeTaskBody(mobile, -70)
     await mobile.locator('.task-gantt').waitFor()
-    await touchDrag(mobile, dockX, dockY, dockX - 60, dockY)
+    assert.equal(await mobile.getByRole('tab', { name: '간트', exact: true }).getAttribute('aria-selected'), 'true', 'left body swipe chooses the next task view')
+    await swipeTaskBody(mobile, 70)
+    await mobile.locator('.task-calendar').waitFor()
+    assert.equal(await mobile.getByRole('tab', { name: '달력', exact: true }).getAttribute('aria-selected'), 'true', 'right body swipe chooses the previous task view')
+    await swipeTaskBody(mobile, -70)
+    await mobile.locator('.task-gantt').waitFor()
+    await swipeTaskBody(mobile, -70)
     await mobile.locator('[data-task-id=period]').waitFor()
     assert.equal(await mobile.getByRole('tab', { name: '목록', exact: true }).getAttribute('aria-selected'), 'true', 'task view navigation wraps and keeps the task panel open')
-    await touchDrag(mobile, dockX - 60, dockY, dockX, dockY)
+    await swipeTaskBody(mobile, 70)
     await mobile.locator('.task-gantt').waitFor()
     assert.equal(await mobile.locator('.task-gantt-labels').evaluate(el => el.getBoundingClientRect().width), 132)
     await mobile.getByRole('button', { name: '오늘', exact: true }).tap()
@@ -435,6 +441,25 @@ async function touchDrag(page: Page, x: number, y: number, endX: number, endY: n
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: endX, y: endY, id: 1 }] })
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
   await cdp.detach()
+}
+
+async function swipeTaskBody(page: Page, dx: number) {
+  const point = await page.locator('.task-view-body').evaluate(el => {
+    const box = el.getBoundingClientRect(), document = el.ownerDocument
+    const excluded = 'button, input, textarea, select, a, [contenteditable="true"], .task-swipe, .task-gantt-scroller, [data-gantt-grab], [data-dock-tab-bar], [role="dialog"], [role="menu"], [role="listbox"]'
+    const controls = [...el.querySelectorAll(excluded)].map(control => control.getBoundingClientRect())
+    for (let y = box.bottom - 20; y >= box.top + 12; y -= 4) {
+      for (let x = box.left + 90; x <= box.right - 90; x += 12) {
+        const hit = document.elementFromPoint(x, y)
+        if (!hit || !el.contains(hit) || hit.closest(excluded)) continue
+        if (controls.some(control => x >= control.left - 8 && x <= control.right + 8 && y >= control.top - 8 && y <= control.bottom + 8)) continue
+        return { x, y }
+      }
+    }
+    return null
+  })
+  assert.ok(point, 'tab swipes start in blank panel content outside existing touch controls')
+  await touchDrag(page, point.x, point.y, point.x + dx, point.y)
 }
 
 function contrast(foreground: string, background: string): number {

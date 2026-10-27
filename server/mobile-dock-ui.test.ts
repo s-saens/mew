@@ -280,6 +280,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     assert.deepEqual(await dock.boundingBox(), initial)
     await assertDesktopCatGround()
     await page.evaluate('window.setVertical(true)')
+    await page.waitForFunction("document.querySelector('.mobile-dock').getAttribute('data-vertical') === 'true'")
     assert.equal(await dock.getAttribute('data-vertical'), 'true')
     const verticalItems = await dock.getByRole('button').all()
     const first = (await verticalItems[0].boundingBox())!

@@ -125,9 +125,9 @@ export function MobileKeyBar({
           </button>
         </>
       )}
-      {(onCodeBlock || onTable) && (
+      {(onCodeBlock || onTable || onUndo || onRedo) && (
         <>
-          <div className="mx-0.5 h-3.5 w-px shrink-0 bg-edge" />
+          {(onCodeBlock || onTable) && <div className="mx-0.5 h-3.5 w-px shrink-0 bg-edge" />}
           {onCodeBlock && (
             <button
               type="button"
