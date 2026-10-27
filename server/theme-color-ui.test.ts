@@ -78,6 +78,22 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     }
     const fillColor = async (input: typeof field, value: string) => { await openColor(input); await input.fill(value) }
     const readColor = async (input: typeof field) => { await openColor(input); return input.inputValue() }
+    const cancelEditor = async () => {
+      if (await editor.getByRole('textbox').count()) await page.keyboard.press('Escape')
+      await page.keyboard.press('Escape')
+      await editor.waitFor({ state: 'hidden' })
+    }
+    const checkHeaderActions = async (existing: boolean) => {
+      const header = editor.locator(':scope > div').first()
+      assert.equal(await header.getByRole('button').count(), existing ? 2 : 1, 'theme actions occupy the former close button position')
+      assert.equal(await editor.getByRole('button', { name: '취소', exact: true }).count(), 0, 'there is no separate X button')
+      for (const name of existing ? ['테마 저장', '커스텀 테마 삭제'] : ['테마 추가']) {
+        const action = header.getByRole('button', { name, exact: true })
+        assert.equal(await action.textContent(), '', 'theme actions display icons without button text')
+        assert.equal(await action.locator('svg[aria-hidden=true]').count(), 1)
+        assert.equal(await action.getAttribute('data-tip'), name, 'each icon retains its translated tooltip')
+      }
+    }
 
     const tokens = () => page.evaluate<string[]>(`(()=>{const s=getComputedStyle(document.documentElement);return ['surface-deep','surface','surface-raised','ink','ink-secondary','accent','accent-strong','link','ink-on-accent'].map(k=>s.getPropertyValue('--color-'+k).trim())})()`)
     const globalBackground = () => page.locator('body').evaluate(el => {
@@ -144,6 +160,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     assert.equal(await font.inputValue(), 'IBM Plex Mono', 'Tab reaches the font reset button')
     assert.equal(await page.locator('input[type=color]').count(), 0)
     await customize.click()
+    await checkHeaderActions(false)
     assert.equal(await editor.getByRole('textbox').count(), 0, 'HEX inputs stay inside closed color pickers')
     assert.equal(await readColor(background), '#0a0a0a')
     assert.equal(await readColor(text), '#e5e5e5')
@@ -209,17 +226,19 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     assert.equal((await stored()).custom.length, 2, 'adding the same palette selects it without duplicates')
     await page.getByRole('button', { name: '커스텀 2', exact: true }).click()
     assert.equal(await editor.count(), 1, 'selecting a custom tile opens its editor immediately')
+    await checkHeaderActions(true)
     assert.equal(await page.getByRole('button', { name: '커스텀 테마 편집', exact: true }).count(), 0)
     const beforeCancel = await stored()
     await fillColor(field, '#123456')
-    await editor.getByRole('button', { name: '취소', exact: true }).click()
+    await cancelEditor()
     assert.equal(await editor.count(), 0)
     assert.deepEqual(await stored(), beforeCancel, 'cancel discards edits and keeps the selected saved theme')
     assert.equal(await page.getByRole('button', { name: '커스텀 2', exact: true }).evaluate(el => el.ownerDocument.activeElement === el), true)
     await page.getByRole('button', { name: '커스텀 2', exact: true }).click()
     assert.equal(await readColor(field), '#ddaa22')
     await fillColor(field, '#75b7ef')
-    await editor.getByRole('button', { name: '테마 저장', exact: true }).click()
+    await editor.getByRole('button', { name: '테마 저장', exact: true }).focus()
+    await page.keyboard.press('Enter')
     assert.equal((await stored()).custom.length, 2, 'editing replaces one saved custom theme')
     assert.equal((await stored()).palette.primary, '#75b7ef')
     await customize.click(); await fillColor(field, '#75b7ef'); await field.press('Escape')
@@ -405,7 +424,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     await page.emulateMedia({ reducedMotion: 'no-preference' })
     assert.notEqual((await globalBackground()).animation, 'none')
     assert.notEqual((await sampleBackground(preview)).animation, 'none')
-    await editor.getByRole('button', { name: '취소', exact: true }).click()
+    await cancelEditor()
     for (const width of [1100, 390, 320]) {
       await page.setViewportSize({ width, height: 850 })
       if (width === 390) await page.getByRole('button', { name: '화면', exact: true }).click()
@@ -447,6 +466,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
           } else await dropdown.press('Escape')
         }
         await customize.click()
+        await checkHeaderActions(false)
         for (const input of [background, text, field]) {
           await openColor(input)
           const bounds = await input.boundingBox()
@@ -484,7 +504,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
         await editor.scrollIntoViewIfNeeded()
         const layoutBefore = await editor.evaluate(el => {
           const rect = el.getBoundingClientRect()
-          const save = el.querySelector('button.bg-accent')!.getBoundingClientRect()
+          const save = el.querySelector('button[aria-label="테마 추가"]')!.getBoundingClientRect()
           return { height: rect.height, saveTop: save.top }
         })
         await openColor(field)
@@ -493,7 +513,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
         assert.equal(await picker.evaluate(el => el.ownerDocument.defaultView!.getComputedStyle(el).position), 'fixed')
         assert.deepEqual(await editor.evaluate(el => {
           const rect = el.getBoundingClientRect()
-          const save = el.querySelector('button.bg-accent')!.getBoundingClientRect()
+          const save = el.querySelector('button[aria-label="테마 추가"]')!.getBoundingClientRect()
           return { height: rect.height, saveTop: save.top }
         }), layoutBefore, 'opening a color picker preserves editor height and the save button position')
         assert.equal(await picker.evaluate(el => {
@@ -513,16 +533,19 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
         }
         assert.equal(await page.evaluate('document.documentElement.scrollWidth>innerWidth'), false)
         await picker.getByRole('button', { name: '닫기', exact: true }).click()
-        await editor.getByRole('button', { name: '취소', exact: true }).click()
+        await cancelEditor()
       }
       await page.getByRole('button', { name: '커스텀 1', exact: true }).click()
       assert.equal(await editor.count(), 1)
+      await checkHeaderActions(true)
       const remove = editor.getByRole('button', { name: '커스텀 테마 삭제', exact: true })
       await remove.scrollIntoViewIfNeeded()
       const removeBounds = await remove.boundingBox(); assert.ok(removeBounds)
-      assert.ok(removeBounds.x >= 0 && removeBounds.x + removeBounds.width <= width && removeBounds.height >= 44)
+      assert.ok(removeBounds.x >= 0 && removeBounds.x + removeBounds.width <= width && removeBounds.height >= (width < 768 ? 44 : 28))
+      const saveBounds = await editor.getByRole('button', { name: '테마 저장', exact: true }).boundingBox(); assert.ok(saveBounds)
+      assert.ok(Math.abs(saveBounds.y - removeBounds.y) < 2 && saveBounds.x < removeBounds.x, 'save and delete stay beside each other in the header')
       await capture(`${width}-edit-custom`)
-      await editor.getByRole('button', { name: '취소', exact: true }).click()
+      await cancelEditor()
     }
     await customize.click()
     for (const [option, labels, addLabel] of [
@@ -540,8 +563,10 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
         await page.keyboard.press('Escape')
       }
       assert.equal(await page.getByRole('button', { name: addLabel, exact: true }).count(), 1)
+      assert.equal(await page.getByRole('button', { name: addLabel, exact: true }).textContent(), '')
+      assert.equal(await page.getByRole('button', { name: addLabel, exact: true }).getAttribute('data-tip'), addLabel)
     }
-    await editor.getByRole('button', { name: '취소', exact: true }).click()
+    await cancelEditor()
     await page.setViewportSize({ width: 1100, height: 850 })
     await page.getByRole('button', { name: '다크', exact: true }).click()
     assert.equal(await page.evaluate("localStorage.getItem('settings-closed')"), null, 'custom editor and picker dismissal never close settings')
