@@ -1,6 +1,7 @@
-import { useEffect, useId, useRef, useState, type PointerEvent } from 'react'
+import { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties, type PointerEvent } from 'react'
 import { RefreshDouble, Xmark } from 'iconoir-react'
 import { useOverlayDismiss } from './useOverlayDismiss'
+import { getFixedPopupLayout } from './fixed-popup-layout'
 
 type HSV = { h: number; s: number; v: number }
 const clamp = (value: number, max = 100) => Math.max(0, Math.min(max, value))
@@ -28,15 +29,17 @@ export interface ColorPickerProps {
   onChange: (value: string) => void
   defaultValue: string
   disabled?: boolean
-  /** Compact trigger with HEX and reset inside the expanded panel. Parent must use flex-wrap. */
+  /** Compact trigger with HEX and reset in a floating panel above surrounding content. */
   compact?: boolean
   swatchOnly?: boolean
   labels: { color: string; hex: string; hue: string; saturation: string; brightness: string; reset: string; close: string }
 }
 
-/** Inline app-owned picker; never opens an OS color dialog. */
+/** App-owned picker; compact panels float, full-size fields expand inline. */
 export function ColorPicker({ value, onChange, defaultValue, disabled = false, compact = false, swatchOnly = false, labels }: ColorPickerProps) {
   const id = useId(), root = useRef<HTMLDivElement>(null), trigger = useRef<HTMLButtonElement>(null)
+  const panel = useRef<HTMLDivElement>(null)
+  const [position, setPosition] = useState<CSSProperties | null>(null)
   const color = validHex(value) ? value.toLowerCase() : '#000000'
   const [draft, setDraft] = useState(color), [open, setOpen] = useState(false), [editing, setEditing] = useState(false)
   const [hsv, setHsv] = useState(() => fromHex(color, { h: 0, s: 0, v: 0 }))
@@ -49,6 +52,42 @@ export function ColorPicker({ value, onChange, defaultValue, disabled = false, c
     lastEmitted.current = null
   }, [color])
   useEffect(() => { if (disabled) { setOpen(false); setEditing(false) } }, [disabled])
+  useLayoutEffect(() => {
+    if (!compact || !open || disabled) return
+    const place = () => {
+      if (!root.current || !trigger.current || !panel.current) return
+      const layout = getFixedPopupLayout(root.current), { bounds } = layout
+      const rect = trigger.current.getBoundingClientRect()
+      const width = Math.max(0, Math.min(288, bounds.width - 16))
+      const below = Math.max(0, bounds.bottom - rect.bottom - 8), above = Math.max(0, rect.top - bounds.top - 8)
+      const down = below >= panel.current.scrollHeight + 2 || below >= above
+      setPosition(layout.toStyle({
+        left: Math.max(bounds.left + 8, Math.min(rect.left, bounds.right - width - 8)), width,
+        maxHeight: down ? below : above,
+        ...(down ? { top: rect.bottom + 4 } : { bottom: window.innerHeight - rect.top + 4 }),
+      }))
+    }
+    place()
+    const observer = new ResizeObserver(place)
+    observer.observe(trigger.current!)
+    observer.observe(panel.current!)
+    const host = getFixedPopupLayout(root.current).host
+    if (host) observer.observe(host)
+    const mutations = new MutationObserver(place)
+    mutations.observe(document.documentElement, { attributes: true, attributeFilter: ['style', 'class'] })
+    if (host && host !== document.documentElement) mutations.observe(host, { attributes: true, attributeFilter: ['style', 'class'] })
+    window.addEventListener('resize', place)
+    window.addEventListener('scroll', place, true)
+    window.visualViewport?.addEventListener('resize', place)
+    window.visualViewport?.addEventListener('scroll', place)
+    return () => {
+      observer.disconnect(); mutations.disconnect()
+      window.removeEventListener('resize', place)
+      window.removeEventListener('scroll', place, true)
+      window.visualViewport?.removeEventListener('resize', place)
+      window.visualViewport?.removeEventListener('scroll', place)
+    }
+  }, [compact, open, disabled])
 
   function update(next: HSV) {
     if (disabled) return
@@ -86,7 +125,7 @@ export function ColorPicker({ value, onChange, defaultValue, disabled = false, c
       {compact && closeButton}
     </div>
 
-  return <div ref={root} className={compact ? 'contents' : 'min-w-0'} onKeyDown={event => {
+  return <div ref={root} className={compact ? 'inline-flex min-w-0' : 'min-w-0'} onKeyDown={event => {
     if (event.key === 'Escape') { event.stopPropagation(); setDraft(color) }
   }}>
     {!compact && <label htmlFor={`${id}-hex`} className="text-sm font-medium">{labels.color}</label>}
@@ -94,15 +133,16 @@ export function ColorPicker({ value, onChange, defaultValue, disabled = false, c
       <button ref={trigger} type="button" aria-label={labels.color} data-tip={swatchOnly ? labels.color : undefined} aria-expanded={open && !disabled} aria-controls={open ? `${id}-panel` : undefined}
         disabled={disabled} onClick={() => open ? close() : setOpen(true)}
         className={compact
-          ? 'flex h-8 shrink-0 items-center gap-2 rounded px-1 text-sm text-ink hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-40 max-md:h-11 max-md:min-w-11'
+          ? 'flex h-8 shrink-0 items-center justify-center gap-2 rounded px-1 text-sm text-ink hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-40 pointer-coarse:h-11 pointer-coarse:min-w-11'
           : 'flex h-11 w-11 shrink-0 items-center justify-center rounded border border-edge-strong bg-surface hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-40'}>
         <span className="h-6 w-6 shrink-0 rounded border border-edge-bright" style={{ backgroundColor: color }} />
         {compact && !swatchOnly && <span>{labels.color}</span>}
       </button>
       {!compact && fields}
     </div>
-    {open && !disabled && <div className={compact ? 'order-last w-full' : 'mt-2'}>
-      <div id={`${id}-panel`} role="group" aria-label={labels.color} className={`rounded border border-edge-strong bg-surface p-2 ${compact ? 'max-w-72' : ''}`}>
+    {open && !disabled && <div ref={panel} id={`${id}-panel`} role="group" aria-label={labels.color}
+      style={compact ? { ...(position ?? { position: 'fixed', width: 288, visibility: 'hidden' }), zIndex: 1201 } : undefined}
+      className={`rounded border border-edge-strong bg-surface p-2 ${compact ? 'fixed overflow-y-auto overscroll-contain shadow-xl' : 'mt-2'}`}>
       {compact && <div className="mb-1.5">{fields}</div>}
       <div className="relative h-28 touch-none select-none overflow-hidden rounded" aria-hidden="true"
         style={{ background: `linear-gradient(to top, #000, transparent), linear-gradient(to right, #fff, transparent), hsl(${hsv.h} 100% 50%)` }}
@@ -134,7 +174,6 @@ export function ColorPicker({ value, onChange, defaultValue, disabled = false, c
         </label>)}
       </div>
       {!compact && <div className="flex justify-end">{closeButton}</div>}
-      </div>
     </div>}
   </div>
 }

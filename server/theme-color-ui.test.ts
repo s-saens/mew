@@ -40,7 +40,7 @@ function Fixture(){
 createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18nProvider>);`
   const bundle = await build({ input: 'virtual:theme.tsx', write: false, platform: 'browser', output: { format: 'iife' }, transform: { jsx: 'react-jsx', define: { 'process.env.NODE_ENV': JSON.stringify('test') } }, plugins: [{ name: 'fixture', resolveId(id) { if (id === 'virtual:theme.tsx') return id; if (id.endsWith('.css')) return 'virtual:style' }, load(id) { if (id === 'virtual:theme.tsx') return source; if (id === 'virtual:style') return '' } }] })
   const chunk = bundle.output.find(item => item.type === 'chunk'); assert.ok(chunk)
-  const content = (await Promise.all(['src/components/SettingsModal.tsx', 'src/components/theme-settings.tsx', 'packages/ui/src/select-field.tsx', 'packages/ui/src/color-picker.tsx', 'packages/ui/src/ConfirmDialog.tsx', 'packages/ui/src/dialog-frame.tsx'].map(file => fs.readFile(path.join(root, file), 'utf8')))).join('\n')
+  const content = (await Promise.all(['src/components/SettingsModal.tsx', 'src/components/theme-settings.tsx', 'src/components/theme-gradient-angle.tsx', 'packages/ui/src/select-field.tsx', 'packages/ui/src/color-picker.tsx', 'packages/ui/src/ConfirmDialog.tsx', 'packages/ui/src/dialog-frame.tsx'].map(file => fs.readFile(path.join(root, file), 'utf8')))).join('\n')
   const compiler = await compile(await fs.readFile(`${root}/src/index.css`, 'utf8'), { base: `${root}/src`, onDependency() {} })
   const css = compiler.build([...new Set((source + content).match(/[A-Za-z0-9_@!&:/.[\]()%,-]+/g))])
   const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
@@ -67,7 +67,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     const grid = page.getByRole('group', { name: '테마', exact: true })
     const gradient = editor.getByRole('checkbox', { name: '그라데이션', exact: true })
     const gradientColors = [1, 2].map(index => editor.getByRole('textbox', { name: `그라데이션 색 ${index} HEX 코드`, exact: true }))
-    const gradientAngle = editor.getByRole('slider', { name: '그라데이션 방향', exact: true })
+    const gradientAngle = editor.getByRole('spinbutton', { name: '그라데이션 방향', exact: true })
     const gradientAnimation = editor.getByRole('checkbox', { name: '배경 애니메이션', exact: true })
     const colorNames = new Map([[background, '배경색'], [text, '글씨색'], [field, '주요색'], ...gradientColors.map((input, index) => [input, `그라데이션 색 ${index + 1}`] as const)])
     const openColor = async (input: typeof field) => {
@@ -280,7 +280,11 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     assert.ok((await backgroundAlpha(neutralComponents)).every(alpha => alpha > .2 && alpha < .95), 'gradient themes tint neutral cards, buttons, inputs and hover surfaces translucently')
     assert.deepEqual(await backgroundAlpha(protectedComponents), Array(6).fill(1), 'nested controls, sticky content and loading boundaries retain solid neutral tokens')
     assert.ok((await backgroundAlpha(glassComponents)).every(alpha => Math.abs(alpha - .75) < .005), 'overlapping surfaces use a 75% background')
-    assert.ok((await page.locator(glassComponents).evaluateAll(elements => elements.map(el => el.ownerDocument.defaultView!.getComputedStyle(el).backdropFilter))).every(filter => filter === 'blur(6px)'))
+    const overlayBlur = () => page.locator(glassComponents).evaluateAll(elements => elements.map(el => ({
+      blur: el.ownerDocument.defaultView!.getComputedStyle(el).backdropFilter,
+      inactive: el.matches('[data-floating-panel]:not(:focus-within)'),
+    })))
+    assert.ok((await overlayBlur()).every(({ blur, inactive }) => blur === (inactive ? 'none' : 'blur(6px)')), 'inactive floating panels release backdrop blur')
     const settingsSurface = page.getByRole('dialog', { name: '설정', exact: true }).locator(':scope > .bg-surface-deep')
     assert.ok(Math.abs((await backgroundAlpha('[role=dialog][aria-label=설정] > .bg-surface-deep'))[0] - .75) < .005, 'the actual settings panel has a translucent background')
     assert.equal(await settingsSurface.evaluate(el => el.ownerDocument.defaultView!.getComputedStyle(el).backdropFilter), 'blur(6px)')
@@ -296,7 +300,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
       const { dark, gradient } = await page.locator('html').evaluate(el => ({ dark: el.classList.contains('dark'), gradient: el.classList.contains('theme-gradient') }))
       const translucent = !dark || gradient
       assert.ok((await backgroundAlpha(glassComponents)).every(alpha => Math.abs(alpha - (translucent ? .75 : 1)) < .005), `${label}: overlays keep the theme's background opacity`)
-      assert.ok((await page.locator(glassComponents).evaluateAll(elements => elements.map(el => el.ownerDocument.defaultView!.getComputedStyle(el).backdropFilter))).every(filter => filter === (translucent ? 'blur(6px)' : 'none')), `${label}: overlays blur only the translucent background`)
+      assert.ok((await overlayBlur()).every(({ blur, inactive }) => blur === (translucent && !inactive ? 'blur(6px)' : 'none')), `${label}: active overlays blur only the translucent background`)
       assert.ok(Math.abs((await backgroundAlpha('[role=dialog][aria-label=설정] > .bg-surface-deep'))[0] - (translucent ? .75 : 1)) < .005, `${label}: the actual settings surface follows the shared opacity`)
       const scrim = await page.getByRole('dialog', { name: '설정', exact: true }).evaluate(el => {
         const view = el.ownerDocument.defaultView!
@@ -454,14 +458,21 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
         const backgroundButton = editor.getByRole('button', { name: '배경색', exact: true })
         const gradientButtons = [1, 2].map(number => editor.getByRole('button', { name: `그라데이션 색 ${number}`, exact: true }))
         const backgroundBounds = await backgroundButton.boundingBox(); assert.ok(backgroundBounds)
-        const textBounds = await editor.getByRole('button', { name: '글씨색', exact: true }).boundingBox(); assert.ok(textBounds)
+        for (const name of ['글씨색', '주요색']) {
+          assert.equal(await editor.getByRole('button', { name, exact: true }).evaluate(el => {
+            const background = el.ownerDocument.querySelector('button[aria-label="배경색"]')!
+            return el.closest('.flex-wrap') === background.closest('.flex-wrap')
+          }), true, 'background, text and primary colors share one wrapping row')
+        }
+        const textBounds = await editor.getByRole('button', { name: '글씨색', exact: true }).boundingBox()
+        const primaryBounds = await editor.getByRole('button', { name: '주요색', exact: true }).boundingBox()
+        assert.ok(textBounds && primaryBounds && Math.abs(textBounds.y - primaryBounds.y) < 2, 'text and primary colors wrap together on narrow screens')
         for (const button of gradientButtons) {
           const bounds = await button.boundingBox(); assert.ok(bounds)
-          assert.ok(bounds.y < textBounds.y, 'gradient colors stay in the background section above text colors')
           if (width >= 390) assert.ok(Math.abs(bounds.y - backgroundBounds.y) < 2, 'gradient colors sit beside the background color')
         }
         assert.equal(await editor.getByRole('textbox').count(), 0)
-        for (const input of [...gradientColors, gradientAngle]) {
+        for (const input of gradientColors) {
           await openColor(input)
           const bounds = await input.boundingBox()
           assert.ok(bounds && bounds.width > 80 && bounds.x >= 0 && bounds.x + bounds.width <= width)
@@ -470,9 +481,25 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
         assert.equal(await page.evaluate('document.documentElement.scrollWidth>innerWidth'), false)
         await page.keyboard.press('Escape')
         await capture(`${width}-${mode}-gradient-custom`)
+        await editor.scrollIntoViewIfNeeded()
+        const layoutBefore = await editor.evaluate(el => {
+          const rect = el.getBoundingClientRect()
+          const save = el.querySelector('button.bg-accent')!.getBoundingClientRect()
+          return { height: rect.height, saveTop: save.top }
+        })
         await openColor(field)
         const pickerRect = await picker.boundingBox(); assert.ok(pickerRect && pickerRect.x >= 0 && pickerRect.x + pickerRect.width <= width)
-        await picker.scrollIntoViewIfNeeded()
+        assert.ok(pickerRect.y >= 0 && pickerRect.y + pickerRect.height <= 850)
+        assert.equal(await picker.evaluate(el => el.ownerDocument.defaultView!.getComputedStyle(el).position), 'fixed')
+        assert.deepEqual(await editor.evaluate(el => {
+          const rect = el.getBoundingClientRect()
+          const save = el.querySelector('button.bg-accent')!.getBoundingClientRect()
+          return { height: rect.height, saveTop: save.top }
+        }), layoutBefore, 'opening a color picker preserves editor height and the save button position')
+        assert.equal(await picker.evaluate(el => {
+          const rect = el.getBoundingClientRect()
+          return el.contains(el.ownerDocument.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2))
+        }), true, 'the floating picker receives input above the settings below it')
         await capture(`${width}-${mode}-color-picker`)
         if (width === 390 && mode === 'dark') {
           const touch = await page.context().newCDPSession(page)

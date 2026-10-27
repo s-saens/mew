@@ -2,6 +2,7 @@ import { useId, useRef, useState, type CSSProperties, type MouseEvent } from 're
 import { Check, Plus, Trash, Xmark } from 'iconoir-react'
 import { ColorPicker, useOverlayDismiss } from '@mew/ui'
 import { useI18n } from '../i18n'
+import { ThemeGradientAngle } from './theme-gradient-angle'
 import { DEFAULT_THEME_PALETTE, deriveThemePalette, normalizeThemeSettings, sameThemePalette, themeBackgroundImage, themePaletteContrast, THEME_PRESETS, type ThemeGradient, type ThemePalette, type ThemeSettings } from '../utils/theme-color'
 
 function sampleStyle(palette: ThemePalette): CSSProperties {
@@ -93,45 +94,41 @@ export function ThemeSettingsPanel({ value, onChange }: { value: ThemeSettings; 
         </div>
         <button type="button" className={iconButton} aria-label={t('common.cancel')} data-tip={t('common.cancel')} onClick={close}><Xmark width={16} height={16} aria-hidden="true" /></button>
       </div>
-      <div className="flex flex-col gap-1">
+      <div className="flex flex-col gap-2">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
           {colorField('background')}
-          <label className="flex min-h-8 max-md:min-h-11 cursor-pointer items-center gap-2 text-sm text-ink">
-            <input type="checkbox" checked={!!draft.gradient} className="h-4 w-4 accent-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-              onChange={event => {
-                if (event.target.checked) setDraft({ ...draft, gradient: gradientBackup.current ?? initialGradient(draft) })
-                else { gradientBackup.current = draft.gradient ?? null; setDraft({ ...draft, gradient: undefined }) }
-              }} />
-            {t('settings.theme.gradient')}
-          </label>
-          {draft.gradient && <>
-            {([0, 1] as const).map(index => <ColorPicker compact swatchOnly key={index} value={draft.gradient!.colors[index]} defaultValue={initialGradient(draftStart.current).colors[index]}
-              onChange={next => {
-                const colors: [string, string] = [...draft.gradient!.colors]
-                colors[index] = next
-                setDraft({ ...draft, gradient: { ...draft.gradient!, colors } })
-              }}
-              labels={{ color: t('settings.theme.gradientColor', { number: index + 1 }), hex: t('settings.theme.gradientColorHex', { number: index + 1 }),
-                hue: t('settings.colorHue'), saturation: t('settings.colorSaturation'), brightness: t('settings.colorBrightness'), reset: t('common.reset'), close: t('common.close') }} />)}
-          </>}
+          <div className="flex items-center gap-1">
+            <label className="flex min-h-8 pointer-coarse:min-h-11 cursor-pointer items-center gap-2 text-sm text-ink">
+              <input type="checkbox" checked={!!draft.gradient} className="h-4 w-4 accent-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                onChange={event => {
+                  if (event.target.checked) setDraft({ ...draft, gradient: gradientBackup.current ?? initialGradient(draft) })
+                  else { gradientBackup.current = draft.gradient ?? null; setDraft({ ...draft, gradient: undefined }) }
+                }} />
+              {t('settings.theme.gradient')}
+            </label>
+            {draft.gradient && ([0, 1] as const).map(index => <ColorPicker compact swatchOnly key={index} value={draft.gradient!.colors[index]} defaultValue={initialGradient(draftStart.current).colors[index]}
+                onChange={next => {
+                  const colors: [string, string] = [...draft.gradient!.colors]
+                  colors[index] = next
+                  setDraft({ ...draft, gradient: { ...draft.gradient!, colors } })
+                }}
+                labels={{ color: t('settings.theme.gradientColor', { number: index + 1 }), hex: t('settings.theme.gradientColorHex', { number: index + 1 }),
+                  hue: t('settings.colorHue'), saturation: t('settings.colorSaturation'), brightness: t('settings.colorBrightness'), reset: t('common.reset'), close: t('common.close') }} />)}
+          </div>
+          <div className="flex items-center gap-2">
+            {colorField('text')}
+            {colorField('primary')}
+          </div>
         </div>
-        {draft.gradient && <div className="flex flex-col">
-          <label className="flex min-h-11 items-center gap-3 text-xs text-ink-secondary">
-            <span className="shrink-0">{t('settings.theme.gradientAngle')}</span>
-            <input type="range" min={0} max={359} step={1} value={draft.gradient.angle} aria-label={t('settings.theme.gradientAngle')} aria-valuetext={`${draft.gradient.angle}°`}
-              className="h-11 min-w-0 flex-1 cursor-pointer accent-accent focus-visible:outline-2 focus-visible:outline-accent"
-              onChange={event => setDraft({ ...draft, gradient: { ...draft.gradient!, angle: Number(event.target.value) } })} />
-            <span className="w-9 shrink-0 text-right tabular-nums">{draft.gradient.angle}°</span>
-          </label>
-          <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm text-ink">
+        {draft.gradient && <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+          <ThemeGradientAngle value={draft.gradient.angle} label={t('settings.theme.gradientAngle')}
+            onChange={angle => setDraft({ ...draft, gradient: { ...draft.gradient!, angle } })} />
+          <label className="flex min-h-8 pointer-coarse:min-h-11 cursor-pointer items-center gap-2 text-sm text-ink">
             <input type="checkbox" checked={draft.gradient.animated} className="h-4 w-4 accent-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
               onChange={event => setDraft({ ...draft, gradient: { ...draft.gradient!, animated: event.target.checked } })} />
             {t('settings.theme.gradientAnimated')}
           </label>
         </div>}
-        {(['text', 'primary'] as const).map(color => <div key={color} className="flex flex-wrap items-center gap-1">
-          {colorField(color)}
-        </div>)}
       </div>
       {themePaletteContrast(draft) < 4.5 && <p role="status" className="mt-2 text-xs text-warning-ink">{t('settings.themeLowContrast')}</p>}
       <div className="mt-3 flex items-center justify-between gap-2">
