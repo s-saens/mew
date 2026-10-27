@@ -81,7 +81,6 @@ export function MewcatNotificationSettings({ hasCat = false }: { hasCat?: boolea
         }, 3000)
       }}>{testing ? t('mewcat.testing') : t('mewcat.test')}</button>
       <p className="mt-2 text-xs leading-relaxed text-ink-secondary">{t('mewcat.testHint')}</p>
-      <p className="mt-2 text-xs leading-relaxed text-ink-secondary">{t('mewcat.scope')}</p>
       {error && <p role="alert" className="mt-2 text-xs text-danger">{error}</p>}
     </div>
   </section>

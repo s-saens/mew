@@ -4,11 +4,11 @@ parent: "mew-settings"
 title: "Mewpet 마스코트·알림·휴식"
 status: "implemented"
 created: "2026-09-18"
-updated: "2026-10-26"
+updated: "2026-10-27"
 status_hash: "8b1758c7281118da18b267a2c001213bb7c463d4dbd018bb221e192d83f43ec3"
 files: ["server/mewpet-skins.ts", "server/mewpet-skin-routes.ts", "shared/mewpet-skins.ts", "src/components/header-notifications.tsx", "src/components/header-resources.tsx", "src/utils/mewcat-notifications.ts", "src/components/Mewcat.tsx", "src/components/mewcat-skin-settings.tsx", "src/components/mewcat-size-settings.tsx", "src/utils/mewcat-size-preferences.ts", "src/utils/mewcat-sprites.ts", "src/utils/mewcat-sprite-storage.ts", "src/components/mewcat-fullscreen-guide.tsx", "src/hooks/use-startup-guide.ts", "src/utils/app-install.ts", "src/components/mewcat-resources.tsx", "src/components/SettingsModal.tsx", "src/components/mewcat-notifications.tsx", "src/hooks/use-mewcat-notifications.ts", "src/utils/mewcat-notification-rules.ts", "src/components/mewcat-break.tsx", "src/hooks/use-mewcat-break.ts", "src/utils/mewcat-break-rules.ts"]
 commits: []
-description: "최상단 바의 작고 둥근 C·R·G 세로 게이지와 중앙 라벨·아래부터 차오르는 테마색 사용량·툴팁 수치·접근성 설명, 전체화면 오른쪽 알림 버튼과 시스템 자원 권한·조회·상세창 연결을 정의한다. 승인 요청의 기본 자동 탭 전환·설정과 토스트 알림, 카피바라만 제공하는 내장 스킨과 검은 카피바라 사용자 스킨의 밝기 조정·멍한 검은 고양이의 눈만 남긴 얼굴과 얇은 흰색 테두리·제거된 내장 선택의 복귀·이미지의 로컬 Git 기록 정리, 전역 파일 스킨 등록·16개 모션 이미지의 저장 제한과 오류 구분·WebP 압축·브라우저 이관·빌드 없는 갱신과 Mew 배포와 분리한 외부 생성 MCP의 선택적 연결을 정의한다. 스킨 로딩 중 뮤펫 숨김과 독립 토스트 표시, 화면 바닥·모바일 설정창·기본 크기, 필수 Idle·걷기·Struggle과 선택 모션·전환의 프레임 수·재생 시간·활성화 및 스킨별 이동 속도·보폭 동기화·공통 바닥 앵커와 주기 경계 전환, 모션 감소에서도 유지하는 기본 프레임 재생·낙하의 좁은 기울기 순환·83% 표시 배율, 이동·끌기·던지기·설치 우선 시작 안내와 전체화면 안내의 개별 영구 숨김·최근 알림 목록과 토스트·선택적 거대 휴식의 저장·입력 계약도 설명한다."
+description: "최상단 바의 작고 둥근 C·R·G 세로 게이지와 중앙 라벨·아래부터 차오르는 테마색 사용량·툴팁 수치·접근성 설명, 전체화면 오른쪽 알림 버튼과 시스템 자원 권한·조회·상세창 연결을 정의한다. 감시 범위 안내 문단 없는 알림 설정, 승인 요청의 기본 자동 탭 전환·설정과 토스트 알림, 카피바라만 제공하는 내장 스킨과 검은 카피바라 사용자 스킨의 밝기 조정·멍한 검은 고양이의 눈만 남긴 얼굴과 얇은 흰색 테두리·제거된 내장 선택의 복귀·이미지의 로컬 Git 기록 정리, 전역 파일 스킨 등록·16개 모션 이미지의 저장 제한과 오류 구분·WebP 압축·브라우저 이관·빌드 없는 갱신과 Mew 배포와 분리한 외부 생성 MCP의 선택적 연결을 정의한다. 스킨 로딩 중 뮤펫 숨김과 독립 토스트 표시, 화면 바닥·모바일 설정창·기본 크기, 필수 Idle·걷기·Struggle과 선택 모션·전환의 프레임 수·재생 시간·활성화 및 스킨별 이동 속도·보폭 동기화·공통 바닥 앵커와 주기 경계 전환, 모션 감소에서도 유지하는 기본 프레임 재생·낙하의 좁은 기울기 순환·83% 표시 배율, 이동·끌기·던지기·설치 우선 시작 안내와 전체화면 안내의 개별 영구 숨김·최근 알림 목록과 토스트·선택적 거대 휴식의 저장·입력 계약도 설명한다."
 상위파일:
   - "MOC.md"
   - "_화면·계정·운영.md"
@@ -30,7 +30,7 @@ description: "최상단 바의 작고 둥근 C·R·G 세로 게이지와 중앙 
 - 작업 완료·오류·승인과 지속적인 서버 자원 과부하를 토스트로 알리고, 알림 목록에서 해당 화면으로 이동한다.
 - 현재 보고 있는 에이전트 탭의 작업 완료 알림은 생략한다. 다른 탭·패널·브라우저 창에 있을 때의 완료 알림과 오류·승인 요청 알림은 유지한다.
 - 클릭 목록·토스트의 문구와 접근성 이름은 화면 언어 설정을 따르며, 열린 상태에서도 언어 변경을 즉시 반영한다.
-- 알림 채널·자원 감시를 설정하고 비활성 PC 창의 OS 알림·소리를 테스트한다.
+- 알림 채널·자원 감시를 설정하고 비활성 PC 창의 OS 알림·소리를 테스트한다. 설정 하단에는 권한 상태와 테스트 안내를 표시하며, 프로젝트·브라우저·터미널 감시 범위를 설명하는 상시 안내 문단은 표시하지 않는다.
 - 기본 꺼짐인 강제 휴식을 제공한다.
 - 사용·휴식 시간을 시/분으로 설정하고 사용 시간이 차면 큰 뮤펫이 휴식 종료까지 작업 화면을 가린다.
 - 타이머만 표시하며 큰 뮤펫도 평소처럼 돌아다니고 잡아 끌거나 던질 수 있다.

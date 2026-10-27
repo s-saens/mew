@@ -95,6 +95,14 @@ test('unsupported desktop API leaves in-app settings usable', async () => {
   await view.close()
 })
 
+test('notification settings omit the monitoring scope footer and retain test guidance', async () => {
+  const view = await mount(h(ui.MewcatNotificationSettings))
+  assert.doesNotMatch(view.element.textContent!, /Agent alerts cover connected chat tabs|Keep the mew browser tab open|Terminal-only agents/)
+  assert.match(view.element.textContent!, /For a desktop test, switch to another window within 3 seconds/)
+  assert.ok([...view.element.querySelectorAll('button')].some(button => button.textContent === 'Send test notification'))
+  await view.close()
+})
+
 test('approval focus defaults on, can be disabled immediately and keeps the Mewpet alert until resolved', async () => {
   store.setNotificationPreferences({ autoOpenApproval: true, visual: true, mewcat: true, desktop: false, sound: false, resources: false })
   function Delivery() { useMewcatNotifications(false, 'approval-test'); return null }
