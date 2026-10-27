@@ -15,6 +15,32 @@ const owner: AuthenticatedSession = { email: 'preview@example.test', user: { has
 async function start(server: http.Server) { server.listen(0, '127.0.0.1'); await once(server, 'listening'); return `http://127.0.0.1:${(server.address() as { port: number }).port}` }
 const stop = (server: http.Server) => new Promise<void>(resolve => { server.closeAllConnections(); server.close(() => resolve()) })
 
+test('module rewriting handles multiline imports and reexports while preserving comments, strings, JSON and source maps', async t => {
+  const comment = '// import fake from "/comment-only.js"'
+  const literal = 'const message = \'import fake from "/string-only.js"\';'
+  const template = 'const example = `export { fake } from "/template-only.js"`;'
+  const sourceMap = '//# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozfQ=='
+  const source = [comment, literal, template, 'import {\n value\n} from "/dependency.js";', 'export {\n value as renamed\n} from "/exports.js";', 'const lazy = import(`/dynamic.js`);', 'const computed = import(`/chunks/${name}.js`);', 'const self = import.meta.url;', sourceMap].join('\n')
+  const json = '{"example":"import fake from \\"/json-only.js\\""}'
+  const upstream = http.createServer((req, res) => {
+    if (req.url === '/entry.js') { res.setHeader('Content-Type', 'text/javascript'); res.end(source); return }
+    res.setHeader('Content-Type', 'text/html')
+    res.end(`<html><head><script type="module">import {\n value\n} from "/inline.js";</script><script type="application/json">${json}</script></head><body></body></html>`)
+  })
+  const target = await start(upstream); t.after(() => stop(upstream))
+  const app = express(), host = http.createServer(app)
+  app.use(createPortPreviewMiddleware())
+  const origin = await start(host); t.after(() => stop(host))
+  const resource = portPreviewFrameUrl(target + '/entry.js', owner.email, { active: () => true })
+  const code = await (await fetch(origin + resource)).text()
+  for (const original of [comment, literal, template, sourceMap, 'import(`/chunks/${name}.js`)', 'import.meta.url']) assert.ok(code.includes(original), original)
+  const prefix = resource.slice(0, resource.lastIndexOf('/'))
+  for (const name of ['dependency', 'exports', 'dynamic']) assert.ok(code.includes(prefix + `/${name}.js`), `${name} stays inside preview capability`)
+  const html = await (await fetch(origin + portPreviewFrameUrl(target, owner.email, { active: () => true }))).text()
+  assert.match(html, /from "\/__mew_port_preview\/[^"\n]+\/inline\.js"/)
+  assert.ok(html.includes(json), 'non-JavaScript inline data is preserved')
+})
+
 
 test('port preview binds cookies and URL capabilities to one port and live login, protects Mew and keeps HTML opaque', async t => {
   let current: AuthenticatedSession | null = owner, body = '', cookie = ''

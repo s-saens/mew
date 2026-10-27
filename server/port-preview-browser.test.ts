@@ -31,13 +31,15 @@ test('direct HTTPS tunnel preview retains its custom domain and proxies modules,
     forwarded.push(req.headers)
     if (req.url === '/echo') { let body = ''; for await (const part of req) body += String(part); res.setHeader('Content-Type', 'application/json'); res.end(body); return }
     if (req.url === '/lazy.js') { res.setHeader('Content-Type', 'text/javascript'); res.end('export const value="module"'); return }
+    if (req.url === '/refresh.js') { res.setHeader('Content-Type', 'text/javascript'); res.end('export function install(){window.refreshReady=true}'); return }
+    if (req.url === '/dynamic.js') { res.setHeader('Content-Type', 'text/javascript'); res.end('export const value="dynamic"'); return }
     if (req.url === '/app.js') {
       res.setHeader('Content-Type', 'text/javascript')
-      res.end(`import {value} from '/lazy.js';const post=await(await fetch('/echo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({value:'POST'})})).json();const socket=new WebSocket('wss://'+location.host+'/hmr');const hmr=await new Promise(resolve=>{socket.onopen=()=>socket.send('update');socket.onmessage=e=>{resolve(e.data);socket.close()}});let isolated=false;try{parent.document.body}catch{isolated=true}document.querySelector('#result').textContent=[value,post.value,hmr,isolated?'isolated':'unsafe'].join(' ')`)
+      res.end(`import {\n value\n} from '/lazy.js';const dynamic=await import(\`/dynamic.js\`);const post=await(await fetch('/echo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({value:'POST'})})).json();const socket=new WebSocket('wss://'+location.host+'/hmr');const hmr=await new Promise(resolve=>{socket.onopen=()=>socket.send('update');socket.onmessage=e=>{resolve(e.data);socket.close()}});let isolated=false;try{parent.document.body}catch{isolated=true}document.querySelector('#result').textContent=[value,post.value,hmr,isolated?'isolated':'unsafe',window.refreshReady?'inline':'missing',dynamic.value].join(' ')`)
       return
     }
     assert.equal(req.url, '/deep?from=branch')
-    res.setHeader('Content-Type', 'text/html'); res.end('<html><head></head><body><p id="result">Loading</p><script type="module" src="/app.js"></script></body></html>')
+    res.setHeader('Content-Type', 'text/html'); res.end('<html><head><script type="module">import {install} from "/refresh.js";install();</script></head><body><p id="result">Loading</p><script type="module" src="/app.js"></script></body></html>')
   })
   const hmr = new WebSocketServer({ server: upstream }); hmr.on('connection', socket => socket.on('message', () => socket.send('HMR')))
   upstream.listen(0, '127.0.0.1'); await once(upstream, 'listening'); t.after(() => stop(upstream))
@@ -76,7 +78,7 @@ test('direct HTTPS tunnel preview retains its custom domain and proxies modules,
   await page.getByRole('link', { name: 'Open preview' }).click()
   const preview = await opened; preview.on('pageerror', error => errors.push(error.message))
   await preview.waitForURL(`${origin}/${upstreamPort}/deep?from=branch`)
-  await preview.frameLocator('iframe').getByText('module POST HMR isolated', { exact: true }).waitFor({ timeout: 10_000 })
+  await preview.frameLocator('iframe').getByText('module POST HMR isolated inline dynamic', { exact: true }).waitFor({ timeout: 10_000 })
   assert.deepEqual(errors, [])
   assert.ok(forwarded.length >= 4)
   for (const headers of forwarded) {

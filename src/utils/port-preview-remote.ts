@@ -15,17 +15,22 @@ export async function mountRemotePortPreview(frame: HTMLIFrameElement, options: 
   const session = await response.json() as PortPreviewSession
   const origin = `https://${crypto.randomUUID().replaceAll('-', '')}.${previewDomain}`
   const bridge = new MessageChannel(), controllers = new Set<AbortController>(), sockets = new Set<WebSocket>()
-  let disposed = false
+  let disposed = false, initialized = false
+  let timer: ReturnType<typeof setTimeout> | undefined
+  let rejectInitialization: ((error: Error) => void) | undefined
   const cleanup = () => {
     if (disposed) return
-    disposed = true; window.removeEventListener('message', ready)
+    disposed = true; clearTimeout(timer); window.removeEventListener('message', ready)
+    rejectInitialization?.(new Error('포트 미리보기 연결이 종료됐습니다.'))
+    rejectInitialization = undefined
     for (const controller of controllers) controller.abort()
     for (const socket of sockets) socket.close()
-    bridge.port1.close(); frame.removeAttribute('src')
+    bridge.port1.close(); bridge.port2.close(); frame.removeAttribute('src')
     void mewFetch(`${PORT_PREVIEW_API}/session`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: session.token }) }).catch(() => {})
   }
   bridge.port1.onmessage = event => {
     const value = event.data, port = event.ports[0]
+    if (value?.type === 'closed') { cleanup(); return }
     if (disposed || !port || !value || typeof value.path !== 'string' || value.path.length > 8192 || !value.path.startsWith('/') || value.path.startsWith('//') || /[\\\r\n#]/.test(value.path)) { port?.close(); return }
     if (value.type === 'fetch') {
       const controller = new AbortController(); controllers.add(controller)
@@ -63,11 +68,30 @@ export async function mountRemotePortPreview(frame: HTMLIFrameElement, options: 
     } else port.close()
   }
   const ready = (event: MessageEvent) => {
-    if (event.source !== frame.contentWindow || event.origin !== origin || event.data?.type !== 'mew-preview-ready' || disposed) return
-    window.removeEventListener('message', ready)
-    frame.contentWindow!.postMessage({ type: 'mew-preview-init', path, port: options.port }, origin, [bridge.port2])
+    if (event.source !== frame.contentWindow || event.origin !== origin || disposed) return
+    if (event.data?.type === 'mew-preview-ready' && !initialized) {
+      initialized = true
+      frame.contentWindow!.postMessage({ type: 'mew-preview-init', path, port: options.port }, origin, [bridge.port2])
+    } else if (event.data?.type === 'mew-preview-failed') {
+      rejectInitialization?.(new Error('포트 미리보기를 준비하지 못했습니다. 브라우저의 Service Worker 사용 가능 여부와 Mewlink 프리뷰 설정을 확인해 주세요.'))
+    } else if (event.data?.type === 'mew-preview-initialized' && initialized) {
+      resolveInitialization?.()
+    }
   }
-  window.addEventListener('message', ready)
-  frame.removeAttribute('sandbox'); frame.referrerPolicy = 'no-referrer'; frame.src = `${origin}/__mew_preview_launch`
-  return cleanup
+  let resolveInitialization: (() => void) | undefined
+  try {
+    await new Promise<void>((resolve, reject) => {
+      resolveInitialization = resolve; rejectInitialization = reject
+      timer = setTimeout(() => reject(new Error('포트 미리보기 연결 시간이 초과됐습니다. Mewlink 프리뷰 도메인의 와일드카드 DNS·HTTPS·Worker 경로를 확인해 주세요.')), 15000)
+      window.addEventListener('message', ready)
+      frame.removeAttribute('sandbox'); frame.referrerPolicy = 'no-referrer'; frame.src = `${origin}/__mew_preview_launch`
+    })
+    clearTimeout(timer); window.removeEventListener('message', ready)
+    rejectInitialization = undefined
+    return cleanup
+  } catch (error) {
+    rejectInitialization = undefined
+    cleanup()
+    throw error
+  }
 }

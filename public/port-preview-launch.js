@@ -11,7 +11,8 @@ window.addEventListener('message', event => {
       frame = document.createElement('iframe'); frame.title = 'localhost:' + event.data.port
       frame.referrerPolicy = 'no-referrer'; frame.src = event.data.path
       document.body.replaceChildren(frame)
-    })().catch(() => { document.body.textContent = '미리보기를 준비하지 못했습니다.'; close() })
+      parent.postMessage({ type: 'mew-preview-initialized' }, owner)
+    })().catch(() => { parent.postMessage({ type: 'mew-preview-failed' }, owner); document.body.textContent = '미리보기를 준비하지 못했습니다.'; close() })
   } else if (event.origin === location.origin && event.source === frame?.contentWindow && event.data?.type === 'mew-preview-socket' && event.ports[0] && bridge) bridge.postMessage(event.data.request, [event.ports[0]])
 })
 navigator.serviceWorker.addEventListener('message', event => {

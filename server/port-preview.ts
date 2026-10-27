@@ -5,6 +5,7 @@ import type { IncomingMessage, Server as HttpServer } from 'node:http'
 import type { Http2SecureServer } from 'node:http2'
 import type { Duplex } from 'node:stream'
 import { CookieJar } from 'tough-cookie'
+import { init as initializeModuleLexer, parse as parseModuleImports } from 'es-module-lexer'
 import {
   parse,
   parseFragment,
@@ -21,6 +22,7 @@ export { PORT_PREVIEW_PREFIX, PORT_PREVIEW_WS_PREFIX } from '../shared/port-prev
 import { PORT_PREVIEW_PREFIX, PORT_PREVIEW_WS_PREFIX } from '../shared/port-preview.ts'
 
 const TOKEN_TTL_MS = 30 * 60 * 1000
+const moduleLexerReady = initializeModuleLexer()
 const TOKEN_SECRET = crypto.randomBytes(32)
 const PORT_PROXY_RE = /^\/([0-9]{1,5})(\/.*)?$/
 const protectedPorts = new Set<number>()
@@ -389,14 +391,18 @@ function rewriteCss(text: string, base: URL, browserToken: string): string {
 }
 
 function rewriteJavascript(text: string, base: URL, browserToken: string): string {
-  const imports = text.replace(
-    /(\b(?:import|export)\s+(?:[^;\n]*?\sfrom\s*)?)(["'])([^"']+)(\2)/g,
-    (_match, start: string, quote: string, url: string) => `${start}${quote}${rewriteUrl(url, base, browserToken)}${quote}`,
-  )
-  return imports.replace(
-    /(\bimport\s*\(\s*)(["'])([^"']+)(\2)/g,
-    (_match, start: string, quote: string, url: string) => `${start}${quote}${rewriteUrl(url, base, browserToken)}${quote}`,
-  )
+  let imports: ReturnType<typeof parseModuleImports>[0]
+  try { [imports] = parseModuleImports(text) } catch { return text }
+  // 뒤에서부터 실제 모듈 지정자만 바꿔 주석·문자열·source map과 원래 위치를 보존한다.
+  for (const entry of [...imports].reverse()) {
+    if (entry.type === 'import-meta' || !entry.specifier || entry.type === 'dynamic' && entry.glob) continue
+    const url = rewriteUrl(entry.specifier, base, browserToken)
+    if (url === entry.specifier) continue
+    const start = entry.type === 'dynamic' ? entry.start : entry.start - 1
+    const end = entry.type === 'dynamic' ? entry.end : entry.end + 1
+    text = text.slice(0, start) + JSON.stringify(url) + text.slice(end)
+  }
+  return text
 }
 
 function storageSnapshot(map: Map<string, StorageArea>, origin: string): StorageArea {
@@ -494,6 +500,11 @@ function rewriteHtml(
           if ('value' in child) child.value = rewriteCss(child.value, target, browserToken)
         }
       }
+      if (node.tagName === 'script' && !attribute(node, 'src') && ['', 'module', 'text/javascript', 'application/javascript', 'text/ecmascript', 'application/ecmascript'].includes((attribute(node, 'type') ?? '').trim().toLowerCase())) {
+        for (const child of node.childNodes) {
+          if ('value' in child) child.value = rewriteJavascript(child.value, target, browserToken)
+        }
+      }
       if ('content' in node) walk(node.content)
     }
     if ('childNodes' in node) for (const child of node.childNodes) walk(child)
@@ -537,6 +548,7 @@ async function rewriteBody(
   browserToken: string,
   session: PreviewSession,
 ): Promise<Buffer | string> {
+  await moduleLexerReady
   const text = buffer.toString('utf8')
   if (contentType.includes('text/html') || contentType.includes('application/xhtml+xml')) {
     return rewriteHtml(

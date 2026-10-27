@@ -1,6 +1,6 @@
 ---
 title: "인증된 localhost 앱 프리뷰"
-description: "명령 세션의 실제 수신 포트 감지와 도메인·Tailscale·Mewlink의 /포트번호 링크, 원격 공개 기기 주소 전달과 권한·실패 경계를 정의한다. localhost HTTP·WebSocket 프리뷰의 로그인·포트 capability, 출처 격리·호환 한계와 HTTPS 터널 검증 범위도 설명한다."
+description: "명령 세션의 수신 포트 감지와 /포트번호 링크, 직접 프록시의 인라인·여러 줄 모듈 전달과 원격 프리뷰 초기화 실패·15초 제한·DNS 준비 경계를 정의한다. localhost HTTP·WebSocket의 로그인·포트 capability, 출처 격리·라우터 호환 한계와 검증 범위도 설명한다."
 created: "2026-10-20"
 updated: "2026-10-27"
 ---
@@ -39,11 +39,15 @@ raw HTML과 앱 쿠키 API는 검증된 P2P dispatcher가 해당 요청의 `port
 
 `PREVIEW_DOMAIN=preview.mew.run` 설정과 `*.preview.mew.run`의 Worker 경로·DNS·HTTPS가 필요하다. 프리뷰마다 임의의 하위 호스트를 생성해 Mew와 다른 앱의 origin·storage·Service Worker를 분리한다. 주소창의 `/user/device/3333` 진입 주소는 유지한다. 이 설정이 없으면 명확한 준비 오류를 표시하며 Mew의 기존 origin으로 앱을 실행하지 않는다.
 
+설정값·공개 기기 페이지의 HTTP 200만으로 프리뷰 준비 완료를 판단하지 않는다. 난수 하위 도메인의 DNS·TLS·Worker 응답이 모두 필요하다. 원격 프리뷰는 같은 iframe·origin에서 보낸 `mew-preview-ready` 이후 Service Worker 준비 완료의 `mew-preview-initialized`를 기다린다. 초기화 실패 통지나 15초 제한에 걸리면 원인을 확인할 오류를 표시하고 발급 세션·소켓·진행 중 요청·메시지 포트·리스너를 정리한다. 호스트 코드와 중앙에 포함되는 공용 `port-preview-launch.js`를 함께 적용한다. [준비 확인](../deployment/remote-central.md#localhost-앱-프리뷰-origin)과 [ADR 0078](../decisions/0078-port-preview-module-initialization.md)을 따른다.
+
 브라우저의 native WebSocket은 Service Worker가 가로채지 못하므로 프리뷰 전용 브리지를 앱 실행 전에 연결한다. upstream이 실제 선택한 subprotocol을 뷰어까지 전달한다. 앱 요청·소켓에는 해당 프리뷰 포트 권한만 적용한다. 프리뷰를 닫으면 MessagePort·소켓·세션을 정리한다. 공용 launcher·Service Worker·runtime의 기준은 루트 `public/port-preview-*.js`이며 중앙 빌드가 같은 자산을 포함한다. 중앙 변경 적용과 wildcard HTTPS 준비는 사용자가 수행한다.
 
 ## 호환성과 검증
 
 루트 자산·API·POST·WebSocket/HMR을 전달한다. POST 본문은 JSON을 포함해 원본 바이트를 유지한다. HTML·CSS·JS·XML만 8MiB 한도 안에서 재작성하며 SSE·바이너리는 역압을 적용해 전달한다. 클라이언트 종료는 upstream 요청을 취소한다.
+
+HTML의 인라인 JavaScript·module과 외부 JavaScript의 import·re-export·문자열/고정 템플릿 동적 import는 `es-module-lexer`의 실제 지정자 위치만 프록시 URL로 바꾼다. Vite의 인라인 React Refresh 초기화와 여러 줄 import도 같은 포트 capability를 유지한다. 주석·일반 문자열·JSON 데이터 스크립트·source map은 보존한다. 런타임 식으로 조합하는 동적 import까지 모두 재작성하지는 않는다. 구문 분석에 실패한 스크립트는 원문을 전달하며, 기존 Next 정적 청크의 원문 보존은 유지한다.
 
 직접 프록시의 `location.pathname`에는 프록시 접두사가 남는다. 런타임 basename을 지원하는 라우터는 읽기 전용 `window.__MEW_PORT_PREVIEW_BASE_PATH__`를 사용해야 한다. Location의 native 속성을 위장하지 않는다. Next처럼 빌드 시점의 고정 basePath가 필요한 앱은 원래 경로를 유지하는 Mewlink의 별도 origin 경로를 사용한다. Mewlink의 SPA 경로는 실제 브라우저 URL·history와 함께 유지한다.
 

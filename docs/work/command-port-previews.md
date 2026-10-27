@@ -1,6 +1,6 @@
 ---
 title: "명령어 버튼의 포트 미리보기 구현·검증"
-description: "2026-10-27 명령 세션별 실제 수신 포트 버튼·공개 기기 URL 전달과 메뉴 폭·밀도·포트 컨테이너 개선의 구현·격리 검증, Git 제외 중앙 수정의 별도 패치 보존 및 OS·운영 적용 한계를 기록한다."
+description: "2026-10-27 포트 버튼·공개 기기 URL·메뉴 밀도 개선과 직접 프리뷰의 Vite 모듈 누락 수정, 원격 초기화 실패 처리·공개 DNS 미준비 확인을 기록한다. 격리·실행 중 앱 관찰과 빌드·운영 미적용을 구분한다."
 created: "2026-10-27"
 updated: "2026-10-27"
 ---
@@ -41,3 +41,17 @@ macOS·Windows의 실제 pane/프로세스 조회, 실제 공개 `mew.run`·사�
 - `npm run check:docs`의 description 491개는 오류 없이 통과했다. 전체 링크 검사는 앞선 작업과 같은 기존 누락 링크 17건으로 실패했으며 이번 변경 문서 3개에는 링크 오류가 없다.
 
 앱 빌드·배포·서버 재시작과 실제 휴대폰 적용은 수행하지 않았다.
+
+## 2026-10-27 — 포트 접속 실패 재현·수정
+
+직접 프리뷰에서 현재 실행 중인 Vite 앱을 격리 프록시·브라우저로 관찰했을 때 인라인 React Refresh와 여러 줄 import의 일부가 Mew 루트로 요청되어 CORS 오류와 빈 화면이 발생했다. 단순 모듈만 사용한 기존 fixture는 이 경우를 포함하지 않았다. 실제 지정자를 분석하는 lexer로 인라인·외부 스크립트를 처리하도록 바꾸고 문자열·주석·JSON·source map을 보호했다. [ADR 0078](../decisions/0078-port-preview-module-initialization.md)을 따른다.
+
+Mewlink 공개 기기 주소는 HTTP 200이었지만 프리뷰 도메인과 서로 다른 난수 호스트 두 곳의 DNS는 `ENOTFOUND`였다. 기존 원격 브라우저 검사는 호스트 해석·인증서를 fixture로 대체하므로 실제 DNS 준비를 입증하지 않았다. 원격 mount에 초기화 완료·실패 통지와 15초 제한을 추가해 준비 실패를 화면에 반환하고 세션·요청·소켓·포트를 정리했다. 공용 launcher 자산은 중앙 빌드에도 포함된다.
+
+- 인라인 React Refresh·여러 줄 import·고정 템플릿 동적 import를 추가한 직접 HTTPS 터널 브라우저 검사는 수정 전에 기대 화면 대기 시간 초과로 실패했고, 수정 후 통과했다.
+- `server/port-preview.test.ts`·`server/port-preview-browser.test.ts`·`server/port-preview-launch.test.ts`의 13개 검사가 통과했다. 주석·문자열·JSON·source map 보존, 모듈·POST·HMR·권한·origin·SSE와 원격 timeout·Service Worker 실패·위조 메시지·자원 정리를 확인했다.
+- 현재 실행 중인 Vite 앱에 대한 격리 진단에서도 수정 후 기존 모듈 CORS 오류가 사라지고 앱 본문이 렌더링됐다. 해당 앱은 프록시 pathname 때문에 자체 경로 안내 화면을 표시했으므로 앱 라우터까지 정상 동작한 것으로 기록하지 않는다. 별도 API 서비스의 `/` 404도 upstream 자체 응답임을 확인했다.
+- 변경 TypeScript·JavaScript 대상 oxlint와 `npx tsc -b`가 통과했다. 임시 진단용 브라우저·HTTP 서버는 종료했다.
+- `npm run check:docs`는 description 494개에서 오류가 없었다. 전체 링크 검사는 기존 누락 대상 17건으로 실패했으며 이번 변경 문서에는 링크 오류가 없다.
+
+DNS·인증서·Worker 설정과 운영 서버는 변경하지 않았다. 호스트 빌드와 중앙 공용 자산 반영, wildcard DNS·HTTPS 준비는 사용자가 수행해야 한다. 경로 기반 앱의 basename 설정 등 기존 [라우터 호환 한계](../development/port-preview.md#호환성과-검증)도 유지한다.
