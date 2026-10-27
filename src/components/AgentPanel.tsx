@@ -1533,6 +1533,7 @@ export function AgentPanel({ requestedPicker = false, onPickerRuntimeChosen, onR
   const activeTabKey = agentTabStorageKey(ACTIVE_TAB_KEY, workspacePath)
   const [tabs, setTabs] = useState<AgentTab[]>(() => loadTabs(workspacePath))
   const closedTabs = useRef<{ tab: AgentTab; group: string; index: number }[]>([])
+  const [autoFocusTabId, setAutoFocusTabId] = useState<string | null>(null)
   useEffect(() => { closedTabs.current = [] }, [workspacePath, cacheAccount])
   useEffect(() => {
     const group = closingFocusGroup.current
@@ -1728,6 +1729,7 @@ export function AgentPanel({ requestedPicker = false, onPickerRuntimeChosen, onR
         const tab = newTab(runtime, preset?.name ?? runtimeOf(runtime).label, cwd, preset)
         setDefaultCwd(cwd)
         setTabs((prev) => [...prev, tab])
+        setAutoFocusTabId(tab.id)
         setActiveId(tab.id)
         latestDock.current?.assign(destination, tab.id)
         setOpened((prev) => new Set(prev).add(tab.id))
@@ -2006,6 +2008,7 @@ export function AgentPanel({ requestedPicker = false, onPickerRuntimeChosen, onR
               allowTerminal={allowTerminal}
               tabId={tab.id}
               active={isActive}
+              autoFocus={isActive && tab.id === autoFocusTabId}
               visible={visible}
               runtime={tab.runtime!}
               cwd={tab.cwd!}
@@ -2194,6 +2197,7 @@ function AgentSessionView({
   allowTerminal,
   tabId,
   active,
+  autoFocus,
   runtime,
   cwd,
   preset,
@@ -2222,6 +2226,7 @@ function AgentSessionView({
   tabId: string
   /** 입력·단축키 포커스 대상 */
   active: boolean
+  autoFocus: boolean
   /** 다른 패널에 포커스가 있어도 현재 표시 중인 탭은 로딩을 재생한다. */
   visible: boolean
   runtime: string
@@ -4242,6 +4247,7 @@ function AgentSessionView({
           <div className="relative flex min-h-0 flex-1">
           <MentionTextarea
             key={editingQueued ? `queue:${editingQueued.index}` : 'draft'}
+            autoFocus={autoFocus && !editingQueued}
             imageCapable
             value={composerDraft}
             resolvePendingToken={token => pendingAttachmentResults.current.get(token)}

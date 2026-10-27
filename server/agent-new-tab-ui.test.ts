@@ -85,6 +85,7 @@ window.showTerminal=()=>{rootView.unmount();rootView=createRoot(document.getElem
       })
       await page.goto('http://mew-close.test/')
       await page.waitForFunction('!!window.sockets?.first').catch(error => { throw new Error(`${error.message} ${JSON.stringify(errors)}`) })
+      assert.equal(await page.locator('[data-agent-composer] [contenteditable="true"]:focus').count(), 0, 'restored tabs do not autofocus the composer')
       await page.evaluate('window.sockets.first.open()')
       const first = page.getByRole('tab', { name: /first/ })
       const add = page.getByRole('button', { name: '새 탭', exact: true })
@@ -197,6 +198,20 @@ window.showTerminal=()=>{rootView.unmount();rootView=createRoot(document.getElem
       assert.equal(await page.getByRole('tab').count(), 2)
       await page.keyboard.press('2')
       await page.waitForFunction("document.querySelectorAll('[role=tab]').length===3")
+      const composer = page.locator('[data-agent-composer] [contenteditable="true"]:visible')
+      await composer.waitFor()
+      assert.equal(await composer.evaluate(el => el === el.ownerDocument.activeElement), width === 1100, 'runtime number selection focuses the new desktop composer only')
+      if (width === 1100) {
+        await page.keyboard.type('New conversation draft')
+        assert.equal(await composer.textContent(), 'New conversation draft', 'typing works before the runtime connects')
+      }
+      await first.click()
+      assert.equal(await page.locator('[data-agent-composer] [contenteditable="true"]:focus').count(), 0, 'switching back preserves tab focus')
+      await add.click()
+      await page.locator('[data-runtime-id="codex"]').getByRole('button', { name: 'Codex', exact: true }).click()
+      await page.waitForFunction("document.querySelectorAll('[role=tab]').length===4")
+      await composer.waitFor()
+      assert.equal(await composer.evaluate(el => el === el.ownerDocument.activeElement), width === 1100, 'runtime click also focuses the new desktop composer only')
       assert.equal(await page.evaluate('window.fileCreates'), 2)
       if (width === 1100) {
         terminalMode = true
