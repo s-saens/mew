@@ -1,8 +1,8 @@
 ---
 title: "인증된 localhost 앱 프리뷰"
-description: "명령 세션의 수신 포트 감지와 /포트번호 링크, 직접 프록시의 인라인·여러 줄 모듈 전달과 원격 프리뷰 초기화 실패·15초 제한·DNS 준비 경계를 정의한다. localhost HTTP·WebSocket의 로그인·포트 capability, 출처 격리·라우터 호환 한계와 검증 범위도 설명한다."
+description: "명령 세션의 포트 감지와 /포트번호 링크, 직접 프록시의 모듈 전달, 원격 초기화 실패·15초 제한과 난수 호스트의 읽기 전용 DNS·HTTPS·공용 자산 준비 검사를 정의한다. localhost HTTP·WebSocket의 로그인·포트 capability, 출처 격리·라우터 호환 한계와 검증 범위도 설명한다."
 created: "2026-10-20"
-updated: "2026-10-27"
+updated: "2026-10-28"
 ---
 
 ## 진입과 실행
@@ -40,6 +40,8 @@ raw HTML과 앱 쿠키 API는 검증된 P2P dispatcher가 해당 요청의 `port
 `PREVIEW_DOMAIN=preview.mew.run` 설정과 `*.preview.mew.run`의 Worker 경로·DNS·HTTPS가 필요하다. 프리뷰마다 임의의 하위 호스트를 생성해 Mew와 다른 앱의 origin·storage·Service Worker를 분리한다. 주소창의 `/user/device/3333` 진입 주소는 유지한다. 이 설정이 없으면 명확한 준비 오류를 표시하며 Mew의 기존 origin으로 앱을 실행하지 않는다.
 
 설정값·공개 기기 페이지의 HTTP 200만으로 프리뷰 준비 완료를 판단하지 않는다. 난수 하위 도메인의 DNS·TLS·Worker 응답이 모두 필요하다. 원격 프리뷰는 같은 iframe·origin에서 보낸 `mew-preview-ready` 이후 Service Worker 준비 완료의 `mew-preview-initialized`를 기다린다. 초기화 실패 통지나 15초 제한에 걸리면 원인을 확인할 오류를 표시하고 발급 세션·소켓·진행 중 요청·메시지 포트·리스너를 정리한다. 호스트 코드와 중앙에 포함되는 공용 `port-preview-launch.js`를 함께 적용한다. [준비 확인](../deployment/remote-central.md#localhost-앱-프리뷰-origin)과 [ADR 0078](../decisions/0078-port-preview-module-initialization.md)을 따른다.
+
+`tools/port-preview-readiness.mjs`는 중앙 설정의 `PREVIEW_DOMAIN`·`APP_ORIGIN`을 읽고 서로 다른 난수 호스트 두 곳의 DNS·검증된 HTTPS·launcher 응답을 확인한다. 공용 launcher·Service Worker·runtime의 응답과 초기화 완료 통지도 검사하며 DNS·인증서·Worker를 변경하지 않는다. 활성 프리뷰가 준비되지 않았으면 `npm run check:port-preview`와 중앙 배포 후 검사가 실패한다. 구체적인 DNS 레코드와 실행 방법은 [배포 절차](../deployment/remote-central.md#localhost-앱-프리뷰-origin)가 소유한다. 실제 기기 인증·P2P 전달·앱 렌더링은 별도 검증한다.
 
 브라우저의 native WebSocket은 Service Worker가 가로채지 못하므로 프리뷰 전용 브리지를 앱 실행 전에 연결한다. upstream이 실제 선택한 subprotocol을 뷰어까지 전달한다. 앱 요청·소켓에는 해당 프리뷰 포트 권한만 적용한다. 프리뷰를 닫으면 MessagePort·소켓·세션을 정리한다. 공용 launcher·Service Worker·runtime의 기준은 루트 `public/port-preview-*.js`이며 중앙 빌드가 같은 자산을 포함한다. 중앙 변경 적용과 wildcard HTTPS 준비는 사용자가 수행한다.
 

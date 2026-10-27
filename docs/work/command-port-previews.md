@@ -1,8 +1,8 @@
 ---
 title: "명령어 버튼의 포트 미리보기 구현·검증"
-description: "2026-10-27 포트 버튼·공개 기기 URL·메뉴 밀도 개선과 직접 프리뷰의 Vite 모듈 누락 수정, 원격 초기화 실패 처리·공개 DNS 미준비 확인을 기록한다. 격리·실행 중 앱 관찰과 빌드·운영 미적용을 구분한다."
+description: "포트 버튼·공개 기기 URL·직접 프리뷰 모듈과 원격 초기화 실패 처리의 구현·검증을 기록한다. 2026-10-28 재배포 뒤에도 남은 DNS 장애 확인, 읽기 전용 준비 검사·배포 완료 판정 보완과 운영 미복구 범위를 구분한다."
 created: "2026-10-27"
-updated: "2026-10-27"
+updated: "2026-10-28"
 ---
 
 ## 목적과 결과 동작
@@ -55,3 +55,18 @@ Mewlink 공개 기기 주소는 HTTP 200이었지만 프리뷰 도메인과 서�
 - `npm run check:docs`는 description 494개에서 오류가 없었다. 전체 링크 검사는 기존 누락 대상 17건으로 실패했으며 이번 변경 문서에는 링크 오류가 없다.
 
 DNS·인증서·Worker 설정과 운영 서버는 변경하지 않았다. 호스트 빌드와 중앙 공용 자산 반영, wildcard DNS·HTTPS 준비는 사용자가 수행해야 한다. 경로 기반 앱의 basename 설정 등 기존 [라우터 호환 한계](../development/port-preview.md#호환성과-검증)도 유지한다.
+
+## 2026-10-28 — 재배포 이후 DNS 장애와 준비 검사
+
+사용자가 중앙을 재배포한 뒤에도 프리뷰 난수 호스트의 IP 주소를 찾을 수 없다고 보고했다. 시스템·Cloudflare `1.1.1.1`·Google `8.8.8.8`에서 해당 호스트가 모두 `ENOTFOUND`인 것을 확인했다. Cloudflare API의 읽기 전용 조회에서는 `*.preview.mew.run/*` 경로가 `mewlink` Worker에 연결되어 있었다. 현재 CLI 인증의 DNS·인증서 API 조회는 403으로 거부됐다. Worker 경로 배포와 DNS 준비가 별개이며, 재배포만으로 누락된 DNS 레코드가 생성되지 않는 경우였다.
+
+`tools/port-preview-readiness.mjs`와 `npm run check:port-preview`를 추가했다. 서로 다른 난수 호스트 두 곳의 DNS·검증된 HTTPS·launcher HTML·부모 origin과 공용 JavaScript·Service Worker scope·초기화 완료 통지를 확인한다. DNS 실패에는 필요한 레코드를 표시하고, HTTPS·Worker 경로·자산 오류는 단계별로 구분한다. 현재 준비·사용법은 [배포 절차](../deployment/remote-central.md#localhost-앱-프리뷰-origin)와 [프리뷰 계약](../development/port-preview.md)이 소유한다.
+
+비공개 `mewlink/scripts/deploy.mjs`에도 Worker 배포 뒤 같은 검사를 연결했다. 프리뷰가 준비되지 않으면 전체 배포 완료 문구를 출력하지 않으며, 이미 적용된 Worker를 자동으로 되돌리지 않는다. 해당 파일은 Git 제외 경로이므로 공개 커밋에 강제 추가하지 않았고, 이번 중앙 수정만 담은 패치를 `/tmp/mewlink-preview-readiness.patch`에 남겼다. 중앙 소스와 패치는 별도로 보관·적용해야 한다.
+
+- `node --test tools/port-preview-readiness.test.mjs server/port-preview-launch.test.ts`: 42개 검사 통과. DNS 누락·일부 호스트만 등록된 경우·TLS 인증서·잘못된 Worker 응답·구버전 자산·제한 시간·CLI 종료 상태·기존 초기화 정리를 확인했다. 외부 연결을 모의 처리했다.
+- 변경 JavaScript 대상 oxlint·중앙 배포 스크립트 `node --check`·`git diff --check` 통과.
+- 실제 `npm run check:port-preview`는 새 난수 호스트 두 곳의 `ENOTFOUND`를 표시하며 종료 코드 1을 반환했다. 운영 프리뷰가 준비되지 않은 상태를 검출한 결과이며 복구 성공이 아니다.
+- 문서 검사는 description 505개에서 오류가 없었고, 이번 변경 밖에서 삭제한 기능 MOC·태스크로 향하는 기존 링크 18건 때문에 전체 링크 검사는 실패했다. 이번 변경 문서에는 링크 오류가 없다.
+
+DNS·인증서·운영 Worker·서버와 `dist/`는 변경하지 않았다. 실제 프리뷰 접속 복구는 DNS·HTTPS 준비와 후속 기기 접속 확인이 남아 있다.

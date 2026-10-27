@@ -18,6 +18,7 @@
     "project:setup": "node server/project-setup-cli.ts",
     "lint": "oxlint",
     "check:docs": "node server/document-descriptions.ts --check --all && node server/document-links.ts --all",
+    "check:port-preview": "node tools/port-preview-readiness.mjs",
     "desktop:install": "node native/remote-desktop/install.mjs",
     "build:native": "cd native/collab && cargo build --release && cp target/release/libmew_collab.so mew-collab.node",
     "test": "MEW_DATA_DIR=\"${TMPDIR:-/tmp}/mew-test-data\" node --test 'server/**/*.test.ts' 'packages/**/*.test.ts' 'src/**/*.test.ts'",

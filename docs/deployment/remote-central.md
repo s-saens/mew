@@ -1,8 +1,8 @@
 ---
 title: "mewlink Cloudflare 배포"
-description: "mew.run의 배포·기존 등록과 키 보존·접근 회수·검증·복귀 및 localhost 프리뷰의 wildcard DNS·HTTPS·Worker·초기화 자산 준비를 안내한다. 2026-10-24 시작 경로 개선의 운영 반영과 미달인 500ms 목표·구버전 호환을 구분한다."
+description: "mew.run의 배포·기존 등록과 키 보존·접근 회수·검증·복귀 및 localhost 프리뷰의 정확한 wildcard DNS·HTTPS 설정과 읽기 전용 준비 검사를 안내한다. Worker 배포 성공과 프리뷰 준비 완료, 2026-10-24 운영 반영과 미달인 500ms 목표를 구분한다."
 created: "2026-10-07"
-updated: "2026-10-27"
+updated: "2026-10-28"
 ---
 
 ## 2026-10-24 단회 준비·ICE 사전 수집·정적 자원 재검증
@@ -470,6 +470,20 @@ npm run test:browser
 
 `mew.run/<user>/<device>/<port>`의 포트 연결에는 `PREVIEW_DOMAIN=preview.mew.run`과 `*.preview.mew.run/*` Worker 경로가 필요하다. 같은 Worker로 proxied wildcard DNS를 연결하고 `*.preview.mew.run`의 HTTPS 인증서를 준비한다. 기본 `*.mew.run` 인증서만으로 중첩 하위 도메인이 포함되지는 않는다. 각 프리뷰는 별도 난수 호스트를 사용하며 앱의 자산·API·WebSocket은 기존 P2P 전송으로 전달한다.
 
+`wrangler deploy`는 wildcard Worker 경로를 등록하지만 해당 경로의 DNS 레코드를 만들지 않는다. 중앙을 다시 배포해도 DNS의 `ENOTFOUND`는 그대로 남을 수 있다. [Cloudflare Worker 경로](https://developers.cloudflare.com/workers/configuration/routing/routes/)의 DNS 준비 조건을 따른다.
+
+현재 `PREVIEW_DOMAIN=preview.mew.run`을 유지할 때 Cloudflare의 **mew.run → DNS → Records**에 다음 레코드를 준비한다.
+
+| 항목 | 값 |
+| --- | --- |
+| Type | `CNAME` |
+| Name | `*.preview` |
+| Target | `mew.run` |
+| Proxy status | **Proxied** |
+| TTL | Auto |
+
+이는 `*.preview.mew.run`을 같은 Worker로 보내는 DNS 레코드다. `preview.mew.run` 자체의 레코드는 난수 호스트 조회를 대신하지 않는다. [깊은 wildcard DNS](https://developers.cloudflare.com/dns/manage-dns-records/reference/wildcard-dns-records/)는 지원되지만, HTTPS에는 정확히 `*.preview.mew.run`을 포함하는 활성 Edge Certificate가 필요하다. 기본 Universal SSL의 `*.mew.run`은 이 주소를 보호하지 않으므로 기존 인증서를 확인한 뒤 필요한 인증서 준비 방법을 결정한다. [Universal SSL 범위](https://developers.cloudflare.com/ssl/edge-certificates/universal-ssl/limitations/)를 따른다.
+
 중앙의 `src/port-preview.ts`·`public/port-preview-launch.js`·`public/port-preview-worker.js`·`public/port-preview-runtime.js`와 Worker 진입점·클라이언트·설정을 함께 반영한 후 사용자가 배포한다. 자세한 권한·보안 경계와 미지원 항목은 [포트 프리뷰](../development/port-preview.md)를 따른다. 이 작업에서는 중앙 배포·실제 도메인·외부망 검사를 실행하지 않았다.
 
 2026-10-27 읽기 전용 확인에서는 공개 기기 프리뷰 진입점이 HTTP 200이었지만 `preview.mew.run`과 서로 다른 난수 하위 호스트의 DNS 조회는 `ENOTFOUND`였다. Worker 설정이 있어도 외부 DNS가 준비되지 않으면 프리뷰는 연결되지 않는다. 이 확인에서는 DNS·인증서·Worker 배포를 변경하지 않았다.
@@ -480,3 +494,12 @@ npm run test:browser
 2. 정확히 `*.preview.mew.run`을 포함하는 활성 HTTPS 인증서를 확인한다. `*.mew.run`만 포함한 인증서로 대체하지 않는다.
 3. 새로 만든 32자리 16진수 하위 호스트에서 DNS와 `https://<난수>.preview.mew.run/__mew_preview_launch`의 HTTPS 응답을 확인한다. 공개 기기 페이지의 200만 확인하고 끝내지 않는다.
 4. 호스트와 공용 프리뷰 launcher의 수정본을 각각 적용하고 실제 기기 주소의 `/<port>`에서 모듈·API·WebSocket을 확인한다. 원격 초기화 실패·15초 제한은 [프리뷰 계약](../development/port-preview.md#mewlink)을 따른다.
+
+저장소 루트에서 다음 명령으로 설정에 맞는 서로 다른 난수 호스트 두 곳의 DNS·HTTPS·launcher와 공용 자산을 읽기 전용으로 검사한다. 이 명령은 DNS·인증서·Worker를 생성하거나 앱을 빌드하지 않는다.
+
+```bash
+npm run check:port-preview
+npm run check:port-preview -- --config mewlink/wrangler.jsonc
+```
+
+`PREVIEW_DOMAIN`이 비어 있으면 프리뷰 비활성으로 표시하고 검사를 생략한다. 설정된 프리뷰의 DNS·HTTPS·Worker 응답·Service Worker scope·launcher 초기화 완료 통지 중 하나라도 준비되지 않으면 실패 종료한다. 비공개 `mewlink/scripts/deploy.mjs`도 Worker 배포 뒤 같은 검사를 실행하고, 준비가 실패하면 전체 완료 문구를 출력하지 않는다. 이때 Worker 변경은 이미 적용됐을 수 있으며 자동으로 되돌리지 않는다. DNS·HTTPS 준비 후 위 검사만 다시 실행할 수 있다. 이 검사의 성공은 실제 로그인·P2P 연결과 upstream 앱의 표시 성공을 대신하지 않는다.
