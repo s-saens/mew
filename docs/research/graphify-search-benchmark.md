@@ -1,9 +1,13 @@
 ---
 title: "Graphify·rg 코드 탐색 성능 비교"
-description: "2026-10-27 Mew 소스 900개와 소스에서 정답을 정한 24개 과제로 rg·Graphify를 5회 비교한 조회 시간·출력 토큰·알려진 파일 포함률 기록. 기본 query의 지연·출력 증가, 전용 조회의 조건별 차이와 연결 경로·호출 경로의 구분을 설명한다."
+description: "검색 연동 철회 후 보존한 2026-10-27 Graphify·rg의 900개 소스·24개 과제 비교 기록. 지연·출력 토큰·파일 포함률·호출 경로의 한계와 과거 재현 소스, 미검증인 변경 영향·첨부·문서 개념 관계 후보를 구분한다."
 created: "2026-10-27"
 updated: "2026-10-27"
 ---
+
+현재 검색 연동은 [결정 0080](../decisions/0080-retire-graphify-search.md)에 따라 제거했다.
+이 문서는 당시 측정 결과이며, 재현 소스는 [이력](../history/graphify/README.md)에 보존한다.
+현재 체크아웃에서 아래의 과거 실행 명령을 사용할 수 있다는 뜻은 아니다.
 
 ## 결과
 
@@ -59,10 +63,10 @@ updated: "2026-10-27"
 
 - 2026-10-27 Linux x64, AMD Ryzen 5 9600X, Node v22.22.2, Python 3.11.15,
   ripgrep 15.2.0, Graphify 0.9.96, tiktoken 0.13.0·`o200k_base`.
-- [로컬 코드 검색 도구](../../tools/graphify.mjs)의 `collectSources`가 선택한 현재 소스
+- [로컬 코드 검색 도구](../history/graphify/graphify.mjs)의 `collectSources`가 선택한 현재 소스
   900개·6,560,260바이트를 별도 Git 저장소에 복사하고 SHA-256으로 고정했다.
   문서·테스트·계정 데이터·빌드 산출물은 대상에서 제외했다. 측정 끝에도 복사본 해시가 같았다.
-- [고정 과제 24개](../../tools/graphify-benchmark-cases.json)는 정의·호출 영향·경로 각 8건이다.
+- [고정 과제 24개](../history/graphify/graphify-benchmark-cases.json)는 정의·호출 영향·경로 각 8건이다.
   검색·경로·권한·세션·협업·미리보기·DB·그리기를 포함한다.
   별도 에이전트가 Graphify 결과를 보기 전에 소스를 읽고 알려진 파일과 근거를 정했다.
   한국어 질문을 적었지만 도구 입력에는 사전에 지정한 코드 식별자를 양쪽에 제공했다.
@@ -89,7 +93,7 @@ updated: "2026-10-27"
 
 ## 재현과 원시 자료
 
-`uv`·Graphify의 [로컬 설치](../configuration/search.md#로컬-코드-관계-탐색), `rg`,
+별도 격리 체크아웃에서 [당시 소스 배치와 설치 환경](../history/graphify/README.md)을 복원한 후 `uv`·Graphify·`rg`,
 `tiktoken`을 사용할 수 있는 `python3`가 필요하다. 다른 Python을 쓰면 `MEW_GRAPHIFY_TOKENIZER_PYTHON`으로 지정한다.
 기존 자료를 덮어쓰지 않도록 새 출력 폴더를 사용한다.
 
@@ -98,8 +102,8 @@ node tools/graphify-benchmark.mjs .data/benchmarks/<새 실행명> 5
 node --test tools/graphify-benchmark.test.mjs tools/graphify.test.mjs
 ```
 
-[측정 스크립트](../../tools/graphify-benchmark.mjs)는 앱 서버·운영 DB·`dist/`를 사용하지 않는다.
-위 명령은 현재 소스를 다시 고정하므로 코드가 바뀌면 별도 조건의 결과다.
+[측정 스크립트](../history/graphify/graphify-benchmark.mjs)는 앱 서버·운영 DB·`dist/`를 사용하지 않는다.
+원래 배치의 위 명령은 실행하는 체크아웃의 소스를 다시 고정하므로 코드가 바뀌면 별도 조건의 결과다.
 이번 원시 자료는 Git 제외 `.data/benchmarks/graphify-20261027/`에 보관했다.
 소스 사본·해시 목록·고정 과제·실행 당시 wrapper와 측정 스크립트·그래프·원출력·`results.json`·파생 집계
 `analysis.json`·호출 간선 분류 `path-analysis.json`을 포함한다.
@@ -107,7 +111,7 @@ node --test tools/graphify-benchmark.test.mjs tools/graphify.test.mjs
 소스 지문은 `efd2cf63f3398a3df4534fb82a1d514b30c2fc61cad0b5ebf965be13fae5fa07`이다.
 원시 보고서의 `revision`은 실행 종료 시 HEAD `2d6305333d604e49553ca73fb37a03ffecbf1081`이며,
 다른 작업의 커밋이 진행됐으므로 소스 기준은 이 커밋이 아닌 고정 사본과 파일 해시다.
-현재 측정 스크립트는 시작·종료 HEAD를 구분해 기록하고 호출 간선 분류도 출력한다.
+이력에 보존한 최종 측정 스크립트는 시작·종료 HEAD를 구분해 기록하고 호출 간선 분류도 출력한다.
 
 `node --test` 10개와 변경 도구의 린트·구문 검사를 실행했다. 문서 검사 결과는
 [작업 기록](../work/graphify-code-search.md)의 후속 측정 항목에 남긴다.
@@ -119,3 +123,22 @@ node --test tools/graphify-benchmark.test.mjs tools/graphify.test.mjs
 앱의 SQLite FTS 검색·브라우저 표시·원격 전송은 측정하지 않았다.
 과제 수·반복이 작고 호스트의 다른 부하·OS 캐시를 통제하지 않아 통계적 유의성이나 다른 저장소의 개선율을 주장하지 않는다.
 일반 검색은 기존 `rg`를 기준으로 두고, 관계가 필요할 때 전용 조회를 선택적으로 사용하는 판단 근거로 삼는다.
+
+## 다른 활용의 검토 후보
+
+검색 비교만으로 Graphify의 모든 사용처를 배제하지 않는다. 다음은 아직 구현·평가하지 않은 아이디어다.
+
+| 후보 | Mew 접점 | 검증할 가치 |
+| --- | --- | --- |
+| 변경 영향 후보 | Git 변경 파일·diff | diff 밖의 호출자·import 의존 중 검토에서 놓친 파일을 줄이는가 |
+| 에이전트 첨부 제안 | 선택 파일·대화 첨부 | 사용자가 고를 관련 파일 후보로 실제 작업의 정확도·총 시간을 개선하는가 |
+| 문서 개념 관계 | Documents 그래프의 별도 관계 표시 | 명시적 Markdown 링크 외의 개념 연결이 유용한가 |
+
+우선 후보는 Git diff의 영향 안내다. 과거 변경 5~10개에서 필요한 호출자·테스트·문서를 먼저 정하고,
+`rg`·TypeScript 참조 찾기와 상위 후보 적중·필수 파일 누락·총 검토 시간·색인 갱신 비용을 비교한다.
+Graphify가 현재 실험의 제외 대상이었던 테스트·문서까지 연결할 수 있는지도 별도 검증해야 한다.
+코드 호출·import·포함·추론 관계를 구분해 표시하고 결과를 장애나 충돌의 증명으로 해석하지 않는다.
+
+현재 Documents의 명시적 링크 그래프는 기존 파서가 처리한다. 문서 개념 추출에 모델을 쓰는 실험은
+비용·권한·최신성 조건이 추가되므로 기존 링크 엔진의 단순 교체 후보로 삼지 않는다.
+이 후보들은 재설치·백그라운드 분석·제품 UI 구현을 승인하거나 검증한 결과가 아니다.

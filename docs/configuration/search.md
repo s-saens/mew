@@ -1,6 +1,6 @@
 ---
 title: "프로젝트 검색"
-description: "파일명·내용 검색과 치환의 범위·와일드카드·RE2 정규식·제한, description 문서 탐색과 제거된 RAG의 경계를 설명한다. Mew 소스 전용 Graphify의 설치·조회·갱신·대상 범위, 연결 경로의 해석과 성능 비교 재현을 안내한다."
+description: "파일명·내용 검색과 치환의 범위·와일드카드·RE2 정규식·제한, description 문서 탐색과 제거된 RAG·Graphify 검색 연동의 경계를 설명한다. Graphify의 측정·철회·과거 소스는 별도 기록으로 연결한다."
 updated: "2026-10-27"
 상위파일:
   - "../MOC.md"
@@ -27,55 +27,11 @@ updated: "2026-10-27"
 
 ## 로컬 코드 관계 탐색
 
-Mew 소스 저장소의 에이전트는 [Graphify](https://github.com/Graphify-Labs/graphify)를 선택적으로 사용해
-함수·파일의 호출·참조와 변경 영향을 찾을 수 있다. 앱의 파일명·본문 검색 API와는 별도의 개발 도구다.
-Python 패키지 `graphifyy==0.9.96`을 `.data/graphify/venv/`에 격리 설치한다. `uv`와 Python 3.10 이상이 필요하다.
-저장소 루트에서 실행한다.
-
-```bash
-node tools/graphify.mjs setup
-node tools/graphify.mjs index
-node tools/graphify.mjs status
-node tools/graphify.mjs query "searchCatalog"
-node tools/graphify.mjs explain "exactSearchCandidates"
-node tools/graphify.mjs path "exactSearchCandidates" "server/searchCatalog.ts::openDatabase()"
-node tools/graphify.mjs affected "exactSearchCandidates"
-```
-
-`setup`만 패키지 다운로드가 필요하며,
-색인·조회는 `--code-only --no-cluster`의 로컬 AST 분석을 사용한다. LLM·API 키·임베딩·별도 DB·서버가 필요하지 않다.
-전역 런타임 설정과 Git hook은 바꾸지 않으며, 조회 질문의 Graphify 로그 저장도 끈다.
-
-색인은 Git에 추적된 파일과 ignore되지 않은 새 파일 중 `src/`, `server/`, `packages/`, `apps/cli/`, `tools/`,
-`native/` 및 루트의 지원 코드·`package.json`·`tsconfig*.json`을 대상으로 한다.
-테스트·fixture·vendor·의존성·빌드·숨김 경로와 심볼릭 링크는 제외한다.
-선택한 현재 작업 파일을 임시 소스 사본으로 만든 뒤 분석하므로 문서·대화·계정 데이터는 색인에 포함하지 않는다.
-지원 확장자와 제외 규칙의 구현은 `tools/graphify.mjs`의 `isSourceFile`이 소유한다.
-
-`index`는 파일 경로·내용의 SHA-256이 같으면 기존 그래프를 재사용한다. 변경·추가·삭제가 있으면 전체를 다시 분석하고,
-완성된 세대로 가리키는 파일을 원자적으로 교체한다. 분석 실패 시 이전 그래프는 유지한다.
-조회 전 같은 해시로 최신 여부를 검사하며, 오래됐으면 결과를 반환하지 않으므로 `index` 후 다시 조회한다.
-자동 감시·재색인은 하지 않는다. 그래프·소스 사본·패키지는 기존 Git 제외 경로인 `.data/graphify/`에만 둔다.
-과거 성공 세대는 진행 중 조회를 보호하기 위해 보존한다. 사용하지 않을 때 `.data/graphify/index-*`와
-`current.json`을 함께 지우면 파생 색인을 정리할 수 있고, 다음 사용 전 `index`를 실행한다.
-
-`query`는 영어 식별자·경로를 출발점으로 관계를 탐색하며 출력 목표 예산은 1,500토큰이다.
-upstream은 노드가 모두 예산에 들어오면 연결 관계를 전부 출력해 이 값을 초과할 수 있다.
-자연어 질문을 모델로 해석하지 않으므로 한국어 질문은 코드 식별자·경로로 좁혀 사용한다.
-이름이 모호하면 `경로::심볼()` 또는 후보 node ID를 사용한다. 종료 코드 `3`은 모호함, `4`는 일치하는 노드 없음이다.
-그래프의 `source_file`·줄 번호와 추출·추론 관계는 탐색 근거이며 정답을 보장하지 않는다.
-현재 원문을 확인하고, 빠진 관계나 잘린 결과는 `rg`와 개별 심볼 조회로 보완한다.
-네이티브 헤더처럼 파서가 일부만 해석하는 파일도 있을 수 있다.
-
-이 설정은 Mew 소스의 로컬 에이전트용이다. 다중 사용자 검색 API·공유 MCP로 공개하거나 다른 작업 공간을
-자동 색인하지 않는다. 제품 통합에는 별도의 권한·갱신 설계와 결정이 필요하다.
-[선택 근거](../decisions/0077-local-code-graph.md)와 [적용·검증 기록](../work/graphify-code-search.md)을 참고한다.
-
-2026-10-27의 [24개 과제 비교](../research/graphify-search-benchmark.md)에서는 일반 `query`가 `rg`보다 느렸고 출력도 늘었다.
-정의·영향 조회의 출력 감소는 과제별로 달랐다. `path`는 포함·import 관계도 연결하므로 호출 순서로 해석하지 말고
-간선 종류와 원문을 확인한다. 일반 검색을 대체하는 성능 개선은 이 측정에서 확인하지 못했다.
-`node tools/graphify-benchmark.mjs .data/benchmarks/<새 실행명> 5`로 비교를 재현할 수 있다.
-이때 `rg`와 `tiktoken`이 설치된 `python3`가 필요하며, Python은 `MEW_GRAPHIFY_TOKENIZER_PYTHON`으로 바꿀 수 있다.
+Graphify의 Mew 소스 검색 연동·에이전트 자동 안내·로컬 설치와 활성 색인은 2026-10-27 제거했다.
+현재 설치·실행 명령은 제공하지 않으며, 일반 코드 탐색과 description 문서 탐색을 사용한다.
+검색 속도 개선을 확인하지 못한 [비교 결과](../research/graphify-search-benchmark.md),
+[철회 결정](../decisions/0080-retire-graphify-search.md), [과거 소스](../history/graphify/README.md)를 보존한다.
+변경 영향 후보 등 다른 활용은 미검증 아이디어이며 현재 기능이 아니다.
 
 ## 제거 검증
 
