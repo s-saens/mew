@@ -64,20 +64,54 @@
   padding: 0;
   justify-content: center;
 }
+[data-command-menu] { font-size: 13px; line-height: 18px; }
+.mew-action-menu[data-command-menu] {
+  --mew-action-menu-min-width: 0px;
+  width: min(308px, 90vw);
+  max-width: 90vw;
+  padding: 3px;
+  font-size: 13px;
+  line-height: 18px;
+}
+.mew-action-menu[data-command-menu] .mew-action-menu-item {
+  gap: 6px;
+  min-height: 30px;
+  padding: 4px 6px;
+}
+.mew-action-menu[data-command-menu] .mew-action-menu-row > .mew-action-menu-icon {
+  flex-basis: 28px;
+  width: 28px;
+  padding: 0;
+}
 .mew-action-menu-ports {
   display: flex;
+  align-items: center;
+  gap: 3px;
   flex: 0 1 auto;
   min-width: 0;
-  max-width: 45%;
+  max-width: 40%;
+  margin-inline: 4px;
   overflow-x: auto;
 }
 .mew-action-menu-ports .mew-action-menu-item.mew-action-menu-port {
   flex: 0 0 auto;
   width: auto;
-  padding-inline: 6px;
+  min-height: 26px;
+  padding: 2px 5px;
+  border: 1px solid var(--color-edge);
+  border-radius: 4px;
+  background: var(--color-surface);
   color: var(--color-accent-strong, var(--color-accent));
+  font-size: 12px;
+  line-height: 16px;
   font-variant-numeric: tabular-nums;
+}
+.mew-action-menu-ports .mew-action-menu-port:hover:not(:disabled),
+.mew-action-menu-ports .mew-action-menu-port:focus-visible {
+  background: var(--color-surface-hover);
 }
 @media (pointer: coarse) {
   .mew-action-menu[data-menu-variant="header"] .mew-action-menu-item { min-height: 40px; }
+  .mew-action-menu[data-command-menu] .mew-action-menu-item { min-height: 36px; }
+  .mew-action-menu-ports .mew-action-menu-item.mew-action-menu-port { min-height: 32px; }
 }

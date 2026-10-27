@@ -8,7 +8,7 @@ updated: "2026-10-27"
 status_hash: "b19a2771f0bfb2f727bc14539350c69b524d222b67a2322b322f359fefd6a804"
 files: ["src/components/AgentPanel.tsx", "src/components/TermButtonBar.tsx", "src/components/CommandButtonMenu.tsx", "server/termButtons.ts", "server/command-ports.ts", "packages/tmux-term/src/TmuxTerminal.tsx", "packages/tmux-term/src/server/tmuxWs.ts"]
 commits: []
-description: "프로젝트별 셸 탭의 생성·입력·재연결·종료, 명령 버튼과 실행 명령의 수신 포트 자동 감지·미리보기 버튼, 포커스별 새 탭·닫힌 탭 복원·이름 변경·우클릭 메뉴와 패널 최대화/복귀를 다룬다. Linux·macOS tmux와 Windows psmux·PowerShell, 투명한 배경·공통 입력 영역·접근성 이름 및 실제 검증 경계를 정의한다."
+description: "프로젝트별 셸 탭의 생성·입력·재연결·종료, 명령 버튼과 실행 명령의 수신 포트 자동 감지·넓고 컴팩트한 미리보기 메뉴, 포커스별 새 탭·닫힌 탭 복원·이름 변경·우클릭 메뉴와 패널 최대화/복귀를 다룬다. Linux·macOS tmux와 Windows psmux·PowerShell, 투명한 배경·공통 입력 영역·접근성 이름 및 실제 검증 경계를 정의한다."
 상위파일:
   - "MOC.md"
   - "_터미널·에이전트·자동화.md"
@@ -39,6 +39,8 @@ description: "프로젝트별 셸 탭의 생성·입력·재연결·종료, 명�
 ## 구현 내용
 
 - Linux·macOS는 기존 tmux, Windows 네이티브는 psmux·PowerShell을 사용한다. backend가 생성·명령·attach·입력·capture·clipboard 제어의 실행 파일과 argv를 소유하며 기존 tmux API·세션 ID는 유지한다. Windows 상태 경로별 namespace로 사용자 세션과 분리한다. 구현과 Windows CI·공개 지원 게이트는 [OS 실행 계약](../../development/windows-native.md)을 따른다.
+
+- 명령 메뉴는 이름이 더 보이도록 폭을 넓히고 글자·여백·조작 너비를 줄인다. 포트 번호는 테마 배경과 테두리가 있는 작은 컨테이너로 구분하며 화면 너비의 90% 이내에서 배치한다. 구체적인 크기는 [공용 UI 계약](../../development/ui-contracts.md#드롭다운과-선택-컴포넌트)을 따른다.
 
 - 프로젝트 명령 메뉴는 실행 세션의 `ports`를 정지·터미널 아이콘 왼쪽의 번호 버튼으로 표시한다. 포트가 여러 개면 오름차순으로 나열하고 해당 영역만 가로로 스크롤한다. 공통 툴팁과 네 언어의 접근성 이름을 제공하며 기존 좌우 방향키로 포트 버튼에도 접근한다. 클릭은 새 탭만 열고 실행·중지·터미널 팝업을 호출하지 않는다.
 - `GET/PUT /api/cmd-buttons`는 실행 중인 버튼에 한해 pane PID와 자손 프로세스의 실제 수신 포트를 연결한다. 포트 미리보기 권한이 없거나 감지에 실패하면 `ports: []`를 반환하고 명령 목록과 실행 상태는 유지한다. 메뉴가 열린 동안의 3초 폴링에서 포트 개방·종료를 반영한다. 구버전 서버가 `ports`를 생략해도 기존 명령 조작은 유지한다. OS별 감지·URL·프리뷰 경계는 [포트 프리뷰 계약](../../development/port-preview.md#명령어-버튼의-포트-감지)을 따른다.

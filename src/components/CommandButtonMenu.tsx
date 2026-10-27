@@ -20,7 +20,7 @@ import { captureCommandMenuShortcut, focusFirstCommand, navigateCommandMenu } fr
 import { portPreviewUrl } from '../utils/port-preview-url'
 
 const LONG_PRESS_MS = 500
-const MENU_WIDTH = 220
+const MENU_WIDTH = 308
 
 /** 편집 중인 명령. index가 null이면 새로 추가하는 중 */
 type Editing = { index: number | null; name: string; command: string; oneShot: boolean }
@@ -127,7 +127,8 @@ export function CommandButtonMenu({
     function place() {
       const rect = btnRef.current?.getBoundingClientRect()
       if (!rect) return
-      const left = Math.max(8, Math.min(rect.right - MENU_WIDTH, window.innerWidth - MENU_WIDTH - 8))
+      const width = Math.min(MENU_WIDTH, window.innerWidth * 0.9)
+      const left = Math.max(8, Math.min(rect.right - width, window.innerWidth - width - 8))
       setAnchor({ top: rect.bottom + 4, left })
     }
     place()
@@ -203,7 +204,8 @@ export function CommandButtonMenu({
       ref={menuRef}
       onKeyDown={event => navigateCommandMenu(event.nativeEvent, event.currentTarget)}
       data-cmd-overlay={!inline || undefined}
-      style={inline ? undefined : { top: anchor?.top, left: anchor?.left, maxWidth: 'calc(100vw - 16px)', maxHeight: '60vh' }}
+      data-command-menu
+      style={inline ? undefined : { top: anchor?.top, left: anchor?.left, maxHeight: '60vh' }}
       className={inline
         ? 'border-b border-edge bg-surface-deep py-1'
         : undefined}

@@ -27,8 +27,8 @@ createRoot(document.getElementById('root')).render(<I18nProvider><CommandButtonM
   const css = compiler.build([...new Set((source + content).match(/[A-Za-z0-9_@:/.[\]()%,-]+/g))])
   const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
   t.after(() => browser.close())
-  for (const width of [1100, 390]) for (const dark of [false, true]) {
-    const page = await browser.newPage({ viewport: { width, height: 700 }, hasTouch: width === 390 })
+  for (const width of [1100, 390, 320]) for (const dark of [false, true]) {
+    const page = await browser.newPage({ viewport: { width, height: 700 }, hasTouch: width <= 390 })
     page.setDefaultTimeout(5_000)
     const errors: string[] = []
     page.on('pageerror', error => errors.push(error.message))
@@ -66,7 +66,24 @@ createRoot(document.getElementById('root')).render(<I18nProvider><CommandButtonM
     assert.deepEqual(order.slice(1, 5), ['3333', '5555', '12345', '65535'], 'ports precede stop and terminal actions')
     const bounds = await menu.boundingBox(); assert.ok(bounds)
     assert.ok(bounds.x >= 0 && bounds.x + bounds.width <= width)
+    assert.ok(Math.abs(bounds.width - Math.min(308, width * 0.9)) < 1, 'menu is 40% wider than 220px and never exceeds 90vw')
     assert.equal(await menu.evaluate(el => el.scrollWidth <= el.clientWidth), true, 'port list scrolls without widening the dropdown')
+    const density = await row.evaluate(el => {
+      const view = el.ownerDocument.defaultView!, name = el.querySelector('button')!, port = el.querySelector('.mew-action-menu-port')!
+      const text = name.querySelector('span')!, icon = el.querySelector('.mew-action-menu-icon')!
+      const item = view.getComputedStyle(name), badge = view.getComputedStyle(port)
+      return { font: item.fontSize, padding: item.padding, height: name.getBoundingClientRect().height,
+        textWidth: text.getBoundingClientRect().width, iconWidth: icon.getBoundingClientRect().width,
+        portFont: badge.fontSize, border: badge.borderTopWidth, radius: badge.borderRadius, background: badge.backgroundColor,
+        portHeight: port.getBoundingClientRect().height }
+    })
+    assert.equal(density.font, '13px'); assert.equal(density.padding, '4px 6px')
+    assert.equal(density.height, width <= 390 ? 36 : 30)
+    assert.ok(density.textWidth >= 80, 'long command names retain usable width even with four ports')
+    assert.equal(density.iconWidth, 28)
+    assert.equal(density.portFont, '12px'); assert.equal(density.border, '1px'); assert.equal(density.radius, '4px')
+    assert.notEqual(density.background, 'rgba(0, 0, 0, 0)', 'port numbers have their own visible surface')
+    assert.equal(density.portHeight, width <= 390 ? 32 : 26)
     await preview.click()
     assert.deepEqual(await page.evaluate('window.opened.at(-1)'), { url: 'http://mew-command.test/5555', target: '_blank', features: 'noopener,noreferrer' })
     assert.equal(runs, 1); assert.equal(stops, 0)
@@ -88,6 +105,12 @@ createRoot(document.getElementById('root')).render(<I18nProvider><CommandButtonM
     if (process.env.MEW_COMMAND_PORT_SCREENSHOTS) {
       await fs.mkdir(process.env.MEW_COMMAND_PORT_SCREENSHOTS, { recursive: true })
       await menu.screenshot({ path: path.join(process.env.MEW_COMMAND_PORT_SCREENSHOTS, `commands-${width}-${dark ? 'dark' : 'light'}.png`) })
+    }
+    if (width === 1100) {
+      await page.setViewportSize({ width: 240, height: 700 })
+      const narrow = await menu.boundingBox(); assert.ok(narrow)
+      assert.ok(Math.abs(narrow.width - 216) < 1, 'resize respects 90vw below the old minimum width')
+      assert.ok(narrow.x >= 0 && narrow.x + narrow.width <= 240)
     }
     await row.getByRole('button', { name: '개발 서버 이름이 길어도 동작 정지', exact: true }).click()
     await preview.waitFor({ state: 'hidden' })
