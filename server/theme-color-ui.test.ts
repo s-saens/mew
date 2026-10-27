@@ -74,7 +74,10 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
       const name = colorNames.get(input)
       if (!name) return
       const button = editor.getByRole('button', { name, exact: true })
-      if (await button.getAttribute('aria-expanded') !== 'true') await button.click()
+      if (await button.getAttribute('aria-expanded') !== 'true') {
+        if (await editor.getByRole('textbox').count()) await page.keyboard.press('Escape')
+        await button.click()
+      }
     }
     const fillColor = async (input: typeof field, value: string) => { await openColor(input); await input.fill(value) }
     const readColor = async (input: typeof field) => { await openColor(input); return input.inputValue() }
@@ -93,6 +96,22 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
         assert.equal(await action.locator('svg[aria-hidden=true]').count(), 1)
         assert.equal(await action.getAttribute('data-tip'), name, 'each icon retains its translated tooltip')
       }
+    }
+    const checkFontRows = async (names: readonly string[]) => {
+      assert.equal(await page.getByText(/^(설치된 글꼴 이름|Installed font name|已安装的字体名称|インストール済みフォント名)$/).count(), 0, 'the redundant font instruction is absent in every locale')
+      const positions: number[] = []
+      for (const name of names) {
+        const label = page.locator('label').filter({ hasText: new RegExp(`^${name}$`) })
+        const control = page.getByRole('combobox', { name, exact: true })
+        const labelBox = await label.boundingBox(), controlBox = await control.boundingBox()
+        assert.ok(labelBox && controlBox)
+        assert.ok(labelBox.x + labelBox.width <= controlBox.x, 'font labels sit to the left of their controls')
+        assert.ok(Math.abs(labelBox.y + labelBox.height / 2 - controlBox.y - controlBox.height / 2) < 1, 'each font label and control share one row')
+        assert.ok(controlBox.width >= 80 && controlBox.x + controlBox.width <= page.viewportSize()!.width, 'font fields fit narrow settings without losing input space')
+        assert.equal(await label.getAttribute('for'), await control.getAttribute('id'), 'visible labels identify their editable font fields')
+        positions.push(controlBox.x)
+      }
+      assert.ok(positions.every(x => Math.abs(x - positions[0]) < 1), 'all font controls share an aligned left edge')
     }
 
     const tokens = () => page.evaluate<string[]>(`(()=>{const s=getComputedStyle(document.documentElement);return ['surface-deep','surface','surface-raised','ink','ink-secondary','accent','accent-strong','link','ink-on-accent'].map(k=>s.getPropertyValue('--color-'+k).trim())})()`)
@@ -135,6 +154,10 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     await language.press('Enter')
     await page.getByRole('combobox', { name: 'Language', exact: true }).click()
     await page.getByRole('option', { name: '한국어', exact: true }).click()
+    await checkFontRows(['화면', '문서', '코드'])
+    await page.locator('label').filter({ hasText: /^화면$/ }).click()
+    assert.equal(await page.getByRole('combobox', { name: '화면', exact: true }).evaluate(el => el.ownerDocument.activeElement === el), true, 'clicking a font label focuses its field')
+    await page.keyboard.press('Escape')
     const font = page.getByRole('combobox', { name: '코드', exact: true })
     await font.fill('Custom'); await font.press('End'); await font.press('Space'); await font.pressSequentially('Mono')
     assert.equal(await font.inputValue(), 'Custom Mono', 'custom fonts allow spaces')
@@ -143,8 +166,9 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     await font.click()
     await font.dispatchEvent('keydown', { key: 'Enter', isComposing: true })
     assert.equal(await font.inputValue(), 'Custom Mono', 'IME confirmation does not pick a suggestion')
+    await font.press('Escape')
     await language.click()
-    assert.equal(await page.getByRole('listbox', { name: '코드', exact: true }).count(), 0, 'outside click closes font suggestions')
+    assert.equal(await page.getByRole('listbox', { name: '코드', exact: true }).count(), 0, 'font suggestions stay closed while the language dropdown opens')
     await language.press('Escape')
     await page.reload(); await font.waitFor()
     assert.equal(await font.inputValue(), 'Custom Mono', 'custom font survives reload')
@@ -447,6 +471,9 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
         }
         assert.equal(await grid.getByRole('button').last().getAttribute('aria-label'), '테마 커스터마이징')
         await capture(`${width}-${mode}-grid`)
+        await checkFontRows(['화면', '문서', '코드'])
+        await font.scrollIntoViewIfNeeded()
+        await capture(`${width}-${mode}-fonts`)
         for (const dropdown of [language, font]) {
           await dropdown.click()
           const list = page.getByRole('listbox')
@@ -556,6 +583,8 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     ] as const) {
       await page.getByRole('combobox').first().click()
       await page.getByRole('option', { name: option, exact: true }).click()
+      const fontNames = { English: ['Interface', 'Document', 'Code'], 日本語: ['画面', '文書', 'コード'], 简体中文: ['界面', '文档', '代码'], 한국어: ['화면', '문서', '코드'] }
+      await checkFontRows(fontNames[option])
       for (const label of labels) {
         const colorLabel = label.replace(/(?: HEX (?:code|代码|코드)|の HEX コード)$/, '')
         await page.getByRole('button', { name: colorLabel, exact: true }).click()

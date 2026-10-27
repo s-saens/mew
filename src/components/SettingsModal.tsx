@@ -3,7 +3,7 @@ import { DockSettingsPanel } from './dock-settings-panel'
 import type { MobileDockPanel } from '../utils/mobile-dock'
 import { uiText } from '@mew/ui/i18n-core'
 import { useUiLocale } from '@mew/ui/i18n'
-import { lazy, Suspense, useEffect, useState, type Ref } from 'react'
+import { lazy, Suspense, useEffect, useId, useState, type Ref } from 'react'
 import { SelectField, useOverlayDismiss } from '@mew/ui'
 import { changePassword, fetchIgnoreList, logout, saveIgnoreList } from '../api/client'
 import { AccountProfileForm } from './account-profile-form'
@@ -323,6 +323,7 @@ function AppearancePanel({
 }) {
   useUiLocale()
   const { locale, setLocale, t } = useI18n()
+  const fontId = useId()
   return (
     <div className="flex flex-col gap-3">
       <ThemeSettingsPanel value={themeSettings} onChange={onThemeSettingsChange} />
@@ -338,26 +339,23 @@ function AppearancePanel({
       </div>
       <div className="mt-2 border-t border-edge pt-3">
         <div className="text-sm font-medium">{t('settings.fonts')}</div>
-        <div className="mt-1 text-xs text-ink-secondary">{t('settings.fontsDescription')}</div>
-        <div className="mt-3 flex flex-col gap-3">
+        <div className="mt-2 grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-2 gap-y-2">
           {(['ui', 'markdown', 'mono'] as const).map((kind) => (
-            <div key={kind}>
-              <span className="text-xs font-medium text-ink-secondary">{t(`settings.font.${kind}`)}</span>
-              <div className="mt-1 flex gap-2">
-                <div className="min-w-0 flex-1" style={{ fontFamily: kind === 'mono' ? 'var(--font-mono)' : kind === 'markdown' ? 'var(--mew-font-markdown)' : 'var(--font-sans)' }}>
-                  <SelectField portalContainer={portalContainer} editable label={t(`settings.font.${kind}`)} value={fonts[kind]}
-                    options={FONT_SUGGESTIONS.map((font) => ({ value: font, label: font }))}
-                    onChange={(value) => onFontsChange({ ...fonts, [kind]: value })} />
-                </div>
-                <button
-                  type="button"
-                  onClick={() => onFontsChange({ ...fonts, [kind]: DEFAULT_FONT_PREFERENCES[kind] })}
-                  disabled={fonts[kind] === DEFAULT_FONT_PREFERENCES[kind]}
-                  className="shrink-0 rounded border border-edge-strong px-2 text-xs text-ink-secondary hover:bg-surface-hover disabled:opacity-40"
-                >
-                  {t('common.reset')}
-                </button>
+            <div key={kind} className="contents">
+              <label htmlFor={`${fontId}-${kind}`} className="text-xs font-medium text-ink-secondary">{t(`settings.font.${kind}`)}</label>
+              <div className="min-w-0" style={{ fontFamily: kind === 'mono' ? 'var(--font-mono)' : kind === 'markdown' ? 'var(--mew-font-markdown)' : 'var(--font-sans)' }}>
+                <SelectField id={`${fontId}-${kind}`} portalContainer={portalContainer} editable label={t(`settings.font.${kind}`)} value={fonts[kind]}
+                  options={FONT_SUGGESTIONS.map((font) => ({ value: font, label: font }))}
+                  onChange={(value) => onFontsChange({ ...fonts, [kind]: value })} />
               </div>
+              <button
+                type="button"
+                onClick={() => onFontsChange({ ...fonts, [kind]: DEFAULT_FONT_PREFERENCES[kind] })}
+                disabled={fonts[kind] === DEFAULT_FONT_PREFERENCES[kind]}
+                className="self-stretch rounded border border-edge-strong px-2 text-xs text-ink-secondary hover:bg-surface-hover disabled:opacity-40"
+              >
+                {t('common.reset')}
+              </button>
             </div>
           ))}
         </div>
