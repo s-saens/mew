@@ -69,7 +69,7 @@ class AttachmentWidget extends WidgetType {
 export function composerAttachments(resolve: (token: string) => ComposerAttachment | undefined): Extension {
   const plugin = ViewPlugin.fromClass(class {
     decorations: DecorationSet = Decoration.none
-    drag: { id: number; from: number; to: number; token: string; x: number; y: number; originX: number; originY: number; active: boolean; moved: boolean; target: number | null; dom: HTMLElement } | null = null
+    drag: { id: number; pointerType: string; from: number; to: number; token: string; x: number; y: number; originX: number; originY: number; active: boolean; moved: boolean; target: number | null; dom: HTMLElement } | null = null
     timer?: ReturnType<typeof setTimeout>
     frame = 0
     marker: HTMLElement
@@ -117,7 +117,7 @@ export function composerAttachments(resolve: (token: string) => ComposerAttachme
       if (resolve(token)?.pending) return
       event.preventDefault()
       const from = this.view.posAtDOM(dom)
-      this.drag = { id: event.pointerId, from, to: from + token.length, token, x: event.clientX, y: event.clientY, originX: event.clientX, originY: event.clientY, active: false, moved: false, target: null, dom }
+      this.drag = { id: event.pointerId, pointerType: event.pointerType, from, to: from + token.length, token, x: event.clientX, y: event.clientY, originX: event.clientX, originY: event.clientY, active: false, moved: false, target: null, dom }
       const doc = this.view.dom.ownerDocument
       doc.addEventListener('pointermove', this.move, { passive: false })
       doc.addEventListener('pointerup', this.up)
@@ -125,36 +125,43 @@ export function composerAttachments(resolve: (token: string) => ComposerAttachme
       doc.addEventListener('keydown', this.key, true)
       doc.defaultView!.addEventListener('blur', this.cancel)
       this.view.dom.setPointerCapture(event.pointerId)
-      this.timer = setTimeout(() => {
-        const drag = this.drag
-        if (!drag) return
-        drag.active = true
-        this.suppressClick = true
-        drag.dom.dataset.attachmentDragging = ''
-        this.ghost = doc.createElement('div')
-        this.ghost.className = this.view.dom.className
-        Object.assign(this.ghost.style, { position: 'fixed', pointerEvents: 'none', zIndex: '1202', opacity: '0.85', width: 'max-content', background: 'transparent', cursor: 'grabbing' })
-        const clone = drag.dom.cloneNode(true) as HTMLElement
-        clone.removeAttribute('data-attachment-token')
-        clone.removeAttribute('data-attachment-dragging')
-        this.ghost.append(clone)
-        this.ghost.setAttribute('aria-hidden', 'true')
-        this.ghost.inert = true
-        const overlay = this.view.dom.closest('dialog, [role="dialog"]') ?? doc.fullscreenElement ?? doc.body
-        overlay.append(this.ghost, this.marker)
-        this.track()
-      }, 350)
+      this.timer = setTimeout(this.startDrag, 350)
+    }
+    startDrag = () => {
+      const drag = this.drag
+      if (!drag || drag.active) return
+      clearTimeout(this.timer)
+      drag.active = true
+      this.suppressClick = true
+      drag.dom.dataset.attachmentDragging = ''
+      const doc = this.view.dom.ownerDocument
+      this.ghost = doc.createElement('div')
+      this.ghost.className = this.view.dom.className
+      Object.assign(this.ghost.style, { position: 'fixed', pointerEvents: 'none', zIndex: '1202', opacity: '0.85', width: 'max-content', background: 'transparent', cursor: 'grabbing' })
+      const clone = drag.dom.cloneNode(true) as HTMLElement
+      clone.removeAttribute('data-attachment-token')
+      clone.removeAttribute('data-attachment-dragging')
+      this.ghost.append(clone)
+      this.ghost.setAttribute('aria-hidden', 'true')
+      this.ghost.inert = true
+      const overlay = this.view.dom.closest('dialog, [role="dialog"]') ?? doc.fullscreenElement ?? doc.body
+      overlay.append(this.ghost, this.marker)
+      this.track()
     }
     move = (event: PointerEvent) => {
       const drag = this.drag
       if (!drag || event.pointerId !== drag.id) return
-      if (!drag.active && Math.hypot(event.clientX - drag.originX, event.clientY - drag.originY) > 8) {
-        this.suppressClick = true
-        this.finish()
-        return
+      const distance = Math.hypot(event.clientX - drag.originX, event.clientY - drag.originY)
+      if (!drag.active) {
+        if (drag.pointerType === 'touch' && distance > 8) {
+          this.suppressClick = true
+          this.finish()
+          return
+        }
+        if (drag.pointerType !== 'touch' && distance > 4) this.startDrag()
       }
       event.preventDefault()
-      if (drag.active && Math.hypot(event.clientX - drag.originX, event.clientY - drag.originY) > 3) drag.moved = true
+      if (drag.active && distance > 3) drag.moved = true
       drag.x = event.clientX
       drag.y = event.clientY
     }

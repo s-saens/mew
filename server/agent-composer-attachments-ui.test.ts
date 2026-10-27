@@ -268,6 +268,29 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
         assert.deepEqual(errors, [])
       })
 
+      await matrix.test('mouse drag moves the attachment without waiting for a long press', async () => {
+        const original = `Start ${photoToken} middle end\nsecond line`
+        await reset(page, original)
+        const previous = await page.evaluate<number>('window.previewed.length')
+        const button = input.getByRole('button', { name: 'photo copy.png 사진 미리보기', exact: true })
+        const box = await button.boundingBox()
+        assert.ok(box)
+        const destination = await page.evaluate<Position>('window.composerFixture.coords(0)')
+        await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+        await page.mouse.down()
+        await page.mouse.move(destination.left + 1, (destination.top + destination.bottom) / 2)
+        await page.locator(dragOverlay).waitFor({ state: 'attached', timeout: 1500 })
+        await page.mouse.up()
+        assert.equal(await rawDocument(page), `${photoToken}Start  middle end\nsecond line`)
+        assert.equal(await page.evaluate<number>('window.previewed.length'), previous, 'dragging must not trigger the preview')
+        assert.equal(await page.locator(dragOverlay).count(), 0)
+        await input.press('Control+z')
+        assert.equal(await rawDocument(page), original, 'undo restores the original text and tag position')
+        await input.press('Control+Shift+z')
+        assert.equal(await rawDocument(page), `${photoToken}Start  middle end\nsecond line`)
+        assert.deepEqual(errors, [])
+      })
+
       await matrix.test('held pointer moves inline attachment and undo restores its position', async () => {
         const original = `Start ${photoToken} middle end\nsecond line`
         await reset(page, original)
