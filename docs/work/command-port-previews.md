@@ -1,6 +1,6 @@
 ---
 title: "명령어 버튼의 포트 미리보기 구현·검증"
-description: "포트 버튼·공개 기기 URL·직접 프리뷰 모듈과 원격 초기화 실패 처리의 구현·검증을 기록한다. 2026-10-28 재배포 뒤에도 남은 DNS 장애 확인, 읽기 전용 준비 검사·배포 완료 판정 보완과 운영 미복구 범위를 구분한다."
+description: "포트 버튼·공개 기기 URL·직접 프리뷰 모듈과 원격 초기화 실패 처리의 구현·검증을 기록한다. 2026-10-28 재배포 뒤에도 남은 DNS 장애 확인, 읽기 전용 준비 검사·배포 완료 판정 보완과 운영 미복구 범위를 구분한다. 직접 SPA 초기 경로 수정과 Along 격리 검증·운영 미적용 상태도 기록한다."
 created: "2026-10-27"
 updated: "2026-10-28"
 ---
@@ -70,3 +70,18 @@ DNS·인증서·Worker 설정과 운영 서버는 변경하지 않았다. 호스
 - 문서 검사는 description 505개에서 오류가 없었고, 이번 변경 밖에서 삭제한 기능 MOC·태스크로 향하는 기존 링크 18건 때문에 전체 링크 검사는 실패했다. 이번 변경 문서에는 링크 오류가 없다.
 
 DNS·인증서·운영 Worker·서버와 `dist/`는 변경하지 않았다. 실제 프리뷰 접속 복구는 DNS·HTTPS 준비와 후속 기기 접속 확인이 남아 있다.
+
+## 2026-10-28 — 직접 프리뷰의 SPA 초기 경로 수정
+
+`/5173`으로 열린 Along은 모듈 로딩 뒤에도 내부 프록시 경로를 앱 경로로 읽어 자체 404를 표시했다. 기존 fixture는 Mew 전용 basename을 사용해 일반 SPA의 최초 경로 인식을 검증하지 못했다. `/3001`의 JSON 404는 localhost에서도 같은 API 루트 응답임을 확인했다.
+
+실행 스크립트의 전역 주소 참조를 구문·스코프 분석으로 가상 Window·Location에 연결했다. 실제 Document·native iframe URL과 opaque sandbox는 유지한다. history·fragment·새로고침에서 앱 경로를 복원하고 진입 주소의 fragment도 iframe에 전달한다. 상세 계약은 [포트 프리뷰](../development/port-preview.md), 선택 근거는 [ADR 0083](../decisions/0083-direct-preview-spa-routing.md)이 소유한다.
+
+- basename 없는 SPA 회귀 검사는 수정 전 최초 `/` 기대에서 실패했고 수정 후 통과했다. 루트·깊은 경로·query·fragment, push/replace/back/forward·hash·iframe 새로고침·링크 이동과 API 루트 404 보존을 확인했다.
+- 전역 참조 변환의 지역 바인딩·문자열·주석·축약 속성·자동 세미콜론 삽입·생성자 우선순위·worker fallback을 검사했다. 별도 리뷰에서 발견한 이벤트 receiver 캐시와 nonconfigurable 속성 정의, Document의 DOM 정체성 문제도 수정하고 회귀 검사를 추가했다.
+- `node --test server/port-preview-location.test.ts server/port-preview-routing.test.ts server/port-preview.test.ts server/port-preview-browser.test.ts server/port-preview-launch.test.ts`로 관련 검사 21개가 통과했다. 기존 HTTPS 터널·P2P·POST·HMR·쿠키·권한 회수·SSE 검사도 포함한다.
+- 현재 실행 중인 Along을 새 브라우저 컨텍스트의 격리 프록시로 열어 로그인 화면과 회원가입 링크 이동을 확인했다. JavaScript 오류는 없었으며 로그인·계정 생성은 제출하지 않았다. 임시 브라우저·프록시는 정리했다.
+- `npx tsc -b`와 변경 TypeScript 대상 oxlint가 통과했다.
+- `npm run check:docs`는 description 519개에서 오류가 없었지만 이번 변경 밖의 기존 누락 링크 18건으로 실패했다. 변경 문서 6개의 링크에는 오류가 없다.
+
+앱 빌드·배포·실행 중인 서버 시작·종료·재시작은 수행하지 않았다. 실제 사용자 도메인에 대한 운영 적용은 사용자가 수행해야 한다. 동적 실행 코드·Next 정적 청크·원본 브라우저 정체성의 호환 한계는 현재 계약을 따른다.

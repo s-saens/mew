@@ -1,11 +1,11 @@
 ---
 title: "프리뷰 모듈 지정자 분석과 원격 초기화 완료 확인"
-description: "직접 프리뷰의 인라인·여러 줄 모듈 누락을 정규식 대신 es-module-lexer로 수정하고, 원격 launcher 초기화 완료·실패 통지와 15초 준비 제한을 추가한 결정이다. 기존 origin·capability 경계와 운영 준비 조건은 유지한다."
+description: "직접 프리뷰의 인라인·여러 줄 모듈 누락을 정규식 대신 es-module-lexer로 수정하고, 원격 launcher 초기화 완료·실패 통지와 15초 준비 제한을 추가한 결정이다. 기존 origin·capability 경계와 운영 준비 조건은 유지하며, 일반 SPA의 주소 참조 변환은 후속 결정 0083이 확장한다."
 created: "2026-10-27"
-updated: "2026-10-27"
+updated: "2026-10-28"
 ---
 
-상태: 채택
+상태: 채택. 직접 프리뷰의 주소 참조 변환 범위는 [결정 0083](0083-direct-preview-spa-routing.md)이 확장한다.
 
 ## 배경
 

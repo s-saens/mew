@@ -1,8 +1,8 @@
 ---
 title: "로그인 화면·localhost 앱·Android"
-description: "독립 로그인 영상 화면, 자체 도메인·Cloudflare Tunnel·Tailscale·Mewlink의 /포트번호 앱 접속과 브랜치별 포트 설정·새 탭 열기, Android 환경 점검·gateway 사용법을 안내한다."
+description: "독립 로그인 영상 화면, 자체 도메인·Cloudflare Tunnel·Tailscale·Mewlink의 /포트번호 앱 접속·일반 SPA 경로 호환과 브랜치별 포트 설정·새 탭 열기, Android 환경 점검·gateway 사용법을 안내한다."
 created: "2026-09-04"
-updated: "2026-10-24"
+updated: "2026-10-28"
 ---
 
 ## 로그인 화면
@@ -33,7 +33,7 @@ Mew 로그인과 **localhost 앱 접속** 권한이 필요하다. 로그인하�
 
 도메인·Tailscale 직접 접속은 HTTP·WebSocket 프록시를 사용하므로 HTTP IP 주소도 지원한다. Mewlink에는 중앙의 `PREVIEW_DOMAIN`과 wildcard HTTPS 준비가 필요하다. 앱에 별도 backend의 `localhost` 주소를 하드코딩했다면 접속한 기기로 향할 수 있으므로 동일 포트의 `/api` 프록시 등으로 설정한다. 설정과 호환 한계는 [localhost 앱 프리뷰](../development/port-preview.md)를 따른다.
 
-직접 접속에서 경로를 읽는 라우터는 제공하는 프리뷰 basename에 맞춰야 한다. Next처럼 고정 basePath가 필요한 앱은 Mewlink 주소를 사용한다. 프리뷰는 30분 뒤 만료하므로 계속 사용할 때는 진입 주소를 다시 연다.
+일반 SPA는 별도 basename 설정 없이 앱의 루트·하위 경로로 열린다. Next의 정적 청크나 원본 브라우저 주소에 의존하는 앱은 Mewlink 주소를 사용한다. API 전용 포트는 `/` 화면이 없을 수 있으므로 웹 화면을 제공하는 프론트엔드 포트를 연다. 프리뷰는 30분 뒤 만료하므로 계속 사용할 때는 진입 주소를 다시 연다.
 
 ## Android 창
 

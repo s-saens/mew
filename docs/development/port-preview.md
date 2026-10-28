@@ -1,6 +1,6 @@
 ---
 title: "인증된 localhost 앱 프리뷰"
-description: "명령 세션의 포트 감지와 /포트번호 링크, 직접 프록시의 모듈 전달, 원격 초기화 실패·15초 제한과 난수 호스트의 읽기 전용 DNS·HTTPS·공용 자산 준비 검사를 정의한다. localhost HTTP·WebSocket의 로그인·포트 capability, 출처 격리·라우터 호환 한계와 검증 범위도 설명한다."
+description: "명령 세션의 포트 감지와 /포트번호 링크, 직접 프록시의 모듈 전달·SPA 가상 경로, 원격 초기화 실패·15초 제한과 난수 호스트의 읽기 전용 DNS·HTTPS·공용 자산 준비 검사를 정의한다. localhost HTTP·WebSocket의 로그인·포트 capability, 출처 격리·구문 변환의 호환 한계와 검증 범위도 설명한다."
 created: "2026-10-20"
 updated: "2026-10-28"
 ---
@@ -51,7 +51,11 @@ raw HTML과 앱 쿠키 API는 검증된 P2P dispatcher가 해당 요청의 `port
 
 HTML의 인라인 JavaScript·module과 외부 JavaScript의 import·re-export·문자열/고정 템플릿 동적 import는 `es-module-lexer`의 실제 지정자 위치만 프록시 URL로 바꾼다. Vite의 인라인 React Refresh 초기화와 여러 줄 import도 같은 포트 capability를 유지한다. 주석·일반 문자열·JSON 데이터 스크립트·source map은 보존한다. 런타임 식으로 조합하는 동적 import까지 모두 재작성하지는 않는다. 구문 분석에 실패한 스크립트는 원문을 전달하며, 기존 Next 정적 청크의 원문 보존은 유지한다.
 
-직접 프록시의 `location.pathname`에는 프록시 접두사가 남는다. 런타임 basename을 지원하는 라우터는 읽기 전용 `window.__MEW_PORT_PREVIEW_BASE_PATH__`를 사용해야 한다. Location의 native 속성을 위장하지 않는다. Next처럼 빌드 시점의 고정 basePath가 필요한 앱은 원래 경로를 유지하는 Mewlink의 별도 origin 경로를 사용한다. Mewlink의 SPA 경로는 실제 브라우저 URL·history와 함께 유지한다.
+직접 프록시는 `acorn`·`eslint-scope`로 실행 스크립트의 구문과 스코프를 분석해 전역 `location`·`window`·`self`·`globalThis` 참조를 앱의 가상 주소에 연결한다. `document.location`·`document.defaultView`와 `window.document.location`도 처리한다. 실제 Document는 DOM 인자·정체성 검사를 위해 유지한다. 지역 바인딩·속성 이름·문자열·주석은 보존하고, 축약 속성·자동 세미콜론 삽입·생성자 호출의 의미도 유지한다. 구문 분석 실패 시 해당 스크립트는 원문을 전달한다.
+
+일반 SPA는 추가 basename 설정 없이 최초 `/`·하위 경로·query·fragment를 읽는다. history push/replace와 뒤로·앞으로·hash 변경·iframe 새로고침도 앱 경로를 유지한다. 진입 주소의 fragment는 서버로 전송되지 않으므로 바깥 문서의 nonce 스크립트가 iframe에 전달한다. 가상 주소는 native iframe URL에서 계산하며, native Location의 속성이나 sandbox·포트 권한을 바꾸지 않는다. 읽기 전용 `window.__MEW_PORT_PREVIEW_BASE_PATH__`와 기존 history 접두사 제거는 이전 URL 호환을 위해 유지한다. [ADR 0083](../decisions/0083-direct-preview-spa-routing.md)을 따른다.
+
+이 변환은 독립 origin과 같은 완전한 브라우저 환경을 보장하지 않는다. `eval`·`Function`·런타임 삽입 코드와 DOM을 통해 우회해서 얻은 native Location까지 변환하지 않으며, `globalThis`·`window`·`self`가 모두 지역 바인딩인 스코프에서는 주소 참조를 보존한다. Next의 `/_next/` 청크는 기존처럼 원문을 유지한다. 고정 basePath·브라우저 원본 정체성이 필요한 앱은 원래 경로를 유지하는 Mewlink의 별도 origin을 사용한다. Mewlink의 SPA 경로는 실제 브라우저 URL·history와 함께 유지한다.
 
 JS에 하드코딩된 다른 `localhost` 포트는 접속한 기기를 가리키므로 앱의 동일 포트 API 프록시 또는 명시적인 주소 설정을 사용한다. PWA 자체 Service Worker·특수 CSP/COOP/COEP·외부 OAuth 콜백·브라우저 원본 쿠키 동작까지 모든 웹앱을 무수정으로 보장하지 않는다.
 
