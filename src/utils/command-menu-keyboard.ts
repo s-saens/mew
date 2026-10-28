@@ -1,7 +1,9 @@
 export function captureCommandMenuShortcut(open: () => void): () => void {
   const onKeyDown = (event: KeyboardEvent) => {
-    if (event.defaultPrevented || !event.ctrlKey || event.metaKey || event.altKey || event.shiftKey || event.isComposing
-      || (event.code !== 'KeyE' && event.key.toLowerCase() !== 'e')) return
+    if (event.defaultPrevented || event.metaKey || event.shiftKey || event.isComposing) return
+    const matches = (event.altKey && !event.ctrlKey && (event.code === 'KeyR' || event.key.toLowerCase() === 'r'))
+      || (event.ctrlKey && !event.altKey && (event.code === 'KeyE' || event.key.toLowerCase() === 'e'))
+    if (!matches) return
     event.preventDefault()
     event.stopImmediatePropagation()
     if (!event.repeat) open()
@@ -15,7 +17,19 @@ export function focusFirstCommand(menu: HTMLElement | null) {
 }
 
 export function navigateCommandMenu(event: KeyboardEvent, menu: HTMLElement) {
-  if (event.isComposing || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return
+  if (event.defaultPrevented || event.isComposing || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return
+  const digit = /^(?:Digit|Numpad)([1-9])$/.exec(event.code)?.[1] ?? (/^[1-9]$/.test(event.key) ? event.key : null)
+  if (digit !== null) {
+    const command = menu.querySelectorAll<HTMLButtonElement>('[data-command-choice]')[Number(digit) - 1]
+    if (!command) return
+    event.preventDefault()
+    event.stopPropagation()
+    if (!event.repeat && !command.disabled) {
+      command.focus()
+      command.click()
+    }
+    return
+  }
   if (!['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
   const rows = Array.from(menu.querySelectorAll<HTMLElement>('[data-command-row]'))
     .map(row => Array.from(row.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')))

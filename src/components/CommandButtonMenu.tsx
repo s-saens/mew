@@ -215,7 +215,7 @@ export function CommandButtonMenu({
         <div className="px-3 py-3 text-xs text-ink-muted">{uiText("불러오는 중…")}</div>
       ) : (
         list.map((b, i) => (
-          <CmdRow key={`${b.name}-${i}`} button={b} busy={busyName === b.name} onRun={() => run(b)} onStop={() => stop(b)} onOpenPort={openPort} onOpenSession={() => { setPopup(b); setOpen(false) }} onEdit={() => startEditing({ index: i, name: b.name, command: b.command, oneShot: b.oneShot })} />
+          <CmdRow key={`${b.name}-${i}`} button={b} shortcut={i < 9 ? String(i + 1) : undefined} busy={busyName === b.name} onRun={() => run(b)} onStop={() => stop(b)} onOpenPort={openPort} onOpenSession={() => { setPopup(b); setOpen(false) }} onEdit={() => startEditing({ index: i, name: b.name, command: b.command, oneShot: b.oneShot })} />
         ))
       )}
       {buttons !== null && list.length === 0 && !error && <div className="px-3 py-2 text-xs text-ink-muted">{uiText("아직 명령이 없습니다.")}</div>}
@@ -241,6 +241,7 @@ export function CommandButtonMenu({
         data-tip={title ?? uiText("{p0} 명령어 버튼", { p0: directory || project })}
         aria-label={title ?? uiText("{p0} 명령어 버튼", { p0: directory || project })}
         aria-expanded={open}
+        aria-keyshortcuts={project === WORKSPACE_PROJECT && !directory && !inline && !alwaysOpen ? 'Alt+R Control+E' : undefined}
         onKeyDown={event => {
           if (event.nativeEvent.isComposing || event.altKey || event.ctrlKey || event.metaKey ||
             (event.key !== 'ArrowDown' && event.key !== 'ArrowUp')) return
@@ -297,6 +298,7 @@ export function CommandButtonMenu({
 /** 한 줄 = 명령 하나. 이름을 꾹 누르거나(모바일) 우클릭하면(데스크톱) 수정 창이 뜬다 */
 function CmdRow({
   button,
+  shortcut,
   busy,
   onRun,
   onStop,
@@ -305,6 +307,7 @@ function CmdRow({
   onEdit,
 }: {
   button: CmdButtonState
+  shortcut?: string
   busy: boolean
   onRun: () => void
   /** 실행 중일 때 재생 버튼이 하는 일 — 이 명령의 세션 종료 */
@@ -330,6 +333,8 @@ function CmdRow({
     <div data-command-row className="mew-action-menu-row">
       <button
         type="button"
+        data-command-choice
+        aria-keyshortcuts={shortcut}
         onPointerDown={() => {
           longFiredRef.current = false
           cancelPress()
@@ -359,7 +364,7 @@ function CmdRow({
         style={{ touchAction: 'manipulation' }}
         title={uiText("{p0}\n(꾹 누르거나 우클릭하면 수정)", { p0: button.command })}
       >
-        <span className="truncate">{button.name}</span>
+        <span className="truncate">{shortcut && <kbd aria-hidden="true" className="mr-1 font-sans text-[11px] text-ink-muted">{shortcut}</kbd>}{button.name}</span>
       </button>
       {button.running && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-blue-500" title={uiText("실행 세션 있음")} />}
       {button.running && !!button.ports?.length && <HoverTipLayer className="mew-action-menu-ports">
