@@ -72,39 +72,112 @@ function fixture(t: TestContext, authenticated = true, options: Parameters<typeo
   return { peer, signal, states, errors, browser, document, close, pending, observe, keyRequests: () => keyRequests, keySignal: () => keySignal }
 }
 
-test('a brief disconnected state preserves the authenticated transport and recovers without rebuilding it', t => {
+test('a subsecond interruption preserves the transport without showing recovery or repeating connected', t => {
   const { peer, states } = fixture(t), transport = activeRemoteTransport()
   peer.state('disconnected')
   assert.equal(peer.channel.readyState, 'open')
   assert.equal(activeRemoteTransport(), transport)
-  assert.equal(states.at(-1), 'reconnecting')
-  t.mock.timers.tick(249)
+  t.mock.timers.tick(999)
+  assert.deepEqual(states, ['connected'])
   peer.state('connected')
-  t.mock.timers.tick(250)
+  t.mock.timers.tick(5000)
   assert.equal(peer.channel.readyState, 'open')
   assert.equal(activeRemoteTransport(), transport)
-  assert.equal(states.at(-1), 'connected')
-  assert.equal(states.filter(state => state === 'error').length, 0)
+  assert.deepEqual(states, ['connected'])
+})
+
+test('a longer interruption shows recovery after one second and keeps the same transport when it recovers', t => {
+  const { peer, signal, states } = fixture(t), transport = activeRemoteTransport(), sent = peer.channel.sent.length
+  const renewals = () => signal.sent.filter(value => value.type === 'renew').length
+  const before = renewals()
+  peer.state('disconnected')
+  t.mock.timers.tick(1000)
+  assert.deepEqual(states, ['connected', 'reconnecting'])
+  assert.equal(activeRemoteTransport(), transport)
+  t.mock.timers.tick(3999)
+  peer.state('connected')
+  t.mock.timers.tick(5000)
+  assert.equal(peer.channel.readyState, 'open')
+  assert.equal(activeRemoteTransport(), transport)
+  assert.deepEqual(states, ['connected', 'reconnecting', 'connected'])
+  assert.equal(renewals(), before + 1, 'recovery refreshes the authorization on the existing connection')
+  assert.equal(peer.channel.sent.length, sent, 'recovery cannot replay authentication or application writes')
+})
+
+test('a pending write completes on its original transport after a two second interruption without replay', async t => {
+  const { peer, states } = fixture(t), transport = activeRemoteTransport()!
+  const pending = transport.fetch('/api/files', { method: 'POST', body: 'unsaved draft' })
+  const frames = () => peer.channel.sent.map(value => JSON.parse(value) as { type: string; id: string; path?: string })
+  await until(() => frames().some(frame => frame.type === 'end'))
+  const request = frames().find(frame => frame.type === 'request')!
+  const sent = peer.channel.sent.length
+  peer.state('disconnected')
+  t.mock.timers.tick(2000)
+  assert.equal(activeRemoteTransport(), transport)
+  assert.equal(transport.requests.size, 1, 'a transient disconnect cannot cancel an in-flight write')
+  peer.state('connected')
+  peer.channel.message({ type: 'response', id: request.id, status: 204, headers: {} })
+  peer.channel.message({ type: 'end', id: request.id })
+  assert.equal((await pending).status, 204)
+  assert.equal(frames().filter(frame => frame.type === 'request' && frame.path === '/api/files').length, 1)
+  assert.equal(peer.channel.sent.length, sent, 'the original write is neither replaced nor sent again')
+  assert.deepEqual(states, ['connected', 'reconnecting', 'connected'])
 })
 
 test('repeated disconnected events cannot extend the bounded recovery deadline', t => {
   const { peer, states } = fixture(t)
   peer.state('disconnected')
-  t.mock.timers.tick(200)
+  t.mock.timers.tick(1000)
   peer.state('disconnected')
-  t.mock.timers.tick(50)
+  t.mock.timers.tick(3999)
+  assert.equal(peer.channel.readyState, 'open')
+  assert.equal(states.filter(state => state === 'reconnecting').length, 1)
+  peer.state('disconnected')
+  t.mock.timers.tick(1)
   assert.equal(peer.channel.readyState, 'closed')
   assert.equal(activeRemoteTransport(), null)
   assert.equal(states.filter(state => state === 'error').length, 1)
 })
 
-for (const cause of ['failed', 'closed', 'signaling']) {
+test('each recovered interruption gets a fresh grace period and cancels its previous notice', t => {
+  const { peer, states } = fixture(t), transport = activeRemoteTransport()
+  peer.state('disconnected')
+  t.mock.timers.tick(600)
+  peer.state('connected')
+  peer.state('disconnected')
+  t.mock.timers.tick(999)
+  assert.deepEqual(states, ['connected'])
+  t.mock.timers.tick(1)
+  assert.deepEqual(states, ['connected', 'reconnecting'])
+  t.mock.timers.tick(3999)
+  assert.equal(activeRemoteTransport(), transport)
+  peer.state('connected')
+  t.mock.timers.tick(5000)
+  assert.equal(activeRemoteTransport(), transport)
+  assert.deepEqual(states, ['connected', 'reconnecting', 'connected'])
+})
+
+test('disposing a connection during silent recovery cancels its pending notice and deadline', t => {
+  const { peer, states, close } = fixture(t)
+  peer.state('disconnected')
+  t.mock.timers.tick(500)
+  close()
+  t.mock.timers.tick(10_000)
+  assert.deepEqual(states, ['connected'])
+  assert.equal(activeRemoteTransport(), null)
+})
+
+for (const cause of ['failed', 'closed', 'signaling', 'channel']) {
   test(`${cause} still terminates immediately during recovery`, t => {
     const { peer, signal, states } = fixture(t)
     peer.state('disconnected')
-    if (cause === 'signaling') signal.close(); else peer.state(cause)
+    if (cause === 'signaling') signal.close()
+    else if (cause === 'channel') peer.channel.close()
+    else peer.state(cause)
     assert.equal(peer.channel.readyState, 'closed')
     assert.equal(states.filter(state => state === 'error').length, 1)
+    t.mock.timers.tick(5000)
+    assert.equal(states.includes('reconnecting'), false, 'termination cannot leave a late recovery notice')
   })
 }
 
@@ -568,13 +641,30 @@ test('signaling retries cannot extend the browser authorization deadline', async
   assert.equal(f.errors.length, 1)
 })
 
-for (const outcome of ['normal-close', 'access-revoked', 'session-expired']) test(`${outcome} ends a resumable connection immediately`, async t => {
+test('RTC recovery cannot extend an authorization lease that expires before the five second grace', async t => {
   const f = await resumableFixture(t)
+  t.mock.timers.tick(56_000)
+  f.peer.state('disconnected')
+  t.mock.timers.tick(1000)
+  assert.equal(f.peer.channel.readyState, 'open')
+  assert.equal(f.states.at(-1), 'reconnecting')
+  t.mock.timers.tick(2001)
+  assert.equal(f.peer.channel.readyState, 'closed')
+  assert.equal(activeRemoteTransport(), null)
+  assert.match(f.errors[0]!, /인증 연결/)
+})
+
+for (const delay of [500, 1500]) for (const outcome of ['normal-close', 'access-revoked', 'session-expired']) test(`${outcome} ends a resumable connection immediately during ${delay}ms of RTC recovery`, async t => {
+  const f = await resumableFixture(t)
+  f.peer.state('disconnected')
+  t.mock.timers.tick(delay)
+  const notices = f.states.filter(state => state === 'reconnecting').length
   if (outcome === 'normal-close') f.signal.close(1000)
   else f.signal.onmessage?.({ data: JSON.stringify({ type: 'error', code: outcome }) })
   await until(() => f.peer.channel.readyState === 'closed')
   assert.equal(activeRemoteTransport(), null)
-  t.mock.timers.tick(1000)
+  t.mock.timers.tick(5000)
+  assert.equal(f.states.filter(state => state === 'reconnecting').length, notices, 'revocation cancels any pending recovery notice')
   assert.equal(FakeSignal.latest, f.signal)
 })
 

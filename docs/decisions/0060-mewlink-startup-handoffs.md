@@ -1,13 +1,15 @@
 ---
 title: "Mewlink 단회 준비와 연결 시작 왕복 축소"
-description: "Mewlink의 보안 검사를 유지하면서 HTML admission·호스트 단회 증명·ICE 사전 준비로 왕복을 줄이고, 코드·글꼴 검증·인증 공유·빠른 재접속과 Workspace·편집기의 state 렌더링·작업 화면 청크 묶음을 선택한 결정. 운영 적용과 500ms 실측의 경계를 구분한다."
+description: "Mewlink의 보안 검사를 유지하면서 HTML admission·호스트 단회 증명·ICE 사전 준비로 왕복을 줄이고, 코드·글꼴 검증·인증 공유·빠른 재접속과 Workspace·편집기의 state 렌더링·작업 화면 청크 묶음을 선택한 결정. 운영 적용과 500ms 실측의 경계를 구분하며, RTC 순단 복구 대기는 후속 ADR 0081이 대체한다."
 created: 2026-10-24
-updated: 2026-10-24
+updated: 2026-10-28
 ---
 
 ## 상태
 
 채택. 구현과 격리 회귀 검사를 통과했다. 첫 방문 500ms의 반복 실측을 진행 중이며 운영에는 적용하지 않았다.
+
+RTC 단절의 자연 복구 대기는 [ADR 0081](0081-mewlink-transient-recovery.md)이 대체한다. 첫 재시도·반복 실패 backoff·기존 인증 경계와 이 결정의 다른 범위는 유지한다.
 
 ## 배경
 

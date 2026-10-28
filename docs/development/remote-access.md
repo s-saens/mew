@@ -1,8 +1,8 @@
 ---
 title: "Mewlink 기기 등록과 로컬 사용자 인증 P2P 접속 계약"
-description: "Mewlink 공개 기기 주소·포트 링크용 공개 base 전달·로컬 인증·브라우저 신뢰와 회수·재접속을 정의한다. 단회 증명·RTC와 비추출 키 사전 준비·native wrapper 수명·비동기 NAT 조회·현재 자원 검증·공개 앱 preconnect·빠른 복구의 보안·운영 경계를 설명한다."
+description: "Mewlink 공개 기기 주소·포트 링크용 공개 base 전달·로컬 인증·브라우저 신뢰와 회수·재접속을 정의한다. 단회 준비·자원 검증과 RTC 순단의 5초 복구 대기·1초 뒤 상태 표시, 시그널링 재부착의 보안·운영 경계를 설명한다."
 created: 2026-10-07
-updated: "2026-10-27"
+updated: "2026-10-28"
 ---
 
 [작업·출시 기준](<../work/remote-access.md>) · [중앙 서비스 설치](../deployment/remote-central.md) · [ADR 0195](../history/decisions/0195-mew-account-based-p2p-remote-access.md) · [후속 ADR 0203](../history/decisions/0203-mewlink-workers-p2p-ui.md) · [로컬 인증 ADR 0207](../history/decisions/0207-mewlink-device-access-local-auth.md) · [권한](access-control.md)
@@ -290,7 +290,7 @@ Worker는 외부의 `X-Mew-Admission`을 지우고 서명을 검증한 값만 DO
 
 중앙 DO는 `serverRenewal: true`를 보낸 브라우저에 기존 10초 alarm 검사 후 연결 ID를 지정한 `renew` 요청을 보낸다. 브라우저는 키 증명을 마친 같은 연결에서만 즉시 응답하므로 20초 타이머가 지연돼도 갱신할 수 있다. 요청을 보내는 것만으로 lease를 연장하지 않으며, 응답에도 기기·신원·만료 검증을 적용한다. 기존 브라우저에는 이 요청을 보내지 않고 기존 중앙에 연결한 새 브라우저는 20초 타이머를 계속 사용한다. 브라우저 실행 중단이나 인증 WSS 단절이 현재 lease를 연장하지 않으며, 협상된 재부착도 아래 유효기간 안에서만 수행한다. 적용에는 사용자 Mewlink 중앙 재배포가 필요하다. 격리 검증은 타이머 지연 경로를 확인하며 실제 반복 끊김의 원인 확정이나 휴대폰 절전·외부망 검증을 대신하지 않는다.
 
-브라우저·네이티브 RTC는 일시적인 `disconnected`에 최대 **15초**의 복구 시간을 둔다. 상태 이벤트 반복으로 기한을 연장하지 않으며 `connected`로 돌아오면 같은 transport·앱 iframe·입력 초안을 유지한다. `failed`·`closed`, 실제 DataChannel과 부모 종료는 해당 transport를 즉시 정리한다. 인증 WSS는 재부착을 협상하지 않았거나 정상 종료·권한 거부·회수인 경우 즉시 정리한다. 브라우저가 visible 상태로 돌아오거나 `pageshow`·`online`을 받으면 기존 세션의 갱신을 즉시 요청한다. 60초 인증 lease를 늘리거나 이미 만료된 권한을 복구하지 않으며 쓰기·명령을 재실행하지 않는다. `disconnected`를 자연 복구 가능한 상태로 다루는 근거는 [WebRTC 상태 계약](https://www.w3.org/TR/webrtc/#dom-rtcicetransportstate)을 따른다.
+브라우저 RTC는 일시적인 `disconnected`에 최대 **5초**의 복구 시간을 둔다. **1초 미만**에 복구되면 복구 표시와 중복 `connected` 알림 없이 같은 transport를 유지한다. 1초 이상 지속되면 복구 상태를 알리고, 5초가 지나도 복구되지 않으면 새 연결로 전환한다. 네이티브 helper 자체의 정리 한도는 **15초**로 별도 유지한다. 상태 이벤트 반복으로 기한을 연장하지 않으며 `connected`로 돌아오면 같은 transport·앱 iframe·입력 초안을 유지하고 갱신을 요청한다. 복구·종료 때 표시·종료 타이머를 모두 취소한다. `failed`·`closed`, 실제 DataChannel과 부모 종료는 해당 transport를 즉시 정리한다. 인증 WSS는 재부착을 협상하지 않았거나 정상 종료·권한 거부·회수인 경우 즉시 정리한다. 복구 대기 중에도 기존 60초 lease 만료가 우선하며 이미 만료된 권한을 복구하지 않는다. 브라우저가 visible 상태로 돌아오거나 `pageshow`·`online`을 받으면 기존 세션의 갱신을 즉시 요청한다. 쓰기·명령을 재실행하지 않으며 요청별 권한 검사·중앙 10초 alarm·20초 갱신 간격은 유지한다. 결정과 검증 범위는 [ADR 0081](../decisions/0081-mewlink-transient-recovery.md), [작업 기록](../work/mewlink-transient-recovery.md)을 따른다. `disconnected`를 자연 복구 가능한 상태로 다루는 근거는 [WebRTC 상태 계약](https://www.w3.org/TR/webrtc/#dom-rtcicetransportstate)을 따른다.
 
 ### 시그널링 순단의 같은 RTC 재부착
 
@@ -302,7 +302,7 @@ DO는 끊긴 브라우저 상태를 `mew_signal_recovery` SQLite 테이블에 �
 
 격리 Workers는 nonce·키·세대·기기 불일치·재사용·회수·로그아웃·만료·hibernation·호스트 교체와 브라우저 재부착 경합을 검사했다. 실제 Workers·네이티브 RTC·Chromium 안정성 검사에서는 브라우저와 호스트 WSS를 각각 끊어도 같은 iframe·RTC에서 HTTP가 성공하고 새 prepare가 생성되지 않았다. 종료 callback 없이 플랫폼이 모든 소켓 상태를 잃는 강제 종료까지 무중단을 보장하지는 않는다. 재부착 실패나 lease 만료는 아래 전체 재연결로 이어진다.
 
-최종 연결 종료나 절전·망 전환 뒤에는 중앙 런처가 새 WebSocket bootstrap과 같은 브라우저 키·저장 세션으로 자동 재연결한다. 구버전 호환 경로에서만 새 HTTP launch를 사용한다. 첫 재시도는 즉시 시작하고 반복 실패에만 250ms부터 최대 **30초**의 대기를 적용한다. online·pageshow·visible 복귀는 이미 대기 중인 재시도를 앞당기며 lease를 연장하지 않는다. 브라우저 RTC의 disconnected는 250ms 동안 자연 복구를 기다린 뒤 새 연결로 전환하고, 호스트 helper 자체의 15초 정리 한도와 구분한다. 기존 앱 iframe·미저장 입력을 유지하며, 새 연결의 `/api/auth/me`에서 같은 로컬 계정과 인증 수단을 확인한 뒤 전송을 교체한다. instance·중앙/앱 origin·previewDomain이 달라지면 새 준비 연결과 기존 iframe을 정리하고 자동 복구를 중단해 새로고침을 안내한다. 계정·인증 수단이 달라져도 기존 앱 상태를 이어 쓰지 않는다. 종료된 연결의 진행 중 요청은 취소하고 저장·명령을 자동 재실행하지 않는다. DOM 브라우저 화면과 뮤펫 대화는 읽기 구독을 다시 열고 이전 입력을 재전송하지 않는다. 명시적 회수·인증 거부·로그아웃은 저장 토큰을 지우고 재시도를 멈춘다. 원격 데스크톱의 별도 영상·입력 peer는 수동 재연결 범위를 유지한다. 90일 미사용·비밀번호 변경·승인 연결 회수 이후에는 재인증해야 하며, 휴대폰 절전 중 실제 연결 유지나 외부망 복구 성공을 보장하지 않는다.
+최종 연결 종료나 절전·망 전환 뒤에는 중앙 런처가 새 WebSocket bootstrap과 같은 브라우저 키·저장 세션으로 자동 재연결한다. 구버전 호환 경로에서만 새 HTTP launch를 사용한다. 첫 재시도는 즉시 시작하고 반복 실패에만 250ms부터 최대 **30초**의 대기를 적용한다. online·pageshow·visible 복귀는 이미 대기 중인 재시도를 앞당기며 lease를 연장하지 않는다. 브라우저 RTC의 disconnected는 최대 5초 동안 자연 복구를 기다린 뒤 새 연결로 전환하고, 호스트 helper 자체의 15초 정리 한도와 구분한다. 기존 앱 iframe·미저장 입력을 유지하며, 새 연결의 `/api/auth/me`에서 같은 로컬 계정과 인증 수단을 확인한 뒤 전송을 교체한다. instance·중앙/앱 origin·previewDomain이 달라지면 새 준비 연결과 기존 iframe을 정리하고 자동 복구를 중단해 새로고침을 안내한다. 계정·인증 수단이 달라져도 기존 앱 상태를 이어 쓰지 않는다. 종료된 연결의 진행 중 요청은 취소하고 저장·명령을 자동 재실행하지 않는다. DOM 브라우저 화면과 뮤펫 대화는 읽기 구독을 다시 열고 이전 입력을 재전송하지 않는다. 명시적 회수·인증 거부·로그아웃은 저장 토큰을 지우고 재시도를 멈춘다. 원격 데스크톱의 별도 영상·입력 peer는 수동 재연결 범위를 유지한다. 90일 미사용·비밀번호 변경·승인 연결 회수 이후에는 재인증해야 하며, 휴대폰 절전 중 실제 연결 유지나 외부망 복구 성공을 보장하지 않는다.
 
 중앙 DO의 비동기 인가 검사 중 수신 대상 탭이 닫혀도 그 탭의 송신 실패만 정리한다. 이 오류를 메시지를 보낸 호스트의 인증 실패로 확장하지 않는다. 실제 호스트 종료·권한 회수는 기존처럼 종속 연결을 모두 닫는다.
 

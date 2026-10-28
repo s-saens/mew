@@ -7,6 +7,7 @@ import { takePrimedRemoteSignal } from './remote-signal-prime.ts'
 type ConnectionObserver = (state: string, error?: string) => void
 type ConnectionCredentials = { session?: string; keyPair: CryptoKeyPair }
 type ConnectionOptions = { centralOrigin?: string; ticketIssuers?: string[]; launch?: string; session?: string; keyPair?: CryptoKeyPair }
+const RTC_RECOVERY_GRACE = 5000, RTC_RECOVERY_NOTICE_DELAY = 1000
 type Bootstrap = {
   target: RemoteConnectionTarget
   identity?: boolean
@@ -55,6 +56,7 @@ function createRemoteConnection(instance: string, onState: ConnectionObserver, o
   setRemoteTransport(null)
   if (typeof RTCPeerConnection === 'undefined' || !crypto.subtle) { onState('error', '이 브라우저는 안전한 원격 연결을 지원하지 않습니다. 최신 브라우저를 사용해 주세요.'); return () => {} }
   let stopped = false, authenticated = false, connection = '', ticket = '', privateKey: CryptoKey, claims: Record<string, any>, renew: ReturnType<typeof setInterval> | undefined, disconnected: ReturnType<typeof setTimeout> | undefined, timeout: ReturnType<typeof setTimeout> | undefined
+  let disconnectNotice: ReturnType<typeof setTimeout> | undefined, recoveryNotified = false
   let signalResume = false, signalInterrupted = false, signalAttempt = 0, connectSentAt = 0, leaseDeadline = 0, resumeNonce = '', resumeSentAt = 0
   let recoveringSignal: WebSocket | undefined
   let signalRetry: ReturnType<typeof setTimeout> | undefined, signalTimeout: ReturnType<typeof setTimeout> | undefined, leaseTimeout: ReturnType<typeof setTimeout> | undefined
@@ -109,7 +111,7 @@ function createRemoteConnection(instance: string, onState: ConnectionObserver, o
     if (signalInterrupted) { if (signalRetry === undefined) return; clearTimeout(signalRetry); clearTimeout(signalTimeout); signalRetry = undefined; reconnectSignal() }
     else emit({ type: 'renew' })
   }
-  const close = () => { if (stopped) return; if (authenticated && signalResume) emit({ type: 'end' }); stopped = true; keyRequest.abort(); bootstrap?.cancel(); clearTimeout(timeout); clearTimeout(disconnected); clearTimeout(signalRetry); clearTimeout(signalTimeout); clearTimeout(leaseTimeout); clearInterval(renew); renewals.clear(); document.removeEventListener('visibilitychange', resume); window.removeEventListener('pageshow', resume); window.removeEventListener('online', resume); setRemoteTransport(null)
+  const close = () => { if (stopped) return; if (authenticated && signalResume) emit({ type: 'end' }); stopped = true; keyRequest.abort(); bootstrap?.cancel(); clearTimeout(timeout); clearTimeout(disconnected); clearTimeout(disconnectNotice); clearTimeout(signalRetry); clearTimeout(signalTimeout); clearTimeout(leaseTimeout); clearInterval(renew); renewals.clear(); document.removeEventListener('visibilitychange', resume); window.removeEventListener('pageshow', resume); window.removeEventListener('online', resume); setRemoteTransport(null)
     channel.close(); peer.close(); signal.close() }
   const fail = (error = '기기와 직접 연결하지 못했습니다. 기기의 실행 상태와 네트워크를 확인해 주세요.', state = 'error') => { if (stopped) return; close(); onState(state, error) }
   const authorizeLease = (remaining: unknown, sentAt: number) => {
@@ -257,14 +259,19 @@ function createRemoteConnection(instance: string, onState: ConnectionObserver, o
     if (stopped) return
     if (peer.connectionState === 'disconnected') {
       if (disconnected !== undefined) return
-      disconnected = setTimeout(() => fail('기기와의 연결이 복구되지 않았습니다. 다시 연결해 주세요.'), 250)
-      if (authenticated) onState('reconnecting')
+      disconnected = setTimeout(() => fail('기기와의 연결이 복구되지 않았습니다. 다시 연결해 주세요.'), RTC_RECOVERY_GRACE)
+      if (authenticated) disconnectNotice = setTimeout(() => {
+        disconnectNotice = undefined
+        if (stopped || peer.connectionState !== 'disconnected') return
+        recoveryNotified = true; onState('reconnecting')
+      }, RTC_RECOVERY_NOTICE_DELAY)
       return
     }
     if (peer.connectionState === 'connected') {
       const recovering = disconnected !== undefined
-      clearTimeout(disconnected); disconnected = undefined
-      if (recovering && authenticated) { resume(); onState('connected') }
+      clearTimeout(disconnected); disconnected = undefined; clearTimeout(disconnectNotice); disconnectNotice = undefined
+      if (recovering && authenticated) { resume(); if (recoveryNotified) onState('connected') }
+      recoveryNotified = false
       return
     }
     if (['failed', 'closed'].includes(peer.connectionState)) fail()
