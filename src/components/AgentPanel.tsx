@@ -18,6 +18,7 @@ import { AgentStartupQueueView } from './agent-startup-queue'
 import { AgentCapacityRetryNotice } from './agent-capacity-retry-notice'
 import { expandHistoryWork } from '../../shared/agent-history'
 import type { HistoryPreview } from '../../shared/agent-history'
+import { MAX_HISTORY_QUERY_LENGTH } from '../../shared/agent-session-search'
 import { PanelTitle } from './panel-title'
 import type { AgentAttachmentInput } from '../../shared/agent-attachment'
 import { panelModelState, splitModelVariant, hasModelEffort, modelVariantId, MODEL_EFFORT_CONFIG_ID } from '../../shared/codex-models'
@@ -665,6 +666,8 @@ function writeAgentControlCache(runtime: string, tabId: string, cwd: string, pat
  */
 function SessionPicker({
   sessions,
+  searching,
+  searchError,
   takenIds,
   currentSessionId,
   loadingSession,
@@ -672,6 +675,7 @@ function SessionPicker({
   hasConversation,
   disabled = false,
   onOpen,
+  onSearch,
   onPick,
   onNewConversation,
   onRefresh,
@@ -679,6 +683,8 @@ function SessionPicker({
   loadDisabledReason,
 }: {
   sessions: SessionInfo[] | null
+  searching: boolean
+  searchError: string | null
   /** 다른 탭이 이미 열어 둔 세션 — 같은 세션을 두 프로세스가 붙들면 전사가 엉킨다 */
   takenIds: string[]
   currentSessionId: string | null
@@ -687,7 +693,8 @@ function SessionPicker({
   hasConversation: boolean
   disabled?: boolean
   /** 드롭다운을 열었다 — 여기서 목록을 받아 온다 */
-  onOpen: () => void | Promise<void>
+  onOpen: (query: string) => void | Promise<void>
+  onSearch: (query: string) => void
   onPick: (session: SessionInfo) => void
   onNewConversation: () => void
   onRefresh?: () => void
@@ -697,13 +704,24 @@ function SessionPicker({
   useUiLocale()
   const { t } = useI18n()
   const [open, setOpen] = useState(false)
-  const [sessionIdInput, setSessionIdInput] = useState('')
+  const [searchInput, setSearchInput] = useState('')
+  const [composing, setComposing] = useState(false)
+  const [requestedQuery, setRequestedQuery] = useState('')
+  const searchCallback = useRef(onSearch)
+  useLayoutEffect(() => { searchCallback.current = onSearch }, [onSearch])
   const pickerId = useId()
-  const sessionId = sessionIdInput.trim()
+  const query = searchInput.trim()
   const inputHint = loadDisabledReason
-    || (sessionId && sessionId === currentSessionId ? t('agent.history.current') : '')
-    || (takenIds.includes(sessionId) ? t('agent.history.taken') : '')
   const loadDisabled = disabled || loadingClaims || loadingSession !== null || !!loadDisabledReason
+  const queryChanged = query !== requestedQuery
+  useEffect(() => {
+    if (!open || composing || query === requestedQuery) return
+    const timeout = setTimeout(() => {
+      setRequestedQuery(query)
+      searchCallback.current(query)
+    }, 250)
+    return () => clearTimeout(timeout)
+  }, [open, query, composing, requestedQuery])
   const ref = useRef<HTMLDivElement>(null)
   const close = useCallback(() => setOpen(false), [])
   // Esc·모바일 뒤로가기가 패널 대신 이 드롭다운을 닫게 한다
@@ -726,7 +744,10 @@ function SessionPicker({
         type="button"
         disabled={disabled}
         onClick={() => {
-          if (!open) void onOpen()
+          if (!open) {
+            setRequestedQuery(query)
+            void onOpen(query)
+          }
           setOpen((v) => !v)
         }}
         aria-controls={open ? pickerId : undefined}
@@ -751,35 +772,38 @@ function SessionPicker({
             className="shrink-0 border-b border-edge px-2.5 pb-2 pt-1"
             onSubmit={(event) => {
               event.preventDefault()
-              if (!sessionId || loadDisabled || inputHint) return
-              onPick(sessions?.find((session) => session.sessionId === sessionId) ?? { sessionId })
-              setOpen(false)
+              if (disabled || composing) return
+              setRequestedQuery(query)
+              onSearch(query)
             }}
           >
-            <label htmlFor={`${pickerId}-input`} className="mb-1 block text-ink-secondary">{t('agent.history.sessionId')}</label>
+            <label htmlFor={`${pickerId}-input`} className="mb-1 block text-ink-secondary">{t('agent.history.search')}</label>
             <div className="flex gap-1.5">
               <input
                 id={`${pickerId}-input`}
-                value={sessionIdInput}
-                onChange={(event) => setSessionIdInput(event.target.value)}
+                value={searchInput}
+                onChange={(event) => setSearchInput(event.target.value)}
+                onCompositionStart={() => setComposing(true)}
+                onCompositionEnd={(event) => { setComposing(false); setSearchInput(event.currentTarget.value) }}
                 onKeyDown={(event) => {
                   if (event.key === 'Enter' && event.nativeEvent.isComposing) event.preventDefault()
                 }}
-                placeholder={t('agent.history.enterId')}
+                placeholder={t('agent.history.searchPlaceholder')}
+                maxLength={MAX_HISTORY_QUERY_LENGTH}
                 autoComplete="off"
                 autoCapitalize="none"
                 spellCheck={false}
-                enterKeyHint="go"
-                disabled={loadDisabled}
+                enterKeyHint="search"
+                disabled={disabled}
                 aria-describedby={inputHint ? `${pickerId}-hint` : undefined}
                 className="h-9 min-w-0 flex-1 rounded border border-edge-bright bg-surface px-2 text-ink placeholder:text-ink-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-40"
               />
               <button
                 type="submit"
-                disabled={!sessionId || loadDisabled || !!inputHint}
+                disabled={disabled}
                 className="h-9 shrink-0 rounded bg-surface-hover px-2.5 text-ink hover:bg-surface focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-40"
               >
-                {t('agent.history.open')}
+                {t('agent.history.searchAction')}
               </button>
             </div>
             {inputHint && <p id={`${pickerId}-hint`} role="status" className="mt-1 text-ink-secondary">{inputHint}</p>}
@@ -811,9 +835,10 @@ function SessionPicker({
                 <span>{uiText("새 대화")}</span>
               </button>
             )}
-            {sessions === null && <AgentLoadingBubbles label={t('common.loading')} compact />}
-            {sessions?.length === 0 && (
-              <div className="px-2.5 py-1.5 text-ink-muted">{uiText("이 워크스페이스에 지난 세션이 없습니다.")}</div>
+            {searchError && <div role="alert" className="px-2.5 py-1.5 text-danger">{t('agent.history.searchFailed')}</div>}
+            {(searching || sessions === null || queryChanged) && <AgentLoadingBubbles label={t('common.loading')} compact />}
+            {!searching && !queryChanged && !searchError && sessions?.length === 0 && (
+              <div role="status" className="px-2.5 py-1.5 text-ink-muted">{query ? t('agent.history.noResults') : uiText("이 워크스페이스에 지난 세션이 없습니다.")}</div>
             )}
             {sessions?.map((session) => {
               const taken = takenIds.includes(session.sessionId)
@@ -826,10 +851,11 @@ function SessionPicker({
                     onPick(session)
                     setOpen(false)
                   }}
-                  disabled={current || taken || loadDisabled}
+                  disabled={current || taken || loadDisabled || queryChanged || searching}
                   className="flex w-full flex-col items-start gap-0.5 px-2.5 py-1.5 text-left hover:bg-surface-hover disabled:opacity-40"
                 >
                   <span className="w-full truncate text-ink">{session.title || session.sessionId.slice(0, 8)}</span>
+                  {session.snippet && <span className="line-clamp-2 w-full break-words text-ink-secondary">{session.snippet}</span>}
                   <span className="text-ink-muted">
                     {session.sessionId === loadingSession
                       ? uiText("불러오는 중…")
@@ -2301,6 +2327,9 @@ function AgentSessionView({
   const commandPopup = cli.records.find(command => command.id === commandPopupId)
   useEffect(() => { if (!allowTerminal) setCliMode(false) }, [allowTerminal])
   const [sessions, setSessions] = useState<SessionInfo[] | null>(null)
+  const [searchingSessions, setSearchingSessions] = useState(false)
+  const [sessionSearchError, setSessionSearchError] = useState<string | null>(null)
+  const sessionSearchRequestRef = useRef<{ requestId: string; query: string } | null>(null)
   const [loadingSessionClaims, setLoadingSessionClaims] = useState(false)
   const sessionClaimsRequestRef = useRef(0)
   const [auth, setAuth] = useState<AgentAuthState | null>(null)
@@ -2649,6 +2678,9 @@ function AgentSessionView({
     previewTargetRef.current = resumeSessionIdRef.current
     setHistoryPreview(null)
     setSessions(null)
+    setSearchingSessions(false)
+    setSessionSearchError(null)
+    sessionSearchRequestRef.current = null
     setLoadingSessionClaims(false)
     sessionClaimsRequestRef.current++
     const clearPreview = () => {
@@ -2825,7 +2857,14 @@ function AgentSessionView({
           setAuthTerminalOpen(false)
           return setAuthTerminal(null)
         }
-        if (event.type === 'sessions') return setSessions(event.sessions)
+        if (event.type === 'sessions') {
+          const requested = sessionSearchRequestRef.current
+          if (!requested || (event.requestId ? event.requestId !== requested.requestId : requested.query !== '')) return
+          setSessions(event.sessions)
+          setSearchingSessions(false)
+          setSessionSearchError(event.error ?? null)
+          return
+        }
         // 재접속 되감기 — 지나간 대화가 한 덩어리로 온다. 그린 것을 통째로 갈아끼우므로 중간에 비지 않는다
         if (event.type === 'replay') {
           clearPreview()
@@ -3060,6 +3099,15 @@ function AgentSessionView({
     if (payload.type === 'clear_session') requestClear(socket)
     else socket.send(JSON.stringify(payload))
   }, [requestClear, clearStartupPrompts])
+
+  const searchSessions = useCallback((query: string) => {
+    const request = { query, requestId: uuid() }
+    if (sessionSearchRequestRef.current?.query !== query) setSessions(null)
+    sessionSearchRequestRef.current = request
+    setSearchingSessions(true)
+    setSessionSearchError(null)
+    send({ type: 'list_sessions', ...request })
+  }, [send])
 
   // 인증 명령의 exit code나 등록된 완료 파일 변경을 본다. 성공했을 때만 tmux를 닫고 ACP를 복구한다.
   // 내부 브라우저를 닫아도 로그인 명령과 감시는 계속된다.
@@ -3702,6 +3750,8 @@ function AgentSessionView({
       <div ref={infoOverlayRef} inert={!connected} className="relative z-20 flex h-8 shrink-0 items-center justify-between border-b border-edge bg-surface px-3">
         <SessionPicker
           sessions={sessions}
+          searching={searchingSessions}
+          searchError={sessionSearchError}
           takenIds={takenIds}
           currentSessionId={meta?.sessionId ?? null}
           loadingSession={loadingSession}
@@ -3713,11 +3763,12 @@ function AgentSessionView({
             : busy || pending || (meta?.queued.length ?? 0) > 0
               ? t('agent.history.wait')
               : undefined}
-          onOpen={async () => {
+          onSearch={searchSessions}
+          onOpen={async (query) => {
             const request = ++sessionClaimsRequestRef.current
             setLoadingSessionClaims(true)
             const claims = onRefreshSessionClaims()
-            send({ type: 'list_sessions' })
+            searchSessions(query)
             try { await claims }
             finally {
               if (sessionClaimsRequestRef.current === request) setLoadingSessionClaims(false)

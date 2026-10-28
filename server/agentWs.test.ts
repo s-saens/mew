@@ -51,14 +51,21 @@ process.env.MEW_AGENT_ARGS = stubPath
 
 const { AGENT_WS_PATH, attachAgentWebSocket } = await import('./agentWs.ts')
 const { shutdownAgentHostsForWorkspace } = await import('./agentHost.ts')
+const { writeAgentTranscript, closeTranscriptDatabase } = await import('./agentTranscript.ts')
+const { closeSessionSearchWorker } = await import('./agent-session-search-service.ts')
 
 test('에이전트가 뜨기 전에 보낸 질문도 잃지 않고, 목록은 물어본 창에만 먼저 간다', async (t) => {
+  const searchMessage = { type: 'update' as const, update: { sessionUpdate: 'user_message_chunk' as const, content: { type: 'text' as const, text: '에이전트 패널 검색을 개선해줘' } } }
+  assert.equal(writeAgentTranscript('claude', outside, 'old-searchable', [searchMessage]), true)
+  assert.equal(writeAgentTranscript('claude', workspace, 'foreign-searchable', [searchMessage]), true)
   const server = http.createServer()
   attachAgentWebSocket(server)
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
   const { port } = server.address() as { port: number }
 
-  t.after(() => {
+  t.after(async () => {
+    await closeSessionSearchWorker()
+    closeTranscriptDatabase()
     shutdownAgentHostsForWorkspace(workspace)
     shutdownAgentHostsForWorkspace(outside)
     server.close()
@@ -95,5 +102,16 @@ test('에이전트가 뜨기 전에 보낸 질문도 잃지 않고, 목록은 �
   // 되감기는 붙을 때 한 프레임으로 딱 한 번 — 그 뒤 이벤트는 개별로 흐른다
   assert.equal(kinds.filter((k) => k === 'replay').length, 1, '지나간 대화는 한 덩어리로 한 번만 온다')
   assert.ok(kinds.indexOf('replay') < kinds.indexOf('update'), '되감기가 새 이벤트보다 먼저 온다')
+  const searched = new Promise<{ requestId: string; query: string; sessions: { sessionId: string; snippet?: string }[] }>(resolve => {
+    ws.on('message', raw => {
+      const event = JSON.parse(raw.toString())
+      if (event.type === 'sessions' && event.requestId === 'topic-search') resolve(event)
+    })
+  })
+  ws.send(JSON.stringify({ type: 'list_sessions', query: '에이전트패널', requestId: 'topic-search' }))
+  const result = await searched
+  assert.equal(result.query, '에이전트패널')
+  assert.deepEqual(result.sessions.map(item => item.sessionId), ['old-searchable'])
+  assert.match(result.sessions[0].snippet!, /에이전트 패널/)
   ws.close()
 })

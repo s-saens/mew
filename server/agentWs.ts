@@ -19,6 +19,9 @@ import { DEFAULT_RUNTIME, isAcpRuntime, type AgentEvent, type AgentImageRef, typ
 import { connectAgentHost, type AgentHostClient } from './agentHost.ts'
 import { composeRuntimePrompt } from './agentRuntimes.ts'
 import { listSessionsFromDisk } from './agentSessionList.ts'
+import { searchSessionHistory } from './agent-session-search-service.ts'
+import { MAX_HISTORY_QUERY_LENGTH, type SessionSearchResult } from '../shared/agent-session-search.ts'
+import { agentSettingsAccount, runWithAgentAccount } from './agent-account-settings.ts'
 import { workspacePaths } from './paths.ts'
 import { listSkills } from './skills.ts'
 import { resolveAgentCwd } from './agentCwd.ts'
@@ -51,7 +54,7 @@ type ClientMessage = MewcatClientMessage
   | { type: 'edit_queued'; index: number; text: string; expect: string; skills?: string[]; attachments?: AgentAttachmentInput[]; settings?: AgentMessageSettings }
   /** `/clear`: 앞선 작업 뒤 새 ACP 세션을 여는 큐 경계 */
   | { type: 'clear_session' }
-  | { type: 'list_sessions' }
+  | { type: 'list_sessions'; query?: string; requestId?: string }
   | { type: 'load_session'; sessionId: string }
   /** 탭을 닫았다 — 창만 닫은 것과 달리 세션도 여기서 끝난다 */
   | { type: 'close_session' }
@@ -126,7 +129,7 @@ type ServerMessage =
   | { type: 'ready'; cwd: string }
   | { type: 'fatal'; message?: string }
   // 목록은 물어본 창에만 답한다 — 상태가 아니라 조회 결과라 이벤트 버퍼에 넣지 않는다
-  | { type: 'sessions'; sessions: { sessionId: string; title?: string | null; updatedAt?: string | null }[] }
+  | { type: 'sessions'; sessions: SessionSearchResult[]; query?: string; requestId?: string; error?: string }
   // 지나간 대화는 한 덩어리로 간다 — 창은 이걸 받아 지금 그린 대화를 통째로 갈아끼운다
   | { type: 'replay'; events: AgentEvent[]; restored?: boolean; restoreFailure?: { sessionId: string; message: string } }
 
@@ -170,6 +173,7 @@ async function handleConnection(
   assistant?: MewcatBinding,
   debuggerServers: McpServer[] = [],
 ) {
+  const account = agentSettingsAccount()
   const fail = (err: unknown) => send(ws, { type: 'error', message: describeError(err) })
 
   // 에이전트가 뜨는 데는 1초가 넘게 걸린다(spawn + initialize + newSession). 그동안 창을 세워 두지 않는다:
@@ -206,11 +210,17 @@ async function handleConnection(
       try { assistant?.handle(msg) } catch { ws.close() }
       return
     }
-    // 목록은 디스크만 읽는다 — 자식 프로세스가 뜨기를 기다리지 않는다(세션의 listSessions와 같은 지름길)
-    if (msg.type === 'list_sessions' && runtime === 'claude') {
-      void listSessionsFromDisk(cwd)
-        .then((sessions) => send(ws, { type: 'sessions', sessions }))
-        .catch(fail)
+    if (msg.type === 'list_sessions') {
+      if (msg.query !== undefined && (typeof msg.query !== 'string' || msg.query.length > MAX_HISTORY_QUERY_LENGTH)) return
+      if (msg.requestId !== undefined && (typeof msg.requestId !== 'string' || msg.requestId.length > 100)) return
+      const query = (msg.query ?? '').trim()
+      if (!session && runtime !== 'claude' && !query) { early.push(msg); return }
+      const current = session
+      void runWithAgentAccount(account, () => searchSessionHistory(runtime, cwd, query, () => runtime === 'claude'
+        ? listSessionsFromDisk(cwd)
+        : current?.request<SessionSearchResult[]>({ type: 'list_sessions' }) ?? Promise.resolve([])))
+        .then((result) => send(ws, { type: 'sessions', query, requestId: msg.requestId, ...result }))
+        .catch(() => send(ws, { type: 'sessions', query, requestId: msg.requestId, sessions: [], error: '대화 검색에 실패했습니다' }))
       return
     }
     if (!session) {
@@ -275,11 +285,6 @@ async function handleConnection(
       else if (msg.type === 'set_mode') live.send({ type: 'set_mode', modeId: msg.modeId })
       else if (msg.type === 'set_thinking') live.send({ type: 'set_thinking', configId: msg.configId, value: msg.value })
       else if (msg.type === 'load_session') live.send({ type: 'load_session', sessionId: msg.sessionId })
-      else if (msg.type === 'list_sessions')
-        void live
-          .request<{ sessionId: string; title?: string | null; updatedAt?: string | null }[]>({ type: 'list_sessions' })
-          .then((sessions) => send(ws, { type: 'sessions', sessions }))
-          .catch(fail)
       else if (msg.type === 'close_session') {
         live.send({ type: 'close_session' })
         live.close()

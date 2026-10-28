@@ -5,6 +5,11 @@ import path from 'node:path'
 import { DatabaseSync, type StatementSync } from 'node:sqlite'
 import { DATA_DIR, readJsonFile } from './dataDir.ts'
 import type { AgentEvent } from './agentAcp.ts'
+import type { SessionSearchResult } from '../shared/agent-session-search.ts'
+import {
+  initializeAgentSessionSearch, queryAgentSessionSearch, readAgentSessionSearchState,
+  updateAgentSessionSearch, type SessionSearchSource, type SessionSearchText,
+} from './agent-transcript-search.ts'
 
 const TRANSCRIPT_DIR = path.join(DATA_DIR, 'agent-transcripts')
 let database: DatabaseSync | null = null
@@ -33,6 +38,7 @@ function db(): DatabaseSync {
         session_key TEXT NOT NULL, seq INTEGER NOT NULL, payload TEXT NOT NULL,
         PRIMARY KEY (session_key, seq)
       ) WITHOUT ROWID; PRAGMA user_version=1;`)
+    initializeAgentSessionSearch(opened)
     database = opened
     return opened
   } catch (error) { opened.close(); throw error }
@@ -73,6 +79,10 @@ export function writeAgentTranscript(runtime: string, cwd: string, sessionId: st
       prepare(store, `INSERT INTO sessions VALUES(?,?,?,?,?,?,?) ON CONFLICT(key) DO UPDATE SET
         revision=excluded.revision, count=excluded.count, updated_at=excluded.updated_at`)
         .run(key, runtime, cwd, sessionId, revision, events.length, Date.now())
+      const indexed = readAgentSessionSearchState(store, key)
+      const searchStart = indexed?.revision === revision && indexed.count <= events.length ? indexed.count : 0
+      updateAgentSessionSearch(store, { key, runtime, cwd, sessionId, revision, count: events.length, updatedAt: Date.now() },
+        searchText(events, searchStart), searchStart)
       store.exec('COMMIT')
       written.set(events, { key, count: events.length, revision })
       return true
@@ -81,6 +91,70 @@ export function writeAgentTranscript(runtime: string, cwd: string, sessionId: st
     console.error('[mew:agent] 전사 저장 실패:', error)
     return false
   }
+}
+
+function* searchText(events: AgentEvent[], start: number): Iterable<SessionSearchText> {
+  for (let i = start; i < events.length; i++) {
+    const event = events[i]
+    if (event.type === 'turn_end') { yield { role: null }; continue }
+    if (event.type !== 'update') continue
+    const update = event.update
+    if (update.sessionUpdate !== 'user_message_chunk' && update.sessionUpdate !== 'agent_message_chunk' || update.content.type !== 'text') continue
+    yield {
+      role: update.sessionUpdate === 'user_message_chunk' ? 'user' : 'assistant',
+      text: update.content.text,
+      ...('messageId' in update && typeof update.messageId === 'string' ? { messageId: update.messageId } : {}),
+    }
+  }
+}
+
+type SearchSourceRow = {
+  key: string; runtime: string; cwd: string; session_id: string; revision: string; count: number; updated_at: number
+}
+
+/** Existing or older supervisors' transcripts are projected once per changed revision/count. */
+function backfillTranscriptSearch(store: DatabaseSync, runtime: string, cwd: string): void {
+  const sources = prepare(store, `SELECT s.key,s.runtime,s.cwd,s.session_id,s.revision,s.count,s.updated_at
+    FROM sessions s LEFT JOIN history_search_sessions h ON h.key=s.key
+    WHERE s.runtime=? AND (h.key IS NULL OR h.revision<>s.revision OR h.count<>s.count)`).all(runtime) as SearchSourceRow[]
+  for (const source of sources) {
+    if (source.cwd.toLocaleLowerCase() !== cwd.toLocaleLowerCase()) continue
+    store.exec('BEGIN IMMEDIATE')
+    try {
+      const current = prepare(store, 'SELECT * FROM sessions WHERE key=?').get(source.key) as SearchSourceRow | undefined
+      if (current) {
+        const indexed = readAgentSessionSearchState(store, current.key)
+        const start = indexed?.revision === current.revision && indexed.count <= current.count ? indexed.count : 0
+        const rows = prepare(store, `SELECT
+          CASE WHEN json_valid(payload) THEN json_extract(payload,'$.type') END AS type,
+          CASE WHEN json_valid(payload) AND json_extract(payload,'$.type')='update'
+            AND json_extract(payload,'$.update.sessionUpdate') IN ('user_message_chunk','agent_message_chunk')
+            AND json_extract(payload,'$.update.content.type')='text'
+          THEN json_extract(payload,'$.update.sessionUpdate','$.update.content.text','$.update.messageId') END AS message
+          FROM events WHERE session_key=? AND seq>=? ORDER BY seq`).iterate(current.key, start)
+        const records = function* (): Iterable<SessionSearchText> {
+          for (const row of rows) {
+            if (row.type === 'turn_end') { yield { role: null }; continue }
+            if (typeof row.message !== 'string') continue
+            const [role, text, messageId] = JSON.parse(row.message) as [string, unknown, unknown]
+            if (typeof text !== 'string') continue
+            yield { role: role === 'user_message_chunk' ? 'user' : 'assistant', text,
+              ...(typeof messageId === 'string' ? { messageId } : {}) }
+          }
+        }
+        const input: SessionSearchSource = { key: current.key, runtime: current.runtime, cwd: current.cwd,
+          sessionId: current.session_id, revision: current.revision, count: current.count, updatedAt: current.updated_at }
+        updateAgentSessionSearch(store, input, records(), start)
+      }
+      store.exec('COMMIT')
+    } catch (error) { store.exec('ROLLBACK'); throw error }
+  }
+}
+
+export function searchAgentTranscripts(runtime: string, cwd: string, query: string): SessionSearchResult[] {
+  const store = db()
+  backfillTranscriptSearch(store, runtime, cwd)
+  return queryAgentSessionSearch(store, runtime, cwd, query)
 }
 
 function importLegacy(runtime: string, cwd: string, sessionId: string): void {

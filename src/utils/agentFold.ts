@@ -49,7 +49,7 @@ export type SessionMeta = {
   canList: boolean
 }
 
-export type SessionInfo = { sessionId: string; title?: string | null; updatedAt?: string | null }
+export type SessionInfo = import('../../shared/agent-session-search').SessionSearchResult
 
 export type AgentAuthMethod = {
   id: string
@@ -107,7 +107,7 @@ export type AgentEvent =
   | { type: 'auth_url_done'; id: string }
   | { type: 'auth_complete' }
   | { type: 'reset' }
-  | { type: 'sessions'; sessions: SessionInfo[] }
+  | { type: 'sessions'; sessions: SessionInfo[]; query?: string; requestId?: string; error?: string }
   // 재접속했을 때 지나간 대화를 한 덩어리로 받는다 — 창은 그린 대화를 이걸로 통째로 갈아끼운다
   | { type: 'replay'; events: AgentEvent[]; restored?: boolean; restoreFailure?: { sessionId: string; message: string } }
 
