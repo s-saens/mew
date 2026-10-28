@@ -43,6 +43,34 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     const option = (project: string) => page.locator(`[data-project-option="${project}"]`)
     const active = () => page.evaluate('window.active')
 
+    for (const width of [1100, 390]) {
+      await page.setViewportSize({ width, height: 600 })
+      await page.locator('#project-input').focus()
+      for (const combo of ['p', 'Alt+Shift+P', 'Control+Alt+P', 'Meta+Alt+P']) await page.keyboard.press(combo)
+      assert.equal(await menu.count(), 0, 'only Alt+P opens the project menu')
+      for (const extra of [{ repeat: true }, { isComposing: true }]) {
+        await page.locator('#project-input').evaluate((element, extra) => element.dispatchEvent(new element.ownerDocument.defaultView!.KeyboardEvent('keydown', { key: 'p', code: 'KeyP', altKey: true, bubbles: true, cancelable: true, ...extra })), extra)
+        assert.equal(await menu.count(), 0)
+      }
+      await page.keyboard.press('Alt+p')
+      await menu.waitFor()
+      assert.equal(await trigger.getAttribute('aria-keyshortcuts'), 'Alt+P')
+      assert.equal(await option('/alpha').evaluate(el => el === el.ownerDocument.activeElement), true)
+      await page.keyboard.press('ArrowDown'); await page.keyboard.press('Enter')
+      await page.waitForFunction('window.active==="/beta"')
+      await page.locator('#project-input').focus()
+      await page.locator('#project-input').evaluate(element => element.dispatchEvent(new element.ownerDocument.defaultView!.KeyboardEvent('keydown', { key: 'π', code: 'KeyP', altKey: true, bubbles: true, cancelable: true })))
+      await menu.waitFor()
+      await option('/beta').focus(); await page.keyboard.press('Alt+p')
+      assert.equal(await option('/alpha').evaluate(el => el === el.ownerDocument.activeElement), true, 'reopening focuses the first project')
+      await page.keyboard.press('Escape')
+      assert.equal(await menu.count(), 0)
+      assert.equal(await trigger.evaluate(el => el === el.ownerDocument.activeElement), true)
+      await page.keyboard.press('Alt+1')
+      await page.waitForFunction('window.active==="/alpha"')
+    }
+    await page.evaluate('window.activations=[]')
+
     assert.equal(await trigger.textContent(), 'alpha')
     assert.equal(await page.locator('[data-project-tabs], [data-project-group], [data-project-drag]').count(), 0)
     assert.equal(await option('/beta').count(), 0, 'inactive projects are rendered only when the list opens')
@@ -118,6 +146,8 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
       assert.equal(await active(), '/beta')
       await page.locator('#project-modal').focus(); await page.keyboard.press('Alt+1')
       assert.equal(await active(), '/beta', 'modal input cannot switch the project behind it')
+      await page.keyboard.press('Alt+p')
+      assert.equal(await menu.count(), 0, 'modal input cannot open the background project menu')
       await page.locator('#project-input').focus()
       await page.locator('#project-input').evaluate(element => element.dispatchEvent(new element.ownerDocument.defaultView!.KeyboardEvent('keydown', { key: '¡', code: 'Digit1', altKey: true, bubbles: true, cancelable: true })))
       await page.waitForFunction('window.active==="/alpha"')
@@ -126,6 +156,9 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     await page.keyboard.press('Alt+2')
     assert.equal(await active(), '/alpha', 'remote keyboard keeps priority over project selection')
     assert.deepEqual(await page.evaluate('window.remoteKeys'), [['AltLeft', true], ['Digit2', true], ['Digit2', false], ['AltLeft', false]])
+    await page.keyboard.press('Alt+p')
+    assert.equal(await menu.count(), 0, 'remote keyboard keeps Alt+P')
+    assert.deepEqual((await page.evaluate('window.remoteKeys') as unknown[]).slice(-4), [['AltLeft', true], ['KeyP', true], ['KeyP', false], ['AltLeft', false]])
     await page.evaluate('window.stopRemote();window.setDialog(false)')
 
     await page.setViewportSize({ width: 1100, height: 600 })
@@ -242,6 +275,8 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     assert.equal(await page.locator('[data-current-project]').textContent(), 'gamma')
     await page.locator('#project-input').focus(); await page.keyboard.press('Alt+1')
     assert.equal(await active(), '/gamma')
+    await page.keyboard.press('Alt+p')
+    assert.equal(await menu.count(), 0, 'project access is required for Alt+P')
     assert.deepEqual(errors, [])
   } finally { await browser.close() }
 })

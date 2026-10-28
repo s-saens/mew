@@ -28,6 +28,7 @@ export function ProjectSwitcher({ paths, activePath, fallbackLabel, canOpen, can
 }) {
   const { t } = useI18n()
   const trigger = useRef<HTMLButtonElement>(null)
+  const menuElement = useRef<HTMLDivElement>(null)
   const contextMenuElement = useRef<HTMLDivElement>(null)
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
   const [contextMenu, setContextMenu] = useState<{ path: string; x: number; y: number; trigger: HTMLElement | null } | null>(null)
@@ -65,12 +66,21 @@ export function ProjectSwitcher({ paths, activePath, fallbackLabel, canOpen, can
   useEffect(() => {
     const select = (event: KeyboardEvent) => {
       if (event.defaultPrevented || !canOpen) return
+      const chooseMenu = event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey && !event.isComposing
+        && (event.code === 'KeyP' || event.key.toLowerCase() === 'p')
       const index = projectTabIndex(event)
-      if (index === null) return
+      if (!chooseMenu && index === null) return
       event.preventDefault()
       event.stopImmediatePropagation()
       const target = event.target instanceof Element ? event.target : document.activeElement
       if (event.repeat || target?.closest('[role="dialog"], [aria-modal="true"]')) return
+      if (chooseMenu) {
+        const box = trigger.current?.getBoundingClientRect()
+        if (box) setMenu({ x: box.left, y: box.bottom + 4 })
+        menuElement.current?.querySelector<HTMLButtonElement>('[data-action-menu-item]:not(:disabled)')?.focus({ preventScroll: true })
+        return
+      }
+      if (index === null) return
       const path = paths[index]
       if (path && path !== activePath) { setMenu(null); onActivate(path) }
     }
@@ -104,6 +114,7 @@ export function ProjectSwitcher({ paths, activePath, fallbackLabel, canOpen, can
     <div data-project-switcher-container className="flex h-full min-w-0 items-stretch">
       {canOpen || canChangeIcon ? <button ref={trigger} type="button" data-project-switcher data-current-project={activePath ?? ''}
         data-header-menu-trigger={canOpen || undefined}
+        aria-keyshortcuts={canOpen ? 'Alt+P' : undefined}
         aria-label={canOpen ? `${label} — ${t('project.choose')}` : label} aria-haspopup={canOpen ? 'menu' : undefined} aria-expanded={canOpen ? !!menu : undefined}
         title={activePath ?? label} className="flex h-full min-w-0 select-none items-center gap-1.5 px-2.5 text-xs text-ink hover:bg-surface-raised focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
         style={{ WebkitTouchCallout: 'none' }}
@@ -129,7 +140,7 @@ export function ProjectSwitcher({ paths, activePath, fallbackLabel, canOpen, can
         {content}
       </button> : <div data-project-switcher data-current-project={activePath ?? ''} title={activePath ?? label} className="flex h-full min-w-0 items-center gap-1.5 px-2.5 text-xs text-ink">{content}</div>}
     </div>
-    {canOpen && menu && <ActionMenu variant="header" x={menu.x} y={menu.y} label={t('project.choose')} trigger={trigger.current} outsideIgnore={() => contextMenuElement.current} onClose={() => { setContextMenu(null); setMenu(null) }}>
+    {canOpen && menu && <ActionMenu ref={menuElement} variant="header" x={menu.x} y={menu.y} label={t('project.choose')} trigger={trigger.current} outsideIgnore={() => contextMenuElement.current} onClose={() => { setContextMenu(null); setMenu(null) }}>
       <ProjectOrder paths={paths} activePath={activePath} onReorder={onReorder} renderItem={(path, move, index) => <ActionMenuItem style={{ flex: 1, minWidth: 0, width: 'auto' }} data-project-option={path} title={path} aria-keyshortcuts={index < 9 ? `Alt+${index + 1}` : undefined} role="menuitemradio" checked={path === activePath}
         icon={<span className="flex h-4 w-4 shrink-0 items-center justify-center" aria-hidden="true"><ProjectIcon icon={icons[path] ?? 'i:folder'} size={16} /></span>}
         hint={index < 9 && <kbd className="whitespace-nowrap font-sans text-[11px]">Alt+{index + 1}</kbd>}
