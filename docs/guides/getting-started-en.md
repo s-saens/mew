@@ -1,7 +1,7 @@
 ---
 title: "Getting started with mew"
-updated: "2026-10-23"
-description: "s-saens/mew 소스의 영어 설치·첫 로그인·목적별 사용법과 Mewlink·대체 외부 접속, 권한·업데이트·데이터 보존 및 미발행 CLI 경로를 안내한다. 햄버거 메뉴의 Mewlink 연결 진입을 포함한다."
+updated: "2026-10-28"
+description: "s-saens/mew 소스의 영어 설치·첫 로그인·파일탐색기 및 목적별 사용법과 Mewlink·대체 외부 접속, 권한·업데이트·데이터 보존 및 미발행 CLI 경로를 안내한다. 햄버거 메뉴의 Mewlink 연결 진입을 포함한다."
 ---
 
 # Getting started with mew
@@ -109,7 +109,7 @@ During setup, enter:
 
 Setup installs dependencies, prepares remote desktop components, builds the app, and starts the server. The first download can take a few minutes. A remote desktop preparation failure is reported as a warning and does not stop the rest of the installation.
 
-Open the URL printed by setup, sign in, and change the temporary password. Use **+** in the header to open a project folder, then select a file in the sidebar.
+Open the URL printed by setup, sign in, and change the temporary password. Use **+** in the header to open a project folder, then select a file in the File explorer.
 
 After a reboot, open Ubuntu or Terminal and start mew from its installation folder:
 
