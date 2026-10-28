@@ -7,11 +7,18 @@ const excluded = '.mobile-dock, [data-dock-tab-bar], [role="dialog"], [role="men
 
 function swipePanel(target: Element): TabbedPanel | null {
   if (target.closest(excluded)) return null
-  const panel = target.closest<HTMLElement>('[data-workspace-panel]')?.dataset.workspacePanel
+  const panelElement = target.closest<HTMLElement>('[data-workspace-panel]')
+  const panel = panelElement?.dataset.workspacePanel
   if (!panel || !tabbedPanels.includes(panel)) return null
   if (panel === 'editor') {
     const area = target.closest<HTMLElement>('[data-mobile-tab-swipe]')?.dataset.mobileTabSwipe
     if (area !== 'content' && !(area === 'key-bar' && target.closest('[data-mobile-key-bar]'))) return null
+    if (area === 'key-bar') return 'editor'
+  }
+  // Reserve the whole gesture for native scrolling, including at either edge.
+  for (let node: Element | null = target; node; node = node.parentElement) {
+    if (node.scrollWidth > node.clientWidth && /^(auto|scroll|overlay)$/.test(getComputedStyle(node).overflowX)) return null
+    if (node === panelElement) break
   }
   return panel as TabbedPanel
 }

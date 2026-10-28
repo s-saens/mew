@@ -37,6 +37,9 @@ function Fixture(){
         <div data-panel-body style={{flex:1}}>Body
           <div className="task-swipe" style={{height:40}}>Task deletion</div><div className="task-gantt-scroller" style={{height:40}}>Gantt scrolling</div><div data-gantt-grab style={{height:40}}>Gantt editing</div>
           <div role="dialog" style={{height:40}}>Dialog</div>
+          <div data-scroll-zone style={{width:280,height:80,overflowX:'auto'}}>
+            <table style={{width:960,tableLayout:'fixed'}}><tbody><tr><td><span data-scroll-target style={{display:'block',height:56}}>Wide table</span></td></tr></tbody></table>
+          </div>
         </div>
       </section>)}
     </div>
@@ -84,6 +87,7 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><I18nProvid
       await touch('touchEnd', [])
     }
     const state = () => page.evaluate<{ panel: string; active: string; index: number }>('({panel:window.swipeFixture.panel,active:window.swipeFixture.active,index:window.swipeFixture.index})')
+    const selectPanel = async (panel: string) => { await page.evaluate(`window.swipeFixture.setPanel(${JSON.stringify(panel)})`); await page.waitForFunction(`window.swipeFixture.panel===${JSON.stringify(panel)}`) }
     const select = async (path: string) => { await page.evaluate(`window.swipeFixture.select(${JSON.stringify(path)})`); await page.waitForFunction(`window.swipeFixture.active===${JSON.stringify(path)}`) }
     const contents = await page.evaluate('window.swipeFixture.tabs.map(tab=>tab.content)')
 
@@ -118,7 +122,7 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><I18nProvid
     assert.equal((await state()).panel, 'editor')
 
     for (const panel of ['sidebar', 'agent', 'terminal', 'git', 'tasks']) {
-      await page.evaluate(`window.swipeFixture.setPanel('${panel}')`)
+      await selectPanel(panel)
       const before = (await state()).index
       const body = `[data-workspace-panel="${panel}"] [data-panel-body]`
       await swipe(body, -100, 0, 400)
@@ -132,7 +136,35 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><I18nProvid
       await swipe(`[data-workspace-panel="tasks"] ${selector}`)
       assert.deepEqual(await state(), before, `${selector} retains its existing gestures`)
     }
-    await page.evaluate('window.swipeFixture.setPanel("memo")')
+    for (const panel of ['sidebar', 'agent', 'terminal', 'git', 'tasks']) {
+      await selectPanel(panel)
+      const zone = `[data-workspace-panel="${panel}"] [data-scroll-zone]`
+      const before = await state()
+      for (const [offset, dx] of [[0, -100], [300, 100], [0, 100], [680, -100]]) {
+        await page.locator(zone).evaluate((el, offset) => { el.scrollLeft = offset }, offset)
+        await swipe(zone, dx)
+        assert.deepEqual(await state(), before, `${panel} table scroll and edge gestures preserve the active tab`)
+        if (offset === 0 && dx < 0) assert.ok(await page.locator(zone).evaluate(el => el.scrollLeft) > 0, `${panel} table scrolls natively`)
+        if (offset === 300) assert.ok(await page.locator(zone).evaluate(el => el.scrollLeft) < offset, `${panel} table scrolls back natively`)
+      }
+    }
+    const zone = '[data-workspace-panel="tasks"] [data-scroll-zone]'
+    for (const mode of ['rtl', 'scroll', 'fitting', 'vertical', 'hidden']) {
+      await page.locator(zone).evaluate((el, mode) => {
+        el.setAttribute('style', `width:280px;height:80px;direction:${mode === 'rtl' ? 'rtl' : 'ltr'};overflow-x:${mode === 'hidden' ? 'hidden' : mode === 'scroll' ? 'scroll' : 'auto'};overflow-y:${mode === 'vertical' ? 'auto' : 'hidden'}`)
+        el.querySelector('table')!.setAttribute('style', `table-layout:fixed;width:${mode === 'fitting' || mode === 'vertical' ? 200 : 960}px;height:${mode === 'vertical' ? 500 : 56}px`)
+        el.scrollLeft = 0
+      }, mode)
+      const before = await state()
+      await swipe(zone, mode === 'rtl' ? 100 : -100)
+      if (mode === 'rtl' || mode === 'scroll') {
+        assert.deepEqual(await state(), before, `${mode} overflow keeps its native horizontal gesture`)
+        assert.notEqual(await page.locator(zone).evaluate(el => el.scrollLeft), 0, `${mode} overflow scrolls natively`)
+      } else {
+        assert.equal((await state()).index, (before.index + 1) % 3, `${mode} content still allows body tab swipes`)
+      }
+    }
+    await selectPanel('memo')
     const memo = await state()
     await swipe('[data-workspace-panel="memo"] [data-panel-body]', -100, 0, 400)
     assert.deepEqual(await state(), memo, 'panels without tabs do not fall back to editor navigation')
@@ -190,7 +222,7 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><I18nProvid
     await page.setViewportSize({ width: 1100, height: 844 })
     await page.locator(bar).waitFor({ state: 'detached' })
     assert.equal(await page.locator(bar).count(), 0, 'the source key bar is mobile only')
-    await page.evaluate('window.swipeFixture.setPanel("tasks")')
+    await selectPanel('tasks')
     const desktop = await state()
     await swipe('[data-workspace-panel="tasks"] [data-panel-body]', -100, 0, 400)
     assert.deepEqual(await state(), desktop, 'desktop touch retains its existing behavior')
