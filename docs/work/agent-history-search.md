@@ -5,7 +5,7 @@ created: "2026-10-28"
 updated: "2026-10-28"
 ---
 
-2026-10-28 작업 기록. 현재 계약은 [세션 계약](../development/agent-sessions.md#히스토리-검색)과 [대화 기능 문서](../features/터미널·에이전트·자동화/에이전트%20대화·큐·복원.md#히스토리-검색), 사용법은 [터미널·에이전트 안내](../guides/terminal-agents.md#대화-진행과-기록), 선택 근거는 [결정 0083](../decisions/0083-agent-history-search.md)을 따른다.
+2026-10-28 작업 기록. 현재 계약은 [세션 계약](../development/agent-sessions.md#히스토리-검색)과 [대화 기능 문서](../features/터미널·에이전트·자동화/에이전트%20대화·큐·복원.md#히스토리-검색), 사용법은 [터미널·에이전트 안내](../guides/terminal-agents.md#대화-진행과-기록), 선택 근거는 [결정 0084](../decisions/0084-agent-history-search.md)을 따른다.
 
 ## 목적과 결과 동작
 
