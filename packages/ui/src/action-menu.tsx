@@ -53,8 +53,18 @@ export function ActionMenu({ x, y, onClose, children, label, trigger, portalCont
 
   useEffect(() => {
     if (!container) return
+    let switchTimer: ReturnType<typeof setTimeout> | undefined
+    function isOtherHeaderTrigger(e: MouseEvent) {
+      const nextTrigger = e.target instanceof Element ? e.target.closest<HTMLButtonElement>('button[data-header-menu-trigger]') : null
+      return variant === 'header' && e.button === 0 && nextTrigger && !nextTrigger.disabled && nextTrigger !== trigger
+    }
+    function onClick(e: MouseEvent) {
+      // 새 메뉴의 클릭 처리가 끝난 뒤 닫아 뒤로가기 가드가 중간에 제거되지 않게 한다.
+      if (isOtherHeaderTrigger(e)) switchTimer = setTimeout(() => close(false), 0)
+    }
     function onDown(e: PointerEvent) {
       if (!ref.current || ref.current.contains(e.target as Node) || outsideIgnoreRef.current?.()?.contains(e.target as Node)) return
+      if (isOtherHeaderTrigger(e)) return
       e.preventDefault()
       e.stopPropagation()
       close()
@@ -75,8 +85,13 @@ export function ActionMenu({ x, y, onClose, children, label, trigger, portalCont
       const timer = setTimeout(clear, 1000)
     }
     document.addEventListener('pointerdown', onDown, true)
-    return () => document.removeEventListener('pointerdown', onDown, true)
-  }, [container])
+    document.addEventListener('click', onClick, true)
+    return () => {
+      clearTimeout(switchTimer)
+      document.removeEventListener('pointerdown', onDown, true)
+      document.removeEventListener('click', onClick, true)
+    }
+  }, [container, variant, trigger])
 
   useLayoutEffect(() => {
     const menu = ref.current

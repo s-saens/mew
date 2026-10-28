@@ -30,6 +30,7 @@ export function HeaderMenu({ items }: { items: HeaderMenuItem[] }) {
       <HoverTipLayer className="contents" placement="bottom"><button
         ref={trigger}
         type="button"
+        data-header-menu-trigger
         onClick={() => {
           const rect = trigger.current!.getBoundingClientRect()
           setPosition({ x: rect.left, y: rect.bottom + 4 }); setOpen(v => !v)

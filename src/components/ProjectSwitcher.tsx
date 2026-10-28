@@ -103,6 +103,7 @@ export function ProjectSwitcher({ paths, activePath, fallbackLabel, canOpen, can
   return <>
     <div data-project-switcher-container className="flex h-full min-w-0 items-stretch">
       {canOpen || canChangeIcon ? <button ref={trigger} type="button" data-project-switcher data-current-project={activePath ?? ''}
+        data-header-menu-trigger={canOpen || undefined}
         aria-label={canOpen ? `${label} — ${t('project.choose')}` : label} aria-haspopup={canOpen ? 'menu' : undefined} aria-expanded={canOpen ? !!menu : undefined}
         title={activePath ?? label} className="flex h-full min-w-0 select-none items-center gap-1.5 px-2.5 text-xs text-ink hover:bg-surface-raised focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
         style={{ WebkitTouchCallout: 'none' }}

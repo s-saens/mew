@@ -143,13 +143,23 @@ export function CommandButtonMenu({
   // 바깥을 누르면 드롭다운을 닫는다 (드롭다운이 포털이라 DOM 상 부모가 아니어서 둘 다 확인한다)
   useEffect(() => {
     if (!open) return
-    function onDown(e: PointerEvent) {
+    let switchTimer: ReturnType<typeof setTimeout> | undefined
+    function onOutside(e: MouseEvent) {
       const target = e.target as Node
       if (btnRef.current?.contains(target) || triggerRef?.current?.contains(target) || menuRef.current?.contains(target)) return
+      if (e.button === 0 && target instanceof Element && target.closest('button[data-header-menu-trigger]:not(:disabled)')) {
+        if (e.type === 'click') switchTimer = setTimeout(() => setOpen(false), 0)
+        return
+      }
       setOpen(false)
     }
-    document.addEventListener('pointerdown', onDown, true)
-    return () => document.removeEventListener('pointerdown', onDown, true)
+    document.addEventListener('pointerdown', onOutside, true)
+    document.addEventListener('click', onOutside, true)
+    return () => {
+      clearTimeout(switchTimer)
+      document.removeEventListener('pointerdown', onOutside, true)
+      document.removeEventListener('click', onOutside, true)
+    }
   }, [open, setOpen, triggerRef])
 
   async function run(button: CmdButtonState) {
@@ -231,6 +241,7 @@ export function CommandButtonMenu({
       {!hideTrigger && <HoverTipLayer className="contents" placement="bottom"><button
         ref={btnRef}
         type="button"
+        data-header-menu-trigger={!inline || undefined}
         onClick={(e) => {
           e.stopPropagation()
           setOpen((v) => !v)
