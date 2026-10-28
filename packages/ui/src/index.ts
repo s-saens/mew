@@ -1,4 +1,5 @@
 export { ActionMenuSurface } from './action-menu'
+export { MenuReorderHandle } from './menu-reorder-handle'
 export { ConfirmDialog } from './ConfirmDialog'
 export { DialogFrame } from './dialog-frame'
 export { DateField } from './date-field'

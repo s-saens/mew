@@ -32,10 +32,19 @@ createRoot(document.getElementById('root')).render(<I18nProvider><CommandButtonM
     page.setDefaultTimeout(5_000)
     const errors: string[] = []
     page.on('pageerror', error => errors.push(error.message))
-    let running = false, ports: number[] = [], runs = 0, stops = 0
-    await page.route('http://mew-command.test/**', route => {
+    let running = false, ports: number[] = [], runs = 0, stops = 0, writes = 0, failSave = false
+    const runNames: string[] = []
+    let entries = [
+      { name: '개발 서버 이름이 길어도 동작', command: 'npm run dev', oneShot: false, session: 'mewcmd-dev' },
+      { name: '종료된 서버', command: 'echo http://localhost:4444', oneShot: true, session: 'mewcmd-stopped' },
+      { name: '이전 서버', command: 'npm test', oneShot: false, session: 'mewcmd-old' },
+    ]
+    const states = () => entries.map(button => ({ ...button, running: button.session === 'mewcmd-dev' ? running : button.session === 'mewcmd-old',
+      ports: button.session === 'mewcmd-dev' ? ports : button.session === 'mewcmd-stopped' ? [4444] : undefined }))
+    await page.route('http://mew-command.test/**', async route => {
       const url = new URL(route.request().url())
       if (url.pathname === '/api/cmd-buttons/run') {
+        runNames.push(route.request().postDataJSON().name)
         runs++; running = true; ports = [3333, 5555, 12345, 65535]
         return route.fulfill({ json: { ok: true, session: 'mewcmd-dev' } })
       }
@@ -43,11 +52,16 @@ createRoot(document.getElementById('root')).render(<I18nProvider><CommandButtonM
         stops++; running = false; ports = []
         return route.fulfill({ json: { ok: true } })
       }
-      if (url.pathname === '/api/cmd-buttons') return route.fulfill({ json: { buttons: [
-        { name: '개발 서버 이름이 길어도 동작', command: 'npm run dev', oneShot: false, session: 'mewcmd-dev', running, ports },
-        { name: '종료된 서버', command: 'echo http://localhost:4444', oneShot: false, session: 'mewcmd-stopped', running: false, ports: [4444] },
-        { name: '이전 서버', command: 'npm test', oneShot: false, session: 'mewcmd-old', running: true },
-      ] } })
+      if (url.pathname === '/api/cmd-buttons') {
+        if (route.request().method() === 'PUT') {
+          writes++
+          if (failSave) { failSave = false; return route.fulfill({ status: 500, json: { error: 'Order save failed' } }) }
+          await new Promise(resolve => setTimeout(resolve, 80))
+          const next = route.request().postDataJSON().buttons as typeof entries
+          entries = next.map(button => ({ ...entries.find(entry => entry.name === button.name)!, ...button }))
+        }
+        return route.fulfill({ json: { buttons: states() } })
+      }
       return route.fulfill({ contentType: 'text/html', body: `<!doctype html><html lang="ko" class="${dark ? 'dark' : ''}"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}
       :root{--color-surface:${dark ? '#14151a' : '#fff'};--color-surface-solid:var(--color-surface);--color-surface-raised:${dark ? '#202228' : '#f8f8fa'};--color-surface-raised-solid:var(--color-surface-raised);--color-surface-hover:${dark ? '#30343e' : '#e4e7ef'};--color-surface-hover-solid:var(--color-surface-hover);--color-ink:${dark ? '#f4f4f6' : '#202128'};--color-ink-muted:${dark ? '#bbc0cd' : '#5b6170'};--color-accent:${dark ? '#a0baff' : '#234db3'};--color-accent-strong:var(--color-accent);--color-edge:#707789;--color-edge-bright:#707789;--color-danger-strong:${dark ? '#ffacac' : '#a31616'}}
       body{background:var(--color-surface);color:var(--color-ink);font:14px sans-serif;margin:0;padding:8px}button{color:inherit}
@@ -68,13 +82,23 @@ createRoot(document.getElementById('root')).render(<I18nProvider><CommandButtonM
     assert.equal(runs, 1)
     assert.equal(await menu.locator('.mew-action-menu-port').count(), 4, 'stale ports on stopped commands and old API responses do not add buttons')
     const order = await row.locator('button').allTextContents()
-    assert.deepEqual(order.slice(1, 5), ['3333', '5555', '12345', '65535'], 'ports precede stop and terminal actions')
+    assert.deepEqual(order.slice(2, 6), ['3333', '5555', '12345', '65535'], 'the handle precedes the command and its port actions')
+    assert.equal(await row.getAttribute('data-active'), 'true', 'running state highlights the row')
+    const positions = await row.evaluate(el => {
+      const handle = el.querySelector('[data-command-drag-handle]')!.getBoundingClientRect()
+      const name = el.querySelector('[data-command-choice]')!.getBoundingClientRect()
+      const hint = el.querySelector('kbd')!.getBoundingClientRect()
+      const terminal = el.querySelector('button:last-of-type')!.getBoundingClientRect()
+      const port = el.querySelector('.mew-action-menu-port')!.getBoundingClientRect()
+      return { handleBeforeName: handle.right <= name.left, hintAfterActions: terminal.right <= hint.left, portsBelow: port.top >= name.bottom }
+    })
+    assert.deepEqual(positions, { handleBeforeName: true, hintAfterActions: true, portsBelow: true })
     const bounds = await menu.boundingBox(); assert.ok(bounds)
     assert.ok(bounds.x >= 0 && bounds.x + bounds.width <= width)
     assert.ok(Math.abs(bounds.width - Math.min(308, width * 0.9)) < 1, 'menu is 40% wider than 220px and never exceeds 90vw')
     assert.equal(await menu.evaluate(el => el.scrollWidth <= el.clientWidth), true, 'port list scrolls without widening the dropdown')
     const density = await row.evaluate(el => {
-      const view = el.ownerDocument.defaultView!, name = el.querySelector('button')!, port = el.querySelector('.mew-action-menu-port')!
+      const view = el.ownerDocument.defaultView!, name = el.querySelector('[data-command-choice]')!, port = el.querySelector('.mew-action-menu-port')!
       const text = name.querySelector('span')!, icon = el.querySelector('.mew-action-menu-icon')!
       const item = view.getComputedStyle(name), badge = view.getComputedStyle(port)
       return { font: item.fontSize, padding: item.padding, height: name.getBoundingClientRect().height,
@@ -82,10 +106,10 @@ createRoot(document.getElementById('root')).render(<I18nProvider><CommandButtonM
         portFont: badge.fontSize, border: badge.borderTopWidth, radius: badge.borderRadius, background: badge.backgroundColor,
         portHeight: port.getBoundingClientRect().height }
     })
-    assert.equal(density.font, '13px'); assert.equal(density.padding, '4px 6px')
-    assert.equal(density.height, width <= 390 ? 36 : 30)
+    assert.equal(density.font, '14px'); assert.equal(density.padding, '6px 10px')
+    assert.equal(density.height, width <= 390 ? 40 : 32)
     assert.ok(density.textWidth >= 80, 'long command names retain usable width even with four ports')
-    assert.equal(density.iconWidth, 28)
+    assert.equal(density.iconWidth, 32)
     assert.equal(density.portFont, '12px'); assert.equal(density.border, '1px'); assert.equal(density.radius, '4px')
     assert.notEqual(density.background, 'rgba(0, 0, 0, 0)', 'port numbers have their own visible surface')
     assert.equal(density.portHeight, width <= 390 ? 32 : 26)
@@ -130,6 +154,52 @@ createRoot(document.getElementById('root')).render(<I18nProvider><CommandButtonM
     await page.keyboard.press('Control+e')
     assert.equal(await command.evaluate(el => el === el.ownerDocument.activeElement), true)
     assert.equal(runs, 1); assert.equal(stops, 1)
+    if (width === 1100) await page.setViewportSize({ width, height: 700 })
+    const commandOrder = () => menu.locator('[data-command-name]').evaluateAll(elements => elements.map(el => el.getAttribute('data-command-name')))
+    const handle = menu.locator('[data-command-drag-handle]').first()
+    await handle.focus()
+    await page.keyboard.press('ArrowDown')
+    await page.keyboard.press('ArrowDown')
+    await page.keyboard.press('ArrowUp')
+    await page.waitForResponse(response => response.request().method() === 'PUT' && response.url().includes('/api/cmd-buttons'))
+    await page.waitForTimeout(150)
+    assert.deepEqual(await commandOrder(), ['종료된 서버', '개발 서버 이름이 길어도 동작', '이전 서버'])
+    assert.deepEqual(entries.map(button => button.name), await commandOrder(), 'rapid moves are saved in order')
+    assert.equal(entries[0].oneShot, true, 'reordering preserves command options')
+    assert.deepEqual(await menu.locator('kbd').allTextContents(), ['1', '2', '3'])
+    const from = await menu.locator('[data-command-drag-handle]').last().boundingBox()
+    const to = await menu.locator('[data-command-name]').first().boundingBox()
+    assert.ok(from && to)
+    if (width <= 390) {
+      const cdp = await page.context().newCDPSession(page)
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: from.x + from.width / 2, y: from.y + from.height / 2, id: 3 }] })
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: from.x + from.width / 2, y: to.y + 2, id: 3 }] })
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+      await cdp.detach()
+    } else {
+      await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2)
+      await page.mouse.down()
+      await page.mouse.move(from.x + from.width / 2, to.y + 2, { steps: 8 })
+      await page.mouse.up()
+    }
+    await page.waitForTimeout(150)
+    assert.deepEqual(await commandOrder(), ['이전 서버', '종료된 서버', '개발 서버 이름이 길어도 동작'])
+    assert.deepEqual(entries.map(button => button.name), await commandOrder(), 'dragged order persists')
+    assert.equal(runs, 1, 'handles never execute commands')
+    const previousWrites = writes
+    failSave = true
+    await menu.locator('[data-command-drag-handle]').first().focus()
+    await page.keyboard.press('ArrowDown')
+    await menu.getByText('Order save failed', { exact: true }).waitFor()
+    assert.equal(writes, previousWrites + 1)
+    assert.deepEqual(await commandOrder(), entries.map(button => button.name), 'failed saves restore the last saved order')
+    await page.keyboard.press('1')
+    await page.waitForTimeout(150)
+    assert.equal(runNames.at(-1), '이전 서버', 'numeric selection follows the reordered list')
+    await page.keyboard.press('Escape')
+    await page.keyboard.press('Alt+r')
+    await menu.locator('[data-command-choice]').first().waitFor()
+    assert.deepEqual(await commandOrder(), entries.map(button => button.name))
     assert.deepEqual(errors, [])
     await page.close()
   }

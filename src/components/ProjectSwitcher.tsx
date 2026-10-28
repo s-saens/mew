@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useId, useMemo, useRef, useState } from 'react'
-import { Check, EditPencil, Plus, Trash, Xmark } from 'iconoir-react'
-import { ActionMenu, ActionMenuItem, ActionMenuSeparator, DialogFrame, useDragReorder } from '@mew/ui'
+import { EditPencil, Plus, Trash, Xmark } from 'iconoir-react'
+import { ActionMenu, ActionMenuItem, ActionMenuSeparator, DialogFrame, MenuReorderHandle, useDragReorder } from '@mew/ui'
 import { projectTabIndex } from '@mew/shortcuts'
 import { useI18n } from '../i18n'
 import { ProjectIcon } from './ProjectIcon'
@@ -130,12 +130,9 @@ export function ProjectSwitcher({ paths, activePath, fallbackLabel, canOpen, can
       </button> : <div data-project-switcher data-current-project={activePath ?? ''} title={activePath ?? label} className="flex h-full min-w-0 items-center gap-1.5 px-2.5 text-xs text-ink">{content}</div>}
     </div>
     {canOpen && menu && <ActionMenu variant="header" x={menu.x} y={menu.y} label={t('project.choose')} trigger={trigger.current} outsideIgnore={() => contextMenuElement.current} onClose={() => { setContextMenu(null); setMenu(null) }}>
-      <ProjectOrder paths={paths} onReorder={onReorder} renderItem={(path, move, index) => <ActionMenuItem style={{ flex: 1, minWidth: 0, width: 'auto' }} data-project-option={path} title={path} aria-keyshortcuts={index < 9 ? `Alt+${index + 1}` : undefined} role="menuitemradio" checked={path === activePath}
+      <ProjectOrder paths={paths} activePath={activePath} onReorder={onReorder} renderItem={(path, move, index) => <ActionMenuItem style={{ flex: 1, minWidth: 0, width: 'auto' }} data-project-option={path} title={path} aria-keyshortcuts={index < 9 ? `Alt+${index + 1}` : undefined} role="menuitemradio" checked={path === activePath}
         icon={<span className="flex h-4 w-4 shrink-0 items-center justify-center" aria-hidden="true"><ProjectIcon icon={icons[path] ?? 'i:folder'} size={16} /></span>}
-        hint={<span className="flex items-center gap-1.5">
-          {index < 9 && <kbd className="whitespace-nowrap font-sans text-[11px]">Alt+{index + 1}</kbd>}
-          <span className="flex h-4 w-4 items-center justify-center">{path === activePath && <Check aria-hidden="true" />}</span>
-        </span>}
+        hint={index < 9 && <kbd className="whitespace-nowrap font-sans text-[11px]">Alt+{index + 1}</kbd>}
         onPointerEnter={() => { if (path !== activePath) onPreview?.(path) }} onFocus={() => { if (path !== activePath) onPreview?.(path) }}
         onClick={() => { if (path !== activePath) onActivate(path) }}
         onContextMenu={event => { if (canChangeIcon) { event.preventDefault(); openContextMenu(path, event.clientX, event.clientY, event.currentTarget) } }}
@@ -163,8 +160,9 @@ export function ProjectSwitcher({ paths, activePath, fallbackLabel, canOpen, can
   </>
 }
 
-function ProjectOrder({ paths, onReorder, renderItem }: {
+function ProjectOrder({ paths, activePath, onReorder, renderItem }: {
   paths: string[]
+  activePath: string | null
   onReorder?: (paths: string[]) => void
   renderItem: (path: string, move: (direction: number) => void, index: number) => React.ReactNode
 }) {
@@ -178,22 +176,11 @@ function ProjectOrder({ paths, onReorder, renderItem }: {
   const drag = useDragReorder({ axis: 'y', handleOnly: true, onReorder: reorder })
   return paths.map((path, index) => {
     const { ref, ...handleProps } = drag.getItemProps(index)
-    return <div key={path} ref={ref} role="none" data-project-row={path} className={`flex items-center ${drag.dragIndex === index ? 'opacity-60' : ''}`}>
-      {onReorder && paths.length > 1 && <button type="button" {...handleProps}
+    return <div key={path} ref={ref} role="none" data-project-row={path} data-active={path === activePath || undefined} className={`mew-sortable-menu-row ${drag.dragIndex === index ? 'opacity-60' : ''}`}>
+      {onReorder && paths.length > 1 && <MenuReorderHandle {...handleProps}
         data-project-drag-handle={path} aria-label={`${labelOf(path)} · ${t('project.reorder')}`} data-tip={t('project.reorder')}
         onClick={event => { event.stopPropagation(); drag.consumeClick() }}
-        onKeyDown={event => {
-          if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return
-          event.preventDefault(); event.stopPropagation()
-          reorder(index, index + (event.key === 'ArrowUp' ? -1 : 1))
-        }}
-        className="flex h-8 w-7 shrink-0 touch-none cursor-grab items-center justify-center rounded text-ink-muted hover:bg-surface-raised hover:text-ink active:cursor-grabbing focus-visible:outline-2 focus-visible:outline-accent">
-        <svg width="12" height="14" viewBox="0 0 12 14" fill="currentColor" aria-hidden="true">
-          <circle cx="4" cy="3" r="1" /><circle cx="8" cy="3" r="1" />
-          <circle cx="4" cy="7" r="1" /><circle cx="8" cy="7" r="1" />
-          <circle cx="4" cy="11" r="1" /><circle cx="8" cy="11" r="1" />
-        </svg>
-      </button>}
+        onMove={direction => reorder(index, index + direction)} />}
       {renderItem(path, direction => reorder(index, index + direction), index)}
     </div>
   })

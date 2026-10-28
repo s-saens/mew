@@ -125,7 +125,7 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><I18nProvid
       }
       const metrics = async (selector: string) => page.locator(selector).evaluate(el => {
         const view = el.ownerDocument.defaultView!, surface = view.getComputedStyle(el)
-        const row = el.querySelector('button')!, item = view.getComputedStyle(row)
+        const row = el.querySelector('[data-action-menu-item], [data-command-choice]')!, item = view.getComputedStyle(row)
         return { width: el.getBoundingClientRect().width, font: item.font, lineHeight: item.lineHeight,
           height: row.getBoundingClientRect().height, padding: item.padding, gap: item.gap,
           radius: surface.borderRadius, surfacePadding: surface.padding,
@@ -146,12 +146,12 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><I18nProvid
       assert.ok(commandRect.y >= 4 && commandRect.y + commandRect.height <= 800)
       const commandMetrics = await metrics('[data-cmd-overlay]')
       assert.equal(commandMetrics.width, Math.min(308, width * 0.9))
-      assert.match(commandMetrics.font, /13px/)
-      assert.equal(commandMetrics.lineHeight, '18px')
-      assert.equal(commandMetrics.height, width === 390 ? 36 : 30)
-      assert.equal(commandMetrics.padding, '4px 6px')
-      assert.equal(commandMetrics.gap, '6px')
-      assert.equal(commandMetrics.surfacePadding, '3px')
+      assert.equal(commandMetrics.font, reference.font)
+      assert.equal(commandMetrics.lineHeight, reference.lineHeight)
+      assert.equal(commandMetrics.height, reference.height)
+      assert.equal(commandMetrics.padding, reference.padding)
+      assert.equal(commandMetrics.gap, reference.gap)
+      assert.equal(commandMetrics.surfacePadding, reference.surfacePadding)
       assert.equal(commandMetrics.radius, reference.radius)
       assert.equal(commandMetrics.background, reference.background, 'command dropdown retains the shared header surface')
       assert.equal(commandMetrics.backdrop, reference.backdrop)

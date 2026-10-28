@@ -1,16 +1,16 @@
-import { ActionMenuSurface, canAutoFocusInput, HoverTipLayer } from '@mew/ui'
+import { ActionMenuSurface, canAutoFocusInput, HoverTipLayer, MenuReorderHandle, useDragReorder, type DragItemProps } from '@mew/ui'
 import { uiText } from '@mew/ui/i18n-core'
 import { useUiLocale } from '@mew/ui/i18n'
 // 프로젝트 탭의 ▶ 아이콘 버튼 = 명령어 버튼. 누르면 그 프로젝트의 <프로젝트>/.mew/cmd-button.json 에
 // 정의된 명령들을 이름으로 나열한다. 각 줄엔 ▶(내부 tmux 세션에서 실행)과 터미널 아이콘(세션 팝업)이
 // 있고, 줄을 꾹 누르거나 우클릭하면 수정·삭제가 뜬다. 맨 아래 +로 새 명령을 추가한다.
-// **실행 중인 줄의 ▶는 ■(정지)가 된다** — 누르면 그 명령의 세션만 죽는다(파란 점도 함께 꺼진다).
+// **실행 중인 줄의 ▶는 ■(정지)가 된다** — 누르면 그 명령의 세션만 죽고 행 강조가 해제된다.
 // 실행 세션은 특수 이름(mewcmd-*)이라 터미널 탭 목록엔 뜨지 않는다.
 //
 // 목록은 프로젝트 탭마다 뜨므로 project를 반드시 인자로 받는다 — 활성 프로젝트가 아닌 탭의
 // 메뉴도 열 수 있기 때문이다. 드롭다운은 프로젝트 탭 줄이 가로 스크롤 컨테이너라 그 안에
 // absolute로 두면 잘린다 — 그래서 body로 포털해 fixed로 띄운다.
-import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
 import { useOverlayDismiss } from '@mew/ui'
 import { fetchCmdButtons, killTmuxSession, runCmdButton, saveCmdButtons, type CmdButtonState } from '../api/client'
@@ -68,6 +68,11 @@ export function CommandButtonMenu({
   const [anchor, setAnchor] = useState<{ top: number; left: number } | null>(null)
   const btnRef = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
+  const buttonsRef = useRef(buttons)
+  useLayoutEffect(() => { buttonsRef.current = buttons }, [buttons])
+  const refreshSequence = useRef(0)
+  const savingOrder = useRef(false)
+  const queuedOrder = useRef<CmdButtonState[] | null>(null)
 
   const closeMenu = useCallback(() => {
     setOpen(false)
@@ -100,12 +105,16 @@ export function CommandButtonMenu({
   useOverlayDismiss(open && !inline && closeMenu)
 
   const refresh = useCallback(() => {
+    if (savingOrder.current) return
+    const sequence = ++refreshSequence.current
     fetchCmdButtons(project, directory)
       .then((res) => {
+        if (sequence !== refreshSequence.current || savingOrder.current) return
         setButtons(res.buttons)
         setError(null)
       })
       .catch((err) => {
+        if (sequence !== refreshSequence.current || savingOrder.current) return
         setButtons([])
         setError(err instanceof Error ? err.message : uiText("불러오기 실패"))
       })
@@ -206,6 +215,38 @@ export function CommandButtonMenu({
   }
 
   const list = buttons ?? []
+  function reorder(from: number, to: number) {
+    const current = buttonsRef.current ?? []
+    if (from === to || from < 0 || to < 0 || from >= current.length || to >= current.length) return
+    const next = [...current]
+    next.splice(to, 0, next.splice(from, 1)[0])
+    buttonsRef.current = next
+    setButtons(next)
+    refreshSequence.current++
+    queuedOrder.current = next
+    if (savingOrder.current) return
+    savingOrder.current = true
+    setError(null)
+    void (async () => {
+      let saved = current
+      try {
+        while (queuedOrder.current) {
+          const order = queuedOrder.current
+          queuedOrder.current = null
+          const res = await saveCmdButtons(project, order.map(({ name, command, oneShot }) => ({ name, command, oneShot })), directory)
+          saved = res.buttons
+        }
+      } catch (err) {
+        queuedOrder.current = null
+        buttonsRef.current = saved
+        setButtons(saved)
+        setError(err instanceof Error ? err.message : uiText('저장 실패'))
+      } finally {
+        savingOrder.current = false
+      }
+    })()
+  }
+  const drag = useDragReorder({ axis: 'y', handleOnly: true, onReorder: reorder })
   const MenuSurface = inline ? 'div' : ActionMenuSurface
 
   const menu = (
@@ -225,7 +266,7 @@ export function CommandButtonMenu({
         <div className="px-3 py-3 text-xs text-ink-muted">{uiText("불러오는 중…")}</div>
       ) : (
         list.map((b, i) => (
-          <CmdRow key={`${b.name}-${i}`} button={b} shortcut={i < 9 ? String(i + 1) : undefined} busy={busyName === b.name} onRun={() => run(b)} onStop={() => stop(b)} onOpenPort={openPort} onOpenSession={() => { setPopup(b); setOpen(false) }} onEdit={() => startEditing({ index: i, name: b.name, command: b.command, oneShot: b.oneShot })} />
+          <CmdRow key={b.name} button={b} shortcut={i < 9 ? String(i + 1) : undefined} dragProps={list.length > 1 ? drag.getItemProps(i) : undefined} dragging={drag.dragIndex === i} onMove={direction => reorder(i, i + direction)} onConsumeClick={drag.consumeClick} busy={busyName === b.name} onRun={() => run(b)} onStop={() => stop(b)} onOpenPort={openPort} onOpenSession={() => { setPopup(b); setOpen(false) }} onEdit={() => startEditing({ index: i, name: b.name, command: b.command, oneShot: b.oneShot })} />
         ))
       )}
       {buttons !== null && list.length === 0 && !error && <div className="px-3 py-2 text-xs text-ink-muted">{uiText("아직 명령이 없습니다.")}</div>}
@@ -310,6 +351,10 @@ export function CommandButtonMenu({
 function CmdRow({
   button,
   shortcut,
+  dragProps,
+  dragging,
+  onMove,
+  onConsumeClick,
   busy,
   onRun,
   onStop,
@@ -319,6 +364,10 @@ function CmdRow({
 }: {
   button: CmdButtonState
   shortcut?: string
+  dragProps?: DragItemProps
+  dragging: boolean
+  onMove: (direction: -1 | 1) => void
+  onConsumeClick: () => boolean
   busy: boolean
   onRun: () => void
   /** 실행 중일 때 재생 버튼이 하는 일 — 이 명령의 세션 종료 */
@@ -339,9 +388,19 @@ function CmdRow({
   }, [])
 
   useEffect(() => cancelPress, [cancelPress])
+  const { ref, ...handleProps } = dragProps ?? {}
 
   return (
-    <div data-command-row className="mew-action-menu-row">
+    <div ref={ref} data-command-row data-command-name={button.name} data-active={button.running || undefined} className={`mew-action-menu-row mew-sortable-menu-row ${dragging ? 'opacity-60' : ''}`}
+      onKeyDown={event => {
+        if (!event.nativeEvent.isComposing && event.shiftKey && (event.key === 'ArrowUp' || event.key === 'ArrowDown')) {
+          event.preventDefault(); event.stopPropagation()
+          onMove(event.key === 'ArrowUp' ? -1 : 1)
+        }
+      }}>
+      {dragProps && <MenuReorderHandle {...handleProps} data-command-drag-handle={button.name}
+        aria-label={`${button.name} · ${uiText('드래그해서 순서 변경')}`} data-tip={uiText('드래그해서 순서 변경')}
+        onClick={event => { event.stopPropagation(); onConsumeClick() }} onMove={onMove} />}
       <button
         type="button"
         data-command-choice
@@ -375,9 +434,8 @@ function CmdRow({
         style={{ touchAction: 'manipulation' }}
         title={uiText("{p0}\n(꾹 누르거나 우클릭하면 수정)", { p0: button.command })}
       >
-        <span className="truncate">{shortcut && <kbd aria-hidden="true" className="mr-1 font-sans text-[11px] text-ink-muted">{shortcut}</kbd>}{button.name}</span>
+        <span className="truncate">{button.name}</span>
       </button>
-      {button.running && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-blue-500" title={uiText("실행 세션 있음")} />}
       {button.running && !!button.ports?.length && <HoverTipLayer className="mew-action-menu-ports">
         {button.ports.map(port => <button
           key={port}
@@ -410,6 +468,7 @@ function CmdRow({
       >
         <TerminalGlyph />
       </button>
+      {shortcut && <span className="mew-action-menu-hint mew-command-shortcut" aria-hidden="true"><kbd className="whitespace-nowrap font-sans text-[11px]">{shortcut}</kbd></span>}
     </div>
   )
 }

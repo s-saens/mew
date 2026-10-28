@@ -40,7 +40,7 @@ test('Ctrl+E consumes browser/editor input, ignores modifiers and repeats, and c
 test('arrows move between command rows and actions, wrap, and skip disabled buttons', async () => {
   const win = new Window()
   const menu = win.document.createElement('div')
-  menu.innerHTML = '<div data-command-row><button>A</button><button>Run A</button><button>Terminal A</button></div>'
+  menu.innerHTML = '<div data-command-row><button data-command-drag-handle>Handle A</button><button data-command-choice>A</button><button>Run A</button><button>Terminal A</button></div>'
     + '<div data-command-row><button disabled>B</button><button disabled>Run B</button><button>Terminal B</button></div>'
     + '<div data-command-row><button>Add</button></div>'
   win.document.body.append(menu)

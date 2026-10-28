@@ -13,7 +13,9 @@ export function captureCommandMenuShortcut(open: () => void): () => void {
 }
 
 export function focusFirstCommand(menu: HTMLElement | null) {
-  menu?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus()
+  const first = menu?.querySelector<HTMLButtonElement>('[data-command-choice]:not(:disabled)')
+    ?? menu?.querySelector<HTMLButtonElement>('button:not(:disabled)')
+  first?.focus()
 }
 
 export function navigateCommandMenu(event: KeyboardEvent, menu: HTMLElement) {
@@ -32,7 +34,7 @@ export function navigateCommandMenu(event: KeyboardEvent, menu: HTMLElement) {
   }
   if (!['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
   const rows = Array.from(menu.querySelectorAll<HTMLElement>('[data-command-row]'))
-    .map(row => Array.from(row.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')))
+    .map(row => Array.from(row.querySelectorAll<HTMLButtonElement>('button:not(:disabled):not([data-command-drag-handle])')))
     .filter(row => row.length > 0)
   if (!rows.length) return
   event.preventDefault()
