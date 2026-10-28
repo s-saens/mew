@@ -27,6 +27,15 @@ export const THEME_PRESETS = [
 ] satisfies { id: 'dark' | 'light' | 'midnight' | 'forest' | 'paper' | 'rose' | 'ocean', palette: ThemePalette }[]
 export const DEFAULT_THEME_PALETTE: ThemePalette = THEME_PRESETS[2].palette
 
+export function themeBackgroundImage(value: ThemePalette): string {
+  const palette = normalizePalette(value) ?? DEFAULT_THEME_PALETTE
+  if (!palette.gradient) return 'none'
+  const { colors, angle } = palette.gradient
+  const radians = angle * Math.PI / 180
+  const point = (direction: number) => `${+(50 + Math.sin(radians) * direction * 38).toFixed(2)}% ${+(50 - Math.cos(radians) * direction * 38).toFixed(2)}%`
+  return colors.map((color, index) => `radial-gradient(ellipse 80% 100% at ${point(index ? -1 : 1)}, ${color} 0%, ${color}00 72%)`).join(', ')
+}
+
 export function sameThemePalette(a: ThemePalette, b: ThemePalette): boolean {
   return a.background === b.background && a.text === b.text && a.primary === b.primary
     && (!a.gradient && !b.gradient || !!a.gradient && !!b.gradient

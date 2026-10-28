@@ -1,5 +1,5 @@
-import { DEFAULT_THEME_PALETTE, THEME_PRESETS, normalizePalette, normalizeThemeSettings, sameThemePalette, uniqueCustomThemes, type ThemePalette, type ThemeSettings } from '../../shared/theme.ts'
-export { DEFAULT_THEME_PALETTE, THEME_PRESETS, normalizeThemeSettings, sameThemePalette, type ThemeGradient, type ThemePalette, type ThemeSettings } from '../../shared/theme.ts'
+import { DEFAULT_THEME_PALETTE, THEME_PRESETS, normalizePalette, normalizeThemeSettings, sameThemePalette, themeBackgroundImage, uniqueCustomThemes, type ThemePalette, type ThemeSettings } from '../../shared/theme.ts'
+export { DEFAULT_THEME_PALETTE, THEME_PRESETS, normalizeThemeSettings, sameThemePalette, themeBackgroundImage, type ThemeGradient, type ThemePalette, type ThemeSettings } from '../../shared/theme.ts'
 import { globalBrowserStorage } from '@mew/ui/browser-storage-scope'
 
 export type ThemeMode = 'dark' | 'light'
@@ -146,15 +146,6 @@ export function themePaletteContrast(value: ThemePalette): number {
   const low = Math.min(...levels), high = Math.max(...levels)
   if (text >= low && text <= high) return 1
   return text < low ? (low + .05) / (text + .05) : (text + .05) / (high + .05)
-}
-
-export function themeBackgroundImage(value: ThemePalette): string {
-  const palette = normalizePalette(value) ?? DEFAULT_THEME_PALETTE
-  if (!palette.gradient) return 'none'
-  const { colors, angle } = palette.gradient
-  const radians = angle * Math.PI / 180
-  const point = (direction: number) => `${+(50 + Math.sin(radians) * direction * 38).toFixed(2)}% ${+(50 - Math.cos(radians) * direction * 38).toFixed(2)}%`
-  return colors.map((color, index) => `radial-gradient(ellipse 80% 100% at ${point(index ? -1 : 1)}, ${color} 0%, ${color}00 72%)`).join(', ')
 }
 
 function readableLink(color: string, surfaces: string[]): string {
