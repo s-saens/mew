@@ -1186,7 +1186,7 @@ export const Editor = forwardRef<
         return true
       },
       handleDOMEvents: {
-        // 표 우클릭 → 셀 기준 행·열 추가와 복사 메뉴. readOnly에서도 복사는 된다
+        // 표 우클릭 → 셀 기준 행·열 추가·삭제와 복사 메뉴. readOnly에서도 복사는 된다
         contextmenu: (view, event) => {
           const e = event as MouseEvent
           const target = e.target as HTMLElement | null

@@ -3,11 +3,12 @@ import { useUiLocale } from '@mew/ui/i18n'
 import type { Editor } from '@tiptap/react'
 import type { Node as PMNode } from '@tiptap/pm/model'
 import { TextSelection } from '@tiptap/pm/state'
+import { findTable, TableMap } from '@tiptap/pm/tables'
 import { ActionMenu, ActionMenuItem, ActionMenuSeparator } from '@mew/ui'
-import { Copy, MediaImage, Table2Columns, ArrowDown, ArrowRight } from 'iconoir-react'
+import { Copy, MediaImage, Table2Columns, ArrowDown, ArrowRight, Trash } from 'iconoir-react'
 import { convertTableToDatabase, editorDatabaseApi, isTableConversionPending } from '../database/tableConversion'
 
-// 표 우클릭 메뉴 — 셀 다음 행·열 추가와 md(기본)·csv·이미지 복사. pos는 표 노드 시작 위치(문서 좌표),
+// 표 우클릭 메뉴 — 셀 기준 행·열 추가·삭제와 md(기본)·csv·이미지 복사. pos는 표 노드 시작 위치(문서 좌표),
 // tableDom은 이미지 복사용 실제 렌더 엘리먼트(계산된 스타일을 그대로 베낀다).
 
 // colspan/rowspan은 무시하고 셀 텍스트만 뽑는다 — md 표 자체가 병합을 표현하지 못한다
@@ -155,14 +156,19 @@ export function TableCopyMenu({
 }) {
   useUiLocale()
 
-  const addAfter = (axis: 'row' | 'column') => {
+  const editCell = (command: 'addRowAfter' | 'addColumnAfter' | 'deleteRow' | 'deleteColumn') => {
     if (readOnly || !editor.isEditable || !cellDom || !editor.view.dom.contains(cellDom)) return
     // 메뉴가 열린 동안 문서 위치가 바뀌어도 우클릭한 셀의 현재 위치를 사용한다.
     const pos = editor.view.posAtDOM(cellDom, 0)
     const selection = TextSelection.near(editor.state.doc.resolve(pos))
+    const table = findTable(selection.$from)
+    const deleteWholeTable = table && (
+      (command === 'deleteRow' && table.node.childCount === 1)
+      || (command === 'deleteColumn' && TableMap.get(table.node).width === 1)
+    )
     const chain = editor.chain().focus().setTextSelection(selection.from)
-    if (axis === 'row') chain.addRowAfter().run()
-    else chain.addColumnAfter().run()
+    if (deleteWholeTable) chain.deleteTable().run()
+    else chain[command]().run()
   }
 
   const run = (fn: () => Promise<void>) => {
@@ -215,8 +221,10 @@ export function TableCopyMenu({
   const icons = [Copy, Table2Columns, MediaImage]
   const content = <>
     {!readOnly && editor.isEditable && cellDom && <>
-      <ActionMenuItem icon={<ArrowDown />} onClick={() => addAfter('row')}>{uiText('행 추가')}</ActionMenuItem>
-      <ActionMenuItem icon={<ArrowRight />} onClick={() => addAfter('column')}>{uiText('열 추가')}</ActionMenuItem>
+      <ActionMenuItem icon={<ArrowDown />} onClick={() => editCell('addRowAfter')}>{uiText('행 추가')}</ActionMenuItem>
+      <ActionMenuItem icon={<ArrowRight />} onClick={() => editCell('addColumnAfter')}>{uiText('열 추가')}</ActionMenuItem>
+      <ActionMenuItem icon={<Trash />} danger onClick={() => editCell('deleteRow')}>{uiText('행 삭제')}</ActionMenuItem>
+      <ActionMenuItem icon={<Trash />} danger onClick={() => editCell('deleteColumn')}>{uiText('열 삭제')}</ActionMenuItem>
       <ActionMenuSeparator />
     </>}
     {!readOnly && editor.isEditable && databaseApi?.create && <>

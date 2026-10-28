@@ -8,7 +8,7 @@ import { domBrowserExecutable } from './browser-dom-executable.ts'
 
 const repo = new URL('..', import.meta.url).pathname
 
-test('table context menu inserts after the clicked cell and preserves readonly copying', { skip: !domBrowserExecutable(), timeout: 60_000 }, async t => {
+test('table context menu edits the clicked row or column and preserves readonly copying', { skip: !domBrowserExecutable(), timeout: 60_000 }, async t => {
   const markdown = 'Outside\n\n| H1 | H2 | H3 |\n| --- | --- | --- |\n| A1 | A2 | A3 |\n| B1 | B2 | B3 |\n\nBetween\n\n| X | Y |\n| --- | --- |\n| C | D |\n'
   const source = `import React from 'react';
     import {createRoot} from 'react-dom/client';
@@ -50,6 +50,8 @@ test('table context menu inserts after the clicked cell and preserves readonly c
     const tables = page.locator('.tiptap table')
     const row = page.getByRole('menuitem', { name: '행 추가', exact: true })
     const column = page.getByRole('menuitem', { name: '열 추가', exact: true })
+    const deleteRow = page.getByRole('menuitem', { name: '행 삭제', exact: true })
+    const deleteColumn = page.getByRole('menuitem', { name: '열 삭제', exact: true })
     const matrix = () => tables.first().locator('tr').evaluateAll(rows => rows.map(row => [...row.querySelectorAll('th,td')].map(cell => cell.textContent)))
     await page.goto('http://mew-table-menu.test/')
     await tables.first().getByText('H1', { exact: true }).click()
@@ -82,8 +84,39 @@ test('table context menu inserts after the clicked cell and preserves readonly c
     await page.getByRole('menuitem', { name: /^md로 복사/ }).waitFor()
     assert.equal(await row.count(), 0)
     assert.equal(await column.count(), 0)
+    assert.equal(await deleteRow.count(), 0)
+    assert.equal(await deleteColumn.count(), 0)
     assert.equal(await page.getByRole('menuitem').count(), 3)
     assert.deepEqual(await matrix(), before)
+
+    await page.reload()
+    await tables.nth(1).getByText('D', { exact: true }).click()
+    await tables.first().getByText('A2', { exact: true }).click({ button: 'right' })
+    await deleteRow.click()
+    assert.deepEqual(await matrix(), [['H1', 'H2', 'H3'], ['B1', 'B2', 'B3']])
+    assert.equal(await tables.nth(1).locator('tr').count(), 2)
+    assert.equal(await page.getByRole('menu').count(), 0)
+    await tables.first().getByText('H2', { exact: true }).click({ button: 'right' })
+    await deleteColumn.focus()
+    await page.keyboard.press('Enter')
+    assert.deepEqual(await matrix(), [['H1', 'H3'], ['B1', 'B3']])
+    await tables.first().getByText('B3', { exact: true }).click({ button: 'right' })
+    await deleteColumn.click()
+    assert.deepEqual(await matrix(), [['H1'], ['B1']])
+    await tables.first().getByText('H1', { exact: true }).click({ button: 'right' })
+    await deleteRow.click()
+    assert.deepEqual(await matrix(), [['B1']])
+    await tables.first().getByText('B1', { exact: true }).click({ button: 'right' })
+    await deleteColumn.click()
+    assert.equal(await tables.count(), 1)
+    assert.deepEqual(await matrix(), [['X', 'Y'], ['C', 'D']])
+    await tables.first().getByText('C', { exact: true }).click({ button: 'right' })
+    await deleteRow.click()
+    assert.deepEqual(await matrix(), [['X', 'Y']])
+    await tables.first().getByText('X', { exact: true }).click({ button: 'right' })
+    await deleteRow.click()
+    assert.equal(await tables.count(), 0)
+    assert.match(await page.locator('.tiptap').innerText(), /Outside[\s\S]*Between/)
     assert.deepEqual(errors, [])
     await page.close()
   }
