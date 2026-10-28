@@ -3,6 +3,7 @@
 @import '@mew/ui/action-menu.css';
 @import '@mew/ui/tab-scroll-area.css';
 @import './components/header-control.css';
+@import './components/project-sidebar.css';
 @plugin '@tailwindcss/typography';
 @variant dark (&:where(.dark, .dark *));
 

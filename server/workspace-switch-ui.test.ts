@@ -27,7 +27,7 @@ for (const mode of ['keyboard', 'workspace', 'documents', 'permissions', 'panels
     if (names.some(({ exported, local }) => keep.has(exported) || keep.has(local))) continue
     stubs.set(match[2], names.map(({ exported, local }) => {
       const stub = local === 'EditorPane'
-        ? `function EditorPane({pane,onCloseTab,onActivate,onChangeContent,workspace}) { const active=pane.tabs.find(t=>t.path===pane.activePath);React.useEffect(()=>{window.fixtureEditors??={};window.fixtureEditors[pane.id]={pane,workspace,onChangeContent};window.fixtureEditorCallbacks??={};window.fixtureEditorCallbacks[(workspace?.path||'')+':'+pane.id]=onChangeContent},[pane,workspace,onChangeContent]);return React.createElement('div',{'data-test-editor':pane.id,'data-test-active':pane.activePath,'data-test-root':workspace?.path,'data-test-revalidating':!!active?.revalidating},React.createElement('span',{'data-test-content':true},active?.content||''),...pane.tabs.flatMap(t=>[React.createElement('button',{key:'select:'+t.path,onClick:()=>onActivate(t.path)},'Select '+t.path),React.createElement('button',{key:t.path,onClick:()=>onCloseTab(t.path)},'Close '+t.path)])); }`
+        ? `import {DockGrip} from '${root}/src/components/DockWorkspace.tsx';function EditorPane({pane,onCloseTab,onActivate,onChangeContent,workspace}) { const active=pane.tabs.find(t=>t.path===pane.activePath);React.useEffect(()=>{window.fixtureEditors??={};window.fixtureEditors[pane.id]={pane,workspace,onChangeContent};window.fixtureEditorCallbacks??={};window.fixtureEditorCallbacks[(workspace?.path||'')+':'+pane.id]=onChangeContent},[pane,workspace,onChangeContent]);return React.createElement('div',{'data-test-editor':pane.id,'data-test-active':pane.activePath,'data-test-root':workspace?.path,'data-test-revalidating':!!active?.revalidating},React.createElement(DockGrip,{group:'editor:'+pane.id}),React.createElement('span',{'data-test-content':true},active?.content||''),...pane.tabs.flatMap(t=>[React.createElement('button',{key:'select:'+t.path,onClick:()=>onActivate(t.path)},'Select '+t.path),React.createElement('button',{key:t.path,onClick:()=>onCloseTab(t.path)},'Close '+t.path)])); }`
         : local === 'AgentPanel' ? `${mode === 'worktree' ? `import {DockPanel} from '${root}/src/components/DockWorkspace.tsx';` : ''}function AgentPanel({preparedTabs,workspacePath,agentOpen,terminalOpen}) { React.useEffect(()=>{window.fixtureAgentMounts=(window.fixtureAgentMounts||0)+1},[]);React.useEffect(()=>{window.fixtureAgentRoot=workspacePath},[workspacePath]);React.useEffect(()=>{const prepared=preparedTabs${mode === 'worktree' ? `??(workspacePath?fetch('/api/user-ui/agent-tabs?workspace='+encodeURIComponent(workspacePath)).then(response=>response.json()):undefined)` : ''};prepared?.then(value=>{window.preparedAgentRoot=value.workspace})},[preparedTabs,workspacePath]);return ${mode === 'worktree' ? `React.createElement(React.Fragment,null,React.createElement(DockPanel,{id:'agent',kind:'agent',visible:agentOpen,tabs:['fixture-agent']},React.createElement('div',{'data-test-agent-root':workspacePath},'Existing agent')),React.createElement(DockPanel,{id:'terminal',kind:'terminal',visible:terminalOpen,tabs:['fixture-terminal']},React.createElement('div',{'data-test-terminal-root':workspacePath},'Existing terminal')))` : 'null'} }`
         : local === 'GitPanel' && mode === 'worktree' ? `import {DockPanel} from '${root}/src/components/DockWorkspace.tsx';function GitPanel({onPrepareBranchChange,onOpenWorktree,visible}) {React.useEffect(()=>{window.openFixtureWorktree=async path=>{window.worktreeError=null;try {const release=await onPrepareBranchChange();try {await onOpenWorktree(path);return true}finally{release()}}catch(error){window.worktreeError=error.message;return false}}},[onPrepareBranchChange,onOpenWorktree]);return React.createElement(DockPanel,{id:'git',kind:'git',visible,tabs:[]},React.createElement('button',{'data-test-worktree-trigger':true,onClick:()=>{window.openFixtureWorktree('/alpha-worktree')}},'Open linked worktree'))}`
         : local === 'RemoteDesktop' ? `function RemoteDesktop({onClose,dockHostRef}) { return React.createElement('div',{'role':'dialog','aria-label':'Remote desktop fixture',style:{position:'fixed',inset:0,zIndex:100,background:'var(--color-surface)'}},React.createElement('button',{onClick:onClose},'Close remote desktop'),React.createElement('div',{ref:dockHostRef})); }`
@@ -355,7 +355,7 @@ for (const mode of ['keyboard', 'workspace', 'documents', 'permissions', 'panels
       await startSwap('/alpha-worktree')
       await page.waitForFunction('window.worktreeResult === true')
       await assertKeptWorkspace()
-      await page.locator('button[data-project-switcher]').click()
+      await page.keyboard.press('Alt+p')
       await page.locator('[data-project-option="/alpha-worktree"]').click()
       await page.locator('[data-test-editor="target"]').getByText('Content of /alpha-worktree / target-only.md', { exact: true }).waitFor()
       assert.equal(active, '/alpha-worktree')
@@ -409,8 +409,16 @@ for (const mode of ['keyboard', 'workspace', 'documents', 'permissions', 'panels
       return
     }
     const selectProject = async (root: string) => {
-      await page.locator('button[data-project-switcher]').click()
+      await page.keyboard.press('Alt+p')
       await page.locator(`[data-project-option="${root}"]`).click()
+      if (page.viewportSize()!.width >= 768) {
+        assert.equal(await page.locator('[data-project-sidebar]').isVisible(), true, 'desktop project selection retains its panel')
+        const projects = await page.locator('[data-project-sidebar]').boundingBox()
+        const files = await page.locator('[data-sidebar]').boundingBox()
+        assert.ok(projects && files && Math.abs(projects.x + projects.width - files.x) < 1, 'project panel precedes the file explorer')
+        const toggle = await page.locator('[data-sidebar-toggle]').boundingBox()
+        assert.ok(toggle && Math.abs(toggle.x - (files.x + files.width - 1)) < 1, 'file explorer toggle follows both panels')
+      }
     }
     const countUi = (root: string) => requests.filter(r => r.path === '/api/user-ui/workspace' && r.method === 'GET' && r.root === root).length
     const explorerToggle = page.locator('[data-explorer-toggle]')
@@ -535,7 +543,7 @@ for (const mode of ['keyboard', 'workspace', 'documents', 'permissions', 'panels
       await page.getByRole('dialog', { name: '새 프로젝트 열기', exact: true }).waitFor()
       await page.keyboard.press('Escape')
       await page.getByRole('dialog').waitFor({ state: 'detached' })
-      await page.locator('button[data-project-switcher]').click()
+      await page.keyboard.press('Alt+p')
       await page.locator('[data-project-option="/beta"]').click()
       await page.locator('[data-test-content]').getByText('Content of /beta', { exact: true }).waitFor()
       await page.keyboard.press('Alt+1')
@@ -577,7 +585,7 @@ for (const mode of ['keyboard', 'workspace', 'documents', 'permissions', 'panels
     blockSwitch = true; blockUi = true
     const handoffsBeforePreview = requests.filter(r => r.path === '/api/workspace' && r.method === 'POST').length
     const filesBeforePreview = requests.filter(r => r.path === '/api/file' || r.path === '/api/tree').length
-    await page.locator('button[data-project-switcher]').click()
+    await page.keyboard.press('Alt+p')
     await page.locator('[data-project-option="/beta"]').hover()
     await page.waitForTimeout(80)
     assert.ok(releaseUi, 'hover starts cold metadata preparation before selection')
@@ -617,7 +625,9 @@ for (const mode of ['keyboard', 'workspace', 'documents', 'permissions', 'panels
     assert.equal(dockBounds.x, 0)
     assert.equal(dockBounds.y, 44)
     assert.ok(dockBounds.width <= 48 && dockBounds.height > dockBounds.width)
-    assert.equal(railSidebarBounds.x, dockBounds.width + 1)
+    const projectPanelBounds = (await page.locator('[data-project-sidebar]').boundingBox())!
+    assert.equal(projectPanelBounds.x, dockBounds.width + 1)
+    assert.equal(railSidebarBounds.x, projectPanelBounds.x + projectPanelBounds.width)
     const railToggleBounds = (await page.locator('[data-sidebar-toggle]').boundingBox())!
     assert.equal(railToggleBounds.x, railSidebarBounds.x + railSidebarBounds.width - 1)
     await page.locator('[data-sidebar-toggle]').click()
@@ -708,7 +718,7 @@ for (const mode of ['keyboard', 'workspace', 'documents', 'permissions', 'panels
       await page.keyboard.press('Escape')
       await page.keyboard.press('Tab')
       assert.equal(await loading.evaluate(el => el.contains(el.ownerDocument.activeElement)), false)
-      const sidebarButton = page.getByRole('navigation', { name: '작업 독' }).getByRole('button', { name: '사이드바', exact: true })
+      const sidebarButton = page.getByRole('navigation', { name: '작업 독' }).getByRole('button', { name: '파일 탐색기', exact: true })
       if (width !== 390 && await page.locator('[data-sidebar]').isVisible()) {
         await page.locator('[data-sidebar-toggle]').click()
         await page.locator('[data-sidebar]').waitFor({ state: 'hidden' })
@@ -854,12 +864,12 @@ for (const mode of ['keyboard', 'workspace', 'documents', 'permissions', 'panels
     const sidebar = page.locator('[data-sidebar]')
     await dock.getByRole('button', { name: '에디터 화면', exact: true }).tap()
     assert.equal(await sidebar.isVisible(), false)
-    await dock.getByRole('button', { name: '사이드바', exact: true }).tap()
+    await dock.getByRole('button', { name: '파일 탐색기', exact: true }).tap()
     await sidebar.waitFor({ state: 'visible' })
-    await dock.getByRole('button', { name: '사이드바', exact: true }).tap()
+    await dock.getByRole('button', { name: '파일 탐색기', exact: true }).tap()
     assert.equal(await sidebar.isVisible(), true, 'selecting current dock panel does not close it')
     await dock.getByRole('button', { name: '에디터 화면', exact: true }).tap()
-    await dock.getByRole('button', { name: '사이드바', exact: true }).tap()
+    await dock.getByRole('button', { name: '파일 탐색기', exact: true }).tap()
     await docsToggle.tap()
     const toggleBounds = (await explorerToggle.boundingBox())!, sidebarBounds = (await sidebar.boundingBox())!
     assert.ok(toggleBounds.y < sidebarBounds.y + sidebarBounds.height / 2)
@@ -900,7 +910,7 @@ for (const mode of ['keyboard', 'workspace', 'documents', 'permissions', 'panels
     await page.keyboard.press('Escape')
     assert.equal(await dock.locator('[data-dock-item=browser]').count(), 0)
     assert.equal(await dock.locator('[data-dock-item=features]').count(), 0)
-    await dock.getByRole('button', { name: '사이드바', exact: true }).tap()
+    await dock.getByRole('button', { name: '파일 탐색기', exact: true }).tap()
     for (const dark of [false, true]) {
       await page.evaluate(`document.documentElement.classList.toggle('dark', ${dark})`)
       await page.screenshot({ path: `/tmp/mew-mobile-dock-app-${dark ? 'dark' : 'light'}.png` })
@@ -959,6 +969,30 @@ for (const mode of ['keyboard', 'workspace', 'documents', 'permissions', 'panels
       await page.keyboard.press('Escape')
       await menu.waitFor({ state: 'detached' })
     }
+    await page.setViewportSize({ width: 1100, height: 700 })
+    await page.keyboard.press('Alt+p')
+    const projectsPanel = page.locator('[data-project-sidebar]')
+    await projectsPanel.waitFor()
+    const projectResize = projectsPanel.getByRole('separator', { name: '프로젝트 패널 너비 조절' })
+    const previousProjectWidth = Number(await projectResize.getAttribute('aria-valuenow'))
+    await projectResize.focus(); await page.keyboard.press('ArrowRight')
+    const savedProjectWidth = Math.min(360, previousProjectWidth + 16)
+    assert.equal(Number(await projectResize.getAttribute('aria-valuenow')), savedProjectWidth)
+    await page.locator('[data-dock-panel^="editor:"] [data-dock-grip]').first().dblclick()
+    await page.locator('[data-dock-maximized]').waitFor()
+    assert.equal(await projectsPanel.isVisible(), false, 'maximized editor hides the project panel')
+    await page.keyboard.press('Alt+p')
+    await projectsPanel.waitFor({ state: 'visible' })
+    assert.equal(await page.locator('[data-dock-maximized]').count(), 0, 'Alt+P restores the workspace before focusing projects')
+    await page.waitForFunction('document.activeElement?.hasAttribute("data-project-option")')
+    await page.reload()
+    await projectsPanel.waitFor()
+    assert.equal(Number(await projectResize.getAttribute('aria-valuenow')), savedProjectWidth, 'App restores project panel width and open state across reload')
+    await projectsPanel.getByRole('button', { name: '프로젝트 · 닫기', exact: true }).click()
+    assert.equal(await page.locator('button[data-project-switcher]').getAttribute('aria-expanded'), 'false')
+    await page.reload()
+    await page.locator('button[data-project-switcher]').waitFor()
+    assert.equal(await projectsPanel.count(), 0, 'App restores the closed project panel')
     assert.equal(await dock.locator('[data-dock-item=tasks]').count(), 1)
     assert.deepEqual(errors, [])
   } finally { await browser.close() }

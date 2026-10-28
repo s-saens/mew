@@ -1699,24 +1699,25 @@ export interface CmdButton {
 }
 
 // 프로젝트 탭마다 자기 메뉴를 띄우므로(활성 프로젝트 것만 보는 게 아니다) 프로젝트를 명시적으로 받는다
-export function fetchCmdButtons(project: string, path = ''): Promise<{ buttons: CmdButtonState[] }> {
-  return mewFetch(`/api/cmd-buttons?${projectQs(project)}&path=${encodeURIComponent(path)}`).then(json<{ buttons: CmdButtonState[] }>)
+export function fetchCmdButtons(project: string, path = '', workspacePath?: string): Promise<{ buttons: CmdButtonState[] }> {
+  const workspace = workspacePath === undefined ? '' : `&workspacePath=${encodeURIComponent(workspacePath)}`
+  return mewFetch(`/api/cmd-buttons?${projectQs(project)}&path=${encodeURIComponent(path)}${workspace}`).then(json<{ buttons: CmdButtonState[] }>)
 }
 
-export function runCmdButton(project: string, name: string, path = ''): Promise<{ ok: true; session: string }> {
+export function runCmdButton(project: string, name: string, path = '', workspacePath?: string): Promise<{ ok: true; session: string }> {
   return mewFetch('/api/cmd-buttons/run', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name, project, path }),
+    body: JSON.stringify({ name, project, path, workspacePath }),
   }).then(json<{ ok: true; session: string }>)
 }
 
 /** 목록 전체를 통째로 저장한다 — 추가·수정·삭제 모두 이 한 경로를 쓴다 (term-buttons와 같은 방식) */
-export function saveCmdButtons(project: string, buttons: CmdButton[], path = ''): Promise<{ buttons: CmdButtonState[] }> {
+export function saveCmdButtons(project: string, buttons: CmdButton[], path = '', workspacePath?: string): Promise<{ buttons: CmdButtonState[] }> {
   return mewFetch('/api/cmd-buttons', {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ project, buttons, path }),
+    body: JSON.stringify({ project, buttons, path, workspacePath }),
   }).then(json<{ buttons: CmdButtonState[] }>)
 }
 

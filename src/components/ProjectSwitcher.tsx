@@ -1,9 +1,13 @@
-import { lazy, Suspense, useEffect, useId, useMemo, useRef, useState } from 'react'
-import { EditPencil, Plus, Trash, Xmark } from 'iconoir-react'
+import { lazy, Suspense, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
+import { EditPencil, Folder, Plus, Trash, Xmark } from 'iconoir-react'
 import { ActionMenu, ActionMenuItem, ActionMenuSeparator, DialogFrame, MenuReorderHandle, useDragReorder } from '@mew/ui'
 import { projectTabIndex } from '@mew/shortcuts'
 import { useI18n } from '../i18n'
 import { ProjectIcon } from './ProjectIcon'
+import { CommandButtonMenu } from './CommandButtonMenu'
+import { PanelCloseButton } from './panel-close-button'
+import { WORKSPACE_PROJECT } from '../utils/active-project'
 
 const IconPicker = lazy(() => import('./IconPicker').then(module => ({ default: module.IconPicker })))
 
@@ -12,7 +16,8 @@ function labelOf(projectPath: string): string {
   return parts.at(-1) || projectPath
 }
 
-export function ProjectSwitcher({ paths, activePath, fallbackLabel, canOpen, canChangeIcon, icons, onActivate, onIconChange, onOpen, onPreview, onRemove, onReorder }: {
+export function ProjectSwitcher({ paths, activePath, fallbackLabel, canOpen, canChangeIcon, icons, onActivate, onIconChange, onOpen, onPreview, onRemove, onReorder,
+  sidebarHost, sidebarEnabled = false, sidebarOpen = false, onSidebarOpenChange, sidebarWidth = 240, onSidebarResize, onSidebarWidthChange, canUseCommands = false, activeWorkingPath }: {
   paths: string[]
   activePath: string | null
   fallbackLabel: string
@@ -25,10 +30,20 @@ export function ProjectSwitcher({ paths, activePath, fallbackLabel, canOpen, can
   onPreview?: (path: string) => void
   onRemove?: (path: string) => void
   onReorder?: (paths: string[]) => void
+  sidebarHost?: HTMLElement | null
+  sidebarEnabled?: boolean
+  sidebarOpen?: boolean
+  onSidebarOpenChange?: (open: boolean) => void
+  sidebarWidth?: number
+  onSidebarResize?: (event: React.PointerEvent) => void
+  onSidebarWidthChange?: (width: number) => void
+  canUseCommands?: boolean
+  activeWorkingPath?: string | null
 }) {
   const { t } = useI18n()
   const trigger = useRef<HTMLButtonElement>(null)
   const menuElement = useRef<HTMLDivElement>(null)
+  const sidebarList = useRef<HTMLDivElement>(null)
   const contextMenuElement = useRef<HTMLDivElement>(null)
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
   const [contextMenu, setContextMenu] = useState<{ path: string; x: number; y: number; trigger: HTMLElement | null } | null>(null)
@@ -37,6 +52,8 @@ export function ProjectSwitcher({ paths, activePath, fallbackLabel, canOpen, can
   const hold = useRef<{ timer: ReturnType<typeof setTimeout>; x: number; y: number } | null>(null)
   const suppressClickUntil = useRef(0)
   const label = activePath ? labelOf(activePath) : fallbackLabel
+  const showingSidebar = sidebarEnabled && sidebarOpen && canOpen
+  const panelId = useId()
   const labels = useMemo(() => {
     const counts = new Map<string, number>()
     for (const path of paths) counts.set(labelOf(path), (counts.get(labelOf(path)) ?? 0) + 1)
@@ -57,8 +74,19 @@ export function ProjectSwitcher({ paths, activePath, fallbackLabel, canOpen, can
     cancelHold()
     setContextMenu({ path, x, y, trigger: origin })
   }
-  function openMenu() {
+  function focusSidebar() {
+    const first = sidebarList.current?.querySelector<HTMLButtonElement>('[data-project-option]')
+    if (first?.checkVisibility({ visibilityProperty: true })) first.focus({ preventScroll: true })
+    else requestAnimationFrame(() => sidebarList.current?.querySelector<HTMLButtonElement>('[data-project-option]')?.focus({ preventScroll: true }))
+  }
+  function openMenu(openOnly = false) {
     if (!canOpen || !trigger.current) return
+    if (sidebarEnabled) {
+      const open = openOnly || !sidebarOpen || !sidebarList.current?.checkVisibility({ visibilityProperty: true })
+      onSidebarOpenChange?.(open)
+      if (open) focusSidebar()
+      return
+    }
     const box = trigger.current.getBoundingClientRect()
     setMenu({ x: box.left, y: box.bottom + 4 })
   }
@@ -75,6 +103,11 @@ export function ProjectSwitcher({ paths, activePath, fallbackLabel, canOpen, can
       const target = event.target instanceof Element ? event.target : document.activeElement
       if (event.repeat || target?.closest('[role="dialog"], [aria-modal="true"]')) return
       if (chooseMenu) {
+        if (sidebarEnabled) {
+          onSidebarOpenChange?.(true)
+          focusSidebar()
+          return
+        }
         const box = trigger.current?.getBoundingClientRect()
         if (box) setMenu({ x: box.left, y: box.bottom + 4 })
         menuElement.current?.querySelector<HTMLButtonElement>('[data-action-menu-item]:not(:disabled)')?.focus({ preventScroll: true })
@@ -86,7 +119,13 @@ export function ProjectSwitcher({ paths, activePath, fallbackLabel, canOpen, can
     }
     window.addEventListener('keydown', select, true)
     return () => window.removeEventListener('keydown', select, true)
-  }, [paths, activePath, canOpen, onActivate])
+  }, [paths, activePath, canOpen, onActivate, sidebarEnabled, sidebarOpen, onSidebarOpenChange])
+
+  useLayoutEffect(() => {
+    if (showingSidebar) sidebarList.current?.querySelector<HTMLButtonElement>('[data-project-option]')?.focus({ preventScroll: true })
+  }, [showingSidebar, sidebarHost])
+
+  useEffect(() => { setMenu(null); setContextMenu(null) }, [sidebarEnabled])
 
   useEffect(() => {
     setMenu(null)
@@ -110,12 +149,32 @@ export function ProjectSwitcher({ paths, activePath, fallbackLabel, canOpen, can
     <span className="max-w-[min(18rem,50vw)] truncate">{label}</span>
   </>
 
+  function projectItems(inSidebar: boolean) {
+    return <ProjectOrder paths={paths} activePath={activePath} onReorder={onReorder} renderItem={(path, move, index) => <>
+      <ActionMenuItem style={{ flex: 1, minWidth: 0, width: 'auto' }} data-project-option={path} title={path} aria-keyshortcuts={index < 9 ? `Alt+${index + 1}` : undefined} role="menuitemradio" checked={path === activePath} closeOnSelect={!inSidebar}
+        icon={<span className="flex h-4 w-4 shrink-0 items-center justify-center" aria-hidden="true"><ProjectIcon icon={icons[path] ?? 'i:folder'} size={16} /></span>}
+        hint={index < 9 && <kbd className="whitespace-nowrap font-sans text-[11px]">Alt+{index + 1}</kbd>}
+        onPointerEnter={() => { if (path !== activePath) onPreview?.(path) }} onFocus={() => { if (path !== activePath) onPreview?.(path) }}
+        onClick={() => { if (path !== activePath) onActivate(path) }}
+        onContextMenu={event => { if (canChangeIcon) { event.preventDefault(); openContextMenu(path, event.clientX, event.clientY, event.currentTarget) } }}
+        onKeyDown={event => { if (onReorder && event.shiftKey && (event.key === 'ArrowUp' || event.key === 'ArrowDown')) { event.preventDefault(); event.stopPropagation(); move(event.key === 'ArrowUp' ? -1 : 1); return } if (canChangeIcon && (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10'))) { event.preventDefault(); const box = event.currentTarget.getBoundingClientRect(); openContextMenu(path, box.left, box.bottom, event.currentTarget) } }}>
+        <span className="min-w-0 flex-1 text-left"><span className="block truncate">{labelOf(path)}</span>
+          {(labels.get(labelOf(path)) ?? 0) > 1 && <span className="block truncate text-[10px] text-ink-muted">{path}</span>}
+        </span>
+      </ActionMenuItem>
+      {inSidebar && canUseCommands && <CommandButtonMenu key={`${path}:${path === activePath ? activeWorkingPath : path}`} project={WORKSPACE_PROJECT}
+        workspacePath={path === activePath ? activeWorkingPath ?? path : path} shortcutEnabled={path === activePath}
+        title={`${labelOf(path)} · ${t('project.commands')}`} className="mew-project-command" />}
+    </>} />
+  }
+
   return <>
     <div data-project-switcher-container className="flex h-full min-w-0 items-stretch">
       {canOpen || canChangeIcon ? <button ref={trigger} type="button" data-project-switcher data-current-project={activePath ?? ''}
-        data-header-menu-trigger={canOpen || undefined}
+        data-header-menu-trigger={canOpen && !sidebarEnabled || undefined}
         aria-keyshortcuts={canOpen ? 'Alt+P' : undefined}
-        aria-label={canOpen ? `${label} — ${t('project.choose')}` : label} aria-haspopup={canOpen ? 'menu' : undefined} aria-expanded={canOpen ? !!menu : undefined}
+        aria-label={canOpen ? `${label} — ${t('project.choose')}` : label} aria-haspopup={canOpen && !sidebarEnabled ? 'menu' : undefined} aria-expanded={canOpen ? sidebarEnabled ? showingSidebar : !!menu : undefined}
+        aria-controls={sidebarEnabled && showingSidebar ? panelId : undefined}
         title={activePath ?? label} className="flex h-full min-w-0 select-none items-center gap-1.5 px-2.5 text-xs text-ink hover:bg-surface-raised focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
         style={{ WebkitTouchCallout: 'none' }}
         onClick={() => { if (Date.now() >= suppressClickUntil.current) openMenu() }}
@@ -123,7 +182,7 @@ export function ProjectSwitcher({ paths, activePath, fallbackLabel, canOpen, can
         onKeyDown={event => {
           if ((event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) && canChangeIcon && activePath) {
             event.preventDefault(); const box = event.currentTarget.getBoundingClientRect(); openContextMenu(activePath, box.left, box.bottom)
-          } else if (canOpen && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) { event.preventDefault(); openMenu() }
+          } else if (canOpen && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) { event.preventDefault(); openMenu(true) }
         }}
         onPointerDown={event => {
           cancelHold()
@@ -140,18 +199,46 @@ export function ProjectSwitcher({ paths, activePath, fallbackLabel, canOpen, can
         {content}
       </button> : <div data-project-switcher data-current-project={activePath ?? ''} title={activePath ?? label} className="flex h-full min-w-0 items-center gap-1.5 px-2.5 text-xs text-ink">{content}</div>}
     </div>
-    {canOpen && menu && <ActionMenu ref={menuElement} variant="header" x={menu.x} y={menu.y} label={t('project.choose')} trigger={trigger.current} outsideIgnore={() => contextMenuElement.current} onClose={() => { setContextMenu(null); setMenu(null) }}>
-      <ProjectOrder paths={paths} activePath={activePath} onReorder={onReorder} renderItem={(path, move, index) => <ActionMenuItem style={{ flex: 1, minWidth: 0, width: 'auto' }} data-project-option={path} title={path} aria-keyshortcuts={index < 9 ? `Alt+${index + 1}` : undefined} role="menuitemradio" checked={path === activePath}
-        icon={<span className="flex h-4 w-4 shrink-0 items-center justify-center" aria-hidden="true"><ProjectIcon icon={icons[path] ?? 'i:folder'} size={16} /></span>}
-        hint={index < 9 && <kbd className="whitespace-nowrap font-sans text-[11px]">Alt+{index + 1}</kbd>}
-        onPointerEnter={() => { if (path !== activePath) onPreview?.(path) }} onFocus={() => { if (path !== activePath) onPreview?.(path) }}
-        onClick={() => { if (path !== activePath) onActivate(path) }}
-        onContextMenu={event => { if (canChangeIcon) { event.preventDefault(); openContextMenu(path, event.clientX, event.clientY, event.currentTarget) } }}
-        onKeyDown={event => { if (onReorder && event.shiftKey && (event.key === 'ArrowUp' || event.key === 'ArrowDown')) { event.preventDefault(); event.stopPropagation(); move(event.key === 'ArrowUp' ? -1 : 1); return } if (canChangeIcon && (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10'))) { event.preventDefault(); const box = event.currentTarget.getBoundingClientRect(); openContextMenu(path, box.left, box.bottom, event.currentTarget) } }}>
-        <span className="min-w-0 flex-1 text-left"><span className="block truncate">{labelOf(path)}</span>
-          {(labels.get(labelOf(path)) ?? 0) > 1 && <span className="block truncate text-[10px] text-ink-muted">{path}</span>}
-        </span>
-      </ActionMenuItem>} />
+    {showingSidebar && sidebarHost && createPortal(<aside id={panelId} data-project-sidebar data-workspace-panel="projects" aria-label={t('project.sidebar')}
+      className="mew-project-sidebar" style={{ width: sidebarWidth }}>
+      <div className="mew-project-sidebar-body">
+        <div className="mew-project-sidebar-heading">
+          <Folder width={14} height={14} aria-hidden="true" />
+          <span className="min-w-0 flex-1 truncate">{t('project.sidebar')}</span>
+          <PanelCloseButton aria-label={`${t('project.sidebar')} · ${t('common.close')}`} onClick={() => { onSidebarOpenChange?.(false); trigger.current?.focus({ preventScroll: true }) }} />
+        </div>
+        <div ref={sidebarList} role="menu" aria-label={t('project.choose')} className="mew-project-sidebar-list"
+          onKeyDown={event => {
+            if (event.defaultPrevented || event.nativeEvent.isComposing || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey
+              || !event.currentTarget.contains(event.target as Node)) return
+            const items = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-project-option]'))
+            const row = (event.target as Element).closest('[data-project-row]')
+            const index = items.findIndex(item => row?.contains(item))
+            if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
+              const target = event.key === 'ArrowRight' ? row?.querySelector<HTMLButtonElement>('.mew-project-command') : items[index]
+              if (target) { event.preventDefault(); target.focus() }
+              return
+            }
+            const next = event.key === 'Home' ? 0 : event.key === 'End' ? items.length - 1
+              : event.key === 'ArrowDown' ? (index + 1) % items.length
+              : event.key === 'ArrowUp' ? (index - 1 + items.length) % items.length : null
+            if (next !== null) { event.preventDefault(); items[next]?.focus({ preventScroll: true }) }
+          }}>
+          {projectItems(true)}
+        </div>
+        <div className="mew-project-sidebar-footer"><ActionMenuItem icon={<Plus />} onClick={onOpen}>{t('project.add')}</ActionMenuItem></div>
+      </div>
+      <div role="separator" tabIndex={0} aria-label={t('project.resizeSidebar')} aria-orientation="vertical" aria-valuenow={sidebarWidth} aria-valuemin={200} aria-valuemax={360}
+        className="mew-project-sidebar-resize" onPointerDown={onSidebarResize}
+        onKeyDown={event => {
+          if (event.key === 'ArrowLeft' || event.key === 'ArrowRight' || event.key === 'Home' || event.key === 'End') {
+            event.preventDefault()
+            onSidebarWidthChange?.(event.key === 'Home' ? 200 : event.key === 'End' ? 360 : sidebarWidth + (event.key === 'ArrowRight' ? 16 : -16))
+          }
+        }} />
+    </aside>, sidebarHost)}
+    {canOpen && !sidebarEnabled && menu && <ActionMenu ref={menuElement} variant="header" x={menu.x} y={menu.y} label={t('project.choose')} trigger={trigger.current} outsideIgnore={() => contextMenuElement.current} onClose={() => { setContextMenu(null); setMenu(null) }}>
+      {projectItems(false)}
       {paths.length > 0 && <ActionMenuSeparator />}
       <ActionMenuItem icon={<Plus />} onClick={onOpen}>{t('project.add')}</ActionMenuItem>
     </ActionMenu>}

@@ -1,4 +1,4 @@
-import { ActionMenuSurface, canAutoFocusInput, HoverTipLayer, MenuReorderHandle, useDragReorder, type DragItemProps } from '@mew/ui'
+import { ActionMenuSurface, canAutoFocusInput, getFixedPopupLayout, HoverTipLayer, MenuReorderHandle, useDragReorder, type DragItemProps } from '@mew/ui'
 import { uiText } from '@mew/ui/i18n-core'
 import { useUiLocale } from '@mew/ui/i18n'
 // 프로젝트 탭의 ▶ 아이콘 버튼 = 명령어 버튼. 누르면 그 프로젝트의 <프로젝트>/.mew/cmd-button.json 에
@@ -10,7 +10,7 @@ import { useUiLocale } from '@mew/ui/i18n'
 // 목록은 프로젝트 탭마다 뜨므로 project를 반드시 인자로 받는다 — 활성 프로젝트가 아닌 탭의
 // 메뉴도 열 수 있기 때문이다. 드롭다운은 프로젝트 탭 줄이 가로 스크롤 컨테이너라 그 안에
 // absolute로 두면 잘린다 — 그래서 body로 포털해 fixed로 띄운다.
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
 import { useOverlayDismiss } from '@mew/ui'
 import { fetchCmdButtons, killTmuxSession, runCmdButton, saveCmdButtons, type CmdButtonState } from '../api/client'
@@ -28,6 +28,8 @@ type Editing = { index: number | null; name: string; command: string; oneShot: b
 export function CommandButtonMenu({
   project,
   directory = '',
+  workspacePath,
+  shortcutEnabled = true,
   title,
   className,
   open: controlledOpen,
@@ -39,6 +41,8 @@ export function CommandButtonMenu({
 }: {
   project: string
   directory?: string
+  workspacePath?: string
+  shortcutEnabled?: boolean
   title?: string
   className?: string
   open?: boolean
@@ -65,7 +69,7 @@ export function CommandButtonMenu({
   const [busyName, setBusyName] = useState<string | null>(null)
   const [popup, setPopup] = useState<CmdButtonState | null>(null)
   const [editing, setEditing] = useState<Editing | null>(null)
-  const [anchor, setAnchor] = useState<{ top: number; left: number } | null>(null)
+  const [anchor, setAnchor] = useState<CSSProperties | null>(null)
   const btnRef = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
   const buttonsRef = useRef(buttons)
@@ -85,7 +89,7 @@ export function CommandButtonMenu({
   }
   const focusOnOpen = useRef(false)
   useEffect(() => {
-    if (project !== WORKSPACE_PROJECT || directory || inline || hideTrigger || alwaysOpen) return
+    if (!shortcutEnabled || project !== WORKSPACE_PROJECT || directory || inline || hideTrigger || alwaysOpen) return
     return captureCommandMenuShortcut(() => {
       if (open) focusFirstCommand(menuRef.current)
       else {
@@ -93,7 +97,7 @@ export function CommandButtonMenu({
         setOpen(true)
       }
     })
-  }, [project, directory, inline, hideTrigger, alwaysOpen, open, setOpen])
+  }, [shortcutEnabled, project, directory, inline, hideTrigger, alwaysOpen, open, setOpen])
 
   useEffect(() => {
     if (!open) { focusOnOpen.current = false; return }
@@ -107,7 +111,7 @@ export function CommandButtonMenu({
   const refresh = useCallback(() => {
     if (savingOrder.current) return
     const sequence = ++refreshSequence.current
-    fetchCmdButtons(project, directory)
+    fetchCmdButtons(project, directory, workspacePath)
       .then((res) => {
         if (sequence !== refreshSequence.current || savingOrder.current) return
         setButtons(res.buttons)
@@ -118,7 +122,7 @@ export function CommandButtonMenu({
         setButtons([])
         setError(err instanceof Error ? err.message : uiText("불러오기 실패"))
       })
-  }, [project, directory])
+  }, [project, directory, workspacePath])
 
   // 메뉴가 열려 있는 동안 목록·실행 상태를 불러오고 가볍게 폴링한다(실행 표시 갱신용).
   // 인라인 사이드바도 항상 열린 메뉴이므로 여기서 제외하면 첫 요청을 보내지 않아
@@ -131,21 +135,45 @@ export function CommandButtonMenu({
   }, [open, refresh])
 
   // 버튼 위치에 맞춰 드롭다운을 놓는다 — 탭 줄이 스크롤되거나 창이 바뀌면 다시 잰다
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!open || inline) return
+    const button = btnRef.current, menu = menuRef.current
+    if (!button || !menu) return
+    const view = button.ownerDocument.defaultView!, viewport = view.visualViewport
     function place() {
-      const rect = btnRef.current?.getBoundingClientRect()
-      if (!rect) return
-      const width = Math.min(MENU_WIDTH, window.innerWidth * 0.9)
-      const left = Math.max(8, Math.min(rect.right - width, window.innerWidth - width - 8))
-      setAnchor({ top: rect.bottom + 4, left })
+      const rect = button!.getBoundingClientRect()
+      const layout = getFixedPopupLayout(menu!.parentElement), bounds = layout.bounds
+      const topEdge = bounds.top + 8, bottomEdge = bounds.bottom - 8
+      const width = Math.min(MENU_WIDTH, bounds.width * 0.9)
+      const maxHeight = Math.max(0, Math.min(bounds.height * 0.6, bottomEdge - topEdge))
+      const limits = layout.toStyle({ width, maxHeight })
+      menu!.style.width = `${limits.width}px`
+      menu!.style.maxHeight = `${limits.maxHeight}px`
+      const measured = menu!.getBoundingClientRect()
+      const below = rect.bottom + 4
+      const preferredTop = below + measured.height <= bottomEdge ? below : rect.top - measured.height - 4
+      const next = layout.toStyle({
+        top: Math.max(topEdge, Math.min(preferredTop, bottomEdge - measured.height)),
+        left: Math.max(bounds.left + 8, Math.min(rect.right - measured.width, bounds.right - measured.width - 8)),
+        width, maxHeight,
+      })
+      setAnchor(current => current && current.top === next.top && current.left === next.left
+        && current.width === next.width && current.maxHeight === next.maxHeight ? current : next)
     }
     place()
-    window.addEventListener('resize', place)
-    window.addEventListener('scroll', place, true)
+    const observer = new ResizeObserver(place)
+    observer.observe(menu)
+    for (let element: HTMLElement | null = button; element; element = element.parentElement) observer.observe(element)
+    view.addEventListener('resize', place)
+    view.addEventListener('scroll', place, true)
+    viewport?.addEventListener('resize', place)
+    viewport?.addEventListener('scroll', place)
     return () => {
-      window.removeEventListener('resize', place)
-      window.removeEventListener('scroll', place, true)
+      observer.disconnect()
+      view.removeEventListener('resize', place)
+      view.removeEventListener('scroll', place, true)
+      viewport?.removeEventListener('resize', place)
+      viewport?.removeEventListener('scroll', place)
     }
   }, [inline, open])
 
@@ -175,7 +203,7 @@ export function CommandButtonMenu({
     if (busyName) return
     setBusyName(button.name)
     try {
-      await runCmdButton(project, button.name, directory)
+      await runCmdButton(project, button.name, directory, workspacePath)
       refresh()
     } catch (err) {
       setError(err instanceof Error ? err.message : uiText("실행 실패"))
@@ -209,7 +237,7 @@ export function CommandButtonMenu({
 
   /** 추가·수정·삭제 모두 목록 전체 저장 한 경로로 처리한다 */
   async function commit(next: { name: string; command: string; oneShot?: boolean }[]) {
-    const res = await saveCmdButtons(project, next, directory)
+    const res = await saveCmdButtons(project, next, directory, workspacePath)
     setButtons(res.buttons)
     setError(null)
   }
@@ -233,7 +261,7 @@ export function CommandButtonMenu({
         while (queuedOrder.current) {
           const order = queuedOrder.current
           queuedOrder.current = null
-          const res = await saveCmdButtons(project, order.map(({ name, command, oneShot }) => ({ name, command, oneShot })), directory)
+          const res = await saveCmdButtons(project, order.map(({ name, command, oneShot }) => ({ name, command, oneShot })), directory, workspacePath)
           saved = res.buttons
         }
       } catch (err) {
@@ -256,7 +284,7 @@ export function CommandButtonMenu({
       onKeyDown={event => navigateCommandMenu(event.nativeEvent, event.currentTarget)}
       data-cmd-overlay={!inline || undefined}
       data-command-menu
-      style={inline ? undefined : { top: anchor?.top, left: anchor?.left, maxHeight: '60vh' }}
+      style={inline ? undefined : { ...anchor, visibility: anchor ? undefined : 'hidden' }}
       className={inline
         ? 'border-b border-edge bg-surface-deep py-1'
         : undefined}
@@ -293,7 +321,7 @@ export function CommandButtonMenu({
         data-tip={title ?? uiText("{p0} 명령어 버튼", { p0: directory || project })}
         aria-label={title ?? uiText("{p0} 명령어 버튼", { p0: directory || project })}
         aria-expanded={open}
-        aria-keyshortcuts={project === WORKSPACE_PROJECT && !directory && !inline && !alwaysOpen ? 'Alt+R Control+E' : undefined}
+        aria-keyshortcuts={shortcutEnabled && project === WORKSPACE_PROJECT && !directory && !inline && !alwaysOpen ? 'Alt+R Control+E' : undefined}
         onKeyDown={event => {
           if (event.nativeEvent.isComposing || event.altKey || event.ctrlKey || event.metaKey ||
             (event.key !== 'ArrowDown' && event.key !== 'ArrowUp')) return
@@ -305,11 +333,11 @@ export function CommandButtonMenu({
         <PlayGlyph />
       </button></HoverTipLayer>}
 
-      {open && (inline ? menu : anchor && createPortal(menu, document.body))}
+      {open && (inline ? menu : createPortal(menu, document.body))}
 
       {editing && (
         <CmdButtonEditor
-          project={directory || project}
+          project={directory || workspacePath || project}
           editing={editing}
           onCancel={() => setEditing(null)}
           onSave={async (draft) => {
@@ -338,7 +366,7 @@ export function CommandButtonMenu({
           idleNote={popup.command}
           session={popup.session}
           running={popup.running}
-          onRun={() => runCmdButton(project, popup.name, directory)}
+          onRun={() => runCmdButton(project, popup.name, directory, workspacePath)}
           onClose={() => setPopup(null)}
           onChanged={refresh}
         />

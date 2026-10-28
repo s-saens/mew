@@ -2,6 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import crypto from 'node:crypto'
 import { projectDirectory } from './subprojects.ts'
+import { WORKSPACE_PROJECT } from './paths.ts'
 import { COMMAND_SESSION_PREFIX } from '@mew/tmux-term/server'
 import { terminalBackend } from '../packages/tmux-term/src/server/backends/index.ts'
 import { quotePowerShell } from '../packages/tmux-term/src/server/backends/psmux.ts'
@@ -101,9 +102,10 @@ function extractList(parsed: unknown): unknown[] {
  * 항상 만족하고, 터미널 탭 목록에서는 이 프리픽스로 걸러져 보이지 않는다.
  */
 export function commandSessionName(project: string, name: string, directory = ''): string {
-  // Explicit folder targets use absolute identity; same-named nested folders stay isolated.
-  const identity = directory ? projectDirectory(project, directory) : project
-  const hash = crypto.createHash('sha256').update(directory ? JSON.stringify([identity, name]) : `${identity} ${name}`).digest('hex').slice(0, 16)
+  // Root projects and explicit folder targets share the same absolute identity.
+  const scoped = !!directory || project === WORKSPACE_PROJECT
+  const identity = scoped ? fs.realpathSync(projectDirectory(project, directory)) : project
+  const hash = crypto.createHash('sha256').update(scoped ? JSON.stringify([identity, name]) : `${identity} ${name}`).digest('hex').slice(0, 16)
   return `${COMMAND_SESSION_PREFIX}${hash}`
 }
 

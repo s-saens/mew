@@ -1,0 +1,45 @@
+.mew-project-sidebar-host { display: contents; }
+.mew-project-sidebar {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex-shrink: 0;
+  color: var(--color-ink);
+  background: var(--color-surface-deep);
+}
+.mew-project-sidebar-body { display: flex; flex: 1; min-width: 0; flex-direction: column; }
+.mew-project-sidebar-heading {
+  display: flex;
+  height: 36px;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 6px;
+  padding-left: 12px;
+  border-bottom: 1px solid var(--color-edge);
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+}
+.mew-project-sidebar-list { min-height: 0; flex: 1; overflow: auto; padding: 6px; }
+.mew-project-sidebar-list .mew-sortable-menu-row { margin-bottom: 2px; }
+.mew-project-sidebar-list .mew-action-menu-item { min-height: 36px; padding: 6px; gap: 8px; border-radius: 4px; font-size: 14px; line-height: 20px; }
+.mew-project-sidebar-list .mew-sortable-menu-row[data-active="true"] { color: var(--color-accent); }
+.mew-project-sidebar-footer { flex-shrink: 0; padding: 4px 6px; border-top: 1px solid var(--color-edge); }
+.mew-project-sidebar-footer .mew-action-menu-item { color: var(--color-ink-secondary); font-size: 12px; }
+.mew-project-command {
+  display: flex;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  margin-right: 2px;
+  border-radius: 4px;
+  color: var(--color-ink-muted);
+}
+.mew-project-command:hover, .mew-project-command[aria-expanded="true"] { background: var(--color-surface-raised); color: var(--color-ink); }
+.mew-project-command:focus-visible { outline: 2px solid var(--color-accent); outline-offset: -2px; }
+.mew-project-sidebar-resize { width: 4px; flex-shrink: 0; cursor: col-resize; touch-action: none; border-right: 1px solid var(--color-edge); }
+.mew-project-sidebar-resize:hover, .mew-project-sidebar-resize:focus-visible { background: var(--color-accent); outline: none; }
+@media (width >= 768px) {
+  .mew-project-sidebar-host { display: flex; order: -9999; flex-shrink: 0; min-height: 0; }
+}

@@ -30,7 +30,7 @@ import multer from 'multer'
 import { GitError } from 'simple-git'
 import fs from 'node:fs'
 import path from 'node:path'
-import { DEFAULT_PROJECT, isDeniedSegment, isProtectedProject, listProjects, projectRoot, resolveProjectPath, UnknownProjectError, UnsafePathError, WORKSPACE_PROJECT, workspacePaths, workspaceContext } from './paths.ts'
+import { assertNotServerDataPath, DEFAULT_PROJECT, isDeniedSegment, isProtectedProject, listProjects, pathsForWorkspace, projectRoot, resolveProjectPath, UnknownProjectError, UnsafePathError, WORKSPACE_PROJECT, workspacePaths, workspaceContext } from './paths.ts'
 import { createProject, deleteProject, ProjectNameError, renameProject } from './projects.ts'
 import { buildTree, buildTreeAsync, isPathVisible } from './tree.ts'
 import { flattenTextFiles, replaceInFile, searchInProject, searchInProjectProgressively } from './search.ts'
@@ -2709,6 +2709,25 @@ export function createApiApp() {
   // 명령어 버튼 — <프로젝트>/.mew/cmd-button.json 을 읽어 목록·실행 상태를 준다. 임의 명령 실행이므로
   // tmux와 동일하게 owner/manager만. 명령 문자열은 언제나 서버가 파일에서 읽고(요청 본문의 명령은 신뢰하지
   // 않음), 실행은 특수 프리픽스 세션(탭에서 숨겨짐)에서 프로젝트 폴더를 cwd로 이뤄진다.
+  app.use('/cmd-buttons', requireFeature('terminal'), (req, res, next) => {
+    const requested = req.query.workspacePath !== undefined ? req.query.workspacePath : req.body?.workspacePath
+    if (requested === undefined) { next(); return }
+    const auth = authOf(req)
+    if (auth.role !== 'owner' && auth.role !== 'manager') { res.status(403).json({ error: '권한이 없습니다' }); return }
+    try {
+      if (typeof requested !== 'string' || requested.length > 4096 || requested.includes('\0') || !path.isAbsolute(requested)) {
+        throw new UnsafePathError('프로젝트 폴더의 절대 경로가 필요합니다')
+      }
+      const root = fs.realpathSync(requested)
+      assertNotServerDataPath(root)
+      if (!fs.statSync(root).isDirectory()) throw new UnsafePathError('프로젝트 폴더가 필요합니다')
+      workspaceContext.run(pathsForWorkspace(root, auth.email), next)
+    } catch (err) {
+      if (err instanceof UnsafePathError) handleError(res, err)
+      else res.status(400).json({ error: '프로젝트 폴더를 열 수 없습니다' })
+    }
+  })
+
   app.get('/cmd-buttons', requireFeature('terminal'), async (req, res) => {
     try {
       const project = projectOf(req)

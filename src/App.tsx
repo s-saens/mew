@@ -333,6 +333,15 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
   const [sidebarOpen, setSidebarOpen] = useState(isDesktop)
   // 터미널·에이전트의 기능 권한과 열림 상태는 독립이다.
   const dockRef = useRef<DockHandle>(null)
+  const [projectSidebarHost, setProjectSidebarHost] = useState<HTMLDivElement | null>(null)
+  const [projectSidebarOpen, setProjectSidebarOpen] = useState(() => scopedBrowserStorage().getItem('mew:project-sidebar-open') === '1')
+  const showProjectSidebar = desktopMode && canOpenProjects && projectSidebarOpen
+  const changeProjectSidebarOpen = useCallback((open: boolean) => {
+    if (open) dockRef.current?.restore()
+    setProjectSidebarOpen(open)
+    try { scopedBrowserStorage().setItem('mew:project-sidebar-open', open ? '1' : '0') } catch { /* session setting */ }
+  }, [])
+  useEffect(() => { setProjectSidebarOpen(scopedBrowserStorage().getItem('mew:project-sidebar-open') === '1') }, [authEmail])
   const [terminalOpen, setTerminalOpen] = useState(() => canUseTerminal && (scopedBrowserStorage().getItem(TERMINAL_OPEN_KEY) !== null ? scopedBrowserStorage().getItem(TERMINAL_OPEN_KEY) === '1' : scopedBrowserStorage().getItem(LEGACY_TMUX_OPEN_KEY) === '1' || scopedBrowserStorage().getItem(AGENT_OPEN_KEY) === '1'))
   const [debuggerOpen, setDebuggerOpen] = useState(false)
   const [agentOpen, setAgentOpen] = useState(() => caps.agent && scopedBrowserStorage().getItem(AGENT_OPEN_KEY) === '1')
@@ -427,8 +436,8 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
   } satisfies Record<WorkspacePanelId, (open: boolean) => void>), [])
 
   const mobileForegroundPanel = mobilePanelStack.at(-1) ?? null
-  const openDockPanels = (['editor', 'desktop', ...WORKSPACE_PANEL_IDS] as const).filter(panel =>
-    panel === 'editor' ? editorOpen : panel === 'desktop' ? remoteDesktopOpen : panel === 'memo' ? memoOpen : workspacePanelOpen[panel])
+  const openDockPanels = (['editor', 'desktop', 'projects', ...WORKSPACE_PANEL_IDS] as const).filter(panel =>
+    panel === 'projects' ? showProjectSidebar : panel === 'editor' ? editorOpen : panel === 'desktop' ? remoteDesktopOpen : panel === 'memo' ? memoOpen : workspacePanelOpen[panel])
   const focusedDockPanel = focusedWorkspacePanel && openDockPanels.some(panel => panel === focusedWorkspacePanel) ? focusedWorkspacePanel : null
   useEffect(() => {
     if (focusedWorkspacePanel && !focusedDockPanel) setFocusedWorkspacePanel(null)
@@ -1099,6 +1108,9 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     min: 180,
     max: 480,
     initial: 256,
+  })
+  const { width: projectSidebarWidth, restoreWidth: restoreProjectSidebarWidth, startResize: startProjectSidebarResize } = usePanelWidth('mew:project-sidebar-width', {
+    min: 200, max: 360, initial: 240,
   })
   const { width: androidWidth, restoreWidth: restoreAndroidWidth, startResize: startAndroidResize } = usePanelWidth('mew:android-panel-width', {
     min: 380,
@@ -2064,6 +2076,9 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
       <div className="flex flex-col">
         <header className="flex h-9 items-stretch border-b border-edge pr-2 md:h-11">
           <ProjectSwitcher
+            sidebarHost={projectSidebarHost} sidebarEnabled={desktopMode} sidebarOpen={showProjectSidebar} onSidebarOpenChange={changeProjectSidebarOpen}
+            sidebarWidth={projectSidebarWidth} onSidebarResize={startProjectSidebarResize} onSidebarWidthChange={restoreProjectSidebarWidth}
+            canUseCommands={canUseTerminal && !isGuest} activeWorkingPath={rootProjectPath}
             paths={projectPaths}
             activePath={projectUiPath}
             fallbackLabel={projectLabel(projectUiPath)}
@@ -2084,7 +2099,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
             }}
             onOpen={() => setOpenProjectDialog(true)}
           />
-          {canUseTerminal && !isGuest && <div className="flex shrink-0 items-center">
+          {canUseTerminal && !isGuest && !showProjectSidebar && <div className="flex shrink-0 items-center">
             <CommandButtonMenu
               key={rootProjectPath}
               project={WORKSPACE_PROJECT}
@@ -2132,9 +2147,10 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
         }}
       >
         <div ref={setSidebarDockHost} className="desktop-dock-rail" data-sidebar-dock />
+        <div ref={setProjectSidebarHost} className="mew-project-sidebar-host" data-project-sidebar-host />
         <button type="button" data-sidebar-toggle aria-expanded={sidebarOpen} aria-label={uiText(sidebarOpen ? '파일 탐색기 닫기' : '파일 탐색기 열기')} data-tip={uiText(sidebarOpen ? '파일 탐색기 닫기' : '파일 탐색기 열기')} onClick={() => toggleWorkspacePanel('sidebar')}
           className="absolute top-1/2 z-50 hidden h-9 w-5 -translate-y-1/2 items-center justify-center rounded-r border border-edge-strong bg-surface-deep text-ink-secondary hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-accent md:flex"
-          style={{ left: `calc(var(--desktop-dock-width) + ${sidebarOpen ? sidebarWidth - 1 : 0}px)` }}>
+          style={{ left: `calc(var(--desktop-dock-width) + ${(showProjectSidebar ? projectSidebarWidth : 0) + (sidebarOpen ? sidebarWidth - 1 : 0)}px)` }}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d={sidebarOpen ? 'm15 6-6 6 6 6' : 'm9 6 6 6-6 6'} /></svg>
         </button>
         {sidebarOpen && (
