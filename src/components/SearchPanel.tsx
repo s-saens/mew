@@ -394,10 +394,10 @@ function renderPreview(m: SearchMatch) {
   const s = Math.max(0, m.matchStart - lead)
   const e = Math.max(s, m.matchEnd - lead)
   return (
-    <>
-      {trimmed.slice(0, s)}
-      <mark className="rounded-sm bg-warning/40 text-ink">{trimmed.slice(s, e)}</mark>
-      {trimmed.slice(e)}
-    </>
+    <span className="flex min-w-0 items-baseline">
+      {s > 0 && <span dir="rtl" className="min-w-0 max-w-[30%] truncate text-left"><bdi dir="ltr">{trimmed.slice(0, s)}</bdi></span>}
+      <mark className="max-w-full shrink-0 truncate rounded-sm bg-warning/40 font-semibold text-ink">{trimmed.slice(s, e)}</mark>
+      <span className="min-w-0 flex-1 truncate">{trimmed.slice(e)}</span>
+    </span>
   )
 }

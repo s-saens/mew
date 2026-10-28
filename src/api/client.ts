@@ -1074,8 +1074,10 @@ export function fetchFileAnchorPreview(path: string, anchorLine: number, project
 
 export interface SearchMatch {
   line: number
+  /** 원문 줄 안에서의 UTF-16 오프셋(0부터). */
   column: number
   text: string
+  /** 미리보기 text 안에서의 UTF-16 오프셋. */
   matchStart: number
   matchEnd: number
   lineEnd?: number

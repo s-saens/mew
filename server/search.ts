@@ -15,6 +15,7 @@ export interface SearchMatch {
   column: number
   /** 미리보기용 줄 텍스트(과도하게 길면 잘라낸다) */
   text: string
+  /** 미리보기 text 안에서의 UTF-16 오프셋. column은 원문 줄 기준이다. */
   matchStart: number
   matchEnd: number
 }
@@ -33,6 +34,17 @@ const MAX_FILES = 4000
 const MAX_TOTAL_MATCHES = 2000
 const MAX_MATCHES_PER_FILE = 300
 const MAX_LINE_LEN = 400
+
+function matchPreview(line: string, start: number, end: number): Pick<SearchMatch, 'text' | 'matchStart' | 'matchEnd'> {
+  const from = line.length > MAX_LINE_LEN ? Math.max(0, start - 24) : 0
+  const to = Math.min(line.length, from + MAX_LINE_LEN)
+  const prefix = from > 0 ? '…' : ''
+  return {
+    text: prefix + line.slice(from, to) + (to < line.length ? '…' : ''),
+    matchStart: prefix.length + start - from,
+    matchEnd: prefix.length + Math.min(end, to) - from,
+  }
+}
 
 /** 트리에서 검색 가능한 텍스트 파일의 상대경로만 평탄화한다 — 미디어·다운로드(바이너리)는 제외 */
 export function flattenTextFiles(nodes: TreeNode[], out: string[] = []): string[] {
@@ -82,9 +94,7 @@ export function searchInProject(
         matches.push({
           line: li + 1,
           column: m.index,
-          text: line.length > MAX_LINE_LEN ? line.slice(0, MAX_LINE_LEN) + '…' : line,
-          matchStart: m.index,
-          matchEnd: m.index + m[0].length,
+          ...matchPreview(line, m.index, m.index + m[0].length),
         })
         total++
         if (matches.length >= MAX_MATCHES_PER_FILE || total >= MAX_TOTAL_MATCHES) break
@@ -121,7 +131,7 @@ export async function searchInProjectProgressively(
     for (const [lineIndex, line] of content.split('\n').entries()) {
       if (matches.length >= MAX_MATCHES_PER_FILE) break
       for (const match of nonEmptySearchMatches(regex, line)) {
-        matches.push({ line: lineIndex + 1, column: match.index, text: line.length > MAX_LINE_LEN ? `${line.slice(0, MAX_LINE_LEN)}…` : line, matchStart: match.index, matchEnd: match.index + match[0].length })
+        matches.push({ line: lineIndex + 1, column: match.index, ...matchPreview(line, match.index, match.index + match[0].length) })
         total++
         if (matches.length >= MAX_MATCHES_PER_FILE || total >= MAX_TOTAL_MATCHES) break
       }
