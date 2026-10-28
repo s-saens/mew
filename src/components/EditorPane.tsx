@@ -112,8 +112,8 @@ function SidebarOpenButton({ onClick }: { onClick: () => void }) {
       type="button"
       onClick={onClick}
       className="rounded border border-edge-strong bg-surface-raised p-1.5 text-ink-muted shadow-sm hover:bg-surface-hover"
-      title={uiText("사이드바 열기 (Ctrl+B)")}
-      aria-label={uiText("사이드바 열기")}
+      title={uiText("파일 탐색기 열기 (Ctrl+B)")}
+      aria-label={uiText("파일 탐색기 열기")}
     >
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <rect x="3" y="3" width="18" height="18" rx="2" />
@@ -1127,7 +1127,7 @@ export function EditorPane({
               </div>
             )}
             <dl className="grid max-w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-x-6 gap-y-2 px-3 text-sm">
-              <dt>{uiText("사이드바 열기")}</dt>
+              <dt>{uiText("파일 탐색기 열기")}</dt>
               <dd className="text-right"><kbd className="font-mono text-xs">{shortcutBindings.toggleSidebar}</kbd></dd>
               <dt>{uiText("문서 검색")}</dt>
               <dd className="text-right"><kbd className="font-mono text-xs">{shortcutBindings.projectSearch}</kbd></dd>

@@ -4,7 +4,7 @@
   { "id": "projectSearch", "category": "전역", "label": "프로젝트 전체 검색", "keys": "Ctrl+Shift+F", "editable": true },
   { "id": "toggleTerminal", "category": "전역", "label": "터미널 열기/닫기", "keys": "Ctrl+`", "editable": true },
   { "id": "toggleTasks", "category": "전역", "label": "태스크 패널 열기/닫기", "keys": "Alt+T", "editable": true },
-  { "id": "toggleSidebar", "category": "전역", "label": "사이드바 열기/닫기", "keys": "Ctrl+B", "editable": true },
+  { "id": "toggleSidebar", "category": "전역", "label": "파일 탐색기 열기/닫기", "keys": "Ctrl+B", "editable": true },
   { "id": "closeTab", "category": "전역", "label": "탭 닫기", "keys": "Ctrl+W", "editable": true },
   { "id": "closeTabAlt", "category": "전역", "label": "탭 닫기 (대체)", "keys": "Alt+W", "editable": true },
   { "id": "newTab", "category": "전역", "label": "새 파일", "keys": "Alt+N", "editable": true },

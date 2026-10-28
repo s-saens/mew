@@ -2132,7 +2132,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
         }}
       >
         <div ref={setSidebarDockHost} className="desktop-dock-rail" data-sidebar-dock />
-        <button type="button" data-sidebar-toggle aria-expanded={sidebarOpen} aria-label={uiText(sidebarOpen ? '사이드바 닫기' : '사이드바 열기')} data-tip={uiText(sidebarOpen ? '사이드바 닫기' : '사이드바 열기')} onClick={() => toggleWorkspacePanel('sidebar')}
+        <button type="button" data-sidebar-toggle aria-expanded={sidebarOpen} aria-label={uiText(sidebarOpen ? '파일 탐색기 닫기' : '파일 탐색기 열기')} data-tip={uiText(sidebarOpen ? '파일 탐색기 닫기' : '파일 탐색기 열기')} onClick={() => toggleWorkspacePanel('sidebar')}
           className="absolute top-1/2 z-50 hidden h-9 w-5 -translate-y-1/2 items-center justify-center rounded-r border border-edge-strong bg-surface-deep text-ink-secondary hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-accent md:flex"
           style={{ left: `calc(var(--desktop-dock-width) + ${sidebarOpen ? sidebarWidth - 1 : 0}px)` }}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d={sidebarOpen ? 'm15 6-6 6 6 6' : 'm9 6 6 6-6 6'} /></svg>
@@ -2200,7 +2200,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
                   </svg>
                 </button>
                 {!isGuest && caps.filesRead && caps.filesWrite && <SidebarCreateButtons documents={docsExpanded} onCreate={sidebarCreate.create} disabled={!workspaceUiLoaded || sidebarStateLoadedRootRef.current !== projectUiPath} />}
-                <PanelCloseButton onClick={() => closeWorkspacePanel('sidebar')} className={isGuest ? 'ml-auto' : ''} aria-label={uiText("사이드바 닫기")} />
+                <PanelCloseButton onClick={() => closeWorkspacePanel('sidebar')} className={isGuest ? 'ml-auto' : ''} aria-label={uiText("파일 탐색기 닫기")} />
               </div>
               <div className="min-h-0 flex-1">
                 <div className={sidebarView === 'files' ? 'flex h-full flex-col' : 'hidden'}>

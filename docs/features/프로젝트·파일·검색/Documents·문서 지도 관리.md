@@ -4,7 +4,7 @@ parent: "mew-projects"
 title: "Documents·문서 지도 관리"
 status: "implemented"
 created: "2026-09-18"
-updated: "2026-10-26"
+updated: "2026-10-28"
 status_hash: "67f36d128f8ff98f55ff2f44e2197710413f6968309439a998bd606dad06b477"
 files: ["src/components/DocsSettingsModal.tsx", "src/components/FileTree.tsx", "server/docsRepo.ts", "src/components/DocumentGraph.tsx", "server/document-graph.ts", "src/utils/document-graph-layout.ts", "server/document-pages.ts", "src/hooks/useTabs.ts"]
 commits: []
@@ -51,7 +51,7 @@ description: "Documents 대표·하위 문서의 파일·폴더 전환, 목록 �
 <!-- mew:implementation:start -->
 ## 구현 내용
 
-- 2026-10-06 사용자 재요청에 따라 상위 항목 스크롤 고정을 다시 제공한다. `TreeHeader`는 상단 여백을 보정해 틈 없이 쌓이고, 노드별 `isolate`로 조상 가이드선이 하위 고정 행 위에 이어지게 한다. 접기·하위 목록 끝에서 고정 해제와 파일 위치 표시를 유지한다. [상위 행 고정 계약](../../development/ui-contracts.md#사이드바-트리의-상위-행-고정)을 따른다.
+- 2026-10-06 사용자 재요청에 따라 상위 항목 스크롤 고정을 다시 제공한다. `TreeHeader`는 상단 여백을 보정해 틈 없이 쌓이고, 노드별 `isolate`로 조상 가이드선이 하위 고정 행 위에 이어지게 한다. 접기·하위 목록 끝에서 고정 해제와 파일 위치 표시를 유지한다. [상위 행 고정 계약](../../development/ui-contracts.md#파일-탐색기-트리의-상위-행-고정)을 따른다.
 
 - `FileTree.tsx`의 공통 `TreeChildren`은 각 하위 목록에 1px 테마 구분선을 겹쳐 표시한다. 선은 폴더 아이콘·문서 펼침 버튼 중심에서 2px 왼쪽에 놓는다. 기존 14px 들여쓰기를 유지하고 생성 입력·로딩 행에도 선을 이어 표시하며 클릭·드래그와 접근성 탐색에는 관여하지 않는다.
 
@@ -100,7 +100,7 @@ description: "Documents 대표·하위 문서의 파일·폴더 전환, 목록 �
 - 그래프 보기 버튼이 Docs 루트에만 한 번 표시되고 문서 홈보다 앞서는지, 검색·선택·문서 열기가 기존 에디터와 연결되는지 확인한다. 읽을 수 없는 문서와 그 연결은 권한 변경 후에도 표시되지 않아야 한다.
 
 - 같은 이름의 Documents·일반 파일이 탭바에 함께 표시되고 각각 올바른 본문을 열고 저장하는지 확인한다. 패널 이동 뒤 파일 전환·새로고침에도 탭과 배치를 유지해야 한다.
-- 2026-09-29: `editor-files.test.ts`·`unified-editor-ui.test.ts`·`workspace-switch-ui.test.ts`에서 동명 파일의 탭·저장 분리, 기존 탭 통합, 패널 이동 후 위치 유지, 새로고침·루트 전환 복원을 확인했다. 편집기·보기 전환·사이드바 회귀를 포함해 10개 테스트가 통과했다.
+- 2026-09-29: `editor-files.test.ts`·`unified-editor-ui.test.ts`·`workspace-switch-ui.test.ts`에서 동명 파일의 탭·저장 분리, 기존 탭 통합, 패널 이동 후 위치 유지, 새로고침·루트 전환 복원을 확인했다. 편집기·보기 전환·파일 탐색기 회귀를 포함해 10개 테스트가 통과했다.
 
 - 아래 항목은 이번 정리에서 실행한 테스트 결과가 아닌 사용자 확인 기준이다:
   - Documents에 연결한 실제 경로와 MOC가 맞고 파일 보기의 진입점으로 문서 보기에 전환되는지 확인한다.

@@ -1,7 +1,7 @@
 ---
 title: "앱 시작과 서버 구조·상태 파일"
 description: "owner·manager의 계정별 프로젝트 전환과 인증 대기 전 시작 화면·병렬 다운로드·초기/인증/작업 화면 청크 묶음·현재 P2P 인증 재사용과 작업 화면·편집기의 일반 state 렌더링을 설명한다. 신원·권한별 비동기 로딩, 서버·CLI·OS 실행 계층, 상태 파일과 격리 시작 검증·운영 적용의 경계를 구분한다."
-updated: "2026-10-24"
+updated: "2026-10-28"
 상위파일:
   - "../MOC.md"
   - "MOC.md"
@@ -39,7 +39,7 @@ updated: "2026-10-24"
 
 편집기·터미널·작업 패널을 포함한 `App`은 인증·저장소 범위·콘텐츠 identity·권한 버전 설정을 마친 뒤 effect에서 동적 import한다. 준비 중에는 같은 시작 화면을 유지하고 모듈이 오면 일반 Component state로 렌더한다. 최상위 Workspace의 React lazy 재시도 경로에서 생기던 약 300ms 대기를 피하며 인증 전 모듈 평가를 시작하지 않는다. 미완료 import는 계정·권한 변경이나 unmount 뒤 마운트를 갱신하지 못한다. 로드된 공개 Component는 권한 갱신 때 유지하고 현재 인증 props를 받는다. import 실패는 해당 신원 범위의 오류로 끝내며 무한 재시도하지 않는다. 포트 프리뷰와 하위 도구의 Suspense 경계는 유지한다.
 
-작업 화면의 헤더·사이드바·독은 편집기와 별도로 준비된다. `deferred-editor-pane.tsx`도 effect에서 편집기를 동적 import하고 일반 Component state로 렌더한다. 계정·역할·워크스페이스 루트·게스트/협업 상태·권한 버전을 결과에 결합해 범위가 바뀌면 즉시 `PanelLoading`을 표시한다. 이전 범위의 늦은 성공·실패와 unmount 뒤 완료는 현재 편집기를 갱신하지 못한다. 로드 오류는 기존 번역된 복구 문구로 표시한다. 파일·버전·협업 준비와 서버의 권한 검사는 그대로 수행한다.
+작업 화면의 헤더·파일 탐색기·독은 편집기와 별도로 준비된다. `deferred-editor-pane.tsx`도 effect에서 편집기를 동적 import하고 일반 Component state로 렌더한다. 계정·역할·워크스페이스 루트·게스트/협업 상태·권한 버전을 결과에 결합해 범위가 바뀌면 즉시 `PanelLoading`을 표시한다. 이전 범위의 늦은 성공·실패와 unmount 뒤 완료는 현재 편집기를 갱신하지 못한다. 로드 오류는 기존 번역된 복구 문구로 표시한다. 파일·버전·협업 준비와 서버의 권한 검사는 그대로 수행한다.
 
 `deferredComponent`는 다른 패널·설정 창에 자체 Suspense 경계를 두므로 한 도구의 다운로드가 늦어도 작업 화면 전체가 사라지지 않는다. 설정·파일 탐색·로그인 화면·원격 데스크톱·이력 같은 도구는 해당 화면을 열 때 받는다. 검색·태스크·메모는 처음 열 때 코드가 로딩되고, 이후 닫아도 컴포넌트를 유지해 내부 상태를 보존한다. 메모는 지연 다운로드가 끝난 첫 마운트에서도 포커스를 받는다. 에이전트 패널은 기존 세션 복원·백그라운드 알림을 유지하며 작업 화면과 독립적으로 로딩된다. 업데이트 전체 검사는 작업 화면을 한 번 그린 뒤 시작한다.
 
@@ -53,7 +53,7 @@ updated: "2026-10-24"
 
 2026-10-23 동일한 실제 main·로그인 코드와 모의 Workspace를 사용하는 `write:false` fixture에서 시작 JS 정적 의존 요청은 8개에서 3개, 로그인 진입까지의 합집합은 9개에서 4개로 줄었다. CSS와 실제 작업 화면은 제외했으며 운영 dist나 전체 접속 시간 측정이 아니다. 같은 테스트의 Chromium 검사는 인증 대기 중 시작 화면, 원격 로그인·임시 비밀번호 변경 전 Workspace 요청 0건, 신원·권한 변경·로컬 게스트 경계를 확인한다.
 
-`src/app-bootstrap.browser.test.ts`는 실제 main·인증·P2P 앱 브리지와 로그인 화면을 격리 브라우저에 올려, 인증 응답 대기 중 시작 화면 표시, 원격 로그인 전 workspace 요청 0건, 최초 인증 조회 1회, 비밀번호 변경 요구·신원/권한 전환·로컬 게스트·조회 실패를 확인한다. `src/workspace-startup.browser.test.ts`는 PC·모바일의 실제 작업 화면에서 편집기·설정 모듈 응답을 보류해도 헤더·사이드바가 동작하고, 닫힌 도구를 미리 받지 않는지 검사한다. API·탐색기·작업 화면의 의존성 검사는 `src/api/client-bundle.test.ts`, 명령 팝업의 renderer 대기는 `src/components/session-terminal-startup.browser.test.ts`, 아이콘 크기·선택은 `src/components/project-icons-startup.browser.test.ts`, 메모의 첫 열기·재열기 포커스는 `src/components/shared-memo-startup.browser.test.ts`가 담당한다. 실제 설치 `dist/`는 사용자가 빌드·적용한다.
+`src/app-bootstrap.browser.test.ts`는 실제 main·인증·P2P 앱 브리지와 로그인 화면을 격리 브라우저에 올려, 인증 응답 대기 중 시작 화면 표시, 원격 로그인 전 workspace 요청 0건, 최초 인증 조회 1회, 비밀번호 변경 요구·신원/권한 전환·로컬 게스트·조회 실패를 확인한다. `src/workspace-startup.browser.test.ts`는 PC·모바일의 실제 작업 화면에서 편집기·설정 모듈 응답을 보류해도 헤더·파일 탐색기가 동작하고, 닫힌 도구를 미리 받지 않는지 검사한다. API·탐색기·작업 화면의 의존성 검사는 `src/api/client-bundle.test.ts`, 명령 팝업의 renderer 대기는 `src/components/session-terminal-startup.browser.test.ts`, 아이콘 크기·선택은 `src/components/project-icons-startup.browser.test.ts`, 메모의 첫 열기·재열기 포커스는 `src/components/shared-memo-startup.browser.test.ts`가 담당한다. 실제 설치 `dist/`는 사용자가 빌드·적용한다.
 
 `src/workspace-loading.browser.test.ts`·`src/editor-loading.browser.test.ts`는 실제 production React의 재시도 타이머를 보류하고 모듈 완료 뒤 타이머 해제 전 마운트를 확인한다. 편집기 검사는 기존 `deferredComponent`와 비교하며 계정·역할·루트·권한 버전 변경, 오래된 완료·실패, unmount와 현재 로드 실패도 확인한다. 전체 소스·실제 저장 파일의 격리 표시 시간은 [측정 기록](../research/mewlink-startup-latency.md)이 소유하며 이 단위 검사의 시간과 구분한다.
 
@@ -90,9 +90,9 @@ flowchart LR
 
 ## 프로젝트 아이콘 기준본
 
-각 루트의 `.mew/project-icon.json`은 `{ "icon": "i:folder" }` 형태로 아이콘 값 하나를 저장한다. 기존 `svg:`·`svgt:`·이모지 표기를 그대로 지원하고 읽기·쓰기에서 공통 SVG 검증을 적용한다. `null`은 명시적 초기화이며 옛 값으로 되돌리지 않는다. 사이드바 목록·중첩 트리·루트 탭은 `server/projectIcons.ts`를 통해 같은 파일을 읽는다. 트리 구조 캐시도 응답 시 프로젝트 파일에서 아이콘을 다시 읽어 오래된 값을 유지하지 않는다. 파일·`.mew` 심볼릭 링크는 거부하고 손상된 파일을 덮어쓰지 않는다.
+각 루트의 `.mew/project-icon.json`은 `{ "icon": "i:folder" }` 형태로 아이콘 값 하나를 저장한다. 기존 `svg:`·`svgt:`·이모지 표기를 그대로 지원하고 읽기·쓰기에서 공통 SVG 검증을 적용한다. `null`은 명시적 초기화이며 옛 값으로 되돌리지 않는다. 파일 탐색기 목록·중첩 트리·루트 탭은 `server/projectIcons.ts`를 통해 같은 파일을 읽는다. 트리 구조 캐시도 응답 시 프로젝트 파일에서 아이콘을 다시 읽어 오래된 값을 유지하지 않는다. 파일·`.mew` 심볼릭 링크는 거부하고 손상된 파일을 덮어쓰지 않는다.
 
-기존 `DATA_DIR/project-icons.json`의 현재 루트 직계 프로젝트 값은 첫 조회 때 프로젝트 파일로 이관한 뒤 이전 키를 제거한다. 계정의 기존 탭 아이콘은 프로젝트 파일·사이드바 값이 없을 때만 초기값으로 이관한다. 이름만 같은 다른 루트에는 옛 사이드바 값을 적용하지 않는다. 조회할 수 없는 프로젝트는 기본 폴더 아이콘을 표시한다. 읽기·이관은 표시 시점에 이루어지므로 닫힌 프로젝트를 재귀 탐색하지 않는다.
+기존 `DATA_DIR/project-icons.json`의 현재 루트 직계 프로젝트 값은 첫 조회 때 프로젝트 파일로 이관한 뒤 이전 키를 제거한다. 계정의 기존 탭 아이콘은 프로젝트 파일·파일 탐색기 값이 없을 때만 초기값으로 이관한다. 이름만 같은 다른 루트에는 옛 파일 탐색기 값을 적용하지 않는다. 조회할 수 없는 프로젝트는 기본 폴더 아이콘을 표시한다. 읽기·이관은 표시 시점에 이루어지므로 닫힌 프로젝트를 재귀 탐색하지 않는다.
 
 Owner 전용 `POST /api/project-icons/read`는 절대경로 목록의 현재 아이콘을 읽고, `PUT /api/project-icons`는 `{ path, icon }`을 프로젝트에 저장한다. 기존 `/api/project-icon`도 같은 파일을 갱신한다. 계정의 루트 탭 저장에는 아이콘 내용을 더 이상 넣지 않는다. [ADR 0177](../history/decisions/0177-mew-project-owned-icons.md)을 따른다.
 ## 계정별 활성 프로젝트

@@ -25,6 +25,20 @@ test('interpolation preserves user text, including Korean, dollar signs and brac
   assert.equal(translateUi('en', '{name} 여는 중…'), 'Opening {name}…')
 })
 
+test('file explorer controls use the renamed panel label in every language', () => {
+  for (const [locale, open, close] of [
+    ['ko', '파일 탐색기 열기', '파일 탐색기 닫기'],
+    ['en', 'Open file explorer', 'Close file explorer'],
+    ['zh-CN', '打开文件资源管理器', '关闭文件资源管理器'],
+    ['ja', 'ファイルエクスプローラーを開く', 'ファイルエクスプローラーを閉じる'],
+  ] as const) {
+    assert.equal(translateUi(locale, '파일 탐색기 열기'), open)
+    assert.equal(translateUi(locale, '파일 탐색기 닫기'), close)
+    assert.equal(translateUi(locale, '파일 탐색기 열기 (Ctrl+B)'), `${open} (Ctrl+B)`)
+    assert.equal(translateUi(locale, '파일 탐색기 닫기 (Ctrl+B)'), `${close} (Ctrl+B)`)
+  }
+})
+
 test('shared UI locale updates subscribers once, supports cleanup, and formats weekdays', () => {
   const initial = getUiLocale()
   let updates = 0
