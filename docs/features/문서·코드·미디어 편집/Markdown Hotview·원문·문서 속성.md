@@ -4,11 +4,11 @@ parent: "mew-editor"
 title: "Markdown Hotview·원문·문서 속성"
 status: "implemented"
 created: "2026-09-18"
-updated: "2026-10-19"
+updated: "2026-10-29"
 status_hash: "2741d359b18c61eecb53b8ce0ba2862f0f42c088d7d02cf55c88a23d1d44a98e"
 files: ["packages/editor/src/editor/FrontmatterSelect.tsx", "server/frontmatter-options.ts", "src/hooks/useTabs.ts", "src/components/EditorPane.tsx", "src/components/markdown-error-boundary.tsx", "packages/editor/src/Editor.tsx", "packages/editor/src/editor/FrontmatterPanel.tsx", "src/components/TableOfContents.tsx"]
 commits: []
-description: "Markdown Hotview·Plain 편집과 블록별 계산 캐시·Pretext 기반 DOM 가상화, 보기 전환 시 읽던 줄 유지와 속성 영역의 커서 복원 경계, 체크박스·문서 목차·프론트매터 속성과 제목 옆 백링크·상위파일 화살표 탐색을 다루는 기능 계약. 상위파일 제외·프로젝트 간 참조, YAML 보존, 모바일 키보드와 원문 저장 경계를 포함한다."
+description: "Markdown Hotview·Plain 편집과 블록별 계산 캐시·Pretext 기반 DOM 가상화, 코드 블록의 줄바꿈 보존·내부 가로 스크롤, 보기 전환 시 읽던 줄 유지와 속성 영역의 커서 복원 경계, 체크박스·문서 목차·프론트매터 속성과 제목 옆 백링크·상위파일 화살표 탐색을 다루는 기능 계약. 상위파일 제외·프로젝트 간 참조, YAML 보존, 모바일 키보드와 원문 저장 경계를 포함한다."
 상위파일:
   - "MOC.md"
   - "_문서·코드·미디어 편집.md"
@@ -22,6 +22,7 @@ description: "Markdown Hotview·Plain 편집과 블록별 계산 캐시·Pretext
 
 - Hotview의 반복 계산은 블록별 캐시를 사용하고, 120개 이상 최상위 블록은 Pretext 높이 예측으로 화면 밖 내용 DOM을 생성하지 않는다. 커서·선택·IME 위치와 전체 편집·협업 모델은 유지한다.
 - Hotview·Plain 전환과 제목·목록·체크박스·인용·코드 블록·강조를 제공한다.
+- Hotview 코드 블록은 원래 줄바꿈·공백·탭을 보존한다. 긴 줄은 자동으로 꺾지 않고 블록 안에서 가로 스크롤하며, 모바일과 읽기 전용에서도 같은 동작을 유지한다. 복사 버튼은 블록 오른쪽 위에 고정한다.
 - 줄 맨 앞의 `[] `·`[ ] ` 입력으로 체크박스 줄을 만들며, 클릭으로 완료 상태를 바꾸고 Enter로 이어 쓰거나 빈 항목에서 일반 문단으로 돌아온다.
 - 프론트매터 속성 편집·문서 목차·목록 들여쓰기를 제공한다.
 - 프론트매터 제목 오른쪽 대각선 화살표로 참조 문서 목록을 열고 선택한 문서로 이동한다. 허용된 외부 프로젝트 문서도 포함하며 현재 문서의 `상위파일`은 목록에서 제외한다.
@@ -49,6 +50,8 @@ description: "Markdown Hotview·Plain 편집과 블록별 계산 캐시·Pretext
 
 <!-- mew:implementation:start -->
 ## 구현 내용
+
+- 코드 블록의 `pre`에 `white-space: pre`와 `overflow-wrap: normal`을 적용하고 기존 `overflow-x: auto`를 유지한다. `.tiptap.ProseMirror pre` 선택자로 뒤늦게 주입되는 Tiptap 기본 `pre-wrap`보다 우선한다. 일반 본문과 인라인 코드의 줄바꿈은 기존 동작을 유지한다.
 
 - 상위파일 ↑ 버튼은 백링크 분석이 반환한 `parents` 경로·제목을 재사용한다. 허용된 외부 부모도 열 수 있고 없는 파일·읽을 수 없는 파일은 탐색 대상에서 제외한다. 단일 부모 바로 열기와 복수 부모 목록 선택, 로딩·빈 상태·실패·재시도를 제공한다.
 
@@ -90,6 +93,8 @@ description: "Markdown Hotview·Plain 편집과 블록별 계산 캐시·Pretext
 
 <!-- mew:validation:start -->
 ## 검증
+
+- 2026-10-29: `server/editor-code-block-scroll-ui.test.ts`에서 1100px·390px, 다크·라이트 테마의 원래 두 줄·공백·탭 보존, 긴 줄의 내부 가로 스크롤·편집기 폭 유지, 복사 버튼 위치, 일반 문단 줄바꿈과 읽기 전용을 검증했다. 적용 범위와 검사 결과는 [작업 기록](../../work/editor-code-block-scroll.md)을 따른다.
 
 - 2026-10-14: 속성 영역에서 Plain→Hotview 전환 시 잘못된 본문 커서 위치로 앱이 내려가는 오류를 재현하고 수정했다. `server/editor-view-switch-ui.test.ts`에서 PC·모바일, 게스트·로그인 사용자, 지연된 협업 초기화의 화면 유지·본문 줄 복원·원문 보존을 통과했다. `server/editor-collab-ui.test.ts`의 기존 오류 격리·원문 복구 검사도 통과했다. 실행 중인 앱 반영은 사용자 빌드 후 확인한다.
 

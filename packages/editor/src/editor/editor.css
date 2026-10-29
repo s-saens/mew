@@ -183,13 +183,15 @@
   color: var(--color-accent, var(--color-ink));
 }
 /* 코드블럭 노드 선택 표시는 아래 범용 .ProseMirror-selectednode 규칙이 담당한다 */
-.tiptap pre {
+.tiptap.ProseMirror pre {
   background: var(--color-surface);
   border: 1px solid var(--color-edge-strong);
   border-radius: 6px;
   padding: 1em;
   margin: 0.5em 0;
   overflow-x: auto;
+  white-space: pre;
+  overflow-wrap: normal;
 }
 .tiptap pre code {
   background: transparent;
