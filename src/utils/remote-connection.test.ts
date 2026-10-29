@@ -55,7 +55,7 @@ function fixture(t: TestContext, authenticated = true, options: Parameters<typeo
   const previous = new Map<string, PropertyDescriptor | undefined>()
   for (const [key, value] of Object.entries(values)) { previous.set(key, Object.getOwnPropertyDescriptor(globalThis, key)); Object.defineProperty(globalThis, key, { configurable: true, value }) }
   t.mock.timers.enable({ apis: ['setTimeout', 'setInterval', 'Date'], now: 1_900_000_000_000 })
-  const states: string[] = [], errors: (string | undefined)[] = []
+  const states: string[] = [], errors: (string | undefined)[] = [], codes: (string | undefined)[] = []
   let keyRequests = 0
   let keySignal: AbortSignal | null = null
   t.mock.method(globalThis, 'fetch', async (_url: unknown, init?: RequestInit) => {
@@ -63,14 +63,22 @@ function fixture(t: TestContext, authenticated = true, options: Parameters<typeo
     keySignal = init?.signal ?? null
     return typeof centralKey === 'function' ? centralKey(keySignal!) : Response.json(centralKey)
   })
-  const observe = (state: string, error?: string) => { states.push(state); if (state === 'error') errors.push(error) }
+  const observe = (state: string, error?: string, code?: string) => { states.push(state); codes.push(code); if (state === 'error') errors.push(error) }
   const pending = bootstrap && bootstrapRemoteConnection(bootstrap.target, { identity: bootstrap.identity, admission: bootstrap.admission })
   const close = pending?.close ?? connectRemote('instance', observe, options)
   t.after(() => { close(); for (const [key, descriptor] of previous) { if (descriptor) Object.defineProperty(globalThis, key, descriptor); else Reflect.deleteProperty(globalThis, key) } })
   const peer = FakePeer.latest, signal = FakeSignal.latest
   if (authenticated) { peer.state('connected'); peer.channel.message({ type: 'authenticated', protocol: 1 }); assert.equal(states.at(-1), 'connected') }
-  return { peer, signal, states, errors, browser, document, close, pending, observe, keyRequests: () => keyRequests, keySignal: () => keySignal }
+  return { peer, signal, states, errors, codes, browser, document, close, pending, observe, keyRequests: () => keyRequests, keySignal: () => keySignal }
 }
+
+for (const code of ['offline', 'rate-limited', 'rtc-unavailable', 'access-revoked', 'session-expired']) test(`signaling ${code} errors preserve their code and existing state`, async t => {
+  const { signal, peer, states, codes } = fixture(t, false)
+  signal.onmessage?.({ data: JSON.stringify({ type: 'error', code }) })
+  await until(() => peer.channel.readyState === 'closed')
+  assert.equal(codes.at(-1), code)
+  assert.equal(states.at(-1), code === 'access-revoked' ? 'revoked' : code === 'session-expired' ? 'denied' : 'error')
+})
 
 test('a subsecond interruption preserves the transport without showing recovery or repeating connected', t => {
   const { peer, states } = fixture(t), transport = activeRemoteTransport()
@@ -523,6 +531,36 @@ test('only a bootstrap transport failure before receiving context permits legacy
   await rejected
   assert.equal(peer.channel.readyState, 'closed')
   assert.deepEqual(signal.sent, [])
+})
+
+for (const code of ['offline', 'rate-limited', 'access-revoked', 'session-expired']) test(`bootstrap ${code} rejection before context preserves its code and fallback contract`, async t => {
+  const { pending, signal, peer } = fixture(t, false, {}, {}, { target: { instance: bootstrapInstance } })
+  const state = code === 'access-revoked' ? 'revoked' : code === 'session-expired' ? 'denied' : 'error'
+  const rejected = assert.rejects(pending!.context, error => {
+    const failure = error as Error & { state: string; code: string; legacyFallback: boolean }
+    assert.equal(failure.code, code)
+    assert.equal(failure.state, state)
+    assert.equal(failure.legacyFallback, state === 'error')
+    return true
+  })
+  signal.onmessage?.({ data: JSON.stringify({ type: 'error', code }) })
+  await rejected
+  assert.equal(peer.channel.readyState, 'closed')
+})
+
+test('a started bootstrap forwards offline codes while allowing observers with two arguments', async t => {
+  const { pending, signal, peer, codes, observe } = fixture(t, false, {}, {}, { target: { instance: bootstrapInstance } })
+  challenge(signal, await bootstrapContext())
+  await pending!.context
+  const pair = await crypto.subtle.generateKey({ name: 'Ed25519' }, false, ['sign', 'verify'])
+  let legacyError: string | undefined
+  const legacyObserver = (state: string, message?: string) => { if (state === 'error') legacyError = message }
+  const compatible: Parameters<typeof connectRemote>[1] = legacyObserver
+  pending!.start((state, message, code) => { compatible(state, message, code); observe(state, message, code) }, { keyPair: pair })
+  signal.onmessage?.({ data: JSON.stringify({ type: 'error', code: 'offline' }) })
+  await until(() => peer.channel.readyState === 'closed')
+  assert.equal(codes.at(-1), 'offline')
+  assert.equal(legacyError, '기기가 오프라인입니다.')
 })
 
 test('a rejected HTML admission cannot downgrade into legacy launch negotiation', async t => {

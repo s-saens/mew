@@ -1,9 +1,11 @@
 ---
 title: "Mewlink 호스트 heartbeat 무응답 복구"
-description: "2026-10-29 중앙의 offline 응답과 호스트의 online·OPEN 상태 불일치 조사, heartbeat 응답 감시·handshake 제한 추가와 격리 검증 및 운영 미적용 범위를 기록한다."
+description: "2026-10-29 중앙 offline·호스트 online 불일치와 최초 60초 heartbeat 감시 수정·격리 검증을 기록한다. 후속 응답 기한 단축·원인별 복구는 별도 작업 기록으로 연결한다."
 created: "2026-10-29"
 updated: "2026-10-29"
 ---
+
+이 기록은 최초 60초 응답 감시 수정이다. 이후 감지 시간 단축과 경량 오프라인 대기는 [후속 작업](mewlink-efficient-recovery.md)·[ADR 0086](../decisions/0086-mewlink-recovery-efficiency.md)을 따른다.
 
 ## 조사와 원인
 

@@ -349,16 +349,28 @@ test('host prepares RTC before its ticket while keeping authentication and clean
     await until(() => prepared.peer.responses().some(value => value.type === 'authenticated'))
     assert.ok(heartbeatCheck, 'the active signaling socket has a heartbeat watchdog')
 
-    const now = performance.now()
-    let clock = t.mock.method(performance, 'now', () => now + 20_000)
-    try { heartbeatCheck() } finally { clock.mock.restore() }
+    const now = performance.now(), replyChecks: (() => void)[] = [], originalTimeout = globalThis.setTimeout
+    function check(callback: () => void, elapsed: number) {
+      const clock = t.mock.method(performance, 'now', () => now + elapsed)
+      const timeouts = t.mock.method(globalThis, 'setTimeout', (callback: () => void, delay?: number) => {
+        if (delay === 5_000) replyChecks.push(callback)
+        return originalTimeout(callback, delay)
+      })
+      try { callback() } finally { clock.mock.restore(); timeouts.mock.restore() }
+    }
+    check(heartbeatCheck, 20_000)
     await until(() => f.frames.some(value => value.type === 'heartbeat'))
     assert.equal(f.socket.readyState, WebSocket.OPEN, 'the central fixture keeps TCP open without echoing the heartbeat')
     assert.equal(f.agent.status().state, 'online')
+    assert.equal(replyChecks.length, 1)
+
+    check(replyChecks[0], 25_000)
+    await until(() => f.frames.filter(value => value.type === 'heartbeat').length === 2)
+    assert.equal(f.agent.status().state, 'online', 'one unanswered probe gets a single five-second confirmation')
+    assert.equal(replyChecks.length, 2)
 
     const reconnect = once(wss, 'connection')
-    clock = t.mock.method(performance, 'now', () => now + 60_001)
-    try { heartbeatCheck() } finally { clock.mock.restore() }
+    check(replyChecks[1], 30_000)
     await until(() => f.agent.status().state === 'offline')
     assert.equal(prepared.peer.connected, true, 'a heartbeat timeout preserves the existing authorized RTC peer')
     const [replacement] = await reconnect as [WebSocket]

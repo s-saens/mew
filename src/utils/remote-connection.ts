@@ -4,7 +4,7 @@ import { DataChannelTransport, setRemoteTransport } from './remote-transport.ts'
 import { parseRemoteBootstrap, remoteBootstrapUrl, REMOTE_ADMISSION_PROTOCOL, REMOTE_ADMISSION_PREFIX, type RemoteBootstrapContext, type RemoteConnectionTarget } from '../../shared/remote-bootstrap.ts'
 import { takePrimedRemoteSignal } from './remote-signal-prime.ts'
 
-type ConnectionObserver = (state: string, error?: string) => void
+type ConnectionObserver = (state: string, error?: string, code?: string) => void
 type ConnectionCredentials = { session?: string; keyPair: CryptoKeyPair }
 type ConnectionOptions = { centralOrigin?: string; ticketIssuers?: string[]; launch?: string; session?: string; keyPair?: CryptoKeyPair }
 const RTC_RECOVERY_GRACE = 5000, RTC_RECOVERY_NOTICE_DELAY = 1000
@@ -28,11 +28,11 @@ export function bootstrapRemoteConnection(target: RemoteConnectionTarget, option
   let observer: ConnectionObserver | undefined, started = false, closed = false, received = false
   const context = new Promise<RemoteBootstrapContext>((resolve, fail) => { accept = resolve; reject = fail })
   const credentials = new Promise<ConnectionCredentials | null>(resolve => { resume = resolve })
-  const close = createRemoteConnection('', (state, message) => {
-    if (observer) observer(state, message)
+  const close = createRemoteConnection('', (state, message, code) => {
+    if (observer) observer(state, message, code)
     else if (['error', 'denied', 'revoked'].includes(state)) {
       closed = true
-      reject(Object.assign(new Error(message ?? '중앙 서비스에 연결하지 못했습니다.'), { state, legacyFallback: !received && state === 'error' && !options.admission }))
+      reject(Object.assign(new Error(message ?? '중앙 서비스에 연결하지 못했습니다.'), { state, code, legacyFallback: !received && state === 'error' && !options.admission }))
     }
   }, {}, {
     target, identity: options.identity, admission: options.admission, credentials, received() { received = true },
@@ -113,7 +113,7 @@ function createRemoteConnection(instance: string, onState: ConnectionObserver, o
   }
   const close = () => { if (stopped) return; if (authenticated && signalResume) emit({ type: 'end' }); stopped = true; keyRequest.abort(); bootstrap?.cancel(); clearTimeout(timeout); clearTimeout(disconnected); clearTimeout(disconnectNotice); clearTimeout(signalRetry); clearTimeout(signalTimeout); clearTimeout(leaseTimeout); clearInterval(renew); renewals.clear(); document.removeEventListener('visibilitychange', resume); window.removeEventListener('pageshow', resume); window.removeEventListener('online', resume); setRemoteTransport(null)
     channel.close(); peer.close(); signal.close() }
-  const fail = (error = '기기와 직접 연결하지 못했습니다. 기기의 실행 상태와 네트워크를 확인해 주세요.', state = 'error') => { if (stopped) return; close(); onState(state, error) }
+  const fail = (error = '기기와 직접 연결하지 못했습니다. 기기의 실행 상태와 네트워크를 확인해 주세요.', state = 'error', code?: string) => { if (stopped) return; close(); onState(state, error, code) }
   const authorizeLease = (remaining: unknown, sentAt: number) => {
     if (typeof remaining !== 'number' || !Number.isFinite(remaining) || remaining < 0 || remaining > REMOTE_LIMITS.lease) throw new Error('연결 유효 시간을 확인하지 못했습니다.')
     // Count from the request start, so network latency and clock skew cannot extend authorization.
@@ -206,9 +206,11 @@ function createRemoteConnection(instance: string, onState: ConnectionObserver, o
         return
       }
       if (value.type === 'error') {
-        if (value.code === 'access-revoked') { fail('이 브라우저의 접근 권한이 해제됐습니다. 다시 인증해 주세요.', 'revoked'); return }
-        if (['forbidden', 'unauthorized', 'permission-denied', 'not-allowed', 'session-expired'].includes(value.code)) { fail('접근 권한을 다시 확인해 주세요.', 'denied'); return }
-        throw new Error(value.code === 'offline' ? '기기가 오프라인입니다.' : value.code === 'rtc-unavailable' ? '기기의 원격 연결 구성 요소를 확인해 주세요.' : '원격 접속이 거부되거나 연결이 종료됐습니다.')
+        const code = typeof value.code === 'string' ? value.code : undefined
+        if (code === 'access-revoked') { fail('이 브라우저의 접근 권한이 해제됐습니다. 다시 인증해 주세요.', 'revoked', code); return }
+        if (['forbidden', 'unauthorized', 'permission-denied', 'not-allowed', 'session-expired'].includes(code ?? '')) { fail('접근 권한을 다시 확인해 주세요.', 'denied', code); return }
+        fail(code === 'offline' ? '기기가 오프라인입니다.' : code === 'rtc-unavailable' ? '기기의 원격 연결 구성 요소를 확인해 주세요.' : '원격 접속이 거부되거나 연결이 종료됐습니다.', 'error', code)
+        return
       }
       if (value.type === 'ticket') {
         const result = await centralKey
