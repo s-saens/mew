@@ -1109,7 +1109,7 @@ export function useTabs(
     [patch, workspaceScope, workspaceDocsPath],
   )
 
-  const prepareDocumentPageMutation = useCallback(async (fileProject = 'docs', includeExternal = false, resumeAutosave = true) => {
+  const prepareDocumentPageMutation = useCallback(async (fileProject = 'docs', includeExternal = false, resumeAutosave = true, flushDirty = true) => {
     const p = projectRef.current
     const epoch = workspaceRequestRef.current.epoch
     while (pageMutationCompletionRef.current?.epoch === epoch) await pageMutationCompletionRef.current.done
@@ -1137,8 +1137,9 @@ export function useTabs(
         if (fileProject !== '*' && editorFile(pending.path, pending.project).project !== fileProject) autosave(pending.project, pending.path)
       }
       await Promise.all([...inFlightSaves.current])
-      if (saveFailureRef.current !== previousSaveFailure) throw saveFailureRef.current
+      if (flushDirty && saveFailureRef.current !== previousSaveFailure) throw saveFailureRef.current
       if (workspaceRequestRef.current.epoch !== epoch) throw new Error('프로젝트가 변경되었습니다. 다시 시도하세요.')
+      if (!flushDirty) return release
       const dirty = new Map(stateOf(p).panes.flatMap(pane => pane.tabs).filter(tab => (includeExternal || !isExternalTabPath(tab.path)) && !isGitTabPath(tab.path) && (fileProject === '*' || editorFile(tab.path, p).project === fileProject) && tab.content !== tab.savedContent && tab.editable).map(tab => [tab.path, tab]))
       const saves = await Promise.allSettled([...dirty.values()].map(async tab => {
         const file = editorFile(tab.path, p), content = tab.content
@@ -1236,10 +1237,17 @@ export function useTabs(
       const absolute = `${workspaceScope}/${path}`
       return absolute.startsWith(`${root}/`) ? absolute.slice(root.length + 1) : null
     }
+    const deleted = changes.filter(change => !change.after)
+    const updates = changes.filter(change => change.after !== null)
+    const isDeleted = (path: string) => {
+      if (isExternalTabPath(path) || isGitTabPath(path)) return false
+      const file = editorFile(path, p)
+      return deleted.some(change => relative(change.before.path!, file.project) === file.path)
+    }
     const match = (path: string) => {
       if (isExternalTabPath(path) || isGitTabPath(path)) return undefined
       const file = editorFile(path, p)
-      const candidates = changes.map(change => ({
+      const candidates = updates.map(change => ({
         next: relative(change.after.path!, file.project),
         previous: relative(change.before?.path ?? change.after.path!, file.project),
       }))
@@ -1252,21 +1260,38 @@ export function useTabs(
     }
     const reads = new Map<string, { file: { project: string; path: string }; baseline: string }>()
     for (const tab of stateOf(p).panes.flatMap(pane => pane.tabs)) {
+      if (isDeleted(tab.path)) {
+        dropCachedFile(p, tab.path)
+        fileReadSequenceRef.current.delete(`${epoch}\0${p}\0${tab.path}`)
+        continue
+      }
       const next = match(tab.path)
       if (!next) continue
       dropCachedFile(p, tab.path)
       const nextPath = remap(tab.path)
       if (!tab.deferredLoad) reads.set(nextPath, { file: next, baseline: tab.savedContent })
     }
-    patch(p, state => ({ ...state, panes: state.panes.map(pane => ({
-      ...pane, activePath: pane.activePath ? remap(pane.activePath) : null,
-      tabs: pane.tabs.map(tab => ({ ...tab, path: remap(tab.path), navigation: remapTabNavigation(tab.navigation, remap) })),
-    })) }))
-    if (workspaceScope) remapTitlePreviews(changes.flatMap(change => change.before?.path && change.after.path && change.before.path !== change.after.path
+    patch(p, state => prunePanes({ ...state, panes: state.panes.map(pane => {
+      const tabs = pane.tabs.flatMap(tab => {
+        const gone = isDeleted(tab.path)
+        if (gone && tab.content === tab.savedContent) return []
+        return [{ ...tab, path: remap(tab.path), navigation: remapTabNavigation(tab.navigation, path => isDeleted(path) ? null : remap(path)),
+          ...(gone ? { editable: false, loading: false, revalidating: false, deferredLoad: false, status: 'error' as const, statusMessage: `${uiText('문서를 찾을 수 없습니다:')} ${tab.path}` } : {}) }]
+      })
+      const next = { ...pane, tabs, activePath: pane.activePath ? remap(pane.activePath) : null }
+      return pane.activePath && !tabs.some(tab => tab.path === remap(pane.activePath!)) ? activatePaneTab(next, mostRecentTab(pane, tabs)) : next
+    }) }))
+    for (const [key, queued] of queuedAutosaves.current) if (queued.project === p && isDeleted(queued.path)) queuedAutosaves.current.delete(key)
+    if (workspaceScope) {
+      for (const change of deleted) clearTitlePreviews(`${workspaceScope}/${change.before.path}`)
+      remapTitlePreviews(updates.flatMap(change => change.before?.path && change.after.path && change.before.path !== change.after.path
       ? [{ from: `${workspaceScope}/${change.before.path}`, to: `${workspaceScope}/${change.after.path}` }] : []))
+    }
     if (saveTimerRef.current?.project === p) {
       const pending = saveTimerRef.current
-      if (match(pending.path)) {
+      if (isDeleted(pending.path)) {
+        clearTimeout(pending.timer); saveTimerRef.current = null
+      } else if (match(pending.path)) {
         clearTimeout(pending.timer); saveTimerRef.current = null
         setTimeout(() => { if (workspaceRequestRef.current.epoch === epoch) autosave(p, remap(pending.path)) }, 500)
       }
@@ -1287,11 +1312,11 @@ export function useTabs(
     }))
     const failed = results.find(result => result.status === 'rejected')
     if (failed) throw failed.reason
-    if (workspaceScope && workspaceRequestRef.current.epoch === epoch) for (const change of changes) clearTitlePreviews(`${workspaceScope}/${change.after.path}`, change.after.text)
+    if (workspaceScope && workspaceRequestRef.current.epoch === epoch) for (const change of updates) clearTitlePreviews(`${workspaceScope}/${change.after.path}`, change.after.text)
   }, [workspaceScope, workspaceDocsPath, patch, mapTabsAtPath, autosave])
 
   useEffect(() => registerTaskDocumentSync({
-    workspace: workspaceScope ?? '', prepare: () => prepareDocumentPageMutation('*'), apply: refreshTaskDocuments,
+    workspace: workspaceScope ?? '', prepare: mode => prepareDocumentPageMutation('*', false, true, mode !== 'read'), apply: refreshTaskDocuments,
   }), [workspaceScope, prepareDocumentPageMutation, refreshTaskDocuments])
 
   const createChildPage = useCallback(async (path: string, name: string, onCreated?: (result: DocumentPageMutation) => void) => {

@@ -47,6 +47,35 @@ test('text resembling a settings marker does not become metadata', () => {
   assert.deepEqual(splitFrontmatter(joinFrontmatter(original, 'Body')).frontmatter, original)
 })
 
+test('task tags and assignees infer multiple selections without stored type settings', () => {
+  for (const source of [
+    'tags: [기능, 검증]\nassignees:\n  - alice@example.test\n  - bob@example.test',
+    'tags: "[\\"기능\\",\\"검증\\"]"\nassignees: "[\\"alice@example.test\\",\\"bob@example.test\\"]"',
+  ]) {
+    const raw = `---\ntitle: Task\n${source}\ndone: false\n---\n\nBody`
+    const data = splitFrontmatter(raw).frontmatter!
+    assert.deepEqual(data.fields.slice(0, 2).map(frontmatterType), ['multi-select', 'multi-select'])
+    assert.deepEqual(frontmatterSelections(data.fields[0].value), ['기능', '검증'])
+    assert.deepEqual(frontmatterSelections(data.fields[1].value), ['alice@example.test', 'bob@example.test'])
+    const untouched = joinFrontmatter(data, 'Edited body')
+    assert.ok(untouched.includes(source), 'unmodified source and comments stay intact')
+    const edited = { ...data, fields: data.fields.map(field => field.key === 'tags' ? { ...field, value: '["수정"]' }
+      : field.key === 'assignees' ? { ...field, value: '[]' } : field) }
+    const saved = joinFrontmatter(edited, 'Edited body')
+    const yaml = parse(saved.split('---')[1])
+    assert.deepEqual(JSON.parse(yaml.tags), ['수정'])
+    assert.deepEqual(JSON.parse(yaml.assignees), [])
+    assert.deepEqual(splitFrontmatter(saved).frontmatter!.fields.slice(0, 2).map(frontmatterType), ['multi-select', 'multi-select'])
+  }
+  for (const key of ['tags', 'assignees']) {
+    assert.equal(frontmatterType({ key, value: '' }), 'multi-select')
+    assert.equal(frontmatterType({ key, value: 'scalar' }), 'multi-select')
+    assert.equal(frontmatterType({ key, value: '["one"]', type: 'text' }), 'text', 'explicit custom types take precedence')
+    for (const value of ['[broken', '[1]', '{"nested":true}']) assert.equal(frontmatterType({ key, value }), 'text')
+  }
+  assert.equal(frontmatterType({ key: 'other', value: '["one"]' }), 'text')
+})
+
 test('body edits preserve block and flow YAML collections, multiline values and field line numbers', () => {
   const header = 'title: Task\ntags:\n  - 기능 # keep tag comment\n  - 검증\nassignees:\n  - alice@example.test\ncustom:\n  nested: retained\ndescription: >-\n  multiple\n  lines\nflow: [one, two]'
   const original = `---\n${header}\n---\n\nBody`

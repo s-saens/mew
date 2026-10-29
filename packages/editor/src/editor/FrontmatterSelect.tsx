@@ -2,7 +2,7 @@ import { canAutoFocusInput, openDropdownOnArrow } from '@mew/ui'
 import { uiText } from '@mew/ui/i18n-core'
 import { useEffect, useId, useRef, useState, type CSSProperties } from 'react'
 import { editSelection, optionHue, SELECTION_PALETTE, type OptionEdit } from '../../../../shared/selection-options'
-import { frontmatterSelections, type FrontmatterField } from '../utils/frontmatter'
+import { frontmatterSelections, frontmatterType, type FrontmatterField } from '../utils/frontmatter'
 import { Check } from './FrontmatterFieldMenu'
 import { FrontmatterPopover } from './FrontmatterPopover'
 import { FrontmatterTag } from './FrontmatterTag'
@@ -20,7 +20,7 @@ export function FrontmatterSelect({ field, readOnly, busy, onChange, onCreate, o
   const [editing, setEditing] = useState<{ option: string; name: string } | null>(null)
   const [colorPick, setColorPick] = useState<string | null>(null)
   const [saving, setSaving] = useState(false), [error, setError] = useState('')
-  const multi = field.type === 'multi-select'
+  const multi = frontmatterType(field) === 'multi-select'
   const selected = multi ? frontmatterSelections(field.value) : field.value ? [field.value] : []
   const choices = [...new Set([...(field.options ?? []), ...selected])].filter(Boolean)
   const draft = query.trim()

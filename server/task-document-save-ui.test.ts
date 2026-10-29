@@ -14,6 +14,10 @@ import React from ${JSON.stringify(import.meta.resolve('react'))};
 import {createRoot} from ${JSON.stringify(import.meta.resolve('react-dom/client'))};
 import {useTabs} from ${JSON.stringify(path.join(root, 'src/hooks/useTabs.ts'))};
 import {I18nProvider} from ${JSON.stringify(path.join(root, 'src/i18n.tsx'))};
+import {syncTaskDocuments,withTaskDocumentSync} from ${JSON.stringify(path.join(root, 'src/utils/task-document-sync.ts'))};
+import {getCachedFile} from ${JSON.stringify(path.join(root, 'src/utils/contentCache.ts'))};
+window.syncTasks=(before,after,mode='read')=>withTaskDocumentSync('/fixture',()=>syncTaskDocuments('/fixture',before,after),mode);
+window.taskCache=()=>getCachedFile('docs','tasks/Task.md');
 function Fixture(){const tabs=useTabs('docs',()=>{},()=>{},'/fixture');window.tabs=tabs;return <button onClick={()=>tabs.openFile('tasks/Task.md')}>Open task</button>}
 createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18nProvider>);`
   const bundle = await build({ input: 'virtual:task-save.tsx', write: false, platform: 'browser', output: { format: 'esm' },
@@ -22,6 +26,120 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
   })
   return bundle.output.find(item => item.type === 'chunk')!.code
 }
+
+test('task deletion closes saved tabs, preserves unsaved drafts and never recreates deleted files', { skip: !domBrowserExecutable(), timeout: 30_000 }, async t => {
+  const script = await taskSaveScript()
+  const browser = await chromium.launch({ executablePath: domBrowserExecutable()!, args: ['--no-sandbox'], headless: true })
+  const original = '---\ntitle: Task\ndone: false\n---\nBody'
+  const task = { id: 'task', text: 'Task', done: false, path: 'docs/tasks/Task.md' }
+  try {
+    for (const dirty of [false, true]) await t.test(dirty ? 'read preserves an unsaved deleted document without flushing it' : 'read removes the saved tab and its cache', async () => {
+      const page = await browser.newPage()
+      const disk = new Map([['tasks/Task.md', original]])
+      const writes: string[] = [], errors: string[] = []
+      page.on('pageerror', error => errors.push(error.message))
+      await page.route('http://mew-task-deletion.test/**', async route => {
+        const request = route.request(), url = new URL(request.url())
+        if (url.pathname === '/api/file') {
+          if (request.method() === 'GET') {
+            const content = disk.get(url.searchParams.get('path')!)
+            return content === undefined ? route.fulfill({ status: 404, json: { error: 'Missing' } }) : route.fulfill({ json: { content, editable: true } })
+          }
+          const input = request.postDataJSON() as { path: string; content: string }
+          writes.push(input.path); disk.set(input.path, input.content)
+          return route.fulfill({ json: { ok: true } })
+        }
+        if (url.pathname.startsWith('/api/')) return route.fulfill({ json: [] })
+        return route.fulfill(url.pathname === '/app.js' ? { contentType: 'text/javascript', body: script } : { contentType: 'text/html', body: '<div id="root"></div><script type="module" src="/app.js"></script>' })
+      })
+      await page.goto('http://mew-task-deletion.test/')
+      await page.getByRole('button', { name: 'Open task' }).click()
+      await page.waitForFunction('window.tabs.activeTab?.content.includes("Body")')
+      if (dirty) {
+        await page.evaluate('window.tabs.updateTabContent("tasks/Task.md",window.tabs.activeTab.content+" unsaved draft")')
+        await page.waitForFunction('window.tabs.activeTab.content.endsWith("unsaved draft")')
+      }
+      disk.delete('tasks/Task.md')
+      await page.evaluate(`window.syncTasks([${JSON.stringify(task)}],[])`)
+      await page.waitForFunction(dirty ? 'window.tabs.activeTab?.editable === false && window.tabs.activeTab.status === "error"' : 'window.tabs.tabs.length === 0')
+      if (dirty) {
+        assert.equal(await page.evaluate('window.tabs.activeTab.content'), `${original} unsaved draft`)
+        assert.equal(await page.evaluate('window.tabs.activeTab.savedContent'), original)
+        await page.evaluate('window.tabs.saveCurrentTab()')
+      }
+      await page.waitForTimeout(800)
+      assert.deepEqual(writes, [], 'deletion cancels pending autosave and the read preparation does not save missing files')
+      assert.equal(disk.has('tasks/Task.md'), false)
+      assert.equal(await page.evaluate('window.taskCache()'), undefined)
+      assert.deepEqual(errors, [])
+      await page.close()
+    })
+    await t.test('deletion waits for an in-flight save and retains typing without replaying its queued autosave', async () => {
+      const page = await browser.newPage()
+      let disk: string | undefined = original, release!: () => void, markReceived!: () => void
+      const delayed = new Promise<void>(resolve => { release = resolve })
+      const received = new Promise<void>(resolve => { markReceived = resolve })
+      const writes: string[] = []
+      await page.route('http://mew-task-inflight-delete.test/**', async route => {
+        const request = route.request(), url = new URL(request.url())
+        if (url.pathname === '/api/file') {
+          if (request.method() === 'GET') return route.fulfill({ json: { content: disk, editable: true } })
+          const input = request.postDataJSON() as { content: string }
+          writes.push(input.content); disk = input.content
+          markReceived(); await delayed
+          return route.fulfill({ json: { ok: true } })
+        }
+        if (url.pathname.startsWith('/api/')) return route.fulfill({ json: [] })
+        return route.fulfill(url.pathname === '/app.js' ? { contentType: 'text/javascript', body: script } : { contentType: 'text/html', body: '<div id="root"></div><script type="module" src="/app.js"></script>' })
+      })
+      try {
+        await page.goto('http://mew-task-inflight-delete.test/')
+        await page.getByRole('button', { name: 'Open task' }).click()
+        await page.waitForFunction('window.tabs.activeTab?.content.includes("Body")')
+        await page.evaluate('window.tabs.updateTabContent("tasks/Task.md",window.tabs.activeTab.content+" saving")')
+        await received
+        await page.evaluate('window.tabs.updateTabContent("tasks/Task.md",window.tabs.activeTab.content+" pending")')
+        await page.waitForTimeout(600)
+        await page.evaluate(`window.deletion=window.syncTasks([${JSON.stringify(task)}],[]);void 0`)
+        assert.equal(await page.evaluate('window.tabs.activeTab.editable'), true)
+        disk = undefined
+        release()
+        await page.evaluate('window.deletion')
+        await page.waitForFunction('window.tabs.activeTab?.editable === false && window.tabs.activeTab.content.endsWith("saving pending")')
+        assert.equal(await page.evaluate('window.tabs.activeTab.savedContent'), `${original} saving`)
+        await page.waitForTimeout(800)
+        assert.equal(writes.length, 1)
+        assert.equal(disk, undefined)
+      } finally { release(); await page.close() }
+    })
+    await t.test('same-ID rename preserves the tab and a subsequent creation refreshes its file', async () => {
+      const page = await browser.newPage()
+      const disk = new Map([['tasks/Task.md', original]])
+      await page.route('http://mew-task-rename.test/**', async route => {
+        const url = new URL(route.request().url())
+        if (url.pathname === '/api/file') return route.fulfill({ json: { content: disk.get(url.searchParams.get('path')!), editable: true } })
+        if (url.pathname.startsWith('/api/')) return route.fulfill({ json: [] })
+        return route.fulfill(url.pathname === '/app.js' ? { contentType: 'text/javascript', body: script } : { contentType: 'text/html', body: '<div id="root"></div><script type="module" src="/app.js"></script>' })
+      })
+      await page.goto('http://mew-task-rename.test/')
+      await page.getByRole('button', { name: 'Open task' }).click()
+      await page.waitForFunction('window.tabs.activeTab?.content.includes("Body")')
+      const id = await page.evaluate('window.tabs.activeTab.id')
+      const renamed = { ...task, text: 'Renamed', path: 'docs/tasks/Renamed.md' }
+      disk.set('tasks/Renamed.md', original.replace('Task', 'Renamed'))
+      disk.delete('tasks/Task.md')
+      await page.evaluate(`window.syncTasks([${JSON.stringify(task)}],[${JSON.stringify(renamed)}])`)
+      await page.waitForFunction('window.tabs.activePath === "tasks/Renamed.md" && window.tabs.activeTab.content.includes("Renamed")')
+      assert.equal(await page.evaluate('window.tabs.activeTab.id'), id)
+      assert.equal(await page.evaluate('window.tabs.tabs.length'), 1)
+      disk.set('tasks/Renamed.md', `${original.replace('Task', 'Renamed')} created`)
+      await page.evaluate(`window.syncTasks([],[${JSON.stringify(renamed)}])`)
+      await page.waitForFunction('window.tabs.activeTab.content.endsWith("created")')
+      assert.equal(await page.evaluate('window.tabs.activeTab.id'), id)
+      await page.close()
+    })
+  } finally { await browser.close() }
+})
 
 test('open tabs rebase server-preserved tags while retaining typing during autosave', { skip: !domBrowserExecutable(), timeout: 30_000 }, async () => {
   const script = await taskSaveScript()

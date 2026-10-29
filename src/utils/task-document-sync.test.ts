@@ -37,6 +37,31 @@ test('task requests wait for prior updates and always release the editor after a
   } finally { finish(); unregister() }
 })
 
+test('task synchronization reports deletions and creation while preserving rename identity', async () => {
+  const updates: TaskDocumentChange[][] = []
+  const unregister = registerTaskDocumentSync({ workspace: '/one', prepare: async () => () => {}, apply: async changes => { updates.push(changes) } })
+  const removed = { id: 'removed', text: 'Removed', done: false, path: 'docs/tasks/Removed.md' }
+  const renamed = { id: 'same', text: 'Before', done: false, path: 'docs/tasks/Before.md' }
+  const next = { ...renamed, text: 'After', path: 'docs/tasks/After.md' }
+  const added = { id: 'added', text: 'Added', done: false, path: 'docs/tasks/Added.md' }
+  try {
+    await syncTaskDocuments('/one', [removed, renamed], [next, added])
+    assert.deepEqual(updates, [[{ before: removed, after: null }, { before: renamed, after: next }, { before: undefined, after: added }]])
+    await syncTaskDocuments('/one', [next, added], [])
+    assert.deepEqual(updates[1], [{ before: next, after: null }, { before: added, after: null }])
+  } finally { unregister() }
+})
+
+test('task reads pause autosave without requesting the write flush policy', async () => {
+  const modes: string[] = []
+  const unregister = registerTaskDocumentSync({ workspace: '/one', prepare: async mode => { modes.push(mode); return () => {} }, apply: async () => {} })
+  try {
+    await withTaskDocumentSync('/one', async () => {}, 'read')
+    await withTaskDocumentSync('/one', async () => {})
+    assert.deepEqual(modes, ['read', 'write'])
+  } finally { unregister() }
+})
+
 test('queued requests from a replaced workspace do not execute', async () => {
   let finish!: () => void
   const blocked = new Promise<void>(resolve => { finish = resolve })

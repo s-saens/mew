@@ -33,7 +33,7 @@ export function useTaskList(workspace: string | null, email: string, open: boole
         return board
       }
       value = new TaskListSession({
-        read: () => withTaskDocumentSync(workspace ?? '', () => fetchTaskList(workspace ?? '', email).then(receive)),
+        read: () => withTaskDocumentSync(workspace ?? '', () => fetchTaskList(workspace ?? '', email).then(receive), 'read'),
         save: (changes, colors, deleted) => withTaskDocumentSync(workspace ?? '', () => patchTaskList(workspace ?? '', changes, email, colors, deleted).then(receive)),
       }, `mew:task-draft:${key}:${draftWindow}`)
       sessions.current.set(key, value)

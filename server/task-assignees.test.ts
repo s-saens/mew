@@ -30,7 +30,7 @@ test('Markdown persists assignees, preserves body/custom properties and accepts 
   const { changeTaskList, readTaskList } = await import('./task-list.ts')
   try {
     const created = changeTaskList(workspace, taskChanges([], [{ ...original, assignees: [a, b] }]))
-    const file = path.join(workspace, created[0].path!)
+    let file = path.join(workspace, created[0].path!)
     let raw = fs.readFileSync(file, 'utf8')
     assert.match(raw, /assignees:\n  - one@example.test\n  - two@example.test/)
     raw = raw.replace('done: false', 'priority: urgent\ndone: false') + '\nBody stays here.\n'
@@ -38,6 +38,9 @@ test('Markdown persists assignees, preserves body/custom properties and accepts 
     const baseline = readTaskList(workspace)
     const changed = changeTaskList(workspace, taskChanges(baseline, [{ ...baseline[0], assignees: [b], done: true }]))
     assert.deepEqual(changed[0].assignees, [b])
+    assert.equal(fs.existsSync(file), false)
+    assert.equal(changed[0].path, 'docs/tasks/Done/Assign work.md')
+    file = path.join(workspace, changed[0].path!)
     assert.match(fs.readFileSync(file, 'utf8'), /priority: urgent/)
     assert.match(fs.readFileSync(file, 'utf8'), /Body stays here/)
     fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replace('assignees:\n  - two@example.test', 'assignees: one@example.test'))

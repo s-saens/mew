@@ -1501,7 +1501,11 @@ export function createApiApp() {
         return
       }
       const taskPath = path.relative(workspacePaths.root, absPath).split(path.sep).join('/')
-      if (!isNew && typeof expectedContent === 'string' && /^(?:docs\/tasks\/(?:Done\/)?|tasks\/)[^/]+\.md$/.test(taskPath) && !['_tasks.md', 'moc.md', '_moc.md', 'readme.md'].includes(path.basename(taskPath).toLowerCase())) {
+      if (typeof expectedContent === 'string' && /^(?:docs\/tasks\/(?:Done\/)?|tasks\/)[^/]+\.md$/.test(taskPath) && !['_tasks.md', '_done.md', 'moc.md', '_moc.md', 'readme.md'].includes(path.basename(taskPath).toLowerCase())) {
+        if (isNew) {
+          res.status(409).json({ error: '태스크 문서가 삭제되거나 이동되었습니다. 목록을 다시 불러오세요.' })
+          return
+        }
         content = mergeTaskFrontmatter(expectedContent, content, fs.readFileSync(absPath, 'utf8'))
       }
       const sharedContent = await saveDatabaseRowPage(project, relPath, content, expectedContent, canUse(authOf(req), 'database') && unrestrictedFiles(authOf(req), project, true))

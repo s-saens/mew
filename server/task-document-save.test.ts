@@ -28,7 +28,7 @@ test('open-document saves preserve panel tags and assignees, accept explicit rem
   const server = app.listen(0, '127.0.0.1')
   await once(server, 'listening')
   const address = server.address(); assert.ok(address && typeof address !== 'string')
-  const save = (content: string, expectedContent: string, target = relative) => fetch(`http://127.0.0.1:${address.port}/file`, {
+  const save = (content: string, expectedContent?: string, target = relative) => fetch(`http://127.0.0.1:${address.port}/file`, {
     method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ project: '.workspace', path: target, content, expectedContent }),
   })
   try {
@@ -60,5 +60,14 @@ test('open-document saves preserve panel tags and assignees, accept explicit rem
     assert.equal((await save(completedBase + '\nCompleted body edit\n', completedBase, completedPath)).status, 200)
     assert.deepEqual(readTaskList(workspace)[0].tags, ['done-tag'])
     assert.ok(fs.readFileSync(completedFile, 'utf8').endsWith('Completed body edit\n'))
+    assert.equal((await save(preserved + '\nStale save after move\n', preserved)).status, 409)
+    assert.equal(fs.existsSync(file), false, 'a stale save cannot recreate a task at its previous path')
+    const deletedBase = fs.readFileSync(completedFile, 'utf8')
+    tasks = readTaskList(workspace)
+    changeTaskList(workspace, taskChanges(tasks, []))
+    assert.equal((await save(deletedBase + '\nStale save after deletion\n', deletedBase, completedPath)).status, 409)
+    assert.equal(fs.existsSync(completedFile), false, 'a late autosave cannot resurrect a deleted task')
+    assert.deepEqual(readTaskList(workspace), [])
+    assert.equal((await save(deletedBase, undefined, completedPath)).status, 200, 'explicit file creation without a stale save baseline remains allowed')
   } finally { await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve())) }
 })

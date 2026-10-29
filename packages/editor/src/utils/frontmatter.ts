@@ -54,10 +54,21 @@ function parseField(key: string, raw: string): FrontmatterField {
 
 export function frontmatterType(field: FrontmatterField): FrontmatterType {
   if (field.type) return field.type
+  if (taskSelectionField(field)) return 'multi-select'
   if (/^\d{4}-\d{2}-\d{2}$/.test(field.value)) return 'date'
   if (field.value.trim() && Number.isFinite(Number(field.value))) return 'number'
   if (/^https?:\/\/|^\[[^\]]*\]\([^)]+\)$/.test(field.value)) return 'link'
   return 'text'
+}
+
+function taskSelectionField(field: FrontmatterField): boolean {
+  if (field.key !== 'tags' && field.key !== 'assignees') return false
+  const value = field.value.trim()
+  if (!value.startsWith('[') && !value.startsWith('{')) return true
+  try {
+    const parsed: unknown = JSON.parse(value)
+    return Array.isArray(parsed) && parsed.every(item => typeof item === 'string')
+  } catch { return false }
 }
 
 export function frontmatterSelections(value: string): string[] {
