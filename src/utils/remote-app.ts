@@ -81,17 +81,27 @@ export async function initializeRemoteApp() {
   if (context.reconnecting) transport.suspendForReconnect()
   setRemoteTransport(transport)
   window.addEventListener('pagehide', () => wire.close(), { once: true })
+  const authenticationRequest = new AbortController()
+  const authenticationTimer = setTimeout(() => {
+    const error = new Error('기기의 로그인 상태를 확인하지 못했습니다. 다시 연결해 주세요.')
+    authenticationRequest.abort(error)
+    finishWaiting(error)
+    finishAuthentication(undefined, error)
+  }, 30_000)
   try {
     if (context.authStatusPending === true && context.initialAuth !== undefined && !validStatus(context.initialAuth)) throw new Error('기기의 로그인 상태를 확인하지 못했습니다. 다시 연결해 주세요.')
-    const waitForConnection = () => transport.closed || wire.readyState !== 'open'
-      ? Promise.reject(new Error('기기 연결이 종료됐습니다. 다시 연결해 주세요.'))
-      : transport.suspended ? new Promise<void>((resolve, reject) => waiting.add({ resolve, reject })) : Promise.resolve()
+    const waitForConnection = () => {
+      authenticationRequest.signal.throwIfAborted()
+      return transport.closed || wire.readyState !== 'open'
+        ? Promise.reject(new Error('기기 연결이 종료됐습니다. 다시 연결해 주세요.'))
+        : transport.suspended ? new Promise<void>((resolve, reject) => waiting.add({ resolve, reject })) : Promise.resolve()
+    }
     const readInitialStatus = async () => {
       while (true) {
         await waitForConnection()
         const attempt = generation
         try {
-          const response = await transport.fetch('/api/auth/me')
+          const response = await transport.fetch('/api/auth/me', { signal: authenticationRequest.signal })
           if (!response.ok) throw new Error('기기의 로그인 상태를 확인하지 못했습니다. 다시 연결해 주세요.')
           const status = await response.json() as AuthStatus
           if (transport.closed || wire.readyState !== 'open') throw new Error('기기 연결이 종료됐습니다. 다시 연결해 주세요.')
@@ -114,7 +124,8 @@ export async function initializeRemoteApp() {
     setBrowserStorageScope(localEmail ?? 'anonymous', context.instance)
     return status
   } catch (error) {
-    channel.port1.postMessage({ type: 'mew-app-error', error: error instanceof Error ? error.message : '기기의 로그인 상태를 확인하지 못했습니다.' })
-    throw error
-  }
+    const failure = authenticationRequest.signal.aborted ? authenticationRequest.signal.reason : error
+    channel.port1.postMessage({ type: 'mew-app-error', error: failure instanceof Error ? failure.message : '기기의 로그인 상태를 확인하지 못했습니다.' })
+    throw failure
+  } finally { clearTimeout(authenticationTimer) }
 }

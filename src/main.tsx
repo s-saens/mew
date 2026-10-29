@@ -12,6 +12,7 @@ import { startScrollbarTouchDragging } from './utils/scrollbar-touch.ts'
 import { StartupScreen } from './components/startup-screen.tsx'
 import { getAppRuntime } from './runtime/app-runtime.ts'
 import { startAppInstallTracking } from './utils/app-install.ts'
+import { uiText } from '@mew/ui/i18n-core'
 
 startAppInstallTracking()
 
@@ -38,26 +39,31 @@ async function startApp() {
   const root = createRoot(document.getElementById('root')!)
   root.render(<StartupScreen />)
 
-  // Download the selected entrypoint while the remote port and identity are prepared.
-  const [pageModule, initialAuth] = await Promise.all([
-    import('./AppBootstrap.tsx'),
-    document.querySelector('meta[name="mew-p2p-app"]') ? initializeRemoteApp() : getAppRuntime().initialAuth,
-  ])
+  try {
+    // Download the selected entrypoint while the remote port and identity are prepared.
+    const [pageModule, initialAuth] = await Promise.all([
+      import('./AppBootstrap.tsx'),
+      document.querySelector('meta[name="mew-p2p-app"]') ? initializeRemoteApp() : getAppRuntime().initialAuth,
+    ])
 
-  const { default: AppBootstrap } = pageModule
-  const page = <AppBootstrap initialAuth={initialAuth} />
+    const { default: AppBootstrap } = pageModule
+    const page = <AppBootstrap initialAuth={initialAuth} />
 
-  // Migrate old disposable caches before any workspace effect persists state.
-  const stopStorageMaintenance = startBrowserStorageMaintenance()
-  if (import.meta.hot) import.meta.hot.dispose(stopStorageMaintenance)
+    // Migrate old disposable caches before any workspace effect persists state.
+    const stopStorageMaintenance = startBrowserStorageMaintenance()
+    if (import.meta.hot) import.meta.hot.dispose(stopStorageMaintenance)
 
-  root.render(
-    <StrictMode>
-      <I18nProvider>
-        {page}
-      </I18nProvider>
-    </StrictMode>,
-  )
+    root.render(
+      <StrictMode>
+        <I18nProvider>
+          {page}
+        </I18nProvider>
+      </StrictMode>,
+    )
+  } catch (error) {
+    console.error(error)
+    root.render(<main role="alert" className="mew-workspace flex h-dvh items-center justify-center px-4 text-center text-sm text-ink">{uiText('작업 화면을 불러오지 못했습니다. 페이지를 다시 열어 주세요.')}</main>)
+  }
 }
 
 void startApp()

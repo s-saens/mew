@@ -30,10 +30,19 @@ self.addEventListener('fetch', event => {
     else if (!url.pathname.startsWith('/api/')) return fetch(event.request)
     const channel = new MessageChannel()
     return new Promise(resolve => {
-      let controller, resolved = false
-      const timer = setTimeout(() => { channel.port1.postMessage({ type: 'cancel' }); channel.port1.close(); if (!resolved) resolve(new Response('Direct connection unavailable', { status: 503 })); else controller?.error(new Error('Direct connection interrupted')) }, 30_000)
-      const done = () => { clearTimeout(timer); channel.port1.close() }
+      let controller, resolved = false, finished = false, timer
+      const done = () => { finished = true; clearTimeout(timer); channel.port1.close() }
+      const waitForResponse = () => {
+        clearTimeout(timer)
+        timer = setTimeout(() => {
+          channel.port1.postMessage({ type: 'cancel' }); done()
+          if (!resolved) { resolved = true; resolve(new Response('Direct connection unavailable', { status: 503 })) }
+          else controller?.error(new Error('Direct connection interrupted'))
+        }, 30_000)
+      }
+      waitForResponse()
       channel.port1.onmessage = ({ data }) => {
+        if (finished) return
         if (data.type === 'response' && !resolved) {
           resolved = true
           clearTimeout(timer)
@@ -45,14 +54,14 @@ self.addEventListener('fetch', event => {
             headers.set('Content-Security-Policy', `default-src 'self'; script-src 'self' 'wasm-unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' ws: wss:; img-src 'self' blob: data: https:; media-src 'self' blob: data: https:; worker-src 'self' blob:; frame-src 'self' blob:${previewDomain ? ' https://*.' + previewDomain : ''}; frame-ancestors 'self' ${central}; object-src 'none'; base-uri 'self'; form-action 'self'`)
           } else if (/text\/html|image\/svg\+xml/.test(headers.get('content-type') ?? '')) headers.set('Content-Security-Policy', "sandbox; default-src 'none'; img-src data: blob:; style-src 'unsafe-inline'")
           headers.set('X-Content-Type-Options', 'nosniff'); headers.set('Cache-Control', 'no-store')
-          let stream = new ReadableStream({ start(value) { controller = value }, pull() { channel.port1.postMessage({ type: 'pull' }) }, cancel() { channel.port1.postMessage({ type: 'cancel' }); done() } })
+          let stream = new ReadableStream({ start(value) { controller = value }, pull() { if (finished) return; if (ui) waitForResponse(); channel.port1.postMessage({ type: 'pull' }) }, cancel() { if (finished) return; channel.port1.postMessage({ type: 'cancel' }); done() } })
           if (ui && headers.get('content-encoding') === 'gzip') {
             stream = stream.pipeThrough(new DecompressionStream('gzip'))
             headers.delete('content-encoding'); headers.delete('content-length')
           }
           resolve(new Response(event.request.method === 'HEAD' || [204,205,304].includes(data.status) ? null : stream, { status: data.status, headers }))
           if (event.request.method === 'HEAD' || [204,205,304].includes(data.status)) { channel.port1.postMessage({ type: 'cancel' }); done() }
-        } else if (data.type === 'chunk') controller?.enqueue(new Uint8Array(data.bytes))
+        } else if (data.type === 'chunk') { clearTimeout(timer); controller?.enqueue(new Uint8Array(data.bytes)) }
         else if (data.type === 'end') { controller?.close(); done() }
         else if (data.type === 'error') { if (!resolved) { resolved = true; resolve(new Response('Direct connection unavailable', { status: 503 })) } else controller?.error(new Error('Direct connection interrupted')); done() }
       }

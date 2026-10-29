@@ -1,8 +1,8 @@
 ---
 title: "Mewlink 기기 등록과 로컬 사용자 인증 P2P 접속 계약"
-description: "Mewlink 공개 기기 주소·포트 링크용 공개 base 전달·로컬 인증·브라우저 신뢰와 회수·재접속을 정의한다. 단회 준비·자원 검증과 RTC 순단의 5초 복구 대기·1초 뒤 상태 표시, 시그널링 재부착의 보안·운영 경계를 설명한다."
+description: "Mewlink 공개 기기 주소·포트 링크용 공개 base 전달·로컬 인증·브라우저 신뢰와 회수·재접속을 정의한다. 단회 준비·자원 검증과 정적 UI 본문 정지 시 제한 시간, RTC 순단의 5초 복구 대기·1초 뒤 상태 표시, 시그널링 재부착의 보안·운영 경계를 설명한다."
 created: 2026-10-07
-updated: "2026-10-28"
+updated: "2026-10-29"
 ---
 
 [작업·출시 기준](<../work/remote-access.md>) · [중앙 서비스 설치](../deployment/remote-central.md) · [ADR 0195](../history/decisions/0195-mew-account-based-p2p-remote-access.md) · [후속 ADR 0203](../history/decisions/0203-mewlink-workers-p2p-ui.md) · [로컬 인증 ADR 0207](../history/decisions/0207-mewlink-device-access-local-auth.md) · [권한](access-control.md)
@@ -101,6 +101,8 @@ Vite의 `base: './'`는 설치된 앱을 루트와 P2P 임시 접두사 양쪽�
 Service Worker는 `DecompressionStream`을 지원하는 브라우저에서 UI 파일의 Range 없는 GET에만 `encoding=gzip`을 요청한다. A는 기존 경로·realpath·크기·bootstrap 검사를 통과한 HTML·JS·CSS·JSON·SVG·텍스트를 gzip 스트림으로 전송한다. dispatcher는 UI 응답에 한해 `Content-Encoding`을 전달하며, worker는 이를 스트리밍 해제하고 압축 인코딩·길이 헤더를 제거한 응답을 브라우저에 제공한다. P2P 수신 창과 취소·역압은 같은 스트림에 적용한다. HEAD·Range·이미지·woff2는 기존 raw 응답을 사용한다.
 
 선택 협상이라 구서버는 query를 무시하고 raw 파일을 보내며, 이전 worker·미지원 브라우저는 압축을 요청하지 않는다. 작업 API·문서 본문을 압축 자원으로 취급하거나 CacheStorage에 보관하지 않는다.
+
+자원 worker는 응답 헤더를 최대 30초 기다린다. 정적 UI 본문은 소비자가 `pull`로 다음 데이터를 요청한 뒤 30초 동안 청크나 완료 신호가 없으면 같은 MessagePort로 상류 요청을 취소하고 읽기를 오류로 끝낸다. 청크가 오면 타이머를 해제하고 다음 `pull`에서 다시 시작하므로, 진행 중인 다운로드의 전체 시간을 30초로 제한하지 않는다. 소비자가 읽기를 멈춘 역압 구간과 일반 API의 SSE 등 장기 본문에는 이 UI 본문 제한을 적용하지 않는다. 완료·오류·취소·본문 없는 응답은 타이머와 포트를 정리한다. `server/remote-resource-worker.test.ts`가 가상 시계로 정지·진행·역압·장기 API와 정리를 검증하며, 실제 압축·캐시·동적 import 검사는 `server/remote-ui-resource-browser.test.ts`가 담당한다.
 
 [ADR 0018](../decisions/0018-mewlink-startup-revalidation.md)에 따라 내부 런처의 `remote-resources.ts`는 `/assets/` 아래 JS·MJS·CSS·폰트·Wasm과 `/fonts/` 아래 CSS·WOFF·WOFF2·TTF·OTF의 Range 없는 GET을 `mew-remote-ui-v1` CacheStorage에 보관한다. `/fonts/`의 스크립트·JSON은 대상이 아니다. 키에는 현재 부모가 확인한 instance ID와 자원 경로를 넣고, launch 토큰이 달라져도 같은 호스트의 코드를 찾는다. 계정·문서·인증 토큰·HTML·이미지·API와 HEAD·Range는 이 캐시에 넣지 않는다. 한 자원은 해제 후 8MiB, 앱 origin 전체는 64개·32MiB·마지막 저장 후 7일 한도이며 오래된 항목부터 지운다. 현재 호스트가 확인한 기존 본문은 마지막 저장에서 24시간이 지나야 다시 저장·시각 갱신해, 연속 방문마다 같은 큰 본문을 CacheStorage에 재기록하지 않는다. 저장소 실패는 기존 P2P 다운로드로 처리한다. HTTP 응답의 `no-store`는 유지하고 명시적으로 관리하는 정적 자원 사본만 별도 저장한다. [Cache API의 수명·HTTP 캐시와의 구분](https://developer.mozilla.org/en-US/docs/Web/API/Cache).
 

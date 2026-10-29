@@ -279,3 +279,76 @@ test('cold startup preserves deferred workspace loading, remote authentication a
 
   assert.deepEqual(errors, [])
 })
+
+test('startup failures and stalled remote authentication end loading while successful authentication clears its deadline', { skip: !domBrowserExecutable(), timeout: 20_000 }, async t => {
+  const bundle = await startupBundle(startupCodeSplitting)
+  const chunks = bundle.output.filter(item => item.type === 'chunk')
+  const entry = chunks.find(item => item.isEntry)!
+  const bootstrap = chunks.find(item => new URL('./AppBootstrap.tsx', import.meta.url).pathname in item.modules)!
+  const scripts = new Map(chunks.map(item => [`/${item.fileName}`, item.code]))
+  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  t.after(() => browser.close())
+  for (const mobile of [false, true]) for (const mode of ['local-import', 'remote-import', 'remote-initialization', 'remote-authentication-timeout', 'remote-authentication-body-timeout', 'remote-authentication-success']) {
+    const context = await browser.newContext({ locale: 'ko-KR', viewport: mobile ? { width: 390, height: 844 } : { width: 1280, height: 800 }, isMobile: mobile, hasTouch: mobile })
+    try {
+      const page = await context.newPage(), errors: string[] = []
+      const directAuth = mode === 'remote-authentication-body-timeout' || mode === 'remote-authentication-success'
+      const launchContext = { type: 'mew-app-context', instance: 'fixture-instance', ...(!directAuth ? { authStatusPending: true, ...(mode !== 'remote-authentication-timeout' ? { initialAuth: mode === 'remote-initialization' ? {} : guest } : {}) } : {}) }
+      page.setDefaultTimeout(1500)
+      await page.clock.install()
+      page.on('pageerror', error => errors.push(error.message))
+      await page.route('https://mew-startup-failure.test/**', route => {
+        const path = new URL(route.request().url()).pathname
+        if (path === `/${bootstrap.fileName}` && mode.endsWith('import')) return route.abort('failed')
+        if (scripts.has(path)) return route.fulfill({ contentType: 'text/javascript', body: scripts.get(path) })
+        const shell = `<html><head>${mode === 'local-import' ? '' : '<meta name="mew-p2p-app">'}</head><body><div id="root"></div><script type="module" src="/${entry.fileName}"></script></body></html>`
+        if (path === '/remote') return route.fulfill({ contentType: 'text/html', body: `<iframe src="/__mew_ui/abcdefghijklmnopqrstuvwxyz/index.html"></iframe><script>
+          addEventListener('message', event => {
+            if (event.data?.type !== 'mew-app-ready') return;
+            const port = event.ports[0];
+            port.onmessage = ({ data }) => {
+              if (typeof data !== 'string') return;
+              const request = JSON.parse(data);
+              if (request.type === 'request' && request.path === '/api/auth/me') {
+                port.postMessage(JSON.stringify({ type: 'response', id: request.id, status: 200, headers: { 'content-type': 'application/json' }, responseWindow: 1 }));
+                if (${mode === 'remote-authentication-success'}) {
+                  port.postMessage(JSON.stringify({ type: 'chunk', id: request.id, data: btoa(${JSON.stringify(JSON.stringify(guest))}) }));
+                  port.postMessage(JSON.stringify({ type: 'end', id: request.id }));
+                }
+                window.authResponseSent = true;
+              }
+              if (request.type === 'request' && request.path === '/api/auth/mewlink') {
+                port.postMessage(JSON.stringify({ type: 'response', id: request.id, status: 200, headers: { 'content-type': 'application/json' }, responseWindow: 1 }));
+                port.postMessage(JSON.stringify({ type: 'chunk', id: request.id, data: btoa('{"state":"none","identity":null}') }));
+                port.postMessage(JSON.stringify({ type: 'end', id: request.id }));
+              }
+              if (request.type === 'cancel') window.authCancelled = true;
+            };
+            port.postMessage(${JSON.stringify(launchContext)});
+            window.contextSent = true;
+          });
+        </script>` })
+        return route.fulfill({ contentType: 'text/html', body: shell })
+      })
+      await page.goto(`https://mew-startup-failure.test/${mode === 'local-import' ? '' : 'remote'}`)
+      const surface = mode === 'local-import' ? page : page.frameLocator('iframe')
+      if (mode === 'remote-authentication-success') {
+        await surface.getByRole('dialog').waitFor()
+        await page.clock.fastForward(60_000)
+        assert.equal(await surface.getByRole('alert').count(), 0)
+        assert.equal(await surface.getByRole('dialog').count(), 1, 'completed authentication does not time out later')
+        assert.deepEqual(errors, [])
+        continue
+      }
+      if (mode.endsWith('timeout')) {
+        await page.waitForFunction(mode === 'remote-authentication-body-timeout' ? 'window.authResponseSent === true' : 'window.contextSent === true')
+        await surface.locator('[data-startup-screen]').waitFor()
+        await page.clock.fastForward(30_001)
+      }
+      await surface.getByRole('alert').filter({ hasText: '작업 화면을 불러오지 못했습니다. 페이지를 다시 열어 주세요.' }).waitFor()
+      assert.equal(await surface.locator('[data-startup-screen]').count(), 0, `${mode}: loading ends on failure`)
+      if (mode === 'remote-authentication-body-timeout') await page.waitForFunction('window.authCancelled === true')
+      assert.deepEqual(errors, [], `${mode}: startup rejection is handled`)
+    } finally { await context.close() }
+  }
+})
