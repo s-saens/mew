@@ -180,10 +180,15 @@ function Fixture(){const [state,setState]=React.useState({...defaults,generation
   t.after(() => browser.close())
   const captures = process.env.MEW_CONTEXT_MENU_SCREENSHOT_DIR
   if (captures) await fs.mkdir(captures, { recursive: true })
-  async function createPage(width: number, theme: string) {
+  async function createPage(width: number, theme: string, nativeCodeSelection = false) {
     const page = await browser.newPage({ viewport: { width, height: 844 }, hasTouch: width < 768, locale: 'ko-KR' })
     page.setDefaultTimeout(5000)
     await page.addInitScript(() => { localStorage.setItem('mew:locale', 'ko'); localStorage.setItem('mew:ui-locale', 'ko') })
+    if (nativeCodeSelection) await page.addInitScript(() => {
+      // Exercise CodeMirror's native-selection branch in Chromium; this does not emulate WebKit rendering.
+      Object.defineProperty(navigator, 'vendor', { get: () => 'Apple Computer, Inc.' })
+      Object.defineProperty(navigator, 'maxTouchPoints', { get: () => 5 })
+    })
     await page.route('http://mew-editor-context.test/**', route => {
       const url = new URL(route.request().url())
       if (url.pathname === '/api/comments') return route.fulfill({ json: { threads: [] } })
@@ -196,6 +201,55 @@ function Fixture(){const [state,setState]=React.useState({...defaults,generation
     await surface(page).getByText('Alpha selected text omega.', { exact: true }).waitFor()
     return page
   }
+
+  await t.test('editor selections follow the current accent in Hotview, drawn code ranges and native code ranges', async () => {
+    for (const width of [1280, 390]) for (const theme of ['light', 'dark']) {
+      for (const nativeCodeSelection of width === 390 ? [false, true] : [false]) {
+        const themed = await createPage(width, theme, nativeCodeSelection)
+        try {
+          for (const fixture of [{}, { viewMode: 'plain' }, { path: 'fixture.ts', value: code, viewMode: 'plain' }]) for (const editable of [true, false]) {
+            await reset(themed, { ...fixture, editable })
+            const text = 'path' in fixture ? 'value' : 'selected text'
+            await select(themed, text)
+            const foreground = await surface(themed).evaluate(el => {
+              const node = el.ownerDocument.defaultView!.getSelection()!.anchorNode!
+              return el.ownerDocument.defaultView!.getComputedStyle(node.nodeType === 1 ? node as typeof el : node.parentElement!).color
+            })
+            for (const [accent, rgb] of [['#d9468e', [217, 70, 142]], ['#16a077', [22, 160, 119]]] as const) {
+              await surface(themed).evaluate((el, accent) => el.ownerDocument.documentElement.style.setProperty('--color-accent', accent), accent)
+              await settle(themed)
+              const colors = await surface(themed).evaluate((el, nativeCodeSelection) => {
+                const doc = el.ownerDocument, win = doc.defaultView!
+                const selection = win.getSelection()!
+                const node = selection.anchorNode!
+                const selected = node.nodeType === 1 ? node as typeof el : node.parentElement!
+                const painted = el.closest('.cm-editor')?.querySelector('.cm-selectionBackground')
+                const useNative = el.matches('.ProseMirror') || nativeCodeSelection
+                const style = useNative ? win.getComputedStyle(selected, '::selection') : painted && win.getComputedStyle(painted)
+                const canvas = doc.createElement('canvas')
+                canvas.width = canvas.height = 1
+                const ctx = canvas.getContext('2d')!
+                ctx.fillStyle = style?.backgroundColor ?? 'transparent'
+                ctx.fillRect(0, 0, 1, 1)
+                return { rgba: Array.from(ctx.getImageData(0, 0, 1, 1).data, channel => Number(channel)),
+                  textColor: win.getComputedStyle(selected).color,
+                  text: selection.toString(), native: useNative,
+                  background: style?.backgroundColor,
+                  accent: win.getComputedStyle(selected).getPropertyValue('--color-accent'),
+                  nativeBackground: win.getComputedStyle(selected, '::selection').backgroundColor }
+              }, nativeCodeSelection)
+              colors.rgba.slice(0, 3).forEach((channel, i) => assert.ok(Math.abs(channel - rgb[i]) <= 2, `selection follows ${accent}, ${width}/${theme}/${JSON.stringify(fixture)}/${nativeCodeSelection}/${editable}: ${JSON.stringify(colors)}`))
+              assert.ok(Math.abs(colors.rgba[3] - 255 * .3) <= 1, 'selection tint uses 30% opacity')
+              assert.equal(colors.textColor, foreground, 'changing the selection tint preserves document and syntax text colors')
+              assert.equal(colors.text, text, 'changing the accent preserves the selected text')
+              if (!colors.native) assert.equal(colors.nativeBackground, 'rgba(0, 0, 0, 0)', 'drawn code selections keep the native highlight transparent')
+            }
+            if (captures && editable && !nativeCodeSelection && (!('viewMode' in fixture) || 'path' in fixture)) await themed.screenshot({ path: path.join(captures, `editor-${'path' in fixture ? 'code-' : ''}selection-${width}-${theme}.png`) })
+          }
+        } finally { await themed.close() }
+      }
+    }
+  })
 
   await t.test('touch text selection opens a scoped menu only after the gesture settles', async () => {
     const mobile = await createPage(390, 'light')

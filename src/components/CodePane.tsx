@@ -224,8 +224,12 @@ const theme = EditorView.theme({
   },
   '.cm-activeLineGutter': { backgroundColor: 'transparent', color: 'var(--color-ink-secondary)' },
   '.cm-activeLine': { backgroundColor: 'color-mix(in srgb, var(--color-surface-raised) 35%, transparent)' },
-  '.cm-selectionBackground, &.cm-focused .cm-selectionBackground': {
+  '.cm-selectionBackground, &.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground': {
     backgroundColor: 'color-mix(in srgb, var(--color-accent) 30%, transparent)',
+  },
+  '.cm-content::selection, .cm-content ::selection': {
+    backgroundColor: 'color-mix(in srgb, var(--color-accent) 30%, transparent)',
+    color: 'currentColor',
   },
   '.cm-tooltip': {
     backgroundColor: 'var(--color-surface-raised)',

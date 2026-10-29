@@ -11,6 +11,12 @@
   font-size: 15px;
   line-height: var(--mew-body-line-height);
 }
+.tiptap::selection,
+.tiptap ::selection {
+  background-color: color-mix(in srgb, var(--color-accent) 30%, transparent);
+  color: currentColor;
+}
+
 /* frontmatter 패널이 위에 있을 때는 본문 상단 여백을 줄인다 (패널 자체 여백과 중복되므로) */
 .editor-root.has-frontmatter .tiptap {
   padding-top: 0.75rem;
