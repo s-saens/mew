@@ -1,8 +1,8 @@
 ---
 title: "mew deployment operations runbook"
 created: 2026-09-04
-updated: 2026-10-23
-description: "Defines native installation, OS user, Mewlink/HTTPS entry point, backup, permission, and workspace search-exclusion checks for Mew operators before and after public exposure or applying changes, along with macOS failure diagnosis and retry restrictions."
+updated: 2026-10-30
+description: "Defines native installation, OS user, Mewlink/HTTPS entry point, backup, permission, and workspace search-exclusion checks for Mew operators before and after applying changes, plus Tailscale proxy-target diagnosis, macOS failure diagnosis, and retry restrictions."
 ---
 
 [ADR 0111](../../.mew/docs/history/decisions/0111-mew-native-deployment-and-supervisor.md) is authoritative for currently supported paths and boundaries, and [Native Server Deployment](../deployment/native.md), which changes in the same commit
@@ -33,6 +33,16 @@ as the code, is authoritative for actual installation and systemd commands. This
 - Following the [search policy](search-discovery.md), check `noindex` on host HTML and files and the text robots response. Check indexing of public product introductions separately on the relevant site.
 - When a failure occurs, check supervisor logs first. You may revert the app clone to a known-good commit, rebuild,
   and restart, but do not roll back by deleting or resetting the workspace or `MEW_DATA_DIR`.
+
+## Diagnosing Tailscale access failures
+
+Compare `tailscale serve status` with the actual Mew listener (`ss -ltnp` on Linux) and the port in [server configuration](../configuration/environment.md). A healthy loopback server can still be unreachable through Tailscale when Serve forwards to an old port.
+
+1. Request `http://127.0.0.1:5000/api/auth/me`, replacing `5000` with the actual Mew port. Expect JSON even before signing in.
+2. If the local response works but the HTTPS proxy target is wrong, update only that listener with `tailscale serve --bg --https=443 http://127.0.0.1:5000`. Preserve unrelated Serve listeners; do not use `tailscale serve reset`.
+3. Request `/` and `/api/auth/me` through the printed HTTPS address. Then check browser login and WebSockets from another tailnet device. A request from the host alone does not verify that device's Tailscale connection or access policy.
+
+Keep Mew on loopback. For an explicitly requested private `http://<tailscale-ip>:5000` endpoint, `tailscale serve --bg --tcp=5000 tcp://127.0.0.1:5000` adds TCP forwarding within the tailnet. Prefer the HTTPS address for browser features that require a secure context. Proxy corrections do not require restarting Mew. Follow the [Tailscale setup guide](../guides/getting-started-en.md#2-tailscale) for installation and HTTPS prerequisites.
 
 ## Diagnosing macOS agent and terminal failures
 
