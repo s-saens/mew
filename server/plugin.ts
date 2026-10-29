@@ -1,10 +1,8 @@
 import './config.ts'
-import { createRemoteAgent } from './remote-access-agent.ts'
 import { watchSocketAccess } from './access-socket.ts' // 반드시 첫 줄 — 설정 파일을 다른 모듈보다 먼저 읽는다
 import { webSocketOriginAllowed } from './websocket-origin.ts'
 import { attachLoginDesktopWebSocket } from './login-desktop.ts'
 import { attachRemoteDesktopWebSocket } from './remote-desktop.ts'
-import { Server as HttpServer } from 'node:http'
 import type { ViteDevServer } from 'vite'
 import express from 'express'
 import { createApiApp } from './api.ts'
@@ -34,7 +32,6 @@ export function configureDocsServer(server: ViteDevServer): void {
   app.use(createPortPreviewMiddleware())
   app.use(checkOrigin)
   app.use('/api/auth', createAuthRouter())
-  if (server.httpServer instanceof HttpServer) app.use('/api/remote-access', attachAuthContext, createRemoteAgent(server.httpServer).router)
   app.use('/api', attachAuthContext, createApiApp())
   server.middlewares.use(app)
   // httpServer는 미들웨어 모드(server.middlewares만 쓰는 임베딩)에선 null일 수 있음.

@@ -1,6 +1,6 @@
 ---
 title: "Mewlink 기기 등록과 로컬 사용자 인증 P2P 접속 계약"
-description: "Mewlink 공개 기기 주소·포트 링크용 공개 base 전달·로컬 인증·브라우저 신뢰와 회수·재접속을 정의한다. 단회 준비·자원 검증과 정적 UI 본문 정지 시 제한 시간, RTC 순단의 5초 복구 대기·1초 뒤 상태 표시, 시그널링 재부착의 보안·운영 경계를 설명한다."
+description: "Mewlink의 운영 서버 전용 연동과 개발 서버 제외, 공개 기기 주소·포트 링크용 공개 base 전달·로컬 인증·브라우저 신뢰와 회수·재접속을 정의한다. 단회 준비·자원 검증과 정적 UI 본문 정지 시 제한 시간, RTC 순단의 5초 복구 대기·1초 뒤 상태 표시, 시그널링 재부착의 보안·운영 경계를 설명한다."
 created: 2026-10-07
 updated: "2026-10-29"
 ---
@@ -41,7 +41,7 @@ updated: "2026-10-29"
 
 Service Worker는 `/__mew_ui/{임시 ID}/...`를 `/api/remote-ui/file?path=...`로 연결하고 절대 정적 URL을 같은 접두사로 redirect한다. JS의 `import.meta.url`·동적 import·worker 자원도 같은 연결에 남는다. worker 재시작 시에도 정확히 같은 `/launch/{임시 ID}` window만 찾으며 다른 탭으로 대체하지 않는다. 앱 요청은 MessagePort → 중앙 origin 부모의 검증된 DataChannel, native URL 요청은 worker → 같은 부모 전송을 사용한다. 실제 앱 코드에는 중앙 세션·launch 증명을 전달하지 않는다.
 
-A의 `server/remote-access-agent.ts`는 로컬 owner가 시작한 5분짜리 등록 요청을 확인한다. A가 생성한 Ed25519 키의 소유 증명과 중앙 서명 영수증을 검증하고 불변 instance ID·중앙 계정 ID·기기 이름·키를 저장한다. 로컬 `serve.ts`와 Vite plugin은 등록이 있을 때만 중앙으로 WSS를 연결한다. 지수 backoff는 최대 30초에 jitter를 더하며, 재시작은 저장한 키를 사용한다.
+A의 `server/remote-access-agent.ts`는 로컬 owner가 시작한 5분짜리 등록 요청을 확인한다. A가 생성한 Ed25519 키의 소유 증명과 중앙 서명 영수증을 검증하고 불변 instance ID·중앙 계정 ID·기기 이름·키를 저장한다. 운영 서버 진입점인 `server/serve.ts`는 등록이 있을 때만 중앙으로 WSS를 연결한다. `npm start`·`npm run serve`·`./mew start`는 이 진입점을 사용한다. `npm run dev`의 Vite plugin은 Mewlink 에이전트를 생성하거나 `/api/remote-access` 관리 API를 등록하지 않으므로, 저장된 등록이 있어도 중앙 연결·재연결·기기 등록을 수행하지 않는다. 개발 서버와 운영 서버를 함께 실행해도 개발 서버가 기존 기기의 중앙 연결을 차지하지 않는다. 운영 서버의 지수 backoff는 최대 30초에 jitter를 더하며, 재시작은 저장한 키를 사용한다.
 
 중앙 신원은 **제공자 ID + 검증된 issuer + 불변 subject**다. GitHub는 고정 issuer 아래 숫자 사용자 ID를 쓴다. 동일 이메일·표시 이름이나 다른 제공자의 동일 subject를 합치지 않는다. 로그인 제공자 변경·이메일 OIDC issuer 교체는 별도 계정이 된다. 제공자 간 계정 연결 UI는 아직 제공하지 않는다.
 
