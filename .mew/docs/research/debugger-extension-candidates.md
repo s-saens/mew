@@ -1,0 +1,177 @@
+---
+title: "외부 DAP 디버거 확장 조사"
+description: "2026-10-07 외부 DAP 디버거 확장 후보·비교·구현 전제의 조사 원문. 현재 지원 명세와 구분하는 당시 계획이다."
+updated: "2026-10-29"
+---
+
+## 확장 조사와 구현 후보 — 2026-10-07 (조사 당시 계획)
+
+이 절은 구현 전 사용자 요청에 따른 조사와 제안 기록이다. 현재 구현 여부는 위의 **고급 기능의 현재 지원 범위**·**추가로 남은 범위**가 기준이며, 아래의 ‘미구현’·‘추가 작업’은 조사 당시 상태다. 앞 절의 현재 기능·실제 검증과 구분하며, 프론트매터 `implemented`는 현재 제공 범위에만 적용한다. 이번 작업에서는 코드·권한·설치 방식·네트워크 경계를 변경하지 않았다. 아래의 추가 기능은 구현·실어댑터 검증 전까지 지원으로 표시하지 않는다.
+
+### 조사 범위와 판단 기준
+
+2026-10-07에 Zed 공식 문서, 공개 저장소의 디버거 UI·프로젝트 세션·DAP 명령·메모리 처리와 Microsoft DAP 스키마를 확인했다. Zed 코드는 main의 [72d073d6423b0bf7e04aa87567a308d19617b7f2](https://github.com/zed-industries/zed/commit/72d073d6423b0bf7e04aa87567a308d19617b7f2), DAP는 [c10f18c3332ca04cece1081aa00232a9d882438d의 스키마](https://github.com/microsoft/debug-adapter-protocol/blob/c10f18c3332ca04cece1081aa00232a9d882438d/debugAdapterProtocol.json)를 기준으로 고정했다. main 코드 확인은 Zed 정식 배포판의 탑재 여부나 모든 언어에서의 동작 검증을 뜻하지 않는다. 외부 어댑터를 새로 설치하거나 대상 프로그램·Zed를 실행하지 않았다.
+
+추가 가능 여부는 다음 세 범주로 분류한다. DAP 명령을 전달하는 것만으로 사용 가능한 기능이 되지는 않으며, 상태·설정·UI·어댑터별 검증까지 필요하다.
+
+- **공통 확장**: 현재 DAP 연결과 기본 명령을 재사용해 mew 안에서 구현 가능한 기능.
+- **어댑터 조건부**: 표준 DAP 기능이 있으나 연결한 어댑터의 capability·대상·OS·빌드 정보에 따라 가능 여부가 달라지는 기능.
+- **별도 연동**: DAP 공통 요청만으로 완결되지 않아 런타임 API·디버거 전용 명령·외부 서비스·장비·분석 엔진이 필요한 기능.
+
+### Zed에서 확인한 구현과 참고 지점
+
+| 참고 대상 | 확인한 내용 | mew에 적용할 부분 |
+| --- | --- | --- |
+| [공식 디버거 문서](https://zed.dev/docs/debugger#breakpoints) | 거터 중단점, 조건·횟수·로그, 예외 중단점, 실행 프로필과 단계 실행 단위 | 패널 입력과 에디터 거터를 같은 중단점 저장소에 연결하고 조건부 옵션을 제공 |
+| [변수 목록](https://github.com/zed-industries/zed/blob/72d073d6423b0bf7e04aa87567a308d19617b7f2/crates/debugger_ui/src/session/running/variable_list.rs) | capability에 따른 변수 수정·데이터 중단점·메모리 이동 메뉴 | 부모 변수 참조와 선택 프레임을 유지하고 항목별 가능한 작업만 표시 |
+| [메모리 UI](https://github.com/zed-industries/zed/blob/72d073d6423b0bf7e04aa87567a308d19617b7f2/crates/debugger_ui/src/session/running/memory_view.rs)와 [페이지 처리](https://github.com/zed-industries/zed/blob/72d073d6423b0bf7e04aa87567a308d19617b7f2/crates/project/src/debugger/memory.rs) | 메모리 조회·수정·주소 범위 중단점, 읽을 수 없는 영역을 포함한 페이지 관리 | 주소 범위별 지연 로드, 읽기 불가 표시, 변경 후 관련 캐시 무효화 |
+| [콘솔](https://github.com/zed-industries/zed/blob/72d073d6423b0bf7e04aa87567a308d19617b7f2/crates/debugger_ui/src/session/running/console.rs) | 사용자 표현식 실행·기록, 어댑터 자동완성과 변수 기반 대안 | 현재 출력 영역에 명시적인 REPL 입력과 결과 탐색 추가 |
+| [실행 UI](https://github.com/zed-industries/zed/blob/72d073d6423b0bf7e04aa87567a308d19617b7f2/crates/debugger_ui/src/session/running.rs)와 [세션](https://github.com/zed-industries/zed/blob/72d073d6423b0bf7e04aa87567a308d19617b7f2/crates/project/src/debugger/session.rs) | 스레드 선택·계속 실행, 단계 단위, 재시작, step-back 요청, 임시 중단점으로 지정 위치까지 실행 | 스레드·자식 연결별 상태 분리, capability 검사와 임시 중단점 정리 |
+| [스택 목록](https://github.com/zed-industries/zed/blob/72d073d6423b0bf7e04aa87567a308d19617b7f2/crates/debugger_ui/src/session/running/stack_frame_list.rs) | 프레임 선택·재시작, 해당 프레임의 가능 여부 검사 | 프레임 재시작을 일반 step-out과 별도 동작으로 제공 |
+| [모듈 목록](https://github.com/zed-industries/zed/blob/72d073d6423b0bf7e04aa87567a308d19617b7f2/crates/debugger_ui/src/session/running/module_list.rs)·[로드 소스](https://github.com/zed-industries/zed/blob/72d073d6423b0bf7e04aa87567a308d19617b7f2/crates/debugger_ui/src/session/running/loaded_source_list.rs)·[DAP 명령](https://github.com/zed-industries/zed/blob/72d073d6423b0bf7e04aa87567a308d19617b7f2/crates/project/src/debugger/dap_command.rs) | 별도 정보 패널과 기능별 요청·응답 처리 | 거대한 단일 패널 대신 필요할 때 여는 조회 영역과 명령별 서버 검증 |
+
+조사한 Zed 파일에서 디스어셈블 전용 UI·instruction breakpoint 관리·범용 힙 덤프·커널/JTAG 제어는 확인하지 못했다. 이를 Zed 구현 완료로 간주하지 않는다. 디스어셈블과 instruction breakpoint의 mew 확장 가능성은 DAP·어댑터 계약에서 판단한다.
+
+Zed의 [debugger_ui](https://github.com/zed-industries/zed/blob/72d073d6423b0bf7e04aa87567a308d19617b7f2/crates/debugger_ui/Cargo.toml), [dap](https://github.com/zed-industries/zed/blob/72d073d6423b0bf7e04aa87567a308d19617b7f2/crates/dap/Cargo.toml), [project](https://github.com/zed-industries/zed/blob/72d073d6423b0bf7e04aa87567a308d19617b7f2/crates/project/Cargo.toml)는 `GPL-3.0-or-later`로 명시되어 있다. mew의 MIT 코드에 그대로 복사하는 계획은 두지 않는다. 이번 조사에서는 동작·상태 처리와 공개 프로토콜을 참고해 TypeScript/React에서 별도로 구현하는 방향을 제안하며, 실제 소스 재사용을 선택할 때는 해당 라이선스와 배포 조건을 따로 검토한다.
+
+### 사용자 요청 항목과 추가 가능 범위
+
+| 기능 | 현재 mew | 추가 분류와 구현 방향 |
+| --- | --- | --- |
+| 소스 단계 실행·step-in/out | 기본 지원 | **공통 확장**: 실행 위치 강조, 바로 소스 열기, 단축키·선택 위치까지 실행 |
+| 문장·기계어 단위 실행 | 단위 선택 없음 | **어댑터 조건부**: `granularity`를 지원하는 어댑터에서 statement/line/instruction 선택 |
+| 소스 중단점 | 파일·줄·활성화 지원 | **공통 확장**: 거터 클릭·전체 일시 비활성화·편집 중 위치 이동. **어댑터 조건부**: 조건·횟수·로그·함수 중단점 |
+| 하드웨어 중단점 | 방식 선택 없음 | **별도 연동**: 네이티브 어댑터 설정·전용 명령을 통해 선택 가능한지 실증. CPU 레지스터를 mew가 직접 제어하지 않음 |
+| 소프트웨어 중단점 | 일반 중단점 요청 지원 | 엔진의 구현 방식에 맡김. Node/Python의 소스 중단점을 CPU 코드 패치와 동일하게 설명하지 않음 |
+| 메모리 접근 Watch | 미지원 | **어댑터 조건부**: 데이터 중단점으로 읽기·쓰기·양쪽 접근 감지. 변수 또는 지원되는 주소 범위에 설정 |
+| 표현식 Watch | 고정 감시 지원 | **공통 확장**: 객체 결과 펼치기·타입·프레임 범위·감시 오류 분리. 상시 실행 중 추적은 별도 기능 |
+| Stack trace | 현재 중단 스택 지원 | **공통 확장**: 스레드 선택·추가 프레임 조회·중단 이유. **어댑터 조건부**: 예외 상세·프레임 재시작 |
+| Memory Dump | 미지원 | **어댑터 조건부**: 제한된 메모리 범위 읽기·파일 내보내기. **별도 연동**: 전체 힙 스냅샷·프로세스/core dump 생성·분석 |
+| Injection | 전용 기능 없음 | **어댑터 조건부**: 명시적인 표현식 실행·변수 수정·메모리 쓰기. **별도 연동**: DLL/원격 코드 주입·바이너리 패치·핫 리로드 |
+| Debug Server / Client | 브라우저→mew 서버→loopback DAP 지원 | **어댑터 조건부/별도 연동**: 원격 대상 attach·소스 매핑·SSH 터널. 커널/JTAG/시리얼은 대상별 백엔드 필요 |
+| Static Analysis | 디버거 전용 기능 없음 | **어댑터 조건부**: 디스어셈블·모듈·심볼 조회로 일부 보완. **별도 연동**: 정적 분석기·바이너리 CFG·역컴파일·악성코드 분석 |
+| Dynamic Analysis | 중단·스텝·변수 조회 지원 | **공통/어댑터 확장**: 로그포인트·예외·데이터 중단점으로 실행 분석 강화. **별도 연동**: 프로파일러·장기 실행 추적·record/replay |
+| 역방향 실행 | 미지원 | **어댑터 조건부**: step-back/reverse-continue. 기록·재생 가능한 대상 백엔드도 필요 |
+
+`instruction breakpoint`는 명령어 주소를 지정하는 중단점이며 하드웨어 구현을 보장하는 옵션이 아니다. 중단점의 실제 구현·하드웨어 슬롯 수는 엔진과 CPU에 의존한다.
+
+### DAP 기반 확장 후보와 지원 조건
+
+아래는 mew에 추가할 요청·필드의 목록이다. 명령·capability 이름은 고정한 [DAP 스키마](https://github.com/microsoft/debug-adapter-protocol/blob/c10f18c3332ca04cece1081aa00232a9d882438d/debugAdapterProtocol.json)를 기준으로 한다. 가능한 UI와 구현 난도·순서는 mew 코드에 대한 판단이며, 특정 어댑터의 실제 지원을 보장하는 표가 아니다.
+
+| 추가 기능 | DAP 요청·필드 | 확인할 capability 또는 조건 |
+| --- | --- | --- |
+| 조건·횟수·로그 중단점 | `setBreakpoints`: `condition`, `hitCondition`, `logMessage` | `supportsConditionalBreakpoints`, `supportsHitConditionalBreakpoints`, `supportsLogPoints` |
+| 함수 중단점 | `setFunctionBreakpoints` | `supportsFunctionBreakpoints` |
+| 예외 중단·상세 | `setExceptionBreakpoints`, `exceptionInfo` | `exceptionBreakpointFilters`와 옵션 지원, `supportsExceptionInfoRequest` |
+| 데이터 중단점 | `dataBreakpointInfo`, `setDataBreakpoints` | `supportsDataBreakpoints`; 주소·바이트 범위는 `supportsDataBreakpointBytes` |
+| 명령어 주소 중단점 | `setInstructionBreakpoints` | `supportsInstructionBreakpoints` |
+| 단계 단위·호출 대상 선택 | `next`/`stepIn`/`stepOut`: `granularity`, `stepInTargets` | `supportsSteppingGranularity`, `supportsStepInTargetsRequest` |
+| 실행 재시작·프레임 재시작 | `restart`, `restartFrame` | `supportsRestartRequest`, `supportsRestartFrame`·프레임 `canRestart` |
+| 이전 단계·역방향 계속 | `stepBack`, `reverseContinue` | `supportsStepBack`와 기록·재생 백엔드 |
+| 스레드별 제어 | `threads`·실행 요청의 `threadId`, `singleThread` | `supportsSingleThreadExecutionRequests`; 스레드마다 실행/중단 상태 관리 |
+| 디버그 콘솔·자동완성 | `evaluate`의 `repl`, `completions` | REPL의 언어별 의미 확인, `supportsCompletionsRequest` |
+| 변수·표현식 수정 | `setVariable`, `setExpression` | `supportsSetVariable`, `supportsSetExpression` |
+| 메모리 조회·수정 | `readMemory`, `writeMemory` | `supportsReadMemoryRequest`, `supportsWriteMemoryRequest`; client 메모리 참조 지원 선언 |
+| 디스어셈블 | `disassemble` | `supportsDisassembleRequest`, 프레임의 명령어 위치 정보 |
+| 모듈·로드 소스·가상 소스 | `modules`, `loadedSources`, `source` | `supportsModulesRequest`, `supportsLoadedSourcesRequest`; 파일 대신 `sourceReference`인 소스 지원 |
+| 실행 위치 변경 | `gotoTargets`, `goto` | `supportsGotoTargetsRequest`; 부작용과 대상 제약을 표시하는 별도 동작 |
+
+지정 위치까지 실행은 기존 `setBreakpoints`와 `continue`로 임시 중단점을 만들 수 있다. 현재 줄부터 그 위치까지의 코드를 실제로 실행하며, 실행 위치만 옮기는 `goto`와 구분한다. 중간의 다른 중단점·예외·종료에서도 임시 중단점을 정리하고 기존 중단점을 보존해야 한다.
+
+### 표준 DAP 밖의 추가 연동
+
+- **네이티브 확장**: [CodeLLDB 설명](https://github.com/vadimcn/codelldb/blob/master/MANUAL.md#debugger-features)은 데이터 중단점·디스어셈블을 다루며, [역방향 실행](https://github.com/vadimcn/codelldb/blob/master/MANUAL.md#reverse-debugging)은 rr 같은 백엔드를 전제로 한다. 일반 LLDB 설치만으로 되감기를 제공한다고 표시하지 않는다. 어댑터·OS·버전을 고정한 실기 검증이 필요하다.
+- **사후 덤프 분석**: [lldb-dap](https://lldb.llvm.org/use/lldbdap.html#attach-configurations)의 `coreFile`·attach 설정을 활용할 수 있다. 이미 생성된 core를 여는 것, core를 새로 만드는 것, 제한된 메모리 영역을 저장하는 것은 별도 기능이다. 덤프 세션에는 실행·계속·쓰기처럼 불가능한 동작을 제공하지 않는다.
+- **Node/브라우저 힙 분석**: Node의 [V8 heap snapshot API](https://nodejs.org/api/v8.html#v8writeheapsnapshotfilename-options) 등 런타임 기능을 연결해야 한다. 메모리 영역을 읽는 DAP 기능만으로 힙 객체 그래프·참조 관계·누수 분석이 완성되지 않는다. 파일 생성·크기·대상 일시정지·실패·삭제를 다루는 별도 수집/분석 흐름이 필요하다.
+- **원격·임베디드·커널**: mew 서버의 DAP 어댑터가 원격 대상 엔진에 연결하는 구성이 우선 후보다. 기존 DAP TCP는 loopback을 유지하고 필요한 경우 별도 SSH 터널·어댑터 설정을 사용한다. [OpenOCD의 GDB 연동](https://openocd.org/doc/html/GDB-and-OpenOCD.html)은 외부 서버와 타깃 구성이 필요한 예다. GDB remote와 DAP는 같은 프로토콜이 아니므로 OpenOCD 포트를 mew의 DAP 포트에 그대로 넣지 않는다. JTAG 장비·드라이버·커널 백엔드·권한은 대상별 별도 범위이며 이번 조사에서 실제 검증하지 않았다.
+- **추가 언어와 설치**: Zed의 [언어별 어댑터 목록](https://zed.dev/docs/debugger#supported-languages)을 참고해 Java·PHP·Ruby·Swift 등의 DAP 어댑터 연결을 후보로 둔다. 공통 DAP 지원과 언어별 실행 프로필·확장 의존성을 구분한다. 선택 설치를 확대한다면 현재 js-debug 설치의 OS별 배포·버전 고정·무결성 검사·라이선스 고지·설치 재사용 계약을 어댑터마다 정의하며, 언어 런타임과 IDE를 일괄 번들하지 않는다.
+- **정적 분석·주입·핫 리로드**: 분석기나 런타임별 별도 통합으로 분리한다. REPL에서 함수 호출이나 대입이 가능한 경우도 있지만, 이를 범용 코드 주입 지원으로 표현하지 않는다. 현재 고정 감시의 `evaluate`도 어댑터에 따라 부작용이 가능하므로 ‘조회만 해서 안전한 표현식’이라고 보장하지 않는다.
+
+### mew 구현 전제와 변경 지점
+
+1. **연결별 capability와 선택 상태**: 현재 `server/debugger.ts`는 루트·자식 연결의 capability를 하나의 snapshot에 합친다. 확장 기능은 선택한 연결별 capability·thread·frame으로 판정해야 한다. `capabilities` 이벤트에 따른 변경을 처리하고, 미지원 동작은 서버에서도 거부한다. 단일 상태값으로 모든 스레드·자식 프로세스를 실행 중 또는 중단됨으로 묶지 않는다.
+2. **명령별 계약**: `/command`의 문자열 허용목록만 늘리지 않는다. 요청마다 세션·연결·중단 상태·프레임/변수 참조·입력 크기·응답 범위를 검증한다. 현재 [접근 권한](../development/access-control.md#외부-디버거), 프로젝트 헤더·세션 ID 검사와 정책 변경 시 정리를 유지한다. 실행 위치 변경·수정·덤프 저장은 명시적인 사용자 동작으로 구분한다.
+3. **참조 수명과 데이터 형식**: `shared/debugger.ts`에 연결·스레드·소스 참조·메모리 참조·중단점 옵션·평가 결과 타입을 확장한다. 변수/프레임 참조는 실행 재개 시 폐기한다. 데이터 중단점은 `dataId: null`, 지원 접근 방식·`canPersist`를 반영하고 임시 참조를 다음 세션에 그대로 저장하지 않는다. 등록된 데이터 중단점의 수명과 조회에 사용한 참조의 수명은 별도로 관리한다.
+4. **메모리 조회와 쓰기**: 메모리 참조는 opaque 문자열로 보존하고 64비트 주소를 JS `Number`로 강제 변환하지 않는다. 주소 표시·계산이 필요하면 별도 파싱·`BigInt`를 사용한다. 제한된 페이지를 읽고 읽기 불가·부분 응답·실제 쓰인 바이트를 표시한다. 쓰기 후 변수·감시·메모리를 갱신하고 비정상 응답을 성공으로 처리하지 않는다.
+5. **에디터 연동**: `packages/editor`의 코드 편집 호스트와 mew의 호스트 API에 거터·현재 실행 위치·호버 평가를 연결한다. 편집으로 바뀐 중단점 위치, 미확인/실제 이동 위치, 소스 맵, 여러 열린 패널과 프로젝트 전환을 처리한다. DAP 가상 소스는 프로젝트 파일로 덮어쓰지 않고 세션 범위의 읽기 전용 문서로 표시한다.
+6. **수정과 평가 구분**: 고정 감시는 자동 조회 대상으로 유지하고, 사용자 REPL·변수/메모리 수정은 별도 액션으로 제공한다. REPL 결과도 객체 펼치기를 지원한다. 스텝·쓰기·프레임 재시작·`invalidated`/`memory` 이벤트 뒤에 관련 조회 상태를 무효화한다. 실제 처리하는 client capability만 initialize에 선언한다.
+7. **프로필과 수명**: 계정·프로젝트별 저장을 유지하며 여러 실행 프로필, 명시적인 `.vscode/launch.json` 가져오기, 제한된 경로/환경 변수 치환을 검토한다. 가져온 프로필을 즉시 실행하지 않는다. `runInTerminal`의 현재 pipe 실행을 사용자 입력 가능한 PTY로 확장하고, 다중 세션·자식 프로세스 선택·재시작·연결 종료의 소유 프로세스 정리를 설계한다. mew 저장소의 빌드·서버 실행 제한을 자동 빌드 기능으로 우회하지 않는다.
+8. **변경량과 한계**: 콘솔·예외·스레드·메모리·모듈은 별도 컴포넌트로 지연 로드한다. 변수·메모리는 페이지 조회, 출력은 범주별 제한, DAP 진단은 명시적으로 켜는 세션 한정 기록으로 둔다. 값·환경변수·덤프·DAP 로그를 문서나 영구 공용 기록에 자동 저장하지 않는다.
+
+### 제안 구현 순서와 완료 기준
+
+| 단계 | 범위 | 완료 기준 |
+| --- | --- | --- |
+| 1. 공통 기반과 일상 디버깅 | 연결별 지원 기능·상태, 거터/실행 위치, 조건·횟수·로그·예외, 콘솔, 스레드 선택, 감시 결과 펼치기 | 기존 Node 예제 회귀 유지, 조건·로그·예외·REPL의 실제 js-debug 검증, 미지원 옵션 서버 거부, PC·모바일 조작과 소스 위치 확인 |
+| 2. 데이터·변수·메모리 | 데이터 중단점, 변수/표현식 수정, 메모리 읽기·쓰기·제한 범위 내보내기 | 네이티브 어댑터 실기로 쓰기 순간 중단과 재조회, 읽기 불가·부분 쓰기·참조 만료 처리. 해당 capability가 없는 대상에는 기능을 지원으로 표시하지 않음 |
+| 3. 고급 실행·진단 | 단계 단위·디스어셈블·명령어 중단점, 프레임 재시작·step-in 대상, 모듈·가상 소스, 프로필·PTY·자식 세션 선택 | 해당 capability가 있는 실어댑터로 개별 검증, 종료/재시작 정리, 소스 없는 대상과 큰 데이터·다중 스레드에서 정상 동작 |
+| 4. 대상별 통합 | core 분석·heap snapshot·원격 프리셋, 기록/재생·역방향 실행, 추가 언어 어댑터 | 기능별 외부 도구·OS·버전·설정 명시, 수집과 분석 구분, 지원/미지원 사례 기록. 커널·JTAG·범용 주입·역컴파일은 별도 요구사항 확정 뒤 진행 |
+
+세부 검증 계획:
+
+- 가짜 DAP 테스트: capability 없음/false/변경, 루트와 자식의 지원 불일치, 중단점 전체 교체·삭제·옵션, 데이터 중단점 정보 없음·참조 수명, 재시작·역방향 실행 이벤트, 큰/부분/오류 응답을 검사한다.
+- 실제 언어 검증: js-debug(Node·브라우저), debugpy, LLDB DAP 또는 CodeLLDB, Delve를 각각 설치 버전·OS와 함께 확인한다. 프리셋 존재나 가짜 응답 테스트만으로 실지원이라고 표시하지 않는다. 역방향 실행은 별도의 record/replay 환경에서 검사한다.
+- 브라우저 검증: 다크/라이트·PC/좁은 모바일의 거터·키보드·터치, 조건 편집·콘솔·변수 수정·메모리 페이지, 미지원 설명·오류 회복, 중단 중 프로젝트 전환을 검사한다.
+- 권한/수명 검증: 기존 계정·프로젝트·세션 격리와 권한 회수에 새 읽기·쓰기·저장 작업도 포함한다. 취소·연결 종료·프로세스 오류·PTY 종료 시 자식 연결·임시 중단점·조회 참조를 정리한다.
+
+이번 조사 작업의 검증은 출처와 현재 구현의 대조·문서 검사다. 위 계획의 기능 테스트나 실제 어댑터 확장 검증을 수행했다는 뜻이 아니다.
+
+### 추가 조사: 실행 흐름·테스트·성능·협업
+
+앞 표에 없던 후보와 기존 후보의 구체적인 사용 흐름을 추가로 조사했다. VS Code·js-debug·Vitest·Chromium CDP·Playwright·Clang·OpenTelemetry·Live Share의 공식 문서/코드가 근거다. 아래 mew 적용안은 구현 가능성에 대한 제안이며 설치·실행 검증이나 지원 확정을 뜻하지 않는다. 기존 다중 세션·heap snapshot·프로파일러 계획을 구체화한 항목은 별도로 표시한다.
+
+#### 실행 설정으로 이미 전달 가능한 옵션
+
+현재 mew는 실행 설정 JSON을 어댑터에 그대로 전달하므로 아래 js-debug 옵션을 전달할 경로가 있다. 전용 설정 UI와 사례별 실검증은 추가 작업이며, 다른 언어의 어댑터에 같은 옵션을 적용하지 않는다. 기준은 관리형 설치 버전인 [js-debug v1.140.0의 OPTIONS.md](https://github.com/microsoft/vscode-js-debug/blob/v1.140.0/OPTIONS.md)다.
+
+| 옵션 | 얻을 수 있는 동작 | 추가할 부분과 제약 |
+| --- | --- | --- |
+| `skipFiles` | Node 내부·외부 라이브러리 등 지정한 경로를 단계 실행에서 건너뛰기 | ‘내 코드 위주로 실행’ 설정과 제외 경로 편집. 명시적 중단점·예외와의 상호작용은 어댑터 계약 확인 필요 |
+| `smartStep` | 소스 맵으로 원본에 대응되지 않는 생성 코드에서 자동으로 다음 위치로 진행 | TypeScript 변환 코드 사례 안내. 소스 맵 자체가 없는 파일의 원본 위치를 복원하는 기능은 아님 |
+| `showAsyncStacks` | 현재 호출로 이어진 비동기 호출 경로를 어댑터가 스택에 포함 | 비동기 경계·인공 프레임 구분, 스택 추가 조회. 과거의 비동기 호출 프레임에 현재 지역 변수가 존재한다고 가정하지 않음 |
+
+[Node 디버깅 문서](https://code.visualstudio.com/docs/nodejs/nodejs-debugging#skipping-uninteresting-code)와 대조했다. 실제 파일·경로·소스 맵을 사용하고 현재 mew에 없는 `${workspaceFolder}` 치환에 의존하지 않는다. ‘원래 스택’과 비동기 호출 관계는 UI에서 구분한다. DAP `StackFrame.presentationHint: label/subtle`을 보존하고 어댑터가 평가할 수 없는 프레임은 변수 조회 대상으로 강제하지 않는다.
+
+#### mew·DAP 경로를 확장할 후보
+
+| 추가 후보 | 사용자에게 제공할 동작 | 가능 범위·구현 조건과 근거 |
+| --- | --- | --- |
+| 줄 안의 중단점·중단 가능 위치 | 한 줄의 여러 문장 중 정확한 열에 중단점을 놓고 가능한 위치 표시 | **어댑터 조건부**. `SourceBreakpoint.column`, `breakpointLocations`와 `supportsBreakpointLocationsRequest`. 열은 UTF-16 위치와 `columnsStartAt1` 계약을 따름. [VS Code inline breakpoint](https://code.visualstudio.com/docs/debugtest/debugging#inline-breakpoints), 고정 DAP 스키마 |
+| 다른 중단점 이후 활성화 | A를 거친 뒤에만 B에서 멈추기 | **공통 확장 + 이벤트 조건**. mew가 B의 활성 상태를 관리하고 `stopped.hitBreakpointIds`의 실제 어댑터 ID로 A를 식별. 이 필드는 선택 사항이므로 ID가 없으면 정확한 발동을 보장할 수 없음. 줄 번호 추측으로 대체하지 않음. [Triggered breakpoint](https://code.visualstudio.com/docs/debugtest/debugging#triggered-breakpoints) |
+| 중단 시점 기록·비교 | 이전 중단의 호출 경로·읽었던 변수·감시 값을 선택하고 두 시점 비교 | **공통 확장**. Zed의 `SessionSnapshot`, `push_to_history`, `historic_snapshots`는 이미 읽은 데이터를 제한된 기록으로 보관함. mew도 별도 기록 모델·개수/용량 제한 필요. [Zed 세션 코드](https://github.com/zed-industries/zed/blob/72d073d6423b0bf7e04aa87567a308d19617b7f2/crates/project/src/debugger/session.rs) |
+| 값 표시와 큰 자료 탐색 | 16진수 전환, 레지스터 scope, 큰 배열 페이지, 읽기 전용·지연 평가 표시 | **공통/어댑터 조건부**. `format.hex`와 `supportsValueFormattingOptions`, `Scope.presentationHint`, `VariablePresentationHint`, `variables`의 `filter/start/count`. 실제 paging을 구현한 뒤 client `supportsVariablePaging` 선언. 값 문자열만으로 숫자·주소를 추측하지 않음. 고정 DAP 스키마 |
+| 값의 표·차트 보기 | 선택한 배열·구조화된 값의 내용을 표나 간단한 그래프로 확인 | **공통 확장 또는 별도 연동**. DAP 자식 조회를 제한된 자료로 정규화할 수 있으나 이미지·텐서·임의 객체의 공통 시각화 형식은 DAP에 없음. 타입별 변환기와 크기 제한을 별도 설계하는 mew 제안 |
+| 선택한/실패한 테스트 디버깅 | 테스트 목록이나 실패 위치에서 해당 사례만 디버거로 재실행 | **별도 러너 연동 + 기존 DAP 재사용**. 테스트 발견·결과 수집·파일/이름 필터를 러너별로 제공. Vitest는 디버깅 시 병렬 실행·timeout 조정이 필요하며 worker 연결도 확인. mew에 VS Code 테스트 확장 기능이 자동으로 생기는 것은 아님. [Vitest 디버깅](https://vitest.dev/guide/debugging), [테스트 필터](https://vitest.dev/guide/filtering) |
+| 프런트·백엔드 함께 디버깅 | 실행 프로필 여러 개를 묶어 시작하고 대상 전환·묶음 종료 | **기존 다중 세션 계획 구체화**. 현재 계정·프로젝트 1세션 계약 변경, 시작 순서·준비 판정·일부 시작 실패 정리 필요. DAP의 자식 `startDebugging`만으로 독립 프로필 묶음이 완성되지는 않음. [VS Code compound launch](https://code.visualstudio.com/docs/debugtest/debugging-configuration#compound-launch-configurations) |
+| 에이전트 디버깅 도구 | 에이전트가 중단 이유·스택·선택 변수 기록을 읽고 중단점·스텝을 요청 | **mew 연동 제안**. [현재 에이전트 세션](../development/agent-sessions.md)의 디버거 안내 설정은 실제 도구 제공과 다름. 인증된 API/MCP에 타입이 정해진 작업·조회 예산·실행 제어권을 제공하고 계정·프로젝트·세션 제한을 유지. 임의 DAP/평가를 허용하는 것으로 대체하지 않음 |
+| 공동 디버깅 | 팀원이 같은 중단 상태를 보면서 서로 다른 프레임을 탐색하고 제어권 전달 | **별도 협업 설계**. [Live Share](https://learn.microsoft.com/en-us/visualstudio/liveshare/use/codebug-visual-studio)의 공동 조사 흐름 참고. mew는 기본 계정 격리를 유지하고 세션 소유자의 명시적 공유·열람 범위·제어권·권한 회수 계약 필요. [기존 협업 계약](../development/collaboration.md)에 따라 구현 전에 공유 결정 기록 마련 |
+| 조사 결과 내보내기 | 선택한 스택·중단점·어댑터 버전·소스 리비전을 재현 자료로 저장 | **공통 확장 제안**. 현재 시점 자료와 Git 리비전을 선택해 내보내고 변수 값·출력 포함 여부를 구분. 실행 환경 전체를 복제하거나 재현 성공을 보장하지 않음. 세션 로그를 문서·태스크·대화에 자동 첨부하지 않음 |
+
+중단 기록은 **과거에 읽은 값의 열람**이다. 당시 펼치지 않은 자식을 나중에 살아 있는 객체처럼 조회하거나, 만료된 `frameId`/`variablesReference`로 평가하지 않는다. 기록을 골라도 프로그램 실행 위치는 바뀌지 않는다. 실제 역방향 실행은 앞 절의 record/replay 백엔드가 필요하다.
+
+큰 자료 탐색에는 명시적인 expensive scope 열기도 포함할 수 있다. `lazy`/`hasSideEffects` 정보가 있으면 반영하되 정보가 없다는 이유로 getter·표현식 조회의 부작용이 없다고 보장하지 않는다. 긴 조회에는 DAP `progressStart/Update/End`와 `cancel` 지원을 함께 검토한다. 취소는 `supportsCancelRequest`가 있을 때의 최선 노력 요청이며, 취소 전송만으로 대상 작업이나 프로세스가 종료됐다고 처리하지 않는다.
+
+#### 별도 분석 백엔드·브라우저와 연결할 후보
+
+Chromium 확장은 [CDP d209a9a38897d2935a078a0bf00ca821811d21ed](https://github.com/ChromeDevTools/devtools-protocol/tree/d209a9a38897d2935a078a0bf00ca821811d21ed/json)의 `browser_protocol.json`·`js_protocol.json`을 확인했다. 최신 프로토콜 코드가 실행 중인 Chromium의 모든 명령 지원을 보장하지 않으므로 실제 브라우저 버전·명령 지원도 확인해야 한다.
+
+| 추가 후보 | 가능한 동작 | 필요한 연동과 한계 |
+| --- | --- | --- |
+| DOM·이벤트·요청 중단점 | 특정 요소 변경, 클릭 등 이벤트 리스너, 특정 URL의 XHR/fetch 호출 시 멈추기 | **CDP/어댑터 전용 연동**. `DOMDebugger.setDOMBreakpoint/setEventListenerBreakpoint/setXHRBreakpoint`. [Chrome 중단점 문서](https://developer.chrome.com/docs/devtools/javascript/breakpoints) 참고. [서버 브라우저](../../../docs/guides/browser.md)의 요소 선택을 실제 서버 DOM에 매핑하고 탭·frame·탐색 변경 시 참조 정리. js-debug와 직접 CDP 제어의 중단 상태를 일치시키는 검증 필요 |
+| CPU·할당 프로파일 분석 | 느린 함수·호출 경로·메모리 할당을 표와 flame graph로 확인 | **기존 프로파일러/heap 계획 구체화**. CDP `Profiler.start/stop`, 런타임·어댑터 전용 수집 또는 파일 가져오기. `.cpuprofile`·`.heapprofile` 분석과 전체 heap snapshot 분석을 별도 범위로 둠. 공통 DAP 수집 명령은 없음. [VS Code 프로파일링](https://code.visualstudio.com/docs/nodejs/profiling) |
+| 실행 커버리지 | 실행한/미실행 함수·구간을 소스에 표시 | **별도 연동**. JS는 CDP `startPreciseCoverage/takePreciseCoverage`, 다른 언어는 러너·계측 결과 형식 연동. 소스 맵·리비전 일치 검사. 정밀 커버리지는 최적화 실행을 제한할 수 있으며 수집 전 실행까지 완전하게 복구하지 못함. 고정 CDP `js_protocol.json` |
+| E2E 동작 기록 분석 | 실패 전후의 DOM·소스·콘솔·네트워크를 시간 순서로 확인 | **별도 연동**. [Playwright Trace Viewer](https://playwright.dev/docs/trace-viewer) 또는 로컬 trace artifact 연동. 테스트 러너·기록 API 설정 필요. 현재 브라우저에 Playwright를 쓴다는 사실만으로 E2E 추적 기능을 지원한다고 표시하지 않음. 기록 화면 열람은 프로그램의 역방향 실행과 구분 |
+| 메모리 오류·경쟁 상태 보고 | use-after-free·범위 초과·data race 보고를 읽고 관련 소스로 이동 | **외부 계측 도구 연동**. [AddressSanitizer](https://clang.llvm.org/docs/AddressSanitizer.html)·[ThreadSanitizer](https://clang.llvm.org/docs/ThreadSanitizer.html)용 대상 빌드·런타임과 심볼 정보 필요. mew는 보고 파싱·실행 프로필·디버거 연결을 보조하며, 일반 DAP 연결만으로 해당 오류를 탐지하지 못함 |
+| 여러 서비스의 요청 추적 | 한 요청의 프런트·서버·DB span과 로그를 이어서 분석 | **외부 telemetry 연동**. [OpenTelemetry traces](https://opentelemetry.io/docs/concepts/signals/traces/)의 계측·context propagation·저장소/API가 필요. span의 소스/리비전 정보가 있을 때 코드와 연결. trace가 모든 지역 변수·모든 문장 실행이나 서비스 동시 중단을 제공하지는 않음 |
+| WebAssembly 원본 디버깅 | JS→Wasm 호출과 C/C++/Rust 원본 위치·값을 확인 | **어댑터/도구 체인 조건부**. [VS Code Wasm 디버깅](https://code.visualstudio.com/docs/nodejs/nodejs-debugging#debugging-webassembly)은 DWARF와 별도의 DWARF 디버깅 확장에 의존. mew standalone js-debug만으로 같은 기능이 탑재된다고 가정하지 않음. DWARF 처리 백엔드·가상 소스·Wasm 메모리의 통합 경로를 별도 조사·검증 |
+
+브라우저 분석은 계정 소유의 선택한 탭에만 연결하고, 기존 브라우저의 탐색·입력·복원과 디버거 연결의 소유권을 분리해 정리한다. 네트워크 요청을 보류하는 CDP Fetch interception과 JS 실행 스레드 중단은 다른 동작이므로 서로의 성공으로 대체하지 않는다. 대상 프로그램의 성능 수집은 mew 협업 presence에서 제거한 JS heap 측정 전송을 다시 도입하는 작업과도 구분한다.
+
+#### 추가 후보의 우선순위와 확인 기준
+
+- **앞 절 1단계에 우선 추가**: 어댑터 옵션 안내/UI, 줄 안 중단점, 큰 배열 페이지, 중단 기록·비교. 각각의 효과를 기존 Node 예제에 비동기/배열 사례를 더해 확인할 수 있다. 테스트 디버깅은 지원할 첫 러너를 정한 뒤 별도 흐름으로 진행한다.
+- **공통 기반 뒤 진행**: 발동 중단점은 실제 ID의 유지·변경 검증, 에이전트 도구는 상태 읽기부터 실행 제어로 확장. 프로필 묶음은 다중 세션 기반 완료 뒤, 협업은 공유·제어권 결정 뒤 진행한다.
+- **도구별 범위를 정해 진행**: DOM/이벤트 중단 → CPU 프로파일 파일 분석·수집 → E2E trace/커버리지 순서를 제안한다. Sanitizer·분산 trace·Wasm은 대상 언어·프로젝트 요구가 있을 때 개별 연동으로 진행한다. 지원 기능 수를 늘리기 위해 모든 도구를 기본 설치하지 않는다.
+
+추가 검증은 인라인 열의 UTF-16 위치, 중단점 ID 누락/변경·활성화 순서, 실행 재개 후 과거 기록 참조 폐기, 큰 배열의 실제 paging, 비동기 경계·평가 불가 프레임, 테스트 worker/timeout과 종료 정리를 포함한다. 브라우저는 두 제어 경로의 동시 연결·탐색·탭 종료를, 에이전트/협업은 제어권 충돌·세션 교체·권한 회수를 검사한다. 프로파일/trace는 버전·소스 불일치와 부분/큰 artifact 처리까지 확인한다. 이번 추가 조사에서는 이러한 런타임 검증을 실행하지 않았다.

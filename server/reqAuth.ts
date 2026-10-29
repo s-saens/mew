@@ -57,7 +57,7 @@ export function attachAuthContext(req: express.Request, res: express.Response, n
 /**
  * 사이드바 트리를 거르지 않고 디스크에 있는 그대로 보는 역할 — 숨김 목록도 확장자 필터도 적용하지 않는다.
  * 이 역할별 표시 기본값과 실제 파일 접근 권한은 별개다.
- * 기능과 파일 권한은 docs/development/access-control.md를 따른다.
+ * 기능과 파일 권한은 .mew/docs/development/access-control.md를 따른다.
  */
 export function seesEveryFile(role: Role): boolean {
   return role === 'owner' || role === 'manager'

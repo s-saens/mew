@@ -3,7 +3,7 @@ title: "프로젝트 검색"
 description: "탭 없는 탐색기의 단일 검색창·내용 검색 토글·기존 문서/파일 전환 토글·계층 결과·주변 문맥 툴팁과 치환의 범위·와일드카드·RE2 정규식·제한, description 문서 탐색과 제거된 RAG·Graphify 검색 연동의 경계를 설명한다. Graphify의 측정·철회·과거 소스는 별도 기록으로 연결한다."
 updated: "2026-10-29"
 상위파일:
-  - "../MOC.md"
+  - "../../.mew/docs/MOC.md"
   - "MOC.md"
 ---
 [설치·실행](../guides/getting-started-ko.md)
@@ -16,22 +16,22 @@ updated: "2026-10-29"
 4. 결과는 현재 탐색기 트리에서 일치 항목과 상위 경로만 보여 주고 조상을 펼친다. 문서는 문서 계층·대표 페이지를, 파일은 실제 폴더·파일명을 유지하며 일치 항목을 강조한다. 검색을 지우면 기존 펼침·스크롤로 돌아온다.
 5. 내용 검색 결과에 마우스를 올리거나 키보드 포커스를 두면 검색 줄과 위아래 최대 3줄, 좌우 약 10단어의 문맥을 툴팁으로 본다. 긴 줄은 잘라 강조 부분을 우선 표시한다. 파일을 누르면 첫 매치로 이동하고, 툴팁에서 다른 매치를 골라 열 수도 있다. 바꾸기 입력줄을 펼치면 툴팁의 파일별 치환 또는 전체 치환을 사용할 수 있다. 일괄 치환은 파일 내용과 Git 커밋을 바꾸므로 범위와 검색어를 확인한다.
 
-파일명 결과는 상위 50개이며 내용 검색도 결과가 많으면 일부만 표시될 수 있다. 인덱스 준비·장애 중에는 원문 검색으로 보완한다. 상세 범위·표시는 [파일 검색 스펙](../features/%ED%94%84%EB%A1%9C%EC%A0%9D%ED%8A%B8%C2%B7%ED%8C%8C%EC%9D%BC%C2%B7%EA%B2%80%EC%83%89/%ED%8C%8C%EC%9D%BC%EB%AA%85%C2%B7%EB%82%B4%EC%9A%A9%20%EA%B2%80%EC%83%89%EA%B3%BC%20%EC%B9%98%ED%99%98.md)을 따른다.
+파일명 결과는 상위 50개이며 내용 검색도 결과가 많으면 일부만 표시될 수 있다. 인덱스 준비·장애 중에는 원문 검색으로 보완한다. 상세 범위·표시는 [파일 검색 스펙](../../.mew/docs/features/%ED%94%84%EB%A1%9C%EC%A0%9D%ED%8A%B8%C2%B7%ED%8C%8C%EC%9D%BC%C2%B7%EA%B2%80%EC%83%89/%ED%8C%8C%EC%9D%BC%EB%AA%85%C2%B7%EB%82%B4%EC%9A%A9%20%EA%B2%80%EC%83%89%EA%B3%BC%20%EC%B9%98%ED%99%98.md)을 따른다.
 
-서버의 파일명·본문 정규식과 치환은 RE2 호환 구문을 사용한다. 전방·후방 탐색(`(?=...)`, `(?<=...)` 등)과 패턴 안의 역참조(`\1` 등)는 오류로 거부한다. 치환 문자열의 `$1`·`$<name>` 캡처 참조는 지원한다. 정규식은 유니코드 문자 단위로 대조하며, 검색·치환 패턴은 2,000자와 컴파일된 명령 10,000개를 넘을 수 없다. 이 제한은 서버 검색·치환에 적용한다. 엔진 선택의 근거는 [선형 시간 검색 결정](../decisions/0036-linear-search-regex.md)을 따른다.
+서버의 파일명·본문 정규식과 치환은 RE2 호환 구문을 사용한다. 전방·후방 탐색(`(?=...)`, `(?<=...)` 등)과 패턴 안의 역참조(`\1` 등)는 오류로 거부한다. 치환 문자열의 `$1`·`$<name>` 캡처 참조는 지원한다. 정규식은 유니코드 문자 단위로 대조하며, 검색·치환 패턴은 2,000자와 컴파일된 명령 10,000개를 넘을 수 없다. 이 제한은 서버 검색·치환에 적용한다. 엔진 선택의 근거는 [선형 시간 검색 결정](../../.mew/docs/decisions/0036-linear-search-regex.md)을 따른다.
 
 ## 문서 탐색
 
-에이전트는 README·지침을 확인한 뒤 각 문서의 YAML `description`과 경로로 필요한 범위를 정하고 관련 본문만 읽는다. `node server/document-descriptions.ts`는 본문을 출력하지 않는 목록을 만들며 MOC 등록은 필요하지 않다. [문서 규칙](../README.md)을 따른다. RAG 패널·API·로컬 CLI·모델·색인·자동 안내는 [ADR 0176](../history/decisions/0176-mew-remove-local-rag.md)에 따라 제거했다. 이전 브라우저의 독 순서에 남은 RAG는 무시하며 다른 항목 순서를 유지한다.
+에이전트는 README·지침을 확인한 뒤 각 문서의 YAML `description`과 경로로 필요한 범위를 정하고 관련 본문만 읽는다. `node server/document-descriptions.ts`는 본문을 출력하지 않는 목록을 만들며 MOC 등록은 필요하지 않다. [문서 규칙](../../.mew/docs/README.md)을 따른다. RAG 패널·API·로컬 CLI·모델·색인·자동 안내는 [ADR 0176](../../.mew/docs/history/decisions/0176-mew-remove-local-rag.md)에 따라 제거했다. 이전 브라우저의 독 순서에 남은 RAG는 무시하며 다른 항목 순서를 유지한다.
 
-기존 설치의 `MEW_DATA_DIR/rag/`와 `rag-settings.json`은 더 이상 읽거나 갱신하지 않는다. 실행 중인 설치의 데이터를 자동 삭제하지 않으며, 제거 버전을 적용한 뒤 필요하면 해당 잔여 파일만 정리할 수 있다. 사용자 요청 없이 RAG를 다시 도입하거나 색인·모델 다운로드를 재시도하지 않는다. [과거 운영 기록](../history/rag-operations.md)·[측정 결과](../research/document-discovery-benchmark.md)는 이력으로 보존한다.
+기존 설치의 `MEW_DATA_DIR/rag/`와 `rag-settings.json`은 더 이상 읽거나 갱신하지 않는다. 실행 중인 설치의 데이터를 자동 삭제하지 않으며, 제거 버전을 적용한 뒤 필요하면 해당 잔여 파일만 정리할 수 있다. 사용자 요청 없이 RAG를 다시 도입하거나 색인·모델 다운로드를 재시도하지 않는다. [과거 운영 기록](../../.mew/docs/history/rag-operations.md)·[측정 결과](../../.mew/docs/research/document-discovery-benchmark.md)는 이력으로 보존한다.
 
 ## 로컬 코드 관계 탐색
 
 Graphify의 Mew 소스 검색 연동·에이전트 자동 안내·로컬 설치와 활성 색인은 2026-10-27 제거했다.
 현재 설치·실행 명령은 제공하지 않으며, 일반 코드 탐색과 description 문서 탐색을 사용한다.
-검색 속도 개선을 확인하지 못한 [비교 결과](../research/graphify-search-benchmark.md),
-[철회 결정](../decisions/0080-retire-graphify-search.md), [과거 소스](../history/graphify/README.md)를 보존한다.
+검색 속도 개선을 확인하지 못한 [비교 결과](../../.mew/docs/research/graphify-search-benchmark.md),
+[철회 결정](../../.mew/docs/decisions/0080-retire-graphify-search.md), [과거 소스](../../.mew/docs/history/graphify/README.md)를 보존한다.
 변경 영향 후보 등 다른 활용은 미검증 아이디어이며 현재 기능이 아니다.
 
 ## 제거 검증

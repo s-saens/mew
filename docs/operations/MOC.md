@@ -1,9 +1,9 @@
 ---
 title: "운영과 복구"
 created: "2026-09-11"
-updated: "2026-10-22"
+updated: "2026-10-29"
 description: "공유 전 보안 기준·서버 반영 점검·설치 위치와 접근 경계·에이전트 메모리 복구를 연결한다. 대체된 DOM 브라우저 실험은 과거 검증 근거로 구분한다."
-상위파일: "../MOC.md"
+상위파일: "../README.md"
 ---
 # 운영과 복구
 
@@ -21,4 +21,4 @@ description: "공유 전 보안 기준·서버 반영 점검·설치 위치와 �
 
 ## 과거 검증 근거
 
-[DOM 브라우저 Google OAuth 실험](../history/browser-dom-oauth.md)은 2026-09-11 당시의 실행 방식과 검증 조건입니다. 현재 로그인은 [로그인 가상 화면](../development/login-desktop.md)을 따릅니다.
+[DOM 브라우저 Google OAuth 실험](../../.mew/docs/history/browser-dom-oauth.md)은 2026-09-11 당시의 실행 방식과 검증 조건입니다. 현재 로그인은 [로그인 가상 화면](../../.mew/docs/development/login-desktop.md)을 따릅니다.

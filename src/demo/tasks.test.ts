@@ -23,6 +23,22 @@ test('scheduled tasks open their real shared documents without dirtying the init
   assert.deepEqual(store.gitWorkingTree().files, [])
 })
 
+test('legacy demo task documents move to .mew on save and retain their identity, properties and relative links', async () => {
+  const store = new DemoWorkspaceStore(), legacyPath = 'docs/tasks/Done/Legacy migration.md'
+  store.writeFile(legacyPath, '---\ntitle: Legacy migration\ndescription: Custom context\ndone: true\ntags: [work]\nassignees: [visitor@example.test]\ncustom: retained\n---\n[Guide](../../guides/editor.md)\nBody\n')
+  const before = (await data(store, '/api/task-list')).tasks.find((task: TaskItem) => task.path === legacyPath)
+  assert.ok(before)
+  assert.equal(store.hasFile('.mew/tasks/Done/Legacy migration.md'), false)
+  const board = await data(store, '/api/task-list', write('PATCH', { workspace: store.workspacePath, changes: [] }))
+  const migrated = board.tasks.find((task: TaskItem) => task.id === before.id)
+  assert.deepEqual(migrated, { ...before, path: '.mew/tasks/Done/Legacy migration.md' })
+  const raw = store.readFile(migrated.path).content
+  assert.match(raw, /description: Custom context/)
+  assert.match(raw, /custom: retained/)
+  assert.ok(raw.endsWith('[Guide](../../../docs/guides/editor.md)\nBody\n'))
+  assert.equal(store.hasFile(legacyPath), false)
+})
+
 
 test('task fields, document bodies, tag colors and deletions stay in one shared state', async () => {
   const store = new DemoWorkspaceStore(), before = readDemoTaskSnapshot(store).tasks[0]
@@ -31,7 +47,7 @@ test('task fields, document bodies, tag colors and deletions stay in one shared 
   const after = { ...before, text: '제목을 바꾼 작업', done: true, tags: ['디자인'], assignees: ['visitor@example.test'], startDate: '2026-10-21', date: '2026-10-24' }
   const board = await editTask(store, before, after, { tagColorChanges: [{ tag: '디자인', before: null, after: TASK_TAG_PALETTE[1] }] })
   const saved = board.tasks.find((task: TaskItem) => task.id === before.id)
-  assert.equal(saved.path, 'docs/tasks/Done/제목을 바꾼 작업.md')
+  assert.equal(saved.path, '.mew/tasks/Done/제목을 바꾼 작업.md')
   assert.equal(saved.done, true)
   assert.equal(board.tagColors['디자인'], TASK_TAG_PALETTE[1])
   const content = store.readFile(saved.path).content
@@ -48,9 +64,9 @@ test('task fields, document bodies, tag colors and deletions stay in one shared 
 test('new task names reserve guides and preserve IDs across duplicate title changes', async () => {
   const store = new DemoWorkspaceStore(), first: TaskItem = { id: 'new-task', text: 'README', done: false }
   const board = await editTask(store, null, first), saved = board.tasks.find((task: TaskItem) => task.id === first.id)
-  assert.equal(saved.path, 'docs/tasks/README (2).md')
+  assert.equal(saved.path, '.mew/tasks/README (2).md')
   const again = await editTask(store, saved, { ...saved, text: 'mewlink', done: true })
-  assert.equal(again.tasks.find((task: TaskItem) => task.id === first.id).path, 'docs/tasks/Done/mewlink (2).md')
+  assert.equal(again.tasks.find((task: TaskItem) => task.id === first.id).path, '.mew/tasks/Done/mewlink (2).md')
   assert.equal(again.tasks.filter((task: TaskItem) => task.text === 'mewlink').length, 2)
 })
 
@@ -92,6 +108,9 @@ test('task event streams refresh shared document edits and close when the panel 
   const task = readDemoTaskSnapshot(store).tasks[0]
   store.writeFile(task.path!, store.readFile(task.path!).content + '\n새 메모\n')
   assert.match(decoder.decode((await reader.read()).value), /^data:/)
+  store.writeFile('.mew/tasks/Done/Stream.md', '---\ntitle: Stream\ndone: true\n---\n')
+  assert.match(decoder.decode((await reader.read()).value), /^data:/)
+  assert.ok(readDemoTaskSnapshot(store).tasks.some(task => task.path === '.mew/tasks/Done/Stream.md'))
   controller.abort()
   assert.equal((await reader.read()).done, true)
 })

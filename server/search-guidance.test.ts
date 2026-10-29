@@ -8,7 +8,7 @@ import { descriptionCatalog } from './document-descriptions.ts'
 const root = fileURLToPath(new URL('..', import.meta.url))
 
 test('agent search guidance does not bootstrap the retired Graphify experiment', () => {
-  const agent = fs.readFileSync(path.join(root, 'docs/AGENT.md'), 'utf8')
+  const agent = fs.readFileSync(path.join(root, '.mew/docs/AGENT.md'), 'utf8')
   const search = fs.readFileSync(path.join(root, 'docs/configuration/search.md'), 'utf8')
   assert.doesNotMatch(agent, /graphify/i)
   assert.doesNotMatch(search, /node tools\/graphify|graphifyy==|MEW_GRAPHIFY_TOKENIZER_PYTHON/)
@@ -18,7 +18,7 @@ test('agent search guidance does not bootstrap the retired Graphify experiment',
 })
 
 test('retired evidence is retained without entering default document discovery', () => {
-  const docs = path.join(root, 'docs')
+  const docs = path.join(root, '.mew/docs')
   const current = descriptionCatalog(docs)
   assert.equal(current.entries.some(([file]) => file.startsWith('history/graphify/')), false)
   const cases = JSON.parse(fs.readFileSync(path.join(docs, 'history/graphify/graphify-benchmark-cases.json'), 'utf8'))

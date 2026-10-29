@@ -6,7 +6,7 @@ description: "Linux systemd·cgroup v2의 동적 가용 메모리 90% 에이전�
 상위파일: "MOC.md"
 ---
 
-결정: [ADR 0205](../history/decisions/0205-mew-dynamic-agent-memory.md), [ADR 0164](../history/decisions/0164-mew-agent-memory-protection.md). 실행 계약: [에이전트 세션](../development/agent-sessions.md).
+결정: [ADR 0205](../../.mew/docs/history/decisions/0205-mew-dynamic-agent-memory.md), [ADR 0164](../../.mew/docs/history/decisions/0164-mew-agent-memory-protection.md). 실행 계약: [에이전트 세션](../../.mew/docs/development/agent-sessions.md).
 
 ## OS 한도 설치
 
@@ -42,7 +42,7 @@ sh native/agent-memory/install.sh
 - 화면에 메모리 부족 오류를 표시하고 날짜·런타임·가용량·기준을 감독 로그에 기록한다. 오류 전사도 즉시 저장한다. 대기 AI·CLI·`/clear` 순서는 보존하고 회복 전까지 다음 작업을 실행하지 않는다.
 - 회복 후 **20% 초과**(최소 여유 1GiB)가 되면 2초 주기의 감시에서 자동으로 재개한다. 작은 머신에서 요구 여유는 총량 40%로 제한한다. 아직 취소 처리 중이면 재개를 거부한다.
 - 예약 메시지·기능 자동 작업은 보류된 대기열에 추가할 뿐 재개하지 않는다. 배경 단발 실행은 보류 상태에서 오류를 반환한다. 편집 잠금·인증·사용량 보류는 자동 재개로 해제하지 않는다.
-- 중단된 AI 턴은 같은 세션에서 원래 모델·노력·권한으로 이어가기 메시지를 먼저 실행한다. 이전 대화와 현재 파일 상태를 확인하고 완료된 작업은 반복하지 않도록 지시한다. CLI 명령은 자동 재실행하지 않고 다음 대기 작업부터 처리한다. 사용자 중단 버튼은 자동 이어가기를 제거하고 대기열은 보존한다([ADR 0192](../history/decisions/0192-mew-agent-memory-auto-resume.md)).
+- 중단된 AI 턴은 같은 세션에서 원래 모델·노력·권한으로 이어가기 메시지를 먼저 실행한다. 이전 대화와 현재 파일 상태를 확인하고 완료된 작업은 반복하지 않도록 지시한다. CLI 명령은 자동 재실행하지 않고 다음 대기 작업부터 처리한다. 사용자 중단 버튼은 자동 이어가기를 제거하고 대기열은 보존한다([ADR 0192](../../.mew/docs/history/decisions/0192-mew-agent-memory-auto-resume.md)).
 - 강제 캐시 삭제나 다른 프로세스 종료는 하지 않는다. OS의 회수 또는 사용자의 메모리 정리로 여유가 확보되기를 기다린다.
 
 SIGSTOP은 이미 쓰는 메모리를 반환하지 않으므로 사용하지 않는다. ACP가 취소를 무시하거나 2초 사이에 급증하면 OS 상한이 최종 방어선이다. OS가 어댑터까지 종료하면 감독은 종료 오류를 표시·저장하고 해당 세션을 닫는다. 이 경우 메모리상의 대기열은 복구되지 않으며, 저장한 완료 대화에서 다시 시작해야 한다. 정상 보호 보류 중 대기열이 남은 감독은 유휴 종료하지 않는다.

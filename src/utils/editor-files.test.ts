@@ -10,6 +10,8 @@ test('task document paths share the Documents tab identity inside the configured
     assert.deepEqual(file, { project: 'docs', path: relative })
     assert.equal(editorTabPath(file.project, file.path), editorTabPath('docs', relative))
     assert.deepEqual(workspaceDocumentFile(`${docsDir}-other/task.md`, workspace), { project: '.workspace', path: `${docsDir}-other/task.md` })
+    assert.deepEqual(workspaceDocumentFile('.mew/tasks/Task.md', workspace), { project: '.workspace', path: '.mew/tasks/Task.md' })
+    assert.deepEqual(workspaceDocumentFile('.mew/tasks/Done/Task.md', workspace), { project: '.workspace', path: '.mew/tasks/Done/Task.md' })
   }
   assert.deepEqual(workspaceDocumentFile('docs/tasks/task.md', { path: '/projects/demo', docsPath: '/projects/demo/notes' }), { project: '.workspace', path: 'docs/tasks/task.md' })
   assert.deepEqual(workspaceDocumentFile('tasks/legacy.md', null), { project: '.workspace', path: 'tasks/legacy.md' })

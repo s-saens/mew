@@ -12,7 +12,7 @@ const { bindMewcat } = await import('./mewcat-assistant.ts')
 const { relayMewcatRequest } = await import('./mewcat-mcp-stdio.ts')
 const { AgentSession } = await import('./agentAcp.ts')
 const { planProjectSetup, applyProjectSetup, defaultAgentSettings } = await import('./project-setup.ts')
-const { MEWCAT_TOOLS } = await import('../shared/mewcat-assistant.ts')
+const { MEWCAT_TOOLS, MEWCAT_HELP_TOPICS } = await import('../shared/mewcat-assistant.ts')
 const sdkUrl = import.meta.resolve('@agentclientprotocol/sdk')
 
 test.after(() => fs.rmSync(dir, { recursive: true, force: true }))
@@ -27,10 +27,14 @@ test('Mewcat MCP isolates accounts, checks revoked access, awaits browser result
   const list = JSON.parse(await relayMewcatRequest(binding.socketPath, JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' })))
   assert.equal(list.result.tools.length, MEWCAT_TOOLS.length)
   assert.ok(!list.result.tools.some((tool: { name: string }) => /delete|restart|deploy/.test(tool.name)))
-  const help = await binding.tool('mew_get_help', { topic: 'mewcat' }) as { source: string; text: string }
-  assert.equal(help.source, 'docs/features/화면·계정·운영/뮤펫 도우미·대화·Mew 조작.md')
-  assert.match(help.text, /## 상세 동작/)
-  assert.match(help.text, /### 자동 MCP/)
+  for (const topic of MEWCAT_HELP_TOPICS) {
+    const help = await binding.tool('mew_get_help', { topic }) as { source: string; text: string }
+    assert.equal(help.source, `resources/help/${topic}.md`)
+    assert.match(help.text, /^---\r?\n[\s\S]*?\ndescription: "[^"\n]+"/)
+    assert.match(help.text, /mew_(get|open|create|setup|start)_/)
+    assert.ok(help.text.trim().length > 0)
+  }
+  await assert.rejects(binding.tool('mew_get_help', { topic: 'unknown' }), /MEWCAT_INVALID_ARGUMENT/)
   const created = await binding.tool('mew_create_project', { parent: dir, name: 'notes' }) as { path: string }
   assert.equal(created.path, path.join(dir, 'notes'))
   await assert.rejects(binding.tool('mew_create_project', { parent: dir, name: 'notes' }))

@@ -4,7 +4,7 @@
 
 Open a folder on your computer or server and work with it in your browser. Write Markdown, edit code, run AI agents, and review their changes in Git — with your files in the same place. Connect from your desktop or phone.
 
-[Get started](#get-started) · [Screenshot tour](docs/guides/overview.md) · [User guides](docs/guides/MOC.md) · [Documentation](docs/MOC.md)
+[Get started](#get-started) · [Screenshot tour](docs/guides/overview.md) · [User guides](docs/guides/MOC.md) · [Documentation](docs/README.md)
 
 **Installation guides:** [한국어](docs/guides/getting-started-ko.md) · [English](docs/guides/getting-started-en.md) · [简体中文](docs/guides/getting-started-zh.md) · [日本語](docs/guides/getting-started-ja.md)
 
@@ -68,7 +68,7 @@ Setup installs dependencies, asks for your workspace folder and owner email, the
 
 [Follow the first-use walkthrough](docs/guides/first-steps.md).
 
-> **Prebuilt CLI:** `npx @liiiiv/mew-cli@latest` is implemented, but the first npm package and GitHub runtime release have not been published. Use source installation for now. [Release status](docs/deployment/cli-release.md).
+> **Prebuilt CLI:** `npx @liiiiv/mew-cli@latest` is implemented, but the first npm package and GitHub runtime release have not been published. Use source installation for now. [Release status](.mew/docs/operations/cli-release.md).
 
 ## Open it from another device
 
@@ -82,7 +82,7 @@ Sign in at `https://mew.run/you` to see your registered devices. This dashboard 
 
 Keep the host awake, online, and running mew. Networks that block direct connections can prevent access. Mewlink registration and local mew sign-in are separate; connecting devices do not need registration.
 
-[한국어 연결 안내](docs/guides/getting-started-ko.md#%EC%99%B8%EB%B6%80%EC%97%90%EC%84%9C-%EC%A0%91%EC%86%8D%ED%95%98%EA%B8%B0) · [English instructions, account access, and alternatives](docs/guides/getting-started-en.md#remote-access) · [Connection validation scope](docs/development/remote-access.md#%EA%B2%80%EC%A6%9D%EA%B3%BC-%EB%82%A8%EC%9D%80-%EA%B2%8C%EC%9D%B4%ED%8A%B8)
+[한국어 연결 안내](docs/guides/getting-started-ko.md#%EC%99%B8%EB%B6%80%EC%97%90%EC%84%9C-%EC%A0%91%EC%86%8D%ED%95%98%EA%B8%B0) · [English instructions, account access, and alternatives](docs/guides/getting-started-en.md#remote-access) · [Connection validation scope](.mew/docs/development/remote-access.md#%EA%B2%80%EC%A6%9D%EA%B3%BC-%EB%82%A8%EC%9D%80-%EA%B2%8C%EC%9D%B4%ED%8A%B8)
 
 ## Documentation
 
@@ -92,8 +92,8 @@ Keep the host awake, online, and running mew. Networks that block direct connect
 | Find a feature's everyday controls | [User guides](docs/guides/MOC.md) |
 | Accounts, appearance, search, agents, skills, and MCP | [Configuration](docs/configuration/MOC.md) |
 | Server installation, HTTPS, updates, and recovery | [Deployment](docs/deployment/_deployment.md) · [Operations](docs/operations/MOC.md) |
-| Architecture, implementation contracts, and verification | [Development](docs/development/MOC.md) |
-| Features, work records, research, and history | [Documentation home](docs/MOC.md) |
+| Architecture, implementation contracts, and verification | [Development](.mew/docs/development/MOC.md) |
+| Features, work records, research, and history | [Project knowledge](.mew/docs/AGENT.md) |
 
 Getting-started guides are available in four languages. Most detailed guides are currently in Korean.
 
@@ -108,9 +108,9 @@ Terminal and agent access uses the server user's OS permissions. Read [Security]
 
 ## Development
 
-Read the [development setup and execution rules](docs/development/getting-started.md) before changing code.
+Read the [development setup](docs/development/getting-started.md) before changing code. Agent work also follows the [repository execution rules](.mew/docs/development/getting-started.md).
 
-Mew is an independent project. This repository owns its [agent instructions](AGENTS.md), [documentation rules](docs/README.md), and [decision records](docs/decisions/README.md).
+Mew is an independent project. This repository owns its [agent instructions](AGENTS.md), [documentation rules](.mew/docs/README.md), and [decision records](.mew/docs/decisions/README.md).
 
 ```bash
 npm ci
@@ -123,7 +123,7 @@ npm run check:docs
 
 The server serves `dist/` directly, so a build changes what a running instance serves. When working on this Mew source repository, coding agents must not build, deploy, run the launcher, or restart the server. The user applies those changes. This project rule does not apply to other projects opened in Mew and is not part of Mew-wide agent instructions.
 
-For documentation work, follow the [writing rules](docs/README.md); agents start at [docs/AGENT.md](docs/AGENT.md).
+For documentation work, follow the [writing rules](.mew/docs/README.md); agents start at [.mew/docs/AGENT.md](.mew/docs/AGENT.md).
 
 ## License
 
@@ -136,6 +136,6 @@ You retain the rights to your own documents, code, and other output.
 The project owner retains commercial rights to code they own or are authorized
 to license. Third-party licenses and rights already granted for earlier MIT
 releases remain in effect. Mew is source-available with commercial restrictions.
-See the [license decision](docs/decisions/0053-source-available-license.md) for the
+See the [license decision](.mew/docs/decisions/0053-source-available-license.md) for the
 scope and [contribution requirements](docs/development/contributing.md) before
 submitting changes.

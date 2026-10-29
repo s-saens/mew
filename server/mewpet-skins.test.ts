@@ -13,7 +13,8 @@ import { createMewpetSkinsRouter } from './mewpet-skin-routes.ts'
 import { DATA_DIR } from './dataDir.ts'
 
 const bundled = path.resolve(import.meta.dirname, '../public/mewcat')
-const png = fs.readFileSync(path.join(bundled, 'capybara/idle.png'))
+const spriteSources = path.resolve(import.meta.dirname, '../assets/mewpet/capybara/source')
+const png = fs.readFileSync(path.join(spriteSources, 'idle.png'))
 const sources = Object.fromEntries(MEWPET_ACTIONS.map(action => [action, { bytes: png, frames: 8 }]))
 function fixture() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mewpet-files-'))
@@ -26,6 +27,16 @@ function manualPack(directory: string, id = 'file-pet') {
   fs.writeFileSync(path.join(directory, 'skin.json'), JSON.stringify(manifest))
   return manifest
 }
+
+test('bundled Mewpet assets contain only manifests and their runtime sprites', () => {
+  for (const entry of fs.readdirSync(bundled, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue
+    const directory = path.join(bundled, entry.name)
+    const manifest = JSON.parse(fs.readFileSync(path.join(directory, 'skin.json'), 'utf8'))
+    const files = Object.values(manifest.sprites as Record<string, { file: string }>).map(sprite => sprite.file)
+    assert.deepEqual(fs.readdirSync(directory).sort(), ['skin.json', ...files].sort())
+  }
+})
 
 test('global registry reads bundled Mewpet manifests and hot-added files without a build', () => {
   const { store, cleanup } = fixture()
@@ -52,7 +63,7 @@ test('global registry reads bundled Mewpet manifests and hot-added files without
     assert.equal(renamed.name, 'Renamed pet')
     assert.equal(renamed.sprites.walk.frames, 1)
     assert.notEqual(renamed.revision, first.revision)
-    fs.copyFileSync(path.join(bundled, 'capybara/love.png'), path.join(directory, 'idle.png'))
+    fs.copyFileSync(path.join(spriteSources, 'love.png'), path.join(directory, 'idle.png'))
     const replaced = store.list().skins.find(skin => skin.id === 'file-pet')!
     assert.notEqual(replaced.revision, renamed.revision)
     fs.writeFileSync(path.join(directory, 'skin.json'), '{invalid')

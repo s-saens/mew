@@ -5,7 +5,7 @@ updated: 2026-10-23
 description: "Mew 운영자가 공개·반영 전후 확인할 네이티브 설치·OS 사용자·Mewlink/HTTPS 진입점·백업·권한과 작업 공간의 검색 제외, macOS 장애 구분 및 재시도 제한을 정한다."
 ---
 
-현재 지원 경로와 경계는 [ADR 0111](../history/decisions/0111-mew-native-deployment-and-supervisor.md), 실제
+현재 지원 경로와 경계는 [ADR 0111](../../.mew/docs/history/decisions/0111-mew-native-deployment-and-supervisor.md), 실제
 설치·systemd 명령은 코드와 같은 커밋에서 바뀌는 [네이티브 서버 배포](../deployment/native.md)가 기준이다. 이 문서는 Mew 운영자가 반복해서 확인할 항목만 남긴다. 소스 폴더를 옮길 때는 [저장소 위치 변경](project-location.md)을 따른다.
 
 ## 공개 전
@@ -15,7 +15,7 @@ description: "Mew 운영자가 공개·반영 전후 확인할 네이티브 설�
 - mew는 전용 비관리자 OS 사용자로 실행한다. `MEW_WORKSPACE`에는 그 사용자가 접근해도 되는 프로젝트만
   있고, 홈 전체·운영 시크릿·다른 서비스의 데이터는 없다.
 - `MEW_BIND=127.0.0.1`인지 확인하고, 외부 방화벽에는 mew 포트를 열지 않는다. Mewlink 또는 HTTPS 프록시·터널을
-  공개 진입점으로 둔다. Mewlink는 [기기 등록과 직접 연결](../development/remote-access.md)의 검증·적용 범위를 따른다.
+  공개 진입점으로 둔다. Mewlink는 [기기 등록과 직접 연결](../../.mew/docs/development/remote-access.md)의 검증·적용 범위를 따른다.
 - 프록시가 원래 Host와 `X-Forwarded-Proto: https`를 전달하고 모든 WebSocket upgrade를 중계하는지 확인한다.
   mew는 별도 호스트명의 `/`에서만 제공한다.
 - 첫 owner 계정의 임시 비밀번호를 안전한 채널로 전달하고 첫 로그인에서 변경했는지 확인한다. manager·owner

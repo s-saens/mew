@@ -13,8 +13,19 @@ test('snapshot selection excludes private, generated, historical and oversized i
     assert.equal(includeDemoSource(filename, 10), false, filename)
   }
   assert.equal(includeDemoSource('docs/features/Editor.md', 17 * 1024), false)
+  assert.equal(includeDemoSource('.mew/docs/features/Editor.md', 17 * 1024), false)
+  assert.equal(includeDemoSource('.mew/docs/features/Editor.md', 1024), true)
+  assert.equal(includeDemoSource('.mew/docs/README.md', 1024), true)
+  assert.equal(includeDemoSource('.mew/docs/AGENT.md', 1024), true)
+  assert.equal(includeDemoSource('.mew/docs/development/getting-started.md', 1024), true)
+  assert.equal(includeDemoSource('.mew/docs/.private/secret.md', 1024), false)
+  assert.equal(includeDemoSource('.mew/docs/history/old.md', 1024), false)
+  assert.equal(includeDemoSource('.mew/notes/private.md', 1024), false)
   assert.equal(includeDemoSource('src/main.tsx', 49 * 1024), false)
   assert.equal(includeDemoSource('docs/tasks/Task.md', 9 * 1024), false)
+  assert.equal(includeDemoSource('.mew/tasks/Task.md', 9 * 1024), false)
+  assert.equal(includeDemoSource('.mew/tasks/Task.md', 1024), true)
+  assert.equal(includeDemoSource('.mew/tasks/Done/Task.md', 1024), false)
   assert.equal(includeDemoSource('shared/task-list.ts', 1024), true)
 })
 
@@ -25,13 +36,15 @@ test('snapshot reads committed blobs, omits accounts and never changes working f
   git(['init', '-q'])
   for (const [filename, content] of Object.entries({
     'README.md': '# Mew snapshot test\n', 'LICENSE': 'MIT\n', 'src/main.tsx': 'export const version = 1\n',
-    'docs/tasks/Task.md': '---\ntitle: Task\ndescription: Test task\ndone: false\nassignees: [owner@example.test]\n---\n\nKeep the original task body.\n',
+    '.mew/tasks/Task.md': '---\ntitle: Task\ndescription: Test task\ndone: false\nassignees: [owner@example.test]\n---\n\nKeep the original task body.\n',
+    '.mew/docs/features/Editor.md': '---\ndescription: Project editor contract\n---\nKeep the current contract.\n',
+    '.mew/docs/README.md': '---\ndescription: Project documentation rules\n---\nKeep the project entrypoint.\n',
     '.env': 'EXCLUDED=fixture-value\n',
   })) {
     await fs.mkdir(path.dirname(path.join(root, filename)), { recursive: true })
     await fs.writeFile(path.join(root, filename), content)
   }
-  git(['add', 'README.md', 'LICENSE', 'src/main.tsx', 'docs/tasks/Task.md', '.env'])
+  git(['add', 'README.md', 'LICENSE', 'src/main.tsx', '.mew/tasks/Task.md', '.mew/docs/features/Editor.md', '.mew/docs/README.md', '.env'])
   git(['-c', 'core.hooksPath=/dev/null', '-c', 'commit.gpgsign=false', '-c', 'user.name=Test', '-c', 'user.email=test@example.test', 'commit', '-qm', 'test'])
   await fs.writeFile(path.join(root, 'src/main.tsx'), 'UNCOMMITTED_CONTENT\n')
   const before = git(['status', '--porcelain']).toString()
@@ -40,7 +53,9 @@ test('snapshot reads committed blobs, omits accounts and never changes working f
   assert.ok(!result.json.includes('UNCOMMITTED_CONTENT'))
   assert.ok(!result.json.includes('owner@example.test'))
   assert.ok(!result.json.includes('EXCLUDED'))
-  assert.match(result.snapshot.files['docs/tasks/Task.md'], /Keep the original task body/)
+  assert.match(result.snapshot.files['.mew/tasks/Task.md'], /Keep the original task body/)
+  assert.match(result.snapshot.files['.mew/docs/features/Editor.md'], /Keep the current contract/)
+  assert.match(result.snapshot.files['.mew/docs/README.md'], /Keep the project entrypoint/)
   assert.equal(git(['status', '--porcelain']).toString(), before)
   assert.equal(await fs.readFile(path.join(root, 'src/main.tsx'), 'utf8'), 'UNCOMMITTED_CONTENT\n')
 })
@@ -71,6 +86,7 @@ async function repositoryFixture(t) {
     'docs/history/old.md': '# Historical public source\n',
     'docs/research/raw.md': '# Research public source\n',
     'docs/tasks/Task.md': '---\ntitle: Task\ndescription: Test task\ndone: false\nassignees: [owner@example.test]\n---\n\nKeep the task body.\n',
+    '.mew/tasks/Done/Completed.md': '---\ntitle: Completed\ndescription: Completed task\ndone: true\nassignees: [completed@example.test]\n---\n\nKeep the completed task body.\n',
     'public/invalid-utf8.dat': Buffer.from([255, 254, 253]),
     'public/example.svg': '<svg xmlns="http://www.w3.org/2000/svg"><circle r="2"/></svg>',
     'public/example.html': '<html><script>example()</script></html>',
@@ -118,7 +134,9 @@ test('full repository index includes public hidden config, binaries, history and
   assert.equal(JSON.parse(source.load(result.index.files['src/bom.ts'].oid)).content, fixture.contents['src/bom.ts'])
   assert.equal(result.index.files['src/large.ts'].size, 100 * 1024)
   assert.match(source.load(result.index.files['docs/tasks/Task.md'].oid), /Keep the task body/)
+  assert.match(source.load(result.index.files['.mew/tasks/Done/Completed.md'].oid), /Keep the completed task body/)
   assert.ok(![...objects.values()].join('').includes('owner@example.test'))
+  assert.ok(![...objects.values()].join('').includes('completed@example.test'))
   assert.ok(![...objects.values()].join('').includes('EXCLUDED_'))
   assert.deepEqual(source.loadBinary(result.index.files['.mew/assets/example.png'].oid), { bytes: fixture.binary, contentType: 'image/png' })
   const svg = result.index.files['public/example.svg']

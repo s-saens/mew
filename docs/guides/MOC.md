@@ -1,13 +1,13 @@
 ---
 title: "사용법"
 created: "2026-09-11"
-updated: "2026-10-15"
+updated: "2026-10-29"
 description: "설치와 첫 사용 이후 문서·파일·Git·에이전트·협업·원격 작업의 사용법을 연결하고, 추가 준비가 필요한 기능과 화면·언어·스킬 설정을 안내한다."
-상위파일: "../MOC.md"
+상위파일: "../README.md"
 ---
 # 사용법
 
-필요한 작업을 골라 해당 안내로 이동하세요. 구현 세부사항은 [기능 명세](../features/MOC.md)와 [개발 계약](../development/MOC.md)에서 확인합니다.
+필요한 작업을 골라 해당 안내로 이동하세요. 구현 세부사항은 [기능 명세](../../.mew/docs/features/_features.md)와 [개발 계약](../../.mew/docs/development/MOC.md)에서 확인합니다.
 
 ## 처음 시작하기
 
@@ -15,7 +15,7 @@ description: "설치와 첫 사용 이후 문서·파일·Git·에이전트·협
 - 설치: [한국어](getting-started-ko.md) · [English](getting-started-en.md) · [简体中文](getting-started-zh.md) · [日本語](getting-started-ja.md)
 - [첫 프로젝트와 문서 열기](first-steps.md)
 
-현재 공개 설치는 Linux·macOS와 Windows의 WSL 2를 사용합니다. 사전 빌드 CLI와 Windows 네이티브 실행본의 발행·검증 상태는 [CLI 릴리스](../deployment/cli-release.md)에서 확인하세요.
+현재 공개 설치는 Linux·macOS와 Windows의 WSL 2를 사용합니다. 사전 빌드 CLI와 Windows 네이티브 실행본의 발행·검증 상태는 [CLI 릴리스](../../.mew/docs/operations/cli-release.md)에서 확인하세요.
 
 ## 문서와 프로젝트
 

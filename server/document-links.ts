@@ -2,6 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseDocument } from 'yaml'
+import { repositoryDocumentRoots } from './document-roots.ts'
 
 function inside(root: string, file: string): boolean {
   const relative = path.relative(root, file)
@@ -42,16 +43,16 @@ function localLinks(source: string): string[] {
 
 export function documentLinkErrors(root: string, includeHistory = false): string[] {
   root = fs.realpathSync(root)
-  const files = ['README.md', 'AGENTS.md', 'CLAUDE.md', 'SECURITY.md'].map(name => path.join(root, name)).filter(file => fs.existsSync(file))
+  const files = new Set(['README.md', 'AGENTS.md', 'CLAUDE.md', 'SECURITY.md', 'CONTRIBUTING.md'].map(name => path.join(root, name)).filter(file => fs.existsSync(file)))
   function walk(dir: string): void {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
       if (entry.name.startsWith('.') || entry.name === 'archives' || !includeHistory && entry.name === 'history') continue
       const file = path.join(dir, entry.name)
       if (entry.isDirectory()) walk(file)
-      else if (entry.isFile() && /\.md$/i.test(entry.name)) files.push(file)
+      else if (entry.isFile() && /\.md$/i.test(entry.name)) files.add(file)
     }
   }
-  if (fs.existsSync(path.join(root, 'docs'))) walk(path.join(root, 'docs'))
+  for (const directory of repositoryDocumentRoots(root)) walk(directory)
   const errors: string[] = []
   for (const file of files) {
     for (const href of localLinks(fs.readFileSync(file, 'utf8'))) {

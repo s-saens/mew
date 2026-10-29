@@ -26,7 +26,7 @@ export function todayDate(): string {
   return new Date().toISOString().slice(0, 10)
 }
 
-/** 새 문서용 YAML frontmatter 블록 — tags는 정책상 넣지 않는다 (docs/README.md 참고).
+/** 새 문서용 YAML frontmatter 블록 — tags는 정책상 넣지 않는다 (.mew/docs/README.md 참고).
     description은 제목으로 시작하고 작성자가 본문 범위에 맞춰 구체화한다. */
 export function buildFrontmatter(title: string): string {
   const today = todayDate()

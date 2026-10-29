@@ -54,7 +54,7 @@ test('open-document saves preserve panel tags and assignees, accept explicit rem
     tasks = readTaskList(workspace)
     tasks = changeTaskList(workspace, taskChanges(tasks, tasks.map(task => ({ ...task, done: true }))))
     const completedPath = tasks[0].path!, completedFile = path.join(workspace, completedPath)
-    assert.equal(completedPath, 'docs/tasks/Done/Task.md')
+    assert.equal(completedPath, '.mew/tasks/Done/Task.md')
     const completedBase = fs.readFileSync(completedFile, 'utf8')
     tasks = changeTaskList(workspace, taskChanges(tasks, tasks.map(task => ({ ...task, tags: ['done-tag'] }))))
     assert.equal((await save(completedBase + '\nCompleted body edit\n', completedBase, completedPath)).status, 200)
@@ -69,5 +69,17 @@ test('open-document saves preserve panel tags and assignees, accept explicit rem
     assert.equal(fs.existsSync(completedFile), false, 'a late autosave cannot resurrect a deleted task')
     assert.deepEqual(readTaskList(workspace), [])
     assert.equal((await save(deletedBase, undefined, completedPath)).status, 200, 'explicit file creation without a stale save baseline remains allowed')
+    for (const directory of ['docs/tasks', 'docs/tasks/Done', 'tasks']) {
+      const legacyPath = `${directory}/Legacy.md`, legacyFile = path.join(workspace, legacyPath)
+      fs.mkdirSync(path.dirname(legacyFile), { recursive: true })
+      const baseline = `---\ntitle: Legacy\ndone: ${directory.endsWith('/Done')}\n---\nLegacy body\n`
+      fs.writeFileSync(legacyFile, baseline.replace('---\nLegacy body', 'tags: [remote]\n---\nLegacy body'))
+      const result = await save(baseline + 'Edited legacy body\n', baseline, legacyPath)
+      assert.equal(result.status, 200, `${directory} keeps concurrent property merging before migration`)
+      assert.match(fs.readFileSync(legacyFile, 'utf8'), /tags: \[\s*remote\s*\]/)
+      fs.unlinkSync(legacyFile)
+      assert.equal((await save(baseline + 'Stale legacy save\n', baseline, legacyPath)).status, 409)
+      assert.equal(fs.existsSync(legacyFile), false)
+    }
   } finally { await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve())) }
 })

@@ -11,6 +11,7 @@ import { parse as parseYaml } from 'yaml'
 import { compileRuntimeSource, stageRuntimeSources, validateCompiledImports, validateRuntimeLinks } from './release-runtime.ts'
 import { verifiedDownload } from './release-tmux.ts'
 import { readDocumentationDependencies } from './documentation-skills.ts'
+import { MEWCAT_HELP_TOPICS } from '../shared/mewcat-assistant.ts'
 
 const exec = promisify(execFile)
 const repository = path.resolve(import.meta.dirname, '..')
@@ -36,6 +37,7 @@ test('runtime fixture resolves compiled imports, native worker URLs, package exp
     '.env': 'SECRET=private', '.data/users.json': '{"private":true}',
     'server/private.test.ts': 'throw new Error("not shipped")',
     'server/fixtures/private.json': '{"private":true}',
+    'server/demo-repository-fixture.mjs': 'import "../tools/private-fixture.mjs"',
     'server/worker.ts': 'export const worker: string = "compiled"',
     'server/login-desktop-x11.py': 'import ctypes\n',
     'server/worker.mjs': 'export { worker } from "./worker.ts"',
@@ -56,11 +58,18 @@ console.log(JSON.stringify({value, number, data, worker: worker.pathname.endsWit
     'native/remote-desktop/runtime/native.node': 'private build',
     'native/remote-desktop/capture-macos.dylib': 'local native build',
     'native/remote-desktop/debug.log': 'private diagnostics',
+    'native/remote-desktop/rust/Cargo.toml': '[package]\nname = "fixture"\n',
+    'native/remote-desktop/rust/Cargo.lock': 'version = 4\n',
+    'native/remote-desktop/rust/src/lib.rs': 'pub fn fixture() {}\n',
+    'native/remote-desktop/rust/vendor/local/lib.rs': 'local vendor cache must not ship',
     'public/mewcat/default/skin.json': '{"name":"fixture"}',
-    'docs/configuration/skills/english-technical-docs/SKILL.md': '---\nname: english-technical-docs\ndescription: Fixture\n---\nRead ../technical-docs-common/workflow.md',
-    'docs/configuration/skills/english-technical-docs/agents/openai.yaml': 'interface:\n  display_name: "English docs"\n',
-    'docs/configuration/skills/technical-docs-common/workflow.md': '# Shared fixture workflow\n',
+    'resources/skills/english-technical-docs/SKILL.md': '---\nname: english-technical-docs\ndescription: Fixture\n---\nRead ../technical-docs-common/workflow.md',
+    'resources/skills/english-technical-docs/agents/openai.yaml': 'interface:\n  display_name: "English docs"\n',
+    'resources/skills/technical-docs-common/workflow.md': '# Shared fixture workflow\n',
+    'resources/help/start.md': '---\ndescription: Fixture product help\n---\nUse mew_get_context.',
     'docs/private.md': 'Unrelated documentation must not ship.',
+    '.mew/docs/development/contract.md': 'Project context must not ship.',
+    'assets/mewpet/capybara/source/source.json': '{"generator":"fixture"}',
   }
   for (const [file, value] of Object.entries(files)) await write(root, file, value)
   await stageRuntimeSources(root, output, { version: '0.1.0', platform: 'linux', arch: 'x64', nodeMajor: 24, entrypoint: 'server/cli-host.js', tmuxVersion: '3.7c' })
@@ -73,12 +82,19 @@ console.log(JSON.stringify({value, number, data, worker: worker.pathname.endsWit
   assert.match(await fs.readFile(path.join(output, 'server', 'worker.mjs'), 'utf8'), /worker\.js/)
   assert.equal(await fs.readFile(path.join(output, 'server', 'login-desktop-x11.py'), 'utf8'), files['server/login-desktop-x11.py'])
   assert.equal(JSON.parse(await fs.readFile(path.join(output, 'packages', 'fixture', 'package.json'), 'utf8')).exports['.'].import, './src/index.js')
-  for (const file of ['.env', '.data/users.json', 'server/private.test.js', 'server/fixtures/private.json', 'native/remote-desktop/.mew-ready', 'native/remote-desktop/runtime/native.node', 'native/remote-desktop/capture-macos.dylib', 'native/remote-desktop/debug.log']) {
+  for (const file of ['.env', '.data/users.json', 'server/private.test.js', 'server/fixtures/private.json', 'server/demo-repository-fixture.mjs', 'native/remote-desktop/.mew-ready', 'native/remote-desktop/runtime/native.node', 'native/remote-desktop/capture-macos.dylib', 'native/remote-desktop/debug.log', 'native/remote-desktop/rust/vendor/local/lib.rs']) {
     await assert.rejects(fs.stat(path.join(output, file)), { code: 'ENOENT' })
   }
   assert.equal((await fs.readFile(path.join(output, 'mew-runtime.json'), 'utf8')).includes('server/cli-host.js'), true)
-  for (const file of Object.keys(files).filter(file => file.startsWith('docs/configuration/skills/'))) assert.equal(await fs.readFile(path.join(output, file), 'utf8'), files[file])
-  await assert.rejects(fs.stat(path.join(output, 'docs/private.md')), { code: 'ENOENT' })
+  for (const file of Object.keys(files).filter(file => file.startsWith('resources/skills/'))) assert.equal(await fs.readFile(path.join(output, file), 'utf8'), files[file])
+  for (const file of ['Cargo.toml', 'Cargo.lock', 'src/lib.rs']) {
+    const source = `native/remote-desktop/rust/${file}`
+    assert.equal(await fs.readFile(path.join(output, source), 'utf8'), files[source])
+  }
+  assert.equal(await fs.readFile(path.join(output, 'resources/help/start.md'), 'utf8'), files['resources/help/start.md'])
+  for (const file of ['docs/private.md', '.mew/docs/development/contract.md', 'assets/mewpet/capybara/source/source.json']) {
+    await assert.rejects(fs.stat(path.join(output, file)), { code: 'ENOENT' })
+  }
 }))
 
 test('compiled import validation rejects missing runtime modules', async () => fixture(async (root, output) => {
@@ -103,7 +119,7 @@ test('tmux binary download must match the pinned digest', () => {
 })
 
 test('repository source graph stages without missing imports or optional helper resources', async () => fixture(async (root, output) => {
-  for (const directory of ['server', 'shared', 'packages', 'native/remote-desktop', 'public/mewcat', 'docs/configuration/skills']) {
+  for (const directory of ['server', 'shared', 'packages', 'native/remote-desktop', 'public/mewcat', 'resources/help', 'resources/skills']) {
     const source = path.join(repository, directory)
     await fs.cp(source, path.join(root, directory), { recursive: true, filter: file => !/(?:^|\/)(?:node_modules|\.data|\.git)(?:\/|$)/.test(path.relative(source, file)) })
   }
@@ -115,15 +131,24 @@ test('repository source graph stages without missing imports or optional helper 
   await validateCompiledImports(output)
   await validateRuntimeLinks(output)
   const helper = await import(pathToFileURL(path.join(output, 'native/remote-desktop/helper-version.mjs')).href)
+  for (const topic of MEWCAT_HELP_TOPICS) {
+    const file = `resources/help/${topic}.md`
+    const content = await fs.readFile(path.join(output, file), 'utf8')
+    assert.equal(content, await fs.readFile(path.join(repository, file), 'utf8'))
+    const metadata = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(content)
+    assert.ok(metadata, `packaged help metadata: ${topic}`)
+    assert.equal(typeof parseYaml(metadata[1]).description, 'string')
+    assert.ok(parseYaml(metadata[1]).description.trim(), `packaged help description: ${topic}`)
+  }
   for (const name of ['korean', 'english', 'japanese', 'chinese']) {
-    const file = path.join(output, 'docs/configuration/skills', `${name}-technical-docs`, 'SKILL.md')
+    const file = path.join(output, 'resources/skills', `${name}-technical-docs`, 'SKILL.md')
     assert.match(await fs.readFile(file, 'utf8'), /technical-docs-common\/workflow\.md/)
   }
-  for (const file of ['workflow.md', 'structure.md', 'translation.md']) await fs.access(path.join(output, 'docs/configuration/skills/technical-docs-common', file))
-  const dependencies = readDocumentationDependencies(path.join(output, 'docs/configuration/skills'))
+  for (const file of ['workflow.md', 'structure.md', 'translation.md']) await fs.access(path.join(output, 'resources/skills/technical-docs-common', file))
+  const dependencies = readDocumentationDependencies(path.join(output, 'resources/skills'))
   for (const skill of dependencies.packages) {
     for (const file of skill.files.filter(file => !file.path.split('/').some(part => part.startsWith('.')))) {
-      const bytes = await fs.readFile(path.join(output, 'docs/configuration/skills/.vendor', skill.name, file.path))
+      const bytes = await fs.readFile(path.join(output, 'resources/skills/.vendor', skill.name, file.path))
       assert.equal(createHash('sha256').update(bytes).digest('hex'), file.sha256, `packaged ${skill.name}/${file.path}`)
     }
   }

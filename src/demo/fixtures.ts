@@ -6,6 +6,9 @@ export const DEMO_FILE_PATH = 'docs/welcome.md'
 export const DEMO_CODE_PATH = 'src/main.tsx'
 export const DEMO_SOURCE_REVISION = snapshot.revision
 export const DEMO_USER = { accountId: 'demo-visitor', email: 'visitor@example.test', displayName: 'Demo visitor', avatarDataUrl: null }
+const documentationRules = '.mew/docs/README.md' in snapshot.files ? '../.mew/docs/README.md' : 'README.md'
+const exampleTask = Object.keys(snapshot.files).find(file => /^\.mew\/tasks\/[^/]+\.md$/.test(file) && /\ndone:/.test(snapshot.files[file as keyof typeof snapshot.files]))
+  ?? 'docs/tasks/디버거 만들기.md'
 
 export const DEMO_FILES: Readonly<Record<string, string>> = {
   ...snapshot.files,
@@ -32,11 +35,11 @@ tags: [mew, demo]
 | 문서와 코드 편집 | [편집기 사용법](guides/editor.md) |
 | 앱의 실제 진입 코드 | [main.tsx](../src/main.tsx) |
 | 태스크 처리 규칙 | [task-list.ts](../shared/task-list.ts) |
-| 문서 탐색·작성 방식 | [문서 규칙](README.md) |
+| 문서 탐색·작성 방식 | [문서 규칙](${documentationRules}) |
 
 ## 태스크도 확인할 수 있어요
 
-**태스크** 패널도 [실제 작업 문서](${encodeURI('tasks/디버거 만들기.md')})를 읽습니다. 완료·태그·날짜를 바꾸거나 새 작업을 추가해 보세요. 변경된 문서를 열거나 Git에서 차이를 확인할 수 있습니다.
+**태스크** 패널도 [실제 작업 문서](${encodeURI(`../${exampleTask}`)})를 읽습니다. 완료·태그·날짜를 바꾸거나 새 작업을 추가해 보세요. 변경된 문서를 열거나 Git에서 차이를 확인할 수 있습니다.
 
 ## 자유롭게 바꿔보세요
 

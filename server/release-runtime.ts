@@ -14,9 +14,11 @@ import { execHostFile } from './platform/process.ts'
 const exec = promisify(execFile)
 const CODE = /\.(?:ts|tsx|js|mjs|cjs)$/
 const RESOURCE = /\.(?:ts|tsx|js|mjs|cjs|json|css|svg|txt|png|webp|woff2?|ttf|wasm|html|cpp|h|m|py|ps1|inf)$/
+const NATIVE_RESOURCE = new RegExp(`${RESOURCE.source}|\\.(?:rs|toml|lock)$`)
 const SKILL_RESOURCE = /\.(?:md|ya?ml|py|txt|json|png|svg|tsv|csv|toml)$/
-const EXCLUDED = /(?:^|\/)(?:\.[^/]+|node_modules|dist|target|build|runtime|fixtures)(?:\/|$)|(?:\.test|\.browser\.test)\.[^/]+$|\.d\.(?:ts|mts)$/
-const SOURCE_DIRS = ['server', 'shared', 'packages', 'docs/configuration/skills', 'docs/configuration/skills/.vendor']
+const EXCLUDED = /(?:^|\/)(?:\.[^/]+|node_modules|dist|target|build|runtime|fixtures)(?:\/|$)|(?:\.test|\.browser\.test|-fixture)\.[^/]+$|\.d\.(?:ts|mts)$/
+const NATIVE_EXCLUDED = new RegExp(`${EXCLUDED.source}|(?:^|/)vendor(?:/|$)`)
+const SOURCE_DIRS = ['server', 'shared', 'packages', 'resources/help', 'resources/skills', 'resources/skills/.vendor']
 
 export interface RuntimeManifest {
   version: string
@@ -100,14 +102,14 @@ function compiledExports(value: unknown): unknown {
   return value
 }
 
-async function copySourceTree(source: string, target: string, relative = '', resources = RESOURCE) {
+async function copySourceTree(source: string, target: string, relative = '', resources = RESOURCE, excluded = EXCLUDED) {
   await fs.mkdir(target, { recursive: true })
   for (const entry of await fs.readdir(source, { withFileTypes: true })) {
     const name = relative ? `${relative}/${entry.name}` : entry.name
-    if (EXCLUDED.test(name) || /^release-/.test(entry.name) || /(?:benchmark|browser-test)/.test(entry.name)) continue
+    if (excluded.test(name) || /^release-/.test(entry.name) || /(?:benchmark|browser-test)/.test(entry.name)) continue
     const input = path.join(source, entry.name), output = path.join(target, outputPath(entry.name))
     if (entry.isSymbolicLink()) throw new Error(`Unexpected source symlink: ${input}`)
-    if (entry.isDirectory()) await copySourceTree(input, output, name, resources)
+    if (entry.isDirectory()) await copySourceTree(input, output, name, resources, excluded)
     else if (entry.isFile()) {
       if (!resources.test(entry.name) && !/^(?:LICENSE|COPYING|COPYRIGHT)(?:\..*)?$/.test(entry.name)) continue
       if (CODE.test(entry.name)) await fs.writeFile(output, compileRuntimeSource(await fs.readFile(input, 'utf8'), input), { mode: (await fs.stat(input)).mode & 0o777 })
@@ -126,7 +128,7 @@ export async function stageRuntimeSources(root: string, directory: string, manif
   await fs.mkdir(directory, { recursive: true })
   for (const folder of SOURCE_DIRS) {
     const source = path.join(root, folder)
-    if (existsSync(source)) await copySourceTree(source, path.join(directory, folder), '', folder.startsWith('docs/configuration/skills') ? SKILL_RESOURCE : RESOURCE)
+    if (existsSync(source)) await copySourceTree(source, path.join(directory, folder), '', folder.startsWith('resources/') ? SKILL_RESOURCE : RESOURCE)
   }
   // A server-side layout-icon CLI shares these two pure application utilities.
   for (const file of ['src/utils/layout-presets.ts', 'src/utils/dock-layout.ts']) {
@@ -137,7 +139,7 @@ export async function stageRuntimeSources(root: string, directory: string, manif
   }
   await fs.cp(path.join(root, 'dist'), path.join(directory, 'dist'), { recursive: true, filter: file => !EXCLUDED.test(path.relative(path.join(root, 'dist'), file)) })
   if (existsSync(path.join(root, 'public', 'mewcat'))) await copySourceTree(path.join(root, 'public', 'mewcat'), path.join(directory, 'public', 'mewcat'))
-  if (existsSync(path.join(root, 'native', 'remote-desktop'))) await copySourceTree(path.join(root, 'native', 'remote-desktop'), path.join(directory, 'native', 'remote-desktop'))
+  if (existsSync(path.join(root, 'native', 'remote-desktop'))) await copySourceTree(path.join(root, 'native', 'remote-desktop'), path.join(directory, 'native', 'remote-desktop'), '', NATIVE_RESOURCE, NATIVE_EXCLUDED)
   for (const file of ['package.json', 'package-lock.json', 'LICENSE']) await fs.copyFile(path.join(root, file), path.join(directory, file))
   await fs.writeFile(path.join(directory, 'mew-runtime.json'), JSON.stringify(manifest, null, 2) + '\n')
 }

@@ -13,7 +13,7 @@ description: "독립 Mew 설치의 프로젝트 위치·포트·OS 실행 권한
 
 이 개발 환경의 소스는 `~/dev/mew`이며 Liiiiv 워크스페이스와 별개다. 문서·지침·결정도 Mew 저장소가 소유한다. 다른 설치에서는 소스 위치를 자유롭게 정할 수 있다.
 
-서버의 기본 작업 폴더는 `MEW_WORKSPACE`로 지정하고, 계정별 활성 프로젝트는 요청 컨텍스트로 분리된다. 소스 폴더를 옮길 때 열린 프로젝트와 저장된 경로도 [위치 변경 절차](project-location.md)에 따라 갱신한다. 자세한 실행·저장 계약은 [아키텍처](../development/architecture.md)가 소유한다.
+서버의 기본 작업 폴더는 `MEW_WORKSPACE`로 지정하고, 계정별 활성 프로젝트는 요청 컨텍스트로 분리된다. 소스 폴더를 옮길 때 열린 프로젝트와 저장된 경로도 [위치 변경 절차](project-location.md)에 따라 갱신한다. 자세한 실행·저장 계약은 [아키텍처](../../.mew/docs/development/architecture.md)가 소유한다.
 
 ## 포트
 
@@ -22,14 +22,14 @@ description: "독립 Mew 설치의 프로젝트 위치·포트·OS 실행 권한
 | 4999 | Vite 개발 UI·HMR | 개인 개발망 또는 loopback으로 제한 |
 | 5000 기본값 | Mew 서버 | 설정한 바인드·HTTPS·Mewlink 연결 정책에 따름 |
 
-개발 서버는 소스와 빌드 전 자산을 제공하므로 공개 진입점으로 사용하지 않는다. 현재 [로그인 가상 화면](../development/login-desktop.md)은 영상·입력을 전달하며 CDP·DOM 중계를 사용하지 않는다. 당시 CDP 방식은 [과거 실험](../history/browser-dom-oauth.md)에 보존한다.
+개발 서버는 소스와 빌드 전 자산을 제공하므로 공개 진입점으로 사용하지 않는다. 현재 [로그인 가상 화면](../../.mew/docs/development/login-desktop.md)은 영상·입력을 전달하며 CDP·DOM 중계를 사용하지 않는다. 당시 CDP 방식은 [과거 실험](../../.mew/docs/history/browser-dom-oauth.md)에 보존한다.
 
 ## OS 권한 경계
 
 터미널과 에이전트는 서버를 실행한 OS 사용자의 권한으로 동작한다. 저장소 분리나 프로젝트 선택은 OS 파일 접근을 격리하지 않는다. 셸 권한이 있는 사용자는 그 OS 사용자가 접근할 수 있는 다른 폴더와 시크릿에도 접근할 수 있으므로 공개 설치에서는 전용 비관리자 사용자와 필요한 폴더만 사용한다.
 
-파일 API의 경로·역할 검증과 셸 권한은 서로 다른 경계다. 현재 역할별 접근 가능 범위는 [보안 정책](security.md)과 [접근 제어 계약](../development/access-control.md)을 따른다. 회사 전체 프로젝트·계정·서비스 목록을 Mew 운영의 필수 참조로 두지 않는다.
+파일 API의 경로·역할 검증과 셸 권한은 서로 다른 경계다. 현재 역할별 접근 가능 범위는 [보안 정책](security.md)과 [접근 제어 계약](../../.mew/docs/development/access-control.md)을 따른다. 회사 전체 프로젝트·계정·서비스 목록을 Mew 운영의 필수 참조로 두지 않는다.
 
 ## 이전 운영 근거
 
-Liiiiv 환경에서 기록한 tailnet·발급 계정·워크스페이스 노출 범위는 [이전 접근 모델](../history/liiiiv-access-model.md)에 보존한다. 당시 운영 현황은 현재 설치의 상태나 권한 정책이 아니다.
+Liiiiv 환경에서 기록한 tailnet·발급 계정·워크스페이스 노출 범위는 [이전 접근 모델](../../.mew/docs/history/liiiiv-access-model.md)에 보존한다. 당시 운영 현황은 현재 설치의 상태나 권한 정책이 아니다.

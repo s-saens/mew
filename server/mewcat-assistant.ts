@@ -13,7 +13,7 @@ import { projectDocsDir, safeProjectPath } from './project-agent-settings.ts'
 import { MEWCAT_HELP_TOPICS, MEWCAT_PANELS, MEWCAT_TOOLS, type MewcatAction, type MewcatClientMessage, type MewcatContext } from '../shared/mewcat-assistant.ts'
 
 const APP_ROOT = fileURLToPath(new URL('../', import.meta.url))
-const helpPaths = ['docs/guides/getting-started-ko.md', 'docs/guides/projects.md', 'docs/guides/project-setup.md', 'docs/guides/terminal-agents.md', 'docs/features/git/workbench.md', 'docs/features/화면·계정·운영/뮤펫 도우미·대화·Mew 조작.md']
+const helpPaths = MEWCAT_HELP_TOPICS.map(topic => `resources/help/${topic}.md`)
 export class MewcatToolError extends Error {}
 const bindings = new Map<string, MewcatBinding>()
 const starting = new Map<string, Promise<MewcatBinding>>()

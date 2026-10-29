@@ -14,7 +14,7 @@ updated: "2026-10-15"
 | Mewlink는 로그인했지만 Mew에 들어가지 못함 | 기기 등록용 Mewlink 계정과 접속할 Mew 서버의 로컬 계정을 구분 | [외부 접속](getting-started-ko.md#외부에서-접속하기) |
 | 폴더·버튼·파일이 안 보이거나 읽기 전용 | 기능 권한·파일 규칙과 **설정 → Dock** 표시 설정 | [계정과 권한](../configuration/accounts.md#내-계정과-계정-관리) |
 | Markdown 화면 오류 | 오류 안내의 **원문 모드로 열기**로 현재 내용을 확인 | [기본 편집](editor.md#기본-편집) |
-| 외부에서 고친 파일이 이전 내용으로 돌아옴 | 같은 파일을 연 Mew 편집기가 오래된 내용을 저장했는지 확인하고 편집기를 닫거나 **Revert File** 사용 | [실행·검증 규칙](../development/getting-started.md) |
+| 외부에서 고친 파일이 이전 내용으로 돌아옴 | 같은 파일을 연 Mew 편집기가 오래된 내용을 저장했는지 확인하고 편집기를 닫거나 **Revert File** 사용 | [실행·검증 규칙](../../.mew/docs/development/getting-started.md) |
 | Git 저장소가 없다고 나옴 | 현재 프로젝트 폴더 자체가 Git 저장소인지 확인. 상위·하위 저장소는 자동으로 대신 열지 않음 | [Git 패널](projects.md#git-작업-패널) |
 | 에이전트가 열리지 않거나 인증 실패 | 선택한 런타임의 설치·로그인·모델 설정과 패널 오류 | [런타임 설정](../configuration/agent-runtimes.md) |
 | 데이터베이스가 구성되지 않았다고 나옴 | 서버의 `DATABASE_URL`과 Postgres 실행 상태 | [DB 준비](database.md#postgres만-docker-compose로-띄우기-선택) |

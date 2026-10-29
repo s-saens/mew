@@ -11,7 +11,7 @@ updated: "2026-10-28"
 
 현재 지원 호스트는 Linux/WSL이다. Chrome/Chromium, Xvfb, FFmpeg, Python 3, libX11·libXtst가 필요하다. Debian/Ubuntu 패키지는 `xvfb ffmpeg python3 libx11-6 libxtst6`이며 Chrome은 별도로 설치한다. `MEW_BROWSER_EXECUTABLE`로 실행 파일의 절대 경로를 지정할 수 있다. 일반 Chrome을 우선하며 기존 Playwright Chromium도 대체 실행 파일로 찾는다. 준비되지 않은 환경에서 실제 호스트 데스크톱을 대신 조작하지 않는다.
 
-이 화면은 로그인·계정 관리용이다. 일반 내부 브라우저 패널·주소창·바로가기·독립 `/browser` 화면은 제거했다. 로그인 페이지에 CDP나 DOM 기록기를 연결하지 않는다. 상세 동작과 수명은 [로그인 가상 화면](../development/login-desktop.md)을 따른다. 실제 Google·Antigravity 계정 인증 성공은 사용자 환경에서 확인해야 한다.
+이 화면은 로그인·계정 관리용이다. 일반 내부 브라우저 패널·주소창·바로가기·독립 `/browser` 화면은 제거했다. 로그인 페이지에 CDP나 DOM 기록기를 연결하지 않는다. 상세 동작과 수명은 [로그인 가상 화면](../../.mew/docs/development/login-desktop.md)을 따른다. 실제 Google·Antigravity 계정 인증 성공은 사용자 환경에서 확인해야 한다.
 
 ## 호스트 localhost 앱 열기
 
@@ -31,13 +31,13 @@ Cloudflare Tunnel로 자체 도메인을 Mew에 연결했다면 `https://mew.exa
 
 Mew 로그인과 **localhost 앱 접속** 권한이 필요하다. 로그인하지 않았으면 로그인 화면을 먼저 표시하고, 완료 후 앱으로 돌아온다. owner·manager는 기본 허용이며 다른 계정은 owner가 기능 권한을 허용한다. 앱은 접속한 기기의 브라우저에서 실행되고 Mew 로그인·관리 화면과 실행 영역이 분리된다. 로그아웃하거나 권한을 회수하면 열린 전달도 중단한다.
 
-도메인·Tailscale 직접 접속은 HTTP·WebSocket 프록시를 사용하므로 HTTP IP 주소도 지원한다. Mewlink에는 중앙의 `PREVIEW_DOMAIN`과 wildcard HTTPS 준비가 필요하다. 앱에 별도 backend의 `localhost` 주소를 하드코딩했다면 접속한 기기로 향할 수 있으므로 동일 포트의 `/api` 프록시 등으로 설정한다. 설정과 호환 한계는 [localhost 앱 프리뷰](../development/port-preview.md)를 따른다.
+도메인·Tailscale 직접 접속은 HTTP·WebSocket 프록시를 사용하므로 HTTP IP 주소도 지원한다. Mewlink에는 중앙의 `PREVIEW_DOMAIN`과 wildcard HTTPS 준비가 필요하다. 앱에 별도 backend의 `localhost` 주소를 하드코딩했다면 접속한 기기로 향할 수 있으므로 동일 포트의 `/api` 프록시 등으로 설정한다. 설정과 호환 한계는 [localhost 앱 프리뷰](../../.mew/docs/development/port-preview.md)를 따른다.
 
 일반 SPA는 별도 basename 설정 없이 앱의 루트·하위 경로로 열린다. Next의 정적 청크나 원본 브라우저 주소에 의존하는 앱은 Mewlink 주소를 사용한다. API 전용 포트는 `/` 화면이 없을 수 있으므로 웹 화면을 제공하는 프론트엔드 포트를 연다. 프리뷰는 30분 뒤 만료하므로 계속 사용할 때는 진입 주소를 다시 연다.
 
 ## Android 창
 
-헤더 메뉴의 Android 버튼으로 오른쪽 끝에 여는 보조창(`components/AndroidPanel.tsx`). Android Emulator나 system image는 mew 배포물에 넣지 않는다([ADR 0058](../history/decisions/0058-mew-android-panel-optional-gateway.md)). 패널이 하는 일은 두 가지뿐이다.
+헤더 메뉴의 Android 버튼으로 오른쪽 끝에 여는 보조창(`components/AndroidPanel.tsx`). Android Emulator나 system image는 mew 배포물에 넣지 않는다([ADR 0058](../../.mew/docs/history/decisions/0058-mew-android-panel-optional-gateway.md)). 패널이 하는 일은 두 가지뿐이다.
 
 - Linux·WSL에서는 `/dev/kvm`, macOS에서는 Emulator의 Hypervisor.Framework 가속 상태를 확인하고, Android SDK 도구(`sdkmanager`·`adb`·`emulator`·`avdmanager`), API 36 system image, AVD 존재 여부를 보여준다. Apple Silicon은 `arm64-v8a`, Intel/AMD는 `x86_64` image를 고르고, image가 없으면 설치 명령만 제시한 뒤 새로고침 후에 AVD 생성 명령을 제시한다.
 - 안내 명령의 복사 아이콘 옆 \*\*▶\*\*는 서버가 정한 명령 ID를 전용 숨김 tmux 세션(`mewcmd-*`)에서 실행한다. 옆 터미널 아이콘은 `SessionTerminalPopup`으로 진행 화면과 대화형 입력을 열고, 명령이 끝나면 프로젝트 one-shot 명령어 버튼과 같은 경로로 자기 세션을 자동 종료한다. 브라우저가 보낸 임의 명령 문자열은 실행하지 않는다.

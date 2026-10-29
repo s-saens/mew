@@ -29,13 +29,13 @@ test('the demo adds just its welcome document to a bounded, public Mew snapshot'
 
 test('the welcome links resolve, documents keep descriptions and task accounts are omitted', () => {
   for (const [file, content] of Object.entries(DEMO_FILES)) {
-    if (!file.startsWith('docs/') || !file.endsWith('.md')) continue
+    if (!/^(?:docs|\.mew\/(?:docs|tasks))\/.+\.md$/.test(file)) continue
     const frontmatter = /^---\r?\n([\s\S]*?)\r?\n---/.exec(content)
     assert.ok(frontmatter, `${file}: frontmatter`)
     const document = parseDocument(frontmatter[1])
     assert.deepEqual(document.errors, [], `${file}: YAML`)
     assert.ok(typeof document.get('description') === 'string' && document.get('description').trim(), `${file}: description`)
-    if (file.startsWith('docs/tasks/')) assert.equal(document.has('assignees'), false)
+    if (/^(?:\.mew\/tasks|docs\/tasks)\//.test(file)) assert.equal(document.has('assignees'), false)
   }
   for (const match of DEMO_FILES[DEMO_FILE_PATH].matchAll(/\[[^\]]*\]\(([^)]+)\)/g)) {
     const target = path.posix.normalize(path.posix.join('docs', decodeURIComponent(match[1])))

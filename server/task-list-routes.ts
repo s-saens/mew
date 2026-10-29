@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { taskDirectory, taskDocumentsNeedMigration, TASK_DONE_DIRECTORY } from './task-markdown.ts'
+import { taskDocumentsNeedMigration } from './task-markdown.ts'
+import { TASK_DOCUMENT_DIRECTORIES } from '../shared/task-document-paths.ts'
 import { taskListFile } from './task-list.ts'
 import { readJsonFile } from './dataDir.ts'
 import express from 'express'
@@ -33,14 +34,25 @@ export function createTaskListRouter() {
       res.write('data: changed\n\n')
     }
     const notify = () => { clearTimeout(timer); timer = setTimeout(send, 75) }
+    const watchDirectories = new Map<string, Set<string> | null>()
+    for (const relative of TASK_DOCUMENT_DIRECTORIES) {
+      const segments = relative.split('/')
+      for (let index = 0; index <= segments.length; index++) {
+        const directory = path.join(root, ...segments.slice(0, index))
+        if (index === segments.length) watchDirectories.set(directory, null)
+        else if (watchDirectories.get(directory) !== null) {
+          const children = watchDirectories.get(directory) ?? new Set<string>()
+          children.add(segments[index]); watchDirectories.set(directory, children)
+        }
+      }
+    }
     const attach = () => {
-      for (const dir of [root, path.join(root, 'docs'), path.join(root, 'tasks'), taskDirectory(root), path.join(root, TASK_DONE_DIRECTORY)]) {
+      for (const [dir, children] of watchDirectories) {
         if (!fs.existsSync(dir)) { watchers.get(dir)?.close(); watchers.delete(dir); continue }
         if (watchers.has(dir)) continue
         try {
           const watcher = fs.watch(dir, (_event, name) => {
-            if (dir === root && name && !['docs', 'tasks'].includes(name.toString())) return
-            if (dir === path.join(root, 'docs') && name && name.toString() !== 'tasks') return
+            if (children && name && !children.has(name.toString())) return
             attach(); notify()
           })
           watcher.on('error', () => { watcher.close(); watchers.delete(dir); notify() })

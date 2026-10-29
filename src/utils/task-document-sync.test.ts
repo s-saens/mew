@@ -7,7 +7,7 @@ test('confirmed task updates compare stable IDs and stay within the registered w
   const unregister = registerTaskDocumentSync({ workspace: '/one', prepare: async () => () => {}, apply: async changes => { updates.push(changes) } })
   try {
     const old = { id: 'one', text: 'Old', done: false, path: 'docs/tasks/Old.md' }
-    const next = { ...old, text: 'New', path: 'docs/tasks/New.md' }
+    const next = { ...old, text: 'New', path: '.mew/tasks/New.md' }
     await syncTaskDocuments('/two', [old], [next])
     await syncTaskDocuments('/one', [old], [{ ...old }])
     assert.equal(updates.length, 0)

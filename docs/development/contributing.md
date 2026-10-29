@@ -7,7 +7,7 @@ updated: 2026-10-23
 
 ## 기여 전 확인
 
-Mew는 [Mew Source Available License 1.0](../../LICENSE)을 사용한다. 개인·회사 내부 사용은 허용하지만 Mew·수정본 판매와 유료 호스팅은 제한한다. [결정 0053](../decisions/0053-source-available-license.md)에 따라 프로젝트 소유자는 권리를 보유한 범위에서 상업 제공을 할 수 있다.
+Mew는 [Mew Source Available License 1.0](../../LICENSE)을 사용한다. 개인·회사 내부 사용은 허용하지만 Mew·수정본 판매와 유료 호스팅은 제한한다. [결정 0053](../../.mew/docs/decisions/0053-source-available-license.md)에 따라 프로젝트 소유자는 권리를 보유한 범위에서 상업 제공을 할 수 있다.
 
 외부 기여를 제출하기 전에 유지관리자와 아래 사항을 확인한다.
 

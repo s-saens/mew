@@ -318,7 +318,7 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><I18nProvid
     const stored = readTaskList(WORKSPACE_ROOT).find(task => task.id === taggedId)!
     assert.equal(await tagged.evaluate(el => (el.ownerDocument.defaultView as unknown as { openedTaskFile: string }).openedTaskFile), stored.path)
     let file = path.join(WORKSPACE_ROOT, stored.path!)
-    assert.equal(stored.path, 'docs/tasks/분류 작업 @Ref #그대로.md')
+    assert.equal(stored.path, '.mew/tasks/분류 작업 @Ref #그대로.md')
     await fs.writeFile(file, `---\nid: ${stored.id}\ntitle: 외부에서 수정\ndone: true\ntags: [abc, 외부]\nstartDate: 2026-10-01\ndate: 2026-10-18\ncustom: keep\n---\n문서 본문\n`)
     await one.waitForFunction("Array.from(document.querySelectorAll('.task-panel textarea')).some(el=>el.value==='외부에서 수정')", null, { timeout: 2000 })
     await two.reload(); await two.locator('[data-dock-item=tasks]').tap()
@@ -358,7 +358,7 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><I18nProvid
     await two.waitForResponse(response => response.url().includes('/api/task-list') && response.request().method() === 'PATCH' && response.ok())
     const oldFile = file
     const renamedTask = readTaskList(WORKSPACE_ROOT).find(task => task.id === taggedId)!
-    assert.equal(renamedTask.path, 'docs/tasks/제목 변경.md')
+    assert.equal(renamedTask.path, '.mew/tasks/Done/제목 변경.md')
     file = path.join(WORKSPACE_ROOT, renamedTask.path!)
     await assert.rejects(fs.stat(oldFile), /ENOENT/)
     await mobileRow.getByRole('button', { name: '파일 열기', exact: true }).tap()

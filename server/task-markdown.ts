@@ -7,10 +7,9 @@ import { parseDocument, Document } from 'yaml'
 import { sameTags } from '../shared/task-tags.ts'
 import type { TaskItem } from '../shared/task-list.ts'
 import { rewritePageLinks } from '../shared/document-pages.ts'
+import { TASK_DOCUMENT_DIRECTORY, TASK_DONE_DIRECTORY, TASK_DOCUMENT_DIRECTORIES, TASK_GUIDE_FILENAMES } from '../shared/task-document-paths.ts'
 
-export const TASK_DOCUMENT_DIRECTORY = 'docs/tasks'
-export const TASK_DONE_DIRECTORY = `${TASK_DOCUMENT_DIRECTORY}/Done`
-const TASK_GUIDE_FILENAMES = new Set(['_tasks.md', '_Done.md', 'MOC.md', '_MOC.md', 'README.md'].map(name => name.toLowerCase()))
+export { TASK_DOCUMENT_DIRECTORY, TASK_DONE_DIRECTORY } from '../shared/task-document-paths.ts'
 export const taskDirectory = (workspace: string) => path.join(workspace, TASK_DOCUMENT_DIRECTORY)
 export type TaskDocumentIdentity = { id: string; path: string; device: number; inode: number }
 export function taskListFile(workspace: string) {
@@ -46,7 +45,7 @@ export function readTaskDocuments(workspace: string): TaskDocument[] {
   const identities = metadata?.version === 5 ? metadata.documents : []
   if (!Array.isArray(identities) || !identities.every(item => item && typeof item.id === 'string' && /^[a-zA-Z0-9_-]{1,100}$/.test(item.id) && typeof item.path === 'string' && Number.isFinite(item.device) && Number.isFinite(item.inode))
     || new Set(identities.map(item => item.id)).size !== identities.length || new Set(identities.map(item => item.path)).size !== identities.length) throw new Error('Invalid task document metadata')
-  return [TASK_DOCUMENT_DIRECTORY, TASK_DONE_DIRECTORY, 'tasks'].flatMap(relative => {
+  return TASK_DOCUMENT_DIRECTORIES.flatMap(relative => {
     const dir = directory(workspace, relative)
     if (!fs.existsSync(dir)) return []
     return fs.readdirSync(dir).filter(name => name.endsWith('.md') && !TASK_GUIDE_FILENAMES.has(name.toLowerCase())).sort().flatMap(name => {

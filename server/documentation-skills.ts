@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { guidanceOptions } from '../shared/agent-guidance.ts'
 import { parseConfig } from './harness-config.ts'
 
-export const DOCUMENTATION_SKILLS_DIR = fileURLToPath(new URL('../docs/configuration/skills/', import.meta.url))
+export const DOCUMENTATION_SKILLS_DIR = fileURLToPath(new URL('../resources/skills/', import.meta.url))
 export const documentationSkills = {
   ko: { name: 'korean-technical-docs', language: 'Korean' },
   en: { name: 'english-technical-docs', language: 'English' },

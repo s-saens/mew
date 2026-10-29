@@ -6,7 +6,7 @@ import { chromium } from 'playwright-core'
 import { domBrowserExecutable } from './browser-dom-executable.ts'
 
 test('Mermaid renders the remote desktop diagram, opens on demand and recovers on desktop/mobile', { skip: !domBrowserExecutable(), timeout: 60000 }, async () => {
-  const doc = await fs.readFile(new URL('../docs/development/remote-desktop.md', import.meta.url), 'utf8')
+  const doc = await fs.readFile(new URL('../.mew/docs/development/remote-desktop.md', import.meta.url), 'utf8')
   const diagram = doc.match(/```mermaid\n([\s\S]*?)\n```/)![1]
   const modulePath = new URL('../packages/editor/src/editor/diagram-preview.ts', import.meta.url).pathname
   const source = `import {createDiagramPreview} from ${JSON.stringify(modulePath)};

@@ -193,7 +193,7 @@ test('the demo pet reuses shipped sprite manifests and fetches only allowlisted 
   assert.equal(catalog.skins.length, 1)
   for (const action of MEWPET_ANIMATIONS) {
     const sprite = catalog.skins[0].sprites[action]!
-    const png = fs.readFileSync(new URL(`../../public/mewcat/capybara/${action}.png`, import.meta.url))
+    const png = fs.readFileSync(new URL(`../../assets/mewpet/capybara/source/${action}.png`, import.meta.url))
     assert.equal(sprite.width, png.readUInt32BE(16))
     assert.equal(sprite.height, png.readUInt32BE(20))
   }

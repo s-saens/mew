@@ -39,7 +39,7 @@ test('Markdown persists assignees, preserves body/custom properties and accepts 
     const changed = changeTaskList(workspace, taskChanges(baseline, [{ ...baseline[0], assignees: [b], done: true }]))
     assert.deepEqual(changed[0].assignees, [b])
     assert.equal(fs.existsSync(file), false)
-    assert.equal(changed[0].path, 'docs/tasks/Done/Assign work.md')
+    assert.equal(changed[0].path, '.mew/tasks/Done/Assign work.md')
     file = path.join(workspace, changed[0].path!)
     assert.match(fs.readFileSync(file, 'utf8'), /priority: urgent/)
     assert.match(fs.readFileSync(file, 'utf8'), /Body stays here/)

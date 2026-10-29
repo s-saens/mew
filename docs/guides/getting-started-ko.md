@@ -20,7 +20,7 @@ mew는 컴퓨터나 서버의 폴더를 브라우저에서 여는 작업 공간�
 
 ### Windows (WSL 2)
 
-Windows 네이티브 실행 계층과 npx 배포 경로를 구현했습니다. [Windows 네이티브 실행 계약](../development/windows-native.md)에서 검증 범위를 확인하세요. 전체 Windows 실기 검증과 첫 공개 발행 전에는 아래 WSL 소스 설치 절차를 사용할 수 있습니다.
+Windows 네이티브 실행 계층과 npx 배포 경로를 구현했습니다. [Windows 네이티브 실행 계약](../../.mew/docs/development/windows-native.md)에서 검증 범위를 확인하세요. 전체 Windows 실기 검증과 첫 공개 발행 전에는 아래 WSL 소스 설치 절차를 사용할 수 있습니다.
 
 WSL 2의 Ubuntu 안에서 mew를 실행한 다음 Windows 브라우저에서 엽니다.
 
@@ -139,7 +139,7 @@ npx @liiiiv/mew-cli@latest
 
 Linux glibc 2.35 이상·macOS 15 이상, x64/arm64를 지원합니다. Windows에서는 WSL 2의 Ubuntu 22.04 이상에서 실행합니다. 처음에는 owner 이메일을 입력하고 출력된 임시 비밀번호로 로그인한 뒤 비밀번호를 바꿉니다. 기존 계정·대화·기기 등록은 재사용합니다. Mewlink 등록은 아래 [외부 접속](#%EC%99%B8%EB%B6%80%EC%97%90%EC%84%9C-%EC%A0%91%EC%86%8D%ED%95%98%EA%B8%B0)을 따르며, 등록 링크와 온라인 주소의 QR이 터미널에도 표시됩니다.
 
-Ctrl+C로 종료한 뒤 같은 명령을 다시 실행하면 최신 버전을 사용합니다. 기존 clone이 `.data/`를 사용했다면 `--data-dir /기존/mew/.data`를 지정하고 이전 서버부터 종료하세요. 원격 데스크톱은 선택 설치·OS 권한 준비가 필요합니다. [실행·데이터 계약](../development/cli-distribution.md) · [발행 절차](../deployment/cli-release.md)
+Ctrl+C로 종료한 뒤 같은 명령을 다시 실행하면 최신 버전을 사용합니다. 기존 clone이 `.data/`를 사용했다면 `--data-dir /기존/mew/.data`를 지정하고 이전 서버부터 종료하세요. 원격 데스크톱은 선택 설치·OS 권한 준비가 필요합니다. [실행·데이터 계약](../../.mew/docs/development/cli-distribution.md) · [발행 절차](../../.mew/docs/operations/cli-release.md)
 
 <a id="remote-access"></a>
 
@@ -155,13 +155,13 @@ Ctrl+C로 종료한 뒤 같은 명령을 다시 실행하면 최신 버전을 �
 4. 로컬 mew에서 **온라인** 상태와 고정 접속 주소를 확인합니다. 주소는 `https://mew.saens.kr/<유저이름>/<기기이름>` 형식입니다.
 5. 휴대폰이나 다른 컴퓨터에서 이 주소를 열면 Mewlink 로그인 없이 해당 컴퓨터의 mew 로그인 화면이 뜹니다. **로컬 mew의 이메일·비밀번호**로 로그인합니다. 접속 브라우저는 별도로 등록하지 않으며, 저장된 로컬 로그인 세션이 유효하면 다음 접속에서 이어 사용할 수 있습니다. [내 기기 목록](https://mew.saens.kr/dashboard)의 등록·삭제·목록 관리는 Mewlink 로그인 후 사용합니다.
 
-내 컴퓨터를 켜 두고 mew 실행과 인터넷 연결을 유지해야 합니다. 컴퓨터가 꺼져 있거나 절전 상태라면 접속할 수 없습니다. 직접 연결이 막힌 네트워크에서는 연결 실패를 표시합니다. Android iframe은 이 접속 방식에서 지원하지 않습니다. 제공자별 로그인·외부 모바일망·절전과 망 전환의 검증 범위는 [원격 접속 계약](../development/remote-access.md#%EA%B2%80%EC%A6%9D%EA%B3%BC-%EB%82%A8%EC%9D%80-%EA%B2%8C%EC%9D%B4%ED%8A%B8)을 참고하세요.
+내 컴퓨터를 켜 두고 mew 실행과 인터넷 연결을 유지해야 합니다. 컴퓨터가 꺼져 있거나 절전 상태라면 접속할 수 없습니다. 직접 연결이 막힌 네트워크에서는 연결 실패를 표시합니다. Android iframe은 이 접속 방식에서 지원하지 않습니다. 제공자별 로그인·외부 모바일망·절전과 망 전환의 검증 범위는 [원격 접속 계약](../../.mew/docs/development/remote-access.md#%EA%B2%80%EC%A6%9D%EA%B3%BC-%EB%82%A8%EC%9D%80-%EA%B2%8C%EC%9D%B4%ED%8A%B8)을 참고하세요.
 
 다른 사람에게 접근을 허용하려면 로컬 mew의 **계정 관리**에서 이메일 계정과 역할·기능·파일 권한을 설정하고 기기 주소를 알려 줍니다. 상대방은 Mewlink 계정 없이 로컬 계정으로 로그인할 수 있습니다.
 
-비밀번호 없이 Mewlink 계정으로 접속하게 하려면 상대방에게 기기 로그인 화면의 **Mewlink로 로그인 → 접근 요청**을 누르게 합니다. owner는 **계정 관리 → Mewlink 계정 접근**에서 요청을 확인하고 기존 mew 사용자에 연결하거나 새 사용자를 만듭니다. 새 사용자의 기본 역할은 member이며 비밀번호를 만들 필요가 없습니다. 승인 후 상대방은 같은 Mewlink 계정으로 접속하고, 권한은 로컬 mew에서 관리합니다. 접근을 중단하려면 같은 화면에서 연결을 해제합니다. 기기 등록 계정과 이메일 일치는 승인을 대신하지 않습니다. 이 기능 적용에는 로컬 mew 업데이트와 Mewlink 재배포가 필요합니다. [계정 연결 계약](../development/remote-access.md#%EC%8A%B9%EC%9D%B8%EB%90%9C-mewlink-%EA%B3%84%EC%A0%95-%EB%A1%9C%EA%B7%B8%EC%9D%B8).
+비밀번호 없이 Mewlink 계정으로 접속하게 하려면 상대방에게 기기 로그인 화면의 **Mewlink로 로그인 → 접근 요청**을 누르게 합니다. owner는 **계정 관리 → Mewlink 계정 접근**에서 요청을 확인하고 기존 mew 사용자에 연결하거나 새 사용자를 만듭니다. 새 사용자의 기본 역할은 member이며 비밀번호를 만들 필요가 없습니다. 승인 후 상대방은 같은 Mewlink 계정으로 접속하고, 권한은 로컬 mew에서 관리합니다. 접근을 중단하려면 같은 화면에서 연결을 해제합니다. 기기 등록 계정과 이메일 일치는 승인을 대신하지 않습니다. 이 기능 적용에는 로컬 mew 업데이트와 Mewlink 재배포가 필요합니다. [계정 연결 계약](../../.mew/docs/development/remote-access.md#%EC%8A%B9%EC%9D%B8%EB%90%9C-mewlink-%EA%B3%84%EC%A0%95-%EB%A1%9C%EA%B7%B8%EC%9D%B8).
 
-설치 후 `./mew remote-access account`로 등록 안내를 다시 볼 수 있습니다. Mewlink 중앙 서비스를 직접 운영하려는 경우에는 [중앙 서비스 설치](../deployment/remote-central.md)를 따릅니다.
+설치 후 `./mew remote-access account`로 등록 안내를 다시 볼 수 있습니다. Mewlink 중앙 서비스를 직접 운영하려는 경우에는 [중앙 서비스 설치](../../.mew/docs/operations/remote-central.md)를 따릅니다.
 
 아래 Tailscale·Cloudflare Tunnel도 사용할 수 있습니다. 두 방법은 HTTPS 트래픽을 로컬 mew 서버로 전달합니다. `MEW_BIND=127.0.0.1`은 그대로 두고, 설치 포트가 다르면 `5000`을 해당 포트로 바꿉니다.
 
@@ -319,16 +319,16 @@ WSL이 멈추거나 mew 접속이 끊긴다면 [문제 해결](troubleshooting.m
 
 ## 문서
 
-[문서 지도](../MOC.md)에서 시작합니다. 상세 제품 명세, 사용법, 운영 절차, 작업 기록은 `docs/`에 두고 이 안내에서는 설치와 일상 사용을 다룹니다. 코드를 바꾸면 관련 문서도 함께 갱신합니다.
+[문서 지도](../../.mew/docs/MOC.md)에서 시작합니다. 상세 제품 명세, 사용법, 운영 절차, 작업 기록은 `docs/`에 두고 이 안내에서는 설치와 일상 사용을 다룹니다. 코드를 바꾸면 관련 문서도 함께 갱신합니다.
 
 | 주제 | 시작 위치 |
 | --- | --- |
 | 프로젝트, 편집, 터미널, 브라우저, 명령, 데이터베이스 | [사용자 안내](../guides/MOC.md) |
 | 환경 변수, 계정, 검색, 에이전트 런타임 | [설정](../configuration/MOC.md) |
 | HTTPS, systemd, 업데이트, 백업 | [배포](../deployment/native.md) |
-| 코드 구조, 패키지, UI, 협업, 에이전트 프로토콜 | [개발 문서](../development/MOC.md) |
-| 제품 명세, 운영, 현재 작업, 이력 | [문서 지도](../MOC.md) |
-| 계정별 기능과 파일 권한 | [계정 설정](../configuration/accounts.md#%EB%82%B4-%EA%B3%84%EC%A0%95%EA%B3%BC-%EA%B3%84%EC%A0%95-%EA%B4%80%EB%A6%AC) · [접근 제어](../development/access-control.md) |
+| 코드 구조, 패키지, UI, 협업, 에이전트 프로토콜 | [개발 문서](../../.mew/docs/development/MOC.md) |
+| 제품 명세, 운영, 현재 작업, 이력 | [문서 지도](../../.mew/docs/MOC.md) |
+| 계정별 기능과 파일 권한 | [계정 설정](../configuration/accounts.md#%EB%82%B4-%EA%B3%84%EC%A0%95%EA%B3%BC-%EA%B3%84%EC%A0%95-%EA%B4%80%EB%A6%AC) · [접근 제어](../../.mew/docs/development/access-control.md) |
 | 역할, 인증, 게스트 접속 | [보안](../operations/security.md) |
 
 Linux에서는 `sh native/agent-memory/install.sh`로 에이전트 작업의 메모리 제한을 설치합니다. 활성화, 점검, 저메모리 작업 일시 중지, 큐 보류, 오류 보고는 [에이전트 메모리 보호](../operations/agent-memory.md)를 참고하세요.

@@ -16,7 +16,7 @@ import { mergeTaskFrontmatter } from '../packages/editor/src/utils/task-frontmat
 test('document titles stay synchronized after explorer, editor, and task edits across open panes', { skip: !domBrowserExecutable(), timeout: 60_000 }, async t => {
   const repo = path.resolve(import.meta.dirname, '..')
   const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'mew-title-sync-ui-'))
-  const docs = path.join(workspace, 'docs')
+  const docs = path.join(workspace, '.mew')
   fs.mkdirSync(path.join(docs, 'tasks'), { recursive: true })
   changeTaskList(workspace, [{ id: 'promotion', before: null, after: { id: 'promotion', text: '가까운 주변에 홍보하기', done: false }, afterId: null }])
   fs.appendFileSync(path.join(docs, 'tasks/가까운 주변에 홍보하기.md'), '\nOriginal body\n\n' + Array.from({ length: 50 }, (_, i) => `Body paragraph ${i}`).join('\n\n') + '\n')
@@ -32,7 +32,7 @@ import {I18nProvider} from '${repo}/src/i18n.tsx';
 import {editorFile,editorTabPath} from '${repo}/src/utils/editor-files.ts';
 const noop=()=>{},callbacks=Object.fromEntries(['registerHandle','registerElement','registerTabBar','onOpenHistory','onSetTocOpen','onOpenSidebar','onTabDragMove','onTabDrop'].map(k=>[k,noop]));
 function Fixture(){
- const tabs=useTabs('.workspace',noop,noop,'/fixture',undefined,undefined,true,'/fixture/docs');
+ const tabs=useTabs('.workspace',noop,noop,'/fixture',undefined,undefined,true,'/fixture/.mew');
  const tasks=useTaskList('/fixture','owner@example.test',true);
  const [tree,setTree]=React.useState([]),[revision,setRevision]=React.useState(0);
  const refresh=React.useCallback(()=>fetch('/api/tree?path=').then(r=>r.json()).then(r=>{setTree(r.entries);setRevision(n=>n+1)}),[]);
@@ -40,14 +40,14 @@ function Fixture(){
  const loadChildren=React.useCallback(p=>fetch('/api/tree?path='+encodeURIComponent(p)).then(r=>r.json()).then(r=>r.entries),[]);
  window.tabs=tabs;window.tasks=tasks;
  return <div className="flex h-dvh bg-surface text-ink">
-  <aside style={{width:270,flexShrink:0}} className="flex min-h-0"><FileTree tree={tree} project="docs" documentPages stateKey="title-sync" workspacePath="/fixture" accountState={{openDirs:['tasks']}}
+  <aside style={{width:270,flexShrink:0}} className="flex min-h-0"><FileTree tree={tree} project="docs" documentPages stateKey="title-sync" workspacePath="/fixture" documentsPath="/fixture/.mew" accountState={{openDirs:['tasks']}}
    selectedPath={tabs.activePath?editorFile(tabs.activePath).path:null} readOnly={false} presence={{}} loadChildren={loadChildren}
    searchFocusSignal={0} newFileSignal={{n:0,parentPath:null}} revealSignal={0} treeInvalidation={{n:revision,project:'docs',version:revision,parents:['','tasks']}}
    onOpenGraph={noop} onSelect={(p,o)=>tabs.openFile(editorTabPath('docs',p),o)} onBeforePageMutation={tabs.prepareDocumentPageMutation}
    onPageMutation={async r=>{await tabs.applyDocumentPageMutation(r);refresh();window.dispatchEvent(new Event('focus'))}}
    onFileCreated={noop} onFolderCreated={refresh} onRenamed={noop} onDeleted={noop} onNotice={noop} onOpenGit={noop} registerSearchCancel={noop}/></aside>
   <main className="flex min-w-0 flex-1">{tabs.panes.map(pane=><section key={pane.id} data-pane={pane.id} className="flex min-w-0 flex-1 flex-col">
-   <EditorPane {...callbacks} pane={pane} role="owner" authEmail="owner@example.test" project=".workspace" workspace={{path:'/fixture',docsPath:'/fixture/docs'}}
+   <EditorPane {...callbacks} pane={pane} role="owner" authEmail="owner@example.test" project=".workspace" workspace={{path:'/fixture',docsPath:'/fixture/.mew'}}
     tree={tree} presence={{}} focused={pane.id===tabs.focusedPaneId} canCollaborate={true} isGuest={false} showSidebarButton={false} tocOpen={false} dropZone={null}
     onFocus={()=>tabs.focusPane(pane.id)} onActivate={(p,id)=>tabs.setActivePath(p,pane.id,id)} onPin={p=>tabs.pinTab(p,pane.id)}
     onCloseTab={(p,id)=>tabs.closeTab(p,pane.id,id)} onReorder={(a,b)=>tabs.reorderTabs(a,b,pane.id)} onSetViewMode={(p,m)=>tabs.setTabViewMode(p,m,pane.id)}
@@ -159,7 +159,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
   const tab = (title: string) => page.getByRole('tab', { name: `${title} ×`, exact: true })
   const refreshTasks = () => page.evaluate("window.dispatchEvent(new Event('focus'))")
   const synchronized = async (title: string, count = 1) => {
-    await page.waitForFunction(`window.tasks.tasks[0]?.text===${JSON.stringify(title)} && window.tasks.tasks[0]?.path===${JSON.stringify(`docs/tasks/${title}.md`)} && window.tabs.panes.flatMap(p=>p.tabs).filter(t=>t.path===${JSON.stringify(`mew:file:docs/tasks/${title}.md`)}).length===${count}`)
+    await page.waitForFunction(`window.tasks.tasks[0]?.text===${JSON.stringify(title)} && window.tasks.tasks[0]?.path===${JSON.stringify(`.mew/tasks/${title}.md`)} && window.tabs.panes.flatMap(p=>p.tabs).filter(t=>t.path===${JSON.stringify(`mew:file:docs/tasks/${title}.md`)}).length===${count}`)
     await explorer(title).waitFor()
     assert.equal(await tab(title).count(), count)
     await waitForEditorTitle()
@@ -257,7 +257,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
   await page.evaluate("window.tasks.edit(window.tasks.tasks.map(t=>({...t,text:t.id==='promotion'?'다른 홍보':'마을에 홍보하기'})))")
   await swapSaveStarted
   releaseTaskSave!()
-  await page.waitForFunction('window.tasks.tasks.find(t=>t.id==="promotion")?.path==="docs/tasks/다른 홍보.md" && window.tasks.tasks.find(t=>t.id==="second")?.path==="docs/tasks/마을에 홍보하기.md" && !window.tasks.saving')
+  await page.waitForFunction('window.tasks.tasks.find(t=>t.id==="promotion")?.path===".mew/tasks/다른 홍보.md" && window.tasks.tasks.find(t=>t.id==="second")?.path===".mew/tasks/마을에 홍보하기.md" && !window.tasks.saving')
   const swapped = await page.evaluate<Record<string, { path: string; content: string }>>('Object.fromEntries(window.tabs.panes.flatMap(p=>p.tabs).filter(t=>t.path.includes("홍보")).map(t=>[t.id,{path:t.path,content:t.content}]))')
   assert.equal(swapped[identities['mew:file:docs/tasks/마을에 홍보하기.md']].path, 'mew:file:docs/tasks/다른 홍보.md')
   assert.ok(swapped[identities['mew:file:docs/tasks/마을에 홍보하기.md']].content.includes('Typed before close'))
@@ -269,7 +269,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
   await page.evaluate("window.tasks.edit(window.tasks.tasks.map(t=>t.id==='promotion'?{...t,done:true}:t))")
   await completionStarted
   releaseTaskSave!()
-  await page.waitForFunction('window.tasks.tasks.find(t=>t.id==="promotion")?.path==="docs/tasks/Done/다른 홍보.md" && !window.tasks.saving')
+  await page.waitForFunction('window.tasks.tasks.find(t=>t.id==="promotion")?.path===".mew/tasks/Done/다른 홍보.md" && !window.tasks.saving')
   const completed = await page.evaluate<Record<string, { path: string; content: string }>>('Object.fromEntries(window.tabs.panes.flatMap(p=>p.tabs).map(t=>[t.id,{path:t.path,content:t.content}]))')
   assert.equal(completed[identities['mew:file:docs/tasks/마을에 홍보하기.md']].path, 'mew:file:docs/tasks/Done/다른 홍보.md')
   assert.ok(completed[identities['mew:file:docs/tasks/마을에 홍보하기.md']].content.includes('Typed before close'))

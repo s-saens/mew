@@ -63,7 +63,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
       await page.addInitScript(`localStorage.setItem('mew:mewcat-skin', '${mobile ? 'penguin' : 'black-cat'}')`)
       await page.route('http://skins.test/**', async route => {
         const pathname = new URL(route.request().url()).pathname
-        if (/^\/mewcat\/capybara\/[a-z-]+\.png$/.test(pathname)) return route.fulfill({ contentType: 'image/png', body: await fs.readFile(`${root}/public${pathname}`) })
+        if (/^\/mewcat\/capybara\/[a-z-]+\.png$/.test(pathname)) return route.fulfill({ contentType: 'image/png', body: await fs.readFile(`${root}/assets/mewpet/capybara/source/${path.basename(pathname)}`) })
         return route.fulfill({ contentType: 'text/html', body: `<html class="${mobile ? '' : 'dark'}"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}</style><div id="root"></div><script>${chunk.code}</script></html>` })
       })
       await page.clock.install()
@@ -142,7 +142,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
       for (let index = 0; index < actions.length; index++) {
         await settings.getByLabel(`${actions[index]} 스프라이트`, { exact: true }).setInputFiles(index === 1
           ? { name: 'walk-10.png', mimeType: 'image/png', buffer: Buffer.from(walkPng, 'base64') }
-          : index === 0 ? { name: 'idle.webp', mimeType: 'image/webp', buffer: Buffer.from(idleWebp, 'base64') } : `${root}/public/mewcat/capybara/${files[index]}.png`)
+          : index === 0 ? { name: 'idle.webp', mimeType: 'image/webp', buffer: Buffer.from(idleWebp, 'base64') } : `${root}/assets/mewpet/capybara/source/${files[index]}.png`)
         await settings.getByLabel(`${actions[index]} 프레임 수`, { exact: true }).fill(index === 1 ? '10' : '8')
       }
       await settings.getByLabel('걷기 프레임 수', { exact: true }).fill('11')
@@ -158,7 +158,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
       await settings.getByRole('button', { name: '스킨 수정: My kitten', exact: true }).click()
       await settings.locator('summary').filter({ hasText: '전환 모션 (선택)' }).click()
       for (const [name, action] of [['뛰기 → 걷기', 'run-walk'], ['바닥 → 점프', 'takeoff'], ['낙하 → 착지', 'landing'], ['상승 → 하강', 'apex']]) {
-        await settings.getByLabel(`${name} 스프라이트`, { exact: true }).setInputFiles(`${root}/public/mewcat/capybara/${action}.png`)
+        await settings.getByLabel(`${name} 스프라이트`, { exact: true }).setInputFiles(`${root}/assets/mewpet/capybara/source/${action}.png`)
         await settings.getByRole('button', { name: `${name} 이미지 제거`, exact: true }).waitFor()
       }
       await settings.getByLabel('상승 → 하강 프레임 수', { exact: true }).fill('11')

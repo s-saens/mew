@@ -8,10 +8,10 @@ import { demoJson, requireMethod, type DemoHttpHandler } from './http.ts'
 import { DemoError, type DemoWorkspaceStore } from './workspace-store.ts'
 import { parseDocument } from 'yaml'
 import { rewritePageLinks } from '../../shared/document-pages.ts'
+import { isTaskDocumentPath, TASK_DOCUMENT_DIRECTORY, TASK_DOCUMENT_DIRECTORIES, TASK_GUIDE_FILENAMES as guides } from '../../shared/task-document-paths.ts'
 
 type Identity = { id: string; path: string }
-const guides = new Set(['_tasks.md', '_done.md', 'readme.md', 'moc.md', '_moc.md'])
-const isTaskDocument = (path: string) => /^docs\/tasks\/(?:Done\/)?[^/]+\.md$/i.test(path) && !guides.has(path.split('/').at(-1)!.toLowerCase())
+const isTaskDocument = isTaskDocumentPath
 const validItem = (item: unknown): item is TaskItem => {
   if (!item || typeof item !== 'object') return false
   const value = item as TaskItem
@@ -57,14 +57,14 @@ function saveTasks(store: DemoWorkspaceStore, workspace: string, tasks: TaskItem
   const documents = taskDocuments(store, workspace), previous = new Map(documents.map(document => [document.task.id, document])), occupied = new Set(guides)
   const paths = new Map<string, string>(), key = (path: string) => path.normalize('NFC').toLowerCase()
   for (const task of tasks) {
-    const stem = `docs/tasks/${task.done ? 'Done/' : ''}${demoFilename(task.text)}`, old = previous.get(task.id)?.task.path
+    const stem = `${TASK_DOCUMENT_DIRECTORY}/${task.done ? 'Done/' : ''}${demoFilename(task.text)}`, old = previous.get(task.id)?.task.path
     if (old && (old === `${stem}.md` || old.startsWith(`${stem} (`)) && !occupied.has(key(old))) { paths.set(task.id, old); occupied.add(key(old)) }
   }
   const writes: { path: string; content: string }[] = []
   for (const task of tasks) {
     let path = paths.get(task.id)
     if (!path) {
-      const stem = `docs/tasks/${task.done ? 'Done/' : ''}${demoFilename(task.text)}`
+      const stem = `${TASK_DOCUMENT_DIRECTORY}/${task.done ? 'Done/' : ''}${demoFilename(task.text)}`
       path = `${stem}.md`; let index = 2
       while (occupied.has(key(path)) || guides.has(path.split('/').at(-1)!.toLowerCase())) path = `${stem} (${index++}).md`
       occupied.add(key(path)); paths.set(task.id, path)
@@ -105,10 +105,10 @@ export const handleDemoTasks: DemoHttpHandler = async ({ store, request, url, bo
         const encoder = new TextEncoder()
         cleanup = () => { if (closed) return; closed = true; unsubscribe(); request.signal.removeEventListener('abort', cleanup); controller.close() }
         controller.enqueue(encoder.encode(': demo task events\n\n'))
-        const root = store.canonicalFilePath(workspace), prefix = `${root ? `${root}/` : ''}docs/tasks/`
+        const root = store.canonicalFilePath(workspace), prefixes = TASK_DOCUMENT_DIRECTORIES.map(directory => `${root ? `${root}/` : ''}${directory}/`)
         unsubscribe = store.subscribe(event => {
           if (event.type === 'close' || event.type === 'state' && event.key === 'workspace' && store.workspaceInfo().path !== workspace) { cleanup(); return }
-          if (event.type !== 'reset' && !(event.type === 'files' && (!event.path || event.path.startsWith(prefix))) && !(event.type === 'state' && event.key?.startsWith(`tasks:${workspace}:`))) return
+          if (event.type !== 'reset' && !(event.type === 'files' && (!event.path || prefixes.some(prefix => event.path!.startsWith(prefix)))) && !(event.type === 'state' && event.key?.startsWith(`tasks:${workspace}:`))) return
           if (pending) return
           pending = true
           queueMicrotask(() => { pending = false; if (!closed) controller.enqueue(encoder.encode(`data: ${JSON.stringify({ revision: store.revision })}\n\n`)) })

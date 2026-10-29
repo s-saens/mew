@@ -50,3 +50,40 @@ test('checks history only when requested and does not require a MOC', t => {
   assert.deepEqual(documentLinkErrors(root), [])
   assert.deepEqual(documentLinkErrors(root, true), ['docs/history/old.md: missing.md: missing target'])
 })
+
+test('checks links across explicit knowledge, task, public guide and resource roots without traversing hidden state', t => {
+  const root = fixture(t)
+  const files = {
+    '.mew/docs/contract.md': '[Guide](../../docs/guide.md)\n[Missing](missing-contract.md)',
+    '.mew/tasks/Task.md': '[Contract](../docs/contract.md)\n[Missing](missing-task.md)',
+    '.mew/notes/Note.md': '[Contract](../docs/contract.md)',
+    'docs/guide.md': '[Task](../.mew/tasks/Task.md)\n[Skill](../resources/skills/example/SKILL.md)',
+    'resources/skills/example/SKILL.md': '[Contract](../../../.mew/docs/contract.md)\n[Missing](missing-skill.md)',
+    'resources/help/commands.md': '[Guide](../../docs/guide.md)',
+    'resources/skills/.vendor/source/SKILL.md': '[Upstream](missing-upstream.md)',
+    '.mew/cache/private.md': '[Private](missing-private.md)',
+    '.mew/docs/archives/raw.md': '[Archive](missing-archive.md)',
+    'resources/images/source.md': '[Image source](missing-image.md)',
+  }
+  for (const [filename, content] of Object.entries(files)) {
+    fs.mkdirSync(path.dirname(path.join(root, filename)), { recursive: true })
+    fs.writeFileSync(path.join(root, filename), content)
+  }
+  fs.writeFileSync(path.join(root, '.mew/agent-context.json'), JSON.stringify({ version: 1, enabled: true, docsDir: '.mew/docs', entrypoints: [], instructions: '' }))
+  assert.deepEqual(documentLinkErrors(root, true), [
+    '.mew/docs/contract.md: missing-contract.md: missing target',
+    '.mew/tasks/Task.md: missing-task.md: missing target',
+    'resources/skills/example/SKILL.md: missing-skill.md: missing target',
+  ])
+})
+
+test('keeps repository boundary checks for the new hidden documentation roots', t => {
+  const root = fixture(t)
+  fs.mkdirSync(path.join(root, '.mew/docs'), { recursive: true })
+  fs.symlinkSync(os.tmpdir(), path.join(root, '.mew/docs/outside'))
+  fs.writeFileSync(path.join(root, '.mew/docs/contract.md'), '[Outside](../../../elsewhere.md)\n[Symlink](outside)')
+  assert.deepEqual(documentLinkErrors(root), [
+    '.mew/docs/contract.md: ../../../elsewhere.md: outside repository',
+    '.mew/docs/contract.md: outside: symlink target outside repository',
+  ])
+})

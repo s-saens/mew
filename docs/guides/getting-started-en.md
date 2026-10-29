@@ -129,7 +129,7 @@ npx @liiiiv/mew-cli@latest
 
 Supports Linux glibc 2.35+ and macOS 15+, on x64/arm64. On Windows, use Ubuntu 22.04+ inside WSL 2. On first use, enter the owner email, sign in with the printed temporary password, and change it. Existing accounts, conversations, and device registration are reused. Follow [remote access](#remote-access) to register with Mewlink; the terminal also prints registration and online address QR codes.
 
-Press Ctrl+C to stop. Run the same command again to use the latest release. If your old clone uses `.data/`, pass `--data-dir /path/to/old/mew/.data` and stop the old server first. Remote desktop requires its optional components and OS permissions. [Runtime and data contract](../development/cli-distribution.md) · [Release procedure](../deployment/cli-release.md)
+Press Ctrl+C to stop. Run the same command again to use the latest release. If your old clone uses `.data/`, pass `--data-dir /path/to/old/mew/.data` and stop the old server first. Remote desktop requires its optional components and OS permissions. [Runtime and data contract](../../.mew/docs/development/cli-distribution.md) · [Release procedure](../../.mew/docs/operations/cli-release.md)
 
 <a id="remote-access"></a>
 
@@ -146,9 +146,9 @@ Use Mewlink to connect from another browser, or choose Tailscale or Cloudflare T
 
 Mewlink sign-in is used for registration, your device list and device removal. To give someone access, create their local mew account and configure its role, features and file permissions; a Mewlink account is not needed for local password sign-in. Application data remains blocked until local sign-in succeeds.
 
-The host must stay running and online. Networks that block direct connections show an error. Android iframe access is unavailable in this mode. Run `./mew remote-access account` to see the registration instructions again. Operators should follow [Central service setup](../deployment/remote-central.md). Applying this authentication change requires updating local mew and redeploying Mewlink; real external-network validation is separate.
+The host must stay running and online. Networks that block direct connections show an error. Android iframe access is unavailable in this mode. Run `./mew remote-access account` to see the registration instructions again. Operators should follow [Central service setup](../../.mew/docs/operations/remote-central.md). Applying this authentication change requires updating local mew and redeploying Mewlink; real external-network validation is separate.
 
-For passwordless access, the visitor can choose **Sign in with Mewlink → Request access** on the device login screen. The owner approves the identity under **Account management → Mewlink account access**, linking it to an existing local user or creating one (member by default). Permissions remain local; remove the identity link to revoke access. The registration account and matching email do not grant access automatically. Local mew and Mewlink must both be updated for this flow; provider sign-in and external-network validation remain separate. See the [remote-access contract](../development/remote-access.md#검증과-남은-게이트).
+For passwordless access, the visitor can choose **Sign in with Mewlink → Request access** on the device login screen. The owner approves the identity under **Account management → Mewlink account access**, linking it to an existing local user or creating one (member by default). Permissions remain local; remove the identity link to revoke access. The registration account and matching email do not grant access automatically. Local mew and Mewlink must both be updated for this flow; provider sign-in and external-network validation remain separate. See the [remote-access contract](../../.mew/docs/development/remote-access.md#검증과-남은-게이트).
 
 #### 2. Tailscale
 
@@ -300,16 +300,16 @@ On macOS, mew repairs a missing execute permission on `node-pty` 1.1.0's `spawn-
 
 ## Documentation
 
-Start at the [document map](../MOC.md). Detailed product specs, usage, operating procedures, and work records belong in `docs/`; this guide covers setup and everyday use. Update the relevant documentation whenever code changes.
+Start at the [document map](../../.mew/docs/MOC.md). Detailed product specs, usage, operating procedures, and work records belong in `docs/`; this guide covers setup and everyday use. Update the relevant documentation whenever code changes.
 
 | Topic | Start here |
 | --- | --- |
 | Projects, editing, terminals, browsers, commands, and databases | [User guides](MOC.md) |
 | Environment variables, accounts, search, and agent runtimes | [Configuration](../configuration/MOC.md) |
 | HTTPS, systemd, updates, and backups | [Deployment](../deployment/native.md) |
-| Code structure, packages, UI, collaboration, and agent protocols | [Development docs](../development/MOC.md) |
-| Product specs, operations, current work, and history | [Document map](../MOC.md) |
-| Per-account features and file permissions | [Account settings](../configuration/accounts.md#%EB%82%B4-%EA%B3%84%EC%A0%95%EA%B3%BC-%EA%B3%84%EC%A0%95-%EA%B4%80%EB%A6%AC) · [Access control](../development/access-control.md) |
+| Code structure, packages, UI, collaboration, and agent protocols | [Development docs](../../.mew/docs/development/MOC.md) |
+| Product specs, operations, current work, and history | [Document map](../../.mew/docs/MOC.md) |
+| Per-account features and file permissions | [Account settings](../configuration/accounts.md#%EB%82%B4-%EA%B3%84%EC%A0%95%EA%B3%BC-%EA%B3%84%EC%A0%95-%EA%B4%80%EB%A6%AC) · [Access control](../../.mew/docs/development/access-control.md) |
 | Roles, authentication, and guest access | [Security](../operations/security.md) |
 
 On Linux, `sh native/agent-memory/install.sh` installs memory limits for agent work. See [agent memory protection](../operations/agent-memory.md) for activation, checks, low-memory job suspension, queue holds, and error reporting.

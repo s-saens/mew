@@ -13,11 +13,12 @@ export const MAX_REPOSITORY_INDEX_GZIP_BYTES = 128 * 1024
 const root = path.resolve(import.meta.dirname, '..')
 const entrypoints = new Set([
   'README.md', 'LICENSE', 'docs/operations/security.md', 'package.json', 'tsconfig.app.json',
+  '.mew/docs/README.md', '.mew/docs/AGENT.md',
   'docs/README.md', 'docs/AGENT.md',
   'docs/configuration/appearance.md', 'docs/configuration/accounts.md',
   'docs/guides/MOC.md', 'docs/guides/first-steps.md', 'docs/guides/editor.md',
   'docs/guides/getting-started-ko.md', 'docs/guides/terminal-agents.md', 'docs/guides/collaboration.md',
-  'docs/development/getting-started.md',
+  '.mew/docs/development/getting-started.md', 'docs/development/getting-started.md',
   'src/main.tsx', 'src/AppBootstrap.tsx',
   'src/components/TabBar.tsx', 'src/components/DocsTab.tsx', 'src/components/ProjectSwitcher.tsx',
   'src/components/git-panel.tsx',
@@ -28,15 +29,16 @@ const entrypoints = new Set([
 
 /** Only committed text in these explicit public areas can enter the demo. */
 export function includeDemoSource(filename, bytes) {
-  if (bytes > 48 * 1024 || filename.split('/').some(part => part.startsWith('.'))) return false
+  const managedDocumentation = /^\.mew\/(?:docs|tasks)\//.test(filename)
+  if (bytes > 48 * 1024 || filename.split('/').some((part, index) => part.startsWith('.') && !(index === 0 && managedDocumentation))) return false
   if (entrypoints.has(filename)) return true
-  if (/^docs\/features\/.+\.md$/.test(filename)) return bytes <= 16 * 1024
-  if (/^docs\/tasks\/[^/]+\.md$/.test(filename)) return bytes <= 8 * 1024
+  if (/^(?:\.mew\/docs|docs)\/features\/.+\.md$/.test(filename)) return bytes <= 16 * 1024
+  if (/^(?:\.mew\/tasks|docs\/tasks)\/[^/]+\.md$/.test(filename)) return bytes <= 8 * 1024
   return /^(?:shared\/(?:task-[^/]+|document-[^/]+|file-[^/]+|project-[^/]+|selection-options|access-policy|active-sessions|agent-harness)|src\/runtime\/[^/]+)\.(?:ts|tsx)$/.test(filename) && !filename.endsWith('.test.ts')
 }
 
 function withoutTaskAccounts(filename, content) {
-  if (!filename.startsWith('docs/tasks/')) return content
+  if (!/^(?:\.mew\/tasks|docs\/tasks)\//.test(filename)) return content
   const match = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(content)
   if (!match) throw new Error(`태스크 문서에 속성이 없습니다: ${filename}`)
   const document = parseDocument(match[1])

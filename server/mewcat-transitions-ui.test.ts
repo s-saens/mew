@@ -67,7 +67,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Mewcat skin={n
   const compiler = await compile(await fs.readFile(`${root}/src/index.css`, 'utf8'), { base: `${root}/src`, onDependency() {} })
   const definitions = ['capybara'].map(id => [id, id])
   const catalog = { failed: false, skins: await Promise.all(definitions.map(async ([id, folder]) => ({ id, name: id, revision: 'test', managed: false, sprites: Object.fromEntries(await Promise.all(MEWCAT_ALL_SPRITE_ACTIONS.map(async action => {
-    const image = await fs.readFile(`${root}/public/mewcat/${folder}/${action}.png`)
+    const image = await fs.readFile(`${root}/assets/mewpet/${folder}/source/${action}.png`)
     return [action, { width: image.readUInt32BE(16), height: image.readUInt32BE(20), frames: MEWCAT_TRANSITION_ACTIONS.some(transition => transition === action) ? 2 : 8, url: `/api/mewpet/skins/${id}/${action}?v=test` }]
   }))) }))) }
   const routeSprites = async (page: Page, missing = false, motion?: MewpetMotion) => {
@@ -80,13 +80,13 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Mewcat skin={n
       const [, id, action] = url.pathname.match(/^\/api\/mewpet\/skins\/([^/]+)\/([^/]+)$/) ?? []
       const folder = definitions.find(([candidate]) => candidate === id)?.[1]
       assert.ok(folder && MEWCAT_ALL_SPRITE_ACTIONS.some(candidate => candidate === action))
-      return route.fulfill({ contentType: 'image/png', body: await fs.readFile(`${root}/public/mewcat/${folder}/${action}.png`) })
+      return route.fulfill({ contentType: 'image/png', body: await fs.readFile(`${root}/assets/mewpet/${folder}/source/${action}.png`) })
     })
     await page.route('**/mewcat/**', async route => {
       const url = new URL(route.request().url())
       const action = path.basename(url.pathname, '.png')
       if (missing && MEWCAT_TRANSITION_ACTIONS.some(transition => transition === action)) return route.fulfill({ status: 404 })
-      await route.fulfill({ contentType: 'image/png', body: await fs.readFile(`${root}/public${url.pathname}`) })
+      await route.fulfill({ contentType: 'image/png', body: await fs.readFile(`${root}/assets/mewpet/capybara/source/${path.basename(url.pathname)}`) })
     })
   }
   assert.equal(catalog.failed, false)

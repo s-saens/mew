@@ -3,6 +3,7 @@ import { protectFileResponse } from './file-response.ts'
 import { createDocumentBacklinksRouter } from './document-backlinks-routes.ts'
 import { createDebuggerRouter } from './debugger-routes.ts'
 import { mergeTaskFrontmatter, TaskFrontmatterConflict } from '../packages/editor/src/utils/task-frontmatter-merge.ts'
+import { isTaskDocumentPath } from '../shared/task-document-paths.ts'
 import { runAccountWorkspace } from './account-workspace.ts'
 import { recordChangeIp, requestIp } from './change-ip.ts'
 import { DocumentPages, DocumentPageError } from './document-pages.ts'
@@ -1501,7 +1502,7 @@ export function createApiApp() {
         return
       }
       const taskPath = path.relative(workspacePaths.root, absPath).split(path.sep).join('/')
-      if (typeof expectedContent === 'string' && /^(?:docs\/tasks\/(?:Done\/)?|tasks\/)[^/]+\.md$/.test(taskPath) && !['_tasks.md', '_done.md', 'moc.md', '_moc.md', 'readme.md'].includes(path.basename(taskPath).toLowerCase())) {
+      if (typeof expectedContent === 'string' && isTaskDocumentPath(taskPath)) {
         if (isNew) {
           res.status(409).json({ error: '태스크 문서가 삭제되거나 이동되었습니다. 목록을 다시 불러오세요.' })
           return

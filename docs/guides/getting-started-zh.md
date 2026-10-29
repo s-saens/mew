@@ -139,7 +139,7 @@ npx @liiiiv/mew-cli@latest
 
 支持 Linux glibc 2.35 以上、macOS 15 以上的 x64/arm64。Windows 请在 WSL 2 的 Ubuntu 22.04 以上运行。首次输入 owner 邮箱，用终端显示的临时密码登录并修改密码。已有账户、会话和设备注册会被保留。按[远程访问](#remote-access)步骤注册 Mewlink，终端也会显示注册链接和在线地址的二维码。
 
-按 Ctrl+C 停止，再次运行相同命令即可使用最新发布版本。如果旧 clone 使用 `.data/`，先停止旧服务器，再传入 `--data-dir /path/to/old/mew/.data`。远程桌面仍需准备可选组件和操作系统权限。[运行与数据约定](../development/cli-distribution.md) · [发布步骤](../deployment/cli-release.md)
+按 Ctrl+C 停止，再次运行相同命令即可使用最新发布版本。如果旧 clone 使用 `.data/`，先停止旧服务器，再传入 `--data-dir /path/to/old/mew/.data`。远程桌面仍需准备可选组件和操作系统权限。[运行与数据约定](../../.mew/docs/development/cli-distribution.md) · [发布步骤](../../.mew/docs/operations/cli-release.md)
 
 <a id="remote-access"></a>
 
@@ -156,9 +156,9 @@ npx @liiiiv/mew-cli@latest
 
 Mewlink 登录仅用于设备注册、列表和删除。要让其他人使用，请创建其本地 mew 账户并设置角色、功能和文件权限，使用本地密码登录时不需要 Mewlink 账户。本地登录成功前禁止访问工作数据。
 
-主机必须保持运行和联网；阻止直接连接的网络会显示连接错误。此模式不支持 Android iframe。运行 `./mew remote-access account` 可再次查看注册说明。运营者请参阅[中央服务配置](../deployment/remote-central.md)。应用此改动需要更新本地 mew 并重新部署 Mewlink，真实外网验证另行进行。
+主机必须保持运行和联网；阻止直接连接的网络会显示连接错误。此模式不支持 Android iframe。运行 `./mew remote-access account` 可再次查看注册说明。运营者请参阅[中央服务配置](../../.mew/docs/operations/remote-central.md)。应用此改动需要更新本地 mew 并重新部署 Mewlink，真实外网验证另行进行。
 
-如需无密码访问，访问者可在设备登录页面选择 **使用 Mewlink 登录 → 请求访问**。owner 在 **账户管理 → Mewlink 账户访问** 中批准身份，将其关联到现有本地用户或创建新用户（默认角色为 member）。权限由本地 mew 管理，解除关联即可撤销访问。注册账户或相同邮箱不会自动授予访问权。此流程需要更新本地 mew 并重新部署 Mewlink；登录提供者及外网验证范围请参阅[远程访问契约](../development/remote-access.md#검증과-남은-게이트)。
+如需无密码访问，访问者可在设备登录页面选择 **使用 Mewlink 登录 → 请求访问**。owner 在 **账户管理 → Mewlink 账户访问** 中批准身份，将其关联到现有本地用户或创建新用户（默认角色为 member）。权限由本地 mew 管理，解除关联即可撤销访问。注册账户或相同邮箱不会自动授予访问权。此流程需要更新本地 mew 并重新部署 Mewlink；登录提供者及外网验证范围请参阅[远程访问契约](../../.mew/docs/development/remote-access.md#검증과-남은-게이트)。
 
 #### 2. Tailscale
 
@@ -310,16 +310,16 @@ Mewlink 登录仅用于设备注册、列表和删除。要让其他人使用，
 
 ## 文档
 
-从[文档地图](../MOC.md)开始。详细产品规格、使用说明、操作流程和工作记录位于 `docs/`；本指南介绍设置和日常使用。代码更改时，请同步更新相关文档。
+从[文档地图](../../.mew/docs/MOC.md)开始。详细产品规格、使用说明、操作流程和工作记录位于 `docs/`；本指南介绍设置和日常使用。代码更改时，请同步更新相关文档。
 
 | 主题 | 从这里开始 |
 | --- | --- |
 | 项目、编辑、终端、浏览器、命令和数据库 | [用户指南](../guides/MOC.md) |
 | 环境变量、账户、搜索和 agent 运行时 | [配置](../configuration/MOC.md) |
 | HTTPS、systemd、更新和备份 | [部署](../deployment/native.md) |
-| 代码结构、包、界面、协作和 agent 协议 | [开发文档](../development/MOC.md) |
-| 产品规格、运营、当前工作和历史 | [文档地图](../MOC.md) |
-| 按账户划分的功能和文件权限 | [账户设置](../configuration/accounts.md#%EB%82%B4-%EA%B3%84%EC%A0%95%EA%B3%BC-%EA%B3%84%EC%A0%95-%EA%B4%80%EB%A6%AC) · [访问控制](../development/access-control.md) |
+| 代码结构、包、界面、协作和 agent 协议 | [开发文档](../../.mew/docs/development/MOC.md) |
+| 产品规格、运营、当前工作和历史 | [文档地图](../../.mew/docs/MOC.md) |
+| 按账户划分的功能和文件权限 | [账户设置](../configuration/accounts.md#%EB%82%B4-%EA%B3%84%EC%A0%95%EA%B3%BC-%EA%B3%84%EC%A0%95-%EA%B4%80%EB%A6%AC) · [访问控制](../../.mew/docs/development/access-control.md) |
 | 角色、身份验证和访客访问 | [安全](../operations/security.md) |
 
 在 Linux 上，`sh native/agent-memory/install.sh` 会为 agent 工作安装内存限制。有关启用、检查、低内存时暂停任务、队列保持和错误报告，请参阅 [agent 内存保护](../operations/agent-memory.md)。
