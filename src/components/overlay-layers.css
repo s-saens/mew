@@ -11,7 +11,7 @@
 
 /* Keep nested controls solid while the overlay's outer surface lets light through. */
 :root.theme-gradient :is(
-  [role='dialog'], [role='menu'], [role='listbox']:not(:where([data-inline-listbox])), [role='tooltip'],
+  [role='dialog'], [role='menu']:not(:where([data-inline-menu])), [role='listbox']:not(:where([data-inline-listbox])), [role='tooltip'],
   .mew-overlay-surface, .mewcat-notifications,
   [data-floating-panel], [data-tree-sticky-depth], [data-agent-loading], .cm-tooltip,
   :where(:root:not(.dark) .fixed.inset-0[class*='bg-black/']) > :is(.bg-surface-deep, .bg-surface, .bg-surface-raised),
@@ -22,7 +22,7 @@
   --color-surface-hover: var(--color-surface-hover-solid);
 }
 
-:root:is(.theme-gradient, :not(.dark)) :is([role='dialog'], [role='menu'], [role='listbox']:not(:where([data-inline-listbox])), [role='tooltip'], [data-floating-panel], .cm-tooltip, .mew-overlay-surface) {
+:root:is(.theme-gradient, :not(.dark)) :is([role='dialog'], [role='menu']:not(:where([data-inline-menu])), [role='listbox']:not(:where([data-inline-listbox])), [role='tooltip'], [data-floating-panel], .cm-tooltip, .mew-overlay-surface) {
   --mew-overlay-fill: var(--color-surface-raised-solid, var(--color-surface-raised));
 }
 :root:is(.theme-gradient, :not(.dark)) .bg-surface-deep { --mew-overlay-fill: var(--color-surface-deep); }
@@ -32,7 +32,7 @@
 :root:is(.theme-gradient, :not(.dark)) .mewcat-notifications { --mew-overlay-fill: var(--color-surface-solid, var(--color-surface)); }
 
 :root:is(.theme-gradient, :not(.dark)) :is(
-  [role='menu'], [role='listbox']:not(:where([data-inline-listbox])), [role='tooltip'], [data-floating-panel], .cm-tooltip,
+  [role='menu']:not(:where([data-inline-menu])), [role='listbox']:not(:where([data-inline-listbox])), [role='tooltip'], [data-floating-panel], .cm-tooltip,
   .mew-overlay-surface, .mewcat-notifications,
   [role='dialog']:is(.bg-surface-deep, .bg-surface, .bg-surface-raised),
   [role='dialog']:not(.bg-surface-deep, .bg-surface, .bg-surface-raised, .bg-surface-hover) > :is(.bg-surface-deep, .bg-surface, .bg-surface-raised),

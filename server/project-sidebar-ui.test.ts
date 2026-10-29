@@ -16,6 +16,8 @@ import {ProjectSwitcher} from '${root}/src/components/ProjectSwitcher.tsx';
 import {CommandButtonMenu} from '${root}/src/components/CommandButtonMenu.tsx';
 import {usePanelWidth} from '${root}/src/hooks/usePanelWidth.ts';
 import {I18nProvider} from '${root}/src/i18n.tsx';
+import {applyThemePalette,THEME_PRESETS} from '${root}/src/utils/theme-color.ts';
+window.setFixtureTheme=id=>applyThemePalette(THEME_PRESETS.find(theme=>theme.id===id).palette);
 window.activations=[];window.previews=[];window.opens=0;window.removals=[];window.outsideClicks=0;
 function Fixture(){
 const [paths,setPaths]=useState(['/alpha','/beta','/gamma','/work/project-with-a-long-name']);
@@ -165,9 +167,23 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     assert.ok(requests.some(request => request.method === 'GET' && request.workspacePath === '/beta-worktree'), 'active row commands target the working tree')
     await page.keyboard.press('Escape')
 
-    for (const theme of ['dark', 'light']) {
-      await page.locator('html').evaluate((el, value) => { el.className = value }, theme)
-      await page.screenshot({ path: `/tmp/mew-project-sidebar-desktop-${theme}.png` })
+    const surface = (locator: typeof sidebar) => locator.evaluate(el => {
+      const style = el.ownerDocument.defaultView!.getComputedStyle(el)
+      return { background: style.backgroundColor, blur: style.backdropFilter, surface: style.getPropertyValue('--color-surface').trim() }
+    })
+    for (const theme of ['dark', 'light', 'midnight', 'forest', 'paper', 'rose', 'ocean']) {
+      await page.evaluate(`window.setFixtureTheme(${JSON.stringify(theme)})`)
+      const projects = await surface(sidebar), files = await surface(page.locator('[data-sidebar]'))
+      assert.equal(projects.background, files.background, `${theme}: projects share the file explorer background`)
+      const list = await surface(menu)
+      assert.equal(list.background, 'rgba(0, 0, 0, 0)', `${theme}: persistent project rows have no popup fill`)
+      assert.equal(list.blur, 'none', `${theme}: persistent project rows have no popup blur`)
+      assert.equal(list.surface, projects.surface, `${theme}: rows inherit panel theme colors`)
+      await row('/beta').locator('.mew-project-command').click()
+      await commands.getByRole('button', { name: '검사 실행', exact: true }).waitFor()
+      assert.equal((await surface(commands)).blur, ['light', 'paper', 'midnight', 'rose', 'ocean'].includes(theme) ? 'blur(6px)' : 'none', `${theme}: actual command popups retain their overlay treatment`)
+      await page.keyboard.press('Escape')
+      if (['dark', 'light', 'midnight'].includes(theme)) await page.screenshot({ path: `/tmp/mew-project-sidebar-desktop-${theme}.png` })
     }
     await page.evaluate('window.setMaximized(true)')
     assert.equal(await sidebar.isVisible(), false, 'workspace maximize hides the project panel')
@@ -187,11 +203,13 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     assert.equal(await sidebar.getByRole('separator').getAttribute('aria-valuenow'), '248', 'saved panel width survives reload')
     assert.equal(await trigger.textContent(), 'beta')
 
+    await page.evaluate("window.setFixtureTheme('midnight')")
     await page.setViewportSize({ width: 390, height: 700 })
     await sidebar.waitFor({ state: 'detached' })
     await trigger.click()
     await menu.waitFor()
     assert.equal(await menu.locator('.mew-project-command').count(), 0, 'mobile keeps the original project menu rows')
+    assert.equal((await surface(menu)).blur, 'blur(6px)', 'mobile dropdowns retain the gradient popup treatment')
     const mobileBox = await menu.boundingBox(); assert.ok(mobileBox && mobileBox.x >= 0 && mobileBox.x + mobileBox.width <= 390)
     await page.screenshot({ path: '/tmp/mew-project-sidebar-mobile.png' })
     await option('/alpha').click()
