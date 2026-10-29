@@ -28,6 +28,9 @@ test('Ctrl+P와 정확 내용 검색은 전체 tree 응답 없이 통합 catalog
   fs.writeFileSync(path.join(root, 'app', 'unicode.txt'), 'a😀 😀😀 😀😀😀\nKelvin ſerver\nაბგ desiredneedle\n검색문자 사이 결과\n')
   fs.writeFileSync(path.join(root, 'app', '.env'), 'SECRET=shared permission phrase\n')
   fs.writeFileSync(path.join(root, 'docs', 'performance.md'), '# 검색 성능\n문서 고유 구절\n')
+  fs.writeFileSync(path.join(root, 'scope-root.md'), 'explorer scope phrase\n')
+  fs.writeFileSync(path.join(root, 'app', 'scope-child.md'), 'explorer scope phrase\n')
+  fs.writeFileSync(path.join(root, 'docs', 'scope-doc.md'), 'explorer scope phrase\n')
   setWorkspaceRoot(root)
 
   const app = express()
@@ -62,6 +65,17 @@ test('Ctrl+P와 정확 내용 검색은 전체 tree 응답 없이 통합 catalog
     const wildcard = await wildcardResponse.json() as { results: Array<{ path: string; project: string }> }
     assert.deepEqual(wildcard.results.map(row => [row.project, row.path]), [[WORKSPACE_PROJECT, 'app/SearchPanel.tsx']])
 
+    for (const [scopes, expected] of [
+      ['root', [[WORKSPACE_PROJECT, 'app/scope-child.md'], [WORKSPACE_PROJECT, 'docs/scope-doc.md'], [WORKSPACE_PROJECT, 'scope-root.md']]],
+      ['docs', [[DEFAULT_PROJECT, 'scope-doc.md']]],
+      ['docs,subproject:app', [[WORKSPACE_PROJECT, 'app/scope-child.md'], [DEFAULT_PROJECT, 'scope-doc.md']]],
+    ] as const) {
+      const response = await fetch(`${base}/api/search/files?${new URLSearchParams({ q: 'scope-*.md', scopes })}`)
+      assert.equal(response.status, 200)
+      const result = await response.json() as { results: Array<{ path: string; project: string }> }
+      assert.deepEqual(result.results.map(row => [row.project, row.path]), expected, scopes)
+    }
+
     await waitForSearchIndex(WORKSPACE_PROJECT)
     await waitForSearchIndex(DEFAULT_PROJECT)
     const contentResponse = await fetch(`${base}/api/search?q=uniqueNeedle&project=${encodeURIComponent(WORKSPACE_PROJECT)}`)
@@ -75,7 +89,7 @@ test('Ctrl+P와 정확 내용 검색은 전체 tree 응답 없이 통합 catalog
       const params = new URLSearchParams({ q: query, project: WORKSPACE_PROJECT, scopes: 'subproject:app', ...options })
       const response = await fetch(`${base}/api/search?${params}`)
       assert.equal(response.status, 200)
-      const json = await response.json() as { results: Array<{ path: string }>; truncated: boolean; state: string; scannedDirtyFiles: number }
+      const json = await response.json() as { results: Array<{ path: string; project: { id: string } }>; truncated: boolean; state: string; scannedDirtyFiles: number }
       assert.deepEqual(json.results.map(row => row.path), expectedPaths, query)
       const stream = await fetch(`${base}/api/search/stream?${params}`)
       const events = (await stream.text()).split('\n\n').filter(event => event.startsWith('event: '))
@@ -86,6 +100,14 @@ test('Ctrl+P와 정확 내용 검색은 전체 tree 응답 없이 통합 catalog
       assert.equal(JSON.parse(done.split('\n')[1].slice(6)).truncated, json.truncated)
       return json
     }
+
+    const rootContent = await checkBothSearches('explorer scope phrase', ['app/scope-child.md', 'docs/scope-doc.md', 'scope-root.md'], { scopes: 'root' })
+    assert.ok(rootContent.results.every(row => row.project.id === WORKSPACE_PROJECT))
+    const docsContent = await checkBothSearches('explorer scope phrase', ['scope-doc.md'], { scopes: 'docs' })
+    assert.ok(docsContent.results.every(row => row.project.id === DEFAULT_PROJECT))
+    const mixedContent = await checkBothSearches('explorer scope phrase', ['app/scope-child.md', 'scope-doc.md'], { scopes: 'docs,subproject:app' })
+    assert.deepEqual(mixedContent.results.map(row => row.project.id), [WORKSPACE_PROJECT, DEFAULT_PROJECT])
+    await checkBothSearches('explorer scope phrase', ['app/scope-child.md', 'docs/scope-doc.md', 'scope-root.md', 'scope-doc.md'], { scopes: '' })
 
     for (const query of ['a😀', '😀😀', '😀😀😀', 'ᲐᲑᲒ', 'ᲐᲑᲒ*needle', 'kelvin', 'server', '검색문자*결과']) {
       await checkBothSearches(query, ['app/unicode.txt'])
@@ -150,6 +172,7 @@ test('Ctrl+P와 정확 내용 검색은 전체 tree 응답 없이 통합 catalog
     assert.equal(guestResponse.status, 200)
     const guest = await guestResponse.json() as { results: Array<{ path: string }> }
     assert.deepEqual(guest.results.map((row) => row.path), ['app/public.md'])
+    await checkBothSearches('shared permission', ['app/public.md'], { scopes: 'root' })
 
     const longQuery = await fetch(`${base}/api/search?q=${'x'.repeat(2_001)}&project=${encodeURIComponent(WORKSPACE_PROJECT)}`)
     assert.equal(longQuery.status, 400)

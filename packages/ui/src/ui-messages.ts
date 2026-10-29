@@ -517,6 +517,7 @@ export const uiMessages = {
   "메모 왼쪽 아래 크기 조절": ["Resize memo from bottom left", "从左下角调整备忘录大小", "メモの左下でサイズ変更"],
   "메모 오른쪽 아래 크기 조절": ["Resize memo from bottom right", "从右下角调整备忘录大小", "メモの右下でサイズ変更"],
   "검색 결과 {matches}개 · 파일 {files}개": ["{matches} matches · {files} files", "{matches} 个结果 · {files} 个文件", "{matches}件の結果 · {files}個のファイル"],
+  "파일 {files}개": ["{files} files", "{files} 个文件", "{files}個のファイル"],
   "{count}개 선택": ["Selected: {count}", "已选择 {count} 个", "{count}件選択"],
   "{count}개 행": ["Rows: {count}", "{count} 行", "{count}行"],
   "선택한 파일 {count}개를 Mew 커밋 스킬로 분석해 작업 단위로 나누고 실제 커밋을 만듭니다. 필요하면 여러 커밋으로 나누며 push는 하지 않습니다.": ["The Mew commit skill analyzes {count} selected files and commits them by task. It may create multiple commits; nothing is pushed.", "Mew 提交技能将分析所选的 {count} 个文件，并按任务实际提交。可能拆分为多个提交，不会推送。", "選択した{count}個のファイルを Mew コミットスキルで分析し、作業単位で実際にコミットします。複数に分ける場合があります。push は行いません。"],

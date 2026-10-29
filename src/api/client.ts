@@ -1080,6 +1080,7 @@ export interface SearchMatch {
   /** 미리보기 text 안에서의 UTF-16 오프셋. */
   matchStart: number
   matchEnd: number
+  context?: { line: number; text: string; matchStart?: number; matchEnd?: number }[]
   lineEnd?: number
   title?: string
   heading?: string

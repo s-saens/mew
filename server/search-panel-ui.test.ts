@@ -7,30 +7,54 @@ import { compile } from '@tailwindcss/node'
 import { chromium } from 'playwright-core'
 import { domBrowserExecutable } from './browser-dom-executable.ts'
 
-test('content search keeps Korean matches highlighted and visible in narrow results', { skip: !domBrowserExecutable(), timeout: 60_000 }, async () => {
+test('explorer search filters file and document trees with contextual content previews', { skip: !domBrowserExecutable(), timeout: 90_000 }, async () => {
   const root = path.resolve(import.meta.dirname, '..')
   const workspaceExports = new Map<string, string>()
   for (const name of ['editor', 'ui', 'mobile-keys', 'shortcuts', 'tmux-term']) {
     const directory = path.join(root, 'packages', name)
     const pkg = JSON.parse(await fs.readFile(path.join(directory, 'package.json'), 'utf8'))
     for (const [entry, target] of Object.entries(pkg.exports as Record<string, string>)) {
-      workspaceExports.set(`@mew/${name}${entry === '.' ? '' : entry.slice(1)}`, path.resolve(directory, target))
+      workspaceExports.set('@mew/' + name + (entry === '.' ? '' : entry.slice(1)), path.resolve(directory, target))
     }
   }
   const query = '사이드바'
-  const texts = ['    사이드바 열기', `${'앞 문맥 '.repeat(50)}사이드바 뒤 문맥`, '<script>사이드바</script>']
-  const matches = texts.map((text, index) => ({ line: index + 1, column: 700 + index, text, matchStart: text.indexOf(query), matchEnd: text.indexOf(query) + query.length }))
-  const result = { path: '검색.md', matches }
-  const source = `import React from ${JSON.stringify(import.meta.resolve('react'))};
-import {createRoot} from ${JSON.stringify(import.meta.resolve('react-dom/client'))};
-import {SearchPanel} from ${JSON.stringify(path.join(root, 'src/components/SearchPanel.tsx'))};
-import {I18nProvider} from ${JSON.stringify(path.join(root, 'src/i18n.tsx'))};
-import {applyThemePalette,THEME_PRESETS} from ${JSON.stringify(path.join(root, 'src/utils/theme-color.ts'))};
-localStorage.setItem('mew:locale','ko');
-applyThemePalette(THEME_PRESETS.find(p=>p.id===new URLSearchParams(location.search).get('theme')).palette);
-createRoot(document.getElementById('root')).render(<I18nProvider><main className="h-full bg-surface-deep" style={{width:240}}><SearchPanel focusSignal={0} readOnly={true} project="fixture" scopes={[]} mode="content" onOpenResult={(...args)=>window.openedResult=args} onReplaced={()=>{}}/></main></I18nProvider>);`
+  const contextTexts = ['세 줄 위 문맥', '두 줄 위 문맥', '한 줄 위 문맥', '<script>사이드바</script>', '한 줄 아래 문맥', '두 줄 아래 문맥', '세 줄 아래 문맥']
+  const context = contextTexts.map((text, index) => ({
+    line: index + 4, text, ...(index === 3 ? { matchStart: text.indexOf(query), matchEnd: text.indexOf(query) + query.length } : {}),
+  }))
+  const firstMatch = { line: 7, column: 700, text: contextTexts[3], matchStart: 8, matchEnd: 8 + query.length, context }
+  const secondText = '다음 사이드바 위치'
+  const secondMatch = {
+    line: 37, column: 1204, text: secondText, matchStart: 3, matchEnd: 3 + query.length,
+    context: Array.from({ length: 7 }, (_, index) => ({ line: index + 34, text: index === 3 ? secondText : '두 번째 매치 주변 문맥 ' + index, ...(index === 3 ? { matchStart: 3, matchEnd: 3 + query.length } : {}) })),
+  }
+  const paths = ['a1/b1/c1.md', 'a1/b2/c3.md']
+  const initialTree = [{
+    type: 'dir', name: 'a1', path: 'a1', children: [
+      { type: 'dir', name: 'b1', path: 'a1/b1', children: [{ type: 'file', name: 'c1.md', path: paths[0] }] },
+      { type: 'dir', name: 'b2', path: 'a1/b2', children: [{ type: 'file', name: 'c3.md', path: paths[1] }] },
+      { type: 'file', name: 'b3.md', path: 'a1/b3.md' },
+    ],
+  }, ...Array.from({ length: 40 }, (_, index) => ({ type: 'file', name: 'unrelated-' + index + '.md', path: 'unrelated-' + index + '.md' }))]
+  const source = [
+    'import React,{useState} from ' + JSON.stringify(import.meta.resolve('react')) + ';',
+    'import {createRoot} from ' + JSON.stringify(import.meta.resolve('react-dom/client')) + ';',
+    'import {SearchPanel} from ' + JSON.stringify(path.join(root, 'src/components/SearchPanel.tsx')) + ';',
+    'import {FileTree} from ' + JSON.stringify(path.join(root, 'src/components/FileTree.tsx')) + ';',
+    'import {I18nProvider} from ' + JSON.stringify(path.join(root, 'src/i18n.tsx')) + ';',
+    'import {applyThemePalette,THEME_PRESETS} from ' + JSON.stringify(path.join(root, 'src/utils/theme-color.ts')) + ';',
+    'localStorage.setItem("mew:locale","ko");',
+    'const params=new URLSearchParams(location.search),initialDocs=params.get("docs")==="1",tree=' + JSON.stringify(initialTree) + ';',
+    'applyThemePalette(THEME_PRESETS.find(p=>p.id===params.get("theme")).palette);',
+    'const noop=()=>{}, scopes=[];',
+    'const readDir=(nodes,path)=>{for(const node of nodes){if(node.path===path)return node.children??[];const found=node.children&&readDir(node.children,path);if(found)return found}return null};',
+    'const loadChildren=path=>window.deferPageLoad&&path==="a1"?new Promise(resolve=>{window.resolvePageLoad=resolve;window.pageLoadPending=true}):Promise.resolve(readDir(tree,path)??[]);',
+    'function Fixture(){const [mode,setMode]=useState("files"),[docs,setDocs]=useState(initialDocs),[selectedPath,setSelectedPath]=useState(null);window.setDocs=setDocs;return <I18nProvider><main className="h-full bg-surface-deep" style={{width:240,maxWidth:"100vw"}}><SearchPanel focusSignal={0} readOnly project=".workspace" scope={docs?"docs":"root"} scopes={scopes} mode={mode} onModeChange={setMode} onOpenResult={(...args)=>{window.openedResult=args;setSelectedPath(args[0])}} onReplaced={noop} registerSearchCancel={fn=>window.cancelSearch=fn}>{search=><FileTree project=".workspace" tree={tree} search={search} loadChildren={loadChildren} documentPages={docs} selectedPath={selectedPath} readOnly newFileSignal={{n:0,parentPath:null}} revealSignal={0} presence={{}} onSelect={path=>{window.openedFile=path;setSelectedPath(path)}} onFileCreated={noop} onFolderCreated={noop} onRenamed={noop} onDeleted={noop} onNotice={noop}/>}</SearchPanel></main></I18nProvider>}',
+    'createRoot(document.getElementById("root")).render(<Fixture/>);',
+  ].join('\n')
   const candidates = [source], styles: string[] = []
-  const bundle = await build({ input: 'virtual:search-panel.tsx', write: false, platform: 'browser', output: { format: 'esm', codeSplitting: false },
+  const bundle = await build({
+    input: 'virtual:search-panel.tsx', write: false, platform: 'browser', output: { format: 'esm', codeSplitting: false },
     onwarn(warning, defaultHandler) { if (warning.code !== 'MODULE_LEVEL_DIRECTIVE') defaultHandler(warning) },
     transform: { jsx: 'react-jsx', define: { 'process.env.NODE_ENV': JSON.stringify('test') } },
     plugins: [{
@@ -49,46 +73,254 @@ createRoot(document.getElementById('root')).render(<I18nProvider><main className
   const css = compiler.build([...new Set(candidates.join('\n').match(/[A-Za-z0-9_@!&:/.[\]()%,-]+/g))]) + styles.join('\n')
   const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
   try {
-    for (const { width, theme } of [{ width: 1100, theme: 'midnight' }, { width: 390, theme: 'rose' }]) {
-      const page = await browser.newPage({ viewport: { width, height: 640 }, hasTouch: width < 768, isMobile: width < 768 })
-      page.setDefaultTimeout(5000)
-      const errors: string[] = []
-      page.on('pageerror', error => errors.push(error.message))
-      await page.route('http://mew-search-panel.test/**', route => {
-        const pathname = new URL(route.request().url()).pathname
-        if (pathname === '/app.js') return route.fulfill({ contentType: 'text/javascript', body: chunk.code })
-        if (pathname === '/api/search/stream') return route.fulfill({ contentType: 'text/event-stream', body: `event: result\ndata: ${JSON.stringify(result)}\n\nevent: done\ndata: {"truncated":false,"state":"ready"}\n\n` })
-        if (pathname.startsWith('/api/')) return route.fulfill({ json: [] })
-        return route.fulfill({ contentType: 'text/html', body: `<!doctype html><html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}</style><div id="root"></div><script type="module" src="/app.js"></script></html>` })
-      })
-      await page.goto(`http://mew-search-panel.test/?theme=${theme}`)
-      await page.locator('input').fill(query)
-      const marks = page.locator('mark')
-      await marks.nth(2).waitFor()
-      assert.deepEqual(await marks.allTextContents(), [query, query, query])
-      for (const mark of await marks.all()) {
-        const view = await mark.evaluate(el => {
-          const box = el.getBoundingClientRect()
-          const row = el.closest('button')!.getBoundingClientRect()
-          const style = el.ownerDocument.defaultView!.getComputedStyle(el)
-          return { left: box.left, right: box.right, width: box.width, rowLeft: row.left, rowRight: row.right, background: style.backgroundColor, weight: style.fontWeight }
+    for (const docs of [false, true]) {
+      for (const { width, theme } of [{ width: 1100, theme: 'midnight' }, { width: 390, theme: 'rose' }]) {
+        const page = await browser.newPage({ viewport: { width, height: 640 }, hasTouch: width < 768, isMobile: width < 768 })
+        page.setDefaultTimeout(5000)
+        const errors: string[] = []
+        const requests: URL[] = []
+        const delayed = new Map<string, () => Promise<void>>()
+        const delayWaiters = new Map<string, () => void>()
+        const delayKey = (route: string, query: string, scope = 'root') => [route, query, scope].join('|')
+        const waitForDelayed = (key: string) => new Promise<void>(resolve => delayWaiters.set(key, resolve))
+        page.on('pageerror', error => errors.push(error.message))
+        await page.route('http://mew-search-panel.test/**', route => {
+          const url = new URL(route.request().url())
+          if (url.pathname === '/app.js') return route.fulfill({ contentType: 'text/javascript', body: chunk.code })
+          if (url.pathname === '/api/search/files') {
+            requests.push(url)
+            const responseDocs = url.searchParams.get('scopes') === 'docs'
+            const q = url.searchParams.get('q')!
+            const results = (q === 'c*.md' ? paths : q.startsWith('slow-') ? ['a1/b3.md'] : []).map(path => ({
+              path, project: responseDocs ? 'docs' : '.workspace', scope: { id: responseDocs ? 'docs' : 'root', label: responseDocs ? 'Documents' : 'fixture', icon: 'i:folder' },
+            }))
+            const respond = () => route.fulfill({ json: { state: 'ready', version: 1, results } })
+            if (q === 'slow-clear' || q === 'slow-mode') {
+              const key = delayKey(url.pathname, q, url.searchParams.get('scopes')!)
+              delayed.set(key, respond)
+              delayWaiters.get(key)?.()
+              return
+            }
+            return respond()
+          }
+          if (url.pathname === '/api/search/stream') {
+            requests.push(url)
+            const responseDocs = url.searchParams.get('scopes') === 'docs'
+            const q = url.searchParams.get('q')!
+            const stale = q === 'slow-scope' && !responseDocs
+            const results = (stale ? ['a1/b3.md'] : paths).map(path => ({ path, matches: path === paths[0] ? [firstMatch, secondMatch] : [firstMatch], project: { id: responseDocs ? 'docs' : '.workspace', label: 'fixture', kind: responseDocs ? 'docs' : 'root' } }))
+            const respond = () => route.fulfill({ contentType: 'text/event-stream', body: results.map(result => 'event: result\ndata: ' + JSON.stringify(result) + '\n\n').join('') + 'event: done\ndata: {"truncated":false,"state":"ready"}\n\n' })
+            if (stale) {
+              const key = delayKey(url.pathname, q, 'root')
+              delayed.set(key, respond)
+              delayWaiters.get(key)?.()
+              return
+            }
+            return respond()
+          }
+          if (url.pathname.startsWith('/api/')) return route.fulfill({ json: [] })
+          return route.fulfill({ contentType: 'text/html', body: '<!doctype html><html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>' + css + '</style><div id="root"></div><script type="module" src="/app.js"></script></html>' })
         })
-        assert.ok(view.width > 0 && view.left >= view.rowLeft && view.right <= view.rowRight, 'the entire Korean match remains inside the result row')
-        assert.ok(!['transparent', 'rgba(0, 0, 0, 0)'].includes(view.background), 'the highlight has a visible background')
-        assert.ok(Number(view.weight) >= 600, 'the match stands out from the surrounding text')
+        try {
+          await page.goto('http://mew-search-panel.test/?theme=' + theme + '&docs=' + Number(docs))
+          const row = (path: string) => page.locator('button[data-path="' + path + '"]')
+          const expansion = (path: string) => docs
+            ? page.locator('[data-document-page="' + path + '"] > :first-child button[aria-expanded]').first()
+            : row(path)
+          const input = page.getByRole('textbox', { name: '파일명 검색', exact: true })
+          await input.waitFor()
+          assert.equal(await page.getByRole('textbox').count(), 1, 'one search input serves the explorer')
+          assert.equal(await page.getByRole('tab').count(), 0, 'the explorer has no search tabs')
+          assert.equal(await expansion('a1').getAttribute('aria-expanded'), 'false')
+          const browsingList = page.locator('[data-tree-key=".workspace"] > div[tabindex="-1"]')
+          if (!docs && width === 1100) {
+            await browsingList.evaluate(el => new Promise<void>(resolve => {
+              const view = el.ownerDocument.defaultView!
+              el.dispatchEvent(new view.Event('wheel', { bubbles: true }))
+              el.scrollTop = 140
+              view.requestAnimationFrame(() => view.requestAnimationFrame(() => resolve()))
+            }))
+            assert.equal(await browsingList.evaluate(el => el.scrollTop), 140)
+          }
+          await input.fill('c*.md')
+          await page.locator('[data-search-match="true"]').nth(1).waitFor()
+          assert.deepEqual(await page.locator('[data-search-match="true"]').evaluateAll(elements => elements.map(el => el.getAttribute('data-path'))), paths)
+          for (const path of ['a1', 'a1/b1', 'a1/b2']) assert.equal(await expansion(path).getAttribute('aria-expanded'), 'true', path + ' is expanded for its matching descendant')
+          assert.equal(await row('a1/b3.md').count(), 0, 'siblings that do not match are excluded')
+          assert.equal(await row(paths[0]).innerText(), docs ? 'C1' : 'c1.md', 'results retain the current explorer layout')
+          assert.equal(await page.locator('[data-document-page="' + paths[0] + '"]').count(), Number(docs))
+          assert.equal(requests.at(-1)!.searchParams.get('scopes'), docs ? 'docs' : 'root')
+          if (docs && width === 1100) {
+            await page.evaluate('window.deferPageLoad=true')
+            await row('a1').click()
+            await page.waitForFunction('window.pageLoadPending===true')
+            await row(paths[0]).click()
+            await page.evaluate('window.resolvePageLoad([{type:"file",name:"_a1.md",path:"a1/_a1.md"}]);window.deferPageLoad=false')
+            await browsingList.evaluate(el => new Promise<void>(resolve => {
+              const view = el.ownerDocument.defaultView!
+              view.requestAnimationFrame(() => view.requestAnimationFrame(() => resolve()))
+            }))
+            assert.equal(await page.evaluate('window.openedFile'), paths[0], 'a delayed ancestor representative cannot replace a subsequently opened search match')
+          }
+          await row(paths[0]).click()
+          assert.equal(await page.evaluate('window.openedFile'), paths[0])
+
+          for (const [label, option] of [['대소문자 구분', 'case'], ['정규식 사용', 'regex']]) {
+            const request = page.waitForRequest(request => {
+              const url = new URL(request.url())
+              return url.pathname === '/api/search/files' && url.searchParams.get(option) === '1'
+            })
+            await page.getByRole('button', { name: label, exact: true }).click()
+            await request
+            assert.equal(await page.getByRole('button', { name: label, exact: true }).getAttribute('aria-pressed'), 'true')
+          }
+          await page.getByRole('button', { name: '검색 지우기', exact: true }).click()
+          if (!docs && width === 1100) {
+            await page.getByRole('button', { name: '검색 지우기', exact: true }).waitFor({ state: 'detached' })
+            assert.equal(await browsingList.evaluate(el => el.scrollTop), 140, 'clearing a short search restores the browsing scroll recorded before DOM truncation')
+          }
+          await row('a1').waitFor()
+          assert.equal(await input.inputValue(), '')
+          assert.equal(await expansion('a1').getAttribute('aria-expanded'), 'false', 'clearing restores the original collapsed explorer')
+          assert.equal(await row(paths[0]).count(), 0)
+          await expansion('a1').click()
+          await expansion('a1/b1').click()
+          await row(paths[0]).waitFor()
+          await input.fill('c*.md')
+          await row(paths[1]).waitFor()
+          await page.getByRole('button', { name: '검색 지우기', exact: true }).click()
+          await row('a1/b3.md').waitFor()
+          assert.equal(await expansion('a1/b1').getAttribute('aria-expanded'), 'true', 'a previously browsed folder stays open')
+          assert.equal(await expansion('a1/b2').getAttribute('aria-expanded'), 'false', 'temporary search expansion is discarded')
+
+          for (const label of ['대소문자 구분', '정규식 사용']) await page.getByRole('button', { name: label, exact: true }).click()
+          await input.fill(query)
+          await page.getByRole('button', { name: '파일 내용 검색', exact: true }).click()
+          const contentInput = page.getByRole('textbox', { name: '파일 내용 검색', exact: true })
+          assert.equal(await contentInput.inputValue(), query, 'the content toggle preserves the query')
+          await page.locator('[data-search-match="true"]').nth(1).waitFor()
+          assert.equal(await page.getByRole('button', { name: '파일 내용 검색', exact: true }).getAttribute('aria-pressed'), 'true')
+          assert.equal(requests.at(-1)!.searchParams.get('scopes'), docs ? 'docs' : 'root')
+          assert.equal(await row('a1/b3.md').count(), 0)
+          await row(paths[0]).hover()
+          const tooltip = page.getByRole('tooltip')
+          await tooltip.waitFor()
+          const tooltipText = await tooltip.textContent() ?? ''
+          for (const text of contextTexts) assert.ok(tooltipText.includes(text), 'the hover preview includes ' + text)
+          assert.deepEqual(await tooltip.locator('[data-search-context-line]').evaluateAll(elements => elements.map(el => Number(el.getAttribute('data-search-context-line')))), [4, 5, 6, 7, 8, 9, 10])
+          assert.equal(await tooltip.locator('[data-search-context-line="7"] mark').innerText(), query)
+          assert.equal(await tooltip.locator('script').count(), 0, 'content previews escape markup')
+          assert.deepEqual(await tooltip.locator('mark').allTextContents(), [query])
+          const highlight = await tooltip.locator('mark').evaluate(el => {
+            const box = el.getBoundingClientRect(), style = el.ownerDocument.defaultView!.getComputedStyle(el)
+            return { left: box.left, right: box.right, width: box.width, viewport: el.ownerDocument.defaultView!.innerWidth, background: style.backgroundColor, weight: style.fontWeight }
+          })
+          assert.ok(highlight.width > 0 && highlight.left >= 0 && highlight.right <= highlight.viewport, 'the Korean match stays visible in the tooltip')
+          assert.ok(!['transparent', 'rgba(0, 0, 0, 0)'].includes(highlight.background))
+          assert.ok(Number(highlight.weight) >= 600)
+          if (process.env.MEW_UI_SCREENSHOTS) {
+            await fs.mkdir(process.env.MEW_UI_SCREENSHOTS, { recursive: true })
+            await page.screenshot({ path: path.join(process.env.MEW_UI_SCREENSHOTS, 'search-tree-' + (docs ? 'documents' : 'files') + '-' + width + '-' + theme + '.png') })
+          }
+          if (!docs && width === 1100) {
+            await row('a1').hover()
+            await tooltip.waitFor({ state: 'hidden' })
+            await row(paths[0]).hover()
+            await tooltip.waitFor()
+            await tooltip.getByRole('button', { name: '다음 매치', exact: true }).click()
+            await tooltip.locator('[data-search-context-line="37"]').waitFor()
+            assert.deepEqual(await tooltip.locator('[data-search-context-line]').evaluateAll(elements => elements.map(el => Number(el.getAttribute('data-search-context-line')))), [34, 35, 36, 37, 38, 39, 40])
+            assert.equal(await tooltip.getByRole('button', { name: '다음 매치', exact: true }).isDisabled(), true)
+            await tooltip.getByRole('button', { name: '파일 열기', exact: true }).click()
+            const secondOpened = await page.evaluate('window.openedResult') as [string, typeof secondMatch]
+            assert.equal(secondOpened[0], paths[0])
+            assert.equal(secondOpened[1].line, secondMatch.line)
+            assert.equal(secondOpened[1].column, secondMatch.column, 'tooltip navigation opens the selected match at its original position')
+          }
+          await row(paths[0]).click()
+          const opened = await page.evaluate('window.openedResult') as [string, typeof firstMatch, string, unknown, string]
+          assert.equal(opened[0], paths[0])
+          assert.equal(opened[1].line, firstMatch.line)
+          assert.equal(opened[1].column, firstMatch.column, 'opening a content match preserves its original document column')
+          assert.equal(opened[2], query)
+          assert.equal(opened[4], docs ? 'docs' : '.workspace')
+          assert.equal(await page.evaluate('window.cancelSearch()'), true)
+          await page.getByRole('button', { name: '검색 지우기', exact: true }).waitFor({ state: 'detached' })
+          assert.equal(await contentInput.inputValue(), '')
+          assert.equal(await page.evaluate('window.cancelSearch()'), false)
+          assert.equal(await expansion('a1/b1').getAttribute('aria-expanded'), 'true', 'opening a search result preserves browsed expansion after clearing')
+          assert.equal(await expansion('a1/b2').getAttribute('aria-expanded'), 'false')
+          if (!docs && width === 1100) {
+            const flushFrames = () => page.locator('main').evaluate(el => new Promise<void>(resolve => {
+              const view = el.ownerDocument.defaultView!
+              view.requestAnimationFrame(() => view.requestAnimationFrame(() => resolve()))
+            }))
+            const matchedPaths = () => page.locator('[data-search-match="true"]').evaluateAll(elements => elements.map(el => el.getAttribute('data-path')))
+            const waitForAbort = (pathname: string, query: string) => page.waitForEvent('requestfailed', { predicate: request => {
+              const url = new URL(request.url())
+              return url.pathname === pathname && url.searchParams.get('q') === query
+            } })
+            await page.getByRole('button', { name: '파일 내용 검색', exact: true }).click()
+            const fileInput = page.getByRole('textbox', { name: '파일명 검색', exact: true })
+            await fileInput.fill('debounced')
+            await page.getByRole('button', { name: '검색 지우기', exact: true }).click()
+            await fileInput.fill('c*.md')
+            await page.locator('[data-search-match="true"]').nth(1).waitFor()
+            assert.equal(requests.some(url => url.searchParams.get('q') === 'debounced'), false, 'clearing cancels a pending debounce before a later request completes')
+            await page.getByRole('button', { name: '검색 지우기', exact: true }).click()
+
+            const clearKey = delayKey('/api/search/files', 'slow-clear')
+            const clearHeld = waitForDelayed(clearKey)
+            await fileInput.fill('slow-clear')
+            await clearHeld
+            const clearAborted = waitForAbort('/api/search/files', 'slow-clear')
+            await page.getByRole('button', { name: '검색 지우기', exact: true }).click()
+            await delayed.get(clearKey)!()
+            await clearAborted
+            await flushFrames()
+            assert.equal(await fileInput.inputValue(), '')
+            assert.deepEqual(await matchedPaths(), [], 'a late response cannot restore a cleared search')
+            assert.equal(await page.getByRole('status').count(), 0)
+
+            const modeKey = delayKey('/api/search/files', 'slow-mode')
+            const modeHeld = waitForDelayed(modeKey)
+            await fileInput.fill('slow-mode')
+            await modeHeld
+            const modeAborted = waitForAbort('/api/search/files', 'slow-mode')
+            await page.getByRole('button', { name: '파일 내용 검색', exact: true }).click()
+            await page.locator('[data-search-match="true"]').nth(1).waitFor()
+            await delayed.get(modeKey)!()
+            await modeAborted
+            await flushFrames()
+            assert.deepEqual(await matchedPaths(), paths, 'a previous filename response cannot overwrite content results after a mode switch')
+            assert.equal(await contentInput.inputValue(), 'slow-mode')
+
+            const scopeKey = delayKey('/api/search/stream', 'slow-scope')
+            const scopeHeld = waitForDelayed(scopeKey)
+            await contentInput.fill('slow-scope')
+            await scopeHeld
+            const scopeAborted = waitForAbort('/api/search/stream', 'slow-scope')
+            const docsRequest = page.waitForRequest(request => {
+              const url = new URL(request.url())
+              return url.pathname === '/api/search/stream' && url.searchParams.get('q') === 'slow-scope' && url.searchParams.get('scopes') === 'docs'
+            })
+            await page.evaluate('window.setDocs(true)')
+            await docsRequest
+            await page.locator('[data-search-match="true"]').nth(1).waitFor()
+            await delayed.get(scopeKey)!()
+            await scopeAborted
+            await flushFrames()
+            assert.deepEqual(await matchedPaths(), paths, 'a previous root response cannot overwrite Documents results after a scope switch')
+            assert.equal(await page.locator('[data-document-page="' + paths[0] + '"]').count(), 1)
+            assert.equal(await row('a1/b3.md').count(), 0)
+            await row(paths[0]).click()
+            assert.equal((await page.evaluate('window.openedResult') as [string, unknown, string, unknown, string])[4], 'docs')
+            await page.getByRole('button', { name: '검색 지우기', exact: true }).click()
+            await page.evaluate('window.setDocs(false)')
+          }
+          assert.deepEqual(errors, [])
+        } finally { await page.close() }
       }
-      assert.equal(await page.locator('main script').count(), 0, 'preview text is escaped')
-      await marks.nth(1).click()
-      const opened = await page.evaluate('window.openedResult') as [string, typeof matches[number], string]
-      assert.equal(opened[0], result.path)
-      assert.equal(opened[1].column, matches[1].column, 'clicking a preview preserves its original document column')
-      assert.equal(opened[2], query)
-      assert.deepEqual(errors, [])
-      if (process.env.MEW_UI_SCREENSHOTS) {
-        await fs.mkdir(process.env.MEW_UI_SCREENSHOTS, { recursive: true })
-        await page.screenshot({ path: path.join(process.env.MEW_UI_SCREENSHOTS, `search-panel-${width}-${theme}.png`) })
-      }
-      await page.close()
     }
   } finally { await browser.close() }
 })

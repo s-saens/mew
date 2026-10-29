@@ -517,14 +517,13 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
   const [readyNoticeTarget, setReadyNoticeTarget] = useState<typeof noticeTarget>()
   const [mewcatHideDesktop, setMewcatHideDesktop] = useState(loadMewcatHideDesktop)
   const [mewcatSkin, setMewcatSkin] = useState<MewcatSkinSelection>(loadMewcatSkin)
-  const [searchFocusSignal] = useState(0)
-  // 사이드바 뷰: 탐색기 · 파일명 검색(Ctrl+P) · 파일 내용 검색(Ctrl+Shift+F)
-  const [sidebarView, setSidebarView] = useState<'files' | 'search' | 'content-search'>('files')
-  const searchMounted = useRef(false)
-  if (sidebarView === 'search' || sidebarView === 'content-search') searchMounted.current = true
+  // Keep the stored search preference compatible with earlier sidebar layouts.
+  const [sidebarView, setSidebarView] = useState<'files' | 'content-search'>('files')
+  const [projectSearchClearSignal, setProjectSearchClearSignal] = useState(0)
   const [projectSearchFocus, setProjectSearchFocus] = useState(0)
   const sidebarCreate = useSidebarCreate(rootProjectPath, (scope) => {
     setSidebarView('files')
+    setProjectSearchClearSignal(value => value + 1)
     setDocsExpanded(scope === 'docs')
   }, docsExpanded ? 'docs' : 'root')
   // 사이드바에서 지금 문서 자리를 드러내라는 신호(부모 폴더 펼치기 + 스크롤). 경로가 아니라 신호인 이유는
@@ -1276,17 +1275,6 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     if (next) selectDockPanel(next, false)
   }
 
-  const switchSidebarTab = useCallback((direction: 'next' | 'previous') => {
-    const views: typeof sidebarView[] = ['files', 'search', 'content-search']
-    const index = views.indexOf(sidebarView)
-    const nextIndex = direction === 'next'
-      ? (index + 1) % views.length
-      : (index - 1 + views.length) % views.length
-    const nextView = views[nextIndex]
-    setSidebarView(nextView)
-    if (nextView === 'search' || nextView === 'content-search') setProjectSearchFocus((value) => value + 1)
-  }, [sidebarView])
-
   const switchCurrentWindowTabRight = useCallback(() => {
     let surface = activeTabbedSurfaceRef.current
     if (surface === 'agent' && !agentOpen || surface === 'terminal' && !terminalOpen) surface = 'editor'
@@ -1300,16 +1288,13 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
       setAgentNextTabSignal((value) => value + 1)
       return
     }
-    if (surface === 'sidebar') {
-      switchSidebarTab('next')
-      return
-    }
+    if (surface === 'sidebar') return
     if (tabs.length < 2 || !activePath) return
     const index = tabs.findIndex((tab) => activeTab?.id ? tab.id === activeTab.id : tab.path === activePath)
     if (index < 0) return
     const target = tabs[(index + 1) % tabs.length]
     setActivePath(target.path, focusedPaneId, target.id)
-  }, [activePath, activeTab?.id, agentOpen, terminalOpen, gitOpen, tasksOpen, focusedPaneId, setActivePath, sidebarOpen, switchSidebarTab, tabs])
+  }, [activePath, activeTab?.id, agentOpen, terminalOpen, gitOpen, tasksOpen, focusedPaneId, setActivePath, sidebarOpen, tabs])
 
   const switchCurrentWindowTabLeft = useCallback(() => {
     let surface = activeTabbedSurfaceRef.current
@@ -1324,16 +1309,13 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
       setAgentPreviousTabSignal((value) => value + 1)
       return
     }
-    if (surface === 'sidebar') {
-      switchSidebarTab('previous')
-      return
-    }
+    if (surface === 'sidebar') return
     if (tabs.length < 2 || !activePath) return
     const index = tabs.findIndex((tab) => activeTab?.id ? tab.id === activeTab.id : tab.path === activePath)
     if (index < 0) return
     const target = tabs[(index - 1 + tabs.length) % tabs.length]
     setActivePath(target.path, focusedPaneId, target.id)
-  }, [activePath, activeTab?.id, agentOpen, terminalOpen, gitOpen, tasksOpen, focusedPaneId, setActivePath, sidebarOpen, switchSidebarTab, tabs])
+  }, [activePath, activeTab?.id, agentOpen, terminalOpen, gitOpen, tasksOpen, focusedPaneId, setActivePath, sidebarOpen, tabs])
 
   const mobileSwipeRoot = useMobilePanelSwipe((panel, direction) => {
     if (remoteDesktopOpen || panel !== (mobileForegroundPanel ?? 'editor')) return
@@ -1402,7 +1384,8 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
         setSidebarOpen(chrome.sidebarOpen)
         restoredOpen.sidebar = chrome.sidebarOpen
       }
-      if (chrome.sidebarView === 'files' || chrome.sidebarView === 'search' || chrome.sidebarView === 'content-search') setSidebarView(chrome.sidebarView)
+      if (chrome.sidebarView === 'files' || chrome.sidebarView === 'content-search') setSidebarView(chrome.sidebarView)
+      else if (chrome.sidebarView === 'search') setSidebarView('files')
       else if (chrome.sidebarView === 'commands') setSidebarView('files')
       // 보조 패널은 모바일에서 화면 전체를 덮는 기기별 상태다. 계정 원장의 이전 값으로
       // 로컬의 방금 연 에이전트를 닫아 버리면 전면 순서를 복원할 수 없으므로, 서버 원장은
@@ -1596,11 +1579,11 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
         saveCurrentTab(true)
       } else if (matchesShortcut(e, getBinding('quickOpen'))) {
         e.preventDefault()
-        setSidebarView('search')
+        setSidebarView('files')
         openWorkspacePanel('sidebar')
         setProjectSearchFocus((s) => s + 1)
       } else if (matchesShortcut(e, getBinding('projectSearch'))) {
-        // VSCode Ctrl+Shift+F — 사이드바를 검색 뷰로 열고 검색창에 포커스
+        // Ctrl+Shift+F enables content search in the explorer's shared input.
         e.preventDefault()
         openWorkspacePanel('sidebar')
         setSidebarView('content-search')
@@ -2166,83 +2149,32 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
             style={{ width: isDesktop() ? sidebarWidth : undefined }}
           >
             <div className="flex min-w-0 flex-1 flex-col">
-              {/* 탐색기 ↔ 검색(Ctrl+Shift+F) 전환 — 프로젝트 전환 버튼은 헤더 맨 왼쪽에 있다 */}
-              <div className="flex h-9 shrink-0 items-center gap-1 border-b border-edge pl-2">
-                <button
-                  type="button"
-                  data-numbered-tab
-                  onClick={() => setSidebarView('files')}
-                  aria-pressed={sidebarView === 'files'}
-                  className={`rounded p-1 ${sidebarView === 'files' ? 'bg-surface-raised text-ink' : 'text-ink-muted hover:bg-surface-hover'}`}
-                  title={uiText("탐색기")}
-                  aria-label={uiText("탐색기")}
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M4 20h16a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1h-7.9a1 1 0 0 1-.79-.38l-1.62-2.24A1 1 0 0 0 8.9 4H4a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1Z" />
-                  </svg>
-                </button>
-                <button
-                  type="button" data-numbered-tab
-                  onClick={() => {
-                    setSidebarView('search')
-                    setProjectSearchFocus((s) => s + 1)
-                  }}
-                  aria-pressed={sidebarView === 'search'}
-                  className={`rounded p-1 ${sidebarView === 'search' ? 'bg-surface-raised text-ink' : 'text-ink-muted hover:bg-surface-hover'}`}
-                  title={uiText("파일명 검색 (Ctrl+P)")}
-                  aria-label={uiText("파일명 검색")}
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="11" cy="11" r="7" />
-                    <path d="m21 21-4.3-4.3" />
-                  </svg>
-                </button>
-                <button
-                  type="button" data-numbered-tab
-                  onClick={() => {
-                    setSidebarView('content-search')
-                    setProjectSearchFocus((s) => s + 1)
-                  }}
-                  aria-pressed={sidebarView === 'content-search'}
-                  className={`rounded p-1 ${sidebarView === 'content-search' ? 'bg-surface-raised text-ink' : 'text-ink-muted hover:bg-surface-hover'}`}
-                  title={uiText("파일 내용 검색 (Ctrl+Shift+F)")}
-                  aria-label={uiText("파일 내용 검색")}
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                    <path d="M14 2v6h6M8 13h8M8 17h5" />
-                    <circle cx="17.5" cy="17.5" r="2.5" />
-                    <path d="m19.4 19.4 1.6 1.6" />
-                  </svg>
-                </button>
-                {!isGuest && caps.filesRead && caps.filesWrite && <SidebarCreateButtons documents={docsExpanded} onCreate={sidebarCreate.create} disabled={!workspaceUiLoaded || sidebarStateLoadedRootRef.current !== projectUiPath} />}
-                <PanelCloseButton onClick={() => closeWorkspacePanel('sidebar')} className={isGuest ? 'ml-auto' : ''} aria-label={uiText("파일 탐색기 닫기")} />
-              </div>
-              <div className="min-h-0 flex-1">
-                <div className={sidebarView === 'files' ? 'flex h-full flex-col' : 'hidden'}>
-                  {!isGuest && <div className="shrink-0 border-b border-edge p-1">
-                    <div role="group" aria-label={uiText("탐색 범위")} data-explorer-toggle className="flex w-full rounded-md bg-surface p-0.5 text-xs">
-                      {(['docs', 'files'] as const).map(scope => {
-                        const selected = (scope === 'docs') === docsExpanded
-                        return <button key={scope} type="button" aria-pressed={selected}
-                          onClick={() => { setDocsExpanded(scope === 'docs'); sidebarCreate.selectDirectory(scope === 'docs' ? 'docs' : 'root', '') }}
-                          onContextMenu={scope === 'docs' && isOwner ? event => { event.preventDefault(); setDocsSettingsOpen(true) } : undefined}
-                          onKeyDown={event => {
-                            if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
-                            event.preventDefault()
-                            const next = event.key === 'Home' ? 'docs' : event.key === 'End' ? 'files' : scope === 'docs' ? 'files' : 'docs'
-                            setDocsExpanded(next === 'docs')
-                            const buttons = event.currentTarget.parentElement?.querySelectorAll('button')
-                            buttons?.[next === 'docs' ? 0 : 1]?.focus()
-                          }}
-                          className={`min-w-0 flex-1 rounded px-3 py-1.5 focus-visible:outline-2 focus-visible:outline-accent ${selected ? 'bg-surface-raised text-ink' : 'text-ink-muted hover:text-ink-secondary'}`}>
-                          {scope === 'docs' ? t('explorer.documents') : t('explorer.files')}
-                        </button>
-                      })}
-                    </div>
-                  </div>}
-                  <div className="min-h-0 flex-1">
+              <SearchPanel
+                key={`${rootProjectPath ?? ''}:${workspaceUiRevision}`}
+                focusSignal={projectSearchFocus}
+                clearSignal={projectSearchClearSignal + revealSignal}
+                readOnly={isGuest || !caps.filesRead || !caps.filesWrite}
+                project={isGuest || docsExpanded ? DEFAULT_PROJECT : WORKSPACE_PROJECT}
+                scope={isGuest || docsExpanded ? 'docs' : 'root'}
+                scopes={isGuest ? [] : rootSubprojects.map(subproject => ({ id: `subproject:${subproject.path}`, label: subproject.name, icon: subproject.icon ?? 'i:folder' }))}
+                mode={sidebarView === 'content-search' ? 'content' : 'files'}
+                onModeChange={mode => setSidebarView(mode === 'content' ? 'content-search' : 'files')}
+                onOpenResult={openSearchResult}
+                onReplaced={refreshTree}
+                refreshSignal={treeRefreshSignal}
+                registerSearchCancel={registerSidebarSearchCancel}
+                actions={<div className="flex h-9 shrink-0 items-center gap-1 border-b border-edge pl-1.5" data-explorer-toggle
+                  onContextMenu={!isGuest && docsExpanded && isOwner ? event => { event.preventDefault(); setDocsSettingsOpen(true) } : undefined}>
+                  {!isGuest && <SelectField compact label={uiText('탐색 범위')} value={docsExpanded ? 'docs' : 'files'} className="min-w-0 flex-1"
+                    options={[{ value: 'docs', label: t('explorer.documents') }, { value: 'files', label: t('explorer.files') }]}
+                    onChange={value => { setDocsExpanded(value === 'docs'); sidebarCreate.selectDirectory(value === 'docs' ? 'docs' : 'root', '') }} />}
+                  {!isGuest && caps.filesRead && caps.filesWrite && <SidebarCreateButtons documents={docsExpanded} onCreate={sidebarCreate.create} disabled={!workspaceUiLoaded || sidebarStateLoadedRootRef.current !== projectUiPath} />}
+                  <PanelCloseButton onClick={() => closeWorkspacePanel('sidebar')} className={isGuest ? 'ml-auto' : ''} aria-label={uiText('파일 탐색기 닫기')} />
+                </div>}
+              >
+                {search => <>
                     {(isGuest || (workspaceUiLoaded && sidebarStateLoadedRootRef.current === projectUiPath)) && <FileTree
+                      search={search}
                       key={`${isGuest || docsExpanded ? DEFAULT_PROJECT : WORKSPACE_PROJECT}:${rootProjectPath ?? ''}:${workspaceUiRevision}`}
                       {...sidebarCreate.treeProps(isGuest || docsExpanded ? 'docs' : 'root')}
                       tree={isGuest || docsExpanded ? docsTree : rootNodes}
@@ -2264,7 +2196,6 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
                       loadChildren={isGuest || docsExpanded ? loadDocsTreeChildren : loadWorkspaceTreeChildren}
                       treeInvalidation={treeInvalidation}
                       refreshSignal={treeRefreshSignal}
-                      searchFocusSignal={searchFocusSignal}
                       newFileSignal={{ n: 0, parentPath: null }}
                       revealSignal={revealSignal}
                       presence={activeFile.project === (isGuest || docsExpanded ? DEFAULT_PROJECT : WORKSPACE_PROJECT) ? tabPresence : {}}
@@ -2285,28 +2216,9 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
                       onDeleted={docsExpanded ? (path, type) => { removePaths(editorTabPath(DEFAULT_PROJECT, path, project), type); void refreshTree() } : handleDeleted}
                       onNotice={showToast}
                       onOpenGraph={isGuest || docsExpanded ? () => setDocumentGraphOpen(true) : undefined}
-                      registerSearchCancel={registerSidebarSearchCancel}
                     />}
-
-                  </div>
-                </div>
-                <div className={(sidebarView === 'search' || sidebarView === 'content-search') ? 'h-full' : 'hidden'}>
-                  {searchMounted.current && <SearchPanel
-                    key={`${rootProjectPath}:${sidebarView}`}
-                    focusSignal={projectSearchFocus}
-                    readOnly={isGuest || !caps.filesRead || !caps.filesWrite}
-                    project={isGuest ? DEFAULT_PROJECT : WORKSPACE_PROJECT}
-                    scopes={!isGuest ? [
-                      { id: 'docs', label: t('project.documents'), icon: 'i:notes' },
-                      ...rootSubprojects.map((subproject) => ({ id: `subproject:${subproject.path}`, label: subproject.name, icon: subproject.icon ?? 'i:folder' })),
-                    ] : []}
-                    mode={sidebarView === 'search' ? 'files' : 'content'}
-                    onOpenFileNameResult={!isGuest ? (result) => openMentionedFile(result.project, result.path, null) : undefined}
-                    onOpenResult={openSearchResult}
-                    onReplaced={refreshTree}
-                  />}
-                </div>
-              </div>
+                </>}
+              </SearchPanel>
             </div>
             <div
               onPointerDown={startSidebarResize}

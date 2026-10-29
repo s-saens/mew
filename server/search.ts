@@ -18,6 +18,15 @@ export interface SearchMatch {
   /** 미리보기 text 안에서의 UTF-16 오프셋. column은 원문 줄 기준이다. */
   matchStart: number
   matchEnd: number
+  /** hover 문맥. 강조 오프셋은 각 text 기준이며 매치가 있는 줄에만 둔다. */
+  context?: SearchContextLine[]
+}
+
+export interface SearchContextLine {
+  line: number
+  text: string
+  matchStart?: number
+  matchEnd?: number
 }
 
 export interface SearchFileResult {
@@ -34,6 +43,8 @@ const MAX_FILES = 4000
 const MAX_TOTAL_MATCHES = 2000
 const MAX_MATCHES_PER_FILE = 300
 const MAX_LINE_LEN = 400
+const CONTEXT_LINES = 3
+const CONTEXT_WORDS = 10
 
 function matchPreview(line: string, start: number, end: number): Pick<SearchMatch, 'text' | 'matchStart' | 'matchEnd'> {
   const from = line.length > MAX_LINE_LEN ? Math.max(0, start - 24) : 0
@@ -44,6 +55,57 @@ function matchPreview(line: string, start: number, end: number): Pick<SearchMatc
     matchStart: prefix.length + start - from,
     matchEnd: prefix.length + Math.min(end, to) - from,
   }
+}
+
+function contextPreview(line: string, start: number, end: number): Pick<SearchMatch, 'text' | 'matchStart' | 'matchEnd'> {
+  const beforeStart = Math.max(0, start - MAX_LINE_LEN)
+  const afterEnd = Math.min(line.length, end + MAX_LINE_LEN)
+  const beforeWords = [...line.slice(beforeStart, start).matchAll(/\S+/gu)]
+  const afterWords = [...line.slice(end, afterEnd).matchAll(/\S+/gu)]
+  let from = beforeWords.length > CONTEXT_WORDS
+    ? beforeStart + beforeWords[beforeWords.length - CONTEXT_WORDS].index
+    : beforeStart
+  let to = afterWords.length > CONTEXT_WORDS
+    ? end + afterWords[CONTEXT_WORDS - 1].index + afterWords[CONTEXT_WORDS - 1][0].length
+    : afterEnd
+
+  if (to - from > MAX_LINE_LEN) {
+    const matchLength = Math.min(end - start, MAX_LINE_LEN)
+    const remaining = MAX_LINE_LEN - matchLength
+    let before = Math.min(start - from, Math.floor(remaining / 2))
+    const after = Math.min(to - end, remaining - before)
+    before = Math.min(start - from, remaining - after)
+    from = start - before
+    to = start + matchLength + after
+  }
+  // 생략 위치가 유니코드 보조 평면 문자의 UTF-16 쌍을 나누지 않게 한다.
+  if (from > 0 && isSurrogateBoundary(line, from)) from++
+  if (to < line.length && isSurrogateBoundary(line, to)) to--
+  const prefix = from > 0 ? '…' : ''
+  return {
+    text: prefix + line.slice(from, to) + (to < line.length ? '…' : ''),
+    matchStart: prefix.length + start - from,
+    matchEnd: prefix.length + Math.min(end, to) - from,
+  }
+}
+
+function isSurrogateBoundary(line: string, offset: number): boolean {
+  const before = line.charCodeAt(offset - 1)
+  const after = line.charCodeAt(offset)
+  return before >= 0xd800 && before <= 0xdbff && after >= 0xdc00 && after <= 0xdfff
+}
+
+function searchMatch(lines: string[], lineIndex: number, start: number, end: number): SearchMatch {
+  const context: SearchContextLine[] = []
+  for (let index = Math.max(0, lineIndex - CONTEXT_LINES); index <= Math.min(lines.length - 1, lineIndex + CONTEXT_LINES); index++) {
+    if (index === lineIndex) {
+      context.push({ line: index + 1, ...contextPreview(lines[index], start, end) })
+    } else {
+      const anchor = Math.min(start, lines[index].length)
+      context.push({ line: index + 1, text: contextPreview(lines[index], anchor, anchor).text })
+    }
+  }
+  return { line: lineIndex + 1, column: start, ...matchPreview(lines[lineIndex], start, end), context }
 }
 
 /** 트리에서 검색 가능한 텍스트 파일의 상대경로만 평탄화한다 — 미디어·다운로드(바이너리)는 제외 */
@@ -91,11 +153,7 @@ export function searchInProject(
     for (let li = 0; li < lines.length && matches.length < MAX_MATCHES_PER_FILE; li++) {
       const line = lines[li]
       for (const m of nonEmptySearchMatches(regex, line)) {
-        matches.push({
-          line: li + 1,
-          column: m.index,
-          ...matchPreview(line, m.index, m.index + m[0].length),
-        })
+        matches.push(searchMatch(lines, li, m.index, m.index + m[0].length))
         total++
         if (matches.length >= MAX_MATCHES_PER_FILE || total >= MAX_TOTAL_MATCHES) break
       }
@@ -127,11 +185,12 @@ export async function searchInProjectProgressively(
     let content: string
     try { content = await fs.promises.readFile(resolveProjectPath(project, rel), 'utf-8') } catch { continue }
     if (content.includes('\u0000')) continue
+    const lines = content.split('\n')
     const matches: SearchMatch[] = []
-    for (const [lineIndex, line] of content.split('\n').entries()) {
+    for (const [lineIndex, line] of lines.entries()) {
       if (matches.length >= MAX_MATCHES_PER_FILE) break
       for (const match of nonEmptySearchMatches(regex, line)) {
-        matches.push({ line: lineIndex + 1, column: match.index, ...matchPreview(line, match.index, match.index + match[0].length) })
+        matches.push(searchMatch(lines, lineIndex, match.index, match.index + match[0].length))
         total++
         if (matches.length >= MAX_MATCHES_PER_FILE || total >= MAX_TOTAL_MATCHES) break
       }

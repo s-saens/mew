@@ -290,7 +290,7 @@ async function scopedSearchFiles(req: express.Request): Promise<ScopedSearchFile
   const selectedSubs = subprojects.filter((node) => requested.has(`subproject:${node.path}`))
   const workspaceAllowed = workspaceAll.filter((relPath) => {
     if (!fileAccess(authOf(req), WORKSPACE_PROJECT, relPath).view) return false
-    if (requested.size === 0) return true
+    if (requested.size === 0 || requested.has('root')) return true
     return selectedSubs.some((node) => relPath.startsWith(`${node.path}/`))
   })
   const includeDocs = requested.size === 0 || requested.has('docs')

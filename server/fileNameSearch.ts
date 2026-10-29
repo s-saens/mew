@@ -111,7 +111,7 @@ export async function searchFileNames(query: string, opts: FileNameSearchOptions
   const candidates: FileNameSearchResult[] = []
   for (const file of workspaceFiles) {
     const subproject = subprojects.find((node) => file.path.startsWith(`${node.path}/`))
-    if (!all && (!subproject || !requested.has(`subproject:${subproject.path}`))) continue
+    if (!all && !requested.has('root') && (!subproject || !requested.has(`subproject:${subproject.path}`))) continue
     candidates.push({
       path: file.path,
       project: WORKSPACE_PROJECT,

@@ -3,8 +3,8 @@ import { ArrowUpRight, Download } from 'iconoir-react'
 import { useI18n } from '../i18n'
 import { pageRepresentative, documentPageLabel, documentPageTarget, remapPagePath, type DocumentPageMutation } from '../../shared/document-pages'
 import { documentAbsolutePath, useTitlePreviews } from '../utils/document-title-preview'
-import { canAutoFocusInput } from '@mew/ui'
 import { uiText } from '@mew/ui/i18n-core'
+import { canAutoFocusInput } from '@mew/ui'
 import { useUiLocale } from '@mew/ui/i18n'
 import { useTreeMoveAnimation } from '../hooks/use-tree-move-animation'
 import { useTreeTouchGesture } from '../hooks/use-tree-touch-gesture'
@@ -13,7 +13,6 @@ import { writeBrowserStorage } from '@mew/ui/browser-storage'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { TreeNode } from '../api/client'
 import { copyFile, copyInto, createSubproject, createFolder, createNewDocument, mutateDocumentPage, deleteFile, downloadUrl, initializeGitRepository, renamePath, uploadInto } from '../api/client'
-import { flattenFiles, fuzzyScore } from '@mew/editor/fuzzy'
 import { ConfirmDialog, setPathDragData, useDialog } from '@mew/ui'
 import { getBinding, matchesShortcut } from '@mew/shortcuts'
 import { PresenceDots } from './PresenceDots'
@@ -26,6 +25,8 @@ import { SubprojectLink } from './subproject-link'
 import { ProjectIcon } from './ProjectIcon'
 import { GitButton } from './GitButton'
 import { VirtualTreeRows } from './virtual-tree-rows'
+import { explorerSearchTree, type ExplorerSearch } from '../utils/explorer-search'
+import { ExplorerSearchPreview } from './explorer-search-preview'
 import {
   childrenForOpenDirs,
   visibleOpenDirectories,
@@ -51,10 +52,9 @@ type Focused = { path: string; type: 'file' | 'dir' } | null
 
 type PopoverState = { path: string; type: 'file' | 'dir'; x: number; y: number } | null
 
-export type FileSearchScope = { id: string; label: string; icon: string }
-export type FileSearchResult = { path: string; project: string; scope: FileSearchScope }
-
 interface NodeCtx {
+  search?: ExplorerSearch
+  searchPaths?: ReadonlyMap<string, string>
   project: string
   documentTitles: Readonly<Record<string, string>>
   documentPages: boolean
@@ -110,16 +110,6 @@ function parentOf(p: string): string {
   return i === -1 ? '' : p.slice(0, i)
 }
 
-// 검색 결과 경로를 짧게: 디렉터리는 첫 글자만, 파일명은 그대로
-// (products/notes/2026/drafts/plan-01.md → p/n/2/d/plan-01.md).
-// Array.from으로 잘라 한글 등 멀티바이트 첫 글자도 안전하게 뽑는다.
-function abbreviatePath(path: string): string {
-  const parts = path.split('/')
-  if (parts.length <= 1) return path
-  const dirs = parts.slice(0, -1).map((seg) => (seg ? (Array.from(seg)[0] ?? '') : ''))
-  return [...dirs, parts[parts.length - 1]].join('/')
-}
-
 // MOC(Map of Content)는 파일명 그대로 목록에 섞이지 않는다 — 자기 폴더의 첫 줄에 지도 아이콘 +
 // "Map Of Contents"로 고정된다. 정렬용 언더스코어를 붙인 _MOC.md도 같은 문서다
 // (server/documents.ts·git.ts와 같은 규칙).
@@ -167,6 +157,7 @@ function MocItem({
   presenceColors,
   label = 'Map Of Contents',
   documentPages = false,
+  search,
   onSelect,
 }: {
   path: string
@@ -176,6 +167,7 @@ function MocItem({
   presenceColors: string[]
   label?: string
   documentPages?: boolean
+  search?: ExplorerSearch
   onSelect: (path: string, opts?: TreeOpenOptions) => void
 }) {
   useUiLocale()
@@ -183,6 +175,8 @@ function MocItem({
     <button
       type="button"
       data-path={path}
+      data-search-match={search?.paths.includes(path) || undefined}
+      data-search-file={search?.paths.includes(path) ? path : undefined}
       onClick={event => onSelect(path, documentPages ? { replaceActive: !event.ctrlKey && !event.metaKey, forceNewTab: event.ctrlKey || event.metaKey, preview: false } : undefined)}
       onDoubleClick={() => onSelect(path, { preview: false })}
       title={path}
@@ -192,7 +186,7 @@ function MocItem({
       style={{ paddingLeft: `${depth * 14 + 8}px`, scrollMarginTop: `${depth * 1.75}rem` }}
     >
       <MapIcon size={14} />
-      <span className="min-w-0 flex-1 truncate">{label}</span>
+      <span className="min-w-0 flex-1 truncate">{search?.paths.includes(path) ? <mark className="rounded bg-accent/25 px-0.5 font-semibold text-ink">{label}</mark> : label}</span>
       <PresenceDots colors={presenceColors} />
     </button>
   )
@@ -309,6 +303,9 @@ function TreeHeader({ depth, open, children }: { depth: number; open: boolean; c
 function Node({ node, depth, ctx }: { node: TreeNode; depth: number; ctx: NodeCtx }) {
   useUiLocale()
   const readOnly = ctx.readOnly || node.editable === false
+  const matchPath = ctx.searchPaths?.get(node.path)
+  const searchProps = { 'data-search-match': matchPath ? true : undefined, 'data-search-file': matchPath }
+  const highlight = (label: string) => matchPath ? <mark className="rounded bg-accent/25 px-0.5 font-semibold text-ink">{label}</mark> : label
   const touch = useTreeTouchGesture({
     enabled: !readOnly,
     onMenu: (x, y) => {
@@ -398,10 +395,10 @@ function Node({ node, depth, ctx }: { node: TreeNode; depth: number; ctx: NodeCt
           </button> : <span aria-hidden="true" data-document-leaf className="flex h-7 w-5 shrink-0 items-center justify-center text-ink-muted">
             <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor"><circle cx="6" cy="6" r="2" /></svg>
           </span>}
-          <button type="button" aria-current={active ? 'page' : undefined} data-path={node.path} data-page-file={pageFile} style={{ scrollMarginTop: `${depth * 1.75}rem` }} draggable={!readOnly} onDragStart={handleDragStart} onDragEnd={ctx.endDrag}
+          <button type="button" {...searchProps} aria-current={active ? 'page' : undefined} data-path={node.path} data-page-file={pageFile} style={{ scrollMarginTop: `${depth * 1.75}rem` }} draggable={!readOnly} onDragStart={handleDragStart} onDragEnd={ctx.endDrag}
             onClick={handleClick} {...touchProps} className={`flex min-w-0 flex-1 items-center gap-1.5 rounded py-1 pr-1 text-left text-sm text-ink select-none [-webkit-touch-callout:none] focus-visible:outline-2 focus-visible:outline-accent ${holdHighlight} ${isMenuTarget ? 'bg-surface-raised' : ''}`}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" className="shrink-0 text-ink-muted" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9ZM14 3v6h6M8 13h8M8 17h5" /></svg>
-            <span className="min-w-0 flex-1 truncate">{label}</span>
+            <span className="min-w-0 flex-1 truncate">{highlight(label)}</span>
             <PresenceDots colors={ctx.presence[pageFile ?? node.path] ?? []} />
           </button>
           {!readOnly && <button type="button" aria-label={uiText('{p0}에 하위 문서 추가', { p0: label })}
@@ -426,6 +423,7 @@ function Node({ node, depth, ctx }: { node: TreeNode; depth: number; ctx: NodeCt
       <div className="flex w-full items-center gap-0.5">
         <button
           type="button"
+          {...searchProps}
           data-path={node.path}
           draggable={!readOnly}
           onDragStart={handleDragStart}
@@ -438,7 +436,7 @@ function Node({ node, depth, ctx }: { node: TreeNode; depth: number; ctx: NodeCt
           }`}
           style={{ paddingLeft: `${depth * 14 + 8}px`, scrollMarginTop: `${depth * 1.75}rem` }}
         >
-          <span className="min-w-0 flex-1 truncate">{ctx.documentTitles[node.path] !== undefined ? `${ctx.documentTitles[node.path] || uiText('제목 없음')}.md` : node.name}</span>
+          <span className="min-w-0 flex-1 truncate">{highlight(ctx.documentTitles[node.path] !== undefined ? `${ctx.documentTitles[node.path] || uiText('제목 없음')}.md` : node.name)}</span>
           <PresenceDots colors={ctx.presence[node.path] ?? []} />
         </button>
       </div>
@@ -529,6 +527,7 @@ function Node({ node, depth, ctx }: { node: TreeNode; depth: number; ctx: NodeCt
               opened={ctx.openPaths?.has(moc.path)}
               presenceColors={ctx.presence[moc.path] ?? []}
               onSelect={ctx.onSelect}
+              search={ctx.search}
             />
           )}
           {createEditing && (
@@ -570,6 +569,7 @@ function NodeList({ nodes, depth, ctx }: { nodes: TreeNode[]; depth: number; ctx
 
 export function FileTree({
   tree,
+  search,
   project,
   stateKey,
   accountState,
@@ -598,7 +598,6 @@ export function FileTree({
   loadChildren,
   treeInvalidation,
   refreshSignal = 0,
-  searchFocusSignal,
   newFileSignal,
   revealSignal,
   revealOnMount = false,
@@ -611,9 +610,9 @@ export function FileTree({
   onDeleted,
   onNotice,
   onOpenGit,
-  registerSearchCancel,
 }: {
   tree: TreeNode[]
+  search?: ExplorerSearch
   /** 펼친 폴더·스크롤을 프로젝트별로 기억하는 열쇠 (이 컴포넌트는 key={project}로 갈아 끼워진다) */
   project: string
   /** API 프로젝트명과 별개로, 트리 UI 상태를 구분하는 열쇠. */
@@ -637,7 +636,7 @@ export function FileTree({
   onOpenProject?: (path: string) => void
   canOpenProjects?: boolean
   canUseGit?: boolean
-  /** 다른 트리 안에 넣을 때 검색·정렬 도구와 독립 스크롤을 숨긴다. */
+  /** 다른 트리 안에 넣을 때 독립 스크롤을 숨긴다. */
   compact?: boolean
   /** 검색창 아래에 서는 Documents/프로젝트 가상 폴더 */
   roots?: React.ReactNode
@@ -655,7 +654,6 @@ export function FileTree({
   /** watcher가 알려 준 영향 부모만 자식 캐시를 다시 읽는다. */
   treeInvalidation?: { n: number; project: string; version: number; parents: string[] }
   refreshSignal?: number
-  searchFocusSignal: number
   /** Alt+N — 새 파일 이름 입력 열기. parentPath가 null이면 트리의 선택 항목 기준 */
   newFileSignal: { n: number; parentPath: string | null }
   /** 오를 때마다 지금 문서 자리를 다시 드러낸다 — 이미 열린 탭을 다시 눌렀을 때도 반응하려고 신호로 받는다 */
@@ -675,15 +673,13 @@ export function FileTree({
   onNotice: (message: string) => void
   /** 저장소 폴더의 Git 워크벤치 가상 탭을 연다. */
   onOpenGit?: (path: string) => void
-  /** 검색창 밖에 포커스가 있어도 사이드바의 첫 Esc가 검색부터 취소할 수 있게 App에 등록한다 */
-  registerSearchCancel: (cancel: (() => boolean) | null) => void
 }) {
   const { t } = useI18n()
   const persistedProject = stateKey ?? project
+  const searchActive = search !== undefined
   const titleDrafts = useTitlePreviews()
   const titleRoot = workspacePath ? documentAbsolutePath(workspacePath, documentsPath, project, '') : ''
   const documentTitles = useMemo(() => Object.fromEntries(Object.entries(titleDrafts).filter(([path]) => titleRoot && path.startsWith(titleRoot)).map(([path, preview]) => [path.slice(titleRoot.length), preview.title])), [titleDrafts, titleRoot])
-  const [query, setQuery] = useState('')
   const [focused, setFocused] = useState<Focused>(null)
   const [openDirs, setOpenDirs] = useState<Set<string>>(() => new Set(accountState?.openDirs ?? loadOpenDirs(persistedProject) ?? []))
   // 로그인 계정은 서버 상태를 우선하고, 서버 상태가 아직 없을 때만 이 브라우저의 기존 캐시를 이관한다.
@@ -729,9 +725,6 @@ export function FileTree({
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [clipboard, setClipboardState] = useState<FileClipboard>(() => readFileClipboard())
   const [dropDir, setDropDir] = useState<string | null>(null)
-  const searchInputRef = useRef<HTMLInputElement>(null)
-  const queryRef = useRef(query)
-  queryRef.current = query
   const setClipboard = useCallback((value: FileClipboard) => {
     writeFileClipboard(value)
     setClipboardState(value)
@@ -751,7 +744,7 @@ export function FileTree({
   const recordScrollRef = useRef(() => {})
   recordScrollRef.current = () => {
     const list = listRef.current
-    if (compact || !list || !list.clientHeight || restoringScrollRef.current) return
+    if (search || compact || !list || !list.clientHeight || restoringScrollRef.current) return
     treeScrollRef.current = list.scrollTop
     centerAnchorRef.current = readTreeCenter(list)
     saveTreeScroll(persistedProject, list.scrollTop)
@@ -812,27 +805,6 @@ export function FileTree({
   const revalidatedRestoredChildrenRef = useRef(new Set<string>())
   const lastTreeInvalidationRef = useRef(0)
   const lastRefreshSignalRef = useRef(refreshSignal)
-  // 마운트 시점 값으로 초기화 — "처음 한 번은 건너뛰기" 식 불리언 가드는 StrictMode가
-  // 마운트 이펙트를 두 번 실행할 때(두 번째 호출에서 가드가 이미 소진됨) 무력화돼 사이드바를
-  // 열기만 해도 검색창에 포커스가 가는(모바일 키보드가 뜨는) 버그가 있었다. 값 비교면
-  // 두 번 호출돼도 항상 "신호가 안 바뀌었으니 스킵"으로 같은 결론이 난다.
-  const lastHandledSearchFocusSignal = useRef(searchFocusSignal)
-
-  useEffect(() => {
-    if (searchFocusSignal === lastHandledSearchFocusSignal.current) return
-    lastHandledSearchFocusSignal.current = searchFocusSignal
-    if (canAutoFocusInput()) searchInputRef.current?.focus()
-  }, [searchFocusSignal])
-
-  useEffect(() => {
-    registerSearchCancel(() => {
-      if (!queryRef.current) return false
-      setQuery('')
-      return true
-    })
-    return () => registerSearchCancel(null)
-  }, [registerSearchCancel])
-
   // Alt+N — 0으로 초기화(마운트 시점 값이 아니라): 사이드바가 닫힌 채 Alt+N을 누르면
   // 신호가 먼저 오르고 이 컴포넌트가 그 뒤에 마운트되므로, 마운트 직후에도 처리해야 한다
   const lastHandledNewFileSignal = useRef(0)
@@ -870,7 +842,7 @@ export function FileTree({
   // their asynchronous rows arrive, but yield immediately to user navigation.
   useLayoutEffect(() => {
     const list = listRef.current
-    if (compact || !list) return
+    if (compact || searchActive || !list) return
     let frame = 0
     const restore = () => {
       if (!restoringScrollRef.current) { recordScrollRef.current(); return }
@@ -894,13 +866,17 @@ export function FileTree({
       list.removeEventListener('mew:tree-reveal', stop)
       for (const event of ['wheel', 'pointerdown', 'touchstart', 'keydown', 'mew:scrollbar-drag-start']) list.removeEventListener(event, stop)
     }
-  }, [compact])
+  }, [compact, searchActive])
 
   const treeReady = tree.length > 0
   // 파일 선택·탭 재선택은 일회성 요청이다. 완료·취소 뒤 목록 갱신으로 다시 실행하지 않는다.
   // 초기 복원은 저장 상태를 유지하되, 닫힌 트리를 탭 클릭으로 열었다면 요청을 이어받는다.
   useEffect(() => {
     const previous = revealRequestRef.current
+    if (searchActive) {
+      revealRequestRef.current = { selectedPath, revealSignal, pending: previous.revealSignal !== revealSignal }
+      return
+    }
     if (previous.selectedPath !== selectedPath || previous.revealSignal !== revealSignal) {
       revealRequestRef.current = { selectedPath, revealSignal, pending: true }
     }
@@ -951,7 +927,7 @@ export function FileTree({
     // StrictMode의 효과 재설정은 요청을 소비하지 않는다.
     return cleanup
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedPath, treeReady, revealSignal])
+  }, [selectedPath, treeReady, revealSignal, searchActive])
 
   const requestDir = useCallback((path: string, refresh = false): Promise<TreeNode[] | undefined> => {
     if (!loadChildren) return Promise.resolve(undefined)
@@ -1116,7 +1092,7 @@ export function FileTree({
 
   function startCreate(parentPath: string, kind: 'file' | 'folder') {
     if (readOnly) return
-    setQuery('')
+    search?.onClear?.()
     ensureOpenChain(documentPages && parentPath.endsWith('.md') ? parentOf(parentPath) : parentPath)
     setEditing({ mode: documentPages || kind === 'file' ? 'create-file' : 'create-folder', parentPath, value: '' })
   }
@@ -1440,33 +1416,41 @@ export function FileTree({
     }
   }
 
-  // 최상위 MOC는 담을 폴더가 없으니 여기서 직접 세운다 — 프로젝트 전체의 입구라서 어떤 폴더보다 위에.
-  // 하위 폴더의 MOC는 각 Node가 자기 첫 줄에 같은 모양으로 세운다.
-  const rootMoc = useMemo(() => tree.find(isMocNode) ?? null, [tree])
-  const rootNodes = useMemo(() => tree.filter(node => !rootMoc || !isMocNode(node)), [tree, rootMoc])
-
-  const filteredPaths = useMemo((): FileSearchResult[] | null => {
-    if (!query.trim()) return null
-    const files = flattenFiles(tree).map((path) => ({ path, project, scope: { id: 'root', label: '', icon: 'i:folder' } }))
-    return files
-      .map((file) => ({ ...file, score: fuzzyScore(query, file.path) }))
-      .filter((r): r is FileSearchResult & { score: number } => r.score !== null)
-      .sort((a, b) => a.score - b.score)
-      .slice(0, 50)
-  }, [tree, query, project])
-
-  function selectSearchResult(result: FileSearchResult) {
-    onSelect(result.path)
-  }
+  const searchPaths = search?.paths
+  const searchTree = useMemo(() => searchPaths ? explorerSearchTree(tree, directoryChildren, searchPaths, documentPages, rootPath) : null, [tree, directoryChildren, searchPaths, documentPages, rootPath])
+  const [collapsedSearchDirs, setCollapsedSearchDirs] = useState<Set<string>>(new Set())
+  useEffect(() => { setCollapsedSearchDirs(new Set()) }, [search?.query])
+  const displayedOpenDirs = useMemo(() => searchTree ? new Set([...searchTree.openDirs].filter(path => !collapsedSearchDirs.has(path))) : openDirs, [searchTree, collapsedSearchDirs, openDirs])
+  const searchScroll = useRef<number | null>(null)
+  useLayoutEffect(() => {
+    const list = listRef.current
+    if (!list) return
+    if (searchActive && searchScroll.current === null) { searchScroll.current = treeScrollRef.current; list.scrollTop = 0 }
+    else if (!searchActive && searchScroll.current !== null) { list.scrollTop = searchScroll.current; searchScroll.current = null }
+  }, [searchActive])
+  const displayedTree = searchTree?.tree ?? tree
+  const rootMoc = useMemo(() => displayedTree.find(isMocNode) ?? null, [displayedTree])
+  const rootNodes = useMemo(() => displayedTree.filter(node => !rootMoc || !isMocNode(node)), [displayedTree, rootMoc])
 
   const rootCreateEditing =
     (editing?.mode === 'create-file' || editing?.mode === 'create-folder') && editing.parentPath === rootPath ? editing : null
 
   const ctx: NodeCtx = {
+    search,
+    searchPaths: searchTree?.matched,
     project,
     documentTitles,
     documentPages,
     openPage: (node, opts) => {
+      const matchedPath = searchTree?.matched.get(node.path)
+      const match = matchedPath ? search?.matches.get(matchedPath)?.[0] : undefined
+      if (matchedPath) {
+        pageOpenSequence.current++
+        focusNode(node.path, node.type)
+        if (match) search!.onOpenMatch(matchedPath, match)
+        else onSelect(matchedPath, opts)
+        return
+      }
       const sequence = ++pageOpenSequence.current
       focusNode(node.path, node.type)
       if (node.type === 'file') { onSelect(node.path, opts); return }
@@ -1476,7 +1460,7 @@ export function FileTree({
         if (representative) onSelect(representative.path, opts)
         else ensureOpenChain(node.path)
       }
-      const cached = node.children ?? directoryChildrenRef.current[node.path]
+      const cached = search ? directoryChildrenRef.current[node.path] : node.children ?? directoryChildrenRef.current[node.path]
       if (cached) resolve(cached)
       else void requestDir(node.path).then(children => {
         if (children && sequence === pageOpenSequence.current) resolve(children)
@@ -1486,7 +1470,7 @@ export function FileTree({
     openPaths,
     focused,
     menuPath: popover?.path,
-    openDirs,
+    openDirs: displayedOpenDirs,
     editing,
     readOnly,
     canUseCommands,
@@ -1496,8 +1480,8 @@ export function FileTree({
     directoryChildren,
     loadingDirs,
     dropDir,
-    onSelect: (path, opts) => { pageOpenSequence.current++; focusNode(path, 'file'); onSelect(path, opts) },
-    toggleDir,
+    onSelect: (path, opts) => { pageOpenSequence.current++; focusNode(path, 'file'); const match = search?.matches.get(path)?.[0]; if (match) search!.onOpenMatch(path, match); else onSelect(path, opts) },
+    toggleDir: search ? path => setCollapsedSearchDirs(previous => { const next = new Set(previous); if (next.has(path)) next.delete(path); else next.add(path); return next }) : toggleDir,
     focusNode,
     startRename,
     startCreate,
@@ -1569,31 +1553,7 @@ export function FileTree({
       >
         {roots}
         {commands}
-        {filteredPaths !== null ? (
-          filteredPaths.length === 0 ? (
-            <div className="px-3 py-2 text-xs text-ink-muted">{uiText("결과 없음")}</div>
-          ) : (
-            filteredPaths.map((result) => (
-              <button
-                key={`${result.project}:${result.path}`}
-                type="button"
-                onClick={() => selectSearchResult(result)}
-                title={result.path}
-                className="group relative flex w-full items-center gap-1.5 rounded px-2 py-1 text-left text-sm text-ink hover:bg-surface-raised"
-              >
-                {result.scope.label && <ProjectIcon icon={result.scope.icon} size={13} />}
-                {/* direction:rtl + text-align:left → 넘칠 때 ...이 왼쪽에 붙어 오른쪽(파일명)이 보인다 */}
-                <span style={{ direction: 'rtl', textAlign: 'left' }} className="min-w-0 flex-1 truncate">
-                  {abbreviatePath(result.path)}
-                </span>
-                <PresenceDots colors={presence[result.path] ?? []} />
-                {result.scope.label && <FileSearchPathTooltip result={result} />}
-              </button>
-            ))
-          )
-        ) : (
-          <>
-            {onOpenGraph && rootPath === '' && <button type="button" data-docs-graph-entry onClick={onOpenGraph}
+            {!search && onOpenGraph && rootPath === '' && <button type="button" data-docs-graph-entry onClick={onOpenGraph}
               className="flex w-full items-center gap-1.5 rounded px-2 py-1 text-left text-sm text-ink-secondary hover:bg-surface-raised hover:text-ink focus-visible:outline-2 focus-visible:outline-accent">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="m6 7 11 0M6 7l5 11M17 7l-6 11"/><circle cx="6" cy="7" r="2.5"/><circle cx="17" cy="7" r="2.5"/><circle cx="11" cy="18" r="2.5"/></svg>
               {uiText('그래프 보기')}
@@ -1607,7 +1567,8 @@ export function FileTree({
                 active={rootMoc.path === selectedPath}
                 opened={openPaths?.has(rootMoc.path)}
                 presenceColors={presence[rootMoc.path] ?? []}
-                onSelect={(path, opts) => { focusNode(path, 'file'); onSelect(path, opts) }}
+                onSelect={ctx.onSelect}
+                search={search}
               />
             )}
             {rootCreateEditing && (
@@ -1622,9 +1583,8 @@ export function FileTree({
               />
             )}
             <NodeList nodes={rootNodes} depth={0} ctx={ctx} />
-          </>
-        )}
       </div>
+      {search && <ExplorerSearchPreview listRef={listRef} search={search} />}
       {popover && !readOnly && (
         <ActionPopover
           x={popover.x}
@@ -1736,14 +1696,4 @@ export function FileTree({
       {errorMsg !== null && <ConfirmDialog message={errorMsg} onConfirm={() => setErrorMsg(null)} />}
     </div>
   )
-}
-
-function FileSearchPathTooltip({ result }: { result: FileSearchResult }) {
-  useUiLocale()
-  const parts = result.path.split('/').filter(Boolean)
-  const relative = result.scope.id.startsWith('subproject:') ? parts.slice(1) : parts
-  return <div className="pointer-events-none absolute left-2 top-full z-40 hidden min-w-[15rem] max-w-[22rem] rounded border border-edge-bright bg-surface-deep p-3 text-xs shadow-xl group-hover:block">
-    <div className="mb-2 flex items-center gap-2 font-medium text-ink"><ProjectIcon icon={result.scope.icon} size={16} /><span>{result.scope.label}</span></div>
-    <div className="space-y-1 text-ink-secondary">{relative.map((part, index) => <div key={`${part}:${index}`} className="flex items-center gap-1" style={{ paddingLeft: `${index * 12}px` }}><span className="text-ink-faint">ㄴ</span><span className={index === relative.length - 1 ? 'text-ink' : ''}>{part}</span></div>)}</div>
-  </div>
 }
