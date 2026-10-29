@@ -75,6 +75,34 @@ body{margin:0;overflow:hidden;background:var(--color-surface);color:var(--color-
     await drag(thumbX, verticalBox.y + 28, 0, 80)
     assert.ok(await vertical.evaluate(element => element.scrollTop) > 500, 'the short thumb has a usable minimum touch length')
 
+    for (const { offset, start, movement } of [
+      { offset: 0, start: 124, movement: 30 },
+      { offset: 900, start: 40, movement: -30 },
+      { offset: 900, start: 160, movement: 30 },
+      { offset: 1800, start: 76, movement: -30 },
+    ]) {
+      await page.evaluate('window.setCase("vertical")')
+      await vertical.evaluate((element, top) => { element.scrollTop = top }, offset)
+      await touch.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: point(thumbX, verticalBox.y + start) })
+      assert.equal(await page.evaluate('window.dragStarts'), 1, `offset ${offset}, start ${start}: the expanded vertical touch area grabs the thumb`)
+      assert.equal(await vertical.evaluate(element => element.scrollTop), offset, 'grabbing above or below the thumb does not jump the scroll position')
+      await touch.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: point(thumbX, verticalBox.y + start + movement) })
+      assert.ok(Math.abs(await vertical.evaluate(element => element.scrollTop) - (offset + movement * 10)) <= 1, 'the expanded area preserves the original drag ratio and direction')
+      await touch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+      assert.equal(await page.evaluate('window.pointerStarts'), 0, 'expanded thumb touches do not start content gestures')
+    }
+    await page.evaluate('window.setCase("vertical")')
+    await drag(thumbX, verticalBox.y + 140, 0, 30)
+    assert.equal(await page.evaluate('window.dragStarts'), 0, 'touches beyond the tripled 132px area retain content scrolling')
+    await drag(verticalBox.x + verticalBox.width - 30, verticalBox.y + 124, 0, 30)
+    assert.equal(await page.evaluate('window.dragStarts'), 0, 'the vertical touch area keeps its existing 24px width')
+
+    await vertical.locator('.content').evaluate(element => element.setAttribute('style', 'height:400px'))
+    await drag(thumbX, verticalBox.y + 170, 0, 20)
+    assert.equal(await page.evaluate('window.dragStarts'), 1, 'longer thumbs also get a tripled touch length, capped at the track length')
+    assert.equal(await vertical.evaluate(element => element.scrollTop), 40)
+    await vertical.locator('.content').evaluate(element => element.removeAttribute('style'))
+
     await page.evaluate('window.setCase("vertical")')
     const button = (await page.getByRole('button', { name: '문서 열기', exact: true }).boundingBox())!
     await page.touchscreen.tap(button.x + button.width / 2, button.y + button.height / 2)
@@ -130,6 +158,9 @@ body{margin:0;overflow:hidden;background:var(--color-surface);color:var(--color-
     const horizontal = page.locator('#horizontal'), horizontalBox = (await horizontal.boundingBox())!
     await drag(horizontalBox.x + 12, horizontalBox.y + horizontalBox.height - 12, 90, 0)
     assert.ok(await horizontal.evaluate(element => element.scrollLeft) > 350, 'horizontal thumbs drag from the enlarged area')
+    await page.evaluate('window.setCase("horizontal")')
+    await drag(horizontalBox.x + 100, horizontalBox.y + horizontalBox.height - 12, 30, 0)
+    assert.equal(await page.evaluate('window.dragStarts'), 0, 'horizontal thumbs keep their existing touch length')
     await page.evaluate('window.setCase("rtl")')
     const rtl = page.locator('#rtl'), rtlBox = (await rtl.boundingBox())!
     await drag(rtlBox.x + rtlBox.width - 12, rtlBox.y + rtlBox.height - 12, -90, 0)

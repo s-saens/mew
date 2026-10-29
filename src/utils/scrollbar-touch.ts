@@ -1,5 +1,6 @@
 const HIT_WIDTH = 24
 const MIN_HIT_LENGTH = 44
+const VERTICAL_HIT_LENGTH_MULTIPLIER = 3
 
 type ScrollbarHit = {
   element: HTMLElement
@@ -59,7 +60,7 @@ function findScrollbar(event: Event, x: number, y: number): ScrollbarHit | null 
       const min = axis === 'x' && rtl ? -range : 0
       const progress = Math.max(0, Math.min(1, (offset - min) / range))
       const center = start + progress * travel + thumbLength / 2
-      const hitLength = Math.min(length, Math.max(thumbLength, MIN_HIT_LENGTH))
+      const hitLength = Math.min(length, Math.max(thumbLength, MIN_HIT_LENGTH) * (axis === 'y' ? VERTICAL_HIT_LENGTH_MULTIPLIER : 1))
       const hitStart = Math.max(start, Math.min(start + length - hitLength, center - hitLength / 2))
       const coordinate = axis === 'y' ? y : x
       if (coordinate < hitStart || coordinate > hitStart + hitLength) return
