@@ -1,8 +1,8 @@
 ---
 title: "mewlink Cloudflare 배포"
-description: "mew.run의 배포·기존 등록과 키 보존·접근 회수·검증·복귀 및 localhost 프리뷰의 정확한 wildcard DNS·HTTPS 설정과 읽기 전용 준비 검사를 안내한다. Worker 배포 성공과 프리뷰 준비 완료, 2026-10-24 운영 반영과 미달인 500ms 목표를 구분한다."
+description: "mew.run의 배포·기존 등록과 키 보존·접근 회수·검증·복귀, 호스트 heartbeat 무응답 복구의 적용 범위 및 localhost 프리뷰의 wildcard DNS·HTTPS 설정과 준비 검사를 안내한다. Worker 배포 성공과 프리뷰 준비 완료, 2026-10-24 운영 반영과 미달인 500ms 목표를 구분한다."
 created: "2026-10-07"
-updated: "2026-10-28"
+updated: "2026-10-29"
 ---
 
 ## 2026-10-24 단회 준비·ICE 사전 수집·정적 자원 재검증
@@ -428,6 +428,8 @@ Google/GitHub/이메일은 Authorization Code + PKCE, Apple은 공식 confidenti
 [Google 웹 서버 OAuth](https://developers.google.com/identity/protocols/oauth2/web-server), [GitHub 웹 OAuth](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps), [Apple 웹 인증 설정](https://developer.apple.com/help/account/capabilities/configure-sign-in-with-apple-for-the-web/), [Apple 인증 metadata](https://appleid.apple.com/.well-known/openid-configuration).
 
 ## 상태·키·복구
+
+호스트는 JSON heartbeat 응답이 60초 이상 없으면 주기 검사에서 WSS를 강제 종료하고 재접속한다. handshake도 30초로 제한한다. 이 수정은 [호스트 서버 적용](../work/mewlink-host-heartbeat.md)이 필요하며 중앙 재배포는 필요하지 않다. 중앙의 `offline`과 호스트의 `online` 표시가 다르면 서버 프로세스 실행 여부와 함께 이 응답 감시의 적용 여부를 확인한다. 상세 생존 확인·RTC 보존 기준은 [원격 접속 계약](../development/remote-access.md#시그널링-순단의-같은-rtc-재부착)을 따른다.
 
 D1은 `mewlink/migrations/0001_accounts.sql`부터 `0006_instance_rate_keys.sql`까지 순서대로 적용한다. 중앙 관리 세션 7일, 로그인/등록 요청 5분, launch 60초, 재사용 방지 증명·rate limit은 각각 만료값을 가진다. 매시간 Cron이 만료 행을 정리하되 브라우저 접근 회수 기록은 보존한다. DO는 WebSocket attachment로 브라우저 키 지문·인증·협상 상태를 보존하고 hibernation 이후 재검증한다. A의 20초 heartbeat는 자동 응답으로 처리하며 60초 무응답·10초 간격 만료 검사로 오프라인을 판정한다. 열린 작업 연결의 lease는 60초·20초 갱신이며 브라우저 회수·등록 폐기는 해당 DO와 A에 종료를 보낸다. 중앙 로그아웃과 로컬 신뢰 세션의 경계는 [원격 인증 계약](../development/remote-access.md#승인된-mewlink-계정-로그인)을 따른다.
 

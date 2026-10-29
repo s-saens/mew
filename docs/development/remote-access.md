@@ -1,6 +1,6 @@
 ---
 title: "Mewlink 기기 등록과 로컬 사용자 인증 P2P 접속 계약"
-description: "Mewlink의 운영 서버 전용 연동과 개발 서버 제외, 공개 기기 주소·포트 링크용 공개 base 전달·로컬 인증·브라우저 신뢰와 회수·재접속을 정의한다. 단회 준비·자원 검증과 정적 UI 본문 정지 시 제한 시간, RTC 순단의 5초 복구 대기·1초 뒤 상태 표시, 시그널링 재부착의 보안·운영 경계를 설명한다."
+description: "Mewlink의 운영 서버 전용 연동과 개발 서버 제외, 공개 기기 주소·포트 링크용 공개 base 전달·로컬 인증·브라우저 신뢰와 회수·재접속을 정의한다. 단회 준비·자원 검증·초기 본문 제한 시간, RTC 순단 복구와 호스트 heartbeat 무응답 감지, 시그널링 재부착의 보안·운영 경계를 설명한다."
 created: 2026-10-07
 updated: "2026-10-29"
 ---
@@ -295,6 +295,8 @@ Worker는 외부의 `X-Mew-Admission`을 지우고 서명을 검증한 값만 DO
 브라우저 RTC는 일시적인 `disconnected`에 최대 **5초**의 복구 시간을 둔다. **1초 미만**에 복구되면 복구 표시와 중복 `connected` 알림 없이 같은 transport를 유지한다. 1초 이상 지속되면 복구 상태를 알리고, 5초가 지나도 복구되지 않으면 새 연결로 전환한다. 네이티브 helper 자체의 정리 한도는 **15초**로 별도 유지한다. 상태 이벤트 반복으로 기한을 연장하지 않으며 `connected`로 돌아오면 같은 transport·앱 iframe·입력 초안을 유지하고 갱신을 요청한다. 복구·종료 때 표시·종료 타이머를 모두 취소한다. `failed`·`closed`, 실제 DataChannel과 부모 종료는 해당 transport를 즉시 정리한다. 인증 WSS는 재부착을 협상하지 않았거나 정상 종료·권한 거부·회수인 경우 즉시 정리한다. 복구 대기 중에도 기존 60초 lease 만료가 우선하며 이미 만료된 권한을 복구하지 않는다. 브라우저가 visible 상태로 돌아오거나 `pageshow`·`online`을 받으면 기존 세션의 갱신을 즉시 요청한다. 쓰기·명령을 재실행하지 않으며 요청별 권한 검사·중앙 10초 alarm·20초 갱신 간격은 유지한다. 결정과 검증 범위는 [ADR 0081](../decisions/0081-mewlink-transient-recovery.md), [작업 기록](../work/mewlink-transient-recovery.md)을 따른다. `disconnected`를 자연 복구 가능한 상태로 다루는 근거는 [WebRTC 상태 계약](https://www.w3.org/TR/webrtc/#dom-rtcicetransportstate)을 따른다.
 
 ### 시그널링 순단의 같은 RTC 재부착
+
+호스트는 중앙 WSS를 열 때 handshake를 30초로 제한한다. 열린 소켓에는 20초마다 기존 JSON heartbeat를 보내고 중앙의 같은 JSON 응답을 비동기 메시지 처리 큐에 넣기 전에 확인한다. 단조 시각으로 마지막 응답 이후 60초 이상 지났으면 다음 20초 검사에서 소켓을 `terminate()`해 기존 비정상 종료·재접속 처리를 실행한다. 송신 성공이나 최초 `pong`만으로 연결이 살아 있다고 판단하지 않으며 송신 오류도 같은 종료로 처리한다. 소켓 종료 때 생존 확인 타이머와 리스너를 정리한다. 이 검사는 권한·lease를 연장하지 않는다. [조사·검증 기록](../work/mewlink-host-heartbeat.md).
 
 [ADR 0033](../decisions/0033-mewlink-signaling-resume.md)에 따라 중앙 challenge·호스트 nonce 서명·브라우저 요청·서명된 ticket에서 모두 `signalResume`를 협상한 연결은 일시적 WSS 단절 때 RTC와 진행 중 작업을 유지한다. 정상 종료(code 1000)·명시적 거부·회수·로그아웃·만료는 이 복구를 사용하지 않는다. 구버전은 기존 전체 재연결을 유지한다.
 

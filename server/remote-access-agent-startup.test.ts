@@ -335,6 +335,47 @@ test('host prepares RTC before its ticket while keeping authentication and clean
     replacement.terminate()
   })
 
+  await t.test('a silently unresponsive open signaling socket reconnects and preserves authenticated resumable peers', async t => {
+    let heartbeatCheck: (() => void) | undefined
+    const originalInterval = globalThis.setInterval
+    const intervals = t.mock.method(globalThis, 'setInterval', (callback: () => void, delay?: number) => {
+      if (delay === 20_000) heartbeatCheck = callback
+      return originalInterval(callback, delay)
+    })
+    const f = await fixture(t, true), prepared = await f.prepare(), token = await f.ticket(prepared)
+    intervals.mock.restore()
+    f.send({ type: 'ticket', connection: prepared.connection, ticket: token })
+    prepared.peer.data(await f.authenticate(prepared, token))
+    await until(() => prepared.peer.responses().some(value => value.type === 'authenticated'))
+    assert.ok(heartbeatCheck, 'the active signaling socket has a heartbeat watchdog')
+
+    const now = performance.now()
+    let clock = t.mock.method(performance, 'now', () => now + 20_000)
+    try { heartbeatCheck() } finally { clock.mock.restore() }
+    await until(() => f.frames.some(value => value.type === 'heartbeat'))
+    assert.equal(f.socket.readyState, WebSocket.OPEN, 'the central fixture keeps TCP open without echoing the heartbeat')
+    assert.equal(f.agent.status().state, 'online')
+
+    const reconnect = once(wss, 'connection')
+    clock = t.mock.method(performance, 'now', () => now + 60_001)
+    try { heartbeatCheck() } finally { clock.mock.restore() }
+    await until(() => f.agent.status().state === 'offline')
+    assert.equal(prepared.peer.connected, true, 'a heartbeat timeout preserves the existing authorized RTC peer')
+    const [replacement] = await reconnect as [WebSocket]
+    t.after(() => replacement.terminate())
+    const frame = once(replacement, 'message')
+    replacement.send(JSON.stringify({ type: 'challenge', nonce: 'heartbeat-replacement-nonce', protocol: REMOTE_PROTOCOL, signalResume: true }))
+    const [raw] = await frame
+    const message = JSON.parse(raw.toString()), claims = await verifyRemoteToken(message.proof, f.host.publicKey, 'mew-instance', `${origin}/signal`)
+    assert.deepEqual(claims.connections, [prepared.connection])
+    assert.equal(claims.nonce, 'heartbeat-replacement-nonce')
+    replacement.send(JSON.stringify({ type: 'online', signalResume: true }))
+    await until(() => f.agent.status().state === 'online')
+    assert.equal(prepared.peer.connected, true)
+    replacement.send(JSON.stringify({ type: 'end', connection: prepared.connection }))
+    await until(() => !prepared.peer.connected)
+  })
+
   await t.test('signal loss never preserves speculative peers or peers without negotiated support', async t => {
     for (const supported of [false, true]) {
       const f = await fixture(t, supported), prepared = await f.prepare()
