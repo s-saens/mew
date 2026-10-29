@@ -430,13 +430,15 @@ for (const mode of ['keyboard', 'workspace', 'documents', 'permissions', 'panels
     }
     const countUi = (root: string) => requests.filter(r => r.path === '/api/user-ui/workspace' && r.method === 'GET' && r.root === root).length
     const explorerToggle = page.locator('[data-explorer-toggle]')
-    const explorerScope = explorerToggle.getByRole('combobox', { name: '탐색 범위', exact: true })
+    const explorerScope = explorerToggle.locator('button[aria-pressed="true"]')
+    assert.equal(await explorerToggle.getByRole('combobox').count(), 0, 'file/document scope keeps its two-button toggle')
+    assert.equal(await explorerToggle.getByRole('button', { name: '문서', exact: true }).count(), 1)
+    assert.equal(await explorerToggle.getByRole('button', { name: '파일', exact: true }).count(), 1)
     const selectExplorerScope = async (label: '문서' | '파일', touch = false) => {
-      if (touch) await explorerScope.tap()
-      else await explorerScope.click()
-      const option = page.getByRole('option', { name: label, exact: true })
-      if (touch) await option.tap()
-      else await option.click()
+      const button = explorerToggle.getByRole('button', { name: label, exact: true })
+      if (touch) await button.tap()
+      else await button.click()
+      assert.equal(await button.getAttribute('aria-pressed'), 'true')
       assert.equal((await explorerScope.innerText()).trim(), label)
     }
     assert.equal((await explorerScope.innerText()).trim(), '파일')
@@ -484,6 +486,10 @@ for (const mode of ['keyboard', 'workspace', 'documents', 'permissions', 'panels
     await page.keyboard.press('Enter')
     await page.keyboard.press('Home')
     await page.keyboard.press('Enter')
+    assert.equal((await explorerScope.innerText()).trim(), '문서')
+    await page.keyboard.press('ArrowRight')
+    assert.equal((await explorerScope.innerText()).trim(), '파일')
+    await page.keyboard.press('ArrowLeft')
     assert.equal((await explorerScope.innerText()).trim(), '문서')
     if (mode === 'documents') {
       for (const width of [1100, 390]) {

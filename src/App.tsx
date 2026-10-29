@@ -2163,11 +2163,26 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
                 onReplaced={refreshTree}
                 refreshSignal={treeRefreshSignal}
                 registerSearchCancel={registerSidebarSearchCancel}
-                actions={<div className="flex h-9 shrink-0 items-center gap-1 border-b border-edge pl-1.5" data-explorer-toggle
-                  onContextMenu={!isGuest && docsExpanded && isOwner ? event => { event.preventDefault(); setDocsSettingsOpen(true) } : undefined}>
-                  {!isGuest && <SelectField compact label={uiText('탐색 범위')} value={docsExpanded ? 'docs' : 'files'} className="min-w-0 flex-1"
-                    options={[{ value: 'docs', label: t('explorer.documents') }, { value: 'files', label: t('explorer.files') }]}
-                    onChange={value => { setDocsExpanded(value === 'docs'); sidebarCreate.selectDirectory(value === 'docs' ? 'docs' : 'root', '') }} />}
+                actions={<div className="flex shrink-0 items-center gap-1 border-b border-edge p-1" data-explorer-toggle>
+                  {!isGuest && <div role="group" aria-label={uiText('탐색 범위')} className="flex min-w-0 flex-1 rounded-md bg-surface p-0.5 text-xs">
+                    {(['docs', 'files'] as const).map(scope => {
+                      const selected = (scope === 'docs') === docsExpanded
+                      const select = (next: 'docs' | 'files') => { setDocsExpanded(next === 'docs'); sidebarCreate.selectDirectory(next === 'docs' ? 'docs' : 'root', '') }
+                      return <button key={scope} type="button" aria-pressed={selected}
+                        onClick={() => select(scope)}
+                        onContextMenu={scope === 'docs' && isOwner ? event => { event.preventDefault(); setDocsSettingsOpen(true) } : undefined}
+                        onKeyDown={event => {
+                          if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
+                          event.preventDefault()
+                          const next = event.key === 'Home' ? 'docs' : event.key === 'End' ? 'files' : scope === 'docs' ? 'files' : 'docs'
+                          select(next)
+                          event.currentTarget.parentElement?.querySelectorAll('button')[next === 'docs' ? 0 : 1]?.focus()
+                        }}
+                        className={`min-w-0 flex-1 rounded px-3 py-1.5 focus-visible:outline-2 focus-visible:outline-accent ${selected ? 'bg-surface-raised text-ink' : 'text-ink-muted hover:text-ink-secondary'}`}>
+                        {scope === 'docs' ? t('explorer.documents') : t('explorer.files')}
+                      </button>
+                    })}
+                  </div>}
                   {!isGuest && caps.filesRead && caps.filesWrite && <SidebarCreateButtons documents={docsExpanded} onCreate={sidebarCreate.create} disabled={!workspaceUiLoaded || sidebarStateLoadedRootRef.current !== projectUiPath} />}
                   <PanelCloseButton onClick={() => closeWorkspacePanel('sidebar')} className={isGuest ? 'ml-auto' : ''} aria-label={uiText('파일 탐색기 닫기')} />
                 </div>}
