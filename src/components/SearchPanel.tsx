@@ -5,11 +5,12 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { replaceInProjectFile, searchFileNames, searchProjectStream, type SearchFileResult, type SearchMatch, type SearchOptions } from '../api/client'
 import type { ExplorerSearch } from '../utils/explorer-search'
 import { ProjectIcon } from './ProjectIcon'
+import { PanelCloseButton } from './panel-close-button'
 import { useI18n } from '../i18n'
 
 export interface SearchScopeOption { id: string; label: string; icon: string }
 
-export function SearchPanel({ focusSignal, readOnly, project, scope, scopes, mode, onModeChange, onOpenResult, onReplaced, registerSearchCancel, refreshSignal = 0, clearSignal = 0, actions, children }: {
+export function SearchPanel({ focusSignal, readOnly, project, scope, scopes, mode, onModeChange, onOpenResult, onReplaced, registerSearchCancel, refreshSignal = 0, clearSignal = 0, onClose, actions, children }: {
   focusSignal: number
   readOnly: boolean
   project: string
@@ -22,6 +23,7 @@ export function SearchPanel({ focusSignal, readOnly, project, scope, scopes, mod
   registerSearchCancel?: (cancel: (() => boolean) | null) => void
   refreshSignal?: number
   clearSignal?: number
+  onClose?: () => void
   actions?: ReactNode
   children: (search: ExplorerSearch | undefined) => ReactNode
 }) {
@@ -139,10 +141,11 @@ export function SearchPanel({ focusSignal, readOnly, project, scope, scopes, mod
   } : undefined
   const optionClass = (pressed: boolean) => `flex h-6 w-6 shrink-0 items-center justify-center rounded text-xs focus-visible:outline-2 focus-visible:outline-accent ${pressed ? 'bg-accent text-ink-on-accent' : 'text-ink-muted hover:bg-surface-hover'}`
 
-  return <div className="flex h-full min-h-0 flex-col text-sm">
+  return <div className="flex h-full min-h-0 min-w-0 flex-col text-sm">
     {dialogs.dialog}
     <HoverTipLayer className="shrink-0 border-b border-edge p-1.5" placement="bottom">
-      <div className="relative flex min-w-0 items-center gap-0.5 rounded border border-edge-strong bg-surface-deep px-1 focus-within:border-accent">
+      <div data-explorer-search-bar className="flex min-w-0 items-center gap-1">
+      <div className="relative flex min-w-0 flex-1 items-center gap-0.5 rounded border border-edge-strong bg-surface-deep px-1 focus-within:border-accent">
         <input ref={inputRef} value={query} onChange={event => setQuery(event.target.value)}
           placeholder={mode === 'files' ? t('search.fileNamePlaceholder') : t('search.fileContentPlaceholder')}
           aria-label={uiText(mode === 'files' ? '파일명 검색' : '파일 내용 검색')}
@@ -168,6 +171,8 @@ export function SearchPanel({ focusSignal, readOnly, project, scope, scopes, mod
           </button>)}
           <button type="button" onClick={() => setScopeMenuOpen(false)} className="w-full px-2 py-1 text-left text-xs text-ink-muted hover:bg-surface-hover">{uiText('완료')}</button>
         </div>}
+      </div>
+      {onClose && <PanelCloseButton onClick={onClose} aria-label={uiText('파일 탐색기 닫기')} />}
       </div>
       {scope === 'root' && selectedScopes.length > 0 && <div className="mt-1 flex flex-wrap gap-1">{selectedScopes.map(id => <button key={id} type="button" onClick={() => setSelectedScopes(values => values.filter(value => value !== id))} className="flex min-w-0 items-center gap-1 rounded bg-accent/15 px-1 text-xs text-ink" aria-label={uiText('{p0} 범위 제거', { p0: scopes.find(item => item.id === id)?.label ?? id })}><span className="truncate">{scopes.find(item => item.id === id)?.label}</span><span aria-hidden="true">×</span></button>)}</div>}
       {mode === 'content' && showReplace && !readOnly && <div className="mt-1 flex items-center gap-1">

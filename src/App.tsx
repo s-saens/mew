@@ -9,7 +9,6 @@ import { factoryLayout, editorIds, layoutPresetsKey, legacyLayoutPresetsKey, nor
 import { loadFloatingRect, restoreFloatingRect } from './hooks/use-floating-panel'
 import { restoreDeviceLayout, saveDeviceLayout } from './utils/device-layout'
 import { useToolPresentation, setToolPresentation } from './hooks/use-tool-presentation'
-import { PanelCloseButton } from './components/panel-close-button'
 import { Computer, Link } from 'iconoir-react'
 import { fetchUpdatesStatus } from './api/client'
 import { uuid } from './utils/uuid'
@@ -2163,7 +2162,8 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
                 onReplaced={refreshTree}
                 refreshSignal={treeRefreshSignal}
                 registerSearchCancel={registerSidebarSearchCancel}
-                actions={<div className="flex shrink-0 items-center gap-1 border-b border-edge p-1" data-explorer-toggle>
+                onClose={() => closeWorkspacePanel('sidebar')}
+                actions={!isGuest && <div className="flex shrink-0 items-center gap-1 border-b border-edge p-1" data-explorer-toggle>
                   {!isGuest && <div role="group" aria-label={uiText('탐색 범위')} className="flex min-w-0 flex-1 rounded-md bg-surface p-0.5 text-xs">
                     {(['docs', 'files'] as const).map(scope => {
                       const selected = (scope === 'docs') === docsExpanded
@@ -2184,7 +2184,6 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
                     })}
                   </div>}
                   {!isGuest && caps.filesRead && caps.filesWrite && <SidebarCreateButtons documents={docsExpanded} onCreate={sidebarCreate.create} disabled={!workspaceUiLoaded || sidebarStateLoadedRootRef.current !== projectUiPath} />}
-                  <PanelCloseButton onClick={() => closeWorkspacePanel('sidebar')} className={isGuest ? 'ml-auto' : ''} aria-label={uiText('파일 탐색기 닫기')} />
                 </div>}
               >
                 {search => <>

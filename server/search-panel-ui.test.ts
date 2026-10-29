@@ -49,7 +49,7 @@ test('explorer search filters file and document trees with contextual content pr
     'const noop=()=>{}, scopes=[];',
     'const readDir=(nodes,path)=>{for(const node of nodes){if(node.path===path)return node.children??[];const found=node.children&&readDir(node.children,path);if(found)return found}return null};',
     'const loadChildren=path=>window.deferPageLoad&&path==="a1"?new Promise(resolve=>{window.resolvePageLoad=resolve;window.pageLoadPending=true}):Promise.resolve(readDir(tree,path)??[]);',
-    'function Fixture(){const [mode,setMode]=useState("files"),[docs,setDocs]=useState(initialDocs),[selectedPath,setSelectedPath]=useState(null);window.setDocs=setDocs;return <I18nProvider><main className="h-full bg-surface-deep" style={{width:240,maxWidth:"100vw"}}><SearchPanel focusSignal={0} readOnly project=".workspace" scope={docs?"docs":"root"} scopes={scopes} mode={mode} onModeChange={setMode} onOpenResult={(...args)=>{window.openedResult=args;setSelectedPath(args[0])}} onReplaced={noop} registerSearchCancel={fn=>window.cancelSearch=fn}>{search=><FileTree project=".workspace" tree={tree} search={search} loadChildren={loadChildren} documentPages={docs} selectedPath={selectedPath} readOnly newFileSignal={{n:0,parentPath:null}} revealSignal={0} presence={{}} onSelect={path=>{window.openedFile=path;setSelectedPath(path)}} onFileCreated={noop} onFolderCreated={noop} onRenamed={noop} onDeleted={noop} onNotice={noop}/>}</SearchPanel></main></I18nProvider>}',
+    'function Fixture(){const [mode,setMode]=useState("files"),[docs,setDocs]=useState(initialDocs),[selectedPath,setSelectedPath]=useState(null);window.setDocs=setDocs;return <I18nProvider><main className="h-full bg-surface-deep" style={{width:240,maxWidth:"100vw"}}><SearchPanel focusSignal={0} readOnly project=".workspace" scope={docs?"docs":"root"} scopes={scopes} mode={mode} onModeChange={setMode} onOpenResult={(...args)=>{window.openedResult=args;setSelectedPath(args[0])}} onReplaced={noop} onClose={()=>window.explorerCloseCount=(window.explorerCloseCount??0)+1} registerSearchCancel={fn=>window.cancelSearch=fn}>{search=><FileTree project=".workspace" tree={tree} search={search} loadChildren={loadChildren} documentPages={docs} selectedPath={selectedPath} readOnly newFileSignal={{n:0,parentPath:null}} revealSignal={0} presence={{}} onSelect={path=>{window.openedFile=path;setSelectedPath(path)}} onFileCreated={noop} onFolderCreated={noop} onRenamed={noop} onDeleted={noop} onNotice={noop}/>}</SearchPanel></main></I18nProvider>}',
     'createRoot(document.getElementById("root")).render(<Fixture/>);',
   ].join('\n')
   const candidates = [source], styles: string[] = []
@@ -129,6 +129,14 @@ test('explorer search filters file and document trees with contextual content pr
             : row(path)
           const input = page.getByRole('textbox', { name: '파일명 검색', exact: true })
           await input.waitFor()
+          const closeExplorer = page.getByRole('button', { name: '파일 탐색기 닫기', exact: true })
+          assert.equal(await closeExplorer.count(), 1, 'one close button is visible with an empty search')
+          const fieldBox = (await input.locator('..').boundingBox())!, closeBox = (await closeExplorer.boundingBox())!, mainBox = (await page.locator('main').boundingBox())!
+          assert.ok(closeBox.x >= fieldBox.x + fieldBox.width, 'the X button is to the right of the search field')
+          assert.ok(Math.abs(closeBox.y + closeBox.height / 2 - (fieldBox.y + fieldBox.height / 2)) <= 1, 'the X button shares the search row')
+          assert.ok(closeBox.x + closeBox.width <= mainBox.x + mainBox.width, 'the X button stays inside the narrow panel')
+          await closeExplorer.click()
+          assert.equal(await page.evaluate('window.explorerCloseCount'), 1, 'the X button invokes the explorer close action')
           assert.equal(await page.getByRole('textbox').count(), 1, 'one search input serves the explorer')
           assert.equal(await page.getByRole('tab').count(), 0, 'the explorer has no search tabs')
           assert.equal(await expansion('a1').getAttribute('aria-expanded'), 'false')
