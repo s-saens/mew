@@ -30,6 +30,7 @@ import { findTable, selectionCell, TableMap } from '@tiptap/pm/tables'
 import type { EditorView } from '@tiptap/pm/view'
 import { Markdown } from 'tiptap-markdown'
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type { EditorApi, EditorCollab, EditorOpenLink, TableWidths, TreeNode } from './types'
 import { ResizableImage } from './ResizableImage'
 import { ImageSourceContext } from './editor/image-source-context'
@@ -66,6 +67,8 @@ import { makeCommentAnchor, resolveCommentAnchor, type CommentAnchor } from './u
 import { docHasTable, readTableWidths, tableWidthsTransaction } from './editor/tableWidths'
 import { EditorSearchBar } from './editor/EditorSearchBar'
 import { EmptyParagraph } from './editor/emptyParagraph'
+import { InlinePageName, inlinePageNameKey } from './editor/inlinePageName'
+import { InlinePageNameInput } from './editor/InlinePageNameInput'
 import { AnnotationMarker, Annotations, insertAnnotation, updateAnnotation, deleteAnnotation, scanAnnotations } from './editor/annotations'
 import { prepareProseMirrorContext } from './editor/prosemirrorContext'
 import type { EditorContextTarget } from './editor/contextTarget'
@@ -296,7 +299,7 @@ export const Editor = forwardRef<
     fileLinkContext?: FileLinkContext
     tree?: TreeNode[]
     onOpenLink?: EditorOpenLink
-    onCreateChildPage?: (insert: (link: { href: string; label: string }) => void) => Promise<void>
+    onCreateChildPage?: (name: string, insert: (link: { href: string; label: string }) => void) => Promise<void>
     /** 선택 글자 수를 호스트 상태줄에 넘긴다 — 상태줄은 파일 종류를 가리지 않으므로 에디터 밖(EditorPane)에 있다 */
     onSelectionChars?: (count: number) => void
     /** 있으면 이 방의 Y.XmlFragment가 본문의 진실 원천이 된다 — value/onChange는 그 결과를 반영만 한다 */
@@ -356,6 +359,8 @@ export const Editor = forwardRef<
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const creatingPageRef = useRef(false)
+  const [pageName, setPageName] = useState<{ editor: TiptapEditor; mount: HTMLElement; path: string } | null>(null)
+  const canCreateChildPage = !!onCreateChildPage && !readOnly
   const [tooltip, setTooltip] = useState<{
     show: boolean
     position: { top: number; left: number }
@@ -538,6 +543,7 @@ export const Editor = forwardRef<
       Document,
       Text,
       EmptyParagraph,
+      InlinePageName,
       // StarterKit이 기본 제공하는 확장 중 아래에서 개별 등록·설정하는 것들은 전부 꺼야 한다.
       // 켠 채로 같은 이름을 또 등록하면 tiptap이 "Duplicate extension names found"를 경고하고,
       // 플러그인이 두 벌 돌아간다 — 특히 Link는 StarterKit 기본값(openOnClick: true)이 함께
@@ -1612,6 +1618,52 @@ export const Editor = forwardRef<
     [mention, editor, path, api],
   )
 
+  function closePageName(focus = true) {
+    if (!pageName) return
+    const e = pageName.editor
+    if (!e.isDestroyed) {
+      const pos = inlinePageNameKey.getState(e.state)?.find()[0]?.from
+      e.view.dispatch(e.state.tr.setMeta(inlinePageNameKey, null))
+      if (focus && pos !== undefined) {
+        e.commands.setTextSelection(pos)
+        e.view.focus()
+        // Refresh focus-dependent caret widgets before the next keystroke.
+        e.view.dispatch(e.state.tr)
+      }
+    }
+    setPageName(null)
+  }
+
+  function submitPageName(name: string) {
+    if (!pageName || creatingPageRef.current) return
+    const e = pageName.editor
+    const posAtSubmit = !e.isDestroyed ? inlinePageNameKey.getState(e.state)?.find()[0]?.from : undefined
+    if (posAtSubmit === undefined || editorRef.current !== e || path !== pageName.path || readOnly || !onCreateChildPage) {
+      closePageName(false)
+      return
+    }
+    closePageName()
+    creatingPageRef.current = true
+    let pos = posAtSubmit
+    const trackPosition = ({ transaction }: { transaction: Transaction }) => { pos = transaction.mapping.map(pos, -1) }
+    e.on('transaction', trackPosition)
+    setUploadError(null)
+    void onCreateChildPage(name, ({ href, label }) => {
+      if (e.isDestroyed || editorRef.current !== e || readOnlyRef.current) return
+      e.commands.insertContentAt(pos, { type: 'text', text: label, marks: [{ type: 'link', attrs: { href } }] }, { updateSelection: false })
+      const active = e.view.dom.ownerDocument.activeElement
+      const { from, to } = e.state.selection
+      continuity.current = { from, to, focused: e.isFocused || active === e.view.dom.ownerDocument.body, scrollTop: containerRef.current?.scrollTop ?? 0 }
+    }).catch(error => {
+      setUploadError(error instanceof Error ? error.message : uiText('하위 페이지 생성 실패'))
+    }).finally(() => { e.off('transaction', trackPosition); creatingPageRef.current = false })
+  }
+
+  useEffect(() => () => {
+    if (editor && !editor.isDestroyed) editor.view.dispatch(editor.state.tr.setMeta(inlinePageNameKey, null))
+    setPageName(null)
+  }, [editor, path, canCreateChildPage])
+
   // 슬래시 커맨드 목록 — run은 항상 최신 에디터(editorRef)를 받고, 메뉴 텍스트(/query)는 range로 넘겨 미리 지운다.
   // openUploadPicker는 refs만 읽는 안정 참조라 매 렌더 재생성돼도 문제없다.
   // 슬래시 커맨드는 데이터·삽입 관련 명령만 노출한다 (제목·목록·인용 등 글 형식은 마크다운
@@ -1621,21 +1673,13 @@ export const Editor = forwardRef<
       id: 'page', title: uiText("하위 페이지"), description: uiText("새 하위 페이지 만들기"), keywords: ['page', '페이지', '하위', '문서'],
       run: (e: TiptapEditor, r: { from: number; to: number }) => {
         if (creatingPageRef.current) return
-        creatingPageRef.current = true
-        e.chain().focus().deleteRange(r).run()
-        let pos = e.state.selection.from
-        const trackPosition = ({ transaction }: { transaction: Transaction }) => { pos = transaction.mapping.map(pos, -1) }
-        e.on('transaction', trackPosition)
-        setUploadError(null)
-        void onCreateChildPage(({ href, label }) => {
-          if (e.isDestroyed || editorRef.current !== e || readOnlyRef.current) return
-          e.commands.insertContentAt(pos, { type: 'text', text: label, marks: [{ type: 'link', attrs: { href } }] }, { updateSelection: false })
-          const active = e.view.dom.ownerDocument.activeElement
-          const { from, to } = e.state.selection
-          continuity.current = { from, to, focused: e.isFocused || active === e.view.dom.ownerDocument.body, scrollTop: containerRef.current?.scrollTop ?? 0 }
-        }).catch(error => {
-          setUploadError(error instanceof Error ? error.message : uiText("하위 페이지 생성 실패"))
-        }).finally(() => { e.off('transaction', trackPosition); creatingPageRef.current = false })
+        const mount = e.view.dom.ownerDocument.createElement('span')
+        mount.contentEditable = 'false'
+        e.chain().deleteRange(r).command(({ tr }) => {
+          tr.setMeta(inlinePageNameKey, { pos: r.from, mount })
+          return true
+        }).run()
+        setPageName({ editor: e, mount, path })
       },
     }] : []),
     { id: 'diagram', title: uiText("다이어그램"), description: uiText("Mermaid 다이어그램 삽입"), keywords: ['diagram', 'mermaid', '다이어그램', '흐름도'], run: (e, r) => e.chain().focus().deleteRange(r).insertContent({ type: 'codeBlock', attrs: { language: 'mermaid' }, content: [{ type: 'text', text: 'flowchart LR\n  A[시작] --> B[완료]' }] }).run() },
@@ -2157,6 +2201,7 @@ export const Editor = forwardRef<
       <ImageSourceContext.Provider value={resolveImageSource}>
         <EditorContent editor={editor} />
       </ImageSourceContext.Provider>
+      {pageName && createPortal(<InlinePageNameInput onSubmit={submitPageName} onCancel={() => closePageName()} />, pageName.mount)}
       {uploading && (
         <div className="absolute bottom-2 right-2 rounded bg-surface-inverse px-2 py-1 text-xs text-ink-inverse">
           {uiText("업로드 중…")}</div>

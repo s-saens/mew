@@ -73,7 +73,7 @@ export function SlashMenu({
           <button
             key={command.id}
             type="button"
-            onMouseDown={() => onSelect(command)}
+            onMouseDown={event => { event.preventDefault(); onSelect(command) }}
             className={`block w-full rounded px-2 py-1 text-left ${
               i === selectedIndex ? 'bg-accent text-ink-on-accent' : 'text-ink hover:bg-surface-hover'
             }`}

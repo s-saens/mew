@@ -1,7 +1,7 @@
 import { mewFetch } from '../utils/remote-transport.ts'
 import { editorImageUrl } from '../utils/editor-image-url.ts'
 import { PanelCloseButton } from './panel-close-button'
-import { LoadingIndicator, observeEditorViewport, useDialog, useToast } from '@mew/ui'
+import { LoadingIndicator, observeEditorViewport, useToast } from '@mew/ui'
 import { uiText } from '@mew/ui/i18n-core'
 import { useUiLocale } from '@mew/ui/i18n'
 import { useShortcutBindings } from '@mew/shortcuts'
@@ -225,7 +225,6 @@ export function EditorPane({
   useUiLocale()
   const dock = useDock()
   const { t } = useI18n()
-  const pageDialogs = useDialog()
   const { toast: commentToast, showToast } = useToast()
   const shortcutBindings = useShortcutBindings()
   const selectedTab = (pane.activeTabId ? pane.tabs.find((t) => t.id === pane.activeTabId) : undefined) ?? pane.tabs.find((t) => t.path === pane.activePath) ?? null
@@ -1045,9 +1044,8 @@ export function EditorPane({
                       } : undefined}
                       tree={tree}
                       onOpenLink={onOpenLink}
-                      onCreateChildPage={!isGuest && !isExternalTabPath(activeTab.path) && onCreateChildPage ? async insert => {
+                      onCreateChildPage={!isGuest && !isExternalTabPath(activeTab.path) && onCreateChildPage ? async (name, insert) => {
                         const sourcePath = pane.activePath
-                        const name = await pageDialogs.prompt({ message: uiText('새 하위 페이지 만들기'), label: uiText('새 문서 이름'), confirmLabel: uiText('만들기') })
                         if (name && activeKeyRef.current === sourcePath) await onCreateChildPage(toTabPath(activeTab.path), name, result => {
                           if (activeKeyRef.current !== sourcePath) return
                           const href = encodeURI(relativeLinkPath(activeTab.path, result.path)).replace(/[#?()]/g, char => '%' + char.charCodeAt(0).toString(16).toUpperCase())
@@ -1172,7 +1170,6 @@ export function EditorPane({
           initialDbId={databasePopup.id} readonly={databasePopup.readonly}
           onClose={() => setDatabasePopup(null)} onOpenPage={databasePopup.onOpenPage} />}
       </DockInlineBody>
-      {pageDialogs.dialog}
       {commentToast}
     </div>
   )

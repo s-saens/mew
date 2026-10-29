@@ -4,11 +4,11 @@ parent: "mew-projects"
 title: "Documents and document map management"
 status: "implemented"
 created: "2026-09-18"
-updated: "2026-10-28"
+updated: "2026-10-30"
 status_hash: "67f36d128f8ff98f55ff2f44e2197710413f6968309439a998bd606dad06b477"
 files: ["src/components/DocsSettingsModal.tsx", "src/components/FileTree.tsx", "server/docsRepo.ts", "src/components/DocumentGraph.tsx", "server/document-graph.ts", "src/utils/document-graph-layout.ts", "server/document-pages.ts", "src/hooks/useTabs.ts"]
 commits: []
-description: "Feature contract covering file/folder transitions for Documents representative and child documents, list caching and virtualization, graphs, and import/export. Explains link insertion at the Markdown /page command position, preserving input and the parent view during creation, preserving open tabs and drafts, and project boundaries."
+description: "Feature contract covering file/folder transitions for Documents representative and child documents, list caching and virtualization, graphs, and import/export. Explains inline naming and link insertion at the Markdown /page command position, preserving input and the parent view during creation, preserving open tabs and drafts, and project boundaries."
 상위파일:
   - "MOC.md"
   - "_projects-files-search.md"
@@ -29,7 +29,7 @@ description: "Feature contract covering file/folder transitions for Documents re
 - Display folders as parent documents, and open the `_폴더이름.md` representative content when the name is clicked. Do not duplicate the representative file in the child list.
 - For documents with no children, show a small bullet in place of the expansion chevron. The bullet is decorative and adds neither a tab stop nor an accessible name. Folders whose child lists have not yet been fetched retain the existing chevron.
 - Save documents without children as `이름.md`, and switch the storage structure when adding the first child or removing the last child.
-- Running `/page` in Hotview for editable project Markdown prompts for a name first and creates a child page using the same structural change as **+**, inserts a link at the command position, and stays in the parent document. Open the created page by clicking the list or link. Do not insert a link on cancellation or failure. If the name already exists, append a number and use the finalized name in the link as well. Save the draft before creation and preserve input entered during creation. Adjust open tabs and autosave paths for the parent and referencing documents, preserve the cursor, focus, and scroll position, and support nested creation. Do not offer the command for guests, read-only files, archives, or files outside the project.
+- Running `/page` in Hotview for editable project Markdown shows a focused name field inline at the command position. Enter or the Create icon confirms; Esc or the Cancel icon cancels and restores editor focus. IME confirmation and empty names do not create a page. Unfinished names remain outside saved and shared document content; navigation or loss of edit access cancels entry. Creation uses the same structural change as **+**, inserts a link at the command position, and stays in the parent document. Open the created page by clicking the list or link. Do not insert a link on cancellation or failure. If the name already exists, append a number and use the finalized name in the link as well. Save the draft before creation and preserve input entered during creation. Adjust open tabs and autosave paths for the parent and referencing documents, preserve the cursor, focus, and scroll position, and support nested creation. Do not offer the command for guests, read-only files, archives, or files outside the project.
 - A normal click opens in the current tab, while Ctrl/Cmd+click continues to open in a new tab.
 - Show only the document list through the full-width Documents toggle at the top of the explorer. Preserve open editor tabs when switching to and from the file view.
 - Provide a graph view entry point above the document home at the Docs root for quickly navigating internal document links.
