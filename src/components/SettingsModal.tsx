@@ -82,8 +82,15 @@ export function SettingsModal({ mewcatHostRef, mewcatRequest, initialDebugger, d
     }
   }
 
-  // Esc·모바일 뒤로가기로 이 창만 닫는다 (뒤의 사이드바·터미널은 그대로)
-  useOverlayDismiss(onClose)
+  useOverlayDismiss(onClose, {
+    closeOnBack: () => {
+      if (mobileSection && window.matchMedia('(width < 768px)').matches) {
+        setMobileSection(null)
+        return false
+      }
+      return true
+    },
+  })
 
   const sections: Section[] = [
     ...(email ? (['account'] as Section[]) : []),
