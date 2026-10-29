@@ -1,17 +1,17 @@
 ---
-title: "OS 실행 계층과 Windows 네이티브"
-description: "공통 mew 서버·화면을 유지하며 Windows·POSIX·Linux 구현을 분리하는 설계와 psmux·Job Object·개인 ACL·상호 인증 named pipe·플랫폼별 릴리스 계약을 소유한다. 구현 및 격리 검사와 실제 Windows·외부망 발행 게이트를 구분한다."
+title: "OS execution layer and Windows native support"
+description: "Owns the design that separates Windows, POSIX, and Linux implementations while retaining the shared mew server and UI, along with the contracts for psmux, Job Objects, private ACLs, mutually authenticated named pipes, and platform-specific releases. Distinguishes implementation and isolated checks from actual Windows and external-network release gates."
 updated: "2026-10-14"
 상위파일:
   - "architecture.md"
   - "../operations/cli-release.md"
 ---
 
-## 설계
+## Design
 
-Windows에서도 기존 mew 서버·React 화면·편집·Git·계정·Mewlink를 사용한다. OS 의존 구현만 `server/platform/`의 `windows/`·`posix/`·`linux/`로 분리한다. `platform/index.ts`는 기능 코드의 진입점이며 계약은 `platform/contracts.ts`가 소유한다. 터미널 패키지는 호스트 서버를 import하지 않고 `packages/tmux-term/src/server/backends/`의 tmux·psmux 구현을 선택한다. 얇은 npm CLI의 OS 경로·브라우저 처리는 `apps/cli/src/platform/`에 둔다.
+Windows also uses the existing mew server, React UI, editing, Git, accounts, and Mewlink. Only OS-dependent implementations are separated into `windows/`, `posix/`, and `linux/` under `server/platform/`. `platform/index.ts` is the entry point for feature code, and `platform/contracts.ts` owns the contracts. The terminal package selects the tmux or psmux implementation in `packages/tmux-term/src/server/backends/` without importing the host server. OS path and browser handling for the thin npm CLI lives in `apps/cli/src/platform/`.
 
-실행·종료·IPC·저장 기능은 공통 API가 구현을 선택한다. 셸 문법·공급자 설치 가능 여부 같은 기능 정책은 해당 호출부에 남긴다. Linux cgroup·systemd 메모리 제어는 Linux 구현이 소유한다. [ADR 0209](../history/decisions/0209-mew-native-windows-host-platform.md)를 따르며, mewnager 관리 앱은 [ADR 0210](../history/decisions/0210-mew-retire-mewnager.md)에 따라 폐기하고 공통 CLI로 실행 경로를 통일한다.
+For execution, shutdown, IPC, and storage, the shared API selects the implementation. Feature policies such as shell syntax and provider installation availability remain at the respective call sites. The Linux implementation owns Linux cgroup and systemd memory control. This follows [ADR 0209](../history/decisions/0209-mew-native-windows-host-platform.md); the mewnager management app is retired under [ADR 0210](../history/decisions/0210-mew-retire-mewnager.md), unifying the execution path through the shared CLI.
 
 ```text
 server/platform/
@@ -27,61 +27,61 @@ packages/tmux-term/src/server/backends/  tmux·psmux
 apps/cli/src/platform/            OS 경로·브라우저 열기
 ```
 
-## OS별 계약
+## OS-specific contracts
 
-| 책임 | Linux·macOS | Windows |
+| Responsibility | Linux/macOS | Windows |
 | --- | --- | --- |
-| 터미널 | 기존 tmux·node-pty | psmux·ConPTY, 버전·해시 고정 exe |
-| 에이전트 프로세스 | 기존 분리 process group | `native/windows/process-host.exe`가 suspended child를 Job Object에 넣은 뒤 실행. handle 종료 시 모든 자손 종료 |
-| 내부 IPC | 기존 owner-only Unix socket | OS 사용자·상태 경로에서 해시한 named pipe, 개인 상태 키를 사용한 상호 HMAC challenge-response |
-| 개인 상태 | 기존 XDG 경로·POSIX mode | `%LOCALAPPDATA%/mew/{config,data,cache,state}`, 현재 SID와 SYSTEM의 파일 ACL |
-| 셸 명령 | 기존 sh/사용자 셸 | 서버 고정 호출은 argv 보존, 사용자 명령은 PowerShell wrapper |
-| 앱 릴리스 | 플랫폼별 native dependency·tmux | 플랫폼별 native dependency·psmux·process host, 내부 workspace junction 메타데이터 |
+| Terminal | Existing tmux/node-pty | psmux/ConPTY, version- and hash-pinned exe |
+| Agent processes | Existing separate process group | `native/windows/process-host.exe` places a suspended child in a Job Object, then runs it. Closing the handle terminates all descendants |
+| Internal IPC | Existing owner-only Unix socket | Named pipe hashed from the OS user and state path, mutual HMAC challenge-response using a private state key |
+| Private state | Existing XDG paths/POSIX modes | `%LOCALAPPDATA%/mew/{config,data,cache,state}`, file ACLs for the current SID and SYSTEM |
+| Shell commands | Existing sh/user shell | Fixed server invocations preserve argv; user commands use a PowerShell wrapper |
+| App releases | Platform-specific native dependencies/tmux | Platform-specific native dependencies/psmux/process host, internal workspace junction metadata |
 
-## 보안과 수명
+## Security and lifecycle
 
-Job Object helper는 child를 일시정지 상태로 만든 뒤 작업 그룹에 연결하고 실행한다. helper가 강제 종료돼도 job handle이 닫히며 자손이 종료된다. 일반 실행은 실제 부모 process handle도 기다려 부모가 비정상 종료됐을 때 정리한다. 독립 에이전트 감독은 이 부모 감시를 해제해 서버와 수명을 분리하고, ACP 자식 그룹은 감독의 수명과 연결한다. 워크스페이스 전환은 인증된 감독 IPC로 종료를 요청한다. PID 이름만 보고 무관한 프로세스를 종료하지 않는다. 이 수명은 [Windows Job Object 계약](https://learn.microsoft.com/en-us/windows/win32/procthread/job-objects)을 사용한다.
+The Job Object helper creates a suspended child, assigns it to the job group, and then runs it. Even if the helper is forcibly terminated, the job handle closes and terminates its descendants. Normal execution also waits on the actual parent process handle to clean up if the parent exits abnormally. Independent agent supervision disables this parent monitoring to separate its lifetime from the server, and ties ACP child groups to the supervisor's lifetime. Workspace switching requests shutdown through authenticated supervisor IPC. Unrelated processes are not terminated based solely on PID names. This lifecycle uses the [Windows Job Object contract](https://learn.microsoft.com/en-us/windows/win32/procthread/job-objects).
 
-Windows Job Object 메모리 한도는 시작 시 가용 물리 메모리의 90%를 해당 작업 트리에 적용한다. 호스트 가용 메모리 감시·대기열 중단/재개는 공통 로직을 사용한다. Linux의 동적 합산 slice 한도와 적용 단위가 다르며 `MEW_AGENT_MEMORY_SCOPE=off`는 명시적으로 메모리 한도만 해제한다. 자손 종료·부모 감시는 유지한다.
+The Windows Job Object memory limit applies 90% of the physical memory available at startup to the task tree. Host available-memory monitoring and queue pause/resume use shared logic. Its scope differs from Linux's dynamic aggregate slice limit, and `MEW_AGENT_MEMORY_SCOPE=off` explicitly disables only the memory limit. Descendant termination and parent monitoring remain enabled.
 
-Windows의 `chmod 600/700`은 다른 사용자의 읽기를 막는 계약으로 사용하지 않는다. 상태 폴더는 inherited ACE를 제거하고 현재 OS 사용자와 SYSTEM의 접근으로 제한한다. ACL 준비가 실패하거나 상태 루트가 reparse point면 실행을 거절한다. 보호된 상태 폴더의 IPC 키는 argv·환경·로그·HTTP에 보내지 않는다.
+On Windows, `chmod 600/700` is not used as a contract for preventing reads by other users. State folders remove inherited ACEs and restrict access to the current OS user and SYSTEM. Execution is refused if ACL preparation fails or the state root is a reparse point. IPC keys in protected state folders are not sent through argv, the environment, logs, or HTTP.
 
-named pipe를 연결했다고 바로 작업을 허용하지 않는다. 서버가 난수 challenge와 자기 증명을 보내고, 클라이언트가 서버 증명을 확인한 뒤 자기 증명을 돌려준다. 양쪽 증명은 endpoint·역할·난수에 묶인다. 인증 전에는 프레임 크기·시간·대기 연결 수를 제한한다. 기존 계정·프로젝트·권한 검사는 인증 뒤에도 유지한다. POSIX wire 형식은 기존 연결과 호환된다.
+Connecting to a named pipe does not immediately authorize operations. The server sends a random challenge and its own proof; the client verifies the server's proof, then returns its own proof. Both proofs are bound to the endpoint, role, and nonce. Frame size, time, and pending connection counts are limited before authentication. Existing account, project, and permission checks remain in effect after authentication. The POSIX wire format is compatible with existing connections.
 
-명령 wrapper는 사용자 텍스트를 저장된 실행 레코드에서 읽고 서버가 소유한 파일 경로만 wrapper 문법에 넣는다. 사용자 `exit`가 완료 처리를 건너뛰지 않도록 내부 PowerShell을 별도로 실행한다. ConPTY가 임의 OSC 완료 marker를 소비할 수 있어 Windows는 완료 파일과 마지막 출력 후 150ms의 유휴 시간을 확인해 콘솔을 닫는다. 실제 대량 출력·취소·Unicode·resize 검증은 Windows CI fixture의 책임이며 임의의 지연 출력을 완전히 보장하는 프로토콜로 표현하지 않는다.
+The command wrapper reads user text from a stored execution record and inserts only server-owned file paths into the wrapper syntax. It runs an inner PowerShell separately so a user's `exit` cannot skip completion handling. Because ConPTY may consume arbitrary OSC completion markers, Windows checks the completion file and an idle period of 150ms after the last output before closing the console. Verification of actual large-volume output, cancellation, Unicode, and resize is the responsibility of the Windows CI fixture; this is not described as a protocol that fully guarantees arbitrary delayed output.
 
-Windows 파일 경계는 `path.win32.relative`에 따라 드라이브·대소문자를 정규화한다. 상대 파일 경로의 ADS·예약 장치 이름·trailing dot/space는 거절하며 실제 symlink/junction 경계는 기존 파일 권한 검사와 함께 확인한다.
+Windows file boundaries normalize drives and case according to `path.win32.relative`. ADS, reserved device names, and trailing dots/spaces in relative file paths are rejected, and actual symlink/junction boundaries are checked alongside existing file permission checks.
 
-## 실행·업데이트와 예약
+## Execution, updates, and scheduling
 
-Windows 사전 빌드 대상은 Node.js 24의 x64/arm64와 Windows 10 1809 이상·Windows 11이다. Git 기능에는 PATH의 Git for Windows가 필요하다. 사용자 작업 폴더, `%LOCALAPPDATA%/mew/data`의 계정·대화·기기 등록과 `%LOCALAPPDATA%/mew/cache/runtimes`의 실행본을 분리한다. CLI 옵션·`MEW_DATA_DIR`로 지정한 위치를 우선한다.
+Windows prebuilt targets are Node.js 24 on x64/arm64 and Windows 10 1809 or later and Windows 11. Git features require Git for Windows on PATH. User working folders, accounts/conversations/device registrations in `%LOCALAPPDATA%/mew/data`, and runtimes in `%LOCALAPPDATA%/mew/cache/runtimes` are kept separate. Locations specified through CLI options or `MEW_DATA_DIR` take precedence.
 
-첫 공개 발행 후 PowerShell에서 다음과 같이 실행한다. 현재 작업에서는 npm·GitHub 실행본을 발행하지 않았다.
+After the first public release, run the following in PowerShell. No npm or GitHub runtimes were published during the current work.
 
 ```powershell
 cd C:\work\project
 npx @liiiiv/mew-cli@latest
 ```
 
-첫 실행은 기존 owner 설정 흐름과 loopback 서버·브라우저 열기·Mewlink 기기 등록을 사용한다. 업데이트는 CLI를 종료한 뒤 같은 명령을 다시 실행한다. Windows 종료는 IPC로 정상 종료를 요청하고 제한 시간이 지나면 강제 종료한다. 캐시를 설치본으로 사용하는 동안 CLI가 clone·pull·재빌드를 수행하지 않는다. 소스 개발은 MSVC 환경의 별도 Windows 릴리스 빌드가 process host를 준비해야 한다.
+The first run uses the existing owner setup flow, loopback server, browser opening, and Mewlink device registration. To update, exit the CLI and run the same command again. Windows shutdown requests graceful termination through IPC, then forcibly terminates after the timeout. While using the cache as the installation, the CLI does not clone, pull, or rebuild. For source development, a separate Windows release build in an MSVC environment must prepare the process host.
 
-반복 작업은 상태 경로 해시로 식별하는 현재 사용자·일반 권한의 작업 스케줄러 항목 하나가 매분 실행한다. private `windows-schedules.cron`은 숫자·범위·목록·step·월/요일 별칭의 5필드 크론식과 PowerShell 명령을 사용하며 OS 로컬 시각으로 판단한다. 같은 분은 파일 stamp로 중복을 막고, 빈 설정 저장 시 mew의 task만 제거한다. 새 실행본의 서버 시작 시 저장된 예약의 runner 경로를 갱신한다. 기존 Windows 작업 스케줄러 항목은 수정하지 않는다. task는 1분, 각 제어 호출은 30초 제한이며 장기 에이전트 작업은 별도 psmux 세션에서 실행한다. 로그온 중 실행하며 로그아웃·절전 동안 놓친 작업을 소급 실행하는 계약은 없다.
+Recurring tasks run every minute through a single Task Scheduler entry for the current user with standard privileges, identified by a hash of the state path. The private `windows-schedules.cron` uses 5-field cron expressions supporting numbers, ranges, lists, steps, and month/day-of-week aliases, along with PowerShell commands, evaluated in OS local time. A file stamp prevents duplicates within the same minute, and saving an empty configuration removes only mew's task. When the server starts from a new runtime, it updates the runner path for saved schedules. Existing Windows Task Scheduler entries are not modified. The task has a 1-minute limit, and each control call has a 30-second limit; long-running agent tasks run in separate psmux sessions. Tasks run while logged in, with no contract to retroactively run tasks missed during logout or sleep.
 
-일반 명령과 프로젝트 버튼도 PowerShell 문법을 사용한다. 기존 Bash 명령은 실행 환경에 맞게 바꿔야 한다. Cursor·Prime의 Unix 자동 설치와 현재 등록된 Antigravity 배포에는 Windows 자동 설치를 제공하지 않는다. 공급자 실행 파일·로그인·DAP 엔진은 각 공급자의 Windows 지원을 확인한다. 선택적인 원격 데스크톱·OS 권한 준비는 기존 해당 계약을 따른다.
+General commands and project buttons also use PowerShell syntax. Existing Bash commands must be adapted to the execution environment. Windows automatic installation is not provided for Cursor and Prime's Unix automatic installers or the currently registered Antigravity distribution. Check each provider's Windows support for provider executables, login, and DAP engines. Optional remote desktop and OS permission setup follow their existing contracts.
 
-## 재배포 고지
+## Redistribution notices
 
-[psmux의 MIT 원문](https://github.com/psmux/psmux/blob/v3.4.0/LICENSE)과 수정된 portable-pty·vt100 고지를 포함한다. 바이너리와 원문 자료의 SHA-256을 고정하고 Cargo.lock의 registry 의존성 247개도 다운로드 체크섬을 확인한다. 전체 `.crate` 소스 압축본을 포함해 license·copyright·NOTICE를 보존하며 `dependencies.json`에 원래 선언과 배포에 선택한 라이선스를 적는다. OR의 허용 선택지와 AND의 모든 조건을 구분하고, 검토 목록에 없는 단독 조건·source·누락된 라이선스는 발행 패키징을 중단한다. 세부 발행 절차는 [CLI 릴리스](../operations/cli-release.md)를 따른다.
+Includes the [original psmux MIT license](https://github.com/psmux/psmux/blob/v3.4.0/LICENSE) and notices for modified portable-pty and vt100. SHA-256 hashes for binaries and original source materials are pinned, and download checksums are also verified for the 247 registry dependencies in Cargo.lock. Complete `.crate` source archives are included, preserving licenses, copyrights, and NOTICE files; `dependencies.json` records the original declarations and the licenses selected for distribution. Permitted alternatives under OR are distinguished from all required conditions under AND; standalone conditions, source, or missing licenses not covered by the review list halt release packaging. Detailed release procedures follow [CLI releases](../operations/cli-release.md).
 
-## 구현·검증·적용
+## Implementation, verification, and application
 
-2026-10-14에 공통/OS 실행 계층·Windows CLI·릴리스·예약·상호 인증 IPC·정상 종료와 CI 검증 경로를 구현했다. 이 작업에서 확인한 범위는 다음과 같다.
+On 2026-10-14, the shared/OS execution layers, Windows CLI, releases, scheduling, mutually authenticated IPC, graceful shutdown, and CI verification paths were implemented. The scope verified in this work is as follows.
 
-- 타입 검사와 대상 린트(오류 없음, 기존 `primeAdapter.ts` 경고 1개), Linux의 CLI 격리 검사 12개를 통과했다.
-- 기존 에이전트·독립 감독·명령 큐/출력 회귀 44개, 운영·로그인·Git·MCP·메모리·예약·릴리스 검사 75개 중 73개를 통과했다. Linux systemd 환경이 필요한 2개는 skip했다.
-- 실제 Windows Node.js 24.21.0·PowerShell에서 CLI와 OS fixture 18개 중 17개를 통과했다. Unix legacy PID 검사 1개는 skip했다. named pipe의 올바른 키·잘못된 키·역할 replay, 현재 SID/SYSTEM ACL, 관리자 권한 없는 junction, 한글/이모지와 명시적 exit code를 확인했다. 실제 mew 서버·사용자 workspace는 실행하지 않았다.
-- psmux registry 의존성 247개의 원문 `.crate` 체크섬과 라이선스 선택 가능 여부를 확인했다. 발행 패키징 자체는 실행하지 않았다.
+- Type checking, targeted lint checks (no errors, 1 existing warning in `primeAdapter.ts`), and 12 isolated CLI checks on Linux passed.
+- Passed 44 existing agent, independent supervisor, and command queue/output regression tests, and 73 of 75 operations, login, Git, MCP, memory, scheduling, and release checks. Skipped 2 checks requiring a Linux systemd environment.
+- Passed 17 of 18 CLI and OS fixtures on actual Windows with Node.js 24.21.0 and PowerShell. Skipped 1 Unix legacy PID check. Verified named pipe behavior with correct keys, incorrect keys, and role replay; current SID/SYSTEM ACLs; junctions without administrator privileges; Korean/emoji; and explicit exit codes. The actual mew server and user workspaces were not run.
+- Verified the original `.crate` checksums and license selection availability for 247 psmux registry dependencies. Release packaging itself was not run.
 
-`server/windows-native.test.ts`의 Job Object 자손/부모 종료·CMD argv·실제 psmux 생성/입력/capture/attach·ConPTY resize·명령 archive/exit/취소는 Windows x64/arm64 CI에 연결했다. 아직 MSVC 컴파일·전체 네이티브 fixture·컴파일된 mew host 시작을 실행한 결과는 없다. 작업 스케줄러의 실제 등록/권한·로그온/절전/DST, 두 아키텍처의 native dependency 설치, 공급자 실제 인증·Git credential·DAP와 외부망/휴대폰 접속도 공개 지원 전 실기 게이트다.
+Job Object descendant/parent termination, CMD argv, actual psmux creation/input/capture/attach, ConPTY resize, and command archive/exit/cancellation in `server/windows-native.test.ts` were connected to Windows x64/arm64 CI. There are still no results from running MSVC compilation, the full native fixtures, or compiled mew host startup. Actual Task Scheduler registration/permissions, logon/sleep/DST, native dependency installation on both architectures, actual provider authentication, Git credentials, DAP, and external-network/mobile access are also tests on actual machines required before public support.
 
-첫 npm·GitHub 발행과 실제 외부망·원격 데스크톱 검증은 기존 계약을 따른다. 구현·부분 실환경 검증을 이미 발행된 실행본이나 모든 공급자의 완전 호환으로 표현하지 않는다. 운영 앱 빌드·서버 실행/재시작은 에이전트가 수행하지 않는다.
+The first npm/GitHub release and actual external-network and remote desktop verification follow the existing contracts. Implementation and partial verification in a real environment must not be described as an already published runtime or full compatibility with all providers. Agents do not build the production app or start/restart the server.

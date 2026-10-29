@@ -1,40 +1,40 @@
 ---
-title: "Graphify 로컬 검색 실험 철회"
-description: "24개 과제 비교 후 Graphify의 Mew 소스 검색 연동·자동 안내·로컬 설치와 활성 색인을 제거하는 결정. 측정·소스 이력은 보존하며 변경 영향·첨부 제안·개념 관계 활용은 별도 미검증 후보로 남긴다."
+title: "Retire the Graphify local search experiment"
+description: "The decision to remove Graphify's Mew source search integration, automatic guidance, local installation, and active indexes after a comparison across 24 tasks. Preserve measurements and source history, and leave change impact, attachment suggestions, and concept relationships as separate unverified candidates."
 created: "2026-10-27"
 updated: "2026-10-27"
 ---
 
-## 상태
+## Status
 
-채택. [결정 0077](0077-local-code-graph.md)의 Mew 소스 보조 검색 도입을 철회한다.
+Adopted. Withdraws the introduction of supplementary Mew source search in [decision 0077](0077-local-code-graph.md).
 
-## 배경
+## Background
 
-[24개 과제 비교](../research/graphify-search-benchmark.md)에서 기본 `query`는 `rg`보다 47.4배 느렸고
-출력 토큰은 631.9% 늘었다. 알려진 정답 파일 포함률은 같았다.
-전용 조회의 출력 이점도 과제별로 달랐고, `path`의 구조 연결을 호출 경로로 읽을 위험이 확인됐다.
-현재 검색 목적에 비해 별도 Python 환경·색인·최신성 관리 부담을 유지할 근거가 부족하다.
+In the [comparison of 24 tasks](../research/graphify-search-benchmark.md), the default `query` was 47.4 times slower than `rg` and produced 631.9% more output tokens. The inclusion rate for known correct files
+was the same. Output benefits from specialized queries also varied by task, and a
+risk of interpreting structural connections from `path` as call paths was confirmed. For current search needs, there is insufficient
+justification for retaining the burden of a separate Python environment, index, and freshness management.
 
-## 결정
+## Decision
 
-- 활성 `tools/graphify*`와 에이전트의 Graphify 탐색 안내를 제거한다. 일반 코드 탐색과 문서 description 탐색을 유지한다.
-- 실험에서 설치한 `.data/graphify/`의 가상환경·파생 소스·색인과 측정 사본의 가상환경 심볼릭 링크를 정리한다.
-  앱 서버·실행 중인 `dist/`·다른 개발 도구와 전역 설정은 변경하지 않는다.
-- wrapper·테스트·측정 도구·과제는 [과거 소스](../history/graphify/README.md)로 보존한다.
-  비교 보고서와 Git 제외 원시 측정 자료는 유지한다. 새 색인이나 설치는 자동 실행하지 않는다.
-- 이 결과를 Graphify의 모든 사용처에 대한 부정으로 일반화하지 않는다.
-  변경 영향 후보·에이전트 첨부 제안·문서 개념 관계는 현재 기능으로 도입하지 않고 별도 평가 대상으로만 남긴다.
+- Remove the active `tools/graphify*` and agents' Graphify exploration guidance. Retain general code navigation and description-based document navigation.
+- Clean up the virtual environment, derived sources, and index installed under `.data/graphify/` for the experiment, along with the virtual environment symbolic links in the measurement
+  copies. Do not change the app server, the running `dist/`, other development tools, or global settings.
+- Preserve the wrapper, tests, measurement tools, and tasks as [historical sources](../history/graphify/README.md). Retain the comparison report and
+  raw measurement data excluded from Git. Do not automatically run new indexing or installation.
+- Do not generalize these results as a rejection of all Graphify use cases. Change impact candidates, agent attachment
+  suggestions, and relationships between document concepts will remain subjects for separate evaluation and will not be introduced as current features.
 
-## 대안과 근거
+## Alternatives and Rationale
 
-전용 조회만 계속 유지하면 일부 출력은 줄일 수 있지만, 전체 에이전트 작업의 시간·정확도 이점은 아직 측정하지 않았다.
-현재 연동을 그대로 둔 채 제품 UI까지 확대하기보다 관리 부담을 제거하고 가치가 분명한 과제로 다시 검증한다.
-현재 TypeScript 코드의 참조 탐색에는 TypeScript/LSP, 문서의 명시적 링크에는 기존 Documents 그래프를 비교 기준으로 둔다.
+Retaining only specialized queries could reduce some output, but time and accuracy benefits for complete agent tasks have not yet been measured. Remove
+the maintenance burden and validate again on tasks with clear value instead of retaining the current integration and extending it
+to the product UI. Use TypeScript/LSP as the comparison baseline for reference navigation in current TypeScript code, and the existing Documents graph for explicit document links.
 
-## 영향
+## Impact
 
-현재 저장소에서 Graphify CLI는 더 이상 제공하지 않는다. 과거 실험은 이력 소스·고정 사본으로 확인할 수 있으나
-직접 재실행하려면 별도 격리 환경에서 원래 배치를 복원해야 한다.
-향후 Git diff의 영향 후보를 검토한다면 과거 변경 5~10개의 누락 감소·총 검토 시간·상위 후보 적중·색인 비용을 먼저 비교한다.
-재도입 시 백그라운드 실행·제품 권한·갱신 계약을 별도 결정으로 정한다.
+The current repository no longer provides the Graphify CLI. The historical experiment can be examined through historical sources and fixed copies, but rerunning it requires
+restoring the original layout in a separate isolated environment. If impact candidates from
+Git diffs are evaluated in the future, first compare reductions in omissions, total review time, top candidate hits, and indexing costs across 5–10 past changes. If reintroduced, background
+execution, product permissions, and update contracts will be defined in a separate decision.

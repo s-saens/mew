@@ -1,30 +1,30 @@
 ---
-title: "0001 — Mew 독립 프로젝트와 문서 소유권"
-description: "Mew를 Liiiiv 워크스페이스에서 분리하고 저장소 내부의 지침·결정·검증을 기준으로 삼는 결정과 로컬 폴더 이동의 운영 조건을 기록한다."
+title: "0001 — Mew as an Independent Project and Document Ownership"
+description: "Records the decision to separate Mew from the Liiiiv workspace and use repository-local instructions, decisions, and validation as the basis, along with the operational conditions for moving the local folder."
 created: 2026-10-14
 updated: 2026-10-14
 ---
 
-- 상태: 채택
-- 결정자: 사용자 지시
-- 부분 대체: 이전 워크스페이스의 문서 소유권·중앙 ADR·공통 검사·등록 규칙 중 Mew에 적용되던 범위
+- Status: Adopted
+- Decision maker: User instruction
+- Partially supersedes: The portions of the previous workspace's document ownership, central ADR, shared checks, and registration rules that applied to Mew
 
-## 배경
+## Background
 
-Mew의 소스 저장소는 독립 Git 저장소였지만 지침, 결정 기록과 문서 검사 명령이 Liiiiv의 부모 폴더에 의존했다. 다른 위치에 클론하거나 폴더를 옮기면 필수 진입점과 근거 링크가 끊겼다.
+Mew's source repository was an independent Git repository, but its instructions, decision records, and document check commands depended on Liiiiv's parent folder. Cloning it elsewhere or moving the folder broke required entry points and supporting links.
 
-## 결정
+## Decision
 
-- Mew의 지침은 루트 `AGENTS.md`, 문서 소유권·작성 규칙은 `docs/README.md`가 소유한다. 부모 Liiiiv 지침과 중앙 문서를 읽거나 갱신하는 의무를 없앤다.
-- 새 Mew 결정은 `.mew/docs/decisions/`에 기록한다. 로컬 번호는 `0001`부터 시작하며, 이전 중앙 번호와 구분한다.
-- 이전 Mew ADR과 그 결정이 참조하는 문서 정책의 원문은 `.mew/docs/history/decisions/`에 이관한다. 원래 번호·날짜·후속 결정과 내용을 보존하고 링크만 저장소 내부 위치에 맞춘다. 외부 원본과 동기화하지 않는다. 당시 회사 정책은 현재 Mew 지침이 아니다.
-- 기능·개발·운영 문서가 현재 계약을 소유한다. 이관한 ADR은 선택 근거와 후속 변경을 확인하는 이력이다. 기존 결정과 충돌하는 변경은 새 Mew ADR로 범위와 이유를 기록한다.
-- description 기반 탐색·같은 작업의 문서 갱신·history 원문 보존·archives 읽기 전용 원칙은 유지한다. 다른 프로젝트의 문서 구조나 규칙은 바꾸지 않는다.
-- 문서 검사는 저장소 안의 도구로 실행한다. 다른 저장소의 스크립트나 MOC 등록에 의존하지 않는다.
-- 이 개발 환경의 소스 위치를 `~/dev/liiiiv/mew`에서 `~/dev/mew`로 옮긴다. 이 위치는 개인 설치 경로이며 다른 설치의 필수 조건이 아니다. Git 이력·미커밋 변경·`.data/`를 보존하고 런처·설정·저장된 경로를 함께 갱신한다.
+- The root `AGENTS.md` owns Mew's instructions, and `docs/README.md` owns document ownership and authoring rules. Remove the obligation to read or update the parent Liiiiv instructions and central documents.
+- Record new Mew decisions in `.mew/docs/decisions/`. Local numbering starts at `0001` and is distinct from the previous central numbering.
+- Move the original text of previous Mew ADRs and the document policies referenced by those decisions to `.mew/docs/history/decisions/`. Preserve their original numbers, dates, subsequent decisions, and content, adjusting only links to repository-local locations. Do not synchronize with external originals. The company policies from that time are not current Mew instructions.
+- Feature, development, and operations documents own the current contracts. Migrated ADRs serve as history for checking the rationale behind choices and subsequent changes. For changes that conflict with existing decisions, record the scope and reasons in a new Mew ADR.
+- Retain the principles of description-based navigation, document updates within the same task, preservation of original text in history, and read-only archives. Do not change other projects' document structures or rules.
+- Run document checks using tools within the repository. Do not depend on scripts or MOC registration in other repositories.
+- Move the source location in this development environment from `~/dev/liiiiv/mew` to `~/dev/mew`. This is a personal installation path, not a requirement for other installations. Preserve Git history, uncommitted changes, and `.data/`, and update launchers, settings, and saved paths together.
 
-## 운영 조건
+## Operational Conditions
 
-실행 중인 서버와 에이전트는 시작 시의 절대경로를 기억한다. 폴더 이동의 적용 절차는 [저장소 위치 변경](../../../docs/operations/project-location.md)을 따른다. 재시작·빌드의 승인 범위는 기존 [실행·검증 규칙](../development/getting-started.md)을 유지한다.
+Running servers and agents retain the absolute paths from startup. Follow [Changing the Repository Location](../../../docs/operations/project-location.md) to apply the folder move. Retain the existing approval scope for restarts and builds in [Execution and Validation Rules](../development/getting-started.md).
 
-Git 원격 저장소·npm 스코프·서비스 도메인은 이 폴더 및 문서 경계 변경으로 개명하지 않는다.
+Do not rename Git remotes, npm scopes, or service domains as part of this folder and documentation boundary change.

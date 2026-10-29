@@ -1,6 +1,6 @@
 ---
 title: mewlink
-description: "태스크: mewlink"
+description: "Task: mewlink"
 done: true
 tags:
   - 기능

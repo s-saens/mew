@@ -1,41 +1,41 @@
 ---
-provenance: "Liiiiv 중앙 ADR 이관본, 2026-10-14"
-description: "이관한 결정 기록: 스킬·MCP는 런타임 원본 설정에서 관리한다. 당시 선택·근거·후속 변경을 보존하며 현재 계약은 Mew 소유 문서에서 확인한다."
-title: "0157 — 스킬·MCP는 런타임 원본 설정에서 관리한다"
+provenance: "Migrated copy of a Liiiiv central ADR, 2026-10-14"
+description: "Migrated decision record: Manage skills and MCP in the runtime's native configuration. Preserves the choices, rationale, and subsequent changes from that time; consult the Mew owning document for the current contract."
+title: "0157 — Manage skills and MCP in the runtime's native configuration"
 created: 2026-09-17
 updated: 2026-09-17
 ---
 
-- 날짜: 2026-09-17
-- 상태: 채택
-- 후속 결정: [0184](0184-mewcat-assistant-session-mcp.md) — 뮤캣 도우미 전용 내장 MCP를 세션에 자동 주입; 원본 MCP 설정 관리와 공급자 간 자동 변환 금지는 유지
-- 후속 결정: [0174](0174-mew-commit-skill-and-automatic-commits.md) — Mew 소유 커밋 스킬 추가; 런타임 원본 관리 유지
-- 결정자: 사용자 요구에 따른 에이전트 구현
+- Date: 2026-09-17
+- Status: Adopted
+- Follow-up decision: [0184](0184-mewcat-assistant-session-mcp.md) — Automatically inject a built-in MCP dedicated to the Mewcat assistant into sessions; retain native MCP configuration management and the prohibition on automatic conversion between providers
+- Follow-up decision: [0174](0174-mew-commit-skill-and-automatic-commits.md) — Add a Mew-owned commit skill; retain management of runtime-native sources
+- Decision maker: Agent implementation based on user requirements
 
-## 배경
+## Background
 
-사용자는 에이전트 패널에서 전역·현재 프로젝트·하위 프로젝트의 공통/런타임별 스킬과 MCP를 한곳에서 보고 편집·이동·삭제하도록 요청했다. 런타임마다 발견 경로·설정 형식·스코프가 다르며, Mew의 별도 복사본을 만들면 CLI와 관리창의 설정이 갈라진다.
+The user requested a single place in the agent panel to view, edit, move, and delete shared and runtime-specific skills and MCP across global, current-project, and subproject scopes. Discovery paths, configuration formats, and scopes differ by runtime, and creating separate Mew copies would cause CLI and management UI settings to diverge.
 
-## 선택지
+## Options
 
-1. Mew 전용 저장소를 만들고 모든 런타임에 설정을 배포한다 — 공통 형식이 생기지만 동기화·변환·런타임 적용 책임을 추가한다.
-2. 각 런타임의 원본을 스코프별로 탐색하고 필요한 항목만 수정한다 — 네이티브 동작을 유지하며 지원 위치와 형식을 명시해야 한다.
+1. Create a Mew-specific store and distribute configuration to all runtimes — Provides a common format but adds responsibility for synchronization, conversion, and application to runtimes.
+2. Discover each runtime's native sources by scope and modify only the necessary entries — Preserves native behavior and requires supported locations and formats to be specified.
 
-## 결정
+## Decision
 
-2번을 채택한다. 스킬과 MCP 관리창은 런타임 원본을 직접 관리하며 별도 설정 SSoT를 만들지 않는다.
+Adopt option 2. The skills and MCP management UI directly manages runtime-native sources and does not create a separate configuration SSoT.
 
-- 스코프(전역/프로젝트), 저장 위치 소유 런타임, 읽기 전용 출처를 독립적으로 표시한다. 같은 이름을 합치지 않는다.
-- 공통 스킬 위치와 각 에이전트의 자동 발견 범위를 동일시하지 않는다. Mew의 명시적 `/스킬` 선택은 현재 cwd·런타임에 맞는 공통/전용 후보를 사용한다.
-- MCP의 가상 공통 설정을 만들지 않는다. MCP 이동은 동일 런타임의 스코프 사이로 제한하며 공급자 간 자동 변환은 하지 않는다.
-- 변경은 실제 항목을 다시 찾고 읽은 버전을 검사한 후 수행한다. 기존 대상은 덮어쓰지 않는다. 스킬 이동은 부속 파일을 포함한다.
-- 원본 CLI의 적용·인증·신뢰 판단을 우회하지 않는다. 설정 목록은 연결 상태나 실행 성공을 의미하지 않는다.
-- API는 에이전트 기능 권한을 요구한다. 전역은 서버 OS 사용자 기준이며 Mew 계정별 격리 저장소가 아니다. 비밀값은 목록·로그·브라우저 영구 저장소에 남기지 않는다.
+- Display scope (global/project), the runtime that owns the storage location, and read-only provenance independently. Do not merge entries with the same name.
+- Do not equate shared skill locations with each agent's automatic discovery scope. Mew's explicit `/스킬` selection uses shared and dedicated candidates appropriate to the current cwd and runtime.
+- Do not create a virtual common MCP configuration. Limit MCP moves to scopes within the same runtime, and do not automatically convert between providers.
+- Perform changes only after locating the actual entry again and checking the version that was read. Do not overwrite existing destinations. Include supporting files when moving skills.
+- Do not bypass the native CLI's application, authentication, or trust decisions. A configuration listing does not indicate connection status or successful execution.
+- The API requires agent feature permission. Global scope is based on the server OS user and is not an isolated store for each Mew account. Do not leave secrets in listings, logs, or persistent browser storage.
 
-## 근거
+## Rationale
 
-공급자 고유 필드를 유지하고 CLI와 Mew가 같은 파일을 보게 하면 동기화 충돌과 잘못된 교차 런타임 변환을 줄일 수 있다. 설치·플러그인 소유 파일과 심볼릭 링크를 일반 사용자 파일과 구분하면 패키지 업데이트 경계를 보존할 수 있다.
+Preserving provider-specific fields and having the CLI and Mew use the same files can reduce synchronization conflicts and incorrect cross-runtime conversions. Distinguishing installation-owned and plugin-owned files and symbolic links from ordinary user files preserves package update boundaries.
 
-## 결과
+## Results
 
-현재 지원 위치·형식·제한과 API는 [Mew 스킬·MCP 설정](../../../../docs/configuration/agent-harness.md)에 둔다. 설정 관리 때문에 별도의 MCP 프로세스를 실행하거나 기존 세션을 재시작하지 않는다.
+Keep currently supported locations, formats, limitations, and APIs in [Mew skills and MCP configuration](../../../../docs/configuration/agent-harness.md). Do not launch a separate MCP process or restart existing sessions for configuration management.

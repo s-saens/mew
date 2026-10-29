@@ -1,145 +1,145 @@
 ---
-title: "프로젝트 문서 연결과 에이전트 자동 안내"
+title: "Connect project documentation and configure automatic agent guidance"
 created: 2026-09-16
 updated: "2026-10-28"
-description: "프로젝트 문서 연결·초기화와 계정별 기본 지침, 모델 혼잡 시 자동 재시도의 대기 시간·최대 횟수와 저장 버튼 없는 자동 저장을 안내한다. 테스트·문서 지침과 Git 자동 처리·커밋 언어·worktree·프로젝트 추가 지침의 보존 및 적용 범위도 설명한다."
+description: "Covers connecting and initializing project documentation, default instructions per account, wait times and maximum attempts for automatic retries during model congestion, and automatic saving without a Save button. Also explains the preservation and scope of test and documentation instructions, automatic Git handling, commit language, worktrees, and additional project instructions."
 상위파일: "MOC.md"
 ---
 
-프로젝트의 문서 폴더를 연결하거나 에이전트가 매번 참고할 지침을 설정하는 안내다. 폴더가 이미 열려 있다면 목적에 맞는 설정부터 선택한다.
+This guide explains how to connect a project's documentation folder or configure instructions for the agent to reference every time. If a folder is already open, start with the settings that match your goal.
 
-| 바꾸려는 것 | 시작 위치 | 적용 범위 |
+| What to change | Where to start | Scope |
 | --- | --- | --- |
-| Documents 위치·문서 생성 | 파일 탐색기 **문서** 토글 우클릭 → **에이전트 안내와 문서 설정** | 현재 프로젝트(owner) |
-| Git·언어·테스트·문서·추가 지침 | 에이전트 패널 상단 **기본 지침** 톱니 → **뮤 전역 지침** | 로그인한 Mew 계정의 모든 프로젝트 |
-| 모델 혼잡 재시도 시간·횟수 | 같은 창 → **뮤 전역 지침** | 로그인한 Mew 계정의 모든 ACP 대화 |
-| 프로젝트별 지침·자동 안내 켜기/끄기 | 같은 창 → **현재 프로젝트** | 현재 프로젝트(owner) |
-| 문서화 스킬·MCP 서버 | 에이전트 패널 상단 책·플러그 버튼 | [스킬·MCP 관리](../configuration/agent-harness.md)에서 출처별 확인 |
+| Documents location and document creation | Right-click the **Documents** toggle in the file explorer → **Agent guidance and document settings** | Current project (owner) |
+| Git, language, tests, documentation, and additional instructions | **Default instructions** gear at the top of the agent panel → **Mew global instructions** | All projects for the signed-in Mew account |
+| Model congestion retry interval and count | Same window → **Mew global instructions** | All ACP conversations for the signed-in Mew account |
+| Project-specific instructions and automatic guidance on/off | Same window → **Current project** | Current project (owner) |
+| Documentation skills and MCP servers | Book and plug buttons at the top of the agent panel | Check by source in [Skills and MCP management](../configuration/agent-harness.md) |
 
-문서화 스킬은 Mew 기본 스킬로 제공되므로 프로젝트마다 복사할 필요가 없다. 사용자 지정 언어와 기존 파일 언어를 우선하며, 새 문서의 기본 언어는 에이전트 응답 언어 설정을 따른다. 설계 근거는 [ADR 0155](../../.mew/docs/history/decisions/0155-mew-project-agent-context.md)를 참고한다.
+Documentation skills are provided as Mew default skills, so you do not need to copy them into each project. User-specified languages and existing file languages take priority; the default language for new documents follows the agent response language setting. See [ADR 0155](../../.mew/docs/history/decisions/0155-mew-project-agent-context.md) for the design rationale.
 
-## 자동으로 전달되는 내용
+## What is passed automatically
 
-mew의 채팅형(ACP) 에이전트는 매 요청마다 프로젝트 루트, 작업 폴더, Documents 위치와 짧은 문서 탐색·갱신 안내를 받는다. 별도 AGENTS.md 생성 없이 기본으로 켜진다. 추가 문서 진입점과 프로젝트 지침은 설정할 수 있다.
+With every request, mew's chat-based (ACP) agents receive the project root, working folder, Documents location, and brief guidance on finding and updating documentation. This is enabled by default without creating a separate AGENTS.md. You can configure additional documentation entry points and project instructions.
 
-안내는 프로젝트 README와 기존 지침을 따르고, 문서 경로와 프론트매터 `description`에서 관련 current 문서를 골라 읽도록 요청한다. 소유 문서 갱신·ADR·작업 기록 등은 계정의 **문서** 선택값에 따라 전달한다. 문서 본문 전체, 회사 고유 정책, 브랜드 규칙을 자동으로 복사하지 않는다. 시스템 역할의 강제 지침이나 문서 열람 검증 기능은 아니다.
+The guidance asks agents to follow the project README and existing instructions, and to select and read relevant current documents based on document paths and frontmatter `description`. Instructions on updating owning documents, ADRs, work records, and similar items are passed according to the account's **Documentation** selections. It does not automatically copy full document bodies, company-specific policies, or brand rules. It is neither mandatory system-role instructions nor a feature that verifies document access.
 
-Mew 전역 지침과 충돌하는 프로젝트 추가 지침은 해당 프로젝트에서 우선한다. 명시적인 사용자 요청과 프로젝트의 기존 지침은 계속 따른다. 빌드·실행·재시작처럼 프로젝트마다 다른 운영 규칙은 프로젝트 지침에 둔다. Mew 기본 템플릿에는 이를 일괄 금지하는 규칙이 없다. Mew 소스 저장소 자체의 제한은 이 저장소의 `.mew/agent-context.json`·[프로젝트 지침](../../AGENTS.md)·[실행 규칙](../../.mew/docs/development/getting-started.md)에 둔다.
+Additional project instructions take priority in that project when they conflict with Mew global instructions. Explicit user requests and existing project instructions still apply. Put operational rules that vary by project, such as building, running, and restarting, in the project instructions. Mew's default template has no blanket rule prohibiting these actions. Restrictions for the Mew source repository itself are in this repository's `.mew/agent-context.json`, [project instructions](../../AGENTS.md), and [execution rules](../../.mew/docs/development/getting-started.md).
 
-기본 안내는 작업 완료 또는 승인된 커밋 전에 짧은 변경 목적과 이번 작업의 파일을 기록하도록 요청한다. 소스에 커밋용 주석을 붙이는 방식이 아니다. 전달된 기록 명령에 목적·Git 루트 상대 경로·실제로 수행한 검증을 stdin JSON으로 보내면 Git 메타데이터에만 남는다. 다른 작업과 섞인 파일·시크릿·대화 원문은 기록하지 않는다. 기록이 없거나 실패해도 작업을 계속하며, 자동 커밋은 기록과 실제 이전/새 Git 객체를 대조하고 전체 diff를 읽는다. 기록은 커밋 승인이나 정식 문서를 대신하지 않는다. 상세 계약은 [AI 커밋 실행](../../.mew/docs/development/agent-sessions.md#git-ai-commit-작업)을 따른다. 기존 설치의 사용자 안내는 업데이트로 덮어쓰지 않는다.
+The default guidance asks agents to record a brief purpose for the changes and the files involved in this task before completing the work or making an approved commit. This does not add commit comments to source code. Sending the purpose, paths relative to the Git root, and checks actually performed as stdin JSON to the supplied recording command stores them only in Git metadata. Files mixed with other work, secrets, and verbatim conversations are not recorded. Work continues even if the record is missing or fails, and automatic commits compare the record against the actual old and new Git objects and read the full diff. The record does not replace commit approval or formal documentation. The detailed contract follows [AI commit execution](../../.mew/docs/development/agent-sessions.md#git-ai-commit-jobs). Updates do not overwrite user guidance in existing installations.
 
-스킬 사용은 도입부·진행 메시지에서 예고하지 않고, 최종 답변 맨 끝에 `사용된 스킬: 스킬명, 스킬명` 한 줄로 정리하도록 안내한다. 영어 답변은 `Used skills: ...`, 다른 언어는 해당 언어의 표제를 쓴다. 실제 사용한 스킬만 중복 없이 적고, 사용하지 않았으면 줄을 생략한다. 기존 계정에도 저장 파일을 덮어쓰지 않고 전달 시 지침을 보충한다. 런타임의 상위 지침이 사전 안내를 요구하는 경우에는 그 지침이 우선한다.
+The guidance asks agents to skip announcing skill use in introductions or progress messages and summarize it in a single `사용된 스킬: 스킬명, 스킬명` line at the very end of the final response. English responses use `Used skills: ...`; other languages use a heading in that language. List only skills actually used, without duplicates, and omit the line if none were used. For existing accounts as well, the instructions are supplemented when passed without overwriting saved files. If higher-priority runtime instructions require advance notice, those instructions take priority.
 
-사용자 입력·대화 표시에는 이 안내를 덧붙이지 않는다. ACP 런타임의 원본 대화 기록에는 실제 전달 내용이 남을 수 있다. 설정의 **전달할 안내 보기**에서 현재 루트 기준 내용을 확인한다. 하위 폴더에서 시작한 에이전트는 실제 작업 폴더의 진입점도 함께 받는다.
+This guidance is not appended to user input or the displayed conversation. The ACP runtime's original conversation log may retain the content actually passed. Use **View guidance to be passed** in settings to inspect the content for the current root. Agents started in a subfolder also receive entry points for their actual working folder.
 
-## 공통 안내 파일 편집
+## Edit the shared guidance file
 
-에이전트 패널 상단 **Skills·MCP 오른쪽의 톱니 버튼(에이전트 기본 지침)**에서 **뮤 전역 지침** 또는 **현재 프로젝트**를 선택한다. **뮤 전역 지침**은 서버 파일 탐색기 권한이 있는 계정(manager·owner 기본)이 편집한다. 로그인한 Mew 계정의 모든 프로젝트·세션에 공통이며 다른 계정에는 적용되지 않는다. **현재 프로젝트**는 owner가 현재 프로젝트의 지침을 편집한다. 두 범위 모두 다음 실제 ACP 요청부터 적용된다.
+Use the **gear button to the right of Skills·MCP (Agent default instructions)** at the top of the agent panel to select **Mew global instructions** or **Current project**. Accounts with server file explorer permission (manager and owner by default) can edit **Mew global instructions**. These apply across all projects and sessions for the signed-in Mew account and do not apply to other accounts. Under **Current project**, an owner edits the current project's instructions. Both scopes take effect starting with the next actual ACP request.
 
-설정창은 전체 Settings 팝업과 같은 크기·표면·탐색 구성을 사용하고 모바일에서는 전체 화면을 쓴다. 제목줄은 36px, 닫기 아이콘은 14px로 조밀하게 배치한다. 작은 제목과 데스크톱 왼쪽 탐색·모바일 가로 탐색을 사용하며 긴 본문만 스크롤한다. **뮤 전역 지침**에서 **일반**과 **Git**을 구분하고 항목 이름 옆에서 값을 고른다. 문서 관련 항목은 **문서**, 브랜치 전략 설명과 추가 항목은 **브랜치 세부 설정**을 펼쳐 확인한다.
+The settings window uses the same dimensions, surfaces, and navigation structure as the full Settings popup, and fills the screen on mobile. The title bar is compact at 36px, with a 14px close icon. It uses a small title, left navigation on desktop, and horizontal navigation on mobile; only the long body content scrolls. **Mew global instructions** separates **General** and **Git**, with values selected beside each setting name. Expand **Documentation** for documentation settings and **Branch details** for branch strategy explanations and additional settings.
 
-- **커밋 방식**: 별도 지정 안 함 / 매 변경 완료 후 커밋 / 요청할 때만 커밋. **기존 커밋 설정 사용** 모드에서 적용한다. 자동 모드에서는 작업 커밋이 처리 범위에 포함되며, 저장된 커밋 선택값은 수동 모드로 돌아올 때 복원한다.
-- **커밋 언어**: English(기본값) / 한국어 / 日本語 / 简体中文 / mew 언어 설정에 따름 / 에이전트 응답 설정 따르기. Git 그룹에서 고르면 즉시 저장되며 일반 에이전트와 Git 패널 AI 자동 커밋의 제목·본문에 적용한다. 응답 언어와 독립적이며 Git 자동 처리 모드에서도 바꿀 수 있다. 저장소의 접두사·형식은 유지한다. 명시적인 사용자 요청·프로젝트 지침은 우선한다.
-- **브랜치 전략**: GitHub Flow (권장, 기본값) / Git Flow / Trunk 기반 / 프로젝트 지침에 따름. 기본 브랜치와 작업 폴더·병합 방식을 함께 조정한다. [브랜치 지침 설정](#git-브랜치-지침)을 참고한다.
-- **응답 언어**: mew 언어 설정에 따름 / 별도 지정 안 함 / 한국어 / 영어 / 일본어 / 중국어 간체.
-- **답변 길이**: 별도 지정 안 함 / 간결하게 / 자세하게.
-- **서브에이전트 위임**: 별도 지정 안 함 / 필요할 때 자동 위임 / 요청할 때만 위임 / 사용 안 함. 자동 위임은 지원하는 런타임에서 독립적으로 나눌 수 있고 속도·품질에 도움이 되는 작업을 맡기도록 지시한다. 작은 작업·순차 의존 작업은 주 에이전트가 수행하고, 공유 파일 수정은 조율하며 결과를 검토·통합한다. 기존 지침에 설정 구간이 없으면 별도 지정 안 함으로 유지한다. 런타임의 기능을 켜거나 강제로 차단하는 옵션은 아니며, 모델·런타임의 상위 지침과 지원 범위 안에서 적용된다.
-- **테스트 작성**: 필수 작성(기본값) / 프로젝트 지침에 따름. 필수 모드에서는 동작 추가·변경과 버그 수정에 자동화 테스트를 작성하거나 보완하고, 버그 수정에는 회귀 테스트를 포함하도록 안내한다. 관련 테스트를 프로젝트 실행 제한 안에서 실행하고, 실행하지 못하면 사유를 보고하도록 한다. 문서만 바꾸는 작업에는 새 테스트를 요구하지 않는다. **프로젝트 지침에 따름**은 Mew 자체의 작성 의무를 추가하지 않는다. 기존 계정도 설정 구간이 없으면 저장 파일을 덮어쓰지 않고 다음 요청부터 필수 지침을 전달한다. 직접 편집한 구간과 기존 선택값은 보존한다. 이 설정은 에이전트에 전달하는 지침이며 테스트 실행을 강제로 차단하거나 보장하지 않는다.
-- **디버거 활용**: 활성화(기본값) / 비활성화. 활성화는 로그·테스트만으로 오류나 실행 흐름을 설명하기 어려울 때 사용 가능한 디버거로 변수·호출 스택을 확인하도록 영어 지침을 전달한다. 기존 실행·권한 제한 준수와 연결·임시 프로세스 정리도 요청한다. 비활성화는 사용자가 명시적으로 요청할 때만 사용하도록 안내한다. 어댑터 설치·실행이나 연결을 자동으로 수행하는 설정은 아니다.
-- **문서**: 아래 7개 항목을 각각 **기본 지침 적용**(기본값) / **프로젝트 지침에 따름**으로 고른다. 선택 즉시 저장되며 다음 실제 요청부터 적용된다. 프로젝트 지침에 맡기면 해당 항목의 Mew 별도 요구를 추가하지 않는다. 명시적인 사용자 요청과 기존 프로젝트 문서 규칙은 계속 따른다.
-- **추가 지침**: 접힌 항목을 펼쳐 모든 프로젝트에 공통으로 전달할 내용을 최대 8,000자로 입력하면 자동 저장한다. 이 필드는 전용 설정 구간만 바꾸며 기존 자유 지침·프리셋은 보존한다. 프로젝트 하나의 규칙은 **현재 프로젝트**에 쓴다.
-- 선택 목록은 앱 자체 드롭다운을 사용한다. 방향키로 이동하고 Enter/Space로 확정하며, Esc는 목록부터 닫는다. 모바일에서도 같은 테마의 목록을 터치로 고른다.
-- 설정창에는 저장 버튼이 없다. 브랜치·재시도·추가 지침·프로젝트 자동 안내는 마지막 변경 후 400ms가 지나면 자동 저장하고, 다른 프리셋은 선택 즉시 저장한다. 하단에서 저장 중·완료 상태를 확인한다. 유효하지 않은 브랜치·숫자 입력은 저장하지 않고 오류를 표시한다. 별도 지정 안 함은 해당 설정 문구만 제거하며 직접 쓴 다른 지침은 유지한다.
-- **파일 보기**로 `agent-guidance.md`를 기존 에디터에서 열어 자유롭게 수정한다. 다시 설정창을 열거나 **다시 불러오기**를 누르면 파일에서 값을 읽는다. 선택값에 해당하지 않는 설정 문구는 **직접 편집한 지침**으로 표시하고 다른 항목을 바꿔도 보존한다.
-- 다른 편집으로 원문이 바뀌었다면 저장을 거부하고 다시 불러오도록 안내한다. 설정 저장 시 이미 열린 파일의 저장된 내용도 갱신한다. 미저장 초안은 보존하고 오래된 내용으로 저장하려 하면 충돌을 알린다.
+- **Commit behavior**: Unspecified / Commit after each completed change / Commit only when requested. Applies in **Use existing commit settings** mode. In automatic mode, task commits are included in the handling scope, and the saved commit selection is restored when returning to manual mode.
+- **Commit language**: English (default) / Korean / Japanese / Simplified Chinese / Follow mew language setting / Follow agent response setting. Selecting it in the Git group saves it immediately and applies it to commit titles and bodies from regular agents and Git panel AI automatic commits. It is independent of the response language and can also be changed in automatic Git handling mode. Repository prefixes and formats are preserved. Explicit user requests and project instructions take priority.
+- **Branch strategy**: GitHub Flow (recommended, default) / Git Flow / Trunk-based / Follow project instructions. Adjusts the base branch, working folder, and merge method together. See [Branch instruction settings](#git-branch-guidance).
+- **Response language**: Follow mew language setting / Unspecified / Korean / English / Japanese / Simplified Chinese.
+- **Response length**: Unspecified / Concise / Detailed.
+- **Subagent delegation**: Unspecified / Delegate automatically when needed / Delegate only when requested / Disabled. Automatic delegation instructs supported runtimes to delegate work that can be separated independently and benefits speed or quality. The primary agent handles small tasks and sequentially dependent work, coordinates changes to shared files, and reviews and integrates results. If existing instructions have no settings section, the value remains Unspecified. This option does not enable or forcibly block runtime capabilities; it applies within the higher-priority instructions and supported capabilities of the model and runtime.
+- **Test writing**: Required (default) / Follow project instructions. Required mode instructs agents to write or extend automated tests for added or changed behavior and bug fixes, including regression tests for bug fixes. It asks them to run relevant tests within the project's execution restrictions and report the reason if they cannot run them. Documentation-only changes do not require new tests. **Follow project instructions** adds no Mew-specific test-writing obligation. For existing accounts without a settings section, the required instructions are passed starting with the next request without overwriting saved files. Manually edited sections and existing selections are preserved. This setting is guidance passed to the agent; it does not forcibly block or guarantee test execution.
+- **Debugger use**: Enabled (default) / Disabled. Enabled passes English instructions to inspect variables and call stacks with an available debugger when logs and tests alone cannot adequately explain an error or execution flow. It also asks agents to respect existing execution and permission restrictions and clean up connections and temporary processes. Disabled instructs agents to use a debugger only when explicitly requested by the user. This setting does not automatically install or run adapters or establish connections.
+- **Documentation**: Set each of the 7 items below to **Apply default instructions** (default) or **Follow project instructions**. Selections are saved immediately and apply starting with the next actual request. Deferring to project instructions adds no separate Mew requirement for that item. Explicit user requests and existing project documentation rules still apply.
+- **Additional instructions**: Expand the collapsed section and enter up to 8,000 characters to pass across all projects; changes are saved automatically. This field changes only its dedicated settings section, preserving existing freeform instructions and presets. Write rules for a single project under **Current project**.
+- Selection lists use the app's own dropdowns. Navigate with the arrow keys, confirm with Enter/Space, and use Esc to close the list first. On mobile, tap to select from the same themed list.
+- The settings window has no Save button. Branch, retry, additional instruction, and automatic project guidance settings are saved automatically 400ms after the last change; other presets are saved immediately upon selection. Check the saving and saved status at the bottom. Invalid branch or numeric inputs are not saved, and an error is displayed. Unspecified removes only the text for that setting and preserves other manually written instructions.
+- Use **View file** to open `agent-guidance.md` in the existing editor and edit it freely. Reopening settings or clicking **Reload** reads values from the file. Setting text that does not match a selection is shown as **Manually edited instructions** and preserved when other settings change.
+- If another edit has changed the source text, saving is rejected and you are prompted to reload. Saving settings also updates the saved content of an already open file. Unsaved drafts are preserved, and attempting to save outdated content reports a conflict.
 
-실제 기준본은 `DATA_DIR/agent-accounts/<정규화 이메일 SHA-256>/agent-guidance.md`다. 기본 설치 데이터 폴더는 `~/.local/share/mew`다. `MEW_DATA_DIR` 또는 기존 `.data`를 쓰는 설치는 그 데이터 폴더를 따른다. 가장 먼저 생성된 owner 계정에는 기존 공용 MD·TXT·런타임 설정·모델 기본값을 한 번만 복사하고 원본을 보존한다. 다른 계정은 기본 템플릿에서 시작한다. 처음 요청하거나 설정을 열 때 계정 MD가 없으면 같은 계정 폴더의 `agent-guidance.txt` 내용을 그대로 복사한다. TXT도 없으면 `server/prompts/agent-guidance.txt`를 사용한다. 기존 TXT는 보존하며 이후에는 MD만 사용한다. 앱 업데이트·재시작은 기존 MD를 덮어쓰지 않는다. 런타임에서 읽을 때 과거 기본 템플릿의 MOC 탐색·등록 두 문장만 description 탐색·갱신 문장으로 치환하며 저장 파일과 사용자 설정은 보존한다. 미리보기만 실행하면 파일을 생성하지 않고 MD → 기존 TXT → 템플릿 순서로 읽는다. 디버거 설정 구간이 없는 기존 MD·TXT에는 전달 시에만 기본 활성화 지침을 보충하며 원본을 덮어쓰지 않는다. 명시적인 비활성화·직접 편집 구간은 보존하고, 손상된 디버거 표시가 있으면 기본 지침을 보충하지 않고 설정 수정 시 복구를 요청한다.
+The actual canonical source is `DATA_DIR/agent-accounts/<정규화 이메일 SHA-256>/agent-guidance.md`. The default installation data folder is `~/.local/share/mew`. Installations using `MEW_DATA_DIR` or the legacy `.data` use that data folder. For the first owner account created, the existing shared MD, TXT, runtime settings, and model defaults are copied once, preserving the originals. Other accounts start from the default template. If the account MD is missing when the first request is made or settings are opened, the contents of `agent-guidance.txt` in the same account folder are copied unchanged. If there is no TXT either, `server/prompts/agent-guidance.txt` is used. The existing TXT is preserved, and only MD is used afterward. App updates and restarts do not overwrite existing MD files. When reading for the runtime, only the two sentences about MOC navigation and registration in the old default template are replaced with sentences about description-based navigation and updates; saved files and user settings are preserved. Running only the preview creates no files and reads in the order MD → existing TXT → template. For existing MD and TXT files without a debugger settings section, the default enabled guidance is supplemented only when passed, without overwriting the originals. Explicitly disabled or manually edited sections are preserved. If debugger markers are damaged, default guidance is not supplemented, and repair is requested when editing settings.
 
-설정 문구는 MD 안의 `<!-- mew:agent-setting:항목 -->`와 `<!-- /mew:agent-setting:항목 -->` 사이에 저장된다. 지침은 일반 문장으로, 모델 혼잡 재시도 같은 실행 설정은 메타데이터로 저장한다. 이 표시 밖에 자유 지침을 작성할 수 있으며 설정 변경은 해당 구간만 교체한다. 구간이 누락·중복·겹침으로 손상되면 파일 보기에서 먼저 수정해야 한다.
+Setting text is stored between `<!-- mew:agent-setting:항목 -->` and `<!-- /mew:agent-setting:항목 -->` in the MD. Instructions are stored as ordinary sentences, while execution settings such as model congestion retries are stored as metadata. You can write freeform instructions outside these markers, and setting changes replace only the corresponding section. If sections are damaged by missing, duplicate, or overlapping markers, you must fix them in View file first.
 
-**현재 프로젝트** 탭에서 자동 안내 사용 여부와 최대 8,000자의 추가 지침을 함께 저장한다. 프로젝트 이름·경로로 대상을 확인하고 이 프로젝트에서 필요한 빌드·서버 실행 규칙 등을 작성한다. 기존 Documents 설정의 추가 지침과 같은 `<프로젝트>/.mew/agent-context.json`을 사용하며 Documents 위치·진입 문서 등 다른 설정은 유지한다. 자동 안내를 끄면 Mew 전역과 프로젝트 지침 모두 전달하지 않는다.
+The **Current project** tab saves both whether automatic guidance is enabled and up to 8,000 characters of additional instructions. Confirm the target by its project name and path, then write build, server execution, and other rules needed for this project. It uses the same `<프로젝트>/.mew/agent-context.json` as the additional instructions in the existing Documents settings, preserving other settings such as the Documents location and entry documents. Turning off automatic guidance stops both Mew global and project instructions from being passed.
 
-추가 지침은 저장 전까지 초안이다. 저장 실패나 동시 수정 충돌 때는 입력을 유지하고 오류를 표시한다. 최신 설정은 다시 불러오기로 확인하며, 미저장 초안이 있으면 버릴지 확인한다. 범위를 전환해도 대기 중인 자동 저장은 이어지며 다른 프로젝트로 이동한 뒤 이전 프로젝트 초안을 새 프로젝트에 저장하지 않는다.
+Additional instructions remain a draft until saved. If saving fails or concurrent edits cause a conflict, the input is retained and an error is displayed. Use Reload to check the latest settings; if there is an unsaved draft, you are asked whether to discard it. Pending automatic saves continue when switching scopes, and after moving to another project, the previous project's draft is not saved to the new project.
 
-응답 언어 목록 맨 위의 **mew 언어 설정에 따름**을 선택하면 요청을 보낸 화면의 언어(한국어·영어·일본어·중국어 간체)를 따른다. 직접 지정한 언어와 직접 편집한 지침은 유지한다. 화면 언어가 없는 CLI·예약 요청은 사용자 메시지의 언어를 따르며, **별도 지정 안 함**은 언어 지침을 추가하지 않는다.
+Selecting **Follow mew language setting** at the top of the response language list follows the language of the screen that sent the request (Korean, English, Japanese, or Simplified Chinese). Explicitly specified languages and manually edited instructions are preserved. CLI and scheduled requests without a screen language follow the language of the user message, while **Unspecified** adds no language instruction.
 
-커밋 언어의 **mew 언어 설정에 따름**은 요청을 보낸 화면 언어를 사용하고 화면 언어가 없으면 영어를 사용한다. **에이전트 응답 설정 따르기**는 선택한 응답 언어를 따르며, 응답 언어가 별도 지정 안 함 또는 직접 편집한 지침이면 실제 답변과 같은 언어로 작성하도록 안내한다. 커밋 언어 구간이 없는 기존 계정에도 읽을 때만 영어 기본값을 보충한다. 기존 원문·revision과 직접 편집하거나 손상된 구간은 유지한다. 설정 저장은 과거 커밋 메시지를 바꾸지 않는다.
+For commit language, **Follow mew language setting** uses the language of the screen that sent the request, or English if there is no screen language. **Follow agent response setting** follows the selected response language; if the response language is Unspecified or manually edited instructions, it instructs agents to write in the same language as the actual response. For existing accounts without a commit language section, the English default is supplemented only when reading. Existing source text, revision, and manually edited or damaged sections are preserved. Saving settings does not change past commit messages.
 
-프로젝트·작업·Documents 경로와 문서 진입점, 프로젝트별 추가 지침은 mew가 자동으로 뒤에 붙인다. 빈 MD를 저장하면 기존 공통 문구는 빠지고 경로 정보·사용 스킬 표기·기본 디버거 활용·테스트 작성·문서 항목·기본 Git 브랜치 안내와 영어 커밋 언어가 유지된다. 디버거 안내를 제한하려면 비활성화, 테스트·문서·브랜치의 별도 요구를 추가하지 않으려면 해당 항목에서 프로젝트 지침에 따름을 명시적으로 선택한다. MD 삭제 후 다음 요청·열기는 같은 계정 폴더의 TXT 또는 기본 템플릿에서 다시 생성한다. 기존 공용 파일을 다시 가져오지 않는다. 계정 없는 CLI는 기존 공용 파일을 사용한다. 이미 실행 중인 이전 버전 감독은 앱 변경 반영 후 탭을 다시 열어야 계정별 설정을 사용한다. 읽기 오류는 요청 오류로 알린다. 프로젝트의 자동 안내를 끄면 공통 파일과 자동 경로 정보 모두 전달하지 않는다. 저장·UI 결정은 [ADR 0171](../../.mew/docs/history/decisions/0171-mew-agent-guidance-settings.md)을 따른다. 파일 탐색기의 공통 안내 행은 설정 진입을 에이전트 패널로 모으기 위해 제거했다. 사용자 요청 없이 중복 진입점을 재도입하지 않는다.
+mew automatically appends project, working, and Documents paths, documentation entry points, and project-specific additional instructions. Saving an empty MD removes the existing shared text while retaining path information, used-skill notation, default debugger use, test writing, documentation items, default Git branch guidance, and English commit language. To restrict debugger guidance, select Disabled; to avoid adding separate requirements for tests, documentation, or branches, explicitly select Follow project instructions for those items. After deleting the MD, the next request or opening regenerates it from the TXT in the same account folder or the default template. It does not reimport the old shared file. CLI use without an account uses the old shared file. An already running supervisor from an older version requires reopening the tab after the app changes take effect to use per-account settings. Read errors are reported as request errors. Turning off automatic guidance for a project stops both the shared file and automatic path information from being passed. Storage and UI decisions follow [ADR 0171](../../.mew/docs/history/decisions/0171-mew-agent-guidance-settings.md). The shared guidance row in the file explorer was removed to consolidate access to settings in the agent panel. Do not reintroduce duplicate entry points without a user request.
 
-### 모델 혼잡 재시도
+### Model congestion retries
 
-**기본 지침 → 뮤 전역 지침 → 일반 → 모델 혼잡 시 자동 재시도**에서 **재시도 간격 (초)**과 **최대 재시도 횟수**를 바꾸면 자동 저장한다. 기본값은 30초와 20회다. 간격은 1~3,600초, 횟수는 0~100회의 정수이며 0회로 저장하면 자동 재시도를 끈다. 최초 요청 이후 추가로 시도하는 횟수다. 입력은 저장 전까지 초안이며 저장 실패 시 보존한다.
+Changes to **Retry interval (seconds)** and **Maximum retry count** under **Default instructions → Mew global instructions → General → Automatically retry during model congestion** are saved automatically. The defaults are 30 seconds and 20 retries. The interval must be an integer from 1 to 3,600 seconds, and the count an integer from 0 to 100 retries; saving 0 retries disables automatic retries. The count is the number of additional attempts after the initial request. Input remains a draft until saved and is preserved if saving fails.
 
-ACP 채팅에서 선택한 모델이 일시적으로 붐벼 요청을 받지 못할 때 같은 대화·모델로 이어 간다. 기다리는 동안 남은 시간·재시도 횟수를 표시하고 작업 중 상태와 대기 메시지를 유지한다. **중단**으로 기다림을 취소할 수 있다. 사용자 한도 소진·구독·결제·인증 오류에는 이 설정을 적용하지 않는다. 횟수를 모두 쓰면 오류를 표시하고 대기 메시지를 보류하며, 직접 새 메시지를 보내면 재개한다. 공식 TUI·일반 터미널과 CLI 명령은 자동 재실행하지 않는다.
+When the selected model in ACP chat is temporarily too busy to accept a request, retries continue with the same conversation and model. While waiting, the remaining time and retry count are displayed, and the working status and pending messages are retained. Use **Stop** to cancel the wait. This setting does not apply to exhausted user quotas or subscription, billing, or authentication errors. When all retries are used, an error is displayed and pending messages are held; sending a new message manually resumes the conversation. Official TUIs, regular terminals, and CLI commands are not automatically rerun.
 
-이 설정은 에이전트에게 전달하는 문구가 아니라 Mew의 실행 정책이다. 프로젝트 자동 안내를 꺼도 적용되며, 변경값은 다음 턴부터 사용한다. 저장·판정·큐의 상세 계약은 [세션 계약](../../.mew/docs/development/agent-sessions.md#모델-용량-부족-자동-재시도)을 따른다.
+This setting is Mew's execution policy, not text passed to the agent. It applies even when automatic project guidance is disabled, and changes take effect starting with the next turn. Detailed storage, evaluation, and queue contracts follow the [session contract](../../.mew/docs/development/agent-sessions.md#automatic-retry-for-insufficient-model-capacity).
 
-### 문서 지침
+### Documentation guidance
 
-**뮤 전역 지침 → 문서**를 펼쳐 항목별로 선택한다.
+Expand **Mew global instructions → Documents** and select each option.
 
-| 항목 | 기본 지침 적용 시 요구 |
+| Item | Requirements when default instructions apply |
 | --- | --- |
-| 기준 문서 갱신 | 코드·기능·설정·운영 변경과 같은 작업에서 해당 기준 문서를 갱신하고 중복 사본 대신 기존 소유 문서를 수정한다. |
-| 결정 기록 (ADR) | 중요한 구조·기술 선택, 공유 계약 변경, 기존 결정 번복의 배경·대안·결정·근거·영향·상태를 기존 형식과 위치에 기록한다. 단순 수정마다 ADR을 만들지는 않는다. |
-| 작업·검증 기록 | 구현 목적·결과·실제로 수행한 검사와 결과·남은 제약을 프로젝트 작업 기록에 남긴다. 로컬 검증과 실제 운영 적용을 구분한다. |
-| 문서 작성 방식 | 독자와 목적에 맞게 간결하게 쓰고 현재 계약·사용법·결정·이력을 구분한다. 사실·조건·코드·불확실성과 기존 용어·형식을 보존한다. |
-| 문서 description | 새로 만들거나 변경한 문서의 주제·범위·상태를 설명하는 비어 있지 않은 프론트매터 description을 작성·갱신한다. 기존 메타데이터 형식을 따른다. |
-| 문서 링크 관리 | 파일·제목 이동이나 개명 시 들어오는 링크·앵커를 같은 작업에서 보정하고 기준 문서로 연결한다. MOC 등록은 요구하지 않는다. |
-| 문서 검사 | 기존 메타데이터·링크·형식 검사를 실행한다. 검사 도구가 없으면 변경 문서의 메타데이터와 로컬 링크를 직접 확인하며, 미실행·실패 사유를 보고한다. |
+| Update canonical documents | Update the relevant canonical documents as part of the same work as code, feature, configuration, or operational changes, and edit the existing owning document instead of creating duplicate copies. |
+| Decision records (ADR) | Record the background, alternatives, decision, rationale, impact, and status of significant architectural or technical choices, shared contract changes, and reversals of prior decisions using the existing format and location. Do not create an ADR for every simple fix. |
+| Work and verification records | Record the implementation purpose, outcome, checks actually performed and their results, and remaining limitations in the project's work record. Distinguish local verification from actual production application. |
+| Documentation writing style | Write concisely for the audience and purpose, and distinguish current contracts, usage, decisions, and history. Preserve facts, conditions, code, uncertainty, and existing terminology and formatting. |
+| Document description | Write or update a nonempty frontmatter description explaining the topic, scope, and status of each new or modified document. Follow the existing metadata format. |
+| Document link management | When moving or renaming files or headings, fix incoming links and anchors in the same work and link to the canonical document. MOC registration is not required. |
+| Documentation checks | Run existing metadata, link, and format checks. If no checking tools exist, manually check metadata and local links in changed documents, and report why checks were not run or failed. |
 
-기존 계정도 구간이 없으면 요청 시 기본값을 보충하며 저장 파일과 revision은 바꾸지 않는다. 이전 기본 템플릿의 고정 문서 갱신 문구는 전달 시에만 설정형 안내로 바꿔 선택값과 충돌하지 않게 한다. 사용자가 수정한 문구·설정 구간·예시 코드 블록은 보존한다. 해당 프로젝트가 별도로 정한 ADR 위치·문서 작성 의무까지 이 옵션으로 해제하지는 않는다. 결정과 이전 방식은 [결정 0073](../../.mew/docs/decisions/0073-documentation-guidance-options.md)을 따른다.
+For existing accounts, missing sections are also supplemented with defaults at request time without changing the saved file or revision. Fixed documentation update wording in the previous default template is replaced with configurable guidance only when passed along, so it does not conflict with selected options. User-edited text, configuration sections, and example code blocks are preserved. These options do not waive ADR locations or documentation obligations separately established by the project. Decisions and migration behavior follow [Decision 0073](../../.mew/docs/decisions/0073-documentation-guidance-options.md).
 
-## Git 브랜치 지침
+## Git branch guidance
 
-에이전트 패널의 **기본 지침**에서 **브랜치 전략**을 선택한다. 기본값 **GitHub Flow (권장)**은 기본 브랜치에서 짧은 작업 브랜치를 만들고 검토·검증 뒤 통합하는 흐름이다. Git Flow는 개발·배포 브랜치를 나눠 릴리스를 관리하는 프로젝트에, Trunk 기반은 작은 변경을 빠르게 통합하는 프로젝트에 맞춰 선택한다. 프로젝트에 정해진 규칙이 있으면 **프로젝트 지침에 따름**을 선택한다. 선택 근거는 [결정 0045](../../.mew/docs/decisions/0045-agent-branch-guidance.md)에 있다.
+Select **Branch strategy** under **Default instructions** in the agent panel. The default, **GitHub Flow (recommended)**, creates short-lived work branches from the default branch and integrates them after review and verification. Choose Git Flow for projects that manage releases with separate development and release branches, or Trunk-based for projects that integrate small changes quickly. If the project has established rules, select **Follow project instructions**. The rationale is in [Decision 0045](../../.mew/docs/decisions/0045-agent-branch-guidance.md).
 
-기본 지침의 **Git** 그룹에서 자동 처리·브랜치·커밋 방식과 세부 설정을 조정한다. **Git 자동 처리**의 기본값은 **로컬 병합까지 자동 (권장)**이며 원격 반영은 포함하지 않는다. 필요하면 기존 커밋 설정 사용 또는 원격 반영까지 자동으로 바꿔 저장한다. 이미 저장한 명시적 선택은 유지한다.
+Adjust automation, branching, commit behavior, and detailed settings in the **Git** group under Default instructions. **Git automation** defaults to **Automate through local merge (recommended)** and does not include remote updates. If needed, change it to Use existing commit settings or Automate through remote updates and save. Previously saved explicit selections are retained.
 
-| Git 자동 처리 | AI가 처리하는 범위 |
+| Git automation | Scope handled by AI |
 | --- | --- |
-| 기존 커밋 설정 사용 | 위 커밋 방식을 따른다. 병합·push는 요청할 때 수행한다. |
-| 로컬 병합까지 자동 (권장, 기본값) | 작업 브랜치·worktree 준비, 작업 파일 커밋, 검증·diff 검토와 로컬 병합을 맡긴다. 각 Git 단계마다 다시 승인받지 않으며 원격 반영은 요청할 때만 수행한다. |
-| 원격 반영까지 자동 | 로컬 자동 처리에 기존 upstream의 fetch·일반 push 또는 저장소에 정해진 PR 흐름을 포함한다. |
+| Use existing commit settings | Follow the commit behavior above. Merge and push when requested. |
+| Automate through local merge (recommended, default) | Delegate work branch and worktree preparation, committing work files, verification, diff review, and local merging. Approval is not requested again at each Git step, and remote updates are performed only when requested. |
+| Automate through remote updates | Extend local automation to include fetch and normal push to the existing upstream, or the repository's established PR workflow. |
 
-자동 모드에서도 명시적인 사용자 요청·프로젝트 규칙·직접 편집한 제약·브랜치 보호를 따른다. 검사 실패나 다른 작업의 변경 때문에 안전한 통합이 불가능하면 내용을 보존하고 구체적인 원인을 알린다. 원격 대상·인증이 준비되지 않았다면 로컬 작업을 마치고 원격 반영을 막는 조건을 알린다. 새 remote를 임의로 만들거나 관계없는 미전송 커밋까지 push하지 않는다.
+Even in automatic mode, explicit user requests, project rules, manually edited constraints, and branch protection are followed. If failed checks or changes from other work prevent safe integration, preserve the content and report the specific cause. If the remote destination or authentication is not ready, finish local work and report the conditions blocking remote updates. Do not create a new remote without authorization or push unrelated unpushed commits.
 
-**브랜치 세부 설정**을 펼쳐 아래 값을 조정하면 자동 저장한다. 전략·자동 처리 범위·모든 세부 값이 함께 저장된다.
+Expand **Branch details** and adjust the values below to save them automatically. The strategy, automation scope, and all detailed values are saved together.
 
-| 세부 설정 | 기본값 | 전달되는 선호 |
+| Detailed setting | Default | Preference passed along |
 | --- | --- | --- |
-| 기본 브랜치 | 자동 감지(빈 값) | 프로젝트 지침·기존 로컬 관례·로컬에 기록된 `origin/HEAD`를 확인한다. 모든 프로젝트에서 같은 이름을 쓸 때만 직접 지정한다. |
-| 개발 브랜치 | `develop` | Git Flow를 선택했을 때 표시되는 개발 통합 브랜치 이름이다. |
-| 작업 브랜치 접두사 | `feat/` | `feat/agent-branch-guidance`처럼 작업 목적을 붙인다. |
-| 작업 폴더 | 필요할 때 worktree | 공유 체크아웃이나 기존 변경과의 충돌 위험이 있으면 별도 작업 폴더를 사용한다. **항상 worktree**·**현재 폴더**로 바꿀 수 있다. |
-| 병합 방식 | Squash | 선택한 자동 처리 범위 또는 사용자 요청으로 허용된 통합에 적용한다. **Merge commit**·**Rebase**로 바꿀 수 있다. |
-| 통합 후 로컬 브랜치 정리 | 끔 | 자동 모드에서 켜면 통합이 확인된 이번 작업의 로컬 브랜치·임시 worktree 정리도 맡긴다. 수동 모드에서는 별도로 요청한 삭제 범위를 따른다. |
+| Default branch | Auto-detect (empty value) | Check project instructions, existing local conventions, and the locally recorded `origin/HEAD`. Specify it manually only if all projects use the same name. |
+| Development branch | `develop` | The development integration branch name, shown when Git Flow is selected. |
+| Work branch prefix | `feat/` | Append the purpose of the work, as in `feat/agent-branch-guidance`. |
+| Working folder | Worktree when needed | Use a separate working folder if there is a risk of conflicts with a shared checkout or existing changes. Can be changed to **Always use worktree** or **Current folder**. |
+| Merge method | Squash | Applies to integration authorized by the selected automation scope or a user request. Can be changed to **Merge commit** or **Rebase**. |
+| Clean up local branches after integration | Off | When enabled in automatic mode, also delegate cleanup of this work's local branch and temporary worktree once integration is confirmed. In manual mode, follow the separately requested deletion scope. |
 
-선택값은 저장 후 다음 실제 ACP 요청부터 전달된다. 저장하는 순간 Git 명령을 실행하거나 기존 브랜치를 일괄 병합하지 않는다. AI가 사용자의 구현 요청을 수행할 때 선택한 범위 안에서 Git 작업을 처리하도록 안내한다. 자동 모드는 표준 커밋·push 제한 문구를 요청에 중복 전달하지 않지만 저장 원문은 바꾸지 않는다. 직접 편집한 커밋 제약은 유지하며, 일반 커밋 선택값은 자동 모드에서 비활성화한다. GitHub 연결 없이 로컬에서도 적용할 수 있고 Git 저장소가 아니면 건너뛴다.
+After saving, selections are passed along starting with the next actual ACP request. Saving does not execute Git commands or bulk-merge existing branches. The AI is instructed to handle Git operations within the selected scope when carrying out the user's implementation request. Automatic mode omits duplicate standard commit and push restriction wording from requests but does not change the saved source text. Manually edited commit constraints are retained, and the regular commit selection is disabled in automatic mode. This also works locally without a GitHub connection and is skipped outside Git repositories.
 
-에이전트는 현재 브랜치와 미커밋·스테이징 변경을 확인하고, 이번 작업에 맞는 기존 작업 브랜치가 있으면 재사용한다. 다른 작업의 변경을 자동 stash·reset하지 않는다. 별도 worktree에는 기존 폴더의 미커밋 변경이 자동으로 옮겨지지 않는다. worktree를 사용하지 않아도 공유 폴더의 변경을 보존할 의무는 유지된다.
+The agent checks the current branch and uncommitted and staged changes, and reuses an existing work branch if it fits the current task. It does not automatically stash or reset changes from other work. Uncommitted changes in the existing folder are not automatically transferred to a separate worktree. The obligation to preserve changes in shared folders remains even when no worktree is used.
 
-새 worktree는 기본 체크아웃의 `.worktrees/<브랜치 슬러그>`에 모은다. 예를 들어 `feat/example`은 `.worktrees/feat-example`을 사용한다. 생성 전에 기본 체크아웃의 `.gitignore`에 `/.worktrees/`가 있는지 확인한다. 이미 worktree 안에서 작업 중이면 공용 Git 디렉터리와 등록 목록으로 기본 체크아웃을 찾아 중첩 생성을 피한다. 사용자나 프로젝트가 정한 위치는 우선한다. 기존 worktree는 자동으로 옮기지 않으며, 이전을 요청받으면 실행 중인 프로세스·세션의 경로 의존성을 확인한 뒤 `git worktree move`로 옮긴다. 부모 프로젝트의 탐색·검색·감시는 `.worktrees` 내부를 제외하며, 해당 worktree 자체를 프로젝트로 열면 정상적으로 탐색할 수 있다.
+New worktrees are collected under `.worktrees/<브랜치 슬러그>` in the main checkout. For example, `feat/example` uses `.worktrees/feat-example`. Before creation, check that the main checkout's `.gitignore` contains `/.worktrees/`. If already working inside a worktree, locate the main checkout using the common Git directory and registration list to avoid nested creation. Locations specified by the user or project take precedence. Existing worktrees are not moved automatically; when a move is requested, check path dependencies of running processes and sessions, then move it with `git worktree move`. Navigation, search, and watching in the parent project exclude the contents of `.worktrees`, while opening the worktree itself as a project allows normal navigation.
 
-브랜치 설정 구간이 없는 기존 MD·TXT는 파일을 바꾸지 않고 읽을 때 기본값을 보충한다. 자동 처리 범위가 없던 정상 v1 설정도 로컬 병합 기본값을 따른다. 정상 v1·v2는 원래 전략·세부 값·저장 원문을 보존하고, 요청에 전달할 구간만 현재 v3 지침으로 바꾼다. 직접 저장할 때는 v3 형식으로 기록한다. v2에 명시적으로 저장한 수동·원격 모드는 기본값으로 덮어쓰지 않는다. 직접 편집한 정상 구간은 **직접 편집한 지침**으로 표시하며 다른 설정을 바꿔도 유지한다. 전략을 다시 선택하면 자동 저장하여 해당 브랜치 구간을 선택값으로 바꾼다. 구간 표시가 중복·겹침·누락으로 손상되면 저장을 거부하므로 **파일 보기**에서 먼저 복구한다. 자동 처리의 권한·이전 설정 보존 기준은 [결정 0046](../../.mew/docs/decisions/0046-agent-git-automation.md), worktree 위치와 v3 호환 기준은 [결정 0054](../../.mew/docs/decisions/0054-internal-worktrees.md)를 따른다.
+Existing MD and TXT files without a branch settings section are supplemented with defaults when read, without modifying the files. Valid v1 settings without an automation scope also use the local merge default. Valid v1 and v2 settings preserve the original strategy, detailed values, and saved source text, replacing only the section passed in requests with current v3 guidance. Explicit saves use v3 format. Manual and remote modes explicitly saved in v2 are not overwritten with defaults. Valid manually edited sections are labeled **Manually edited instructions** and retained when other settings change. Selecting a strategy again automatically saves and replaces that branch section with the selected values. If section markers are damaged by duplication, overlap, or omission, saving is rejected, so repair them first in **View file**. Automation permissions and criteria for preserving previous settings follow [Decision 0046](../../.mew/docs/decisions/0046-agent-git-automation.md); worktree locations and v3 compatibility criteria follow [Decision 0054](../../.mew/docs/decisions/0054-internal-worktrees.md).
 
-## GUI로 설정하기
+## Configure through the GUI
 
-1. 프로젝트를 열거나 새 폴더를 만든 뒤, 파일 탐색기 상단 **문서** 토글(영어: **Documents**)을 우클릭한다. 모바일에서는 길게 눌러 항목 메뉴를 연다.
-2. **에이전트 안내와 문서 설정**을 연다(owner 전용).
-3. Documents 상대 경로, 자동 전달 여부, 추가 문서 진입점(한 줄에 하나), 추가 지침을 설정한다. 진입점은 프로젝트 안의 기존 Markdown 파일이다.
-4. 새 프로젝트에는 **없는 문서 기본 구조 만들기**를 선택한다. 기존 프로젝트에는 현재 문서 폴더를 연결하고 필요한 진입점만 지정해도 된다.
-5. 외부 도구에서도 문서 안내를 쓰려면 **외부 도구용 AGENTS.md 만들기**를 선택한다.
-6. **미리보기**에서 생성·갱신·기존 유지 파일과 전달 안내를 확인한 뒤 **적용**한다. 입력을 바꾸면 다시 미리보기해야 한다. 적용 후 화면을 다시 불러온다.
+1. After opening a project or creating a new folder, right-click the **Documents** toggle (English: **Documents**) at the top of the file explorer. On mobile, press and hold to open the item menu.
+2. Open **Agent guidance and document settings** (owner only).
+3. Set the Documents relative path, whether guidance is passed automatically, additional document entry points (one per line), and additional instructions. Entry points are existing Markdown files within the project.
+4. For a new project, select **Create missing basic document structure**. For an existing project, you can simply connect the current documentation folder and specify only the necessary entry points.
+5. To use documentation guidance in external tools too, select **Create AGENTS.md for external tools**.
+6. In **Preview**, review the files to be created, updated, or kept unchanged and the guidance to be passed along, then select **Apply**. If you change the inputs, you must preview again. Reload the screen after applying.
 
-초기화 대상은 Documents의 `AGENT.md`, `README.md`와 프로젝트 `README.md`다. 새 Documents 문서는 `description`을 포함하며 MOC는 새로 만들지 않는다. 없는 파일만 생성하며 기존 문서 내용·지도·AGENTS.md를 덮어쓰거나 이동하지 않는다. 기본 GUI·CLI 생성 템플릿은 영어다. [뮤펫 도우미](../../.mew/docs/features/%ED%99%94%EB%A9%B4%C2%B7%EA%B3%84%EC%A0%95%C2%B7%EC%9A%B4%EC%98%81/%EB%AE%A4%ED%8E%AB%20%EB%8F%84%EC%9A%B0%EB%AF%B8%C2%B7%EB%8C%80%ED%99%94%C2%B7Mew%20%EC%A1%B0%EC%9E%91.md)의 문서 준비 도구는 현재 UI 언어로 없는 문서만 만든다. 기존 MOC는 화면과 링크 호환을 위해 보존하지만 탐색·새 문서 등록 의무는 없다. 추가 폴더와 ADR 저장 위치는 프로젝트 정책에 맡긴다.
+Initialization targets `AGENT.md` and `README.md` in Documents and the project's `README.md`. New Documents documents include `description`, and no new MOC is created. Only missing files are created; existing document content, maps, and AGENTS.md are not overwritten or moved. Default GUI and CLI creation templates are in English. The document preparation tool in the [Mewpet assistant](../../.mew/docs/features/appearance-accounts-operations/mewpet-assistant-conversations-and-controls.md) creates only missing documents in the current UI language. Existing MOCs are preserved for display and link compatibility, but there is no obligation to navigate through them or register new documents. Additional folders and ADR storage locations are left to project policy.
 
-AGENTS.md 내보내기는 해당 파일이 없을 때만 짧은 Documents 연결 파일을 만든다. 기존 파일은 미리보기에 **기존 유지**로 표시되며 자동 병합하지 않는다. 이 경우 기존 지침에 Documents 진입점 링크가 필요한지는 사용자가 판단한다.
+AGENTS.md export creates a short Documents linking file only when that file does not exist. Existing files are shown as **Keep existing** in the preview and are not automatically merged. In this case, the user decides whether the existing instructions need a link to the Documents entry point.
 
-## CLI로 설정하기
+## Configure through the CLI
 
-mew 저장소에서 실행한다. 기본은 읽기 전용 미리보기이고 `--apply`를 붙여야 기록한다.
+Run this in the mew repository. The default is a read-only preview; writes require `--apply`.
 
 ```bash
 # 기존 프로젝트의 문서 폴더 연결·미리보기
@@ -159,11 +159,11 @@ npm run project:setup -- --project /absolute/path/to/project --disable --apply
 npm run project:setup -- --help
 ```
 
-`--entry`는 반복할 수 있으며 저장된 추가 진입점 목록을 대체한다. `--instructions ""`는 추가 지침을 지운다. `--enable`은 자동 안내를 다시 켠다. CLI는 프로젝트 파일만 설정하며 mew 서버를 실행·빌드·재시작하거나 프로젝트 탭을 열지 않는다. CLI로 현재 열린 프로젝트의 Documents 경로를 바꿨다면 그 프로젝트를 다시 열어 화면의 경로도 갱신한다.
+`--entry` can be repeated and replaces the saved list of additional entry points. `--instructions ""` clears additional instructions. `--enable` re-enables automatic guidance. The CLI configures project files only; it does not run, build, or restart the mew server or open a project tab. If you change the Documents path of a currently open project through the CLI, reopen that project to update the path on screen as well.
 
-## 저장과 세션 수명
+## Storage and session lifetime
 
-프로젝트별 설정은 `<프로젝트>/.mew/agent-context.json`에 저장한다.
+Per-project settings are stored in `<프로젝트>/.mew/agent-context.json`.
 
 ```json
 {
@@ -175,17 +175,17 @@ npm run project:setup -- --help
 }
 ```
 
-Documents 경로 선택 우선순위는 프로젝트 설정 → 해당 폴더가 실제 존재하는 기존 `MEW_DOCS` → `docs` 또는 기존 `.mew/docs`다. 기존 **폴더 바꾸기**도 같은 프로젝트 설정을 기록한다. 상대 경로만 허용하며 설정·생성 경로에서 심볼릭 링크를 따라가지 않는다. 잘못된 JSON은 덮어쓰지 않고 오류를 알린다.
+Documents path selection priority is project settings → existing `MEW_DOCS` whose folder actually exists → `docs` or existing `.mew/docs`. The existing **Change folder** action also writes the same project settings. Only relative paths are allowed, and symbolic links are not followed in configuration or creation paths. Invalid JSON is not overwritten; an error is reported.
 
-세션이 시작되면 프로젝트 루트와 Documents 연결을 세션 ID에 귀속한다. 프로젝트 화면을 전환하거나 오래된 기록을 복원해도 다른 프로젝트의 연결로 바뀌지 않는다. Documents 경로를 바꾼 뒤에는 **새 대화**(`/clear`)부터 새 경로를 쓴다. 자동 안내 켜기/끄기와 추가 지침은 다음 실제 요청에서 읽는다. 큐 메시지도 실행 시점의 지침을 받는다.
+When a session starts, its project root and Documents connection are bound to the session ID. Switching project screens or restoring old history does not change them to another project's connection. After changing the Documents path, the new path is used starting with **New conversation** (`/clear`). The automatic guidance toggle and additional instructions are read on the next actual request. Queued messages also receive the instructions in effect when they execute.
 
-명시적으로 설정된 하위 프로젝트에서 시작하면 그 프로젝트 설정을 사용한다. 설정이 없는 하위 폴더는 현재 워크스페이스 연결을 상속한다. 워크스페이스 밖에서 시작한 세션은 자기 경로의 설정·기본 Documents를 사용하며 다른 화면의 문서 경로를 빌리지 않는다.
+Starting in an explicitly configured subproject uses that project's settings. Subfolders without settings inherit the current workspace connection. Sessions started outside the workspace use settings and default Documents from their own path and do not borrow the document path from another screen.
 
-## 지원 범위와 업데이트
+## Supported scope and updates
 
-- 채팅 입력, 에이전트셋, 큐 수정 후 실행, 예약 메시지, 반복 예약 작업은 공통 ACP 전송 지점에서 안내를 받는다. 반복 예약 명령에는 작업의 프로젝트·Documents 연결을 명시한다.
-- 일반 터미널·터미널형 에이전트에 직접 입력한 내용에는 자동 주입하지 않는다. 외부 도구의 AGENTS.md 지원에 따라 선택적으로 내보낸 연결 파일을 사용한다.
-- 이미 실행 중인 이전 버전의 독립 에이전트 감독은 서버 재시작만으로 교체되지 않는다. 작업이 끝난 뒤 기존 에이전트 탭을 닫고 다시 열어 업데이트된 전달 경로를 사용한다.
-- Mew 소스 저장소의 변경을 실행 중인 Mew에 반영할 때는 이 저장소의 [실행 규칙](../../.mew/docs/development/getting-started.md)에 따라 사용자가 빌드·재시작한다. 이 규칙은 Mew에서 연 다른 프로젝트에 자동 적용되지 않는다.
+- Chat input, agent sets, execution after queue edits, scheduled messages, and recurring scheduled tasks receive guidance at the shared ACP transmission point. Recurring scheduled commands explicitly specify the task's project and Documents connection.
+- Guidance is not automatically injected into content entered directly in regular terminals or terminal-based agents. Use the optionally exported linking file according to the external tool's AGENTS.md support.
+- An older standalone agent supervisor that is already running is not replaced by restarting the server alone. After the task finishes, close and reopen the existing agent tab to use the updated delivery path.
+- When applying changes from the Mew source repository to a running Mew instance, the user builds and restarts it according to this repository's [execution rules](../../.mew/docs/development/getting-started.md). These rules do not automatically apply to other projects opened in Mew.
 
-문서 탐색에는 README·지침과 각 문서의 `description`을 사용하고 관련 본문만 읽는다. 로컬 RAG 명령은 프로젝트 자동 안내에 포함하지 않는다([검색 계약](../configuration/search.md#문서-탐색)).
+Use README files, instructions, and each document's `description` for document navigation, and read only relevant body text. Local RAG commands are not included in automatic project guidance ([search contract](../configuration/search.md#document-discovery)).

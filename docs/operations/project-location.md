@@ -1,42 +1,42 @@
 ---
-title: "Mew 저장소 위치 변경"
-description: "소스 설치 폴더 이동의 실행 경로·설정·영구 데이터·세션 키 보존과 적용·복구 절차. 저장소 소유권·이력 교체는 별도 유지관리 문서로 연결한다."
+title: "Relocating the Mew repository"
+description: "Procedures for preserving execution paths, configuration, persistent data, and session keys when moving the source installation folder, and for applying and recovering from the move. Links to separate maintenance documentation for repository ownership and history replacement."
 created: 2026-10-14
 updated: "2026-10-29"
 ---
 
-# 저장소 위치 변경
+# Repository relocation
 
-Mew 소스는 특정 부모 워크스페이스 없이 설치할 수 있다. 이 개발 환경의 현재 소스 위치는 `~/dev/mew`다. 실행 중인 설치의 위치를 다시 바꿀 때는 아래 사전 조건을 충족한 뒤 적용한다. [독립 프로젝트 결정](../../.mew/docs/decisions/0001-independent-project.md)에 따라 문서·결정·검증도 저장소 안에서 관리한다.
+Mew source can be installed without a specific parent workspace. The current source location in this development environment is `~/dev/mew`. Before relocating a running installation again, meet the prerequisites below, then apply the move. Under the [independent project decision](../../.mew/docs/decisions/0001-independent-project.md), documentation, decisions, and validation are also managed within the repository.
 
-폴더를 옮겨도 Git 원격 주소나 npm 스코프는 바뀌지 않는다. 열어 두는 프로젝트의 위치는 소스 위치와 별개이며 `MEW_WORKSPACE`와 계정별 활성 프로젝트가 정한다.
+Moving the folder does not change the Git remote URL or npm scope. Open project locations are independent of the source location and are determined by `MEW_WORKSPACE` and each account's active project.
 
-저장소 소유권 이전과 Git 이력 교체는 [유지관리 절차](../../.mew/docs/operations/repository-maintenance.md)를 따른다.
+For repository ownership transfer and Git history replacement, follow the [maintenance procedure](../../.mew/docs/operations/repository-maintenance.md).
 
-## 소스 폴더 이동 전
+## Before moving the source folder
 
-- 목적지에 다른 폴더가 없는지 확인한다. 기존 Git 이력·staged와 unstaged 변경·미추적 파일을 보존한다.
-- `~/.config/mew/config.env`, 기존 `.data/` 또는 `MEW_DATA_DIR`와 로컬 런처를 백업한다. 데이터 폴더를 새 빈 폴더로 대체하지 않는다.
-- 실행 중인 서버·에이전트·터미널의 작업 경로와 이전 폴더를 참조하는 systemd·런처·디버거 설정을 확인한다.
+- Confirm that no other folder exists at the destination. Preserve existing Git history, staged and unstaged changes, and untracked files.
+- Back up `~/.config/mew/config.env`, the existing `.data/` or `MEW_DATA_DIR`, and local launchers. Do not replace the data folder with a new empty folder.
+- Check the working paths of running servers, agents, and terminals, and systemd, launcher, and debugger settings that reference the old folder.
 
-## 경로 갱신
+## Updating paths
 
-소스 설치의 이동은 서버 쓰기를 멈춘 상태에서 적용한다. 코딩 에이전트의 서버 중지·재시작은 [실행·검증 규칙](../../.mew/docs/development/getting-started.md)에 따른 별도 사용자 승인 범위를 따른다.
+Move the source installation while server writes are stopped. Coding agents stopping or restarting the server are subject to separate user authorization under the [execution and validation rules](../../.mew/docs/development/getting-started.md).
 
-1. 폴더 전체를 옮긴다. `.git/`, `.data/`, 의존성과 기존 빌드 파일도 함께 보존한다.
-2. 런처의 작업 폴더와 `MEW_WORKSPACE`·`MEW_DATA_DIR`·서비스의 작업 경로 중 이동한 폴더를 가리키는 값만 갱신한다. 다른 프로젝트나 외부 데이터 폴더는 그대로 둔다.
-3. 저장된 프로젝트 목록·활성 프로젝트·에이전트 탭·Documents·접근 정책·디버거의 경로를 갱신한다. 절대경로로 만든 키와 해시 파일명도 해당 저장 형식에 맞춰 이관한다. 대화 원문·실행 로그의 과거 경로는 고쳐 쓰지 않는다.
-4. 새 위치에서 문서 검사와 필요한 타입·테스트·린트 검사를 실행한다. 폴더 이동 자체에는 앱 빌드가 필요하지 않다.
-5. 서버를 새 위치에서 실행한 뒤 로그인·프로젝트·Documents·대화와 자동저장을 확인한다. 이전 경로의 임시 연결을 사용했다면 이를 참조하는 실행이 끝난 뒤 제거한다.
+1. Move the entire folder. Preserve `.git/`, `.data/`, dependencies, and existing build files along with it.
+2. Update only values pointing to the moved folder in the launcher's working directory, `MEW_WORKSPACE`, `MEW_DATA_DIR`, and service working paths. Leave other projects and external data folders unchanged.
+3. Update paths in the saved project list, active projects, agent tabs, Documents, access policies, and debuggers. Also migrate keys and hashed filenames derived from absolute paths according to their storage formats. Do not rewrite historical paths in original conversations or execution logs.
+4. Run documentation checks and the necessary type checks, tests, and lint checks at the new location. Moving the folder itself does not require an app build.
+5. After starting the server at the new location, verify login, projects, Documents, conversations, and autosave. If a temporary link at the old path was used, remove it after executions referencing it finish.
 
-서버와 에이전트는 시작 시의 절대경로를 기억하므로 파일 이동만으로 실행 중 경로가 바뀌지 않는다. 기존 대화를 새 경로에서 이어갈 때는 런타임별 세션 위치와 Mew의 문서 연결도 확인한다. Mew의 Documents·에이전트 설정은 실제 폴더를 요구한다. 실행 중인 프로젝트 루트를 심볼릭 링크로 바꾸면 기존 세션의 문서 연결 검증이 실패하므로 링크만으로 서버 전환을 대신하지 않는다. 이전 위치의 연결은 새 설치의 의존 경로로 유지하지 않는다.
+Servers and agents retain their absolute paths from startup, so moving files alone does not change paths in running processes. When continuing an existing conversation at the new path, also check runtime-specific session locations and Mew's document links. Mew's Documents and agent settings require actual folders. Replacing a running project's root with a symbolic link causes document-link validation for existing sessions to fail, so do not use a link alone as a substitute for switching the server. Do not retain a link at the old location as a dependency of the new installation.
 
-## 저장 상태의 일관성
+## Consistency of saved state
 
-서버 재시작만으로 독립 에이전트 감독이 종료되지는 않는다. 같은 설치의 소스·데이터 경로를 기억하는 감독의 쓰기도 끝난 뒤 저장 상태를 이관한다. 다른 작업 폴더의 에이전트도 이 설치의 데이터 폴더를 사용하면 재연결이 필요하지만, 그 작업 폴더 자체의 경로는 바꾸지 않는다. PID의 작업 폴더만으로 설치 소유권을 판정하지 않는다.
+Restarting the server alone does not stop independent agent supervisors. Migrate stored state only after supervisors that remember this installation's source and data paths have also finished writing. Agents in other working folders also need to reconnect if they use this installation's data folder, but do not change those working folders' own paths. Do not determine installation ownership solely from a PID's working folder.
 
-프로젝트별 태스크·기능 파일은 workspace의 SHA-256, 디버거 설정은 `[account, root]`, 대화·문서 연결은 `[runtime, cwd, sessionId]`의 JSON 문자열 해시로 찾는다. JSON 경로만 바꾸고 키나 파일명을 그대로 두면 새 위치에서 기존 상태를 찾지 못한다. 목적지 키가 이미 있으면 덮어쓰지 말고 충돌을 먼저 해결한다.
+Project-specific task and feature files are located using the workspace's SHA-256 hash, debugger settings using the hash of the JSON string for `[account, root]`, and conversation/document links using the hash of the JSON string for `[runtime, cwd, sessionId]`. If you change only the JSON paths and leave the keys or filenames unchanged, the existing state cannot be found at the new location. If the destination key already exists, resolve the conflict before overwriting it.
 
-대화 전사의 SQLite `sessions`에는 `cwd`와 조회 키를, `events`에는 연결 키만 갱신한다. 이벤트 payload·순서·개수·revision은 보존한다. 이전 JSON 전사도 메타데이터와 파일명만 옮긴다. SQLite 백업 API로 일관된 사본을 만들며 실행 중 DB 파일만 복사하지 않는다. 런타임이 별도로 소유하는 세션 원문은 경로 문자열 전체 치환 대상이 아니다.
+In conversation transcripts, update `cwd` and lookup keys in SQLite `sessions`, and only link keys in `events`. Preserve event payloads, order, counts, and revisions. For older JSON transcripts, move only metadata and filenames as well. Use the SQLite backup API to create a consistent copy; do not copy only the live DB file. Raw session data owned separately by the runtime is not subject to blanket path-string replacement.
 
-적용 뒤에는 이전 경로의 활성 설정·키가 남지 않았는지, Git HEAD와 index가 유지되는지, 대화 개수와 내용이 보존되는지 확인한다. 실패하면 저장 상태·설정·폴더 위치를 같은 백업 시점으로 되돌린다. 복구 사본과 검사 로그는 저장소 문서에 넣지 않는다.
+After applying the changes, verify that no active settings or keys for the old path remain, Git HEAD and the index are retained, and conversation counts and contents are preserved. If the operation fails, restore stored state, settings, and folder locations to the same backup point. Do not put recovery copies or verification logs in repository documentation.

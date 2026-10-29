@@ -1,87 +1,87 @@
 ---
-title: "명령어 버튼의 포트 미리보기 구현·검증"
-description: "포트 버튼·공개 기기 URL·직접 프리뷰 모듈과 원격 초기화 실패 처리의 구현·검증을 기록한다. 2026-10-28 재배포 뒤에도 남은 DNS 장애 확인, 읽기 전용 준비 검사·배포 완료 판정 보완과 운영 미복구 범위를 구분한다. 직접 SPA 초기 경로 수정과 Along 격리 검증·운영 미적용 상태도 기록한다."
+title: "Command button port preview implementation and verification"
+description: "Records implementation and verification of port buttons, public device URLs, direct preview modules, and remote initialization failure handling. Distinguishes confirmation of the DNS failure remaining after redeployment on 2026-10-28, improvements to read-only readiness checks and deployment completion criteria, and the scope still not restored in production. Also records the direct SPA initial route fix, isolated Along verification, and status of not applied to production."
 created: "2026-10-27"
 updated: "2026-10-28"
 ---
 
-## 목적과 결과 동작
+## Purpose and resulting behavior
 
-개발 서버 명령이 연 포트를 해당 명령 줄의 정지·터미널 버튼 왼쪽에 표시했다. 실제 프로세스와 수신 소켓을 연결하고 포트가 닫히면 다음 목록 갱신에 버튼을 제거한다. 버튼은 명령을 재실행하지 않고 현재 Mew 주소에 포트를 붙인 새 탭을 연다. Mewlink 예시는 `https://mew.run/saens/windows/5555`다.
+Displayed ports opened by development server commands to the left of the stop and terminal buttons on each command row. Links actual processes to listening sockets and removes the button on the next list refresh when a port closes. The button opens a new tab with the port appended to the current Mew address without rerunning the command. A Mewlink example is `https://mew.run/saens/windows/5555`.
 
-현재 계약은 [명령 사용법](../../../docs/guides/commands.md), [셸 터미널 기능](../features/%ED%84%B0%EB%AF%B8%EB%84%90%C2%B7%EC%97%90%EC%9D%B4%EC%A0%84%ED%8A%B8%C2%B7%EC%9E%90%EB%8F%99%ED%99%94/tmux%20%EC%85%B8%20%ED%84%B0%EB%AF%B8%EB%84%90.md), [포트 감지·프리뷰](../development/port-preview.md)와 [원격 접속](../development/remote-access.md)이 소유한다. 공개 기기 base의 전달과 감지 방식은 [ADR 0076](../decisions/0076-command-port-previews.md)에 기록했다.
+The current contracts are owned by [Command usage](../../../docs/guides/commands.md), [Shell terminal features](../features/terminals-agents-automation/tmux-shell-terminals.md), [Port detection and previews](../development/port-preview.md), and [Remote access](../development/remote-access.md). Public device base propagation and detection are recorded in [ADR 0076](../decisions/0076-command-port-previews.md).
 
-## 검증
+## Verification
 
-- `server/command-ports.test.ts`: 실제 Linux 부모·자식 프로세스의 HTTP/TCP·IPv4/IPv6·wildcard·다중 포트·세션 분리·포트 닫힘과 파서·시간 초과를 검사했다. macOS·Windows는 실제 명령 실행 없이 소켓·프로세스 출력 파서를 검사했다.
-- `server/cmd-button-ports.test.ts`: GET/PUT의 실제 포트 연결·중첩 프로젝트·정지 세션·Mew 수신 포트 제외·권한 거부·조회 실패·실행 상태 보존을 확인했다. 기존 명령 설정·하위 프로젝트·에이전트 터미널·번역 검사도 통과했다.
-- `packages/tmux-term/src/server/pane-pids.test.ts`: 격리 multiplexer 대역으로 namespace·조회 argv·pane PID·Windows CRLF 출력을 검사했다. CRLF fixture에서 PID가 누락되는 실패를 확인한 뒤 줄 끝 정리로 수정하고 통과했다.
-- `server/command-button-menu-ui.test.ts`: 격리 Chromium의 1100/390px·양 테마에서 번호 버튼 순서·가로 스크롤·키보드 접근·로컬/공개 기기 새 탭 URL·구버전 중앙 오류·정지 후 제거와 재실행 방지를 확인했다. 실제 컴포넌트와 모의 API 응답을 사용하며 OS 서버를 실행하는 검사는 아니다. 캡처도 확인했다.
-- 기존 `server/action-menu-ui.test.ts`와 `src/utils/command-menu-keyboard.test.ts`에서 공용 메뉴의 크기·테마·포커스·방향키 회귀도 통과했다.
-- `src/utils/port-preview-url.test.ts`·`src/utils/remote-reconnect.test.ts`: 공개 base·로컬 도메인과 포트 보존·잘못된 원격 주소 거부·기존 재접속의 base 보존을 확인했다.
-- 기존 `server/port-preview.test.ts`·`server/port-preview-browser.test.ts`의 9개 검사는 직접 HTTPS 터널과 원격 raw P2P의 모듈·POST·HMR·쿠키·SSE·권한 경계에서 통과했다.
-- 중앙의 `mewlink/test/startup.browser.test.ts` 16개, `mewlink/test/port-preview.test.ts` 2개와 `npm --prefix mewlink run check`가 통과했다. 첫 방문·새로고침·프리뷰 하위 경로에서 공개 기기 base 전달을 확인했다.
-- `npx tsc -b`, 변경 TypeScript 대상 oxlint가 통과했다. Impeccable `detect`는 빈 배열을 반환했다.
-- `npm run check:docs`는 description 491개에서 오류가 없었다. 전체 링크 검사는 이번 작업 밖에서 삭제한 기능 MOC·태스크 문서를 가리키는 기존 링크 17건으로 실패했다. 이번 변경 문서 6개의 링크 오류는 없다.
+- `server/command-ports.test.ts`: checked HTTP/TCP, IPv4/IPv6, wildcard addresses, multiple ports, session isolation, port closure, parsers, and timeouts using actual Linux parent and child processes. For macOS and Windows, checked socket and process output parsers without executing actual commands.
+- `server/cmd-button-ports.test.ts`: verified actual port associations in GET/PUT, nested projects, stopped sessions, exclusion of Mew listening ports, permission denial, lookup failure, and preservation of running status. Existing command configuration, subproject, agent terminal, and translation checks also passed.
+- `packages/tmux-term/src/server/pane-pids.test.ts`: checked namespaces, lookup argv, pane PIDs, and Windows CRLF output using an isolated multiplexer test double. Confirmed a failure where PIDs were missing in the CRLF fixture, fixed it by normalizing line endings, and passed.
+- `server/command-button-menu-ui.test.ts`: in isolated Chromium at 1100/390px in both themes, verified numbered button order, horizontal scrolling, keyboard access, local/public device new-tab URLs, errors from older central versions, removal after stopping, and prevention of reruns. Uses actual components and mock API responses; this test does not run an OS server. Captures were also reviewed.
+- Existing shared-menu size, theme, focus, and arrow-key regression checks in `server/action-menu-ui.test.ts` and `src/utils/command-menu-keyboard.test.ts` also passed.
+- `src/utils/port-preview-url.test.ts` and `src/utils/remote-reconnect.test.ts`: verified the public base, preservation of local domains and ports, rejection of invalid remote addresses, and base preservation during existing reconnection behavior.
+- The 9 existing tests in `server/port-preview.test.ts` and `server/port-preview-browser.test.ts` passed for modules, POST, HMR, cookies, SSE, and permission boundaries over direct HTTPS tunnels and remote raw P2P.
+- The central service's 16 tests in `mewlink/test/startup.browser.test.ts`, 2 tests in `mewlink/test/port-preview.test.ts`, and `npm --prefix mewlink run check` passed. Verified public device base propagation on first visits, reloads, and preview subpaths.
+- `npx tsc -b` and oxlint targeting the changed TypeScript passed. Impeccable `detect` returned an empty array.
+- `npm run check:docs` found no errors in 491 descriptions. The full link check failed due to 17 existing links pointing to feature MOC and task documents deleted outside this work. The 6 documents changed in this work have no link errors.
 
-## 중앙 변경과 적용 한계
+## Central changes and application limitations
 
-`mewlink/src/launcher-types.ts`·`connection-parent.ts`·`app-launcher.ts`와 `mewlink/test/startup.browser.test.ts`는 이 체크아웃의 Git 제외 경로다. 해당 중앙 변경만 담은 패치를 `/tmp/mew-command-port-preview-central.patch`에 따로 남겼으며 현재 소스에 역방향으로 적용 가능한지 검사했다. 이 파일은 임시 로컬 산출물이므로 중앙 담당자가 별도로 보관·적용해야 한다. 공개 저장소에 중앙 소스를 강제 추가하지 않았다.
+`mewlink/src/launcher-types.ts`, `connection-parent.ts`, `app-launcher.ts`, and `mewlink/test/startup.browser.test.ts` are Git-ignored paths in this checkout. Saved a separate patch containing only those central changes at `/tmp/mew-command-port-preview-central.patch` and checked whether it could be reverse-applied to the current source. This file is a temporary local artifact, so the central maintainer must retain and apply it separately. Central source was not forcibly added to the public repository.
 
-macOS·Windows의 실제 pane/프로세스 조회, 실제 공개 `mew.run`·사용자 도메인·Tailscale·외부망 접속은 확인하지 않았다. Linux 격리 검사에서는 IPv6 fixture도 실행됐다. daemon의 재부모화·컨테이너 별도 프로세스·HTTP가 아닌 서비스는 자동 연결 범위 밖이다.
+Actual pane/process lookups on macOS and Windows and actual access through public `mew.run`, user domains, Tailscale, and external networks were not verified. IPv6 fixtures also ran in isolated Linux checks. Reparented daemons, separate container processes, and non-HTTP services are outside the automatic association scope.
 
-앱·중앙 빌드·배포·실행 중인 서버의 시작·종료·재시작은 수행하지 않았다. 사용자가 호스트 앱과 중앙 변경을 각각 적용해야 하며 기존 `PREVIEW_DOMAIN`·wildcard DNS·HTTPS·Worker 준비 조건도 유지된다.
+App and central builds and deployments and starts, stops, and restarts of running servers were not performed. The user must apply the host app and central changes separately, and existing `PREVIEW_DOMAIN`, wildcard DNS, HTTPS, and Worker prerequisites remain.
 
-## 2026-10-27 — 명령 이름 가시성 개선
+## 2026-10-27 — Improved command name visibility
 
-포트 버튼 때문에 이름이 대부분 가려지는 화면 제보를 반영해 명령 메뉴를 220px에서 308px로 40% 넓히고 화면 너비의 90%를 상한으로 뒀다. 글자·행간·바깥/항목 여백과 실행·터미널 버튼 너비를 조금 줄였다. 포트에는 테마 배경·테두리·작은 모서리를 더하고 묶음 너비를 제한해 이름 표시 공간을 확보했다. 현재 수치는 [공용 UI 계약](../development/ui-contracts.md#드롭다운과-선택-컴포넌트)이 소유한다.
+In response to a report that port buttons obscured most of the names, widened the command menu by 40%, from 220px to 308px, with a maximum of 90% of screen width. Slightly reduced font size, line spacing, outer/item padding, and run and terminal button widths. Added themed backgrounds, borders, and small corner radii to ports and limited the group's width to leave room for names. Current values are owned by the [Shared UI contract](../development/ui-contracts.md#dropdowns-and-selection-components).
 
-- `server/command-button-menu-ui.test.ts`·`server/action-menu-ui.test.ts`·`src/utils/command-menu-keyboard.test.ts`의 4개 검사가 통과했다. 실제 컴포넌트와 모의 API로 1100/390/320px·양 테마와 240px 크기 변경의 메뉴 폭, 작은 글자·여백·포트 배경/테두리·이름 영역, 기존 키보드·실행·새 탭을 확인했다. 햄버거·프로젝트 메뉴와 공통 표면의 회귀도 검사했다.
-- `npx tsc -b`와 변경 TypeScript 대상 oxlint가 통과했다. Impeccable `detect`는 빈 배열이었다. 390px 어두운 테마와 320px 밝은 테마의 격리 캡처를 확인했다.
-- `npm run check:docs`의 description 491개는 오류 없이 통과했다. 전체 링크 검사는 앞선 작업과 같은 기존 누락 링크 17건으로 실패했으며 이번 변경 문서 3개에는 링크 오류가 없다.
+- 4 tests in `server/command-button-menu-ui.test.ts`, `server/action-menu-ui.test.ts`, and `src/utils/command-menu-keyboard.test.ts` passed. Using actual components and a mock API, verified menu width, smaller text and padding, port backgrounds/borders, name area, and existing keyboard, execution, and new-tab behavior at 1100/390/320px in both themes and after resizing to 240px. Also checked regressions in hamburger and project menus and shared surfaces.
+- `npx tsc -b` and oxlint targeting the changed TypeScript passed. Impeccable `detect` was an empty array. Reviewed isolated captures at 390px in the dark theme and 320px in the light theme.
+- 491 descriptions in `npm run check:docs` passed without errors. The full link check failed due to the same 17 existing missing links as in the previous work; the 3 documents changed in this work have no link errors.
 
-앱 빌드·배포·서버 재시작과 실제 휴대폰 적용은 수행하지 않았다.
+App builds, deployment, server restarts, and application on actual phones were not performed.
 
-## 2026-10-27 — 포트 접속 실패 재현·수정
+## 2026-10-27 — Port connection failure reproduction and fix
 
-직접 프리뷰에서 현재 실행 중인 Vite 앱을 격리 프록시·브라우저로 관찰했을 때 인라인 React Refresh와 여러 줄 import의 일부가 Mew 루트로 요청되어 CORS 오류와 빈 화면이 발생했다. 단순 모듈만 사용한 기존 fixture는 이 경우를 포함하지 않았다. 실제 지정자를 분석하는 lexer로 인라인·외부 스크립트를 처리하도록 바꾸고 문자열·주석·JSON·source map을 보호했다. [ADR 0078](../decisions/0078-port-preview-module-initialization.md)을 따른다.
+Observing the currently running Vite app in direct preview through an isolated proxy and browser showed that inline React Refresh and some multiline imports were requested from the Mew root, causing CORS errors and a blank screen. The existing fixture, which used only simple modules, did not cover this case. Changed inline and external script processing to use a lexer that parses actual specifiers, protecting strings, comments, JSON, and source maps. Follows [ADR 0078](../decisions/0078-port-preview-module-initialization.md).
 
-Mewlink 공개 기기 주소는 HTTP 200이었지만 프리뷰 도메인과 서로 다른 난수 호스트 두 곳의 DNS는 `ENOTFOUND`였다. 기존 원격 브라우저 검사는 호스트 해석·인증서를 fixture로 대체하므로 실제 DNS 준비를 입증하지 않았다. 원격 mount에 초기화 완료·실패 통지와 15초 제한을 추가해 준비 실패를 화면에 반환하고 세션·요청·소켓·포트를 정리했다. 공용 launcher 자산은 중앙 빌드에도 포함된다.
+The Mewlink public device address returned HTTP 200, but DNS for the preview domain and two distinct random hosts returned `ENOTFOUND`. Existing remote browser checks replaced host resolution and certificates with fixtures, so they did not establish actual DNS readiness. Added initialization completion/failure notifications and a 15-second limit to remote mounts to report readiness failures on screen and clean up sessions, requests, sockets, and ports. Shared launcher assets are also included in the central build.
 
-- 인라인 React Refresh·여러 줄 import·고정 템플릿 동적 import를 추가한 직접 HTTPS 터널 브라우저 검사는 수정 전에 기대 화면 대기 시간 초과로 실패했고, 수정 후 통과했다.
-- `server/port-preview.test.ts`·`server/port-preview-browser.test.ts`·`server/port-preview-launch.test.ts`의 13개 검사가 통과했다. 주석·문자열·JSON·source map 보존, 모듈·POST·HMR·권한·origin·SSE와 원격 timeout·Service Worker 실패·위조 메시지·자원 정리를 확인했다.
-- 현재 실행 중인 Vite 앱에 대한 격리 진단에서도 수정 후 기존 모듈 CORS 오류가 사라지고 앱 본문이 렌더링됐다. 해당 앱은 프록시 pathname 때문에 자체 경로 안내 화면을 표시했으므로 앱 라우터까지 정상 동작한 것으로 기록하지 않는다. 별도 API 서비스의 `/` 404도 upstream 자체 응답임을 확인했다.
-- 변경 TypeScript·JavaScript 대상 oxlint와 `npx tsc -b`가 통과했다. 임시 진단용 브라우저·HTTP 서버는 종료했다.
-- `npm run check:docs`는 description 494개에서 오류가 없었다. 전체 링크 검사는 기존 누락 대상 17건으로 실패했으며 이번 변경 문서에는 링크 오류가 없다.
+- The direct HTTPS tunnel browser test with added inline React Refresh, multiline imports, and fixed-template dynamic imports failed before the fix by timing out while waiting for the expected screen, then passed after the fix.
+- 13 tests in `server/port-preview.test.ts`, `server/port-preview-browser.test.ts`, and `server/port-preview-launch.test.ts` passed. Verified preservation of comments, strings, JSON, and source maps; modules, POST, HMR, permissions, origin, and SSE; and remote timeouts, Service Worker failures, forged messages, and resource cleanup.
+- Isolated diagnostics of the currently running Vite app also showed that the existing module CORS errors disappeared and the app body rendered after the fix. The app displayed its own route guidance screen because of the proxy pathname, so this is not recorded as successful app router operation. Also confirmed that the separate API service's `/` 404 was the upstream's own response.
+- Oxlint targeting the changed TypeScript and JavaScript and `npx tsc -b` passed. Temporary diagnostic browsers and HTTP servers were shut down.
+- `npm run check:docs` found no errors in 494 descriptions. The full link check failed due to 17 existing missing targets; the documents changed in this work have no link errors.
 
-DNS·인증서·Worker 설정과 운영 서버는 변경하지 않았다. 호스트 빌드와 중앙 공용 자산 반영, wildcard DNS·HTTPS 준비는 사용자가 수행해야 한다. 경로 기반 앱의 basename 설정 등 기존 [라우터 호환 한계](../development/port-preview.md#호환성과-검증)도 유지한다.
+DNS, certificates, Worker settings, and production servers were not changed. The user must build the host, apply the central shared assets, and prepare wildcard DNS and HTTPS. Existing [router compatibility limitations](../development/port-preview.md#compatibility-and-validation), such as basename configuration for path-based apps, also remain.
 
-## 2026-10-28 — 재배포 이후 DNS 장애와 준비 검사
+## 2026-10-28 — DNS failure after redeployment and readiness checks
 
-사용자가 중앙을 재배포한 뒤에도 프리뷰 난수 호스트의 IP 주소를 찾을 수 없다고 보고했다. 시스템·Cloudflare `1.1.1.1`·Google `8.8.8.8`에서 해당 호스트가 모두 `ENOTFOUND`인 것을 확인했다. Cloudflare API의 읽기 전용 조회에서는 `*.preview.mew.run/*` 경로가 `mewlink` Worker에 연결되어 있었다. 현재 CLI 인증의 DNS·인증서 API 조회는 403으로 거부됐다. Worker 경로 배포와 DNS 준비가 별개이며, 재배포만으로 누락된 DNS 레코드가 생성되지 않는 경우였다.
+The user reported that the preview random host's IP address still could not be found after redeploying the central service. Confirmed that the host returned `ENOTFOUND` through the system resolver, Cloudflare `1.1.1.1`, and Google `8.8.8.8`. A read-only Cloudflare API query showed that the `*.preview.mew.run/*` route was connected to the `mewlink` Worker. DNS and certificate API queries using the current CLI authentication were denied with 403. Worker route deployment and DNS readiness are separate; in this case, redeployment alone did not create the missing DNS records.
 
-`tools/port-preview-readiness.mjs`와 `npm run check:port-preview`를 추가했다. 서로 다른 난수 호스트 두 곳의 DNS·검증된 HTTPS·launcher HTML·부모 origin과 공용 JavaScript·Service Worker scope·초기화 완료 통지를 확인한다. DNS 실패에는 필요한 레코드를 표시하고, HTTPS·Worker 경로·자산 오류는 단계별로 구분한다. 현재 준비·사용법은 [배포 절차](../operations/remote-central.md#localhost-앱-프리뷰-origin)와 [프리뷰 계약](../development/port-preview.md)이 소유한다.
+Added `tools/port-preview-readiness.mjs` and `npm run check:port-preview`. They check DNS, verified HTTPS, launcher HTML, parent origin and shared JavaScript, Service Worker scope, and initialization completion notifications for two distinct random hosts. DNS failures display the required records, while HTTPS, Worker route, and asset errors are distinguished by stage. Current readiness requirements and usage are owned by the [Deployment procedure](../operations/remote-central.md#localhost-app-preview-origin) and [Preview contract](../development/port-preview.md).
 
-비공개 `mewlink/scripts/deploy.mjs`에도 Worker 배포 뒤 같은 검사를 연결했다. 프리뷰가 준비되지 않으면 전체 배포 완료 문구를 출력하지 않으며, 이미 적용된 Worker를 자동으로 되돌리지 않는다. 해당 파일은 Git 제외 경로이므로 공개 커밋에 강제 추가하지 않았고, 이번 중앙 수정만 담은 패치를 `/tmp/mewlink-preview-readiness.patch`에 남겼다. 중앙 소스와 패치는 별도로 보관·적용해야 한다.
+Also connected the same check after Worker deployment in the private `mewlink/scripts/deploy.mjs`. If previews are not ready, it does not print the overall deployment completion message and does not automatically roll back the already applied Worker. This file is Git-ignored, so it was not forcibly added to the public commit; a patch containing only this central change was saved at `/tmp/mewlink-preview-readiness.patch`. The central source and patch must be retained and applied separately.
 
-- `node --test tools/port-preview-readiness.test.mjs server/port-preview-launch.test.ts`: 42개 검사 통과. DNS 누락·일부 호스트만 등록된 경우·TLS 인증서·잘못된 Worker 응답·구버전 자산·제한 시간·CLI 종료 상태·기존 초기화 정리를 확인했다. 외부 연결을 모의 처리했다.
-- 변경 JavaScript 대상 oxlint·중앙 배포 스크립트 `node --check`·`git diff --check` 통과.
-- 실제 `npm run check:port-preview`는 새 난수 호스트 두 곳의 `ENOTFOUND`를 표시하며 종료 코드 1을 반환했다. 운영 프리뷰가 준비되지 않은 상태를 검출한 결과이며 복구 성공이 아니다.
-- 문서 검사는 description 505개에서 오류가 없었고, 이번 변경 밖에서 삭제한 기능 MOC·태스크로 향하는 기존 링크 18건 때문에 전체 링크 검사는 실패했다. 이번 변경 문서에는 링크 오류가 없다.
+- `node --test tools/port-preview-readiness.test.mjs server/port-preview-launch.test.ts`: 42 checks passed. Verified missing DNS, registration of only some hosts, TLS certificates, incorrect Worker responses, outdated assets, time limits, CLI exit status, and existing initialization cleanup. External connections were mocked.
+- Oxlint targeting the changed JavaScript, `node --check` for the central deployment script, and `git diff --check` passed.
+- The actual `npm run check:port-preview` displayed `ENOTFOUND` for two new random hosts and returned exit code 1. This detected that production previews were not ready; it was not a successful recovery.
+- Document checks found no errors in 505 descriptions, but the full link check failed because of 18 existing links to feature MOCs and tasks deleted outside this change. The documents changed here have no link errors.
 
-DNS·인증서·운영 Worker·서버와 `dist/`는 변경하지 않았다. 실제 프리뷰 접속 복구는 DNS·HTTPS 준비와 후속 기기 접속 확인이 남아 있다.
+DNS, certificates, the production Worker, servers, and `dist/` were not changed. Restoring actual preview access still requires DNS and HTTPS readiness and follow-up access checks on devices.
 
-## 2026-10-28 — 직접 프리뷰의 SPA 초기 경로 수정
+## 2026-10-28 — Fix SPA initial paths in direct previews
 
-`/5173`으로 열린 Along은 모듈 로딩 뒤에도 내부 프록시 경로를 앱 경로로 읽어 자체 404를 표시했다. 기존 fixture는 Mew 전용 basename을 사용해 일반 SPA의 최초 경로 인식을 검증하지 못했다. `/3001`의 JSON 404는 localhost에서도 같은 API 루트 응답임을 확인했다.
+Along opened through `/5173` read the internal proxy path as the app path even after modules loaded and displayed its own 404. The existing fixture used a Mew-specific basename and could not verify how a general SPA recognized its initial path. The JSON 404 from `/3001` was confirmed to be the same API root response on localhost.
 
-실행 스크립트의 전역 주소 참조를 구문·스코프 분석으로 가상 Window·Location에 연결했다. 실제 Document·native iframe URL과 opaque sandbox는 유지한다. history·fragment·새로고침에서 앱 경로를 복원하고 진입 주소의 fragment도 iframe에 전달한다. 상세 계약은 [포트 프리뷰](../development/port-preview.md), 선택 근거는 [ADR 0083](../decisions/0083-direct-preview-spa-routing.md)이 소유한다.
+Global address references in executed scripts were connected to virtual Window and Location objects through syntax and scope analysis. The actual Document, native iframe URL, and opaque sandbox are retained. App paths are restored across history, fragments, and reloads, and the entry URL's fragment is also passed to the iframe. [Port Preview](../development/port-preview.md) owns the detailed contract, and [ADR 0083](../decisions/0083-direct-preview-spa-routing.md) owns the decision rationale.
 
-- basename 없는 SPA 회귀 검사는 수정 전 최초 `/` 기대에서 실패했고 수정 후 통과했다. 루트·깊은 경로·query·fragment, push/replace/back/forward·hash·iframe 새로고침·링크 이동과 API 루트 404 보존을 확인했다.
-- 전역 참조 변환의 지역 바인딩·문자열·주석·축약 속성·자동 세미콜론 삽입·생성자 우선순위·worker fallback을 검사했다. 별도 리뷰에서 발견한 이벤트 receiver 캐시와 nonconfigurable 속성 정의, Document의 DOM 정체성 문제도 수정하고 회귀 검사를 추가했다.
-- `node --test server/port-preview-location.test.ts server/port-preview-routing.test.ts server/port-preview.test.ts server/port-preview-browser.test.ts server/port-preview-launch.test.ts`로 관련 검사 21개가 통과했다. 기존 HTTPS 터널·P2P·POST·HMR·쿠키·권한 회수·SSE 검사도 포함한다.
-- 현재 실행 중인 Along을 새 브라우저 컨텍스트의 격리 프록시로 열어 로그인 화면과 회원가입 링크 이동을 확인했다. JavaScript 오류는 없었으며 로그인·계정 생성은 제출하지 않았다. 임시 브라우저·프록시는 정리했다.
-- `npx tsc -b`와 변경 TypeScript 대상 oxlint가 통과했다.
-- `npm run check:docs`는 description 519개에서 오류가 없었지만 이번 변경 밖의 기존 누락 링크 18건으로 실패했다. 변경 문서 6개의 링크에는 오류가 없다.
+- The regression check for an SPA without a basename failed on the initial `/` expectation before the fix and passed afterward. Checks covered root and deep paths, query and fragment, push/replace/back/forward, hash, iframe reloads, link navigation, and preservation of the API root 404.
+- Checks covered local bindings, strings, comments, shorthand properties, automatic semicolon insertion, constructor precedence, and worker fallback in global reference transformations. Event receiver caching, nonconfigurable property definitions, and Document DOM identity issues found in a separate review were also fixed, with regression checks added.
+- 21 related checks passed with `node --test server/port-preview-location.test.ts server/port-preview-routing.test.ts server/port-preview.test.ts server/port-preview-browser.test.ts server/port-preview-launch.test.ts`. These include existing checks for HTTPS tunnels, P2P, POST, HMR, cookies, permission revocation, and SSE.
+- The currently running Along was opened through an isolated proxy in a new browser context to verify the login screen and navigation to the sign-up link. There were no JavaScript errors, and neither login nor account creation was submitted. The temporary browser and proxy were cleaned up.
+- `npx tsc -b` and oxlint for the changed TypeScript files passed.
+- `npm run check:docs` found no errors in 519 descriptions but failed because of 18 existing missing links outside this change. Links in the 6 changed documents have no errors.
 
-앱 빌드·배포·실행 중인 서버 시작·종료·재시작은 수행하지 않았다. 실제 사용자 도메인에 대한 운영 적용은 사용자가 수행해야 한다. 동적 실행 코드·Next 정적 청크·원본 브라우저 정체성의 호환 한계는 현재 계약을 따른다.
+No app build, deployment, or start, stop, or restart of the running server was performed. The user must apply the changes to production for the actual user domain. Compatibility limits for dynamically executed code, Next static chunks, and original browser identity follow the current contract.

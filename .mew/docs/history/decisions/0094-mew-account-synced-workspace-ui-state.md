@@ -1,39 +1,39 @@
 ---
-provenance: "Liiiiv 중앙 ADR 이관본, 2026-10-14"
-description: "이관한 결정 기록: 작업 화면 상태는 계정에 귀속한다. 당시 선택·근거·후속 변경을 보존하며 현재 계약은 Mew 소유 문서에서 확인한다."
-title: "0094 — 작업 화면 상태는 계정에 귀속한다"
+provenance: "Migrated copy of a Liiiiv central ADR, 2026-10-14"
+description: "Migrated decision record: Workspace UI state belongs to the account. Preserves the choices, rationale, and subsequent changes at the time; see the Mew owning document for the current contract."
+title: "0094 — Workspace UI state belongs to the account"
 created: 2026-08-31
 updated: 2026-09-11
 ---
 
-- 날짜: 2026-08-31
-- 상태: 채택
-- 후속 결정: [0197](0197-mew-device-local-workspace-layout.md) — 도킹·문서 탭·패널 여닫힘의 기기별 복원 우선순위
-- 후속 결정: [0134](0134-mew-dockable-workspace-panels.md) — 공통 도킹 배치와 독립 터미널 열림 상태 추가
-- 후속 결정: [0119](0119-mew-unified-terminal-agent-panel.md) — agentOpen·tmuxOpen 별도 패널 상태
-- 후속 결정: [0125](0125-mew-sidebar-center-anchor-and-visible-loading.md) — 사이드바 픽셀 스크롤 복원
-- 부분 대체: [0093](0093-mew-account-synced-project-and-agent-tabs.md) — 편집 탭·사이드바·스크롤·패널 상태를 기기 로컬에 남기는 범위
-- 결정자: 송상훈 (지시)
+- Date: 2026-08-31
+- Status: Adopted
+- Follow-up decision: [0197](0197-mew-device-local-workspace-layout.md) — Per-device restoration priorities for docking, document tabs, and panel open/closed states
+- Follow-up decision: [0134](0134-mew-dockable-workspace-panels.md) — Add a shared docking layout and independent terminal open state
+- Follow-up decision: [0119](0119-mew-unified-terminal-agent-panel.md) — Separate agentOpen and tmuxOpen panel states
+- Follow-up decision: [0125](0125-mew-sidebar-center-anchor-and-visible-loading.md) — Restore sidebar scroll position in pixels
+- Partially supersedes: [0093](0093-mew-account-synced-project-and-agent-tabs.md) — The scope of keeping editor tabs, sidebar, scroll, and panel state device-local
+- Decision maker: Song Sanghoon (directive)
 
-## 배경
+## Background
 
-Documents·하위 프로젝트와 폴더 펼침, 사이드바 스크롤, 열린 문서와 분할 칸은 작업을 다시 찾는 맥락이다. 브라우저 `localStorage`에만 두면 같은 계정으로 다른 기기나 시크릿 창을 열었을 때 작업 화면을 다시 만들어야 한다.
+Documents, expanded subprojects and folders, sidebar scroll position, open documents, and split panes provide context for finding work again. Keeping them only in browser `localStorage` requires users to reconstruct their workspace UI when opening another device or an incognito window with the same account.
 
-## 선택지
+## Options
 
-1. 작업 맥락만 계정에 둔다 — 기기마다 화면은 맞지만 작업 위치가 갈린다.
-2. 작업 화면 전체를 계정에 둔다 — 어디서 로그인해도 같은 작업을 이어가며, 동시 변경은 마지막 저장을 기준으로 한다.
+1. Store only work context in the account — the screen suits each device, but the work position differs.
+2. Store the entire workspace UI in the account — continue the same work wherever the user logs in, with the last save taking precedence for concurrent changes.
 
-## 결정
+## Decision
 
-2번을 채택한다.
+Adopt option 2.
 
-- 서버 `DATA_DIR`의 계정별 UI 원장은 루트 절대경로별로 문서 탭·분할 배치·활성 문서, Documents·하위 프로젝트·폴더 펼침, 트리 스크롤, TOC와 보조 패널 열림 상태를 저장한다.
-- 첫 계정 원장 값이 없을 때만 기존 `localStorage` 값을 올린다. 원장이 있으면 새 기기의 빈 로컬 값이 덮어쓰지 않는다.
-- 변경은 짧게 묶어 서버에 저장한다. 여러 기기에서 동시에 고치면 마지막 저장이 기준이며, 실시간 원격 화면 갱신·충돌 병합은 범위 밖이다.
-- 패널 폭, 화면 크기에 의존하는 모바일 배치, 테마·언어·글꼴, 작성 중 초안·메뉴·모달 같은 기기 또는 순간 상태는 계속 브라우저 로컬에 둔다.
-- 서버 원장은 인증된 자기 계정만 읽고 쓰며, 절대 경로가 포함되는 루트 프로젝트 목록은 기존 owner 제한을 유지한다.
+- The per-account UI ledger in the server's `DATA_DIR` stores document tabs, split layouts, the active document, expansion states for Documents, subprojects, and folders, tree scroll position, and TOC and auxiliary panel open states for each absolute root path.
+- Upload existing `localStorage` values only when no initial account ledger values exist. If a ledger exists, empty local values from a new device do not overwrite it.
+- Batch changes briefly before saving them to the server. If multiple devices make changes simultaneously, the last save takes precedence; real-time remote screen updates and conflict merging are out of scope.
+- Device-specific or transient state, such as panel widths, mobile layouts dependent on screen size, theme, language, fonts, drafts in progress, menus, and modals, remains local to the browser.
+- Users can read and write only their own authenticated account's server ledger, and the root project list containing absolute paths retains the existing owner restriction.
 
-## 근거
+## Rationale
 
-이 상태는 픽셀 단위 창 모양보다 "어느 자료를 어떤 맥락으로 보고 있었는가"를 나타낸다. 기존 계정별 프로젝트·에이전트 탭 원장과 같은 저장소를 확장하면 별도 동기화 서비스 없이 이 연속성을 제공할 수 있다.
+This state represents "which materials the user was viewing and in what context" more than pixel-level window appearance. Extending the same storage used by the existing per-account project and agent tab ledger provides this continuity without a separate synchronization service.

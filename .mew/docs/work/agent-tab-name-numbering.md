@@ -1,19 +1,19 @@
 ---
-title: "새 에이전트 탭 이름 중복 방지"
-description: "새 런타임·에이전트셋 대화 이름에 하이픈 번호를 붙이는 구현과 단위·격리 UI 검증, 기존 문서 링크 오류 및 운영 미적용 범위를 기록한다."
+title: "Preventing duplicate names for new agent tabs"
+description: "Records the implementation of hyphenated numbering for new runtime and agent set conversation names, unit and isolated UI verification, existing documentation link errors, and the scope not applied to production."
 created: "2026-10-27"
 updated: "2026-10-27"
 ---
 
-같은 런타임으로 대화를 여러 개 열었을 때 탭을 구분하도록, 새 대화 이름이 겹치면 `Codex-1`, `Codex-2`처럼 번호를 붙였다. 현재 규칙은 [에이전트셋·탭 생성](../features/%ED%84%B0%EB%AF%B8%EB%84%90%C2%B7%EC%97%90%EC%9D%B4%EC%A0%84%ED%8A%B8%C2%B7%EC%9E%90%EB%8F%99%ED%99%94/%EC%97%90%EC%9D%B4%EC%A0%84%ED%8A%B8%EC%85%8B%C2%B7%ED%83%AD%20%EC%83%9D%EC%84%B1.md)에 둔다.
+To distinguish tabs when multiple conversations use the same runtime, new conversation names receive numbers such as `Codex-1` and `Codex-2` when they conflict. Current rules are maintained in [agent set and tab creation](../features/terminals-agents-automation/agent-sets-and-tab-creation.md).
 
-`nextAgentTabLabel`은 열린 탭의 이름에서 사용하지 않는 첫 이름을 고른다. `AgentPanel`은 작업 폴더 확인 후 최신 탭 상태로 이름을 정한다. 런타임과 에이전트셋이 같은 흐름을 사용하며, 기존·복원 탭과 일반 셸의 이름 규칙은 유지한다.
+`nextAgentTabLabel` selects the first name not used by open tabs. `AgentPanel` determines the name from the latest tab state after checking the working folder. Runtimes and agent sets use the same flow; naming rules for existing and restored tabs and regular shells are preserved.
 
-검증 결과:
+Verification results:
 
-- `node --test src/utils/agentTabs.test.ts server/agent-new-tab-ui.test.ts`: 8개 테스트 통과. 단위 검사에서 순차 번호, 수동 이름 충돌, 빈 번호·기본 이름 재사용과 기존 이름 보존을 확인했다. 격리 Chromium의 1100px·390px 양 테마에서 런타임을 연속 선택해 `Codex`, `Codex-1`, `Codex-2`가 되는 것과 기존 입력 포커스·탭 생성·복원 회귀를 확인했다.
-- `npx tsc -b`와 변경 코드·테스트의 대상 린트 통과. 린트의 기존 React 관련 경고는 남아 있다.
-- `AgentPanel.tsx`의 Impeccable 검사에서 지적 사항이 없었다.
-- 문서 description과 변경 문서 링크 검사 통과. 전체 링크 검사는 별도 작업의 삭제 파일을 참조하는 기존 오류 18건으로 실패했다.
+- `node --test src/utils/agentTabs.test.ts server/agent-new-tab-ui.test.ts`: 8 tests passed. Unit tests verified sequential numbering, manual name conflicts, reuse of available numbers and default names, and preservation of existing names. In isolated Chromium at 1100px and 390px in both themes, consecutive runtime selections produced `Codex`, `Codex-1`, and `Codex-2`, and regression checks covered existing input focus, tab creation, and restoration.
+- `npx tsc -b` and targeted linting of the changed code and tests passed. Existing React lint warnings remain.
+- The Impeccable check of `AgentPanel.tsx` found no issues.
+- Document description and changed-document link checks passed. The full link check failed with 18 existing errors referencing files deleted in separate work.
 
-앱 빌드·배포·서버 적용과 실제 공급자 실행은 수행하지 않았다.
+App builds, deployment, server application, and actual provider execution were not performed.

@@ -1,22 +1,22 @@
 ---
-title: "테스트 작성 의무를 공통 기본 지침의 설정으로 제공"
-description: "동작 변경의 테스트 작성을 기본 필수로 안내하고 계정별로 프로젝트 지침에 맡길 수 있게 한 결정과 기존 지침 보존 범위를 기록한다."
+title: "Provide the Test-Writing Requirement as a Shared Default Instruction Setting"
+description: "Record the decision to make test writing required by default for behavior changes, allow each account to defer to project instructions, and define which existing instructions are preserved."
 created: "2026-10-26"
 updated: "2026-10-26"
 ---
 
-상태: 채택
+Status: Adopted
 
-## 배경
+## Background
 
-Mew 공통 기본 지침에는 테스트 작성 의무가 없었다. 개발 시 테스트 작성을 기본으로 요구하면서 다른 지침처럼 계정별로 선택할 수 있어야 한다.
+Mew's shared default instructions did not require writing tests. Test writing should be required by default during development while remaining selectable per account like other instructions.
 
-## 결정
+## Decision
 
-공통 기본 지침에 **테스트 작성** 설정을 추가한다. 기본값은 **필수 작성**, 다른 선택값은 **프로젝트 지침에 따름**이다. 동작 변경과 버그 수정을 대상으로 하며 문서만 바꾸는 작업은 제외한다. 실행 제한을 준수하고 실행하지 못한 검사는 사유를 보고한다.
+Add a **Test Writing** setting to the shared default instructions. The default is **Required**, and the other option is **Follow Project Instructions**. It applies to behavior changes and bug fixes and excludes documentation-only work. Comply with execution restrictions and report reasons for checks that could not be run.
 
-기존 계정에는 저장 파일을 덮어쓰지 않고 요청 시 기본 지침을 보충한다. 명시적인 선택과 직접 편집한 지침은 보존한다. API·저장 계약은 [에이전트 세션 계약](../development/agent-sessions.md), 조작과 적용 범위는 [기본 지침 사용법](../../../docs/guides/project-setup.md#공통-안내-파일-편집)이 소유한다.
+For existing accounts, supplement the default instructions on request without overwriting saved files. Preserve explicit selections and manually edited instructions. The [Agent Session Contract](../development/agent-sessions.md) owns the API and storage contracts, and [Default Instructions Usage](../../../docs/guides/project-setup.md#edit-the-shared-guidance-file) owns interactions and scope of application.
 
-## 근거와 영향
+## Rationale and Impact
 
-계정의 모든 프로젝트에 동일한 기본값을 적용하면서 프로젝트 요구사항에 맡길 선택지를 제공한다. 에이전트에 전달하는 지침이며 테스트 실행을 보장하는 강제 게이트는 아니다. Mew 자체의 프로젝트 지침에는 중복되는 테스트 작성 의무가 없어 제거할 규정이 없다. 저장소의 테스트 실행 방법과 서버 실행 제한은 프로젝트 문서에 유지한다.
+Apply the same default to all projects in an account while offering an option to defer to project requirements. These are instructions passed to the agent, not an enforcement gate that guarantees test execution. Mew's own project instructions contain no duplicate test-writing requirement, so there is no rule to remove. Keep repository test execution methods and server execution restrictions in project documentation.

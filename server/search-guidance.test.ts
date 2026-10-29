@@ -12,7 +12,7 @@ test('agent search guidance does not bootstrap the retired Graphify experiment',
   const search = fs.readFileSync(path.join(root, 'docs/configuration/search.md'), 'utf8')
   assert.doesNotMatch(agent, /graphify/i)
   assert.doesNotMatch(search, /node tools\/graphify|graphifyy==|MEW_GRAPHIFY_TOKENIZER_PYTHON/)
-  assert.match(search, /제거했다/)
+  assert.match(search, /0176-mew-remove-local-rag\.md/)
   assert.match(agent, /document-descriptions\.ts/)
   for (const name of fs.readdirSync(path.join(root, 'tools'))) assert.doesNotMatch(name, /^graphify/)
 })

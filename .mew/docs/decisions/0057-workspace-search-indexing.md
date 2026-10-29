@@ -1,27 +1,27 @@
 ---
-title: "작업 공간과 공개 제품 사이트의 검색 색인 분리"
-description: "호스트 작업 공간에 noindex 메타·응답 헤더를 적용하고 robots 수집은 허용한다. 공개 제품 소개의 canonical·사이트맵·AI 인용 설정은 대표 URL과 소유권이 확인된 배포에서 관리하기로 한 결정."
+title: "Separate search indexing for the workspace and public product site"
+description: "Apply noindex metadata and response headers to the host workspace while allowing robots to crawl it. The decision assigns canonical URLs, sitemaps, and AI citation settings for the public product introduction to a deployment with a verified primary URL and ownership."
 created: 2026-10-23
 updated: 2026-10-23
 ---
 
-# 작업 공간의 검색 색인 경계
+# Workspace search indexing boundaries
 
-상태: 승인됨.
+Status: Approved.
 
-## 배경
+## Background
 
-SEO 설정 요청을 진단한 결과 호스트 HTML은 로그인·게스트 접근을 처리하는 React 앱의 진입점이며 제품 소개 사이트와 역할이 다르다. 설치 주소가 고정되지 않고 문서·코드·대화가 사용자마다 다르므로 임의 공개 canonical이나 파일 사이트맵을 만들면 검색 대상과 비공개 작업 공간을 섞게 된다.
+Diagnosis of the SEO configuration request found that the host HTML is the entry point for a React app handling login and guest access, with a different role from a product introduction site. Installation URLs are not fixed, and documents, code, and conversations vary by user, so creating an arbitrary public canonical URL or file sitemap would mix search targets with private workspaces.
 
-## 결정
+## Decision
 
-- 직접·개발 호스트의 응답과 앱 HTML에 `noindex, nofollow`를 적용한다. 같은 HTTP 서버를 사용하는 P2P 전달에서도 해당 헤더와 HTML 메타를 보존한다.
-- robots는 수집을 허용해 크롤러가 `noindex`를 읽도록 한다. 색인 정책을 인증이나 파일 권한의 대체 수단으로 사용하지 않는다.
-- 제품의 실제 정의로 제목과 description을 정리한다. 공개 대표 주소·소유권이 확인되기 전에는 canonical·사이트맵·AI용 공개 문서나 블로그를 추정해서 만들지 않는다.
-- 중앙 Mewlink의 공개 소개·기기·대시보드 페이지는 중앙 배포의 별도 정책으로 관리한다. 이 결정은 기존 기기 접속·게스트 공유의 권한을 바꾸지 않는다.
+- Apply `noindex, nofollow` to responses from direct and development hosts and to app HTML. Preserve these headers and HTML metadata in P2P forwarding through the same HTTP server as well.
+- Allow crawling in robots so crawlers can read `noindex`. Do not use indexing policy as a substitute for authentication or file permissions.
+- Align the title and description with the product's actual definition. Do not create canonical URLs, sitemaps, public documents for AI, or blogs based on assumptions before the public primary URL and ownership are verified.
+- The central Mewlink public introduction, device, and dashboard pages are managed under a separate policy for the central deployment. This decision does not change permissions for existing device access or guest sharing.
 
-## 근거와 영향
+## Rationale and Impact
 
-[Google의 noindex 안내](https://developers.google.com/search/docs/crawling-indexing/block-indexing)는 색인 제외 메타·헤더를 읽으려면 robots로 수집을 막지 않아야 한다고 설명한다. 호스트를 여러 도메인에 설치해도 동일한 검색 경계를 적용할 수 있고, 공개 소개의 검색 유입은 그 소유 배포에서 관리할 수 있다.
+[Google's noindex guidance](https://developers.google.com/search/docs/crawling-indexing/block-indexing) explains that crawling must not be blocked by robots if crawlers are to read indexing exclusion metadata and headers. The same search boundary can apply even when hosts are installed on multiple domains, and search traffic to a public introduction can be managed by its owning deployment.
 
-게스트가 읽을 수 있는 문서도 호스트 검색 제외 정책을 따른다. 공개 문서를 검색 유입 대상으로 운영하려면 공개 문서용 배포와 색인 정책을 별도로 설계해야 한다. 현재 응답 계약과 반영 후 확인 절차는 [검색 정책 운영 문서](../../../docs/operations/search-discovery.md)가 소유한다.
+Documents readable by guests also follow the host's search exclusion policy. Operating public documents as destinations for search traffic requires a separately designed public-document deployment and indexing policy. The [search policy operations document](../../../docs/operations/search-discovery.md) owns the current response contract and post-application verification procedure.

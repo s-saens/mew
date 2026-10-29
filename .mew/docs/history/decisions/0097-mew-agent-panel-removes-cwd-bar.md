@@ -1,35 +1,35 @@
 ---
-provenance: "Liiiiv 중앙 ADR 이관본, 2026-10-14"
-description: "이관한 결정 기록: mew 에이전트 창에서 작업 경로 입력줄을 제거한다. 당시 선택·근거·후속 변경을 보존하며 현재 계약은 Mew 소유 문서에서 확인한다."
-title: "0097 — mew 에이전트 창에서 작업 경로 입력줄을 제거한다"
+provenance: "Migrated copy of a Liiiiv central ADR, 2026-10-14"
+description: "Migrated decision record: Remove the working directory input bar from the mew agent window. Preserves the choices, rationale, and subsequent changes at the time; see the Mew owning document for the current contract."
+title: "0097 — Remove the working directory input bar from the mew agent window"
 created: 2026-08-31
 updated: 2026-09-11
 ---
 
-- 날짜: 2026-08-31
-- 상태: 채택
-- 후속 결정: [0099](0099-mew-agent-history-new-conversation.md) — Clear 버튼의 위치·동작
-- 부분 대체: [0077](0077-mew-agent-tab-working-directory.md) — 탭 줄 아래 작업 경로 입력·변경 UI 범위
-- 결정자: 송상훈 (지시)
+- Date: 2026-08-31
+- Status: Adopted
+- Follow-up decision: [0099](0099-mew-agent-history-new-conversation.md) — Clear button placement and behavior
+- Partially supersedes: [0077](0077-mew-agent-tab-working-directory.md) — The UI for entering and changing the working directory below the tab bar
+- Decision maker: Song Sanghoon (directive)
 
-## 배경
+## Background
 
-탭 줄 아래의 cwd 입력줄은 에이전트 대화보다 경로 조작을 앞에 두고, Clear·세션 정보처럼 대화 중 자주 쓰는 조작까지 같은 줄에 섞었다.
+The cwd input bar below the tab bar put path controls ahead of the agent conversation and mixed frequently used conversation controls such as Clear and session information into the same row.
 
-## 선택지
+## Options
 
-1. 경로 입력줄을 유지한다 — 탭 안에서 cwd를 바꿀 수 있지만 대화 화면의 상단 밀도가 높다.
-2. 입력줄을 제거하고 새 탭의 기본 cwd를 쓴다 — 경로 전환은 닫히고 세션 조작을 작게 분리한다.
+1. Keep the path input bar — cwd can be changed within the tab, but the top of the conversation screen is crowded.
+2. Remove the input bar and use the default cwd for new tabs — disable path switching and separate session controls into a compact area.
 
-## 결정
+## Decision
 
-2번을 채택한다.
+Adopt option 2.
 
-- 새 에이전트 탭은 기존처럼 현재 워크스페이스 루트를 cwd로 시작하며, runtime·tab·cwd 세션 키와 히스토리 저장 경계는 유지한다.
-- 에이전트 창에서 cwd 주소창·자동완성·홈·경로 전환 조작을 보이지 않게 한다.
-- 기존 Clear와 세션 정보 버튼은 헤더 아래 왼쪽 상단에 작은 둥근 플로팅 버튼으로 가로 배치한다.
-  세션 정보는 대화 영역을 밀지 않는 독립 팝업으로 열리며 바깥 클릭·Esc로 닫는다.
+- New agent tabs start with the current workspace root as cwd as before, and the runtime, tab, and cwd session keys and history storage boundaries remain unchanged.
+- Hide the cwd address bar, autocomplete, Home, and path switching controls in the agent window.
+- Place the existing Clear and Session Info buttons horizontally as small, round floating buttons at the upper left below the header. Session
+  Info opens in a standalone popup that does not shift the conversation area and closes on an outside click or Esc.
 
-## 근거
+## Rationale
 
-대화 시작의 기본 작업 경로는 충분히 예측 가능하다. 자주 쓰는 세션 조작을 경로 줄에서 분리하면 대화 본문에 더 많은 공간을 준다.
+The default working directory when starting a conversation is sufficiently predictable. Separating frequently used session controls from the path bar gives the conversation body more space.

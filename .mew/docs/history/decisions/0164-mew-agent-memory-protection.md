@@ -1,32 +1,32 @@
 ---
-provenance: "Liiiiv 중앙 ADR 이관본, 2026-10-14"
-description: "이관한 결정 기록: 에이전트 메모리 제한과 작업 보류. 당시 선택·근거·후속 변경을 보존하며 현재 계약은 Mew 소유 문서에서 확인한다."
-title: "0164 — 에이전트 메모리 제한과 작업 보류"
+provenance: "Migrated copy of a Liiiiv central ADR, 2026-10-14"
+description: "Migrated decision record: Agent memory limits and work suspension. Preserves the choices, rationale, and subsequent changes at the time; see the Mew owning document for the current contract."
+title: "0164 — Agent memory limits and work suspension"
 created: 2026-09-21
 updated: 2026-09-21
 ---
 
-- 날짜: 2026-09-21
-- 상태: 채택
-- 후속 결정: [0205](0205-mew-dynamic-agent-memory.md) — 동적 가용 메모리 90% 예산·MemoryHigh 속도 제한 제거
-- 후속 결정: [0192](0192-mew-agent-memory-auto-resume.md) — 메모리 회복 후 AI 이어가기·큐 자동 재개
-- 부분 대체: [0048](0048-mew-agent-supervisor-process.md) — OS 자원 제한 없음; 독립 감독 수명은 유지
-- 부분 대체: [0153](0153-mew-agent-cli-shared-queue.md) — 메모리 보호 중에는 FIFO 자동 실행을 보류
-- 결정자: 송상훈 (OS 메모리 관리·작업 중단·오류 알림 지시), Codex (구현)
+- Date: 2026-09-21
+- Status: Adopted
+- Subsequent decision: [0205](0205-mew-dynamic-agent-memory.md) — dynamic budget of 90% of available memory and removal of MemoryHigh throttling
+- Subsequent decision: [0192](0192-mew-agent-memory-auto-resume.md) — AI continuation and automatic queue resumption after memory recovers
+- Partially supersedes: [0048](0048-mew-agent-supervisor-process.md) — no OS resource limits; independent supervisor lifetime remains
+- Partially supersedes: [0153](0153-mew-agent-cli-shared-queue.md) — suspend automatic FIFO execution during memory protection
+- Decision makers: Song Sanghun (directed OS memory management, work interruption, and error notifications), Codex (implementation)
 
-## 배경
+## Background
 
-에이전트와 빌드 등 자식 작업의 메모리 증가로부터 mew와 호스트를 보호해야 한다. WSL 전체 종료는 Linux OOM 기록이 없을 수도 있어, 원인 확정과 예방 장치를 구분한다.
+mew and the host must be protected from growing memory usage by agents and child tasks such as builds. A complete WSL shutdown may leave no Linux OOM record, so distinguish confirmed causes from preventive measures.
 
-## 결정
+## Decision
 
-- Linux systemd 사용자 관리자가 있는 환경에서는 설치한 `mew-agents.slice`에 ACP 어댑터와 자손, 에이전트 패널 CLI 명령의 셸을 별도 scope로 넣는다. 모든 탭이 합산 한도를 공유한다. mew 서버와 감독은 밖에 남긴다.
-- `MemoryHigh`로 회수·속도 제한을 유도하고 `MemoryMax`·`MemorySwapMax`를 최종 방어선으로 둔다. 기본 설치값은 호스트 RAM의 50%·65%·25%다. 이는 보안 샌드박스가 아니다.
-- 감독은 Linux `MemAvailable`과 공유 slice의 여유를 확인한다. 부족하면 진행 작업을 취소하고 대기열을 보존·보류하며 화면 오류와 감독 로그를 남긴다. 회복 후 명시적 새 전송만 재개한다. 중단된 턴을 자동 재실행하지 않는다.
-- 단순 SIGSTOP은 메모리를 반환하지 않으므로 채택하지 않는다. 취소를 무시하는 프로세스와 순간 급증은 OS 한도가 막는다.
-- systemd 미설치 환경에서는 OS 격리 미적용을 로그로 알리고 가용 메모리 보호를 사용한다. 필수 모드는 격리를 준비할 수 없으면 실행을 거부한다. 설정된 scope 실행 실패 후 제한 없는 재실행은 하지 않는다.
-- 일반 터미널·terminal 런타임·별도 외부 서비스·Windows 측 프로세스는 이 slice의 범위 밖이다. 해당 부하까지 보호됐다고 표시하지 않는다.
+- In environments with a Linux systemd user manager, place ACP adapters and their descendants, along with shells for agent panel CLI commands, in separate scopes within the installed `mew-agents.slice`. All tabs share an aggregate limit. Keep the mew server and supervisor outside it.
+- Use `MemoryHigh` to trigger reclamation and throttling, with `MemoryMax` and `MemorySwapMax` as the final lines of defense. Default installation values are 50%, 65%, and 25% of host RAM. This is not a security sandbox.
+- The supervisor checks Linux `MemAvailable` and the shared slice's remaining capacity. If memory is insufficient, cancel active work, preserve and suspend the queue, display an error, and write supervisor logs. After recovery, resume only on an explicit new submission. Do not automatically rerun interrupted turns.
+- Do not use SIGSTOP alone because it does not release memory. OS limits stop processes that ignore cancellation and sudden memory spikes.
+- In environments without systemd, log that OS isolation is not applied and use available-memory protection. Required mode refuses execution if isolation cannot be prepared. Do not rerun without limits after execution in a configured scope fails.
+- Regular terminals, the terminal runtime, separate external services, and Windows-side processes are outside this slice's scope. Do not indicate that their loads are also protected.
 
-## 근거
+## Rationale
 
-감독까지 제한 그룹에 넣으면 커널 강제 종료 시 오류 전달과 큐가 함께 사라진다. 작업 프로세스만 묶어 기존 독립 감독 계약을 유지하고, 전체 머신 OOM보다 앞서 제한한다. 적용·한계·복구는 [운영 문서](../../../../docs/operations/agent-memory.md)가 소유한다.
+Putting the supervisor in the limited group would cause error reporting and the queue to disappear together when the kernel kills it. Group only work processes to retain the existing independent supervisor contract and enforce limits before a machine-wide OOM. The [Operations document](../../../../docs/operations/agent-memory.md) owns application, limitations, and recovery.

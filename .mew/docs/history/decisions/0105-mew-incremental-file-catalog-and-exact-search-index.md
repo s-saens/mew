@@ -1,62 +1,62 @@
 ---
-provenance: "Liiiiv 중앙 ADR 이관본, 2026-10-14"
-description: "이관한 결정 기록: mew 탐색과 정확 검색은 증분 파일 카탈로그를 공유한다. 당시 선택·근거·후속 변경을 보존하며 현재 계약은 Mew 소유 문서에서 확인한다."
-title: "0105 — mew 탐색과 정확 검색은 증분 파일 카탈로그를 공유한다"
+provenance: "Migrated copy of a Liiiiv central ADR, 2026-10-14"
+description: "Migrated decision record: mew navigation and exact search share an incremental file catalog. Preserves the choices, rationale, and subsequent changes from that time; consult the Mew owning document for the current contract."
+title: "0105 — mew navigation and exact search share an incremental file catalog"
 created: 2026-09-01
 updated: 2026-09-02
 ---
 
-- 날짜: 2026-09-01
-- 상태: 채택
-- 부분 대체: 0088 — 전체 트리가 필요한 검색·watcher는 재귀 트리를 계속 만든다는 범위
-- 결정자: 송상훈 (구현 지시, 초안: Codex)
+- Date: 2026-09-01
+- Status: Adopted
+- Partially supersedes: 0088 — the scope in which search and watchers that need the full tree continue building a recursive tree
+- Decision maker: Song Sanghun (implementation direction; draft: Codex)
 
-## 배경
+## Background
 
-[ADR 0088](0088-mew-sidebar-tree-lazy-loading.md)은 평상시 사이드바를 폴더 단위로 지연 로드했지만,
-파일명·내용 검색과 watcher 변경 판정은 여전히 전체 트리를 재귀 생성한다. 내용 검색은 입력이 바뀔 때마다
-같은 파일을 다시 읽는다. SSE는 첫 결과를 일찍 보여 줄 뿐 전체 디스크 작업량을 줄이지 못한다.
+[ADR 0088](0088-mew-sidebar-tree-lazy-loading.md) lazy-loaded the sidebar by folder during normal use, but filename and content searches and watcher change
+detection still recursively build the entire tree. Content search rereads the same files whenever the input
+changes. SSE only shows the first results sooner; it does not reduce total disk work.
 
-mew는 Node 22.18+ 또는 24와 단일 프로세스를 설치 계약으로 이미 요구하며, 원문 파일이 SSoT여야 한다.
-정확 검색 장애가 파일 편집·탐색·서버 부팅을 막아서도 안 된다.
+mew already requires Node 22.18+ or 24 and a single process as its installation contract, and source files must remain the SSoT. Exact search
+failures must not block file editing, navigation, or server startup.
 
-## 선택지
+## Options
 
-1. 요청마다 Node 또는 `rg`로 전수 검색 — 별도 상태는 없지만 반복 I/O와 프로세스 비용이 프로젝트 크기에 비례한다.
-2. 외부 검색 서비스 — 큰 규모에는 강하지만 mew 한 벌로 설치하는 계약과 로컬 문서 경계를 깨뜨린다.
-3. 메모리 파일 카탈로그 + Node 내장 SQLite FTS5 — 별도 서비스·패키지 없이 증분 갱신하고, 실패 시 전수 검색으로 물러날 수 있다.
-4. LanceDB RAG에 정확 검색을 합친다 — 저장소는 재사용하지만 벡터 청크와 파일·문자열 정확 검색은 데이터 수명과 질의 계약이 다르다.
+1. Perform a full scan with Node or `rg` for every request — no separate state, but repeated I/O and process costs scale with project size.
+2. External search service — handles large scale well, but breaks the contract of installing mew as a single package and the local document boundary.
+3. In-memory file catalog + Node's built-in SQLite FTS5 — supports incremental updates without separate services or packages and can fall back to full scans on failure.
+4. Combine exact search with LanceDB RAG — reuses storage, but vector chunks and exact file and string searches have different data lifetimes and query contracts.
 
-## 결정
+## Decision
 
-3번을 채택한다.
+Adopt option 3.
 
-- 프로젝트별 메모리 `FileCatalog`가 경로·부모·종류와 부모별 정렬 목록의 불변 snapshot을 소유하고,
-  정확 검색 SQLite가 파일별 크기·mtime을 추적한다.
-  첫 루트 응답은 기존 한 단계 읽기로 즉시 돌려주면서 전체 snapshot을 백그라운드에서 한 번 만든다.
-- 탐색·Ctrl+P·Ctrl+Shift+F가 같은 catalog version을 사용한다. watcher는 변경 부모·파일만 갱신하고,
-  클라이언트에는 영향 받은 부모와 version을 알려 관련 폴더 캐시만 무효화한다.
-- Ctrl+P는 서버의 catalog 후보에 fuzzy ranking을 적용해 상위 50개만 반환한다. 전체 `TreeNode`를 브라우저로 보내지 않는다.
-- 정확 내용 색인은 Node 22의 `node:sqlite`와 FTS5 `trigram` tokenizer를 쓴다. DB는
-  `<MEW_DATA_DIR>/search/<workspace-hash>/catalog.sqlite`에 두고 LanceDB RAG와 분리한다.
-- 3글자 이상 비정규식 질의만 FTS 후보를 사용한다. 후보 파일의 현재 원문에서 대소문자·줄·열·미리보기를 다시 검증한다.
-  1~2글자·정규식·색인 준비/장애/불일치 상태는 기존 정확 scanner로 fallback한다.
-- 원문 파일이 SSoT다. DB는 백업하지 않으며 삭제·손상·schema 변경 시 자동 재구축한다. 색인 오류는 서버 부팅이나
-  파일 탐색을 실패시키지 않는다.
-- catalog와 색인은 권한 경계가 아니다. 모든 tree·파일명·내용 결과는 요청 시점의 역할·guest 승인·ignore·차단 정책으로 다시 거른다.
-- 부모 경로가 든 부분 tree 신호는 로그인 역할에만 보내고, guest에게는 경로 없는 전체 갱신 신호만 보낸다.
-- `MEW_SEARCH_INDEX_ENABLED=0`이면 즉시 기존 scanner만 쓴다. 기본값은 `1`이고 fallback은 항상 남긴다.
+- A per-project in-memory `FileCatalog` owns an immutable snapshot of paths, parents, types, and sorted lists by parent, while the exact-search SQLite
+  database tracks each file's size and mtime. The first root response
+  is returned immediately using the existing single-level read, while the full snapshot is built once in the background.
+- Navigation, Ctrl+P, and Ctrl+Shift+F use the same catalog version. The watcher updates only changed parents and files and notifies clients of the
+  affected parents and version so that only the relevant folder caches are invalidated.
+- Ctrl+P applies fuzzy ranking to server catalog candidates and returns only the top 50 results. It does not send the entire `TreeNode` to the browser.
+- The exact content index uses Node 22's `node:sqlite` and the FTS5 `trigram`
+  tokenizer. The DB is stored at `<MEW_DATA_DIR>/search/<workspace-hash>/catalog.sqlite`, separate from LanceDB RAG.
+- Only non-regex queries of at least 3 characters use FTS candidates. Case, line, column, and preview are revalidated against each candidate file's current source text. Queries of 1–2
+  characters, regex queries, and index states involving preparation, failure, or inconsistency fall back to the existing exact scanner.
+- Source files are the SSoT. The DB is not backed up and is automatically rebuilt if deleted, corrupted, or subject to a schema change. Index errors do not cause server
+  startup or file navigation to fail.
+- The catalog and index are not permission boundaries. All tree, filename, and content results are filtered again using the role, guest approval, ignore, and blocking policies in effect at request time.
+- Send partial tree signals containing parent paths only to authenticated roles; send guests only full refresh signals without paths.
+- When `MEW_SEARCH_INDEX_ENABLED=0`, immediately use only the existing scanner. The default is `1`, and the fallback is always retained.
 
-## 근거
+## Rationale
 
-현재 Node 최소 버전과 Docker base가 모두 `node:sqlite`를 제공해 새 네이티브 패키지·컴파일 도구·외부 프로세스가
-필요 없다. FTS trigram은 한글·영문 substring의 3글자 이상 후보를 좁힐 수 있고, 원문 재검증과 짧은 질의 fallback으로
-정확성을 유지한다. 메모리 catalog와 SQLite 색인을 분리하면 탐색은 DB 장애와 무관하게 동작하고, 의미 검색 저장층과
-정확 검색의 복구·schema 변경도 독립적으로 관리할 수 있다.
+Both the current minimum Node version and the Docker base provide `node:sqlite`, so no new native packages, compilation tools, or external processes are needed. FTS trigram
+can narrow candidates for Korean and English substrings of at least 3 characters, while source-text revalidation and fallback for short queries preserve accuracy.
+Separating the in-memory catalog from the SQLite index lets navigation work regardless of DB failures and allows recovery and schema changes for the semantic
+search storage layer and exact search to be managed independently.
 
-## 결과
+## Results
 
-- warm 탐색과 파일명 검색은 전체 디스크 크기가 아니라 부모 자식 수·상위 결과 수에 비례한다.
-- warm 리터럴 내용 검색은 전체 파일 read 대신 FTS 후보 파일만 읽는다.
-- 최초 catalog·색인 구축은 기존과 같은 전체 읽기 비용과 원문에 비례한 추가 디스크 공간을 쓴다. 구축 중에도 기존 scanner가 정확한 결과를 제공한다.
-- Node 22의 `node:sqlite` 경고와 API 안정성은 Node 업그레이드 때 검토한다. 이 API를 제거하거나 외부 DB로 바꿀 때는 새 ADR이 필요하다.
+- Warm navigation and filename search scale with the number of children under a parent and the number of top results, rather than total disk size.
+- Warm literal content search reads only FTS candidate files instead of reading all files.
+- Initial catalog and index construction incurs the same full-read cost as before, plus additional disk space proportional to the source content. The existing scanner provides accurate results even during construction.
+- Review Node 22's `node:sqlite` warnings and API stability when upgrading Node. Removing this API or switching to an external DB requires a new ADR.

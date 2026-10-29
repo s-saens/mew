@@ -1,23 +1,23 @@
 ---
-title: "0071 — 프로젝트 목록 핸들 정렬"
-description: "헤더 프로젝트 드롭다운에 왼쪽 마우스·터치 핸들과 키보드 정렬을 추가하고 기존 계정별 경로 순서 저장을 재사용하는 결정. 탭·그룹 UI 제거는 유지한다."
+title: "0071 — Reorder the Project List with Handles"
+description: "Decision to add mouse and touch handles on the left and keyboard reordering to the header project dropdown, reusing existing per-account path order storage. The removal of the tab and group UI remains in effect."
 created: 2026-10-26
 updated: 2026-10-26
 ---
 
-- 상태: 채택
-- 부분 대체: [0019](0019-project-selector.md)의 재배열 UI 제거 중 드롭다운 목록 순서 변경에 해당하는 범위.
+- Status: Adopted
+- Partially supersedes: the portion of the reordering UI removal in [0019](0019-project-selector.md) that covers changing dropdown list order.
 
-## 배경
+## Background
 
-프로젝트 목록의 사용 순서를 직접 정할 수 있도록 드래그 핸들이 요청되었다. 이름 영역은 프로젝트 선택과 터치 스크롤에 계속 사용해야 한다.
+Drag handles were requested so users could set the order of the project list themselves. The name area must remain available for project selection and touch scrolling.
 
-## 결정
+## Decision
 
-프로젝트 행 왼쪽에 전용 핸들을 두고 공용 세로 드래그 훅을 재사용한다. 행의 `Shift+↑/↓`와 포커스한 핸들의 `↑/↓`도 지원한다. 프로젝트 추가 항목은 정렬 대상에서 제외한다.
+Place a dedicated handle on the left of each project row and reuse the shared vertical drag hook. Also support `Shift+↑/↓` on the row and `↑/↓` on the focused handle. Exclude the Add Project item from reordering.
 
-바뀐 순서는 기존 계정별 경로 목록과 브라우저 사본으로 저장한다. `Alt+1…9`도 같은 목록 순서를 따른다. 정렬 중 활성 프로젝트와 열린 메뉴는 유지한다. 프로젝트 탭·그룹 UI를 추가하지 않는다.
+Save the changed order in the existing per-account path list and browser copy. `Alt+1…9` follows the same list order. Preserve the active project and open menu during reordering. Do not add project tabs or a group UI.
 
-## 근거와 영향
+## Rationale and Impact
 
-공용 훅의 포인터 캡처·스크롤·이동 애니메이션을 유지하면서 선택과 정렬의 입력 영역을 구분한다. 새 저장 형식이나 API는 필요 없다. 사용법과 검증 범위는 [프로젝트 기능 계약](../features/%ED%94%84%EB%A1%9C%EC%A0%9D%ED%8A%B8%C2%B7%ED%8C%8C%EC%9D%BC%C2%B7%EA%B2%80%EC%83%89/%ED%94%84%EB%A1%9C%EC%A0%9D%ED%8A%B8%20%EC%97%B4%EA%B8%B0%C2%B7%ED%83%AD%C2%B7%EA%B7%B8%EB%A3%B9.md), 공유 구현은 [UI 계약](../development/ui-contracts.md#헤더-프로젝트-선택기)을 따른다.
+Separate input areas for selection and reordering while retaining the shared hook's pointer capture, scrolling, and movement animations. No new storage format or API is needed. Follow the [Project Feature Contract](../features/projects-files-search/opening-projects-tabs-and-groups.md) for usage and verification scope and the [UI Contract](../development/ui-contracts.md#header-project-switcher) for the shared implementation.

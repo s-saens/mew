@@ -1,35 +1,35 @@
 ---
-title: "탐색기 검색창 통합과 계층 결과"
-description: "2026-10-29 검색 탭을 단일 검색창·내용 토글로 통합하고 파일/문서 계층 결과와 매치 주변 툴팁을 구현한 기록. 격리 검증과 기존 문서 오류·운영 미적용 범위와 문서/파일 토글 복원·검색창 오른쪽 닫기 위치 정정을 구분한다."
+title: "Unified explorer search box and hierarchical results"
+description: "Records the 2026-10-29 consolidation of search tabs into a single search box and content toggle, and implementation of file/document hierarchical results and tooltips with context around matches. Distinguishes isolated validation, existing documentation errors, and the scope not applied to production from restoration of the document/file toggle and correction of the close button position to the right of the search box."
 created: "2026-10-29"
 updated: "2026-10-29"
 ---
 
-## 목적과 결과
+## Purpose and results
 
-검색하면서 원래 파일·문서 위치를 확인할 수 있도록 탐색·파일명·내용 검색 탭을 없앴다. 맨 위 검색창과 내용 검색 토글을 공유하고 문서/파일 범위는 기존 두 버튼 토글로 고른다. 결과는 기존 트리에서 일치 항목·조상만 보이며 검색을 해제하면 기존 펼침·스크롤을 복원한다.
+Removed the navigation, filename search, and content search tabs so users can see the original file and document locations while searching. A top search box and content search toggle are shared, and the document/file scope is selected with the existing two-button toggle. Results show only matching items and their ancestors in the existing tree, and clearing search restores the previous expansion and scroll state.
 
-본문 결과의 hover·키보드 포커스 툴팁은 검색 줄과 위아래 각각 최대 3줄을 보여 준다. 문맥은 좌우 약 10단어·줄 길이 상한으로 제한하고 매치를 강조한다. 복수 매치 이동·해당 위치 열기와 파일별·전체 치환을 유지한다. API에 범위 상한 이전의 `root` 선별과 선택적 `context`를 추가했다.
+Hover and keyboard-focus tooltips for body-content results show the matching line and up to 3 lines each above and below it. Context is limited to approximately 10 words on either side and a line-length cap, with matches highlighted. Navigation among multiple matches, opening the matching location, and per-file and global replacement are preserved. Added `root` filtering before the scope limit and optional `context` to the API.
 
-현재 계약은 [기능 문서](../features/%ED%94%84%EB%A1%9C%EC%A0%9D%ED%8A%B8%C2%B7%ED%8C%8C%EC%9D%BC%C2%B7%EA%B2%80%EC%83%89/%ED%8C%8C%EC%9D%BC%EB%AA%85%C2%B7%EB%82%B4%EC%9A%A9%20%EA%B2%80%EC%83%89%EA%B3%BC%20%EC%B9%98%ED%99%98.md)·[검색 안내](../../../docs/configuration/search.md), 선택 근거는 [ADR 0085](../decisions/0085-explorer-inline-search.md)가 소유한다.
+The current contract is owned by the [feature document](../features/projects-files-search/filename-content-search-and-replacement.md) and [search guide](../../../docs/configuration/search.md); the decision rationale is owned by [ADR 0085](../decisions/0085-explorer-inline-search.md).
 
-## 검증과 적용
+## Verification and application
 
-- 격리한 `MEW_DATA_DIR`·`MEW_WORKSPACE`에서 검색·패턴·파일명·API·트리 구성·탐색기 성능·생성·용어·실제 앱 전환·시작 UI의 11개 테스트 파일을 함께 실행해 44개를 통과했다. JSON/SSE 문맥 일치, 긴 줄·유니코드·원문 오프셋과 문서/파일 범위·50개 상한 선별을 확인했다.
-- 격리 UI에서 Files/Documents × 1100px midnight/390px rose 조합으로 계층·일치 강조·검색 해제 복원·옵션·내용 토글·7줄 툴팁·원문 위치 열기를 확인했다. 검색 결과를 열고 해제한 뒤 기존 접힘 상태·140px 스크롤의 복원, 늦은 응답의 clear/모드/범위 변경 시 취소, 두 번째 매치 열기와 지연된 상위 문서 조회의 선택 덮어쓰기 방지도 검사했다. 응답은 예제 데이터로 모의했으며 실제 서버·실기기 검증은 아니다.
-- `npx tsc -b`와 변경 코드의 oxlint 검사는 통과했다. 린트 경고는 남아 있다.
-- `npm run check:docs`는 기존 `docs/지원서.md`의 frontmatter 누락으로 실패했다. 해당 파일은 이 작업 이전의 사용자 변경이므로 수정하지 않았다. `node server/document-links.ts --all`도 기존 README의 절대 경로와 삭제된 문서·태스크를 참조하는 링크 오류 19개로 실패했다. 변경한 문서 6개의 description·로컬 링크는 같은 검사 함수를 사용한 별도 검사에서 통과했다.
-- impeccable detector는 변경 UI에서 지적 사항 없이 통과했다. 격리 컴포넌트의 데스크톱·모바일 화면을 확인했다.
-- 앱 빌드·배포·런처 실행·서버 재시작은 하지 않았다. 실행 중인 인스턴스 반영은 사용자의 빌드·적용 후 확인해야 한다.
+- Ran 11 test files together for search, patterns, filenames, APIs, tree construction, explorer performance, creation, terminology, actual app switching, and startup UI with isolated `MEW_DATA_DIR` and `MEW_WORKSPACE`; 44 tests passed. Verified JSON/SSE context consistency, long lines, Unicode, original-text offsets, document/file scopes, and filtering for the 50-item limit.
+- In the isolated UI, checked hierarchy, match highlighting, restoration after clearing search, options, the content toggle, 7-line tooltips, and opening original-text locations across Files/Documents × 1100px midnight/390px rose combinations. Also checked restoration of the previous collapsed state and 140px scroll position after opening a search result and clearing search; cancellation of late responses on clear, mode, or scope changes; opening the second match; and prevention of delayed parent-document lookups overwriting the selection. Responses were mocked with sample data; this was not actual-server or physical-device validation.
+- `npx tsc -b` and oxlint checks for the changed code passed. Lint warnings remain.
+- `npm run check:docs` failed because frontmatter was missing from the existing `docs/지원서.md`. That file contained user changes predating this work and was left unchanged. `node server/document-links.ts --all` also failed with 19 existing link errors involving absolute paths in the README and references to deleted documents and tasks. Descriptions and local links in the 6 changed documents passed a separate check using the same validation functions.
+- The impeccable detector passed with no findings in the changed UI. Desktop and mobile views of the isolated component were reviewed.
+- No app build, deployment, launcher execution, or server restart was performed. Application to the running instance must be checked after the user builds and applies the changes.
 
-## 문서/파일 토글 복원
+## Restore the document/file toggle
 
-검색 탭만 제거해야 했으나 문서/파일 전환까지 드롭다운으로 바꾼 범위 초과를 정정했다. 기존 두 버튼의 모양·선택 상태·클릭·터치·좌우 방향키·Home/End 전환과 문서 우클릭 설정을 복원했다. 단일 검색창·내용 검색 토글·트리 결과·문맥 툴팁은 유지한다. 실제 App 회귀는 범위 선택에 combobox가 없고 문서·파일 버튼이 직접 전환되는지 확인하도록 갱신했다.
+Corrected a scope overreach that changed document/file switching to a dropdown when only the search tabs were meant to be removed. Restored the existing two buttons' appearance, selected state, click and touch behavior, left/right arrow and Home/End switching, and document context-menu settings. The single search box, content search toggle, tree results, and context tooltips are preserved. Updated the actual App regression test to verify that scope selection has no combobox and that the document and file buttons switch directly.
 
-검증: App 전환·통합 검색 회귀 8개와 시작 UI 회귀 3개를 통과했다. `npx tsc -b`·변경 코드 oxlint·UI detector와 변경 문서 6개의 description·로컬 링크 검사도 통과했다. 전체 문서 검사는 위에 기록한 기존 frontmatter 오류로 실패했다. 데스크톱·모바일의 토글 표시를 격리 화면에서 확인했으며 앱 빌드·서버 적용은 하지 않았다.
+Validation: 8 App switching and unified-search regression tests and 3 startup UI regression tests passed. `npx tsc -b`, oxlint for the changed code, the UI detector, and description and local-link checks for the 6 changed documents also passed. Full documentation validation failed due to the existing frontmatter error recorded above. Desktop and mobile toggle displays were checked in isolated views; no app build or application to the server was performed.
 
-## 검색창 오른쪽 닫기 버튼
+## Close button to the right of the search box
 
-파일 탐색기 닫기 X를 문서/파일 범위 행에서 검색창 오른쪽 바깥의 같은 줄로 옮겼다. 공용 `PanelCloseButton`을 재사용하며 검색어가 비어 있어도 항상 표시한다. 문서/파일 토글·검색 지우기·검색 옵션은 유지한다.
+Moved the file explorer close X from the document/file scope row to the same line, outside and to the right of the search box. It reuses the shared `PanelCloseButton` and is always displayed even when the search query is empty. The document/file toggle, clear search, and search options are preserved.
 
-검증: 통합 검색 UI 검사 1개 안의 파일/문서 × 데스크톱/모바일 4개 조합에서 빈 검색창의 X 표시·오른쪽 배치·수직 정렬·240px 패널 경계·닫기 콜백을 확인했다. `npx tsc -b`·변경 코드 oxlint(경고 포함)·UI detector와 변경 문서 3개의 description·로컬 링크 검사는 통과했다. 전체 문서 검사는 기존 frontmatter 오류로 실패했다. 앱 빌드·서버 반영은 하지 않았다.
+Validation: Within 1 unified-search UI test, checked the X display with an empty search box, right-side placement, vertical alignment, 240px panel boundaries, and close callback across 4 file/document × desktop/mobile combinations. `npx tsc -b`, oxlint for the changed code (with warnings), the UI detector, and description and local-link checks for the 3 changed documents passed. Full documentation validation failed due to the existing frontmatter error. No app build or application to the server was performed.

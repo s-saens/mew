@@ -1,92 +1,92 @@
 ---
-provenance: "Liiiiv 중앙 ADR 이관본, 2026-10-14"
-description: "이관한 결정 기록: mew 에이전트 창 재도입: ACP 프로토콜, 벤더 독립, 역할 게이트. 당시 선택·근거·후속 변경을 보존하며 현재 계약은 Mew 소유 문서에서 확인한다."
-title: "0034 — mew 에이전트 창 재도입: ACP 프로토콜, 벤더 독립, 역할 게이트"
+provenance: "Migrated copy of a Liiiiv central ADR, 2026-10-14"
+description: "Migrated decision record: reintroduce the mew agent panel: ACP protocol, vendor independence, role gates. Preserves the choices, rationale, and subsequent changes at the time; consult the Mew owning document for the current contract."
+title: "0034 — Reintroduce the mew agent panel: ACP protocol, vendor independence, role gates"
 created: 2026-08-04
 updated: 2026-09-11
 ---
 
-- 날짜: 2026-08-04
-- 상태: 채택
-- 후속 결정: [0150](0150-mew-account-feature-and-file-permissions.md) — 에이전트와 tmux의 고정 역할 게이트
-- 후속 결정: [0037](0037-mew-agent-bypass-permissions-default.md) — 권한 기본값
-- 후속 결정: [0043](0043-mew-agent-workspace-scope-and-runtimes.md) — 프로젝트 단위 파일 스코프
-- 후속 결정: [0048](0048-mew-agent-supervisor-process.md) — 서버와 에이전트 프로세스 수명 결합
-- 후속 결정: [0061](0061-mew-claude-acp-official-org-migration.md) — Claude ACP 패키지
-- 후속 결정: [0117](0117-mew-terminal-agent-tabs-for-claude-and-antigravity.md) — 모든 대화형 탭이 ACP라는 범위
-- 후속 결정: [0119](0119-mew-unified-terminal-agent-panel.md) — 터미널과 에이전트의 별도 패널
-- 후속 결정: [0123](0123-mew-codex-acp-uses-host-cli.md) — Codex 어댑터 내부 엔진
-- 결정자: 송상훈 (지시)
-- 대체: [ADR 0014](0014-mew-agent-panel-removal.md)의 "재추가·재조사 금지" (나머지는 유효)
+- Date: 2026-08-04
+- Status: Adopted
+- Follow-up decision: [0150](0150-mew-account-feature-and-file-permissions.md) — Fixed role gates for agents and tmux
+- Follow-up decision: [0037](0037-mew-agent-bypass-permissions-default.md) — Permission defaults
+- Follow-up decision: [0043](0043-mew-agent-workspace-scope-and-runtimes.md) — project-level file scope
+- Follow-up decision: [0048](0048-mew-agent-supervisor-process.md) — coupling server and agent process lifetimes
+- Follow-up decision: [0061](0061-mew-claude-acp-official-org-migration.md) — Claude ACP package
+- Follow-up decision: [0117](0117-mew-terminal-agent-tabs-for-claude-and-antigravity.md) — the scope in which all interactive tabs use ACP
+- Follow-up decision: [0119](0119-mew-unified-terminal-agent-panel.md) — separate panels for terminals and agents
+- Follow-up decision: [0123](0123-mew-codex-acp-uses-host-cli.md) — internal engine of the Codex adapter
+- Decision maker: Song Sanghoon (directive)
+- Supersedes: the prohibition on "reintroducing or reinvestigating" in [ADR 0014](0014-mew-agent-panel-removal.md) (the rest remains valid)
 
-## 배경
+## Background
 
-[ADR 0014](0014-mew-agent-panel-removal.md)가 2026-07-25에 mew의 에이전트 창을 전면 제거했다. 이유는 원인 불명의 버그였다 — 프로덕션 서버(`server/serve.ts`) 안에서 돌 때만 첫 메시지가 약 20초 스톨하고 클라이언트에 `Failed to fetch`가 났고, 같은 코드를 단독 실행하면 재현되지 않았다. 원인을 못 찾은 채 시간을 더 쓰지 않기로 하고 접었다.
+[ADR 0014](0014-mew-agent-panel-removal.md) completely removed mew's agent panel on 2026-07-25. The reason was a bug of unknown origin — only when running inside the production server (`server/serve.ts`), the first message stalled for about 20 seconds and the client reported `Failed to fetch`; running the same code standalone did not reproduce it. We stopped without finding the cause, deciding not to spend more time on it.
 
-지금 다시 여는 이유는 두 가지다.
+There are two reasons to reopen this now.
 
-1. 그때의 증상이 아키텍처의 결과였을 가능성이 높다. 제거된 `server/agent.ts`를 git에서 되살려 보면(`git show 7bebca2^:server/agent.ts`), 그 코드는 Claude Code를 CLI로, 블로킹·비스트리밍으로 불렀다:
+1. The symptoms at the time were likely a consequence of the architecture. Restoring the deleted `server/agent.ts` from git (`git show 7bebca2^:server/agent.ts`) shows that it invoked Claude Code through the CLI in a blocking, non-streaming manner:
 
 ```js
 const { stdout } = await exec(CLAUDE_BIN, ['-p', prompt, '--output-format', 'json', ...])
 ```
 
-`-p --output-format json`은 턴이 전부 끝날 때까지 단 한 바이트도 흘리지 않는다. 그동안 HTTP 연결은 중간자(프록시·express·브라우저) 입장에서 유휴 상태로 보인다. 단독 실행에서 재현되지 않은 것도 이 가설과 맞는다 — 단독 실행에는 그 중간자가 없다. 매 메시지마다 `--resume`으로 세션 전체를 다시 읽어들이는 것도 첫 턴이 유독 느렸던 것과 일관된다.
+`-p --output-format json` does not emit a single byte until the entire turn finishes. During that time, the HTTP connection appears idle to intermediaries (proxies, express, and the browser). The failure to reproduce it standalone also fits this hypothesis — those intermediaries are absent in standalone execution. Reloading the entire session with `--resume` for every message is also consistent with the first turn being particularly slow.
 
-이건 가설이지 확정된 원인이 아니다. 다만 "원인 불명"이 아니라 "스트리밍하지 않은 결과"라면 재도입은 같은 실패의 반복이 아니다. 스트리밍으로 짜면 애초에 그 조건이 성립하지 않는다.
+This is a hypothesis, not a confirmed cause. But if the issue was a consequence of not streaming rather than an unknown cause, reintroducing it does not repeat the same failure. A streaming implementation prevents that condition from arising in the first place.
 
-2. 요구가 달라졌다. 0014는 "터미널로 100% 대체된다"를 근거로 삼았다. 지금 원하는 것은 터미널이 아니라 채팅 UI다 — 대화 이력, 툴 승인 버튼, 프로젝트 스코프가 있는 창. tmux 터미널은 이걸 대체하지 못한다.
+2. The requirements have changed. 0014 relied on the premise that "the terminal replaces 100% of it." What we want now is a chat UI, not a terminal — a panel with conversation history, tool approval buttons, and project scope. A tmux terminal cannot replace this.
 
-## 선택지
+## Options
 
-프로토콜을 무엇으로 할 것인가가 실질적 갈림길이었다. 벤더 독립이 요구사항이다 — Claude 외에 Hermes·Gemini CLI·Codex·Kimi Code를 붙일 수 있어야 한다.
+The choice of protocol was the real fork in the road. Vendor independence is a requirement — we must be able to connect Hermes, Gemini CLI, Codex, and Kimi Code in addition to Claude.
 
-1. Claude SDK 직접 사용 — 가장 빠르고 기능을 100% 쓴다. 벤더 독립 요구를 못 채운다.
-2. 자체 어댑터 층 — 벤더별 공식 SDK 위에 얇은 정규화 층. 각 벤더 기능을 다 노출할 수 있다. 대신 벤더 스펙이 바뀔 때 조용히 깨지고, 세션 resume·취소처럼 벤더마다 근본적으로 다른 것들이 공통 층에 안 들어간다.
-3. 벤더별 완전 분리 — 배관까지 벤더마다 따로. 기능은 안 잘리지만 세션·WS·격리·역할 게이트가 벤더 수만큼 복제된다. 특히 보안·격리 정책이 여러 벌이 되면 그중 하나는 반드시 틀린다.
-4. ACP (Agent Client Protocol) — 에디터↔에이전트 표준, stdio JSON-RPC. 스트리밍·세션 로드·취소·권한 승인 요청이 프로토콜에 있다.
+1. Use the Claude SDK directly — fastest, with access to 100% of its features. Does not meet the vendor independence requirement.
+2. Custom adapter layer — a thin normalization layer over each vendor's official SDK. Can expose all vendor features. However, it breaks silently when vendor specifications change, and fundamental differences between vendors, such as session resume and cancellation, do not fit into a common layer.
+3. Fully separate implementations per vendor — even the plumbing is separate for each vendor. No features are lost, but sessions, WS, isolation, and role gates are duplicated for every vendor. In particular, with multiple copies of security and isolation policies, one is bound to be wrong.
+4. ACP (Agent Client Protocol) — an editor↔agent standard using stdio JSON-RPC. Streaming, session loading, cancellation, and permission approval requests are part of the protocol.
 
-## 결정
+## Decision
 
-4번(ACP)을 채택한다.
+Adopt option 4 (ACP).
 
-- mew의 에이전트 창은 ACP만 말한다. 벤더 전환은 spawn 대상 교체다.
-- 1단계 백엔드는 `@zed-industries/claude-code-acp` 하나. 버전을 핀으로 고정하고 `npx @latest`로 띄우지 않는다. 특정 패키지 선택은 [ADR 0061](0061-mew-claude-acp-official-org-migration.md)이 공식 후속 패키지로 대체했다.
-- 자체 어댑터 인터페이스를 정의하지 않는다. ACP가 인터페이스다. 구현 하나짜리 추상화를 만들지 않는다.
-- 에이전트는 child process로 spawn한다. `serve.ts` 요청 핸들러 안에서 돌리지 않는다. 이벤트는 WS로 스트리밍 릴레이한다.
-- 창은 터미널이 아니다. 기존 tmux 터미널은 그대로 남는다 — 대체가 아니라 추가다.
+- mew's agent panel speaks only ACP. Switching vendors means changing the spawn target.
+- Phase 1 has a single backend: `@zed-industries/claude-code-acp`. Pin the version; do not launch it with `npx @latest`. [ADR 0061](0061-mew-claude-acp-official-org-migration.md) superseded this specific package choice with its official successor package.
+- Do not define a custom adapter interface. ACP is the interface. Do not create an abstraction with only one implementation.
+- Spawn the agent as a child process. Do not run it inside a `serve.ts` request handler. Relay events as a stream over WS.
+- The panel is not a terminal. The existing tmux terminal remains — this is an addition, not a replacement.
 
-### 격리와 접근 권한 (단계별)
+### Isolation and access permissions (by phase)
 
-1단계에서 member에게 열지 않는다. 현재 `/tmux`·`/cmd-buttons`·`/system-stats`가 전부 `requireRole('owner','manager')`인데, 에이전트 창은 셸 실행 능력을 가지므로 더 낮은 게이트로 열면 그 경계를 우회하는 것이 된다.
+Do not grant members access in phase 1. Currently, `/tmux`, `/cmd-buttons`, and `/system-stats` all use `requireRole('owner','manager')`. Since the agent panel can execute shell commands, allowing access through a lower role gate would bypass that boundary.
 
-- 1단계 (지금): OS 격리 없음. `requireRole('owner','manager')`. 에이전트는 mew 서버와 같은 유닉스 사용자로 돈다.
-- 2단계 (미착수): 별도 유닉스 사용자 + `setfacl` 통과 권한. `/home/saens`가 `drwxr-x---`라 성립한다. 네트워크 유출·fork bomb·`/tmp`·world-readable 파일은 못 막는다.
-- 3단계 (미착수): 프로젝트당 도커 컨테이너 + egress 허용목록 프록시. member 개방은 여기 도달한 뒤에 판단한다.
+- Phase 1 (now): no OS isolation. `requireRole('owner','manager')`. The agent runs as the same Unix user as the mew server.
+- Phase 2 (not started): a separate Unix user + traversal permissions via `setfacl`. This works because `/home/saens` has permissions `drwxr-x---`. It cannot prevent network exfiltration, fork bombs, access to `/tmp`, or access to world-readable files.
+- Phase 3 (not started): a Docker container per project + an egress allowlist proxy. Decide whether to grant members access only after reaching this phase.
 
-### 지켜야 하는 불변식
+### Invariants to uphold
 
-- ~~`bypassPermissions`를 워크스페이스 루트에서 쓰지 않는다.~~ — [ADR 0037](0037-mew-agent-bypass-permissions-default.md)이 뒤집었다(2026-08-05). 승인 프롬프트는 owner/manager가 이미 가진 셸 권한을 다시 묻는 것뿐이었고, 컨테이너 격리로도 마운트한 프로젝트 자체는 못 지킨다는 판단이다. 지금 기본 모드는 `bypassPermissions`이고 게이트(`authorizeTmux`)가 유일한 통제다. 원래 근거는 [ops/mew/security-review-2026-07-21.md](../security-review-2026-07-21.md) §4.
-- ~~파일 도구는 프로젝트 폴더로 스코프한다. docs는 SSoT 규칙상 읽어야 하므로 읽기 전용으로만 추가한다.~~ — [ADR 0043](0043-mew-agent-workspace-scope-and-runtimes.md)이 뒤집었다(2026-08-10). 창 자체가 워크스페이스 스코프가 되어 파일 도구 경계도 워크스페이스다(프로젝트 사이는 막지 않는다). Bash는 경로 스코프가 되지 않는다 — 격리는 OS 층에서만 실질적이다.
-- `~/.claude/.credentials.json`을 member가 닿는 샌드박스에 마운트하지 않는다. 별도 API 키를 쓴다.
-- `/var/run/docker.sock`을 에이전트 컨테이너에 절대 마운트하지 않는다. 호스트 root와 같다.
-- push 자격증명(`~/.ssh`·gh 토큰)을 샌드박스에 넣지 않는다. 필요하면 레포별 deploy key.
-- ACP 핸드셰이크 + 한 턴(스트리밍·권한 승인 왕복)을 도는 계약 테스트 하나를 남긴다. 어댑터를 올릴 때 이게 먼저 터져야 한다.
+- ~~Do not use `bypassPermissions` at the workspace root.~~ — [ADR 0037](0037-mew-agent-bypass-permissions-default.md) reversed this (2026-08-05). The assessment was that approval prompts merely asked again about shell permissions owner/manager already had, and container isolation could not protect the mounted project itself. The current default mode is `bypassPermissions`, and the gate (`authorizeTmux`) is the only control. The original rationale is in [ops/mew/security-review-2026-07-21.md](../security-review-2026-07-21.md) §4.
+- ~~Scope file tools to the project folder. Add docs as read-only because SSoT rules require reading them.~~ — [ADR 0043](0043-mew-agent-workspace-scope-and-runtimes.md) reversed this (2026-08-10). The panel itself became workspace-scoped, so the file tool boundary is also the workspace (access between projects is not blocked). Bash cannot be path-scoped — isolation is effective only at the OS layer.
+- Do not mount `~/.claude/.credentials.json` in a sandbox accessible to members. Use a separate API key.
+- Never mount `/var/run/docker.sock` in an agent container. It is equivalent to host root access.
+- Do not put push credentials (`~/.ssh` or gh tokens) in the sandbox. Use per-repository deploy keys if needed.
+- Keep one contract test that runs an ACP handshake + one turn (streaming and a permission approval round trip). This test must fail first when an adapter upgrade breaks the contract.
 
-### 혼동 금지 — 함께 건드리면 안 되는 것
+### Do not confuse these — things that must not be changed together
 
-디스크→방 협업 브리지는 이 결정과 무관한 별개 경로다. AI가 터미널에서 고친 `.md`가 열린 Yjs 방에 `agent` 커서로 주입되는 동작으로, 0014가 지운 에이전트 창과도 이번에 만들 창과도 다르다. 0014의 이 경고는 그대로 유효하다.
+The disk→room collaboration bridge is a separate path unrelated to this decision. It injects `.md` files edited by AI in the terminal into an open Yjs room with an `agent` cursor. It is distinct from both the agent panel removed by 0014 and the panel being built now. This warning in 0014 remains valid.
 
-## 근거
+## Rationale
 
-- 0014의 "재조사 금지"는 원인 불명을 전제로 했다. 그 전제가 흔들렸다 — 블로킹 CLI 호출이라는 구조적 설명이 증상 세 가지(서버 안에서만 발생, 첫 메시지, 약 20초)를 모두 덮는다. 다른 아키텍처로 다시 짜는 것은 같은 벽에 다시 부딪히는 것이 아니다.
-- ACP를 고른 이유는 표준이라서가 아니라 어려운 부분이 표준에 있어서다. 벤더마다 제일 안 맞는 것이 세션 resume·취소·툴 승인인데, 자체 어댑터로는 이 셋이 공통 층에 안 들어간다. ACP는 이걸 프로토콜 레벨에서 다룬다. 기능 편차가 사라지지는 않지만 `initialize`의 capability 선언으로 조용한 실패가 아니라 미리 아는 제약이 된다.
-- 어댑터가 벤더 소유가 아니다. `@zed-industries/claude-code-acp`는 Anthropic이 아니라 Zed 쪽 오픈소스 패키지이고, Gemini의 ACP 모드도 오픈소스 CLI 안에 있다. 어댑터 층에 구멍이 있으면 벤더 허락 없이 포크·PR로 메꿀 수 있다. 벤더가 진짜 막는 경우는 밑단 CLI/SDK가 그 기능 자체를 안 내놓을 때뿐이다.
-- 벤더별 완전 분리를 안 고른 이유: 벤더 고유 코드는 전체의 소수이고 나머지는 세션·WS·역할 게이트·격리 spawn 같은 배관이다. 배관이 벤더 수만큼 복제되면 UX가 창마다 갈라지고(코드 리뷰에서 안 보인다), 무엇보다 격리·자격증명 정책이 여러 벌이 된다. 보안 정책은 단일 출처여야 한다.
+- The prohibition on "reinvestigation" in 0014 assumed an unknown cause. That premise has weakened — the structural explanation of blocking CLI calls covers all three symptoms (occurring only inside the server, on the first message, for about 20 seconds). Rebuilding with a different architecture does not mean hitting the same wall again.
+- ACP was chosen because the hard parts are in the standard, not simply because it is a standard. Session resume, cancellation, and tool approval differ the most across vendors, and a custom adapter cannot fit these three into a common layer. ACP handles them at the protocol level. Feature differences remain, but capability declarations in `initialize` turn them into known constraints rather than silent failures.
+- The adapters are not vendor-owned. `@zed-industries/claude-code-acp` is an open-source package from Zed, not Anthropic, and Gemini's ACP mode is also in its open-source CLI. Gaps in the adapter layer can be filled through forks or PRs without vendor permission. A vendor truly blocks a feature only when the underlying CLI/SDK does not expose it at all.
+- Why fully separate implementations per vendor were rejected: vendor-specific code is a small fraction of the whole; the rest is plumbing such as sessions, WS, role gates, and isolated spawning. Duplicating that plumbing for each vendor fragments the UX across panels (which is not apparent in code review) and, above all, creates multiple copies of isolation and credential policies. Security policies must have a single source.
 
-## 결과
+## Results
 
-- ACP 스펙과 어댑터는 아직 어리다. 메서드 시그니처는 구현 직전에 실물로 확인한다 — 기억이나 문서 캐시로 쓰지 않는다.
-- 벤더는 1단계에서 하나뿐이다. 두 번째(Gemini CLI 등)를 붙이기 전까지 "벤더 독립"은 검증되지 않은 상태다.
-- 20초 스톨의 원인은 가설로 남는다. 스트리밍 구조에서 재현되지 않는 것으로 확인을 갈음하고, 만약 재현되면 그때 이 ADR의 전제가 틀린 것이므로 다시 기록한다.
-- member 개방은 이 ADR이 승인하지 않는다. 3단계 격리 없이 열려면 별도 결정이 필요하다.
+- The ACP specification and adapters are still young. Verify actual method signatures immediately before implementation — do not code from memory or cached documentation.
+- There is only one vendor in phase 1. Until a second one (such as Gemini CLI) is connected, "vendor independence" remains unverified.
+- The cause of the 20-second stall remains a hypothesis. Treat the absence of reproduction under the streaming architecture as confirmation; if it does recur, record it again, since that would invalidate this ADR's premise.
+- This ADR does not authorize member access. Granting access without phase 3 isolation requires a separate decision.

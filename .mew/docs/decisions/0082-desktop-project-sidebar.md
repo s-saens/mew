@@ -1,36 +1,36 @@
 ---
-title: "0082 — 데스크톱 프로젝트 사이드바"
-description: "데스크톱 프로젝트 선택을 파일 탐색기 왼쪽의 독립 패널로 바꾸고 프로젝트별 명령 버튼을 제공하는 결정. 모바일 드롭다운·기존 목록 정렬을 유지하며 명령 요청의 프로젝트 고정과 루트 세션 격리, 이전 실행 세션의 이행 제한을 정한다."
+title: "0082 — Desktop project sidebar"
+description: "The decision to move desktop project selection into an independent panel to the left of the file explorer and provide command buttons for each project. Retains the mobile dropdown and existing list sorting, and defines project binding for command requests, root session isolation, and migration limitations for previously running sessions."
 created: "2026-10-28"
 updated: "2026-10-28"
 ---
 
-- 상태: 채택
-- 부분 대체: [0019 — 헤더 프로젝트 선택기](0019-project-selector.md)의 데스크톱 드롭다운. 모바일 드롭다운·프로젝트 경로 목록·계정별 전환 및 복원은 유지한다.
+- Status: Adopted
+- Partially replaces the desktop dropdown in [0019 — Header project selector](0019-project-selector.md). Retains the mobile dropdown, project path list, and per-account switching and restoration.
 
-## 배경
+## Background
 
-프로젝트를 오가며 명령을 실행할 때 드롭다운이 닫혀 목록을 반복해서 열어야 했다. 사용자는 기존 헤더 표시를 접힌 상태로 유지하면서, 데스크톱에서는 프로젝트 목록을 파일 탐색기보다 왼쪽의 패널로 열고 각 프로젝트의 명령 버튼도 함께 쓰기를 요청했다.
+When switching between projects to run commands, the dropdown closed, requiring the list to be reopened repeatedly. The user requested keeping the existing header display collapsed while opening the project list in a panel to the left of the file explorer on desktop, with command buttons for each project.
 
-## 결정
+## Decision
 
-768px 이상에서 헤더의 프로젝트 선택기는 독립적인 **프로젝트 사이드바**를 열고 닫는다. 사이드바는 파일 탐색기의 왼쪽에 고정하며 작업 영역을 나눠 쓴다. 파일 탐색기와 별도로 열고 폭을 조절하며 열림 상태·폭을 브라우저의 계정별 설정으로 보존한다. 프로젝트를 선택하거나 다른 영역을 눌러도 열림 상태를 유지한다. 닫기 버튼·헤더 선택기로 닫으며 Esc·뒤로가기 스택에 패널 자체를 등록하지 않는다. 모바일에서는 기존 드롭다운을 사용한다.
+At widths of 768px or more, the project selector in the header opens and closes a separate **project sidebar**. The sidebar is fixed to the left of the file explorer and shares the workspace width. It opens independently of the file explorer, is resizable, and preserves its open state and width in per-account browser settings. It stays open when a project is selected or another area is clicked. Close it with the close button or header selector; the panel itself is not registered in the Esc or back-navigation stack. Mobile uses the existing dropdown.
 
-기존 아이콘·핸들·오른쪽 단축키 번호·행 전체 활성 강조와 재정렬·우클릭 편집·삭제를 공유한다. 각 행의 ▶는 그 프로젝트의 명령 목록을 연다. 사이드바가 열려 있으면 헤더의 중복 명령 버튼은 숨기며 Alt+R·Ctrl+E는 현재 프로젝트 행의 명령 버튼을 연다. Alt+P는 사이드바를 열고 첫 항목으로 포커스를 옮긴다. 일반 작업 패널 최대화 중에는 그 확대를 해제한 뒤 표시한다.
+It shares the existing icons, handles, shortcut numbers on the right, full-row active highlighting, reordering, and right-click editing and deletion. The ▶ on each row opens that project's command list. While the sidebar is open, the duplicate command button in the header is hidden, and Alt+R and Ctrl+E open the command button on the current project's row. Alt+P opens the sidebar and moves focus to the first item. If a regular work panel is maximized, it is restored before the sidebar is shown.
 
-비활성 프로젝트의 명령 목록·편집·실행·상태 조회는 선택적 `workspacePath`에 요청 대상을 고정한다. 현재 계정의 활성 프로젝트를 전환하지 않으며, 서버는 대상 경로와 기존 기능·프로젝트 접근 권한을 다시 확인한다. 루트 프로젝트 명령의 세션 식별자에는 실제 프로젝트 폴더 경로를 포함해 서로 다른 루트의 같은 이름 명령이 충돌하지 않게 한다. 하위 디렉터리 명령도 같은 실제 폴더 기준으로 식별한다.
+Command listing, editing, execution, and status queries for inactive projects pin the request target using the optional `workspacePath`. They do not switch the current account's active project, and the server rechecks the target path and existing feature and project access permissions. Session identifiers for root project commands include the actual project folder path to prevent commands with the same name in different roots from colliding. Subdirectory commands are also identified by their actual folder.
 
-## 대안과 근거
+## Alternatives and Rationale
 
-- 드롭다운 유지는 공간을 적게 쓰지만 프로젝트 목록과 명령 버튼을 계속 표시할 수 없다.
-- 떠 있는 목록은 파일 탐색기·작업 본문을 가린다. 고정 패널은 두 탐색 영역을 나란히 사용하고 각각 접을 수 있다.
-- 도킹 트리에 프로젝트 목록을 넣으면 사용자가 다른 위치로 옮길 수 있다. 파일 탐색기 왼쪽이라는 위치와 모바일 드롭다운을 유지하기 위해 별도 고정 칸으로 둔다.
-- 명령을 누를 때 프로젝트를 먼저 전환하면 현재 문서·배치도 바뀐다. 요청별 대상 고정은 작업 화면을 유지한 채 해당 프로젝트 명령을 실행한다.
+- Keeping the dropdown uses less space but cannot keep the project list and command buttons visible.
+- A floating list obscures the file explorer and work content. A fixed panel lets both navigation areas sit side by side and collapse independently.
+- Putting the project list in the docking tree would let users move it elsewhere. It remains in a separate fixed area to preserve its position to the left of the file explorer and the mobile dropdown.
+- Switching projects before running a command would also change the current document and layout. Pinning the target per request runs that project's command while preserving the work view.
 
-## 영향과 제한
+## Impact and limitations
 
-프로젝트 사이드바는 데스크톱 작업 폭을 사용하며 닫으면 기존 헤더의 아이콘·이름·명령 버튼으로 돌아간다. 패널 최대화 중에는 다른 보조 패널처럼 숨기고 복귀 시 열림 상태·폭을 되살린다. 프로젝트 목록·순서·아이콘·활성 루트의 기존 저장 계약은 바꾸지 않는다.
+The project sidebar uses desktop workspace width; closing it restores the existing header icon, name, and command button. It is hidden while a panel is maximized, like other auxiliary panels, and its open state and width are restored afterward. The existing storage contracts for the project list, order, icons, and active root remain unchanged.
 
-이전 식별자로 이미 실행 중인 루트 명령 세션은 자동 종료하지 않는다. 새 메뉴에서는 그 세션의 실행 상태를 이어서 표시하지 않으므로 기존 터미널에서 출력을 확인하고 종료할 수 있다. 새 실행부터 폴더별 식별자를 사용한다.
+Root command sessions already running under previous identifiers are not terminated automatically. The new menu does not continue displaying their running status, so users can check output and terminate them in the existing terminal. Folder-specific identifiers are used starting with new executions.
 
-현재 동작은 [프로젝트 기능](../features/%ED%94%84%EB%A1%9C%EC%A0%9D%ED%8A%B8%C2%B7%ED%8C%8C%EC%9D%BC%C2%B7%EA%B2%80%EC%83%89/%ED%94%84%EB%A1%9C%EC%A0%9D%ED%8A%B8%20%EC%97%B4%EA%B8%B0%C2%B7%ED%83%AD%C2%B7%EA%B7%B8%EB%A3%B9.md), [명령 버튼](../features/%ED%84%B0%EB%AF%B8%EB%84%90%C2%B7%EC%97%90%EC%9D%B4%EC%A0%84%ED%8A%B8%C2%B7%EC%9E%90%EB%8F%99%ED%99%94/%ED%94%84%EB%A1%9C%EC%A0%9D%ED%8A%B8%20%EB%AA%85%EB%A0%B9%20%EB%B2%84%ED%8A%BC.md), [공용 UI 계약](../development/ui-contracts.md#헤더-프로젝트-선택기)을 따른다. 검증·운영 적용 범위는 [작업 기록](../work/desktop-project-sidebar.md)에 남긴다.
+Current behavior follows [Project features](../features/projects-files-search/opening-projects-tabs-and-groups.md), [Command button](../features/terminals-agents-automation/project-command-buttons.md), and [Shared UI contract](../development/ui-contracts.md#header-project-switcher). Validation and production application scope are recorded in the [Work record](../work/desktop-project-sidebar.md).

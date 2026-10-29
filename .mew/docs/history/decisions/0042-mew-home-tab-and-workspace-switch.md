@@ -1,84 +1,84 @@
 ---
-provenance: "Liiiiv 중앙 ADR 이관본, 2026-10-14"
-description: "이관한 결정 기록: mew 홈 탭: 워크스페이스 스코프 화면(위젯·할 일·달력)과 런타임 워크스페이스 전환. 당시 선택·근거·후속 변경을 보존하며 현재 계약은 Mew 소유 문서에서 확인한다."
-title: "0042 — mew 홈 탭: 워크스페이스 스코프 화면(위젯·할 일·달력)과 런타임 워크스페이스 전환"
+provenance: "Migrated copy of a Liiiiv central ADR, 2026-10-14"
+description: "Migrated decision record: mew Home tab: a workspace-scoped screen (widgets, to-dos, calendar) and runtime workspace switching. Preserves the choices, rationale, and subsequent changes from that time; see the Mew owning document for the current contract."
+title: "0042 — mew Home tab: a workspace-scoped screen (widgets, to-dos, calendar) and runtime workspace switching"
 created: 2026-08-10
 updated: 2026-09-11
 ---
 
-- 날짜: 2026-08-10
-- 상태: 채택
-- 후속 결정: [0056](0056-mew-user-owned-home-todos.md) — 파일 표식 기반 할 일 원장
-- 후속 결정: [0081](0081-mew-root-project-tabs-and-git-subprojects.md) — 고정 홈 탭·워크스페이스 전환 진입점
-- 결정자: 송상훈 (지시)
+- Date: 2026-08-10
+- Status: Adopted
+- Subsequent decision: [0056](0056-mew-user-owned-home-todos.md) — To-do ledger based on file markers
+- Subsequent decision: [0081](0081-mew-root-project-tabs-and-git-subprojects.md) — Fixed Home tab and workspace switching entry point
+- Decision maker: Song Sanghoon (directive)
 
-## 배경
+## Background
 
-mew의 모든 화면은 프로젝트 하나를 본다. 트리·검색·탭·터미널·에이전트가 전부 활성 프로젝트에 매여 있고,
-docs도 ADR 0041로 특별 레포가 됐지만 여전히 "폴더 하나를 여는 화면"이다.
+Every screen in mew views a single project. The tree, search, tabs, terminal, and agent are all tied to the active project;
+although ADR 0041 made docs a special repo, it is still "a screen that opens one folder."
 
-그런데 워크스페이스 전체에 걸리는 일이 있다 — 어느 레포에 할 일이 몇 개 남았는지, 이번 주에 기한이 걸린
-것이 무엇인지. 프로젝트 화면에는 둘 자리가 없다. 또 워크스페이스 자체를 바꾸려면 지금은 `./mew setup`으로
-설정 파일을 고치고 프로세스를 다시 띄워야 한다 — 폰에서 접속해 쓰는 방식(원격 개발)에서는 사실상 불가능하다.
+But some work spans the entire workspace — how many tasks remain in each repo, or what is due this week. There is no
+place for this on a project screen. Also, switching the workspace itself currently requires editing the configuration file
+with `./mew setup` and restarting the process — effectively impossible when connecting from a phone (remote development).
 
-## 결정
+## Decision
 
-탭 줄 맨 왼쪽(docs 탭보다 앞)에 홈 탭을 둔다. 홈은 프로젝트가 아니라 워크스페이스 스코프 화면이고,
-워크스페이스 자체를 여기서 갈아끼운다.
+Place a Home tab at the far left of the tab row (before the docs tab). Home is a workspace-scoped screen rather than a project, and this
+is where the workspace itself is switched.
 
-### 1. 홈 화면은 위젯 등록표로 조립한다
+### 1. Assemble the home screen from a widget registry
 
-- 화면 구성은 `src/components/home/widgets.tsx`의 정적 등록표 하나 — 위젯은 `{ id, title, render(ctx) }`
-- 사용자가 켜고 끄고 순서를 바꾸는 것은 브라우저(localStorage `mew:home-widgets`)에 남는다. 서버는 모른다
-- 플러그인 런타임(코드 주입·원격 위젯 로딩)은 만들지 않는다. 넣고 빼고 배치하는 조작감은 등록표 + 배치
-  저장으로 전부 나오고, 코드 주입은 owner 권한을 셸과 같은 등급으로 넓히는 일이라 값이 다르다.
-  위젯을 늘리려면 등록표에 항목을 더한다
+- The screen is configured through a single static registry in `src/components/home/widgets.tsx` — each widget is `{ id, title, render(ctx) }`
+- Users' enabled/disabled settings and ordering stay in the browser (localStorage `mew:home-widgets`). The server has no knowledge of them
+- Do not build a plugin runtime (code injection or remote widget loading). A registry plus saved layouts provides the full experience of adding,
+  removing, and arranging widgets, while code injection expands owner privileges to shell-level access and carries a different cost.
+  To add widgets, add entries to the registry
 
-### 2. 할 일 원장은 파일 안의 표식 자체다
+### 2. The task ledger is the markers in the files themselves
 
-- 워크스페이스 전체를 훑어 `[TODO:라벨]`·`[DONE:라벨]` 표식을 모은다(`server/todos.ts`). 항목 하나 =
-  프로젝트·경로·줄 번호·라벨·완료 여부·기한
-- 기한은 표식 안에 붙인다 — `[TODO:라벨 @2026-08-20]`. 곁다리 저장소를 두지 않는다: 파일이 옮겨지거나
-  줄이 밀려도 원장이 낡지 않는다. 표식이 곧 원장이다
-- 체크하면 서버가 그 파일의 표식을 `DONE`으로 바꿔 되쓴다. 되쓸 때 `noteAppWrite`를 부르지 않는다 —
-  외부 변경으로 취급되어야 열려 있는 협업 방에 그대로 주입된다(디스크→방 브리지, ADR 0035)
-- 어느 표식을 고칠지는 줄 번호가 아니라 라벨로 찾는다. 목록이 낡았으면 조용히 엉뚱한 줄을 고치는 대신
-  실패한다(클라이언트는 목록을 다시 받는다)
-- 백틱으로 감싼 표식(`` `[TODO:…]` ``)은 형식을 설명하는 예시로 보고 건너뛴다 — 문서가 자기 목록을 채우지 않게
-- 달력 위젯은 기한이 잡힌 항목만 날짜 칸에 놓는다. 날짜는 전부 `YYYY-MM-DD` 문자열로 비교한다
-- 훑기는 점으로 시작하는 디렉터리와 빌드 산출물 폴더(`build`·`.dart_tool`·`target` 등)를 건너뛴다.
-  이 제외 없이는 실제 워크스페이스에서 4초가 걸렸다(제외 후 0.1초)
-- `GET/POST /api/todos`는 로그인 사용자 전용(게스트 차단) — 응답에 모든 프로젝트의 파일 경로가 실린다
+- Scan the entire workspace for `[TODO:라벨]` and `[DONE:라벨]` markers (`server/todos.ts`). One item = project, path, line number, label,
+  completion status, and due date
+- Put the due date inside the marker — `[TODO:라벨 @2026-08-20]`. Do not keep a separate store: the ledger stays current even when files move
+  or line numbers shift. The markers are the ledger
+- Checking an item makes the server change the marker in that file to `DONE` and write it back. Do not call `noteAppWrite` when writing it back — it must be
+  treated as an external change to be injected directly into open collaboration rooms (disk-to-room bridge, ADR 0035)
+- Find the marker to edit by label, not line number. If the list is stale, fail instead of silently editing the wrong
+  line (the client fetches the list again)
+- Treat backtick-wrapped markers (`` `[TODO:…]` ``) as format examples and skip them — so documentation does not populate its own list
+- The calendar widget places only items with due dates in date cells. Compare all dates as `YYYY-MM-DD` strings
+- The scan skips directories starting with a dot and build output folders (`build`, `.dart_tool`, `target`, etc.). Without these exclusions, it took
+  4 seconds on the actual workspace (0.1 seconds with exclusions)
+- `GET/POST /api/todos` is restricted to logged-in users (guests blocked) — the response includes file paths from all projects
 
-### 3. 워크스페이스 전환은 프로세스를 다시 띄우지 않는다
+### 3. Switching workspaces does not restart the process
 
-- 홈 탭을 우클릭(모바일에선 꾹) 하면 폴더 브라우저가 열린다(owner 전용). 네이티브 대화상자가 아니라
-  서버가 목록을 내려주는 컴포넌트(`GET /api/fs/dirs`, ADR 0041과 같은 통로)
-- 고른 폴더의 하위 폴더 목록이 곧 프로젝트 목록이다. 확인 화면에서 그대로 보여주고 승인받는다
-- `POST /api/workspace`(owner 전용)가 `paths.ts`의 `WORKSPACE_ROOT`·`MEW_DIR`·`DOCS_ROOT`를 갈아끼운다.
-  세 값은 `const`가 아니라 `let` — ESM 라이브 바인딩이라 요청 때마다 경로를 푸는 쪽은 전부 자동으로 새 폴더를 본다
-- 옛 폴더에 매인 것은 손으로 접는다: 트리 감시자(`resetTreeWatchers`)와 열린 협업 방 전부(`closeAllRooms`).
-  방 키는 `프로젝트:경로`뿐이라 그냥 두면 옛 내용을 든 방이 새 워크스페이스의 동명 파일을 덮어쓴다
-- 모든 클라이언트에 presence로 `{type:'workspace'}`를 보내 페이지를 다시 띄우게 한다. 기억해 둔 활성
-  프로젝트(`mew:project`)는 버린다 — 남의 폴더 이름이다
-- 다음 실행에도 유지되도록 설정 파일(`~/.config/mew/config.env`)의 `MEW_WORKSPACE`를 갱신한다. 뒤에 오는
-  설정 파일(레포 `.env`)이 앞을 덮는 구조라, 거기 남은 `MEW_WORKSPACE`는 지운다
-- 라이브 바인딩이 닿지 않는 곳은 모듈 초기화 때 경로를 복사해 둔 곳뿐이다. 지금은 tmux 매니저의 `cwd`
-  하나이며 전환 시 같이 고친다(`tmuxManager.cwd`). 새로 그런 코드를 만들지 말 것
+- Right-clicking the Home tab (long-pressing on mobile) opens a folder browser (owner only). It is a component populated
+  with server-provided listings, not a native dialog (`GET /api/fs/dirs`, the same channel as ADR 0041)
+- The selected folder's subfolder list is the project list. Show it as-is on the confirmation screen and obtain approval
+- `POST /api/workspace` (owner only) replaces `WORKSPACE_ROOT`, `MEW_DIR`, and `DOCS_ROOT` in `paths.ts`. These three values use `let` rather than `const` — as ESM
+  live bindings, they automatically point all code that resolves paths per request to the new folder
+- Explicitly shut down anything tied to the old folder: tree watchers (`resetTreeWatchers`) and all open collaboration rooms (`closeAllRooms`). Room keys contain only `프로젝트:경로`, so leaving
+  them open would let rooms holding old content overwrite files with the same names in the new workspace
+- Send `{type:'workspace'}` to all clients through presence so they reload the page. Discard the remembered active project
+  (`mew:project`) — it is a folder name from another workspace
+- Update `MEW_WORKSPACE` in the configuration file (`~/.config/mew/config.env`) so the change persists across runs. Since later configuration files
+  (the repo's `.env`) override earlier ones, remove any remaining `MEW_WORKSPACE` there
+- The only places live bindings do not reach are those that copied paths during module initialization. Currently, the tmux manager's `cwd`
+  is the only one, and it is updated during switching as well (`tmuxManager.cwd`). Do not introduce more code like this
 
-## 근거
+## Rationale
 
-- 프로젝트 화면에 워크스페이스 스코프 정보를 끼워 넣으면 "지금 보는 폴더"의 뜻이 흐려진다. 탭을 하나 더 두는
-  쪽이 화면의 스코프 규칙을 그대로 지킨다
-- 할 일을 별도 DB에 넣으면 코드와 갈라진다. 표식 자체를 원장으로 삼으면 브랜치를 옮기든 파일을 옮기든
-  진실은 언제나 파일 안에 있고, mew는 그것을 보여주고 되쓰기만 한다
-- 전환에 재시작을 요구하면 원격(폰)에서는 못 쓴다. 라이브 바인딩 전환은 코드가 적고(경로 세 개 + 정리 세 줄),
-  못 따라오는 곳이 하나(tmux cwd)뿐이라 값이 싸다
+- Inserting workspace-scoped information into a project screen blurs the meaning of "the folder currently being viewed." Adding another
+  tab preserves the screen scope rules
+- Putting tasks in a separate DB separates them from the code. Using the markers themselves as the ledger keeps the truth in the files,
+  whether switching branches or moving files; mew only displays and writes them back
+- Requiring a restart to switch makes it unusable remotely (from a phone). Switching through live bindings requires little code (three paths + three cleanup lines), and
+  only one place cannot follow automatically (tmux cwd), so the cost is low
 
-## 결과
+## Results
 
-- 이미 떠 있는 tmux 세션은 옛 폴더에 그대로 남는다(tmux 서버가 들고 있다). 새 세션부터 새 폴더에서 열린다 —
-  전환 확인 화면에 이 사실을 적어 둔다
-- 워크스페이스마다 `.mew/docs`가 하나씩 생긴다(없으면 빈 폴더로) — 워크스페이스를 바꾸면 docs도 바뀐다.
-  ADR 0041의 "docs는 워크스페이스에 하나뿐"이 그대로 적용된 결과다
-- 옛 워크스페이스의 탭 상태(`mew:tabs:*`)는 브라우저에 남지만, 그 이름의 프로젝트가 없으면 열리지 않아 무해하다
+- Existing tmux sessions stay in the old folder (the tmux server retains it). New sessions open in the new folder — state this
+  on the switch confirmation screen
+- Each workspace gets its own `.mew/docs` (an empty folder if absent) — switching workspaces also switches docs. This directly
+  follows ADR 0041's rule that "there is only one docs per workspace"
+- The old workspace's tab state (`mew:tabs:*`) remains in the browser, but it is harmless because tabs do not open if no project with that name exists

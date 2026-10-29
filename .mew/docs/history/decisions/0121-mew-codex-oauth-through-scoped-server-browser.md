@@ -1,68 +1,68 @@
 ---
-provenance: "Liiiiv 중앙 ADR 이관본, 2026-10-14"
-description: "이관한 결정 기록: Codex OAuth는 제한된 서버 브라우저로 loopback callback까지 이어준다. 당시 선택·근거·후속 변경을 보존하며 현재 계약은 Mew 소유 문서에서 확인한다."
-title: "0121 — Codex OAuth는 제한된 서버 브라우저로 loopback callback까지 이어준다"
+provenance: "Migrated copy of a Liiiiv central ADR, 2026-10-14"
+description: "Migrated decision record: Codex OAuth proceeds through the loopback callback using a restricted server browser. Preserves the choices, rationale, and subsequent changes at the time; see the Mew owning document for the current contract."
+title: "0121 — Codex OAuth proceeds through the loopback callback using a restricted server browser"
 created: 2026-09-07
 updated: 2026-09-11
 ---
 
-- 날짜: 2026-09-07
-- 상태: 채택
-- 후속 결정: [0126](0126-mew-codex-auth-dom-remoting-pilot.md) — fetch·재작성·iframe 인증
-- 후속 결정: [0128](0128-mew-browser-oauth-uses-internal-browser.md) — Codex 전용 호스트 제한 임시 문맥; 공식 codex login은 유지
-- 부분 대체: [0109](0109-mew-agent-authentication-and-loopback-browser.md) — Codex 로그인을 device-code와 접속 기기의 외부 브라우저에 고정한 범위
-- 부분 대체: [0110](0110-mew-declarative-agent-authentication-jobs.md) — Codex의 `codex login --device-auth` 실행 계약
-- 부분 대체: [0116](0116-mew-oauth-agent-logins-use-external-browser.md) — Codex OAuth를 접속 기기의 top-level 브라우저로 여는 범위
-- 결정자: 송상훈 (지시·실기기 검증), Codex (설계·구현)
+- Date: 2026-09-07
+- Status: Adopted
+- Follow-up decision: [0126](0126-mew-codex-auth-dom-remoting-pilot.md) — Authentication through fetch, rewriting, and an iframe
+- Follow-up decision: [0128](0128-mew-browser-oauth-uses-internal-browser.md) — Temporary context restricted to Codex-specific hosts; retain official codex login
+- Partially supersedes: [0109](0109-mew-agent-authentication-and-loopback-browser.md) — The provision restricting Codex login to device-code and the connecting device's external browser
+- Partially supersedes: [0110](0110-mew-declarative-agent-authentication-jobs.md) — Codex's `codex login --device-auth` execution contract
+- Partially supersedes: [0116](0116-mew-oauth-agent-logins-use-external-browser.md) — The provision opening Codex OAuth in the connecting device's top-level browser
+- Decision makers: Song Sang-hoon (direction and physical-device verification), Codex (design and implementation)
 
-## 배경
+## Background
 
-Mew 서버에서 실행한 기본 `codex login`은 브라우저 OAuth 주소를 출력하고
-`localhost` callback listener를 연다. 원격 휴대폰의 일반 브라우저에서 승인하면 callback이
-휴대폰 localhost로 가서 실패하지만, 그 callback URL을 Mew 내장 브라우저에 넣으면 서버
-loopback으로 전달돼 로그인이 완료됨을 실기기에서 확인했다. 기존 device-code 흐름은
-추가 설정·코드 입력을 요구해 일반 OAuth보다 번거롭다.
+The default `codex login` run on the Mew server prints a browser OAuth URL and opens a `localhost` callback
+listener. Approving in a regular browser on a remote phone fails because the callback goes to the phone's localhost, but testing
+on a physical device confirmed that entering the callback URL in Mew's built-in browser forwards it to the
+server loopback and completes login. The existing device-code flow requires additional configuration and
+code entry, making it more cumbersome than regular OAuth.
 
-공식 OpenAI 문서도 Codex CLI의 기본 로그인을 `codex login` 후 브라우저 흐름을 완료하는
-것으로 정의한다. 다만 기존 Mew 브라우저는 SSRF 경계 때문에 loopback만 허용하므로,
-일반 브라우저 탭을 범용 외부 프록시로 풀어서는 안 된다.
+Official OpenAI documentation also defines the default Codex CLI login as running `codex login` and then completing the browser flow. However,
+the existing Mew browser allows only loopback destinations because of its SSRF boundary, so regular browser
+tabs must not be opened up as general-purpose external proxies.
 
-## 선택지
+## Options
 
-1. Codex device-code를 유지한다 — 안전하지만 사용자가 확인한 간단한 기본 OAuth를 쓰지 못한다.
-2. 내장 브라우저의 모든 외부 주소를 허용한다 — 흐름은 간단하지만 manager·owner 셸 권한 밖에
-   범용 SSRF·credential proxy 표면을 만든다.
-3. 등록된 Codex 로그인 작업이 발급한 URL만 서버 브라우저 세션으로 열고, 인증 호스트와
-   loopback으로 대상을 한정한다.
+1. Keep Codex device-code — safe, but prevents use of the simple default OAuth flow verified by the user.
+2. Allow all external addresses in the built-in browser — the flow is simple, but it creates a general-purpose SSRF and credential
+   proxy surface outside manager and owner shell permissions.
+3. Open only URLs issued by registered Codex login tasks in server browser sessions, limiting destinations
+   to authentication hosts and loopback.
 
-## 결정
+## Decision
 
-3번을 채택한다.
+Adopt option 3.
 
-- Codex 등록 로그인 명령은 `codex login`이다. `--device-auth`를 넘기지 않아 공식 기본
-  브라우저 OAuth를 쓴다.
-- 브라우저형 인증 작업의 pane에서 등록표 allowlist를 통과한 URL을 찾은 뒤, 서버가
-  계정·인증 작업에 묶인 짧은 브라우저 capability URL을 발급한다.
-- 해당 브라우저 세션은 등록표의 HTTPS 인증 호스트와 `localhost`·127/8·`::1`만 요청한다.
-  서명 URL을 변조해 다른 origin을 지정해도 서버의 세션 allowlist가 차단한다.
-- 로그인 페이지는 에이전트 인증 화면 안의 일회성 내장 브라우저로 연다. 외부 주소를
-  일반 Browser 패널 탭·localStorage에 보존하지 않는다.
-- OAuth가 loopback callback을 호출하면 같은 서버 브라우저 세션이 Codex CLI의 로컬
-  listener로 요청한다. CLI가 0으로 종료하면 인증 브라우저를 내리고 같은 탭의 ACP
-  인증을 재시도해 채팅 화면으로 복귀한다.
-- 범용 Browser 패널은 기존처럼 loopback 전용이다. 다른 런타임은 별도 검증·등록 없이
-  이 경로를 사용하지 않는다.
+- The registered Codex login command is `codex login`. It uses the official default browser OAuth flow without
+  passing `--device-auth`.
+- After finding a URL in the browser-based authentication task's pane that passes the registry allowlist, the server
+  issues a short browser capability URL tied to the account and authentication task.
+- That browser session requests only the registry's HTTPS authentication hosts and `localhost`, 127/8, and `::1`. Even if
+  a signed URL is tampered with to specify another origin, the server's session allowlist blocks it.
+- The login page opens in a one-time built-in browser within the agent authentication screen. External
+  addresses are not persisted in regular Browser panel tabs or localStorage.
+- When OAuth invokes the loopback callback, the same server browser session sends the request to the Codex CLI's local listener.
+  When the CLI exits with 0, Mew closes the authentication browser and retries ACP authentication in
+  the same tab to return to the chat screen.
+- The general-purpose Browser panel remains loopback-only. Other runtimes do not use this path without separate verification
+  and registration.
 
-## 근거
+## Rationale
 
-OAuth client·PKCE·token 저장은 계속 Codex CLI가 소유한다. Mew는 등록된 명령의 출력과
-서버 loopback 사이의 브라우저 전달만 담당하므로 토큰 교환 계약을 복제하지 않는다.
-범용 외부 프록시 대신 작업별 allowlist capability를 쓰면 사용자가 원한 서버쪽 OAuth를
-제공하면서 0109·0112의 기본 SSRF 경계를 유지할 수 있다.
+The Codex CLI continues to own the OAuth client, PKCE, and token storage. Mew only handles browser forwarding between the registered
+command's output and the server loopback, so it does not duplicate the token exchange contract. Using
+task-specific allowlist capabilities instead of a general-purpose external proxy provides the server-side OAuth users requested
+while preserving the default SSRF boundaries of 0109 and 0112.
 
-## 결과
+## Results
 
-- 인증 공급자가 sandbox fetch proxy를 거부하거나 새 호스트로 이동하면 작업은 실패할 수 있다.
-  호스트 추가는 실제 OAuth 흐름과 보안 경계를 같이 검토한 뒤 등록표에서만 한다.
-- 기본 OAuth가 사용 불가능한 환경을 위한 device-code 재도입은 금지하지 않지만, 기본 버튼으로
-  다시 복귀하지 않는다.
+- The task may fail if the authentication provider rejects the sandbox fetch proxy or moves to a new host. Hosts are added
+  only in the registry after reviewing both the actual OAuth flow and security boundaries.
+- Reintroducing device-code for environments where default OAuth is unavailable is not prohibited, but it will not return
+  as the default button.

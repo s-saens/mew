@@ -1,37 +1,37 @@
 ---
-title: "모바일 화면 진단"
-description: "직접 접속의 전체화면·OS 키보드 가로띠를 실기에서 조사하기 위한 선택적 viewport-debug URL 옵션, 로컬 진단 복사·파일 저장과 수집 항목·제외 항목·검증 한계를 정한다."
+title: "Mobile Viewport Diagnostics"
+description: "Defines the optional viewport-debug URL option for investigating fullscreen and OS keyboard horizontal bands on physical devices using direct access, local diagnostic copying and file saving, collected and excluded data, and validation limitations."
 created: 2026-10-22
 updated: 2026-10-22
 ---
 
-# 모바일 화면 진단
+# Mobile Viewport Diagnostics
 
-전체화면·키보드 전환 순서 보정 뒤에도 Android Brave의 가로 띠가 재발했다. 원인은 확정되지 않았다. 이 진단은 사진의 띠 좌표와 실제 DOM·키보드 경계를 비교할 자료를 수집하며 화면 배치나 키보드 정책을 바꾸지 않는다.
+The horizontal band in Android Brave recurred even after correcting the fullscreen/keyboard transition sequence. The cause remains undetermined. These diagnostics collect data to compare the band's coordinates in photos with actual DOM and keyboard boundaries, without changing screen layout or keyboard policy.
 
-## 사용
+## Usage
 
-로컬 앱에 이 변경을 반영한 뒤 직접 접속 주소에 `?viewport-debug=1`을 붙여 연다. 이미 쿼리 문자열이 있으면 `&viewport-debug=1`을 붙인다. 옵션이 없으면 진단 모듈과 버튼을 설치하지 않는다. Mewlink 바깥 주소의 옵션을 내부 앱에 전달하는 기능은 제공하지 않는다.
+After applying this change to the local app, open the direct-access address with `?viewport-debug=1` appended. If it already has a query string, append `&viewport-debug=1`. Without the option, the diagnostic module and button are not installed. Forwarding the option from the outer Mewlink address to the inner app is not supported.
 
-문제를 재현한 상태에서 오른쪽 위의 **화면 진단 복사** 아이콘을 누른다. 입력 포커스를 옮기지 않도록 pointerdown 기본 동작을 막고, 클립보드 요청 전에 수치를 읽는다. 복사가 차단되면 같은 자료를 `mew-viewport-diagnostics.json`으로 다운로드한다. 복사한 JSON 또는 파일을 진단 담당자에게 전달한다. 자동 서버 전송이나 저장소 기록은 없다.
+While the issue is reproduced, press the **Copy Viewport Diagnostics** icon at the upper right. The default pointerdown behavior is prevented to avoid moving input focus, and measurements are read before the clipboard request. If copying is blocked, the same data is downloaded as `mew-viewport-diagnostics.json`. Send the copied JSON or file to the person responsible for diagnostics. There is no automatic server transmission or storage recording.
 
-## 수집 범위
+## Collection scope
 
-| 항목 | 범위 |
+| Item | Scope |
 | --- | --- |
-| 환경 | 브라우저 User-Agent, 화면 크기·방향, DPR, 안전 영역 |
-| 화면 | layout·visual viewport, fullscreen 여부, 루트 실측 영역, 앱 높이 CSS 변수 |
-| 키보드 | API 제공 여부, overlay 정책, boundingRect |
-| 이벤트 | 시작 이후 resize·visual scroll·focus·fullscreen·키보드 geometry와 루트 크기 변경 중 최근 80개 |
-| DOM | 루트·작업 영역·입력창과 화면의 세 가로 지점에서 잰 hit target의 태그·실측 영역·배경색·배치 스타일 |
-| 샘플링 | 화면 높이에 따라 4px 이상 간격, 세로 최대 240행·각 지점 최대 3개 요소 |
+| Environment | Browser User-Agent, screen size and orientation, DPR, safe area |
+| Viewport | Layout and visual viewports, fullscreen status, measured root bounds, app height CSS variable |
+| Keyboard | API availability, overlay policy, boundingRect |
+| Events | The most recent 80 resize, visual scroll, focus, fullscreen, keyboard geometry, and root size changes since startup |
+| DOM | Tags, measured bounds, background colors, and layout styles of the root, workspace, input field, and hit targets measured at three horizontal positions on the screen |
+| Sampling | Spacing of at least 4px depending on screen height, up to 240 vertical rows and 3 elements per point |
 
-대화·문서·입력 값·선택 텍스트·URL·DOM ID·class·파일 경로·임의의 HTML 속성 값은 수집하지 않는다. 배경 이미지·필터는 원문 대신 사용 여부만 기록한다. 보고서의 요소 번호는 자료 안에서만 쓰는 임시 번호다.
+Conversations, documents, input values, selected text, URLs, DOM IDs, classes, file paths, and arbitrary HTML attribute values are not collected. Background images and filters are recorded only as present or absent, rather than by their original values. Element numbers in the report are temporary identifiers used only within the data.
 
-DOM의 hit test와 계산된 스타일은 실제 화면의 픽셀 색을 측정한 결과가 아니다. 사진의 띠 위치에서 DOM 요소·배경과 사진이 일치하는지 비교하는 근거이며, 결과만으로 브라우저·OS 합성 문제를 확정하지 않는다. 전체화면의 자식 요소가 top layer에 있거나 사용자 확대·화면 이동이 있으면 보고된 배율·offset도 함께 비교한다.
+DOM hit tests and computed styles do not measure actual on-screen pixel colors. They provide evidence for comparing DOM elements and backgrounds with the photo at the band location; the results alone do not establish a browser or OS compositing issue. If a fullscreen child element is in the top layer or the user has zoomed or panned, also compare the reported scale and offsets.
 
-## 구현과 검증
+## Implementation and verification
 
-`src/main.tsx`가 URL 옵션을 확인하고 `src/utils/viewport-diagnostics.ts`를 지연 로드한다. 종료·HMR 교체 시 이벤트·ResizeObserver·언어 구독·버튼·상태 타이머를 정리한다. 진단의 DOM 수치와 이벤트 이력은 메모리에만 둔다.
+`src/main.tsx` checks the URL options and lazy-loads `src/utils/viewport-diagnostics.ts`. On shutdown or HMR replacement, it cleans up events, ResizeObserver, language subscriptions, buttons, and status timers. Diagnostic DOM measurements and event history are kept only in memory.
 
-`server/viewport-diagnostics-ui.test.ts`는 390px 터치와 1100px 화면에서 포커스 유지, 읽기 전용 키보드 정책, DOM 띠 좌표의 샘플 일치, 민감한 테스트 문자열의 제외, 이벤트 한도, 클립보드 차단 시 파일 저장과 관찰 종료를 검사한다. 이 검사는 Android OS의 검은 띠를 재현하거나 해결한 검사가 아니다.
+`server/viewport-diagnostics-ui.test.ts` checks focus retention on 390px touch and 1100px screens, the read-only keyboard policy, sample matching of DOM band coordinates, exclusion of sensitive test strings, event limits, file saving when clipboard access is blocked, and stopping observation. These tests neither reproduce nor resolve the Android OS black band.

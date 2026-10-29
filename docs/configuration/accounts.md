@@ -1,41 +1,41 @@
 ---
-title: "계정·권한·Mewlink 신원 연결"
-description: "내 계정의 사진 메뉴·표시 이름 저장과 owner의 계정·기능·파일 권한 관리, 기존 이메일 계정의 Mewlink 신원 연결·병합 시 이전 계정 삭제 및 호스트 사용자 관리 CLI를 안내한다. 역할·공유의 보안 기준과 구현 계약은 별도 소유 문서로 연결한다."
+title: "Accounts, permissions, and Mewlink identity linking"
+description: "Covers the photo menu and saving the display name for your account; owner management of accounts and feature/file permissions; linking Mewlink identities to existing email accounts, including deletion of the previous account when merging; and the host user management CLI. Links to separate owning documents for role and sharing security standards and implementation contracts."
 created: 2026-10-22
 updated: 2026-10-26
 상위파일: "MOC.md"
 ---
 
-# 계정·권한·Mewlink 신원 연결
+# Accounts, permissions, and Mewlink identity linking
 
-앱의 계정 조작과 호스트의 사용자 관리 명령을 안내한다. 역할별 허용 범위와 공유 전 주의사항은 [보안 운영 기준](../operations/security.md), 화면 취향은 [화면 설정](appearance.md)을 따른다.
+Covers account actions in the app and user management commands on the host. Follow the [Security operations standards](../operations/security.md) for permissions by role and precautions before sharing, and [Appearance settings](appearance.md) for visual preferences.
 
-## 내 계정과 계정 관리
+## My account and account management
 
-- **로그인**: 관리자가 등록한 이메일과 임시 비밀번호로 접속하고 첫 비밀번호 로그인에서 비밀번호를 바꾼다. Mewlink 접속에서는 승인된 외부 계정으로도 로그인할 수 있다. 공개 회원가입은 없다.
-- **내 계정**: 메뉴 → 설정 → 계정에서 표시 이름·프로필 이미지·비밀번호를 변경하거나 로그아웃한다. 비밀번호를 바꾸면 다른 기기의 비밀번호 세션이 무효화된다. 비밀번호 없는 외부 전용 사용자에게 비밀번호 폼을 표시하지 않으며 외부 로그아웃은 중앙 세션을 종료한다.
-- **계정 관리(owner)**: 메뉴 → 계정 관리에서 이메일과 역할을 골라 계정을 추가하고 발급된 임시 비밀번호를 본인에게 전달한다. 기능 권한 표는 각 계정과 guest를 행, 기능을 열로 표시한다. 체크를 바꾸면 즉시 저장하고 초기화는 역할 기본값을 복원한다. 역할도 같은 표에서 변경한다.
-- **원격 접속(owner)**: 로컬 mew의 **헤더 메뉴 → Mewlink → 원격 접속 → 기기 등록**을 누른다. Mewlink 로그인은 기기 등록·목록·삭제를 관리하며 기기 주소 방문자는 로컬 비밀번호 또는 승인된 외부 신원으로 로그인한다. **계정 관리 → Mewlink 계정 접근**에서 요청을 승인하면 비밀번호 없는 member가 바로 등록되며, 같은 화면에서 외부 로그인을 회수한다. 역할은 계정 관리에서 변경한다. 등록 자체는 외부 사용 권한을 부여하지 않는다. [기기 등록](../../.mew/docs/operations/remote-central.md#5-내-mew-연결하기) · [신원 연결](../../.mew/docs/development/remote-access.md#승인된-mewlink-계정-로그인).
-- **호스트 관리**: 최초 owner 발급, 비밀번호 재발급, 계정 삭제는 아래 CLI를 사용한다. 역할별 권한의 기준본은 [보안](../operations/security.md#역할)다.
+- **Log in**: Sign in with the email address and temporary password registered by an administrator, and change your password on your first password login. When accessing through Mewlink, you can also log in with an approved external account. Public signup is not available.
+- **My Account**: Go to Menu → Settings → Account to change your display name, profile image, or password, or to log out. Changing your password invalidates password sessions on other devices. The password form is not shown to external-only users without passwords, and external logout ends the central session.
+- **Account Management (owner)**: Go to Menu → Account Management, choose an email and role to add an account, and send the issued temporary password to that user. The feature permissions table shows each account and guest as rows and features as columns. Checkbox changes are saved immediately, and Reset restores the role defaults. Roles are also changed in the same table.
+- **Remote Access (owner)**: In local mew, click **Header Menu → Mewlink → Remote Access → Register Device**. Mewlink login manages device registration, listing, and deletion, while visitors to a device address log in with a local password or an approved external identity. Approving a request in **Account Management → Mewlink Account Access** immediately registers a member without a password; revoke external login on the same screen. Change roles in Account Management. Registration itself does not grant external access permissions. [Device registration](../../.mew/docs/operations/remote-central.md#5-connect-your-mew) · [Identity linking](../../.mew/docs/development/remote-access.md#approved-mewlink-account-login).
+- **Host Administration**: Use the CLI below to create the initial owner, reissue passwords, or delete accounts. [Security](../operations/security.md#roles) is the canonical source for permissions by role.
 
-내 계정의 프로필 사진을 누르면 **기본**, **사진 선택**, **클립보드에서 붙여넣기** 메뉴가 열린다. **기본**은 사진을 기본 표시로 되돌린다. 사진이나 표시 이름을 바꾼 뒤 이름 입력칸 오른쪽의 **저장**을 누른다.
+Click the profile photo in My Account to open the **Default**, **Choose Photo**, and **Paste from Clipboard** menu. **Default** restores the default photo display. After changing the photo or display name, click **Save** to the right of the name field.
 
-**파일·폴더 권한** 탭에서 폴더를 탐색하거나 상대경로를 입력한 뒤 계정별 상속·차단·열람·수정을 선택한다. 폴더 규칙은 하위에 적용되고 더 구체적인 규칙이 우선한다. 기능 표에서 파일 열람·수정을 끄면 파일별 허용보다 우선한다. guest 설정은 모든 비로그인 방문자에게 적용된다.
+In the **File and Folder Permissions** tab, browse folders or enter a relative path, then select Inherit, Block, Read, or Edit for each account. Folder rules apply to descendants, and more specific rules take precedence. Disabling file reading or editing in the feature table overrides per-file allowances. Guest settings apply to all visitors who are not logged in.
 
-### Mewlink를 기존 이메일 계정에 연결하기
+### Linking Mewlink to an Existing Email Account
 
-같은 Mewlink 접속에서 두 로그인 수단을 확인한다. 이메일 계정이 이미 있으면 새 접근 승인 없이 본인이 연결할 수 있다.
+Verify both login methods within the same Mewlink connection. If you already have an email account, you can link it yourself without new access approval.
 
-1. Mewlink 기기 주소에서 Mewlink로 로그인한다. 접근 요청 화면에서는 기존 Mew 이메일·비밀번호로 로그인한다.
-2. **설정 → 계정 → Mewlink 계정 연결**을 연다. 이미 별도 Mewlink 사용자로 들어온 경우 **기존 이메일 계정으로 로그인**을 누른다. 이메일 로그인으로 화면이 다시 열리면 **설정 → 계정**을 다시 연다.
-3. Mewlink 아이디와 연결할 이메일을 확인하고 **이 계정에 연결**을 누른다. **이메일에 연결됨** 표시를 확인한다.
+1. Log in with Mewlink at the Mewlink device address. On the access request screen, log in with your existing Mew email and password.
+2. Open **Settings → Account → Link Mewlink Account**. If you are already logged in as a separate Mewlink user, click **Log In with an Existing Email Account**. When the screen reopens after email login, open **Settings → Account** again.
+3. Check the Mewlink ID and the email to link, then click **Link to This Account**. Confirm that **Linked to Email** appears.
 
-이후 해당 Mewlink 아이디는 이메일 계정의 권한·개인 설정으로 접속한다. 기존 Mewlink 연결이 있으면 그 연결을 이메일 계정으로 옮기며 예전 연결의 접속 권한을 회수한다. 병합 후 비밀번호나 다른 Mewlink 로그인이 남지 않는 이전 계정은 자동 삭제되어 계정 관리에서 사라진다. 기존 세션·신뢰 브라우저·Git 연결·권한도 회수한다. 이전 작업 기록·파일·개인 설정은 보존하며 대상 계정으로 자동 이관하지 않는다. 다른 로그인 수단이 남은 계정은 유지하고 마지막 owner를 삭제하는 병합은 거부한다. Mewlink 신원이 없는 접속은 먼저 **Mewlink로 로그인**한 뒤 같은 순서로 진행한다.
+Afterward, that Mewlink ID connects with the email account's permissions and personal settings. If an existing Mewlink link exists, it is moved to the email account, and access through the old link is revoked. After merging, a previous account with no password or other Mewlink login remaining is automatically deleted and disappears from Account Management. Its existing sessions, trusted browsers, Git connections, and permissions are also revoked. Previous work records, files, and personal settings are preserved and are not automatically transferred to the target account. Accounts with other login methods remaining are retained, and merges that would delete the last owner are rejected. For a connection without a Mewlink identity, first **Log In with Mewlink**, then follow the same steps.
 
 
-에이전트·터미널 등 서버 제어 기능은 파일 규칙으로 제한되지 않는다. 터미널형 에이전트는 에이전트와 터미널 권한이 모두 필요하다. 저장·적용 범위는 [권한 계약](../../.mew/docs/development/access-control.md)을 따른다.
+Server control features such as agents and terminals are not restricted by file rules. Terminal agents require both agent and terminal permissions. Storage and application scope follow the [permissions contract](../../.mew/docs/development/access-control.md).
 
-## 사용자 관리 (호스트에서)
+## User management (on the host)
 
 ```bash
 npm run users -- add <email> [role]   # 임시 비밀번호 발급 — 첫 로그인 때 변경 강제 (role 생략 시 member)
@@ -45,6 +45,6 @@ npm run users -- remove <account-id>  # 사용자 삭제 (비밀번호·외부 �
 npm run users -- list
 ```
 
-임시 비밀번호는 안전한 채널로 본인에게 전달한다. 소스 설치의 최초 owner는 이 관리 CLI 또는 `./mew setup`으로 만든다. 사전 빌드 실행 CLI는 첫 이메일 입력으로 같은 임시 비밀번호 계정을 만든다 — 이후로는 owner가 앱 내 설정 팝업에서 다른 계정의 역할을 바꿀 수 있다.
+Send temporary passwords to the users themselves through a secure channel. For source installations, create the initial owner with this administration CLI or `./mew setup`. The prebuilt execution CLI creates the same temporary-password account when the first email is entered—afterward, an owner can change other accounts' roles in the in-app settings popup.
 
-기존 이메일 계정의 `account-id`는 이메일이며, 외부 전용 사용자의 불변 ID는 `list`에서 확인한다. `role`·`remove`는 두 형태를 모두 받는다. `reset`은 이메일 비밀번호 계정용이며 외부 전용 ID에 비밀번호를 만들지 않는다.
+For existing email accounts, `account-id` is the email address; for external-only users, find the immutable ID in `list`. `role` and `remove` accept both forms. `reset` is for email-and-password accounts and does not create passwords for external-only IDs.

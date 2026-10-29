@@ -1,35 +1,35 @@
 ---
-title: "스킬·MCP 관리 구현 계획"
+title: "Skills and MCP management implementation plan"
 created: 2026-09-17
 updated: 2026-09-17
-description: "스킬·MCP 원본 관리 GUI·API의 범위·출처 모델·구현 순서와 파일 보존·권한·충돌 보호 및 격리 검증 완료 기록을 남긴다."
+description: "Records the scope, source model, and implementation sequence for the skills and MCP source management GUI and API, file preservation, permissions, and conflict protection, and completion of isolated verification."
 상위파일: "_work.md"
 ---
 
-기존 에이전트 패널의 정보 버튼 오른쪽에 Skills·MCP 진입점을 추가한다.
+Add Skills and MCP entry points to the right of the information button in the existing agent panel.
 
-## 구현 순서
+## Implementation sequence
 
-1. 현재 작업 폴더와 하위 프로젝트의 설정 위치를 탐색하고 전역/프로젝트, 공통/런타임, 출처를 독립 축으로 모델링한다.
-2. 스킬은 SKILL.md 조회·편집, 부속 파일을 포함한 폴더 이동·삭제를 제공한다. 이름 충돌·외부 변경·심볼릭 링크를 검사한다.
-3. MCP는 에이전트의 실제 설정에서 서버 단위로 조회·추가·편집·이동·삭제한다. 다른 설정을 보존하며 형식이 다른 런타임 사이 자동 변환은 하지 않는다.
-4. 기존 테마·팝업 규칙을 유지한 목록/상세 화면을 만든다. 스코프·에이전트 필터, 검색, 출처·읽기 전용 이유, 오류·빈 상태, 모바일 상세 전환, 키보드·초안 보호를 포함한다.
-5. 임시 홈/프로젝트의 서버 테스트, 실제 React 격리 브라우저 테스트, 타입·lint·문서 검사를 수행한다. 빌드·재시작은 하지 않는다.
+1. Discover configuration locations in the current working folder and subprojects, and model global/project, shared/runtime, and source as independent dimensions.
+2. For skills, provide SKILL.md viewing and editing, and folder moves and deletion including supporting files. Check for name conflicts, external changes, and symbolic links.
+3. For MCP, view, add, edit, move, and delete individual servers in the agent's actual configuration. Preserve other settings and do not automatically convert between runtimes with different formats.
+4. Build list and detail views that retain existing theme and popup rules. Include scope and agent filters, search, source and read-only reasons, error and empty states, mobile detail navigation, keyboard support, and draft protection.
+5. Run server tests with temporary homes and projects, isolated browser tests using actual React, and type, lint, and document checks. Do not build or restart.
 
-## 경계
+## Boundaries
 
-- 원본 CLI 설정을 기준본으로 유지한다. 관리창을 열거나 저장한다고 MCP 프로세스를 실행하지 않는다.
-- 전역은 Mew 계정이 아닌 서버 OS 사용자의 설정이다. API는 에이전트 기능 권한을 요구한다.
-- 공통 스킬 저장소와 각 런타임의 자동 발견 범위는 구분한다. MCP에는 임의의 공통 설정 파일을 만들지 않는다.
-- 목록에 인증 값을 싣지 않고, 상세 요청에서 선택한 MCP 항목만 반환한다. 원문은 로그·브라우저 영구 저장소에 남기지 않는다.
-- 시스템·플러그인 관리 스킬은 읽기 전용으로 표시한다. 확인되지 않은 런타임 설정은 지원하지 않는다고 표시한다.
+- Keep the original CLI configuration as the canonical source. Opening or saving in the management dialog does not launch MCP processes.
+- Global settings belong to the server OS user, not the Mew account. The API requires agent feature permissions.
+- Distinguish the shared skill repository from each runtime's automatic discovery scope. Do not create an arbitrary shared configuration file for MCP.
+- Do not include authentication values in lists; return only the MCP entry selected in a detail request. Do not retain raw content in logs or persistent browser storage.
+- Mark system-managed and plugin-managed skills as read-only. Mark unverified runtime configurations as unsupported.
 
-## 검증 결과
+## Verification results
 
-서버 원본 관리·패널 버튼·공통 팝업·스킬 입력 후보 연결을 구현했다. 현재 지원 범위·사용법·API는 [스킬·MCP 관리](../../../docs/configuration/agent-harness.md), 저장 소유권 결정은 [ADR 0157](../history/decisions/0157-mew-native-agent-harness-management.md)에 기록했다.
+Implemented server-side source management, panel buttons, a shared popup, and integration with skill input suggestions. Current support, usage, and APIs are documented in [Skills and MCP management](../../../docs/configuration/agent-harness.md), and the storage ownership decision is documented in [ADR 0157](../history/decisions/0157-mew-native-agent-harness-management.md).
 
-- 서버 테스트: 스코프·동명 항목·읽기 전용·스킬 부속 파일/실행 모드 유지·해시 충돌·이동 충돌·Claude 동일 파일 이동·TOML/JSONC/YAML/JSON5 보존·권한 검사.
-- 격리 Chromium: 1200px 어두운 테마·390px 밝은 테마에서 필터·상세·초안 보호·저장 실패 복원·이동·삭제 확인·MCP 편집/추가·키보드 포커스 검사.
-- 목록은 이름과 오른쪽 에이전트 표기(공통은 `Global`)를 표시하는 32px 행으로 줄이고 설명은 선택한 항목의 상세 영역에 표시한다. 스코프별 접기·펼치기와 항목 수를 제공하며, 브라우저 테스트에서 행 높이·설명 위치·키보드 펼치기·접을 때 편집 초안 유지를 확인했다.
-- 전용 테스트와 기존 에이전트 WS·계정 팝업·CLI 입력 회귀를 합친 12개 테스트가 통과했다. `npx tsc -b`, `npm run lint`(기존 경고 10개, 새 경고 없음), 문서 허용목록·워크스페이스 링크 검사도 통과했다. 실제 서버 빌드·재시작·사용자 스킬/MCP 변경은 수행하지 않았다.
-- 별도 UI 검토의 모바일 포커스·선택 행 대비 지적을 수정하고 격리 브라우저에서 확인했다. 검토 에이전트의 후속 판정은 사용량 한도로 실행되지 않아, 그 판정을 통과했다고 보고하지 않는다.
+- Server tests: scope, entries with the same name, read-only behavior, preservation of skill supporting files and executable modes, hash conflicts, move conflicts, Claude moves within the same file, TOML/JSONC/YAML/JSON5 preservation, and permission checks.
+- Isolated Chromium: checked filters, details, draft protection, recovery from save failures, moves, deletion confirmation, MCP editing and addition, and keyboard focus in the dark theme at 1200px and the light theme at 390px.
+- Reduced the list to 32px rows showing the name and an agent label on the right (`Global` for shared entries), with descriptions in the selected entry's detail area. Provides per-scope collapse and expand controls and item counts. Browser tests verified row height, description placement, keyboard expansion, and preservation of edit drafts when collapsed.
+- Passed 12 tests combining dedicated tests and existing agent WS, account popup, and CLI input regressions. `npx tsc -b`, `npm run lint` (10 existing warnings, no new warnings), and document allowlist and workspace link checks also passed. No actual server build or restart, or changes to user skills or MCP, were performed.
+- Fixed mobile focus and selected-row contrast issues identified in a separate UI review and verified them in an isolated browser. The review agent's follow-up assessment did not run due to usage limits, so no claim is made that it passed that assessment.

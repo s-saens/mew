@@ -1,31 +1,31 @@
 ---
-title: "0019 — 헤더 프로젝트 선택기"
-description: "헤더의 프로젝트 탭·닫기·재배열·그룹 UI를 현재 프로젝트 아이콘·이름과 드롭다운 선택기로 바꾼 결정. 데스크톱 목록은 후속 결정 0082의 프로젝트 사이드바가 대체하며 모바일 드롭다운·경로 순서·전환 복원과 메타데이터 준비는 유지한다. 접근 역할과 핸들 정렬은 후속 결정 0070·0071을 따른다."
+title: "0019 — Header Project Selector"
+description: "Decision to replace the header's project tabs, close, reorder, and group UI with the current project's icon and name and a dropdown selector. The project sidebar in subsequent decision 0082 replaces the desktop list, while the mobile dropdown, path order, restoration on switching, and metadata preparation remain. Access roles and handle-based reordering follow subsequent decisions 0070 and 0071."
 created: 2026-10-19
 updated: 2026-10-28
 ---
 
-- 상태: 채택
-- 부분 대체: [0082](0082-desktop-project-sidebar.md)가 데스크톱 드롭다운을 파일 탐색기 왼쪽의 프로젝트 사이드바로 바꾼다. 모바일 드롭다운과 헤더의 접힌 표시는 유지한다.
-- 후속 변경: [0071](0071-project-list-reorder.md)이 드롭다운 목록의 핸들 정렬을 추가한다. 프로젝트 탭·그룹 UI 제거는 유지한다.
-- 후속 변경: [0070](0070-manager-project-access.md)이 프로젝트 접근의 owner 제한을 owner·manager로 확장한다.
-- 부분 대체: [ADR 0004](0004-subproject-folder-exploration.md)의 프로젝트를 독립 헤더 탭으로 표시하는 UI. 일반 폴더 탐색·별도 이동 화살표·owner 권한·계정별 활성 루트 경계는 유지한다.
-- 대체 범위: 기존 헤더의 프로젝트 탭 나열·닫기·드래그 재배열·그룹 조작. 프로젝트 경로 목록·계정 저장 형식·활성 루트 전환 API는 유지한다.
+- Status: Adopted
+- Partially superseded: [0082](0082-desktop-project-sidebar.md) replaces the desktop dropdown with a project sidebar to the left of the file explorer. The mobile dropdown and collapsed header display remain.
+- Subsequent change: [0071](0071-project-list-reorder.md) adds handle-based reordering to the dropdown list. Project tabs and group UI remain removed.
+- Subsequent change: [0070](0070-manager-project-access.md) expands project access from owner-only to owner and manager.
+- Partially supersedes: the UI in [ADR 0004](0004-subproject-folder-exploration.md) that displays projects as separate header tabs. General folder navigation, separate navigation arrows, owner permissions, and per-account active root boundaries remain unchanged.
+- Scope of replacement: project tab listing, closing, drag reordering, and group operations in the existing header. The project path list, account storage format, and active root switching API remain unchanged.
 
-## 배경
+## Background
 
-프로젝트마다 헤더 탭과 그룹을 나열하면 현재 프로젝트와 전환 대상이 섞여 선택하기 어렵다. 사용자는 현재 프로젝트의 아이콘·이름만 표시하고 눌렀을 때 목록에서 고르는 방식과 전환 대기 감소를 요청했다.
+Listing header tabs and groups for every project mixes the current project with switching targets, making selection difficult. The user requested a button showing only the current project's icon and name that opens a selection list when clicked, along with shorter switching waits.
 
-## 결정
+## Decision
 
-헤더 왼쪽에는 현재 프로젝트의 아이콘·이름을 표시하는 버튼만 둔다. 누르면 공용 메뉴에 저장된 프로젝트를 순서대로 표시하고 마지막 항목은 **프로젝트 추가**로 둔다. 기존 프로젝트 경로·순서를 재사용하며 그룹 정보는 화면에 표시하지 않는다. `Alt+1…9`는 목록 순서를 따르고 아이콘 변경은 현재 버튼·목록 행에서 유지한다.
+Place only a button showing the current project's icon and name on the left side of the header. Clicking it lists saved projects in order in the shared menu, with **Add Project** as the last item. Reuse existing project paths and order, and do not display group information. `Alt+1…9` follows the list order, and icon changes remain available from the current project button and list rows.
 
-프로젝트 추가·전환의 owner 제한, 계정별 활성 루트와 프로젝트별 문서·배치·스크롤 복원, 실행 중 에이전트의 기존 작업 경로는 유지한다. 하위 프로젝트는 현재 트리에서 일반 폴더처럼 탐색하고 별도 화살표로 해당 작업 루트를 선택한다.
+Retain the owner restriction on adding and switching projects, per-account active roots, per-project restoration of documents, layouts, and scroll positions, and the existing working paths of running agents. Navigate subprojects as ordinary folders in the current tree, and use a separate arrow to select their working root.
 
-드롭다운 항목에 포인터를 올리거나 포커스를 두면 계정·절대 루트에 고정된 UI 메타데이터만 미리 준비한다. 실제 전환에서 같은 요청을 재사용하며 추측 요청의 동시 수는 제한한다. 파일·트리 조회와 에이전트 세션 점유는 선택 전에 실행하지 않는다. 권한이 바뀌면 이전 복원 응답을 폐기하고 새 권한으로 조회한다.
+When a dropdown item is hovered or focused, prepare only UI metadata scoped to the account and absolute root. Reuse the same request during the actual switch and limit concurrent speculative requests. Do not query files or trees or claim agent sessions before selection. If permissions change, discard previous restoration responses and query with the new permissions.
 
-## 근거와 영향
+## Rationale and Impact
 
-현재 프로젝트는 한 곳에서 확인하고 전환 대상은 필요할 때만 표시한다. 기존 경로 목록을 유지하므로 새 선택기를 위해 프로젝트를 다시 추가할 필요가 없다. 탭 닫기·재배열·그룹 기능은 사라지며 저장된 그룹의 별도 관리 UI는 제공하지 않는다.
+Show the current project in one place and switching targets only when needed. Retaining the existing path list eliminates the need to add projects again for the new selector. Tab closing, reordering, and grouping are removed, and no separate management UI is provided for saved groups.
 
-선택 전 메타데이터 조회는 실제 루트를 바꾸지 않고, 기존 전환 POST·캐시 복원 경로에서 중복 대기를 줄인다. 격리 테스트의 지연 응답으로 요청 순서와 캐시 재사용을 확인하며 실제 서버·대형 편집기·에이전트 재연결 전체의 지연 보장은 별도 운영 실측이 필요하다. 현재 동작·검증 범위는 [프로젝트 기능](../features/%ED%94%84%EB%A1%9C%EC%A0%9D%ED%8A%B8%C2%B7%ED%8C%8C%EC%9D%BC%C2%B7%EA%B2%80%EC%83%89/%ED%94%84%EB%A1%9C%EC%A0%9D%ED%8A%B8%20%EC%97%B4%EA%B8%B0%C2%B7%ED%83%AD%C2%B7%EA%B7%B8%EB%A3%B9.md)과 [프로젝트 선택기·빠른 전환 UI 계약](../development/ui-contracts.md#헤더-프로젝트-선택기)을 따른다.
+Metadata queries before selection do not change the actual root and reduce duplicate waits in the existing switch POST and cache restoration paths. Delayed responses in isolated tests verify request order and cache reuse; guaranteeing latency across the actual server, large editors, and agent reconnection requires separate production measurements. Current behavior and verification scope follow [Project Features](../features/projects-files-search/opening-projects-tabs-and-groups.md) and the [Project Selector and Fast Switching UI Contract](../development/ui-contracts.md#header-project-switcher).

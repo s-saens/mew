@@ -1,32 +1,32 @@
 ---
-provenance: "Liiiiv 중앙 ADR 이관본, 2026-10-14"
-description: "이관한 결정 기록: 프로젝트 기능 원장과 에이전트 구현 요청. 당시 선택·근거·후속 변경을 보존하며 현재 계약은 Mew 소유 문서에서 확인한다."
-title: "0159 — 프로젝트 기능 원장과 에이전트 구현 요청"
+provenance: "Migrated copy of a Liiiiv central ADR, 2026-10-14"
+description: "Migrated decision record: Project feature ledger and agent implementation requests. Preserves the choices, rationale, and subsequent changes from that time; consult the Mew owning document for the current contract."
+title: "0159 — Project feature ledger and agent implementation requests"
 created: 2026-09-17
 updated: 2026-09-17
 ---
 
-- 날짜: 2026-09-17
-- 상태: 채택
-- 후속 결정: [0194](0194-mew-readonly-feature-panel.md) — 기능 패널 읽기 전용; 문서·API·CLI·실행 큐 유지
-- 후속 결정: [0161](0161-mew-feature-markdown-source.md) — 기능·결과 기준본을 프로젝트 Markdown으로 이전, 실행 이력은 서버에 유지
-- 후속 결정: [0173](0173-mew-inline-feature-edit-dispatch.md) — 기능 계층 인라인 편집 적용 시 명세 저장과 에이전트 작업 접수
-- 후속 확장: [0095](0095-mew-agent-sets-as-tab-presets.md) — 셋 프리셋과 별도로 mew 기능 작업 시스템을 추가
-- 결정자: 사용자 지시, Codex 설계·구현
+- Date: 2026-09-17
+- Status: Adopted
+- Follow-up decision: [0194](0194-mew-readonly-feature-panel.md) — Make the feature panel read-only; retain documents, APIs, CLI, and execution queue
+- Follow-up decision: [0161](0161-mew-feature-markdown-source.md) — Move the canonical source for features and results to project Markdown; retain execution history on the server
+- Follow-up decision: [0173](0173-mew-inline-feature-edit-dispatch.md) — Save specifications and accept agent jobs when applying inline edits to the feature hierarchy
+- Follow-up extension: [0095](0095-mew-agent-sets-as-tab-presets.md) — Add a mew feature job system separate from set presets
+- Decision makers: User direction, Codex design and implementation
 
-## 결정
+## Decision
 
-- 현재 프로젝트 탭의 절대 루트를 기준으로 기능 트리·요구사항 버전·사용자 판정·구현 요청·결과를 관리한다. 원장은 서버 데이터 디렉터리에 두고 프로젝트별로 분리한다. 계정별 화면 상태와 달리 기능은 프로젝트 구성원이 공유한다. 조회에는 agent 기능과 프로젝트 전체 열람, 변경에는 전체 수정 권한이 필요하다.
-- 기능 화면은 메뉴의 **기능**에서 연다. 한 줄 트리와 상세를 나란히 배치하고 작은 화면에서는 목록·상세를 전환한다. 최상단 `+` 요청은 제목·내용·에이전트셋을 받아 새 기능·기존 수정·하위 기능 여부를 에이전트가 판단하게 한다.
-- 셋은 런타임·모델·역할 스냅샷으로만 사용한다. 분류·항목 갱신·결과 보고는 mew가 모든 셋에 같은 지침과 공통 CLI로 전달한다. 기능 전용 셋이나 별도 분류 모델은 만들지 않는다.
-- 요청마다 기존 독립 에이전트 감독의 고유 탭을 사용한다. 프로젝트 내 요청은 순서대로 실행하고 서로 다른 프로젝트는 독립이다. 브라우저 닫기·프로젝트 전환은 실행을 취소하지 않는다. 사용자 중단만 취소한다. 서버 복원은 기존 감독에만 재접속하며 전달 여부가 불명확한 요청을 자동으로 재전송하지 않는다.
-- 에이전트는 구현 전에 CLI로 항목을 연결하고, 완료 전에 구현 설명·검증·실제 파일·실제 커밋을 보고한다. 보고와 정상 턴 종료를 확인한 뒤에만 민트색으로 표시한다. 보고 누락·오류·중단은 실행 상태로 따로 표시한다. 자동 커밋은 요구하지 않는다.
-- 파랑은 구현 중, 민트는 구현 완료·사용자 확인 전, 초록은 사용자 확인 완료, 빨강은 사용자 수정 필요 판정, 주황은 요구사항 변경이다. 제목·내용 저장은 주황으로 바꾸며 자동 실행하지 않는다. 주황에서 직접 초록으로 변경하거나 에이전트에게 다시 맡길 수 있다.
-- 사용자 편집·판정은 버전을 검사한다. 실행 시작 뒤 바뀐 요구사항·판정을 이전 실행의 완료가 덮어쓰지 않는다. 부모 상태는 독립이며 하위 기능의 승인을 자동 전파하지 않는다. 형제 단위 정렬과 하위 변경 시각의 상위 묶음 반영을 사용한다.
-- 파일·커밋은 프로젝트 안의 경로와 실제 Git 객체로 검증한다. 서버와 에이전트 CLI의 원장 변경은 프로세스 간 잠금·원자적 쓰기를 공유한다. 실패한 검증은 기존 원장에 덮어쓰지 않는다.
+- Manage the feature tree, requirements versions, user judgments, implementation requests, and results based on the current project tab's absolute root. Store the ledger in the server data directory, separated by project. Unlike per-account UI state, features are shared by project members. Viewing requires the agent feature permission and project-wide read access; changes require full edit permission.
+- Open the feature screen from **Features** in the menu. Place a tree with single-line rows beside the details, and switch between list and details on small screens. The top-level `+` request accepts a title, content, and agent set, allowing the agent to determine whether it is a new feature, a modification to an existing feature, or a subfeature.
+- Use sets only as snapshots of runtime, model, and role. For classification, item updates, and result reporting, mew provides all sets with the same instructions and common CLI. Do not create feature-specific sets or a separate classification model.
+- Use a unique tab in the existing independent agent supervisor for each request. Run requests within a project sequentially; different projects are independent. Closing the browser or switching projects does not cancel execution. Only a user stop cancels it. Server restoration reconnects only to the existing supervisor and does not automatically resend requests whose delivery status is unclear.
+- Before implementation, the agent links items through the CLI, and before completion, it reports the implementation description, verification, actual files, and actual commits. Display mint only after confirming the report and a normal turn ending. Display missing reports, errors, and interruptions separately as execution statuses. Do not require automatic commits.
+- Blue means implementation in progress, mint means implementation complete and awaiting user confirmation, green means user confirmation complete, red means the user has determined that revisions are needed, and orange means requirements changed. Saving the title or content changes the status to orange without automatically starting execution. From orange, users can change directly to green or assign it to the agent again.
+- Check versions for user edits and judgments. Completion of an earlier run must not overwrite requirements or judgments changed after that run started. Parent statuses are independent, and subfeature approval does not propagate automatically. Sort within sibling groups and reflect descendant modification times in ancestor groups.
+- Validate files and commits using paths within the project and actual Git objects. Ledger changes by the server and agent CLI share interprocess locking and atomic writes. Failed validation must not overwrite the existing ledger.
 
-## 근거
+## Rationale
 
-기능은 반복 구현과 사용자 검토를 거쳐도 같은 항목으로 남아야 한다. 에이전트 대화나 셋 설정을 원장으로 사용하지 않고, 검증 가능한 공통 갱신 경로를 두어 여러 런타임에서 같은 동작을 제공한다.
+Features must remain the same items through repeated implementation and user review. Do not use agent conversations or set configurations as the ledger; provide a verifiable common update path to ensure consistent behavior across runtimes.
 
-세부 실행·저장 계약은 [기능 기반 개발](../../specs/feature-development.md)에 둔다.
+Detailed execution and storage contracts are defined in [Feature-driven development](../../specs/feature-development.md).

@@ -1,30 +1,30 @@
 ---
-title: "기능 패널과 전용 실행 경로 제거"
-description: "사용하지 않는 기능 패널·브랜치 작업 원장·기능 문서 API·실행 큐·CLI를 제거하고, 기존 Markdown과 저장 데이터를 보존하기로 한 결정."
+title: "Remove the Feature Panel and Dedicated Execution Paths"
+description: "Decision to remove the unused feature panel, branch work ledger, feature document APIs, execution queue, and CLI while preserving existing Markdown and stored data."
 created: "2026-10-26"
 updated: "2026-10-26"
 ---
 
-## 상태
+## Status
 
-채택. [0049](0049-branch-feature-previews.md)의 기능 패널·브랜치 작업 원장 계약을 대체한다.
+Accepted. Supersedes the feature panel and branch work ledger contracts in [0049](0049-branch-feature-previews.md).
 
-## 배경
+## Background
 
-사용자가 기능 패널을 사용하지 않아 코드까지 제거하도록 요청했다.
+The user did not use the feature panel and requested that its code also be removed.
 
-## 결정
+## Decision
 
-도크·단축키·도킹·모바일 복원에서 기능 패널을 제거한다. 브랜치별 제목·작업·검증·판정·포트 원장과 전용 CLI, 기능 문서 조회·요청·편집·판정 API, 실행 큐·보고 CLI·실시간 구독과 데모 대역도 제거한다. 에이전트 컨텍스트의 브랜치 작업 패널 기록 지침도 배포하지 않는다.
+Remove the feature panel from the dock, shortcuts, docking, and mobile restoration. Also remove the per-branch title, work, verification, assessment, and port ledger and dedicated CLI; feature document lookup, request, editing, and assessment APIs; execution queue, reporting CLI, real-time subscriptions, and demo stubs. Do not distribute branch work panel recording instructions in agent context either.
 
-기능 명세 Markdown과 과거 문서·결정·검증 기록은 보존한다. 기존 Git 메타데이터·서버 실행 이력·브라우저 초안은 자동 삭제하거나 이관하지 않는다. 저장된 패널 배치의 제거된 항목은 복원 시 제외한다.
+Preserve feature specification Markdown and historical documents, decisions, and verification records. Do not automatically delete or migrate existing Git metadata, server execution history, or browser drafts. Exclude removed items from saved panel layouts when restoring them.
 
-## 근거와 영향
+## Rationale and Impact
 
-미사용 패널을 위한 화면·서버·자동 실행 경로의 유지 비용을 없앤다. Git 패널·태스크·일반 에이전트 대화와 `/포트번호` localhost 앱 미리보기는 유지한다. 기존 기록은 앱에서 조회하거나 자동 실행하지 않는다. 빌드·서버 반영은 사용자가 수행한다.
+Eliminate the maintenance cost of UI, server, and automatic execution paths for an unused panel. Retain the Git panel, tasks, ordinary agent conversations, and `/포트번호` localhost app previews. Existing records are not viewed or automatically executed in the app. The user performs builds and applies changes to the server.
 
-## 검증 범위
+## Verification Scope
 
-타입·문서·린트 검사와 도킹·모바일 순서·프리셋·데모 데이터 단위 검사 55개를 수행했다. 실제 App의 태스크·모바일 전환·기능 독 제거, Git·태스크 테마, Mewpet 작업 대화, 도크 조작과 포트 프리뷰를 격리 브라우저·서버 검사로 확인했다. 전체 테스트는 메모리 사용 증가로 중단하고 관련 검사를 직렬로 실행했다. 기존 `release-runtime` 소스 그래프 검사와 UI 한국어 리터럴 검사는 이번 작업과 최신 `main` 양쪽에서 같은 오류로 실패했다. 빌드·서버 적용은 수행하지 않았다.
+Ran type, documentation, and lint checks and 55 unit checks for docking, mobile ordering, presets, and demo data. Verified tasks, mobile transitions, and feature dock removal in the actual App, Git and task themes, Mewpet work conversations, dock interactions, and port previews through isolated browser and server checks. Stopped the full test suite due to increased memory usage and ran related checks serially. The existing `release-runtime` source graph check and UI Korean literal check failed with the same errors in both this work and the latest `main`. No build or server application was performed.
 
-최신 `main`의 터미널 접근성 이름에 누락된 번역 키를 별도 수정한 뒤, 통합 상태의 타입·린트·문서 검사와 관련 단위·데모 데이터·에이전트 컨텍스트·실시간 구독 검사 63개를 통과했다.
+After separately fixing the missing translation key in the terminal accessible name in the latest `main`, the integrated state passed type, lint, and documentation checks and 63 related unit, demo data, agent context, and real-time subscription checks.

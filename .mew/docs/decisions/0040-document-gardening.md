@@ -1,27 +1,27 @@
 ---
-title: "문서 소유권에 따른 분류와 현재·기록 구분"
-description: "보안 운영·개인 설정·서버 설정의 소유권을 나누고, 태스크에서 작업 기록을 분리하며 과거 실험·연구를 현재 계약과 구분하는 문서 정리 결정이다. 보안 기준본의 docs 루트 배치는 결정 0037을 대체한다."
+title: "Classification by Document Ownership and Separation of Current Documents from Records"
+description: "A documentation cleanup decision that separates ownership of security operations, personal settings, and server settings, separates work records from tasks, and distinguishes past experiments and research from current contracts. Placing the security canonical source at the docs root supersedes decision 0037."
 created: 2026-10-22
 updated: "2026-10-29"
 ---
 
-## 상태
+## Status
 
-채택. 역할별 저장 경로는 [후속 결정 0087](0087-documentation-role-boundaries.md)이 확장한다. [결정 0037](0037-security-document-location.md)의 보안 기준본 위치를 대체한다.
+Adopted. [Follow-up Decision 0087](0087-documentation-role-boundaries.md) extends storage paths by role. Supersedes the security canonical source location in [Decision 0037](0037-security-document-location.md).
 
-## 배경
+## Background
 
-보안 문서를 `docs/` 바로 아래로 옮겨도 기존 분야별 분류와 중복 소유권은 해결되지 않았다. 환경변수 문서에는 화면·계정 조작이 섞였고, Mewlink 태스크는 긴 설계·검증 기록을 소유했다. 과거 실험·연구의 제약과 당시 상태가 현재 계약처럼 읽히는 곳도 있었다.
+Moving security documents directly under `docs/` did not resolve the existing subject-based classification and duplicate ownership. The environment variable document mixed in display and account operations, and the Mewlink task owned lengthy design and verification records. In some places, constraints and statuses from past experiments and research read as current contracts.
 
-## 결정
+## Decision
 
-- 공유 전 주의·역할·게스트·브라우저 회수·데이터 보관은 [보안 운영 기준](../../../docs/operations/security.md), 인가·저장·프로토콜의 구현은 기존 `development/` 소유 문서에 둔다.
-- 개인 [화면 설정](../../../docs/configuration/appearance.md)과 [계정 설정](../../../docs/configuration/accounts.md)을 [서버 환경변수](../../../docs/configuration/environment.md)에서 분리한다.
-- Mewlink 태스크는 상태·기간·태그·담당자를 유지하고 상세 설계·구현·검증 기록은 [작업 기록](../work/remote-access.md)에 둔다. 현재 계약·배포 상태를 작업 기록에 새로 복제하지 않는다.
-- 대체된 DOM 브라우저 실험은 `history/`에 원문을 보존하고, 연구는 조사 시점·후속 반영 범위·실기 미검증 조건을 구분한다.
+- Keep precautions before sharing, roles, guests, browser access revocation, and data retention in [Security Operations Standards](../../../docs/operations/security.md), and authorization, storage, and protocol implementation in the existing `development/` owning documents.
+- Separate personal [Display Settings](../../../docs/configuration/appearance.md) and [Account Settings](../../../docs/configuration/accounts.md) from [Server Environment Variables](../../../docs/configuration/environment.md).
+- The Mewlink task retains status, dates, tags, and assignees; detailed design, implementation, and verification records belong in the [Work Record](../work/remote-access.md). Do not create new copies of current contracts or deployment status in work records.
+- Preserve the original text of the superseded DOM browser experiment in `history/`, and distinguish research dates, the scope incorporated in follow-up work, and conditions unverified on actual systems.
 
-## 근거와 영향
+## Rationale and Impact
 
-기존 폴더와 description 탐색을 유지하면서 독자가 찾는 목적에 맞는 기준본을 하나씩 둔다. 이동·분리와 함께 들어오는 상대 링크와 사용 중인 앵커를 보정한다. 태스크 속성과 실험·연구의 원문·수치·코드·미검증 조건은 보존하며 파일 나이만으로 이력 처리하지 않는다.
+Keep the existing folders and description-based navigation while providing one canonical source for each reader purpose. When moving or splitting documents, fix incoming relative links and anchors in use. Preserve task properties and the original text, figures, code, and unverified conditions of experiments and research; do not archive files based solely on age.
 
-운영 정책이나 기능을 새로 결정하는 작업이 아니며, 앱 빌드·배포·서버 적용을 의미하지 않는다. 정리 원칙과 검증은 [문서 규칙](../README.md)을 따른다.
+This work does not establish new operational policies or features, and does not imply an app build, deployment, or application to the server. Cleanup principles and verification follow the [Documentation Rules](../README.md).

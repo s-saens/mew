@@ -1,29 +1,29 @@
 ---
-provenance: "Liiiiv 중앙 ADR 이관본, 2026-10-14"
-description: "이관한 결정 기록: 폴더 위치를 유지하는 중첩 하위 프로젝트. 당시 선택·근거·후속 변경을 보존하며 현재 계약은 Mew 소유 문서에서 확인한다."
-title: "0151 — 폴더 위치를 유지하는 중첩 하위 프로젝트"
+provenance: "Migrated copy of a Liiiiv central ADR, 2026-10-14"
+description: "Migrated decision record: Nested subprojects that retain their folder locations. Preserves the choices, rationale, and subsequent changes from that time; consult the Mew owning document for the current contract."
+title: "0151 — Nested subprojects that retain their folder locations"
 created: 2026-09-16
 updated: 2026-09-17
 ---
 
-- 날짜: 2026-09-16
-- 상태: 채택
-- 후속 결정: [0158](0158-mew-subprojects-open-root-tabs.md) — 모든 깊이의 프로젝트는 탭으로 열기; .mew 판별·지정 유지
-- 부분 대체: [0083](0083-mew-explorer-documents-and-mew-subprojects.md), [0085](0085-mew-explorer-root-and-subproject-sections.md) — 직계 폴더만 하위 프로젝트로 판별하던 제한
-- 결정자: 사용자 지시, Codex 설계·구현
+- Date: 2026-09-16
+- Status: Adopted
+- Subsequent decision: [0158](0158-mew-subprojects-open-root-tabs.md) — Open projects at every depth in tabs; retain .mew detection and designation
+- Partially supersedes: [0083](0083-mew-explorer-documents-and-mew-subprojects.md), [0085](0085-mew-explorer-root-and-subproject-sections.md) — The restriction that recognized only immediate child folders as subprojects
+- Decision makers: User direction, Codex design and implementation
 
-## 배경
+## Background
 
-사이드바에서 기존 폴더를 하위 프로젝트로 지정하고, 하위 프로젝트 안에도 프로젝트를 둘 수 있어야 한다.
+Users must be able to designate existing folders as subprojects in the sidebar and place projects within subprojects.
 
-## 결정
+## Decision
 
-- 실제 `.mew` 디렉터리가 있는 폴더는 깊이와 무관하게 하위 프로젝트다. 일반 폴더를 거쳐 중첩되어도 인식한다. `.mew` 파일·심볼릭 링크는 표식이 아니다.
-- 쓰기 가능한 폴더의 우클릭·모바일 항목 메뉴에서 **하위 프로젝트로 만들기**를 제공한다. 폴더 안에 빈 `.mew`만 만들며 기존 설정은 덮어쓰지 않는다. 루트·이미 지정된 프로젝트·`.mew` 설정 내부에는 생성 메뉴를 제공하지 않는다.
-- 직계 프로젝트는 기존 Documents 다음의 큰 펼침 항목을 유지한다. 깊은 프로젝트는 실제 부모 폴더 안에서 프로젝트 표식과 명령 버튼을 갖는다. 상단으로 끌어올리거나 중간 폴더에 표식을 자동 생성하지 않는다.
-- 경로는 현재 트리의 프로젝트 식별자와 상대경로로 전달한다. 명령 파일·실행 디렉터리·세션은 폴더 전체 경로를 구별한다. 문서·협업 식별자 `docs`·`.workspace`는 유지한다.
-- 한 단계 지연 로드와 파일 접근 권한을 유지한다. 초기 화면에서 전체 폴더를 재귀 탐색하지 않는다. 검색의 상단 범위 선택은 기존 Documents·직계 프로젝트를 유지하며 그 아래 중첩 폴더도 해당 범위에 포함한다.
+- A folder containing an actual `.mew` directory is a subproject regardless of depth. Recognize it even when nested through ordinary folders. A `.mew` file or symbolic link is not a marker.
+- Offer **Make Subproject** in the right-click and mobile item menus for writable folders. Create only an empty `.mew` inside the folder; do not overwrite existing settings. Do not offer the creation menu for the root, already designated projects, or inside `.mew` settings.
+- Immediate child projects retain the existing large expandable entries after Documents. Deeper projects have a project marker and command buttons inside their actual parent folders. Do not promote them to the top or automatically create markers in intermediate folders.
+- Pass paths as the project identifier from the current tree and a relative path. Command files, working directories, and sessions distinguish folders by their full paths. Retain the document and collaboration identifiers `docs` and `.workspace`.
+- Retain one-level-at-a-time lazy loading and file access permissions. Do not recursively traverse all folders on the initial screen. Keep the existing Documents and immediate projects as the top-level search scope choices, and include nested folders beneath them in those scopes.
 
-## 근거
+## Rationale
 
-별도 등록 원장 없이 사용자가 요청한 `.mew` 표식을 기준본으로 삼는다. 폴더의 실제 계층을 유지하면 루트 선택에 따라 같은 폴더가 자연스럽게 직계 또는 중첩 프로젝트로 보인다.
+Use the user-requested `.mew` marker as the canonical source without a separate registration ledger. Preserving the actual folder hierarchy naturally makes the same folder appear as an immediate or nested project depending on the selected root.

@@ -1,26 +1,26 @@
 ---
-title: "가로 탭 바의 공용 스크롤 화살표"
-description: "모든 가로 탭 바에서 스크롤이 남은 방향에만 꺾쇠 버튼을 겹쳐 표시하고, 누르는 동안 일정 속도로 이동하며 일반 휠을 가로 스크롤로 연결하는 공용 TabScrollArea를 채택한다."
+title: "Shared Scroll Arrows for Horizontal Tab Bars"
+description: "Adopt a shared TabScrollArea that overlays chevron buttons only in directions with remaining scroll space in all horizontal tab bars, scrolls at a constant speed while held, and maps ordinary wheel input to horizontal scrolling."
 created: "2026-10-26"
 updated: "2026-10-26"
 ---
 
-## 상태
+## Status
 
-채택.
+Adopted.
 
-## 배경
+## Background
 
-활성 탭 자동 스크롤로 선택한 탭은 찾을 수 있지만, 가려진 다른 탭을 살펴보려면 탭 바를 직접 스크롤해야 했다. 어느 방향에 탭이 더 있는지 표시하고 클릭으로 이동할 수 있는 공통 조작이 필요하다.
+Active tab auto-scrolling makes the selected tab easy to find, but viewing other hidden tabs required manually scrolling the tab bar. A shared control is needed to indicate which direction has more tabs and allow scrolling by clicking.
 
-## 결정
+## Decision
 
-모든 가로 탭 바는 공용 `TabScrollArea`를 사용한다. 기존 `useTabAutoScroll`을 내부에서 유지하고 스크롤이 남은 쪽 끝에 꺾쇠 버튼을 탭 위로 겹쳐 표시한다. 버튼은 배경·테두리 없이 진한 그림자를 사용하며 누르는 동안 초당 320px로 이동하고 놓으면 즉시 멈춘다. 일반 세로 휠도 가로 이동으로 연결한다.
+All horizontal tab bars use the shared `TabScrollArea`. It retains the existing `useTabAutoScroll` internally and overlays chevron buttons over the tabs at ends with remaining scroll space. The buttons use a strong shadow without a background or border, scroll at 320px per second while held, and stop immediately on release. Ordinary vertical wheel input also maps to horizontal movement.
 
-2026-10-26 추가 요청으로 처음 채택한 표시 너비 50% 이동을 누르는 동안 일정 속도 이동으로 변경하고 그림자를 강화했다. 이동량을 누르는 시간으로 조절할 수 있게 한다.
+At an additional request on 2026-10-26, changed the initially adopted movement of 50% of the visible width to constant-speed scrolling while held and strengthened the shadow. Users can adjust the scrolling distance by how long they hold the button.
 
-## 근거와 영향
+## Rationale and Impact
 
-가려진 탭이 있는 방향을 드러내면서 기존 탭의 표시 너비를 유지한다. 공용 컴포넌트에서 스크롤·크기·탭 변화를 관찰해 방향별 표시를 일관되게 갱신한다. 이동은 활성 탭을 바꾸지 않으며 기존 자동 노출·입력 포커스·키보드·드래그·모션 감소 계약을 유지한다.
+Reveal the direction of hidden tabs while retaining the display width of existing tabs. The shared component observes scrolling, size, and tab changes to update directional indicators consistently. Scrolling does not change the active tab and preserves the existing automatic reveal, input focus, keyboard, drag, and reduced motion contracts.
 
-[ADR 0066](0066-active-tab-auto-scroll.md)의 활성 탭 자동 스크롤 결정을 확장한다. 현재 동작의 세부 조건은 [공용 탭 스크롤 계약](../development/ui-contracts.md#활성-탭-자동-스크롤)이 소유한다.
+Extends the active tab auto-scroll decision in [ADR 0066](0066-active-tab-auto-scroll.md). The [Shared Tab Scrolling Contract](../development/ui-contracts.md#active-tab-auto-scrolling) owns the detailed conditions of the current behavior.

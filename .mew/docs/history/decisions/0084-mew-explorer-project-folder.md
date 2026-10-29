@@ -1,31 +1,31 @@
 ---
-provenance: "Liiiiv 중앙 ADR 이관본, 2026-10-14"
-description: "이관한 결정 기록: 탐색기의 현재 루트는 이름 없는 Project 폴더다. 당시 선택·근거·후속 변경을 보존하며 현재 계약은 Mew 소유 문서에서 확인한다."
-title: "0084 — 탐색기의 현재 루트는 이름 없는 Project 폴더다"
+provenance: "Migrated copy of a Liiiiv central ADR, 2026-10-14"
+description: "Migrated decision record: The explorer presents the current root as a Project folder without a path name. Preserves the choices, rationale, and subsequent changes at the time; consult the Mew owning document for the current contract."
+title: "0084 — The explorer presents the current root as a Project folder without a path name"
 created: 2026-08-26
 updated: 2026-09-11
 ---
 
-- 날짜: 2026-08-26
-- 상태: 대체됨: 0085
-- 대체 확인: 2026-09-11 — [0085](0085-mew-explorer-root-and-subproject-sections.md). Project 컨테이너를 제거했다. 유지된 Documents·직계 .mew 판별도 후속 결정에 명시돼 있다.
-- 부분 대체: 0083 — 현재 루트 내용을 Documents 바로 아래에 직접 나열하던 범위
-- 결정자: 송상훈 (지시)
+- Date: 2026-08-26
+- Status: Superseded by: 0085
+- Supersession confirmed: 2026-09-11 — [0085](0085-mew-explorer-root-and-subproject-sections.md). Removed the Project container. The follow-up decision also explicitly states that Documents and immediate-child .mew detection are retained.
+- Partially supersedes: 0083 — The scope that listed the current root contents directly below Documents
+- Decision maker: Song Sanghoon (directive)
 
-## 배경
+## Background
 
-Documents는 접고 펼치는 폴더인데, 바로 뒤의 현재 루트 내용은 아무 경계 없이 같은 깊이에 놓인다. 현재
-프로젝트 경로명(`liiiiv` 등)을 다시 붙이는 것은 중복이지만, Documents와 같은 탐색 단위라는 표시와 접기
-동작은 필요하다.
+Documents is a collapsible folder, but the current root's contents immediately after it sit at the same depth without any boundary. Repeating
+the current project's path name, such as `liiiiv`, is redundant, but an indication that it is an exploration unit like Documents and a collapse
+action are needed.
 
-## 결정
+## Decision
 
-- Documents는 최상단의 일반 펼침 폴더로 유지한다.
-- 그 바로 아래에 경로명이 아닌 일반명 **Project** 펼침 폴더를 둔다. Project를 열면 현재 루트의 파일과
-  폴더가 바로 나타난다. `liiiiv` 같은 현재 루트명으로 한 단계 더 감싸지 않는다.
-- Project는 Documents보다 아래, 현재 루트의 다른 항목보다 위에 선다.
-- 0083의 `.mew/` 기반 직계 하위 프로젝트 표식·명령 버튼 판별은 그대로 유지한다.
+- Keep Documents as a regular expandable folder at the top.
+- Directly below it, place an expandable folder with the generic name **Project** rather than a path name. Opening Project immediately shows the
+  current root's files and folders. Do not add another wrapper using the current root name, such as `liiiiv`.
+- Project sits below Documents and above the other entries in the current root.
+- Retain the `.mew/`-based detection of immediate subproject markers and command buttons from 0083.
 
-## 근거
+## Rationale
 
-Documents와 Project를 같은 폴더 표현으로 맞추면 탐색 계층을 일관되게 유지하면서도 경로명 중복을 없앤다.
+Using the same folder presentation for Documents and Project keeps the navigation hierarchy consistent while eliminating repeated path names.

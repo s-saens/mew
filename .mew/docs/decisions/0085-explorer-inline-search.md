@@ -1,32 +1,32 @@
 ---
-title: "0085 — 탐색기 안의 파일명·내용 검색"
-description: "검색 탭·평면 목록을 단일 검색창·내용 토글·기존 파일/문서 트리로 통합하고 기존 문서/파일 두 버튼 토글을 유지하며 root 범위와 제한된 매치 문맥을 API에 추가하기로 한 결정."
+title: "0085 — Filename and content search within the explorer"
+description: "Decision to consolidate search tabs and flat lists into a single search field, a content toggle, and the existing file/document tree, retain the existing two-button document/file toggle, and add root scope and bounded match context to the API."
 created: "2026-10-29"
 updated: "2026-10-29"
 status: "accepted"
 ---
 
-## 배경
+## Background
 
-파일명·본문 검색 탭과 평면 결과 목록은 탐색 중인 폴더·문서 계층을 가렸다. 사용자는 탐색기에서 같은 검색창을 사용하고 내용 검색만 토글하며 일치 항목의 원래 위치와 주변 문맥을 확인할 수 있어야 한다.
+The filename and body search tabs and flat result lists obscured the folder and document hierarchy being browsed. Users must be able to use the same search field in the explorer, toggle only content search, and see matches in their original locations with surrounding context.
 
-## 결정
+## Decision
 
-- 별도 검색 탭을 제거하고 `SearchPanel`이 검색창·요청·치환 상태를 소유한다. 결과는 기존 `FileTree`의 파일 또는 문서 보기에 전달한다.
-- 반환된 매치 경로에서 일치 항목·조상만 구성한다. 검색용 펼침·스크롤은 평상시 탐색 상태와 분리하고 전체 트리를 추가 조회하지 않는다.
-- 문서/파일 범위 선택은 기존 두 버튼 토글을 유지한다. API에 `root` 범위를 추가해 상한 적용 전에 `.workspace` 전체를 선택하고 별도 Documents 결과를 제외한다. 기존 무범위 통합·docs/하위 프로젝트 OR 조회는 유지한다.
-- 본문 매치에 선택적 `context` 배열을 더한다. 이미 읽은 원문에서 위아래 최대 3줄과 좌우 약 10단어를 만들고 줄별 길이를 제한한다. JSON·SSE에서 같은 생성 함수를 사용하며 기존 원문 열·미리보기 오프셋은 보존한다.
+- Remove the separate search tabs and make `SearchPanel` own the search field, requests, and replacement state. Pass results to the existing file or document view in `FileTree`.
+- Build only matching items and their ancestors from the returned match paths. Keep search expansion and scrolling separate from normal browsing state, and do not fetch the full tree again.
+- Retain the existing two-button toggle for selecting the document/file scope. Add the `root` scope to the API to select all of `.workspace` before applying limits and exclude separate Documents results. Preserve the existing unscoped unified queries and OR queries across docs/subproject scopes.
+- Add an optional `context` array to body matches. Generate up to 3 lines above and below and approximately 10 words on either side from source text already read, limiting each line's length. Use the same generation function for JSON and SSE, preserving existing source columns and preview offsets.
 
-## 대안과 근거
+## Alternatives and Rationale
 
-검색 탭과 평면 목록을 유지하면 요청한 계층 탐색을 충족하지 못한다. 브라우저에서 전체 트리를 검색하면 기존 카탈로그·폴더 지연 로드의 이점을 잃는다. 결과를 받은 뒤 범위만 거르면 다른 범위의 파일이 상한을 먼저 채울 수 있으므로 서버에서 범위를 선별한다. hover마다 원문을 다시 읽는 대신 제한된 문맥을 기존 응답에 실어 추가 요청을 피한다.
+Keeping search tabs and flat lists would not meet the requested hierarchical browsing behavior. Searching the full tree in the browser would lose the benefits of the existing catalog and lazy folder loading. Filtering by scope only after receiving results could let files from other scopes fill the limit first, so scope is selected on the server. Include bounded context in existing responses to avoid additional requests instead of rereading source text on every hover.
 
-## 영향
+## Impact
 
-문서 대표 파일은 해당 페이지 행으로 표시하고 파일 보기에서는 실제 경로를 유지한다. 본문 검색의 응답 크기는 문맥만큼 늘어나지만 파일·매치·줄 길이 상한을 유지한다. 문맥이 없는 이전 응답은 한 줄 미리보기로 표시한다. 검색 권한·정규식 엔진·색인 및 scanner 보완 정책은 유지한다. 파일 탐색기에는 탭 번호·다음/이전 탭·본문 스와이프로 전환할 검색 탭이 없다.
+Display a document's representative file as its page row, and preserve the actual path in the file view. Body search response sizes increase by the amount of context, but file, match, and line-length limits remain. Display older responses without context as single-line previews. Preserve search permissions, the regex engine, indexing, and scanner supplementation policies. The file explorer has no search tab to switch to through tab numbers, next/previous tab actions, or body swipes.
 
-현재 계약은 [파일명·내용 검색과 치환](../features/%ED%94%84%EB%A1%9C%EC%A0%9D%ED%8A%B8%C2%B7%ED%8C%8C%EC%9D%BC%C2%B7%EA%B2%80%EC%83%89/%ED%8C%8C%EC%9D%BC%EB%AA%85%C2%B7%EB%82%B4%EC%9A%A9%20%EA%B2%80%EC%83%89%EA%B3%BC%20%EC%B9%98%ED%99%98.md), 검증과 적용 범위는 [구현 기록](../work/explorer-inline-search.md)을 따른다.
+The current contract follows [Filename and content search and replacement](../features/projects-files-search/filename-content-search-and-replacement.md); validation and application scope follow the [Implementation record](../work/explorer-inline-search.md).
 
-## 2026-10-29 범위 토글 정정
+## 2026-10-29 scope toggle correction
 
-초기 구현은 검색 탭 제거를 문서/파일 범위 전환까지 바꾸는 것으로 잘못 해석해 `SelectField` 드롭다운을 적용했다. 사용자 확인에 따라 범위 전환을 기존 두 버튼 토글로 복원했다. 제거 대상은 탐색·파일명·내용 검색 탭이며, 문서/파일 토글은 유지한다. 검색창·계층 결과·문맥 API 결정은 유지한다.
+The initial implementation incorrectly interpreted removing search tabs as also changing document/file scope switching and introduced a `SelectField` dropdown. Following user confirmation, scope switching was restored to the existing two-button toggle. The tabs to remove are browsing, filename search, and content search; the document/file toggle remains. The decisions on the search field, hierarchical results, and context API remain.

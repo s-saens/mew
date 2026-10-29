@@ -1,38 +1,38 @@
 ---
-title: "Mew·Mewlink 전체 진입 로고와 내부 세 점 로딩"
-description: "공용 로딩을 전체 진입 전용의 저채도 로고 하이라이트와 패널·에디터·버튼 내부의 크기가 순차 변화하는 세 점으로 분리한 결정. 기존 원형·궤도·전면 로고 적용의 변경 이력과 검증 경계를 설명하며, 첨부 태그의 원형 복원은 후속 결정 0075를 따른다."
+title: "Full-entry logos and internal three-dot loading for Mew and Mewlink"
+description: "Decision to split shared loading indicators into a low-saturation logo highlight exclusively for full entry and three dots that sequentially change size inside panels, editors, and buttons. Explains the change history of the previous circular, orbital, and universal logo implementations and the verification boundaries; restoring circular indicators for attachment tags follows subsequent decision 0075."
 created: "2026-10-26"
 updated: "2026-10-27"
 ---
 
-상태: 부분 대체 — 첨부 업로드 태그의 세 점 적용은 [ADR 0075](0075-attachment-spinner-indicator.md)가 원형으로 대체한다.
+Status: Partially superseded — [ADR 0075](0075-attachment-spinner-indicator.md) replaces the three dots on attachment upload tags with a circular indicator.
 
-## 배경
+## Background
 
-프로젝트·편집기는 테두리 링, 댓글 전송은 회전하는 새로고침 아이콘, 첨부 업로드와 Mewlink는 별도 CSS 스피너를 사용했다. 회전 속도·트랙·강조 방향도 달라 같은 대기 상태가 서로 다르게 보였다.
+Projects and editors used border rings, comment submission used a rotating refresh icon, and attachment uploads and Mewlink used separate CSS spinners. Rotation speeds, tracks, and highlight directions also differed, making the same waiting state look different.
 
-## 결정
+## Decision
 
-`@mew/ui`의 `LoadingIndicator`와 `loading-indicator.css`로 대기 표시를 통일한다. React를 사용하지 않는 비공개 Mewlink도 같은 CSS를 직접 가져온다. 크기는 사용 위치에서 정하고 로고·그라데이션·회전 속도·모션 감소 처리는 공용 CSS가 소유한다. 구체적인 값과 사용 범위는 [공용 UI 계약](../development/ui-contracts.md#공용-로딩-인디케이터)을 따른다.
+Standardize waiting indicators using `LoadingIndicator` and `loading-indicator.css` from `@mew/ui`. Private Mewlink, which does not use React, also imports the same CSS directly. Usage locations determine size, while shared CSS owns the logo, gradients, rotation speed, and reduced-motion handling. Follow the [shared UI contract](../development/ui-contracts.md#shared-loading-indicators) for specific values and usage scope.
 
-연결 상태와 알림 유무를 나타내는 표시는 해당 의미를 보존한다. 대기 표시는 아래 용도별 분리 결정을 따른다.
+Indicators for connection status and the presence of notifications retain their meanings. Waiting indicators follow the purpose-specific separation decision below.
 
-## 이전 혜성 궤도 디자인
+## Previous comet orbit design
 
-처음에는 단일 span과 두 가상 요소에 그라데이션·마스크를 적용한 두 궤도를 채택했다. 사용자의 후속 요청에 따라 아래 로고 하이라이트 방식으로 대체했다. 컴포넌트 API와 공용 CSS의 소유권은 유지한다.
+Initially adopted two orbits using gradients and masks on a single span and two pseudo-elements. Replaced this with the logo highlight approach below following a subsequent user request. Retain ownership of the component API and shared CSS.
 
-## Mew 로고 하이라이트
+## Mew logo highlight
 
-`public/favicon.svg`의 사각 테두리·내부 마크를 고정 마스크로 사용하고, 보라·핑크·시안의 빛 레이어만 transform으로 회전시킨다. 로고 자체는 움직이지 않으며 원본 SVG의 기하를 브라우저 테스트로 대조한다. 별도 SVG 요청이나 JS 프레임 루프를 추가하지 않는다. 당시에는 작은 버튼에도 같은 형태를 사용하고 중앙 대기는 로고를 읽기 쉽게 키웠다. 이 적용 범위는 아래 용도별 분리 결정으로 대체한다. 강제 색상에서는 시스템색의 로고를, 모션 감소에서는 정적인 그라데이션을 유지한다.
+Use the square border and inner mark of `public/favicon.svg` as a fixed mask, rotating only the purple, pink, and cyan light layers with transform. The logo itself does not move, and browser tests compare its geometry against the original SVG. Do not add a separate SVG request or JS frame loop. At the time, the same form was used even in small buttons, with the logo enlarged for central waiting indicators to improve legibility. The purpose-specific separation decision below supersedes this usage scope. Retain a system-color logo in forced colors and a static gradient with reduced motion.
 
-SVG stroke-dashoffset으로 정확한 path trace를 만드는 대신 고정 마스크 위의 이동 하이라이트를 선택했다. 기존 React·일반 HTML 소비 경로를 함께 유지하면서 반복적인 SVG 페인트를 피하기 위한 선택이다. 성능 측정은 격리 Chromium과 실제 운영·모바일 기기 검증을 구분한다.
+Chose a moving highlight over a fixed mask instead of exact path tracing with SVG stroke-dashoffset. This avoids repeated SVG painting while retaining both existing React and plain HTML consumption paths. Performance measurements distinguish isolated Chromium from verification in actual production and on mobile devices.
 
-## 전체 진입과 내부 대기 분리
+## Separate full entry from internal waiting
 
-로고를 모든 크기의 대기에 사용하자 패널·버튼에서 시각적 무게가 컸다. 사용자 요청에 따라 로고는 전체 진입·복원·전환에 명시적으로 선택하고 색을 저채도 회보라·청회색으로 낮춘다. 패널·에디터·댓글·첨부·Mewlink 목록과 복구는 기본 세 점을 사용한다. 기존 에이전트 말풍선 skeleton도 같은 세 점으로 대체한다.
+Using the logo for waiting indicators at every size gave panels and buttons excessive visual weight. At the user's request, explicitly select the logo for full entry, restoration, and transitions, and reduce its colors to low-saturation gray-purple and blue-gray. Panels, editors, comments, attachments, Mewlink lists, and recovery use the default three dots. Replace existing agent speech-bubble skeletons with the same three dots.
 
-세 점은 각 점의 scale과 opacity만 위상차를 두어 변화시킨다. 현재 글자색을 따르고 위치를 움직이지 않으며 모션 감소·정지·시스템 고대비를 지원한다. 구체적인 적용 위치와 크기는 [공용 UI 계약](../development/ui-contracts.md#공용-로딩-인디케이터)이 소유한다.
+The three dots vary only each dot's scale and opacity with phase offsets. They follow the current text color, remain stationary, and support reduced motion, pausing, and system high contrast. The [shared UI contract](../development/ui-contracts.md#shared-loading-indicators) owns specific usage locations and sizes.
 
-## 근거와 영향
+## Rationale and Impact
 
-공용 스타일 하나를 수정하면 Mew와 Mewlink의 원형 로딩이 함께 바뀐다. Mewlink에 React 의존성을 추가하지 않으며 기존 상태 안내와 모션 감소 설정을 유지한다. 비공개 중앙 소스는 Git 제외를 유지한다. 운영 반영은 사용자가 수행하는 로컬 앱 빌드와 중앙 프론트 배포가 각각 필요하다.
+Changing one shared style updates circular loading indicators in both Mew and Mewlink. Do not add a React dependency to Mewlink; retain existing status guidance and reduced-motion settings. Keep private central source excluded from Git. Production application requires both a local app build performed by the user and a central frontend deployment.

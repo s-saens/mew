@@ -1,21 +1,21 @@
 ---
-title: "태스크 문서의 태그 표시와 생성·삭제 동기화 수정"
-description: "2026-10-29 타입 주석이 없는 태그·담당자의 다중선택 표시와 태스크 생성·이동·삭제의 열린 탭 동기화를 보완한 기록. 미저장 내용 보존·삭제 파일 재생성 방지와 회귀·격리 UI 검사, 기존 문서 오류 및 운영 미적용 범위를 남긴다."
+title: "Fixed Tag Display and Creation/Deletion Synchronization for Task Documents"
+description: "Record for 2026-10-29 of improvements to multiselect display for tags and assignees without type annotations and synchronization of open tabs on task creation, moves, and deletion. Records preservation of unsaved content, prevention of deleted file recreation, regression and isolated UI checks, existing documentation errors, and changes not applied to production."
 created: "2026-10-29"
 updated: "2026-10-29"
 ---
 
-## 목적과 결과
+## Purpose and results
 
-태스크가 저장한 YAML 배열에 타입 주석이 없으면 문서 속성의 `tags`·`assignees`가 배열 문자열로 표시됐다. 두 필드의 기본 타입을 다중선택으로 해석하고 선택기에서도 같은 해석을 사용하도록 수정했다. 기존 YAML 배열과 이전 배열 문자열을 읽고, 명시한 사용자 타입과 손상된 값의 텍스트 편집은 유지한다. 문서를 열기만 하면 파일을 변경하지 않는다. 현재 계약은 [공용 패키지](../development/packages.md)가 소유한다.
+When YAML arrays saved by tasks lacked type annotations, document properties displayed `tags` and `assignees` as array strings. Changed the default type of both fields to multiselect and made the picker use the same interpretation. Reads existing YAML arrays and legacy array strings while preserving explicit user types and text editing for malformed values. Merely opening a document does not modify the file. The current contract is owned by [Shared packages](../development/packages.md).
 
-태스크 응답의 생성·변경뿐 아니라 삭제도 열린 에디터에 전달한다. 저장된 삭제 탭은 닫고 캐시·탐색 기록·예약 저장을 정리하며, 미저장 내용은 읽기 전용 오류 탭에 남긴다. 조회 전에 미저장 문서를 강제로 저장하지 않고 진행 중 저장만 기다린다. 서버는 저장 기준이 있는 태스크 요청의 경로가 삭제되거나 이동됐으면 409로 거부한다. 현재 저장·수명주기 계약은 [태스크 계약](../development/task-list.md#클라이언트-수명과-오류)을 따른다.
+Propagate deletions from task responses to open editors, along with creations and changes. Close deleted tabs with saved content and clear their caches, navigation history, and scheduled saves, while retaining unsaved content in read-only error tabs. Before fetching, wait only for saves already in progress without forcing unsaved documents to save. The server rejects task requests with a save baseline using 409 if the path has been deleted or moved. The current save and lifecycle contract follows the [Task contract](../development/task-list.md#client-lifecycle-and-errors).
 
-## 검증과 적용
+## Verification and application
 
-- 프론트매터·속성 병합·Markdown 저장·담당자·Done 이동·API·문서 동기화·세션 회귀 55개를 통과했다. 담당자 기존 테스트의 완료 후 경로도 현재 `Done/` 계약에 맞췄다.
-- `server/task-frontmatter-ui.test.ts`와 `server/task-document-save-ui.test.ts`의 격리 Chromium 검사 9개를 통과했다. PC·모바일 태그 표시·해제·새 문서 전환·읽기 전용, 삭제 시 저장된 탭과 캐시 제거·미저장 내용 보존·진행 중 저장과 대기 저장의 경합·같은 ID 이름 변경을 확인했다. UI 응답은 fixture를 사용했다.
-- `npx tsc -b`와 변경 TypeScript 파일의 oxlint를 통과했다. oxlint에는 기존 훅의 ref 접근과 선택기의 effect 상태 갱신 경고가 남아 있다. 변경 선택기 대상 디자인 검사 결과는 빈 목록이었다.
-- 전체 문서 검사는 기존 `docs/지원서.md`의 프론트매터 누락으로 실패했다. 별도로 실행한 링크 검사도 기존 README의 API 이미지 경로, 삭제된 기능 MOC와 태스크 문서 참조 등 19건 때문에 실패했다. 이번 변경 문서의 description과 로컬 링크는 별도로 확인했다.
+- Passed 55 regression tests covering frontmatter, property merging, Markdown saving, assignees, Done moves, APIs, document synchronization, and sessions. Also aligned the post-completion path in the existing assignee test with the current `Done/` contract.
+- Passed 9 isolated Chromium checks in `server/task-frontmatter-ui.test.ts` and `server/task-document-save-ui.test.ts`. Verified tag display and removal, switching to new documents, and read-only behavior on desktop and mobile; removal of saved tabs and caches on deletion; preservation of unsaved content; races between in-progress and pending saves; and renames with the same ID. UI responses used fixtures.
+- Passed `npx tsc -b` and oxlint on changed TypeScript files. Existing warnings remain in oxlint for ref access in a hook and effect state updates in the picker. The design check for the changed picker returned an empty list.
+- The full documentation check failed because the existing `docs/지원서.md` was missing frontmatter. A separately run link check also failed due to 19 existing issues, including an API image path in the README and references to deleted feature MOC and task documents. Separately verified descriptions and local links in the documents changed in this work.
 
-앱 빌드·배포·서버 시작·종료·재시작은 수행하지 않았다. 실행 중인 인스턴스 적용과 실기기 확인은 사용자의 빌드 후 남아 있다.
+No app build, deployment, or server start, stop, or restart was performed. Applying the changes to the running instance and checking on physical devices remain pending after the user's build.

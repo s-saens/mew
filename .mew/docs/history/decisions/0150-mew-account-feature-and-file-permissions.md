@@ -1,37 +1,37 @@
 ---
-provenance: "Liiiiv 중앙 ADR 이관본, 2026-10-14"
-description: "이관한 결정 기록: mew 계정별 기능 권한과 파일 접근 표. 당시 선택·근거·후속 변경을 보존하며 현재 계약은 Mew 소유 문서에서 확인한다."
-title: "0150 — mew 계정별 기능 권한과 파일 접근 표"
+provenance: "Migrated copy of a Liiiiv central ADR, 2026-10-14"
+description: "Migrated decision record: mew per-account feature permissions and file access matrix. Preserves the choices, rationale, and subsequent changes from that time; consult the Mew owning document for the current contract."
+title: "0150 — mew per-account feature permissions and file access matrix"
 created: 2026-09-16
 updated: 2026-09-16
 ---
 
-- 날짜: 2026-09-16
-- 상태: 채택
-- 부분 대체: [0080](0080-mew-server-file-explorer.md) — 서버 파일 탐색기의 고정 역할 게이트
-- 부분 대체: [0127](0127-mew-browser-server-dom-runtime.md) — 내부 브라우저의 고정 역할 게이트
-- 부분 대체: [0034](0034-mew-agent-panel-acp-reintroduction.md) — 에이전트·tmux의 고정 역할 게이트
-- 부분 대체: [0120](0120-mew-project-local-assets-replace-r2.md) — UUID 첨부의 공개 열람 경계
-- 결정자: 사용자 (계정별 기능·파일 권한 표 지시), Codex (구현)
+- Date: 2026-09-16
+- Status: Adopted
+- Partially supersedes: [0080](0080-mew-server-file-explorer.md) — Fixed role gate for the server file explorer
+- Partially supersedes: [0127](0127-mew-browser-server-dom-runtime.md) — Fixed role gate for the internal browser
+- Partially supersedes: [0034](0034-mew-agent-panel-acp-reintroduction.md) — Fixed role gate for agents and tmux
+- Partially supersedes: [0120](0120-mew-project-local-assets-replace-r2.md) — Public viewing boundary for UUID attachments
+- Decision makers: User (directed creation of a per-account feature and file permission matrix), Codex (implementation)
 
-## 배경
+## Background
 
-역할 하나로 모든 서버 기능을 묶고 파일 공유는 사이드바에서 guest에게만 부여하던 방식으로는 계정별 기능 제한과 파일별 열람·수정 범위를 관리할 수 없다.
+Bundling all server features under a single role and granting file sharing only to guests through the sidebar cannot manage per-account feature restrictions and per-file viewing and editing scope.
 
-## 결정
+## Decision
 
-- 계정 관리는 owner 전용으로 유지한다. 역할은 기능 권한의 기본값이며 각 계정과 guest의 기능 권한을 별도 저장한다. 마지막 owner의 강등은 허용하지 않는다.
-- 계정 관리의 행은 계정과 guest, 열은 기능이다. 파일 권한은 같은 화면의 파일·폴더 탐색 표에서 계정별로 상속·차단·열람·수정을 고른다. 사이드바의 guest 눈·연필 설정은 제거한다.
-- 기능 사용은 HTTP·WebSocket 서버에서 검사한다. 파일 열람·수정의 기능 토글은 상한이며 경로 규칙은 가장 구체적인 조상/자기 규칙이 이긴다. 수정은 열람을 전제한다. 권한 없는 파일은 트리·검색·원문·협업에서 접근하지 못한다.
-- 경로 규칙은 실제 워크스페이스 경계와 정규화한 경로에 귀속한다. Documents·하위 프로젝트·루트의 별칭으로 제한을 우회하지 못하며 다른 워크스페이스에 동일 경로의 권한이 전파되지 않는다. 기존 guest 규칙은 현재 워크스페이스로 가져온다.
-- owner·manager의 기본 기능은 기존과 같고 member도 개별 허용한 서버 기능을 사용할 수 있다. 계정 관리는 역할로만 결정하며 기능 표의 변경으로 위임하지 않는다.
-- 파일 권한은 mew 파일 API의 경계다. 에이전트·터미널·원격 데스크톱·서버 파일 탐색기 등 OS 접근 기능은 파일 권한으로 샌드박싱되지 않는다. 기능 표에 이 범위를 표시한다. OS 격리·공급자 자격증명 수집 등 기존 금지는 해제하지 않는다.
-- 기존 접속의 권한 변경도 서버에서 반영하고 클라이언트는 새 권한을 다시 읽어 열린 기능과 파일을 재검증한다. 권한 저장 실패는 화면에 알리고 성공한 것처럼 표시하지 않는다.
+- Keep account management exclusive to owners. Roles provide default feature permissions; store feature permissions separately for each account and guest. Do not allow demotion of the last owner.
+- In account management, rows represent accounts and guest, and columns represent features. For file permissions, select Inherit, Block, View, or Edit per account in the file and folder navigation table on the same screen. Remove the guest eye and pencil settings from the sidebar.
+- Check feature use on the HTTP and WebSocket servers. File viewing and editing feature toggles set the upper limit, and the most specific rule on the path itself or an ancestor takes precedence. Editing requires viewing. Unauthorized files must be inaccessible through the tree, search, raw content, and collaboration.
+- Bind path rules to the actual workspace boundary and normalized paths. Restrictions cannot be bypassed through Documents, subproject, or root aliases, and permissions for the same path do not propagate to other workspaces. Import existing guest rules into the current workspace.
+- Default features for owners and managers remain unchanged, and members can also use individually permitted server features. Account management is determined solely by role and cannot be delegated through changes to the feature matrix.
+- File permissions define the boundary of the mew file API. Features with OS access, such as agents, terminals, remote desktop, and the server file explorer, are not sandboxed by file permissions. Show this scope in the feature matrix. Do not lift existing prohibitions concerning OS isolation, provider credential collection, and similar matters.
+- The server also applies permission changes to existing connections, and clients reread the new permissions and revalidate open features and files. Show permission save failures on screen; do not display them as successes.
 
-- guest는 파일 열람·수정만 설정하고 서버 제어 기능은 로그인 계정에만 허용한다. 터미널형 에이전트는 에이전트와 터미널 기능을 모두 요구한다.
-- UUID 첨부도 파일 ACL을 적용한다. Git·DB·RAG 관리 같은 프로젝트 전체 조회는 부분 파일 제한이 있는 프로젝트에서 차단한다.
-- 권한 회수는 연결·API 사용을 막으며 이미 실행한 OS 프로세스나 내려받은 데이터까지 소급 회수하지 않는다.
+- For guest, configure only file viewing and editing; allow server control features only for logged-in accounts. Terminal-based agents require both agent and terminal features.
+- Apply file ACLs to UUID attachments as well. Block project-wide queries such as Git, DB, and RAG management in projects with partial file restrictions.
+- Revoking permissions blocks connections and API use; it does not retroactively revoke OS processes already started or data already downloaded.
 
-## 근거
+## Rationale
 
-역할을 더 만드는 대신 기본값과 계정별 설정을 분리하면 기능 간 결합을 줄인다. 명시적인 차단과 상속을 구분해야 상위 폴더를 허용하고 특정 파일만 숨기는 설정이 가능하다. 파일 접근은 클라이언트 표시만 바꾸지 않고 서버 경계까지 함께 변경한다.
+Separating defaults from per-account settings instead of creating more roles reduces coupling between features. Distinguishing explicit blocking from inheritance makes it possible to allow a parent folder while hiding specific files. Change file access at the server boundary as well as in the client display.

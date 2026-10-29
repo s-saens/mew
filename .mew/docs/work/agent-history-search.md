@@ -1,31 +1,31 @@
 ---
-title: "에이전트 히스토리 주제 검색 구현·검증"
-description: "세션 ID 입력을 로컬 주제·본문·ID 검색으로 바꾼 구현과 저장 시 색인·외부 CLI·Worker 처리, 서버·격리 UI·타입·린트 검증 결과와 기존 문서 링크 오류·운영 미적용 범위를 기록한다."
+title: "Agent history topic search: implementation and verification"
+description: "Records the implementation replacing session ID entry with local topic, body text, and ID search, indexing on save, external CLI and Worker handling, server, isolated UI, type, and lint verification results, existing document link errors, and the scope not applied to production."
 created: "2026-10-28"
 updated: "2026-10-28"
 ---
 
-2026-10-28 작업 기록. 현재 계약은 [세션 계약](../development/agent-sessions.md#히스토리-검색)과 [대화 기능 문서](../features/%ED%84%B0%EB%AF%B8%EB%84%90%C2%B7%EC%97%90%EC%9D%B4%EC%A0%84%ED%8A%B8%C2%B7%EC%9E%90%EB%8F%99%ED%99%94/%EC%97%90%EC%9D%B4%EC%A0%84%ED%8A%B8%20%EB%8C%80%ED%99%94%C2%B7%ED%81%90%C2%B7%EB%B3%B5%EC%9B%90.md#히스토리-검색), 사용법은 [터미널·에이전트 안내](../../../docs/guides/terminal-agents.md#대화-진행과-기록), 선택 근거는 [결정 0084](../decisions/0084-agent-history-search.md)을 따른다.
+Work record for 2026-10-28. The current contract follows the [session contract](../development/agent-sessions.md#history-search) and [conversation feature document](../features/terminals-agents-automation/agent-conversations-queue-and-restoration.md#history-search), usage follows the [terminal and agent guide](../../../docs/guides/terminal-agents.md#conversations-and-history), and the rationale follows [Decision 0084](../decisions/0084-agent-history-search.md).
 
-## 목적과 결과 동작
+## Purpose and resulting behavior
 
-세션 ID를 기억하지 않아도 대화 주제·내용으로 지난 기록을 찾도록 한다. 기존 ID 입력을 한 검색칸으로 바꾸고, 제목·본문 발췌·날짜를 확인해 결과를 선택한다. ID의 정확한 일치·부분 일치도 같은 검색 경로를 사용한다. 검색 요청과 대화 복원을 분리하고 기존 점유·진행 작업·승인·큐 제한을 유지한다.
+Allows users to find past records by conversation topic or content without remembering session IDs. Replaces the existing ID input with a single search field, where users review titles, body excerpts, and dates to select a result. Exact and partial ID matches use the same search path. Separates search requests from conversation restoration and preserves existing occupancy, ongoing work, approval, and queue restrictions.
 
-Mew 전사는 저장 시 로컬 SQLite 검색 색인을 갱신하며 기존 전사는 검색할 때 보강한다. Codex·Claude 외부 CLI의 JSONL 기록은 줄 단위로 읽고 파일 변경 여부로 재사용한다. 실행 안내를 제외한 본문 검색·색인 보강은 계정 컨텍스트를 전달한 재사용 Worker에서 처리하며, 일부 소스 실패 때도 성공한 검색 결과는 보여 준다. 띄어쓰기·대소문자 정규화와 주요 기능의 한영 동의어를 사용하고 외부 임베딩 API나 모델은 추가하지 않는다.
+Mew transcripts update the local SQLite search index on save, and existing transcripts are backfilled during searches. JSONL records from external Codex and Claude CLIs are read line by line and reused based on whether the file has changed. Body text search and index backfilling, excluding execution guidance, run in a reusable Worker supplied with account context; successful search results are shown even if some sources fail. Uses whitespace and case normalization and Korean-English synonyms for major features, without adding an external embedding API or model.
 
-## 검증
+## Verification
 
-- `node --test`로 `agentWs.test.ts`·`agentSessionList.test.ts`·`agent-session-search.test.ts`·`agent-session-search-service.test.ts`·`agent-transcript-search.test.ts`·`agentTranscript.test.ts`·`agent-runtime-history-search.test.ts`의 7개 서버 테스트 파일을 함께 실행해 60개가 통과했다. 세션 ID·본문·동의어 검색, 증분 저장·기존 전사 보강, CLI 기록의 범위·캐시, WS·Worker 통합을 포함했다.
-- `server/agent-history-preview-ui.test.ts`와 `server/agent-history-ui.test.ts`가 통과했다. 격리 Chromium의 1100·390px 화면과 밝은·어두운 테마에서 검색·선택·기존 복원을 확인했다. IME 조합 중 검색 대기와 부분 실패 후 재검색을 추가한 최종 preview 검사도 다시 실행해 통과했다.
-- `npx tsc -b`가 통과했다. 대상 oxlint는 오류 0개였으며 기존 React 경고는 남아 있다. 변경 UI의 Impeccable `detect` 결과는 빈 배열이었다.
-- 변경 문서의 `git diff --check`가 통과했다.
-- 최종 `npm run check:docs`의 description 검사 519개는 오류 0개였다. 전체 링크 검사는 작업 전부터 삭제된 `docs/features/MOC.md`의 들어오는 링크 16개와 삭제된 태스크 문서 링크 2개, 총 18개 오류로 실패했다. 해당 작업 외 파일은 수정하지 않았다.
-- 기존 `documentLinkErrors` 검사로 이번 변경 문서 5개를 별도 확인했으며 로컬 링크 오류는 0개였다.
+- Ran the 7 server test files `agentWs.test.ts`, `agentSessionList.test.ts`, `agent-session-search.test.ts`, `agent-session-search-service.test.ts`, `agent-transcript-search.test.ts`, `agentTranscript.test.ts`, and `agent-runtime-history-search.test.ts` together with `node --test`; 60 tests passed. Covered session ID, body text, and synonym search, incremental saving and existing transcript backfilling, CLI record scope and caching, and WS and Worker integration.
+- `server/agent-history-preview-ui.test.ts` and `server/agent-history-ui.test.ts` passed. Verified search, selection, and existing restoration behavior in isolated Chromium at 1100 and 390px screen widths in light and dark themes. Reran and passed the final preview check after adding search deferral during IME composition and searching again after partial failures.
+- `npx tsc -b` passed. Targeted oxlint reported 0 errors; existing React warnings remain. Impeccable `detect` returned an empty array for the changed UI.
+- `git diff --check` passed for the changed documents.
+- The final `npm run check:docs` run completed 519 description checks with 0 errors. The full link check failed with 18 errors in total: 16 incoming links to `docs/features/MOC.md`, which had been deleted before this work, and 2 links to deleted task documents. Those files outside this work were not changed.
+- Separately checked the 5 documents changed here using the existing `documentLinkErrors` check and found 0 local link errors.
 
-도구 결과가 포함된 합성 12MiB 전사의 최초 색인 보강은 95.7ms, 변경 없는 재검색은 1.2ms로 관측했다. 담당 에이전트의 로컬 단일 관측이며 실제 보유 대화 전체나 운영 응답 시간의 측정값은 아니다.
+Observed initial index backfilling of a synthetic 12MiB transcript containing tool results at 95.7ms, and a repeat search without changes at 1.2ms. This was a single local observation by the assigned agent, not a measurement of all actual stored conversations or production response times.
 
-## 운영 적용과 제한
+## Production application and limitations
 
-앱 빌드·배포·서버 시작·종료·재시작은 수행하지 않았다. 변경의 운영 적용은 사용자가 수행한다. 임의의 의미 추론과 동의어 사전 밖의 관계를 찾는 벡터 검색은 포함하지 않으며, 실제 보유 대화 전체의 검색 회수율은 측정하지 않았다.
+No app build, deployment, or server startup, shutdown, or restart was performed. The user will apply the changes to production. This does not include arbitrary semantic inference or vector search for relationships outside the synonym dictionary, and search recall across all actual stored conversations was not measured.
 
-외부 JSONL의 개별 줄이 8Mi 문자를 넘으면 해당 줄은 건너뛴다. 외부 파일이 바뀌면 바이트 위치에서 이어 읽지 않고 그 파일을 다시 색인한다. 변경 없는 파일은 수정 시각·크기로 재사용한다.
+If an individual line in an external JSONL file exceeds 8Mi characters, that line is skipped. When an external file changes, the file is reindexed rather than resuming from a byte offset. Unchanged files are reused based on modification time and size.

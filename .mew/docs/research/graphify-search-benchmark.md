@@ -1,144 +1,144 @@
 ---
-title: "Graphify·rg 코드 탐색 성능 비교"
-description: "검색 연동 철회 후 보존한 2026-10-27 Graphify·rg의 900개 소스·24개 과제 비교 기록. 지연·출력 토큰·파일 포함률·호출 경로의 한계와 과거 재현 소스, 미검증인 변경 영향·첨부·문서 개념 관계 후보를 구분한다."
+title: "Graphify vs. rg code navigation performance comparison"
+description: "A 2026-10-27 comparison record of Graphify and rg across 900 source files and 24 tasks, retained after the search integration was withdrawn. Distinguishes latency, output tokens, file inclusion rates, call-path limitations, and historical reproduction sources from unverified candidates involving change impact, attachments, and document concept relationships."
 created: "2026-10-27"
 updated: "2026-10-27"
 ---
 
-현재 검색 연동은 [결정 0080](../decisions/0080-retire-graphify-search.md)에 따라 제거했다.
-이 문서는 당시 측정 결과이며, 재현 소스는 [이력](../history/graphify/README.md)에 보존한다.
-현재 체크아웃에서 아래의 과거 실행 명령을 사용할 수 있다는 뜻은 아니다.
+The search integration has now been removed under [Decision 0080](../decisions/0080-retire-graphify-search.md). This document records measurements from
+that time, and the reproduction sources are preserved in [History](../history/graphify/README.md). This does not mean the historical
+commands below are available in the current checkout.
 
-## 결과
+## Results
 
-이번 조건에서는 **Graphify 기본 `query`가 검색 속도나 출력량을 개선하지 않았다.** `rg`보다 조회 중앙값이
-47.4배 느렸고 출력 토큰은 631.9% 늘었다. 두 방법 모두 사전에 지정한 정답 파일을 전부 포함했다.
-함수 이름을 아는 코드 검색을 기본 `query`로 대체할 성능 근거는 확인하지 못했다.
+Under these conditions, **Graphify's default `query` did not improve search speed or output volume.** Its median lookup time was 47.4 times slower
+than `rg`, and output tokens increased by 631.9%. Both methods included all predefined answer files. We found no performance
+evidence supporting replacement of code searches with known function names by the default `query`.
 
-24개 과제 각각 5회, 방법별 120회 조회의 시간 중앙값·p95다. 출력 토큰은 반복마다 동일해 과제별 한 번씩 합산했다.
+These are median and p95 query times for 24 tasks, each repeated 5 times, totaling 120 queries per method. Output token counts were identical across repetitions, so they were summed once per task.
 
-| 방법 | 조회 중앙값 | p95 | 24개 출력 토큰 합계 | 알려진 파일 포함률 | 처음 10개 파일 내 포함률 |
+| Method | Median query time | p95 | Total output tokens across 24 tasks | Known-file inclusion rate | Inclusion rate within the first 10 files |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | `rg` | 11.9ms | 15.5ms | 12,062 | 100% | 93.75% |
 | Graphify `query` | 563.1ms | 671.3ms | 88,276 | 100% | 100% |
 
-포함률은 과제마다 지정한 파일의 회수 비율을 평균한 값이다. 처음 10개는 **출력에서 처음 등장한 고유 파일** 기준이다.
-`rg`는 경로 순서로 출력하므로 이 차이 6.25%p를 관련성 순위나 답변 정확도의 개선으로 해석하지 않는다.
-정답은 알려진 일부 파일이며 전체 관련 파일의 완전성·정밀도를 평가한 것이 아니다.
+Inclusion rate is the average proportion of designated files retrieved for each task. The first 10 are based on **unique files in order of first appearance in the output**.
+Because `rg` outputs in path order, we do not interpret this 6.25 percentage-point difference as an improvement in relevance ranking or answer accuracy.
+The answers consist of some known files; this did not evaluate completeness or precision across all relevant files.
 
-## 전용 조회의 차이
+## Differences in specialized queries
 
-`explain`·`affected`는 기본 `query`보다 출력이 작았다. 파일 포함률을 비교할 수 있는 정의·영향 과제 16건에서
-출력은 5,224→4,418토큰으로 15.4% 줄었지만 조회 중앙값은 11.8→462.3ms로 39.2배 느렸다.
-이 16건은 두 방식 모두 알려진 파일을 전부 포함했고 전용 조회는 전부 종료 코드 0이었다.
+`explain`·`affected` produced less output than the default `query`. Across the 16 definition and impact tasks where file inclusion rates could be compared, output fell from
+5,224 to 4,418 tokens, a 15.4% reduction, but median lookup time increased from 11.8 to 462.3ms, making it 39.2 times slower. In these
+16 tasks, both methods included all known files, and every specialized lookup returned exit code 0.
 
-| 과제 | `rg` 중앙값 | 전용 조회 중앙값 | `rg` 출력 토큰 | 전용 조회 출력 토큰 | 출력 변화 |
+| Task | `rg` median | Specialized query median | `rg` output tokens | Specialized query output tokens | Output change |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| 정의 8건 → `explain` | 11.7ms | 500.3ms | 4,126 | 2,739 | −33.6% |
-| 호출·영향 후보 8건 → `affected` | 11.8ms | 362.8ms | 1,098 | 1,679 | +52.9% |
+| 8 definition tasks → `explain` | 11.7 ms | 500.3 ms | 4,126 | 2,739 | −33.6% |
+| 8 call and impact candidate tasks → `affected` | 11.8 ms | 362.8 ms | 1,098 | 1,679 | +52.9% |
 
-따라서 전용 조회도 항상 출력 비용을 줄이지는 않는다. 토큰 감소율은 `o200k_base`로 센 **도구 출력 텍스트의 크기**이며,
-모델 입력·추론·답변·캐시·재조회·실제 과금이나 전체 에이전트 토큰의 절감률이 아니다. 모델 세션은 실행하지 않았다.
+Thus, specialized lookups do not always reduce output costs either. The token reduction rate measures **the size of tool output text** counted with `o200k_base`; it is not
+a reduction rate for model input, reasoning, answers, caching, repeat lookups, actual billing, or total agent tokens. No model sessions were run.
 
-## 연결 경로와 호출 경로
+## Connection paths and call paths
 
-호출 경로를 묻는 8개 과제의 `path` 중앙값은 538.0ms였다. 명령은 7건에서 성공했지만,
-이 중 6건은 `contains`·`imports`·`imports_from`을 사용하는 구조 연결이었다.
-예를 들어 `updateCell ← contains — databaseService.ts — contains → coerceCellValue`는 함수 호출 순서를 보여주지 않는다.
+The median `path` time for the 8 tasks asking about call paths
+was 538.0ms. The command succeeded in 7 cases, but 6 of
+these were structural connections using `contains`·`imports`·`imports_from`. For example, `updateCell ← contains — databaseService.ts — contains → coerceCellValue` does not show function call order.
 
-호출·간접호출 간선만으로 구성된 출력은 8건 중 1건이었다.
-`searchInProject → resolveProjectPath → assertNotServerDataPath`가 `calls`와 `indirect_call [INFERRED]`로 이어졌다.
-소스의 함수 인자 전달과 `assertSafe(resolved)` 실행으로 간접 관계 근거를 확인했지만 런타임 실행 검증은 아니다.
-이 분류를 실행 경로 정확도 12.5%로 표현하지 않는다.
+Output consisting solely of call and indirect-call edges
+occurred in 1 of 8 cases. `searchInProject → resolveProjectPath → assertNotServerDataPath` was connected through `calls` and `indirect_call [INFERRED]`. We confirmed evidence for the indirect relationship from function argument passing
+in the source and the execution of `assertSafe(resolved)`, but this is not runtime execution verification. We do not describe this classification
+as 12.5% execution-path accuracy.
 
-나머지 1건은 `searchFileNames`가 서버·클라이언트 양쪽에 있어 종료 코드 3과 구분 후보를 반환했다.
-측정 후 성공하도록 질문을 고쳐 집계하지 않았다. 전체 360회 측정에서 실패는 이 과제의 전용 조회 5회였다.
-모든 과제·방법에서 5회 반복의 종료 코드·출력 크기·출력 토큰·후보 파일 순서는 동일했다.
+In the remaining 1 case, `searchFileNames` existed on both the server and client, so the command returned exit code 3 and candidates for disambiguation. We did not revise the question
+after measurement to make it succeed and include that result in the totals. Across all 360 measurements, the failures were the 5 specialized lookups for this task.
+For every task and method, exit codes, output sizes, output tokens, and candidate file order were identical across 5 repetitions.
 
-`path` 출력은 파일 위치 없이 심볼 이름을 보여주므로 파일 포함률을 점수화하지 않았다.
-8개 경로 과제는 시작·끝 파일 외의 독립적인 중간 파일 정답도 없어 `rg`·기본 `query`의 파일 포함률만으로
-관계 탐색 품질을 평가할 수 없다. 짧은 `path` 출력까지 합친 토큰 감소를 효율 개선 근거로 사용하지 않는다.
+Because `path` output shows symbol names without file locations, we did not score its file inclusion rate. The 8 path tasks
+also had no independently established intermediate answer files beyond the start and end files, so file inclusion rates from `rg` and the default `query` alone
+cannot evaluate relationship exploration quality. We do not use token reductions that include the short `path` output as evidence of improved efficiency.
 
-## 조건과 절차
+## Conditions and procedure
 
 - 2026-10-27 Linux x64, AMD Ryzen 5 9600X, Node v22.22.2, Python 3.11.15,
   ripgrep 15.2.0, Graphify 0.9.96, tiktoken 0.13.0·`o200k_base`.
-- [로컬 코드 검색 도구](../history/graphify/graphify.mjs)의 `collectSources`가 선택한 현재 소스
-  900개·6,560,260바이트를 별도 Git 저장소에 복사하고 SHA-256으로 고정했다.
-  문서·테스트·계정 데이터·빌드 산출물은 대상에서 제외했다. 측정 끝에도 복사본 해시가 같았다.
-- [고정 과제 24개](../history/graphify/graphify-benchmark-cases.json)는 정의·호출 영향·경로 각 8건이다.
-  검색·경로·권한·세션·협업·미리보기·DB·그리기를 포함한다.
-  별도 에이전트가 Graphify 결과를 보기 전에 소스를 읽고 알려진 파일과 근거를 정했다.
-  한국어 질문을 적었지만 도구 입력에는 사전에 지정한 코드 식별자를 양쪽에 제공했다.
-- `rg --no-config --sort path -n -H -F -w -e <식별자> ... -- <동일 파일 목록>`을 기준으로 했다.
-  파일 목록은 사전 경로 정렬했다. `rg --sort`가 명시적으로 전달한 파일 인자를 재정렬하지 않는 점도 검사했다.
-- 기본 Graphify는 같은 식별자를 `query`에 전달했다. 전용 방식은 `explain`·`affected`·`path`를 과제 유형에 맞춰 사용했다.
-  `affected`는 직접 호출 외 여러 관계와 깊이 2의 영향을 포함하므로 정답 일부의 회수만 평가했다.
-- 방법별·과제별 한 번의 워밍업 후 5회 순차 반복했다. 세 방법의 순서를 과제·반복별로 회전했다.
-  매 명령마다 새 프로세스를 시작하고 종료까지 측정했다. Graphify는 Mew wrapper의 Node/Python 시작,
-  패키지 버전 확인·전체 소스 최신성 검사·그래프 읽기를 포함했다. `rg`에 불필요한 최신성 검사를 추가하지 않았다.
-- 첫 반복의 stdout·stderr와 모든 반복의 시간·종료 코드·후보·토큰을 보관했다.
-  토큰 계산은 시간 측정이 끝난 후 수행했다. 후보 파싱·정답 판정도 명령 실행 시간에 넣지 않았다.
-  기본 `query`의 1,500토큰 예산은 upstream의 연결 출력 정책 때문에 엄격한 상한이 아니었다.
-- 원출력과 호출 관계 분류는 별도 에이전트가 소스와 대조했다. 사용자 승인이나 실제 업무 수행 평가는 아니다.
+- We copied the 900 current source files, totaling 6,560,260 bytes, selected by `collectSources` in the [local code search tool](../history/graphify/graphify.mjs) into a separate
+  Git repository and pinned them with SHA-256. Documents, tests, account data, and
+  build artifacts were excluded. The copy's hash was unchanged at the end of measurement.
+- The [24 fixed tasks](../history/graphify/graphify-benchmark-cases.json) comprise 8 cases each for definitions, call impact, and paths. They cover search, paths, permissions, sessions, collaboration,
+  previews, DB, and drawing. A separate agent read the
+  source and established the known files and evidence before seeing Graphify results. Questions were
+  written in Korean, but both tools received predefined code identifiers as input.
+- We used `rg --no-config --sort path -n -H -F -w -e <식별자> ... -- <동일 파일 목록>` as the baseline. The file list was sorted by path in advance. We also checked
+  that `rg --sort` does not reorder explicitly supplied file arguments.
+- Default Graphify passed the same identifiers to `query`. The specialized method used `explain`·`affected`·`path` according to task type. Because `affected` includes multiple relationships
+  beyond direct calls and impacts to a depth of 2, we evaluated only retrieval of a subset of the answers.
+- After one warmup per method and task, we ran 5 sequential repetitions. We rotated the order of the three methods for
+  each task and repetition. Each command started a new process, and timing continued until it exited. Graphify included the Mew wrapper's Node/Python
+  startup, package version check, freshness check of all sources, and graph loading. We did not add an unnecessary freshness check to `rg`.
+- We retained stdout·stderr from the first repetition and timing, exit codes, candidates, and tokens from all repetitions.
+  Token counting was performed after timing ended. Candidate parsing and answer evaluation were also excluded from command
+  execution time. The default `query` token budget of 1,500 was not a strict upper limit because of upstream's connection output policy.
+- A separate agent checked the raw output and call relationship classifications against the source. This was not user acceptance or an evaluation of actual work performance.
 
-## 색인 비용
+## Indexing cost
 
-분리된 저장소의 **새 그래프 생성**은 wrapper 전체 14,081.6ms, 그중 `extract` 실행과 결과 그래프 확인은 13,922ms였다.
-패키지 설치 시간은 포함하지 않았다. 그래프는 노드 8,243개·관계 25,987개·JSON 8,275,496바이트였다.
-변경 없는 `index` 실행은 105.5ms였다. 같은 OS의 파일 캐시를 비우지 않았으므로 디스크 cold-cache 성능을 뜻하지 않는다.
+**Creating a new graph** in the isolated repository took 14,081.6ms for the entire wrapper, of which 13,922ms was spent running `extract` and checking the resulting
+graph. Package installation time was excluded. The graph contained 8,243 nodes and 25,987 relationships, with 8,275,496 bytes
+of JSON. Running `index` with no changes took 105.5ms. Because the OS file cache was not cleared, this does not represent disk cold-cache performance.
 
-조회부터 `rg`보다 느렸으므로 이번 측정에는 색인 비용을 회수하는 조회 횟수의 손익분기점이 없다.
-이는 조회 지연만의 비교이며 관계를 사람이 읽고 조합하는 시간은 측정하지 않았다.
+Because lookups themselves were slower than `rg`, these measurements have no break-even lookup count at which indexing costs are recovered. This
+compares lookup latency only; we did not measure the time a person spends reading and combining relationships.
 
-## 재현과 원시 자료
+## Reproduction and raw data
 
-별도 격리 체크아웃에서 [당시 소스 배치와 설치 환경](../history/graphify/README.md)을 복원한 후 `uv`·Graphify·`rg`,
-`tiktoken`을 사용할 수 있는 `python3`가 필요하다. 다른 Python을 쓰면 `MEW_GRAPHIFY_TOKENIZER_PYTHON`으로 지정한다.
-기존 자료를 덮어쓰지 않도록 새 출력 폴더를 사용한다.
+After restoring the [source layout and installation environment from that time](../history/graphify/README.md) in a separate isolated checkout, you need
+`python3` with access to `uv`, Graphify, `rg`, and `tiktoken`. To use a different Python, specify it with `MEW_GRAPHIFY_TOKENIZER_PYTHON`. Use a new output folder
+to avoid overwriting existing materials.
 
 ```bash
 node tools/graphify-benchmark.mjs .data/benchmarks/<새 실행명> 5
 node --test tools/graphify-benchmark.test.mjs tools/graphify.test.mjs
 ```
 
-[측정 스크립트](../history/graphify/graphify-benchmark.mjs)는 앱 서버·운영 DB·`dist/`를 사용하지 않는다.
-원래 배치의 위 명령은 실행하는 체크아웃의 소스를 다시 고정하므로 코드가 바뀌면 별도 조건의 결과다.
-이번 원시 자료는 Git 제외 `.data/benchmarks/graphify-20261027/`에 보관했다.
-소스 사본·해시 목록·고정 과제·실행 당시 wrapper와 측정 스크립트·그래프·원출력·`results.json`·파생 집계
-`analysis.json`·호출 간선 분류 `path-analysis.json`을 포함한다.
+The [measurement script](../history/graphify/graphify-benchmark.mjs) does not use the app server, production DB, or `dist/`. The command above from the original layout pins the
+source again from the checkout where it runs, so results under changed code represent different
+conditions. The raw materials from this run were stored in the Git-excluded `.data/benchmarks/graphify-20261027/`. They include
+source copies, a hash list, fixed tasks, the wrapper and measurement script used at execution time, graphs, raw output,
+`results.json`, derived aggregates in `analysis.json`, and call-edge classifications in `path-analysis.json`.
 
-소스 지문은 `efd2cf63f3398a3df4534fb82a1d514b30c2fc61cad0b5ebf965be13fae5fa07`이다.
-원시 보고서의 `revision`은 실행 종료 시 HEAD `2d6305333d604e49553ca73fb37a03ffecbf1081`이며,
-다른 작업의 커밋이 진행됐으므로 소스 기준은 이 커밋이 아닌 고정 사본과 파일 해시다.
-이력에 보존한 최종 측정 스크립트는 시작·종료 HEAD를 구분해 기록하고 호출 간선 분류도 출력한다.
+The source fingerprint is `efd2cf63f3398a3df4534fb82a1d514b30c2fc61cad0b5ebf965be13fae5fa07`. The raw report's `revision` is HEAD `2d6305333d604e49553ca73fb37a03ffecbf1081` at the end of execution; because commits
+from other work were made during the run, the source reference is the pinned copies and file hashes, not this
+commit. The final measurement script preserved in history records the
+starting and ending HEAD separately and also outputs call-edge classifications.
 
-`node --test` 10개와 변경 도구의 린트·구문 검사를 실행했다. 문서 검사 결과는
-[작업 기록](../work/graphify-code-search.md)의 후속 측정 항목에 남긴다.
+Ran 10 `node --test` tests and lint and syntax checks for the modified tools. Documentation
+check results are recorded under follow-up measurements in the [work record](../work/graphify-code-search.md).
 
-## 해석 범위
+## Scope of interpretation
 
-이 결과는 식별자를 이미 아는 소스 900개의 로컬 후보 검색 비교다.
-관계 설명을 읽은 뒤 원문을 확인하는 시간, 한국어 자연어 검색, 답변 정확도, 실제 에이전트 전체 해결 시간·토큰·요금,
-앱의 SQLite FTS 검색·브라우저 표시·원격 전송은 측정하지 않았다.
-과제 수·반복이 작고 호스트의 다른 부하·OS 캐시를 통제하지 않아 통계적 유의성이나 다른 저장소의 개선율을 주장하지 않는다.
-일반 검색은 기존 `rg`를 기준으로 두고, 관계가 필요할 때 전용 조회를 선택적으로 사용하는 판단 근거로 삼는다.
+These results compare local candidate searches across 900 source files with identifiers already
+known. They did not measure the time to check source text after reading relationship descriptions, Korean natural-language search, answer accuracy, actual agents' total
+resolution time, tokens, or fees, or the app's SQLite FTS search, browser rendering, or remote transmission.
+With few tasks and repetitions and no control over other host load or the OS cache, no statistical significance or improvement rates for other repositories are claimed.
+The results support keeping the existing `rg` as the baseline for general search and selectively using dedicated queries when relationships are needed.
 
-## 다른 활용의 검토 후보
+## Other potential uses to consider
 
-검색 비교만으로 Graphify의 모든 사용처를 배제하지 않는다. 다음은 아직 구현·평가하지 않은 아이디어다.
+The search comparison alone does not rule out all uses of Graphify. The following ideas have not yet been implemented or evaluated.
 
-| 후보 | Mew 접점 | 검증할 가치 |
+| Candidate | Mew integration point | Value to validate |
 | --- | --- | --- |
-| 변경 영향 후보 | Git 변경 파일·diff | diff 밖의 호출자·import 의존 중 검토에서 놓친 파일을 줄이는가 |
-| 에이전트 첨부 제안 | 선택 파일·대화 첨부 | 사용자가 고를 관련 파일 후보로 실제 작업의 정확도·총 시간을 개선하는가 |
-| 문서 개념 관계 | Documents 그래프의 별도 관계 표시 | 명시적 Markdown 링크 외의 개념 연결이 유용한가 |
+| Change impact candidates | Git changed files and diff | Does it reduce files missed in review among callers and import dependencies outside the diff? |
+| Agent attachment suggestions | Selected files and conversation attachments | Do related file candidates that users can select improve accuracy and total time for actual work? |
+| Document concept relationships | Separate relationship display in the Documents graph | Are concept connections beyond explicit Markdown links useful? |
 
-우선 후보는 Git diff의 영향 안내다. 과거 변경 5~10개에서 필요한 호출자·테스트·문서를 먼저 정하고,
-`rg`·TypeScript 참조 찾기와 상위 후보 적중·필수 파일 누락·총 검토 시간·색인 갱신 비용을 비교한다.
-Graphify가 현재 실험의 제외 대상이었던 테스트·문서까지 연결할 수 있는지도 별도 검증해야 한다.
-코드 호출·import·포함·추론 관계를 구분해 표시하고 결과를 장애나 충돌의 증명으로 해석하지 않는다.
+The first candidate is impact guidance for Git diffs. For 5–10 past changes, first identify the required callers, tests, and documents, then
+compare top-candidate hits, missing required files, total review time, and index update costs against `rg` and TypeScript Find References. Whether Graphify
+can also connect tests and documents, which were excluded from the current experiment, requires separate verification. Display
+code calls, imports, containment, and inferred relationships distinctly, and do not interpret results as proof of failures or conflicts.
 
-현재 Documents의 명시적 링크 그래프는 기존 파서가 처리한다. 문서 개념 추출에 모델을 쓰는 실험은
-비용·권한·최신성 조건이 추가되므로 기존 링크 엔진의 단순 교체 후보로 삼지 않는다.
-이 후보들은 재설치·백그라운드 분석·제품 UI 구현을 승인하거나 검증한 결과가 아니다.
+The existing parser currently handles the explicit link graph in Documents. Experiments that use a model to extract document concepts add cost, permission,
+and freshness requirements, so they are not considered simple replacement candidates for the existing link engine. These
+candidates do not constitute approval or verification of reinstallation, background analysis, or product UI implementation.

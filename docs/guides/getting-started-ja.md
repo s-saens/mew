@@ -1,40 +1,44 @@
 ---
-title: "mew を始める"
+title: "Getting started with mew"
 updated: "2026-10-28"
-description: "s-saens/mew 소스의 일본어 설치·첫 로그인·파일탐색기 및 목적별 사용법과 Mewlink·대체 외부 접속, 권한·업데이트·데이터 보존 및 미발행 CLI 경로를 안내한다. 햄버거 메뉴의 Mewlink 연결 진입을 포함한다."
+description: "Installation, first sign-in, remote access, updates, and data retention for Mew. The legacy locale filename is retained for existing links."
 ---
 
-# mew を始める
+[Current installation guide](getting-started-en.md) · [Documentation](../README.md)
 
-[한국어](getting-started-ko.md) · [English](getting-started-en.md) · [简体中文](getting-started-zh.md) · [日本語](getting-started-ja.md)
+> This guide is maintained in English. Its original filename is retained for existing links. Use the [current installation guide](getting-started-en.md) for new references.
 
-mew は、コンピューターやサーバー上のフォルダーをブラウザーで開くアプリです。Markdown とコードの編集、ターミナルと AI エージェントの実行、Git の変更確認、ドキュメントの共同作業ができます。スマートフォンからも使えます。
+# Getting started with mew
+
+
+
+mew is an app for opening folders on a computer or server in your browser. You can edit Markdown and code, run terminals and AI agents, review Git changes, and collaborate on documents. You can also use it from a smartphone.
 
 <a id="quick-start"></a>
 
-[最初の操作](#first-steps) · [リモートアクセス](#remote-access) · [実行と更新](#running-and-updating) · [ドキュメント](#documentation)
+[First steps](#first-steps) · [Remote access](#remote-access) · [Running and updating](#running-and-updating) · [Documentation](#documentation)
 
-## すぐに始める
+## Quick start
 
-[Windows（WSL 2）](#windows-wsl-2) · [macOS](#macos) · [Linux](#linux) · [リモートアクセス](#remote-access)
+[Windows (WSL 2)](#windows-wsl-2) · [macOS](#macos) · [Linux](#linux) · [Remote access](#remote-access)
 
 <a id="windows-wsl-2"></a>
 
 ### Windows（WSL 2）
 
-WSL 2 の Ubuntu 内で mew を実行し、Windows のブラウザーで開きます。
+Run mew inside Ubuntu on WSL 2 and open it in a Windows browser.
 
-**1. WSL と Ubuntu をインストールします。** 管理者として PowerShell を開き、次を実行します。
+**1. Install WSL and Ubuntu.** Open PowerShell as an administrator and run the following.
 
 ```powershell
 wsl --install -d Ubuntu
 ```
 
-Windows を再起動し、スタートメニューから **Ubuntu** を開いて Linux のユーザー名とパスワードを作成します。これは Windows のサインイン用アカウントとは別です。このコマンドには Windows 11、または Windows 10 バージョン 2004（ビルド 19041）以降が必要です。インストールに失敗した場合は、[Microsoft の WSL インストールガイド](https://learn.microsoft.com/en-us/windows/wsl/install)を確認してください。
+Restart Windows, open **Ubuntu** from the Start menu, and create a Linux username and password. This is separate from your Windows sign-in account. This command requires Windows 11 or Windows 10 version 2004 (build 19041) or later. If installation fails, consult [Microsoft's WSL installation guide](https://learn.microsoft.com/en-us/windows/wsl/install).
 
-Ubuntu がすでに入っている場合は、PowerShell で `wsl -l -v` を実行して確認します。バージョンが `1` なら、一覧に表示されたディストリビューション名を使って `wsl --set-version Ubuntu 2` を実行してください。
+If Ubuntu is already installed, run `wsl -l -v` in PowerShell to check. If the version is `1`, run `wsl --set-version Ubuntu 2` using the distribution name shown in the list.
 
-**2. mew をインストールします。** **Ubuntu** で次を実行します。
+**2. Install mew.** Run the following in **Ubuntu**.
 
 ```bash
 sudo apt update
@@ -46,33 +50,33 @@ cd mew
 ./mew setup
 ```
 
-Node を nvm でインストールするか確認されたら、インストールを選んでください。Linux のツールをより速く使うため、リポジトリーとプロジェクトは `~/apps` や `~/mew-workspace` のように Linux ファイルシステム内に置きます。現在のフォルダーは `explorer.exe .` で Windows エクスプローラーから開けます。[Microsoft の WSL ファイル保存ガイド](https://learn.microsoft.com/en-us/windows/wsl/setup/environment#file-storage)も参照してください。
+If asked whether to install Node with nvm, choose to install it. For faster Linux tools, keep repositories and projects in the Linux filesystem, such as `~/apps` or `~/mew-workspace`. You can open the current folder in Windows File Explorer with `explorer.exe .`. See also [Microsoft's WSL file storage guide](https://learn.microsoft.com/en-us/windows/wsl/setup/environment#file-storage).
 
-**3. サインインします。** 下の[セットアップを完了する](#finish-setup)に従い、表示された URL を Edge、Chrome などの Windows ブラウザーで開きます。通常は `http://localhost:5000` です。[WSL は Windows からの localhost アクセスを転送します](https://learn.microsoft.com/en-us/windows/wsl/networking#accessing-linux-networking-apps-from-windows-localhost)。
+**3. Sign in.** Follow [Finish setup](#finish-setup) below, then open the displayed URL in a Windows browser such as Edge or Chrome. It is usually `http://localhost:5000`. [WSL forwards localhost access from Windows](https://learn.microsoft.com/en-us/windows/wsl/networking#accessing-linux-networking-apps-from-windows-localhost).
 
 ### macOS
 
-**1. Apple のコマンドラインツールをインストールします。** ターミナルを開き、次を実行します。
+**1. Install Apple's command line tools.** Open a terminal and run the following.
 
 ```bash
 xcode-select --install
 ```
 
-インストールが終わるまで待ちます。すでにツールが入っている場合は次へ進みます。
+Wait for installation to finish. If the tools are already installed, continue to the next step.
 
-**2. Homebrew と必要なツールをインストールします。** `brew` が入っていない場合は、[Homebrew](https://brew.sh/) のコマンドを実行します。
+**2. Install Homebrew and the required tools.** If `brew` is not installed, run the command from [Homebrew](https://brew.sh/).
 
 ```bash
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 ```
 
-インストーラーの **Next steps** に従って Homebrew をシェルに追加してから、次を実行します。
+Follow the installer's **Next steps** to add Homebrew to your shell, then run the following.
 
 ```bash
 brew install tmux python
 ```
 
-**3. mew をインストールします。** 同じターミナルで次を実行します。
+**3. Install mew.** Run the following in the same terminal.
 
 ```bash
 mkdir -p ~/apps
@@ -82,13 +86,13 @@ cd mew
 ./mew setup
 ```
 
-Node を nvm でインストールするか確認されたら、インストールを選んでください。下の[セットアップを完了する](#finish-setup)に従い、表示された URL をブラウザーで開きます。
+If asked whether to install Node with nvm, choose to install it. Follow [Finish setup](#finish-setup) below and open the displayed URL in your browser.
 
-セットアップではリモートデスクトップ用ヘルパーも準備します。mew を実行する Mac でシステム設定が開いたら、Electron に **アクセシビリティ** と **画面収録** を許可してください。権限を検出するとセットアップが続行されます。詳しくは[Mac の権限準備](../guides/remote-desktop.md#mac-%EA%B6%8C%ED%95%9C-%EC%A4%80%EB%B9%84)を参照してください。
+Setup also prepares a remote desktop helper. When System Settings opens on the Mac running mew, grant Electron **Accessibility** and **Screen Recording** permissions. Setup continues once it detects the permissions. See [Prepare Mac permissions](../guides/remote-desktop.md#mac-permission-setup) for details.
 
 ### Linux
 
-Debian または Ubuntu では次を実行します。
+On Debian or Ubuntu, run the following.
 
 ```bash
 sudo apt update
@@ -100,178 +104,178 @@ cd mew
 ./mew setup
 ```
 
-その他のディストリビューションでは、まず同等のパッケージをインストールしてください。上の[セットアップを完了する](#finish-setup)に従います。起動時にサーバーを開始する場合やリモート接続を受け付ける場合は、[デプロイガイド](../deployment/native.md)を使ってください。
+On other distributions, install equivalent packages first. Follow [Finish setup](#finish-setup) above. To start the server at boot or accept remote connections, use the [deployment guide](../deployment/native.md).
 
 <a id="finish-setup"></a>
 
-### セットアップを完了する
+### Finish setup
 
-セットアップ中に次の項目を入力します。
+Enter the following during setup.
 
-- **ワークスペースフォルダー:** プロジェクトを入れる親フォルダーです。既定値は `~/mew-workspace` で、その中の各フォルダーがプロジェクトになります。
-- **ポート:** 既定値は `5000` です。使用中の場合、セットアップが近い空きポートを選びます。
-- **Postgres 接続:** データベーステーブル用の任意設定です。スキップして後から追加できます。
-- **オーナーのメールアドレス:** 最初の mew アカウントです。セットアップが一時パスワードを表示します。
+- **Workspace folder:** The parent folder containing your projects. The default is `~/mew-workspace`, and each folder inside it becomes a project.
+- **Port:** The default is `5000`. If it is in use, setup selects a nearby available port.
+- **Postgres connection:** An optional setting for database tables. You can skip it and add it later.
+- **Owner email address:** The first mew account. Setup displays a temporary password.
 
-セットアップは依存関係をインストールし、リモートデスクトップのコンポーネントを準備してアプリをビルドし、サーバーを起動します。最初のダウンロードには数分かかることがあります。リモートデスクトップの準備に失敗しても警告として表示され、残りのインストールは続きます。
+Setup installs dependencies, prepares remote desktop components, builds the app, and starts the server. The initial download may take a few minutes. If remote desktop preparation fails, a warning is displayed and the rest of the installation continues.
 
-セットアップが表示した URL を開き、サインインして一時パスワードを変更します。ヘッダーの **+** でプロジェクトフォルダーを開き、ファイルエクスプローラーでファイルを選択します。
+Open the URL displayed by setup, sign in, and change the temporary password. Use **+** in the header to open a project folder, then select a file in the file explorer.
 
-再起動後は Ubuntu またはターミナルを開き、インストールフォルダーから mew を起動します。
+After restarting, open Ubuntu or a terminal and launch mew from the installation folder.
 
 ```bash
 cd ~/apps/mew
 ./mew start
 ```
 
-### 1つのコマンドで実行（初回リリース公開後）
+### Run with 1 command (after the first release is published)
 
-Node.js 24 があれば、作業フォルダーで次を実行してビルド済みアプリを取得できます。**実装は用意されていますが、初回の npm パッケージと GitHub リリース公開は未実施です。**
+If you have Node.js 24, run the following in your working folder to download the prebuilt app. **The implementation is ready, but the first npm package and GitHub release have not been published.**
 
 ```bash
 cd /path/to/workspace
 npx @liiiiv/mew-cli@latest
 ```
 
-Linux glibc 2.35 以上・macOS 15 以上の x64/arm64 を対象にします。Windows は WSL 2 の Ubuntu 22.04 以上で実行します。初回は owner のメールアドレスを入力し、表示された仮パスワードでログインして変更します。既存のアカウント・会話・機器登録を再利用します。Mewlink 登録は [リモートアクセス](#remote-access) の手順で行い、登録リンクとオンライン接続先の QR もターミナルに表示されます。
+Targets x64/arm64 on Linux with glibc 2.35 or later and macOS 15 or later. On Windows, run it on Ubuntu 22.04 or later under WSL 2. On the first run, enter the owner's email address, log in with the displayed temporary password, and change it. Existing accounts, conversations, and device registrations are reused. Register Mewlink using the [Remote access](#remote-access) instructions; the registration link and a QR code for the online connection address also appear in the terminal.
 
-Ctrl+C で終了し、同じコマンドを再実行すると最新リリースを使用します。以前の clone が `.data/` を使用している場合は、以前のサーバーを終了して `--data-dir /path/to/old/mew/.data` を指定してください。リモートデスクトップには任意の構成要素と OS 権限の準備が必要です。[実行とデータの契約](../../.mew/docs/development/cli-distribution.md) · [公開手順](../../.mew/docs/operations/cli-release.md)
+Press Ctrl+C to exit, then run the same command again to use the latest release. If a previous clone uses `.data/`, stop the previous server and specify `--data-dir /path/to/old/mew/.data`. Remote desktop requires optional components and OS permissions to be set up. [Execution and data contract](../../.mew/docs/development/cli-distribution.md) · [Publishing procedure](../../.mew/docs/operations/cli-release.md)
 
 <a id="remote-access"></a>
 
-### リモートアクセス
+### Remote access
 
-Mewlink で別のブラウザーから接続できます。Tailscale や Cloudflare Tunnel も選べます。ホストを起動したまま、mew とインターネット接続を維持してください。プロキシ方式では `MEW_BIND=127.0.0.1` を維持し、`5000` を設定したポートに置き換えます。
+You can connect from another browser through Mewlink. Tailscale and Cloudflare Tunnel are also options. Keep the host running, with mew and the internet connection active. When using a proxy, keep `MEW_BIND=127.0.0.1` and replace `5000` with your configured port.
 
 #### 1. Mewlink
 
-1. ローカルの mew に owner としてログインし、仮パスワードを変更します。**メニュー → Mewlink → リモートアクセス → 端末登録**を開きます。
-2. 登録用 URL で Mewlink にログインし、ユーザー名と端末名を設定します。
-3. オンライン状態と `https://mew.saens.kr/<ユーザー名>/<端末名>` の接続 URL を確認します。
-4. 別のデバイスでこの URL を開くと、Mewlink にログインせずにホストの mew ログイン画面が表示されます。**そのコンピューターのローカル mew のメールアドレスとパスワード**でログインします。接続元の登録は不要で、有効な保存済みセッションがあれば次回も利用できます。
+1. Log in to local mew as owner and change the temporary password. Open **Menu → Mewlink → Remote access → Register device**.
+2. Log in to Mewlink at the registration URL and set a username and device name.
+3. Check the online status and the connection URL `https://mew.saens.kr/<ユーザー名>/<端末名>`.
+4. Opening this URL on another device displays the host's mew login screen without requiring a Mewlink login. Log in with **the email address and password for local mew on that computer**. The connecting device does not need to be registered, and a valid saved session can be reused on subsequent visits.
 
-Mewlink のログインは端末の登録・一覧・削除に使います。他の利用者にはローカル mew アカウントを作成し、役割・機能・ファイル権限を設定します。ローカルのパスワードでログインする場合、Mewlink アカウントは不要です。ローカルのログイン前は作業データへのアクセスを拒否します。
+Mewlink login is used to register, list, and delete devices. Create local mew accounts for other users and configure their roles, features, and file permissions. A Mewlink account is not required when logging in with a local password. Access to work data is denied until local login.
 
-ホストを起動し、インターネット接続を維持してください。直接接続が遮断されるネットワークではエラーを表示します。Android iframe は利用できません。`./mew remote-access account` で登録手順を再表示できます。[中央サービスの運用](../../.mew/docs/operations/remote-central.md)も参照してください。この変更の適用にはローカル mew の更新と Mewlink の再デプロイが必要で、外部ネットワークの実測は別途行います。
+Keep the host running and connected to the internet. An error is displayed on networks that block direct connections. Android iframe is unavailable. Use `./mew remote-access account` to display the registration instructions again. Also see [Central service operations](../../.mew/docs/operations/remote-central.md). Applying this change requires updating local mew and redeploying Mewlink; measurements on external networks will be performed separately.
 
-パスワードなしで接続するには、訪問者が機器のログイン画面で **Mewlink でログイン → アクセスを要求** を選びます。owner は **アカウント管理 → Mewlink アカウントアクセス** で承認し、既存のローカルユーザーに接続するか新規ユーザーを作ります（初期ロールは member）。権限はローカルで管理し、接続解除でアクセスを取り消します。登録アカウントやメールアドレスの一致だけではアクセスできません。この方式にはローカル mew の更新と Mewlink の再デプロイが必要です。提供者ログインと外部ネットワークの検証範囲は[接続契約](../../.mew/docs/development/remote-access.md#검증과-남은-게이트)を参照してください。
+To connect without a password, visitors select **Log in with Mewlink → Request access** on the device's login screen. The owner approves the request under **Account management → Mewlink account access** and links it to an existing local user or creates a new user (the initial role is member). Permissions are managed locally, and unlinking revokes access. A matching registered account or email address alone does not grant access. This method requires updating local mew and redeploying Mewlink. See the [Connection contract](../../.mew/docs/development/remote-access.md#verification-and-remaining-gates) for the scope of provider login and external network verification.
 
 #### 2. Tailscale
 
-自分のデバイス間で使う方法です。ドメインを購入する必要はなく、アクセスはプライベートな Tailscale ネットワーク（tailnet）内に留まります。
+Use this method between your own devices. You do not need to purchase a domain, and access stays within your private Tailscale network (tailnet).
 
-1. mew のホストと接続元の各デバイスに [Tailscale](https://tailscale.com/download) をインストールします。すべてのデバイスで同じ tailnet にサインインしてください。
+1. Install [Tailscale](https://tailscale.com/download) on the mew host and each connecting device. Sign in to the same tailnet on all devices.
 
-2. mew のホストで次を実行します。
+2. Run the following on the mew host.
 
    ```bash
    tailscale serve --bg http://127.0.0.1:5000
    ```
 
-   求められたら、表示されたリンクを開いて HTTPS を有効にします。Linux で権限エラーが出る場合は `sudo` を使います。WSL 2 では Tailscale を **Windows** にインストールし、Windows ブラウザーで `http://localhost:5000` が開くことを確認してから **PowerShell** でこのコマンドを実行してください。
+   If prompted, open the displayed link to enable HTTPS. If you get a permission error on Linux, use `sudo`. On WSL 2, install Tailscale on **Windows**, verify that `http://localhost:5000` opens in a Windows browser, then run this command in **PowerShell**.
 
-3. スマートフォンまたは別のコンピューターで Tailscale に接続し、表示された `https://<machine>.<tailnet>.ts.net` URL を開いて mew にサインインします。
+3. Connect to Tailscale on your phone or another computer, open the displayed `https://<machine>.<tailnet>.ts.net` URL, and sign in to mew.
 
-公式の [Tailscale Serve ガイド](https://tailscale.com/docs/features/tailscale-serve)と[コマンドリファレンス](https://tailscale.com/docs/reference/tailscale-cli/serve)を参照してください。
+See the official [Tailscale Serve guide](https://tailscale.com/docs/features/tailscale-serve) and [command reference](https://tailscale.com/docs/reference/tailscale-cli/serve).
 
 #### 3. Cloudflare Tunnel
 
-接続元のデバイスに Tailscale を入れず、ブラウザーから安定した HTTPS アドレスを使いたい場合に向いています。**この設定には Cloudflare DNS で管理するドメインが必要です。**
+This is suitable if you want to use a stable HTTPS address from a browser without installing Tailscale on connecting devices. **This setup requires a domain managed through Cloudflare DNS.**
 
-1. 公式の [Cloudflare ドメイン登録ガイド](https://developers.cloudflare.com/registrar/get-started/register-domain/)でドメインを購入するか、既存ドメインを[Cloudflare に追加](https://developers.cloudflare.com/fundamentals/manage-domains/add-site/)してネームサーバーの手順に従います。
-2. 公式の [Cloudflare Tunnel セットアップガイド](https://developers.cloudflare.com/tunnel/get-started/)に従ってトンネルを作成し、mew ホストで `cloudflared` をインストール、実行します。WSL 2 では mew と同じ Ubuntu 環境内で `cloudflared` を実行します。
-3. `mew.example.com` のようなホスト名とサービス URL `http://127.0.0.1:5000` を指定して **Published application** ルートを追加します。mew を `/` で提供するため、パスは空のままにします。
-4. `cloudflared` を実行したままにし、別のデバイスから `https://mew.example.com` を開いて mew にサインインします。
+1. Purchase a domain using the official [Cloudflare domain registration guide](https://developers.cloudflare.com/registrar/get-started/register-domain/), or [add an existing domain to Cloudflare](https://developers.cloudflare.com/fundamentals/manage-domains/add-site/) and follow the nameserver instructions.
+2. Follow the official [Cloudflare Tunnel setup guide](https://developers.cloudflare.com/tunnel/get-started/) to create a tunnel, then install and run `cloudflared` on the mew host. On WSL 2, run `cloudflared` in the same Ubuntu environment as mew.
+3. Add a **Published application** route with a hostname such as `mew.example.com` and the service URL `http://127.0.0.1:5000`. Leave the path empty to serve mew at `/`.
+4. Keep `cloudflared` running, open `https://mew.example.com` from another device, and sign in to mew.
 
-これにより公開 HTTPS の入口ができますが、mew のアカウント権限は引き続き適用されます。プロキシの要件と接続確認は [Security](../operations/security.md) および[デプロイガイド](../deployment/native.md#2-https-%ED%94%84%EB%A1%9D%EC%8B%9C-%EB%98%90%EB%8A%94-%ED%84%B0%EB%84%90-%EC%97%B0%EA%B2%B0)を参照してください。
+This creates a public HTTPS entry point, but mew account permissions still apply. See [Security](../operations/security.md) and the [Deployment guide](../deployment/native.md#2-connect-an-https-proxy-or-tunnel) for proxy requirements and connection checks.
 
-## 動作要件と権限
+## System requirements and permissions
 
-サーバーは Linux または macOS で動作し、Windows では WSL 2 を使います。Node 22.18 以降または 24 以降が必要で、Node 24 を推奨します。ターミナルは tmux とローカルでコンパイルされた `node-pty` を使うため、セットアップには Python と C/C++ ツールチェーンが必要です。Postgres 用に Docker を任意で使えますが、mew アプリ自体をコンテナーで実行することは現在サポートしていません。
+The server runs on Linux or macOS; Windows uses WSL 2. Node 22.18 or later, or 24 or later, is required; Node 24 is recommended. The terminal uses tmux and a locally compiled `node-pty`, so setup requires Python and a C/C++ toolchain. Docker is optional for Postgres, but running the mew app itself in a container is currently unsupported.
 
-mew は信頼できる人とだけ使ってください。既定では `manager` と `owner` アカウントが、サーバーユーザーの OS 権限でターミナルとエージェントを実行できます。ほかのアカウントにこれらの機能を与えると、そのアカウントにも同じアクセス権が渡ります。ほかの人にインスタンスを公開する前に [セキュリティ](../operations/security.md) を読んでください。
+Use mew only with people you trust. By default, `manager` and `owner` accounts can run terminals and agents with the server user's OS permissions. Granting these features to other accounts gives them the same access. Read [Security](../operations/security.md) before exposing your instance to others.
 
 <a id="first-steps"></a>
 
-## mew を使う
+## Using mew
 
-表示されたアドレスを開き、owner としてログインして仮パスワードを変更します。
+Open the displayed address, log in as owner, and change the temporary password.
 
-1. ヘッダーの **+** で作業フォルダーを開きます。
-2. 左側の一覧から Markdown やコードを選びます。
-3. 必要に応じて dock からターミナル・エージェント・Git を開きます。
+1. Use **+** in the header to open a working folder.
+2. Select Markdown or code from the list on the left.
+3. Open the terminal, agents, or Git from the dock as needed.
 
-[画面紹介](overview.md) · [初回操作ガイド](first-steps.md) · [使い方一覧](MOC.md)。詳細ガイドは現在韓国語です。
+[Interface overview](overview.md) · [First steps guide](first-steps.md) · [Usage guides](MOC.md).
 
 <a id="projects-files-and-search"></a>
 
-### プロジェクト、ファイル、検索
+### Projects, files, and search
 
-ヘッダーの **+** でフォルダーを開き、左側でファイルを選びます。`Ctrl+P` はファイル名、`Ctrl+Shift+F` は本文の検索です。
+Use **+** in the header to open a folder, then select a file on the left. `Ctrl+P` searches filenames, and `Ctrl+Shift+F` searches file contents.
 
-[プロジェクトとタスク](projects.md) · [検索と置換](../configuration/search.md) · [プロジェクト設定](project-setup.md).
+[Projects and tasks](projects.md) · [Search and replace](../configuration/search.md) · [Project setup](project-setup.md).
 
 <a id="writing-code-and-media"></a>
 
-### 文章、コード、メディア
+### Text, code, and media
 
-Markdown は **Hotview** で表示しながら編集し、**Plain** でソースを確認します。本文は自動保存されます。コード・表・添付・PDF・メディアもファイルを開いて使います。
+Edit Markdown while viewing it in **Hotview**, and inspect the source in **Plain**. Content is saved automatically. Open files to work with code, tables, attachments, PDFs, and media as well.
 
-[編集・保存・ファイル履歴](editor.md).
+[Editing, saving, and file history](editor.md).
 
 <a id="git"></a>
 
 ### Git
 
-dock の **Git** で変更ファイルとコミット履歴を確認します。ファイルを開いて diff を確認し、コミットするファイルを選びます。
+Use **Git** in the dock to review changed files and commit history. Open files to review diffs, then select the files to commit.
 
-[Git パネル](projects.md#git-작업-패널).
+[Git panel](projects.md#git-operations-panel).
 
 <a id="collaboration-and-sharing"></a>
 
-### 共同作業と共有
+### Collaboration and sharing
 
-共同編集、コメント、メンション、チャットを使えます。他のアカウントとゲストのアクセスはロール・機能・ファイル権限に従います。
+You can use collaborative editing, comments, mentions, and chat. Access for other accounts and guests follows role, feature, and file permissions.
 
-[共同作業と共有](collaboration.md) · [セキュリティ](../operations/security.md).
+[Collaboration and sharing](collaboration.md) · [Security](../operations/security.md).
 
 <a id="terminals-agents-and-automation"></a>
 
-### ターミナル、エージェント、自動化
+### Terminals, agents, and automation
 
-dock からターミナルやエージェントを開きます。AI ランタイムは先にインストールと認証を行います。会話、コマンドボタン、スケジュールは各ガイドを参照してください。
+Open terminals and agents from the dock. Install and authenticate AI runtimes first. See the respective guides for conversations, command buttons, and schedules.
 
-[ターミナルとエージェント](terminal-agents.md) · [ランタイム設定](../configuration/agent-runtimes.md) · [コマンドと予約](commands.md).
+[Terminals and agents](terminal-agents.md) · [Runtime configuration](../configuration/agent-runtimes.md) · [Commands and scheduling](commands.md).
 
 <a id="browser-android-and-remote-desktop"></a>
 
-### ブラウザー、Android、リモートデスクトップ
+### Browser, Android, and remote desktop
 
-サーバーブラウザーでウェブページを開けます。Android とリモートデスクトップは別途環境準備・インストール・OS 権限が必要です。対応範囲を先に確認してください。
+You can open web pages in the server browser. Android and remote desktop require separate environment preparation, installation, and OS permissions. Check the scope of support first.
 
-[ブラウザーと Android](browser.md) · [リモートデスクトップ](remote-desktop.md).
+[Browser and Android](browser.md) · [Remote desktop](remote-desktop.md).
 
 <a id="databases"></a>
 
-### データベース
+### Database
 
-Postgres 接続を設定した後、`/db` でデータベース表を文書に挿入します。Markdown 表とは別の機能です。文書やコードの編集に DB は不要です。
+After configuring a Postgres connection, use `/db` to insert a database table into a document. This is separate from Markdown tables. A database is not required to edit documents or code.
 
-[データベース表](database.md).
+[Database tables](database.md).
 
 <a id="layout-settings-and-accounts"></a>
 
-### レイアウト、設定、アカウント
+### Layout, settings, and accounts
 
-dock でパネルを開き、タブをドラッグして配置します。スマートフォンは下部 dock で切り替えます。**Settings** でテーマ・言語・フォント・ショートカット・Mewpet・アカウントを設定します。
+Open panels from the dock and drag tabs to arrange them. On phones, switch panels using the bottom dock. Configure the theme, language, fonts, shortcuts, Mewpet, and accounts in **Settings**.
 
-[画面分割とモバイル](editor.md) · [環境とアカウント](../configuration/MOC.md).
+[Split views and mobile](editor.md) · [Environment and accounts](../configuration/MOC.md).
 
 <a id="running-and-updating"></a>
 
-## 実行と更新
+## Running and updating
 
-mew のリポジトリーで次を実行します。Windows では Ubuntu のターミナルを使います。
+Run the following in the mew repository. On Windows, use the Ubuntu terminal.
 
 ```bash
 ./mew start                    # サーバーを起動する
@@ -284,38 +288,38 @@ mew のリポジトリーで次を実行します。Windows では Ubuntu のタ
 ./mew users add you@example.com owner
 ```
 
-`./mew update` は fast-forward pull を使います。`./mew start` で開始したインストールでは、アプリメニューから更新を確認してインストールすることもできます。systemd などのスーパーバイザーで管理するサーバーには、別の[デプロイと更新の手順](../deployment/native.md)を使ってください。
+`./mew update` uses a fast-forward pull. For installations started with `./mew start`, you can also check for and install updates from the app menu. For servers managed by a supervisor such as systemd, use the separate [deployment and update procedure](../deployment/native.md).
 
-設定と実行時データは、既定でクローンの外にあります。
+Configuration and runtime data are stored outside the clone by default.
 
-| 内容 | 場所 |
+| Contents | Location |
 | --- | --- |
-| 設定 | `~/.config/mew/config.env` |
-| アカウント、セッション、完了済みエージェントターン | `~/.local/share/mew/` |
-| ログ | `~/.local/state/mew/` |
+| Configuration | `~/.config/mew/config.env` |
+| Accounts, sessions, and completed agent turns | `~/.local/share/mew/` |
+| Logs | `~/.local/state/mew/` |
 
-クローンを削除してもこれらのファイルは残ります。ワークスペースと Postgres データと一緒にバックアップしてください。上書き設定は[サーバー設定](../configuration/environment.md#%EC%84%9C%EB%B2%84-%EC%84%A4%EC%A0%95)を参照してください。
+These files remain even if you delete the clone. Back them up along with your workspace and Postgres data. See [Server configuration](../configuration/environment.md#server-settings) for overrides.
 
-スマートフォンまたは別のコンピューターから接続するには、[リモートアクセス](#remote-access)に従います。既定のサーバーバインドはホストローカルです。個人用の `./mew start` インストールでは自動起動サービスは登録されません。
+To connect from a phone or another computer, follow [Remote access](#remote-access). The server binds to the local host by default. Personal `./mew start` installations do not register an autostart service.
 
-セットアップ中のリモートデスクトップ準備に失敗した場合は、`./mew desktop-setup` で再試行します。これはアプリをビルドまたはサーバーを再起動せずにヘルパーをインストールし、Mac の権限設定を処理します。サインイン済みのデスクトップと、該当 OS のライブラリー・権限は引き続き必要です。[OS 要件](../guides/remote-desktop.md#%EC%B2%98%EC%9D%8C-%EC%97%B0%EA%B2%B0)を参照してください。
+If remote desktop preparation fails during setup, retry with `./mew desktop-setup`. This installs helpers and handles Mac permission settings without building the app or restarting the server. A signed-in desktop and the applicable OS libraries and permissions are still required. See [OS requirements](../guides/remote-desktop.md#first-connection).
 
-macOS では、ターミナルを開く前に mew が `node-pty` 1.1.0 の `spawn-helper` にない実行権限を修復します。ターミナルが空白のままなら、サーバーログで `[mew:tmux]` エラーを確認してください。
+On macOS, mew repairs missing execute permissions on `spawn-helper` in `node-pty` 1.1.0 before opening a terminal. If the terminal remains blank, check the server logs for `[mew:tmux]` errors.
 
 <a id="documentation"></a>
 
-## ドキュメント
+## Documentation
 
-[ドキュメントマップ](../../.mew/docs/MOC.md)から始めます。詳細な製品仕様、使い方、運用手順、作業記録は `docs/` にあり、このガイドはセットアップと日常的な使い方を扱います。コードを変更したときは、関連するドキュメントも更新してください。
+Start with the [Documentation map](../../.mew/docs/MOC.md). Detailed product specifications, usage guides, operating procedures, and work records are in `docs/`; this guide covers setup and everyday use. Update the relevant documentation when you change code.
 
-| トピック | 開始場所 |
+| Topic | Starting point |
 | --- | --- |
-| プロジェクト、編集、ターミナル、ブラウザー、コマンド、データベース | [ユーザーガイド](../guides/MOC.md) |
-| 環境変数、アカウント、検索、エージェント実行環境 | [設定](../configuration/MOC.md) |
-| HTTPS、systemd、更新、バックアップ | [デプロイ](../deployment/native.md) |
-| コード構造、パッケージ、UI、共同作業、エージェントプロトコル | [開発ドキュメント](../../.mew/docs/development/MOC.md) |
-| 製品仕様、運用、現在の作業、履歴 | [ドキュメントマップ](../../.mew/docs/MOC.md) |
-| アカウントごとの機能とファイル権限 | [アカウント設定](../configuration/accounts.md#%EB%82%B4-%EA%B3%84%EC%A0%95%EA%B3%BC-%EA%B3%84%EC%A0%95-%EA%B4%80%EB%A6%AC) · [アクセス制御](../../.mew/docs/development/access-control.md) |
-| ロール、認証、ゲストアクセス | [Security](../operations/security.md) |
+| Projects, editing, terminals, browser, commands, databases | [User guides](../guides/MOC.md) |
+| Environment variables, accounts, search, agent runtimes | [Configuration](../configuration/MOC.md) |
+| HTTPS, systemd, updates, backups | [Deployment](../deployment/native.md) |
+| Code structure, packages, UI, collaboration, agent protocols | [Development documentation](../../.mew/docs/development/MOC.md) |
+| Product specifications, operations, current work, history | [Documentation map](../../.mew/docs/MOC.md) |
+| Per-account feature and file permissions | [Account settings](../configuration/accounts.md#my-account-and-account-management) · [Access control](../../.mew/docs/development/access-control.md) |
+| Roles, authentication, guest access | [Security](../operations/security.md) |
 
-Linux では `sh native/agent-memory/install.sh` を実行すると、エージェント作業用のメモリー制限をインストールします。有効化、確認、低メモリー時のジョブ中断、キューの保留、エラー報告については[エージェントのメモリー保護](../operations/agent-memory.md)を参照してください。
+On Linux, run `sh native/agent-memory/install.sh` to install memory limits for agent work. See [Agent memory protection](../operations/agent-memory.md) for activation, verification, job interruption under low memory, queue holds, and error reporting.

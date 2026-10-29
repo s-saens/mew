@@ -1,51 +1,51 @@
 ---
-title: "mew 배포 운영 런북"
+title: "mew deployment operations runbook"
 created: 2026-09-04
 updated: 2026-10-23
-description: "Mew 운영자가 공개·반영 전후 확인할 네이티브 설치·OS 사용자·Mewlink/HTTPS 진입점·백업·권한과 작업 공간의 검색 제외, macOS 장애 구분 및 재시도 제한을 정한다."
+description: "Defines native installation, OS user, Mewlink/HTTPS entry point, backup, permission, and workspace search-exclusion checks for Mew operators before and after public exposure or applying changes, along with macOS failure diagnosis and retry restrictions."
 ---
 
-현재 지원 경로와 경계는 [ADR 0111](../../.mew/docs/history/decisions/0111-mew-native-deployment-and-supervisor.md), 실제
-설치·systemd 명령은 코드와 같은 커밋에서 바뀌는 [네이티브 서버 배포](../deployment/native.md)가 기준이다. 이 문서는 Mew 운영자가 반복해서 확인할 항목만 남긴다. 소스 폴더를 옮길 때는 [저장소 위치 변경](project-location.md)을 따른다.
+[ADR 0111](../../.mew/docs/history/decisions/0111-mew-native-deployment-and-supervisor.md) is authoritative for currently supported paths and boundaries, and [Native Server Deployment](../deployment/native.md), which changes in the same commit
+as the code, is authoritative for actual installation and systemd commands. This document retains only items Mew operators need to check repeatedly. When moving the source folder, follow [Changing the Repository Location](project-location.md).
 
-## 공개 전
+## Before public exposure
 
-- 지원되는 네이티브 설치인지 확인한다. Dockerfile 없는 `docker compose --profile app`은 배포 경로가
-  아니다. `/db`가 필요할 때만 Compose로 Postgres를 별도 기동한다.
-- mew는 전용 비관리자 OS 사용자로 실행한다. `MEW_WORKSPACE`에는 그 사용자가 접근해도 되는 프로젝트만
-  있고, 홈 전체·운영 시크릿·다른 서비스의 데이터는 없다.
-- `MEW_BIND=127.0.0.1`인지 확인하고, 외부 방화벽에는 mew 포트를 열지 않는다. Mewlink 또는 HTTPS 프록시·터널을
-  공개 진입점으로 둔다. Mewlink는 [기기 등록과 직접 연결](../../.mew/docs/development/remote-access.md)의 검증·적용 범위를 따른다.
-- 프록시가 원래 Host와 `X-Forwarded-Proto: https`를 전달하고 모든 WebSocket upgrade를 중계하는지 확인한다.
-  mew는 별도 호스트명의 `/`에서만 제공한다.
-- 첫 owner 계정의 임시 비밀번호를 안전한 채널로 전달하고 첫 로그인에서 변경했는지 확인한다. manager·owner
-  계정 수를 최소화하고, 단순 읽기 공유에는 member 대신 게스트 경로 규칙을 쓴다.
-- `config.env`, `MEW_DATA_DIR`, workspace, `/db` 사용 시 Postgres의 복구 가능한 백업을 확인한다.
+- Verify that this is a supported native installation. `docker compose --profile app` without a Dockerfile is not a deployment path. Start
+  Postgres separately with Compose only when `/db` is needed.
+- Run mew as a dedicated non-administrator OS user. `MEW_WORKSPACE` contains only projects that user may access, with no entire home directory,
+  production secrets, or data from other services.
+- Verify `MEW_BIND=127.0.0.1`, and do not open the mew port on the external firewall. Use Mewlink or an HTTPS proxy/tunnel as
+  the public entry point. Mewlink follows the verification and application scope in [Device Registration and Direct Connections](../../.mew/docs/development/remote-access.md).
+- Verify that the proxy forwards the original Host and `X-Forwarded-Proto: https` and relays all WebSocket upgrades. Serve mew only
+  at `/` on a dedicated hostname.
+- Deliver the first owner account's temporary password through a secure channel and verify that it was changed at first login. Minimize the number of manager
+  and owner accounts, and use guest path rules instead of member accounts for simple read-only sharing.
+- Verify recoverable backups of `config.env`, `MEW_DATA_DIR`, the workspace, and Postgres when using `/db`.
 
-## 반영 전후
+## Before and after applying changes
 
-- 현재 커밋·상태·백업 완료 시각을 기록하고, 작업 트리가 깨끗한 상태에서만 fast-forward 업데이트한다.
-- 개인용 `./mew start` 설치는 헤더의 **Mew 업데이트**가 `origin/main` ahead/behind를 확인하고 숨김 tmux에서 같은 CLI 업데이트를 실행한다. 성공 시 새 서버 응답 뒤 화면이 자동 새로고침된다. 분기·작업 트리 충돌은 `--ff-only` 실패로 남기고 자동 merge·stash·reset하지 않는다.
-- 새 의존성 설치 뒤 테스트와 빌드를 마치고 supervisor를 한 번 재시작한다. 개인용 `mew` CLI가 띄운 `nohup`
-  프로세스와 systemd를 동시에 실행하지 않는다.
-- 공개 도메인에서 로그인·비밀번호 변경·자동 저장·협업 WebSocket을 점검한다. manager/owner의 터미널 검사는
-  제한된 테스트 계정으로만 한다.
-- [검색 정책](search-discovery.md)에 따라 호스트 HTML·파일의 `noindex`와 텍스트 robots 응답을 확인한다. 공개 제품 소개의 색인 여부는 해당 사이트에서 별도로 확인한다.
-- 장애 시 supervisor 로그를 먼저 확인한다. 앱 클론을 알려진 정상 커밋으로 되돌려 재빌드·재시작할 수는
-  있지만, workspace나 `MEW_DATA_DIR`를 삭제·초기화해 롤백하지 않는다.
+- Record the current commit, state, and backup completion time, and perform fast-forward updates only with a clean working tree.
+- For personal `./mew start` installations, **Update Mew** in the header checks ahead/behind status against `origin/main` and runs the same CLI update in a hidden tmux session. On success, the page automatically refreshes after the new server responds. Branch divergence and working-tree conflicts remain `--ff-only` failures; no automatic merge, stash, or reset is performed.
+- After installing new dependencies, complete tests and the build, then restart the supervisor once. Do not run a `nohup` process launched by the
+  personal `mew` CLI and systemd at the same time.
+- Check login, password changes, autosave, and collaboration WebSockets on the public domain. Test manager/owner terminals only with
+  restricted test accounts.
+- Following the [search policy](search-discovery.md), check `noindex` on host HTML and files and the text robots response. Check indexing of public product introductions separately on the relevant site.
+- When a failure occurs, check supervisor logs first. You may revert the app clone to a known-good commit, rebuild,
+  and restart, but do not roll back by deleting or resetting the workspace or `MEW_DATA_DIR`.
 
-## macOS 에이전트·터미널 장애 구분
+## Diagnosing macOS agent and terminal failures
 
-- 일반 터미널에서 같은 CLI·tmux가 실행되는지 먼저 비교한다. 웹 터미널만 비면 서버 로그의
-  `[mew:tmux]`·`posix_spawnp failed`를 확인한다. PTY 보조 파일 권한 보정과 확인 방법은 [macOS 터미널 확인 안내](../guides/getting-started-ko.md#실행과-업데이트)를 따른다.
-- ACP의 `Falling back from WebSockets to HTTPS`·`Connection refused`는 공급자 연결과 브라우저→mew
-  연결을 구분해 조사한다. mew는 ACP 어댑터와 stdio로 통신하므로 이 문구만으로 공개 프록시의
-  WebSocket upgrade 문제라고 판단하지 않는다.
-- mew를 시작한 환경과 해당 CLI의 설정 파일에 남은 HTTP(S)/ALL_PROXY를 로컬에서 확인한다.
-  Codex는 `CODEX_HOME`(기본 `~/.codex`)의 `.env`도 확인한다. 프록시 주소·인증정보는 docs나 로그 공유에
-  복사하지 않는다. 필요한 프록시를 일괄 삭제하지 않고 실제 리스너와 설정을 대조한다.
+- First compare whether the same CLI and tmux run in a regular terminal. If only
+  the web terminal is blank, check `[mew:tmux]` and `posix_spawnp failed` in the server logs. Follow [macOS Terminal Verification Guide](../guides/getting-started-ko.md#running-and-updating) for correcting PTY helper file permissions and verifying them.
+- When investigating ACP's `Falling back from WebSockets to HTTPS` and `Connection refused`, distinguish the provider connection from the browser→mew connection. Since mew communicates
+  with ACP adapters over stdio, do not conclude from these messages alone that the
+  public proxy has a WebSocket upgrade problem.
+- Locally check for HTTP(S)/ALL_PROXY settings remaining in the environment that started mew and in the CLI's configuration files.
+  For Codex, also check `.env` under `CODEX_HOME` (default: `~/.codex`). Do not copy proxy addresses or credentials into docs or shared logs. Compare actual listeners against
+  the configuration rather than deleting all proxies indiscriminately, including required ones.
 
-## 재시도 금지
+## Do not retry
 
-Dockerfile·이미지·권한 모델을 다시 검증하기 전에는 Compose의 `app` 프로파일을 임시 배포 수단으로
-되살리지 않는다. 컨테이너 앱 경로를 재시도하려면 ADR 0111이 요구한 별도 결정과 검증을 먼저 한다.
+Do not revive Compose's `app` profile as a temporary deployment method before revalidating the Dockerfile, image, and permission model.
+Before retrying the container app path, first complete the separate decision and validation required by ADR 0111.

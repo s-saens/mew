@@ -1,5 +1,5 @@
 ---
-description: "설치된 Diátaxis documentation 스킬을 프로젝트의 문서 소유권과 내부 명세·계약 형식에 맞춰 적용하는 연결 지침."
+description: "Integration instructions for applying the installed Diátaxis documentation skill to the project's document ownership and internal specification and contract formats."
 ---
 
 # Structure specialist adaptation

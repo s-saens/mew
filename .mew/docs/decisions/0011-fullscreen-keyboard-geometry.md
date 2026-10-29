@@ -1,34 +1,34 @@
 ---
-title: "0011 — 모바일 전체화면의 명시적 키보드 영역 반영"
-description: "Chromium 전체화면에서 viewport·루트 크기만으로 OS 키보드 가림을 알 수 없는 문제를 VirtualKeyboard overlay 정책과 geometrychange로 보완하고, 데스크톱 사이트의 초기 축소와 터치 입력 판별, 일반 화면 복원·구형 좌표·미지원 환경·검증 범위를 정한 결정. Mewlink 중첩 iframe의 설정 주체는 후속 결정 0034, 진입 전 정책 준비는 0038로 보완한다."
+title: "0011 — Accounting for Explicit Keyboard Geometry in Mobile Fullscreen"
+description: "Decision to address the inability to detect OS keyboard occlusion from viewport and root dimensions alone in Chromium fullscreen using a VirtualKeyboard overlay policy and geometrychange, and to define initial desktop-site zoom-out, touch input detection, restoration to normal display, legacy coordinates, unsupported environments, and verification scope. Subsequent decision 0034 clarifies who configures nested Mewlink iframes, and 0038 supplements policy preparation before entry."
 created: 2026-10-16
 updated: 2026-10-22
 ---
 
-# 0011 — 모바일 전체화면의 명시적 키보드 영역 반영
+# 0011 — Accounting for Explicit Keyboard Geometry in Mobile Fullscreen
 
-상태: 승인
+Status: Approved
 
-Mewlink의 중첩 iframe에서는 [0034 — 최상위 페이지의 키보드 영역 전달](0034-mewlink-keyboard-host.md)로 정책 설정 주체와 영역 전달을 보완한다. 직접 접속의 기존 처리와 구형 좌표 보정은 유지한다.
+For Mewlink's nested iframes, [0034 — Forwarding Keyboard Geometry from the Top-Level Page](0034-mewlink-keyboard-host.md) supplements policy ownership and geometry forwarding. Existing direct-access handling and legacy coordinate compensation remain in place.
 
-최상위 페이지의 전체화면 진입 전 정책 준비와 진행 중 유지·실패 복원은 [0038 — 전체화면 진입 전 키보드 정책 준비](0038-fullscreen-keyboard-entry-order.md)로 보완한다.
+[0038 — Preparing Keyboard Policy Before Entering Fullscreen](0038-fullscreen-keyboard-entry-order.md) supplements policy preparation before the top-level page enters fullscreen, retention while entry is in progress, and restoration on failure.
 
-## 배경
+## Background
 
-모바일 전체화면에서 키보드를 열면 에이전트 입력창과 전송 버튼의 아래쪽이 가려진다. 루트의 실제 하단을 높이 계산에 추가한 뒤에도 사용자 실기에서 문제가 이어졌다. 이전 회귀 검사는 CSS로 루트를 줄이는 조건만 다뤘으므로, 키보드가 DOM 밖에서 화면을 덮는 경우를 검증하지 못했다.
+Opening the keyboard in mobile fullscreen obscures the bottom of the agent input and send button. The problem persisted on the user's physical device even after the root's actual bottom edge was added to height calculations. Previous regression checks covered only conditions that reduced the root through CSS, so they did not verify cases where the keyboard overlays the screen outside the DOM.
 
-[Chromium 구현](https://github.com/chromium/chromium/blob/main/content/browser/web_contents/web_contents_impl.cc)은 전체화면에서 키보드로 콘텐츠 크기를 줄이지 않는다. 따라서 viewport 설정과 DOM 크기의 최솟값만으로 가림을 처리하기에 부족하다.
+The [Chromium implementation](https://github.com/chromium/chromium/blob/main/content/browser/web_contents/web_contents_impl.cc) does not resize content for the keyboard in fullscreen. Therefore, viewport settings and the minimum of DOM dimensions alone are insufficient to handle occlusion.
 
-## 결정
+## Decision
 
-- 너비 768px 미만이거나 주 포인터가 coarse인 환경의 전체화면에서 VirtualKeyboard API를 지원하면 `overlaysContent`를 켜고 `geometrychange`와 `boundingRect`로 키보드 영역을 받는다. 일반 화면·터치 키보드 대상이 아닌 환경으로 전환하거나 관찰을 해제하면 이전 정책을 복원한다.
-- 데스크톱 사이트 모드의 넓은 CSS 레이아웃과 터치 키보드 처리는 독립적으로 판단한다. 화면 높이는 visual viewport와 레이아웃의 너비 비율로 정규화하며, 초기 축소 배율을 CSS 높이에 다시 곱하지 않는다. 같은 높이 보정을 작업 영역과 키보드 감지에 사용한다.
-- 작업 영역과 에이전트 입력창은 기존 viewport·루트 경계에 키보드 영역 경계를 추가한다. 독 숨김, 편집기 높이·커서, fixed 보조키와 뮤펫도 명시적 키보드 영역을 반영한다.
-- 하단 고정 키보드의 가림 경계는 전체 레이아웃 높이에서 키보드 높이를 빼서 구한다. 구형 Android Chromium이 키보드 top 대신 root의 보이는 원점을 보고하므로 top에 의존하지 않는다. 기기별 키보드 높이나 여백을 상수로 추정하지 않는다.
-- API가 없는 브라우저·보안 컨텍스트에서는 기존 viewport 관찰을 유지한다. 전체화면을 강제로 해제하거나 입력 포커스를 옮기지 않는다.
+- In fullscreen environments with a width below 768px or a coarse primary pointer, enable `overlaysContent` if the VirtualKeyboard API is supported, and obtain keyboard geometry through `geometrychange` and `boundingRect`. Restore the previous policy when switching to normal view or an environment not targeted for touch-keyboard handling, or when stopping observation.
+- Evaluate the wide CSS layout of desktop-site mode independently from touch-keyboard handling. Normalize screen height using the width ratio between the visual viewport and the layout, and do not multiply the CSS height by the initial zoom-out scale again. Use the same height correction for the workspace and keyboard detection.
+- Add keyboard geometry bounds to the existing viewport and root bounds for the workspace and agent input. Dock hiding, editor height and cursor handling, fixed modifier keys, and Mewpet also account for explicit keyboard geometry.
+- Calculate the occlusion boundary of a bottom-docked keyboard by subtracting keyboard height from the full layout height. Do not rely on top, because older Android Chromium reports the root's visible origin instead of the keyboard's top. Do not estimate device-specific keyboard heights or margins using constants.
+- Retain existing viewport observation in browsers and secure contexts where the API is unavailable. Do not forcibly exit fullscreen or move input focus.
 
-## 근거와 영향
+## Rationale and Impact
 
-[Chrome 공식 API 안내](https://developer.chrome.com/docs/web-platform/virtual-keyboard)는 overlay 정책을 명시적으로 켠 뒤 키보드 영역을 관찰하는 방식을 제공한다. 일반 화면의 `interactive-widget=resizes-content`는 유지한다. 구형 좌표 보완은 [Chromium의 geometry 계산](https://github.com/chromium/chromium/blob/main/chrome/android/java/src/org/chromium/chrome/browser/compositor/CompositorViewHolder.java)에 있는 이전 root origin 처리에 대응한다.
+The [official Chrome API guide](https://developer.chrome.com/docs/web-platform/virtual-keyboard) provides a method for explicitly enabling the overlay policy and then observing keyboard geometry. Retain `interactive-widget=resizes-content` in normal view. Legacy coordinate compensation addresses the older root-origin handling in [Chromium's geometry calculation](https://github.com/chromium/chromium/blob/main/chrome/android/java/src/org/chromium/chrome/browser/compositor/CompositorViewHolder.java).
 
-공유 구현과 검사 범위는 [공용 UI 계약](../development/ui-contracts.md#모바일-에디터와-키보드)에 둔다. 격리 Chromium 검사는 실제 전체화면의 에이전트·편집기에 키보드 영역을 모의 주입하며, 실제 Android Brave의 OS 키보드를 재현한 검사는 아니다. API 미지원 환경의 같은 증상과 실기 브라우저별 적용 결과는 별도로 확인해야 한다.
+Keep the shared implementation and test scope in the [Shared UI Contract](../development/ui-contracts.md#mobile-editor-and-keyboard). Isolated Chromium tests inject simulated keyboard geometry into the agent and editor in actual fullscreen; they do not reproduce the OS keyboard in Android Brave on a physical device. The same symptoms in environments without API support and application results in each physical-device browser require separate verification.

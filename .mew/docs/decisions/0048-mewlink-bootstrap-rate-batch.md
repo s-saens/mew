@@ -1,24 +1,24 @@
 ---
-title: "Mewlink 연결 시작의 요청 한도 일괄 검사"
-description: "WebSocket bootstrap의 세 요청 한도 검사를 D1 batch 한 번으로 묶되 순서·거절 후 카운터·만료를 보존하는 결정과 운영 적용 전 검증 경계를 기록한다."
+title: "Batch Rate-Limit Checks at Mewlink Connection Startup"
+description: "Records the decision to combine the three WebSocket bootstrap rate-limit checks into one D1 batch while preserving their order, counter behavior after rejection, and expiration, along with the verification boundary before production rollout."
 created: 2026-10-22
 updated: 2026-10-22
 ---
 
-## 상태
+## Status
 
-채택. 비공개 중앙 소스의 로컬 구현이며 운영 배포와 접속 시간 개선은 별도로 확인한다.
+Accepted. Implemented locally in the private central source; production deployment and connection time improvements are verified separately.
 
-## 배경
+## Background
 
-기존 시작 병렬화 이후에도 익명 로그인 화면까지 수 초가 걸리는 사례를 운영 주소에서 확인했다. 중앙 Worker는 bootstrap의 기기 조회 뒤 IP launch·기기 launch·IP browser signal 한도를 순서대로 검사해 D1을 세 번 호출했다. 전체 시간의 측정 조건과 한계는 [배포 기록](../work/mewlink-deployment-history.md#2026-10-22-접속-지연-재측정과-요청-한도-batch)에 남긴다.
+Even after the earlier startup parallelization, cases where the anonymous login screen took several seconds to appear were observed at the production URL. After looking up the device during bootstrap, the central Worker checked the IP launch, device launch, and IP browser signal limits in order, making three D1 calls. The conditions and limitations of the total time measurements are recorded in the [deployment record](../work/mewlink-deployment-history.md#2026-10-22-connection-latency-remeasurement-and-request-limit-batching).
 
-## 결정
+## Decision
 
-세 한도 검사를 D1 `batch()` 한 번으로 처리한다. 뒤 UPSERT는 앞선 한도 초과 여부를 SQL에서 확인한다. 순차 검사의 한도·키·60초 창과 거절 후 뒤 카운터를 올리지 않는 동작을 유지한다. batch 오류에는 연결을 허용하지 않으며, 일반 signal과 구버전 HTTP launch는 기존 경로를 사용한다.
+Process the three rate-limit checks in one D1 `batch()`. Subsequent UPSERTs check in SQL whether an earlier limit was exceeded. Preserve the limits, keys, 60-second windows, and behavior of not incrementing subsequent counters after rejection from the sequential checks. Do not allow connections on batch errors; regular signal requests and legacy HTTP launch requests use the existing paths.
 
-## 근거와 영향
+## Rationale and Impact
 
-[D1 batch](https://developers.cloudflare.com/d1/worker-api/d1-database/#batch)는 한 DB 호출로 여러 문장을 순서대로 실행하고 실패 시 전체를 rollback한다. 정상 bootstrap에서 DB 왕복 두 번을 제거하면서 기존 요청 한도와 인증 경계를 유지한다. 스키마 변경은 없으며 중앙 Worker 배포만 필요하다. [ADR 0028](0028-mewlink-websocket-bootstrap.md)의 nonce·ticket·키 증명·RTC 준비 계약은 유지한다.
+[D1 batch](https://developers.cloudflare.com/d1/worker-api/d1-database/#batch) executes multiple statements in order in one database call and rolls back the entire batch on failure. It removes two database round trips during normal bootstrap while preserving existing rate limits and authentication boundaries. No schema changes are required; only the central Worker needs deployment. The nonce, ticket, key proof, and RTC preparation contracts in [ADR 0028](0028-mewlink-websocket-bootstrap.md) remain unchanged.
 
-로컬 런처·네트워크·기기 상태에 따른 다른 대기는 남는다. 격리 검사는 한도 경계·거절 순서·만료·기존 검사와의 카운터 공유·동시 요청·rollback을 확인하며, 운영 배포 후의 실제 시간 단축을 대신하지 않는다. 현재 값과 적용 절차는 [접속 계약](../development/remote-access.md#연결-인증과-회수)과 배포 기록이 소유한다.
+Other waits caused by the local launcher, network, and device state remain. Isolated checks verify limit boundaries, rejection order, expiration, counter sharing with existing checks, concurrent requests, and rollback; they do not replace verification of actual time savings after production deployment. The [connection contract](../development/remote-access.md#connection-authentication-and-revocation) and deployment record own the current values and rollout procedure.

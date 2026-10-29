@@ -1,31 +1,31 @@
 ---
-title: "0038 — 전체화면 진입 전 키보드 정책 준비"
-description: "Android Brave 직접 접속의 전체화면·키보드 전환 순서에 따른 검은 띠 제보에 대응해 요청 직전 overlay 정책을 준비하고 진행 중 유지·실패 복원을 정한다. 사용자 실기에서 가로 띠가 재발해 화면 진단으로 후속 조사한다."
+title: "0038 — Preparing the keyboard policy before entering fullscreen"
+description: "In response to reports of a black band depending on the order of fullscreen and keyboard transitions in Android Brave direct access, prepare the overlay policy immediately before the request and define retention while pending and restoration on failure. The horizontal band recurred in user testing on a physical device, so further investigation uses screen diagnostics."
 created: 2026-10-22
 updated: 2026-10-22
 ---
 
-# 0038 — 전체화면 진입 전 키보드 정책 준비
+# 0038 — Preparing the keyboard policy before entering fullscreen
 
-상태: 승인
+Status: Approved
 
-## 배경
+## Background
 
-직접 접속의 전체화면에서 키보드를 열면 검은 가로 띠가 생기고 닫으면 사라진다는 사용자 결과가 있다. 일반 화면에서는 발생하지 않으며, 키보드를 연 상태로 전체화면에 진입하면 이후 키보드를 다시 열어도 발생하지 않는다. 기존 구현은 `fullscreenchange` 이후 다음 프레임에서 키보드 overlay 정책을 변경했다.
+A user reported that opening the keyboard in fullscreen during direct access produces a black horizontal band that disappears when the keyboard closes. It does not occur in the normal view, and entering fullscreen with the keyboard open prevents it from occurring when the keyboard is opened again later. The existing implementation changed the keyboard overlay policy in the frame after `fullscreenchange`.
 
-[Chromium Android 구현](https://github.com/chromium/chromium/blob/main/chrome/android/java/src/org/chromium/chrome/browser/fullscreen/FullscreenHtmlApiHandlerBase.java)은 전체화면 진입 중 네이티브 레이아웃 플래그를 별도 단계에서 바꾸며 이 과정과 키보드 표시 시 레이아웃·화면 갱신의 관계를 명시한다. 사용자 결과는 전환 순서에 따른 초기화 문제라는 가설을 지지하지만, 정확한 네이티브 원인이나 앱 정책 변경과의 인과까지 확인한 것은 아니다.
+The [Chromium Android implementation](https://github.com/chromium/chromium/blob/main/chrome/android/java/src/org/chromium/chrome/browser/fullscreen/FullscreenHtmlApiHandlerBase.java) changes native layout flags in a separate step during fullscreen entry and documents how this process relates to layout and screen updates when the keyboard appears. The user's results support the hypothesis of an initialization issue dependent on transition order, but do not establish the exact native cause or a causal relationship with app policy changes.
 
-## 결정
+## Decision
 
-- 최상위 터치 페이지는 공통 `requestFullscreenWithKeyboard`로 네이티브 전체화면 요청 직전에 키보드 overlay 정책을 준비한다. 별도 `await`·프레임 대기 없이 같은 사용자 제스처에서 요청한다.
-- 요청이 진행 중이면 viewport 관찰자도 준비한 정책을 유지한다. 중복 요청은 마지막 요청이 끝날 때까지 보호하고, 전체화면에 진입하지 못하면 원래 정책으로 복원한다.
-- 헤더·단축키·뮤펫 안내·원격 데스크톱·PDF의 진입 경로를 공통 처리로 연결한다. 각 화면의 전체화면 대상·옵션·오류 처리와 PDF 모달 대체 동작은 유지한다.
-- iframe·마우스 환경·API 미지원 환경의 네이티브 요청은 유지한다. Mewlink 최상위 정책·영역 전달은 [0034](0034-mewlink-keyboard-host.md), 키보드 영역 계산과 해제 복원은 [0011](0011-fullscreen-keyboard-geometry.md)을 따른다.
+- The top-level touch page prepares the keyboard overlay policy through the shared `requestFullscreenWithKeyboard` immediately before requesting native fullscreen. Make the request within the same user gesture, without a separate `await` or frame wait.
+- While the request is pending, the viewport observer also retains the prepared policy. Protect overlapping requests until the last request finishes, and restore the original policy if fullscreen entry fails.
+- Route entry through the header, keyboard shortcuts, Mewpet guidance, remote desktop, and PDF through shared handling. Retain each screen's fullscreen target, options, and error handling, and the PDF modal fallback behavior.
+- Retain native requests in iframes, mouse environments, and environments without API support. Follow [0034](0034-mewlink-keyboard-host.md) for the Mewlink top-level policy and geometry forwarding, and [0011](0011-fullscreen-keyboard-geometry.md) for keyboard geometry calculation and restoration on release.
 
-## 영향과 검증 범위
+## Impact and validation scope
 
-2026-10-22 사용자 실기에서 이 보정 뒤에도 같은 가로 띠가 재발했다. 이 결정의 순서 보정은 검은 띠 해결로 검증되지 않았으며, 추가 추정 보정 대신 [모바일 화면 진단](../development/viewport-diagnostics.md)으로 실기 자료를 확보한다.
+In user testing on a physical device on 2026-10-22, the same horizontal band recurred even after this adjustment. The ordering adjustment in this decision has not been verified to resolve the black band; instead of further speculative adjustments, collect physical-device data through [Mobile screen diagnostics](../development/viewport-diagnostics.md).
 
-이 보정은 직접 접속의 로컬 앱 반영으로 적용하며 중앙 Mewlink 배포는 필요 없다. 에이전트는 빌드·서버 재시작을 수행하지 않는다.
+Apply this adjustment by updating the local app for direct access; no central Mewlink deployment is required. The agent does not build or restart the server.
 
-회귀 검사는 정책 설정과 네이티브 요청의 순서, 진행 중 유지·실패 복원, 키보드 열린 진입과 다시 열기, 기존 화면 경계를 대상으로 한다. OS 키보드의 검은 띠를 자동 검사에서 재현한 것은 아니므로 해당 Brave 기기의 실기 확인이 남는다. 세부 검사 범위는 [공용 UI 계약](../development/ui-contracts.md#모바일-에디터와-키보드)에 둔다.
+Regression checks cover the order of policy setting and native requests, retention while pending and restoration on failure, entry with the keyboard open and reopening it, and existing screen boundaries. Automated checks did not reproduce the OS keyboard's black band, so physical-device verification on the affected Brave device remains pending. Keep the detailed check scope in the [Shared UI contract](../development/ui-contracts.md#mobile-editor-and-keyboard).

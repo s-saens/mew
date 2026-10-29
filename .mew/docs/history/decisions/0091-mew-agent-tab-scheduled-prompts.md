@@ -1,33 +1,33 @@
 ---
-provenance: "Liiiiv 중앙 ADR 이관본, 2026-10-14"
-description: "이관한 결정 기록: 에이전트 탭 예약 전송은 원 세션으로 되돌아간다. 당시 선택·근거·후속 변경을 보존하며 현재 계약은 Mew 소유 문서에서 확인한다."
-title: "0091 — 에이전트 탭 예약 전송은 원 세션으로 되돌아간다"
+provenance: "Migrated copy of a Liiiiv central ADR, 2026-10-14"
+description: "Migrated decision record: Scheduled sends from agent tabs return to the original session. Preserves the choices, rationale, and subsequent changes from that time; see the Mew owning document for the current contract."
+title: "0091 — Scheduled sends from agent tabs return to the original session"
 created: 2026-08-27
 updated: 2026-08-27
 ---
 
-- 날짜: 2026-08-27
-- 상태: 채택
-- 결정자: 송상훈 (지시)
-- 관련: [0036](0036-mew-agent-session-controls-and-usage.md) · [0048](0048-mew-agent-supervisor-process.md) · [0079](0079-mew-agent-tabs-resume-after-idle.md)
+- Date: 2026-08-27
+- Status: Adopted
+- Decision maker: Song Sanghoon (directive)
+- Related: [0036](0036-mew-agent-session-controls-and-usage.md) · [0048](0048-mew-agent-supervisor-process.md) · [0079](0079-mew-agent-tabs-resume-after-idle.md)
 
-## 배경
+## Background
 
-에이전트 창의 메시지는 즉시 보내거나 진행 중인 세션의 큐에만 넣을 수 있었다. 특정 탭의 대화 문맥을 유지한 채 미래 시각에 한 번 보내는 기능이 필요하다. 브라우저와 감독 프로세스는 그 전에 닫힐 수 있다.
+Messages in the agent window could only be sent immediately or queued in an ongoing session. A feature is needed to send a message once at a future time while preserving a specific tab's conversation context. The browser and supervisor process may close before then.
 
-## 결정
+## Decision
 
-- 예약 항목은 서버의 `<DATA_DIR>/agent-scheduled-prompts.json`에 저장한다. 브라우저 localStorage나 살아 있는 감독 메모리에 두지 않는다.
-- 항목은 런타임·탭 ID·cwd·그 탭의 ACP session ID·프롬프트·선택한 skill·실행 시각을 가진다.
-- 시각이 되면 서버는 해당 탭 감독에 붙거나 새 감독을 띄운다. 새 감독에는 저장한 session ID를 resume 힌트로 주어 ACP `session/load` 뒤에 프롬프트를 보낸다.
-- `AgentSession.prompt()`의 기존 계약을 그대로 사용한다. 세션이 진행 중이면 예약 메시지는 서버 큐의 끝에 들어가고, 유휴 종료 뒤라면 먼저 세션을 복원한다.
-- 실행 직전 일시 오류는 항목을 버리지 않고 1분 뒤 재시도한다. 성공한 한 번 전송만 목록에서 제거한다.
-- 등록 API는 에이전트·터미널과 같은 owner/manager 권한을 요구한다.
+- Store scheduled items in `<DATA_DIR>/agent-scheduled-prompts.json` on the server. Do not store them in browser localStorage or a running supervisor's memory.
+- Each item contains the runtime, tab ID, cwd, the tab's ACP session ID, prompt, selected skill, and execution time.
+- At the scheduled time, the server attaches to that tab's supervisor or starts a new one. It gives a new supervisor the saved session ID as a resume hint and sends the prompt after ACP `session/load`.
+- Use the existing `AgentSession.prompt()` contract unchanged. If the session is in progress, the scheduled message goes at the end of the server queue; if idle shutdown has occurred, restore the session first.
+- For a transient error immediately before execution, retain the item and retry after 1 minute. Remove an item from the list only after its one-time send succeeds.
+- The registration API requires the same owner/manager permissions as agents and terminals.
 
-## 근거
+## Rationale
 
-독립 cron 작업은 새 세션·새 tmux 실행이라 탭의 대화 문맥과 큐를 공유하지 못한다. 감독의 기존 resume 경로를 재사용하면 별도 전사 저장소나 장기 상주 프로세스 없이 같은 세션에 안전하게 이어 보낼 수 있다.
+An independent cron job starts a new session and a new tmux execution, so it cannot share the tab's conversation context and queue. Reusing the supervisor's existing resume path allows safe follow-up sends to the same session without a separate transcript store or long-running resident process.
 
-## 결과
+## Results
 
-예약은 mew 프로세스가 실행 중일 때 처리한다. 서버가 꺼져 있던 시각의 항목은 다음 시작 직후 실행되며, 정확한 벽시계 시각을 보장하는 외부 스케줄러는 도입하지 않는다.
+Scheduled items are processed while the mew process is running. Items due while the server was down run immediately after the next startup; no external scheduler guaranteeing an exact wall-clock time is introduced.

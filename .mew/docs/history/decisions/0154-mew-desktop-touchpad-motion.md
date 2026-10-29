@@ -1,24 +1,24 @@
 ---
-provenance: "Liiiiv 중앙 ADR 이관본, 2026-10-14"
-description: "이관한 결정 기록: 원격 컨트롤은 터치패드처럼 이동량을 따른다. 당시 선택·근거·후속 변경을 보존하며 현재 계약은 Mew 소유 문서에서 확인한다."
-title: "0154 — 원격 컨트롤은 터치패드처럼 이동량을 따른다"
+provenance: "Migrated copy of a Liiiiv central ADR, 2026-10-14"
+description: "Migrated decision record: Remote controls follow movement distance like a touchpad. Preserves the choices, rationale, and subsequent changes from that time; consult the Mew owning document for the current contract."
+title: "0154 — Remote controls follow movement distance like a touchpad"
 created: 2026-09-16
 updated: 2026-09-23
 ---
 
-- 상태: 채택
-- 후속 결정: [0169](0169-mew-desktop-view-velocity-controls.md) — 일반 휠·화면 이동·확대는 중앙 변위 기반 속도 조작; 커서·버튼 드래그는 유지
-- 결정자: 사용자 (속도 조이스틱 대신 움직인 만큼만 포인터 이동 요청)
-- 부분 대체: [0136](0136-mew-native-remote-desktop-webrtc.md)의 모바일 조이스틱 속도 이득
+- Status: Adopted
+- Follow-up decision: [0169](0169-mew-desktop-view-velocity-controls.md) — Regular wheel, panning, and zoom use velocity controls based on displacement from the center; retain cursor and button dragging
+- Decision maker: User (requested pointer movement only by the distance moved, instead of a velocity joystick)
+- Partially supersedes: Mobile joystick velocity gain in [0136](0136-mew-native-remote-desktop-webrtc.md)
 
-## 결정
+## Decision
 
-모바일 컨트롤은 누른 시작점으로부터의 변위를 속도로 해석하지 않고, 직전 입력 위치와의 차이를 이동량으로 사용한다. 손가락을 멈추면 커서·드래그·스크롤·화면 이동·확대도 멈춘다. 손을 떼고 다시 대면 새 입력 기준점을 잡으며 커서를 되돌리지 않는다. 시각적 손잡이의 이동 반경은 실제 입력 거리를 제한하지 않는다.
+Mobile controls use the difference from the previous input position as movement distance, rather than interpreting displacement from the initial press point as velocity. When the finger stops, cursor movement, dragging, scrolling, panning, and zooming also stop. Lifting and touching again establishes a new input reference point without moving the cursor back. The visual handle's movement radius does not limit the actual input distance.
 
-[0145](0145-mew-desktop-mouse-controls.md)의 마우스 형태 배치, 탭 클릭·좌우 즉시 드래그·휠 hold 드래그, 방향키 조작과 입력 해제 계약은 유지한다. 입력 프로토콜·전송·캡처는 바꾸지 않는다.
+Retain the mouse-shaped layout, tap-to-click, immediate left/right button dragging, wheel hold dragging, arrow-key controls, and input release contract from [0145](0145-mew-desktop-mouse-controls.md). Do not change the input protocol, transport, or capture.
 
-## 근거
+## Rationale
 
-밀어 둔 동안 계속 이동하는 방식은 정밀한 위치 선택을 어렵게 한다. 이동 거리 기반으로 바꿔 손가락 정지와 원격 조작 정지를 일치시킨다. 기존 속도 방식은 사용자 요청 없이 다시 도입하지 않는다.
+Continuous movement while holding the control displaced makes precise positioning difficult. Switch to distance-based movement so that stopping the finger also stops remote control. Do not reintroduce the previous velocity-based behavior without a user request.
 
-감도·문턱·검증은 [개발 계약](../../development/remote-desktop.md), 사용자 조작은 [사용법](../../../../docs/guides/remote-desktop.md#조작)에 둔다.
+Keep sensitivity, thresholds, and verification in the [development contract](../../development/remote-desktop.md), and user controls in the [usage guide](../../../../docs/guides/remote-desktop.md#controls).

@@ -1,25 +1,25 @@
 ---
-provenance: "Liiiiv 중앙 ADR 이관본, 2026-10-14"
-description: "이관한 결정 기록: mew 공통 RAG 설정·패널·에이전트 검색 안내. 당시 선택·근거·후속 변경을 보존하며 현재 계약은 Mew 소유 문서에서 확인한다."
-title: "0167 — mew 공통 RAG 설정·패널·에이전트 검색 안내"
+provenance: "Migrated copy of a Liiiiv central ADR, 2026-10-14"
+description: "Migrated decision record: mew shared RAG settings, panel, and agent search guidance. Preserves the choices, rationale, and subsequent changes at the time; see the Mew owning document for the current contract."
+title: "0167 — mew shared RAG settings, panel, and agent search guidance"
 created: 2026-09-22
 updated: 2026-09-29
 ---
 
-- 날짜: 2026-09-22
-- 상태: 대체됨: 0176
-- 후속 결정: [0176](0176-mew-remove-local-rag.md) — 로컬 RAG 전체 제거
-- 결정자: 사용자 요청
-- 관련: [0071](0071-mew-embedded-lancedb-local-rag.md) · [0165](0165-mew-common-agent-guidance-file.md)
+- Date: 2026-09-22
+- Status: Superseded by: 0176
+- Subsequent decision: [0176](0176-mew-remove-local-rag.md) — Remove all local RAG functionality
+- Decision maker: User request
+- Related: [0071](0071-mew-embedded-lancedb-local-rag.md) · [0165](0165-mew-common-agent-guidance-file.md)
 
-## 결정
+## Decision
 
-- 같은 Mew 서버의 모든 프로젝트가 `DATA_DIR/rag-settings.json`의 RAG 사용·에이전트 안내 설정을 공유한다. 둘 다 기본값은 켜짐이다. `MEW_RAG_ENABLED=0`은 상위 비활성화이며 UI로 해제하지 않는다.
-- 모바일 하단 독 기본 맨 오른쪽과 데스크톱 메뉴에 RAG 패널을 둔다. 현재 프로젝트/연결 Documents의 모델·DB 식별자·색인 파일·청크와 검색·재색인을 제공한다. 설정 공유가 다른 프로젝트 문서의 검색 허용을 뜻하지 않는다.
-- 공통 안내가 켜진 ACP 요청에 런타임 중립 로컬 CLI 검색 명령을 붙인다. 프로젝트 지식이 필요한 작업에서 관련 문서를 찾고 원문을 확인하도록 안내하며 검색 실행 자체는 에이전트가 판단한다. 프로젝트 자동 안내 끄기와 터미널 직접 입력 경계를 유지한다. 기존 사용자 공통 안내 파일은 덮어쓰지 않는다.
-- CLI는 세션에 묶인 프로젝트·Documents·데이터 경로를 사용하고 JSON stdin을 받는다. 기존 셸 권한으로 실행하며 별도 인증 우회 HTTP 경로를 만들지 않는다. 웹 API와 같은 LanceDB 색인을 쓰며 프로세스 간 잠금으로 읽기·쓰기 작업을 직렬화한다.
-- 패널 API는 로그인·파일 권한을 유지하고 설정 변경·재색인은 `system` 기능 권한을 요구한다. 프로젝트 전환 중 요청은 원래 루트에 고정하거나 409로 거절한다. 검색·목록은 현재 가시 파일로 제한한다.
+- All projects on the same Mew server share the RAG usage and agent guidance settings in `DATA_DIR/rag-settings.json`. Both default to on. `MEW_RAG_ENABLED=0` is an overriding disable setting and cannot be cleared through the UI.
+- Place the RAG panel at the far right of the default mobile bottom dock and in the desktop menu. Provide model, DB identifier, indexed file, and chunk information for the current project/linked Documents, along with search and reindexing. Shared settings do not grant permission to search other projects' documents.
+- Attach a runtime-neutral local CLI search command to ACP requests with shared guidance enabled. Instruct agents to find relevant documents and check the original text for tasks requiring project knowledge; agents decide whether to run searches. Retain the boundaries for disabling project automatic guidance and for direct terminal input. Do not overwrite existing user shared guidance files.
+- The CLI uses project, Documents, and data paths bound to the session and accepts JSON stdin. It runs with existing shell permissions and does not create a separate HTTP path that bypasses authentication. It uses the same LanceDB index as the web API and serializes reads and writes through interprocess locking.
+- The panel API retains login and file permissions, and changing settings or reindexing requires the `system` feature permission. Requests during project switches are pinned to the original root or rejected with 409. Search and listings are limited to currently visible files.
 
-## 근거
+## Rationale
 
-프로젝트별 설정 사본 없이 검색 사용 방식을 안내하고, 실제 사용하는 파생 DB를 사용자가 확인할 수 있다. 내장 로컬 검색·원문 SSoT·권한 경계를 유지한다.
+Provide search usage guidance without per-project settings copies, and let users inspect the derived DB actually in use. Retain built-in local search, original-text SSoT, and permission boundaries.

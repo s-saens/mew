@@ -1,42 +1,42 @@
 ---
-title: "Mew 기능 문서 관리"
+title: "Mew feature document management"
 created: "2026-09-18"
 updated: "2026-10-29"
-description: "현재 기능 명세의 소유권·계층·공유 계약 연결과 작업·연구 기록 분리, 이전 상태 필드 및 제거된 기능 패널의 호환 자료 보존 기준."
+description: "Criteria for ownership, hierarchy, and shared-contract links in current feature specifications; separation of work and research records; and preservation of compatibility materials for legacy status fields and the removed feature panel."
 ---
 
-AI는 [문서 규칙](../README.md)에 따라 각 문서의 `description`에서 필요한 기능을 고른다. [기능 홈](_features.md)은 문서 탐색과 이전 링크 호환을 위해 유지한다. Mew의 Documents 연결은 `.mew/docs`다.
+AI selects the needed features from each document's `description` according to the [document rules](../README.md). The [feature home](_features.md) is retained for document navigation and compatibility with old links. Mew's Documents connection is `.mew/docs`.
 
-기능 패널과 전용 API·CLI·실행 큐는 [제거 결정](../decisions/0065-remove-feature-panel.md)에 따라 제거했다. 기능 명세 Markdown은 Documents에서 계속 읽고 편집한다.
+The feature panel and its dedicated API, CLI, and execution queue were removed according to the [removal decision](../decisions/0065-remove-feature-panel.md). Feature specification Markdown continues to be read and edited in Documents.
 
-## 파일과 계층
+## Files and hierarchy
 
-- 기능 항목 하나는 Markdown 파일 하나다. 제목은 실제 파일명에서 `.md`를 뺀 이름이다. 상위 대표 파일의 접두 `_`는 표시하지 않는다. 프론트매터의 `title`과 `parent`는 제목·계층의 기준본이 아니다.
-- 자식 없는 항목은 `이름.md`다. 첫 하위 항목을 만들거나 이동해 넣으면 `이름/_이름.md`로 옮기고, 하위 항목은 같은 폴더에 둔다. 마지막 자식이 삭제되거나 이동하면 대표를 다시 `이름.md`로 옮기고 빈 폴더를 제거한다. 첨부·숨김 파일이 남으면 Documents와 같이 폴더를 유지한다.
-- Documents의 생성·개명·이동·삭제를 사용하면 본문과 링크도 함께 보정한다. 상위 이름 변경은 폴더와 대표 이름을 함께 바꾼다. 일반 파일 도구로 직접 옮기면 링크도 직접 확인한다.
-- 기존 `MOC.md`·`_MOC.md`는 해당 폴더의 대표로 호환한다. `_폴더이름.md`가 있으면 대표 파일과 별도 MOC를 구분한다. 루트 MOC·README는 문서 탐색 안내로 유지한다.
-- 기존 ID는 과거 실행 이력 참조를 위해 유지한다. 일반 Markdown은 프론트매터나 전용 구분자가 없어도 읽으며, 본문 제목·불렛 형식을 강제하지 않는다.
+- Each feature item is one Markdown file. Its title is the actual filename without `.md`. The `_` prefix of a parent representative file is not displayed. Frontmatter `title` and `parent` are not the canonical source for titles or hierarchy.
+- An item without children is `이름.md`. When its first child is created or moved under it, move it to `이름/_이름.md` and place the children in the same folder. When the last child is deleted or moved, move the representative file back to `이름.md` and remove the empty folder. If attachments or hidden files remain, retain the folder as Documents does.
+- Using create, rename, move, and delete operations in Documents also adjusts body content and links. Renaming a parent changes both the folder name and the representative filename. If you move files directly with general file tools, check the links yourself.
+- Existing `MOC.md` and `_MOC.md` are supported as folder representatives for compatibility. If `_폴더이름.md` exists, distinguish the representative file from a separate MOC. Retain root MOCs and READMEs as document navigation guides.
+- Retain existing IDs for references to historical execution records. Read ordinary Markdown even without frontmatter or dedicated delimiters, and do not enforce heading or bullet formats in the body.
 
-## 탐색과 내용 소유권
+## Navigation and content ownership
 
-- 문서 계층은 Documents와 실제 파일·폴더에서 탐색한다. 제목·본문·관련 파일·커밋·검증은 원본 문서와 문서 편집기에서 확인한다.
-- 기능 문서 하나가 해당 기능의 요구사항·범위·상세 동작·구현 진입점·확인 기준을 소유한다. 기능 전용 명세는 같은 파일에서 관리하며 별도 Specs 본문을 만들지 않는다. 개요 뒤 현재 상세 동작과 확인 기준을 둔다. 날짜별 구현·검증 기록은 `../work/`, 비교·조사 원문은 `../research/`에 두고 연결한다.
-- 여러 기능이 공유하는 개발 계약과 사용법·설정·운영은 기존 소유 문서에 두고 링크한다. 해당 본문을 기능 파일에 복제하지 않는다. 기능을 맡길 때 연결한 공통 계약도 읽는다.
-- 코드·기능이 바뀌면 소유 기능 파일을 고치고, 공통 계약이 바뀌면 해당 소유 문서도 같은 작업에서 고친다. 새 문서의 MOC 등록은 필요하지 않으며 MOC 목록의 자동 생성·갱신도 요구하지 않는다. 문서를 이동하면 실제 들어오는 링크를 갱신한다. 상태 판정과 확인 해시는 형식 정리만으로 다시 승인하지 않는다.
+- Navigate the document hierarchy through Documents and the actual files and folders. Check titles, body content, related files, commits, and validation in the original documents and document editor.
+- One feature document owns that feature's requirements, scope, detailed behavior, implementation entry points, and acceptance criteria. Maintain feature-specific specifications in the same file without creating a separate Specs body. Place current detailed behavior and acceptance criteria after the overview. Store and link dated implementation/validation records in `../work/` and original comparison/research materials in `../research/`.
+- Keep development contracts shared by multiple features, along with usage, configuration, and operations guidance, in their existing owning documents and link to them. Do not duplicate that content in feature files. When delegating a feature, also read the linked shared contracts.
+- When code or features change, update the owning feature file; when shared contracts change, update their owning documents in the same task. New documents do not require MOC registration, and automatic generation or updating of MOC lists is not required. When moving documents, update actual incoming links. Do not reapprove status determinations or verification hashes solely because formatting was cleaned up.
 
-## 상태와 실행
+## Status and execution
 
-2026-09-18 최초 목록화에서는 8개 분야와 44개 하위 기능을 등록했다. `created`는 등록일이며 실제 최초 구현일이 아니다. 이후 추가·제거한 기능은 현재 파일 목록을 따른다.
+The initial catalog on 2026-09-18 registered 8 areas and 44 subfeatures. `created` is the registration date, not the actual initial implementation date. For features added or removed afterward, follow the current file list.
 
-- `implemented`는 제공 범위를 문서·코드에서 확인한 상태이며 모든 환경의 검증 완료를 뜻하지 않는다. `verified`·`needs-fix`는 사용자 판정이다.
-- `status_hash`는 현재 제목·본문 요구사항·부모 관계에 상태를 연결한다. 이전 기능 API가 외부 내용·경로 변경을 `changed`로 판별하던 해시이며, 패널 제거 후 앱에서 다시 계산하거나 판정하지 않는다.
-- `files`는 대표 구현 진입점이며 변경 파일 전체 목록이 아니다. 실제 수행하지 않은 실행·커밋·검증을 추정해 쓰지 않는다.
-- 문서 편집만으로 에이전트 실행이나 Git 커밋은 발생하지 않는다. 제거한 API·CLI·실행 큐의 과거 기록은 [기능 기반 개발](%ED%84%B0%EB%AF%B8%EB%84%90%C2%B7%EC%97%90%EC%9D%B4%EC%A0%84%ED%8A%B8%C2%B7%EC%9E%90%EB%8F%99%ED%99%94/%EA%B8%B0%EB%8A%A5%20%EA%B8%B0%EB%B0%98%20%EA%B0%9C%EB%B0%9C%C2%B7Markdown%20%EB%AC%B8%EC%84%9C.md)이 소유한다.
+- `implemented` means the provided scope has been confirmed in documentation and code; it does not mean validation is complete in every environment. `verified` and `needs-fix` are user determinations.
+- `status_hash` associates status with the current title, body requirements, and parent relationship. It is the hash the former feature API used to identify external content/path changes as `changed`; after the panel's removal, the app does not recalculate it or make determinations from it.
+- `files` lists representative implementation entry points, not every changed file. Do not infer and record executions, commits, or validations that were not actually performed.
+- Editing documents alone does not trigger agent execution or Git commits. [Feature-based development](terminals-agents-automation/feature-driven-development-and-markdown-documents.md) owns the historical records of the removed API, CLI, and execution queue.
 
-## 목록에 넣지 않은 것
+## Items not included in the catalog
 
-옛 홈의 할 일·달력, 미구현 AI 커밋 메시지 생성, 실현되지 않은 계획을 현재 기능으로 만들지 않았다. Android는 환경 준비와 기존 gateway 연결 범위다. 최초 등록했던 RAG는 2026-09-28 제거해 [과거 기능 기록](../history/rag-feature.md)으로 옮겼다. 설치·HTTPS·백업·라이선스·연구·과거 계획은 기존 소유 문서에 유지한다.
+The old home's to-do list/calendar, AI commit message generation that was not implemented, and unrealized plans were not listed as current features. Android is limited to environment preparation and existing gateway connections. The initially registered RAG was removed on 2026-09-28 and moved to [historical feature records](../history/rag-feature.md). Installation, HTTPS, backups, licensing, research, and past plans remain in their existing owning documents.
 
-## Specs 통합 — 2026-10-06
+## Specs consolidation — 2026-10-06
 
-기존에는 기능 탐색·위임용 요약과 Specs의 상세 명세를 분리했지만, 한 기능을 이해·수정하려고 두 문서를 오가는 부담이 컸다. 기능 전용 Specs 7개의 본문을 대응하는 기능 파일로 통합했다. `.mew/docs/specs/`에는 기존 ADR·외부 링크를 위한 이동 안내만 남기고 현재 AI 탐색은 description 목록에서 해당 기능 본문을 선택한다. 기존 ID·저장된 상태·확인 해시·검증 기록을 보존하며 문서 통합만으로 사용자 판정을 갱신하지 않는다. 본문이나 링크가 바뀐 항목은 기존 해시 규칙에 따라 `changed`로 읽힐 수 있으며 자동으로 재승인하지 않는다.
+Previously, summaries for feature discovery/delegation were separate from detailed specifications in Specs, but switching between two documents to understand or modify one feature created substantial overhead. The bodies of 7 feature-specific Specs documents were consolidated into their corresponding feature files. Only relocation notices for existing ADRs and external links remain in `.mew/docs/specs/`; current AI discovery selects the relevant feature body from the description list. Existing IDs, saved statuses, verification hashes, and validation records are preserved, and document consolidation alone does not update user determinations. Items with changed body content or links may be read as `changed` under the existing hash rules and are not automatically reapproved.

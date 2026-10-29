@@ -1,37 +1,37 @@
 ---
-provenance: "Liiiiv 중앙 ADR 이관본, 2026-10-14"
-description: "이관한 결정 기록: 탐색기는 루트 내용과 하위 프로젝트를 분리해 보인다. 당시 선택·근거·후속 변경을 보존하며 현재 계약은 Mew 소유 문서에서 확인한다."
-title: "0085 — 탐색기는 루트 내용과 하위 프로젝트를 분리해 보인다"
+provenance: "Migrated copy of a Liiiiv central ADR, 2026-10-14"
+description: "Migrated decision record: The explorer displays root contents and subprojects separately. Preserves the choices, rationale, and subsequent changes at the time; consult the Mew owning document for the current contract."
+title: "0085 — The explorer displays root contents and subprojects separately"
 created: 2026-08-27
 updated: 2026-09-17
 ---
 
-- 날짜: 2026-08-27
-- 상태: 채택
-- 후속 결정: [0180](0180-mew-explorer-documents-files-toggle.md) — Documents와 Files를 하단 토글로 분리; 하위 프로젝트 탭 경계 유지
-- 후속 결정: [0158](0158-mew-subprojects-open-root-tabs.md) — 하위 프로젝트는 펼침 대신 프로젝트 탭으로 열기
-- 후속 결정: [0151](0151-mew-nested-subprojects.md) — 중첩 .mew 판별·생성; 기존 직계 배치 유지
-- 대체: [0084](0084-mew-explorer-project-folder.md) — 고유 결정은 제거하거나 이 ADR에 흡수; 유지되는 공통 경계는 본문 참조
-- 결정자: 송상훈 (지시)
+- Date: 2026-08-27
+- Status: Adopted
+- Follow-up decision: [0180](0180-mew-explorer-documents-files-toggle.md) — Separate Documents and Files with a bottom toggle; retain the subproject tab boundary
+- Follow-up decision: [0158](0158-mew-subprojects-open-root-tabs.md) — Open subprojects as project tabs instead of expanding them
+- Follow-up decision: [0151](0151-mew-nested-subprojects.md) — Detect and create nested .mew folders; retain the existing immediate-child layout
+- Supersedes: [0084](0084-mew-explorer-project-folder.md) — Remove its unique decisions or incorporate them into this ADR; see the body for shared boundaries that remain
+- Decision maker: Song Sanghoon (directive)
 
-## 배경
+## Background
 
-Project 토글은 실제 루트의 일반 파일·폴더를 한 단계 더 감싸, 탐색기에서 곧바로 보이지 않게 한다.
-반면 `.mew`가 있는 직계 하위 폴더는 실행 단위라 Documents처럼 독립된 탐색 단위로 먼저 보여 줄 필요가 있다.
+The Project toggle adds another level around the actual root's ordinary files and folders, hiding them from immediate view in the explorer.
+Immediate subfolders containing `.mew`, however, are execution units and need to appear first as independent exploration units like Documents.
 
-## 선택지
+## Options
 
-1. Project 토글을 유지한다 — Documents와 모양은 같지만 루트 내용이 한 단계 더 깊어진다.
-2. 루트 내용은 바로 보이고 하위 프로젝트만 독립 토글로 분리한다 — 실행 단위가 먼저 드러나며 일반 파일 구조도 평평하다.
+1. Keep the Project toggle — It looks like Documents, but the root contents are one level deeper.
+2. Show root contents directly and separate only subprojects into independent toggles — Execution units appear first, and the ordinary file structure stays flat.
 
-## 결정
+## Decision
 
-- Documents는 최상단의 큰 펼침 항목으로 유지한다.
-- 현재 루트의 직계 `.mew` 하위 프로젝트는 Documents 다음에 각각 독립된 큰 펼침 항목으로 둔다. 각 항목은 자기 파일을 펼치고 기존 명령 버튼을 유지한다.
-- 이름 없는 Project 토글은 제거한다.
-- 루트의 나머지 파일·폴더는 위 항목 어느 쪽에도 넣지 않고 바로 뒤에 나열한다.
-- 하위 프로젝트 판별은 0083의 직계 `.mew` 규칙을 유지한다.
+- Keep Documents as a large expandable entry at the top.
+- Place each immediate `.mew` subproject of the current root after Documents as an independent large expandable entry. Each entry expands its own files and retains the existing command button.
+- Remove the Project toggle without a path name.
+- List the remaining root files and folders immediately afterward, without placing them inside any of the entries above.
+- Retain the immediate-child `.mew` rule from 0083 for subproject detection.
 
-## 근거
+## Rationale
 
-일반 루트 내용에는 인위적인 컨테이너가 없어 경로 깊이가 실제 파일시스템과 일치한다. 실행·설정 경계를 가진 하위 프로젝트만 별도로 접을 수 있어, Documents와 함께 중요한 작업 단위를 빠르게 찾을 수 있다.
+Ordinary root contents have no artificial container, so their path depth matches the actual filesystem. Only subprojects with execution and configuration boundaries can be collapsed separately, making important work units easy to find alongside Documents.

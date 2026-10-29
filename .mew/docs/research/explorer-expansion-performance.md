@@ -1,72 +1,72 @@
 ---
-title: "파일 문서 탐색기 펼치기 성능 조사"
-description: "2026-10-07 폴더·상위 문서 펼치기의 중복 요청, 캐시 무효화, P2P 수신 제어, 대량 행 렌더링과 순차 파일 메타데이터 조회를 분석한 합성 실험 및 최적화 우선순위. 구현 변경이나 실서비스 성능 검증 결과는 아니다."
+title: "File and document explorer expansion performance investigation"
+description: "2026-10-07 synthetic experiments and optimization priorities analyzing duplicate requests, cache invalidation, P2P receive control, large-scale row rendering, and sequential file metadata lookups when expanding folders and parent documents. These are not implementation changes or production performance validation results."
 created: 2026-10-07
 updated: 2026-10-07
 ---
 
-폴더별 비동기 조회와 서버 카탈로그는 이미 구현되어 있다. 추가 개선의 핵심은 **같은 폴더의 중복 요청을 없애고, 재조회 중 기존 목록을 유지하며, P2P 전송의 조각별 왕복 대기를 줄이고, 화면 밖 행을 만들지 않는 것**이다. 서버 전체 탐색기는 목록에 쓰지 않는 파일 크기 조회도 줄일 수 있다.
+Asynchronous per-folder fetching and the server catalog are already implemented. The key additional improvements are to **eliminate duplicate requests for the same folder, retain existing lists during refetching, reduce per-chunk round-trip waits in P2P transfers, and avoid creating off-screen rows**. The server-wide explorer can also reduce file-size lookups that the list does not use.
 
-2026-10-07 조사 시점의 작업 트리를 분석했다. 아래 수치는 Linux의 격리 fixture에서 얻은 합성 측정이며 실제 사용자의 접속 방식·배포본·휴대폰·외부망 성능을 확정하지 않는다. 앱 코드와 실행 중 서버는 변경하지 않았다.
+The working tree at the time of the 2026-10-07 investigation was analyzed. The figures below are synthetic measurements from isolated fixtures on Linux and do not establish performance for actual users' connection methods, deployed builds, phones, or external networks. The app code and running server were not changed.
 
-현재 기능 계약은 [파일 폴더 탐색과 조작](<../features/프로젝트·파일·검색/파일·폴더 탐색과 조작.md>), [Documents 문서 지도 관리](<../features/프로젝트·파일·검색/Documents·문서 지도 관리.md>), [원격 접속](../development/remote-access.md)을 따른다. 이전 설계·성능 목표는 [사이드바 탐색과 정확 검색](../work/sidebar-explorer-search-performance.md)에 있다.
+The current feature contracts follow [File and folder browsing and operations](<../features/projects-files-search/file-folder-exploration-and-operations.md>), [Documents document map management](<../features/projects-files-search/documents-and-document-map-management.md>), and [Remote access](../development/remote-access.md). Previous designs and performance targets are in [Sidebar browsing and exact search](../work/sidebar-explorer-search-performance.md).
 
-## 현재 조회 경로와 지연 요인
+## Current fetch paths and latency factors
 
-| 경로 | 현재 동작 | 개선할 지점 |
+| Path | Current behavior | Areas for improvement |
 | --- | --- | --- |
-| Files 폴더 또는 Documents 화살표 | `toggleDir` → `requestDir` → `/api/tree?path=…&v=1` → 전체 JSON 파싱 → `directoryChildren` 교체 → 모든 펼친 행 렌더 | 최초 조회 직후 복원용 effect가 같은 폴더를 한 번 더 재검증한다. |
-| Documents 상위 문서 이름 | `openPage`가 자식 목록에서 대표 파일을 찾고 파일 열기를 호출 | 진행 중인 화살표 조회와 Promise를 공유하지 않는다. 대표 경로가 부모 엔트리에 있으면 이름 클릭의 선행 목록 요청도 줄일 수 있다. |
-| 사이드바 변경 알림 | 영향 부모의 자식 캐시를 삭제하고 재조회 | 응답을 기다리는 동안 기존 자식 행이 사라진다. 루트 배열이 교체되면 전체 자식 캐시도 지운다. |
-| 일반 계정의 한 단계 tree API | 카탈로그의 직접 자식 → 항목별 권한 검사 | 카탈로그 조회보다 반복 동기 파일시스템 검사가 비싸다. |
-| 제한된 파일 권한 또는 게스트 | 전체 트리 재귀 조회·권한 필터 후 요청 폴더를 추출 | `path`를 지정해도 전체 프로젝트를 다시 순회한다. 사용자 역할만으로 이 경로 여부를 판정할 수 없다. |
-| 서버 전체 탐색기 | `/api/fs/entries` → 한 단계 `readdir` → 파일마다 순차 `stat` → 전체 JSON | 파일 크기를 표시하지 않으면서 모든 일반 파일의 크기를 기다린다. |
+| Files folder or Documents arrow | `toggleDir` → `requestDir` → `/api/tree?path=…&v=1` → parse full JSON → replace `directoryChildren` → render all expanded rows | Immediately after the initial fetch, the restoration effect revalidates the same folder once more. |
+| Documents parent document name | `openPage` finds the representative file in the child list and invokes file opening | It does not share a Promise with an in-progress fetch initiated by the arrow. Including the representative path in the parent entry could also reduce the preliminary list request when clicking the name. |
+| Sidebar change notification | Delete the affected parent's child cache and refetch | Existing child rows disappear while waiting for the response. Replacing the root array also clears the entire child cache. |
+| Single-level tree API for regular accounts | Direct children from the catalog → per-entry permission checks | Repeated synchronous filesystem checks cost more than the catalog lookup. |
+| Restricted file permissions or guest | Recursively fetch the entire tree, filter permissions, then extract the requested folder | The entire project is traversed again even when `path` is specified. The user's role alone cannot determine whether this path is used. |
+| Server-wide explorer | `/api/fs/entries` → single-level `readdir` → sequential `stat` for each file → full JSON | Waits for the sizes of all regular files even though file sizes are not displayed. |
 
-근거: [FileTree](../../../src/components/FileTree.tsx)의 `requestDir`, 복원 effect, `treeInvalidation`, `openPage`; [App](../../../src/App.tsx)의 `refreshTree`; [tree API](../../../server/api.ts)의 `/tree`; [카탈로그](../../../server/fileCatalog.ts)의 `listCatalogChildren`; [권한](../../../server/access-policy.ts)의 `filterTreeForAccess`; [서버 파일 목록](../../../server/fsBrowse.ts)의 `listEntries`; [서버 탐색기](../../../src/components/ServerFileExplorer.tsx)와 [행 UI](../../../src/components/file-browser.tsx).
+Evidence: `requestDir`, the restoration effect, `treeInvalidation`, and `openPage` in [FileTree](../../../src/components/FileTree.tsx); `refreshTree` in [App](../../../src/App.tsx); `/tree` in the [tree API](../../../server/api.ts); `listCatalogChildren` in the [catalog](../../../server/fileCatalog.ts); `filterTreeForAccess` in [permissions](../../../server/access-policy.ts); `listEntries` in the [server file listing](../../../server/fsBrowse.ts); the [server explorer](../../../src/components/ServerFileExplorer.tsx) and [row UI](../../../src/components/file-browser.tsx).
 
-## 네트워크 전송 측정
+## Network transfer measurements
 
-현재 mewlink 구현에서 중앙은 로그인·시그널링을 처리한다. 파일 목록 본문은 브라우저와 기기의 DataChannel로 직접 이동하며 TURN relay 후보와 중앙 작업 HTTP 프록시는 사용하지 않는다. 따라서 중앙 중계 서버의 추가 홉을 곧바로 원인으로 단정할 수 없다. 직접 서버 주소로 접속하면 이 DataChannel 경로도 사용하지 않는다. [연결 코드](../../../src/utils/remote-connection.ts), [전송 선택](../../../src/utils/remote-transport.ts), [현재 원격 계약](../development/remote-access.md).
+In the current mewlink implementation, the central server handles login and signaling. File-list bodies travel directly over a DataChannel between the browser and device; TURN relay candidates and the central operation HTTP proxy are not used. An extra hop through a central relay server therefore cannot immediately be identified as the cause. Connecting directly to the server address also bypasses this DataChannel path. [Connection code](../../../src/utils/remote-connection.ts), [transport selection](../../../src/utils/remote-transport.ts), [current remote access contract](../development/remote-access.md).
 
-P2P HTTP 응답은 최대 12KiB 조각으로 전송된다. 브라우저는 `ReadableStream.pull`마다 `credit` 하나를 보내고 그 조각이 도착해야 다음 pull을 진행한다. 서버도 조각마다 `credit`을 기다린다. 첫 본문부터 추가 왕복을 요구하고, 연속 조각도 왕복 지연에 묶이는 구조다. HTTP처럼 `Response.json()`을 사용하므로 부분 수신된 항목은 화면에 표시되지 않는다. [브라우저 수신](../../../src/utils/remote-transport.ts), [서버 송신](../../../server/remote-access-dispatch.ts), [청크 제한](../../../shared/remote-access.ts).
+P2P HTTP responses are sent in chunks of up to 12 KiB. The browser sends one `credit` for each `ReadableStream.pull` and waits for that chunk to arrive before proceeding with the next pull. The server also waits for `credit` for each chunk. This structure requires an additional round trip starting with the first body chunk, and subsequent chunks are also bound by round-trip latency. As with HTTP, it uses `Response.json()`, so partially received entries are not displayed. [Browser receiving](../../../src/utils/remote-transport.ts), [server sending](../../../server/remote-access-dispatch.ts), [chunk limit](../../../shared/remote-access.ts).
 
-실제 `DataChannelTransport`와 `remoteDispatcher`를 메모리 HTTP 연결로 결합했다. 가짜 채널의 양방향 전달에 RTT의 절반씩 지연을 넣고, 서버는 준비된 JSON을 즉시 응답했다. 각 조건 3회 중앙값이며 서버 디스크 조회와 UI 렌더링은 포함하지 않는다. 실제 WebRTC의 대역폭·손실·혼잡은 재현하지 않았다.
+The actual `DataChannelTransport` and `remoteDispatcher` were connected through an in-memory HTTP connection. Half the RTT was added as a delay in each direction of the fake channel, and the server immediately returned prepared JSON. Each condition reports the median of 3 runs and excludes server disk lookups and UI rendering. Actual WebRTC bandwidth, loss, and congestion were not reproduced.
 
-| 항목 수 | JSON 바이트 | 실제 본문 조각 수 | RTT 0ms 수신 완료 | RTT 40ms 수신 완료 | RTT 100ms 수신 완료 |
+| Entry count | JSON bytes | Actual body chunk count | Receive completion at 0 ms RTT | Receive completion at 40 ms RTT | Receive completion at 100 ms RTT |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | 50 | 4,371 | 1 | 1.7ms | 82.3ms | 202.9ms |
 | 250 | 22,071 | 2 | 2.5ms | 123.3ms | 303.3ms |
 | 1,000 | 88,821 | 8 | 5.1ms | 367.9ms | 911.3ms |
 
-RTT 100ms 조건에서 응답 헤더는 약 102ms에 도착했다. 목록 1,000개의 나머지 약 810ms는 본문 수신에 들었다. 이 실험에서는 완료 시간이 대략 `(1 + 본문 조각 수) × RTT`로 증가했다. 최대 조각이 계속 온다고 가정하면 한 조각씩 기다리는 100ms RTT 경로의 처리량 상한은 약 120KiB/s다.
+At 100 ms RTT, response headers arrived at approximately 102 ms. For the list of 1,000 entries, the remaining approximately 810 ms was spent receiving the body. In this experiment, completion time increased approximately as `(1 + 본문 조각 수) × RTT`. Assuming a continuous sequence of maximum-size chunks, the throughput ceiling for a 100 ms RTT path that waits for one chunk at a time is approximately 120 KiB/s.
 
-우선 첫 응답과 작은 본문을 같은 송신 구간에 보내고, 큰 응답에는 **바이트 수로 제한한 복수 조각 전송 창**을 적용할 수 있다. 브라우저의 수신 큐와 서버의 credit 검사를 함께 바꿔야 한다. 서버의 credit 값만 늘리면 현재 브라우저의 큐 초과 검사로 연결이 종료될 수 있다. 스트림 취소·권한 회수·동시 요청·전역 메모리 제한을 유지하고 양쪽 프로토콜 호환성을 검증해야 한다. 송신 큐는 [`bufferedAmount`](https://developer.mozilla.org/en-US/docs/Web/API/RTCDataChannel/bufferedAmount)와 저수위 이벤트로 관리할 수 있다.
+As a first step, the initial response and a small body could be sent in the same transmission interval, with a **multi-chunk transmission window limited by byte count** for large responses. The browser's receive queue and the server's credit checks must be changed together. Increasing only the server's credit value could cause the current browser's queue overflow check to terminate the connection. Stream cancellation, permission revocation, concurrent requests, and global memory limits must be preserved, and protocol compatibility on both sides must be verified. The send queue can be managed using [`bufferedAmount`](https://developer.mozilla.org/en-US/docs/Web/API/RTCDataChannel/bufferedAmount) and low-water events.
 
-base64 본문은 바이트 수를 약 33% 늘린다. 1,000개 응답의 서버 송신 프레임 합계는 119,193바이트였다. 바이너리 프레임·압축도 후보지만, 작은 목록에서는 조각별 왕복 제거의 우선순위가 더 높다. 네이티브 HTTP 압축을 추가했다고 이 사용자 정의 채널도 자동으로 압축된다고 가정해서는 안 된다.
+A base64 body increases the byte count by approximately 33%. The total server-sent frames for a response with 1,000 entries amounted to 119,193 bytes. Binary frames and compression are also candidates, but eliminating per-chunk round trips has higher priority for small lists. Adding native HTTP compression must not be assumed to automatically compress this custom channel as well.
 
-## 중복 요청과 캐시 재검증
+## Duplicate requests and cache revalidation
 
-실제 FileTree를 사용하는 production React fixture에서, 빈 자식 캐시로 폴더를 처음 펼치면 Files·Documents 모두 같은 경로를 **2회** 요청했다. StrictMode를 사용하지 않았고 항목 수 50·250·1,000의 각 3회 실행에서 같은 결과였다. 클릭으로 시작한 요청이 끝난 뒤 복원용 effect가 새로 받은 목록까지 복원 캐시로 취급하는 동작과 일치한다. 두 번째 요청은 첫 표시 뒤에 발생하므로 첫 표시 시간을 그대로 두 배로 만드는 것은 아니지만, 네트워크와 후속 렌더링·저장 작업을 늘린다.
+In a production React fixture using the actual FileTree, expanding a folder for the first time with an empty child cache requested the same path **2 times** in both Files and Documents. StrictMode was not used, and the result was the same across 3 runs each with 50, 250, and 1,000 entries. This matches the behavior in which the restoration effect treats even the newly received list as a restoration cache after the click-initiated request completes. The second request occurs after the initial display, so it does not simply double the time to first display, but it increases network traffic and subsequent rendering and storage work.
 
-별도 캐시 fixture에서는 두 열린 폴더 `a`, `b`의 저장된 자식을 복원하고 조회 응답에 150ms 지연을 넣었다. 이 검사는 스타일·메뉴를 제외하고 실제 FileTree의 상태 처리와 조회를 사용했다.
+A separate cache fixture restored saved children for two open folders, `a` and `b`, and added a 150 ms delay to fetch responses. This check used the actual FileTree's state handling and fetching, excluding styles and menus.
 
-| 동작 | 재조회 중 표시 | 요청 |
+| Action | Display during refetching | Requests |
 | --- | --- | --- |
-| 저장된 자식 목록으로 최초 복원 | 두 폴더 자식 모두 유지 | `a`, `b` 각각 1회 |
-| `a`만 변경 알림 | `a` 자식은 사라지고 `b` 자식은 유지 | `a` 1회 |
-| 내용이 같은 루트 목록을 새 배열로 교체 | 두 폴더 자식 모두 사라짐 | `a`, `b` 각각 1회 |
+| Initial restoration from saved child lists | Children of both folders retained | 1 request each for `a` and `b` |
+| Change notification for `a` only | Children of `a` disappear; children of `b` remain | 1 request for `a` |
+| Replace the root list with a new array containing identical contents | Children of both folders disappear | 1 request each for `a` and `b` |
 
-단일 조회 함수가 계정·워크스페이스·프로젝트·경로별 진행 중 Promise와 받은 버전을 관리하도록 통합하는 것이 첫 개선이다. 새 조회 성공 자체를 재검증 완료로 기록하고, 저장된 목록의 최초 재검증과 구분한다. `openPage`와 변경 알림도 이 함수를 공유한다.
+The first improvement is to consolidate fetching into a single function that manages in-flight Promises and received versions by account, workspace, project, and path. A successful new fetch itself is recorded as completed revalidation, distinguished from initial revalidation of a saved list. `openPage` and change notifications also share this function.
 
-일반 변경에서는 목록을 stale로 표시하고 새 응답이 올 때 교체하면, 이미 본 항목은 즉시 유지할 수 있다. 루트 목록이 교체되었다는 이유만으로 관계없는 자식 캐시를 지우지 않는다. 삭제가 확인된 경로·권한 회수·계정 또는 루트 전환은 즉시 무효화하고 늦게 도착한 이전 응답을 버린다.
+For ordinary changes, marking the list stale and replacing it when a new response arrives can keep previously viewed entries visible immediately. Unrelated child caches should not be cleared merely because the root list was replaced. Confirmed deleted paths, permission revocations, and account or root switches must invalidate the cache immediately and discard late responses from the previous state.
 
-[ADR 0105](../history/decisions/0105-mew-incremental-file-catalog-and-exact-search-index.md)는 영향 부모만 무효화하도록 정하며, [ADR 0125](../history/decisions/0125-mew-sidebar-center-anchor-and-visible-loading.md)는 받은 목록과 진행 중 요청의 재사용 및 열린 경로만 읽기를 정한다. 접힌 최상위 폴더 전체 예열은 재도입하지 않는다.
+[ADR 0105](../history/decisions/0105-mew-incremental-file-catalog-and-exact-search-index.md) specifies invalidating only affected parents, and [ADR 0125](../history/decisions/0125-mew-sidebar-center-anchor-and-visible-loading.md) specifies reusing received lists and in-flight requests and reading only open paths. Prewarming all collapsed top-level folders must not be reintroduced.
 
-## 대량 목록의 화면 표시 측정
+## Display measurements for large lists
 
-실제 FileTree와 프로젝트 CSS를 메모리에서 번들링했다. Chromium 1,100×750 화면, production React, CPU 4배 감속, `loadChildren`의 응답 지연 100ms 조건이다. 각 조건 3회 중앙값이다. 첫 자식 DOM 반영 후 두 번의 `requestAnimationFrame`을 지난 시점을 표시 지표로 사용했으므로 엄밀한 화면 paint 추적값이나 INP는 아니다. 전체 App·실기기 부하도 포함하지 않는다.
+The actual FileTree and project CSS were bundled in memory. Conditions were a Chromium viewport of 1,100×750, production React, 4× CPU slowdown, and a 100 ms response delay for `loadChildren`. Each condition reports the median of 3 runs. The display metric was the point after two `requestAnimationFrame` callbacks following the first child DOM update, so it is not a precise screen-paint trace or INP. It also excludes the full App and load on actual devices.
 
-| 보기 | 자식 수 | 첫 클릭부터 표시 지표 | 응답부터 표시 지표 | 캐시가 있는 폴더 다시 펼치기 | 표시 후 전체 DOM 요소 수 |
+| View | Child count | First click to display metric | Response to display metric | Re-expanding a cached folder | Total DOM elements after display |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | Files | 50 | 130.8ms | 30.6ms | 25.7ms | 171 |
 | Files | 250 | 154.6ms | 53.7ms | 36.5ms | 771 |
@@ -75,46 +75,46 @@ base64 본문은 바이트 수를 약 33% 늘린다. 1,000개 응답의 서버 �
 | Documents | 250 | 269.1ms | 168.9ms | 155.1ms | 3,276 |
 | Documents | 1,000 | 539.5ms | 438.2ms | 387.7ms | 13,026 |
 
-대량 목록은 네트워크 없이 캐시로 다시 펼쳐도 느려질 수 있다. 모든 자식을 `map`으로 마운트하며 행별 터치 hook도 실행한다. `Node`는 메모화하지 않았고 공통 `ctx`는 렌더마다 새로 만들어져, 한 폴더의 로딩·선택 변화도 다른 열린 행의 재렌더링으로 이어진다.
+Large lists can be slow even when re-expanded from cache without network access. All children are mounted using `map`, and per-row touch hooks also run. `Node` is not memoized, and the shared `ctx` is recreated on every render, so loading or selection changes in one folder also cause other open rows to rerender.
 
-변경이 없는 행을 재사용하도록 행별 props와 콜백을 정리한 뒤, 펼친 트리를 평탄한 표시 행 목록으로 만들고 화면 주변만 마운트하는 가상화를 적용하는 것이 큰 목록의 핵심이다. `memo`만 붙이고 매번 새로운 `ctx`를 전달하면 효과가 제한된다. [React memo 설명](https://react.dev/reference/react/memo), [긴 목록 가상화](https://web.dev/articles/virtualize-long-lists-react-window).
+The key for large lists is to organize per-row props and callbacks so unchanged rows can be reused, then flatten the expanded tree into a list of display rows and apply virtualization that mounts only rows near the viewport. Simply adding `memo` while passing a new `ctx` each time has limited effect. [React memo explanation](https://react.dev/reference/react/memo), [virtualizing long lists](https://web.dev/articles/virtualize-long-lists-react-window).
 
-현재 상위 행 고정·조상선·드래그 이동·키보드 포커스·선택 파일 위치 표시·중앙 스크롤 복원을 함께 유지해야 한다. 단순히 기존 중첩 DOM에 가상화 컴포넌트를 씌우는 것으로 완료할 수 없다. 저장 시 전체 `directoryChildren` 직렬화와 `readTreeCenter`의 전체 행 좌표 조회도 측정 대상이다.
+Existing parent-row pinning, ancestor lines, drag moves, keyboard focus, selected-file location indication, and center-based scroll restoration must all be preserved. Simply wrapping the existing nested DOM in a virtualization component is insufficient. Full `directoryChildren` serialization during saving and queries for every row's coordinates in `readTreeCenter` are also measurement targets.
 
-## 서버 조회 비용
+## Server lookup costs
 
-임시 파일시스템에 일반 Markdown 파일을 만들고, 카탈로그가 준비된 뒤 각 조건을 12회 측정했다. owner의 제한 없는 파일 권한, 유효한 임시 권한 정책 파일을 사용했다. 아래는 중앙값이며 OS 캐시가 따뜻한 로컬 파일시스템 결과다.
+Regular Markdown files were created in a temporary filesystem, and each condition was measured 12 times after the catalog was ready. The owner's unrestricted file permissions and a valid temporary permission policy file were used. The figures below are medians from a local filesystem with a warm OS cache.
 
-| 스코프 | 자식 수 | 카탈로그 직접 자식 조회 | 권한 필터 | JSON 직렬화 |
+| Scope | Child count | Direct catalog child lookup | Permission filtering | JSON serialization |
 | --- | ---: | ---: | ---: | ---: |
 | Files | 50 | 0.06ms | 1.87ms | 0.01ms |
 | Files | 250 | 0.17ms | 7.76ms | 0.03ms |
 | Files | 1,000 | 0.31ms | 26.45ms | 0.08ms |
 | Documents | 1,000 | 0.18ms | 29.79ms | 0.08ms |
 
-1,000개 항목의 권한 필터 한 번에 `realpathSync` 3,000회와 `statSync` 2,000회를 호출했다. Documents에서는 루트 확보용 `mkdirSync`도 1,000회 호출했다. 정책 파일을 캐시해도 stamp 확인과 canonical 경로 계산이 항목마다 반복된다. 요청 단위로 정책·capability·워크스페이스 루트를 확보하고 중복 계산을 재사용할 수 있다. 심볼릭 링크와 경로 이탈 검사는 보존해야 한다.
+A single permission-filtering pass over 1,000 entries called `realpathSync` 3,000 times and `statSync` 2,000 times. In Documents, `mkdirSync` was also called 1,000 times to ensure the root existed. Even with the policy file cached, stamp checks and canonical path calculations are repeated for every entry. Policies, capabilities, and workspace roots could be obtained once per request, with duplicate calculations reused. Symbolic-link and path-escape checks must be preserved.
 
-파일 권한에 deny 예외가 있으면 `/tree`는 따뜻한 카탈로그 대신 전체 트리를 다시 만든다. 이 경로는 별도 개선 대상이다. 카탈로그의 부모 목록·권한 상속·허용 후손의 조상 경로를 이용해 결과를 만들되, 게스트의 부모 경로 보존과 요청 시점 권한 검사를 유지해야 한다.
+When file permissions contain deny exceptions, `/tree` rebuilds the entire tree instead of using the warm catalog. This path is a separate improvement target. Results should be built using the catalog's parent lists, permission inheritance, and ancestor paths of allowed descendants, while preserving parent paths for guests and permission checks at request time.
 
-서버 전체 탐색기의 `listEntries`는 각 일반 파일의 크기를 순차 조회한다. 로컬 임시 파일 조건에서 6회 중앙값은 50개 5.63ms, 250개 25.35ms, 1,000개 84.60ms였다. 파일별 `stat`에 인위적으로 2ms 대기를 추가한 250개 조건에서는 현재 코드 554.18ms, 동시 조회 8개의 파일 목록 비교안 79.49ms였다. 이 비교안은 일반 파일의 목록·크기·정렬 결과가 같음을 확인했으며, 실제 느린 디스크나 심볼릭 링크를 검증한 개선 배포본은 아니다.
+The server-wide explorer's `listEntries` looks up the size of each regular file sequentially. With local temporary files, medians over 6 runs were 5.63 ms for 50 files, 25.35 ms for 250 files, and 84.60 ms for 1,000 files. In the 250-file condition with an artificial 2 ms wait added to each file's `stat`, the current code took 554.18 ms, while a comparison file-listing implementation with 8 concurrent lookups took 79.49 ms. The comparison implementation was confirmed to produce identical lists, sizes, and sorting results for regular files; it is not a deployed improvement validated on actual slow disks or symbolic links.
 
-현재 서버 탐색기 행은 파일 크기를 표시하지 않는다. 목록 요청에서 크기를 생략하거나 필요할 때 별도 조회하면 일반 파일당 `stat`을 없앨 수 있다. 호환상 크기를 유지해야 하면 제한된 병렬 조회를 사용한다. 디렉터리별 `.git` 및 프로젝트 표식·아이콘 조회도 이름 목록의 첫 응답을 지연시키지 않도록 캐시하거나 분리할 수 있다.
+Current server explorer rows do not display file sizes. Omitting sizes from list requests or fetching them separately when needed could eliminate one `stat` per regular file. If sizes must be retained for compatibility, use bounded parallel lookups. Per-directory `.git` and project marker and icon lookups could also be cached or separated so they do not delay the initial name-list response.
 
-## 점진적 표시와 권장 적용 순서
+## Progressive display and recommended implementation order
 
-항목별로 API를 하나씩 호출하면 요청 수와 왕복 대기가 커진다. 점진적 표시를 도입한다면 **정렬된 목록을 묶음으로 받고 화면도 묶음으로 갱신**한다. 서버 카탈로그에서 첫 50~100개를 먼저 보내고, 나머지는 스크롤·유휴 시간에 받거나 스트림으로 이어 받는 방식이 적합하다. 전체 JSON을 받은 뒤 표시만 나누는 방식은 렌더링 정지는 줄여도 네트워크 수신 대기를 줄이지 못한다.
+Calling an API separately for each entry increases request counts and round-trip waits. If progressive display is introduced, **receive sorted lists in batches and update the screen in batches**. A suitable approach is to send the first 50–100 entries from the server catalog first, then receive the rest during scrolling or idle time, or continue receiving them as a stream. Receiving the full JSON and only splitting up display updates can reduce rendering stalls but cannot reduce the wait for network reception.
 
-| 순서 | 변경 후보 | 기대하는 결과 |
+| Order | Candidate change | Expected result |
 | --- | --- | --- |
-| 1 | 조회 Promise 통합, 신규 조회와 복원 재검증 구분, 영향 부모만 갱신, 기존 목록 유지 | 첫 펼치기 요청 2회 → 1회. 재조회 때 목록이 사라지는 대기 제거. |
-| 2 | P2P 첫 본문 동시 송신과 제한된 전송 창 | 원격 접속에서 작은 목록의 추가 RTT 및 큰 목록의 조각별 RTT 감소. 실제 망에서 재측정 필요. |
-| 3 | 행 props 분리·재사용, 대량 표시 행 가상화 | 네트워크와 무관한 수백 ms 렌더링 및 캐시 재펼치기 비용 감소. |
-| 4 | 서버 전체 탐색기의 불필요한 `stat` 제거 또는 제한된 병렬 처리 | 느린 파일시스템의 항목 수에 비례하는 대기 감소. |
-| 5 | 요청 단위 권한 계산 재사용, 제한된 권한의 카탈로그 조회 | 반복 동기 I/O와 권한 예외 경로의 전체 재귀 조회 감소. |
-| 6 | 큰 폴더의 페이지 또는 스트리밍 응답, 묶음 렌더링 | 첫 화면 분량을 먼저 표시하고 큰 목록의 완료를 기다리지 않음. |
+| 1 | Consolidate fetch Promises, distinguish new fetches from restoration revalidation, update only affected parents, and retain existing lists | Requests on first expansion: 2 → 1. Eliminate the wait with missing lists during refetching. |
+| 2 | Send the first P2P body with the response and use a bounded transmission window | Reduce the additional RTT for small lists and per-chunk RTTs for large lists over remote access. Remeasurement on actual networks is required. |
+| 3 | Separate and reuse row props; virtualize large sets of display rows | Reduce hundreds of milliseconds of rendering time and cached re-expansion costs independent of the network. |
+| 4 | Remove unnecessary `stat` calls from the server-wide explorer or use bounded parallel processing | Reduce waits proportional to entry count on slow filesystems. |
+| 5 | Reuse permission calculations within requests; use catalog lookups for restricted permissions | Reduce repeated synchronous I/O and full recursive lookups on permission-exception paths. |
+| 6 | Paginated or streaming responses for large folders, with batched rendering | Display the first screenful before waiting for the large list to complete. |
 
-점진적 렌더링이 필요하면 긴 작업 사이에 실행권을 양보하되, 화면에 필요한 첫 목록을 지연시키지 않는다. [`scheduler.yield`와 긴 작업 분할](https://web.dev/articles/optimize-long-tasks)은 지원 여부에 따라 fallback을 함께 사용한다. 서버 정렬 순서·대표 파일 판정·캐시 version·취소·오류와 목록 완성 여부를 응답 계약에 포함해야 한다.
+If progressive rendering is needed, yield execution between long tasks without delaying the initial list needed on screen. Use [`scheduler.yield` and splitting long tasks](https://web.dev/articles/optimize-long-tasks) with a fallback depending on support. The response contract must include server sort order, representative-file determination, cache version, cancellation, errors, and whether the list is complete.
 
-검증은 클릭 → 요청 → 응답 헤더 → 첫 조각 → 전체 파싱 → 첫 자식 표시를 분리하고, 서버의 목록·권한 필터·직렬화 시간도 기록한다. 기존 `MEW_PERF_LOG`의 `tree.list`만으로는 권한 필터·전송·렌더링을 판단할 수 없다. 직접 HTTP와 P2P, 신규 조회와 캐시 조회, 제한 없는 계정과 권한 예외 계정, PC와 휴대폰을 각각 비교한다.
+Validation separates click → request → response headers → first chunk → full parsing → first child display, and also records server listing, permission-filtering, and serialization times. The existing `tree.list` in `MEW_PERF_LOG` alone cannot assess permission filtering, transfer, or rendering. Compare direct HTTP versus P2P, new versus cached fetches, unrestricted accounts versus accounts with permission exceptions, and PCs versus phones.
 
-첫 개선의 확인 기준은 폴더 첫 조회 1회, 저장된 열린 목록의 재검증 1회, 일반 갱신 중 기존 행 유지, 루트 갱신 시 관계없는 캐시 유지다. 대량 목록은 화면 주변 행만 마운트하면서 조상 고정·포커스·드래그·스크롤 복원이 유지되어야 한다. 실제 p95 목표는 기존 [탐색 성능 설계](../work/sidebar-explorer-search-performance.md)의 캐시 펼치기 80ms·신규 펼치기 250ms를 기준으로 삼고, 외부망 RTT가 큰 경우 전송 시간을 별도로 평가한다.
+Acceptance criteria for the first improvement are 1 initial fetch per folder, 1 revalidation of a saved open list, retention of existing rows during ordinary updates, and retention of unrelated caches when the root updates. Large lists must mount only rows near the viewport while preserving ancestor pinning, focus, dragging, and scroll restoration. Actual p95 targets should use the existing [explorer performance design](../work/sidebar-explorer-search-performance.md) values of 80 ms for cached expansion and 250 ms for new expansion as the baseline, with transfer time evaluated separately when external-network RTT is high.

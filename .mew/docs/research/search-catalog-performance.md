@@ -1,92 +1,92 @@
 ---
-title: "검색 색인·파일 카탈로그 최적화의 격리 측정"
-description: "2026-10-24 합성 파일에서 프로젝트 범위 FTS v2·와일드카드 후보 추출·카탈로그 일괄 가시성 판정을 비교한 중앙값과 재현 명령을 기록한다. 최초 색인 비용·작은 프로젝트의 공통어 조건과 운영 화면·네트워크 미측정 범위를 구분한다."
+title: "Isolated Measurements of Search Index and File Catalog Optimizations"
+description: "Records medians and reproduction commands from comparisons of project-scoped FTS v2, wildcard candidate extraction, and batch catalog visibility evaluation using synthetic files on 2026-10-24. Separately identifies initial indexing costs, common-term conditions for small projects, and the unmeasured production UI and network scope."
 created: "2026-10-24"
 updated: "2026-10-24"
 ---
 
-# 검색 색인·파일 카탈로그 최적화의 격리 측정
+# Isolated Measurements of Search Index and File Catalog Optimizations
 
-DB 엔진을 교체하거나 Redis를 추가하기 전에 기존 SQLite 조회와 메모리 카탈로그의 반복 작업을 줄였다.
-현재 동작은 [검색 계약](../features/%ED%94%84%EB%A1%9C%EC%A0%9D%ED%8A%B8%C2%B7%ED%8C%8C%EC%9D%BC%C2%B7%EA%B2%80%EC%83%89/%ED%8C%8C%EC%9D%BC%EB%AA%85%C2%B7%EB%82%B4%EC%9A%A9%20%EA%B2%80%EC%83%89%EA%B3%BC%20%EC%B9%98%ED%99%98.md)과
-[파일 탐색 계약](../features/%ED%94%84%EB%A1%9C%EC%A0%9D%ED%8A%B8%C2%B7%ED%8C%8C%EC%9D%BC%C2%B7%EA%B2%80%EC%83%89/%ED%8C%8C%EC%9D%BC%C2%B7%ED%8F%B4%EB%8D%94%20%ED%83%90%EC%83%89%EA%B3%BC%20%EC%A1%B0%EC%9E%91.md), 선택 근거는
-[결정 0058](../decisions/0058-search-query-and-catalog-batches.md)이 소유한다.
+Before replacing the DB engine or
+adding Redis, repeated work in existing SQLite queries and the in-memory catalog was reduced. The [search
+contract](../features/projects-files-search/filename-content-search-and-replacement.md) and [file browsing contract](../features/projects-files-search/file-folder-exploration-and-operations.md) own the current behavior, and [Decision 0058](../decisions/0058-search-query-and-catalog-batches.md)
+owns the rationale.
 
-## 조건과 재현
+## Conditions and Reproduction
 
-2026-10-24 Linux에서 Node v22.22.2·SQLite 3.51.2로 측정했다. 두 스크립트는 임시 파일·DB만 만들고 종료 시
-정리한다. 호스트 설정 파일 로딩을 차단하고 실제 앱 서버·운영 DB·계정 데이터·`dist/`를 사용하지 않는다.
-저장소 루트에서 실행한다.
+Measurements were taken on 2026-10-24 on Linux with Node v22.22.2 and SQLite 3.51.2. Both scripts create only temporary files and DBs and clean them up on exit.
+They block loading host configuration files and do not use the actual app server, production DB, account data, or `dist/`. Run them
+from the repository root.
 
 ```bash
 node server/search-performance-benchmark.mjs
 node server/catalog-performance-benchmark.ts 5000 7
 ```
 
-검색 스크립트는 `MEW_SEARCH_BENCH_FILES`(기본 4,000·최대 4,000), `MEW_SEARCH_BENCH_ROUNDS`(기본 5·최대 20),
-`MEW_SEARCH_BENCH_OTHER_FILES`(기본 30,000·최대 100,000)로 규모를 바꿀 수 있다. 카탈로그 스크립트의 두 인자는
-파일 수(최대 20,000)와 반복 횟수(최대 15)다. 비교 순서를 번갈아 실행하고 실행별 소요 시간의 중앙값을 사용한다.
-검증은 결과의 동등성과 후보 수를 확인하며, 테스트에 절대 시간 상한을 넣지 않는다.
+The search script's scale can be adjusted with `MEW_SEARCH_BENCH_FILES` (default 4,000, maximum 4,000), `MEW_SEARCH_BENCH_ROUNDS` (default 5, maximum 20), and `MEW_SEARCH_BENCH_OTHER_FILES` (default 30,000,
+maximum 100,000). The catalog script's two arguments are the file count (maximum 20,000) and repetition count (maximum 15). The
+comparison order alternates between runs, and the median duration across runs is used. Validation checks result equivalence
+and candidate counts; tests do not impose an absolute time limit.
 
-## 검색
+## Search
 
-본문 12줄의 일반 텍스트 파일 4,000개를 만들고 마지막 파일 한 개에만 `unique value workspace phrase`를 넣었다.
-`unique*workspace phrase` 검색에서 `workspace phrase`로 FTS 후보를 구한 다음 원래 와일드카드로 원문을 확인했다.
-색인이 준비된 상태에서 5회 비교했으며, FTS 후보와 최종 결과는 모두 파일 한 개였다.
+Created 4,000 plain-text files with 12 lines of body text each and placed `unique value workspace phrase` only in the last file. For the `unique*workspace phrase` search, FTS
+candidates were retrieved with `workspace phrase`, then the source text was checked using the original wildcard. The comparison ran 5 times with
+the index ready; both the FTS candidates and final results consisted of one file.
 
-| 구간 | 비교 방식 | 중앙값 |
+| Stage | Comparison method | Median |
 | --- | --- | ---: |
-| 후보 조회 | v2 DB에서 기존 프로젝트 우선 JOIN | 307.546ms |
-| 후보 조회 | 프로젝트 posting 조건 없는 FTS 우선 CROSS JOIN | 0.114ms |
-| 후보 조회 | 프로젝트 posting을 포함한 FTS 우선 CROSS JOIN | 2.949ms |
-| 원문 검색 | 전체 4,000개 파일의 비동기 scanner | 1,374.353ms |
-| 후보 조회와 원문 검색 | 프로젝트 범위 FTS와 후보 한 개의 scanner | 4.080ms |
+| Candidate query | Existing project-first JOIN on the v2 DB | 307.546ms |
+| Candidate query | FTS-first CROSS JOIN without a project posting condition | 0.114ms |
+| Candidate query | FTS-first CROSS JOIN including project postings | 2.949ms |
+| Source text search | Asynchronous scanner over all 4,000 files | 1,374.353ms |
+| Candidate query and source text search | Project-scoped FTS and scanner over one candidate | 4.080ms |
 
-최초 v2 색인 구축은 2,590.429ms였다. 후보 조회의 JOIN 비교는 **동일한 v2 DB**에서 실행 순서와 MATCH 조건을
-바꾼 실험이다. 기존 배포의 v1 DB를 그대로 측정한 값이 아니다. 와일드카드 원문 검색 비교에는 실제 API의
-카탈로그·권한 선별·직렬화·네트워크·브라우저 표시 시간이 포함되지 않는다.
+The initial v2 index build took 2,590.429 ms. The JOIN comparison for candidate retrieval was an experiment that varied execution order and MATCH conditions on **the same v2 DB**.
+These are not measurements taken directly from the v1 DB of an existing deployment. The wildcard source-text search comparison excludes the actual API's
+catalog processing, permission filtering, serialization, network, and browser rendering time.
 
-### 작은 프로젝트와 다른 프로젝트의 공통어
+### Common Terms in a Small Project and Other Projects
 
-공유 FTS를 먼저 조회하는 변경이 다른 프로젝트의 매치를 모두 읽는 회귀를 만들 수 있어 별도 조건을 확인했다.
-인메모리 DB에 대상 프로젝트 파일 한 개와 다른 프로젝트 파일 30,000개를 넣고, 모두 같은 `shared common phrase`를
-담도록 했다. 5회 모두 최종 후보는 대상 프로젝트의 파일 한 개였다.
+Querying the shared FTS first could introduce a regression that reads all matches from other projects, so a separate condition
+was checked. An in-memory DB contained one file from the target project and 30,000 files from other projects, all containing the same `shared common phrase`. In all 5
+runs, the final candidate was the single file from the target project.
 
-| 후보 조회 방식 | 중앙값 |
+| Candidate query method | Median |
 | --- | ---: |
-| 기존 프로젝트 우선 JOIN | 0.103ms |
-| 프로젝트 posting 조건 없는 CROSS JOIN | 10.304ms |
-| 프로젝트 posting을 포함한 CROSS JOIN | 0.379ms |
+| Existing project-first JOIN | 0.103ms |
+| CROSS JOIN without a project posting condition | 10.304ms |
+| CROSS JOIN including project postings | 0.379ms |
 
-프로젝트 해시와 본문 posting을 MATCH 안에서 교차해 전역 매치의 메타데이터 순회를 피했다. 전체 해시를 비교하는
-비용이 있어 작은 프로젝트에서는 기존 JOIN보다 상수 비용이 남는다. 결과에 권한·프로젝트 조건을 적용하는 검사는
-성능을 이유로 생략하지 않는다.
+Intersecting the project hash and body postings within MATCH avoided traversing metadata for global matches. Comparing the full hash has a cost, leaving
+constant overhead relative to the existing JOIN for small projects. Checks that apply permission and project conditions to results
+are not omitted for performance.
 
-## 카탈로그 가시성 판정
+## Catalog Visibility Evaluation
 
-같은 ready snapshot의 `.ts` 파일 5,000개에 대해 항목마다 루트·정책을 준비하는 방식과 목록당 한 번 준비하는
-방식을 7회 비교했다. 각 파일의 실제 경로 검사는 양쪽 모두 수행했다.
+For 5,000 `.ts` files in the same ready snapshot, preparing roots and policies for each item was compared with preparing them once per
+listing over 7 runs. Both methods checked each file's real path.
 
-| 표시 조건 | 항목마다 준비 | 목록당 준비 |
+| Display condition | Preparation per item | Preparation per list |
 | --- | ---: | ---: |
-| 전체 표시(`showAll=true`) | 152.981ms | 55.705ms |
-| 기본 확장자·숨김 정책 | 182.367ms | 55.405ms |
+| Show All (`showAll=true`) | 152.981ms | 55.705ms |
+| Default extension and hidden-file policies | 182.367ms | 55.405ms |
 
-새 회귀 검사는 루트·서버 데이터 기준 경로 준비가 파일 수에 비례하지 않는지, 없는 숨김 설정 파일은 목록당 한 번
-읽는지, 각 대상의 실제 경로 검사는 남는지 확인한다. 목록 사이의 숨김 설정 변경·전체 표시 전환·서버 데이터로의
-심볼릭 링크 교체·계정별 다른 루트도 확인한다. 이 시간에는 최초 트리 구축·아이콘 조회·계정별 권한 필터가 포함되지 않는다.
+The new regression checks verify that preparing root and server-data base paths does not scale with the number of files, that a missing hidden-file configuration file is
+read once per listing, and that real-path checks remain for each target. They also check hidden-file configuration changes between listings, switching to Show All, replacing
+a symbolic link to point to server data, and different roots per account. These timings exclude initial tree construction, icon lookup, and per-account permission filtering.
 
-## 검증
+## Verification
 
-검색·카탈로그·트리·파일 읽기·서버 데이터 경계·접근 제어·숨김 목록·플랫폼 관련 13개 테스트 파일에서 58개를
-통과했다. Windows ACL·명령 래퍼 전용 2개는 Linux에서 건너뛰었다. 1만 파일 fixture 검사도 이 실행에 포함한다.
-`tsc -b` 타입 검사와 전체 린트를 통과했으며, 변경 파일에는 새 린트 경고가 없고 기존 다른 파일의 경고는 남아 있다.
+Passed 58 tests across 13 test files covering search, catalogs, trees, file reads, server-data boundaries, access control, hidden-file
+lists, and platform behavior. The 2 tests specific to Windows ACLs and command wrappers were skipped on Linux. This run also included the 10,000-file
+fixture check. The `tsc -b` type check and full lint passed; modified files have no new lint warnings, while existing warnings in other files remain.
 
-## 해석 범위
+## Scope of interpretation
 
-합성 데이터와 같은 호스트의 로컬 I/O에서 특정 처리 구간을 비교한 결과다. 실제 설치의 평균·p95 검색 시간이나
-전체 로딩 개선율을 뜻하지 않는다. 검색어의 선택도·파일 크기·프로젝트 수·디스크·호스트 부하에 따라 수치가 달라진다.
+These results compare specific processing stages using synthetic data and local I/O on the same host. They do not represent average or p95 search times
+or overall loading improvement rates in actual installations. Values vary with query selectivity, file size, project count, disk, and host load.
 
-실제 설치에는 운영자가 빌드·적용한 뒤 `MEW_PERF_LOG=1`의 `catalog.visibility`, `search.scope`,
-`search-index.query`, `search.scan`, `file.read`와 브라우저의 기존 파일 열기 Performance measure를 비교할 수 있다.
-이번 작업에서는 앱 빌드·서버 재시작·운영 로그인·HTTP/P2P 전송·브라우저 trace를 실행하지 않았다.
+For an actual installation, after the operator builds and applies the changes, `catalog.visibility`, `search.scope`, `search-index.query`, `search.scan`,
+and `file.read` from `MEW_PERF_LOG=1` can be compared alongside the browser's existing file-opening Performance measure. This work did not include an
+app build, server restart, production login, HTTP/P2P transmission, or browser trace.

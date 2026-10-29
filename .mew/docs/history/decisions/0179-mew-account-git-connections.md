@@ -1,31 +1,31 @@
 ---
-provenance: "Liiiiv 중앙 ADR 이관본, 2026-10-14"
-description: "이관한 결정 기록: Mew 계정별 Git 제공자 연결. 당시 선택·근거·후속 변경을 보존하며 현재 계약은 Mew 소유 문서에서 확인한다."
-title: "0179 — Mew 계정별 Git 제공자 연결"
+provenance: "Migrated copy of a Liiiiv central ADR, 2026-10-14"
+description: "Migrated decision record: per-account Git provider connections in Mew. Preserves the choices, rationale, and subsequent changes from that time; consult Mew's owning documents for the current contract."
+title: "0179 — Per-account Git provider connections in Mew"
 created: 2026-09-29
 updated: 2026-09-29
 ---
 
-- 날짜: 2026-09-29
-- 상태: 채택
-- 후속 결정: [0181](0181-mew-default-github-oauth-app.md) — 공용 Client ID 기본 배포와 자체 앱 설정; 계정별 인증 경계 유지
-- 부분 대체: [0172](0172-mew-github-cli-login.md) — OS 공용 CLI 인증·토큰 소유·동시 로그인·작성자 경계
-- 결정자: 사용자(계정별 OAuth 연결 구현 요청), Codex(구현)
+- Date: 2026-09-29
+- Status: Adopted
+- Follow-up decision: [0181](0181-mew-default-github-oauth-app.md) — ship a shared Client ID by default and support custom app configuration; retain per-account authentication boundaries
+- Partially supersedes: [0172](0172-mew-github-cli-login.md) — OS-shared CLI authentication, token ownership, concurrent login, and authorship boundaries
+- Decision makers: user (requested implementation of per-account OAuth connections), Codex (implementation)
 
-## 배경
+## Background
 
-서버의 gh 자격증명을 공유하면 서로 다른 Mew 사용자의 커밋 작성자와 원격 권한을 구분할 수 없다.
+Sharing the server's gh credentials prevents distinguishing commit authorship and remote permissions between different Mew users.
 
-## 결정
+## Decision
 
-- 기존 OS 인증을 이관하지 않고 모든 Mew 계정을 미연결 상태로 시작한다. 직접 OAuth 기기 인증으로 GitHub를 연결하고 사용자·제공자·호스트별로 토큰을 보관한다. 최초 제공자는 github.com이며 제공자 인터페이스로 확장한다.
-- 토큰은 서버 전용 암호화 저장소에 보관한다. 사용자 브라우저·Git URL·명령 인자·AI 프롬프트에 토큰을 넣지 않는다. 서버 OS 권한을 가진 터미널·에이전트로부터의 격리는 보장하지 않는다.
-- 명시적 일반·파일·AI 커밋과 원격 작업은 계정 연결을 요구한다. 로그인 취소 시 실행하지 않고 입력을 유지한다. 자동 파일 작업은 미연결 상태에서 파일만 변경하고 자동 커밋을 생략한다.
-- 커밋 작성자·커미터는 요청한 사용자의 연결 정보로 명령마다 지정한다. 공용 Git 설정을 바꾸지 않는다. AI 작업은 시작한 연결을 고정하고 커밋 전에 연결 해제·교체를 확인한다.
-- 원격 전송은 검증한 HTTPS 제공자 주소에 해당 사용자 토큰만 주입한다. OS credential helper·SSH·환경 토큰으로 대체하지 않는다. SSH GitHub 주소는 저장소 설정 변경 없이 실행 시 HTTPS로 정규화한다.
-- 연결 상태·시작·취소·해제는 로그인한 사용자가 자기 연결에만 접근한다. 공식 외부 승인 URL을 제공하며 내부 브라우저 사용에는 기존 browser 기능 권한이 필요하다. Mew 로그인과 제공자 OAuth는 별개다.
-- 각 계정의 최초 연결만 기본 미연결이다. 이후 연결은 재접속에도 유지하고 명시적 해제·만료 시 다시 로그인한다. 서버 전체 gh 로그아웃은 실행하지 않는다.
+- Start all Mew accounts disconnected without migrating existing OS authentication. Connect GitHub directly through OAuth device authentication and store tokens by user, provider, and host. The initial provider is github.com, with expansion through a provider interface.
+- Store tokens in a server-only encrypted store. Do not put tokens in user browsers, Git URLs, command arguments, or AI prompts. Isolation from terminals or agents with server OS permissions is not guaranteed.
+- Require an account connection for explicit regular, file, and AI commits and remote operations. If login is canceled, do not execute the operation and preserve the input. When disconnected, automatic file tasks only modify files and skip automatic commits.
+- Specify the commit author and committer for each command using the requesting user's connection information. Do not change shared Git configuration. AI tasks pin the connection used at startup and check for disconnection or replacement before committing.
+- Remote transfers inject only that user's token into a verified HTTPS provider address. They do not fall back to OS credential helpers, SSH, or environment tokens. GitHub SSH addresses are normalized to HTTPS at execution time without changing repository settings.
+- Only logged-in users can access the status, initiation, cancellation, and disconnection of their own connections. An official external authorization URL is provided, and using the internal browser requires the existing browser feature permission. Mew login and provider OAuth are separate.
+- Each account defaults to disconnected only before its first connection. Subsequent connections persist across reconnects, and users log in again after explicit disconnection or expiration. Server-wide gh logout is not run.
 
-## 근거
+## Rationale
 
-[GitHub OAuth device flow](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps#device-flow)는 설치마다 callback 주소나 client secret을 배포하지 않아도 된다. 앱 등록과 device flow 활성화는 운영자가 담당한다. 현행 사용·설정은 [프로젝트 안내](../../../../docs/guides/projects.md#github-로그인)에 둔다.
+[GitHub OAuth device flow](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps#device-flow) does not require deploying a callback address or client secret for each installation. The operator is responsible for app registration and enabling device flow. Current usage and configuration are documented in the [project guide](../../../../docs/guides/projects.md#github-login).

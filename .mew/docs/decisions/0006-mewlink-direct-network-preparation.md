@@ -1,28 +1,28 @@
 ---
-title: "Mewlink 직접 연결의 자동 네트워크 준비"
-description: "데이터 직접 연결을 유지하면서 owner 동작에 한정한 Windows UDP 준비와 짧은 공유기 매핑을 추가하는 결정. 준비 상태·시그널링 상태·외부망 성공을 구분하고 기존 등록과 정책을 보존한다."
+title: "Automatic Network Preparation for Mewlink Direct Connections"
+description: "The decision to add Windows UDP preparation limited to owner actions and short-lived router mappings while retaining direct data connections. Distinguish preparation status, signaling status, and external-network success, and preserve existing registrations and policies."
 created: 2026-10-16
 updated: 2026-10-16
 ---
 
-# Mewlink 직접 연결의 자동 준비
+# Automatic Preparation for Mewlink Direct Connections
 
-상태: 승인됨.
+Status: Approved.
 
-## 배경
+## Background
 
-공개 기기 주소가 열려도 별도 휴대폰에서 WebRTC 연결이 실패했다. 운영 WSL에서 STUN 후보는 생성됐으나 Hyper-V 기본 수신은 차단이고 전용 UDP 허용 규칙은 없었다. 외부 폰 실패의 단일 원인은 아직 확정하지 않았다. 사용자는 배포 후 연결 버튼만으로 준비되는 동작을 요청하고 데이터 중계를 명시적으로 제외했다.
+WebRTC connections failed from a separate phone even though the public device address opened. STUN candidates were generated in production WSL, but Hyper-V blocked inbound traffic by default and there was no dedicated UDP allow rule. A single cause for the external phone failure has not yet been established. The user requested preparation through the connect button alone after deployment and explicitly excluded data relaying.
 
-## 결정
+## Decision
 
-- 작업 데이터는 WebRTC 직접 연결로 전송한다. HTTPS·WSS·TURN 데이터 중계를 추가하지 않는다.
-- 로컬 owner의 기기 등록 또는 기존 기기의 연결 준비 동작에서만 Windows UDP 수신을 준비한다. 필요한 UAC를 요청하며 서버 시작·조회·외부 폰 접속에서 자동 승격하지 않는다.
-- 준비 범위는 기존 UDP `55000–55031`이다. 기존 차단·충돌·관리 정책은 보존하고 실패를 표시한다. 검사할 수 없는 환경은 준비 완료와 구분하며 등록 자체는 허용한다.
-- 일반 후보로 빠르게 연결되지 않으면 실제 UDP 소켓과 기본 경로에 한정한 기존 PCP/NAT-PMP/UPnP의 짧은 임대·갱신·삭제를 재사용한다.
-- 기존 등록 ID·키·로컬 인증 경계는 유지한다. 시그널링 온라인·OS 준비·후보 수집과 외부 기기의 연결 성공을 각각 구분한다.
+- Transmit workspace data over direct WebRTC connections. Do not add HTTPS, WSS, or TURN data relaying.
+- Prepare Windows UDP inbound access only when the local owner registers a device or prepares an existing device for connection. Request UAC approval as needed; do not automatically elevate privileges on server startup, queries, or access from an external phone.
+- The preparation scope is the existing UDP `55000–55031`. Preserve existing blocks, conflicts, and administrative policies, and display failures. Distinguish environments that cannot be checked from completed preparation, while allowing registration itself.
+- If normal candidates do not establish a connection quickly, reuse the existing PCP/NAT-PMP/UPnP short-lived lease, renewal, and deletion mechanisms, limited to the actual UDP socket and default route.
+- Preserve existing registration IDs, keys, and the local authentication boundary. Distinguish signaling availability, OS preparation, candidate gathering, and successful connections from external devices.
 
-## 근거와 영향
+## Rationale and Impact
 
-방화벽 준비와 지원 공유기의 임시 매핑은 직접 연결에 필요한 수동 설정을 줄인다. Windows 관리자 동의와 네트워크의 직접 UDP 허용은 여전히 필요하며, 다중 NAT나 관리망 제한까지 모든 환경에서 성공한다고 보장하지 않는다.
+Firewall preparation and temporary mappings on supported routers reduce the manual configuration needed for direct connections. Windows administrator consent and network permission for direct UDP are still required, and success is not guaranteed in every environment, including those with multiple NAT layers or managed network restrictions.
 
-이 결정은 [0005](0005-mewlink-domain-and-private-dashboard.md)의 제한된 UDP 수신을 자동 준비 절차로 확장한다. 직접 전송·중앙 시그널링·로컬 인증 경계는 유지한다. 구현·검증 범위는 [원격 접속 계약](../development/remote-access.md#wsl-외부-접속과-udp-수신), 적용은 [배포 문서](../operations/remote-central.md)가 소유한다.
+This decision extends the restricted UDP inbound access in [0005](0005-mewlink-domain-and-private-dashboard.md) into an automatic preparation procedure. Preserve direct transmission, central signaling, and the local authentication boundary. [Remote Access Contract](../development/remote-access.md#external-wsl-access-and-udp-inbound-traffic) owns the implementation and validation scope, and [Deployment Documentation](../operations/remote-central.md) owns application procedures.

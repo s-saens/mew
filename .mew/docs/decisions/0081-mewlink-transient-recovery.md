@@ -1,32 +1,32 @@
 ---
-title: "Mewlink RTC 순단의 복구 대기와 상태 표시"
-description: "짧은 P2P 순단의 전체 재연결·복구 표시를 줄이기 위해 브라우저의 복구 대기를 5초, 표시 지연을 1초로 선택한 결정이다. 기존 권한 회수·lease 만료와 실제 연결 실패의 즉시 종료를 유지하며, 원인별 장기 복구는 후속 ADR 0086이 보완한다."
+title: "Recovery wait and status display for transient Mewlink RTC interruptions"
+description: "This decision selects a browser recovery wait of 5 seconds and a display delay of 1 second to reduce full reconnections and recovery indicators for brief P2P interruptions. Existing permission revocation, lease expiration, and immediate termination on actual connection failure remain; subsequent ADR 0086 adds cause-specific long-term recovery."
 created: "2026-10-28"
 updated: "2026-10-29"
 ---
 
-## 상태
+## Status
 
-채택. 로컬 구현이며 운영 반영은 사용자가 수행한다. 검증 결과와 남은 제한은 [작업 기록](../work/mewlink-transient-recovery.md)에 둔다.
+Adopted. Implemented locally; the user applies it to production. Verification results and remaining limitations are in the [work record](../work/mewlink-transient-recovery.md).
 
-원인별 전체 재시도·오프라인 대기와 알려진 실패 이유의 표시는 [ADR 0086](0086-mewlink-recovery-efficiency.md)이 보완한다. 이 결정의 5초 자연 복구·1초 표시 지연은 유지한다.
+[ADR 0086](0086-mewlink-recovery-efficiency.md) adds cause-specific full retries, offline waiting, and display of known failure reasons. This decision's 5-second natural recovery period and 1-second display delay remain.
 
-## 배경
+## Background
 
-사용 중 간헐적으로 짧은 재연결이 표시된다는 보고가 있었다. 기존 브라우저 제어기는 RTC가 `disconnected`로 바뀌면 즉시 복구 상태를 알리고 250ms 뒤에도 복구되지 않으면 정상 인증된 transport를 종료했다. 짧은 망 흔들림도 새 연결·인증 상태 조회·앱 소켓 복구로 확대될 수 있었다. 이 경로는 코드와 회귀 테스트에서 확인했으며 보고된 운영 증상의 원인으로 확정하지는 않았다.
+There were reports of intermittent brief reconnection indicators during use. When RTC changed to `disconnected`, the existing browser controller immediately reported a recovering state and terminated the normally authenticated transport if recovery had not occurred after 250 ms. Even brief network instability could escalate into a new connection, an authentication status lookup, and app socket recovery. This path was confirmed in code and regression tests, but was not established as the cause of the reported production symptoms.
 
-## 결정
+## Decision
 
-- [ADR 0060](0060-mewlink-startup-handoffs.md)의 브라우저 RTC 자연 복구 대기를 5초로 바꾼다. 네이티브 helper의 별도 15초 정리 한도는 유지한다.
-- 1초 미만의 순단은 같은 transport에서 복구하며 상태 표시와 중복 `connected` 알림을 생략한다. 1초 이상 지속되면 기존 복구 인디케이터를 사용한다.
-- 같은 단절의 상태 이벤트가 반복되어도 종료 기한을 연장하지 않는다. 복구되면 갱신을 요청하고 다음 단절에는 새 기한을 부여한다. 종료·복구 시 두 타이머를 정리한다.
-- `failed`·`closed`·DataChannel 종료·명시적 회수·인증 거부는 즉시 처리한다. 기존 lease 만료가 더 빠르면 그 시각에 종료하며 대기 때문에 권한을 연장하지 않는다.
-- 10초 중앙 검사와 20초 갱신 간격은 유지한다. 쓰기·명령은 재전송하지 않는다.
+- Change the browser RTC natural recovery wait in [ADR 0060](0060-mewlink-startup-handoffs.md) to 5 seconds. Retain the native helper's separate 15-second cleanup limit.
+- Recover interruptions shorter than 1 second on the same transport, omitting status display and duplicate `connected` notifications. Use the existing recovery indicator if the interruption lasts 1 second or longer.
+- Repeated status events for the same disconnection do not extend the termination deadline. Request renewal upon recovery and assign a new deadline to the next disconnection. Clear both timers on termination or recovery.
+- Handle `failed`, `closed`, DataChannel closure, explicit revocation, and authentication rejection immediately. If the existing lease expires sooner, terminate at that time; waiting does not extend permissions.
+- Retain the 10-second central check and 20-second renewal intervals. Do not retransmit writes or commands.
 
-## 대안과 근거
+## Alternatives and Rationale
 
-250ms 유지안은 빠르게 새 연결을 시작하지만 짧은 순단도 전체 재연결로 확대한다. 표시만 늦추는 안은 재연결 자체를 줄이지 못한다. 브라우저도 15초 기다리는 안은 실제 단절 시 새 연결 시도를 오래 늦춘다. 5초 대기와 1초 표시 지연으로 짧은 순단을 흡수하면서 복구 실패 시의 대기 시간을 제한한다. 이 수치는 외부망 실측의 최적값이 아니라 초기 정책 선택이다.
+Keeping 250 ms starts new connections quickly but escalates even brief interruptions into full reconnections. Delaying only the indicator does not reduce reconnections themselves. Having the browser also wait 15 seconds delays new connection attempts for too long after an actual disconnection. A 5-second wait and 1-second display delay absorb brief interruptions while limiting the wait when recovery fails. These values are initial policy choices, not optimal values measured on external networks.
 
-## 영향
+## Impact
 
-자연 복구가 가능한 순단에서 같은 앱·초안·transport를 유지한다. `disconnected`가 지속되면 기존보다 새 연결 시작이 늦어진다. 권한 회수·만료와 실제 실패를 기다리는 정책으로 바꾸지는 않는다. 현재 동작은 [원격 접속 계약](../development/remote-access.md), 표시 방식은 [공용 UI 계약](../development/ui-contracts.md)이 소유한다. 적용에는 사용자 Mewlink 런처 빌드·배포가 필요하다.
+Retain the same app, draft, and transport during interruptions that can recover naturally. If `disconnected` persists, a new connection starts later than before. This does not change the policy to wait on permission revocation, expiration, or actual failure. The [remote access contract](../development/remote-access.md) owns current behavior, and the [shared UI contract](../development/ui-contracts.md) owns presentation. Application requires the user to build and deploy the Mewlink launcher.

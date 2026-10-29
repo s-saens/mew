@@ -1,67 +1,67 @@
 ---
-title: "기능 기반 개발 GUI — 구현 기록과 기획 초안"
+title: "Feature-driven development GUI — Implementation record and planning draft"
 created: 2026-09-17
 updated: 2026-09-17
-description: "기능별 요청·분류·감독 큐·구현 기록·사용자 판정 GUI와 Markdown 저장 전환의 구현 결과 및 이전 기획 초안을 보존한다."
+description: "Preserves the implementation results and earlier planning draft for the GUI covering per-feature requests, classification, supervisor queues, implementation records, and user judgments, along with the transition to Markdown storage."
 상위파일: "_work.md"
 ---
 
-상태: 구현·격리 검증 완료, 실행 서버 반영 전. 현재 동작의 기준본은 [기능 기반 개발](../features/%ED%84%B0%EB%AF%B8%EB%84%90%C2%B7%EC%97%90%EC%9D%B4%EC%A0%84%ED%8A%B8%C2%B7%EC%9E%90%EB%8F%99%ED%99%94/%EA%B8%B0%EB%8A%A5%20%EA%B8%B0%EB%B0%98%20%EA%B0%9C%EB%B0%9C%C2%B7Markdown%20%EB%AC%B8%EC%84%9C.md), 결정은 [ADR 0159](../history/decisions/0159-mew-feature-driven-development.md)다. 아래 초안은 요구사항과 당시 검토 과정을 보존하며 현재 계약으로 사용하지 않는다.
+Status: Implementation and isolated verification complete; not yet applied to the running server. The canonical source for current behavior is [Feature-driven development](../features/terminals-agents-automation/feature-driven-development-and-markdown-documents.md), and the decision is [ADR 0159](../history/decisions/0159-mew-feature-driven-development.md). The draft below preserves the requirements and review process at the time and is not used as the current contract.
 
-## 구현 결과
+## Implementation results
 
-1. 프로젝트별 원장·버전·상태 전환·계층과 동시 쓰기 보호를 구현했다.
-2. 모든 셋이 사용하는 분류·결과 기록 CLI와 공통 지침을 연결했다.
-3. 독립 감독의 요청 큐·중단·복원·대화 연결과 접수 시점 컨텍스트를 구현했다.
-4. 메뉴의 기능 트리·상세 편집·요청 팝업·파일과 커밋·사용자 판정을 구현했다.
-5. 임시 파일·Git 저장소·가짜 에이전트·격리 브라우저 검증과 current 문서를 추가했다. 빌드·서버 반영은 사용자가 수행한다.
+1. Implemented per-project ledgers, versions, state transitions, hierarchies, and protection against concurrent writes.
+2. Connected the classification and result-recording CLI and shared instructions used by all sets.
+3. Implemented an independent supervisor's request queue, interruption, restoration, conversation linking, and context captured at request intake.
+4. Implemented the feature tree, detail editing, request popup, files and commits, and user judgments in the menu.
+5. Added verification using temporary files, Git repositories, fake agents, and an isolated browser, along with current documentation. The user performs the build and applies it to the server.
 
-## Markdown 저장 전환
+## Transition to Markdown storage
 
-[ADR 0161](../history/decisions/0161-mew-feature-markdown-source.md)에 따라 기능 정의·구현 결과·판정을 Documents/features의 Markdown으로 옮겼다. 서버 JSON은 실행 큐·요청 이력을 유지한다. 외부 편집과 GUI 동시 수정 검사, 고정 ID 계층, 기존 원장 백업·자동 이전·중단 복구, 문서 열기와 MOC 연결을 구현했다. 복제·이전·잘못된 문서·저장 충돌·격리 GUI 검증을 완료했다. 실행 중인 서버와 실제 사용자 데이터의 이전은 수행하지 않았다.
+Following [ADR 0161](../history/decisions/0161-mew-feature-markdown-source.md), moved feature definitions, implementation results, and judgments to Markdown in Documents/features. Server JSON retains the execution queue and request history. Implemented checks for concurrent external and GUI edits, a hierarchy with fixed IDs, backup and automatic migration of existing ledgers, recovery from interruptions, document opening, and MOC linking. Completed verification of copying, migration, invalid documents, save conflicts, and the isolated GUI. Did not migrate the running server or actual user data.
 
-## History / raw — 기획 초안
+## History / raw — Planning draft
 
-## 목적과 기본 단위
+## Purpose and basic unit
 
-사용자는 기능 단위로 개발을 맡기고, 구현 내용·관련 파일·관련 커밋을 확인한 뒤 결과를 승인하거나 수정을 요청한다. 기능 항목은 반복 수정에도 유지되며 하위 기능을 가질 수 있다. 에이전트셋은 실행할 때 선택하는 담당 프리셋이며 기능 목록의 소유자가 아니다.
+Users delegate development by feature, review the implementation details, related files, and related commits, then approve the results or request revisions. Feature items persist through repeated revisions and can have child features. An agent set is a preset selected to handle execution, not the owner of the feature list.
 
-## 사용자 지정 요구사항
+## User-specified requirements
 
-### 목록과 상세
+### List and details
 
-- 기능 목록은 세로로 짧은 행을 사용한다. 각 제목 왼쪽에 상태를 나타내는 동그라미를 둔다.
-- 하위 기능을 추가하고 계층 구조로 표현한다.
-- 기본 정렬은 최근 변경순(최신 우선)이다. 이름순과 최초 생성순으로 전환할 수 있다.
-- 목록 맨 위 항목은 항상 `+` 버튼이다. 누르면 기능 요청 팝업을 연다.
-- 기능 항목을 클릭하면 제목·내용을 편집하고 상세 구현 내용·관련 파일 목록·관련 커밋 목록을 볼 수 있다.
+- The feature list uses compact rows with a status circle to the left of each title.
+- Allow child features to be added and displayed in a hierarchy.
+- The default sort order is most recently changed first. Users can switch to sorting by name or initial creation time.
+- The top item in the list is always the `+` button. Clicking it opens the feature request popup.
+- Clicking a feature item lets users edit its title and content and view detailed implementation information, a list of related files, and a list of related commits.
 
-### 상태
+### Status
 
-| 색 | 의미 | 진입 조건 |
+| Color | Meaning | Entry condition |
 | --- | --- | --- |
-| 파란색 | 구현 중 | 에이전트가 해당 기능 구현·수정 작업을 진행 |
-| 민트색 | 구현 완료, 사용자 확인 전 | 에이전트가 구현을 완료 |
-| 초록색 | 사용자 확인 완료 | 사용자가 잘 구현되었다고 판단 |
-| 빨간색 | 수정 필요 | 사용자가 아직 수정사항이 남았다고 판단 |
-| 주황색 | 요구사항 변경 | 사용자가 상세 화면의 제목 또는 내용을 수정 |
+| Blue | Implementation in progress | An agent is implementing or modifying the feature |
+| Mint | Implementation complete, awaiting user review | An agent has completed implementation |
+| Green | User review complete | The user determines that the feature is implemented well |
+| Red | Revisions needed | The user determines that revisions are still needed |
+| Orange | Requirements changed | The user edits the title or content in the detail view |
 
-주황색 상태에서는 사용자가 직접 초록색으로 바꾸거나 에이전트에게 작업을 넘길 수 있다. 제목·내용 편집 자체는 자동 구현을 시작하지 않는다. 에이전트가 구현을 끝내는 것과 사용자가 결과를 확인하는 것은 별도 단계다.
+In the orange state, users can change it directly to green or hand the work over to an agent. Editing the title or content alone does not start automatic implementation. An agent completing implementation and a user reviewing the results are separate steps.
 
-### 기능 요청 흐름
+### Feature request flow
 
-1. 목록 최상단 `+`를 누른다.
-2. 팝업에서 요청 제목·내용과 담당 에이전트셋을 입력·선택한다.
-3. 확인하면 선택한 에이전트셋이 요청과 기존 기능을 검토한다.
-4. 완전히 새로운 기능이면 새 항목을 추가한다. 기존 기능 수정이면 해당 항목을 갱신한다. 기존 기능의 하위 기능이면 그 아래에 추가한다.
-5. 판단한 항목을 대상으로 구현하고, 완료 시 구현 내용·관련 파일·관련 커밋을 남긴다.
-6. 사용자가 결과를 확인하여 초록색 또는 빨간색으로 표시한다.
+1. Click `+` at the top of the list.
+2. In the popup, enter the request title and content and select the responsible agent set.
+3. Upon confirmation, the selected agent set reviews the request and existing features.
+4. For an entirely new feature, add a new item. For a modification to an existing feature, update that item. For a child feature of an existing feature, add it beneath that feature.
+5. Implement the selected item and, upon completion, record the implementation details, related files, and related commits.
+6. The user reviews the results and marks the item green or red.
 
-분류 판단과 항목 갱신 규칙은 **mew 공통 에이전트 지침**으로 제공한다. 특정 에이전트셋의 역할 프롬프트에만 넣지 않는다. 어떤 에이전트셋을 골라도 같은 기능 관리 규칙을 따른다.
+Provide classification and item update rules through **shared mew agent instructions**. Do not place them only in a specific agent set's role prompt. Every agent set follows the same feature management rules.
 
-## 화면 구성 제안 — 미확정
+## Proposed screen layout — Not finalized
 
-넓은 화면은 왼쪽 기능 트리, 오른쪽 선택 항목 상세로 구성한다. 좁은 화면은 목록에서 상세로 이동하고 뒤로 돌아올 때 선택·스크롤을 유지한다. 정확한 메뉴 진입 위치는 아직 정하지 않는다.
+On wide screens, place the feature tree on the left and details for the selected item on the right. On narrow screens, navigate from the list to details and preserve selection and scroll position when returning. The exact menu entry location remains undecided.
 
 ```text
 기능                       [최근 변경순 ▾]
@@ -72,38 +72,38 @@ description: "기능별 요청·분류·감독 큐·구현 기록·사용자 판
   ● 검색
 ```
 
-- 행은 한 줄 제목을 기본으로 하고 긴 제목은 말줄임한다. 구현 설명과 파일·커밋 목록은 상세에서 보여준다.
-- 펼침 화살표와 상태 동그라미를 분리한다. 접기·펼치기는 상세 선택과 별도 동작이다.
-- 상태 동그라미에 상태명 툴팁과 접근 가능한 이름을 제공하고 상세에는 상태명을 문자로 표시한다. 민트색과 초록색을 색만으로 구별하게 하지 않는다.
-- 상세는 편집 가능한 제목·요구사항, 구현 결과, 관련 파일, 관련 커밋으로 구성한다. 사용자 확인·수정 필요·에이전트에게 맡기기 동작을 제공한다.
-- 요청 입력을 위한 내용과 에이전트가 작성하는 구현 결과를 분리한다. 구현 결과 기록만으로 주황색이 되지 않게 한다.
+- Rows use single-line titles by default, with long titles truncated with an ellipsis. Show implementation descriptions and file and commit lists in the detail view.
+- Separate the expand arrow from the status circle. Collapsing and expanding are separate actions from selecting an item to view its details.
+- Give status circles a tooltip with the status name and an accessible name, and display the status name as text in the detail view. Do not rely on color alone to distinguish mint from green.
+- The detail view contains an editable title and requirements, implementation results, related files, and related commits. Provide actions for User confirmation, Revisions needed, and Assign to agent.
+- Separate request content from implementation results written by the agent. Recording implementation results alone must not turn the item orange.
 
-## 동작 보완 제안 — 미확정
+## Proposed behavior improvements — Not finalized
 
-| 쟁점 | 제안 |
+| Issue | Proposal |
 | --- | --- |
-| 계층과 정렬 | 부모·자식 관계를 유지하며 같은 부모 아래의 형제끼리 정렬한다. 최근 변경순에서는 하위 기능의 변경 시각을 상위 묶음의 정렬에도 반영한다. |
-| 정렬 방향 | 이름순은 오름차순, 최초 생성순은 오래된 항목 우선으로 한다. 최근 변경에는 요구사항·구현 결과·상태·계층 변경을 포함하고 단순 열람·접기는 제외한다. |
-| 부모 상태 | 부모 동그라미는 부모 기능 자체의 상태로 유지한다. 하위 상태로 자동 승인하지 않는다. 하위 진행률 표시가 필요하면 별도 보조 정보로 다룬다. |
-| 편집 중 상태 | 실제로 바뀐 제목·내용이 저장되는 시점에 주황색으로 바꾼다. 입력 취소나 값이 같은 저장은 제외한다. |
-| 실행 중 요구사항 변경 | 항목은 주황색이 되고, 진행 중인 실행은 별도로 표시한다. 실행이 시작한 요구사항 버전을 기록하여 옛 버전의 완료가 새 변경을 민트색으로 덮어쓰지 않게 한다. 변경분을 넘기는 큐·중단 정책은 후속 결정 대상이다. |
-| 수정 필요 후 재작업 | 빨간색은 즉시 재실행하지 않는다. 수정 내용을 적고 `에이전트에게 맡기기`로 다시 실행한다. 이전 담당을 기본값으로 제안하되 바꿀 수 있게 한다. |
-| 자동 분류 확인 | 판단 결과와 이유를 짧게 남기고 처리한 항목으로 이동한다. 기존 항목 수정은 식별자와 이력을 보존한다. 잘못 분류했을 때 대상·상하위 관계를 수정하는 경로가 필요하다. |
-| 파일·커밋 연결 | 실제 작업에서 확인한 파일과 커밋만 연결한다. 커밋이 없으면 빈 상태를 표시한다. 관련 커밋을 보여준다는 요구만으로 자동 커밋 정책을 확정하지 않는다. |
-| 여러 차례 실행 | 같은 기능의 반복 작업 결과와 실행 연결을 보존한다. 커밋은 저장소와 해시를 함께 식별하며 하나의 커밋이 여러 기능과 관련될 수 있다. |
+| Hierarchy and sorting | Preserve parent-child relationships and sort siblings under the same parent. When sorting by recent changes, also factor child feature change times into the sort order of parent groups. |
+| Sort direction | Sort names in ascending order and initial creation times oldest first. Recent changes include changes to requirements, implementation results, status, and hierarchy, but exclude simple viewing and collapsing. |
+| Parent status | Keep the parent circle tied to the parent feature's own status. Do not automatically approve it based on child statuses. If child progress needs to be displayed, treat it as separate supporting information. |
+| Status during editing | Change to orange when an actually changed title or content is saved. Exclude canceled input and saves with unchanged values. |
+| Requirements changed during execution | Turn the item orange and display the ongoing execution separately. Record the requirements version at execution start so that completion of an old version does not overwrite new changes with mint. Queue and interruption policies for passing along changes remain for a later decision. |
+| Rework after revisions are needed | Red does not trigger an immediate rerun. Enter the revisions and rerun using `에이전트에게 맡기기`. Suggest the previous assignee by default, but allow it to be changed. |
+| Automatic classification review | Leave a brief record of the decision and its rationale, then navigate to the processed item. Updates to existing items preserve their identifiers and history. A way to change the target and parent-child relationships is needed for incorrect classifications. |
+| File and commit links | Link only files and commits confirmed during actual work. Show an empty state if there are no commits. The requirement to show related commits alone does not establish an automatic commit policy. |
+| Multiple executions | Preserve the results of repeated work on the same feature and links to its executions. Identify commits by both repository and hash; a single commit can relate to multiple features. |
 
-## 후속 기획에서 정할 사항
+## Items to decide in follow-up planning
 
-- 기능 목록의 프로젝트 범위와 공동 사용 시 소유권·편집 권한.
-- 요청 접수·분류 중·실행 대기·실패·중단을 표시하는 방법. 현재 지정한 다섯 색은 기능 상태이므로 실패를 곧바로 사용자 판정인 빨간색과 같게 취급하지 않는다.
-- 하나의 요청이 여러 기능을 포함하거나 분류가 모호할 때 분리·질문하는 기준.
-- 작업 중 편집·추가 요청·동시 실행을 조율하는 방식과 사용자 승인 대상 버전.
-- 기능 실행을 기존 에이전트 탭에 연결할지 새 세션으로 시작할지, 탭을 닫아도 어떤 기록을 유지할지.
-- 목록의 저장 방식, 에이전트가 읽고 갱신하는 공통 인터페이스, 결과 검증 방식. 지침 전달만으로 정확한 갱신이 보장되지는 않는다.
+- The project scope of the feature list, and ownership and editing permissions for collaborative use.
+- How to display request intake, classification in progress, queued execution, failure, and interruption. The five currently specified colors represent feature status, so failure must not be treated as equivalent to red, which represents a user judgment.
+- Criteria for splitting requests or asking questions when a single request includes multiple features or classification is ambiguous.
+- How to coordinate edits, additional requests, and concurrent executions during work, and which version is subject to user approval.
+- Whether to connect feature execution to an existing agent tab or start a new session, and which records to retain after the tab is closed.
+- How to store the list, the shared interface agents use to read and update it, and how to verify results. Delivering instructions alone does not guarantee correct updates.
 
-## 기존 결정과의 연결
+## Connections to existing decisions
 
-- [ADR 0095 — 에이전트셋은 탭 시작 프리셋](../history/decisions/0095-mew-agent-sets-as-tab-presets.md): 기능 관리와 작업 기록은 mew 기능 시스템의 책임으로 설계하고 셋은 담당 실행 설정으로 사용한다. 이 ADR은 무인 라우팅·작업 이력이 다시 필요하면 별도 작업 시스템으로 결정하도록 한다. 실행 구조 확정 시 새 중앙 ADR을 작성한다.
-- [ADR 0155 — 프로젝트 컨텍스트 자동 전달](../history/decisions/0155-mew-project-agent-context.md): mew 공통 지침 전달의 기존 경계다. 기능 지침의 연결 방식은 후속 설계 대상이며 현재 자동 전달 계약을 변경하지 않는다.
+- [ADR 0095 — Agent sets are tab startup presets](../history/decisions/0095-mew-agent-sets-as-tab-presets.md): Design feature management and work records as responsibilities of the mew feature system, and use sets as the execution settings for the assignee. This ADR calls for a separate task system decision if unattended routing and task history become necessary again. Write a new central ADR when the execution structure is finalized.
+- [ADR 0155 — Automatic project context delivery](../history/decisions/0155-mew-project-agent-context.md): Defines the existing boundary for delivering shared mew instructions. How to connect feature instructions remains subject to follow-up design and does not change the current automatic delivery contract.
 
-초안의 요구사항은 위 계획에 따라 구현한다. 완료된 동작의 기준본은 [기능 기반 개발](../features/%ED%84%B0%EB%AF%B8%EB%84%90%C2%B7%EC%97%90%EC%9D%B4%EC%A0%84%ED%8A%B8%C2%B7%EC%9E%90%EB%8F%99%ED%99%94/%EA%B8%B0%EB%8A%A5%20%EA%B8%B0%EB%B0%98%20%EA%B0%9C%EB%B0%9C%C2%B7Markdown%20%EB%AC%B8%EC%84%9C.md)로 기록한다.
+Implement the draft requirements according to the plan above. Record the canonical source for completed behavior in [Feature-driven development](../features/terminals-agents-automation/feature-driven-development-and-markdown-documents.md).

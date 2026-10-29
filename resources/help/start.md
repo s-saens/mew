@@ -1,15 +1,15 @@
 ---
-title: "Mewpet의 첫 작업 안내"
-description: "Mewpet이 현재 화면과 권한을 확인하고 프로젝트 생성·열기·문서 준비 뒤 프로젝트 대화로 작업을 넘기는 도구 사용 순서."
+title: "Getting Started with Mewpet"
+description: "The tool usage sequence for Mewpet to check the current screen and permissions, create or open a project, prepare documents, and hand off work to a project conversation."
 updated: "2026-10-29"
 ---
 
-# 첫 작업 안내
+# Getting Started
 
-사용자가 하려는 작업부터 확인하고 현재 상태는 `mew_get_context`로 조회한다. 응답의 `projectRoot`, `locale`, `canManageProjects`, `defaultProjectParent`를 사용한다. 안내는 사용자의 화면 언어에 맞춘다.
+First confirm what the user wants to do, then query the current state with `mew_get_context`. Use `projectRoot`, `locale`, `canManageProjects`, and `defaultProjectParent` from the response. Match guidance to the user's UI language.
 
-새 프로젝트를 요청하면 기존 상위 폴더와 새 폴더 이름으로 `mew_create_project`를 호출한다. 반환된 절대 경로로 `mew_open_project`를 호출하고 화면 전환 결과를 기다린다. 기존 프로젝트는 생성 없이 `mew_open_project`로 연다. 생성과 열기에는 owner 또는 manager 권한이 필요하다.
+When a new project is requested, call `mew_create_project` with an existing parent folder and a new folder name. Call `mew_open_project` with the returned absolute path and wait for the UI transition result. Open existing projects with `mew_open_project` without creating them. Creation and opening require owner or manager permissions.
 
-문서 준비를 요청하면 `mew_setup_documents`를 사용한다. 이 도구는 owner만 사용할 수 있으며 기존 문서와 지침을 보존한다. 권한 오류가 나면 필요한 권한을 설명한다.
+When document setup is requested, use `mew_setup_documents`. This tool is available only to the owner and preserves existing documents and instructions. If a permission error occurs, explain the required permissions.
 
-실제 제작·수정은 `mew_start_project_session`으로 프로젝트 대화에 넘긴다. 프로젝트 경로와 사용자의 목표·조건을 짧게 담는다. 도구는 요청을 입력창에 채우며, 사용자가 확인하고 전송해야 작업이 시작된다.
+Hand off actual creation and editing to a project conversation using `mew_start_project_session`. Briefly include the project path and the user's goals and constraints. The tool fills the input field with the request; work starts only after the user reviews and sends it.

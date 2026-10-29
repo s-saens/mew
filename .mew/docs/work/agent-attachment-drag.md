@@ -1,19 +1,19 @@
 ---
-title: "첨부 태그 즉시 드래그"
-description: "에이전트 입력의 첨부 태그를 마우스·펜으로 기다리지 않고 드래그하도록 바꾼 구현, 기존 터치 길게 누르기 유지와 회귀·타입·린트 검증 및 운영 미적용 범위를 기록한다."
+title: "Immediate attachment tag dragging"
+description: "Records the implementation that allows attachment tags in agent input to be dragged immediately with a mouse or pen, retention of the existing touch long press, regression, type, and lint verification, and the scope not applied to production."
 created: "2026-10-27"
 updated: "2026-10-27"
 ---
 
-첨부 태그를 잡고 곧바로 움직이면 이동이 취소되던 문제를 수정했다. 현재 조작 기준은 [에이전트 입력·멘션·스킬·첨부](../features/%ED%84%B0%EB%AF%B8%EB%84%90%C2%B7%EC%97%90%EC%9D%B4%EC%A0%84%ED%8A%B8%C2%B7%EC%9E%90%EB%8F%99%ED%99%94/%EC%97%90%EC%9D%B4%EC%A0%84%ED%8A%B8%20%EC%9E%85%EB%A0%A5%C2%B7%EB%A9%98%EC%85%98%C2%B7%EC%8A%A4%ED%82%AC%C2%B7%EC%B2%A8%EB%B6%80.md)에 둔다.
+Fixed an issue where grabbing an attachment tag and moving immediately canceled the move. Current interaction rules are in [Agent input, mentions, skills, and attachments](../features/terminals-agents-automation/agent-input-mentions-skills-and-attachments.md).
 
-`agent-composer-attachments.tsx`에서 이동 시작 처리를 공유 함수로 분리했다. 마우스·펜은 누른 채 4px 넘게 움직이면 이동을 시작하고, 터치는 기존 350ms 길게 누르기와 조기 이동 취소를 유지한다. 태그의 고스트·삽입 커서, 미리보기 클릭과 드래그의 구분, Esc·입력칸 밖 드롭 취소와 편집 이력은 기존 처리를 사용한다.
+Extracted move initiation into a shared function in `agent-composer-attachments.tsx`. A mouse or pen starts a move when moved more than 4px while held down; touch retains the existing 350ms long press and cancellation on early movement. Tag ghosts and insertion cursors, distinguishing preview clicks from drags, cancellation with Esc or a drop outside the input field, and edit history use the existing handling.
 
-검증 결과:
+Verification results:
 
-- `node --test server/agent-composer-attachments-ui.test.ts`: 추가한 즉시 마우스 드래그 회귀 테스트가 수정 전 실패하는 것을 확인했다. 수정 후 격리 Chromium의 1100px·390px, 밝은·어두운 테마에서 전체 50개 검사를 통과했다. 이동 후 본문·태그 위치, 미리보기 미실행, Undo/Redo와 기존 길게 누르기·취소·업로드·삭제 동작을 확인했다. CDP의 touch 포인터 길게 누르기 검사도 통과했다.
-- `npx tsc -b`, 대상 파일의 `npx oxlint`: 통과했다.
-- 변경 UI의 Impeccable 검사에서 지적 사항이 없었다. 데스크톱·모바일 격리 화면도 확인했다.
-- 문서 description 검사는 통과했다. 전체 링크 검사는 별도 작업에서 삭제된 기능 목록·태스크 파일을 참조하는 기존 오류 18건으로 실패했다. 이번 변경 문서의 링크는 정상이다.
+- `node --test server/agent-composer-attachments-ui.test.ts`: Confirmed that the added immediate mouse drag regression test failed before the fix. After the fix, all 50 checks passed in isolated Chromium at 1100px and 390px in light and dark themes. Verified body text and tag positions after moving, no preview activation, Undo/Redo, and existing long press, cancellation, upload, and deletion behavior. The CDP touch pointer long press check also passed.
+- `npx tsc -b` and `npx oxlint` on the target files: passed.
+- The Impeccable check of the changed UI found no issues. Isolated desktop and mobile screens were also checked.
+- The document description check passed. The full link check failed with 18 existing errors referencing feature catalog and task files deleted in separate work. Links in the documents changed here are valid.
 
-앱 빌드·배포·서버 적용은 수행하지 않았다. 실제 터치 기기와 펜 하드웨어의 실기 조작은 검증하지 않았다.
+No app build, deployment, or server application was performed. Physical interaction on actual touch devices and pen hardware was not verified.

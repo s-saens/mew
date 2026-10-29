@@ -1,37 +1,37 @@
 ---
 updated: "2026-10-23"
-title: "네이티브 서버 배포"
-description: "s-saens/mew 소스 서버 설치와 이전 clone의 원격 주소 변경, 발행 전 CLI 경로, 전용 사용자·HTTPS·systemd 운영과 햄버거 메뉴의 Mewlink 등록·로컬 인증 P2P 접속을 안내한다. 보존되는 업데이트 터미널·백업, node-pty 네이티브 모듈 누락 복구와 하위 경로·앱 컨테이너의 지원 제한을 설명한다."
+title: "Native server deployment"
+description: "Covers installing the s-saens/mew source server, changing the remote URL of older clones, the CLI path before publication, dedicated-user, HTTPS, and systemd operations, and Mewlink registration and locally authenticated P2P access through the hamburger menu. Explains preserved update terminals, backups, recovery from missing node-pty native modules, and support limitations for subpath and app container deployments."
 상위파일:
   - "../../.mew/docs/MOC.md"
   - "_deployment.md"
 ---
-[설치·실행](../guides/getting-started-ko.md)
+[Installation and execution](../guides/getting-started-ko.md)
 
-사전 빌드 CLI 실행 경로와 최초 공개 발행은 [CLI 배포 계약](../../.mew/docs/development/cli-distribution.md)·[릴리스 절차](../../.mew/docs/operations/cli-release.md)를 따른다. 아래는 기존 clone 기반 설치·서버 운영 절차다. CLI는 앱 캐시에서 실행하므로 이 문서의 `./mew update`·systemd unit을 그대로 사용하지 않는다.
+For the prebuilt CLI execution path and first public publication, follow the [CLI distribution contract](../../.mew/docs/development/cli-distribution.md) and [release procedure](../../.mew/docs/operations/cli-release.md). The following procedures cover existing clone-based installations and server operations. Because the CLI runs from the app cache, do not use this document's `./mew update` or systemd unit as-is.
 
-## 배포 경로와 전제
+## Deployment paths and prerequisites
 
-현재 지원하는 배포 경로는 **Linux 또는 macOS에서의 네이티브 설치**다. 개인 컴퓨터에서는 `./mew setup`만으로 충분하고, 서버에서는 아래 절차처럼 전용 OS 사용자·로컬 바인딩·HTTPS 프록시(또는 터널)·프로세스 관리자를 함께 둔다.
+The currently supported deployment path is **native installation on Linux or macOS**. On a personal computer, `./mew setup` is sufficient; on a server, use a dedicated OS user, local binding, an HTTPS proxy (or tunnel), and a process manager as described below.
 
-| 상황 | 권장 경로 |
+| Scenario | Recommended path |
 | --- | --- |
-| 내 컴퓨터에서 혼자 사용 | 네이티브 설치 후 `./mew setup` |
-| 휴대폰을 포함한 내 기기에서 접속 | 네이티브 설치 + VPN 또는 HTTPS 터널 |
-| 신뢰하는 소규모 팀용 서버 | 네이티브 설치 + `127.0.0.1` 바인딩 + HTTPS 리버스 프록시 + systemd |
-| 불특정 다수·다중 테넌트 서비스 | 지원 대상 아님 — 권한 모델과 터미널 기능이 맞지 않음 |
+| Solo use on your own computer | Native installation, then `./mew setup` |
+| Access from your own devices, including phones | Native installation + VPN or HTTPS tunnel |
+| Server for a small, trusted team | Native installation + `127.0.0.1` binding + HTTPS reverse proxy + systemd |
+| Public or multitenant service | Not supported — the permission model and terminal features are unsuitable |
 
-앱은 **별도 호스트명의 루트 경로(**`/`**)** 에 올리는 것을 전제로 한다. 클라이언트가 `/api`와 WebSocket 경로를 절대 경로로 사용하므로 `/mew` 같은 하위 경로 배포는 지원하지 않는다.
+The app assumes deployment at **the root path (**`/`**) of a separate hostname**. Because the client uses `/api` and WebSocket paths as absolute paths, deployment under a subpath such as `/mew` is not supported.
 
-> **컨테이너 앱 배포는 현재 지원하지 않는다.** 이 레포에서는 Dockerfile이 제거되어 `docker compose --profile app up -d --build`가 성공하지 않는다. `docker-compose.yml`은 현재 `/db` 기능용 Postgres를 띄우는 용도로만 쓴다. 컨테이너 앱 경로를 다시 제공하려면 Dockerfile·운영 계약·보안 검토를 함께 복구해야 한다.
+> **Containerized app deployment is not currently supported.** The Dockerfile has been removed from this repository, so `docker compose --profile app up -d --build` does not succeed. `docker-compose.yml` is currently used only to start Postgres for the `/db` feature. Restoring a containerized app deployment path requires restoring the Dockerfile, operations contract, and security review together.
 
-## 서버 배포 (네이티브)
+## Server deployment (native)
 
-아래는 Linux 서버에서 `mew`라는 전용 비관리자 계정으로 운영하는 예시다. 계정명·경로·도메인은 환경에 맞게 바꾼다. `config.env` **안의 경로는** `~`**·**`$HOME`**이 아닌 절대 경로로 쓴다.** 설정 파일은 셸 스크립트가 아니므로 경로를 확장하지 않는다.
+The following example runs a Linux server under a dedicated non-administrator account named `mew`. Adjust the account name, paths, and domain for your environment. Use **absolute paths in** `config.env` **rather than** `~` or `$HOME`**.** The configuration file is not a shell script and does not expand paths.
 
-## 1. 서버와 파일 경로 준비
+## 1. Prepare the server and file paths
 
-Node는 24를 권장한다(최소 Node 22.18). `git`, C/C++ 빌드 도구, `python3`, `tmux`가 필요하다. `node-pty`를 로컬에서 빌드하고 tmux가 터미널 기능을 담당하기 때문이다.
+Node 24 is recommended (minimum Node 22.18). `git`, C/C++ build tools, `python3`, and `tmux` are required because `node-pty` is built locally and tmux provides terminal functionality.
 
 ```bash
 # Debian/Ubuntu 예시 — root가 아닌 mew 사용자로 서비스를 운영한다.
@@ -54,35 +54,35 @@ cd ~/apps/mew
 ./mew setup
 ```
 
-설정 파일이 이미 있으면 `setup`은 작업 폴더와 포트를 다시 묻지 않는다. 앱 의존성 설치 후 원격 데스크톱 보조앱도 미리 준비하고, Mac은 서버 Mac의 권한 설정을 열어 승인을 확인한다. 이어 앱을 빌드·시작한 뒤 첫 owner 계정의 이메일을 받는다. 보조앱 설치·권한 준비가 실패하면 오류와 경고를 표시하고 Mew 설치는 계속한다(Ctrl+C는 중단). 이미 실행 중인 서버에서는 설치 폴더의 `./mew desktop-setup`으로 빌드·서버 재시작 없이 준비만 재실행할 수 있다. 준비 중 화면 캡처·입력 제어·로그인 자동 시작을 활성화하지 않는다. 데스크톱이 없는 서버에 구성 요소를 설치해도 공유할 화면이 생기지는 않는다. OS별 라이브러리·로그인·권한 조건은 [원격 데스크톱 준비](../guides/remote-desktop.md#%EC%B2%98%EC%9D%8C-%EC%97%B0%EA%B2%B0)를 따른다. 출력한 임시 비밀번호로 로그인한 즉시 비밀번호를 바꾼다.
+If a configuration file already exists, `setup` does not ask for the workspace folder and port again. After installing app dependencies, it also prepares the Remote Desktop helper app; on Mac, it opens permission settings on the server Mac to check approvals. It then builds and starts the app and asks for the first owner account's email address. If helper app installation or permission preparation fails, it displays errors and warnings and continues installing Mew (Ctrl+C cancels). On an already running server, you can rerun preparation alone using `./mew desktop-setup` in the installation folder without building or restarting the server. Preparation does not enable screen capture, input control, or automatic startup at login. Installing components on a server without a desktop does not create a screen to share. For OS-specific library, login, and permission requirements, follow [Remote Desktop preparation](../guides/remote-desktop.md#first-connection). Change the password immediately after logging in with the printed temporary password.
 
-`MEW_WORKSPACE`에는 mew가 읽고 쓸 프로젝트만 둔다. 홈 디렉터리 전체, 서버 설정, 다른 서비스의 데이터처럼 mew 사용자에게도 열어서는 안 되는 경로를 넣지 않는다. 설정 파일과 데이터 폴더의 소유자는 반드시 mew를 실행하는 OS 사용자여야 한다.
+Keep only projects that mew will read and write in `MEW_WORKSPACE`. Do not include paths that must not be accessible even to the mew user, such as the entire home directory, server configuration, or other services' data. The configuration file and data folder must be owned by the OS user running mew.
 
-Mewlink 원격 접속을 쓸 때는 로컬 owner가 임시 비밀번호를 변경한 뒤 **Mewlink → 원격 접속**에서 A를 한 번 등록한다. `./mew setup`의 원격 접속 선택 또는 `./mew remote-access account`는 이 순서를 안내한다. 중앙 서비스의 HTTPS·OAuth 구성은 [중앙 서비스 운영](../../.mew/docs/operations/remote-central.md)을 따른다. A의 HTTP 포트는 loopback으로 유지하며 중앙에는 발신 WSS로 연결하고, 작업 데이터는 브라우저와 직접 WebRTC로 전송한다. [구현 계약](../../.mew/docs/development/remote-access.md)을 참고한다. 방문자는 중앙 로그인 없이 기기 주소를 열고 로컬 mew 이메일·비밀번호로 로그인한다. 중앙 계정은 등록·관리만 담당한다. 새 인증 경로 적용에는 중앙 재배포와 로컬 업데이트가 필요하며 실제 외부망 검증은 별도 진행한다.
+To use Mewlink remote access, the local owner changes the temporary password, then registers A once under **Mewlink → Remote Access**. The remote access option in `./mew setup` or `./mew remote-access account` guides you through this sequence. Follow [Central Service Operations](../../.mew/docs/operations/remote-central.md) for the central service's HTTPS and OAuth configuration. Keep A's HTTP port on loopback and connect to the central service through outbound WSS; transfer work data directly between A and the browser over WebRTC. See the [implementation contract](../../.mew/docs/development/remote-access.md). Visitors open the device address without logging in to the central service and log in with their local mew email and password. Central accounts handle registration and management only. Applying the new authentication flow requires redeploying the central service and updating the local installation; actual external-network verification is performed separately.
 
-## 2. HTTPS 프록시 또는 터널 연결
+## 2. Connect an HTTPS proxy or tunnel
 
-서비스 포트는 외부에 직접 열지 않고 `MEW_BIND=127.0.0.1`로 둔다. 그 앞에 HTTPS를 종료하는 리버스 프록시나 터널을 둔다. 프록시 설정에는 다음이 모두 필요하다.
+Keep `MEW_BIND=127.0.0.1` and do not expose the service port directly to the outside. Place a reverse proxy or tunnel that terminates HTTPS in front of it. The proxy configuration requires all of the following.
 
-- 공개 도메인의 요청을 `http://127.0.0.1:5000`으로 전달한다. 경로를 덧붙이거나 지우지 않는다.
-- 원래 `Host` 헤더를 보존하고 HTTPS 요청에는 `X-Forwarded-Proto: https`를 보낸다. 로그인 쿠키가 `Secure`로 발급되고 CSRF Origin 검사가 정상 동작하려면 필요하다.
-- WebSocket 업그레이드를 모든 경로에서 통과시킨다. 협업·presence·터미널·에이전트·데이터베이스·로그인 영상과 localhost 앱 프리뷰가 모두 WebSocket을 쓴다.
-- `index.html`이나 `/api` 응답을 프록시에서 장기 캐시하지 않는다. 정적 `/assets` 캐시는 앱이 직접 관리한다.
+- Forward requests for the public domain to `http://127.0.0.1:5000`. Do not add or remove path segments.
+- Preserve the original `Host` header and send `X-Forwarded-Proto: https` for HTTPS requests. This is required for login cookies to be issued with `Secure` and for CSRF Origin checks to work correctly.
+- Pass WebSocket upgrades through on all paths. Collaboration, presence, terminals, agents, databases, login video, and localhost app previews all use WebSocket.
+- Do not cache `index.html` or `/api` responses long-term at the proxy. The app manages the static `/assets` cache itself.
 
-프록시 또는 터널을 연결한 뒤, 실제 도메인에서 아래 순서로 확인한다.
+After connecting the proxy or tunnel, check the following on the actual domain in this order.
 
-1. `https://<도메인>/api/auth/me`가 JSON 응답을 돌려준다.
-2. 브라우저에서 로그인한 뒤 임시 비밀번호 변경 화면이 먼저 보인다.
-3. 문서를 다른 브라우저 창에서 함께 열어 협업 연결과 자동 저장이 되는지 확인한다.
-4. manager 또는 owner 계정에서 터미널을 열 수 있는지 확인한다. 이 검사는 실제 셸 권한을 주는 일이므로 테스트 계정으로만 한다.
+1. `https://<도메인>/api/auth/me` returns a JSON response.
+2. After logging in through the browser, the temporary password change screen appears first.
+3. Open the same document in another browser window and verify that collaboration connects and autosave works.
+4. Verify that a manager or owner account can open a terminal. Perform this check only with a test account, since it grants actual shell access.
 
-개발 서버 `npm run dev`(4999)는 HMR과 소스맵을 노출하므로 터널·프록시·방화벽 어느 쪽으로도 공개하지 않는다.
+The development server `npm run dev` (4999) exposes HMR and source maps, so do not expose it through a tunnel, proxy, or firewall.
 
-## 3. 재부팅 뒤에도 실행하기 (systemd)
+## 3. Keep running after reboot (systemd)
 
-`./mew start`는 `nohup`으로 프로세스를 띄우는 간단한 개인용 경로라 재부팅 후 자동 시작하지 않는다. 서버에서는 하나의 process manager만 사용한다. 아래처럼 systemd를 쓴다면 `./mew start|stop|restart|update`와 섞지 말고 `systemctl`로만 시작·중지·재시작한다.
+`./mew start` is a simple personal-use option that launches the process with `nohup` and does not start automatically after reboot. Use only one process manager on the server. If you use systemd as shown below, do not mix it with `./mew start|stop|restart|update`; start, stop, and restart only with `systemctl`.
 
-먼저 `./mew setup`이 띄운 프로세스를 멈춘 다음, 실제 사용자·경로·Node 경로를 반영한 unit을 만든다. `command -v node`로 Node 절대 경로를 확인한다.
+First stop the process launched by `./mew setup`, then create a unit using the actual user, paths, and Node path. Check Node's absolute path with `command -v node`.
 
 ```ini
 # /etc/systemd/system/mew.service
@@ -118,28 +118,28 @@ sudo systemctl status mew
 journalctl -u mew -f
 ```
 
-Node 또는 에이전트 CLI를 `nvm`, `mise` 같은 사용자 전용 경로에 설치했다면 systemd의 `PATH`에도 그 절대 경로를 넣는다. systemd는 로그인 셸의 초기화 파일을 읽지 않는다.
+If Node or an agent CLI is installed in a user-specific location through tools such as `nvm` or `mise`, include that absolute path in systemd's `PATH` as well. systemd does not read login shell initialization files.
 
 <br/>
 
-## 4. 업데이트·백업·장애 확인
+## 4. Updates, backups, and failure checks
 
-이전 `liiiiv-life/mew`에서 설치했다면 GitHub Transfer가 끝난 뒤 [원격 주소 변경](../../.mew/docs/operations/repository-maintenance.md#github-소유자-이전)을 먼저 적용한다. 런처와 앱의 업데이트 확인은 clone에 설정된 `origin/main`을 사용한다.
+If you installed from the previous `liiiiv-life/mew` repository, first apply the [remote URL change](../../.mew/docs/operations/repository-maintenance.md#transferring-github-ownership) after the GitHub Transfer is complete. Launcher and app update checks use the clone's configured `origin/main`.
 
-`./mew start`로 실행한 개인용 설치는 헤더 메뉴의 **업데이트**에서 `origin/main`의 새 커밋을 확인하고 업데이트할 수 있다. 새 커밋이 있으면 전용 tmux에서 `./mew update`를 실행한다. 항목의 터미널 아이콘으로 실행 출력을 열며, pull·의존성 설치·빌드·재시작이 모두 성공한 뒤 **새로고침** 아이콘을 눌러 새 화면을 적용한다. `git pull --ff-only`라 로컬 브랜치가 갈라졌거나 작업 파일과 충돌하면 자동 병합하지 않고 실패하며 작업 트리를 보존한다. 의존성 설치·빌드가 실패하면 서버를 재시작하지 않고, 업데이트 화면에 실패 상태와 접을 수 있는 실행 로그를 남긴다. pull이 성공해 Git 커밋이 최신이어도 실패한 작업은 **다시 시도**로 전체 절차를 다시 실행할 수 있다. tmux 작업이 중단되면 실패로 표시하며, 시작 대기에는 최대 30초의 실행 유예를 둔다. 업데이트 중 페이지를 다시 열어도 진행 상태를 이어서 확인한다. tmux는 로그인 셸 초기화 없이 작업 명령을 직접 시작하고 완료 뒤에도 출력 확인을 위해 세션을 보존한다. 재시작 중 브라우저 연결이 끊기면 Mew에 다시 연결한 뒤 같은 세션을 연다. systemd 같은 외부 supervisor가 실행한 서버는 이 버튼으로 재시작하지 않고 수동 업데이트가 필요하다고 표시한다. 세션 동작의 상세 계약은 [앱 업데이트·운영 진입](../../.mew/docs/features/%ED%99%94%EB%A9%B4%C2%B7%EA%B3%84%EC%A0%95%C2%B7%EC%9A%B4%EC%98%81/%EC%95%B1%20%EC%97%85%EB%8D%B0%EC%9D%B4%ED%8A%B8%C2%B7%EC%9A%B4%EC%98%81%20%EC%A7%84%EC%9E%85.md)을 따른다.
+Personal installations run with `./mew start` can check for new commits on `origin/main` and update through **Update** in the header menu. If new commits are available, it runs `./mew update` in a dedicated tmux session. Open the execution output using the item's terminal icon, and click the **Refresh** icon to load the new interface after pull, dependency installation, build, and restart all succeed. Because it uses `git pull --ff-only`, it fails without automatically merging if the local branch has diverged or conflicts with working files, preserving the working tree. If dependency installation or the build fails, it does not restart the server and leaves a failure status and collapsible execution log on the update screen. Even if pull succeeds and the Git commit is current, a failed job can rerun the entire procedure with **Retry**. An interrupted tmux job is marked as failed, and the startup wait allows an execution grace period of up to 30 seconds. Reopening the page during an update lets you continue monitoring progress. tmux starts the job command directly without login shell initialization and preserves the session after completion so you can inspect the output. If the browser disconnects during restart, reconnect to Mew and open the same session. A server launched by an external supervisor such as systemd is not restarted by this button; the screen indicates that a manual update is required. The detailed session behavior contract follows [App Updates and Operations Entry](../../.mew/docs/features/appearance-accounts-operations/application-updates-and-operations.md).
 
-배포 전에는 항상 현재 커밋과 데이터 백업 위치를 기록한다. 앱 클론을 지워도 다음 상태는 남고, 반대로 이 상태를 잃으면 계정·세션·게스트 규칙·UI 원장이 사라진다.
+Always record the current commit and data backup location before deployment. The following state remains even if the app clone is deleted; losing this state removes accounts, sessions, guest rules, and the UI ledger.
 
-| 대상 | 기본 위치 | 백업 이유 |
+| Target | Default location | Reason for backup |
 | --- | --- | --- |
-| 설정·외부 서비스 자격증명 | `~/.config/mew/config.env` | 워크스페이스, 포트, DB 연결 등 복구 |
-| mew 앱 데이터 | `~/.local/share/mew/` 또는 `MEW_DATA_DIR` | 계정, 세션, 게스트 규칙, 채팅 |
-| 작업물 | `MEW_WORKSPACE` | mew가 편집하는 실제 파일 — Git만으로 충분한지 별도 판단 |
-| `/db` 데이터 | `DATABASE_URL`이 가리키는 Postgres | 앱 데이터 폴더에 포함되지 않음 |
+| Configuration and external service credentials | `~/.config/mew/config.env` | Restore workspace, port, DB connections, and other settings |
+| mew app data | `~/.local/share/mew/` or `MEW_DATA_DIR` | Accounts, sessions, guest rules, and chat |
+| Work files | `MEW_WORKSPACE` | Actual files edited by mew — assess separately whether Git alone is sufficient |
+| `/db` data | Postgres referenced by `DATABASE_URL` | Not included in the app data folder |
 
-설정 파일과 앱 데이터는 비밀값·비밀번호 해시를 포함하므로 암호화된 백업에만 넣고, Git이나 공유 폴더에 복사하지 않는다. 계정·세션·게스트 규칙은 지워도 다시 만들 수 있는 캐시가 아니므로 보존한다.
+Configuration files and app data contain secrets and password hashes, so include them only in encrypted backups and do not copy them to Git or shared folders. Preserve accounts, sessions, and guest rules; they are not caches that can be deleted and regenerated.
 
-systemd 운영에서는 다음처럼 업데이트한다. 빌드가 `dist/`를 바로 바꾸므로, 사용자가 접속 중인 서버에서는 짧은 반영 구간을 공지하고 한 번에 진행한다.
+For systemd operations, update as follows. Because the build changes `dist/` directly, announce a brief update window on servers with connected users and complete the procedure in one pass.
 
 ```bash
 # mew 사용자에서 빌드한다.
@@ -157,43 +157,43 @@ sudo systemctl restart mew
 sudo systemctl status mew
 ```
 
-문제가 나면 `journalctl -u mew -n 100 --no-pager`로 서버 로그를 먼저 확인한다. 개인용 `./mew` 실행 경로에서는 `./mew status`와 `./mew logs`를 쓴다. 롤백은 마지막 정상 커밋으로 앱 클론을 되돌린 뒤 같은 의존성 설치·빌드·재시작 절차를 수행한다. 워크스페이스와 `MEW_DATA_DIR`를 지우거나 덮어쓰는 방식으로 롤백하지 않는다.
+If a problem occurs, first check server logs with `journalctl -u mew -n 100 --no-pager`. For personal installations run through `./mew`, use `./mew status` and `./mew logs`. To roll back, revert the app clone to the last known good commit, then follow the same dependency installation, build, and restart procedure. Do not roll back by deleting or overwriting the workspace or `MEW_DATA_DIR`.
 
-### node-pty 네이티브 모듈 누락
+### Missing node-pty native module
 
-`✓ built` 뒤 서버 로그에 `Failed to load native module: pty.node`가 나오면 브라우저 빌드는 완료됐지만 서버용 네이티브 의존성이 누락된 상태다. 서버를 실행하는 Node 버전과 OS 사용자로 앱 클론에서 아래 복구·확인을 수행한다. Linux에서는 C/C++ 빌드 도구와 `python3`가 필요하며, 설치 스크립트를 생략한 의존성 설치는 피한다.
+If server logs show `Failed to load native module: pty.node` after `✓ built`, the browser build completed, but a server-side native dependency is missing. Perform the recovery and checks below in the app clone using the Node version and OS user that run the server. Linux requires C/C++ build tools and `python3`; avoid installing dependencies with installation scripts skipped.
 
 ```bash
 npm rebuild node-pty --foreground-scripts
 node -e 'require("node-pty"); console.log("node-pty loaded")'
 ```
 
-이 명령은 의존성만 복구하며 `dist/`나 서버 실행 상태를 바꾸지 않는다. 모듈 로딩을 확인한 뒤 개인용 설치는 사용자가 `./mew start`를, systemd 설치는 해당 서비스의 시작 명령을 실행한다. 브라우저 빌드가 이미 성공했다면 이 복구를 위해 다시 빌드할 필요는 없다.
+This command repairs dependencies only and does not change `dist/` or the server's running state. After verifying that the module loads, the user runs `./mew start` for a personal installation or the service's start command for a systemd installation. If the browser build already succeeded, there is no need to rebuild for this repair.
 
-## 앱 업데이트 API
+## App Update API
 
-| 라우트 | 역할 | 하는 일 |
+| Route | Role | Function |
 | --- | --- | --- |
-| `GET /api/mew-update/status` | manager·owner | `HEAD`와 `origin/main`의 ahead/behind, 실행 방식, 업데이트 작업 상태 조회. `?refresh=1`이면 먼저 fetch |
-| `POST /api/mew-actions/update/run` | manager·owner | 내장 `./mew start` 서버에서만 고정 업데이트 명령을 보존되는 tmux 세션으로 실행 |
+| `GET /api/mew-update/status` | manager·owner | Query ahead/behind status for `HEAD` and `origin/main`, launch method, and update job status. Fetch first if `?refresh=1` is specified |
+| `POST /api/mew-actions/update/run` | manager·owner | Run the fixed update command in a preserved tmux session only on servers using the built-in `./mew start` launcher |
 
-### 설치된 의존성·에이전트 통합 업데이트
+### Unified updates for installed dependencies and agents
 
-- manager·owner가 앱에 들어올 때 설치된 항목의 현재 버전과 최신 버전을 조회한다. 업데이트가 있으면 뮤캣이 개수와 대표 항목을 알리며 **업데이트 보기**로 통합 화면을 연다. 화면의 **다시 확인**은 원격 버전 조회를 다시 수행한다. 같은 서버의 동시 조회는 합쳐 처리한다.
-- 목록은 Mew의 Git 커밋, 설치된 독립 에이전트 CLI, Mew 관련 시스템 도구를 포함한다. 앱 npm 의존성(개발·선택·전이 의존성 포함), 번들 ACP 어댑터, 내부 `@mew/*` 패키지와 미설치 항목은 개별 최신 조회·알림·업데이트에서 제외한다.
-- npm 최신 버전은 공식 레지스트리 `latest`, Hermes는 PyPI, Cursor는 공식 설치 스크립트의 버전, Antigravity는 공식 ACP Registry, Prime은 공식 설치 스크립트의 배포 저장소 stable 채널, Rust는 stable 채널, uv는 공식 GitHub 릴리스에서 조회한다. Prime의 `PRIME_AGENT_DOWNLOAD_BASE_URL`·`PRIME_AGENT_RELEASE_CHANNEL`·`PRIME_AGENT_VERSION` 설정은 공식 updater와 동일하게 따른다. Node는 최신 LTS를 표시한다. apt 도구는 호스트의 현재 패키지 목록에 있는 설치 버전·candidate를 비교하며 패키지 목록 자체는 갱신하지 않는다.
-- 각 항목은 현재·최신 버전과 **업데이트** 버튼을 갖는다. `terminal` 권한이 있고 세션이 생성되면 옆의 터미널 아이콘으로 명령 버튼과 같은 팝업에서 출력을 확인한다. 팝업을 닫아도 작업과 세션은 유지된다. 설치 방식과 자동 갱신 명령이 확인된 항목만 실행 가능하다. Node의 외부 설치 관리, apt의 관리자 권한, 비 npm Codex CLI, 버전 고정 Antigravity ACP 등 자동 갱신할 수 없는 항목에는 사유를 표시한다. 조회 실패·버전 미확인은 최신으로 단정하지 않는다.
-- 앱 의존성은 Mew 업데이트에서 해당 커밋의 `package-lock.json` 조합을 `npm ci --no-audit --no-fund`로 설치한다. 화면과 API는 앱 의존성을 개별·일괄 최신화하지 않으며, 이전 `npm:*` ID 요청도 거절한다. 독립 CLI 업데이트는 앱 manifest·lockfile을 변경하지 않지만 Mew 연동 호환성을 보장하지는 않는다. 앱 의존성 갱신은 개발자가 별도 작업 공간에서 관련 패키지를 함께 변경하고 타입 검사·테스트·빌드로 검증한 뒤 코드와 lockfile을 함께 반영한다. 에이전트의 빌드·서버 재시작 금지 규칙은 그대로 적용한다.
-- 독립 에이전트는 **개별 업데이트**만 허용한다. 일괄 선택에서 제외하고 API도 에이전트가 포함된 여러 항목 요청을 거절한다. 실행 직전 같은 OS 사용자의 프로세스에서 해당 런타임의 Mew 감독·CLI 실행을 검사해 발견하면 차단한다. 프로세스 조회가 실패해도 설치를 진행하지 않는다. 외부에서 검사 후 시작되는 프로세스까지 잠그지는 못한다.
-- **일괄 업데이트**는 실행 가능한 시스템 도구만 하나의 tmux 세션에서 순차 처리하며 각 행에서 같은 세션을 연다. 하나가 실패해도 나머지를 처리하고 항목별 대기·실행·완료·실패 및 오류를 남긴다. 창을 닫아도 작업은 계속된다. 큐·항목 결과·세션 연결은 `dependency-update-job.json`에 저장하고 별도 worker가 실행하므로 Mew 서버 종료·재시작 뒤에도 복원한다. worker가 사라졌으면 남은 대기·실행 항목을 실패로 표시한다. 개별 업데이트는 항목별 세션을 사용하고, 같은 대상의 다음 실행은 이전 완료 세션을 교체한다.
-- 일괄 선택에 Mew가 있으면 모든 의존성 업데이트 성공 뒤 기존 Mew 업데이트 경로를 마지막에 호출한다. 실패 항목이 있으면 Mew 재시작을 보류한다. Mew는 기존 main·실행 관리자 제한을 유지하고, Git 충돌을 자동 병합하지 않는다. 전체 앱 페이지를 닫으면 의존성 서버 작업은 계속되지만 클라이언트의 후속 Mew 실행 예약은 취소된다.
-- API는 항목 ID만 받는다. 클라이언트가 셸 문자열·버전·파일 경로를 정할 수 없으며 요청 시 설치 목록과 최신 버전을 다시 확인한다. 같은 서버에서 통합 업데이트 작업은 하나만 실행하며, Mew 빌드·재시작·업데이트 작업과 서로 동시에 시작하지 않는다.
+- When a manager or owner enters the app, it queries the current and latest versions of installed items. If updates are available, Mewcat reports the count and representative items; **View Updates** opens the unified screen. **Check Again** on that screen repeats the remote version lookup. Concurrent lookups on the same server are combined.
+- The list includes Mew's Git commit, installed standalone agent CLIs, and Mew-related system tools. App npm dependencies (including development, optional, and transitive dependencies), bundled ACP adapters, internal `@mew/*` packages, and items that are not installed are excluded from individual latest-version checks, notifications, and updates.
+- Latest npm versions are queried from the official registry's `latest` tag; Hermes from PyPI; Cursor from the version in its official installation script; Antigravity from the official ACP Registry; Prime from the stable channel of the distribution repository used by its official installation script; Rust from the stable channel; and uv from official GitHub releases. Prime follows the `PRIME_AGENT_DOWNLOAD_BASE_URL`, `PRIME_AGENT_RELEASE_CHANNEL`, and `PRIME_AGENT_VERSION` settings in the same way as its official updater. Node shows the latest LTS version. For apt tools, installed versions and candidates are compared using the host's current package lists; the package lists themselves are not refreshed.
+- Each item has current and latest versions and an **Update** button. With `terminal` permission and a created session, use the terminal icon beside it to view output in the same popup used by command buttons. Closing the popup preserves the job and session. Only items with a confirmed installation method and automatic update command can run. Items that cannot be updated automatically, such as Node managed by an external installation manager, apt requiring administrator privileges, non-npm Codex CLI installations, and version-pinned Antigravity ACP, display the reason. Failed lookups and unknown versions are not treated as up to date.
+- Mew updates install the app dependency set in that commit's `package-lock.json` using `npm ci --no-audit --no-fund`. The screen and API do not update app dependencies to the latest versions individually or in bulk, and also reject requests using old `npm:*` IDs. Standalone CLI updates do not change the app manifest or lockfile, but do not guarantee compatibility with Mew integration. To update app dependencies, developers change related packages together in a separate workspace, validate them with type checks, tests, and builds, then incorporate the code and lockfile together. The rules prohibiting agents from building or restarting the server still apply.
+- Standalone agents allow only **individual updates**. They are excluded from bulk selection, and the API also rejects requests for multiple items that include an agent. Immediately before execution, it checks processes belonging to the same OS user for Mew-supervised or CLI executions of that runtime and blocks the update if any are found. Installation also does not proceed if the process query fails. It cannot lock out processes started externally after the check.
+- **Update All** processes only executable system tool updates sequentially in a single tmux session, and each row opens that same session. It continues processing the remaining items even if one fails, recording each item's pending, running, completed, or failed status and errors. Work continues even if the window is closed. The queue, item results, and session links are saved in `dependency-update-job.json` and executed by a separate worker, allowing restoration after the Mew server stops or restarts. If the worker is gone, remaining pending and running items are marked as failed. Individual updates use a session per item, and the next run for the same target replaces the previous completed session.
+- If Mew is included in the bulk selection, the existing Mew update flow is invoked last, after all dependency updates succeed. If any item fails, the Mew restart is deferred. Mew retains the existing main and process manager restrictions and does not automatically merge Git conflicts. Closing the entire app page allows dependency jobs on the server to continue but cancels the client's scheduled follow-up Mew run.
+- The API accepts only item IDs. Clients cannot specify shell strings, versions, or file paths, and the installed item list and latest versions are checked again when a request is made. Only one unified update job runs on the same server, and it cannot start concurrently with Mew build, restart, or update jobs.
 
-| 라우트 | 역할 | 하는 일 |
+| Route | Role | Function |
 | --- | --- | --- |
-| `GET /api/updates/status` | manager·owner | 설치된 항목·버전·실행 가능 여부·직전 작업 상태. `?refresh=1`로 원격 재조회 |
-| `POST /api/updates/run` | manager·owner | `{ ids: string[] }`로 등록된 설치 항목의 개별·일괄 업데이트 요청. 즉시 작업 상태 응답 |
+| `GET /api/updates/status` | manager·owner | Installed items, versions, execution availability, and most recent job status. Query remote sources again with `?refresh=1` |
+| `POST /api/updates/run` | manager·owner | Request individual or bulk updates for registered installed items using `{ ids: string[] }`. Return job status immediately |
 
-### 화면에서 실행하는 업데이트 런타임
+### Runtime for updates launched from the UI
 
-화면 업데이트는 실행 중인 서버의 Node 절대경로를 사용한다. 작업 스크립트는 Bash로 호출하고, 의존성 설치·빌드 PATH와 서버 재시작(`MEW_NODE`)도 같은 Node로 고정한다. tmux 환경의 다른 Node 버전이나 `mew` 실행 비트 누락으로 인한 시작 실패를 방지한다. 실패 이유·단계와 재시도 상태는 업데이트 화면에 남으며 기존 main/프로세스 관리자 경계는 유지한다.
+Updates launched from the UI use the running server's absolute Node path. Job scripts are invoked with Bash, and the PATH for dependency installation and builds and the server restart (`MEW_NODE`) are pinned to the same Node. This prevents startup failures caused by a different Node version in the tmux environment or a missing executable bit on `mew`. Failure reasons, stages, and retry status remain on the update screen, and the existing main/process manager boundaries are maintained.

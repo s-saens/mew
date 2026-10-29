@@ -1,20 +1,20 @@
 ---
-provenance: "Liiiiv 중앙 ADR 이관본, 2026-10-14"
-description: "이관한 결정 기록: 메모리 회복 후 에이전트 자동 재개. 당시 선택·근거·후속 변경을 보존하며 현재 계약은 Mew 소유 문서에서 확인한다."
-title: "0192 — 메모리 회복 후 에이전트 자동 재개"
+provenance: "Migrated copy of a Liiiiv central ADR, 2026-10-14"
+description: "Migrated decision record: Automatically resume agents after memory recovery. Preserves the choices, rationale, and subsequent changes from that time; consult the Mew owning document for the current contract."
+title: "0192 — Automatically resume agents after memory recovery"
 created: 2026-10-03
 updated: 2026-10-03
 ---
 
-- 날짜: 2026-10-03
-- 상태: 채택
-- 부분 대체: [0164](0164-mew-agent-memory-protection.md) — 명시적 전송만 재개·AI 자동 이어가기 금지
-- 결정자: 사용자 (메모리 정리 후 자동 재개 지시), Codex (구현)
+- Date: 2026-10-03
+- Status: Adopted
+- Partially supersedes: [0164](0164-mew-agent-memory-protection.md) — Resume only on explicit submission; prohibit automatic AI continuation
+- Decision makers: User (instructed automatic resumption after memory cleanup), Codex (implementation)
 
-## 결정
+## Decision
 
-감독은 보호 보류 중에도 메모리를 감시한다. 기존 회복 여유를 충족하고 취소가 완료되면 같은 세션의 AI 작업을 이어가는 메시지를 대기열 맨 앞에 넣어 자동 실행한다. 완료된 변경을 확인하고 남은 작업만 수행하도록 지시하며 원래 모델·노력·권한을 유지한다. 사용자 중단은 자동 이어가기를 제거한다. 큐 편집·인증·사용량 보류는 유지한다.
+The supervisor monitors memory even during a protection hold. Once the existing recovery headroom requirement is met and cancellation completes, place a message to continue the AI task in the same session at the front of the queue and run it automatically. Instruct it to check completed changes and perform only the remaining work, retaining the original model, effort, and permissions. A user stop removes automatic continuation. Retain queue editing, authentication holds, and usage holds.
 
-CLI 명령은 부작용 중복을 피하기 위해 재실행하지 않고 다음 대기 작업부터 자동 재개한다. OS가 어댑터나 감독을 강제 종료한 경우의 복원은 범위 밖이다. 강제 캐시 삭제나 다른 프로세스 종료 없이 OS 회수·사용자의 메모리 정리로 여유가 확보되기를 기다린다.
+Do not rerun CLI commands, to avoid duplicate side effects; automatically resume from the next queued task. Recovery when the OS forcibly terminates the adapter or supervisor is out of scope. Wait for OS reclamation or user memory cleanup to free headroom without forcibly clearing caches or terminating other processes.
 
-현재 계약은 [운영 문서](../../../../docs/operations/agent-memory.md)가 소유한다.
+The [operations document](../../../../docs/operations/agent-memory.md) owns the current contract.

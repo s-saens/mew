@@ -1,40 +1,40 @@
 ---
-provenance: "Liiiiv 중앙 ADR 이관본, 2026-10-14"
-description: "이관한 결정 기록: 일반 서버 브라우저는 직접 실행 후 CDP로 연결한다. 당시 선택·근거·후속 변경을 보존하며 현재 계약은 Mew 소유 문서에서 확인한다."
-title: "0129 — 일반 서버 브라우저는 직접 실행 후 CDP로 연결한다"
+provenance: "Migrated copy of a Liiiiv central ADR, 2026-10-14"
+description: "Migrated decision record: Launch the general server browser directly, then connect via CDP. Preserves the choices, rationale, and subsequent changes from that time; consult the Mew owning document for the current contract."
+title: "0129 — Launch the general server browser directly, then connect via CDP"
 created: 2026-09-10
 updated: 2026-09-11
 ---
 
-- 날짜: 2026-09-10
-- 상태: 채택
-- 후속 결정: [0163](0163-mew-browser-virtual-display.md) — Linux/WSL 창 모드는 전용 가상 디스플레이를 기본 사용; 직접 실행·CDP·프로필 유지
-- 부분 대체: [0127](0127-mew-browser-server-dom-runtime.md) — 일반 프로필의 Chromium 실행·제어 연결 방식
-- 결정자: 송상훈 (단계별 로그인 실험 요청·결과 확인), Codex (DOM 중계 통합 구현)
+- Date: 2026-09-10
+- Status: Adopted
+- Subsequent decision: [0163](0163-mew-browser-virtual-display.md) — Linux/WSL windowed mode uses a dedicated virtual display by default; retain direct launch, CDP, and profiles
+- Partially supersedes: [0127](0127-mew-browser-server-dom-runtime.md) — How Chromium is launched and connected for control with regular profiles
+- Decision makers: Song Sanghoon (requested step-by-step login experiments and confirmed the results), Codex (DOM relay integration implementation)
 
-## 배경
+## Background
 
-사용자는 DOM 중계를 유지하길 원한다. 기존 Playwright 실행에서는 Google 로그인이 거부됐지만,
-WSL에서 Chromium을 직접 실행한 경우와 이후 CDP 연결만 추가한 경우, DOM 기록 코드까지 추가한 경우에는
-사용자가 로그인 성공을 확인했다. 특정 실행 플래그를 차단 원인으로 확정하지 않는다.
+The user wants to retain DOM relaying. Google login was rejected with the existing Playwright launch, but the user confirmed
+successful login when Chromium was launched directly in WSL, when only a CDP connection was subsequently added, and when DOM recording
+code was added as well. No specific launch flag is established as the cause of blocking.
 
-## 결정
+## Decision
 
-- 일반 탭과 브라우저형 OAuth는 계정별 전용 프로필의 Chromium 프로세스를 직접 실행하고 CDP로 연결한다.
-- Playwright의 기본 실행 옵션 묶음을 적용하지 않는다. 샌드박스는 유지하고 브라우저 식별값을 스크립트로 덮어쓰지 않는다.
-- 디버깅 연결은 서버 loopback의 동적 포트만 사용한다. 실행한 자식 프로세스가 알린 endpoint만 연결하고 클라이언트에는 공개하지 않는다. 터널·웹 API·공용 포트로 제공하지 않는다.
-- 원본 사이트의 DOM 중계·계정 소유권·OAuth 최초 URL 검증·프로필 영속성은 0127·[0128](0128-mew-browser-oauth-uses-internal-browser.md)을 유지한다. 픽셀 스트리밍은 도입하지 않는다.
-- 마지막 사용자가 프로필을 반납하거나 시작에 실패하면 해당 브라우저 프로세스와 연결을 정리한다. 기존 개인 브라우저·수동 로그인 프로필에는 연결하지 않는다.
-- 디버깅 포트는 로컬 프로세스에 브라우저 제어 권한을 준다. 서버 셸 사용자 사이의 격리 수단으로 취급하지 않는다.
-- 과거 호스트 제한 인증 검증 helper는 일반 프로필과 분리된 기존 실행·네트워크 경계를 유지한다.
+- For regular tabs and browser-based OAuth, launch Chromium processes directly with dedicated per-account profiles and connect via CDP.
+- Do not apply Playwright's default launch option bundle. Retain the sandbox and do not override browser identifiers with scripts.
+- Use only dynamic ports on server loopback for debugging connections. Connect only to the endpoint reported by the launched child process, and do not expose it to clients. Do not provide it through tunnels, web APIs, or public ports.
+- Retain 0127 and [0128](0128-mew-browser-oauth-uses-internal-browser.md) for original-site DOM relay, account ownership, initial OAuth URL validation, and profile persistence. Do not introduce pixel streaming.
+- Clean up the browser process and connection when the last user releases the profile or startup fails. Do not connect to existing personal browsers or manual-login profiles.
+- The debugging port grants local processes control of the browser. Do not treat it as a means of isolation between server shell users.
+- The legacy host-restricted authentication validation helper retains its existing execution and network boundaries, separate from regular profiles.
 
-## 검증 경계
+## Verification Boundaries
 
-직접 실행·CDP 연결·DOM 기록 코드 단계의 Google 로그인은 사용자 확인 결과다.
-2026-09-11에는 실제 Mew 내부 DOM 재생 화면에서도 Google 로그인 성공을 사용자가 확인했다.
-단계별 증거·선행 중계 오류·회귀 방지 기준은 [운영 설명](../../operations/browser-dom-oauth.md)에 둔다.
+Google login at the direct launch, CDP connection, and DOM recording code stages is a user-confirmed
+result. On 2026-09-11, the user also confirmed successful Google login in the actual DOM replay screen
+inside Mew. Evidence for each stage, prior relay errors, and regression prevention criteria are kept in the [operations guide](../../operations/browser-dom-oauth.md).
 
-성공한 실행 방식은 확인했지만 차단을 유발한 단일 플래그는 특정하지 않았다.
-모든 공급자·계정·향후 환경에서의 허용 여부나 헤드리스 인증 성공까지 일반화하지 않는다.
+A successful launch method was confirmed, but no single flag that caused blocking was identified. This is not
+generalized to acceptance across all providers, accounts, and future environments, or to successful headless authentication.
 
-현재 기능은 [결정 0023](../../decisions/0023-login-desktop-and-port-preview.md)에 따라 독립 로그인 영상 화면과 localhost 앱 접속으로 대체했다. 이 문서는 이전 결정의 근거로 보존한다.
+The current functionality has been replaced with a standalone login video screen and localhost app access under [Decision 0023](../../decisions/0023-login-desktop-and-port-preview.md). This document is preserved as the rationale for the previous decision.

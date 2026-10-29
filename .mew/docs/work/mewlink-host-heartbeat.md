@@ -1,27 +1,27 @@
 ---
-title: "Mewlink 호스트 heartbeat 무응답 복구"
-description: "2026-10-29 중앙 offline·호스트 online 불일치와 최초 60초 heartbeat 감시 수정·격리 검증을 기록한다. 후속 응답 기한 단축·원인별 복구는 별도 작업 기록으로 연결한다."
+title: "Mewlink host recovery from heartbeat nonresponse"
+description: "Records the 2026-10-29 mismatch between central offline and host online status, the initial 60-second heartbeat monitoring fix, and isolated validation. Links subsequent shorter response deadlines and cause-specific recovery to a separate work record."
 created: "2026-10-29"
 updated: "2026-10-29"
 ---
 
-이 기록은 최초 60초 응답 감시 수정이다. 이후 감지 시간 단축과 경량 오프라인 대기는 [후속 작업](mewlink-efficient-recovery.md)·[ADR 0086](../decisions/0086-mewlink-recovery-efficiency.md)을 따른다.
+This record covers the initial 60-second response monitoring fix. Subsequent faster detection and lightweight offline waiting follow the [follow-up work](mewlink-efficient-recovery.md) and [ADR 0086](../decisions/0086-mewlink-recovery-efficiency.md).
 
-## 조사와 원인
+## Investigation and cause
 
-공개 기기 접속을 새 Chromium 컨텍스트에서 확인했을 때 중앙 WebSocket은 challenge 뒤 `offline`을 반복해서 반환했고 화면은 계속 ‘연결 복구 중’을 표시했다. 로컬 운영 서버는 실행 중이었다. 기존 운영 프로세스의 디버거에서 주기 검사 호출 스택과 변수를 확인하니 호스트 상태는 `online`, 중앙 소켓은 `OPEN`, 재시도 타이머는 이미 종료된 상태였다. 디버거의 중단점을 제거하고 실행을 재개했으며 연결과 inspector 포트도 닫았다.
+When public device access was checked in a new Chromium context, the central WebSocket repeatedly returned `offline` after the challenge, and the screen continued to display ‘Recovering connection’. The local production server was running. Inspection of the periodic check call stack and variables in the existing production process's debugger showed host status `online`, central socket `OPEN`, and a retry timer that had already ended. Debugger breakpoints were removed and execution resumed; the debugger connection and inspector port were also closed.
 
-호스트는 20초마다 heartbeat를 보내지만 중앙 응답의 도착 여부를 검사하지 않았다. 따라서 `close`나 `error` 없이 끊긴 소켓이 열린 상태로 남으면 재연결도 시작하지 않았다. 중앙과 호스트의 상태 불일치는 이 결함과 일치한다. 최초 단절의 원인이 절전·네트워크 전환·서비스 문제 중 무엇이었는지는 확인하지 못했다. 브라우저의 범용 복구 표시도 최초 오류를 보여주지 않아 원인을 구분하기 어려웠다.
+The host sent a heartbeat every 20 seconds but did not check whether a central response arrived. As a result, if a disconnected socket remained open without `close` or `error`, reconnection did not start. The status mismatch between the central service and host is consistent with this defect. Whether the initial disconnection was caused by sleep, network switching, or a service issue could not be determined. The browser's generic recovery display also hid the initial error, making causes difficult to distinguish.
 
-## 변경
+## Changes
 
-현재 동작은 [원격 접속 계약](../development/remote-access.md#시그널링-순단의-같은-rtc-재부착)이 소유한다. 기존 JSON heartbeat 응답을 비동기 처리 큐 밖에서 확인하고, 단조 시각으로 60초 이상 무응답이면 주기 검사에서 소켓을 강제 종료해 기존 재접속 절차를 사용한다. 송신 오류도 같은 경로로 정리하고 최초 WSS handshake는 30초로 제한한다. 중앙 프로토콜·등록 키·lease·RTC 재부착 정책은 유지한다.
+The [remote access contract](../development/remote-access.md#reattaching-the-same-rtc-after-a-brief-signaling-interruption) owns current behavior. Existing JSON heartbeat responses are checked outside the asynchronous processing queue; after at least 60 seconds without a response, measured using monotonic time, the periodic check forcibly closes the socket and uses the existing reconnection procedure. Send errors are cleaned up through the same path, and the initial WSS handshake is limited to 30 seconds. The central protocol, registration keys, leases, and RTC reattachment policy remain in place.
 
-## 검증과 적용
+## Verification and application
 
-- `MEW_DATA_DIR="${TMPDIR:-/tmp}/mew-test-data" node --test server/remote-access-heartbeat.test.ts server/remote-access-agent-startup.test.ts server/remote-access-retry.test.ts server/remote-access-registration-network.test.ts`: 34개 통과. OPEN 상태의 무응답·정상 응답·송신 실패·종료 정리와, 실제 TLS WebSocket fixture에서 무응답 종료 뒤 재접속·인증된 RTC 보존을 확인했다. 단위 검사는 가상 시각을, 통합 검사는 수동 heartbeat 검사와 가상 단조 시각을 사용했다.
-- `npx tsc -b`와 변경한 TypeScript 4개 파일의 `npm run lint -- …`: 통과.
-- `npm run check:docs`: 기존 `docs/지원서.md`의 frontmatter 누락으로 실패했다. 별도 실행한 `node server/document-links.ts --all`도 기존 README 이미지·기능·태스크 링크 오류 19개로 실패했다. 기존 `readDescription`·`documentLinkErrors`로 이번 문서 3개의 description과 로컬 링크 대상을 별도 검사해 통과했다.
-- 변경 파일의 `git diff --check`: 통과.
+- `MEW_DATA_DIR="${TMPDIR:-/tmp}/mew-test-data" node --test server/remote-access-heartbeat.test.ts server/remote-access-agent-startup.test.ts server/remote-access-retry.test.ts server/remote-access-registration-network.test.ts`: 34 passed. Verified nonresponse in the OPEN state, normal responses, send failures, shutdown cleanup, and reconnection after nonresponse termination with authenticated RTC preservation using an actual TLS WebSocket fixture. Unit checks used virtual time; integration checks used manual heartbeat checks and virtual monotonic time.
+- `npx tsc -b` and `npm run lint -- …` on 4 changed TypeScript files: passed.
+- `npm run check:docs`: failed because the existing `docs/지원서.md` lacks frontmatter. The separately run `node server/document-links.ts --all` also failed on 19 existing README image, feature, and task link errors. Descriptions and local link targets in the 3 documents for this change were checked separately using the existing `readDescription` and `documentLinkErrors` and passed.
+- `git diff --check` on changed files: passed.
 
-앱 빌드·배포·서버 시작·종료·재시작은 수행하지 않았다. 이 수정은 호스트 서버에 적용해야 하며 중앙 Worker 재배포는 필요하지 않다. 기존 운영 프로세스의 연결이 복구됐다는 뜻은 아니다. 실제 절전·외부망 전환 뒤의 복구 검증은 남아 있다.
+No app build, deployment, or server startup, shutdown, or restart was performed. This fix must be applied to the host server and does not require central Worker redeployment. This does not mean the existing production process's connection has recovered. Recovery validation after actual sleep and external network switching remains outstanding.

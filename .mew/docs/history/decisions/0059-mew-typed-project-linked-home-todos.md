@@ -1,50 +1,50 @@
 ---
-provenance: "Liiiiv 중앙 ADR 이관본, 2026-10-14"
-description: "이관한 결정 기록: mew 홈 할 일을 타입과 프로젝트 연결로 확장한다. 당시 선택·근거·후속 변경을 보존하며 현재 계약은 Mew 소유 문서에서 확인한다."
-title: "0059 — mew 홈 할 일을 타입과 프로젝트 연결로 확장한다"
+provenance: "Migrated copy of a Liiiiv central ADR, 2026-10-14"
+description: "Migrated decision record: extend mew home to-dos with types and project links. Preserves the choices, rationale, and subsequent changes from that time; see the Mew owning document for the current contract."
+title: "0059 — Extend mew home to-dos with types and project links"
 created: 2026-08-20
 updated: 2026-09-11
 ---
 
-- 날짜: 2026-08-20
-- 상태: 채택
-- 후속 결정: [0066](0066-mew-todo-single-completion-checkbox.md) — 완료·취소·못함 선택 UI
-- 후속 결정: [0075](0075-mew-recurring-todos-reset-daily-always-visible.md) — 반복 할 일의 일일 리셋·항상 표시
-- 결정자: 송상훈 (지시)
+- Date: 2026-08-20
+- Status: Adopted
+- Subsequent decision: [0066](0066-mew-todo-single-completion-checkbox.md) — UI for selecting Done, Canceled, or Missed
+- Subsequent decision: [0075](0075-mew-recurring-todos-reset-daily-always-visible.md) — daily reset and persistent visibility for recurring to-dos
+- Decision maker: Song Sanghoon (directive)
 
-## 배경
+## Background
 
-[ADR 0056](0056-mew-user-owned-home-todos.md)은 홈 할 일을 사용자별 `todos.json` 원장으로 옮겼지만, 항목 종류는
-기한 유무와 `done` 하나로만 표현했다. 실제 홈 화면에서는 “당장 오늘 할 일”, “기한이 있는 일”, “기간과 무관하게
-주기적으로 할 일”을 한 화면에서 같이 봐야 하고, 각 항목이 어느 프로젝트와 관련되는지도 보여야 한다.
+[ADR 0056](0056-mew-user-owned-home-todos.md) moved home to-dos to a per-user `todos.json` ledger, but represented item types only through the presence or absence of a due date and a
+single `done` field. The actual home screen needs to show “things to do today,” “things with deadlines,” and “things to
+do regularly regardless of date range” together, and show which projects each item relates to.
 
-특히 오늘 할 일은 지나간 뒤에도 단순 완료 여부보다 “했다”, “취소됐다”, “해야 했는데 못했다”를 먼저 기록해야 한다.
+For today's to-dos in particular, even after the day has passed, recording “done,” “canceled,” or “should have done it but couldn't” must take priority over a simple completion flag.
 
-## 선택지
+## Options
 
-1. 위젯 로컬 상태로만 분류 — 저장 스키마를 안 바꾸지만 새로고침·다른 브라우저에서 분류가 사라진다.
-2. 프로젝트별 TODO 파일로 분산 저장 — 프로젝트 연결은 자연스럽지만 개인 할 일과 주기 작업이 여러 레포로 흩어진다.
-3. 사용자별 `todos.json` 항목을 확장 — 기존 원장 위치를 유지하면서 타입, 상태, 프로젝트 연결을 구조화한다.
+1. Classify only in widget-local state — leaves the storage schema unchanged, but classifications disappear on refresh or in another browser.
+2. Distribute storage across per-project TODO files — project links are natural, but personal to-dos and recurring tasks become scattered across multiple repositories.
+3. Extend per-user `todos.json` items — structure types, statuses, and project links while retaining the existing ledger location.
 
-## 결정
+## Decision
 
-홈 할 일 항목은 사용자별 `todos.json`에 계속 저장하되 필드를 확장한다. 항목은
-`id`·`text`·`type`·`status`·`done`·`due`·`projects`·`createdAt`·`updatedAt`을 가진다.
-`type`은 `today`·`dated`·`recurring`, `status`는 `open`·`done`·`canceled`·`missed`다.
-`projects`는 연관 프로젝트 이름 배열이고 다중 선택 가능하다.
+Home to-do items remain stored in per-user `todos.json` files, with expanded
+fields. Items have `id`, `text`, `type`, `status`, `done`, `due`, `projects`, `createdAt`, and `updatedAt`. `type` is
+`today`, `dated`, or `recurring`; `status` is `open`, `done`, `canceled`, or `missed`. `projects` is an array of related
+project names and supports multiple selections.
 
-기존 항목은 읽을 때 마이그레이션한다. `due`가 있으면 `dated`, 없으면 `today`로 보고, `done: true`는
-`status: done`, `done: false`는 `status: open`으로 해석한다. `done` 필드는 API 호환용으로 남기며
-`status === done`일 때만 true로 계산한다.
+Existing items are migrated when read. Items with `due` are treated as `dated`; those without it are treated
+as `today`. `done: true` is interpreted as `status: done`, and `done: false` as `status: open`. The `done` field is retained for API compatibility
+and is computed as true only when `status === done`.
 
-## 근거
+## Rationale
 
-- 세 타입을 저장 필드로 두면 홈 위젯과 달력 위젯이 같은 원장을 보면서도 각자 필요한 뷰를 만들 수 있다.
-- `status`를 `done`보다 넓히면 오늘 할 일의 회고 상태를 잃지 않는다.
-- 프로젝트 연결을 파일 앵커가 아니라 프로젝트 이름 배열로 두면 문서 위치를 고르지 않아도 빠르게 분류할 수 있고,
-  프로젝트 탭의 아이콘 자산을 그대로 표시할 수 있다.
+- Storing the three types as a field allows the home and calendar widgets to use the same ledger while creating the views each needs.
+- Expanding `status` beyond `done` preserves retrospective statuses for today's to-dos.
+- Using an array of project names for project links instead of file anchors allows quick categorization without choosing a document location,
+  and allows project tab icon assets to be displayed as is.
 
-## 결과
+## Results
 
-- 달력은 계속 `due`가 있는 항목만 표시한다.
-- 주기 작업의 실제 반복 주기 계산은 아직 없다. 현재 `recurring`은 “날짜와 무관하게 계속 봐야 하는 항목” 타입이다.
+- The calendar continues to display only items with `due`.
+- Actual recurrence interval calculations for recurring tasks do not exist yet. Currently, `recurring` is a type for “items that must remain visible regardless of date.”

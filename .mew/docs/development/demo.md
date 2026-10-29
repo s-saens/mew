@@ -1,111 +1,111 @@
 ---
-title: "공유 UI 기반 브라우저 데모"
-description: "실제 Mew UI를 쓰는 브라우저 데모의 전체 공개 파일 목록·초기 사본·요청 시 본문 로딩과 용량 예산, 기능 패널 제거 후의 태스크·가상 호스트·계정 테마·메모리 저장 계약을 정의한다. 정적 파일·origin·CSP와 고정 Git 객체 부재 시 검증된 공개 자료를 쓰는 테스트 경계, 사용자 배포 절차를 설명한다."
+title: "Browser demo using the shared UI"
+description: "Defines the full public file list, initial copy, on-demand body loading, and size budgets for the browser demo using the actual Mew UI, along with the task, virtual host, account theme, and in-memory storage contracts after removal of the feature panel. Explains static files, origins, CSP, test boundaries for using verified public materials when pinned Git objects are unavailable, and user deployment procedures."
 created: "2026-10-19"
 updated: "2026-10-26"
 ---
 
-# 공유 UI 기반 브라우저 데모
+# Browser demo using the shared UI
 
-데모는 로그인이나 실행 중인 호스트 없이 Mew를 체험하는 별도 진입점이다. `demo.html` → `src/demo-main.tsx`에서 데모 환경을 준비한 뒤 일반 `src/main.tsx`·`AppBootstrap`·`App`을 그대로 불러온다. UI를 복사하지 않으며 편집기·탭·도킹·설정·에이전트·Git 패널의 변경은 다음 데모 빌드에도 반영된다. 새 API나 기능을 추가할 때는 해당 데모 동작도 구현해야 한다. 선택 근거는 [ADR 0020](../decisions/0020-browser-demo-runtime.md)에 기록한다.
+The demo is a separate entry point for trying Mew without logging in or running a host. It prepares the demo environment through `demo.html` → `src/demo-main.tsx`, then loads the regular `src/main.tsx`, `AppBootstrap`, and `App` unchanged. The UI is not copied, and changes to the editor, tabs, docking, settings, agent, and Git panel are reflected in the next demo build. When adding an API or feature, its demo behavior must also be implemented. The rationale is recorded in [ADR 0020](../decisions/0020-browser-demo-runtime.md).
 
-## 실행 환경 계약
+## Runtime environment contract
 
-`src/runtime/app-runtime.ts`는 앱을 import하기 전에 선택하는 전송·협업 provider·초기 인증·기준 경로·헤더 조작을 소유한다. 일반 실행은 기존 서버 연결을 사용한다. 데모의 `initialize.ts`는 메모리 저장소, `DemoWorkspaceStore`, HTTP adapter, 로컬 이벤트 채널과 협업 provider를 조합한다.
+`src/runtime/app-runtime.ts` owns transport, collaboration providers, initial authentication, base paths, and header manipulation selected before importing the app. Normal execution uses the existing server connection. The demo's `initialize.ts` combines in-memory storage, `DemoWorkspaceStore`, an HTTP adapter, a local event channel, and a collaboration provider.
 
-- `mewFetch`·`openMewSocket`은 선택한 runtime의 transport를 사용한다. 기존 `activeRemoteTransport`·`isRemoteMode`는 실제 P2P 연결만 의미한다. 데모를 원격 연결로 취급하지 않는다.
-- `EditorApi`·`EditorCollab`과 기존 에이전트 이벤트·Git 구독 계약을 공유한다. 데모 문서 방은 실제 Yjs 문서와 공통 편집기 스키마를 사용하며 서버 동기화 프로토콜을 흉내 내지 않는다.
-- 공통 Hotview는 `useEditor({ immediatelyRender: false })`로 React commit 이후 편집기를 생성한다. 지연 로딩·Suspense 재연결 중 폐기된 추측 렌더 인스턴스를 effect에서 다시 사용하지 않는다.
-- 이미지·다운로드처럼 DOM이 직접 여는 URL도 `appResourceUrl`을 경유한다. 데모는 가상 파일의 Blob URL이나 고정 커밋의 정적 리소스 URL을 제공하며, 만든 Blob URL은 리소스 종료 시 해제한다.
-- 실행 환경의 `basePath`가 프로젝트 URL 해석과 주소 정규화의 기준이다. 데모의 `/demo/`를 프로젝트 이름으로 해석하거나 `/`로 바꾸지 않는다.
-- 공통 UI에는 데모 조건을 흩어 넣지 않는다. 시작 시 환경을 선택하고, 기존 capability에 따라 제공 가능한 패널을 표시한다. 헤더의 `Demo`·초기화 버튼은 runtime이 제공한다.
-- 데모 방문자에게 모든 capability를 제공해 햄버거 메뉴·독·설정의 기능을 노출한다. 호스트가 필요한 기능도 같은 UI에서 더미 데이터로 체험한다. `desktopConnection` provider는 실제 연결 준비·WebRTC 생성 전에 선택하며, 일반 실행의 연결 경로는 유지한다.
+- `mewFetch` and `openMewSocket` use the selected runtime's transport. The existing `activeRemoteTransport` and `isRemoteMode` refer only to actual P2P connections. The demo is not treated as a remote connection.
+- Shares `EditorApi`, `EditorCollab`, and the existing agent event and Git subscription contracts. Demo document rooms use actual Yjs documents and the shared editor schema, without imitating the server synchronization protocol.
+- The shared Hotview creates the editor after the React commit using `useEditor({ immediatelyRender: false })`. Effects do not reuse speculative render instances discarded during lazy loading or Suspense reconnection.
+- URLs opened directly by the DOM, such as images and downloads, also go through `appResourceUrl`. The demo provides Blob URLs for virtual files or static resource URLs from the pinned commit, and revokes created Blob URLs when the resource lifecycle ends.
+- The runtime environment's `basePath` is the basis for project URL interpretation and address normalization. Do not interpret the demo's `/demo/` as a project name or replace it with `/`.
+- Do not scatter demo conditions throughout the shared UI. Select the environment at startup and display available panels according to existing capabilities. The runtime provides the header's `Demo` and reset button.
+- Demo visitors receive all capabilities, exposing features in the hamburger menu, dock, and settings. Features that require a host can also be tried with dummy data in the same UI. The `desktopConnection` provider is selected before actual connection preparation or WebRTC creation, while preserving the normal execution connection path.
 
-## 단일 가상 워크스페이스
+## Single virtual workspace
 
-`src/demo/workspace-store.ts`가 방문자 한 탭의 파일·폴더·설정·문서 DB·가상 Git 이력을 소유한다. `.workspace`는 현재 열린 가상 프로젝트의 루트이며 `docs`는 그 프로젝트의 `docs/` 하위 뷰다. HTTP 응답, 열린 편집기, 에이전트 수정과 Git 구독은 같은 상태를 읽는다.
+`src/demo/workspace-store.ts` owns the files, folders, settings, document DB, and virtual Git history for one visitor tab. `.workspace` is the root of the currently open virtual project, and `docs` is a view under that project's `docs/`. HTTP responses, open editors, agent edits, and Git subscriptions read the same state.
 
-| 기능 | 데모 동작 |
+| Feature | Demo behavior |
 | --- | --- |
-| 문서·코드 | 실제 편집·자동저장·탭·보기 전환, Files의 새 파일·폴더와 Documents의 새 문서·하위 문서 생성·이동·복사·이름 변경·삭제·검색 |
-| 태스크 | 예제 작업의 추가·수정·완료·삭제, 태그·색상·담당자·날짜·달력·간트와 Markdown 문서 열기 |
-| 프로젝트 | 폴더 생성·열기·전환, 프로젝트 추가·이름 변경·삭제·배치, 가상 Git 초기화·복제 |
-| 에이전트 | 기존 전송·대기·취소 UI와 이벤트 표시를 사용하고 예제 문서를 수정하는 응답 생성 |
-| 터미널 | 세션 생성·이름 변경·삭제·재연결, 작업 폴더·기록 유지와 파일·Git 명령을 로컬로 해석. 패키지 설치·개발·테스트 명령은 예제 출력 제공 |
-| Git | 같은 파일에서 변경·diff·선택 커밋·이력·되돌리기를 계산. 실제 Git 저장소는 변경하지 않음 |
-| 문서 DB·댓글·채팅 | 방문자별 메모리의 예제 데이터와 기존 UI 사용 |
-| 원격 데스크톱 | 960×600 가상 화면 두 개, 키보드·붙여넣기·가상 클립보드·포인터 입력, 화면 선택·회전·설정 UI 사용 |
-| 시스템 자원 | 더미 CPU·메모리·GPU·온도·프로세스 값과 시간에 따라 변하는 그래프 |
-| Android | SDK·가상 기기 상태, 로컬 HTML 휴대전화의 홈·메모·설정, 가상 명령 실행과 터미널 출력 |
-| 예약 작업 | 예제 주기·프롬프트 편집·추가·삭제와 실행 기록, 가상 터미널·예약 프롬프트의 메모리 상태 변경 |
-| 업데이트·명령어 | 더미 버전·완료 상태·실행 로그, 명령어 버튼과 에이전트 런타임 설치·삭제·로그아웃을 모의 처리 |
-| 계정 관리·Mewlink | 예제 계정·기능·파일 권한 변경, 예제 접근 요청 승인·거절·연결 해제와 기기 등록 상태 변경 |
-| 디버거 | 가상 스택·변수·감시식·중단점·단계 실행·계속·일시정지, 설정의 메모리 저장 |
+| Documents and code | Actual editing, autosave, tabs, and view switching; creating new files and folders in Files; creating, moving, copying, renaming, deleting, and searching documents and subdocuments in Documents |
+| Tasks | Adding, editing, completing, and deleting example tasks; tags, colors, assignees, dates, calendar, Gantt, and opening Markdown documents |
+| Projects | Creating, opening, and switching folders; adding, renaming, deleting, and arranging projects; initializing and cloning virtual Git repositories |
+| Agent | Uses the existing send, wait, and cancel UI and event display, and generates responses that modify example documents |
+| Terminal | Creating, renaming, deleting, and reconnecting sessions; preserving working directories and history; interpreting file and Git commands locally. Package installation, development, and test commands provide example output |
+| Git | Computes changes, diffs, selective commits, history, and reverts from the same files. Does not modify actual Git repositories |
+| Document DB, comments, and chat | Uses example data in per-visitor memory and the existing UI |
+| Remote desktop | Two 960×600 virtual screens; keyboard, paste, virtual clipboard, and pointer input; screen selection, rotation, and settings UI |
+| System resources | Dummy CPU, memory, GPU, temperature, and process values, with graphs that change over time |
+| Android | SDK and virtual device status; Home, Notes, and Settings on a local HTML phone; virtual command execution and terminal output |
+| Scheduled tasks | Editing, adding, and deleting example schedules and prompts, execution history, and in-memory state changes from the virtual terminal and scheduled prompts |
+| Updates and commands | Dummy versions, completion status, and execution logs; simulates command buttons and agent runtime installation, removal, and logout |
+| Account management and Mewlink | Changing example account, feature, and file permissions; approving, rejecting, and disconnecting example access requests; changing device registration status |
+| Debugger | Virtual stacks, variables, watch expressions, breakpoints, stepping, continue, and pause; in-memory settings storage |
 
-파일 목록과 원문은 고정한 Mew 커밋에서 만들며 실제 사용자 계정·인증정보를 포함하지 않는다. 에이전트 응답과 터미널 명령은 외부 모델·CLI에 연결하지 않는다. 미구현 API·소켓은 명시적으로 실패하며 실제 서버로 fallback하지 않는다.
+The file list and original content are generated from a pinned Mew commit and contain no actual user accounts or credentials. Agent responses and terminal commands do not connect to external models or CLIs. APIs and sockets that are not implemented fail explicitly and do not fall back to the actual server.
 
-### 호스트 기능의 체험 범위
+### Scope of host feature demos
 
-`http-host.ts`·`host-fixtures.ts`는 시스템·Android·예약·업데이트·기기 등록의 더미 응답을 소유한다. `http-admin.ts`·`http-debugger.ts`는 관리자와 디버거의 가상 상태를 소유한다. 실행 결과에는 Demo·시뮬레이션 표기를 사용한다. 예약 시간에 실제 프로세스를 실행하거나 OS·crontab·계정·방화벽·설치 상태를 변경하지 않는다. 관리자 화면의 권한 편집은 예제 계정 상태에만 적용하며 데모 방문자의 전체 기능 체험 권한은 유지한다.
+`http-host.ts` and `host-fixtures.ts` own dummy responses for system resources, Android, scheduling, updates, and device registration. `http-admin.ts` and `http-debugger.ts` own virtual admin and debugger state. Execution results use Demo and simulation labels. They do not run actual processes at scheduled times or change the OS, crontab, accounts, firewall, or installation state. Permission edits in the admin screen apply only to example account state, while demo visitors retain access to try all features.
 
-`desktop.ts`는 Canvas로 화면을 그리고 공통 `desktopInput`의 입력을 로컬 메모와 포인터에 적용한다. 실제 화면 캡처·외부 미디어·설치 자산·원격 소켓·WebRTC를 사용하지 않는다. `VideoFrame`을 지원하지 않는 브라우저에서는 같은 Canvas의 로컬 스트림을 표시한다. 프레임은 그린 즉시 해제하고 닫기·초기화·페이지 종료 시 타이머·스트림 트랙·연결을 정리한다. 영상 해상도·FPS 설정은 기존 UI를 체험하며 가상 화면 크기와 실제 전송 품질은 바꾸지 않는다.
+`desktop.ts` draws screens with Canvas and applies input from the shared `desktopInput` to local notes and pointers. It does not use actual screen capture, external media, installed assets, remote sockets, or WebRTC. Browsers that do not support `VideoFrame` display a local stream from the same Canvas. Frames are released immediately after drawing, and timers, stream tracks, and connections are cleaned up on close, reset, or page exit. Video resolution and FPS settings let visitors try the existing UI without changing virtual screen dimensions or actual transmission quality.
 
-Android 화면은 외부 리소스·스크립트 없는 Blob HTML이다. 앱 CSP의 `frame-src blob:`만 허용하고 외부 프레임은 계속 막는다. SDK·게이트웨이 주소를 바꿔도 실제 주소에 접속하지 않는다. 원격 기기 등록은 예제 주소만 보여 주며 실제 접속 주소를 발급하지 않는다. 서버 브라우저의 실제 로그인·로컬 포트 서비스 실행·고급 디버그 어댑터 요청은 실행할 수 없다. 관련 기능은 기존 설정·권한·도구에 노출하고, 미구현 요청에는 체험 범위를 알리는 오류를 반환한다.
+The Android screen is Blob HTML without external resources or scripts. The app CSP permits only `frame-src blob:` and continues to block external frames. Changing SDK or gateway addresses does not connect to actual addresses. Remote device registration shows only example addresses and does not issue actual connection addresses. Actual server-browser login, running local port services, and advanced debug adapter requests cannot be executed. Related features are exposed in existing settings, permissions, and tools, and requests that are not implemented return errors explaining the demo's scope.
 
-### 전체 파일 목록과 요청 시 본문 로딩
+### Full file list and on-demand body loading
 
-탐색기는 고정한 공개 Mew 커밋의 파일을 보여 준다. 처음 화면에는 `src/demo/repository-index.json`의 경로·크기·형식·본문 식별자와 `repository-snapshot.json`의 작은 텍스트 사본을 준비한다. `fixtures.ts`는 이 사본에 데모 안내인 `docs/welcome.md`를 추가한다. 파일·폴더 목록과 파일명 검색은 목록만 사용하며 본문을 내려받지 않는다. 선택 근거는 [ADR 0027](../decisions/0027-demo-lazy-repository.md)에 기록한다.
+The explorer shows files from a pinned public Mew commit. The initial screen is prepared with paths, sizes, types, and body identifiers from `src/demo/repository-index.json` and a small text copy from `repository-snapshot.json`. `fixtures.ts` adds the demo guide `docs/welcome.md` to this copy. File and folder listings and filename searches use only the index and do not download bodies. The rationale is recorded in [ADR 0027](../decisions/0027-demo-lazy-repository.md).
 
-작은 사본은 README·[보안 기준본](../../../docs/operations/security.md)·사용법·기능·태스크와 공통 코드 등 기존 체험을 바로 시작하는 데 필요한 파일을 담는다. 나머지 텍스트·이미지·첨부는 열 때 같은 데모 origin의 `/demo/repository/` 정적 파일에서 불러온다. 텍스트 본문은 SHA-256 식별자의 JSON으로 제공하고, 미디어는 기존 뷰어가 읽을 수 있는 별도 정적 리소스로 제공한다. GitHub·실제 Mew API·호스트 파일 시스템에 접속하지 않는다. 웰컴 문서에는 기준 커밋, 추가 본문의 요청 시 로딩, 변경 내용이 영구 저장되지 않는다는 안내를 표시한다.
+The small copy contains files needed to start the existing demo immediately, including the README, [security canonical source](../../../docs/operations/security.md), usage guides, features, tasks, and shared code. Other text, images, and attachments are loaded when opened from `/demo/repository/` static files on the same demo origin. Text bodies are served as JSON identified by SHA-256, and media is served as separate static resources readable by existing viewers. It does not access GitHub, actual Mew APIs, or the host file system. The welcome document displays the reference commit, explains on-demand loading of additional bodies, and states that changes are not saved permanently.
 
-`tools/demo-snapshot.mjs`는 Git의 지정 커밋에서 파일 목록과 blob을 읽어 목록·사본을 갱신한다. 작업 트리·stage·미추적 파일의 내용을 읽거나 바꾸지 않는다. 공개 코드·문서·미디어와 커밋된 숨김 설정·history·research·vendor를 포함한다. 실제 비밀 설정·개인 데이터·비공개 중앙 코드·실행 중 생성한 데이터와 의존성·빌드 산출물, 자동 생성 목록 자체는 제외한다. 태스크 담당자 계정은 본문을 제공하기 전에 제거하고 나머지 속성과 본문은 보존한다. Git에서 추적하지 않는 로컬 파일은 목록에도 들어가지 않는다.
+`tools/demo-snapshot.mjs` reads the file list and blobs from the specified Git commit to update the index and copy. It does not read or modify content in the working tree, staging area, or untracked files. It includes public code, documents, media, and committed hidden settings, history, research, and vendor files. It excludes actual secret settings, personal data, private central code, runtime-generated data, dependencies, build artifacts, and the generated index itself. Task assignee accounts are removed before bodies are served; other properties and bodies are preserved. Local files not tracked by Git are also excluded from the index.
 
-초기 텍스트 사본의 상한은 원문 768KiB·gzip 160KiB, 전체 파일 목록의 상한은 원문 512KiB·gzip 128KiB다. 기능 문서는 파일당 16KiB, 태스크는 8KiB, 명시한 진입 파일 등도 최대 48KiB만 포함한다. 파일을 중간에서 잘라 넣지 않으며 예산 초과 시 생성에 실패한다. 전체 파일의 본문 크기는 초기 전송량에 합산하지 않는다. 목록·사본의 크기와 실제 앱 번들 전체의 전송 크기는 구분한다.
+The initial text copy is limited to 768KiB uncompressed and 160KiB gzipped; the full file index is limited to 512KiB uncompressed and 128KiB gzipped. Feature documents are limited to 16KiB per file, tasks to 8KiB, and specified entry files and similar files to at most 48KiB. Files are not truncated, and generation fails if a budget is exceeded. The body sizes of all files are not added to the initial transfer size. Index and copy sizes are distinguished from the transfer size of the entire actual app bundle.
 
-커밋 `a7bae991`의 생성 결과는 초기 사본 111개·JSON 545,068바이트·gzip 159,640바이트, 목록 2,003개·JSON 286,318바이트·gzip 104,419바이트다. 전체 본문은 약 30.1MB지만 첫 진입에 합쳐 받지 않는다. 목록은 경로·크기 외에 검증용 SHA-256 등을 포함하므로 gzip 약 102KiB가 추가된다. 이 값은 생성 JSON의 압축 크기이며 실제 배포 번들·브라우저 전송 실측은 아니다.
+Generation from commit `a7bae991` produced an initial copy of 111 files, 545,068 bytes of JSON, and 159,640 bytes gzipped, and an index of 2,003 files, 286,318 bytes of JSON, and 104,419 bytes gzipped. All bodies total about 30.1MB but are not downloaded together on initial entry. The index includes verification data such as SHA-256 in addition to paths and sizes, adding about 102KiB gzipped. These values are compressed sizes of the generated JSON, not measurements of actual deployment bundles or browser transfers.
 
-요청한 본문은 탭 안의 8MiB LRU 캐시에서 재사용한다. 이 상한은 원문의 UTF-8·바이너리 바이트 합계이며 브라우저 전체의 메모리 사용량을 제한하는 값은 아니다. 캐시에서 내보낸 원문은 다시 열 때 불러오며, 편집 내용·가상 Git 이력은 별도 상태로 유지한다. 본문 로딩이나 캐시 정리만으로 파일의 수정 시각·Git 상태가 바뀌지 않는다. 새로고침·초기화·로그아웃·종료 시 편집과 앱의 메모리 캐시는 사라진다. 모든 파일을 미리 불러오거나 IndexedDB 본문 캐시를 열지 않는다. 공개 정적 자산의 브라우저 HTTP 캐시는 앱의 편집·설정 저장소와 별개다.
+Requested bodies are reused from an 8MiB LRU cache within the tab. This limit is the sum of original UTF-8 and binary bytes, not a limit on total browser memory usage. Original content evicted from the cache is loaded again when reopened, while edits and virtual Git history are maintained as separate state. Body loading or cache cleanup alone does not change file modification times or Git status. Edits and the app's in-memory cache disappear on refresh, reset, logout, or exit. It does not preload all files or open an IndexedDB body cache. The browser HTTP cache for public static assets is separate from the app's edit and settings storage.
 
-편집한 파일은 원문과 비교하는 데 필요한 내용을 별도로 보존한다. 원문을 받기 전에 덮어쓴 파일의 diff를 열거나 원래 내용으로 되돌린 뒤 LRU에서 원문을 내보내도 Git 상태가 바뀌지 않는다. 협업 편집에서도 되돌린 원문을 재사용하며 빈 본문으로 대체하지 않는다.
+Edited files separately preserve the content needed for comparison with the original. Git status remains unchanged when opening a diff for a file overwritten before its original content was received, or when evicting the original from the LRU after reverting to it. Collaborative editing also reuses the restored original rather than replacing it with an empty body.
 
-전체 내용 검색과 폴더 다운로드는 사용자가 실행한 범위의 파일을 최대 6개씩 요청하고 취소 신호를 전달한다. 같은 원문을 여러 작업이 기다리면 요청을 공유하며 마지막 대기자가 취소할 때 전송도 중단한다. 내용 검색은 바이너리·2MB 초과 파일을 제외하고 최대 100개 파일·1,000개 일치 줄을 반환한다. 폴더 다운로드는 선택 범위의 본문 합계 64MiB까지 허용하며 바이너리도 ZIP에 보존한다. 큰 범위의 검색·다운로드는 해당 동작 중 많은 데이터를 받을 수 있지만 초기 진입이나 파일명 검색에서 시작하지 않는다.
+Full-content search and folder downloads request files within the user-selected scope in batches of up to 6 and propagate cancellation signals. When multiple operations await the same original content, they share the request, and the transfer stops when the last waiter cancels. Content search excludes binary files and files larger than 2MB, returning at most 100 files and 1,000 matching lines. Folder downloads allow up to 64MiB of total body content in the selected scope and preserve binary files in the ZIP. Searches and downloads over large scopes may receive substantial data during those operations, but do not start on initial entry or filename search.
 
-정적 원문을 참조하는 단일 파일의 다운로드는 정적 URL을 바로 사용해 앱의 본문 캐시에 넣지 않는다. 초기 사본·편집한 파일과 폴더 ZIP은 다운로드 동작 때 Blob URL을 만들고 다운로드 시작 1초 뒤 해제한다. 시작 후 해제 경로를 거치지 못한 URL도 생성 60초 뒤 만료되며 초기화·종료는 남은 URL과 타이머를 모두 정리한다.
+Downloads of individual files referencing static originals use static URLs directly without adding content to the app's body cache. Downloads of the initial copy, edited files, and folder ZIPs create Blob URLs at download time and revoke them 1 second after download starts. URLs that miss the post-start revocation path also expire 60 seconds after creation, and reset or exit cleans up all remaining URLs and timers.
 
-기능 패널과 전용 API·실행 대역은 [제거 결정](../decisions/0065-remove-feature-panel.md)에 따라 제공하지 않는다. 현재 공개 파일 목록의 증가를 반영해 목록의 gzip 상한을 128KiB로 조정했다. 초기 사본의 압축 예산을 유지하기 위해 선택 필드 구현 예제는 요청 시 원문 로딩으로 제공한다.
+The feature panel and its dedicated APIs and execution substitutes are not provided, in accordance with the [removal decision](../decisions/0065-remove-feature-panel.md). The index's gzip limit was adjusted to 128KiB to reflect growth in the current public file list. To maintain the initial copy's compression budget, the selection-field implementation example is provided through on-demand original-content loading.
 
-목록·사본 갱신은 다음 명령으로 수행한다. 앱 빌드·서버 실행·배포는 하지 않는다. 배포 전 기준 커밋·제외 영역·용량과 변경 차이를 검토하고 생성 파일을 함께 커밋한다.
+Update the index and copy with the following commands. They do not build the app, run a server, or deploy. Before deployment, review the reference commit, exclusions, sizes, and changes, and commit the generated files together.
 
 ```bash
 node tools/demo-snapshot.mjs
 node --test tools/demo-snapshot.test.mjs src/demo/fixtures.test.ts
 ```
 
-태스크 패널은 같은 가상 파일의 실제 Markdown을 읽는다. 작은 초기 사본을 재사용하고 부족한 해당 문서 폴더의 본문만 요청한다. 원래 완료 상태·태그·일정을 사용하며 체험 날짜에 맞춘 가상 작업을 만들지 않는다. 패널을 여는 동작만으로 전체 저장소의 본문을 받지 않는다. 수정한 속성·본문은 같은 가상 파일과 패널·Git에 반영되고, 새로고침·초기화·종료하면 사라진다. 문서 DB의 기본 표도 이 태스크에서 만든 별도 편집 사본이며 원본 태스크나 실제 DB에 쓰지 않는다.
+The task panel reads actual Markdown from the same virtual files. It reuses the small initial copy and requests only missing bodies from the relevant document folder. It uses original completion states, tags, and schedules without creating virtual tasks adjusted to the demo date. Opening the panel alone does not download bodies for the entire repository. Modified properties and bodies are reflected in the same virtual files, panels, and Git, and disappear on refresh, reset, or exit. The document DB's default table is also a separate editable copy made from these tasks and does not write to the original tasks or actual DB.
 
-`fixtures.test.ts`는 사본에 웰컴 문서만 추가하는지, 용량 예산·문서 속성·웰컴 링크·계정 제외·방문자 격리·초기화·새 프로젝트 시딩을 검사한다. `tools/demo-snapshot.test.mjs`는 격리한 Git 저장소에서 목록·원문 생성과 미커밋 내용·제외 영역의 차단을 확인한다. 가상 터미널의 설치·개발·테스트 명령과 에이전트 응답은 체험용이며 실제 Mew를 실행하거나 변경하지 않는다.
+`fixtures.test.ts` checks that only the welcome document is added to the copy, along with size budgets, document properties, welcome links, account exclusion, visitor isolation, reset, and new-project seeding. `tools/demo-snapshot.test.mjs` verifies index and original-content generation and the exclusion of uncommitted content and excluded areas in an isolated Git repository. Installation, development, and test commands in the virtual terminal and agent responses are for demonstration and do not run or modify actual Mew.
 
-Documents는 일반 파일 생성 API와 별도로 `/api/docs/pages/*`를 사용한다. 데모도 이 계약을 처리하며, 하위 문서 추가·삭제에 따른 대표 문서 전환과 문서 링크 변경을 같은 가상 파일에 반영한다. 기능·태스크 문서는 저장소 사본과 함께 초기 파일로 시딩하므로 패널을 열기만 해서는 Git 변경이 생기지 않는다. 기능 요청은 더미 결과를 즉시 완료하고 기능 문서를 추가하거나 갱신한다. 태스크 속성 변경은 `.mew/tasks/`의 YAML과 본문을 보존하며 저장한다.
+Documents uses `/api/docs/pages/*` separately from the general file creation API. The demo also handles this contract, reflecting representative-document switching and document link changes caused by adding or deleting subdocuments in the same virtual files. Feature and task documents are seeded as initial files along with the repository copy, so merely opening a panel does not create Git changes. Feature requests immediately complete with dummy results and add or update feature documents. Task property changes are saved while preserving the YAML and body in `.mew/tasks/`.
 
-새 프로젝트는 `/demo/mew-playground` 아래의 가상 폴더다. 빈 폴더를 열거나 가상 저장소를 복제하면 같은 Mew 파일 목록·작은 사본과 웰컴 문서를 준비한다. 프로젝트를 전환해도 각 루트의 파일·화면·태스크·기능·문서 DB 상태를 유지한다. Git 변경·이력은 방문자의 전체 가상 파일을 함께 추적한다. 복제 URL은 예제 메타데이터로만 저장하고 원격 저장소에 접속하지 않는다.
+New projects are virtual folders under `/demo/mew-playground`. Opening an empty folder or cloning a virtual repository prepares the same Mew file index, small copy, and welcome document. Switching projects preserves each root's files, screens, tasks, features, and document DB state. Git changes and history track all of the visitor's virtual files together. Clone URLs are stored only as example metadata, without connecting to remote repositories.
 
-가상 터미널의 `pwd`, `cd`, `ls`, `cat`, `touch`, `mkdir`, `echo`의 파일 출력, `cp`, `mv`, `rm` 등은 같은 가상 파일을 조회·수정한다. `cat`·`head`·`tail`·`wc`·추가 출력·Git diff는 읽을 파일만 요청하며, `ls`와 기존 파일의 `touch`는 본문을 받거나 덮어쓰지 않는다. 여러 파일을 읽을 때는 각 본문을 받은 뒤 결과를 확보해 원문 캐시에서 내보내도 출력을 잃지 않는다. 로딩 중 다음 명령은 순서대로 대기하며 Ctrl+C·초기화·세션 종료는 대기 중 실행과 뒤따를 파일 쓰기를 취소한다.
+The virtual terminal's `pwd`, `cd`, `ls`, `cat`, `touch`, `mkdir`, file output from `echo`, `cp`, `mv`, `rm`, and similar operations query and modify the same virtual files. `cat`, `head`, `tail`, `wc`, appended output, and Git diff request only files they need to read, while `ls` and `touch` on existing files neither fetch nor overwrite bodies. When reading multiple files, results are retained after each body is received so output is not lost even if originals are evicted from the cache. Subsequent commands wait in order during loading, and Ctrl+C, reset, or session termination cancels pending execution and subsequent file writes.
 
-변경 결과는 탐색기·편집기·Git에 이어진다. 셸 입력과 명령 기록은 세션에 남고, OS 셸·패키지 관리자·개발 서버를 실행하거나 명령에 포함된 외부 네트워크 요청을 보내지 않는다.
+Changes propagate to the explorer, editor, and Git. Shell input and command history remain in the session. It does not run an OS shell, package manager, or development server, or send external network requests included in commands.
 
-계정 테마의 `GET/PUT /api/user-ui/theme`도 방문자별 `DemoWorkspaceStore`에 저장하며 조건부 첫 이관과 presence의 `theme` 신호를 제공한다. 실제 계정이나 서버 저장소에 기록하지 않는다. 브라우저 설정·초안·캐시는 `setBrowserStorageScope`의 메모리 backend를 사용한다. 전역 테마·글꼴·단축키와 sessionStorage의 휴식 진행·창 식별자도 메모리에 격리하며 IndexedDB 영속 캐시는 열지 않는다. 새로고침·초기화·로그아웃·탭 종료 후 새 fixture로 시작한다. 실제 사용 환경의 브라우저 저장소는 읽거나 정리하지 않는다. BFCache로 잠시 보관된 페이지는 닫지 않아 뒤로가기 복원 후에도 작동한다. 공통 저장소 계약은 [브라우저 저장소](browser-storage.md#데모의-메모리-저장소)를 따른다.
+The account theme's `GET/PUT /api/user-ui/theme` is also stored in each visitor's `DemoWorkspaceStore`, providing conditional initial migration and the `theme` presence signal. It does not write to actual accounts or server storage. Browser settings, drafts, and caches use the in-memory backend of `setBrowserStorageScope`. Global themes, fonts, shortcuts, and sessionStorage break progress and window identifiers are also isolated in memory, and persistent IndexedDB caches are not opened. Refresh, reset, logout, or tab closure starts a new fixture. Browser storage from actual use is neither read nor cleared. Pages temporarily retained in BFCache are not closed, so they continue working after restoration through back navigation. The shared storage contract follows [Browser storage](browser-storage.md#demo-memory-storage).
 
-## mew.run/demo와 배포 경계
+## mew.run/demo and deployment boundaries
 
-공개 중앙 경로 `https://mew.run/demo`는 로그인 없이 `APP_ORIGIN/demo/`의 데모 앱을 iframe으로 연다. 중앙 로그인 origin과 실행 앱 origin을 분리하며, 데모 앱에는 실제 Mew 호스트의 P2P 연결·인증 자료를 제공하지 않는다. `demo`는 사용자 이름 예약명이며 기존 사용자 이름·별칭 점유가 발견되면 배포를 중단한다. 기존 계정의 주소를 자동 변경하지 않는다.
+The public central route `https://mew.run/demo` opens the demo app at `APP_ORIGIN/demo/` in an iframe without login. The central login origin is separate from the running app origin, and the demo app receives no P2P connection or authentication material for actual Mew hosts. `demo` is a reserved username, and deployment stops if an existing username or alias occupies it. Existing account addresses are not changed automatically.
 
-공개 `shared/mewlink-demo.ts`가 라우팅·정적 경로·CSP·예약명 검사를 소유한다. Git에서 제외된 중앙 `mewlink/src/worker.ts`·`username.ts`가 이를 연결하고, `scripts/deploy.mjs`·`package.json`이 데모 배포 흐름을 연결한다. 중앙 사본을 옮길 때는 이 비공개 연결도 함께 보존해야 한다. 공개 저장소의 커밋에 중앙 원본이나 패치를 넣지 않는다.
+The public `shared/mewlink-demo.ts` owns routing, static paths, CSP, and reserved-name checks. The Git-excluded central `mewlink/src/worker.ts` and `username.ts` connect it, while `scripts/deploy.mjs` and `package.json` connect the demo deployment flow. These private integrations must also be preserved when moving the central copy. Do not include central source files or patches in public repository commits.
 
-`vite.demo.config.ts`는 일반 서버 플러그인 없이 공통 UI의 데모 진입점을 `dist-demo/`로 빌드한다. `tools/demo-repository-plugin.mjs`는 목록의 고정 커밋에서 원문 객체를 읽고 파일별 정적 산출물을 함께 담는다. 원문 해시·크기·형식이 목록과 다르면 실패한다. 개발 서버에서도 같은 생성기를 사용하며 작업 트리의 파일로 대체하지 않는다.
+`vite.demo.config.ts` builds the shared UI's demo entry point into `dist-demo/` without normal server plugins. `tools/demo-repository-plugin.mjs` reads original objects from the index's pinned commit and includes per-file static artifacts. It fails if original hashes, sizes, or types differ from the index. The development server uses the same generator and does not substitute working-tree files.
 
-중앙 배포는 데모 산출물을 중앙 `dist/demo/`에 복사하고 `demo.html`을 `index.html`로 바꾼다. `tools/demo-distribution.mjs`는 빌드 전후의 소스 해시와 원문 파일을 포함한 산출물 manifest를 확인한다. 오래되거나 변경된 산출물의 배포는 실패한다. Mew UI 수정 후 중앙 데모 배포까지 완료해야 공개 화면이 갱신된다.
+Central deployment copies demo artifacts to the central `dist/demo/` and renames `demo.html` to `index.html`. `tools/demo-distribution.mjs` checks source hashes before and after the build and the artifact manifest, including original-content files. Deployment fails for stale or modified artifacts. After modifying the Mew UI, central demo deployment must also be completed to update the public screen.
 
-아래 명령은 사용자가 실행한다. 에이전트는 앱 빌드·서버 실행·배포를 수행하지 않는다.
+The user runs the commands below. The agent does not build the app, run a server, or deploy.
 
 ```bash
 # 데모 전용 개발 서버: 기존 Mew 서버·API를 띄우지 않음
@@ -119,19 +119,19 @@ npm run build:demo
 npm --prefix mewlink run deploy
 ```
 
-실제 운영 반영은 [중앙 배포](../operations/remote-central.md)를 따른다. 소스 변경과 로컬 격리 테스트 통과는 공개 서비스 배포 완료를 의미하지 않는다.
+Actual production rollout follows [Central deployment](../operations/remote-central.md). Source changes and passing local isolated tests do not mean deployment to the public service is complete.
 
-## 검증과 유지보수
+## Validation and maintenance
 
-`src/demo/`의 fixture·store·transport·실시간·협업·저장소 테스트는 실제 Mew 사본의 범위·용량과 웰컴 링크, 파일 저장과 Git 변경의 일관성, Documents의 문서 조작, 기능·태스크의 문서 동기화, 프로젝트 전환·상태 보존, 터미널 명령·세션 수명과 외부 요청 차단을 검사한다. `src/demo/demo.browser.test.ts`는 서버 없이 실제 공통 작업 화면을 Chromium에 올려 PC·모바일의 조작을 검증한다. 일반 앱 번들이나 실행 중인 서버는 변경하지 않는다.
+The fixture, store, transport, real-time, collaboration, and storage tests in `src/demo/` check the scope and size of the actual Mew copy and welcome links, consistency between file saves and Git changes, document operations in Documents, feature and task document synchronization, project switching and state preservation, terminal commands and session lifecycles, and blocking external requests. `src/demo/demo.browser.test.ts` loads the actual shared workspace UI in Chromium without a server to validate desktop and mobile interactions. It does not modify the normal app bundle or running servers.
 
-이 브라우저 검사의 `server/demo-repository-fixture.mjs`는 snapshot revision이 로컬 Git에 있으면 원래 Git-tree 검증 생성기를 먼저 사용한다. 고정 revision 객체가 없는 checkout에서만 체크인된 index·초기 사본의 정확한 SHA와 원래 크기 상한을 확인하고, 등록된 기본 checkout의 공개 `dist/demo` 또는 `mewlink/dist/demo` 자료를 읽는다. 모든 본문의 content-address·크기·binary 형식과 초기 사본의 일치를 확인한 뒤 메모리에서 제공한다. 다른 revision 부재·변조·자료 부재는 실패하며 네트워크에서 내려받거나 snapshot을 재생성하지 않는다. 이 경로는 고정 공개 데이터의 무결성 검증이며 원래 Git tree 검증을 통과한 것으로 표현하지 않는다. 실제 UI는 현재 소스로 메모리에서 컴파일하고 과거 공개 JS를 실행하지 않는다.
+For this browser check, `server/demo-repository-fixture.mjs` first uses the original Git-tree validation generator if the snapshot revision exists in local Git. Only in checkouts lacking the pinned revision object does it verify the exact SHAs and original size limits of the checked-in index and initial copy, then read public `dist/demo` or `mewlink/dist/demo` materials from the registered primary checkout. It verifies every body's content address, size, binary format, and consistency with the initial copy before serving it from memory. Missing other revisions, tampering, or missing materials cause failure; it neither downloads from the network nor regenerates the snapshot. This path verifies the integrity of pinned public data and is not described as passing the original Git tree validation. The actual UI is compiled in memory from current source and does not execute historical public JS.
 
-데모 host 흐름은 계정 관리의 Mewlink 접근 요청에서 예제 방문자의 승인·거절 버튼을 확인하고, 기기명은 소유자 메뉴의 별도 Mewlink 설정에서 확인한다. 서로 다른 API의 예제 값을 같은 대화상자에서 찾지 않는다. 고정 자료의 생성·용량 검사는 원래 snapshot 도구와 별도 회귀가 계속 소유한다.
+The demo host flow checks the example visitor's approve and reject buttons in account management's Mewlink access requests, and checks the device name in the separate Mewlink settings in the owner menu. Do not look for example values from different APIs in the same dialog. The original snapshot tools and separate regression tests continue to own generation and size checks for pinned materials.
 
-`host.test.ts`는 전체 capability, 더미 자원·예약·업데이트·관리자·디버거의 상태 변경·방문자 격리·초기화, Android Blob 해제와 가상 실행 로그를 검사한다. `server/demo-host-browser-flow.ts`는 PC·모바일에서 햄버거 메뉴 전체 노출, 자원 팝업·가상 데스크톱 입력·설정·예약 실행·관리자·Android 메모 조작을 공통 브라우저 검사에 연결한다.
+`host.test.ts` checks all capabilities, state changes for dummy resources, schedules, updates, admin, and debugger, visitor isolation, reset, Android Blob revocation, and virtual execution logs. `server/demo-host-browser-flow.ts` integrates full hamburger-menu visibility, resource popups, virtual desktop input, settings, scheduled execution, admin, and Android note operations on desktop and mobile into the shared browser check.
 
-`server/mewlink-demo.test.ts`는 두 origin의 라우팅·정적 경로·CSP·예약명 충돌을 검사한다. `tools/demo-distribution.test.mjs`는 임시 산출물과 주입한 빌드 함수를 사용하며 실제 앱 빌드·배포를 실행하지 않는다. 비공개 중앙의 `test/demo.test.ts`·`username.test.ts`도 연결 변경 시 검사한다.
+`server/mewlink-demo.test.ts` checks routing, static paths, CSP, and reserved-name conflicts across both origins. `tools/demo-distribution.test.mjs` uses temporary artifacts and an injected build function without running actual app builds or deployments. The private central `test/demo.test.ts` and `username.test.ts` are also checked when integrations change.
 
 ```bash
 npx tsc -b
@@ -140,14 +140,14 @@ npm run lint
 npm run check:docs
 ```
 
-공통 인터페이스가 바뀌면 데모 구현·예제·검증을 같은 작업에서 갱신한다. 서버 API를 직접 호출하거나 새 WebSocket을 생성하는 기능을 추가할 때는 runtime 경계를 경유하는지도 확인한다.
+When shared interfaces change, update the demo implementation, examples, and validation in the same work. When adding features that call server APIs directly or create new WebSockets, also verify that they go through the runtime boundary.
 
-2026-10-19에 데모·기존 원격 연결·저장소·인증 시작·편집기 회귀 133개를 순차 실행해 통과했다. 실제 공통 화면의 1440px·390px 검사에서 편집·가상 에이전트·Git·초기화, 실제 API·WebSocket 요청 없음, 기존 브라우저 저장소 보존을 확인했다. 중앙의 모의 Workers 검사도 통과했으며 공개 서비스 빌드·배포·실제 외부 접속은 실행하지 않았다.
+On 2026-10-19, 133 demo, existing remote connection, storage, authentication startup, and editor regression tests were run sequentially and passed. Checks of the actual shared screen at 1440px and 390px verified editing, the virtual agent, Git, reset, the absence of actual API and WebSocket requests, and preservation of existing browser storage. Central mock Workers checks also passed; no public-service build, deployment, or actual external connection was performed.
 
-2026-10-20에는 데모·중앙 라우팅·배포 산출물 모의 검사 70개와 공통 화면 브라우저 검사 3개가 통과했다. 1440px·390px에서 새 문서·새 파일 편집과 저장·Git 반영, 터미널 명령·탭·작업 폴더 유지, 기능 제목 변경·문서 열기, 태스크 완료·태그·일정·문서·달력·간트·추가, 새 프로젝트 생성·원래 프로젝트 복귀·초기화를 확인했다. API 실패·외부 요청·실제 WebSocket 연결은 없었다. 타입·린트·문서 검사도 통과했으며, 린트에는 이번 변경 밖의 기존 경고가 남아 있다. 공개 서비스 빌드·배포는 실행하지 않았다.
+On 2026-10-20, 70 mock checks for the demo, central routing, and deployment artifacts and 3 shared-screen browser checks passed. At 1440px and 390px, checks verified new documents, editing and saving new files and reflecting them in Git, terminal commands, tab and working-directory preservation, feature title changes and document opening, task completion, tags, schedules, documents, calendar, Gantt, and task creation, as well as new-project creation, returning to the original project, and reset. There were no API failures, external requests, or actual WebSocket connections. Type, lint, and documentation checks also passed, with preexisting lint warnings outside this change remaining. No public-service build or deployment was performed.
 
-같은 날 호스트 기능 확장 후 데모 검사 83개와 기존 런타임·데스크톱 준비·입력 회귀 검사 31개가 통과했다. PC·모바일에서 전체 메뉴, 자원·가상 데스크톱 입력·예약 실행·업데이트 목록·계정 관리·Mewlink·Android 메모·디버거 단계 실행을 확인했다. 모바일에서는 `VideoFrame`이 없는 경우의 Canvas 스트림과 닫은 뒤 트랙 종료도 검사했다. 실제 API 실패·외부 요청·WebSocket·WebRTC 연결, 기존 브라우저 저장소 변경은 없었다. 타입·린트·문서 검사도 통과했으며 앱 빌드·배포는 실행하지 않았다.
+After the host feature expansion on the same day, 83 demo checks and 31 existing runtime, desktop preparation, and input regression checks passed. Checks on PC and mobile covered all menus, resources, virtual desktop input, scheduled execution, update lists, account management, Mewlink, Android notes, and debugger stepping. Mobile checks also covered the Canvas stream when `VideoFrame` is unavailable and track termination after closing. No actual API failures, external requests, WebSocket or WebRTC connections, or changes to existing browser storage occurred. Type, lint, and documentation checks also passed; no app build or deployment was run.
 
-2026-10-20 전체 파일 로딩 확장 후 위 데모·중앙 라우팅·사본 생성·배포 산출물 검사 115개가 모두 통과했다. 실제 공통 화면의 1440px PC·390px 모바일에서 1,900개가 넘는 파일 목록, 첫 진입의 추가 원문 요청 0건, `server/serve.ts` 첫 열기의 요청 1건과 캐시된 재열기의 추가 요청 없음, 탐색 후 깨끗한 Git 상태를 확인했다. 기존 편집·기능·태스크·호스트 체험과 로딩 중 프로젝트 전환·원문 캐시 정리·협업 되돌리기 회귀도 통과했다. 최종 `npx tsc -b`·린트·문서 검사가 통과했으며 린트에는 이번 변경 밖의 기존 경고가 남아 있다. 실제 앱 빌드·공개 배포는 실행하지 않았다.
+After the full-file loading expansion on 2026-10-20, all 115 checks for the demo above, central routing, copy creation, and deployment artifacts passed. Checks in the actual shared UI on a 1440px PC viewport and a 390px mobile viewport confirmed a list of more than 1,900 files, 0 additional source requests on initial entry, 1 request on first opening `server/serve.ts` with no additional request on a cached reopening, and a clean Git state after navigation. Existing editing, feature, task, and host experiences also passed, along with regressions for project switching during loading, source cache cleanup, and collaboration undo. Final `npx tsc -b`, lint, and documentation checks passed; lint still has preexisting warnings outside this change. No actual app build or public deployment was run.
 
-2026-10-26 기능 패널 제거 후 초기 사본과 전체 공개 파일 목록을 갱신했다. 사본·태스크·프로젝트·HTTP 데이터 검사 31개와 실제 공통 UI의 1440px·390px 데모 검사 3개를 통과했다. 태스크 검사는 특정 사본의 항목 수·상태 대신 초기 값을 기준으로 복원·격리를 확인하고, 완료 항목을 표시한 뒤 선택한다. 빌드·배포는 수행하지 않았다.
+After removing the feature panel on 2026-10-26, the initial copy and full public file list were updated. All 31 copy, task, project, and HTTP data checks and 3 demo checks in the actual shared UI at 1440px and 390px passed. Task checks verify restoration and isolation against initial values rather than a specific copy's item count and status, and show completed items before selecting them. No build or deployment was performed.

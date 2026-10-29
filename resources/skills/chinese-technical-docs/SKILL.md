@@ -1,15 +1,15 @@
 ---
 name: chinese-technical-docs
-description: "把简体中文技术文档工作连接到已安装的专业技能：用documentation设计结构，用tech-doc-style-chinese润色原文；确认原文后直接翻译到所请求的语言，依次应用翻译、目标语言润色和reviewing-translations。"
+description: "Connect Simplified Chinese technical documentation work to installed specialized skills: use documentation to design the structure and tech-doc-style-chinese to polish the source text; after confirming the source, translate directly into the requested language, applying translation, target-language polishing, and reviewing-translations in that order."
 ---
 
-# 简体中文技术文档技能连接
+# Simplified Chinese Technical Documentation Skill Integration
 
-本技能负责选择阶段和语言。润色与翻译均读取并应用随包安装的现有专业技能，而不是用本入口代替它们的规则。
+This skill selects the stage and language. For both polishing and translation, read and apply the existing specialized skills installed with the package rather than replacing their rules with this entry point.
 
-1. 按[共用工作流程](../technical-docs-common/workflow.md)确定范围、读者与原文语言。新文档默认跟随mew的实际回复语言；明确的文档语言要求和现有项目、文件规则优先。
-2. 设计原文结构时读取[documentation](../.vendor/documentation/SKILL.md)。保留内部规格和开发契约的既有格式。
-3. 使用[tech-doc-style-chinese](../.vendor/tech-doc-style-chinese/SKILL.md)润色简体中文原文。按文档用途读取受控技术写作、术语排版等参考，并保留已经确定的结构。核对条件、技术含义、代码和链接后确认原文。
-4. 用户要求翻译时，遵循[翻译连接顺序](../technical-docs-common/translation.md)。简体中文译文先应用`translating-chinese`，再用`tech-doc-style-chinese`润色，最后由`reviewing-translations`与确定后的原文对照。
+1. Use the [shared workflow](../technical-docs-common/workflow.md) to determine the scope, audience, and source language. New documents default to mew's actual response language; explicit document language requirements and existing project and file rules take precedence.
+2. Read [documentation](../.vendor/documentation/SKILL.md) when designing the source structure. Preserve existing formats for internal specifications and development contracts.
+3. Use [tech-doc-style-chinese](../.vendor/tech-doc-style-chinese/SKILL.md) to polish the Simplified Chinese source. Read references on controlled technical writing, terminology formatting, and other topics as appropriate for the document's purpose, and preserve the established structure. Verify conditions, technical meaning, code, and links before confirming the source.
+4. When the user requests translation, follow the [translation integration sequence](../technical-docs-common/translation.md). For Simplified Chinese translations, first apply `translating-chinese`, then polish with `tech-doc-style-chinese`, and finally use `reviewing-translations` to compare the translation against the finalized source.
 
-简体中文仅为目标语言时，从实际原文语言的入口开始。不得用摘要代替专业技能的SKILL.md。共用文件的路径以本SKILL.md的实际位置为准。
+If Simplified Chinese is only the target language, start from the entry point for the actual source language. Do not substitute summaries for the specialized skills' SKILL.md files. Resolve shared file paths relative to the actual location of this SKILL.md.

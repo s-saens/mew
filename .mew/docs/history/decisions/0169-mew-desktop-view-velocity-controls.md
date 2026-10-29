@@ -1,27 +1,27 @@
 ---
-provenance: "Liiiiv 중앙 ADR 이관본, 2026-10-14"
-description: "이관한 결정 기록: 휠·화면 이동·확대는 중앙 변위에 비례한 속도 조작. 당시 선택·근거·후속 변경을 보존하며 현재 계약은 Mew 소유 문서에서 확인한다."
-title: "0169 — 휠·화면 이동·확대는 중앙 변위에 비례한 속도 조작"
+provenance: "Migrated copy of a Liiiiv central ADR, 2026-10-14"
+description: "Migrated decision record: Wheel, pan, and zoom use velocity controls proportional to displacement from the center. Preserves the choices, rationale, and subsequent changes at the time; see the Mew owning document for the current contract."
+title: "0169 — Wheel, pan, and zoom use velocity controls proportional to displacement from the center"
 created: 2026-09-23
 updated: 2026-09-23
 ---
 
-- 상태: 채택
-- 결정자: 사용자 (휠·화면 이동·확대를 조이스틱 속도 방식으로 변경 요청)
-- 부분 대체: [0154](0154-mew-desktop-touchpad-motion.md) — 일반 휠·화면 이동·확대의 이동량 기반 조작
+- Status: Adopted
+- Decision maker: User (requested joystick-style velocity controls for wheel, pan, and zoom)
+- Partially supersedes: [0154](0154-mew-desktop-touchpad-motion.md) — displacement-based controls for regular wheel, pan, and zoom
 
-## 배경
+## Background
 
-사용자가 원격 데스크톱의 휠·화면 이동·확대를 계속 밀지 않고 일정 방향에 유지해 연속 조절하기를 요청했다.
+The user requested continuous remote desktop wheel, pan, and zoom control by holding in a direction instead of repeatedly pushing.
 
-## 결정
+## Decision
 
-일반 휠·화면 이동·확대는 컨트롤 중앙에서의 변위를 속도로 해석한다. 중앙 부근에서는 정지하고 멀리 밀수록 빨라지며, 밀어 둔 동안 계속 작동한다. 손을 떼거나 입력이 취소되면 즉시 멈춘다. 휠과 확대는 세로 축만 사용한다.
+Regular wheel, pan, and zoom interpret displacement from the control's center as velocity. They stop near the center, move faster the farther the control is pushed, and continue operating while it is held away from the center. They stop immediately on release or input cancellation. Wheel and zoom use only the vertical axis.
 
-커서 이동·좌우 버튼 드래그·휠 hold 후 중간 버튼 드래그는 기존 터치패드 이동량·속도 가속 방식을 유지한다. 탭·hold 구분, 방향키 조작, 입력 해제·전송 계약은 유지한다. 속도 방식의 재도입 허용 범위는 요청한 세 조절 동작에 한정한다.
+Cursor movement, left/right button dragging, and middle-button dragging after a wheel hold retain the existing touchpad displacement and velocity acceleration behavior. Retain tap/hold distinctions, arrow-key controls, and input release and transmission contracts. Permission to reintroduce velocity controls is limited to the three requested operations.
 
-## 근거
+## Rationale
 
-정밀한 포인터 위치 선택은 기존 방식을 보존하면서 스크롤과 화면 탐색은 손가락을 반복해서 밀지 않고 이어갈 수 있다.
+Preserve the existing method for precise pointer positioning while allowing continuous scrolling and view navigation without repeatedly swiping a finger.
 
-수치·검증은 [개발 계약](../../development/remote-desktop.md), 조작 안내는 [사용법](../../../../docs/guides/remote-desktop.md)에 둔다.
+Values and verification are defined in the [Development contract](../../development/remote-desktop.md), and operating instructions in the [Usage guide](../../../../docs/guides/remote-desktop.md).

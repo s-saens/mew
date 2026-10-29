@@ -1,48 +1,48 @@
 ---
-provenance: "Liiiiv 중앙 ADR 이관본, 2026-10-14"
-description: "이관한 결정 기록: 문서는 current 라우터와 history 원문을 분리한다. 당시 선택·근거·후속 변경을 보존하며 현재 계약은 Mew 소유 문서에서 확인한다."
-title: "0070 — 문서는 current 라우터와 history 원문을 분리한다"
+provenance: "Migrated copy of a Liiiiv central ADR, 2026-10-14"
+description: "Migrated decision record: Separate current routing documents from history source texts. Preserves the choices, rationale, and subsequent changes from that time; see the Mew owning document for the current contract."
+title: "0070 — Separate current routing documents from history source texts"
 created: 2026-08-21
 updated: 2026-08-21
 ---
 
-- 날짜: 2026-08-21
-- 상태: 채택
-- 결정자: 사용자 (초안: Codex)
+- Date: 2026-08-21
+- Status: Adopted
+- Decision maker: User (draft: Codex)
 
-## 배경
+## Background
 
-docs는 약 41만 토큰이고, ADR·지원사업 원자재·완료된 작업 기록이 약 31만 토큰이다. 총량 자체는 보존 비용일 뿐이지만 루트 MOC와 상시 진입 문서가 세부 목록·설명을 담아 작업마다 관련 없는 문서를 고르게 했다. 일부 현재 문서에는 뒤집힌 ADR의 사실도 남아 있었다.
+The docs contain approximately 410,000 tokens, of which ADRs, support program source materials, and completed work records account for approximately 310,000 tokens. The total volume itself is only a preservation cost, but the root MOC and routine entry documents contained detailed lists and explanations that led to unrelated documents being selected for each task. Some current documents also retained facts from overturned ADRs.
 
-본문을 일괄 압축하면 실패 이유·근거·인용을 잃고, 요약본을 별도로 만들면 기준본이 둘이 된다. 필요한 것은 저장량 축소가 아니라 기본 검색·읽기 경로에서 이력을 빼는 것이다.
+Compressing all document bodies would lose reasons for failure, rationale, and citations, while creating separate summaries would produce two canonical sources. What is needed is to exclude history from default search and reading paths, rather than reduce storage volume.
 
-## 선택지
+## Options
 
-1. 모든 본문 압축 — 컨텍스트는 줄지만 근거 손실과 대규모 검수 비용이 생긴다.
-2. 현재 요약본을 별도 유지 — 빠르지만 원문과 갈라지는 두 번째 SSoT가 생긴다.
-3. MOC 라우팅 + current/history 구분 — 원문은 보존하고 기본 경로만 작게 만든다.
-4. RAG만 도입 — 발견성은 좋아지지만 틀린 현재 사실과 중복 원문을 해결하지 못한다.
+1. Compress all document bodies — reduces context, but causes loss of evidence and substantial review costs.
+2. Maintain separate current summaries — fast, but creates a second SSoT that diverges from the originals.
+3. MOC routing + current/history separation — preserves the originals and reduces only the default path.
+4. Introduce RAG alone — improves discoverability, but does not resolve incorrect current facts or duplicate source texts.
 
-## 결정
+## Decision
 
-3번을 채택하고 4번은 그 위의 보조 검색층으로만 추가한다.
+Adopt option 3 and add option 4 only as a supplementary search layer on top of it.
 
-- 상시 진입 문서는 규칙과 라우팅만 둔다. 세부 목록·완료 이력·설명은 하위 MOC나 본문으로 보낸다.
-- 루트 MOC는 회사·플랫폼·제품·프로그램·운영의 하위 MOC만 가리킨다. 제품 스펙을 루트에서 직접 나열하지 않는다.
-- MOC는 `current`를 먼저, `history/raw`를 뒤에 둔다. 에이전트는 기본적으로 current만 읽고, 결정 근거나 회고가 필요할 때만 history를 연다.
-- 현재 기준본 하나를 유지한다. 이전 초안·제출본은 삭제하지 않되 history/raw로 분류하고 현재 사실의 근거로 자동 선택되지 않게 한다.
-- 완료 목록이 현재 문서의 절반을 넘으면 별도 history 문서로 분리한다. 현재 문서에는 링크와 현재 상태만 남긴다.
-- 오래된 문장을 기계적으로 줄이지 않는다. 링크 라우팅으로 충분하지 않고 중복된 현재 기준본이 확인될 때만 증류한다.
-- RAG 인덱스는 파생 캐시다. Git의 Markdown만 SSoT이며 인덱스 손실 시 전부 재생성할 수 있어야 한다.
+- Routine entry documents contain only rules and routing. Move detailed lists, completion history, and explanations to child MOCs or document bodies.
+- The root MOC points only to child MOCs for company, platform, product, program, and operations. Do not list product specs directly at the root.
+- MOCs place `current` first and `history/raw` afterward. Agents read only current by default and open history only when decision rationale or retrospectives are needed.
+- Maintain a single current canonical source. Do not delete earlier drafts or submitted versions, but classify them as history/raw so they are not automatically selected as evidence for current facts.
+- If a completion list occupies more than half of a current document, move it into a separate history document. Leave only a link and the current status in the current document.
+- Do not mechanically shorten old sentences. Distill content only when link routing is insufficient and duplicate current canonical sources are confirmed.
+- The RAG index is a derived cache. Markdown in Git is the only SSoT, and the entire index must be regenerable if lost.
 
-## 근거
+## Rationale
 
-- ADR·원자재를 보존하면서도 기본 컨텍스트에서 제외할 수 있다.
-- MOC가 본문 요약을 복제하지 않으므로 갱신 지점이 늘지 않는다.
-- current/history 메타데이터는 향후 검색 필터·freshness 검사·RAG 기본 스코프에 그대로 쓸 수 있다.
-- 먼저 현재 사실을 고친 뒤 RAG를 붙여야 오래된 충돌을 더 빠르게 검색하는 역효과를 피한다.
+- ADRs and source materials can be preserved while excluded from default context.
+- MOCs do not duplicate body summaries, so they do not add update points.
+- The current/history metadata can be reused directly for future search filters, freshness checks, and the default RAG scope.
+- Correct current facts before adding RAG to avoid the counterproductive effect of retrieving outdated conflicts faster.
 
-## 결과
+## Results
 
-- 신규·이동 문서는 루트가 아니라 가장 가까운 하위 MOC에 등록한다.
-- RAG의 기본 검색은 current/reference를 우선하고 history/raw는 명시적으로 요청할 때만 포함한다.
+- Register new or moved documents in the nearest child MOC, rather than the root.
+- Default RAG searches prioritize current/reference and include history/raw only when explicitly requested.

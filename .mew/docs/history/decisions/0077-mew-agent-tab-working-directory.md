@@ -1,63 +1,63 @@
 ---
-provenance: "Liiiiv 중앙 ADR 이관본, 2026-10-14"
-description: "이관한 결정 기록: mew 에이전트 탭은 워크스페이스 밖 작업 경로를 고를 수 있다. 당시 선택·근거·후속 변경을 보존하며 현재 계약은 Mew 소유 문서에서 확인한다."
-title: "0077 — mew 에이전트 탭은 워크스페이스 밖 작업 경로를 고를 수 있다"
+provenance: "Migrated copy of a Liiiiv central ADR, 2026-10-14"
+description: "Migrated decision record: mew agent tabs can select a working directory outside the workspace. Preserves the choices, rationale, and subsequent changes from that time; see the Mew owning document for the current contract."
+title: "0077 — mew agent tabs can select a working directory outside the workspace"
 created: 2026-08-24
 updated: 2026-09-11
 ---
 
-- 날짜: 2026-08-24
-- 상태: 채택
-- 후속 결정: [0097](0097-mew-agent-panel-removes-cwd-bar.md) — cwd 입력·변경 UI; 세션 cwd 키는 유지
-- 부분 대체: 0043 — 세션 cwd를 워크스페이스로 고정한 범위
-- 결정자: 송상훈 (지시)
+- Date: 2026-08-24
+- Status: Adopted
+- Subsequent decision: [0097](0097-mew-agent-panel-removes-cwd-bar.md) — cwd entry and change UI; session cwd keys retained
+- Partially supersedes: 0043 — the portion fixing session cwd to the workspace
+- Decision maker: Song Sanghoon (directive)
 
-## 배경
+## Background
 
-[ADR 0043](0043-mew-agent-workspace-scope-and-runtimes.md)은 에이전트 창을 프로젝트가 아닌 워크스페이스
-스코프로 올리면서 모든 세션의 cwd를 `WORKSPACE_ROOT`로 고정했다. 이후 [ADR 0044](0044-mew-agent-cli-tool-parity.md)는
-CLI 도구 동등성을 위해 ACP 파일 경계를 없앴으므로 에이전트는 이미 서버 사용자 권한이 닿는 워크스페이스 밖
-경로를 읽고 쓸 수 있다. 하지만 세션의 기준 경로와 히스토리 범위는 계속 워크스페이스에 묶여 있고, 화면에는
-그 경로가 드러나지 않는다.
+[ADR 0043](0043-mew-agent-workspace-scope-and-runtimes.md) moved the agent window from project scope to workspace scope and fixed every session's cwd to
+`WORKSPACE_ROOT`. Later, [ADR 0044](0044-mew-agent-cli-tool-parity.md) removed the ACP file boundary for CLI tool parity, so agents can already read and write paths
+outside the workspace that the server user has permission to access. However, the session's
+base path and history scope remain tied to the workspace, and that path is not
+shown on screen.
 
-## 선택지
+## Options
 
-1. 경로를 표시만 한다 — 현재 상태는 알 수 있지만 워크스페이스 밖 폴더를 작업 기준으로 삼을 수 없다.
-2. 탭마다 cwd를 고르게 한다 — 탭의 세션·히스토리·상대경로 기준을 원하는 폴더로 옮길 수 있다.
-3. 에이전트가 셸에서 실행한 마지막 `cd`를 추적한다 — ACP가 도구 내부 셸 상태를 표준 이벤트로 보내지 않아
-   런타임마다 별도 추적이 필요하고, 세션 cwd와도 뜻이 달라진다.
+1. Only display the path — users can see the current state but cannot use a folder outside the workspace as the working directory.
+2. Allow cwd selection per tab — users can move the tab's session, history, and relative path base to their chosen folder.
+3. Track the last `cd` the agent ran in the shell. ACP does not send internal tool shell state through standard events, so this requires separate
+   tracking for each runtime and also has a different meaning from the session cwd.
 
-## 결정
+## Decision
 
-2번을 채택한다.
+Adopt option 2.
 
-- 에이전트 탭 줄 바로 아래에 주소창 모양의 작업 경로 입력줄을 둔다. 값은 세션 생성·로드에 쓰는 절대 cwd다.
-  포커스하면 드롭다운이 열리고, 아직 완성하지 않은 마지막 경로 조각은 부모 폴더의 하위 폴더를 접두어로
-  필터링한다. 항목 클릭 또는 Enter는 그 폴더 안으로 들어가 하위를 다시 보여 준다.
-- 주소창 맨 왼쪽 홈 버튼은 현재 워크스페이스 기본 경로를 실제 cwd로 다시 연다. 실행 중 잠금은 다른 경로
-  변경과 동일하게 적용한다.
-- 새 탭과 이전 저장값은 현재 `WORKSPACE_ROOT`를 기본으로 한다. 사용자는 절대경로·`~` 경로·현재 cwd 기준
-  상대경로를 입력할 수 있다.
-- 서버가 실제로 존재하는 디렉터리인지 검증하고 정규화한 절대경로만 세션에 넘긴다. 권한은 에이전트 창과 같은
-  `owner`·`manager`다.
-- cwd는 탭 상태와 함께 브라우저에 저장한다. 드롭다운으로 폴더에 들어간 뒤 Enter를 한 번 더 누르거나 주소창
-  오른쪽 `→`를 눌러야 실제로 이동한다. 같은 탭의 cwd를 바꾸면 기존 세션을 끝내고 새 cwd에서 새 세션을 연다.
-  실행 중에는 경로 변경을 잠가 진행 중인 작업을 끊지 않는다.
-- 에이전트 WS 키와 감독 프로세스 키는 `runtime+tab+cwd`다. 세션 목록·세션 로드·사용량도 해당 cwd를 기준으로
-  조회한다.
-- 이 경로는 에이전트 프로세스와 ACP 세션의 기준 cwd다. 도구 내부에서 일시적으로 실행한 `cd`를 추적해
-  주소창 값을 바꾸지는 않는다.
+- Place an address-bar-style working directory input directly below the agent tab bar. Its value is the absolute cwd used to create
+  and load sessions. Focusing it opens a dropdown; the unfinished final path segment filters the parent folder's subfolders
+  by prefix. Clicking an item or pressing Enter enters that folder and displays its subfolders.
+- The home button at the far left of the address bar reopens the current workspace's default path as the actual cwd. Apply the same lock during execution
+  as for other path changes.
+- New tabs and older saved values default to the current `WORKSPACE_ROOT`. Users can enter absolute paths, `~` paths, or paths relative
+  to the current cwd.
+- The server verifies that the directory actually exists and passes only the normalized absolute path to the session. Permissions are the same
+  as for the agent window: `owner` and `manager`.
+- Save cwd in the browser along with the tab state. After entering a folder through the dropdown, users must press Enter again or click `→` on
+  the right side of the address bar to actually switch. Changing cwd in the same tab ends the existing session and opens a new session in the new cwd.
+  Lock path changes during execution to avoid interrupting ongoing work.
+- The agent WS key and supervisor process key are `runtime+tab+cwd`. Session lists, session loading, and usage are also queried for that
+  cwd.
+- This path is the base cwd for the agent process and ACP session. Do not track temporary `cd` commands run inside tools to
+  change the address bar value.
 
-## 근거
+## Rationale
 
-파일 접근 권한은 0044에서 이미 워크스페이스 밖까지 열렸다. cwd만 고정한 상태는 보안 경계를 만들지 못하면서
-상대경로, 세션 히스토리, 저장소별 에이전트 지침 탐색을 불필요하게 워크스페이스에 묶는다. 탭별 cwd는 기존의
-"탭 하나가 작업 대화 하나"라는 모델과 맞고, 서버가 검증한 경로만 사용하므로 잘못된 입력이 재접속 반복으로
-이어지는 것도 막는다.
+File access permissions were already extended beyond the workspace in 0044. Keeping cwd fixed creates no security boundary while unnecessarily
+tying relative paths, session history, and discovery of repository-specific agent instructions to the workspace. A cwd per tab fits the
+existing model of "one tab is one work conversation," and using only server-validated paths also prevents invalid input from causing
+repeated reconnections.
 
-## 결과
+## Results
 
-- 워크스페이스 밖 폴더에서 시작한 세션은 그 폴더의 히스토리만 보여 준다.
-- 주소창을 바꾸는 것은 셸의 `cd`가 아니라 새 세션 시작이다. 기존 대화는 해당 cwd의 히스토리에 남는다.
-- 이는 새 파일 권한을 부여하는 변경이 아니다. 실제 접근 범위는 계속 mew 서버를 실행한 OS 사용자의 권한이며,
-  에이전트 창 역할 게이트도 바뀌지 않는다.
+- Sessions started in a folder outside the workspace show only that folder's history.
+- Changing the address bar starts a new session rather than running a shell `cd`. The existing conversation remains in that cwd's history.
+- This change does not grant new file permissions. Actual access remains limited by the permissions of the OS user running the mew server, and the
+  agent window's role gate also remains unchanged.

@@ -1,84 +1,84 @@
 ---
-title: "공동 편집·댓글·채팅·게스트 공유"
-description: "함께 작업할 계정과 파일 권한 준비, Ctrl+Shift+C·본문 우클릭 댓글 작성과 스레드·목록·실패 시 초안 유지, 공동 편집·공통 메모·접속 세션과 기록·채팅·DM을 안내한다. 비로그인 방문자 전체에 적용되는 게스트 공유도 구분한다."
+title: "Collaborative Editing, Comments, Chat, and Guest Sharing"
+description: "Covers preparing accounts and file permissions for collaboration; adding comments with Ctrl+Shift+C or the body context menu; threads, lists, and retaining drafts on failure; collaborative editing; shared notes; active sessions and history; chat; and DMs. Also distinguishes guest sharing, which applies to all visitors who are not logged in."
 updated: "2026-10-28"
 상위파일:
   - "../../.mew/docs/MOC.md"
   - "MOC.md"
 ---
-공동 편집·댓글·채팅·공유의 사용자 조작을 안내합니다. 다른 사람을 초대하기 전에는 [보안과 역할](../operations/security.md)을 확인하세요.
+This guide explains user actions for collaborative editing, comments, chat, and sharing. Review [Security and Roles](../operations/security.md) before inviting others.
 
-[공동 편집](#공동-편집과-참여자) · [공통 메모](#공통-메모) · [접속 세션](#접속-중인-mew-세션) · [댓글](#댓글과-답글) · [채팅](#단체-채팅과-dm) · [게스트 공유](#게스트-공유)
+[Collaborative Editing](#collaborative-editing-and-participants) · [Shared Notes](#shared-memo) · [Active Sessions](#active-mew-sessions) · [Comments](#comments-and-replies) · [Chat](#group-chat-and-dms) · [Guest Sharing](#guest-sharing)
 
-## 같이 작업하기 전
+## Before Working Together
 
-1. owner가 **메뉴 → 계정 관리**에서 참여자의 이메일과 역할을 등록하고 임시 비밀번호를 전달한다. 각 참여자는 같은 Mew 서버에 자기 계정으로 로그인하고 비밀번호를 바꾼다.
-2. owner가 계정의 **기능 권한**과 **파일·폴더 권한**을 확인한다. 편집에는 파일 수정 권한, 공동 편집·댓글에는 해당 기능 권한도 필요하다.
-3. 같은 프로젝트의 같은 파일을 열고 참여자 색 점·커서로 연결을 확인한다. 서버 밖에서 접속할 때는 먼저 [외부 접속](getting-started-ko.md#외부에서-접속하기)을 준비한다.
+1. The owner registers each participant's email and role under **Menu → Account Management** and provides a temporary password. Each participant logs in to the same Mew server with their own account and changes their password.
+2. The owner checks the account's **Feature Permissions** and **File and Folder Permissions**. Editing requires file modification permission; collaborative editing and comments also require their respective feature permissions.
+3. Open the same file in the same project and check participant color dots and cursors to confirm the connection. For access from outside the server, first set up [external access](getting-started-ko.md#connect-remotely).
 
-파일만 보여 주려면 아래의 [게스트 공유](#게스트-공유)를 사용할 수 있다. 공동 편집과 채팅에는 로그인 계정이 필요하다.
+To let others only view files, you can use [Guest Sharing](#guest-sharing) below. Collaborative editing and chat require a logged-in account.
 
-## 공동 편집과 참여자
+## Collaborative Editing and Participants
 
-로그인한 사용자끼리 같은 프로젝트의 같은 파일을 열면 실시간으로 내용을 함께 편집한다. Markdown은 Hotview에서, 다른 텍스트 파일은 Plain에서 협업한다. 문서·파일 탐색기에 표시되는 색 점으로 작업 중인 사람을 확인하고 편집기에서 다른 사용자의 커서를 볼 수 있다.
+When logged-in users open the same file in the same project, they edit its contents together in real time. Collaborate on Markdown in Hotview and other text files in Plain. Color dots in the document and file explorers show who is working, and the editor displays other users' cursors.
 
-여러 칸에 파일을 열어도 다른 사람에게 보고 있는 파일로 알리는 것은 마지막으로 클릭한 편집 칸의 파일 하나다. 터미널이나 에이전트가 디스크에서 수정한 Markdown도 열린 협업 문서에 반영된다. 게스트와 서버 파일 탐색기의 프로젝트 밖 파일에는 실시간 공동 편집을 제공하지 않는다. 동기화 상세는 [협업 계약](../../.mew/docs/development/collaboration.md)을 따른다.
+Even if you open files in multiple panes, only the file in the last editor pane you clicked is reported to others as the file you are viewing. Markdown changes made on disk by a terminal or agent are also reflected in open collaborative documents. Real-time collaborative editing is not available to guests or for files outside projects in the server file explorer. Synchronization details follow the [collaboration contract](../../.mew/docs/development/collaboration.md).
 
-## 공통 메모
+## Shared memo
 
-PC 왼쪽·모바일 하단 독의 **메모** 아이콘 또는 `Ctrl+M`·`Cmd+M`으로 **메모 패널**을 연다. 아이콘은 로그인·협업 권한이 있을 때 기본 표시하며 **설정 → Dock**에서 숨기거나 다시 표시할 수 있다. PC에서는 포커스된 메모의 독 아이콘을 다시 누르면 닫고, 다른 패널에 있다면 메모로 이동한다. 모바일에서는 메모를 전면으로 가져오며 다른 독 항목으로 이동해도 작성 내용은 유지된다. 단축키는 이미 열려 있고 외부에 포커스가 있으면 메모 본문으로 이동하고, 메모 안에 포커스가 있으면 닫는다. 단축키 설정에서 조합을 바꿀 수 있다.
+Open the **Notes Panel** using the **Notes** icon in the left dock on desktop or bottom dock on mobile, or with `Ctrl+M` or `Cmd+M`. The icon appears by default when you are logged in and have collaboration permission; you can hide or show it under **Settings → Dock**. On desktop, clicking the dock icon again closes notes if they have focus, or switches to notes if another panel has focus. On mobile, it brings notes to the front, and your content remains when you switch to another dock item. If notes are already open and focus is outside them, the shortcut moves focus to the notes body; if focus is inside notes, it closes them. You can change the key combination in shortcut settings.
 
-메모를 열거나 보기 모드를 바꾸어도 입력칸에 자동 포커스하지 않는다. 모바일에서는 본문을 직접 눌러 키보드를 연다. 제목과 참여자 색 점·닫기 버튼 아래에 Markdown 입력칸을 표시한다. 제목 오른쪽 눈(Hotview)·코드 괄호(Plain) 버튼으로 렌더 보기와 원문 편집을 전환한다. 선택한 보기는 닫기·다시 열기와 프로젝트 전환에서도 유지한다. PC에서는 제목 왼쪽의 도킹 핸들로 패널을 옮기고 다른 패널과의 경계를 끌어 크기를 조절한다. 제목 탭을 두 번 누르면 확대하며 Esc로 복원한다. 패널 배치와 열림 상태는 프로젝트별로 저장하지만 메모 내용은 서버 전체가 공유한다. 팝업의 별도 위치 이동·가장자리 크기 조절은 제공하지 않는다. 모바일에서는 다른 작업 패널과 같은 화면을 사용하며 Esc·뒤로가기·닫기 버튼으로 닫는다. 소프트 키보드를 닫으면 모바일 보조키도 사라진다.
+Opening notes or changing the view mode does not automatically focus the input. On mobile, tap the body directly to open the keyboard. A Markdown input appears below the title, participant color dots, and close button. Use the eye (Hotview) and code brackets (Plain) buttons to the right of the title to switch between rendered view and source editing. The selected view persists when closing and reopening notes and when switching projects. On desktop, move the panel with the docking handle to the left of the title and resize it by dragging its boundary with another panel. Double-click the title tab to maximize it, and press Esc to restore it. Panel layout and open state are saved per project, but note contents are shared across the entire server. Separate popup repositioning and edge resizing are not provided. On mobile, notes use the same screen as other work panels and close with Esc, Back, or the close button. Closing the software keyboard also hides the mobile auxiliary keys.
 
-메모는 같은 Mew 서버의 로그인 사용자들이 함께 쓰는 하나의 공간이다. 프로젝트·루트 프로젝트 전환과 무관하게 실시간 공동 편집되며, 서버에 자동 저장되어 모두 닫거나 서버를 재시작한 뒤에도 남는다. 제목 옆 색 점은 현재 메모를 열어 둔 사용자 수를 나타내고 같은 계정의 여러 창은 하나로 센다. 협업 권한이 없는 계정과 게스트에게는 제공하지 않는다. 연결 중에는 상태를 표시하고 편집을 잠시 막으며, 창을 닫아도 현재 페이지 안의 미전송 변경은 재연결 시 병합한다.
+Notes are a single shared space for logged-in users on the same Mew server. They support real-time collaborative editing regardless of project or root project changes and are saved automatically on the server, persisting after everyone closes them or the server restarts. Color dots beside the title indicate the number of users who currently have notes open; multiple windows for the same account count as one. Notes are not available to accounts without collaboration permission or to guests. While connecting, a status is shown and editing is temporarily blocked. Even if you close the panel, unsent changes within the current page are merged on reconnection.
 
-## 접속 중인 mew 세션
+## Active mew Sessions
 
-로그인 후 헤더 오른쪽의 **활성 세션 버튼**을 누르면 접속 중인 세션 목록을 연다. 버튼은 사각 아이콘 안에 세션 총 개수를 표시한다. 사용자별로 브라우저·기기, 보고 있는 프로젝트와 파일, 접속 시각을 볼 수 있다. 지금 사용하는 탭에는 **현재 세션**, 다른 화면 뒤에 있는 탭에는 **백그라운드**를 표시한다.
+After logging in, click the **Active Sessions button** on the right side of the header to open the list of connected sessions. The button shows the total session count inside a square icon. For each user, you can see their browser and device, the project and file they are viewing, and their connection time. The tab you are using is labeled **Current Session**, and tabs behind other screens are labeled **Background**.
 
-헤더 숫자와 대화상자의 전체 숫자는 브라우저 탭·창별 세션 수다. 같은 사람이 두 탭을 열면 2개이며 내 계정의 다른 기기와 게스트 접속도 포함한다. 100개 이상이면 아이콘 안에는 **99+**로 표시하고 툴팁에 실제 수를 표시한다.
+The number in the header and the total in the dialog count sessions per browser tab or window. If one person opens two tabs, the count is 2; it also includes other devices using your account and guest connections. At 100 or more, the icon displays **99+**, and the tooltip shows the actual count.
 
-접속·종료에 따라 자동으로 갱신된다. 목록이 아직 없거나 연결이 끊기면 헤더에는 1을 표시하고, 열린 대화상자에는 연결 중 상태를 표시한다. 서버에서 받은 목록이 비어 있으면 0을 표시한다. 게스트에게는 이 버튼과 목록을 공개하지 않는다.
+The list updates automatically as sessions connect and disconnect. If no list is available yet or the connection is lost, the header shows 1 and the open dialog shows a connecting status. If the list received from the server is empty, it shows 0. This button and list are not exposed to guests.
 
-각 세션 아래의 **작업 중 에이전트 N개**는 해당 브라우저의 현재 프로젝트에서 연결된 에이전트 탭 중 작업 중인 수다. 대기 중인 탭·일반 터미널은 제외하며 에이전트 탭에서 실행 중인 CLI 명령은 작업으로 센다. 작업 상태 변경 시 바로 갱신하고 30초마다 다시 보고한다. 구버전 클라이언트나 90초 넘게 갱신되지 않은 값은 다음 목록 갱신에서 `—`로 표시한다.
+**N Agents Working** below each session is the number of working agent tabs connected in that browser's current project. Idle tabs and regular terminals are excluded; CLI commands running in agent tabs count as work. The count updates immediately when work status changes and is reported again every 30 seconds. Values from older clients or values not updated for more than 90 seconds appear as `—` on the next list update.
 
-같은 에이전트를 여러 브라우저에서 보면 각 세션에 표시될 수 있으므로 합산하지 않는다. 브라우저 연결을 떠나 서버에서 계속 실행 중인 작업 전체의 수는 아니다. 기존 JS 메모리 표시·측정·전송은 작업 현황을 보여 달라는 요청에 따라 제거했다. 사용자 요청 전에는 다시 도입하지 않는다.
+If the same agent is viewed in multiple browsers, it may appear in each session, so do not add the counts together. This is not the total number of tasks that continue running on the server independently of browser connections. The previous JS memory display, measurement, and transmission were removed in response to the request to show work status. Do not reintroduce them unless the user requests it.
 
-### 날짜별 접속 기록
+### Connection History by Date
 
-같은 창의 **기록** 탭에서 날짜를 고르고 **사람**, **시작**, **종료**로 범위를 좁힌다. 시간대 그래프의 막대를 누르면 그 시간만 선택하며 **하루 전체**로 되돌린다. 날짜와 시간은 화면에 표시된 내 브라우저의 시간대를 따른다. 자정을 넘긴 접속도 해당 날짜 안의 구간으로 표시한다.
+In the same window's **History** tab, select a date and narrow the range with **Person**, **Start**, and **End**. Click a bar in the hourly graph to select only that hour, and use **Full Day** to reset it. Dates and times use your browser's time zone shown on the screen. Connections that cross midnight are also shown as segments within the selected date.
 
-위쪽에는 접속 수·사람 수·관측 시간 합계가 있고, 아래에는 사람별 기기 타임라인이 있다. 보라색은 화면 활성, 회색은 백그라운드이며 **상세 기록**을 펼치면 시간·프로젝트/파일·관측 에이전트 수를 확인한다. 관측 시간은 탭별 접속 기록이라 같은 사람의 동시 접속은 중복된다. 시간대 그래프는 그 시간에 접속했던 탭 수이며 근무 시간이나 최대 동시 접속 수를 뜻하지 않는다. 오늘 기록은 30초마다 갱신하고 **새로고침**으로 바로 조회할 수 있다.
+The top shows connection count, people count, and total observed time, with a per-person device timeline below. Purple indicates an active screen and gray indicates background activity. Expand **Detailed History** to see times, projects/files, and observed agent counts. Observed time comes from per-tab connection records, so simultaneous connections by the same person overlap. The hourly graph shows the number of tabs that connected during that hour, not working hours or peak concurrent connections. Today's history updates every 30 seconds, and you can fetch it immediately with **Refresh**.
 
-**엑셀 다운로드**는 선택한 날짜·사람·시간 범위를 `.xlsx`로 저장한다. 엑셀 시각은 열 이름에 표시된 UTC 기준이며, 권한 없는 프로젝트·파일 위치는 화면과 엑셀 모두 가린다. 기록은 기능 적용 이후부터 서버 DB에 저장하고 서버 재시작 후에도 남는다. 과거의 미수집 접속을 복원하지는 않는다. 타임라인은 사람별 최대 100개 탭을 그리지만 상세 목록과 다운로드에는 조회 범위의 모든 구간을 포함한다. 조회가 50,000개 구간을 넘으면 시간이나 사람 필터를 좁힌다.
+**Download Excel** saves the selected date, person, and time range as `.xlsx`. Excel timestamps use UTC, as indicated in the column names. Project and file locations you do not have permission to access are hidden both on screen and in Excel. Records are stored in the server DB from the time the feature is applied and persist after server restarts. Past connections that were not collected are not reconstructed. The timeline draws up to 100 tabs per person, but the detailed list and download include all segments in the query range. If a query exceeds 50,000 segments, narrow the time or person filter.
 
-## 댓글과 답글
+## Comments and Replies
 
-1. 문서에서 의견을 남길 부분을 선택하고 `Ctrl+Shift+C`(macOS는 `Cmd+Shift+C`)를 누른다. 모바일에서는 선택 후 키보드 보조키 바의 댓글 아이콘을 누른다. 이 단축키는 선택한 글자가 없으면 작성창을 열지 않는다.
-2. 인용 구절 아래 입력칸에 내용을 쓰고 등록 아이콘이나 Enter로 보낸다. Shift+Enter는 줄바꿈이며 `@`로 멤버를 고를 수 있다. 멘션 후보가 열려 있으면 Enter로 후보를 먼저 선택한다.
-3. 본문의 하이라이트를 누르거나 편집기의 **댓글 목록**에서 스레드를 고른다. 스레드 아래 입력칸에서 답글을 보내며, 원문이 바뀌어 하이라이트를 찾을 수 없는 댓글도 목록에서 확인한다.
-4. 본인 댓글은 수정·삭제할 수 있고 owner는 다른 사람의 댓글도 관리할 수 있다.
+1. Select the passage you want to comment on in the document and press `Ctrl+Shift+C` (`Cmd+Shift+C` on macOS). On mobile, select the passage and tap the comment icon in the keyboard auxiliary bar. This shortcut does not open the composer if no text is selected.
+2. Write in the input below the quoted passage and send with the submit icon or Enter. Shift+Enter inserts a line break, and `@` lets you select a member. If mention suggestions are open, Enter selects a suggestion first.
+3. Click a highlight in the body or select a thread from the editor's **Comment List**. Send replies using the input below the thread. The list also includes comments whose highlights can no longer be found because the source text changed.
+4. You can edit and delete your own comments, and the owner can also manage other people's comments.
 
-선택 없이 본문 우클릭 메뉴의 **댓글 달기**를 고르면 해당 Hotview 문단이나 Plain·코드 줄을 자동 선택한다. [본문 우클릭 메뉴](editor.md#본문-우클릭-메뉴)를 참고한다.
+If you choose **Add Comment** from the body context menu without a selection, the corresponding Hotview paragraph or Plain/code line is selected automatically. See the [body context menu](editor.md#body-context-menu).
 
-작성·답글·수정 전송이 실패하면 오류와 입력한 내용이 그대로 남으므로 다시 보낼 수 있다. 댓글 목록 위의 숫자는 현재 파일의 스레드 수다. 닫기 아이콘·Esc·뒤로가기로 팝업을 닫는다.
+If sending a new comment, reply, or edit fails, the error and entered content remain so you can send it again. The number above the comment list is the thread count for the current file. Close the popup with the close icon, Esc, or Back.
 
-댓글은 본문에 텍스트로 삽입되지 않고 별도로 관리된다. Markdown의 Hotview·Plain과 코드·텍스트에 제공하며 로그인과 협업 기능 권한이 필요하다. 목록 조회에는 파일 열람 권한, 등록·수정·삭제에는 파일 수정 권한도 필요하다. 읽기 전용·보관된 파일에서는 댓글을 조회만 할 수 있다. 게스트·미디어·diff·프로젝트 밖 파일·앵커 미리보기와 파일 재검증 중에는 댓글을 시작하지 않는다. 기본 댓글 단축키는 [설정](../configuration/appearance.md)에서 바꿀 수 있다.
+Comments are managed separately rather than inserted as text in the body. They are available for Markdown in Hotview and Plain, and for code and text, and require login and collaboration feature permission. Viewing the list requires file viewing permission; adding, editing, and deleting also require file modification permission. Comments on read-only or archived files can only be viewed. Comments cannot be started by guests, on media, diffs, files outside projects, or anchor previews, or while a file is being revalidated. You can change the default comment shortcut in [Settings](../configuration/appearance.md).
 
-## 단체 채팅과 DM
+## Group Chat and DMs
 
-헤더 메뉴 → **채팅** 또는 `Alt+C`로 연다. 대화 목록에서 단체방을 고르면 전체 멤버와, 사람을 고르면 그 사람과 1:1로 대화한다. 읽지 않은 대화 수와 메시지별 미확인 수신자 수를 표시한다.
+Open chat through Header Menu → **Chat** or `Alt+C`. In the conversation list, select the group room to talk with all members, or select a person for a 1:1 conversation. The unread conversation count and the number of recipients who have not read each message are displayed.
 
-입력창에서 파일 참조를 넣어 보내면 수신자가 그 참조를 눌러 mew 편집기로 열 수 있다. 채팅을 연 뒤 편집기에서 `Ctrl+L`을 누르면 [참조 전달 규칙](editor.md#ctrll-참조-경로줄)에 따라 파일 멘션을 입력창에 넣는다. 다른 보조창을 마지막으로 열었다면 그 창이 참조를 받을 수 있다.
+If you insert a file reference in the input and send it, recipients can click the reference to open it in the mew editor. After opening chat, press `Ctrl+L` in the editor to insert a file mention into the input according to the [reference forwarding rules](editor.md#ctrll-references-경로줄). If you opened another auxiliary panel most recently, that panel may receive the reference.
 
-채팅은 채팅 기능이 허용된 로그인 사용자 전용이다. DM은 앱에서 당사자에게만 전달하지만 서버 파일에 저장되므로 서버 관리자에게 숨기는 비밀 대화는 아니다. 저장·읽음 처리 범위는 [채팅 계약](../../.mew/docs/development/collaboration.md), 권한 정책은 [보안](../operations/security.md)를 따른다.
+Chat is only available to logged-in users with chat permission. The app delivers DMs only to the participants, but they are stored in server files, so they are not secret conversations hidden from the server administrator. Storage and read-status handling follow the [chat contract](../../.mew/docs/development/collaboration.md); permission policies follow [Security](../operations/security.md).
 
-## 게스트 공유
+## Guest Sharing
 
-로그인하지 않은 방문자는 guest다. owner는 **계정 관리 → 파일·폴더 권한**에서 경로를 선택하고 guest 행의 상속·차단·열람·수정을 설정한다. 수정은 열람을 포함한다. 파일 탐색기의 눈·연필 설정은 사용하지 않는다. 설정 후 mew 접속 주소를 전달하면 방문자가 허용된 경로를 탐색할 수 있다.
+Visitors who are not logged in are guests. The owner selects a path under **Account Management → File and Folder Permissions** and sets Inherit, Block, View, or Modify in the guest row. Modify includes View. Do not use the eye and pencil settings in the file explorer. After configuring permissions, share the mew access URL so visitors can browse allowed paths.
 
-이 권한은 특정 수신자에게만 발급하는 초대가 아니라 **로그인하지 않은 방문자 전체에 적용되는 경로 규칙**이다. 폴더를 허용하면 하위 경로에도 적용되고 더 구체적인 경로 규칙이 우선한다. 공유를 중단하려면 해당 규칙을 해제하고 하위 항목의 별도 허용도 확인한다.
+This permission is a **path rule that applies to all visitors who are not logged in**, rather than an invitation issued only to a specific recipient. Allowing a folder also applies to its subpaths, and more specific path rules take precedence. To stop sharing, remove the rule and check for separate allowances on child items.
 
-게스트는 허용된 파일의 열람·본문 편집만 할 수 있고 생성·삭제·개명·터미널·에이전트·DB·공동 편집은 사용할 수 없다. 차단 경로·시크릿 파일과 알려진 예외의 기준본은 [게스트 경계](../operations/security.md#게스트-경계)다.
+Guests can only view allowed files and edit their body contents; they cannot create, delete, rename, or use terminals, agents, DB, or collaborative editing. [Guest Boundaries](../operations/security.md#guest-boundaries) is the canonical source for blocked paths, secret files, and known exceptions.
 
-공동 편집·댓글은 해당 기능과 대상 파일 권한을 함께 확인한다. 접속 세션 팝업도 보는 계정이 열람할 수 없는 프로젝트·파일 경로는 표시하지 않는다. 기능 기본값과 계정별 변경은 [권한 설정](../configuration/accounts.md#내-계정과-계정-관리)을 따른다.
+Collaborative editing and comments check both the relevant feature permission and the target file permissions. The active sessions popup also hides project and file paths that the viewing account cannot access. Feature defaults and per-account changes follow [Permission Settings](../configuration/accounts.md#my-account-and-account-management).

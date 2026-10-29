@@ -1,13 +1,13 @@
 ---
-title: "Mewpet의 Git 안내"
-description: "Mewpet이 Git 화면에서 변경 검토·커밋을 안내하는 범위와 자동 저장·커밋·원격 전송의 구분 및 직접 조작 도구의 한계."
+title: "Mewpet Git guidance"
+description: "The scope of Mewpet guidance for reviewing changes and committing on the Git screen, the distinction between autosaving, committing, and sending to a remote, and the limits of direct operation tools."
 updated: "2026-10-29"
 ---
 
-# Git 안내
+# Git guidance
 
-현재 프로젝트의 Git 화면은 `mew_open_panel`의 `panel: "git"`로 연다. 사용자는 변경 파일을 선택해 차이를 검토하고 기록할 변경을 커밋한다.
+Open the current project's Git screen using `mew_open_panel` with `panel: "git"`. Users select changed files, review the differences, and commit the changes they want to record.
 
-문서 자동 저장은 파일 내용을 저장하는 동작이다. Git 커밋과 원격 저장소 전송은 각각 별도 동작이며, 파일을 저장하거나 Git 화면을 열었다고 커밋·전송이 끝난 것은 아니다.
+Document autosave saves file contents. A Git commit and sending to a remote repository are separate operations; saving a file or opening the Git screen does not mean a commit or transfer is complete.
 
-Mewpet 도구에는 diff 조회·커밋·브랜치 변경·push·되돌리기 기능이 없다. 사용자가 Git 화면에서 검토하도록 안내하거나 구체적인 범위와 요청을 `mew_start_project_session`에 담아 프로젝트 대화로 넘긴다. 도구 결과 없이 변경 내용을 검토했거나 Git 작업을 마쳤다고 말하지 않는다.
+Mewpet tools cannot view diffs, commit, switch branches, push, or revert. Guide users to review changes on the Git screen, or include the specific scope and request in `mew_start_project_session` and hand it off to a project conversation. Do not claim to have reviewed changes or completed Git operations without tool results.

@@ -1,26 +1,26 @@
 ---
-title: "첨부 업로드 태그의 원형 인디케이터 복원"
-description: "공용 로딩을 로고·세 점·원형 세 종류로 구분하고, 에이전트 입력의 첨부 업로드 태그를 세 점에서 원형으로 복원해 ADR 0063의 적용 범위를 일부 대체한 결정이다."
+title: "Restore the Circular Indicator on Attachment Upload Tags"
+description: "Decision to distinguish three shared loading indicator types—logo, three dots, and circular—and restore attachment upload tags in agent input from three dots to circular, partially superseding the scope of ADR 0063."
 created: "2026-10-27"
 updated: "2026-10-27"
 ---
 
-상태: 채택
+Status: Adopted
 
-## 배경
+## Background
 
-[ADR 0063](0063-shared-loading-indicator.md)은 전체 진입을 로고, 내부 대기를 세 점으로 나누면서 첨부 업로드 태그도 세 점으로 바꿨다. 사용자가 에이전트 패널의 첨부 태그에서는 기존 원형을 사용하고, 전체 인디케이터를 로고·세 점·원형 세 종류로 정리하도록 요청했다.
+[ADR 0063](0063-shared-loading-indicator.md) assigned the logo to full entry and three dots to internal waits, and also changed attachment upload tags to three dots. The user requested keeping the original circular indicator for attachment tags in the agent panel and organizing all indicators into three types: logo, three dots, and circle.
 
-## 결정
+## Decision
 
-`@mew/ui`의 `LoadingIndicator`에 원형 `spinner` variant를 추가한다. 에이전트 새 입력·대기 큐 편집의 첨부 업로드 태그가 이를 명시적으로 선택한다. 로고와 기본 세 점의 기존 사용 범위는 유지한다. 원형의 색·회전·정지·모션 감소·강제 색상 처리는 공용 CSS가 소유한다.
+Add a circular `spinner` variant to `LoadingIndicator` in `@mew/ui`. Attachment upload tags in new agent input and queued input editing explicitly select it. Keep the existing usage scopes of the logo and default three dots. Shared CSS owns the circle's color, rotation, stopped state, reduced motion, and forced colors handling.
 
-업로드가 끝나야 전송할 수 있으므로 전송한 사용자 버블의 첨부 태그는 완료된 파일 종류 아이콘을 유지한다. 버블 태그에 별도 로딩 상태를 만들지 않는다. 구체적인 크기와 사용 위치는 [공용 UI 계약](../development/ui-contracts.md#공용-로딩-인디케이터), 태그의 상세 동작은 [입력·첨부 기능 계약](../features/%ED%84%B0%EB%AF%B8%EB%84%90%C2%B7%EC%97%90%EC%9D%B4%EC%A0%84%ED%8A%B8%C2%B7%EC%9E%90%EB%8F%99%ED%99%94/%EC%97%90%EC%9D%B4%EC%A0%84%ED%8A%B8%20%EC%9E%85%EB%A0%A5%C2%B7%EB%A9%98%EC%85%98%C2%B7%EC%8A%A4%ED%82%AC%C2%B7%EC%B2%A8%EB%B6%80.md)이 소유한다.
+Because sending requires uploads to finish, attachment tags in sent user bubbles retain the completed file type icon. Do not add a separate loading state to bubble tags. The [shared UI contract](../development/ui-contracts.md#shared-loading-indicators) owns specific sizes and usage locations, and the [input and attachment feature contract](../features/terminals-agents-automation/agent-input-mentions-skills-and-attachments.md) owns detailed tag behavior.
 
-## 대안과 근거
+## Alternatives and Rationale
 
-모든 내부 대기를 세 점으로 유지하는 방법은 첨부에 원형을 쓰려는 요청을 반영하지 못한다. 첨부 전용 CSS를 다시 만드는 방법은 공용 모션·접근성 처리를 중복한다. 공용 컴포넌트에 variant를 추가해 세 종류를 구분하고 같은 동작 기준을 적용한다.
+Keeping three dots for all internal waits does not address the request to use a circle for attachments. Recreating attachment-specific CSS duplicates shared motion and accessibility handling. Add a variant to the shared component to distinguish the three types and apply the same behavioral standards.
 
-## 영향
+## Impact
 
-ADR 0063 중 첨부 업로드 태그에 세 점을 적용한 범위만 대체한다. 입력의 태그 위치·업로드 상태·전송 차단·완료 후 아이콘과 사용자 버블의 표시 계약은 유지한다. 검증과 운영 적용 상태는 [작업 기록](../work/loading-indicators.md)에 남긴다.
+Replace only the part of ADR 0063 that applied three dots to attachment upload tags. Preserve the contracts for tag placement in input, upload states, send blocking, icons after completion, and display in user bubbles. Record verification and production application status in the [work record](../work/loading-indicators.md).

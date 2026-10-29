@@ -1,22 +1,22 @@
 ---
-provenance: "Liiiiv 중앙 ADR 이관본, 2026-10-14"
-description: "이관한 결정 기록: 기능 계층 인라인 명세 편집과 즉시 작업 접수. 당시 선택·근거·후속 변경을 보존하며 현재 계약은 Mew 소유 문서에서 확인한다."
-title: "0173 — 기능 계층 인라인 명세 편집과 즉시 작업 접수"
+provenance: "Migrated copy of a Liiiiv central ADR, 2026-10-14"
+description: "Migrated decision record: inline specification editing and immediate task submission in the feature hierarchy. Preserves the choices, rationale, and subsequent changes from that time; consult Mew's owning documents for the current contract."
+title: "0173 — Inline specification editing and immediate task submission in the feature hierarchy"
 created: 2026-09-23
 updated: 2026-09-23
 ---
 
-- 상태: 채택
-- 후속 결정: [0194](0194-mew-readonly-feature-panel.md) — 기능 패널 읽기 전용; 문서·API·CLI·실행 큐 유지
-- 부분 대체: [0159](0159-mew-feature-driven-development.md) — 목록·상세 분리와 GUI 편집 후 별도 재위임
-- 결정자: 사용자 지시, Codex 구현
+- Status: Adopted
+- Follow-up decision: [0194](0194-mew-readonly-feature-panel.md) — Make the feature panel read-only; retain documents, APIs, CLI, and execution queue
+- Partially supersedes: [0159](0159-mew-feature-driven-development.md) — separate list and detail views, and separate redelegation after GUI editing
+- Decision maker: User direction, Codex implementation
 
-## 결정
+## Decision
 
-- 기능 계층 안에서 요구사항·구현 설명·검증을 개별 텍스트 항목으로 표시하고 인라인 편집한다. 관련 파일·커밋·작업 이력도 같은 기능 아래에서 확인한다. 모바일도 같은 계층을 사용한다.
-- GUI의 항목 편집을 적용하면 현재 선택한 에이전트셋에 즉시 작업을 접수한다. 명세 저장과 요청 생성은 같은 잠금·복구 가능한 쓰기 단위다. 전송 실패·버전 충돌은 초안을 보존하며 같은 요청 ID의 재시도는 중복 실행하지 않는다.
-- 변경된 전체 명세와 편집 전후를 요청에 캡처한다. 구현 설명·검증 문구의 수정은 사용자가 원하는 새 동작으로 해석하고, 완료 보고는 실제 구현·검증 결과로 갱신한다. 파일·커밋 증거와 과거 실행 보고는 사용자가 문구를 수정해도 보존한다.
-- 같은 기능의 대기·실행 중 작업은 기존 중복 방지를 유지한다. 편집 초안은 작성할 수 있으나 적용은 기존 작업 완료 또는 중단 후 가능하다.
-- 일반 문서·외부 Markdown 편집은 자동 실행하지 않는다. [0161](0161-mew-feature-markdown-source.md)의 기준본·동시 편집·권한과 기존 큐·감독 계약은 유지한다.
+- Display requirements, implementation descriptions, and verification as individual text items within the feature hierarchy and edit them inline. View related files, commits, and task history under the same feature. Use the same hierarchy on mobile.
+- Applying an item edit in the GUI immediately submits a task to the currently selected agent set. Saving the specification and creating the request form a single locked, recoverable write unit. Preserve drafts on transmission failure or version conflict, and do not execute duplicate requests when retrying with the same request ID.
+- Capture the complete modified specification and its before-and-after versions in the request. Interpret edits to implementation descriptions and verification wording as new behavior the user wants, and update completion reports with actual implementation and verification results. Preserve file and commit evidence and past execution reports even when the user edits the wording.
+- Maintain existing duplicate prevention for queued or running tasks for the same feature. Users may draft edits, but can apply them only after the existing task completes or is stopped.
+- Do not automatically execute tasks for edits to general documents or external Markdown. Preserve the canonical source, concurrent editing, and permissions in [0161](0161-mew-feature-markdown-source.md), along with the existing queue and supervision contracts.
 
-세부 계약: [기능 기반 개발](../../specs/feature-development.md).
+Detailed contract: [Feature-Driven Development](../../specs/feature-development.md).

@@ -1,28 +1,28 @@
 ---
-title: "0013 — 파일 본문 버전 확인과 비동기 캐시"
-description: "파일 본문을 scoped IndexedDB와 루트별 메모리 LRU에 보관하고, 캐시를 읽기 전용으로 먼저 표시한 뒤 권한·버전을 확인하기로 한 결정. P2P 호환 JSON unchanged 응답과 초안·협업 보호, 기존 localStorage 본문 캐시의 대체 범위를 정한다."
+title: "0013 — File Content Version Checks and Asynchronous Caching"
+description: "Decision to store file content in scoped IndexedDB and a per-root in-memory LRU, display cached content read-only first, and then check permissions and versions. Defines P2P-compatible JSON unchanged responses, draft and collaboration protection, and the scope of replacement for the existing localStorage content cache."
 created: 2026-10-17
 updated: 2026-10-17
 ---
 
-# 0013 — 파일 본문 버전 확인과 비동기 캐시
+# 0013 — File Content Version Checks and Asynchronous Caching
 
-상태: 채택.
+Status: Accepted.
 
-## 배경
+## Background
 
-프로젝트 복귀 때 본문 메모리가 비워지고 localStorage의 동기 본문 파싱·저장이 반복됐다. 캐시가 있어도 전체 본문을 다시 받고, 서버 응답까지 에디터를 가려 캐시의 첫 표시 이점을 살리지 못했다.
+Returning to a project cleared content from memory and repeatedly triggered synchronous content parsing and storage in localStorage. Even with a cache, the full content was fetched again, and the editor stayed hidden until the server responded, losing the benefit of displaying cached content immediately.
 
-## 결정
+## Decision
 
-본문 영구 캐시는 계정·인스턴스 범위를 따르는 IndexedDB로 옮기고 최근 루트의 메모리 캐시는 제한된 LRU에서 유지한다. 캐시 본문은 응답 전에 읽기 전용으로 표시하며, 최신본과 권한 확인 뒤 편집·협업을 시작한다. 캐시를 먼저 보여 주기 위해 오래된 내용을 협업 방에 시딩하거나 자동 저장하지 않는다.
+Move the persistent content cache to IndexedDB scoped by account and instance, and retain memory caches for recent roots in a bounded LRU. Display cached content read-only before the response arrives, and start editing and collaboration after confirming the latest content and permissions. Do not seed collaboration rooms with stale content or autosave it to display the cache first.
 
-서버 파일 버전과 캐시 본문을 함께 저장한다. 같은 버전은 본문을 읽거나 전송하지 않고 JSON unchanged 응답을 반환한다. HTTP 304에 의존하지 않아 HTTP·P2P에서 같은 경로를 사용한다. 권한은 요청마다 다시 검사한다. 버전 없는 기존 캐시와 로컬 저장 결과는 전체 조회로 재확인한다.
+Store the server file version together with cached content. For the same version, return a JSON unchanged response without reading or transmitting the content. Use the same path for HTTP and P2P without relying on HTTP 304. Recheck permissions on every request. Revalidate existing unversioned caches and local save results with a full fetch.
 
-기존 [ADR 0133](../history/decisions/0133-mew-browser-cache-budget-and-retention.md)의 **파일 본문 localStorage 저장** 부분을 대체한다. 다른 localStorage 캐시·초안·설정의 원래 수명과 예산은 유지한다. 본문 IndexedDB는 별도 제한을 가지며 상세 한도·이관·검증은 [파일 조회 계약](../development/file-loading.md)이 소유한다.
+Replaces the **file content storage in localStorage** portion of the existing [ADR 0133](../history/decisions/0133-mew-browser-cache-budget-and-retention.md). Preserve the original lifetimes and budgets of other localStorage caches, drafts, and settings. Content IndexedDB has separate limits; the [File Retrieval Contract](../development/file-loading.md) owns detailed limits, migration, and verification.
 
-## 근거와 영향
+## Rationale and Impact
 
-동기 본문 직렬화와 반복 전송을 줄이면서 현재 권한·디스크 변경을 확인할 수 있다. 확인 전 본문 열람은 가능하지만 편집은 서버 확인을 기다린다. 비동기 캐시가 실패하면 서버 조회로 진행하고, 캐시 손실이 원본 파일·초안 손실로 이어지지 않는다.
+This reduces synchronous content serialization and repeated transfers while checking current permissions and disk changes. Content can be viewed before verification, but editing waits for server confirmation. If the asynchronous cache fails, proceed with a server fetch; cache loss does not cause loss of source files or drafts.
 
-Markdown 문서 모델과 Yjs 협업 방의 수명은 기존대로 유지한다. 에디터·소켓 상주 풀이나 부분 문서 편집은 이 결정에 포함하지 않는다. 격리 테스트의 전송량 감소와 실제 설치의 전체 전환 지연은 구분한다.
+Keep the Markdown document model and Yjs collaboration room lifetimes unchanged. Resident editor or socket pools and partial-document editing are outside this decision. Distinguish reduced transfer volume in isolated tests from total switching latency in actual installations.

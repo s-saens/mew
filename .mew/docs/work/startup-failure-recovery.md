@@ -1,23 +1,23 @@
 ---
-title: "첫 접속 실패 시 로딩 종료 보완"
-description: "2026-10-29 Mewlink 데스크톱 첫 접속 지연 제보 조사와 초기 다운로드·원격 초기화 실패 표시, 초기 인증·정적 UI 본문 정지 시 취소를 보완한 작업 기록이다. 격리 검증과 실제 제보의 미재현·운영 미적용 범위를 구분한다."
+title: "Improved Loading Termination on Initial Connection Failure"
+description: "Work record for 2026-10-29 covering investigation of reported delays on the first desktop connection to Mewlink, failure displays for initial downloads and remote initialization, and cancellation when initial authentication or static UI response bodies stall. Distinguishes isolated validation from the actual report, which was not reproduced, and changes not applied to production."
 created: "2026-10-29"
 updated: "2026-10-29"
 ---
 
-## 목적과 결과
+## Purpose and results
 
-데스크톱에서 Mewlink로 처음 접속할 때 화면이 오래 표시되지 않고, 이후 방문은 캐시 덕분에 빨라졌다는 제보를 조사했다. 조사 환경의 새 Chromium 컨텍스트에서는 로그인 화면까지 데스크톱 첫 방문 1.9초·재방문 1.4초, 모바일 에뮬레이션 첫 방문 1.4초·재방문 1.3초로 제보한 30분 지연을 재현하지 못했다. 호스트와 같은 조사 환경의 접속 결과이며 친구 PC·외부망·로그인 후 작업 화면의 검증을 대신하지 않는다.
+Investigated a report that the screen took a long time to appear on the first desktop visit through Mewlink, while subsequent visits were faster due to caching. In a fresh Chromium context in the investigation environment, reaching the login screen took 1.9 seconds on the first desktop visit and 1.4 seconds on a repeat visit, and 1.4 seconds on the first visit with mobile emulation and 1.3 seconds on a repeat visit; the reported 30-minute delay was not reproduced. These connection results came from the same investigation environment as the host and do not replace validation on the friend's PC, an external network, or the workspace UI after login.
 
-별도로 확인한 실패 경로를 보완했다. 인증 진입점 다운로드나 원격 초기화가 실패하면 시작 화면이 계속 남던 경로를 기존 복구 문구로 끝낸다. 부모가 전달할 초기 인증 결과나 직접 조회한 인증 본문이 끝나지 않는 경우도 최대 30초 뒤 대기·직접 요청을 취소한다. 정적 UI 응답은 헤더 도착 뒤 본문 전송이 멈춰도 대기 제한이 없었으므로, 다음 데이터를 요청하고 30초간 응답이 없으면 취소한다. 진행 중인 다운로드·소비자 역압·일반 API 장기 스트림은 유지한다. 현재 기준은 [브라우저 첫 시작](../development/architecture.md#브라우저-첫-시작)과 [원격 자원 전송](../development/remote-access.md#호스트-ui의-압축과-재검증)이 소유한다.
+Addressed separately confirmed failure paths. When downloading the authentication entry point or remote initialization fails, paths that previously left the startup screen displayed now end with the existing recovery message. If the initial authentication result expected from the parent or the directly fetched authentication body never completes, cancel the wait and direct request after at most 30 seconds. Static UI responses previously had no timeout if body transfer stalled after headers arrived; now cancel if no response arrives for 30 seconds after requesting the next data. Preserve active downloads, consumer backpressure, and long-running regular API streams. The current requirements are owned by [Browser startup](../development/architecture.md#initial-browser-startup) and [Remote resource transfer](../development/remote-access.md#host-ui-compression-and-revalidation).
 
-## 검증과 한계
+## Validation and Limitations
 
-- 수정 전 초기 다운로드 실패 회귀 검사는 복구 문구가 표시되지 않아 실패했다. 수정 후 PC·모바일 크기의 일반·원격 import 실패·원격 초기화 실패, 초기 인증 정지와 정상 완료 후 타이머 정리를 확인했다.
-- `node --test src/app-bootstrap.browser.test.ts server/remote-resource-worker.test.ts server/remote-ui-resource-browser.test.ts server/remote-flow-control-ui.test.ts`: 13개 통과, 건너뜀 없음. 시작 의존성·인증 경계, 가상 시계의 본문 정지·진행·역압·SSE·정리와 실제 Chromium의 압축·캐시·동적 import·수신 창을 확인했다.
-- `node --test src/utils/remote-reconnect.test.ts`: 17개 통과. 초기 인증 공유·연결 복구·늦은 응답·권한 회수 경계를 확인했다.
-- `npx tsc -b`와 변경한 코드·테스트 파일 5개의 `npx oxlint`: 통과. 이번 작업 경로의 `git diff --check`도 통과했다.
-- UI 기계 검사는 `impeccable detect --json src/main.tsx`에서 지적 사항이 없었다.
-- `npm run check:docs`: description 520개는 오류 없이 통과했다. 전체 링크 검사는 이번 작업과 무관하게 삭제된 기능 MOC·태스크 문서의 기존 링크 18건 때문에 실패했다. 기존 검사 함수로 이번 변경 문서 3개의 링크 오류가 없음을 따로 확인했다.
+- Before the fix, the initial download failure regression check failed because the recovery message was not displayed. After the fix, verified standard and remote import failures, remote initialization failures, initial authentication stalls, and timer cleanup after normal completion at desktop and mobile sizes.
+- `node --test src/app-bootstrap.browser.test.ts server/remote-resource-worker.test.ts server/remote-ui-resource-browser.test.ts server/remote-flow-control-ui.test.ts`: 13 passed, none skipped. Verified startup dependencies and authentication boundaries; body stalls, progress, backpressure, SSE, and cleanup with a virtual clock; and compression, caching, dynamic import, and receive windows in real Chromium.
+- `node --test src/utils/remote-reconnect.test.ts`: 17 passed. Verified shared initial authentication, connection recovery, late responses, and permission revocation boundaries.
+- `npx tsc -b` and `npx oxlint` on the 5 changed code and test files: passed. `git diff --check` also passed for the paths changed in this work.
+- The automated UI check reported no findings with `impeccable detect --json src/main.tsx`.
+- `npm run check:docs`: 520 descriptions passed without errors. The full link check failed due to 18 existing links to deleted feature MOC and task documents unrelated to this work. Separately used the existing check function to confirm no link errors in the 3 documents changed in this work.
 
-실제 제보의 원인은 아직 확정하지 않았다. 이번 변경은 확인한 실패·전송 정지를 무기한 로딩으로 남기지 않도록 보완한 것이다. 앱 빌드·배포·서버 시작·종료·재시작은 수행하지 않았으며, 운영 적용은 사용자의 호스트 빌드·재시작과 중앙 앱 origin의 자원 worker 반영이 필요하다. 운영 적용 후 친구 PC의 브라우저·네트워크에서 다시 확인해야 한다.
+The cause of the actual report has not yet been determined. These changes prevent the confirmed failures and transfer stalls from leaving loading active indefinitely. No app build, deployment, or server start, stop, or restart was performed. Applying the changes to production requires the user to build and restart the host and update the resource worker at the central app origin. After production application, verification must be repeated in the browser and network environment on the friend's PC.

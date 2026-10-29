@@ -1,36 +1,36 @@
 ---
-provenance: "Liiiiv 중앙 ADR 이관본, 2026-10-14"
-title: "0207 — mewlink 계정은 기기를 관리하고 기기 사용은 로컬 mew가 인증한다"
-description: "기기 주소의 비로그인 WebRTC 연결과 로컬 이메일·비밀번호 인증, 중앙 등록·관리 계정의 경계, 제한된 미인증 전송과 기기별 세션 보관을 결정한다."
+provenance: "Migrated copy of a Liiiiv central ADR, 2026-10-14"
+title: "0207 — mewlink accounts manage devices, and local mew authenticates device use"
+description: "Define unauthenticated WebRTC connections to device addresses, local email and password authentication, boundaries for central registration and management accounts, restricted unauthenticated transport, and per-device session storage."
 created: 2026-10-12
 updated: 2026-10-12
 ---
 
-- 날짜: 2026-10-12
-- 상태: 채택
-- 적용 상태: 구현·격리 자동 검증 완료 · 운영 미반영
-- 부분 대체: [0195](0195-mew-account-based-p2p-remote-access.md) — 방문자의 중앙 계정 로그인·멤버 매핑·중앙 세션 회수로 기기 작업을 허용하던 범위
-- 부분 대체: [0203](0203-mewlink-workers-p2p-ui.md) — 계정·중앙 세션 결합 launch와 인증 후에만 로컬 UI를 전송하던 범위
-- 결정자: 사용자 (등록과 기기 접속 인증 분리 요청), Codex (구현 계약)
+- Date: 2026-10-12
+- Status: Adopted
+- Application status: implementation and isolated automated verification complete · not applied to production
+- Partially supersedes: [0195](0195-mew-account-based-p2p-remote-access.md) — The scope that permitted device work through visitors' central account login, member mapping, and central session revocation
+- Partially supersedes: [0203](0203-mewlink-workers-p2p-ui.md) — The scope that bound launch to accounts and central sessions and transferred the local UI only after authentication
+- Decision makers: user (requested separation of registration and device access authentication), Codex (implementation contract)
 
-## 배경
+## Background
 
-기기 등록에 필요한 중앙 계정과 실제 컴퓨터의 mew 계정이 접속 과정에서 함께 등장한다. 사용자는 `mew.saens.kr/<유저이름>/<기기이름>`을 일반 웹사이트처럼 열고, 해당 컴퓨터의 mew 로그인 화면에서 인증하기를 요청했다. 로그인 단계 제거만으로 연결·화면 전송의 속도 개선을 보장하지 않는다.
+The central account required for device registration and the mew account on the actual computer both appear during access. The user requested opening `mew.saens.kr/<유저이름>/<기기이름>` like a regular website and authenticating on that computer's mew login screen. Removing a login step alone does not guarantee faster connections or screen transfer.
 
-## 결정
+## Decision
 
-- Mewlink 로그인은 기기 등록·삭제·내 기기 목록·중앙 계정 관리를 소유한다. 중앙 로그인이나 이메일 일치로 로컬 mew 사용 권한을 부여하지 않는다.
-- 공개 기기 주소는 중앙 로그인 없이 연결을 시작한다. 중앙은 등록된 기기·origin·요청 한도·짧은 일회용 launch와 WebRTC 신원 증명을 확인한다. 방문자용 launch subject는 연결용 난수이며 로컬 사용자 신원이 아니다.
-- 연결 전후 기기 키·임시 브라우저 키·challenge·generation·SDP 지문·issuer·audience·서명·만료 검사와 일회용 소비를 유지한다. 기기 삭제·호스트 종료·연결 lease 만료는 연결을 정리한다.
-- 로컬 로그인 전에는 설치된 정적 UI와 인증 전용 경로만 제공한다. 일반 guest 파일 권한을 이 경로에 적용하지 않으며 파일·작업 API·WebSocket을 차단한다. 임시 비밀번호는 비밀번호 변경 경로만 추가로 허용한다.
-- 실제 작업 권한은 로컬 mew의 승인된 이메일·비밀번호와 서버측 세션으로 결정한다. 기존 비밀번호 변경·계정 삭제·세션 만료·역할·기능·파일 권한과 회수 계약을 유지한다. 중앙 멤버 매핑 UI와 승인은 기기 접속 경로에서 사용하지 않는다.
-- 브라우저의 재접속용 로컬 세션 토큰은 중앙 로그인 쿠키와 별개다. 중앙 호스트의 기기별 저장소에만 보관하고, 중앙 origin의 WebRTC 연결에서 서버에 재개한다. 앱 origin의 launch 프레임은 자격증명을 제거한 MessagePort만 받는다. 설치된 앱 프레임에 토큰을 전달하지 않으며 설치된 앱과 launcher의 브리지 응답에서 자격증명 헤더를 제거한다. 비밀번호는 중앙 인증 API·저장소·로그에 전송하지 않는다.
-- 설치된 앱의 데이터 캐시·탭·초안·설정 범위는 로컬 계정과 instance ID다. 로그인·로그아웃·사용자 전환 때 이전 계정 작업과 화면을 정리한 뒤 새 범위를 적용한다.
-- 중앙에서 IP·기기별 신규 연결 빈도를 제한하고 pending·전체 연결 수를 제한한다. 로컬 로그인은 중앙에서 서명한 접속 IP와 로컬 계정별 실패 한도를 적용한다. 미인증 연결은 유한 시간 뒤 종료하며 브라우저 갱신으로 무기한 유지하지 않는다.
-- 네이티브 설치·loopback bind·직접 DataChannel 전송·로그인 origin과 앱 origin 분리·TURN 미사용을 유지한다. 중앙 소스는 공개 mew Git에서 계속 제외한다. 공개 연결 전의 호스트 IP 노출과 자원 소비 위험은 중앙 로그인 선행 방식보다 커진다.
+- Mewlink login owns device registration, deletion, the My Devices list, and central account management. Central login or matching email addresses do not grant permission to use local mew.
+- Public device addresses initiate connections without central login. The central service verifies registered devices, origins, request limits, short-lived one-time launches, and WebRTC identity proofs. A visitor launch subject is a random value for the connection, not a local user identity.
+- Retain checks of device keys, temporary browser keys, challenges, generations, SDP fingerprints, issuers, audiences, signatures, and expiration, along with single-use consumption, before and after connection. Device deletion, host shutdown, and connection lease expiration clean up connections.
+- Before local login, provide only the installed static UI and authentication-only routes. Do not apply general guest file permissions to these routes, and block files, work APIs, and WebSocket. Temporary passwords additionally allow only the password-change route.
+- Determine actual work permissions through local mew's approved email and password and server-side sessions. Retain existing contracts for password changes, account deletion, session expiration, roles, features, file permissions, and revocation. Do not use central member mapping UI or approvals in the device access flow.
+- The browser's local session token for reconnection is separate from the central login cookie. Store it only in per-device storage on the central host, and use it to resume the session with the server over a WebRTC connection from the central origin. The launch frame on the app origin receives only a MessagePort stripped of credentials. Do not pass tokens to the installed app frame, and strip credential headers from bridge responses for the installed app and launcher. Do not send passwords to central authentication APIs, storage, or logs.
+- Scope the installed app's data caches, tabs, drafts, and settings by local account and instance ID. On login, logout, or user switching, clean up the previous account's work and screens before applying the new scope.
+- Centrally limit the rate of new connections by IP and device, and limit pending and total connections. Local login applies failure limits by the connecting IP signed by the central service and by local account. Terminate unauthenticated connections after a finite period; browser refreshes must not keep them alive indefinitely.
+- Retain native installation, loopback binding, direct DataChannel transport, separation of login and app origins, and no TURN usage. Continue excluding central source code from the public mew Git repository. Host IP exposure and resource consumption risks before public connections are greater than with an approach that requires central login first.
 
-## 근거
+## Rationale
 
-일반 웹 서비스처럼 주소·전송과 사용자 인가를 분리하면 기기 등록자의 중앙 계정 없이도 로컬 계정으로 접속할 수 있다. 기존 로그인 화면·비밀번호·역할을 기준으로 유지한다. 다만 미인증 방문자가 호스트와 연결할 수 있으므로 전송·인증 경계와 자원 한도를 별도로 적용한다.
+Separating addressing and transport from user authorization, as in a regular web service, allows access with a local account without the device registrant's central account. Keep the existing login screen, passwords, and roles as the basis. Because unauthenticated visitors can connect to the host, apply transport and authentication boundaries and resource limits separately.
 
-기술 근거: [WebRTC 보안 RFC 8827](https://www.rfc-editor.org/rfc/rfc8827.html), [OWASP 세션 관리](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html). 현재 구현·검증·운영 범위는 [원격 접속 계약](../../development/remote-access.md)이 소유한다.
+Technical basis: [WebRTC Security RFC 8827](https://www.rfc-editor.org/rfc/rfc8827.html), [OWASP Session Management](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html). The [Remote Access Contract](../../development/remote-access.md) owns the current implementation, verification, and production scope.

@@ -1,40 +1,44 @@
 ---
-title: "开始使用 mew"
+title: "Getting started with mew"
 updated: "2026-10-28"
-description: "s-saens/mew 소스의 중국어 간체 설치·첫 로그인·파일탐색기 및 목적별 사용법과 Mewlink·대체 외부 접속, 권한·업데이트·데이터 보존 및 미발행 CLI 경로를 안내한다. 햄버거 메뉴의 Mewlink 연결 진입을 포함한다."
+description: "Installation, first sign-in, remote access, updates, and data retention for Mew. The legacy locale filename is retained for existing links."
 ---
 
-# 开始使用 mew
+[Current installation guide](getting-started-en.md) · [Documentation](../README.md)
 
-[한국어](getting-started-ko.md) · [English](getting-started-en.md) · [简体中文](getting-started-zh.md) · [日本語](getting-started-ja.md)
+> This guide is maintained in English. Its original filename is retained for existing links. Use the [current installation guide](getting-started-en.md) for new references.
 
-mew 可在浏览器中打开电脑或服务器上的文件夹。你可以编辑 Markdown 和代码，运行终端和 AI agent，审查 Git 更改，并与他人一起处理文档；也可在手机上使用。
+# Getting started with mew
+
+
+
+mew lets you open folders on a computer or server in a browser. You can edit Markdown and code, run terminals and AI agents, review Git changes, and collaborate on documents; you can also use it on your phone.
 
 <a id="quick-start"></a>
 
-[首次使用](#first-steps) · [远程访问](#remote-access) · [运行与更新](#running-and-updating) · [文档](#documentation)
+[First steps](#first-steps) · [Remote access](#remote-access) · [Running and updating](#running-and-updating) · [Documentation](#documentation)
 
-## 快速开始
+## Quick start
 
-[Windows（WSL 2）](#windows-wsl-2) · [macOS](#macos) · [Linux](#linux) · [远程访问](#remote-access)
+[Windows (WSL 2)](#windows-wsl-2) · [macOS](#macos) · [Linux](#linux) · [Remote access](#remote-access)
 
 <a id="windows-wsl-2"></a>
 
 ### Windows（WSL 2）
 
-在 WSL 2 的 Ubuntu 中运行 mew，再用 Windows 浏览器打开它。
+Run mew in Ubuntu on WSL 2, then open it in a Windows browser.
 
-**1. 安装 WSL 和 Ubuntu。**以管理员身份打开 PowerShell，运行：
+**1. Install WSL and Ubuntu.** Open PowerShell as an administrator and run:
 
 ```powershell
 wsl --install -d Ubuntu
 ```
 
-重启 Windows，从开始菜单打开 **Ubuntu**，创建 Linux 用户名和密码。它与 Windows 登录账户相互独立。该命令要求 Windows 11 或 Windows 10 版本 2004（内部版本 19041）及以上。安装失败时请参阅 [Microsoft 的 WSL 安装指南](https://learn.microsoft.com/en-us/windows/wsl/install)。
+Restart Windows, open **Ubuntu** from the Start menu, and create a Linux username and password. These are separate from your Windows login account. This command requires Windows 11 or Windows 10 version 2004 (build 19041) or later. If installation fails, see [Microsoft's WSL installation guide](https://learn.microsoft.com/en-us/windows/wsl/install).
 
-若已安装 Ubuntu，请在 PowerShell 中以 `wsl -l -v` 查看其状态。如果版本为 `1`，使用列表中显示的发行版名称运行 `wsl --set-version Ubuntu 2`。
+If Ubuntu is already installed, check its status with `wsl -l -v` in PowerShell. If the version is `1`, run `wsl --set-version Ubuntu 2` using the distribution name shown in the list.
 
-**2. 安装 mew。**在 **Ubuntu** 中运行：
+**2. Install mew.** Run in **Ubuntu**:
 
 ```bash
 sudo apt update
@@ -46,35 +50,35 @@ cd mew
 ./mew setup
 ```
 
-如出现提示，请接受通过 nvm 安装 Node 的选项。将仓库和项目放在 Linux 文件系统中，例如 `~/apps` 和 `~/mew-workspace`，Linux 工具的性能会更好。可用 `explorer.exe .` 在 Windows 资源管理器中打开当前文件夹。参阅 [Microsoft 的 WSL 文件存储说明](https://learn.microsoft.com/en-us/windows/wsl/setup/environment#file-storage)。
+If prompted, accept the option to install Node through nvm. Keep repositories and projects in the Linux filesystem, such as `~/apps` and `~/mew-workspace`, for better Linux tool performance. Use `explorer.exe .` to open the current folder in Windows File Explorer. See [Microsoft's WSL file storage guidance](https://learn.microsoft.com/en-us/windows/wsl/setup/environment#file-storage).
 
-**3. 登录。**按照下面的[完成设置](#finish-setup)操作，然后在 Edge、Chrome 或其他 Windows 浏览器中打开终端显示的 URL。通常是 `http://localhost:5000`；[WSL 会将 localhost 访问从 Windows 转发过来](https://learn.microsoft.com/en-us/windows/wsl/networking#accessing-linux-networking-apps-from-windows-localhost)。
+**3. Sign in.** Follow [Finish setup](#finish-setup) below, then open the URL displayed in the terminal in Edge, Chrome, or another Windows browser. It is usually `http://localhost:5000`; [WSL forwards localhost access from Windows](https://learn.microsoft.com/en-us/windows/wsl/networking#accessing-linux-networking-apps-from-windows-localhost).
 
 <a id="macos"></a>
 
 ### macOS
 
-**1. 安装 Apple 命令行工具。**打开终端并运行：
+**1. Install Apple's command line tools.** Open a terminal and run:
 
 ```bash
 xcode-select --install
 ```
 
-等待安装窗口完成。如果工具已安装，直接继续。
+Wait for the installation window to finish. If the tools are already installed, continue.
 
-**2. 安装 Homebrew 和所需工具。**若未安装 `brew`，运行 [Homebrew](https://brew.sh/) 提供的命令：
+**2. Install Homebrew and the required tools.** If `brew` is not installed, run the command provided by [Homebrew](https://brew.sh/):
 
 ```bash
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 ```
 
-按安装程序的 **Next steps** 将 Homebrew 加入 shell，然后运行：
+Follow the installer's **Next steps** to add Homebrew to your shell, then run:
 
 ```bash
 brew install tmux python
 ```
 
-**3. 安装 mew。**在同一终端窗口运行：
+**3. Install mew.** Run in the same terminal window:
 
 ```bash
 mkdir -p ~/apps
@@ -84,15 +88,15 @@ cd mew
 ./mew setup
 ```
 
-如出现提示，请接受通过 nvm 安装 Node 的选项。按下面的[完成设置](#finish-setup)操作，然后在浏览器中打开终端显示的 URL。
+If prompted, accept the option to install Node through nvm. Follow [Finish setup](#finish-setup) below, then open the URL shown in the terminal in your browser.
 
-设置还会准备远程桌面助手。在运行 mew 的 Mac 上，系统设置打开时，请为 Electron 批准 **Accessibility** 和 **Screen Recording** 权限。检测到这些权限后，设置会继续。详见 [Mac 权限准备](../guides/remote-desktop.md#mac-%EA%B6%8C%ED%95%9C-%EC%A4%80%EB%B9%84)。
+Setup also prepares the remote desktop helper. On the Mac running mew, grant Electron **Accessibility** and **Screen Recording** permissions when System Settings opens. Setup continues once these permissions are detected. See [Prepare Mac permissions](../guides/remote-desktop.md#mac-permission-setup) for details.
 
 <a id="linux"></a>
 
 ### Linux
 
-在 Debian 或 Ubuntu 上：
+On Debian or Ubuntu:
 
 ```bash
 sudo apt update
@@ -104,178 +108,178 @@ cd mew
 ./mew setup
 ```
 
-其他发行版请先安装等效软件包。然后按上面的[完成设置](#finish-setup)操作。服务器需要开机启动或接受远程连接时，请使用[部署指南](../deployment/native.md)。
+On other distributions, install equivalent packages first. Then follow [Finish setup](#finish-setup) above. If the server needs to start at boot or accept remote connections, use the [deployment guide](../deployment/native.md).
 
 <a id="finish-setup"></a>
 
-### 完成设置
+### Finish setup
 
-安装程序会询问：
+The installer asks for:
 
-- **工作区文件夹：**项目的父目录。默认是 `~/mew-workspace`；其中的每个文件夹都会成为一个项目。
-- **端口：**默认 `5000`。若端口已被占用，setup 会选择附近可用的端口。
-- **Postgres 连接：**可选，用于数据库表。可跳过，之后再添加。
-- **所有者邮箱：**第一个 mew 账户。设置程序会显示临时密码。
+- **Workspace folder:** The parent directory for projects. The default is `~/mew-workspace`; each folder inside it becomes a project.
+- **Port:** Defaults to `5000`. If the port is already in use, setup selects a nearby available port.
+- **Postgres connection:** Optional, for database tables. You can skip it and add it later.
+- **Owner email:** The first mew account. Setup displays a temporary password.
 
-设置会安装依赖、准备远程桌面组件、构建应用并启动服务器。首次下载可能需要几分钟。远程桌面准备失败会显示为警告，不会阻止其余安装。
+Setup installs dependencies, prepares remote desktop components, builds the app, and starts the server. The initial download may take a few minutes. A remote desktop preparation failure appears as a warning and does not block the rest of the installation.
 
-打开 setup 显示的 URL，登录后修改临时密码。使用页眉中的 **+** 打开项目文件夹，再从文件资源管理器选择文件。
+Open the URL shown by setup, log in, and change the temporary password. Use **+** in the header to open a project folder, then select a file from the file explorer.
 
-重启后，打开 Ubuntu 或终端，在安装目录中启动 mew：
+After a restart, open Ubuntu or a terminal and start mew from the installation directory:
 
 ```bash
 cd ~/apps/mew
 ./mew start
 ```
 
-### 一条命令运行（首次发布后）
+### Run with one command (after the first release)
 
-安装 Node.js 24 后，可在工作文件夹运行以下命令，下载预构建的应用。**实现已准备好，但首次 npm 包和 GitHub 运行包尚未发布。**
+After installing Node.js 24, run the following command in your working folder to download the prebuilt app. **The implementation is ready, but the first npm package and GitHub runtime package have not yet been published.**
 
 ```bash
 cd /path/to/workspace
 npx @liiiiv/mew-cli@latest
 ```
 
-支持 Linux glibc 2.35 以上、macOS 15 以上的 x64/arm64。Windows 请在 WSL 2 的 Ubuntu 22.04 以上运行。首次输入 owner 邮箱，用终端显示的临时密码登录并修改密码。已有账户、会话和设备注册会被保留。按[远程访问](#remote-access)步骤注册 Mewlink，终端也会显示注册链接和在线地址的二维码。
+Supports x64/arm64 on Linux with glibc 2.35 or later and macOS 15 or later. On Windows, run in Ubuntu 22.04 or later on WSL 2. On first use, enter the owner email, log in with the temporary password shown in the terminal, and change the password. Existing accounts, sessions, and device registrations are preserved. Follow [Remote access](#remote-access) to register with Mewlink; the terminal also displays the registration link and a QR code for the online address.
 
-按 Ctrl+C 停止，再次运行相同命令即可使用最新发布版本。如果旧 clone 使用 `.data/`，先停止旧服务器，再传入 `--data-dir /path/to/old/mew/.data`。远程桌面仍需准备可选组件和操作系统权限。[运行与数据约定](../../.mew/docs/development/cli-distribution.md) · [发布步骤](../../.mew/docs/operations/cli-release.md)
+Press Ctrl+C to stop, then run the same command again to use the latest published version. If an old clone uses `.data/`, stop the old server first, then pass `--data-dir /path/to/old/mew/.data`. Remote desktop still requires optional components and operating system permissions. [Runtime and data contracts](../../.mew/docs/development/cli-distribution.md) · [Release steps](../../.mew/docs/operations/cli-release.md)
 
 <a id="remote-access"></a>
 
-### 远程访问
+### Remote access
 
-可用 Mewlink 从其他浏览器连接，也可选择 Tailscale 或 Cloudflare Tunnel。请保持主机唤醒、mew 运行及网络连接。使用代理方案时，保持 `MEW_BIND=127.0.0.1`，并将 `5000` 替换为安装时选择的端口。
+Use Mewlink to connect from another browser, or choose Tailscale or Cloudflare Tunnel. Keep the host awake, mew running, and the network connected. When using a proxy, keep `MEW_BIND=127.0.0.1` and replace `5000` with the port selected during installation.
 
 #### 1. Mewlink
 
-1. 在本机 mew 中以 owner 登录并修改临时密码，打开**菜单 → Mewlink → 远程访问 → 注册设备**。
-2. 打开注册 URL，登录 Mewlink 并设置用户名和设备名称。
-3. 确认在线状态并复制 `https://mew.saens.kr/<用户名>/<设备名>` 连接地址。
-4. 在另一台设备打开该地址，无需登录 Mewlink 即可连接并显示主机的 mew 登录页。使用**该电脑的本地 mew 邮箱和密码**登录。连接端无需注册设备；保存的本地会话仍有效时，下次可继续使用。
+1. Log in to local mew as the owner and change the temporary password, then open **Menu → Mewlink → Remote access → Register device**.
+2. Open the registration URL, log in to Mewlink, and set a username and device name.
+3. Confirm the online status and copy the `https://mew.saens.kr/<用户名>/<设备名>` connection address.
+4. Open that address on another device to connect and display the host's mew login page without logging in to Mewlink. Log in with **that computer's local mew email and password**. The connecting device does not need to be registered; if the saved local session is still valid, it can be reused next time.
 
-Mewlink 登录仅用于设备注册、列表和删除。要让其他人使用，请创建其本地 mew 账户并设置角色、功能和文件权限，使用本地密码登录时不需要 Mewlink 账户。本地登录成功前禁止访问工作数据。
+Mewlink login is only used to register, list, and delete devices. To give others access, create their local mew accounts and configure roles, features, and file permissions. They do not need a Mewlink account to log in with a local password. Access to work data is prohibited until local login succeeds.
 
-主机必须保持运行和联网；阻止直接连接的网络会显示连接错误。此模式不支持 Android iframe。运行 `./mew remote-access account` 可再次查看注册说明。运营者请参阅[中央服务配置](../../.mew/docs/operations/remote-central.md)。应用此改动需要更新本地 mew 并重新部署 Mewlink，真实外网验证另行进行。
+The host must remain running and connected to the network; networks that block direct connections display a connection error. This mode does not support Android iframes. Run `./mew remote-access account` to view the registration instructions again. Operators should see [Central service configuration](../../.mew/docs/operations/remote-central.md). Applying this change requires updating local mew and redeploying Mewlink; verification over the actual public internet will be performed separately.
 
-如需无密码访问，访问者可在设备登录页面选择 **使用 Mewlink 登录 → 请求访问**。owner 在 **账户管理 → Mewlink 账户访问** 中批准身份，将其关联到现有本地用户或创建新用户（默认角色为 member）。权限由本地 mew 管理，解除关联即可撤销访问。注册账户或相同邮箱不会自动授予访问权。此流程需要更新本地 mew 并重新部署 Mewlink；登录提供者及外网验证范围请参阅[远程访问契约](../../.mew/docs/development/remote-access.md#검증과-남은-게이트)。
+For passwordless access, visitors can select **Log in with Mewlink → Request access** on the device login page. The owner approves the identity under **Account management → Mewlink account access** and links it to an existing local user or creates a new user (with the member role by default). Local mew manages permissions, and unlinking revokes access. Registering an account or having the same email address does not automatically grant access. This flow requires updating local mew and redeploying Mewlink; see the [remote access contract](../../.mew/docs/development/remote-access.md#verification-and-remaining-gates) for login providers and the scope of public internet verification.
 
 #### 2. Tailscale
 
-用于自己的设备。不需要购买域名，访问限制在私有 Tailscale 网络（tailnet）内。
+For your own devices. No domain purchase is required, and access is limited to the private Tailscale network (tailnet).
 
-1. 在 mew 主机以及每一台需要连接的设备上[安装 Tailscale](https://tailscale.com/download)。所有设备登录同一个 tailnet。
+1. [Install Tailscale](https://tailscale.com/download) on the mew host and every device that needs to connect. Sign all devices in to the same tailnet.
 
-2. 在 mew 主机上运行：
+2. Run on the mew host:
 
    ```bash
    tailscale serve --bg http://127.0.0.1:5000
    ```
 
-   若出现提示，请打开显示的链接以启用 HTTPS。在 Linux 上，如命令提示权限错误，请使用 `sudo`。对于 WSL 2，请在确认 `http://localhost:5000` 能在 Windows 浏览器中打开后，将 Tailscale 安装在 **Windows** 上，并在 **PowerShell** 中运行此命令。
+   If prompted, open the displayed link to enable HTTPS. On Linux, use `sudo` if the command reports a permission error. For WSL 2, first confirm that `http://localhost:5000` opens in a Windows browser, then install Tailscale on **Windows** and run this command in **PowerShell**.
 
-3. 在手机或另一台电脑连接 Tailscale 后，打开显示的 `https://<machine>.<tailnet>.ts.net` URL，登录 mew。
+3. After connecting your phone or another computer to Tailscale, open the displayed `https://<machine>.<tailnet>.ts.net` URL and log in to mew.
 
-参阅官方 [Tailscale Serve 指南](https://tailscale.com/docs/features/tailscale-serve)和[命令参考](https://tailscale.com/docs/reference/tailscale-cli/serve)。
+See the official [Tailscale Serve guide](https://tailscale.com/docs/features/tailscale-serve) and [command reference](https://tailscale.com/docs/reference/tailscale-cli/serve).
 
 #### 3. Cloudflare Tunnel
 
-如需稳定的 HTTPS 地址，并且连接设备无需安装 Tailscale，请使用此方式。**该设置要求域名由 Cloudflare DNS 管理。**
+Use this option if you need a stable HTTPS address without installing Tailscale on connecting devices. **This setup requires a domain managed by Cloudflare DNS.**
 
-1. 按官方 [Cloudflare 域名注册指南](https://developers.cloudflare.com/registrar/get-started/register-domain/)购买域名，或将[现有域名添加到 Cloudflare](https://developers.cloudflare.com/fundamentals/manage-domains/add-site/)，并按其说明设置名称服务器。
-2. 按官方 [Cloudflare Tunnel 设置指南](https://developers.cloudflare.com/tunnel/get-started/)创建隧道，在 mew 主机上安装并运行 `cloudflared`。对于 WSL 2，请在与 mew 相同的 Ubuntu 环境中运行 `cloudflared`。
-3. 添加一条 **Published application** 路由，主机名可为 `mew.example.com`，服务 URL 为 `http://127.0.0.1:5000`。路径留空，使 mew 在 `/` 提供服务。
-4. 保持 `cloudflared` 运行，然后从另一台设备打开 `https://mew.example.com` 并登录 mew。
+1. Follow the official [Cloudflare domain registration guide](https://developers.cloudflare.com/registrar/get-started/register-domain/) to buy a domain, or [add an existing domain to Cloudflare](https://developers.cloudflare.com/fundamentals/manage-domains/add-site/), and configure nameservers as instructed.
+2. Follow the official [Cloudflare Tunnel setup guide](https://developers.cloudflare.com/tunnel/get-started/) to create a tunnel, then install and run `cloudflared` on the mew host. For WSL 2, run `cloudflared` in the same Ubuntu environment as mew.
+3. Add a **Published application** route with a hostname such as `mew.example.com` and a service URL of `http://127.0.0.1:5000`. Leave the path empty so mew is served at `/`.
+4. Keep `cloudflared` running, then open `https://mew.example.com` from another device and log in to mew.
 
-这会创建公开的 HTTPS 入口；mew 的账户权限仍然生效。有关代理要求和连接检查，请参阅 [Security](../operations/security.md) 和[部署指南](../deployment/native.md#2-https-%ED%94%84%EB%A1%9D%EC%8B%9C-%EB%98%90%EB%8A%94-%ED%84%B0%EB%84%90-%EC%97%B0%EA%B2%B0)。
+This creates a public HTTPS entry point; mew's account permissions still apply. For proxy requirements and connection checks, see [Security](../operations/security.md) and the [deployment guide](../deployment/native.md#2-connect-an-https-proxy-or-tunnel).
 
-## 系统要求与权限
+## System requirements and permissions
 
-服务器运行在 Linux 或 macOS；Windows 通过 WSL 2 使用。它需要 Node 22.18+ 或 24+，建议使用 Node 24。终端使用 tmux 和本地编译的 `node-pty`，因此 setup 需要 Python 和 C/C++ 工具链。Docker 可选，仅用于 Postgres；目前不支持在容器中运行 mew 应用。
+The server runs on Linux or macOS; Windows uses WSL 2. It requires Node 22.18+ or 24+, with Node 24 recommended. The terminal uses tmux and a locally compiled `node-pty`, so setup requires Python and a C/C++ toolchain. Docker is optional and used only for Postgres; running the mew app in a container is currently unsupported.
 
-仅与信任的人共同使用 mew。默认情况下，`manager` 和 `owner` 账户可按服务器用户的操作系统权限运行终端和 agent。向其他账户授予这些功能，就等于授予相同的访问权限。在向他人提供实例前，请阅读 [安全](../operations/security.md)。
+Use mew only with people you trust. By default, `manager` and `owner` accounts can run terminals and agents with the server user's operating system permissions. Granting these features to other accounts grants the same access. Read [Security](../operations/security.md) before providing an instance to others.
 
 <a id="first-steps"></a>
 
-## 使用 mew
+## Using mew
 
-打开安装程序显示的地址，以 owner 登录并更改临时密码。
+Open the address shown by the installer, log in as the owner, and change the temporary password.
 
-1. 用页眉的 **+** 打开工作文件夹。
-2. 从左侧列表选择 Markdown 或代码文件。
-3. 按需从 dock 打开终端、agent 或 Git。
+1. Use **+** in the header to open a working folder.
+2. Select a Markdown or code file from the list on the left.
+3. Open a terminal, agent, or Git from the dock as needed.
 
-[界面截图](overview.md) · [首次操作指南](first-steps.md) · [用户指南](MOC.md)。详细指南目前为韩文。
+[Interface screenshots](overview.md) · [First steps guide](first-steps.md) · [User guide](MOC.md).
 
 <a id="projects-files-and-search"></a>
 
-### 项目、文件与搜索
+### Projects, files, and search
 
-用页眉的 **+** 打开文件夹，再从左侧选择文件。`Ctrl+P` 搜索文件名，`Ctrl+Shift+F` 搜索文件内容。
+Use **+** in the header to open a folder, then select a file on the left. `Ctrl+P` searches filenames, and `Ctrl+Shift+F` searches file contents.
 
-[项目、文件和任务](projects.md) · [搜索与替换](../configuration/search.md) · [项目设置](project-setup.md).
+[Projects, files, and tasks](projects.md) · [Search and replace](../configuration/search.md) · [Project setup](project-setup.md).
 
 <a id="writing-code-and-media"></a>
 
-### 写作、代码与媒体
+### Writing, code, and media
 
-用 **Hotview** 编辑渲染后的 Markdown，用 **Plain** 查看源文本。内容会自动保存。代码、表格、附件、PDF 和媒体都从文件列表打开。
+Use **Hotview** to edit rendered Markdown and **Plain** to view the source text. Content is saved automatically. Open code, tables, attachments, PDFs, and media from the file list.
 
-[编辑、保存与文件历史](editor.md).
+[Editing, saving, and file history](editor.md).
 
 <a id="git"></a>
 
 ### Git
 
-从 dock 打开 **Git**，查看更改文件与提交记录。打开文件检查 diff，再选择要提交的文件。
+Open **Git** from the dock to view changed files and commit history. Open a file to inspect its diff, then select the files to commit.
 
-[Git 面板](projects.md#git-작업-패널).
+[Git panel](projects.md#git-operations-panel).
 
 <a id="collaboration-and-sharing"></a>
 
-### 协作与共享
+### Collaboration and sharing
 
-支持共同编辑、评论、提及和聊天。其他账户与访客的访问受角色、功能和文件权限控制。
+Supports collaborative editing, comments, mentions, and chat. Access for other accounts and guests is controlled by roles, features, and file permissions.
 
-[协作与共享](collaboration.md) · [安全](../operations/security.md).
+[Collaboration and sharing](collaboration.md) · [Security](../operations/security.md).
 
 <a id="terminals-agents-and-automation"></a>
 
-### 终端、agent 与自动化
+### Terminals, agents, and automation
 
-从 dock 打开终端或 agent。先安装并认证 AI 运行时。对话、命令按钮和计划任务请参阅相应指南。
+Open a terminal or agent from the dock. Install and authenticate the AI runtime first. See the respective guides for conversations, command buttons, and scheduled tasks.
 
-[终端与 agent](terminal-agents.md) · [运行时设置](../configuration/agent-runtimes.md) · [命令与计划任务](commands.md).
+[Terminals and agents](terminal-agents.md) · [Runtime setup](../configuration/agent-runtimes.md) · [Commands and scheduled tasks](commands.md).
 
 <a id="browser-android-and-remote-desktop"></a>
 
-### 浏览器、Android 与远程桌面
+### Browser, Android, and remote desktop
 
-用服务器浏览器打开网页。Android 与远程桌面需要单独准备环境、安装组件和授予操作系统权限；请先检查支持范围。
+Use the server browser to open web pages. Android and remote desktop require separate environment preparation, component installation, and operating system permissions; check the scope of support first.
 
-[浏览器与 Android](browser.md) · [远程桌面](remote-desktop.md).
+[Browser and Android](browser.md) · [Remote desktop](remote-desktop.md).
 
 <a id="databases"></a>
 
-### 数据库
+### Database
 
-配置 Postgres 后，用 `/db` 在文档中插入数据库表。这与 Markdown 表格是不同功能；编辑文档和代码不需要数据库。
+After configuring Postgres, use `/db` to insert database tables into documents. This is a separate feature from Markdown tables; editing documents and code does not require a database.
 
-[数据库表](database.md).
+[Database tables](database.md).
 
 <a id="layout-settings-and-accounts"></a>
 
-### 布局、设置与账户
+### Layout, settings, and accounts
 
-用 dock 打开面板并拖动标签调整布局。手机上用底部 dock 切换。**Settings** 控制主题、语言、字体、快捷键、Mewpet 和账户。
+Use the dock to open panels and drag tabs to adjust the layout. On phones, use the bottom dock to switch. **Settings** controls the theme, language, fonts, shortcuts, Mewpet, and accounts.
 
-[分屏与移动界面](editor.md) · [环境与账户](../configuration/MOC.md).
+[Split views and mobile interface](editor.md) · [Environment and accounts](../configuration/MOC.md).
 
 <a id="running-and-updating"></a>
 
-## 运行与更新
+## Running and updating
 
-请在 mew 仓库中运行以下命令。Windows 请使用 Ubuntu 终端。
+Run the following commands in the mew repository. On Windows, use the Ubuntu terminal.
 
 ```bash
 ./mew start                    # 启动服务器
@@ -288,38 +292,38 @@ Mewlink 登录仅用于设备注册、列表和删除。要让其他人使用，
 ./mew users add you@example.com owner
 ```
 
-`./mew update` 使用 fast-forward 拉取。由 `./mew start` 启动的安装也可从应用菜单检查和安装更新。由 systemd 或其他监督程序管理的服务器，请遵循单独的[部署和更新流程](../deployment/native.md)。
+`./mew update` pulls using fast-forward. Installations started with `./mew start` can also check for and install updates from the app menu. For servers managed by systemd or another supervisor, follow the separate [deployment and update procedure](../deployment/native.md).
 
-设置和运行时数据默认保存在克隆目录外：
+Settings and runtime data are stored outside the clone directory by default:
 
-| 内容 | 位置 |
+| Content | Location |
 | --- | --- |
-| 配置 | `~/.config/mew/config.env` |
-| 账户、会话和已完成的 agent 轮次 | `~/.local/share/mew/` |
-| 日志 | `~/.local/state/mew/` |
+| Configuration | `~/.config/mew/config.env` |
+| Accounts, sessions, and completed agent turns | `~/.local/share/mew/` |
+| Logs | `~/.local/state/mew/` |
 
-删除克隆目录不会删除这些文件。请将它们与工作区和所有 Postgres 数据一同备份。覆盖设置请参阅[服务器配置](../configuration/environment.md#%EC%84%9C%EB%B2%84-%EC%84%A4%EC%A0%95)。
+Deleting the clone directory does not delete these files. Back them up along with your workspace and all Postgres data. For configuration overrides, see [Server settings](../configuration/environment.md#server-settings).
 
-要从手机或另一台电脑连接，请按[远程访问](#remote-access)操作。默认服务器绑定到主机本地。个人 `./mew start` 安装不会注册自动启动服务。
+To connect from a phone or another computer, follow [Remote access](#remote-access). By default, the server binds to the local host. A personal `./mew start` installation does not register an automatic startup service.
 
-若设置期间远程桌面准备失败，请用 `./mew desktop-setup` 重试。它会安装助手并处理 Mac 权限设置，无需构建应用或重启服务器。仍需已登录的桌面、相关操作系统库和权限；参阅[操作系统要求](../guides/remote-desktop.md#%EC%B2%98%EC%9D%8C-%EC%97%B0%EA%B2%B0)。
+If remote desktop preparation fails during setup, retry with `./mew desktop-setup`. It installs the helper and handles Mac permission setup without building the app or restarting the server. A logged-in desktop, the relevant operating system libraries, and permissions are still required; see [Operating system requirements](../guides/remote-desktop.md#first-connection).
 
-在 macOS 上，mew 会在打开终端前修复 `node-pty` 1.1.0 的 `spawn-helper` 缺失的执行权限。终端持续空白时，请在服务器日志中检查 `[mew:tmux]` 错误。
+On macOS, mew restores missing execute permissions on `node-pty` 1.1.0's `spawn-helper` before opening a terminal. If the terminal remains blank, check the server logs for `[mew:tmux]` errors.
 
 <a id="documentation"></a>
 
-## 文档
+## Documentation
 
-从[文档地图](../../.mew/docs/MOC.md)开始。详细产品规格、使用说明、操作流程和工作记录位于 `docs/`；本指南介绍设置和日常使用。代码更改时，请同步更新相关文档。
+Start with the [documentation map](../../.mew/docs/MOC.md). Detailed product specifications, usage instructions, operating procedures, and work records are in `docs/`; this guide covers setup and everyday use. Update the relevant documentation whenever code changes.
 
-| 主题 | 从这里开始 |
+| Topic | Start here |
 | --- | --- |
-| 项目、编辑、终端、浏览器、命令和数据库 | [用户指南](../guides/MOC.md) |
-| 环境变量、账户、搜索和 agent 运行时 | [配置](../configuration/MOC.md) |
-| HTTPS、systemd、更新和备份 | [部署](../deployment/native.md) |
-| 代码结构、包、界面、协作和 agent 协议 | [开发文档](../../.mew/docs/development/MOC.md) |
-| 产品规格、运营、当前工作和历史 | [文档地图](../../.mew/docs/MOC.md) |
-| 按账户划分的功能和文件权限 | [账户设置](../configuration/accounts.md#%EB%82%B4-%EA%B3%84%EC%A0%95%EA%B3%BC-%EA%B3%84%EC%A0%95-%EA%B4%80%EB%A6%AC) · [访问控制](../../.mew/docs/development/access-control.md) |
-| 角色、身份验证和访客访问 | [安全](../operations/security.md) |
+| Projects, editing, terminals, browsers, commands, and databases | [User guide](../guides/MOC.md) |
+| Environment variables, accounts, search, and agent runtimes | [Configuration](../configuration/MOC.md) |
+| HTTPS, systemd, updates, and backups | [Deployment](../deployment/native.md) |
+| Code structure, packages, interfaces, collaboration, and agent protocols | [Development documentation](../../.mew/docs/development/MOC.md) |
+| Product specifications, operations, current work, and history | [Documentation map](../../.mew/docs/MOC.md) |
+| Features and file permissions by account | [Account settings](../configuration/accounts.md#my-account-and-account-management) · [Access control](../../.mew/docs/development/access-control.md) |
+| Roles, authentication, and guest access | [Security](../operations/security.md) |
 
-在 Linux 上，`sh native/agent-memory/install.sh` 会为 agent 工作安装内存限制。有关启用、检查、低内存时暂停任务、队列保持和错误报告，请参阅 [agent 内存保护](../operations/agent-memory.md)。
+On Linux, `sh native/agent-memory/install.sh` installs memory limits for agent work. For enabling them, checking them, pausing tasks when memory is low, preserving queues, and reporting errors, see [Agent memory protection](../operations/agent-memory.md).

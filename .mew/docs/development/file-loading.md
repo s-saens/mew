@@ -1,60 +1,60 @@
 ---
-title: "파일 본문 조회와 캐시 복원"
-description: "파일 버전 확인으로 본문 재전송을 생략하고, 프로젝트별 메모리·IndexedDB 캐시를 먼저 표시하는 계약을 정의한다. 협업 동기화 대기 중 읽기 전용 본문 유지와 빈 방 시딩, 권한 재검사·외부 변경 보호, 투명한 로딩 레이어·파일 오류 표시 및 성능 계측·검증 범위를 설명한다."
+title: "File body retrieval and cache restoration"
+description: "Defines the contract for skipping body retransmission through file version checks and displaying project-specific memory and IndexedDB caches first. Describes retaining a read-only body while waiting for collaboration sync, seeding empty rooms, permission rechecks and protection against external changes, transparent loading layers and file error display, and the scope of performance instrumentation and verification."
 created: 2026-10-17
 updated: 2026-10-26
 ---
 
-# 파일 본문 조회와 캐시 복원
+# File body retrieval and cache restoration
 
-`useTabs`는 캐시가 있으면 서버 응답 전에 본문을 표시한다. 최신본과 현재 권한을 확인하는 동안에는 읽기 전용이며, 확인이 끝나면 서버의 편집 권한을 적용한다. 표시 완료와 편집·협업 준비 완료는 서로 다른 시점이다. 저장소·전송 선택의 근거는 [ADR 0013](../decisions/0013-file-content-revalidation.md)에 둔다.
+`useTabs` displays the body before the server responds when a cache is available. It remains read-only while the latest version and current permissions are checked, then applies the server’s edit permission once verification finishes. Display completion and readiness for editing and collaboration occur at different times. The rationale for storage and transport choices is in [ADR 0013](../decisions/0013-file-content-revalidation.md).
 
-## 본문 조회
+## Body retrieval
 
-`GET /api/file?project=<scope>&path=<relative>`는 전체 본문과 `editable`, `version`, `partial:false`를 반환한다. `version`은 `size`, `mtimeMs`, `ctimeMs`와 불투명한 `tag`를 포함한다. 서버는 절대경로·device·inode·크기·수정 시각·변경 시각으로 tag를 계산한다. 다른 루트의 동명 파일, 같은 크기와 수정 시각으로 다시 쓴 파일도 같은 버전으로 취급하지 않는다.
+`GET /api/file?project=<scope>&path=<relative>` returns the full body along with `editable`, `version`, and `partial:false`. `version` includes `size`, `mtimeMs`, `ctimeMs`, and an opaque `tag`. The server computes the tag from the absolute path, device, inode, size, modification time, and change time. Files with the same name under different roots and files rewritten with the same size and modification time are not treated as the same version.
 
-같은 서버 응답에서 받은 본문·tag 쌍이 캐시에 있으면 클라이언트는 `version=<tag>`를 추가한다. 일치할 때 서버는 본문을 읽지 않고 `{path,editable,version,partial:false,unchanged:true}`를 반환한다. HTTP와 P2P가 같은 JSON 계약을 사용하도록 상태 코드는 200이다. 클라이언트는 응답 tag가 요청 tag와 같을 때만 캐시 본문을 합성한다. 일치하지 않는 unchanged 응답은 조건 없는 조회로 한 번 재시도한다.
+If the cache contains a body and tag pair received in the same server response, the client adds `version=<tag>`. On a match, the server returns `{path,editable,version,partial:false,unchanged:true}` without reading the body. The status code is 200 so HTTP and P2P use the same JSON contract. The client incorporates the cached body only when the response tag matches the request tag. An unchanged response with a mismatched tag triggers one retry with an unconditional request.
 
-모든 요청은 열람·편집 권한을 다시 검사한다. 비동기 읽기 뒤에도 열람 권한을 확인하며, 권한 회수·파일 삭제는 이전 캐시로 성공 처리하지 않는다. 변경된 파일은 비동기로 전체를 읽고 읽기 전후 버전을 비교한다. 최대 세 번 읽어도 안정되지 않으면 재사용 tag를 생략해 다음 요청이 전체 본문을 받도록 한다. tag는 파일 내용의 암호학적 해시나 잠금이 아니며, 저장 시 기존 본문 비교 검사를 대체하지 않는다.
+Every request rechecks read and edit permissions. Read permission is also checked after asynchronous reads; revoked permissions and deleted files are not treated as successful results using an old cache. Changed files are read in full asynchronously, and versions are compared before and after reading. If the file remains unstable after up to three reads, the reusable tag is omitted so the next request receives the full body. A tag is neither a cryptographic hash of the file contents nor a lock, and does not replace the existing body comparison check when saving.
 
-## 프로젝트별 캐시
+## Project-specific cache
 
-`src/utils/contentCache.ts`의 동기 `getCachedFile`은 메모리만 읽는다. 메모리는 브라우저 저장소 범위·계정·절대 루트·API 프로젝트·파일 경로로 구분하고, 전체 최대 20항목의 LRU를 유지한다. 루트를 바꿔도 다른 루트의 최근 본문을 버리지 않는다.
+The synchronous `getCachedFile` in `src/utils/contentCache.ts` reads only memory. Memory is partitioned by browser storage scope, account, absolute root, API project, and file path, and maintains an LRU with a total maximum of 20 entries. Switching roots does not discard recent bodies from other roots.
 
-`loadCachedFile`은 scoped IndexedDB `mew-file-content`에서 비동기로 복원한다. 본문과 관리 메타데이터를 다른 object store에 두어 예산 검사 때 모든 본문을 복제하지 않는다. 디스크 한도는 DB당 2MiB·256항목, 계정/루트당 40항목, 항목당 256KiB이며 본문은 최대 128Ki UTF-16 코드 단위다. 기록 후 7일이 지난 항목은 재사용하지 않는다. P2P의 DB 이름은 기존 계정·인스턴스 범위를 따르므로 이 예산도 해당 DB 단위다. localStorage의 origin 공통 예산과 합산하는 한도는 아니다.
+`loadCachedFile` restores asynchronously from the scoped IndexedDB `mew-file-content`. Bodies and management metadata reside in separate object stores so budget checks do not clone every body. Disk limits are 2 MiB and 256 entries per DB, 40 entries per account/root, and 256 KiB per entry, with a maximum body length of 128 Ki UTF-16 code units. Entries older than 7 days since writing are not reused. P2P DB names follow the existing account and instance scope, so this budget also applies per DB. This limit is not combined with localStorage’s origin-wide budget.
 
-`putCachedFile`은 메모리를 즉시 바꾸고 영구 저장을 별도 작업으로 넘긴다. 같은 파일의 대기 쓰기는 최신 값으로 합친다. 본문 직렬화·저장·오래된 항목 정리는 파일 클릭과 응답 적용 호출에서 실행하지 않는다. 자동 저장 등 서버 버전을 받지 않은 본문으로 갱신하면 이전 tag를 붙이지 않는다.
+`putCachedFile` updates memory immediately and delegates persistent storage to a separate task. Pending writes for the same file are coalesced to the latest value. Body serialization, storage, and cleanup of old entries do not run in file-click or response-application calls. Updates using a body without a server version, such as autosave updates, do not attach the previous tag.
 
-기존 `mew:content:*` 값은 유효한 기록 시각·항목 크기를 확인한 뒤 비동기로 이관하고, 성공한 원본만 지운다. 날짜가 없거나 만료된 캐시는 재사용하지 않는다. IndexedDB가 막히거나 실패해도 파일 열기는 계속하며, 콜드 캐시 조회는 최대 40ms만 기다린 뒤 서버 조회로 진행한다. 본문 캐시는 초안 저장소가 아니므로 서버 파일·미전송 초안·설정을 지우지 않는다. [브라우저 저장소 계약](browser-storage.md)이 다른 캐시와 사용자 설정의 경계를 정의한다.
+Existing `mew:content:*` values are migrated asynchronously after validating their recorded timestamps and entry sizes, and only successfully migrated originals are deleted. Undated or expired caches are not reused. File opening continues even if IndexedDB is blocked or fails; a cold cache lookup waits at most 40 ms before proceeding to a server request. The body cache is not a draft store, so it does not delete server files, unsent drafts, or settings. The [browser storage contract](browser-storage.md) defines the boundaries with other caches and user settings.
 
-대기 쓰기·삭제는 예약 당시 DB와 루트를 유지한다. 로그아웃·계정 변경·명시적 캐시 초기화는 진행 중 읽기와 이전 쓰기를 무효화한다. 삭제 뒤 늦은 읽기나 오래된 쓰기가 캐시 본문을 되살리지 않도록 한다.
+Pending writes and deletions retain the DB and root from when they were scheduled. Logout, account changes, and explicit cache resets invalidate in-progress reads and previous writes. Late reads and stale writes must not restore cached bodies after deletion.
 
-## 화면 복원과 변경 보호
+## Screen restoration and change protection
 
-복원 시 모든 탭의 경로·순서·분할을 만들고 각 칸의 활성 탭만 조회한다. 캐시가 있는 탭은 `loading:false`, `revalidating:true`로 표시하여 본문을 가리는 로딩 레이어를 올리지 않는다. 검증 중에는 편집·자동 저장·협업 시딩·DB 페이지 구독·댓글 작업을 시작하지 않는다. 로그인 사용자의 활성 주 편집화면은 본문 조회와 협업 소켓 연결을 병렬로 준비한다. 소켓은 서버에서 협업 기능·파일 편집 권한을 별도로 검사하며, 파일 응답에서 본문·편집 권한을 확인하고 협업 문서의 첫 동기화가 끝난 뒤에만 Y.Doc을 편집기에 연결한다. 동기화 대기 중에는 로컬 본문을 읽기 전용으로 유지해 빈 협업 문서가 표시된 본문을 지우거나 대기 중 입력이 원격 상태로 대체되지 않게 한다. 파일 조회 실패·편집 불가 판정·탭 전환 시 준비 연결을 정리한다. 게스트·미디어·외부 파일·아카이브·비활성 복원 탭·anchor preview는 준비 대상에서 제외한다. [ADR 0014](../decisions/0014-parallel-file-collaboration.md)가 기존 ADR 0013의 준비 순서를 보완한다. 캐시가 없으면 투명한 로딩 레이어에 테마 글자색을 따르는 세 점 표시를 보여준다. 로딩 중에도 에디터 바탕을 검게 덮지 않으며, 본문 입력은 차단한다.
+Restoration creates the paths, order, and splits for all tabs and retrieves only the active tab in each pane. Tabs with cached content are displayed with `loading:false` and `revalidating:true`, without a loading layer obscuring the body. Editing, autosave, collaboration seeding, DB page subscriptions, and comment operations do not start during verification. For logged-in users, the active main editor prepares body retrieval and the collaboration socket connection in parallel. The server separately checks collaboration capability and file edit permission for the socket, and the Y.Doc is connected to the editor only after the file response confirms the body and edit permission and the collaboration document’s initial sync completes. While waiting for sync, the local body remains read-only so an empty collaboration document cannot erase the displayed body and input entered while waiting cannot be replaced by remote state. Prepared connections are cleaned up if file retrieval fails, the file is deemed uneditable, or the tab changes. Guests, media, external files, archives, inactive restored tabs, and anchor preview are excluded from preparation. [ADR 0014](../decisions/0014-parallel-file-collaboration.md) supplements the preparation order in the existing ADR 0013. Without a cache, a transparent loading layer shows a three-dot indicator using the theme’s text color. The editor background is not covered in black during loading, and body input is blocked.
 
-전체 응답은 현재 루트의 전환 세대와 파일 조회 순서가 맞을 때만 반영한다. 읽기 중 다른 경로가 버퍼를 바꾼 경우 그 내용을 보존하고, 서버 본문까지 달라졌으면 기존 저장 기준과 오류 상태를 유지한다. 외부 변경을 오래된 캐시로 자동 저장하지 않는다. 권한·조회 오류 때는 표시한 본문과 캐시를 제거하고 오류를 알린다.
+Full responses are applied only when they match the current root’s transition generation and file request order. If another path changes the buffer during a read, that content is preserved; if the server body has also changed, the existing save baseline and error state are retained. External changes are not autosaved over with stale cached content. Permission or retrieval errors remove the displayed body and cache and report the error.
 
-파일 오류는 앱 상단 헤더 대신 해당 탭이 열린 에디터 안에 `role="alert"`로 표시한다. 조회 실패로 편집할 수 없는 파일은 본문 대신 오류를 보여주고, 편집 가능한 파일의 저장·커밋 오류는 내용을 유지한 채 상태줄 위에 표시한다. 모바일에서도 오류를 숨기지 않으며, 다른 탭이나 에이전트 화면에 오류를 옮겨 표시하지 않는다.
+File errors appear with `role="alert"` inside the editor containing the affected tab, rather than in the app’s top header. Files that cannot be edited because retrieval failed show an error instead of the body; save and commit errors for editable files appear above the status bar while preserving the content. Errors remain visible on mobile and are not moved to another tab or the agent screen.
 
-값이 같은 탭 갱신은 기존 상태 객체를 재사용한다. 열린 탭 저장은 경로·순서·보기 등 메타데이터가 달라진 경우에만 localStorage와 계정 원장을 갱신한다. `EditorPane`의 DB 프론트매터 분석은 관련 본문·경로·준비 상태에만 의존하고, 상태줄의 전체 UTF-8 크기 계산은 첫 paint 뒤로 미룬다. 비활성 문서의 에디터·협업 연결을 상주시켜 두지는 않는다. 협업 훅은 현재 프로젝트·파일·계정과 일치하는 문서만 반환한다.
+Tab updates with identical values reuse the existing state object. Saving open tabs updates localStorage and the account ledger only when metadata such as paths, order, or views changes. DB frontmatter parsing in `EditorPane` depends only on the relevant body, path, and readiness state, and the status bar’s full UTF-8 size calculation is deferred until after the first paint. Editors and collaboration connections for inactive documents are not kept resident. The collaboration hook returns only documents matching the current project, file, and account.
 
-Hotview는 연결할 Y.Doc이 바뀌면 편집기 인스턴스를 다시 만든다. 첫 동기화 뒤에도 방의 본문 fragment가 비어 있으면 화면을 그리기 전 layout effect에서 확인된 로컬 본문으로 시딩한다. 시딩 전에는 현재 편집기의 Collaboration 확장이 실제로 같은 Y.Doc에 연결되어 있는지 확인해, 교체 과정에서 남은 이전 편집기에 본문을 주입하지 않는다. 이미 본문이 있는 방은 다시 시딩하지 않는다. 교체 중 읽기 전용인 중간 편집기에서는 선택·포커스 복원 정보를 보존하고, 편집 가능한 상태가 된 뒤 복원한다.
+Hotview recreates the editor instance when the Y.Doc to connect changes. If the room’s body fragment is still empty after initial sync, it is seeded with the verified local body in a layout effect before painting. Before seeding, it checks that the current editor’s Collaboration extension is actually connected to the same Y.Doc, preventing body injection into an old editor left over during replacement. Rooms that already contain a body are not seeded again. Selection and focus restoration information is preserved in the intermediate read-only editor during replacement and restored once editing becomes available.
 
-## 성능 계측
+## Performance instrumentation
 
-`MEW_PERF_LOG=1`인 서버에서 전체 본문 읽기는 `file.read` JSON 로그로 소요 시간과 조회 전 파일 크기(`bytes`)를 남긴다. 읽는 동안 변경된 파일의 재시도도 같은 구간에 포함한다. 조건부 조회가 `unchanged`로 끝나면 본문을 읽지 않으므로 이 로그가 없다. 파일 경로·본문·계정은 필드에 넣지 않는다. 이 구간에는 네트워크 전송과 편집기 표시 시간이 포함되지 않는다.
+On servers with `MEW_PERF_LOG=1`, full body reads record elapsed time and the file size before retrieval (`bytes`) in a `file.read` JSON log. Retries for files changed during reading are included in the same interval. Conditional requests ending with `unchanged` do not read the body and therefore produce no such log. File paths, bodies, and accounts are not included in the fields. This interval excludes network transfer and editor display time.
 
-브라우저의 기존 `mew:file-open:<id>:<phase>` Performance measure는 파일 열기 시작부터 `cache-ready`, `file-response`, `editor-ready`, `first-paint`까지를 각각 측정한다. 같은 id의 단계들을 비교해 서버 응답을 기다리는 시간과 편집기 준비·표시 시간을 구분한다. 각 값은 시작 이후의 누적 시간이며, 서버 로그와 요청 id를 자동 연결하지는 않는다. 계측을 켜기 위한 서버 설정 적용·빌드·재시작은 운영자가 수행한다.
+The browser’s existing `mew:file-open:<id>:<phase>` Performance measure separately measures the interval from the start of file opening to `cache-ready`, `file-response`, `editor-ready`, and `first-paint`. Comparing phases with the same id distinguishes time spent waiting for the server response from editor preparation and display time. Each value is cumulative from the start; request ids are not automatically correlated with server logs. Operators apply the server configuration, build, and restart required to enable instrumentation.
 
-## 검증과 적용 범위
+## Verification and scope of application
 
-- `server/file-revalidation.test.ts`: 본문 읽기 생략, 같은 크기·mtime 재작성, 읽기 도중 변경·권한 회수, 계정·루트 격리와 삭제.
-- `src/api/client-file.test.ts`: P2P 공통 조회, tag 일치·불일치와 조건 없는 재시도.
-- `src/utils/contentCache.test.ts`: 실제 Chromium IndexedDB의 비동기 저장·복원, 예산·만료·이관, 루트·계정·원격 범위 전환과 삭제 경합.
-- `server/editor-file-cache-ui.test.ts`: 캐시 본문의 응답 전 표시, 확인 전 읽기 전용·수정 차단, 확인 후 편집·협업, 외부 변경·권한 회수와 오래된 본문의 자동 저장 방지.
-- `server/editor-collab-handoff-ui.test.ts`: PC·모바일에서 느린 협업 응답·빠른 동기화·기존 방·캐시 재열기의 프레임별 본문 유지, 동기화 전 읽기 전용·시딩 차단과 완료 후 편집·자동 저장 재개.
-- `server/tab-cache-state-ui.test.ts`: 분할 화면의 확인 완료한 칸에서 편집·저장 유지, 늦은 조회의 저장 버퍼 보호, localStorage 실패 후 같은 메타데이터 저장 재시도와 계정 알림 중복 방지.
-- `server/editor-pane-ui.test.ts`, `server/workspace-switch-ui.test.ts`: 콜드 로딩·저장소 실패와 프로젝트 화면 복원의 회귀.
+- `server/file-revalidation.test.ts`: Skipping body reads, rewrites with the same size and mtime, changes and permission revocation during reads, and account/root isolation and deletion.
+- `src/api/client-file.test.ts`: Shared P2P retrieval, tag matches and mismatches, and unconditional retries.
+- `src/utils/contentCache.test.ts`: Asynchronous storage and restoration in actual Chromium IndexedDB, budgets, expiration, migration, root/account/remote scope transitions, and deletion races.
+- `server/editor-file-cache-ui.test.ts`: Displaying cached bodies before responses, read-only mode and modification blocking before verification, editing and collaboration after verification, external changes and permission revocation, and prevention of stale body autosaves.
+- `server/editor-collab-handoff-ui.test.ts`: Frame-by-frame body preservation on desktop and mobile with slow collaboration responses, fast sync, existing rooms, and cached reopening; read-only mode and blocked seeding before sync; and resumed editing and autosave after completion.
+- `server/tab-cache-state-ui.test.ts`: Continued editing and saving in verified split-screen panes, save buffer protection from late retrievals, retries to save identical metadata after localStorage failures, and prevention of duplicate account notifications.
+- `server/editor-pane-ui.test.ts`, `server/workspace-switch-ui.test.ts`: Regressions in cold loading, storage failures, and project screen restoration.
 
-합성 100KiB 문서의 압축 전 JSON 응답은 약 102.6KB에서 unchanged 응답 약 0.2KB로 줄었으며, unchanged 요청의 본문 읽기는 0회였다. 격리 브라우저에서는 파일 응답을 보류한 동안 캐시 편집기의 첫 paint가 끝나는지 확인한다. 실제 프로젝트의 전체 전환 시간·대형 Markdown 파싱·외부망 P2P 지연 개선율을 측정한 결과는 아니다. 실행 중인 설치의 빌드·서버 적용은 사용자가 수행한다.
+The uncompressed JSON response for a synthetic 100 KiB document decreased from about 102.6 KB to about 0.2 KB for an unchanged response, with 0 body reads for unchanged requests. The isolated browser check verifies that the cached editor completes its first paint while the file response is withheld. These are not measurements of improvements in total transition time for actual projects, large Markdown parsing, or P2P latency over external networks. The user builds and applies the server changes to the running installation.

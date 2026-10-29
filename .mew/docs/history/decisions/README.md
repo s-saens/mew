@@ -1,20 +1,20 @@
 ---
-title: "이전 결정 기록 이관본"
-description: "독립 전환 때 보존한 이전 Mew ADR과 관련 문서 정책의 출처·원문 보존·현재 계약 구분을 설명한다."
+title: "Migrated Previous Decision Records"
+description: "Explains the provenance, original-text preservation, and distinction from current contracts of previous Mew ADRs and related documentation policies preserved during the transition to an independent project."
 created: 2026-10-14
 updated: 2026-10-14
 ---
 
-# 이전 결정 기록
+# Previous Decision Records
 
-이 폴더는 2026-10-14 독립 전환 당시 Liiiiv 중앙 문서에서 이관한 Mew·Mewlink ADR 162개의 소유 위치다. 결정 본문을 대조한 뒤 중앙의 Mew 전용 사본은 제거했다. 기존 번호는 이력 번호이며 새 결정의 로컬 번호와 구분한다.
+This folder is the owning location for 162 Mew and Mewlink ADRs migrated from Liiiiv's central documentation during the transition to an independent project on 2026-10-14. After comparing the decision bodies, the central Mew-specific copies were removed. Existing numbers are historical numbers and are distinguished from local numbers for new decisions.
 
-기존 결정이 참조하던 공통 문서 정책 0012·0070·0132는 당시 근거의 스냅샷으로 보존한다. 회사 전체에 적용되는 정책 원본은 Liiiiv가 소유하며, 이 스냅샷과 동기화하지 않는다.
+Shared documentation policies 0012, 0070, and 0132 referenced by existing decisions are preserved as snapshots of the rationale at the time. Liiiiv owns the original company-wide policies, which are not synchronized with these snapshots.
 
-번호·날짜·본문·후속 결정의 의미를 유지하고 문서 링크를 Mew 저장소 내부 위치로 보정했다. 함께 이관하지 않은 회사 전용 문서의 참조는 출처 경로를 텍스트로 남겼다. description이 없던 기록에는 이관한 결정임을 설명하는 프론트매터를 추가하고, 옛 `desc` 값은 `legacy_description`에 보존했다.
+Preserved the meaning of numbers, dates, bodies, and subsequent decisions, and adjusted document links to locations within the Mew repository. References to company-only documents that were not migrated retain their source paths as text. Records without a description received frontmatter explaining that they are migrated decisions, and old `desc` values were preserved in `legacy_description`.
 
-당시 채택 상태와 워크스페이스 정책을 현재 계약으로 추정하지 않는다. 현재 지침은 [독립 프로젝트 결정](../../decisions/0001-independent-project.md)과 [문서 규칙](../../README.md), 기능·개발·운영의 소유 문서를 따른다. 이후 결정은 [Mew 결정 기록](../../decisions/README.md)에 작성한다.
+Do not infer current contracts from adoption status or workspace policies at the time. Current guidance follows the [Independent Project Decision](../../decisions/0001-independent-project.md), [Documentation Rules](../../README.md), and the owning documents for features, development, and operations. Write subsequent decisions in [Mew Decision Records](../../decisions/README.md).
 
-이력은 기본 description 목록에서 제외된다. 과거 근거가 필요하면 `node server/document-descriptions.ts --all`로 경로와 설명을 찾고 관련 기록만 읽는다.
+History is excluded from the default description list. When historical rationale is needed, use `node server/document-descriptions.ts --all` to find paths and descriptions, and read only the relevant records.
 
-이전 주제별 분류는 [당시 ADR 지도](topics/MOC.md)에 보존했다. 이 지도에 쓰인 채택·Current 표시는 당시 분류이며 현재 구현 상태를 보증하지 않는다.
+The previous topic-based classification is preserved in the [ADR map from that time](topics/MOC.md). The Adopted and Current labels in that map reflect the classification at the time and do not guarantee the current implementation status.

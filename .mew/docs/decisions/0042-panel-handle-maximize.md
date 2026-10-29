@@ -1,22 +1,22 @@
 ---
-title: "패널 핸들 더블클릭 최대화와 탭 이름 변경"
-description: "탭 더블클릭의 최대화를 공통 패널 이동 손잡이로 옮기고 에이전트·터미널 탭 더블클릭은 이름 변경으로 사용하는 결정과 기존 키보드·메뉴 조작의 유지 범위를 기록한다."
+title: "Double-Clicking Panel Handles to Maximize and Tabs to Rename"
+description: "Records the decision to move double-click maximization from tabs to the shared panel drag handle, use double-clicking agent and terminal tabs to rename them, and retain existing keyboard and menu operations within the specified scope."
 created: "2026-10-22"
 updated: "2026-10-22"
 ---
 
-## 상태
+## Status
 
-채택.
+Adopted.
 
-## 배경
+## Background
 
-탭 더블클릭이 패널 최대화를 실행해 에이전트·터미널 탭 이름을 직접 바꾸기 어려웠다. 사용자는 탭 더블클릭으로 이름을 바꾸고 패널 핸들 더블클릭으로 최대화하도록 요청했다.
+Double-clicking a tab maximized the panel, making it difficult to rename agent and terminal tabs directly. The user requested double-clicking tabs to rename them and double-clicking panel handles to maximize panels.
 
-## 결정
+## Decision
 
-공통 `DockGrip`의 더블클릭으로 해당 패널의 최대화·복귀를 전환한다. 에이전트·터미널 탭 더블클릭은 기존 이름 입력을 열며 F2·우클릭 메뉴와 탭 포커스의 Shift+Enter 최대화·복귀는 유지한다.
+Double-clicking the shared `DockGrip` toggles the corresponding panel between maximized and restored states. Double-clicking an agent or terminal tab opens the existing name input. Retain F2, the context menu, and Shift+Enter to maximize or restore when a tab has focus.
 
-## 근거와 영향
+## Rationale and Impact
 
-패널 전체를 조작하는 손잡이와 탭을 조작하는 영역에 각각의 동작을 연결한다. 저장된 배치·세션 수명·모바일 손잡이 숨김은 유지한다. 상세 동작과 검증 범위는 [공용 UI 계약](../development/ui-contracts.md#작업-패널-배치)과 [패널 배치 기능](../features/%ED%99%94%EB%A9%B4%C2%B7%EA%B3%84%EC%A0%95%C2%B7%EC%9A%B4%EC%98%81/%ED%8C%A8%EB%84%90%20%EB%B0%B0%EC%B9%98%C2%B7%EB%AA%A8%EB%B0%94%EC%9D%BC%C2%B7%EC%83%81%ED%83%9C%20%EB%B3%B5%EC%9B%90.md)이 소유한다.
+Assign each action to its corresponding area: the handle that operates the entire panel and the area that operates tabs. Keep saved layouts, session lifetimes, and hidden handles on mobile. The [Shared UI Contract](../development/ui-contracts.md#workspace-panel-layout) and [Panel Layout Feature](../features/appearance-accounts-operations/panel-layout-mobile-and-state-restoration.md) own detailed behavior and verification scope.

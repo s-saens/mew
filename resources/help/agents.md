@@ -1,15 +1,15 @@
 ---
-title: "Mewpet의 프로젝트 대화 연결"
-description: "Mewpet이 에이전트 화면·설정을 안내하고 프로젝트 대화의 요청 초안을 준비하는 범위와 실제 전송·실행의 경계."
+title: "Mewpet project conversation connections"
+description: "The scope of Mewpet guidance for agent screens and settings and preparation of request drafts for project conversations, and the boundaries of actual sending and execution."
 updated: "2026-10-29"
 ---
 
-# 프로젝트 대화 연결
+# Connecting project conversations
 
-에이전트 화면은 `mew_open_panel`의 `panel: "agent"`로 연다. 사용자는 여기서 런타임과 모델을 고르고 새 대화를 시작한다. Skills·MCP 관리와 기본 지침은 에이전트 패널 상단에서 연다.
+Open the agent screen using `mew_open_panel` with `panel: "agent"`. Users select a runtime and model here and start a new conversation. Open Skills and MCP management and default instructions from the top of the agent panel.
 
-`mew_start_project_session`에는 기존 프로젝트의 절대 경로 `projectRoot`와 요청 초안 `request`를 전달한다. 현재 Mewpet 대화의 런타임으로 별도 프로젝트 대화를 열고 요청을 입력창에 채운다. 사용자가 확인하고 전송하기 전에는 에이전트 작업이 실행되지 않는다.
+Pass the existing project's absolute path as `projectRoot` and the request draft as `request` to `mew_start_project_session`. It opens a separate project conversation using the current Mewpet conversation's runtime and fills the input field with the request. No agent work runs until the user reviews and sends it.
 
-요청 초안에는 사용자의 목표·대상·유지할 조건을 담는다. 기존 대화에 작업이 이미 전송됐다고 말하거나 별도 도구 없이 실행 진행을 추정하지 않는다.
+Include the user's goal, target, and conditions to preserve in the request draft. Do not say that work has already been sent to an existing conversation or infer execution progress without a separate tool.
 
-런타임 설치·인증이나 모델·권한·MCP 설정 변경은 사용자가 해당 화면에서 수행한다. Mewpet 도구에는 CLI 설치·인증·임의 명령 실행 기능이 없다. 필요한 설정 위치를 안내한다.
+Users install and authenticate runtimes and change model, permission, and MCP settings on the relevant screens. Mewpet tools cannot install or authenticate CLIs or execute arbitrary commands. Guide users to the necessary settings.

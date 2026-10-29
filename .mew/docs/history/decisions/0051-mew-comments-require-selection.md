@@ -1,49 +1,49 @@
 ---
-provenance: "Liiiiv 중앙 ADR 이관본, 2026-10-14"
-description: "이관한 결정 기록: 댓글은 고른 글자에만 붙는다. 커서 자리 댓글(작은 네모)을 없앤다. 당시 선택·근거·후속 변경을 보존하며 현재 계약은 Mew 소유 문서에서 확인한다."
-title: "0051 — 댓글은 고른 글자에만 붙는다. 커서 자리 댓글(작은 네모)을 없앤다"
+provenance: "Migrated copy of a Liiiiv central ADR, 2026-10-14"
+description: "Migrated decision record: Comments attach only to selected characters. Remove cursor-position comments (small squares). Preserves the choices, rationale, and subsequent changes at the time; see the Mew owning document for the current contract."
+title: "0051 — Comments attach only to selected characters. Remove cursor-position comments (small squares)"
 created: "2026-08-12"
 updated: 2026-08-20
 ---
 
-- 날짜: 2026-08-12
-- 상태: 채택
-- 결정자: 송상훈 (지시)
+- Date: 2026-08-12
+- Status: Adopted
+- Decision maker: Song Sanghoon (directive)
 
-## 배경
+## Background
 
-[ADR 0049](0049-mew-team-chat-and-inline-comments.md) §3은 선택 없이 커서 자리에만 남기는 댓글을
-허용했다 — 앵커의 `text`가 빈 문자열이고 본문에는 작은 네모가 섰다.
+[ADR 0049](0049-mew-team-chat-and-inline-comments.md) §3 allowed comments left only at the cursor position without a selection — the anchor's `text`
+was an empty string, and a small square appeared in the body.
 
-써 보니 그 네모가 무엇에 대한 말인지 본문만 보고는 알 수 없었다. 인용문이 없으니 목록에서도
-"어디에 달린 댓글"인지 구별되지 않고, 본문이 조금만 바뀌면 앞 문맥(prefix)만으로 자리를 되찾아야 해서
-엉뚱한 곳에 서기도 쉬웠다. 실수로 만들기도 너무 쉬웠다 — 아무 데나 커서를 두고 단축키를 누르면 생겼다.
+In use, the body alone did not reveal what that square referred to. Without a quote, the list also could not distinguish "where
+the comment was attached," and even a small change to the body required relocating it using only the preceding context (prefix), making it easy to
+place it incorrectly. It was also too easy to create one accidentally — placing the cursor anywhere and pressing the shortcut created one.
 
-## 결정
+## Decision
 
-댓글은 한 글자 이상 고른 상태에서만 달 수 있다. 띄어쓰기 한 자도 선택이면 된다.
+A comment can be added only when at least one character is selected. Even a single space counts as a selection.
 
-- `makeCommentAnchor(text, from, to)`는 `from >= to`면 null이다 — 앵커 자체가 만들어지지 않는다
-- `resolveCommentAnchor`는 `text`가 빈 앵커를 자리 없음(null)으로 본다
-- 서버 `sanitizeAnchor`가 빈 `text`를 거부한다 — 화면을 우회한 요청도 막힌다
-- 모바일 보조키의 댓글 아이콘은 고른 글자가 있을 때만 뜬다(`selChars > 0`).
-  누를 수는 있는데 아무 일도 안 일어나는 버튼을 두지 않는다
-- 작은 네모 장식(`.mew-comment-point`)과 그것을 그리던 두 경로(hotview `commentHighlight.ts`의
-  `Decoration.widget`, plain `CodePane.tsx`의 `CommentPointWidget`)를 지웠다
+- `makeCommentAnchor(text, from, to)` returns null when `from >= to` — no anchor is created at all
+- `resolveCommentAnchor` treats an anchor with empty `text` as having no position (null)
+- The server's `sanitizeAnchor` rejects empty `text` — requests that bypass the UI are blocked too
+- The comment icon in the mobile accessory keys appears only when text is selected (`selChars > 0`). Do
+  not provide a button that can be pressed but does nothing.
+- Removed the small square decoration (`.mew-comment-point`) and both paths that rendered
+  it (`Decoration.widget` in hotview `commentHighlight.ts` and `CommentPointWidget` in plain `CodePane.tsx`).
 
-## 근거
+## Rationale
 
-- 인용문 없는 댓글은 자기가 무엇에 대한 말인지 스스로 설명하지 못한다. 앵커 표기를 인용문으로
-  고른 이유(ADR 0049 §3)가 커서 댓글에서는 성립하지 않았다
-- 빈 선택은 앵커를 만드는 쪽에서 막는 게 가장 싸다. 화면 넷(hotview·plain·단축키·보조키)이 각자
-  검사하는 대신 `makeCommentAnchor` 하나가 null을 주고, 서버가 한 번 더 거른다
+- A comment without a quote cannot explain what it refers to. The reason for choosing quotes to represent
+  anchors (ADR 0049 §3) did not hold for cursor comments.
+- The cheapest place to block empty selections is where anchors are created. Instead of four UI paths (hotview, plain, keyboard shortcuts,
+  and accessory keys) checking independently, a single `makeCommentAnchor` returns null, and the server filters again.
 
-## 결과
+## Results
 
-- 재시도 금지 아님. 인용문 없이 "이 문단 전체"를 가리키는 방식(블록 단위 앵커)이 필요해지면
-  그건 커서 댓글이 아니라 별도 설계다. 되살릴 것은 빈 `text` 앵커가 아니다
-- 옛 원장(`<프로젝트>/.mew/comments.json`)에 남은 커서 댓글은 지우지 않는다. 자리를 못 찾는
-  고아가 되어 댓글 목록 팝업에만 남는다 — 남의 글이라 자동으로 지우지 않는다(ADR 0049와 같은 원칙).
-  목록에서 누르면 "자리를 찾지 못했다"고 알린다
-- 이미지·표처럼 텍스트가 없는 선택은 `text`가 빈 값이라 댓글을 달 수 없다. 그 자리에 말을 남기려면
-  주변 글자를 함께 고른다
+- This does not prohibit revisiting the idea. If a way to refer to "this entire paragraph" without a quote (a block-level anchor) becomes
+  necessary, that is a separate design, not a cursor comment. Empty `text` anchors are not what should be restored.
+- Cursor comments remaining in the old ledger (`<프로젝트>/.mew/comments.json`) are not deleted. They become orphans whose positions cannot be found and remain only
+  in the comment list popup — other people's writing is not deleted automatically (the same principle as ADR 0049). Clicking one
+  in the list displays "Could not find the location."
+- Selections without text, such as images and tables, cannot receive comments because `text` is empty. To leave a comment there, include surrounding
+  text in the selection.

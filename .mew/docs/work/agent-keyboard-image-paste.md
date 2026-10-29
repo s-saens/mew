@@ -1,23 +1,23 @@
 ---
-title: "모바일 키보드 이미지 붙여넣기 수정·검증"
-description: "에이전트 입력의 CodeMirror 일반 텍스트 전용 속성 해제와 이미지·텍스트 붙여넣기 회귀 검사 결과를 기록한다. 실제 Android 키보드와 운영 적용은 미검증이다."
+title: "Mobile keyboard image paste fix and verification"
+description: "Records the removal of CodeMirror's plaintext-only property from the agent input and regression test results for image and text pasting. Actual Android keyboards and production application remain unverified."
 created: "2026-10-27"
 updated: "2026-10-27"
 ---
 
-## 목적과 변경
+## Purpose and changes
 
-모바일 키보드 클립보드의 이미지를 에이전트 입력에 붙여넣을 수 없는 제보에 대응했다. CodeMirror 기본 스타일이 편집 호스트에 `read-write-plaintext-only`를 적용하는 것을 확인하고, 에이전트 입력에서만 `read-write`로 덮어썼다. 기존 이미지 첨부 콜백과 서식 없는 텍스트 붙여넣기를 유지한다. 현재 동작과 지원 경계는 [입력 기능 계약](../features/%ED%84%B0%EB%AF%B8%EB%84%90%C2%B7%EC%97%90%EC%9D%B4%EC%A0%84%ED%8A%B8%C2%B7%EC%9E%90%EB%8F%99%ED%99%94/%EC%97%90%EC%9D%B4%EC%A0%84%ED%8A%B8%20%EC%9E%85%EB%A0%A5%C2%B7%EB%A9%98%EC%85%98%C2%B7%EC%8A%A4%ED%82%AC%C2%B7%EC%B2%A8%EB%B6%80.md)을 따른다.
+Addressed a report that images from a mobile keyboard clipboard could not be pasted into the agent input. Confirmed that CodeMirror's default styles apply `read-write-plaintext-only` to the editing host and overrode it with `read-write` only in the agent input. Preserves the existing image attachment callback and plain-text pasting. Current behavior and support boundaries follow the [input feature contract](../features/terminals-agents-automation/agent-input-mentions-skills-and-attachments.md).
 
-## 검증
+## Verification
 
-- 수정 없이 새 `server/agent-composer-clipboard-ui.test.ts`를 실행하면 네 화면·테마 조합 모두 일반 텍스트 전용 속성으로 실패했다. 수정 후 격리 Chromium의 1100·390px, 밝은·어두운 배경에서 계산된 편집 속성·브라우저 이미지 삽입 허용 상태, 합성 `paste`·`beforeinput`의 이미지 콜백 단회 전달·기존 본문 보존과 HTML을 일반 텍스트로 커서 위치에 붙여넣는 동작을 확인했다.
-- 새 UI 검사와 `clipboard-images.test.ts`·`agent-composer-document.test.ts`의 관련 검사 19개가 통과했다.
-- `npx tsc -b`와 대상 oxlint가 종료 코드 0으로 통과했다. 입력 컴포넌트의 기존 React ref 경고 1개는 유지된다. Impeccable `detect` 결과는 빈 배열이었다.
-- 초기 수정 전 `agent-composer-attachments-ui.test.ts` 실행에서는 새 속성 검사 실패 외에 기존 업로드 대기 태그의 숨김 상태로 인한 대기 시간 초과가 발생했고, 전체 60초 제한으로 종료됐다. 해당 파일 변경은 남기지 않고 이번 버그의 회귀 검사를 독립 파일로 분리했다.
+- Running the new `server/agent-composer-clipboard-ui.test.ts` without the fix failed in all four viewport and theme combinations because of the plaintext-only property. After the fix, isolated Chromium checks at 1100 and 390px with light and dark backgrounds verified the computed editing property, browser permission to insert images, single delivery to the image callback and preservation of existing content for synthetic `paste` and `beforeinput` events, and pasting HTML as plain text at the cursor.
+- The new UI checks and 19 related tests in `clipboard-images.test.ts` and `agent-composer-document.test.ts` passed.
+- `npx tsc -b` and targeted oxlint checks passed with exit code 0. The input component's 1 existing React ref warning remains. Impeccable `detect` returned an empty array.
+- The initial pre-fix run of `agent-composer-attachments-ui.test.ts` failed the new property check and also timed out waiting because an existing pending-upload tag was hidden, then terminated at the overall 60-second limit. Changes to that file were not retained; regression checks for this bug were separated into an independent file.
 
-- `npm run check:docs`의 description 486개 검사는 통과했다. 당시 전체 링크 검사는 이번 작업 밖에서 삭제되거나 작성 중인 문서를 가리키는 링크 21개로 실패했다.
+- The 486 description checks in `npm run check:docs` passed. At the time, the full link check failed on 21 links to documents deleted or being written outside this work.
 
-## 적용과 제한
+## Application and limitations
 
-실제 Android·Brave·키보드 클립보드의 이미지 선택은 확인하지 않았다. 웹에 이미지 파일을 전달하지 않는 OS·키보드·브라우저 조합까지 지원을 보장하지 않는다. 앱 빌드·배포·서버 시작·종료·재시작은 수행하지 않았으며 사용자가 운영에 적용한 뒤 실기기로 확인해야 한다.
+Image selection on actual Android devices, Brave, and keyboard clipboards was not checked. Support is not guaranteed for OS, keyboard, and browser combinations that do not pass image files to the web. No app build, deployment, or server start, stop, or restart was performed; the user must verify on a physical device after applying the change to production.

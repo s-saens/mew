@@ -1,26 +1,26 @@
 ---
-title: "커밋 메시지 언어를 응답 언어와 분리"
-description: "계정별 Git 지침에 영어 기본 커밋 언어와 네 가지 지원 언어·Mew 화면·에이전트 응답 연동을 추가하고, 일반 대화와 AI 자동 커밋에 같은 선택값을 전달하는 결정."
+title: "Separate commit message language from response language"
+description: "Decision to add English as the default commit language, four supported languages, and options to follow the Mew UI or agent response language to per-account Git guidance, passing the same selection to ordinary conversations and AI automatic commits."
 created: "2026-10-26"
 updated: "2026-10-26"
 ---
 
-## 상태
+## Status
 
-채택. 기존 계정 전역 지침의 저장·권한·우선순위를 유지하며 커밋 언어 설정을 추가한다.
+Accepted. Adds a commit language setting while retaining the storage, permissions, and precedence of existing account-wide guidance.
 
-## 배경
+## Background
 
-응답 언어나 최근 커밋의 언어만으로 메시지를 작성하면 한국어로 대화하면서 영어 커밋을 남기려는 선호를 표현하기 어렵다. 일반 에이전트와 Git 패널 AI 자동 커밋이 같은 설정을 사용해야 한다.
+Writing messages based only on the response language or the language of recent commits makes it difficult to express a preference for English commits while conversing in Korean. The ordinary agent and Git panel AI automatic commits must use the same setting.
 
-## 결정
+## Decision
 
-에이전트 기본 지침의 Git 그룹에 **커밋 언어**를 둔다. 기본값은 영어이며 한국어·영어·일본어·중국어 간체와 Mew 화면 언어 또는 에이전트 응답 언어를 따르는 선택을 제공한다. 제목·본문에 적용하고 저장소의 접두사·형식과 명시적인 사용자 요청·프로젝트 지침을 유지한다.
+Add **Commit language** to the Git group in agent default guidance. Default to English and offer Korean, English, Japanese, Simplified Chinese, and options to follow the Mew UI language or agent response language. Apply it to the title and body while retaining repository prefixes and formats, explicit user requests, and project guidance.
 
-계정별 `agent-guidance.md`의 독립 설정 구간을 기준본으로 사용한다. 기존 파일에 구간이 없으면 읽을 때만 영어 기본 안내를 보충하며 원문·revision·직접 편집·손상 구간을 보존한다. 응답 언어는 변경하지 않는다.
+Use an independent settings section in the account-specific `agent-guidance.md` as the canonical source. If the section is absent from an existing file, supplement it with English-default guidance only when reading, preserving the source, revision, direct edits, and damaged sections. Do not change the response language.
 
-일반 요청은 전달 시점에 화면·응답 언어를 해석한다. AI 자동 커밋은 시작 요청의 화면 언어와 계정 설정을 해석해 작업 입력에 고정한다. 설정 저장은 이후 메시지 작성에 적용되며 과거 커밋을 재작성하지 않는다.
+For ordinary requests, resolve the UI and response languages when passing the request. For AI automatic commits, resolve the UI language and account settings from the starting request and fix them in the task input. Saved settings apply to subsequent message composition and do not rewrite past commits.
 
-## 근거와 영향
+## Rationale and Impact
 
-대화 언어와 커밋 언어를 독립적으로 고를 수 있고 Git 자동 처리에서도 선택을 유지한다. 기존 사용자 파일을 일괄 변경하거나 별도 설정 저장소를 만들지 않는다. 구체적인 옵션·fallback·API는 [세션 계약](../development/agent-sessions.md#프로젝트-컨텍스트-전달), 사용법은 [프로젝트 설정 안내](../../../docs/guides/project-setup.md#공통-안내-파일-편집), UI·검증은 [소유 기능 문서](../features/%ED%94%84%EB%A1%9C%EC%A0%9D%ED%8A%B8%C2%B7%ED%8C%8C%EC%9D%BC%C2%B7%EA%B2%80%EC%83%89/%ED%94%84%EB%A1%9C%EC%A0%9D%ED%8A%B8%20%EB%AC%B8%EC%84%9C%20%EC%95%88%EB%82%B4%C2%B7%EC%B4%88%EA%B8%B0%ED%99%94.md)가 소유한다.
+Users can choose conversation and commit languages independently, and the selection is retained during automated Git processing. Do not bulk-modify existing user files or create separate settings storage. The [session contract](../development/agent-sessions.md#passing-project-context) owns specific options, fallback, and APIs; the [project settings guide](../../../docs/guides/project-setup.md#edit-the-shared-guidance-file) owns usage; and the [owning feature document](../features/projects-files-search/project-documentation-guidance-and-initialization.md) owns UI and verification.

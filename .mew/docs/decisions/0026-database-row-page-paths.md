@@ -1,30 +1,30 @@
 ---
-title: "0026 — DB 행 페이지의 원본 문서 하위·이름 기반 저장"
-description: "DB 행 페이지를 DB가 있는 문서의 바로 하위에 대표열 값으로 저장하고, UUID 연결·기존 본문·링크·초안을 보존하며 이전 UUID 파일을 이관하기로 한 결정. 0012의 UUID 파일명 선택을 대체한다."
+title: "0026 — Name-based storage of DB row pages directly under the source document"
+description: "Decision to store DB row pages directly under the document containing the DB, using primary column values, preserve UUID associations, existing bodies, links, and drafts, and migrate old UUID files. Supersedes the UUID filename choice in 0012."
 created: 2026-10-20
 updated: 2026-10-20
 ---
 
-# 0026 — DB 행 페이지의 원본 문서 하위·이름 기반 저장
+# 0026 — Name-based storage of DB row pages directly under the source document
 
-상태: 승인
+Status: Approved
 
-## 배경
+## Background
 
-행 페이지가 `데이터베이스/<DB UUID>/<행 UUID>.md`에 저장돼 탐색기에 원본 문서와 별개인 중간 문서와 읽기 어려운 파일명이 나타났다. 사용자는 DB를 담은 문서의 하위에서 행 이름으로 페이지를 찾을 수 있어야 한다.
+Row pages were stored in `데이터베이스/<DB UUID>/<행 UUID>.md`, causing intermediate documents separate from the source document and hard-to-read filenames to appear in the explorer. Users must be able to find pages by row name under the document containing the DB.
 
-## 결정
+## Decision
 
-- 새 행 페이지는 원본 문서의 바로 하위에 대표열 값으로 저장한다. 원본이 단일 Markdown 파일이면 기존 상위·하위 문서 규칙으로 대표 파일로 전환한다.
-- 파일명은 자연어를 유지하고 예약 문자·이름을 보정한다. 파일·폴더 이름 충돌은 번호를 붙여 피한다.
-- 내부 행 UUID와 프론트매터 연결 ID는 유지한다. 생성 후 제목 변경·수동 이동 때 기존 경로를 유지하는 계약도 보존한다.
-- 이전 UUID 파일은 원본 문서 아래 이름 기반 경로로 이관한다. 본문·속성·링크·DB 경로를 보존하고 비어 있는 자동 생성 중간 문서와 폴더만 정리한다.
-- 파일 변경은 DB 트랜잭션 실패 시 되돌린다. 브라우저에서 요청 전 초안을 저장하고 열린 탭 경로를 보정한 뒤 자동저장을 재개한다.
+- Store new row pages directly under the source document using primary column values. If the source is a single Markdown file, convert it to a representative file under the existing parent/child document rules.
+- Keep natural-language filenames and adjust reserved characters and names. Avoid file and folder name collisions by appending numbers.
+- Retain internal row UUIDs and frontmatter association IDs. Also preserve the contract that keeps existing paths when titles are changed or pages are moved manually after creation.
+- Migrate old UUID files to name-based paths under the source document. Preserve bodies, properties, links, and DB paths, and clean up only empty, automatically generated intermediate documents and folders.
+- Roll back file changes if the DB transaction fails. In the browser, save drafts before making the request, update open tab paths, and then resume autosave.
 
-[0012](0012-database-row-pages.md)의 UUID 파일명 선택을 대체한다. 대표열·공유 필드·본문 보존·시간 필드의 기존 결정은 유지한다.
+Supersedes the UUID filename choice in [0012](0012-database-row-pages.md). Existing decisions on primary columns, shared fields, body preservation, and time fields remain in effect.
 
-## 근거와 영향
+## Rationale and Impact
 
-경로가 원본 문서와 행 이름을 드러내므로 일반 문서와 같은 방식으로 탐색할 수 있다. 이름이 겹치거나 파일명으로 쓸 수 없는 값을 보정해도 DB 연결은 UUID로 유지된다. 생성 뒤 제목을 바꿀 때 경로를 그대로 두어 기존 링크와 열린 문서의 수명을 보존한다.
+Paths expose the source document and row name, allowing navigation in the same way as ordinary documents. DB associations remain UUID-based even when duplicate names or values unsuitable for filenames are adjusted. Keeping paths unchanged when titles change after creation preserves existing links and the lifetime of open documents.
 
-구현 계약과 검증 범위는 [문서 페이지 계약](../development/document-pages.md#데이터베이스-행-하위페이지), 사용자 조작은 [DB 안내](../../../docs/guides/database.md#행을-하위페이지로-열기)에서 관리한다.
+The [document page contract](../development/document-pages.md#database-row-subpages) governs the implementation contract and verification scope, and the [DB guide](../../../docs/guides/database.md#opening-rows-as-subpages) governs user operations.

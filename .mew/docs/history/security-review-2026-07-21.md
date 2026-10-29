@@ -1,87 +1,87 @@
 ---
-title: "mew 5000번 포트 터널 노출 보안 검토 (2026-07-21)"
+title: "Security review of mew port 5000 tunnel exposure (2026-07-21)"
 created: 2026-07-27
 updated: 2026-07-27
-description: "2026-07-21 두 포트 운영 당시 presence·WebSocket 인증·프록시 IP 등 보안 검토와 이후 해결 표기를 보존한다. 현재 권한 기준과 구분한다."
+description: "Preserves the security review of presence, WebSocket authentication, proxy IP handling, and related issues during two-port operation on 2026-07-21, along with subsequent resolution notes. Separate from the current authorization rules."
 ---
 
-**2026-07-21 시점의 검토 스냅샷**이다. 코드 위치 참조(`파일:줄`)는 그날의 것이라 현재와 다를 수 있다. 현재의 접근 모델은 [access-model.md](../../../docs/operations/access-model.md)를 본다.
+This is a **review snapshot as of 2026-07-21**. Code location references (`파일:줄`) are from that day and may differ from the current code. See [access-model.md](../../../docs/operations/access-model.md) for the current access model.
 
-- 검토 범위: 5000(팀)·5001(게스트) 두 서버의 인증·인가·네트워크 경계
-- ⚠️ **이후 변경**: 5001 게스트 서버는 이후 단일 포트(5000) 모델로 통합됐다. §4의 "AI 에이전트도 동일 범위" 항목은 [ADR 0014](decisions/0014-mew-agent-panel-removal.md)로 **해소됐다**(에이전트 창 전면 제거).
-- ✅ **2026-07-28 재확인 — §1·§2·§3 모두 해소됐다.** presence는 수신자별 권한 필터를 거치고, tmux·collab WS 인가가 `mustChangePassword`를 확인하며, `clientIp`는 소켓이 loopback일 때만(=cloudflared 경유) 헤더를 신뢰한다. 아래 본문과 우선순위 표는 2026-07-21 당시 기록이니 **그대로 두고 다시 고치지 않는다.** 현재 상태는 [access-model.md](../../../docs/operations/access-model.md).
+- Review scope: authentication, authorization, and network boundaries of the two servers, 5000 (team) and 5001 (guest)
+- ⚠️ **Subsequent changes**: The 5001 guest server was later consolidated into a single-port (5000) model. The "AI agents have the same scope" item in §4 was **resolved** by [ADR 0014](decisions/0014-mew-agent-panel-removal.md) (complete removal of the agent window).
+- ✅ **Rechecked on 2026-07-28 — §1, §2, and §3 have all been resolved.** Presence passes through per-recipient permission filters, tmux and collab WS authorization check `mustChangePassword`, and `clientIp` trusts headers only when the socket is loopback (= via cloudflared). The body and priority table below are records from 2026-07-21, so **leave them as they are and do not revise them again.** For the current state, see [access-model.md](../../../docs/operations/access-model.md).
 
-## 결론 먼저
+## Conclusion first
 
-로그인 자체(비밀번호 해시, 세션, CSRF, 레이트리밋)는 잘 만들어져 있어 **"승인 안 된 사람이 로그인한다"** 시나리오는 안심해도 된다. 문제는 그게 아니라 **"승인된 이메일 하나 = 정확히 무엇에 대한 권한인가"** 쪽이다. 5000번은 문서 편집기가 아니라 `~/dev/liiiiv` 전체에 대한 셸 접근을 포함한, 사실상 SSH에 준하는 개발 환경 접근권을 내주는 서버다. 계정 하나가 털리면 blast radius는 "docs 프로젝트"가 아니라 "이 워크스페이스의 모든 프로젝트"다.
+Login itself (password hashing, sessions, CSRF, rate limiting) is well implemented, so the **"an unauthorized person logs in"** scenario is not a concern. The issue is **"exactly what does one approved email address authorize?"** Port 5000 serves not as a document editor but as a server granting development environment access effectively equivalent to SSH, including shell access to all of `~/dev/liiiiv`. If one account is compromised, the blast radius is "every project in this workspace," not "the docs project."
 
-## 1. [High] Presence 정보가 팀·게스트 경계를 넘어 공유됨
+## 1. [High] Presence information is shared across team and guest boundaries
 
-`presence.ts`가 `wss`와 `clientState`를 **모듈 전역 싱글턴**으로 선언한다. `attachPresenceWebSocket()`이 팀 서버와 게스트 서버 양쪽에서 호출되지만 실제 브로드캐스트 대상은 두 서버 모두 **같은 클라이언트 집합**이다.
+`presence.ts` declares `wss` and `clientState` as **module-global singletons**. Although `attachPresenceWebSocket()` is called for both the team and guest servers, broadcasts from both servers actually target **the same set of clients**.
 
-즉 인증 없이 게스트로 접속한 익명 사용자도 팀원이 지금 포커스한 문서 **경로**와 커서 **색**을 실시간으로 받는다. 게스트 콘텐츠 API는 `docs` 프로젝트로 제한돼 있지만 presence 브로드캐스트는 그 필터를 거치지 않으므로, 팀원이 `docs`가 아닌 프로젝트(소스코드·내부 기획 문서)를 열면 그 경로 문자열이 그대로 공개 인터넷에 노출된다.
+This means even anonymous users connected as guests without authentication receive the **path** of the document a team member currently has focused and their cursor **color** in real time. The guest content API is restricted to the `docs` project, but presence broadcasts do not pass through that filter. When a team member opens a project other than `docs` (source code or internal planning documents), its path string is exposed as-is to the public internet.
 
-"문서를 몇 명이 보고 있는지 게스트에게도 보여준다"는 것 자체는 의도된 설계지만, 팀/게스트를 구분하지 않고 완전히 동일한 채널을 쓰는 건 의도한 범위를 넘는다.
+Showing guests how many people are viewing a document is intentional, but using exactly the same channel without distinguishing team members from guests exceeds the intended scope.
 
-**영향**: 내부 프로젝트 구조, 팀 활동 패턴(누가 언제 무엇을 보는지)이 익명 사용자에게 노출.
-**조치**: `attachPresenceWebSocket`에 서버 구분자(scope)를 넘겨 브로드캐스트를 분리하거나, 최소한 `docs` 밖 경로를 게스트 브로드캐스트에서 필터링.
+**Impact**: Internal project structure and team activity patterns (who views what and when) are
+exposed to anonymous users. **Remediation**: Pass a server scope identifier to `attachPresenceWebSocket` to separate broadcasts, or at least filter paths outside `docs` out of guest broadcasts.
 
-## 2. [Medium] WebSocket authorize가 `mustChangePassword`를 확인하지 않음
+## 2. [Medium] WebSocket authorize does not check `mustChangePassword`
 
-HTTP API를 지키는 `requireAuth`는 `session.user.mustChangePassword`까지 확인해 임시 비밀번호 사용자를 막는다. 그런데 WebSocket 업그레이드의 `authorize`는 세션 존재 여부만 본다:
+`requireAuth`, which protects the HTTP API, also checks `session.user.mustChangePassword` to block users with temporary passwords. However, `authorize` for WebSocket upgrades only checks whether a session exists:
 
 ```ts
 const authorize = (req: IncomingMessage) => sessionFromRequest(req) !== null
 ```
 
-임시 비밀번호만 가진 계정도 **tmux로 셸을 붙잡을 수 있다** — HTTP 가드를 WS 경로로 우회하는 셈이다.
+Even an account with only a temporary password **can obtain a shell through tmux** — effectively bypassing the HTTP guard through the WS path.
 
-**조치**: `(req) => { const s = sessionFromRequest(req); return s !== null && !s.user.mustChangePassword }`
+**Action**: `(req) => { const s = sessionFromRequest(req); return s !== null && !s.user.mustChangePassword }`
 
-## 3. [Medium] `clientIp()`가 헤더를 무조건 신뢰
+## 3. [Medium] `clientIp()` unconditionally trusts headers
 
-`cf-connecting-ip` → `x-forwarded-for` → `socket.remoteAddress` 순으로 신뢰한다. 이는 트래픽이 **오직 cloudflared 경유로만** 들어온다는 가정인데, 실제로는 tailnet 직접 접속 경로도 있다. 그 경로로 오면 클라이언트가 헤더를 임의로 붙일 수 있고 서버는 그대로 믿는다.
+It trusts `cf-connecting-ip` → `x-forwarded-for` → `socket.remoteAddress` in that order. This assumes traffic arrives **only through cloudflared**, but a direct tailnet access path also exists. Through that path, clients can set arbitrary headers, and the server trusts them as-is.
 
-**영향**: 로그인 실패 레이트리밋(IP+이메일, 10회/15분)이 매 요청 다른 `x-forwarded-for`로 무력화돼 무차별 대입이 가능해진다.
-**조치**: 신뢰 가능한 경로(cloudflared)와 아닌 경로(tailnet 직결)를 구분해, 신뢰 불가 경로에서는 `socket.remoteAddress`만 쓴다. 가장 간단한 방법은 tailnet 직결을 막고 cloudflared 전용으로 강제하는 것.
+**Impact**: The login failure rate limit (IP + email, 10 attempts per 15 minutes) can be bypassed by using a different `x-forwarded-for` on every request, enabling
+brute-force attacks. **Remediation**: Distinguish trusted routes (cloudflared) from untrusted routes (direct tailnet connections), and use only `socket.remoteAddress` on untrusted routes. The simplest approach is to block direct tailnet connections and require cloudflared exclusively.
 
-## 4. 구조적 한계 — "승인된 이메일만"의 실질적 의미
+## 4. Structural limitation — what "approved emails only" means in practice
 
-버그가 아니라 설계의 귀결이다. 요약은 [access-model.md](../../../docs/operations/access-model.md) "이 경계가 의미하는 것"에 옮겨 뒀다.
+This is a consequence of the design, not a bug. The summary has been moved to "What this boundary means" in [access-model.md](../../../docs/operations/access-model.md).
 
-- **워크스페이스 전체 접근** — `WORKSPACE_ROOT`가 `~/dev/liiiiv`이고 그 아래 모든 최상위 폴더가 프로젝트로 취급된다. 팀 서버 로그인 사용자는 mew 자체 소스와 옆 프로젝트들을 API로 열람·수정할 수 있다.
-- **완전한 셸 접근** — tmux WebSocket이 `cwd: WORKSPACE_ROOT`로 pty를 스폰한다. API 레벨 경로 검증(`.git`·`node_modules`·`.data`·`.env*` 차단)은 "우발적 UI 노출"만 막을 뿐, 셸을 가진 사용자에게는 경계가 아니다. `.env`·`.data/`의 세션·비밀번호 해시·다른 프로젝트 시크릿이 전부 `cat` 한 줄로 읽힌다.
-- ~~**AI 에이전트도 동일 범위**~~ — `server/agent.ts`가 `bypassPermissions`로 워크스페이스 루트에서 Claude Code를 헤드리스 실행했다. **해소됨** — [ADR 0014](decisions/0014-mew-agent-panel-removal.md)로 전면 제거.
+- **Workspace-wide access** — `WORKSPACE_ROOT` is `~/dev/liiiiv`, and every top-level folder under it is treated as a project. Users logged into the team server can view and modify mew's own source and neighboring projects through the API.
+- **Full shell access** — The tmux WebSocket spawns a pty with `cwd: WORKSPACE_ROOT`. API-level path validation (blocking `.git`, `node_modules`, `.data`, and `.env*`) only prevents "accidental UI exposure"; it is not a boundary for users with a shell. Sessions, password hashes, and other project secrets in `.env` and `.data/` can all be read with a single `cat` command.
+- ~~**AI agents have the same scope**~~ — `server/agent.ts` ran Claude Code headlessly from the workspace root with `bypassPermissions`. **Resolved** — Completely removed under [ADR 0014](decisions/0014-mew-agent-panel-removal.md).
 
-**권장**: 계정 발급을 신뢰하는 소수에게만. 공개 인터넷 터널보다 tailnet이 훨씬 안전한 경계다. 세션 TTL 단축 검토.
+**Recommendation**: Issue accounts only to a small number of trusted people. A tailnet is a much safer boundary than a public internet tunnel. Consider shortening the session TTL.
 
-## 5. [Low] ~~`/upload`에 사용자별 쿼터 없음~~ — 쿼터를 두지 않기로 결정(2026-07-28)
+## 5. [Low] ~~No per-user quota on `/upload`~~ — Decided not to impose a quota (2026-07-28)
 
-> 이 지적을 받아 계정당 일일 200MB 쿼터를 넣었다가 **2026-07-28 다시 제거했다.** 발급 계정이 owner·manager 둘뿐이고 전원 셸을 가진 상황에서 "비용성 DoS"는 실질 위협이 아니라 정상 사용(대용량 자산 업로드)을 막는 마찰이었다. **재추가 금지** — 계정을 외부에 넓게 발급하는 모델로 바뀌면 그때 다시 판단한다. 아래는 2026-07-21 당시 기록이다.
+> In response to this finding, a daily 200 MB quota per account was added, then **removed again on 2026-07-28.** With only two issued accounts, owner and manager, both with shell access, "cost-based DoS" was not a practical threat; the quota was friction that blocked normal use (large asset uploads). **Do not add it again** — Reassess if the model changes to issuing accounts broadly to external users. The following is the record from 2026-07-21.
 
-파일당 500MB까지 허용되고 R2 업로드에 사용자별·기간별 쿼터가 없다. 인증 사용자만 가능하지만 반복 업로드로 스토리지 비용을 늘릴 수 있다 — 계정 하나가 털리면 비용성 DoS 벡터.
+Files up to 500 MB each are allowed, and R2 uploads have no per-user or per-period quota. Only authenticated users can upload, but repeated uploads can increase storage costs — a cost-based DoS vector if one account is compromised.
 
-## 6. [Low] Yjs collab room이 인증만 되면 무제한 생성 가능
+## 6. [Low] Unlimited Yjs collab rooms can be created once authenticated
 
-`roomKey`가 클라이언트 쿼리 파라미터 그대로다. 검증·소유권 확인이 없어 임의 room 키로 계속 접속하면 메모리에 `Y.Doc`이 쌓인다. 클라이언트 0이 되면 정리되지만 동시 연결을 유지하면 무한정 늘어난다. 디스크에 쓰지 않고 인증이 필요해 우선순위는 낮다.
+`roomKey` is taken directly from the client query parameter. Without validation or ownership checks, repeatedly connecting with arbitrary room keys accumulates `Y.Doc` instances in memory. They are cleaned up when the client count reaches 0, but can grow indefinitely if concurrent connections are maintained. Priority is low because nothing is written to disk and authentication is required.
 
-## 7. 잘 되어 있는 것
+## 7. What is working well
 
-- 비밀번호: scrypt + 사용자별 salt, 타이밍 세이프 비교, 미등록 이메일에도 더미 해시로 응답해 존재 여부 타이밍 공격 방지
-- 셀프 등록·비밀번호 재설정 HTTP 엔드포인트가 **아예 없음** — 계정 발급은 호스트 로컬 CLI 전용이라 원격 계정 생성 공격면이 없다
-- 세션 토큰은 원문이 아니라 sha256 해시로 저장 — 저장소가 유출돼도 세션 재사용 불가
-- 비밀번호 변경 시 다른 기기 세션 전부 무효화
-- 로그인 레이트리밋, CSRF 방어(SameSite=Lax + Origin 검증), HttpOnly + 조건부 Secure 쿠키
-- 게스트는 tmux에 절대 못 붙게 코드·주석 양쪽에서 경계가 명확함, 쓰기 라우트 전부 차단
-- `/link-preview`는 SSRF 우려로 게스트 화이트리스트에서 의도적으로 제외
-- 보안 헤더(nosniff, `X-Frame-Options: DENY`, Referrer-Policy) 양쪽 적용
+- Passwords: scrypt + per-user salt, timing-safe comparison, and dummy hash responses even for unregistered emails to prevent timing attacks that reveal account existence
+- **No HTTP endpoints at all** for self-registration or password reset — accounts can only be issued through the host-local CLI, leaving no remote account creation attack surface
+- Session tokens are stored as sha256 hashes rather than plaintext — sessions cannot be reused even if the store is leaked
+- Changing a password invalidates all sessions on other devices
+- Login rate limiting, CSRF protection (SameSite=Lax + Origin validation), HttpOnly + conditional Secure cookies
+- Both code and comments clearly enforce the boundary that guests can never connect to tmux; all write routes are blocked
+- `/link-preview` is intentionally excluded from the guest whitelist due to SSRF concerns
+- Security headers (nosniff, `X-Frame-Options: DENY`, Referrer-Policy) applied to both servers
 
-## 우선순위 요약
+## Priority summary
 
-| 순위 | 항목 | 조치 난이도 |
+| Rank | Item | Remediation difficulty |
 | --- | --- | --- |
-| 1 | Presence 팀/게스트 채널 분리 (§1) | 낮음 — scope 파라미터 추가 |
-| 2 | WS authorize에 `mustChangePassword` 체크 (§2) | 매우 낮음 — 한 줄 |
-| 3 | `clientIp` 신뢰 경로 재검토 / tailnet 직결 차단 (§3) | 중간 — 네트워크 구성 확인 필요 |
-| 4 | "승인 이메일 = 워크스페이스 전체 권한" 전제하에 계정 발급 최소화 (§4) | 정책적 결정 |
-| 5 | 업로드 쿼터, collab room 정리 (§5·§6) | 낮음, 급하지 않음 |
+| 1 | Separate team/guest presence channels (§1) | Low — add a scope parameter |
+| 2 | Check `mustChangePassword` in WS authorize (§2) | Very low — one line |
+| 3 | Review trusted paths for `clientIp` / block direct tailnet connections (§3) | Medium — network configuration needs to be checked |
+| 4 | Minimize account issuance on the premise that "approved email = workspace-wide access" (§4) | Policy decision |
+| 5 | Upload quotas, collab room cleanup (§5, §6) | Low, not urgent |

@@ -1,26 +1,26 @@
 ---
-provenance: "Liiiiv 중앙 ADR 이관본, 2026-10-14"
-description: "이관한 결정 기록: Mew 커밋 스킬과 작업 단위 자동 커밋. 당시 선택·근거·후속 변경을 보존하며 현재 계약은 Mew 소유 문서에서 확인한다."
-title: "0174 — Mew 커밋 스킬과 작업 단위 자동 커밋"
+provenance: "Migrated copy of a Liiiiv central ADR, 2026-10-14"
+description: "Migrated decision record: the Mew commit skill and automatic commits by task. Preserves the choices, rationale, and subsequent changes from that time; consult Mew's owning documents for the current contract."
+title: "0174 — Mew commit skill and automatic commits by task"
 created: 2026-09-23
 updated: 2026-09-23
 ---
 
-- 상태: 채택
-- 결정자: 사용자 요청
-- 부분 대체: [0166](0166-mew-git-ai-commit-drafts.md), [0170](0170-mew-git-selected-files-and-composer.md) — AI 초안 적용·별도 커밋 확정 대신 작업 단위 실제 커밋
-- 부분 대체: [0157](0157-mew-native-agent-harness-management.md) — Mew 소유 커밋 스킬 추가; 일반 런타임 스킬의 원본 관리 유지
+- Status: Adopted
+- Decision maker: User request
+- Partially supersedes: [0166](0166-mew-git-ai-commit-drafts.md), [0170](0170-mew-git-selected-files-and-composer.md) — actual commits by task instead of applying AI drafts and separately confirming commits
+- Partially supersedes: [0157](0157-mew-native-agent-harness-management.md) — add a Mew-owned commit skill; retain source management for general runtime skills
 
-## 결정
+## Decision
 
-커밋 절차의 기준본은 서버 데이터 폴더의 `skills/commit/SKILL.md`다. 최초 템플릿으로 생성하되 이후 사용자 편집을 보존한다. Mew Skills 관리에서 읽고 편집하며, 모든 런타임의 Mew `/commit`과 Git AI 자동 커밋이 같은 파일을 사용한다. 런타임 전역·프로젝트 스킬로 배포하거나 복제하지 않는다.
+The canonical source for the commit procedure is `skills/commit/SKILL.md` in the server data folder. Create it from an initial template, then preserve subsequent user edits. Read and edit it in Mew Skills management; Mew `/commit` in every runtime and Git AI Auto Commit use the same file. Do not distribute or duplicate it as a runtime-global or project skill.
 
-AI 자동 커밋의 실행 버튼은 선택한 파일을 작업 단위로 나눈 실제 커밋 실행을 뜻한다. 독립 tmux·ACP 작업에서 스킬과 변경 스냅샷·최근 메시지 관례를 읽어 파일별 커밋 계획을 만든다. Mew가 계획의 범위·중복·누락과 변경 여부를 검증한 뒤 그룹별로 커밋하고 해시·남긴 파일·실패를 기록한다. 초기 구현은 파일 단위 분리이며 한 파일의 여러 hunk는 같은 커밋으로 둔다.
+The execution button for AI Auto Commit means executing actual commits that divide selected files by task. An independent tmux or ACP task reads the skill, change snapshot, and recent message conventions to create a per-file commit plan. Mew validates the plan's scope, duplicates, omissions, and whether changes have occurred, then commits each group and records hashes, files left uncommitted, and failures. The initial implementation splits at the file level, keeping multiple hunks in one file in the same commit.
 
-현재 프로젝트 저장소·선택 파일 경계를 유지한다. 선택하지 않은 변경과 stage를 보존하고 push하지 않는다. 취소·실패 전에 만든 커밋은 되돌리지 않고 결과에 남긴다. 이전 버전의 초안 작업은 자동 실행하지 않는다. 일반 대화에서 스킬을 안내하는 것만으로 커밋 권한이 생기지 않으며 사용자 요청·공통 커밋 지침의 범위를 따른다.
+Preserve the boundaries of the current project repository and selected files. Preserve unselected changes and staging state, and do not push. Do not revert commits created before cancellation or failure; retain them in the results. Do not automatically execute draft tasks from earlier versions. Merely mentioning the skill in a regular conversation does not grant commit authorization; follow the scope of the user's request and shared commit guidance.
 
-## 근거
+## Rationale
 
-사용자는 `/commit`과 같이 논리적으로 구분되는 변경을 필요시 여러 커밋으로 기록하는 동작을 요구했다. 파일 하나를 공통 기준으로 사용하면 런타임별 스킬과 버튼 내 지침이 달라지지 않는다.
+The user requested behavior like `/commit` that records logically distinct changes in multiple commits when needed. Using one file as the shared standard prevents runtime-specific skills and guidance within the button from diverging.
 
-현재 동작은 [Git 사용법](../../../../docs/guides/projects.md#git-작업-패널), [스킬 관리](../../../../docs/configuration/agent-harness.md), [실행 계약](../../development/agent-sessions.md)에 둔다.
+Current behavior is documented in [Git Usage](../../../../docs/guides/projects.md#git-operations-panel), [Skill Management](../../../../docs/configuration/agent-harness.md), and [Execution Contract](../../development/agent-sessions.md).

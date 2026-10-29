@@ -1,57 +1,57 @@
 ---
-provenance: "Liiiiv 중앙 ADR 이관본, 2026-10-14"
-description: "이관한 결정 기록: mew 공개 배포는 공급자 자격증명 수집 없이 안전한 기본값을 쓴다. 당시 선택·근거를 보존하며, Mew 자체 MIT 신규 배포 선택은 결정 0053가 부분 대체한다."
-title: "0112 — mew 공개 배포는 공급자 자격증명 수집 없이 안전한 기본값을 쓴다"
+provenance: "Migrated copy of a Liiiiv central ADR, 2026-10-14"
+description: "Migrated decision record: mew public distribution uses secure defaults without collecting provider credentials. Preserves the choices and rationale at the time; decision 0053 partially supersedes the choice to newly distribute Mew itself under MIT."
+title: "0112 — mew public distribution uses secure defaults without collecting provider credentials"
 created: 2026-09-04
 updated: 2026-10-05
 ---
 
-- 날짜: 2026-09-04
-- 상태: 채택
-- 후속 결정: [0195](0195-mew-account-based-p2p-remote-access.md) — 옵트인 계정 기반 P2P 접속 설계 추가(미구현); 로컬 기본값·공급자 자격증명·기존 공개 보안 경계는 유지
-- 부분 대체: [0109](0109-mew-agent-authentication-and-loopback-browser.md) — Mew UI가 Claude Code OAuth 토큰을 받아 서버 런타임 설정에 보관하던 범위
-- 결정자: 송상훈 (공개 배포 지시), Codex (보안 검토·구현)
+- Date: 2026-09-04
+- Status: Adopted
+- Follow-up decision: [0195](0195-mew-account-based-p2p-remote-access.md) — Adds an opt-in account-based P2P access design (not implemented); local defaults, provider credential boundaries, and existing public security boundaries remain in place
+- Partially supersedes: [0109](0109-mew-agent-authentication-and-loopback-browser.md) — The scope in which the Mew UI accepted Claude Code OAuth tokens and stored them in server runtime settings
+- Decision makers: Song Sanghun (public distribution directive), Codex (security review and implementation)
 
-- 후속 결정: [0053](../../decisions/0053-source-available-license.md) — Mew 자체 MIT 신규 배포 선택만 소스 공개 조건으로 대체. 기존 MIT 허여·제3자 권리와 나머지 결정은 유지
+- Follow-up decision: [0053](../../decisions/0053-source-available-license.md) — Replace only the choice to make new releases of Mew itself under MIT with source-available terms. Existing MIT grants, third-party rights, and the remaining decisions stay in effect
 
-## 배경
+## Background
 
-공개 전 점검에서 세 경계가 맞지 않았다. 레포에는 재배포 권한을 주는 LICENSE가 없었고, 원저작자의
-재배포 금지 자산이 추적돼 있었다. 또한 Mew가 브라우저에서 Claude Code OAuth 토큰을 받아 서버 파일에
-저장했고, 외부 URL을 서버에서 가져오는 링크 미리보기와 500MiB 메모리 업로드가 공개 서버의 공격 표면을
-넓혔다.
+The pre-release review found three misaligned boundaries. The repository had no LICENSE granting redistribution rights, and tracked
+assets whose original author prohibited redistribution. Mew also accepted Claude Code OAuth tokens through the browser and stored them in server files,
+while link previews that fetched external URLs on the server and 500 MiB in-memory uploads expanded the public server's attack
+surface.
 
-## 선택지
+## Options
 
-1. 기존 편의 기능을 유지하고 운영 문서로만 주의시킨다 — 공개 기본값이 취약하고 자격증명·자산의 배포
-   권리를 해결하지 못한다.
-2. 공개 경로에서 문제 기능을 제거하거나 안전한 기본값으로 바꾸고, 필요한 외부 계약만 별도 검증한다.
+1. Keep existing convenience features and provide cautions only in operational documentation—the public defaults remain vulnerable, and this does not resolve distribution
+   rights for credentials and assets.
+2. Remove problematic features from public paths or switch to secure defaults, and separately verify only the necessary external agreements.
 
-## 결정
+## Decision
 
-2번을 채택한다.
+Adopt option 2.
 
-- MIT LICENSE를 레포에 다시 포함하고, 재배포 권한이 확인되지 않은 Oreo Cat 원본·가공 자산은 공개 트리와
-  실행 경로에서 제거한다. 같은 자산의 재도입은 하지 않는다. 새 마스코트는 레포 기여자가 직접 만든 코드
-  기반 벡터만 쓴다.
-- Mew UI와 런타임 설정 API는 `CLAUDE_CODE_OAUTH_TOKEN`을 수집·저장·spawn 환경에 주입하지 않는다.
-  기존 데이터 파일의 해당 키는 서버 시작 시 제거한다. 사용자는 공급자가 소유한 로그인 흐름 또는 자신이
-  관리하는 정식 API 자격증명을 써야 한다.
-- 서버가 임의 외부 URL을 대신 요청하는 링크 미리보기는 중지한다. egress 격리, DNS/IP·redirect 검증,
-  테스트가 갖춰진 별도 설계 없이는 재도입하지 않는다.
-- 업로드는 디스크 임시 저장·엄격한 요청 한도·사용자별 속도 제한을 사용한다. 기본 서버 바인딩은 loopback이며,
-  외부 공개는 HTTPS 프록시 또는 터널만 통해 명시적으로 구성한다.
+- Include the MIT LICENSE in the repository again, and remove original and modified Oreo Cat assets whose redistribution rights have not been confirmed from the public
+  tree and execution paths. Do not reintroduce the same assets. Use only code-based vectors created directly by repository contributors
+  for the new mascot.
+- The Mew UI and runtime configuration API do not collect or store `CLAUDE_CODE_OAUTH_TOKEN` or inject it into the spawn environment. Remove that key
+  from existing data files when the server starts. Users must use a provider-owned login flow or official
+  API credentials they manage themselves.
+- Discontinue link previews that have the server request arbitrary external URLs on the user's behalf. Do not reintroduce them without a separate design that includes
+  egress isolation, DNS/IP and redirect validation, and tests.
+- Uploads use temporary disk storage, strict request limits, and per-user rate limits. The default server binding is loopback; external
+  access must be explicitly configured through an HTTPS proxy or tunnel only.
 
-## 근거
+## Rationale
 
-공개 저장소의 기본값은 신뢰할 수 없는 네트워크에 노출돼도 최소 권한이어야 한다. manager·owner가 서버
-셸 권한을 받는 제품 특성상, 편의 기능 하나가 내부망 요청이나 메모리 고갈의 우회로가 되면 안 된다.
-자격증명과 제3자 자산의 계약은 코드의 마스킹이나 출처 표기만으로 해결되지 않으므로, 수집 자체를 없애는
-것이 배포 가능한 최소 경계다.
+The public repository's defaults must enforce least privilege even when exposed to untrusted networks. Because the product gives managers and owners
+server shell access, no convenience feature may become a bypass for internal network requests or memory exhaustion. Credential and
+third-party asset contracts cannot be resolved through code masking or attribution alone, so eliminating collection itself is the minimum
+boundary required for distribution.
 
-## 결과
+## Results
 
-- 링크 미리보기와 외부 OAuth 토큰 입력은 기능 축소다. 공개 릴리스에서는 안전을 우선하며, 재도입은 새 ADR과
-  보안 테스트가 있어야 한다.
-- 공급자 CLI·SDK의 재배포·호스팅 조건과 모든 기여자의 저작권 귀속은 코드로 확인할 수 없다. 공개 릴리스
-  태그 전에는 유지보수자가 해당 계약과 기여 권리를 확인해야 한다.
+- Removing link previews and external OAuth token input reduces functionality. Public releases prioritize safety, and reintroduction requires
+  a new ADR and security tests.
+- Provider CLI and SDK redistribution and hosting terms, and copyright ownership for all contributors, cannot be verified through code. Before tagging
+  a public release, maintainers must verify those contracts and contribution rights.

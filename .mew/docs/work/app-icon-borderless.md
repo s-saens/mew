@@ -1,34 +1,34 @@
 ---
-title: "설치용 앱 아이콘 사각 테두리 제거"
-description: "2026-10-28 설치용 PNG 아이콘 세 크기의 사각 테두리 제거와 기본 미드나이트 그라데이션 배경 적용을 기록한다. 마크 보존, 회귀 검사 결과와 미배포 범위를 설명한다."
+title: "Remove the square border from installable app icons"
+description: "Records the removal of square borders from three sizes of installable PNG icons and application of the default midnight gradient background on 2026-10-28. Describes mark preservation, regression check results, and the scope that has not been deployed."
 created: "2026-10-28"
 updated: "2026-10-28"
 ---
 
-## 목적과 결과
+## Purpose and results
 
-홈 화면에 설치한 앱 아이콘의 바깥 사각 테두리를 제거했다. 180·192·512px PNG에 기존 배경과 내부 마크의 색·크기·위치·획 두께를 유지했다. 파비콘과 전체 로딩 로고는 변경하지 않았다. 현재 기준은 [설치형 웹앱 UI 계약](../development/ui-contracts.md#설치형-웹앱과-시작-안내)이 소유한다.
+Removed the outer square border from the app icon installed on the home screen. Preserved the existing background and the internal mark's color, size, position, and stroke width in the 180, 192, and 512px PNGs. The favicon and full loading logo were not changed. The current requirements are owned by the [Installable web app UI contract](../development/ui-contracts.md#installable-web-app-and-startup-guidance).
 
-기존 `public/favicon.svg`의 path에 캔버스 크기의 20%만큼 평행 이동하고 `크기 × 0.6 / 64` 비율로 확대·축소하는 변환을 적용했다. CairoSVG로 기존 테두리를 포함한 PNG를 먼저 재현해 세 크기 모두 원본과 픽셀이 일치함을 확인한 뒤, 같은 SVG에서 테두리만 제외하고 PNG를 생성했다.
+Applied a transform to the existing paths in `public/favicon.svg` that translates them by 20% of the canvas size and scales them by `크기 × 0.6 / 64`. First reproduced the PNGs with their existing borders using CairoSVG and confirmed pixel matches with the originals at all three sizes, then generated PNGs from the same SVG with only the border excluded.
 
-## 검증과 적용
+## Verification and application
 
-- `node --test server/app-install-manifest.test.ts`: 5개 검사 통과. 세 크기의 바깥 여백이 불투명 배경색으로만 채워지고 내부 마크의 크기·위치가 보존되는지 확인한다. 기존 manifest·Apple touch 연결과 PNG 크기도 검사한다. 변경 전 PNG에서는 세 크기 모두 테두리 검사에 실패함을 확인했다.
-- 변경한 512px PNG를 직접 열어 테두리가 제거된 모습을 확인했다.
-- Git 원본과 세 크기의 픽셀을 비교해 내부 마크가 동일하고 바뀐 픽셀은 모두 배경색임을 확인했다.
-- `npx tsc -b`와 `npx oxlint server/app-install-manifest.test.ts`: 통과.
-- `npm run check:docs`: description 506개는 오류 없이 통과했다. 전체 링크 검사는 이번 작업과 무관한 기존 누락 문서 링크 18건 때문에 실패했다. 변경한 두 문서의 링크 오류는 없다.
+- `node --test server/app-install-manifest.test.ts`: 5 checks passed. Checks verify that the outer margins at all three sizes contain only the opaque background color and that the internal mark's size and position are preserved. They also check existing manifest and Apple touch links and PNG dimensions. Confirmed that the pre-change PNGs failed the border check at all three sizes.
+- Opened the changed 512px PNG directly and confirmed that the border was removed.
+- Compared pixels at all three sizes against the Git originals and confirmed that the internal mark was identical and all changed pixels were the background color.
+- `npx tsc -b` and `npx oxlint server/app-install-manifest.test.ts`: passed.
+- `npm run check:docs`: 506 descriptions passed without errors. The full link check failed due to 18 existing links to missing documents unrelated to this work. The two changed documents have no link errors.
 
-앱 빌드·배포·서버 시작·종료·재시작은 수행하지 않았다. 실행 중인 앱에는 사용자의 빌드·적용이 필요하며 Mewlink 중앙 자원은 별도 배포 대상이다. 기존 설치 아이콘의 갱신 시점과 실제 Android·iOS 홈 화면 표시는 실기 검증하지 않았다.
+App builds, deployment, and server starts, stops, and restarts were not performed. The running app requires the user to build and apply the changes, and Mewlink central resources require separate deployment. The update timing for existing installed icons and their actual appearance on Android and iOS home screens were not verified on physical devices.
 
-## 후속 변경: 미드나이트 배경
+## Follow-up change: midnight background
 
-2026-10-28 후속 요청으로 단색 배경을 기본 미드나이트의 정적인 그라데이션으로 바꿨다. `shared/theme.ts`의 기본 팔레트와 `themeBackgroundImage()`를 사용해 남색 바탕에 보라색·청록색을 135° 방향으로 섞었다. 앱 배경과 같은 `inset: -8%` 영역을 사용하고 애니메이션 없이 격리 Chromium에서 세 크기의 PNG를 생성했다. 내부 마크의 원본 path·색·변환과 테두리 없는 형태는 유지한다. 위의 단색 배경 픽셀 비교는 이전 변경의 검증 기록이다. 아이콘 검사와 앱이 같은 배경 계산을 사용하도록 순수 함수 `themeBackgroundImage()`를 `shared/theme.ts`로 옮기고 기존 프런트엔드 진입점에서 다시 내보낸다.
+Following a request on 2026-10-28, replaced the solid background with the default midnight static gradient. Used the default palette in `shared/theme.ts` and `themeBackgroundImage()` to blend purple and teal into a navy background at 135°. Used the same `inset: -8%` area as the app background and generated PNGs at all three sizes in isolated Chromium without animation. The internal mark's original paths, colors, and transform and the borderless shape are preserved. The solid-background pixel comparison above records verification of the earlier change. Moved the pure function `themeBackgroundImage()` to `shared/theme.ts` and re-exported it from the existing frontend entry point so the icon checks and app use the same background calculation.
 
-- `node --test server/app-install-manifest.test.ts`: 5개 검사 통과. 세 크기 모두 바깥 여백이 기본 미드나이트 그라데이션과 일치하고 불투명하며, 마크의 크기·위치와 설치 메타데이터가 유지되는지 확인했다. 기존 단색 PNG에서는 세 크기 모두 새 배경 검사에 실패했다.
-- `node --test server/app-install-manifest.test.ts src/utils/theme-color.test.ts`: 22개 검사 통과. 공유 배경 함수의 이동 후 기존 테마 계산·적용 회귀 검사도 통과했다.
-- 변경한 512px PNG를 직접 열어 남색·보라색·청록색의 정적인 배경과 내부 마크를 확인했다.
-- `npx tsc -b`와 `npx oxlint shared/theme.ts src/utils/theme-color.ts server/app-install-manifest.test.ts`: 통과.
-- `npm run check:docs`: description 506개 통과. 기존 누락 문서 링크 18건으로 전체 검사는 실패했으며 이번 변경 문서의 링크 검사는 통과했다.
+- `node --test server/app-install-manifest.test.ts`: 5 checks passed. Verified that the outer margins at all three sizes match the default midnight gradient and are opaque, and that the mark's size and position and installation metadata are preserved. The existing solid-color PNGs failed the new background check at all three sizes.
+- `node --test server/app-install-manifest.test.ts src/utils/theme-color.test.ts`: 22 checks passed. Existing theme calculation and application regression checks also passed after moving the shared background function.
+- Opened the changed 512px PNG directly and checked the static navy, purple, and teal background and internal mark.
+- `npx tsc -b` and `npx oxlint shared/theme.ts src/utils/theme-color.ts server/app-install-manifest.test.ts`: passed.
+- `npm run check:docs`: 506 descriptions passed. The full check failed due to 18 existing links to missing documents; link checks for the documents changed in this work passed.
 
-빌드·배포와 실제 설치 기기의 아이콘 갱신은 수행하지 않았다.
+Builds, deployment, and icon updates on actual installed devices were not performed.

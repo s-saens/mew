@@ -1,38 +1,38 @@
 ---
-title: "ADR 0018: Mewlink 시작 병렬화와 정적 코드 재검증"
-description: "Mewlink의 중복 시작·인증·메타데이터 왕복을 줄이고 현재 P2P 연결의 SHA-256 확인 뒤 정적 코드를 재사용하기로 한 결정. D1 조회 개선은 후속 0025, 코드·글꼴 묶음 검증과 인증 결과 대기는 0060이 확장한다."
+title: "ADR 0018: Mewlink Startup Parallelization and Static Code Revalidation"
+description: "Decision to reduce duplicate Mewlink startup, authentication, and metadata round trips and reuse static code after verifying SHA-256 over the current P2P connection. Subsequent decision 0025 extends D1 query improvements, and 0060 extends code and font bundle verification and waiting for authentication results."
 created: 2026-10-19
 updated: 2026-10-24
 ---
 
-# ADR 0018: Mewlink 시작 병렬화와 정적 코드 재검증
+# ADR 0018: Mewlink Startup Parallelization and Static Code Revalidation
 
-## 상태
+## Status
 
-채택. 로컬 코드와 비공개 중앙 런처의 구현·격리 검증을 완료했으며 사용자 빌드·서버 적용·중앙 배포는 별도로 수행한다.
+Accepted. Implementation and isolated verification of the local code and private central launcher are complete; user builds, server application, and central deployment are performed separately.
 
-[후속 ADR 0060](0060-mewlink-startup-handoffs.md)은 현재 호스트의 SHA-256 검증을 유지하며 정적 코드·글꼴의 시작 시 묶음 확인과 늦게 도착하는 인증 결과 공유를 확장한다.
+[Subsequent ADR 0060](0060-mewlink-startup-handoffs.md) retains SHA-256 verification of the current host and extends bundled startup checks for static code and fonts and sharing of late-arriving authentication results.
 
-## 배경
+## Background
 
-Mewlink 접속에서는 암호 검증 외에도 launch·ICE 협상·로컬 인증 상태·정적 자원 준비가 필요하다. 기존 시작 경로는 DataChannel 준비 후 인증 상태·앱 메타데이터·HTML을 순서대로 기다렸고, 연결마다 달라지는 URL과 모든 자원의 저장 금지로 앱 코드를 다시 받았다. 브라우저 신뢰 세션을 사용해도 이 비용은 남았다.
+Mewlink connections require launch, ICE negotiation, local authentication status, and static resource preparation in addition to cryptographic verification. The previous startup path waited sequentially for authentication status, app metadata, and HTML after the DataChannel was ready, and downloaded app code again because URLs changed with each connection and storage of all resources was prohibited. These costs remained even with browser trusted sessions.
 
-로컬 합성 측정의 Ed25519 서명·검증 평균은 각각 약 0.55ms·0.39ms, 비밀번호 scrypt 6회는 약 52~66ms였다. 저장된 세션 재접속에서는 비밀번호 해시를 계산하지 않는다. 이 측정은 운영 지연의 원인 확정이 아니지만 인증 검사를 줄이기보다 중복 왕복과 반복 전송을 먼저 줄일 근거가 된다.
+In local synthetic measurements, Ed25519 signing and verification averaged about 0.55 ms and 0.39 ms respectively, and 6 password scrypt runs took about 52–66 ms. Reconnection with a stored session does not compute a password hash. These measurements do not establish the cause of production latency, but support reducing duplicate round trips and repeated transfers before reducing authentication checks.
 
-## 결정
+## Decision
 
-최초 연결의 인증 상태 확인과 자원 준비를 겹치고 index와 동일한 메타데이터 검사를 중복 요청하지 않는다. 런처가 현재 연결에서 확인한 인증 상태를 새 앱 프레임에 한 번 전달해 중복 조회를 줄인다. 전달 상태가 없으면 기존 조회를 수행한다. 복구 연결은 같은 계정·인증 수단 확인을 마친 뒤 이어 쓰며 기존 인증·신뢰 동의·회수·lease를 유지한다.
+Overlap authentication status checks and resource preparation on the initial connection, and avoid duplicate requests for the same metadata checks as index. The launcher passes authentication status verified on the current connection to the new app frame once to reduce duplicate queries. If no status is passed, perform the existing query. Resume recovery connections after confirming the same account and authentication method, preserving existing authentication, trust consent, revocation, and leases.
 
-기기별 정적 코드에만 명시적 CacheStorage를 허용한다. 저장 본문의 SHA-256을 확인하고 현재 기기의 인증된 P2P 요청에서 같은 ETag의 304를 받아야 재사용한다. gzip과 raw 표현의 ETag는 구분하며 저장은 해제된 본문으로 통일한다. 응답 CSP는 현재 연결에서 다시 적용한다. 같은 앱 origin의 다른 코드가 저장 ETag를 유지한 채 본문만 바꾸더라도 해시 비교가 재사용을 막는다.
+Allow explicit CacheStorage only for per-device static code. Verify the stored content's SHA-256 and reuse it only after receiving 304 with the same ETag from an authenticated P2P request to the current device. Distinguish ETags for gzip and raw representations, and consistently store decompressed content. Reapply the response CSP from the current connection. Even if other code on the same app origin changes only the content while retaining the stored ETag, the hash comparison prevents reuse.
 
-이 결정은 [원격 접속 계약](../development/remote-access.md#정적-자원-압축과-재검증-캐시)의 정적 코드 저장 금지를 해당 범위에서 대체한다. HTML·작업 API·문서·인증 정보의 저장 금지, 정확한 탭의 연결 확인과 직접 전송은 유지한다. 캐시 한도·허용 자원·오류 처리의 현재 값은 원격 접속 계약이 소유한다.
+This decision supersedes the prohibition on static code storage in the [Remote Access Contract](../development/remote-access.md#static-asset-compression-and-revalidation-caching) within this scope. Preserve the prohibitions on storing HTML, work APIs, documents, and authentication information, as well as connection verification for the exact tab and direct transmission. The Remote Access Contract owns current cache limits, allowed resources, and error handling.
 
-## 근거와 영향
+## Rationale and Impact
 
-재방문의 앱 코드 전송량을 없애면서 현재 호스트 확인을 생략하지 않는다. 첫 응답은 스트리밍하고 캐시 쓰기는 나중에 처리한다. 캐시 사용이 불가능하면 기존 다운로드로 돌아가며 단절·권한 오류에 저장 코드로 대체하지 않는다. Cache API는 HTTP 캐시 지시어와 별개이므로 수명·크기·삭제를 명시적으로 관리한다. [Cache API](https://developer.mozilla.org/en-US/docs/Web/API/Cache)·[ETag](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/ETag).
+Eliminate app code transfers on return visits without skipping verification of the current host. Stream the first response and handle cache writes later. If caching is unavailable, fall back to the existing download path; do not substitute stored code for disconnection or permission errors. The Cache API is independent of HTTP cache directives, so explicitly manage lifetime, size, and deletion. [Cache API](https://developer.mozilla.org/en-US/docs/Web/API/Cache) · [ETag](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/ETag).
 
-최초 방문·코드 변경에는 다운로드가 필요하며 재방문에도 ICE·인증·자원별 검증 왕복은 남는다. 공유기 매핑이 필요한 경로의 지연은 별도 개선 후보로 남긴다. 신호 메시지의 반복 D1 조회는 후속 [ADR 0025](0025-mewlink-signaling-authority.md)가 기기별 Durable Object의 영속 인가 상태로 줄인다. 이 문서의 시작 병렬화·정적 코드 재검증 결정은 유지하며 임의 네트워크의 즉각 연결을 보장하지 않는다.
+Initial visits and code changes require downloads, and return visits still incur ICE, authentication, and per-resource verification round trips. Latency on paths requiring router mapping remains a separate candidate for improvement. Subsequent [ADR 0025](0025-mewlink-signaling-authority.md) reduces repeated D1 queries for signaling messages through persistent authorization state in per-device Durable Objects. This document's startup parallelization and static code revalidation decisions remain in effect and do not guarantee instant connections on arbitrary networks.
 
-## 검증 경계
+## Verification Boundaries
 
-격리 Chromium과 실제 메모리 HTTP dispatcher로 새 launch의 304·본문 전송 0바이트, 호스트 분리, 본문 변조·갱신·만료·잘못된 304의 재다운로드, 저장소 실패·구서버·gzip 미지원·오프라인 거부를 확인했다. 앱 시작 검사는 현재 런처 상태의 재사용과 상태 미전달 시 기존 조회를 검증했다. 로컬 관련 65개·중앙 브라우저 6개·실제 Workers/DO와 네이티브 RTC P2P 1개 검사, 양쪽 타입 검사·루트 lint·문서 검사를 통과했다. 기존 lint 경고는 남아 있다. 운영 서버·중앙 배포·휴대폰 외부망 접속 시간은 사용자 적용 후 별도로 측정한다. 비공개 중앙 소스의 공개 Git 제외는 유지한다.
+Using isolated Chromium and the actual in-memory HTTP dispatcher, verified 304 and 0 bytes of content transfer for a new launch, host isolation, redownloads for content tampering, updates, expiration, and invalid 304, storage failures, older servers, lack of gzip support, and offline rejection. App startup checks verified reuse of the current launcher status and the existing query when no status is passed. Passed 65 local checks, 6 central browser checks, 1 check with actual Workers/DO and native RTC P2P, type checks on both sides, root lint, and documentation checks. Existing lint warnings remain. Production server and central deployment and phone connection times over external networks will be measured separately after user application. Private central source remains excluded from public Git.

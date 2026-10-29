@@ -1,45 +1,45 @@
 ---
-title: "테마 그라데이션과 배경 애니메이션"
-description: "세 색 테마에 선택적 두 색 그라데이션·배경 애니메이션을 더하고, 실제 도킹 호스트의 투명화·반투명 컴포넌트·배경 없는 에디터 줄번호 거터·기존 프리셋 선택·단색 커스텀 보존·대비 검사·모션 감소를 정한 결정. 후속 조정에서 모든 라이트 팝업의 밝은 75% 배경·6px 블러와 모달 패널 바깥 덮개를 채택하고 다크 모드의 기존 동작을 유지한다."
+title: "Theme Gradients and Background Animation"
+description: "Decision adding optional two-color gradients and background animation to three-color themes, and defining transparency for the actual docking host, translucent components, editor line-number gutters without backgrounds, preservation of existing preset selections and solid-color custom themes, contrast checks, and reduced motion. Subsequent adjustments adopt bright 75% backgrounds and 6px blur for all light popups and a backdrop outside modal panels, while retaining existing dark-mode behavior."
 created: 2026-10-16
 updated: 2026-10-20
 status: accepted
 ---
 
-## 배경
+## Background
 
-사용자가 커스텀 테마에서 그라데이션 배경을 설정하고, 미드나이트·로즈·오션 프리셋에도 Mewlink 로딩 화면처럼 부드러운 배경 움직임을 적용해 달라고 요청했다. 기존 세 색 테마의 저장·초안·단색 표면 계약을 유지하면서 배경 표현을 확장해야 한다.
+The user requested gradient backgrounds for custom themes and soft background motion like the Mewlink loading screen for the Midnight, Rose, and Ocean presets. Background presentation must be extended while preserving the existing three-color theme contracts for storage, drafts, and solid-color surfaces.
 
-## 결정
+## Decision
 
-기존 `background`·`text`·`primary`에 선택적 `gradient`를 추가한다. 그라데이션은 두 색·방향·애니메이션 여부를 저장하며, `background`는 바탕색과 단색 폴백으로 유지한다. 미드나이트·로즈·오션에 기본으로 느린 배경 움직임을 적용하고 커스텀 편집에서도 같은 설정을 제공한다. 변경은 미리보기에서 확인한 뒤 저장할 때 적용한다.
+Add optional `gradient` to the existing `background`, `text`, and `primary`. Gradients store two colors, a direction, and whether animation is enabled, while `background` remains the base color and solid-color fallback. Apply slow background motion by default to Midnight, Rose, and Ocean, and offer the same settings in custom editing. Changes take effect when saved after previewing.
 
-그라데이션 유무와 두 색·방향·애니메이션까지 조합 비교에 포함한다. 잘못된 그라데이션 설정은 해당 설정만 버리고 유효한 기본 세 색을 보존한다. 저장한 이전 미드나이트·로즈·오션 선택은 세 색이 정확히 일치하고 같은 단색 커스텀 항목이 없을 때만 새 프리셋으로 이관한다. 이관은 설정을 읽을 때만 적용한다.
+Include gradient presence, both colors, direction, and animation in combination comparisons. Discard only invalid gradient settings while preserving the valid base three colors. Migrate previously saved Midnight, Rose, and Ocean selections to the new presets only when all three colors match exactly and no identical solid-color custom entry exists. Apply migration only when reading settings.
 
-고정 배경 한 장에 두 방사형 그라데이션을 합성하고 작업 영역의 큰 기본 표면을 투명하게 해 배경을 보여 준다. 이 범위에는 실제 패널의 포털 호스트인 `DockWorkspace`의 `[data-dock-workspace]`도 포함한다. 배경의 이동·크기·불투명도만 천천히 바꾸며, 기기의 모션 감소 설정에서는 움직임을 멈춘다. 기본 배경색과 그라데이션 샘플을 함께 사용해 본문 대비 안내와 링크색 보정을 계산한다.
+Composite two radial gradients on a single fixed background and make the workspace's large base surfaces transparent to reveal it. This includes `[data-dock-workspace]` in `DockWorkspace`, the portal host for the actual panels. Slowly change only the background's position, size, and opacity, and stop motion when the device's reduced-motion setting is enabled. Use the base background color together with gradient samples to calculate body-text contrast guidance and link-color adjustments.
 
-그라데이션이 있는 테마의 중립 버블·버튼·컴포넌트에는 더 진한 색조와 알파를 가진 공통 표면을 적용한다. 겹치는 팝업·메뉴·대화상자·부유창은 바깥 배경 면을 80% 불투명도로 표시하고 6px 배경 블러를 적용한다. 내부 표면은 불투명 대응 토큰으로 복원해 입력과 hover의 가독성을 유지하며, 글씨·아이콘 자체는 흐리지 않는다. CodeMirror의 줄번호 거터는 배경색과 배경 블러를 제거해 본문 배경과 이어지게 한다. 단색 테마에서도 거터는 완전히 투명하게 유지한다. 대화상자의 바깥 덮개와 트리 고정 행·로딩 덮개의 단색은 유지한다. 단색 테마·원본 팔레트·전체 작업 배경·주요색·글씨색·테두리와 터미널 기본 배경은 유지한다. 파생 표면만 바뀌므로 저장 항목이나 초안을 이관하지 않는다.
+Apply a shared surface with a stronger tint and alpha to neutral bubbles, buttons, and components in themes with gradients. Display the outer background surfaces of overlapping popups, menus, dialogs, and floating windows at 80% opacity with 6px backdrop blur. Restore inner surfaces using opaque counterpart tokens to keep inputs and hover states readable, without blurring text or icons themselves. Remove background color and backdrop blur from CodeMirror's line-number gutter so it flows into the body background. Keep the gutter fully transparent in solid-color themes as well. Retain dialog backdrops and the solid colors of pinned tree rows and loading overlays. Preserve solid-color themes, the original palette, the overall workspace background, primary colors, text colors, borders, and the terminal's default background. Only derived surfaces change, so saved entries and drafts are not migrated.
 
-## 근거와 영향
+## Rationale and Impact
 
-기존 팔레트 형식과 단색 테마를 그대로 읽을 수 있고, 사용자가 저장한 단색 커스텀 조합도 보존한다. 두 색과 방향으로 설정 범위를 제한해 편집 화면과 저장 형식을 간결하게 유지한다. 배경 애니메이션은 읽기와 입력을 방해하지 않는 느린 움직임으로 제공하며 사용자와 기기 설정에서 끌 수 있다.
+Existing palette formats and solid-color themes remain readable, and users' saved solid-color custom combinations are preserved. Limit configuration to two colors and a direction to keep the editing screen and storage format simple. Provide background animation as slow motion that does not interfere with reading or typing and can be disabled in user and device settings.
 
-호스트의 기본 경계색 배경은 일반 작업 표면의 색과 다르므로 그라데이션에서 별도로 투명하게 해야 한다. 실제 패널과 도킹 호스트를 함께 렌더링한 캡처·픽셀 검사를 통해 배경 가시성을 확인하며, 설정용 단순 작업 영역 대역의 CSS 검사만으로 완료를 판정하지 않는다.
+The host's default border-color background differs from ordinary workspace surface colors, so it must be made transparent separately for gradients. Verify background visibility through captures and pixel checks that render actual panels together with the docking host; CSS checks of a simple workspace stand-in used for settings are not sufficient to declare completion.
 
-중립 컴포넌트가 배경을 가리는 문제는 팔레트의 그라데이션 색을 바꾸지 않고 공통 표면 토큰에서 해결한다. 반투명 바탕은 색조를 진하게 해 윤곽을 유지하며, 불투명 대응 토큰을 함께 제공해 내부 컨트롤의 가독성을 보존한다. 겹치는 창의 바깥 배경은 약한 블러로 아래 화면의 세부 글씨를 흐리면서 전체 색을 비치게 한다.
+Resolve neutral components obscuring the background through shared surface tokens without changing the palette's gradient colors. Give translucent backgrounds a stronger tint to preserve their outlines, and provide opaque counterpart tokens to keep inner controls readable. Apply a light blur to the outer backgrounds of overlapping windows to obscure detailed text underneath while letting the overall colors show through.
 
-이 결정은 [0002 — 세 색 테마](0002-theme-palettes.md)의 배경 표현과 이전 프리셋 선택 이관 범위를 확장한다. 세 색의 의미와 저장 전 초안 유지 계약은 계속 적용한다. 현재 저장·렌더링·대비 계약은 [공용 UI 계약](../development/ui-contracts.md#테마색과-파생-액센트), 조작은 [화면 설정](../../../docs/configuration/appearance.md#화면-설정), 기능 범위와 실제 검증은 [화면 설정 기능](../features/%ED%99%94%EB%A9%B4%C2%B7%EA%B3%84%EC%A0%95%C2%B7%EC%9A%B4%EC%98%81/%ED%99%94%EB%A9%B4%C2%B7%EC%96%B8%EC%96%B4%C2%B7%EA%B8%80%EA%BC%B4%C2%B7%EB%8B%A8%EC%B6%95%ED%82%A4%20%EC%84%A4%EC%A0%95.md)이 소유한다.
+This decision extends the background presentation and migration scope for previous preset selections in [0002 — Three-Color Themes](0002-theme-palettes.md). The meanings of the three colors and the contract for retaining drafts before saving continue to apply. [Shared UI Contract](../development/ui-contracts.md#theme-colors-and-derived-accents) owns the current storage, rendering, and contrast contracts; [Display Settings](../../../docs/configuration/appearance.md#appearance-settings) owns interactions; and [Display Settings Features](../features/appearance-accounts-operations/appearance-language-fonts-and-shortcuts.md) owns feature scope and actual verification.
 
-## 후속 조정 — 2026-10-17
+## Subsequent Adjustment — 2026-10-17
 
-팝업을 조금 더 투명하게 해 달라는 사용자 요청에 따라 공통 배경 불투명도를 80%에서 75%로 낮춘다. 햄버거 메뉴·드롭다운·뮤펫·다른 팝업에 같은 값을 적용하고, 6px 배경 블러와 내부 컨트롤의 단색은 유지한다. 위 결정의 불투명도 수치만 이 조정으로 대체한다.
+In response to the user's request for slightly more transparent popups, reduce shared background opacity from 80% to 75%. Apply the same value to the hamburger menu, dropdowns, Mewpet, and other popups, while retaining 6px backdrop blur and solid-color inner controls. This adjustment supersedes only the opacity value in the decision above.
 
-## 후속 조정 — 2026-10-19
+## Subsequent Adjustment — 2026-10-19
 
-밝은 모드의 반투명 팝업에 검은 덮개가 비쳐 표면이 칙칙해지는 문제를 해결하기 위해, 그라데이션 라이트 모드의 팝업·메뉴·대화상자·부유창은 불투명 대응색을 사용한다. 다크 모드는 75% 배경·6px 블러를 유지한다. 명령어 버튼 추가·수정 창에도 공용 오버레이 경계를 지정해 내부 입력은 단색으로, 바깥 면은 모드별 배경·블러 규칙으로 표시한다. 저장된 테마와 본문 컴포넌트의 투명도는 유지한다.
+To resolve translucent light-mode popups looking dull because a black backdrop shows through, use opaque counterpart colors for popups, menus, dialogs, and floating windows in gradient light mode. Dark mode retains 75% backgrounds and 6px blur. Also assign the shared overlay boundary to the command-button add/edit dialog so its inner inputs use solid colors and its outer surface follows the mode-specific background and blur rules. Preserve saved themes and body-component transparency.
 
-## 후속 조정 — 2026-10-20
+## Subsequent Adjustment — 2026-10-20
 
-라이트 팝업의 투명도·블러가 사라지고 드롭다운이 어둡게 보인다는 사용자 요청에 따라, 위 2026-10-19 조정의 라이트 불투명 배경 결정을 대체한다. 라이트·페이퍼·로즈·오션과 밝은 커스텀 테마의 팝업·드롭다운·메뉴·대화상자·부유창·툴팁은 그라데이션 유무와 관계없이 75% 배경과 6px 배경 블러를 사용한다. 테마 배경색 70%와 기존 팝업의 불투명 표면색 30%를 섞어 밝은 색조로 표시한다. 글씨·아이콘 자체는 흐리지 않고 내부 입력·컨트롤은 단색을 유지한다.
+In response to the user's report that light popups had lost transparency and blur and dropdowns looked dark, supersede the opaque light-background decision in the 2026-10-19 adjustment above. Popups, dropdowns, menus, dialogs, floating windows, and tooltips in Light, Paper, Rose, Ocean, and light custom themes use 75% backgrounds and 6px backdrop blur, regardless of whether a gradient is present. Blend 70% theme background color with 30% of the existing popup's opaque surface color to produce a bright tint. Do not blur text or icons themselves, and keep inner inputs and controls solid-colored.
 
-라이트 모달의 검은 덮개는 패널 아래에서 제거하고 둥근 패널 바깥으로만 퍼지는 그림자로 표시한다. 반투명 패널 아래에 검은색이 비치지 않으면서 바깥 화면은 기존처럼 어둡게 한다. `src/components/overlay-layers.css`가 기존 `src/index.css`의 팝업 배경·블러 규칙과 이 바깥 덮개를 함께 소유한다. 바깥 누름·Esc·뒤로가기·레이어 순서는 유지하며, 다크 모드는 기존 그라데이션 팝업의 75% 배경·6px 블러와 단색 팝업의 불투명 배경을 유지한다. 저장된 테마와 본문 컴포넌트의 투명도는 바꾸지 않는다.
+Remove the black backdrop beneath light modal panels and render it as a shadow extending only outside the rounded panel. This keeps black from showing through the translucent panel while dimming the surrounding screen as before. `src/components/overlay-layers.css` owns both the existing popup background and blur rules in `src/index.css` and this outer backdrop. Preserve outside-click, Esc, back-navigation, and layer-order behavior; dark mode retains the existing 75% backgrounds and 6px blur for gradient popups and opaque backgrounds for solid-color popups. Do not change saved themes or body-component transparency.

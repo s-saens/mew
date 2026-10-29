@@ -1,19 +1,19 @@
 ---
-title: "패널 팝업 동작 공통화"
-description: "메모 전용 팝업 이동·비활성 투명도·블러 규칙을 DockPanel과 공통 CSS로 옮겨 태스크와 이후 팝업 전환 패널에 함께 적용하는 결정."
+title: "Shared panel popup behavior"
+description: "Decision to move memo-specific popup movement, inactive opacity, and blur rules into DockPanel and shared CSS, applying them to tasks and future panels that support switching to popups."
 created: "2026-10-26"
 updated: "2026-10-26"
 status: "accepted"
 ---
 
-## 배경
+## Background
 
-메모와 태스크는 같은 `DockPanel`로 팝업을 표시하지만, 제목으로 이동하기·전체 작업 영역 경계·비활성 투명도와 블러 해제는 메모 전용 분기와 CSS에 있었다. 같은 표시 방식인데도 태스크에는 별도 이동 바가 남고 동작이 달랐다.
+Memos and tasks display popups using the same `DockPanel`, but title-based dragging, full workspace bounds, inactive opacity, and blur removal were implemented in memo-specific branches and CSS. Despite using the same display mode, tasks retained a separate drag bar and behaved differently.
 
-## 결정
+## Decision
 
-메모의 팝업 동작을 `DockPanel`과 `overlay-layers.css`의 공통 계약으로 옮긴다. 패널 종류에 따른 예외를 제거하며, 이후 팝업 전환을 제공하는 패널도 이 컴포넌트를 사용한다. 상세 동작은 [공용 UI 계약](../development/ui-contracts.md)이 소유한다.
+Move memo popup behavior into the shared contract of `DockPanel` and `overlay-layers.css`. Remove panel-type exceptions; future panels that support switching to popups also use this component. The [shared UI contract](../development/ui-contracts.md) owns detailed behavior.
 
-## 근거와 영향
+## Rationale and Impact
 
-별도 팝업 컴포넌트를 추가하지 않고 기존 공통 구현을 확장해 기능 간 차이가 다시 생기는 것을 막는다. 메모 전용 CSS에는 본문 편집 스타일만 남긴다. 태스크의 비활성 외형·이동 범위가 메모와 같아지며, 패널 모드·모바일·내용 보존·기존 위치 저장 키는 유지한다.
+Extend the existing shared implementation without adding a separate popup component to prevent behavior from diverging across features again. Leave only body editing styles in memo-specific CSS. The inactive appearance and movement bounds of tasks become the same as those of memos, while panel mode, mobile behavior, content preservation, and existing position storage keys remain in place.

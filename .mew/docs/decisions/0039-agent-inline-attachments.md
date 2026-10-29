@@ -1,31 +1,31 @@
 ---
-title: "에이전트 첨부의 인라인 참조와 원자적 편집"
-description: "에이전트 첨부를 커서 위치의 CodeMirror 원자적 위젯으로 바꾸고 초안·큐·프롬프트에 기존 업로드 참조 위치를 보존하는 결정. 업로드 이력·기존 큐 호환과 2026-10-23 사용자 대화 버블의 인라인 표시 확장을 설명한다."
+title: "Inline references and atomic editing for agent attachments"
+description: "A decision to turn agent attachments into atomic CodeMirror widgets at the cursor position and preserve existing upload reference positions in drafts, queues, and prompts. Describes upload history, compatibility with existing queues, and the 2026-10-23 extension for inline display in user conversation bubbles."
 created: 2026-10-22
 updated: 2026-10-23
 status: accepted
 ---
 
-## 배경
+## Background
 
-첨부를 입력칸 위의 별도 목록에 두면 문장 사이에 배치할 수 없고, 전송할 때 모든 경로가 본문 끝에 붙는다. 사용자는 첨부 태그를 커서 위치에 글자처럼 넣고 길게 눌러 이동하기를 요청했다.
+Keeping attachments in a separate list above the input prevents placing them between sentences, and all paths are appended to the end of the body when sent. The user requested inserting attachment tags like characters at the cursor position and moving them with a long press.
 
-## 결정
+## Decision
 
-- 기존 `[[프로젝트:.mew/assets/파일]]` 참조를 초안 문자열 안에 저장하고 CodeMirror의 대체 위젯과 `atomicRanges`로 표시한다. 기존 `.mew/files/` 참조도 읽는다.
-- 글과 첨부 위치를 같은 문서·편집 이력으로 관리한다. 파일 종류·사진 바이트는 별도 메타데이터로 유지하고 현재 문서에서 참조하는 첨부만 전송한다.
-- 업로드 시작 시 선택 위치에 고유 식별자를 넣는다. 업로드가 끝나도 편집기 내부의 식별자는 유지하고 표시·초안 값·클립보드·전송에서는 실제 참조로 변환한다. 완료·실패 결과를 기억해 실행 취소·다시 실행이 식별자를 복원해도 결과에 연결한다.
-- 새 메시지와 큐의 본문은 참조 위치를 보존한다. 기존 큐의 별도 첨부는 편집을 시작할 때 누락 참조만 끝에 붙인다. 서버 프롬프트 조립도 이미 있는 참조를 중복 추가하지 않는다.
-- 대화 버블과 큐 목록의 첨부 표시 방식은 유지하고 본문의 업로드 참조는 숨긴다. 일반 파일·폴더 멘션은 그대로 표시한다.
+- Store existing `[[프로젝트:.mew/assets/파일]]` references within the draft string and display them using CodeMirror replacement widgets and `atomicRanges`. Also read existing `.mew/files/` references.
+- Manage text and attachment positions in the same document and edit history. Keep file types and photo bytes as separate metadata, and send only attachments referenced in the current document.
+- Insert a unique identifier at the selection when an upload starts. Keep the identifier inside the editor even after the upload finishes, and convert it to the actual reference for display, draft values, the clipboard, and transmission. Remember success and failure results so that even if undo or redo restores an identifier, it remains linked to its result.
+- New message and queue bodies preserve reference positions. When editing an existing queue item, append only missing references for its separate attachments to the end. Server prompt assembly also avoids adding references that are already present.
+- Keep attachment displays in conversation bubbles and the queue list, and hide upload references in the body. Continue displaying regular file and folder mentions.
 
-## 근거와 영향
+## Rationale and Impact
 
-문자열 기반 초안·멘션·큐 저장 계약을 확장하므로 새 리치 문서 형식이나 별도 위치 필드를 도입하지 않아도 된다. 참조가 문서에 있으므로 복사·붙여넣기와 저장된 초안에서도 위치를 유지한다. 원시 경로는 편집 UI에서 보이지 않는다.
+This extends the string-based draft, mention, and queue storage contract, so no new rich document format or separate position field is needed. References reside in the document, preserving their positions through copy and paste and in saved drafts. Raw paths are hidden in the editing UI.
 
-업로드 완료 시 편집기 문서를 치환하면 CodeMirror가 기존 실행 이력의 삽입·삭제 범위를 잃을 수 있다. 내부 식별자를 유지하면 업로드 전후의 삭제·복원·이동이 같은 이력을 사용한다. 입력 커서 API는 실제 참조 문자열의 위치와 내부 위치를 서로 변환한다. 실패한 식별자는 문서와 복원 이력에서 제거한다. 태그를 삭제해도 메타데이터를 즉시 버리지 않아 실행 취소로 사진 미리보기와 첨부 바이트를 복구할 수 있다.
+Replacing the editor document when an upload completes can cause CodeMirror to lose the insertion and deletion ranges in its existing undo history. Keeping internal identifiers lets deletion, restoration, and movement use the same history before and after upload. The input cursor API converts between positions in the actual reference string and internal positions. Failed identifiers are removed from the document and restoration history. Deleting a tag does not immediately discard its metadata, allowing undo to restore the photo preview and attachment bytes.
 
-구체적인 조작·취소·검증 범위는 [입력 기능 계약](../features/%ED%84%B0%EB%AF%B8%EB%84%90%C2%B7%EC%97%90%EC%9D%B4%EC%A0%84%ED%8A%B8%C2%B7%EC%9E%90%EB%8F%99%ED%99%94/%EC%97%90%EC%9D%B4%EC%A0%84%ED%8A%B8%20%EC%9E%85%EB%A0%A5%C2%B7%EB%A9%98%EC%85%98%C2%B7%EC%8A%A4%ED%82%AC%C2%B7%EC%B2%A8%EB%B6%80.md), 서버 호환은 [세션·통신 계약](../development/agent-sessions.md)이 소유한다.
+The [Input Feature Contract](../features/terminals-agents-automation/agent-input-mentions-skills-and-attachments.md) owns the specific scope of operations, cancellation, and verification; the [Session and Communication Contract](../development/agent-sessions.md) owns server compatibility.
 
-## 2026-10-23 후속 변경
+## 2026-10-23 Follow-up Changes
 
-위 결정에서 유지했던 대화 첨부의 표시 위치를 확장한다. 전송한 사용자 메시지는 버블 본문의 업로드 참조 위치에 인라인 태그를 표시하고, 참조가 없는 과거 메타데이터 첨부는 버블 안의 본문 끝에 표시한다. 큐 목록·입력 편집·저장·서버 전달 계약은 유지한다. 현재 표시와 호환 기준은 [입력 기능 계약](../features/%ED%84%B0%EB%AF%B8%EB%84%90%C2%B7%EC%97%90%EC%9D%B4%EC%A0%84%ED%8A%B8%C2%B7%EC%9E%90%EB%8F%99%ED%99%94/%EC%97%90%EC%9D%B4%EC%A0%84%ED%8A%B8%20%EC%9E%85%EB%A0%A5%C2%B7%EB%A9%98%EC%85%98%C2%B7%EC%8A%A4%ED%82%AC%C2%B7%EC%B2%A8%EB%B6%80.md)이 소유한다.
+Extend the conversation attachment display locations retained in the decision above. Sent user messages display inline tags at upload reference positions in the bubble body; historical metadata attachments without references appear at the end of the body inside the bubble. Keep the queue list, input editing, storage, and server delivery contracts. The [Input Feature Contract](../features/terminals-agents-automation/agent-input-mentions-skills-and-attachments.md) owns the current display and compatibility criteria.

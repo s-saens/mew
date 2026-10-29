@@ -1,30 +1,30 @@
 ---
-title: "검색 색인 조회 순서와 파일 목록의 일괄 판정"
-description: "SQLite FTS 안에서 프로젝트·본문 후보를 교차 조회하고 와일드카드의 필수 문자열로 후보를 좁히며, 파일 목록의 경로·숨김 설정 준비를 동기 처리 단위로 공유하기로 한 결정. 색인 v2 재구축·원문 검증·파일별 경계 검사와 DB 교체·Redis 도입의 보류 근거를 기록한다."
+title: "Search index query order and batch evaluation of file listings"
+description: "Decision to intersect project and body candidates within SQLite FTS, narrow candidates using required wildcard strings, and share preparation of file-list paths and hidden settings within each synchronous processing batch. Records index v2 rebuilding, source verification, per-file boundary checks, and the reasons for deferring a database replacement and Redis adoption."
 created: "2026-10-24"
 updated: "2026-10-24"
 ---
 
-## 상태
+## Status
 
-채택. 기존 증분 카탈로그·FTS 검색 구조를 유지하면서 조회 실행 순서와 후보 선택을 보완한다.
+Accepted. Improves query execution order and candidate selection while retaining the existing incremental catalog and FTS search structure.
 
-## 배경
+## Background
 
-로딩·검색 성능 개선을 위해 DB 교체와 Redis 캐시를 검토했다. 격리 파일 fixture에서 기존 SQLite JOIN이 프로젝트의 파일을 먼저 순회하고 파일마다 FTS MATCH를 다시 실행하는 계획을 확인했다. 반대로 FTS 조회만 앞세우면 작은 프로젝트의 흔한 단어 검색이 다른 프로젝트의 매치 수에 영향을 받았다. 와일드카드 검색은 고정된 문자열이 있어도 색인을 사용하지 않았다. 메모리에 있는 파일 카탈로그도 항목마다 프로젝트 루트·서버 데이터 기준 경로·숨김 목록을 반복 준비했다.
+A database replacement and Redis caching were considered to improve loading and search performance. An isolated file fixture confirmed that the existing SQLite JOIN plan first traversed the project's files and reran FTS MATCH for each file. Conversely, running the FTS query first made searches for common words in small projects depend on the number of matches in other projects. Wildcard searches did not use the index even when they contained a fixed string. The in-memory file catalog also repeatedly prepared the project root, server data base path, and hidden list for each entry.
 
-## 결정
+## Decision
 
-- FTS에 본문 `body`와 프로젝트 해시 `scope` 열을 두고 MATCH 안에서 두 조건의 교집합을 구한다. `scope`는 프로젝트 이름의 고정 길이 SHA-256이며, 본문 검색은 `body` 열에만 적용한다. FTS 테이블을 `CROSS JOIN`의 왼쪽에 두어 이 후보부터 구하고 파일 메타데이터를 rowid로 조회한다. 메타데이터의 프로젝트 일치 조건·권한 범위 필터와 후보 상한도 유지한다.
-- 파생 검색 색인의 스키마를 v2로 올린다. 기존 v1 색인은 원문에서 자동 재구축하고, 구축 중 검색은 scanner로 처리한다. 원본 문서·대화 DB·PostgreSQL 데이터는 이 재구축의 대상이 아니다.
-- 일반 검색과 와일드카드에서 반드시 포함되어야 하는 문자열을 골라 후보 조회에 사용한다. 기준은 UTF-16 길이가 아닌 유니코드 문자 3개 이상이다. 정규식과 안전한 문자열을 고를 수 없는 검색은 원문 scanner를 사용한다. SQLite와 RE2의 대소문자 변환 차이로 결과가 누락될 수 있는 문자는 후보 문자열의 경계로 처리한다.
-- 파일 목록을 동기로 판정하는 동안 프로젝트 루트·서버 데이터 기준 경로·숨김 설정을 한 번 준비한다. 각 대상 파일의 실제 경로와 서버 데이터 경계는 계속 검사한다. 준비한 함수를 다음 요청이나 비동기 작업으로 넘기지 않는다.
-- 기존 `MEW_PERF_LOG=1` 계측에 파일 읽기와 검색 범위 준비 등 구간을 보완한다. 검색어·본문·계정·파일 경로를 계측 필드에 추가하지 않는다.
+- Add body `body` and project hash `scope` columns to FTS and intersect the two conditions within MATCH. `scope` is a fixed-length SHA-256 of the project name, and body searches apply only to the `body` column. Place the FTS table on the left side of `CROSS JOIN` to obtain these candidates first, then look up file metadata by rowid. Retain the metadata project-match condition, permission-scope filters, and candidate cap.
+- Upgrade the derived search index schema to v2. Automatically rebuild existing v1 indexes from the source, and use the scanner for searches during construction. Source documents, conversation databases, and PostgreSQL data are outside the scope of this rebuild.
+- Select strings that must be present in ordinary and wildcard searches and use them for candidate queries. The threshold is at least 3 Unicode characters, rather than UTF-16 length. Regular expressions and searches for which no safe string can be selected use the source scanner. Treat characters that could cause missing results due to differences between SQLite and RE2 case conversion as candidate-string boundaries.
+- Prepare the project root, server data base path, and hidden settings once while synchronously evaluating a file listing. Continue checking each target file's real path and the server data boundary. Do not pass the prepared function to the next request or an asynchronous task.
+- Extend the existing `MEW_PERF_LOG=1` instrumentation with stages such as file reading and search-scope preparation. Do not add search terms, body text, accounts, or file paths to instrumentation fields.
 
-현재 SQLite·PostgreSQL 저장 방식과 파일 원본을 유지한다. 새로운 DB나 Redis는 도입하지 않는다. 반복 조회 적중률과 운영 병목이 확인되면 별도 결정으로 검토한다. 현재 계약은 [검색 기능](../features/%ED%94%84%EB%A1%9C%EC%A0%9D%ED%8A%B8%C2%B7%ED%8C%8C%EC%9D%BC%C2%B7%EA%B2%80%EC%83%89/%ED%8C%8C%EC%9D%BC%EB%AA%85%C2%B7%EB%82%B4%EC%9A%A9%20%EA%B2%80%EC%83%89%EA%B3%BC%20%EC%B9%98%ED%99%98.md)과 [파일 탐색 기능](../features/%ED%94%84%EB%A1%9C%EC%A0%9D%ED%8A%B8%C2%B7%ED%8C%8C%EC%9D%BC%C2%B7%EA%B2%80%EC%83%89/%ED%8C%8C%EC%9D%BC%C2%B7%ED%8F%B4%EB%8D%94%20%ED%83%90%EC%83%89%EA%B3%BC%20%EC%A1%B0%EC%9E%91.md)이 소유한다.
+Retain the current SQLite and PostgreSQL storage methods and source files. Do not introduce a new database or Redis. Consider them in a separate decision if repeated-query hit rates and production bottlenecks are confirmed. [Search functionality](../features/projects-files-search/filename-content-search-and-replacement.md) and [file browsing functionality](../features/projects-files-search/file-folder-exploration-and-operations.md) own the current contract.
 
-## 근거와 영향
+## Rationale and Impact
 
-SQLite는 [CROSS JOIN의 순서를 바꾸지 않는다](https://www.sqlite.org/optoverview.html#manual_control_of_query_plans_using_cross_join). [FTS5 trigram](https://www.sqlite.org/fts5.html#the_trigram_tokenizer)은 유니코드 문자 3개 미만인 부분 문자열의 MATCH 결과를 반환하지 않는다. 두 특성을 조회와 후보 선택에 반영한다.
+SQLite [does not reorder CROSS JOINs](https://www.sqlite.org/optoverview.html#manual_control_of_query_plans_using_cross_join). [FTS5 trigram](https://www.sqlite.org/fts5.html#the_trigram_tokenizer) does not return MATCH results for substrings shorter than 3 Unicode characters. Account for both properties in queries and candidate selection.
 
-원문 대조·dirty 파일 보완·색인 구축 및 장애 시 scanner 경로를 유지한다. 카탈로그에는 계정별 권한을 저장하지 않으며, 숨김 설정과 실제 파일 경계는 다음 목록 조회에서 다시 준비·검사한다. 변경의 목적은 기존 경로의 반복 작업을 줄이는 것이며, 브라우저 렌더링·원격 전송이나 운영 환경 전체 로딩 시간의 개선율은 별도 실측이 필요하다.
+Retain source comparison, dirty-file supplementation, and the scanner path during index construction and failures. The catalog does not store per-account permissions, and hidden settings and actual file boundaries are prepared and checked again on the next listing query. The change aims to reduce repeated work in existing paths; improvements in browser rendering, remote transfer, or total production loading time require separate measurements.

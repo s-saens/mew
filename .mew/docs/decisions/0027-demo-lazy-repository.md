@@ -1,30 +1,30 @@
 ---
-title: "0027 — 전체 공개 파일 목록과 요청 시 본문을 받는 데모"
-description: "데모의 선별된 사본을 전체 공개 커밋의 파일 목록과 작은 초기 사본으로 나누고, 고정 정적 원문을 요청 시 받기로 한 결정. 초기 용량·본문 캐시·가상 Git 상태·외부 연결 차단과 배포 영향을 정한다."
+title: "0027 — Demo with a complete public file listing and on-demand content"
+description: "Decision to split the demo's curated copy into a file listing from the full public commit and a small initial copy, and fetch fixed static source content on demand. Defines initial size, content caching, virtual Git state, blocking of external connections, and deployment implications."
 created: "2026-10-20"
 updated: "2026-10-20"
 ---
 
-# 0027 — 전체 공개 파일 목록과 요청 시 본문을 받는 데모
+# 0027 — Demo with a complete public file listing and on-demand content
 
-상태: 채택
+Status: Adopted
 
-## 배경
+## Background
 
-기존 데모는 작은 코드·문서 사본만 담아 빠르게 시작하지만 저장소의 나머지 파일과 첨부를 탐색할 수 없다. 전체 원문을 앱 번들에 넣으면 데모 시작 때 열지 않을 파일까지 전송하고 메모리에 보관하게 된다. 공개 저장소 전체를 둘러보면서 초기 진입 비용은 제한해야 한다.
+The existing demo starts quickly with only a small copy of code and documents, but does not allow browsing the rest of the repository's files and attachments. Including all source content in the app bundle would transfer and retain in memory even files that users will not open when starting the demo. Users need to browse the entire public repository while keeping initial entry costs limited.
 
-## 결정
+## Decision
 
-[ADR 0020](0020-browser-demo-runtime.md)의 공통 UI·방문자별 가상 상태·메모리 저장소를 유지한다. 파일 준비 방식을 전체 공개 커밋의 메타데이터 목록과 기존의 작은 초기 사본으로 나눈다. 폴더 탐색과 파일명 검색은 목록을 사용하고, 초기 사본에 없는 본문은 파일을 열거나 내용 검색·다운로드를 명시적으로 실행할 때 받는다.
+Retain the shared UI, per-visitor virtual state, and in-memory storage from [ADR 0020](0020-browser-demo-runtime.md). Split file preparation into a metadata listing from the full public commit and the existing small initial copy. Folder browsing and filename search use the listing; content absent from the initial copy is fetched when a file is opened or content search or download is explicitly invoked.
 
-목록과 본문은 같은 고정 커밋에서 생성한다. 본문은 해시로 식별하는 데모 정적 산출물로 패키징한다. 브라우저에서 GitHub·실제 Mew API·호스트 파일 시스템에 연결하지 않으며 작업 트리·stage·미추적 파일을 공개 사본의 출처로 쓰지 않는다. 공개 파일의 포함·제외 기준과 태스크 계정 제거를 생성 단계에 적용한다.
+Generate the listing and content from the same fixed commit. Package content as hash-identified demo static artifacts. Do not connect to GitHub, actual Mew APIs, or the host file system from the browser, and do not use the working tree, stage, or untracked files as sources for the public copy. Apply public file inclusion/exclusion criteria and task account removal during generation.
 
-초기 사본과 목록의 용량을 각각 검사한다. 불러온 원문은 제한된 메모리 캐시에 보관하고 동시 요청·취소를 관리한다. 원문 캐시와 편집·가상 Git 이력을 분리해 본문을 받거나 캐시에서 내보내도 Git 변경이 생기지 않게 한다. 수정 내용과 가상 이력은 원문 캐시의 크기 제한 때문에 사라지지 않는다.
+Check the sizes of the initial copy and listing separately. Keep fetched source content in a bounded memory cache and manage concurrent requests and cancellation. Separate the source content cache from edits and virtual Git history so that fetching or evicting content does not create Git changes. Edits and virtual history are not lost because of source content cache size limits.
 
-## 근거와 영향
+## Rationale and Impact
 
-파일 전체를 탐색하는 데 필요한 정보와 지금 읽는 내용을 분리하면 공개 파일이 늘어도 원문 전체를 첫 화면에서 전송할 필요가 없다. 원문은 앱과 같은 데모 origin에서 제공하므로 외부 저장소의 응답·요청 제한에 의존하지 않으며 고정 커밋과 파일 내용의 일치도 확인할 수 있다.
+Separating the information needed to browse all files from the content currently being read eliminates the need to transfer all source content on the first screen as public files grow. Source content is served from the same demo origin as the app, avoiding dependence on external repository responses and request limits and allowing verification that file contents match the fixed commit.
 
-큰 범위의 내용 검색·다운로드는 여전히 많은 데이터와 시간이 필요하다. 이 비용은 해당 사용자 동작에서 발생하며 초기 탐색 비용과 구분한다. 원문 캐시의 상한은 미편집 본문에 적용하고 편집·Git 이력과 브라우저 뷰어의 메모리 전체를 제한한다고 주장하지 않는다.
+Broad content searches and downloads still require substantial data and time. This cost occurs during the corresponding user action and is distinct from the initial browsing cost. The source content cache limit applies to unedited bodies and does not claim to limit edits, Git history, or all browser viewer memory.
 
-배포 산출물에는 목록에 대응하는 원문 파일도 함께 있어야 한다. 목록 갱신·앱 빌드·공개 배포는 각각 구분하며, 소스와 격리 테스트 변경만으로 공개 데모가 갱신되지 않는다. 현재 포함 기준·예산·생성 명령·검증은 [브라우저 데모](../development/demo.md)가 소유한다.
+Deployment artifacts must also include the source content files corresponding to the listing. Listing updates, app builds, and public deployments are separate operations; changes to source code and isolated tests alone do not update the public demo. The [browser demo](../development/demo.md) owns the current inclusion criteria, budgets, generation commands, and verification.

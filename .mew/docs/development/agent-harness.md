@@ -1,32 +1,32 @@
 ---
-title: "스킬·MCP 관리 구현 계약"
-description: "스킬·MCP 원본 관리의 저장 원자성·충돌·스코프 탐색·입력 후보·API와 검증 계약. 사용자 조작은 공개 설정 가이드를 따른다."
+title: "Skills and MCP management implementation contract"
+description: "Contracts for save atomicity, conflicts, scope discovery, input suggestions, APIs, and verification when managing skill and MCP source files. User operations follow the public settings guide."
 updated: "2026-10-29"
 ---
 
-## 저장·적용 범위
+## Storage and application scope
 
-- JSON/JSONC는 해당 경로만 패치하고 YAML은 문서 노드 편집으로 주변 설정·주석을 보존한다. Codex TOML은 MCP 테이블을 다시 직렬화하고 다른 설정의 값을 검증한다. MCP 구역의 주석·서식은 정리되며 인라인 `mcp_servers = {...}`는 안전하게 수정할 수 없어 거부한다.
-- OpenClaw JSON5는 모든 설정값을 유지한 JSON으로 저장한다. 주석·서식 제거를 관리창에서 안내한다. JSON은 유효한 JSON5다.
-- 잘못된 문법은 경고로 표시하며 덮어쓰지 않는다. 생성·수정은 기본 MCP 전송 필드와 에이전트별 핵심 형식도 검사한다. 공급자의 전체 스키마 검증이나 서버 연결 검증은 아니다.
-- 저장은 같은 디렉터리 임시 파일과 rename을 사용하고 원본 모드를 유지한다. 새 파일은 0600이다. 스킬 폴더 이동은 rename이며 디스크 간 이동은 원본을 유지하고 거부한다. 내부 심볼릭 링크가 있는 스킬의 이동·삭제도 거부한다.
-- 두 파일에 걸친 MCP 이동은 대상을 먼저 저장한다. 이후 원본 삭제가 실패하면 양쪽 사본을 보존하고 부분 완료 오류를 표시한다. 같은 파일 안의 Claude 개인→전역 이동은 한 번에 저장한다.
-- 스킬 상세·변경은 폴더 전체 내용의 해시로 충돌을 검사한다. MCP는 원본 설정 파일 전체의 해시를 사용한다. 파일 크기 2MiB, 스킬 폴더 32MiB 제한이 있다.
-- 프로젝트 탐색은 현재 cwd 아래 실제 디렉터리에서 `.mew`·`.git`·지원 설정 위치가 있는 폴더를 찾는다. 숨김 폴더·의존성·빌드 산출물·archives·docs-editor는 순회하지 않는다. 깊이 16/12,000개 폴더 한도에 도달하면 경고하고 해당 폴더를 cwd로 다시 열도록 안내한다.
-- 관리창은 MCP를 실행·연결하거나 세션을 재시작하지 않는다. 네이티브 CLI의 재시작·신뢰·설정 우선순위가 적용된다. Antigravity 항목은 공식 CLI/IDE 설정이며 Mew가 고정한 ACP 1.1.1의 자동 로딩 여부는 검증하지 않았다. Prime은 MCP 정의 외에 Python 연동 스킬이 필요할 수 있다.
+- JSON/JSONC patches only the relevant paths, and YAML uses document node editing to preserve surrounding settings and comments. Codex TOML reserializes MCP tables and validates other setting values. Comments and formatting in the MCP section are normalized, and inline `mcp_servers = {...}` is rejected because it cannot be safely modified.
+- OpenClaw JSON5 is saved as JSON with all setting values preserved. The management dialog explains that comments and formatting are removed. JSON is valid JSON5.
+- Invalid syntax is shown as a warning and is not overwritten. Creation and editing also validate basic MCP transport fields and core per-agent formats. This is not full provider schema validation or server connection verification.
+- Saving uses a temporary file in the same directory and rename, preserving the original mode. New files use 0600. Skill folder moves use rename; cross-disk moves are rejected with the source preserved. Moving or deleting skills containing internal symbolic links is also rejected.
+- MCP moves spanning two files save the destination first. If subsequent source deletion fails, both copies are preserved and a partial-completion error is displayed. Claude personal-to-global moves within the same file are saved in a single operation.
+- Skill details and changes check for conflicts using a hash of the entire folder's contents. MCP uses a hash of the entire source configuration file. Limits are 2 MiB per file and 32 MiB per skill folder.
+- Project discovery searches actual directories below the current cwd for folders containing `.mew`, `.git`, or supported configuration locations. It does not traverse hidden folders, dependencies, build outputs, archives, or docs-editor. When the depth limit of 16 or folder limit of 12,000 is reached, it warns and instructs the user to reopen that folder as cwd.
+- The management dialog does not run or connect to MCP or restart sessions. Native CLI restart, trust, and configuration precedence rules apply. Antigravity entries are official CLI/IDE settings; automatic loading by Mew's pinned ACP 1.1.1 has not been verified. Prime may require a Python integration skill in addition to MCP definitions.
 
-## 입력창과 API
+## Input fields and APIs
 
-`GET /api/skills?cwd=...&runtime=...`는 해당 런타임 전용·공통 스킬을 cwd부터 상위 Git 루트까지 찾고 전역을 합친다. 같은 이름이면 가까운 프로젝트를 우선하며 각 스코프에서는 전용이 공통보다 먼저다. 하위·형제 프로젝트는 프롬프트 후보에 섞지 않는다. 관리창 변경 뒤 열린 입력창 후보를 다시 불러오며, 즉시 전송·대기 메시지 편집·예약 메시지도 동일한 cwd/runtime 규칙을 사용한다. 이것은 Mew의 명시적 스킬 선택 규칙이며 네이티브 런타임의 자동 발견 우선순위를 대신하지 않는다.
+`GET /api/skills?cwd=...&runtime=...` searches for runtime-specific and shared skills from cwd up to the parent Git root and merges global skills. For identical names, the nearest project takes precedence, and runtime-specific skills precede shared skills within each scope. Child and sibling projects are excluded from prompt suggestions. Suggestions in open input fields are reloaded after management dialog changes, and immediate sending, queued message editing, and scheduled messages use the same cwd/runtime rules. These are Mew's explicit skill selection rules and do not replace the native runtime's automatic discovery precedence.
 
-| API | 계약 |
+| API | Contract |
 | --- | --- |
-| `GET /api/agent/harness?cwd=...&kind=skills\|mcp` | 스코프·런타임·저장 위치·항목 요약·읽기 경고. MCP 원문·인증 값은 제외 |
-| `GET /api/agent/harness/detail?cwd=...&kind=...&id=...` | 선택 항목 원문·revision·포함 파일 목록 |
-| `POST /api/agent/harness` | `{cwd, kind, action, id?, revision?, target?, name?, content?}`. action은 create/save/move/delete |
+| `GET /api/agent/harness?cwd=...&kind=skills\|mcp` | Scope, runtime, storage location, item summaries, and read warnings. Excludes raw MCP content and authentication values |
+| `GET /api/agent/harness/detail?cwd=...&kind=...&id=...` | Selected item's raw content, revision, and included file list |
+| `POST /api/agent/harness` | `{cwd, kind, action, id?, revision?, target?, name?, content?}`. action is create/save/move/delete |
 
-원본 경로를 요청에서 직접 받지 않고 서버가 다시 발견한 ID에 매칭한다. 모든 응답은 no-store이며 원문·인증 값은 로그나 localStorage에 저장하지 않는다. 상세 원문은 사용자가 선택한 동안 브라우저 메모리에서 편집한다.
+The server does not accept source paths directly in requests; it matches them to rediscovered IDs. All responses use no-store, and raw content and authentication values are not saved to logs or localStorage. Detailed raw content is edited in browser memory while the user has the item selected.
 
-## 검증·출처
+## Verification and sources
 
-`server/agent-harness.test.ts`는 임시 홈/프로젝트의 스코프·중복·링크·부속 파일·이동 충돌·외부 변경·설정 보존·런타임 경로·권한을 검사한다. `server/agent-harness-ui.test.ts`는 실제 React/Chromium에서 데스크톱·모바일 검색/필터·읽기 전용·초안·오류 복원·수정·이동·삭제·MCP 추가·포커스를 검증한다. 실제 사용자 설정 변경이나 MCP 실행은 테스트하지 않는다.
+`server/agent-harness.test.ts` checks scopes, duplicates, links, supporting files, move conflicts, external changes, configuration preservation, runtime paths, and permissions in temporary homes/projects. `server/agent-harness-ui.test.ts` verifies desktop/mobile search and filters, read-only behavior, drafts, error recovery, editing, moving, deleting, adding MCP entries, and focus in actual React/Chromium. Tests do not modify actual user settings or run MCP.

@@ -1,32 +1,32 @@
 ---
-title: "에이전트 그림판의 SVG 문서와 PNG 첨부"
-description: "에이전트 그림판을 외부 그림판 의존성 없이 브라우저 SVG·순수 문서 모델로 구현하고, 편집 메타데이터·이미지·폰트를 담은 프로젝트별 SVG 기록과 기존 PNG 첨부 경로를 분리한 결정. 단독 편집·기능별 모듈·메모리와 저장 제한의 영향을 설명하며, 저장 위치는 후속 결정 0055가 대체한다."
+title: "SVG Documents and PNG Attachments for the Agent Drawing Editor"
+description: "Decision to implement the agent drawing editor with browser SVG and a pure document model, without an external drawing editor dependency, and to separate per-project SVG records containing editing metadata, images, and fonts from the existing PNG attachment path. Explains the implications of single-user editing, feature-specific modules, and memory and storage limits; the storage location is superseded by subsequent decision 0055."
 created: "2026-10-16"
 updated: "2026-10-23"
 ---
 
-# 에이전트 그림판의 SVG 문서와 PNG 첨부
+# SVG Documents and PNG Attachments for the Agent Drawing Editor
 
-상태: 승인됨. 저장 위치는 [0055 — 첨부·그림의 프로젝트 임시 경로 통합](0055-project-temp-attachments.md)이 대체한다.
+Status: Approved. The storage location is superseded by [0055 — Unifying Attachments and Drawings Under the Project Temporary Path](0055-project-temp-attachments.md).
 
-## 배경
+## Background
 
-에이전트에게 맥락을 전달할 때 도형·텍스트·스크린샷 위 주석을 함께 그릴 수 있어야 한다. 격자·무한 작업 영역·객체 변형·그룹·레이어를 지원하면서 편집기를 빠르게 열고, 저장한 그림을 다시 편집하며, 기존 이미지 첨부·대기 큐를 그대로 사용해야 한다. 현재 범위에는 실시간 공동 편집이 없다.
+Users need to be able to draw shapes, text, and annotations over screenshots together when providing context to an agent. The editor must support a grid, an infinite workspace, object transformations, groups, and layers while opening quickly, allowing saved drawings to be edited again, and using the existing image attachment and pending queue flows unchanged. Real-time collaborative editing is outside the current scope.
 
-## 결정
+## Decision
 
-- 브라우저 SVG를 렌더링 표면으로 사용하고 외부 그림판 라이브러리를 추가하지 않는다. 버전 있는 순수 TypeScript 문서 모델·기하 계산·개체 렌더러·SVG 변환·글꼴·저장 전송과 포인터 중심 UI를 분리한다. 편집기는 입력칸에서 요청할 때 지연 로딩한다.
-- 개체의 px 좌표와 화면 위치·확대 비율을 분리한다. 고정 아트보드 없이 원점을 기준으로 편집하며, 내보낼 때는 실제 개체의 바깥 영역으로 범위를 계산한다.
-- 재편집 원본은 현재 프로젝트의 `.mew/drawings/`에 새 UUID의 SVG로 저장한다. SVG 안의 메타데이터에 문서·격자 설정을 담고, 이미지와 Google Fonts에서 내려받은 글꼴을 포함한다. 이름·시각·크기는 작은 JSON 파일에 따로 두어 기록 목록에서 대형 SVG를 읽지 않는다.
-- PNG는 브라우저에서 같은 SVG로 만들고 기존 `.mew/assets/` 첨부 경로로 전달한다. 그림판 저장은 입력에 이미지를 추가하며 메시지를 자동 전송하지 않는다. 저장·조회·첨부에 현재 프로젝트 확인과 기존 인증·파일 권한을 적용한다.
-- 편집 도중에는 문서 스냅샷 이력을 사용한다. 드래그 미리보기와 완료를 분리해 한 제스처를 하나의 실행 취소 단위로 남기고, 화면 이동·확대는 문서를 변경하지 않는다.
+- Use browser SVG as the rendering surface without adding an external drawing editor library. Separate the versioned pure TypeScript document model, geometry calculations, object renderers, SVG conversion, fonts, storage transport, and pointer-centered UI. Lazy-load the editor when requested from the input field.
+- Separate object coordinates in px from screen position and zoom level. Edit relative to the origin without a fixed artboard, and calculate export bounds from the outer bounds of the actual objects.
+- Save the reeditable source as an SVG with a new UUID in the current project's `.mew/drawings/`. Store the document and grid settings in SVG metadata, and embed images and fonts downloaded from Google Fonts. Keep the name, timestamp, and size in a separate small JSON file so the history list does not read large SVG files.
+- Generate the PNG from the same SVG in the browser and pass it through the existing `.mew/assets/` attachment path. Saving in the drawing editor adds an image to the input and does not send the message automatically. Apply current-project checks and existing authentication and file permissions to saving, retrieval, and attachment.
+- Use document snapshot history during editing. Separate drag previews from completion so that each gesture becomes one undo unit; panning and zooming do not change the document.
 
-## 근거와 영향
+## Rationale and Impact
 
-SVG는 도형·곡선·텍스트·이미지를 같은 개체 모델로 표현하며, 화면과 원본 저장에 같은 변환 규칙을 적용한다. 브라우저의 이미지·Canvas API로 PNG를 만들 수 있어 서버에 이미지 렌더링 런타임을 추가하지 않는다. 기존 메뉴·색상 선택기·선택 필드와 첨부 흐름을 재사용하므로 Mew의 테마·키보드·큐 동작을 함께 유지한다.
+SVG represents shapes, curves, text, and images through the same object model and applies the same transformation rules to display and source storage. The browser's image and Canvas APIs can generate PNGs, so no image rendering runtime is added to the server. Reusing existing menus, color pickers, selection fields, and attachment flows also preserves Mew's theme, keyboard, and queue behavior.
 
-외부 편집기 엔진을 도입하면 도구와 변형 기능을 가져올 수 있지만, 그 엔진의 문서 형식·UI·번들·수명 주기를 기존 입력과 연결해야 한다. 현재의 단독 설명 그림 범위에서는 필요한 개체 모델과 조작을 직접 소유한다. 그 결과 기하 계산·곡선·키보드·접근성과 내보내기 회귀 검증도 Mew가 맡는다.
+An external editor engine could provide tools and transformation features, but its document format, UI, bundle, and lifecycle would need to be integrated with the existing input. For the current scope of single-user explanatory drawings, Mew directly owns the required object model and interactions. As a result, Mew also handles regression verification for geometry calculations, curves, keyboard behavior, accessibility, and export.
 
-그림 전체를 SVG에 포함하므로 원본은 독립적으로 표시되지만 이미지·폰트가 저장 크기를 늘린다. 문서·이력·이미지·SVG·PNG에 각각 상한을 두고, 문서 이력에서 이미지 문자열을 재인코딩하지 않는다. Google 글꼴을 새로 내려받을 때는 브라우저의 외부 연결이 필요하며 다운로드 실패를 저장 실패로 표시한다. 실시간 동기화·임의 외부 SVG 편집·중첩 그룹 트리는 이번 결정의 제공 범위에 넣지 않는다.
+Embedding the entire drawing in the SVG makes the source independently viewable, but images and fonts increase storage size. Set separate limits for documents, history, images, SVGs, and PNGs, and do not reencode image strings in document history. Downloading new Google fonts requires an external browser connection, and download failures are reported as save failures. Real-time synchronization, editing arbitrary external SVGs, and nested group trees are outside the scope provided by this decision.
 
-구체적인 조작·단축키·저장 위치·제한·API·검증 기준은 [에이전트 그림판](../features/%ED%84%B0%EB%AF%B8%EB%84%90%C2%B7%EC%97%90%EC%9D%B4%EC%A0%84%ED%8A%B8%C2%B7%EC%9E%90%EB%8F%99%ED%99%94/%EC%97%90%EC%9D%B4%EC%A0%84%ED%8A%B8%20%EA%B7%B8%EB%A6%BC%ED%8C%90.md), 첨부의 공통 수명은 [입력·첨부 계약](../features/%ED%84%B0%EB%AF%B8%EB%84%90%C2%B7%EC%97%90%EC%9D%B4%EC%A0%84%ED%8A%B8%C2%B7%EC%9E%90%EB%8F%99%ED%99%94/%EC%97%90%EC%9D%B4%EC%A0%84%ED%8A%B8%20%EC%9E%85%EB%A0%A5%C2%B7%EB%A9%98%EC%85%98%C2%B7%EC%8A%A4%ED%82%AC%C2%B7%EC%B2%A8%EB%B6%80.md)이 소유한다.
+[Agent Drawing Editor](../features/terminals-agents-automation/agent-drawing-editor.md) owns the specific interactions, shortcuts, storage locations, limits, APIs, and verification criteria; [Input and Attachment Contract](../features/terminals-agents-automation/agent-input-mentions-skills-and-attachments.md) owns the shared attachment lifecycle.

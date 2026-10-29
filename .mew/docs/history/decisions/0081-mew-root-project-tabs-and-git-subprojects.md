@@ -1,66 +1,66 @@
 ---
-provenance: "Liiiiv 중앙 ADR 이관본, 2026-10-14"
-description: "이관한 결정 기록: mew는 워크스페이스 대신 루트 프로젝트와 Git 하위 프로젝트를 쓴다. 당시 선택·근거·후속 변경을 보존하며 현재 계약은 Mew 소유 문서에서 확인한다."
-title: "0081 — mew는 워크스페이스 대신 루트 프로젝트와 Git 하위 프로젝트를 쓴다"
+provenance: "Migrated copy of a Liiiiv central ADR, 2026-10-14"
+description: "Migrated decision record: mew uses root projects and Git subprojects instead of workspaces. Preserves the choices, rationale, and subsequent changes from that time; consult the Mew owning document for the current contract."
+title: "0081 — mew uses root projects and Git subprojects instead of workspaces"
 created: 2026-08-26
 updated: 2026-09-11
 ---
 
-- 날짜: 2026-08-26
-- 상태: 채택
-- 후속 결정: [0083](0083-mew-explorer-documents-and-mew-subprojects.md) — Documents·직계 하위 프로젝트 판별
-- 후속 결정: [0086](0086-mew-root-project-spa-handoff-and-cache.md) — 루트 전환 전체 새로고침
-- 후속 결정: [0093](0093-mew-account-synced-project-and-agent-tabs.md) — 프로젝트 탭의 브라우저 전용 저장
-- 후속 결정: [0113](0113-mew-project-browser-and-git-workbench-tab.md) — 프로젝트 추가·Git 진입 UI
-- 부분 대체: 0018 — 워크스페이스 최상위 폴더 전부를 프로젝트 탭으로 보이던 프로젝트 정의·탭 목록 범위
-- 부분 대체: 0041·0053 — docs를 헤더의 고정 탭으로 두던 UI 배치
-- 부분 대체: 0042 — 홈 탭을 워크스페이스 스코프 진입점과 폴더 전환 입구로 두던 범위
-- 부분 대체: 0080 — 서버 파일 탐색기의 “프로젝트로 열기”가 부모를 워크스페이스로 열던 동작
-- 결정자: 송상훈 (지시)
+- Date: 2026-08-26
+- Status: Adopted
+- Follow-up decision: [0083](0083-mew-explorer-documents-and-mew-subprojects.md) — identifying Documents and direct child projects
+- Follow-up decision: [0086](0086-mew-root-project-spa-handoff-and-cache.md) — full reload on root switching
+- Follow-up decision: [0093](0093-mew-account-synced-project-and-agent-tabs.md) — browser-only storage of project tabs
+- Follow-up decision: [0113](0113-mew-project-browser-and-git-workbench-tab.md) — UI for adding projects and entering Git
+- Partially supersedes: 0018 — the project definition and tab-list scope that displayed all top-level workspace folders as project tabs
+- Partially supersedes: 0041·0053 — the UI layout that placed docs in a fixed header tab
+- Partially supersedes: 0042 — the scope that used the home tab as the workspace-scope entry point and the entry point for switching folders
+- Partially supersedes: 0080 — the server file explorer's “Open as Project” behavior that opened the parent as a workspace
+- Decision maker: Song Sanghoon (directive)
 
-## 배경
+## Background
 
-기존 mew는 설정한 워크스페이스의 최상위 하위 폴더를 전부 프로젝트로 인식해 헤더 탭에
-나열했다. 이 모델은 한 루트 밖의 독립 폴더를 열기 어렵고, 실제로는 폴더인 하위 Git 저장소를
-항상 전역 탭으로 승격시켰다. docs와 홈도 워크스페이스 전용 고정 탭이어서 사용자가 인식해야 할
-스코프가 늘어났다.
+Previously, mew treated every immediate subfolder of the configured workspace as a project and listed them as header tabs.
+This model made it difficult to open independent folders outside a single root and always promoted nested Git repositories, which
+were actually folders, to global tabs. docs and Home were also fixed workspace-specific tabs, increasing the number of scopes users
+had to understand.
 
-## 선택지
+## Options
 
-1. 워크스페이스를 유지하고 외부 폴더 마운트만 추가 — 기존 API는 작지만 하위 폴더와 독립 프로젝트의 뜻이 계속 섞인다.
-2. 폴더 하나를 프로젝트로 보고 Git 저장소인 직계 하위 폴더만 하위 프로젝트로 표시 — 파일시스템 구조와 UI가 같아진다.
-3. 중첩 Git 저장소를 재귀 프로젝트 그래프로 구성 — 모델은 완전하지만 현재 필요보다 탐색·상태·명령 범위가 크게 늘어난다.
+1. Keep workspaces and add only external folder mounts — keeps the existing API small, but continues to blur the meaning of subfolders and independent projects.
+2. Treat a single folder as a project and show only immediate subfolders that are Git repositories as subprojects — aligns the UI with the filesystem structure.
+3. Organize nested Git repositories into a recursive project graph — the model is complete, but greatly expands navigation, state, and command scopes beyond current needs.
 
-## 결정
+## Decision
 
-2번을 채택한다.
+Adopt option 2.
 
-- mew에서 프로젝트는 서버의 절대경로 폴더 하나다. 설정·서버 내부의 `WORKSPACE_ROOT`·`MEW_WORKSPACE`
-  이름은 기존 경로 검증·재시작 호환을 위한 내부 구현 용어로만 남고 사용자 모델이 아니다.
-- 헤더에는 열어 본 루트 프로젝트 경로만 탭으로 서고, `+ 탭`과 `Ctrl+O`가 같은 중앙 경로 입력창을 연다.
-  경로 입력·자동완성·확정은 에이전트 cwd 입력창과 같은 서버 검증 API를 쓴다.
-- 열어 본 경로 목록은 브라우저 `localStorage`의 `mew:open-project-paths`에 남는다. 현재 서버 구조에서 루트
-  전환은 기존 전환 절차를 재사용하므로 협업 방·트리 감시자·에이전트를 정리하고 화면을 다시 띄운다.
-- 현재 프로젝트의 직계 하위 폴더 중 `.git`이 있는 것은 사이드바에 `Git` 표식을 붙인 하위 프로젝트로
-  보인다. 그 줄에 기존 `.mew/cmd-button.json` 명령 메뉴를 두며, 중첩 Git 저장소 탐지는 이 결정의 범위가 아니다.
-- 프로젝트 명령 재생 버튼은 헤더 탭에서 사이드바 최상단의 폴더·검색 버튼 옆으로 옮긴다.
-- docs는 사이드바 검색창 아래의 `Documents` 가상 폴더로 옮긴다. 폴더 위치·내부 식별자 `docs`·가져오기·
-  내보내기 계약은 유지하고, owner의 우클릭으로 기존 설정창을 연다.
-- 워크스페이스 홈 고정 탭과 하위 폴더 전체를 나열하던 프로젝트 격자 진입점은 제거한다. 워크스페이스 홈 탭은
-  같은 모델로 재시도하지 않는다. 할 일·달력 위젯을 다시 노출할 때는 프로젝트 스코프 배치를 별도로 결정한다.
-- 서버 파일 탐색기의 `프로젝트로 열기`도 선택 폴더 자신을 루트 프로젝트로 연다. 별도 `워크스페이스로 열기`
-  메뉴는 두지 않는다.
+- In mew, a project is a single folder identified by an absolute path on the server. The `WORKSPACE_ROOT` and `MEW_WORKSPACE` names in configuration and server internals remain only as internal
+  implementation terms for compatibility with existing path validation and restarts; they are not part of the user model.
+- The header shows tabs only for root project paths that have been opened, and `+ 탭` and `Ctrl+O` open the same central path input. Path entry,
+  autocomplete, and confirmation use the same server validation API as the agent cwd input.
+- The list of opened paths is stored under `mew:open-project-paths` in the browser's `localStorage`. In the current server architecture, root switching reuses the existing switching
+  procedure, which cleans up collaboration rooms, tree watchers, and agents, then reloads the UI.
+- Immediate subfolders of the current project that contain `.git` appear in the sidebar as subprojects marked with
+  `Git`. Their rows include the existing `.mew/cmd-button.json` command menu; detecting nested Git repositories is outside the scope of this decision.
+- Move the project command play button from the header tabs to the top of the sidebar, next to the folder and search buttons.
+- Move docs to a virtual `Documents` folder below the sidebar search field. Preserve the folder location, internal identifier `docs`, and import/export
+  contracts, and open the existing settings dialog when the owner right-clicks it.
+- Remove the fixed workspace Home tab and the project grid entry point that listed all subfolders. Do not retry the workspace Home tab
+  with the same model. When exposing the task and calendar widgets again, decide their placement within the project scope separately.
+- The server file explorer's `프로젝트로 열기` action also opens the selected folder itself as the root project. Do not provide a separate
+  `워크스페이스로 열기` menu item.
 
-## 근거
+## Rationale
 
-탭은 독립적으로 열어 본 폴더만 담고, 폴더 안의 구조는 사이드바가 그대로 담당하면 “폴더”와 “프로젝트”를
-별개 계층으로 외울 필요가 없다. Git 여부는 파일시스템이 이미 가진 경계를 표시하므로 새 프로젝트 설정 원장도
-필요 없다. 기존 루트 전환 절차를 호환층으로 남기면 절대경로를 협업 방 키에 즉시 넣는 대규모 마이그레이션 없이
-사용자 모델을 먼저 바꿀 수 있다.
+If tabs contain only folders opened independently and the sidebar continues to handle the structure within each folder, users do not need to learn “folder”
+and “project” as separate layers. Git status marks boundaries already present in the filesystem, so no new project configuration registry is needed. Retaining
+the existing root-switching procedure as a compatibility layer allows the user model to change first without a large migration to immediately incorporate
+absolute paths into collaboration room keys.
 
-## 결과
+## Results
 
-- 열린 프로젝트 탭은 브라우저별 목록이지만 서버의 활성 루트는 현재 프로세스 전역이다. 한 사용자가 루트를 바꾸면
-  기존 presence 전환 계약에 따라 다른 클라이언트도 새 루트를 본다.
-- 루트 프로젝트의 숨김 폴더는 owner·manager 트리에 다른 항목처럼 보인다. `.git`·`node_modules`·`.data`는
-  기존 API 차단·성능 규칙으로 계속 숨긴다.
+- The list of open project tabs is browser-specific, but the server's active root is currently process-wide. When one user changes the root,
+  other clients also see the new root under the existing presence-switching contract.
+- Hidden folders in the root project appear like other items in the owner and manager trees. `.git`, `node_modules`, and `.data` remain hidden under existing
+  API blocking and performance rules.

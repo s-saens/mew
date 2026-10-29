@@ -1,35 +1,35 @@
 ---
-provenance: "Liiiiv 중앙 ADR 이관본, 2026-10-14"
-description: "이관한 결정 기록: mew 접속 세션 기록을 SQLite에 저장. 당시 선택·근거·후속 변경을 보존하며 현재 계약은 Mew 소유 문서에서 확인한다."
-title: "0183 — mew 접속 세션 기록을 SQLite에 저장"
+provenance: "Migrated copy of a Liiiiv central ADR, 2026-10-14"
+description: "Migrated decision record: store mew connection session history in SQLite. Preserves the choices, rationale, and subsequent changes at the time; consult the Mew owning document for the current contract."
+title: "0183 — Store mew connection session history in SQLite"
 created: 2026-09-30
 updated: 2026-09-30
 ---
 
-- 날짜: 2026-09-30
-- 상태: 채택
-- 결정자: 사용자(접속 기록·날짜/사람/시간 필터·엑셀 요청), 에이전트(저장·조회 설계)
+- Date: 2026-09-30
+- Status: Adopted
+- Decision makers: user (requested connection history, date/person/time filters, and Excel export), agent (storage and retrieval design)
 
-## 배경
+## Background
 
-기존 presence는 현재 연결만 메모리에 유지했다. 사용자가 하루별·사용자별·시간별 접속 기록과 엑셀 다운로드를 요청했다.
+Previously, presence kept only current connections in memory. The user requested connection history by day, user, and time, along with Excel downloads.
 
-## 선택지
+## Options
 
-1. JSON 원장 — 단순하지만 구간별 검색·누적 갱신에 전체 파일 재기록이 필요하다.
-2. 외부 PostgreSQL — 중앙 조회에 적합하지만 기본 mew 설치에 별도 DB 설정을 요구한다.
-3. 서버 내부 SQLite — 기존 Node SQLite 사용 방식을 재사용하며 트랜잭션·시간/사용자 인덱스와 설치 독립성을 제공한다.
+1. JSON ledger — Simple, but searching by interval and applying cumulative updates requires rewriting the entire file.
+2. External PostgreSQL — Suitable for centralized queries, but requires separate DB configuration for a basic mew installation.
+3. Server-internal SQLite — Reuses the existing Node SQLite usage pattern and provides transactions, time/user indexes, and installation independence.
 
-## 결정
+## Decision
 
-브라우저 탭별 presence 접속과 상태 구간을 서버 데이터 디렉터리의 SQLite에 영구 저장한다. 기존 Node SQLite 사용 방식을 따르며 외부 DB 설정을 요구하지 않는다. 인증 쿠키·토큰·IP·원본 User-Agent는 저장하지 않는다. 게스트는 익명으로 기록한다.
+Persist presence connections and state intervals for each browser tab in SQLite in the server data directory. Follow the existing Node SQLite usage pattern without requiring external DB configuration. Do not store authentication cookies, tokens, IP addresses, or raw User-Agent strings. Record guests anonymously.
 
-동일 상태의 보고는 마지막 관측 시각만 갱신하고, 사용자 신원·파일·프로젝트·전경 여부·에이전트 수 변경 시 새 구간을 시작한다. 종료 시 구간을 닫고, 서버 재시작 시 미종료 구간을 마지막 관측 시각으로 종료해 중단 시간까지 접속한 것으로 계산하지 않는다. 기록은 자동 삭제하지 않는다. 손상된 DB를 빈 DB로 덮어쓰지 않는다.
+Reports with the same state update only the last observed timestamp; changes to user identity, file, project, foreground status, or agent count start a new interval. Close the interval on termination. On server restart, close unfinished intervals at their last observed timestamp so downtime is not counted as connected time. Do not automatically delete history. Do not overwrite a corrupted DB with an empty DB.
 
-현재 세션 목록과 동일하게 로그인 사용자만 조회하며, 파일·프로젝트 정보는 조회 및 내보내기 순간의 권한으로 가린다. 역사적 경로의 루트가 현재 프로젝트 루트와 다르면 위치 정보도 가린다. 날짜는 조회 브라우저의 현지 날짜·시간 경계이며 필터와 엑셀은 같은 범위를 사용한다. 접속 시간은 브라우저 탭별 관측 시간이라 병렬 탭은 중복된다. 실제 근무 시간으로 해석하지 않는다.
+As with the current session list, only logged-in users can query history, and file and project information is masked based on permissions at the time of retrieval or export. Location information is also masked if the root of a historical path differs from the current project root. Dates use the querying browser's local date and time boundaries, and filters and Excel exports use the same range. Connection time is observed time per browser tab, so parallel tabs are counted more than once. Do not interpret it as actual working time.
 
-UI·API·검증·백업 범위의 기준본은 [mew 협업 개발 계약](../../development/collaboration.md#활성-mew-세션-presence)과 [협업 사용법](../../../../docs/guides/collaboration.md#접속-중인-mew-세션)에 둔다.
+The canonical source for UI, API, validation, and backup scope is maintained in the [mew collaboration development contract](../../development/collaboration.md#active-mew-sessions-presence) and [collaboration guide](../../../../docs/guides/collaboration.md#active-mew-sessions).
 
-## 근거
+## Rationale
 
-단일 서버의 로컬 접속 원장이므로 3번을 선택한다. 현재 목록은 기존 WebSocket 상태를 유지하고 기록 조회를 별도 원장으로 분리한다. [Node SQLite 문서](https://nodejs.org/api/sqlite.html)의 내장 DB·준비된 쿼리 방식을 따른다.
+Choose option 3 because this is a local connection ledger for a single server. Keep the existing WebSocket state for the current list and separate history queries into a dedicated ledger. Follow the embedded DB and prepared query approach in the [Node SQLite documentation](https://nodejs.org/api/sqlite.html).

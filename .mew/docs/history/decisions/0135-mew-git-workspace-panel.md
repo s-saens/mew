@@ -1,27 +1,27 @@
 ---
-provenance: "Liiiiv 중앙 ADR 이관본, 2026-10-14"
-description: "이관한 결정 기록: Git 워크벤치는 저장소 탭을 가진 작업 패널이다. 당시 선택·근거·후속 변경을 보존하며 현재 계약은 Mew 소유 문서에서 확인한다."
-title: "0135 — Git 워크벤치는 저장소 탭을 가진 작업 패널이다"
+provenance: "Migrated copy of a Liiiiv central ADR, 2026-10-14"
+description: "Migrated decision record: The Git workbench is a workspace panel with repository tabs. Preserves the choices, rationale, and subsequent changes from that time; consult Mew's owning documents for the current contract."
+title: "0135 — The Git workbench is a workspace panel with repository tabs"
 created: 2026-09-12
 updated: 2026-09-12
 ---
 
-- 날짜: 2026-09-12
-- 상태: 채택
-- 후속 결정: [0160](0160-mew-git-current-project-only.md) — 현재 프로젝트 단일 저장소; 선택기·추가 탭 제거, 도킹·초안 유지
-- 부분 대체: [0114](0114-mew-git-workbench-popup.md) — 독립 팝업·분할 제외·팝업 닫기 방식
-- 부분 대체: [0115](0115-mew-git-menu-and-repository-picker.md) — 매번 팝업 선택기에서 시작하는 수명주기
-- 부분 대체: [0134](0134-mew-dockable-workspace-panels.md) — 공통 작업 패널 종류에 Git 추가
-- 결정자: 사용자 (Git 팝업도 다른 작업 패널과 같은 패널로 변경 요청)
+- Date: 2026-09-12
+- Status: Adopted
+- Follow-up decision: [0160](0160-mew-git-current-project-only.md) — a single repository for the current project; removes the picker and additional tabs, preserves docking and drafts
+- Partially supersedes: [0114](0114-mew-git-workbench-popup.md) — standalone popup, exclusion from split layouts, and popup closing behavior
+- Partially supersedes: [0115](0115-mew-git-menu-and-repository-picker.md) — the lifecycle that starts from the popup picker every time
+- Partially supersedes: [0134](0134-mew-dockable-workspace-panels.md) — adds Git to shared workspace panel types
+- Decision maker: User (requested changing the Git popup into a panel like other workspace panels)
 
-## 결정
+## Decision
 
-- manager·owner는 기존 헤더 메뉴와 `Alt+G`로 Git 작업 패널을 연다. 편집기 파일 탭과 분리된 저장소 탭을 사용하며 `mew:git:` 파일 가상 탭은 복원하지 않는다.
-- 첫 진입과 `+`는 루트 프로젝트·Documents·중첩 Git 저장소 선택기를 연다. 같은 프로젝트 스코프·상대 경로의 저장소는 기존 탭을 선택한다.
-- Git은 `DockWorkspace`에서 손잡이로 이동하고 탭을 분리·합치며 경계를 조절한다. 브라우저의 세로 배치 제한은 유지한다. 탭바·추가·닫기 UI는 에이전트·터미널·브라우저와 같은 형태다.
-- 패널 닫기는 공통 도킹 계약대로 탭을 남은 Git 패널에 모으거나 마지막 패널을 접는다. 탭 이동·패널 숨김은 본문을 다시 마운트하지 않아 현재 상세 화면과 커밋 초안을 유지한다. 탭 닫기는 그 저장소 화면만 닫는다.
-- 열림 상태·저장소 탭·도킹 배정은 계정의 루트 프로젝트별 작업 화면 상태에 저장한다. 새로고침은 저장소 탭과 배치를 복원하며 커밋 초안을 영구 저장하지 않는다.
-- 모바일은 다른 작업 패널과 같은 전면 전환·Esc·뒤로가기 스택을 사용한다. 다른 작업 영역을 클릭했다고 Git을 닫지 않는다.
-- 그래프 → 상세 → diff, 저장소 목록으로 돌아가기, Git API·권한·사용자 확인·커밋 범위는 유지한다. 팝업 배경과 본문 내부의 중복 창 닫기 버튼은 제거한다. Git 팝업은 재도입하지 않는다.
+- manager and owner open the Git workspace panel through the existing header menu or `Alt+G`. Use repository tabs separate from editor file tabs, and do not restore `mew:git:` virtual file tabs.
+- Initial entry and `+` open a picker for the root project, Documents, and nested Git repositories. For a repository with the same project scope and relative path, select the existing tab.
+- In `DockWorkspace`, Git can be moved by its handle, its tabs can be detached or merged, and its boundaries can be resized. Preserve the browser's vertical layout restriction. The tab bar, add, and close UI use the same form as agents, terminals, and browsers.
+- Closing a panel gathers its tabs into remaining Git panels or collapses the last panel according to the shared docking contract. Moving tabs or hiding panels does not remount the body, preserving the current detail view and commit draft. Closing a tab closes only that repository view.
+- Save open state, repository tabs, and docking assignments in the account's workspace UI state per root project. Refreshing restores repository tabs and layout but does not persist commit drafts.
+- On mobile, use the same foreground switching, Esc, and back-navigation stack as other workspace panels. Do not close Git when another workspace area is clicked.
+- Preserve graph → details → diff, return to repository list, Git APIs, permissions, user confirmation, and commit scope. Remove the popup backdrop and redundant window close buttons inside the body. Do not reintroduce the Git popup.
 
-현행 사용법은 [프로젝트·Git](../../../../docs/guides/projects.md), 배치 계약은 [UI 계약](../../development/ui-contracts.md)에 둔다.
+Keep current usage instructions in [Projects and Git](../../../../docs/guides/projects.md) and layout contracts in [UI contracts](../../development/ui-contracts.md).

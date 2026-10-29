@@ -1,24 +1,24 @@
 ---
-title: "첨부·그림의 프로젝트 임시 경로 통합"
-description: "첨부와 그림판의 새 파일을 .mew/temp 아래에 저장하고 기존 경로의 읽기 호환을 유지하기로 한 결정. Git 제외와 기존 파일 보존의 경계를 정한다."
+title: "Consolidate attachments and drawings under the project's temporary path"
+description: "The decision stores new attachment and drawing board files under .mew/temp while preserving read compatibility with existing paths. Defines the boundaries for Git exclusion and preservation of existing files."
 created: "2026-10-23"
 updated: "2026-10-23"
 ---
 
-# 첨부·그림의 프로젝트 임시 경로 통합
+# Consolidate attachments and drawings under the project's temporary path
 
-상태: 승인됨.
+Status: Approved.
 
-## 배경
+## Background
 
-에이전트 첨부와 그림 기록이 소스 변경과 함께 커밋된다. 프로젝트에서 이미 제외한 `.mew/temp` 아래에 생성 파일을 모은다.
+Agent attachments and drawing records are committed alongside source changes. Collect generated files under `.mew/temp`, which the project already excludes.
 
-## 결정
+## Decision
 
-새 첨부는 `.mew/temp/assets/`, 그림판의 SVG·JSON은 `.mew/temp/drawings/`에 저장한다. [0008](0008-agent-vector-drawing.md)의 저장 위치만 대체한다. 기존 `.mew/assets/` 첨부와 `.mew/drawings/` 기록은 이동·삭제하지 않고 계속 읽으며, 파일 권한과 안전한 경로 검사를 유지한다.
+Store new attachments in `.mew/temp/assets/` and drawing board SVG and JSON files in `.mew/temp/drawings/`. Supersede only the storage locations in [0008](0008-agent-vector-drawing.md). Continue reading existing `.mew/assets/` attachments and `.mew/drawings/` records without moving or deleting them, and preserve file permissions and safe path checks.
 
-## 근거와 영향
+## Rationale and Impact
 
-생성 파일을 한 경로 아래에 모으면 `.gitignore`의 `.mew/temp` 규칙으로 함께 제외할 수 있다. 기존에 Git이 추적하는 파일과 과거 커밋은 변경하지 않는다. 자동 삭제나 수명 만료는 추가하지 않는다.
+Collecting generated files under one path allows them to be excluded together by the `.mew/temp` rule in `.gitignore`. Do not change files already tracked by Git or past commits. Do not add automatic deletion or expiration.
 
-현재 저장·조회 계약은 [입력·첨부](../features/%ED%84%B0%EB%AF%B8%EB%84%90%C2%B7%EC%97%90%EC%9D%B4%EC%A0%84%ED%8A%B8%C2%B7%EC%9E%90%EB%8F%99%ED%99%94/%EC%97%90%EC%9D%B4%EC%A0%84%ED%8A%B8%20%EC%9E%85%EB%A0%A5%C2%B7%EB%A9%98%EC%85%98%C2%B7%EC%8A%A4%ED%82%AC%C2%B7%EC%B2%A8%EB%B6%80.md)와 [그림판](../features/%ED%84%B0%EB%AF%B8%EB%84%90%C2%B7%EC%97%90%EC%9D%B4%EC%A0%84%ED%8A%B8%C2%B7%EC%9E%90%EB%8F%99%ED%99%94/%EC%97%90%EC%9D%B4%EC%A0%84%ED%8A%B8%20%EA%B7%B8%EB%A6%BC%ED%8C%90.md)이 소유한다.
+[Input and attachments](../features/terminals-agents-automation/agent-input-mentions-skills-and-attachments.md) and the [drawing board](../features/terminals-agents-automation/agent-drawing-editor.md) own the current storage and retrieval contracts.

@@ -1,191 +1,191 @@
 ---
-title: "대량 문서 변경의 AI 커밋 압축 연구"
+title: "Research on AI commit compression for large-scale document changes"
 created: "2026-10-04"
 updated: "2026-10-04"
-description: "대량 문서 변경을 누락 없이 전달하기 위한 공통 문자·반복 줄·변경 의도 압축 연구와 로컬 실험, 후속 실행 경로 반영 및 미측정 범위를 기록한다."
+description: "Records research and local experiments on compressing shared character sequences, repeated lines, and change intent to convey large-scale document changes without omissions, subsequent integration into the execution path, and areas not measured."
 상위파일: "_work.md"
 ---
 
-선행 실측: [AI 커밋 토큰 절감 검토](git-ai-commit-token-efficiency.md). 현재 동작의 기준본: [AI 커밋 실행 계약](../development/agent-sessions.md#git-ai-commit-작업).
+Prior measurements: [Review of AI commit token reduction](git-ai-commit-token-efficiency.md). Canonical source for current behavior: [AI commit execution contract](../development/agent-sessions.md#git-ai-commit-jobs).
 
-**연구 결론은 문서 구조에 맞춘 변경 표현, 반복 수정의 공통화, 변경 시점의 의도 기록을 결합하는 것이다.** 임베딩만으로 diff를 대체하는 방식은 현재 ACP 입력과 맞지 않고, 발췌만 먼저 보내는 방식은 실제 실행에서 대량 스킵을 일으켰다. 의미가 다른 변경을 없애는 대신 같은 정보를 반복해서 읽는 비용을 줄여야 한다.
+**The research concludes that change representations tailored to document structure, consolidation of repetitive edits, and intent recorded at the time of change should be combined.** Replacing diffs with embeddings alone is incompatible with current ACP input, and sending excerpts first caused large-scale skipping in actual runs. Reduce the cost of repeatedly reading the same information rather than removing semantically distinct changes.
 
-로컬 실험에서 실제 문서 43개의 모든 변경을 복원하는 표현은 3줄 문맥 Git diff보다 기준 토큰을 **48.5%** 줄였다. 반복된 동일 수정 100건의 합성 사례에서는 **88.8%** 줄었다. 반대로 고유한 새 내용 100건은 거의 줄지 않았다. 실제 코퍼스에서 단순 발췌 없이 90%를 줄였다는 근거는 없다.
+In a local experiment, a representation that reconstructs all changes across 43 actual documents reduced baseline tokens by **48.5%** compared with a Git diff with 3 lines of context. In a synthetic case with 100 repeated identical edits, the reduction was **88.8%**. By contrast, 100 unique additions showed almost no reduction. There is no evidence of a 90% reduction on the actual corpus without simply extracting excerpts.
 
-이 문서는 조사·재현 가능한 오프라인 실험·구현 제안이다. 실험 도구는 자동 커밋 실행 경로에 연결하지 않았다. 모델의 그룹 판단, 실제 완료 시간, 임베딩·LLMLingua의 이 서버 성능은 미측정이다. 기본 스킬·운영 계약은 이 제안으로 교체하지 않는다.
+This document presents research, reproducible offline experiments, and an implementation proposal. The experimental tools were not connected to the automatic commit execution path. Model grouping decisions, actual completion time, and embedding and LLMLingua performance on this server have not been measured. This proposal does not replace the default skill or production contract.
 
-## 후속 구현 상태
+## Subsequent implementation status
 
-2026-10-04 사용자 승인으로 전체 패치의 공통 문자·반복 줄·동일 변경 사전 압축과 Git 객체로 검증하는 변경 목적 기록을 실행 경로에 추가했다. 한 패킷이면 계획 1회, 넘으면 모든 패킷의 근거를 읽고 전량 커버리지를 검증한 뒤 계획한다. 위 실험 수치는 연구 당시 문서 전용 표현의 측정이며, 이번 패치 표현의 압축률이나 실서비스 속도를 뜻하지 않는다. 연구 원문·이전 실행 결과는 그대로 보존한다. 현재 계약과 한도는 [AI 커밋 실행](../development/agent-sessions.md#git-ai-commit-작업)을 따른다.
+With user approval on 2026-10-04, compression using shared characters, repeated lines, and a dictionary of identical changes across the full patch, along with change-purpose records verified against Git objects, was added to the execution path. A single packet requires 1 planning pass; if there are more, planning follows reading the evidence from all packets and verifying complete coverage. The experimental figures above measure the document-only representation used during the research; they do not indicate the compression ratio of this patch representation or live service speed. The original research and previous execution results are preserved unchanged. The current contract and limits follow [AI Commit Execution](../development/agent-sessions.md#git-ai-commit-jobs).
 
-후속 패치 표현의 별도 오프라인 확인에서는 당시 미커밋 Markdown 47개(이번 구현 문서 포함), `HEAD e3466026ebe8f0ab6e935eddeff5607c8a4a8978`, 선택 트리 `9327028db5f29885bb021a4a374affd31fb41cd8`를 사용했다. 전체 3줄 diff를 3개 조각·2개 패킷으로 준비하는 데 한 번의 로컬 측정에서 261ms가 걸렸다. `o200k_base` 기준 JSON 인용 원문은 58,691토큰, 형식 설명을 포함한 패킷 근거는 55,400토큰으로 5.6% 줄었다. 공통 스킬·선택 목록·목적 힌트·근거 응답·최종 계획 비용은 이 비교에서 제외했다. 앞의 43문서 실험과 다른 집합이며 반복이 적은 고유 내용의 압축 한계를 보여준다. 실제 속도는 미측정이다. 이 집합의 실행 구조는 근거 2개 병렬 분석 → 최종 계획 1회이며 발췌로 파일을 스킵하지 않는다.
+A separate offline check of the subsequent patch representation used 47 Markdown files that were uncommitted at the time (including this implementation document), `HEAD e3466026ebe8f0ab6e935eddeff5607c8a4a8978`, and selected tree `9327028db5f29885bb021a4a374affd31fb41cd8`. Preparing the full 3-line diff as 3 chunks in 2 packets took 261 ms in a single local measurement. With `o200k_base`, the original text quoted in JSON was 58,691 tokens, while the packet evidence including format instructions was 55,400 tokens, a 5.6% reduction. This comparison excluded the costs of the shared skill, selection list, purpose hints, evidence responses, and final plan. This is a different set from the earlier 43-document experiment and demonstrates the limits of compressing unique content with little repetition. Actual speed has not been measured. Execution for this set consists of parallel analysis of 2 evidence packets → 1 final planning pass, and does not skip files based on excerpts.
 
-## 무엇을 빠르게 해야 하는가
+## What needs to be faster
 
-Git은 이미 변경 부분만 나타내는 delta를 만든다. 남은 문제는 변경 전후의 긴 문장 반복, 여러 문서에 적용한 동일 수정, 변경과 무관한 문맥, 반복 지침, AI 호출·추론·출력 시간이다. 커밋의 원본은 Git 트리로 보존하고, AI에는 커밋의 목적·논리적 묶음·메시지를 판단할 근거를 제공해야 한다.
+Git already produces deltas that represent only the changes. The remaining issues are repeated long sentences before and after changes, identical edits across multiple documents, context unrelated to the changes, repeated instructions, and time spent on AI calls, reasoning, and output. The original commit content must be preserved as a Git tree, and the AI must receive evidence for determining the commit's purpose, logical grouping, and message.
 
-다음 세 가지는 별도 목표다. 구분하지 않으면 입력을 줄인 대신 커밋할 파일도 줄이는 실패가 생긴다.
+The following are three separate goals. Failing to distinguish them can lead to reducing the files committed along with the input.
 
-| 목표 | 확인할 것 |
+| Goal | What to check |
 | --- | --- |
-| 입력의 완전성 | 모든 선택 파일·변경 구간·전후 차이가 표현됐는가 |
-| 판단의 정확도 | 제목·설명이 실제 변경과 맞으며 독립 작업을 잘 묶었는가 |
-| 실제 실행의 안전성 | 선택 범위·전체 원본·HEAD·트리·stage·취소·권한을 지키는가 |
+| Input completeness | Are all selected files, changed regions, and before/after differences represented? |
+| Decision accuracy | Do the title and description match the actual changes, and are independent tasks grouped appropriately? |
+| Execution safety | Are the selection scope, complete original content, HEAD, tree, stage, cancellation, and permissions respected? |
 
-커밋 메시지 작성이 전체 코드·문서 감사를 대신하지는 않는다. 제공된 근거로 알 수 있는 변경만 설명하고 테스트·검토 완료를 주장하지 않는 계약이 필요하다. 제목에 영향을 주는 의도가 모호하면 해당 문맥을 더 읽어야 하지만, 모든 변경 파일의 구현 정확성을 증명하는 일을 기본 전제로 삼을 필요는 없다. 이 구분은 제안이며 현재 스킬에 적용하지 않았다.
+Writing a commit message does not replace a full code and documentation audit. A contract is needed that describes only changes supported by the provided evidence and does not claim that testing or review is complete. If intent affecting the title is unclear, more of the relevant context must be read, but proving implementation correctness for every changed file need not be a default prerequisite. This distinction is a proposal and has not been applied to the current skill.
 
-## 실제 스킵이 발생한 이유
+## Why files were actually skipped
 
-2026-10-04 빠른 경로의 완료 작업은 선택 145개 중 13개 파일을 4개 커밋으로 기록하고 132개를 남겼다. 전체 스킵률은 91.0%, 문서는 45개 중 43개가 남아 95.6%였다. 작업 경과 시간은 181.0초다. 다수의 사유가 부분 diff만 받아 전체 변경을 확인하지 못했다는 내용이었다. 저장된 스킵 배열만 기준 토크나이저로 4,014토큰이었다. 이것은 실제 공급자가 청구한 출력 토큰 수가 아니다.
+The completed fast-path task on 2026-10-04 recorded 13 of 145 selected files in 4 commits and left 132 files uncommitted. The overall skip rate was 91.0%; for documents, 43 of 45 remained, a rate of 95.6%. The task elapsed time was 181.0 seconds. Many reasons stated that only a partial diff had been received, preventing verification of all changes. The saved skip array alone contained 4,014 tokens under the baseline tokenizer. This is not the number of output tokens actually billed by the provider.
 
-현재 구현에는 네 가지 문제가 함께 있다.
+The current implementation has four problems in combination.
 
-1. 8,000자 조각마다 최대 약 1,200자 이하를 고르므로 상당수 변경 근거가 처음부터 사라진다. 서로 다른 작은 파일을 같은 조각에 넣으면 작은 문서도 전체 조각의 일부라는 이유로 부분 입력이 된다.
-2. 원본을 6개씩 2회만 요청할 수 있어, 변경량이 커지면 아직 읽지 못한 조각이 남는 것이 구조적으로 불가피하다. 전체 조각 수에 비례해 근거를 확보할 경로가 없다.
-3. 근거가 부족하면 스킵하라는 계약과 제한된 재확인 예산이 결합했다. 호출 횟수만 줄이고 처리 완전성을 보장하지 않았다.
-4. 문서·코드가 함께 선택되면 전체 크기가 큰 변경 경로를 결정한다. 문서만 별도로 보면 단일 입력에 들어가는 변경도 혼합 입력에서 손실될 수 있다.
+1. Selecting at most approximately 1,200 characters or fewer from each 8,000-character chunk discards a substantial amount of change evidence from the outset. When different small files share a chunk, even a small document becomes partial input because it is only part of the entire chunk.
+2. Original chunks can be requested only 2 times, 6 at a time, so unread chunks are structurally inevitable as the volume of changes grows. There is no path for obtaining evidence in proportion to the total number of chunks.
+3. The contract to skip when evidence is insufficient was combined with a limited recheck budget. This reduced only the number of calls without guaranteeing complete processing.
+4. When documents and code are selected together, the total size determines the change-processing path. Changes that would fit in a single input when documents are considered separately can be lost in mixed input.
 
-종료된 작업의 `input.json`과 원본 조각은 정상 정리돼 남아 있지 않았다. 따라서 당시 전체 프롬프트·모델 설정·정확한 호출별 기여도는 재구성하지 않았다. 아래 압축 실험은 이후 남아 있는 문서 변경을 **새 고정 스냅샷**으로 측정한 결과이며, 이 145개 파일 작업과 직접적인 완료 시간 비교는 하지 않는다.
+The completed task's `input.json` and original chunks had been cleaned up normally and were no longer available. Therefore, the full prompt, model settings, and exact contribution of each call at the time were not reconstructed. The compression experiments below measured the remaining document changes afterward using a **new fixed snapshot**; they do not directly compare completion times with this 145-file task.
 
-**후속 설계에서는 크기·발췌 표시·남은 호출 예산만으로 파일을 스킵하지 않아야 한다.** 근거가 덜 제공됐으면 서버가 남은 근거를 다음 묶음으로 공급하고, 실질적으로 판단할 수 없는 경우와 자원 한도에 도달한 경우를 구분한다. 자동 커밋·push·권한 범위를 확대한다는 뜻은 아니다.
+**The subsequent design must not skip files solely because of size, excerpt markers, or the remaining call budget.** If insufficient evidence has been provided, the server supplies the remaining evidence in the next batch and distinguishes cases that cannot substantively be judged from cases where resource limits have been reached. This does not mean expanding automatic commit, push, or permission scope.
 
-## 압축이라는 말의 서로 다른 의미
+## Different meanings of compression
 
-| 방법 | AI가 실제로 받는 것 | 장점 | 커밋에서의 한계 |
+| Method | What the AI actually receives | Benefits | Limitations for commits |
 | --- | --- | --- | --- |
-| gzip·zstd | 압축 바이트나 base64 | 저장·전송 용량 절감 | 모델이 읽을 변경 의미가 없다. 외부에서 풀면 입력 토큰은 돌아온다 |
-| 검색 임베딩 | 원문 대신 벡터를 색인하고 검색 결과 원문을 전달 | 관련 후보 연결·검색 | 모든 선택 변경의 근거를 보내는 절차를 대신하지 않는다 |
-| 학습된 memory·gist | 전용 decoder가 해석하는 잠재 표현 | 큰 압축의 연구 가능성 | 일반 텍스트 ACP에 그대로 넣을 수 없다. 모델·학습·서빙 변경이 필요하다 |
-| 추출형 신경 압축 | 작은 모델이 남긴 단어·문장 | 일반 텍스트 입력과 호환 | 제거된 부정·수치·조건·관계가 판단을 바꿀 수 있다 |
-| 문서 변경 표현 압축 | 전후 수정·공통 구간·문서 구조·참조 | 로컬 처리와 전체 변경 coverage를 함께 설계 가능 | 새로운 표현을 모델이 읽는 정확도는 별도 평가 필요 |
-| 변경 의도 기록 | 작성 시 남긴 목적·그룹·검증된 범위 | 커밋 때 의도를 다시 추론하는 비용 절감 | 원본 해시·잔여 변경 검사 없이 기록만 믿을 수 없다 |
+| gzip·zstd | Compressed bytes or base64 | Reduced storage and transfer size | No change semantics for the model to read. External decompression restores the input tokens |
+| Retrieval embeddings | Vectors are indexed instead of original text, and the original text from search results is passed along | Connecting and retrieving related candidates | Does not replace the procedure for sending evidence for every selected change |
+| Learned memory·gist | Latent representations interpreted by a dedicated decoder | Research potential for substantial compression | Cannot be inserted directly into ordinary text ACP. Requires changes to the model, training, and serving |
+| Extractive neural compression | Words and sentences retained by a small model | Compatible with ordinary text input | Removed negations, numbers, conditions, and relationships can change decisions |
+| Document change representation compression | Before/after edits, shared segments, document structure, and references | Local processing and full change coverage can be designed together | The accuracy with which the model reads the new representation requires separate evaluation |
+| Change intent records | Purpose, grouping, and verified scope recorded when authoring | Reduced cost of inferring intent again at commit time | Records alone cannot be trusted without checking original hashes and residual changes |
 
-### 임베딩이 무엇을 해결하는가
+### What embeddings solve
 
-Sentence-BERT는 문장을 유사도 비교에 쓸 벡터로 만드는 접근이다. 일반적인 사용은 벡터를 자연어 생성 모델에 diff의 대체 입력으로 넣는 것이 아니라 검색·군집화에 사용하는 것이다. [Sentence-BERT 논문](https://arxiv.org/abs/1908.10084), [Sentence Transformers 문서](https://www.sbert.net/docs/sentence_transformer/usage/semantic_textual_similarity.html)
+Sentence-BERT is an approach that converts sentences into vectors for similarity comparisons. Typically, these vectors are used for retrieval and clustering rather than fed to a natural language generation model as replacement input for a diff. [Sentence-BERT paper](https://arxiv.org/abs/1908.10084), [Sentence Transformers documentation](https://www.sbert.net/docs/sentence_transformer/usage/semantic_textual_similarity.html)
 
-현재 `AgentSession`은 `runOnce(text)`에서 ACP에 텍스트 content block을 전달한다. 임베딩 벡터를 latent input으로 해석하도록 연결한 경로가 없다. 숫자 배열을 프롬프트에 써 넣어도 이 벡터가 원래 diff의 의미로 변환되지는 않는다. 임베딩을 추가한다면 변경 구간을 관련 작업끼리 묶는 후보 생성에 쓰고, 실제 변경 근거는 별도로 보내는 설계가 맞다.
+Currently, `AgentSession` passes text content blocks to ACP through `runOnce(text)`. No path is connected to interpret embedding vectors as latent input. Writing a numeric array into a prompt does not convert that vector into the meaning of the original diff. If embeddings are added, the appropriate design is to use them to generate candidates for grouping changed regions by related tasks and send the actual change evidence separately.
 
-검색의 top-k는 일부 문서를 선택하는 방식이다. 모든 선택 파일을 배정해야 하는 커밋에서는 top-k 밖의 독립 수정도 남김없이 다뤄야 한다. 정확한 경로·API·링크·수치 관계는 어휘 검색과 구조 관계로 먼저 연결할 수 있다. 임베딩과 BM25를 결합하고 검색 결과 원문을 보내는 구조는 [Anthropic Contextual Retrieval](https://www.anthropic.com/engineering/contextual-retrieval)에서도 확인된다. 이를 커밋의 전량 분류에 그대로 적용하면 coverage 문제가 남는다는 것은 이 연구의 추론이다.
+Retrieval top-k selects a subset of documents. For commits that must assign every selected file, independent edits outside the top-k must also be handled without omission. Exact paths, APIs, links, and numeric relationships can first be connected through lexical retrieval and structural relationships. A structure combining embeddings with BM25 and sending the original search-result text is also described in [Anthropic Contextual Retrieval](https://www.anthropic.com/engineering/contextual-retrieval). The conclusion that applying this directly to exhaustive commit classification leaves a coverage problem is an inference from this research.
 
-임베딩의 손익 조건은 다음과 같다. 이 서버에서 모델 다운로드·로딩·CPU/GPU 인코딩 시간을 실측하지 않았으므로 임베딩이 항상 빠르거나 느리다고 결론 내리지 않는다.
+The tradeoffs for embeddings are as follows. Model download, loading, and CPU/GPU encoding times have not been measured on this server, so no conclusion is drawn that embeddings are always faster or slower.
 
 ```text
 추가 인코딩·검색·군집 비용
   < 없어진 AI 호출 준비·입력 처리 시간 - 늘어난 재확인·출력 시간
 ```
 
-낯선 표현이 많고 기존 색인·상주 모델이 있다면 유사한 수정들을 찾는 데 도움이 될 수 있다. 동일 수정·링크·필드 변경은 해시와 정확 일치로 찾을 수 있어 먼저 임베딩할 이유가 약하다. 유사도 점수를 동일 의미의 증명으로 취급해서는 안 된다. 부정·반의어가 섞인 유사도 평가의 어려움은 [SemAntoNeg 연구](https://aclanthology.org/2022.blackboxnlp-1.20/)에서도 다룬다.
+If there are many unfamiliar expressions and an existing index or resident model is available, embeddings may help find similar edits. Identical edits and link or field changes can be found through hashes and exact matching, so there is little reason to embed them first. Similarity scores must not be treated as proof of identical meaning. The difficulty of similarity evaluation involving negation and antonyms is also addressed in the [SemAntoNeg study](https://aclanthology.org/2022.blackboxnlp-1.20/).
 
-### 학습 압축 논문에서 가져올 것
+### What to take from learned compression papers
 
-[LLMLingua-2](https://aclanthology.org/2024.findings-acl.57/)는 bidirectional encoder의 토큰 분류로 남길 내용을 선택한다. 논문은 평가 과제에서 2~5배 압축과 1.6~2.9배 end-to-end 지연 개선을 보고한다. MeetingBank·LongBench 등의 결과이며 Mew의 한영 혼합 Markdown diff·커밋 분류·이 서버 CPU 성능 결과가 아니다. 반복 설명이 많은 새 문서의 본문을 줄이는 후속 후보로는 적합하지만, 조건·수치·링크·명령·코드·표를 보호한 상태에서 평가해야 한다. [공식 구현](https://github.com/microsoft/LLMLingua)
+[LLMLingua-2](https://aclanthology.org/2024.findings-acl.57/) selects content to retain through token classification by a bidirectional encoder. The paper reports 2–5× compression and 1.6–2.9× end-to-end latency improvements on evaluation tasks. These are results from MeetingBank, LongBench, and other benchmarks, not results for Mew's mixed Korean/English Markdown diffs, commit classification, or this server's CPU performance. It is a suitable follow-up candidate for reducing the body text of new documents with repetitive explanations, but it must be evaluated while protecting conditions, numbers, links, commands, code, and tables. [Official implementation](https://github.com/microsoft/LLMLingua)
 
-[Selective Context](https://aclanthology.org/2023.emnlp-main.391/)는 정보량에 따라 문맥의 일부를 제거한다. [Selection-p](https://aclanthology.org/2024.findings-emnlp.646/)도 토큰을 유지·제거할지 학습한다. 이런 방법의 과제 평균 점수가 높다고 모든 문서 변경의 작은 계약 차이를 보존하는 것은 아니다. 국소 부정이나 예외가 주된 수정인 diff에서는 삭제가 더 큰 영향을 줄 수 있다는 것은 적용상의 가설이다.
+[Selective Context](https://aclanthology.org/2023.emnlp-main.391/) removes portions of context based on information content. [Selection-p](https://aclanthology.org/2024.findings-emnlp.646/) also learns whether to retain or remove tokens. High average task scores for these methods do not mean they preserve small contract differences in every document change. The idea that deletion may have a greater impact on diffs whose primary edits are local negations or exceptions is a hypothesis about their application.
 
-[Gist tokens](https://arxiv.org/abs/2304.08467)는 학습한 모델과 attention mask를 사용해 프롬프트를 압축한다. 논문의 최대 26배 프롬프트 압축이 보고된 wall time 개선은 4.2%였다. **압축률과 완료 시간 개선률은 같지 않다.** [ICAE](https://arxiv.org/abs/2307.06945)도 학습한 memory slot과 이를 해석하는 모델을 사용한다. 두 방식 모두 표준 ACP 텍스트 입력 앞에 외부 임베딩을 붙이는 변경으로 얻을 수 있는 기능은 아니다.
+[Gist tokens](https://arxiv.org/abs/2304.08467) compress prompts using a trained model and attention masks. The paper reported a 4.2% wall time improvement with up to 26× prompt compression. **The compression ratio and the improvement in completion time are not the same.** [ICAE](https://arxiv.org/abs/2307.06945) also uses learned memory slots and a model that interprets them. Neither method is a capability obtainable by prepending external embeddings to standard ACP text input.
 
-압축률뿐 아니라 실제 과제 성능·원문 근거·정보 보존을 따로 평가해야 한다는 근거는 [정보 보존을 평가한 EMNLP 연구](https://aclanthology.org/2025.findings-emnlp.949/)에 있다. 여기서는 압축기 복원 검증과 모델 판단 검증을 별도 단계로 설계한다.
+An [EMNLP study evaluating information preservation](https://aclanthology.org/2025.findings-emnlp.949/) provides evidence that actual task performance, original-text evidence, and information preservation must be evaluated separately from compression ratio. Here, compressor reconstruction validation and model decision validation are designed as separate stages.
 
-## 실제 문서에서 한 로컬 실험
+## Local experiments on actual documents
 
-### 고정한 입력과 측정 범위
+### Fixed input and measurement scope
 
-기존 작업트리의 변경 문서 43개·181개 hunk를 별도 Git index로 고정했다. 기준 HEAD는 `74351efbf9cb73bb6230bdbc290167cfe36e3b68`, 선택 변경 tree는 `3d5b7661b36d168b1512a19e4d224ea144e4bc1c`이다. 전체 문서 폴더·아카이브를 재귀 로드하지 않고 선택된 변경 문서의 현재·기준 blob만 읽었다.
+The 43 changed documents and 181 hunks in the existing working tree were fixed using a separate Git index. The baseline HEAD is `74351efbf9cb73bb6230bdbc290167cfe36e3b68`, and the selected change tree is `3d5b7661b36d168b1512a19e4d224ea144e4bc1c`. Only the current and baseline blobs of the selected changed documents were read, without recursively loading the entire documentation folder or archives.
 
-환경은 Node `22.22.2`, Ryzen 5 9600X, `diff 9.0.0`, `markdown-it 14.3.0`, `yaml 2.9.1`이었다. 기준 토큰은 로컬 `tiktoken`의 `o200k_base`다. 운영 모델의 토크나이저·청구 사용량과 동일하다고 가정하지 않는다. 표의 입력에는 각 표현의 파일 목록·범위·형식 설명을 포함하고 공통 스킬·런타임 지침·모델 출력은 제외했다.
+The environment was Node `22.22.2`, Ryzen 5 9600X, `diff 9.0.0`, `markdown-it 14.3.0`, and `yaml 2.9.1`. Baseline tokens use `o200k_base` from local `tiktoken`. They are not assumed to match the production model's tokenizer or billed usage. The table's inputs include each representation's file list, scope, and format instructions, and exclude the shared skill, runtime instructions, and model output.
 
-Git diff의 주변 문맥은 3줄과 0줄을 비교했다. 전역 공백 무시·잘린 원문·AI 요약은 사용하지 않았다. 모든 표현은 같은 고정 문서 집합을 사용했다.
+Git diffs with 3 and 0 lines of surrounding context were compared. Global whitespace ignoring, truncated original text, and AI summaries were not used. Every representation used the same fixed document set.
 
-### 표현별 결과
+### Results by representation
 
-| 입력 표현 | 기준 토큰 | 3줄 Git 대비 절감 | 0줄 Git 대비 절감 | 보존하는 근거 |
+| Input representation | Baseline tokens | Reduction vs. 3-line Git | Reduction vs. 0-line Git | Evidence preserved |
 | --- | ---: | ---: | ---: | --- |
-| Git 3줄 문맥 | 51,025 | 기준 | — | 전량 변경·주변 3줄 |
-| Git 0줄 문맥 | 30,330 | 40.6% | 기준 | 전량 변경·주변 문맥 별도 |
-| 전후 문자열 JSON | 31,719 | 37.8% | -4.6% | 전량 변경. JSON 구조만 추가하면 오히려 증가 |
-| 공통 문자열을 한 번 기록 | 27,007 | 47.1% | 11.0% | 모든 hunk의 전후 문자열 복원 |
-| 위 표현과 동일 수정 사전 | 26,302 | **48.5%** | **13.3%** | 전량 변경 복원·반복 내용 1회 |
-| 각 수정에 주변 32자 부착 | 37,634 | 26.2% | -24.1% | 모든 바뀐 문자열. 문맥이 중복돼 증가 |
-| 겹친 문맥 통합·32자 후보와 전체 중 작은 것 | 23,925 | 53.1% | 21.1% | 모든 수정, 일부 바뀌지 않은 문맥은 생략 |
-| 위 적응 선택의 80자 후보 | 25,412 | 50.2% | 16.2% | 모든 수정, 문맥이 부족할 가능성은 남음 |
+| Git with 3 lines of context | 51,025 | Baseline | — | All changes and 3 surrounding lines |
+| Git with 0 lines of context | 30,330 | 40.6% | Baseline | All changes; surrounding context separate |
+| Before/after string JSON | 31,719 | 37.8% | -4.6% | All changes. Adding only JSON structure increases the size |
+| Record shared strings once | 27,007 | 47.1% | 11.0% | Reconstructs the before/after strings of every hunk |
+| Above representation plus a dictionary of identical edits | 26,302 | **48.5%** | **13.3%** | Reconstructs all changes; repeated content appears 1 time |
+| Attach 32 surrounding characters to each edit | 37,634 | 26.2% | -24.1% | All changed strings. Duplicated context increases the size |
+| Merge overlapping context; choose the smaller of the 32-character candidate and the full text | 23,925 | 53.1% | 21.1% | All edits; some unchanged context omitted |
+| 80-character candidate for the adaptive selection above | 25,412 | 50.2% | 16.2% | All edits; context may still be insufficient |
 
-**전체 hunk 복원과 의미 판단에 필요한 문맥 확보는 다르다.** 공통 문자열·사전 표현은 기준 파일에 적용해 결과 문서 전체가 원본과 같은지 검사했다. 주변 문맥 후보도 모든 문자 수정으로 결과를 복원하지만 모델에는 바뀌지 않은 문맥 일부를 주지 않는다. 조건의 주어·적용 범위가 그 부분에 있을 수 있으므로 53.1%를 의미 손실 없는 압축률이라고 부르지 않는다.
+**Reconstructing every hunk and obtaining the context needed to judge meaning are different things.** The shared-string and dictionary representations were applied to the baseline files to check whether the complete resulting documents matched the originals. The surrounding-context candidates also reconstruct the result from all character edits, but do not give the model some unchanged context. That context may contain the subject or scope of a condition, so 53.1% is not described as a compression ratio without semantic loss.
 
-공통 문자열 예시는 다음과 같다. 문자열 항목은 양쪽 공통 내용이며 쌍은 `[이전, 이후]`다. 구분자 모양을 원문에서 추측하는 대신 명시적 JSON 타입으로 구분한다.
+An example of shared strings follows. String entries are content shared by both sides, and pairs are `[이전, 이후]`. Explicit JSON types distinguish them instead of inferring delimiter patterns from the original text.
 
 ```json
 {"shared":["접근을 ",["허용한다","허용하지 않는다"],".\n"]}
 ```
 
-모델 입력만 이처럼 바꾼다. 실제 커밋 파일은 원본 전체이며 압축한 표현을 소스에 쓰지 않는다.
+Only the model input changes in this way. The actual committed files contain the complete original content; the compressed representation is not written to the source.
 
-### 시간과 구조 분류에서 확인한 것
+### Findings on timing and structural classification
 
-동일 스냅샷을 새 Node 프로세스에서 5회 측정했다. blob·hunk 읽기의 중앙값은 381ms, 3줄·0줄 기준과 여러 압축 후보를 모두 생성하는 준비 구간 중앙값은 917ms였다. 준비 구간의 범위는 894~1,009ms다. 이 값은 Git 스냅샷 생성·모듈 로딩·후속 AST 통계·합성 사례 생성·토큰화·ACP 준비·모델 호출·실제 커밋을 제외한다. 한 운영 후보만 생성하는 경로의 완료 시간이나 사용자 체감 시간이 아니다.
+The same snapshot was measured 5 times in fresh Node processes. The median time for reading blobs and hunks was 381 ms, and the median preparation time for generating both the 3-line and 0-line baselines and all compression candidates was 917 ms. Preparation ranged from 894 to 1,009 ms. These values exclude Git snapshot creation, module loading, subsequent AST statistics, synthetic case generation, tokenization, ACP preparation, model calls, and actual commits. They are not the completion time or user-perceived latency of a path that generates only one production candidate.
 
-보수적인 `markdown-it` token 구조와 YAML 값 비교에서는 43개 모두 Markdown 본문 구조 또는 내용이 달랐다. 내용이 같고 공백만 바뀐 문서로 분류할 수 있는 파일은 없었다. 문서 제목·링크·계약·UI 사용 안내 등이 함께 바뀌었다. 이 코퍼스에 공백 무시를 적용하면 대부분이 사라진다는 가설은 지지되지 않았다. 이 파서는 Mew의 모든 확장을 재현하는 의미 검증기는 아니다.
+A conservative comparison of `markdown-it` token structure and YAML values found differences in Markdown body structure or content in all 43 documents. No file could be classified as having identical content with only whitespace changes. Document titles, links, contracts, UI usage instructions, and other content changed together. The hypothesis that ignoring whitespace would eliminate most changes in this corpus was not supported. This parser is not a semantic validator that reproduces every Mew extension.
 
-gzip도 비교했다. 3줄 diff의 UTF-8 190,054바이트가 56,989바이트로 줄었고 처리에 약 5.5ms가 걸렸다. 하지만 base64 표현은 **51,891토큰**으로 원문 51,025보다 커졌다. 압축 바이트를 읽는 decoder를 호출하지 않고 모델이 이 값으로 변경을 이해할 수 있다고 가정하지 않았다. 이 사례에서는 저장·전송 압축도 AI 입력 절감으로 이어지지 않았다.
+gzip was also compared. The 3-line diff shrank from 190,054 UTF-8 bytes to 56,989 bytes, taking approximately 5.5 ms to process. However, its base64 representation was **51,891 tokens**, larger than the original 51,025. It was not assumed that the model could understand changes from this value without invoking a decoder that reads compressed bytes. In this case, storage and transfer compression did not reduce AI input.
 
-### 반복성과 새로운 정보의 차이
+### The difference between repetition and new information
 
-100개 문서에 동일 수정 또는 서로 다른 수정·추가를 만든 통제 사례다. 각 행 안에서 같은 문서 집합의 전후 문자열 JSON을 기준으로 비교한다. 실제 저장소 통계와 섞지 않는다.
+These are controlled cases with identical edits or different edits and additions across 100 documents. Within each row, comparisons use before/after string JSON for the same document set as the baseline. These results are not mixed with actual repository statistics.
 
-| 합성 변경 | 전후 JSON | 공통 문자열·사전 | 절감 | 해석 |
+| Synthetic change | Before/after JSON | Shared strings and dictionary | Reduction | Interpretation |
 | --- | ---: | ---: | ---: | --- |
-| 같은 긴 문장의 같은 조건 수정 100건 | 42,550 | 4,751 | **88.8%** | 규칙·근거 1회와 적용 목록으로 큰 절감 |
-| 서로 다른 긴 문장의 국소 수정 100건 | 82,550 | 44,350 | 46.3% | 파일 간 중복이 없어도 전후 공통 문장은 절감 |
-| 동일 새 문서 내용 100건 | 37,450 | 4,883 | **87.0%** | 동일 추가 내용을 한 번 제공 |
-| 서로 다른 새 내용 100건 | 71,774 | 71,874 | -0.1% | 중복이 없으면 사전 비용만 더해짐 |
+| 100 identical condition edits in the same long sentence | 42,550 | 4,751 | **88.8%** | Large reduction from providing the rule and evidence 1 time plus a list of applications |
+| 100 local edits in different long sentences | 82,550 | 44,350 | 46.3% | Shared before/after sentence content reduces size even without duplication across files |
+| 100 instances of identical new document content | 37,450 | 4,883 | **87.0%** | Identical added content provided once |
+| 100 different additions of new content | 71,774 | 71,874 | -0.1% | Without duplication, the dictionary only adds overhead |
 
-서로 다른 긴 문장의 국소 수정에서는 적응 32자 문맥 후보가 8,767토큰으로 줄었다. 다만 바뀌지 않은 긴 문장의 정보를 생략한 결과이며 의미 보존·모델 판단은 검증하지 않았다. 합성 89.4% 절감을 실제 문서 43개의 성과로 인용하면 안 된다.
+For local edits in different long sentences, the adaptive 32-character context candidate reduced the input to 8,767 tokens. However, this resulted from omitting information in unchanged portions of long sentences; semantic preservation and model decisions were not validated. The synthetic 89.4% reduction must not be cited as a result for the 43 actual documents.
 
-프로토타입은 문자 길이를 기준으로 후보를 골랐다. 일부 합성 추가에서는 문자가 줄어도 토큰은 증가했다. 운영 구현은 실제 런타임에 맞는 토크나이저나 확인 가능한 보수적 예산으로 비교하고, 압축이 불리하면 원래 표현을 사용해야 한다. 짧은 숫자 ID와 JSON이 무조건 토큰을 줄인다는 가정도 하지 않는다.
+The prototype selected candidates based on character length. In some synthetic additions, token counts increased even as character counts decreased. A production implementation must compare candidates using a tokenizer appropriate for the actual runtime or a verifiable conservative budget, and use the original representation when compression is unfavorable. It must also not assume that short numeric IDs and JSON always reduce tokens.
 
-## 권장하는 문서용 변경 표현
+## Recommended change representation for documents
 
-### 파일과 조각보다 문서 구조를 우선한다
+### Prioritize document structure over files and chunks
 
-문서를 frontmatter, 제목 계층, 문단, 목록 항목, 표 행·셀, 코드 블록, 링크, HTML·주석으로 나눈다. 각 변경에 이전/이후 blob, 구조 위치, 변경 표현, 전체 원본 참조를 연결한다. 이동한 문단도 이전·이후의 상위 제목을 함께 보존한다. 같은 문장이 금지 항목에서 권장 항목으로 이동하면 의미가 달라질 수 있다.
+Split documents into frontmatter, heading hierarchies, paragraphs, list items, table rows and cells, code blocks, links, and HTML and comments. Associate each change with its before/after blobs, structural location, change representation, and complete original references. Preserve the before/after parent headings for moved paragraphs as well. The same sentence can change meaning when moved from a prohibition to a recommendation.
 
-변경 구간의 상태는 다음 세 가지가 필요하다. 단순한 전체/부분 조각 구분만으로는 모든 변경을 표현했는지 알 수 없다.
+Changed regions need the following three states. Simply distinguishing complete from partial chunks does not show whether every change is represented.
 
-| 상태 | 뜻 | 다음 행동 |
+| State | Meaning | Next action |
 | --- | --- | --- |
-| 전체 변경 표현 | hunk의 전후 문자열이 모두 표현됨 | 메시지 판단에 충분하면 사용 |
-| 구조적으로 검증한 수정 | 지정한 필드·링크·위치의 규칙 적용과 잔여 diff가 검증됨 | 규칙 근거를 공유하고 모든 적용 대상을 배정 |
-| 문맥 확인이 필요한 수정 | 모든 수정은 있지만 적용 범위·의도가 모호함 | 해당 문단·제목·연결 구간을 추가 제공 |
+| Complete change representation | All before/after strings in the hunk are represented | Use if sufficient for deciding the message |
+| Structurally verified edit | Rule application at the specified fields, links, and locations, along with the residual diff, has been verified | Share rule evidence and assign every application target |
+| Edit requiring context review | All edits are present, but scope or intent is unclear | Provide the relevant paragraphs, headings, and connected regions as additional context |
 
-### 동일 수정은 규칙과 적용 목록으로 보낸다
+### Send identical edits as a rule and a list of applications
 
-예를 들어 300개 문서의 같은 안내 문구가 바뀌면 대표 수정 하나와 문서·구간 ID 목록을 제공한다. 대표만 읽고 나머지를 같은 것으로 추측하지 않는다. 모든 적용 대상에서 이전 문자열·이후 문자열·구조 위치가 규칙과 맞고, 별도의 잔여 변경이 없는지 로컬에서 검사한다. 잔여 변경이 있으면 별도 변경으로 남긴다.
+For example, if the same guidance text changes in 300 documents, provide one representative edit and a list of document and region IDs. Do not read only the representative edit and assume the rest are identical. Locally check that the before string, after string, and structural location match the rule at every application target, and that there are no separate residual changes. If residual changes exist, retain them as separate changes.
 
-규칙 후보는 정확한 전후 문자열, frontmatter 키·값, 제목 수정, 링크 라벨·대상, 표의 지정 셀, 완전히 같은 삽입·삭제 블록으로 찾는다. 서로 비슷한 prose를 해시로 동일시하거나 줄 번호만으로 묶지 않는다. 의미적 군집은 메시지 후보에 쓸 수 있지만 규칙의 동일성을 증명하지 않는다.
+Find rule candidates using exact before/after strings, frontmatter keys and values, heading edits, link labels and targets, specified table cells, and completely identical insertion or deletion blocks. Do not treat similar prose as identical through hashing or group it solely by line number. Semantic clusters can be used for message candidates, but do not prove that rules are identical.
 
-**앞으로 큰 절감을 기대할 부분은 전량을 더 세게 자르는 것보다 반복을 한 번 판단하는 것이다.** 규칙·대상·예외가 완전히 검증된 기계적 수정은 표준 메시지 생성까지 로컬에서 처리하는 경로도 가능하다. 사용자 스킬이 요구하는 메시지·분할 규칙을 만족하는 범위에서만 적용하고, 일반 prose의 의미 판단까지 규칙으로 확정하지 않는다. 이 0회 AI 경로는 제안이며 구현하지 않았다.
+**The largest potential savings ahead come from evaluating repetition once, rather than cutting the entire input more aggressively.** For mechanical edits whose rules, targets, and exceptions are fully verified, a path that handles even standard message generation locally is also possible. Apply it only where it satisfies the message and splitting rules required by user skills, and do not use rules to settle semantic judgments about general prose. This 0-AI-call path is a proposal and has not been implemented.
 
-### 긴 문장의 공통 부분은 한 번만 보낸다
+### Send shared parts of long sentences only once
 
-전후 문장 전체를 각각 보내기보다 공통 부분과 변경 쌍을 사용한다. 삭제·삽입·부정·수치·명령·링크를 생략하지 않는다. 복원 검사는 압축기 버그를 잡는다. 새로운 표현의 지침과 구조 비용을 포함해도 이득인 경우만 선택한다.
+Use shared text and change pairs instead of sending each full before-and-after sentence. Do not omit deletions, insertions, negations, numbers, commands, or links. Reconstruction checks catch compressor bugs. Select this approach only when it saves space even after accounting for instructions for the new representation and structural overhead.
 
-Git의 `--word-diff=plain`은 원문 속 구분자를 escaping하지 않아 모호할 수 있고, 기본 단어 비교는 공백을 기준으로 한다. 따라서 표시용 plain 문자열을 무손실 codec으로 취급하지 않는다. [공식 Git diff 문서](https://git-scm.com/docs/git-diff). 프로토타입은 `diffChars`와 타입이 분명한 JSON을 사용했으며, 연산이 오래 걸리면 전체 전후 문자열로 돌아간다. [JsDiff 계약](https://github.com/kpdecker/jsdiff)
+Git's `--word-diff=plain` can be ambiguous because it does not escape delimiters in the source, and default word comparison uses whitespace boundaries. Therefore, do not treat plain display strings as a lossless codec. [Official Git diff documentation](https://git-scm.com/docs/git-diff). The prototype used `diffChars` and explicitly typed JSON, falling back to full before-and-after strings when computation takes too long. [JsDiff contract](https://github.com/kpdecker/jsdiff)
 
-### 문맥을 줄이는 경우에는 겹침과 관계를 보존한다
+### Preserve overlaps and relationships when reducing context
 
-각 문자 변경에 일정 문맥을 무조건 붙이면 작은 변경이 많은 문장에서 같은 내용이 여러 번 나타난다. 가까운 변경은 같은 문장·구조 구간으로 합친다. 남은 문맥이 불충분하면 문단을 확장한다. 고유한 새 문단·삭제한 계약·코드 블록은 원문 전체를 보내는 쪽이 짧거나 더 명확할 수 있다.
+Unconditionally attaching a fixed amount of context to each character change repeats the same content in sentences with many small changes. Merge nearby changes into the same sentence or structural span. Expand to the paragraph if the remaining context is insufficient. For unique new paragraphs, deleted contracts, and code blocks, sending the full source may be shorter or clearer.
 
-Markdown의 빈 줄·들여쓰기·두 칸 뒤 공백은 목록 구조·코드·강제 줄바꿈에 영향을 준다. frontmatter의 `title`·`parent`·`status`도 Mew 동작과 연결된다. 전체 공백 삭제나 prose의 불용어 제거는 기본 경로로 두지 않는다. [CommonMark 명세](https://spec.commonmark.org/0.31.2/), [GFM의 표·체크 목록 확장](https://github.github.com/gfm/). 실제 Mew 확장과 renderer에 맞춘 검증이 있어야 기계적 형식 변경으로 분류할 수 있다.
+Markdown blank lines, indentation, and two trailing spaces affect list structure, code, and hard line breaks. The frontmatter fields `title`, `parent`, and `status` also affect Mew behavior. Do not make removing all whitespace or removing stop words from prose the default path. [CommonMark specification](https://spec.commonmark.org/0.31.2/), [GFM table and task list extensions](https://github.github.com/gfm/). Validation against the actual Mew extensions and renderer is required before classifying a change as mechanical formatting.
 
-## 커밋 때 분석을 다시 하지 않는 장기 방안
+## A long-term approach to avoiding repeated analysis at commit time
 
-편집·에이전트 작업이 끝날 때 목적, 관련 파일, 한 작업으로 묶은 이유, 전후 blob·블록 hash, 실제 확인한 검증을 작은 변경 기록에 남긴다. 같은 문구를 여러 문서에 적용하는 기능은 규칙·대상·예외를 함께 기록할 수 있다. 커밋 때는 기록과 현재 고정 스냅샷의 일치를 확인하고 **그 기록에 없는 잔여 변경만 분석**한다.
+When editing or agent work ends, leave a small change record containing the purpose, related files, why they form one task, before-and-after blob and block hashes, and verification actually performed. Features that apply the same wording to multiple documents can record rules, targets, and exceptions together. At commit time, check that the records match the current fixed snapshot and **analyze only the remaining changes absent from those records**.
 
-이것은 요약을 그대로 신뢰하는 캐시와 다르다. 다른 작업의 후속 편집·수동 변경·리베이스·선택 범위 변경으로 hash가 달라지면 영향을 받는 기록을 무효화한다. 여러 작업이 한 파일을 수정한 경우 파일 단위 커밋 제약을 먼저 해결한다. 기록은 선택 파일의 커밋 승인이나 현재 stage 상태를 대신하지 않는다. 계정·저장소 경계 안에 보관하고 원문·비밀값을 불필요하게 복제하지 않는다.
+This differs from a cache that trusts summaries as-is. If subsequent edits from other tasks, manual changes, rebases, or selection changes alter the hashes, invalidate the affected records. If multiple tasks modify one file, resolve file-level commit constraints first. Records do not replace commit approval for selected files or the current staging state. Keep them within account and repository boundaries, and avoid unnecessarily duplicating source text or secrets.
 
-현재 프로젝트에는 이 목적의 검증된 변경 기록 경로가 없다. 이번 변경의 과거 의도를 기록 없이 복원했다고 주장하지 않는다. 다만 앞으로 반복적인 문서 작업이 많다면 커밋 시점의 임베딩보다 작업 시점의 작은 의도 기록이 더 큰 지연 절감을 만들 가능성이 있다. 이 효과는 후속 측정 과제다.
+The project currently has no verified change-recording path for this purpose. We do not claim to have reconstructed the past intent of these changes without records. However, if repetitive documentation work becomes common, small intent records made during the work may reduce latency more than embeddings at commit time. Measuring this effect remains a follow-up task.
 
-## 실행 흐름과 지연 예산
+## Execution flow and latency budget
 
 ```mermaid
 flowchart TD
@@ -199,11 +199,11 @@ flowchart TD
   G --> H[원본 전체 커밋]
 ```
 
-첫 입력은 파일 목록만이 아니라 규칙·전체 변경 근거를 포함한다. 목적은 보통 1회 계획으로 끝나는 것이며, 의미가 다른 변경이 많은 경우에는 누락 없이 추가 묶음을 처리한다. 3회라는 고정 호출 제한을 모든 크기에 적용하는 것은 해결책이 아니다. 시간·입력·출력 예산은 사전에 알리고, 더 읽을 수 없는 상태를 내용상의 불확실성과 구분해야 한다.
+The first input includes rules and evidence for all changes, not just a file list. The goal is usually to finish planning in 1 call, while processing additional batches without omissions when many changes differ in meaning. Applying a fixed limit of 3 calls to every input size is not a solution. State time, input, and output budgets in advance, and distinguish inability to read more from uncertainty about the content.
 
-문서만 있는 경우와 코드·테스트가 섞인 경우의 입력 예산을 분리해 볼 수 있다. `parent`·frontmatter의 `files`·같은 기능 문서·실제 변경 표현·링크 관계는 그룹 후보의 근거다. 디렉터리나 공통 단어 하나로 모든 파일을 강하게 연결하지 않는다. 관련 코드와 문서가 같은 변경이면 최종 그룹에서 함께 묶고, 여러 관심사가 한 파일에 있으면 파일 단위 제약에 맞게 묶거나 범위를 조정한다. 무조건 문서만 별도 커밋하는 정책을 새로 만들지 않는다.
+Separate input budgets could be considered for documentation-only changes and changes mixing code and tests. `parent`, frontmatter `files`, documents for the same feature, actual change representations, and link relationships provide evidence for candidate groups. Do not strongly connect every file based on a directory or a single shared word. If related code and documentation are part of the same change, group them together in the final groups. If a file contains multiple concerns, group them or adjust the scope to satisfy file-level constraints. Do not introduce a policy that always commits documentation separately.
 
-분할이 필요하면 독립 묶음의 제한된 동시 분석을 비교할 수 있다. 동일 ACP 세션의 병렬 prompt는 현재 `busy` 계약과 맞지 않으므로 별도 세션·요청 제한이 필요하다. 병렬화는 벽시계 시간을 줄일 가능성이 있지만 읽는 총 토큰을 줄이지 않는다. 시작·종료 비용과 rate limit을 함께 측정한다. 같은 작업의 후속 확인에 세션을 재사용하는 안은 준비 비용 대신 누적 문맥 비용을 늘릴 수 있다.
+If splitting is needed, compare bounded concurrent analysis of independent batches. Parallel prompts within the same ACP session conflict with the current `busy` contract, so separate sessions and request limits are required. Parallelization may reduce wall-clock time but does not reduce the total tokens read. Measure startup and shutdown overhead together with rate limits. Reusing a session for follow-up checks on the same task may increase accumulated context costs in exchange for lower setup costs.
 
 ```text
 전체 시간 = 로컬 수집·압축
@@ -211,46 +211,46 @@ flowchart TD
           + 스냅샷 재검증·Git hook·서명·커밋
 ```
 
-현재 로그의 호출 완료 시간만으로 이 항목들을 분리할 수 없다. 준비 시작/끝, 첫 토큰, 마지막 토큰, 호출 종료, 전체·캐시·출력·추론 사용량, 원본 추가 요청량, 결과 coverage를 수집해야 한다. `AgentSession`은 `turn_end.durationMs`와 사용량 관련 meta 경로를 갖지만 자동 커밋의 작업별 비용 분해는 연결돼 있지 않다. 런타임에서 제공하지 않는 사용량은 결측으로 표시한다.
+Call completion times in the current logs cannot separate these components. Collect preparation start/end, first token, last token, call end, total/cache/output/reasoning usage, the amount of additional source requested, and result coverage. `AgentSession` has `turn_end.durationMs` and usage-related meta paths, but per-task cost breakdowns for automatic commits are not connected. Mark usage unavailable from the runtime as missing.
 
-입력만 줄이고 긴 분석·반복 스킵 이유·모든 경로의 재출력을 유지하면 완료 시간이 기대만큼 줄지 않을 수 있다. 메시지는 변경의 목적 위주로 간결하게 만들고 내부 파일 ID를 모델 응답에서 사용할 수 있게 하는 안을 검토한다. 서버가 ID를 경로로 복원해 기존 전량 배정 검사와 같은 검증을 수행해야 한다. 132건에 같은 스킵 사유를 출력했던 경로는 특히 줄일 대상이다.
+Reducing only the input while retaining lengthy analysis, repeated skip reasons, and repeated output of every path may not reduce completion time as much as expected. Consider concise messages focused on the purpose of the changes and allowing internal file IDs in model responses. The server must restore IDs to paths and perform validation equivalent to the existing complete-assignment check. The path that output the same skip reason for 132 items is a particular target for reduction.
 
-공급자 prefix 캐시는 반복 지침·같은 입력의 처리 비용을 줄이는 보조 수단이다. 처음 읽는 고유한 변경을 없애지는 않는다. 동일 prefix·캐시 hit 사용량을 확인하고 ACP 런타임이 캐시 제어를 지원하는지 검증해야 한다. [Claude의 공식 캐시 계약](https://platform.claude.com/docs/en/build-with-claude/prompt-caching). 로컬 구조·hash 캐시는 모델 호출 전 재계산을 줄이며, 필드·구간 해시를 사용해야 앞쪽 편집 때문에 모든 조각이 무효화되는 일을 줄일 수 있다.
+Provider prefix caching is a supplementary way to reduce the processing cost of repeated instructions and identical input. It does not eliminate unique changes being read for the first time. Verify identical prefixes, cache-hit usage, and whether the ACP runtime supports cache control. [Claude's official caching contract](https://platform.claude.com/docs/en/build-with-claude/prompt-caching). Local structure and hash caches reduce recomputation before model calls; field and span hashes are needed to reduce invalidation of every chunk after an edit near the beginning.
 
-## 도입 전에 통과해야 할 평가
+## Evaluations required before adoption
 
-기존 커밋 벤치마크는 대체로 이미 정해진 단일 커밋의 메시지 생성이다. [Long Code Arena](https://arxiv.org/html/2406.11612v1)의 large commit 과제와 [CommitBench](https://arxiv.org/abs/2403.05188)는 참고가 되지만, Mew의 미커밋 변경 분할·문서·한국어·전량 처리 평가를 대신하지 않는다. BLEU·ROUGE 같은 문장 유사도만으로 올바른 그룹·누락 없는 커밋을 판정하지 않는다.
+Existing commit benchmarks mostly generate messages for a single commit whose contents are already determined. The large commit task in [Long Code Arena](https://arxiv.org/html/2406.11612v1) and [CommitBench](https://arxiv.org/abs/2403.05188) are useful references, but do not replace evaluation of Mew's uncommitted-change splitting, documentation, Korean, and complete processing. Do not judge correct grouping or omission-free commits solely by sentence similarity metrics such as BLEU and ROUGE.
 
-비교군은 원문 전체, 현재 발췌 경로, 완전한 공통 문자열·사전, 구조 규칙·잔여 변경, 적응 문맥, 보호 구간을 둔 신경 압축이다. 같은 스냅샷·모델·추론 강도·스킬을 고정하고 최초 실행과 동일 변경 재시도를 별도로 비교한다.
+Comparison groups are full source text, the current excerpt path, complete shared strings and dictionaries, structural rules and remaining changes, adaptive context, and neural compression with protected spans. Fix the same snapshot, model, reasoning effort, and skills, and compare initial runs separately from retries of the same changes.
 
-| 평가축 | 지표·합격 기준 제안 |
+| Evaluation dimension | Proposed metrics and acceptance criteria |
 | --- | --- |
-| 완전성 | 선택 파일·hunk·수정 구간 coverage 100%; 단순 크기 사유의 스킵 0건 |
-| 복원 | 모든 UTF-8 문서·전후 mode·삽입·삭제·마지막 개행의 원본 일치 |
-| 의미 | 부정·예외·수치·역할·링크 대상·표 셀·명령·체크 상태 변경의 누락 여부 |
-| 그룹 | 사람이 정한 독립 작업의 분리·잘못된 합침·같은 기능의 코드/문서 분리 여부 |
-| 메시지 | 사실 오류·빠진 주요 목적·근거 없는 테스트/검토 주장 |
-| 속도 | 동일 처리 coverage에서 p50·p95 전체 시간, 호출 수, 첫 토큰 대기 |
-| 비용 | 누적 입력·캐시·출력·추론 토큰, 재시도·복원 비용 포함 |
-| 운영 | stage 보존·경합·취소·부분 성공·권한·사용자 스킬 보존 |
+| Completeness | Selected file, hunk, and modified-span coverage of 100%; 0 skips solely due to size |
+| Reconstruction | Exact source matches for all UTF-8 documents, before-and-after modes, insertions, deletions, and final newlines |
+| Semantics | Whether changes to negations, exceptions, numbers, roles, link targets, table cells, commands, or checkbox states are omitted |
+| Grouping | Separation of human-defined independent tasks, incorrect merging, and separation of code and documentation for the same feature |
+| Messages | Factual errors, missing main purposes, and unsupported claims of testing or review |
+| Speed | p50 and p95 total time, call count, and time to first token at equal processing coverage |
+| Cost | Cumulative input, cache, output, and reasoning tokens, including retry and reconstruction costs |
+| Operations | Staging preservation, contention, cancellation, partial success, permissions, and preservation of user skills |
 
-고정 사례에는 동일 수정 100/1,000건, 고유 prose 100건, 긴 문장 한 단어, 한 파일 안의 두 작업, 섹션 이동, 링크·이미지 대상 변경, 표/코드/HTML 변경, 마지막 개행, 중간에 숨은 조건 반전, 구조만 비슷한 서로 다른 계약을 포함한다. 실제 43개 문서 집합과 합성 집합은 따로 보고한다. 압축 원문을 사람이 복원할 수 있다는 것만으로 모델의 정확도를 통과시키지 않는다.
+Fixed cases include 100/1,000 identical edits, 100 unique prose items, one word in a long sentence, two tasks in one file, section moves, link and image target changes, table/code/HTML changes, final newlines, a condition reversal hidden in the middle, and different contracts with similar structure. Report the actual set of 43 documents separately from synthetic sets. Human ability to reconstruct compressed source alone does not establish that the model passes the accuracy evaluation.
 
-제안 도입 순서는 다음과 같다.
+The proposed adoption order is as follows.
 
-1. **계측·스킵 사유 분리:** 입력 부족이 커밋 완료로 조용히 끝나는 문제를 관찰 가능하게 만든다.
-2. **문서의 완전한 변경 표현:** 반복 지침·staged 참고 중복을 줄이고 공통 문자열·동일 수정 사전을 사용한다. 잔여 diff와 전체 결과를 검증한다.
-3. **구조 규칙과 그룹 후보:** 검증 가능한 반복 수정부터 적용하고 전체 모델 평가를 통과한 다음 확대한다.
-4. **변경 의도 기록·구간 캐시:** 새 작업부터 적용하며 기록 없는 변경은 완전한 변경 표현으로 처리한다.
-5. **임베딩·신경 압축 실험:** 위 경로로 남는 큰 고유 변경이 지연을 지배하는지 확인한 뒤 비교한다.
+1. **Instrumentation and separate skip reasons:** Make it observable when insufficient input silently ends as a completed commit.
+2. **Complete change representations for documents:** Reduce repeated instructions and duplicate staged references, and use shared strings and identical-edit dictionaries. Validate the remaining diff and the complete result.
+3. **Structural rules and candidate groups:** Start with verifiable repetitive edits and expand after passing the full model evaluation.
+4. **Change intent records and span caches:** Apply them to new work, and handle changes without records using complete change representations.
+5. **Embedding and neural compression experiments:** Compare them after checking whether large unique changes remaining in the paths above dominate latency.
 
-첫 실험의 목표는 현재 남은 변경을 실제로 처리하면서 모델 호출 수를 줄이는 것이다. 90% 토큰 절감이나 몇 초 완료를 먼저 약속하지 않는다. 같은 coverage와 판단 품질에서 얻은 p50·p95가 근거가 돼야 한다.
+The first experiment aims to reduce model calls while actually processing the currently remaining changes. Do not promise 90% token savings or completion in a few seconds upfront. Evidence must come from p50 and p95 measurements at equal coverage and judgment quality.
 
-## 재현 도구와 확인한 범위
+## Reproduction tools and verified scope
 
-[오프라인 실험 도구](../../../server/git-doc-compression-benchmark.ts)는 `{head,tree,files}`를 받아 고정된 Markdown blob과 Git U0 hunk를 읽고 후보를 생성한다. 원본 복원·mode 목록 보존을 검사하고, 필요하면 입력을 private 임시 폴더에 저장한다. AI 호출·stage·커밋·서버 변경은 수행하지 않는다. 현재 잠금 파일에 있는 `diff` 의존성을 연구용으로 사용하며 운영 경로에 도입할 때는 명시적 의존성 여부도 정리해야 한다. UTF-8 일반 파일만 대상으로 하며 바이너리·symlink에는 별도 표현이 필요하다.
+The [offline experiment tool](../../../server/git-doc-compression-benchmark.ts) accepts `{head,tree,files}`, reads fixed Markdown blobs and Git U0 hunks, and generates candidates. It checks source reconstruction and mode-list preservation, and optionally saves input in a private temporary folder. It performs no AI calls, staging, commits, or server changes. It uses the `diff` dependency in the current lockfile for research; whether to declare it as an explicit dependency must also be resolved when introducing it into the production path. It targets only UTF-8 regular files; binaries and symlinks require separate representations.
 
-현재 변경의 새 스냅샷은 다음과 같이 만들 수 있다. 최초 실측의 Git 객체가 남아 있을 때만 같은 코퍼스를 재현할 수 있으며, 새 clone이나 Git GC 이후에는 동일 객체가 없을 수 있다. 아래 명령은 그 시점의 새 변경을 측정하므로 이 문서의 숫자와 같다는 보장은 없다.
+A new snapshot of the current changes can be created as follows. The same corpus can be reproduced only while the Git objects from the initial measurement remain; the same objects may be absent in a new clone or after Git GC. The commands below measure new changes at that point in time, so the results are not guaranteed to match the numbers in this document.
 
 ```bash
 node --input-type=module <<'JS' > /tmp/mew-doc-snapshot.json
@@ -264,10 +264,10 @@ node server/git-doc-compression-benchmark.ts --snapshot /tmp/mew-doc-snapshot.js
 node --test server/git-doc-compression-benchmark.test.ts
 ```
 
-이 스냅샷 예시는 tracked 문서의 변경만 선택한다. 새 미추적 문서를 측정하려면 명시적인 선택 목록에 추가한다.
+This snapshot example selects only changes to tracked documents. To measure new untracked documents, add them to the explicit selection list.
 
-기준 토큰은 같은 임시 파일의 문자열 전체를 `tiktoken.get_encoding('o200k_base').encode(text, disallowed_special=())`로 측정했다. 스킬·모델 출력·시스템 지침을 합산한 비용 실험은 아니다. `--emit-directory` 없이 실행하면 원문 입력 파일은 저장하지 않는다. 임시 원문은 문서나 Git에 추가하지 않는다.
+Baseline tokens were measured with `tiktoken.get_encoding('o200k_base').encode(text, disallowed_special=())` over the entire string in the same temporary file. This is not a cost experiment that includes skills, model output, and system instructions. Running without `--emit-directory` does not save source input files. Do not add temporary source text to documents or Git.
 
-복원 테스트는 부정·숫자·링크·표·fence·HTML 주석·들여쓰기·목록 빈 줄·강제 줄바꿈·Unicode·CRLF·삽입/삭제·마지막 개행과 60개 결정적 변형을 포함한다. 실제 43개 문서 및 4종 100문서 합성 집합의 전량 복원도 실험 중 검사했다. 이 확인은 압축기의 데이터 보존 검사이며, 운영 모델의 커밋 판단 품질 검사는 후속 과제로 남는다.
+Reconstruction tests cover negations, numbers, links, tables, fences, HTML comments, indentation, blank lines in lists, hard line breaks, Unicode, CRLF, insertions/deletions, final newlines, and 60 deterministic variations. Complete reconstruction of the actual 43 documents and 4 types of synthetic 100-document sets was also checked during the experiments. These checks verify the compressor's data preservation; evaluation of the production model's commit judgment quality remains a follow-up task.
 
-연구 도구의 4개 테스트, TypeScript와 대상 lint 검사를 통과했다.
+The research tool passed 4 tests, TypeScript checks, and targeted lint checks.

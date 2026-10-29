@@ -1,30 +1,30 @@
 ---
-title: "커스텀 테마 색상 배치와 방향 조절 개선"
-description: "2026-10-27 커스텀 테마의 색상 묶음·제목 옆 저장/삭제 아이콘·24px 원형 방향 조절·겹쳐 열리는 컬러피커 구현과 격리 Chromium·타입·린트 검사 결과, 기존 문서 링크 오류 및 미배포 범위를 기록한다."
+title: "Improved Custom Theme Color Layout and Direction Controls"
+description: "Records the 2026-10-27 implementation of grouped custom theme colors, save/delete icons beside the title, a 24px circular direction control, and an overlay color picker, along with isolated Chromium, type, and lint check results, existing documentation link errors, and the scope not deployed."
 created: "2026-10-27"
 updated: "2026-10-27"
 ---
 
-색상 선택이 여러 행에 흩어지고 컬러피커가 아래 설정을 밀어내는 문제를 개선했다. 현재 조작은 [화면 설정](../../../docs/configuration/appearance.md#화면-설정), 세부 동작은 [화면 설정 기능 계약](../features/%ED%99%94%EB%A9%B4%C2%B7%EA%B3%84%EC%A0%95%C2%B7%EC%9A%B4%EC%98%81/%ED%99%94%EB%A9%B4%C2%B7%EC%96%B8%EC%96%B4%C2%B7%EA%B8%80%EA%BC%B4%C2%B7%EB%8B%A8%EC%B6%95%ED%82%A4%20%EC%84%A4%EC%A0%95.md), 좌표 계산은 [공용 팝업 계약](../development/ui-contracts.md#모달-내부-팝업-좌표)이 소유한다.
+Improved the layout where color choices were scattered across multiple rows and the color picker pushed settings below it down. Current controls are owned by [Appearance settings](../../../docs/configuration/appearance.md#appearance-settings), detailed behavior by the [Appearance settings feature contract](../features/appearance-accounts-operations/appearance-language-fonts-and-shortcuts.md), and coordinate calculations by the [Shared popup contract](../development/ui-contracts.md#popup-coordinates-inside-modals).
 
-## 구현 결과
+## Implementation results
 
-- 배경·그라데이션·글씨·주요색을 한 영역에 모았다. 좁은 화면에서는 글씨색·주요색이 함께 줄을 바꾼다.
-- 방향 슬라이더를 색상 네모와 같은 24px 시계형 그래픽과 숫자 입력으로 교체했다. 드래그·키보드·숫자 입력이 같은 각도를 조절하며, 터치 조작 영역은 44px다.
-- compact 피커는 기존 공용 좌표 계산으로 fixed 레이어에 표시한다. 아래 폼의 높이·저장 버튼 위치와 Tab·Esc·뒤로가기 순서를 유지한다. 그림판의 일반 피커는 인라인 표시를 유지한다.
+- Grouped background, gradient, text, and primary colors in one area. On narrow screens, text and primary colors wrap together.
+- Replaced the direction slider with a 24px clock-style graphic matching the color squares and a numeric input. Dragging, keyboard controls, and numeric input adjust the same angle, and the touch target is 44px.
+- The compact picker appears in a fixed layer using the existing shared coordinate calculations. Preserves the height of the form below, the save button position, and the Tab, Esc, and Back handling order. The paint app's regular picker remains inline.
 
-## 검증
+## Verification
 
-- `node --test server/theme-color-ui.test.ts server/theme-gradient-angle-ui.test.ts server/fixed-popup-ui.test.ts src/utils/theme-color.test.ts`: 22개 통과, 건너뜀 없음. 실제 앱 서버를 실행하지 않고 메모리 fixture와 Chromium으로 검사했다.
-- 테마 설정은 320/390/1100px·라이트/다크에서 색상 묶음·피커의 화면 경계·높이와 저장 버튼 위치 유지·가림 위 입력·기존 저장/취소/초기화·Esc/뒤로가기·네 언어를 확인했다. 데스크톱과 좁은 화면 캡처도 확인했다.
-- 원형 조절은 PC·터치에서 24px 크기, 실제 배경과 같은 네 방향, 영역 밖 포인터 캡처·취소·재조작, 숫자 정규화·빈 입력 복원, 방향키·Page Up/Down·Home/End를 확인했다.
-- `npx tsc -b` 통과. 변경한 코드·테스트의 `oxlint`는 오류 없이 완료했으며 ref 접근·기존 effect 상태 동기화 경고가 남았다. `impeccable detect --json --scope layout`은 발견 항목이 없었다.
-- 전체 `npm run check:docs`의 description 검사는 통과했으나 링크 검사는 작업 전부터 삭제·이동 중인 기능 MOC와 태스크 문서를 가리키는 링크 18개로 실패했다. 이번 작업 문서의 description·직접 링크는 별도로 확인했다.
+- `node --test server/theme-color-ui.test.ts server/theme-gradient-angle-ui.test.ts server/fixed-popup-ui.test.ts src/utils/theme-color.test.ts`: 22 passed, none skipped. Tested with in-memory fixtures and Chromium without running the actual app server.
+- Verified theme settings at 320/390/1100px in light/dark modes: color grouping, picker screen boundaries, preservation of height and save button position, input over obscured content, existing save/cancel/reset behavior, Esc/Back, and four languages. Also reviewed desktop and narrow-screen captures.
+- For the circular control, verified its 24px size on PC and touch devices, all four directions matching the actual background, pointer capture outside the area, cancellation and repeated interaction, numeric normalization and restoration of empty inputs, and arrow keys, Page Up/Down, and Home/End.
+- `npx tsc -b` passed. `oxlint` completed without errors for the changed code and tests, with warnings remaining about ref access and existing effect state synchronization. `impeccable detect --json --scope layout` reported no findings.
+- The description check in the full `npm run check:docs` passed, but the link check failed on 18 links pointing to feature MOCs and task documents that were already being deleted or moved before this work. The description and direct links in this work's document were checked separately.
 
-앱 빌드·배포·서버 실행·재시작은 수행하지 않았다. 실제 인스턴스 적용과 실기기 확인은 남아 있다.
+No app build, deployment, server startup, or restart was performed. Application to an actual instance and verification on physical devices remain pending.
 
-## 후속: 제목 옆 저장·삭제 아이콘
+## Follow-up: Save and Delete icons next to the title
 
-2026-10-27 추가 요청에 따라 커스텀 편집 제목 오른쪽의 X를 저장·삭제 아이콘으로 바꾸고 하단 텍스트 버튼 행을 제거했다. 새 테마에는 저장만 표시하고, 저장된 항목에는 저장·삭제를 나란히 표시한다. 수정 취소는 Esc·뒤로가기로 유지한다.
+Following an additional request on 2026-10-27, replaced the X to the right of the custom editing title with Save and Delete icons and removed the bottom row of text buttons. New themes show only Save; saved items show Save and Delete side by side. Esc and Back remain available to cancel edits.
 
-`node --test server/theme-color-ui.test.ts`가 통과했다. 320/390/1100px·라이트/다크에서 아이콘만 표시되는지, 제목 옆 배치·조작 크기·네 언어의 접근성 이름/툴팁·저장과 삭제·Esc 취소·피커를 열 때 버튼 위치 유지를 확인했다. 저장 아이콘의 Enter 조작과 PC·모바일 캡처도 확인했다. `npx tsc -b`와 변경 코드·테스트의 린트는 오류 없이 완료했으며 기존 ref 경고가 남았다. 레이아웃 검사에는 발견 항목이 없었다. 전체 문서 검사는 기존 링크 오류 18개로 실패했으며 변경 문서의 설명·직접 링크는 별도 검사했다. 빌드·서버 적용은 수행하지 않았다.
+`node --test server/theme-color-ui.test.ts` passed. Verified that only icons appear at 320/390/1100px in light/dark mode, their placement next to the title, control sizes, accessible names/tooltips in four languages, saving and deleting, cancellation with Esc, and stable button positions when opening the picker. Also verified Enter activation of the Save icon and PC/mobile captures. `npx tsc -b` and linting of the changed code and tests completed without errors, with existing ref warnings remaining. The layout check reported no findings. The full documentation check failed on 18 existing link errors; descriptions and direct links in the changed documents were checked separately. No build or application to the server was performed.

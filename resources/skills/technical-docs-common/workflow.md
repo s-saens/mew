@@ -1,5 +1,5 @@
 ---
-description: "공통 문서화 연결 흐름. 원문 언어와 범위를 정한 뒤 설치된 구조·언어별 교정·번역 전문 스킬의 실제 원문을 단계별로 적용한다."
+description: "Shared documentation integration workflow. Determine the source language and scope, then apply the actual original text of the installed specialized skills for structure, language-specific editing, and translation at each stage."
 ---
 
 # Documentation skill orchestration

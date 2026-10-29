@@ -1,65 +1,65 @@
 ---
-provenance: "Liiiiv 중앙 ADR 이관본, 2026-10-14"
-description: "이관한 결정 기록: mew 에이전트 창 세션 조작(새 세션·불러오기)·프롬프트 큐·토큰 사용량 표시. 당시 선택·근거·후속 변경을 보존하며 현재 계약은 Mew 소유 문서에서 확인한다."
-title: "0036 — mew 에이전트 창 세션 조작(새 세션·불러오기)·프롬프트 큐·토큰 사용량 표시"
+provenance: "Migrated copy of a Liiiiv central ADR, 2026-10-14"
+description: "Migrated decision record: mew agent panel session controls (New Session, Load), prompt queue, and token usage display. Preserves the choices, rationale, and subsequent changes at the time; see the Mew owning document for the current contract."
+title: "0036 — mew agent panel session controls (New Session, Load), prompt queue, and token usage display"
 created: 2026-08-05
 updated: 2026-09-11
 ---
 
-- 날짜: 2026-08-05
-- 상태: 채택
-- 후속 결정: [0046](0046-mew-agent-panel-tabs-one-session-per-tab.md) — 프로젝트당 세션 하나
-- 후속 결정: [0047](0047-mew-agent-session-list-from-disk-and-nonblocking-connect.md) — ACP 전용 세션 목록
-- 후속 결정: [0103](0103-mew-queued-clear-session-boundary.md) — 즉시 /clear 동작
-- 후속 결정: [0118](0118-mew-agent-queue-edit-lock.md) — 편집 중 큐의 즉시 연속 실행
-- 후속 결정: [0122](0122-mew-codex-history-load-restarts-writer.md) — Codex history load 시 writer 재사용
-- 결정자: 송상훈 (지시)
-- 관련: [ADR 0034](0034-mew-agent-panel-acp-reintroduction.md)를 보완한다(대체 아님)
+- Date: 2026-08-05
+- Status: Adopted
+- Subsequent decision: [0046](0046-mew-agent-panel-tabs-one-session-per-tab.md) — One session per project
+- Subsequent decision: [0047](0047-mew-agent-session-list-from-disk-and-nonblocking-connect.md) — ACP-only session list
+- Subsequent decision: [0103](0103-mew-queued-clear-session-boundary.md) — Immediate /clear behavior
+- Subsequent decision: [0118](0118-mew-agent-queue-edit-lock.md) — Immediate sequential queue execution during editing
+- Subsequent decision: [0122](0122-mew-codex-history-load-restarts-writer.md) — Reuse the writer when loading Codex history
+- Decision maker: Song Sanghoon (directive)
+- Related: Supplements [ADR 0034](0034-mew-agent-panel-acp-reintroduction.md) (does not supersede it)
 
-## 배경
+## Background
 
-[ADR 0034](0034-mew-agent-panel-acp-reintroduction.md)로 되살린 에이전트 창은 "한 프로젝트에 세션 하나, 창을 닫아도 유지"까지만 있었다. 실제로 써 보니 CLI에는 있는데 창에는 없는 것이 세 가지였다.
+The agent panel restored by [ADR 0034](0034-mew-agent-panel-acp-reintroduction.md) only supported "one session per project, retained even when the panel closes." Actual use revealed three things available in the CLI but missing from the panel.
 
-1. `/clear`와 `/resume`이 없다. 대화를 비울 방법도, 지난 대화로 돌아갈 방법도 없다. 유일한 초기화 수단은 창을 10분 방치해 유휴 타이머가 프로세스를 죽이길 기다리는 것이었다.
-2. 턴이 도는 중에는 메시지를 보낼 수 없다. `AgentSession.prompt()`가 `이미 진행 중인 턴이 있습니다`를 던졌고, 그 문자열이 그대로 창에 에러로 떴다. 사용자는 턴이 끝나기를 지켜보다 다시 입력해야 했다.
-3. 세션이 지금 무엇을 쓰고 있는지 안 보인다. 모델·턴 수·시작 시각·토큰 사용량이 어디에도 없다.
+1. There is no `/clear` or `/resume`. There is no way to clear a conversation or return to a previous one. The only reset mechanism was to leave the panel idle for 10 minutes and wait for the idle timer to kill the process.
+2. Messages cannot be sent while a turn is running. `AgentSession.prompt()` threw `이미 진행 중인 턴이 있습니다`, and that string appeared verbatim as an error in the panel. Users had to watch for the turn to finish and then enter their message again.
+3. There is no visibility into what the session is currently using. The model, turn count, start time, and token usage are nowhere to be found.
 
-## 결정
+## Decision
 
-### 1. 세션 조작은 ACP 메서드로만 한다
+### 1. Control sessions only through ACP methods
 
-`/clear` = `session/new`, `/resume` = `session/list` + `session/load`. 셋 다 ACP에 있고 `@zed-industries/claude-code-acp` 0.16.2가 구현한다(`loadSession: true`, `sessionCapabilities.{list,fork,resume}`).
+`/clear` = `session/new`, `/resume` = `session/list` + `session/load`. All three exist in ACP and are implemented by `@zed-industries/claude-code-acp` 0.16.2 (`loadSession: true`, `sessionCapabilities.{list,fork,resume}`).
 
-- 자식 프로세스는 재사용한다. 새 세션을 연다고 에이전트를 죽였다 다시 띄우지 않는다 — 같은 연결 위에서 `session/new`를 한 번 더 부른다.
-- 프로젝트당 살아 있는 세션은 여전히 하나다. "새 세션"과 "불러오기"는 그 하나를 갈아끼우는 동작이고, 창은 `reset` 이벤트를 받아 지금까지 그린 대화를 버린다. 동시에 여러 세션을 띄우는 것은 이 결정의 범위가 아니다 — 지난 대화는 사라지지 않고 목록에 남으므로 되돌아갈 수 있다.
-- 기능 유무는 capability로 판단한다. `initialize` 응답의 `agentCapabilities`를 그대로 창에 내려보내고, 없다고 답하는 백엔드에서는 해당 버튼을 그리지 않는다. 벤더를 바꿨을 때 조용히 깨지는 대신 버튼이 사라진다.
+- Reuse the child process. Opening a new session does not kill and restart the agent — it calls `session/new` again over the same connection.
+- There is still only one live session per project. "New Session" and "Load" replace that session, and the panel discards the conversation rendered so far when it receives a `reset` event. Running multiple sessions simultaneously is outside this decision's scope — previous conversations remain in the list, so users can return to them.
+- Determine feature availability through capabilities. Pass `agentCapabilities` from the `initialize` response directly to the panel, and do not render the corresponding buttons for backends that report no support. Switching vendors makes the buttons disappear instead of silently breaking them.
 
-### 2. 진행 중 입력은 막지 않고 줄을 세운다
+### 2. Queue input during execution instead of blocking it
 
-`prompt()`는 더 이상 던지지 않는다. 턴이 도는 중이면 대기열에 넣고, 턴이 끝나면 서버가 순서대로 이어서 돌린다.
+`prompt()` no longer throws. If a turn is running, it queues the input, and the server runs queued inputs in order when the turn finishes.
 
-- 대기열은 서버에 산다. 창을 닫거나 다른 기기에서 다시 붙어도 줄은 그대로다.
-- 중단(`cancel`)은 대기열도 비운다. 멈추라고 해 놓고 다음 것이 저절로 도는 것은 놀라운 동작이다.
-- 대기 중 메시지는 개별 취소할 수 있다.
+- The queue lives on the server. It remains intact even if the panel closes or the user reconnects from another device.
+- Stop (`cancel`) also clears the queue. Having the next item run automatically after being told to stop would be surprising behavior.
+- Queued messages can be canceled individually.
 
-### 3. 토큰 사용량은 Claude Code 세션 JSONL에서 읽는다 — ACP 밖의 유일한 예외
+### 3. Read token usage from Claude Code session JSONL — the only exception outside ACP
 
-ACP 0.14 스키마에 `Usage`·`UsageUpdate` 타입이 있지만 `claude-code-acp` 0.16.2는 아무 사용량도 보내지 않는다(어댑터 dist 전체에 사용량 전송 코드가 없다). 즉 프로토콜로는 지금 얻을 수 없다.
+The ACP 0.14 schema has `Usage` and `UsageUpdate` types, but `claude-code-acp` 0.16.2 sends no usage data (there is no usage-sending code anywhere in the adapter's dist). Therefore, it cannot currently be obtained through the protocol.
 
-그래서 `server/agentUsage.ts`가 `<CLAUDE_CONFIG_DIR>/projects/<인코딩된 cwd>/<sessionId>.jsonl`을 직접 읽는다. 이건 ADR 0034의 "ACP가 인터페이스다"에 대한 의도된 예외이므로 조건을 붙인다.
+So `server/agentUsage.ts` reads `<CLAUDE_CONFIG_DIR>/projects/<인코딩된 cwd>/<sessionId>.jsonl` directly. This is an intentional exception to ADR 0034's "ACP is the interface," so it comes with conditions.
 
-- 읽기 전용이고, 없으면 그만이다. 파일이 없거나 형식이 바뀌면 사용량 칸만 "기록 없음"이 되고 창의 나머지는 그대로 돈다. 대화·권한·파일 스코프 중 어느 것도 이 파일에 의존하지 않는다.
-- 경로 규칙은 어댑터와 같은 규칙을 쓴다(`cwd.replace(/[^a-zA-Z0-9]/g, '-')`). 어긋나면 사용량이 비어 보일 뿐이다.
-- 파일 파싱 계약을 테스트로 박아 둔다(`server/agentUsage.test.ts`). 벤더 형식이 바뀌면 여기가 먼저 터진다.
-- 다른 용도로 넓히지 않는다. 대화 복원·세션 목록·모델 정보는 전부 ACP로 얻는다. 이 파일은 사용량과 턴 수 표시 전용이다. 어댑터가 `UsageUpdate`를 보내기 시작하면 이 모듈을 지운다.
+- It is read-only, and absence is acceptable. If the file is missing or its format changes, only the usage field shows "No Records"; the rest of the panel continues to work. Conversations, permissions, and file scopes do not depend on this file.
+- Use the same path convention as the adapter (`cwd.replace(/[^a-zA-Z0-9]/g, '-')`). A mismatch only makes usage appear empty.
+- Lock down the file parsing contract with tests (`server/agentUsage.test.ts`). If the vendor format changes, this is where it fails first.
+- Do not expand it to other purposes. Conversation restoration, session lists, and model information all come through ACP. This file is exclusively for displaying usage and turn counts. Delete this module when the adapter starts sending `UsageUpdate`.
 
-### 4. 상태는 이벤트가 아니라 스냅샷으로 보낸다
+### 4. Send state as snapshots rather than events
 
-세션 ID·시작 시각·턴 수·진행 여부·대기열·사용량은 `{type:'meta', meta}` 한 덩어리로 보낸다. 이벤트 버퍼에 쌓지 않는다 — 재접속 때 되감기는 것은 대화지 상태가 아니고, 상태를 버퍼에 넣으면 지나간 스냅샷이 재생되면서 창이 잠깐 옛 값을 그린다.
+Send the session ID, start time, turn count, running status, queue, and usage together as `{type:'meta', meta}`. Do not accumulate them in the event buffer — conversations are replayed on reconnection, not state; buffering state would replay outdated snapshots and briefly render old values in the panel.
 
-## 결과
+## Results
 
-- 사용량 숫자는 Claude Code 백엔드에서만 나온다. 다른 ACP 백엔드를 붙이면 그 칸은 비고, 그건 버그가 아니다.
-- 전체 토큰은 입력+출력+캐시 쓰기+캐시 읽기의 누적 합이다. 캐시 읽기는 턴마다 다시 세므로 청구액이 아니라 사용 규모로 읽어야 한다. 컨텍스트 칸이 "지금 얼마나 무거운가"에 해당한다.
-- 지난 세션을 불러오면 히스토리가 `session/update` 재생으로 들어오는데, 여기엔 `turn_start`·`turn_end`가 없다. 창의 접기 규칙은 사용자 발화가 앞 턴을 닫는 것으로 이 경우를 함께 처리한다(`src/utils/agentFold.ts`, 테스트 있음).
-- 프로젝트당 세션 하나라는 제약은 그대로다. 한 프로젝트에서 두 대화를 동시에 돌리고 싶다면 별도 결정이 필요하다.
+- Usage numbers come only from the Claude Code backend. With another ACP backend, that field is empty, which is not a bug.
+- Total tokens are the cumulative sum of input, output, cache writes, and cache reads. Cache reads are counted again each turn, so interpret this as usage volume rather than billing. The context field indicates "how heavy it is right now."
+- When loading a previous session, history arrives as a replay of `session/update`, which has no `turn_start` or `turn_end`. The panel's folding rules also handle this case by having a user utterance close the preceding turn (`src/utils/agentFold.ts`, covered by tests).
+- The one-session-per-project restriction remains. Running two conversations simultaneously in one project requires a separate decision.

@@ -1,102 +1,102 @@
 ---
 id: "mew-agents-features"
 parent: "mew-agents"
-title: "기능 기반 개발·Markdown 문서"
+title: "Feature-Based Development and Markdown Documents"
 status: "changed"
 created: "2026-09-18"
 updated: "2026-10-24"
 status_hash: "701eba69573a58c7cb0cae079dbdcc13ad3125808a1b999accc26f79d331606c"
 files: ["src/App.tsx", "src/components/DockWorkspace.tsx", "src/utils/dock-layout.ts", "src/components/feature-development.tsx", "src/components/feature-development.css", "shared/branch-features.ts", "server/branch-features.ts", "server/branch-feature-cli.ts", "server/features.ts", "server/feature-documents.ts", "server/feature-document-tree.ts", "server/document-pages.ts", "server/feature-service.ts", "server/feature-agent-instructions.ts"]
 commits: []
-description: "2026-10-26 제거한 기능 패널·브랜치 작업 원장·기능 문서 API·실행 큐의 이전 계약과 검증 기록을 보존한다. 현재 동작은 ADR 0065를 따른다."
+description: "Preserves previous contracts and verification records for the feature panel, branch work ledger, feature document API, and execution queue removed on 2026-10-26. Current behavior follows ADR 0065."
 상위파일:
-  - "../features/터미널·에이전트·자동화/MOC.md"
-  - "../features/터미널·에이전트·자동화/_터미널·에이전트·자동화.md"
+  - "../features/terminals-agents-automation/MOC.md"
+  - "../features/terminals-agents-automation/_terminals-agents-automation.md"
 ---
 
-> 2026-10-26 기능 패널과 전용 API·CLI·실행 큐를 제거했다. 이 문서는 이전 기록이다. [제거 결정](../decisions/0065-remove-feature-panel.md)을 따른다.
+> The feature panel and its dedicated API, CLI, and execution queue were removed on 2026-10-26. This document is a historical record. Follow the [removal decision](../decisions/0065-remove-feature-panel.md).
 
 
-## 요구사항
+## Requirements
 
-- 독의 **기능** 패널을 현재 프로젝트의 로컬 Git 브랜치별 작업 목록으로 제공한다. 기존 Documents 기능 문서 계층은 이 패널에 표시하지 않는다.
-- 각 브랜치의 제목·작업 내용, 체크아웃된 worktree, 최근 커밋과 미커밋 변경 수를 함께 보여준다. `feat/` 접두사로 목록을 제한하지 않는다.
-- 브랜치별 미리보기 포트·경로와 검증 기록·사용자 판정을 저장한다. **포트 설정**과 **새 탭에서 열기**를 구분하며, 열기는 현재 Mew 접속 주소의 `/포트번호` 진입점을 새 브라우저 탭으로 연다.
-- 포트의 연결 가능 여부와 검증 기록·사용자 판정을 구분한다. 앱이 실행 중이라는 이유로 검사 통과나 사용자 확인 완료를 추정하지 않는다.
-- 패널에서 브랜치 전환·worktree 생성·빌드·서버 실행·중지·병합은 하지 않는다. 기존 에이전트 Git 자동 처리 설정과 실행 제한을 유지한다.
-- 기존 기능 문서·문서 편집기·Markdown 저장·API·CLI·실행 큐·보고 이력은 보존한다. 이 화면 변경으로 문서나 실행 기록을 자동 이관·삭제하지 않는다.
+- Provide the dock's **Features** panel as a task list organized by local Git branch in the current project. Do not display the existing Documents feature document hierarchy in this panel.
+- Show each branch's title and task description, checked-out worktree, latest commit, and uncommitted change count together. Do not restrict the list to the `feat/` prefix.
+- Save preview ports and paths, verification records, and user verdicts for each branch. Distinguish **Port Settings** from **Open in New Tab**; opening launches the `/포트번호` entry point at the current Mew access address in a new browser tab.
+- Distinguish port connectivity from verification records and user verdicts. Do not infer that checks passed or user verification is complete merely because the app is running.
+- Do not switch branches, create worktrees, build, start or stop servers, or merge from the panel. Preserve existing agent Git automation settings and execution restrictions.
+- Preserve existing feature documents, the document editor, Markdown storage, APIs, CLI, execution queue, and report history. Do not automatically migrate or delete documents or execution records as part of this screen change.
 
-### 관련 문서
+### Related documents
 
-- [작업 브랜치 확인과 미리보기 사용법](../../../docs/guides/projects.md#기능-패널에서-작업-브랜치-확인)
-- [localhost 앱 프리뷰](../development/port-preview.md)
-- [문서 페이지 저장·조작](../development/document-pages.md)
+- [How to check work branches and use previews](../../../docs/guides/projects.md#기능-패널에서-작업-브랜치-확인)
+- [localhost app preview](../development/port-preview.md)
+- [Saving and managing document pages](../development/document-pages.md)
 
-## 상세 동작
+## Detailed behavior
 
-현재 화면은 [결정 0049 — 브랜치별 작업과 미리보기](../decisions/0049-branch-feature-previews.md)를 따른다. Markdown 기능 문서와 기존 실행 서비스는 [ADR 0159 — 실행](decisions/0159-mew-feature-driven-development.md)·[ADR 0161 — Markdown 기준본](decisions/0161-mew-feature-markdown-source.md)·[에이전트 세션](../development/agent-sessions.md)의 보존 범위를 따른다.
+The current screen follows [Decision 0049 — Branch-specific tasks and previews](../decisions/0049-branch-feature-previews.md). Markdown feature documents and the existing execution service follow the preservation scope in [ADR 0159 — Execution](decisions/0159-mew-feature-driven-development.md), [ADR 0161 — Markdown canonical source](decisions/0161-mew-feature-markdown-source.md), and [Agent sessions](../development/agent-sessions.md).
 
-### 사용 흐름
+### Usage flow
 
-1. 프로젝트를 열고 PC·모바일 독의 **기능** 버튼을 누른다. 기본 **작업 브랜치** 목록은 기준 브랜치를 제외하며 **전체**에서 모든 로컬 브랜치를 확인한다. 제목·브랜치 이름·작업 내용으로 검색할 수 있다.
-2. 작업 행에서 브랜치·worktree·변경 수·최근 커밋을 확인한다. 펼친 설정에서 작업 제목·내용·검증 기록과 미리보기 포트·경로를 저장한다.
-3. 해당 worktree에서 앱을 따로 실행하고 **포트 설정**으로 포트·경로를 저장한 뒤 **새 탭에서 열기**로 직접 써본다. 설정은 포트 입력란을 바로 선택하며, 같은 설정이 열린 상태에서도 다시 선택할 수 있다. 포트·경로와 연결 상태 옆에 열기 버튼을 표시하고, 등록된 포트는 별도 설정 아이콘으로 수정한다. 열기 버튼은 앱을 실행하거나 빌드하지 않는다.
-4. 확인 결과를 **확인 전**(`pending`)·**확인 완료**(`verified`)·**수정 필요**(`needs-fix`)로 기록한다. 판정 저장은 Git 병합을 실행하거나 에이전트의 Git 설정을 바꾸지 않는다.
+1. Open a project and press the **Features** button in the desktop or mobile dock. The default **Work Branches** list excludes the base branch; view all local branches under **All**. You can search by title, branch name, or task description.
+2. Check the branch, worktree, change count, and latest commit in the task row. Expand settings to save the task title, description, verification records, and preview port and path.
+3. Run the app separately in that worktree, save the port and path through **Port Settings**, then try it yourself with **Open in New Tab**. Settings focuses the port input directly, and can focus it again even while the same settings are open. Show the open button beside the port, path, and connection status, and edit a registered port through a separate settings icon. The open button does not run or build the app.
+4. Record the review result as **Pending** (`pending`), **Verified** (`verified`), or **Needs Fix** (`needs-fix`). Saving a verdict does not perform a Git merge or change the agent's Git settings.
 
-### 브랜치와 worktree 상태
+### Branch and worktree status
 
-- Git 원격 저장소에 접속하지 않고 실제 로컬 브랜치와 Git에 등록된 worktree를 읽는다. 기준 브랜치와 현재 프로젝트에서 체크아웃된 브랜치를 구분하며 브랜치별 최신 커밋의 해시·제목·시각을 제공한다.
-- 체크아웃된 worktree에서 staged·unstaged·untracked 파일 수를 읽는다. worktree가 없는 브랜치의 미커밋 상태는 계산할 수 없으며, 이를 깨끗한 작업 폴더로 판정하지 않는다.
-- 작업 제목·내용·검증·판정·미리보기 설정은 Git 공통 디렉터리의 `mew-branch-features.json`에 브랜치 이름별로 저장한다. 같은 저장소의 다른 worktree에서도 같은 설정을 읽으며, 이 파일은 프로젝트 소스나 기존 `docs/features/`를 변경하지 않는다.
-- Git 저장소가 아니면 빈 브랜치 목록 대신 해당 상태를 안내한다. 에이전트·Git 기능과 프로젝트 전체 열람 권한이 필요하며 저장에는 전체 수정 권한이 필요하다. 부분 파일 제한 계정에는 다른 worktree 정보나 브랜치 원장을 노출하지 않는다.
+- Read actual local branches and worktrees registered with Git without connecting to a Git remote repository. Distinguish the base branch from the branch checked out in the current project, and provide the hash, title, and timestamp of each branch's latest commit.
+- Read staged, unstaged, and untracked file counts from checked-out worktrees. Uncommitted status cannot be calculated for branches without a worktree; do not classify them as clean working directories.
+- Save task titles, descriptions, verification, verdicts, and preview settings by branch name in `mew-branch-features.json` in the Git common directory. Other worktrees in the same repository read the same settings, and this file does not modify project source or the existing `docs/features/`.
+- If this is not a Git repository, explain that status instead of showing an empty branch list. Access requires agent and Git features and full-project read permission; saving requires full edit permission. Do not expose other worktree information or the branch ledger to accounts restricted to a subset of files.
 
-### 미리보기와 검증
+### Previews and verification
 
-- 미리보기는 포트와 선택적 하위 경로로 구성한다. 포트 미설정·연결 가능·연결 불가·미확인(`unknown`)을 구분한다. **localhost 앱 접속** 권한이 있는 조회에서만 호스트 IPv4·IPv6 loopback TCP 접속을 각 250ms 한도로 확인한다. 권한이 없거나 저장·CLI만 수행할 때는 포트에 접속하지 않는다. HTTP 응답 내용·테스트 결과·실행 프로세스가 해당 브랜치에서 시작했는지는 확인하지 않는다.
-- 사용자가 버튼을 누를 때 현재 Mew 주소에 포트와 경로를 붙여 새 탭을 연다. 도메인·Tailscale·Mewlink의 기존 인증·권한·분리 출처를 재사용하며 임의 외부 URL을 저장하거나 자동으로 열지 않는다. **localhost 앱 접속** 권한이나 공개 접속 주소가 없으면 열기를 비활성화하고 원인을 표시한다. 접속 주소 조회 실패에는 재조회 버튼을 제공한다. 작업 설정이 읽기 전용이어도 미리보기 권한이 있으면 열 수 있다.
-- 포트 미설정 상태에는 새 창 아이콘을 표시하지 않고 **포트 설정**을 제공한다. 포트 응답이 없으면 앱 실행·등록 포트 확인 안내를 표시하며, 다시 접속할 수 있도록 열기 링크를 유지한다.
-- 브랜치마다 서로 다른 포트에서 해당 worktree의 앱을 실행해야 한다. 데이터베이스·업로드·설정의 분리는 앱 실행 환경에서 준비하며, 이 패널은 데이터 복제·격리나 프로세스 관리를 수행하지 않는다.
-- 검증 기록은 실제 수행한 명령과 결과를 사용자가 또는 에이전트가 기록하는 텍스트다. 기록만으로 검사 성공이나 사용자 판정을 자동 생성하지 않는다.
-- 사용자 판정은 커밋과 worktree 변경 상태에 연결한다. 커밋이나 미커밋 파일 상태가 바뀌면 **확인 전**으로 표시하므로 이전 결과를 최신 코드의 승인으로 읽지 않는다. 검증 기록은 근거 텍스트로 남으며 최신 코드에서 다시 실행한 결과로 간주하지 않는다.
-- 화면에서 판정을 저장할 때 편집 시작 시 받은 `revision`을 `expectedRevision`으로 함께 보낸다. 그동안 코드 상태가 바뀌었으면 409로 거부하며 이전 코드에서 작성한 확인 결과를 새 코드에 적용하지 않는다.
-- 코드 변경으로 판정 저장이 거부되면 **최신 상태로 다시 확인**으로 최신 기준을 불러온다. 기존 입력을 보존하며 최신 코드를 확인한 뒤 **저장**으로 판정을 반영한다. 기준을 다시 불러오는 것만으로 판정을 자동 저장하지 않는다.
+- A preview consists of a port and an optional subpath. Distinguish between port not configured, reachable, unreachable, and unknown (`unknown`). Check TCP connectivity to the host's IPv4 and IPv6 loopback addresses, each with a 250ms limit, only for queries with **localhost App Access** permission. Do not connect to ports when permission is absent or when only saving or performing CLI operations. Do not check HTTP response content, test results, or whether the running process was started from that branch.
+- When the user presses the button, append the port and path to the current Mew address and open a new tab. Reuse existing authentication, permissions, and isolated origins for domains, Tailscale, and Mewlink; do not save arbitrary external URLs or open them automatically. If **localhost App Access** permission or a public access address is missing, disable opening and display the reason. Provide a retry button if the access address lookup fails. Users with preview permission can open previews even when task settings are read-only.
+- When no port is configured, provide **Port Settings** without showing a new-window icon. If the port does not respond, show guidance to run the app and check the registered port, and retain the open link so users can reconnect.
+- For each branch, run the app from its worktree on a different port. Prepare database, upload, and configuration separation in the app's runtime environment; this panel does not replicate or isolate data or manage processes.
+- Verification records are text in which the user or agent records commands actually run and their results. Records alone do not automatically produce a successful check result or user verdict.
+- User verdicts are tied to the commit and worktree change state. If the commit or uncommitted file state changes, the verdict is displayed as **Pending confirmation** so that previous results are not read as approval of the latest code. Validation records remain as supporting text and are not treated as results rerun against the latest code.
+- When saving a verdict in the UI, send the `revision` received when editing began as `expectedRevision`. If the code state has changed in the meantime, reject the save with 409 and do not apply confirmation results written for the previous code to the new code.
+- If a verdict save is rejected because the code changed, use **Recheck against the latest state** to load the latest baseline. Preserve existing input, review the latest code, and then apply the verdict with **Save**. Reloading the baseline alone does not automatically save the verdict.
 
-### API·CLI와 화면 경계
+### API, CLI, and UI boundaries
 
-조회와 저장은 `GET /api/features/branches`·`PATCH /api/features/branches`를 사용한다. 현재 프로젝트의 `workspace`를 전달하며 기존 `/api/features` 문서·실행 API와 다른 원장이다. 패널은 화면이 보이는 동안 8초마다 갱신하며, 조회·프로젝트 전환·저장 실패가 작성 중인 입력을 덮어쓰지 않아야 한다. Git 브랜치 이름은 제목 별칭과 별개이며 이 화면에서 개명하지 않는다.
+Use `GET /api/features/branches` and `PATCH /api/features/branches` for retrieval and saving. Pass the current project's `workspace`; this ledger is separate from the existing `/api/features` document and execution API. The panel refreshes every 8 seconds while visible, and retrieval, project switching, or save failures must not overwrite input being drafted. Git branch names are separate from title aliases and are not renamed in this UI.
 
-에이전트는 아래처럼 작업 중인 worktree의 상태와 미리보기 설정을 기록할 수 있다. `--cwd`를 생략하면 현재 폴더, JSON의 `branch`를 생략하면 해당 폴더의 현재 브랜치를 사용한다. `title`·`notes`·`validation`·`review`·`previewPort`·`previewPath` 중 전달한 필드만 변경하며 `previewPort: null`은 미리보기를 해제한다.
+Agents can record the state and preview settings of their working worktree as shown below. If `--cwd` is omitted, use the current folder; if `branch` is omitted from the JSON, use that folder's current branch. Change only the supplied fields among `title`, `notes`, `validation`, `review`, `previewPort`, and `previewPath`; `previewPort: null` disables the preview.
 
 ```bash
 printf '%s' '{"notes":"로그인 구현","previewPort":5101,"previewPath":"/","validation":"node --test server/example.test.ts 통과"}' \
   | node /path/to/mew/server/branch-feature-cli.ts --cwd /path/to/worktree
 ```
 
-위 경로·포트·검사 결과는 사용 예다. 실제 실행 중인 포트와 수행한 검사만 기록하며 CLI는 앱을 실행하거나 검사를 대신 수행하지 않는다.
+The paths, ports, and check results above are usage examples. Record only ports that are actually running and checks that were performed; the CLI does not launch the app or perform checks for you.
 
-프로젝트의 에이전트 안내에는 구현을 시작할 때 제목·작업 내용, 마칠 때 실제 검증 결과를 이 CLI로 남기도록 전달한다. `--cwd`는 요청을 시작한 프로젝트가 아닌 실제 작업 브랜치의 worktree를 가리킨다. 미리보기 포트는 이미 실행 중이거나 별도로 실행이 허용된 앱에 대해서만 기록한다. 이 안내는 빌드·서버 실행 권한을 추가하지 않으며 에이전트가 사용자 대신 `verified`로 판정하지 않는다. 브랜치 판정은 선택된 Git 자동 처리를 바꾸거나 병합을 차단·실행하지 않는다.
+The project's agent guidance tells agents to use this CLI to record the title and work details when starting implementation and actual validation results when finishing. `--cwd` points to the worktree of the actual working branch, rather than the project where the request originated. Record preview ports only for apps that are already running or have separate authorization to run. This guidance does not grant additional permission to run builds or servers, and agents do not assign `verified` on the user's behalf. Branch verdicts do not change the selected automatic Git processing or block or execute merges.
 
-기능 화면은 기존 `kind="features"` 작업 패널과 36px 타이틀바·독·도킹·크기 조절·모바일 배치를 유지한다. 작업 목록과 펼친 설정은 좁은 화면에서도 가로 넘침 없이 표시하며, 익숙한 동작은 접근성 이름과 공통 툴팁을 가진 아이콘 버튼을 사용한다. 선택 항목은 공통 `SelectField`를 사용한다.
+The feature UI retains the existing `kind="features"` work panel and 36px title bar, dock, docking, resizing, and mobile layout. The work list and expanded settings display without horizontal overflow even on narrow screens, and familiar actions use icon buttons with accessible names and shared tooltips. Selection controls use the shared `SelectField`.
 
-미저장 설정은 같은 브라우저 탭의 `sessionStorage`에 계정·접속 인스턴스·프로젝트별로 저장한다. 다른 프로젝트로 전환했다 돌아오거나 페이지를 새로고침하면 브랜치·입력·편집 기준을 복원하며, 저장 완료 또는 명시적 초안 버리기에서 지운다. 다른 계정·인스턴스·프로젝트에 초안을 적용하지 않는다. 브라우저 저장소가 막히면 현재 페이지 메모리에서만 유지하므로 새로고침 뒤 복구는 보장하지 않는다. 저장 형식이 잘못되거나 필드 제한을 넘은 값은 복원하지 않는다.
+Unsaved settings are stored in the same browser tab's `sessionStorage`, separated by account, connected instance, and project. Switching to another project and back or refreshing the page restores the branch, input, and editing baseline; these are cleared after a successful save or an explicit discard of the draft. Drafts are not applied to other accounts, instances, or projects. If browser storage is blocked, drafts remain only in the current page's memory, so recovery after a refresh is not guaranteed. Values with an invalid storage format or exceeding field limits are not restored.
 
-## 보존하는 Markdown 기능 문서·실행 계약
+## Preserved Markdown feature document and execution contracts
 
-이하의 문서·큐·보고·상태 해시는 기존 API·CLI의 계약이다. 새 브랜치 작업 목록이나 브랜치별 사용자 판정과 연결하거나 자동 이관하지 않는다. 기능 패널은 이 API로 요청·중단·재시도하지 않는다.
+The documents, queues, reports, and status hashes below are contracts of the existing API and CLI. They are not linked to or automatically migrated to the new branch work list or per-branch user verdicts. The feature panel does not use this API to request, stop, or retry work.
 
-### 실행과 복원
+### Execution and restoration
 
-- 다음은 기존 API·CLI·실행 서비스 계약이다. 기능 패널은 작업을 요청·중단·재시도하지 않는다.
-- 프로젝트별 FIFO 큐로 한 요청씩 실행한다. 다른 프로젝트 큐는 독립이다. 같은 기능의 명시적 재위임이 대기·실행 중이면 중복 요청을 막는다. 대기·실행 합계 50개, 기능 항목 2,000개까지 받는다.
-- 요청은 셋의 런타임·모델·역할과 프로젝트·Documents 연결을 캡처한다. 셋 편집·프로젝트 전환은 접수한 요청을 바꾸지 않는다. 실행 직전에 요청 계정의 에이전트·프로젝트 전체 수정 권한을 재검사한다.
-- `feature_<request UUID>` 탭의 기존 독립 감독을 사용한다. 세션 준비와 모델 적용을 확인한 뒤 프롬프트를 보낸다. 로그인·승인 대기는 이력에 표시하며 **대화 열기**에서 처리한다. 대화를 열 때 같은 탭에 연결하고 구현 프롬프트를 추가 전송하지 않는다.
-- 전달 직전에 `dispatchedAt`을 저장한다. 복원은 기존 감독에만 연결하며 전송 의도를 기록한 요청은 자동 재전송하지 않는다. 아직 전송하지 않은 요청은 세션 준비 후 전달할 수 있다. 복원 불가나 전송 경계의 불확실성은 대화 확인 후 사용자가 재요청한다.
-- 브라우저 닫기·프로젝트 전환은 작업을 계속 둔다. **중단**은 큐에서 제거하거나 실행 취소를 보내고 완료 확인까지 다음 요청을 막는다. 전송 전 취소는 즉시 끝낸다. 서버 종료 시 감시 연결만 닫고 감독을 죽이지 않는다.
-- 유효한 보고와 정상 턴 종료가 모두 있어야 `implemented` 상태가 된다. 보고 누락·비정상 종료·복원 불가에서는 실패 이유와 재요청 경로를 제공한다. 감독까지 사라진 작업은 성공을 추정하지 않는다.
+- The following are the existing API, CLI, and execution service contracts. The feature panel does not request, stop, or retry work.
+- Run one request at a time through a per-project FIFO queue. Other project queues are independent. Block duplicate requests while an explicit redelegation of the same feature is queued or running. Accept up to 50 queued and running requests combined and 2,000 feature items.
+- Requests capture the set's runtime, model, and role, along with its project and Documents connections. Editing the set or switching projects does not change accepted requests. Immediately before execution, recheck the requesting account's permissions to modify all agents and project files.
+- Use the existing independent supervisor for the `feature_<request UUID>` tab. Send the prompt after confirming session readiness and model application. Login and approval waits appear in the history and are handled through **Open conversation**. Opening the conversation connects to the same tab without sending an additional implementation prompt.
+- Save `dispatchedAt` immediately before delivery. Restoration connects only to the existing supervisor, and requests with a recorded intent to send are not automatically resent. Requests not yet sent may be delivered after the session is ready. If restoration is impossible or the send boundary is uncertain, the user checks the conversation and submits another request.
+- Closing the browser or switching projects leaves work running. **Stop** removes the request from the queue or sends an execution cancellation and blocks the next request until completion is confirmed. Cancellation before sending completes immediately. Server shutdown closes only the monitoring connection and does not kill the supervisor.
+- Both a valid report and a normal turn end are required for the `implemented` status. If a report is missing, termination is abnormal, or restoration is impossible, provide the failure reason and a way to submit another request. Do not infer success for work whose supervisor has also disappeared.
 
-### 공통 에이전트 인터페이스와 저장
+### Shared agent interface and storage
 
-`server/feature-agent-instructions.ts`가 모든 셋에 같은 분류·구현·결과 보고 지침을 붙인다. 셋은 실행 프리셋이며 원장이나 분류 규칙을 소유하지 않는다. 에이전트는 지침에 들어 있는 절대 경로 명령을 사용한다.
+`server/feature-agent-instructions.ts` attaches the same classification, implementation, and result reporting instructions to every set. Sets are execution presets and do not own the ledger or classification rules. Agents use the absolute-path commands included in the instructions.
 
 ```text
 node <feature-cli.ts> <feature store directory> <workspace> <request UUID> list
@@ -104,109 +104,109 @@ node <feature-cli.ts> <feature store directory> <workspace> <request UUID> assig
 node <feature-cli.ts> <feature store directory> <workspace> <request UUID> report
 ```
 
-`assign`·`report`는 JSON 한 개를 표준 입력으로 받는다. `assign`은 new/update/child 분류·전체 요구사항·분류 이유·대상 ID/버전을 검사한다. `report`는 구현 설명·검증·프로젝트 상대 파일·저장소 상대 경로와 실제 커밋 해시를 받는다. 경로 이탈·symlink 외부 연결·없는 파일·허위 커밋을 거부한다. 삭제 파일은 연결한 커밋에서 삭제를 확인할 때만 연결한다. 커밋 없는 결과도 유효하며 자동 커밋을 지시하지 않는다.
+`assign` and `report` each accept one JSON object on standard input. `assign` checks the new/update/child classification, full requirements, classification reason, and target ID/version. `report` accepts the implementation description, validation, project-relative files, repository-relative paths, and actual commit hashes. Reject path escapes, symlinks pointing outside, nonexistent files, and false commits. Link deleted files only when their deletion is confirmed in the linked commit. Results without commits are also valid, and automatic commits are not instructed.
 
-### Markdown 기준본과 실행 기록
+### Markdown canonical source and execution records
 
-기능의 기준본은 **현재 프로젝트에 설정한 Documents 폴더의 `features/` 아래 Markdown**이다. 기본 Documents가 `docs`이면 `docs/features/`를 사용한다. 일반 Markdown 파일도 프론트매터·전용 구분자 없이 읽는다.
+The canonical source for features is **Markdown under `features/` in the Documents folder configured for the current project**. If the default Documents folder is `docs`, use `docs/features/`. Read ordinary Markdown files without frontmatter or dedicated delimiters as well.
 
-자식 없는 항목은 `이름.md`, 자식 있는 항목은 `이름/_이름.md`다. 첫 하위 문서를 만들거나 이동해 넣으면 기존 부모 본문을 대표 파일로 옮긴다. 마지막 실제 자식을 삭제하거나 이동하면 부모를 단일 파일로 내리고 빈 폴더를 제거한다. 첨부·숨김 파일이 남으면 Documents와 같이 폴더를 보존한다. 상위 이름 변경은 폴더·대표·하위 경로를 함께 바꾼다. [Documents 페이지 계약](../development/document-pages.md)의 조작을 사용하며, 기능 API·CLI의 생성·제목/부모 변경도 같은 구조와 링크 보정을 사용한다.
+An item without children is `이름.md`; an item with children is `이름/_이름.md`. When the first child document is created or moved in, move the existing parent body to the representative file. When the last actual child is deleted or moved out, convert the parent to a single file and remove the empty folder. If attachments or hidden files remain, preserve the folder as in Documents. Renaming a parent changes the folder, representative file, and child paths together. Use the operations in the [Documents page contract](../development/document-pages.md); creation and title/parent changes through the feature API and CLI use the same structure and link adjustments.
 
-예를 들어 `로그인.md`에 `비밀번호 재설정`을 추가하면 `로그인/_로그인.md`와 `로그인/비밀번호 재설정.md`가 된다. 파일 이름의 공백·한글·대소문자를 그대로 제목으로 표시한다. API·CLI의 새 이름은 태스크와 같은 파일명 정리를 적용하고, 중복 이름은 기존 파일을 덮어쓰지 않고 충돌로 거절한다.
+For example, adding `비밀번호 재설정` to `로그인.md` produces `로그인/_로그인.md` and `로그인/비밀번호 재설정.md`. Display spaces, Korean characters, and letter case in filenames unchanged as titles. New names from the API and CLI receive the same filename sanitization as tasks, and duplicate names are rejected as conflicts without overwriting existing files.
 
-| 위치 | 관리하는 내용 |
+| Location | Managed content |
 | --- | --- |
-| 파일·폴더 경로 | 제목·부모 계층. `title`·`parent` 메타데이터는 읽기 기준이 아니다 |
-| 선택적 프론트매터 | 기존 고정 `id`, 상태·날짜·내용 확인 해시, 관련 파일·커밋, 사용자 추가 메타데이터 |
-| Markdown 본문 | 기능 설명·요구사항·구현·검증 등 자유로운 문서 내용 |
-| `DATA_DIR/features/<sha256(workspace)>.json` | 저장 형식 2: 실행 큐·셋·대화·요청별 결과 이력·저장 복구 정보 |
+| File and folder paths | Title and parent hierarchy. `title` and `parent` metadata are not the basis for reading them |
+| Optional frontmatter | Existing fixed `id`, status, dates, content verification hash, related files and commits, and user-added metadata |
+| Markdown body | Free-form document content such as feature descriptions, requirements, implementation, and validation |
+| `DATA_DIR/features/<sha256(workspace)>.json` | Storage format 2: execution queue, sets, conversations, per-request result history, and save recovery information |
 
-Hotview 에디터에서 기능 문서를 열면 프론트매터의 `files`는 본문 내부 링크와 같은 모양의 작은 12px 파일 링크로 표시한다. 각 링크는 기능 문서 폴더가 아닌 프로젝트 루트의 파일을 연다. `commits`는 기존 선택값과 같은 태그 컴포넌트에 해시 앞 7자를 표시하고 툴팁으로 저장소·전체 해시·커밋 제목을 제공한다. 긴 경로와 여러 태그는 좁은 화면에서 줄바꿈한다. 표시만으로 YAML을 변경하지 않으며, 편집 버튼으로 배열 값을 수정할 때도 `files`의 문자열 배열과 `commits`의 `repository`·`hash`·`subject` 객체 배열을 유지한다. Enter·포커스 이동으로 저장하고 Esc로 취소하며 잘못된 배열은 저장하지 않는다. 읽기 전용에서는 편집 버튼 없이 파일 링크를 열 수 있다. 명시적으로 지정한 속성 타입이나 형식이 다른 값은 기존 표시·편집을 따른다.
+When a feature document is opened in the Hotview editor, frontmatter `files` values appear as small 12px file links styled like links in the body. Each link opens a file relative to the project root rather than the feature document folder. `commits` uses the same tag component as existing selection values, showing the first 7 characters of the hash and providing the repository, full hash, and commit subject in a tooltip. Long paths and multiple tags wrap on narrow screens. Display alone does not change the YAML, and editing array values with the edit button preserves the string array for `files` and the array of objects with `repository`, `hash`, and `subject` for `commits`. Save on Enter or focus change, cancel on Esc, and do not save invalid arrays. In read-only mode, file links can be opened without an edit button. Explicitly specified property types or values in other formats follow the existing display and editing behavior.
 
-기존 `id`는 실행 이력 연결을 위해 보존한다. 생략하면 현재 상대 경로에서 ID를 만들며 외부 이름 변경 뒤에는 새 ID가 될 수 있다. API·CLI가 문서를 저장하거나 이동할 때는 고정 ID를 기록한다. 기존 `title`·`parent`는 호환 메타데이터로 보존·갱신하지만 실제 파일 이름·폴더 관계를 우선한다. ID가 있으면 영문·숫자·밑줄·하이픈 1~128자를 사용한다. 날짜는 ISO 문자열이며 생략 시 파일 시각을 사용한다. 관련 파일·커밋은 기존 경로·해시 형식 검사를 유지하고 결과 보고 시 실제 존재도 검증한다.
+Preserve existing `id` values to link execution history. If omitted, generate an ID from the current relative path; an external rename may therefore produce a new ID. When the API or CLI saves or moves a document, record a fixed ID. Preserve and update existing `title` and `parent` as compatibility metadata, but prioritize actual filenames and folder relationships. If an ID is present, it must contain 1–128 letters, digits, underscores, or hyphens. Dates are ISO strings; use file timestamps when omitted. Related files and commits retain the existing path and hash format checks, and their actual existence is also verified when results are reported.
 
-지속 상태는 `changed`·`implemented`·`verified`·`needs-fix`다. `implementing`은 서버 실행과 문서 버전이 일치할 때만 계산하며 파일에는 저장하지 않는다. `status_hash`는 제목·본문 요구사항·실제 부모 ID에 상태를 연결한다. 해시가 없거나 내용·제목·부모가 다르면 `changed`로 읽으며 원본 판정을 자동으로 고쳐 쓰지 않는다. 사용자 판정 시 현재 해시와 판정을 함께 기록한다. 파일 버전에는 경로와 전체 내용이 포함되어 외부 이름 변경도 이전 실행 결과의 덮어쓰기를 막는다.
+Persistent statuses are `changed`, `implemented`, `verified`, and `needs-fix`. Calculate `implementing` only when the server execution and document version match, and do not store it in the file. `status_hash` ties the status to the title, body requirements, and actual parent ID. If the hash is missing or the content, title, or parent differs, read the status as `changed` without automatically rewriting the original verdict. When the user assigns a verdict, record the current hash with it. The file version includes the path and full content, so external renames also prevent previous execution results from overwriting it.
 
-API·CLI 결과는 기존 `## 구현 내용`·`## 검증`과 `mew:implementation`·`mew:validation` 구분자로 기록한다. 읽기는 구분자와 제목 사이의 빈 줄·메모를 허용하고, 코드 블록의 구분자 예시는 일반 본문으로 남긴다. 불완전한 구분자나 반복된 결과 제목 때문에 전체 목록을 거부하지 않는다. 전용 섹션을 쓰지 않는 일반 Markdown도 그대로 유지한다. 기능 API·CLI는 사용자 추가 프론트매터·주석과 기존 결과를 보존한다.
+Record API and CLI results using the existing `## 구현 내용` and `## 검증` headings and `mew:implementation` and `mew:validation` delimiters. Reading allows blank lines and notes between delimiters and headings, and delimiter examples in code blocks remain ordinary body content. Do not reject the entire list because of incomplete delimiters or repeated result headings. Preserve ordinary Markdown that does not use dedicated sections as well. The feature API and CLI preserve user-added frontmatter, comments, and existing results.
 
-새 결과가 현재 버전에 대해 완료되면 구현·검증 설명을 갱신하고 관련 파일·커밋을 합친다. 실행 중 문서가 편집되면 이전 실행 결과는 요청 이력에만 남기고 최신 문서에 덮어쓰지 않는다. 직접 편집한 기능 문서는 별도 스펙 문서에 복제하지 않는다. 설치·운영·공통 지침·ADR은 기존 소유 문서에 둔다. 기존 docs 전체를 자동 변환하거나 삭제하지 않는다.
+When new results complete for the current version, update the implementation and validation descriptions and merge related files and commits. If the document is edited during execution, keep the previous execution results only in request history without overwriting the latest document. Do not duplicate directly edited feature documents into separate specification documents. Keep installation, operations, shared guidance, and ADRs in their existing owning documents. Do not automatically convert or delete all existing docs.
 
-#### 외부 편집과 Git
+#### External editing and Git
 
-- 문서 편집기·일반 편집기·공통 CLI가 같은 파일을 사용한다. 조회 시 문서를 읽으므로 외부 추가·수정·rename·삭제는 다음 갱신에 반영한다. 외부 파일 추가는 상태 해시 규칙에 따라 `changed`로 읽으며 에이전트를 자동 실행하지 않는다.
-- 동시 편집은 파일 전체 내용에서 만든 불투명 버전으로 검사한다. 버전의 크기를 시간순으로 해석하지 않는다. 기능 API·CLI는 저장 시 예상 버전과 다르면 충돌로 거부한다. 현재 브랜치 작업 패널은 이 문서 편집 API를 호출하지 않는다.
-- 루트 `features/MOC.md`·`README.md`와 숨김 파일은 기능으로 읽지 않는다. 내부 폴더의 MOC·_MOC는 대표가 없을 때만 해당 상위 항목으로 읽는다. 기존 형식의 같은 이름 부모 파일도 호환한다. 중복 ID·잘못된 YAML·심볼릭 링크는 오류로 알리고 덮어쓰지 않는다. 문서당 512KB, 폴더 깊이 16, 기능 2,000개까지다. API 입력은 요구사항/구현 설명 각각 40,000자, 검증 20,000자 제한을 유지한다.
-- mew가 기능 문서를 저장할 때 `features/MOC.md`의 관리 블록과 Documents `MOC.md`의 진입 링크도 갱신한다. 사용자 작성한 나머지 인덱스 내용은 유지한다. 외부에서만 rename·삭제했다면 다음 mew 문서 저장 전까지는 일반 문서 규칙에 따라 MOC 링크도 직접 고친다.
-- Documents와 프로젝트의 Documents 설정을 Git으로 공유하면 새 clone에서도 기능·계층·결과·사용자 판정을 읽을 수 있다. 실행 중 상태·대화·요청 이력은 서버 데이터에 남으며 clone에 따라가지 않는다. 자동 Git 커밋은 하지 않는다.
+- The document editor, general-purpose editors, and shared CLI use the same files. Documents are read on retrieval, so external additions, edits, renames, and deletions appear on the next refresh. Read externally added files as `changed` according to the status hash rules without automatically running an agent.
+- Check concurrent edits using an opaque version derived from the entire file content. Do not interpret version magnitude as chronological order. The feature API and CLI reject saves as conflicts if the version differs from the expected version. The current branch work panel does not call this document editing API.
+- Root-level `features/MOC.md` and `README.md` and hidden files are not read as features. MOC and _MOC in internal folders are read as the corresponding parent item only when no representative exists. Parent files with the same name in the old format are also supported. Duplicate IDs, invalid YAML, and symbolic links are reported as errors and are not overwritten. Limits are 512KB per document, a folder depth of 16, and 2,000 features. API input limits remain 40,000 characters each for requirements and implementation descriptions, and 20,000 characters for validation.
+- When mew saves a feature document, it also updates the managed block in `features/MOC.md` and the entry link in the Documents `MOC.md`. Preserve the rest of the user-written index content. If a rename or deletion was performed only externally, manually correct MOC links under the ordinary document rules until the next mew document save.
+- Sharing Documents and the project's Documents settings through Git allows a fresh clone to read features, hierarchy, results, and user verdicts. Running status, conversations, and request history remain in server data and do not follow the clone. Do not create automatic Git commits.
 
-#### 기존 데이터 이전과 복구
+#### Legacy data migration and recovery
 
-서버에 변경을 반영한 뒤, 수정 권한이 있는 기능 조회·CLI 접근 또는 실행 서비스 복구 시 기존 형식 1 JSON을 감지해 이전한다. 기존 ID·계층·상태·완료 결과를 Markdown으로 쓰고, 큐의 버전 연결과 실행 이력을 보존한다. 원본은 같은 서버 파일 옆 `<sha256(workspace)>.json.v1-backup`에 보관한다. 동일 ID의 기존 Markdown이 있으면 원본 확인이 필요하므로 이전을 중단하고 덮어쓰지 않는다. 읽기 전용 조회만으로 이전을 수행하지 않는다.
+After the changes are applied to the server, detect and migrate legacy format 1 JSON during feature retrieval or CLI access with modification permission, or during execution service recovery. Write existing IDs, hierarchy, statuses, and completed results to Markdown, preserving queue version links and execution history. Keep the original in `<sha256(workspace)>.json.v1-backup` beside the same server file. If Markdown with the same ID already exists, stop migration without overwriting it because the original must be checked. Do not migrate on read-only retrieval alone.
 
-API와 CLI는 같은 프로세스 간 잠금을 사용한다. 문서 이동을 위한 생성·원본 삭제·링크·MOC 쓰기 계획을 서버 JSON의 `pendingWrites`에 먼저 기록하고 파일별 원자적 교체를 마친 뒤 계획을 지운다. 중간 종료 시 이미 적용한 내용은 인정하고 남은 쓰기를 복구한다. 외부 편집이 감지되면 해당 파일과 계획을 보존한 채 오류를 표시한다. 잠금을 사용하지 않는 외부 편집기와의 완전한 트랜잭션 격리를 보장하지는 않는다.
+The API and CLI use the same interprocess lock. First record the plan for creation, source deletion, link updates, and MOC writes needed to move documents in the server JSON's `pendingWrites`, then clear the plan after completing atomic replacement of each file. If execution stops midway, recognize changes already applied and recover the remaining writes. If external edits are detected, preserve the affected file and plan and display an error. Full transaction isolation from external editors that do not use the lock is not guaranteed.
 
-복구 충돌은 표시된 문서와 실행 JSON을 먼저 별도 백업하고 처리한다. `pendingWrites`의 해당 경로·예정 내용(`content`)과 외부 변경을 비교한다. 예상 이전 내용(`before`의 SHA-256)으로 복원하거나 예정 내용과 동일하게 맞추면 다음 조회/CLI에서 복구가 진행된다. 보관한 외부 변경은 복구 후 다시 합친다. 원인을 확인하지 않고 `pendingWrites`나 서버 파일을 삭제하지 않는다. 일반 편집에는 JSON을 직접 수정하지 않으며, 백업에는 프로젝트 Documents와 서버 features 디렉터리를 함께 포함한다.
+Before resolving recovery conflicts, separately back up the indicated documents and execution JSON. Compare the affected paths and planned content (`content`) in `pendingWrites` with the external changes. Restoring the expected previous content (the SHA-256 in `before`) or matching the planned content allows recovery to proceed on the next retrieval or CLI access. Merge the preserved external changes back in after recovery. Do not delete `pendingWrites` or server files without identifying the cause. Do not edit JSON directly for ordinary edits, and include both the project's Documents and the server features directory in backups.
 
-API는 `/api/features` 아래 조회·요청·편집·판정·취소 경로다. `POST /requests`의 선택적 `edit`는 `{title, content, parentId, summary, validation}` 전체 명세이며 `targetId`·`expectedVersion`과 함께 보낸다. 저장·큐 생성은 같은 프로세스 간 잠금과 `pendingWrites` 복구 단위로 처리하며, 저장 후 문서 버전으로 요청의 대상 버전을 고정한다. 기존 큐·버전·계층·크기 검증 실패 시 명세와 요청을 둘 다 변경하지 않는다. 서버는 편집 전후·원본 버전을 실행 이력에 캡처하고 같은 요청 ID 재전송의 본문을 비교한다. 응답 실패 후 같은 내용을 다시 적용하면 동일 ID를 사용하므로 중복 실행하지 않는다. 현재 프로젝트와 요청 workspace가 다르면 409다. 조회에는 agent 기능과 전체 파일 열람, 변경에는 전체 파일 수정 권한이 필요하다. 부분 파일 제한이 있는 계정에는 원장을 노출하지 않는다. 파일 열기에는 기존 파일 API 권한, 커밋 상세에는 Git 권한을 적용한다. CLI는 에이전트 셸과 같은 OS 신뢰 경계 안에서 사용한다.
+The API provides retrieval, request, editing, verdict, and cancellation routes under `/api/features`. The optional `edit` in `POST /requests` is the full `{title, content, parentId, summary, validation}` specification and is sent with `targetId` and `expectedVersion`. Saving and queue creation are handled under the same interprocess lock and `pendingWrites` recovery unit, and the saved document version fixes the request's target version. If existing queue, version, hierarchy, or size validation fails, change neither the specification nor the request. The server captures the document versions before and after editing and the original version in execution history, and compares the bodies of retransmissions with the same request ID. Reapplying the same content after a response failure uses the same ID, preventing duplicate execution. If the current project differs from the request workspace, return 409. Retrieval requires the agent capability and permission to read all files; changes require permission to modify all files. Do not expose the ledger to accounts with partial file restrictions. Apply existing file API permissions to opening files and Git permissions to commit details. Use the CLI within the same OS trust boundary as the agent shell.
 
-### 기존 문서·실행 검증과 현재 한계
+### Existing document and execution validation and current limitations
 
-`server/feature-documents.test.ts`는 Markdown 왕복·외부 편집·복제·이전·복구 충돌을, `server/features.test.ts`는 수명주기·동시 수정·계층·경로/Git·기존 CLI를, `server/feature-service.test.ts`는 큐·로그인/모델 대기·취소·권한·복원을 검사한다. `server/feature-host.test.ts`는 실제 독립 감독과 ACP 테스트 에이전트로 모델 적용·CLI 보고·같은 대화 복원을 확인한다. 아래 이전 UI 검증 기록은 당시 문서 계층 패널에 대한 결과이며 새 브랜치 패널의 검증 근거가 아니다. 실제 유료 AI의 구현 품질이나 모바일 실기기 동작을 보증하지 않는다.
+`server/feature-documents.test.ts` checks Markdown round trips, external edits, cloning, migration, and recovery conflicts; `server/features.test.ts` checks lifecycle, concurrent modifications, hierarchy, paths/Git, and the existing CLI; `server/feature-service.test.ts` checks queues, login/model waits, cancellation, permissions, and restoration. `server/feature-host.test.ts` uses an actual independent supervisor and an ACP test agent to verify model application, CLI reporting, and restoration of the same conversation. The earlier UI validation records below describe results for the document hierarchy panel at that time and are not validation evidence for the new branch panel. They do not guarantee implementation quality from actual paid AI or behavior on physical mobile devices.
 
-기존 문서·실행 API와 새 브랜치 목록은 별도로 갱신한다. 빌드와 서버 반영은 [실행·검증 규칙](../development/getting-started.md)에 따라 사용자가 수행한다.
+Update the existing document and execution API and the new branch list separately. The user performs builds and applies changes to the server according to the [Execution and validation rules](../development/getting-started.md).
 
 <!-- mew:implementation:start -->
-## 구현 내용
+## Implementation details
 
-### 2026-10-22 브랜치별 작업·미리보기
+### 2026-10-22 Per-branch work and previews
 
-- 기능 패널을 실제 로컬 브랜치·worktree별 작업 목록으로 바꾸고 기존 `/포트번호` 미리보기를 연결했다. 작업 내용·검증·사용자 판정은 Git 공통 디렉터리에 저장하며 기존 Markdown 문서·실행 API를 보존한다.
-- 코드 상태에 연결한 사용자 판정과 충돌 검사를 적용하고, 미저장 설정은 계정·프로젝트별 탭 세션에 복원한다. 저장 충돌 후 최신 기준을 불러와 작성 중인 내용을 이어갈 수 있다.
+- Changed the feature panel to a work list organized by actual local branches and worktrees and connected the existing `/포트번호` preview. Work details, validation, and user verdicts are stored in the Git common directory, while the existing Markdown documents and execution API are preserved.
+- Applied user verdicts tied to code state and conflict checks, and restored unsaved settings in tab sessions separated by account and project. After a save conflict, users can load the latest baseline and continue their draft.
 
-### 이전 문서 계층 패널
+### Previous document hierarchy panel
 
-이하의 기록은 2026-10-06까지의 문서 계층 패널 구현이다.
+The records below cover the document hierarchy panel implementation through 2026-10-06.
 
-- `FeatureTreeNode`는 사이드바와 같은 14px 계층 간격·중심에서 2px 왼쪽의 1px 세로선·4px 불렛을 사용한다. 노드별 쌓임 격리로 조상선이 하위 고정 행 위에 보이게 하며, 실제 상위 행 높이를 측정해 저장 오류·폭 변경 때도 고정 위치를 빈틈 없이 맞춘다. 기존 제목 편집·문서 열기·상태 복원을 유지한다.
+- `FeatureTreeNode` uses the same 14px hierarchy spacing as the sidebar, with a 1px vertical line 2px left of center and 4px bullets. Per-node stacking isolation keeps ancestor lines visible above descendant sticky rows, and measuring actual parent row heights keeps sticky positions aligned without gaps even after save errors or width changes. Existing title editing, document opening, and state restoration are retained.
 
-- 제목·부모 관계를 파일명·폴더에서 읽고, 상위 대표 파일은 별도 자식으로 중복 표시하지 않는다.
-- 파일 기반 항목 생성·개명·부모 이동은 본문·상대 링크·실행 버전 연결을 보존한다. 중복 이름·외부 변경은 덮어쓰지 않는다.
-- 패널 본문 섹션과 커밋 상세 팝업을 제거하고 제목·자식 전용 트리로 단순화했다. 문서 열기와 기존 화면 상태 복원은 유지한다.
-- 제목을 직접 입력하는 필드로 바꾸고 원본 문서는 문서 아이콘으로만 열도록 했다. 제목 저장은 입력 시작 버전을 검사하며 파일·폴더 개명과 링크 보정은 기존 API를 재사용한다. 저장 실패 시 입력을 유지하고 주기적인 조회는 입력을 덮어쓰지 않는다.
-- 정렬 선택기에 전용 외형을 적용해 큰 입력 필드 테두리를 제거하고, 도구 줄·버튼·선택 행의 여백을 줄였다. 공통 선택기의 접근성·선택 저장·오버레이 동작을 재사용한다.
-- 기존 기능 문서는 제목과 같은 파일명·상위 대표 구조로 이동하고 문서 지도·들어오는 링크를 보정한다.
+- Read titles and parent relationships from filenames and folders, without displaying parent representative files again as separate children.
+- File-based item creation, renaming, and parent moves preserve body content, relative links, and execution version links. Duplicate names and external changes are not overwritten.
+- Removed panel body sections and the commit details popup, simplifying the panel to a tree of titles and children only. Document opening and existing UI state restoration are retained.
+- Changed titles to directly editable input fields and made source documents open only through the document icon. Saving a title checks the version from when input began, while file and folder renaming and link adjustments reuse the existing API. Failed saves preserve input, and periodic retrieval does not overwrite it.
+- Applied a dedicated appearance to the sort selector to remove the large input field border, and reduced spacing in the toolbar, buttons, and selection rows. Reuses the shared selector's accessibility, selection persistence, and overlay behavior.
+- Move existing feature documents to filenames matching their titles and the parent representative structure, adjusting document maps and incoming links.
 
 <!-- mew:implementation:end -->
 
 <!-- mew:validation:start -->
-## 검증
+## Verification
 
-- 2026-10-22: 로컬 브랜치·worktree·CLI·권한·포트 상태·판정 버전을 `server/branch-features.test.ts`로, PC·모바일의 미리보기·저장·실패 시 초안 보존·프로젝트별 복원·409 복구를 격리 Chromium의 `server/feature-ui.test.ts`로 확인했다. 프리뷰 주소와 데모·테마 패널 회귀도 통과했다. `src/utils/branch-feature-draft.test.ts`의 계정·프로젝트·인스턴스 격리, 저장값 검증과 저장소 실패 시 보존 3개 검사 및 문서 검사를 통과했다. 빌드·운영 서버 반영·실제 사용자 앱의 동작 확인은 수행하지 않았다.
+- 2026-10-22: Verified local branches, worktrees, CLI, permissions, port status, and verdict versions with `server/branch-features.test.ts`, and desktop/mobile previews, saving, draft preservation on failure, per-project restoration, and 409 recovery with `server/feature-ui.test.ts` in isolated Chromium. Preview URL and demo/theme panel regression checks also passed. The 3 checks in `src/utils/branch-feature-draft.test.ts` for account, project, and instance isolation, stored value validation, and preservation on storage failure, along with document checks, passed. Builds, application to the production server, and verification of actual user app behavior were not performed.
 
-### 이전 문서 계층 패널 검증
+### Previous document hierarchy panel validation
 
-이하의 기록은 당시 문서 계층 패널에 대한 결과다.
+The records below describe results for the document hierarchy panel at that time.
 
-- 2026-10-06: `server/feature-tree-ui.test.ts`에서 PC·모바일과 양 테마의 세 단계 상위 행 고정·빈틈 없는 배치·조상선 픽셀·불렛을 확인했다. 저장 오류로 늘어난 행의 배치와 하위 목록 끝의 고정 해제·접기·문서 열기도 통과했다. 기존 `server/feature-ui.test.ts`, TypeScript·대상 lint·문서 허용목록 검사도 통과했다. 워크스페이스 링크 검사는 이번 작업 밖의 미추적 태스크 문서 3개의 MOC 미연결로 실패했다. 빌드·서버 반영은 수행하지 않았다.
+- 2026-10-06: Verified three-level sticky parent rows, gap-free layout, ancestor line pixels, and bullets on desktop and mobile in both themes with `server/feature-tree-ui.test.ts`. Layout of rows expanded by save errors, releasing sticky positioning at the end of child lists, collapsing, and document opening also passed. Existing `server/feature-ui.test.ts`, TypeScript, targeted lint, and document allowlist checks also passed. The workspace link check failed because 3 untracked task documents outside this work were not linked from MOCs. Builds and application to the server were not performed.
 
-- 2026-10-06: 격리 Chromium에서 PC·모바일 제목 인라인 수정, Enter·포커스 이동 저장, Esc 취소, 조회 중 입력 유지, 외부 변경 충돌 시 입력·원문 보존, 파일·하위 경로 개명과 읽기 전용 계정을 확인했다. TypeScript·대상 lint·문서 허용목록 검사를 통과했다. 워크스페이스 링크 검사는 기존 미추적 태스크 문서 2개의 MOC 미연결로 실패했다. 빌드·서버 반영은 수행하지 않았다.
+- 2026-10-06: Verified desktop/mobile inline title editing, saving on Enter and focus change, cancellation with Esc, input preservation during retrieval, preservation of input and source text on external change conflicts, file and child path renaming, and read-only accounts in isolated Chromium. TypeScript, targeted lint, and document allowlist checks passed. The workspace link check failed because 2 existing untracked task documents were not linked from MOCs. Builds and application to the server were not performed.
 
-- 2026-10-06: 정렬 폴리싱 후 `server/feature-ui.test.ts`에서 PC 다크 28px 버튼·160px 메뉴·28px 행, 키보드 탐색 시 값 유지·Esc 포커스 유지·정렬 복원, 320px 모바일 라이트 32px 버튼·36px 행·터치 선택·화면 경계를 확인했다. TypeScript·전체 lint(기존 경고만 남음)·문서 허용목록·워크스페이스 링크 검사를 통과했다. 빌드·서버 반영은 수행하지 않았다.
+- 2026-10-06: After polishing sorting, used `server/feature-ui.test.ts` to verify desktop dark mode with 28px buttons, a 160px menu, and 28px rows; value preservation during keyboard navigation, focus retention on Esc, and sort restoration; and mobile light mode at 320px with 32px buttons, 36px rows, touch selection, and viewport boundaries. TypeScript, full lint (only existing warnings remained), document allowlist, and workspace link checks passed. Builds and application to the server were not performed.
 
-- 2026-10-06: 기능·문서 페이지·실행 서비스·독립 감독·PC 다크/모바일 라이트 UI 검사 36개와 TypeScript·전체 lint·문서 허용목록 검사를 통과했다. 전체 문서 링크 검사는 기존 미추적 `docs/하이.md`의 MOC 미연결 1건만 남아 있다. 빌드·서버 반영은 수행하지 않았다.
+- 2026-10-06: Passed 36 feature, document page, execution service, independent supervisor, and desktop dark/mobile light UI checks, along with TypeScript, full lint, and document allowlist checks. The full document link check still has only 1 missing MOC link for the existing untracked `docs/하이.md`. Builds and application to the server were not performed.
 
-### 이전 UI·실행 검증 기록
+### Earlier UI and execution validation records
 
-- 2026-10-04: 격리 Chromium에서 요구사항·하위 기능의 즉시 표시, 묶음별 접기 버튼 제거, 하위 기능 자체의 접기·펼치기, 요구사항의 12px 글자·보조 색상과 모바일 표시를 확인했다. 관련 UI·Markdown 테스트 5개, 타입·대상 린트·문서 링크 검사를 통과했다.
+- 2026-10-04: Verified immediate display of requirements and child features, removal of per-group collapse buttons, collapsing and expanding child features themselves, and requirements displayed with 12px text, secondary color, and mobile layout in isolated Chromium. Passed 5 related UI and Markdown tests, type checks, targeted lint, and document link checks.
 
-- 2026-10-04: 격리 Chromium에서 읽기 전용 UI, 변경 API·에이전트셋 조회 미호출, 문서·파일·커밋·대화 열기, 접기·펼치기·화면 상태 복원·모바일을 확인했다. 타입·린트·문서 검사를 통과했다. 워크스페이스 전환 통합 검사는 기능 패널 진입 전 `extra.md` 선택 단계에서 시간 초과로 실패했다.
+- 2026-10-04: Verified read-only UI, no calls to change APIs or agent set retrieval, opening documents, files, commits, and conversations, collapsing and expanding, UI state restoration, and mobile behavior in isolated Chromium. Type, lint, and document checks passed. The workspace switching integration check failed with a timeout at the `extra.md` selection step before entering the feature panel.
 
-- PC·모바일 타이틀바에서 제목 앞에 독과 같은 기능 아이콘이 표시되는지 확인한다.
+- Verify that the same feature icon used in the dock appears before the title in desktop and mobile title bars.
 
-- 서버·Markdown·큐·독립 감독 테스트와 격리 Chromium UI 테스트로 인라인 요구사항/구현 편집·작업 접수, 셋 선택·충돌·실패 재시도·초안 보존, 관련 증거·하위 기능·모바일·권한을 확인했다.
-- 실제 유료 AI의 구현 품질은 별도 사용자 확인 대상이다.
-- 2026-09-25: Markdown 렌더링·원문 범위 보존·중복 탐색 정보 숨김을 단위 검사하고, 격리 Chromium에서 제목 직접 편집·아이콘 접기·초안 보호·링크 열기·읽기 전용·모바일 터치 동작을 확인한다.
+- Verified inline requirements/implementation editing and work submission, set selection, conflicts, retries after failure, draft preservation, related evidence, child features, mobile behavior, and permissions through server, Markdown, queue, independent supervisor, and isolated Chromium UI tests.
+- Implementation quality from actual paid AI requires separate user verification.
+- 2026-09-25: Unit-test Markdown rendering, source range preservation, and hiding duplicate navigation information, and verify direct title editing, collapsing via icons, draft protection, link opening, read-only behavior, and mobile touch behavior in isolated Chromium.
 
-- 2026-09-29: 격리 Chromium에서 36px 타이틀바, 데스크톱 손잡이 이동·마우스 폭 조절·키보드 높이 조절, 이동 중 초안 보존, 모바일 손잡이 숨김, 닫기·모바일 전환·저장 완료 후 새로고침의 배치 복원을 확인했다. `feature-ui.test.ts`·`workspace-switch-ui.test.ts`·`dockWorkspaceUi.test.ts`·`dock-maximize-ui.test.ts`, 도킹 단위 검사와 타입·대상 린트·문서 검사를 통과했다.
+- 2026-09-29: Verified the 36px title bar, desktop dragging by the handle, width resizing with the mouse, height resizing with the keyboard, draft preservation while moving, hidden handles on mobile, and layout restoration after closing, switching to mobile, and refreshing after a successful save in isolated Chromium. Passed `feature-ui.test.ts`, `workspace-switch-ui.test.ts`, `dockWorkspaceUi.test.ts`, `dock-maximize-ui.test.ts`, docking unit tests, and type, targeted lint, and document checks.
 
 <!-- mew:validation:end -->

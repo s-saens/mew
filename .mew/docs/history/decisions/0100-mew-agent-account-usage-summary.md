@@ -1,36 +1,36 @@
 ---
-provenance: "Liiiiv 중앙 ADR 이관본, 2026-10-14"
-description: "이관한 결정 기록: mew는 CLI 계정 사용량 원문에서 안정적인 요약을 함께 보여 준다. 당시 선택·근거·후속 변경을 보존하며 현재 계약은 Mew 소유 문서에서 확인한다."
-title: "0100 — mew는 CLI 계정 사용량 원문에서 안정적인 요약을 함께 보여 준다"
+provenance: "Migrated copy of a Liiiiv central ADR, 2026-10-14"
+description: "Migrated decision record: mew displays a reliable summary alongside the raw CLI account usage output. Preserves the choices, rationale, and subsequent changes from that time; consult the Mew owning document for the current contract."
+title: "0100 — mew displays a reliable summary alongside the raw CLI account usage output"
 created: 2026-08-31
 updated: 2026-09-11
 ---
 
-- 날짜: 2026-08-31
-- 상태: 대체됨: 0104
-- 대체 확인: 2026-09-11 — [0104](0104-mew-agent-account-usage-dashboard-link.md). CLI 원문 파싱·한도 요약 UI를 제거했다. 현재 계정 조회는 0130을 따른다.
-- 부분 대체: [0098](0098-mew-agent-account-usage-cli-bridge.md) — Info 팝업의 원문 단독 표시 범위
-- 결정자: 송상훈 (지시), Codex (구현)
+- Date: 2026-08-31
+- Status: Superseded by: 0104
+- Supersession confirmed: 2026-09-11 — [0104](0104-mew-agent-account-usage-dashboard-link.md). CLI output parsing and the limit summary UI were removed. Current account queries follow 0130.
+- Partially supersedes: [0098](0098-mew-agent-account-usage-cli-bridge.md) — the scope of displaying only raw output in the Info popup
+- Decision makers: Song Sanghun (direction), Codex (implementation)
 
-## 배경
+## Background
 
-0098의 CLI 중계는 계정 자격증명을 새로 소유하지 않는 대신 터미널 원문 전체를 Info 팝업에 보였다. 한도·리셋 시각처럼 반복해서 확인하는 값도 ANSI를 지운 텍스트 안에 섞여 있어, 빠르게 남은 사용량을 판단하기 어려웠다. CLI는 서버 상태를 갱신 중일 때 `refresh requested`처럼 수치를 주지 않을 수도 있다.
+The CLI bridge in 0098 displayed the full terminal output in the Info popup without taking ownership of account credentials. Frequently checked values such as limits and reset times were mixed into text stripped of ANSI codes, making it difficult to quickly assess remaining usage. While refreshing server state, the CLI may not provide numbers, as with `refresh requested`.
 
-## 선택지
+## Options
 
-1. 원문만 유지한다 — 공급자 출력 변화에는 강하지만 핵심 값을 매번 읽어야 한다.
-2. 계정 자격증명 또는 공급자 청구 API를 직접 읽는다 — 정확한 구조화 데이터는 얻지만 0098의 자격증명 경계를 깬다.
-3. 허용된 CLI 원문에서 보수적으로 인식할 수 있는 한도·리셋만 요약하고, 원문과 공식 Usage 대시보드 링크를 남긴다.
+1. Keep only the raw output — resilient to provider output changes, but requires reading the key values every time.
+2. Read account credentials or the provider billing API directly — provides accurate structured data but breaks the credential boundary in 0098.
+3. Summarize only limits and reset times that can be conservatively recognized in the permitted raw CLI output, and retain the raw output and a link to the official Usage dashboard.
 
-## 결정
+## Decision
 
-3번을 채택한다.
+Adopt option 3.
 
-- 서버는 `N% left|remaining` 및 해당 줄의 리셋 시각만 구조화한다. 인식하지 못한 형식·크레딧·공급자 고유 값은 추측하지 않는다.
-- 수치를 얻으면 Info 팝업은 한도별 남은 비율과 리셋 시각을 먼저 보이고, 원문은 접어 확인할 수 있게 둔다.
-- CLI가 갱신 중이거나 수치를 주지 않으면 빈 게이지를 그리지 않는다. `아직 수치 없음` 상태와 재조회, 공식 Usage 대시보드로 가는 링크를 보인다.
-- 원문은 계속 브라우저에만 일시 표시하며 Mew 데이터·이벤트·로그에는 저장하지 않는다. 직접 API 호출·인증 저장소 파싱은 하지 않는다.
+- The server structures only `N% left|remaining` and the reset time on that line. It does not guess unrecognized formats, credits, or provider-specific values.
+- When numbers are available, the Info popup shows the remaining percentage and reset time for each limit first, with the raw output available in a collapsed section.
+- Do not draw empty gauges when the CLI is refreshing or provides no numbers. Show the `아직 수치 없음` state, a refresh action, and a link to the official Usage dashboard.
+- Continue displaying raw output temporarily in the browser only; do not store it in Mew data, events, or logs. Do not make direct API calls or parse authentication stores.
 
-## 근거
+## Rationale
 
-구조화된 수치는 CLI가 실제로 보여 준 범위만 표현하므로, 자격증명 경계와 CLI 우선 원칙을 지키면서도 일상적인 확인을 한눈에 할 수 있다. 원문을 남기면 CLI 형식 변경이나 새 항목도 숨기지 않는다.
+Structured numbers represent only what the CLI actually displayed, allowing routine checks at a glance while respecting the credential boundary and CLI-first principle. Retaining the raw output also keeps CLI format changes and new items visible.

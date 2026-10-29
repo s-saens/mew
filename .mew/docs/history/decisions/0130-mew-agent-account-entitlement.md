@@ -1,36 +1,36 @@
 ---
-provenance: "Liiiiv 중앙 ADR 이관본, 2026-10-14"
-description: "이관한 결정 기록: 에이전트 로그인과 구독·사용량 제한을 분리한다. 당시 선택·근거·후속 변경을 보존하며 현재 계약은 Mew 소유 문서에서 확인한다."
-title: "0130 — 에이전트 로그인과 구독·사용량 제한을 분리한다"
+provenance: "Migrated copy of a Liiiiv central ADR, 2026-10-14"
+description: "Migrated decision record: Separate agent login from subscriptions and usage limits. Preserves the choices, rationale, and subsequent changes from that time; consult the Mew owning document for the current contract."
+title: "0130 — Separate agent login from subscriptions and usage limits"
 created: 2026-09-11
 updated: 2026-09-11
 ---
 
-- 날짜: 2026-09-11
-- 상태: 채택
-- 대체: [0104](0104-mew-agent-account-usage-dashboard-link.md) — 계정 조회 금지와 외부 대시보드 단독 표시; 자격증명 비직접 접근은 이 ADR에도 유지
-- 결정자: 사용자 (요구), Codex (구현)
+- Date: 2026-09-11
+- Status: Adopted
+- Supersedes: [0104](0104-mew-agent-account-usage-dashboard-link.md) — Prohibiting account queries and showing only an external dashboard; the prohibition on direct credential access remains in this ADR
+- Decision makers: User (requirements), Codex (implementation)
 
-## 배경
+## Background
 
-Kimi 로그인에 성공해도 미구독 또는 월간 사용량 소진으로 요청이 거절될 수 있다. 공급자가 이 오류를
-ACP Authentication required(-32000)로 감싸 보내면 Mew가 다시 로그인 화면을 띄웠다.
-사용자는 연결 계정과 구독 상태를 확인하고 내부 브라우저에서 구독 페이지를 열기를 요청했다.
+Even after a successful Kimi login, requests may be rejected because there is no subscription or the monthly usage allowance is exhausted.
+When the provider wrapped this error as ACP Authentication required(-32000), Mew displayed the login screen again. The user requested a way
+to check the connected account and subscription status and open the subscription page in the built-in browser.
 
-## 결정
+## Decision
 
-- 공급자의 구독 필요·한도 소진·크레딧 부족 오류를 인증 만료보다 먼저 분류한다. 단순 403·429·RPC 코드만으로 미구독이라고 단정하지 않는다.
-- 계정·플랜은 공식 CLI가 제공하는 읽기 전용 상태 기능으로 확인한다. Kimi는 CLI가 소유한 임시 loopback 서버의 계정·사용량 API, Codex는 공식 app-server 계정 RPC, Claude·Cursor는 CLI 상태 명령을 사용한다.
-- Kimi 임시 서버의 접속 자격은 자신이 실행한 프로세스의 시작 출력에서만 메모리로 전달받고 로그·응답·디스크에 복제하지 않는다. 서버 인증을 끄거나 기존 서버에 임의 연결하지 않는다. 조회 완료·실패·제한 시간 초과 시 생성한 프로세스를 종료한다.
-- 공급자 인증 파일·Keychain·토큰을 Mew가 직접 읽지 않는다. 계정 조회를 위해 모델 프롬프트를 보내거나 기존 대화에 슬래시 명령을 삽입하지 않는다.
-- Antigravity는 사용자의 범위 수정에 따라 이번 적용에서 제외한다. 공식 TUI와 기존 동작을 유지한다.
-- 무료 플랜과 사용 불가 상태를 구분한다. 무료 사용량·추가 크레딧이 있는 상품은 미구독이라는 이유만으로 막지 않는다. 한도 소진 때 대기 메시지는 보존하고 자동 연속 전송은 멈춘다.
-- 공식 구독·사용량 페이지는 같은 Mew 계정의 내부 DOM 브라우저로 연다. 오류에 포함된 임의 URL을 결제 링크로 쓰지 않는다. 결제와 실제 재전송은 사용자가 결정한다.
-- 조회는 owner/manager에 한정하고 필요한 계정 표시명·플랜·한도 상태만 일시 반환한다. 계정 조회 결과는 전사·브라우저 저장소·Mew 로그에 보관하지 않는다.
+- Classify provider errors indicating a required subscription, exhausted limits, or insufficient credits before authentication expiration. Do not conclude that there is no subscription based solely on 403, 429, or an RPC code.
+- Check accounts and plans using read-only status functionality provided by official CLIs. For Kimi, use the account and usage APIs of a temporary loopback server owned by the CLI; for Codex, use official app-server account RPCs; for Claude and Cursor, use CLI status commands.
+- Receive Kimi temporary-server access credentials into memory only from the startup output of the process Mew launched, and do not copy them to logs, responses, or disk. Do not disable server authentication or arbitrarily connect to an existing server. Terminate the created process when the query completes, fails, or times out.
+- Mew must not directly read provider authentication files, Keychain, or tokens. Do not send model prompts or insert slash commands into existing conversations to query accounts.
+- Exclude Antigravity from this implementation following the user's scope revision. Retain the official TUI and existing behavior.
+- Distinguish free plans from unavailable states. Do not block products with free usage allowances or additional credits solely because there is no subscription. When limits are exhausted, preserve queued messages and stop automatic successive sending.
+- Open official subscription and usage pages in the internal DOM browser for the same Mew account. Do not use arbitrary URLs included in errors as payment links. The user decides whether to pay and actually resend.
+- Limit queries to owner/manager and temporarily return only the required account display name, plan, and limit status. Do not retain account query results in transcripts, browser storage, or Mew logs.
 
-## 근거
+## Rationale
 
-인증 재시도는 사용량 부족을 해결하지 못한다. [Codex 공식 계정 RPC](https://learn.chatgpt.com/docs/app-server#auth-endpoints)는 계정·플랜·한도를 제공하며,
-[Antigravity 플랜](https://www.antigravity.google/docs/plans/)은 무료 기본 한도도 명시한다. 로그인 여부·유료 여부·현재 요청 가능 여부를 분리해야 잘못된 결제 요구를 피할 수 있다.
+Retrying authentication does not resolve insufficient usage allowance. The [official Codex account RPC](https://learn.chatgpt.com/docs/app-server#auth-endpoints) provides account, plan, and limit information, and [Antigravity
+plans](https://www.antigravity.google/docs/plans/) also specify free baseline limits. Login status, paid status, and whether requests can currently be made must be distinguished to avoid incorrectly requiring payment.
 
-구현 계약과 공급자별 조회 지원 범위는 코드 레포 README, 화면 기준은 [운영 문서](../../specs/agent-panel.md)에 둔다.
+Keep the implementation contract and per-provider query support scope in the code repository README, and screen criteria in the [operations document](../../specs/agent-panel.md).

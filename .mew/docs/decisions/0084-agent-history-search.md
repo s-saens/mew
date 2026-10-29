@@ -1,35 +1,35 @@
 ---
-title: "에이전트 히스토리를 로컬 주제·본문 색인으로 검색"
-description: "세션 ID 직접 입력을 주제·본문·ID 통합 검색으로 바꾸고, 임베딩 대신 SQLite FTS5 trigram·정규화·주요 용어 동의어와 저장 시 증분 색인을 선택한 근거와 범위를 기록한다."
+title: "Search agent history with a local topic and body index"
+description: "Records the rationale and scope for replacing direct session ID entry with unified topic, body, and ID search, and choosing SQLite FTS5 trigram, normalization, key-term synonyms, and incremental indexing on save instead of embeddings."
 created: "2026-10-28"
 updated: "2026-10-28"
 ---
 
-상태: 채택
+Status: Adopted
 
-## 배경
+## Background
 
-기존 히스토리는 최근 세션 목록에서 고르거나 세션 ID를 직접 입력해 불러왔다. 사용자는 ID를 기억하지 않아도 `에이전트패널` 같은 주제로 관련 대화를 찾고, ID를 아는 경우에도 같은 검색칸을 사용하기를 요청했다. 제목에 없는 답변 내용과 외부 CLI에서 만든 오래된 대화도 찾으려면 목록 제목만 거르는 방식으로는 부족하다.
+Previously, history was loaded by selecting from recent sessions or entering a session ID directly. Users requested finding relevant conversations by topics such as `에이전트패널` without remembering IDs, and using the same search field when they do know the ID. Filtering list titles alone is insufficient to find answer content absent from titles and older conversations created in external CLIs.
 
-## 결정
+## Decision
 
-현재 runtime·cwd 안의 세션을 주제·본문·세션 ID로 통합 검색한다. Mew 전사의 사용자 질문·에이전트 답변을 기존 SQLite의 FTS5 trigram 색인에 반영하고, 전사 저장 때 색인을 갱신한다. 기존 전사는 검색 시 revision·이벤트 수를 확인해 보강한다. Codex·Claude의 디스크 JSONL은 줄 단위로 읽어 색인에 합치고, 파일 수정 시각·크기가 같으면 재사용한다. 검색 시 색인 보강·원문 읽기·본문 조회는 요청 계정 컨텍스트를 전달한 재사용 Worker에서 처리해 서버 주 이벤트 루프와 분리한다.
+Provide unified topic, body, and session ID search across sessions in the current runtime and cwd. Index user questions and agent answers from Mew transcripts in the existing SQLite FTS5 trigram index, and update the index when transcripts are saved. Supplement existing transcripts during searches by checking revisions and event counts. Read Codex and Claude disk JSONL files line by line and merge them into the index, reusing indexed data when file modification times and sizes are unchanged. During searches, index supplementation, source reading, and body retrieval run in a reused Worker that receives the requesting account's context, separate from the server's main event loop.
 
-검색어와 본문은 띄어쓰기·대소문자·기호 차이를 정규화하고 주요 Mew 용어의 한영 동의어를 적용한다. 세션 ID의 정확한 일치·부분 일치를 우선한다. 외부 임베딩 API·벡터 DB·모델 다운로드는 도입하지 않는다. 검색은 본문 일치와 정해진 동의어로 관련 주제를 찾는 범위이며 임의의 의미 추론을 보장하지 않는다.
+Normalize differences in spacing, case, and symbols in queries and body text, and apply Korean-English synonyms for key Mew terms. Prioritize exact and partial session ID matches. Do not introduce external embedding APIs, vector databases, or model downloads. Search finds related topics through body matches and predefined synonyms; it does not guarantee arbitrary semantic inference.
 
-검색과 복원을 분리한다. 입력·Enter는 검색만 하고 결과 선택은 기존 `load_session` 경로를 사용한다. 응답에 검색어·요청 ID를 돌려 늦은 응답이 최신 결과를 덮지 않게 한다. 세션 점유·진행 작업·승인·큐로 인한 전환 제한을 유지한다.
+Separate search from restoration. Typing and Enter only search; selecting a result uses the existing `load_session` path. Return the query and request ID in the response so late responses do not overwrite the latest results. Preserve switching restrictions caused by session occupancy, ongoing work, approvals, and queues.
 
-## 대안과 근거
+## Alternatives and Rationale
 
-| 대안 | 판단 |
+| Alternative | Assessment |
 | --- | --- |
-| 임베딩·벡터 검색 | 등록되지 않은 유사 개념까지 찾는 데 유리하지만 모델·자원·색인 수명·추론 비용을 추가한다. 현재 요청은 한국어 띄어쓰기와 주요 기능 용어 확장으로 우선 다룬다. |
-| 검색마다 모든 JSONL 전체 읽기 | 구현은 단순하지만 입력할 때마다 오래된 대화 원문까지 반복 파싱한다. 저장 시 색인과 파일 변경 확인으로 반복 비용을 줄인다. |
-| 최근 목록의 제목만 필터 | 추가 저장은 적지만 본문·외부 CLI·최근 50개 밖의 대화를 놓친다. 검색 대상 확보에 사용하지 않는다. |
-| 로컬 FTS·정규화·동의어 | 기존 SQLite를 재사용하며 별도 공급자 설정 없이 본문과 ID를 찾는다. 동의어 사전 밖의 의미 관계는 찾지 못할 수 있다. |
+| Embeddings and vector search | Better at finding related concepts that are not registered, but adds models, resources, index lifecycle management, and inference costs. Address the current request first through Korean spacing normalization and expansion of key feature terms. |
+| Read all JSONL files in full for every search | Simple to implement, but repeatedly parses even old conversation sources on every input. Indexing on save and checking for file changes reduce repeated costs. |
+| Filter only titles in the recent list | Requires little additional storage but misses body content, external CLI conversations, and conversations outside the most recent 50. Not used to establish search coverage. |
+| Local FTS, normalization, and synonyms | Reuses existing SQLite to find body content and IDs without separate provider configuration. May miss semantic relationships outside the synonym dictionary. |
 
-## 영향
+## Impact
 
-최초 검색은 기존 전사와 CLI 기록의 색인을 준비하므로 이후 검색보다 오래 걸릴 수 있다. 색인은 사용자 질문·에이전트 답변의 사본을 로컬에 보관하며, 원본 전사를 대신하지 않는다. 생각·도구 호출/결과·시스템 안내와 원문에 붙은 실행 안내는 검색 대상에서 제외한다. 공급자 CLI의 기존 OS 계정·기록 공유 범위는 바꾸지 않는다. 소스 일부를 읽지 못하면 성공한 결과를 유지하고 부분 실패를 알린다.
+The first search may take longer than subsequent searches because it prepares indexes for existing transcripts and CLI history. The index stores local copies of user questions and agent answers and does not replace the original transcripts. Thoughts, tool calls and results, system notices, and execution instructions attached to the source are excluded from search. The provider CLIs' existing OS account and history-sharing scope remain unchanged. If some sources cannot be read, retain successful results and report partial failures.
 
-새 대화의 색인은 저장 경로에서 갱신하지만 외부 CLI의 변경은 다음 검색 때 확인한다. 임베딩이 필요한 수준의 의미 회수율은 별도 요구와 측정을 바탕으로 다시 결정한다. 프로토콜·색인·지원 런타임의 현재 기준은 [세션 계약](../development/agent-sessions.md#히스토리-검색), 화면은 [기능 문서](../features/%ED%84%B0%EB%AF%B8%EB%84%90%C2%B7%EC%97%90%EC%9D%B4%EC%A0%84%ED%8A%B8%C2%B7%EC%9E%90%EB%8F%99%ED%99%94/%EC%97%90%EC%9D%B4%EC%A0%84%ED%8A%B8%20%EB%8C%80%ED%99%94%C2%B7%ED%81%90%C2%B7%EB%B3%B5%EC%9B%90.md#히스토리-검색), 검증과 운영 적용 여부는 [작업 기록](../work/agent-history-search.md)이 소유한다.
+New conversation indexes are updated in the save path, while external CLI changes are checked during the next search. Semantic recall requiring embeddings will be reconsidered based on separate requirements and measurements. The [Session contract](../development/agent-sessions.md#history-search) owns the current protocol, index, and supported runtime standards; the [Feature documentation](../features/terminals-agents-automation/agent-conversations-queue-and-restoration.md#history-search) owns the UI; and the [Work record](../work/agent-history-search.md) owns validation and whether changes are applied to production.

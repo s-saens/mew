@@ -1,89 +1,89 @@
 ---
-title: "터미널과 에이전트 탭"
-description: "Ctrl+백틱으로 여는 셸·AI 대화 시작과 런타임 준비·숫자키 선택·드래그 정렬, 탭·패널 닫기, 대기 큐와 주제·내용·세션 ID로 찾는 기록 복원, CLI·그림판·에이전트셋·스킬·MCP의 진입점을 안내한다."
+title: "Terminal and Agent Tabs"
+description: "Covers opening a shell with Ctrl+backtick, starting AI conversations and preparing runtimes, selecting with number keys and reordering by dragging, closing tabs and panels, the waiting queue and restoring history by topic, content, or session ID, and entry points for the CLI, Paint, agent sets, skills, and MCP."
 updated: "2026-10-28"
 상위파일:
   - "../../.mew/docs/MOC.md"
   - "MOC.md"
 ---
-독에서 **터미널**로 셸을, **에이전트**로 AI 대화를 엽니다. AI 도구는 [런타임 설치·인증](../configuration/agent-runtimes.md)을 먼저 준비하세요.
+In the dock, open a shell with **Terminal** or an AI conversation with **Agents**. For AI tools, complete [runtime installation and authentication](../configuration/agent-runtimes.md) first.
 
-| 하려는 일 | 시작 위치 | 확인할 것 |
+| Task | Where to start | What to check |
 | --- | --- | --- |
-| 셸 명령 실행 | **터미널** → `+`에서 셸 선택 | 새 탭은 현재 프로젝트 폴더에서 시작 |
-| AI와 새 대화 | **에이전트** → `+`에서 런타임 선택 | 서버에서 해당 런타임 설치·로그인 완료 |
-| 모델·역할을 재사용 | `+` 선택기의 **에이전트셋** | 저장한 셋을 새 탭과 예약 작업에서 선택 |
-| 스킬·MCP·기본 지침 설정 | 에이전트 패널 상단 책·플러그·톱니 버튼 | [Skills·MCP](../configuration/agent-harness.md) · [기본 지침](project-setup.md#공통-안내-파일-편집) |
+| Run shell commands | **Terminal** → select a shell from `+` | New tabs start in the current project folder |
+| Start a new AI conversation | **Agents** → select a runtime from `+` | The runtime must be installed and logged in on the server |
+| Reuse models and roles | **Agent Sets** in the `+` selector | Select saved sets for new tabs and scheduled tasks |
+| Configure skills, MCP, and default instructions | Book, plug, and gear buttons at the top of the agent panel | [Skills·MCP](../configuration/agent-harness.md) · [Default instructions](project-setup.md#edit-the-shared-guidance-file) |
 
-터미널과 AI가 실행하는 도구는 Mew 서버의 OS 계정 권한으로 동작한다. 브라우저 기기의 셸이나 파일을 실행하는 기능은 아니다. 권한 기본값과 변경은 [보안과 역할](../operations/security.md)을 따른다.
+The terminal and tools run by AI operate with the OS account permissions of the Mew server. They do not run shells or files on the browser device. Permission defaults and changes follow [Security and Roles](../operations/security.md).
 
-[대화·기록](#대화-진행과-기록) · [CLI 명령 실행](#대화에서-cli-명령-실행) · [외부 CLI 대화](#외부-cli에서-이어-쓴-대화) · [탭·배치](#탭-만들기와-배치)
+[Conversations and History](#conversations-and-history) · [Run CLI Commands](#run-cli-commands-in-conversations) · [Conversations Continued in External CLIs](#conversations-continued-in-external-clis) · [Tabs and Layout](#creating-and-arranging-tabs)
 
-## 대화 진행과 기록
+## Conversations and History
 
-독의 **에이전트**(`Alt+L`)를 열면 탭이 없을 때 `+` 선택 화면이 바로 표시된다. 런타임을 고르고 설치·로그인을 마친다. 기존 탭이 있으면 복원하며, 추가할 때는 `+`를 누른다. Claude Agent·Antigravity·Codex 등은 ACP 채팅에서 조작한다. 일반 셸은 독의 **터미널**(`Ctrl+백틱`)에서 연다.
+Opening **Agents** (`Alt+L`) in the dock immediately shows the `+` selection screen if there are no tabs. Select a runtime and complete installation and login. Existing tabs are restored; press `+` to add one. Claude Agent, Antigravity, Codex, and others are controlled through ACP chat. Open a regular shell from **Terminal** (`Ctrl+백틱`) in the dock.
 
-`+`의 런타임 목록에서 `1`~`9`를 누르면 해당 번호의 설치된 런타임으로 새 탭을 연다. 기본 순서는 Codex → Claude Agent → Kimi Code다. 왼쪽 핸들을 끌어 순서를 바꾸면 번호도 함께 바뀌고 다음에도 같은 브라우저에서 유지된다. 핸들에 포커스를 두고 위·아래 방향키로도 순서를 바꿀 수 있다.
+In the `+` runtime list, press `1`–`9` to open a new tab with the installed runtime at that number. The default order is Codex → Claude Agent → Kimi Code. Drag the handle on the left to reorder the list; the numbers change accordingly, and the order persists in the same browser. You can also focus the handle and use the up and down arrow keys to reorder it.
 
-탭 줄이나 입력칸에 포커스가 있을 때 `Ctrl/Cmd+N/T` 또는 `Alt+N`으로 같은 그룹의 새 에이전트·터미널 탭을 만든다. `Ctrl/Cmd+Shift+T`는 해당 패널에서 최근 닫힌 탭부터 다시 연다. 에이전트는 저장된 대화를 이어 쓰고 터미널은 같은 이름·작업 폴더로 새 셸을 연다. 닫힌 탭 기록은 새로고침이나 프로젝트 전환 때 비운다. `Ctrl/Cmd+W`는 현재 탭을 닫고, `Ctrl/Cmd+1…9`·`Ctrl/Cmd+Tab`은 탭을 선택·이동한다. Chrome 예약키는 **mew 전체화면 버튼**으로 전체화면을 켜야 받을 수 있다. 자세한 조건은 [단축키 설정](../configuration/appearance.md#단축키-설정)을 따른다.
+When the tab bar or input field has focus, use `Ctrl/Cmd+N/T` or `Alt+N` to create a new agent or terminal tab in the same group. `Ctrl/Cmd+Shift+T` reopens tabs in that panel, starting with the most recently closed. Agents resume saved conversations, while terminals open a new shell with the same name and working directory. Closed-tab history is cleared on refresh or project switching. `Ctrl/Cmd+W` closes the current tab, and `Ctrl/Cmd+1…9` and `Ctrl/Cmd+Tab` select and switch tabs. Chrome-reserved shortcuts can only be received after entering fullscreen with the **mew fullscreen button**. See [Shortcut Settings](../configuration/appearance.md#keyboard-shortcut-settings) for detailed conditions.
 
-- ACP 입력창에 프롬프트를 적고 전송 버튼 또는 `Ctrl+Enter`로 보낸다. `@` 참조·`/` 스킬·첨부·입력 기록은 [입력 사용법](../../.mew/docs/features/%ED%84%B0%EB%AF%B8%EB%84%90%C2%B7%EC%97%90%EC%9D%B4%EC%A0%84%ED%8A%B8%C2%B7%EC%9E%90%EB%8F%99%ED%99%94/%EC%97%90%EC%9D%B4%EC%A0%84%ED%8A%B8%20%EC%9E%85%EB%A0%A5%C2%B7%EB%A9%98%EC%85%98%C2%B7%EC%8A%A4%ED%82%AC%C2%B7%EC%B2%A8%EB%B6%80.md)을 따른다.
-- 입력칸 안 오른쪽 아래의 **그림판 열기** 아이콘이나 `Ctrl/Cmd+Alt+D`로 [그림판](../../.mew/docs/features/%ED%84%B0%EB%AF%B8%EB%84%90%C2%B7%EC%97%90%EC%9D%B4%EC%A0%84%ED%8A%B8%C2%B7%EC%9E%90%EB%8F%99%ED%99%94/%EC%97%90%EC%9D%B4%EC%A0%84%ED%8A%B8%20%EA%B7%B8%EB%A6%BC%ED%8C%90.md)을 연다. 도형·텍스트를 그리거나 스크린샷을 붙여넣고 **저장**하면 SVG 기록을 남기고 PNG를 입력에 첨부한다. 원본은 그림판의 **그림 기록**에서 다시 편집한다.
-- 터미널·에이전트 입력칸의 힌트는 **텍스트 입력**으로 통일한다. 작업 중·승인 대기·키보드 잠금 상태에도 같은 짧은 문구를 쓰며, 화면 언어에 따라 영어 `Enter text`·일본어 `テキスト入力`·중국어 `输入文本`으로 표시한다.
-- 모바일 터미널의 보조키는 **텍스트 입력칸 바로 위**에 한 줄로 표시한다. Esc·Tab·Ctrl·Shift·방향키에 **Home·End·^C**를 더해 가로 폭을 채운다. Home/End는 터미널 커서를 줄 처음/끝으로 이동하고, ^C는 Ctrl+C로 실행 중단을 요청한다. 입력칸의 미전송 내용은 유지한다.
-- 진행 중에도 다음 메시지를 보낼 수 있다. 대기 큐에서 본문을 누르면 전체 내용을 펼쳐 확인하며, 4줄을 넘으면 본문 안에서 스크롤한다. 삭제 X 왼쪽 연필 버튼으로 수정하고 왼쪽 핸들로 순서를 바꾸며, 현재 턴이 끝나면 순서대로 실행된다. 일반 대기 메시지를 편집하는 동안 큐는 실행을 기다린다. 중단은 현재 작업 취소와 일반 대기열 비우기를 함께 요청한다.
-- 작업 버블에서 진행·완료·중단·실패 상태와 걸린 시간·작업 내역을 확인한다. 세션의 `i`에서는 지원 런타임의 토큰·API 환산 비용과 [계정·구독 정보](../configuration/agent-runtimes.md#설치로그인구독)를 확인한다.
-- `/clear`는 새 대화를 시작한다. 작업 중이면 앞선 작업이 끝난 뒤 새 대화로 전환하고, 이후 대기 메시지는 새 대화에서 실행한다. 이전 대화는 히스토리에 남는다.
-- Codex는 `/clear` 전환 때 이전 대화의 잠금까지 해제하므로 다른 탭에서도 그 기록을 열 수 있다. 전환에 실패하면 기존 대화와 대기 메시지를 보존하고 실행을 멈춘다. `/clear`를 다시 보내 전환을 완료한다. 이 수정 전에 열린 탭은 작업 완료 후 탭을 닫고 다시 열어야 새 코드가 적용된다.
-- 히스토리의 검색칸에 **에이전트패널**처럼 주제·대화 내용을 입력하면 관련 기록을 찾는다. `에이전트 패널`처럼 띄어 쓰거나 주요 기능의 영어 이름을 써도 찾을 수 있다. 전체 세션 ID나 일부도 같은 칸에 입력한다. 입력 뒤 자동 검색하거나 Enter로 바로 검색하고, 제목·본문 발췌·날짜를 확인한 뒤 목록 항목을 눌러 이어 쓴다. 검색어가 비어 있으면 최근 기록을 보여 준다.
-- 검색 범위는 현재 탭의 런타임과 작업 폴더다. 저장된 사용자 질문·에이전트 답변을 찾으며 Codex·Claude의 외부 CLI 기록도 포함한다. 정해진 동의어와 본문 일치를 사용하는 로컬 검색이므로, 대화에 없는 개념까지 추론하지는 않는다. 현재 탭·다른 탭에서 열린 세션은 중복으로 열 수 없으며 작업·승인·대기 메시지가 남아 있을 때는 세션을 전환하지 않는다. 런타임에 따라 기록 목록·불러오기 지원이 다르며 TUI의 기록은 공식 CLI 안에서 조작한다. 지원 범위는 [히스토리 검색 계약](../../.mew/docs/development/agent-sessions.md#히스토리-검색)을 따른다.
-- 패널 닫기는 세션을 유지하고 탭의 `×`는 세션을 종료한다. 브라우저를 닫아도 서버가 실행 중이면 작업은 계속된다. 입력줄의 시계는 [한 번 보낼 예약 메시지](../../.mew/docs/features/%ED%84%B0%EB%AF%B8%EB%84%90%C2%B7%EC%97%90%EC%9D%B4%EC%A0%84%ED%8A%B8%C2%B7%EC%9E%90%EB%8F%99%ED%99%94/%EC%97%90%EC%9D%B4%EC%A0%84%ED%8A%B8%20%EC%98%88%EC%95%BD%20%EB%A9%94%EC%8B%9C%EC%A7%80.md), 헤더의 예약 작업은 [독립 반복 작업](commands.md#예약-작업-dataschedulesjson)이다.
+- Enter a prompt in the ACP input field and send it with the send button or `Ctrl+Enter`. For `@` references, `/` skills, attachments, and input history, see [Input Usage](../../.mew/docs/features/terminals-agents-automation/agent-input-mentions-skills-and-attachments.md).
+- Open the [Drawing Board](../../.mew/docs/features/terminals-agents-automation/agent-drawing-editor.md) with the **Open Drawing Board** icon at the bottom right inside the input field or with `Ctrl/Cmd+Alt+D`. Draw shapes and text or paste a screenshot, then select **Save** to retain an SVG record and attach a PNG to the input. Edit the original again from **Drawing History** in the drawing board.
+- Hints in terminal and agent input fields consistently use **Enter text**. The same short phrase is used while working, awaiting approval, or with the keyboard locked, and appears as `Enter text` in English, `テキスト入力` in Japanese, or `输入文本` in Chinese according to the interface language.
+- Mobile terminal modifier keys appear in a single row **directly above the text input field**. **Home, End, and ^C** join Esc, Tab, Ctrl, Shift, and the arrow keys to fill the horizontal space. Home/End move the terminal cursor to the beginning/end of the line, and ^C requests execution interruption with Ctrl+C. Unsent input is retained.
+- You can send the next message while work is in progress. Click a message body in the queue to expand its full contents; bodies longer than 4 lines scroll internally. Edit with the pencil button to the left of the delete X, and reorder with the left handle. Messages run in order after the current turn ends. The queue waits while a regular queued message is being edited. Stop requests both cancellation of the current task and clearing of the regular queue.
+- Task bubbles show in-progress, completed, stopped, and failed states, along with elapsed time and task details. The session's `i` shows token usage, API-equivalent costs for supported runtimes, and [Account and Subscription Information](../configuration/agent-runtimes.md#installation-login-and-subscriptions).
+- `/clear` starts a new conversation. If work is in progress, it switches to the new conversation after the preceding task finishes, and subsequent queued messages run in the new conversation. The previous conversation remains in history.
+- When switching with `/clear`, Codex also unlocks the previous conversation so its history can be opened in other tabs. If switching fails, it preserves the existing conversation and queued messages and stops execution. Send `/clear` again to complete the switch. Tabs opened before this fix must be closed and reopened after work finishes for the new code to take effect.
+- Enter a topic or conversation content, such as **agent panel**, in the history search field to find related records. You can also search with spaced wording such as `에이전트 패널` or the English names of major features. Enter a full or partial session ID in the same field. Search runs automatically after input, or immediately with Enter. Review the title, body excerpt, and date, then click a list item to resume it. An empty query shows recent history.
+- Search is scoped to the current tab's runtime and working directory. It searches saved user questions and agent responses, including external CLI history from Codex and Claude. This is a local search using predefined synonyms and body matches, so it does not infer concepts absent from the conversation. Sessions open in the current tab or another tab cannot be opened again, and sessions cannot be switched while tasks, approvals, or queued messages remain. History listing and loading support varies by runtime; manage TUI history within the official CLI. Supported scope follows the [History Search Contract](../../.mew/docs/development/agent-sessions.md#history-search).
+- Closing a panel preserves the session, while the tab's `×` ends it. Work continues even if you close the browser, as long as the server is running. The clock in the input row is for [a one-time scheduled message](../../.mew/docs/features/terminals-agents-automation/agent-scheduled-messages.md), while scheduled tasks in the header are [independent recurring tasks](commands.md#scheduled-jobs-dataschedulesjson).
 
-## 대화에서 CLI 명령 실행
+## Run CLI Commands in Conversations
 
-입력칸 맨 앞에 `! `(`!` 뒤 공백 하나)를 입력하면 두 문자를 지우고 일반 입력과 CLI 모드를 전환한다. CLI 모드에서 다시 맨 앞에 `! `를 입력하면 일반 입력으로 돌아오며 나머지 본문과 커서 위치를 유지한다. 입력칸에 포커스가 있을 때 `Ctrl+Alt+M`으로 일반 입력과 CLI 모드를 전환할 수 있다. 작성 중인 내용과 입력 포커스는 유지한다. 버튼과 동일하게 터미널 권한이 없거나 첨부·전송 처리가 진행 중이면 전환하지 않는다.
+Entering `! ` (`!` followed by one space) at the very beginning of the input field removes those two characters and toggles between regular input and CLI mode. Entering `! ` at the beginning again in CLI mode returns to regular input while preserving the rest of the body and cursor position. With the input field focused, use `Ctrl+Alt+M` to toggle between regular input and CLI mode. Draft content and input focus are preserved. As with the button, switching is blocked without terminal permission or while attachment or send processing is in progress.
 
-모델 선택 바로 왼쪽의 터미널 아이콘을 누르면 **CLI 명령 모드**가 켜진다. 기본값은 해제이며 탭을 다시 열 때도 해제 상태다. 켜진 동안 입력은 고정폭 글꼴로 표시되고, 전송 버튼 또는 `Ctrl+Enter`로 현재 에이전트 탭의 작업 폴더에서 셸 명령을 보낸다. 같은 탭에서 AI나 CLI가 작업 중이면 공통 대기열에 쌓이고, 앞 작업이 끝난 뒤 차례대로 실행한다. 실행 차례가 되어야 별도 tmux를 만든다. 명령에 모델·추론·권한 설정이나 스킬·멘션을 적용하지 않는다. 첨부 파일이 있으면 제거한 뒤 켤 수 있으며, CLI 모드에서는 첨부·예약 메시지를 사용할 수 없다. 에이전트와 터미널 기능 권한이 모두 필요하다.
+Click the terminal icon immediately to the left of the model selector to enable **CLI Command Mode**. It is off by default and remains off when reopening a tab. While enabled, input uses a monospace font; use the send button or `Ctrl+Enter` to submit a shell command in the current agent tab's working directory. If AI or CLI work is in progress in the same tab, the command enters the shared queue and runs in order after preceding work finishes. A separate tmux is created only when execution reaches the command. Model, reasoning, and permission settings, skills, and mentions do not apply to commands. Remove any attachments before enabling this mode; attachments and scheduled messages are unavailable in CLI mode. Both agent and terminal feature permissions are required.
 
-- 대기 중인 CLI 명령은 대기열에 `$`와 고정폭 글꼴로 표시되며 취소·순서 변경을 할 수 있다. 수정하려면 취소 후 다시 보낸다. CLI 실행 중 보낸 AI 메시지도 기다린다. 일반 모드의 `/clear` 뒤에 대기한 명령은 새 대화에서 실행된다.
-- 실행된 명령은 `$`와 고정폭 글꼴로 표시된다. 답변 자리는 **터미널 열기** 버튼이며 실행 중 파랑, 정상 완료 초록, 실패 빨강, 중단 회색으로 표시한다.
-- 버튼을 누르면 기존 tmux 팝업이 열린다. 실행 중 키 입력과 중단이 가능하다. 중단하면 현재 명령과 같은 탭의 대기 작업을 함께 취소한다. 팝업·패널·브라우저를 닫아도 명령은 계속 실행되고, 탭의 `×`는 그 탭이 시작한 명령도 중단한다.
-- 명령 종료 후 출력을 저장하고 tmux를 종료한다. 같은 버튼은 **실행 기록 보기**로 바뀌며, 다시 열면 저장된 읽기 전용 텍스트를 본다. 긴 출력은 최근 512 Ki 문자만 미리 보여 주고 **전체 출력 다운로드**로 전체 ANSI 터미널 기록(`.log.gz`)을 받는다. 색·커서 제어는 텍스트 미리보기에서 제거된다.
-- 기록은 계정·런타임·작업 폴더·대화 ID에 연결되어 새로고침·재접속 후에도 복원된다. `/clear`나 히스토리 이동으로 대화가 바뀌면 해당 대화의 명령만 표시된다. 명령과 출력은 AI에게 전달되지 않는다.
+- Queued CLI commands appear with `$` in a monospace font and can be canceled or reordered. To edit one, cancel and resend it. AI messages sent during CLI execution also wait. Commands queued after `/clear` in regular mode run in the new conversation.
+- Executed commands appear with `$` in a monospace font. The response area contains an **Open Terminal** button, shown in blue while running, green on successful completion, red on failure, and gray when stopped.
+- Clicking the button opens the existing tmux popup. You can enter keystrokes and stop execution while it runs. Stopping cancels both the current command and queued tasks in the same tab. Commands continue running when the popup, panel, or browser is closed; the tab's `×` also stops commands started by that tab.
+- After the command ends, its output is saved and tmux exits. The same button changes to **View Execution History**; reopening it shows saved read-only text. Long output previews show only the most recent 512 Ki characters. Use **Download Full Output** to download the complete ANSI terminal log (`.log.gz`). Color and cursor controls are removed from the text preview.
+- History is associated with the account, runtime, working directory, and conversation ID and is restored after refresh or reconnection. When the conversation changes through `/clear` or history navigation, only commands from that conversation appear. Commands and output are not sent to AI.
 
-## 외부 CLI에서 이어 쓴 대화
+## Conversations Continued in External CLIs
 
-Codex CLI에서 같은 세션을 `resume`해 이어 쓴 뒤 mew에 돌아오면 **히스토리 → 현재 대화 새로고침**으로 최신 기록을 읽는다. 외부 CLI에서 진행 중인 작업을 마치고 종료한 뒤 사용한다. mew에서도 진행 중인 턴이나 대기 메시지가 없어야 한다. 같은 세션 ID를 유지하며, 동일한 기존 턴의 소요 시간·작업 기록은 보존하고 외부에서 추가한 대화를 반영한다. 일반 브라우저 새로고침은 살아 있는 mew 감독의 메모리 기록을 다시 보여줄 수 있다.
+After using `resume` to continue the same session in Codex CLI and returning to mew, use **History → Refresh Current Conversation** to load the latest history. Use this after finishing ongoing work in the external CLI and exiting it. There must also be no active turn or queued messages in mew. The session ID stays the same, elapsed times and work records for the same existing turns are preserved, and conversation content added externally is incorporated. A normal browser refresh may redisplay the in-memory history of a running mew supervisor.
 
-복원 코드 업데이트 전에 실행된 감독은 서버 재시작 뒤에도 남을 수 있다. 그 경우 작업 종료 후 기존 에이전트 탭을 닫고, 새 Codex 탭의 히스토리에서 같은 세션을 선택해야 새 복원 코드가 적용된다. 탭 닫기는 Codex 원본 히스토리를 삭제하지 않는다.
+Supervisors started before the restoration code update may survive a server restart. In that case, after work finishes, close the existing agent tab and select the same session from history in a new Codex tab for the new restoration code to take effect. Closing a tab does not delete the original Codex history.
 
-## 탭 만들기와 배치
+## Creating and Arranging Tabs
 
-에이전트셋 생성·편집의 런타임 선택은 앱 자체 드롭다운을 사용한다. 목록은 키보드·터치로 조작하고 Esc로 목록만 닫을 수 있으며, 저장 중에는 런타임 선택도 잠근다.
+Runtime selection when creating or editing an agent set uses the app's own dropdown. The list supports keyboard and touch controls, and Esc closes only the list. Runtime selection is also locked while saving.
 
-모델 입력란을 누르면 해당 런타임의 후보가 펼쳐진다. 모델 이름이나 ID 일부를 입력해 검색한 뒤 항목을 누르거나 방향키·Enter로 선택한다. 선택한 모델은 정확한 ID로 저장하며, 빈 값 또는 **런타임 기본 모델**은 기본 설정을 사용한다. 목록에 없는 모델 ID도 직접 입력할 수 있다. 런타임을 바꾸면 이전 모델·노력도 선택을 비우고 새 목록을 불러오며, 조회 실패 시 직접 입력하거나 **다시 시도**한다. 저장 중에는 모델 입력·선택도 잠근다.
+Click the model input field to expand the runtime's candidates. Search by entering part of a model name or ID, then click an item or select it with the arrow keys and Enter. The selected model is saved with its exact ID; an empty value or **Runtime Default Model** uses the default settings. You can also enter a model ID that is not listed. Changing runtimes clears the previous model and effort selections and loads a new list. If lookup fails, enter an ID manually or select **Retry**. Model input and selection are also locked while saving.
 
-노력도를 지원하는 런타임은 모델 아래에서 **노력도**도 선택한다. Codex 모델은 노력도별 항목을 하나로 묶어 표시하며 선택한 모델의 지원 노력도만 고를 수 있다. 저장값은 `모델[노력도]` 형태의 정확한 ID이고, 모델을 바꾸면 지원 가능한 기존 노력도를 유지하거나 medium·첫 후보로 전환한다. 다른 런타임은 기본 노력도를 유지하거나 ACP가 제공한 노력도를 별도로 저장한다. 설정은 셋으로 시작하는 새 탭과 예약·기능 작업·AI Commit에 적용된다.
+For runtimes that support effort, select **Effort** below the model as well. Codex models group entries for different effort levels into one, and only effort levels supported by the selected model are selectable. The saved value is an exact ID in `모델[노력도]` format. Changing models retains the existing effort if supported, or switches to medium or the first candidate. Other runtimes retain the default effort or separately save the effort provided by ACP. These settings apply to new tabs started from the set, scheduled tasks, feature tasks, and AI Commit.
 
-데스크톱에서는 탭을 더블클릭하거나 탭에 포커스를 둔 채 `Shift+Enter`를 눌러 패널의 탭 바와 본문을 함께 확대·복귀한다. 선택한 탭 바는 맨 위에서 전체 너비로 표시하고 다른 패널의 탭 바는 숨긴다. 프로젝트 헤더와 독은 그대로 남고 **Esc**로도 원래 배치에 복귀한다. 탭 이름 변경은 데스크톱에서 **F2**, 모바일에서는 기존처럼 제목을 두 번 눌러 시작한다.
+On desktop, double-click a tab or press `Shift+Enter` while it has focus to maximize or restore both the panel's tab bar and content. The selected tab bar appears at the top at full width, and other panels' tab bars are hidden. The project header and dock remain visible; **Esc** also restores the original layout. Start renaming a tab with **F2** on desktop, or by tapping the title twice on mobile as before.
 
-`+` 선택 화면에서 설치된 런타임 항목을 누르면 서버가 현재 프로젝트 루트 cwd를 확인한 뒤에만 탭을 만든다. 키보드로 항목에 포커스한 뒤 Enter·Space로도 열 수 있다. 미설치 런타임은 오른쪽의 `설치` 버튼을 사용하며, 톱니 아이콘은 맨 오른쪽에서 설정을 연다. 확인 중에는 선택기를 닫지 않고 진행 상태를 표시하므로 cwd 없는 빈 탭은 만들지 않는다.
+Clicking an installed runtime in the `+` selection screen creates a tab only after the server verifies the current project root cwd. You can also focus an item with the keyboard and open it with Enter or Space. For uninstalled runtimes, use the `설치` button on the right; the gear icon at the far right opens settings. During verification, the selector stays open and shows progress, so no empty tab without a cwd is created.
 
-독의 **에이전트**(`Alt+L`)와 **터미널**(`Ctrl+백틱`)은 별도 창을 연다. 탭 목록은 현재 루트 프로젝트별로 기억한다. 일반 셸은 터미널에, Claude Agent·Antigravity·Codex 등의 ACP 채팅은 에이전트에 표시한다. 새 탭의 cwd는 현재 루트 프로젝트다.
+**Agents** (`Alt+L`) and **Terminal** (`Ctrl+백틱`) in the dock open separate windows. Tab lists are remembered for each current root project. Regular shells appear in Terminal, while ACP chats such as Claude Agent, Antigravity, and Codex appear in Agents. New tabs use the current root project as their cwd.
 
-상단 손잡이로 창 전체를 옮기고, 탭을 끌어 다른 구역에 따로 둘 수 있다. 같은 종류의 창의 탭바나 본문 가운데에 탭을 놓으면 합쳐진다. 탭바는 빈 공간까지 모두 받으며, 마지막 탭을 옮긴 창은 자동으로 닫힌다. 경계선을 끌어 크기를 조절하며 배치는 계정에 저장한다. 모바일에서는 같은 종류의 탭을 한 줄로 모아 보여 준다. 패널의 닫기 버튼은 그 칸만 닫으며 다른 패널이 빈자리를 채운다. 탭은 같은 종류의 남은 패널로 모으고, 마지막 패널의 탭도 다시 열 수 있도록 보존한다. 닫은 분할은 다시 열 때 살아나지 않는다. 실행 중인 세션은 유지되고, 탭의 `×`로 세션을 끝낸다. 패널 기준은 [ADR 0134](../../.mew/docs/history/decisions/0134-mew-dockable-workspace-panels.md), 권한은 [security.md](../operations/security.md)를 따른다.
+Move an entire window with its top handle, or drag a tab into a separate area. Dropping a tab onto the tab bar or center of the content of a window of the same type merges them. The entire tab bar accepts drops, including empty space, and a window closes automatically when its last tab is moved. Drag borders to resize; layouts are saved to the account. On mobile, tabs of the same type appear together in one row. A panel's close button closes only that area, and other panels fill the space. Tabs move into remaining panels of the same type, and even the last panel's tabs are preserved so they can be reopened. Closed splits are not restored when reopened. Running sessions are preserved; use the tab's `×` to end a session. Panel rules follow [ADR 0134](../../.mew/docs/history/decisions/0134-mew-dockable-workspace-panels.md), and permissions follow [security.md](../operations/security.md).
 
-- ACP 채팅 입력창의 `/` 스킬, `@` 프로젝트·폴더·파일 멘션, 첨부·입력 기록·높이 조절은 [입력 사용법](../../.mew/docs/features/%ED%84%B0%EB%AF%B8%EB%84%90%C2%B7%EC%97%90%EC%9D%B4%EC%A0%84%ED%8A%B8%C2%B7%EC%9E%90%EB%8F%99%ED%99%94/%EC%97%90%EC%9D%B4%EC%A0%84%ED%8A%B8%20%EC%9E%85%EB%A0%A5%C2%B7%EB%A9%98%EC%85%98%C2%B7%EC%8A%A4%ED%82%AC%C2%B7%EC%B2%A8%EB%B6%80.md)을 따른다. 사용 가능한 스킬은 **Skills 관리**의 Mew·전역·현재 프로젝트 그룹에서 확인한다. Mew 기본 문서화 스킬과 런타임별 원본 위치·우선순위는 [스킬 관리](../configuration/agent-harness.md)에서 확인한다.
-- 질문 위에는 전송 시점의 **모델 · 추론 정도 · 권한**을 양쪽 선과 함께 남긴다. 첫 질문도 표시하며, 이전 질문과 셋 중 하나라도 달라질 때만 다시 표시한다. 이 값은 ACP 이벤트 전사에 같이 저장돼 재접속·세션 복원 뒤에도 당시 설정을 보인다.
-- `+`는 탭을 먼저 만들지 않고 **새 탭 선택기**를 연다. 에이전트 탭이 없으면 서버의 탭 복원 확인 후 같은 선택기를 바로 표시하고 `+`를 선택 상태로 보여 준다. 첫 진입과 마지막 탭을 닫은 뒤의 불필요한 클릭을 줄이기 위해 가운데 **새 에이전트/새 탭** 버튼 단계는 제거했다. 별도 재시도 금지 정책은 없다. 런타임을 고르면 그 이름의 탭이 열리고, `tmux 터미널`은 전용 셸 세션을, Antigravity·Claude를 포함한 ACP 런타임은 채팅 세션을 시작한다. 에이전트셋은 모델·역할을 주입할 수 있는 ACP 채팅 런타임만 대상으로 한다. 선택 전에는 탭·WS·프로세스가 없고, 탭 이름은 직접 바꿀 수 있다. 정의는 `GET`·`PUT /api/agent-sets`(owner/manager)로 `<DATA_DIR>/agent-sets.json`에 저장된다 ([ADR 0095](../../.mew/docs/history/decisions/0095-mew-agent-sets-as-tab-presets.md)·[ADR 0119](../../.mew/docs/history/decisions/0119-mew-unified-terminal-agent-panel.md)).
-- 답변의 **현재 워크스페이스 파일 링크**를 누르면 브라우저 새 탭이 아니라 같은 mew에서 해당 프로젝트와 문서 탭을 연다. `:줄`·`#L줄`이 붙으면 그 줄로 이동하며, Markdown도 정확한 원본 줄을 보여 주기 위해 이 경우 Plain으로 연다. `GET /api/agent-file-link?href=`가 서버 절대경로를 노출하지 않고 `{project,path,line}`으로 검증·변환한다(owner/manager). 웹 링크는 계속 새 브라우저 탭으로 연다.
-- 탭의 **작업 경로(cwd)**는 새 탭을 열 때 현재 프로젝트 루트로 정해지며 화면에서 바꾸지 않는다. 다른 폴더에서 작업하려면 그 폴더를 프로젝트로 연 뒤 새 탭을 만든다. 프로젝트를 전환해도 이미 실행 중인 탭의 경로는 유지된다.
-- ACP 채널은 `/api/agent/ws?runtime=<id>&tab=<id>&cwd=<absolute-path>&resume=<session-id>`이고 terminal 표면은 `POST /api/agent-runtimes/:id/terminal/:tab`으로 전용 tmux를 준비한 뒤 기존 `/api/tmux/ws?session=<server-name>`에 붙는다. 어느 쪽이든 **탭 하나가 세션 하나**다. 패널·브라우저를 닫아도 세션은 남으며, 탭의 `×`만 ACP 감독 또는 terminal tmux를 종료한다. terminal tmux 이름은 `mewagent-*`로 서버가 만들고 사용자 세션 목록에서는 숨긴다.
+- For `/` skills, `@` project, folder, and file mentions, attachments, input history, and height adjustment in ACP chat input, see [Input Usage](../../.mew/docs/features/terminals-agents-automation/agent-input-mentions-skills-and-attachments.md). Find available skills in the Mew, global, and current project groups under **Manage Skills**. For Mew's default documentation skill and runtime-specific source locations and precedence, see [Skill Management](../configuration/agent-harness.md).
+- Above each question, the **model · reasoning level · permissions** at submission time are recorded with lines on both sides. They appear for the first question and appear again only when at least one of the three differs from the previous question. These values are saved in the ACP event transcript, so the settings used at the time remain visible after reconnection or session restoration.
+- `+` opens the **New Tab Selector** without creating a tab first. If there are no agent tabs, the same selector appears immediately after the server checks tab restoration, with `+` shown as selected. The intermediate **New Agent/New Tab** button step was removed to reduce unnecessary clicks on first entry and after closing the last tab. There is no separate policy prohibiting retries. Selecting a runtime opens a tab with its name; `tmux 터미널` starts a dedicated shell session, while ACP runtimes, including Antigravity and Claude, start chat sessions. Agent sets target only ACP chat runtimes that support model and role injection. No tab, WS, or process exists before selection, and tab names can be changed manually. Definitions are saved to `<DATA_DIR>/agent-sets.json` through `GET` and `PUT /api/agent-sets` (owner/manager) ([ADR 0095](../../.mew/docs/history/decisions/0095-mew-agent-sets-as-tab-presets.md) · [ADR 0119](../../.mew/docs/history/decisions/0119-mew-unified-terminal-agent-panel.md)).
+- Clicking a **current workspace file link** in a response opens the corresponding project and document tab in the same mew instance instead of a new browser tab. If `:줄` or `#L줄` is appended, it jumps to that line; Markdown also opens in Plain in this case to show the exact source line. `GET /api/agent-file-link?href=` validates and converts it to `{project,path,line}` without exposing the server's absolute path (owner/manager). Web links continue to open in new browser tabs.
+- A tab's **working directory (cwd)** is set to the current project root when opening a new tab and cannot be changed in the UI. To work in another folder, open that folder as a project and create a new tab. Switching projects preserves the paths of tabs already running.
+- The ACP channel is `/api/agent/ws?runtime=<id>&tab=<id>&cwd=<absolute-path>&resume=<session-id>`, while the terminal surface prepares a dedicated tmux through `POST /api/agent-runtimes/:id/terminal/:tab` and then attaches to the existing `/api/tmux/ws?session=<server-name>`. In either case, **one tab is one session**. Sessions remain when the panel or browser is closed; only the tab's `×` terminates the ACP supervisor or terminal tmux. The server creates terminal tmux names as `mewagent-*` and hides them from the user session list.
 
-설치·인증·구독과 공급자별 명령은 [런타임 설정](../configuration/agent-runtimes.md), 복원·큐·전송 형식은 [세션 계약](../../.mew/docs/development/agent-sessions.md)을 따른다.
+Installation, authentication, subscriptions, and provider-specific commands follow [Runtime Settings](../configuration/agent-runtimes.md); restoration, queues, and transport formats follow the [Session Contract](../../.mew/docs/development/agent-sessions.md).
 
-## 테마와 연결 상태
+## Theme and Connection Status
 
-터미널의 기본 배경·글자·커서·선택 색상은 **설정 → 화면**에서 고른 mew 테마를 따르며, 열린 터미널에도 변경이 즉시 반영된다. tmux 상태줄이나 내부 프로그램이 별도로 지정한 색상은 해당 프로그램의 테마 설정을 따른다.
+The terminal's default background, text, cursor, and selection colors follow the mew theme selected in **Settings → Appearance**, and changes apply immediately to open terminals. Colors specified separately by the tmux status bar or programs running inside the terminal follow those programs' theme settings.
 
-터미널 연결·재연결 상태와 터미널 열기 실패, 에이전트 명령 조회·실행 및 런타임 열기 오류는 본문 위에 작고 반투명한 알림으로 표시한다. 긴 오류는 알림 안에서 스크롤해 읽을 수 있다.
+Terminal connection and reconnection status, terminal opening failures, agent command lookup and execution errors, and runtime opening errors appear as small translucent notifications above the content. Long errors can be read by scrolling within the notification.

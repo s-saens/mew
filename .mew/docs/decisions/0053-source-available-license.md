@@ -1,32 +1,32 @@
 ---
-title: "0053 — 내부 업무 사용을 허용하고 Mew 판매·유료 호스팅을 제한"
-description: "Mew 자체 코드의 MIT 신규 배포를 소스 공개 라이선스로 전환한다. 내부 업무 사용·수정·무료 재배포를 허용하고 판매·유료 호스팅은 제한하며, 권리자의 상업 이용·기존 MIT 허여·제3자 권리와 기여 수락 범위를 구분한다."
+title: "0053 — Allow internal business use and restrict Mew sales and paid hosting"
+description: "Switch new distributions of Mew's own code from MIT to a source-available license. Allow internal business use, modification, and free redistribution while restricting sales and paid hosting, and distinguish the rights holder's commercial use, existing MIT grants, third-party rights, and the scope of contribution acceptance."
 created: 2026-10-23
 updated: 2026-10-23
 ---
 
-- 상태: 채택
-- 부분 대체: [이전 ADR 0023](../history/decisions/0023-mew-selfhost-packaging-repo.md), [이전 ADR 0112](../history/decisions/0112-mew-public-release-security-and-credential-boundaries.md)의 Mew 자체 MIT 신규 배포 선택. 설치·보안 결정은 유지한다.
+- Status: Adopted
+- Partially supersedes the choice of MIT for new distributions of Mew's own code in [earlier ADR 0023](../history/decisions/0023-mew-selfhost-packaging-repo.md) and [earlier ADR 0112](../history/decisions/0112-mew-public-release-security-and-credential-boundaries.md). Installation and security decisions remain unchanged.
 
-## 배경
+## Background
 
-제작자는 개인·회사 내부 업무 사용을 허용하면서 Mew 자체의 판매와 유료 호스팅을 제한하고, 본인의 상업 제공 권한은 유지하려 한다. MIT는 판매·유료 호스팅을 허용하므로 이 요구에 맞지 않는다. [기존 검토](../work/open-source-cloud-license-review.md)는 요구를 기록했지만 실제 라이선스 변경은 하지 않았다.
+The creator intends to allow personal and internal company business use while restricting sales and paid hosting of Mew itself and retaining their own rights to offer it commercially. MIT permits sales and paid hosting, so it does not meet this requirement. The [previous review](../work/open-source-cloud-license-review.md) recorded the requirements but did not actually change the license.
 
-## 결정
+## Decision
 
-Mew 자체 코드의 신규 배포 조건을 [Mew Source Available License 1.0](../../../LICENSE)으로 정한다. 루트·CLI·원격 데스크톱 호스트에 동일한 전문을 두고, 각 package.json과 lockfile의 자체 패키지 항목에 `SEE LICENSE IN LICENSE`를 쓴다. 제3자 의존성의 라이선스 메타데이터는 바꾸지 않는다.
+Set [Mew Source Available License 1.0](../../../LICENSE) as the terms for new distributions of Mew's own code. Place the same full text in the root, CLI, and remote desktop host, and use `SEE LICENSE IN LICENSE` in each package.json and in lockfile entries for the project's own packages. Do not change license metadata for third-party dependencies.
 
-개인·회사 내부 사용, 수익을 내는 업무, 내부 목적의 비공개 수정과 조건을 유지한 무료 재배포를 허용한다. Mew로 작성한 문서·코드 등 결과물의 판매도 허용하며, 결과물에 포함한 Mew 코드에는 해당 코드의 라이선스가 계속 적용된다.
+Allow personal and internal company use, revenue-generating work, private modifications for internal purposes, and free redistribution that preserves the terms. Also allow sales of outputs such as documents and code created with Mew; Mew code included in those outputs remains subject to its license.
 
-Mew·수정본 판매와 제3자를 위한 유료 호스팅·관리형 서비스·SaaS 제공은 별도 서면 허락 없이 금지한다. 이름 변경·번들·구독료 등 간접 과금으로 우회할 수 없다. 내부 사용을 위한 직원·계약자 보수나 범용 인프라 비용은 금지 대상이 아니다. 독립적인 조언·지원 비용은 Mew 판매나 유료 운영 제공을 포함하지 않을 때 허용한다.
+Prohibit sales of Mew or modified versions and paid hosting, managed services, or SaaS offerings for third parties without separate written permission. Renaming, bundling, subscription fees, or other indirect charges cannot be used to bypass this restriction. Compensation for employees or contractors for internal use and general-purpose infrastructure costs are not prohibited. Fees for independent advice or support are allowed when they do not include selling Mew or providing paid operation of it.
 
-프로젝트 소유자 `s-saens`는 자신이 보유하거나 별도로 허락받은 권리 범위에서 판매·유료 호스팅·별도 상업 라이선스 제공 권한을 유지한다. 기여자의 저작권을 자동 양도받거나 제3자 코드의 권리를 변경하는 것으로 해석하지 않는다. [기여 수락 기준](../../../docs/development/contributing.md)에 따라 외부 기여의 상업 제공 권한은 별도 확인한다.
+Project owner `s-saens` retains the right to sell, provide paid hosting, and offer separate commercial licenses within the scope of rights they own or have separately obtained permission to exercise. This must not be interpreted as automatically assigning contributors' copyrights or changing rights to third-party code. Under the [contribution acceptance criteria](../../../docs/development/contributing.md), rights to offer external contributions commercially are verified separately.
 
-## 근거와 영향
+## Rationale and Impact
 
-- [MIT 원문](https://opensource.org/license/mit)은 판매를 허용한다. AGPL도 경쟁사의 유료 호스팅을 금지하지 않으므로 이번 목적에 맞지 않는다.
-- 상업적 재배포를 제한하므로 [OSI 정의](https://opensource.org/osd)의 오픈소스로 소개하지 않고 소스 공개(source-available)로 표시한다.
-- npm의 [사용자 정의 라이선스 표기](https://docs.npmjs.com/cli/v11/configuring-npm/package-json/)에 맞춰 실제 전문을 동봉한다. [발행 절차](../operations/cli-release.md)에서 사본·메타데이터·패키지 포함 여부를 확인한다.
-- 기존 MIT로 적법하게 받은 코드·버전에 이미 부여한 권리를 소급 회수하지 않는다. 이전 MIT 고지 전문을 LICENSE 끝에 보존하며, 그 고지가 새 코드에 MIT를 부여하는 것은 아님을 명시한다. 이전 버전에서 포크가 생길 가능성은 남는다.
-- 폰트·라이브러리·참조 코드 등 제3자 자료의 기존 조건·고지·대응 소스·교체 권리는 유지한다. 이번 결정은 전체 의존성 감사나 외부 기여자의 동의를 완료했다는 의미가 아니다.
-- 실제 npm 발행·GitHub 릴리스는 이 변경에서 수행하지 않는다. 비표준 라이선스의 집행 가능성과 권리 귀속에 대한 전문 법률 검토는 별도다.
+- The [MIT text](https://opensource.org/license/mit) permits sales. AGPL also does not prohibit competitors from providing paid hosting, so it does not serve this purpose.
+- Because commercial redistribution is restricted, label it source-available rather than presenting it as open source under the [OSI definition](https://opensource.org/osd).
+- Include the actual full text in accordance with npm's [custom license notation](https://docs.npmjs.com/cli/v11/configuring-npm/package-json/). Check the copies, metadata, and package inclusion in the [publishing procedure](../operations/cli-release.md).
+- Do not retroactively revoke rights already granted for code or versions lawfully received under MIT. Preserve the full previous MIT notice at the end of LICENSE and state that this notice does not grant MIT terms to new code. Forks from earlier versions remain possible.
+- Preserve existing terms, notices, corresponding source, and replacement rights for third-party materials such as fonts, libraries, and reference code. This decision does not mean a full dependency audit or consent from external contributors has been completed.
+- Actual npm publishing and GitHub releases are not performed as part of this change. Professional legal review of the nonstandard license's enforceability and rights ownership is separate.

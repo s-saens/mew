@@ -1,114 +1,114 @@
 ---
-title: "표 데이터베이스 (/db)"
-description: "Postgres 문서 DB의 삽입과 일반 표 양방향 전환·실행 취소, 테두리 없는 뷰와 캘린더·간트 기간 편집을 안내한다. 텍스트 필드 가져오기·검색·그룹 이동·속성 편집·열 정렬·대표열·행 페이지 공유와 읽기 전용 참조·백업 범위도 설명한다."
+title: "Table Databases (/db)"
+description: "Explains inserting Postgres document databases, converting between databases and regular tables in both directions and undoing conversions, borderless views, and editing date ranges in calendar and Gantt views. Also covers importing text fields, search, moving between groups, property editing, column sorting, primary columns, row page sharing, read-only references, and backup scope."
 updated: "2026-10-23"
 상위파일:
   - "../../.mew/docs/MOC.md"
   - "MOC.md"
 ---
-문서 안에 편집 가능한 데이터 표를 넣거나 기존 Postgres 테이블을 읽기 전용으로 표시할 때 사용한다. 간단한 본문 표만 필요하면 Postgres 없이 쓰는 [Markdown 표](editor.md#표-편집과-복사)를 선택한다.
+Use this to embed editable data tables in documents or display existing Postgres tables read-only. If you only need a simple table in the document body, choose [Markdown tables](editor.md#editing-and-copying-tables), which work without Postgres.
 
-## 표 만들기와 편집
+## Creating and Editing Tables
 
-먼저 운영자가 서버의 `DATABASE_URL`을 준비해야 한다. 로그인 계정에는 데이터베이스 기능과 프로젝트 전체 파일 접근 권한이 필요하며, 변경하려면 파일 수정도 허용돼야 한다. 접속 설정이 없거나 실패하면 DB 기능만 사용할 수 없고 나머지 편집 기능은 계속 동작한다.
+An operator must first configure `DATABASE_URL` on the server. The logged-in account needs the database feature and access to all project files; making changes also requires permission to modify files. If connection settings are missing or the connection fails, only DB features become unavailable; other editing features continue to work.
 
-1. 프로젝트의 Markdown 문서를 **Hotview**로 연다.
-2. 삽입할 위치에서 `/db`를 입력하고 **데이터베이스**를 선택한다.
-3. 표의 제목과 셀을 편집한다. 열 헤더의 `+`로 텍스트·숫자·체크박스·날짜·단일선택·다중선택 열을 추가하고, 열 이름을 눌러 바꾼다. 페이지 타입은 대표열을 전환해 사용한다.
-4. 다른 문서에 있는 표를 찾으려면 헤더 메뉴 → **데이터베이스**에서 이 프로젝트의 전체 목록을 연다.
+1. Open a Markdown document in the project in **Hotview**.
+2. Type `/db` at the insertion point and select **Database**.
+3. Edit the table title and cells. Use `+` in the column header to add text, number, checkbox, date, single-select, or multi-select columns, and click a column name to rename it. To use the page type, change the primary column's type.
+4. To find tables in other documents, open the full list for this project from the header menu → **Databases**.
 
-새 표에는 **제목** 대표열과 **텍스트** 열이 있고, `항목 1` / `첫 번째 내용`, `항목 2` / `두 번째 내용`의 예시 2행이 입력되어 있다. 셀과 열 이름을 원하는 내용으로 바꾸면 된다.
+A new table has a **Title** primary column and a **Text** column, with 2 example rows: `항목 1` / `첫 번째 내용` and `항목 2` / `두 번째 내용`. Replace the cells and column names with your own content.
 
-표·카드·보드·캘린더·간트 보기를 제공한다. 제목과 뷰 설정에는 테두리가 없고, 표의 필드 영역만 둥근 테두리와 셀 구분선으로 표시한다. 같은 DB를 보는 로그인 세션에는 행·셀·열·제목 변경이 실시간으로 반영된다.
+Table, card, board, calendar, and Gantt views are available. The title and view settings have no borders; only the table's field area has a rounded border and cell dividers. Row, cell, column, and title changes appear in real time in logged-in sessions viewing the same DB.
 
-**Plain**에서는 `<div data-mew-db="…"></div>` 부분을 Ctrl+클릭하거나 Mac에서 Cmd+클릭하면 해당 DB가 팝업으로 열린다. 읽기 전용 참조는 팝업에서도 읽기 전용으로 표시한다. 일반 클릭으로는 원문을 편집하며, 코드 예시나 주석 안의 DB 표기는 링크로 열리지 않는다.
+In **Plain**, Ctrl+click the `<div data-mew-db="…"></div>` portion, or Cmd+click on Mac, to open that DB in a popup. Read-only references remain read-only in the popup. A regular click edits the source text; DB notation inside code examples or comments does not open as a link.
 
-## 일반 표와 전환하기
+## Converting Between Databases and Regular Tables
 
-편집 가능한 Hotview 문서에서 DB를 우클릭하고 **표로 전환**을 고르면 전체 열·행을 일반 표로 옮긴다. 검색으로 숨긴 행도 포함한다. 원본 DB와 행 페이지는 그대로 남으며 일반 표의 수정은 원본 DB에 반영되지 않는다.
+In an editable Hotview document, right-click a DB and select **Convert to Table** to transfer all columns and rows to a regular table. This includes rows hidden by search. The original DB and row pages remain, and edits to the regular table do not affect the original DB.
 
-일반 표를 우클릭하고 **데이터베이스로 전환**을 고르면 모든 열을 텍스트 필드로 가져온다. 첫 열에 빈 값이나 중복 값이 있으면 원래 셀을 유지하고 맨 앞에 별도 대표열을 추가한다. 헤더만 있는 표에는 예시 행을 추가하지 않는다.
+Right-click a regular table and select **Convert to Database** to import all columns as text fields. If the first column has empty or duplicate values, the original cells are preserved and a separate primary column is added at the beginning. No example rows are added to a table that has only headers.
 
-두 방향 모두 **Ctrl/Cmd+Z**로 한 번에 되돌리고 **Ctrl/Cmd+Shift+Z** 또는 **Ctrl+Y**로 다시 실행할 수 있다. 되돌리면 원래 표 서식이나 DB 참조 설정이 복원된다. 표→DB를 되돌려도 생성한 DB는 목록에 남고 다시 실행할 때 재사용한다. 이후 표를 새로 DB로 전환하면 새 DB가 생기며 이전 필드 타입은 복원하지 않는다.
+Conversions in either direction can be undone in one step with **Ctrl/Cmd+Z** and redone with **Ctrl/Cmd+Shift+Z** or **Ctrl+Y**. Undo restores the original table formatting or DB reference settings. Undoing a table-to-DB conversion leaves the created DB in the list and reuses it on redo. Converting the table to a DB anew later creates a new DB and does not restore the previous field types.
 
-## 뷰 바꾸기
+## Switching Views
 
-DB 제목 아래의 **표·카드·보드·캘린더·간트**를 눌러 같은 데이터를 다른 방식으로 본다. 좁은 화면에서는 아이콘으로 표시하며 버튼에 포커스를 두면 방향키로도 전환할 수 있다.
+Click **Table, Cards, Board, Calendar, or Gantt** below the DB title to view the same data in different ways. On narrow screens, these appear as icons; when a button has focus, you can also switch with the arrow keys.
 
-| 뷰 | 사용 방법 |
+| View | How to use |
 | --- | --- |
-| 표 | 열별로 값을 편집하고 열 제목 오른쪽 버튼으로 정렬한다. |
-| 카드 | 항목 제목과 주요 속성을 카드로 본다. **표시 속성**에서 표시할 열을 고른다. |
-| 보드 | **그룹 기준**에서 단일선택 또는 체크박스 열을 고른다. 컴퓨터에서는 카드를 다른 그룹으로 끌어 옮기고, 휴대폰에서는 카드 상세의 해당 속성을 바꾼다. |
-| 간트 | **시작일·종료일** 열을 골라 행별 기간을 막대로 본다. 이름이나 막대를 누르면 항목 상세를 연다. |
-| 캘린더 | **종료일**에 사용할 날짜 열을 고른다. **시작일** 열도 고르면 기간 전체에 일정이 표시된다. 날짜를 누르면 아래에 그날의 모든 항목이 표시된다. 이전·다음 달과 **오늘**로 이동할 수 있다. |
+| Table | Edit values by column and sort with the button to the right of a column title. |
+| Cards | View item titles and key properties as cards. Choose which columns to show under **Visible Properties**. |
+| Board | Choose a single-select or checkbox column under **Group By**. On a computer, drag cards to another group; on a phone, change the corresponding property in the card details. |
+| Gantt | Choose **Start Date and End Date** columns to view each row's date range as a bar. Click a name or bar to open the item details. |
+| Calendar | Choose a date column to use as the **End Date**. If you also choose a **Start Date** column, events appear across the entire date range. Click a date to display all items for that day below. You can navigate to the previous or next month and to **Today**. |
 
-카드나 일정을 누르면 항목 상세가 열린다. 속성을 바꾸면 표와 다른 뷰에도 반영되며, 연결된 하위페이지는 **페이지 열기**로 연다. 행 삭제는 상세 창 아래에서 실행한다.
+Click a card or event to open the item details. Property changes also appear in the table and other views; use **Open Page** to open a linked subpage. Delete rows from the bottom of the details window.
 
-보드 그룹의 `+`는 해당 그룹에, 캘린더 날짜의 `+`나 선택한 날짜 목록의 **행 추가**는 그 날짜에 새 항목을 만든다. 필요한 선택·날짜 열이 없으면 뷰 안의 추가 버튼으로 준비한다. 날짜가 없는 항목은 캘린더 아래 **날짜 없음**에 표시된다.
+The `+` in a board group creates a new item in that group; the `+` on a calendar date or **Add Row** in the selected date's list creates one on that date. If the required select or date columns are missing, create them with the add button in the view. Items without dates appear under **No Date** below the calendar.
 
-캘린더의 **시작일** 목록에서 기존 날짜 열을 고르거나 **열 추가**로 새 시작일 열을 만든다. 일정을 열면 공용 달력에서 시작일·종료일을 입력하거나 두 날짜를 눌러 기간을 정할 수 있다. 휴지통 버튼은 연결한 두 날짜를 지운다. 기간은 시작일과 종료일을 모두 포함하며, 한쪽 날짜만 있으면 그 날짜에 표시한다. 날짜별로 추가한 항목은 양 끝 날짜가 같은 날로 시작한다. 시작일을 **날짜 없음**으로 두면 기존처럼 하루 일정으로 편집한다.
+In the calendar's **Start Date** list, choose an existing date column or use **Add Column** to create a new start date column. Open an event to enter its start and end dates in the shared date picker or click two dates to set a range. The trash button clears both linked dates. Ranges include both the start and end dates; if only one date is set, the event appears on that date. Items added for a specific date initially have both endpoints set to that day. Set the start date to **No Date** to edit single-day events as before.
 
-간트는 이번 달부터 표시한다. 이전·다음 달, **오늘**, 확대·축소와 **전체** 기간 보기를 제공한다. 날짜 없는 행도 남겨 두며, 항목 상세에서 날짜를 입력할 수 있다. 월 보기에서는 막대를 끌어 옮기고 시작일 열이 있으면 양 끝을 잡아 기간을 바꾼다. 날짜 없는 행의 빈 시간축을 가로로 그어 날짜를 지정한다. 막대에 포커스를 두고 좌우 방향키를 누르면 하루 이동하고, Shift는 종료일, Alt는 시작일을 바꾼다. **전체** 기간 보기에서는 상세 창이나 키보드로 편집한다.
+Gantt starts with the current month. It provides previous and next month navigation, **Today**, zoom controls, and an **All** date-range view. Rows without dates remain visible, and dates can be entered in the item details. In month view, drag bars to move them; if a start date column exists, drag either end to change the range. Drag horizontally across the empty timeline of a row without dates to assign dates. With a bar focused, press the left or right arrow key to move it by one day; Shift changes the end date, and Alt changes the start date. In the **All** date-range view, edit through the details window or keyboard.
 
-검색 아이콘으로 현재 DB의 모든 속성을 검색할 수 있다. 편집 가능한 문서에서는 선택한 뷰와 기준 열·표시 속성이 문서에 저장된다. 전체 DB 팝업의 뷰 설정은 이 브라우저에 저장된다. 읽기 전용 DB에서도 뷰 전환·검색·항목 열람은 가능하다.
+Use the search icon to search all properties in the current DB. In editable documents, the selected view, reference columns, and visible properties are saved in the document. View settings in the full DB popup are saved in this browser. Read-only DBs also support switching views, searching, and viewing items.
 
-## 행 정렬하기
+## Sorting Rows
 
-각 열 제목 오른쪽의 정렬 버튼을 누르면 **오름차순 → 내림차순 → 정렬 해제**로 바뀐다. 다른 열의 버튼을 누르면 그 열을 기준으로 정렬한다. 숫자·날짜는 값에 맞게 정렬하고 빈 값은 항상 마지막에 표시한다.
+Click the sort button to the right of a column title to cycle through **Ascending → Descending → Clear Sort**. Clicking another column's button sorts by that column. Numbers and dates are sorted by value, and empty values always appear last.
 
-읽기 전용 표에서도 사용할 수 있다. 정렬은 현재 보고 있는 표에만 적용되며 저장된 행 순서와 다른 표의 정렬은 바꾸지 않는다. 해제하면 원래 순서로 돌아간다.
+Sorting is also available in read-only tables. It applies only to the table currently being viewed and does not change the saved row order or sorting in other tables. Clearing the sort restores the original order.
 
-## 열 타입 바꾸기
+## Changing Column Types
 
-바꾸려는 열의 셀을 우클릭하고 타입을 고른다. 열 이름 왼쪽 타입 아이콘으로도 같은 메뉴를 열 수 있다. 해당 열의 모든 행에 새 타입이 적용된다. 단일선택은 값 하나를, 다중선택은 여러 값을 고르는 데 사용한다. 선택 셀을 편집하면서 새 선택지를 추가할 수 있다.
+Right-click a cell in the column you want to change and choose a type. The type icon to the left of the column name opens the same menu. The new type applies to all rows in that column. Use single-select to choose one value and multi-select to choose multiple values. You can add new options while editing a select cell.
 
-변환할 수 없는 값이 있으면 타입 변경을 적용하지 않는다. 예를 들어 다중선택에 여러 값을 고른 행이 있으면 먼저 선택값을 하나로 줄여야 단일선택으로 바꿀 수 있다.
+If any value cannot be converted, the type change is not applied. For example, if a multi-select row has multiple selected values, reduce it to one before changing the column to single-select.
 
-표의 맨 왼쪽 데이터 열은 행을 대표한다. 대표열은 삭제할 수 없으며, 각 행의 값은 비어 있지 않고 같은 DB 안에서 유일해야 한다. 대표열의 타입은 텍스트 또는 페이지다. 내부 행 ID는 이 제목과 별도로 유지된다.
+The leftmost data column represents each row. This primary column cannot be deleted, and every row's value must be nonempty and unique within the DB. The primary column's type is text or page. Internal row IDs are maintained separately from these titles.
 
-새 행은 중복되지 않는 `제목 없음`으로 시작한다. 기존 표를 처음 열 때 대표열의 빈 값은 기본 제목으로 채우고, 중복 값에는 번호를 붙인다.
+New rows start with a unique `제목 없음` value. When an existing table is first opened, empty primary-column values are filled with default titles, and duplicate values receive numbers.
 
-## 행을 하위페이지로 열기
+## Opening Rows as Subpages
 
-대표열의 타입을 **페이지**로 바꾸면 각 행의 값이 제목인 하위페이지가 생긴다. 페이지 셀에서 해당 문서를 열어 본문과 속성을 편집한다. 페이지는 DB가 있는 문서의 바로 하위에 이름으로 저장한다. 예를 들어 `Books` 문서의 `송상훈` 행은 `Books/송상훈.md`가 된다. 같은 이름의 문서가 있으면 번호를 붙인다. 기존 UUID 파일도 DB를 열면 이 구조로 옮기며 본문을 보존한다. 생성 후 제목을 고쳐도 기존 파일 경로는 유지한다.
+Changing the primary column's type to **Page** creates a subpage for each row, using its value as the title. Open the document from a page cell to edit its body and properties. Pages are saved by name directly beneath the document containing the DB. For example, the `송상훈` row in the `Books` document becomes `Books/송상훈.md`. If a document with the same name exists, a number is appended. Opening the DB also moves existing UUID files into this structure while preserving their bodies. Changing a title after creation preserves the existing file path.
 
-연결한 하위페이지를 저장할 때도 DB 편집에 필요한 데이터베이스 기능과 프로젝트 전체 파일 수정 권한이 필요하다.
+Saving a linked subpage also requires the database feature and permission to modify all project files, as required for DB editing.
 
-예를 들어 대표열 **제목**에 `송상훈`, 숫자 열 **나이**에 `27`이 있으면 생성한 페이지 제목은 `송상훈`이며 프론트매터에는 `나이: 27`이 숫자로 저장된다. 표의 나이를 바꾸면 페이지 속성에 반영되고, 페이지의 나이를 바꾸면 표에도 반영된다. 다중선택 값은 YAML 배열로 공유한다.
+For example, if the **Title** primary column contains `송상훈` and the **Age** number column contains `27`, the created page is titled `송상훈` and its frontmatter stores `나이: 27` as a number. Changing the age in the table updates the page property, and changing it on the page updates the table. Multi-select values are shared as YAML arrays.
 
-이 하위페이지에는 `created`·`updated` 필드를 자동으로 추가하지 않는다. 날짜가 필요하면 DB 열로 직접 정의한다. 본문만 편집할 때는 기존 `updated` 값도 자동으로 바뀌지 않는다.
+The `created` and `updated` fields are not automatically added to these subpages. If dates are needed, define them explicitly as DB columns. Editing only the body also does not automatically change an existing `updated` value.
 
-대표열을 텍스트로 되돌리거나 행·DB를 삭제하면 페이지와의 필드 공유를 중단한다. 이미 작성한 하위페이지 본문은 남는다. 같은 행을 다시 페이지로 전환하면 기존 본문을 유지한다.
+Changing the primary column back to text or deleting a row or DB stops field sharing with the page. Existing subpage bodies remain. Converting the same row back to a page preserves its existing body.
 
-단일선택·다중선택 목록에서는 각 항목의 색상 원으로 태스크 태그와 같은 팔레트를 열고, 연필로 이름을 수정한다. X를 누르면 그 선택지와 모든 행의 해당 선택값을 함께 지운다. 다중선택의 다른 값은 남는다. 항목 이름·색상·삭제 결과는 연결된 행 페이지에도 반영된다.
+In single-select and multi-select lists, click an item's color circle to open the same palette used for task tags, or the pencil to rename it. Clicking X deletes the option and its selected value from every row. Other multi-select values remain. Changes to option names and colors, as well as deletions, also appear in linked row pages.
 
-## 기존 표를 읽기 전용으로 참조하기
+## Referencing Existing Tables Read-Only
 
-Hotview에서 `/` → **데이터베이스 참조**를 선택한다(`/db-ref`로 검색할 수도 있다). 현재 프로젝트의 기존 DB를 고르거나, 서버에 연결된 Postgres의 외부 테이블을 `schema`와 `table`로 지정해 **읽기 전용으로 참조**를 누른다. 새 접속 주소를 입력하는 창은 아니므로 연결할 Postgres는 운영자가 먼저 설정해야 한다. 참조 뷰에서는 원본 데이터를 수정할 수 없다.
+In Hotview, select `/` → **Database Reference** (you can also search with `/db-ref`). Choose an existing DB in the current project, or specify an external table in the server-connected Postgres using `schema` and `table`, then click **Reference Read-Only**. This dialog does not accept a new connection address, so an operator must configure the Postgres connection first. Reference views cannot modify the source data.
 
-## 저장 위치와 공유 범위
+## Storage Locations and Sharing Scope
 
-DB를 넣은 본문에는 참조 ID와 문서별 표시 설정이 저장되고(기본 표는 `<div data-mew-db="uuid">`), 실제 표 데이터는 Postgres에 저장된다. 행 하위페이지에는 연결한 필드의 값이 프론트매터로 동기화되지만 DB 정의·행 ID·전체 데이터의 백업을 대신하지 않는다. **Markdown 파일을 복사하거나 Git에 커밋하는 것만으로 표 데이터가 복사·백업되지는 않는다.** 운영 시 하위페이지를 포함한 프로젝트 파일과 Postgres 데이터를 각각 보존한다.
+The document body containing the DB stores its reference ID and document-specific display settings (the default table uses `<div data-mew-db="uuid">`), while the actual table data is stored in Postgres. Linked field values are synchronized to row subpages as frontmatter, but this does not replace backups of the DB definition, row IDs, or complete data. **Copying Markdown files or committing them to Git alone does not copy or back up table data.** In production, preserve project files, including subpages, and Postgres data separately.
 
-물리 테이블은 프로젝트별 스키마 `mew_{프로젝트}`에, 메타데이터(제목·컬럼)는 카탈로그 스키마 `mew`에 저장된다. 다른 프로젝트의 DB ID로는 조회할 수 없다. 외부 테이블도 현재 프로젝트에 연결해 사용하며, 게스트 공유로 Markdown 문서를 열어도 DB 행 데이터는 전달하지 않는다.
+Physical tables are stored in the per-project schema `mew_{프로젝트}`, and metadata (titles and columns) in the catalog schema `mew`. DB IDs from other projects cannot be queried. External tables are also linked to the current project for use; opening a Markdown document through guest sharing does not transmit DB row data.
 
-## Postgres만 Docker Compose로 띄우기 (선택)
+## Running Only Postgres with Docker Compose (Optional)
 
-현재 Docker Compose는 `/db` 기능의 Postgres만 보조한다. 앱 컨테이너에는 Dockerfile이 없으므로 `--profile app`은 실행하지 않는다. Docker Compose를 준비한 운영자가 **Mew 설치 폴더**에서 실행한다.
+The current Docker Compose setup supports only Postgres for the `/db` feature. There is no Dockerfile for the app container, so do not run `--profile app`. An operator with Docker Compose installed runs it from the **Mew installation folder**.
 
 ```bash
 npm run db:up     # Postgres만 127.0.0.1:55432에 기동
 npm run db:down   # Postgres 중지
 ```
 
-`DATABASE_URL`과 `MEW_PG_PASSWORD`는 레포에 커밋하지 않는 설정 파일에 둔다. 기본 연결 예시는 [.env.example](../../.env.example)에 있다.
+Keep `DATABASE_URL` and `MEW_PG_PASSWORD` in a configuration file that is not committed to the repository. A basic connection example is available in [.env.example](../../.env.example).
 
-## 보안
+## Security
 
-- 모든 값은 파라미터(`$1`)로, 모든 식별자는 앱이 생성하거나 화이트리스트 검증(`[a-z0-9_]+`) 후 쿼팅한다 (`server/db/identifiers.ts`) — SQL 인젝션 차단.
-- external(참조) 테이블은 **읽기 전용**이다. 원본 테이블에 대한 INSERT/UPDATE/DELETE/DDL은 일절 없다.
-- `/db`의 모든 REST·WS는 마운트 시 `requireAuthenticated`라 **게스트는 행 데이터를 받지 못한다**.
-- 백엔드 계층: `pool → identifiers → schema → catalog → databaseService → hub`, REST는 `server/db/routes.ts`, 실시간 릴레이는 `server/db/socket.ts`.
+- All values use parameters (`$1`), and all identifiers are quoted after being generated by the app or validated against an allowlist (`[a-z0-9_]+`) (`server/db/identifiers.ts`) — preventing SQL injection.
+- external (reference) tables are **read-only**. No INSERT/UPDATE/DELETE/DDL operations are performed on the source tables.
+- All REST and WS endpoints under `/db` are mounted with `requireAuthenticated`, so **guests cannot receive row data**.
+- Backend layers: `pool → identifiers → schema → catalog → databaseService → hub`; REST: `server/db/routes.ts`; real-time relay: `server/db/socket.ts`.
 
-보안 경계를 구현하는 지점: `server/guestAccess.ts`(게스트 파일 단위 승인), `server/paths.ts`(deny 목록), `server/reqAuth.ts`(역할 게이팅). **정책 자체는 [security.md](../operations/security.md)가 기준본**이고, 여기 코드는 그것의 구현이다 — 정책을 바꾸면 docs를 같은 세션에 고친다.
+Security boundaries are implemented in `server/guestAccess.ts` (per-file guest authorization), `server/paths.ts` (deny list), and `server/reqAuth.ts` (role gating). **[security.md](../operations/security.md) is the canonical source for the policy itself**, and this code implements it — update the docs in the same session when changing the policy.

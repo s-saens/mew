@@ -1,32 +1,32 @@
 ---
-title: "0012 — 문서 DB의 대표열과 행 하위페이지"
-description: "문서 DB의 필수·유일 대표열을 텍스트 또는 페이지로 유지하고, 행 UUID에 연결한 하위페이지 프론트매터와 DB 필드를 양방향 공유하기로 한 결정. 선택 타입·필드 이름·본문 보존과 자동 날짜 필드 예외를 정한다. UUID 파일명 결정은 후속 0026이 이름 기반 저장으로 대체한다."
+title: "0012 — Primary Columns and Row Subpages in Document Databases"
+description: "Decision keeping the required, unique primary column in a document database as text or page type, and sharing fields bidirectionally between the database and the frontmatter of subpages linked to row UUIDs. Defines select types, field names, body preservation, and exceptions for automatic date fields. Subsequent 0026 supersedes UUID filenames with name-based storage."
 created: 2026-10-17
 updated: 2026-10-20
 ---
 
-# 0012 — 문서 DB의 대표열과 행 하위페이지
+# 0012 — Primary Columns and Row Subpages in Document Databases
 
-상태: 승인. UUID 파일명·중간 폴더 저장은 [0026](0026-database-row-page-paths.md)으로 대체한다.
+Status: Approved. UUID filenames and intermediate-folder storage are superseded by [0026](0026-database-row-page-paths.md).
 
-## 배경
+## Background
 
-기존 문서 DB는 텍스트·숫자·체크박스·날짜 값을 표에서 편집했다. 사람이나 항목마다 본문을 작성하려면 별도 문서를 만들고 표의 필드를 다시 옮겨야 했다. 표에서 사용하는 제목과 문서 제목, 나이 같은 속성이 서로 다른 값으로 남지 않도록 행과 페이지를 연결해야 한다.
+Existing document databases allowed text, number, checkbox, and date values to be edited in a table. Writing body content for each person or item required creating a separate document and copying the table fields again. Rows and pages need to be linked so table titles, document titles, and properties such as age do not remain as different values.
 
-## 결정
+## Decision
 
-- 내부 기본키는 행 UUID를 유지한다. 첫 데이터 열을 필수·유일 대표열로 정하고, 텍스트 또는 페이지 타입만 허용한다. 페이지 모드에서도 대표열 값은 제목 문자열이다.
-- 단일선택은 문자열, 다중선택은 문자열 배열로 저장하며 선택지는 열 메타데이터가 소유한다. 셀 우클릭으로 해당 열 전체의 타입을 바꾼다.
-- 대표열을 페이지로 전환하면 행마다 하위 Markdown 문서를 만든다. 제목이 바뀌어도 행과 연결을 유지하도록 파일 경로는 행 UUID를 사용한다.
-- 대표열 값은 표준 프론트매터 `title`에, 다른 열 값은 열 표시명을 필드명으로 동기화한다. 제목·행 연결·상위 문서 필드와 충돌하는 `title`·`_mew_database`·`_mew_row`·`상위파일`은 일반 열 이름으로 허용하지 않는다.
-- Postgres의 행 데이터와 하위페이지의 연결 필드를 양방향으로 동기화하고, 마지막 공유 상태를 비교해 변경한 필드를 반영한다. 본문과 연결하지 않은 사용자 속성은 보존한다.
-- DB 행 페이지에는 `created`·`updated`를 자동으로 추가하지 않고, 본문 편집 시 기존 `updated` 값도 자동 갱신하지 않는다. 사용자가 같은 이름의 DB 열을 만든 경우에는 해당 필드도 다른 열처럼 공유한다.
-- 페이지 모드 해제·행 삭제·DB 삭제는 연결을 해제하며, 하위페이지 본문을 자동 삭제하지 않는다. 같은 행을 다시 페이지로 전환하면 행 바인딩이 일치하는 기존 문서를 재사용한다.
+- Retain the row UUID as the internal primary key. Designate the first data column as the required, unique primary column, allowing only text or page type. Even in page mode, the primary-column value is a title string.
+- Store single-select values as strings and multi-select values as string arrays, with options owned by column metadata. Right-click a cell to change the type of the entire column.
+- Switching the primary column to page type creates a child Markdown document for each row. Use the row UUID in the file path to preserve the row link even when the title changes.
+- Synchronize the primary-column value to the standard frontmatter field `title`, and other column values using their display names as field names. Do not allow `title`, `_mew_database`, `_mew_row`, or `상위파일` as ordinary column names because they conflict with title, row-link, or parent-document fields.
+- Synchronize Postgres row data and linked subpage fields bidirectionally, comparing the last shared state to apply changed fields. Preserve body content and unlinked user properties.
+- Do not automatically add `created` or `updated` to database row pages, and do not automatically update existing `updated` values when editing the body. If the user creates database columns with the same names, share those fields like other columns.
+- Disabling page mode, deleting a row, or deleting the database removes links without automatically deleting subpage bodies. Switching the same row back to page mode reuses an existing document whose row binding matches.
 
-## 근거와 영향
+## Rationale and Impact
 
-행 UUID는 제목을 고치거나 같은 페이지를 다시 열 때 연결을 유지한다. 대표열의 필수·유일 조건은 표에서 각 행을 구별하고 문서 제목을 만들 기준을 제공한다. YAML의 숫자·불리언·배열 타입을 보존해 표의 필드와 문서 속성을 같은 값으로 다룬다.
+The row UUID preserves the link when the title is edited or the same page is reopened. The primary column's required and unique constraints provide a basis for distinguishing rows in the table and generating document titles. Preserve YAML number, boolean, and array types so table fields and document properties are treated as the same values.
 
-DB를 삽입한 Markdown 본문은 계속 DB 참조 ID만 저장한다. 행 페이지의 프론트매터는 DB 정의와 전체 행 데이터를 백업하는 형식이 아니므로 프로젝트 파일과 Postgres를 함께 보존한다. 외부 Postgres 참조는 기존처럼 읽기 전용이다.
+Markdown bodies with embedded databases continue to store only database reference IDs. Row page frontmatter is not a backup format for database definitions and all row data, so preserve project files and Postgres together. External Postgres references remain read-only.
 
-사용법은 [표 데이터베이스 안내](../../../docs/guides/database.md), 기능 범위와 확인 기준은 [문서 데이터베이스·전체 목록](../features/%EB%AC%B8%EC%84%9C%20%EB%8D%B0%EC%9D%B4%ED%84%B0%EB%B2%A0%EC%9D%B4%EC%8A%A4/%EB%AC%B8%EC%84%9C%20%EB%8D%B0%EC%9D%B4%ED%84%B0%EB%B2%A0%EC%9D%B4%EC%8A%A4%C2%B7%EC%A0%84%EC%B2%B4%20%EB%AA%A9%EB%A1%9D.md), 파일 경로와 동기화 계약은 [문서 페이지 계약](../development/document-pages.md)에서 관리한다.
+Usage is maintained in the [Table Database Guide](../../../docs/guides/database.md), feature scope and verification criteria in [Document Databases and Full Listings](../features/document-databases/document-databases-and-catalog.md), and file paths and synchronization contracts in the [Document Page Contract](../development/document-pages.md).

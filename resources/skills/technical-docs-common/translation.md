@@ -1,5 +1,5 @@
 ---
-description: "실제로 설치한 translating-core·translating-documentation·언어별 번역 스킬·reviewing-translations를 원문에서 대상 언어로 연결하는 순서와 전달 정보."
+description: "The sequence and handoff information for connecting the actually installed translating-core, translating-documentation, language-specific translation skills, and reviewing-translations from source to target language."
 ---
 
 # Translation specialist sequence

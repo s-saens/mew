@@ -1,42 +1,42 @@
 ---
-provenance: "Liiiiv 중앙 ADR 이관본, 2026-10-14"
-description: "이관한 결정 기록: mew 에이전트 탭은 루트 프로젝트별로 분리한다. 당시 선택·근거·후속 변경을 보존하며 현재 계약은 Mew 소유 문서에서 확인한다."
-title: "0087 — mew 에이전트 탭은 루트 프로젝트별로 분리한다"
+provenance: "Migrated copy of a Liiiiv central ADR, 2026-10-14"
+description: "Migrated decision record: Separate mew agent tabs by root project. Preserves the choices, rationale, and subsequent changes at the time; consult the Mew owning document for the current contract."
+title: "0087 — Separate mew agent tabs by root project"
 created: 2026-08-27
 updated: 2026-09-11
 ---
 
-- 날짜: 2026-08-27
-- 상태: 채택
-- 후속 결정: [0093](0093-mew-account-synced-project-and-agent-tabs.md) — 탭 원장의 브라우저 로컬 저장; 루트별 분리는 유지
-- 부분 대체: 0046·0079 — 브라우저 전역 탭 목록·활성 탭 저장 범위
-- 결정자: 송상훈 (지시)
+- Date: 2026-08-27
+- Status: Adopted
+- Follow-up decision: [0093](0093-mew-account-synced-project-and-agent-tabs.md) — Store the tab registry locally in the browser; retain per-root separation
+- Partially supersedes: 0046·0079 — Storage scope for the browser-wide tab list and active tab
+- Decision maker: Song Sanghoon (directive)
 
-## 배경
+## Background
 
-에이전트 창의 탭 목록은 브라우저 전역 `mew:agent-tabs` 하나에 남았다. 서로 다른 루트 프로젝트를
-전환해도 같은 탭이 보여서, 프로젝트별 작업 맥락과 탭이 섞였다. 동시에 루트 전환이 에이전트 창을
-닫아 모바일에서 사용자가 보고 있던 보조 창 대신 사이드바·에디터가 먼저 보였다.
+The agent pane's tab list was stored in a single browser-global `mew:agent-tabs` entry. The same tabs appeared even when switching between different
+root projects, mixing project-specific work contexts and tabs. Root switching also closed the agent pane, so on mobile,
+the sidebar and editor appeared first instead of the auxiliary pane the user had been viewing.
 
-## 결정
+## Decision
 
-- 에이전트 탭 목록·마지막 활성 탭·탭별 ACP 세션 포인터는 루트 프로젝트 절대 경로별로 분리한다.
-  프로젝트 A에서 만든 탭은 A를 다시 열 때만 보이며, B에서는 B의 탭만 보인다.
-- 루트 프로젝트를 전환해도 보조 창의 열림 상태는 바꾸지 않는다. 에이전트 창이 열려 있었다면 같은
-  창을 계속 보되, 그 안의 탭 상태만 새 루트 프로젝트 것으로 교체한다. 사이드바·에디터·터미널·로컬
-  브라우저도 같은 원칙을 따른다.
-- 기존 전역 저장값은 최초로 완전히 식별된 현재 루트 프로젝트에 한 번만 옮긴다. 다른 프로젝트에
-  레거시 탭이 복제되어 나타나지 않게 전역 키는 제거한다.
+- Separate the agent tab list, last active tab, and per-tab ACP session pointers by root project absolute path.
+  Tabs created in project A appear only when A is reopened, while B shows only B's tabs.
+- Switching root projects does not change whether auxiliary panes are open. If the agent pane was open, keep showing the
+  same pane and replace only its tab state with that of the new root project. The sidebar, editor, terminal, and local
+  browser follow the same principle.
+- Migrate the existing global stored values only once, to the first current root project that is fully identified. Remove the global
+  key so that legacy tabs do not appear as duplicates in other projects.
 
-## 근거
+## Rationale
 
-루트 프로젝트 전환은 SPA 안에서 상태 캐시를 교체하는 동작이다([ADR 0086](0086-mew-root-project-spa-handoff-and-cache.md)).
-문서 탭과 본문 캐시가 이미 루트 절대 경로로 나뉘므로, 에이전트 탭도 같은 경계를 써야 사용자가
-프로젝트를 다시 열었을 때 작업 맥락을 정확히 되찾는다. 창의 열림 여부는 프로젝트 데이터가 아니라
-현재 화면이므로 전환 중에 바꾸지 않는다.
+Switching root projects replaces state caches within the SPA ([ADR 0086](0086-mew-root-project-spa-handoff-and-cache.md)). Document tabs and content caches are already separated by root absolute path, so
+agent tabs must use the same boundary to restore the correct work context when users reopen
+a project. Whether a pane is open is part of the current display, not project data, so it
+remains unchanged during switching.
 
-## 결과
+## Results
 
-- 프로젝트별 에이전트 탭을 처음 열 때는 빈 탭에서 시작한다.
-- 프로젝트 전환 때 이전 탭의 화면 연결은 정리되고 새 프로젝트 탭만 붙는다. 살아 있는 ACP 작업의
-  수명은 기존 감독·유휴 종료 규칙을 그대로 따른다.
+- Opening a project's agent tabs for the first time starts with an empty tab.
+- When switching projects, the previous tabs' UI connections are cleaned up, and only the new project's tabs are attached. The lifetime of running ACP tasks
+  continues to follow the existing supervisor and idle shutdown rules.

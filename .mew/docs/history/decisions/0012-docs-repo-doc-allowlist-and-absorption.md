@@ -1,86 +1,86 @@
 ---
-provenance: "Liiiiv 중앙 ADR 이관본, 2026-10-14"
-description: "이관한 결정 기록: 코드 레포 문서 허용목록과 docs 전면 흡수. 당시 선택·근거·후속 변경을 보존하며 현재 계약은 Mew 소유 문서에서 확인한다."
-title: "0012 — 코드 레포 문서 허용목록과 docs 전면 흡수"
+provenance: "Migrated copy of a Liiiiv central ADR, 2026-10-14"
+description: "Migrated decision record: code repository documentation allowlist and full absorption into docs. Preserves the choices, rationale, and subsequent changes at the time; consult Mew's owning documents for the current contract."
+title: "0012 — Code repository documentation allowlist and full absorption into docs"
 created: 2026-07-27
 updated: 2026-09-11
 ---
 
-- 날짜: 2026-07-27
-- 상태: 채택
-- 후속 결정: [0131](0131-mew-repository-docs-hierarchy.md) — Mew 상세 참조 예외; 현재는 0132에 흡수
-- 후속 결정: [0132](0132-docs-project-owned-documentation.md) — 프로젝트 docs 허용·소유권·write-back; docs 밖 허용목록은 유지
-- 결정자: 송상훈 (요청·판단) + 에이전트(조사·실행)
+- Date: 2026-07-27
+- Status: Adopted
+- Subsequent decision: [0131](0131-mew-repository-docs-hierarchy.md) — Exception for detailed Mew references; now absorbed into 0132
+- Subsequent decision: [0132](0132-docs-project-owned-documentation.md) — Project docs permissions, ownership, and write-back; the allowlist outside docs remains in effect
+- Decision makers: Song Sanghoon (request and judgment) + agent (research and execution)
 
-## 배경
+## Background
 
-ADR 0008 (`이전 Liiiiv 문서: decisions/0008-docs-agent-write-back-contract-and-repo-wiring.md`)이 write-back 계약을 세웠지만 "무엇을 docs로 올리는가"만 정하고 "무엇이 레포에 남아도 되는가"는 정하지 않았다. 그 결과 트리거에 해당하는 문서가 레포에 남는 것이 규칙 위반인지 아닌지 판정할 수 없었고, 실제로 남았다.
+ADR 0008 (`이전 Liiiiv 문서: decisions/0008-docs-agent-write-back-contract-and-repo-wiring.md`) established the write-back contract, but defined only "what goes into docs," not "what may remain in the repository." As a result, there was no way to determine whether leaving documents that met the triggers in the repository violated the rules, and such documents did remain.
 
-2026-07-27 실측 — 워크스페이스 코드 레포의 `.md` 34개(docs 제외). 대부분이 이미 write-back 트리거에 해당한다:
+Measured on 2026-07-27 — 34 `.md` files in workspace code repositories (excluding docs). Most already meet write-back triggers:
 
-| 파일 | 해당 트리거 | 있어야 할 곳 |
+| File | Applicable trigger | Where it belongs |
 | --- | --- | --- |
-| `liiiiv-life/SEO.md` (137줄) | 5 (반복 절차·런북) | `ops/` |
-| `typebot/GOOGLE-SHEETS-SETUP.md` | 4·5 (외부 서비스 계정) | `ops/` |
-| `liiiiv-life/PLAN-HOMEPAGE.md` | 1 (통합 계정·역할 모델) | `decisions/`·`platform/` |
-| `alaaaarm/PLAN.md` (149줄) | 3 (제품 범위·기능 정의) | `products/alaaaarm/` |
+| `liiiiv-life/SEO.md` (137 lines) | 5 (recurring procedures and runbooks) | `ops/` |
+| `typebot/GOOGLE-SHEETS-SETUP.md` | 4·5 (external service accounts) | `ops/` |
+| `liiiiv-life/PLAN-HOMEPAGE.md` | 1 (unified account and role model) | `decisions/`·`platform/` |
+| `alaaaarm/PLAN.md` (149 lines) | 3 (product scope and feature definitions) | `products/alaaaarm/` |
 | `mew/SECURITY-REVIEW.md` | 5 | `ops/mew/` |
-| `server/GPT-RESEARCH.md` (233줄) | 3 (태그 체계·스키마) | `products/sleeeep/research/` |
+| `server/GPT-RESEARCH.md` (233 lines) | 3 (tag system and schema) | `products/sleeeep/research/` |
 
-드리프트는 가설이 아니라 이미 발생했다. 세 건이 관측됐다:
+Drift was not hypothetical; it had already occurred. Three cases were observed:
 
-1. alaaaarm MethodChannel 계약이 3중복이고 서로 다르다. `NATIVE.md`는 8채널(정본), `README.md`는 5채널(`sound`·`powerGuard` 누락), `PLAN.md`는 3채널에 `EventChannel` 방식 — 그런데 같은 `PLAN.md` 144행이 "EventChannel push 설계를 폐기하고 pending 큐로 바꿨다"고 적고 있다. 한 파일 안에서조차 갈라졌다.
-2. `mew/SECURITY-REVIEW.md`(2026-07-21)가 이미 없는 코드를 지적한다. §4가 `server/agent.ts`의 `callClaude`를 리스크로 드는데 에이전트 창은 2026-07-25에 전면 제거됐다.
-3. 레포 문서가 docs 상태에 대해 거짓말을 한다. `alaaaarm/AGENTS.md`가 docs 홈을 "아직 미생성"이라고 적은 시점에 `products/alaaaarm/product.md`·`roadmap.md`는 이미 존재했다.
+1. The alaaaarm MethodChannel contract is duplicated 3 times, with conflicting versions. `NATIVE.md` has 8 channels (the canonical version), `README.md` has 5 channels (missing `sound` and `powerGuard`), and `PLAN.md` has 3 channels using `EventChannel` — yet line 144 of that same `PLAN.md` says "the EventChannel push design was abandoned and replaced with a pending queue." It diverged even within a single file.
+2. `mew/SECURITY-REVIEW.md` (2026-07-21) flags code that no longer exists. §4 cites `callClaude` in `server/agent.ts` as a risk, but the agent panel was completely removed on 2026-07-25.
+3. Repository documentation misrepresents the state of docs. When `alaaaarm/AGENTS.md` described the docs home as "not yet created," `products/alaaaarm/product.md` and `roadmap.md` already existed.
 
-추가 동인 — 에이전트의 작업 시작점. 레포에 문서가 있으면 에이전트는 그것부터 읽고 docs를 나중에(또는 아예 안) 본다. 레포에 코드와 실행 정보만 있으면 컨텍스트를 얻을 곳이 docs뿐이라 진입 순서가 구조적으로 강제된다.
+An additional driver is where agents start their work. If documentation exists in the repository, agents read it first and consult docs later, or never. If the repository contains only code and execution information, docs is the only place to obtain context, so the entry order is structurally enforced.
 
-## 선택지
+## Options
 
-1. 현행 유지 — 트리거 목록만으로 판단 — 장점: 변경 없음. 단점: 판정 기준이 "이 문서가 트리거에 해당하나?"라는 주관적 질문이라 매번 다르게 답한다. 위 34개가 그 결과다.
-2. 레포 문서 전면 금지(README 포함 0개) — 장점: 규칙이 단순해 어길 수 없다. 단점: `AGENTS.md`는 문서가 아니라 하니스가 cwd 기준으로 자동 로드하는 라우터 설정 파일이다. 이걸 없애면 "docs부터 읽는다"를 보장하는 장치 자체가 사라져 목적과 정반대가 된다. MethodChannel 계약처럼 코드와 같은 커밋에서 바뀌어야 하는 것을 docs에 두면 드리프트가 오히려 는다.
-3. 내용 유형 기준 허용목록 + 나머지 전면 흡수 — 레포에 남을 수 있는 것을 파일 단위로 열거하고, 그 밖의 모든 `.md`는 docs로 옮긴다.
+1. Keep the current approach — judge solely by the trigger list — Advantage: no changes. Disadvantage: the criterion is the subjective question "Does this document meet a trigger?", which receives a different answer each time. The 34 files above are the result.
+2. Ban all repository documentation (0 files, including README) — Advantage: the rule is simple and cannot be violated. Disadvantage: `AGENTS.md` is a router configuration file that the harness automatically loads based on cwd, rather than documentation. Removing it eliminates the very mechanism that ensures "read docs first," directly defeating the purpose. Placing contracts that must change in the same commit as code, such as MethodChannel contracts, in docs would actually increase drift.
+3. Allowlist by content type + full absorption of everything else — enumerate, by file, what may remain in the repository, and move all other `.md` files to docs.
 
-## 결정
+## Decision
 
-3번 채택. ADR 0008 (`이전 Liiiiv 문서: decisions/0008-docs-agent-write-back-contract-and-repo-wiring.md`)을 대체하지 않고 좁힌다 — 0008의 write-back 트리거는 그대로 유효하고, 여기서 그 역방향(레포 잔류 허용 범위)을 닫는다.
+Option 3 adopted. This narrows ADR 0008 (`이전 Liiiiv 문서: decisions/0008-docs-agent-write-back-contract-and-repo-wiring.md`) without replacing it — the write-back triggers in 0008 remain valid, and this decision closes the reverse side: what is allowed to remain in the repository.
 
-### 레포 허용목록 — 이 파일명 넷만 허용한다
+### Repository allowlist — only these four filenames are allowed
 
-레포 어디에도 이 넷 밖의 `.md`를 두지 않는다. 파일명 기준이라 린트로 검사할 수 있다.
+Do not place any `.md` files with names other than these four anywhere in the repository. Because the rule is based on filenames, it can be checked by linting.
 
-| 허용 파일명 | 무엇 | 왜 레포인가 |
+| Allowed filename | Contents | Why it belongs in the repository |
 | --- | --- | --- |
-| `README.md` | 무엇인지 한 문단 · 어떻게 띄우는지(명령어·전제·포트) · 코드 구조 개요 · 실행 결합 계약 | 실행 정보. 코드와 함께 낡는다 |
-| `AGENTS.md` + `CLAUDE.md` | 얇은 라우터 — 정체 · docs 홈 링크 · 그 레포에서만 참인 실행 불변식 | 하니스가 cwd로 자동 로드. 문서가 아니라 설정 |
-| `SECURITY.md` | 취약점 신고 경로만 (GitHub이 인식하는 관례 위치). 공개 레포에서만 | 감사 내역·알려진 한계는 docs |
+| `README.md` | One paragraph describing what it is · how to launch it (commands, prerequisites, ports) · code structure overview · execution-coupled contracts | Execution information. Becomes outdated along with the code |
+| `AGENTS.md` + `CLAUDE.md` | Thin router — identity · docs home link · execution invariants true only in that repository | Automatically loaded by the harness based on cwd. Configuration, not documentation |
+| `SECURITY.md` | Vulnerability reporting channel only (the conventional location recognized by GitHub). Public repositories only | Audit history and known limitations belong in docs |
 
-실행 결합 계약(코드와 같은 커밋에서 바뀌어야 하는 기계적 계약 — MethodChannel 표, API 시그니처)은 별도 파일을 만들지 않고 `README.md` 안에 절로 둔다. 별도 파일을 허용하면 "이건 계약이니까"라는 판단으로 허용목록이 계속 새기 때문이다. `.env.example`·마이그레이션·생성된 스키마 등 `.md`가 아닌 산출물은 문서가 아니므로 이 규칙의 대상이 아니다.
+Place execution-coupled contracts (mechanical contracts that must change in the same commit as code — MethodChannel tables and API signatures) in sections within `README.md` rather than creating separate files. Allowing separate files would keep opening holes in the allowlist through judgments such as "this is a contract." Non-`.md` artifacts such as `.env.example`, migrations, and generated schemas are not documentation and are outside the scope of this rule.
 
-그 밖의 모든 `.md`는 docs로 옮긴다. 판별이 애매하면 다음 한 문장으로 정한다:
+Move all other `.md` files to docs. If classification is unclear, decide using this single question:
 
-> 이 레포를 통째로 지우고 처음부터 다시 짜도 살아남아야 하는 정보인가? — 그렇다면 docs, 아니면 레포.
+> Should this information survive even if the entire repository is deleted and rewritten from scratch? — If so, docs; otherwise, the repository.
 
-### 링크 네트워크
+### Link network
 
-docs가 모든 컨텍스트를 흡수하면 비대해진다. 컨텍스트 비용은 문서 수가 아니라 한 작업에서 실제로 열어야 하는 문서 수로 결정되므로, 트리 색인(MOC)만으로는 부족하고 문서 간 횡단 링크가 필요하다.
+Absorbing all context makes docs grow large. Context cost is determined by the number of documents that must actually be opened for a task, not the total document count, so a tree index (MOC) alone is insufficient; cross-links between documents are needed.
 
-- MOC는 계층 색인 역할을 유지한다(CI가 커버리지 강제). 그 위에 각 문서가 관련 문서를 본문에서 직접 링크해, 한 문서에 도착하면 다음 문서로 바로 갈 수 있게 한다.
-- 링크 문법은 상대경로 마크다운 링크를 유지한다([README.md](../../README.md) "네이밍 · 링크"). Foam·Obsidian 둘 다 마크다운 링크로 그래프·백링크를 구성하므로 위키링크 없이 목적이 달성된다. 위키링크 금지 규칙은 이 ADR로 바뀌지 않는다.
-- 각 제품·스코프 문서는 자기 레포 위치를 명시한다(예: "코드: `~/dev/liiiiv/alaaaarm`"). docs가 코드의 위치를 알고, 레포 `AGENTS.md`가 docs 홈을 안다 — 양방향.
+- MOCs retain their role as hierarchical indexes (CI enforces coverage). In addition, each document directly links related documents in its body so that arriving at one document provides a direct path to the next.
+- Link syntax remains relative-path Markdown links ([README.md](../../README.md), "Naming · Links"). Both Foam and Obsidian build graphs and backlinks from Markdown links, so the goal is achieved without wikilinks. This ADR does not change the rule prohibiting wikilinks.
+- Each product or scope document specifies its repository location (for example, "Code: `~/dev/liiiiv/alaaaarm`"). docs knows where the code is, and the repository's `AGENTS.md` knows the docs home — bidirectional.
 
-### 강제
+### Enforcement
 
-docs CI는 다른 레포를 보지 못한다(0008에서 확인된 한계). 워크스페이스 레벨 스크립트로 허용목록 위반을 검출하고, 실행 절차는 ops/repo-doc-allowlist.md (`이전 Liiiiv 문서: ops/repo-doc-allowlist.md`)에 둔다.
+docs CI cannot see other repositories (a limitation confirmed in 0008). Detect allowlist violations with a workspace-level script, and place the execution procedure in ops/repo-doc-allowlist.md (`이전 Liiiiv 문서: ops/repo-doc-allowlist.md`).
 
-## 근거
+## Rationale
 
-- "문서 0개"가 아니라 파일명 허용목록인 이유: "레포에 문서 0개"는 기억하기 쉽지만 `AGENTS.md`를 함께 죽인다. 반대로 내용 유형 기준("계약이면 허용")은 판단이 개입해 허용목록이 샌다 — 위 34개가 전부 누군가에게는 "이건 남겨야 하는 것"이었다. 파일명으로 닫으면 판단할 여지가 없고 린트가 가능하다.
-- 실행 결합 계약을 레포에 남긴 이유: 드리프트의 원인은 "레포에 있어서"가 아니라 "두 곳에 있어서"다. 채널 계약을 docs로 옮겨도 코드를 고치는 에이전트가 docs를 같이 안 고치면 똑같이 갈라진다. 같은 커밋에서 바뀌는 것은 같은 곳에 둔다.
-- 판별 질문을 남긴 이유: 허용목록은 열거라 새로운 종류의 파일이 나오면 답하지 못한다. `server/`가 `med-gen/`으로 대체됐을 때 실제로 겪은 상황("레포는 죽었는데 그 안의 리서치는 살아야 한다")을 그대로 질문으로 만들었다.
-- 컨텍스트 비용 반론에 대해: docs 비대화는 실재하는 비용이다. 다만 대안(레포 분산)은 비용을 줄이는 게 아니라 정보를 못 찾게 만들어 비용이 안 드는 것처럼 보이게 한다. 실제 해법은 스코프 서브트리([README.md](../../README.md) "구조") + 횡단 링크로 열어야 할 문서 수를 줄이는 것이다.
-- "AI가 코드를 안 본다"는 전제는 채택하지 않았다. 에이전트는 코드를 사람보다 많이 읽는다. 이 결정의 근거는 "코드를 안 보니까"가 아니라 "코드가 답할 수 없는 것(왜·무엇을 접었는지·어디에 붙는지)만 docs에 있으면 되고, 코드가 답할 수 있는 것이 docs와 레포에 이중으로 있으면 갈라진다"이다.
+- Why a filename allowlist rather than "0 documents": "0 documents in the repository" is easy to remember but also eliminates `AGENTS.md`. Conversely, content-type criteria ("allowed if it is a contract") introduce judgment and holes in the allowlist — every one of the 34 files above was something someone thought "must stay." Restricting by filename leaves no room for judgment and enables linting.
+- Why execution-coupled contracts remain in the repository: drift is caused by "being in two places," rather than "being in the repository." Moving a channel contract to docs produces the same divergence if the agent changing the code does not also update docs. Keep things that change in the same commit in the same place.
+- Why the classification question remains: an allowlist is an enumeration and cannot answer when a new kind of file appears. The question directly reflects the situation encountered when `server/` was replaced by `med-gen/`: "The repository is dead, but the research inside it must survive."
+- On the context cost objection: docs growth is a real cost. However, the alternative (scattering information across repositories) does not reduce cost; it makes information impossible to find, creating the appearance of no cost. The actual solution is to reduce the number of documents that must be opened through scope subtrees ([README.md](../../README.md), "Structure") and cross-links.
+- The premise that "AI does not read code" was not adopted. Agents read more code than humans do. The rationale for this decision is not "because they do not read code," but "docs only needs information that code cannot answer (why, what was abandoned, and where things connect), and duplicating information that code can answer in both docs and the repository causes divergence."
 
-## 결과 (선택)
+## Consequences (optional)
 
 <!-- 시간이 지난 후 확인된 효과·부작용을 여기에 추가. 결정 본문은 수정하지 않는다. -->

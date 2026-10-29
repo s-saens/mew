@@ -1,24 +1,24 @@
 ---
-title: "디버거 패널 입력 폼과 접기 상태 정리"
-description: "모바일 디버거의 중단점·감시 입력 폼을 필요할 때 열도록 바꾸고 접기 상태·터치 크기를 보정한 작업과 로컬 검증 결과, 기존 고급 UI·문서 검사 실패 및 미적용 범위를 기록한다."
+title: "Debugger Panel Input Forms and Collapse State Cleanup"
+description: "Records changes that make the mobile debugger's breakpoint and watch input forms open on demand and adjust collapse state and touch target sizes, along with local validation results, existing advanced UI and documentation check failures, and the scope not applied."
 created: "2026-10-29"
 updated: "2026-10-29"
 ---
 
-## 목적과 결과
+## Purpose and results
 
-모바일에서 중단점·감시 입력 폼과 상세 옵션이 검사 결과를 밀어내는 문제를 줄였다. 중단점과 고정 감시 제목 옆 **+**로 폼을 열고 닫으며, 추가하면 폼을 닫는다. 항목 수는 배지로 표시하고 상세 옵션의 펼침 표시를 통일했다. 실행 제어와 입력칸·영역 제목은 터치 환경에서 최소 44px 높이를 유지한다. 헤더의 작은 설정 버튼은 기존 헤더 크기를 따른다.
+Reduced the problem of breakpoint and watch input forms and detailed options pushing inspection results out of view on mobile. Use **+** beside the Breakpoints and Pinned Watches headings to open and close the forms; adding an item closes the form. Item counts appear as badges, and expansion indicators for detailed options are consistent. Execution controls, input fields, and section headings maintain a minimum height of 44 px in touch environments. The small settings button in the header follows the existing header size.
 
-사용자가 바꾼 접기 상태는 같은 실행 상태의 갱신에서 유지한다. 중단·실행 전환으로 기본 표시 조건이 바뀌면 기본 상태를 적용한다. 현재 동작과 지원 범위는 [외부 DAP 디버거](../features/%ED%84%B0%EB%AF%B8%EB%84%90%C2%B7%EC%97%90%EC%9D%B4%EC%A0%84%ED%8A%B8%C2%B7%EC%9E%90%EB%8F%99%ED%99%94/%EC%99%B8%EB%B6%80%20DAP%20%EB%94%94%EB%B2%84%EA%B1%B0.md#패널의-표시와-조작)가 소유한다.
+User-adjusted collapse states are preserved across updates within the same execution state. Default states are applied when a transition between paused and running changes the default display conditions. [External DAP Debugger](../features/terminals-agents-automation/external-dap-debugger.md#panel-display-and-controls) owns the current behavior and supported scope.
 
-## 로컬 검증
+## Local Validation
 
-- `node --test server/debugger-ui.test.ts`: 통과. 1366·768·320px에서 초기 폼 숨김, 제목 옆 버튼의 키보드 조작, 중단점·감시 추가 후 폼 닫기, 소스 검색, 조건 저장, 중단 시 스택 펼침, 단계 실행 후 접기 상태 유지·변경 변수 우선 표시와 가로 넘침을 검사했다. 320px에서는 실행 버튼의 44px 터치 크기도 확인했다. 준비·입력·중단 상태의 PC·모바일 캡처를 확인했다.
-- `npx tsc -b`: 통과.
-- 변경한 디버거 컴포넌트와 UI 테스트의 `oxlint`: 오류 없이 완료. 기존 패널의 ref·effect 관련 경고는 남아 있다.
-- `server/debugger-advanced-ui.test.ts`: `.cm-debugger-marker` 표시 대기에서 실패했다. 임시 폴더로 추출한 변경 전 HEAD에서도 같은 지점의 실패를 확인했다. 이 작업에서 고급 기능 전체 검증을 통과했다고 판단하지 않는다.
-- `npm run check:docs`: 작업 전부터 있던 `docs/지원서.md`의 frontmatter 누락으로 실패했다. 별도 실행한 링크 검사도 기존 README 이미지 경로와 기능 MOC 등의 누락 링크로 실패했다. 이번 변경 문서의 메타데이터와 로컬 링크는 별도로 확인했다.
+- `node --test server/debugger-ui.test.ts`: passed. At 1366, 768, and 320 px, checks covered initially hidden forms, keyboard operation of buttons beside headings, form closure after adding breakpoints and watches, source search, condition saving, stack expansion when paused, preservation of collapse states after stepping, prioritization of changed variables, and horizontal overflow. At 320 px, the execution buttons' 44 px touch target size was also verified. Desktop and mobile captures in ready, input, and paused states were reviewed.
+- `npx tsc -b`: passed.
+- `oxlint` for the changed debugger components and UI tests: completed without errors. Existing ref and effect warnings in the panel remain.
+- `server/debugger-advanced-ui.test.ts`: failed while waiting for `.cm-debugger-marker` to appear. The same failure at the same point was confirmed on the pre-change HEAD extracted to a temporary folder. This work is not considered to have passed full advanced-feature validation.
+- `npm run check:docs`: failed because of missing frontmatter in `docs/지원서.md` that predated this work. A separately run link check also failed because of existing missing links, including README image paths and feature MOCs. Metadata and local links in the documents changed here were checked separately.
 
-## 적용 범위와 남은 한계
+## Scope of Application and Remaining Limitations
 
-검증은 격리된 브라우저 fixture에서 수행했다. 실제 휴대폰·실행 중 인스턴스의 화면은 확인하지 않았다. 앱 빌드·배포·런처 실행·서버 재시작은 수행하지 않았으며 운영 화면 적용은 사용자의 빌드가 필요하다.
+Validation was performed in an isolated browser fixture. Screens on actual phones or the running instance were not checked. No app build, deployment, launcher execution, or server restart was performed; applying the changes to the production UI requires the user to build the app.

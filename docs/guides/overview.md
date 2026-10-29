@@ -1,72 +1,72 @@
 ---
-title: "mew 소개와 화면 둘러보기"
-description: "dark 테마와 뮤펫이 보이는 문서 편집·코드 분할·Git·모바일 예제 화면으로 mew를 소개하고, 설치·첫 사용·에이전트와 설정 안내로 연결한다. 로그인 화면·localhost 앱과 Android 사용법도 안내한다."
+title: "Introduction to mew and a tour of the interface"
+description: "Introduces mew through example screens showing document editing, split code views, Git, and mobile use with the dark theme and Mewpet, and links to installation, first use, agents, and settings guides. Also covers the login screen, localhost apps, and Android use."
 created: "2026-10-14"
 updated: "2026-10-20"
 상위파일: "MOC.md"
 ---
-# mew 소개와 화면 둘러보기
+# Introduction to mew and a tour of the interface
 
-**내 컴퓨터의 폴더를, 브라우저에서 쓰는 작업 공간으로.**
+**Turn a folder on your computer into a workspace in your browser.**
 
-mew는 문서·코드·터미널·AI 에이전트·Git을 한 화면에서 엽니다. 파일은 컴퓨터나 서버의 폴더에 두고, 브라우저로 접속해 작업합니다. Linux·macOS에서 실행하며 Windows에서는 WSL 2를 사용합니다.
+mew opens documents, code, terminals, AI agents, and Git on one screen. Keep files in a folder on your computer or server and work through your browser. It runs on Linux and macOS, and uses WSL 2 on Windows.
 
-[설치하기](getting-started-ko.md) · [첫 프로젝트 열기](first-steps.md) · [사용법 찾기](MOC.md)
+[Install](getting-started-ko.md) · [Open your first project](first-steps.md) · [Find usage instructions](MOC.md)
 
-## 문서를 읽으면서 코드 작업하기
+## Work on code while reading documents
 
-![dark 테마에서 왼쪽 파일 탐색기, 가운데 Markdown 문서, 오른쪽 TypeScript 코드를 열고 아래에 카피바라 뮤펫을 표시한 화면](../assets/screenshots/split.png)
+![A dark theme screen with the file explorer on the left, a Markdown document in the center, TypeScript code on the right, and a capybara Mewpet at the bottom](../assets/screenshots/split.png)
 
-왼쪽에서 프로젝트 파일을 고르고, 문서와 코드를 나란히 엽니다. 탭을 편집 칸 가장자리로 끌면 화면을 나눌 수 있습니다. 작업에 따라 터미널·에이전트·Git 같은 패널도 독에서 열어 배치합니다.
+Select project files on the left and open documents and code side by side. Drag a tab to the edge of an editor pane to split the screen. Open and arrange panels such as terminals, agents, and Git from the dock as needed.
 
-문서에 요구사항을 쓰고 옆에서 구현을 확인할 때, 또는 코드와 설명을 함께 검토할 때 사용할 수 있습니다. [화면 분할과 탭 사용법](editor.md#편집-칸-문서-탭--화면-분할) · [터미널·에이전트 사용법](terminal-agents.md).
+Use this to write requirements in a document while checking the implementation beside it, or to review code and explanations together. [Split screens and tabs](editor.md#editor-panes-document-tabs--split-view) · [Terminals and agents](terminal-agents.md).
 
-## Markdown을 바로 편집하기
+## Edit Markdown directly
 
-![dark 테마와 뮤펫을 켜고 프로젝트 노트의 체크리스트·표·코드 블록을 편집하는 Hotview 화면](../assets/screenshots/desktop.png)
+![Hotview screen editing a project note's checklists, tables, and code blocks with the dark theme and Mewpet enabled](../assets/screenshots/desktop.png)
 
-**Hotview**는 제목·체크리스트·표·코드 블록을 렌더링하면서 편집합니다. 문서 위쪽에는 YAML 속성이 표시됩니다. 원문으로 전환해 Markdown 구문을 직접 수정할 수도 있습니다.
+**Hotview** lets you edit headings, checklists, tables, and code blocks as they render. YAML properties appear at the top of the document. You can also switch to source to edit Markdown syntax directly.
 
-본문은 자동으로 파일에 저장됩니다. Git 커밋은 별도 작업입니다. 문서 링크와 Documents 목록으로 관련 파일을 찾아 이동할 수 있습니다. [편집·저장·PDF·미디어 안내](editor.md).
+The document body is automatically saved to the file. Git commits are a separate action. Use document links and the Documents list to find and navigate to related files. [Editing, saving, PDF, and media guide](editor.md).
 
-## Git 변경 검토하기
+## Review Git changes
 
-![dark 테마에서 뮤펫과 함께 변경 파일·커밋 기록을 보여주는 Git 패널](../assets/screenshots/git.png)
+![Git panel showing changed files and commit history with Mewpet in the dark theme](../assets/screenshots/git.png)
 
-독의 **Git**에서 현재 프로젝트의 변경 파일과 커밋 기록을 확인합니다. 변경 파일을 열면 에디터에서 diff를 볼 수 있으며, 커밋할 파일을 골라 기록할 수 있습니다.
+Open **Git** in the dock to view changed files and commit history for the current project. Open a changed file to see its diff in the editor, and select files to commit.
 
-AI 에이전트가 작업한 뒤 어떤 파일이 바뀌었는지 확인하는 데도 사용할 수 있습니다. [Git 패널과 선택 커밋 사용법](projects.md#git-작업-패널).
+You can also use it to check which files changed after an AI agent finishes its work. [Git panel and selective commits](projects.md#git-operations-panel).
 
-## 휴대폰에서 이어 보기
+## Continue viewing on your phone
 
-![390 × 844 크기의 dark 테마 화면에서 프로젝트 노트와 하단 독·카피바라 뮤펫을 표시한 모바일 예시](../assets/screenshots/mobile.png)
+![Mobile example showing project notes, the bottom dock, and a capybara Mewpet in a 390 × 844 dark theme screen](../assets/screenshots/mobile.png)
 
-휴대폰에서는 한 패널을 화면에 띄우고 아래 독으로 문서·파일·에이전트 등을 전환합니다. 같은 프로젝트 파일에 접근하므로, 컴퓨터에서 작업한 내용을 휴대폰에서 확인할 수 있습니다.
+On a phone, one panel fills the screen, and the bottom dock switches between documents, files, agents, and other panels. Since you access the same project files, you can check work from your computer on your phone.
 
-외부에서 접속하려면 로컬 mew의 **메뉴 → Mewlink → 원격 접속 → 기기 등록**을 마친 뒤 기기 주소를 엽니다. 호스트가 켜져 있고 mew가 실행 중이어야 합니다. [외부 접속](getting-started-ko.md#외부에서-접속하기) · [모바일 조작](editor.md#모바일과-전체화면).
+To connect from outside, complete **Menu → Mewlink → Remote access → Register device** in your local mew, then open the device address. The host must be on and mew must be running. [External access](getting-started-ko.md#connect-remotely) · [Mobile controls](editor.md#mobile-and-fullscreen).
 
-## 에이전트와 화면 설정하기
+## Configure agents and appearance
 
-독의 **에이전트**에서 런타임을 선택해 대화를 시작합니다. 런타임의 설치와 인증이 필요하며, **Skills 관리 → Mew**에서 기본 문서화·커밋 스킬을 확인할 수 있습니다. 새 문서의 기본 언어는 에이전트의 응답 언어 설정을 따릅니다. [런타임 준비](../configuration/agent-runtimes.md) · [기본 스킬](../configuration/agent-harness.md) · [응답 언어와 지침](project-setup.md).
+Select a runtime under **Agents** in the dock to start a conversation. The runtime must be installed and authenticated. You can view the default documentation and commit skills under **Manage Skills → Mew**. The default language for new documents follows the agent's response language setting. [Prepare runtimes](../configuration/agent-runtimes.md) · [Default skills](../configuration/agent-harness.md) · [Response language and instructions](project-setup.md).
 
-새 브라우저의 기본 테마는 미드나이트입니다. 화면의 테마·글꼴·독은 설정에서 바꿉니다. 화면 아래의 **뮤펫**은 눌러 알림과 자원 정보를 확인하거나, 에이전트를 연결해 도우미 대화를 열 수 있습니다. 이 문서의 화면은 dark 테마와 내장 카피바라 뮤펫을 사용합니다. [화면 설정](../configuration/appearance.md) · [뮤펫 도우미](<../../.mew/docs/features/화면·계정·운영/뮤펫 도우미·대화·Mew 조작.md>).
+The default theme in a new browser is Midnight. Change the theme, fonts, and dock in settings. Click the **Mewpet** at the bottom of the screen to check notifications and resource information, or connect an agent to open an assistant conversation. The screens in this document use the dark theme and built-in capybara Mewpet. [Appearance settings](../configuration/appearance.md) · [Mewpet assistant](<../../.mew/docs/features/appearance-accounts-operations/mewpet-assistant-conversations-and-controls.md>).
 
-## 그 밖에 할 수 있는 일
+## Other things you can do
 
-| 하고 싶은 일 | 안내 |
+| What you want to do | Guide |
 | --- | --- |
-| 여러 폴더와 프로젝트를 전환하고 파일 찾기 | [프로젝트·파일·검색](projects.md) |
-| AI 런타임을 연결하고 대화·터미널 사용하기 | [터미널·에이전트](terminal-agents.md) · [런타임 설정](../configuration/agent-runtimes.md) |
-| 문서 공동 편집, 댓글, 채팅, 게스트 공유 | [협업과 공유](collaboration.md) |
-| 로그인 화면·localhost 앱 또는 Android 사용하기 | [로그인·localhost 앱·Android](browser.md) |
-| 컴퓨터 화면에 직접 접속하기 | [원격 데스크톱](remote-desktop.md) — 구성 요소 설치와 OS 권한 필요 |
-| 문서에 데이터베이스 표 넣기 | [Postgres 표](database.md) — 별도 DB 연결 필요 |
-| 반복 명령과 예약 작업 설정하기 | [명령 버튼·예약](commands.md) |
+| Switch between folders and projects and find files | [Projects, files, and search](projects.md) |
+| Connect AI runtimes and use conversations and terminals | [Terminals and agents](terminal-agents.md) · [Runtime settings](../configuration/agent-runtimes.md) |
+| Coedit documents, comment, chat, and share with guests | [Collaboration and sharing](collaboration.md) |
+| Use the login screen, localhost apps, or Android | [Login, localhost apps, and Android](browser.md) |
+| Connect directly to your computer's screen | [Remote desktop](remote-desktop.md) — Requires component installation and OS permissions |
+| Add database tables to documents | [Postgres tables](database.md) — Requires a separate database connection |
+| Set up recurring commands and scheduled tasks | [Command buttons and scheduling](commands.md) |
 
-## 시작하기
+## Get started
 
-1. [운영체제에 맞게 설치](getting-started-ko.md)하고 임시 비밀번호를 바꿉니다.
-2. [첫 사용 안내](first-steps.md)에 따라 폴더와 문서를 엽니다.
-3. 필요한 기능은 [사용법 홈](MOC.md), 구현·운영 자료는 [프로젝트 지식](../../.mew/docs/MOC.md)에서 찾습니다.
+1. [Install for your operating system](getting-started-ko.md) and change the temporary password.
+2. Follow the [First use guide](first-steps.md) to open folders and documents.
+3. Find the features you need in the [Usage guide home](MOC.md) and implementation and operations materials in [Project knowledge](../../.mew/docs/MOC.md).
 
-화면은 2026-10-15에 실행 중인 mew의 UI를 Playwright로 촬영했습니다. 촬영 당시 기본값인 dark 프리셋과 내장 카피바라 뮤펫을 사용하고, 공개용 예제 폴더·문서·Git 기록을 브라우저의 모의 API 응답으로 제공했습니다. 실제 계정·개인 파일·대화는 포함하지 않았습니다. 데스크톱 이미지는 1440 × 900, 모바일 이미지는 390 × 844 브라우저 viewport이며 실기기 촬영은 아닙니다. 이미지의 Git 기록은 기능 설명용 예제이며 실제 저장소 이력이 아닙니다. 화면 크기·버전에 따라 배치는 달라질 수 있습니다.
+The screenshots were captured with Playwright from the running mew UI on 2026-10-15. They use the dark preset, which was the default at the time, and the built-in capybara Mewpet, with public example folders, documents, and Git history supplied through mock API responses in the browser. No real accounts, personal files, or conversations were included. Desktop images use a 1440 × 900 browser viewport, and mobile images use a 390 × 844 browser viewport; they were not captured on physical devices. The Git history in the images is an example for explaining features, not actual repository history. Layout may vary by screen size and version.

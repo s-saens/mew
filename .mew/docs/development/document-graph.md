@@ -1,50 +1,50 @@
 ---
-title: "Documents 링크 그래프·백링크 엔진"
+title: "Documents Link Graph and Backlink Engine"
 created: 2026-10-02
 updated: 2026-10-08
-description: "Documents 그래프와 제목 옆 백링크·상위파일 화살표의 공용 Markdown 분석·역방향 색인, 프로젝트 간 참조·부모 탐색과 권한 필터·검증 계약을 정의한다."
+description: "Defines the shared Markdown analysis and reverse index for the Documents graph and the backlink and parent-file arrows beside the title, along with cross-project references, parent navigation, permission filtering, and validation contracts."
 상위파일:
   - "MOC.md"
-  - "../features/프로젝트·파일·검색/Documents·문서 지도 관리.md"
+  - "../features/projects-files-search/documents-and-document-map-management.md"
 ---
 
-## 범위와 API
+## Scope and API
 
-Docs 루트의 **그래프 보기**는 **문서 홈**보다 위에 한 번만 표시한다. 하위 폴더와 일반 파일 보기에는 표시하지 않는다. 그래프는 현재 연결된 Documents 안의 `.md` 문서를 대상으로 하며 링크가 없는 문서도 포함한다. 문서 선택은 연결을 강조하고, 더블클릭 또는 **문서 열기**는 기존 Docs 스코프의 에디터 탭으로 연다. 검색·목록으로도 문서를 선택하거나 열 수 있다. [상위·하위 문서](document-pages.md)의 대표 파일도 본문 문서로 분석한다. 포함 관계는 디스크 계층이며 실제 본문 하이퍼링크가 있을 때만 그래프 간선을 만든다.
+Show **View Graph** only once at the Docs root, above **Document Home**. Do not show it in subfolders or regular file views. The graph covers `.md` documents in the currently connected Documents, including documents with no links. Selecting a document highlights its connections; double-clicking or choosing **Open Document** opens it in an editor tab in the existing Docs scope. Documents can also be selected or opened through search and the list. Representative files from [Parent and Child Documents](document-pages.md) are also analyzed as document bodies. Containment follows the disk hierarchy, and graph edges are created only when actual body hyperlinks exist.
 
-`GET /api/docs/graph`는 `filesRead`와 요청자의 파일 열람 권한을 적용해 `{ nodes, edges, skipped }`를 반환한다. 노드는 `{ path, title, group }`, 방향 있는 간선은 응답 노드의 인덱스 `[source, target]`다. 숨김·차단 파일과 읽을 수 없는 노드·제목·간선을 반환하지 않는다. 그래프 응답은 `no-store`이며 권한 변경 시 클라이언트 그래프를 즉시 비우고 다시 요청한다. 분석 중 Documents 루트가 바뀌면 409로 재요청을 유도한다.
+`GET /api/docs/graph` applies `filesRead` and the requester's file read permissions and returns `{ nodes, edges, skipped }`. Nodes are `{ path, title, group }`, and directed edges are `[source, target]` indices into the response nodes. Hidden or blocked files and unreadable nodes, titles, and edges are not returned. The graph response uses `no-store`; when permissions change, the client graph is cleared immediately and requested again. If the Documents root changes during analysis, 409 prompts a new request.
 
-Markdown 인라인·참조형 링크를 Markdown 파서로 읽는다. 상대경로, Docs 루트 기준 `/path`, URI 인코딩과 문서 뒤의 fragment/query를 처리하며 확장자를 생략하면 `.md`를 확인한다. `[[문서#제목|표시명]]`은 현재 폴더·Docs 루트·유일한 파일명 순으로 해석한다. 같은 파일명이 여러 곳에 있어 모호하면 추측하지 않는다. 외부 URL·이미지·코드·frontmatter·자기 문서·없는 대상·Docs 밖 경로는 연결에서 제외하며 같은 방향의 중복 링크는 하나로 합친다. HTML 링크와 문서 밖의 파일은 대상이 아니다.
+Reads Markdown inline and reference-style links with a Markdown parser. Handles relative paths, Docs-root-relative `/path`, URI encoding, and fragments/queries after document paths, and checks for `.md` when the extension is omitted. Resolves `[[문서#제목|표시명]]` in order against the current folder, the Docs root, and a unique filename. Does not guess when the same filename exists in multiple locations and is ambiguous. External URLs, images, code, frontmatter, the document itself, missing targets, and paths outside Docs are excluded from connections, and duplicate links in the same direction are merged into one. HTML links and files outside the document set are out of scope.
 
-파일별 8 MiB를 넘거나 읽기 오류가 발생하면 해당 문서를 제외하고 `skipped`로 알린다. 심볼릭 링크의 실제 경로도 Docs 루트 안인지 확인한다. 전체 문서 본문을 API나 브라우저에 전달하지 않는다.
+If a file exceeds 8 MiB or encounters a read error, the document is excluded and reported through `skipped`. Symlink real paths are also checked to ensure they are inside the Docs root. Full document bodies are not passed to the API or browser.
 
-## 처리·성능 계약
+## Processing and Performance Contract
 
-- `server/document-link-index.ts`의 `DocumentLinkIndex`는 그래프와 백링크가 공유하는 파일별 제목·본문 링크·상위파일 분석 캐시다. mtime·ctime·크기와 파일 카탈로그 변경 신호로 변경된 파일만 다시 파싱하며, 권한 판단은 캐시하지 않는다. 캐시는 최대 50,000개이며 초과 시 기존 항목을 제거할 뿐 응답 문서 수를 제한하지 않는다. `server/document-graph.ts`는 기존 파일 카탈로그를 사용하고 최대 12개 파일 I/O를 병렬 처리한다.
-- `src/utils/document-graph-layout.ts`는 직접 구현한 결정적 힘 기반 배치다. 사분 트리의 Barnes–Hut 반발력은 평균 `O(n log n)`, 간선 스프링은 `O(e)`다. 동일 위치의 노드와 빈 그래프를 처리하고, 감쇠 뒤에는 계산을 멈춘다.
-- `document-graph-worker.ts`는 짧은 작업 묶음으로 배치를 계산한다. Float32 좌표를 transferable buffer로 전달하고 노드 드래그 때만 다시 가열한다. 그래프를 닫거나 새 데이터로 교체하면 Worker를 종료한다.
-- `document-graph-canvas.ts`는 Canvas 하나로 간선·노드를 그린다. 그리기는 `requestAnimationFrame`으로 병합하고 DPR은 2로 제한한다. 공간 그리드로 포인터의 가까운 노드를 찾고 화면 밖 요소와 겹치는 라벨을 줄인다. 라벨은 최대 65개이며 선택한 노드와 이웃을 우선한다.
-- 휠·버튼·두 손가락으로 확대하고 빈 영역 드래그로 이동한다. 노드를 드래그하면 그 위치를 잠시 고정한다. 키보드 방향키는 이동, +/-는 확대·축소, Home은 전체 보기, Enter는 선택 문서 열기다. 검색과 페이지 단위 목록은 Canvas를 사용할 수 없는 환경에서도 문서 접근을 제공한다.
-- 그래프 화면은 기존 `DialogFrame`의 포커스 복원·Esc/뒤로가기 닫기를 사용한다. 검색·새로고침·문서 목록·크기/읽기 오류 및 Worker 실패 상태를 제공하며 데스크톱과 모바일의 기존 테마를 따른다.
+- `DocumentLinkIndex` in `server/document-link-index.ts` is a per-file cache of title, body link, and parent-file analysis shared by the graph and backlinks. It reparses only changed files based on mtime, ctime, size, and file catalog change signals; permission decisions are not cached. The cache holds up to 50,000 entries; exceeding this only evicts existing entries and does not limit the number of documents in responses. `server/document-graph.ts` uses the existing file catalog and processes up to 12 file I/O operations in parallel.
+- `src/utils/document-graph-layout.ts` is a custom deterministic force-directed layout. Quadtree Barnes–Hut repulsion averages `O(n log n)`, and edge springs are `O(e)`. It handles colocated nodes and empty graphs and stops computing after cooling.
+- `document-graph-worker.ts` computes the layout in short work batches. It passes Float32 coordinates through a transferable buffer and reheats only when a node is dragged. The Worker is terminated when the graph is closed or replaced with new data.
+- `document-graph-canvas.ts` draws edges and nodes on a single Canvas. Drawing is coalesced through `requestAnimationFrame`, and DPR is capped at 2. A spatial grid finds nodes near the pointer, and offscreen elements and overlapping labels are reduced. Labels are limited to 65, prioritizing the selected node and its neighbors.
+- Zoom with the wheel, buttons, or two fingers, and pan by dragging an empty area. Dragging a node temporarily pins its position. Keyboard arrow keys pan, +/- zoom in and out, Home fits the entire graph, and Enter opens the selected document. Search and a paginated list provide document access even when Canvas is unavailable.
+- The graph view uses the existing `DialogFrame` behavior for focus restoration and closing with Esc or Back. It provides search, refresh, a document list, size/read error states, and a Worker failure state, and follows the existing desktop and mobile themes.
 
-## 백링크
+## Backlinks
 
-프론트매터 `title` 오른쪽의 대각선 화살표를 누르면 현재 문서를 참조하는 문서 목록을 연다. 각 항목은 제목과 절대 경로를 보여주며 선택하면 기존 파일 열기 경로로 해당 문서를 연다. 현재 프로젝트 밖의 문서도 열 수 있다. 읽기 전용에서도 탐색할 수 있으며 로딩·빈 목록·실패와 재시도·일부 문서 제외 상태를 표시한다. Esc·뒤로가기·바깥 누름·화살표 재클릭으로 닫고 포커스를 복원한다. 문서 전환이나 팝업 닫기 시 요청을 취소한다.
+Clicking the diagonal arrow to the right of the frontmatter `title` opens a list of documents referencing the current document. Each item shows its title and absolute path; selecting it opens the document through the existing file-opening flow. Documents outside the current project can also be opened. Navigation is available in read-only mode, with states for loading, an empty list, failure and retry, and partial document exclusions. Esc, Back, clicking outside, or clicking the arrow again closes the popup and restores focus. Requests are canceled when switching documents or closing the popup.
 
-프론트매터 `상위파일`은 일반 속성 행에서 숨기고 제목 옆 ↑ 버튼으로 탐색한다. 백링크 분석에서 해석한 동일한 부모 경로와 제목을 사용한다. 열 수 있는 부모가 하나면 즉시 열고, 여러 개면 같은 팝업에서 선택한다. 없거나 권한이 없으면 빈 상태를 표시한다. YAML 값은 파일에 보존하며 원문 모드에서 수정한다. 부모는 기존처럼 백링크 목록에서 제외한다.
+The frontmatter `상위파일` is hidden from regular property rows and navigated through the ↑ button beside the title. It uses the same parent paths and titles resolved by backlink analysis. If one parent can be opened, it opens immediately; if there are multiple, the same popup lets the user choose. If none exist or access is denied, an empty state is shown. YAML values remain in the file and are edited in source mode. Parents remain excluded from the backlink list as before.
 
-`GET /api/docs/backlinks?project=...&path=...`는 `{ documents: [{ path, title }], parents: [{ path, title }], skipped }`를 `no-store`로 반환한다. 상대 `path`는 프로젝트 기준이며 절대 경로는 `serverFiles` 권한이 필요하다. 참조 원문을 탐색하는 범위는 현재 워크스페이스와 연결된 Documents다. `serverFiles` 권한이 있는 계정은 등록된 루트 프로젝트와 각각의 연결된 Documents도 포함한다. 외부 대상 문서를 열었다고 그 문서의 상위 디렉터리를 새 탐색 범위로 추가하지 않는다.
+`GET /api/docs/backlinks?project=...&path=...` returns `{ documents: [{ path, title }], parents: [{ path, title }], skipped }` with `no-store`. A relative `path` is project-relative, and absolute paths require `serverFiles` permission. Reference source discovery covers the current workspace and its connected Documents. Accounts with `serverFiles` permission also include registered root projects and their respective connected Documents. Opening an external target document does not add its parent directory as a new discovery scope.
 
-본문의 Markdown 인라인·참조형·위키 링크만 참조로 센다. 상대 경로·절대 로컬 경로·`file://`·URI 인코딩·fragment/query·생략된 `.md`를 해석하고 같은 원문 문서는 한 번만 표시한다. 프로젝트 간 위키 파일명이 모호하면 추측하지 않는다. 이미지·코드·외부 웹 URL·frontmatter는 참조를 만들지 않는다. 현재 문서의 `상위파일` 문자열/배열에 적힌 문서는 본문에서 현재 문서를 링크하더라도 백링크 목록에서 제외한다. 기능 `parent` ID는 이 제외 규칙과 별개다.
+Only Markdown inline, reference-style, and wiki links in the body count as references. Relative paths, absolute local paths, `file://`, URI encoding, fragments/queries, and omitted `.md` extensions are resolved, and each source document is shown only once. Ambiguous wiki filenames across projects are not guessed. Images, code, external web URLs, and frontmatter do not create references. Documents listed in the current document's `상위파일` string/array are excluded from the backlink list even if their bodies link to the current document. Feature `parent` IDs are separate from this exclusion rule.
 
-`server/document-backlinks.ts`는 탐색 범위의 Markdown 파일 목록을 확인하고 공용 캐시로 분석한다. 의존성·빌드·Git·내부 데이터 디렉터리와 하위 심볼릭 링크는 탐색하지 않는다. 최대 12개 파일 I/O를 병렬 처리하며 8 MiB 초과·읽기 오류는 `skipped`로 알린다. 범위별 역방향 색인에서 변경된 원문의 간선만 갱신하고 파일 추가·삭제·권한 변화로 보이는 파일 집합이 바뀌면 경로와 위키 모호성을 다시 계산한다. 최근 4개 범위의 색인을 유지한다.
+`server/document-backlinks.ts` checks the Markdown file list within the discovery scope and analyzes it using the shared cache. It does not traverse dependency, build, Git, or internal data directories, or symlinks below them. It processes up to 12 file I/O operations in parallel and reports files exceeding 8 MiB and read errors through `skipped`. The per-scope reverse index updates only edges from changed source documents, and recalculates paths and wiki ambiguity when file additions, deletions, or permission changes alter the visible file set. Indexes for the most recent 4 scopes are retained.
 
-API는 `filesRead`와 대상 열람 권한을 확인하고 각 원문의 워크스페이스 문맥에서 파일 열람 권한을 적용한다. 권한이 없는 원문의 제목·경로는 반환하지 않으며 요청마다 다시 판단한다. 일반 사용자는 현재 범위의 허용된 문서만 볼 수 있다. 상위파일도 같은 열람 권한을 적용하며, 등록 범위 밖 부모는 `serverFiles` 권한이 있을 때만 경로·제목을 반환한다. 등록 범위 밖의 절대 대상도 `serverFiles` 권한으로 조회할 수 있지만 참조 원문 범위는 위 계약을 유지한다.
+The API checks `filesRead` and target read permissions and applies file read permissions in each source document's workspace context. It does not return titles or paths of unauthorized source documents and reevaluates permissions on every request. Regular users can see only permitted documents in the current scope. Parent files use the same read permissions; parent paths and titles outside registered scopes are returned only with `serverFiles` permission. Absolute targets outside registered scopes can also be queried with `serverFiles` permission, but the reference source scope remains as defined above.
 
-## 검증
+## Verification
 
-`server/document-backlinks.test.ts`는 공용 캐시 재사용, 실제 링크와 프로젝트 간 경로, 상위파일 제외 및 변경·삭제·이름 변경·권한 필터·용량 제한을 검증한다. `server/document-backlinks-access.test.ts`는 실제 API의 계정별 탐색 범위·파일 권한·절대 경로 권한·잘못된 요청을 확인한다. `server/document-backlinks-ui.test.ts`는 PC·모바일과 양 테마에서 화살표 배치·팝업 경계·키보드 탐색·닫기·빈 목록·재시도·전환 중 요청 취소와 외부 문서 탭 열기, 상위파일 속성 숨김·단일 부모 바로 열기·복수 부모 선택·빈 상태·실패를 검증한다.
+`server/document-backlinks.test.ts` verifies shared cache reuse, actual links and cross-project paths, parent-file exclusion, changes, deletion, renaming, permission filtering, and size limits. `server/document-backlinks-access.test.ts` checks per-account discovery scopes, file permissions, absolute-path permissions, and invalid requests through the actual API. `server/document-backlinks-ui.test.ts` verifies arrow placement, popup boundaries, keyboard navigation, closing, empty lists, retry, request cancellation during switching, external document tab opening, parent-file property hiding, direct opening of a single parent, multiple-parent selection, empty states, and failures on PC and mobile in both themes.
 
-링크 파싱·경로 경계·중복/모호한 링크·권한 projection·파일 변경/삭제·루트 교체는 `server/document-graph.test.ts`, 실제 API 권한 적용은 `server/document-graph-access.test.ts`에서 확인한다. 배치의 수렴·겹친 좌표·드래그 고정·대규모 계산은 `src/utils/document-graph-layout.test.ts`에서 검증한다. 실제 Worker/Canvas의 데스크톱·모바일 동작은 `server/document-graph-ui.test.ts`, Docs 루트 버튼 배치는 `server/workspace-switch-ui.test.ts`에서 확인한다.
+`server/document-graph.test.ts` checks link parsing, path boundaries, duplicate/ambiguous links, permission projection, file changes/deletions, and root replacement; `server/document-graph-access.test.ts` checks actual API permission enforcement. `src/utils/document-graph-layout.test.ts` verifies layout convergence, overlapping coordinates, drag pinning, and large-scale computation. `server/document-graph-ui.test.ts` checks actual Worker/Canvas behavior on desktop and mobile, and `server/workspace-switch-ui.test.ts` checks Docs root button placement.
 
-2026-10-02 합성 자료 3,000개 노드·2,999개 간선의 배치 20회는 약 90ms, 마지막 단계는 256,122개 셀 방문이었다(전체 쌍 비교 9,000,000개). 이는 이 개발 환경에서 배치 엔진만 측정한 값이며 초기 문서 읽기·네트워크·그리기 시간은 포함하지 않는다.
+On 2026-10-02, 20 layout iterations on synthetic data with 3,000 nodes and 2,999 edges took approximately 90ms, and the final step visited 256,122 cells (versus 9,000,000 all-pairs comparisons). These measurements cover only the layout engine in this development environment and exclude initial document reading, network, and drawing time.

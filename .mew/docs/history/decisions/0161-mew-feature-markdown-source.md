@@ -1,24 +1,24 @@
 ---
-provenance: "Liiiiv 중앙 ADR 이관본, 2026-10-14"
-description: "이관한 결정 기록: 기능 문서는 Markdown과 프론트매터가 기준본. 당시 선택·근거·후속 변경을 보존하며 현재 계약은 Mew 소유 문서에서 확인한다."
-title: "0161 — 기능 문서는 Markdown과 프론트매터가 기준본"
+provenance: "Migrated copy of a Liiiiv central ADR, 2026-10-14"
+description: "Migrated decision record: Markdown and frontmatter are the canonical source for feature documents. Preserves the choices, rationale, and subsequent changes at the time; see the Mew owning document for the current contract."
+title: "0161 — Markdown and frontmatter are the canonical source for feature documents"
 created: 2026-09-17
 updated: 2026-09-17
 ---
 
-- 날짜: 2026-09-17
-- 상태: 채택
-- 부분 대체: [0159](0159-mew-feature-driven-development.md) — 서버 JSON 기능 원장·결과 저장; 실행 큐·감독·권한은 유지
-- 결정자: 사용자 지시, Codex 구현
-- 후속 결정: [0196](0196-mew-file-backed-feature-tree.md) — 파일명 기반 제목·폴더 계층·일반 Markdown 읽기; 실행 기록 소유권은 유지
+- Date: 2026-09-17
+- Status: Adopted
+- Partially supersedes: [0159](0159-mew-feature-driven-development.md) — server JSON feature ledger and result storage; execution queues, supervision, and permissions remain
+- Decision maker: User direction, Codex implementation
+- Subsequent decision: [0196](0196-mew-file-backed-feature-tree.md) — filename-based titles, folder hierarchy, and reading ordinary Markdown; execution record ownership remains
 
-## 결정
+## Decision
 
-- 프로젝트의 Documents 아래 `features/`에 기능별 Markdown 파일을 둔다. 프론트매터는 ID·부모 ID·제목·지속 상태·날짜·관련 파일/커밋·상태가 확인한 내용 해시, 본문은 요구사항·구현 설명·검증을 소유한다. 파일명과 계층은 독립이다.
-- GUI와 공통 CLI는 같은 파일을 읽고 갱신한다. 새 clone에서도 문서만으로 목록·계층·구현 결과·사용자 판정을 복원한다. 서버 JSON은 실행 큐·세션·요청별 이력만 소유하며 문서의 두 번째 기준본을 만들지 않는다.
-- 파랑은 진행 중인 실행에서 파생하며 문서에 지속 저장하지 않는다. 요구사항·제목·부모의 내용 해시로 외부 편집 후 주황 표시를 판단한다. 파일 시각만 바뀌는 checkout은 승인을 해제하지 않는다. 전체 문서 내용으로 동시 편집을 검사한다.
-- 기존 JSON은 원본 백업을 보존한 뒤 안전하게 문서로 이전한다. 같은 ID의 다른 파일을 덮어쓰지 않는다. 중단된 쓰기는 기록된 트랜잭션을 복구하며 외부 변경과 충돌하면 보존하고 오류를 표시한다.
-- 일반 Markdown 편집·rename·추가·삭제는 다음 조회에 반영한다. 중복 ID·잘못된 프론트매터·없는 부모·순환·경로 이탈은 파일 경로와 함께 알린다. 파일 변경만으로 에이전트를 자동 실행하지 않는다.
-- 기능 스펙의 중복 작성은 없앤다. 설치·운영·ADR·공통 지침은 기존 소유 문서에 유지한다. 이전 docs 전체를 자동 변환하거나 삭제하지 않는다.
+- Store a Markdown file for each feature in `features/` under the project's Documents. Frontmatter owns the ID, parent ID, title, persistent status, dates, related files/commits, and the content hash confirmed by the status; the body owns requirements, implementation descriptions, and verification. Filenames and hierarchy are independent.
+- The GUI and shared CLI read and update the same files. Even in a fresh clone, restore the list, hierarchy, implementation results, and user judgments from the documents alone. Server JSON owns only execution queues, sessions, and per-request history, without creating a second canonical source for the documents.
+- Blue is derived from an active execution and is not persisted in the document. Use a content hash of the requirements, title, and parent to determine whether to display orange after external edits. A checkout that changes only file timestamps does not revoke approval. Check for concurrent edits using the entire document content.
+- Safely migrate existing JSON to documents after preserving a backup of the original. Do not overwrite another file with the same ID. Recover interrupted writes using the recorded transaction; if they conflict with external changes, preserve them and display an error.
+- Reflect ordinary Markdown edits, renames, additions, and deletions on the next query. Report duplicate IDs, invalid frontmatter, missing parents, cycles, and paths escaping the allowed scope, along with file paths. File changes alone do not automatically run agents.
+- Eliminate duplicate authoring of feature specs. Keep installation, operations, ADRs, and shared guidance in their existing owning documents. Do not automatically convert or delete all old docs.
 
-형식·이전·복구·편집 계약은 [기능 기반 개발](../../specs/feature-development.md)에 둔다.
+Format, migration, recovery, and editing contracts are defined in [Feature-driven development](../../specs/feature-development.md).

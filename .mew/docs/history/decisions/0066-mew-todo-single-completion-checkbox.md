@@ -1,44 +1,44 @@
 ---
-provenance: "Liiiiv 중앙 ADR 이관본, 2026-10-14"
-description: "이관한 결정 기록: mew 할 일 완료 조작은 체크박스 하나다. 당시 선택·근거·후속 변경을 보존하며 현재 계약은 Mew 소유 문서에서 확인한다."
-title: "0066 — mew 할 일 완료 조작은 체크박스 하나다"
+provenance: "Migrated copy of a Liiiiv central ADR, 2026-10-14"
+description: "Migrated decision record: Mew uses a single checkbox to complete a to-do. Preserves the choices, rationale, and subsequent changes at the time; see the Mew owning document for the current contract."
+title: "0066 — Mew uses a single checkbox to complete a to-do"
 created: 2026-08-21
 updated: 2026-08-21
 ---
 
-- 날짜: 2026-08-21
-- 상태: 채택
-- 결정자: 송상훈 (지시)
+- Date: 2026-08-21
+- Status: Adopted
+- Decision maker: Song Sanghoon (directive)
 
-## 배경
+## Background
 
-[ADR 0059](0059-mew-typed-project-linked-home-todos.md)는 오늘 할 일에 `done`·`canceled`·`missed` 세 상태를
-고르는 아이콘을 두었다. 완료 표시 하나를 바꾸려 할 때 상태 셋을 먼저 해석해야 해서, 빠르게 체크하는 투두 위젯의
-조작과 맞지 않았다. 기한·주기 할 일은 이미 완료 체크박스 하나를 쓰고 있어 타입에 따라 조작도 달랐다.
+[ADR 0059](0059-mew-typed-project-linked-home-todos.md) added an icon for selecting among three states for today's to-dos: `done`, `canceled`, and `missed`. Changing a single completion indicator required
+first interpreting three states, which did not fit a to-do widget intended for quick checking. Dated and recurring
+to-dos already used a single completion checkbox, so interactions also differed by type.
 
-## 선택지
+## Options
 
-1. 오늘 할 일만 세 상태 버튼 유지 — 회고 정보는 남지만 완료 조작이 복잡하고 타입마다 UI가 다르다.
-2. 모든 타입을 완료 체크박스로 통일 — 취소·못함을 새로 기록할 수 없지만 열림·완료 전환이 즉시 보인다.
+1. Keep the three status buttons only for today's tasks — retrospective information is retained, but marking tasks complete is complicated and the UI differs by type.
+2. Use a completion checkbox for all types — canceled and missed can no longer be recorded, but transitions between open and done are immediately visible.
 
-## 결정
+## Decision
 
-할 일 위젯의 모든 타입은 체크박스 하나로 완료 여부를 바꾼다. 체크하면 `status: done`, 해제하면
-`status: open`을 저장한다. 오늘 할 일에 있던 취소·못함 버튼은 제거한다.
+All types in the to-do widget use a single checkbox to change completion status. Checking it saves `status: done`; unchecking
+it saves `status: open`. Remove the Canceled and Missed buttons from today's to-dos.
 
-`canceled`·`missed` 값과 API 타입은 기존 저장 데이터와 외부 호출 호환을 위해 당장 제거하지 않는다. 위젯에서는
-끝난 항목으로 합쳐 체크된 상태로 보이고 새로 선택할 수 없다. 사용자가 체크를 해제하면 `open`으로 바뀐다.
+The `canceled` and `missed` values and API types are not removed immediately, to preserve compatibility with existing stored data and external calls. In the widget, they
+are grouped with finished items and displayed as checked, and cannot be newly selected. If the user unchecks an item, it changes to `open`.
 
-이 결정은 ADR 0059의 “오늘 할 일은 완료·취소·못함 상태를 기록한다”와 해당 상태 선택 UI를 대체한다. 할 일 타입,
-프로젝트 연결, 사용자별 `todos.json` 원장은 유지한다.
+This decision replaces ADR 0059's rule that “today's to-dos record Done, Canceled, and Missed states” and the corresponding state selection UI. To-do
+types, project links, and the per-user `todos.json` ledger remain in place.
 
-## 근거
+## Rationale
 
-- 체크박스 하나가 투두 목록의 가장 익숙하고 빠른 완료 조작이다.
-- 세 타입의 같은 위치에서 같은 조작을 쓰면 상태 아이콘의 뜻을 따로 익힐 필요가 없다.
-- 저장값을 즉시 삭제하지 않으면 기존 데이터와 API 소비자를 깨지 않고 화면부터 단순화할 수 있다.
+- A single checkbox is the most familiar and fastest way to mark a task complete in a to-do list.
+- Using the same action in the same location for all three types eliminates the need to learn the meanings of separate status icons.
+- Keeping stored values for now allows the UI to be simplified first without breaking existing data or API consumers.
 
-## 결과
+## Results
 
-- 새 UI에서는 취소·못함을 기록할 수 없다.
-- 기존 `canceled`·`missed` 항목은 “끝난 일도 보기”에서 체크된 항목으로 남아 있으며, 체크를 해제하면 `open`으로 정리된다.
+- The new UI cannot record canceled or missed statuses.
+- Existing `canceled` and `missed` items remain checked under “Show finished tasks too,” and unchecking them changes their status to `open`.

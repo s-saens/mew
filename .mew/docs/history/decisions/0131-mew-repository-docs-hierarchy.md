@@ -1,45 +1,45 @@
 ---
-provenance: "Liiiiv 중앙 ADR 이관본, 2026-10-14"
-description: "이관한 결정 기록: mew 실행 안내와 계층형 레포 문서를 분리한다. 당시 선택·근거·후속 변경을 보존하며 현재 계약은 Mew 소유 문서에서 확인한다."
-title: "0131 — mew 실행 안내와 계층형 레포 문서를 분리한다"
+provenance: "Migrated copy of a Liiiiv central ADR, 2026-10-14"
+description: "Migrated decision record: Separate mew startup guidance from hierarchical repository documentation. Preserves the choices, rationale, and subsequent changes from that time; consult the Mew owning document for the current contract."
+title: "0131 — Separate mew startup guidance from hierarchical repository documentation"
 created: 2026-09-11
 updated: 2026-09-11
 ---
 
-- 날짜: 2026-09-11
-- 상태: 대체됨: 0132
-- 대체 확인: 2026-09-11 — [0132](0132-docs-project-owned-documentation.md). Mew 전용 예외를 모든 소유 프로젝트의 README + docs 구조로 흡수하고 중앙 운영 보관 제한도 변경했다.
-- 부분 대체: 0012 — Mew 코드 결합 상세 참조의 README 단일 파일 제한
-- 결정자: 사용자(루트 README에 실행법을 유지하고 mew/docs로 분리 요청) + 에이전트(구조 설계·실행)
+- Date: 2026-09-11
+- Status: Superseded by: 0132
+- Supersession confirmed: 2026-09-11 — [0132](0132-docs-project-owned-documentation.md). The Mew-only exception was absorbed into a README + docs structure for all owning projects, and the limits on central storage of operational documents were also changed.
+- Partially supersedes: 0012 — the single-README-file restriction on detailed references coupled to Mew code
+- Decision makers: User (requested keeping run instructions in the root README and separating documentation into mew/docs) + agent (structure design and execution)
 
-## 배경
+## Background
 
-mew README가 858줄로 커져 실행법을 찾거나 특정 기능의 계약만 읽기 어렵다.
-사용자가 `mew/docs/`에 계층형 문서를 만들고 실행 방법은 루트 README에 남기도록 요청했다.
-[ADR 0012](0012-docs-repo-doc-allowlist-and-absorption.md)의 파일명 허용목록은 이 분리를 막는다.
+The mew README grew to 858 lines, making it difficult to find run instructions
+or read only the contract for a specific feature. The user requested hierarchical documentation in
+`mew/docs/` while keeping run instructions in the root README. The filename allowlist in [ADR 0012](0012-docs-repo-doc-allowlist-and-absorption.md) prevents this separation.
 
-## 선택지
+## Options
 
-1. 모든 상세 내용을 README에 유지 — 기존 허용목록은 지키지만 시작 문서가 계속 커진다.
-2. 상세 내용을 회사 SSoT로 이동 — 코드와 함께 바뀌는 계약이 자립 레포 밖에 놓인다.
-3. mew에 한정해 `docs/`를 허용 — 실행 진입점과 상세 참조를 분리하고 회사 SSoT 경계는 유지한다.
+1. Keep all details in the README — complies with the existing allowlist, but the entry document keeps growing.
+2. Move details to the company SSoT — contracts that change with the code would reside outside the standalone repository.
+3. Allow `docs/` only for mew — separates the execution entry point from detailed references while preserving the company SSoT boundary.
 
-## 결정
+## Decision
 
-3번을 채택한다. 다른 코드 레포의 허용목록은 변경하지 않는다.
+Adopt option 3. Do not change the allowlists for other code repositories.
 
-- `mew/README.md`: 제품 소개, 필수 도구, 설치·실행·검증 명령, 실행 불변식, 상세 문서 진입점.
-- `mew/docs/MOC.md`: 사용법·설정·배포·개발의 짧은 지도. 하위 스코프 MOC에서 필요한 문서만 선택한다.
-- `mew/docs/`: 현재 UI 동작, 설정, 배포 절차, 코드 구조, API·저장 형식·프로토콜 등 코드와 함께 바뀌는 상세 참조.
-- `mew/SECURITY.md`: 기존 역할·인증·게스트 경계 기준본. 다른 문서에서 복제하지 않고 연결한다.
-- 회사의 운영 기록과 뒤집기 어려운 결정은 기존 `.mew/docs/ops/mew/`와 `.mew/docs/decisions/`에 둔다.
-  `mew/docs/`에 별도 회사 헌법·ADR 원본·운영 이력을 만들지 않는다.
-- 새 문서·이동은 해당 MOC와 상대 링크를 함께 갱신한다. 코드 수정 시 해당 상세 참조를 같은 변경에서 고친다.
-- 워크스페이스 문서 검사에는 정확히 `mew/docs/` 경로만 예외로 추가한다.
-  다른 위치의 임의 `.md`를 허용하지 않으며 새 파일명은 소문자 케밥 케이스를 따른다.
+- `mew/README.md`: Product introduction, required tools, installation, run, and validation commands, execution invariants, and entry points to detailed documentation.
+- `mew/docs/MOC.md`: A brief map of usage, configuration, deployment, and development. Select only the documents needed from MOCs for narrower scopes.
+- `mew/docs/`: Detailed references that change with the code, including current UI behavior, configuration, deployment procedures, code structure, APIs, storage formats, and protocols.
+- `mew/SECURITY.md`: The existing canonical source for roles, authentication, and guest boundaries. Link to it from other documents without duplicating it.
+- Company operational records and decisions that are difficult to reverse remain in the existing `.mew/docs/ops/mew/` and `.mew/docs/decisions/`. Do not create a separate
+  company constitution, original ADRs, or operational history in `mew/docs/`.
+- When adding or moving documents, update the relevant MOC and relative links together. When changing code, update the relevant detailed references in the same change.
+- Add only the exact `mew/docs/` path as an exception to workspace documentation checks. Do
+  not allow arbitrary `.md` files elsewhere, and use lowercase kebab-case for new filenames.
 
-## 근거
+## Rationale
 
-실행 정보는 첫 화면에서 찾고, 구현 작업은 해당 주제만 읽을 수 있어야 한다.
-레포 안의 상세 참조는 README 본문을 이동한 단일 기준본이며 회사 SSoT의 복제본이 아니다.
-[ADR 0023](0023-mew-selfhost-packaging-repo.md)의 자립 레포 방향과 코드·문서의 같은 변경 수명을 유지한다.
+Run information must be available on the first screen, and implementation work must require reading
+only the relevant topic. Detailed references in the repository are the single canonical source moved from the README
+body, not a copy of the company SSoT. This preserves the self-contained repository direction of [ADR 0023](0023-mew-selfhost-packaging-repo.md) and the shared change lifecycle of code and documentation.

@@ -1,27 +1,27 @@
 ---
-title: "Mewlink 병합 시 이전 계정 삭제"
-description: "Mewlink 신원을 기존 이메일 계정으로 병합할 때 로그인 수단이 남지 않는 이전 계정을 원자적으로 삭제하고, 세션·Git 자격증명·권한을 회수하는 결정. 작업 기록 보존과 다른 로그인 수단·마지막 owner 보호 범위를 정한다."
+title: "Removing the Previous Account During a Mewlink Merge"
+description: "A decision to atomically delete a previous account with no remaining login methods when merging a Mewlink identity into an existing email account, and to revoke its sessions, Git credentials, and permissions. Defines preservation of work records and protections for other login methods and the last owner."
 created: 2026-10-22
 updated: 2026-10-22
 ---
 
-# Mewlink 병합 시 이전 계정 삭제
+# Removing the Previous Account During a Mewlink Merge
 
-상태: 승인됨.
+Status: Approved.
 
-## 배경
+## Background
 
-별도로 승인한 Mewlink 사용자를 기존 이메일 계정에 연결해도 이전 계정이 남아 계정 관리에 같은 사람이 두 명으로 표시됐다. 사용자는 병합 시 시스템이 이전 계정을 삭제하도록 요청했다.
+Linking a separately approved Mewlink user to an existing email account left the previous account behind, causing account management to display the same person twice. The user requested that the system delete the previous account during a merge.
 
-## 결정
+## Decision
 
-- 검증된 Mewlink 신원과 완료된 대상 이메일 비밀번호 로그인을 확인한다. 연결 상태 비교·중복 요청 처리·새 연결 ID 발급은 유지한다.
-- 신원을 옮긴 뒤 비밀번호와 다른 Mewlink 신원이 남지 않는 이전 계정은 연결 변경과 같은 원자적 저장에서 삭제한다. 이전 계정의 저장된 세션·신뢰 브라우저·Git 자격증명·모든 워크스페이스의 기능·파일 권한도 회수한다.
-- 다른 로그인 수단이 남은 이전 계정은 유지한다. 마지막 owner를 삭제하는 병합은 거부하며 대상 계정의 역할을 올리지 않는다.
-- 대상 계정의 비밀번호·역할·설정은 유지한다. 이전 계정의 프로젝트 파일·개인 설정·작업 기록은 보존하고 자동으로 이관하지 않는다.
-- P2P에서는 권한 정리를 실행하는 병합 요청만 완료할 수 있게 유지하고 다른 요청·접속은 재검증한다. 병합 요청의 응답도 완료 시점의 권한에 다시 고정한다.
-- 이미 연결 이력이 사라진 고아 계정은 표시 이름만으로 추정해 자동 삭제하지 않는다. 이 변경은 이후 실행하는 병합에 적용한다.
+- Confirm the verified Mewlink identity and completed email and password login to the target account. Retain connection state comparisons, duplicate request handling, and issuance of new connection IDs.
+- After moving the identity, delete the previous account in the same atomic save as the connection change if it has no password or other Mewlink identities remaining. Also revoke the previous account's saved sessions, trusted browsers, Git credentials, and feature and file permissions across all workspaces.
+- Keep the previous account if it has other login methods remaining. Reject merges that would delete the last owner, and do not elevate the target account's role.
+- Keep the target account's password, role, and settings. Preserve the previous account's project files, personal settings, and work records without automatically transferring them.
+- In P2P, continue allowing only the merge request performing permission cleanup to complete, and revalidate other requests and connections. Rebind the merge request's response to the permissions in effect at completion as well.
+- Do not infer ownership from display names and automatically delete orphaned accounts whose connection history is already gone. This change applies to merges performed afterward.
 
-## 근거와 영향
+## Rationale and Impact
 
-[0007](0007-mewlink-self-service-linking.md)의 이전 계정 보존 결정을 위 범위에서 대체한다. 로그인할 수 없는 중복 계정을 남기지 않으면서 별도로 사용할 수 있는 계정과 작업 기록을 보호한다. 구현 계약은 [원격 접속](../development/remote-access.md#승인된-mewlink-계정-로그인)이 소유한다. 적용에는 사용자의 로컬 업데이트가 필요하다.
+Supersedes the decision in [0007](0007-mewlink-self-service-linking.md) to retain previous accounts within the scope above. Avoids leaving duplicate accounts that cannot log in while protecting independently usable accounts and work records. [Remote Access](../development/remote-access.md#approved-mewlink-account-login) owns the implementation contract. Applying this requires the user to update locally.

@@ -1,15 +1,15 @@
 ---
-title: "Mew ADR — 할 일·달력"
+title: "Mew ADR — To-dos and Calendar"
 created: 2026-09-11
 updated: 2026-09-11
-description: "독립 전 Mew ADR의 주제별 분류를 보존한 이력 지도. 현재 계약은 Mew 자체 문서와 후속 결정을 따른다."
+description: "A historical map preserving the topic-based classification of Mew ADRs before independence. Current contracts follow Mew's own documentation and subsequent decisions."
 ---
 
-상위: [Mew ADR 지도](../MOC.md). 상태가 `채택`이어도 상단의 **후속 결정**이 있으면 변경 범위를 함께 확인한다.
+Parent: [Mew ADR Map](../MOC.md). Even if the status is `채택`, also check the scope of changes if there is a **subsequent decision** at the top.
 
-## History / raw — 당시 분류
+## History / raw — Classification at the time
 
-- [0075 — 주기 할 일은 매일 초기화되고 항상 보인다](../../0075-mew-recurring-todos-reset-daily-always-visible.md)
-- [0066 — 완료 조작은 체크박스 하나](../../0066-mew-todo-single-completion-checkbox.md)
-- [0059 — 할 일 타입과 프로젝트 연결](../../0059-mew-typed-project-linked-home-todos.md) — 타입·프로젝트 연결; 완료 UI·반복 리셋은 0066·0075
-- [0056 — 사용자 소유 홈 할 일](../../0056-mew-user-owned-home-todos.md)
+- [0075 — Recurring to-dos reset daily and are always visible](../../0075-mew-recurring-todos-reset-daily-always-visible.md)
+- [0066 — A single checkbox for completion](../../0066-mew-todo-single-completion-checkbox.md)
+- [0059 — To-do types and project linking](../../0059-mew-typed-project-linked-home-todos.md) — Types and project linking; completion UI and recurring resets are in 0066 and 0075
+- [0056 — User-owned home to-dos](../../0056-mew-user-owned-home-todos.md)

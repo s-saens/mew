@@ -1,39 +1,39 @@
 ---
-title: "프로젝트 계층형 태스크 계약"
+title: "Project hierarchical task contract"
 created: 2026-09-30
 updated: 2026-10-01
-description: "2026-10-01 제거 전 계층형 태스크의 우선순위·날짜·시간·저장·API·검증 계약을 보존한다. 현재 Markdown 태스크 패널의 기준이 아니다."
+description: "Preserves the priority, date, time, storage, API, and validation contracts for hierarchical tasks before their removal on 2026-10-01. This is not the standard for the current Markdown task panel."
 상위파일: "MOC.md"
 ---
 
-[제거된 기능](project-tasks.md)
+[Removed feature](project-tasks.md)
 
-> 2026-10-01: 태스크 UI·API·관련 구현 및 테스트를 제거했다. 아래는 제거 전 계약이다. 저장 파일만 보존하며 현재 앱에서는 읽거나 수정하지 않는다. 사용자 요청 없이 재도입하지 않는다.
+> 2026-10-01: Removed the task UI, API, and related implementation and tests. The contract below predates removal. Only the saved files are preserved; the current app does not read or modify them. Do not reintroduce this without a user request.
 
-## 사용과 범위
+## Usage and scope
 
-프로젝트를 연 뒤 독의 **태스크**에서 계층형 태스크 목록을 관리한다. 각 항목의 왼쪽에 완료 체크박스를 두고, 하위 항목이 있을 때만 그 앞에 펼침/접힘 화살표를 표시한다. 하위 항목이 없으면 화살표 공간을 남기지 않는다. 제목은 클릭해 바로 편집하며 Enter 또는 포커스 이동으로 저장한다. 각 행의 오른쪽에는 우선순위(없음·낮음·보통·높음), 날짜, 시간 입력이 있고 모두 비울 수 있다. 우선순위는 선택 즉시, 날짜·시간은 포커스 이동으로 저장한다. 저장 실패 시 입력과 재시도 저장 버튼을 유지한다.
+After opening a project, manage the hierarchical task list in **Tasks** in the dock. Each item has a completion checkbox on the left, preceded by an expand/collapse arrow only when it has children. No arrow space is reserved for items without children. Click a title to edit it inline; save with Enter or by moving focus. Each row has priority (None, Low, Normal, High), date, and time inputs on the right, all of which can be cleared. Priority saves immediately on selection; date and time save when focus moves. If saving fails, retain the input and a button to retry saving.
 
-추가 버튼은 문구 없이 + 아이콘만 표시하고 접근성 이름과 툴팁은 유지한다. 추가 입력창이 열려 있는 동안 목록과 각 행의 추가 버튼을 숨기며 저장 성공 또는 취소 후 다시 표시한다. 목록 하단의 +는 최상위 항목을, 각 행의 +는 해당 항목 아래 하위 태스크를 생성한다. 임의 깊이의 부모 관계를 지원하며 접힘 상태는 패널을 연 동안 유지한다. 체크박스는 해당 항목만 완료/예정으로 전환하고 부모·자식 상태는 자동 변경하지 않는다. 삭제 버튼을 누른 뒤 삭제 확인 버튼으로 확정하며 부모 삭제 시 직계 자식은 삭제한 부모의 상위 수준으로 옮겨 보존한다.
+Add buttons show only a + icon without text, while retaining their accessible names and tooltips. While an add input is open, hide the add buttons for the list and each row, then show them again after a successful save or cancellation. The + at the bottom of the list creates a top-level item; the + on each row creates a child task under that item. Parent relationships support arbitrary depth, and collapsed states persist while the panel is open. A checkbox toggles only that item between completed and planned; parent and child states do not change automatically. After clicking Delete, confirm with the deletion confirmation button. When a parent is deleted, preserve its immediate children by moving them to the deleted parent's parent level.
 
-기능·Git 패널과 같은 `data-dock-tab-bar` 헤더를 사용한다. 헤더는 36px 높이·surface-deep 배경·12px 제목·14px 아이콘·24px 새로고침/닫기 버튼이며 공통 DockGrip으로 이동한다. 본문은 12px 제목·24px 입력/아이콘 버튼·28px 행·18px 들여쓰기와 기능 패널의 목록 여백·hover 색상을 사용한다. 제목과 우선순위·날짜·시간은 항상 한 줄이며 오른쪽 메타데이터와 작업 버튼은 우측 정렬한다. 우선순위 48px·날짜 100px·시간 94px로 표시하고 선택기도 제목 입력과 같은 24px 높이를 사용한다. 좁은 패널에서는 고정 최소 행 너비 없이 입력 폭을 줄여 한 줄 배치를 유지하며 가로 스크롤을 만들지 않는다. 들여쓰기는 최대 패널 너비의 12%로 제한한다. 기존 마일스톤 데이터와 진행 중·막힘 상태는 저장에서 유지하지만 이번 단순 계층형 UI에서는 마일스톤 관리·상태 선택·집계·검색 필터를 제공하지 않는다. 사용자 지정 계층형 조작으로 대체한 것이며 별도 요청 없이 옛 UI를 복원하지 않는다.
+Use the same `data-dock-tab-bar` header as the Features and Git panels. The header has a height of 36 px, a surface-deep background, a 12 px title, 14 px icons, and 24 px refresh/close buttons; move it with the shared DockGrip. The body uses 12 px titles, 24 px inputs/icon buttons, 28 px rows, 18 px indentation, and the Features panel's list spacing and hover colors. Keep the title, priority, date, and time on one line, with metadata and action buttons aligned right. Display priority at 48 px, date at 100 px, and time at 94 px; pickers use the same 24 px height as the title input. In narrow panels, reduce input widths without a fixed minimum row width to preserve the single-line layout without horizontal scrolling. Limit indentation to 12% of the panel width. Preserve existing milestone data and in-progress/blocked states in storage, but do not provide milestone management, state selection, aggregation, or search filters in this simple hierarchical UI. Custom hierarchical controls replaced the old UI; do not restore it without a separate request.
 
-독의 태스크는 기존 도킹·패널 포커스·모바일 전면 스택·Esc/뒤로가기와 연결한다. 데스크톱 열림 상태는 프로젝트별 계정 UI 원장의 `chrome.tasksOpen`에 저장한다. 배치는 기존 dock 원장의 `tasks` kind를 사용한다. 한국어·영어·중국어·일본어를 제공한다.
+Integrate dock tasks with existing docking, panel focus, the mobile frontmost stack, and Esc/Back behavior. Store the desktop open state in `chrome.tasksOpen` in the per-project account UI ledger. Layout uses the `tasks` kind in the existing dock ledger. Provide Korean, English, Chinese, and Japanese.
 
-## 저장과 API
+## Storage and API
 
-- 서버 소유 `DATA_DIR/project-tasks-<루트 경로 SHA-256>.json`에 프로젝트별로 저장한다. 같은 프로젝트를 보는 계정은 같은 보드를 공유하고 기존 홈의 사용자 소유 할 일 원장은 변경하지 않는다.
-- `GET /api/project-tasks?workspace=<현재 루트>`는 `{revision, tasks, milestones, canEdit}`를 반환한다.
-- `PUT /api/project-tasks`는 `{workspace, board: {revision, tasks, milestones}}`를 받고 저장된 새 revision과 canEdit을 반환한다. 정상 저장마다 revision을 1 증가시킨다.
+- Store data per project in server-owned `DATA_DIR/project-tasks-<루트 경로 SHA-256>.json`. Accounts viewing the same project share the same board; do not change the existing user-owned to-do ledger on Home.
+- `GET /api/project-tasks?workspace=<현재 루트>` returns `{revision, tasks, milestones, canEdit}`.
+- `PUT /api/project-tasks` accepts `{workspace, board: {revision, tasks, milestones}}` and returns the newly saved revision and canEdit. Increment revision by 1 on each successful save.
 - `ProjectTask`: `{id, title, milestoneId: string|null, status: todo|doing|blocked|done, due: YYYY-MM-DD|null, parentId: string|null, priority: low|medium|high|null, time: HH:mm|null}`.
 - `ProjectMilestone`: `{id, title, due: YYYY-MM-DD|null}`.
-- owner·manager·member만 접근한다. 현재 루트 전체 파일 읽기 권한이 필요하며 쓰기는 전체 파일 편집 권한도 필요하다. canEdit=false면 변경 컨트롤을 숨기거나 비활성화한다. guest는 접근할 수 없다.
-- 서버의 현재 루트와 요청 workspace가 다르면 409, revision이 오래되면 409, 파일 권한 부족은 403이다. 클라이언트는 서버 오류를 표시하며 충돌 시 새로고침 후 다시 저장한다. 다른 창의 변경을 자동으로 덮어쓰거나 합치지 않는다.
-- 제목은 공백 제거 후 비어 있지 않아야 하고 최대 240자다. 태스크 최대 2,000개·마일스톤 최대 200개, ID 중복·없는 마일스톤/부모 참조·자기 참조·부모 순환·잘못된 날짜/시간/우선순위/상태는 거부한다. 기존 저장에서 parentId·priority·time 누락은 null로 읽는다.
-- 기존 원자 저장·손상 파일 처리 계약을 재사용한다. 손상 파일을 빈 보드로 간주해 덮어쓰지 않는다. 실행 중인 서버 프로세스의 동기 읽기·검사·저장 사이에는 비동기 경계가 없다.
-- 서버 푸시 동기화는 제공하지 않는다. 다른 창의 최신 변경은 새로고침으로 읽는다.
+- Only owner, manager, and member can access it. Read access to all files in the current root is required; writing also requires edit access to all files. If canEdit=false, hide or disable mutation controls. Guests cannot access it.
+- The response is 409 if the server's current root differs from the requested workspace, 409 if the revision is stale, and 403 for insufficient file permissions. The client displays server errors; on a conflict, refresh and save again. Changes from other windows are not automatically overwritten or merged.
+- Titles must be nonempty after trimming whitespace and contain at most 240 characters. Allow at most 2,000 tasks and 200 milestones. Reject duplicate IDs, references to nonexistent milestones or parents, self-references, parent cycles, and invalid dates, times, priorities, or states. Read missing parentId, priority, and time fields in existing saved data as null.
+- Reuse the existing atomic save and corrupt-file handling contracts. Do not treat a corrupt file as an empty board and overwrite it. There are no asynchronous boundaries between synchronous reading, validation, and saving in the running server process.
+- Server-push synchronization is not provided. Refresh to read the latest changes from other windows.
 
-## 검증
+## Verification
 
-- `server/project-tasks.test.ts`: 저장·루트 분리·오래된 revision 거부·손상 원본 보존·입력 검증·실제 HTTP 역할/루트/충돌 검사.
-- `server/project-tasks-ui.test.ts`: 격리 Chromium의 PC·모바일 다단계 생성·접기/펼치기·개별 완료·선택 메타데이터·인라인 편집·저장 실패 입력 유지·부모 삭제와 가로 넘침 검사. 실행 중인 앱을 빌드하거나 재시작하지 않는다.
+- `server/project-tasks.test.ts`: storage, root isolation, stale revision rejection, preservation of corrupt originals, input validation, and role/root/conflict checks over actual HTTP.
+- `server/project-tasks-ui.test.ts`: desktop and mobile checks in isolated Chromium for multilevel creation, collapse/expand, individual completion, optional metadata, inline editing, input retention after save failure, parent deletion, and horizontal overflow. Do not build or restart the running app.

@@ -1,28 +1,28 @@
 ---
-title: "에디터 탭별 문서 탐색과 최근 활성 탭 복귀"
-description: "내부문서 링크의 기본 동작을 같은 탭 탐색으로 바꾸고 탭별 뒤로가기·앞으로가기와 Ctrl/Cmd+클릭 새 탭 열기를 분리한다. 활성 탭을 닫을 때 같은 편집 칸의 최근 활성 탭으로 돌아가는 결정을 기록한다."
+title: "Per-Editor-Tab Document Navigation and Return to the Most Recently Active Tab"
+description: "Changes the default behavior of internal document links to navigation in the same tab, separating per-tab back and forward navigation from opening new tabs with Ctrl/Cmd+click. Records the decision to return to the most recently active tab in the same editor pane when closing the active tab."
 created: "2026-10-22"
 updated: "2026-10-22"
 ---
 
-## 상태
+## Status
 
-채택.
+Adopted.
 
-## 배경
+## Background
 
-에디터의 내부문서 링크는 새 탭을 열었고 활성 탭을 닫으면 화면상 인접 탭을 선택했다. 1·2·3 탭 중 1에서 문서 4를 열고 닫아도 3으로 이동해 읽던 흐름을 이어가기 어려웠다. 사용자는 일반 링크 클릭으로 같은 탭을 탐색하고 필요할 때만 새 탭을 열며, 탭 안에서 방문한 문서를 앞뒤로 이동하도록 요청했다.
+Internal document links in the editor opened new tabs, and closing the active tab selected a visually adjacent tab. Among tabs 1, 2, and 3, opening document 4 from 1 and then closing it still moved to 3, making it difficult to continue reading. The user requested navigating in the same tab with a regular link click, opening new tabs only when needed, and moving backward and forward through documents visited within a tab.
 
-## 결정
+## Decision
 
-하위문서를 포함한 내부문서 링크의 일반 클릭은 현재 탭의 문서를 바꾸고 그 탭의 방문 이력에 추가한다. Ctrl/Cmd+클릭은 새 탭을 열며 새 탭의 이력은 첫 문서 하나로 시작한다. 같은 탭 탐색과 뒤로가기·앞으로가기는 다른 탭이 같은 문서를 표시해도 출발 탭을 유지하며 각 탭의 문서 방문 이력을 따로 관리한다.
+A regular click on an internal document link, including links to child documents, changes the document in the current tab and adds it to that tab's visit history. Ctrl/Cmd+click opens a new tab whose history starts with only the first document. Same-tab navigation and back and forward navigation stay in the originating tab even if another tab displays the same document, and each tab maintains its own document visit history.
 
-파일 이력 플로팅 도구 줄 맨 왼쪽에 같은 스타일의 뒤로가기·앞으로가기 버튼을 둔다. 각 방향에 방문 기록이 있을 때만 활성화한다. 뒤로 간 뒤 새 문서를 열면 앞으로 이력을 제거한다.
+Place matching Back and Forward buttons at the far left of the floating file history toolbar. Enable each direction only when it has visit history. Opening a new document after going back clears forward history.
 
-활성 에디터 탭을 닫으면 같은 편집 칸에서 가장 최근에 사용한 남은 탭을 선택한다. 이 탭 선택 순서와 탭 안의 문서 방문 이력은 각각 관리한다. 문서 방문 이력은 탭 세션의 메모리에 두며 탭 이동 시 유지한다. 저장된 탭을 복원할 때는 기존 복원 정책에 따라 동일 문서의 중복 탭을 합치고 각 이력을 현재 문서 하나로 초기화한다.
+Closing the active editor tab selects the most recently used remaining tab in the same editor pane. Manage this tab selection order separately from document visit history within tabs. Keep document visit history in tab session memory and preserve it when moving tabs. When restoring saved tabs, merge duplicate tabs for the same document under the existing restoration policy and reset each history to the current document alone.
 
-## 근거와 영향
+## Rationale and Impact
 
-같은 탭에서 이어 읽는 흐름과 여러 문서를 병렬로 열어 두는 흐름을 클릭 방식으로 선택할 수 있다. 새 탭을 닫으면 앞서 보던 탭으로 돌아간다. 기존 파일 저장·협업·접근 권한과 모바일 패널 방문 이력의 경계는 유지한다.
+The click method lets users choose between continuing to read in the same tab and keeping multiple documents open in parallel. Closing a new tab returns to the previously viewed tab. Preserve the existing boundaries for file saving, collaboration, access permissions, and mobile panel visit history.
 
-현재 상태·UI 계약은 [에디터 탭 방문과 문서 탐색](../development/ui-contracts.md#에디터-탭-방문과-문서-탐색), 링크 동작은 [링크 기능](../features/%EB%AC%B8%EC%84%9C%C2%B7%EC%BD%94%EB%93%9C%C2%B7%EB%AF%B8%EB%94%94%EC%96%B4%20%ED%8E%B8%EC%A7%91/%EB%A7%81%ED%81%AC%C2%B7%ED%8C%8C%EC%9D%BC%20%EC%B0%B8%EC%A1%B0%C2%B7%EC%B2%A8%EB%B6%80.md), 사용법은 [편집 안내](../../../docs/guides/editor.md#링크와-첨부)가 소유한다.
+[Editor Tab Visits and Document Navigation](../development/ui-contracts.md#editor-tab-visits-and-document-navigation) owns the current status and UI contract, [Link Features](../features/document-code-media-editing/links-file-references-and-attachments.md) owns link behavior, and the [Editing Guide](../../../docs/guides/editor.md#links-and-attachments) owns usage instructions.

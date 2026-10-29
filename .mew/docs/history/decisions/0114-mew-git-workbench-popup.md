@@ -1,48 +1,48 @@
 ---
-provenance: "Liiiiv 중앙 ADR 이관본, 2026-10-14"
-description: "이관한 결정 기록: Git 워크벤치는 사이드바 팝업으로 연다. 당시 선택·근거·후속 변경을 보존하며 현재 계약은 Mew 소유 문서에서 확인한다."
-title: "0114 — Git 워크벤치는 사이드바 팝업으로 연다"
+provenance: "Migrated copy of a Liiiiv central ADR, 2026-10-14"
+description: "Migrated decision record: The Git workbench opens as a sidebar popup. Preserves the choices, rationale, and subsequent changes at the time; consult the Mew owning document for the current contract."
+title: "0114 — The Git workbench opens as a sidebar popup"
 created: 2026-09-04
 updated: 2026-09-23
 ---
 
-- 날짜: 2026-09-04
-- 상태: 채택
-- 후속 결정: [0170](0170-mew-git-selected-files-and-composer.md) — 기본 작성 영역과 선택 파일 커밋
-- 후속 결정: [0168](0168-mew-git-changes-history-split.md) — 기본 화면을 변경 파일 목록·커밋 그래프로 분할; 작업트리 첫 항목을 대체
-- 후속 결정: [0135](0135-mew-git-workspace-panel.md) — 독립 팝업을 공통 도킹·저장소 탭 패널로 변경; 그래프·상세·diff·Git API 유지
-- 후속 결정: [0115](0115-mew-git-menu-and-repository-picker.md) — Git 버튼 위치·즉시 저장소 선택; 팝업 그래프/상세/diff는 유지
-- 부분 대체: 0113 — Git 워크벤치의 파일 탭 수명주기와 사이드바 도구 줄 배치
-- 결정자: 송상훈 (지시)
+- Date: 2026-09-04
+- Status: Adopted
+- Follow-up decision: [0170](0170-mew-git-selected-files-and-composer.md) — Default composer area and committing selected files
+- Follow-up decision: [0168](0168-mew-git-changes-history-split.md) — Splits the default view into a changed-file list and commit graph; replaces the working tree as the first item
+- Follow-up decision: [0135](0135-mew-git-workspace-panel.md) — Replaces the standalone popup with a shared docking panel with repository tabs; retains the graph, details, diff, and Git API
+- Follow-up decision: [0115](0115-mew-git-menu-and-repository-picker.md) — Git button placement and immediate repository selection; retains the popup graph/details/diff
+- Partially supersedes: 0113 — The Git workbench's file tab lifecycle and sidebar toolbar placement
+- Decision maker: Song Sanghoon (directive)
 
-## 배경
+## Background
 
-Git 그래프를 열면 현재 편집 파일을 대신하는 탭이 생겨 문서 작업 흐름이 끊긴다. Git은 저장소를
-잠시 탐색하는 도구이므로, 문서·코드 편집 탭과 같은 수명주기를 가질 필요가 없다.
+Opening the Git graph creates a tab that replaces the file currently being edited, interrupting the document workflow. Git is a tool for
+briefly exploring a repository, so it does not need the same lifecycle as document and code editing tabs.
 
-## 선택지
+## Options
 
-1. 파일 탭으로 유지한다 — 분할·복원은 공유하지만 편집기 자리를 차지한다.
-2. 사이드바 도구 줄에서 여는 독립 팝업으로 둔다 — 편집 탭을 보존하고 필요할 때 닫는다.
+1. Keep it as a file tab — Shares splitting and restoration but occupies editor space.
+2. Use a standalone popup opened from the sidebar toolbar — Preserves editing tabs and can be closed when needed.
 
-## 결정
+## Decision
 
-2번을 채택한다.
+Adopt option 2.
 
-- 루트 Git 버튼은 사이드바 도구 줄에서 탐색기 바로 다음, 왼쪽에서 두 번째에 둔다.
-- 모든 Git 버튼은 저장소 상대 경로를 팝업으로 넘겨 Git 그래프·커밋 상세·patch·허용된 Git 작업을
-  표시한다. 바깥 클릭·닫기 버튼·Esc로 팝업을 닫는다.
-- 팝업은 한 화면 안에서 `그래프 → 커밋 또는 작업트리 상세 → 파일 diff`의 계층으로 이동한다.
-  상세와 diff에서는 왼쪽 위 뒤로가기로 직전 단계에 돌아가며 오른쪽 위 닫기 버튼은 계속 보인다.
-- 그래프의 첫 항목은 항상 커밋되지 않은 작업트리다. 상세에서 변경 파일 전체를 확인하고 파일별
-  diff를 열 수 있으며, 제목과 선택 설명을 입력해 모든 변경을 한 커밋으로 만든다.
-- 과거 커밋 상세도 변경 파일 목록까지만 먼저 읽고, 파일을 고르면 별도 diff 단계에서 patch와
-  이전·이후 줄 번호를 표시한다.
-- Git 워크벤치는 파일 탭·분할·탭 순서·계정별 탭 복원 대상이 아니다. 기존 `mew:git:` 가상 탭
-  저장분은 복원·재저장 시 제거한다.
-- 저장소 판별·허용된 Git API와 안전한 작업 범위는 ADR 0113을 그대로 따른다.
+- Place the root Git button immediately after the explorer in the sidebar toolbar, second from the left.
+- All Git buttons pass the repository-relative path to a popup that displays the Git graph, commit details, patches, and allowed Git operations. Clicking
+  outside, clicking the close button, or pressing Esc closes the popup.
+- The popup navigates through the `그래프 → 커밋 또는 작업트리 상세 → 파일 diff` hierarchy within a single view. In details and diff views, the back button
+  at the top left returns to the previous level, while the close button at the top right remains visible.
+- The first graph entry is always the uncommitted working tree. Its details show all changed files and allow users to open
+  per-file diffs; entering a title and optional description creates a single commit containing all changes.
+- Past commit details also initially load only the changed-file list; selecting a file displays its patch and before-and-after line
+  numbers in a separate diff view.
+- The Git workbench is not included in file tabs, splits, tab ordering, or per-account tab restoration. Existing saved `mew:git:` virtual tabs are
+  removed during restoration and resaving.
+- Repository detection, permitted Git APIs, and safe operation boundaries follow ADR 0113 unchanged.
 
-## 근거
+## Rationale
 
-저장소 이력 탐색은 일시적인 보조 작업이므로 팝업이 편집 문맥을 보존한다. 이전 가상 탭 저장분을
-정리하면 배포 뒤에도 더 이상 편집기에 Git 화면이 나타나지 않는다.
+Exploring repository history is a temporary supporting task, so a popup preserves the editing context. Cleaning up previously saved
+virtual tabs ensures that Git views no longer appear in the editor after deployment.

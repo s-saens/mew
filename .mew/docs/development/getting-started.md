@@ -2,7 +2,7 @@
 title: "Development setup and rules"
 created: 2026-09-29
 updated: "2026-10-26"
-description: "개발 명령과 저장소 내부 문서 검사·CLI 및 Postgres 격리 테스트·타입·테스트·린트 검증, 이 Mew 소스 저장소에 한정한 에이전트의 빌드·서버 실행 제한, 문서 소유권·갱신 및 필수 UI 구현 규칙과 기능 패널 제거 후 기능 문서의 소유권을 정한다."
+description: "Defines development commands; repository-internal document checks, CLI and isolated Postgres tests, type checks, tests, and lint validation; restrictions on agent builds and server execution limited to this Mew source repository; document ownership and updates; required UI implementation rules; and ownership of feature documentation after removal of the feature panel."
 상위파일:
   - "../MOC.md"
   - "MOC.md"
@@ -32,24 +32,24 @@ For feature work, select the owning current document from its frontmatter `descr
 
 ### Required UI rules
 
-**Keep working UI compact.** Avoid decorative whitespace, stacked container padding, and unnecessary minimum heights. Reduce outer spacing before shrinking readable text or usable click/touch targets. Follow the [spacing and information density rules](ui-contracts.md#디자인-지침-여백과-정보-밀도).
+**Keep working UI compact.** Avoid decorative whitespace, stacked container padding, and unnecessary minimum heights. Reduce outer spacing before shrinking readable text or usable click/touch targets. Follow the [spacing and information density rules](ui-contracts.md#design-guidelines-spacing-and-information-density).
 
-**Prefer icon buttons for familiar actions.** Close, refresh, copy, cancel, and disconnect controls should normally use the established icon set with a translated accessible name and a shared tooltip. Keep short text where an icon alone makes the primary action or its consequences unclear. Use small padding and gaps by default; see the [UI button and spacing contract](ui-contracts.md#디자인-지침-여백과-정보-밀도).
+**Prefer icon buttons for familiar actions.** Close, refresh, copy, cancel, and disconnect controls should normally use the established icon set with a translated accessible name and a shared tooltip. Keep short text where an icon alone makes the primary action or its consequences unclear. Use small padding and gaps by default; see the [UI button and spacing contract](ui-contracts.md#design-guidelines-spacing-and-information-density).
 
-**Do not add permanent instructions, shortcut hints, or explanatory copy that repeats what the interface already makes clear.** Use the button or field label when it is enough. Show additional information where it helps someone decide or recover from an error. See [UI copy](ui-contracts.md#%ED%99%94%EB%A9%B4-%EB%AC%B8%EA%B5%AC).
+**Do not add permanent instructions, shortcut hints, or explanatory copy that repeats what the interface already makes clear.** Use the button or field label when it is enough. Show additional information where it helps someone decide or recover from an error. See [UI copy](ui-contracts.md#ui-copy).
 
 **Do not use native** `<select>` **or** `<datalist>` **popups for app-owned choices.** Reuse an existing custom component, or create a shared one if none fits. Changing a native control's border or `appearance` does not satisfy this rule. It applies on desktop and mobile, including when modifying an existing native dropdown.
 
-Prefer `SelectField` from `@mew/ui` for single-choice fields. Follow the [selection component contract](ui-contracts.md#%EB%93%9C%EB%A1%AD%EB%8B%A4%EC%9A%B4%EA%B3%BC-%EC%84%A0%ED%83%9D-%EC%BB%B4%ED%8F%AC%EB%84%8C%ED%8A%B8) for themes, keyboard and touch input, focus, Esc/Back dismissal, and viewport boundaries.
+Prefer `SelectField` from `@mew/ui` for single-choice fields. Follow the [selection component contract](ui-contracts.md#dropdowns-and-selection-components) for themes, keyboard and touch input, focus, Esc/Back dismissal, and viewport boundaries.
 
-### Postgres 데이터베이스 검증
+### Postgres database verification
 
-DB 서비스·라우트·행 페이지 통합 테스트는 `MEW_DB_TEST_DATABASE_URL`로 명시한 격리 테스트 DB만 사용한다. 일반 실행 환경의 `.env`나 `DATABASE_URL`을 자동 사용하지 않으며 전용 URL이 없으면 건너뛴다. 테스트는 임시 프로젝트·스키마를 만들고 종료 시 정리한다. 운영 DB URL을 지정하지 않는다.
+DB service, route, and row page integration tests use only the isolated test DB explicitly specified by `MEW_DB_TEST_DATABASE_URL`. They do not automatically use `.env` or `DATABASE_URL` from the normal runtime environment and are skipped if no dedicated URL is provided. Tests create temporary projects and schemas and clean them up on completion. Do not specify a production DB URL.
 
 ```bash
 MEW_DB_TEST_DATABASE_URL='<격리 테스트 DB URL>' node --test server/db/databaseService.test.ts server/db/routes.test.ts server/db/rowPages.test.ts
 ```
 
-### CLI 릴리스 검증
+### CLI release verification
 
-사전 빌드 런처의 기준은 [CLI 배포 계약](cli-distribution.md)·[릴리스 절차](../operations/cli-release.md)다. `npm ci --prefix apps/cli --ignore-scripts`와 `npm run test:cli`, `node --test server/cli-host.test.ts server/instance-lock.test.ts server/release-runtime.test.ts server/mew-release-actions.test.ts`는 실제 서버·dist를 바꾸지 않는 격리 검사다. `npm run release:runtime -- --output <폴더>`는 이미 빌드된 dist와 플랫폼별 네이티브 의존성을 패키징하는 발행 담당자/CI 명령이며 에이전트의 앱 빌드·배포·재시작 금지 규칙을 변경하지 않는다.
+The canonical sources for the prebuilt launcher are the [CLI distribution contract](cli-distribution.md) and [release procedure](../operations/cli-release.md). `npm ci --prefix apps/cli --ignore-scripts`, `npm run test:cli`, and `node --test server/cli-host.test.ts server/instance-lock.test.ts server/release-runtime.test.ts server/mew-release-actions.test.ts` are isolated checks that do not modify the actual server or dist. `npm run release:runtime -- --output <폴더>` is a command for release maintainers/CI that packages an already-built dist and platform-specific native dependencies; it does not change the rule prohibiting agents from building, deploying, or restarting the app.

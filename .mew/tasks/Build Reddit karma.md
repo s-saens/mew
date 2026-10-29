@@ -1,0 +1,11 @@
+---
+title: "Build Reddit karma"
+description: "Task: Build Reddit karma"
+done: false
+tags:
+  - 마케팅
+assignees:
+  - songsh5775@gmail.com
+startDate: 2026-10-04
+date: 2026-11-23
+---

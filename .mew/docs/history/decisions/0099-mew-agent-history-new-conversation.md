@@ -1,37 +1,37 @@
 ---
-provenance: "Liiiiv 중앙 ADR 이관본, 2026-10-14"
-description: "이관한 결정 기록: 에이전트 창의 히스토리에서 새 대화를 시작한다. 당시 선택·근거·후속 변경을 보존하며 현재 계약은 Mew 소유 문서에서 확인한다."
-title: "0099 — 에이전트 창의 히스토리에서 새 대화를 시작한다"
+provenance: "Migrated copy of a Liiiiv central ADR, 2026-10-14"
+description: "Migrated decision record: Start a new conversation from the agent window's history. Preserves the choices, rationale, and subsequent changes at the time; see the Mew owning document for the current contract."
+title: "0099 — Start a new conversation from the agent window's history"
 created: 2026-08-31
 updated: 2026-09-11
 ---
 
-- 날짜: 2026-08-31
-- 상태: 채택
-- 후속 결정: [0103](0103-mew-queued-clear-session-boundary.md) — 입력창 /clear의 즉시 전환; 히스토리 새 대화는 즉시 전환 유지
-- 부분 대체: [0097](0097-mew-agent-panel-removes-cwd-bar.md) — Clear 플로팅 버튼의 위치·동작 범위
-- 결정자: 송상훈 (지시)
+- Date: 2026-08-31
+- Status: Adopted
+- Follow-up decision: [0103](0103-mew-queued-clear-session-boundary.md) — Immediate switching with /clear in the input field; new conversations from history continue to switch immediately
+- Partially supersedes: [0097](0097-mew-agent-panel-removes-cwd-bar.md) — Clear floating button placement and behavior
+- Decision maker: Song Sanghoon (directive)
 
-## 배경
+## Background
 
-Clear와 히스토리가 각각 세션을 바꾸는 길이어서, 새 대화와 이전 대화 선택이 떨어져 있었다. 작업 중일 때 Clear는 대기열 끝 예약과 더블클릭 강제 종료라는 별도 규칙도 가졌다.
+Clear and history each provided a way to switch sessions, so starting a new conversation and selecting a previous one were separate. While work was in progress, Clear also had separate rules for scheduling at the end of the queue and forcing termination with a double-click.
 
-## 선택지
+## Options
 
-1. Clear와 히스토리를 분리해 유지한다 — 기존 동작을 보존하지만 세션 선택 경로가 둘이다.
-2. 히스토리에 새 대화를 넣는다 — 이전·새 대화를 한 메뉴에서 고르고, 즉시 전환 규칙 하나만 남긴다.
+1. Keep Clear and history separate — preserves existing behavior but leaves two paths for selecting a session.
+2. Add new conversations to history — select previous and new conversations from one menu, leaving a single rule for immediate switching.
 
-## 결정
+## Decision
 
-2번을 채택한다.
+Adopt option 2.
 
-- 기존 Clear 자리의 버튼은 `히스토리`가 되며, 지난 대화 아이콘을 쓴다.
-- 히스토리 목록은 기존처럼 열 때만 불러온다. 현재 탭에 작업 내역이 있으면 목록 맨 위에 `새 대화`를 보이고, 새 세션처럼 내역이 없으면 보이지 않는다.
-- `새 대화`를 누르면 현재 작업과 프롬프트 큐가 있어도 즉시 현재 세션을 닫고, 같은 탭에서 새 세션을 시작한다. 예약 토글과 더블클릭 강제 종료는 없다.
-- 입력창의 정확한 `/clear`도 `새 대화`와 같은 동작이다. CLI로 전달하지 않고 Mew가 세션 포인터·전사 캐시를
-  함께 비운 뒤 새 세션을 시작하므로, 이전 메시지는 현재 화면에서 사라지고 히스토리에서만 다시 열 수 있다.
-- 지난 세션 선택의 중복 방지와 불러오기 동작은 그대로 유지한다.
+- The button in the existing Clear position becomes `히스토리` and uses the past conversations icon.
+- As before, the history list loads only when opened. If the current tab has activity, show `새 대화` at the top of the list; if it has no activity, as with a new session, do not show it.
+- Clicking `새 대화` immediately closes the current session and starts a new session in the same tab, even if work is running and prompts are queued. There is no scheduling toggle or double-click force termination.
+- Entering exactly `/clear` in the input field has the same effect as `새 대화`. Instead of passing it to the CLI, Mew clears both the session pointer and transcript
+  cache and starts a new session, so previous messages disappear from the current screen and can be reopened only from history.
+- Keep duplicate prevention and loading behavior for selecting past sessions unchanged.
 
-## 근거
+## Rationale
 
-세션의 다음 상태는 새 대화 또는 과거 대화 중 하나다. 두 선택지를 같은 목록에 두면 의미와 위치가 일치하고, 작업 상태에 따라 클릭 규칙이 바뀌지 않는다.
+The next session state is either a new conversation or a past conversation. Placing both choices in the same list aligns their meaning and location, and the click rules do not change with the work state.

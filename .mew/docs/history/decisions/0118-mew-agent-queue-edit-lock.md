@@ -1,41 +1,41 @@
 ---
-provenance: "Liiiiv 중앙 ADR 이관본, 2026-10-14"
-description: "이관한 결정 기록: 에이전트 대기 메시지는 편집하는 동안 실행을 잠근다. 당시 선택·근거·후속 변경을 보존하며 현재 계약은 Mew 소유 문서에서 확인한다."
-title: "0118 — 에이전트 대기 메시지는 편집하는 동안 실행을 잠근다"
+provenance: "Migrated copy of a Liiiiv central ADR, 2026-10-14"
+description: "Migrated decision record: Agent queued messages are locked against execution while being edited. Preserves the choices, rationale, and subsequent changes at the time; see the Mew owning document for the current contract."
+title: "0118 — Agent queued messages are locked against execution while being edited"
 created: 2026-09-07
 updated: 2026-09-07
 ---
 
-- 날짜: 2026-09-07
-- 상태: 채택
-- 부분 대체: 0036 — 앞 턴 종료 뒤 큐를 즉시 이어 실행하는 범위에서 편집 중 항목을 제외
-- 결정자: 송상훈 (지시)
+- Date: 2026-09-07
+- Status: Adopted
+- Partially supersedes: 0036 — Excludes items being edited from immediate queue execution after the preceding turn ends
+- Decision maker: Song Sanghoon (directive)
 
-## 배경
+## Background
 
-에이전트 대기 메시지는 실행 중인 턴이 끝나는 즉시 큐 앞에서부터 실행된다. 사용자가 내용을 고치는
-도중 앞 턴이 끝나면, 편집을 완료하기 전 원문이 실행되어 버릴 수 있었다. 목록의 한 번 누르기는 전문
-펼치기이고 두 번 누르기가 편집이라 모바일과 데스크톱의 조작도 불필요하게 달랐다.
+Queued agent messages run from the front of the queue as soon as the running turn ends. If the preceding turn ended while the user was editing
+a message, the original text could run before editing was complete. A single click or tap in the list expanded the full text, while a double
+click or tap opened editing, creating unnecessary differences between mobile and desktop interactions.
 
-## 선택지
+## Options
 
-1. 클라이언트에서만 편집 화면을 연다 — 단순하지만 앞 턴 종료와 경합하면 원문이 실행된다.
-2. 편집 시작을 서버 큐에 알리고 해당 항목을 잠근다 — 명령 하나가 늘지만 실행 경합을 막는다.
+1. Open the editor only on the client — Simple, but the original message executes if this races with the preceding turn ending.
+2. Notify the server queue when editing starts and lock the item — Adds one command but prevents execution races.
 
-## 결정
+## Decision
 
-2번을 채택한다.
+Adopt option 2.
 
-- 대기·예약 목록의 메시지 본문은 한 번 누르면 바로 인라인 편집한다. 전문 펼치기와 더블클릭 동작은 두지 않는다.
-- 대기 메시지 편집을 시작하면 서버는 원문이 일치하는 해당 큐 항목에 편집 잠금을 건다.
-- 하나라도 편집 중이면 앞 턴이 끝나도 큐 전체를 그 자리에서 멈춘다. 편집 중 큐 인덱스가 당겨져 다른 메시지를 덮어쓰는 경합과 뒤 항목의 추월을 함께 막는다.
-- 완료는 고친 내용을 저장하며 잠금을 풀고, 취소는 원문을 유지하며 잠금을 푼다. 어느 쪽이든 세션이 유휴면 그 뒤 큐 실행을 재개한다.
-- 편집을 시작한 창의 연결이 끊기면 그 연결이 잡은 잠금을 풀어 영구 정지를 막는다.
-- `/clear` 큐 경계는 메시지로 편집할 수 없다는 기존 규칙을 유지한다.
-- 편집 UI에는 세로로 놓인 `완료`·`취소`만 보인다. 항목 삭제 버튼은 편집 중에는 숨긴다.
+- A single click on a message body in the queued or scheduled list starts inline editing immediately. There is no full-text expansion or double-click action.
+- When editing a queued message starts, the server places an edit lock on the corresponding queue item whose original text matches.
+- If any item is being edited, the entire queue stops in place even when the preceding turn ends. This prevents both races where queue indices shift during editing and overwrite another message, and later items overtaking earlier ones.
+- Done saves the edited content and releases the lock; Cancel keeps the original text and releases the lock. In either case, queue execution then resumes if the session is idle.
+- If the window that started editing disconnects, the locks held by that connection are released to prevent a permanent stall.
+- The existing rule that a `/clear` queue boundary cannot be edited into a message remains in effect.
+- The editing UI shows only `완료` and `취소`, arranged vertically. The item delete button is hidden during editing.
 
-## 근거
+## Rationale
 
-편집 잠금을 서버가 소유해야 브라우저 렌더 시점과 ACP 턴 종료가 겹쳐도 원문 실행을 막을 수 있다.
-항목 하나만 멈추고 큐 순서는 그대로 두면 [ADR 0036](0036-mew-agent-session-controls-and-usage.md)의
-순차 실행 계약과 [ADR 0103](0103-mew-queued-clear-session-boundary.md)의 세션 경계도 보존된다.
+The server must own the edit lock to prevent the original text from running even when
+browser rendering coincides with the end of an ACP turn. Pausing only one item while preserving queue order also preserves
+the sequential execution contract in [ADR 0036](0036-mew-agent-session-controls-and-usage.md) and the session boundary in [ADR 0103](0103-mew-queued-clear-session-boundary.md).

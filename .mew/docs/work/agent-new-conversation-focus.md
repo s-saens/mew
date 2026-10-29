@@ -1,20 +1,20 @@
 ---
-title: "새 에이전트 대화 입력 포커스"
-description: "런타임·에이전트셋 선택 후 새 대화 입력 자동 포커스의 구현과 격리 브라우저·타입·린트 검사 결과, 기존 문서 링크 오류 및 운영 미적용 범위를 기록한다."
+title: "New agent conversation input focus"
+description: "Records the implementation of automatic focus on new conversation input after runtime or agent set selection, isolated browser, type, and lint check results, existing documentation link errors, and the scope not applied to production."
 created: "2026-10-27"
 updated: "2026-10-27"
 ---
 
-런타임을 선택한 뒤 입력칸을 다시 눌러야 하는 동작을 개선했다. 현재 동작의 기준은 [에이전트셋·탭 생성](../features/%ED%84%B0%EB%AF%B8%EB%84%90%C2%B7%EC%97%90%EC%9D%B4%EC%A0%84%ED%8A%B8%C2%B7%EC%9E%90%EB%8F%99%ED%99%94/%EC%97%90%EC%9D%B4%EC%A0%84%ED%8A%B8%EC%85%8B%C2%B7%ED%83%AD%20%EC%83%9D%EC%84%B1.md)이다.
+Improved the behavior that required clicking the input again after selecting a runtime. The current behavior is defined in [agent set and tab creation](../features/terminals-agents-automation/agent-sets-and-tab-creation.md).
 
-`AgentPanel`에서 새로 만든 탭 ID를 기억하고 활성 대화의 입력기에 자동 포커스 요청을 전달한다. 런타임·에이전트셋 생성 흐름이 이를 공유하며, 기존 공통 환경 판별을 사용한다. 저장된 탭 복원·기존 탭 전환은 요청 대상에 포함하지 않는다.
+`AgentPanel` remembers the newly created tab ID and sends an automatic focus request to the active conversation's input. Runtime and agent set creation flows share this behavior and use the existing shared environment detection. Restoring saved tabs and switching to existing tabs are excluded from these requests.
 
-검증 결과:
+Verification results:
 
-- `node --test server/agent-new-tab-ui.test.ts`: 격리 Chromium의 1100px·390px, 밝은·어두운 테마에서 통과했다. 런타임 숫자키·클릭 선택 후 데스크톱 입력 포커스, 런타임 연결 전 초안 입력, 모바일 자동 포커스 억제, 저장 탭 복원·기존 탭 전환의 포커스 보존을 확인했다. 기존 새 탭·닫기·복원·정렬 회귀도 통과했다.
-- `npx tsc -b`: 통과했다.
-- `npx oxlint src/components/AgentPanel.tsx server/agent-new-tab-ui.test.ts`: 오류 없이 완료했다. 기존 React 관련 경고가 남아 있다.
-- Impeccable 검사: 변경한 `AgentPanel.tsx`에서 지적 사항이 없었다.
-- `npm run check:docs`: description 검사는 통과했으나, 이번 작업과 무관한 기존 삭제 파일(`docs/features/MOC.md`와 태스크 문서)을 가리키는 링크 17건으로 실패했다.
+- `node --test server/agent-new-tab-ui.test.ts`: Passed in isolated Chromium at 1100px and 390px with light and dark themes. Verified desktop input focus after runtime selection by number key or click, draft input before runtime connection, suppression of automatic focus on mobile, and focus preservation when restoring saved tabs or switching to existing tabs. Existing regressions for new tabs, closing, restoration, and ordering also passed.
+- `npx tsc -b`: Passed.
+- `npx oxlint src/components/AgentPanel.tsx server/agent-new-tab-ui.test.ts`: Completed without errors. Existing React-related warnings remain.
+- Impeccable check: No findings in the modified `AgentPanel.tsx`.
+- `npm run check:docs`: Description checks passed, but the command failed on 17 links to previously deleted files (`docs/features/MOC.md` and task documents) unrelated to this work.
 
-앱 빌드·서버 적용은 수행하지 않았다. 실제 공급자 연결이나 물리 키보드의 연결·해제는 검증하지 않았다. 공통 판별은 브라우저 화면·포인터 특성을 사용한다.
+No app build or server application was performed. Actual provider connections and physical keyboard connection or disconnection were not verified. Shared detection uses browser viewport and pointer characteristics.

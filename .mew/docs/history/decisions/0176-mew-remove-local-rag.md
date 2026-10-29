@@ -1,28 +1,28 @@
 ---
-provenance: "Liiiiv 중앙 ADR 이관본, 2026-10-14"
-description: "이관한 결정 기록: mew 로컬 RAG 제거와 일반 파일 검색. 당시 선택·근거·후속 변경을 보존하며 현재 계약은 Mew 소유 문서에서 확인한다."
-title: "0176 — mew 로컬 RAG 제거와 일반 파일 검색"
+provenance: "Migrated copy of a Liiiiv central ADR, 2026-10-14"
+description: "Migrated decision record: remove mew local RAG and use regular file search. Preserves the choices, rationale, and subsequent changes from that time; consult Mew's owning documents for the current contract."
+title: "0176 — Remove mew local RAG and use regular file search"
 created: 2026-09-28
 updated: 2026-09-28
 ---
 
-- 날짜: 2026-09-28
-- 상태: 채택
-- 결정자: 사용자 요청
-- 대체: [0071](0071-mew-embedded-lancedb-local-rag.md) · [0167](0167-mew-shared-rag-panel-and-agent-guidance.md)
+- Date: 2026-09-28
+- Status: Adopted
+- Decision maker: User request
+- Supersedes: [0071](0071-mew-embedded-lancedb-local-rag.md) · [0167](0167-mew-shared-rag-panel-and-agent-guidance.md)
 
-## 결정
+## Decision
 
-- 로컬 RAG 기능을 제거한다. 독·패널·설정·의미 검색 API·색인·임베딩·CLI·에이전트 자동 검색 안내와 RAG 전용 평가 도구를 함께 제거한다.
-- RAG 전용 직접 의존성 LanceDB·Transformers.js와 더 이상 사용하지 않는 전이 의존성을 제거한다. 협업·에디터 등 다른 기능에서 쓰는 의존성은 유지한다.
-- 문서 탐색은 README·MOC와 명확한 파일·기능명을 이용한 일반 파일 검색을 사용한다. 파일명·내용·정규식 검색과 치환은 유지한다.
-- 이전 브라우저 독 순서의 RAG 항목은 무시하고 다른 항목의 사용자 순서는 유지한다. 기존 RAG 설정·파생 캐시는 더 이상 읽거나 갱신하지 않는다. 실행 중인 설치의 데이터는 자동 삭제하지 않는다.
-- 이전 결정·기능·운영 문서와 비교 측정 결과는 이력으로 보존한다. 사용자 요청 없이 RAG 재도입·재색인·모델 다운로드를 재시도하지 않는다.
+- Remove local RAG functionality. Also remove its dock entry, panel, settings, semantic search API, indexing, embeddings, CLI, automatic search guidance for agents, and RAG-specific evaluation tools.
+- Remove the RAG-specific direct dependencies LanceDB and Transformers.js, along with transitive dependencies no longer in use. Retain dependencies used by other features such as collaboration and the editor.
+- Use README files, MOCs, and regular file search with clear file and feature names to navigate documentation. Retain filename, content, and regular expression search and replacement.
+- Ignore the RAG entry in the previous browser dock order and preserve the user's order for other entries. Stop reading or updating existing RAG settings and derived caches. Do not automatically delete data from running installations.
+- Preserve previous decision, feature, and operations documents and comparative measurement results as history. Do not retry RAG reintroduction, reindexing, or model downloads without a user request.
 
-## 근거
+## Rationale
 
-명확한 파일·기능명을 유지하는 현재 문서 구조에서 별도 의미 색인의 유지 비용을 들이지 않기로 했다. [문서 탐색 비교](../../research/document-discovery-benchmark.md)의 소규모 실측에서는 일반 파일 검색이 가장 빠르고 토큰 비용도 낮았다. 이 결과를 모든 의미 검색 과제의 우열로 일반화하지 않는다.
+We decided against the maintenance cost of a separate semantic index in the current documentation structure, which maintains clear file and feature names. In the small-scale measurements in [Document Discovery Comparison](../../research/document-discovery-benchmark.md), regular file search was the fastest and had the lowest token cost. Do not generalize these results into a ranking for all semantic search tasks.
 
-## 검증
+## Verification
 
-독 순서 호환·패널 전환·에이전트 컨텍스트·기존 검색의 회귀 검사, 타입·린트·문서 링크 검사를 수행한다. 서비스 빌드·재시작은 별도 실행 절차를 따른다.
+Run regression checks for dock order compatibility, panel switching, agent context, and existing search, along with type, lint, and documentation link checks. Follow separate execution procedures for service builds and restarts.

@@ -1,25 +1,25 @@
 ---
-title: "0021 — 로컬 스프라이트 생성기를 외부 프로젝트로 분리"
-description: "생성 코드·설치·모델을 Mew 배포에서 제외하고 독립 local-sprites 프로젝트로 옮기는 결정. 범용 MCP 연결과 선택적 Mewpet 스킨 출력만으로 통합하며 기존 외부 모델 데이터를 재사용한다."
+title: "0021 — Separate the Local Sprite Generator into an External Project"
+description: "Decision to exclude generation code, installation, and models from Mew distributions and move them to the independent local-sprites project. Integrate only through a general-purpose MCP connection and optional Mewpet skin output, reusing existing external model data."
 created: 2026-10-19
 updated: 2026-10-19
 ---
 
-# 0021 — 로컬 스프라이트 생성기를 외부 프로젝트로 분리
+# 0021 — Separate the Local Sprite Generator into an External Project
 
-상태: 채택. [결정 0017](0017-local-sprite-generation.md)의 소스·설치·배포 경계를 대체한다.
+Status: Adopted. Supersedes the source, installation, and deployment boundaries in [Decision 0017](0017-local-sprite-generation.md).
 
-## 배경
+## Background
 
-생성기는 여러 MCP 클라이언트에서 재사용할 개인 로컬 도구이며 Mew의 배포 대상이 아니다. 저장소 안에 둔 초기 구현은 이 경계를 분명히 하지 못했다.
+The generator is a personal local tool to reuse across multiple MCP clients and is not part of Mew's distribution. The initial implementation inside the repository did not make this boundary clear.
 
-## 결정
+## Decision
 
-1. 생성 코드·설치 도구·Python 의존성·모델 고정 정보·전용 검사를 독립 저장소 `local-sprites`로 옮긴다. Mew는 생성 코드·가중치·Python 의존성을 배포하지 않는다.
-2. 생성기는 Mew 체크아웃이나 Node.js 없이 실행하며 범용 stdio MCP로 연결한다. Codex 등록 도구와 다른 MCP 클라이언트용 설정 출력을 외부 프로젝트가 제공한다.
-3. Mew는 기존 런타임 MCP 설정과 선택적인 `<DATA_DIR>/mewpet/skins` 출력 경로로만 통합한다. 생성기 설치·모델·운영 문서는 외부 프로젝트, 스킨 형식과 연결 안내는 Mew가 소유한다.
-4. 현재 소스는 `/home/saens/dev/local-sprites`로 옮기고 기존 `~/.local/share/mew-sprites`의 모델·가상환경·작업은 재다운로드 없이 유지한다. 새 설치는 `LOCAL_SPRITES_HOME`과 `~/.local/share/local-sprites`를 기본으로 하며 이전 `MEW_*` 설정을 호환한다.
+1. Move generation code, installation tools, Python dependencies, model pinning information, and dedicated checks to the independent repository `local-sprites`. Mew does not distribute generation code, weights, or Python dependencies.
+2. The generator runs without a Mew checkout or Node.js and connects through general-purpose stdio MCP. The external project provides a Codex registration tool and configuration output for other MCP clients.
+3. Mew integrates only through existing runtime MCP settings and the optional `<DATA_DIR>/mewpet/skins` output path. The external project owns generator installation, models, and operations documentation; Mew owns the skin format and connection guidance.
+4. Move the current source to `/home/saens/dev/local-sprites` and retain the models, virtual environment, and jobs in the existing `~/.local/share/mew-sprites` without downloading them again. New installations default to `LOCAL_SPRITES_HOME` and `~/.local/share/local-sprites` and remain compatible with the previous `MEW_*` settings.
 
-## 근거와 영향
+## Rationale and Impact
 
-Mew와 생성기의 수명·의존성·배포를 분리하고 같은 모델과 도구를 다른 클라이언트에서 재사용한다. Mew의 런타임·빌드·배포와 렌더러 계약은 바꾸지 않으며, 사용자는 필요한 환경에만 생성기를 설치한다. 현재 연결 방법은 [외부 MCP 안내](../../../docs/configuration/local-sprites.md)가 소유한다.
+Separate the lifetimes, dependencies, and distributions of Mew and the generator, and reuse the same models and tools in other clients. Mew's runtime, build, deployment, and renderer contracts remain unchanged, and users install the generator only in environments that need it. [External MCP Guide](../../../docs/configuration/local-sprites.md) owns the current connection instructions.

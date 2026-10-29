@@ -1,44 +1,44 @@
 ---
-provenance: "Liiiiv 중앙 ADR 이관본, 2026-10-14"
-description: "이관한 결정 기록: Git은 헤더 메뉴에서 저장소를 골라 연다. 당시 선택·근거·후속 변경을 보존하며 현재 계약은 Mew 소유 문서에서 확인한다."
-title: "0115 — Git은 헤더 메뉴에서 저장소를 골라 연다"
+provenance: "Migrated copy of a Liiiiv central ADR, 2026-10-14"
+description: "Migrated decision record: Open Git by choosing a repository from the header menu. Preserves the choices, rationale, and subsequent changes at the time; see the Mew owning document for the current contract."
+title: "0115 — Open Git by choosing a repository from the header menu"
 created: 2026-09-04
 updated: 2026-09-12
 ---
 
-- 날짜: 2026-09-04
-- 상태: 채택
-- 후속 결정: [0160](0160-mew-git-current-project-only.md) — 현재 프로젝트 루트 직접 열기; 통합 선택기·중첩 탐색 제거
-- 후속 결정: [0135](0135-mew-git-workspace-panel.md) — 패널 재열기는 탭을 유지하며 첫 진입·새 탭에서 저장소 선택; 메뉴·단축키·탐색 범위 유지
-- 부분 대체: 0114 — 사이드바 Git 버튼과 버튼이 지정한 저장소를 곧바로 여는 진입 방식
-- 결정자: 송상훈 (지시)
+- Date: 2026-09-04
+- Status: Adopted
+- Follow-up decision: [0160](0160-mew-git-current-project-only.md) — Open the current project root directly; remove the unified picker and nested discovery
+- Follow-up decision: [0135](0135-mew-git-workspace-panel.md) — Preserve tabs when reopening the panel and select a repository on first entry or in a new tab; retain menus, shortcuts, and discovery scope
+- Partially supersedes: 0114 — The sidebar Git button and the entry flow that directly opens the repository specified by the button
+- Decision maker: Song Sanghoon (directive)
 
-## 배경
+## Background
 
-저장소별 Git 버튼을 사이드바와 폴더 줄에 흩어 두면 중첩 저장소를 한눈에 찾기 어렵고, Documents도
-같은 진입점으로 고르기 어렵다. Git 팝업을 열 때마다 어떤 저장소를 볼지 먼저 고르는 흐름이 더
-명확하다.
+Scattering per-repository Git buttons across the sidebar and folder rows makes nested repositories difficult to find at a glance and makes it difficult
+to select Documents through the same entry point. A flow that first asks which repository to view each time the Git popup opens
+is clearer.
 
-## 선택지
+## Options
 
-1. 사이드바의 저장소별 버튼을 유지한다 — 빠르지만 중첩 저장소와 Documents의 발견성이 낮다.
-2. 헤더 메뉴와 단축키에서 통합 선택기를 연다 — 모든 저장소를 한 목록에서 고른다.
+1. Keep per-repository buttons in the sidebar — Fast, but nested repositories and Documents are hard to discover.
+2. Open a unified picker from the header menu and shortcut — Select any repository from a single list.
 
-## 결정
+## Decision
 
-2번을 채택한다.
+Adopt option 2.
 
-- manager·owner는 헤더 햄버거 메뉴의 Git과 `Alt+G`로 팝업을 연다. 사이드바·폴더 줄의 Git 열기
-  버튼은 두지 않는다.
-- 팝업 첫 화면은 루트 프로젝트·Documents·각 영역의 모든 중첩 Git 저장소 선택 목록이다. Documents는
-  워크스페이스 탐색에서 중복하지 않고 자기 프로젝트 스코프에서 따로 찾는다.
-- 저장소 선택 뒤에는 기존의 그래프·상세·diff 계층을 열며, 그래프 화면에 제목 텍스트는 두지 않는다.
-  그래프 왼쪽 위 뒤로가기는 저장소 선택 목록으로 돌아간다.
-- 서버는 `.git`·`node_modules`·`.data`에 내려가지 않고 실제 Git 루트만 목록으로 돌려준다. 이후의
-  저장소 API도 고른 프로젝트 스코프와 상대 경로만 받는다.
+- Managers and owners open the popup through Git in the header hamburger menu or with `Alt+G`. No Git open buttons are provided in the sidebar
+  or folder rows.
+- The popup's first screen is a selection list containing the root project, Documents, and all nested Git repositories in each area. Documents is discovered
+  separately within its own project scope, without duplication in workspace discovery.
+- Selecting a repository opens the existing graph, details, and diff hierarchy, with no title text in the graph view. The back button
+  at the top left of the graph returns to the repository selection list.
+- The server does not descend into `.git`, `node_modules`, or `.data` and returns only actual Git roots in the list. Subsequent repository APIs
+  also accept only the selected project scope and relative path.
 
-## 근거
+## Rationale
 
-한 진입점과 목록은 저장소의 위치를 기억하지 않아도 되고, Documents를 포함한 작업 영역 전체에서
-같은 Git 흐름을 제공한다. 경로를 구조화한 채 서버가 탐색하면 클라이언트의 접힌 파일 트리 상태와
-무관하게 목록이 완전하다.
+A single entry point and list eliminate the need to remember repository locations and provide the same Git flow throughout the workspace,
+including Documents. Server-side discovery with structured paths produces a complete list regardless of which parts of the client's
+file tree are collapsed.

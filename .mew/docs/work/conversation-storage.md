@@ -1,29 +1,29 @@
 ---
-title: "대화 저장·구간 동기화 구현 계획"
+title: "Conversation Storage and Segment Synchronization Implementation Plan"
 created: 2026-09-30
 updated: 2026-09-30
-description: "대화를 SQLite·IndexedDB로 증분 저장하고 구간별 전송하는 구현 계획·격리 검증 결과와 운영 적용 제한·합성 성능 측정을 기록한다."
+description: "Records the implementation plan for incremental conversation storage in SQLite and IndexedDB and segment-based transfer, isolated validation results, production rollout restrictions, and synthetic performance measurements."
 상위파일: "_work.md"
 ---
 
-[결정](../history/decisions/0182-mew-incremental-conversation-storage.md) · [현재 계약](../development/conversation-storage.md)
+[Decision](../history/decisions/0182-mew-incremental-conversation-storage.md) · [Current Contract](../development/conversation-storage.md)
 
-## 계획
+## Plan
 
-1. 서버 저장: SQLite WAL 세션/이벤트 테이블, 증분 저장, 기존 v2 JSON의 비파괴 이전과 오류 보호.
-2. 전송: generation·순번을 포함한 최근 구간, 이전 구간, 재접속 변경분. 구 감독 replay 호환과 인증 경계 유지.
-3. 기기 저장: IndexedDB 비동기 이벤트 저장, 제한된 최근 기록, 만료·탭 종료 정리, 저장 불가 폴백.
-4. 화면: 최근 구간으로 시작, 위로 스크롤할 때 이전 대화 로드, 스크롤 고정, CLI 전역 질문 순서 유지.
-5. 검증: 이전·복원·변경·중복·단절·동시 접근, 실제 브라우저의 IndexedDB·스크롤, 타입·린트·문서 검사. 합성 긴 대화의 쓰기/전송량 비교.
+1. Server storage: SQLite WAL session/event tables, incremental storage, nondestructive migration of existing v2 JSON, and error protection.
+2. Transfer: recent segments, older segments, and changes on reconnection, including generation and sequence numbers. Preserve compatibility with legacy supervisor replay and authentication boundaries.
+3. Device storage: asynchronous event storage in IndexedDB, bounded recent history, cleanup on expiration and tab closure, and fallback when storage is unavailable.
+4. UI: start with recent segments, load older conversations when scrolling up, preserve scroll position, and maintain the global CLI question order.
+5. Validation: migration, restoration, changes, duplicates, disconnections, concurrent access, IndexedDB and scrolling in real browsers, and type, lint, and documentation checks. Compare write and transfer volumes for synthetic long conversations.
 
-## 적용 제한
+## Application Restrictions
 
-실제 데이터 변경·빌드·서버 재시작·커밋은 수행하지 않는다. 공급자 ACP의 세션 복원 자체와 답변 생성 시간은 이 최적화의 대상이 아니다.
+Do not modify actual data, build, restart servers, or commit. Provider ACP session restoration itself and response generation time are outside the scope of this optimization.
 
-## 진행
+## Progress
 
-- 1~5단계 구현·격리 검증 완료. 실제 운영 적용 전 상태다.
-- 관련 자동 테스트 101개 통과. 타입 검사·대상 린트·문서 허용목록/링크 검사 통과. PC/모바일 양 테마의 기존 표시를 확인했다.
-- 최초 전송량은 합성 500턴 기준 약 96% 감소했다. 최근 구간 읽기는 평균 6.37ms에서 0.38ms로 감소했다. FULL commit을 사용하는 SQLite 쓰기는 같은 측정에서 1.80초에서 2.61초로 증가했다. 조건과 제한은 [현재 계약](../development/conversation-storage.md#검증과-측정)에 남겼다.
-- 빌드·운영 서버 재시작·실제 JSON 일괄 이전·커밋은 수행하지 않았다. 새 코드 적용 후 처음 읽는 세션부터 이전하며 기존 JSON은 보존한다. 기존 감독은 종료·교체 전까지 구 replay 경로를 사용할 수 있다.
-- 감독의 전체 메모리 이벤트 버퍼와 공급자 ACP 전체 복원은 유지한다. 기록이 커질 때의 모든 메모리 문제를 해결했다고 간주하지 않는다.
+- Implementation and isolated validation of stages 1–5 are complete. The changes have not yet been applied to production.
+- 101 related automated tests passed. Type checks, targeted linting, and documentation allowlist/link checks passed. Existing rendering was checked in both themes on desktop and mobile.
+- Initial transfer volume decreased by approximately 96% for a synthetic 500-turn conversation. Average recent-segment read time decreased from 6.37 ms to 0.38 ms. SQLite writes using FULL commit increased from 1.80 seconds to 2.61 seconds in the same measurement. Conditions and limitations are recorded in the [current contract](../development/conversation-storage.md#validation-and-measurement).
+- No build, production server restart, bulk migration of actual JSON, or commit was performed. After the new code is applied, sessions are migrated when first read, and existing JSON is preserved. Existing supervisors can use the legacy replay path until they are stopped or replaced.
+- The supervisor's full in-memory event buffer and full provider ACP restoration are retained. This must not be considered a solution to all memory issues as history grows.

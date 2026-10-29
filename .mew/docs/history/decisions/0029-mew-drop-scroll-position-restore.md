@@ -1,32 +1,32 @@
 ---
-provenance: "Liiiiv 중앙 ADR 이관본, 2026-10-14"
-description: "이관한 결정 기록: mew 문서별 스크롤 위치 저장·복원 제거, 탭·창은 즉시 전환. 당시 선택·근거·후속 변경을 보존하며 현재 계약은 Mew 소유 문서에서 확인한다."
-title: "0029 — mew 문서별 스크롤 위치 저장·복원 제거, 탭·창은 즉시 전환"
+provenance: "Migrated copy of a Liiiiv central ADR, 2026-10-14"
+description: "Migrated decision record: remove per-document scroll position saving and restoration in mew; switch tabs and windows immediately. Preserves the choices, rationale, and subsequent changes at the time; consult the Mew owning document for the current contract."
+title: "0029 — Remove per-document scroll position saving and restoration in mew; switch tabs and windows immediately"
 created: 2026-07-31
 updated: 2026-08-21
 ---
 
-- 날짜: 2026-07-31
-- 상태: 대체됨: 0039
-- 대체 과정: [0038](0038-mew-scroll-restore-on-reload.md)이 새로고침·재시작 복원을, [0039](0039-mew-scroll-restore-on-tab-switch.md)가 탭·창 전환 복원을 되살렸다
-- 결정자: 송상훈 (지시)
+- Date: 2026-07-31
+- Status: Superseded by: 0039
+- Supersession sequence: [0038](0038-mew-scroll-restore-on-reload.md) restored restoration on reload and restart; [0039](0039-mew-scroll-restore-on-tab-switch.md) restored restoration when switching tabs and windows
+- Decision maker: Song Sanghoon (directive)
 
-## 배경
+## Background
 
-mew는 문서별 스크롤 위치를 localStorage(`mew:scroll-offsets[:{프로젝트}]`)에 저장하고, 탭·창을 전환할 때 마지막으로 보던 자리로 되돌렸다. hotview(tiptap)는 `'h:'`, plain(CodeMirror)은 `'p:'` 접두사로 키를 나눠 썼다.
+mew saved per-document scroll positions in localStorage (`mew:scroll-offsets[:{프로젝트}]`) and returned to the last viewed position when switching tabs and windows. hotview (tiptap) and plain (CodeMirror) used separate key prefixes, `'h:'` and `'p:'`, respectively.
 
-복원은 즉시 되지 않는다. 내용이 채워져야 스크롤 높이가 확보되고(collab은 ySync가 비동기, 이미지 등은 더 늦게), 그래서 `requestAnimationFrame`으로 최대 30프레임까지 재시도했다. 결과적으로 전환할 때마다 맨 위에서 열린 뒤 저장된 위치까지 스크롤이 흘러가는 과정이 눈에 보였고, 전환이 끝나기를 기다려야 하는 느낌이 됐다.
+Restoration is not immediate. Content must load to establish the scroll height (ySync is asynchronous for collab, and images take even longer), so it retried with `requestAnimationFrame` for up to 30 frames. As a result, every switch visibly opened at the top and then scrolled to the saved position, making it feel like you had to wait for the switch to finish.
 
-## 결정
+## Decision
 
-스크롤 위치 저장·복원을 전면 제거한다. 탭·창을 바꾸면 지연 없이 곧장 맨 위에서 열린다.
+Remove scroll position saving and restoration entirely. Switching tabs or windows opens immediately at the top without delay.
 
-지운 것: `src/utils/viewState.ts`, `packages/editor`의 `ScrollStore` 타입과 `Editor`의 `scrollStore` prop, `CodePane`의 복원·저장 블록, `App.tsx`의 배선. 남아 있는 localStorage 키(`mew:scroll-offsets…`)는 아무도 읽지 않으므로 그대로 둔다.
+Removed: `src/utils/viewState.ts`, the `ScrollStore` type in `packages/editor` and the `scrollStore` prop on `Editor`, the restoration and saving blocks in `CodePane`, and the wiring in `App.tsx`. Leave the remaining localStorage keys (`mew:scroll-offsets…`) as they are, since nothing reads them.
 
-재추가 금지. 다시 붙이려면 이 ADR을 대체하는 새 ADR이 필요하다. → 새로고침·브라우저 재시작 복원은 [ADR 0038](0038-mew-scroll-restore-on-reload.md)이(2026-08-07), 탭·창 전환 복원은 [ADR 0039](0039-mew-scroll-restore-on-tab-switch.md)가(2026-08-08) 대체해 금지는 전부 해제됐다.
+Do not re-add it. Reintroducing it requires a new ADR that supersedes this one. → [ADR 0038](0038-mew-scroll-restore-on-reload.md) superseded restoration on reload and browser restart (2026-08-07), and [ADR 0039](0039-mew-scroll-restore-on-tab-switch.md) superseded restoration when switching tabs and windows (2026-08-08), lifting the prohibition entirely.
 
-## 근거
+## Rationale
 
-- 전환 속도가 복원의 편의보다 중요하다. mew는 탭·창을 자주 오가는 도구다. 매 전환마다 보이는 스크롤 흘러감은 편의가 아니라 지연으로 읽힌다
-- "내용이 다 찬 뒤에 맞추기"에 값싼 해법이 없다. 즉시 복원하려면 문서 높이를 미리 알아야 하는데, collab 동기화·이미지·표 때문에 높이는 렌더 이후에야 정해진다. rAF 재시도 말고 남는 선택지는 복원이 끝날 때까지 화면을 가리는 것이고, 그건 전환을 더 느리게 만든다
-- 열린 탭·활성 탭 복원과는 다른 문제다. 그쪽은 전환 순간에 값이 확정돼 있어 지연이 없다 — 함께 지우지 않는다
+- Switching speed matters more than the convenience of restoration. mew is a tool for frequently switching tabs and windows. Visible scrolling on every switch feels like a delay rather than a convenience
+- There is no cheap solution to "adjust after all content has loaded." Immediate restoration requires knowing the document height in advance, but collab synchronization, images, and tables determine the height only after rendering. The remaining alternative to rAF retries is hiding the screen until restoration finishes, which makes switching even slower
+- This is separate from restoring open tabs and the active tab. Those values are settled at the moment of switching, so there is no delay — do not remove them along with it

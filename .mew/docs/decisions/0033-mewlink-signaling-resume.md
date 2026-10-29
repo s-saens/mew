@@ -1,38 +1,38 @@
 ---
-title: "인증 유효기간 안의 Mewlink 시그널링 재부착"
-description: "중앙 WebSocket 순단 때 협상된 RTC를 기존 lease 안에서 유지하고 새 nonce의 키 소유 증명으로 재부착하는 결정. 회수·만료·교체·hibernation 경계를 정하며 즉시 재시도와 실제 RTC 실패 복구 대기는 후속 0060이 확장한다."
+title: "Mewlink signaling reattachment within the authentication validity period"
+description: "A decision to preserve negotiated RTC within the existing lease during a brief central WebSocket interruption and reattach using proof of key possession for a new nonce. Defines revocation, expiration, replacement, and hibernation boundaries; subsequent 0060 extends immediate retries and the recovery wait for actual RTC failures."
 created: 2026-10-20
 updated: 2026-10-24
 ---
 
-## 상태
+## Status
 
-채택. 중앙·브라우저·호스트가 모두 지원을 협상한 연결에 적용한다. 중앙 배포와 로컬 실행본 적용은 별도다.
+Accepted. Applies to connections where the central service, browser, and host have all negotiated support. Central deployment and application to the local runtime are separate.
 
-[후속 ADR 0060](0060-mewlink-startup-handoffs.md)은 기존 lease와 재부착 검증을 유지하면서 첫 재시도를 즉시 시작하고 실제 RTC 단절의 자연 복구 대기를 줄인다.
+The [subsequent ADR 0060](0060-mewlink-startup-handoffs.md) starts the first retry immediately and shortens the wait for natural recovery from an actual RTC disconnection while retaining the existing lease and reattachment validation.
 
-## 배경
+## Background
 
-기존 브라우저는 중앙 시그널링 WebSocket이 닫히면 정상 RTC도 즉시 종료했다. 호스트도 중앙 연결이 닫히면 모든 RTC helper를 정리했다. 짧은 신호 연결 순단이 앱의 모든 요청·소켓 재연결로 확대됐다.
+Previously, the browser immediately terminated even healthy RTC when the central signaling WebSocket closed. The host also cleaned up all RTC helpers when its central connection closed. Brief signaling interruptions escalated into reconnections of all app requests and sockets.
 
-기존 lease는 중앙의 기기·브라우저·선택적 외부 신원 인가를 주기적으로 확인하는 경계다. 중앙과 단절됐다는 이유로 이 유효기간을 연장하거나 키 증명 없이 기존 연결을 새 소켓에 붙여서는 안 된다.
+The existing lease is the boundary for periodically checking the central service's authorization of the device, browser, and optional external identity. Its validity period must not be extended because of a central disconnection, and an existing connection must not be attached to a new socket without proof of key possession.
 
-## 결정
+## Decision
 
-중앙 challenge·호스트의 nonce 서명·브라우저 요청·서명된 ticket으로 재부착 지원을 협상한다. 지원하지 않는 상대, 인증이 끝나지 않은 연결, 명시적인 정상 종료·권한 거부·회수는 기존처럼 종료한다.
+Negotiate reattachment support through the central challenge, the host's nonce signature, the browser request, and the signed ticket. As before, terminate unsupported peers, connections whose authentication is incomplete, and explicit normal closures, authorization denials, and revocations.
 
-협상된 연결은 일시적인 시그널링 단절에 RTC와 앱의 기존 요청·소켓을 유지한다. 재시도는 현재 승인된 lease 안에서만 진행하며 새 시도 자체로 유효기간을 늘리지 않는다. 브라우저는 갱신 요청의 단조 시각과 중앙의 잔여 시간을 연결해 네트워크 지연·시계 차이가 허용 시간을 늘리지 않게 한다.
+Negotiated connections retain RTC and the app's existing requests and sockets during temporary signaling interruptions. Retries proceed only within the currently approved lease, and a new attempt does not itself extend validity. The browser ties the renewal request's monotonic timestamp to the remaining time from the central service so that network delays and clock differences do not extend the allowed time.
 
-브라우저는 새 시그널링 소켓의 단회 nonce에 기존 브라우저 키로 서명한다. 중앙은 instance·origin·connection·generation·SDP 지문·브라우저 키와 subject, 선택적 외부 신원의 같은 세션·유효 상태, 기기·브라우저 회수와 남은 lease를 검증한다. 성공해도 기존 lease만 복원하며 이후 정상 갱신에서만 새 유효기간을 부여한다.
+The browser signs the new signaling socket's single-use nonce with its existing browser key. The central service validates instance, origin, connection, generation, SDP fingerprint, browser key and subject, the same session and valid status of the optional external identity, device and browser revocation, and the remaining lease. Even on success, it restores only the existing lease and grants a new validity period only through a subsequent normal renewal.
 
-DO는 단절된 브라우저의 연결 상태를 SQLite에 보관한다. 최대 8개와 기존 만료 시각을 유지하고 alarm·새 연결·회수에서 정리한다. 열린 WebSocket의 attachment와 분리된 SQLite 상태를 함께 사용해 hibernation 뒤에도 복구한다. 메모리 상태만으로 권한을 복구하지 않는다.
+The DO stores disconnected browsers' connection state in SQLite. It retains at most 8 entries and their existing expiration times, cleaning them up on alarms, new connections, and revocations. It uses both open WebSocket attachments and detached SQLite state to recover after hibernation. It does not restore authorization from in-memory state alone.
 
-호스트는 같은 등록 키로 새 nonce와 실제 보유한 인증 완료 연결 목록을 서명한다. 중앙은 현재 연결·보존 기록과 교차 확인해 해당 연결의 기존 만료 시각만 재전송한다. 새 호스트 프로세스나 구버전처럼 목록을 증명하지 못하면 남은 브라우저 연결을 정리한다. 비동기 신원 확인 후에는 호스트·브라우저·저장 상태를 다시 조회해 교체·회수·재부착 경합에서 늦은 결과를 적용하지 않는다.
+The host uses the same registration key to sign a new nonce and a list of authenticated connections it actually holds. The central service cross-checks this against current connections and retained records and resends only those connections' existing expiration times. If the host cannot prove the list, as with a new host process or an older version, it cleans up the remaining browser connections. After asynchronous identity verification, it queries the host, browser, and stored state again to avoid applying late results during replacement, revocation, or reattachment races.
 
-lease 만료나 실제 RTC 실패는 기존 앱 자동 복구로 넘긴다. 쓰기·명령을 재전송하지 않는다. [브라우저 신뢰](0015-trusted-browser-access.md)와 [시그널링 인가 보존](0025-mewlink-signaling-authority.md)의 회수 경계는 유지하며, [WebSocket bootstrap](0028-mewlink-websocket-bootstrap.md)의 시그널링 단절 시 전체 연결 종료 범위만 이 결정으로 대체한다.
+Lease expiration or actual RTC failure is handed off to the app's existing automatic recovery. Writes and commands are not retransmitted. Retain the revocation boundaries of [Browser trust](0015-trusted-browser-access.md) and [Signaling authorization preservation](0025-mewlink-signaling-authority.md), and supersede only the scope of [WebSocket bootstrap](0028-mewlink-websocket-bootstrap.md) that terminates all connections on signaling disconnection.
 
-## 검증과 영향
+## Validation and impact
 
-키·nonce·세대·기기 불일치와 재사용, 세션 로그아웃·회수·만료, 구버전, DO hibernation과 호스트 교체 경합을 격리 검사한다. 실제 Workers·네이티브 RTC·Chromium 검사에서 양쪽 시그널링의 순단 후 같은 iframe·RTC를 유지하고 일반 요청이 성공하는지 확인한다. 외부망 순단의 전체 성공률을 뜻하지 않는다.
+Run isolated checks for key, nonce, generation, and device mismatches and reuse; session logout, revocation, and expiration; older versions; DO hibernation; and host replacement races. In checks using actual Workers, native RTC, and Chromium, verify that the same iframe and RTC are retained and ordinary requests succeed after brief interruptions to signaling on both sides. This does not represent an overall success rate for interruptions over external networks.
 
-현재 계약과 적용·복귀의 구체 절차는 [원격 접속](../development/remote-access.md)과 [중앙 배포](../operations/remote-central.md)가 소유한다.
+[Remote access](../development/remote-access.md) and [Central deployment](../operations/remote-central.md) own the current contract and specific rollout and rollback procedures.

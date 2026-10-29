@@ -1,33 +1,33 @@
 ---
-title: "프로젝트 에이전트 컨텍스트 구현 계획"
+title: "Project agent context implementation plan"
 created: 2026-09-16
 updated: 2026-09-16
-description: "Documents 연결·비파괴 초기화·에이전트 자동 안내의 GUI·CLI 구현 순서, UI 방향과 세션·큐·예약 실행의 구현·검증 완료 기록을 남긴다."
+description: "Records the GUI and CLI implementation sequence for Documents linking, nondestructive initialization, and automatic agent guidance; the UI direction; and completion of implementation and verification for sessions, queues, and scheduled execution."
 상위파일: "_work.md"
 ---
 
-결정: [ADR 0155](../history/decisions/0155-mew-project-agent-context.md).
+Decision: [ADR 0155](../history/decisions/0155-mew-project-agent-context.md).
 
-## 계획
+## Plan
 
-1. 프로젝트 설정·안전한 문서 초기화의 공통 모듈을 만든다. 기존 파일 보존, 경로 경계, 멱등성을 검증한다.
-2. ACP 실행 지점에 자동 안내를 전달한다. 세션 연결 저장·복원, 새 대화, 큐, 예약 실행을 검증한다.
-3. Documents 설정 창에 연결·초기화·미리보기를 추가하고 같은 모듈을 호출하는 CLI를 제공한다.
-4. 동작 테스트·타입·lint·문서 검사를 수행하고 사용법을 갱신한다. 빌드·배포·서버 재시작은 사용자가 수행한다.
+1. Create a shared module for project settings and safe document initialization. Verify preservation of existing files, path boundaries, and idempotency.
+2. Pass automatic guidance at ACP execution points. Verify saving and restoring session links, new conversations, queues, and scheduled execution.
+3. Add linking, initialization, and previews to the Documents settings dialog, and provide a CLI that calls the same module.
+4. Run behavioral tests, type checks, lint, and documentation checks, and update usage instructions. The user performs builds, deployments, and server restarts.
 
-## UI 방향
+## UI direction
 
-기존 Documents 설정 창의 색상·컨트롤을 유지한다. 연결 경로 → 자동 안내와 추가 지침 → 선택적 초기화 → 변경 미리보기 → 적용 순서다. 작은 화면에서는 내부 스크롤하며, 오류와 생성·보존 파일을 명시한다.
+Keep the colors and controls of the existing Documents settings dialog. The sequence is linked path → automatic guidance and additional instructions → optional initialization → change preview → apply. Use internal scrolling on small screens, and clearly identify errors and files to be created or preserved.
 
-## 완료 범위
+## Completed scope
 
-- 세션별 Documents 연결 저장·복원과 매 ACP 요청의 공통 안내 전달을 구현했다. 새 대화는 변경된 경로를 적용하고 큐·예약 실행도 같은 경로를 사용한다.
-- 프로젝트 설정과 비파괴 초기화의 공통 모듈, 읽기 전용 미리보기가 기본인 CLI, Documents 설정 GUI를 추가했다.
-- GUI는 기존 설정 창의 토큰·DialogFrame을 사용한다. 데스크톱·390px 모바일에서 입력 변경에 따른 미리보기 무효화, 적용, Esc, 화면 넘침을 검증했다.
-- [사용법과 지원 범위](../../../docs/guides/project-setup.md), [개발 계약](../development/agent-sessions.md)을 갱신했다.
+- Implemented saving and restoring per-session Documents links and passing shared guidance with every ACP request. New conversations apply the changed path, and queues and scheduled execution use the same path.
+- Added a shared module for project settings and nondestructive initialization, a CLI that defaults to read-only previews, and a Documents settings GUI.
+- The GUI uses tokens and DialogFrame from the existing settings dialog. Verified preview invalidation after input changes, applying changes, Esc, and screen overflow on desktop and 390px mobile screens.
+- Updated [usage and supported scope](../../../docs/guides/project-setup.md) and the [development contract](../development/agent-sessions.md).
 
-## 검증
+## Verification
 
-관련 테스트 64개(에이전트·큐·세션·워크스페이스·예약 56개, 신규 설정·컨텍스트·API·브라우저 8개), `npx tsc -b`, `npm run lint`, 중앙 문서 허용목록·링크 검사를 통과했다. lint에는 기존 경고가 남아 있다. 전체 `npm test`에서는 DB 권한 통합 테스트와 기존 사이드바 tooltip 테스트 실패가 남으며 별도 재실행에서도 재현된다. 이 작업은 해당 기능을 변경하지 않았다.
+Passed 64 relevant tests (56 for agents, queues, sessions, workspaces, and scheduling; 8 new tests for settings, context, API, and browser), `npx tsc -b`, `npm run lint`, and central documentation allowlist and link checks. Existing lint warnings remain. The full `npm test` still has failures in DB permission integration tests and existing sidebar tooltip tests, which also reproduce in separate reruns. This work did not change those features.
 
-빌드·배포·서버 재시작은 수행하지 않았다. 이전 버전 독립 감독의 갱신 방법은 사용법의 업데이트 절을 따른다.
+No build, deployment, or server restart was performed. For updating an older standalone supervisor, follow the update section in the usage instructions.

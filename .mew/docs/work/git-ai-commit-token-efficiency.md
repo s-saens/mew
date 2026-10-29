@@ -1,97 +1,97 @@
 ---
-title: "AI 커밋 토큰 절감 검토"
+title: "Review of AI commit token reduction"
 created: 2026-10-04
 updated: 2026-10-04
-description: "AI 커밋 전체 diff·분할 요약·변경 목록의 입력 토큰 실측과 로컬 색인·선택 읽기 제안을 기록한다. 후속 전량 압축 연구와 현재 실행 계약으로 연결한다."
+description: "Records input token measurements for full diffs, chunked summaries, and change lists for AI commits, along with a proposal for local indexing and selective reading. Links to follow-up research on compressing all changes and the current execution contract."
 상위파일: "_work.md"
 ---
 
-[Git 기능](../features/Git%C2%B7%EB%B3%80%EA%B2%BD%20%EC%9D%B4%EB%A0%A5/%ED%98%84%EC%9E%AC%20%ED%94%84%EB%A1%9C%EC%A0%9D%ED%8A%B8%20Git%20%EC%9E%91%EC%97%85%20%ED%8C%A8%EB%84%90.md) · [현재 실행 계약](../development/agent-sessions.md#git-ai-commit-작업)
+[Git features](../features/git-history/project-git-work-panel.md) · [Current execution contract](../development/agent-sessions.md#git-ai-commit-jobs)
 
-후속 실행에서 제한된 발췌·재확인이 대량 스킵을 일으킨 것을 확인했다. 대량 문서의 전량 변경 표현·반복 수정·변경 의도 기록을 다시 검토한 [후속 압축 연구](git-document-commit-compression.md)가 이 문서의 초기 제안을 보완한다. 아래 실측과 당시 구현 기록은 그대로 보존한다.
+Subsequent runs confirmed that limited excerpts and rechecks caused large-scale skipping. [Follow-up compression research](git-document-commit-compression.md), which reexamines representations of all changes across large volumes of documents, repetitive edits, and records of change intent, supplements this document's initial proposal. The measurements and implementation records from that time are preserved below.
 
-최초 분할 요약은 큰 변경의 입력 한도를 해결했지만 전체 diff를 먼저 모델에 보내므로 총 토큰 절감에는 한계가 있다. 권장 방향은 로컬에서 전체 변경을 색인하고 작은 변경 목록을 먼저 제공한 뒤, 판단에 필요한 diff 구간만 요청받는 방식이다. 모든 원본과 파일 배정 검증은 유지한다. 이 문서는 입력 크기 실측과 구현 제안이다. 2026-10-04 후속 변경에서 로컬 색인·선택 읽기와 계획 최대 3회 경로를 적용했다. 현재 계약은 실행 문서를 따르며 임베딩·의미적 AST 분석·분석 캐시는 아직 적용하지 않았다.
+The initial chunked summarization addressed input limits for large changes, but its total token savings are limited because the full diff is sent to the model first. The recommended approach is to index all changes locally, provide a small change list first, and then accept requests only for the diff sections needed for decisions. Retain all original content and file assignment validation. This document contains input size measurements and an implementation proposal. Follow-up changes on 2026-10-04 applied local indexing, selective reading, and a path allowing up to 3 planning calls. The execution document defines the current contract; embeddings, semantic AST analysis, and analysis caching have not yet been applied.
 
-## 최초 방식의 비용 구조
+## Cost structure of the initial approach
 
-최초 구현의 `server/git-commit-analysis.ts`는 모든 원본 조각을 요약하고 중간 요약을 다시 통합했다. `server/git-ai-commit-runner.ts`는 각 호출에 전체 커밋 스킬을 붙이고 새 ACP 세션을 만든다. 따라서 전체 원문의 최초 입력 비용에 요약 출력, 중간 통합 입력, 최종 계획 입력, 재확인 입력이 더해진다. 새 세션은 누적 컨텍스트를 제어하지만 호출마다 런타임 지침이 다시 들어갈 수 있다.
+In the initial implementation, `server/git-commit-analysis.ts` summarized all source chunks and then consolidated the intermediate summaries. `server/git-ai-commit-runner.ts` attaches the full commit skill to each call and creates a new ACP session. Thus, summary output, intermediate consolidation input, final planning input, and recheck input are added to the initial input cost of the full source text. New sessions control accumulated context, but runtime instructions may be included again with every call.
 
-입력 크기, 실제 처리 토큰, 캐시 입력, 출력·추론 토큰, 청구 비용, 지연 시간은 구분해서 평가해야 한다. 더 싼 모델이나 공급자 프롬프트 캐시는 비용을 낮출 수 있지만 최초 원문을 읽는 양을 자동으로 줄이지 않는다.
+Input size, tokens actually processed, cached input, output and reasoning tokens, billed cost, and latency must be evaluated separately. A cheaper model or provider prompt cache may reduce costs, but does not automatically reduce the amount of original text read initially.
 
-## 현재 변경의 입력 크기 실측
+## Measured input size of the current changes
 
-2026-10-04에 커밋 대상 후보 156개 파일을 임시 Git index로 고정해 측정했다. 이름만 `0`인 미추적 파일은 분석 대상에서 제외했다. 당시 HEAD는 `44002d4b52b03f55b78e82f7b88c64a6a55fe63e`, 작업트리 tree는 `d4ac35251fdba9abbafb1fab60ce3e0da00768f1`이다. 이 검토 문서 작성 전 스냅샷이며 이후 변경에도 같은 숫자가 나온다는 뜻은 아니다.
+On 2026-10-04, measurements were taken with 156 candidate files for commit fixed in a temporary Git index. An untracked file named simply `0` was excluded from analysis. HEAD at the time was `44002d4b52b03f55b78e82f7b88c64a6a55fe63e`, and the working-tree tree was `d4ac35251fdba9abbafb1fab60ce3e0da00768f1`. This snapshot predates this review document and does not imply that later changes will produce the same numbers.
 
-토큰 수는 로컬 `tiktoken`의 `o200k_base`로 계산한 비교 기준값이다. 실제 선택 모델의 사용량·청구액·요약 품질을 측정하지 않았다. 유료 모델 호출 없이 원문을 로컬에서만 처리했다. 아래 값은 지침·시스템 프롬프트·AI 출력이 빠진 입력 자료 크기다.
+Token counts are reference values for comparison calculated locally using `tiktoken` with `o200k_base`. Usage, billing, and summary quality for the actual selected model were not measured. The source text was processed only locally, without paid model calls. The values below represent input data size excluding instructions, system prompts, and AI output.
 
-| 입력 자료 | 기준 토큰 수 | 전체 diff 대비 감소 | 해석 |
+| Input data | Reference token count | Reduction from full diff | Interpretation |
 | --- | ---: | ---: | --- |
-| 전체 diff와 주변 3줄 | 205,769 | 기준 | 전체 변경과 주변 문맥 |
-| 전체 diff와 주변 0줄 | 159,985 | 22.3% | 변경 줄은 보존하고 주변 문맥을 필요할 때 읽음 |
-| 주변 0줄과 중복 헤더 축약 및 변경 목록 | 158,628 | 22.9% | 헤더 축약의 추가 이득은 작음 |
-| 경로·추가/삭제 줄 수·hunk 수·구간 제목 목록 | 6,279 | 96.9% | 최초 탐색용 목록이며 커밋 근거로는 부족 |
-| 위 목록과 파일별 앞뒤 변경 줄 12개 | 48,557 | 76.4% | 크기 비교용 샘플링이며 의미 보존·판단 품질 미검증 |
+| Full diff with 3 lines of context | 205,769 | Baseline | All changes and surrounding context |
+| Full diff with 0 lines of context | 159,985 | 22.3% | Preserves changed lines and reads surrounding context as needed |
+| 0 lines of context, abbreviated duplicate headers, and change list | 158,628 | 22.9% | Little additional benefit from abbreviating headers |
+| List of paths, added/deleted line counts, hunk counts, and section headings | 6,279 | 96.9% | List for initial exploration; insufficient evidence for commits |
+| The list above plus 12 changed lines from the beginning and end of each file | 48,557 | 76.4% | Sampling for size comparison; semantic preservation and decision quality are unverified |
 
-앞뒤 12줄만으로 자동 커밋해도 된다는 결론은 낼 수 없다. 한 줄이 매우 길 수도 있고 중요한 변경이 중간에 있을 수 있다. 구현 시 임의 줄 수로 자르기보다 변경 구간별 증거와 읽지 않은 부분을 명시해야 한다.
+These results do not establish that automatic commits based only on the first and last 12 lines are acceptable. A single line may be very long, and important changes may be in the middle. An implementation should explicitly identify evidence for each changed section and unread portions, rather than truncate at arbitrary line counts.
 
-이 측정은 요약의 권장 길이 초과 복구를 추가하기 전 입력 경로를 기준으로 한다. 실제 한도 초과 시 기존 요약만 1회 압축하는 복구는 이후 추가했으며, 아래 실측은 후속 로컬 색인·선택 읽기 적용 전 수치이며 새 실행 경로의 실제 모델 비용·시간 측정으로 간주하지 않는다.
+This measurement uses the input path from before recovery for summaries exceeding the recommended length was added. Recovery that compresses only existing summaries 1 time when the actual limit is exceeded was added later. The measurements below predate the subsequent application of local indexing and selective reading and must not be treated as measurements of actual model cost or time for the new execution path.
 
-현재 분할 모듈로는 원본 조각 15개가 생겼다. 각 조각을 JSON 문자열로 전달하는 입력은 합계 218,699 기준 토큰이고, 커밋 스킬 1,387토큰이 15번 반복돼 20,805토큰이 더해진다. **diff와 반복 스킬만 239,504토큰**이다. 실제 총 사용량은 요약 출력·통합·최종 계획·런타임 지침 때문에 이보다 커질 수 있다. 공급자 캐시가 적용될 경우 비캐시 처리량과 비용은 별도로 달라진다.
+The current splitting module produced 15 source chunks. Input passing each chunk as a JSON string totals 218,699 reference tokens, and the 1,387-token commit skill is repeated 15 times, adding 20,805 tokens. **The diff and repeated skill alone total 239,504 tokens**. Actual total usage may be higher due to summary output, consolidation, final planning, and runtime instructions. If provider caching applies, uncached processing volume and costs will differ separately.
 
-주변 0줄 diff의 파일별 토큰 합계는 코드·기타 74,774, 테스트 44,377, 문서 40,649, lockfile 185다. 이번 변경의 주요 절감 대상은 코드·테스트·문서다. lockfile의 패키지·버전·변경 필드 요약은 72토큰이지만 절대 절감량은 113토큰뿐이다. 대형 lockfile이 지배하는 다른 저장소에 이 결과를 일반화하지 않는다.
+Per-file token totals for the diff with 0 context lines are 74,774 for code/other, 44,377 for tests, 40,649 for documentation, and 185 for the lockfile. The main reduction targets in this change are code, tests, and documentation. The lockfile summary of packages, versions, and changed fields is 72 tokens, but the absolute savings are only 113 tokens. Do not generalize these results to other repositories dominated by large lockfiles.
 
-### 측정 방법
+### Measurement method
 
-HEAD와 선택 작업트리 전체를 고정하고 `git diff --no-renames --no-ext-diff --no-textconv --no-color --unified=N <HEAD> <tree> -- <literal paths>`를 비교했다. 미추적 파일도 작업트리 tree에 포함했다. 변경 목록은 경로 ID·경로·`--numstat`·hunk 개수·`@@` 뒤의 비어 있지 않은 구간 제목을 JSON 행으로 만들었다. 구간 제목은 Git이 제공한 문자열이며 AST로 검증한 함수명이라고 간주하지 않는다.
+Fixed HEAD and the entire selected working tree and compared `git diff --no-renames --no-ext-diff --no-textconv --no-color --unified=N <HEAD> <tree> -- <literal paths>`. Untracked files were also included in the working-tree tree. The change list consisted of JSON rows containing path IDs, paths, `--numstat`, hunk counts, and nonempty section headings after `@@`. Section headings are strings provided by Git and are not considered AST-validated function names.
 
-헤더 축약은 각 파일의 `diff --git`, `index`, `---`, `+++` 행을 파일 ID로 치환하고 실제 추가·삭제 줄과 hunk·mode 정보를 남겼다. 샘플 입력은 각 파일의 추가·삭제 줄 앞 6개와 뒤 6개를 변경 목록에 붙였다. 전체 문자열을 기준 토크나이저에 넣었으며 파일별 합계와 전체 문자열 토큰화는 경계 때문에 약간 다를 수 있다.
+Header abbreviation replaced each file's `diff --git`, `index`, `---`, and `+++` lines with a file ID, retaining actual added/deleted lines and hunk/mode information. Sample input appended the first 6 and last 6 added/deleted lines of each file to the change list. The full string was passed to the reference tokenizer; per-file totals and tokenization of the full string may differ slightly due to boundaries.
 
-주변 0줄에서 `-w`를 추가한 비교값은 158,794토큰으로, 0줄 diff 대비 추가 절감은 약 0.7%였다. 문자열 내부 공백·Python 들여쓰기·Markdown 구조 등의 의미가 사라질 수 있어 전역 공백 무시는 권장하지 않는다. Git의 문맥·hunk·통계 옵션은 [공식 git diff 문서](https://git-scm.com/docs/git-diff)를 따른다.
+Adding `-w` with 0 lines of context yielded 158,794 tokens, an additional reduction of about 0.7% compared with the diff with 0 lines of context. Globally ignoring whitespace is not recommended because it may lose meaning in whitespace within strings, Python indentation, Markdown structure, and similar content. Git context, hunk, and statistics options follow the [official git diff documentation](https://git-scm.com/docs/git-diff).
 
-### 후속 로컬 색인 경로 실측
+### Measurements of the subsequent local indexing path
 
-2026-10-04 후속 구현에서 당시 변경 후보 151개 파일을 69개 원본 조각으로 만들고 개요를 생성하는 로컬 준비에 577ms가 걸렸다. 개요는 43,929자·`o200k_base` 기준 13,262토큰이었다. 유료 모델 호출 없이 측정했으며 스킬·시스템 지침·추가 원본·모델 출력은 제외했다. 앞의 156개 파일 실측과 스냅샷이 달라 직접적인 절감률 비교는 하지 않는다. 기본 경로는 조각별 모델 요약 없이 계획을 요청하고, 원본을 회당 최대 6개·최대 2회 요청받아 계획 호출을 1~3회로 제한한다. 이 준비 시간은 전체 커밋 완료 시간이 아니다.
+In the follow-up implementation on 2026-10-04, local preparation took 577ms to turn the 151 candidate files at the time into 69 source chunks and generate an overview. The overview contained 43,929 characters and 13,262 tokens using `o200k_base`. Measurements used no paid model calls and excluded the skill, system instructions, additional source content, and model output. This snapshot differs from the earlier measurement of 156 files, so no direct savings percentage comparison is made. The default path requests a plan without per-chunk model summaries, accepts requests for up to 6 source chunks per round for up to 2 rounds, and limits planning calls to 1–3. This preparation time is not the total time to complete a commit.
 
 
-## 권장 실행 흐름
+## Recommended execution flow
 
-1. **로컬에서 전체 변경 목록을 만든다.** 경로 ID·상태·이전/이후 blob·hunk ID·변경 통계·심볼/문서 제목·변경된 import·패키지 정보를 추출한다. 처음에는 Git의 hunk와 구간 제목을 사용하고 지원 언어의 AST는 정확도를 검증하며 추가한다. 이름만으로 기능을 단정하지 않는다.
-2. **작은 목록과 예산 내 근거를 먼저 보낸다.** 구현·관련 테스트·문서·import 관계로 그룹 후보를 제안하되 자동 확정하지 않는다. 모든 파일의 경로와 변경 유무는 유지한다. 새 파일·큰 함수·서로 다른 관심사가 섞인 파일은 추가 분석 대상으로 표시한다.
-3. **필요한 구간만 요청받는다.** 제안 프로토콜은 `{needDiff:[{fileId,hunkIds}]}`다. Mew가 고정된 Git 객체에서 해당 hunk와 필요한 함수/앞뒤 문맥을 제공한다. 기존 도구 승인 거절 경계를 유지하고 임의 파일 읽기·명령 실행 권한을 주지 않는다. 현재의 48,000자 원본 조각 재확인보다 요청 단위를 작게 만든다.
-4. **분석 상태를 명시한다.** 각 파일은 구조적으로 확인한 변경, 원문으로 판단한 변경, 아직 불확실한 변경으로 구분한다. 삭제·권한·조건문·에러 처리·보안 경계처럼 짧아도 의미가 큰 변경은 반드시 관련 원문을 읽는다. 읽지 않은 부분을 이해했다고 주장하거나 경로명만으로 커밋을 승인하지 않는다.
-5. **해결되지 않은 그룹에만 요약을 사용한다.** 한 파일이나 관련 그룹을 충분히 읽어야 할 때 기존 분할 요약으로 보완한다. 전체 저장소를 항상 map/reduce하지 않는다. 예산을 초과했는데 근거가 부족하면 사유와 함께 `skipped`에 남긴다. 파일 배정과 HEAD·트리·stage 검증 및 원본 전체 커밋은 유지한다.
+1. **Build a complete change list locally.** Extract path IDs, statuses, before/after blobs, hunk IDs, change statistics, symbols/document headings, changed imports, and package information. Start with Git hunks and section headings, and add ASTs for supported languages while validating accuracy. Do not infer functionality from names alone.
+2. **Send a small list and evidence within the budget first.** Propose candidate groups based on implementations, related tests, documents, and import relationships, without finalizing them automatically. Retain every file's path and whether it has changes. Flag new files, large functions, and files mixing different concerns for additional analysis.
+3. **Accept requests only for the sections needed.** The proposed protocol is `{needDiff:[{fileId,hunkIds}]}`. Mew provides the corresponding hunks and necessary functions/surrounding context from fixed Git objects. Retain existing tool approval denial boundaries and do not grant arbitrary file reading or command execution permissions. Make request units smaller than the current rechecks of 48,000-character source chunks.
+4. **State analysis status explicitly.** For each file, distinguish changes verified structurally, changes assessed from source text, and changes that remain uncertain. Always read the relevant source text for changes with significant meaning even when short, such as deletions, permissions, conditionals, error handling, and security boundaries. Do not claim to understand unread portions or approve commits based only on path names.
+5. **Use summaries only for unresolved groups.** Supplement with existing chunked summarization when a file or related group needs to be read thoroughly. Do not always map/reduce the entire repository. If the budget is exceeded and evidence is insufficient, leave the item in `skipped` with a reason. Retain file assignment, HEAD/tree/stage validation, and commits of the complete original content.
 
-이 방식은 경량 식별자를 먼저 유지하고 필요한 자료만 뒤늦게 불러오는 [Anthropic의 just in time context 설계](https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents)와 맞는다. 이 설계를 커밋에 적용하면 어느 정도 절약되는지는 아직 추론이며 실제 판단 실험이 필요하다. 변경이 모두 독립적이고 복잡하면 결국 원문 대부분을 읽어야 할 수 있다.
+This approach aligns with [Anthropic's just in time context design](https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents), which retains lightweight identifiers first and loads only necessary material later. How much applying this design to commits would save remains an inference and requires experiments with actual decisions. If all changes are independent and complex, most of the source text may ultimately need to be read.
 
-## 후보 기술과 적용 우선순위
+## Candidate techniques and implementation priorities
 
-| 방법 | 효과와 제약 | 제안 우선순위 |
+| Method | Benefits and limitations | Proposed priority |
 | --- | --- | --- |
-| 주변 문맥을 필요할 때 읽기 | 이번 입력 자료 22.3% 감소. 조건/함수 문맥은 추가 읽기 필요 | 먼저 |
-| 변경 목록과 hunk 단위 선택 읽기 | 큰 절감 가능성. 전체 파일 coverage와 미분석 상태 검증 필요 | 핵심 |
-| 원문 중복 제거와 파일 ID 사용 | 반복 경로·공통 지침·staged/최종 diff 중복 제거. 모든 변경 의미 보존 필요 | 함께 |
-| 분석 결과를 blob/hash로 캐시 | 동일 변경의 재시도에서 요약 호출 자체를 생략. 최초 분석에는 효과 없음 | 다음 |
-| 공급자 프롬프트 캐시 | 반복 prefix 비용·지연 감소. 컨텍스트 크기는 그대로 | 지원 확인 후 보조 |
-| 임베딩과 검색 | 관련 변경 후보 검색에 활용. 모든 파일의 분류·근거 확보를 대신하지 못함 | 필요가 입증되면 |
-| LLMLingua 계열 토큰 제거 | 로컬 작은 모델로 입력 축약 가능. 코드 의미·연산자·부정·상수 보존 검증 필요 | 후순위 실험 |
-| 싼 모델과 낮은 추론 강도 | 비용·추론 사용량을 줄일 가능성. 입력 토큰 감소와는 별개이며 정확도 검증 필요 | 별도 평가 |
+| Read surrounding context as needed | Reduces this input data by 22.3%. Requires additional reading for conditional/function context | First |
+| Change list and hunk-level selective reading | Potential for substantial savings. Requires validation of coverage across all files and unanalyzed status | Core |
+| Deduplicate source text and use file IDs | Removes repeated paths, common instructions, and duplication between staged/final diffs. Must preserve the meaning of all changes | Alongside |
+| Cache analysis results by blob/hash | Skips summary calls entirely when retrying the same changes. No benefit for initial analysis | Next |
+| Provider prompt caching | Reduces repeated prefix costs and latency. Context size stays the same | Supplement after confirming support |
+| Embeddings and retrieval | Useful for finding candidate related changes. Cannot replace classifying every file and gathering evidence | When need is demonstrated |
+| LLMLingua-family token removal | Can shorten input using a small local model. Requires validation that code semantics, operators, negations, and constants are preserved | Lower-priority experiment |
+| Cheaper models and lower reasoning effort | May reduce costs and reasoning usage. Separate from input token reduction; requires accuracy validation | Evaluate separately |
 
-캐시는 계정·저장소·파일별 이전/이후 blob·mode·스킬 해시·요약 프롬프트 버전·모델을 키에 포함하는 방식으로 제안한다. 관련 파일의 내용을 함께 사용한 요약은 그 의존 입력 해시도 포함해야 한다. 고정 문자 길이 조각의 순번만 키로 쓰면 앞쪽 편집 때문에 뒤쪽 전체가 무효화될 수 있다. 기간과 삭제 정책을 정하고 계정 간 결과를 공유하지 않는다.
+The proposed cache key includes the account, repository, per-file before/after blobs, mode, skill hash, summary prompt version, and model. Summaries that also use related files' contents must include hashes of those dependency inputs. Using only the sequence number of fixed-character-length chunks as the key may invalidate all later chunks after an earlier edit. Define retention periods and deletion policies, and do not share results across accounts.
 
-공통 스킬 전체를 매 조각마다 주입하는 대신 작은 요약 전용 계약을 분리하는 안도 평가할 수 있다. 다만 사용자가 편집한 커밋 스킬을 무시해서는 안 된다. 요약 지침을 기준본에서 명시적으로 제공하거나 사용자가 선택한 방식으로 분리하고, 최종 그룹·메시지 판단에는 전체 기준본을 적용한다. 단순히 스킬을 잘라서 기존 지침과 다르게 실행하는 방식은 피한다.
+Another option to evaluate is separating a small summary-specific contract instead of injecting the entire common skill into every chunk. However, user-edited commit skills must not be ignored. Provide summary instructions explicitly from the canonical source or separate them in a user-selected way, and apply the full canonical source to final group and message decisions. Avoid simply truncating the skill and executing differently from the existing instructions.
 
-공급자 캐시는 고정 prefix가 같을 때 효과가 있다. 현재는 요약 지침 뒤에 전체 스킬을 붙이므로 요약/통합 모드의 가변 지침보다 공통 스킬을 먼저 놓는 것도 검토 대상이다. ACP 뒤의 런타임이 어떤 캐시 제어를 지원하는지 확인해야 하며, JSON으로 넘긴다고 캐시가 보장되지는 않는다. [Claude 공식 캐시 계약](https://platform.claude.com/docs/en/build-with-claude/prompt-caching)은 동일 prefix와 캐시 사용량 확인을 요구한다.
+Provider caching is effective when the fixed prefix is identical. Currently, the full skill is appended after the summary instructions, so placing the common skill before the variable instructions for summary/consolidation modes is also worth examining. The cache controls supported by the runtime behind ACP must be checked; passing input as JSON does not guarantee caching. The [official Claude caching contract](https://platform.claude.com/docs/en/build-with-claude/prompt-caching) requires identical prefixes and checking cache usage.
 
-임베딩은 검색할 후보를 좁히는 방법이다. 커밋은 모든 선택 파일을 빠짐없이 배정해야 하므로 상위 몇 개 검색 결과만 보내면 독립적인 변경이 누락될 수 있다. 정확한 심볼·경로·import·테스트 이름은 로컬 관계와 단어 검색으로 먼저 연결할 수 있다. 임베딩을 도입해도 이 전체 목록과 근거 검증은 필요하다. 검색에서 의미 검색과 정확한 식별자 검색을 함께 사용하는 이유는 [Anthropic Contextual Retrieval](https://www.anthropic.com/engineering/contextual-retrieval)에서도 설명한다.
+Embeddings narrow the candidates to search. Commits must assign every selected file without omission, so sending only the top few search results may omit independent changes. Exact symbols, paths, imports, and test names can first be linked using local relationships and word searches. Even with embeddings, the complete list and evidence validation remain necessary. [Anthropic Contextual Retrieval](https://www.anthropic.com/engineering/contextual-retrieval) also explains why retrieval combines semantic search with exact identifier search.
 
-[LLMLingua 2 논문](https://arxiv.org/abs/2403.12968)은 작은 encoder의 토큰 분류로 추출형 압축을 수행하고 평가 데이터셋에서 2~5배 압축을 보고한다. 이것은 Mew의 한영 혼합 Git diff·커밋 그룹 정확도를 검증한 결과가 아니다. [공식 구현](https://github.com/microsoft/LLMLingua)은 참고 후보지만, 모델 설치·CPU/메모리 비용과 제거된 연산자·상수의 영향까지 비교해야 한다. 현재 데이터에서는 로컬 Git 문맥 조절과 선택 읽기를 먼저 검증하는 편이 구현 범위가 작다.
+The [LLMLingua 2 paper](https://arxiv.org/abs/2403.12968) performs extractive compression through token classification with a small encoder and reports 2–5× compression on evaluation datasets. These results do not validate accuracy for Mew's mixed Korean/English Git diffs or commit groups. The [official implementation](https://github.com/microsoft/LLMLingua) is a candidate reference, but model installation, CPU/memory costs, and the impact of removed operators and constants must also be compared. For the current data, validating local Git context adjustment and selective reading first requires a smaller implementation scope.
 
-## 구현 전에 비교할 기준
+## Comparison criteria before implementation
 
-- 동일한 스냅샷·런타임·모델·스킬로 현재 전체 요약, 주변 0줄 전체 분석, 변경 목록과 선택 읽기를 비교한다. 재시도 캐시는 최초 분석과 따로 측정한다. 모델 사용량이 없으면 로컬 기준 토큰과 실제 청구를 혼동하지 않는다.
-- 성공한 한 요청의 컨텍스트 크기 대신 전체 작업의 누적 입력·캐시 입력·출력·추론 토큰·호출 수·시간을 합산한다. 입력 감소 목표는 우선 기존 전체 요약 대비 50%로 잡을 수 있으나 아직 달성한 결과는 아니다. `skipped` 비율이 늘어 절감된 것인지도 함께 보고한다.
-- 현재 `runOnce`는 종료 사유만 반환하므로 작업별 사용량 수집 경로가 필요하다. 설치된 ACP SDK의 `Usage`는 실험적이고 공급자가 반드시 제공한다고 가정할 수 없다. 공개 [ACP usage_update 계약](https://agentclientprotocol.com/protocol/v1/schema#usageupdate)의 `used`는 현재 컨텍스트 사용량이며 누적 처리 토큰이 아니다. 공급자 보고값이 없으면 unknown으로 남긴다.
-- 품질은 파일 누락·중복 0, 선택 밖 포함 0, 원문 변경 감지, 원본 전체 커밋을 먼저 유지한다. 이어 독립 관심사 오배정, 구현/테스트/문서 분리 오류, 메시지의 근거 없는 주장, 판단 불가 파일 비율을 비교한다.
-- 작은 조건 반전, 오류 경로, CSS/문자열 공백, 문서 목록 구조, 이름 변경, 바이너리, 큰 새 파일, 한 파일 안의 여러 관심사를 포함한 사례가 필요하다. 자동 검증과 사람이 판단한 그룹 품질을 구분한다.
+- Compare the current full summarization, full analysis with 0 lines of context, and change lists with selective reading using the same snapshot, runtime, model, and skill. Measure retry caching separately from initial analysis. Without model usage data, do not confuse local reference tokens with actual billing.
+- Sum cumulative input, cached input, output, reasoning tokens, call count, and time for the entire task, rather than the context size of one successful request. An initial input reduction target of 50% relative to existing full summarization could be set, but this has not yet been achieved. Also report whether savings came from an increased `skipped` rate.
+- Currently, `runOnce` returns only the stop reason, so a path for collecting per-task usage is needed. `Usage` in the installed ACP SDK is experimental and cannot be assumed to be provided by every provider. `used` in the public [ACP usage_update contract](https://agentclientprotocol.com/protocol/v1/schema#usageupdate) is current context usage, not cumulative processed tokens. Leave it as unknown when provider-reported values are unavailable.
+- For quality, first preserve 0 missing/duplicate files, 0 files included outside the selection, detection of source text changes, and committing the full originals. Then compare misassignment of independent concerns, errors in separating implementation/tests/documentation, unsupported claims in messages, and the proportion of files that cannot be classified.
+- Cases must include small conditional inversions, error paths, CSS/string whitespace, document list structure, renames, binaries, large new files, and multiple concerns within a single file. Distinguish automated validation from human judgments of group quality.
 
-연구 범위에서 실제 유료 모델의 품질·비용 실험이나 운영 서버 변경은 수행하지 않았다. 후속 구현은 주변 문맥 축소·로컬 변경 목록·일괄 선택 읽기를 먼저 적용했다. 토큰 감소가 실제 완료 시간과 판단 품질을 개선하는지 공급자 사용량과 평가로 확인해야 한다. 임베딩은 준비·추론 시간이 추가되므로 순차 요약을 대체한 뒤 효과가 필요한 경우에 별도로 측정한다.
+The research did not include quality/cost experiments with actual paid models or changes to production servers. The follow-up implementation first applied reduced surrounding context, local change lists, and batched selective reading. Provider usage data and evaluations must confirm whether token reduction improves actual completion time and decision quality. Because embeddings add preparation and inference time, measure them separately if their benefits are needed after replacing sequential summarization.

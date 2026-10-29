@@ -1,71 +1,71 @@
 ---
-title: "이전 Mac/Linux Electron 원격 데스크톱"
+title: "Previous Mac/Linux Electron remote desktop"
 created: 2026-10-01
 updated: 2026-10-01
-description: "Mac/Linux 네이티브 전환 전 Electron 화면 캡처와 OS별 입력·권한·설치·검증 계약을 보존한다. 현재 POSIX 호스트의 기준이 아니다."
+description: "Preserves the Electron screen capture and OS-specific input, permission, installation, and verification contracts from before the Mac/Linux native transition. This is not the current canonical source for POSIX hosts."
 ---
 
-ADR 0188 이전의 계약과 검증 기록이다. 현재 기준은 [네이티브 POSIX 계약](../development/remote-desktop-posix.md)을 따른다.
+These are contracts and verification records from before ADR 0188. The current canonical source is the [native POSIX contract](../development/remote-desktop-posix.md).
 
-## OS 어댑터
+## OS adapters
 
-| 호스트 | 캡처·실행 | 입력 |
+| Host | Capture/execution | Input |
 | --- | --- | --- |
-| macOS 13+, x64/arm64 | 로그인한 Mac의 ScreenCaptureKit + 화면 기록 권한; 초기 실패 시 Chromium | CoreGraphics·손쉬운 사용 권한. modifier flags와 중간 버튼 드래그 유지 |
-| Linux X11, x64/arm64 | 같은 DISPLAY/Xauthority의 Electron | libX11·libXtst/XTest. 누적 휠을 notch로 변환 |
-| Linux Wayland, x64/arm64 | Chromium/PipeWire 화면 공유 승인 | D-Bus RemoteDesktop portal의 별도 입력 승인. XWayland 주입 폴백 없음 |
-| Windows/WSL | 상주 Node + D3D11/Media Foundation 하드웨어 H.264, WSL interop | Windows SendInput·실제 픽셀 커서 위치. Linux 화면 사용 안 함 |
+| macOS 13+, x64/arm64 | ScreenCaptureKit on a logged-in Mac + Screen Recording permission; Chromium on initial failure | CoreGraphics and Accessibility permission. Preserves modifier flags and middle-button dragging |
+| Linux X11, x64/arm64 | Electron using the same DISPLAY/Xauthority | libX11 and libXtst/XTest. Converts accumulated wheel input to notches |
+| Linux Wayland, x64/arm64 | Chromium/PipeWire screen sharing approval | Separate input approval through the D-Bus RemoteDesktop portal. No XWayland injection fallback |
+| Windows/WSL | Persistent Node + D3D11/Media Foundation hardware H.264, WSL interop | Windows SendInput and actual pixel cursor position. Does not use the Linux screen |
 
-Mac/Linux의 Electron 44.3.0 실행 조건은 `runtime-support.mjs`가 소유한다. 설치 전·준비 상태 조회·Mac 권한 준비에서 macOS 13/Darwin 22와 x64/arm64 조건을 확인한다. 미지원 OS에는 재설치를 반복하지 않는다([Electron 44 지원 조건](https://www.electronjs.org/blog/electron-44-0)).
+`runtime-support.mjs` owns the requirements for running Electron 44.3.0 on Mac/Linux. The macOS 13/Darwin 22 and x64/arm64 requirements are checked before installation, during readiness queries, and during Mac permission setup. Installation is not repeatedly attempted on unsupported operating systems ([Electron 44 support requirements](https://www.electronjs.org/blog/electron-44-0)).
 
-`host-permissions.mjs`는 고정 로컬 renderer의 요청·조회 양쪽에서 media·display-capture·직접 WebRTC용 로컬 네트워크 권한만 허용한다. 다른 WebContents·하위 프레임·종료 중 요청과 그 외 권한은 거부한다. OS의 화면 기록·portal 승인과 Electron sandbox·contextIsolation·navigation 차단은 유지한다. `display-capture`는 Chromium이 media와 별도로 검사하는 권한이다([Electron session API](https://github.com/electron/electron/blob/v44.3.0/docs/api/session.md)).
+`host-permissions.mjs` allows only media, display-capture, and local network permissions for direct WebRTC, in both permission requests and checks from the fixed local renderer. It denies requests from other WebContents, subframes, or during shutdown, and denies all other permissions. OS Screen Recording and portal approval requirements, Electron sandboxing, contextIsolation, and navigation blocking remain in place. `display-capture` is a permission Chromium checks separately from media ([Electron session API](https://github.com/electron/electron/blob/v44.3.0/docs/api/session.md)).
 
-Mac의 접속 경로는 손쉬운 사용 권한을 요청 없이 확인하며 부족하면 `desktop-setup`을 안내한다. 종료 시 renderer에 즉시 stop을 보내 영상 track·WebRTC를 먼저 닫고 최대 300ms 동안 완료 응답을 기다린다. 입력 close는 최대 500ms, 네이티브 캡처 close는 병렬로 기다린 뒤 창·임시 프로필·호스트를 종료한다. Linux에서 활성 캡처를 남긴 채 창을 먼저 파괴해 정상 종료가 지연되던 경로를 방지한다. 부모의 강제 종료 상한도 유지한다.
+The Mac connection path checks Accessibility permission without requesting it and directs the user to `desktop-setup` if it is missing. On shutdown, it immediately sends stop to the renderer to close video tracks and WebRTC first, then waits up to 300 ms for a completion response. It waits up to 500 ms for input close and waits for native capture close in parallel, then closes the window, temporary profile, and host. This prevents the Linux path where destroying the window first while capture remained active delayed normal shutdown. The parent's forced termination time limit also remains in place.
 
-Wayland 캡처와 입력 portal의 ScreenCast stream이 같지 않아 절대 좌표를 주입하지 않는다. 조이스틱 상대 이동·클릭·드래그·휠을 사용한다. compositor에 RemoteDesktop portal이 없으면 오류로 종료한다. 키보드 권한을 제외하면 포인터만 사용할 수 있다. PipeWire에서는 OS 선택기가 공유 소스 하나를 반환할 수 있다.
+Absolute coordinates are not injected because the ScreenCast streams for Wayland capture and the input portal differ. Joystick relative movement, clicking, dragging, and scrolling are used. If the compositor lacks a RemoteDesktop portal, it exits with an error. Without keyboard permission, only the pointer is available. With PipeWire, the OS picker may return a single sharing source.
 
-Wayland의 Session Closed·D-Bus 오류·입력 거부는 adapter의 `check()`에 보관한다. 기존 250ms 호스트 watchdog이 이를 확인해 추가 사용자 입력 없이도 세션·영상·입력을 종료한다. portal Close 실패에도 bus를 정리한다. 권한은 승인한 portal 세션 수명에만 유효하다([RemoteDesktop portal 계약](https://flatpak.github.io/xdg-desktop-portal/docs/doc-org.freedesktop.portal.RemoteDesktop.html)).
+Wayland Session Closed events, D-Bus errors, and input denials are stored in the adapter's `check()`. The existing 250 ms host watchdog checks this and terminates the session, video, and input without requiring further user input. The bus is cleaned up even if portal Close fails. Permissions are valid only for the lifetime of the approved portal session ([RemoteDesktop portal contract](https://flatpak.github.io/xdg-desktop-portal/docs/doc-org.freedesktop.portal.RemoteDesktop.html)).
 
-붙여넣기는 사용자가 제출한 최대 4096자만 서버 클립보드에 쓰고 Ctrl+V/Mac Cmd+V를 보낸다. 양방향 클립보드 동기화·오디오·파일 전송은 구현하지 않는다. 로컬 Esc는 보조 창·전체화면·뷰어 순으로 닫으며 도구의 원격 Esc로 키를 전달한다.
+Paste writes only the user-submitted text, up to 4096 characters, to the server clipboard and sends Ctrl+V/Mac Cmd+V. Bidirectional clipboard synchronization, audio, and file transfer are not implemented. Local Esc closes auxiliary windows, fullscreen, and the viewer in that order; use Remote Esc in the tools to send the key remotely.
 
-## macOS 캡처·설치 계약
+## macOS capture and installation contract
 
-### Mac 터미널 권한 준비
+### Mac terminal permission preparation
 
-`permissions.mjs`는 macOS에서만 `/dev/console` 소유 UID와 현재 비-root UID가 같은지 확인하고, 실제 원격 연결과 같은 설치 경로의 Electron 실행 파일로 `permissions-host.mjs`를 실행한다. 다른 OS에서는 권한 helper를 실행하지 않는다. 실행 인자는 고정된 check/accessibility/screen 중 하나이며 셸로 감싸지 않는다. `NODE_OPTIONS`와 `ELECTRON_RUN_AS_NODE`를 제거하고 고유 임시 프로필을 사용한다. 앱 바이너리·서명·권한 DB는 수정하지 않는다.
+Only on macOS, `permissions.mjs` checks that the owner UID of `/dev/console` matches the current non-root UID, then runs `permissions-host.mjs` with the Electron executable from the same installation path used for actual remote connections. It does not run the permission helper on other operating systems. The execution argument is fixed to one of check/accessibility/screen and is not wrapped in a shell. It removes `NODE_OPTIONS` and `ELECTRON_RUN_AS_NODE` and uses a unique temporary profile. It does not modify app binaries, signatures, or the permission database.
 
-helper는 `systemPreferences.isTrustedAccessibilityClient`와 `getMediaAccessStatus('screen')`로 확인하고, 누락된 권한만 `isTrustedAccessibilityClient(true)` 또는 CoreGraphics의 `CGRequestScreenCaptureAccess`로 요청한다. 해당 Privacy 설정 URL을 열며 화면 목록·캡처·입력 어댑터·renderer는 만들지 않는다. 설정을 여는 것은 승인이 아니며 granted 상태 확인만 완료로 취급한다. 파일 설치 마커와 권한 상태는 분리한다.
+The helper checks permissions with `systemPreferences.isTrustedAccessibilityClient` and `getMediaAccessStatus('screen')` and requests only missing permissions using `isTrustedAccessibilityClient(true)` or CoreGraphics `CGRequestScreenCaptureAccess`. It opens the corresponding Privacy settings URL without creating a screen list, capture, input adapter, or renderer. Opening settings does not grant permission; only confirmation of the granted state counts as completion. File installation markers and permission state are kept separate.
 
-손쉬운 사용 후 화면 기록 순서로 각 권한을 한 번만 요청하고, 최대 5분 동안 2초 간격(프로세스 실행 시간 별도)으로 **새 Electron 프로세스**에서 재확인한다. 앱 실행 중 권한 캐시·OS의 종료 및 다시 열기를 고려한 경로다([Electron 권한 API](https://www.electronjs.org/docs/latest/api/system-preferences)). 상태 조회는 10초, 요청은 30초 상한이며 남은 전체 예산을 넘기지 않는다. 요청 표시 후 OS 종료/시간 초과는 다음 상태 확인으로 넘기되 완료로 기록하지 않는다. 정책 제한·조회 실패·전체 대기 만료는 오류다. 같은 명령의 재실행은 OS 상태를 다시 읽는다.
+It requests each permission only once, Accessibility first and then Screen Recording, and rechecks in a **new Electron process** at 2-second intervals for up to 5 minutes (excluding process execution time). This path accounts for permission caching while the app is running and the OS requirement to quit and reopen ([Electron permission API](https://www.electronjs.org/docs/latest/api/system-preferences)). Status queries have a 10-second limit and requests a 30-second limit, without exceeding the remaining overall budget. OS termination/timeouts after displaying a request are deferred to the next status check and are not recorded as completion. Policy restrictions, query failures, and expiration of the overall wait are errors. Rerunning the same command reads the OS state again.
 
-Ctrl+C·SIGTERM은 AbortSignal로 현재 자식과 대기를 취소하고 130/143으로 종료한다. 자식 종료를 확인한 후 임시 프로필을 정리한다. helper도 stdin EOF·오류·35초 watchdog에서 종료한다. 서버나 이미 실행 중인 원격 세션을 종료하지 않으며 공개 포트·백그라운드 서비스도 추가하지 않는다.
+Ctrl+C and SIGTERM use AbortSignal to cancel the current child process and wait, then exit with 130/143. Temporary profiles are cleaned up after confirming child process termination. The helper also exits on stdin EOF, errors, or its 35-second watchdog. It does not terminate the server or existing remote sessions, or add public ports or background services.
 
-검증은 `server/remote-desktop-permissions.test.ts`의 승인 순서·기존 승인·거부·제한·로그인 불일치·취소·경로/환경·실제 자식 프로세스 종료·모사 Electron API·셸 흐름 12개 테스트로 수행했다. 실제 Mac은 사용할 수 없어 OS 권한창, TCC의 실제 앱 식별·권한 유지와 승인 후 실제 캡처는 미검증이다. Mac에서 미승인 상태 → 설정 표시 → 승인 → 완료 → 실제 연결, 재실행 시 요청 생략을 별도로 확인해야 한다.
+Verification used 12 tests in `server/remote-desktop-permissions.test.ts` covering approval order, existing approvals, denial, restrictions, login mismatch, cancellation, paths/environment, actual child process termination, simulated Electron APIs, and shell flow. No actual Mac was available, so OS permission dialogs, TCC's actual app identification and permission persistence, and actual capture after approval are unverified. On a Mac, separately verify the sequence from unapproved → settings displayed → approval → completion → actual connection, and that requests are skipped on rerun.
 
-### 캡처 모듈
+### Capture module
 
-[ADR 0148](decisions/0148-mew-macos-local-cursor.md)에 따라 자체 `capture-macos.m` 모듈을 사용한다. ScreenCaptureKit API와 모듈의 배포 target은 macOS 12.3 이상이지만, 현재 전체 보조앱은 Electron 44의 요구 조건에 따라 **macOS 13 이상**에서 지원한다. 별도 서비스·계정·공개 포트를 추가하지 않는다.
+Uses the custom `capture-macos.m` module according to [ADR 0148](decisions/0148-mew-macos-local-cursor.md). The ScreenCaptureKit API and module deployment target are macOS 12.3 or later, but the complete helper app currently supports **macOS 13 or later** according to Electron 44 requirements. It adds no separate services, accounts, or public ports.
 
-- `install-macos.mjs`가 helper 준비 중 `/usr/bin/xcrun --sdk macosx clang`으로 현재 Node CPU(Apple Silicon arm64 또는 Intel x64)의 dylib를 컴파일한다. Apple Command Line Tools와 ScreenCaptureKit을 포함한 SDK가 필요하다. `codesign`의 로컬 ad-hoc 서명·검증 후 임시 파일을 원자적으로 교체한다. 컴파일/서명 실패는 준비 실패이며 `.mew-ready`를 만들지 않는다. CLT 설치·업데이트 후 다시 연결한다. 바이너리는 저장소 밖 설치 산출물이며 소스·헤더·설치 스크립트는 `HELPER_FILES`에 포함한다.
-- `capture-macos.mjs`가 기존 Koffi로 작은 C ABI를 호출한다. ScreenCaptureKit 비동기 콜백은 Objective-C 내부 queue에서 처리한다. Electron main도 라이브러리를 유지하여 worker 종료 후 도착한 native stop completion이 해제된 코드에 접근하지 않게 한다. 시작 도중 닫기는 시작 completion 이후 stream까지 종료한다.
-- Electron의 `display_id`를 `CGDirectDisplayID`와 맞추고 CoreGraphics의 논리 bounds를 확인한다. 화면은 배율을 반영하되 OS 변환 단계에서 최대 1920×1080의 짝수 크기·60Hz·BGRA로 제한한다. 입력·포인터 정규화는 논리 좌표를 사용하므로 Retina 및 음수 원점의 두 번째 화면에서 픽셀 배율을 중복 적용하지 않는다. 회전 화면도 화면 bounds의 종횡비를 사용한다.
-- `SCStreamConfiguration.showsCursor = NO`, `queueDepth = 3`으로 화면에서 커서를 제외한다. native queue는 최신 미소비 CVPixelBuffer 하나만 보관하고 이전 surface를 해제한다. worker가 요청하면 행 stride를 반영해 이전 화면과 비교하고 변경분이 있을 때만 V8 소유 버퍼에 전체 화면을 복사한다. 유휴 상태는 픽셀 없이 응답하며 기존 생성 track·VP8·직접 WebRTC를 사용한다. GPU→CPU 복사는 남으며 zero-copy나 하드웨어 VP8 인코딩을 보장하지 않는다.
-- `CGEventGetLocation`의 전역 위치와 `CGCursorIsVisible`을 읽고 AppKit main queue에서 `NSCursor.currentSystemCursor`의 모양·hotspot을 최대 30Hz 확인한다. 이미지는 논리 크기의 premultiplied BGRA, 최대 128×128로 제한하고 변경 시에만 PNG로 전송한다. 현재 OS에서 시스템 모양 조회가 nil이면 시스템 화살표를 사용한다. `currentSystemCursor`와 `CGCursorIsVisible`은 deprecated 공개 API이며 최신 macOS에서 커서 모양·숨김 상태 실기 확인이 필요하다. 비공개 API나 전역 hide/show는 쓰지 않는다.
-- 첫 화면을 확보하기 전에는 커서 모양을 소비하지 않는다. 약 3초의 초기 프레임 probe에 성공해야 로컬 커서를 켠다. 초기 API/권한/화면 실패는 Chromium 영상 커서로 복귀하며 도움말에 실제 모드를 표시한다. 실행 중 stream 종료·blank/suspended/stopped·권한/활성 사용자/디스플레이 bounds·화면 크기·회전 변화는 오류로 종료한다. 연결 중 idle sleep을 막는 activity는 close 때 해제한다. 잠금·수동 절전·로그인 전 화면은 지원하지 않는다.
+- During helper preparation, `install-macos.mjs` compiles a dylib for the current Node CPU (Apple Silicon arm64 or Intel x64) using `/usr/bin/xcrun --sdk macosx clang`. Apple Command Line Tools and an SDK containing ScreenCaptureKit are required. After local ad-hoc signing and verification with `codesign`, it atomically replaces the temporary file. Compilation/signing failure is a preparation failure, and `.mew-ready` is not created. Reconnect after installing or updating CLT. The binary is an installation artifact outside the repository; source, headers, and installation scripts are included in `HELPER_FILES`.
+- `capture-macos.mjs` calls a small C ABI through the existing Koffi dependency. ScreenCaptureKit asynchronous callbacks are handled on an internal Objective-C queue. Electron main also retains the library so native stop completion arriving after worker termination cannot access unloaded code. Closing during startup also stops the stream after startup completion.
+- Matches Electron's `display_id` to `CGDirectDisplayID` and checks CoreGraphics logical bounds. The screen reflects scaling, but the OS conversion stage limits it to even dimensions of at most 1920×1080, 60 Hz, and BGRA. Input and pointer normalization use logical coordinates, so pixel scaling is not applied twice on Retina displays or a second display with a negative origin. Rotated displays also use the aspect ratio of the display bounds.
+- `SCStreamConfiguration.showsCursor = NO` and `queueDepth = 3` exclude the cursor from the screen. The native queue retains only the latest unconsumed CVPixelBuffer and releases the previous surface. When the worker requests it, the screen is compared with the previous one accounting for row stride, and the full screen is copied into a V8-owned buffer only when changes exist. Idle responses contain no pixels and use the existing generated track, VP8, and direct WebRTC. GPU→CPU copies remain; zero-copy or hardware VP8 encoding is not guaranteed.
+- Reads the global position from `CGEventGetLocation` and reads `CGCursorIsVisible`, then checks the shape and hotspot of `NSCursor.currentSystemCursor` on the AppKit main queue at up to 30 Hz. Images use premultiplied BGRA at logical size, limited to 128×128, and are sent as PNG only when changed. If querying the system shape returns nil on the current OS, the system arrow is used. `currentSystemCursor` and `CGCursorIsVisible` are deprecated public APIs; cursor shape and visibility require hardware verification on current macOS. No private APIs or global hide/show are used.
+- Cursor shapes are not consumed before the first screen is obtained. The local cursor is enabled only after an initial frame probe of approximately 3 seconds succeeds. Initial API/permission/display failures fall back to the Chromium video cursor, and help shows the actual mode. During execution, stream termination, blank/suspended/stopped states, or changes in permissions, active user, display bounds, screen dimensions, or rotation cause termination with an error. The activity preventing idle sleep while connected is released on close. Lock screens, manual sleep, and pre-login screens are unsupported.
 
-근거: [ScreenCaptureKit 소개](https://developer.apple.com/videos/play/wwdc2022/10156/), [프레임 상태](https://developer.apple.com/documentation/screencapturekit/scframestatus), [커서 제외](https://developer.apple.com/documentation/screencapturekit/scstreamconfiguration/showscursor), [시스템 커서](https://developer.apple.com/documentation/appkit/nscursor/currentsystem).
+Sources: [Introduction to ScreenCaptureKit](https://developer.apple.com/videos/play/wwdc2022/10156/), [Frame status](https://developer.apple.com/documentation/screencapturekit/scframestatus), [Cursor exclusion](https://developer.apple.com/documentation/screencapturekit/scstreamconfiguration/showscursor), [System cursor](https://developer.apple.com/documentation/appkit/nscursor/currentsystem).
 
-## 검증
+## Verification
 
-상주 호스트 테스트는 캡처 없는 예열, 종료 확인 후 프로세스 재사용, 오래된 세션의 응답·kill 격리, 종료 확인 실패의 lease 대기, 시작 실패 재시도를 확인한다. WebSocket 테스트는 인증 회수·단일 제어권과 relay/relay-input/frame-ack 거부를 확인한다. 기존 합성 Chromium 테스트는 직접 WebRTC 영상·모바일 입력을 검사한다.
+Persistent host tests verify warmup without capture, process reuse after confirmed termination, isolation of responses and kills from old sessions, lease waiting when termination confirmation fails, and retries after startup failure. WebSocket tests verify authentication revocation, exclusive control, and rejection of relay/relay-input/frame-ack. Existing synthetic Chromium tests check direct WebRTC video and mobile input.
 
-알림 검사는 첫 디코드와 두 입력 채널의 준비 전 전송 금지, 연결당 한 번 표시, 재접속, 종료 후 응답 무시, OS 알림 오류 격리를 확인한다. 합성 Chromium 검사는 실제 WebRTC의 reliable 채널에서 호스트 알림 신호를 확인하며 OS 팝업 자체는 따로 실기 확인한다.
+Notification checks verify that sending is blocked until the first decode and both input channels are ready, display occurs once per connection, reconnection works, responses after termination are ignored, and OS notification errors are isolated. Synthetic Chromium checks verify the host notification signal over an actual WebRTC reliable channel; the OS popup itself is checked separately on actual hardware.
 
-2026-10-01 알림·연결 준비·설치·WebSocket·입력·합성 Chromium 검사 54개와 Windows 네이티브 컴파일을 통과했다. 격리된 Windows Node에서 알림 시작·취소를 32회 반복한 뒤 프로세스 핸들 수가 증가하지 않음을 확인했다. 실제 로그인 화면의 Windows 팝업과 Mac/Linux의 OS 알림 표시는 사용자 적용 후 확인할 항목이다.
+On 2026-10-01, 54 notification, connection readiness, installation, WebSocket, input, and synthetic Chromium checks and Windows native compilation passed. In an isolated Windows Node process, notification startup and cancellation were repeated 32 times, with no increase in the process handle count. Windows popups on the actual logged-in screen and Mac/Linux OS notification display remain items to verify after the user applies the changes.
 
-같은 날 Mac/Linux 보완은 OS별 설치·권한 제한·입력·준비·알림 검사 40개와 합성 Chromium UI 검사 2개를 통과했다. 별도 Linux 프로세스의 실제 Electron·X11 캡처/XTest 입력·Chromium 직접 WebRTC 검사도 통과했다. 첫 영상·두 입력 채널·연결당 한 번의 D-Bus 알림 요청·키/버튼 주입·인증 회수 후 해제·정상 종료 코드 0·재접속·뷰어 닫기 후 정상 종료·서버 영상 중계 없음까지 확인했다. Xvfb와 별도 D-Bus 알림 서비스에서 검사했으므로 물리 GPU 성능·실제 데스크톱 알림 팝업의 확인은 포함하지 않는다. Mac ScreenCaptureKit 실기 검사는 실행 환경이 없어 건너뛰었으며, 실제 Mac TCC·알림과 Wayland compositor의 승인/회수 검증도 남아 있다.
+On the same day, the Mac/Linux improvements passed 40 OS-specific installation, permission restriction, input, readiness, and notification checks and 2 synthetic Chromium UI checks. Actual Electron, X11 capture/XTest input, and Chromium direct WebRTC checks in a separate Linux process also passed. Verification covered the first video, both input channels, one D-Bus notification request per connection, key/button injection, release after authentication revocation, normal exit code 0, reconnection, normal exit after closing the viewer, and absence of server video relay. Testing used Xvfb and a separate D-Bus notification service, so it did not include physical GPU performance or actual desktop notification popups. Mac ScreenCaptureKit hardware tests were skipped because no execution environment was available; actual Mac TCC/notifications and Wayland compositor approval/revocation verification also remain outstanding.
 
-Linux 실기 경로 검사는 `server/remote-desktop-linux.test.ts`의 opt-in이다. 별도 helper 복사본에 의존성·Electron을 설치하고, Xvfb·xauth·dbus-run-session·libX11·libXtst 및 테스트용 Chromium을 준비한다. 아래 명령은 실제 사용자 데스크톱 대신 전용 Xvfb·D-Bus에서만 입력한다. 영상은 메모리에만 받고 운영 helper·서버는 변경하지 않는다.
+Linux hardware-path testing is opt-in through `server/remote-desktop-linux.test.ts`. Install dependencies and Electron in a separate helper copy, and prepare Xvfb, xauth, dbus-run-session, libX11, libXtst, and a test Chromium installation. The commands below inject input only into dedicated Xvfb/D-Bus sessions, rather than the actual user desktop. Video is received only in memory, and the production helper and server are not modified.
 
 ```bash
 env -u WAYLAND_DISPLAY -u ELECTRON_RUN_AS_NODE \

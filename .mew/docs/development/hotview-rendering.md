@@ -1,52 +1,52 @@
 ---
-title: "Hotview 입력·블록 렌더링 계약"
-description: "Hotview의 블록별 Markdown 직렬화·줄 번호 캐시, Pretext 높이 예측과 화면 밖 DOM 자리표시자, 파일 링크 경계 입력과 선택·협업·탐색·글꼴 변경의 보존 범위 및 검증 방법을 정의한다."
+title: "Hotview Input and Block Rendering Contract"
+description: "Defines Hotview's per-block Markdown serialization and line number caches, Pretext height prediction and offscreen DOM placeholders, preservation guarantees for file link boundary input, selection, collaboration, navigation, and font changes, and verification methods."
 created: 2026-10-19
 updated: 2026-10-19
 ---
 
-# Hotview 입력·블록 렌더링 계약
+# Hotview Input and Block Rendering Contract
 
-Hotview는 전체 ProseMirror 문서와 기존 Markdown 저장 형식을 유지하면서 변경한 블록의 계산과 화면에 표시할 DOM을 분리한다. [도입 결정](../decisions/0016-hotview-pretext-windowing.md)과 [도입 전 측정](../research/editor-input-performance.md)을 근거로 한다. 성능 비교와 검증 결과는 [도입 후 측정](../research/hotview-pretext-performance.md)에 둔다.
+Hotview separates computation for changed blocks from the DOM displayed onscreen while retaining the full ProseMirror document and existing Markdown storage format. It is based on the [adoption decision](../decisions/0016-hotview-pretext-windowing.md) and [pre-adoption measurements](../research/editor-input-performance.md). Performance comparisons and verification results are kept in [post-adoption measurements](../research/hotview-pretext-performance.md).
 
-## 입력과 직렬화
+## Input and Serialization
 
-[IncrementalMarkdown](../../../packages/editor/src/editor/incrementalMarkdown.ts)은 `tiptap-markdown` 초기화 다음에 설치한다. 기존 노드·마크 렌더러와 상태 생성자를 사용하며, 비공개 패키지 경로를 import하거나 Markdown 규칙을 별도로 복제하지 않는다.
+[IncrementalMarkdown](../../../packages/editor/src/editor/incrementalMarkdown.ts) is installed after `tiptap-markdown` initialization. It uses the existing node and mark renderers and state constructor, without importing private package paths or separately duplicating Markdown rules.
 
-- ProseMirror의 변경되지 않은 최상위 노드와 블록 경계 상태를 캐시한다. 문단 하나를 수정하면 해당 블록과 경계가 바뀐 이웃만 다시 직렬화한다. 노드당 경계 변형은 최대 8개다.
-- 완성한 문서 문자열은 최근 문서 하나만 보관한다. 같은 문서를 여러 번 조회할 때 전체 출력을 다시 만들지 않는다.
-- 인접 목록의 구분, 빈 문단과 마지막 줄바꿈, 코드·표·HTML 저장 형식을 유지한다. 앞선 출력까지 수정하는 커스텀 렌더러는 기존 전체 직렬화로 되돌아간다.
-- 클립보드의 `Fragment`는 기존 직렬화 경로를 유지한다. 선택 줄 범위를 요청할 때는 완성한 앞 블록을 재사용하고 해당 블록의 접두어만 렌더링한다.
-- `onUpdate`의 저장 통지는 계속 동기적으로 전달한다. 저장을 지연하거나 입력 일부를 버리는 방식으로 지연을 숨기지 않는다. React가 방금 내보낸 본문을 돌려줄 때 재직렬화를 생략한다. 링크 양옆의 브라우저 커서를 맞추는 가벼운 transaction은 유지하며, 이때 줄 번호·본문 분석은 캐시를 재사용한다.
-- [파일 링크 경계](../../../packages/editor/src/editor/file-link.ts)의 커서 위젯 안에서 발생하는 취소 가능한 비조합 `insertText`는 `beforeinput`에서 모델 transaction으로 반영한다. ProseMirror가 무시하는 위젯 DOM에만 글자가 남는 입력 손실을 막고, 위젯의 제로폭 문자를 원문에 넣지 않는다. 조합 중이거나 읽기 전용인 입력에는 이 처리를 적용하지 않는다.
+- Caches unchanged top-level ProseMirror nodes and block boundary state. Editing one paragraph reserializes only that block and neighbors whose boundaries changed. Each node has at most 8 boundary variants.
+- Retains the completed document string for only the most recent document. Repeated queries for the same document do not rebuild the entire output.
+- Preserves separation between adjacent lists, empty paragraphs and the final newline, and storage formats for code, tables, and HTML. Custom renderers that also modify preceding output fall back to the existing full serialization.
+- Clipboard `Fragment` retains the existing serialization path. When a selected line range is requested, completed preceding blocks are reused and only the prefix of the relevant block is rendered.
+- `onUpdate` save notifications continue to be delivered synchronously. Latency is not hidden by delaying saves or dropping some input. Reserialization is skipped when React returns the body just emitted. Lightweight transactions that align the browser cursor on either side of links are retained, and line number and body analysis reuse caches during these transactions.
+- Cancelable, non-composition `insertText` occurring inside the cursor widget at a [file link boundary](../../../packages/editor/src/editor/file-link.ts) is applied as a model transaction in `beforeinput`. This prevents input loss where characters remain only in widget DOM ignored by ProseMirror, and keeps the widget's zero-width characters out of the source. This handling does not apply during composition or to read-only input.
 
-[LineFocus](../../../packages/editor/src/editor/lineFocus.ts)는 줄 번호를 plugin state에 저장한다. 처음 읽은 원문은 Markdown line map으로 간격·주석·빈 줄을 반영하고, 편집 후에는 캐시된 블록의 원문 기여분으로 번호를 갱신한다. 커서 이동과 viewport 갱신은 번호 분석을 다시 수행하지 않는다. 외부 본문 교체는 모델이나 저장 문자열이 같아도 명시적인 `source` 메타데이터로 원문 매핑을 초기화한다. 로컬 echo와 속성 행 수 변경에는 `offset` 메타데이터를 전달해 기존 본문 캐시를 재사용한다.
+[LineFocus](../../../packages/editor/src/editor/lineFocus.ts) stores line numbers in plugin state. Initially loaded source uses a Markdown line map to account for spacing, comments, and blank lines; after edits, numbers are updated using cached blocks' contributions to the source. Cursor movement and viewport updates do not rerun line number analysis. External body replacement resets source mapping with explicit `source` metadata even if the model or saved string is identical. Local echoes and changes to the number of property rows pass `offset` metadata to reuse the existing body cache.
 
-## Pretext와 DOM 표시 범위
+## Pretext and the DOM Display Range
 
-[VirtualBlocks](../../../packages/editor/src/editor/virtualBlocks.ts)는 최상위 블록이 120개 이상이면 화면 높이와 위아래 700px 여유 범위를 사용한다. 처음 EditorView를 생성할 때부터 화면 밖 블록의 편집 DOM을 생성하지 않는다.
+[VirtualBlocks](../../../packages/editor/src/editor/virtualBlocks.ts) uses the screen height plus an overscan of 700px above and below when there are at least 120 top-level blocks. Editing DOM for offscreen blocks is omitted starting with initial EditorView creation.
 
-화면 밖 블록은 `contentDOM` 없는 높이 자리표시자다. 모델을 잘라내거나 Yjs 문서에서 노드를 제거하지 않는다. 각 최상위 블록의 자리표시자 하나는 남으므로 전체 DOM 개수가 문서 길이와 완전히 무관해지는 구조는 아니다.
+Offscreen blocks are height placeholders without `contentDOM`. The model is not truncated, and nodes are not removed from the Yjs document. One placeholder remains for each top-level block, so the total DOM count is not completely independent of document length.
 
-[Pretext 1.0.0](https://github.com/chenglou/pretext)의 `prepare`·`layout`과 rich inline API로 문단·제목의 높이를 예측한다. 준비 결과는 노드와 글꼴·자간·줄바꿈 설정에 연결하고, 너비 변경에는 준비 결과를 재사용한다. 코드·링크 등의 인라인 차이를 반영하되 표·미디어·복잡한 블록의 최초 높이는 추정치다. 표시 후 실제 높이와 margin을 측정해 보정한다.
+Uses `prepare`, `layout`, and the rich inline API from [Pretext 1.0.0](https://github.com/chenglou/pretext) to predict paragraph and heading heights. Preparation results are associated with nodes and font, letter spacing, and line wrapping settings, and are reused when width changes. Inline differences such as code and links are reflected, but initial heights for tables, media, and complex blocks are estimates. Actual heights and margins are measured after display to correct them.
 
-스크롤과 resize 처리는 프레임 단위로 합친다. 실제 높이를 측정하고 첫 가시 블록을 기준으로 위치를 보정해 스크롤 점프를 줄인다. 글꼴 로드·너비·테마 변경은 높이 캐시를 갱신한다. 노드마다 문서 시작부터 위치를 재탐색하지 않으며, 줄 번호와 파일 링크 커서의 ProseMirror 장식도 표시 범위로 제한한다. 같은 노드 객체를 공유하는 드래그 복사본도 DOM·유지 범위는 문서 위치별로 구분한다.
+Scroll and resize handling is batched per frame. Actual heights are measured, and positions are corrected relative to the first visible block to reduce scroll jumps. Font loading, width changes, and theme changes update the height cache. Positions are not searched again from the document start for each node, and ProseMirror decorations for line numbers and file link cursors are also limited to the display range. Drag copies sharing the same node object also have separate DOM and retention ranges for each document position.
 
-## 편집·탐색 보존
+## Preserving Editing and Navigation
 
-- 커서가 있는 블록과 선택 범위 전체는 계속 마운트한다. 긴 범위 선택이나 전체 선택은 복사·브라우저 선택의 정확성을 위해 많은 DOM을 만들 수 있다.
-- DB 셀·제목 등 별도 입력창에 포커스가 있으면 해당 블록도 유지해 저장 전 초안을 보존한다. 재생 중인 HTML 오디오·영상도 유지하며, 포커스·재생이 끝나면 표시 범위를 다시 계산한다.
-- IME 조합 중인 위치는 transaction mapping으로 추적하고 조합이 끝날 때까지 유지한다. 실제 OS 한글 키보드의 전체 조합 동작은 실기 확인 대상이다.
-- 표시하는 블록은 기존 코드·표·이미지·미디어 노드뷰를 사용한다. 숨길 때 기존 뷰를 정리하고 다시 표시하면 생성한다. 일시정지된 영상·오디오의 재생 위치와 포커스 없는 iframe 내부 상태는 보존하지 않는다.
-- 목차·검색·Plain에서 Hotview로 돌아오는 원문 줄 탐색은 DOM 전체 검색에 의존하지 않는다. 모델 위치를 찾고 `materializeVirtualPosition`으로 대상 블록을 만든 뒤 좌표를 조회한다.
-- undo·redo와 Yjs 협업은 전체 문서를 대상으로 한다. 표시 범위 변경 transaction은 저장·실행 취소 이력에 넣지 않는다.
-- 편집기를 닫으면 RAF·scroll/resize·글꼴·테마·composition·포커스·재생 관찰자를 정리한다.
+- The block containing the cursor and the entire selection remain mounted. Long range selections or Select All can create substantial DOM to ensure accurate copying and browser selection.
+- When a separate input such as a DB cell or title has focus, its block is also retained to preserve the unsaved draft. Playing HTML audio and video are also retained, and the display range is recalculated when focus or playback ends.
+- The position undergoing IME composition is tracked through transaction mapping and retained until composition ends. Full composition behavior with an actual OS Korean keyboard requires hands-on verification.
+- Displayed blocks use the existing code, table, image, and media node views. Existing views are cleaned up when hidden and recreated when displayed again. Playback positions of paused video and audio and internal state of unfocused iframes are not preserved.
+- Source line navigation from the table of contents, search, or a return from Plain to Hotview does not depend on searching the entire DOM. It finds the model position, creates the target block with `materializeVirtualPosition`, and then queries its coordinates.
+- Undo, redo, and Yjs collaboration operate on the entire document. Transactions that change the display range are excluded from save and undo history.
+- Closing the editor cleans up RAF, scroll/resize, font, theme, composition, focus, and playback observers.
 
-최상위 블록 하나인 거대한 목록이나 표의 내부 항목·행은 별도로 가상화하지 않는다. 브라우저 자체의 페이지 찾기는 마운트한 텍스트만 볼 수 있으므로 문서 전체 찾기는 Mew의 문서 검색을 사용한다. 화면 밖 텍스트는 접근성 트리에도 상주하지 않는다.
+Items and rows inside a huge list or table that forms a single top-level block are not virtualized separately. The browser's built-in Find in Page can see only mounted text, so use Mew's document search to search the entire document. Offscreen text also does not remain in the accessibility tree.
 
-## 검증
+## Verification
 
-검증은 앱을 빌드하거나 서버를 시작하지 않는 격리 fixture에서 수행한다.
+Verification runs in isolated fixtures without building the app or starting a server.
 
 ```bash
 node --test packages/editor/src/editor/incrementalMarkdown.test.ts packages/editor/src/editor/lineFocus.test.ts packages/editor/src/editor/virtualBlocks.test.ts
@@ -54,4 +54,4 @@ node --test server/editor-virtual-blocks-ui.test.ts
 MEW_BENCH_SAMPLES=20 node server/editor-performance-benchmark.mjs
 ```
 
-단위 검사는 기존 native serializer와의 완전 일치, 변경 블록 재계산, 줄 번호 보존, 표시 범위와 선택·IME·포커스·재생 위치·정리, 동일 노드 객체 복사본의 위치 구분을 확인한다. UI 검사는 데스크톱·모바일과 로컬·Yjs 편집에서 숨긴 블록의 입력·undo·복사·목차·검색·원문 줄 탐색·표·이미지 노드뷰 복원과 DB 제목 초안의 스크롤 중 보존·blur 저장을 확인한다. 성능 수치는 합성 Markdown의 ASCII 입력 기준이며 현장 INP나 모바일 실기 성능을 보장하지 않는다.
+Unit tests verify exact matches with the existing native serializer, changed-block recomputation, line number preservation, display ranges, selection, IME, focus, playback positions, cleanup, and position distinctions between copies of the same node object. UI tests verify input, undo, copying, table of contents, search, source line navigation, restoration of table and image node views for hidden blocks, and preservation of DB title drafts while scrolling and saving on blur, across desktop and mobile and local and Yjs editing. Performance figures are based on ASCII input in synthetic Markdown and do not guarantee field INP or performance on actual mobile devices.

@@ -1,26 +1,26 @@
 ---
-title: "모바일 독의 패널 전환과 본문의 탭 전환 분리"
-description: "독 스와이프를 인접 패널 전환으로 바꾸고 모바일 본문 스와이프는 탭 전환에 사용한다. 일반 파일·Markdown Plain은 가로 스크롤 보존을 위해 보조키바에서만 탭을 전환하기로 한 결정이다."
+title: "Separate panel switching in the mobile dock from tab switching in panel content"
+description: "Change dock swipes to switch to adjacent panels and use mobile content swipes to switch tabs. This decision restricts tab switching for regular files and Markdown Plain to the auxiliary key bar to preserve horizontal scrolling."
 created: "2026-10-27"
 updated: "2026-10-27"
 ---
 
-상태: 채택
+Status: Adopted
 
-## 배경
+## Background
 
-독 스와이프는 현재 패널에 탭이 있으면 탭을 먼저 전환했다. 사용자가 독에서는 패널을 바꾸고 패널 본문에서는 탭을 바꾸도록 요청했다. 일반 파일·Markdown Plain은 긴 줄의 가로 스크롤과 탭 전환을 구분해야 하며, 기존 Plain 편집기에는 보조키바가 없었다.
+Dock swipes previously switched tabs first if the current panel had tabs. The user requested switching panels in the dock and tabs in panel content. Regular files and Markdown Plain need to distinguish horizontal scrolling of long lines from tab switching, and the existing Plain editor had no auxiliary key bar.
 
-## 결정
+## Decision
 
-독 스와이프는 표시 중인 독 순서로 인접 패널을 선택한다. 모바일 본문 스와이프는 현재 패널의 탭을 선택한다. Markdown Hotview 외의 에디터는 보조키바에서 시작한 스와이프만 탭 전환으로 처리하며 Plain에도 공용 보조키바를 제공한다.
+Dock swipes select adjacent panels in the displayed dock order. Mobile content swipes select tabs in the current panel. Editors other than Markdown Hotview treat only swipes starting on the auxiliary key bar as tab switches, and Plain also receives the shared auxiliary key bar.
 
-탭 줄·팝업·태스크 삭제·간트 스크롤과 일정 드래그 등 별도 제스처 영역은 기존 처리를 유지한다. 여러 손가락과 취소된 터치는 탭을 전환하지 않는다. 구체적인 거리·방향·취소 기준은 [공용 UI 계약](../development/ui-contracts.md#모바일-독과-패널-전환), 기능 범위는 [패널 배치·모바일](../features/%ED%99%94%EB%A9%B4%C2%B7%EA%B3%84%EC%A0%95%C2%B7%EC%9A%B4%EC%98%81/%ED%8C%A8%EB%84%90%20%EB%B0%B0%EC%B9%98%C2%B7%EB%AA%A8%EB%B0%94%EC%9D%BC%C2%B7%EC%83%81%ED%83%9C%20%EB%B3%B5%EC%9B%90.md)이 소유한다.
+Keep existing handling for separate gesture areas such as tab rows, popups, task deletion, Gantt scrolling, and schedule dragging. Multitouch and canceled touches do not switch tabs. The [shared UI contract](../development/ui-contracts.md#mobile-dock-and-panel-switching) owns specific distance, direction, and cancellation criteria, and [panel layout and mobile](../features/appearance-accounts-operations/panel-layout-mobile-and-state-restoration.md) owns feature scope.
 
-## 대안과 근거
+## Alternatives and Rationale
 
-독의 탭 우선 전환을 유지하면 패널과 탭의 제스처가 요청한 구분과 달라진다. 화면 높이로 탭·패널 전환 구역을 나누면 긴 줄의 가로 스크롤을 특정 높이에서만 사용할 수 있다. 터치 시작 요소로 구분하면 본문 전체의 가로 스크롤을 보존하면서 보조키바에서 탭을 전환할 수 있다.
+Keeping tab-first switching in the dock would make panel and tab gestures differ from the requested distinction. Dividing tab and panel switching areas by screen height would allow horizontal scrolling of long lines only at certain heights. Distinguishing gestures by the element where the touch starts preserves horizontal scrolling throughout the content while allowing tab switching on the auxiliary key bar.
 
-## 영향
+## Impact
 
-2026-10-03부터 제공하던 독 탭 우선 전환을 대체한다. 기존 독 순서·표시·권한 필터·패널 방문 이력과 탭 순환·선택 보존을 재사용하며 저장 형식은 바꾸지 않는다. 검증 결과와 운영 미적용 범위는 [작업 기록](../work/mobile-panel-swipes.md)에 남긴다.
+Replace dock tab-first switching provided since 2026-10-03. Reuse existing dock order, visibility, permission filters, panel visit history, tab cycling, and selection preservation without changing the storage format. Record verification results and the scope not applied to production in the [work record](../work/mobile-panel-swipes.md).

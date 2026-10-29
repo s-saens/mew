@@ -1,35 +1,35 @@
 ---
-provenance: "Liiiiv 중앙 ADR 이관본, 2026-10-14"
-description: "이관한 결정 기록: /clear는 프롬프트 큐의 세션 경계다. 당시 선택·근거·후속 변경을 보존하며 현재 계약은 Mew 소유 문서에서 확인한다."
-title: "0103 — /clear는 프롬프트 큐의 세션 경계다"
+provenance: "Migrated copy of a Liiiiv central ADR, 2026-10-14"
+description: "Migrated decision record: /clear is a session boundary in the prompt queue. Preserves the choices, rationale, and subsequent changes from that time; consult the Mew owning document for the current contract."
+title: "0103 — /clear is a session boundary in the prompt queue"
 created: 2026-09-01
 updated: 2026-09-01
 ---
 
-- 날짜: 2026-09-01
-- 상태: 채택
-- 후속 결정: [0140](0140-mew-codex-clear-releases-writer.md) — Codex 큐 경계에서는 새 프로세스를 사용한다; 큐 순서 계약은 유지
-- 부분 대체: [0099](0099-mew-agent-history-new-conversation.md) — 입력창 `/clear`의 즉시 세션 전환 범위
-- 결정자: 송상훈 (지시)
+- Date: 2026-09-01
+- Status: Adopted
+- Subsequent decision: [0140](0140-mew-codex-clear-releases-writer.md) — use a new process at Codex queue boundaries; retain the queue ordering contract
+- Partially supersedes: [0099](0099-mew-agent-history-new-conversation.md) — the scope of immediate session switching for `/clear` in the input
+- Decision maker: Song Sanghoon (directive)
 
-## 배경
+## Background
 
-작업 중 입력은 서버 프롬프트 큐에 남지만, 정확한 `/clear`는 클라이언트에서 즉시 세션을 닫았다. 따라서 진행 중인 작업과 그 뒤에 이미 쌓인 메시지를 예고 없이 버렸고, `/clear` 뒤에 친 메시지가 어느 세션에서 실행되는지도 순서로 표현할 수 없었다.
+Input entered during work remained in the server prompt queue, but entering exactly `/clear` immediately closed the session on the client. This discarded the ongoing work and messages already queued behind it without warning, and ordering could not express which session would execute messages entered after `/clear`.
 
-## 선택지
+## Options
 
-1. `/clear`를 즉시 유지한다 — 단순하지만 큐 순서와 충돌한다.
-2. `/clear`를 큐 항목으로 둔다 — 앞 작업을 마친 뒤 새 세션으로 전환하고, 뒤 작업의 문맥을 분리한다.
+1. Keep `/clear` immediate — simple, but conflicts with queue ordering.
+2. Make `/clear` a queue item — switch to a new session after preceding work finishes, separating the context of subsequent work.
 
-## 결정
+## Decision
 
-2번을 채택한다.
+Adopt option 2.
 
-- 입력창의 정확한 `/clear`는 서버 프롬프트 큐에 세션 경계를 넣는다. 앞선 실행·대기 메시지는 그대로 완료한다.
-- 경계가 큐 맨 앞에 오면 Mew는 같은 에이전트 연결에서 ACP `session/new`를 호출하고, 전사·세션 포인터를 `reset` 이벤트로 바꾼다.
-- `/clear` 뒤 큐에 들어온 프롬프트는 새 ACP 세션으로만 전달한다.
-- 히스토리의 `새 대화`와 탭 종료의 즉시 세션 전환 동작은 이 변경의 대상이 아니다.
+- Entering exactly `/clear` in the input inserts a session boundary into the server prompt queue. Preceding running and queued messages complete as usual.
+- When the boundary reaches the front of the queue, Mew calls ACP `session/new` on the same agent connection and changes the transcript and session pointer through a `reset` event.
+- Prompts queued after `/clear` are sent only to the new ACP session.
+- The immediate session switching behavior of `새 대화` in history and closing a tab is outside the scope of this change.
 
-## 근거
+## Rationale
 
-큐는 사용자가 입력한 순서를 보존하는 계약이다. 세션을 바꾸는 명령도 같은 순서 안에 있어야, 이전 작업을 끝내면서 이후 작업의 문맥을 확실히 분리할 수 있다.
+The queue is a contract that preserves the user's input order. Commands that change sessions must follow the same ordering so that previous work can finish while the context of subsequent work is clearly separated.

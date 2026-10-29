@@ -1,19 +1,19 @@
 ---
-title: "mewlink Cloudflare 배포"
-description: "Mewlink 중앙 서비스의 설정·배포·키 보존·접근 회수·검증·복귀와 localhost 프리뷰 DNS·HTTPS 준비를 다루는 유지관리자 런북. 날짜별 배포 결과는 작업 기록으로 연결한다."
+title: "mewlink Cloudflare Deployment"
+description: "Maintainer runbook covering Mewlink central service configuration, deployment, key preservation, access revocation, verification, rollback, and localhost preview DNS and HTTPS preparation. Links to work records for deployment results by date."
 created: "2026-10-07"
 updated: "2026-10-29"
 ---
 
-중앙 서비스 유지관리자가 사용하는 반복 배포·설정·복구 절차다. 날짜별 적용 결과는 [배포 기록](../work/mewlink-deployment-history.md)에 보존한다.
+Recurring deployment, configuration, and recovery procedures for central service maintainers. Results of changes by date are preserved in the [deployment history](../work/mewlink-deployment-history.md).
 
-## 내가 할 일
+## What I Need to Do
 
-**처음에는 Google 또는 GitHub 하나만 설정해도 된다.** Apple은 나중에 추가해도 된다.
+**Initially, configuring just Google or GitHub is sufficient.** Apple can be added later.
 
-### 1. 설정 파일 만들기
+### 1. Create a configuration file
 
-터미널에서 실행한다.
+Run in the terminal.
 
 ```bash
 cd /home/saens/dev/mew/mewlink
@@ -21,67 +21,67 @@ npm ci --ignore-scripts
 npm run setup
 ```
 
-### 2. 로그인 버튼에 쓸 값 받기
+### 2. Obtain values for the login button
 
-**Google을 쓰려면**
+**To use Google**
 
-1. [Google 콘솔](https://console.cloud.google.com/) → 프로젝트 선택 또는 생성.
+1. [Google Console](https://console.cloud.google.com/) → select or create a project.
 
-2. **Google Auth platform → Branding → Get started** → 앱 이름 `mewlink`와 이메일 입력.
+2. **Google Auth platform → Branding → Get started** → enter `mewlink` as the app name and enter an email address.
 
-3. **Audience → External** 선택 → **Test users**에 내 Google 계정 추가.
+3. Select **Audience → External** → add your Google account under **Test users**.
 
-4. **Clients → Create client → Web application** 선택. **Authorized redirect URIs**에 아래 주소 입력.
+4. Select **Clients → Create client → Web application**. Enter the address below under **Authorized redirect URIs**.
 
    `https://mew.saens.kr/auth/google/callback`
 
-5. 생성된 **Client ID**와 **Client secret** 복사.
+5. Copy the generated **Client ID** and **Client secret**.
 
-**GitHub를 쓰려면**
+**To use GitHub**
 
-1. [GitHub 설정](https://github.com/settings/developers) → **OAuth apps → New OAuth App**.
+1. [GitHub Settings](https://github.com/settings/developers) → **OAuth apps → New OAuth App**.
 
-2. 아래처럼 입력하고 **Register application** 클릭.
+2. Enter the values shown below and click **Register application**.
 
-   | 입력칸 | 넣을 값 |
+   | Field | Value to enter |
    | --- | --- |
    | Application name | `mewlink` |
    | Homepage URL | `https://mew.saens.kr` |
    | Authorization callback URL | `https://mew.saens.kr/auth/github/callback` |
 
-3. **Client ID** 복사 → **Generate a new client secret** 클릭 → 나온 secret 복사.
+3. Copy the **Client ID** → click **Generate a new client secret** → copy the generated secret.
 
-**Apple도 쓰려면 — Apple Developer Program 가입 필요**
+**To also use Apple — Apple Developer Program membership required**
 
-1. [Apple 개발자 계정](https://developer.apple.com/account/) → **Membership details**에서 **Team ID** 복사.
+1. [Apple Developer Account](https://developer.apple.com/account/) → copy the **Team ID** under **Membership details**.
 
-2. **Certificates, Identifiers & Profiles → Identifiers**에서 앱 ID의 **Sign in with Apple**을 켠다.
+2. Under **Certificates, Identifiers & Profiles → Identifiers**, enable **Sign in with Apple** for the app ID.
 
-3. **Identifiers → + → Services IDs**로 웹 로그인 ID를 만든다. **Sign in with Apple → Configure**에서 2번 앱을 선택하고 다음 주소를 저장한다.
+3. Create a web login ID through **Identifiers → + → Services IDs**. Under **Sign in with Apple → Configure**, select the app from step 2 and save the following addresses.
 
-   | 입력칸 | 넣을 값 |
+   | Field | Value to enter |
    | --- | --- |
    | Domains and Subdomains | `mew.saens.kr` |
    | Return URLs | `https://mew.saens.kr/auth/apple/callback` |
 
-4. **Keys → + → Sign in with Apple**에서 같은 앱을 선택하고 키를 만든다. **Key ID**를 복사하고 **Download**로 `.p8` 파일을 받는다.
+4. Under **Keys → + → Sign in with Apple**, select the same app and create a key. Copy the **Key ID** and use **Download** to download the `.p8` file.
 
-### 3. 받은 값 저장하기
+### 3. Save the values you received
 
-`mewlink/.secrets.json`을 열고, 사용하는 로그인 방식의 항목만 추가한다.
+Open `mewlink/.secrets.json` and add entries only for the login methods you use.
 
-| 복사한 값 | 파일에 넣을 이름 |
+| Copied value | Name to use in the file |
 | --- | --- |
 | Google Client ID | `GOOGLE_CLIENT_ID` |
 | Google Client secret | `GOOGLE_CLIENT_SECRET` |
 | GitHub Client ID | `GITHUB_CLIENT_ID` |
 | GitHub Client secret | `GITHUB_CLIENT_SECRET` |
-| Apple 웹 로그인 ID(Services ID) | `APPLE_CLIENT_ID` |
+| Apple web login ID (Services ID) | `APPLE_CLIENT_ID` |
 | Apple Team ID | `APPLE_TEAM_ID` |
 | Apple Key ID | `APPLE_KEY_ID` |
-| Apple `.p8` 파일 내용 | `APPLE_PRIVATE_KEY` |
+| Contents of the Apple `.p8` file | `APPLE_PRIVATE_KEY` |
 
-예를 들어 **GitHub만 사용하면** 이렇게 넣는다. 따옴표 안을 실제 값으로 바꾼다.
+For example, **if you use only GitHub**, enter the following. Replace the text inside the quotation marks with the actual values.
 
 ```json
 {
@@ -90,114 +90,114 @@ npm run setup
 }
 ```
 
-기존 값이 있으면 지우지 말고 추가한다. Apple 파일 내용 넣기는 아래 [Apple 상세 안내](#3-apple-services-id-team-id-key-id-p8)의 명령을 사용한다. 실제 값은 이 문서나 채팅에 붙여 넣지 않는다.
+Add to any existing values without deleting them. To insert the Apple file contents, use the command in the [detailed Apple instructions](#3-apple-services-id-team-id-key-id-p8) below. Do not paste actual values into this document or chat.
 
-### 4. Cloudflare에 올리기
+### 4. Deploy to Cloudflare
 
-같은 터미널에서 실행한다. 브라우저가 열리면 **`saens.kr`를 관리하는 Cloudflare 계정**으로 로그인한다.
+Run in the same terminal. When the browser opens, sign in with **the Cloudflare account that manages `saens.kr`**.
 
 ```bash
 npx wrangler login
 npm run deploy
 ```
 
-데이터베이스와 서버용 키는 이 명령이 자동으로 준비한다.
+This command automatically prepares the database and server keys.
 
-### ERR_TOO_MANY_REDIRECTS가 표시될 때
+### When ERR_TOO_MANY_REDIRECTS Appears
 
-Worker가 화면 요청을 `/index.html`로 바꾸면 Cloudflare Static Assets의 기본 HTML 정규화가 `/`로 307 리다이렉트한다. `/`에서도 같은 처리를 반복하므로 무한 리다이렉트가 발생한다. 화면 경로는 Worker 내부에서 정규 주소 `/`로 요청하여 HTML을 받고, 브라우저의 대시보드·등록·기기·launch 주소를 유지한다. [Cloudflare HTML 처리](https://developers.cloudflare.com/workers/static-assets/routing/advanced/html-handling/).
+When the Worker rewrites a page request to `/index.html`, Cloudflare Static Assets' default HTML normalization issues a 307 redirect to `/`. The same handling repeats at `/`, causing an infinite redirect loop. For page routes, the Worker internally requests the canonical URL `/` to retrieve HTML while preserving the dashboard, registration, device, and launch URLs in the browser. [Cloudflare HTML handling](https://developers.cloudflare.com/workers/static-assets/routing/advanced/html-handling/).
 
-수정된 소스로 `mewlink/`에서 `npm run deploy`를 다시 실행한다. 재배포 후 `curl -I https://mew.saens.kr/`의 상태가 `200`이고 `Location: /`가 없는지 확인한다. 회귀 테스트는 빌드 산출물 대신 `public/index.html`과 실제 Cloudflare Assets 바인딩을 사용해 중앙 화면과 내부 launch 화면의 GET·HEAD를 검사한다.
+With the corrected source, rerun `npm run deploy` from `mewlink/`. After redeployment, verify that `curl -I https://mew.saens.kr/` returns status `200` with no `Location: /`. Regression tests use `public/index.html` and the actual Cloudflare Assets binding instead of build artifacts to check GET and HEAD requests for central pages and internal launch pages.
 
-### 5. 내 mew 연결하기
+### 5. Connect your mew
 
-1. 로컬 mew를 새 버전으로 빌드·적용한다. 방법은 [로컬 설치 안내](../../../docs/deployment/native.md)를 따른다.
-2. 로컬 mew에 `owner`로 로그인한 뒤 **헤더 메뉴 → Mewlink → 원격 접속 → 기기 등록** 클릭. **설정 → 계정**은 개인 프로필·비밀번호 설정이며 원격 접속 항목이 없다.
-3. 열린 `mew.saens.kr`에서 로그인 → 기기 이름 입력 → 등록 승인.
-4. 다른 PC나 휴대폰에서 등록된 기기 링크를 열어 연결 확인.
+1. Build and apply the new version of local mew. Follow the [local installation guide](../../../docs/deployment/native.md).
+2. Log in to local mew as `owner`, then click **Header menu → Mewlink → Remote Access → Register Device**. **Settings → Account** contains personal profile and password settings and has no Remote Access option.
+3. On the `mew.saens.kr` page that opens, log in → enter a device name → approve registration.
+4. Open the registered device link on another PC or phone to verify the connection.
 
-사용자가 최초 배포를 실행했다. 제공자 로그인과 외부망 P2P 연결은 아직 검증하지 않았다. **이 문서에 적힌 명령은 사용자가 실행한다.**
+The user performed the initial deployment. Provider login and P2P connections over external networks have not yet been verified. **The user runs the commands listed in this document.**
 
 ---
 
-## 상세 참고
+## Detailed references
 
-아래는 추가 로그인 설정·문제 해결·운영 정보를 확인할 때 읽는다.
+Read the following for additional login configuration, troubleshooting, and operational information.
 
-[구현·전송 계약](../development/remote-access.md) · [로컬 설치](../../../docs/deployment/native.md) · [작업·출시 게이트](../work/remote-access.md) · [ADR 0203](../history/decisions/0203-mewlink-workers-p2p-ui.md)
+[Implementation and transport contract](../development/remote-access.md) · [Local installation](../../../docs/deployment/native.md) · [Work and release gates](../work/remote-access.md) · [ADR 0203](../history/decisions/0203-mewlink-workers-p2p-ui.md)
 
-**Cloudflare용 구현·로컬 자동 검증 완료, 사용자 최초 배포 실행.** mewlink는 로그인·기기 목록·등록·접속 승인·시그널링만 제공한다. 실제 mew HTML·JS·CSS·worker·이미지와 작업 API는 등록된 로컬 A에서 인증된 WebRTC DataChannel로 받는다. 중앙 배포에 mew의 `dist/`나 워크스페이스를 포함하지 않는다. Supabase는 사용하지 않는다.
+**Cloudflare implementation and local automated verification are complete; the user performed the initial deployment.** mewlink provides only login, device lists, registration, connection approval, and signaling. Actual mew HTML, JS, CSS, workers, images, and work APIs are received from registered local A over an authenticated WebRTC DataChannel. The central deployment does not include mew's `dist/` or workspaces. Supabase is not used.
 
-## 위치와 배포 구성
+## Location and deployment configuration
 
-중앙 프로젝트는 `mew/mewlink/`다. 부모 [.gitignore](../../../.gitignore)의 `/mewlink/`와 npm workspace 제외를 유지하며 별도 Git 저장소는 아직 만들지 않았다. 공개 mew의 기본 설치·타입 검사·테스트는 이 폴더 없이 동작한다. 중앙 소스·의존성·잠금 파일은 이 폴더에만 남으므로 별도 저장소나 백업에 폴더를 보관해야 한다.
+The central project is `mew/mewlink/`. The `/mewlink/` exclusion in the parent [.gitignore](../../../.gitignore) and the npm workspace exclusion remain in place; no separate Git repository has been created yet. The public mew project's default installation, type checking, and tests work without this folder. Central source code, dependencies, and lockfiles exist only in this folder, so the folder must be kept in a separate repository or backup.
 
-공개 mew의 Git 이력에서도 이전 중앙 구현 `server/remote-central/`, 전용 테스트 `server/remote-central.test.ts`·`server/remote-access-authenticated.test.ts`, 이전 중앙 화면 `src/components/remote-dashboard.tsx`를 제외한다. 현재 파일 삭제와 [.gitignore](../../../.gitignore)만으로 과거 커밋이 정리되지는 않는다. 공개 연결 클라이언트·공유 프로토콜은 유지하고, 중앙 소스와 이력 재작성 전 복구 백업은 공개 저장소 밖에서 보관한다. 복구 시 이 파일들이 공개 이력에 다시 들어오지 않도록 확인한다.
+Also exclude the previous central implementation `server/remote-central/`, dedicated tests `server/remote-central.test.ts` and `server/remote-access-authenticated.test.ts`, and previous central UI `src/components/remote-dashboard.tsx` from the public mew Git history. Deleting current files and updating [.gitignore](../../../.gitignore) alone do not clean up past commits. Keep the public connection client and shared protocol, and store central source code and recovery backups made before rewriting history outside the public repository. When restoring, ensure these files do not reenter public history.
 
-| 구성 | 책임 |
+| Component | Responsibility |
 | --- | --- |
-| `mewlink/src/worker.ts` | OAuth 콜백·세션·등록·멤버십·일회용 launch·접속 증명 |
-| `mewlink/src/client.ts`, `mewlink/public/index.html` | 로그인·기기 선택·P2P 연결용 작은 프론트 |
-| Worker의 `ASSETS` | mewlink의 `dist/`만 제공. 부모 mew 빌드 제외 |
-| D1 `DB` | 계정·등록·해시 세션·멤버십·일회용 요청·만료 정리 |
-| 기기별 Durable Object `SIGNAL` | A의 상시 WSS, 승인된 연결의 SDP·ICE, lease·회수 |
-| 공개 `shared/remote-access*.ts`, `src/utils/remote-*` | mew와 mewlink가 공유하는 연결·서명·자원 계약 |
+| `mewlink/src/worker.ts` | OAuth callbacks, sessions, registration, membership, single-use launch, connection proofs |
+| `mewlink/src/client.ts`, `mewlink/public/index.html` | Small frontend for login, device selection, and P2P connections |
+| Worker's `ASSETS` | Serves only mewlink's `dist/`. Excludes the parent mew build |
+| D1 `DB` | Accounts, registration, hashed sessions, membership, single-use requests, expiration cleanup |
+| Per-device Durable Object `SIGNAL` | A's persistent WSS connection, SDP and ICE for approved connections, leases and revocation |
+| Public `shared/remote-access*.ts`, `src/utils/remote-*` | Connection, signing, and resource contracts shared by mew and mewlink |
 
-프론트와 백엔드는 **Workers + Static Assets 한 배포**로 묶었다. Pages 프로젝트와 Worker를 따로 만들 필요가 없다. Pages Functions에서 Durable Objects를 쓰면 별도 Worker가 필요하므로 통합 배포 요구에는 이 구성이 맞는다. [Cloudflare 통합 앱 배포](https://developers.cloudflare.com/workers/static-assets/), [Pages의 Durable Objects binding](https://developers.cloudflare.com/pages/functions/bindings/#durable-objects).
+The frontend and backend are bundled into **one Workers + Static Assets deployment**. There is no need to create a separate Pages project and Worker. Using Durable Objects with Pages Functions requires a separate Worker, so this configuration fits the unified deployment requirement. [Cloudflare full-stack app deployment](https://developers.cloudflare.com/workers/static-assets/), [Durable Objects binding in Pages](https://developers.cloudflare.com/pages/functions/bindings/#durable-objects).
 
-운영 서버의 Node 프로세스·내부 `5002` 포트·HTTPS 역방향 프록시는 더 이상 요구하지 않는다. 공개 접속은 Cloudflare HTTPS `443`이며 로컬 A는 기존 `localhost:5000` 또는 설정한 `5001`에서 실행한다. 개발용 Wrangler 포트는 운영 포트가 아니다.
+A Node process on a production server, internal port `5002`, and an HTTPS reverse proxy are no longer required. Public access uses Cloudflare HTTPS `443`, while local A runs at the existing `localhost:5000` or configured `5001`. The development Wrangler port is not a production port.
 
-## 접속 주소와 P2P UI
+## Access URLs and P2P UI
 
-사용자는 `https://mew.saens.kr/{중앙 계정 ID}/{기기 이름}` 또는 `/dashboard`만 연다. 주소창은 이 경로를 유지한다. 내부 연결 프레임은 `https://mew-ui.saens.kr/launch/{임시 ID}`에서 열고, 그 안의 `/__mew_ui/{임시 ID}/index.html`부터 실제 UI를 A에서 받는다. JS·CSS·worker의 절대 자원 주소도 연결별 접두사로 돌려 받아 동적 import와 worker 요청을 같은 A에 결합한다. 새로고침은 새 접속 증명과 P2P 연결을 만든다.
+Users open only `https://mew.saens.kr/{중앙 계정 ID}/{기기 이름}` or `/dashboard`. The address bar retains this path. The internal connection frame opens at `https://mew-ui.saens.kr/launch/{임시 ID}`, and the actual UI within it is received from A starting with `/__mew_ui/{임시 ID}/index.html`. Absolute resource URLs for JS, CSS, and workers are also routed through a connection-specific prefix, binding dynamic imports and worker requests to the same A. Refreshing creates a new connection proof and P2P connection.
 
-`mew-ui.saens.kr`는 같은 Worker에 붙는 **내부 실행 origin**이다. 전체 mew UI를 별도 배포하는 사이트가 아니다. 로그인 호스트의 `__Host-mew_central` cookie와 인증·계정 API를 P2P 앱 코드에서 분리하기 위한 경계다. 한 origin 아래 `/user/device` 경로만 나누면 같은 origin의 JS가 인증 API를 호출할 수 있다. 중앙에서 발급한 60초·일회용 launch 증명은 정확한 내부 프레임에만 전달하며 실제 앱에는 중앙 cookie·launch 증명을 전달하지 않는다.
+`mew-ui.saens.kr` is an **internal execution origin** attached to the same Worker. It is not a site that separately deploys the entire mew UI. It provides a boundary that separates the login host's `__Host-mew_central` cookie and authentication and account APIs from P2P app code. Merely separating `/user/device` paths under one origin allows JS on that origin to call authentication APIs. The central service's single-use launch proof, valid for 60 seconds, is passed only to the exact internal frame; central cookies and launch proofs are not passed to the actual app.
 
-자원 Service Worker는 정확히 대응하는 연결 페이지·탭의 전송만 사용한다. 브라우저 저장 범위는 중앙 계정·instance ID로 나눈다. 공유 앱 origin을 서로 불신하는 기기 간 보안 격리로 표현하지 않는다. A가 오프라인이거나 직접 연결할 수 없으면 UI와 작업 요청은 실패하며 중앙 HTTP 프록시·TURN으로 대체하지 않는다.
+The resource Service Worker uses only the transport of the exact corresponding connection page and tab. Browser storage is scoped by central account and instance ID. Do not describe the shared app origin as security isolation between mutually untrusted devices. If A is offline or cannot be reached directly, UI and work requests fail; there is no fallback to a central HTTP proxy or TURN.
 
-### OAuth 발급값
+### OAuth credentials
 
-| 제공자 | `mewlink/.secrets.json` 항목 | 정확한 콜백 |
+| Provider | `mewlink/.secrets.json` entries | Exact callback |
 | --- | --- | --- |
 | Google | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | `https://mew.saens.kr/auth/google/callback` |
 | GitHub | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | `https://mew.saens.kr/auth/github/callback` |
-| Apple | `APPLE_CLIENT_ID`(Services ID), `APPLE_TEAM_ID`, `APPLE_KEY_ID`, `APPLE_PRIVATE_KEY`(PKCS8 `.p8`, JSON 문자열의 줄바꿈 보존) | `https://mew.saens.kr/auth/apple/callback` |
-| 선택 이메일 OIDC | `EMAIL_OIDC_ISSUER`, `EMAIL_CLIENT_ID`, `EMAIL_CLIENT_SECRET` | `https://mew.saens.kr/auth/email/callback` |
+| Apple | `APPLE_CLIENT_ID` (Services ID), `APPLE_TEAM_ID`, `APPLE_KEY_ID`, `APPLE_PRIVATE_KEY` (PKCS8 `.p8`, preserve line breaks in the JSON string) | `https://mew.saens.kr/auth/apple/callback` |
+| Optional email OIDC | `EMAIL_OIDC_ISSUER`, `EMAIL_CLIENT_ID`, `EMAIL_CLIENT_SECRET` | `https://mew.saens.kr/auth/email/callback` |
 
-설정은 제공자별로 독립적이다. Google·GitHub는 각각 ID와 secret 두 값, Apple은 네 값이 모두 있어야 버튼이 표시된다. 먼저 한 제공자만 설정해 배포하고 다른 제공자를 추가해도 된다. 모든 콜백은 **로그인 호스트** `mew.saens.kr` 기준이다. `mew-ui.saens.kr`나 로컬 mew의 포트는 OAuth 콜백에 등록하지 않는다. 아래 콘솔 경로·공식 자료는 2026-10-08에 확인했다.
+Each provider is configured independently. Google and GitHub each require both an ID and a secret, and Apple requires all four values for its button to appear. You may configure and deploy one provider first and add others later. All callbacks use the **login host** `mew.saens.kr`. Do not register `mew-ui.saens.kr` or local mew ports as OAuth callbacks. The console paths and official resources below were checked on 2026-10-08.
 
-### 1. Google: Client ID와 Client Secret
+### 1. Google: Client ID and Client Secret
 
-1. [Google Cloud Console](https://console.cloud.google.com/)에 로그인하고 상단 프로젝트 선택에서 mewlink용 프로젝트를 선택하거나 새로 만든다. Google Cloud 프로젝트 이름·번호는 `GOOGLE_CLIENT_ID`가 아니다.
-2. **Google Auth platform → Branding**을 연다. 처음이면 **Get started**로 앱 이름 `mewlink`, 사용자 지원 이메일, 개발자 연락 이메일을 입력한다. 운영용 홈페이지·개인정보처리방침·이용약관 URL은 실제 게시한 주소를 사용하고, 승인된 도메인은 `saens.kr`로 설정한다.
-3. **Audience**에서 일반 Google 계정을 받을 서비스는 **External**을 선택한다. 테스트 중에는 **Test users → Add users**에서 사용할 계정을 추가한다. 조직 전용 Internal은 그 조직의 Workspace 계정으로 제한된다. 일반 공개 전에는 Audience의 게시 상태와 Branding 검증 요구를 확인한다.
-4. **Data Access**에서 로그인에 필요한 `openid`, 이메일, 기본 프로필 범위만 설정한다. 현재 코드는 `openid profile email`을 요청하며 Drive·Gmail 권한은 요청하지 않는다. [동의 화면 설정 공식 안내](https://developers.google.com/workspace/guides/configure-oauth-consent).
-5. **Clients → Create client**에서 **Web application**을 선택하고 이름을 `mewlink production`으로 정한다. **Authorized redirect URIs**에 `https://mew.saens.kr/auth/google/callback`을 정확히 추가한다. Authorized JavaScript origins는 현재 서버 리다이렉트 흐름의 필수값이 아니다. 입력한다면 `https://mew.saens.kr`만 쓰며 경로를 붙이지 않는다.
-6. 생성 화면 또는 해당 클라이언트 상세에서 **Client ID**를 `GOOGLE_CLIENT_ID`, **Client secret**을 `GOOGLE_CLIENT_SECRET`에 복사한다. ID는 일반적으로 `.apps.googleusercontent.com`으로 끝난다. secret을 표시할 수 없다면 새 secret을 추가해 그 값을 저장한다. [클라이언트 생성](https://developers.google.com/workspace/guides/create-credentials), [secret 추가·교체](https://support.google.com/googleapi/answer/6158849?hl=en).
+1. Log in to [Google Cloud Console](https://console.cloud.google.com/) and select or create a project for mewlink using the project selector at the top. The Google Cloud project name and number are not the `GOOGLE_CLIENT_ID`.
+2. Open **Google Auth platform → Branding**. For initial setup, use **Get started** to enter the app name `mewlink`, user support email, and developer contact email. Use actually published URLs for the production homepage, privacy policy, and terms of service, and set the authorized domain to `saens.kr`.
+3. In **Audience**, select **External** for a service that accepts regular Google accounts. During testing, add the accounts you will use under **Test users → Add users**. Organization-only Internal access is restricted to that organization's Workspace accounts. Before public release, check the publishing status in Audience and the Branding verification requirements.
+4. In **Data Access**, configure only the `openid`, email, and basic profile scopes needed for login. The current code requests `openid profile email` and does not request Drive or Gmail permissions. [Official consent screen setup guide](https://developers.google.com/workspace/guides/configure-oauth-consent).
+5. Under **Clients → Create client**, select **Web application** and name it `mewlink production`. Add exactly `https://mew.saens.kr/auth/google/callback` to **Authorized redirect URIs**. Authorized JavaScript origins is not required for the current server redirect flow. If you enter a value, use only `https://mew.saens.kr` without a path.
+6. From the creation screen or the client's details, copy **Client ID** to `GOOGLE_CLIENT_ID` and **Client secret** to `GOOGLE_CLIENT_SECRET`. The ID typically ends in `.apps.googleusercontent.com`. If the secret cannot be displayed, add a new secret and save its value. [Create a client](https://developers.google.com/workspace/guides/create-credentials), [Add or rotate a secret](https://support.google.com/googleapi/answer/6158849?hl=en).
 
-`redirect_uri_mismatch`는 등록한 콜백의 프로토콜·호스트·경로·마지막 `/`를 대조한다. 테스트 계정 접근 오류는 Audience의 Test users와 게시 상태를 확인한다. Google API key나 서비스 계정 JSON을 OAuth secret 칸에 넣지 않는다.
+For `redirect_uri_mismatch`, compare the registered callback's protocol, host, path, and trailing `/`. For test account access errors, check Test users and publishing status in Audience. Do not put a Google API key or service account JSON in the OAuth secret field.
 
-### 2. GitHub: OAuth App의 Client ID와 Client Secret
+### 2. GitHub: OAuth App Client ID and Client Secret
 
-1. [GitHub OAuth Apps 설정](https://github.com/settings/developers)에서 **New OAuth App**을 누른다. 메뉴 경로는 프로필 **Settings → Developer settings → OAuth apps**다. 조직 소유로 만들 때는 해당 조직의 관리 권한으로 조직 설정에서 등록한다.
-2. **Application name**은 `mewlink`, **Homepage URL**은 `https://mew.saens.kr`, **Authorization callback URL**은 `https://mew.saens.kr/auth/github/callback`으로 입력하고 **Register application**을 누른다. 현재 중앙 로그인은 웹 인증이므로 **Enable Device Flow**는 필요 없다. [OAuth App 등록 공식 안내](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/creating-an-oauth-app).
-3. 앱 상세의 **Client ID**를 `GITHUB_CLIENT_ID`에 복사한다. **Client secrets → Generate a new client secret**으로 생성한 값을 `GITHUB_CLIENT_SECRET`에 저장한다. 다시 표시되지 않을 수 있으므로 생성 시 저장한다. [Client ID·secret 위치 공식 안내](https://docs.github.com/en/rest/authentication/authenticating-to-the-rest-api#using-basic-authentication).
-4. 현재 요청 범위는 `read:user`다. 저장소 접근 `repo` 권한이나 Personal Access Token은 중앙 로그인에 필요하지 않다. 로컬 A의 Git 인증용 Device Flow 앱과 중앙 mewlink OAuth 앱의 ID를 구분한다.
+1. Click **New OAuth App** in [GitHub OAuth Apps settings](https://github.com/settings/developers). The menu path is profile **Settings → Developer settings → OAuth apps**. To create an organization-owned app, register it in the organization's settings with administrative permissions for that organization.
+2. Enter `mewlink` for **Application name**, `https://mew.saens.kr` for **Homepage URL**, and `https://mew.saens.kr/auth/github/callback` for **Authorization callback URL**, then click **Register application**. Current central login uses web authentication, so **Enable Device Flow** is unnecessary. [Official OAuth App registration guide](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/creating-an-oauth-app).
+3. Copy **Client ID** from the app details to `GITHUB_CLIENT_ID`. Save the value generated through **Client secrets → Generate a new client secret** in `GITHUB_CLIENT_SECRET`. Save it when generated because it may not be displayed again. [Official guide to locating the Client ID and secret](https://docs.github.com/en/rest/authentication/authenticating-to-the-rest-api#using-basic-authentication).
+4. The currently requested scope is `read:user`. Repository access permission `repo` and Personal Access Tokens are not required for central login. Distinguish the ID of local A's Device Flow app for Git authentication from the ID of the central mewlink OAuth app.
 
-GitHub App의 App ID, 설치 ID, PAT는 위 두 값의 대체물이 아니다. callback 오류는 앱 상세의 URL을 수정하고 다시 로그인한다. 조직 정책으로 승인이 필요한 계정은 해당 조직 정책도 확인한다.
+A GitHub App's App ID, installation ID, and PAT are not substitutes for the two values above. For callback errors, correct the URL in the app details and log in again. For accounts requiring approval under organization policies, also check those policies.
 
 ### 3. Apple: Services ID, Team ID, Key ID, `.p8`
 
-Apple은 Apple Developer Program 멤버십과 **Sign in with Apple을 활성화한 primary App ID**에 웹 Services ID를 연결하는 준비가 필요하다. 개발팀의 Account Holder 또는 Admin과 진행한다. 단순 Apple Account 로그인만으로 모든 등록 메뉴를 사용할 수 있는 것은 아니다. [멤버십별 제공 기능](https://developer.apple.com/help/account/basics/account-landing-page/), [웹 인증 연결 요건](https://developer.apple.com/help/account/capabilities/configure-sign-in-with-apple-for-the-web/).
+Apple requires Apple Developer Program membership and preparation to link a web Services ID to a **primary App ID with Sign in with Apple enabled**. Work with the development team's Account Holder or Admin. Simply signing in with an Apple Account does not provide access to every registration menu. [Features available by membership](https://developer.apple.com/help/account/basics/account-landing-page/), [Web authentication linking requirements](https://developer.apple.com/help/account/capabilities/configure-sign-in-with-apple-for-the-web/).
 
-1. [Apple Developer 계정](https://developer.apple.com/account/)에서 올바른 팀을 선택하고 **Membership details**의 **Team ID**를 `APPLE_TEAM_ID`에 저장한다. Apple이 부여한 10자리 팀 식별자이며 App Store Connect의 Issuer ID와 다르다. [Team ID 공식 안내](https://developer.apple.com/help/glossary/team-id/).
-2. **Certificates, Identifiers & Profiles → Identifiers**에서 연결할 App ID를 선택하고 **Sign in with Apple**을 활성화한다. App ID가 없다면 앱용 명시적 Bundle ID를 등록하고 capability를 설정한다. 이 App ID는 다음 단계의 primary App ID로 쓰며, 웹 로그인 `APPLE_CLIENT_ID`에는 Services ID를 넣는다.
-3. **Identifiers → + → Services IDs**로 새 웹 식별자를 등록한다. Description은 `mewlink web`, Identifier는 팀 내 유일한 역도메인 이름(예: `kr.saens.mewlink.web`)으로 정한다. 예시 문자열을 자동 발급값처럼 쓰지 말고 실제 등록된 Identifier를 `APPLE_CLIENT_ID`에 저장한다.
-4. 해당 Services ID를 열고 **Sign in with Apple → Configure**에서 위 primary App ID를 선택한다. **Domains and Subdomains**에는 `mew.saens.kr`(프로토콜·경로 없이), **Return URLs**에는 `https://mew.saens.kr/auth/apple/callback`을 등록하고 **Done → Continue → Save**로 저장한다. 현재 Apple 공식 안내상 이 등록을 위해 서버에 도메인 검증 파일을 올릴 필요는 없다. [Services ID와 웹 주소 설정](https://developer.apple.com/help/account/capabilities/configure-sign-in-with-apple-for-the-web/).
-5. **Keys → +**에서 이름을 `mewlink Sign in with Apple`로 입력하고 **Sign in with Apple**을 선택한다. **Configure**에서 같은 primary App ID를 연결한 뒤 등록한다. 키 상세의 **Key ID**를 `APPLE_KEY_ID`에 저장하고 **Download**로 `.p8` 파일을 받는다. App Store Connect API용 `.p8` 키 대신 Sign in with Apple용 키를 사용한다. [Apple 로그인 키 생성](https://developer.apple.com/help/account/capabilities/create-a-sign-in-with-apple-private-key/).
-6. `APPLE_PRIVATE_KEY`는 `.p8` 파일 경로가 아니라 `-----BEGIN PRIVATE KEY-----`부터 끝까지의 **파일 내용 전체**다. 다운로드는 한 번만 가능하므로 별도로 보호해 백업한다. [키 다운로드·보관 공식 안내](https://developer.apple.com/help/account/keys/create-a-private-key/).
+1. Select the correct team in your [Apple Developer account](https://developer.apple.com/account/) and save the **Team ID** from **Membership details** in `APPLE_TEAM_ID`. This is the 10-character team identifier assigned by Apple, distinct from the App Store Connect Issuer ID. [Official Team ID guide](https://developer.apple.com/help/glossary/team-id/).
+2. Under **Certificates, Identifiers & Profiles → Identifiers**, select the App ID to link and enable **Sign in with Apple**. If there is no App ID, register an explicit Bundle ID for the app and configure the capability. Use this App ID as the primary App ID in the next step; enter the Services ID in `APPLE_CLIENT_ID` for web login.
+3. Register a new web identifier through **Identifiers → + → Services IDs**. Set Description to `mewlink web` and Identifier to a reverse-domain name unique within the team (for example, `kr.saens.mewlink.web`). Do not use the example string as though it were an automatically issued value; save the actually registered Identifier in `APPLE_CLIENT_ID`.
+4. Open the Services ID and select the primary App ID above under **Sign in with Apple → Configure**. Register `mew.saens.kr` (without a protocol or path) under **Domains and Subdomains** and `https://mew.saens.kr/auth/apple/callback` under **Return URLs**, then save through **Done → Continue → Save**. Current official Apple guidance does not require uploading a domain verification file to the server for this registration. [Configure the Services ID and web URLs](https://developer.apple.com/help/account/capabilities/configure-sign-in-with-apple-for-the-web/).
+5. Under **Keys → +**, enter `mewlink Sign in with Apple` as the name and select **Sign in with Apple**. Link the same primary App ID under **Configure**, then register the key. Save **Key ID** from the key details in `APPLE_KEY_ID` and use **Download** to download the `.p8` file. Use a key for Sign in with Apple rather than a `.p8` key for the App Store Connect API. [Create an Apple sign-in key](https://developer.apple.com/help/account/capabilities/create-a-sign-in-with-apple-private-key/).
+6. `APPLE_PRIVATE_KEY` is the **entire file contents** from `-----BEGIN PRIVATE KEY-----` to the end, not the path to the `.p8` file. The file can be downloaded only once, so protect it and back it up separately. [Official key download and storage guide](https://developer.apple.com/help/account/keys/create-a-private-key/).
 
-`.p8`의 실제 줄바꿈을 JSON 문자열로 안전하게 저장하려면 아래를 **사용자가 `mewlink/`에서** 실행한다. 인자만 다운로드한 파일의 실제 절대 경로로 바꾼다. 기존 설정을 읽어 이 키만 추가하므로 다른 제공자 값과 자동 생성된 `SIGNING_KEY`는 유지한다. 키 내용은 터미널에 출력하지 않는다.
+To safely store the actual line breaks in `.p8` as a JSON string, **the user runs the following from `mewlink/`**. Replace only the argument with the actual absolute path to the downloaded file. It reads the existing configuration and adds only this key, preserving other provider values and the automatically generated `SIGNING_KEY`. It does not print the key contents to the terminal.
 
 ```bash
 node --input-type=module - '/절대/경로/AuthKey_실제KeyID.p8' <<'NODE'
@@ -210,20 +210,20 @@ await fs.chmod(file, 0o600)
 NODE
 ```
 
-파일 내용의 줄바꿈은 JSON에서 `\n`으로 보이고 파싱 후 실제 줄바꿈으로 복원된다. 수동으로 이중 이스케이프하지 않는다. `APPLE_CLIENT_SECRET`은 현재 설정 항목이 아니다. Worker가 위 네 값으로 짧은 수명의 client secret JWT를 만들므로 장기 JWT를 별도로 발급받아 붙여 넣지 않는다.
+Line breaks in the file contents appear as `\n` in JSON and are restored to actual line breaks after parsing. Do not manually double-escape them. `APPLE_CLIENT_SECRET` is not a current configuration entry. The Worker creates a short-lived client secret JWT from the four values above, so do not separately obtain and paste a long-lived JWT.
 
-### 4. 선택 이메일 OIDC: 제공자에서 발급
+### 4. Optional email OIDC: Obtain from the provider
 
-Google·GitHub·Apple 중 하나로 먼저 사용할 수 있다. 별도 이메일 로그인이 필요할 때만 이메일·매직 링크 등을 지원하는 OIDC 제공자를 준비한다. 현재 프로젝트에서 이메일 제공자는 정해 두지 않았으므로 콘솔 메뉴 이름은 선택한 제공자의 안내를 따른다.
+You can start with Google, GitHub, or Apple. Set up an OIDC provider supporting email, magic links, or similar methods only if separate email login is needed. This project has not selected an email provider, so follow the selected provider's instructions for console menu names.
 
-1. 제공자 콘솔의 Applications/Clients에서 **서버용 웹 애플리케이션(confidential client)**을 등록한다. Authorization Code와 PKCE `S256`, `openid profile email`, 서명된 ID token·JWKS를 지원하는지 확인한다.
-2. 허용된 callback/redirect URL에 `https://mew.saens.kr/auth/email/callback`을 등록한다. 발급된 Client ID와 Client Secret을 각각 `EMAIL_CLIENT_ID`, `EMAIL_CLIENT_SECRET`에 넣는다.
-3. 애플리케이션의 OpenID Connect 설정·discovery 문서에 표시된 **issuer**를 `EMAIL_OIDC_ISSUER`에 복사한다. `https://` issuer 원문을 그대로 사용하며 discovery 문서 URL 자체, 로그인 페이지, JWKS URL은 넣지 않는다. 경로·마지막 `/`가 있다면 임의로 제거하지 않는다. mewlink는 issuer discovery를 사용하므로 해당 제공자가 반환하는 issuer와 설정값이 일치해야 한다. [OIDC Discovery 표준](https://openid.net/specs/openid-connect-discovery-1_0.html).
-4. 제공자 콘솔에서 이메일 로그인 방식을 활성화하고 필요하면 그 제공자의 발송 도메인·SMTP를 설정한다. 현재 mewlink는 `SMTP_PASSWORD`나 이메일 API 키를 사용하지 않는다. 메일 발송과 비밀번호 관리는 제공자의 책임이다.
+1. Register a **server-side web application (confidential client)** under Applications/Clients in the provider console. Verify support for Authorization Code, PKCE `S256`, `openid profile email`, signed ID tokens, and JWKS.
+2. Register `https://mew.saens.kr/auth/email/callback` as an allowed callback/redirect URL. Enter the issued Client ID and Client Secret in `EMAIL_CLIENT_ID` and `EMAIL_CLIENT_SECRET`, respectively.
+3. Copy the **issuer** shown in the application's OpenID Connect settings or discovery document to `EMAIL_OIDC_ISSUER`. Use the exact original `https://` issuer; do not enter the discovery document URL itself, a login page, or a JWKS URL. Do not arbitrarily remove any path or trailing `/`. mewlink uses issuer discovery, so the configured value must match the issuer returned by the provider. [OIDC Discovery standard](https://openid.net/specs/openid-connect-discovery-1_0.html).
+4. Enable email login in the provider console and configure the provider's sending domain and SMTP if needed. Current mewlink does not use `SMTP_PASSWORD` or an email API key. The provider is responsible for sending email and managing passwords.
 
-### 5. 설정 파일에 옮기기
+### 5. Copy into the configuration file
 
-`npm run setup`은 빈 `mewlink/.secrets.json`만 만들고 제공자 자격증명을 발급하지 않는다. JSON은 문자열 값과 쉼표로 구성하며 주석을 넣지 않는다. 아래는 **Google·GitHub만 활성화하는 가짜 값 예시**다. 처음 설정할 때 구조를 참고하고, 기존 파일에 `SIGNING_KEY`가 있으면 파일 전체를 덮어쓰지 말고 필요한 항목만 추가한다.
+`npm run setup` creates only an empty `mewlink/.secrets.json` and does not issue provider credentials. Use string values and commas in JSON, without comments. The following is an **example with fake values that enables only Google and GitHub**. Refer to its structure for initial setup; if the existing file contains `SIGNING_KEY`, add only the required entries instead of overwriting the entire file.
 
 ```json
 {
@@ -234,62 +234,62 @@ Google·GitHub·Apple 중 하나로 먼저 사용할 수 있다. 별도 이메�
 }
 ```
 
-Apple을 추가할 때는 위 네 항목을, 이메일 OIDC를 추가할 때는 위 세 항목을 같은 객체에 추가한다. 사용하지 않는 제공자는 항목을 생략한다. secret을 바꾸어도 이미 배포한 Worker에는 자동 반영되지 않는다. 사용자가 `npm run deploy`를 다시 실행하면 `wrangler deploy --secrets-file`로 반영된다. 파일에서 항목을 지우는 것만으로 기존 Worker secret이 삭제되지는 않으므로 제공자 비활성화는 원격 secret 삭제까지 별도로 확인한다.
+To add Apple, add the four entries above to the same object; to add email OIDC, add the three entries above. Omit entries for unused providers. Changing a secret does not automatically update an already deployed Worker. When the user reruns `npm run deploy`, the changes are applied through `wrangler deploy --secrets-file`. Removing entries from the file alone does not delete existing Worker secrets, so separately verify that remote secrets are deleted when disabling a provider.
 
-### 6. Cloudflare 인증과 자동 생성값
+### 6. Cloudflare authentication and automatically generated values
 
-기본 배포는 Wrangler의 브라우저 OAuth 로그인을 사용하므로 별도 Cloudflare API token을 발급할 필요가 없다. 사용자가 `mewlink/`에서 `npx wrangler login`으로 `saens.kr`를 관리하는 계정에 로그인하고 `npx wrangler whoami`로 대상 계정을 확인한다. [Wrangler 로그인 공식 안내](https://developers.cloudflare.com/workers/wrangler/commands/#login).
+The default deployment uses Wrangler's browser OAuth login, so a separate Cloudflare API token is unnecessary. From `mewlink/`, the user runs `npx wrangler login` to log in to the account that manages `saens.kr` and checks the target account with `npx wrangler whoami`. [Official Wrangler login guide](https://developers.cloudflare.com/workers/wrangler/commands/#login).
 
-| 값 | 얻는 곳·처리 방식 | 저장 위치 |
+| Value | Where to obtain it and how it is handled | Storage location |
 | --- | --- | --- |
-| Cloudflare Account ID | 여러 계정 중 대상 지정이 필요하면 Dashboard에서 대상 계정의 ID를 복사한다. `saens.kr` zone의 Overview에서도 Account ID를 확인할 수 있다. 배포 환경의 `CLOUDFLARE_ACCOUNT_ID`로 지정한다. | 배포 셸 환경변수. `mewlink/.secrets.json`에 넣지 않음 |
-| Cloudflare Zone ID | `saens.kr` Overview의 Zone ID. 현재 배포 스크립트는 직접 입력받지 않는다. | 수동 설정 불필요 |
-| `CLOUDFLARE_API_TOKEN` | CI 등 비대화형 배포가 필요할 때 Dashboard의 프로필 → API Tokens → Create Token에서 발급한다. 대상 계정·zone의 Workers·D1·도메인 작업을 허용해야 한다. 로컬 브라우저 로그인 방식에서는 생략한다. | CI 비밀 저장소 또는 배포 셸 환경변수. Worker OAuth 설정 파일에 넣지 않음 |
-| D1 `database_id` | `npm run deploy`가 이름 `mewlink`로 조회하고 없으면 생성해 UUID를 기록한다. 이미 다른 ID가 있으면 중단한다. | `mewlink/wrangler.jsonc` |
-| `SIGNING_KEY` | 최초 배포에서 기존 원격·로컬 키가 모두 없을 때 Ed25519 private JWK를 자동 생성한다. OAuth 제공자가 발급하는 값이 아니다. | `mewlink/.secrets.json`의 JSON 문자열과 Worker secret |
-| 중앙·앱 origin | 현재 도메인으로 이미 설정된 `CENTRAL_ORIGIN`·`APP_ORIGIN`. ID나 secret이 아니다. | `mewlink/wrangler.jsonc`의 `vars` |
-| 중앙 계정 ID·기기 주소 | 제공자 로그인·기기 등록 후 mewlink에서 생성한다. OAuth Client ID나 Cloudflare Account ID와 다르다. | 대시보드·기기 링크에서 확인 |
+| Cloudflare Account ID | If you need to select a target from multiple accounts, copy the target account's ID from the Dashboard. You can also find the Account ID in the Overview for the `saens.kr` zone. Specify it through `CLOUDFLARE_ACCOUNT_ID` in the deployment environment. | Deployment shell environment variable. Do not put it in `mewlink/.secrets.json` |
+| Cloudflare Zone ID | Zone ID in the `saens.kr` Overview. The current deployment script does not accept it as direct input. | No manual configuration required |
+| `CLOUDFLARE_API_TOKEN` | For noninteractive deployment such as CI, issue a token through profile → API Tokens → Create Token in the Dashboard. It must permit Workers, D1, and domain operations for the target account and zone. Omit it when using local browser login. | CI secret store or deployment shell environment variable. Do not put it in the Worker OAuth configuration file |
+| D1 `database_id` | `npm run deploy` looks it up by the name `mewlink`, creates it if absent, and records the UUID. Stops if a different ID is already present. | `mewlink/wrangler.jsonc` |
+| `SIGNING_KEY` | Automatically generates an Ed25519 private JWK during initial deployment when neither a remote nor a local key exists. This value is not issued by an OAuth provider. | JSON string in `mewlink/.secrets.json` and a Worker secret |
+| Central and app origins | `CENTRAL_ORIGIN` and `APP_ORIGIN`, already configured for the current domains. These are not IDs or secrets. | `vars` in `mewlink/wrangler.jsonc` |
+| Central account ID and device URL | Generated by mewlink after provider login and device registration. Distinct from the OAuth Client ID and Cloudflare Account ID. | Available in the dashboard and device links |
 
-[Account·Zone ID 확인](https://developers.cloudflare.com/fundamentals/account/find-account-and-zone-ids/), [배포 환경변수](https://developers.cloudflare.com/workers/wrangler/system-environment-variables/), [API token 발급](https://developers.cloudflare.com/fundamentals/api/get-started/create-token/). Cloudflare 인증값은 배포 도구의 인증이고, Google 등의 OAuth secret은 사용자 로그인용이므로 서로 대신할 수 없다. 이미 등록된 A가 있으면 `SIGNING_KEY`를 새로 만들지 말고 기존 키·백업을 유지한다.
+[Find Account and Zone IDs](https://developers.cloudflare.com/fundamentals/account/find-account-and-zone-ids/), [Deployment environment variables](https://developers.cloudflare.com/workers/wrangler/system-environment-variables/), [Issue an API token](https://developers.cloudflare.com/fundamentals/api/get-started/create-token/). Cloudflare credentials authenticate deployment tools, while OAuth secrets from Google and other providers are for user login; they are not interchangeable. If A is already registered, retain the existing key and backups instead of creating a new `SIGNING_KEY`.
 
-#### 최초 배포의 Worker 없음 처리
+#### Handling a missing Worker during initial deployment
 
-최초 배포에서는 `wrangler secret list`가 `Worker "mewlink" not found.`를 반환할 수 있다. 배포 스크립트는 이 경우 원격 secret이 없는 상태로 진행하고, 필요한 서명 키를 준비한 뒤 `deploy --secrets-file`로 Worker와 secret을 함께 배포한다. 인증·권한·네트워크 등 다른 조회 오류는 중단하며, 기존 Worker의 서명 키 보호는 유지한다.
+During initial deployment, `wrangler secret list` may return `Worker "mewlink" not found.`. In this case, the deployment script proceeds with no remote secrets, prepares the required signing key, then deploys the Worker and secrets together using `deploy --secrets-file`. Other lookup errors, including authentication, permission, and network errors, stop deployment; protection of the existing Worker's signing key remains in place.
 
-#### D1 ID 불일치로 배포가 중단될 때
+#### When deployment stops due to a D1 ID mismatch
 
-`기존 D1 ID와 이름이 다릅니다` 또는 `D1 ID 불일치`는 `wrangler.jsonc`에 저장된 ID와 현재 계정의 같은 이름 DB의 UUID가 다르다는 뜻이다. 자동으로 DB를 바꾸지 않고 중단한다.
+`기존 D1 ID와 이름이 다릅니다` or `D1 ID 불일치` means that the ID stored in `wrangler.jsonc` differs from the UUID of the database with the same name in the current account. The process stops without automatically switching databases.
 
-`mewlink/`에서 아래 조회 명령을 실행한다.
+Run the following query commands from `mewlink/`.
 
 ```bash
 npx wrangler whoami
 npx wrangler d1 list --json
 ```
 
-대상 Cloudflare 계정이 맞는지 먼저 확인한다. 다른 계정이면 배포 계정을 바로잡는다. 올바른 계정이고 목록의 `mewlink`가 사용할 DB라면 `wrangler.jsonc`의 `d1_databases`에서 `DB` 바인딩의 `database_id`를 조회된 `uuid`로 수정하고 `npm run deploy`를 다시 실행한다. 기존 계정·기기 등록을 복구하려는 상황이면 빈 DB로 대체하지 말고 기존 DB가 있는 계정과 백업을 먼저 확인한다. 이 복구에 DB 삭제나 서명 키 재생성은 필요 없다. [D1 조회 명령](https://developers.cloudflare.com/d1/wrangler-commands/).
+First verify that the target Cloudflare account is correct. If it is a different account, correct the deployment account. If the account is correct and `mewlink` in the list is the database to use, change `database_id` for the `DB` binding under `d1_databases` in `wrangler.jsonc` to the returned `uuid`, then rerun `npm run deploy`. If you are restoring existing accounts and device registrations, do not substitute an empty database; first check the account containing the existing database and its backups. This recovery does not require deleting the database or regenerating the signing key. [D1 query commands](https://developers.cloudflare.com/d1/wrangler-commands/).
 
-Google/GitHub/이메일은 Authorization Code + PKCE, Apple은 공식 confidential-client 흐름과 `form_post`·state·nonce를 사용한다. Apple metadata에서 PKCE 지원을 선언하지 않으므로 적용을 가정하지 않는다. OIDC는 issuer·audience·nonce·만료·JWKS 서명을 검증한다. Apple의 교차 사이트 POST용 로그인 cookie는 `SameSite=None`, 중앙 세션 cookie는 `SameSite=Lax`다. 신원은 제공자/issuer/불변 subject로 식별하고 같은 이메일로 계정을 합치지 않는다.
+Google/GitHub/email use Authorization Code + PKCE; Apple uses the official confidential-client flow with `form_post`, state, and nonce. Apple's metadata does not declare PKCE support, so do not assume it applies. OIDC validates the issuer, audience, nonce, expiration, and JWKS signature. The login cookie for Apple's cross-site POST uses `SameSite=None`, and the central session cookie uses `SameSite=Lax`. Identities are identified by provider/issuer/immutable subject; accounts are not merged based on matching email addresses.
 
-[Google 웹 서버 OAuth](https://developers.google.com/identity/protocols/oauth2/web-server), [GitHub 웹 OAuth](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps), [Apple 웹 인증 설정](https://developer.apple.com/help/account/capabilities/configure-sign-in-with-apple-for-the-web/), [Apple 인증 metadata](https://appleid.apple.com/.well-known/openid-configuration).
+[Google web server OAuth](https://developers.google.com/identity/protocols/oauth2/web-server), [GitHub web OAuth](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps), [Apple web authentication configuration](https://developer.apple.com/help/account/capabilities/configure-sign-in-with-apple-for-the-web/), [Apple authentication metadata](https://appleid.apple.com/.well-known/openid-configuration).
 
-## 상태·키·복구
+## State, keys, and recovery
 
-호스트는 20초 heartbeat의 응답을 5초 기다리고 한 번 재전송해 5초 더 확인한 뒤 WSS를 강제 종료·재접속한다. handshake는 30초로 제한한다. 호스트 감시 수정은 서버 적용이 필요하다. 경량 presence API와 원인별 브라우저 복구·인증 본문 제한은 별도로 중앙 런처 빌드·Worker 배포가 필요하다. [구현·검증과 비공개 소스 보관 범위](../work/mewlink-efficient-recovery.md)를 확인한다. 중앙의 `offline`과 호스트의 `online` 표시가 다르면 서버 프로세스 실행 여부와 함께 이 응답 감시의 적용 여부를 확인한다. 상세 생존 확인·RTC 보존 기준은 [원격 접속 계약](../development/remote-access.md#시그널링-순단의-같은-rtc-재부착)을 따른다.
+The host waits 5 seconds for a response to its heartbeat sent every 20 seconds, retransmits once and waits another 5 seconds, then forcibly closes and reconnects WSS. The handshake is limited to 30 seconds. The host monitoring fix must be applied to the server. The lightweight presence API, cause-specific browser recovery, and authentication body limits separately require a central launcher build and Worker deployment. See [implementation, verification, and private source retention scope](../work/mewlink-efficient-recovery.md). If the central `offline` status differs from the host's `online` status, check whether the server process is running and whether this response monitoring has been applied. Follow the [remote access contract](../development/remote-access.md#reattaching-the-same-rtc-after-a-brief-signaling-interruption) for detailed liveness checks and RTC retention criteria.
 
-D1은 `mewlink/migrations/0001_accounts.sql`부터 `0006_instance_rate_keys.sql`까지 순서대로 적용한다. 중앙 관리 세션 7일, 로그인/등록 요청 5분, launch 60초, 재사용 방지 증명·rate limit은 각각 만료값을 가진다. 매시간 Cron이 만료 행을 정리하되 브라우저 접근 회수 기록은 보존한다. DO는 WebSocket attachment로 브라우저 키 지문·인증·협상 상태를 보존하고 hibernation 이후 재검증한다. A의 20초 heartbeat는 자동 응답으로 처리하며 60초 무응답·10초 간격 만료 검사로 오프라인을 판정한다. 열린 작업 연결의 lease는 60초·20초 갱신이며 브라우저 회수·등록 폐기는 해당 DO와 A에 종료를 보낸다. 중앙 로그아웃과 로컬 신뢰 세션의 경계는 [원격 인증 계약](../development/remote-access.md#승인된-mewlink-계정-로그인)을 따른다.
+Apply the D1 migrations in order from `mewlink/migrations/0001_accounts.sql` through `0006_instance_rate_keys.sql`. Central management sessions expire after 7 days, login/registration requests after 5 minutes, and launch after 60 seconds; replay-prevention proofs and rate limits each have their own expiration values. An hourly Cron removes expired rows while retaining browser access revocation records. The DO preserves browser key fingerprints, authentication, and negotiation state in WebSocket attachments and revalidates them after hibernation. A's heartbeat every 20 seconds is handled with automatic responses; offline status is determined after 60 seconds without a response, with expiration checks every 10 seconds. Open work connections have a 60-second lease renewed every 20 seconds; browser revocation and registration revocation send termination messages to the corresponding DO and A. Follow the [remote authentication contract](../development/remote-access.md#approved-mewlink-account-login) for the boundary between central logout and local trusted sessions.
 
-중앙 Ed25519 `SIGNING_KEY`는 최초 배포 때 생성하여 보호된 `mewlink/.secrets.json`과 Worker secret에 보관한다. `.deployment-state.json`은 배포된 공개 키 지문만 기록한다. 기존 Worker의 키를 다른 값으로 자동 교체하지 않는다. 로컬 키가 없으면 이미 배포된 Worker secret을 유지한다. 키를 잃고 Worker secret도 지웠다면 새 키는 기존 A에 고정된 공개 키와 달라지므로 복구 또는 명시적 재등록이 필요하다. 자동 키 회전은 제공하지 않는다.
+The central Ed25519 `SIGNING_KEY` is generated during the initial deployment and stored in protected `mewlink/.secrets.json` and a Worker secret. `.deployment-state.json` records only the deployed public key fingerprint. The existing Worker's key is not automatically replaced with a different value. If the local key is missing, the already deployed Worker secret is retained. If the key is lost and the Worker secret has also been deleted, a new key will differ from the public key pinned on existing A instances, requiring recovery or explicit re-registration. Automatic key rotation is not provided.
 
-D1의 일관된 export/복구와 서명 키를 함께 백업한다. 과거 Node 중앙의 `central.sqlite`와 `signing-key.json` 자동 이관은 제공하지 않는다. 실제 과거 등록이 있다면 키·계정·등록을 확인하고 별도 이관 또는 owner 승인 재등록을 수행한다. 보관/개인정보 안내·계정 삭제·재해 복구 실습은 출시 전 운영 게이트다.
+Back up a consistent D1 export/recovery set together with the signing key. Automatic migration of `central.sqlite` and `signing-key.json` from the former Node central service is not provided. If actual historical registrations exist, check the keys, accounts, and registrations, then perform a separate migration or re-registration approved by the owner. Retention/privacy notices, account deletion, and disaster recovery exercises are pre-release operational gates.
 
-OAuth callback query/form·Cookie·launch·등록 코드·SDP·ICE·접속 증명은 로그에 기록하지 않는다. Wrangler 설정은 invocation 로그를 끄고 오류 응답은 비밀값을 포함하지 않는다. 사용자 작업 데이터를 위한 중앙 `/api` 경로는 제공하지 않는다.
+Do not log OAuth callback query/form data, Cookie, launch, registration codes, SDP, ICE, or connection proofs. The Wrangler configuration disables invocation logs, and error responses contain no secrets. No central `/api` route is provided for user work data.
 
-## 멤버·설정과 검증
+## Members, configuration, and verification
 
-A의 중앙 주소는 기본 `https://mew.saens.kr`이며 `MEW_REMOTE_ORIGIN`으로 최초 등록 대상을 바꾼다. 등록 후에는 저장한 origin·키를 사용하므로 주소/키 변경은 등록 해제·재등록을 따른다. CLI `./mew remote-access account`는 안내만 제공하고 owner 인가를 대신하지 않는다. 로컬 bind·포트는 유지한다.
+A's default central address is `https://mew.saens.kr`; `MEW_REMOTE_ORIGIN` changes the initial registration target. After registration, the saved origin and key are used, so changing the address/key requires unregistering and re-registering. CLI `./mew remote-access account` provides guidance only and does not replace owner authorization. The local bind and port are retained.
 
-멤버는 중앙에 먼저 로그인하고 헤더의 이름을 눌러 계정 ID를 복사한다. A의 owner가 **멤버 접근**에서 이 ID와 기존 로컬 계정을 연결한다. 임시 비밀번호·역할·기능·파일 권한은 로컬에서 계속 검사한다. 회수는 A에서, 중앙 등록 삭제는 owner 대시보드 또는 A의 등록 해제로 수행한다.
+Members first log in to the central service and click their name in the header to copy their account ID. A's owner links this ID to an existing local account under **Member Access**. Temporary passwords, roles, features, and file permissions continue to be checked locally. Revoke access on A; delete the central registration through the owner dashboard or by unregistering A.
 
 ```bash
 # 공개 mew: 빌드·서비스에 영향을 주지 않는 검증
@@ -304,25 +304,25 @@ npm test
 npm run test:browser
 ```
 
-브라우저 통합 테스트는 부모 mew 개발 환경의 Chromium·네이티브 RTC·rolldown을 사용하며 작은 테스트 fixture를 메모리에서 컴파일한다. 실제 앱 `dist/`를 쓰거나 빌드하지 않는다. 현재 검증은 Worker/D1/DO의 등록·권한·일회용 승인·hibernation·로그아웃, 제공자 응답 fixture를 통한 OAuth, 실제 Chromium과 A의 P2P UI·worker·자원·새로고침·여러 탭을 포함한다. Cloudflare 운영 배포는 사용자가 실행했으며 수정본의 운영 반영은 재배포 후 확인한다. 실제 OAuth 앱 로그인·Windows/WSL/Mac ↔ Android/LTE/5G 성공률은 검증하지 않았다. 일반 출시 판단은 [작업 기록](../work/remote-access.md)을 따른다.
+Browser integration tests use Chromium, native RTC, and rolldown from the parent mew development environment and compile a small test fixture in memory. They do not use or build the actual app's `dist/`. Current verification covers Worker/D1/DO registration, permissions, one-time approval, hibernation, and logout; OAuth using provider response fixtures; and P2P UI, workers, resources, refreshes, and multiple tabs with actual Chromium and A. The user performed the Cloudflare production deployment; production application of the fixes is checked after redeployment. Actual OAuth app login and success rates for Windows/WSL/Mac ↔ Android/LTE/5G have not been verified. Follow the [work record](../work/remote-access.md) for general release decisions.
 
-## 시그널링 인가 상태의 보존과 복귀
+## Preserving and restoring signaling authorization state
 
-기기·브라우저 인가 상태는 기기별 DO SQLite에도 영속 저장한다. 중앙 코드가 `mew_signal_instances`·`mew_signal_browsers` 테이블을 생성하고 첫 접근에서 기존 D1 기록을 가져온다. D1 스키마 변경·기기 재등록·로컬 mew 재시작 없이 중앙 재배포로 적용한다. [현재 인가 계약](../development/remote-access.md#중앙-시그널링의-인가-상태)·[ADR 0025](../decisions/0025-mewlink-signaling-authority.md).
+Device and browser authorization state is also persisted in each device's DO SQLite. The central code creates the `mew_signal_instances` and `mew_signal_browsers` tables and imports existing D1 records on first access. Apply this through central redeployment without D1 schema changes, device re-registration, or restarting local mew. [Current authorization contract](../development/remote-access.md#central-signaling-authorization-state) · [ADR 0025](../decisions/0025-mewlink-signaling-authority.md).
 
-브라우저 회수·기기 폐기는 DO에 먼저 기록한 뒤 D1을 갱신한다. D1 갱신 실패로 관리 요청이 실패해도 DO의 회수는 유지된다. 같은 회수 요청을 다시 실행해 D1 반영을 확인한다. 이 단계에서 기기를 재등록하거나 DO 상태를 삭제해 오류를 해소하지 않는다.
+Browser revocation and device revocation are recorded in the DO first, then D1 is updated. Even if the management request fails because the D1 update fails, the DO revocation remains in effect. Rerun the same revocation request to confirm that it is reflected in D1. Do not resolve errors at this stage by re-registering the device or deleting DO state.
 
-백업은 중앙 서명 키·D1과 함께 DO의 영속 인가 상태를 포함한다. D1 export만으로는 아직 D1에 반영하지 못한 DO 회수 기록을 복구할 수 없다. 구버전으로 복귀하기 전에 회수 기록의 D1 반영을 확인하고 열린 연결을 종료한다. 상태를 복구할 때 오래된 active 기록으로 DO 회수를 덮어쓰지 않는다. DO SQLite의 복구 기능은 [Cloudflare PITR](https://developers.cloudflare.com/durable-objects/api/sqlite-storage-api/#pitr-point-in-time-recovery-api)을 따른다.
+Backups include the DO's persistent authorization state along with the central signing key and D1. A D1 export alone cannot restore DO revocation records that have not yet been reflected in D1. Before rolling back to an older version, confirm that revocation records are reflected in D1 and terminate open connections. When restoring state, do not overwrite DO revocations with old active records. Follow [Cloudflare PITR](https://developers.cloudflare.com/durable-objects/api/sqlite-storage-api/#pitr-point-in-time-recovery-api) for DO SQLite recovery capabilities.
 
-## localhost 앱 프리뷰 origin
+## localhost app preview origin
 
-`mew.run/<user>/<device>/<port>`의 포트 연결에는 `PREVIEW_DOMAIN=preview.mew.run`과 `*.preview.mew.run/*` Worker 경로가 필요하다. 같은 Worker로 proxied wildcard DNS를 연결하고 `*.preview.mew.run`의 HTTPS 인증서를 준비한다. 기본 `*.mew.run` 인증서만으로 중첩 하위 도메인이 포함되지는 않는다. 각 프리뷰는 별도 난수 호스트를 사용하며 앱의 자산·API·WebSocket은 기존 P2P 전송으로 전달한다.
+Port connections at `mew.run/<user>/<device>/<port>` require `PREVIEW_DOMAIN=preview.mew.run` and the `*.preview.mew.run/*` Worker route. Point proxied wildcard DNS to the same Worker and prepare an HTTPS certificate for `*.preview.mew.run`. The default `*.mew.run` certificate alone does not cover nested subdomains. Each preview uses a separate random hostname, and app assets, APIs, and WebSockets are forwarded over the existing P2P transport.
 
-`wrangler deploy`는 wildcard Worker 경로를 등록하지만 해당 경로의 DNS 레코드를 만들지 않는다. 중앙을 다시 배포해도 DNS의 `ENOTFOUND`는 그대로 남을 수 있다. [Cloudflare Worker 경로](https://developers.cloudflare.com/workers/configuration/routing/routes/)의 DNS 준비 조건을 따른다.
+`wrangler deploy` registers a wildcard Worker route but does not create a DNS record for that route. DNS `ENOTFOUND` may persist even after redeploying the central service. Follow the DNS prerequisites for [Cloudflare Worker routes](https://developers.cloudflare.com/workers/configuration/routing/routes/).
 
-현재 `PREVIEW_DOMAIN=preview.mew.run`을 유지할 때 Cloudflare의 **mew.run → DNS → Records**에 다음 레코드를 준비한다.
+When retaining the current `PREVIEW_DOMAIN=preview.mew.run`, prepare the following record under **mew.run → DNS → Records** in Cloudflare.
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
 | Type | `CNAME` |
 | Name | `*.preview` |
@@ -330,24 +330,24 @@ npm run test:browser
 | Proxy status | **Proxied** |
 | TTL | Auto |
 
-이는 `*.preview.mew.run`을 같은 Worker로 보내는 DNS 레코드다. `preview.mew.run` 자체의 레코드는 난수 호스트 조회를 대신하지 않는다. [깊은 wildcard DNS](https://developers.cloudflare.com/dns/manage-dns-records/reference/wildcard-dns-records/)는 지원되지만, HTTPS에는 정확히 `*.preview.mew.run`을 포함하는 활성 Edge Certificate가 필요하다. 기본 Universal SSL의 `*.mew.run`은 이 주소를 보호하지 않으므로 기존 인증서를 확인한 뒤 필요한 인증서 준비 방법을 결정한다. [Universal SSL 범위](https://developers.cloudflare.com/ssl/edge-certificates/universal-ssl/limitations/)를 따른다.
+This DNS record routes `*.preview.mew.run` to the same Worker. A record for `preview.mew.run` itself does not handle random hostname lookups. [Deep wildcard DNS](https://developers.cloudflare.com/dns/manage-dns-records/reference/wildcard-dns-records/) is supported, but HTTPS requires an active Edge Certificate that explicitly includes `*.preview.mew.run`. The default Universal SSL `*.mew.run` does not secure this address, so check existing certificates before deciding how to provision the required certificate. Follow [Universal SSL coverage](https://developers.cloudflare.com/ssl/edge-certificates/universal-ssl/limitations/).
 
-중앙의 `src/port-preview.ts`·`public/port-preview-launch.js`·`public/port-preview-worker.js`·`public/port-preview-runtime.js`와 Worker 진입점·클라이언트·설정을 함께 반영한 후 사용자가 배포한다. 자세한 권한·보안 경계와 미지원 항목은 [포트 프리뷰](../development/port-preview.md)를 따른다. 이 작업에서는 중앙 배포·실제 도메인·외부망 검사를 실행하지 않았다.
+The user deploys after applying the central `src/port-preview.ts`, `public/port-preview-launch.js`, `public/port-preview-worker.js`, and `public/port-preview-runtime.js` together with the Worker entry point, client, and configuration. Follow [port preview](../development/port-preview.md) for detailed permission/security boundaries and unsupported items. This work did not include central deployment, actual domain checks, or external network checks.
 
-2026-10-27 읽기 전용 확인에서는 공개 기기 프리뷰 진입점이 HTTP 200이었지만 `preview.mew.run`과 서로 다른 난수 하위 호스트의 DNS 조회는 `ENOTFOUND`였다. Worker 설정이 있어도 외부 DNS가 준비되지 않으면 프리뷰는 연결되지 않는다. 이 확인에서는 DNS·인증서·Worker 배포를 변경하지 않았다.
+In the read-only check on 2026-10-27, the public device preview entry point returned HTTP 200, but DNS lookups for `preview.mew.run` and different random subhosts returned `ENOTFOUND`. Even with Worker configuration in place, previews cannot connect unless external DNS is ready. This check did not change DNS, certificates, or the Worker deployment.
 
-운영 담당자는 다음 순서로 준비를 확인한다.
+Operators check readiness in the following order.
 
-1. `PREVIEW_DOMAIN`과 일치하는 도메인 아래의 `*` DNS 레코드를 같은 Worker로 연결하고 proxied 상태·`*.preview.mew.run/*` 경로를 확인한다.
-2. 정확히 `*.preview.mew.run`을 포함하는 활성 HTTPS 인증서를 확인한다. `*.mew.run`만 포함한 인증서로 대체하지 않는다.
-3. 새로 만든 32자리 16진수 하위 호스트에서 DNS와 `https://<난수>.preview.mew.run/__mew_preview_launch`의 HTTPS 응답을 확인한다. 공개 기기 페이지의 200만 확인하고 끝내지 않는다.
-4. 호스트와 공용 프리뷰 launcher의 수정본을 각각 적용하고 실제 기기 주소의 `/<port>`에서 모듈·API·WebSocket을 확인한다. 원격 초기화 실패·15초 제한은 [프리뷰 계약](../development/port-preview.md#mewlink)을 따른다.
+1. Point the `*` DNS record under the domain matching `PREVIEW_DOMAIN` to the same Worker, and verify its proxied status and the `*.preview.mew.run/*` route.
+2. Verify an active HTTPS certificate that explicitly includes `*.preview.mew.run`. Do not substitute a certificate that includes only `*.mew.run`.
+3. Verify DNS and the HTTPS response from `https://<난수>.preview.mew.run/__mew_preview_launch` on a newly created subhost with a 32-digit base-16 name. Do not stop after checking only the public device page's 200 response.
+4. Apply the host and public preview launcher fixes respectively, then check modules, APIs, and WebSockets at `/<port>` on the actual device address. Follow the [preview contract](../development/port-preview.md#mewlink) for remote initialization failures and the 15-second limit.
 
-저장소 루트에서 다음 명령으로 설정에 맞는 서로 다른 난수 호스트 두 곳의 DNS·HTTPS·launcher와 공용 자산을 읽기 전용으로 검사한다. 이 명령은 DNS·인증서·Worker를 생성하거나 앱을 빌드하지 않는다.
+From the repository root, use the following command to perform read-only checks of DNS, HTTPS, the launcher, and public assets on two different random hosts matching the configuration. This command does not create DNS records, certificates, or Workers, or build the app.
 
 ```bash
 npm run check:port-preview
 npm run check:port-preview -- --config mewlink/wrangler.jsonc
 ```
 
-`PREVIEW_DOMAIN`이 비어 있으면 프리뷰 비활성으로 표시하고 검사를 생략한다. 설정된 프리뷰의 DNS·HTTPS·Worker 응답·Service Worker scope·launcher 초기화 완료 통지 중 하나라도 준비되지 않으면 실패 종료한다. 비공개 `mewlink/scripts/deploy.mjs`도 Worker 배포 뒤 같은 검사를 실행하고, 준비가 실패하면 전체 완료 문구를 출력하지 않는다. 이때 Worker 변경은 이미 적용됐을 수 있으며 자동으로 되돌리지 않는다. DNS·HTTPS 준비 후 위 검사만 다시 실행할 수 있다. 이 검사의 성공은 실제 로그인·P2P 연결과 upstream 앱의 표시 성공을 대신하지 않는다.
+If `PREVIEW_DOMAIN` is empty, report previews as disabled and skip the checks. Exit with failure if any configured preview DNS, HTTPS, Worker response, Service Worker scope, or launcher initialization completion notification is not ready. The private `mewlink/scripts/deploy.mjs` also runs the same checks after Worker deployment and does not print the overall completion message if readiness checks fail. Worker changes may already have been applied at that point and are not automatically rolled back. After DNS and HTTPS are ready, only the checks above can be rerun. Passing these checks does not establish successful actual login, P2P connection, or upstream app display.

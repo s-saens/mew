@@ -1,25 +1,25 @@
 ---
-provenance: "Liiiiv 중앙 ADR 이관본, 2026-10-14"
-description: "이관한 결정 기록: AI 메시지와 CLI 명령은 같은 탭 실행 큐를 쓴다. 당시 선택·근거·후속 변경을 보존하며 현재 계약은 Mew 소유 문서에서 확인한다."
-title: "0153 — AI 메시지와 CLI 명령은 같은 탭 실행 큐를 쓴다"
+provenance: "Migrated copy of a Liiiiv central ADR, 2026-10-14"
+description: "Migrated decision record: AI messages and CLI commands use the same tab execution queue. Preserves the choices, rationale, and subsequent changes from that time; consult the Mew owning document for the current contract."
+title: "0153 — AI messages and CLI commands use the same tab execution queue"
 created: 2026-09-16
 updated: 2026-09-21
 ---
 
-- 상태: 채택
-- 후속 결정: [0186](0186-mew-cancel-active-continues-queue.md) — 사용자 중단은 진행 작업만 취소하고 대기 큐를 계속 실행
-- 후속 결정: [0164](0164-mew-agent-memory-protection.md) — 메모리 부족 시 작업 취소·큐 보류·명시적 재개
-- 결정자: 송상훈 (지시)
-- 부분 대체: [0152](0152-mew-agent-cli-command-records.md) — CLI 즉시 실행·ACP 큐 제외 범위
+- Status: Adopted
+- Follow-up decision: [0186](0186-mew-cancel-active-continues-queue.md) — User cancellation cancels only the active job and continues running the pending queue
+- Follow-up decision: [0164](0164-mew-agent-memory-protection.md) — Cancel jobs, hold the queue, and require explicit resumption when memory is low
+- Decision maker: Song Sanghoon (directive)
+- Partially supersedes: [0152](0152-mew-agent-cli-command-records.md) — Immediate CLI execution and exclusion from the ACP queue
 
-## 결정
+## Decision
 
-같은 에이전트 탭의 AI 메시지·CLI 명령·`/clear`는 감독이 소유한 공통 FIFO 큐를 사용한다. 이미 실행 중인 작업이 있으면 CLI 명령도 대기하며, CLI 실행 중 도착한 AI 메시지도 기다린다. 실행 차례가 되기 전에는 tmux를 생성하지 않는다. 다른 탭의 작업은 막지 않는다.
+AI messages, CLI commands, and `/clear` in the same agent tab use a shared FIFO queue owned by the supervisor. If a job is already running, CLI commands wait too, and AI messages arriving during CLI execution also wait. Do not create tmux until the job's turn to run. Do not block jobs in other tabs.
 
-CLI는 AI 프롬프트로 변환하지 않는다. 큐 항목에 명령 유형과 기록 ID를 보존하며, 화면의 기존 대기열에서 CLI를 표시하고 취소·재정렬한다. 일반 프롬프트 편집과 달리 CLI 원문 편집은 제공하지 않는다. 중단은 진행 작업과 대기 항목을 함께 취소하고, 패널·브라우저 닫기는 큐를 유지한다.
+Do not convert CLI commands into AI prompts. Preserve the command type and record ID in queue entries, and display, cancel, and reorder CLI commands in the existing on-screen queue. Unlike regular prompts, CLI source text cannot be edited. Stopping cancels both the active job and pending entries; closing the panel or browser preserves the queue.
 
-`/clear` 뒤의 명령은 경계가 성공한 새 대화에 기록한다. 실행 시작 시 대화 ID와 표시 위치를 확정한다. 완료 기록·출력 압축·tmux 종료·권한 경계는 ADR 0152를 유지한다. 세부 계약과 검증은 [세션 문서](../../development/agent-sessions.md)에 기록한다.
+Record commands after `/clear` in the new conversation created by the successful boundary transition. Finalize the conversation ID and display position when execution starts. Retain the completion recording, output compression, tmux termination, and permission boundaries from ADR 0152. Record detailed contracts and verification in the [session document](../../development/agent-sessions.md).
 
-## 근거
+## Rationale
 
-화면의 입력 순서와 실행 순서를 일치시키고, 같은 작업 폴더에서 AI와 CLI가 의도치 않게 동시에 변경하는 것을 막는다. 브라우저 메모리가 아닌 독립 감독의 큐를 사용해 재접속 중에도 실행 순서를 유지한다.
+Match execution order to the on-screen input order and prevent AI and CLI from unintentionally making simultaneous changes in the same working folder. Use the independent supervisor's queue rather than browser memory to preserve execution order during reconnection.

@@ -1,34 +1,34 @@
 ---
-provenance: "Liiiiv 중앙 ADR 이관본, 2026-10-14"
-description: "이관한 결정 기록: mew 탭·창 전환 시 스크롤 위치 복원 (ADR 0029 잔여 금지 해제). 당시 선택·근거·후속 변경을 보존하며 현재 계약은 Mew 소유 문서에서 확인한다."
-title: "0039 — mew 탭·창 전환 시 스크롤 위치 복원 (ADR 0029 잔여 금지 해제)"
+provenance: "Migrated copy of a Liiiiv central ADR, 2026-10-14"
+description: "Migrated decision record: Restore scroll positions on mew tab and window switches (lifts the remaining prohibition from ADR 0029). Preserves the choices, rationale, and subsequent changes from that time; see the Mew owning document for the current contract."
+title: "0039 — Restore scroll positions on mew tab and window switches (lifts the remaining prohibition from ADR 0029)"
 created: 2026-08-08
 updated: 2026-08-20
 ---
 
-- 날짜: 2026-08-08
-- 상태: 채택
-- 결정자: 송상훈 (지시)
+- Date: 2026-08-08
+- Status: Adopted
+- Decision maker: Song Sanghoon (directive)
 
-## 배경
+## Background
 
-[ADR 0029](0029-mew-drop-scroll-position-restore.md)는 스크롤 복원을 전면 제거하며 "재추가 금지"를 걸었고,
-[ADR 0038](0038-mew-scroll-restore-on-reload.md)이 새로고침·브라우저 재시작에 한해 부분 대체했다.
-그 결과 새로고침은 보던 자리로 돌아오는데 탭을 오가면 맨 위로 간다 — 두 동작이 갈라져 오히려 어색해졌고,
-사용자가 탭 전환에도 같은 복원을 지시했다.
+[ADR 0029](0029-mew-drop-scroll-position-restore.md) removed scroll restoration entirely and prohibited reintroducing it; [ADR 0038](0038-mew-scroll-restore-on-reload.md) partially superseded it for
+reloads and browser restarts only. As a result, reloading returns to the previous position, but switching tabs goes to
+the top — the divergent behaviors made things more awkward, and the user instructed us to apply
+the same restoration to tab switches.
 
-## 결정
+## Decision
 
-탭·창 전환에도 스크롤 위치를 복원한다. 0029의 잔여 금지(전환 복원)를 해제한다.
+Restore scroll positions on tab and window switches as well. Lift 0029's remaining prohibition (switch restoration).
 
-- 저장은 0038 그대로 (`src/utils/scrollMemory.ts`, `mew:scroll:{프로젝트}`)
-- `takeScroll`의 "로드 후 문서당 한 번" 소비 제한을 없애고 `getScroll`로 바꾼다 — 아직 flush 안 된
-  pending 값을 우선하므로 전환 직전 위치가 즉시 잡힌다
-- `EditorPane`의 복원 effect가 활성 문서가 바뀔 때마다 돈다. 내용이 차야 높이가 생기는 건 그대로라
-  rAF 재시도(최대 ~10초)도 그대로 — 전환으로 문서가 또 바뀌면 cleanup이 이전 추격을 끊는다
+- Saving remains as defined in 0038 (`src/utils/scrollMemory.ts`, `mew:scroll:{프로젝트}`)
+- Remove `takeScroll`'s consumption limit of "once per document after loading" and replace it with `getScroll` — pending values that have not yet been flushed take priority,
+  so the position immediately before switching is available right away
+- The restoration effect in `EditorPane` runs whenever the active document changes. Height still depends on content being populated, so rAF retries remain
+  (up to ~10 seconds) — if another switch changes the document again, cleanup stops the previous restoration attempts
 
-## 근거
+## Rationale
 
-- 0029의 근거였던 "매 전환의 보이는 스크롤 흘러감"보다 보던 자리 유지가 낫다는 사용자 판단.
-  plain(CodeMirror)·로컬 문서는 높이가 즉시 있어 첫 프레임에 복원되고, collab 문서만 동기화만큼 늦는다
-- 0038이 저장·복원 기반을 이미 깔아 둬 변경은 소비 제한 제거뿐이다 — 별도 메커니즘을 만들지 않는다
+- The user judged preserving the previous position preferable to the "visible scrolling on every switch" that motivated 0029.
+  Plain (CodeMirror) and local documents have height immediately and restore on the first frame; only collab documents are delayed by synchronization
+- 0038 already established the saving and restoration infrastructure, so the only change is removing the consumption limit — no separate mechanism is created

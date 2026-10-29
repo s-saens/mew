@@ -1,30 +1,30 @@
 ---
-provenance: "Liiiiv 중앙 ADR 이관본, 2026-10-14"
-description: "이관한 결정 기록: macOS 화면과 커서를 ScreenCaptureKit으로 분리한다. 당시 선택·근거·후속 변경을 보존하며 현재 계약은 Mew 소유 문서에서 확인한다."
-title: "0148 — macOS 화면과 커서를 ScreenCaptureKit으로 분리한다"
+provenance: "Migrated copy of a Liiiiv central ADR, 2026-10-14"
+description: "Migrated decision record: Separate the macOS screen and cursor with ScreenCaptureKit. Preserves the choices, rationale, and subsequent changes from that time; consult the Mew owning document for the current contract."
+title: "0148 — Separate the macOS screen and cursor with ScreenCaptureKit"
 created: 2026-09-15
 updated: 2026-09-15
 ---
 
-- 상태: 채택
-- 결정자: 사용자 (외부 서비스 없는 Mac 최적화 구현 요청), Codex (설계)
-- 부분 대체: [0144](0144-mew-desktop-local-cursor.md)의 Mac 기존 캡처 유지 범위
-- 부분 대체: [0136](0136-mew-native-remote-desktop-webrtc.md)의 macOS Chromium 캡처 선택
+- Status: Adopted
+- Decision makers: User (requested implementation of Mac optimizations without external services), Codex (design)
+- Partially supersedes: The scope in [0144](0144-mew-desktop-local-cursor.md) that retains existing capture on Mac
+- Partially supersedes: The macOS Chromium capture choice in [0136](0136-mew-native-remote-desktop-webrtc.md)
 
-## 결정
+## Decision
 
-**후속 결정:** [0188](0188-mew-posix-native-desktop.md)은 Mac의 Electron·CPU 픽셀·canvas 전송을 네이티브 VideoToolbox H.264와 자체 권한 앱으로 전환한다. 우선 영상 커서를 사용하며 기존 분리 커서 구현은 역사적 근거로 보존한다.
+**Subsequent decision:** [0188](0188-mew-posix-native-desktop.md) switches Mac from Electron, CPU pixels, and canvas transport to native VideoToolbox H.264 and an app with its own permissions. It initially uses the video cursor and preserves the existing separate-cursor implementation as historical rationale.
 
-macOS 12.3 이상에서는 ScreenCaptureKit의 `showsCursor = NO`로 전체 모니터를 캡처한다. 자체 Objective-C 모듈의 C ABI를 기존 Koffi worker에서 호출한다. ScreenCaptureKit 비동기 콜백은 네이티브 코드 안에서만 처리하며 JavaScript 콜백으로 넘기지 않는다. 설치 시 Apple Command Line Tools로 해당 CPU의 dylib를 컴파일·서명한다. 소스·빌드 스크립트는 helper 지문에 포함하고 바이너리는 저장소에 넣지 않는다.
+On macOS 12.3 or later, capture the entire monitor using ScreenCaptureKit's `showsCursor = NO`. Call the custom Objective-C module's C ABI from the existing Koffi worker. Handle ScreenCaptureKit asynchronous callbacks only within native code; do not pass them to JavaScript callbacks. During installation, compile and sign a dylib for the current CPU using Apple Command Line Tools. Include the source and build scripts in the helper fingerprint, and do not commit binaries to the repository.
 
-OS에서 최대 1080p·60Hz로 변환한 최신 프레임 하나만 유지한다. 변경 없는 화면은 복사·인코딩·영상 전송을 생략한다. 기존 생성 track·WebRTC·VP8 서버 전송·ACK 적응·유휴 생존 확인을 공유한다. 별도 서비스·계정·코덱 의존성을 추가하지 않는다.
+Keep only the latest frame converted by the OS at up to 1080p and 60Hz. Skip copying, encoding, and video transmission for unchanged screens. Share the existing generated track, WebRTC, VP8 server transport, ACK adaptation, and idle liveness checks. Do not add separate service, account, or codec dependencies.
 
-시스템 커서의 모양·hotspot·위치를 별도로 읽어 기존 로컬 커서 프로토콜로 전달한다. AppKit 커서 이미지는 main queue에서 읽고, 화면 복사는 worker에서 수행한다. Retina 영상 픽셀과 CoreGraphics 입력의 논리 좌표를 구분한다. 모양 조회에 쓰는 공개 `currentSystemCursor`와 `CGCursorIsVisible`은 deprecated API이며 최신 OS에서 실제 동작을 별도로 확인한다. 모양 조회가 nil이면 시스템 화살표를 사용한다. 비공개 WindowServer API와 전역 커서 숨기기는 사용하지 않는다.
+Read the system cursor's shape, hotspot, and position separately and send them through the existing local cursor protocol. Read AppKit cursor images on the main queue and copy the screen in the worker. Distinguish Retina video pixels from logical coordinates used for CoreGraphics input. The public `currentSystemCursor` and `CGCursorIsVisible` used for shape queries are deprecated APIs; separately verify their actual behavior on the latest OS. If the shape query returns nil, use the system arrow. Do not use private WindowServer APIs or globally hide the cursor.
 
-첫 커서 없는 프레임을 확인한 뒤에만 로컬 커서를 활성화한다. 초기 네이티브 캡처 실패는 기존 Chromium 영상 커서로 복귀하고 실제 모드는 도움말에 표시한다. 실행 중 권한·로그인 세션·화면 구성 변화나 캡처 종료는 입력을 해제하고 재연결하도록 종료한다. 잠금·로그인 전 화면을 지원하지 않는다. 설치 실패를 성공으로 기록하지 않는다.
+Enable the local cursor only after confirming the first cursor-free frame. If initial native capture fails, fall back to the existing Chromium video cursor and show the actual mode in the help. If permissions, the login session, or the display configuration change during operation, or capture stops, release input and terminate so the user can reconnect. Do not support the lock screen or pre-login screen. Do not record installation failures as successes.
 
-## 근거·검증
+## Rationale and verification
 
-[Apple ScreenCaptureKit](https://developer.apple.com/videos/play/wwdc2022/10156/), [showsCursor](https://developer.apple.com/documentation/screencapturekit/scstreamconfiguration/showscursor), [시스템 커서](https://developer.apple.com/documentation/appkit/nscursor/currentsystem), [커서 표시 상태](https://developer.apple.com/documentation/coregraphics/cgcursorisvisible()).
+[Apple ScreenCaptureKit](https://developer.apple.com/videos/play/wwdc2022/10156/), [showsCursor](https://developer.apple.com/documentation/screencapturekit/scstreamconfiguration/showscursor), [System cursor](https://developer.apple.com/documentation/appkit/nscursor/currentsystem), [Cursor visibility](https://developer.apple.com/documentation/coregraphics/cgcursorisvisible()).
 
-구현·지원 조건은 [개발 계약](../../development/remote-desktop.md), 테스트 결과와 실기 미확인 범위는 [작업 문서](../../work/remote-desktop-latency.md)에 기록한다.
+Record implementation and support conditions in the [development contract](../../development/remote-desktop.md), and test results and areas not checked on actual hardware in the [work document](../../work/remote-desktop-latency.md).

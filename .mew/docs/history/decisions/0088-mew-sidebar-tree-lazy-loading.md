@@ -1,40 +1,40 @@
 ---
-provenance: "Liiiiv 중앙 ADR 이관본, 2026-10-14"
-description: "이관한 결정 기록: mew 사이드바 트리는 폴더 단위로 지연 로드한다. 당시 선택·근거·후속 변경을 보존하며 현재 계약은 Mew 소유 문서에서 확인한다."
-title: "0088 — mew 사이드바 트리는 폴더 단위로 지연 로드한다"
+provenance: "Migrated copy of a Liiiiv central ADR, 2026-10-14"
+description: "Migrated decision record: Load the mew sidebar tree lazily by folder. Preserves the choices, rationale, and subsequent changes from that time; see the Mew owning document for the current contract."
+title: "0088 — Load the mew sidebar tree lazily by folder"
 created: 2026-08-27
 updated: 2026-09-11
 ---
 
-- 날짜: 2026-08-27
-- 상태: 채택
-- 후속 결정: [0105](0105-mew-incremental-file-catalog-and-exact-search-index.md) — 전체 검색·watcher의 재귀 트리와 캐시 전부 무효화
-- 후속 결정: [0125](0125-mew-sidebar-center-anchor-and-visible-loading.md) — 접힌 최상위 폴더 예열
-- 결정자: 송상훈 (지시)
+- Date: 2026-08-27
+- Status: Adopted
+- Follow-up decision: [0105](0105-mew-incremental-file-catalog-and-exact-search-index.md) — Recursive trees for full search and watchers, and full cache invalidation
+- Follow-up decision: [0125](0125-mew-sidebar-center-anchor-and-visible-loading.md) — Prewarm collapsed top-level folders
+- Decision maker: Song Sanghoon (directive)
 
-## 배경
+## Background
 
-루트 프로젝트 전환 때 서버가 전체 디렉터리 트리를 재귀 순회하고, 클라이언트가 여러 트리 요청을
-모두 기다린 뒤 사이드바를 그렸다. 큰 프로젝트에서는 최상위 파일·폴더처럼 바로 보여 줄 수 있는
-정보까지 가장 깊은 하위 경로의 디스크 읽기에 묶였다.
+When switching root projects, the server recursively traversed the entire directory tree, and the client waited for multiple tree requests
+to finish before rendering the sidebar. In large projects, even information that could be displayed immediately, such as top-level
+files and folders, had to wait for disk reads at the deepest subpaths.
 
-## 결정
+## Decision
 
-- `GET /api/tree?path=<상대 폴더>`는 해당 폴더의 직접 자식만 반환한다. 응답에 `children`이 없으면
-  비어 있다는 뜻이 아니라 아직 로드하지 않았다는 뜻이다.
-- 사이드바는 프로젝트 전환 시 루트 목록을 먼저 렌더하고, 다음 프레임부터 최상위 폴더의 직접 자식을
-  하나씩 백그라운드로 예열한다. 더 깊은 폴더는 펼칠 때 요청한다.
-- 파일 조작·watcher 갱신으로 새 루트 목록을 받으면 지연 로드한 자식 캐시를 버린다.
-- `path`가 없는 `/api/tree`는 서버 도구·기존 호출 호환을 위해 전체 재귀 트리를 계속 반환한다.
-  게스트 트리는 후손의 공개 규칙으로 부모 경로를 남겨야 하므로 기존 전체 필터를 유지한다.
+- `GET /api/tree?path=<상대 폴더>` returns only the folder's immediate children. If the response has no `children`, it means they have not
+  been loaded yet, not that the folder is empty.
+- When switching projects, the sidebar renders the root listing first, then starts preloading the immediate children of top-level folders one at a time
+  in the background from the next frame onward. Deeper folders are requested when expanded.
+- When a new root listing arrives after a file operation or watcher update, discard the lazily loaded child cache.
+- `/api/tree` without `path` continues to return the full recursive tree for compatibility with server tools and existing callers. The guest tree retains
+  the existing full-tree filtering because parent paths must be retained based on descendants' public-access rules.
 
-## 근거
+## Rationale
 
-첫 화면의 목적은 탐색을 시작할 수 있게 하는 것이지 프로젝트 전체를 미리 전송하는 것이 아니다.
-한 단계 요청은 디스크와 JSON 크기를 경로별로 제한하면서, 최상위 예열로 자주 여는 첫 폴더의 체감
-지연도 줄인다. 전체 트리가 필요한 검색·watcher의 기존 서버 경로는 유지해 권한·감시 의미를 바꾸지 않는다.
+The initial display is intended to let users start browsing, not to transfer the entire project in advance. Single-level requests limit
+disk access and JSON size per path, while top-level preloading reduces the perceived delay when opening the first frequently used folder.
+Preserve the existing server paths for search and watchers that require the full tree so that permission and monitoring semantics remain unchanged.
 
-## 결과
+## Results
 
-- 큰 프로젝트의 전환은 루트 엔트리가 준비되는 즉시 사이드바에 보인다.
-- 접지 않은 깊은 폴더는 디스크를 읽지 않는다. 처음 펼치는 경우에는 그 행 아래에 로딩 상태가 잠깐 보일 수 있다.
+- When switching to a large project, the sidebar displays its root entries as soon as they are ready.
+- Deep folders that are not collapsed do not trigger disk reads. When expanded for the first time, a loading state may briefly appear below the row.

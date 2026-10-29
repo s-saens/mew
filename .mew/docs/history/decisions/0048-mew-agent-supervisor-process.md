@@ -1,53 +1,53 @@
 ---
-provenance: "Liiiiv 중앙 ADR 이관본, 2026-10-14"
-title: "0048 — 에이전트는 mew의 자식이 아니다. 감독 프로세스가 들고, mew는 소켓으로 붙는다"
+provenance: "Migrated copy of a Liiiiv central ADR, 2026-10-14"
+title: "0048 — Agents are not children of mew. A supervisor process owns them, and mew connects through a socket"
 created: "2026-08-11"
 updated: 2026-10-14
-description: "에이전트 세션을 mew 서버와 수명이 분리된 감독 프로세스가 소유하고 내부 소켓으로 재연결하는 결정을 보존한다. OS 메모리 제어·복원·루트 전환과 Windows 네이티브의 후속 결정에 연결한다."
+description: "Preserves the decision for a supervisor process with a lifecycle separate from the mew server to own agent sessions and reconnect through an internal socket. Links to subsequent decisions on OS memory control, restoration, root switching, and native Windows support."
 ---
 
-- 날짜: 2026-08-11
-- 상태: 채택
-- 후속 결정: [0164](0164-mew-agent-memory-protection.md) — 작업 프로세스 OS 메모리 제한; 독립 감독 수명 유지
-- 후속 결정: [0079](0079-mew-agent-tabs-resume-after-idle.md) — 감독 종료 뒤 복원
-- 후속 결정: [0092](0092-mew-agent-survives-root-project-switch.md) — 루트 전환 시 감독 종료
-- 후속 결정: [0209](0209-mew-native-windows-host-platform.md) — 공통 앱·OS 실행 계층으로 Windows 네이티브 지원을 추가; 기존 감독 수명·loopback·개인 데이터 경계 유지
-- 결정자: 송상훈 (지시)
+- Date: 2026-08-11
+- Status: Adopted
+- Subsequent decision: [0164](0164-mew-agent-memory-protection.md) — OS memory limits for worker processes; retain the independent supervisor lifecycle
+- Subsequent decision: [0079](0079-mew-agent-tabs-resume-after-idle.md) — restoration after supervisor shutdown
+- Subsequent decision: [0092](0092-mew-agent-survives-root-project-switch.md) — shut down supervisors when switching roots
+- Subsequent decision: [0209](0209-mew-native-windows-host-platform.md) — add native Windows support through a common app and OS execution layer; retain existing supervisor lifecycle, loopback, and personal data boundaries
+- Decision maker: Song Sanghoon (directive)
 
-## 배경
+## Background
 
-[ADR 0034](0034-mew-agent-panel-acp-reintroduction.md) 이후 에이전트는 mew 서버가 `spawn`한 자식 프로세스였고, ACP 세션 상태(전사 버퍼·대기 줄·승인 대기)는 mew 프로세스의 메모리에 있었다. 그래서 mew의 수명이 곧 에이전트의 수명이었다:
+Since [ADR 0034](0034-mew-agent-panel-acp-reintroduction.md), agents had been child processes launched by the mew server using `spawn`, and ACP session state (transcript buffer, queue, pending approvals) lived in the mew process's memory. Thus, mew's lifecycle was the agent's lifecycle:
 
-- mew를 재시작하면(배포·설정 변경·크래시) 돌던 턴이 그 자리에서 죽는다. `serve.ts`는 나가는 길에 일부러 자식을 전부 죽였다 — 안 그러면 고아가 쌓였기 때문이다(2026-08-10에 6일치 28개, 3.4GB)
-- 붙어 있는 창이 없으면 10분 뒤 세션을 죽였다. 일하는 중인지는 보지 않았다 — 창을 닫아 두고 긴 작업을 시키면 10분에 잘렸다
+- Restarting mew (deployment, configuration change, crash) immediately killed the running turn. `serve.ts` deliberately killed all children on exit—otherwise orphans accumulated (on 2026-08-10: 28 processes accumulated over 6 days, 3.4 GB)
+- Sessions were killed after 10 minutes with no connected window. Whether work was underway was not checked—assigning a long task and closing the window cut it off at 10 minutes
 
-즉 "시켜 놓고 자리를 뜬다"가 성립하지 않았다. 사용자가 겪은 증상은 "mew가 꺼지면 에이전트가 멈춘다".
+In other words, "assign work and walk away" did not work. The symptom users experienced was "the agent stops when mew shuts down."
 
-## 결정
+## Decision
 
-세션 하나마다 감독 프로세스(`server/agentHost.ts`)를 따로 띄운다. mew는 유닉스 소켓에 붙는 중계다.
+Launch a separate supervisor process (`server/agentHost.ts`) for each session. mew is a relay connected to a Unix socket.
 
 ```
 브라우저 ──WS(/api/agent/ws)── mew ──유닉스 소켓── 감독 프로세스 ──stdio ACP── 어댑터 ── CLI
                                                  (<DATA_DIR>/agent/<runtime>-<hash>.sock)
 ```
 
-- 감독은 `detached`로 뜨고 mew의 프로세스 그룹 밖이다. mew가 죽어도 하던 턴이 계속 돈다. 다시 뜬 mew가 같은 소켓에 붙으면 지나간 이벤트를 통째로 되받아 대화가 그대로 복원된다 (버퍼는 `AgentSession`이 이미 들고 있던 것 — 재접속 복원 경로를 그대로 쓴다)
-- 감독은 아무도 안 보고 일도 없을 때만 저 혼자 나간다(기본 30분). **작업·대기열·진행 중 인증이 전부 끝난 시점부터** 30분을 새로 세며, 일하는 중이면 나가지 않는다 — 이게 옛 유휴 종료와의 차이이고, 이 ADR의 요점이다
-- 탭을 닫는 것(`close_session`)만 감독을 끝낸다. 창을 닫는 것·mew가 꺼지는 것은 소켓만 끊는다
-- 워크스페이스를 갈아끼울 때는 기존 cwd의 감독을 전부 접는다(`shutdownAgentHostsForWorkspace`) — 세션의 cwd는 뜰 때 정해진다
+- The supervisor starts with `detached`, outside mew's process group. Running turns continue even if mew dies. When mew restarts and connects to the same socket, it receives all past events again, restoring the conversation intact (the buffer is the one `AgentSession` already held—the existing reconnection restoration path is reused)
+- The supervisor exits on its own only when no one is watching and no work remains (default: 30 minutes). It starts a fresh 30-minute countdown **once all work, queued tasks, and authentication in progress have finished**, and does not exit while working—this is the difference from the old idle shutdown and the point of this ADR
+- Only closing a tab (`close_session`) terminates the supervisor. Closing the window or shutting down mew only disconnects the socket
+- When switching workspaces, shut down all supervisors for the previous cwd (`shutdownAgentHostsForWorkspace`)—a session's cwd is set at startup
 
-### tmux를 쓰지 않는다
+### Do not use tmux
 
-지시는 "tmux 세션을 이용하든지 해서"였지만 ACP는 stdio에 흐르는 ndjson이다. tmux 안에서 돌리면 그 줄이 pty를 지나며 에코·줄바꿈·폭 접기로 망가진다. 감독이 필요한 것이지 터미널이 필요한 것이 아니라서, pty 대신 프로세스 하나 + 유닉스 소켓으로 간다. 로그는 `<socket>.log`에 남으므로 들여다볼 수는 있다.
+The instruction was "use tmux sessions or something similar," but ACP is ndjson flowing over stdio. Running it inside tmux sends those lines through a pty, where echo, newline handling, and wrapping to terminal width corrupt them. What is needed is a supervisor, not a terminal, so use one process + a Unix socket instead of a pty. Logs remain available for inspection in `<socket>.log`.
 
-### 보안
+### Security
 
-소켓에 붙는 것은 곧 셸을 얻는 것이다(에이전트는 Bash를 쓴다). 그래서 `<DATA_DIR>/agent/`는 `0700`, 소켓은 `0600`으로 만든다 — 같은 유닉스 사용자만 열 수 있다. 브라우저 쪽 경계(owner/manager)는 그대로 WS가 지킨다(`~/dev/liiiiv/mew/SECURITY.md`). 이 결정은 격리를 늘리지 않는다 — mew 서버와 같은 사용자 권한으로 도는 것은 ADR 0044와 같고, OS 층 격리는 여전히 없다.
+Connecting to the socket effectively grants a shell (the agent uses Bash). Therefore, `<DATA_DIR>/agent/` is created with `0700` permissions and the socket with `0600` permissions — only the same Unix user can open them. WS continues to enforce the browser-side boundary (owner/manager) (`~/dev/liiiiv/mew/SECURITY.md`). This decision adds no isolation — running with the same user privileges as the mew server is unchanged from ADR 0044, and there is still no OS-level isolation.
 
-## 결과
+## Results
 
-- mew 재시작·크래시가 에이전트 작업을 끊지 않는다. 배포하면서 시켜 둔 일이 살아남는다
-- `serve.ts`는 나가는 길에 에이전트 탭 감독을 죽이지 않는다. 고아 청소(`reapOrphanAgents`)는 남는다 — 이제 어댑터의 주인 표식은 감독 pid이므로, 감독까지 죽은 어댑터만 잔해다
-- 감독이 살아 있는 동안 그 세션의 램은 유지된다. 옛 구조는 mew가 죽으면 램도 같이 갔다 — 대신 유휴 종료가 그 자리를 맡는다
-- 되돌리려면 `agentWs.ts`가 `connectAgentHost` 대신 `AgentSession`을 직접 잡으면 된다. `AgentSession`은 그대로 두었다(감독 안에서 도는 것뿐이다)
+- A mew restart or crash does not interrupt agent work. Tasks assigned before a deployment survive it.
+- `serve.ts` does not kill agent tab supervisors on exit. Orphan cleanup (`reapOrphanAgents`) remains — since an adapter's owner marker is now the supervisor PID, only adapters whose supervisors have also died are remnants.
+- The session's RAM remains allocated while its supervisor is alive. In the old structure, RAM was released when mew died — idle shutdown now takes over that role.
+- To revert, have `agentWs.ts` manage `AgentSession` directly instead of `connectAgentHost`. `AgentSession` was left unchanged (it simply runs inside the supervisor).

@@ -1,49 +1,49 @@
 ---
-title: "서버 환경변수와 CLI 설정"
-description: "호스트의 설정 파일 우선순위·환경변수·데이터 위치·Mewlink origin·OAuth·원격 데스크톱과 사전 빌드 CLI 옵션을 안내한다. 모듈 초기화 계약은 개발 문서가 소유한다."
+title: "Server environment variables and CLI settings"
+description: "Covers host configuration file precedence, environment variables, data locations, Mewlink origin, OAuth, Remote Desktop, and prebuilt CLI options. Development documentation owns the module initialization contract."
 updated: "2026-10-29"
 상위파일: "MOC.md"
 ---
 
-# 서버 환경변수와 CLI 설정
+# Server environment variables and CLI settings
 
-호스트 운영자가 설정 파일과 실행 옵션을 바꿀 때 읽는다. [설치·실행](../guides/getting-started-ko.md), [화면·알림·단축키](appearance.md), [계정·권한 관리](accounts.md)는 각 안내를 따른다.
+Read this when changing configuration files and launch options as a host operator. Follow the respective guides for [installation and startup](../guides/getting-started-ko.md), [appearance, notifications, and keyboard shortcuts](appearance.md), and [account and permission management](accounts.md).
 
-## 서버 설정
+## Server settings
 
-서버 설정 파일은 Linux·macOS에서 `~/.config/mew/config.env`(`XDG_CONFIG_HOME` 존중), Windows 네이티브에서 `%LOCALAPPDATA%\mew\config\config.env`다. 소스 설치는 이어서 저장소의 `.env`도 읽는다. `server/config.ts`가 `process.loadEnvFile()`로 읽으므로 **명시한 프로세스 환경변수 → config.env → 저장소 .env** 순으로 기존 값이 우선한다. `.env`는 앞에서 정하지 않은 값을 보충하며 이미 설정한 값을 덮지 않는다.
+The server configuration file is `~/.config/mew/config.env` on Linux and macOS (respecting `XDG_CONFIG_HOME`), and `%LOCALAPPDATA%\mew\config\config.env` on native Windows. Source installations then also read the repository's `.env`. Because `server/config.ts` reads these using `process.loadEnvFile()`, existing values take precedence in the order **explicit process environment variables → config.env → repository .env**. `.env` supplies values not set earlier and does not overwrite values already set.
 
-| 변수 | 기본값 | 무엇 |
+| Variable | Default | Purpose |
 | --- | --- | --- |
-| `MEW_WORKSPACE` | 앱 폴더의 부모 | 프로젝트들이 사는 폴더. 앱 설치 경로와 별도로 지정할 수 있다 |
-| `MEW_GITHUB_CLIENT_ID` | 내장 Mew OAuth 앱 | 자체 GitHub OAuth 앱 Client ID로 교체하는 선택 설정. 미설정·빈 값·공백은 기본 앱 사용 |
-| `MEW_DATA_DIR` | Linux·macOS: `~/.local/share/mew`(`XDG_DATA_HOME` 존중), Windows: `%LOCALAPPDATA%\mew\data`. 옛 설치의 `<앱>/.data`가 있으면 우선 사용 | 계정·세션·기능/파일 권한·아이콘 |
-| `MEW_AGENT_MEMORY_SCOPE` | `auto` | 설치된 systemd slice에 ACP·CLI 작업 메모리 제한 적용. `required`는 미설치 시 실행 거부, `off`는 OS 제한만 해제. [설치·메모리 보호](../operations/agent-memory.md) |
-| `MEW_REMOTE_ORIGIN` | `https://mew.run` | 새 원격 등록에 사용할 중앙 HTTPS origin. 등록 후에는 저장된 origin을 사용한다. 기존 `mew.saens.kr` 등록은 중앙의 허용된 이전 origin 지원으로 유지한다. 임의 서비스로 변경하려면 등록을 해제한 뒤 다시 등록한다. [중앙 서비스 운영](../../.mew/docs/operations/remote-central.md) |
-| `MEW_TEAM_PORT` | 5000 | 서버 포트 |
-| `MEW_DESKTOP_ENGINE` | `rust` | 기본 Rust 영상 스레드. `legacy`는 비교·복구용 기존 JS worker 송신 경로. 서버/상주 보조앱을 다시 시작해야 적용. [엔진 계약](../../.mew/docs/development/remote-desktop-rust.md) |
-| `MEW_DESKTOP_HELPER_DIR` | 프로젝트의 `native/remote-desktop`, WSL은 Windows LocalAppData의 `Mew/remote-desktop` | [원격 데스크톱 보조 앱](../guides/remote-desktop.md) 설치 경로. WSL은 Windows 절대 경로 |
-| `MEW_DESKTOP_ICE_SERVERS` | `[{"urls":["stun:stun.l.google.com:19302","stun:stun.cloudflare.com:3478"]}]` | WebRTC 주소 발견용 STUN JSON 배열. `[]`로 외부 조회 비활성화. TURN·영상 중계는 지원하지 않으며 NAT/방화벽에 따라 직접 연결이 불가능할 수 있음 |
-| `MEW_DESKTOP_AUTO_NAT` | `1` | 활성 직결이 지연되면 OS 기본 게이트웨이의 PCP/NAT-PMP/UPnP 임시 UDP 매핑을 시도. `0`으로 비활성화. [수명·OS 네트워크 승인](../../.mew/docs/development/remote-desktop-connectivity.md) |
-| `MEW_DESKTOP_UDP_PORT` | 자동 선택 | Windows/WSL·Mac·Linux 네이티브 호스트의 고정 UDP 포트(1024–65535). 운영자 선택 설정. 기본 연결은 포트 지정 없이 STUN과 짧은 자동 NAT 매핑을 사용함 |
-| `MEW_BIND` | `127.0.0.1` | 서버가 들을 주소. 공개 기본값은 loopback이며, LAN 직접 접속이 꼭 필요할 때만 노출 주소를 명시한다. 서버 배포는 HTTPS 프록시·터널 뒤 `127.0.0.1`로 유지한다 |
-| `MEW_COLLAB_RUST` | 없음(=JS Yjs) | `1`이면 협업 방 상태를 Rust(yrs)로 — 먼저 `npm run build:native` ([협업 방](../../.mew/docs/development/collaboration.md)) |
-| `DATABASE_URL` | 없음 | `/db`용 Postgres. 없거나 접속 불가면 `/db` API만 503 |
+| `MEW_WORKSPACE` | Parent of the app folder | Folder containing projects. Can be specified separately from the app installation path |
+| `MEW_GITHUB_CLIENT_ID` | Built-in Mew OAuth app | Optional setting to replace it with your own GitHub OAuth app Client ID. Unset, empty, or whitespace-only values use the default app |
+| `MEW_DATA_DIR` | Linux/macOS: `~/.local/share/mew` (respecting `XDG_DATA_HOME`), Windows: `%LOCALAPPDATA%\mew\data`. An older installation's `<앱>/.data` takes precedence if present | Accounts, sessions, feature/file permissions, and icons |
+| `MEW_AGENT_MEMORY_SCOPE` | `auto` | Applies ACP and CLI task memory limits through the installed systemd slice. `required` refuses execution if it is not installed; `off` disables only OS limits. [Installation and memory protection](../operations/agent-memory.md) |
+| `MEW_REMOTE_ORIGIN` | `https://mew.run` | Central HTTPS origin for new remote registrations. After registration, the saved origin is used. Existing `mew.saens.kr` registrations are maintained through the central service's support for allowed previous origins. To switch to an arbitrary service, unregister and register again. [Central service operations](../../.mew/docs/operations/remote-central.md) |
+| `MEW_TEAM_PORT` | 5000 | Server port |
+| `MEW_DESKTOP_ENGINE` | `rust` | Default Rust video thread. `legacy` is the previous JS worker transmission path for comparison and recovery. Requires restarting the server/resident helper app to take effect. [Engine contract](../../.mew/docs/development/remote-desktop-rust.md) |
+| `MEW_DESKTOP_HELPER_DIR` | Project's `native/remote-desktop`; on WSL, `Mew/remote-desktop` under Windows LocalAppData | Installation path for the [Remote Desktop helper app](../guides/remote-desktop.md). On WSL, use an absolute Windows path |
+| `MEW_DESKTOP_ICE_SERVERS` | `[{"urls":["stun:stun.l.google.com:19302","stun:stun.cloudflare.com:3478"]}]` | STUN JSON array for WebRTC address discovery. Use `[]` to disable external lookups. TURN and video relaying are not supported; direct connections may be impossible depending on NAT/firewall conditions |
+| `MEW_DESKTOP_AUTO_NAT` | `1` | If an active direct connection is delayed, attempts temporary UDP mappings through PCP/NAT-PMP/UPnP on the OS default gateway. Disable with `0`. [Lifetime and OS network approval](../../.mew/docs/development/remote-desktop-connectivity.md) |
+| `MEW_DESKTOP_UDP_PORT` | Automatically selected | Fixed UDP port for Windows/WSL, Mac, and native Linux hosts (1024–65535). Optional operator setting. Default connections use STUN and short-lived automatic NAT mappings without specifying a port |
+| `MEW_BIND` | `127.0.0.1` | Address the server listens on. The published default is loopback; specify an exposed address only when direct LAN access is essential. Keep server deployments on `127.0.0.1` behind an HTTPS proxy or tunnel |
+| `MEW_COLLAB_RUST` | Unset (=JS Yjs) | If `1`, uses Rust (yrs) for collaboration room state — run `npm run build:native` first ([Collaboration rooms](../../.mew/docs/development/collaboration.md)) |
+| `DATABASE_URL` | Unset | Postgres for `/db`. If unset or unreachable, only the `/db` API returns 503 |
 
-전부 선택이다 — 하나도 없어도 뜬다. 지금 값이 어디서 오는지는 `./mew status`.
+All are optional — the app starts even if none are set. To see where current values come from, use `./mew status`.
 
-중앙 mewlink는 로컬 A와 별도 Cloudflare Worker이며 자체 vars·secret·OAuth 자격증명을 사용한다. 로컬 GitHub Device Flow 설정과 공유하지 않는다. 전체 중앙 설정은 [중앙 서비스 운영](../../.mew/docs/operations/remote-central.md)을 따른다.
+Central mewlink is a Cloudflare Worker separate from local A and uses its own vars, secrets, and OAuth credentials. It does not share the local GitHub Device Flow settings. For the full central configuration, follow [Central service operations](../../.mew/docs/operations/remote-central.md).
 
-## GitHub OAuth 연결
+## GitHub OAuth connection
 
-Mew는 공개 Client ID를 코드에 포함하므로 기본 설치에는 OAuth 앱 등록이나 환경변수 설정이 필요 없다. 각 사용자는 GitHub 로그인에서 자기 계정으로 승인한다. 토큰은 설치 서버에 계정별로 저장하며 앱 소유자의 계정 권한을 공유하지 않는다.
+Mew includes a public Client ID in its code, so a default installation does not require registering an OAuth app or setting environment variables. Each user authorizes their own account through GitHub login. Tokens are stored per account on the installation server and do not share the app owner's account permissions.
 
-자체 앱을 쓰려면 GitHub Settings → Developer settings → OAuth Apps에서 등록하고 **Enable Device Flow**를 켠다. 등록 화면의 URL 필드는 실제 서비스 주소로 채우지만 현재 기기 코드 흐름은 callback을 사용하지 않는다. 레포 밖 서버 설정에 `MEW_GITHUB_CLIENT_ID=발급된_ID`를 넣고 사용자가 서버를 재시작하면 기본 앱을 대체한다. 앞뒤 공백은 제거하며 미설정·빈 값·공백은 내장 앱을 사용한다. Client secret은 사용하지 않는다. 기본값 구현은 `server/git-providers.ts`가 소유한다.
+To use your own app, register it under GitHub Settings → Developer settings → OAuth Apps and enable **Enable Device Flow**. Fill the URL fields on the registration screen with the actual service address, although the current device code flow does not use a callback. Set `MEW_GITHUB_CLIENT_ID=발급된_ID` in the server configuration outside the repository; it replaces the default app when the user restarts the server. Leading and trailing whitespace is removed; unset, empty, or whitespace-only values use the built-in app. A Client secret is not used. `server/git-providers.ts` owns the default implementation.
 
-앱은 `repo read:user` 범위를 요청한다. 회사/조직 저장소는 별도 앱 승인과 SSO가 필요할 수 있다. 토큰 만료·승인 철회 시 재로그인하며 OS의 기존 로그인으로 대체하지 않는다. 기본 앱도 GitHub의 앱 단위 인증 제한을 받는다. 실제 앱 승인·Device Flow 활성화 여부는 사용자 확인 대상이다.
+The app requests the `repo read:user` scopes. Company/organization repositories may require separate app approval and SSO. Log in again when a token expires or authorization is revoked; existing OS login is not used as a substitute. The default app is also subject to GitHub's per-app authentication limits. Users must verify actual app approval and whether Device Flow is enabled.
 
-사용법은 [GitHub 로그인](../guides/projects.md#github-로그인), 키·암호문 백업과 저장 경계는 [Git 연결 계약](../../.mew/docs/development/git-connections.md)을 따른다.
+For usage, follow [GitHub login](../guides/projects.md#github-login); for key and ciphertext backups and storage boundaries, follow the [Git connection contract](../../.mew/docs/development/git-connections.md).
 
-## 사전 빌드 CLI 설정
+## Prebuilt CLI settings
 
-[CLI 배포 계약](../../.mew/docs/development/cli-distribution.md)은 기존 config.env·명시 환경변수의 데이터 경로를 재사용한다. `--data-dir`·`--port` 등 명시 옵션이 우선하며 작업 폴더는 현재 폴더 또는 `--workspace`이다. 기존 clone 내부 `.data/`는 `--data-dir`로 지정한다. `MEW_DISTRIBUTION=release`는 런처가 내부적으로 설정하며 source 업데이트·빌드·재시작과 번들 tmux 개별 업데이트를 차단한다. 최초 발행 전의 npm 명령은 아직 공개 설치 경로가 아니다.
+The [CLI distribution contract](../../.mew/docs/development/cli-distribution.md) reuses data paths from existing config.env files and explicit environment variables. Explicit options such as `--data-dir` and `--port` take precedence, and the workspace is the current folder or `--workspace`. Specify an existing clone's internal `.data/` using `--data-dir`. The launcher sets `MEW_DISTRIBUTION=release` internally, blocking source updates, builds, restarts, and individual updates to bundled tmux. Before the first publication, the npm commands are not yet a public installation path.

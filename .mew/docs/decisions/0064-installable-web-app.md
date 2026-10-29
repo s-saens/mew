@@ -1,25 +1,25 @@
 ---
-title: "설치형 웹앱과 설치 우선 시작 안내"
-description: "직접 접속과 Mewlink 공개 기기 페이지에 설치 manifest·아이콘을 제공하고, 오프라인 캐시 추가 없이 설치를 전체화면보다 먼저 안내하며 두 안내의 영구 숨김을 별도로 저장하는 결정. 호스트 업데이트·중앙 배포와 실제 모바일 검증의 경계를 정한다."
+title: "Installable web app and installation-first startup guidance"
+description: "Decision to provide an installation manifest and icons for direct access and Mewlink public device pages, recommend installation before fullscreen without adding offline caching, and separately store permanent dismissal of the two prompts. Defines boundaries for host updates, central deployment, and actual mobile verification."
 created: "2026-10-26"
 updated: "2026-10-26"
 status: "accepted"
 ---
 
-## 배경
+## Background
 
-일반 웹 전체화면에서는 브라우저가 Esc·모바일 뒤로가기를 먼저 처리해 팝업을 닫기 전에 전체화면이 해제될 수 있다. 기존 Mew는 전체화면만 먼저 추천하고 안내를 영구적으로 숨길 수 없었다. 데스크톱의 브라우저 메뉴 설치와 별개로 모바일 설치에 필요한 manifest·아이콘과 안내도 필요했다.
+In ordinary web fullscreen mode, the browser handles Esc and mobile Back first, potentially exiting fullscreen before closing a popup. Mew previously recommended only fullscreen first and did not allow permanent dismissal of the prompt. In addition to installation through desktop browser menus, mobile installation also required a manifest, icons, and guidance.
 
-## 결정
+## Decision
 
-기존 웹앱에 설치 manifest와 크기별 PNG 아이콘을 추가한다. 설치 실행 모드는 `fullscreen`을 요청하고 미지원 브라우저에서는 지원 모드로 대체한다. 설치 화면으로 실행한 경우 기존 Fullscreen API 진입을 요구하지 않는다. Mewlink에서는 최상위 공개 기기 페이지가 설치 정보를 제공하고 기존 연결 채널로 내부 앱과 설치 상태·동작을 연결한다.
+Add an installation manifest and PNG icons in multiple sizes to the existing web app. Request `fullscreen` as the installed launch mode and fall back to a supported mode in unsupported browsers. Launching from the installed app does not require entering the existing Fullscreen API mode. In Mewlink, the top-level public device page provides installation information and connects installation status and actions to the internal app through the existing connection channel.
 
-시작 안내는 설치를 전체화면보다 먼저 표시한다. 브라우저가 설치 창을 제공하면 설치 버튼을 사용하고, 모바일과 설치를 지원하는 데스크톱 브라우저에서는 이벤트가 없어도 수동 설치 경로를 안내하며, 그 외 환경은 설치 이벤트가 있을 때 안내한다. 설치 완료·설치 앱 실행을 확인하면 두 안내를 숨긴다. 두 안내에는 각각 **다시 보지 않기**를 두고 선택을 독립된 브라우저 설정으로 즉시 저장한다.
+The startup guidance displays installation before fullscreen. Use the install button when the browser provides an installation prompt. On mobile and desktop browsers that support installation, provide manual installation instructions even without an event; in other environments, provide guidance when an installation event is available. Hide both prompts once installation completion or an installed app launch is confirmed. Each prompt has its own **Don't show again** option, and the choice is immediately saved as an independent browser setting.
 
-설치를 위해 별도 오프라인 캐시·서비스워커를 도입하지 않는다. 기존 Mewlink 정적 자원 중계는 유지하며 호스트·네트워크·기존 인증이 계속 필요하다. 상세 표시·연결 계약은 [공용 UI 계약](../development/ui-contracts.md#설치형-웹앱과-시작-안내), 저장은 [브라우저 저장소](../development/browser-storage.md#시작-안내의-다시-보지-않기), 사용자 조작은 [모바일 안내](../../../docs/guides/editor.md#모바일과-전체화면)가 소유한다.
+Do not introduce a separate offline cache or service worker for installation. Retain the existing Mewlink static asset relay; the host, network, and existing authentication remain required. The [Shared UI Contract](../development/ui-contracts.md#installable-web-app-and-startup-guidance) owns the detailed display and connection contracts, [Browser Storage](../development/browser-storage.md#dont-show-again-for-startup-guidance) owns storage, and [Mobile Guide](../../../docs/guides/editor.md#mobile-and-fullscreen) owns user actions.
 
-## 근거와 영향
+## Rationale and Impact
 
-별도 앱 패키지·스토어 등록 없이 기존 웹 배포에 설치 정보를 포함한다. HTTPS 또는 localhost가 필요하며 브라우저마다 설치 메뉴와 표시 모드가 다를 수 있다. 일반 웹 전체화면의 입력 선점을 앱 코드로 우회한다고 약속하지 않으며, 설치만으로 Keyboard Lock 권한을 얻지도 않는다.
+Include installation information in the existing web deployment without a separate app package or store listing. HTTPS or localhost is required, and installation menus and display modes may vary by browser. Do not promise that app code can bypass input interception in ordinary web fullscreen, and installation alone does not grant Keyboard Lock permission.
 
-직접 접속은 호스트 Mew 업데이트로 반영한다. Mewlink 접속은 Git에서 제외한 중앙 소스도 별도로 배포해야 한다. 에이전트는 앱 빌드·서버 실행·중앙 배포를 하지 않는다. 실제 Android·iOS 설치와 설치 모드의 뒤로가기·전체화면 동작은 실기 검증 전까지 보장하지 않는다.
+Direct access receives the change through a host Mew update. Mewlink access also requires a separate deployment of the central source excluded from Git. Agents do not build the app, run the server, or deploy the central source. Actual Android and iOS installation and back navigation and fullscreen behavior in installed mode are not guaranteed until verified on physical devices.

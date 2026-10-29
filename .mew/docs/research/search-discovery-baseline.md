@@ -1,20 +1,20 @@
 ---
-title: "검색 설정 초기 진단"
-description: "2026-10-23 공개 소개·작업 공간의 검색 설정 초기 진단 원문. 현재 운영 상태의 확인 결과가 아니다."
+title: "Initial Search Configuration Assessment"
+description: "Original initial assessment of search configuration for the public product overview and workspace on 2026-10-23. This is not a verification of the current production state."
 updated: "2026-10-29"
 ---
 
-## 2026-10-23 초기 진단
+## 2026-10-23 Initial Assessment
 
-아래는 변경 전 소스와 접근 가능한 공개 응답의 관측이다. 공개 검색 콘솔이나 AI 답변 서비스의 성과 데이터에는 접근하지 않았다.
+The following observations cover the source before changes and accessible public responses. We did not access performance data from public search consoles or AI answer services.
 
-| 레인 | 상태 | 근거 |
+| Track | Status | Evidence |
 | --- | --- | --- |
-| SEO | ⚠️ | 호스트 HTML은 빈 React 진입점이며 제목만 있었다. 설명·색인 정책·사이트맵이 없었다. 작업 공간의 공개 색인은 목표로 삼지 않는다. |
-| AEO: 답변 추출 | ⚠️ | 호스트에 공개 제품 답변 HTML이나 구조화 데이터가 없다. FAQ를 실제 본문 없이 추가하지 않는다. |
-| GEO: AI 검색 인용 | ⚠️ | 대표 공개 사이트의 크롤러 정책·`llms.txt`를 검증하지 못했다. |
-| LLMO: 제품 인지 | ✅ | 공식 GitHub README에 제품 정의·기능·설치 경로가 있다. 모델의 실제 인지·인용 여부는 미측정이다. |
-| NEO: 네이버 노출 | ⚠️ | 한국어 설치 가이드가 있으나 공개 대표 주소의 수집·소유 확인·인용 상태는 미측정이다. |
-| 콘텐츠 운영 | ⚠️ | 저장소에 제품 소개와 4개 언어 설치 가이드가 있다. 공개 블로그 인벤토리·질문 매핑·발행 주기·노출 수치는 확인하지 못했다. |
+| SEO | ⚠️ | The host HTML was an empty React entry point with only a title. It had no description, indexing policy, or sitemap. Public indexing of the workspace is not a goal. |
+| AEO: Answer extraction | ⚠️ | The host has no public product-answer HTML or structured data. Do not add an FAQ without actual body content. |
+| GEO: AI search citations | ⚠️ | We could not verify the primary public site's crawler policy or `llms.txt`. |
+| LLMO: Product awareness | ✅ | The official GitHub README contains the product definition, features, and installation paths. Actual model awareness and citations have not been measured. |
+| NEO: Naver visibility | ⚠️ | A Korean installation guide exists, but crawling, ownership verification, and citation status for the primary public URL have not been measured. |
+| Content operations | ⚠️ | The repository contains a product overview and installation guides in 4 languages. We could not verify the public blog inventory, question mapping, publishing cadence, or visibility metrics. |
 
-이 환경에서 `https://mew.run/`, `/robots.txt`, `/sitemap.xml`, `/llms.txt`, `/blog`, `/feed.xml`, 확인용 미존재 경로를 일반 비인증 요청으로 조회했을 때 모두 403과 `text/plain`을 받았다. 정책인지 관측 환경의 제한인지 원인을 확정하지 않는다. 이 결과로 사이트맵의 부재나 운영 사이트의 404 처리를 판정하지 않는다.
+In this environment, ordinary unauthenticated requests to `https://mew.run/`, `/robots.txt`, `/sitemap.xml`, `/llms.txt`, `/blog`, `/feed.xml`, and a nonexistent path used for verification all returned 403 and `text/plain`. We do not establish whether this was due to policy or a limitation of the observation environment. These results do not establish the absence of a sitemap or the production site's 404 handling.

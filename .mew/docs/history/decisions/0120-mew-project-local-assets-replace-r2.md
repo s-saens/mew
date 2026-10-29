@@ -1,48 +1,48 @@
 ---
-provenance: "Liiiiv 중앙 ADR 이관본, 2026-10-14"
-description: "이관한 결정 기록: mew 에셋은 프로젝트의 .mew에 저장한다. 당시 선택·근거·후속 변경을 보존하며 현재 계약은 Mew 소유 문서에서 확인한다."
-title: "0120 — mew 에셋은 프로젝트의 .mew에 저장한다"
+provenance: "Migrated copy of a Liiiiv central ADR, 2026-10-14"
+description: "Migrated decision record: mew assets are stored in the project's .mew directory. Preserves the choices, rationale, and subsequent changes at the time; see the Mew owning document for the current contract."
+title: "0120 — mew assets are stored in the project's .mew directory"
 created: 2026-09-07
 updated: 2026-09-07
 ---
 
-- 날짜: 2026-09-07
-- 상태: 채택
-- 후속 결정: [0150](0150-mew-account-feature-and-file-permissions.md) — UUID 첨부 링크의 공개 열람 경계
-- 결정자: 송상훈 (지시), Codex (현행 구현 대조·기록)
+- Date: 2026-09-07
+- Status: Adopted
+- Follow-up decision: [0150](0150-mew-account-feature-and-file-permissions.md) — Public read-access boundary for UUID attachment links
+- Decision makers: Song Sanghun (direction), Codex (comparison against the current implementation and documentation)
 
-## 배경
+## Background
 
-mew의 에디터에 붙여넣거나 업로드한 이미지·오디오·비디오는 Cloudflare R2 버킷에 저장하고 공개 URL을
-본문에 넣었다. 이 구조는 앱과 워크스페이스를 배포하는 것 외에 R2 버킷·S3 자격증명·공개 도메인을 따로
-준비해야 해 네이티브 설치와 서버 이전을 번거롭게 했다. 프로젝트 파일과 asset의 백업·복구 경계도
-서로 달랐다.
+Images, audio, and video pasted or uploaded into mew's editor were stored in a Cloudflare R2 bucket, with public URLs inserted into the body. In
+addition to deploying the app and workspace, this architecture required separately preparing an R2 bucket, S3 credentials, and a public
+domain, complicating native installation and server migration. Project files and assets also had different backup and recovery
+boundaries.
 
-## 선택지
+## Options
 
-1. R2를 유지하고 설치 자동화만 보강한다 — 여러 서버가 같은 asset을 공유하기 쉽지만 외부 계정·버킷·자격증명과 별도 백업이 계속 필요하다.
-2. asset을 앱 데이터인 `MEW_DATA_DIR`에 둔다 — 배포 의존성은 줄지만 프로젝트와 함께 Git으로 이동·복구할 수 없다.
-3. 각 프로젝트의 `.mew/assets/`에 둔다 — 프로젝트 용량과 Git 이력이 커질 수 있지만 코드·문서·asset의 배포 단위가 하나가 된다.
+1. Keep R2 and improve only installation automation — Makes it easy for multiple servers to share the same assets, but still requires an external account, bucket, credentials, and separate backups.
+2. Store assets in `MEW_DATA_DIR` as app data — Reduces deployment dependencies, but assets cannot be moved or restored with the project through Git.
+3. Store them in each project's `.mew/assets/` — May increase project size and Git history, but makes code, documents, and assets a single deployment unit.
 
-## 결정
+## Decision
 
-3번을 채택한다.
+Adopt option 3.
 
-- 새 editor asset은 `<프로젝트>/.mew/assets/<uuid>.<확장자>`에 저장한다. 사용자가 고른 원래 이름은 본문 링크의 표시 이름에만 쓴다.
-- 업로드는 로그인 계정만 할 수 있고 기존 파일 크기·횟수 제한을 유지한다. 저장된 asset은 프로젝트가 Git 저장소이고 그 저장소의 ignore 규칙에 걸리지 않으면 즉시 커밋한다.
-- 본문은 같은 mew 서버의 `/api/asset` URL을 링크한다. URL은 프로젝트와 UUID 경로를 담은 bearer link다. R2 공개 URL과 같은 공유 동작을 유지하기 위해 링크를 아는 사람은 로그인하지 않아도 asset을 읽을 수 있지만, 이 라우트는 `.mew/assets/` 아래의 UUID 파일만 허용한다.
-- R2 환경변수·설치 질문·SDK 의존성은 제거한다. 기존 문서의 R2 링크는 초기 마이그레이션에서 로컬 링크로 치환하고, 원격 버킷 객체는 롤백 가능성을 위해 삭제하지 않는다.
-- R2 저장 방식을 기본 경로로 재시도하지 않는다. 여러 mew 인스턴스가 Git 동기화 없이 같은 asset을 즉시 공유해야 하는 요구가 생기면 별도 ADR로 원격 저장소 또는 CDN 계층을 다시 판단한다.
+- Store new editor assets in `<프로젝트>/.mew/assets/<uuid>.<확장자>`. Use the original name selected by the user only as the display name of the link in the body.
+- Only logged-in accounts can upload, and existing file-size and upload-count limits remain in place. Saved assets are committed immediately if the project is a Git repository and its ignore rules do not exclude them.
+- The body links to an `/api/asset` URL on the same mew server. The URL is a bearer link containing the project and UUID path. To preserve the same sharing behavior as R2 public URLs, anyone who knows the link can read the asset without logging in, but this route permits only UUID files under `.mew/assets/`.
+- Remove R2 environment variables, installation prompts, and SDK dependencies. Replace R2 links in existing documents with local links during the initial migration, and retain remote bucket objects to allow rollback.
+- Do not retry R2 storage as the default path. If a need arises for multiple mew instances to share the same assets immediately without Git synchronization, reevaluate remote storage or a CDN layer in a separate ADR.
 
-## 근거
+## Rationale
 
-mew의 지원 배포는 네이티브 설치이고 작업물의 복구 단위는 이미 `MEW_WORKSPACE`다([ADR 0111](0111-mew-native-deployment-and-supervisor.md)).
-asset을 프로젝트에 넣으면 별도 Cloudflare 설정 없이 업로드가 항상 동작하고, 프로젝트를 clone·pull·백업할 때
-본문과 그 asset이 함께 움직인다. UUID 파일명은 충돌과 원래 파일명 기반 경로 주입을 막고 기존 공개 URL의
-공유 성질도 유지한다.
+mew's supported deployment is a native installation, and the recovery unit for work is already `MEW_WORKSPACE` ([ADR 0111](0111-mew-native-deployment-and-supervisor.md)). Putting assets in the project ensures uploads always work without separate
+Cloudflare configuration, and the body and its assets move together when the project is cloned, pulled, or backed up. UUID filenames
+prevent collisions and path injection based on original filenames while preserving the sharing properties of existing
+public URLs.
 
-## 결과
+## Results
 
-- 새 배포에는 R2 계정·버킷·공개 도메인 설정이 필요 없다.
-- 큰 바이너리가 Git 저장소 크기를 늘릴 수 있다. 현재 25MB 파일 제한과 클라이언트 이미지 압축을 유지하며, 저장소 크기가 실제 운영 문제가 되면 Git LFS 또는 별도 media 정책을 후속 결정한다.
-- 기존 R2 링크 22개(고유 객체)는 `.mew/assets/`로 내려받아 문서 링크를 모두 로컬 `/api/asset` 링크로 치환했다. 원격 객체는 삭제하지 않았다.
+- New deployments require no R2 account, bucket, or public-domain configuration.
+- Large binaries may increase Git repository size. Retain the current 25MB file limit and client-side image compression; if repository size becomes an actual production issue, make a follow-up decision on Git LFS or a separate media policy.
+- Downloaded 22 existing R2 links (unique objects) to `.mew/assets/` and replaced all document links with local `/api/asset` links. Remote objects were not deleted.

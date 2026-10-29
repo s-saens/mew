@@ -1,24 +1,24 @@
 ---
-title: "mew 사이드바 탐색·정확 검색 성능 설계"
+title: "mew Sidebar Navigation and Exact Search Performance Design"
 created: 2026-09-01
 updated: 2026-09-07
 reviewed: 2026-09-02
 review-after-days: 60
-description: "파일 탐색·Ctrl+P·내용 정확 검색의 전체 순회 병목을 줄이는 증분 카탈로그·색인 구조와 성능 목표·권한·일관성·복구·도입 우선순위를 정리한 설계다."
+description: "This design describes an incremental catalog and index architecture that reduces full traversal bottlenecks in file navigation, Ctrl+P, and exact content search, along with performance targets, permissions, consistency, recovery, and adoption priorities."
 ---
 
-> 2026-09-28 후속: [ADR 0176](../history/decisions/0176-mew-remove-local-rag.md)으로 RAG와 전용 모델·의존성을 제거했다. 아래 RAG 관련 구현·검토 항목은 당시 기록이며 현재 도입·배포 과제가 아니다.
+> 2026-09-28 follow-up: [ADR 0176](../history/decisions/0176-mew-remove-local-rag.md) removed RAG and its dedicated models and dependencies. The RAG implementation and review items below are historical records, not current adoption or deployment tasks.
 
 
-이 문서는 **정확 검색과 탐색 성능**의 설계·우선순위 기준이다. 현재 UX 계약은
-[사이드바 파일 검색](../features/%ED%94%84%EB%A1%9C%EC%A0%9D%ED%8A%B8%C2%B7%ED%8C%8C%EC%9D%BC%C2%B7%EA%B2%80%EC%83%89/%ED%8C%8C%EC%9D%BC%EB%AA%85%C2%B7%EB%82%B4%EC%9A%A9%20%EA%B2%80%EC%83%89%EA%B3%BC%20%EC%B9%98%ED%99%98.md), 폴더 단위 지연 로드는 [ADR 0088](../history/decisions/0088-mew-sidebar-tree-lazy-loading.md),
-의미 검색은 [ADR 0071](../history/decisions/0071-mew-embedded-lancedb-local-rag.md)을 따른다. 증분 메모리 카탈로그와
-Node 내장 SQLite FTS5 저장소는 [ADR 0105](../history/decisions/0105-mew-incremental-file-catalog-and-exact-search-index.md)에서 채택했다.
+This document defines the design
+and priority criteria for **exact search and navigation performance**. The current UX contract follows [Sidebar File Search](../features/projects-files-search/filename-content-search-and-replacement.md), folder-level lazy loading follows [ADR 0088](../history/decisions/0088-mew-sidebar-tree-lazy-loading.md), and semantic
+search follows [ADR 0071](../history/decisions/0071-mew-embedded-lancedb-local-rag.md). The incremental in-memory
+catalog and Node built-in SQLite FTS5 store were adopted in [ADR 0105](../history/decisions/0105-mew-incremental-file-catalog-and-exact-search-index.md).
 
-## 결론
+## Conclusion
 
-가장 큰 개선은 검색마다 디스크 전체를 다시 걷고 내용을 다시 읽는 구조를 없애는 것이다. 파일 탐색과
-파일명·내용 검색이 **하나의 증분 파일 카탈로그**를 공유하게 한다.
+The biggest improvement is eliminating the architecture that walks the entire disk and rereads content for every search. Have file
+navigation and filename/content search share **one incremental file catalog**.
 
 ```text
 파일 변경 감지
@@ -31,113 +31,113 @@ Node 내장 SQLite FTS5 저장소는 [ADR 0105](../history/decisions/0105-mew-in
                                   요청 시 권한·가시성 재검사
 ```
 
-원본 파일은 계속 SSoT이고 카탈로그는 삭제해도 재구축 가능한 파생 캐시다. 이를 적용하면 요청 비용이
-`프로젝트 전체 파일 수·총 바이트`가 아니라 대체로 `검색어 길이·결과 수` 또는 `펼친 폴더의 직접 자식 수`에 비례한다.
+The original files remain the SSoT, and the catalog is a derived cache that can be deleted
+and rebuilt. With this applied, request cost generally scales with `검색어 길이·결과 수` or `펼친 폴더의 직접 자식 수` rather than `프로젝트 전체 파일 수·총 바이트`.
 
-## 교체 전 병목
+## Bottlenecks before replacement
 
-| 경로 | 현재 비용 | 큰 프로젝트에서 생기는 문제 |
+| Path | Current cost | Problems in large projects |
 | --- | --- | --- |
-| 폴더 펼치기 | 한 단계 `readdir` | 이미 ADR 0088로 전체 재귀 순회는 피하지만, 빠르게 연 폴더·동시 요청·watcher 갱신에서 같은 디렉터리를 반복 읽을 수 있다. |
-| 파일명 검색 | 250ms 뒤 Documents·workspace의 **전체 트리**를 만들고 브라우저에서 fuzzy 점수 계산 | 검색 화면을 처음 열 때 깊은 모든 폴더를 읽고, 범위마다 큰 JSON을 전송·파싱한다. 파일 수가 많으면 메인 스레드 정렬도 막힌다. |
-| 내용 검색 | 매 검색마다 전체 트리를 만들고, 최대 4,000개 파일을 순서대로 열어 정규식을 실행 | 검색어 한 글자 변경마다 같은 파일을 다시 읽고 줄 배열을 새로 만든다. SSE는 첫 결과 표시를 앞당기지만 전체 스캔 비용 자체는 남는다. |
-| tree watcher | 변경 뒤 watch 대상 전체를 다시 걷고 전체 트리 JSON과 비교 | 파일 하나 생성해도 워크스페이스 크기에 비례한 재순회·대량 JSON 직렬화가 일어난다. |
+| Expanding a folder | One-level `readdir` | ADR 0088 already avoids full recursive traversal, but rapidly opened folders, concurrent requests, and watcher updates can cause repeated reads of the same directory. |
+| Filename search | After 250 ms, build the **entire tree** for Documents and the workspace, then calculate fuzzy scores in the browser | Opening the search screen for the first time reads all nested folders and transmits and parses large JSON payloads for each scope. With many files, sorting also blocks the main thread. |
+| Content search | Build the entire tree for every search, then sequentially open up to 4,000 files and run a regex | Every single-character change to the query rereads the same files and creates new line arrays. SSE displays the first result sooner, but the full scan cost remains. |
+| tree watcher | After a change, traverse all watched targets again and compare against the full tree JSON | Creating even one file triggers another traversal proportional to workspace size and bulk JSON serialization. |
 
-동기 I/O를 async로 바꾼 것은 서버 이벤트 루프 정지 완화에는 유효하지만, 읽어야 하는 디렉터리·파일의 양을 줄이지 않는다.
+Changing synchronous I/O to async helps reduce server event loop blocking, but does not reduce the number of directories or files that must be read.
 
-## 목표와 측정
+## Targets and measurement
 
-성능을 "빠르다"로 판정하지 않는다. 개발자 도구 performance mark와 서버 구조화 로그에서 아래를 분리해
-p50/p95를 기록한다. 기준 프로젝트는 1만·10만·50만 파일, 텍스트 총량 1/10/50 GiB의 합성 fixture와 실제 큰
-워크스페이스 하나를 함께 쓴다.
+Do not judge performance as simply "fast." Record separate p50/p95 values for the following using developer tools performance marks and structured
+server logs. Use synthetic fixtures with 10,000, 100,000, and 500,000 files and total text sizes of 1/10/50 GiB, along with one actual large
+workspace, as benchmark projects.
 
-| 사용자 행동 | 측정 시작 → 끝 | warm 목표 | cold/재구축 목표 |
+| User action | Measurement start → end | Warm target | Cold/rebuild target |
 | --- | --- | --- | --- |
-| 사이드바 첫 표시 | 프로젝트 전환 → 루트 행 첫 paint | p95 100ms 이하 | p95 300ms 이하 |
-| 폴더 펼치기 | 클릭 → 자식 행 paint | p95 80ms 이하 | p95 250ms 이하 |
-| 파일명 첫 결과 | Ctrl+P 입력 → 첫 20개 paint | p95 50ms 이하 | 인덱스 준비 상태를 즉시 표시, UI는 막지 않음 |
-| 내용 첫 결과 | Ctrl+Shift+F 입력 → 첫 매치 paint | p95 150ms 이하 | p95 500ms 이하 또는 진행률·취소 가능 |
-| 내용 검색 완료 | 입력 → done | p95 1초 이하(10만 파일 기준의 대표 질의) | 재구축과 검색을 분리해 완료 시각을 따로 기록 |
-| 변경 반영 | write/rename/delete → 해당 결과·폴더 갱신 | p95 300ms 이하 | 대량 Git checkout은 배치 완료 뒤 한 번 반영 |
+| Initial sidebar display | Project switch → first paint of root rows | p95 ≤ 100ms | p95 ≤ 300ms |
+| Folder expansion | Click → child row paint | p95 ≤ 80ms | p95 ≤ 250ms |
+| First filename results | Ctrl+P input → paint of first 20 results | p95 ≤ 50ms | Show index readiness immediately without blocking the UI |
+| First content result | Ctrl+Shift+F input → first match paint | p95 ≤ 150ms | p95 ≤ 500ms or progress display and cancellation available |
+| Content search completion | Input → done | p95 ≤ 1 second (representative queries over 100,000 files) | Separate rebuilding from searching and record their completion times separately |
+| Change propagation | write/rename/delete → update affected results and folders | p95 ≤ 300ms | Apply bulk Git checkout changes once after the batch completes |
 
-각 요청에는 `indexState(hit|stale|building)`, 후보 파일 수, 읽은 바이트, 색인 질의 시간, 결과 수,
-취소 여부를 남긴다. CPU·디스크·직렬화·클라이언트 렌더 시간 중 어디가 병목인지 구분하지 못한 수치는 채택 근거로 쓰지 않는다.
+For each request, record `indexState(hit|stale|building)`, candidate file count, bytes read, index query time, result count, and whether it was canceled. Do not use measurements
+as evidence for adoption unless they distinguish whether the bottleneck is CPU, disk, serialization, or client rendering time.
 
-## 권장 구조
+## Recommended Architecture
 
-### 1. 메모리 스냅샷과 비동기 증분 갱신
+### 1. In-memory snapshots and asynchronous incremental updates
 
-서버는 프로젝트별 immutable 스냅샷을 메모리에 둔다. 스냅샷은 경로·부모·종류·표시 가능 여부·크기·mtime/버전·
-파일명 검색용 정규화 이름만 가진다. `/api/tree?path=`는 스냅샷의 해당 부모 목록을 즉시 돌려주고, 갱신 작업은
-별도 큐가 새 스냅샷을 만든 뒤 원자적으로 교체한다. 요청 중인 스냅샷을 수정하지 않으므로 경합 잠금이 필요 없다.
+The server keeps an immutable snapshot for each project in memory. Each snapshot contains only paths, parents, types, visibility, sizes, mtime/versions,
+and normalized names for filename search. `/api/tree?path=` immediately returns the snapshot's list for the specified parent, while a separate update queue creates a
+new snapshot and atomically replaces the old one. Since snapshots serving active requests are not modified, no contention locks are needed.
 
-- 초기 스캔은 비동기 디렉터리 I/O를 직렬로 제한하고 주기적으로 이벤트 루프에 양보한다. 계측에서 CPU 병목이
-  확인될 때만 worker thread를 추가한다.
-- watcher 이벤트는 100~300ms로 묶되, 경로를 잃어버리는 OS 이벤트에서는 해당 **부모 폴더만** 다시 읽는다.
-- rename은 가능하면 하나의 이동으로, 판별이 불가능하면 delete+create로 처리한다. 정확성은 최적화보다 우선한다.
-- Git checkout·대량 생성은 이벤트마다 broadcast하지 않는다. dirty 부모 집합을 모아 하나의 스냅샷 버전으로 publish한다.
-- 클라이언트는 `treeVersion`을 받아 캐시를 전부 비우지 않고 영향 받은 부모 목록만 교체한다. 열린 경로의 목록은 stale-while-revalidate로 먼저 보여 준다.
-- 클라이언트는 펼친 폴더 경로와 함께 그 폴더에서 마지막으로 받은 직접 자식 스냅샷을 계정별 작업 화면 상태에 저장한다. 다시 열 때 루트 목록만 먼저 요청하고 저장된 하위 폴더·파일을 즉시 그린 뒤, 펼친 경로를 깊이순으로 백그라운드 재검증한다. 경로만 저장된 옛 상태도 같은 백그라운드 요청으로 보완한다. 게스트는 권한이 바뀐 뒤 과거 파일명이 남지 않도록 자식 스냅샷을 영속화하지 않는다.
+- Limit the initial scan to serial asynchronous directory I/O and periodically yield to the event loop. Add worker threads only
+  when instrumentation confirms a CPU bottleneck.
+- Batch watcher events over 100–300ms, but for OS events that lose path information, reread **only the affected parent folder**.
+- Handle a rename as a single move when possible, or as delete+create when it cannot be identified. Correctness takes priority over optimization.
+- Do not broadcast every event during Git checkout or bulk creation. Collect a set of dirty parents and publish them as one snapshot version.
+- When the client receives `treeVersion`, it replaces only the affected parent listings without clearing the entire cache. Show listings for open paths first using stale-while-revalidate.
+- The client stores expanded folder paths and the last direct-child snapshot received for each folder in the account's workspace UI state. When reopening, request only the root listing first, immediately render the saved subfolders and files, then revalidate expanded paths in the background in depth order. Use the same background requests to fill in older state that stores only paths. Do not persist child snapshots for guests, so old filenames do not remain after permissions change.
 
-이 단계만으로도 탐색·watcher의 전체 재귀 트리 재생성을 제거한다. ADR 0088의 한 단계 응답 및 게스트의 재귀 필터 계약은 유지한다.
+This step alone eliminates full recursive tree regeneration during browsing and watcher processing. Preserve ADR 0088's single-level response and recursive guest filtering contracts.
 
-### 2. 파일명·경로 전용 색인
+### 2. Dedicated filename and path index
 
-파일명 검색은 내용 색인이나 전체 `TreeNode` JSON을 사용하지 않는다. 스냅샷에서 만든 작고 정렬된 후보 배열을
-클라이언트 또는 서버에 유지하고, 범위 키(`root/docs/subproject` 조합)별 결과를 짧게 캐시한다.
+Filename search does not use the content index or the full `TreeNode` JSON. Keep a small, sorted candidate array built from
+the snapshot on the client or server, and briefly cache results by scope key (a combination of `root/docs/subproject`).
 
-- 2~3글자 이상일 때만 fuzzy 검색을 시작한다. 그 전에는 최근 파일·최근 폴더·명령을 보인다.
-- 단순 subsequence 점수만 쓰지 말고 `파일명 완전 일치 > 파일명 prefix > 경로 segment prefix > camel/kebab 경계 > 부분 일치` 순으로 랭킹한다. 경로가 아니라 basename을 우선해 같은 입력에서 결과가 흔들리지 않게 한다.
-- fuzzy 점수 계산은 서버의 메모리 catalog에서 하고 상위 50개만 브라우저로 보낸다. UI thread는 입력·결과 렌더만 한다.
-- 결과는 50개 상한, 키보드 선택은 가상화 목록을 쓴다. 수천 행을 DOM으로 만들지 않는다.
-- 인덱스 version을 응답에 붙여, 검색 중 갱신이 오면 이전 결과를 비우지 말고 다음 입력 또는 idle 재질의에서 교체한다.
+- Start fuzzy search only after at least 2–3 characters. Before that, show recent files, recent folders, and commands.
+- Do not rely solely on a simple subsequence score; rank in the order `파일명 완전 일치 > 파일명 prefix > 경로 segment prefix > camel/kebab 경계 > 부분 일치`. Prioritize the basename over the path so results remain stable for the same input.
+- Calculate fuzzy scores in the server's in-memory catalog and send only the top 50 results to the browser. The UI thread handles only input and result rendering.
+- Cap results at 50 and use a virtualized list for keyboard selection. Do not create thousands of DOM rows.
+- Include the index version in responses. If an update arrives during a search, retain the previous results and replace them on the next input or idle requery.
 
-파일 수가 수십만을 넘거나 브라우저 메모리가 문제가 되면 이 색인을 서버의 SQLite FTS5 trigram/접두 색인으로 승격한다.
-초기에는 메모리 배열이 단순하고 빠르므로, 실제 p95·메모리 수치가 임계치를 넘기기 전에는 별도 DB를 도입하지 않는다.
+If the file count exceeds several hundred thousand or browser memory becomes a problem, promote this index to a server-side SQLite FTS5 trigram/prefix index. Initially,
+an in-memory array is simple and fast, so do not introduce a separate DB until actual p95 and memory measurements exceed the thresholds.
 
-### 3. 내용 정확 검색 색인
+### 3. Exact content search index
 
-내용 검색은 `rg`를 요청마다 실행하는 방식도, Node로 매번 전수 `readFile`하는 방식도 최종 해법으로 충분하지 않다.
-상시 변경을 반영하는 로컬 색인을 두고, 리터럴 검색은 FTS/역색인으로 후보를 먼저 좁힌 뒤 원문으로 매치 위치를 검증한다.
+For content search, neither running `rg` for every request nor performing a full `readFile` scan in Node every time is sufficient as a final solution. Maintain a local index
+that reflects ongoing changes; for literal search, first narrow candidates using FTS/an inverted index, then verify match positions against the original text.
 
-- 저장 후보: 네이티브 의존성 없이 배포하려면 SQLite FTS5를 우선 검토한다. 파일 메타데이터와 본문 색인을 같은 DB에 두고, `MEW_DATA_DIR/search/` 아래에 저장한다. 기존 LanceDB RAG와 역할이 다르므로 결합하지 않는다.
-- 워크스페이스 hash로 DB를 분리하고 색인 레코드는 `project, relPath, mtimeMs, size`와 FTS가 요구하는 본문 복사본을
-  포함한다. 항상 디스크 원문이 기준이며 DB는 삭제 가능한 파생 캐시다.
-- 파일 저장·watcher 변경 뒤에는 debounce 큐가 해당 파일만 재색인한다. 저장 직후의 검색 정확성을 위해, 큐가 끝나기 전에는 dirty 파일을 원문에서 보충 검색해 색인 결과와 합친다.
-- 리터럴 검색은 색인 후보를 사용한다. 정규식·복잡한 word boundary·대소문자 민감 질의는 후보 필터가 안전할 때만 색인을 쓰고, 그렇지 않으면 **후보가 제한된 fallback scanner**로 원문 검증한다. 잘못된 "결과 없음"보다 느린 정확 검색이 낫다.
-- 매치의 줄·열·미리보기는 후보 파일 원문에서 계산한다. line-start 캐시는 실제 원문 검증이 다시 병목으로 측정될 때 추가한다.
-- 바이너리, 너무 큰 파일, 권한 밖 파일, ignore·denied 경로는 색인하지 않는다. 임계 크기를 넘는 텍스트 파일은 현재 anchor preview와 같은 별도 정책을 둔다.
+- Storage candidate: Consider SQLite FTS5 first for deployment without native dependencies. Keep file metadata and the content index in the same DB, stored under `MEW_DATA_DIR/search/`. Its role differs from the existing LanceDB RAG, so do not combine them.
+- Separate databases by workspace hash, and include `project, relPath, mtimeMs, size` and the copy of the body required by FTS in index records. The original text on disk
+  is always authoritative, and the DB is a disposable derived cache.
+- After file saves or watcher changes, a debounce queue reindexes only the affected files. To ensure accurate searches immediately after saving, search dirty files directly for supplemental matches and merge them with index results until the queue finishes.
+- Literal searches use index candidates. For regex, complex word boundary, and case-sensitive queries, use the index only when candidate filtering is safe; otherwise, verify against the source text with a **fallback scanner with a restricted candidate set**. A slow, accurate search is preferable to an incorrect "no results."
+- Calculate match lines, columns, and previews from the candidate files' source text. Add a line-start cache only when measurements show that source-text verification has become a bottleneck again.
+- Do not index binaries, excessively large files, files outside the user's permissions, or ignore/denied paths. Define a separate policy for text files exceeding the size threshold, as with the current anchor preview.
 
-완료 뒤에는 검색 결과를 파일·최대 매치 수로 제한하되, `indexed`, `scanning dirty files`, `truncated`를 구분해 표시한다.
-SSE는 유지하되 결과 순서를 디스크 순서가 아니라 점수·경로 기준의 작은 배치로 보내서 화면 흔들림을 줄인다.
+After completion, limit search results by file count and maximum match count, while displaying `indexed`, `scanning dirty files`, and `truncated` distinctly. Keep SSE, but send
+results in small batches ordered by score and path rather than disk order to reduce visual shifts.
 
-## 권한·일관성·복구 불변식
+## Permission, Consistency, and Recovery Invariants
 
-- 카탈로그·색인은 접근 제어가 아니다. 모든 `/tree`, `/search`, `/search/stream` 결과는 **요청 시점** 역할·게스트 승인·숨김 규칙으로 다시 필터한다.
-- manager/owner의 `showAll`과 guest의 보이는 트리를 같은 색인 파일에 섞어도, 권한별 view를 쿼리 뒤에 만들며 캐시 키에 역할·가시성 버전을 넣는다.
-- `.git`, `node_modules`, `.data`, 설정된 ignore, 다운로드 전용 내부 파일은 탐색·검색·watch 모두에서 같은 정책을 공유한다. 정책이 바뀌면 카탈로그를 부분 갱신할 수 없다고 가정하고 해당 프로젝트를 재스캔한다.
-- 파일의 `mtimeNs + size`가 색인 값과 다르면 결과를 믿지 않는다. 변경 중 읽기·원자적 저장·네트워크 파일시스템 오류에서는 재시도 후 해당 파일을 stale로 표시하거나 원문 fallback한다.
-- 인덱스 손상·스키마 변경·서버 재시작은 캐시 삭제와 재구축으로 복구 가능해야 한다. 원문 파일·Git 상태·사용자 설정을 수정하거나 잠그지 않는다.
+- Catalogs and indexes are not access control. Refilter all `/tree`, `/search`, and `/search/stream` results using roles, guest approvals, and hiding rules at **request time**.
+- Even if manager/owner `showAll` and the guest-visible tree share the same index file, build permission-specific views after querying and include the role and visibility version in cache keys.
+- Apply the same policy to `.git`, `node_modules`, `.data`, configured ignores, and download-only internal files across browsing, search, and watch. When the policy changes, assume the catalog cannot be partially updated and rescan the affected project.
+- Do not trust results if a file's `mtimeNs + size` differs from the indexed value. For reads during changes, atomic saves, or network filesystem errors, retry, then mark the file stale or fall back to the source text.
+- Index corruption, schema changes, and server restarts must be recoverable by deleting and rebuilding the cache. Do not modify or lock source files, Git state, or user settings.
 
-## 도입 순서
+## Adoption Sequence
 
-| 단계 | 바꾸는 것 | 기대 효과 | 다음 단계 조건 |
+| Stage | Changes | Expected benefit | Conditions for the next stage |
 | --- | --- | --- | --- |
-| 0. 계측 | 현재 tree/search/watch 구간에 mark·로그·대형 fixture 추가 | 추측 대신 병목을 수치화 | 기준 p95와 파일 수·바이트 수 확보 |
-| 1. 탐색 스냅샷 | 부모별 목록 캐시, watcher의 영향 부모 갱신, versioned invalidation | 탐색과 watcher를 파일 수에서 분리 | 대량 변경 뒤 tree 재귀 walk가 사라짐 |
-| 2. 파일명 색인 | 경량 path index + worker fuzzy + 최근 항목 | Ctrl+P의 첫 검색 지연 제거 | 10만 파일에서도 p95 목표 충족 |
-| 3. 내용 색인 PoC | SQLite FTS5/대안의 빌드·복구·권한 재필터 검증 | 전수 read 제거 가능성 검증 | 정확성 회귀 0, 설치·배포 계약 검토 완료 |
-| 4. 내용 색인 채택 | ADR 후 증분 색인·dirty fallback·SSE batch 구현 | Ctrl+Shift+F 완료 시간 대폭 단축 | 30일 실제 사용 지표·복구 시험 통과 |
+| 0. Instrumentation | Add marks, logs, and large fixtures to the current tree/search/watch stages | Quantify bottlenecks instead of guessing | Establish baseline p95, file counts, and byte counts |
+| 1. Navigation snapshots | Per-parent listing cache, watcher updates to affected parents, versioned invalidation | Decouple navigation and watchers from file count | Eliminate recursive tree walks after bulk changes |
+| 2. Filename index | Lightweight path index + worker fuzzy + recent items | Eliminate initial search latency in Ctrl+P | Meet the p95 target even with 100,000 files |
+| 3. Content index PoC | Verify building, recovery, and permission refiltering for SQLite FTS5/alternatives | Verify whether reading every file can be eliminated | 0 correctness regressions, installation and deployment contract review complete |
+| 4. Adopt content indexing | Implement incremental indexing, dirty fallback, and SSE batch after the ADR | Substantially reduce Ctrl+Shift+F completion time | Pass 30 days of real-world usage metrics and recovery tests |
 
-1·2단계는 ADR 0088의 방향을 확장하며, 3·4단계의 저장소·복구 수명은 ADR 0105가 확정했다. 외부 상주 서비스,
-검색 SaaS, 원문을 외부로 보내는 API는 단일 설치·로컬 우선·권한 경계를
-흐리므로 후보에서 제외한다.
+Stages 1 and 2 extend the direction of ADR 0088, while ADR 0105 finalized the storage and recovery lifecycle for stages 3 and 4. Exclude external resident services, search
+SaaS, and APIs that send original text externally from consideration because they blur the single-installation,
+local-first, and permission boundaries.
 
-## 검증 시나리오
+## Validation Scenarios
 
-- 50만 파일 트리에서 root 표시, 깊은 폴더 최초/재열기, 연속 20회 펼치기, 프로젝트 전환을 측정한다.
-- 10만 텍스트 파일에서 prefix·fuzzy·한글·camelCase·정규식·대소문자 질의의 결과 집합을 기존 full scan과 byte-for-byte 비교한다.
-- 파일 생성·저장·rename·delete, Git checkout, ignore 규칙 변경, watcher overflow/누락을 재현해 이전 경로가 결과에 남지 않는지 확인한다.
-- guest·member·manager·owner별로 같은 질의를 보내 승인 밖 파일·비밀 파일·denied 경로가 한 건도 반환되지 않는지 검사한다.
-- 인덱스 디렉터리를 삭제·손상·스키마 downgrade한 뒤 서버 부팅, 재구축, fallback 검색이 원문을 보존하는지 확인한다.
-- 검색 중 새 질의를 입력하거나 탭·프로젝트를 전환해 취소했을 때 이전 SSE·worker 결과가 화면이나 캐시에 섞이지 않는지 확인한다.
+- Measure root display, first opening and reopening of deep folders, 20 consecutive expansions, and project switching in a tree of 500,000 files.
+- Compare result sets for prefix, fuzzy, Korean, camelCase, regex, and case-sensitive queries over 100,000 text files byte-for-byte against the existing full scan.
+- Reproduce file creation, saves, rename, delete, Git checkout, ignore rule changes, and watcher overflow/missed events, and verify that old paths do not remain in results.
+- Send the same query as guest, member, manager, and owner, and verify that no unapproved files, secret files, or denied paths are returned.
+- After deleting or corrupting the index directory or downgrading its schema, verify that server boot, rebuilding, and fallback searches preserve the source text.
+- Verify that previous SSE or worker results do not mix into the UI or cache when a search is canceled by entering a new query or switching tabs or projects.

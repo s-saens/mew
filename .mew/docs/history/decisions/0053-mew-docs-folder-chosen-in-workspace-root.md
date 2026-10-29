@@ -1,61 +1,61 @@
 ---
-provenance: "Liiiiv 중앙 ADR 이관본, 2026-10-14"
-description: "이관한 결정 기록: docs 폴더는 워크스페이스 루트에서 고른다 (`.mew/docs` 고정 폐지). 당시 선택·근거·후속 변경을 보존하며 현재 계약은 Mew 소유 문서에서 확인한다."
-title: "0053 — docs 폴더는 워크스페이스 루트에서 고른다 (`.mew/docs` 고정 폐지)"
+provenance: "Migrated copy of a Liiiiv central ADR, 2026-10-14"
+description: "Migrated decision record: Choose the docs folder from the workspace root (remove the fixed `.mew/docs` location). Preserves the choices, rationale, and subsequent changes at the time; see the Mew owning document for the current contract."
+title: "0053 — Choose the docs folder from the workspace root (remove the fixed `.mew/docs` location)"
 created: 2026-08-14
 updated: 2026-09-16
 ---
 
-- 날짜: 2026-08-14
-- 상태: 채택
-- 후속 결정: [0155](0155-mew-project-agent-context.md) — 프로젝트별 Documents 설정 우선
-- 후속 결정: [0081](0081-mew-root-project-tabs-and-git-subprojects.md) — 고정 헤더 docs 탭·폴더 선택 UI 배치; 선택 경로와 식별자는 유지
-- 결정자: 송상훈 (지시)
+- Date: 2026-08-14
+- Status: Adopted
+- Subsequent decision: [0155](0155-mew-project-agent-context.md) — Per-project Documents settings take precedence
+- Subsequent decision: [0081](0081-mew-root-project-tabs-and-git-subprojects.md) — Placement of the docs tab and folder selection UI in the fixed header; selected paths and identifiers are retained
+- Decision maker: Song Sanghoon (directive)
 
-## 배경
+## Background
 
-[ADR 0041](0041-mew-docs-as-workspace-special-repo.md)이 docs를 프로젝트에서 빼면서 위치를
-`<워크스페이스>/.mew/docs`로 고정했다. 근거는 "워크스페이스 최상위에 제품 레포만 남는다"였다.
+[ADR 0041](0041-mew-docs-as-workspace-special-repo.md) fixed the location at `<워크스페이스>/.mew/docs` when it removed docs from projects. The rationale
+was that "only product repos remain at the workspace's top level."
 
-쓰다 보니 대가가 더 컸다:
+In use, the costs proved greater:
 
-- docs가 점 폴더 안으로 들어가 평소 눈에 보이지 않는다. 워크스페이스 전체의 SSoT인데 파일 탐색기·
-  셸 `ls`·에디터 사이드바 어디에도 안 뜬다
-- 레포마다 `../.mew/docs/...`라는 한 칸 더 깊은 링크를 쓴다
-- 이미 docs를 다른 이름·다른 자리에 두고 쓰던 워크스페이스는 mew로 열 수 없다 — 고정 경로 하나뿐이라
-  "그 폴더를 docs로 쓴다"는 말을 할 방법이 없었다
+- docs is inside a dot folder and is normally invisible. It is the SSoT for the entire workspace, yet it appears nowhere in the file
+  explorer, shell `ls` output, or editor sidebar.
+- Each repo uses `../.mew/docs/...` links that go one level deeper
+- Workspaces already using docs under a different name or in a different location cannot be opened in mew — with only one fixed
+  path, there was no way to say "use that folder as docs."
 
-## 결정
+## Decision
 
-docs 폴더는 워크스페이스 안의 폴더 하나를 골라 쓴다. 기본은 워크스페이스 루트의 `docs`다.
+Choose a folder inside the workspace to use as the docs folder. The default is `docs` at the workspace root.
 
-- `paths.ts`에 `DOCS_DIR`(워크스페이스 루트 기준 상대 경로)이 생기고 `DOCS_ROOT`은 거기서 파생된다.
-  `.mew` 아래 고정은 폐지 — ADR 0041의 "위치는 `<워크스페이스>/.mew/docs`" 부분을 대체한다
-- 고르기는 owner 전용 `POST /api/docs/root` — docs 탭 꾹/우클릭 → "폴더 바꾸기".
-  워크스페이스 안이어야 하고 워크스페이스 폴더 자신은 안 된다(그러면 docs 탭이 워크스페이스 전체가 된다)
-- 다음 실행에도 남도록 `~/.config/mew/config.env`의 `MEW_DOCS`에 적는다 — `MEW_WORKSPACE`와 같은 방식
-  (뒤 파일에 남은 같은 키는 지운다)
-- 설정이 없으면 `<워크스페이스>/docs`. 그것이 없고 옛 `.mew/docs`만 있으면 그쪽을 쓴다 — ADR 0041
-  시절 설치가 아무 조작 없이 그대로 열리게 하는 폴백이다
-- `MEW_DOCS`는 그 폴더가 실제로 있는 워크스페이스에서만 쓰인다. 워크스페이스를 갈아끼우면 남의 폴더
-  이름이 따라와 엉뚱한 빈 폴더를 만드는 것을 막는다 — 없으면 그 워크스페이스의 기본값으로 돌아간다
-- docs로 쓰는 폴더는 프로젝트 목록에서 빠진다(`isValidProjectName`이 `'docs'`와 그 폴더 이름을 함께 거른다).
-  홈(`.workspace`) 트리의 맨 위 칸에서도 빠진다 — 같은 폴더가 탭 줄에 두 번 서면 안 된다
-- 바뀌지 않는 것: 내부 식별자는 여전히 `docs`다. 협업 방 키·저장된 탭·git·`.data/` 키가 전부
-  프로젝트 이름으로 도는 구조라, ADR 0041과 같은 이유로 이름은 건드리지 않고 경로만 꺾는다
+- `paths.ts` gains `DOCS_DIR` (a path relative to the workspace root), and `DOCS_ROOT` is derived from it. The fixed location
+  under `.mew` is abolished — this replaces the "location is `<워크스페이스>/.mew/docs`" portion of ADR 0041.
+- Selection uses the owner-only `POST /api/docs/root` — long-press or right-click the docs tab → "Change Folder." It must be inside the workspace
+  and cannot be the workspace folder itself (that would make the docs tab represent the entire workspace).
+- Write it to `MEW_DOCS` in `~/.config/mew/config.env` so it persists on the next run — the same approach as `MEW_WORKSPACE` (remove the same key remaining
+  in the latter file).
+- Without a setting, use `<워크스페이스>/docs`. If that does not exist and only the old `.mew/docs` exists, use that instead — this fallback lets installations from
+  the ADR 0041 era open unchanged without any intervention.
+- `MEW_DOCS` is used only in workspaces where that folder actually exists. This prevents a folder name from another workspace from carrying over
+  and creating an unintended empty folder when switching workspaces — if it does not exist, revert to that workspace's default.
+- The folder used as docs is excluded from the project list (`isValidProjectName` filters out both `'docs'` and that folder's name). It is also excluded
+  from the top level of the home (`.workspace`) tree — the same folder must not appear twice in the tab bar.
+- What remains unchanged: the internal identifier is still `docs`. Collaboration room keys, saved tabs, git, and `.data/` keys all operate
+  on project names, so for the same reason as ADR 0041, leave the name untouched and redirect only the path.
 
-## 근거
+## Rationale
 
-- 워크스페이스의 SSoT는 워크스페이스를 열었을 때 보여야 한다. 숨김 폴더에 넣는 것은 "하나뿐인 특별한 것"이
-  아니라 "내부 구현"이라는 신호다
-- 위치를 고정하면 mew가 폴더 구조를 강요한다. 고르게 하면 이미 있는 워크스페이스를 그대로 열 수 있다 —
-  워크스페이스 갈아끼우기(ADR 0042)와 같은 성질의 자유도다
-- `.mew`는 남는다 — 프로젝트별 설정(`cmd-button.json`·`comments.json`·`table-layout.json`)의 자리다.
-  docs만 거기서 나온다
+- The workspace's SSoT should be visible when the workspace is opened. Putting it in a hidden folder signals "internal implementation"
+  rather than "the one special thing."
+- Fixing the location makes mew impose a folder structure. Allowing a choice lets existing workspaces open as they are —
+  the same kind of flexibility as switching workspaces (ADR 0042).
+- `.mew` remains — it holds per-project settings (`cmd-button.json`, `comments.json`, and `table-layout.json`). Only docs
+  moves out.
 
-## 결과
+## Results
 
-- ADR 0041의 위치 결정은 이 ADR이 대체한다. 나머지(프로젝트에서 뺀 것·이름 `docs` 유지·가져오기/내보내기·
-  고정 탭)는 그대로 유효하다
-- 워크스페이스에 실제로 있는 `.mew/docs`를 루트 `docs/`로 옮기는 일은 별건이다 — 옮기면 레포들의
-  `../.mew/docs/...` 링크를 전부 고쳐야 하므로 한 번에 같이 한다. 옮기기 전까지는 폴백이 옛 자리를 연다
+- This ADR supersedes the location decision in ADR 0041. The rest (removal from projects, retaining the name `docs`, import/export, and the
+  pinned tab) remains valid.
+- Moving the actual `.mew/docs` in the workspace to `docs/` at the root is a separate task — moving it requires
+  updating all `../.mew/docs/...` links in the repos, so do those together. Until then, the fallback opens the old location.

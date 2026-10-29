@@ -1,91 +1,91 @@
 ---
-title: "이전 Liiiiv 워크스페이스의 Mew 접근 모델"
+title: "Mew access model in the former Liiiiv workspace"
 created: "2026-07-27"
 updated: 2026-10-14
 reviewed: 2026-08-21
 review-after-days: 30
-description: "독립 프로젝트 전환 전 Liiiiv 환경의 포트·계정·tailnet·셸 접근 범위를 보존한 운영 이력이며 현재 설치의 접근 정책이 아니다."
+description: "Operational history preserving the port, account, tailnet, and shell access scope in the Liiiiv environment before the transition to an independent project; this is not the access policy for the current installation."
 ---
 
-> 2026-10-14 독립 전환 전 운영 기록이다. 현재 기준은 [Mew 접근 모델](../../../docs/operations/access-model.md)과 [독립 프로젝트 결정](../decisions/0001-independent-project.md)을 따른다.
+> This is an operational record from before the transition to an independent project on 2026-10-14. The current standards follow the [Mew access model](../../../docs/operations/access-model.md) and [independent project decision](../decisions/0001-independent-project.md).
 
-mew를 **우리 워크스페이스에서 운영하는 기준**(reference). 역할 매트릭스·게스트 규칙 같은 모델 자체는 레포 `SECURITY.md`가 기준본이다. 코드는 `~/dev/liiiiv/mew`, 실행 명령은 [사용법](../../../docs/guides/getting-started-ko.md), 코드 구조는 [개발 문서](../development/MOC.md). 이 경계가 실제로 어디까지 유효한지에 대한 검토는 [security-review-2026-07-21.md](security-review-2026-07-21.md).
+A reference for **operating mew in our workspace** (reference). The repository's `SECURITY.md` is the canonical source for the model itself, including the role matrix and guest rules. The code is at `~/dev/liiiiv/mew`, run commands are in [Usage](../../../docs/guides/getting-started-ko.md), and the code structure is in the [development documentation](../development/MOC.md). See [security-review-2026-07-21.md](security-review-2026-07-21.md) for a review of how far this boundary actually holds.
 
-> ⚠️ **이 문서의 내용을 바꾸는 변경은 write-back 트리거 4번(포트·인증 모델)이다.** 코드만 고치고 여기를 안 고치면 안 된다.
+> ⚠️ **A change that affects this document's contents falls under write-back trigger 4 (port and authentication model).** You must update this document along with the code.
 
-> **2026-07-30 — 역할 매트릭스·게스트 규칙의 기준본은 mew 레포 `SECURITY.md`로 옮겼다**([ADR 0023](decisions/0023-mew-selfhost-packaging-repo.md)). 공개 레포는 자기 보안 모델을 자기 안에 들고 있어야 하기 때문이다. **이 문서에는 우리 운영 사항만 남긴다** — 아래 포트 표, 발급 계정 현황, tailnet 경계. 모델 자체를 고칠 일이면 레포 `SECURITY.md`를 고친다.
+> **2026-07-30 — The canonical source for the role matrix and guest rules was moved to `SECURITY.md` in the mew repository** ([ADR 0023](decisions/0023-mew-selfhost-packaging-repo.md)). A public repository must contain its own security model. **Only our operational details remain in this document** — the port table below, issued account status, and tailnet boundaries. To change the model itself, edit the repository's `SECURITY.md`.
 
-## 포트
+## Ports
 
-| 포트 | 용도 | 노출 | 인증 |
+| Port | Purpose | Exposure | Authentication |
 | --- | --- | --- | --- |
-| 4999 | dev (vite, HMR) | **tailnet 전용 — 외부 노출 금지** | 5000과 동일 |
-| 5000 | 프로덕션 (단일 포트) | 터널 노출 | 미로그인 = 게스트, 로그인 시 역할 부여 |
-| 동적 loopback 포트 | 서버 Chromium CDP | 서버 내부 전용 · 터널·외부 노출 금지 | 로컬 프로세스 접근 경계, Mew 사용자 인증 없음 |
+| 4999 | dev (vite, HMR) | **tailnet only — external exposure prohibited** | Same as 5000 |
+| 5000 | Production (single port) | Exposed through a tunnel | Not logged in = guest; role assigned on login |
+| Dynamic loopback port | Server Chromium CDP | Server internal use only · tunnel and external exposure prohibited | Local process access boundary; no Mew user authentication |
 
-CDP 포트는 브라우저 프로필 프로세스와 함께 생성·종료한다. 일반 사용자에게 제공하는 API가 아니며 접근 가능한 로컬 프로세스는 해당 브라우저를 제어할 수 있다([ADR 0129](decisions/0129-mew-browser-native-launch-cdp.md)).
+The CDP port is created and terminated with the browser profile process. It is not an API for general users, and any local process with access can control that browser ([ADR 0129](decisions/0129-mew-browser-native-launch-cdp.md)).
 
-4999도 5000과 같은 인증 체계를 통과한다(로그인 없이는 게스트). 그럼에도 tailnet 전용인 이유는 개발 서버라 주변 방어가 얇기 때문이다 — vite HMR을 죽이지 않으려고 알 수 없는 WebSocket 업그레이드를 끊지 않고, 소스맵과 빌드 전 자산이 그대로 나간다.
+4999 uses the same authentication system as 5000 (guest without login). It is still restricted to the tailnet because the development server has limited surrounding defenses — unknown WebSocket upgrades are not disconnected to avoid breaking vite HMR, and source maps and prebuild assets are served as is.
 
-## 역할
+## Roles
 
-서열은 **guest &lt; member &lt; manager &lt; owner**. 로그인하지 않은 방문자는 자동으로 guest이고, 로그인하면 승인 리스트에 등록된 역할을 받는다. **임시 비밀번호를 아직 바꾸지 않은 계정은 역할과 무관하게 모든 API·셸·협업이 차단된다.**
+The hierarchy is **guest &lt; member &lt; manager &lt; owner**. Visitors who are not logged in are automatically guests; after login, they receive the role registered in the approval list. **Accounts that have not yet changed their temporary password are blocked from all APIs, shells, and collaboration regardless of role.**
 
-### 권한 매트릭스
+### Permission matrix
 
-**표는 mew 레포 `SECURITY.md`에 있다** — 여기 복제하지 않는다. 아래 두 절은 그 표를 *왜* 지금 모양으로
-바꿨는지에 대한 우리 기록이다.
+**The table is in `SECURITY.md` in the mew repo** — it is not duplicated here. The next two sections are our record of *why* we changed
+that table to its current form.
 
-### 역할과 무관하게 막히는 것 (우리 워크스페이스 기준)
+### Blocked regardless of role (in our workspace)
 
-- `.data/`·`.git/`·`node_modules/` — API 경로 검증에서 거부된다.
-- docs 프로젝트의 `archives/` 문서 — 불변. 저장도 되돌리기도 거부된다.
-- 보호된 프로젝트(`docs`와 mew 자신) — owner도 개명·삭제할 수 없다.
+- `.data/`·`.git/`·`node_modules/` — rejected by API path validation.
+- Documents under `archives/` in the docs project — immutable. Both saving and reverting are rejected.
+- Protected projects (`docs` and mew itself) — even owners cannot rename or delete them.
 
-### 시크릿 파일(`.env*`)은 "게스트만" 차단이다 (2026-07-28 변경)
+### Secret files (`.env*`) are blocked for "guests only" (changed 2026-07-28)
 
-`.env`·`.env.local` 등은 **로그인한 역할(member 이상)에게 사이드바 트리·읽기·편집·검색이 모두 열려 있고, 게스트에게만 차단된다.** 이전에는 역할과 무관한 API 차단이었다.
+For `.env`, `.env.local`, and similar files, **sidebar tree visibility, reading, editing, and search are all available to logged-in roles (member and above), and blocked only for guests.** Previously, the API blocked them regardless of role.
 
-- **바꾼 이유** — 로그인 가능한 역할은 어차피 셸(manager·owner)이나 광범위한 파일 조작 권한(member)을 갖는다. 역할 무관 차단은 실질적 방어가 아니라 UI 편의만 깎고 있었다.
-- **게스트 차단은 경로 규칙보다 우선한다** — 게스트에게 프로젝트 루트(`''`)에 view를 줘도 `.env*`는 따라가지 않는다.
-- **함께 열린 것**: 편집·삭제·개명, 전문 검색 결과(내용 미리보기), 실시간 협업 방. 협업 방에 올라가는 것도 허용 범위로 합의됐다.
-- `.data/`(계정·세션)는 그대로 전 역할 차단이다 — 여기서 푼 것은 `.env*`뿐이다.
+- **Reason for the change** — roles that can log in already have shell access (manager and owner) or broad file manipulation permissions (member). Blocking all roles provided no practical defense and only reduced UI convenience.
+- **Guest blocking takes precedence over path rules** — granting a guest view access to the project root (`''`) does not extend to `.env*`.
+- **Also enabled**: editing, deletion, renaming, full-text search results (content previews), and real-time collaboration rooms. Inclusion in collaboration rooms was also agreed to be within the allowed scope.
+- `.data/` (accounts and sessions) remains blocked for all roles — only `.env*` was unblocked here.
 
-### 사이드바 트리는 owner·manager에게 거르지 않는다 (2026-07-29 변경)
+### The sidebar tree is not filtered for owners and managers (changed 2026-07-29)
 
-**owner·manager의 사이드바에는 디스크에 있는 그대로가 뜬다** — 확장자 화이트리스트도, 설정 창의 숨김 목록도 적용하지 않는다. member 이하는 종전대로 걸러진 트리를 본다(docs는 `.md`+미디어, 그 밖의 프로젝트는 텍스트·미디어 화이트리스트, 숨김 목록 적용).
+**The sidebar for owners and managers shows files as they exist on disk** — neither the extension whitelist nor the hidden list in settings applies. Members and below continue to see a filtered tree (docs: `.md` + media; other projects: text and media whitelist; hidden list applied).
 
-- **바꾼 이유** — 트리를 거르지 않고 볼 수 있는 역할과 **터미널을 쓸 수 있는 역할이 같은 집합**이다. 셸이 있으면 어차피 무엇이든 보고 만들 수 있으므로, 화이트리스트는 방어가 아니라 "방금 만든 파일이 사이드바에 안 뜬다"는 혼란만 만들고 있었다.
-- **그래도 안 보이는 둘** — 숨김 규칙이 아니라 구조적 제약이다.
-  - `.git`·`node_modules`·`.data` — API가 경로 자체를 거부하므로(위 §역할과 무관하게 막히는 것) 트리에 세워도 열리지 않고, `node_modules` 하나로 항목이 수만 개가 된다.
-  - `build/` 안의 산출물 — APK/AAB만 통과시키고 나머지는 접는다. 숨김 목록과 무관한 "산출물 홍수 방지" 규칙이고, flutter build 하나가 9천 항목이다.
-- **치르는 값** — 숨김 목록에 있던 것이 owner·manager 트리에 전부 올라온다. 가장 큰 것이 `liiiiv-life/.next`(약 3,300 항목)이고, docs 최상위에는 `.foam`·`.github`·`.vscode`가 함께 선다. 숨김 목록은 그대로 남아 member 이하와 **검색·트리 감시**에는 계속 적용된다.
-- **트리 가시성은 인가 경계가 아니다.** 안 보이는 파일도 경로만 알면 API로 읽힌다 — 실제 경계는 게스트 규칙(`guestAccess.ts`)과 차단 경로(`paths.ts`)다. 판정은 mew 레포 `server/tree.ts`(`isPathVisible`)와 `server/reqAuth.ts`(`seesEveryFile`) 두 곳에서만 한다.
-- **안 보이게 되는 조작에는 안내가 뜬다** — member가 파일을 만들거나 개명한 결과가 자기 트리에서 사라지면 "권한이 없습니다" 토스트로 알린다. 조작 자체는 성공한 것이고, 파일은 디스크에 그대로 있다.
+- **Reason for the change** — the roles that can view the unfiltered tree and **the roles that can use the terminal are the same set**. With a shell, users can already view and create anything, so the whitelist provided no defense and only caused confusion when "the file I just created does not appear in the sidebar."
+- **Two categories still remain invisible** — these are structural constraints, not hiding rules.
+  - `.git`·`node_modules`·`.data` — the API rejects the paths themselves (see §Blocked regardless of role above), so listing them in the tree would not make them openable, and `node_modules` alone contains tens of thousands of entries.
+  - Artifacts in `build/` — only APK/AAB files are allowed through; the rest are collapsed. This rule prevents an "artifact flood" independently of the hidden list; a single flutter build produces 9,000 entries.
+- **The cost** — everything previously on the hidden list appears in the owner and manager tree. The largest is `liiiiv-life/.next` (about 3,300 entries), and `.foam`·`.github`·`.vscode` appear together at the top level of docs. The hidden list remains and continues to apply to members and below, and to **search and tree watching**.
+- **Tree visibility is not an authorization boundary.** Even invisible files can be read through the API if their paths are known — the actual boundaries are guest rules (`guestAccess.ts`) and blocked paths (`paths.ts`). Decisions are made in only two places in the mew repository: `server/tree.ts` (`isPathVisible`) and `server/reqAuth.ts` (`seesEveryFile`).
+- **Operations that make a file invisible display a notice** — if a file a member creates or renames disappears from their tree, a "You do not have permission" toast notifies them. The operation itself succeeded, and the file remains on disk.
 
-## 게스트 경계 · 인증
+## Guest boundaries · Authentication
 
-**규칙과 절차의 기준본은 mew 레포 `SECURITY.md`다**(경로 규칙 우선순위, `.env*` 절대 차단, 게스트는
-셸 불가, 승인 리스트·세션·잠금 정책, `/file-revert`의 알려진 불일치). 여기서는 우리 운영 사실만 든다 —
-계정 발급은 이 호스트에서 CLI로만 하고, 게스트 권한은 폴더 통짜가 아니라 경로 단위로 준다.
+**The canonical source for rules and procedures is `SECURITY.md` in the mew repo** (path rule precedence, absolute blocking of `.env*`, no shell access for
+guests, allowlist, session, and lock policies, and known inconsistencies in `/file-revert`). This document covers only our operational facts — accounts are provisioned
+only through the CLI on this host, and guest permissions are granted per path rather than for entire folders.
 
-## 계정 프로필
+## Account profiles
 
-로그인 사용자는 설정창에서 **자기** 표시 이름과 프로필 사진을 바꾼다. 이름·사진은 계정 원장에 함께 저장되고, 로그인한 사용자에게만 채팅 같은 협업 화면용 공개 프로필로 제공한다. 이메일 주소와 역할·비밀번호 상태는 별도이며, 프로필 API는 타인의 계정을 수정할 수 없다.
+Logged-in users change **their own** display name and profile photo in settings. Names and photos are stored together in the account ledger and provided only to logged-in users as public profiles for collaboration interfaces such as chat. Email addresses, roles, and password status are separate, and the profile API cannot modify other users' accounts.
 
-사진은 512KB 이하 JPG·PNG·WebP·GIF만 받는다. SVG와 외부 URL은 받지 않아, 스크립트가 섞인 이미지나 외부 추적 요청을 만들지 않는다.
+Only JPG, PNG, WebP, and GIF photos up to 512 KB are accepted. SVG and external URLs are not accepted, preventing images containing scripts or external tracking requests.
 
-## 이 경계가 의미하는 것
+## What this boundary means
 
-**"승인된 이메일만 쓸 수 있다"는 말은 "승인된 이메일이면 이 개발 머신에 대해 SSH에 준하는 권한을 갖는다"는 뜻이다.** 5000번 서버는 워크스페이스 루트(`~/dev/liiiiv`)를 cwd로 하는 tmux 셸을 제공하므로, manager 이상은 mew 자체 소스뿐 아니라 옆의 모든 프로젝트를 열람·수정할 수 있고 API 레벨의 경로 차단(`.env`·`.data/`)은 셸을 가진 사용자에게 의미 있는 경계가 아니다.
+**"Only approved email addresses can use it" means "an approved email address grants permissions comparable to SSH on this development machine."** The server on port 5000 provides a tmux shell with the workspace root (`~/dev/liiiiv`) as its cwd, so managers and above can view and modify not only mew's own source but all adjacent projects. API-level path blocking (`.env`·`.data/`) is not a meaningful boundary for users with a shell.
 
-계정 하나가 유출되면 blast radius는 "문서 편집기"가 아니라 \*\*"이 워크스페이스의 모든 프로젝트 + 그 안의 시크릿"\*\*이다. 계정 발급을 최소화하고, 가능하면 공개 터널보다 tailnet 경계를 쓴다. 근거와 세부 항목은 [security-review-2026-07-21.md](security-review-2026-07-21.md) §4.
+If one account is compromised, the blast radius is \*\*"all projects in this workspace + the secrets inside them"\*\*, rather than a "document editor." Minimize account issuance and use a tailnet boundary instead of a public tunnel when possible. For rationale and details, see [security-review-2026-07-21.md](security-review-2026-07-21.md) §4.
 
-> **2026-07-28 기준 발급 계정은 owner 1 + manager 1뿐이고 member 계정은 없다.** 즉 지금 로그인 가능한 사람은 전원 셸을 갖고 있다. **member 계정을 처음 발급하는 순간** 위 매트릭스의 member 행이 처음으로 실제 경계가 되는데, 그 역할은 셸은 없어도 **워크스페이스 전 프로젝트의 `.env*`를 읽을 수 있다**(2026-07-28 결정). 시크릿을 못 보는 역할이 필요하면 member가 아니라 guest + 경로 규칙으로 준다.
+> **As of 2026-07-28, the only issued accounts are 1 owner + 1 manager, with no member accounts.** Everyone currently able to log in therefore has a shell. **The moment the first member account is issued**, the member row in the matrix above becomes an actual boundary for the first time. Even without a shell, that role **can read `.env*` in every project in the workspace** (decision dated 2026-07-28). If a role must not see secrets, grant guest access with path rules rather than member access.
 
-## 함께 볼 것
+## See also
 
-- repos.md (`이전 Liiiiv 문서: ops/repos.md`) — mew가 접근하는 워크스페이스 폴더 목록
-- [ADR 0023](decisions/0023-mew-selfhost-packaging-repo.md) — mew를 공개 가능한 자립 레포로 정리한 결정. 권한 모델 기준본이 레포 `SECURITY.md`로 옮겨간 근거이고, 컨테이너로 띄우면 위 §"이 경계가 의미하는 것"의 셸이 **컨테이너 안 + 마운트한 폴더 하나**로 좁아진다. **우리 5000번 운영은 여전히 호스트 프로세스라 아래 사실이 그대로 유효하다**
-- [mew ADR 지도](../decisions/README.md) — 현재 에이전트 패널·세션·CLI 권한 결정. [ADR 0014](decisions/0014-mew-agent-panel-removal.md)의 제거 결정은 [ADR 0034](decisions/0034-mew-agent-panel-acp-reintroduction.md)가 대체했다
-- company/services.md (`이전 Liiiiv 문서: company/services.md`) — 외부 서비스·계정 인벤토리
+- repos.md (`이전 Liiiiv 문서: ops/repos.md`) — list of workspace folders accessed by mew
+- [ADR 0023](decisions/0023-mew-selfhost-packaging-repo.md) — decision to organize mew as a self-contained repository suitable for public release. This is the rationale for moving the permission model's canonical source to the repository's `SECURITY.md`. When running in a container, the shell described in §"What this boundary means" above is restricted to **inside the container + one mounted folder**. **Our production server on port 5000 is still a host process, so the facts below remain valid**
+- [mew ADR map](../decisions/README.md) — current decisions on agent panel, session, and CLI permissions. The removal decision in [ADR 0014](decisions/0014-mew-agent-panel-removal.md) was superseded by [ADR 0034](decisions/0034-mew-agent-panel-acp-reintroduction.md)
+- company/services.md (`이전 Liiiiv 문서: company/services.md`) — external service and account inventory

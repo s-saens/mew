@@ -1,10 +1,12 @@
 ---
-title: "mew 문서 탐색 진입점"
-description: "AI가 Mew 자체의 지침·문서 규칙을 읽고 description 목록에서 필요한 현재 문서와 로컬 결정을 고르는 실행 순서."
+title: "mew documentation navigation entry point"
+description: "The agent entry point for Mew's own instructions, English documentation policy, description-based discovery of current documents, and local decisions."
 created: "2026-10-06"
 updated: "2026-10-27"
 ---
 
-프로젝트 [README](../../README.md)와 [AGENTS](../../AGENTS.md), [문서 규칙](README.md), [실행·검증 규칙](development/getting-started.md)을 읽는다. Mew 자체의 지침이 기준이며 부모 워크스페이스 문서의 탐색·갱신은 요구하지 않는다.
+Read the project [README](../../README.md), [AGENTS](../../AGENTS.md), [documentation rules](README.md), and [execution and verification rules](development/getting-started.md). Mew's own instructions govern; navigating or updating parent workspace documents is not required.
 
-저장소 루트에서 `node server/document-descriptions.ts`로 설정된 `.mew/docs`의 경로와 description을 확인한 뒤 관련 본문만 선택한다. 현재 결정은 `decisions/`, 과거 근거는 필요할 때만 `history/`에서 확인한다. MOC 탐색·등록 의무는 없다. 코드·기능·운영을 바꾸면 해당 소유 문서와 description을 같은 작업에서 갱신하고 `npm run check:docs`로 검사한다.
+From the repository root, run `node server/document-descriptions.ts` to list the paths and descriptions in the configured `.mew/docs`, then read only the relevant document bodies. Check current decisions in `decisions/` and historical evidence in `history/` only when needed. There is no obligation to navigate or register in a MOC. When changing code, features, or operations, update the owning document and its description in the same task and check them with `npm run check:docs`.
+
+Use English for this repository's project-owned documentation; follow the [documentation language policy](README.md#documentation-language).

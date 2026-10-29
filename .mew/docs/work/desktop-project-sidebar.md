@@ -1,39 +1,39 @@
 ---
-title: "데스크톱 프로젝트 사이드바 작업 기록"
-description: "2026-10-28 데스크톱 프로젝트 드롭다운을 파일 탐색기 왼쪽의 독립 패널로 바꾸고 프로젝트별 명령 버튼을 추가한 구현·검증 기록. 모바일 드롭다운 유지, 명령 대상 고정·루트 세션 격리와 이전 실행 세션·운영 미적용 범위, 2026-10-29 공통 패널 배경 수정과 검증을 구분한다."
+title: "Desktop project sidebar work record"
+description: "Implementation and verification record for replacing the desktop project dropdown with an independent panel to the left of the file explorer and adding per-project command buttons on 2026-10-28. Distinguishes retention of the mobile dropdown, fixed command targets, root session isolation, previously running sessions, and the scope not applied to production from the shared panel background fix and verification on 2026-10-29."
 created: "2026-10-28"
 updated: "2026-10-29"
 ---
 
-## 목적과 결과
+## Purpose and results
 
-헤더의 프로젝트 선택기를 데스크톱에서는 파일 탐색기 왼쪽의 **프로젝트 사이드바**로 열도록 바꿨다. 목록을 열어 둔 채 프로젝트를 전환하고 각 프로젝트 행의 ▶로 명령을 실행할 수 있다. 다른 프로젝트 명령의 조회·편집·실행은 요청 대상만 고정하며 현재 프로젝트·문서·배치를 바꾸지 않는다.
+Changed the header project selector to open a **project sidebar** to the left of the file explorer on desktop. Users can switch projects while keeping the list open and run commands with ▶ on each project row. Viewing, editing, or running commands for another project fixes only the request target and does not change the current project, document, or layout.
 
-기존 핸들·아이콘·오른쪽 번호·현재 행 전체 강조와 재정렬·우클릭 편집·삭제를 유지한다. 파일 탐색기와 독립적으로 닫고 폭을 조절하며 브라우저의 계정별 열림 상태·폭을 복원한다. 선택·바깥 누름·Esc·뒤로가기는 패널을 닫지 않는다. 닫기 버튼·헤더 선택기로 닫으면 기존 아이콘·이름·명령 버튼 표시로 돌아간다. 모바일은 기존 드롭다운을 사용한다.
+Retains the existing handles, icons, right-side numbers, full highlighting of the current row, reordering, and right-click editing and deletion. It closes and resizes independently of the file explorer and restores the per-account open state and width stored in the browser. Selection, outside clicks, Esc, and Back do not close the panel. Closing it with the close button or header selector restores the existing icon, name, and command button display. Mobile uses the existing dropdown.
 
-Alt+P는 패널을 열고 첫 항목에 포커스를 두며 작업 패널 최대화 중에는 확대를 해제한다. Alt+R·Ctrl+E는 패널이 열려 있으면 현재 프로젝트 행, 닫혀 있거나 모바일이면 헤더의 명령 메뉴를 연다. 각 루트 프로젝트의 같은 이름 명령은 실제 폴더 경로를 포함한 세션 식별자로 격리한다.
+Alt+P opens the panel and focuses the first item, and exits maximization if the work panel is maximized. Alt+R and Ctrl+E open the command menu on the current project row when the panel is open, or in the header when it is closed or on mobile. Commands with the same name in different root projects are isolated using session identifiers that include the actual folder path.
 
-현재 사용법은 [프로젝트 안내](../../../docs/guides/projects.md#프로젝트-탭)·[명령 안내](../../../docs/guides/commands.md), 기능 계약은 [프로젝트 열기·선택·전환](../features/%ED%94%84%EB%A1%9C%EC%A0%9D%ED%8A%B8%C2%B7%ED%8C%8C%EC%9D%BC%C2%B7%EA%B2%80%EC%83%89/%ED%94%84%EB%A1%9C%EC%A0%9D%ED%8A%B8%20%EC%97%B4%EA%B8%B0%C2%B7%ED%83%AD%C2%B7%EA%B7%B8%EB%A3%B9.md)·[프로젝트 명령 버튼](../features/%ED%84%B0%EB%AF%B8%EB%84%90%C2%B7%EC%97%90%EC%9D%B4%EC%A0%84%ED%8A%B8%C2%B7%EC%9E%90%EB%8F%99%ED%99%94/%ED%94%84%EB%A1%9C%EC%A0%9D%ED%8A%B8%20%EB%AA%85%EB%A0%B9%20%EB%B2%84%ED%8A%BC.md), 공용 구현은 [UI 계약](../development/ui-contracts.md#헤더-프로젝트-선택기), 기존 결정 변경은 [ADR 0082](../decisions/0082-desktop-project-sidebar.md)를 따른다.
+Current usage follows the [project guide](../../../docs/guides/projects.md#프로젝트-탭) and [command guide](../../../docs/guides/commands.md); feature contracts follow [Opening, selecting, and switching projects](../features/projects-files-search/opening-projects-tabs-and-groups.md) and [Project command buttons](../features/terminals-agents-automation/project-command-buttons.md); shared implementation follows [UI contracts](../development/ui-contracts.md#header-project-switcher); changes to existing decisions follow [ADR 0082](../decisions/0082-desktop-project-sidebar.md).
 
-## 검증과 적용
+## Verification and application
 
-- `node --test server/workspace-switch-ui.test.ts server/project-sidebar-ui.test.ts server/project-switcher-ui.test.ts`: 9개 통과. 실제 App에서 두 탐색 패널의 순서·토글 위치, 프로젝트 전환 후 패널 유지, 최대화 중 Alt+P 복귀·포커스, 새로고침 후 열림·닫힘·폭 복원을 확인했다. 격리 패널에서는 핸들·키보드 정렬·리사이즈, 프로젝트별 명령·작업 루트, 모바일 드롭다운 전환과 기존 입력 경계를 검사했다. 다크·라이트 데스크톱과 모바일 캡처도 검토했다.
-- `node --test server/cmd-button-workspace.test.ts server/cmd-button-workspace-ui.test.ts server/cmdButtons.test.ts server/cmd-button-ports.test.ts server/subprojects.test.ts server/command-button-menu-ui.test.ts server/header-menu-switch-ui.test.ts server/action-menu-ui.test.ts`: 18개 통과. 프로젝트에 고정한 명령 요청·루트 세션 격리와 기존 명령 메뉴 동작을 검사했다.
-- `npx tsc -b`: 통과.
-- 변경 TS·TSX 11개 파일의 oxlint: 오류 없이 통과. 기존·상태 effect 관련 경고는 남아 있다.
-- 변경 UI 4개의 Impeccable 검사와 별도 디자인 검토: 차단 결함 없음.
-- `npm run check:docs`: description 검사 오류 없음. 전체 링크 검사는 기존 기능 MOC·태스크의 삭제된 대상을 가리키는 18건으로 실패했다. 이번 변경 문서의 링크 오류는 없다.
+- `node --test server/workspace-switch-ui.test.ts server/project-sidebar-ui.test.ts server/project-switcher-ui.test.ts`: 9 passed. Verified the order and toggle positions of the two navigation panels in the actual App, panel persistence after switching projects, return from maximization and focus with Alt+P, and restoration of open/closed state and width after refresh. In an isolated panel, checked handles, keyboard reordering, resizing, per-project commands and working roots, mobile dropdown switching, and existing input boundaries. Also reviewed dark and light desktop and mobile captures.
+- `node --test server/cmd-button-workspace.test.ts server/cmd-button-workspace-ui.test.ts server/cmdButtons.test.ts server/cmd-button-ports.test.ts server/subprojects.test.ts server/command-button-menu-ui.test.ts server/header-menu-switch-ui.test.ts server/action-menu-ui.test.ts`: 18 passed. Checked command requests fixed to a project, root session isolation, and existing command menu behavior.
+- `npx tsc -b`: passed.
+- oxlint on 11 changed TS and TSX files: passed without errors. Existing warnings and warnings related to state effects remain.
+- Impeccable checks of 4 changed UIs and a separate design review: no blocking defects.
+- `npm run check:docs`: no description check errors. The full link check failed on 18 references to deleted targets in existing feature MOCs and tasks. No link errors in the documents changed here.
 
-앱 빌드·배포·서버 실행·재시작은 수행하지 않았다. 실행 중인 인스턴스에는 사용자가 빌드 후 적용해야 한다. 이전 식별자로 이미 실행 중인 루트 명령 세션은 자동 종료하지 않으며 새 메뉴가 해당 세션의 실행 상태를 이어서 표시하지 않는다. 기존 터미널에서 확인·종료할 수 있고 새 실행부터 폴더별 식별자를 사용한다.
+The app was not built or deployed, and the server was not started or restarted. The user must build and apply the changes to running instances. Root command sessions already running under previous identifiers are not automatically terminated, and the new menu does not carry over the display of their running status. They can be checked and terminated in existing terminals; folder-specific identifiers are used starting with new runs.
 
 
-## 공통 패널 배경 수정 (2026-10-29)
+## Shared panel background fix (2026-10-29)
 
-프로젝트 사이드바만 단색으로 남고 내부 목록에 팝업의 배경·블러가 겹치는 문제를 수정했다. 바탕에 다른 패널의 공통 표면 클래스를 적용하고, 상시 표시 목록은 인라인 메뉴로 구분해 팝업 효과를 제외했다. 헤더 왼쪽 여백도 파일 탐색기와 같은 8px로 맞췄다. 현재 기준은 [헤더 프로젝트 선택기](../development/ui-contracts.md#헤더-프로젝트-선택기)를 따른다.
+Fixed an issue where only the project sidebar retained a solid background while popup backgrounds and blur were layered over its internal list. Applied the shared surface class used by other panels to its base, and classified the persistent list as an inline menu to exclude popup effects. Also aligned the header's left padding with the file explorer at 8px. The current standard follows the [header project selector](../development/ui-contracts.md#header-project-switcher).
 
-- 프로젝트 사이드바 회귀 검사: 7개 실제 테마에서 파일 탐색기와 배경 일치, 인라인 목록의 투명 배경·블러 없음·테마색 상속, 명령 팝업과 모바일 드롭다운의 기존 블러를 확인했다. 수정 전에는 밝은 테마의 목록에 75% 배경이 남아 같은 회귀 검사가 실패했다.
-- 공용 메뉴와 테마 설정 브라우저 검사도 통과했다. 미드나이트·다크·라이트 데스크톱과 미드나이트 모바일 캡처를 검토했다.
-- `npx tsc -b`: 통과. 변경 TSX·테스트의 `npx oxlint`는 기존 경고 4건과 함께 오류 없이 통과했다. 변경 UI의 Impeccable 검사에 지적은 없다.
-- `npm run check:docs`: description 검사 오류 없음. 전체 링크 검사는 작업 전부터 남아 있던 README의 임시 에셋 URL과 삭제된 문서 참조 19건으로 실패했다. 이번 변경 문서의 링크 오류는 없다.
+- Project sidebar regression checks: verified background matching with the file explorer across 7 actual themes, a transparent inline list background with no blur and inherited theme colors, and retention of the existing blur in command popups and the mobile dropdown. Before the fix, the same regression check failed because a 75% background remained on the list in light themes.
+- Browser checks for shared menus and theme settings also passed. Reviewed midnight, dark, and light desktop captures and a midnight mobile capture.
+- `npx tsc -b`: passed. `npx oxlint` on the changed TSX and tests passed without errors, with 4 existing warnings. The Impeccable check found no issues in the changed UI.
+- `npm run check:docs`: no description check errors. The full link check failed on 19 temporary asset URLs in README and references to deleted documents that predated this work. No link errors in the documents changed here.
 
-빌드·배포·서버 재시작은 수행하지 않았다. 실제 인스턴스 반영은 사용자가 빌드 후 수행한다.
+No build, deployment, or server restart was performed. The user applies the changes to actual instances after building.

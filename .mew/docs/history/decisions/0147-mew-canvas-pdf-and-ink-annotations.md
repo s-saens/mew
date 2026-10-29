@@ -1,33 +1,33 @@
 ---
-provenance: "Liiiiv 중앙 ADR 이관본, 2026-10-14"
-description: "이관한 결정 기록: mew Canvas PDF와 표준 필기 주석. 당시 선택·근거·후속 변경을 보존하며 현재 계약은 Mew 소유 문서에서 확인한다."
-title: "0147 — mew Canvas PDF와 표준 필기 주석"
+provenance: "Migrated copy of a Liiiiv central ADR, 2026-10-14"
+description: "Migrated decision record: mew Canvas PDF and standard ink annotations. Preserves the choices, rationale, and subsequent changes from that time; consult the Mew owning document for the current contract."
+title: "0147 — mew Canvas PDF and standard ink annotations"
 created: 2026-09-15
 updated: 2026-09-15
 ---
 
-- 날짜: 2026-09-15
-- 상태: 채택
-- 결정자: Codex + 사용자 PDF 뷰어·최적화·PDF 내 필기 저장 요청
+- Date: 2026-09-15
+- Status: Adopted
+- Decision makers: Codex + user requests for a PDF viewer, optimization, and saving handwriting within PDFs
 
-## 배경
+## Background
 
-내장 PDF iframe은 프로덕션의 `frame-ancestors 'none'`과 충돌하며 기기마다 동작이 다르다. 큰 문서의 메모리와 필기 입력을 앱에서 제어해야 한다.
+The embedded PDF iframe conflicts with production's `frame-ancestors 'none'` and behaves differently across devices. The app must control memory use for large documents and handwriting input.
 
-## 선택지
+## Options
 
-1. 내장 뷰어 iframe — 브라우저 의존·필기 저장 제어 불가.
-2. 완성형 PDF UI — 별도 UI·상태 계층이 필요하다.
-3. 설치된 PDF.js display API와 직접 만든 Canvas UI — 파서는 재사용하고 페이지 수명·입력·저장을 직접 제어한다.
+1. Embedded viewer iframe — Browser-dependent; cannot control handwriting storage.
+2. Full-featured PDF UI — Requires separate UI and state layers.
+3. Installed PDF.js display API and a custom Canvas UI — Reuse the parser and directly control page lifecycles, input, and saving.
 
-## 결정
+## Decision
 
-- PDF.js worker에서 파싱하고 필요한 페이지만 Canvas·텍스트 레이어에 표시한다. 페이지별 픽셀 예산·렌더 취소·자원 해제를 적용한다. 뷰어와 PDF 저장 코드는 지연 로드한다.
-- 펜 입력은 문서 좌표의 벡터 스트로크다. PDF 재렌더 없이 별도 Canvas에서 그린다.
-- PDF-LIB를 별도 worker에서 사용해 표준 `/Ink` 주석·appearance stream으로 PDF 자체에 저장한다. 원본 본문과 타 도구의 주석을 보존한다. PDF 파서를 새로 작성하지 않는다.
-- 원본 저장은 명시적이며 기존 파일 접근 권한과 archives 불변성을 따른다. 버전 조건과 임시 파일 교체로 중간 실패·동시 저장의 원본 손상을 방지한다. 충돌 시 필기를 남기고 사본 다운로드를 제공한다.
-- 런타임 자원은 같은 출처에서 제공한다. PDF 때문에 프레임 차단 정책을 완화하지 않는다.
+- Parse in a PDF.js worker and display only needed pages in Canvas and text layers. Apply per-page pixel budgets, render cancellation, and resource release. Lazy-load the viewer and PDF saving code.
+- Pen input consists of vector strokes in document coordinates. Draw them on a separate Canvas without rerendering the PDF.
+- Use PDF-LIB in a separate worker to save directly into the PDF as standard `/Ink` annotations and appearance streams. Preserve the original body content and annotations from other tools. Do not write a new PDF parser.
+- Saving to the original is explicit and follows existing file access permissions and archives immutability. Use version conditions and temporary file replacement to prevent damage to the original from failures during saving or concurrent saves. On conflict, retain the handwriting and offer a copy for download.
+- Serve runtime resources from the same origin. Do not relax the frame-blocking policy for PDFs.
 
-## 근거
+## Rationale
 
-성숙한 PDF 디코더를 유지하면서 큰 문서의 화면·메모리·필기 지연을 제어할 수 있다. 표준 벡터 주석은 별도 sidecar 없이 다른 PDF 도구에서도 보이고 인쇄된다. 상세 구현·검증 범위는 [개발 계약](../../development/pdf-viewer.md)에 둔다.
+This retains a mature PDF decoder while allowing control over display, memory, and handwriting latency for large documents. Standard vector annotations are visible and printable in other PDF tools without a separate sidecar. Keep detailed implementation and verification scope in the [development contract](../../development/pdf-viewer.md).

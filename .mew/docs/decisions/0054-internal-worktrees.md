@@ -1,28 +1,28 @@
 ---
-title: "저장소 내부 worktree 배치와 중복 탐색 제외"
-description: "새 worktree를 기본 체크아웃의 .worktrees에 모으고 Git·탐색·검색·감시에서 사본을 제외한다. 기존 경로·작업 보존과 v1·v2 안내의 요청 시 v3 호환을 정한다."
+title: "Place worktrees inside the repository and exclude duplicate traversal"
+description: "Collect new worktrees in .worktrees under the main checkout and exclude the copies from Git, browsing, search, and watching. Define preservation of existing paths and work, and v3 compatibility at request time for v1 and v2 guidance."
 created: "2026-10-23"
 updated: "2026-10-23"
 ---
 
-## 상태
+## Status
 
-채택. [결정 0045](0045-agent-branch-guidance.md)·[0046](0046-agent-git-automation.md)의 worktree 위치와 안내 버전 호환을 확장한다. 커밋·병합·삭제·원격 작업의 권한 범위는 유지한다.
+Accepted. Extends the worktree location and guidance version compatibility in [decision 0045](0045-agent-branch-guidance.md) and [0046](0046-agent-git-automation.md). Authorization scope for commits, merges, deletion, and remote operations remains unchanged.
 
-## 배경
+## Background
 
-기존 안내는 작업을 worktree로 분리하도록 했지만 위치를 정하지 않았다. 에이전트가 저장소 옆에 작업 폴더를 만들면서 상위 디렉터리에 완료된 작업이 쌓였다. 저장소 내부로 모으더라도 Git ignore만 추가하면 Mew의 전체 파일 카탈로그와 파일 감시는 사본까지 순회한다.
+Existing guidance required isolating work in worktrees but did not specify a location. As agents created work folders beside the repository, completed work accumulated in the parent directory. Even if worktrees are collected inside the repository, adding only a Git ignore rule still leaves Mew's full file catalog and file watcher traversing the copies.
 
-## 결정
+## Decision
 
-새 worktree의 기본 위치는 기본 체크아웃의 `.worktrees/<브랜치 슬러그>`다. 공용 Git 디렉터리와 등록 목록으로 기본 체크아웃을 찾고, 이미 연결된 worktree 안에 다시 worktree를 만들지 않는다. 생성 전에 기본 체크아웃의 `.gitignore`에 `/.worktrees/`가 있는지 확인한다. 명시적인 사용자·저장소 위치 규칙이 있으면 우선한다.
+The default location for new worktrees is `.worktrees/<브랜치 슬러그>` under the main checkout. Find the main checkout using the common Git directory and registered worktree list, and do not create another worktree inside an existing linked worktree. Before creation, verify that the main checkout's `.gitignore` contains `/.worktrees/`. Explicit user or repository location rules take precedence.
 
-Mew 저장소도 이 배치를 지침과 ignore에 기록한다. 부모 프로젝트의 트리·파일 카탈로그·문서 탐색·감시와 Vite 개발 감시는 `.worktrees` 아래를 순회하지 않는다. 숨김 파일을 모두 표시하는 모드에서도 제외한다. 사용자가 worktree 자체를 프로젝트 루트로 열면 그 안의 파일은 정상적으로 탐색·감시한다.
+Record this layout in the Mew repository's guidance and ignore rules as well. The parent project's tree, file catalog, document browsing, and watchers, along with Vite's development watcher, do not traverse below `.worktrees`. Exclude it even in the mode that shows all hidden files. If the user opens the worktree itself as the project root, browse and watch its files normally.
 
-안내는 v3로 기록한다. 정상 v1·v2는 이전 생성문과 정확히 대조한 뒤 저장 원문을 보존하고 요청에서만 현재 지침을 전달한다. 전략·수동·원격·정리 설정과 직접 편집한 지침은 유지한다. 구체적인 현재 동작은 [프로젝트 설정 안내](../../../docs/guides/project-setup.md#git-브랜치-지침)와 [파일 탐색 계약](../features/%ED%94%84%EB%A1%9C%EC%A0%9D%ED%8A%B8%C2%B7%ED%8C%8C%EC%9D%BC%C2%B7%EA%B2%80%EC%83%89/%ED%8C%8C%EC%9D%BC%C2%B7%ED%8F%B4%EB%8D%94%20%ED%83%90%EC%83%89%EA%B3%BC%20%EC%A1%B0%EC%9E%91.md)이 소유한다.
+Record the guidance as v3. For valid v1 and v2 guidance, compare it exactly against the previous generated text, preserve the stored original, and pass the current guidance only in requests. Preserve strategy, manual, remote, and cleanup settings and directly edited guidance. The [project settings guide](../../../docs/guides/project-setup.md#git-branch-guidance) and [file browsing contract](../features/projects-files-search/file-folder-exploration-and-operations.md) own the specific current behavior.
 
-기존 worktree는 자동으로 옮기지 않는다. 이전을 요청받으면 기존 경로에 의존하는 프로세스·세션과 미커밋 작업을 확인하고 `git worktree move`를 사용한다. 정리는 통합이 확인된 사용하지 않는 브랜치·worktree에 한정하며, Git에서 무시하는 별도 소스·운영 데이터도 삭제 전에 확인해 보존한다.
+Do not automatically move existing worktrees. When relocation is requested, check processes and sessions that depend on the existing paths and any uncommitted work, then use `git worktree move`. Limit cleanup to unused branches and worktrees whose integration has been confirmed, and check and preserve separate sources and production data ignored by Git before deletion as well.
 
-## 근거와 영향
+## Rationale and Impact
 
-관련 작업 폴더를 저장소 안에 모아 상위 디렉터리의 혼잡을 줄인다. worktree는 정상 Git 등록을 유지하며 형제 디렉터리 배치와 같은 격리를 제공한다. 앱의 순회 제외를 함께 적용해 검색 중복·감시 자원 증가·사본에 대한 문서 수정을 막는다. 기존 배치를 전부 옮기거나 사용자 지침 파일을 덮어쓰는 마이그레이션은 수행하지 않는다.
+Collect related work folders inside the repository to reduce clutter in the parent directory. Worktrees retain normal Git registration and provide the same isolation as a sibling directory layout. Apply app traversal exclusions as well to prevent duplicate search results, increased watcher resource use, and document edits to copies. Do not perform a migration that moves all existing layouts or overwrites user guidance files.

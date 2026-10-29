@@ -1,84 +1,84 @@
 ---
-provenance: "Liiiiv 중앙 ADR 이관본, 2026-10-14"
-description: "이관한 결정 기록: 채팅에 1:1 대화와 읽음 표시를 넣는다. 방을 만들지 않고 수신자(to)로 가른다. 당시 선택·근거·후속 변경을 보존하며 현재 계약은 Mew 소유 문서에서 확인한다."
-title: "0050 — 채팅에 1:1 대화와 읽음 표시를 넣는다. 방을 만들지 않고 수신자(to)로 가른다"
+provenance: "Migrated copy of a Liiiiv central ADR, 2026-10-14"
+description: "Migrated decision record: add 1:1 conversations and read receipts to chat. Separate conversations by recipients (to) without creating rooms. Preserves the choices, rationale, and subsequent changes at the time; consult the Mew owning document for the current contract."
+title: "0050 — Add 1:1 conversations and read receipts to chat. Separate conversations by recipients (to) without creating rooms"
 created: "2026-08-12"
 updated: 2026-08-20
 ---
 
-- 날짜: 2026-08-12
-- 상태: 채택
-- 결정자: 송상훈 (지시)
+- Date: 2026-08-12
+- Status: Adopted
+- Decision maker: Song Sanghoon (directive)
 
-## 배경
+## Background
 
-[ADR 0049](0049-mew-team-chat-and-inline-comments.md)의 채팅은 워크스페이스에 방 하나였다. 그 문서는
-같은 자리에서 확장 방향까지 미리 적어 뒀다 — "채널·DM이 필요해지면 `to`가 이미 있으므로 수신자 있는
-메시지를 목록으로 묶는 방향으로 늘린다(새 저장 형식이 필요 없다)".
+Chat in [ADR 0049](0049-mew-team-chat-and-inline-comments.md) had one room per workspace. That document also outlined the extension path right there—"If channels
+or DMs become necessary, `to` already exists, so extend it by grouping messages with
+recipients into lists (no new storage format is needed)."
 
-이번에 필요해진 것은 둘이다: 1:1 대화, 그리고 읽었는지 표시. 방이 하나뿐이라 개인적인 말도
-전원에게 갔고, 보낸 말이 상대에게 닿았는지 알 방법이 없었다.
+Two things became necessary this time: 1:1 conversations and read indicators. With only one room, even personal messages went to everyone,
+and there was no way to know whether a sent message had reached the other person.
 
-정할 것은 셋이었다:
+Three decisions were needed:
 
-1. 대화를 무엇으로 가를 것인가 — 방(room) 식별자인가, 수신자 목록인가
-2. "읽음"을 무엇으로 적을 것인가 — 메시지마다 읽은 사람 목록인가, 사람마다 읽은 지점인가
-3. 숫자를 무엇으로 셀 것인가
+1. How to separate conversations — room identifiers or recipient lists
+2. How to represent "read" — a list of readers per message or a read position per person
+3. What the number should count
 
-## 결정
+## Decision
 
-### 1. 방을 만들지 않는다 — `to`가 있으면 DM, 없으면 단체방
+### 1. Do not create rooms — with `to` it is a DM; without it, a group chat
 
-ADR 0049가 예고한 그대로다. `ChatMessage.to?: string[]`이 전부이고 방 식별자·방 목록은 없다.
-대화는 보는 사람 기준으로 계산한다:
+This is exactly what ADR 0049 anticipated. `ChatMessage.to?: string[]` is all there is; there are no room identifiers or room lists. Conversations are computed
+from the viewer's perspective:
 
-| 메시지 | 보는 사람 A에게 | 보는 사람 C에게 |
+| Message | For viewer A | For viewer C |
 | --- | --- | --- |
-| `to` 없음 | 단체방 | 단체방 |
-| `author: A, to: [B]` | B와의 대화 | 목록에 실리지 않는다 |
-| `author: B, to: [A]` | B와의 대화 | 안 실린다 |
+| No `to` | Group chat | Group chat |
+| `author: A, to: [B]` | Conversation with B | Not included in the list |
+| `author: B, to: [A]` | Conversation with B | Not included |
 
-- 서버는 `GET /api/chat`에서 그 사람이 볼 수 있는 것만 골라 준다. 남의 DM은 응답에 애초에 없다 —
-  화면에서 거르는 방식이면 개발자 도구로 다 보인다
-- 여러 명을 지목한 메시지(코멘트 멘션)는 보낸 사람 쪽에서 상대별 대화에 각각 보인다
-- 원장은 그대로 `.data/chat.json` 최근 500줄이다. 단체·DM이 한 원장을 나눠 쓴다
+- The server selects only what that person can see in `GET /api/chat`. Other people's DMs are absent from the response entirely — filtering them
+  in the UI would expose everything in developer tools.
+- Messages addressed to multiple people (comment mentions) appear in each recipient's conversation on the sender's side.
+- The ledger remains the most recent 500 lines in `.data/chat.json`. Group chat and DMs share one ledger.
 
-### 2. 읽음은 "사람마다 대화마다 여기까지 읽었다" 한 줄이다
+### 2. Read status is one record per person per conversation: "read up to here"
 
-`reads[읽은 사람][대화] = 시각`. 대화 키는 `group` 또는 상대 이메일이다. 메시지마다 읽은 사람
-목록을 붙이지 않는다 — 500줄 × 사람 수만큼 배열이 늘어나는데, 실제로 필요한 것은 경계 하나다.
+`reads[읽은 사람][대화] = 시각`. The conversation key is `group` or the other person's email. Do not attach a list of readers to each message — that would
+grow the arrays by 500 lines × the number of people, when all that is actually needed is a single boundary.
 
-찍는 값은 "지금 시각"이 아니라 읽는 순간 그 대화에 있던 마지막 메시지의 시각이다. 지금 시각으로
-찍으면 같은 밀리초에 도착한 다음 메시지가 읽은 것으로 묻힌다 — 눈앞에 뜬 적 없는 글의 숫자가
-사라진다. 같은 이유로 원장의 메시지 시각은 엄격히 증가시킨다(`max(now, 마지막+1)`).
+The recorded value is not "the current time" but the timestamp of the last message in that conversation at the moment it is read.
+Using the current time would mark the next message arriving in the same millisecond as read — the count for a message
+never displayed would disappear. For the same reason, message timestamps in the ledger increase strictly (`max(now, 마지막+1)`).
 
-### 3. 숫자는 "아직 안 읽은 수신자 수"다 — 0이면 감춘다
+### 3. The number is the "count of recipients who have not read it yet" — hide it when it is 0
 
-카카오톡과 같은 규칙이다. 서버가 메시지마다 세어 `unread`로 내려 주고 화면은 그리기만 한다.
+This follows the same rule as KakaoTalk. The server counts it for each message and returns it as `unread`; the UI only renders it.
 
-- 모집단은 단체방이면 현재 계정 전체(보낸 사람 제외), DM이면 `to`다
-- 지워진 계정은 세지 않는다. 안 그러면 그 사람 몫의 숫자가 영영 안 내려간다
-- 한 번도 채팅을 연 적 없는 사람은 계속 안 읽은 것으로 남는다(카톡과 같다)
+- For group chat, the population is all current accounts (excluding the sender); for DMs, it is `to`.
+- Deleted accounts are not counted. Otherwise, their share of the count would never decrease.
+- People who have never opened chat continue to count as unread (as in KakaoTalk).
 
-### 4. 코멘트 멘션은 단체방이 아니라 지목된 사람에게 간다
+### 4. Comment mentions go to the specified person rather than the group chat
 
-ADR 0049 §4가 정한 동작인데 구현은 단체방에 넣고 있었다. `to: [지목된 사람들]`을 붙여 문서대로
-맞춘다 — 남의 문서 논의가 전원에게 가지 않는다.
+ADR 0049 §4 specified this behavior, but the implementation was posting to the group chat. Add `to: [지목된 사람들]` to match the documentation — discussions
+of other people's documents will not go to everyone.
 
-## 근거
+## Rationale
 
-- 방 식별자를 안 만든 이유: 두 사람 이메일로 방 id를 만들면 정규화(순서·대소문자)가 생기고,
-  그 id가 원장·읽음·화면 세 군데에 박힌다. `to`는 이미 있는 필드이고 마이그레이션이 필요 없다
-- 읽음을 방송하는 이유: 보낸 쪽 숫자가 줄어야 하는데 presence 신호에는 내용이 없다.
-  `{type:'chat'}`을 그대로 쓰고 받은 쪽이 다시 읽는다(게스트 소켓에 내용이 흐르지 않는다)
-- 읽음 기록이 바뀔 때만 방송한다. 창이 떠 있는 동안 계속 읽음을 찍으면 방송이 무한히 돈다
+- Why no room identifier was created: building a room id from two people's emails requires normalization (order and case), and that
+  id becomes embedded in three places: the ledger, read receipts, and UI. `to` is an existing field and requires no migration.
+- Why read receipts are broadcast: the sender's count must decrease, but presence signals carry
+  no content. Reuse `{type:'chat'}` and have the recipient fetch again (no content flows through guest sockets).
+- Broadcast only when the read record changes. Continuously marking messages as read while the window is open creates an infinite broadcast loop
 
-## 결과
+## Results
 
-- 경계가 하나 늘었다: DM은 보낸 사람과 수신자만 본다. 서버 응답 자체에서 갈린다
-- 원장 상한 500줄은 단체·DM 공용이다. 단체방이 시끄러우면 오래된 DM이 먼저 밀려 사라진다.
-  남길 대화는 문서에 쓴다 — 채팅은 여전히 기록 매체가 아니다
-- 화면(dist)만 새로 올리고 서버를 재시작하지 않으면, 옛 서버가 `to`를 무시해 DM이 단체방으로
-  나간다. 그래서 화면은 응답에 `unread` 키가 없으면 옛 서버로 보고 DM을 잠근다. 서버를 다시
-  띄우면 저절로 풀린다
-- 사람이 늘면 왼쪽 아이콘 줄이 길어진다. 스무 명을 넘기면 목록·검색이 필요해진다(지금은 안 만든다)
+- One more boundary was added: only the sender and recipients can see a DM. Filtering happens in the server response itself
+- The ledger's 500-line limit is shared by group chat and DMs. If the group chat is busy, older DMs are pushed out first. Write conversations
+  worth keeping in documents — chat is still not a recordkeeping medium.
+- If only the UI (dist) is updated without restarting the server, the old server ignores `to` and sends DMs to the group chat. The
+  UI therefore treats a response without the `unread` key as coming from an old server and disables DMs. Restarting the server automatically
+  unlocks them.
+- As more people join, the icon column on the left gets longer. Beyond twenty people, a list and search will be needed (not being built now)

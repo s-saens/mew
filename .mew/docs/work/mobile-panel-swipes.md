@@ -1,38 +1,38 @@
 ---
-title: "모바일 독·본문·Plain 보조키바 스와이프 분리"
-description: "2026-10-27 독·본문·Plain 보조키바 스와이프 분리와 2026-10-28 본문의 내부 가로 스크롤 우선 처리 수정 기록이다. 기존 격리 검사·타입·린트·문서 결과와 후속 수정의 검증·실기·운영 적용 범위를 구분한다."
+title: "Separate swipes for the mobile dock, panel body, and Plain auxiliary key bar"
+description: "Records the separation of dock, panel body, and Plain auxiliary key bar swipes on 2026-10-27 and the fix to prioritize internal horizontal scrolling in panel bodies on 2026-10-28. Distinguishes the existing isolated check, type check, lint, and documentation results from the scope of verification, physical-device testing, and production application of the follow-up fix."
 created: "2026-10-27"
 updated: "2026-10-28"
 ---
 
-독 스와이프가 탭을 먼저 바꾸던 동작을 패널 전환으로 바꿨다. 탭 전환은 모바일 패널 본문에서 처리하며, 일반 파일·Markdown Plain은 가로 스크롤을 보존하도록 보조키바에서만 처리한다. 현재 계약은 [패널 배치·모바일](../features/%ED%99%94%EB%A9%B4%C2%B7%EA%B3%84%EC%A0%95%C2%B7%EC%9A%B4%EC%98%81/%ED%8C%A8%EB%84%90%20%EB%B0%B0%EC%B9%98%C2%B7%EB%AA%A8%EB%B0%94%EC%9D%BC%C2%B7%EC%83%81%ED%83%9C%20%EB%B3%B5%EC%9B%90.md)과 [공용 UI 계약](../development/ui-contracts.md#모바일-독과-패널-전환), 선택 근거는 [ADR 0079](../decisions/0079-mobile-panel-swipes.md)가 소유한다.
+Changed dock swipes from switching tabs first to switching panels. Tab switching is handled in the mobile panel body; for regular files and Markdown Plain, it is handled only in the auxiliary key bar to preserve horizontal scrolling. The current contract is owned by [Panel layout and mobile](../features/appearance-accounts-operations/panel-layout-mobile-and-state-restoration.md) and [Shared UI contracts](../development/ui-contracts.md#mobile-dock-and-panel-switching), and the rationale is owned by [ADR 0079](../decisions/0079-mobile-panel-swipes.md).
 
-`App`의 독 연결에서 탭 우선 분기를 제거하고 `useMobilePanelSwipe`로 시작 패널·요소를 확정했다. `EditorPane`이 Hotview 본문과 Plain 보조키바를 구분하며, 탭 줄·팝업·태스크 삭제·간트 조작은 기존 처리를 유지한다. 취소·다중 터치·전면 패널 변경은 탭을 전환하지 않고 스와이프 뒤 키 클릭을 억제한다.
+Removed the tab-first branch from the dock wiring in `App` and used `useMobilePanelSwipe` to establish the starting panel and element. `EditorPane` distinguishes the Hotview body from the Plain auxiliary key bar, while tab rows, popups, task deletion, and Gantt interactions retain their existing handling. Cancellation, multitouch, and foreground panel changes do not switch tabs, and key clicks after swipes are suppressed.
 
-기존 Plain에는 보조키바가 없어 `CodePane`에 선택적 공용 키바를 추가했다. 파일 에디터에서 켜고 내장 편집기는 기본으로 끈다. CodeMirror의 기존 키맵·협업 실행 취소를 사용하며 키바가 상태줄 아래에 머물도록 기존 키보드 높이 계산을 재사용한다. 공용 바의 Undo/Redo는 코드블럭·표 버튼 없이도 표시하도록 보완했다. 독의 접근성 안내도 네 언어에서 패널 전환으로 맞췄다.
+Plain previously had no auxiliary key bar, so an optional shared key bar was added to `CodePane`. It is enabled in the file editor and disabled by default in embedded editors. It uses CodeMirror's existing keymaps and collaborative undo, and reuses the existing keyboard height calculation to keep the key bar below the status bar. The shared bar was also updated to show Undo/Redo even without code block and table buttons. The dock's accessibility guidance was updated to describe panel switching in all four languages.
 
-검증 결과:
+Verification results:
 
-- `server/mobile-panel-swipe-ui.test.ts`: 실제 EditorPane·CodeMirror·Hotview·공용 독·키바를 사용하는 격리 Chromium에서 본문 가로 스크롤, 화면 높이와 무관한 Hotview 탭 전환, Plain 키바 전환·순환, 패널별 탭 전환과 탭 없는 패널 유지, 취소·다중 터치·클릭 억제, 문서 보존, modifier·방향키·Tab·Undo/Redo, 읽기 전용·데스크톱 제외를 확인했다. 390px 밝은·어두운 화면도 확인했다.
-- `node --test --test-name-pattern='App mobile dock swipes' server/workspace-switch-ui.test.ts`: 실제 App의 독 스와이프가 탭이 있는 패널에서도 인접 패널을 열고 첫 경계에서 멈추며 문서 탭을 보존하는지 확인했다. 본문 스와이프가 사이드바 뷰만 전환하는 검사도 통과했다. 기존 `Files opens Documents` 검사도 별도로 통과했다.
-- `server/task-schedule-ui.test.ts`: 본문 양방향 목록·달력·간트 순환, 독 선택과 태스크 탭 보존, 기존 간트 터치 편집·가로 범위 확장을 통과했다. fixture의 데이터 경로는 workspace와 분리했다.
-- `server/editor-keyboard-ui.test.ts`·`server/fullscreen-keyboard-ui.test.ts`: 실제 Plain 키바의 키보드 경계·커서·상태줄 유지와 높이 복원을 통과했다. 전체화면 fixture는 모바일에서 실제 키바를 사용하도록 갱신했다.
-- `server/code-pinch-zoom-ui.test.ts`·`src/utils/mobile-dock.test.ts`: 핀치·본문·선택·편집 이력 보존과 독 순서·표시·권한·끝 경계를 통과했다.
-- 위 편집기·키보드·핀치·태스크·독 검사를 `node --test --test-concurrency=2`로 묶어 10개 모두 통과했다. 독 UI fixture의 세로 배치 검사는 React 상태 반영을 기다리도록 보완했다.
-- `npx tsc -b`와 대상 파일 `npx oxlint`: 오류 없이 완료했다. 린트의 React ref·effect·의존성 경고는 남아 있다.
-- 변경 UI의 Impeccable 검사에서 지적 사항이 없었다.
-- `npm run check:docs`: description 502개는 오류 없이 통과했다. 전체 링크 검사는 이번 작업 전부터 삭제되어 있던 기능 MOC·태스크 참조 18건으로 실패했다. 이번 변경 문서 6개의 링크 오류는 없다.
+- `server/mobile-panel-swipe-ui.test.ts`: In isolated Chromium using the actual EditorPane, CodeMirror, Hotview, shared dock, and key bar, verified horizontal scrolling in the body, Hotview tab switching regardless of screen height, Plain key bar switching and cycling, per-panel tab switching and retention of panels without tabs, cancellation, multitouch, click suppression, document preservation, modifiers, arrow keys, Tab, Undo/Redo, and exclusion of read-only and desktop modes. Also checked light and dark screens at 390px.
+- `node --test --test-name-pattern='App mobile dock swipes' server/workspace-switch-ui.test.ts`: Verified that dock swipes in the actual App open adjacent panels even when the panel has tabs, stop at the first boundary, and preserve document tabs. The check that body swipes switch only sidebar views also passed. The existing `Files opens Documents` check passed separately as well.
+- `server/task-schedule-ui.test.ts`: Passed bidirectional cycling through list, calendar, and Gantt views in the body, dock selection and task tab preservation, and existing Gantt touch editing and horizontal range expansion. The fixture's data path was separated from the workspace.
+- `server/editor-keyboard-ui.test.ts`·`server/fullscreen-keyboard-ui.test.ts`: Passed checks for keyboard boundaries, cursor and status bar retention, and height restoration with the actual Plain key bar. The fullscreen fixture was updated to use the actual key bar on mobile.
+- `server/code-pinch-zoom-ui.test.ts`·`src/utils/mobile-dock.test.ts`: Passed checks for pinch gestures, body content, selection, and edit history preservation, as well as dock order, visibility, permissions, and end boundaries.
+- Ran the editor, keyboard, pinch, task, and dock checks above together with `node --test --test-concurrency=2`; all 10 passed. The dock UI fixture's vertical layout check was updated to wait for React state updates.
+- `npx tsc -b` and `npx oxlint` on the target files: Completed without errors. Lint warnings about React refs, effects, and dependencies remain.
+- The Impeccable review of the changed UI found no issues.
+- `npm run check:docs`: All 502 descriptions passed without errors. The full link check failed on 18 references to feature MOCs and tasks that had been deleted before this work. There are no link errors in the 6 documents changed in this work.
 
-앱 빌드·배포·서버 시작·재시작은 수행하지 않았다. 실제 휴대폰의 Safari·Chrome과 OS 키보드 조작은 미검증이다.
+The app was not built or deployed, and the server was not started or restarted. Safari, Chrome, and OS keyboard interactions on actual phones are unverified.
 
-## 2026-10-28 내부 가로 스크롤 우선 처리
+## 2026-10-28 Prioritize internal horizontal scrolling
 
-에디터 외 패널의 표·코드 등에서 가로로 스크롤하려는 터치가 탭 전환으로 처리되는 문제를 수정했다. `useMobilePanelSwipe`가 터치 시작 요소와 시작 패널 사이의 실제 가로 스크롤 영역을 확인해, 해당 터치 전체를 브라우저 기본 스크롤에 맡긴다. 양 끝에서도 탭 전환으로 넘기지 않으며, 넘침 없는 컨테이너·세로 전용 스크롤과 Plain 보조키바의 기존 탭 전환은 유지한다. 현재 판정 조건은 [공용 UI 계약](../development/ui-contracts.md#모바일-독과-패널-전환)이 소유한다.
+Fixed an issue where touches intended to scroll horizontally in tables, code, and similar content in non-editor panels were handled as tab switches. `useMobilePanelSwipe` checks for an actual horizontal scroll area between the initial touch element and the starting panel, and leaves the entire touch gesture to native browser scrolling. It does not hand off to tab switching at either end. Existing tab switching is retained for containers without overflow, vertical-only scrolling, and the Plain auxiliary key bar. The current detection conditions are owned by [Shared UI contracts](../development/ui-contracts.md#mobile-dock-and-panel-switching).
 
-검증 결과:
+Verification results:
 
-- `node --test --test-concurrency=2 server/mobile-panel-swipe-ui.test.ts server/task-schedule-ui.test.ts src/utils/mobile-dock.test.ts`: 6개 모두 통과했다. 격리 Chromium의 실제 터치로 사이드바·에이전트·터미널·Git·태스크 내부 표의 양방향 가로 스크롤과 양 끝의 탭 유지, RTL·`overflow-x: scroll`, 넘침 없는 영역·세로 전용·숨긴 넘침 영역의 탭 전환을 확인했다. 기존 Plain 보조키바·Hotview 본문·태스크·간트·독 회귀 검사도 통과했다. fixture의 패널 전환은 React 상태 반영을 기다리도록 보완했다.
-- `npx tsc -b`, 대상 두 코드 파일의 `npx oxlint`, `git diff --check`: 통과했다. 변경 훅의 Impeccable 검사도 지적 사항이 없었다.
-- `npm run check:docs`: description 506개는 오류 없이 통과했다. 전체 링크 검사는 작업 전부터 삭제되어 있던 기능 MOC·태스크 참조 18건으로 실패했으며, 이번 변경 문서 3개에는 링크 오류가 없다.
+- `node --test --test-concurrency=2 server/mobile-panel-swipe-ui.test.ts server/task-schedule-ui.test.ts src/utils/mobile-dock.test.ts`: All 6 passed. Using actual touch input in isolated Chromium, verified bidirectional horizontal scrolling and tab retention at both ends in tables within the sidebar, agent, terminal, Git, and task panels; RTL and `overflow-x: scroll`; and tab switching in areas without overflow, vertical-only areas, and areas with hidden overflow. Existing regression checks for the Plain auxiliary key bar, Hotview body, tasks, Gantt, and dock also passed. Panel switching in the fixture was updated to wait for React state updates.
+- `npx tsc -b`, `npx oxlint` on the two target code files, and `git diff --check`: Passed. The Impeccable review of the changed hook also found no issues.
+- `npm run check:docs`: All 506 descriptions passed without errors. The full link check failed on 18 references to feature MOCs and tasks that had been deleted before this work; there are no link errors in the 3 documents changed in this work.
 
-로컬 격리 검사만 수행했다. 앱 빌드·배포·서버 시작·재시작은 수행하지 않았으며, 실제 휴대폰의 Safari·Chrome과 운영 반영 후 동작은 미검증이다.
+Only local isolated checks were performed. The app was not built or deployed, and the server was not started or restarted. Safari and Chrome on actual phones and behavior after application to production are unverified.

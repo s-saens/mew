@@ -1,41 +1,41 @@
 ---
-title: "Windows 관리 앱 사용법"
+title: "Windows Management App Guide"
 created: 2026-10-07
 updated: 2026-10-11
-description: "2026-10-14 폐기한 mewnager의 기존 구현·운영 기록이다. 현재 설치·지원 안내가 아닌 역사 자료로 보존한다."
+description: "Implementation and operations records for mewnager, discontinued on 2026-10-14. Preserved as historical material, not current installation or support guidance."
 retired: "2026-10-14"
 ---
 
-> 이 문서는 2026-10-14 폐기한 mewnager의 이력입니다. 앱 코드와 CI는 삭제했으며 당시 코드는 Git 이력에 남습니다. 현재 실행 계약은 [Windows 네이티브](../development/windows-native.md), 폐기 결정은 [ADR 0210](decisions/0210-mew-retire-mewnager.md)을 따릅니다.
+> This document records the history of mewnager, retired on 2026-10-14. The app code and CI were deleted; the code from that time remains in Git history. For the current runtime contract, follow [Windows native](../development/windows-native.md); for the retirement decision, see [ADR 0210](decisions/0210-mew-retire-mewnager.md).
 
-`mewnager`를 실행하면 Windows·WSL·mew 상태를 확인하고 설치와 서버 실행을 관리할 수 있다. 현재 x64 개발 실행 파일이며 실제 Windows에서 실행·WSL 상태 조회를 확인했으며, 새 배포판의 전체 설치 검증과 코드 서명은 아직 완료하지 않았다. 구현·지원 범위는 [기능 문서](windows-manager-feature.md)가 소유한다.
+Run `mewnager` to check Windows, WSL, and mew status and manage installation and server execution. It is currently an x64 development executable; execution and WSL status queries have been verified on actual Windows, but full installation verification for a new distribution and code signing are not yet complete. The [feature document](windows-manager-feature.md) owns the implementation and support scope.
 
-## 처음 실행
+## First Launch
 
-Windows 10 빌드 19041 이상 또는 Windows 11의 64비트 환경, CPU 가상화, 인터넷 연결, [Microsoft Edge WebView2 Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/)이 필요하다. Windows 11에는 보통 WebView2가 포함된다. 관리 앱 exe 자체는 별도 설치 없이 실행한다. WSL·Ubuntu·mew는 PC에 설치되고 데이터는 별도로 남는다.
+Requires a 64-bit environment running Windows 10 build 19041 or later or Windows 11, CPU virtualization, an internet connection, and [Microsoft Edge WebView2 Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/). Windows 11 usually includes WebView2. The management app exe itself runs without separate installation. WSL, Ubuntu, and mew are installed on the PC, and their data remains separately.
 
-1. 실행 파일을 일반 사용자로 연다. **설정**에서 첫 관리자 이메일을 입력한다. 전용 배포판 기본 이름은 `Mew`다. 같은 이름의 기존 환경이 있으면 다른 이름을 선택한다.
-2. **저장하고 설치**를 누른다. WSL 준비가 필요한 경우 Windows 권한 승인 창에서 허용한다. BIOS/UEFI 가상화가 꺼져 있으면 먼저 해당 설정을 켠다.
-3. **재부팅 필요**가 나오면 Windows를 다시 시작하고 같은 exe를 열어 **설치 시작**을 누른다. 다시 상태를 검사하고 이어 간다. 앱이 PC를 자동 재부팅하지 않는다.
-4. 다운로드·Linux 도구·mew 빌드 단계는 **작업 로그**에서 확인한다. 실패하면 로그와 현재 상태를 확인한 뒤 다시 설치를 요청한다.
-5. 준비되면 **첫 로그인 정보**의 이메일·임시 비밀번호를 확인하고 **mew 열기**로 접속한다. 첫 로그인에서 비밀번호를 바꾼다. 임시 비밀번호는 관리 앱에 영구 저장되지 않는다.
+1. Open the executable as a standard user. Enter the first administrator email in **Settings**. The default dedicated distribution name is `Mew`. If an existing environment has the same name, choose another name.
+2. Click **Save and Install**. If WSL preparation is required, approve the Windows permission prompt. If BIOS/UEFI virtualization is disabled, enable it first.
+3. If **Restart Required** appears, restart Windows, open the same exe, and click **Start Installation**. It checks the status again and continues. The app does not automatically restart the PC.
+4. Check download, Linux tool, and mew build stages in **Operation Logs**. If installation fails, review the logs and current status, then request installation again.
+5. When ready, check the email and temporary password in **First Login Information** and connect through **Open mew**. Change the password at first login. The temporary password is not permanently stored in the management app.
 
-작업 폴더 기본값은 `/home/mew/workspace`다. mew에서 사용할 프로젝트를 이 폴더 아래에 둔다. Windows 탐색기에서 `\\wsl.localhost\Mew\home\mew\workspace`로 열 수 있다(배포판 이름을 변경했다면 그 이름을 사용한다). 기존 Ubuntu를 자동 수정하거나 프로젝트를 이동하지 않는다.
+The default work folder is `/home/mew/workspace`. Place projects to use in mew under this folder. You can open it in Windows Explorer at `\\wsl.localhost\Mew\home\mew\workspace` (use the distribution's name if you changed it). Existing Ubuntu installations are not automatically modified, and projects are not moved.
 
-## 실행과 업데이트
+## Running and Updating
 
-- **개요**의 시작·중지·재시작으로 서버를 조작한다. 앱을 닫아도 실행 중인 서버는 유지된다. Windows를 재부팅한 다음에는 앱에서 다시 시작한다.
-- **환경과 설치**에서 WSL와 설치 도구 버전, 실제 데이터 위치, 설치 복구를 확인한다.
-- **업데이트 → 확인**은 GitHub main의 새 커밋을 확인한다. 작업 트리가 깨끗하고 로컬 커밋이 앞서지 않을 때만 **업데이트 적용**을 제공한다. 실패 출력은 **작업 로그**에서 확인하고 **업데이트 다시 시도**를 누른다. 앱을 다시 열어도 실패한 빌드의 재시도를 제공한다.
-- mewnager 자체는 새 exe로 교체한다. mew 데이터와 WSL은 유지된다. 진행 중인 작업이 있으면 완료 후 창을 닫는다.
+- Use Start, Stop, and Restart in **Overview** to control the server. A running server remains running when the app closes. After restarting Windows, start it again from the app.
+- In **Environment and Installation**, check WSL and installation tool versions, actual data locations, and installation recovery.
+- **Updates → Check** checks for new commits on GitHub main. **Apply Update** is available only when the working tree is clean and local commits are not ahead. Review failure output in **Operation Logs** and click **Retry Update**. Retrying a failed build remains available after reopening the app.
+- Replace mewnager itself with a new exe. mew data and WSL are retained. If an operation is in progress, close the window after it finishes.
 
-원격 데스크톱 준비 버튼은 WSL 서버의 보조 구성 요소를 준비한다. Windows 바탕 화면을 공유하는 버튼은 아니다. Windows 화면 공유는 [원격 데스크톱 사용법](../../../docs/guides/remote-desktop.md)을 따른다.
+The Prepare Remote Desktop button prepares supporting components for the WSL server. It is not a button for sharing the Windows desktop. For Windows screen sharing, follow the [Remote Desktop Guide](../../../docs/guides/remote-desktop.md).
 
-## WSL 준비가 실패할 때
+## When WSL Preparation Fails
 
-0.1.1 이상은 WSL 준비 명령과 실제 오류 원문을 **작업 로그**에 표시한다. `종료 코드 -1`만 보이는 0.1.0 실행 파일이면 새 exe로 교체해 다시 확인한다. 이 숫자만으로 가상화·다운로드·Windows 구성 요소 중 원인을 판단할 수 없다.
+0.1.1 and later display the WSL preparation command and actual original error text in **Operation Logs**. If a 0.1.0 executable shows only `종료 코드 -1`, replace it with a new exe and check again. This number alone cannot identify whether the cause is virtualization, downloading, or Windows components.
 
-PowerShell에서 아래 읽기 전용 명령의 결과와 오류 직전 작업 로그를 함께 확인한다.
+In PowerShell, review the results of the read-only commands below together with the operation logs immediately before the error.
 
 ```powershell
 Get-CimInstance Win32_OperatingSystem | Select-Object Caption, BuildNumber
@@ -43,29 +43,29 @@ wsl --status
 wsl --help
 ```
 
-구형 WSL에 `--web-download`가 없으면 앱이 해당 옵션을 제외한다. `--no-distribution`이 없으면 Windows 업데이트 또는 [Microsoft WSL 설치 안내](https://learn.microsoft.com/en-us/windows/wsl/install)에 따라 최신 WSL을 준비한 뒤 앱을 다시 연다. 앱은 기본 Ubuntu를 설치하는 방식으로 자동 우회하지 않는다.
+If an older WSL lacks `--web-download`, the app omits that option. If it lacks `--no-distribution`, update Windows or prepare the latest WSL according to the [Microsoft WSL installation guide](https://learn.microsoft.com/en-us/windows/wsl/install), then reopen the app. The app does not automatically work around this by installing the default Ubuntu.
 
-설치 후 WSL이 멈추거나 접속이 반복해서 끊기면 [WSL 문제 해결](../../../docs/guides/troubleshooting.md)을 확인한다. WSLg의 GUI 충돌은 mew와 별개의 문제로 구분하며, GUI 비활성화와 사용자 재시작 절차를 안내한다.
+If WSL freezes or connections repeatedly drop after installation, see [WSL Troubleshooting](../../../docs/guides/troubleshooting.md). WSLg GUI crashes are treated as a separate issue from mew, with instructions for disabling the GUI and having the user restart.
 
-## 파일과 복구
+## Files and Recovery
 
-| 항목 | 기본 위치 |
+| Item | Default location |
 | --- | --- |
-| 관리 앱 설정·원장·로그·배포판 | `%LOCALAPPDATA%\Mew\Manager` |
-| 앱 소스 | `/home/mew/apps/mew` |
-| 프로젝트 | `/home/mew/workspace` |
-| 서버 설정 | `/home/mew/.config/mew/config.env` |
-| 계정·세션 | `/home/mew/.local/share/mew` |
-| 서버 로그 | `/home/mew/.local/state/mew/mew.log` |
+| Management app settings, ledger, logs, and distributions | `%LOCALAPPDATA%\Mew\Manager` |
+| App source | `/home/mew/apps/mew` |
+| Projects | `/home/mew/workspace` |
+| Server settings | `/home/mew/.config/mew/config.env` |
+| Accounts and sessions | `/home/mew/.local/share/mew` |
+| Server logs | `/home/mew/.local/state/mew/mew.log` |
 
-GUI의 **관리 폴더 열기**는 Windows 설정·작업 로그를 연다. 서버 출력은 Windows PowerShell에서 아래 명령으로 확인할 수 있다. 기본 배포판 이름을 바꿨다면 `Mew`를 바꾼다.
+**Open Management Folder** in the GUI opens the Windows settings and operation logs. You can view server output with the command below in Windows PowerShell. Replace `Mew` if you changed the default distribution name.
 
 ```powershell
 wsl -d Mew -u mew -- tail -n 80 /home/mew/.local/state/mew/mew.log
 ```
 
-첫 임시 비밀번호를 잃었다면 기존 계정을 삭제하지 말고 mew CLI의 사용자 비밀번호 초기화를 사용한다. [계정 관리](../../../docs/guides/getting-started-ko.md)의 명령을 따른다. 접속 불가이면 서버 로그와 WSL 네트워크를 확인하고 **재시작**한다. 외부 접속을 위한 방화벽·portproxy는 자동 설정하지 않는다.
+If you lose the initial temporary password, use the mew CLI's user password reset without deleting the existing account. Follow the commands in [Account Management](../../../docs/guides/getting-started-ko.md). If you cannot connect, check the server logs and WSL network, then click **Restart**. Firewall and portproxy settings for external access are not configured automatically.
 
-exe만 지워도 프로젝트·계정은 남는다. `distros` 또는 WSL 배포판을 삭제하면 그 안의 프로젝트와 계정도 사라질 수 있으므로 데이터 백업 없이 삭제하지 않는다. 운영 백업은 [네이티브 배포](../../../docs/deployment/native.md)의 데이터·설정·작업물 구분을 따른다.
+Deleting only the exe leaves projects and accounts intact. Deleting `distros` or the WSL distribution may also delete the projects and accounts inside, so do not delete them without backing up the data. Production backups follow the distinction between data, settings, and work products in [Native Deployment](../../../docs/deployment/native.md).
 
-개발·exe 생성·CI 아티팩트는 [빌드 문서](windows-manager-development.md)에 정리한다.
+Development, exe generation, and CI artifacts are documented in the [build document](windows-manager-development.md).

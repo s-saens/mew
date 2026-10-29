@@ -1,34 +1,34 @@
 ---
-title: "Mewlink 단회 준비와 연결 시작 왕복 축소"
-description: "Mewlink의 보안 검사를 유지하면서 HTML admission·호스트 단회 증명·ICE 사전 준비로 왕복을 줄이고, 코드·글꼴 검증·인증 공유·빠른 재접속과 Workspace·편집기의 state 렌더링·작업 화면 청크 묶음을 선택한 결정. 운영 적용과 500ms 실측의 경계를 구분하며, RTC 순단 복구 대기는 ADR 0081이 대체하고 원인별 재시도·오프라인 대기는 ADR 0086이 보완한다."
+title: "Mewlink one-time preparation and fewer connection startup round trips"
+description: "Decision to reduce round trips through HTML admission, one-time host proofs, and ICE preparation while retaining Mewlink security checks, and to adopt code and font verification, shared authentication, fast reconnection, state-based rendering for Workspace and the editor, and workspace screen chunk grouping. Distinguishes production application from actual 500ms measurements; ADR 0081 replaces the RTC interruption recovery wait, and ADR 0086 supplements cause-specific retries and offline waiting."
 created: 2026-10-24
 updated: 2026-10-29
 ---
 
-## 상태
+## Status
 
-채택. 구현과 격리 회귀 검사를 통과했다. 첫 방문 500ms의 반복 실측을 진행 중이며 운영에는 적용하지 않았다.
+Accepted. Implementation and isolated regression checks passed. Repeated measurements of 500ms on first visits are underway; not applied to production.
 
-RTC 단절의 자연 복구 대기는 [ADR 0081](0081-mewlink-transient-recovery.md)이 대체한다. 원인별 반복 실패 backoff·오프라인 대기·본문 제한 시간은 [ADR 0086](0086-mewlink-recovery-efficiency.md)이 보완한다. 최초 접속 병렬화·기존 인증 경계와 이 결정의 다른 범위는 유지한다.
+[ADR 0081](0081-mewlink-transient-recovery.md) replaces waiting for natural recovery from RTC disconnections. [ADR 0086](0086-mewlink-recovery-efficiency.md) supplements cause-specific backoff for repeated failures, offline waiting, and body timeouts. Initial connection parallelization, existing authentication boundaries, and the other scopes of this decision remain in place.
 
-## 배경
+## Background
 
-적용 전 운영의 익명 로그인 표시는 첫 방문 3.44초, 후속 방문 1.80~1.87초였다. 기존 요청 한도 batch·브리지 병렬 준비 이후에도 중앙·호스트 왕복, 매번 수행하는 네이티브 초기화·ICE 수집, 정적 자원의 개별 재검증이 남았다. [단계별 조사](../research/mewlink-startup-latency.md)는 운영 관측과 격리 실측을 구분한다.
+Before application, the anonymous login screen appeared in production after 3.44 seconds on first visits and 1.80–1.87 seconds on subsequent visits. Even after existing request-limit batching and parallel bridge preparation, central-to-host round trips, native initialization and ICE gathering on every attempt, and individual revalidation of static resources remained. The [staged investigation](../research/mewlink-startup-latency.md) distinguishes production observations from isolated measurements.
 
-## 결정
+## Decision
 
-- 공개 HTML에서 연결 시작 한도를 미리 소비하고 짧은 서명 admission을 발급해 이어지는 WSS의 중복 D1 왕복을 줄인다. admission은 기기·경로·origin·IP에 결합한 단회 한도 소비 증명이며 인증 권한이 아니다. 현재 DO 인가와 새 WSS nonce·브라우저 키 증명·최종 ticket은 유지한다.
-- 인증된 호스트가 단회 challenge·generation을 미리 공급하고 중앙·호스트가 각각 소비해 prepare→ready 왕복을 줄인다. 소비 기록은 영속 보관하며 호스트 인증 세대·만료·교체·회수·hibernation 경계를 지킨다. 미지원 상대와 소진 시에는 기존 ready를 사용한다.
-- 연결별 프로세스를 유지하면서 대기 helper 하나에서 네이티브 초기화·인증서·ICE를 준비한다. 준비한 SDP·후보는 공개하지 않고 실제 offer에서 정상 answer로 전환한다. 미사용 소켓은 회전하고 공유기 매핑은 실제 연결 준비 뒤에만 시도한다.
-- 현재 index 응답에 정적 자원의 SHA-256 재검증을 묶는다. 저장 본문은 다시 해시하고 같은 연결 세대·짧은 시작 구간·한 번의 사용에 한정한다. 설치된 글꼴 CSS·폰트도 같은 검사를 적용하며 문서·계정·세션은 캐시하지 않는다.
-- 신뢰된 정적 선행 코드의 정확한 SHA-256만 CSP에 허용해 HTML에서 WSS·비추출 브라우저 키 준비를 시작한다. 동적 metadata를 코드에 삽입하지 않고 `unsafe-inline`을 허용하지 않는다. 연결 제어기·JOSE 검증 코드·앱 코드 다운로드와 겹치며 준비 소켓은 같은 설정의 제어기에 한 번만 넘기고 수신량·시간을 제한한다. 서명 검증 전에 인가하지 않는다. 같은 연결의 인증 조회는 공유하고, 첫 재접속은 즉시 시작하며 반복 실패에만 제한된 대기를 적용한다. 쓰기 작업을 자동 재전송하지 않는다.
-- 작업 화면은 인증·계정 저장소·콘텐츠 identity·권한 버전 설정 뒤 동적 import하고 일반 Component state로 렌더한다. 편집기도 같은 방식으로 완료 즉시 렌더하되 계정·역할·루트·권한 버전에 결과를 결합한다. React lazy 재시도의 불필요한 대기를 피하며 준비 중 화면·취소·실패·신원 전환을 유지한다. 다른 하위 도구와 포트 프리뷰의 지연 로딩은 유지한다. [앱 시작 계약](../development/architecture.md#브라우저-첫-시작)이 구현·검증 범위를 소유한다.
-- 초기·인증 청크 뒤의 작업 화면 정적 의존성을 별도 그룹으로 묶어 개별 요청을 줄인다. 기존 동적 경계를 보존하고, 새 도구 의존성은 모든 호출자가 이미 준비한 경우만 허용한다. 편집기 의존성까지 재귀적으로 묶는 안은 설정 창이 편집기 다운로드를 기다리는 회귀가 있어 제외한다.
+- Consume the connection-start allowance in advance on public HTML requests and issue a short signed admission to reduce duplicate D1 round trips for the subsequent WSS connection. The admission is proof of one-time allowance consumption bound to the device, path, origin, and IP; it is not authentication authority. Retain current DO authorization, a fresh WSS nonce, browser key proof, and the final ticket.
+- Authenticated hosts supply one-time challenges and generations in advance, which the central service and host each consume to reduce the prepare→ready round trip. Persist consumption records and respect host authentication generation, expiration, replacement, revocation, and hibernation boundaries. Use the existing ready flow for unsupported peers and when the supply is exhausted.
+- Retain per-connection processes while preparing native initialization, certificates, and ICE in one standby helper. Do not expose the prepared SDP or candidates; convert them into a normal answer upon an actual offer. Rotate unused sockets and attempt router mapping only after preparing an actual connection.
+- Bundle SHA-256 revalidation of static resources into the current index response. Rehash stored bodies and limit reuse to the same connection generation, a short startup window, and one use. Apply the same checks to installed font CSS and font files; do not cache documents, accounts, or sessions.
+- Allow only the exact SHA-256 hash of trusted static bootstrap code in CSP to begin preparing WSS and a non-extractable browser key from HTML. Do not insert dynamic metadata into code or allow `unsafe-inline`. Preparation overlaps downloads of the connection controller, JOSE verification code, and app code; hand the prepared socket to a controller with the same configuration only once, and limit received data and elapsed time. Do not authorize before signature verification. Share authentication lookups for the same connection, start the first reconnection immediately, and apply bounded delays only after repeated failures. Do not automatically resend writes.
+- Dynamically import the workspace screen after configuring authentication, the account store, content identity, and permission version, and render it using ordinary Component state. Render the editor immediately upon completion in the same way, binding the result to the account, role, root, and permission version. Avoid unnecessary waits from React lazy retries while retaining preparation screens, cancellation, failure handling, and identity switching. Retain lazy loading for other subtools and port previews. The [app startup contract](../development/architecture.md#initial-browser-startup) owns the implementation and verification scope.
+- Bundle the workspace screen's static dependencies after the initial and authentication chunks into a separate group to reduce individual requests. Preserve existing dynamic boundaries, and allow new tool dependencies only when all callers have already prepared them. Exclude recursively bundling editor dependencies because it caused a regression in which the settings window waited for the editor download.
 
-이 결정은 [ADR 0018](0018-mewlink-startup-revalidation.md)의 자원별 재검증, [ADR 0028](0028-mewlink-websocket-bootstrap.md)의 호스트 ready, [ADR 0033](0033-mewlink-signaling-resume.md)의 복구 대기를 해당 범위에서 확장한다. 기존 인증·회수·lease·전송 한도와 [ADR 0050](0050-mewlink-startup-preparation.md)의 origin 분리·공개 코드 캐시는 유지한다.
+Within the applicable scopes, this decision extends per-resource revalidation from [ADR 0018](0018-mewlink-startup-revalidation.md), host ready from [ADR 0028](0028-mewlink-websocket-bootstrap.md), and recovery waiting from [ADR 0033](0033-mewlink-signaling-resume.md). Retain existing authentication, revocation, leases, transport limits, and the origin separation and public code cache from [ADR 0050](0050-mewlink-startup-preparation.md).
 
-## 근거와 영향
+## Rationale and Impact
 
-핵심은 검사를 없애는 대신 검증된 준비 결과를 짧게 결합하고 직렬 작업을 겹치는 것이다. [libdatachannel의 원격 offer rollback](https://github.com/paullouisageneau/libdatachannel/blob/v0.24.5/src/peerconnection.cpp#L194)은 실제 브라우저·NAT 회귀 검사로 확인한다. 기존 DO의 위치를 강제로 바꾸거나 회수 상태 없이 새 객체로 전환하지 않는다.
+The key is to briefly bind verified preparation results and overlap serial work while retaining checks. Verify [libdatachannel remote offer rollback](https://github.com/paullouisageneau/libdatachannel/blob/v0.24.5/src/peerconnection.cpp#L194) through actual browser and NAT regression checks. Do not forcibly relocate an existing DO or switch to a new object without revocation state.
 
-중앙 Worker·런처·D1과 로컬 호스트·앱의 적용 위치가 다르다. 구버전·만료·한도 및 복귀 동작은 [원격 접속 계약](../development/remote-access.md), 적용 순서와 최종 검증은 [중앙 배포 절차](../operations/remote-central.md)가 소유한다. 합성 환경의 500ms 미만 결과는 실제 외부망이나 운영 적용 완료를 보장하지 않는다.
+The central Worker, launcher, and D1 have different application locations from the local host and app. The [remote access contract](../development/remote-access.md) owns old-version, expiration, limit, and fallback behavior; the [central deployment procedure](../operations/remote-central.md) owns the application order and final verification. Results below 500ms in a synthetic environment do not guarantee actual external-network performance or completed production application.

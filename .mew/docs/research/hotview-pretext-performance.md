@@ -1,60 +1,60 @@
 ---
-title: "Hotview 블록 캐시·Pretext 도입 후 성능"
-description: "블록별 Markdown·줄 번호 캐시와 Pretext 기반 DOM 가상화를 함께 적용한 Hotview의 입력·첫 표시·DOM 수를 동일 합성 Markdown 기준선과 비교하고 검증 범위와 남은 제한을 기록한다."
+title: "Hotview performance after introducing block caching and Pretext"
+description: "Compares input, initial display, and DOM counts in Hotview after applying per-block Markdown and line-number caching together with Pretext-based DOM virtualization against the same synthetic Markdown baseline, and records the scope of validation and remaining limitations."
 created: 2026-10-19
 updated: 2026-10-19
 ---
 
-# Hotview 블록 캐시·Pretext 도입 후 성능
+# Hotview performance after introducing block caching and Pretext
 
-## 비교 범위
+## Comparison scope
 
-[도입 전 측정](editor-input-performance.md)의 전체 직렬화·줄 번호 계산·화면 밖 DOM 비용을 줄였다. 현재 구현 계약은 [Hotview 입력·블록 렌더링](../development/hotview-rendering.md), 선택 근거는 [도입 결정](../decisions/0016-hotview-pretext-windowing.md)에 둔다.
+Reduced the full serialization, line-number calculation, and offscreen DOM costs identified in the [pre-adoption measurements](editor-input-performance.md). The current implementation contract is in [Hotview input and block rendering](../development/hotview-rendering.md), and the rationale is in the [adoption decision](../decisions/0016-hotview-pretext-windowing.md).
 
-이번 결과는 블록별 직렬화, 줄 번호·파일 링크 장식 캐시, 로컬 본문 echo 생략, Pretext 높이 예측과 화면 밖 내용 DOM 생략을 **함께 적용한 효과**다. Pretext 하나의 독립적인 개선율로 해석하지 않는다.
+These results reflect the **combined effect** of per-block serialization, line-number and file-link decoration caches, skipping local body echo, Pretext height prediction, and omitting offscreen content DOM. Do not interpret them as an independent improvement rate from Pretext alone.
 
-## 측정 조건
+## Measurement conditions
 
-2026-10-19 최종 작업트리에서 기존 [측정 도구](../../../server/editor-performance-benchmark.mjs)를 그대로 실행했다. 기준선은 `bfb25f7`에 기록한 도입 전 결과다.
+The existing [measurement tool](../../../server/editor-performance-benchmark.mjs) was run unchanged on the final working tree on 2026-10-19. The baseline is the pre-adoption result recorded at `bfb25f7`.
 
-- Linux x64, AMD Ryzen 5 9600X, 논리 CPU 12개, Node.js 22.22.2, Chromium 153.0.8010.12.
-- 1280×800, production React, dark 테마, 로컬 IBM Plex Sans KR·Mono 로드 완료 후 측정. CPU 감속은 없다.
-- 실제 EditorPane의 guest 로컬 Hotview·Plain에 같은 합성 Markdown을 사용한다. 협업·네트워크·파일 자동저장은 모의 처리한다.
-- 첫 본문 문단 앞에서 준비 입력 5회 뒤 ASCII `x` 20회를 입력한다. 50·500문단은 각각 새 페이지 3회, 5000문단은 1회이며 두 편집기의 실행 순서를 번갈아 바꾼다. 총 14개 결과다.
-- 다른 브라우저 검사와 동시에 실행하지 않는다. 앱 서버·`dist/`는 사용하거나 변경하지 않는다.
+- Linux x64, AMD Ryzen 5 9600X, 12 logical CPUs, Node.js 22.22.2, Chromium 153.0.8010.12.
+- 1280×800, production React, dark theme, measured after local IBM Plex Sans KR and Mono finished loading. No CPU throttling.
+- Uses the same synthetic Markdown in the actual EditorPane's guest-local Hotview and Plain editors. Collaboration, networking, and file autosave are mocked.
+- After 5 warm-up inputs before the first body paragraph, ASCII `x` is typed 20 times. The 50- and 500-paragraph cases each run 3 times on fresh pages, and the 5000-paragraph case runs 1 time, alternating the execution order of the two editors. There are 14 results in total.
+- Do not run concurrently with other browser checks. The app server and `dist/` are neither used nor modified.
 
 ```bash
 MEW_BENCH_SAMPLES=20 MEW_BENCH_OUTPUT=/tmp/mew-editor-pretext.json node server/editor-performance-benchmark.mjs
 ```
 
-## 결과
+## Results
 
-시간 단위는 ms다. JavaScript·레이아웃은 CDP 구간 증가량을 키 수로 나눈 라운드별 평균의 중앙값이다. 프레임 경계는 keydown부터 두 번째 RAF까지의 전체 표본 p50이며 paint 시각이나 INP가 아니다. 중앙값은 nearest-rank 방식으로 짝수 표본의 가운데 두 값 중 작은 값을 택한다. 5000문단은 한 라운드의 값이다.
+Times are in ms. JavaScript and layout values are medians of per-round averages calculated by dividing CDP interval deltas by the number of keys. The frame boundary is the p50 of all samples from keydown to the second RAF, not paint timing or INP. Medians use nearest rank, selecting the smaller of the two middle values for even sample counts. The 5000-paragraph results are from one round.
 
-| 문단·크기 | 기존 Hotview JS/키 | 변경 후 Hotview JS/키 | 변경 후 Plain JS/키 | 변경 후 Hotview 레이아웃/키 |
+| Paragraphs and size | Previous Hotview JS/key | Updated Hotview JS/key | Updated Plain JS/key | Updated Hotview layout/key |
 | --- | ---: | ---: | ---: | ---: |
 | 50 · 11.3KB | 5.4 | 3.4 | 2.1 | 1.1 |
 | 500 · 113.0KB | 61.1 | 5.4 | 2.6 | 1.2 |
 | 5000 · 1.13MB | 16047.9 | 38.0 | 6.2 | 2.5 |
 
-113KB 문서의 JavaScript 시간은 약 91%, 1.13MB 문서는 약 99.8% 줄었다. 큰 문서의 직렬화 호출은 4회/키에서 캐시를 공유하는 2회/키로 줄었고, 직렬화 포함 시간은 15435.0ms/키에서 1.9ms/키가 됐다. 함수 시간은 중첩되므로 CDP 시간과 합산하지 않는다.
+JavaScript time decreased by about 91% for the 113 KB document and about 99.8% for the 1.13 MB document. Serialization calls for the large document decreased from 4/key to 2/key sharing a cache, and inclusive serialization time fell from 15435.0 ms/key to 1.9 ms/key. Function times overlap and are not added to CDP time.
 
-| 문단 | 변경 후 Hotview 프레임 경계 | 변경 후 Plain 프레임 경계 | 변경 후 Hotview 첫 표시 | 변경 후 Hotview DOM 하위 요소 |
+| Paragraphs | Updated Hotview frame boundary | Updated Plain frame boundary | Updated Hotview initial display | Updated Hotview DOM descendants |
 | --- | ---: | ---: | ---: | ---: |
 | 50 | 32.0 | 32.1 | 197.3 | 301 |
 | 500 | 32.0 | 31.9 | 297.9 | 726 |
 | 5000 | 40.8 | 31.9 | 941.6 | 5226 |
 
-1.13MB 문서의 기존 첫 표시는 10311.1ms, DOM 하위 요소는 30001개였다. 첫 표시는 약 1초가 됐으며, 텍스트·링크·커서 DOM을 화면 범위로 제한했다. 최상위 블록마다 자리표시자 하나가 남아 DOM 수가 문서 길이와 완전히 무관해지지는 않는다.
+Previously, the 1.13 MB document took 10311.1 ms to display initially and had 30001 DOM descendants. Initial display now takes about 1 second, with text, link, and cursor DOM limited to the viewport. One placeholder remains per top-level block, so the DOM count is not completely independent of document length.
 
-## 검증과 남은 범위
+## Validation and remaining scope
 
-직렬화·줄 번호·가상 블록·파일 링크·각주·Markdown 동작·선택 줄 계산 단위 검사 90개와 관련 브라우저 검사 8개가 통과했다. 브라우저 검사는 데스크톱·모바일 viewport, 로컬·Yjs, 숨긴 블록의 입력·undo·복사·목차·검색·보기 전환, 외부 원문 교체, 코드·표·이미지, DB 제목 초안의 스크롤 중 보존과 blur 저장을 포함한다. 타입 검사와 문서 검사도 통과했다. 변경 파일 lint에는 기존 협업 시딩 effect의 React 의존성 경고 1개가 남는다.
+90 unit tests for serialization, line numbers, virtual blocks, file links, footnotes, Markdown behavior, and selected-line calculation, plus 8 related browser checks, passed. Browser checks cover desktop and mobile viewports, local and Yjs editing, input, undo, copy, table of contents, search, and view switching for hidden blocks, external source replacement, code, tables, images, and preserving DB title drafts while scrolling and saving on blur. Type and documentation checks also passed. Lint for the changed files still reports 1 existing React dependency warning in the collaboration seeding effect.
 
-브라우저 검사는 개별 또는 순차 실행으로 확인했다. 기존 거터 검사의 간헐적 실패는 CDP에서 이미 교체된 DOM 참조를 읽는 문제로 확인했고, 번호·스타일을 한 콜백의 스냅샷으로 검증하도록 수정했다. 일부 문자열 형태의 대기식이 함수로 실행되지 않던 문제도 명시적 호출로 고쳤다. 코드 블록 EOF의 입력용 문단은 변경 전·후 모두 원문 10번 줄인 것을 확인해 기존 검사의 기대값 11을 바로잡았다. 새 가상 블록 검사는 모바일 포커스 조정이 끝난 뒤 스크롤하고 모델 선택과 브라우저 선택이 일치한 뒤 입력하도록 한다.
+Browser checks were verified individually or sequentially. Intermittent failures in the existing gutter check were traced to CDP reading DOM references that had already been replaced; the check was updated to validate numbers and styles from a snapshot in a single callback. Some string-form wait expressions were not being executed as functions; these were fixed with explicit calls. The input paragraph at code-block EOF was confirmed to be source line 10 both before and after the change, correcting the existing test's expected value of 11. The new virtual-block check scrolls after mobile focus adjustment finishes and types after the model and browser selections match.
 
-실제 입력 반영 대기를 적용하면서 기존 코드에도 있던 파일 링크 커서 위젯의 입력 손실을 확인했다. 비조합 일반 입력을 위젯 DOM 대신 모델에 반영하도록 수정하고, 링크 앞뒤의 영문·한글 입력이 Markdown에 저장되는지 검증한다.
+Waiting for actual input updates revealed input loss in the file-link cursor widget that also existed in the previous code. Ordinary non-composition input was changed to update the model instead of the widget DOM, and English and Korean input before and after links is checked for persistence in Markdown.
 
-입력 통지는 동기적으로 유지한다. 전체 문서 문자열의 생성·전달과 문서 위치 갱신 등 문서 크기에 비례하는 비용은 남으므로 큰 문서도 Plain과 같은 시간으로 수렴하지 않는다. 거대한 단일 목록·표의 내부, 긴 선택 범위는 많은 DOM을 만들 수 있다. 화면 밖 텍스트의 브라우저 자체 찾기·접근성 트리 상주와 숨긴 미디어의 임시 상태에는 구현 계약의 제한이 있다.
+Input notifications remain synchronous. Costs proportional to document size remain, including generating and passing the full document string and updating document positions, so large documents do not converge to Plain's timing. The internals of a huge single list or table and long selections can create substantial DOM. The implementation contract limits native browser find and accessibility-tree residency for offscreen text, as well as temporary state for hidden media.
 
-이 수치는 합성 문서의 데스크톱 ASCII 입력 결과다. 실제 OS 한글 IME 조합, 모바일 기기 성능과 현장 INP는 별도 확인 대상이다. 실행 중인 앱에 반영하는 빌드·재시작은 수행하지 않았다.
+These figures are desktop ASCII input results for synthetic documents. Actual OS Korean IME composition, mobile device performance, and field INP require separate checks. No build or restart was performed to apply the changes to the running app.

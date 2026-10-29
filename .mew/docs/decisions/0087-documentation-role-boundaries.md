@@ -1,34 +1,34 @@
 ---
-title: "문서 역할과 프로젝트 자료의 저장 경계"
-description: "프로젝트 지식·태스크·공개 안내·제품 리소스·제작 원본의 소유 경로와 탐색·검사·배포 및 기존 경로 호환을 정한다. 기존 문서 소유권 결정의 배치 규칙을 확장한다."
+title: "Documentation roles and storage boundaries for project materials"
+description: "Defines owning paths, discovery, checks, deployment, and compatibility with existing paths for project knowledge, tasks, public guidance, product resources, and production source assets. Extends the placement rules from the existing documentation ownership decision."
 created: "2026-10-29"
 updated: "2026-10-29"
 ---
 
-## 상태
+## Status
 
-채택. [0040](0040-document-gardening.md)의 내용별 소유권과 현재·기록 구분을 유지하면서 저장소 루트 `docs/`에 모든 역할을 모으던 배치를 대체한다. 기능 전용 명세를 별도 Specs로 분리하지 않는 기존 결정은 유지한다.
+Accepted. Replaces the arrangement that grouped all roles under repository-root `docs/` while preserving content-based ownership and the distinction between current content and records from [0040](0040-document-gardening.md). Retains the existing decision not to separate feature-specific specifications into a separate Specs area.
 
-## 배경
+## Background
 
-`docs/`에 사용자 안내, 구현 계약, 태스크, 사업 자료와 서버가 직접 배포·읽는 스킬이 섞였다. Documents 연결 경로, 태스크의 고정 저장 경로, 공개 안내와 제품 패키지의 소비자가 서로 달랐다. 일부 공개 이미지에는 Git에서 제외한 임시 업로드 주소가 사용됐고, 공개 뮤펫 폴더에는 제작 원본도 들어 있었다.
+`docs/` mixed user guidance, implementation contracts, tasks, business materials, and skills directly served and read by the server. Documents-linked paths, fixed task storage paths, and consumers of public guidance and product packages differed. Some public images used temporary upload URLs excluded from Git, and the public Mewpet folder also contained production source assets.
 
-## 결정
+## Decision
 
-- `.mew/docs/`는 Git으로 추적하는 프로젝트 지식이다. 현재 기능·공유 계약·결정·반복 유지관리 절차와 작업·조사·이력을 역할별 하위 폴더에서 관리한다. 사업 자료는 `business/`, 자유 작업 문서는 기본 지식 탐색에서 제외하는 `.mew/notes/`에 둔다.
-- `.mew/tasks/`는 작업 제목·완료·담당자·기간·태그의 Markdown 원본이다. 설치별 태스크 순서·색상·식별자 메타데이터는 기존 데이터 경로에 남긴다. 기존 `docs/tasks/`·`docs/tasks/Done/`·`tasks/`는 읽기 및 비파괴 쓰기 이관으로 호환한다.
-- 저장소 루트 `docs/`는 사용자·자체 서버 운영자·외부 기여자를 위한 안내다. npm 발행·중앙 서비스·저장소 이력 유지관리 절차는 프로젝트 문서에서 관리한다. 날짜별 적용·검증은 `work/`, 비교·조사 원문은 `research/`로 연결한다.
-- `resources/skills/`와 `resources/help/`는 앱이 읽고 배포하는 제품 리소스다. 고정한 외부 스킬 원문·라이선스·해시는 함께 보존한다. Mewpet 도구 도움말은 개발 명세나 공개 가이드를 runtime payload로 읽지 않는다.
-- `assets/`는 제작 원본과 검수 자료, `public/`은 앱 최종 자산, `docs/assets/`는 공개 문서 이미지다. 기존 생성물은 생성 입력·방법을 따라 갱신하고, 과거 커밋에 고정된 데모 사본은 경로를 수작업으로 치환하지 않는다.
-- 루트 `AGENTS.md`와 `.mew/agent-context.json`이 프로젝트 문서 진입점을 연결한다. 이 저장소의 Documents는 `.mew/docs`로 명시한다. 다른 프로젝트의 기본 Documents 정책을 일괄 변경하지 않는다.
-- 기본 description 탐색은 연결된 Documents만 읽는다. `--repository` 검사는 명시한 문서 역할 전체를 검사하고 `.vendor`·임의 숨김 상태·archives를 제외한다. 이력은 `--all`로 포함하며 MOC 등록 의무는 없다.
+- `.mew/docs/` contains project knowledge tracked in Git. Manage current features, shared contracts, decisions, recurring maintenance procedures, work, research, and history in role-specific subfolders. Place business materials in `business/` and free-form work documents in `.mew/notes/`, which is excluded from default knowledge discovery.
+- `.mew/tasks/` is the Markdown source for task titles, completion, assignees, dates, and tags. Installation-specific task order, colors, and identifier metadata remain in the existing data path. Preserve compatibility with existing `docs/tasks/`, `docs/tasks/Done/`, and `tasks/` through reading and nondestructive migration on write.
+- Repository-root `docs/` provides guidance for users, self-hosted server operators, and external contributors. Manage npm publishing, central service, and repository history maintenance procedures in project documentation. Link dated application and validation records to `work/` and original comparison and research materials to `research/`.
+- `resources/skills/` and `resources/help/` are product resources read and distributed by the app. Preserve pinned external skill source text, licenses, and hashes together. Mewpet tool help does not read development specifications or public guides as runtime payloads.
+- `assets/` contains production source assets and review materials, `public/` contains final app assets, and `docs/assets/` contains public documentation images. Update existing generated artifacts using their generation inputs and methods, and do not manually replace paths in demo copies pinned to historical commits.
+- Root `AGENTS.md` and `.mew/agent-context.json` link to project documentation entry points. Explicitly set Documents for this repository to `.mew/docs`. Do not change the default Documents policy for other projects in bulk.
+- Default description discovery reads only linked Documents. The `--repository` check covers all specified documentation roles and excludes `.vendor`, arbitrary hidden state, and archives. Include history through `--all`; MOC registration is not required.
 
-## 대안과 근거
+## Alternatives and Rationale
 
-`docs/internal/`로 나누면 공개 안내와 프로젝트 운영 자료가 계속 같은 Documents 루트에 섞인다. 모든 Markdown을 `.mew/docs/`로 옮기면 공개 설치·기여 안내와 제품 리소스의 배포 경계가 흐려진다. 역할별 최상위 폴더를 계속 추가하는 대신 프로젝트 지식은 `.mew/docs` 안에서 주제로 나눈다.
+Splitting by `docs/internal/` would keep public guidance and project operations materials mixed under the same Documents root. Moving all Markdown to `.mew/docs/` would blur distribution boundaries for public installation and contribution guidance and product resources. Instead of continuing to add top-level folders for each role, organize project knowledge by topic within `.mew/docs`.
 
-## 영향과 검증
+## Impact and validation
 
-상대 링크·프론트매터의 상위파일·문서 검사·런타임 경로·릴리스 포함 목록을 같은 변경에서 갱신한다. 기존 편집·미추적 문서·협업 데이터는 새 위치에서 보존하며 다른 작업의 내용은 이번 커밋에 포함하지 않는다. Git으로 추적한 `.mew` 문서도 공개 저장소의 자료이며 디렉터리 이동은 접근 제어가 아니다.
+Update relative links, parent-file references in frontmatter, documentation checks, runtime paths, and release inclusion lists in the same change. Preserve existing edits, untracked documents, and collaboration data in their new locations, and do not include content from other work in this commit. Git-tracked `.mew` documents are also public repository materials; moving directories is not access control.
 
-구체적인 작성·배치 계약은 [문서 규칙](../README.md), 태스크 저장 계약은 [태스크 목록](../development/task-list.md), 배포 경계는 [CLI 계약](../development/cli-distribution.md)을 따른다. 실제 수행·검사와 운영 미적용 범위는 [이전 작업 기록](../work/documentation-role-migration.md)에 남긴다.
+Specific authoring and placement contracts follow [Documentation rules](../README.md), the task storage contract follows [Task list](../development/task-list.md), and distribution boundaries follow the [CLI contract](../development/cli-distribution.md). Record actual execution, checks, and the scope not applied to production in the [Migration work record](../work/documentation-role-migration.md).

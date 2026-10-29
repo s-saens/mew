@@ -1,69 +1,69 @@
 ---
-provenance: "Liiiiv 중앙 ADR 이관본, 2026-10-14"
-description: "이관한 결정 기록: mew 에이전트 창은 워크스페이스 스코프다. 런타임(Claude Code·Hermes)은 창에서 고른다. 당시 선택·근거·후속 변경을 보존하며 현재 계약은 Mew 소유 문서에서 확인한다."
-title: "0043 — mew 에이전트 창은 워크스페이스 스코프다. 런타임(Claude Code·Hermes)은 창에서 고른다"
+provenance: "Migrated copy of a Liiiiv central ADR, 2026-10-14"
+description: "Migrated decision record: the mew agent panel is workspace-scoped. The runtime (Claude Code or Hermes) is selected in the panel. Preserves the choices, rationale, and subsequent changes from that time; consult the Mew owning document for the current contract."
+title: "0043 — The mew agent panel is workspace-scoped. The runtime (Claude Code or Hermes) is selected in the panel"
 created: 2026-08-10
 updated: 2026-09-11
 ---
 
-- 날짜: 2026-08-10
-- 상태: 채택
-- 후속 결정: [0077](0077-mew-agent-tab-working-directory.md) — 워크스페이스로 고정한 cwd
-- 후속 결정: [0117](0117-mew-terminal-agent-tabs-for-claude-and-antigravity.md) — Gemini 런타임·Claude 대화형 ACP 표면
-- 결정자: 송상훈 (지시)
+- Date: 2026-08-10
+- Status: Adopted
+- Follow-up decision: [0077](0077-mew-agent-tab-working-directory.md) — cwd fixed to the workspace
+- Follow-up decision: [0117](0117-mew-terminal-agent-tabs-for-claude-and-antigravity.md) — Gemini runtime and Claude interactive ACP surface
+- Decision maker: Song Sanghoon (directive)
 
-## 배경
+## Background
 
-ADR 0034로 되돌아온 에이전트 창은 프로젝트에 묶여 있었다 — `/api/agent/ws?project=<이름>`,
-세션의 cwd는 그 프로젝트 폴더, 세션 등록표의 키도 프로젝트였다. 파일 도구는 프로젝트 밖을 거부했다.
+The agent pane restored by ADR 0034 was tied to a project — `/api/agent/ws?project=<이름>`, the session's cwd was that project folder, and
+the session registry was also keyed by project. File tools rejected access outside the project.
 
-실제로 시키는 일은 레포 하나에서 끝나지 않는다. 결정은 docs에, 구현은 제품 레포에, 런북은 또 다른
-곳에 쓴다. 프로젝트 스코프에서는 탭을 옮길 때마다 대화가 갈리고, 에이전트가 옆 레포를 읽지 못해
-"docs에 적힌 대로 고쳐"가 성립하지 않는다.
+The actual work requested does not stop at one repo. Decisions go in docs, implementation in a product repo, and runbooks somewhere
+else. With project scope, conversations split whenever tabs change, and the agent cannot read neighboring
+repos, making "fix it according to docs" impossible.
 
-또 창 왼쪽 위에는 "에이전트"라는 글자만 있어서 지금 무엇이 붙어 있는지 알 수 없었다. 백엔드 교체는
-`MEW_AGENT_CMD`를 고치고 서버를 다시 띄우는 일이었다.
+Also, the upper-left corner of the pane showed only "Agent," so there was no way to tell what was connected. Replacing
+the backend required editing `MEW_AGENT_CMD` and restarting the server.
 
-## 결정
+## Decision
 
-에이전트 창의 스코프를 워크스페이스로 올린다. 나뉘는 축은 프로젝트가 아니라 런타임이다.
+Expand the agent panel's scope to the workspace. Sessions are separated by runtime rather than project.
 
-### 1. 세션은 워크스페이스 하나에 하나(런타임당)
+### 1. One session per workspace (per runtime)
 
-- 세션의 cwd는 `WORKSPACE_ROOT`. 어느 프로젝트를 보고 있든 같은 창·같은 대화가 뜬다
-- 채널은 `/api/agent/ws?runtime=<id>`. 등록표(`RUNTIMES`)에 없는 id는 400으로 끊는다. 생략하면 `claude`
-- 파일 도구(ACP `fs`)의 경계도 워크스페이스로 넓힌다 — 프로젝트 사이는 막지 않는다. 그게 이 변경의 목적이다.
-  밖으로 나가는 것은 여전히 `UnsafePathError`
-- 워크스페이스를 갈아끼우면(ADR 0042) 떠 있던 세션을 전부 접는다(`disposeAllSessions`) — 자식 프로세스의
-  cwd는 뜰 때 정해져 옛 폴더에 매여 있다
+- The session's cwd is `WORKSPACE_ROOT`. The same panel and conversation appear regardless of which project is being viewed
+- The channel is `/api/agent/ws?runtime=<id>`. Reject IDs absent from the registry (`RUNTIMES`) with 400. If omitted, default to `claude`
+- Expand the file tool boundary (ACP `fs`) to the workspace as well — do not block access between projects. That is the purpose
+  of this change. Going outside still results in `UnsafePathError`
+- Switching workspaces (ADR 0042) shuts down all running sessions (`disposeAllSessions`) — a child process's cwd is set at startup
+  and remains tied to the old folder
 
-### 2. 런타임은 창에서 고르고, 고른다고 권한이 늘지 않는다
+### 2. Select the runtime in the window; selection does not grant additional permissions
 
-- 창 왼쪽 위는 글자 대신 지금 붙어 있는 런타임 아이콘이다. 누르면 목록이 열리고 거기서 갈아탄다
-- 고른 값은 브라우저에만 남는다(`mew:agent-runtime`) — 서버 설정이 아니다. 사람마다 다르게 쓸 수 있다
-- 갈아타도 저쪽 세션은 서버에 그대로 남는다. 돌아오면 지나간 이벤트를 되받아 대화가 이어진다
-- 실행 명령은 서버 환경변수로만 정해진다: `claude`는 `MEW_AGENT_CMD`(기본 번들 `claude-code-acp`),
-  `hermes`는 `MEW_AGENT_HERMES_CMD`·`MEW_AGENT_HERMES_ARGS`(기본 `hermes acp`).
-  브라우저가 보낸 문자열이 명령이 되는 경로는 없다 — id 하나가 등록표를 고르는 것뿐이다
-- Hermes는 mew가 번들하지 않는다. 진입점이 없거나 ACP를 말하지 않으면 창에 "에이전트를 실행하지
-  못했습니다"로 드러난다 — 목록에서 감추지 않는다(감추려면 매번 실행해 봐야 한다)
-- 아이콘 때문에 런타임 목록이 클라이언트에도 있다. 판정은 언제나 서버가 한다
+- The upper-left corner of the panel shows the currently connected runtime's icon instead of text. Click it to open the list and switch runtimes there
+- The selection is stored only in the browser (`mew:agent-runtime`) — it is not a server setting. Each person can use a different runtime
+- When switching, the other session remains on the server. Returning replays past events so the conversation continues
+- Execution commands are determined solely by server environment variables: `claude` uses `MEW_AGENT_CMD` (bundled default:
+  `claude-code-acp`), and `hermes` uses `MEW_AGENT_HERMES_CMD` and `MEW_AGENT_HERMES_ARGS` (default: `hermes acp`). There is no path that turns a browser-supplied
+  string into a command — a single id only selects a registry entry
+- mew does not bundle Hermes. If its entry point is missing or it does not speak ACP, the pane shows "Failed to start agent"
+  — it is not hidden from the list (hiding it would require attempting to run it every time)
+- The client also has a runtime list for the icons. The server always makes the decision
 
-## 근거
+## Rationale
 
-- 프로젝트 스코프의 격리는 값을 주지 못했다. 창을 여는 사람은 이미 owner/manager, 즉 워크스페이스 전체에
-  닿는 셸을 가진 사람이다(ADR 0037). 파일 도구만 프로젝트로 좁혀 봤자 같은 사람이 Bash로 옆 레포를
-  고칠 수 있으니, 막고 있던 것은 공격자가 아니라 사용자였다
-- 벤더를 늘리는 방법은 여전히 spawn 대상 교체다(ADR 0034). 런타임 등록표는 그 spawn 인자 묶음에 이름을
-  붙인 것뿐이고, 자체 어댑터 인터페이스가 아니다 — ACP가 인터페이스라는 결정은 그대로다
-- 런타임 선택을 서버 설정으로 두면 다시 띄워야 하고, 한 사람이 바꾸면 모두가 바뀐다. 브라우저에 두면
-  둘 다 아니다
+- Project-scoped isolation provided no value. Anyone opening the panel is already an owner/manager, someone with a shell that can access the entire
+  workspace (ADR 0037). Restricting only the file tools to a project does little when the same person can use Bash to modify a neighboring
+  repo; the restriction was blocking the user, not an attacker.
+- Adding vendors still means replacing the spawn target (ADR 0034). The runtime registry merely names each set of spawn arguments;
+  it is not a custom adapter interface—the decision that ACP is the interface remains unchanged.
+- Keeping runtime selection in server settings requires a restart, and one person's change affects everyone. Keeping it in the browser
+  does neither.
 
-## 결과
+## Results
 
-- 프로젝트별로 대화를 나눠 두던 방식은 사라진다. 옛 세션은 어댑터가 cwd별로 보관하므로, 프로젝트
-  폴더를 cwd로 하던 지난 세션들은 창의 "이전 세션" 목록에 더 이상 뜨지 않는다(파일은 남아 있다)
-- 토큰 사용량이 읽는 경로도 cwd를 따라 바뀐다(`<CLAUDE_CONFIG_DIR>/projects/<인코딩된 cwd>/…`) — 워크스페이스
-  기준 폴더가 새로 생긴다. 없으면 사용량 칸만 빈다(ADR 0036의 규칙 그대로)
-- 런타임을 늘리려면 서버 `RUNTIMES`와 클라이언트 목록(아이콘) 양쪽에 한 줄씩 넣는다. 한쪽만 넣으면
-  서버는 400, 창은 기본 아이콘으로 조용히 어긋난다
+- Conversations are no longer separated by project. The adapter stores old sessions by cwd, so past sessions
+  whose cwd was a project folder no longer appear in the panel's "Previous Sessions" list (the files remain).
+- The path used to read token usage also changes with cwd (`<CLAUDE_CONFIG_DIR>/projects/<인코딩된 cwd>/…`)—a new workspace-based folder is created. If it does not exist, only
+  the usage field stays empty (following the same rule as ADR 0036).
+- To add a runtime, add one entry to both the server's `RUNTIMES` and the client list (icons). Updating only one side silently creates a mismatch:
+  the server returns 400, or the panel shows the default icon.

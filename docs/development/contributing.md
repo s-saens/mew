@@ -1,21 +1,21 @@
 ---
-title: "Mew 기여와 상업 제공 권한"
-description: "소스 공개 라이선스 아래 외부 기여를 수락하기 전 확인할 저작권·제3자 고지·프로젝트 소유자의 상업 제공 권한을 정한다. 기존 기여의 동의나 권리 양도를 소급 가정하지 않는다."
+title: "Mew Contributions and Commercial Offering Rights"
+description: "Defines the copyright, third-party notices, and project owner's commercial offering rights to verify before accepting external contributions under the source-available license. Does not retroactively assume consent or rights assignments for existing contributions."
 created: 2026-10-23
 updated: 2026-10-23
 ---
 
-## 기여 전 확인
+## Before contributing
 
-Mew는 [Mew Source Available License 1.0](../../LICENSE)을 사용한다. 개인·회사 내부 사용은 허용하지만 Mew·수정본 판매와 유료 호스팅은 제한한다. [결정 0053](../../.mew/docs/decisions/0053-source-available-license.md)에 따라 프로젝트 소유자는 권리를 보유한 범위에서 상업 제공을 할 수 있다.
+Mew uses the [Mew Source Available License 1.0](../../LICENSE). Personal and internal company use is permitted, but selling Mew or modified versions and providing paid hosting are restricted. Under [Decision 0053](../../.mew/docs/decisions/0053-source-available-license.md), the project owner may make commercial offerings within the scope of the rights they hold.
 
-외부 기여를 제출하기 전에 유지관리자와 아래 사항을 확인한다.
+Before submitting an external contribution, confirm the following with the maintainer.
 
-- 본인 또는 소속 회사 등 실제 권리자의 제출 권한이 있는가.
-- 가져온 코드·자산의 출처와 라이선스·필수 고지를 명시했는가.
-- 기여분을 Mew의 공개 조건으로 배포할 권한이 있는가.
-- 프로젝트 소유자의 유료 제공과 별도 상업 라이선스에 기여분을 포함할 권한을 별도 서면 합의로 허락할 수 있는가.
+- Do you have authorization to submit from the actual rights holder, such as yourself or your employer?
+- Have you identified the sources, licenses, and required notices for any incorporated code or assets?
+- Do you have the right to distribute the contribution under Mew's public terms?
+- Can you grant permission through a separate written agreement to include the contribution in the project owner's paid offerings and separate commercial licenses?
 
-유지관리자는 이 권한이 확인되기 전 외부 코드·자산 기여를 병합하지 않는다. PR 제출, 커밋 작성자 표시, DCO 서명만으로 저작권 양도나 별도 상업 이용 허락이 완료됐다고 보지 않는다. 이 문서 자체는 기여 계약이나 저작권 양도 계약이 아니다.
+Maintainers do not merge external code or asset contributions until these rights are confirmed. Submitting a PR, being listed as a commit author, or signing a DCO alone is not considered a completed copyright assignment or separate commercial use authorization. This document itself is not a contribution agreement or copyright assignment agreement.
 
-기존 기여에 새 동의가 소급 적용된다고 가정하지 않는다. 이미 부여된 MIT 권한과 제3자 라이선스는 유지하고, 추가로 필요한 권한은 실제 권리자와 확인한다. 동의하지 않은 기여분까지 소유자의 독점 상업 권한에 포함됐다고 표시하지 않는다.
+Do not assume that new consent applies retroactively to existing contributions. Preserve previously granted MIT permissions and third-party licenses, and confirm any additional rights needed with the actual rights holder. Do not represent contributions without consent as included in the owner's exclusive commercial rights.

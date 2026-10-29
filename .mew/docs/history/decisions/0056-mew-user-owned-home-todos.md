@@ -1,49 +1,49 @@
 ---
-provenance: "Liiiiv 중앙 ADR 이관본, 2026-10-14"
-description: "이관한 결정 기록: mew 홈 할 일은 파일 표식이 아니라 사용자 등록 항목이다. 당시 선택·근거·후속 변경을 보존하며 현재 계약은 Mew 소유 문서에서 확인한다."
-title: "0056 — mew 홈 할 일은 파일 표식이 아니라 사용자 등록 항목이다"
+provenance: "Migrated copy of a Liiiiv central ADR, 2026-10-14"
+description: "Migrated decision record: mew home to-dos are user-added items, not file markers. Preserves the choices, rationale, and subsequent changes at the time; see the Mew owning document for the current contract."
+title: "0056 — mew home to-dos are user-added items, not file markers"
 created: 2026-08-19
 updated: 2026-09-11
 ---
 
-- 날짜: 2026-08-19
-- 상태: 채택
-- 후속 결정: [0059](0059-mew-typed-project-linked-home-todos.md) — 할 일 타입·상태·프로젝트 연결 스키마
-- 결정자: 송상훈 (지시)
+- Date: 2026-08-19
+- Status: Adopted
+- Subsequent decision: [0059](0059-mew-typed-project-linked-home-todos.md) — Schema for to-do types, statuses, and project links
+- Decision maker: Song Sanghoon (directive)
 
-## 배경
+## Background
 
-[ADR 0042](0042-mew-home-tab-and-workspace-switch.md)는 홈 탭의 할 일 원장을 워크스페이스 파일 안의 표식으로
-정했다. 표식 방식은 코드와 TODO가 붙어 있어 별도 DB가 낡지 않는 장점이 있었지만, 홈 화면에서 빠르게 개인 할 일을
-등록하는 용도와 맞지 않았다. 사용자가 “문서의 TODO를 긁어오는 것 대신 사용자가 등록하는 투두 형태”를 요구했다.
+[ADR 0042](0042-mew-home-tab-and-workspace-switch.md) designated markers in workspace files as the home tab's to-do ledger. Keeping code and TODOs together had the advantage of preventing
+a separate DB from becoming stale, but the marker approach did not fit quickly adding personal to-dos from
+the home screen. The user requested "to-dos registered by the user instead of scraping TODOs from documents."
 
-## 선택지
+## Options
 
-1. 파일 표식 유지 + 홈에서 표식 삽입 UI 제공 — 코드와 TODO가 계속 붙지만, 새 할 일을 만들려면 프로젝트·파일·줄을
-   먼저 골라야 한다. 개인 일정이나 문서와 무관한 일을 담기 어렵다.
-2. 전역 팀 TODO 파일 하나 운영 — 파일 스캔은 줄지만 여러 사용자의 항목이 섞이고, 게스트·member 경계와 읽음 범위가
-   불명확하다.
-3. 로그인 사용자별 TODO 상태 파일 — 문서와 분리되어 빠르게 등록할 수 있고, 기한이 있으면 달력에 바로 세울 수 있다.
-   대신 코드 안 표식과 자동 동기화되지는 않는다.
+1. Keep file markers and provide a UI for inserting them from home — code and TODOs stay together, but creating a new to-do requires choosing a project, file, and line first.
+   It is difficult to accommodate personal schedules or tasks unrelated to documents.
+2. Maintain one global team TODO file — this reduces file scanning, but mixes multiple users' items and leaves guest/member boundaries and read scope
+   unclear.
+3. A TODO state file for each logged-in user — separate from documents, it allows quick entry and immediate placement on the calendar when a due date exists. However,
+   it does not automatically synchronize with markers in code.
 
-## 결정
+## Decision
 
-홈 할 일 원장은 파일 표식이 아니라 mew 서버 데이터 폴더의 `todos.json`이다. 항목은 로그인 사용자 이메일별로 분리하고,
-`id`·`text`·`done`·`due`·`createdAt`·`updatedAt`을 저장한다. `due`가 있는 항목만 달력 위젯에 표시한다.
+The home to-do ledger is `todos.json` in the mew server data folder, rather than file markers. Items are separated by logged-in
+user email and store `id`, `text`, `done`, `due`, `createdAt`, and `updatedAt`. Only items with `due` appear in the calendar widget.
 
-이 결정은 [ADR 0042](0042-mew-home-tab-and-workspace-switch.md)의 “할 일 원장은 파일 안의 표식 자체다” 부분을 대체한다.
-홈 탭, 위젯 등록표, 워크스페이스 전환 결정은 유지한다.
+This decision replaces the portion of [ADR 0042](0042-mew-home-tab-and-workspace-switch.md) stating that "the to-do ledger is the markers themselves inside files." The decisions on the home tab, widget
+registry, and workspace switching remain in effect.
 
-## 근거
+## Rationale
 
-- 홈 화면의 할 일은 프로젝트 파일 위치보다 사용자 행동 흐름이 더 중요하다. 입력칸에 적고 기한을 고르는 구조가 모바일
-  홈 탭에 더 맞다.
-- 파일 스캔을 없애면 빌드 산출물 제외 목록, 백틱 예시 제외, 줄 번호·라벨 재확인 같은 스캔 전용 규칙이 사라진다.
-- 사용자별 저장이면 팀 채팅·문서 권한과 별개로 개인 할 일을 관리할 수 있고, 게스트에게 워크스페이스 파일 경로가 새지
-  않는다.
+- For home screen to-dos, the user workflow matters more than the location of project files. Typing into an input field and choosing a due date fits the mobile
+  home tab better.
+- Removing file scanning eliminates scan-specific rules such as build artifact exclusion lists, excluding backtick examples, and rechecking line numbers and labels.
+- Per-user storage allows personal to-dos to be managed independently of team chat and document permissions, and prevents workspace file paths from leaking to
+  guests.
 
-## 결과
+## Results
 
-- 기존 파일 안 표식은 더 이상 홈 할 일 목록에 자동으로 뜨지 않는다.
-- 문서와 연결된 TODO가 필요하면 별도 기능으로 다시 설계한다. 이 결정은 “문서 앵커가 있는 작업 관리” 자체를 금지하지
-  않는다.
+- Existing markers in files no longer automatically appear in the home to-do list.
+- If document-linked TODOs are needed, redesign them as a separate feature. This decision does not prohibit "task management with document anchors"
+  itself.

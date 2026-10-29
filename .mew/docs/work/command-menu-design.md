@@ -1,24 +1,24 @@
 ---
-title: "프로젝트·명령 드롭다운 디자인 통일"
-description: "2026-10-28 프로젝트·명령 목록의 공용 핸들·오른쪽 번호·체크 없는 행 전체 강조와 명령 순서 저장을 구현한 기록. 격리 검증과 기존 문서 링크 오류·운영 미적용 범위를 구분한다."
+title: "Unify project and command dropdown design"
+description: "Records the implementation on 2026-10-28 of shared handles, right-aligned numbers, full-row highlighting without checkmarks, and saved command order for project and command lists. Distinguishes isolated verification, existing document link errors, and the scope not applied to production."
 created: "2026-10-28"
 updated: "2026-10-28"
 ---
 
-## 목적과 결과
+## Purpose and results
 
-프로젝트와 명령 목록의 핸들·행 강조를 공용 컴포넌트와 CSS로 묶었다. 명령의 글꼴·행 높이·간격을 프로젝트 메뉴에 맞추고, 숫자를 이름 앞에서 항목 오른쪽 끝으로 옮겼다. 현재 프로젝트의 체크와 실행 중인 명령의 점을 없애고 항목 전체 배경으로 상태를 표시한다. 포트 버튼은 같은 항목의 아래 줄에 둔다.
+Consolidated project and command list handles and row highlighting into shared components and CSS. Matched command fonts, row heights, and spacing to the project menu, and moved numbers from before the names to the right edge of each item. Removed the current project's checkmark and running commands' dots, using the entire item background to indicate status. Port buttons sit on the line below within the same item.
 
-명령 핸들은 마우스·터치 드래그와 키보드 정렬을 지원한다. 바뀐 순서는 기존 명령 파일에 직렬 저장하며, 저장 중 상태 폴링과 늦은 응답이 순서를 덮어쓰지 않게 한다. 실패하면 마지막 저장 순서로 복원한다. 최초 포커스와 일반 방향키 탐색에서는 핸들을 제외해 기존 숫자 실행·행 탐색 동작을 유지한다.
+Command handles support mouse and touch dragging and keyboard reordering. Changed orders are saved serially to the existing command file, preventing status polling and late responses from overwriting the order during saving. On failure, the order reverts to the last saved order. Handles are excluded from initial focus and normal arrow-key navigation to preserve existing numeric execution and row navigation behavior.
 
-현재 계약은 [공용 드롭다운](../development/ui-contracts.md#드롭다운과-선택-컴포넌트)과 [프로젝트 명령 버튼](../features/%ED%84%B0%EB%AF%B8%EB%84%90%C2%B7%EC%97%90%EC%9D%B4%EC%A0%84%ED%8A%B8%C2%B7%EC%9E%90%EB%8F%99%ED%99%94/%ED%94%84%EB%A1%9C%EC%A0%9D%ED%8A%B8%20%EB%AA%85%EB%A0%B9%20%EB%B2%84%ED%8A%BC.md), 사용법은 [명령 버튼 안내](../../../docs/guides/commands.md)를 따른다. 이전 단축키 추가와 메뉴 전환 수정은 [기존 기록](command-menu-shortcuts.md)에 남긴다.
+The current contracts follow [Shared dropdowns](../development/ui-contracts.md#dropdowns-and-selection-components) and [Project command buttons](../features/terminals-agents-automation/project-command-buttons.md), and usage follows the [Command button guide](../../../docs/guides/commands.md). Earlier shortcut additions and menu switching fixes remain in the [existing record](command-menu-shortcuts.md).
 
-## 검증과 적용
+## Verification and application
 
-- `node --test src/utils/command-menu-keyboard.test.ts server/command-button-menu-ui.test.ts server/project-switcher-ui.test.ts server/action-menu-ui.test.ts server/header-menu-switch-ui.test.ts`: 8개 통과. 격리 Chromium에서 PC·모바일 폭과 밝은·어두운 테마의 공용 행 배치·표면·포커스, 체크 없는 활성 프로젝트 강조, 명령의 마우스·터치·키보드 정렬, 연속 저장·옵션 보존·저장 실패 복원·재열기 후 순서와 숫자 실행을 검사했다. 포트 버튼의 새 탭 열기와 가로 스크롤, 240px 폭 제한과 상단 메뉴 전환도 확인했다.
-- PC 라이트·320px 다크 명령 메뉴와 모바일 프로젝트 메뉴 캡처를 확인했다.
-- `npx tsc -b`: 통과.
-- 변경 TypeScript 파일 9개의 `npx oxlint`: 오류 없이 통과. `ProjectSwitcher`의 기존 React 경고 2건은 남아 있다.
-- `npm run check:docs`: description 오류는 없으며 전체 링크 검사는 기존 삭제 문서 참조 18건으로 실패했다. 변경 문서의 링크 오류는 없다.
+- `node --test src/utils/command-menu-keyboard.test.ts server/command-button-menu-ui.test.ts server/project-switcher-ui.test.ts server/action-menu-ui.test.ts server/header-menu-switch-ui.test.ts`: 8 tests passed. In isolated Chromium at desktop and mobile widths in light and dark themes, checked shared row layout, surfaces, and focus; active project highlighting without a checkmark; mouse, touch, and keyboard command reordering; consecutive saves; option preservation; restoration after save failure; order after reopening; and numeric execution. Also verified port buttons opening new tabs, horizontal scrolling, the 240px width limit, and top menu switching.
+- Reviewed captures of the desktop light-theme and 320px dark-theme command menus and the mobile project menu.
+- `npx tsc -b`: passed.
+- `npx oxlint` on 9 changed TypeScript files: passed without errors. 2 existing React warnings in `ProjectSwitcher` remain.
+- `npm run check:docs`: no description errors; the full link check failed due to 18 existing references to deleted documents. The changed documents have no link errors.
 
-앱 빌드·배포·서버 실행·재시작은 수행하지 않았다. 실제 서버 파일 저장·실제 모바일 기기 조작·운영 적용은 별도로 확인해야 한다.
+App builds, deployment, and server runs and restarts were not performed. Actual server file saving, operation on physical mobile devices, and application to production require separate verification.

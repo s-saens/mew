@@ -1,51 +1,51 @@
 ---
-provenance: "Liiiiv 중앙 ADR 이관본, 2026-10-14"
-description: "이관한 결정 기록: 주기 할 일은 매일 초기화되고 항상 보인다. 당시 선택·근거·후속 변경을 보존하며 현재 계약은 Mew 소유 문서에서 확인한다."
-title: "0075 — 주기 할 일은 매일 초기화되고 항상 보인다"
+provenance: "Migrated copy of a Liiiiv central ADR, 2026-10-14"
+description: "Migrated decision record: Recurring to-dos reset daily and remain visible at all times. Preserves the choices, rationale, and subsequent changes from that time; see the Mew owning document for the current contract."
+title: "0075 — Recurring to-dos reset daily and remain visible at all times"
 created: 2026-08-24
 updated: 2026-08-24
 ---
 
-- 날짜: 2026-08-24
-- 상태: 채택
-- 결정자: 송상훈 (지시)
+- Date: 2026-08-24
+- Status: Adopted
+- Decision maker: Song Sanghoon (directive)
 
-## 배경
+## Background
 
-[ADR 0059](0059-mew-typed-project-linked-home-todos.md)의 `recurring` 타입은 이름만 주기적이고 동작은 다른 타입과
-같았다. 체크해 두면 다음 날에도 완료 상태 그대로 남아 "오늘 할 일"이 아니게 되고, [ADR 0066](0066-mew-todo-single-completion-checkbox.md)의
-"끝난 일도 보기"를 켜지 않으면 사라져 어제 뭘 했는지조차 확인할 수 없었다. 사용자는 주기 할 일이 매일 초기화되고
-끝난 것도 항상 보이기를 기대한다.
+The `recurring` type in [ADR 0059](0059-mew-typed-project-linked-home-todos.md) was recurring in name only and behaved like the other types. Once checked, it remained complete the next
+day and was no longer a "task for today." Unless "Show Completed Tasks" from [ADR 0066](0066-mew-todo-single-completion-checkbox.md) was enabled, it disappeared, making it impossible even to
+check what was done yesterday. Users expect recurring tasks to reset daily and completed tasks to remain
+visible at all times.
 
-## 선택지
+## Options
 
-1. 클라이언트가 접속 시마다 초기화 — 서버를 여러 화면에서 보면 각자 판단이 갈리고, 원장(status)과 화면이 어긋난다.
-2. 서버가 타이머로 자정 리셋 — 상시 프로세스에 깨어 있는 타이머가 필요하고, 안 띄운 날의 처리가 애매하다.
-3. 조회 시점 초기화 — `listTodos()`에서 하루 지난 완료를 open으로 되돌려 저장한다. 별도 타이머 없이, 어떤 경로로
-   읽어도 같은 결과다.
+1. Reset on every client connection — when viewing the server from multiple screens, each makes a different determination, and the ledger (status) and display diverge.
+2. Server resets at midnight using a timer — requires an active timer in a continuously running process, and handling days when it is not running is ambiguous.
+3. Reset on read: in `listTodos()`, return completions from a previous day to open and save them. Without a separate timer, every read path produces
+   the same result.
 
-## 결정
+## Decision
 
-주기(`recurring`) 할 일은 **완료한 날짜를 기록하고, 그날이 지나면 open으로 되돌린다.**
+Recurring (`recurring`) to-dos **record the completion date and revert to open after that day ends.**
 
-- `TodoItem`에 `doneDate`(YYYY-MM-DD 또는 null)를 추가한다. `updateTodo`에서 status가 `done`으로 바뀌면 서버 현지
-  시각 오늘을 찍는다.
-- `listTodos()`는 읽으면서 주기 항목 중 `canceled`·`missed` 또는 "done인데 doneDate가 오늘이 아닌" 것을
-  `open`(doneDate null)으로 되돌리고, 바뀌었으면 원장에 되쓴다. 타이머·크론 없는 조회 시점 초기화다.
-- 오늘·기한(`today`·`dated`) 항목은 초기화하지 않는다 — 완료 이력이 곧 기록이다.
-- 위젯에서 주기 항목은 "끝난 일도 보기" 체크박스와 무관하게 **항상 표시**한다. 매일 초기화되는 게 본래 모습이라
-  숨길 이유가 없으며, 오늘 이미 했는지는 줄의 체크가 말한다.
+- Add `doneDate` (YYYY-MM-DD or null) to `TodoItem`. When status changes to `done` in `updateTodo`, stamp it with today's date in the server's
+  local time.
+- While reading, `listTodos()` resets recurring items that are `canceled`, `missed`, or "done with a doneDate other than today" to `open` (doneDate
+  null), and writes back to the ledger if anything changed. This is a reset on read without timers or cron.
+- Today and dated (`today` and `dated`) items are not reset — their completion history is the record.
+- In the widget, **always display** recurring items regardless of the "Show Completed Tasks" checkbox. Daily resets are their intended behavior, so there is no reason
+  to hide them; the row's checkmark indicates whether they have already been done today.
 
-## 근거
+## Rationale
 
-- "주기적으로 하는 일"의 단위는 날짜다 — 완료 여부가 아니라 "오늘 했는가"가 상태다.
-- 조회 시점 초기화면 mew처럼 요청마다 원장을 읽는 구조에서 타이머 없이 정확하고, 서버가 며칠 꺼져 있어도 다음
-  첫 조회에 한 번에 정리된다.
-- 위젯 필터를 건드리지 않고 항상 보이게 하면 회고("어제 뭐 했지")와 오늘 진행률이 같은 목록에 있다.
+- The unit for "recurring tasks" is the day — the state represents "done today," rather than completion in general.
+- Resetting on read is accurate without timers in an architecture like mew's that reads the ledger on every request, and even if the server is off for several days, the next
+  first read handles everything at once.
+- Keeping items visible without changing the widget filter puts reflection ("What did I do yesterday?") and today's progress in the same list.
 
-## 결과
+## Results
 
-- `todos.json`에 `doneDate` 필드가 생긴다. 없는 옛 데이터는 normalize에서 null로 읽히며, done 상태인 옛 주기 항목은
-  다음 조회 때 자동 초기화된다.
-- API 응답의 `TodoItem`에 `doneDate`가 추가된다(추가 필드라 기존 소비자는 깨지지 않는다).
-- 주기 항목의 `updatedAt`은 초기화 때 갱신된다 — 완료 보존 기간이 생겨서가 아니라 값이 실제로 바뀌기 때문이다.
+- `todos.json` gains a `doneDate` field. Older data without it is read as null during normalization, and old recurring items in the done state reset automatically
+  on the next read.
+- `doneDate` is added to `TodoItem` in API responses (as an additional field, it does not break existing consumers).
+- A recurring item's `updatedAt` is updated on reset — because the value actually changes, not because a completion retention period has been introduced.

@@ -1,26 +1,26 @@
 ---
-title: "문서 기본 지침 설정 구현·검증"
-description: "문서 기본 지침 7개 항목, 기존 계정의 비파괴 이전, 설정창과 API 검증 결과 및 운영 적용 전 상태를 기록한다."
+title: "Documentation default guidance settings: implementation and verification"
+description: "Records 7 documentation default guidance options, nondestructive migration of existing accounts, settings dialog and API verification results, and the status before application to production."
 created: "2026-10-26"
 updated: "2026-10-26"
 ---
 
-2026-10-26 구현 기록. 현재 명세는 [기본 지침 사용법](../../../docs/guides/project-setup.md#문서-지침)과 [세션 계약](../development/agent-sessions.md), 선택 근거는 [결정 0073](../decisions/0073-documentation-guidance-options.md)을 따른다.
+Implementation record for 2026-10-26. The current specification follows the [default guidance usage guide](../../../docs/guides/project-setup.md#documentation-guidance) and [session contract](../development/agent-sessions.md), and the rationale follows [Decision 0073](../decisions/0073-documentation-guidance-options.md).
 
-## 목적과 구현
+## Purpose and implementation
 
-기준 문서 갱신·ADR·작업 및 검증 기록·작성 방식·description·링크·문서 검사를 각각 공통 기본 지침으로 적용하거나 프로젝트 지침에 맡길 수 있게 했다. 새 계정에는 설정 구간을 포함한 템플릿을 사용하고, 기존 계정에는 요청 시에만 기본값을 보충한다.
+Enabled canonical document updates, ADRs, work and verification records, writing style, descriptions, links, and document checks to each be applied as shared default guidance or left to project guidance. New accounts use a template that includes the settings section; existing accounts receive missing defaults only on request.
 
-이전 기본 템플릿과 정확히 일치하는 고정 문서 갱신 문구는 전달 시 설정형 지침으로 바꾼다. 저장 파일·직접 편집한 문구·설정 구간·코드 예시는 보존한다. UI는 기존 설정창과 SelectField를 재사용하고 접힌 문서 그룹에 항목을 모았다.
+Fixed document update wording that exactly matches the previous default template is replaced with configurable guidance when delivered. Saved files, manually edited wording, settings sections, and code examples are preserved. The UI reuses the existing settings dialog and SelectField and groups the options in a collapsed documentation group.
 
-## 검증
+## Verification
 
-- `node --test server/agent-guidance.test.ts server/agent-guidance-ui.test.ts server/agent-account-settings.test.ts server/agent-context.test.ts`: 31개 통과. 기본값·개별 선택·revision·계정 분리·기존 및 손상·직접 편집 지침 보존과 요청 반영을 확인했다.
-- `node --test server/agent-guidance.test.ts`: 24개 통과. 빈 저장 파일·CRLF·이전 메타데이터 문구의 읽기 시 이전도 확인했다.
-- `node --test server/agent-guidance-ui.test.ts`: 통과. 1100px 데스크톱과 390·320px 터치 화면에서 7개 항목의 변경·재조회·직접 편집 항목 대체, 다크·라이트 드롭다운의 화면 경계와 기존 포커스·충돌 처리를 확인했다. 앱 번들·서버 없이 격리 브라우저 픽스처를 사용했다.
-- `npx tsc -b`와 변경 TypeScript·TSX 파일의 scoped oxlint 통과.
-- 전체 description 검사 483개 통과. 변경 문서 4개의 로컬 링크 오류는 0개다. `npm run check:docs` 전체 검사는 이번 작업 밖의 기존 문서 이동·삭제에 따른 링크 오류 17개로 실패했다.
+- `node --test server/agent-guidance.test.ts server/agent-guidance-ui.test.ts server/agent-account-settings.test.ts server/agent-context.test.ts`: 31 passed. Verified defaults, individual selections, revision, account isolation, preservation of existing, corrupted, and manually edited guidance, and application of requests.
+- `node --test server/agent-guidance.test.ts`: 24 passed. Also verified migration on read for empty saved files, CRLF, and previous metadata wording.
+- `node --test server/agent-guidance-ui.test.ts`: passed. Verified changes and retrieval for 7 options, replacement of manually edited entries, screen boundaries for dark and light dropdowns, and existing focus and conflict handling on a 1100px desktop screen and 390 and 320px touch screens. Used isolated browser fixtures without an app bundle or server.
+- `npx tsc -b` and scoped oxlint on the changed TypeScript and TSX files passed.
+- All 483 description checks passed. The 4 changed documents have 0 local link errors. The full `npm run check:docs` check failed with 17 existing link errors caused by document moves and deletions outside this work.
 
-## 운영 적용과 제한
+## Production application and limitations
 
-앱 빌드·배포·서버 시작·재시작은 수행하지 않았다. 운영 적용은 사용자가 수행한다. 지침은 에이전트 안내이며 문서 작성·검사를 강제하는 실행 게이트는 아니다. 기존 프로젝트 규칙과 이미 생성한 프로젝트 문서는 바꾸지 않았다.
+No app build, deployment, or server startup or restart was performed. The user will apply the changes to production. The guidance instructs agents; it is not an execution gate that enforces document writing or checks. Existing project rules and previously generated project documents were not changed.

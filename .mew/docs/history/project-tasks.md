@@ -1,60 +1,60 @@
 ---
 id: "mew-projects-tasks"
 parent: "mew-projects"
-title: "프로젝트 계층형 태스크 관리"
+title: "Project hierarchical task management"
 status: "changed"
 created: "2026-09-30"
 updated: "2026-10-01"
 files: ["src/components/project-tasks.tsx", "server/project-tasks.ts", "server/project-task-routes.ts", "src/App.tsx"]
 commits: []
-description: "제거된 계층형 태스크 기능의 요구사항·상세 동작·구현·검증과 기존 JSON 보존 방침을 기록한다. 현재 평면 태스크와 구분한다."
+description: "Records the requirements, detailed behavior, implementation, validation, and existing JSON preservation policy for the removed hierarchical task feature. Distinguishes it from current flat tasks."
 상위파일:
-  - "../features/프로젝트·파일·검색/MOC.md"
-  - "../features/프로젝트·파일·검색/_프로젝트·파일·검색.md"
+  - "../features/projects-files-search/MOC.md"
+  - "../features/projects-files-search/_projects-files-search.md"
 ---
 
-> 2026-10-01: 사용자 요청으로 태스크 패널과 API를 제거하고 [공통 메모 패널](../features/%ED%98%91%EC%97%85%C2%B7%EB%8C%93%EA%B8%80%C2%B7%EC%B1%84%ED%8C%85/%EA%B3%B5%ED%86%B5%20%EB%A9%94%EB%AA%A8.md)로 대체했다. 아래는 제거 전 기록이며 현재 기능이 아니다. 기존 `DATA_DIR/project-tasks-*.json`은 삭제하거나 메모로 자동 이전하지 않는다. 사용자 요청 없이 재도입하지 않는다.
+> 2026-10-01: Removed the task panel and API at the user's request and replaced them with the [shared memo panel](../features/collaboration-comments-chat/shared-notes.md). The record below predates removal and does not describe a current feature. Do not delete existing `DATA_DIR/project-tasks-*.json` or automatically migrate it to memos. Do not reintroduce this without a user request.
 
-## 요구사항
+## Requirements
 
-- 각 프로젝트의 개별 태스크를 계층형 목록에서 쉽게 추가·편집·완료 처리한다.
+- Easily add, edit, and complete individual tasks for each project in a hierarchical list.
 
-### 범위
+### Scope
 
-- 최상위·하위 태스크 추가, 인라인 제목 편집, 펼침/접힘과 삭제를 제공한다.
-- 추가 버튼은 +만 표시하며 추가 입력 중에는 숨기고 저장·취소 후 다시 표시한다.
-- 왼쪽 체크박스로 해당 항목의 완료를 처리한다. 하위 항목이 있을 때만 체크박스 앞에 펼침/접힘 화살표를 표시하고, 없으면 빈 공간을 남기지 않는다.
-- 각 항목 오른쪽에 선택 입력 가능한 우선순위·날짜·시간을 제공한다.
-- 제목부터 시간·작업 버튼까지 한 줄로 표시하고 메타데이터는 우측 정렬하며 입력 높이를 24px로 통일한다. 좁은 패널에서도 입력 폭과 들여쓰기를 조정해 가로 스크롤 없이 표시한다.
-- 독에서 열고 PC 도킹·모바일 전면 패널을 사용한다.
+- Provide top-level and child task creation, inline title editing, expand/collapse, and deletion.
+- Add buttons display only +; hide them while entering a new item and show them again after saving or canceling.
+- Use the checkbox on the left to complete that item. Show an expand/collapse arrow before the checkbox only when the item has children; otherwise, leave no empty space.
+- Provide optional priority, date, and time inputs on the right of each item.
+- Display everything from the title through the time and action buttons on one line, align metadata right, and use a uniform input height of 24 px. Adjust input widths and indentation in narrow panels to display without horizontal scrolling.
+- Open from the dock, using desktop docking and a frontmost panel on mobile.
 
-### 경계와 제한
+### Boundaries and limitations
 
-- 데이터는 루트 프로젝트별 서버 저장이고 전체 파일 권한에 따라 읽기·쓰기를 제한한다.
-- 기존 개인 홈 할 일을 이전하거나 변경하지 않는다.
-- 다른 창의 변경은 새로고침으로 확인하고 저장 충돌은 자동 덮어쓰기하지 않는다.
+- Data is stored on the server per root project, with read and write access restricted by permissions for all files.
+- Do not migrate or change existing personal home tasks.
+- Refresh to view changes from other windows, and do not automatically overwrite save conflicts.
 
-### 상세 계약
+### Detailed contracts
 
-- [사용·저장·API 계약](project-tasks-contract.md).
+- [Usage, storage, and API contract](project-tasks-contract.md).
 <!-- mew:implementation:start -->
-## 구현 내용
+## Implementation details
 
-- 기존 독·도킹·모바일 스택·패널 닫기와 태스크 패널을 연결했다.
-- 타이틀/탭바는 기능·Git 패널과 같은 헤더 구조·크기·색상·아이콘 버튼을 사용하며 공통 DockGrip과 확대 패널 헤더 계약을 재사용한다.
-- 서버 원자 저장과 revision 검사로 프로젝트 분리·동시 편집 충돌을 처리한다.
-- 부모 삭제 시 하위 태스크는 상위 수준으로 옮겨 보존한다.
-- 마일스톤·집계·검색 중심 UI를 공통 패널 스타일의 간결한 계층형 목록으로 대체했다. 기존 데이터는 보존한다.
-- 저장 실패 시 행/추가 입력을 유지하고 오류와 저장 재시도를 제공한다.
-- 한국어·영어·중국어·일본어 문구와 기존 테마를 사용한다.
+- Connected the task panel to the existing dock, docking, mobile stack, and panel closing behavior.
+- The title/tab bar uses the same header structure, size, colors, and icon buttons as the features and Git panels, and reuses the shared DockGrip and expanded panel header contract.
+- Server-side atomic saves and revision checks handle project isolation and concurrent editing conflicts.
+- When a parent is deleted, its subtasks are preserved by moving them up a level.
+- Replaced the milestone, aggregation, and search-focused UI with a concise hierarchical list using the shared panel style. Existing data is preserved.
+- When saving fails, retain the row/add input and provide an error and a save retry option.
+- Uses Korean, English, Chinese, and Japanese text and existing themes.
 
-## 검증
+## Verification
 
-- 2026-10-01 재구현 검사: 서버 저장/API/계층·메타데이터 검증 4개와 PC·모바일 UI 검사 1개를 통과했다. 인라인 실패 입력 유지와 연속 편집 후 실제 완료·날짜·시간·우선순위 저장을 확인했다.
-- 프론트엔드 타입 검사·변경 파일 lint·문서 경계/링크 검사를 통과했다. 전체 타입 검사는 작업 외 `server/update-policy.ts`의 node:path 타입 오류로 실패했다.
+- 2026-10-01 reimplementation checks: Passed 4 server storage/API/hierarchy and metadata validation checks and 1 desktop/mobile UI check. Confirmed that inline input is retained on failure and that completion, date, time, and priority are actually saved after consecutive edits.
+- Frontend type checking, lint for changed files, and document boundary/link checks passed. Full type checking failed due to a node:path type error in `server/update-policy.ts` outside the scope of this work.
 
-- 2026-09-30 자동 검사: 저장·권한·충돌·입력 검증, 격리 PC/모바일 UI와 독·도킹·모바일 스택 회귀 총 22개를 통과했다.
-- 전체 타입 검사와 lint를 통과했다(lint에는 기존 파일의 경고가 남아 있다). 문서 경계·링크 검사를 통과했다.
-- 전체 UI 번역 검사는 기존 shared-memo·agent-history-cache·agent-scheduled-cache·Editor의 번역되지 않은 문구로 실패했으며 새 태스크 문구는 실패 목록에 없다.
-- 사용자 확인 예정: 실제 앱 독 진입·프로젝트 전환·도킹 복원·업무 데이터 관리.
+- 2026-09-30 automated checks: Passed a total of 22 checks covering storage, permissions, conflicts, input validation, isolated desktop/mobile UI, and dock, docking, and mobile stack regressions.
+- Full type checking and lint passed (warnings remain in existing files). Document boundary and link checks passed.
+- The full UI translation check failed due to existing untranslated text in shared-memo, agent-history-cache, agent-scheduled-cache, and Editor; the new task text is not on the failure list.
+- Pending user verification: access through the dock in the actual app, project switching, docking restoration, and work data management.
 <!-- mew:implementation:end -->

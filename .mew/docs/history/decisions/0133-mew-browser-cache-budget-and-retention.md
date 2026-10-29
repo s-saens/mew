@@ -1,29 +1,29 @@
 ---
-provenance: "Liiiiv 중앙 ADR 이관본, 2026-10-14"
-description: "이관한 결정 기록: 브라우저 재생성 캐시의 공통 용량·수명 제한을 보존한다. 에이전트 전사의 별도 IndexedDB 이전과 Mew ADR 0013의 파일 본문 비동기 캐시 전환을 후속 결정으로 연결한다."
-title: "0133 — 브라우저 재생성 캐시는 공통 용량·수명 제한을 따른다"
+provenance: "Migrated copy of a Liiiiv central ADR, 2026-10-14"
+description: "Migrated decision record: Preserves common size and retention limits for regenerable browser caches. Links the separate migration of agent transcripts to IndexedDB and the switch to asynchronous file-content caching in Mew ADR 0013 as follow-up decisions."
+title: "0133 — Regenerable browser caches follow common size and retention limits"
 created: 2026-09-11
 updated: 2026-10-17
 ---
 
-- 날짜: 2026-09-11
-- 상태: 채택
-- 후속 결정: [0182](0182-mew-incremental-conversation-storage.md) — 에이전트 전사는 별도 IndexedDB 예산으로 이전; 나머지 캐시·초안 보호 유지
-- 후속 결정: [Mew 0013](../../decisions/0013-file-content-revalidation.md) — 파일 본문은 별도 IndexedDB 예산과 조건부 조회로 전환; 다른 localStorage 캐시·초안 보호 유지
-- 결정자: 사용자 (자동 정리 요청), Codex (구현)
+- Date: 2026-09-11
+- Status: Adopted
+- Follow-up decision: [0182](0182-mew-incremental-conversation-storage.md) — moves agent transcripts to a separate IndexedDB budget; retains other cache and draft protections
+- Follow-up decision: [Mew 0013](../../decisions/0013-file-content-revalidation.md) — switches file content to a separate IndexedDB budget and conditional retrieval; retains other localStorage cache and draft protections
+- Decision makers: User (requested automatic cleanup), Codex (implementation)
 
-## 배경
+## Background
 
-에이전트 전사·파일 본문·폴더 목록·전송한 입력 기록이 각각 제한을 두어도 같은 브라우저 origin의 저장 공간을 함께 채운다. 계정 상태 저장 실패가 화면을 중단하는 문제를 고쳤지만, 캐시 전체의 누적을 제한할 공통 계약이 필요하다.
+Agent transcripts, file content, folder listings, and sent input history collectively fill the storage space of the same browser origin even when each has its own limits. The issue where failure to save account state interrupted the screen has been fixed, but a common contract is needed to limit total cache accumulation.
 
-## 결정
+## Decision
 
-- 서버에서 다시 읽을 수 있는 본문·전사·폴더 목록·에이전트 컨트롤 캐시, 전송이 끝난 입력 기록만 명시적 allowlist로 관리한다. 설정·탭 원장 fallback·작성 중 초안·로그인 정보·다른 앱의 키는 자동 삭제하지 않는다. localStorage.clear()는 사용하지 않는다.
-- 공용 저장 모듈에서 캐시 합계·항목 크기·보관 기간을 제한한다. 저장 직전에 여유 공간을 확보하고, 중요한 상태 저장이 quota에 막히면 재생성 캐시만 정리한 뒤 한 번 재시도한다. 다른 탭의 쓰기도 같은 예산을 따른다.
-- 첫 실행에서 기존 캐시를 정리하고 이후 주기·페이지 숨김/복귀·종료 때 검사한다. 종료 이벤트는 보장되지 않으므로 시작·저장 시 검사도 필수다. 명시적 에이전트 탭 종료 때 그 탭의 모든 런타임 캐시를 제거한다.
-- 날짜가 없는 옛 재생성 캐시는 마이그레이션에서 제거할 수 있다. 초안은 크기·나이만으로 지우지 않는다. 자동 정리는 서버 세션·파일·대화 전사를 변경하지 않는다.
-- [0093](0093-mew-account-synced-project-and-agent-tabs.md)·[0094](0094-mew-account-synced-workspace-ui-state.md)의 서버 원장 소유권과 로컬 초안 경계, [0086](0086-mew-root-project-spa-handoff-and-cache.md)의 루트별 캐시 격리는 유지한다.
+- Use an explicit allowlist to manage only content, transcripts, folder listings, and agent control caches that can be read again from the server, along with input history whose transmission is complete. Do not automatically delete settings, tab ledger fallbacks, drafts in progress, login information, or keys belonging to other apps. Do not use localStorage.clear().
+- Limit total cache size, item size, and retention periods in the shared storage module. Free space immediately before saving; if a quota blocks saving important state, clean up only regenerable caches and retry once. Writes from other tabs follow the same budget.
+- Clean up existing caches on first launch, then check periodically and when the page is hidden, restored, or closed. Because shutdown events are not guaranteed, checks at startup and on save are also required. When an agent tab is explicitly closed, remove all runtime caches for that tab.
+- Old regenerable caches without dates may be removed during migration. Do not delete drafts based only on size or age. Automatic cleanup does not modify server sessions, files, or conversation transcripts.
+- Preserve the server ledger ownership and local draft boundaries in [0093](0093-mew-account-synced-project-and-agent-tabs.md) and [0094](0094-mew-account-synced-workspace-ui-state.md), and the per-root cache isolation in [0086](0086-mew-root-project-spa-handoff-and-cache.md).
 
-## 근거
+## Rationale
 
-브라우저 전체를 비우면 저장되지 않은 입력과 개인 설정까지 잃는다. 재생성 캐시만 한정해 제한하면 작업 상태를 보존하면서 캐시가 공간을 독점하는 것을 예방할 수 있다. 구체적 예산·수명·검증은 [mew 저장 계약](../../development/browser-storage.md)에 둔다.
+Clearing all browser storage also loses unsaved input and personal settings. Limiting only regenerable caches can preserve work state while preventing caches from monopolizing space. Keep specific budgets, lifetimes, and validation in the [mew storage contract](../../development/browser-storage.md).

@@ -1,53 +1,53 @@
 ---
-provenance: "Liiiiv 중앙 ADR 이관본, 2026-10-14"
-description: "이관한 결정 기록: mew 프로젝트 전환을 URL 라우트에서 탭으로 교체. 당시 선택·근거·후속 변경을 보존하며 현재 계약은 Mew 소유 문서에서 확인한다."
-title: "0018 — mew 프로젝트 전환을 URL 라우트에서 탭으로 교체"
+provenance: "Migrated copy of a Liiiiv central ADR, 2026-10-14"
+description: "Migrated decision record: replace URL routes with tabs for switching mew projects. Preserves the choices, rationale, and subsequent changes at the time; consult the Mew owning document for the current contract."
+title: "0018 — Replace URL routes with tabs for switching mew projects"
 created: 2026-07-28
 updated: 2026-09-11
 ---
 
-- 날짜: 2026-07-28
-- 상태: 채택
-- 후속 결정: [0081](0081-mew-root-project-tabs-and-git-subprojects.md) — 프로젝트 탭 대상과 진입점
-- 후속 결정: [0093](0093-mew-account-synced-project-and-agent-tabs.md) — 탭의 브라우저 전용 저장
-- 결정자: 송상훈 (지시)
+- Date: 2026-07-28
+- Status: Adopted
+- Follow-up decision: [0081](0081-mew-root-project-tabs-and-git-subprojects.md) — Project tab targets and entry points
+- Follow-up decision: [0093](0093-mew-account-synced-project-and-agent-tabs.md) — Browser-only tab storage
+- Decision maker: Song Sanghoon (directive)
 
-## 배경
+## Background
 
-mew는 프로젝트(워크스페이스 최상위 폴더)를 URL 첫 세그먼트로 골랐다 — `/`는 docs, `/{프로젝트}`는 그 폴더. 전환은 `location.href` 대입, 즉 페이지 새로고침이었다. 그래서:
+mew selected the project (a top-level workspace folder) using the first URL segment — `/` meant docs, and `/{프로젝트}` meant that folder. Switching assigned `location.href`, reloading the page. As a result:
 
-- 프로젝트를 옮길 때마다 앱 전체가 다시 뜬다. 열린 문서 탭·사이드바·터미널이 매번 새로 붙는다.
-- 프로젝트가 화면에 하나씩만 존재한다. 어떤 프로젝트가 있는지는 팝업을 열어야 알 수 있었다.
-- 클라이언트가 대상 프로젝트를 모듈 상수(`CURRENT_PROJECT`)로 들고 있어, 프로젝트가 바뀌려면 새로고침 말고는 방법이 없는 구조였다.
+- The entire app reloads whenever you switch projects. Open document tabs, the sidebar, and the terminal reconnect each time.
+- Only one project exists on screen at a time. You had to open a popup to see which projects were available.
+- The client held the target project as a module constant (`CURRENT_PROJECT`), so the architecture offered no way to change projects without reloading.
 
-여러 프로젝트를 오가며 쓰는 실제 사용 방식(문서를 고치다 옆 레포 코드를 보는 식)에서 이 왕복 비용이 계속 걸렸다.
+This round-trip cost kept getting in the way of actual usage across multiple projects (such as editing documentation and then checking code in a neighboring repo).
 
-## 선택지
+## Options
 
-1. 라우트 유지 + SPA 내비게이션(history.pushState) — 장점: 주소가 곧 상태라 링크 공유·뒤로가기가 자연스럽다. 단점: 프로젝트가 여전히 "한 번에 하나"다. 뒤로가기 의미가 문서 탭·패널 스택(이미 `useOverlayDismiss`가 안드로이드 뒤로가기를 쓰고 있다)과 충돌한다.
-2. 라우트 제거, 프로젝트를 탭으로 — 모든 프로젝트가 헤더 줄에 탭으로 서고, 선택은 앱 상태 변경일 뿐이다.
-3. 프로젝트별 창(멀티 윈도) — 반려. 내부 도구에 과한 복잡도이고 모바일에서 의미가 없다.
+1. Keep routes + SPA navigation (history.pushState) — Pros: the URL represents state, making link sharing and back navigation natural. Cons: projects are still "one at a time." The meaning of back navigation conflicts with document tabs and the panel stack (`useOverlayDismiss` already uses Android's back action).
+2. Remove routes and make projects tabs — all projects appear as tabs in the header row, and selecting one only changes app state.
+3. A window per project (multiple windows) — rejected. Too much complexity for an internal tool, with no value on mobile.
 
-## 결정
+## Decision
 
-2번 채택.
+Adopt option 2.
 
-- `/{프로젝트}` 라우트를 없앤다. 주소는 항상 `/`다. 옛 주소로 들어오면 그 프로젝트로 시작한 뒤 주소만 `/`로 정리한다(밖에 남아 있는 링크를 죽이지 않기 위해).
-- 대상 프로젝트는 런타임 상태다. `CURRENT_PROJECT` 상수를 `getProject()`/`setProject()`로 바꿨다. 전환보다 오래 사는 비동기 작업(자동저장 디바운스 등)은 이 값을 믿지 않고 자기 프로젝트를 인자로 들고 다닌다.
-- 탭 상태는 프로젝트별로 산다. 열린 문서 탭·활성 탭·스크롤 위치·내용 캐시가 프로젝트마다 따로 유지되고, 프로젝트를 옮겼다 돌아오면 그대로 있다.
-- 볼 수 있는 프로젝트는 전부 같은 모양의 탭으로 선다. 특별한 자리(맨 왼쪽 기둥 등)를 두지 않는다 — 처음엔 두 줄을 걸치는 큰 "대빵탭"을 뒀다가 같은 날 걷어냈다. 프로젝트 하나만 특별대우할 이유가 없고, 균일한 탭 줄이 문서 탭 줄과 시각적으로 이어진다.
-- 기존 격자 팝업(아이콘·자리 배치·생성·개명·삭제)의 입구는 프로젝트 탭 꾹 누르기(우클릭) 다. 헤더에서 팝업 전용 버튼이 사라졌으므로 이 제스처가 유일한 입구다.
-- 프로젝트마다 자기 명령어 버튼(▶) 을 탭에 달고 있다. `.mew/cmd-button.json`은 이제 UI에서 추가·수정·삭제할 수 있다(그전에는 파일 손편집뿐).
+- Remove the `/{프로젝트}` route. The URL is always `/`. When opening an old URL, start with that project, then normalize only the URL to `/` (to avoid breaking existing external links).
+- The target project is runtime state. Replaced the `CURRENT_PROJECT` constant with `getProject()`/`setProject()`. Async tasks that outlive a switch (such as autosave debouncing) carry their own project as an argument rather than relying on this value.
+- Tab state is maintained per project. Open document tabs, the active tab, scroll positions, and content caches are kept separately for each project and remain intact when you switch away and return.
+- All visible projects appear as identically styled tabs. No special position (such as a far-left column) is reserved — initially, a large "boss tab" spanning two rows was added, then removed the same day. There is no reason to give one project special treatment, and a uniform tab row visually connects with the document tab row.
+- Long-pressing (right-clicking) a project tab opens the existing grid popup (icons, positioning, creation, renaming, deletion). Since the dedicated popup button was removed from the header, this gesture is the only entry point.
+- Each project has its own command button (▶) on its tab. `.mew/cmd-button.json` can now be added, edited, and deleted through the UI (previously, it required manual file editing).
 
-## 근거
+## Rationale
 
-- 프로젝트 경계는 URL이 아니라 인가(권한)가 지킨다. 서버는 모든 요청에서 `project` 파라미터를 받아 경로를 검증하고 게스트 승인 규칙을 적용한다([ops/mew/access-model.md](../../../../docs/operations/access-model.md)). 라우트는 편의였을 뿐 경계가 아니었으므로, 없앤다고 보안 표면이 변하지 않는다.
-- 주소 공유는 잃는 것이 맞다. mew는 로그인 경계 안의 내부 편집기다. "이 프로젝트 링크"를 주고받는 흐름이 실제로 없었고, 문서 단위 링크(에디터 내부 링크)는 그대로 동작한다.
-- 뒤로가기를 라우팅에 쓰지 않는 편이 낫다. 모바일에서 안드로이드 뒤로가기는 이미 팝업·패널을 한 겹씩 닫는 데 쓰인다. 라우트를 늘리면 같은 제스처가 두 뜻을 갖는다.
+- Authorization (permissions), rather than URLs, enforces project boundaries. The server accepts a `project` parameter on every request, validates paths, and applies guest approval rules ([ops/mew/access-model.md](../../../../docs/operations/access-model.md)). Routes were only a convenience, never a boundary, so removing them does not change the security exposure.
+- URL sharing is indeed lost. mew is an internal editor behind a login boundary. There was no actual workflow of exchanging "links to this project," and document-level links (links within the editor) continue to work.
+- It is better not to use back navigation for routing. On mobile, Android's back action already closes popups and panels one layer at a time. Adding routes gives the same gesture two meanings.
 
-## 결과
+## Results
 
-- 문서 탭 저장 키는 그대로다(`mew:open-tabs`, 프로젝트별 접미사) — 기존 사용자의 열린 탭을 잃지 않는다.
-- 새 화면 상태 키: `mew:project`(활성 프로젝트) · `mew:tmux-open`.
-- 프로젝트 탭에는 닫기가 없다. 볼 수 있는 프로젝트는 언제나 전부 탭으로 서 있다 — "열어둔 것만 보이는" 문서 탭과 달리, 프로젝트 탭 줄은 워크스페이스의 지도 역할을 한다. 폴더 삭제는 팝업의 삭제 흐름 그대로다.
-- 화면 구조와 저장 키의 세부는 레포의 `mew/README.md`가 기준본이다 — 코드와 같은 커밋에서 바뀌는 실행 결합 계약이기 때문이다([ADR 0012](0012-docs-repo-doc-allowlist-and-absorption.md)).
+- The document tab storage key stays the same (`mew:open-tabs`, with a per-project suffix) — existing users do not lose their open tabs.
+- New screen state keys: `mew:project` (active project) · `mew:tmux-open`.
+- Project tabs have no close action. All visible projects always appear as tabs — unlike document tabs, which show only open documents, the project tab row serves as a map of the workspace. Folder deletion still uses the popup's existing deletion flow.
+- The repo's `mew/README.md` is the canonical source for screen structure and storage key details — these are runtime-coupled contracts that change in the same commit as the code ([ADR 0012](0012-docs-repo-doc-allowlist-and-absorption.md)).

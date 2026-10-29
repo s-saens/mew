@@ -1,27 +1,27 @@
 ---
-title: "세 색 테마와 커스텀 프리셋"
-description: "단일 테마색·고정 모드 조합을 배경색·글씨색·주요색 테마로 바꾸고, 프리셋 그리드·커스텀 저장과 이전 표시 색 이관을 선택한 결정. 선택적 그라데이션 배경의 확장은 후속 결정 0010, 계정별 저장과 기기 간 동기화는 0030을 따른다."
+title: "Three-Color Themes and Custom Presets"
+description: "Decision to replace the single theme color and fixed mode combination with background, text, and primary color themes, and to adopt a preset grid, custom saving, and migration of previous display colors. The extension for optional gradient backgrounds is covered by subsequent decision 0010; per-account storage and cross-device synchronization follow 0030."
 created: 2026-10-14
 updated: 2026-10-20
 status: accepted
 ---
 
-## 배경
+## Background
 
-기존 화면 설정은 밝은/어두운 배경·글씨를 고정하고 테마색 하나에서 액센트를 계산했다. 배경색·글씨색·주요색을 함께 고르고 직접 조합할 수 있도록 사용자가 요청했다.
+The previous display settings fixed the light/dark background and text colors and calculated accents from a single theme color. The user requested the ability to select background, text, and primary colors together and create custom combinations.
 
-## 결정
+## Decision
 
-세 색을 하나의 테마로 저장한다. 기본 다크·라이트를 포함한 프리셋과 커스텀 테마를 `Aa` 버튼 그리드에 표시하고, 마지막 `+`에서 복사·편집·추가한다. 커스텀 초안은 미리보기에서 편집한 뒤 저장할 때 적용한다.
+Save the three colors as a single theme. Display presets, including the default dark and light themes, and custom themes in a `Aa` button grid, with copying, editing, and adding available from the final `+`. Edit custom drafts in the preview and apply them when saved.
 
-선택한 세 색은 본문 배경·본문 글씨·주요색에 그대로 적용한다. 패널·테두리·보조 글씨·링크·버튼 hover와 버튼 글씨는 파생한다. 밝은/어두운 모드는 배경 밝기에서 정한다. 이전 단일 테마색은 저장한 원본보다 실제 표시 색을 보존해 이관한다.
+Apply the three selected colors directly to the body background, body text, and primary color. Derive panel, border, secondary text, link, button hover, and button text colors. Determine light/dark mode from background brightness. Migrate the previous single theme color by preserving the color actually displayed rather than the saved original.
 
-## 근거와 영향
+## Rationale and Impact
 
-한 버튼에서 배경·글씨·강조의 조합을 비교할 수 있고, 저장 전 초안이 작업 화면의 가독성을 바꾸지 않는다. 선택값과 커스텀 목록을 함께 저장해 새로고침 후에도 같은 테마를 다시 고를 수 있다. 임의로 지정한 본문 색은 자동 교정하지 않으며 대비가 낮으면 편집 영역에 안내한다.
+Each button lets users compare a combination of background, text, and accent colors, and unsaved drafts do not change the readability of the workspace. Save the selection together with the custom theme list so the same theme can be selected again after a refresh. Do not automatically correct user-specified body colors; show guidance in the editing area if contrast is low.
 
-이 결정은 기존 단일 테마색·모드 전환 계약을 대체한다. 현재 UI·저장·검증은 [화면 설정 기능](../features/%ED%99%94%EB%A9%B4%C2%B7%EA%B3%84%EC%A0%95%C2%B7%EC%9A%B4%EC%98%81/%ED%99%94%EB%A9%B4%C2%B7%EC%96%B8%EC%96%B4%C2%B7%EA%B8%80%EA%BC%B4%C2%B7%EB%8B%A8%EC%B6%95%ED%82%A4%20%EC%84%A4%EC%A0%95.md)과 [테마 계약](../development/ui-contracts.md#테마색과-파생-액센트), 조작은 [화면 설정](../../../docs/configuration/appearance.md#화면-설정)이 소유한다.
+This decision replaces the previous single theme color and mode-switching contract. [Display Settings Feature](../features/appearance-accounts-operations/appearance-language-fonts-and-shortcuts.md) and [Theme Contract](../development/ui-contracts.md#theme-colors-and-derived-accents) own the current UI, storage, and validation; [Display Settings](../../../docs/configuration/appearance.md#appearance-settings) owns usage instructions.
 
-[0010 — 테마 그라데이션](0010-theme-gradients.md)은 세 색과 초안 저장 계약을 유지하면서 선택적 그라데이션 배경·배경 애니메이션과 이전 프리셋 선택의 이관을 추가한다.
+[0010 — Theme Gradients](0010-theme-gradients.md) retains the three-color and draft-saving contracts while adding optional gradient backgrounds, background animation, and migration of previous preset selections.
 
-[0030 — 계정 테마](0030-account-themes.md)는 선택값·커스텀 목록의 기준본을 브라우저에서 계정 상태로 옮기고 기기 간 동기화와 첫 이관 조건을 정한다.
+[0030 — Account Themes](0030-account-themes.md) moves the canonical source for the selection and custom theme list from the browser to account state and defines cross-device synchronization and initial migration conditions.

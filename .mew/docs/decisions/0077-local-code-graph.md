@@ -1,51 +1,51 @@
 ---
-title: "에이전트용 로컬 코드 그래프"
-description: "결정 0080으로 철회한 Graphify 로컬 보조 검색 도입 결정. 당시 코드 전용 분석·격리·최신성 검사와 기존 검색 경계를 보존하며 현재 지원 상태와 구분한다."
+title: "Local code graph for agents"
+description: "The decision to introduce Graphify as a local supplementary search tool, withdrawn by decision 0080. Preserves the code-only analysis, isolation, freshness checks, and existing search boundaries at the time, distinguishing them from current support status."
 created: "2026-10-27"
 updated: "2026-10-27"
 ---
 
-## 상태
+## Status
 
-철회됨. [결정 0080](0080-retire-graphify-search.md)이 대체한다. 아래는 당시 도입 결정이다.
+Withdrawn. Superseded by [decision 0080](0080-retire-graphify-search.md). The original adoption decision follows.
 
-## 배경
+## Background
 
-기존 문자열 검색과 description 문서 탐색은 유지하면서, 함수·모듈의 호출·참조와 변경 영향 탐색을 보완할 필요가 있다.
-Graphify는 코드 AST로 로컬 관계 그래프를 만들 수 있다. 문서 의미 분석·모델·공유 서비스를 함께 도입하면
-기존 RAG 제거 범위와 권한·운영 계약까지 바뀌므로 이번 적용은 코드 전용으로 제한한다.
+Existing string search and description document navigation need to be retained while adding support for exploring function and module calls, references, and change impacts.
+Graphify can build a local relationship graph from code ASTs. Introducing document semantic analysis, models, and shared services together would also change
+the scope of existing RAG removal and the permissions and operations contracts, so this adoption is limited to code.
 
-## 결정
+## Decision
 
-- `graphifyy==0.9.96`을 저장소의 `.data/graphify/venv/`에 설치하고 프로젝트 CLI를 통해 실행한다.
-  upstream installer·전역 설정·Git hook·MCP 서버는 사용하지 않는다.
-- Git 파일 목록과 명시한 소스 경로·확장자에서 현재 내용을 선택해 사본을 만든다.
-  테스트·문서·숨김 데이터·심볼릭 링크·의존성·산출물은 대상에서 제외한다.
-  사본은 실제 상대 경로와 package·tsconfig 정보를 유지해 파일 간 관계를 해석한다.
-- `extract --code-only --no-cluster`와 작업자 두 개로 분석하고, 같은 로컬 그래프로 query·explain·path·affected를 제공한다.
-  LLM 백엔드와 질문 로그 저장을 비활성화한다. 설치 외에는 외부 서비스 호출이 필요 없다.
-- 원시 그래프의 버전 정보 누락을 보완해 CLI 상태에 패키지 버전과 소스 해시를 기록한다.
-  변경·추가·삭제가 있으면 조회를 거부하고 수동 재색인을 요구한다.
-  새 그래프가 완성된 후 현재 세대를 교체하며 실패한 분석으로 기존 그래프를 덮어쓰지 않는다.
-- 후보 경로·줄을 현재 원문으로 검증한다. 문서 탐색과 파일 검색의 소유 계약은 유지한다.
-  공용 검색 API나 다른 프로젝트의 기본 안내에는 연결하지 않는다.
+- Install `graphifyy==0.9.96` in the repository's `.data/graphify/venv/` and run it through the project CLI. Do not use the upstream
+  installer, global settings, Git hooks, or an MCP server.
+- Select current content from the Git file list and the specified source paths and extensions to create a copy.
+  Exclude tests, documents, hidden data, symbolic links, dependencies, and build artifacts.
+  The copy preserves actual relative paths and package and tsconfig information to resolve relationships between files.
+- Analyze with `extract --code-only --no-cluster` and two workers, and provide query, explain, path, and affected using the same local graph. Disable the LLM backend and question
+  log storage. No external service calls are required except for installation.
+- Record the package version and source hash in the CLI state to compensate for missing version information in the raw graph. Reject
+  queries when there are changes, additions, or deletions, and require manual reindexing.
+  Replace the current generation only after the new graph is complete; failed analysis must not overwrite the existing graph.
+- Verify candidate paths and lines against the current source text. Retain the ownership contracts for document navigation and file
+  search. Do not connect this to the shared search API or default guidance for other projects.
 
-## 대안과 근거
+## Alternatives and Rationale
 
-기존 `rg`만 사용하는 방식은 추가 의존성이 없지만 파일 간 관계를 매번 읽어 조합해야 한다.
-Graphify의 upstream skill 자동 설치는 기존 지침·런타임 설정과 답변 저장 흐름까지 바꾸므로 사용하지 않는다.
-제품 검색 엔진 전체 교체와 문서 의미 그래프는 실제 품질·속도 비교 및 다중 사용자 권한 설계 후 별도 검토한다.
+Using only the existing `rg` adds no dependencies, but requires reading and piecing together relationships between files each time. Do
+not use Graphify's automatic upstream skill installation because it also changes existing instructions, runtime settings, and the answer storage flow. Replacing the entire product
+search engine and introducing a document semantic graph will be reviewed separately after comparing actual quality and speed and designing multiuser permissions.
 
-[공식 0.9.96 패키지](https://pypi.org/project/graphifyy/0.9.96/)와
-[upstream CLI 구현](https://github.com/Graphify-Labs/graphify/blob/v8/graphify/cli.py)을 확인했다.
-설치한 0.9.96에서 code-only의 의미 분석 생략, 원시 그래프 조회 지원과 종료 코드를 확인했다.
-upstream 기본 브랜치의 이후 변경은 고정 버전의 보장으로 간주하지 않는다.
+The [official 0.9.96 package](https://pypi.org/project/graphifyy/0.9.96/) and [upstream CLI implementation](https://github.com/Graphify-Labs/graphify/blob/v8/graphify/cli.py)
+were checked. The installed 0.9.96 was checked for code-only skipping semantic analysis, raw graph query
+support, and exit codes. Later changes on the upstream default branch
+are not considered guarantees for the pinned version.
 
-## 영향
+## Impact
 
-Python·uv와 로컬 파생 색인 공간이 추가된다. 변경 후 전체 분석이 필요하고 한국어 질문·동적 호출·파서 오류의
-정확도를 보장하지 않는다. 검색 속도·토큰 절감률의 개선은 비교 실험 전에는 주장하지 않는다.
-과거 성공 세대는 명시적 정리 전까지 남는다. 운영 앱 빌드·재시작이 필요하지 않으며 제품 검색 동작도 바꾸지 않는다.
+This adds Python, uv, and storage for a local derived index. Full analysis is required after changes, and accuracy is not guaranteed for Korean questions, dynamic
+calls, or parser errors. No improvements in search speed or token savings will be claimed before comparative experiments. Previous
+successful generations remain until explicitly cleaned up. No production app build or restart is required, and product search behavior does not change.
 
-당시 명령·검증 소스는 [이력](../history/graphify/README.md),
-실행 결과와 철회 내용은 [작업 기록](../work/graphify-code-search.md)에 보존한다.
+The commands and validation sources from that time are preserved in [history](../history/graphify/README.md),
+and execution results and withdrawal details are preserved in the [work record](../work/graphify-code-search.md).

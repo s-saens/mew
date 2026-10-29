@@ -1,19 +1,19 @@
 ---
-provenance: "Liiiiv 중앙 ADR 이관본, 2026-10-14"
-description: "이관한 결정 기록: 원격 조이스틱을 마우스 형태로 배치한다. 당시 선택·근거·후속 변경을 보존하며 현재 계약은 Mew 소유 문서에서 확인한다."
-title: "0145 — 원격 조이스틱을 마우스 형태로 배치한다"
+provenance: "Migrated copy of a Liiiiv central ADR, 2026-10-14"
+description: "Migrated decision record: Arrange remote joysticks in a mouse layout. Preserves the choices, rationale, and subsequent changes from that time; consult the Mew owning document for the current contract."
+title: "0145 — Arrange remote joysticks in a mouse layout"
 created: 2026-09-15
 updated: 2026-09-15
 ---
 
-- 상태: 채택
-- 결정자: 사용자 (마우스 형태·커서 전용 조이스틱·즉시 드래그 요청)
-- 부분 대체: [0136](0136-mew-native-remote-desktop-webrtc.md)의 모바일 컨트롤 배치·좌우 조이스틱 이동 동작
+- Status: Adopted
+- Decision maker: User (requested a mouse layout, a cursor-only joystick, and immediate dragging)
+- Partially supersedes: The mobile control layout and left/right joystick movement behavior in [0136](0136-mew-native-remote-desktop-webrtc.md)
 
-## 결정
+## Decision
 
-상단에 좌클릭(1)·휠(2)·우클릭(3), 하단에 세 칸 너비를 합친 커서 이동(0)을 두어 하나의 마우스 형태로 만든다. 화면 이동(4)·확대(5)는 옆에 분리하고 마지막 핸들로 전체를 이동한다.
+Place Left Click (1), Wheel (2), and Right Click (3) on top, with Move Cursor (0) spanning all three columns below, forming a single mouse layout. Place Pan Screen (4) and Zoom (5) separately beside it, and use the final handle to move the entire control.
 
-0은 클릭 없이 커서만 이동한다. 1·3은 짧은 탭으로 클릭하고, 이동을 시작하면 기다리지 않고 해당 버튼을 누른 채 드래그한다. 손을 떼거나 취소하면 해제한다. 2의 탭·세로 스크롤·길게 누른 뒤 중간 버튼 드래그와 4·5의 로컬 조작은 유지한다. 입력 프로토콜·캡처·권한·세션 수명은 바꾸지 않는다.
+0 moves only the cursor without clicking. 1 and 3 click on a short tap; when movement starts, they immediately drag with the corresponding button held down. Release the button when the user lifts their finger or cancels. Retain 2's tap, vertical scrolling, and middle-button dragging after a long press, along with local operations for 4 and 5. Do not change the input protocol, capture, permissions, or session lifetime.
 
-커서 이동을 별도 영역으로 분리해 좌우 드래그의 길게 누르기 대기를 없애고, 배치를 실제 마우스 버튼과 대응시킨다. 상세 동작·검증은 [프로젝트 개발 계약](../../development/remote-desktop.md), 사용법은 [조작 안내](../../../../docs/guides/remote-desktop.md#조작)에 둔다.
+Separate cursor movement into its own area to eliminate the long-press wait for left- and right-button dragging, and align the layout with physical mouse buttons. Keep detailed behavior and verification in the [project development contract](../../development/remote-desktop.md), and usage instructions in the [controls guide](../../../../docs/guides/remote-desktop.md#controls).

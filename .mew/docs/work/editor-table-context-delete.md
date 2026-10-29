@@ -1,18 +1,18 @@
 ---
-title: "표 우클릭 행·열 삭제"
-description: "2026-10-28 표 우클릭 메뉴의 행·열 삭제와 마지막 행·열의 표 제거, 읽기 전용 제어 및 격리 브라우저·타입·린트 검사 결과와 운영 미적용 범위를 기록한다."
+title: "Delete table rows and columns from the context menu"
+description: "Records the 2026-10-28 table context-menu row and column deletion, table removal when deleting the last row or column, read-only controls, isolated browser, type, and lint check results, and the scope not applied to production."
 created: "2026-10-28"
 updated: "2026-10-28"
 ---
 
-표의 행·열을 우클릭 메뉴에서 삭제할 수 있도록 `행 삭제`와 `열 삭제`를 추가했다. 현재 동작은 [표 기능 계약](../features/%EB%AC%B8%EC%84%9C%C2%B7%EC%BD%94%EB%93%9C%C2%B7%EB%AF%B8%EB%94%94%EC%96%B4%20%ED%8E%B8%EC%A7%91/Markdown%20%ED%91%9C%20%ED%8E%B8%EC%A7%91%C2%B7%EB%B3%B5%EC%82%AC.md), 사용자 조작은 [표 편집 사용법](../../../docs/guides/editor.md#표-편집과-복사)이 소유한다.
+Added `행 삭제` and `열 삭제` to allow deleting table rows and columns from the context menu. Current behavior is owned by the [table feature contract](../features/document-code-media-editing/markdown-table-editing-and-copying.md), and user actions are owned by the [table editing guide](../../../docs/guides/editor.md#editing-and-copying-tables).
 
-추가와 삭제가 우클릭한 셀의 현재 문서 위치를 함께 사용하도록 처리했다. 읽기 전용에서는 삭제 항목을 숨기고 실행 시에도 편집 권한을 확인한다. 기존 편집기 명령은 마지막 행·열 삭제를 거부하므로, 하나만 남았을 때는 표 삭제 명령을 실행한다.
+Made insertion and deletion both use the right-clicked cell's current document position. In read-only mode, deletion items are hidden, and edit permissions are also checked at execution. Existing editor commands reject deletion of the last row or column, so the table deletion command runs when only one remains.
 
-`node --test server/editor-table-menu-ui.test.ts`를 통과했다. 격리 Chromium의 1100px·390px 화면에서 다른 표에 커서가 있어도 우클릭한 행·열만 삭제하는지, 헤더 삭제·키보드 실행·메뉴 닫기·읽기 전용·마지막 행·열의 표 제거와 주변 본문 보존을 검사했다. 기존 행·열 삽입과 Esc 취소 검사도 통과했고 두 화면 폭의 메뉴 캡처를 확인했다. 첫 검사에서 마지막 열 삭제가 적용되지 않는 것을 확인한 뒤 표 삭제 처리를 보완했다.
+`node --test server/editor-table-menu-ui.test.ts` passed. In isolated Chromium at 1100px and 390px, checked that only the right-clicked row or column was deleted even when the cursor was in another table, as well as header deletion, keyboard activation, menu dismissal, read-only behavior, table removal for the last row or column, and preservation of surrounding body text. Existing row and column insertion and Esc cancellation checks also passed, and menu captures at both screen widths were reviewed. After the first check showed that deleting the last column had no effect, table deletion handling was updated.
 
-`npx tsc -b`는 통과했다. 변경한 코드·테스트에 대한 `npx oxlint`는 오류 없이 완료했으며 `Editor.tsx`의 기존 React 경고가 남았다. 브라우저 테스트 번들에는 기존 의존성의 `use client` 경고가 남았다.
+`npx tsc -b` passed. `npx oxlint` for the changed code and tests completed without errors, while existing React warnings in `Editor.tsx` remained. The browser test bundle retained the `use client` warning from an existing dependency.
 
-`npm run check:docs`에서 description 509개는 오류 없이 통과했다. 링크 검사는 작업 전부터 삭제 상태였던 `docs/features/MOC.md`와 태스크 문서를 가리키는 기존 링크 18건으로 실패했다. 이번 변경 문서의 링크 오류는 없었다. 작업 범위의 `git diff --check`도 통과했다.
+All 509 descriptions passed `npm run check:docs` without errors. Link validation failed with 18 existing links pointing to `docs/features/MOC.md` and task documents that had already been deleted before this work. There were no link errors in the documents changed this time. `git diff --check` also passed for the work scope.
 
-앱 빌드·배포·서버 실행·재시작은 수행하지 않았다. 실제 인스턴스 적용은 사용자가 수행한다.
+No app build, deployment, server launch, or restart was performed. The user applies the changes to the actual instance.

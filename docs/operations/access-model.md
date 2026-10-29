@@ -1,35 +1,35 @@
 ---
-title: "Mew 접근 모델 — 설치 위치·포트·OS 실행 경계"
+title: "Mew Access Model — Installation Locations, Ports, and OS Execution Boundaries"
 created: 2026-07-27
 updated: 2026-10-22
-description: "독립 Mew 설치의 프로젝트 위치·포트·OS 실행 권한과 접근 경계를 설명한다. 역할·공유·데이터 보관은 보안 운영 기준, 실제 인가 판정은 접근 제어 계약으로 연결한다."
+description: "Explains project locations, ports, OS execution permissions, and access boundaries for a standalone Mew installation. Links roles, sharing, and data retention to the security operations standards, and actual authorization decisions to the access control contract."
 ---
 
-# 접근 모델
+# Access Model
 
-역할·파일 권한·게스트 공유·인증의 기준본은 [보안 운영 기준](security.md)다. 이 문서는 서버 운영의 위치·포트·OS 권한 경계를 설명한다. 실행 방법은 [한국어 사용법](../guides/getting-started-ko.md), 공개 설치의 점검은 [배포 운영](deployment.md)을 따른다.
+[Security Operations Standards](security.md) is the canonical source for roles, file permissions, guest sharing, and authentication. This document explains the location, port, and OS permission boundaries of server operations. For execution instructions, follow the [Korean User Guide](../guides/getting-started-ko.md); for checks on public installations, follow [Deployment Operations](deployment.md).
 
-## 소스와 작업 폴더
+## Source and Working Directories
 
-이 개발 환경의 소스는 `~/dev/mew`이며 Liiiiv 워크스페이스와 별개다. 문서·지침·결정도 Mew 저장소가 소유한다. 다른 설치에서는 소스 위치를 자유롭게 정할 수 있다.
+The source for this development environment is at `~/dev/mew` and is separate from the Liiiiv workspace. The Mew repository also owns the documentation, guidelines, and decisions. Other installations may use any source location.
 
-서버의 기본 작업 폴더는 `MEW_WORKSPACE`로 지정하고, 계정별 활성 프로젝트는 요청 컨텍스트로 분리된다. 소스 폴더를 옮길 때 열린 프로젝트와 저장된 경로도 [위치 변경 절차](project-location.md)에 따라 갱신한다. 자세한 실행·저장 계약은 [아키텍처](../../.mew/docs/development/architecture.md)가 소유한다.
+The server's default working directory is specified by `MEW_WORKSPACE`, and each account's active project is isolated through the request context. When moving the source folder, also update open projects and saved paths according to the [relocation procedure](project-location.md). [Architecture](../../.mew/docs/development/architecture.md) owns the detailed execution and storage contracts.
 
-## 포트
+## Ports
 
-| 포트 | 용도 | 접근 범위 |
+| Port | Purpose | Access scope |
 | --- | --- | --- |
-| 4999 | Vite 개발 UI·HMR | 개인 개발망 또는 loopback으로 제한 |
-| 5000 기본값 | Mew 서버 | 설정한 바인드·HTTPS·Mewlink 연결 정책에 따름 |
+| 4999 | Vite development UI and HMR | Restricted to a private development network or loopback |
+| 5000 default | Mew server | Follows the configured bind, HTTPS, and Mewlink connection policies |
 
-개발 서버는 소스와 빌드 전 자산을 제공하므로 공개 진입점으로 사용하지 않는다. 현재 [로그인 가상 화면](../../.mew/docs/development/login-desktop.md)은 영상·입력을 전달하며 CDP·DOM 중계를 사용하지 않는다. 당시 CDP 방식은 [과거 실험](../../.mew/docs/history/browser-dom-oauth.md)에 보존한다.
+The development server serves source code and pre-build assets, so do not use it as a public entry point. The current [login virtual screen](../../.mew/docs/development/login-desktop.md) transmits video and input and does not use CDP or DOM relaying. The CDP approach used at the time is preserved in [past experiments](../../.mew/docs/history/browser-dom-oauth.md).
 
-## OS 권한 경계
+## OS permission boundary
 
-터미널과 에이전트는 서버를 실행한 OS 사용자의 권한으로 동작한다. 저장소 분리나 프로젝트 선택은 OS 파일 접근을 격리하지 않는다. 셸 권한이 있는 사용자는 그 OS 사용자가 접근할 수 있는 다른 폴더와 시크릿에도 접근할 수 있으므로 공개 설치에서는 전용 비관리자 사용자와 필요한 폴더만 사용한다.
+Terminals and agents run with the permissions of the OS user running the server. Repository separation and project selection do not isolate OS file access. Users with shell access can also access other folders and secrets available to that OS user, so public installations must use a dedicated non-administrator user and only the necessary folders.
 
-파일 API의 경로·역할 검증과 셸 권한은 서로 다른 경계다. 현재 역할별 접근 가능 범위는 [보안 정책](security.md)과 [접근 제어 계약](../../.mew/docs/development/access-control.md)을 따른다. 회사 전체 프로젝트·계정·서비스 목록을 Mew 운영의 필수 참조로 두지 않는다.
+File API path and role validation and shell permissions are separate boundaries. Current access scopes by role follow the [security policy](security.md) and [access control contract](../../.mew/docs/development/access-control.md). Do not make company-wide project, account, or service lists required references for Mew operations.
 
-## 이전 운영 근거
+## Previous operational basis
 
-Liiiiv 환경에서 기록한 tailnet·발급 계정·워크스페이스 노출 범위는 [이전 접근 모델](../../.mew/docs/history/liiiiv-access-model.md)에 보존한다. 당시 운영 현황은 현재 설치의 상태나 권한 정책이 아니다.
+The tailnet, issued accounts, and workspace exposure scope recorded in the Liiiiv environment are preserved in the [previous access model](../../.mew/docs/history/liiiiv-access-model.md). The operational state at that time does not represent the current installation's state or permission policy.

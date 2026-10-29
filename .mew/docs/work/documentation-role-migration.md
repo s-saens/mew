@@ -1,37 +1,37 @@
 ---
-title: "문서 역할별 분류와 경로 이전"
-description: "2026-10-29 프로젝트 지식·태스크·공개 안내·제품 리소스·제작 원본의 분류·이전, 기존 내용 보존과 링크·메타데이터·저장·패키징 검증 및 운영 미적용 범위를 기록한다."
+title: "Document classification by role and path migration"
+description: "Records the classification and migration of project knowledge, tasks, public guides, product resources, and authoring sources on 2026-10-29, preservation of existing content, verification of links, metadata, saving, and packaging, and the scope not applied to production."
 created: "2026-10-29"
 updated: "2026-10-29"
 ---
 
-## 목적과 결과
+## Purpose and results
 
-[결정 0087](../decisions/0087-documentation-role-boundaries.md)에 따라 프로젝트 문서·결정·작업·조사·이력은 `.mew/docs`, 태스크는 `.mew/tasks`, 자유 작업 문서는 `.mew/notes`, 내장 스킬과 도구 도움말은 `resources`로 분류했다. 사용자·운영자·기여자 안내와 문서 이미지는 루트 `docs`에 남겼다. 사업 초안에는 탐색 메타데이터를 보완했다.
+Following [Decision 0087](../decisions/0087-documentation-role-boundaries.md), classified project documentation, decisions, work, research, and history under `.mew/docs`, tasks under `.mew/tasks`, freeform work documents under `.mew/notes`, and built-in skills and tool help under `resources`. User, operator, and contributor guides and documentation images remain in the root `docs`. Added navigation metadata to business drafts.
 
-공개 설정 문서의 API·저장 계약, 중앙 서비스의 날짜별 배포 기록, 디버거의 과거 확장 조사, 저장소 이력 유지관리와 제품 검색 노출 자료를 소유 문서로 분리했다. 현재 사실을 복제하지 않고 관련 기준본으로 연결했다. 기존 문서의 본문·과거 제약·결정 원문은 보존하고 이동에 따른 상대 링크를 보정했다.
+Separated the API and storage contracts from public configuration documentation, dated deployment records for the central service, historical debugger extension research, repository history maintenance, and product search visibility materials into owning documents. Linked to the relevant canonical sources without duplicating current facts. Preserved existing document bodies, historical constraints, and original decision text, and adjusted relative links for the moves.
 
-## 동작과 배포 경계
+## Behavior and deployment boundaries
 
-Documents 연결과 에이전트 진입점, description·링크 검사 범위를 갱신했다. 태스크는 새 위치에 저장하고 옛 위치의 읽기·쓰기 이관과 동시 편집 보호·변경 감시를 유지한다. 제품 스킬·도움말은 리소스 경로에서 읽고 릴리스에 포함한다. 뮤펫 제작 원본은 `assets/mewpet/capybara/source`로 옮기고 배포 폴더에는 manifest와 최종 WebP를 남겼다.
+Updated Documents links, agent entry points, and the scope of description and link checks. Tasks are saved in the new location, while migration of reads and writes from the old location, concurrent editing protection, and change monitoring are retained. Product skills and help are read from resource paths and included in releases. Moved Mewpet authoring sources to `assets/mewpet/capybara/source`, leaving the manifest and final WebP files in the distribution folder.
 
-제품 패키지 검사 중 확인한 테스트 fixture 혼입과 필수 native Rust 소스 누락은 포함·제외 규칙과 회귀 검사로 보완했다. 고정된 과거 데모 생성물은 원래 커밋의 경로를 유지하고 생성기의 새 경로 지원을 갱신했다.
+Addressed test fixture inclusion and missing required native Rust sources found during product package checks through inclusion/exclusion rules and regression checks. Frozen historical demo outputs retain their paths from the original commits, and the generator was updated to support the new paths.
 
-## 보존
+## Preservation
 
-작업 시작 전 변경된 문서와 미추적 자료는 새 위치에 보존한다. 커밋은 이전·계약 변경만 기록하며 기존 본문 편집·태스크 변경·자유 작업 문서·협업 데이터 및 다른 UI 작업은 별도로 남긴다. 기존 이미지 선택은 영구 상대 경로로 옮겨 작업 트리에 보존하며 사용자 이미지 자체는 이번 커밋에 포함하지 않는다. 설치별 계정·대화·태스크 메타데이터와 기존 서버 프로세스는 변경하지 않았다.
+Documents modified before this work began and untracked materials are preserved in the new locations. The commit records only moves and contract changes, leaving existing body edits, task changes, freeform work documents, collaboration data, and other UI work separate. The existing image selection is moved to a permanent relative path and preserved in the working tree; the user image itself is not included in this commit. Per-installation account, conversation, and task metadata and existing server processes were not changed.
 
-## 검증
+## Verification
 
-- 작업 트리의 `npm run check:docs`: description 549개, 메타데이터 오류 0개, 로컬 링크 오류 0개.
-- 커밋 대상만 추출한 검증 사본에서도 description 546개·메타데이터 오류 0개·로컬 링크 오류 0개를 확인했다. 기존 사용자 문서 편집·미추적 자료는 이 사본에서 제외했다.
-- `npx tsc -b`와 수정 코드 대상 oxlint를 통과했다.
-- 문서 검사·데모 생성/전송/저장 관련 회귀 61개, 태스크 서버·이관·SSE·API·데모·탭 경로 회귀 27개와 태스크 패널 UI 1개를 통과했다.
-- 스킬·Mewpet 도움말·커밋·릴리스 회귀 18개, 뮤펫 자산 레지스트리·PC/모바일 UI 회귀 11개를 통과했다. 옮긴 PNG·atlas 18개의 원본 바이트를 확인했다.
-- 현재 탐색·Graphify 이력 보존 회귀 2개를 통과했다.
-- 추가로 실행한 기존 검사 3건은 실패했다. `agent-harness.test.ts`의 TOML 보존 오류는 HEAD 설정 모듈·동일 입력에서도 재현됐다. `editor-diagram-ui.test.ts`는 Rolldown의 CSS 번들 미지원으로 브라우저 단계 전에 실패했고 HEAD 테스트·문서·소스 입력에서도 재현됐다. `document-title-sync-ui.test.ts`는 고정 scrollTop 180 조건에서 실패했으며 HEAD 테스트와 옛 태스크 경로를 사용하는 격리 baseline에서도 같았다. 이 세 문제의 제품 코드나 기존 assertion은 변경하지 않았다.
-- 검사들은 로컬·임시 저장소·격리 브라우저에서 수행한 결과이며 실제 배포·외부 계정 연결·운영 적용 검증은 아니다.
+- `npm run check:docs` in the working tree: 549 descriptions, 0 metadata errors, and 0 local link errors.
+- A verification copy containing only the commit targets also showed 546 descriptions, 0 metadata errors, and 0 local link errors. Existing user document edits and untracked materials were excluded from this copy.
+- Passed `npx tsc -b` and oxlint on the modified code.
+- Passed 61 regression checks for documentation checks and demo generation/transfer/saving, 27 regression checks for the task server, migration, SSE, API, demos, and tab paths, and 1 task panel UI check.
+- Passed 18 regression checks for skills, Mewpet help, commits, and releases, and 11 regression checks for the Mewpet asset registry and PC/mobile UI. Verified the original bytes of 18 moved PNG and atlas files.
+- Passed 2 regression checks for current navigation and Graphify history preservation.
+- 3 additional existing checks failed. The TOML preservation error in `agent-harness.test.ts` was also reproduced with the HEAD configuration module and identical input. `editor-diagram-ui.test.ts` failed before the browser stage because Rolldown does not support CSS bundling, and was also reproduced with HEAD test, documentation, and source inputs. `document-title-sync-ui.test.ts` failed with scrollTop fixed at 180, with the same result in the HEAD test and an isolated baseline using the old task paths. Product code and existing assertions for these three issues were not changed.
+- These checks were performed locally, in temporary repositories, and in isolated browsers; they do not verify actual deployment, external account connections, or application to production.
 
-## 적용과 제한
+## Application and limitations
 
-앱 빌드·배포·서버 실행·중지·재시작은 수행하지 않았다. 실행 중인 이전 서버는 옛 태스크 저장 코드를 사용할 수 있으므로 사용자가 새 코드를 적용하기 전까지 태스크 편집을 피한다. Documents 경로 변경은 프로젝트를 다시 열고 새 대화부터 확인한다. 고정된 과거 데모 사본은 다음 정식 생성 전까지 기존 문서 경로를 계속 사용한다.
+The app was not built or deployed, and the server was not started, stopped, or restarted. Previously running servers may use the old task storage code, so avoid editing tasks until the user applies the new code. Check the Documents path changes after reopening the project, starting with new conversations. Frozen historical demo copies continue to use the existing document paths until the next official generation.

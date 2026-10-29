@@ -1,31 +1,31 @@
 ---
-title: "모델 용량 부족 자동 재시도 구현·검증"
-description: "일시적 모델 용량 부족의 계정별 재시도 설정과 같은 턴 재요청·취소·큐 보존 구현, 타입·설정 API·격리 UI 및 문서 검사 결과를 기록한다. 기존 링크 오류와 앱 빌드·운영 미적용 상태를 구분한다."
+title: "Automatic retry for insufficient model capacity: implementation and verification"
+description: "Records per-account retry settings for temporary model capacity shortages, implementation of same-turn requests, cancellation, and queue preservation, and results of type, settings API, isolated UI, and document checks. Distinguishes existing link errors from the status of no app build and not applied to production."
 created: "2026-10-26"
 updated: "2026-10-27"
 ---
 
-2026-10-26~27 구현·검증 기록. 현재 계약은 [세션 계약](../development/agent-sessions.md#모델-용량-부족-자동-재시도)과 [대화 기능 문서](../features/%ED%84%B0%EB%AF%B8%EB%84%90%C2%B7%EC%97%90%EC%9D%B4%EC%A0%84%ED%8A%B8%C2%B7%EC%9E%90%EB%8F%99%ED%99%94/%EC%97%90%EC%9D%B4%EC%A0%84%ED%8A%B8%20%EB%8C%80%ED%99%94%C2%B7%ED%81%90%C2%B7%EB%B3%B5%EC%9B%90.md#모델-용량-부족-자동-재시도), 설정 방법은 [사용법](../../../docs/guides/project-setup.md#모델-혼잡-재시도), 선택 근거는 [결정 0074](../decisions/0074-agent-capacity-retry.md)를 따른다.
+Implementation and verification record for 2026-10-26~27. The current contract follows the [session contract](../development/agent-sessions.md#automatic-retry-for-insufficient-model-capacity) and [conversation feature document](../features/terminals-agents-automation/agent-conversations-queue-and-restoration.md#automatic-retry-for-insufficient-model-capacity), configuration follows the [usage guide](../../../docs/guides/project-setup.md#model-congestion-retries), and the rationale follows [Decision 0074](../decisions/0074-agent-capacity-retry.md).
 
-## 목적과 구현
+## Purpose and implementation
 
-사용자 잔여 한도와 별개로 공급자의 선택 모델 수용량이 부족한 경우 작업을 자동으로 이어 가도록 한다. 기본 지침에 계정별 대기 시간·최대 횟수를 추가하고 기본값은 30초·20회로 둔다. 같은 계정의 지침 파일에 메타데이터로 저장하며 에이전트에게 전달할 문구에서는 제외한다.
+Allows work to continue automatically when the provider lacks capacity for the selected model, independently of the user's remaining quota. Adds per-account wait time and maximum retry count to the default guidance, with defaults of 30 seconds and 20 retries. Stores them as metadata in the same account's guidance file and excludes them from the text sent to the agent.
 
-ACP 채팅의 명시적인 일시적 용량 부족만 같은 논리 턴 안에서 재시도한다. RPC 실패와 답변 말미에 용량 오류를 보내고 정상 종료하는 공급자 경로를 모두 다룬다. 대기 중 busy·전사·큐를 유지하고 남은 시간·횟수를 표시하며 부분 응답 뒤에는 이어 가도록 요청한다. 사용자 중단·탭 종료는 재시도를 취소하며 실제 사용자 한도·인증·결제 오류와 재시도 소진은 큐 보류를 유지한다. 공식 TUI·일반 터미널과 CLI 명령은 자동 재실행하지 않는다.
+Retries only explicit temporary capacity shortages in ACP chat within the same logical turn. Handles both RPC failures and provider paths that send a capacity error at the end of a response and then terminate normally. Preserves busy status, the transcript, and the queue while waiting, displays the remaining time and retry count, and requests continuation after a partial response. User interruption or tab closure cancels retries; actual user quota, authentication, or billing errors and exhausted retries keep the queue on hold. Official TUIs, regular terminals, and CLI commands are not automatically rerun.
 
-## 검증
+## Verification
 
-- `npx tsc -b` 통과.
-- `server/agent-guidance-ui.test.ts` 통과. 현재 소스를 사용하는 격리 Chromium의 1100·390·320px 화면에서 설정 입력·저장·재조회와 초안 보존을 확인했다.
-- `server/agent-capacity-retry-notice-ui.test.ts` 통과. 4개 UI 언어와 1100·320px 화면에서 대기 시간의 감소·중단 동작·가로 넘침 방지를 확인했다.
-- 설정·브랜치 관련 자동화 검사 39개와 추가 메타데이터 보존 회귀 검사 4개 통과. API 접근 정책 검사 1개도 통과했다.
-- 용량 오류 판정·ACP 재시도 자동화 검사 20개 통과. 재시도 설정 RPC 응답 대기 중 중단·종료, 다음 메시지용 모델 변경과 최종 설정 복원의 경쟁 상태, 재시도 대기 중 메모리 압박을 포함했다.
-- 기존 `agentAcp`·`agent-memory`·`agent-clear`·`agent-queue-attachments` 회귀 검사 총 55개 중 53개 통과·선택적 systemd/OOM 검사 2개 생략·실패 0개였다.
-- 변경 TypeScript·TSX 파일 14개의 대상 린트는 종료 코드 0으로 통과했다. 기존 `AgentPanel.tsx`의 React 관련 경고는 남아 있다.
-- 최종 경쟁 상태 보완 뒤 서버 변경 파일 4개의 oxlint와 `npx tsc -p tsconfig.node.json --noEmit`, `git diff --check`가 통과했다.
-- 변경 UI 파일 4개의 Impeccable `detect` 결과는 빈 배열이었다.
-- `npm run check:docs`의 description 485개 검사는 오류 0개로 통과했다. 전체 링크 검사는 작업 전부터 삭제된 `docs/features/MOC.md`의 들어오는 링크 16개와 삭제된 마케팅 태스크 문서 링크 1개, 총 17개 오류로 실패했다. 해당 사용자 변경 파일은 이번 작업에서 수정하지 않았다. 이번에 변경한 문서 5개의 description·로컬 링크 별도 검사는 오류 0개였다.
+- `npx tsc -b` passed.
+- `server/agent-guidance-ui.test.ts` passed. Verified settings entry, saving, retrieval, and draft preservation in isolated Chromium using the current source at 1100, 390, and 320px screen widths.
+- `server/agent-capacity-retry-notice-ui.test.ts` passed. Verified the wait countdown, interruption behavior, and prevention of horizontal overflow in 4 UI languages at 1100 and 320px screen widths.
+- Passed 39 automated settings and branch checks and 4 additional metadata preservation regression checks. Also passed 1 API access policy check.
+- Passed 20 automated capacity error classification and ACP retry checks. These included interruption and termination while waiting for the retry settings RPC response, races between model changes for the next message and final settings restoration, and memory pressure while waiting to retry.
+- Of 55 existing regression checks for `agentAcp`, `agent-memory`, `agent-clear`, and `agent-queue-attachments`, 53 passed, 2 optional systemd/OOM checks were skipped, and 0 failed.
+- Targeted linting of 14 changed TypeScript and TSX files passed with exit code 0. Existing React warnings in `AgentPanel.tsx` remain.
+- After the final race condition fixes, oxlint on 4 changed server files, `npx tsc -p tsconfig.node.json --noEmit`, and `git diff --check` passed.
+- Impeccable `detect` returned an empty array for the 4 changed UI files.
+- The 485 description checks in `npm run check:docs` passed with 0 errors. The full link check failed with 17 errors in total: 16 incoming links to `docs/features/MOC.md`, which had been deleted before this work, and 1 link to a deleted marketing task document. Those user-modified files were not changed in this work. Separate description and local link checks on the 5 documents changed here found 0 errors.
 
-## 운영 적용과 제한
+## Production application and limitations
 
-앱 빌드·배포·서버 시작·종료·재시작은 수행하지 않았다. 운영 적용은 사용자가 수행한다. 실제 공급자 과부하를 발생시키는 검사는 수행하지 않았으며 서버나 독립 감독 종료 뒤 대기 타이머의 복원은 포함하지 않는다.
+No app build, deployment, or server startup, shutdown, or restart was performed. The user will apply the changes to production. No tests that induce actual provider overload were performed, and restoration of wait timers after server or independent supervisor termination is not included.

@@ -1,14 +1,14 @@
 ---
-title: "Mew 결정 기록"
-description: "독립 프로젝트의 새 ADR 작성 위치·번호·변경 범위와 이전 중앙 결정 이관본의 역할을 정한다."
+title: "Mew decision records"
+description: "Defines the location, numbering, and change scope for new ADRs in the independent project and the role of migrated copies of earlier central decisions."
 created: 2026-10-14
 updated: 2026-10-14
 ---
 
-# Mew 결정 기록
+# Mew decision records
 
-Mew의 기술 선택·공유 계약·기존 결정 변경은 이 폴더에 기록한다. 첫 결정은 [0001 — 독립 프로젝트](0001-independent-project.md)다. 새 번호는 이 폴더의 마지막 번호 다음으로 정하고 `번호-주제.md` 형식을 쓴다. description 목록으로 필요한 결정을 찾으며 별도 MOC 등록은 필요 없다.
+Record Mew's technical choices, shared contracts, and changes to existing decisions in this folder. The first decision is [0001 — Independent project](0001-independent-project.md). Assign new numbers after the last number in this folder and use the `번호-주제.md` format. Find relevant decisions through the description list; separate MOC registration is not required.
 
-ADR에는 상태, 배경, 결정, 근거와 영향을 적는다. 기존 결정을 바꾸면 대체 범위를 명시하고 이전 기록에 후속 결정 링크를 추가한다. 기능과 운영의 구체적인 현재 계약은 해당 소유 문서에 갱신하며 ADR에 복제하지 않는다.
+ADRs include status, background, decision, rationale, and impact. When changing an existing decision, specify the scope being superseded and add a link to the subsequent decision in the earlier record. Update specific current feature and operations contracts in their owning documents rather than duplicating them in ADRs.
 
-Liiiiv에서 이관한 이전 번호의 기록은 [결정 이력](../history/decisions/README.md)에 보존한다. 해당 기록의 원문·후속 결정은 근거이며 당시 워크스페이스 정책을 현재 Mew 규칙으로 적용하지 않는다. 외부 원본의 갱신이나 중앙 등록은 필요 없다.
+Records with earlier numbers migrated from Liiiiv are preserved in [Decision history](../history/decisions/README.md). Their original text and subsequent decisions serve as rationale; do not apply the workspace policies from that time as current Mew rules. Updating external originals or registering centrally is not required.

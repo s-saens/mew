@@ -1,63 +1,63 @@
 ---
-provenance: "Liiiiv 중앙 ADR 이관본, 2026-10-14"
-description: "이관한 결정 기록: mew 에이전트 창: 세션 목록은 디스크에서 직접, 접속은 에이전트 기동을 기다리지 않는다. 당시 선택·근거·후속 변경을 보존하며 현재 계약은 Mew 소유 문서에서 확인한다."
-title: "0047 — mew 에이전트 창: 세션 목록은 디스크에서 직접, 접속은 에이전트 기동을 기다리지 않는다"
+provenance: "Migrated copy of a Liiiiv central ADR, 2026-10-14"
+description: "Migrated decision record: mew agent window: read session lists directly from disk, and connect without waiting for agent startup. Preserves the choices, rationale, and subsequent changes at the time; see the Mew owning document for the current contract."
+title: "0047 — mew agent window: read session lists directly from disk, and connect without waiting for agent startup"
 created: 2026-08-11
 updated: 2026-08-20
 ---
 
-- 날짜: 2026-08-11
-- 상태: 채택
-- 결정자: 송상훈 (지시: "에이전트 창 작동이 너무 느려 — 캐싱이든 비동기든 해서 이후 연결이라도 빠르게")
-- 관련: [ADR 0036](0036-mew-agent-session-controls-and-usage.md) §3의 "세션 목록은 ACP로 얻는다"를 부분 대체한다. [ADR 0034](0034-mew-agent-panel-acp-reintroduction.md)·[ADR 0046](0046-mew-agent-panel-tabs-one-session-per-tab.md) 보완
+- Date: 2026-08-11
+- Status: Adopted
+- Decision maker: Song Sanghun (instruction: "The agent window is too slow—use caching or async processing so at least subsequent connections are fast")
+- Related: Partially supersedes "Get the session list through ACP" in [ADR 0036](0036-mew-agent-session-controls-and-usage.md) §3. Supplements [ADR 0034](0034-mew-agent-panel-acp-reintroduction.md) and [ADR 0046](0046-mew-agent-panel-tabs-one-session-per-tab.md)
 
-## 배경
+## Background
 
-창을 열면 지난 세션 목록이 뜰 때까지 몇 초가 걸렸다. 탭이 여러 개면 그만큼 더 걸렸다. 원인은 두 군데였다.
+After opening the window, it took several seconds for the previous session list to appear. More tabs made it take proportionally longer. There were two causes.
 
-1. 어댑터의 `session/list`가 세션 파일을 통째로 읽는다. `claude-code-acp` 0.16.x의 `unstable_listSessions`는 폴더의 모든 `*.jsonl`을 `readFile`로 끝까지 읽은 뒤 첫 줄들만 쓴다. 이 워크스페이스 기준 파일 256개·266MB다. 측정: 어댑터 호출 959ms(페이지 캐시가 더운 상태). 창은 탭마다 어댑터를 하나씩 두므로([ADR 0046](0046-mew-agent-panel-tabs-one-session-per-tab.md)) 탭 수만큼 곱해지고, 각자 자기 프로세스의 이벤트 루프를 그동안 막는다.
-2. WS가 에이전트 기동을 기다린 뒤에야 말을 걸었다. `handleConnection`이 `sessionFor()`를 `await`한 다음에 `ready`를 보내고 메시지 핸들러를 달았다. 측정: spawn+`initialize` 188ms + `newSession` ~900ms. 그동안 창은 빈 화면이었고, 그 사이에 보낸 질문은 조용히 사라졌다(핸들러가 아직 없었다).
+1. The adapter's `session/list` reads entire session files. In `claude-code-acp` 0.16.x, `unstable_listSessions` reads every `*.jsonl` in the folder to the end with `readFile`, then uses only the first lines. In this workspace, that is 256 files totaling 266MB. Measurement: 959ms per adapter call (with a warm page cache). The window has one adapter per tab ([ADR 0046](0046-mew-agent-panel-tabs-one-session-per-tab.md)), so this multiplies by the number of tabs, and each blocks its own process's event loop for that duration.
+2. The WS waited for agent startup before communicating. `handleConnection` would `await` `sessionFor()` before sending `ready` and attaching the message handler. Measurement: spawn+`initialize` 188 ms + `newSession` ~900 ms. The window stayed blank during that time, and questions sent in the meantime silently disappeared (the handler was not attached yet).
 
-## 선택지
+## Options
 
-1. 어댑터가 고쳐지길 기다린다 — 우리 코드 0줄 / 남의 릴리스에 묶이고, 그동안 창은 계속 느리다.
-2. 어댑터 호출 결과를 캐시만 한다 — 작은 변경 / 서버가 뜬 뒤 첫 호출은 여전히 1초+이고, 어댑터 프로세스가 그동안 멈춘다. 탭마다 따로 캐시된다.
-3. 세션 목록만 우리가 디스크에서 직접 읽는다 — [ADR 0036](0036-mew-agent-session-controls-and-usage.md)이 그어 둔 선을 한 칸 넘는다 / 첫 호출도 빠르고, 캐시가 프로세스 전체에서 공유되며, 자식 프로세스가 없어도 답할 수 있다.
+1. Wait for the adapter to be fixed—0 lines of our code / dependent on someone else's release, while the window remains slow.
+2. Only cache adapter call results—small change / the first call after server startup still takes 1+ seconds, and the adapter process stalls during that time. Each tab has its own cache.
+3. Read only the session list directly from disk ourselves—steps just beyond the boundary set by [ADR 0036](0036-mew-agent-session-controls-and-usage.md) / even the first call is fast, the cache is shared across the process, and responses require no child process.
 
-## 결정
+## Decision
 
-3번 + 접속 비동기화.
+Option 3 + asynchronous connection handling.
 
-### 1. 세션 목록은 `server/agentSessionList.ts`가 디스크에서 읽는다 (claude 런타임 한정)
+### 1. `server/agentSessionList.ts` reads the session list from disk (claude runtime only)
 
-- 파일 머리 64KB만 읽는다. 제목(첫 사용자 발화)과 `cwd`는 파일 맨 앞에 있다.
-- `(mtime, size)`가 그대로면 다시 읽지 않는다. 캐시는 모듈 전역이라 모든 탭이 함께 쓴다.
-- 제목 정규화·`agent-*.jsonl` 제외·`cwd` 재확인·최근순 50개는 어댑터와 같은 규칙이다 — 목록에 보이던 이름이 달라지지 않게.
-- `runtime === 'claude'`일 때만이다. 다른 런타임은 그대로 `unstable_listSessions`로 간다. 기록 형식을 아는 백엔드에서만 쓰는 지름길이다.
-- 세션 불러오기는 여전히 ACP `session/load`다. 디스크는 목록에만 쓴다.
+- Read only the first 64 KB of each file. The title (first user message) and `cwd` are at the beginning of the file.
+- Do not reread if `(mtime, size)` is unchanged. The cache is module-global and shared by all tabs.
+- Title normalization, excluding `agent-*.jsonl`, rechecking `cwd`, and returning the 50 most recent entries follow the adapter's rules—so names already shown in the list stay the same.
+- Only when `runtime === 'claude'`. Other runtimes continue to use `unstable_listSessions`. This shortcut is used only for a backend whose record format is known.
+- Loading sessions still uses ACP `session/load`. Disk access is used only for the list.
 
-### 2. WS는 에이전트가 뜨기를 기다리지 않는다
+### 2. WS does not wait for the agent to start
 
-- `ready`와 세션 목록을 붙자마자 보낸다. 목록은 디스크만 읽으므로 자식 프로세스가 필요 없다.
-- 기동 중에 온 클라이언트 메시지는 버린다 → 줄을 세운다. 세션이 뜨면 순서대로 흘린다. 창은 뜨는 동안에도 질문을 받고, 상태줄이 "에이전트 준비 중"이라고 말한다.
-- 창은 `meta`(=에이전트가 떴다)와 세션 목록 중 먼저 오는 것으로 지난 세션 화면을 그린다.
+- Send `ready` and the session list immediately upon connection. The list reads only from disk, so no child process is needed.
+- Client messages received during startup: discard → queue. Once the session starts, forward them in order. The window accepts questions during startup, and the status bar says "Preparing Agent".
+- The window renders the previous sessions screen upon receiving either `meta` (= the agent has started) or the session list, whichever arrives first.
 
-## 근거
+## Rationale
 
-- 측정(파일 256개·266MB, 워크스페이스 `~/dev/liiiiv`):
+- Measurements (256 files, 266 MB, workspace `~/dev/liiiiv`):
 
-  | 경로 | 첫 호출 | 다음 호출 |
+| Path | First call | Subsequent calls |
   |---|---|---|
-  | 어댑터 `unstable_listSessions` (탭마다) | 959ms | 959ms |
-  | 디스크 직접 + (mtime,size) 캐시 | 202ms | 26ms |
+| Adapter `unstable_listSessions` (per tab) | 959 ms | 959 ms |
+| Direct disk access + (mtime,size) cache | 202 ms | 26 ms |
 
-- [ADR 0036](0036-mew-agent-session-controls-and-usage.md) §3이 "사용량 말고는 넓히지 않는다"고 못 박은 이유는 대화의 정확성이 벤더 파일 형식에 매이는 것을 막기 위해서였다. 목록은 그 위험군이 아니다 — 읽기 전용이고, 형식이 바뀌면 목록만 비거나 제목만 없어지며(파싱 실패는 그 파일만 건너뛴다), 대화·권한·불러오기 중 어느 것도 여기에 기대지 않는다. 사용량과 같은 조건을 그대로 건다.
-- 경로 규칙은 이미 `agentUsage.ts`가 알고 있던 것을 나눠 쓴다(`sessionDirPath`) — 규칙이 두 벌이 되지 않게.
+- [ADR 0036](0036-mew-agent-session-controls-and-usage.md) §3 explicitly stated "Do not extend beyond usage" to prevent conversation correctness from depending on vendor file formats. The list does not carry that risk—it is read-only, format changes only leave the list empty or titles missing (parse failures skip only the affected file), and conversations, permissions, and loading do not depend on it. Apply exactly the same conditions as for usage.
+- Share the path rules already known to `agentUsage.ts` (`sessionDirPath`)—to avoid two sets of rules.
 
-## 결과
+## Results
 
-- 목록 계약은 테스트로 박혀 있다(`server/agentSessionList.test.ts` — 제목·최근순·cwd 필터·`agent-*` 제외·mtime 변경 시 재읽기). 벤더 형식이 바뀌면 여기가 먼저 터진다.
-- 기동 중 메시지 유실이 사라졌다는 것도 테스트로 박았다(`server/agentWs.test.ts` — 일부러 늦게 뜨는 가짜 에이전트).
-- 되돌릴 조건: 어댑터가 `session/list`를 파일 머리만 읽도록 고치면 `agentSessionList.ts`를 지우고 `unstable_listSessions`로 돌아간다. 그때까지는 이 지름길이 유지된다.
-- 세션이 살아 있는 동안의 재접속은 원래도 빨랐다(`sessionFor`가 캐시된 세션을 준다). 이 결정이 고친 것은 처음 뜰 때와 탭이 여럿일 때다.
-- 목록을 파일 머리 64KB로만 판단하므로, 첫 사용자 발화가 그보다 뒤에 있는 기록은 제목이 비어 보인다. 실제 파일에서는 관측되지 않았다(256개 중 0개).
+- The list contract is enforced by tests (`server/agentSessionList.test.ts`—titles, most-recent ordering, cwd filtering, excluding `agent-*`, and rereading on mtime changes). If the vendor format changes, these tests fail first.
+- Tests also establish that messages are no longer lost during startup (`server/agentWs.test.ts`—a fake agent deliberately slow to start).
+- Reversion condition: once the adapter changes `session/list` to read only file headers, delete `agentSessionList.ts` and return to `unstable_listSessions`. Until then, this shortcut remains.
+- Reconnecting while a session is alive was already fast (`sessionFor` returns the cached session). This decision fixes initial startup and cases with multiple tabs.
+- Because the list uses only the first 64 KB of each file, records whose first user message appears later show an empty title. This was not observed in actual files (0 out of 256).

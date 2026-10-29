@@ -1,21 +1,21 @@
 ---
-provenance: "Liiiiv 중앙 ADR 이관본, 2026-10-14"
-description: "이관한 결정 기록: 기능 제목 인라인 수정. 당시 선택·근거를 보존하며 문서 제목 편집을 브랜치 작업 설정으로 대체하는 후속 결정 0049로 연결한다."
-title: "0198 — 기능 제목 인라인 수정"
+provenance: "Migrated copy of a Liiiiv central ADR, 2026-10-14"
+description: "Migrated decision record: Inline feature title editing. Preserves the choices and rationale at the time and links to subsequent decision 0049, which replaces document title editing with branch work settings."
+title: "0198 — Inline feature title editing"
 created: 2026-10-06
 updated: 2026-10-06
 ---
 
-- 상태: 채택
-- 결정자: 사용자 지시, Codex 구현
-- 부분 대체: [0194](0194-mew-readonly-feature-panel.md) — 제목 편집 금지·변경 API 미호출
-- 부분 대체: [0196](0196-mew-file-backed-feature-tree.md) — 제목 클릭으로 문서 열기
-- 후속 결정: [0049](../../decisions/0049-branch-feature-previews.md) — 문서 목록 대신 브랜치별 작업 설정과 미리보기를 표시
+- Status: Adopted
+- Decision maker: User direction, Codex implementation
+- Partially supersedes: [0194](0194-mew-readonly-feature-panel.md) — Prohibition on title editing and no calls to mutation APIs
+- Partially supersedes: [0196](0196-mew-file-backed-feature-tree.md) — Open a document by clicking its title
+- Subsequent decision: [0049](../../decisions/0049-branch-feature-previews.md) — Display branch-specific work settings and previews instead of a document list
 
-## 결정
+## Decision
 
-- 수정 권한이 있는 계정은 기능 패널의 제목을 클릭해 바로 수정한다. Enter 또는 포커스 이동으로 저장하고 Esc로 입력을 취소한다. 원본 문서는 오른쪽 문서 아이콘으로만 연다.
-- 제목은 파일명 기준이며 기존 기능 편집 API의 버전 검사·파일/폴더 개명·링크 보정을 사용한다. 입력 시작 시의 버전으로 저장해 외부 변경을 덮어쓰지 않고 실패한 입력은 유지한다.
-- 읽기 전용 계정은 제목을 수정하지 못한다. 제목 변경은 에이전트 실행을 만들지 않으며 다른 제거된 상세·실행 조작은 재도입하지 않는다.
+- Accounts with edit permission click a title in the feature panel to edit it directly. Save with Enter or by moving focus, and cancel input with Esc. Open the original document only through the document icon on the right.
+- Titles are based on filenames and use the existing feature editing API's version checks, file/folder renaming, and link correction. Save using the version from when input began to avoid overwriting external changes, and retain input when saving fails.
+- Read-only accounts cannot edit titles. Title changes do not create agent runs, and other removed detail and execution controls are not reintroduced.
 
-세부 계약: [기능 기반 개발](../../specs/feature-development.md).
+Detailed contract: [Feature-Driven Development](../../specs/feature-development.md).

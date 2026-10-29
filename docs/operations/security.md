@@ -1,128 +1,128 @@
 ---
-title: "보안 운영 기준"
-description: "Mew 인스턴스를 공유하는 운영자가 역할·파일 권한과 owner·manager의 프로젝트 접근, 서버 제어 기능, Mewlink 로그인·브라우저 접근 회수와 데이터 보관의 위험을 판단하는 기준이다. 기능별 구현·인증·저장 세부는 개발 계약으로 연결하며 비공개 취약점 신고 방법을 안내한다."
+title: "Security operations guidelines"
+description: "Guidelines for operators sharing a Mew instance to assess roles and file permissions, owner and manager project access, server control features, Mewlink login and browser access revocation, and data retention risks. Links implementation, authentication, and storage details for each feature to development contracts and explains how to report vulnerabilities privately."
 created: 2026-10-22
 updated: 2026-10-26
 상위파일: "MOC.md"
 ---
 
-# 보안 운영 기준
+# Security operations guidelines
 
-다른 사람에게 인스턴스를 제공하기 전에 이 문서에서 허용할 기능과 공개·보관 범위를 확인한다. 운영 위치·포트는 [접근 모델](access-model.md), 공개 전후 점검은 [배포 운영](deployment.md), 서버의 권한 판정·저장·실시간 회수는 [접근 제어 계약](../../.mew/docs/development/access-control.md)이 소유한다.
+Before providing an instance to others, review this document to determine which features to allow and what to expose and retain. The [access model](access-model.md) owns operating locations and ports, [deployment operations](deployment.md) owns checks before and after public exposure, and the [access control contract](../../.mew/docs/development/access-control.md) owns server permission decisions, storage, and real-time revocation.
 
-## 계정을 공유하기 전에
+## Before sharing accounts
 
-Mew에서는 파일 편집뿐 아니라 터미널과 에이전트로 서버에서 명령을 실행할 수 있다. 에이전트·터미널·원격 데스크톱·서버 파일 탐색기 등 서버 제어 기능을 허용하면 서버 OS 사용자 권한 범위에 접근할 수 있다. 기본값은 manager·owner지만 owner가 member에게 개별 기능을 허용할 수도 있다. **서버 제어 기능은 SSH 계정을 줄 수 있을 만큼 신뢰하는 사람에게만 허용한다.**
+Mew supports not only file editing but also running commands on the server through terminals and agents. Allowing server control features such as agents, terminals, remote desktop, and the server file explorer grants access within the server OS user's permissions. These features default to manager and owner, but the owner can also allow individual features for members. **Allow server control features only for people you trust enough to give an SSH account.**
 
-파일별 권한은 Mew 파일 API에만 적용된다. 셸과 에이전트의 파일 접근까지 제한하지는 않는다. 특정 파일을 숨겨야 하는 계정에는 서버 제어 기능을 함께 허용하지 않는다. 공개 설치는 전용 비관리자 OS 사용자로 실행하고 필요한 프로젝트만 접근할 수 있게 한다.
+Per-file permissions apply only to the Mew file API. They do not restrict file access through shells or agents. Do not also allow server control features for accounts from which specific files must be hidden. Run public installations as a dedicated, non-administrator OS user with access only to the required projects.
 
-## 역할
+## Roles
 
-역할은 guest &lt; member &lt; manager &lt; owner이며 **기능의 기본값**이다. owner의 계정 관리에서 각 계정과 guest의 기능 및 파일 권한을 조절한다.
+Roles are guest &lt; member &lt; manager &lt; owner and define **feature defaults**. The owner adjusts feature and file permissions for each account and for guests in account management.
 
-| 기본 기능 | guest | member | manager | owner |
+| Default features | guest | member | manager | owner |
 | --- | --- | --- | --- | --- |
-| 파일 열람·본문 수정 | 허용한 경로만 | 허용 | 허용 | 허용 |
-| 파일 생성·삭제·개명·업로드·이력 | 차단 | 허용 | 허용 | 허용 |
-| DB·공동 편집·댓글·채팅 | 차단 | 허용 | 허용 | 허용 |
-| 에이전트·터미널·localhost 앱 접속·원격 데스크톱·Android | 차단 | 차단 | 허용 | 허용 |
-| 서버 파일 탐색기·Git 워크벤치·시스템·예약 작업 | 차단 | 차단 | 허용 | 허용 |
-| 프로젝트 목록·추가·전환·아이콘 변경·폴더 생성·Git clone/초기화 | 차단 | 차단 | 허용 | 허용 |
-| 계정 관리·docs 설정/가져오기/내보내기 | 차단 | 차단 | 차단 | 허용 |
+| View files and edit contents | Allowed paths only | Allowed | Allowed | Allowed |
+| File creation, deletion, renaming, uploads, and history | Blocked | Allowed | Allowed | Allowed |
+| DB, collaborative editing, comments, and chat | Blocked | Allowed | Allowed | Allowed |
+| Agents, terminals, localhost app access, remote desktop, and Android | Blocked | Blocked | Allowed | Allowed |
+| Server file explorer, Git workbench, system, and scheduled tasks | Blocked | Blocked | Allowed | Allowed |
+| Project listing, addition, switching, icon changes, folder creation, and Git clone/initialization | Blocked | Blocked | Allowed | Allowed |
+| Account management and docs settings/import/export | Blocked | Blocked | Blocked | Allowed |
 
-마지막 행은 역할로 정하는 관리 기능이며 기능 표로 위임하지 않는다. 마지막 owner는 강등하거나 삭제할 수 없고, 현재 로그인한 본인도 삭제할 수 없다. guest의 서버 제어 기능은 활성화할 수 없다. 터미널형 에이전트에는 에이전트와 터미널 권한이 모두 필요하다.
+The last row contains administrative features determined by role and cannot be delegated through the feature table. The last owner cannot be demoted or deleted, and users cannot delete their own currently logged-in account. Server control features cannot be enabled for guests. Terminal-based agents require both agent and terminal permissions.
 
-### 파일별 권한
+### Per-file permissions
 
-계정에 허용한 파일 기능 안에서 각 경로에 가장 구체적인 규칙(상속·차단·열람·수정)을 적용한다. 로그인 계정은 규칙이 없으면 허용되므로 `.env*`도 명시적으로 제한하지 않으면 읽을 수 있다. guest는 명시적 허용 전까지 모든 경로가 차단되며 `.env*`는 허용 규칙보다 우선해 거부한다. 권한은 로컬 사용자 ID와 실제 워크스페이스 루트에 귀속하고 별칭·심볼릭 링크로 우회할 수 없다.
+Within the file features allowed for an account, apply the most specific rule for each path: inherit, block, read, or edit. Logged-in accounts are allowed access when no rule exists, so they can also read `.env*` unless explicitly restricted. Guests are blocked from all paths until explicitly allowed, and `.env*` is denied even when an allow rule exists. Permissions belong to the local user ID and actual workspace root and cannot be bypassed through aliases or symbolic links.
 
-검색·다운로드·첨부·협업도 서버에서 파일 권한을 검사한다. Git·DB 관리처럼 프로젝트 전체 자료를 다루는 기능은 프로젝트 안에 부분 파일 제한이 있으면 거부한다. 일반 파일 API는 서버 데이터 폴더·보호 경로와 워크스페이스 밖 접근을 차단한다. 실제 데이터 폴더의 이름이나 위치를 바꾸어도 이 차단은 유지된다. 앱 자체 등 보호된 프로젝트는 owner도 개명·삭제할 수 없다.
+The server also checks file permissions for searches, downloads, attachments, and collaboration. Features that handle project-wide data, such as Git and DB administration, are denied if any files within the project have partial restrictions. The general file API blocks access to the server data folder, protected paths, and locations outside the workspace. This block remains in effect even if the actual data folder's name or location changes. Even the owner cannot rename or delete protected projects such as the app itself.
 
-서버 파일 탐색기는 OS 전체 접근을 의도한 별도 기능이며 워크스페이스 파일 경계와 차단 목록을 적용하지 않는다. docs 가져오기/내보내기와 워크스페이스 변경 등 관리 작업은 owner 전용이다. 구체적인 판정·예외는 [접근 제어 계약](../../.mew/docs/development/access-control.md)을 따른다.
+The server file explorer is a separate feature intended to provide access across the OS and does not apply workspace file boundaries or blocklists. Administrative operations such as docs import/export and workspace changes are owner-only. Specific decisions and exceptions follow the [access control contract](../../.mew/docs/development/access-control.md).
 
-### Git 작업과 외부 계정 연결
+### Git operations and external account connections
 
-Git 작업은 요청자의 기능·프로젝트 접근 권한과 연결한 외부 계정으로 실행한다. Mew의 Git 연결은 기존 OS 자격증명을 자동으로 가져오지 않으며 공유 Git 설정을 바꾸지 않는다. 셸·서버 파일 기능을 가진 사용자에게서 같은 OS 권한으로 보관한 자격증명을 격리할 수는 없다. 터미널·일반 에이전트·외부 clone은 OS 실행 환경을 유지한다. 연결·보관·계정 삭제 시 정리는 [Git 연결 계약](../../.mew/docs/development/git-connections.md), 조작은 [GitHub 로그인](../guides/projects.md#github-로그인)을 따른다.
+Git operations run with the requester's feature and project access permissions and connected external account. Mew's Git connections do not automatically import existing OS credentials or change shared Git settings. Credentials stored under the same OS permissions cannot be isolated from users with shell or server file features. Terminals, general agents, and external clone operations retain the OS execution environment. Connections, storage, and cleanup on account deletion follow the [Git connection contract](../../.mew/docs/development/git-connections.md); operation follows [GitHub login](../guides/projects.md#github-login).
 
-## 게스트 경계
+## Guest boundaries
 
-owner가 **계정 관리 → 파일·폴더 권한**에서 guest 규칙을 설정한다. 이 규칙은 비로그인 방문자 전체에 적용된다. 폴더 허용은 하위로 상속되므로 공유 중단 시 하위의 별도 허용도 확인한다. 파일 생성·삭제·개명·이력·셸·DB·공동 편집·채팅은 허용하지 않는다.
+The owner configures guest rules in **Account Management → File and Folder Permissions**. These rules apply to all visitors who are not logged in. Folder permissions are inherited by descendants, so check for separate allow rules on descendants when stopping sharing. File creation, deletion, renaming, history, shell access, DB access, collaborative editing, and chat are not allowed.
 
-접근할 수 없는 프로젝트·파일은 트리와 검색에서 숨긴다. presence도 보는 계정이 접근할 수 있는 경로만 제공하며, 전체 활성 세션 수와 사용자·기기 목록은 로그인 사용자에게만 전송한다. 공개 연결 ID는 인증 세션과 별개다.
+Inaccessible projects and files are hidden from the tree and search. presence also provides only paths accessible to the viewing account, and the total active session count and user and device lists are sent only to logged-in users. Public connection IDs are separate from authentication sessions.
 
-첨부 링크를 알아도 해당 파일의 열람 권한이 필요하다. 문서를 공유할 때 필요한 첨부 경로도 허용한다. 정책 변경은 열린 연결과 UI에 반영하지만 이미 내려받은 데이터나 실행 중인 OS 프로세스를 소급 회수하지 않는다. [접근 제어 계약](../../.mew/docs/development/access-control.md)이 첨부·공유·회수의 서버 경계를 정의한다.
+Knowing an attachment link still requires read permission for that file. When sharing a document, also allow the required attachment paths. Policy changes are reflected in open connections and the UI but do not retroactively revoke downloaded data or running OS processes. The [access control contract](../../.mew/docs/development/access-control.md) defines server boundaries for attachments, sharing, and revocation.
 
-## Mewlink 기기 접속
+## Mewlink device access
 
-Mewlink는 기기 등록·목록·삭제를 관리하며, 선택적으로 호스트의 Mew 로그인에 외부 신원을 증명한다. 기기 주소는 중앙 로그인 없이 직접 연결할 수 있지만, 로컬 Mew 로그인 전에는 일반 guest 공유로 허용한 파일도 열 수 없다. 기기 등록자·연결용 난수·같은 이메일만으로 로컬 사용자 권한을 얻지 않는다.
+Mewlink manages device registration, listing, and deletion and optionally verifies external identities for Mew login on the host. A device address can be connected to directly without central login, but even files allowed through general guest sharing cannot be opened before local Mew login. Being the device registrant, possessing the random connection value, or having the same email address alone does not grant local user permissions.
 
-새 외부 사용자는 owner가 승인해야 하며 승인하면 비밀번호 없는 member로 등록된다. 기존 이메일 사용자는 검증된 Mewlink 신원과 같은 연결의 완료된 비밀번호 로그인으로 본인 계정에 연결할 수 있다. 본인 연결은 새 계정을 만들거나 역할을 올리지 않는다. 역할·기능·파일 권한은 같은 로컬 사용자 ID에 귀속한다. 연결을 옮기거나 해제하면 이전 외부 접속을 회수하며 기존 계정·데이터·로컬 비밀번호는 보존한다.
+New external users require owner approval and are registered as members without passwords upon approval. Existing email users can link to their own accounts using a verified Mewlink identity and a completed password login on the same connection. Linking one's own account does not create a new account or elevate its role. Roles, features, and file permissions belong to the same local user ID. Moving or removing a link revokes previous external access while preserving the existing account, data, and local password.
 
-로그인 전 직접 연결은 호스트 IP와 연결 자원을 방문자에게 노출한다. 요청·동시 연결 한도와 미인증 연결 시간 제한을 적용하더라도 중앙 로그인 선행 방식과 같은 노출 범위는 아니다. 인증·연결 수명과 검증·운영 적용 범위는 [원격 접속 계약](../../.mew/docs/development/remote-access.md)을 따른다.
+Direct connections before login expose the host IP and connection resources to visitors. Even with request and concurrent connection limits and unauthenticated connection timeouts, the exposure differs from requiring central login first. Authentication and connection lifetimes, verification, and the scope of production application follow the [remote access contract](../../.mew/docs/development/remote-access.md).
 
-### 브라우저 로그인 유지와 회수
+### Keeping browser logins and revoking access
 
-로그인한 사용자가 중앙 부모의 **이 브라우저에서 로그인 유지 → 기억하기**에 동의하면 현재 로컬 계정·인증 수단과 호스트별 브라우저 키에 결합한 로그인을 유지한다. 90일 미사용 시 만료하며, 유효한 사용 중에는 수명을 갱신한다. 비밀번호 변경·외부 연결 회수·계정 삭제와 현재 권한 검사도 적용한다. 연결이 복구되어도 이전 저장·명령을 자동 재실행하지 않는다.
+If a logged-in user consents to **Stay signed in on this browser → Remember** in the central parent, the login is retained and bound to the current local account, authentication method, and host-specific browser key. It expires after 90 days of inactivity, and its lifetime is renewed during valid use. Password changes, external connection revocation, account deletion, and current permission checks also apply. Restoring a connection does not automatically replay previous saves or commands.
 
-중앙 기기 owner는 대시보드의 **접속 브라우저 관리 → 접근 해제**에서 특정 키의 모든 탭을 끊고 재접속을 차단할 수 있다. 다른 브라우저·다른 호스트에는 적용하지 않는다. **등록 해제**는 호스트 전체의 별도 회수다.
+The central device owner can disconnect all tabs for a specific key and block reconnection through **Manage Connected Browsers → Revoke Access** on the dashboard. This does not apply to other browsers or hosts. **Unregister** is a separate revocation for the entire host.
 
-오래 로그인된 분실 기기는 서버 제어 권한을 계속 사용할 수 있다. 브라우저 키를 추출할 수 없도록 해도 같은 origin의 XSS·악성 확장·OS 탈취가 키를 사용하는 것까지 방어하지 않는다. 브라우저 데이터를 지워 새 키를 만든 사람이 유효한 비밀번호 또는 승인된 외부 계정으로 다시 인증할 수도 있다. 인증 수단까지 탈취됐으면 비밀번호 변경·외부 연결 회수가 필요하다.
+A lost device with a persistent login can continue using server control permissions. Preventing browser key extraction does not prevent same-origin XSS, malicious extensions, or OS compromise from using the key. Someone who clears browser data and creates a new key may also authenticate again with a valid password or approved external account. If authentication methods have also been compromised, change the password and revoke external connections.
 
-만료·보안 회수 뒤에는 재인증하며 절전 중 연결 유지나 모든 망 전환의 복구를 보장하지 않는다. 키·토큰의 보관과 수명은 [브라우저 저장소 계약](../../.mew/docs/development/browser-storage.md#원격-로컬-계정-접속의-저장소-범위), 설계 근거는 [브라우저 신뢰 결정](../../.mew/docs/decisions/0015-trusted-browser-access.md)을 따른다.
+Reauthentication is required after expiration or security revocation. Connections are not guaranteed to remain active during sleep or recover from every network transition. Key and token storage and lifetimes follow the [browser storage contract](../../.mew/docs/development/browser-storage.md#storage-scope-for-remote-local-account-connections), and the design rationale follows the [browser trust decision](../../.mew/docs/decisions/0015-trusted-browser-access.md).
 
-## 인증
+## Authentication
 
-로컬 이메일 계정 또는 명시적으로 연결한 외부 신원만 로그인할 수 있으며 공개 회원가입은 없다. 임시 비밀번호는 비밀번호로 첫 로그인할 때 변경해야 업무 기능을 사용할 수 있다. 승인된 외부 로그인은 별도 인증 수단이며 외부 프로필 수정으로 임시 비밀번호 변경 요구를 지우지 않는다. 비밀번호를 바꾸면 다른 기기의 비밀번호 세션이 끊긴다. 인증 상태와 접속 중 회수는 [접근 제어 계약](../../.mew/docs/development/access-control.md), Mewlink의 인증 수명은 [원격 접속 계약](../../.mew/docs/development/remote-access.md)을 따른다.
+Only local email accounts or explicitly linked external identities can log in; there is no public signup. Temporary passwords must be changed at the first password login before work features can be used. Approved external login is a separate authentication method, and editing an external profile does not remove the temporary password change requirement. Changing a password disconnects password sessions on other devices. Authentication state and revocation during active connections follow the [access control contract](../../.mew/docs/development/access-control.md), and Mewlink authentication lifetimes follow the [remote access contract](../../.mew/docs/development/remote-access.md).
 
-## 에이전트 창
+## Agent window
 
-에이전트의 파일 도구와 명령은 서버를 실행하는 OS 사용자 권한으로 동작한다. 워크스페이스 밖 파일에도 접근할 수 있으며 OS 수준의 별도 격리는 없다. 보고 있는 프로젝트를 바꾸는 것으로 실행 권한을 격리하지 않는다.
+Agent file tools and commands run with the permissions of the OS user running the server. They can access files outside the workspace, and there is no separate OS-level isolation. Switching the project being viewed does not isolate execution permissions.
 
-**기본 권한 모드는 승인 없이 실행하는 “전체 허용”이며 에이전트 창과 예약 작업에 적용된다.** 신뢰할 수 없는 문서나 웹페이지의 프롬프트 인젝션이 성공하면 중간 확인 없이 명령이 실행될 수 있다. 창에서 세션별 모드를 바꾸거나 서버 기본값을 조정한다. 런타임 설치도 서버 OS 사용자 권한으로 실행된다. 모드·설치 설정은 [에이전트 런타임](../configuration/agent-runtimes.md), 세션·실행 계약은 [에이전트 세션](../../.mew/docs/development/agent-sessions.md)을 따른다.
+**The default permission mode is “Allow All,” which runs without approval and applies to agent windows and scheduled tasks.** If prompt injection from an untrusted document or webpage succeeds, commands may run without intermediate confirmation. Change the mode for each session in the window or adjust the server default. Runtime installation also runs with the server OS user's permissions. Mode and installation settings follow [agent runtimes](../configuration/agent-runtimes.md), and session and execution contracts follow [agent sessions](../../.mew/docs/development/agent-sessions.md).
 
-## 원격 데스크톱
+## Remote desktop
 
-원격 데스크톱은 계정별 가상 화면이 아니라 서버의 실제 로그인 데스크톱이며 WSL에서는 Windows 화면까지 포함한다. Windows 가상 디스플레이도 같은 로그인 데스크톱의 확장 화면이다. 한 서버의 제어 연결은 하나로 제한하며 같은 OS 사용자의 여러 서버가 제어 잠금을 공유하지 않으므로 원격 제어용 서버는 하나만 운영한다.
+Remote desktop provides the server's actual logged-in desktop, not a virtual screen for each account, and includes the Windows screen under WSL. A Windows virtual display is also an extended screen of the same logged-in desktop. Each server is limited to one control connection. Multiple servers under the same OS user do not share a control lock, so run only one server for remote control.
 
-OS 승인·활성 사용자·잠금·입력 회수는 [원격 데스크톱 계약](../../.mew/docs/development/remote-desktop.md)과 [POSIX 계약](../../.mew/docs/development/remote-desktop-posix.md)을 따른다. 외부 직결은 활성 세션의 임시 연결만 허용하며 기존 방화벽 차단·다른 앱 매핑을 보존하고 VPN을 임의의 물리 LAN으로 우회하지 않는다. 방화벽 승인·정리는 [연결 계약](../../.mew/docs/development/remote-desktop-connectivity.md), 드라이버 권한·정식 서명과 설치 실기 확인 범위는 [가상 디스플레이 계약](../../.mew/docs/development/remote-desktop-virtual-display.md)을 따른다.
+OS approval, active users, locking, and input revocation follow the [remote desktop contract](../../.mew/docs/development/remote-desktop.md) and [POSIX contract](../../.mew/docs/development/remote-desktop-posix.md). External direct access allows only temporary connections for active sessions, preserves existing firewall blocks and mappings for other apps, and does not bypass a VPN through an arbitrary physical LAN. Firewall approval and cleanup follow the [connectivity contract](../../.mew/docs/development/remote-desktop-connectivity.md); driver permissions, official signing, and the scope of installation checks on actual hardware follow the [virtual display contract](../../.mew/docs/development/remote-desktop-virtual-display.md).
 
-## 로그인 가상 화면과 localhost 앱
+## Virtual login screens and localhost apps
 
-일반 내부 DOM 브라우저는 제거했다. OAuth·계정 관리는 Linux/WSL의 독립 로그인 영상 화면을 사용하며 호스트 데스크톱의 입력·클립보드와 분리한다. 입력·화면·인증 코드는 저장하거나 로그로 기록하지 않는다. CPU/GPU와 서버 OS 권한은 공유하므로 파일 샌드박스는 아니다.
+The general internal DOM browser has been removed. OAuth and account management use a separate login video screen on Linux/WSL, isolated from the host desktop's input and clipboard. Input, screen content, and authentication codes are not saved or logged. CPU/GPU resources and server OS permissions are shared, so this is not a file sandbox.
 
-로그인 화면은 생성 계정과 인증 작업의 기능 권한에 귀속한다. 에이전트 인증에는 에이전트 권한, GitHub 연결에는 Git 또는 파일 수정 권한을 확인하며 별도 일반 브라우저 권한은 요구하지 않는다. 본인 화면만 조회·입력·종료할 수 있다. 지원 조건·종료 수명과 실제 인증의 검증 범위는 [로그인 가상 화면 계약](../../.mew/docs/development/login-desktop.md)을 따른다.
+A login screen belongs to the account that created it and the feature permissions for its authentication task. Agent authentication checks agent permission, while GitHub connections check Git or file editing permission; no separate general browser permission is required. Users can view, provide input to, and close only their own screens. Support conditions, shutdown lifetimes, and the scope of verification of actual authentication follow the [virtual login screen contract](../../.mew/docs/development/login-desktop.md).
 
-`/<port>` 앱 접속은 로그인과 localhost 앱 접속 기능 권한을 요구한다. 대상은 허용한 loopback HTTP(S) 포트이며 Mew 자체 포트와 다른 대상으로의 우회는 거부한다. 개발 앱의 JavaScript는 접속한 기기에서 실행된다. 앱은 Mew 세션·전체 API 권한과 출처를 공유하지 않으며 호스트의 공급자 인증 정보·Mew 쿠키·방문자 IP를 앱 upstream에 전달하지 않는다. 격리·프록시·저장의 기준은 [localhost 앱 프리뷰 계약](../../.mew/docs/development/port-preview.md)을 따른다.
+`/<port>` app access requires login and permission for the localhost app access feature. Targets are allowed loopback HTTP(S) ports; Mew's own port and bypasses to other targets are denied. Development app JavaScript runs on the connecting device. Apps do not share an origin with the Mew session or full API permissions, and the host's provider credentials, Mew cookies, and visitor IP are not forwarded to the app upstream. Isolation, proxying, and storage standards follow the [localhost app preview contract](../../.mew/docs/development/port-preview.md).
 
-## Android 창
+## Android Panel
 
-Android 화면 조회와 입력도 로컬 개발 서버와 같은 수준으로 보호한다. gateway 주소는 loopback으로 제한하고 SDK 경로·가속 상태는 서버 운영 정보로 취급한다. 상태 조회만으로 Emulator 실행·설치·AVD 생성을 하지 않는다. 명시적인 준비 작업과 gateway 권한은 [Android 기능 계약](../../.mew/docs/features/%EB%B8%8C%EB%9D%BC%EC%9A%B0%EC%A0%80%C2%B7Android%C2%B7%EC%9B%90%EA%B2%A9%20%EB%8D%B0%EC%8A%A4%ED%81%AC%ED%86%B1/Android%20%ED%99%98%EA%B2%BD%20%EC%A0%90%EA%B2%80%C2%B7%ED%99%94%EB%A9%B4%20%EC%97%B0%EA%B2%B0.md)을 따른다.
+Android screen viewing and input are protected at the same level as a local development server. Gateway addresses are restricted to loopback, and SDK paths and acceleration status are treated as server operational information. Status queries alone do not start or install the Emulator or create AVDs. Explicit preparation operations and gateway permissions follow the [Android feature contract](../../.mew/docs/features/browser-android-remote-desktop/android-environment-checks-and-screen-connection.md).
 
-## 외부 접속 시 설정
+## Settings for external access
 
-기본 수신 주소는 loopback(`127.0.0.1`)이다. LAN 직접 접속이 필요해 수신 주소를 바꿀 때는 노출 범위를 확인한다. 공개 설치에서는 [배포 운영](deployment.md)에 따라 loopback 바인드와 공개 진입점을 유지한다.
+The default listening address is loopback (`127.0.0.1`). Check the exposure scope when changing the listening address for direct LAN access. For public installations, retain the loopback bind and public entry point according to [deployment operations](deployment.md).
 
-- Mew 포트를 인터넷에 직접 공개하지 않고 Mewlink 또는 HTTPS 프록시·터널·VPN을 사용한다.
-- HTTPS를 쓴다. 프록시는 원래 Host와 HTTPS 여부를 전달하고 WebSocket upgrade를 중계해야 한다.
-- 계정 수와 서버 제어 권한을 최소화하고 읽기 공유는 member 계정 대신 guest 경로 규칙을 쓴다.
-- 개발 서버는 소스와 빌드 전 자산을 제공하므로 외부에 공개하지 않는다.
+- Use Mewlink or an HTTPS proxy, tunnel, or VPN instead of exposing the Mew port directly to the internet.
+- Use HTTPS. The proxy must forward the original Host and whether the request used HTTPS, and relay WebSocket upgrades.
+- Minimize the number of accounts and server control permissions, and use guest path rules for read-only sharing instead of member accounts.
+- Do not expose the development server externally, because it serves source code and assets before building.
 
-현재 배포물은 컨테이너 앱 경로를 지원하지 않는다. 컨테이너가 셸 범위를 격리한다고 가정해 공개하지 않는다. 설치·반영은 [네이티브 서버 배포](../deployment/native.md), 접속별 경계는 [접근 모델](access-model.md)을 따른다.
+The current distribution does not support running the app in a container. Do not expose it on the assumption that a container isolates shell access. Installation and application of changes follow [native server deployment](../deployment/native.md), and boundaries for each connection type follow the [access model](access-model.md).
 
-## 채팅과 개인 대화(DM)
+## Chat and direct messages (DMs)
 
-채팅 화면에는 본인이 참여한 대화만 보이지만 **서버 파일을 읽을 수 있는 관리자는 다른 사람의 DM도 읽을 수 있다.** 대화는 서버에 평문으로 저장되므로 셸·서버 파일 권한이 있는 계정에 숨겨야 하는 내용은 남기지 않는다. 읽음 표시에는 사용자별 마지막 열람 시각이 남는다.
+The chat screen shows only conversations you participate in, but **administrators who can read server files can also read other people's DMs.** Conversations are stored in plaintext on the server, so do not leave content that must be hidden from accounts with shell or server file permissions. Read receipts retain each user's last viewing time.
 
-단체방과 DM을 합쳐 최근 500줄만 보관한다. 이를 넘으면 오래된 대화부터 삭제되므로 단체방 메시지가 많으면 DM도 삭제될 수 있다. guest는 채팅을 보지도 보내지도 못한다.
+Only the most recent 500 lines are retained across group chats and DMs combined. Older conversations are deleted when this limit is exceeded, so a high volume of group chat messages can also cause DMs to be deleted. Guests cannot view or send chat messages.
 
-## 저장된 데이터
+## Stored data
 
-계정·세션·권한 규칙·대화 등 서버 데이터와 백업의 접근 권한을 제한하고 저장소에 커밋하지 않는다. 위치와 설정은 [환경 설정](../configuration/environment.md), 백업·복구 범위는 [서버 배포](../deployment/native.md#4-업데이트백업장애-확인)를 따른다. 파일 권한과 별도로 OS 사용자 접근을 제한해야 한다.
+Restrict access to server data and backups, including accounts, sessions, permission rules, and conversations, and do not commit them to the repository. Locations and settings follow [environment configuration](../configuration/environment.md), and backup and recovery scope follows [server deployment](../deployment/native.md#4-updates-backups-and-failure-checks). OS user access must be restricted separately from file permissions.
 
-공급자 OAuth bearer token을 Mew UI나 런타임 설정에 저장하지 않는다. 이전 설치에 남은 해당 키는 시작 시 제거한다. 외부 링크의 제목·설명을 얻으려고 서버가 임의 URL을 요청하는 기능도 제공하지 않는다. 업로드는 임시 디스크에만 받고 파일당 25MiB, 계정당 15분에 20회로 제한한다. 대용량 파일 공유는 지원하지 않는다.
+Do not store provider OAuth bearer tokens in the Mew UI or runtime settings. Any such keys remaining from earlier installations are removed at startup. There is also no feature for the server to request arbitrary URLs to retrieve external link titles and descriptions. Uploads are accepted only on temporary disk and limited to 25 MiB per file and 20 uploads per 15 minutes per account. Large file sharing is not supported.
 
-최근 연 문서의 본문은 브라우저 기기에 남을 수 있다. 새 영구 본문 캐시는 계정·루트 범위를 구분한 IndexedDB를 사용하며 기존 localStorage 캐시는 유효한 항목만 이관하고 성공한 원본을 지운다. 로그아웃·계정 변경은 진행 중인 이전 캐시 작업도 무효화한다. 이미 내려받은 데이터의 소급 회수를 보장하지 않으므로 공용 기기에서는 사용 후 로그아웃한다. 캐시 수명·정리·미전송 초안의 구분은 [파일 본문 캐시](../../.mew/docs/development/file-loading.md)와 [브라우저 저장소 계약](../../.mew/docs/development/browser-storage.md)을 따른다.
+The contents of recently opened documents may remain on the browser device. The new persistent content cache uses IndexedDB scoped by account and root; only valid entries from the existing localStorage cache are migrated, and their originals are deleted after successful migration. Logging out or switching accounts also invalidates previous cache operations still in progress. Retroactive revocation of downloaded data is not guaranteed, so log out after using a shared device. Cache lifetimes, cleanup, and the distinction from unsent drafts follow the [file content cache](../../.mew/docs/development/file-loading.md) and [browser storage contract](../../.mew/docs/development/browser-storage.md).
 
-## 취약점 신고
+## Reporting vulnerabilities
 
-취약점은 공개 이슈 대신 이 저장소의 GitHub Security Advisories로 비공개 제보해 주세요. 재현 방법과 `./mew status` 출력 정보를 함께 보내 주세요.
+Please report vulnerabilities privately through this repository's GitHub Security Advisories instead of public issues. Include reproduction steps and the output of `./mew status`.

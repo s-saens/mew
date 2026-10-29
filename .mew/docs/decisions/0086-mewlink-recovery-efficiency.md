@@ -1,30 +1,30 @@
 ---
-title: "Mewlink의 원인별 복구와 오프라인 대기"
-description: "호스트 heartbeat의 짧은 응답 기한, 오프라인 확인 뒤의 경량 presence 조회, 화면·네트워크 상태별 재시도와 인증 본문 제한 시간을 선택한 결정. 기존 RTC·lease·인증 경계를 보존하고 중앙·호스트 적용 범위를 구분한다."
+title: "Cause-specific Mewlink recovery and offline waiting"
+description: "Decision to use a short host heartbeat response deadline, lightweight presence queries after offline confirmation, retries based on visibility and network state, and an authentication body timeout. Preserves existing RTC, lease, and authentication boundaries and distinguishes central and host application scope."
 created: "2026-10-29"
 updated: "2026-10-29"
 ---
 
-## 상태
+## Status
 
-채택. 로컬 구현·격리 검증이며 운영 적용은 사용자가 수행한다. 현재 계약은 [원격 접속](../development/remote-access.md#시그널링-순단의-같은-rtc-재부착), 검증과 적용 범위는 [작업 기록](../work/mewlink-efficient-recovery.md)이 소유한다.
+Accepted. Implemented locally and validated in isolation; the user applies it to production. [Remote access](../development/remote-access.md#reattaching-the-same-rtc-after-a-brief-signaling-interruption) owns the current contract, and the [Work record](../work/mewlink-efficient-recovery.md) owns validation and application scope.
 
-## 배경
+## Background
 
-호스트가 중앙의 끊긴 WSS를 `OPEN`·`online`으로 오인하는 결함에 응답 감시를 추가했지만, 최초 정책은 60~80초 뒤에야 종료했다. 기존 RTC의 60초 lease 안에서 재부착할 여유가 부족할 수 있다. 브라우저도 중앙의 `offline` 오류를 일반 실패와 합쳐 전체 bootstrap·RTC 준비를 반복했고, 숨겨진 탭에서도 재시도했다. 재연결의 인증 헤더만 도착하고 본문이 멈추면 활성화가 끝나지 않는 경로도 있었다.
+Response monitoring was added to address a defect where the host mistook a disconnected central WSS for `OPEN` or `online`, but the initial policy terminated it only after 60–80 seconds. This may leave insufficient time to reattach within the existing RTC's 60-second lease. The browser also treated the central service's `offline` error as a generic failure, repeating full bootstrap and RTC preparation and retrying even in hidden tabs. There was also a path where activation never completed if only the reconnection authentication headers arrived and the body stalled.
 
-## 결정
+## Decision
 
-- 정상 heartbeat 간격은 20초로 유지하고 응답을 5초 기다린다. 한 번 재전송해 5초 더 확인한 뒤 기존 비정상 종료·재접속 경로로 넘긴다. 이벤트 루프가 실행되는 동안 단절 감지에 최악 약 30초가 걸린다. 절전 뒤 첫 기한이 늦게 실행돼도 재확인 5초를 확보하며 권한·lease를 연장하지 않는다.
-- 명시적 `offline` 이후에만 공개 기기의 경량 presence API를 조회한다. 온라인을 확인하면 새 bootstrap을 시작한다. 정상 최초 접속의 병렬 준비는 유지한다. API는 온라인 여부만 제공하고 IP 요청 한도·기기 존재·현재 DO 상태를 확인하며 로그인·launch·RTC 작업을 하지 않는다.
-- 오류 코드를 보존해 오프라인·응답 지연·요청 제한·인증 거부를 구분한다. 반복 실패는 지터를 포함해 간격을 늘린다. 전체 복구 중 탭이 숨겨지거나 인터넷이 끊기면 요청과 타이머를 취소하고, 화면·네트워크 복귀 시 한 번 재개한다. 이미 살아 있는 RTC의 갱신·중앙 재부착은 계속 허용한다.
-- 인증 확인의 요청부터 JSON 본문 완료까지 10초로 제한한다. 이전 세대의 응답은 버리고 명시적 인증 거부·계정 변경은 자동 재시도를 중단한다.
-- [ADR 0081](0081-mewlink-transient-recovery.md)의 5초 자연 복구·1초 표시 지연은 유지한다. 일반 순단은 작은 인디케이터를 사용하고 알려진 지속 실패 이유는 기존 앱 위의 짧은 상태 안내로 표시한다. [ADR 0060](0060-mewlink-startup-handoffs.md)의 최초 연결 병렬화와 기존 lease·권한 검증을 유지한다.
+- Keep the normal heartbeat interval at 20 seconds and wait 5 seconds for a response. Retransmit once and wait another 5 seconds before handing off to the existing abnormal termination and reconnection path. While the event loop is running, disconnection detection takes approximately 30 seconds in the worst case. Even if the first deadline runs late after sleep, allow 5 seconds for rechecking without extending permissions or leases.
+- Query the lightweight presence API for public devices only after an explicit `offline`. Start a new bootstrap once online status is confirmed. Preserve parallel preparation for normal initial connections. The API provides only online status, checks IP request limits, device existence, and current DO state, and performs no login, launch, or RTC work.
+- Preserve error codes to distinguish offline status, delayed responses, rate limiting, and authentication denial. Increase retry intervals with jitter after repeated failures. During full recovery, cancel requests and timers if the tab becomes hidden or internet connectivity is lost, and resume once when visibility or connectivity returns. Continue allowing renewal and central reattachment for an RTC connection that is already alive.
+- Limit authentication verification to 10 seconds from the request through completion of the JSON body. Discard responses from previous generations, and stop automatic retries on explicit authentication denial or account changes.
+- Preserve the 5-second natural recovery period and 1-second display delay from [ADR 0081](0081-mewlink-transient-recovery.md). Use a small indicator for ordinary brief interruptions and a short status message over the existing app for known persistent failure reasons. Preserve initial connection parallelization from [ADR 0060](0060-mewlink-startup-handoffs.md) and existing lease and permission checks.
 
-## 대안과 근거
+## Alternatives and Rationale
 
-모든 실패에서 전체 연결을 다시 만들면 경로는 단순하지만 꺼진 호스트를 기다리는 동안 RTC·키·STUN 준비를 반복한다. 항상 presence를 먼저 조회하면 정상 첫 접속에도 왕복이 추가된다. 온라인 알림 전용 WebSocket은 별도 대기 상태·수명·인가 계약이 필요하다. 명시적 오프라인 뒤에만 제한 시간 있는 조회를 사용하는 방식으로 변경 범위를 줄인다.
+Rebuilding the entire connection on every failure simplifies the path but repeats RTC, key, and STUN preparation while waiting for a powered-off host. Always querying presence first adds a round trip even to normal initial connections. A WebSocket dedicated to online notifications requires separate waiting-state, lifecycle, and authorization contracts. Limit the scope of changes by using time-limited queries only after explicit offline status.
 
-## 영향
+## Impact
 
-오프라인 대기 중에는 기기 존재 조회·요청 한도 처리·DO 생존 확인 비용이 발생한다. 새 중앙에 적용하기 전의 404 응답에는 기존 전체 재연결로 복귀한다. 삭제된 기기의 명시적 오류는 복구를 중단한다. 빠른 재확인 정책은 장시간 지연된 연결을 재접속으로 전환할 수 있으며 외부망·절전 실측으로 조정해야 한다. 호스트 서버 갱신과 중앙 런처·Worker 적용이 각각 필요하다. 비공개 중앙 소스의 Git 제외 경계는 유지한다.
+Offline waiting incurs costs for device existence queries, request limit handling, and DO liveness checks. For 404 responses before the new central version is applied, fall back to the existing full reconnection process. Explicit errors for deleted devices stop recovery. The fast recheck policy may reconnect connections with prolonged delays and must be tuned through measurements on external networks and after sleep. Host server updates and central launcher and Worker application are each required. Preserve the Git exclusion boundary for private central source code.

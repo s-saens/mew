@@ -1,89 +1,89 @@
 ---
-title: "RAG·MOC·일반 파일 검색의 문서 탐색 비용 비교"
+title: "Comparing document discovery costs of RAG, MOC, and general file search"
 created: 2026-09-28
 updated: 2026-09-28
-description: "2026-09-28 RAG·MOC·일반 파일 검색의 실제 AI 탐색 시간·토큰·정확도 비교를 보존한다. 제거된 RAG를 현재 앱에서 재실행할 수는 없다."
+description: "Preserves the 2026-09-28 comparison of actual AI discovery time, tokens, and accuracy for RAG, MOC, and general file search. The removed RAG cannot be rerun in the current app."
 상위파일: "../MOC.md"
 ---
 
-[당시 실행 절차](../history/rag-operations.md#문서-탐색-방식-비교)
+[Execution procedure at the time](../history/rag-operations.md#comparing-document-discovery-methods)
 
-> 후속 결정: [ADR 0176](../history/decisions/0176-mew-remove-local-rag.md)으로 RAG를 제거했다. 측정 결과는 그대로 보존한다. 실행 스크립트는 앱에서 제거하고 이 설치의 원시 결과 폴더 `.data/benchmarks/doc-discovery-20260928/benchmark-discovery.py`에 보존했다. 현재 앱에서 과거 RAG 측정을 그대로 재실행할 수는 없다.
+> Subsequent decision: RAG was removed under [ADR 0176](../history/decisions/0176-mew-remove-local-rag.md). The measurement results remain preserved as recorded. The execution script was removed from the app and preserved at `.data/benchmarks/doc-discovery-20260928/benchmark-discovery.py` in this installation's raw results folder. The historical RAG measurements cannot be rerun unchanged in the current app.
 
-## 결론
+## Conclusion
 
-2026-09-28의 mew 문서 122개·질문 3개·총 9회 탐색에서는 **일반 파일 검색이 가장 적은 시간·입력 토큰·API 환산 비용으로 같은 필수 근거를 찾았다.** RAG는 MOC보다 입력 토큰과 환산 비용이 조금 적었지만 더 오래 걸렸다. 이는 기능명·증상이 비교적 분명한 소규모 문서 집합의 첫 비교이며, 모든 검색 문제에서의 우열을 뜻하지 않는다.
+Across 9 total searches covering 122 mew documents and 3 questions on 2026-09-28, **regular file search found the same required evidence with the least time, input tokens, and API-equivalent cost.** RAG used slightly fewer input tokens and had a slightly lower equivalent cost than MOC, but took longer. This is an initial comparison on a small document set with relatively clear feature names and symptoms; it does not establish superiority across all search problems.
 
-시간·토큰·비용은 질문 하나당 평균이며, 문서 회수는 세 문제 합계다. 입력 토큰에는 캐시 입력이 포함되며 모든 모델 호출의 누적값이다. 원문 파일의 단순 토큰 수가 아니다.
+Time, tokens, and cost are averages per question; document retrieval counts are totals across the three questions. Input tokens include cached input and are cumulative across all model calls. They are not simply token counts of the source files.
 
-| 방식 | 완료 시간 | 입력 토큰 | 그중 캐시 입력 | 출력 토큰 | API 환산 비용 | 필수 문서 회수 |
+| Method | Completion time | Input tokens | Cached input subset | Output tokens | API-equivalent cost | Required documents retrieved |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| 일반 파일 검색 | 38.2초 | 70,396 | 50,347 | 742 | $0.2879 | 9/9 |
-| MOC | 40.7초 | 109,711 | 83,456 | 728 | $0.3824 | 9/9 |
-| RAG | 50.0초 | 101,276 | 77,568 | 791 | $0.3542 | 9/9 |
+| Regular file search | 38.2 seconds | 70,396 | 50,347 | 742 | $0.2879 | 9/9 |
+| MOC | 40.7 seconds | 109,711 | 83,456 | 728 | $0.3824 | 9/9 |
+| RAG | 50.0 seconds | 101,276 | 77,568 | 791 | $0.3542 | 9/9 |
 
-- RAG vs 일반 검색: 시간 **+31.1%**, 입력 토큰 **+43.9%**, 환산 비용 **+23.0%**.
-- RAG vs MOC: 시간 **+22.9%**, 입력 토큰 **-7.7%**, 환산 비용 **-7.4%**.
-- 캐시가 전혀 없다고 가정한 동일 토큰량의 단가 환산도 일반 검색 $0.7410, MOC $1.1335, RAG $1.0523로 순서는 같다. 이는 별도 무캐시 실행 결과가 아니다.
+- RAG vs regular search: time **+31.1%**, input tokens **+43.9%**, equivalent cost **+23.0%**.
+- RAG vs MOC: time **+22.9%**, input tokens **-7.7%**, equivalent cost **-7.4%**.
+- Converting the same token volumes to costs assuming no cache at all gives the same ranking: general search $0.7410, MOC $1.1335, and RAG $1.0523. These are not results from separate uncached runs.
 
-## 비교 조건
+## Comparison conditions
 
-- 모델: `gpt-6-astra`, 추론 `medium`, 서비스 티어 `default`(standard). CLI `codex-cli 0.154.0`. 매번 `--ephemeral` 새 세션이며 사용자 설정·프로젝트 지침 자동 주입을 끄고 동일 공통 프롬프트를 사용했다. 기존 대화와 정답을 넘기지 않았다.
-- 대상: 당시 작업 트리의 현재 Markdown **122개, 905,770바이트**. `history`·`archives`·숨김 파일을 제외했다. 중앙 ADR·코드 파일·외부 웹은 세 방식 모두 범위 밖이다. 이 보고서는 실험 후 생성됐으며 재실행에서도 정답 누출을 막기 위해 제외한다.
-- 같은 스냅샷을 `/tmp`에 고정했다. 모델에 전체 파일 본문을 미리 주지 않았으며 전후 SHA-256 검사가 모두 일치했다. 공급자 프롬프트 캐시는 실제 반환값으로 기록했다.
-- RAG는 실제 mew CLI와 `Xenova/multilingual-e5-small:q8:mean-normalized` 검색을 먼저 수행하고 결과 원문·관련 링크를 읽었다. 일반 `rg` 전체 검색이나 MOC 탐색은 금지했다. 검색 요약만으로 답하지 않았다.
-- MOC는 `docs/MOC.md`에서 시작해 지도와 문서 링크를 따라갔다. 전체 파일 목록·내용 검색과 RAG를 금지했다. 이미 찾은 파일 안에서는 검색할 수 있었다.
-- 일반 검색은 파일 접근, `rg --files`, 내용 검색과 원문 읽기를 제공했다. MOC 내용과 RAG 사용은 제외했다. 세 방식 모두 동일한 최대 5개 문서·3~5개 사실의 JSON 답변을 요구했다.
-- 실행 순서는 첫 문제 RAG→MOC→일반, 둘째 MOC→일반→RAG, 셋째 일반→RAG→MOC였다. 병렬 실행에 따른 자원 경쟁을 피하려고 순차 실행했다. 문제별 방식당 1회이며 재시도·실패·시간초과는 없었다.
-- 시간은 CLI 프로세스 시작부터 답변·사용량 반환·종료까지의 실제 경과 시간이다. 모델 대기·생성·도구 실행을 포함한다. 실험 준비·현재 대화의 설계/채점 비용·앱 구현/테스트 시간은 제외한다.
-- 기존 임베딩 가중치를 재사용한 **빈 색인 구축과 첫 검색은 71.4초**였다. 표의 RAG 시간은 이 준비 이후의 값이다. 최초 모델 다운로드 시간과 CPU·메모리·디스크의 금전 비용은 측정하지 않았다. 준비까지 이번 RAG 3회에 배분하면 질문당 73.8초다.
+- Model: `gpt-6-astra`, reasoning `medium`, service tier `default` (standard). CLI `codex-cli 0.154.0`. Each run used a new `--ephemeral` session with automatic injection of user settings and project instructions disabled and the same shared prompt. No prior conversation or correct answers were passed in.
+- Scope: **122 current Markdown files, 905,770 bytes** in the working tree at the time. `history`, `archives`, and hidden files were excluded. Central ADRs, code files, and the external web were out of scope for all three methods. This report was created after the experiment and is also excluded from reruns to prevent answer leakage.
+- The same snapshot was fixed in `/tmp`. The model was not given the full file contents in advance, and all before-and-after SHA-256 checks matched. Provider prompt caching was recorded from the actual returned values.
+- RAG first searched using the actual mew CLI and `Xenova/multilingual-e5-small:q8:mean-normalized`, then read the source texts and related links from the results. Regular full-text `rg` search and MOC navigation were prohibited. Answers were not based solely on search summaries.
+- MOC started at `docs/MOC.md` and followed maps and document links. Full file listings, content searches, and RAG were prohibited. Searching within files already found was allowed.
+- Regular search provided file access, `rg --files`, content search, and source reading. MOC contents and RAG use were excluded. All three methods required the same JSON answer with at most 5 documents and 3–5 facts.
+- The execution order was RAG→MOC→regular for the first question, MOC→regular→RAG for the second, and regular→RAG→MOC for the third. Runs were sequential to avoid resource contention from parallel execution. There was 1 run per method per question, with no retries, failures, or timeouts.
+- Time is actual elapsed time from CLI process startup through answer and usage return and process exit. It includes model waiting, generation, and tool execution. It excludes experiment preparation, design/grading costs in the current conversation, and app implementation/testing time.
+- **Building an empty index and performing the first search using existing embedding weights took 71.4 seconds**. The RAG times in the table are measured after this preparation. Initial model download time and the monetary costs of CPU, memory, and disk were not measured. Allocating preparation across the 3 RAG runs in this experiment gives 73.8 seconds per question.
 
-세션 사용량은 [Codex 비대화형 JSON 이벤트](https://learn.chatgpt.com/docs/non-interactive-mode)의 `turn.completed.usage`에서 읽었다. 비용은 [GPT-6 Astra의 2026-09-28 확인 Standard 단가](https://developers.openai.com/api/docs/models/gpt-6-astra)를 적용한 **API 환산값이며 실제 구독 청구액이 아니다**. 100만 토큰당 비캐시 입력 $10·캐시 입력 $1·출력 $50을 사용했다. 캐시 쓰기는 모든 실행에서 0이다.
+Session usage was read from `turn.completed.usage` in [Codex non-interactive JSON events](https://learn.chatgpt.com/docs/non-interactive-mode). Costs are **API-equivalent amounts, not actual subscription charges**, calculated using [GPT-6 Astra Standard rates verified on 2026-09-28](https://developers.openai.com/api/docs/models/gpt-6-astra). Rates per 1,000,000 tokens were $10 for uncached input, $1 for cached input, and $50 for output. Cache writes were 0 in all runs.
 
 `환산 비용 = ((입력 - 캐시 입력) × 10 + 캐시 입력 × 1 + 출력 × 50) / 1,000,000`
 
-누적 입력을 매 요청의 컨텍스트 크기로 오인해 장문 단가를 적용하지 않는다. 개별 요청의 입력은 총 누적값보다 작으며, 이번 실행의 총 누적 입력도 모두 장문 단가 임계값 미만이다.
+Long-context rates are not applied by mistaking cumulative input for the context size of each request. Each request's input is smaller than the cumulative total, and even the cumulative input totals for all runs in this experiment are below the long-context pricing threshold.
 
-## 문제와 품질
+## Questions and quality
 
-| 문제 | 찾도록 요구한 필수 문서 | 사실 확인 기준 |
+| Question | Required documents to find | Fact-checking criteria |
 | --- | --- | --- |
-| 목록 줄번호·내부 링크 | [링크 기능](../features/%EB%AC%B8%EC%84%9C%C2%B7%EC%BD%94%EB%93%9C%C2%B7%EB%AF%B8%EB%94%94%EC%96%B4%20%ED%8E%B8%EC%A7%91/%EB%A7%81%ED%81%AC%C2%B7%ED%8C%8C%EC%9D%BC%20%EC%B0%B8%EC%A1%B0%C2%B7%EC%B2%A8%EB%B6%80.md), [패키지 계약](../development/packages.md), [사용법](../../../docs/guides/editor.md) | 중첩 거터·24px 일치, 인라인 줄바꿈·높이, Markdown 저장 보존 |
-| PDF 저장 충돌 | [PDF 기능](../features/%EB%AC%B8%EC%84%9C%C2%B7%EC%BD%94%EB%93%9C%C2%B7%EB%AF%B8%EB%94%94%EC%96%B4%20%ED%8E%B8%EC%A7%91/PDF%20%EC%9D%BD%EA%B8%B0%C2%B7%ED%95%84%EA%B8%B0%C2%B7%EC%A0%80%EC%9E%A5.md), [PDF 계약](../development/pdf-viewer.md), [사용법](../../../docs/guides/editor.md) | 충돌·초안 보존, 명시적 버전 검사 저장, 암호화·전자서명·인증 제한 |
-| /clear·큐·재접속 | [대화 기능](../features/%ED%84%B0%EB%AF%B8%EB%84%90%C2%B7%EC%97%90%EC%9D%B4%EC%A0%84%ED%8A%B8%C2%B7%EC%9E%90%EB%8F%99%ED%99%94/%EC%97%90%EC%9D%B4%EC%A0%84%ED%8A%B8%20%EB%8C%80%ED%99%94%C2%B7%ED%81%90%C2%B7%EB%B3%B5%EC%9B%90.md), [세션 계약](../development/agent-sessions.md), [사용법](../../../docs/guides/terminal-agents.md) | FIFO 세션 경계, Codex 종료 대기·실패 보존, 브라우저 재접속 |
+| List line numbers and internal links | [Link features](../features/document-code-media-editing/links-file-references-and-attachments.md), [Package contract](../development/packages.md), [Usage](../../../docs/guides/editor.md) | Nested gutters and 24px alignment, inline wrapping and height, Markdown preservation on save |
+| PDF save conflicts | [PDF features](../features/document-code-media-editing/pdf-reading-annotation-and-saving.md), [PDF contract](../development/pdf-viewer.md), [Usage](../../../docs/guides/editor.md) | Conflicts and draft preservation, explicit version-checked saves, encryption, digital signature, and certification restrictions |
+| /clear, queue, and reconnection | [Conversation features](../features/terminals-agents-automation/agent-conversations-queue-and-restoration.md), [Session contract](../development/agent-sessions.md), [Usage](../../../docs/guides/terminal-agents.md) | FIFO session boundaries, waiting for Codex to exit and preservation on failure, browser reconnection |
 
-기대 문서 목록은 실행 전에 고정했다. 경로 회수는 자동 집계하고 답변·인용 줄 범위·명령 이력은 별도로 검토했다. **9개 답변 모두 필수 문서 3개와 핵심 사실 3개를 충족했고, 인용 경로·줄 범위도 유효했다.** 탐색 방식 위반이나 문서 수정은 없었다. 같은 문서를 여러 구간으로 인용한 것은 하나로 센다. 독립 평가자나 사용자 승인에 의한 품질 판정은 아니다.
+The expected document list was fixed before execution. Path retrieval was tallied automatically, while answers, cited line ranges, and command histories were reviewed separately. **All 9 answers met the requirements for 3 required documents and 3 key facts, and their cited paths and line ranges were valid.** There were no search-method violations or document modifications. Multiple cited ranges from the same document count as one document. This was not a quality assessment by an independent evaluator or through user approval.
 
-## 개별 실행
+## Individual runs
 
-| 문제 | 방식 | 시간(초) | 입력 | 캐시 입력 | 출력 | 셸 명령 | 도구 출력 문자 | 환산 USD |
+| Question | Method | Time (seconds) | Input | Cached input | Output | Shell commands | Tool output characters | Equivalent USD |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| 목록 줄번호·내부 링크 | RAG | 42.38 | 72,055 | 51,072 | 842 | 4 | 16,892 | 0.303002 |
-| 목록 줄번호·내부 링크 | MOC | 39.42 | 125,682 | 90,880 | 759 | 9 | 34,185 | 0.476850 |
-| 목록 줄번호·내부 링크 | 일반 파일 검색 | 39.72 | 70,847 | 45,440 | 742 | 3 | 23,974 | 0.336610 |
-| PDF 저장 충돌 | MOC | 39.47 | 69,909 | 50,944 | 652 | 7 | 30,297 | 0.273194 |
-| PDF 저장 충돌 | 일반 파일 검색 | 39.07 | 66,907 | 54,144 | 715 | 3 | 17,266 | 0.217524 |
-| PDF 저장 충돌 | RAG | 46.89 | 103,837 | 82,560 | 717 | 4 | 26,107 | 0.331180 |
-| /clear·큐·재접속 | 일반 파일 검색 | 35.71 | 73,434 | 51,456 | 768 | 3 | 26,105 | 0.309636 |
-| /clear·큐·재접속 | RAG | 60.83 | 127,936 | 99,072 | 813 | 4 | 52,749 | 0.428362 |
-| /clear·큐·재접속 | MOC | 43.28 | 133,541 | 108,544 | 773 | 9 | 47,295 | 0.397164 |
+| List line numbers and internal links | RAG | 42.38 | 72,055 | 51,072 | 842 | 4 | 16,892 | 0.303002 |
+| List line numbers and internal links | MOC | 39.42 | 125,682 | 90,880 | 759 | 9 | 34,185 | 0.476850 |
+| List line numbers and internal links | Regular file search | 39.72 | 70,847 | 45,440 | 742 | 3 | 23,974 | 0.336610 |
+| PDF save conflicts | MOC | 39.47 | 69,909 | 50,944 | 652 | 7 | 30,297 | 0.273194 |
+| PDF save conflicts | Regular file search | 39.07 | 66,907 | 54,144 | 715 | 3 | 17,266 | 0.217524 |
+| PDF save conflicts | RAG | 46.89 | 103,837 | 82,560 | 717 | 4 | 26,107 | 0.331180 |
+| /clear, queue, and reconnection | Regular file search | 35.71 | 73,434 | 51,456 | 768 | 3 | 26,105 | 0.309636 |
+| /clear, queue, and reconnection | RAG | 60.83 | 127,936 | 99,072 | 813 | 4 | 52,749 | 0.428362 |
+| /clear, queue, and reconnection | MOC | 43.28 | 133,541 | 108,544 | 773 | 9 | 47,295 | 0.397164 |
 
-셸 명령 수는 CLI가 보고한 실행 단위다. 한 명령 안에서 여러 파일을 읽기도 하므로 파일 읽기 횟수와 같지 않다. 도구 출력 문자는 보조 지표이며 토큰으로 환산하지 않았다. 9회 세션 합계는 386.8초, API 환산 $3.0735다. 통신 확인용 짧은 사전 호출과 실험 설계 대화는 이 합계에 포함하지 않았다.
+Shell command counts are execution units reported by the CLI. A single command may read multiple files, so they are not file-read counts. Tool output characters are a supplementary metric and were not converted to tokens. The 9 sessions totaled 386.8 seconds and $3.0735 in API-equivalent cost. A short preliminary call to check connectivity and the experiment design conversation were excluded from these totals.
 
-## 결과 해석과 한계
+## Interpretation and limitations
 
-- RAG는 PDF·에이전트 문제에서 기능 문서를 찾기 위해 각각 한 번 더 검색했다. 검색 결과 요약을 받은 뒤 원문도 읽으므로 그 자체가 항상 토큰 절약은 아니다. 목록 문제에서는 MOC 대비 입력을 많이 줄였지만 PDF 문제에서는 반대였다.
-- MOC는 세 문제 모두 지도 4개를 먼저 읽었다. 소유 문서 연결을 확실히 찾았지만 추가 왕복과 큰 사용법 파일 읽기가 누적 입력을 늘렸다.
-- 일반 검색은 세 문제 모두 파일 목록→키워드 검색→필요 구간 읽기의 3개 셸 실행으로 끝났다. 파일명·기능명이 명확하고 의미 있는 폴더 구조가 이미 있다는 조건의 이점을 받았다. 문서 지도가 없는 무질서한 저장소를 시험한 것은 아니다.
-- 질문은 에디터·PDF·에이전트의 명확한 기능과 어휘를 포함한다. 모호한 표현, 다른 용어로 설명한 문제, 정답 부재, 큰 문서 집합에서는 결과가 달라질 수 있다.
-- 방식당 서로 다른 문제 3개뿐이고 같은 문제의 반복 표본은 없다. 유의성·신뢰구간을 주장하지 않는다. 시간에는 공급자 대기·호스트 부하가 포함되며, 공급자 캐시도 완전히 통제하지 못했다.
-- 실제 작업은 RAG·MOC·키워드 검색을 섞을 수 있다. 이 실험은 효과를 분리하기 위해 탐색 경로를 제한했다. **기존 작업 전체가 RAG 때문에 몇 % 빨라졌는지**를 입증하지 않는다.
-- 현재 자료로는 모든 작업에서 RAG를 강제하기보다 명확한 파일/기능명은 일반 검색으로 시작하고 모호하거나 검색이 실패할 때 의미 검색을 쓰는 가설이 합리적이다. 이 혼합 전략 자체는 이번에 측정하지 않았고 제품 기본 설정도 바꾸지 않았다.
+- RAG performed one additional search each for the PDF and agent questions to find feature documents. Because it reads source texts after receiving search result summaries, it does not inherently always save tokens. It substantially reduced input compared with MOC for the list question, but the reverse was true for the PDF question.
+- MOC read 4 maps first for all three questions. It reliably found links to owning documents, but additional round trips and reading large usage files increased cumulative input.
+- Regular search completed all three questions in 3 shell executions: file listing→keyword search→reading required sections. It benefited from clear file and feature names and an existing meaningful folder structure. This did not test a disorganized repository without document maps.
+- The questions contain clear features and terminology for the editor, PDF, and agents. Results may differ with ambiguous wording, problems described using different terminology, missing answers, or larger document sets.
+- Each method covered only 3 distinct questions, with no repeated samples of the same question. No claims of significance or confidence intervals are made. Times include provider waiting and host load, and provider caching was not fully controlled.
+- Real work can combine RAG, MOC, and keyword search. This experiment restricted search paths to isolate their effects. It does not demonstrate **what percentage faster all prior work became because of RAG**.
+- Based on the current evidence, a reasonable hypothesis is to start with regular search for clear file/feature names and use semantic search when wording is ambiguous or search fails, rather than requiring RAG for every task. This mixed strategy itself was not measured in this experiment, and product defaults were not changed.
 
-## 재현과 원시 자료
+## Reproduction and raw data
 
-- 명령: `python3 server/rag/benchmark-discovery.py --output .data/benchmarks/<새 실행명>`.
-- 이번 실행: `.data/benchmarks/doc-discovery-20260928/`. `metadata.json`, `snapshot-manifest.json`, `snapshot.tar.gz`, 조건별 프롬프트·JSONL·답변, `results.json`, `summary.json`, `quality-review.json`을 보관한다.
-- 문서 스냅샷 묶음 해시: `646ac608c68be9526dd2248d19eb4d406a99995919cc4c04ba6ebf267d57f54a`. 실행 중 스냅샷 변경 없음.
-- 스냅샷·원시 실행 로그는 Git 제외 `.data`에 둔다. 이 문서는 실험 조건·집계·한계만 소유한다.
-- 기존 `server/rag/evaluate.ts`는 상위 5개 결과의 기대 경로 포함 여부를 확인하는 별도 평가다. 기존 문제 세트의 이전 중앙 문서 경로를 이번 비교의 정답으로 재사용하지 않았다.
+- Command: `python3 server/rag/benchmark-discovery.py --output .data/benchmarks/<새 실행명>`.
+- This run: `.data/benchmarks/doc-discovery-20260928/`. Preserved artifacts include `metadata.json`, `snapshot-manifest.json`, `snapshot.tar.gz`, prompts, JSONL, and answers for each condition, `results.json`, `summary.json`, and `quality-review.json`.
+- Document snapshot bundle hash: `646ac608c68be9526dd2248d19eb4d406a99995919cc4c04ba6ebf267d57f54a`. The snapshot did not change during execution.
+- Snapshots and raw execution logs are stored in Git-excluded `.data`. This document owns only the experiment conditions, aggregates, and limitations.
+- The existing `server/rag/evaluate.ts` is a separate evaluation that checks whether expected paths appear in the top 5 results. Previous central document paths from the existing question set were not reused as correct answers for this comparison.

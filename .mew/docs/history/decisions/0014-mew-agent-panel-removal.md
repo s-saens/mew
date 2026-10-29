@@ -1,51 +1,51 @@
 ---
-provenance: "Liiiiv 중앙 ADR 이관본, 2026-10-14"
-description: "이관한 결정 기록: mew 에이전트 창 제거, 재추가·재조사 금지. 당시 선택·근거·후속 변경을 보존하며 현재 계약은 Mew 소유 문서에서 확인한다."
-title: "0014 — mew 에이전트 창 제거, 재추가·재조사 금지"
+provenance: "Migrated copy of a Liiiiv central ADR, 2026-10-14"
+description: "Migrated decision record: removal of the mew agent panel and prohibition on reintroducing or reinvestigating it. Preserves the choices, rationale, and subsequent changes at the time; consult Mew's owning documents for the current contract."
+title: "0014 — Remove the mew agent panel; prohibit reintroduction and reinvestigation"
 created: 2026-07-27
 updated: 2026-08-21
 ---
 
-- 날짜: 2026-07-25 (결정) / 2026-07-27 (SSoT에 기록)
-- 상태: 대체됨: 0034
-- 결정자: 송상훈 (지시)
+- Date: 2026-07-25 (decision) / 2026-07-27 (recorded in SSoT)
+- Status: Superseded by: 0034
+- Decision maker: Song Sanghoon (directive)
 
-> 무엇이 뒤집혔나 (2026-08-04): "재추가·재조사 금지"가 [ADR 0034](0034-mew-agent-panel-acp-reintroduction.md)로 대체됐다. 아래 "원인을 찾지 못했다"의 전제가 흔들렸다 — 제거된 `server/agent.ts`는 Claude Code CLI를 `-p --output-format json`으로, 즉 블로킹·비스트리밍으로 불렀다. 턴이 끝날 때까지 한 바이트도 흐르지 않으니 중간자에게는 유휴 연결로 보인다. 서버 밖에서 재현되지 않은 것도 이 설명과 맞는다. 0034는 스트리밍(ACP) 구조로 다시 만든다.
+> What was reversed (2026-08-04): the "prohibition on reintroduction and reinvestigation" was superseded by [ADR 0034](0034-mew-agent-panel-acp-reintroduction.md). The premise behind "the cause could not be found" below was called into question — the removed `server/agent.ts` invoked Claude Code CLI with `-p --output-format json`, meaning blocking, non-streaming execution. Because not a single byte flows until the turn ends, intermediaries see an idle connection. The failure to reproduce it outside the server is also consistent with this explanation. 0034 rebuilds it using a streaming (ACP) architecture.
 >
-> 그대로 유효한 것: 제거 자체와 그 근거 · `bypassPermissions` 지적 · 아래 "함께 지우면 안 되는 것"(디스크→방 협업 브리지).
+> What remains valid: the removal itself and its rationale · the concern about `bypassPermissions` · "What must not be removed along with it" below (the disk-to-room collaboration bridge).
 
-> 이 결정은 2026-07-25에 실행됐으나 어디에도 기록되지 않았다 — ops/repos.md (`이전 Liiiiv 문서: ops/repos.md`) 백로그가 "왜 접었는지라 ADR 대상"으로 표시해 둔 항목이다. [ADR 0012](0012-docs-repo-doc-allowlist-and-absorption.md) 정리 과정에서 기록한다.
+> This decision was executed on 2026-07-25 but was not recorded anywhere — the ops/repos.md (`이전 Liiiiv 문서: ops/repos.md`) backlog marked it as "an ADR candidate because it explains why it was abandoned." It is being recorded during the cleanup for [ADR 0012](0012-docs-repo-doc-allowlist-and-absorption.md).
 
-## 배경
+## Background
 
-mew에는 브라우저에서 Claude Code 에이전트와 대화하는 사이드바가 있었다 — `packages/agent-panel`(클라이언트), `server/agent.ts`(SDK 헤드리스 실행), `server/mcp.ts`(MCP 배선).
+mew had a sidebar for conversing with a Claude Code agent in the browser — `packages/agent-panel` (client), `server/agent.ts` (SDK headless execution), and `server/mcp.ts` (MCP wiring).
 
-증상: 프로덕션 서버(`server/serve.ts`) 안에서 실행할 때만 SDK의 첫 메시지가 약 20초 스톨하고 클라이언트에 `Failed to fetch`가 났다. 같은 코드를 서버 밖에서 단독 실행하면 재현되지 않았다.
+Symptom: only when running inside the production server (`server/serve.ts`), the SDK's first message stalled for about 20 seconds, and the client received `Failed to fetch`. Running the same code standalone outside the server did not reproduce the issue.
 
-원인을 찾지 못했다. `serve.ts` 컨텍스트에서만 발생한다는 것 외에 좁히지 못한 상태에서, 사용자가 기능 제거를 지시했다.
+The cause could not be found. With the issue narrowed down only to occurring in the `serve.ts` context, the user directed that the feature be removed.
 
-## 선택지
+## Options
 
-1. 원인을 계속 추적한다 — 장점: 기능이 살아난다. 단점: 재현 조건이 "프로덕션 서버 안에서만"이라 격리가 어렵고, 이미 상당한 시간을 썼다. mew의 핵심 가치(문서 편집)와 무관한 부가 기능이다.
-2. 기능을 남겨두고 비활성화 — 장점: 나중에 되살리기 쉽다. 단점: 죽은 코드가 남아 이후 작업자가 "이건 왜 안 켜지지"에 시간을 쓴다. 보안 표면(`bypassPermissions`로 도는 에이전트)도 그대로 남는다.
-3. 전면 제거 — 관련 패키지·서버 모듈을 지우고 터미널만 남긴다.
+1. Keep investigating the cause — Pros: restores the feature. Cons: reproduction is limited to "inside the production server," making isolation difficult, and substantial time has already been spent. This is an auxiliary feature unrelated to mew's core value (document editing).
+2. Keep the feature but disable it — Pros: easy to restore later. Cons: dead code remains, causing future contributors to spend time asking "why won't this turn on?" The security exposure (an agent running with `bypassPermissions`) also remains.
+3. Remove it entirely — delete the related packages and server modules, leaving only the terminal.
 
-## 결정
+## Decision
 
-3번 채택. `packages/agent-panel`·`server/agent.ts`·`server/mcp.ts`를 전면 제거하고 터미널(tmux)만 남긴다. 브라우저에서 에이전트를 쓰려면 터미널에서 Claude Code를 직접 띄운다.
+Adopt option 3. Remove `packages/agent-panel`, `server/agent.ts`, and `server/mcp.ts` entirely, leaving only the terminal (tmux). To use an agent in the browser, launch Claude Code directly in the terminal.
 
-재추가·재조사 금지. 다시 붙이려면 이 ADR을 대체하는 새 ADR이 필요하다. — 2026-08-04 [ADR 0034](0034-mew-agent-panel-acp-reintroduction.md)가 그 새 ADR이다.
+Do not re-add or reinvestigate it. Reintroducing it requires a new ADR that supersedes this one. — 2026-08-04 [ADR 0034](0034-mew-agent-panel-acp-reintroduction.md) is that new ADR.
 
-### 혼동 금지 — 함께 지우면 안 되는 것
+### Do not confuse these — what must not be removed along with it
 
-디스크→방 협업 브리지는 이 결정과 무관한 정상 기능이다. AI가 터미널에서 고친 `.md`가 열려 있는 Yjs 방에 `agent` 커서로 실시간 주입되는 동작으로, 제거된 에이전트 창과 별개 경로다. `appWrites` 메아리 원장이 사용자의 정상 타이핑을 보호한다. 이름이 비슷하다고 같이 지우지 않는다.
+The disk-to-room collaboration bridge is a working feature unrelated to this decision. It injects AI edits to `.md` made in the terminal into an open Yjs room in real time with an `agent` cursor, through a separate path from the removed agent panel. The `appWrites` echo ledger protects normal user typing. Do not remove it just because the names are similar.
 
-## 근거
+## Rationale
 
-- 부가 기능에 무한정 시간을 쓰지 않는다. mew는 내부 도구이고 에이전트 창은 터미널로 100% 대체된다. 대체재가 이미 같은 화면 안에 있는 기능의 미해결 버그를 쫓는 것은 비용 대비 가치가 없다.
-- "비활성화 후 보존"을 고르지 않은 이유: 죽은 코드는 다음 작업자에게 "고쳐야 할 것"으로 보인다. 이 ADR이 없었다면 실제로 그렇게 됐을 것이다 — 제거 사실이 코드에는 흔적을 남기지 않기 때문이다([README.md](../../README.md) write-back 트리거 7번의 사례).
-- 보안 측면의 부수 효과: 제거된 에이전트는 `--permission-mode bypassPermissions`로 워크스페이스 루트에서 돌았다. 승인 없이 파일 수정·명령 실행이 가능한 경로가 하나 사라졌다([ops/mew/security-review-2026-07-21.md](../security-review-2026-07-21.md) §4가 지적했던 항목).
+- Do not spend unlimited time on an auxiliary feature. mew is an internal tool, and the terminal replaces 100% of the agent panel's functionality. Chasing unresolved bugs in a feature whose replacement is already on the same screen is not worth the cost.
+- Why "disable and retain" was not chosen: dead code looks like "something to fix" to the next contributor. Without this ADR, that would actually have happened — because removal leaves no trace in the code (an example of write-back trigger 7 in [README.md](../../README.md)).
+- Security side effect: the removed agent ran at the workspace root with `--permission-mode bypassPermissions`. This eliminated one path that allowed file changes and command execution without approval (an item identified in [ops/mew/security-review-2026-07-21.md](../security-review-2026-07-21.md) §4).
 
-## 결과
+## Results
 
-- 2026-07-27 확인 — `packages/`에 `agent-panel`이 없고 소스 어디에도 참조가 없다. 다만 `mew/README.md`가 이 패키지를 계속 문서화하고 있었다(제거 후 이틀). ADR 0012가 다루는 드리프트의 실제 사례.
+- Verified on 2026-07-27 — `packages/` contains no `agent-panel`, and there are no references anywhere in the source. However, `mew/README.md` was still documenting this package (two days after removal). A real example of the drift addressed by ADR 0012.

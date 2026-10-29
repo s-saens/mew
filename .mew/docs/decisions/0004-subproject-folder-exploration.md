@@ -1,24 +1,24 @@
 ---
-title: "0004 — 하위 프로젝트도 일반 폴더로 탐색"
-description: "하위 프로젝트를 실제 계층·일반 정렬로 펼쳐 탐색하고 별도 화살표로 작업 루트를 여는 결정. ADR 0158의 인라인 탐색 금지를 대체하며, 독립 헤더 탭 표시는 후속 ADR 0019가 선택기로 대체한다."
+title: "0004 — Browse Subprojects as Regular Folders Too"
+description: "The decision to expand and browse subprojects in their actual hierarchy with normal sorting and open the working root through a separate arrow. Supersedes ADR 0158's prohibition on inline browsing; subsequent ADR 0019 replaces separate header tabs with a selector."
 created: 2026-10-15
 updated: 2026-10-19
 ---
 
-- 상태: 채택
-- 부분 대체: [ADR 0158](../history/decisions/0158-mew-subprojects-open-root-tabs.md)의 별도 진입점 배치·폴더 클릭 전환·인라인 탐색 및 생성 금지
-- 후속 결정: [ADR 0019](0019-project-selector.md)가 독립 헤더 탭 표시를 프로젝트 선택기로 대체한다. 이 문서의 일반 폴더 탐색·별도 이동 화살표·권한 경계는 유지한다.
+- Status: Adopted
+- Partially supersedes: [ADR 0158](../history/decisions/0158-mew-subprojects-open-root-tabs.md)'s separate entry point placement, switching on folder click, and prohibition on inline browsing and creation
+- Subsequent decision: [ADR 0019](0019-project-selector.md) replaces separate header tabs with a project selector. This document's regular folder browsing, separate navigation arrow, and permission boundaries remain in effect.
 
-## 배경
+## Background
 
-사용자는 문서 폴더에 적용한 일반 폴더 탐색과 별도 이동 화살표를 하위 프로젝트에도 요청했다. 폴더 내용을 확인할 때마다 프로젝트 탭을 전환해야 하는 경계를 제거한다.
+The user requested the same regular folder browsing and separate navigation arrow used for document folders for subprojects as well. Remove the boundary that required switching project tabs every time users wanted to inspect folder contents.
 
-## 결정
+## Decision
 
-직계·중첩 하위 프로젝트를 실제 부모 아래에서 다른 폴더와 같은 순서로 표시한다. 폴더 클릭은 펼침·접기이며 현재 트리에서 내부 파일 열기·생성·업로드·이동과 펼침·캐시 복원을 지원한다. 프로젝트 아이콘과 옆 화살표를 표시하고 화살표만 기존 프로젝트 탭 전환을 수행한다.
+Display direct and nested subprojects under their actual parents in the same sort order as other folders. Clicking a folder expands or collapses it; support opening, creating, uploading, and moving internal files in the current tree, as well as restoring expansion and cache state. Display a project icon and an adjacent arrow, with only the arrow performing the existing project tab switch.
 
-프로젝트 판별은 실제 `.mew` 디렉터리를 기준으로 유지한다. 프로젝트 탭 열기의 owner 제한·출발 루트 검증·중복 탭 재사용·계정별 상태와 실행 중 에이전트의 기존 경로는 유지한다. 파일 탐색·조작은 현재 프로젝트의 기존 파일 권한·숨김·차단 규칙을 적용한다. 프로젝트 행의 명령 메뉴는 계속 숨기고 명령은 해당 프로젝트 탭에서 실행한다.
+Continue identifying projects based on the actual `.mew` directory. Preserve the owner restriction on opening project tabs, source root validation, duplicate tab reuse, per-account state, and existing paths of running agents. Apply the current project's existing file permission, hiding, and blocking rules to file browsing and operations. Continue hiding the command menu on project rows and run commands from the corresponding project tab.
 
-## 근거와 영향
+## Rationale and Impact
 
-폴더 탐색과 작업 루트 선택을 각각 폴더 행과 화살표로 나누면 현재 맥락에서 내용을 확인하면서 필요할 때 독립 프로젝트로 이동할 수 있다. 하위 프로젝트의 펼침·지연 로드·파일 생성 차단과 직계 프로젝트의 별도 상단 구획을 제거한다. 상세 계약은 [파일 탐색](../features/%ED%94%84%EB%A1%9C%EC%A0%9D%ED%8A%B8%C2%B7%ED%8C%8C%EC%9D%BC%C2%B7%EA%B2%80%EC%83%89/%ED%8C%8C%EC%9D%BC%C2%B7%ED%8F%B4%EB%8D%94%20%ED%83%90%EC%83%89%EA%B3%BC%20%EC%A1%B0%EC%9E%91.md)과 [UI 계약](../development/ui-contracts.md#하위-프로젝트-탭-진입)이 소유한다.
+Assigning folder browsing to the folder row and working root selection to the arrow lets users inspect contents in the current context and move to an independent project when needed. Remove the blocks on expanding, lazy-loading, and creating files in subprojects, as well as the separate top section for direct subprojects. [File Browsing](../features/projects-files-search/file-folder-exploration-and-operations.md) and [UI Contract](../development/ui-contracts.md#하위-프로젝트-탭-진입) own the detailed contracts.

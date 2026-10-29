@@ -1,42 +1,42 @@
 ---
-provenance: "Liiiiv 중앙 ADR 이관본, 2026-10-14"
-description: "이관한 결정 기록: 에이전트셋은 탭 시작 프리셋이다. 당시 선택·근거·후속 변경을 보존하며 현재 계약은 Mew 소유 문서에서 확인한다."
-title: "0095 — 에이전트셋은 탭 시작 프리셋이다"
+provenance: "Migrated copy of a Liiiiv central ADR, 2026-10-14"
+description: "Migrated decision record: Agent sets are tab startup presets. Preserves the choices, rationale, and subsequent changes at the time; see the Mew owning document for the current contract."
+title: "0095 — Agent sets are tab startup presets"
 created: 2026-08-31
 updated: 2026-09-11
 ---
 
-- 날짜: 2026-08-31
-- 상태: 채택
-- 후속 결정: [0159](0159-mew-feature-driven-development.md) — 셋 프리셋은 유지하고 별도의 프로젝트 기능 작업 시스템 추가
-- 후속 결정: [0096](0096-mew-agent-tabs-created-after-selection.md) — 새 탭 선택·생성 시점
-- 대체: [0052](0052-mew-agent-sets-router-dispatch.md) — 고유 결정은 제거하거나 이 ADR에 흡수; 유지되는 공통 경계는 본문 참조
-- 결정자: 송상훈 (지시)
+- Date: 2026-08-31
+- Status: Adopted
+- Follow-up decision: [0159](0159-mew-feature-driven-development.md) — Retain set presets and add a separate project feature task system
+- Follow-up decision: [0096](0096-mew-agent-tabs-created-after-selection.md) — Timing of new tab selection and creation
+- Supersedes: [0052](0052-mew-agent-sets-router-dispatch.md) — Remove its unique decisions or incorporate them into this ADR; see the body for shared boundaries that remain
+- Decision maker: Song Sanghoon (directive)
 
-## 배경
+## Background
 
-[ADR 0052](0052-mew-agent-sets-router-dispatch.md)는 에이전트셋을 무인 작업 단위로 보고, 별도 창의 라우터가 프롬프트를 대상 셋의 서버 큐에 배정하게 했다. 라우팅 한 턴이 추가되고, 사람과 한 대화에 붙어 일하는 에이전트 창과 작업 흐름도 갈라졌다.
+[ADR 0052](0052-mew-agent-sets-router-dispatch.md) treated agent sets as unattended work units, with a router in a separate window assigning prompts to the target set's server queue. This added a routing turn and split the workflow from the agent window where an agent works with a person in a single conversation.
 
-## 선택지
+## Options
 
-1. 별도 창의 라우터·큐를 유지한다 — 무인 분업은 남지만 탭 대화와 선택 흐름이 계속 갈린다.
-2. 셋을 탭 시작 프리셋으로 바꾼다 — 새 탭에서 런타임 또는 셋을 같은 방식으로 골라 즉시 대화를 시작한다.
+1. Keep the router and queue in a separate window — unattended division of work remains, but tab conversations and the selection flow remain separate.
+2. Convert sets into tab startup presets — select a runtime or set in the same way in a new tab and start a conversation immediately.
 
-## 결정
+## Decision
 
-2번을 채택한다.
+Adopt option 2.
 
-- 에이전트셋은 `런타임 + 선택 모델 + 역할` 정보 객체다. 역할은 해당 탭 ACP 세션의 첫 사용자 프롬프트 앞에 시스템 지시로 한 번 붙인다.
-- 새 탭 런타임 선택 화면 맨 위에 `런타임 | 에이전트셋` 토글을 둔다. 런타임은 기존 목록, 에이전트셋은 저장된 셋의 리스트와 마지막 `+ 새 에이전트셋 추가` 항목을 보인다.
-- 어느 쪽을 고르든 같은 에이전트 창 탭의 ACP 세션을 연다. 셋은 런타임·모델·역할을 그 탭에 고정하며, 런타임만 고른 탭은 기존 런타임 기본값을 쓴다.
-- 셋 목록에는 라우터가 없고, 라우터·서버 소유 작업 큐·별도 에이전트셋 창을 제거한다. 이전 저장값에 라우터가 있으면 읽을 때 제외한다.
-- 셋 정의 CRUD와 런타임별 모델 후보 탐색은 남긴다. 모델 후보가 없으면 생성/수정 화면에서 기존처럼 탐색하거나 직접 입력한다.
+- An agent set is a `런타임 + 선택 모델 + 역할` information object. Its role is prepended once as system instructions before the first user prompt in that tab's ACP session.
+- Place a `런타임 | 에이전트셋` toggle at the top of the new tab runtime selection screen. Runtime shows the existing list; agent sets shows the list of saved sets with a final `+ 새 에이전트셋 추가` entry.
+- Either selection opens an ACP session in the same agent window tab. A set fixes the runtime, model, and role for that tab; a tab with only a runtime selected uses the existing runtime defaults.
+- The set list has no router, and the router, server-owned task queue, and separate agent set window are removed. If older saved values contain a router, exclude it when reading them.
+- Retain set definition CRUD and discovery of model candidates for each runtime. If no model candidates are available, discover them or enter one manually on the create/edit screen as before.
 
-## 근거
+## Rationale
 
-탭 하나가 사람과 에이전트의 대화 하나라는 [ADR 0046](0046-mew-agent-panel-tabs-one-session-per-tab.md)의 모델에 맞는다. 프리셋은 대화를 시작하는 설정일 뿐 별도의 작업 수명·큐를 만들지 않아, 선택·진행 확인·중단이 한 화면에 모인다.
+This fits the model in [ADR 0046](0046-mew-agent-panel-tabs-one-session-per-tab.md), where one tab represents one conversation between a person and an agent. A preset is simply configuration for starting a conversation and creates no separate task lifecycle or queue, bringing selection, progress checks, and stopping into one screen.
 
-## 결과
+## Results
 
-- 에이전트셋은 서버 재시작 뒤에도 정의만 남고, 실행 중인 탭 세션은 기존 에이전트 창의 감독·복원 계약을 따른다.
-- 무인 라우팅과 셋별 작업 이력은 제공하지 않는다. 다시 필요해져도 이 프리셋 모델을 확장하지 않고 별도 작업 시스템으로 결정한다.
+- Only agent set definitions persist after a server restart; running tab sessions follow the existing agent window supervision and restoration contract.
+- Unattended routing and per-set task history are not provided. If needed again, they will be addressed through a separate task system rather than by extending this preset model.

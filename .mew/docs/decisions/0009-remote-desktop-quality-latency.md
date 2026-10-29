@@ -1,35 +1,35 @@
 ---
-title: "품질 우선 원격 데스크톱의 전송 지연 제한"
-description: "품질 우선의 인코더 고정·최대 2초 전송 대기를 인코더/송신 연동·100ms 일반 프레임 한도로 대체한 결정. 송신 한도·고정 수신 버퍼 보정은 유지하며 이후 처리 중첩·RTT 기준과 회복은 후속 ADR 0024를 따른다."
+title: "Transmission Latency Limits for Quality-First Remote Desktop"
+description: "Decision replacing quality-first fixed encoder settings and transmission waits of up to 2 seconds with coordinated encoder/transmission control and a 100ms limit for normal frames. Retains transmission limits and fixed receive-buffer compensation; subsequent processing overlap, RTT criteria, and recovery follow subsequent ADR 0024."
 created: 2026-10-16
 updated: 2026-10-20
 ---
 
-## 상태
+## Status
 
-채택. 코드·격리 검증의 결정이며 실제 운영 적용·기기 성능 확인과 구분한다.
+Adopted. This is a decision based on code and isolated verification, distinct from actual production application and device performance verification.
 
-후속 [ADR 0024](0024-remote-desktop-fhd-pipeline.md)가 이후 남아 있던 한 프레임 직렬 처리와 RTT 반복 감속·느린 회복을 대체한다. 아래는 2026-10-16 결정의 근거이며 현재 상세 계약은 개발 문서를 따른다.
+Subsequent [ADR 0024](0024-remote-desktop-fhd-pipeline.md) supersedes the remaining serial processing of one frame at a time, repeated RTT-based slowdowns, and slow recovery. The following records the rationale for the 2026-10-16 decision; the current detailed contract follows the development documentation.
 
-## 배경
+## Background
 
-2026-10-08 품질 우선 구현은 인코더 bitrate를 유지하면서 pacer 송신량만 낮추고 프레임마다 500–2000ms를 기다렸다. 전송 ACK가 다음 프레임 처리를 막으므로 느린 회선에서는 큰 프레임과 긴 반응 지연이 반복될 수 있었다.
+The 2026-10-08 quality-first implementation maintained the encoder bitrate while reducing only pacer throughput and waiting 500–2000ms per frame. Because transmission ACKs blocked processing of the next frame, large frames and long response delays could recur on slow connections.
 
-고정 수신 버퍼 체류 시간만으로 속도 우선 bitrate를 계속 낮추는 오판도 재현했다. 별도로 2ms분의 작은 token bucket은 송신 타이머가 2–4ms 간격으로 실행될 때 전송 예산을 버려, 혼잡이 없어도 처리량을 낮췄다. 이는 결정론적 로직 재현이며 실제 기기의 지연 원인을 모두 측정한 결과는 아니다.
+We also reproduced erroneous continued reductions in speed-first bitrate based solely on fixed receive-buffer residence time. Separately, a small token bucket holding 2ms of budget discarded transmission budget when the send timer ran at 2–4ms intervals, reducing throughput even without congestion. This is a deterministic reproduction of the logic, not a measurement of all causes of latency on actual devices.
 
-## 결정
+## Decision
 
-- 두 전송 우선순위 모두 혼잡 시 인코더와 pacer bitrate를 함께 조절한다.
-- 품질 우선은 현재 지원 FPS에서 일반 프레임 전송 대기를 100ms로 제한한다. 속도 우선은 기존의 더 짧은 한도를 유지한다. 복구 IDR에는 두 모드 모두 500ms를 허용한다.
-- 품질 우선은 더 큰 수신 버퍼 지연 증가를 허용해 선명도를 우선하되 화질 고정을 약속하지 않는다. 고정 수신 버퍼와 유휴 표본은 실제 혼잡 증가와 구분한다.
-- pacing burst는 최대 패킷 두 개의 전송 비용 또는 전송 예산 5ms분으로 제한한다. 짧은 타이머 지연을 흡수하되 프레임 경계·긴 정지 뒤 무제한 전송을 허용하지 않는다.
+- Both transmission priorities adjust encoder and pacer bitrates together during congestion.
+- Quality-first limits transmission waits for normal frames to 100ms at currently supported FPS settings. Speed-first retains its existing shorter limit. Both modes allow 500ms for recovery IDRs.
+- Quality-first prioritizes clarity by allowing a larger increase in receive-buffer delay, but does not promise fixed image quality. Fixed receive-buffer delay and idle samples are distinguished from actual increases in congestion.
+- Limit pacing bursts to the transmission cost of at most two packets or 5ms of transmission budget. Absorb short timer delays without allowing unlimited transmission at frame boundaries or after long pauses.
 
-이 결정은 이전 품질 우선의 인코더 고정·긴 프레임 대기를 대체한다. H.264 참조 프레임 폐기 후 IDR 복구, 직접 WebRTC·권한·입력·세션 수명은 기존 계약을 따른다.
+This decision supersedes the previous quality-first fixed encoder settings and long frame waits. IDR recovery after discarding H.264 reference frames, direct WebRTC, permissions, input, and session lifecycles follow the existing contracts.
 
-## 근거와 영향
+## Rationale and Impact
 
-화질 고정과 짧은 지연을 가용 대역폭에 관계없이 동시에 보장할 수 없다. 오래된 화면을 계속 보내는 대신 해상도·요청 품질 모드를 유지하며 압축량과 실제 FPS의 변화를 허용한다. 인코더 FPS를 동적으로 바꿔 프레임당 화질을 보장하는 기능은 추가하지 않는다.
+Fixed image quality and low latency cannot both be guaranteed regardless of available bandwidth. Instead of continuing to send stale screen content, preserve the resolution and requested quality mode while allowing compression and actual FPS to vary. Do not add a feature that dynamically changes encoder FPS to guarantee per-frame image quality.
 
-범용 재압축이나 새로운 영상 코덱을 넣기 전에 현재 H.264 전송 경로의 잘못된 감속과 대기를 줄인다. HEVC·AV1·인코딩/전송 중첩과 완전한 혼잡 제어는 별도 검증 대상이다. 자체 프레임 전송 한도는 입력부터 표시까지의 총지연 상한이 아니며, 실제 GPU·외부망·StarDesk 대비 성능은 따로 측정해야 한다.
+Reduce incorrect slowdowns and waits in the current H.264 transmission path before introducing general-purpose recompression or new video codecs. HEVC, AV1, encoding/transmission overlap, and full congestion control require separate verification. The internal frame transmission limit is not an upper bound on total input-to-display latency; actual performance on GPUs and external networks, and performance relative to StarDesk, must be measured separately.
 
-현재 수치·동작과 검증 범위는 [개발 계약](../development/remote-desktop.md#전송과-지연), 사용자가 고르는 우선순위는 [사용법](../../../docs/guides/remote-desktop.md#화면과-설정)을 따른다.
+Current values, behavior, and verification scope follow the [Development Contract](../development/remote-desktop.md#transport-and-latency); user-selectable priorities follow the [Usage Guide](../../../docs/guides/remote-desktop.md#display-and-settings).

@@ -1,25 +1,25 @@
 ---
-provenance: "Liiiiv 중앙 ADR 이관본, 2026-10-14"
-description: "에이전트 패널의 기본 지침 선택·Markdown 원문 편집·충돌 보호를 결정한 기록. 공용 저장 범위는 후속 ADR 0202의 계정별 저장으로 변경된다."
-title: "0171 — 에이전트 기본 지침 설정과 Markdown 기준본"
+provenance: "Migrated copy of a Liiiiv central ADR, 2026-10-14"
+description: "A record of the decision on selecting default guidance, editing Markdown source, and protecting against conflicts in the agent panel. The shared storage scope is changed to per-account storage by subsequent ADR 0202."
+title: "0171 — Agent default guidance settings and the Markdown canonical source"
 created: 2026-09-23
 updated: 2026-09-23
 ---
 
-- 날짜: 2026-09-23
-- 상태: 채택
-- 후속 결정: [0202](0202-mew-account-agent-settings.md) — 기본 지침·런타임 설정·모델 기본값의 로그인 계정별 저장; 기존 편집·권한·전달 경계 유지
-- 부분 대체: [0165](0165-mew-common-agent-guidance-file.md) — 설정 진입점과 원문 파일 형식; 서버 공통 범위·권한·ACP 전달 시점 유지
-- 결정자: 사용자 요청
+- Date: 2026-09-23
+- Status: Adopted
+- Subsequent decision: [0202](0202-mew-account-agent-settings.md) — per-login-account storage of default guidance, runtime settings, and model defaults; existing editing, permission, and delivery boundaries remain
+- Partially supersedes: [0165](0165-mew-common-agent-guidance-file.md) — settings entry point and source file format; retain the server-wide scope, permissions, and ACP delivery timing
+- Decision maker: User request
 
-## 결정
+## Decision
 
-- 사이드바 공통 안내 행을 제거하고 에이전트 패널의 Skills·MCP 옆에 기본 지침 설정 버튼을 둔다. 서버 파일 권한(`serverFiles`) 경계를 유지한다.
-- 기준본은 `DATA_DIR/agent-guidance.md`다. 기존 TXT가 있으면 내용을 그대로 복사하여 최초 생성하며, 기존 TXT는 보존하되 이후 읽기·편집에는 MD를 사용한다. MD가 이미 있으면 덮어쓰지 않는다.
-- 커밋 방식·응답 언어·답변 길이는 MD 안의 항목별 표시 구간에 일반 지침 문장으로 저장한다. 별도 설정 사본을 만들지 않는다. 변경한 항목만 교체하며 직접 작성한 나머지 원문은 보존한다.
-- 파일 보기로 기존 에디터에서 원문을 편집한다. 설정창은 원문에서 선택값을 읽고 사용자 정의 문구를 구분한다. 원문이 바뀐 경우 이전 revision으로 저장하지 않는다.
-- 공통 설정은 다음 실제 ACP 요청부터 적용한다. 프로젝트 자동 안내 끄기·프로젝트 추가 지침·터미널 직접 입력 경계는 유지한다.
+- Remove the shared guidance row from the sidebar and place a default guidance settings button next to Skills and MCP in the agent panel. Preserve the server file permission (`serverFiles`) boundary.
+- The canonical source is `DATA_DIR/agent-guidance.md`. If an existing TXT file is present, create it initially by copying that file's contents unchanged. Preserve the existing TXT file, but use MD for subsequent reading and editing. Do not overwrite an existing MD file.
+- Store commit method, response language, and response length as plain guidance sentences in marked sections for each item within the MD file. Do not create a separate settings copy. Replace only changed items and preserve the rest of the manually written source.
+- Use View File to edit the source in the existing editor. The settings dialog reads selected values from the source and distinguishes custom wording. If the source has changed, do not save against an older revision.
+- Apply shared settings starting with the next actual ACP request. Preserve the boundaries for disabling automatic project guidance, additional project guidance, and direct terminal input.
 
-## 근거
+## Rationale
 
-자주 쓰는 지침은 선택 UI로 바꾸고 자유로운 원문 편집도 유지한다. 기존 사용자 지침을 마이그레이션하거나 설정을 바꿀 때 잃지 않도록 원문 하나를 기준으로 삼는다.
+Provide a selection UI for frequently used guidance while retaining unrestricted source editing. Use a single source so existing user guidance is not lost during migration or settings changes.

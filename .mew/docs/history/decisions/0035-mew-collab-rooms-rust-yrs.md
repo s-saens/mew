@@ -1,155 +1,155 @@
 ---
-provenance: "Liiiiv 중앙 ADR 이관본, 2026-10-14"
-description: "이관한 결정 기록: mew 협업 방 상태를 Rust(yrs)로, 디스크→방 브리지는 프로토콜 클라이언트로. RTT·검색 Rust는 접음. 당시 선택·근거·후속 변경을 보존하며 현재 계약은 Mew 소유 문서에서 확인한다."
-title: "0035 — mew 협업 방 상태를 Rust(yrs)로, 디스크→방 브리지는 프로토콜 클라이언트로. RTT·검색 Rust는 접음"
+provenance: "Migrated copy of a Liiiiv central ADR, 2026-10-14"
+description: "Migrated decision record: move mew collaboration room state to Rust (yrs) and make the disk→room bridge a protocol client. Abandon Rust for RTT and search. Preserves the choices, rationale, and subsequent changes from that time; consult the Mew owning documents for the current contract."
+title: "0035 — Move mew collaboration room state to Rust (yrs) and make the disk→room bridge a protocol client. Abandon Rust for RTT and search"
 created: 2026-08-04
 updated: 2026-08-20
 ---
 
-- 날짜: 2026-08-04
-- 상태: 채택
-- 결정자: 송상훈 (지시)
+- Date: 2026-08-04
+- Status: Adopted
+- Decision maker: Song Sanghoon (directive)
 
-## 배경
+## Background
 
-mew에서 "문서를 열 때 느리다"는 보고로 시작한 조사다. 원인은 대역폭이 아니라 직렬 왕복 횟수였다 —
-문서 본문 렌더가 `collab.synced`를 기다리고(`packages/editor/src/Editor.tsx`), synced는 클라이언트가
-sync step1을 보내고 서버가 step2로 답한 뒤에야 선다. TCP + (TLS) + WS 업그레이드 + step1/step2 =
-3~5 RTT.
+This investigation began with a report that "opening documents is slow" in mew. The cause was the
+number of sequential round trips, not bandwidth: document body rendering waits for `collab.synced` (`packages/editor/src/Editor.tsx`), and synced becomes true only
+after the client sends sync step1 and the server responds with step2. TCP + (TLS) + WS upgrade + step1/step2 = 3–5
+RTTs.
 
-조사 중 나온 후보를 모두 검토했고, 실제로 채택한 것과 접은 것이 갈렸다. 이 ADR은 그 갈림을 한곳에
-남긴다 — 접은 쪽의 사유가 코드에 흔적을 남기지 않기 때문이다.
+All candidates identified during the investigation were reviewed, and some were adopted while others were dropped. This ADR records that split
+in one place, because the reasons for dropping options leave no trace in the code.
 
-이미 반영한 것(이 ADR의 대상 아님): 서버가 접속 즉시 요청받지 않은 sync step2(방의 전체 상태)를
-보내도록 했다(`server/collab.ts`). 3 RTT → 2 RTT. Yjs sync 프로토콜에서 step2의 상태 벡터는 선택
-인자이고(생략 = 전체 상태) 업데이트 적용은 멱등이라, 기존 프로토콜 안에서 성립하는 변경이며 클라이언트
-수정이 필요 없다. 프로토콜 봉투를 바꾸지 않으므로 뒤집기 어려운 선택이 아니다.
+Already implemented (outside this ADR's scope): the server now sends unsolicited sync step2 (the room's full state) immediately
+upon connection (`server/collab.ts`). 3 RTTs → 2 RTTs. In the Yjs sync protocol, step2's state vector is optional (omitted = full state), and applying
+updates is idempotent, so this change works within the existing protocol and requires no client changes. Because
+it does not change the protocol envelope, it is not a difficult choice to reverse.
 
-Rust 이관 후보는 셋이었고 순위는 다음과 같았다.
+There were three candidates for migration to Rust, ranked as follows.
 
-1. `server/collabAgent.ts`의 헤드리스 tiptap + happy-dom (냄새는 가장 강함)
-2. `server/collab.ts`의 협업 방 상태 (Y.Doc + sync 프로토콜)
-3. `server/search.ts`의 Node 줄 단위 스캔
+1. Headless tiptap + happy-dom in `server/collabAgent.ts` (the strongest code smell)
+2. Collaboration room state in `server/collab.ts` (Y.Doc + sync protocol)
+3. Node line-by-line scanning in `server/search.ts`
 
-## 선택지
+## Options
 
-### Rust 이관 대상
+### Rust migration targets
 
-1. 후보 1 (collabAgent를 Rust로) — 장점: 첫 방 열기 ~170ms가 여기서 났다. 단점: 막힘. 이
-   브리지는 마크다운 ↔ ProseMirror 변환을 `tiptap-markdown`(내부적으로 markdown-it) + mew 자체 노드
-   직렬화기(`serverExtensions.ts` · `databaseMarkdown.ts` · `MediaNodes.ts` · `imageSchema.ts`)로 한다.
-   Rust 구현이 이 조합의 출력과 바이트 단위로 일치하지 않으면 사용자 문서가 조용히 손상된다.
-   게다가 이 ~170ms는 서버 수명당 한 번이라 예열로 사라진다(아래 근거).
-2. 후보 2 (방 상태를 Rust로) — 장점: y-protocols가 언어 중립이라 와이어 포맷을 바꾸지 않고
-   구현을 갈아낄 수 있다. 클라이언트 수정 0. 단점: 새 블로커가 있다(아래).
-3. 후보 3 (search를 Rust로) — 장점: 없다시피(측정 참조). 단점: JS `RegExp`와 Rust `regex` 크레이트의
-   의미가 다르다 — lookahead·backreference 미지원, `replaceInFile`의 `$1` 확장도 JS 의미다. 사용자가
-   쓰는 정규식 모드의 동작이 바뀐다.
+1. Candidate 1 (move collabAgent to Rust) — Benefit: the ~170 ms for opening the first room came
+   from here. Drawback: blocked. This bridge converts Markdown ↔ ProseMirror using `tiptap-markdown` (internally markdown-it) plus
+   mew's own node serializers (`serverExtensions.ts`, `databaseMarkdown.ts`, `MediaNodes.ts`, and `imageSchema.ts`). Unless a Rust implementation matches this combination's output byte for byte, user
+   documents will be silently corrupted. Moreover, this ~170 ms occurs only once
+   per server lifetime and disappears with warmup (evidence below).
+2. Candidate 2 (move room state to Rust) — Benefit: y-protocols is language-neutral, so the implementation can be replaced without
+   changing the wire format. Client changes: 0. Drawback: there is a new blocker (below).
+3. Candidate 3 (move search to Rust) — Benefit: almost none (see measurements). Drawback: JS `RegExp` and Rust's `regex` crate have different
+   semantics: lookahead and backreferences are unsupported, and `$1` expansion in `replaceInFile` also uses JS semantics. This changes the behavior
+   of the regex mode users rely on.
 
-### 왕복 줄이기 (별도 축, 모두 접음)
+### Reducing round trips (a separate track, all abandoned)
 
-- 소켓 멀티플렉싱 — 소켓 하나에 방 N개. 단점: 모든 메시지에 roomKey 접두사 = 와이어 포맷 변경.
-  `npm run build`가 즉시 배포이므로 띄워 둔 탭은 새 서버 + 옛 JS를 만나 그 탭의 협업이 새로고침까지
-  죽는다. 더 나쁜 것은 구독 해제 경로가 없다는 점 — `ws.on('close')`가 유일한 탈퇴 지점이라
-  문서를 옮겨도 close가 뜨지 않는다. 명시적 leave 메시지를 다섯 경로(탭 닫기·pane 닫기·프로젝트
-  전환·언마운트·StrictMode 이중 마운트)에서 정확히 한 번씩 보내야 하고, 하나라도 새면
-  `removeAwarenessStates` 누락(유령 커서) · `closeRoomIfEmpty` 누락(방마다 헤드리스 tiptap과 fs
-  watcher 누수) · `MAX_ROOMS` 소진이 동시에 온다. 그리고 이득은 콜드 오픈에서 1 RTT뿐이다.
-- 소켓 풀링 — 탭을 옮겨도 소켓·Y.Doc을 살려둔다. A→B→A가 0 RTT. 단점: 비활성 문서에 커서가 남고,
-  클라이언트당 방 5개 + 브리지 에디터 5개가 살아 `MAX_ROOMS=200`이 동시 접속 ~40명에서 걸린다.
+- Socket multiplexing — N rooms on one socket. Drawback: a roomKey prefix on every message changes the wire
+  format. Since `npm run build` deploys immediately, open tabs encounter the new server with old JS, breaking collaboration
+  in those tabs until refresh. Worse, there is no unsubscribe path: `ws.on('close')` is the only departure
+  point, so switching documents does not trigger close. An explicit leave message must be sent exactly
+  once from each of five paths (tab close, pane close, project switch, unmount, and StrictMode
+  double mount). A leak in any one simultaneously causes missing `removeAwarenessStates` (ghost cursors), missing `closeRoomIfEmpty` (headless tiptap and fs
+  watcher leaks in each room), and exhaustion of `MAX_ROOMS`. And the gain is only 1 RTT on a cold open.
+- Socket pooling — keep sockets and Y.Doc alive when switching tabs. A→B→A takes 0 RTTs. Drawback: cursors remain in inactive
+  documents, and 5 rooms plus 5 bridge editors stay alive per client, hitting `MAX_ROOMS=200` at ~40 concurrent users.
 
-### 브리지가 방 상태를 잃는 문제 (후보 2의 블로커)
+### The bridge losing access to room state (blocker for candidate 2)
 
-`server/collabAgent.ts`가 `Collaboration.configure({ document: room.doc, field: 'default' })`로 방의
-JS `Y.Doc`을 직접 붙들고 있다. `room.doc`의 외부 소비자는 이 파일 하나뿐이다. 방 상태가 Rust로
-가면 이 결합이 성립하지 않는다.
+`server/collabAgent.ts` directly holds the room's JS `Y.Doc` through `Collaboration.configure({ document: room.doc, field: 'default' })`. This file is the only external consumer
+of `room.doc`. If room state moves to Rust, this coupling no
+longer works.
 
-- (a) 브리지를 프로토콜 클라이언트로 — 자기 `Y.Doc`을 갖고 sync 메시지로 방과 동기화한다.
-  장점: 결합이 끊기고, 브라우저 클라이언트와 같은 경로를 탄다. 단점: 브리지 재배선.
-- (b) 브리지도 Rust로 — 후보 1과 같은 벽(문서 손상 위험)에 부딪힌다.
-- (c) doc을 양쪽에 둔다 — 진실 원천이 둘. 반드시 갈라진다.
+- (a) Make the bridge a protocol client — it has its own `Y.Doc` and synchronizes with the room through sync messages. Benefit:
+  decouples it and uses the same path as browser clients. Drawback: requires rewiring the bridge.
+- (b) Move the bridge to Rust too — hits the same wall as candidate 1 (risk of document corruption).
+- (c) Keep a doc on both sides — two sources of truth. They will inevitably diverge.
 
-## 결정
+## Decision
 
-후보 2만 한다. 후보 1·3과 왕복 줄이기(멀티플렉싱·풀링)는 접는다.
+Proceed only with candidate 2. Drop candidates 1 and 3 and round-trip reduction through multiplexing and pooling.
 
-방 상태를 Rust로 옮기고, 브리지는 (a) 프로토콜 클라이언트로 전환한다. 경계는 최소로 긋는다.
+Move room state to Rust and convert the bridge to (a), a protocol client. Keep the boundary minimal.
 
-Rust가 소유하는 것 — napi-rs 인프로세스 네이티브 모듈. 방의 `yrs::Doc`과 sync 프로토콜
-(step1 / step2 / update) 뿐이다. 별도 프로세스로 빼지 않는다 — 포트와 인증을 한 벌 더 만들게 된다.
+What Rust owns — an in-process napi-rs native module. Only the room's `yrs::Doc` and sync protocol (step1 / step2
+/ update). Do not move it to a separate process; that would require another set of ports and authentication.
 
-Node에 남는 것 — ws 업그레이드와 `authorizeCollab`(`server/reqAuth.ts`) 인증 경계 전부, ws
-프레이밍, `clients` 맵, `MAX_ROOMS`, `RoomLifecycle`, 그리고 awareness 전부. awareness는 CRDT가
-아니라 clock + JSON 맵이라 Rust로 갈 이유가 없고, 남기면 Rust 표면이 크게 줄어든다.
-권한 모델은 바뀌지 않는다.
+What stays in Node — ws upgrades and the entire `authorizeCollab` (`server/reqAuth.ts`) authentication boundary, ws framing, the `clients`
+map, `MAX_ROOMS`, `RoomLifecycle`, and all awareness handling. Awareness is a clock + JSON map, not a CRDT, so there is no reason to move
+it to Rust; keeping it in Node greatly reduces the Rust surface. The permission model
+does not change.
 
-브리지 전송은 인프로세스 채널이다 — 실제 루프백 소켓을 쓰지 않는다. 루프백 소켓으로 붙이면
-브리지가 `authorizeCollab`(게스트 차단)을 통과할 통로를 새로 뚫어야 한다. 즉 내부용 인증 우회를
-만드는 것이고, 그건 인증 경계에 구멍을 내는 일이다. 채널이면 인증 표면이 0이면서 (a)의 본질 —
-"브리지는 방의 소유자가 아니라 클라이언트다" — 은 그대로 지킨다.
+Bridge transport uses an in-process channel, not an actual loopback socket. Connecting through a loopback socket
+would require creating a new route for the bridge to pass `authorizeCollab` (which blocks guests). That means creating an internal authentication
+bypass and opening a hole in the authentication boundary. A channel keeps the authentication surface at 0 while preserving
+the essence of (a): "the bridge is a client, not the owner of the room."
 
-마이그레이션은 `MEW_COLLAB_RUST` 플래그로 한다. 기본은 off(기존 TS 경로). 검증 후 켜고, 켜진
-뒤에 TS 경로를 제거한다. 두 구현이 동시에 사는 건 이 마이그레이션 동안만이다 — 협업 릴레이는 실패하면
-사용자 문서가 날아가는 경로이고, 팀이 쓰는 서버에서 곧바로 갈아치우지 않는다.
+Migration uses the `MEW_COLLAB_RUST` flag. It defaults to off (the existing TS path). Enable it after verification, then remove the TS path after
+it is enabled. The two implementations coexist only during this migration: a failure in the collaboration relay can wipe
+out user documents, so we will not replace it immediately on the server the team uses.
 
-## 근거
+## Rationale
 
-후보 3을 접은 이유 — 측정. 실제 워크스페이스에서 `function` 검색(웜):
+Why candidate 3 was dropped — measurements. A warm `function` search in actual workspaces:
 
-| 프로젝트 | 파일 수 | 시간 |
+| Project | File count | Time |
 |---|---|---|
 | mew | 200 | 9ms |
 | docs | 166 | 7ms |
 | liiiiv-life | 234 | 4ms |
 
-`MAX_FILES`는 4000이고 실제 최대는 234다. Rust면 1~2ms — 8ms 이득은 보이지 않는다. 반대편 비용은
-`./mew setup`에 cargo 요구(공개 자립 레포다, [ADR 0023](0023-mew-selfhost-packaging-repo.md)),
-플랫폼별 프리빌트, 정규식 의미 변화. 재시도 금지 — 파일 수가 수만 단위가 되면 그때 다시 판단한다.
+`MAX_FILES` is 4000, and the actual maximum is 234. Rust would take 1–2 ms; an 8 ms gain would not be noticeable.
+The costs are requiring cargo for `./mew setup` (this is a public, self-contained repo; [ADR 0023](0023-mew-selfhost-packaging-repo.md)), platform-specific prebuilt binaries,
+and changed regex semantics. Do not retry; reconsider when file counts reach the tens of thousands.
 
-후보 1을 접은 이유 — 예열로 해결됐다. 첫 `.md` 방 열기 실측:
+Why candidate 1 was dropped — warmup solved it. Measured time to open the first `.md` room:
 
 ```
 예열 없음: 176.6ms → 5.8 → 4.4
 예열 있음:  22.3ms → 6.5 → 4.6
 ```
 
-DOM 셧과 tiptap 모듈 그래프 로드를 부팅 때 미리 하도록 하니 154ms가 사용자 경로에서 빠졌다. 문서
-손상 위험을 지는 대신 이걸 한다.
+Preloading the DOM shim and tiptap module graph at boot removed 154 ms from the user path. Do this instead
+of risking document corruption.
 
-왕복 줄이기를 접은 이유. 멀티플렉싱은 와이어 포맷을 깨고(즉시 배포와 겹쳐 열린 탭이 죽는다) 누수
-경로를 다섯 개 만들면서 콜드 오픈 1 RTT만 얻는다. 풀링은 이득이 더 크지만(A→B→A 0 RTT) 동시 접속
-상한을 5배로 깎는다. 이미 반영한 unsolicited step2가 왕복 하나를 이미 걷어냈고, 남은 왕복은 TCP·TLS·
-업그레이드라 애플리케이션이 손댈 자리가 아니다. 둘 다 재시도 금지 — 다시 하려면 이 ADR을 대체하는
-새 ADR로.
+Why round-trip reduction was dropped. Multiplexing breaks the wire format (combined with immediate deployment, this breaks open tabs)
+and creates five leak paths while saving only 1 RTT on a cold open. Pooling offers a larger gain (A→B→A in 0 RTTs) but reduces the concurrent
+connection limit by a factor of 5. The unsolicited step2 already implemented has already removed one round trip, and the remaining round trips are TCP,
+TLS, and the upgrade, which the application cannot change. Do not retry either option; revisiting them requires a new ADR that supersedes
+this one.
 
-후보 2를 하는 이유. y-protocols가 언어 중립이라 와이어 포맷을 바꾸지 않고 구현만 교체할 수
-있다 — 클라이언트 수정이 0이고, 멀티플렉싱을 막았던 배포 스큐 문제가 없다. 천장은
-`MAX_ROOMS=200` 도달이나 MB 단위 문서이며 아직 닿지 않았으므로, 이 결정은 성능 급함이 아니라
-지시에 따른 선택이다. yrs 0.27.3으로 필요한 API(`state_vector` · `encode_state_as_update_v1` ·
-`apply_update` · `observe_update_v1`)가 실제로 존재하는지 컴파일로 확인했다.
+Why choose candidate 2: y-protocols is language-neutral, so the implementation can be replaced without
+changing the wire format — client changes total 0, and there is no deployment
+skew problem of the kind that blocked multiplexing. The ceiling is reaching `MAX_ROOMS=200` or documents on the
+order of MB, and we have not reached it yet, so this decision follows an instruction rather than an urgent performance need. Compilation against
+yrs 0.27.3 confirmed that the required APIs (`state_vector` · `encode_state_as_update_v1` · `apply_update` · `observe_update_v1`) actually exist.
 
-대가 — 명시해 둔다. `server/`를 빌드 없이 `.ts`로 그대로 돌리던 성질을 잃는다. 이게 mew의 개발
-속도를 지탱하던 요소이므로, 네이티브 모듈은 `server/` 전체가 아니라 방 상태 한 곳에만 둔다.
+The tradeoff, stated explicitly: we lose the ability to run `server/` directly as `.ts` without a build. Since this supported
+mew's development speed, the native module is confined to room state rather than all of `server/`.
 
-## 결과
+## Results
 
-2026-08-04 — 구현 완료, 기본은 JS Yjs로 배포.
+2026-08-04 — Implementation complete; deployed with JS Yjs as the default.
 
-- 구조: `server/syncCodec.ts`(프레임 인코딩·디코딩) · `server/roomDoc.ts`(백엔드 둘) ·
-  `server/collab.ts`(방·인증·awareness·수명) · `server/collabAgent.ts`(브리지 = 프로토콜 클라이언트) ·
-  `mew/native/collab`(Rust 크레이트, napi-rs). 실행 계약은 mew/README의 §협업 방.
-- 프로토콜 경로가 하나로 합쳐졌다 — 브리지가 인프로세스 클라이언트가 되면서 ws 경로와 같은
-  `admit`/`handleFrame`을 탄다. 백엔드 전환은 `roomDoc.ts` 안에서 끝난다.
-- 검증: `server/syncCodec.test.ts`가 y-protocols와 바이트 단위 대조(와이어 포맷이 어긋나면
-  배포 순간 열려 있는 모든 탭이 깨지므로 이게 핵심 안전장치) + 신뢰할 수 없는 바이트 6종.
-  `server/collabAgent.test.ts`는 실제 ws 서버·실제 클라이언트로 브리지 주입과 앱 메아리 무시를
-  확인한다 — `MEW_COLLAB_RUST=1`로도 같은 테스트가 통과했다. 전체 170개 통과.
-- 배포는 플래그를 끈 채로 했다. `.node`는 플랫폼별 산물이라 커밋하지 않고 `npm run build:native`로
-  만든다. 켰는데 로드가 실패하면 조용히 JS로 돌지 않고 던진다.
-- 두 함정을 구현 중에 잡았고 코드 주석으로 남겼다: ① 브로드캐스트 diff를 상태 벡터 diff로 계산하면
-  삭제만 있는 업데이트가 사라진다(상태 벡터는 delete set을 담지 않는다) — 업데이트 옵저버로 얻는다.
-  ② 브리지의 인프로세스 클라이언트를 방 인원으로 세면 방이 영원히 닫히지 않아 헤드리스 에디터와
-  fs watcher가 방마다 쌓인다 — 방 수명은 실제 접속자만 결정한다.
+- Structure: `server/syncCodec.ts` (frame encoding and decoding) · `server/roomDoc.ts` (two backends) · `server/collab.ts` (rooms,
+  authentication, awareness, lifecycle) · `server/collabAgent.ts` (bridge = protocol client) · `mew/native/collab` (Rust crate, napi-rs).
+  The runtime contract is in the Collaboration Rooms section of mew/README.
+- The protocol paths have been unified — with the bridge now an in-process client, it goes
+  through the same `admit`/`handleFrame` as the ws path. Backend switching is contained within `roomDoc.ts`.
+- Validation: `server/syncCodec.test.ts` performs byte-for-byte comparisons with y-protocols (the key safeguard, since a wire
+  format mismatch would break every open tab at deployment) plus 6 types of
+  untrusted bytes. `server/collabAgent.test.ts` verifies bridge injection and ignoring app echoes using a real ws server and
+  real clients — the same tests also passed with `MEW_COLLAB_RUST=1`. All 170 tests passed.
+- Deployed with the flag off. `.node` is a platform-specific artifact, so it is built with `npm run build:native` rather than committed. If the flag is enabled
+  and loading fails, it throws instead of silently falling back to JS.
+- Two pitfalls were caught during implementation and documented in code comments: ① Calculating broadcast diffs from state vector diffs
+  loses deletion-only updates (state vectors do not contain the delete set) — obtain them from the update observer. ② Counting the
+  bridge's in-process client as a room participant prevents the room from ever closing, accumulating a headless
+  editor and fs watcher for each room — only actual connections determine room lifetime.
 
-같은 작업 묶음에서 함께 배포한 것(이 ADR의 대상은 아니다): 브리지 에디터 모듈 부팅 예열(첫 문서
-열기 177ms → 22ms) · 협업 소켓 재연결 지수 백오프 · 업로드 전 이미지 압축.
+Also deployed in the same batch of work (outside this ADR's scope): bridge editor module warmup at startup (first document open: 177ms
+→ 22ms) · exponential backoff for collaboration socket reconnection · image compression before upload.

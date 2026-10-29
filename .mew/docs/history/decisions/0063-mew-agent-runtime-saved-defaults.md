@@ -1,48 +1,48 @@
 ---
-provenance: "Liiiiv 중앙 ADR 이관본, 2026-10-14"
-description: "이관한 결정 기록: mew 에이전트 모델·권한은 런타임별 기본값으로 저장할 수 있다. 당시 선택·근거·후속 변경을 보존하며 현재 계약은 Mew 소유 문서에서 확인한다."
-title: "0063 — mew 에이전트 모델·권한은 런타임별 기본값으로 저장할 수 있다"
+provenance: "Migrated copy of a Liiiiv central ADR, 2026-10-14"
+description: "Migrated decision record: Mew agent models and permissions can be saved as per-runtime defaults. Preserves the choices, rationale, and subsequent changes at the time; see the Mew owning document for the current contract."
+title: "0063 — Mew agent models and permissions can be saved as per-runtime defaults"
 created: 2026-08-20
 updated: 2026-09-11
 ---
 
-- 날짜: 2026-08-20
-- 상태: 채택
-- 후속 결정: [0090](0090-mew-agent-reasoning-and-permission-controls.md) — 모델·권한 기본값을 추론 정도까지 확장
-- 결정자: 송상훈 (지시)
-- 관련: [ADR 0037](0037-mew-agent-bypass-permissions-default.md)의 고정 권한 기본값을 부분 대체하고, [ADR 0060](0060-mew-shared-agent-runtime-registry.md)의 공통 런타임 경로를 사용한다
+- Date: 2026-08-20
+- Status: Adopted
+- Subsequent decision: [0090](0090-mew-agent-reasoning-and-permission-controls.md) — Extend model and permission defaults to include reasoning effort
+- Decision maker: Song Sanghoon (directive)
+- Related: Partially supersedes the fixed permission defaults in [ADR 0037](0037-mew-agent-bypass-permissions-default.md) and uses the shared runtime path from [ADR 0060](0060-mew-shared-agent-runtime-registry.md)
 
-## 배경
+## Background
 
-에이전트 창에서 모델과 권한 모드를 바꿀 수 있지만 그 값은 현재 ACP 세션에만 적용됐다. 새 탭이나 다음 서버 실행에서
-Codex를 다시 띄우면 런타임이 광고한 기본 모델과 [ADR 0037](0037-mew-agent-bypass-permissions-default.md)의
-전체 허용 권한으로 돌아갔다. 같은 모델·추론 강도·권한을 매번 다시 고르는 조작이었다.
+The model and permission mode could be changed in the agent window, but those values applied only to the current ACP session. Launching
+Codex again in a new tab or on the next server run reverted to the default model advertised by the runtime and the full permissions from [ADR 0037](0037-mew-agent-bypass-permissions-default.md).
+Users had to select the same model, reasoning effort, and permissions again every time.
 
-브라우저 `localStorage`는 탭과 런타임 선택을 기억하는 데는 맞지만, 에이전트 자체의 기본값에는 맞지 않는다.
-브라우저나 기기가 바뀌면 사라지고, 서버의 예약 작업·에이전트셋은 그 값을 볼 수 없기 때문이다.
+Browser `localStorage` is suitable for remembering tabs and runtime selection, but not for the agent's own defaults. Those values are lost
+when switching browsers or devices, and server-side scheduled tasks and agent sets cannot access them.
 
-## 결정
+## Decision
 
-에이전트 창의 모델·권한 선택기 바로 옆에 저장 아이콘을 둔다. 누르면 현재 모델 id와 권한 모드 id를
-`<DATA_DIR>/agent-defaults.json`에 **런타임별**로 저장한다. Codex의 저장값은 Claude·Hermes 등의 값과 섞이지 않는다.
+Place a save icon directly beside the model and permission selectors in the agent window. Clicking it saves the
+current model ID and permission mode ID to `<DATA_DIR>/agent-defaults.json` **per runtime**. Saved Codex values are kept separate from those for Claude, Hermes, and other runtimes.
 
-새 ACP 세션은 `session/new`와 `session/load` 직후 저장된 값을 적용한다. 적용 경로는
-`server/agentAcp.ts`의 `AgentSession` 하나이므로 에이전트 창·에이전트셋·예약 작업이 같은 런타임 기본값을 본다.
-에이전트셋에 모델이 명시돼 있으면 셋의 모델이 그 뒤에 적용되어 우선한다.
+New ACP sessions apply the saved values immediately after `session/new` and `session/load`. The single application path is `AgentSession`
+in `server/agentAcp.ts`, so the agent window, agent sets, and scheduled tasks all use the same runtime defaults. If an agent set explicitly specifies
+a model, that model is applied afterward and takes precedence.
 
-우선순위와 실패 규칙은 다음과 같다.
+The precedence and failure rules are as follows.
 
-1. 권한의 `MEW_AGENT_MODE`는 운영자가 서버 전체에 강제하는 값이므로 UI 저장값보다 우선한다.
-2. 저장된 권한 모드가 현재 런타임 목록에 있으면 적용한다.
-3. 저장값이 없거나 런타임 업그레이드로 사라졌으면 ADR 0037의 전체 허용 후보 순서로 폴백한다.
-4. 저장된 모델이 현재 런타임 목록에 없으면 런타임 기본 모델을 그대로 쓴다. 기본값 하나 때문에 세션 시작을 막지 않는다.
+1. The permission setting `MEW_AGENT_MODE` takes precedence over values saved through the UI because the operator enforces it server-wide.
+2. Apply the saved permission mode if it appears in the current runtime's list.
+3. If no saved value exists or a runtime upgrade has removed it, fall back to the allow-all candidate order from ADR 0037.
+4. If the saved model is absent from the current runtime's list, keep using the runtime's default model. A single default must not block session startup.
 
-저장 API는 manager·owner만 쓴다. 에이전트 창과 같은 셸 권한 경계이며, 런타임 id는 서버 등록표와 대조하고
-모델·모드 id는 길이를 제한한다. 저장 파일은 원자적으로 교체하고 권한은 `0600`이다.
+Only managers and owners can use the save API. It uses the same shell permission boundary as the agent window; runtime IDs are checked against the server registry,
+and model and mode IDs have length limits. The saved file is replaced atomically and has permissions of `0600`.
 
-## 결과
+## Results
 
-- 예: Codex에서 `gpt-5.6-sol high`와 원하는 권한 모드를 고른 뒤 저장하면 다음 Codex 세션과 서버 재시작 뒤에도 적용된다.
-- 저장은 사용자별이 아니라 mew 인스턴스의 런타임별 기본값이다. 같은 서버를 쓰는 manager·owner는 같은 기본값을 본다.
-- 저장 아이콘은 현재 선택이 저장값과 같으면 강조된다. 저장은 현재 세션을 재시작하지 않고 다음 세션의 시작값만 바꾼다.
-- ADR 0037의 보안 판단과 owner/manager 게이트는 유지된다. 바뀐 것은 “항상 전체 허용”이 “저장값이 없을 때 전체 허용”이 된 부분뿐이다.
+- Example: Select `gpt-5.6-sol high` and the desired permission mode in Codex, then save them. They apply to subsequent Codex sessions, including after a server restart.
+- Saved defaults are per runtime for the Mew instance, not per user. Managers and owners using the same server share the same defaults.
+- The save icon is highlighted when the current selection matches the saved values. Saving does not restart the current session; it only changes the initial values for the next session.
+- The security assessment and owner/manager gate from ADR 0037 remain in place. The only change is from “always allow all” to “allow all when no saved value exists.”

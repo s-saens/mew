@@ -1,193 +1,193 @@
 ---
-title: "문서 편집과 저장 형식"
-description: "Markdown·코드·문서 속성·표·링크·첨부·PDF 편집과 본문 우클릭의 행·열 추가·삭제, 모바일 텍스트 선택 후 자동 메뉴를 안내한다. Hotview @의 전체 폴더 파일 자동완성, 주석·내부문서 탐색·표/DB 전환·하위 페이지 생성·자동저장·화면 분할, 모바일 독의 패널 전환·본문과 Plain 보조키바의 탭 전환 및 설치 조작을 다룬다."
+title: "Document Editing and Storage Formats"
+description: "Explains editing Markdown, code, document properties, tables, links, attachments, and PDFs; adding and deleting rows and columns through the body context menu; and the automatic menu after selecting text on mobile. Covers Hotview @ file autocomplete across all folders, annotations, internal document navigation, table/DB conversion, subpage creation, autosave, split views, panel switching in the mobile dock, tab switching in the body and Plain modifier key bars, and installation controls."
 updated: "2026-10-29"
 상위파일:
   - "../../.mew/docs/MOC.md"
   - "MOC.md"
 ---
-문서를 열고 편집·저장하는 방법을 안내합니다. 처음이라면 [첫 사용 순서](first-steps.md)부터 따라 해 보세요.
+This guide explains how to open, edit, and save documents. If you are new, start with [First Steps](first-steps.md).
 
-[Markdown·코드·문서 속성](#기본-편집) · [이미지·파일 링크](#링크와-첨부) · [표 편집](#표-편집과-복사) · [PDF·필기](#pdf-읽기와-필기) · [자동저장·커밋·복원](#자동저장커밋파일-이력) · [휴대폰·전체화면](#모바일과-전체화면) · [화면 분할·문서 탭](#편집-칸-문서-탭--화면-분할) · [주석](#주석-annotation) · [각주](#각주-alte) · [다이어그램](#다이어그램)
+[Markdown, Code, and Document Properties](#basic-editing) · [Image and File Links](#links-and-attachments) · [Table Editing](#editing-and-copying-tables) · [PDFs and Handwriting](#reading-and-annotating-pdfs) · [Autosave, Commits, and Restore](#autosave-commits-and-file-history) · [Mobile and Fullscreen](#mobile-and-fullscreen) · [Split Views and Document Tabs](#editor-panes-document-tabs--split-view) · [Annotations](#annotations) · [Footnotes](#footnotes-alte) · [Diagrams](#diagrams)
 
-## 기본 편집
+## Basic Editing
 
-파일 탐색기에서 파일을 한 번 누르면 미리보기 탭으로 연다. 탭을 더블클릭하거나 내용을 편집하면 고정되어 다른 파일을 열어도 그 탭이 남는다. 탭의 `×`로 닫는다. 보고 있던 탭을 닫으면 같은 편집 칸에서 직전에 사용한 탭으로 돌아간다. 예를 들어 1·2·3 탭 중 1에서 새 4 탭을 열었다가 닫으면 1을 다시 연다.
+Click a file once in the file explorer to open it in a preview tab. Double-click the tab or edit its contents to pin it, so it stays open when you open another file. Close it with the tab's `×`. Closing the active tab returns to the previously used tab in the same editor pane. For example, with tabs 1, 2, and 3 open, opening a new tab 4 from tab 1 and then closing it reopens tab 1.
 
-열린 파일이 없는 편집 칸에는 파일 탐색기 열기(`Ctrl+B`), 문서 내용 검색(`Ctrl+Shift+F`), 문서 파일명 검색(`Ctrl+P`) 단축키를 세로로 표시한다. 설정에서 단축키를 변경하면 표시도 즉시 갱신된다. 문서 선택·새 파일·자동 저장 안내는 사용자 요청으로 제거했으며 명시적 후속 요청 없이 다시 표시하지 않는다.
+An editor pane with no open file displays a vertical list of shortcuts for opening the file explorer (`Ctrl+B`), searching document contents (`Ctrl+Shift+F`), and searching document filenames (`Ctrl+P`). Changing shortcuts in settings immediately updates the display. Guidance for selecting documents, creating files, and autosave was removed at the user's request and must not be shown again without an explicit follow-up request.
 
-- **본문 불러오기**: 파일을 읽는 동안 해당 에디터 본문과 도구 위에 반투명 검정 덮개와 중앙 로딩 인디케이터를 표시한다. 캐시된 글이 보여도 로딩 중에는 편집을 막으며, 탭 전환과 다른 패널은 계속 사용할 수 있다. 빈 문서를 포함해 로딩이 끝나거나 실패하면 덮개를 제거한다.
-- **Markdown**: `.md`는 Hotview에서 보이는 본문을 바로 편집한다. 편집기 위의 **Plain**은 Markdown 원문, **Hotview**는 렌더된 편집 화면으로 전환한다. `# `로 제목, `- `·`1. `로 목록, `- [ ] `로 체크박스, `> `로 인용, 백틱 세 개로 코드 블록을 작성하고 Markdown 문법으로 굵게·기울임·취소선·인라인 코드를 넣는다. 줄 맨 앞에서 `[]` 또는 `[ ]` 뒤에 스페이스를 입력하면 체크박스 줄이 된다. 체크박스를 누르면 완료 상태를 바꾸고, Enter로 다음 체크박스 줄을 만든다. 빈 체크박스 줄에서 Enter를 누르면 일반 문단으로 돌아온다. 빈 문서의 첫 줄과 비어 있는 문단에도 원문 줄번호를 표시하며, 중간 빈 문단은 Markdown에 `<br/>`로 보존한다. 문서 끝의 입력용 빈 줄은 마지막 줄바꿈 하나로 보존하며, 목록 뒤에서 빈 줄을 삭제해도 바로 다음 줄번호를 유지한다. Tab·Shift+Tab으로 체크 목록을 들여쓰거나 내어쓴다. 저장할 때는 `- [ ]`·`- [x]` Markdown 목록을 사용한다.
-- **개체 삽입 메뉴**: Hotview에서 `/`를 입력하면 삽입 메뉴가 열린다. 모바일 키보드를 제외한 보이는 화면에서 아래 공간이 부족하고 위쪽이 더 넓으면 `/` 위에 표시한다. 양쪽 공간이 부족하면 메뉴 높이를 줄여 내부에서 스크롤하며, 키보드·화면 크기·스크롤 변화에 따라 입력 위치를 다시 확인한다.
-- **하위 페이지**: Hotview에서 `/page`를 입력하고 Enter를 누르거나 **하위 페이지**를 선택하면 이름 입력창이 열린다. 이름을 입력하고 **만들기**를 누르면 하위 페이지를 만들고 현재 문서에 머무른다. 새 페이지는 목록이나 링크를 눌러 연다. 취소하면 만들지 않는다. Documents의 **+**와 같이 `abc.md`는 `abc/_abc.md`로 옮기고 새 페이지를 `abc/`에 만든다. 이미 하위 페이지가 있으면 같은 폴더에 추가하고 이름이 겹치면 번호를 붙인다. 편집 중인 본문과 열린 부모 탭은 유지한다. 프로젝트 안에서 편집 가능한 Markdown에 제공하며 게스트·읽기 전용 문서에는 표시하지 않는다.
-- **문서 속성**: Hotview 상단 속성 영역에서 제목과 frontmatter 필드 이름·값을 고친다. 필드를 추가·삭제하거나 왼쪽 여백의 손잡이를 마우스·터치로 끌어 순서를 바꿀 수 있다. 손잡이를 우클릭하거나 누르면 글 링크(내부·외부)·단일선택·다중선택·날짜·텍스트·숫자로 타입을 바꾼다. 메뉴 맨 아래의 **필드 삭제**로 해당 속성을 삭제한다. 단일·다중선택은 값을 눌러 열린 선택창에서 바로 검색하거나 새 이름을 입력한다. Enter 또는 추가 항목을 누르면 새 항목이 만들어지고 선택된다. 단일선택은 하나를 선택하면 창을 닫고, 다중선택은 창을 유지하며 선택된 항목을 다시 누르면 해제한다. 항목 목록은 프로젝트 안에서 같은 필드명끼리 공유하며, 타입 메뉴에서도 추가·삭제할 수 있다. 공유 항목을 삭제해도 다른 문서에 이미 저장된 값은 유지한다. 타입과 선택 항목은 문서를 다시 열어도 유지한다. 원문은 파일 앞부분의 YAML frontmatter로 저장한다. 제목과 각 필드 왼쪽에는 원문 줄번호를 표시한다. 필드 들여쓰기는 손잡이 너비(아이콘과 오른쪽 여백을 합친 12px)만 둔다.
-- **모바일 키보드**: 키보드가 열리면 Hotview·원문·코드 편집기의 높이가 실제 보이는 화면에 맞춰 줄어든다. 터치한 커서 줄은 키보드와 보조키 바 위로 스크롤하며, 키보드를 닫으면 높이를 복원한다.
-- **보기 전환 위치**: Hotview↔Plain 전환은 화면에 보이는 커서 줄을 원문 줄번호 기준으로 유지한다. 커서가 화면 밖이면 현재 보이는 본문 줄을 이어받는다. 예를 들어 Hotview의 180번 줄을 보고 전환하면 Plain에서도 180번 줄이 보인다. Plain의 빈 줄·표·코드 내부처럼 Hotview에서 별도 줄로 표시하지 않는 위치는 해당 렌더 블록으로 이동한다.
-- **Markdown 화면 오류**: Hotview 초기화·렌더링 오류는 해당 문서 본문에 안내한다. 파일 탐색기와 탭은 계속 사용할 수 있고, **원문 모드로 열기**로 현재 탭의 내용을 확인·편집할 수 있다. 복구 버튼은 문서를 다시 내려받거나 저장하지 않는다. 다른 파일로 이동하면 그 파일의 Hotview를 정상적으로 시도하며, Plain에서 Hotview로 전환해 다시 시도할 수도 있다.
-- **목차**: 편집기의 목차 버튼을 누르고 제목을 선택하면 해당 위치로 이동한다.
-- **코드·텍스트**: `.md` 이외의 텍스트는 Plain 코드 편집기로 열린다. 줄 번호·구문 강조·괄호 짝 표시를 제공하며, 지원되는 파일 형식은 진단도 표시한다. 진단 지원은 언어·서버 도구에 따라 다르다.
-- **문서 안 검색**: 편집기에 포커스를 두고 `Ctrl+F`로 찾기·바꾸기를 연다. 여러 파일을 한꺼번에 검색·치환하려면 [프로젝트 검색](../configuration/search.md#파일명내용-검색과-치환)을 쓴다.
-- **실행 취소·다시 실행**: `Ctrl+Z`·`Ctrl+Y`를 사용한다. 각주·목록 들여쓰기는 아래 절을, 댓글은 [협업 사용법](collaboration.md#댓글과-답글)을 참고한다.
+- **Loading Document Body**: While a file is being read, a translucent black overlay and centered loading indicator appear over that editor's body and tools. Editing is blocked during loading even if cached content is visible; tab switching and other panels remain available. The overlay is removed when loading finishes or fails, including for empty documents.
+- **Markdown**: `.md` files let you directly edit the body displayed in Hotview. Above the editor, **Plain** switches to Markdown source, and **Hotview** switches to the rendered editing view. Use `# ` for headings, `- `·`1. ` for lists, `- [ ] ` for checkboxes, `> ` for quotes, and three backticks for code blocks, and use Markdown syntax for bold, italics, strikethrough, and inline code. At the start of a line, typing a space after `[]` or `[ ]` turns it into a checkbox line. Click a checkbox to toggle its completion status, and press Enter to create the next checkbox line. Press Enter on an empty checkbox line to return to a regular paragraph. Source line numbers also appear on the first line of an empty document and in empty paragraphs; intermediate empty paragraphs are preserved in Markdown as `<br/>`. The empty input line at the end of a document is preserved as a single trailing newline, and deleting an empty line after a list still preserves the immediately following line number. Use Tab·Shift+Tab to indent or outdent checklists. Saving uses `- [ ]`·`- [x]` Markdown lists.
+- **Insert Object menu**: Typing `/` in Hotview opens the insert menu. If there is insufficient space below in the visible viewport excluding the mobile keyboard, and more space above, the menu appears above `/`. If space is limited on both sides, the menu height shrinks and its contents scroll internally. The input position is checked again when the keyboard, viewport size, or scroll position changes.
+- **Subpage**: In Hotview, type `/page` and press Enter, or select **Subpage** to open a name dialog. Enter a name and click **Create** to create a subpage and stay in the current document. Open the new page from the list or its link. Canceling creates nothing. As with **+** in Documents, `abc.md` moves to `abc/_abc.md` and the new page is created in `abc/`. If subpages already exist, the page is added to the same folder, with a number appended if the name conflicts. The body being edited and the open parent tab are preserved. This is available for editable Markdown within a project and is not shown to guests or in read-only documents.
+- **Document Properties**: Edit the title and frontmatter field names and values in the properties area at the top of Hotview. You can add or delete fields, or reorder them by dragging the handle in the left margin with a mouse or touch. Right-click or tap the handle to change the type to document link (internal or external), single select, multi-select, date, text, or number. Use **Delete Field** at the bottom of the menu to delete the property. For single select and multi-select, click the value to open the picker, then search directly or enter a new name. Press Enter or click the add option to create and select a new option. Single select closes the picker after you select one option; multi-select keeps it open, and clicking a selected option again deselects it. Option lists are shared across fields with the same name within the project, and options can also be added or deleted in the type menu. Deleting a shared option preserves values already saved in other documents. Types and options persist when the document is reopened. The source is saved as YAML frontmatter at the beginning of the file. Source line numbers appear to the left of the title and each field. Field indentation is limited to the handle width (12px including the icon and right margin).
+- **Mobile Keyboard**: When the keyboard opens, the Hotview, source, and code editors shrink to fit the actual visible viewport. The tapped cursor line scrolls above the keyboard and auxiliary key bar, and the height is restored when the keyboard closes.
+- **Position When Switching Views**: Switching between Hotview and Plain preserves the visible cursor line based on its source line number. If the cursor is offscreen, the currently visible body line is carried over. For example, switching while viewing line 180 in Hotview also shows line 180 in Plain. Positions that Hotview does not display as separate lines, such as blank lines, tables, and code interiors in Plain, move to the corresponding rendered block.
+- **Markdown Display Errors**: Hotview initialization and rendering errors are reported in the affected document body. The file explorer and tabs remain usable, and **Open in Source Mode** lets you view and edit the current tab's contents. The recovery button does not download the document again or save it. Moving to another file attempts to open that file in Hotview normally. You can also retry by switching from Plain to Hotview.
+- **Table of Contents**: Click the editor's table of contents button and select a heading to jump to it.
+- **Code and Text**: Text files other than `.md` open in the Plain code editor. It provides line numbers, syntax highlighting, and matching bracket indicators, and displays diagnostics for supported file types. Diagnostic support varies by language and server tools.
+- **Search Within a Document**: Focus the editor and use `Ctrl+F` to open find and replace. To search and replace across multiple files at once, use [Project Search](../configuration/search.md#filename-and-content-search-and-replacement).
+- **Undo and Redo**: Use `Ctrl+Z`·`Ctrl+Y`. For footnotes and list indentation, see the sections below; for comments, see [Collaboration Guide](collaboration.md#comments-and-replies).
 
-### 본문 우클릭 메뉴
+### Body Context Menu
 
-Hotview·Plain·코드 본문을 우클릭하면 **주석 추가 · 댓글 달기 · 복사 · 잘라내기 · 붙여넣기 · 삭제 · 전체 선택** 메뉴가 열린다. 각 항목은 왼쪽 아이콘과 오른쪽 이름으로 표시한다. 선택한 글 안에서 우클릭하면 선택을 유지하고, 밖에서 우클릭하면 그 위치로 커서를 옮긴다.
+Right-click the Hotview, Plain, or code body to open the **Add Annotation · Add Comment · Copy · Cut · Paste · Delete · Select All** menu. Each item shows an icon on the left and its name on the right. Right-clicking within selected text preserves the selection; right-clicking outside it moves the cursor to that position.
 
-모바일에서는 본문을 길게 누르거나 더블탭해 글자를 선택한다. 손가락을 떼고 선택 범위가 안정되면 같은 메뉴가 자동으로 열린다. 선택 핸들로 범위를 바꾸면 메뉴를 닫고 조절이 끝난 뒤 새 범위에 맞춰 다시 연다. 읽기 전용 본문에서도 선택한 글을 복사할 수 있다.
+On mobile, long-press or double-tap the body to select text. Once you lift your finger and the selection stabilizes, the same menu opens automatically. Adjusting the range with selection handles closes the menu, which reopens for the new range when adjustment finishes. You can also copy selected text from a read-only body.
 
-글자를 선택하지 않으면 복사·잘라내기·삭제는 비활성화된다. 읽기 전용에서는 본문을 바꾸는 항목을, Markdown 이외의 파일에서는 주석 추가를 사용할 수 없다. 댓글 달기는 선택한 글을 대상으로 하며, 선택이 없으면 Hotview의 해당 문단이나 Plain·코드의 해당 줄을 자동으로 선택한다. 글자가 없는 곳에서는 댓글을 달 수 없다.
+Copy, Cut, and Delete are disabled when no text is selected. Actions that modify the body are unavailable in read-only mode, and Add Annotation is unavailable for files other than Markdown. Add Comment targets the selected text; without a selection, it automatically selects the relevant paragraph in Hotview or line in Plain or code. You cannot comment where there is no text.
 
-복사·잘라내기·붙여넣기에 실패하면 안내에 따라 `Ctrl/Cmd+C`·`Ctrl/Cmd+X`·`Ctrl/Cmd+V`를 사용할 수 있다. 잘라내기는 클립보드 복사에 성공한 뒤에만 선택 내용을 지운다.
+If copying, cutting, or pasting fails, follow the guidance to use `Ctrl/Cmd+C`·`Ctrl/Cmd+X`·`Ctrl/Cmd+V`. Cut deletes the selected content only after it has been successfully copied to the clipboard.
 
-## 링크와 첨부
+## Links and Attachments
 
-내부문서 링크는 하위문서를 포함해 **같은 탭에서 연다**. **Ctrl/Cmd+클릭**하면 새 탭에서 연다. 같은 탭으로 탐색할 때 다른 탭이 같은 문서를 표시하더라도 현재 탭에서 이동하며 각 탭의 문서 방문 기록을 따로 유지한다.
+Internal document links, including subdocuments, **open in the same tab**. **Ctrl/Cmd+click** opens them in a new tab. Same-tab navigation uses the current tab even if another tab displays the same document, and each tab maintains its own document browsing history.
 
-파일 이력 플로팅 도구 줄 맨 왼쪽의 **뒤로가기·앞으로가기**로 현재 탭에서 방문한 문서를 오간다. 이동할 문서가 없는 방향은 비활성화된다. 새 탭은 방문한 첫 문서에서 시작하므로 두 버튼 모두 비활성화되어 있다. 뒤로 간 뒤 다른 문서를 열면 앞으로 가던 경로는 새 경로로 바뀐다. 탭을 다른 칸으로 옮겨도 문서 방문 이력은 유지하지만, 새로고침하면 각 탭의 현재 문서에서 다시 시작한다.
+Use **Back and Forward** at the far left of the floating file history toolbar to navigate documents visited in the current tab. A direction is disabled when there is no document to navigate to. New tabs start at their first visited document, so both buttons are disabled. Opening another document after going back replaces the forward path with the new path. Document browsing history persists when a tab moves to another pane, but refreshing restarts each tab's history at its current document.
 
-Markdown 이미지의 상대 경로는 현재 문서가 있는 폴더를 기준으로 읽는다. 예를 들어 저장소 루트 `README.md`는 `docs/assets/screenshots/split.png`, `docs/guides/overview.md`는 `../assets/screenshots/split.png`로 같은 파일을 표시한다. 화면에서만 인증된 파일 API 주소로 바꾸며 저장되는 Markdown에는 원래 상대 경로를 유지한다. 프로젝트·Documents·프로젝트 밖 파일은 기존 파일 접근 권한을 따른다. 업로드로 만든 `/api/asset` 주소와 외부 이미지 URL은 그대로 사용한다.
+Relative paths for Markdown images are resolved from the current document's folder. For example, `README.md` at the repository root uses `docs/assets/screenshots/split.png`, while `docs/guides/overview.md` uses `../assets/screenshots/split.png` to display the same file. Paths are converted to authenticated file API URLs only for display; saved Markdown retains the original relative paths. Files in projects, Documents, and outside projects follow existing file access permissions. `/api/asset` URLs created by uploads and external image URLs are used as is.
 
-- 글자를 선택하고 `Ctrl+K`로 링크를 삽입·수정한다. Hotview에서 `@` 뒤에 파일명 앞부분을 입력하면 현재 프로젝트 전체의 파일 후보를 찾는다. Documents 문서에서는 Documents 전체를 찾으며 접힌 폴더의 파일도 표시한다. 후보를 고르면 파일 링크를 넣는다. 에이전트 입력창의 `@`는 [별도 멘션 기능](../../.mew/docs/features/%ED%84%B0%EB%AF%B8%EB%84%90%C2%B7%EC%97%90%EC%9D%B4%EC%A0%84%ED%8A%B8%C2%B7%EC%9E%90%EB%8F%99%ED%99%94/%EC%97%90%EC%9D%B4%EC%A0%84%ED%8A%B8%20%EC%9E%85%EB%A0%A5%C2%B7%EB%A9%98%EC%85%98%C2%B7%EC%8A%A4%ED%82%AC%C2%B7%EC%B2%A8%EB%B6%80.md)이다.
-- Hotview의 내부 파일 링크는 파일 아이콘·배경·테두리가 있는 작은 인라인 항목으로 표시한다. 현재 문서의 하위문서 링크에는 아래로 꺾여 들어가는 화살표 아이콘을, 그 밖의 내부문서에는 문서 아이콘을 표시한다. 두 종류 모두 같은 테두리·배경을 유지하며, 설정된 Docs 폴더 밖 파일 링크에는 오른쪽 위 대각선 화살표를 덧붙인다. 위아래 패딩 없이 테두리 높이를 낮추고 글자·아이콘 크기는 유지한다. 인라인 코드처럼 문장·목록·표의 줄 높이를 유지하고 긴 이름은 본문 흐름 안에서 줄바꿈한다. 링크 오른쪽 바깥에 2px 여백을 두며, 줄바꿈된 조각마다 닫힌 테두리를 반복하지 않는다. 첫 조각의 왼쪽과 마지막 조각의 오른쪽에만 세로 테두리·둥근 모서리를 표시하고, 중간 연결부에는 위아래 테두리만 이어진다. 목록 줄번호는 중첩 깊이와 관계없이 본문 왼쪽 거터에 맞춘다. 외부 URL과 문서 안 `#앵커`는 기존 밑줄 링크로 표시한다. 저장 형식은 기존 Markdown 링크 그대로다. 내부 파일 링크의 표시 텍스트는 Hotview에서 직접 수정할 수 없으며 클릭하면 툴팁 없이 바로 대상 파일을 연다. 링크 바로 오른쪽에서 왼쪽 방향키를 누르면 링크 바로 왼쪽으로, 왼쪽에서 오른쪽 방향키를 누르면 바로 오른쪽으로 이동한다. Shift+방향키는 링크 전체를 선택한다. 링크 전체 선택·삭제는 가능하며 이름과 대상은 원문 모드에서 수정한다. 외부 링크는 클릭으로 툴팁을 열고 `Ctrl`/`Cmd`+클릭으로 이동한다.
-- 프로젝트 밖 다른 폴더의 파일도 링크를 클릭하면 같은 에디터에서 열린다. `../` 상대경로, `/etc/hosts` 같은 절대경로와 로컬 `file://` 링크를 지원한다. 서버 OS가 읽을 수 있는 시스템 파일·숨김 파일도 열 수 있으며 서버 파일 기능 권한이 필요하다. 외부 Markdown은 Hotview로 열리고 그 안의 상대 링크는 외부 파일의 폴더를 기준으로 해석한다.
-- 링크 툴팁에서 대상을 확인한다. 외부 사이트의 제목·설명 미리보기는 현재 비활성이다. 지원되는 YouTube URL을 붙여넣으면 영상 노드를 삽입하지만, 프로덕션 CSP가 외부 프레임을 허용하지 않아 재생을 위해서는 [배포 정책 보완](../../.mew/docs/work/deployment-readiness-review.md)이 필요하다.
-- Hotview에서 `/`를 입력한 뒤 **파일 업로드**를 선택하거나 파일을 본문으로 끌어놓는다. 클립보드 이미지 붙여넣기도 지원한다. 삽입한 이미지의 크기 조절 손잡이로 표시 크기를 바꾼다.
-- 본문 첨부는 프로젝트의 `.mew/assets/`에 저장한다. 파일 탐색기에 드롭하면 선택한 폴더에 원래 이름으로 저장한다. 충돌 처리·공유 링크·Git 반영은 [끌어놓기 계약](#파일-탐색기-항목-끌어놓기)을 따른다.
+- Select text and use `Ctrl+K` to insert or edit a link. In Hotview, type the beginning of a filename after `@` to find matching files across the current project. In Documents documents, the search covers all of Documents and also shows files in collapsed folders. Select a candidate to insert a file link. `@` in the agent input is a [separate mention feature](../../.mew/docs/features/terminals-agents-automation/agent-input-mentions-skills-and-attachments.md).
+- Internal file links in Hotview appear as small inline items with a file icon, background, and border. Links to subdocuments of the current document show a downward-bending arrow icon; other internal documents show a document icon. Both types retain the same border and background, and file links outside the configured Docs folder also show an arrow pointing diagonally up and right. The border height is reduced without vertical padding, while text and icon sizes remain unchanged. Like inline code, they preserve line height in sentences, lists, and tables, and long names wrap within the body flow. A 2px margin sits outside the right edge of the link, and wrapped fragments do not each repeat a closed border. Vertical borders and rounded corners appear only on the left of the first fragment and the right of the last fragment; intermediate connections continue only the top and bottom borders. List line numbers align with the body's left gutter regardless of nesting depth. External URLs and in-document `#앵커` links retain the existing underlined style. The saved format remains standard Markdown links. The display text of internal file links cannot be edited directly in Hotview, and clicking immediately opens the target file without a tooltip. Pressing the left arrow key immediately to the right of a link moves immediately to its left; pressing the right arrow key to its left moves immediately to its right. Shift+arrow selects the entire link. Entire links can be selected and deleted; edit their names and targets in source mode. Clicking an external link opens a tooltip; `Ctrl`/`Cmd`+click follows it.
+- Clicking links to files in other folders outside the project also opens them in the same editor. Relative `../` paths, absolute paths such as `/etc/hosts`, and local `file://` links are supported. System files and hidden files readable by the server OS can also be opened, and permission to use server file features is required. External Markdown opens in Hotview, and its relative links are resolved from the external file's folder.
+- Check the destination in the link tooltip. Title and description previews for external sites are currently disabled. Pasting a supported YouTube URL inserts a video node, but playback requires [deployment policy updates](../../.mew/docs/work/deployment-readiness-review.md) because the production CSP does not allow external frames.
+- In Hotview, type `/` and select **Upload File**, or drag a file into the body. Pasting images from the clipboard is also supported. Use an inserted image's resize handles to change its display size.
+- Body attachments are saved in the project's `.mew/assets/`. Dropping a file in the file explorer saves it in the selected folder under its original name. Conflict handling, shared links, and Git integration follow the [drag-and-drop contract](#dragging-and-dropping-file-explorer-items).
 
-## 표 편집과 복사
+## Editing and Copying Tables
 
-Hotview에서 `/` → **표**를 고르면 3×3 Markdown 표를 삽입한다. 셀 안에서 `Insert`로 행·열 추가 도구를, `Ctrl+Shift+D`로 제거 도구를 열고 방향 버튼이나 방향키로 적용한다. 세로 경계선을 끌어 열 너비를 조절한다. 표를 우클릭하면 기본 본문 메뉴 아래에 행·열 추가·삭제, DB 전환과 Markdown·CSV·이미지 복사를 함께 표시한다. **행 삭제**·**열 삭제**는 우클릭한 셀이 속한 행·열을 지우며, 하나만 남은 행이나 열을 지우면 표 전체가 사라진다. 읽기 전용에서는 추가·삭제 항목을 표시하지 않는다. 이미지 클립보드 지원은 브라우저 환경에 따라 다르다.
+In Hotview, select `/` → **Table** to insert a 3×3 Markdown table. Within a cell, use `Insert` to open the row and column insertion tools, or `Ctrl+Shift+D` to open the removal tools, then apply them with the direction buttons or arrow keys. Drag vertical boundaries to resize columns. Right-clicking a table shows row and column insertion and deletion, DB conversion, and copying as Markdown, CSV, or an image below the standard body menu. **Delete Row**·**Delete Column** delete the row or column containing the right-clicked cell; deleting the only remaining row or column removes the entire table. In read-only mode, insertion and deletion items are hidden. Image clipboard support varies by browser environment.
 
-본문에는 Markdown 표를 저장하고 열 너비는 별도로 기억한다(아래 **표 열 너비**). 편집 가능한 표의 우클릭 메뉴에서 **데이터베이스로 전환**을 고르면 모든 열을 텍스트 필드로 가져온다. DB의 우클릭 메뉴에서는 **표로 전환**을 고른다. 양방향 전환은 실행 취소·다시 실행이 가능하다. [DB 전환과 저장 범위](database.md#일반-표와-전환하기)를 참고한다.
+The body stores the Markdown table, while column widths are remembered separately (see **Table Column Widths** below). Selecting **Convert to Database** from an editable table's context menu imports all columns as text fields. In a DB's context menu, select **Convert to Table**. Conversion in either direction supports undo and redo. See [DB Conversion and Storage Scope](database.md#converting-between-databases-and-regular-tables).
 
-## 미디어와 시트 보기
+## Viewing Media and Sheets
 
-파일 트리에서 파일을 누르면 형식에 맞는 뷰어로 연다.
+Click a file in the file tree to open it in the viewer for its format.
 
-| 형식 | 조작과 범위 |
+| Format | Controls and scope |
 | --- | --- |
-| 이미지 | PNG·JPEG·GIF·WebP·AVIF·BMP·ICO를 미리보고 원본 다운로드 |
-| SVG | 이미지 보기와 텍스트 편집을 전환 |
-| 오디오·영상 | 브라우저 재생 컨트롤로 재생·일시정지·탐색. 실제 재생 가능 여부는 기기의 코덱 지원에 따름 |
-| PDF | 페이지 이동·확대·텍스트 선택, 펜·형광펜 필기와 PDF 자체 저장. [PDF 사용법](#pdf-읽기와-필기) |
-| XLSX·CSV·TSV | 읽기 전용 표로 열람하고 XLSX 시트 탭 전환·원본 다운로드. 셀 편집·수식 계산기는 제공하지 않음 |
-| APK·AAB | 미리보기 없이 다운로드 |
+| Images | Preview PNG·JPEG·GIF·WebP·AVIF·BMP·ICO and download originals |
+| SVG | Switch between image viewing and text editing |
+| Audio and video | Play, pause, and seek using browser playback controls. Actual playback availability depends on device codec support |
+| PDF | Navigate pages, zoom, select text, annotate with a pen or highlighter, and save the PDF itself. [PDF Guide](#reading-and-annotating-pdfs) |
+| XLSX·CSV·TSV | View as read-only tables, switch XLSX sheet tabs, and download originals. Cell editing and formula calculation are not provided |
+| APK·AAB | Download without a preview |
 
-## PDF 읽기와 필기
+## Reading and Annotating PDFs
 
-PDF를 누르면 mew 뷰어가 열린다. 하단 중앙의 둥근 반투명 플로팅 바에서 페이지 번호·**너비 맞춤**·확대 비율을 고른다. **텍스트 선택 · 스크롤**로 문서를 읽거나 글자를 복사한다. 작은 화면에서는 필기 도구 줄을 좌우로 밀어 나머지 도구를 본다.
+Click a PDF to open the mew viewer. Use the rounded, translucent floating bar at the bottom center to select a page number, **Fit Width**, or zoom level. Use **Text Selection · Scroll** to read the document or copy text. On small screens, swipe the annotation toolbar left or right to see the remaining tools.
 
-도구 줄 맨 왼쪽의 반원 아이콘 **색 반전**을 누르면 흰 바탕은 검정, 검은 글씨는 흰색으로 바뀐다. 이미지와 필기도 함께 반전되며 다시 누르면 원래 색으로 돌아온다. 읽기 전용 PDF에서도 사용할 수 있다. 화면 표시만 바꾸므로 저장·다운로드한 PDF에는 원래 색이 유지된다. 전체화면·확대·페이지 이동 중에는 유지되고 뷰어를 다시 열면 기본 색으로 시작한다.
+Click **Invert Colors**, the semicircle icon at the far left of the toolbar, to turn white backgrounds black and black text white. Images and annotations are also inverted; click again to restore the original colors. This is also available for read-only PDFs. It changes only the display, so saved and downloaded PDFs retain their original colors. The setting persists during fullscreen, zooming, and page navigation; reopening the viewer starts with the default colors.
 
-플로팅 바 오른쪽의 **PDF 전체화면**을 누르면 탭·파일 탐색기·다른 앱 UI를 가리고 PDF 내용과 플로팅 바만 표시한다. 같은 자리의 **PDF 전체화면 나가기** 또는 `Esc`로 돌아온다. 전환해도 필기·선택 도구·읽던 페이지가 유지된다. 브라우저가 요소 전체화면을 허용하지 않으면 브라우저 내부를 채우는 모드로 전환하며, 이때 브라우저 자체 주소창은 남을 수 있다.
+Click **PDF Fullscreen** on the right of the floating bar to hide tabs, the file explorer, and other app UI, showing only the PDF content and floating bar. Return using **Exit PDF Fullscreen** in the same location or `Esc`. Switching preserves annotations, the selected tool, and the current page. If the browser does not allow element fullscreen, it switches to a mode that fills the browser's content area; the browser's own address bar may remain visible.
 
-- 편집 가능한 PDF는 **펜**·**형광펜**으로 마우스·터치·펜 필기를 한다. 펜의 색과 굵기를 고를 수 있다. 터치로 문서를 움직이려면 텍스트 선택 도구로 돌아간다.
-- **새 필기 지우기**는 이번에 그린 선을 통째로 지운다. 필기 실행 취소·다시 실행과 `Ctrl/Cmd+Z`, `Ctrl/Cmd+Shift+Z`·`Ctrl+Y`를 지원한다.
-- **PDF 저장** 또는 PDF 본문에 포커스를 둔 `Ctrl/Cmd+S`로 원본 파일에 필기를 저장한다. PDF는 명시적 저장이며 Git 커밋을 만들지 않는다. 필기는 PDF 표준 벡터 주석으로 들어가 다른 PDF 도구에서도 보이고 인쇄된다.
-- 다운로드 버튼은 필기가 있으면 **필기한 PDF 사본**, 없으면 원본을 내려받는다. 원본이 다른 곳에서 바뀌면 덮어쓰기를 중단하고 필기를 남긴다. 원본 전체 바이트를 이미 읽은 상태라면 필기 사본을 다운로드할 수 있다.
-- 미저장 초안은 계정·문서별 브라우저 저장소에 보관되어 탭을 바꾸거나 새로고침해도 복원된다. 저장 공간이 없거나 차단돼 보관에 실패하면 안내가 나온다. 다른 브라우저·기기로 초안이 동기화되지는 않는다. 복원 중 원본 버전이 달라졌다면 초안을 자동으로 덮어씌우지 않는다.
+- For editable PDFs, use **Pen**·**Highlighter** to annotate with a mouse, touch, or pen. You can choose the pen color and thickness. To move the document by touch, return to the text selection tool.
+- **Erase New Annotations** removes entire strokes drawn in the current session. Annotation undo and redo are supported, along with `Ctrl/Cmd+Z`, `Ctrl/Cmd+Shift+Z`·`Ctrl+Y`.
+- Use **Save PDF** or `Ctrl/Cmd+S` with the PDF body focused to save annotations to the original file. PDFs require explicit saving, which does not create a Git commit. Annotations are stored as standard PDF vector annotations, so they are visible and printable in other PDF tools.
+- The download button downloads an **annotated PDF copy** if annotations exist, or the original otherwise. If the original changes elsewhere, overwriting stops and annotations are retained. If all bytes of the original have already been read, you can download an annotated copy.
+- Unsaved drafts are kept in browser storage per account and document and restored after switching tabs or refreshing. A notice appears if storage fails because space is unavailable or storage is blocked. Drafts do not sync to other browsers or devices. If the original version has changed during restoration, the draft is not automatically applied over it.
 
-저장된 필기는 PDF의 일부로 다시 표시되며 mew의 지우개·실행 취소 대상에서 빠진다. 원본 저장은 100MiB까지 지원한다. 읽기 전용 파일·archives에는 저장할 수 없으며, 암호화·전자서명·인증된 PDF의 필기 저장은 지원하지 않는다. 전체 문서 검색·OCR·폼 입력·실시간 공동 필기는 제공하지 않는다. 구현·검증 기준은 [PDF 개발 계약](../../.mew/docs/development/pdf-viewer.md)을 따른다.
+Saved annotations reappear as part of the PDF and are excluded from mew's eraser and undo operations. Saving to the original is supported up to 100MiB. Saving is unavailable for read-only files and archives, and saving annotations in encrypted, digitally signed, or certified PDFs is not supported. Full-document search, OCR, form entry, and real-time collaborative annotation are not provided. Implementation and verification criteria follow the [PDF Development Contract](../../.mew/docs/development/pdf-viewer.md).
 
-## 자동저장·커밋·파일 이력
+## Autosave, Commits, and File History
 
-| 작업 | 저장되는 것 | 조작 |
+| Task | What is saved | Action |
 | --- | --- | --- |
-| Markdown·코드 편집 | 서버 파일의 현재 내용 | 자동저장 상태·오류를 확인 |
-| 현재 텍스트 파일 커밋 | 그 파일의 Git 이력 | `Ctrl+S` 또는 메뉴 → **Commit** |
-| 여러 파일 커밋 | 선택 파일의 Git 이력 | 독 → **Git**에서 파일을 체크하고 커밋 |
-| PDF 필기 저장 | PDF 원본에 주석 반영 | PDF의 **저장** 또는 본문에 포커스를 두고 `Ctrl/Cmd+S` |
+| Edit Markdown or code | Current contents of the server file | Check autosave status and errors |
+| Commit the current text file | That file's Git history | `Ctrl+S` or Menu → **Commit** |
+| Commit multiple files | Git history for selected files | Dock → **Git**, check files, and commit |
+| Save PDF annotations | Apply annotations to the original PDF | PDF **Save** or `Ctrl/Cmd+S` with the body focused |
 
-편집한 본문은 디스크에 자동저장되며 저장 상태·오류를 편집기에 표시한다. 자동저장은 Git 커밋을 만들지 않는다. Git 저장소의 현재 파일을 이력으로 남기려면 `Ctrl+S` 또는 헤더 메뉴 → **Commit**을 누른다. 저장소 전체 변경을 커밋하려면 [Git 작업 패널](projects.md#git-작업-패널)을 사용한다.
+Edited body content is automatically saved to disk, and the editor displays save status and errors. Autosave does not create Git commits. To record the current file in a Git repository's history, press `Ctrl+S` or select Header Menu → **Commit**. To commit changes across the repository, use the [Git Work Panel](projects.md#git-operations-panel).
 
-편집기 위의 **히스토리**에서 커밋을 선택하면 그 시점의 파일을 읽기 전용으로 확인할 수 있다. 편집 권한이 있으면 선택한 버전으로 되돌릴 수 있다. 파일 이력은 로그인 사용자에게 제공되며, 서버 파일 탐색기로 연 프로젝트 밖 파일에는 협업·댓글·Git 이력이 없다.
+Select a commit in **History** above the editor to view the file at that point in read-only mode. With edit permission, you can restore the selected version. File history is available to logged-in users. Files outside projects opened through the server file explorer have no collaboration, comments, or Git history.
 
-## 모바일과 전체화면
+## Mobile and Fullscreen
 
-휴대폰에서 Mew에 접속하면 전체화면 추천보다 **앱 설치 안내**가 먼저 나온다. **앱 설치** 버튼이 있으면 눌러 브라우저의 설치 창을 열고, 없으면 안내에 따라 브라우저 메뉴의 **앱 설치** 또는 **홈 화면에 추가**를 사용한다. iPhone·iPad에서는 공유 메뉴에서 **홈 화면에 추가**를 선택한다. 브라우저마다 메뉴 이름·지원 여부가 다르며, 설치에는 HTTPS 주소 또는 localhost가 필요하다. 다른 기기에서 쓰는 일반 HTTP 주소에서는 설치할 수 없다.
+When you access Mew on a phone, **app installation guidance** appears before the fullscreen recommendation. If an **Install App** button is available, tap it to open the browser's installation dialog; otherwise, follow the guidance to use **Install App** or **Add to Home Screen** in the browser menu. On iPhone and iPad, select **Add to Home Screen** from the Share menu. Menu names and support vary by browser, and installation requires an HTTPS address or localhost. Installation is unavailable from a regular HTTP address accessed on another device.
 
-설치한 아이콘으로 열면 브라우저가 지원하는 앱 화면으로 실행되고 시작 안내는 표시하지 않는다. 기존 Mew 서버에 연결하므로 호스트가 계속 켜져 있어야 하며 오프라인 작업은 지원하지 않는다. Mewlink 주소를 사용하는 경우 새 설치 지원은 호스트 Mew 업데이트와 Mewlink 중앙 서비스 반영이 모두 필요하다.
+Opening the installed icon launches the browser-supported app view without showing startup guidance. It connects to the existing Mew server, so the host must remain on, and offline work is not supported. When using a Mewlink address, support for new installations requires both a host Mew update and an update to the Mewlink central service.
 
-설치 안내를 닫으면 가능한 환경에서 전체화면 안내가 이어진다. 두 안내의 **다시 보지 않기**는 각각 이 브라우저에 기억한다. 체크하지 않고 닫으면 다음 새로고침 때 다시 표시한다. PC에서도 설치를 지원하는 브라우저에서는 설치 창 제공 여부와 관계없이 수동 설치 방법을 먼저 안내한다.
+After you dismiss installation guidance, fullscreen guidance follows in supported environments. Each guide's **Don't Show Again** choice is remembered separately in this browser. Dismissing without checking it shows the guide again on the next refresh. On PCs, browsers that support installation also show manual installation instructions first, regardless of whether an installation dialog is available.
 
-PC에서는 화면 **왼쪽 가장자리**에 세로 독을 표시한다. 아이콘에 마우스를 올리면 도구 이름을 확인할 수 있다. 닫힌 패널은 열고, 열려 있지만 포커스되지 않은 패널은 포커스를 옮기며, 포커스된 아이콘을 다시 누르면 닫는다. 에디터는 탭과 내용을 유지한 채 숨기거나 다시 표시한다. 열린 패널과 현재 포커스된 패널은 강조 정도로 구분한다.
+On PCs, a vertical dock appears along the **left edge** of the screen. Hover over an icon to see the tool name. Clicking opens a closed panel, focuses an open but unfocused panel, or closes the panel if its icon is already focused. The editor hides or reappears while preserving its tabs and content. Open panels and the currently focused panel use different levels of emphasis.
 
-모바일에서는 화면 맨 아래 **독**으로 전면 패널을 바꾼다. 현재 패널을 다시 눌러도 닫지 않는다. 파일 탐색기·에디터·에이전트·터미널·Git·브라우저·기능·디버거·메모·태스크 가운데 권한과 현재 프로젝트에 맞는 도구만 표시한다. **설정 → Dock**에서 표시 여부와 순서를 바꿀 수 있다.
+On mobile, use the **dock** at the bottom of the screen to switch the foreground panel. Tapping the current panel again does not close it. Only tools appropriate for your permissions and current project appear from among File Explorer, Editor, Agent, Terminal, Git, Browser, Features, Debugger, Notes, and Tasks. Change visibility and order in **Settings → Dock**.
 
-아이콘을 **450ms 길게 누른 뒤 독 방향으로 끌면 순서가 바뀐다**. PC의 세로 독은 위아래로, 모바일의 가로 독은 좌우로 옮긴다. 빈 자리 표시로 놓을 위치를 확인하고, Esc나 터치 취소로 원래 순서로 돌아간다. 키보드는 아이콘에 포커스를 둔 뒤 PC에서 `Alt+↑/↓`, 모바일에서 `Alt+←/→`를 쓴다. 표시 설정과 순서는 이 브라우저에 저장한다.
+**Long-press an icon for 450ms, then drag along the dock to reorder it**. Move up or down in the PC's vertical dock, or left or right in the mobile horizontal dock. Use the placeholder to identify the drop position, and press Esc or cancel the touch to restore the original order. With the keyboard, focus an icon and use `Alt+↑/↓` on PCs or `Alt+←/→` on mobile. Visibility settings and order are saved in this browser.
 
-독 위에서 **왼쪽→오른쪽 스와이프**는 이전 패널을, **오른쪽→왼쪽**은 다음 패널을 연다. 설정한 독 순서를 따르고 양 끝에서는 멈춘다. 각 패널은 마지막으로 선택했던 탭을 유지한다.
+On the dock, **swiping left→right** opens the previous panel, and **right→left** opens the next panel. Navigation follows the configured dock order and stops at either end. Each panel retains its last selected tab.
 
-모바일 패널 본문을 좌우로 밀면 현재 패널의 이전·다음 탭으로 이동한다. 탭은 양 끝에서 순환하며, 탭이 하나이면 유지한다. 에디터에서는 **Markdown Hotview 본문**을 밀어 탭을 바꾼다. **일반 파일·Markdown Plain**에서는 본문을 가로로 스크롤할 수 있으므로 **보조키바**를 밀어 탭을 바꾼다. Plain의 보조키바는 모바일 키보드가 닫혀 있어도 표시한다. 탭 줄의 가로 스크롤, 태스크 행 삭제와 간트 이동·일정 편집은 기존 조작을 유지한다.
+Swipe left or right on a mobile panel's body to move to the current panel's previous or next tab. Tabs wrap around at either end; a single tab stays selected. In the editor, swipe the **Markdown Hotview body** to switch tabs. Because the body in **regular files and Markdown Plain** supports horizontal scrolling, swipe the **auxiliary key bar** to switch tabs instead. Plain's auxiliary key bar appears even when the mobile keyboard is closed. Horizontal scrolling of the tab bar, task row deletion, and Gantt navigation and schedule editing retain their existing controls.
 
-**기능**은 현재 프로젝트의 기능 문서 목록을 연다. 에이전트 권한이 있을 때 표시하며, 다른 패널을 보았다 돌아와도 작성 내용이 유지된다. 닫기·Esc·뒤로가기는 미저장 내용을 확인한다.
+**Features** opens the current project's feature document list. It appears when you have agent permission, and content you are writing persists when you view another panel and return. Close, Esc, and Back check for unsaved content.
 
-**원격 데스크톱**은 헤더 메뉴에서 연다. 뷰어의 닫기·뒤로가기로 이전 작업 화면에 돌아오며, 모바일에서는 하단 독으로 다른 패널을 선택할 수도 있다. 이때 원격 연결은 종료된다. 자세한 연결·조작은 [원격 데스크톱](remote-desktop.md)을 따른다.
+Open **Remote Desktop** from the header menu. Use the viewer's Close or Back action to return to the previous workspace; on mobile, you can also select another panel from the bottom dock. This ends the remote connection. For connection and control details, see [Remote Desktop](remote-desktop.md).
 
-채팅·Android·원격 데스크톱·설정은 헤더 메뉴에서 연다. 모바일 소프트 키보드가 열리면 독과 하단 예약 공간을 숨기고, 키보드를 내리면 복원한다. 패널은 독·상단 메뉴로 조작하고 탭은 탭 바·단축키·모바일 본문 또는 Plain 보조키바 스와이프로 전환한다.
+Open Chat, Android, Remote Desktop, and Settings from the header menu. When the mobile software keyboard opens, the dock and reserved bottom space are hidden; they return when the keyboard closes. Control panels using the dock and top menu, and switch tabs using the tab bar, keyboard shortcuts, or swipes on the mobile body or Plain auxiliary key bar.
 
-화면 폭 768px 이상에서는 상단 **메뉴** 버튼에 아이콘과 글자를 함께 표시하고 헤더 높이와 여백을 늘린다. 좁은 화면에서는 아이콘 버튼을 사용한다.
+At screen widths of 768px or greater, the top **Menu** button shows both an icon and text, and the header height and spacing increase. Narrow screens use an icon button.
 
-헤더의 **전체화면 버튼** 또는 `Alt+Enter`로 화면을 전환한다. 모바일에서는 전면 작업 패널 하나를 보고, 문서 편집 칸이 여럿이면 탭 줄 위 선택기로 칸을 바꾼다. 데스크톱 분할 배치는 유지한다.
+Toggle fullscreen using the header's **fullscreen button** or `Alt+Enter`. On mobile, one foreground work panel is shown; if there are multiple document editing panes, switch panes using the selector above the tab bar. The desktop split layout is preserved.
 
-파일·폴더는 움직이지 않고 0.5초 이상 누른 뒤 1초가 되기 전에 손을 떼면 우클릭 메뉴가 열린다. 1초까지 계속 누르면 이동 모드가 되고, 항목과 손가락 옆의 파일명이 강조된다. 그 상태에서 대상 폴더로 끌어 놓으면 이동한다. 움직이지 않고 놓으면 이동하지 않는다. 짧게 누르면 파일 열기·폴더 펼치기, 일찍 움직이면 스크롤이다. 탭 줄은 손가락으로 좌우 이동한다. Esc는 가장 위 팝업을 닫으며, 모바일 뒤로가기는 팝업을 먼저 닫고 이전 작업 화면으로 돌아간다. 입력 중인 터미널의 Esc는 터미널 프로그램에 전달될 수 있다. 일반 웹 전체화면에서는 브라우저가 먼저 전체화면을 해제할 수 있으며, 설치한 앱의 뒤로가기 동작도 기기·브라우저별 확인이 필요하다. [패널·포커스 계약](../../.mew/docs/development/ui-contracts.md)에 세부 동작을 둔다.
+Press and hold a file or folder without moving for at least 0.5 seconds, then release before 1 second to open its context menu. Continue holding until 1 second to enter move mode, highlighting the item and the filename beside your finger. Then drag and drop it onto the destination folder to move it. Releasing without moving does not move it. A short tap opens a file or expands a folder; moving early scrolls. Slide the tab bar left or right with your finger. Esc closes the topmost popup; mobile Back closes popups first, then returns to the previous workspace. Esc in a terminal receiving input may be passed to the terminal program. In regular web fullscreen, the browser may exit fullscreen first; Back behavior in the installed app also requires verification for each device and browser. Detailed behavior is defined in the [Panel and Focus Contract](../../.mew/docs/development/ui-contracts.md).
 
-앱의 제목·안내·버튼·탭 이름은 길게 눌러도 텍스트가 선택되지 않는다. 문서·코드·PDF 본문, 에이전트 대화·채팅·댓글, 오류 메시지·명령·표 데이터는 선택해 복사할 수 있다. 입력칸의 선택·복사·편집도 유지된다.
+Long-pressing app titles, guidance, buttons, or tab names does not select their text. You can select and copy document, code, and PDF body content; agent conversations, chats, and comments; and error messages, commands, and table data. Selection, copying, and editing in input fields remain available.
 
-## 편집 칸 (문서 탭 · 화면 분할)
+## Editor Panes (Document Tabs · Split View)
 
-PC 파일 탐색기는 제일 왼쪽에 고정되어 있고 오른쪽 경계 중앙 버튼으로 접거나 펼친다. **설정 → 화면**에서 메모와 태스크를 각각 **탭** 또는 **팝업**으로 볼 수 있다. 팝업 상단 손잡이로 이동하고 우하단 손잡이로 크기를 조절한다. 위치·크기·탭 배치는 기기의 브라우저에 기억하며 다른 기기의 배치와 별도로 복원한다. 모바일에서는 기존 패널 화면을 사용한다.
+The PC file explorer is fixed at the far left and can be collapsed or expanded using the button at the center of its right edge. In **Settings → Display**, Notes and Tasks can each be shown as a **Tab** or **Popup**. Move a popup using its top handle and resize it using its bottom-right handle. Position, size, and tab layout are remembered in the device's browser and restored separately from layouts on other devices. Mobile uses the existing panel view.
 
-편집 칸마다 문서 탭 줄과 협업 세션을 가진다. Documents와 일반 파일은 같은 탭 줄에 함께 열리며, 파일을 전환해도 이동한 패널 위치를 유지한다. 이름이 같은 파일도 각각의 위치와 내용으로 구분한다. 에이전트·터미널·브라우저와 같은 작업 영역에서 배치한다.
+Each editing pane has its own document tab bar and collaboration session. Documents and regular files open together in the same tab bar, and switching files preserves the panel's moved position. Files with identical names are distinguished by their respective locations and contents. Editing panes share the workspace with agents, terminals, and browsers.
 
-- 문서·에이전트·터미널·브라우저 탭을 잡아 끌면 탭 모양이 포인터를 따라 움직이고, 탭 줄에는 들어갈 빈 자리가 보인다. PC에서는 바로 드래그하거나 길게 누른 뒤 움직이고, 모바일에서는 0.35초 길게 누른 뒤 끈다. 모바일에서 바로 좌우로 밀면 탭 줄을 스크롤한다.
-- 마우스로 문서 탭을 끌어 가장자리에 놓으면 새 칸으로 분리한다. 같은 종류의 탭 줄·가운데에 놓으면 그 칸으로 옮긴다. 드롭 위치는 반투명 영역으로 표시한다.
-- 상단 손잡이는 탭 전체가 있는 칸을 옮긴다. 경계선을 끌거나 경계선에 포커스를 두고 화살표 키를 눌러 크기를 조절한다.
-- 데스크톱에서는 **패널 이동 손잡이를 더블클릭**하면 해당 패널의 탭 바와 본문이 파일 탐색기까지 포함한 작업 영역 전체를 덮는다. 선택한 패널의 탭 바만 맨 위에 전체 너비로 표시하고 다른 패널의 탭 바와 사이드 독은 숨긴다. 같은 손잡이를 다시 더블클릭하거나 **Esc**를 누르면 원래 배치로 복귀한다. 팝업이 열려 있으면 Esc는 팝업부터 닫는다. 문서 탭 더블클릭은 미리보기를 고정하고 에이전트·터미널 탭 더블클릭은 이름을 바꾼다. Git도 공통 손잡이로 확대할 수 있다.
-- 확대는 현재 화면에서만 유지하며 탭·패널 드래그, 확대 패널 닫기·마지막 탭 제거, 프로젝트 전환·새로고침·모바일 화면으로 전환하면 해제된다. 모바일은 기존처럼 전면 패널 하나를 표시한다.
-- 키보드로는 탭에 포커스를 두고 `Shift+Enter`로 확대·복귀하며, 확대 중에는 선택한 패널의 탭만 탐색할 수 있다. 독에서 패널을 선택하면 확대를 해제하고 선택한 화면으로 이동한다.
-- 파일 탐색기 파일을 편집기 본문 가장자리에 놓으면 새 칸에서 연다. 본문 가운데는 기존처럼 경로 텍스트 삽입이다.
-- 모바일에서 편집 칸이 여럿이면 탭 줄 위의 선택기로 전환한다. 데스크톱 분할 배치는 유지한다.
-- 문서 탭 목록은 `useTabs`, 공통 작업 배치는 `DockWorkspace`가 관리한다. 자세한 기준은 [UI 계약](../../.mew/docs/development/ui-contracts.md#작업-패널-배치)을 따른다.
-- 칸이 비면(마지막 탭을 닫으면) **저절로 접히고** 나무도 같이 줄어든다(`removeLeaf`·`prunePanes`). 마지막 한 칸은 비어도 남아 안내문을 띄운다.
-- \*\*초점 칸(focused pane)\*\*이 키보드 단축키·검색·기록 되돌리기·터미널 선택 붙여넣기의 대상이다. 칸 아무 데나 누르면(`onPointerDownCapture`) 초점이 옮겨 가고, 초점 없는 칸의 탭 줄은 흐려진다. `useTabs`가 내주는 `tabs`/`activePath`/`activeTab`은 **초점 칸의 것**이다.
-- **내용 캐시·자동저장은 칸이 아니라 경로 기준**이다. 같은 파일을 두 칸에 열면 같은 내용을 본다.
-- 열린 문서 탭의 로컬 복원 저장소는 fallback이다. `localStorage`가 가득 차거나 차단돼도 파일 열기·탭 전환·계정 서버의 탭 상태 동기화는 계속한다. 같은 파일 선택 흐름에서 파일 탐색기 펼침 상태와 모바일 전면 창 기억이 실패해도 화면을 비우거나 에디터로 전달할 파일 선택을 중단하지 않는다. 문서 본문 저장 실패는 이 처리와 별개로 기존 저장 오류 안내를 유지한다.
-- 터미널·에이전트 패널·시스템 자원 버튼은 칸이 아니라 **헤더 햄버거 메뉴**(`HeaderMenu`)에 있다 — 칸 도구 줄에 달면 같은 버튼이 여러 개 선다.
-- 협업 참여자 표시(presence)가 서버에 알리는 파일은 **초점 칸의 것 하나**다 — 다른 칸에 열어둔 문서는 남에게 "보고 있는 중"으로 보이지 않는다.
+- When you drag a document, agent, terminal, or browser tab, its tab shape follows the pointer, and a placeholder in the tab bar shows where it will go. On PCs, drag immediately or long-press before moving; on mobile, long-press for 0.35 seconds before dragging. Swiping left or right immediately on mobile scrolls the tab bar.
+- Drag a document tab with the mouse and drop it at an edge to split it into a new pane. Drop it on a tab bar of the same type or in a pane's center to move it into that pane. The drop target appears as a translucent area.
+- The top handle moves the pane containing all its tabs. Resize by dragging a boundary or focusing it and pressing the arrow keys.
+- On desktop, **double-click the panel move handle** to make that panel's tab bar and body cover the entire workspace, including the file explorer. Only the selected panel's tab bar appears across the full width at the top; other panels' tab bars and the side dock are hidden. Double-click the same handle again or press **Esc** to restore the original layout. If a popup is open, Esc closes it first. Double-clicking a document tab pins its preview, while double-clicking an agent or terminal tab renames it. Git can also be maximized using the shared handle.
+- Maximization persists only in the current view and ends when you drag a tab or panel, close the maximized panel or remove its last tab, switch projects, refresh, or switch to the mobile view. Mobile continues to display one foreground panel as before.
+- With the keyboard, focus a tab and use `Shift+Enter` to maximize or restore; while maximized, you can navigate only the selected panel's tabs. Selecting a panel from the dock exits maximization and switches to the selected view.
+- Drop a file from the file explorer onto an edge of the editor body to open it in a new pane. Dropping in the center of the body inserts path text as before.
+- On mobile, if there are multiple editing panes, switch between them using the selector above the tab bar. The desktop split layout is preserved.
+- `useTabs` manages the document tab list, and `DockWorkspace` manages the shared workspace layout. Follow the [UI contract](../../.mew/docs/development/ui-contracts.md#workspace-panel-layout) for detailed rules.
+- When a pane becomes empty (when its last tab is closed), it **collapses automatically** and the tree shrinks with it (`removeLeaf`·`prunePanes`). The last remaining pane stays open even when empty and displays guidance.
+- The \*\*focused pane\*\* is the target for keyboard shortcuts, search, history navigation, and pasting terminal selections. Clicking anywhere in a pane (`onPointerDownCapture`) moves focus to it, and tab bars in unfocused panes are dimmed. The `tabs`/`activePath`/`activeTab` provided by `useTabs` **belong to the focused pane**.
+- **Content caching and autosave are keyed by path, not pane**. Opening the same file in two panes shows the same content.
+- Local storage for restoring open document tabs is a fallback. Opening files, switching tabs, and syncing tab state with the account server continue even if `localStorage` is full or blocked. In the same file selection flow, failures to remember the file explorer's expanded state or the foreground panel on mobile do not clear the screen or stop the selected file from being passed to the editor. Document content save failures retain the existing save error messages independently of this handling.
+- The terminal, agent panel, and system resource buttons are in the **header hamburger menu** (`HeaderMenu`), rather than individual panes — placing them on pane toolbars would create duplicate buttons.
+- Collaboration presence reports **only the file in the focused pane** to the server — documents open in other panes do not appear to others as being viewed.
 
-## Ctrl+L 참조 (`경로:줄`)
+## Ctrl+L references (`경로:줄`)
 
-편집기 안에서 Ctrl+L(`insertPathOrSelection`)을 누르면 지금 보고 있는 자리를 `programs/modoo-2026/사업계획서-0811.md:3` 꼴로 만들어 **보조창 입력칸 하나**에 써 준다. 선택이 있으면 `…:3-15`, 없으면 커서가 있는 줄 하나다. 뒤에 공백 한 칸이 붙어 바로 이어 칠 수 있다.
+Pressing Ctrl+L (`insertPathOrSelection`) inside the editor formats the current location as `programs/modoo-2026/사업계획서-0811.md:3` and writes it into **one auxiliary panel input**. If there is a selection, it uses `…:3-15`; otherwise, it uses the single line containing the cursor. A trailing space lets you continue typing immediately.
 
-- **파일 종류를 가리지 않는다** — md 핫뷰(ProseMirror)든 코드·텍스트(CodeMirror)든 편집기가 붙으면 대상이다 (`.ProseMirror, .cm-editor` 안에서 눌렀을 때만). 줄 번호는 각 편집기의 `getSelectedLineRange`가 내고, 핫뷰는 화면상의 블록이 아니라 **md 원본 줄**로 환산한다(frontmatter 줄 수까지 더한다).
-- **받는 창은 마지막으로 연 보조창 하나**다(터미널·에이전트 패널 · 채팅). 그 창이 닫혀 있으면 지금 열려 있는 창으로 넘어가고, 하나도 안 열려 있으면 아무 일도 하지 않는다 (`utils/refTarget.ts`, 테스트 있음). App이 `mew:insert-ref`에 `detail.target`을 실어 보내고 **자기 이름이 아닌 창은 무시**한다 — 예전에는 열려 있는 창이 전부 받아 적어 쓰지도 않을 창에 찌꺼기가 남았다.
-- 터미널·에이전트 패널은 탭이 여럿이어도 마지막으로 사용한 패널의 **활성 탭 하나**만 받는다(안 보이는 탭도 마운트된 채로 살아 있다). 채팅 창만 글자 대신 파일 멘션 토큰(`[[프로젝트:경로]]`)으로 받는다 — 같은 이벤트의 `project`·`path`를 쓴다.
-- 터미널 **안에서** 누른 Ctrl+L은 이 경로가 아니다 — `TmuxTerminal`이 직접 처리해 편집기 선택 글자(없으면 활성 파일 경로)를 셸에 찍는다.
+- **All file types are supported** — Markdown in Hotview (ProseMirror) and code or text (CodeMirror) qualify whenever an editor is attached (only when pressed inside `.ProseMirror, .cm-editor`). Each editor's `getSelectedLineRange` supplies the line numbers, and Hotview converts them to **Markdown source lines** rather than onscreen blocks (including the frontmatter line count).
+- **The recipient is the most recently opened auxiliary panel** (terminal, agent panel, or chat). If that panel is closed, it falls back to a currently open panel; if none are open, it does nothing (`utils/refTarget.ts`, covered by tests). App sends `detail.target` with `mew:insert-ref`, and **panels ignore events addressed to a different panel** — previously, every open panel received the text, leaving residue in panels that would not be used.
+- Even with multiple tabs, only **one active tab** in the most recently used terminal or agent panel receives it (hidden tabs remain mounted). Only the chat panel receives a file mention token (`[[프로젝트:경로]]`) instead of text — it uses `project` and `path` from the same event.
+- Ctrl+L pressed **inside** the terminal does not use this route — `TmuxTerminal` handles it directly and writes the selected editor text (or the active file path if there is no selection) to the shell.
 
-## 파일 탐색기 항목 끌어놓기
+## Dragging and dropping file explorer items
 
-파일·폴더를 끌면 **놓는 자리에 따라 뜻이 다르다**. 여러 뜻을 한 드래그에 담으려고 `@mew/ui`의 `pathDrag.ts`가 전용 MIME(`application/x-mew-path`)과 `text/plain` 양쪽에 경로를 싣고, 폴더는 `application/x-mew-dir`을 하나 더 실어 **값을 못 읽는** `dragover` **단계에서도 파일과 구분**되게 한다.
+When dragging a file or folder, **the meaning depends on where it is dropped**. To support multiple meanings in a single drag, `pathDrag.ts` in `@mew/ui` includes the path in both a dedicated MIME type (`application/x-mew-path`) and `text/plain`. Folders also include `application/x-mew-dir` so they can be **distinguished from files even during the** `dragover` **phase, when values cannot be read**.
 
-| 놓는 곳 | 결과 |
+| Drop target | Result |
 | --- | --- |
-| 파일 탐색기의 폴더 (빈 곳 = 프로젝트 루트) | 그 폴더로 **이동**(`POST /api/rename`) |
-| 에디터 칸의 **가장자리 30%** (파일만) | 탭 드래그와 같은 규칙으로 **그 방향 화면 분할** + 새 칸에 그 파일이 열린다 |
-| 에디터 Hotview·Plain (가운데) | 놓은 자리에 **경로 텍스트** 삽입 |
-| 터미널 화면 | 셸에 그대로 **타이핑**(Enter는 보내지 않는다 — 명령을 완성하는 건 사용자다) |
-| 터미널 하단 입력칸 | 커서 자리에 **경로 삽입**(선택 영역이 있으면 대체) |
+| A folder in the file explorer (empty area = project root) | **Move** to that folder (`POST /api/rename`) |
+| The **outer 30%** of an editor pane (files only) | **Split the view in that direction** using the same rules as tab dragging + open the file in the new pane |
+| Hotview/Plain editor (center) | Insert **path text** at the drop position |
+| Terminal screen | **Type** directly into the shell (Enter is not sent — the user completes the command) |
+| Input field at the bottom of the terminal | **Insert the path** at the cursor (replace the selection if present) |
 
-가장자리 분할 가로채기는 `App.tsx`가 칸 컨테이너의 **캡처 단계** `dragover`/`drop`에서 한다 (`pathDropTargetAt`) — 가운데·폴더는 `preventDefault` 없이 흘려보내 아래 표의 원래 뜻을 지키고, 가장자리 드롭은 `stopPropagation`으로 끊어 ProseMirror의 경로 삽입이 뒤따르지 않게 한다. 새 칸은 `useTabs.splitEmptyPane`이 비워서 세우고 탭은 `openFile(paneId)`가 붙인다.
+`App.tsx` intercepts edge splits in the pane container's **capture-phase** `dragover`/`drop` handlers (`pathDropTargetAt`) — center drops and folders pass through without `preventDefault` to preserve their original meanings in the table below, while edge drops are stopped with `stopPropagation` so ProseMirror does not subsequently insert the path. `useTabs.splitEmptyPane` creates an empty pane, and `openFile(paneId)` adds the tab.
 
-- `dragover`**에서는** `getData()`**가 언제나 빈 문자열이다**(DataTransfer 보호 모드). 받는 쪽 판정은 `hasPathDrag`(=`types` 검사)로 하고, 값 읽기(`pathFromDrag`)는 `drop`에서만 한다. 여기서 헷갈리면 `preventDefault`를 못 해 드롭 자체가 발생하지 않는다.
-- `effectAllowed`는 `copyMove`다 — `move`만 허용하면 `dropEffect='copy'`로 받는 에디터·터미널에서 드롭이 통째로 거부된다. 트리 안 폴더는 자기 `dragover`에서 `move`를 명시해 원래 뜻을 지킨다.
-- 에디터는 **전용 MIME이 있을 때만** 가로챈다. 바깥에서 끌어온 이미지·텍스트는 프로젝트의 `.mew/assets/`에 업로드되고 본문에 링크로 삽입된다. UUID 파일명과 프로젝트 id를 담은 `/api/asset` 링크도 파일 열람 권한을 검사한다. guest 공유에는 첨부 경로의 열람 권한도 필요하다. Git이 무시하지 않는 새 asset은 프로젝트 저장소에 자동 커밋되며, 기존 R2 링크 22개는 `.mew/assets/`로 이관 완료했다.
+- **During** `dragover`, `getData()` **always returns an empty string** (DataTransfer protected mode). Determine whether the target can accept the drag with `hasPathDrag` (= checking `types`), and read the value (`pathFromDrag`) only during `drop`. Getting this wrong prevents `preventDefault` from being called, so the drop itself never occurs.
+- `effectAllowed` is `copyMove` — allowing only `move` causes editors and terminals that accept drops with `dropEffect='copy'` to reject the drop entirely. Folders in the tree explicitly specify `move` in their own `dragover` handlers to preserve the original meaning.
+- The editor intercepts drags **only when the dedicated MIME type is present**. Images and text dragged in from outside are uploaded to the project's `.mew/assets/` and inserted into the content as links. `/api/asset` links containing a UUID filename and project ID also check file viewing permissions. Guest shares also require viewing permission for the attachment path. New assets that Git does not ignore are automatically committed to the project repository, and migration of the existing 22 R2 links to `.mew/assets/` is complete.
 
-**바깥(파일 탐색기)에서 파일 탐색기로 끌어놓기**는 놓은 폴더(빈 곳 = 프로젝트 루트)에 그 파일을 **그대로 저장**한다(`POST /api/upload-into`, multipart `file`·`destDir`). 판정은 `dataTransfer.types`에 `'Files'`가 있는지로 하고, 그때만 `dropEffect='copy'`가 된다. 이름이 겹치면 서버가 `이름 copy`로 비켜 쓰고, 여러 개를 놓으면 **순서대로** 올린다(동시에 보내면 같은 빈 이름을 함께 집는다). 에디터 본문 드롭은 `.mew/assets/`에 UUID 이름으로 저장하는 반면, 파일 탐색기 드롭은 바이트와 원래 이름을 놓은 폴더에 보존하고 Git에 커밋한다.
+**Dragging files from outside (the system file explorer) into the file explorer** **saves the files as-is** in the drop folder (empty area = project root) (`POST /api/upload-into`, multipart `file` and `destDir`). This is detected by checking for `'Files'` in `dataTransfer.types`, and only then is `dropEffect='copy'` set. If a name conflicts, the server uses `이름 copy` to avoid it. Multiple dropped files are uploaded **sequentially** (concurrent uploads would select the same available name). Editor content drops save files under UUID names in `.mew/assets/`, whereas file explorer drops preserve the bytes and original names in the drop folder and commit them to Git.
 
-## 표 열 너비 (.mew/table-layout.json)
+## Table column widths (.mew/table-layout.json)
 
-Hotview에서 표의 세로선을 끌어 조절한 **열 너비**는 마크다운이 담지 못한다(HTML `<table>`로 쓰면 담기지만 plain 모드가 지저분해진다). 그래서 본문은 순수 md 표로 두고, 너비만 그 프로젝트의 `.mew/table-layout.json`에 문서 경로별로 저장한다.
+Markdown cannot store **column widths** adjusted by dragging table dividers in Hotview (HTML `<table>` can store them, but makes plain mode cluttered). The content therefore remains a pure Markdown table, with only the widths stored by document path in the project's `.mew/table-layout.json`.
 
 ```json
 {
@@ -198,45 +198,45 @@ Hotview에서 표의 세로선을 끌어 조절한 **열 너비**는 마크다�
 }
 ```
 
-- 바깥 배열 = **그 문서 안 표의 등장 순서**, 안쪽 배열 = 그 표의 열 너비(px). `null`은 저장된 너비가 없는 표, `0`은 아직 끌지 않은 열이다.
-- 표를 **추가·삭제·이동하면 순서가 밀려 너비가 어긋날 수 있다.** 다시 끌면 덮어써진다 — 본문 md를 건드리지 않는 대가다.
-- 복원은 본문 시딩 뒤에 한 번, `addToHistory: false`(collab이면 `SEED_ORIGIN`)로 들어간다. 사용자의 undo 스택에 올라가면 Ctrl+Z 한 번에 너비가 통째로 되돌아가기 때문이다. **콘텐츠를 코드로 시딩하는 곳은 전부 이 규칙을 따른다** — `SEED_ORIGIN` 트랜잭션으로 감싸지 않으면 시딩이 사용자 undo 스택에 잡혀 Ctrl+Z 한 번에 문서 전체가 사라진다(`Editor.tsx`).
-- **불러오기에 실패하면 저장도 하지 않는다.** 못 읽은 것을 "너비 없음"으로 오해해 덮어쓰면 저장돼 있던 값이 사라진다.
-- 서버: `server/tableLayout.ts` + `GET /api/table-layout`(모든 계정에 파일 열람 권한 필요)· `PUT /api/table-layout`(로그인과 파일 수정 권한 필요). 클라이언트: `packages/editor/src/Editor.tsx`의 `readTableWidths`/`applyTableWidths`, 주입은 `EditorApi.fetchTableLayout`/`saveTableLayout`.
+- Outer array = **the order in which tables appear in the document**; inner array = column widths (px) for that table. `null` means a table has no saved widths, and `0` means a column has not yet been resized by dragging.
+- **Adding, deleting, or moving tables can shift their order and misalign the widths.** Dragging again overwrites them — this is the tradeoff for leaving the Markdown content untouched.
+- Widths are restored once after seeding the content, using `addToHistory: false` (`SEED_ORIGIN` for collaboration). Otherwise, the restoration would enter the user's undo stack, and a single Ctrl+Z would revert all widths. **Every place that seeds content programmatically follows this rule** — without a wrapping `SEED_ORIGIN` transaction, seeding enters the user's undo stack, and a single Ctrl+Z removes the entire document (`Editor.tsx`).
+- **If loading fails, do not save either.** Treating unread data as "no widths" and overwriting it would erase the saved values.
+- Server: `server/tableLayout.ts` + `GET /api/table-layout` (requires file viewing permission for all accounts) and `PUT /api/table-layout` (requires login and file modification permission). Client: `readTableWidths`/`applyTableWidths` in `packages/editor/src/Editor.tsx`; injected through `EditorApi.fetchTableLayout`/`saveTableLayout`.
 
-## 리스트 첫 항목 들여쓰기 (`- - b`)
+## Indenting the first list item (`- - b`)
 
-Tab은 리스트 항목을 한 단계 들여쓴다. 기본 `sinkListItem`은 **바로 앞 형제 항목 안으로** 밀어 넣는 방식이라 앞에 형제가 없는 첫 항목에서는 아무 일도 하지 않는다. mew는 그 자리에 **자기 줄이 없는 부모 항목**을 만들어 들여쓴다 — 마크다운으로는 `- - b`, Shift+Tab이 그대로 되돌린다.
+Tab indents a list item by one level. The default `sinkListItem` moves it **inside the immediately preceding sibling item**, so it does nothing for the first item, which has no preceding sibling. mew instead creates a **parent item with no line of its own** and indents into it — `- - b` in Markdown, which Shift+Tab reverses.
 
-- 그래서 `listItem`의 content가 기본값 `paragraph block*`이 아니라 `(paragraph|bulletList|orderedList) block*`다 (`packages/editor/src/editor/listIndent.ts`의 `IndentableListItem`). 문단이 필수면 markdown-it이 중첩으로 읽어 준 `- - b`의 HTML을 항목 안에 넣지 못해 두 리스트로 풀려, 들여쓰기가 왕복에서 사라진다.
-- **클라이언트(**`Editor.tsx`**)와 서버(**`serverExtensions.ts`**)가 같은** `IndentableListItem`**을 써야 한다**.한쪽만 바꾸면 협업 병합에서 문서가 갈라진다. 그래서 정의는 한 모듈에만 둔다.
-- 부모 마커 없는 `- b`로는 저장할 수 없다 — 마크다운 규칙상 다시 읽으면 최상위 항목이 된다.
+- That is why the content of `listItem` is `(paragraph|bulletList|orderedList) block*` rather than the default `paragraph block*` (`IndentableListItem` in `packages/editor/src/editor/listIndent.ts`). If a paragraph is required, the HTML that markdown-it parses as nested `- - b` cannot be placed inside the item and becomes two separate lists, losing the indentation on a round trip.
+- **The client** (`Editor.tsx`) **and server** (`serverExtensions.ts`) **must use the same** `IndentableListItem` **implementation**. Changing only one side causes the document to diverge during collaborative merges. The definition therefore lives in a single module.
+- It cannot be saved as `- b` without a parent marker — under Markdown rules, it becomes a top-level item when read again.
 
-## 주석 (Annotation)
+## Annotations
 
-Markdown의 Hotview나 Plain에서 주석을 달 위치에 커서를 두고 `Ctrl+'`를 누르거나 우클릭 메뉴의 **주석 추가**를 고른다. 글자를 선택했다면 선택한 글 뒤에 마커를 붙인다. 열린 작은 입력창에 내용을 쓰면 자동저장된다. Hotview 본문에는 `1)`, `2)` 모양의 작은 위첨자가 생긴다.
+In Markdown Hotview or Plain, place the cursor where you want an annotation and press `Ctrl+'` or choose **Add Annotation** from the right-click menu. If text is selected, the marker is added after it. Enter content in the small input window that opens; it is saved automatically. Small superscripts such as `1)` and `2)` appear in the Hotview content.
 
-위첨자를 누르면 같은 입력창이 열려 내용을 고치거나 삭제할 수 있다. 문서의 모든 주석은 댓글 플로팅 버튼 바로 옆에 있는 닫는 쌍따옴표 모양의 **주석** 버튼으로 확인한다. 목록에서 항목을 누르면 그 주석의 입력창을 연다.
+Click a superscript to open the same input window and edit or delete its content. View all annotations in the document with the **Annotations** button, shaped like a closing double quotation mark, immediately beside the floating comments button. Clicking an item in the list opens that annotation's input window.
 
-주석 내용은 파일 하단의 `# $Annotations$` 아래에 번호 목록으로 저장된다. Hotview에서는 이 저장 구역을 숨기고, Plain에서는 본문의 `^[1]` 마커와 저장 구역을 볼 수 있다. 마지막 주석을 삭제하면 저장 구역도 없어진다. `Alt+E` 각주와 `# References`는 따로 유지한다. 자세한 형식은 [주석 기능 계약](../../.mew/docs/features/%EB%AC%B8%EC%84%9C%C2%B7%EC%BD%94%EB%93%9C%C2%B7%EB%AF%B8%EB%94%94%EC%96%B4%20%ED%8E%B8%EC%A7%91/%EA%B0%81%EC%A3%BC%C2%B7%EC%B0%B8%EA%B3%A0%EB%AC%B8%ED%97%8C.md#주석-저장과-표시)을 참고한다.
+Annotation content is stored as a numbered list under `# $Annotations$` at the bottom of the file. Hotview hides this storage section; Plain shows both the `^[1]` markers in the content and the storage section. Deleting the last annotation also removes the storage section. `Alt+E` footnotes and `# References` remain separate. See the [annotation feature contract](../../.mew/docs/features/document-code-media-editing/footnotes-and-references.md#annotation-storage-and-display) for the detailed format.
 
-## 각주 (Alt+E)
+## Footnotes (Alt+E)
 
-커서 자리(고른 글자가 있으면 그 **뒤**)에 마커를 박고, 문서 맨 아래 `# References` 구역과 번호를 맞춘다. 계산은 `utils/footnotes.ts`(순수·테스트), 적용은 `editor/footnoteSync.ts`(tiptap 확장).
+Insert a marker at the cursor (or **after** selected text) and match its number with the `# References` section at the bottom of the document. Calculations: `utils/footnotes.ts` (pure functions, tested); application: `editor/footnoteSync.ts` (tiptap extension).
 
-**저장 형태가 곧 결합 계약이다:**
+**The stored format is the integration contract:**
 
-- 마커는 **유니코드 아래첨자 글자 그대로**다 — `22만명₁₎`. 커스텀 노드도 직렬화기도 없어서 다른 편집기·GitHub·git diff에서 그대로 읽힌다. 찾는 정규식은 `[₀-₉]+₎`
-- 참고문헌은 `# References` 아래의 **순서 목록**이다. 문단에 `1) 내용`이라고 쓰면 안 된다 — `1)`은 CommonMark의 목록 표시라 저장했다 다시 열면 목록으로 재파싱돼 구역이 통째로 어긋난다 (`footnoteSync.test.ts`의 왕복 테스트가 이걸 잡는다). 화면에 `1)`로 보이는 것은 CSS(`.mew-references`)다
-- **번호는 자리가 정한다.** n번째 마커 ↔ 목록의 n번째 항목. 그래서 번호를 글자로 적을 필요가 없고, 중간에 끼우거나 빼면 목록이 스스로 다시 센다. 우리가 하는 일은 **항목을 끼우고 빼기만** — 내용을 다시 쓰지 않으므로 참고문헌에 걸어 둔 링크가 살아남는다
-- 짝짓기는 **옛 번호** 기준이다(`planFootnotes`). 새 마커는 아직 아무도 안 쓰는 번호(최대+1)로 넣어 남의 내용을 가로채지 않게 하고, 제자리 번호는 `appendTransaction`이 매긴다
-- **마커가 하나도 없으면 아무것도 하지 않는다** — 손으로 쓴 References를 지우지 않는 안전장치다. 마지막 각주를 지우면 마지막 항목이 남는다(남의 글을 자동으로 지우는 것보다 낫다)
-- 마커를 누르면 그 번호의 내용이 쪽지로 뜨고, 참고문헌 항목을 누르면 그 마커 자리로 간다. 쪽지는 오버레이 스택에 올리지 않는다(링크·표 툴팁과 같은 이유)
+- Markers are **literal Unicode subscript characters** — `22만명₁₎`. There are no custom nodes or serializers, so they remain readable in other editors, GitHub, and git diff. The matching regular expression is `[₀-₉]+₎`.
+- References are an **ordered list** under `# References`. Do not write `1) 내용` in a paragraph — `1)` is a CommonMark list marker, so saving and reopening reparses it as a list and misaligns the entire section (the round-trip test in `footnoteSync.test.ts` catches this). The onscreen `1)` appearance comes from CSS (`.mew-references`).
+- **Position determines the number.** The nth marker ↔ the nth list item. Numbers therefore do not need to be written as text, and the list renumbers itself when items are inserted or removed in the middle. We **only insert and remove items** — we do not rewrite their content, so links in references survive.
+- Matching uses the **old numbers** (`planFootnotes`). New markers are inserted with an unused number (maximum + 1) so they do not take over another marker's content; `appendTransaction` assigns the positional numbers.
+- **If there are no markers, do nothing** — this safeguard prevents deletion of manually written References. Deleting the last footnote leaves the last item behind (preferable to automatically deleting someone else's writing).
+- Click a marker to show its numbered content in a popup, and click a reference item to jump to its marker. The popup is not added to the overlay stack (for the same reason as link and table tooltips).
 
-## 다이어그램
+## Diagrams
 
-Hotview의 `/diagram`은 기본 Mermaid 흐름도를 삽입한다. `mermaid` 블록은 기본적으로 코드를 표시하며, 오른쪽 위 이미지 아이콘의 **다이어그램 보기** 버튼을 누르면 팝업에서 그림을 보여 준다. 기존 Mermaid 블록과 읽기 전용 문서에서도 같은 보기 버튼을 제공한다. 팝업은 닫기 버튼·Esc·뒤로가기·바깥 누름으로 닫고 호출 버튼으로 포커스를 복원한다. 원문과 협업 저장은 표준 코드 펜스를 유지한다. 문법 오류는 팝업에 표시하며 코드는 그대로 유지해 수정할 수 있다. 렌더러는 팝업을 열 때 로드하며 strict 모드로 HTML·클릭 동작을 제한한다. 큰 다이어그램은 팝업 안에서 스크롤한다.
+Hotview's `/diagram` inserts a basic Mermaid flowchart. `mermaid` blocks display code by default; pressing the **View Diagram** button with the image icon at the upper right displays the diagram in a popup. Existing Mermaid blocks and read-only documents provide the same view button. The popup closes with the close button, Esc, Back, or an outside press, and restores focus to the invoking button. Source and collaborative saves retain standard code fences. Syntax errors appear in the popup, while the code remains intact for editing. The renderer loads when the popup opens and restricts HTML and click actions in strict mode. Large diagrams scroll inside the popup.
 
-## 캐시와 저장 상태
+## Cache and save status
 
-파일 본문·폴더 목록 같은 재생성 캐시는 공통 예산과 7일 보관 기간을 따르며 실행·주기·페이지 전환 때 자동 정리한다. 초안·설정·열린 탭은 자동 삭제하지 않는다. 기준은 [브라우저 저장 계약](../../.mew/docs/development/browser-storage.md)이다.
+Regenerable caches such as file content and folder listings follow a shared budget and a 7-day retention period, with automatic cleanup at startup, periodically, and on page navigation. Drafts, settings, and open tabs are not automatically deleted. The [browser storage contract](../../.mew/docs/development/browser-storage.md) defines the rules.

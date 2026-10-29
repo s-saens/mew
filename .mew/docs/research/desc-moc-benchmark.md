@@ -1,96 +1,96 @@
 ---
-title: "desc 목록·MOC 문서 탐색 비용 비교"
+title: "Comparing document discovery costs of desc catalogs and MOCs"
 created: "2026-10-06"
 updated: "2026-10-20"
-description: "2026-10-06 desc 목록과 MOC의 실제 AI 문서 탐색을 비교한 토큰·시간·품질 결과, 동일 입력 조건·질문·실행별 수치·재현 방법과 한계를 기록한다."
+description: "Records token, time, and quality results from comparing actual AI document discovery using desc catalogs and MOCs on 2026-10-06, including identical input conditions, questions, per-run metrics, reproduction methods, and limitations."
 상위파일: "../MOC.md"
 ---
 
-[이전 RAG·MOC·일반 검색 실험](document-discovery-benchmark.md)
+[Previous RAG, MOC, and general search experiment](document-discovery-benchmark.md)
 
-## 최종 결과
+## Final results
 
-질문 3개·두 번 반복한 실제 AI 탐색에서는 **desc 전체 목록이 누적 입력 토큰을 7.1% 줄였지만, 시간은 거의 같았다.** 문서 탐색 자체는 가능했고 핵심 사실도 찾았다. MOC를 없애면 크게 빨라지거나 토큰이 대폭 줄어든다고 말할 근거는 부족하다.
+In actual AI discovery with 3 questions repeated twice, **the full desc catalog reduced cumulative input tokens by 7.1%, but time was nearly identical.** Document discovery worked, and key facts were found. There is insufficient evidence to claim that removing MOCs substantially speeds up discovery or dramatically reduces tokens.
 
-질문 한 개당 평균이며 입력은 모든 모델 호출의 누적값이다.
+Values are averages per question; input is cumulative across all model calls.
 
-| 방식 | 완료 시간 | 입력 토큰(캐시 포함) | 그중 캐시 입력 | 비캐시 입력 | 출력 토큰 | 셸 명령 | 핵심 사실 충족 |
+| Method | Completion time | Input tokens (including cached) | Cached input portion | Uncached input | Output tokens | Shell commands | Key facts satisfied |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| MOC | 36.5초 | 153,610 | 119,531 | 34,079 | 946 | 9.3 | 6/6 |
-| desc 전체 목록 | 35.4초 | 142,666 | 111,147 | 31,520 | 965 | 6.7 | 6/6 |
+| MOC | 36.5 seconds | 153,610 | 119,531 | 34,079 | 946 | 9.3 | 6/6 |
+| Full desc catalog | 35.4 seconds | 142,666 | 111,147 | 31,520 | 965 | 6.7 | 6/6 |
 
-- desc vs MOC: 누적 입력 **-7.1%**, 비캐시 입력 **-7.5%**, 평균 시간 **-2.8%**. 평균 시간 차이는 1.01초다.
-- 시간 중앙값은 MOC 36.3초, desc 35.7초다. 표본이 작고 공급자 대기가 있어 이 차이를 안정적인 속도 개선으로 단정하지 않는다.
-- 기대 경로 회수는 MOC 17/18, desc 18/18이다. MOC의 목록 질문 한 번은 미리 정한 링크 기능 문서 대신 같은 요구를 명시한 Hotview 기능 문서를 골랐다. 핵심 사실은 충족하므로 경로 불일치를 사실 누락으로 판정하지 않았다.
-- 12회 모두 완료·줄 범위 검사에 성공했다. 실패한 셸 명령과 전체 파일 검색은 없었다. desc는 매번 전체 목록을 정확히 한 번 읽었고 에이전트 질문 두 번에서는 목록 일부를 두 차례씩 추가 조회했다. 원문 복사본 SHA-256도 모두 유지됐다.
+- desc vs MOC: cumulative input **-7.1%**, uncached input **-7.5%**, average time **-2.8%**. The average time difference is 1.01 seconds.
+- Median time is 36.3 seconds for MOC and 35.7 seconds for desc. The small sample and provider wait times prevent treating this difference as a consistent speed improvement.
+- Expected-path retrieval was 17/18 for MOC and 18/18 for desc. For one MOC listing question, it selected a Hotview feature document stating the same requirement instead of the predetermined link feature document. Because the key facts were covered, the path mismatch was not classified as a factual omission.
+- All 12 runs completed and passed line-range checks. There were no failed shell commands or whole-file searches. desc read the full catalog exactly once each time, and in two runs of the agent question, it queried parts of the catalog twice more each. All source copy SHA-256 hashes were also preserved.
 
-### 질문별 평균
+### Averages by question
 
-| 질문 | MOC 시간 | desc 시간 | MOC 입력 | desc 입력 | desc 입력 변화 |
+| Question | MOC time | desc time | MOC input | desc input | desc input change |
 | --- | --- | --- | --- | --- | --- |
-| 목록 줄번호·링크 | 39.5초 | 35.7초 | 159,260 | 162,807 | +2.2% |
-| PDF 저장 충돌 | 34.7초 | 28.4초 | 120,614 | 83,726 | \-30.6% |
-| /clear·대기열·재접속 | 35.2초 | 42.3초 | 180,956 | 181,466 | +0.3% |
+| List line numbers and links | 39.5 seconds | 35.7 seconds | 159,260 | 162,807 | +2.2% |
+| PDF save conflicts | 34.7 seconds | 28.4 seconds | 120,614 | 83,726 | \-30.6% |
+| /clear, queue, and reconnection | 35.2 seconds | 42.3 seconds | 180,956 | 181,466 | +0.3% |
 
-PDF는 desc로 세 문서를 바로 선택해 토큰과 시간을 줄였다. 목록 질문은 지도 탐색을 줄였지만 추가 원문 읽기로 입력 절감이 이어지지 않았고, 에이전트 질문은 추가 목록 조회·패널 계약 확인 등으로 시간·입력이 늘었다. 탐색 단계가 줄어드는 것과 누적 토큰이 줄어드는 것은 동일하지 않다.
+For PDF, desc directly selected three documents, reducing tokens and time. The list question required less map navigation, but additional source reading prevented input savings; the agent question increased time and input through additional catalog queries and panel contract checks. Fewer discovery steps do not necessarily mean fewer cumulative tokens.
 
-### 판단
+### Assessment
 
-문서마다 `desc`를 두고 자동으로 **경로 + desc 목록**을 제공하는 방식은 MOC 없이도 동작할 수 있다. 이번 작은 문서 집합에서는 MOC와 비슷한 품질·시간, 조금 적은 입력 토큰을 보였다. 지도 관리 부담을 없애려는 선택으로 검토할 만하지만 성능만으로 전면 교체를 정당화할 결과는 아니다.
+Placing `desc` in each document and automatically providing a **path + desc catalog** can work without MOCs. In this small document set, it showed quality and time similar to MOC, with slightly fewer input tokens. It is worth considering to eliminate map maintenance overhead, but the results do not justify a complete replacement based on performance alone.
 
-실제로 적용한다면 AI가 프론트매터를 파일마다 하나씩 열게 하기보다 도구가 설명 목록을 한 번에 추출해 제공해야 이번 조건을 재현한다. 문서 수가 늘 때는 질문·분야에 관련된 설명만 공급하는 방식이 추가 후보이며, 그 효과는 아직 측정하지 않았다. 문서의 소유권·현행/과거 구분·관련 문서 연결을 유지하는 문제도 별도로 해결해야 한다.
+To reproduce these conditions in actual use, a tool must extract and provide the description catalog in one batch rather than having the AI open each file's frontmatter individually. As the document count grows, supplying only descriptions relevant to the question or domain is another candidate, but its effect has not yet been measured. Maintaining document ownership, distinctions between current and historical content, and links to related documents must also be addressed separately.
 
-## 비교 조건
+## Comparison conditions
 
-- 현재 Markdown 147개를 `/tmp` 복사본에 고정했다. `history`·`archives`·숨김 파일과 이전/이번 측정 보고서는 제외했다. 원문은 약 1.60MB이며 실제 프로젝트의 문서 구조를 바꾸는 실험은 아니다.
-- 원래 비어 있지 않은 `desc`가 있는 문서는 12개다. 나머지 135개는 제목·첫 설명/불렛·소제목에서 자동 추출한 설명을 실험 목록에 넣었다. 질문이나 정답을 보고 개별 설명을 작성하지 않았다. 사람이 다듬은 의미 요약이나 AI로 생성한 설명의 효과는 측정하지 않았다.
-- 목록은 경로와 `desc`만 포함하며 147행·25,088자다. `o200k_base` 추정으로 12,881토큰이다. 여기에는 현재 MOC 파일 16개의 설명도 포함된다. 이 행들을 제외하면 추정 12,212토큰이며, 제외한 목록으로 AI 탐색을 다시 측정한 값은 아니다.
-- 모델 `gpt-6.1-sol`, 추론 `medium`, 서비스 티어 `default`, `codex-cli 0.159.2`. 질문 3개 × 방법 2개 × 반복 2회, 총 12회다. 사용자 설정과 프로젝트 지침 자동 주입을 끈 새 `--ephemeral`·읽기 전용 세션을 사용했다. 웹·코드·중앙 ADR·다른 에이전트는 범위 밖이다.
-- MOC는 `docs/MOC.md`에서 시작해 지도·본문 링크만 따라간다. 전체 파일 검색이나 `desc` 목록은 읽지 않는다.
-- desc는 정확한 경로 `docs/desc-catalog.tsv`의 전체 목록을 먼저 한 번 읽고, 필요한 원문과 본문 링크를 확인한다. MOC 내용과 전체 파일 본문 검색은 사용하지 않는다. 요약을 사실 근거로 대신하지 않는다.
-- 두 방법의 도구 출력 한도는 24,000토큰으로 동일하게 고정했다. 12,881토큰짜리 목록을 한 번의 읽기로 전달할 수 있는 조건이다. 질문별 선후 순서를 교차하고 두 번째 반복에서는 반대로 실행했다. 호출은 순차 실행했다.
-- 시간은 CLI 시작부터 최종 답변·사용량 반환·종료까지다. 모델 대기·생성·도구 실행을 포함하며 실험 설계·설명 생성·검토 시간은 제외한다. 설명/목록의 로컬 준비 구간은 약 0.073초이며 별도 AI 요약 생성 호출은 없다. Python 시작·토큰 추정·압축 묶음 생성 시간은 이 준비 구간에 포함하지 않는다.
-- 토큰은 각 세션의 `turn.completed.usage` 실측 누적값이다. 캐시 포함 입력, 캐시 입력, 차감한 비캐시 입력과 출력 토큰을 구분한다. 목록 원문의 단순 토큰 수와 다르다. 추론 토큰은 별도 보고 필드로 기록하고 입력·출력에 임의 합산하지 않았다. 측정 인터페이스는 [Codex 비대화형 JSON 이벤트](https://learn.chatgpt.com/docs/non-interactive-mode)를 사용했다. 실제 청구액·구독 사용량 환산은 하지 않았다.
+- The current 147 Markdown files were frozen in a `/tmp` copy. `history`, `archives`, hidden files, and the previous/current measurement reports were excluded. The source content is approximately 1.60 MB; this experiment does not change the actual project's document structure.
+- 12 documents originally had a nonempty `desc`. For the remaining 135 documents, descriptions automatically extracted from titles, opening descriptions/bullets, and subheadings were added to the experiment catalog. Individual descriptions were not written based on the questions or answers. The effects of human-refined semantic summaries or AI-generated descriptions were not measured.
+- The catalog contains only paths and `desc`, with 147 lines and 25,088 characters. The `o200k_base` estimate is 12,881 tokens. This includes descriptions of the 16 current MOC files. Excluding these rows gives an estimated 12,212 tokens; AI discovery was not remeasured using the catalog with these rows excluded.
+- Model `gpt-6.1-sol`, reasoning `medium`, service tier `default`, `codex-cli 0.159.2`. 3 questions × 2 methods × 2 repetitions, totaling 12 runs. Fresh `--ephemeral`, read-only sessions were used with automatic injection of user settings and project instructions disabled. Web, code, central ADRs, and other agents were out of scope.
+- MOC starts at `docs/MOC.md` and follows only map and body links. It does not search all files or read the `desc` catalog.
+- desc first reads the full catalog at the exact path `docs/desc-catalog.tsv` once, then checks the necessary source content and body links. It does not use MOC content or search the body text of all files. Summaries do not substitute for factual evidence.
+- Both methods used the same fixed tool output limit of 24,000 tokens. This allows the 12,881-token catalog to be delivered in a single read. The order of methods was alternated by question and reversed in the second repetition. Calls ran sequentially.
+- Time runs from CLI startup through the final answer, usage return, and exit. It includes model waiting, generation, and tool execution, but excludes experiment design, description generation, and review time. Local preparation of descriptions/catalog took approximately 0.073 seconds, with no separate AI summary generation calls. Python startup, token estimation, and compressed bundle creation are excluded from this preparation interval.
+- Tokens are the measured cumulative values from each session's `turn.completed.usage`. Input including cached tokens, cached input, uncached input calculated by subtraction, and output tokens are reported separately. These differ from a simple token count of the catalog source text. Reasoning tokens were recorded in a separate reporting field and were not arbitrarily added to input or output. The measurement interface used [Codex non-interactive JSON events](https://learn.chatgpt.com/docs/non-interactive-mode). Actual charges or subscription usage were not calculated.
 
-## 질문과 판정
+## Questions and evaluation
 
-실행 전에 질문과 기대 문서를 고정했다. 각 답변에는 최대 5개 문서와 원문 줄 범위, 핵심 사실 3\~5개를 요구했다.
+Questions and expected documents were fixed before execution. Each answer was required to include at most 5 documents with source line ranges and 3\~5 key facts.
 
-| 질문 | 확인할 핵심 사실 | 기대 문서 |
+| Question | Key facts to verify | Expected documents |
 | --- | --- | --- |
-| 목록 줄번호·내부 링크 | 24px 중첩 보정, 링크 줄 높이·줄바꿈, Markdown 저장 보존 | 링크 기능, 공용 패키지 계약, 편집 사용법 |
-| PDF 저장 충돌 | 충돌 시 초안 보존, 버전 조건·임시 파일 교체, 암호화/전자서명/인증 파일 제한 | PDF 기능, PDF 개발 계약, 편집 사용법 |
-| /clear·대기열·재접속 | FIFO 세션 경계, Codex 종료 대기·실패 보존, 큐 복원 | 대화 기능, 에이전트 세션 계약, 터미널·에이전트 사용법 |
+| List line numbers and internal links | 24px nesting adjustment, link line height and wrapping, preservation when saving Markdown | Link features, shared package contract, editing guide |
+| PDF save conflicts | Draft preservation on conflict, version conditions and temporary file replacement, restrictions on encrypted/digitally signed/certified files | PDF features, PDF development contract, editing guide |
+| /clear, queue, and reconnection | FIFO session boundaries, waiting for Codex termination and preservation on failure, queue restoration | Conversation features, agent session contract, terminal and agent guide |
 
-경로 회수와 줄 범위는 자동 검사하고, 답변의 핵심 사실과 명령 이력은 별도로 검토한다. 정답 경로의 단순 일치와 사실 충족을 같은 지표로 보지 않는다. 독립 평가자나 사용자에 의한 품질 승인은 아니다.
+Path retrieval and line ranges are checked automatically; key facts in answers and command history are reviewed separately. Exact matches to expected paths and factual completeness are treated as separate metrics. This is not quality approval by an independent evaluator or user.
 
-## 개별 실행
+## Individual runs
 
-| 반복 | 질문 | 방법 | 시간(초) | 입력 | 캐시 입력 | 비캐시 입력 | 출력 | 명령 수 | 기대 경로 |
+| Repetition | Question | Method | Time (seconds) | Input | Cached input | Uncached input | Output | Command count | Expected paths |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | 목록 줄번호·링크 | moc | 39.88 | 160,236 | 131,072 | 29,164 | 1,043 | 10 | 3/3 |
-| 1 | 목록 줄번호·링크 | desc | 35.50 | 142,806 | 110,848 | 31,958 | 1,024 | 7 | 3/3 |
-| 1 | PDF 저장 충돌 | desc | 31.56 | 98,018 | 76,800 | 21,218 | 767 | 5 | 3/3 |
-| 1 | PDF 저장 충돌 | moc | 35.61 | 118,724 | 93,824 | 24,900 | 918 | 8 | 3/3 |
-| 1 | /clear·대기열·재접속 | moc | 33.36 | 178,861 | 141,312 | 37,549 | 843 | 9 | 3/3 |
-| 1 | /clear·대기열·재접속 | desc | 47.70 | 218,351 | 174,336 | 44,015 | 1,360 | 10 | 3/3 |
-| 2 | 목록 줄번호·링크 | desc | 35.86 | 182,808 | 150,144 | 32,664 | 1,061 | 7 | 3/3 |
-| 2 | 목록 줄번호·링크 | moc | 39.11 | 158,285 | 109,312 | 48,973 | 887 | 9 | 2/3 |
-| 2 | PDF 저장 충돌 | moc | 33.80 | 122,504 | 97,792 | 24,712 | 918 | 10 | 3/3 |
-| 2 | PDF 저장 충돌 | desc | 25.18 | 69,434 | 46,976 | 22,458 | 619 | 4 | 3/3 |
-| 2 | /clear·대기열·재접속 | desc | 36.87 | 144,581 | 107,776 | 36,805 | 958 | 7 | 3/3 |
-| 2 | /clear·대기열·재접속 | moc | 36.96 | 183,050 | 143,872 | 39,178 | 1,070 | 10 | 3/3 |
+| 1 | List line numbers and links | moc | 39.88 | 160,236 | 131,072 | 29,164 | 1,043 | 10 | 3/3 |
+| 1 | List line numbers and links | desc | 35.50 | 142,806 | 110,848 | 31,958 | 1,024 | 7 | 3/3 |
+| 1 | PDF save conflicts | desc | 31.56 | 98,018 | 76,800 | 21,218 | 767 | 5 | 3/3 |
+| 1 | PDF save conflicts | moc | 35.61 | 118,724 | 93,824 | 24,900 | 918 | 8 | 3/3 |
+| 1 | /clear, queue, and reconnection | moc | 33.36 | 178,861 | 141,312 | 37,549 | 843 | 9 | 3/3 |
+| 1 | /clear, queue, and reconnection | desc | 47.70 | 218,351 | 174,336 | 44,015 | 1,360 | 10 | 3/3 |
+| 2 | List line numbers and links | desc | 35.86 | 182,808 | 150,144 | 32,664 | 1,061 | 7 | 3/3 |
+| 2 | List line numbers and links | moc | 39.11 | 158,285 | 109,312 | 48,973 | 887 | 9 | 2/3 |
+| 2 | PDF save conflicts | moc | 33.80 | 122,504 | 97,792 | 24,712 | 918 | 10 | 3/3 |
+| 2 | PDF save conflicts | desc | 25.18 | 69,434 | 46,976 | 22,458 | 619 | 4 | 3/3 |
+| 2 | /clear, queue, and reconnection | desc | 36.87 | 144,581 | 107,776 | 36,805 | 958 | 7 | 3/3 |
+| 2 | /clear, queue, and reconnection | moc | 36.96 | 183,050 | 143,872 | 39,178 | 1,070 | 10 | 3/3 |
 
-## 해석 범위
+## Scope of interpretation
 
-- 이번 시험은 **전체 desc 목록**을 읽는 방식이다. 질문별 키워드/의미 검색, 분야별 목록, 관련 문서만 공급하는 방식은 측정하지 않았다.
-- 자동 추출한 설명의 품질에 영향을 받는다. 문서 소유자가 짧고 정확한 설명을 작성했을 때의 추가 비용·효과와 설명 유지 비용은 미측정이다.
-- 질문은 기능명과 현상을 명확히 포함한다. 모호한 질문·정답 없는 질문·과거 기록·큰 문서 집합에는 일반화할 수 없다. 동일 질문 반복도 2회뿐이므로 통계적 유의성을 주장하지 않는다.
-- 새 세션이어도 공급자 프롬프트 캐시는 공유될 수 있다. 캐시를 완전히 통제하거나 별도 무캐시 실행을 하지 않았다. 시간에는 공급자 대기·호스트 부하도 포함된다.
-- 두 방법 모두 동일한 파일 경로와 기존 본문 링크를 쓴다. 기존 링크를 모두 제거한 무구조 저장소의 성능을 검증하지 않았다.
-- 2026-09-28의 이전 실험은 모델·문서 수·내용·시점이 달라 절대값을 이번 수치와 직접 비교하지 않는다.
+- This test reads the **full desc catalog**. Per-question keyword/semantic search, domain-specific catalogs, and supplying only relevant documents were not measured.
+- Results depend on the quality of automatically extracted descriptions. The additional cost and benefit of short, accurate descriptions written by document owners, and the cost of maintaining descriptions, were not measured.
+- The questions explicitly include feature names and observed behavior. Results cannot be generalized to ambiguous questions, questions without answers, historical records, or large document sets. Each question was repeated only 2 times, so no statistical significance is claimed.
+- Provider prompt caches may be shared even across fresh sessions. Caches were not fully controlled, and no separate uncached runs were performed. Time also includes provider waiting and host load.
+- Both methods use the same file paths and existing body links. Performance in an unstructured repository with all existing links removed was not verified.
+- The previous experiment on 2026-09-28 used a different model, document count, content, and point in time, so its absolute values are not directly compared with these results.
 
-## 재현과 원시 자료
+## Reproduction and raw data
 
 ```bash
 python3 server/document-discovery-benchmark.py \
@@ -98,12 +98,12 @@ python3 server/document-discovery-benchmark.py \
   --model gpt-6.1-sol --effort medium --repeats 2
 ```
 
-Python `PyYAML`이 필요하며 `tiktoken`은 목록 크기 추정에만 사용한다. 이 명령은 실제 모델 세션 12회를 실행한다. `--prepare-only`로 복사본과 설명 목록만 만들고, 같은 출력 폴더를 `--resume`으로 이어 실행할 수 있다. 앱을 빌드하거나 서버를 시작·재시작하지 않는다.
+Python `PyYAML` is required; `tiktoken` is used only to estimate catalog size. This command runs 12 actual model sessions. Use `--prepare-only` to create only the copy and description catalog, then continue with the same output folder using `--resume`. It does not build the app or start/restart a server.
 
-최종 원시 자료는 Git 제외 `.data/benchmarks/desc-moc-20261006-final/`에 보관한다. 메타데이터·설명 목록·원문 SHA-256 목록·스냅샷 묶음·실행 스크립트·프롬프트·JSONL·답변·개별 결과·집계를 포함한다. 실행 당시 스크립트와 고정 원문을 함께 보관하므로 현재 작업 트리가 달라져도 조건을 확인할 수 있다.
+Final raw data is stored in `.data/benchmarks/desc-moc-20261006-final/`, which is excluded from Git. It includes metadata, the description catalog, the source SHA-256 list, snapshot bundle, execution scripts, prompts, JSONL, answers, individual results, and aggregates. The scripts used at execution time and frozen source content are stored together, so conditions can be checked even if the current working tree changes.
 
-예비 12회는 `.data/benchmarks/desc-moc-20261006/`에 따로 보존한다. 예비 프롬프트는 문서 폴더만 읽으라는 공통 조건과 루트에 둔 설명 목록 경로가 혼동을 일으켜 desc 6회 모두 처음에 잘못된 경로를 조회했다. 기본 도구 출력 한도에서는 목록도 여러 번 읽었다. 이 조건의 수치는 최종 비교에 합치지 않았다. 같은 147개 원문과 같은 설명 목록을 유지한 채 경로를 명시하고 양쪽 출력 한도를 동일하게 설정해 전체 12회를 다시 측정했다.
+The 12 preliminary runs are preserved separately in `.data/benchmarks/desc-moc-20261006/`. In the preliminary prompt, the common instruction to read only the document folder conflicted with the description catalog path at the root, causing all 6 desc runs to query the wrong path initially. The catalog was also read multiple times under the default tool output limit. Results under these conditions were not included in the final comparison. All 12 runs were remeasured with explicit paths and identical output limits for both methods, while retaining the same 147 source documents and description catalog.
 
-최종 12회 실행 합계는 431.4초·입력 1,777,658토큰이다. 예비 실행까지 실제 모델 세션은 24회, 실행 합계 929.3초·입력 4,235,793토큰이었다. 설계·준비·채점 대화 비용은 포함하지 않았다.
+The final 12 runs totaled 431.4 seconds and 1,777,658 input tokens. Including preliminary runs, there were 24 actual model sessions, totaling 929.3 seconds and 4,235,793 input tokens. Conversation costs for design, preparation, and scoring were excluded.
 
-고정 원문 SHA-256 목록 해시: `e66b881e8be7329067aab8fa21aae9933aefd9a4b459b5176eaec97069036797`.
+Frozen source SHA-256 list hash: `e66b881e8be7329067aab8fa21aae9933aefd9a4b459b5176eaec97069036797`.

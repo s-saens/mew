@@ -1,60 +1,60 @@
 ---
-provenance: "Liiiiv 중앙 ADR 이관본, 2026-10-14"
-description: "이관한 결정 기록: 프로젝트 브라우저와 Git 워크벤치는 파일 탭 모델을 공유한다. 당시 선택·근거·후속 변경을 보존하며 현재 계약은 Mew 소유 문서에서 확인한다."
-title: "0113 — 프로젝트 브라우저와 Git 워크벤치는 파일 탭 모델을 공유한다"
+provenance: "Migrated copy of a Liiiiv central ADR, 2026-10-14"
+description: "Migrated decision record: The project browser and Git workbench share the file tab model. Preserves the choices, rationale, and subsequent changes at the time; consult the Mew owning document for the current contract."
+title: "0113 — The project browser and Git workbench share the file tab model"
 created: 2026-09-04
 updated: 2026-09-11
 ---
 
-- 날짜: 2026-09-04
-- 상태: 채택
-- 후속 결정: [0114](0114-mew-git-workbench-popup.md) — Git 워크벤치 파일 탭
-- 후속 결정: [0115](0115-mew-git-menu-and-repository-picker.md) — 사이드바 Git 진입; 저장소·API 경계는 유지
-- 부분 대체: 0081 — 프로젝트 추가를 경로 검색·확정만 하던 UI 범위
-- 결정자: 송상훈 (지시)
+- Date: 2026-09-04
+- Status: Adopted
+- Follow-up decision: [0114](0114-mew-git-workbench-popup.md) — Git workbench file tab
+- Follow-up decision: [0115](0115-mew-git-menu-and-repository-picker.md) — Git entry point in the sidebar; repository and API boundaries remain in place
+- Partially supersedes: 0081 — The UI scope that limited adding projects to searching for and confirming paths
+- Decision maker: Song Sanghoon (directive)
 
-## 배경
+## Background
 
-루트 프로젝트 탭의 `+`는 기존 폴더를 찾아 여는 일만 할 수 있다. 새 폴더를 만들거나 원격 Git
-저장소를 clone하려면 터미널로 나가야 하고, 현재 폴더 또는 사이드바의 하위 폴더를 Git 저장소로
-바꾸는 진입점도 없다. 커밋 이력은 파일별 모달만 있어 저장소 전체의 브랜치 흐름과 커밋별 변경을
-한 화면에서 탐색할 수 없다.
+The `+` in the root project tabs can only find and open existing folders. Creating a new folder or cloning a remote Git repository
+requires switching to a terminal, and there is no entry point for turning the current folder or a subfolder in the sidebar into a
+Git repository. Commit history is available only in per-file modals, so repository-wide branch flows and changes in each commit
+cannot be explored in one view.
 
-## 선택지
+## Options
 
-1. Git 기능을 별도 고정 패널에 둔다 — 에디터 분할·탭 복원·드래그 이동과 다른 화면 수명주기가 생긴다.
-2. Git 워크벤치를 파일 탭과 같은 가상 탭으로 둔다 — 기존 탭·분할·복원 모델을 그대로 쓸 수 있다.
-3. 터미널 명령 프리셋만 제공한다 — 저장소 탐색과 안전한 구조화 작업을 GUI에서 제공하지 못한다.
+1. Place Git features in a separate fixed panel — This creates a screen lifecycle separate from editor splits, tab restoration, and drag-to-move behavior.
+2. Make the Git workbench a virtual tab equivalent to a file tab — This allows reuse of the existing tab, split, and restoration model.
+3. Provide only terminal command presets — This cannot provide repository browsing and safe structured operations in the GUI.
 
-## 결정
+## Decision
 
-2번을 채택한다.
+Adopt option 2.
 
-- 프로젝트 `+`는 서버 파일시스템을 한 디렉터리씩 탐색하는 브라우저를 연다. 현재 디렉터리에서
-  새 폴더 생성, 원격 저장소 clone, Git 저장소 초기화, 현재 폴더를 루트 프로젝트 탭으로 열기를
-  제공한다.
-- 임의 절대경로를 탐색·생성·clone·초기화하는 프로젝트 브라우저 API는 owner 전용이다.
-- 사이드바에서는 manager·owner가 프로젝트 경계 안의 선택한 폴더를 Git 저장소로 초기화할 수 있다.
-  서버는 브라우저가 보낸 셸 문자열을 실행하지 않고 경로와 구조화된 인자만 받는다.
-- Git API는 지정한 폴더 자체에 `.git`이 있을 때만 그 저장소를 조작한다. 상위 저장소를 암묵적으로
-  찾아 올라가지 않아 루트 프로젝트와 하위 프로젝트의 작업 대상이 섞이지 않게 한다.
-- Git 워크벤치는 `mew:git:<저장소 상대경로>` 가상 경로를 가진 파일 탭이다. 파일 탭과 함께 순서 변경,
-  닫기, 칸 이동, 화면 분할, 계정별 복원 대상이 된다. 가상 탭은 파일 읽기·자동저장·협업·댓글 대상이 아니다.
-- 루트 프로젝트 자체가 Git 저장소면 사이드바 도구 줄에 Git 버튼을 보인다. 직계 하위 Git 프로젝트는
-  그 프로젝트 제목 줄에서 명령 버튼 왼쪽에 Git 버튼을 보인다.
-- 워크벤치는 전체 ref를 포함한 topo-order 커밋 목록, 왼쪽 그래프 레인, 커밋 메타데이터와 변경 파일,
-  파일별 patch를 제공한다. 우클릭 작업은 복사처럼 클라이언트에서 끝나는 것과 branch·tag·checkout·
-  cherry-pick·revert처럼 서버의 허용 목록에 있는 작업으로 한정한다.
-- checkout·cherry-pick·revert는 작업 트리를 임의로 덮는 강제 옵션을 쓰지 않는다. Git이 로컬 변경 때문에
-  거부하면 그대로 실패시키며, reset/clean/강제 checkout은 GUI에 제공하지 않는다.
+- The project `+` opens a browser that navigates the server filesystem one directory at a time. It provides actions to create
+  a folder in the current directory, clone a remote repository, initialize a Git repository, and open the current folder as a root project
+  tab.
+- The project browser API for browsing, creating, cloning, and initializing arbitrary absolute paths is restricted to owners.
+- In the sidebar, managers and owners can initialize a selected folder within the project boundary as a Git repository. The server accepts
+  only paths and structured arguments, without executing shell strings sent by the browser.
+- The Git API operates on a repository only when the specified folder itself contains `.git`. It does not implicitly search upward for a parent
+  repository, preventing operations on root projects and subprojects from targeting the wrong repository.
+- The Git workbench is a file tab with the virtual path `mew:git:<저장소 상대경로>`. Like file tabs, it can be reordered, closed, moved between panes, included
+  in split views, and restored per account. Virtual tabs are not subject to file reading, autosave, collaboration, or comments.
+- If the root project itself is a Git repository, a Git button appears in the sidebar toolbar. For immediate child Git projects, a Git
+  button appears to the left of the command button in that project's title bar.
+- The workbench provides a topo-order commit list covering all refs, graph lanes on the left, commit metadata and changed
+  files, and per-file patches. Right-click actions are limited to operations completed on the client, such as copying, and server-allowlisted
+  operations such as branch, tag, checkout, cherry-pick, and revert.
+- checkout, cherry-pick, and revert do not use force options that arbitrarily overwrite the working tree. If Git rejects an operation because of
+  local changes, the operation fails as-is; reset, clean, and forced checkout are not provided in the GUI.
 
-## 근거
+## Rationale
 
-가상 탭은 Git 화면을 문서와 나란히 놓거나 다른 칸으로 끌 수 있게 하면서 새로운 전역 패널 상태를
-만들지 않는다. 정확한 저장소 루트와 구조화된 작업만 받는 서버 경계는 사용자가 누른 대상과 실제 Git
-명령 대상이 달라지는 일을 막고, 임의 셸 실행 표면을 추가하지 않는다.
+Virtual tabs let users place the Git view alongside documents or drag it to another pane without creating new global panel state. The
+server boundary accepts only exact repository roots and structured operations, preventing discrepancies between the target the user clicked
+and the actual Git command target without adding an arbitrary shell execution surface.
 
-## 결과
+## Results
 
-- clone은 네트워크와 원격 인증 상태에 따라 오래 걸리거나 실패할 수 있으며 완료 뒤 목록을 다시 읽는다.
-- 커밋 patch는 선택한 파일에 대해 필요할 때만 불러와 큰 저장소의 첫 화면 응답을 제한한다.
+- Cloning may take a long time or fail depending on the network and remote authentication state; reload the list after completion.
+- Load commit patches only on demand for the selected file to limit the initial response for large repositories.

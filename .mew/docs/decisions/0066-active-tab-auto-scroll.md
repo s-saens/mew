@@ -1,24 +1,24 @@
 ---
-title: "활성 탭의 공용 가로 자동 스크롤"
-description: "모든 가로 탭 바에서 활성·포커스 탭을 부드럽게 노출하고, 바깥 스크롤·입력 포커스·드래그의 즉시 반응과 모션 감소 설정을 보존하는 공용 동작을 채택한다."
+title: "Shared Horizontal Auto-Scrolling for the Active Tab"
+description: "Adopt shared behavior that smoothly brings active and focused tabs into view in all horizontal tab bars while preserving outer scrolling, input focus, immediate drag responses, and reduced motion settings."
 created: "2026-10-26"
 updated: "2026-10-26"
 ---
 
-## 상태
+## Status
 
-채택.
+Adopted.
 
-## 배경
+## Background
 
-탭이 표시 영역보다 많으면 새 탭을 열거나 단축키로 다른 탭을 선택해도 탭 바의 가로 위치가 남아 있어 현재 탭을 찾기 어려웠다. 에디터뿐 아니라 에이전트·터미널과 다른 탭에도 같은 동작이 필요하다.
+When there were more tabs than fit in the visible area, opening a new tab or selecting another tab with a shortcut left the tab bar's horizontal position unchanged, making the current tab hard to find. Agents, terminals, and other tabs need the same behavior as the editor.
 
-## 결정
+## Decision
 
-모든 가로 탭 바는 공용 `useTabAutoScroll`을 사용해 활성·포커스 탭이 보이는 최소 거리만 부드럽게 이동한다. 이미 보이는 탭은 위치를 유지하고 모션 감소 설정에서는 즉시 이동한다. 스크롤은 각 탭 바 안에서 처리하며 바깥 스크롤과 입력 포커스를 바꾸지 않는다.
+All horizontal tab bars use the shared `useTabAutoScroll` to scroll smoothly by the minimum distance needed to bring the active or focused tab into view. Tabs already in view stay in place, and scrolling is immediate when reduced motion is enabled. Scrolling is handled within each tab bar and does not change outer scrolling or input focus.
 
-## 근거와 영향
+## Rationale and Impact
 
-탭 생성·단축키 선택·기본 키보드 탐색에서 현재 위치를 같은 방식으로 확인할 수 있다. 공용 동작으로 복원·크기 변경·가상 새 탭도 처리한다. 드래그 중에는 자동 노출을 양보하고 패닝과 가장자리 스크롤은 포인터에 즉시 반응하도록 유지한다.
+Users can locate the current tab consistently when creating tabs, selecting them with shortcuts, or using standard keyboard navigation. The shared behavior also handles restoration, resizing, and virtual new tabs. Automatic reveal yields during dragging, while panning and edge scrolling continue to respond immediately to the pointer.
 
-구체적인 대상·상태 표식과 검증은 [활성 탭 자동 스크롤 계약](../development/ui-contracts.md#활성-탭-자동-스크롤)이 소유한다. 탭 선택 순서와 문서 방문 이력에 관한 [ADR 0044](0044-editor-tab-navigation.md)는 유지한다.
+The [Active Tab Auto-Scroll Contract](../development/ui-contracts.md#active-tab-auto-scrolling) owns the specific targets, state markers, and verification. [ADR 0044](0044-editor-tab-navigation.md) on tab selection order and document visit history remains in effect.

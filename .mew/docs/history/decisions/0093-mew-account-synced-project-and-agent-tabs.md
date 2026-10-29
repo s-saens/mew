@@ -1,51 +1,51 @@
 ---
-provenance: "Liiiiv 중앙 ADR 이관본, 2026-10-14"
-title: "0093 — 프로젝트·에이전트 탭 상태는 계정에 귀속한다"
+provenance: "Migrated copy of a Liiiiv central ADR, 2026-10-14"
+title: "0093 — Project and agent tab state belongs to the account"
 created: 2026-08-27
 updated: 2026-10-07
-description: "프로젝트·에이전트 탭 목록을 계정 원장에 저장하고 기기에서 복원하는 결정. 활성 루트 전환 알림은 후속 ADR 0200이 정한다."
+description: "Decision to store project and agent tab lists in the account ledger and restore them on devices. Follow-up ADR 0200 defines active root switch notifications."
 ---
 
-- 날짜: 2026-08-27
-- 상태: 채택
-- 후속 결정: [0200](0200-mew-account-active-workspace.md) — 활성 루트·요청 경로·전환 알림을 계정별로 분리
-- 후속 결정: [0177](0177-mew-project-owned-icons.md) — 아이콘은 프로젝트 파일로 이동; 계정별 탭 목록·그룹 유지
-- 후속 결정: [0094](0094-mew-account-synced-workspace-ui-state.md) — 문서 탭·사이드바·스크롤을 기기 로컬에 남기는 범위
-- 부분 대체: [0081](0081-mew-root-project-tabs-and-git-subprojects.md) — 열린 루트 프로젝트 탭의 브라우저 로컬 저장 범위
-- 부분 대체: [0087](0087-mew-agent-tabs-per-root-project.md) — 에이전트 탭·활성 탭의 브라우저 로컬 저장 범위
-- 부분 대체: [0046](0046-mew-agent-panel-tabs-one-session-per-tab.md) — 에이전트 탭 목록·이름의 브라우저 전용 저장 범위
-- 결정자: 송상훈 (지시)
+- Date: 2026-08-27
+- Status: Adopted
+- Follow-up decision: [0200](0200-mew-account-active-workspace.md) — Separate the active root, request paths, and switch notifications by account
+- Follow-up decision: [0177](0177-mew-project-owned-icons.md) — Move icons to project files; retain per-account tab lists and groups
+- Follow-up decision: [0094](0094-mew-account-synced-workspace-ui-state.md) — The scope of keeping document tabs, sidebar state, and scroll positions local to each device
+- Partially supersedes: [0081](0081-mew-root-project-tabs-and-git-subprojects.md) — The scope of browser-local storage for open root project tabs
+- Partially supersedes: [0087](0087-mew-agent-tabs-per-root-project.md) — The scope of browser-local storage for agent tabs and the active tab
+- Partially supersedes: [0046](0046-mew-agent-panel-tabs-one-session-per-tab.md) — The scope of browser-only storage for the agent tab list and names
+- Decision maker: Song Sanghoon (directive)
 
-## 배경
+## Background
 
-루트 프로젝트 탭·그 아이콘과 에이전트 탭·ACP 세션 포인터는 브라우저 `localStorage`에만 있었다.
-따라서 같은 계정으로 모바일·시크릿 창·다른 기기에 로그인하면 열어 둔 프로젝트와 아이콘, 에이전트
-작업 맥락이 사라졌다. tmux 세션은 서버가 소유하므로 어느 브라우저에서도 보이는 것과 일관되지 않는다.
+Root project tabs and their icons, agent tabs, and ACP session pointers existed only in the browser's `localStorage`. As a result, signing
+in with the same account on mobile, in an incognito window, or on another device lost the open projects, icons, and
+agent work context. This is inconsistent with tmux sessions, which are owned by the server and visible from any browser.
 
-## 선택지
+## Options
 
-1. 브라우저 로컬 상태를 유지한다 — 구현은 단순하지만 계정의 작업 맥락이 기기마다 갈린다.
-2. 모든 UI 상태를 계정 저장소로 옮긴다 — 일시적인 창 배치·입력 초안까지 공유해 기기별 화면 성격을 잃는다.
-3. 작업 맥락인 프로젝트·에이전트 탭만 계정 저장소로 옮긴다 — 로그인한 곳마다 같은 일을 이어가면서
-   화면 폭·드래프트·스크롤처럼 기기 특성인 상태는 로컬에 남긴다.
+1. Keep browser-local state — simple to implement, but the account's work context differs across devices.
+2. Move all UI state to account storage — even temporary window layouts and input drafts are shared, losing each device's distinct screen setup.
+3. Move only project and agent tabs, which represent work context, to account storage—allowing users to resume the same work wherever they sign in while
+   keeping device-specific state such as screen width, drafts, and scroll position local.
 
-## 결정
+## Decision
 
-3번을 채택한다.
+Adopt option 3.
 
-- 서버 `DATA_DIR`의 계정별 UI 상태 파일이 열린 루트 프로젝트 절대경로 목록과 그 아이콘, 루트 경로별
-  에이전트 탭 목록·마지막 활성 탭을 소유한다. 서버 응답은 인증된 **자기 계정**의 값만 준다.
-- owner만 볼 수 있는 루트 프로젝트 절대경로·아이콘은 owner 경로에서만 읽고 쓴다. 에이전트 탭은 기존과
-  같은 owner/manager 게이트를 쓴다.
-- 최초 서버 저장값이 없을 때만 기존 브라우저 값을 올려 한 번 마이그레이션한다. 서버 저장값이 있으면
-  빈 시크릿 창의 로컬 값이 이를 덮어쓰지 않는다.
-- 탭 변경은 서버에 저장하고, 새 로그인·새 기기는 그 값을 먼저 받아 복원한다. 동시에 둘을 조작하면 마지막
-  저장이 기준이다. 실시간 원격 화면 갱신은 이번 결정 범위 밖이다.
-- 에이전트 이벤트 캐시·작성 중인 입력·패널 폭·스크롤 같은 기기 로컬 상태는 옮기지 않는다. ACP 세션
-  자체와 tmux는 계속 서버 감독 프로세스가 소유한다.
+- The per-account UI state file in the server's `DATA_DIR` owns the list of absolute paths of open root projects and their icons, as well as the agent tab list
+  and last active tab for each root path. Server responses return values only for the authenticated user's **own account**.
+- Root project absolute paths and icons, visible only to the owner, are read and written only through owner routes. Agent
+  tabs use the existing owner/manager gate.
+- Perform a one-time migration by uploading existing browser values only when no server values have been saved yet. If server values exist, local
+  values from an empty incognito window do not overwrite them.
+- Tab changes are saved to the server, and new logins and new devices first fetch those values to restore them. If both are operated simultaneously, the
+  last save wins. Real-time updates to remote screens are outside the scope of this decision.
+- Device-local state such as the agent event cache, input being composed, panel width, and scroll position is not moved. ACP sessions
+  themselves and tmux remain owned by the server supervisor process.
 
-## 근거
+## Rationale
 
-열린 프로젝트와 에이전트 탭은 창 모양이 아니라 사용자가 다음에 이어갈 작업의 목록이다. 계정 인증을
-이미 가진 서버에 작은 상태 원장을 두면 별도 동기화 서비스 없이 같은 계정의 모든 브라우저가 이 목록을
-재구성할 수 있다. 반면 초안과 화면 배치는 키보드·화면 크기에 강하게 묶여 있어 함께 공유할 이유가 없다.
+Open projects and agent tabs are a list of work the user will resume next, rather than window appearance. Keeping a small state ledger on
+the server, which already has account authentication, lets all browsers for the same account reconstruct this list without a separate synchronization
+service. Drafts and screen layouts, meanwhile, are closely tied to the keyboard and screen size, so there is no reason to share them.

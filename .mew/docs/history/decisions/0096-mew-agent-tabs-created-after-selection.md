@@ -1,34 +1,34 @@
 ---
-provenance: "Liiiiv 중앙 ADR 이관본, 2026-10-14"
-description: "이관한 결정 기록: mew 에이전트 탭은 선택을 마친 뒤에 만든다. 당시 선택·근거·후속 변경을 보존하며 현재 계약은 Mew 소유 문서에서 확인한다."
-title: "0096 — mew 에이전트 탭은 선택을 마친 뒤에 만든다"
+provenance: "Migrated copy of a Liiiiv central ADR, 2026-10-14"
+description: "Migrated decision record: mew agent tabs are created after selection is complete. Preserves the choices, rationale, and subsequent changes at the time; see the Mew owning document for the current contract."
+title: "0096 — mew agent tabs are created after selection is complete"
 created: 2026-08-31
 updated: 2026-08-31
 ---
 
-- 날짜: 2026-08-31
-- 상태: 채택
-- 부분 대체: [0062](0062-mew-agent-tab-runtime-gate-and-install.md) — `+`가 런타임 미선택 탭을 먼저 만드는 범위
-- 결정자: 송상훈 (지시)
+- Date: 2026-08-31
+- Status: Adopted
+- Partially supersedes: [0062](0062-mew-agent-tab-runtime-gate-and-install.md) — The behavior where `+` first creates a tab with no runtime selected
+- Decision maker: Song Sanghoon (directive)
 
-## 배경
+## Background
 
-0062의 `+`는 런타임을 고르기 전 `새 대화` 탭을 만들고 그 탭 안에 선택기를 그린다. 선택하기 전의 빈 탭이 작업 단위처럼 남고, 탭 이름도 선택한 에이전트가 아니라 임시 문구가 된다.
+In 0062, `+` creates a `새 대화` tab before a runtime is selected and renders the selector inside that tab. The empty tab before selection remains as though it were a work unit, and its name is temporary text rather than the selected agent.
 
-## 선택지
+## Options
 
-1. 미선택 탭을 유지한다 — 선택기를 탭 안에 둘 수 있지만 임시 탭이 보인다.
-2. 선택기를 탭 생성 전 상태로 둔다 — 선택을 완료한 뒤에만 이름 있는 탭을 만든다.
+1. Keep tabs with no selection — the selector can remain inside the tab, but a temporary tab is visible.
+2. Keep the selector in a pre-creation state — create a named tab only after selection is complete.
 
-## 결정
+## Decision
 
-2번을 채택한다.
+Adopt option 2.
 
-- `+`와 탭이 0개일 때의 `새 탭` 버튼은 런타임 | 에이전트셋 선택기를 연다. 이때 탭·WS·ACP 세션은 만들지 않는다.
-- 런타임을 고르면 그 런타임 이름의 탭을 만들고, 에이전트셋을 고르면 그 셋 이름의 탭을 만든다. 선택 이름은 첫 프롬프트로 자동 교체하지 않으며 사용자는 탭 이름을 직접 바꿀 수 있다.
-- 0062 시절에 저장된 런타임 미선택 `새 대화` 탭은 복원하지 않는다. 런타임이 이미 선택된 같은 이름의 이전 탭은 런타임 이름으로 한 번 승격한다.
-- 런타임·셋을 선택한 뒤에만 세션을 시작한다는 0062의 게이트와, 셋이 탭 시작 프리셋이라는 0095의 경계는 유지한다.
+- `+` and the `새 탭` button shown when there are 0 tabs open the runtime | agent set selector. No tab, WS, or ACP session is created at this point.
+- Selecting a runtime creates a tab named after that runtime; selecting an agent set creates a tab named after that set. The selected name is not automatically replaced by the first prompt, and users can rename the tab manually.
+- Do not restore `새 대화` tabs saved under 0062 with no runtime selected. Older tabs with the same name that already have a runtime selected are renamed to the runtime name in a one-time upgrade.
+- Retain the gate in 0062 that starts a session only after a runtime or set is selected, and the boundary in 0095 that defines sets as tab startup presets.
 
-## 근거
+## Rationale
 
-선택기는 새 대화를 위한 입력 단계이지 대화 자체가 아니다. 탭을 실제 에이전트 또는 셋 이름으로만 보이게 하면 탭 줄이 현재 열려 있는 작업을 바로 나타낸다.
+The selector is an input step for a new conversation, not the conversation itself. Showing tabs only with actual agent or set names makes the tab bar directly represent currently open work.

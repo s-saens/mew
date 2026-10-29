@@ -1,22 +1,22 @@
 ---
-provenance: "Liiiiv 중앙 ADR 이관본, 2026-10-14"
-description: "Mew 로그인 계정별 에이전트 지침·모델 기본값·런타임 설정 저장, 최초 owner로만 공용 설정 이전과 독립 감독·예약 실행 계정 보존을 결정한다."
-title: "0202 — 계정별 에이전트 설정"
+provenance: "Migrated copy of a Liiiiv central ADR, 2026-10-14"
+description: "Decides to store agent guidance, model defaults, and runtime settings per Mew login account, migrate shared settings only to the first owner, and preserve execution accounts for independent supervision and scheduled runs."
+title: "0202 — Per-account agent settings"
 created: 2026-10-07
 updated: 2026-10-07
 ---
 
-- 날짜: 2026-10-07
-- 상태: 채택
-- 부분 대체: [0171](0171-mew-agent-guidance-settings.md), [0165](0165-mew-common-agent-guidance-file.md) — 서버 공용 저장 범위를 로그인 계정별로 변경; Markdown 기준본·권한·다음 요청 적용 계약 유지
-- 결정자: 사용자 요청
+- Date: 2026-10-07
+- Status: Adopted
+- Partially supersedes: [0171](0171-mew-agent-guidance-settings.md), [0165](0165-mew-common-agent-guidance-file.md) — Change server-wide storage scope to per-login-account storage; retain the Markdown canonical source, permissions, and application-on-next-request contracts
+- Decision maker: User request
 
-## 결정
+## Decision
 
-기본 지침, 모델·사고·권한 기본값, 런타임 실행 경로·인자·환경변수는 Mew 로그인 계정별로 저장하고 같은 계정의 모든 프로젝트에서 사용한다. HTTP·WS는 서버 인증 컨텍스트, 독립 감독·예약·Git AI 실행은 서버가 고정한 실행 계정을 사용한다. 브라우저가 보낸 계정 이름으로 저장 대상을 바꾸지 않는다.
+Store default guidance, model, reasoning, and permission defaults, and runtime executable paths, arguments, and environment variables per Mew login account, and use them across all projects for that account. HTTP and WS use the server authentication context; independent supervision, scheduled runs, and Git AI runs use the execution account pinned by the server. Do not change the storage target based on an account name sent by the browser.
 
-기존 공용 파일은 보존하고 생성 시각이 가장 이른 owner 계정에만 한 번 복사한다. 다른 계정은 템플릿·런타임 기본값으로 시작한다. 계정 없는 기존 CLI는 기존 공용 파일을 사용한다. 공급자 CLI 자체의 인증·설치 및 OS 홈 디렉터리는 이번 변경으로 격리하지 않는다.
+Preserve existing shared files and copy them once only to the owner account with the earliest creation time. Other accounts start with templates and runtime defaults. Existing CLI use without an account uses the existing shared files. This change does not isolate provider CLI authentication or installation, or OS home directories.
 
-## 근거
+## Rationale
 
-개인 지침과 기본 모델 선택이 다른 계정에 영향을 주지 않게 하고 저장된 공급자 환경변수를 다른 계정으로 복제하지 않는다. 기존 독립 감독은 시작 계정을 유지하며 새 구현의 적용에는 사용자가 빌드·반영 후 탭을 다시 열어야 한다.
+Prevent personal guidance and default model selections from affecting other accounts, and do not copy saved provider environment variables to other accounts. Existing independent supervision retains its starting account; to apply the new implementation, the user must build and apply it, then reopen the tab.

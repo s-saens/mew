@@ -1,30 +1,30 @@
 ---
-title: "문서 작성과 기록 지침을 계정별 항목으로 설정"
-description: "문서 갱신·ADR·작업 기록·작성·description·링크·검사의 기본 지침과 프로젝트 위임을 분리하고 기존 고정 문구를 비파괴적으로 이전하는 결정이다."
+title: "Configure Documentation and Recordkeeping Instructions per Account"
+description: "Decision to separate default instructions from delegation to project instructions for document updates, ADRs, work records, writing, descriptions, links, and checks, and to migrate existing fixed wording without destructive changes."
 created: "2026-10-26"
 updated: "2026-10-26"
 ---
 
-상태: 채택
+Status: Adopted
 
-## 배경
+## Background
 
-Mew 공통 지침은 소유 문서 갱신·description·링크 보정을 고정 문구로 요구했다. ADR 작성 조건과 구현·검증 기록은 프로젝트 규칙에 의존했다. 사용자가 문서 작성과 기록에도 공통 기본값을 두고 항목마다 변경할 수 있도록 요청했다.
+Mew's shared instructions required owning document updates, descriptions, and link corrections through fixed wording. ADR creation criteria and implementation and verification records depended on project rules. The user requested shared defaults for documentation and recordkeeping that could be changed individually.
 
-## 결정
+## Decision
 
-기준 문서 갱신·결정 기록(ADR)·작업 및 검증 기록·작성 방식·description·링크·문서 검사를 독립적인 7개 설정으로 제공한다. 기본값은 **기본 지침 적용**, 다른 값은 **프로젝트 지침에 따름**이다. 계정의 모든 프로젝트에 다음 요청부터 적용하며 기존 프로젝트 요구와 명시적인 사용자 요청은 우선한다.
+Provide 7 independent settings for canonical document updates, decision records (ADRs), work and verification records, writing style, descriptions, links, and document checks. The default is **Apply Default Instructions**, and the other value is **Follow Project Instructions**. Apply them to all projects in the account starting with the next request; existing project requirements and explicit user requests take precedence.
 
-ADR은 중요한 구조·기술 선택과 공유 계약 변경·기존 결정 번복을 기록한다. 단순 수정마다 새 ADR을 만들지는 않는다. 작업 기록은 구현 목적·결과·실제 검사·남은 제약을 남기고 운영 적용 여부를 구분한다. 기존 프로젝트의 문서 형식·위치·소유권을 따른다.
+ADRs record significant architectural and technical choices, shared contract changes, and reversals of existing decisions. Do not create a new ADR for every simple change. Work records capture implementation purpose, results, actual checks, and remaining constraints, and distinguish whether changes have been applied to production. Follow the existing project's document formats, locations, and ownership.
 
-기존 저장 원문은 덮어쓰지 않는다. 예전 기본 문구와 정확히 일치하는 독립 문구만 요청 시 설정형 안내로 바꿔 프로젝트 위임과 충돌하지 않게 한다. 사용자 수정·설정 구간·코드 예시는 보존한다. 손상된 구간은 자동 복구하거나 기본값을 중복 삽입하지 않는다.
+Do not overwrite existing stored source text. On request, replace only standalone wording that exactly matches the old defaults with configurable guidance so it does not conflict with delegation to project instructions. Preserve user edits, settings sections, and code examples. Do not automatically repair damaged sections or insert duplicate defaults.
 
-## 대안과 근거
+## Alternatives and Rationale
 
-문서화 전체를 켜고 끄는 하나의 설정은 ADR·기록·메타데이터를 독립적으로 선택할 수 없다. 새 템플릿만 바꾸면 기존 계정에 기본값이 적용되지 않으며, 기존 파일을 일괄 수정하면 직접 편집한 지침을 훼손할 수 있다. 항목별 설정과 읽기 시 보충을 함께 사용한다.
+A single setting that turns all documentation on or off cannot independently control ADRs, records, and metadata. Changing only the new template would not apply defaults to existing accounts, while bulk editing existing files could damage manually edited instructions. Use per-item settings together with supplementation on read.
 
-## 영향
+## Impact
 
-설정창의 접힌 **문서** 그룹에서 값을 바꾸며 검사 도구나 문서 폴더를 자동 생성하지 않는다. 이 설정은 에이전트 지침이며 기록·검사 실행을 보장하는 강제 게이트는 아니다. 프로젝트별 문서 규칙을 자동 삭제하지 않는다.
+Change values in the collapsed **Documents** group in settings; do not automatically create checking tools or documentation folders. These settings are agent instructions, not an enforcement gate that guarantees recordkeeping or check execution. Do not automatically delete project-specific documentation rules.
 
-구체적인 범위는 [사용법](../../../docs/guides/project-setup.md#문서-지침), 저장·이전·API는 [세션 계약](../development/agent-sessions.md), 검증 결과와 적용 상태는 [작업 기록](../work/agent-documentation-guidance.md)이 소유한다.
+[Usage](../../../docs/guides/project-setup.md#documentation-guidance) owns the specific scope, the [Session Contract](../development/agent-sessions.md) owns storage, migration, and APIs, and the [Work Record](../work/agent-documentation-guidance.md) owns verification results and application status.

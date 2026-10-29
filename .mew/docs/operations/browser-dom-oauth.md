@@ -1,10 +1,10 @@
 ---
-title: "DOM 브라우저 Google OAuth 실험 — 이동 안내"
+title: "DOM Browser Google OAuth Experiment — Relocation Notice"
 created: 2026-09-11
 updated: 2026-10-22
-description: "2026-09-11 DOM 브라우저 Google OAuth 실험을 history로 옮긴 안내. 현재 로그인 영상 화면·localhost 앱 프리뷰 계약과 당시 실험 원문으로 연결한다."
+description: "Relocation notice for the 2026-09-11 DOM browser Google OAuth experiment, now in history. Links to the current login video screen and localhost app preview contracts and the original experiment."
 ---
 
-현재 구현 계약은 [독립 로그인 영상 화면](../development/login-desktop.md)과 [localhost 앱 프리뷰](../development/port-preview.md)에서 관리한다. 내부 DOM 브라우저는 [결정 0023](../decisions/0023-login-desktop-and-port-preview.md)으로 대체했다.
+The current implementation contracts are maintained in [Standalone Login Video Screen](../development/login-desktop.md) and [localhost App Preview](../development/port-preview.md). The internal DOM browser was replaced under [Decision 0023](../decisions/0023-login-desktop-and-port-preview.md).
 
-2026-09-11의 Google 로그인 확인과 당시 실행 방식·검증 한계는 [과거 실험 원문](../history/browser-dom-oauth.md)에 보존한다. 이 파일은 기존 링크를 위한 이동 안내다.
+The Google login check on 2026-09-11, the execution method used at the time, and verification limitations are preserved in the [original historical experiment](../history/browser-dom-oauth.md). This file is a relocation notice for existing links.

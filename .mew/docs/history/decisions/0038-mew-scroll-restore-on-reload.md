@@ -1,33 +1,33 @@
 ---
-provenance: "Liiiiv 중앙 ADR 이관본, 2026-10-14"
-description: "이관한 결정 기록: mew 새로고침·브라우저 재시작 시 스크롤 위치 복원 (ADR 0029 부분 대체). 당시 선택·근거·후속 변경을 보존하며 현재 계약은 Mew 소유 문서에서 확인한다."
-title: "0038 — mew 새로고침·브라우저 재시작 시 스크롤 위치 복원 (ADR 0029 부분 대체)"
+provenance: "Migrated copy of a Liiiiv central ADR, 2026-10-14"
+description: "Migrated decision record: Restore scroll positions on mew refresh and browser restart (partially supersedes ADR 0029). Preserves the choices, rationale, and subsequent changes from that time; see the Mew owning document for the current contract."
+title: "0038 — Restore scroll positions on mew refresh and browser restart (partially supersedes ADR 0029)"
 created: 2026-08-07
 updated: 2026-08-20
 ---
 
-- 날짜: 2026-08-07
-- 상태: 채택
-- 결정자: 송상훈 (지시)
+- Date: 2026-08-07
+- Status: Adopted
+- Decision maker: Song Sanghoon (directive)
 
-## 배경
+## Background
 
-[ADR 0029](0029-mew-drop-scroll-position-restore.md)는 문서별 스크롤 복원을 전면 제거했다. 문제의 핵심은 전환마다 복원이 rAF로 따라붙어 스크롤 흘러가는 게 보였다는 것 — 탭·창을 자주 오가는 도구에서 매 전환의 지연으로 읽혔다.
+[ADR 0029](0029-mew-drop-scroll-position-restore.md) removed per-document scroll restoration entirely. The core problem was that restoration followed every switch through rAF, making the scrolling visible — in a tool where users frequently switch tabs and windows, this felt like a delay on every switch.
 
-그런데 전면 제거라 새로고침·브라우저 재시작 때도 맨 위로 간다. 열린 탭·활성 탭·칸 배치는 복원되는데 보던 자리만 사라진다.
+But removing it entirely also sends users to the top on refresh or browser restart. Open tabs, the active tab, and pane layout are restored, but the reading position is lost.
 
-## 결정
+## Decision
 
-복원을 "페이지 로드 후 문서당 한 번"으로 좁혀 되살린다.
+Reintroduce restoration, limited to "once per document after page load."
 
-- 저장: 스크롤할 때마다 모아서 localStorage `mew:scroll:{프로젝트}`(경로→scrollTop 맵)에 쓴다. 새로고침 직전 위치를 잃지 않게 `pagehide`에서 남은 것을 마저 쓴다 (`src/utils/scrollMemory.ts`)
-- 복원: 칸(pane)이 마운트될 때 그 칸의 활성 문서에만 시도한다. `takeScroll`이 로드 후 문서당 한 번만 값을 주므로 이후 탭 전환은 복원할 값 자체가 없다. 내용(collab 동기화·이미지)이 차야 높이가 생기므로 rAF로 최대 ~10초 재시도한다 (`EditorPane.tsx`)
-- 배선은 mew 앱 쪽 한 곳이다 — `packages/editor`에 prop을 뚫지 않고, 칸 래퍼에서 capture 단계 scroll 리스너로 hotview(`.editor-root`)·plain(`.cm-scroller`)을 함께 받는다
+- Saving: Batch scroll updates and write them to localStorage `mew:scroll:{프로젝트}` (a path-to-scrollTop map). Flush remaining updates on `pagehide` so the position immediately before refresh is not lost (`src/utils/scrollMemory.ts`)
+- Restoration: When a pane mounts, attempt restoration only for its active document. Since `takeScroll` returns a value only once per document after load, subsequent tab switches have no value to restore. Content (collab synchronization and images) must populate before scroll height becomes available, so retry through rAF for up to ~10 seconds (`EditorPane.tsx`)
+- The wiring lives in one place in the mew app — without passing a prop through `packages/editor`, a capture-phase scroll listener on the pane wrapper handles both hotview (`.editor-root`) and plain (`.cm-scroller`)
 
-탭·창 전환 복원은 여전히 금지다(0029 유지). 이 ADR은 0029의 "재추가 금지"를 새로고침·재시작 복원에 한해서만 대체한다. → 전환 복원 금지도 [ADR 0039](0039-mew-scroll-restore-on-tab-switch.md)가 해제했다(2026-08-08).
+Restoration on tab and window switches remains prohibited (0029 remains in effect). This ADR supersedes 0029's "do not reintroduce" rule only for restoration on refresh and restart. → [ADR 0039](0039-mew-scroll-restore-on-tab-switch.md) also lifted the prohibition on switch restoration (2026-08-08).
 
-## 근거
+## Rationale
 
-- 0029의 근거는 "매 전환의 보이는 지연"이지 복원 자체의 무가치가 아니었다. 로드당 한 번의 rAF 추격은 앱 부팅(탭 복원·collab 연결)과 겹쳐 별도 지연으로 읽히지 않는다
-- "값싼 즉시 복원은 없다"는 0029의 진단은 그대로 유효하다 — 그래서 방식을 바꾸는 게 아니라 횟수를 로드당 1회로 제한한다
-- 옛 키 `mew:scroll-offsets…`는 `h:`/`p:` 접두사 등 형식이 달라 재사용하지 않는다 — 새 키는 `mew:scroll:{프로젝트}`
+- The rationale for 0029 was "visible delay on every switch," not that restoration itself had no value. One rAF catch-up per load overlaps with app startup (tab restoration and collab connection), so it does not feel like a separate delay
+- 0029's diagnosis that "there is no cheap, immediate restoration" remains valid — so the approach stays the same, with the frequency limited to 1 time per load
+- The old key `mew:scroll-offsets…` is not reused because its format differs, including the `h:`/`p:` prefixes — the new key is `mew:scroll:{프로젝트}`

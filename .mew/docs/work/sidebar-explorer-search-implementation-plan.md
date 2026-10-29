@@ -1,77 +1,77 @@
 ---
-title: "mew 사이드바 탐색·검색 구현 계획"
+title: "mew sidebar exploration and search implementation plan"
 created: 2026-09-01
 updated: 2026-09-11
 reviewed: 2026-09-02
 review-after-days: 30
-description: "증분 파일 카탈로그·폴더 지연 로드·서버 파일명 검색·SQLite FTS5 내용 검색의 단계별 구현·권한·복구·테스트 계획과 완료 범위를 기록한다."
+description: "Records the phased implementation, permission, recovery, and test plans and completed scope for an incremental file catalog, lazy folder loading, server-side filename search, and SQLite FTS5 content search."
 ---
 
-> 2026-09-28 후속: [ADR 0176](../history/decisions/0176-mew-remove-local-rag.md)으로 RAG와 전용 모델·의존성을 제거했다. 아래 RAG 관련 구현·검토 항목은 당시 기록이며 현재 도입·배포 과제가 아니다.
+> 2026-09-28 follow-up: [ADR 0176](../history/decisions/0176-mew-remove-local-rag.md) removed RAG and its dedicated models and dependencies. The RAG implementation and review items below are historical records, not current adoption or deployment tasks.
 
 
-이 문서는 [사이드바 탐색·정확 검색 성능 설계](sidebar-explorer-search-performance.md)를 실제 코드로 옮길
-**구현 담당자용 실행 계획**이다. UI 계약은 [사이드바 파일 검색](../features/%ED%94%84%EB%A1%9C%EC%A0%9D%ED%8A%B8%C2%B7%ED%8C%8C%EC%9D%BC%C2%B7%EA%B2%80%EC%83%89/%ED%8C%8C%EC%9D%BC%EB%AA%85%C2%B7%EB%82%B4%EC%9A%A9%20%EA%B2%80%EC%83%89%EA%B3%BC%20%EC%B9%98%ED%99%98.md), 현재 지연 로드 계약은
-[ADR 0088](../history/decisions/0088-mew-sidebar-tree-lazy-loading.md)을 지킨다. 본문 파일은 SSoT이고 검색 자료구조는
-`MEW_DATA_DIR` 아래의 삭제·재생성 가능한 파생 캐시다.
+This document is an **execution plan for implementers** to
+turn [Sidebar Navigation and Exact Search Performance Design](sidebar-explorer-search-performance.md) into actual code. Follow [Sidebar File Search](../features/projects-files-search/filename-content-search-and-replacement.md) for the UI contract and [ADR 0088](../history/decisions/0088-mew-sidebar-tree-lazy-loading.md) for the current lazy-loading contract. Content
+files are the SSoT, and search data structures are disposable, regenerable
+derived caches under `MEW_DATA_DIR`.
 
-## 범위와 완료 정의
+## Scope and definition of done
 
-이번 작업은 다음 세 경로를 빠르게 만든다.
+This work speeds up the following three paths.
 
-1. 사이드바의 루트 표시와 폴더 펼치기
-2. Ctrl+P 파일명·경로 검색
-3. Ctrl+Shift+F 리터럴 내용 검색
+1. Sidebar root display and folder expansion
+2. Ctrl+P filename and path search
+3. Ctrl+Shift+F literal content search
 
-의미 검색(LanceDB), 편집기 본문 열기, 협업 방, 외부 검색 서비스는 범위 밖이다. 정규식 내용 검색은 결과의
-정확성을 유지하는 fallback 경로로 남겨도 된다. 완료는 전체 트리·전체 파일 read가 평상시 요청 경로에서 사라지고,
-아래 테스트·성능 기준을 만족하는 것이다.
+Semantic search (LanceDB), opening content in the editor, collaboration rooms, and external search services are out of scope. Regex content search
+may remain as a fallback path that preserves result accuracy. Completion means eliminating full-tree and full-file reads from normal request paths and
+meeting the tests and performance criteria below.
 
-## 구현 상태
+## Implementation status
 
-2026-09-02에 구현과 자동 검증을 완료했다. [ADR 0105](../history/decisions/0105-mew-incremental-file-catalog-and-exact-search-index.md)를
-채택하고 계측, 메모리 `FileCatalog`, 영향 부모 watcher 갱신, watcher 누락 시 전체 reconcile, 서버 Ctrl+P,
-versioned tree 부분 invalidation, Node 내장 SQLite FTS5, dirty 원문 fallback과 SSE batch를 적용했다. 파일 조작
-API는 변경 부모를 즉시 catalog에 반영하고, 게스트에게는 경로 없는 tree 신호만 보낸다. 색인 손상·schema 변경·
-삭제 복구, 0600 DB 권한, 다중 프로세스 write 경합도 검증했다.
+Implementation and automated verification were completed on 2026-09-02. [ADR 0105](../history/decisions/0105-mew-incremental-file-catalog-and-exact-search-index.md) was adopted, and instrumentation, an in-memory `FileCatalog`, watcher updates for affected parents,
+full reconciliation when watcher events are missed, server-side Ctrl+P, partial invalidation of the versioned tree, Node's built-in
+SQLite FTS5, dirty-source fallback, and SSE batching were applied. File operation APIs immediately reflect changed parents in the catalog and
+send guests only pathless tree signals. Recovery from index corruption, schema changes, and deletion, 0600 DB permissions,
+and multiprocess write contention were also verified.
 
-구현은 이 계획의 PoC 폴더 분할 대신 응집된 `mew/server/searchCatalog.ts` 하나로 시작했고, 별도 worker thread 대신
-비동기 파일 I/O·128개 transaction batch·`setImmediate` 양보를 사용했다. 기능 경계와 롤백 계약은 같다. 실제
-브라우저 p50/p95 trace만 실행 중인 앱에 새 build를 반영한 뒤 별도로 측정한다. 이번 작업에서는 `mew/README.md`의
-운영 계약에 따라 build·restart·배포를 실행하지 않았다.
+The implementation started with a single cohesive `mew/server/searchCatalog.ts` instead of the PoC folder split in this plan, and used asynchronous file I/O, transaction batches
+of 128, and `setImmediate` yielding instead of a separate worker thread. Feature boundaries and rollback contracts remain the same. Only actual browser
+p50/p95 traces will be measured separately after the new build is applied to the running app. This work did not run build, restart, or deployment,
+in accordance with the operational contract in `mew/README.md`.
 
-## 저장소 결정
+## Storage decision
 
-내용 색인 저장소는 ADR 0105가 다음처럼 확정했다.
+ADR 0105 finalized content index storage as follows.
 
-- 현재 최소 런타임 Node 22.18+의 `node:sqlite`와 FTS5 trigram을 사용해
-  `MEW_DATA_DIR/search/<workspace-hash>/catalog.sqlite`에 저장한다.
-- 색인을 끄거나 구축·query가 실패하면 기존 scanner로 안전하게 fallback한다.
-- 본문은 FTS 후보 생성용 파생 복사본이고 원문 파일이 SSoT다. schema 불일치는 자동 재구축한다.
-- LanceDB RAG와 독립된 저장소를 쓴다.
+- Use `node:sqlite` and FTS5 trigram on the current minimum
+  runtime, Node 22.18+, and store the data in `MEW_DATA_DIR/search/<workspace-hash>/catalog.sqlite`.
+- If indexing is disabled or building or querying fails, safely fall back to the existing scanner.
+- The content is a derived copy for generating FTS candidates; the source files are the SSoT. Schema mismatches trigger an automatic rebuild.
+- Use storage independent of LanceDB RAG.
 
-## 현재 코드 지도
+## Current code map
 
-| 책임 | 현재 파일 | 구현 중 바뀌는 방향 |
+| Responsibility | Current file | Direction of implementation changes |
 | --- | --- | --- |
-| 트리 순회·가시성·정렬 | `mew/server/tree.ts` | 정책 함수는 유지하고, 디스크 walk를 `FileCatalog` 초기 구축/증분 갱신으로 감싼다. |
-| 변경 감시 | `mew/server/watcher.ts` | 전체 watcher 재순회·전체 JSON 비교 대신 영향 경로를 catalog에 넘긴다. |
-| API | `mew/server/api.ts` | `/tree`, `/search/stream`은 catalog query를 사용하고 version·상태를 돌려준다. |
-| 내용 scanner | `mew/server/search.ts` | 원문 검증·정규식 fallback만 남기고, 색인 candidate query와 합친다. |
-| API client | `mew/src/api/client.ts` | tree envelope·파일명 검색 API·abort 가능한 검색을 타입화한다. |
-| 화면 상태·범위 | `mew/src/App.tsx` | `fetchFullTree` 기반 Ctrl+P 후보 생성을 제거한다. |
-| 트리 렌더 | `mew/src/components/FileTree.tsx` | 버전별 부모 캐시 무효화로 관련 열린 폴더만 다시 읽는다. |
-| 검색 UI | `mew/src/components/SearchPanel.tsx` | 서버 파일명 검색, abort, stale/bulding 상태, 결과 batch를 처리한다. |
-| 현재 보호 규칙 | `mew/server/guestAccess.ts`, `mew/server/ignoreList.ts`, `mew/server/paths.ts`, `mew/server/reqAuth.ts` | 색인에 복제하지 않고 결과 반환 직전에 반드시 재사용한다. |
+| Tree traversal, visibility, and sorting | `mew/server/tree.ts` | Keep the policy functions and wrap disk walks in `FileCatalog` initial construction and incremental updates. |
+| Change watching | `mew/server/watcher.ts` | Pass affected paths to the catalog instead of retraversing all watchers and comparing full JSON. |
+| API | `mew/server/api.ts` | `/tree` and `/search/stream` use catalog queries and return the version and state. |
+| Content scanner | `mew/server/search.ts` | Retain only source verification and regex fallback, and combine them with index candidate queries. |
+| API client | `mew/src/api/client.ts` | Define types for the tree envelope, filename search API, and abortable search. |
+| UI state and scopes | `mew/src/App.tsx` | Remove Ctrl+P candidate generation based on `fetchFullTree`. |
+| Tree rendering | `mew/src/components/FileTree.tsx` | Invalidate parent caches by version to reread only the relevant open folders. |
+| Search UI | `mew/src/components/SearchPanel.tsx` | Handle server-side filename search, abort, stale/bulding states, and result batches. |
+| Current protection rules | `mew/server/guestAccess.ts`, `mew/server/ignoreList.ts`, `mew/server/paths.ts`, `mew/server/reqAuth.ts` | Do not duplicate them in the index; always reuse them immediately before returning results. |
 
-`buildTreeAsync`, `listTreeDirAsync`, `flattenTextFiles`, `searchInProjectProgressively`의 기존 public export는
-한 PR에서 지우지 않는다. 새 경로가 기존 테스트와 동등함을 확인한 뒤 내부 구현을 옮긴다.
+Do not remove the existing public exports of `buildTreeAsync`, `listTreeDirAsync`, `flattenTextFiles`, and `searchInProjectProgressively` in a single PR. Move the internal implementation after confirming
+that the new path is equivalent under the existing tests.
 
-## 공통 데이터 계약
+## Shared data contract
 
-### 서버 내부 타입
+### Internal server types
 
-`mew/server/fileCatalog.ts`를 새로 만들고 다음 타입을 export한다. 실제 필드 이름은 바꿀 수 있지만 의미는 유지한다.
+Create `mew/server/fileCatalog.ts` and export the following types. Actual field names may change, but their meaning must be preserved.
 
 ```ts
 type CatalogNode = {
@@ -100,16 +100,16 @@ type CatalogChange =
   | { kind: 'rescan-project' }
 ```
 
-- snapshot은 불변이다. 갱신 중인 Map을 HTTP 요청이 읽으면 안 된다.
-- `version`은 실제로 보이는 경로 집합이나 자식 목록이 달라질 때만 증가한다.
-- `CatalogNode`에 역할·guest 권한을 저장하지 않는다. 그 값은 사용자별이고 변경 가능하므로 응답 시 계산한다.
-- `filtersFor`, `fileVisible`, `isPathVisible`은 `tree.ts`에서 export하거나 `treePolicy.ts`로 추출해 catalog,
-  tree API, watcher, 검색이 한 정의를 공유한다. 이름·확장자 정책을 두 군데 복제하지 않는다.
+- Snapshots are immutable. HTTP requests must not read a Map while it is being updated.
+- `version` increases only when the set of actually visible paths or a child list changes.
+- Do not store roles or guest permissions in `CatalogNode`. These values are user-specific and mutable, so calculate them at response time.
+- Export `filtersFor`, `fileVisible`, and `isPathVisible` from `tree.ts` or extract them into `treePolicy.ts` so the catalog, tree API, watcher, and search share
+  one definition. Do not duplicate name and extension policies in two places.
 
-### HTTP 계약
+### HTTP contract
 
-기존 `GET /api/tree`의 배열 응답은 호환성을 위해 유지한다. 새 클라이언트가 opt-in query `v=1`을 보낼 때만
-envelope를 받는다. 기존 guest 재귀 응답도 배열을 유지한다.
+Keep the existing array response from `GET /api/tree` for compatibility. Only new clients that send the opt-in query `v=1` receive an envelope.
+Keep arrays for the existing recursive guest responses as well.
 
 ```ts
 type TreeResponseV1 = {
@@ -125,183 +125,183 @@ type FileNameSearchResponse = {
 }
 ```
 
-- `GET /api/search/files?q=&scopes=&project=`을 새로 둔다. file-name 검색은 `/tree` 전체 응답을 사용하지 않는다.
-- `GET /api/search/stream`은 현 SSE event 이름 `result`, `done`, `error`를 유지한다. `done`에
-  `{ truncated, state, version, scannedDirtyFiles }`를 추가한다.
-- 모든 새 요청은 `AbortSignal`과 요청 번호를 사용한다. 중단된 요청은 server queue에 취소를 전달하거나,
-  최소한 결과 write를 즉시 멈춘다.
+- Add `GET /api/search/files?q=&scopes=&project=`. Filename search does not use the full `/tree` response.
+- `GET /api/search/stream` retains the current SSE event names `result`, `done`,
+  and `error`. Add `{ truncated, state, version, scannedDirtyFiles }` to `done`.
+- All new requests use `AbortSignal` and a request number. Aborted requests propagate cancellation to the server queue or, at minimum,
+  immediately stop writing results.
 
-### 실시간 신호
+### Real-time signals
 
-presence WebSocket의 기존 `{ type: 'tree' }`는 호환을 위해 남긴다. 새 서버는 가능할 때만 다음처럼 범위를 보낸다.
+Keep the existing `{ type: 'tree' }` on the presence WebSocket for compatibility. The new server sends the scope as follows only when possible.
 
 ```ts
 { type: 'tree', project: string, version: number, parents: string[] }
 ```
 
-클라이언트는 `parents`가 없거나 project가 다르면 기존처럼 root를 다시 읽는다. `parents`가 있으면 그 부모의
-`directoryChildren`만 stale 처리하고, 펼쳐진 폴더만 다시 요청한다. 신호에는 파일명·경로·권한 정보를 싣지 않는다.
+If `parents` is absent or the project differs, the client rereads the root as before. If `parents` is present, mark only those parents'
+`directoryChildren` as stale and request only expanded folders again. Do not include filenames, paths, or permission information in the signal.
 
-## 구현 단계
+## Implementation phases
 
-각 단계를 독립 PR/커밋으로 만들고, 이전 단계를 통과한 뒤 다음 단계로 간다. `npm run build`는 실행 중인 mew를
-즉시 바꾼다는 [실행·검증 규칙](../development/getting-started.md)이 있으므로 구현 담당자는 `npm test`, `npm run lint`, `npx tsc -b`로 검증하고
-사용자 승인 없이 build/serve/restart하지 않는다.
+Make each stage a separate PR/commit, and proceed to the next stage only after the previous one passes. Because
+the [Execution and Verification Rules](../development/getting-started.md) state that `npm run build` immediately changes the running mew instance, implementers must verify with `npm test`, `npm run lint`, and `npx tsc -b` and
+must not build/serve/restart without user approval.
 
-### 0. 기준선 계측과 fixture
+### 0. Baseline instrumentation and fixtures
 
-**목적:** 이후의 "개선"을 수치로 증명할 기준을 만든다.
+**Purpose:** Establish a baseline for quantitatively demonstrating subsequent "improvements."
 
-1. `mew/server/perfMarks.ts`를 추가한다. `process.hrtime.bigint()` 기반 `measure(name, fields, fn)`을 제공하고,
-   개발 모드 또는 `MEW_PERF_LOG=1`일 때만 JSON 한 줄을 쓴다. 기본 실행에서는 로그·개인 경로를 내보내지 않는다.
-2. `tree.ts`, `search.ts`, `watcher.ts`, `/api/tree`, `/api/search/stream`에 다음 구간을 각각 찍는다:
-   `tree.list`, `tree.full`, `search.candidate-build`, `search.read`, `search.match`, `watch.sync`, `watch.signature`,
-   `api.serialize`. 파일 수·읽은 바이트·결과 수만 부가한다.
-3. `mew/server/perfFixture.ts`와 테스트 전용 fixture 생성기를 만든다. 1만 파일까지는 기본 test에서,
-   10만/50만 파일은 `MEW_PERF_FIXTURE=1`에서만 생성한다. binary·ignore·docs·subproject·긴 경로를 섞는다.
-4. `mew/server/perf.test.ts`에 회귀 예산을 넣되 CI의 절대 시간 assertion은 피한다. 대신 full tree 호출 횟수,
-   읽은 후보 수, 반환 행 수 같은 결정적 상한을 검사한다.
+1. Add `mew/server/perfMarks.ts`. Provide `measure(name, fields, fn)` based on `process.hrtime.bigint()`, and write a single JSON line only in development mode or
+   when `MEW_PERF_LOG=1`. Do not emit logs or private paths during default execution.
+2. Instrument the following intervals in `tree.ts`, `search.ts`, `watcher.ts`, `/api/tree`, and `/api/search/stream`:
+   `tree.list`, `tree.full`, `search.candidate-build`, `search.read`, `search.match`, `watch.sync`, `watch.signature`, and `api.serialize`. Attach only file counts,
+   bytes read, and result counts.
+3. Create `mew/server/perfFixture.ts` and a test-only fixture generator. Generate up to 10,000 files in default tests, and 100,000/500,000
+   files only with `MEW_PERF_FIXTURE=1`. Include a mix of binary files, ignored files, docs, subprojects, and long paths.
+4. Add regression budgets to `mew/server/perf.test.ts`, but avoid absolute timing assertions in CI. Instead, check deterministic upper bounds such as full-tree
+   call counts, candidates read, and rows returned.
 
-**통과:** 현재 병목 표의 모든 구간이 로그로 구분되고, fixture가 작업 트리·사용자 파일을 만들거나 지우지 않는다.
+**Pass criteria:** Logs distinguish every interval in the current bottleneck table, and fixtures do not create or delete working-tree or user files.
 
-### 1. 메모리 FileCatalog와 tree API 전환
+### 1. Transition to an in-memory FileCatalog and tree API
 
-**목적:** 평상시 탐색과 watcher에서 전체 재귀 tree 재구축을 없앤다. 이 단계는 새 DB가 없다.
+**Purpose:** Eliminate full recursive tree rebuilds during normal navigation and watcher processing. This phase introduces no new DB.
 
-1. `fileCatalog.ts`에 프로젝트별 `Map<project, Catalog>`를 구현한다. `ensure(project)`는 첫 요청에서 한 번만
-   async 초기 스캔을 시작하고, 동시에 온 요청은 같은 Promise를 공유한다.
-2. 초기 scan은 `fs.promises.readdir`로 한다. 재귀 순회는 64~256개 디렉터리 단위로 `setImmediate`에 양보하며,
-   무제한 `Promise.all`을 쓰지 않는다. `.git`·`node_modules`·`.data`·ignore·download-only의 기존 정책을 그대로 적용한다.
-3. `listChildren(project, parent, opts)`를 구현한다. `listTreeDirAsync`와 같은 정렬·`project` 판별 결과를 만들고,
-   stale/building 중에는 마지막 완전 snapshot을 반환한다. snapshot이 전혀 없을 때만 기존 `listTreeDirAsync`로 안전하게 fallback한다.
-4. `tree.ts`의 public 함수는 유지하되, `/api/tree`만 catalog adapter를 이용하게 바꾼다. guest의 path 보존을 위한
-   전체 필터는 아직 기존 `buildTreeAsync`를 사용해도 된다. guest 최적화는 권한 회귀 없이 별도 PR로 한다.
-5. `watcher.ts`에 `catalog.note(change)`를 주입한다. 이벤트의 filename을 신뢰할 수 있으면 해당 부모만,
-   filename이 없거나 `rename`이면 부모 재스캔을 예약한다. watcher 집합의 증분 추가/삭제가 이 단계의 목표가 아니므로
-   기존 `collectWatchDirsAsync`는 남긴다.
-6. catalog 변경이 반영되면 affected parents와 version을 포함한 tree 신호를 broadcast한다. `lastJson` signature 비교는
-   catalog 경로에서는 제거한다.
+1. Implement a per-project `Map<project, Catalog>` in `fileCatalog.ts`. `ensure(project)` starts an asynchronous initial scan only once, on the first
+   request, and concurrent requests share the same Promise.
+2. Use `fs.promises.readdir` for the initial scan. Yield recursive traversal to `setImmediate` every 64–256 directories, and
+   do not use unbounded `Promise.all`. Apply the existing policies for `.git`, `node_modules`, `.data`, ignore, and download-only unchanged.
+3. Implement `listChildren(project, parent, opts)`. Produce the same sorting and `project` classification results as `listTreeDirAsync`, and return the last
+   complete snapshot while stale/building. Safely fall back to the existing `listTreeDirAsync` only when no snapshot exists.
+4. Keep the public functions in `tree.ts`, but change only `/api/tree` to use the catalog adapter. The full filter for preserving guest paths
+   may still use the existing `buildTreeAsync`. Optimize guests in a separate PR without permission regressions.
+5. Inject `catalog.note(change)` into `watcher.ts`. If the event's filename is reliable, schedule a rescan of only the affected parent; if the filename is
+   absent or the event is `rename`, schedule a parent rescan. Keep the existing `collectWatchDirsAsync` because incremental additions to and removals
+   from the watcher set are not the goal of this stage.
+6. Once catalog changes are reflected, broadcast a tree signal containing the affected parents and version. Remove the `lastJson` signature comparison
+   from the catalog path.
 
-**필수 테스트:**
+**Required tests:**
 
-- `fileCatalog.test.ts`: 최초 scan dedupe, 파일/폴더 생성·rename·delete, parent만 재스캔, immutable snapshot, 정렬.
-- 기존 `tree.test.ts`: member/manager/owner/guest의 결과 배열이 이전과 동일.
-- `watcher.test.ts`를 추가 또는 확장: 파일 하나 변경 시 full recursive build 없이 영향 부모만 publish.
+- `fileCatalog.test.ts`: initial scan deduplication, file/folder creation, rename, and deletion, parent-only rescans, immutable snapshots, and sorting.
+- Existing `tree.test.ts`: result arrays for member/manager/owner/guest remain identical to previous results.
+- Add or extend `watcher.test.ts`: when one file changes, publish only affected parents without a full recursive build.
 
-**통과:** 반복 `/tree?path=`는 디스크 `readdir` 없이 snapshot을 사용하고, 프로젝트 변경 뒤 현재 열린 폴더만 갱신된다.
+**Pass criteria:** Repeated `/tree?path=` requests use snapshots without disk `readdir` calls, and only currently open folders refresh after project changes.
 
-### 2. Ctrl+P 서버 파일명 색인
+### 2. Server-side filename index for Ctrl+P
 
-**목적:** `App.tsx`의 `fetchFullTree` 두 번과 브라우저 전체 후보 정렬을 제거한다.
+**Purpose:** Eliminate the two `fetchFullTree` calls in `App.tsx` and browser-side sorting of all candidates.
 
-1. `mew/server/fileNameSearch.ts`를 추가한다. catalog snapshot의 files에서 scope별 후보 view를 만들고, 정규화된
-   basename·segment·전체 경로를 보관한다. scope 판정은 현재 `App.tsx`의 Documents/직계 `.mew` 하위 프로젝트 규칙과
-   결과가 같아야 한다.
-2. fuzzy 알고리즘은 `mew/packages/editor/src/utils/fuzzy.ts`의 이미 검증된 함수를 먼저 조사·재사용한다.
-   재사용이 부적절하면 순수 함수로 추출하고 한 곳만 기준으로 둔다. 순위는 basename exact/prefix, segment prefix,
-   경계 match, subsequence 순으로 deterministic tie-break(`path.localeCompare`)를 둔다.
-3. `/api/search/files`를 `api.ts`에 붙인다. query 2글자 미만이면 빈 검색 결과 대신 `recent` 슬롯을 돌릴 수 있으나,
-   최근 파일 저장 기능은 이 단계의 선행조건이 아니다. 결과는 최대 50개다.
-4. `client.ts`에 `searchFiles()`를 추가하고 `App.tsx`의 `loadSidebarFileSearchResults`와 `fetchFullTree` import를 삭제한다.
-5. `SearchPanel.tsx`는 파일 모드에서 debounce 후 `searchFiles`를 호출한다. 이전 `fileCandidatesRef` 전체 후보 cache를
-   없애고 `AbortController`·request id로 늦은 응답을 버린다. 기존 정규식·대소문자 옵션과 tooltip·scope UX는 유지한다.
-6. 파일명 결과가 100개 이상으로 확장될 가능성에 대비해 목록 행을 `react-window` 같은 새 의존성 없이 간단한
-   viewport window로 렌더하거나, 상한 50을 유지한다. 이번 단계에서는 상한 50 유지가 기본이다.
+1. Add `mew/server/fileNameSearch.ts`. Build candidate views by scope from the files in the catalog snapshot, and retain normalized basenames, segments, and
+   full paths. Scope classification must produce the same results as the current Documents/direct-child `.mew` subproject rules
+   in `App.tsx`.
+2. For the fuzzy algorithm, first inspect and reuse the already verified functions in `mew/packages/editor/src/utils/fuzzy.ts`. If reuse is unsuitable,
+   extract a pure function and maintain a single canonical implementation. Rank matches in this order: basename
+   exact/prefix, segment prefix, boundary match, and subsequence, with a deterministic tie-break (`path.localeCompare`).
+3. Wire `/api/search/files` into `api.ts`. If the query is shorter than 2 characters, it may return a `recent` slot instead of empty search results, but recent-file persistence
+   is not a prerequisite for this stage. Return at most 50 results.
+4. Add `searchFiles()` to `client.ts` and remove the `loadSidebarFileSearchResults` and `fetchFullTree` imports from `App.tsx`.
+5. In file mode, `SearchPanel.tsx` calls `searchFiles` after debouncing. Remove the previous full candidate cache in `fileCandidatesRef` and discard late responses
+   using `AbortController` and a request ID. Preserve the existing regex and case-sensitivity options, tooltips, and scope UX.
+6. To accommodate possible expansion to 100 or more filename results, render list rows with a simple viewport window without a new
+   dependency such as `react-window`, or retain the cap of 50. Retaining the cap of 50 is the default for this stage.
 
-**필수 테스트:**
+**Required tests:**
 
-- `fileNameSearch.test.ts`: 한글, camelCase, kebab-case, 동일 basename, scope OR, docs/하위 프로젝트, regex/case.
-- `SearchPanel` 또는 pure helper test: 취소된 옛 응답이 새 query 결과를 덮지 않음.
-- 정적 검사: Ctrl+P 경로에서 `fetchFullTree` 호출 0회.
+- `fileNameSearch.test.ts`: Korean, camelCase, kebab-case, identical basenames, scope OR, docs/subproject scopes, regex/case.
+- `SearchPanel` or pure helper test: canceled old responses do not overwrite results for a new query.
+- Static check: 0 calls to `fetchFullTree` in the Ctrl+P path.
 
-**통과:** 10만 파일 fixture에서 Ctrl+P 요청이 전송·파싱하는 후보 수가 50개 이하이며, 검색 중 UI main thread 긴 task가 없다.
+**Pass:** With a fixture containing 100,000 files, Ctrl+P requests transmit and parse no more than 50 candidates, and no long tasks occur on the UI main thread during search.
 
-### 3. 클라이언트 tree version·부분 invalidation
+### 3. Client tree version and partial invalidation
 
-**목적:** 변경 신호마다 root·docs·활성 프로젝트 트리 전체를 다시 읽는 흐름을 없앤다.
+**Purpose:** Eliminate rereading the entire root, docs, and active project trees on every change signal.
 
-1. `client.ts`에 `fetchTreeV1()`을 추가한다. 배열 구 API는 호출자가 모두 옮겨질 때까지 남긴다.
-2. `App.tsx`에 프로젝트별 `{ version, rootEntries, staleParents }` 상태를 둔다. 현재 tree state를 한꺼번에 바꾸지
-   말고 adapter 함수로 `FileTree`가 기대하는 `TreeNode[]`를 만든다.
-3. `usePresence.ts`의 tree 메시지 타입을 확장하고, `App.tsx`의 `onTreeChange`에서 `parents`만 stale 처리한다.
-   열린 parent는 즉시 background refetch, 접힌 parent는 다음 expand 때 fetch한다. 서버가 구 신호만 보내면 기존 전체 reload를 fallback으로 쓴다.
-4. `FileTree.tsx`에 `catalogVersion`과 `invalidateParents(paths)` 또는 동등한 props를 추가한다. `directoryChildren` 중
-   영향 없는 key·openDirs·focus·scroll identity를 보존한다.
-5. 파일 조작 성공 뒤의 낙관적 UI는 유지하되, catalog version 응답이 올 때까지 전체 root refetch를 강제하지 않는다.
+1. Add `fetchTreeV1()` to `client.ts`. Keep the old array API until all callers have migrated.
+2. Maintain per-project `{ version, rootEntries, staleParents }` state in `App.tsx`. Instead of replacing the current tree state all at once, use an
+   adapter function to produce the `TreeNode[]` expected by `FileTree`.
+3. Extend the tree message type in `usePresence.ts`, and mark only `parents` as stale in `onTreeChange` in `App.tsx`. Immediately refetch expanded parents
+   in the background, and fetch collapsed parents on their next expansion. If the server sends only legacy signals, fall back to the existing full reload.
+4. Add `catalogVersion` and `invalidateParents(paths)`, or equivalent props, to `FileTree.tsx`. Preserve unaffected keys, openDirs, focus,
+   and scroll identity within `directoryChildren`.
+5. Preserve the optimistic UI after successful file operations, but do not force a full root refetch until the catalog version response arrives.
 
-**필수 테스트:**
+**Required tests:**
 
-- `usePresence` 메시지 parsing test: 구/신 tree 신호 모두 동작.
-- `FileTree` test: `docs/a` 변경이 `src`의 펼침 cache를 지우지 않음.
-- 프로젝트 전환 중 늦은 v1 응답이 새 root state를 덮지 않음.
+- `usePresence` message parsing test: both old and new tree signals work.
+- `FileTree` test: changes to `docs/a` do not clear the expansion cache for `src`.
+- Late v1 responses during project switching do not overwrite the new root state.
 
-**통과:** 한 파일 수정이 열린 관련 폴더 외 UI 스크롤·펼침 상태를 바꾸지 않고, `/tree` root 재요청을 만들지 않는다.
+**Pass:** Editing one file does not change UI scroll or expansion state outside the relevant expanded folders, and does not trigger another `/tree` root request.
 
-### 4. 내용 색인 PoC
+### 4. Content index PoC
 
-**목적:** scanner를 대체할 만큼 정확하고 복구 가능한 후보 색인을 증명한다. 이 단계는 feature flag 뒤에 둔다.
+**Purpose:** Demonstrate a candidate index accurate and recoverable enough to replace the scanner. Keep this stage behind a feature flag.
 
-1. `mew/server/searchCatalog/`를 만든다: `storage.ts`, `schema.ts`, `indexer.ts`, `query.ts`, `manifest.ts`.
-   database path와 schema version은 이 폴더 밖에 흩어놓지 않는다.
-2. schema에는 `files(project, path, mtime_ms, size, content_hash, indexed_at)`와 FTS table을 둔다. project/path unique,
-   transaction, prepared statement를 사용한다. SQLite가 FTS 구문상 같은 한글 substring을 못 찾는 경우를 ADR에서 정한
-   tokenizer/보조 trigram table로 처리한다.
-3. `SearchCatalog.ensure(project, visibleFiles)`는 manifest와 filesystem fingerprint를 비교해 dirty 파일만 index한다.
-   초기 구축은 background job으로 실행하고 API는 `{ state: 'building' }`을 즉시 반환한다. 검색 요청의 event loop에서
-   대량 index를 수행하지 않는다.
-4. write·upload·rename·delete API와 watcher의 catalog change가 search catalog update를 예약한다. rename은 old row 삭제와
-   new row upsert를 한 transaction으로, 삭제는 tombstone 없이 row 삭제한다.
-5. `/search/stream`은 literal query에서 `SearchCatalog.candidates()`를 먼저 부른다. 후보 각 파일의 현재 `mtime/size`를
-   확인한 뒤 `searchInProjectProgressively`의 line/match 계산으로 검증한다. dirty·stale 파일은 original scanner를 추가로
-   돌려 색인 지연이 결과를 빠뜨리지 않게 한다.
-6. regex는 기본적으로 기존 scanner를 사용한다. PoC에서 FTS candidate filter가 regex 결과의 **superset**임이 증명되기 전에는
-   regex에 색인을 사용하지 않는다.
-7. 색인 open/migration/build 실패는 503이 아니라 `state: 'stale'` + 기존 scanner fallback이다. 오류는 사용자에게
-   경로·본문 없이 일반 메시지로만 보인다.
+1. Create `mew/server/searchCatalog/` with `storage.ts`, `schema.ts`, `indexer.ts`, `query.ts`, and `manifest.ts`. Do not scatter the database path
+   and schema version outside this folder.
+2. Include `files(project, path, mtime_ms, size, content_hash, indexed_at)` and an FTS table in the schema. Use project/path uniqueness, transactions, and prepared statements. Handle cases
+   where SQLite cannot find the same Korean substring under FTS syntax using the tokenizer/auxiliary
+   trigram table specified in the ADR.
+3. `SearchCatalog.ensure(project, visibleFiles)` compares the manifest with filesystem fingerprints and indexes only dirty files. Run the initial build as a background
+   job, and have the API immediately return `{ state: 'building' }`. Do not perform bulk indexing in the search request's
+   event loop.
+4. Catalog changes from write, upload, rename, and delete APIs and the watcher schedule search catalog updates. For renames, delete the old row and upsert
+   the new row in one transaction; for deletions, delete the row without a tombstone.
+5. `/search/stream` first calls `SearchCatalog.candidates()` for literal queries. After checking each candidate file's current `mtime/size`, verify it
+   using the line/match calculations in `searchInProjectProgressively`. Also run the original scanner on dirty/stale files so indexing delays
+   do not omit results.
+6. Regex uses the existing scanner by default. Do not use the index for regex until the PoC proves that the FTS candidate filter is a **superset**
+   of regex results.
+7. Index open/migration/build failures result in `state: 'stale'` plus fallback to the existing scanner, rather than 503. Show users only generic error
+   messages without paths or content.
 
-**필수 테스트:**
+**Required tests:**
 
-- schema 생성/upgrade, DB 삭제·손상 뒤 재구축, 파일 rename/delete, watcher 누락 뒤 full reconcile.
-- literal 검색 결과가 기존 `searchInProject`와 파일·줄·열·매치 수까지 동등.
-- index write가 지연된 직후 저장한 문서도 검색됨(dirty fallback).
-- guest/member/manager/owner별로 허용 밖 경로가 결과·snippet·진행 이벤트에 전혀 없음.
+- Schema creation/upgrades, rebuilding after DB deletion or corruption, file rename/delete, and full reconciliation after missed watcher events.
+- Literal search results match the existing `searchInProject` in files, lines, columns, and match counts.
+- Documents saved immediately after an index write is delayed are also searchable (dirty fallback).
+- For guest/member/manager/owner, no paths outside their permissions appear in results, snippets, or progress events.
 
-**통과:** 10만 파일 대표 literal query에서 full scan이 아닌 후보 검증만 하며, 결과 동등성 suite가 0건 누락이다.
+**Pass:** Representative literal queries over 100,000 files validate only candidates rather than performing a full scan, and the result equivalence suite has 0 omissions.
 
-### 5. 내용 검색 운영화
+### 5. Put content search into production
 
-**목적:** PoC를 기본 경로로 올리되, 문제 발생 시 즉시 안전하게 되돌린다.
+**Purpose:** Make the PoC the default path while allowing an immediate, safe rollback if problems occur.
 
-1. `MEW_SEARCH_INDEX_ENABLED=0|1` feature flag를 제공한다. ADR 0105에 따라 기본값은 `1`이고, `0`이면 scanner만 쓴다.
-   설정 값·DB 위치·상태는 `mew/docs/configuration/`의 해당 문서에 코드 계약으로 기록한다.
-2. `/api/search/stream`의 done 이벤트에 `state`, `version`, `scannedDirtyFiles`를 넣고 `SearchPanel.tsx`에
-   "색인 준비 중 — 정확 검색으로 보완 중" 상태를 추가한다. 결과 없음은 index building 완료 전 확정 문구를 쓰지 않는다.
-3. 결과 event는 최대 20 파일 단위, 50~100ms 단위로 flush한다. 각 파일 결과를 도착 즉시 `setResults([...])`로 append해
-   수천 React render가 나는 현재 경로를 batch reducer로 바꾼다.
-4. 30일간 `candidateCount`, `dirtyFallbackCount`, `queryMs`, `firstResultMs`, `indexLagMs`, fallback 비율을 기록한다.
-   색인 오류 또는 누락 의심 시 flag를 0으로 바꿔 scanner만 쓰게 할 수 있어야 한다.
+1. Provide the `MEW_SEARCH_INDEX_ENABLED=0|1` feature flag. Per ADR 0105, the default is `1`; when set to `0`, use only the scanner. Record configuration values,
+   DB location, and state as code contracts in the relevant documents under `mew/docs/configuration/`.
+2. Include `state`, `version`, and `scannedDirtyFiles` in the done event from `/api/search/stream`, and add an "Index preparing — supplementing with exact search"
+   state to `SearchPanel.tsx`. Do not use definitive no-results wording before index building is complete.
+3. Flush result events in batches of at most 20 files, at intervals of 50–100 ms. Replace the current path, which appends each file's results via `setResults([...])` immediately
+   on arrival and causes thousands of React renders, with a batch reducer.
+4. Record `candidateCount`, `dirtyFallbackCount`, `queryMs`, `firstResultMs`, `indexLagMs`, and the fallback rate for 30 days. If an index error or omission is suspected, it must
+   be possible to change the flag to 0 to use only the scanner.
 
-**통과:** 새 의존성/설정/복구 절차가 README와 ADR에 기록되고, flag off에서 기존 검색 테스트 전부 통과한다.
+**Pass:** New dependencies, configuration, and recovery procedures are documented in the README and ADR, and all existing search tests pass with the flag off.
 
-## 금지와 주의점
+## Prohibitions and precautions
 
-- 요청마다 `rg` 프로세스를 띄워 해결하지 않는다. 빠를 수 있어도 watcher·권한·scope·Windows 배포와 별개 계약을 다시 만들며,
-  상시 검색 부하가 커진다.
-- UI의 파일명 검색을 위해 `/api/tree` 전체 트리를 다시 보내지 않는다.
-- 인덱스 결과를 권한 판정으로 쓰지 않는다. **반환 직전** `guestAccess`와 tree visibility를 다시 적용한다.
-- worker thread, SSE, watcher callback에서 stale snapshot을 직접 mutate하지 않는다.
-- 파일 본문·절대 경로·검색어를 기본 로그나 telemetry로 보내지 않는다.
-- 대량 Git 변경에 이벤트마다 index transaction·WebSocket broadcast를 하지 않는다. debounce된 batch와 version 하나를 쓴다.
-- `npm run build`, 서버 restart, 배포는 사용자 승인 없이 실행하지 않는다.
+- Do not solve this by launching an `rg` process for every request. Even if it is fast, it creates another separate contract for watchers, permissions, scope, and Windows deployment, and
+  increases ongoing search load.
+- Do not resend the entire `/api/tree` tree for filename search in the UI.
+- Do not use index results to determine permissions. Reapply `guestAccess` and tree visibility **immediately before returning results**.
+- Do not directly mutate stale snapshots from worker threads, SSE, or watcher callbacks.
+- Do not send file contents, absolute paths, or search terms to default logs or telemetry.
+- For bulk Git changes, do not perform an index transaction or WebSocket broadcast for every event. Use a debounced batch and a single version.
+- Do not run `npm run build`, restart the server, or deploy without user approval.
 
-## 최종 검증 체크리스트
+## Final validation checklist
 
-- [x] `npm test`, `npm run lint`, `npx tsc -b` 통과
-- [x] `python3 .mew/docs/.github/scripts/moc_coverage.py`와 `docs_health.py` 통과
-- [x] 1만 파일 기본 fixture에서 tree·파일명·내용 검색의 기능 동등성 통과
-- [x] 선택 성능 fixture에서 full-tree API 호출 없이 Ctrl+P가 상위 50개만 반환
-- [x] 리터럴·regex·case-sensitive·한글·빈 query·긴 query·바이너리·대용량 파일의 회귀 테스트 통과
-- [x] 저장 직후·rename·delete와 watcher 누락/대량 변경 full reconcile에서 stale 결과가 남지 않음
-- [x] guest 권한 변경 전후 검색 결과와 tree presence 신호에 비공개 경로가 없음
-- [x] index 디렉터리 삭제·손상·migration 실패에서 재구축과 scanner fallback이 계속 동작
-- [ ] 실제 브라우저 trace를 연결 가능한 환경에서 수집해 설계 문서의 p50/p95 목표를 기록
+- [x] `npm test`, `npm run lint`, and `npx tsc -b` pass
+- [x] `python3 .mew/docs/.github/scripts/moc_coverage.py` and `docs_health.py` pass
+- [x] Functional equivalence checks for tree, filename, and content search pass with the baseline fixture of 10,000 files
+- [x] With the optional performance fixture, Ctrl+P returns only the top 50 results without calling the full-tree API
+- [x] Regression tests pass for literal, regex, case-sensitive, Korean, empty queries, long queries, binary files, and large files
+- [x] No stale results remain immediately after saves, renames, or deletions, or after full reconciliation for missed watcher events or bulk changes
+- [x] No private paths appear in search results or tree presence signals before or after guest permission changes
+- [x] Rebuilding and scanner fallback continue to work after index directory deletion, corruption, or migration failure
+- [ ] Collect actual browser traces in an environment that supports a connection, and record the design document's p50/p95 targets

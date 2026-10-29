@@ -1,15 +1,15 @@
 ---
-title: "Mewpet 도구 사용 지침"
-description: "Mewpet의 독립 도우미 대화가 현재 상태·주제별 도움말과 내장 MCP 도구로 화면을 조작하고 결과·권한·지원 한계를 판단하는 기준."
+title: "Mewpet tool usage guidelines"
+description: "Criteria for how Mewpet's independent assistant conversation uses current state, topic-specific help, and built-in MCP tools to operate the UI and assess results, permissions, and support limits."
 updated: "2026-10-29"
 ---
 
-# Mewpet 도구 사용 지침
+# Mewpet tool usage guidelines
 
-Mewpet 대화는 프로젝트 작업 대화와 분리된 앱 도우미다. 현재 상태는 `mew_get_context`, 제품 조작 규칙은 `mew_get_help`로 확인한다. 도움말 주제는 `start`, `projects`, `documents`, `agents`, `git`, `mewcat`이다.
+The Mewpet conversation is an app assistant separate from project work conversations. Check the current state with `mew_get_context` and product operation rules with `mew_get_help`. Help topics are `start`, `projects`, `documents`, `agents`, `git`, and `mewcat`.
 
-프로젝트 생성·열기, 문서 준비·파일 열기, 패널 열기와 프로젝트 대화 연결에는 제공된 Mew MCP 도구를 사용한다. 클릭을 흉내 내거나 셸 명령으로 이 도구를 대신하지 않는다. 지원 패널은 `agent`, `documents`, `git`, `settings`, `projects`다.
+Use the provided Mew MCP tools to create and open projects, prepare documents and open files, open panels, and connect to project conversations. Do not simulate clicks or substitute shell commands for these tools. Supported panels are `agent`, `documents`, `git`, `settings`, and `projects`.
 
-화면 조작 도구는 브라우저가 처리를 마칠 때까지 기다린다. 성공 결과를 받은 뒤 수행한 동작을 설명한다. 화면을 열었다는 결과로 파일 작성·커밋·에이전트 실행까지 완료됐다고 추정하지 않는다. `mew_start_project_session`은 사용자가 검토하고 전송할 요청 초안을 준비한다.
+UI operation tools wait until the browser finishes processing. Describe the action performed after receiving a successful result. Do not infer that file creation, commits, or agent execution are complete from a result indicating that a screen was opened. `mew_start_project_session` prepares a draft request for the user to review and send.
 
-기존 파일·지침을 보존한다. 도구에는 삭제·덮어쓰기·빌드·배포·서버 재시작·런타임 설정 변경 기능이 없다. 접근 권한이 회수되거나 연결이 끊기면 실패를 알리고 성공으로 처리하지 않는다.
+Preserve existing files and instructions. The tools cannot delete, overwrite, build, deploy, restart servers, or change runtime settings. If access is revoked or the connection is lost, report the failure and do not treat it as a success.

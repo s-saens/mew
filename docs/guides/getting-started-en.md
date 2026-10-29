@@ -1,12 +1,12 @@
 ---
 title: "Getting started with mew"
 updated: "2026-10-28"
-description: "s-saens/mew 소스의 영어 설치·첫 로그인·파일탐색기 및 목적별 사용법과 Mewlink·대체 외부 접속, 권한·업데이트·데이터 보존 및 미발행 CLI 경로를 안내한다. 햄버거 메뉴의 Mewlink 연결 진입을 포함한다."
+description: "Provides English instructions for installation, first login, the file explorer, and task-specific usage of the s-saens/mew source, along with Mewlink and alternative external access, permissions, updates, data retention, and the unpublished CLI path. Includes access to Mewlink connection from the hamburger menu."
 ---
 
 # Getting started with mew
 
-[한국어](getting-started-ko.md) · [English](getting-started-en.md) · [简体中文](getting-started-zh.md) · [日本語](getting-started-ja.md)
+
 
 mew opens folders on your computer or server in a browser. Edit Markdown and code, run terminals and AI agents, review Git changes, and work on documents together. You can use it from your phone, too.
 
@@ -80,7 +80,7 @@ cd mew
 
 Accept the offer to install Node with nvm if prompted. Follow the [setup prompts below](#finish-setup), then open the printed URL in your browser.
 
-Setup also prepares the remote desktop helper. On the Mac running mew, approve **Accessibility** and **Screen Recording** for Electron when System Settings opens. Setup continues once it detects the permissions. See [Mac permission setup](remote-desktop.md#mac-%EA%B6%8C%ED%95%9C-%EC%A4%80%EB%B9%84) for details.
+Setup also prepares the remote desktop helper. On the Mac running mew, approve **Accessibility** and **Screen Recording** for Electron when System Settings opens. Setup continues once it detects the permissions. See [Mac permission setup](remote-desktop.md#mac-permission-setup) for details.
 
 ### Linux
 
@@ -148,7 +148,7 @@ Mewlink sign-in is used for registration, your device list and device removal. T
 
 The host must stay running and online. Networks that block direct connections show an error. Android iframe access is unavailable in this mode. Run `./mew remote-access account` to see the registration instructions again. Operators should follow [Central service setup](../../.mew/docs/operations/remote-central.md). Applying this authentication change requires updating local mew and redeploying Mewlink; real external-network validation is separate.
 
-For passwordless access, the visitor can choose **Sign in with Mewlink → Request access** on the device login screen. The owner approves the identity under **Account management → Mewlink account access**, linking it to an existing local user or creating one (member by default). Permissions remain local; remove the identity link to revoke access. The registration account and matching email do not grant access automatically. Local mew and Mewlink must both be updated for this flow; provider sign-in and external-network validation remain separate. See the [remote-access contract](../../.mew/docs/development/remote-access.md#검증과-남은-게이트).
+For passwordless access, the visitor can choose **Sign in with Mewlink → Request access** on the device login screen. The owner approves the identity under **Account management → Mewlink account access**, linking it to an existing local user or creating one (member by default). Permissions remain local; remove the identity link to revoke access. The registration account and matching email do not grant access automatically. Local mew and Mewlink must both be updated for this flow; provider sign-in and external-network validation remain separate. See the [remote-access contract](../../.mew/docs/development/remote-access.md#verification-and-remaining-gates).
 
 #### 2. Tailscale
 
@@ -177,7 +177,7 @@ Use this for a stable HTTPS address that works in a browser without installing T
 3. Add a **Published application** route with a hostname such as `mew.example.com` and service URL `http://127.0.0.1:5000`. Leave the path empty so mew is served at `/`.
 4. Keep `cloudflared` running, then open `https://mew.example.com` from another device and sign in to mew.
 
-This creates a public HTTPS entry point; mew's account permissions still apply. See [Security](../operations/security.md) and the [deployment guide](../deployment/native.md#2-https-%ED%94%84%EB%A1%9D%EC%8B%9C-%EB%98%90%EB%8A%94-%ED%84%B0%EB%84%90-%EC%97%B0%EA%B2%B0) for proxy requirements and connection checks.
+This creates a public HTTPS entry point; mew's account permissions still apply. See [Security](../operations/security.md) and the [deployment guide](../deployment/native.md#2-connect-an-https-proxy-or-tunnel) for proxy requirements and connection checks.
 
 ## Requirements and permissions
 
@@ -195,7 +195,7 @@ Open the printed address, sign in as owner, and change the temporary password.
 2. Select a Markdown or code file from the file list.
 3. Open terminals, agents, or Git from the dock when needed.
 
-[Screenshot tour](overview.md) · [First-use walkthrough](first-steps.md) · [User guides](MOC.md). Detailed guides are currently in Korean.
+[Screenshot tour](overview.md) · [First-use walkthrough](first-steps.md) · [User guides](MOC.md).
 
 <a id="projects-files-and-search"></a>
 
@@ -219,7 +219,7 @@ Use **Hotview** to edit rendered Markdown and **Plain** for its source. File con
 
 Open **Git** from the dock to see changed files and commit history. Open a file to review its diff and select files for a commit.
 
-[Git panel](projects.md#git-작업-패널).
+[Git panel](projects.md#git-operations-panel).
 
 <a id="collaboration-and-sharing"></a>
 
@@ -288,11 +288,11 @@ Settings and runtime data live outside the clone by default:
 | Accounts, sessions, and completed agent turns | `~/.local/share/mew/` |
 | Logs | `~/.local/state/mew/` |
 
-Deleting the clone leaves these files in place. Back them up along with your workspace and any Postgres data. See [server configuration](../configuration/environment.md#%EC%84%9C%EB%B2%84-%EC%84%A4%EC%A0%95) for overrides.
+Deleting the clone leaves these files in place. Back them up along with your workspace and any Postgres data. See [server configuration](../configuration/environment.md#server-settings) for overrides.
 
 To connect from a phone or another computer, follow [Remote access](#remote-access). The default server binding is local to the host. A personal `./mew start` installation does not register an automatic startup service.
 
-If remote desktop preparation failed during setup, retry with `./mew desktop-setup`. This installs the helper and handles Mac permission setup without building the app or restarting the server. A logged-in desktop and the relevant OS libraries and permissions are still required; see [OS requirements](remote-desktop.md#%EC%B2%98%EC%9D%8C-%EC%97%B0%EA%B2%B0).
+If remote desktop preparation failed during setup, retry with `./mew desktop-setup`. This installs the helper and handles Mac permission setup without building the app or restarting the server. A logged-in desktop and the relevant OS libraries and permissions are still required; see [OS requirements](remote-desktop.md#first-connection).
 
 On macOS, mew repairs a missing execute permission on `node-pty` 1.1.0's `spawn-helper` before opening a terminal. If a terminal stays blank, check the server log for `[mew:tmux]` errors.
 
@@ -309,7 +309,7 @@ Start at the [document map](../../.mew/docs/MOC.md). Detailed product specs, usa
 | HTTPS, systemd, updates, and backups | [Deployment](../deployment/native.md) |
 | Code structure, packages, UI, collaboration, and agent protocols | [Development docs](../../.mew/docs/development/MOC.md) |
 | Product specs, operations, current work, and history | [Document map](../../.mew/docs/MOC.md) |
-| Per-account features and file permissions | [Account settings](../configuration/accounts.md#%EB%82%B4-%EA%B3%84%EC%A0%95%EA%B3%BC-%EA%B3%84%EC%A0%95-%EA%B4%80%EB%A6%AC) · [Access control](../../.mew/docs/development/access-control.md) |
+| Per-account features and file permissions | [Account settings](../configuration/accounts.md#my-account-and-account-management) · [Access control](../../.mew/docs/development/access-control.md) |
 | Roles, authentication, and guest access | [Security](../operations/security.md) |
 
 On Linux, `sh native/agent-memory/install.sh` installs memory limits for agent work. See [agent memory protection](../operations/agent-memory.md) for activation, checks, low-memory job suspension, queue holds, and error reporting.

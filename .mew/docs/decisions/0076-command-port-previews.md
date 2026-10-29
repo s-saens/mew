@@ -1,30 +1,30 @@
 ---
-title: "명령 세션의 실제 수신 포트와 공개 기기 프리뷰 링크"
-description: "명령 버튼의 포트를 자손 프로세스의 LISTEN 소켓에서 감지하고, 원격 launcher가 공개 기기 base를 전달해 /포트번호 새 탭을 여는 결정과 구버전·조회 실패 경계를 기록한다."
+title: "Actual listening ports of command sessions and public device preview links"
+description: "Records the decision to detect command button ports from descendant processes' LISTEN sockets and have the remote launcher pass the public device base to open /port-number in a new tab, along with boundaries for older versions and lookup failures."
 created: "2026-10-27"
 updated: "2026-10-27"
 ---
 
-상태: 채택
+Status: Adopted
 
-## 배경
+## Background
 
-명령어 버튼으로 개발 서버를 실행해도 목록에는 세션 존재 여부만 보였다. 사용자는 실제 열린 포트를 같은 줄의 실행·터미널 버튼 왼쪽에 표시하고 `mew.run/<user>/<device>/<port>`로 접속하기를 요청했다. 기존 [프리뷰 결정](0023-login-desktop-and-port-preview.md)의 진입·인증 경로는 재사용할 수 있지만, 원격 앱은 별도 origin의 프레임 안에서 실행되어 현재 origin만으로 공개 기기 링크를 만들 수 없다.
+Even when a command button started a development server, the list only showed whether a session existed. The user requested showing actual open ports to the left of the run and terminal buttons on the same row and accessing them through `mew.run/<user>/<device>/<port>`. The entry and authentication paths in the existing [preview decision](0023-login-desktop-and-port-preview.md) can be reused, but the remote app runs inside a frame on a separate origin, so its current origin alone cannot produce a public device link.
 
-## 결정
+## Decision
 
-명령 목록의 런타임 상태에 `ports` 배열을 추가한다. pane PID와 자손 프로세스의 실제 TCP LISTEN 소켓을 연결하며 명령·로그의 포트 추측과 설정 저장은 하지 않는다. 조회는 기존 터미널 권한을 유지하고 포트 미리보기 권한이 있을 때만 감지한다. 감지 실패는 빈 배열로 처리해 명령 조작을 계속 제공한다.
+Add a `ports` array to the command list's runtime state. Associate the pane PID and descendant processes with their actual TCP LISTEN sockets; do not infer ports from commands or logs or save them in settings. Lookups retain existing terminal permissions and detect ports only when port preview permission is available. Treat detection failures as an empty array and continue providing command controls.
 
-원격 부모는 중앙 origin과 현재 사용자·기기로 공개 `previewBaseUrl`을 생성한다. launcher가 origin을 확인하고 기존 MessagePort 컨텍스트로 앱에 전달한다. 앱은 검증한 base에 포트를 붙여 새 탭을 열고, base가 없는 구버전 중앙에서는 오류를 표시한다. 직접 접속은 현재 origin을 사용한다. 세부 동작은 [프리뷰 계약](../development/port-preview.md)과 [셸 터미널 기능 계약](../features/%ED%84%B0%EB%AF%B8%EB%84%90%C2%B7%EC%97%90%EC%9D%B4%EC%A0%84%ED%8A%B8%C2%B7%EC%9E%90%EB%8F%99%ED%99%94/tmux%20%EC%85%B8%20%ED%84%B0%EB%AF%B8%EB%84%90.md)이 소유한다.
+The remote parent generates the public `previewBaseUrl` using the central origin and current user and device. The launcher checks the origin and passes it to the app through the existing MessagePort context. The app appends the port to the validated base and opens a new tab; it displays an error on older central versions that provide no base. Direct access uses the current origin. The [preview contract](../development/port-preview.md) and [shell terminal feature contract](../features/terminals-agents-automation/tmux-shell-terminals.md) own detailed behavior.
 
-## 대안과 근거
+## Alternatives and Rationale
 
-- 명령의 `--port`·터미널 출력 URL을 파싱하면 기본값·자동 포트 변경·이전 실행 로그와 실제 수신 상태를 구분하기 어렵다. OS 소켓과 소유 프로세스를 기준으로 연결한다.
-- 호스트 전체 포트를 모든 명령에 붙이면 어느 명령이 연 앱인지 알 수 없다. pane의 자손으로 범위를 좁힌다.
-- 원격 앱의 현재 origin이나 고정 `mew.run` 도메인을 사용하면 앱 프레임·사용자 지정 중앙 주소에서 잘못된 URL이 된다. 공개 경로를 소유한 부모가 base만 전달한다.
+- Parsing a command's `--port` or URLs in terminal output makes it difficult to distinguish defaults, automatic port changes, and logs from previous runs from the actual listening state. Associate ports based on OS sockets and their owning processes.
+- Attaching all host ports to every command makes it impossible to identify which command opened an app. Restrict the scope to the pane's descendants.
+- Using the remote app's current origin or a fixed `mew.run` domain produces incorrect URLs for app frames and custom central addresses. The parent that owns the public path passes only the base.
 
-## 영향과 적용
+## Impact and application
 
-포트 미리보기의 인증·capability·origin 격리와 기존 직접 입력 주소는 유지한다. 로컬 OS 조회 도구·프로세스 계층에 의존하며 HTTP가 아닌 TCP 서비스와 재부모화된 daemon은 자동 미리보기를 보장하지 않는다. macOS·Windows 파서는 격리 검증하지만 실기 확인은 별도로 한다.
+Preserve port preview authentication, capability and origin isolation, and existing manually entered addresses. This depends on local OS lookup tools and the process hierarchy; automatic previews are not guaranteed for non-HTTP TCP services or reparented daemons. Validate macOS and Windows parsers in isolation, with testing on actual devices performed separately.
 
-호스트 앱과 중앙 launcher의 변경을 각각 적용해야 한다. 이 체크아웃의 `mewlink/`는 Git 제외 대상이므로 중앙 수정은 별도 패치로 보존하며 공개 저장소에 강제 추가하지 않는다. 검증 결과와 운영 적용 한계는 [작업 기록](../work/command-port-previews.md)에 남긴다.
+Changes to the host app and central launcher must each be applied. Because `mewlink/` in this checkout is excluded from Git, preserve central changes as a separate patch and do not force-add them to the public repository. Record verification results and production application limitations in the [work record](../work/command-port-previews.md).

@@ -1,22 +1,22 @@
 ---
-title: "통합 소스의 새 Git 이력 시작"
-description: "기존 GitHub 저장소는 유지하고 통합된 소스를 부모 없는 첫 커밋으로 시작한다. 외부 Git 백업·미커밋 변경 보존·원격 main의 명시적 lease와 기존 데이터·다른 ref 유지 범위를 정한다."
+title: "Start a new Git history for the integrated source"
+description: "Keep the existing GitHub repository and start the integrated source with a parentless initial commit. Define the scope of the external Git backup, preservation of uncommitted changes, an explicit lease for remote main, and preservation of existing data and other refs."
 created: "2026-10-23"
 updated: "2026-10-23"
 ---
 
-## 상태
+## Status
 
-채택. 사용자가 기존 `.git`을 외부 백업하고 같은 GitHub 저장소의 `main` 이력을 교체하도록 명시적으로 요청했다.
+Accepted. The user explicitly requested backing up the existing `.git` externally and replacing the `main` history in the same GitHub repository.
 
-## 배경과 결정
+## Background and decision
 
-분산된 작업을 로컬 `main`에 통합한 현재 소스를 새 이력의 시작점으로 삼는다. 기존 GitHub 저장소·이슈·설정은 유지하며 `main`에 부모 없는 첫 커밋을 반영한다. 기존 라이선스·기여 조건과 소스·문서의 소유권은 변경하지 않는다.
+Use the current source, with distributed work integrated into local `main`, as the starting point for the new history. Keep the existing GitHub repository, issues, and settings, and apply a parentless initial commit to `main`. Do not change existing license and contribution terms or ownership of source and documents.
 
-기존 `.git` 전체와 원래 staged·unstaged 변경은 `~/dev/mew-backups/`의 날짜별 폴더에 보존한다. 기존 Git 메타데이터 안의 별도 소스와 복구 자료도 함께 보존한다. 현재 소스의 추적 파일과 승인된 변경만 새 첫 커밋에 넣으며 계정 데이터·환경 설정·빌드 결과·사용자 임시 파일을 추가하지 않는다.
+Preserve the entire existing `.git` and original staged and unstaged changes in dated folders under `~/dev/mew-backups/`. Also preserve separate sources and recovery materials within the existing Git metadata. Include only tracked files from the current source and approved changes in the new initial commit; do not add account data, environment settings, build outputs, or user temporary files.
 
-교체 전 읽은 원격 `main`의 SHA를 명시한 `--force-with-lease`로 해당 ref만 갱신한다. 다른 ref나 브랜치 보호는 변경하지 않는다. 원격이 바뀌면 기존 기대값으로 강제 덮어쓰지 않는다. 구체적인 적용·복구 경계는 [저장소 운영 안내](../operations/repository-maintenance.md#git-이력-새-시작)가 소유한다.
+Update only the relevant ref using `--force-with-lease` with the SHA of remote `main` read before replacement explicitly specified. Do not change other refs or branch protection. If the remote changes, do not forcibly overwrite it using the old expected value. The [repository operations guide](../operations/repository-maintenance.md#starting-fresh-git-history) owns the specific application and recovery boundaries.
 
-## 영향
+## Impact
 
-새 `main`의 이력은 첫 커밋부터 시작한다. 과거 커밋과 Git 메타데이터는 외부 백업에 남고 소스 내 과거 결정·연구 문서는 계속 보존한다. 이전 이력을 쓰는 clone은 다시 받아야 한다. 이 작업은 GitHub 내부 참조·캐시나 외부 clone의 과거 데이터를 완전히 삭제하는 작업은 아니다.
+The new `main` history starts with the initial commit. Past commits and Git metadata remain in the external backup, and historical decision and research documents in the source remain preserved. Clones using the previous history must be cloned again. This operation does not completely delete historical data from GitHub internal references and caches or external clones.

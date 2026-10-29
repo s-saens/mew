@@ -1,39 +1,39 @@
 ---
-title: "FHD 원본 크기를 유지하는 원격 데스크톱 처리 중첩과 품질 회복"
-description: "FHD 고화질의 송신 완료 대기를 최대 두 프레임의 인코딩·송신 중첩으로 바꾸고, RTT 상승 구간 재학습·시간 기반 회복·Windows 설정 적용 확인과 단계별 진단을 채택한다. 기존 단일 프레임 직렬 처리의 대체 범위와 합성 검증·실기 미검증을 구분한다. 후속 결정 0059은 프레임 한도·품질 정책을 유지하면서 영상 처리를 Rust로 옮긴다."
+title: "Overlapped Remote Desktop Processing and Quality Recovery While Preserving Original FHD Dimensions"
+description: "Replaces waiting for high-quality FHD transmission to complete with overlapping encoding and transmission for up to two frames, and adopts relearning during RTT increases, time-based recovery, Windows setting application checks, and per-stage diagnostics. Distinguishes the scope of replacing existing single-frame serial processing, synthetic verification, and unverified physical hardware behavior. Subsequent decision 0059 moves video processing to Rust while retaining frame limits and quality policies."
 created: 2026-10-20
 updated: 2026-10-24
 ---
 
-## 상태
+## Status
 
-채택. 코드·격리 검증의 결정이며 운영 적용·실제 GPU 및 StarDesk 대비 우위를 확인한 결정은 아니다.
+Adopted. This decision covers code and isolated verification; it does not confirm production application, actual GPU behavior, or superiority over StarDesk.
 
-후속 [ADR 0059](0059-remote-desktop-rust-engine.md)은 기본 경로의 JS worker 전달·ACK·pacing을 같은 스레드의 Rust 큐·직접 송신으로 대체한다. 이 결정의 프레임 수명·참조 복구·품질 적응 정책은 유지한다.
+Subsequent [ADR 0059](0059-remote-desktop-rust-engine.md) replaces JS worker handoff, ACKs, and pacing in the default path with a Rust queue and direct transmission on the same thread. This decision's frame lifetime, reference recovery, and quality adaptation policies remain unchanged.
 
-## 배경
+## Background
 
-FHD 화면의 원본 크기를 유지하면 품질을 낮춘 모드보다 반응이 느리다는 조건을 우선 기준으로 삼았다. [조사](../research/remote-desktop-stardesk-gap.md)에서 송신 완료 ACK 전까지 다음 인코더 처리를 멈추는 구조, 세션 전체 RTT 최솟값에 따른 반복 감속과 느린 화질 회복, Windows 설정 반환값 무시를 확인했다.
+The primary criterion was the condition that preserving original FHD dimensions produces slower responses than reduced-quality modes. The [investigation](../research/remote-desktop-stardesk-gap.md) identified a design that stops subsequent encoder processing until the transmission completion ACK, repeated slowdowns based on the session-wide minimum RTT and slow quality recovery, and ignored Windows setting return values.
 
-[ADR 0009](0009-remote-desktop-quality-latency.md)는 품질 우선의 긴 전송 대기·고정 수신 버퍼 오판·작은 pacing 예산 문제를 줄였지만 이 구조들은 남겨 두었다. 해상도를 낮추거나 비트레이트 상한만 높이는 방법으로는 처리 중첩의 손실과 잘못된 감속을 해결하기 어렵다.
+[ADR 0009](0009-remote-desktop-quality-latency.md) reduced long transmission waits caused by prioritizing quality, misjudgments from a fixed receive buffer, and small pacing budgets, but left these structures in place. Lowering resolution or merely raising the bitrate ceiling is unlikely to resolve lost processing overlap and incorrect slowdowns.
 
-## 결정
+## Decision
 
-- FHD 해상도와 요청 품질은 유지한다. 압축 access unit의 내용과 크기를 바꾸지 않고 인코더 처리와 송신을 겹친다.
-- worker가 인계한 프레임은 송신 하나·대기 하나로 제한하고 프레임별 ID·세션·협상에 맞는 완료 ACK로 생산량을 관리한다. IDR 전송 중에는 다음 생산을 기다린다. 초기 GPU 표면·참조 수명·권한·lease 계약은 유지한다.
-- 대기 프레임도 처음 생산한 시점부터의 IPC·대기 시간을 한도에 포함한다. 참조가 깨지면 대기 프레임까지 정리하고 IDR로 복구한다. 새 프레임의 참조 순서를 바꾸거나 무제한 큐를 만들지 않는다.
-- RTT 기준 상승의 첫 감속과 이후 최고값의 추가 상승을 구분하고, 다른 혼잡 근거가 없는 정상 진행 구간에서 기준을 다시 학습한다. 손실·버퍼 증가·자체 적체에 대한 감속은 유지한다. 회복은 경과 시간과 요청 상한에 비례하게 제한한다.
-- Windows 초기 필수 CBR·bitrate 설정과 동적 bitrate 변경의 실패를 상위로 전달한다. 읽기 전용 `S_FALSE`를 성공으로 처리하지 않고, 선택적 속성의 미지원·적용 여부와 가능한 읽기 값을 진단한다. 확장 메타데이터에 맞춰 Windows ABI를 5로 올린다.
-- Windows 커서 조회를 영상 backpressure에서 분리한다. 단계별 기간·송신/수신 집계는 선택적 진단 callback으로 제공하고 화면·입력 내용이나 원본 timestamp를 로그로 저장하지 않는다.
+- Retain FHD resolution and requested quality. Overlap encoder processing and transmission without changing the contents or sizes of compressed access units.
+- Limit frames handed off by the worker to one transmitting and one waiting, and control production using completion ACKs matching each frame's ID, session, and negotiation. Wait before producing the next frame while transmitting an IDR. Retain the initial GPU surface, reference lifetime, permission, and lease contracts.
+- Include IPC and waiting time from initial production in the time limit for waiting frames as well. If references break, clear waiting frames too and recover with an IDR. Do not reorder references for new frames or create an unlimited queue.
+- Distinguish the first slowdown caused by an RTT baseline increase from subsequent increases in the peak value, and relearn the baseline during normal progress with no other evidence of congestion. Retain slowdowns for loss, buffer growth, and internal backlog. Limit recovery in proportion to elapsed time and the requested ceiling.
+- Propagate failures of required initial Windows CBR and bitrate settings and dynamic bitrate changes to higher layers. Do not treat read-only `S_FALSE` as success; diagnose whether optional properties are unsupported or applied, along with readable values where available. Raise the Windows ABI to 5 to accommodate extended metadata.
+- Separate Windows cursor queries from video backpressure. Provide per-stage durations and send/receive aggregates through an optional diagnostic callback, and do not log screen or input contents or original timestamps.
 
-이 결정은 ADR 0009 이후 남은 단일 프레임 직렬 처리와 RTT 반복 감속·느린 회복을 대체한다. 일반/IDR 송신 한도·유한 burst·직접 WebRTC·인증·OS 권한은 유지한다. 상세 수치와 진단 필드는 [현재 전송 계약](../development/remote-desktop.md#전송과-지연)이 소유한다.
+This decision replaces the single-frame serial processing, repeated RTT slowdowns, and slow recovery remaining after ADR 0009. Retain normal/IDR transmission limits, finite bursts, direct WebRTC, authentication, and OS permissions. The [Current Transport Contract](../development/remote-desktop.md#transport-and-latency) owns detailed values and diagnostic fields.
 
-## 근거와 영향
+## Rationale and Impact
 
-FHD 60FPS·고화질 12Mbps를 우선 기준으로 검증한다. fake clock·25KB 압축 프레임·8ms 합성 인코더에서 같은 2초의 처리량은 직렬 105→중첩 117프레임이며 프레임 폐기는 모두 0이다. RTT 10→40ms와 정상 수신이 이어지는 4초 사례에서는 이전 350kbps 붕괴 대신 요청한 12Mbps로 회복한다. 반복 혼잡 뒤 200ms 간격의 정상 feedback에서 12Mbps 회복은 55.6→8.2초다. 이는 제어 로직과 스케줄링의 비교이며 실제 FHD 영상 화질·표시 FPS·입력 후 표시 지연의 측정은 아니다.
+Verify primarily against FHD 60 FPS and high-quality 12 Mbps. With a fake clock, 25 KB compressed frames, and a 8 ms synthetic encoder, throughput over the same 2 seconds is serial 105→overlapped 117 frames, with 0 frame drops in all cases. In a 4-second case with RTT 10→40 ms and continued normal reception, it recovers to the requested 12 Mbps instead of the previous collapse to 350 kbps. After repeated congestion, recovery to 12 Mbps with normal feedback at 200 ms intervals takes 55.6→8.2 seconds. This compares control logic and scheduling; it does not measure actual FHD video quality, displayed FPS, or input-to-display latency.
 
-최대 인계 메모리는 압축 프레임 한 개에서 두 개로 늘어난다. 원래 deadline과 참조 복구를 유지해 생산과 송신을 분리하면서 생기는 오래된 프레임의 위험을 제한한다. 설정 실패가 드러나면서 기존에 조용히 무시하던 인코더가 초기화·변경 오류로 종료될 수 있다. 미지원 선택 속성은 적용했다고 주장하지 않는다.
+Maximum handoff memory increases from one compressed frame to two. Retaining the original deadline and reference recovery limits the risk of stale frames introduced by separating production and transmission. Exposing setting failures may cause encoders whose failures were previously silently ignored to terminate with initialization or change errors. Do not claim that unsupported optional properties were applied.
 
-RTT 재학습은 혼잡 제어 휴리스틱이다. 실제 bufferbloat·망 변동의 검증이 필요하며 TWCC/GCC의 패킷 도착 기반 추정을 구현한 것으로 보지 않는다. HEVC·AV1·4:4:4·글자 정밀 정보 보강·동적 FPS·가상 디스플레이 모드 확장은 이 결정의 구현 범위에 포함하지 않는다. 우선 이 경로를 실제 FHD 환경에서 계측한 뒤 추가 전환을 결정한다.
+RTT relearning is a congestion control heuristic. It requires verification against actual bufferbloat and network variation and must not be regarded as an implementation of TWCC/GCC packet-arrival-based estimation. HEVC, AV1, 4:4:4, supplemental fine text detail, dynamic FPS, and expanded virtual display modes are outside this decision's implementation scope. Measure this path in an actual FHD environment first, then decide on further changes.
 
-코드와 JavaScript 회귀·격리 타입 검사, Windows C++ 구문을 검증한다. 실제 GPU 캡처·인코더 설정 수락·외부망·StarDesk 비교·운영 배포는 별도로 확인한다. 앱 빌드·서버 재시작·보조앱의 실제 반영은 사용자가 수행한다.
+Verify the code, JavaScript regressions, isolated type checks, and Windows C++ syntax. Verify actual GPU capture, acceptance of encoder settings, external networks, StarDesk comparisons, and production deployment separately. The user performs the app build, server restart, and actual rollout of the companion app.

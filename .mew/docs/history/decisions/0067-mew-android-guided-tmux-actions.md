@@ -1,54 +1,54 @@
 ---
-provenance: "Liiiiv 중앙 ADR 이관본, 2026-10-14"
-description: "이관한 결정 기록: mew Android 안내 명령은 사용자 조작 one-shot tmux로 실행한다. 당시 선택·근거·후속 변경을 보존하며 현재 계약은 Mew 소유 문서에서 확인한다."
-title: "0067 — mew Android 안내 명령은 사용자 조작 one-shot tmux로 실행한다"
+provenance: "Migrated copy of a Liiiiv central ADR, 2026-10-14"
+description: "Migrated decision record: Run mew Android guided commands in user-initiated one-shot tmux sessions. Preserves the choices, rationale, and subsequent changes from that time; see the Mew owning document for the current contract."
+title: "0067 — Run mew Android guided commands in user-initiated one-shot tmux sessions"
 created: 2026-08-21
 updated: 2026-08-21
 ---
 
-- 날짜: 2026-08-21
-- 상태: 채택
-- 결정자: 송상훈 (지시)
-- 부분 대체: [ADR 0058](0058-mew-android-panel-optional-gateway.md)의 “mew 서버는 emulator 설치·AVD 생성·실행을 하지 않는다”
+- Date: 2026-08-21
+- Status: Adopted
+- Decision maker: Song Sanghoon (directive)
+- Partially supersedes: “The mew server does not install the emulator, create AVDs, or launch them” in [ADR 0058](0058-mew-android-panel-optional-gateway.md)
 
-## 배경
+## Background
 
-Android 패널은 호스트 상태와 다음 명령을 보여줬지만 실행은 사용자가 터미널로 복사해야 했다. 특히
-`sdkmanager --licenses`와 `avdmanager create avd`는 대화형 입력이 필요할 수 있어, 실행 버튼만 두면 진행 상황과
-입력할 자리가 사라진다. 반대로 명령 문자열을 브라우저에서 서버로 보내 실행하면 manager·owner의 셸 경계를
-불필요하게 넓힌다.
+The Android panel showed host status and the next commands, but users had to copy them into a terminal to run them.
+In particular, `sdkmanager --licenses` and `avdmanager create avd` may require interactive input, so providing only a run button would leave no place to view progress or enter input. Conversely,
+sending command strings from the browser to the server for execution unnecessarily broadens the shell boundary for managers
+and owners.
 
-## 선택지
+## Options
 
-1. 복사 안내만 유지 — 서버 실행 표면은 없지만 사용자가 패널과 터미널을 오가야 한다.
-2. 브라우저가 보낸 임의 명령 실행 — 구현은 단순하지만 Android API가 범용 셸 실행 API가 된다.
-3. 서버 등록표의 안내 명령만 one-shot tmux에서 실행 — 고정된 실행 경계와 진행 화면을 함께 제공한다.
+1. Keep copy-only guidance — there is no server execution surface, but users must switch between the panel and terminal.
+2. Run arbitrary commands sent by the browser — simple to implement, but turns the Android API into a general-purpose shell execution API.
+3. Run only guided commands from the server registry in one-shot tmux sessions — provides both a fixed execution boundary and a progress view.
 
-## 결정
+## Decision
 
-Android 패널의 실행 가능한 안내 명령에는 복사 아이콘 옆에 ▶와 터미널 아이콘을 둔다.
+Place ▶ and terminal icons next to the copy icon for runnable guided commands in the Android panel.
 
-- 브라우저는 명령 문자열이 아니라 서버 등록표의 명령 ID만 `POST /api/android/commands/:id/run`으로 보낸다.
-- 서버는 호스트 SDK 경로와 CPU 아키텍처로 명령을 조립한다. 허용 ID는 라이선스 확인, system image 설치,
-  `mew-api36` AVD 생성, 헤드리스 emulator 실행으로 닫는다.
-- 실행은 프로젝트 명령어 버튼과 같은 `mewcmd-*` 숨김 tmux 세션과 `SessionTerminalPopup`을 쓴다.
-- 모든 Android 안내 명령은 one-shot이다. 명령이 끝나면 성공 여부와 관계없이 뒤따르는
-  `tmux kill-session`이 자기 세션을 닫는다. 실행 중에는 ▶ 자리가 정지 버튼이 된다.
-- 터미널 아이콘은 실행 전에는 실행 진입점, 실행 중에는 출력과 대화형 입력 창이다.
-- 권한은 기존 Android 상태 API·tmux와 같은 manager·owner로 유지한다.
+- The browser sends only the command ID from the server registry, rather than a command string, to `POST /api/android/commands/:id/run`.
+- The server constructs commands using the host SDK path and CPU architecture. Allowed IDs are limited to license verification,
+  system image installation, `mew-api36` AVD creation, and headless emulator launch.
+- Execution uses the same hidden `mewcmd-*` tmux sessions and `SessionTerminalPopup` as the project command buttons.
+- All guided Android commands are one-shot. When a command finishes, the subsequent `tmux kill-session` closes its
+  own session regardless of success or failure. While running, the ▶ control becomes a stop button.
+- Before execution, the terminal icon provides an entry point to run the command; during execution, it opens a window for output and interactive input.
+- Permissions remain restricted to manager and owner, as with the existing Android status API and tmux.
 
-ADR 0058의 배포물 경계는 유지한다. emulator·system image·AVD·gateway를 mew 배포물에 넣지 않으며, 패널을
-열었다고 자동 설치하거나 실행하지 않는다. 이번 결정은 사용자가 명시적으로 ▶를 누른 고정 명령만 서버가
-실행하도록 좁게 부분 대체한다.
+The distribution boundary from ADR 0058 remains in place. The emulator, system images, AVDs, and gateway are not included in the mew distribution, and opening the panel does not automatically
+install or run them. This decision narrowly supersedes part of that ADR to allow the server to execute only fixed commands for
+which the user explicitly clicks ▶.
 
-## 근거
+## Rationale
 
-- 명령 ID 등록표는 복사 안내와 실제 실행이 같은 명령을 보게 하면서 범용 원격 셸 API를 만들지 않는다.
-- 기존 명령어 버튼의 세션 이름·팝업·종료 방식을 재사용하면 Android 전용 프로세스 감독기를 추가하지 않아도 된다.
-- 대화형 설치는 터미널 팝업이 있어야 라이선스·기기 프로필 질문에 답할 수 있다.
+- The command ID registry ensures that copy guidance and actual execution use the same commands without creating a general-purpose remote shell API.
+- Reusing the session names, popup, and termination behavior of existing command buttons avoids adding an Android-specific process supervisor.
+- Interactive installation requires a terminal popup so users can answer license and device profile prompts.
 
-## 결과
+## Results
 
-- 명령 실행 중에만 호스트 CPU·디스크·네트워크 자원을 쓴다.
-- 장기 실행인 emulator는 프로세스가 끝날 때까지 세션이 유지되며 정지 버튼이나 팝업의 종료로 끌 수 있다.
-- 완료된 짧은 명령의 세션 기록은 남지 않는다. 진행 중 출력만 팝업에서 볼 수 있다.
+- Host CPU, disk, and network resources are used only while commands are running.
+- For the long-running emulator, the session remains open until the process exits, and can be shut down with the Stop button or the popup's termination action.
+- No session history remains for completed short commands. Only output from commands currently running is visible in the popup.

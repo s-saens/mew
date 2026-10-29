@@ -1,50 +1,50 @@
 ---
-provenance: "Liiiiv 중앙 ADR 이관본, 2026-10-14"
-description: "이관한 결정 기록: mew 에이전트 탭은 런타임을 고른 뒤에만 세션을 띄운다. 당시 선택·근거·후속 변경을 보존하며 현재 계약은 Mew 소유 문서에서 확인한다."
-title: "0062 — mew 에이전트 탭은 런타임을 고른 뒤에만 세션을 띄운다"
+provenance: "Migrated copy of a Liiiiv central ADR, 2026-10-14"
+description: "Migrated decision record: Mew agent tabs start a session only after a runtime is selected. Preserves the choices, rationale, and subsequent changes at the time; see the Mew owning document for the current contract."
+title: "0062 — Mew agent tabs start a session only after a runtime is selected"
 created: 2026-08-20
 updated: 2026-09-11
 ---
 
-- 날짜: 2026-08-20
-- 상태: 채택
-- 후속 결정: [0074](0074-mew-agent-header-runtime-switch.md) — 탭 안 런타임 변경 금지
-- 후속 결정: [0096](0096-mew-agent-tabs-created-after-selection.md) — 선택 전에 미선택 탭 생성
-- 후속 결정: [0101](0101-mew-runtime-lifecycle-controls.md) — 설치만 제공하던 수명주기 UI
-- 결정자: 송상훈 (지시)
-- 관련: [ADR 0046](0046-mew-agent-panel-tabs-one-session-per-tab.md), [ADR 0060](0060-mew-shared-agent-runtime-registry.md)
+- Date: 2026-08-20
+- Status: Adopted
+- Subsequent decision: [0074](0074-mew-agent-header-runtime-switch.md) — Prohibit runtime changes within a tab
+- Subsequent decision: [0096](0096-mew-agent-tabs-created-after-selection.md) — Create an unselected tab before selection
+- Subsequent decision: [0101](0101-mew-runtime-lifecycle-controls.md) — The lifecycle UI that previously offered installation only
+- Decision maker: Song Sanghoon (directive)
+- Related: [ADR 0046](0046-mew-agent-panel-tabs-one-session-per-tab.md), [ADR 0060](0060-mew-shared-agent-runtime-registry.md)
 
-## 배경
+## Background
 
-ADR 0046의 빈 탭은 마지막으로 쓴 런타임을 즉시 띄우고 그 히스토리를 보여 준다. 탭을 만든
-순간 어떤 런타임인지 고르지 않았는데도 자식 프로세스가 뜨고, 설치되지 않은 런타임은
-선택 뒤 핸드셰이크 실패로만 드러난다. 탭을 모두 닫아도 빈 탭이 즉시 다시 생겨 “탭 0개” 상태도
-표현할 수 없다.
+An empty tab under ADR 0046 immediately launches the last-used runtime and shows its history. A child process starts even though
+no runtime was selected when the tab was created, and an uninstalled runtime is revealed only by a handshake
+failure after selection. Closing all tabs immediately creates another empty tab, so a state with “0 tabs” cannot be
+represented either.
 
-## 결정
+## Decision
 
-### 1. 탭 0개와 런타임 미선택 탭을 별도 상태로 둔다
+### 1. Treat 0 tabs and a tab with no runtime selected as separate states
 
-- 마지막 탭을 닫으면 탭이 0개가 된다. 패널 가운데의 `새 탭` 버튼만 남는다.
-- `+`나 가운데 버튼으로 만든 새 탭은 `runtime` 값이 없다. 먼저 런타임 목록을 그린다.
-- 런타임을 고르기 전에는 WS·ACP 자식 프로세스·히스토리 조회·입력창이 없다.
-- 런타임은 탭 속성이고 `mew:agent-tabs`에 같이 남는다. 예전 탭은 한 번만 `mew:agent-runtime`으로 승격해
-  기존 대화 연결을 보전한다.
+- Closing the last tab leaves 0 tabs. Only the `새 탭` button in the center of the panel remains.
+- A new tab created with `+` or the center button has no `runtime` value. It displays the runtime list first.
+- Before a runtime is selected, there is no WS connection, ACP child process, history query, or input field.
+- The runtime is a tab property and is persisted alongside it in `mew:agent-tabs`. Legacy tabs are promoted once using `mew:agent-runtime` to preserve existing
+  conversation connections.
 
-이 결정은 ADR 0046의 “마지막 탭을 닫으면 빈 탭을 즉시 만든다”와 “탭 안에서 런타임을
-갈아탄다”를 대체한다. 탭 하나 = 세션 하나, 탭을 닫으면 세션을 끝내는 규칙은 유지한다.
+This decision replaces ADR 0046's rules to “immediately create an empty tab when the last tab is closed” and “switch runtimes
+within a tab.” The rules that one tab equals one session and closing a tab ends its session remain in place.
 
-### 2. 설치 판정과 설치는 서버 런타임 등록표가 담당한다
+### 2. The server runtime registry handles installation detection and installation
 
-- `server/agentRuntimes.ts`가 spawn spec과 함께 실행 파일 판정·고정 설치 명령을 든다. UI에 명령을
-  복제하지 않는다.
-- 설치 API는 manager·owner만 쓴다. 이 역할은 이미 터미널과 무인 셸을 갖는다.
-- 런타임 id 외의 명령·인자·URL을 요청에서 받지 않는다. 등록표에 고정된 공식 설치 경로만
-  실행한다.
-- 설치가 끝나면 바로 실행 파일을 다시 판정한다. 새로고침 없이 해당 타일이 `사용` 상태로 바뀐다.
+- `server/agentRuntimes.ts` contains executable detection and fixed installation commands alongside the spawn specs. Commands are not duplicated
+  in the UI.
+- Only managers and owners can use the installation API. These roles already have access to terminals and unattended shells.
+- Requests accept only a runtime ID, with no commands, arguments, or URLs. Only official installation paths fixed in the registry are
+  executed.
+- As soon as installation finishes, the executable is checked again. The corresponding tile changes to the `사용` state without a refresh.
 
-## 결과
+## Results
 
-- 새 탭은 사용자가 어떤 에이전트를 쓸지 명시하기 전에 프로세스를 만들지 않는다.
-- 설치 실패는 출력 끝부와 함께 런타임 선택 화면에 남는다. 설치 성공이 로그인·자격증명 완료를
-  뜻하지는 않으며, 첫 세션에서 해당 런타임의 인증 흐름이 이어질 수 있다.
+- A new tab does not create a process before the user specifies which agent to use.
+- Installation failures remain on the runtime selection screen along with the tail of the output. Successful installation does not mean login
+  or credential setup is complete; the runtime's authentication flow may continue in the first session.

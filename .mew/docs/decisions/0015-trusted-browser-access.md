@@ -1,42 +1,42 @@
 ---
-title: "ADR 0015: 브라우저 신뢰와 선택적 접근 회수"
-description: "명시적으로 신뢰한 호스트별 브라우저 비추출 키에 로컬 인증 세션을 결합해 자동 재접속하고, 중앙 owner가 브라우저 접근을 회수하도록 한 결정. 90일 미사용 수명·짧은 연결 lease·계정 및 자격증명 재검증, 동의 우회 차단과 보안·운영 적용 경계를 정한다."
+title: "ADR 0015: Browser Trust and Selective Access Revocation"
+description: "Decision to combine local authentication sessions with explicitly trusted, per-host non-extractable browser keys for automatic reconnection and allow the central owner to revoke browser access. Defines the 90-day inactivity lifetime, short connection leases, account and credential revalidation, consent bypass prevention, and security and production application boundaries."
 created: 2026-10-19
 updated: 2026-10-19
 ---
 
-# ADR 0015: 브라우저 신뢰와 선택적 접근 회수
+# ADR 0015: Browser Trust and Selective Access Revocation
 
-## 상태
+## Status
 
-채택. 구현과 격리 검증을 완료했으며 사용자 빌드·서버 적용·중앙 배포는 별도로 수행한다.
+Accepted. Implementation and isolated verification are complete; user builds, server application, and central deployment are performed separately.
 
-## 배경
+## Background
 
-Mewlink의 중앙 계정은 기기 관리와 선택적 외부 신원 증명, 호스트의 로컬 계정은 실제 작업 권한을 소유한다. 짧은 연결 lease와 연결마다 바뀌는 브라우저 키만으로는 사용자가 신뢰한 브라우저를 계속 식별하거나 한 브라우저의 접근만 회수하기 어렵다. 절전·망 단절 뒤 수동 재연결은 로그인 유지와 작업 초안 보존도 끊는다.
+Mewlink's central account owns device management and optional external identity verification, while the host's local account owns actual work permissions. Short connection leases and browser keys that change on each connection make it difficult to persistently identify a browser trusted by the user or revoke access for just one browser. Manual reconnection after sleep or network loss also interrupts persistent login and preservation of work drafts.
 
-연결 lease를 무기한 늘리면 중앙 단절과 접근 회수를 늦추며, 만료 없는 bearer 토큰은 탈취 후 장기 재사용을 허용한다. 기존 인증·권한 검사를 유지하면서 브라우저 신뢰와 전송 복구를 따로 관리할 필요가 있다.
+Extending connection leases indefinitely delays central disconnection and access revocation, while bearer tokens without expiration allow long-term reuse after theft. Browser trust and transport recovery need to be managed separately while preserving existing authentication and permission checks.
 
-## 결정
+## Decision
 
-사용자가 로컬 비밀번호 또는 승인된 외부 신원으로 로그인한 뒤 중앙 부모의 **이 브라우저에서 로그인 유지 → 기억하기**에 동의하면 현재 계정·인증 수단·자격증명 ID·브라우저 공개 키 지문에 결합한 신뢰 세션을 발급한다. 수명은 90일 미사용 기준으로 갱신하고 이전 bearer 세션은 폐기한다. 다른 키의 재개를 거부하며 비밀번호 변경·승인 연결 회수·계정 삭제·권한을 계속 검사한다. 외부 인증의 신뢰 세션도 원래 승인 연결을 확인하고 중앙 쿠키와 독립적으로 재개할 수 있다.
+After the user logs in with a local password or approved external identity and consents to **Stay signed in on this browser → Remember** in the central parent, issue a trusted session bound to the current account, authentication method, credential ID, and browser public key fingerprint. Renew its lifetime based on 90 days of inactivity and discard the previous bearer session. Reject resumption with a different key, and continuously check password changes, approved connection revocation, account deletion, and permissions. Trusted sessions for external authentication also verify the original approved connection and can resume independently of the central cookie.
 
-중앙 origin의 IndexedDB에 호스트 instance별 비추출 Ed25519 키를 보관하고 같은 호스트의 탭이 키를 공유한다. 서로 다른 호스트의 방문 상관관계를 줄이기 위해 origin 전체에서 키 하나를 공유하지 않는다. 새 세션은 sessionStorage로 강등한 뒤 신뢰 상태를 확인해야 기기별 localStorage로 승격하며 이전 30일 토큰의 호환은 유지한다. IndexedDB 저장이 불가능하면 메모리 비추출 키로 연결하되 다음 방문의 키 보존을 보장하지 않는다. 앱 iframe에는 키·토큰을 제공하지 않으며 앱 브리지의 신뢰 요청도 차단해 중앙 부모의 동의를 우회하지 못하게 한다.
+Store a non-extractable Ed25519 key for each host instance in IndexedDB on the central origin, and share the key among tabs for the same host. Do not share one key across the entire origin, to reduce correlation of visits across different hosts. Downgrade new sessions to sessionStorage, then promote them to per-device localStorage only after confirming trust status, while retaining compatibility with previous 30-day tokens. If IndexedDB storage is unavailable, connect with an in-memory non-extractable key without guaranteeing key persistence for the next visit. Do not provide keys or tokens to the app iframe, and block trust requests from the app bridge so they cannot bypass consent in the central parent.
 
-호스트는 인증과 동의를 확인한 연결만 중앙에 신뢰 등록한다. 중앙은 호스트 instance와 키 지문으로 접근 기록을 관리하며 owner의 **접속 브라우저 관리 → 접근 해제**는 같은 키의 모든 탭을 즉시 종료하고 새 연결도 차단한다. 회수 기록을 영속 보존해 늦은 신뢰 등록이나 재접속으로 되살리지 않는다. 다른 브라우저·다른 호스트와 호스트 등록 자체는 별도로 유지한다.
+The host registers trust centrally only for connections with verified authentication and consent. The central service manages access records by host instance and key fingerprint; the owner's **Manage Connected Browsers → Revoke Access** immediately terminates all tabs using the same key and blocks new connections. Persist revocation records so late trust registration or reconnection cannot restore access. Other browsers, other hosts, and the host registration itself remain separate.
 
-연결 lease는 60초·20초 갱신과 중앙 단절 시 작업 종료를 유지한다. 일시적인 최종 단절 뒤에는 새 launch로 최대 30초 대기의 자동 재연결을 시도한다. 같은 로컬 계정·인증 수단을 확인한 뒤 기존 앱 iframe·초안을 이어 쓰며, 이전 요청은 취소하고 저장·명령을 자동 재실행하지 않는다. 로그아웃·회수·명시적 인증 거부는 저장 토큰을 지우고 자동 재시도를 멈춘다.
+Keep the 60-second connection lease, renewal every 20 seconds, and termination of work upon central disconnection. After a transient full disconnection, attempt automatic reconnection with a new launch and a wait of up to 30 seconds. After verifying the same local account and authentication method, continue using the existing app iframe and drafts, cancel previous requests, and do not automatically rerun saves or commands. Logout, revocation, and explicit authentication denial clear stored tokens and stop automatic retries.
 
-이 결정은 [원격 접속 계약](../development/remote-access.md)의 브라우저 키·재개 토큰 저장·수동 재접속 계약을 보완한다. 중앙 로그인과 로컬 작업 권한의 분리, 승인된 외부 신원의 자격증명 경계와 직접 P2P 전송은 유지한다. 구체적인 API·수명·저장 경계는 [원격 접속](../development/remote-access.md#브라우저-로그인-유지와-접근-해제)과 [브라우저 저장소](../development/browser-storage.md#원격-로컬-계정-접속의-저장소-범위)가 소유한다.
+This decision supplements the browser key, resume token storage, and manual reconnection contracts in the [Remote Access Contract](../development/remote-access.md). Preserve the separation of central login and local work permissions, the credential boundaries of approved external identities, and direct P2P transport. [Remote Access](../development/remote-access.md#keeping-browser-login-and-revoking-access) and [Browser Storage](../development/browser-storage.md#storage-scope-for-remote-local-account-connections) own specific APIs, lifetimes, and storage boundaries.
 
-## 근거와 영향
+## Rationale and Impact
 
-브라우저별 키는 토큰만 복사한 재개를 막고 다른 브라우저를 유지한 채 한 브라우저의 접근을 회수할 수 있게 한다. 짧은 연결 lease를 유지하므로 저장된 로그인 신뢰가 현재 작업 권한을 대신하지 않는다. 자동 재접속은 사용자의 로그인 반복을 줄이되 진행 중 작업의 성공 여부를 추정하지 않는다.
+Per-browser keys prevent resumption with only a copied token and allow access to one browser to be revoked while preserving other browsers. Short connection leases remain, so stored login trust does not replace current work permissions. Automatic reconnection reduces repeated user logins without assuming whether work in progress succeeded.
 
-비추출 설정은 같은 origin의 XSS·악성 확장·OS 탈취에 대한 방어 보장이 아니다. 키를 삭제한 뒤 새 키와 유효한 로그인 수단으로 인증하면 새 브라우저가 되므로 접근 해제는 비밀번호·외부 계정 자체의 회수가 아니다. 인증 수단까지 탈취된 경우 비밀번호 변경이나 승인 연결 회수가 필요하다. 90일 미사용과 보안 회수 이후에는 다시 인증한다. 휴대폰 절전 중 실제 연결 유지와 모든 외부망의 복구는 보장하지 않는다.
+Non-extractability does not guarantee protection against same-origin XSS, malicious extensions, or OS compromise. Deleting the key and authenticating with a new key and valid login method creates a new browser identity, so revoking access does not revoke the password or external account itself. If the authentication method is also compromised, a password change or revocation of the approved connection is required. Reauthentication is required after 90 days of inactivity or security revocation. Actual connection persistence while a phone sleeps and recovery on all external networks are not guaranteed.
 
-사용자는 로컬 서버·앱과 비공개 중앙을 함께 적용하고 D1 `0005_browser_access.sql`을 배포한다. 중앙 폴더의 공개 Git 제외는 유지하므로 공개 코드 커밋과 중앙 사본 보관·배포를 구분한다. 운영 적용은 [중앙 배포 안내](../work/mewlink-deployment-history.md#브라우저-로그인-유지와-접근-회수-적용-2026-10-19)를 따른다.
+The user applies the local server and app together with the private central service and deploys D1 `0005_browser_access.sql`. The central folder remains excluded from public Git, so distinguish public code commits from retaining and deploying the central copy. Follow the [Central Deployment Guide](../work/mewlink-deployment-history.md#applying-persistent-browser-login-and-access-revocation-2026-10-19) for production application.
 
-## 검증 경계
+## Verification Boundaries
 
-중앙 `npm run check`와 Workers Vitest 9개 파일·56개 테스트, 로컬 타입 검사와 호스트·전송 관련 69개 테스트를 통과했다. owner·Origin 검사, 같은 키의 여러 탭 회수·다른 브라우저/호스트 격리, pending·늦은 재등록의 회수 경쟁과 앱 브리지의 동의 우회 차단을 확인했다. 별도 네이티브 P2P 브라우저 검사와 모의 런처의 신뢰/복구 Chromium 검사로 키 재사용·세션 저장 경계·같은 iframe/초안 유지·명령 재실행 방지·회수 후 중단도 검증했다. 세부 검증과 기존 전체 테스트의 한계는 [원격 접속](../development/remote-access.md#검증과-남은-게이트)을 따른다. 실제 운영 배포·로컬 적용, 휴대폰 절전·외부망 복구는 별도 검증이다.
+Passed central `npm run check` and Workers Vitest checks across 9 files and 56 tests, local type checks, and 69 host and transport tests. Verified owner and Origin checks, revocation across multiple tabs with the same key, isolation of other browsers and hosts, revocation races involving pending and late re-registration, and prevention of consent bypass through the app bridge. Separate native P2P browser checks and Chromium trust/recovery checks with a mock launcher also verified key reuse, session storage boundaries, preservation of the same iframe and drafts, prevention of command re-execution, and stopping after revocation. See [Remote Access](../development/remote-access.md#verification-and-remaining-gates) for detailed verification and limitations of the existing full test suite. Actual production deployment and local application, phone sleep, and external network recovery require separate verification.

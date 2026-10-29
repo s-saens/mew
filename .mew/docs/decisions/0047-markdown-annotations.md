@@ -1,30 +1,30 @@
 ---
-title: "Markdown 주석의 본문 마커와 숨김 저장 구역"
-description: "주석을 본문의 ^[번호] 마커와 파일 하단 $Annotations$ 순서 목록으로 저장하고, Hotview에서는 위첨자와 별도 목록으로 제공하기로 한 결정. 기존 References 각주와 분리하고 마지막 주석 삭제 시 저장 구역도 제거한다."
+title: "Body Markers and a Hidden Storage Section for Markdown Annotations"
+description: "A decision to store annotations as ^[number] markers in the body and an ordered list under $Annotations$ at the bottom of the file, and present them as superscripts and a separate list in Hotview. Keep them separate from existing References footnotes, and remove the storage section when the last annotation is deleted."
 created: "2026-10-22"
 updated: "2026-10-22"
 ---
 
-## 상태
+## Status
 
-채택.
+Adopted.
 
-## 배경
+## Background
 
-문서의 커서 위치나 선택한 글에 짧은 설명을 달고, 본문을 읽는 중에 팝업으로 고칠 수 있어야 한다. 사용자는 위첨자 번호와 전체 주석 목록을 요청했으며, 주석 내용은 별도 데이터 파일 대신 해당 Markdown 파일 하단에 보존하도록 지정했다.
+Users need to add short explanations at the cursor position or to selected text in a document and edit them in a popup while reading the body. The user requested superscript numbers and a full annotation list, and specified that annotation content be preserved at the bottom of the same Markdown file rather than in a separate data file.
 
-기존 `Alt+E` 각주는 유니코드 아래첨자와 `# References`를 사용한다. 마지막 마커를 지워도 수동으로 작성한 참고문헌을 보호하기 위해 References 내용을 남기므로, 마지막 주석 삭제 시 저장 구역도 지우는 새 요구와 구분할 필요가 있다.
+Existing `Alt+E` footnotes use Unicode subscripts and `# References`. References content remains even after the last marker is deleted to protect manually written bibliographies, so this must be distinguished from the new requirement to remove the storage section when the last annotation is deleted.
 
-## 결정
+## Decision
 
-주석 본문 마커는 `^[1]` 형식으로 저장한다. 주석 내용은 파일 하단의 `# $Annotations$` 아래 순서 목록에 보관한다. Hotview는 마커를 `1)` 모양의 작은 위첨자로 표시하고 저장 구역을 본문에서 숨긴다. Plain에서는 원문을 그대로 확인할 수 있다.
+Store annotation body markers in `^[1]` format. Keep annotation content in an ordered list under `# $Annotations$` at the bottom of the file. Hotview displays markers as small superscripts resembling `1)` and hides the storage section from the body. Plain shows the original text unchanged.
 
-Markdown 편집기의 `Ctrl+'`로 커서 위치 또는 선택한 글 뒤에 마커를 넣고 텍스트 입력 팝업을 연다. 주석 내용은 같은 문서의 자동저장 경로를 따르며, 본문 마커와 댓글 버튼 옆의 별도 주석 목록에서 다시 열어 편집한다. 주석이 하나도 남지 않으면 `$Annotations$` 제목과 목록을 함께 제거한다.
+Use `Ctrl+'` in the Markdown editor to insert a marker at the cursor position or after selected text and open a text input popup. Annotation content follows the same document's autosave path and can be reopened for editing from body markers or the separate annotation list next to the comment button. When no annotations remain, remove both the `$Annotations$` heading and the list.
 
-기존 각주 마커·References 목록과 주석은 각각 관리한다. 댓글 저장소로 주석을 옮기거나 기존 각주를 새 구문으로 변환하지 않는다.
+Manage existing footnote markers and the References list separately from annotations. Do not move annotations to the comment store or convert existing footnotes to the new syntax.
 
-## 근거와 영향
+## Rationale and Impact
 
-주석과 본문을 같은 파일에 두면 파일 복사·Git 변경 검토·일반 텍스트 편집에서도 연결 관계를 확인할 수 있다. 전용 마커와 제목은 기존 References 각주의 저장·삭제 규칙을 보존하면서 주석 구역만 구분하게 한다. 다른 Markdown 도구에서는 위첨자 팝업 대신 `^[번호]`와 하단 목록이 원문으로 보일 수 있다.
+Keeping annotations and the body in the same file makes their relationship visible when copying files, reviewing Git changes, or editing plain text. Dedicated markers and a heading distinguish only the annotation section while preserving existing References footnote storage and deletion rules. Other Markdown tools may show `^[번호]` and the list at the bottom as raw text instead of superscript popups.
 
-상세 동작과 확인 기준은 [각주·참고문헌 기능](../features/%EB%AC%B8%EC%84%9C%C2%B7%EC%BD%94%EB%93%9C%C2%B7%EB%AF%B8%EB%94%94%EC%96%B4%20%ED%8E%B8%EC%A7%91/%EA%B0%81%EC%A3%BC%C2%B7%EC%B0%B8%EA%B3%A0%EB%AC%B8%ED%97%8C.md), 사용 순서는 [편집 안내](../../../docs/guides/editor.md#주석-annotation)가 소유한다.
+[Footnotes and Bibliography Features](../features/document-code-media-editing/footnotes-and-references.md) owns detailed behavior and verification criteria; the [Editing Guide](../../../docs/guides/editor.md#annotations) owns usage steps.

@@ -1,9 +1,11 @@
-Mew는 독립 프로젝트다. 이 저장소의 지침과 문서가 기준이며, Liiiiv 워크스페이스의 지침·문서 갱신 절차를 적용하지 않는다.
+Mew is an independent project. This repository's instructions and documentation are authoritative; Liiiiv workspace instructions and documentation update procedures do not apply.
 
-소개·언어별 사용법은 [README.md](README.md), 문서 탐색·작성은 [.mew/docs/AGENT.md](.mew/docs/AGENT.md)와 [문서 규칙](.mew/docs/README.md)을 따른다. `node server/document-descriptions.ts`로 문서의 `description`을 읽고 관련 본문만 선택한다. MOC 탐색·등록 의무는 없다.
+For an introduction and usage instructions, follow [README.md](README.md); for documentation navigation and writing, follow [.mew/docs/AGENT.md](.mew/docs/AGENT.md) and [Documentation rules](.mew/docs/README.md). Use `node server/document-descriptions.ts` to read document `description` values and select only the relevant body text. There is no requirement to navigate or register MOCs.
 
-작업 전 [실행·검증 규칙](.mew/docs/development/getting-started.md)을, UI 작업 전 같은 문서의 [필수 UI 구현 규칙](.mew/docs/development/getting-started.md#required-ui-rules)을 읽고 따른다. 코드·기능·운영을 바꾸면 Mew 안의 소유 문서와 description을 같은 작업에서 갱신한다. 결정 기록은 [.mew/docs/decisions/](.mew/docs/decisions/README.md)에 둔다.
+Write this repository's project-owned documentation in English, regardless of the response language. Follow the [documentation language policy](.mew/docs/README.md#documentation-language).
 
-에이전트의 빌드·배포·서버 실행·재시작 제한은 이 Mew 소스 저장소의 프로젝트 지침이다. 다른 프로젝트에 적용하는 Mew 전역 기본 지침으로 배포하지 않는다. 구체적인 제한과 허용 검사는 [실행·검증 규칙](.mew/docs/development/getting-started.md)을 따른다.
+Before starting work, read and follow the [Execution and verification rules](.mew/docs/development/getting-started.md); before UI work, also read and follow the [Required UI implementation rules](.mew/docs/development/getting-started.md#required-ui-rules) in the same document. When changing code, features, or operations, update the owning document and description in Mew as part of the same work. Keep decision records in [.mew/docs/decisions/](.mew/docs/decisions/README.md).
 
-새 Git worktree는 기본 체크아웃의 `.worktrees/<브랜치 슬러그>`에 둔다. 브랜치 이름의 `/`는 `-`로 바꾸며, 현재 worktree 안에 다시 `.worktrees`를 만들지 않는다. 생성 전에 기본 체크아웃의 `.gitignore`에 `/.worktrees/`가 있는지 확인한다. 기존 worktree를 옮길 때는 실행 중인 프로세스·세션의 경로 의존성을 확인하고 `git worktree move`로 미커밋 변경을 보존한다.
+Restrictions on agent builds, deployments, server startup, and restarts are project instructions for this Mew source repository. Do not distribute them as global Mew default instructions for other projects. Follow the [Execution and verification rules](.mew/docs/development/getting-started.md) for specific restrictions and permitted checks.
+
+Place new Git worktrees in `.worktrees/<브랜치 슬러그>` in the primary checkout. Replace `/` in branch names with `-`, and do not create another `.worktrees` inside the current worktree. Before creating one, check that the primary checkout's `.gitignore` contains `/.worktrees/`. When moving an existing worktree, check running processes and sessions for path dependencies and preserve uncommitted changes with `git worktree move`.

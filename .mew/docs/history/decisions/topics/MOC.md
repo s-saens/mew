@@ -1,24 +1,24 @@
 ---
-title: "Mew ADR 지도"
+title: "Mew ADR Map"
 created: 2026-08-21
 updated: 2026-09-11
-description: "독립 전 Mew ADR의 주제별 분류를 보존한 이력 지도. 현재 계약은 Mew 자체 문서와 후속 결정을 따른다."
+description: "A historical map preserving the topic-based classification of Mew ADRs before independence. Current contracts follow Mew's own documentation and subsequent decisions."
 ---
 
-상위: [ADR 라우터](../README.md). 현재 기능·운영은 [Mew 문서](../../../MOC.md), 결정 근거는 아래에서 작업 주제 하나를 고른다.
+Parent: [ADR router](../README.md). For current features and operations, see [Mew documentation](../../../MOC.md); for decision rationale, choose a work topic below.
 
-## History / raw — 당시 분류
+## History / raw — Classification at the time
 
-- [런타임·권한·실행 표면](runtimes/MOC.md)
-- [대화·탭·감독·큐](sessions/MOC.md)
-- [인증·계정·구독](authentication/MOC.md)
-- [프로젝트·Documents·Git](workspace/MOC.md)
-- [편집·스크롤·트리·검색 성능](editor/MOC.md)
-- [협업 방·채팅·댓글](collaboration/MOC.md)
-- [할 일·달력](home/MOC.md)
-- [서버 브라우저·Android](browser/MOC.md)
-- [배포·보안·저장·문서](deployment/MOC.md)
+- [Runtimes, permissions, and execution surfaces](runtimes/MOC.md)
+- [Conversations, tabs, supervision, and queues](sessions/MOC.md)
+- [Authentication, accounts, and subscriptions](authentication/MOC.md)
+- [Projects, Documents, and Git](workspace/MOC.md)
+- [Editing, scrolling, tree, and search performance](editor/MOC.md)
+- [Collaboration rooms, chat, and comments](collaboration/MOC.md)
+- [To-dos and calendar](home/MOC.md)
+- [Server browser and Android](browser/MOC.md)
+- [Deployment, security, storage, and documentation](deployment/MOC.md)
 
 ## History / raw
 
-- [대체된 결정과 검토 기록](../README.md) — 제거 이유나 결정의 변천을 확인할 때만 연다.
+- [Superseded decisions and review records](../README.md) — Open only to check reasons for removal or how decisions evolved.

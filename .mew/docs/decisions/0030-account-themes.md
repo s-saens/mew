@@ -1,23 +1,23 @@
 ---
-title: "계정별 테마 저장과 기기 간 동기화"
-description: "선택한 테마·커스텀 목록의 기준본을 브라우저에서 로그인 계정으로 옮기고, 조건부 첫 이관·계정별 변경 알림·복귀 재조회·늦은 응답 보호를 정한 결정이다. 언어·글꼴 등 기기별 설정의 범위는 유지한다."
+title: "Account-level theme storage and cross-device synchronization"
+description: "Decision to move the canonical source for the selected theme and custom list from the browser to the signed-in account, and define conditional initial migration, per-account change notifications, refetching on return, and protection against late responses. Preserves the scope of per-device settings such as language and fonts."
 created: 2026-10-20
 updated: 2026-10-20
 status: accepted
 ---
 
-## 배경
+## Background
 
-한 계정으로 다른 기기에서 테마를 바꾸면 먼저 쓰던 기기에도 같은 선택이 반영되어야 한다. 기존 브라우저별 저장은 선택과 커스텀 목록을 공유하지 못하고, 오래된 사본을 서버에 올리면 다른 기기의 최신 선택을 잃을 수 있다.
+When a theme is changed on another device using the same account, the same selection must also appear on the device used earlier. Existing per-browser storage cannot share selections or custom lists, and uploading an outdated copy to the server can lose another device's latest selection.
 
-## 결정
+## Decision
 
-같은 Mew 인스턴스의 계정 UI 원장에 선택한 팔레트와 커스텀 목록을 함께 저장한다. 소유 계정은 인증된 요청에서만 정하며 공용 모델로 입력을 정규화한다. 브라우저 저장값은 초기 화면용 캐시와 첫 이관 원본으로 사용한다. 계정에 테마가 없을 때만 조건부로 이관하고, 다른 기기가 먼저 저장했다면 그 값을 반환한다.
+Store the selected palette and custom list together in the account UI ledger of the same Mew instance. Determine the owning account only from authenticated requests and normalize input using a shared model. Use browser-stored values as an initial-screen cache and the source for initial migration. Migrate conditionally only when the account has no theme; if another device has already saved one, return that value.
 
-저장 후 기존 presence 소켓에서 같은 계정에만 내용 없는 테마 변경 신호를 보내고 REST로 다시 조회한다. 화면 복귀·bfcache 복원·온라인 복귀·소켓 재연결 때도 확인한다. 사용자의 명시적 변경은 즉시 적용하고 기기 안의 저장을 직렬화하며, 원격 조회를 적용하는 것만으로 다시 쓰지 않는다. 기기 간에는 마지막 서버 저장을 따르고 늦은 응답과 계정 전환 뒤의 응답은 새 선택을 바꾸지 않는다.
+After saving, send a theme change signal with no content only to the same account over the existing presence socket, then refetch through REST. Also check when returning to the screen, restoring from bfcache, coming back online, or reconnecting the socket. Apply explicit user changes immediately and serialize saves within the device; applying a remote fetch alone does not trigger another write. Across devices, follow the last server save, and prevent late responses and responses after an account switch from changing a newer selection.
 
-## 근거와 영향
+## Rationale and Impact
 
-기존 계정 원장과 presence 연결을 재사용해 별도의 저장소·소켓·주기적 조회 없이 모든 기기에 같은 테마를 제공한다. 커스텀 테마의 색·그라데이션·애니메이션도 함께 공유한다. 서버 저장 실패 시 현재 선택을 유지하고 오류를 알리며 다음 복귀·재접속·변경 때 재시도한다.
+Reuse the existing account ledger and presence connection to provide the same theme on all devices without separate storage, sockets, or polling. Custom theme colors, gradients, and animations are shared as well. If a server save fails, retain the current selection, report the error, and retry on the next return, reconnection, or change.
 
-[0002 — 세 색 테마](0002-theme-palettes.md)의 브라우저 저장 범위를 계정 저장으로 확장한다. [0010 — 테마 그라데이션](0010-theme-gradients.md)의 팔레트·초안·렌더링 계약은 유지한다. 언어·글꼴·Dock 등 다른 기기 설정은 이번 동기화에 포함하지 않는다. 현재 API·이관·캐시·검증 계약은 [계정 테마](../development/browser-storage.md#계정-테마), 사용자 조작은 [화면 설정](../../../docs/configuration/appearance.md#화면-설정)이 소유한다.
+Extend the browser storage scope of [0002 — Three-color themes](0002-theme-palettes.md) to account storage. Retain the palette, draft, and rendering contracts of [0010 — Theme gradients](0010-theme-gradients.md). Other device settings, such as language, fonts, and Dock, are not included in this synchronization. [Account themes](../development/browser-storage.md#account-themes) owns the current API, migration, cache, and verification contracts, and [display settings](../../../docs/configuration/appearance.md#appearance-settings) owns user operations.

@@ -1,60 +1,60 @@
 ---
-provenance: "Liiiiv 중앙 ADR 이관본, 2026-10-14"
-description: "이관한 결정 기록: mew 서버 파일 탐색기는 프로젝트와 분리된 셸 권한 도구다. 당시 선택·근거·후속 변경을 보존하며 현재 계약은 Mew 소유 문서에서 확인한다."
-title: "0080 — mew 서버 파일 탐색기는 프로젝트와 분리된 셸 권한 도구다"
+provenance: "Migrated copy of a Liiiiv central ADR, 2026-10-14"
+description: "Migrated decision record: the mew server file explorer is a tool with shell permissions, separate from projects. Preserves the choices, rationale, and subsequent changes from that time; consult the Mew owning document for the current contract."
+title: "0080 — the mew server file explorer is a tool with shell permissions, separate from projects"
 created: 2026-08-25
 updated: 2026-09-11
 ---
 
-- 날짜: 2026-08-25
-- 상태: 채택
-- 후속 결정: [0150](0150-mew-account-feature-and-file-permissions.md) — 고정 역할 게이트를 계정별 기능 권한으로 변경
-- 후속 결정: [0081](0081-mew-root-project-tabs-and-git-subprojects.md) — 프로젝트로 열 때 부모 워크스페이스로 이동하던 동작
-- 결정자: 송상훈 (지시)
+- Date: 2026-08-25
+- Status: Adopted
+- Follow-up decision: [0150](0150-mew-account-feature-and-file-permissions.md) — replace fixed role gates with per-account feature permissions
+- Follow-up decision: [0081](0081-mew-root-project-tabs-and-git-subprojects.md) — behavior that switched to the parent workspace when opening as a project
+- Decision maker: Song Sanghoon (directive)
 
-## 배경
+## Background
 
-mew의 사이드바와 문서 탭은 활성 프로젝트의 상대경로를 기준으로 동작한다. 에이전트 탭은
-[ADR 0077](0077-mew-agent-tab-working-directory.md)에 따라 서버 사용자의 홈과 워크스페이스 밖 경로를 작업
-디렉터리로 고를 수 있지만, 그 경로의 파일을 화면에서 탐색하거나 잠깐 열려면 프로젝트 또는 워크스페이스를
-갈아끼워야 했다. 프로젝트 전환은 열린 탭·협업 방·트리 전체에 영향을 주므로 파일 하나를 확인하는 동작과
-비용이 맞지 않는다.
+mew's sidebar and document tabs operate on paths relative to the active project. Under [ADR
+0077](0077-mew-agent-tab-working-directory.md), agent tabs can select the server user's home directory and paths outside the workspace as working directories, but browsing or
+briefly opening files at those paths required switching projects or workspaces. Switching projects affects
+all open tabs, collaboration rooms, and the entire tree, making its cost disproportionate to checking
+a single file.
 
-## 선택지
+## Options
 
-1. 선택한 폴더를 항상 새 워크스페이스로 연다 — 기존 모델을 재사용하지만 파일 하나를 확인할 때도 모든 화면이 재시작된다.
-2. 현재 프로젝트 트리에 외부 경로를 마운트한다 — 사이드바의 프로젝트 상대경로 계약과 게스트 경계가 흐려진다.
-3. 셸 권한 역할만 쓰는 별도 파일 탐색기와 일시 탭을 둔다 — 프로젝트 상태를 보존하면서 권한 범위를 UI에 명시할 수 있다.
+1. Always open the selected folder as a new workspace — reuses the existing model, but restarts every screen even when checking a single file.
+2. Mount external paths in the current project tree — blurs the sidebar's project-relative path contract and guest boundaries.
+3. Provide a separate file explorer and temporary tabs available only to roles with shell permissions — preserves project state while making the permission scope explicit in the UI.
 
-## 결정
+## Decision
 
-3번을 채택한다.
+Adopt option 3.
 
-- 헤더 메뉴의 서버 파일 탐색기는 `manager`·`owner`만 연다. 이 둘은 이미 tmux와 ACP를 통해 같은 OS 사용자
-  권한으로 서버 전체 경로를 조작할 수 있다. `member`·`guest`에게는 API와 UI를 모두 열지 않는다.
-- 기본 경로는 서버 사용자의 홈(`~`)이다. 주소 입력과 자동완성은 에이전트 cwd 입력줄과 같은 `~` 확장·절대경로
-  검증 규칙을 쓴다.
-- 디렉터리는 펼칠 때 한 단계씩 비동기로 읽는다. 홈 전체나 `node_modules`를 재귀 스캔하지 않으며 숨김 항목을
-  포함해 OS 사용자가 읽을 수 있는 파일과 폴더를 필터 없이 보여 준다.
-- 파일 클릭은 현재 프로젝트를 바꾸지 않고 그 프로젝트의 편집 칸에 미리보기 탭으로 연다. 외부 탭은 절대경로를
-  식별자로 쓰고 자동저장은 가능하지만 협업·댓글·git 이력·프로젝트 규칙에는 참여하지 않으며 localStorage 탭
-  복원 목록에도 남기지 않는다.
-- 파일·폴더 우클릭은 이름 변경, 복사·잘라내기·폴더에 붙여넣기, 삭제를 제공하고 파일은 다운로드할 수 있다.
-  작업 범위는 서버 프로세스의 OS 권한 전체다.
-- 폴더의 `프로젝트로 열기`와 `워크스페이스로 열기`는 owner만 쓴다. 프로젝트로 열기는 선택 폴더의 부모를 새
-  워크스페이스로 바꾼 뒤 선택 폴더를 활성 프로젝트로 연다. 워크스페이스로 열기는 선택 폴더 자체를 기존
-  워크스페이스 전환 절차로 연다. 둘 다 모든 클라이언트의 화면을 다시 띄운다.
-- 새 UI 문자열은 [ADR 0078](0078-mew-client-ui-localization.md)의 네 locale 카탈로그를 함께 갱신한다.
+- Only `manager` and `owner` can open the server file explorer from the header menu. Both roles can already manipulate paths throughout the server
+  through tmux and ACP with the same OS user permissions. Neither the API nor the UI is available to `member` or `guest`.
+- The default path is the server user's home directory (`~`). Address entry and autocomplete use the same `~` expansion and absolute-path validation rules as
+  the agent cwd input.
+- Directories are read asynchronously one level at a time when expanded. The explorer does not recursively scan the entire home directory or `node_modules`, and it displays
+  all files and folders the OS user can read, including hidden items, without filtering.
+- Clicking a file opens it as a preview tab in the current project's editor pane without changing the project. External tabs use absolute paths
+  as identifiers and support autosave, but do not participate in collaboration, comments, git history, or project rules, and are not retained in the
+  localStorage tab restoration list.
+- Right-clicking files or folders provides Rename, Copy, Cut, Paste into Folder, and Delete actions; files can also be downloaded. Operations cover
+  the full scope of the server process's OS permissions.
+- Only the owner can use a folder's `프로젝트로 열기` and `워크스페이스로 열기` actions. Open as Project changes the workspace to the selected folder's parent,
+  then opens the selected folder as the active project. Open as Workspace opens the selected folder itself through
+  the existing workspace-switching procedure. Both reload the UI on all clients.
+- For new UI strings, update all four locale catalogs from [ADR 0078](0078-mew-client-ui-localization.md) together.
 
-## 근거
+## Rationale
 
-프로젝트 트리에 외부 경로를 섞지 않으면 기존 상대경로 API, 게스트 규칙, 협업 방 키를 바꾸지 않아도 된다.
-일시 탭은 파일 하나를 확인하는 동작의 상태 비용을 최소화하고, 쓰기 작업의 권한은 이미 셸을 가진 역할과
-정확히 맞춘다. 단계별 디렉터리 조회는 서버 루트 전체를 보여 주면서도 느린 마운트나 거대한 의존성 폴더가
-HTTP 이벤트 루프와 팝업 첫 화면을 붙잡는 것을 피한다.
+Keeping external paths out of the project tree avoids changes to existing relative-path APIs, guest rules, and collaboration room keys. Temporary
+tabs minimize the state cost of checking a single file, and write permissions align exactly with roles that already have shell
+access. Reading directories one level at a time exposes the entire server root while preventing slow mounts or massive dependency folders
+from blocking the HTTP event loop and the popup's initial display.
 
-## 결과
+## Results
 
-- 서버 파일 탐색기는 샌드박스가 아니다. manager·owner 계정 유출 시 피해 범위는 셸과 동일하다.
-- 외부 파일의 git 커밋·협업이 필요하면 해당 폴더를 프로젝트 또는 워크스페이스로 열어야 한다.
-- 프로젝트로 열 수 없는 이름(숨김 폴더, 특별 `docs` 이름 등)은 기존 프로젝트 이름 규칙에 따라 거부된다.
+- The server file explorer is not a sandbox. If a manager or owner account is compromised, the scope of damage is the same as with shell access.
+- If external files require git commits or collaboration, their folder must be opened as a project or workspace.
+- Names that cannot be opened as projects (hidden folders, the special `docs` name, etc.) are rejected under existing project naming rules.

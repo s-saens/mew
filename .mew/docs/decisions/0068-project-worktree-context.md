@@ -1,30 +1,30 @@
 ---
-title: "0068 — 프로젝트 화면을 유지하는 worktree 전환"
-description: "Git 브랜치 선택으로 기존 worktree를 열 때 논리 프로젝트 루트와 실제 파일 작업 루트를 분리해 배치·탭·기존 세션을 유지한다. 물리 폴더 교환을 채택하지 않은 이유와 저장·조회 경계를 정한다."
+title: "0068 — Switch Worktrees While Preserving the Project UI"
+description: "When opening an existing worktree through Git branch selection, separate the logical project root from the actual file working root to preserve layouts, tabs, and existing sessions. Define storage and lookup boundaries and explain why physical folder swapping was not adopted."
 created: "2026-10-26"
 updated: "2026-10-26"
 ---
 
-## 상태
+## Status
 
-채택. [결정 0019](0019-project-selector.md)의 일반 프로젝트 선택·복원 계약을 유지하면서 같은 저장소의 worktree 선택을 별도 작업 루트 전환으로 구분한다. [결정 0054](0054-internal-worktrees.md)의 worktree 배치는 유지한다.
+Accepted. Retains the general project selection and restoration contract in [Decision 0019](0019-project-selector.md) while distinguishing worktree selection within the same repository as a separate working root switch. Retains the worktree placement in [Decision 0054](0054-internal-worktrees.md).
 
-## 배경
+## Background
 
-브랜치가 다른 worktree에서 사용 중이면 그 폴더를 여는 방식으로 Git의 중복 체크아웃 제한을 피할 수 있다. 기존 프로젝트 열기와 같은 경로를 사용하면 프로젝트 이름과 패널 배치·에디터·에이전트 탭까지 다른 프로젝트의 상태로 바뀌어 브랜치만 선택한 사용자의 작업 흐름이 끊긴다.
+If a branch is in use in another worktree, opening that folder avoids Git's duplicate checkout restriction. Using the same path as ordinary project opening changes the project name, panel layout, editor tabs, and agent tabs to another project's state, interrupting the workflow of a user who only selected a branch.
 
-현재 폴더와 대상 worktree 폴더의 이름을 교환하는 대안은 화면 경로를 유지할 수 있지만 Git 등록 경로·열린 프로세스의 cwd·감시자·절대경로 참조를 함께 다뤄야 한다. 기본 체크아웃 안의 `.worktrees` 배치에서는 상위 폴더를 옮길 때 연결된 작업 폴더의 경로도 함께 바뀐다.
+Swapping the names of the current folder and target worktree folder could preserve UI paths, but would also require handling Git's registered paths, the cwd of open processes, watchers, and absolute path references. With the `.worktrees` layout inside the main checkout, moving the parent folder also changes the paths of linked working folders.
 
-## 결정
+## Decision
 
-같은 프로젝트에서 worktree를 선택하면 논리 프로젝트 루트를 유지하고 실제 파일 작업 루트만 바꾼다. 폴더를 개명·이동하거나 내용을 복사하지 않는다. 프로젝트 이름·계정별 화면·에디터 칸과 탭·에이전트 및 터미널 탭은 유지한다. 파일과 Git은 선택한 worktree에서 다시 읽고 기존 세션의 cwd는 보존한다. 새 세션은 선택한 작업 루트에서 시작한다.
+Selecting a worktree within the same project preserves the logical project root and changes only the actual file working root. Do not rename or move folders or copy their contents. Preserve the project name, per-account UI, editor panes and tabs, and agent and terminal tabs. Reload files and Git from the selected worktree and preserve the cwd of existing sessions. New sessions start at the selected working root.
 
-전환은 같은 Git 공용 디렉터리를 사용하는 등록된 worktree만 허용하며 owner·출발 루트·동시 전환을 검사한다. 전환 전 파일 저장을 완료하고 늦은 저장과 응답이 새 작업 루트에 섞이지 않게 한다. 프로젝트 선택기와 프로젝트 추가의 일반 전환은 논리 루트도 대상으로 바꾸어 기존 화면 복원 동작을 유지한다.
+Allow switching only to registered worktrees that use the same Git common directory, and check the owner, source root, and concurrent switches. Complete file saves before switching and prevent late saves and responses from mixing into the new working root. Ordinary switches through the project selector and Add Project also change the logical root to the target, preserving existing UI restoration behavior.
 
-API·저장·캐시와 오류의 구체적인 기준은 [worktree 전환 UI 계약](../development/ui-contracts.md#같은-프로젝트의-worktree-전환)이 소유한다. 사용자 동작은 [Git 패널](../features/Git%C2%B7%EB%B3%80%EA%B2%BD%20%EC%9D%B4%EB%A0%A5/%ED%98%84%EC%9E%AC%20%ED%94%84%EB%A1%9C%EC%A0%9D%ED%8A%B8%20Git%20%EC%9E%91%EC%97%85%20%ED%8C%A8%EB%84%90.md)과 [프로젝트 전환](../features/%ED%94%84%EB%A1%9C%EC%A0%9D%ED%8A%B8%C2%B7%ED%8C%8C%EC%9D%BC%C2%B7%EA%B2%80%EC%83%89/%ED%94%84%EB%A1%9C%EC%A0%9D%ED%8A%B8%20%EC%97%B4%EA%B8%B0%C2%B7%ED%83%AD%C2%B7%EA%B7%B8%EB%A3%B9.md)이 소유한다.
+The [Worktree Switching UI Contract](../development/ui-contracts.md#switching-worktrees-within-the-same-project) owns the specific API, storage, cache, and error criteria. The [Git Panel](../features/git-history/project-git-work-panel.md) and [Project Switching](../features/projects-files-search/opening-projects-tabs-and-groups.md) own user actions.
 
-## 근거와 영향
+## Rationale and Impact
 
-화면을 재구성하거나 worktree 파일 전체를 옮기지 않고 브랜치 작업을 이어갈 수 있다. 파일 본문·권한·탐색 결과는 실제 경로로 분리해야 하며 대상에 없는 파일은 이전 내용을 편집·저장할 수 없는 상태로 표시한다. 현재 화면과 실행 중 세션이 서로 다른 작업 루트를 사용할 수 있으므로 세션 cwd를 임의로 변경하지 않는다.
+Users can continue branch work without rebuilding the UI or moving all worktree files. File contents, permissions, and navigation results must be separated by actual path, and files absent from the target must be shown in a state that prevents editing or saving their previous contents. The current UI and running sessions may use different working roots, so do not arbitrarily change session cwd values.
 
-전체 전환 속도는 대상 파일 조회와 권한 검증에도 영향을 받는다. 실제 운영 환경의 지연은 측정 전 수치로 보장하지 않는다.
+Overall switching speed is also affected by target file lookups and permission validation. Do not guarantee numerical latency figures for the actual production environment before measurement.

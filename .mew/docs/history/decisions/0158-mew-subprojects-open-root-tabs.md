@@ -1,37 +1,37 @@
 ---
-provenance: "Liiiiv 중앙 ADR 이관본, 2026-10-14"
-description: "이관한 결정 기록: 하위 프로젝트는 프로젝트 탭으로 연다. 인라인 탐색 금지는 ADR 0004로 대체되었으며 당시 선택·근거·후속 변경을 보존한다. 현재 계약은 Mew 소유 문서에서 확인한다."
-title: "0158 — 하위 프로젝트는 프로젝트 탭으로 연다"
+provenance: "Migrated copy of a Liiiiv central ADR, 2026-10-14"
+description: "Migrated decision record: Open subprojects in project tabs. ADR 0004 superseded the prohibition on inline navigation; this record preserves the choices, rationale, and subsequent changes from that time. Consult the Mew owning document for the current contract."
+title: "0158 — Open subprojects in project tabs"
 created: 2026-09-17
 updated: 2026-09-17
 ---
 
-- 날짜: 2026-09-17
-- 상태: 채택
-- 부분 대체: [0085](0085-mew-explorer-root-and-subproject-sections.md), [0151](0151-mew-nested-subprojects.md) — 하위 프로젝트의 인라인 펼침·명령 버튼
-- 결정자: 사용자 지시, Codex 구현
+- Date: 2026-09-17
+- Status: Adopted
+- Partially supersedes: [0085](0085-mew-explorer-root-and-subproject-sections.md), [0151](0151-mew-nested-subprojects.md) — Inline expansion and command buttons for subprojects
+- Decision maker: User direction, Codex implementation
 
-## 배경
+## Background
 
-하위 프로젝트를 일반 폴더처럼 펼치면 상위 프로젝트의 작업 맥락에서 계속 편집하게 된다. 사용자는 하위 프로젝트를 독립된 프로젝트 탭으로 열고 그 안에서 작업하기를 요청했다.
+Expanding subprojects like ordinary folders keeps editing within the parent project's working context. The user requested opening subprojects in independent project tabs and working within them.
 
-## 결정
+## Decision
 
-- 직계 하위 프로젝트는 Documents 다음의 프로젝트 진입점으로 표시한다. 클릭·터치·키보드 활성화는 해당 폴더를 루트 프로젝트 탭으로 열고 활성화한다. 이미 열린 경로는 기존 탭을 재사용한다.
-- 일반 폴더 안의 중첩 프로젝트도 같은 동작을 한다. 프로젝트 내부는 그 탭에서 탐색하며, 현재 트리에서는 펼침·내부 지연 로드를 하지 않는다. 저장된 옛 펼침 상태로도 이 경계를 넘지 않는다.
-- `.mew` 판별·폴더 지정과 실제 계층은 0151을 유지한다. 직계 프로젝트 밖의 중첩 프로젝트를 상단으로 끌어올리지 않는다.
-- 프로젝트 행의 명령 버튼은 제거한다. 명령 실행과 파일 생성·편집은 열린 프로젝트의 기존 루트 도구를 사용한다. 일반 폴더의 조작과 Documents의 펼침은 유지한다.
-- 프로젝트 전환은 기존 owner 전용 API·SPA 전환·계정별 탭 저장을 따른다. owner 이외에는 프로젝트 열기를 비활성화한다. 권한 확장이나 사용자별 서버 루트 분리는 이번 변경에 포함하지 않는다.
-- 상대경로는 요청한 트리의 스코프와 현재 루트를 함께 검증한다. 이전 루트에서 온 요청은 새 루트의 동명 폴더를 열지 않도록 거부한다. 실패한 경로는 새 탭으로 기억하지 않는다.
-- 상위 프로젝트 탭은 남겨 돌아올 수 있게 한다. 전환 시 이전 프로젝트의 실행 중 에이전트는 기존 수명 계약을 따른다.
+- Display immediate subprojects as project entry points after Documents. Clicking, touching, or activating one with the keyboard opens and activates that folder as a root project tab. Reuse the existing tab for a path that is already open.
+- Nested projects inside ordinary folders behave the same way. Navigate project contents in that project's tab; do not expand or lazily load their contents in the current tree. Previously saved expansion states must not cross this boundary either.
+- Retain 0151 for `.mew` detection, folder designation, and the actual hierarchy. Do not promote nested projects outside immediate projects to the top level.
+- Remove command buttons from project rows. Use the open project's existing root tools to execute commands and create or edit files. Retain ordinary folder operations and Documents expansion.
+- Project switching follows the existing owner-only API, SPA transitions, and per-account tab persistence. Disable opening projects for anyone other than the owner. Permission expansion and per-user server root isolation are outside this change.
+- Validate relative paths against both the requested tree's scope and the current root. Reject requests from a previous root so they do not open a same-named folder in the new root. Do not remember failed paths as new tabs.
+- Keep the parent project tab so users can return to it. When switching, running agents in the previous project follow the existing lifetime contract.
 
-## 근거
+## Rationale
 
-프로젝트 행은 작업 맥락을 선택하고, 일반 폴더는 현재 프로젝트의 파일을 탐색한다. 기존 프로젝트 탭 경로를 공유하면 Documents·편집 상태·새 에이전트의 작업 경로가 선택한 프로젝트에 맞춰진다.
+Project rows select the working context, while ordinary folders navigate files in the current project. Reusing the existing project-tab flow aligns Documents, editing state, and new agents' working paths with the selected project.
 
-기존 인라인 프로젝트 탐색은 이 결정으로 중단한다. 같은 동작을 다시 도입하려면 후속 ADR이 필요하다.
+This decision discontinues existing inline project navigation. Reintroducing the same behavior requires a follow-up ADR.
 
 
-## 후속 결정
+## Follow-up decision
 
-- 2026-10-15: [ADR 0004](../../decisions/0004-subproject-folder-exploration.md)가 별도 진입점 배치·폴더 클릭 전환과 인라인 탐색·생성 금지를 대체한다. 별도 화살표의 프로젝트 탭 전환과 기존 권한·계정 경계는 유지한다.
+- 2026-10-15: [ADR 0004](../../decisions/0004-subproject-folder-exploration.md) supersedes the separate entry-point placement, switching on folder click, and prohibitions on inline navigation and creation. Retain switching to project tabs via a separate arrow and the existing permission and account boundaries.

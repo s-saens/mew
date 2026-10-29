@@ -1,32 +1,32 @@
 ---
-title: "사용자가 선택하는 에이전트 Git 자동 처리 범위"
-description: "로컬 자동 병합을 기본으로 선택한 Git 처리 권한·기존 설정 보존·정리 경계를 정한 결정. worktree 위치와 v1·v2의 v3 호환은 후속 0054가 확장한다."
+title: "User-Selected Scope of Agent Git Automation"
+description: "A decision defining Git operation permissions with automatic local merging as the default, preservation of existing settings, and cleanup boundaries. Follow-up 0054 extends worktree locations and v1 and v2 compatibility with v3."
 created: "2026-10-22"
 updated: "2026-10-23"
 ---
 
-## 상태
+## Status
 
-채택. [결정 0045](0045-agent-branch-guidance.md)의 수동 브랜치·병합 선호를 선택적 자동 처리로 확장한다.
+Adopted. Extends the manual branch and merge preferences in [Decision 0045](0045-agent-branch-guidance.md) with optional automation.
 
-새 worktree의 기본 위치와 현재 안내 형식은 [후속 결정 0054](0054-internal-worktrees.md)를 따른다. 아래 v2 저장 설명은 이 결정 당시 형식이다.
+The default location for new worktrees and the current guidance format follow [Follow-up Decision 0054](0054-internal-worktrees.md). The v2 storage description below reflects the format at the time of this decision.
 
-## 배경
+## Background
 
-브랜치를 분리한 뒤 병합을 항상 사용자에게 남기면 사용자가 Git 상태와 후속 작업을 계속 판단해야 한다. 반대로 설정 추가만으로 모든 계정의 병합·push 권한을 바꾸면 기존 선택을 보존하지 못한다. 사용자가 AI에게 맡길 범위를 정하고 그 안에서는 작업을 마무리하는 흐름이 필요하다.
+Always leaving merging to the user after separating work into branches requires the user to keep assessing Git state and follow-up work. Conversely, changing merge and push permissions for all accounts simply by adding a setting would fail to preserve existing choices. Users need to define what they entrust to AI and have it finish work within that scope.
 
-## 결정
+## Decision
 
-에이전트 기본 지침의 **Git** 그룹에 자동 처리·커밋 방식·브랜치·병합·정리를 모은다. 기본값은 **로컬 병합까지 자동**이며 원격 반영은 포함하지 않는다. 사용자는 기존 커밋 설정 사용 또는 원격 반영까지 자동을 선택해 저장할 수 있다. 전략·자동 처리·세부 설정은 **Git 설정 저장**으로 하나의 리비전에 함께 반영하고 다음 ACP 요청부터 적용한다. 수동 모드의 커밋 방식은 기존처럼 선택 즉시 저장한다. 실제 선택값과 사용법은 [프로젝트 설정 안내](../../../docs/guides/project-setup.md#git-브랜치-지침), 구현·검증은 [소유 기능 계약](../features/%ED%94%84%EB%A1%9C%EC%A0%9D%ED%8A%B8%C2%B7%ED%8C%8C%EC%9D%BC%C2%B7%EA%B2%80%EC%83%89/%ED%94%84%EB%A1%9C%EC%A0%9D%ED%8A%B8%20%EB%AC%B8%EC%84%9C%20%EC%95%88%EB%82%B4%C2%B7%EC%B4%88%EA%B8%B0%ED%99%94.md)을 따른다.
+Group automation, commit behavior, branches, merging, and cleanup under **Git** in the agent's default guidance. The default is **Automate through local merge** and excludes remote updates. Users can select and save Use existing commit settings or Automate through remote updates. Apply the strategy, automation, and detailed settings together in one revision with **Save Git Settings**, effective starting with the next ACP request. As before, commit behavior in manual mode is saved immediately on selection. Actual choices and usage follow the [Project Settings Guide](../../../docs/guides/project-setup.md#git-branch-guidance); implementation and verification follow the [Owning Feature Contract](../features/projects-files-search/project-documentation-guidance-and-initialization.md).
 
-자동 모드 선택은 사용자의 구현 요청에 필요한 작업 브랜치·worktree 준비, 해당 작업의 커밋·검증·검토·로컬 통합을 맡기는 권한이다. 원격 모드는 정해진 upstream의 fetch·일반 push 또는 기존 PR 흐름을 포함한다. 매 Git 단계마다 다시 승인받지 않지만, 명시적인 사용자 요청·프로젝트 지침·직접 편집한 제약·브랜치 보호와 필수 검토·CI는 유지한다. 설정 저장 자체가 Git 작업을 실행하거나 현재의 모든 작업 브랜치를 병합하는 동작은 아니다.
+Selecting automatic mode grants permission to prepare the work branches and worktrees needed for the user's implementation request, and to commit, verify, review, and integrate that work locally. Remote mode includes fetches from the designated upstream, normal pushes, or the existing PR workflow. Approval is not requested again at every Git step, but explicit user requests, project instructions, manually edited constraints, branch protections, and required reviews and CI remain in effect. Saving settings does not itself execute Git operations or merge all current work branches.
 
-표준 커밋 시점·push 제한 구간은 자동 모드의 실제 요청에서만 생략한다. 원문과 수동 선택값은 보존하고 직접 편집한 커밋 제약은 남긴다. GUI의 일반 커밋 선택기는 자동 모드에서 비활성화하며 수동으로 돌아오면 저장값을 다시 사용한다.
+Omit the standard commit timing and push restriction sections only in actual requests using automatic mode. Preserve the original text and manual selections, and retain manually edited commit constraints. Disable the GUI's general commit selector in automatic mode and reuse its saved value when returning to manual mode.
 
-자동 처리 범위가 없던 정상 v1 구간은 이전 생성문과 정확히 대조해 선택값을 인식하고 로컬 병합 기본값을 적용한다. 저장 원문·전략·세부 값은 유지하며, 실제 요청에서만 구간을 현재 지침으로 바꿔 이전 수동 문구와 충돌하지 않게 한다. v2에 명시적으로 저장한 수동·원격 모드는 그대로 유지한다. 직접 저장할 때 v2 형식을 사용하며, 직접 편집·손상·리비전 충돌의 보존 계약은 유지한다.
+For intact v1 sections without an automation scope, recognize selections by comparing them exactly against the previously generated text and apply the local merge default. Preserve the stored original text, strategy, and detailed values; replace the section with current guidance only in actual requests to avoid conflicting with earlier manual wording. Preserve manual and remote modes explicitly saved in v2. Use the v2 format when explicitly saving, and retain the preservation contract for manual edits, corruption, and revision conflicts.
 
-정리를 켠 자동 모드는 이번 작업의 통합이 확인된 로컬 브랜치·임시 worktree 정리도 맡긴다. squash의 통합 여부는 실제 변경으로 확인하며 미커밋·고유 변경이나 실행 중인 세션의 작업 폴더를 삭제하지 않는다. 검사가 실패하거나 기존 작업 보존 때문에 안전한 통합이 불가능하면 구체적인 원인을 알린다. 새 remote 생성, 관계없는 미전송 커밋의 공개, 강제 push와 공유 이력 재작성은 자동 처리 범위에 넣지 않는다.
+Automatic mode with cleanup enabled also delegates cleanup of local branches and temporary worktrees confirmed to have been integrated for this task. Verify squash integration from actual changes, and do not delete uncommitted or unique changes or working folders used by running sessions. If checks fail or preserving existing work prevents safe integration, report the specific cause. Creating new remotes, publishing unrelated unpushed commits, force pushes, and rewriting shared history are outside the automation scope.
 
-## 근거와 영향
+## Rationale and Impact
 
-기본 동작으로 로컬 작업의 마무리까지 맡겨 Git 판단 부담을 줄이고, 원격 공개는 별도 선택으로 구분한다. 사용자가 이미 명시한 처리 범위를 기본값으로 덮어쓰지 않는다. 이 기능은 AI에게 전달하는 지침과 권한 범위를 구성하며 Git 명령을 대신 실행하는 백그라운드 서비스나 서버의 강제 차단 장치가 아니다.
+By default, delegate completion of local work to reduce the burden of Git decisions, while making remote publication a separate choice. Do not overwrite a scope the user has already explicitly selected with the default. This feature configures instructions and permission scope passed to AI; it is not a background service that runs Git commands on the user's behalf or a server-enforced blocking mechanism.

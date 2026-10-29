@@ -1,151 +1,151 @@
 ---
-title: "대화 저장과 구간 동기화"
+title: "Conversation Storage and Range Synchronization"
 created: 2026-09-30
 updated: 2026-10-26
-description: "SQLite 원본·첨부 저장, 최근 3턴 우선 표시와 작업 상세 지연 조회, 순번 기반 동기화·최근 질문 경계 역탐색으로 불필요한 원본 파싱을 줄이는 복원 선표시와 한도, 프레임별 대화 조합·IndexedDB 이동 캐시와 초기화 전 로컬 전송 대기의 저장 수명·측정을 정의한다."
+description: "Defines SQLite storage of originals and attachments, prioritized display of the latest 3 turns and lazy loading of work details, early display during restoration and its limits using sequence-based synchronization and reverse searches for recent question boundaries to reduce unnecessary parsing of originals, per-frame conversation assembly, and the storage lifetimes and measurement of the IndexedDB sliding cache and local sends pending before initialization."
 상위파일: "MOC.md"
 ---
 
-[세션 계약](agent-sessions.md) · [ADR 0182](../history/decisions/0182-mew-incremental-conversation-storage.md) · [표시용 도구 이벤트 결정](../decisions/0031-agent-display-events.md) · [작업 상세 지연 조회 결정](../decisions/0043-agent-work-details-loading.md)
+[Session Contract](agent-sessions.md) · [ADR 0182](../history/decisions/0182-mew-incremental-conversation-storage.md) · [Display Tool Events Decision](../decisions/0031-agent-display-events.md) · [Lazy Loading of Work Details Decision](../decisions/0043-agent-work-details-loading.md)
 
-## 서버 저장
+## Server Storage
 
-`server/agentTranscript.ts`는 `<DATA_DIR>/agent-transcripts/transcripts.sqlite`에 `sessions`와 `events`를 저장한다. 키는 기존과 같은 SHA-256(runtime, cwd, sessionId), 이벤트 기본키는 `(session_key, seq)`다. 별도 DB 서버나 새 의존성은 없으며 기존 Node 내장 `node:sqlite`를 사용한다. 디렉터리 0700·DB 파일 0600, schema `user_version=1`이며 더 높은 버전은 쓰지 않는다.
+`server/agentTranscript.ts` stores `sessions` and `events` in `<DATA_DIR>/agent-transcripts/transcripts.sqlite`. The key remains SHA-256(runtime, cwd, sessionId), and the event primary key is `(session_key, seq)`. There is no separate DB server or new dependency; it uses the existing Node built-in `node:sqlite`. Directory permissions are 0700, DB file permissions are 0600, and the schema is `user_version=1`; higher versions are not written to.
 
-WAL·`synchronous=FULL`·1초 busy timeout을 사용한다. DB는 같은 호스트의 로컬 디스크에 둔다. 일반 스트리밍은 최초 미저장 이벤트 후 250ms에 모아 저장하고, 턴 종료·종료 처리 때 즉시 저장한다. 같은 append-only 이벤트 배열의 이미 기록한 접두부는 직렬화·INSERT를 반복하지 않는다. ACP 복원 등으로 배열이 교체되면 하나의 트랜잭션으로 해당 세션 기록을 교체한다. 같은 내용의 재저장은 DB 갱신을 생략한다.
+Uses WAL, `synchronous=FULL`, and a 1-second busy timeout. The DB resides on a local disk on the same host. Normal streaming batches saves 250ms after the first unsaved event and saves immediately at turn completion and shutdown. Already recorded prefixes of the same append-only event array are not serialized or INSERTed again. When ACP restoration or another operation replaces the array, the session records are replaced in a single transaction. Saving identical content skips the DB update.
 
-새 메시지와 대기 큐 실행은 사용자 본문 직후 `user_attachments` 이벤트에 모든 첨부의 `project`·`path`·`mimeType`을 저장한다. 이미지 바이트는 포함하지 않으며 현재 문서 스코프와 무관하게 저장된 첨부 스코프로 원본을 조회한다. 첨부 메타데이터가 없는 이전 클라이언트의 `user_images` 이벤트도 읽는다. 구간 조회·기기 캐시·전사 선표시는 이 이벤트를 본문과 함께 유지한다.
+New messages and queued executions store `project`, `path`, and `mimeType` for all attachments in a `user_attachments` event immediately after the user body. Image bytes are excluded, and originals are retrieved using the stored attachment scope regardless of the current document scope. `user_images` events from older clients without attachment metadata are also read. Range retrieval, device caching, and early transcript display retain this event with the body.
 
-WS 입력 검증은 첨부와 이미지 참조 모두에서 현재 업로드 경로인 `.mew/assets/`와 과거 `.mew/files/`를 허용한다. 새 메시지·첨부만 있는 메시지·대기 큐 편집에 같은 규칙을 적용해 업로드된 파일의 메타데이터가 감독으로 전달되게 한다.
+WS input validation accepts both the current upload path `.mew/assets/` and the legacy `.mew/files/` for attachments and image references. The same rules apply to new messages, attachment-only messages, and queue edits so that uploaded file metadata reaches the supervisor.
 
-조회·삽입·교체 SQL의 prepared statement는 DB 연결 수명 동안 재사용하고 연결을 닫을 때 함께 해제한다. 스키마·저장 주기·내구성·다른 writer의 revision 검사·복원 의미는 유지한다.
+Prepared statements for retrieval, insertion, and replacement SQL are reused for the lifetime of the DB connection and released when it closes. The schema, save interval, durability, revision checks for other writers, and restoration semantics remain unchanged.
 
-최초 조회 시 세션 행이 없으면 기존 `<hash>.json`의 version 2·세션 키·이벤트 배열을 검사해 이전한다. JSON은 삭제하거나 덮어쓰지 않는다. 불완전한 v1 전사는 이전하지 않는다. 손상·잠금·용량 오류는 기록하며, 실패한 트랜잭션은 이전 기록을 유지한다. 다른 writer가 갱신한 전사를 오래된 append 버퍼로 덮어쓰지 않도록 revision·개수를 검사한다. 저장 실패가 진행 중 대화를 멈추지는 않는다. 이후 저장 기회에 미저장 꼬리를 다시 시도한다. 기존 JSON은 이전 시점의 원본 보존용이며, 새 DB 변경을 역으로 동기화하는 롤백 사본은 아니다.
+If no session row exists on the first retrieval, migration checks the version 2, session key, and event array in the existing `<hash>.json`. The JSON is neither deleted nor overwritten. Incomplete v1 transcripts are not migrated. Corruption, locking, and capacity errors are logged, and failed transactions preserve previous records. Revision and count checks prevent stale append buffers from overwriting transcripts updated by another writer. Save failures do not stop ongoing conversations. Subsequent save opportunities retry the unsaved tail. The existing JSON preserves the original at migration time; it is not a rollback copy that receives reverse synchronization of new DB changes.
 
-공급자 ACP 기록은 에이전트 컨텍스트의 기준이다. 외부 CLI 변경·설정·완료 시간 병합은 기존 [세션 복원 계약](agent-sessions.md#메시지재접속큐)을 따른다. SQLite는 Mew 표시 전사이며 공급자 저장소를 수정하지 않는다. 감독은 현재 전체 이벤트 배열을 여전히 메모리에 보유하고 ACP 복원 시 전체 히스토리를 조정하므로, 이 변경은 공급자 복원 시간이나 감독 메모리 전체의 상한을 보장하지 않는다.
+The provider's ACP history is authoritative for agent context. Merging external CLI changes, settings, and completion times follows the existing [Session Restoration Contract](agent-sessions.md#messages-reconnection-and-queues). SQLite holds the Mew display transcript and does not modify provider storage. The supervisor still holds the current full event array in memory and reconciles the entire history during ACP restoration, so this change guarantees neither provider restoration time nor an overall supervisor memory limit.
 
-## 구간과 연결
+## Ranges and Connections
 
-`shared/agent-history.ts`의 범위는 `[start, end)`다. 감독 생성·전사 교체마다 새 generation을 만들고 현재 질문 경계를 증분 인덱싱한다. 새 화면은 `history=1&deferWork=1&turns=3`으로 최근 **3개 질문과 연결된 답변**을 먼저 받는다. 이전 구간도 3턴씩 읽는다. `turns`는 1~20이며 생략한 기존 클라이언트는 최근 20턴을 받는다. 한 질문의 연속 청크·답변은 분리하지 않으므로 턴 수만으로 큰 질문·답변의 바이트 크기가 제한되지는 않는다.
+The scope of `shared/agent-history.ts` is `[start, end)`. Each supervisor creation or transcript replacement creates a new generation and incrementally indexes current question boundaries. New screens first receive the latest **3 questions and their associated answers** through `history=1&deferWork=1&turns=3`. Earlier ranges are also read in batches of 3 turns. `turns` ranges from 1 to 20; existing clients that omit it receive the latest 20 turns. Consecutive chunks and answers for a single question are not split, so the turn count alone does not limit the byte size of large questions or answers.
 
-- WS의 `history=1&generation=...&after=...`는 마지막으로 실제 보유한 순번을 전달한다. 같은 generation이고 최근 구간 안의 유효한 순번이면 새 꼬리만 `append`, 그 밖에는 최근 구간 `replace`다.
-- `history` 응답은 세션 ID·generation·start/end/total·앞선 질문 수(`usersBefore`)·events·현재 모델/권한/thinking controls를 담는다.
-- `{type:'history', range:{generation,before:start}}`는 바로 앞 구간을 `prepend`로 읽는다. 감독은 이미 보유한 메모리에서 구간을 잘라 표시용으로 변환한다. 저장된 원본 JSON의 SQLite 재조회·파싱을 반복하지 않는다.
-- 실시간 `history_event`는 event와 `{generation,seq}`를 함께 보낸다. 브라우저는 중복을 무시하고 누락·세대 변경을 발견하면 최근 구간을 재요청한다. 순번은 화면 state 반영보다 먼저 메모리 기록에 반영하므로 빠른 재접속에도 잘못된 커서를 보내지 않는다.
-- 감독은 hello의 capability와 subscribe로 협상한다. 구 클라이언트에는 전체 replay, 구 감독에는 기존 replay 경로를 사용한다. 실행 중인 구 감독은 교체 전까지 전체 전송을 계속할 수 있다.
-- 조회는 인증·기능 권한을 재검사하는 기존 탭 WS/감독 IPC 안에서만 가능하다. 임의 세션 키를 받는 공개 조회 API를 추가하지 않는다. 자동 복원 실패 시 원래 탭 포인터·기기 전사를 보존한다.
+- The WS `history=1&generation=...&after=...` passes the last sequence number actually held. If it belongs to the same generation and is valid within the recent range, only the new tail is sent as `append`; otherwise, the recent range is sent as `replace`.
+- The `history` response contains the session ID, generation, start/end/total, preceding question count (`usersBefore`), events, and current model/permission/thinking controls.
+- `{type:'history', range:{generation,before:start}}` reads the immediately preceding range through `prepend`. The supervisor slices the range from memory it already holds and converts it for display. It does not repeatedly retrieve and parse the stored original JSON from SQLite.
+- Real-time `history_event` sends the event together with `{generation,seq}`. The browser ignores duplicates and requests the recent range again if it detects gaps or a generation change. Sequence numbers are recorded in memory before being applied to screen state, preventing incorrect cursors even on rapid reconnections.
+- The supervisor negotiates through hello capabilities and subscribe. Older clients receive a full replay, and older supervisors use the existing replay path. A running older supervisor may continue sending the full history until replaced.
+- Retrieval is available only through the existing tab WS/supervisor IPC, which rechecks authentication and feature permissions. No public retrieval API accepting arbitrary session keys is added. If automatic restoration fails, the original tab pointer and device transcript are preserved.
 
-질문 경계 배열에서 이전 구간과 `usersBefore`를 이진 탐색한다. 턴 수에 비례하는 매 요청의 앞부분 순회를 피하며 구간·질문 경계는 동일하다.
+Binary search finds the preceding range and `usersBefore` in the question boundary array. This avoids scanning the prefix on every request in proportion to the turn count, while preserving the same range and question boundaries.
 
-### 표시용 도구 이벤트
+### Display Tool Events
 
-`shared/agent-display.ts`는 브라우저 전송용 사본에서 `tool_call`·`tool_call_update`의 `update`를 화면이 사용하는 `sessionUpdate`·`toolCallId`·`title`·`status`·`kind`로 줄인다. 화면에서 사용하지 않는 원시 도구 입출력·결과 본문·위치 정보는 전송하지 않는다. 이벤트 바깥의 설정 등은 보존하고 사용자·답변·승인 요청·오류·controls는 그대로 전달한다. 작업 상세의 지연 조회도 표시용 필드만 제공하며 원시 도구 결과를 제공하지 않는다.
+In the copy sent to the browser, `shared/agent-display.ts` reduces `update` in `tool_call` and `tool_call_update` to the `sessionUpdate`, `toolCallId`, `title`, `status`, and `kind` fields used by the screen. Raw tool inputs and outputs, result bodies, and location information unused by the screen are not sent. Settings and other data outside events are preserved, and user messages, answers, approval requests, errors, and controls pass through unchanged. Lazy loading of work details also provides only display fields, without raw tool results.
 
-`server/agentHost.ts`의 IPC 송신 경계에서 먼저 표시용으로 줄여 감독→서버 사이에 큰 원본을 직렬화하지 않는다. 인증·권한을 확인한 `server/agentWs.ts`의 공통 송신 함수에도 같은 변환을 유지해 구 감독의 `history`·전체 `replay`·개별 이벤트를 보호한다. 원래의 순서·generation·순번·구간 경계·복원 실패 정보는 유지한다.
+The data is first reduced for display at the IPC send boundary of `server/agentHost.ts` so that large originals are not serialized between the supervisor and server. The same transformation remains in the shared send function of `server/agentWs.ts` after authentication and permission checks, protecting `history`, full `replay`, and individual events from older supervisors. Original order, generation, sequence numbers, range boundaries, and restoration failure information are preserved.
 
-SQLite 전사·감독 메모리·공급자 ACP 기록은 원본을 유지한다. 표시 변환은 원본 객체를 수정하지 않으며 공급자 복원·컨텍스트·도구 실행에는 관여하지 않는다. 이 변경은 도구 결과가 큰 대화의 전송량을 줄이지만, 질문·답변 자체가 큰 경우의 전체 전송량이나 최초 표시 시간을 보장하지 않는다.
+SQLite transcripts, supervisor memory, and provider ACP history retain the originals. Display conversion does not modify original objects or participate in provider restoration, context, or tool execution. This change reduces transfer volume for conversations with large tool results, but does not guarantee total transfer volume or initial display time when questions or answers themselves are large.
 
-### 접힌 작업 상세의 지연 조회
+### Lazy Loading of Collapsed Work Details
 
-감독의 `hello.workDetails`가 참일 때만 `deferWork`·`turns`를 협상한다. 최근·이전 구간과 복원 선표시는 연속된 `agent_thought_chunk`·`tool_call`을 `{type:'work_pending',count:N}`으로 보낸다. 작은 `tool_call_update`는 표시 필드로 줄여 즉시 보내므로 완료 뒤 늦게 온 상태 갱신이 가짜 턴을 만들지 않는다. 실시간 생각·도구 이벤트는 지연하지 않는다. 구 감독에는 새 옵션을 보내지 않고 기존 전송을 유지한다.
+`deferWork` and `turns` are negotiated only when the supervisor's `hello.workDetails` is true. Recent and earlier ranges and early restoration display send consecutive `agent_thought_chunk` and `tool_call` as `{type:'work_pending',count:N}`. Small `tool_call_update` is reduced to display fields and sent immediately so that status updates arriving after completion do not create spurious turns. Real-time thinking and tool events are not delayed. Older supervisors receive no new options and retain the existing transmission behavior.
 
-브라우저는 수신한 run을 원래 순번 수의 가벼운 marker로 펼친다. `start/end/total`·재접속 커서·기기 캐시의 한 행당 한 순번 의미와 버블 키가 유지된다. 조합기는 marker를 연속 구간 하나로 묶어 작업 상세 위치만 만든다.
+The browser expands each received run into lightweight markers matching the original sequence count. This preserves the one-sequence-number-per-row semantics of `start/end/total`, reconnection cursors, and device caches, as well as bubble keys. The assembler groups markers into a single contiguous range that only establishes the location of work details.
 
-첫 화면을 표시한 뒤 200ms 후, 보이는 탭의 최근 3개 답변에 대해 최대 2,048이벤트를 메모리 캐시에 미리 읽는다. 동시에 최대 2개 요청을 보내고, 펼친 상세의 대기 요청을 앞에 둔다. 비활성 탭이나 숨긴 브라우저에서는 새 상세 요청을 중지하고 다시 보이면 재개한다. 이미 진행 중인 응답은 받아 캐시한다. 백그라운드 응답만으로 접힌 상세를 조합·렌더링하지 않으며, 펼친 턴의 상세를 모두 받았을 때 해당 marker만 채우고 한 번 재조합한다.
+200ms after the first screen is displayed, up to 2,048 events for the latest 3 answers in the visible tab are prefetched into the memory cache. At most 2 requests run concurrently, with pending requests for expanded details taking priority. New detail requests stop in inactive tabs or hidden browsers and resume when visible again. Responses already in flight are received and cached. Background responses alone do not assemble or render collapsed details; once all details for an expanded turn arrive, only its markers are filled, followed by one reassembly.
 
-조회는 기존 인증된 탭 WS의 `{type:'history_details',requestId,generation,start,end}`를 사용한다. 현재 generation과 유효한 구간을 검사하며 요청당 최대 256이벤트, 응답당 표시 JSON 1MiB를 목표로 한다. 첫 이벤트 하나는 최대 8MiB까지 허용하고 한도를 넘으면 오류를 돌려준다. 응답의 실제 `end`가 요청보다 작으면 그 순번부터 이어 읽는다. 같은 범위의 요청·응답은 공유하며 10초 동안 응답이 없으면 슬롯을 반환한다. 펼친 상세의 실패는 다시 시도할 수 있고 질문·답변은 유지한다.
+Retrieval uses `{type:'history_details',requestId,generation,start,end}` on the existing authenticated tab WS. It checks the current generation and valid range, targeting at most 256 events per request and 1MiB of display JSON per response. The first event alone may be up to 8MiB; exceeding the limit returns an error. If the response's actual `end` is smaller than requested, reading continues from that sequence number. Requests and responses for the same range are shared, and a slot is released if no response arrives within 10 seconds. Failed expanded details can be retried, and questions and answers are preserved.
 
-상세 응답은 대화 커서를 전진시키거나 live 이벤트를 교체하지 않는다. 재접속·세대 교체는 요청·메모리 캐시를 비우고 늦은 응답을 무시한다. hydrate와 같은 프레임에 받은 실시간 이벤트·비순번 오류도 보존한다. ACP 복원 중의 임시 선표시는 최종 generation을 받기 전까지 상세를 조회하지 않는다.
+Detail responses do not advance the conversation cursor or replace live events. Reconnection and generation replacement clear requests and the memory cache and ignore late responses. Real-time events and unsequenced errors received in the same frame as hydrate are also preserved. Temporary early display during ACP restoration does not retrieve details until the final generation arrives.
 
-## 브라우저와 화면
+## Browser and Screen
 
-`src/utils/agent-history-cache.ts`는 `mew-agent-history` IndexedDB의 sessions/events 저장소를 사용한다. 키는 로그인 계정·런타임·탭·cwd이고 이벤트는 순번별 행이다. 최근 20개 질문만 저장하며, 동일 구간에 새 기록이 붙으면 새 행만 저장한다. 새 질문으로 구간의 시작이 이동해도 같은 세션·generation의 겹치는 행은 보존하고, 빠진 앞부분 삭제와 새 꼬리 삽입·메타데이터 갱신을 한 트랜잭션으로 처리한다. 이벤트 행의 선택적 `bytes`는 기존 행에 없으면 직렬화 길이로 계산하며 DB 버전 1을 유지한다. 느린 저장 중 갱신은 최신 스냅샷 하나로 합쳐 대기열이 계속 자라지 않게 한다.
+`src/utils/agent-history-cache.ts` uses the sessions/events stores in the `mew-agent-history` IndexedDB database. Keys consist of the logged-in account, runtime, tab, and cwd, with one event row per sequence number. Only the latest 20 questions are stored, and when new records are appended to the same range, only new rows are saved. Even when a new question shifts the range start, overlapping rows for the same session and generation are preserved; deletion of the dropped prefix, insertion of the new tail, and metadata updates occur in one transaction. The optional `bytes` on event rows is calculated from serialized length when absent from existing rows, and DB version 1 is retained. Updates during slow saves are coalesced into one latest snapshot so the queue does not keep growing.
 
-소켓이 소유한 append-only 이벤트 배열별 질문 인덱스를 WeakMap에 보관해 최근 구간을 계산할 때 새 이벤트만 인덱싱한다. 과거 구간 삽입·전사 교체는 새 배열을 만들고 인덱스도 새로 구성한다. 저장 대기 중인 스냅샷은 별도 배열이므로 이후 스트리밍을 섞지 않는다.
+A WeakMap holds a question index for each socket-owned append-only event array, so only new events are indexed when calculating the recent range. Inserting earlier ranges or replacing the transcript creates a new array and rebuilds the index. Snapshots awaiting storage use separate arrays so subsequent streaming is not mixed in.
 
-상한은 항목별 4MiB, 전체 32MiB, 최대 128개, 마지막 기록 후 7일이다. 크기는 직렬화 길이 기반 추정치이며 실제 브라우저 quota와 다르다. 초기 열기 때 만료분, 저장 때 만료·용량·개수 초과분을 정리한다. 한 구간이 항목 상한을 넘으면 기기 캐시를 생략하며 서버 기록은 유지한다. quota·저장 금지·업그레이드 지연은 캐시 없는 연결로 폴백한다. 캐시 읽기 대기는 최대 200ms다. 일반 동작 중 비동기 저장하며 종료 이벤트 저장 완료를 가정하지 않는다.
+Limits are 4MiB per entry, 32MiB total, at most 128 entries, and 7 days after the last write. Sizes are estimates based on serialized length and differ from actual browser quotas. Expired entries are cleaned up on initial opening; expired entries and entries exceeding capacity or count limits are cleaned up on save. If a range exceeds the per-entry limit, device caching is skipped and server records are retained. Quota errors, storage restrictions, and delayed upgrades fall back to a connection without caching. Cache reads wait at most 200ms. Saves run asynchronously during normal operation, and completion of saves on shutdown events is not assumed.
 
-서버 탭 원장을 확인한 뒤 동일 계정·세션의 유효한 기기 기록을 실제 버블로 먼저 표시한다. 오래된 localStorage 줄글 미리보기는 사용하지 않고 새 구간을 받으면 해당 레거시 전사 키를 제거한다. 기기 캐시를 세션 포인터의 기준으로 사용하지 않는다. 입력 초안·설정·컨트롤 캐시는 기존 [브라우저 저장 계약](browser-storage.md)을 유지한다. 탭의 명시적 종료는 해당 계정·탭의 모든 런타임/cwd IndexedDB 기록도 제거한다.
+After checking the server tab ledger, valid device records for the same account and session are displayed first as actual bubbles. Legacy localStorage plain-text previews are not used, and the legacy transcript key is removed when a new range arrives. The device cache is not authoritative for session pointers. Input drafts, settings, and control caches retain the existing [Browser Storage Contract](browser-storage.md). Explicitly closing a tab also removes all runtime/cwd IndexedDB records for that account and tab.
 
-위로 스크롤해 상단 80px에 도달하면 이전 구간을 요청한다. 앞쪽 삽입 전후 높이 차이로 읽던 위치를 유지하고, 전역 이벤트 순번을 버블 키에 사용해 펼침 상태를 보존한다. CLI 배치와 새 CLI의 질문 수는 `usersBefore`를 포함한다. 이미 읽은 과거 구간은 열린 화면에 유지하며, 재접속/기기 저장의 기본 구간은 최근 20개다.
+Scrolling upward to within 80px of the top requests the preceding range. The height difference before and after prepending preserves the reading position, and global event sequence numbers serve as bubble keys to preserve expanded states. Question counts for CLI batches and new CLIs include `usersBefore`. Previously read ranges remain on the open screen, while the default range for reconnection/device storage is the latest 20 questions.
 
-### ACP 복원 중 서버 전사 선표시
+### Early Display of Server Transcripts During ACP Restoration
 
-자동 복원이나 히스토리 선택·현재 대화 새로고침 때 감독은 ACP 준비·`session/load`와 별개로 이미 저장된 SQLite 전사를 읽는다. `server/agent-history-preview.ts`의 한시적 Worker가 읽기 전용 DB 연결과 읽기 트랜잭션에서 최신 순번부터 이벤트 종류·사용자 메시지 ID를 SQLite로 추출해 최근 질문의 온전한 구간을 찾고, 선택한 구간의 원본만 JavaScript로 읽어 파싱한다. 질문 청크의 ID 유무·변경과 중립 이벤트는 기존 정방향 인덱스와 같은 경계로 처리한다. 기존의 256행 묶음에 함께 들어 있던 불필요한 과거 원본 때문에 최근 구간의 선표시가 생략되는 경우를 줄인다. 새 화면은 3턴의 생각·도구 호출을 marker로 보내며 기존 요청은 20턴을 유지한다. 감독의 이벤트 루프에서 I/O·JSON 파싱을 하지 않으며 같은 전사·표시 옵션의 동시 조회는 진행 중인 Worker 하나를 공유한다. 스키마 변경·JSON 이전·저장은 수행하지 않는다.
+During automatic restoration, history selection, or refresh of the current conversation, the supervisor reads the already stored SQLite transcript independently of ACP readiness and `session/load`. A temporary Worker in `server/agent-history-preview.ts` uses a read-only DB connection and read transaction to extract event types and user message IDs through SQLite, starting from the latest sequence number, to find a complete range of recent questions; only originals in the selected range are read into JavaScript and parsed. The presence, absence, and changes of question chunk IDs and neutral events use the same boundaries as the existing forward index. This reduces cases where unnecessary older originals in the existing 256-row batch caused early display of the recent range to be skipped. New screens receive thinking and tool calls from 3 turns as markers, while existing requests retain 20 turns. I/O and JSON parsing do not run on the supervisor's event loop, and concurrent queries with the same transcript and display options share one in-flight Worker. No schema changes, JSON migration, or saves are performed.
 
-인증된 기존 탭 연결의 구간 동기화 클라이언트에만 `{type:'history_preview', preview:{sessionId,start,events}}`를 보낸다. generation·재접속 커서·controls는 포함하지 않는다. 감독의 복원이 이미 끝났거나 다른 대화로 바뀌었으면 늦은 결과를 버린다. 전사가 없거나 읽기/파싱에 실패하면 선표시를 생략하고 기존 복원을 계속한다.
+`{type:'history_preview', preview:{sessionId,start,events}}` is sent only to range synchronization clients on existing authenticated tab connections. It excludes generation, reconnection cursors, and controls. Late results are discarded if supervisor restoration has already finished or the conversation has changed. If no transcript exists or reading/parsing fails, early display is skipped and existing restoration continues.
 
-원본 크기를 SQL에서 먼저 검사하고 선택한 각 행을 따로 읽어 표시용 이벤트로 변환하므로 큰 원본 배치를 메모리에 누적하지 않는다. 표시용 출력은 봉투를 포함해 최대 4MiB이며, 경계 탐색의 원본 크기 합계 64MiB·50,000행과 선택 구간의 단일 이벤트 8MiB 한도를 적용한다. SQLite의 경계 추출은 원본 JSON을 읽지만 큰 도구 본문을 JavaScript 객체로 만들지는 않는다. Worker의 64MiB V8 메모리 한도와 500ms 제한도 유지한다. 한도를 넘으면 기존 ACP 복원을 계속하며 결과·오류·시간 초과 뒤 Worker를 종료한다. 원본 도구 결과가 4MiB보다 커도 표시용 출력과 조회 한도 안에 들면 선표시할 수 있다. 구 클라이언트의 전체 replay 경로는 유지한다.
+Original sizes are checked in SQL first, and each selected row is read separately and converted to a display event, so large batches of originals do not accumulate in memory. Display output, including the envelope, is limited to 4MiB; boundary searches are limited to a total original size of 64MiB and 50,000 rows, and individual events in the selected range are limited to 8MiB. SQLite boundary extraction reads the original JSON but does not create JavaScript objects for large tool bodies. The Worker's 64MiB V8 memory limit and 500ms timeout also remain. If a limit is exceeded, existing ACP restoration continues, and the Worker terminates after a result, error, or timeout. Even original tool results larger than 4MiB can be displayed early if they fit within the display output and retrieval limits. The full replay path for older clients remains.
 
-브라우저는 현재 복원 대상 ID와 일치하는 기록만 별도 임시 state로 표시한다. 기존 대화·기기 캐시·탭 포인터·재접속 커서는 그대로 보존하며 선표시를 저장하지 않는다. 질문·답변 펼침·복사·스크롤은 허용하고 전송·승인과 이전 구간 요청은 막는다. 이전 대화의 CLI 기록도 섞지 않는다. 대화의 `aria-busy`는 복원이 끝날 때까지 유지한다. 최종 `history`·`replay`/`meta`·`reset`·오류·인증 전환·연결 종료 시 임시 표시를 해제한다. 실패하면 기존 대화를 유지하고 성공하면 최신 ACP 전사로 교체한다. 공급자 복원 시간과 writer 교체 규칙은 바뀌지 않는다.
+The browser displays only records matching the current restoration target ID in separate temporary state. The existing conversation, device cache, tab pointer, and reconnection cursor are preserved, and the early display is not saved. Expanding questions and answers, copying, and scrolling are allowed; sending, approvals, and requests for earlier ranges are blocked. CLI history from the previous conversation is not mixed in. The conversation's `aria-busy` is retained until restoration finishes. Temporary display is cleared on final `history`, `replay`/`meta`, `reset`, errors, authentication transitions, or connection closure. Failure preserves the existing conversation; success replaces it with the latest ACP transcript. Provider restoration time and writer replacement rules remain unchanged.
 
-### 증분 화면 갱신
+### Incremental Screen Updates
 
-실시간 이벤트는 소켓 전용 버퍼에 추가하고 순번을 즉시 갱신한다. 이벤트마다 전체 기록 배열을 복사하지 않으며 React의 화면 state에는 별도 배열을 전달한다. 화면 state의 이벤트 배열 복사와 대화 조합은 animation frame마다 한 번이다.
+Real-time events are appended to a socket-specific buffer, and sequence numbers are updated immediately. The full history array is not copied for every event, and a separate array is passed to React screen state. Copying the screen state's event array and assembling the conversation occur once per animation frame.
 
-`src/hooks/use-agent-event-state.ts`와 `src/utils/agentFold.ts`는 새 프레임의 이벤트만 질문·답변·도구·승인 항목에 반영한다. 변경된 항목과 그 자식만 복사해 이전 렌더의 스냅샷을 보존한다. 완료된 버블·변하지 않은 답변은 같은 객체를 유지해 memoized 컴포넌트가 렌더링과 Markdown 변환을 생략한다. 과거 턴의 늦은 도구 갱신·승인 응답은 해당 위치만 수정한다. 질문별 설정 변경 표시는 한 번의 순회로 계산한다.
+`src/hooks/use-agent-event-state.ts` and `src/utils/agentFold.ts` apply only events from the new frame to question, answer, tool, and approval items. Only changed items and their children are copied, preserving snapshots from previous renders. Completed bubbles and unchanged answers retain the same objects, allowing memoized components to skip rendering and Markdown conversion. Late tool updates and approval responses for earlier turns modify only their corresponding locations. Per-question setting change indicators are calculated in a single pass.
 
-전사 교체·과거 구간 삽입·언어·시작 순번 변경은 전체 조합을 다시 수행한다. 프레임 안에 reset이 있으면 마지막 reset 뒤의 이벤트만 새 대화에 반영한다. 레거시 전체 replay와 구간 복원은 같은 조합 규칙을 사용한다.
+Transcript replacement, insertion of earlier ranges, and changes to the language or starting sequence number trigger full reassembly. If a frame contains a reset, only events after the last reset are applied to the new conversation. Legacy full replay and range restoration use the same assembly rules.
 
-Markdown HTML 캐시는 언어와 본문을 키로 사용하며 최대 128개·추정 4MiB의 LRU로 관리한다. 항목 하나가 추정 512KiB를 넘으면 전역 캐시를 생략하고 마운트된 답변의 마지막 변환 결과만 재사용한다. 새 스트리밍 본문 때문에 캐시 전체를 비우지 않는다. 원본 HTML 차단, 코드·표 복사와 번역된 컨트롤은 유지한다.
+The Markdown HTML cache uses language and body as keys and is managed as an LRU with at most 128 entries and an estimated 4MiB. If one entry exceeds an estimated 512KiB, it bypasses the global cache and reuses only the last conversion result for the mounted answer. New streaming bodies do not clear the entire cache. Raw HTML blocking, code/table copying, and translated controls remain.
 
-화면 갱신 최적화는 공급자에게 전달하는 대화 맥락·프롬프트 캐싱을 변경하지 않는다. 열린 화면과 감독은 여전히 전체 기록을 보유할 수 있고, 진행 중인 한 거대한 답변의 Markdown은 본문 변경 시 다시 파싱한다. DOM 가상화나 감독 메모리 상한을 도입한 변경은 아니다.
+Screen update optimizations do not change the conversation context sent to providers or prompt caching. Open screens and supervisors may still hold the full history, and Markdown for a single large answer in progress is reparsed when its body changes. This change does not introduce DOM virtualization or a supervisor memory limit.
 
-큐도 같은 IndexedDB의 별도 스냅샷으로 비동기 저장한다. 계정·런타임·탭·cwd·세션을 확인해 연결 전에 본문·종류·첨부 참조·등록 당시 설정을 표시하며, 서버 `meta`를 받으면 빈 큐까지 그대로 교체한다. 연결이 잠시 끊겨도 마지막 큐 표시는 유지한다. 서버 상태를 받기 전에는 편집·삭제·재정렬을 막으며, 캐시의 작업을 서버에 재전송하거나 실행하지 않는다. 서버 감독이 큐 실행의 기준이다. 큐는 대화와 동일한 항목/전체 예산·7일 수명·저장 실패 폴백·200ms 읽기 제한·명시적 탭 종료 정리를 공유한다. 큐 스냅샷은 전체 128개 항목 제한에서 별도 항목으로 계산한다.
+The queue is also saved asynchronously as a separate snapshot in the same IndexedDB database. After checking the account, runtime, tab, cwd, and session, it displays bodies, types, attachment references, and settings at registration before connecting; receipt of the server's `meta` replaces it exactly, including an empty queue. The last queue display remains during temporary disconnections. Editing, deletion, and reordering are blocked until server state arrives, and cached work is neither resent to the server nor executed. The server supervisor is authoritative for queue execution. The queue shares the conversation's per-entry/total budgets, 7-day lifetime, save-failure fallback, 200ms read limit, and cleanup on explicit tab closure. Queue snapshots count as separate entries toward the overall 128-entry limit.
 
-새 탭에서 세션 준비 전에 접수한 메시지는 `AgentStartupQueue`의 별도 메모리 목록이다. 세션 ID가 없어 IndexedDB 서버 큐 스냅샷에 쓰거나 기존 큐로 가장하지 않는다. 해당 탭이 마운트된 동안 재접속·로그인 대기에 걸친 미전송 항목을 유지하고, 초기화 완료 후 한 번씩 넘긴다. 탭 종료·새로고침·앱 종료 뒤 복구는 보장하지 않는다. 전송 조건과 취소·범위 전환은 [세션 계약](agent-sessions.md#메시지재접속큐)이 소유한다.
+Messages accepted in a new tab before session readiness reside in a separate in-memory list in `AgentStartupQueue`. Without a session ID, they are not written to IndexedDB server queue snapshots or represented as an existing queue. While that tab remains mounted, unsent items persist through reconnections and login waits and are handed off once each after initialization completes. Recovery after tab closure, refresh, or app exit is not guaranteed. The [Session Contract](agent-sessions.md#messages-reconnection-and-queues) owns sending conditions, cancellation, and scope switching.
 
-## 검증과 측정
+## Validation and Measurement
 
-2026-10-26에는 같은 256행 묶음 안에서 최근 3턴보다 앞선 대형·손상 이벤트 때문에 선표시가 생략되던 경우를 재현하고, 최근 구간만 정상 표시하는 회귀 검사를 추가했다. 질문 ID가 같거나 달라지는 청크·ID 없는 청크·중립 이벤트·문서 앞부분과 생성한 혼합 기록의 경계를 기존 정방향 인덱스와 비교했다. 히스토리 UI의 PC·모바일/양 테마 검사에서는 목록·점유 병렬 요청, 점유 확인 전 선택 잠금, 중복 점유 요청 공유와 재열기 시 마지막 목록 표시를 확인했다. 실제 공급자의 복원 시간이나 운영 환경의 개선율을 측정한 결과는 아니다.
+On 2026-10-26, a regression check was added that reproduces early display being skipped because of large or corrupted events preceding the latest 3 turns within the same 256-row batch and verifies that only the recent range displays correctly. Boundaries for chunks with matching or changing question IDs, chunks without IDs, neutral events, the beginning of the document, and generated mixed histories were compared against the existing forward index. PC and mobile checks of the history UI in both themes verified parallel list and occupancy requests, selection locking before occupancy confirmation, sharing of duplicate occupancy requests, and display of the last list when reopened. These results do not measure actual provider restoration time or production improvement rates.
 
-2026-10-22 지연 조회는 `agent-work-loader.test.ts`·`agent-work-state.test.ts`와 서버 display/history/preview 검사로 순번·중복·동시 2개·우선순위·부분 응답·시간 초과·중지/재개·원본 보존·늦은 도구 상태를 확인했다. `agent-work-details-ui.test.ts`의 격리 Chromium(1100/390px, 양 테마)에서 질문·답변 선표시, 상세 로딩·오류 재시도·복사 제외·늦은 세대 응답 차단과 hydrate 직전 live 갱신·비순번 오류 보존을 확인했다. 기존 history·preview UI 회귀와 타입 검사도 통과했다.
+The 2026-10-22 lazy loading was verified with `agent-work-loader.test.ts`, `agent-work-state.test.ts`, and server display/history/preview checks covering sequence numbers, duplicates, 2 concurrent requests, priority, partial responses, timeouts, pause/resume, preservation of originals, and late tool status. Isolated Chromium in `agent-work-details-ui.test.ts` (1100/390px, both themes) verified early question/answer display, detail loading, error retries, exclusion from copying, blocking of late generation responses, and preservation of live updates and unsequenced errors immediately before hydrate. Existing history/preview UI regressions and type checks also passed.
 
-`node server/agent-conversation-benchmark.mjs`의 합성 30턴(턴당 생각 40청크·도구 호출 40개·상태 갱신 40개)에서 워밍업 후 5회 중앙값을 측정했다. 기존 표시용 20턴은 1,962,381B·파싱/조합 2.80ms, 상세를 미룬 같은 20턴은 130,581B·1.10ms, 새 초기 3턴은 19,588B·0.12ms였다. 전송 배열 크기는 각각 약 93.3%·99.0% 줄었다. 백그라운드 상세와 봉투 바이트를 제외한 합성 비교이며 실제 계정·외부망·ACP 복원 전체 지연을 측정한 결과는 아니다. 빌드·운영 서버 재시작은 수행하지 않았다.
+For 30 synthetic turns in `node server/agent-conversation-benchmark.mjs` (with 40 thinking chunks, 40 tool calls, and 40 status updates per turn), medians over 5 runs were measured after warmup. The existing 20 display turns used 1,962,381B and 2.80ms for parsing/assembly; the same 20 turns with deferred details used 130,581B and 1.10ms; the new initial 3 turns used 19,588B and 0.12ms. Transmitted array sizes fell by approximately 93.3% and 99.0%, respectively. This is a synthetic comparison excluding background details and envelope bytes, not a measurement of actual accounts, external networks, or overall ACP restoration latency. No build or production server restart was performed.
 
-- `agentTranscript.test.ts`: v2 비파괴 이전·v1 제외·다시 열기·키 격리·긴 전사·증분 INSERT·범위 읽기·교체·실패 rollback·여러 프로세스의 WAL 쓰기.
-- `agent-history.test.ts`: 모의 ACP와 격리 WS/감독의 최근/이전 구간·실시간 순번·재접속 delta·clear generation 변경. 실제 공급자 호출 없이 검사한다.
-- `agent-history-state.test.ts`·`agent-command-timeline.test.ts`: 전체 재구성·중복/누락·동시 prepend/append·캐시 최근 구간·전역 버블 키·CLI 순서.
-- `agentFold.test.ts`·`agent-event-state.test.ts`: 프레임 경계·사진·메시지 ID·늦은 도구/승인 갱신, 이전 렌더의 불변성·항목 재사용, reset·교체·언어/시작 순번 변경.
-- `agentMarkdown.test.ts`: 캐시 교체 중 자주 쓰는 답변 보존·큰 항목 생략·HTML/위험 링크 차단·언어별 코드 컨트롤·각 표의 복사 원문.
-- `agent-history-ui.test.ts`: 격리 Chromium의 PC/모바일·양 테마에서 스크롤 유지·IndexedDB 복원·계정 격리·delta 재접속·quota rollback·탭 캐시 정리, 200개 실시간 이벤트와 중복 제외, 이동 구간의 새 행만 저장·기존 bytes 없는 행 호환·앞부분 삭제의 rollback. 기존 연결/큐 UI 테스트도 함께 검사한다.
-- `agent-history-preview.test.ts`: 온전한 최근 질문·배치 경계·긴 질문 청크·이전 기록 미파싱·진행 중 조회 공유·호스트 이벤트 루프 유지·키 격리와 누락/손상/용량 초과의 읽기 전용 폴백.
-- `agent-history-preview-ws.test.ts`: 격리 WS·감독·모의 ACP에서 실제 복원을 대기시킨 상태의 자동/선택 복원 선표시, 최신 전사 교체와 실패 시 이전 대화 복구.
-- `agent-history-preview-ui.test.ts`: PC/모바일·양 테마의 자동/선택 복원 선표시, 전송·승인 차단과 복사·초안 보존, 최종 응답 전 포인터 미변경, 실패 복구와 늦은 선표시 무시.
-- `agent-display.test.ts`: 도구 표시 필드 변환 전후 버블 조합 일치·원본 불변·승인과 외부 설정 보존, 전체 송신 형태와 구간·순번·controls의 보존. `agent-history.test.ts`는 실제 모의 ACP·WS에서 구간·실시간·레거시 전송과 저장 원본 보존을 함께 검사한다.
+- `agentTranscript.test.ts`: nondestructive v2 migration, v1 exclusion, reopening, key isolation, long transcripts, incremental INSERT, range reads, replacement, rollback on failure, and multiprocess WAL writes.
+- `agent-history.test.ts`: recent/earlier ranges, real-time sequence numbers, reconnection deltas, and clear generation changes using mock ACP and isolated WS/supervisors. Checks run without actual provider calls.
+- `agent-history-state.test.ts` · `agent-command-timeline.test.ts`: full reconstruction, duplicates/gaps, concurrent prepend/append, cached recent ranges, global bubble keys, and CLI ordering.
+- `agentFold.test.ts` · `agent-event-state.test.ts`: frame boundaries, photos, message IDs, late tool/approval updates, immutability of previous renders, item reuse, reset, replacement, and language/starting sequence number changes.
+- `agentMarkdown.test.ts`: preservation of frequently used answers during cache eviction, omission of large entries, HTML/unsafe link blocking, language-specific code controls, and original copy text for each table.
+- `agent-history-ui.test.ts`: scroll preservation, IndexedDB restoration, account isolation, delta reconnection, quota rollback, and tab cache cleanup in isolated Chromium on PC/mobile in both themes; 200 real-time events and duplicate exclusion; saving only new rows in sliding ranges, compatibility with existing rows without bytes, and rollback of prefix deletion. Existing connection/queue UI tests are also checked.
+- `agent-history-preview.test.ts`: complete recent questions, batch boundaries, long question chunks, no parsing of older records, sharing of in-flight queries, host event loop responsiveness, key isolation, and read-only fallback for missing/corrupted/oversized records.
+- `agent-history-preview-ws.test.ts`: early display for automatic/selected restoration while actual restoration is held pending in isolated WS, supervisors, and mock ACP; replacement with the latest transcript and recovery of the previous conversation on failure.
+- `agent-history-preview-ui.test.ts`: early display for automatic/selected restoration on PC/mobile in both themes, blocking of sends/approvals, preservation of copying/drafts, no pointer changes before the final response, failure recovery, and ignoring late early-display results.
+- `agent-display.test.ts`: matching bubble assembly before and after tool display field conversion, unchanged originals, preservation of approvals and external settings, and preservation of all outbound forms, ranges, sequence numbers, and controls. `agent-history.test.ts` also checks range, real-time, and legacy transmission and preservation of stored originals using actual mock ACP and WS.
 
-2026-10-20 표시용 도구 이벤트 변경은 격리 단위·WS 11개와 Chromium UI 2개 검사로 확인했다. 4MiB를 넘는 합성 도구 원본의 선표시와 원본 보존, 단일 원본 이벤트·전체 조회 예산·표시 출력의 초과 시 폴백, ACP 완료를 기다리지 않는 선표시를 검사했다.
+The 2026-10-20 display tool event changes were verified with 11 isolated unit/WS checks and 2 Chromium UI checks. Checks covered early display and preservation of synthetic tool originals exceeding 4MiB, fallback when a single original event, total retrieval budget, or display output exceeds limits, and early display without waiting for ACP completion.
 
-같은 날 최근 저장 전사 20개를 읽기 전용으로 조회해 새 공용 함수로 변환한 합계는 65,539,527B에서 7,816,900B로 약 88.1% 줄었다. 가장 큰 표본은 22,531,218B에서 1,840,501B로 줄었고, 실제 읽기 Worker의 선표시 결과는 1,840,573B·299ms였다. 이 조회는 서버 기록을 변경하지 않았으며 외부망이나 실제 계정 화면의 전체 로딩시간을 나타내지 않는다. 로컬 운영 빌드·서버 재시작은 수행하지 않았다.
+On the same day, read-only queries of 20 recent stored transcripts transformed with the new shared function reduced the total from 65,539,527B to 7,816,900B, approximately 88.1%. The largest sample shrank from 22,531,218B to 1,840,501B, and the actual read Worker's early-display result was 1,840,573B in 299ms. These queries did not modify server records and do not represent total loading time over an external network or on an actual account screen. No local production build or server restart was performed.
 
-2026-09-30 합성 500턴(턴당 답변 청크 20개, 청크당 256자), 이벤트 11,500개의 로컬 단일 실행 결과:
+2026-09-30 results from a single local run with 500 synthetic turns (20 answer chunks per turn, 256 characters per chunk), totaling 11,500 events:
 
-| 지표 | 기존 전체 JSON | 새 구조 |
+| Metric | Existing full JSON | New structure |
 | --- | --- | --- |
-| 누적 직렬화 payload | 925,911,740 bytes | 이벤트 payload 3,684,780 bytes |
-| 최초 전송 payload | 3,696,281 bytes | 최근 20턴 148,002 bytes |
-| 읽기 평균(20회) | 전체 파싱 6.37ms | 최근 구간 조회 0.38ms |
-| 500회 저장 경과 시간 | 1,799ms | 2,608ms |
+| Cumulative serialized payload | 925,911,740 bytes | Event payload 3,684,780 bytes |
+| Initial transmission payload | 3,696,281 bytes | Latest 20 turns, 148,002 bytes |
+| Average read (20 runs) | Full parse 6.37ms | Recent range query 0.38ms |
+| Elapsed time for 500 saves | 1,799ms | 2,608ms |
 
-SQLite 수치는 DB 페이지·WAL·인덱스 쓰기 바이트를 제외한 이벤트 payload다. JSON은 fsync 없는 write+rename, SQLite는 FULL commit이므로 내구성 조건이 다르다. 이 측정에서는 읽기·전송량을 줄였지만 쓰기 지연은 증가했다. 실제 사용자 체감·공급자 복원·전원 장애 복구 성능은 측정하지 않았다.
+SQLite figures represent event payloads excluding DB page, WAL, and index write bytes. Durability conditions differ: JSON uses write+rename without fsync, while SQLite uses FULL commit. This measurement showed reduced read and transfer volume but increased write latency. Actual user experience, provider restoration, and power-failure recovery performance were not measured.
 
-### 2026-10-07 화면 처리 최적화 측정
+### 2026-10-07 Screen Processing Optimization Measurements
 
-Node v22.22.2 로컬 합성 500턴(턴당 답변 청크 20개·청크당 210자)과 진행 중 질문 하나, 총 11,502개 이벤트에서 워밍업 후 5회 중앙값을 비교했다. SQLite 범위 조회는 별도의 격리 DB에 10,000개 이벤트를 넣고 끝의 100개를 1,000회 읽는다.
+Using Node v22.22.2 locally, medians over 5 runs after warmup were compared for 500 synthetic turns (20 answer chunks per turn, 210 characters per chunk) and one question in progress, totaling 11,502 events. The SQLite range query uses a separate isolated DB containing 10,000 events and reads the last 100 events 1,000 times.
 
-| 반복 작업의 총 경과 시간 | 변경 전 | 변경 후 |
+| Total elapsed time for repeated operations | Before | After |
 | --- | ---: | ---: |
-| 새 청크 200프레임의 대화 조합·state 갱신 | 54.44ms | 8.19ms |
-| 실시간 이벤트 2,000개 버퍼 추가 | 143.33ms | 0.18ms |
-| 최근 구간 스냅샷 200회 계산 | 51.20ms | 0.69ms |
-| SQLite 100행 구간 조회 1,000회 | 64.50ms | 42.93ms |
+| Conversation assembly and state updates over 200 frames with new chunks | 54.44ms | 8.19ms |
+| Adding 2,000 real-time events to the buffer | 143.33ms | 0.18ms |
+| Computing recent-range snapshots 200 times | 51.20ms | 0.69ms |
+| Querying SQLite ranges of 100 rows 1,000 times | 64.50ms | 42.93ms |
 
-변경 전 대화 조합 측정은 기존 전체 fold, 변경 후는 최초 전체 조합과 프레임별 증분 조합·state 배열 복사를 포함한다. 캐시 구간 측정에는 IndexedDB I/O가 포함되지 않는다. 한 프레임의 지연이나 실제 기기·전체 앱의 개선율을 나타내는 수치가 아니며 다른 프로세스와 JIT의 영향으로 실행마다 변동한다. 이동 캐시의 쓰기 횟수는 별도 브라우저 검사에서 20턴 중 19턴을 재기록하지 않고 새 턴의 4행만 저장함을 확인했다.
+The before measurement for conversation assembly uses the existing full fold; the after measurement includes the initial full assembly, per-frame incremental assembly, and state array copying. Cache-range measurements exclude IndexedDB I/O. These figures do not represent single-frame latency or improvement rates on actual devices or across the entire app, and vary between runs due to other processes and JIT. A separate browser check of rolling-cache writes confirmed that only the new turn's 4 rows were saved, without rewriting 19 of the 20 turns.
 
-현재 최적화 경로는 `node server/agent-conversation-benchmark.mjs`로 재측정한다. 벤치마크 DB는 OS 임시 폴더에 생성하고 종료 시 삭제한다. 빌드·운영 서버 재시작·실제 공급자 호출은 수행하지 않았다.
+Remeasure the current optimized path with `node server/agent-conversation-benchmark.mjs`. The benchmark DB is created in the OS temporary folder and deleted on exit. No build, production server restart, or actual provider call was performed.
 
-### 2026-10-08 복원 전사 선표시 측정
+### 2026-10-08 measurement of early transcript display during restoration
 
-격리 Chromium의 동일한 모의 소켓에서 ACP 완료를 3,000ms 지연시켰다. 히스토리 선택부터 첫 본문 표시까지 변경 전 1100px 밝은 테마에서 3,305ms, 변경 후 1100/390px·양 테마에서 31~33ms였다. 이 수치는 준비된 소켓 fixture의 화면 처리 비교이며 서버 조회·실제 공급자·사용자 네트워크 시간을 포함하지 않는다.
+ACP completion was delayed by 3,000ms on the same mock socket in isolated Chromium. The time from history selection to the first body display was 3,305ms before the change at 1100px in the light theme, and 31–33ms after the change at 1100/390px in both themes. These figures compare rendering with a prepared socket fixture and exclude server queries, actual providers, and user network time.
 
-별도의 실제 WS·감독·읽기 Worker 검사에서는 모의 ACP 완료를 파일 신호로 막고 선표시가 먼저 도착하는 것을 확인했다. 브라우저 검사와 병렬 실행한 단일 로컬 측정은 새 감독의 자동 복원 658ms(감독 시작 포함), 열린 탭의 선택 복원 120ms, 실패 대상 선표시 144ms였다. 실제 공급자의 준비 완료 시간이나 운영 환경의 개선율을 보장하는 수치는 아니다. 빌드·운영 서버 재시작·실제 공급자 호출은 수행하지 않았다.
+A separate check using real WS, a supervisor, and a read Worker blocked mock ACP completion with a file signal and confirmed that the early display arrived first. A single local measurement run in parallel with the browser check recorded 658ms for automatic restoration by a new supervisor (including supervisor startup), 120ms for selection-based restoration in an open tab, and 144ms for early display of a target that would fail. These figures do not guarantee actual provider readiness times or improvement rates in production. No build, production server restart, or actual provider call was performed.

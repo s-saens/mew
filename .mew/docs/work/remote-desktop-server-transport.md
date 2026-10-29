@@ -1,10 +1,10 @@
 ---
-title: "이전 원격 데스크톱 서버 전송 구현 — 이동 안내"
+title: "Previous remote desktop server transport implementation — relocation notice"
 created: 2026-09-14
 updated: "2026-10-07"
-description: "이전 원격 데스크톱 서버 전송 구현의 원문을 history로 옮긴 안내다. 중앙 ADR·외부 링크의 경로를 보존하고 현재 상주 GPU 직접 연결 계약으로 연결한다."
+description: "Notice that the original documentation for the previous remote desktop server transport implementation was moved to history. Preserves paths used by central ADRs and external links and links to the current resident GPU direct connection contract."
 ---
 
-구현·검증 원문은 [이전 기록](../history/remote-desktop-server-transport.md)으로 옮겼다. 이 파일은 중앙 ADR과 외부 링크의 기존 경로를 보존한다.
+The original implementation and verification documentation was moved to [Previous records](../history/remote-desktop-server-transport.md). This file preserves the existing path used by central ADRs and external links.
 
-현재 영상·입력·캡처 계약은 [원격 데스크톱 개발 계약](../development/remote-desktop.md), 상주 GPU 직접 연결의 구현·검증은 [작업 기록](remote-desktop-resident-direct.md)을 따른다. 이전 Electron·VP8 서버 영상 전송을 현재 구현 계획으로 사용하지 않는다.
+The current video, input, and capture contracts follow the [Remote desktop development contract](../development/remote-desktop.md), and implementation and verification of resident GPU direct connections follow the [Work record](remote-desktop-resident-direct.md). Do not use the previous Electron and VP8 server video transport as the current implementation plan.

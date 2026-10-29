@@ -1,16 +1,16 @@
 ---
-title: "뮤펫 말풍선의 설정 바로가기"
-description: "말풍선 상단의 뮤펫 설정 버튼과 데스크톱·모바일 직접 진입 구현, 격리 UI·타입·린트·문서 검사 결과 및 운영 미적용 상태를 기록한다."
+title: "Settings shortcut in the Mewpet speech bubble"
+description: "Records implementation of the Mewpet settings button at the top of the speech bubble and direct desktop/mobile navigation, isolated UI, type, lint, and documentation check results, and the status not applied to production."
 created: "2026-10-27"
 updated: "2026-10-27"
 ---
 
-뮤펫을 누른 뒤 설정을 쉽게 열 수 있도록 말풍선 상단의 닫기 버튼 옆에 톱니 버튼을 추가했다. 버튼을 누르면 말풍선을 닫고 설정의 뮤펫 항목을 연다. 모바일에서도 항목 내용을 바로 표시하고, 열린 설정에서 다른 항목을 보고 있어도 뮤펫 항목으로 전환한다. 현재 동작은 [뮤펫 도우미 기능 문서](../features/%ED%99%94%EB%A9%B4%C2%B7%EA%B3%84%EC%A0%95%C2%B7%EC%9A%B4%EC%98%81/%EB%AE%A4%ED%8E%AB%20%EB%8F%84%EC%9A%B0%EB%AF%B8%C2%B7%EB%8C%80%ED%99%94%C2%B7Mew%20%EC%A1%B0%EC%9E%91.md)가 소유한다.
+A gear button was added beside the close button at the top of the speech bubble to make settings easy to open after clicking Mewpet. Clicking the button closes the speech bubble and opens the Mewpet section in settings. On mobile, it also displays the section content directly, and switches to the Mewpet section even if settings is already open on another section. The [Mewpet assistant feature document](../features/appearance-accounts-operations/mewpet-assistant-conversations-and-controls.md) owns current behavior.
 
-검증 결과:
+Verification results:
 
-- `node --test server/mewcat-size-ui.test.ts`: 격리 Chromium의 데스크톱 다크·모바일 라이트에서 설정 바로가기, 말풍선 닫힘, 모바일의 열린 설정 전환 및 기존 크기·드래그·저장 동작 검사를 통과했다.
-- `npx tsc -b`: 통과했다.
-- 변경한 코드·테스트 5개 파일의 `npx oxlint`: 오류 없이 완료했다. 기존 App·Mewcat 경고는 남아 있다.
-- `npm run check:docs`: description 489개 검사는 통과했다. 작업 전부터 삭제 상태였던 `docs/features/MOC.md`와 태스크 문서를 가리키는 기존 링크 17개 때문에 전체 링크 검사는 실패했다. 이번에 변경한 두 문서의 링크 오류는 없었다.
-- 앱 빌드·배포·서버 재시작은 수행하지 않았다. 실제 인스턴스 적용은 사용자가 빌드한 뒤 확인해야 한다.
+- `node --test server/mewcat-size-ui.test.ts`: passed checks in isolated Chromium on desktop dark and mobile light themes for the settings shortcut, speech bubble closure, switching within already-open settings on mobile, and existing resize, drag, and save behavior.
+- `npx tsc -b`: Passed.
+- `npx oxlint` on 5 changed code and test files: completed without errors. Existing App and Mewcat warnings remain.
+- `npm run check:docs`: checks of 489 descriptions passed. The full link check failed because of 17 existing links pointing to `docs/features/MOC.md` and task documents that had already been deleted before this work. There were no link errors in the two documents changed in this work.
+- The app was not built or deployed, and the server was not restarted. Application to the actual instance must be checked after the user builds it.

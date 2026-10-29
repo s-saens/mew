@@ -1,7 +1,7 @@
 ---
-description: "한국어 기술 문서화 스킬의 이전 번역 기준 경로. 원문 언어에 중립적인 공통 번역·대조 검수 기준으로 연결한다."
+description: "Legacy path for the Korean technical documentation skill's translation guidelines. Links to shared translation and comparative review guidelines that are neutral with respect to the source language."
 ---
 
-# 번역과 대조 검수
+# Translation and Comparative Review
 
-현재 기준은 [공통 번역 기준](../../technical-docs-common/translation.md)이다. 한국어뿐 아니라 선택한 어떤 원문 언어에서도 각 대상 언어로 직접 번역한다. 이 경로는 기존 참조를 위해 유지한다.
+The current guidelines are the [shared translation guidelines](../../technical-docs-common/translation.md). Translate directly into each target language from any selected source language, not just Korean. This path is retained for existing references.

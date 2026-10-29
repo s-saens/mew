@@ -1,116 +1,116 @@
 ---
-title: "원격 데스크톱 설치와 조작"
+title: "Remote Desktop Setup and Controls"
 created: 2026-09-12
 updated: "2026-10-24"
-description: "서버의 로그인 데스크톱을 PC·모바일에서 여는 순서와 Rust 보조앱의 빌드 도구·OS 권한·직결 조건, 화면 키보드·클립보드·터치 조작을 안내한다. FHD 원본 해상도와 고화질의 비교 기준, 품질/속도 우선 선택·실제 성능 한계를 설명한다."
+description: "Explains how to open the server's logged-in desktop from a PC or mobile device, the Rust helper app's build tools, OS permissions, and direct connection requirements, plus the on-screen keyboard, clipboard, and touch controls. Covers the comparison criteria for native FHD resolution and high image quality, quality/speed priority options, and actual performance limitations."
 상위파일: "MOC.md"
 ---
 
-PC·모바일 햄버거 메뉴의 **원격 데스크톱**을 누른다. Dock에는 표시하지 않는다. 원격 데스크톱 기능 권한이 필요하며 기본으로 manager·owner에게 허용된다. 작업 패널과 독립적으로 화면 전체를 채우고, 서버가 Mac/Linux면 로그인한 데스크톱을, WSL이면 Windows 데스크톱을 공유한다. 서버 전체에 한 연결만 사용할 수 있다.
+Click **Remote Desktop** in the hamburger menu on PC or mobile. It does not appear in the Dock. Remote desktop feature permission is required and is granted to managers and owners by default. It fills the entire screen independently of work panels, sharing the logged-in desktop on Mac/Linux servers or the Windows desktop on WSL. Only one connection can be used across the entire server.
 
-Mew 문서·터미널에 접속하는 [Mewlink](getting-started-ko.md#외부에서-접속하기)와 별개의 기능이다. 화면이 없는 Linux 서버·컨테이너에는 공유할 데스크톱이 없으며, 로그인·잠금 화면과 UAC 화면은 지원하지 않는다. 실제 OS·고해상도 검증 범위는 [개발 계약](../../.mew/docs/development/remote-desktop.md#검증)에서 확인한다.
+This is separate from [Mewlink](getting-started-ko.md#connect-remotely), which provides access to Mew documents and terminals. Headless Linux servers and containers have no desktop to share, and login screens, lock screens, and UAC screens are not supported. See the [development contract](../../.mew/docs/development/remote-desktop.md#verification) for the actual OS and high-resolution verification scope.
 
-[처음 연결·권한](#처음-연결) · [화질·키보드·클립보드](#화면과-설정) · [터치 조작](#마우스와-터치) · [연결 실패·네트워크](#네트워크와-설정)
+[First Connection and Permissions](#first-connection) · [Image Quality, Keyboard, and Clipboard](#display-and-settings) · [Touch Controls](#mouse-and-touch) · [Connection Failures and Networking](#network-and-configuration)
 
-## 처음 연결
+## First Connection
 
-1. 서버 컴퓨터의 데스크톱에 로그인하고 아래 OS별 준비 조건을 확인한다. 화면·입력 권한 승인은 접속한 폰이 아니라 **서버 컴퓨터**에서 한다.
-2. Mew의 **메뉴 → 원격 데스크톱**을 연다. 구성 요소가 없으면 준비가 진행된다. **준비 내역 보기**에서 진행·오류를 확인한다.
-3. 화면과 입력이 연결되면 **설정 → 공유 화면**에서 사용할 모니터를 고른다. 먼저 기본값인 FHD·60FPS·균형으로 연결 상태를 확인한 뒤 화질을 조절한다.
-4. 작업이 끝나면 상단 **닫기**로 연결을 종료한다. 원격 데스크톱을 닫아도 Mew 서버는 계속 실행된다.
+1. Log in to the server computer's desktop and check the OS-specific prerequisites below. Grant screen and input permissions on the **server computer**, rather than the phone used to connect.
+2. Open **Menu → Remote Desktop** in Mew. If components are missing, preparation begins. Check progress and errors in **View Setup Details**.
+3. Once screen and input are connected, select a monitor in **Settings → Shared Screen**. First check the connection using the defaults of FHD, 60 FPS, and Balanced, then adjust image quality.
+4. When finished, use **Close** at the top to end the connection. The Mew server continues running after Remote Desktop is closed.
 
-`./mew setup`은 필요한 보조앱 구성 요소를 미리 설치한다. Mac/Linux는 해당 OS용, WSL은 Windows용으로 준비하며, 별도 앱이나 npm 명령을 직접 실행할 필요가 없다. 최초 다운로드는 몇 분 걸릴 수 있고 진행 상황은 setup 터미널에 표시한다. 이 단계에서는 화면 캡처나 입력 제어를 시작하지 않는다. 설치 파일 준비와 아래 표의 OS 로그인·라이브러리·권한 승인은 별개다.
+`./mew setup` installs the required helper app components in advance. It prepares components for the host OS on Mac/Linux and for Windows on WSL, with no need to run a separate app or npm command manually. The initial download may take a few minutes, and progress appears in the setup terminal. This step does not start screen capture or input control. Preparing installation files is separate from OS login, libraries, and permission approval listed in the table below.
 
-Mac은 설치 후 아래의 [권한 준비](#mac-권한-준비)까지 진행한다. setup에서 보조앱 설치·권한 준비에 실패해도 경고를 표시하고 Mew 설치는 계속한다(Ctrl+C는 setup도 중단). 이전 설치이거나 구성 요소가 없거나 업데이트가 필요하면 햄버거 메뉴에서 **원격 데스크톱**을 열 때 자동으로 설치한 뒤 연결한다. 이때 **준비 내역 보기**를 누르면 내부 tmux의 진행 상황을 확인할 수 있다. Mac 권한이 부족하면 `./mew desktop-setup`으로 준비한 뒤 다시 연결한다.
+On Mac, continue through [Permission Setup](#mac-permission-setup) below after installation. If helper app installation or permission setup fails during setup, a warning appears and Mew installation continues (Ctrl+C also stops setup). For older installations, missing components, or required updates, opening **Remote Desktop** from the hamburger menu automatically installs them before connecting. Click **View Setup Details** to check progress in the internal tmux session. If Mac permissions are insufficient, prepare them with `./mew desktop-setup` and reconnect.
 
-내역 창의 **닫기**는 준비를 계속 진행하며, **종료**는 준비 작업도 중단한다. 원격 데스크톱을 닫아도 준비 작업은 남는다. 다시 열면 진행 중인 작업에 이어서 기다린다. 실패하면 내역의 오류를 확인하고 **다시 연결**을 누른다. 실패한 작업을 무한히 재시도하지 않는다.
+**Close** in the log window lets preparation continue; **Exit** also stops preparation. Preparation continues even if you close Remote Desktop. Reopening it resumes waiting for the ongoing task. If it fails, check the error in the log and click **Reconnect**. Failed tasks are not retried indefinitely.
 
-Windows/WSL에서는 설치가 끝난 보조 호스트를 Mew 서버와 함께 미리 준비하고 접속마다 재사용한다. 대기 중에는 화면을 캡처·인코딩하지 않는다. 화면을 닫으면 입력·캡처·인코더를 해제하며, 다음 연결에서 GPU 장치를 재사용한다. 최초 설치·OS 로그인·권한 승인·네트워크 연결 시간은 별도로 필요하다.
+On Windows/WSL, the installed helper host is prepared in advance with the Mew server and reused for each connection. It does not capture or encode the screen while idle. Closing the screen releases input, capture, and encoder resources, and the GPU device is reused on the next connection. Initial installation, OS login, permission approval, and network connection require additional time.
 
-Windows에서 모니터를 꺼서 활성 화면이 사라지는 경우 자체 **Mew 가상 화면** 경로를 제공한다. StarDesk에 의존하지 않으며, 서명된 별도 드라이버를 한 번 관리자 권한으로 설치해야 한다. **현재는 소스·빌드·설치 경로만 제공하며 정식 서명 패키지와 headless 실기 검증은 준비되지 않았다.** [서명·설치와 확인 절차](../../.mew/docs/development/remote-desktop-virtual-display.md)를 따른다. 설치 뒤 공유 화면에서 **Mew 가상 화면**을 선택하면 연결 중에만 별도 확장 화면을 만든다. 물리 화면에 남은 창은 자동 복제하지 않는다.
+When turning off a monitor on Windows removes the active display, Mew provides its own **Mew Virtual Display** option. It does not depend on StarDesk and requires a separate signed driver to be installed once with administrator privileges. **Currently, only source, build, and installation paths are provided; an officially signed package and headless testing on physical hardware are not ready.** Follow the [signing, installation, and verification procedure](../../.mew/docs/development/remote-desktop-virtual-display.md). After installation, selecting **Mew Virtual Display** under Shared Display creates a separate extended display only while connected. Windows remaining on the physical display are not automatically duplicated.
 
-Mew 코드가 업데이트되면 구성 요소의 버전도 자동으로 확인한다. 의존성이 그대로면 설치된 런타임을 재사용한다. 준비가 끝나면 자동으로 연결하므로 터미널을 닫고 재연결 버튼을 누르는 단계는 필요 없다.
+When Mew code is updated, component versions are also checked automatically. If dependencies are unchanged, the installed runtime is reused. The connection starts automatically when preparation finishes, so there is no need to close the terminal and click Reconnect.
 
-영상과 입력은 브라우저와 호스트의 WebRTC 직접 연결로 전달한다. 직접 연결이 성립하지 않으면 네트워크 복구 안내를 표시한다. 서버를 통한 영상 중계는 사용하지 않는다.
+Video and input are transmitted over a direct WebRTC connection between the browser and host. If a direct connection cannot be established, network recovery guidance is displayed. Video is not relayed through the server.
 
-첫 화면과 입력이 준비되면 원격으로 연결되는 PC에 **mew 원격 데스크톱 연결됨** 시스템 알림을 연결당 한 번 표시한다. 재접속하면 다시 알린다. OS에서 알림을 껐거나 방해 금지 설정을 사용하면 표시되지 않을 수 있다.
+Once the initial screen and input are ready, the remotely accessed PC displays a **mew Remote Desktop Connected** system notification once per connection. Reconnecting triggers another notification. It may not appear if OS notifications are disabled or Do Not Disturb is enabled.
 
-모든 서버 환경에서 Rust stable·CMake·libclang·C++ 컴파일러·Perl이 필요하다. WSL에서는 이 도구를 **Windows 쪽**에 준비한다. 최초 Rust 엔진 컴파일에는 추가 시간이 걸리며, 도구가 없으면 준비 내역에 실패 이유가 표시된다. 구성 요소 준비는 화면 캡처를 시작하지 않는다. [엔진 설치와 확인 범위](../../.mew/docs/development/remote-desktop-rust.md)를 참고한다.
+All server environments require Rust stable, CMake, libclang, a C++ compiler, and Perl. On WSL, install these tools on the **Windows side**. The initial Rust engine compilation takes additional time; if tools are missing, the preparation log shows the reason for failure. Preparing components does not start screen capture. See [engine installation and verification scope](../../.mew/docs/development/remote-desktop-rust.md).
 
-| 서버 환경 | 필요한 OS 준비 |
+| Server environment | Required OS setup |
 | --- | --- |
-| Mac | macOS 13(Ventura) 이상·Apple Silicon arm64 또는 Intel x64·Apple Command Line Tools가 필요하다(`xcode-select --install`). 준비 중 자체 캡처 모듈을 컴파일한다. 데스크톱에 로그인한다. setup 또는 desktop-setup이 연 서버 Mac의 시스템 설정에서 **손쉬운 사용**과 **화면 기록**을 MewDesktop에 허용한다. 승인 감지 후 원격 데스크톱을 연결한다 |
-| Linux X11 | x64/arm64의 Linux 데스크톱을 지원한다. 로그인한 사용자 환경의 DISPLAY/Xauthority, GStreamer 1.24 이상·VA-API 또는 NVENC 하드웨어 인코더·libX11·libXtst·화면 잠금 D-Bus 서비스가 필요하다. Debian/Ubuntu 입력 라이브러리는 `libx11-6 libxtst6` |
-| Linux Wayland | x64/arm64의 Linux 데스크톱을 지원한다. 로그인한 사용자 D-Bus·PipeWire·xdg-desktop-portal과 compositor의 RemoteDesktop 지원이 필요하다. 화면 공유와 별도 원격 입력 요청을 승인한다. 커서는 터치패드·조이스틱의 상대 이동으로 조작하며, 키보드는 해당 권한까지 승인해야 한다 |
-| WSL | Windows에 같은 사용자로 로그인하고 WSL interop를 켠다. Mew가 전용 Windows Node/npm 런타임을 자동으로 준비한다. Windows 작업 스케줄러에서 현재 사용자 작업 실행을 허용해야 한다. Visual Studio C++ Build Tools·Windows SDK·하드웨어 H.264 인코더가 필요하다 |
+| Mac | Requires macOS 13 (Ventura) or later, Apple Silicon arm64 or Intel x64, and Apple Command Line Tools (`xcode-select --install`). The native capture module is compiled during preparation. Log in to the desktop. In System Settings on the server Mac, opened by setup or desktop-setup, grant MewDesktop **Accessibility** and **Screen Recording** permissions. Remote Desktop connects after approval is detected |
+| Linux X11 | Supports x64/arm64 Linux desktops. Requires DISPLAY/Xauthority from the logged-in user's environment, GStreamer 1.24 or later, a VA-API or NVENC hardware encoder, libX11, libXtst, and a screen-lock D-Bus service. Debian/Ubuntu input libraries: `libx11-6 libxtst6` |
+| Linux Wayland | Supports x64/arm64 Linux desktops. Requires the logged-in user's D-Bus, PipeWire, xdg-desktop-portal, and compositor RemoteDesktop support. Approve screen sharing and the separate remote input request. Control the cursor through relative movement with the touchpad or joystick; keyboard input also requires approval of its permission |
+| WSL | Log in to Windows as the same user and enable WSL interop. Mew automatically prepares a dedicated Windows Node/npm runtime. Windows Task Scheduler must allow tasks to run as the current user. Requires Visual Studio C++ Build Tools, Windows SDK, and a hardware H.264 encoder |
 
-WSL에서는 Mew를 **내부 tmux에서 시작하거나 재시작해도 된다**. Windows 세션 0에서 시작했더라도 연결할 때 임시 작업을 통해 현재 Windows 계정의 로그인 데스크톱에서 캡처를 실행한다. 로그인 비밀번호나 영구 서비스·로그인 자동 실행을 등록하지 않는다. 상주 호스트는 Mew 서버 수명 안에서만 유지한다. 로그아웃·로그인 전·잠금·UAC 화면은 지원 범위 밖이다.
+On WSL, you **can start or restart Mew inside tmux**. Even if started in Windows session 0, capture runs on the current Windows account's logged-in desktop through a temporary task when connecting. No login password, permanent service, or login startup entry is registered. The resident host is maintained only for the lifetime of the Mew server. Logged-out, pre-login, lock, and UAC screens are outside the supported scope.
 
-Windows/WSL에서는 설치 때 보조 앱 `runtime/node.exe`의 UDP 수신 허용을 **Mew 서버 PC의 Windows UAC 승인**으로 준비한다. 승인창을 허용해야 하며 취소했다면 `desktop-setup`으로 다시 요청할 수 있다. 기존 앱 차단 규칙·조직 정책은 자동으로 바꾸지 않는다. **Windows 방화벽 차단** 안내가 나오면 해당 차단 정책을 확인한다. 설치 파일 준비와 네트워크 승인 성공은 구분하며, 명시적 수신 허용 규칙 부재도 직결 실패 안내에 표시한다.
+On Windows/WSL, installation prepares permission for the helper app `runtime/node.exe` to receive UDP through **Windows UAC approval on the Mew server PC**. You must approve the prompt; if canceled, you can request it again with `desktop-setup`. Existing app blocking rules and organizational policies are not changed automatically. If **Blocked by Windows Firewall** guidance appears, check the relevant blocking policy. Preparing installation files and successfully obtaining network approval are treated separately, and the absence of an explicit inbound allow rule is also shown in direct connection failure guidance.
 
-Windows 파일은 `%LOCALAPPDATA%\Mew\remote-desktop`에 준비한다. PATH에 PowerShell이 없어도 마운트된 Windows 드라이브에서 찾는다. Windows 드라이브·interop가 끊긴 경우에는 연결 오류 안내를 따른다. Linux GUI가 없는 서버/컨테이너에는 공유할 데스크톱이 없으며 WSLg 화면을 Windows 전체 화면으로 대신 보여주지 않는다.
+Windows files are prepared in `%LOCALAPPDATA%\Mew\remote-desktop`. PowerShell is located on the mounted Windows drive even if it is not in PATH. If the Windows drive or interop is disconnected, follow the connection error guidance. Servers/containers without a Linux GUI have no desktop to share, and the WSLg screen is not shown as a substitute for the full Windows desktop.
 
-Mac/Linux도 자체 상주 네이티브 보조앱에서 하드웨어 H.264로 직접 연결한다. [OS별 설치 요구 사항](../../.mew/docs/development/remote-desktop-posix.md#설치와-권한)을 따른다. Linux에서는 Mew 서버도 로그인한 데스크톱 사용자의 환경으로 실행해야 한다. Wayland에서 공유·입력 승인을 취소하면 연결을 종료한다. 실제 Mac·Wayland 검증이 남은 범위는 [개발 문서](../../.mew/docs/development/remote-desktop.md#검증)를 따른다.
+Mac/Linux also connect directly using hardware H.264 through Mew's resident native helper app. Follow the [OS-specific installation requirements](../../.mew/docs/development/remote-desktop-posix.md#installation-and-permissions). On Linux, the Mew server must also run in the logged-in desktop user's environment. Revoking sharing or input permission on Wayland ends the connection. See the [development documentation](../../.mew/docs/development/remote-desktop.md#verification) for areas still awaiting testing on actual Mac and Wayland systems.
 
-macOS 15 이상에서는 **개인정보 보호 및 보안 → 로컬 네트워크**에서 OS가 표시한 Mew Desktop 또는 이를 실행한 앱의 승인이 별도로 필요할 수 있다. Mac 방화벽이 수신 허용을 묻는다면 MewDesktop에 허용한다. Linux의 공유기 자동 매핑에는 `iproute2`가 필요하다. UFW/firewalld 정책이 UDP 수신을 차단하면 해당 PC의 정책도 승인해야 한다. 이 OS 정책은 공유기 임시 매핑으로 바뀌지 않으며, 읽기 전용 진단의 조회 실패를 설치 실패로 취급하지 않는다.
+On macOS 15 or later, separate approval may be required under **Privacy & Security → Local Network** for Mew Desktop or the app that launched it, as listed by the OS. If the Mac firewall asks whether to allow incoming connections, allow MewDesktop. Automatic router mapping on Linux requires `iproute2`. If UFW/firewalld policies block incoming UDP, the policy on that PC must also permit it. Temporary router mappings do not change these OS policies, and failed queries in read-only diagnostics are not treated as installation failures.
 
-진단용 수동 준비도 유지한다. Mew 저장소에서 `npm run desktop:install`을 실행할 수 있다. 앱 빌드·서버 재시작은 [실행·검증 규칙](../../.mew/docs/development/getting-started.md)에 따라 사용자가 한다.
+Manual preparation remains available for diagnostics. You can run `npm run desktop:install` in the Mew repository. The user builds the app and restarts the server according to the [execution and verification rules](../../.mew/docs/development/getting-started.md).
 
-### Mac 권한 준비
+### Mac Permission Setup
 
-`./mew setup`에 포함되며, Mew 서버가 이미 실행 중이면 **Mew 설치 폴더**의 Mew 터미널 또는 같은 Mac의 로컬 터미널에서 다음 명령만 실행한다. 현재 프로젝트 폴더가 다른 곳이면 먼저 Mew 설치 폴더로 이동한다.
+This is included in `./mew setup`. If the Mew server is already running, run only the following command in a Mew terminal in the **Mew installation folder** or in a local terminal on the same Mac. If the current project folder is elsewhere, first change to the Mew installation folder.
 
 ```bash
 ./mew desktop-setup
 ```
 
-보조앱 설치 → 권한 확인 → 필요한 설정 열기 → 승인 감지 순서로 진행한다. **승인창은 접속 중인 폰·PC나 터미널 안이 아니라 Mew 서버 Mac의 데스크톱에 뜬다.** 데스크톱에 로그인한 동일 OS 사용자로 실행하고 `sudo`는 붙이지 않는다.
+The process proceeds through helper app installation → permission checks → opening required settings → detecting approval. **Approval prompts appear on the Mew server Mac's desktop, rather than on the connected phone or PC or inside the terminal.** Run as the same OS user logged in to the desktop, without `sudo`.
 
-- 이미 허용된 권한은 다시 요청하지 않는다. 부족하면 **손쉬운 사용 → 화면 기록** 순서로 설정을 열고, MewDesktop 보조앱을 사용자가 허용한다.
-- 터미널에서 각 권한 상태를 표시하고 최대 5분 동안 기다린다. 승인 감지 후 자동으로 완료하며, Mac이 **종료 및 다시 열기**를 요구하는 경우도 새 보조 프로세스로 다시 확인한다. Mew 서버는 재시작하지 않는다.
-- 완료 메시지가 나오면 Mew에서 원격 데스크톱을 열거나 다시 연결한다. 이 명령 자체는 화면 캡처·원격 입력을 시작하지 않는다.
-- 거부·시간 초과·로그인 사용자 불일치·관리 정책 제한은 미완료로 표시한다. Ctrl+C로 중단해도 설치 파일은 남으며 같은 명령으로 재시도한다. `desktop-setup`은 미완료 시 실패 코드로 종료한다.
+- Permissions already granted are not requested again. If permissions are missing, settings open in the order **Accessibility → Screen Recording**, and the user grants permission to the MewDesktop helper app.
+- The terminal displays each permission's status and waits for up to 5 minutes. It finishes automatically when approval is detected. Even if the Mac requires **Quit & Reopen**, permissions are checked again with a new helper process. The Mew server is not restarted.
+- When the completion message appears, open Remote Desktop in Mew or reconnect. This command itself does not start screen capture or remote input.
+- Denial, timeout, a logged-in user mismatch, or management policy restrictions are marked incomplete. Installation files remain even if you interrupt with Ctrl+C; retry with the same command. `desktop-setup` exits with a failure code if incomplete.
 
-설치 완료 마커는 파일 준비 상태만 뜻한다. 권한은 매번 OS에서 확인하며, 명령어로 사용자의 승인을 대신하거나 권한 DB를 수정하지 않는다. 터미널이 설정을 열 수 없는 로그인 환경에서는 서버 Mac의 시스템 설정에서 MewDesktop 권한을 직접 확인한 뒤 다시 실행한다. Mac 실기 검증 범위는 [개발 계약](../../.mew/docs/development/remote-desktop.md#mac-터미널-권한-준비)을 따른다.
+The installation completion marker indicates only that files are ready. Permissions are checked with the OS each time; commands do not substitute for user approval or modify the permission database. In login environments where the terminal cannot open settings, check MewDesktop permissions directly in System Settings on the server Mac, then run the command again. The [development contract](../../.mew/docs/development/remote-desktop.md#mac-terminal-permission-preparation) defines the scope of testing on physical Macs.
 
-## 화면 키보드
+## On-screen keyboard
 
-상단의 **화면 키보드** 버튼으로 열고 **풀키** 또는 **게임용**을 선택한다. 물리 키보드가 감지된 뒤에도 이 버튼으로 직접 열 수 있다.
+Open it with the **On-Screen Keyboard** button at the top and select **Full Keyboard** or **Gaming**. You can still open it manually with this button after a physical keyboard is detected.
 
-- **풀키**: 문자·숫자·F1–F12·편집/방향키·숫자패드와 한/영·한자 키를 제공한다. Ctrl·Shift·Alt·Meta는 한 번 누르면 유지되고 다시 누르면 해제되므로 다른 키와 조합할 수 있다. 좁거나 낮은 화면에서는 키보드 안을 스크롤해 나머지 키를 사용한다.
-- **게임용**: Q/W/E, A/S/D, F/G/Space를 기본 배치로 제공한다. 여러 키를 동시에 누르거나 누른 채 유지할 수 있다. 연필 버튼에서 각 자리의 키를 바꾸고 **키 추가**·삭제·**초기화**로 1~24개 키를 구성한다. **완료**로 조작 화면에 돌아온다. 게임 모드의 수정키는 손을 뗄 때 해제된다.
+- **Full Keyboard**: Provides letters, numbers, F1–F12, editing/navigation keys, a numeric keypad, and Korean/English and Hanja keys. Ctrl, Shift, Alt, and Meta stay pressed when tapped once and release when tapped again, allowing combinations with other keys. On narrow or short screens, scroll within the keyboard to access the remaining keys.
+- **Gaming**: Provides Q/W/E, A/S/D, and F/G/Space as the default layout. You can press multiple keys simultaneously or hold them down. Use the pencil button to change the key in each position, and use **Add Key**, Delete, and **Reset** to configure 1–24 keys. Select **Done** to return to the controls. Modifier keys in gaming mode release when you lift your finger.
 
-**키보드만 보기**(눈 감은 아이콘)를 켜면 원격 영상과 가상 마우스를 숨기고 키보드가 남은 공간을 사용한다. 풀키·게임용 모두 지원한다. 같은 버튼을 다시 누르거나 키보드를 닫으면 원격 화면이 돌아온다. 영상 수신과 연결은 유지되며 키 입력도 계속 전달한다. 연결이 끊기면 재연결 안내가 표시된다.
+Enabling **Keyboard Only** (the closed-eye icon) hides the remote video and virtual mouse, letting the keyboard use the remaining space. Both Full Keyboard and Gaming modes support this. Press the same button again or close the keyboard to restore the remote screen. Video reception and the connection remain active, and keystrokes continue to be sent. If the connection drops, reconnection guidance appears.
 
-선택한 모드와 게임 키 배치, 키보드만 보기 설정은 현재 계정·인스턴스의 브라우저 저장소에 보관한다. 손 떼기·터치 취소·키보드 닫기·모드/배치 변경·회전·전체화면 전환·포커스 이탈·연결 종료에서 해당 키를 해제한다. 실제 입력 가능 여부는 원격 OS와 키 배열을 따른다. OS 보안 키 조합을 우회하는 기능은 아니다.
+The selected mode, gaming key layout, and Keyboard Only setting are saved in browser storage for the current account and instance. Relevant keys are released when you lift your finger, a touch is canceled, the keyboard closes, the mode/layout changes, the display rotates, fullscreen toggles, focus is lost, or the connection ends. Actual input support depends on the remote OS and keyboard layout. This does not bypass OS security key combinations.
 
-## 조작
+## Controls
 
-모바일 원격 화면에서도 하단 독으로 다른 패널을 선택할 수 있다. 다른 패널로 이동하면 원격 연결은 종료된다. **전체화면**을 켜면 독이 숨고, 전체화면을 해제하면 다시 나타난다. 키보드가 열린 동안에도 독은 숨긴다.
+You can select other panels from the bottom dock on the mobile remote screen as well. Switching to another panel ends the remote connection. Enabling **Fullscreen** hides the dock; exiting fullscreen restores it. The dock is also hidden while the keyboard is open.
 
-### 화면과 설정
+### Display and Settings
 
-상단 도구는 **맞춤 → 입력 → 도움말 → 회전 → 전체화면 → 설정 → 닫기** 순서다. 전체화면 버튼은 브라우저의 주소창·탭 영역까지 숨긴다. 해제 버튼으로 돌아오며, 지원하지 않거나 전환이 거절되면 안내가 나온다. 회전 버튼은 원격 영상·마우스·핫키·도구 모음·설정 등 패널 전체를 시계 방향으로 90도씩 돌린다(0·90·180·270도). 호스트 모니터 설정은 바꾸지 않고, 회전할 때 확대·이동을 맞춤으로, 컨트롤 위치를 기본 배치로 초기화한다. 회전한 영상에서도 직접 클릭 위치·커서·드래그 방향이 일치한다.
+The top tools are ordered **Fit → Input → Help → Rotate → Fullscreen → Settings → Close**. The Fullscreen button also hides the browser's address bar and tabs. Use the exit button to return; guidance appears if fullscreen is unsupported or the transition is denied. The Rotate button rotates the entire panel clockwise in 90-degree increments, including remote video, mouse, hotkeys, toolbar, and settings (0, 90, 180, and 270 degrees). It does not change host monitor settings. Rotating resets zoom and pan to Fit and control positions to the default layout. Direct click positions, the cursor, and drag directions remain aligned in the rotated video.
 
-**설정**에서 마우스 커서 감도(0.5–6배), 공유 화면, 영상 해상도·목표 FPS·영상 품질·전송 우선순위, 핫키 보조키(Ctrl 또는 Mac의 Cmd)를 선택한다. 커서 감도 기본값은 **3배**이며 커서 이동 패드·세 버튼 드래그·방향키 이동에 즉시 적용한다. 터치/마우스로 패드를 빠르게 밀수록 커서가 더 멀리 움직이는 **속도 비례 가속**을 적용한다. 같은 100px을 0.05초에 밀면 0.5초에 밀 때보다 커서 이동량이 10배다(화면 가장자리에 도달하기 전 기준). 천천히 움직이면 정밀하게 조절할 수 있고, 멈추면 커서도 멈춘다. 슬라이더 배율은 가속된 이동량에 곱한다. 방향키는 반복 속도에 따른 가속 없이 감도 배율만 적용한다. 직접 마우스로 화면을 가리키는 좌표·휠·화면 이동·확대 속도는 바꾸지 않는다. 감도와 영상 설정은 이 브라우저에 저장한다. **감도 초기화**는 3배, **버튼 위치 초기화**는 마우스와 핫키를 처음 위치로 돌린다. **다시 연결**도 설정 안에 있다.
+In **Settings**, select mouse cursor sensitivity (0.5–6×), shared display, video resolution, target FPS, video quality, transmission priority, and the hotkey modifier (Ctrl or Cmd on Mac). Cursor sensitivity defaults to **3×** and applies immediately to the cursor movement pad, dragging with the three buttons, and arrow-key movement. **Speed-proportional acceleration** moves the cursor farther the faster you swipe the pad with touch or a mouse. Moving the same 100 px in 0.05 seconds moves the cursor 10 times as far as moving it in 0.5 seconds (before reaching the screen edge). Move slowly for precise control; the cursor stops when you stop. The slider multiplier is applied to the accelerated movement. Arrow keys use only the sensitivity multiplier, without acceleration based on repeat speed. This does not change coordinates when pointing directly at the screen with a mouse, wheel speed, panning speed, or zoom speed. Sensitivity and video settings are saved in this browser. **Reset Sensitivity** restores 3×, and **Reset Button Positions** returns the mouse and hotkeys to their initial positions. **Reconnect** is also in Settings.
 
-영상은 **HD·FHD·QHD·4K**, 목표 FPS는 **30·60·120·144·165·240**, 품질은 **균형·고화질** 중에서 선택한다. 바꾸면 같은 화면에 다시 연결한다. 기본은 FHD·60FPS·균형이다. 고화질은 더 높은 인코더 비트레이트를 요청한다. **전송 우선순위 → 품질 우선**은 선명도를 위해 한 프레임 전송을 더 기다리며, **속도 우선**은 더 짧은 대기로 반응 속도를 우선한다. 두 모드 모두 회선이 느려지면 인코더와 송신량을 함께 줄이므로 화질이나 FPS가 낮아질 수 있다. 품질 우선도 일반 프레임 전송을 수 초씩 기다리지 않으며, 설정한 해상도는 유지한다. 전송 한도는 [개발 계약](../../.mew/docs/development/remote-desktop.md#전송과-지연)을 따른다. 기본은 속도 우선이며, 이전에 저장한 고화질 설정에 우선순위가 없으면 품질 우선으로 복원한다. 글자를 선명하게 보려면 고화질과 품질 우선을 선택하되 실제 수신 해상도와 회선 상태도 확인한다. 매우 느리거나 손실이 큰 연결에서는 두 모드 모두 프레임을 폐기·복구할 수 있다.
+Choose video resolution from **HD, FHD, QHD, and 4K**; target FPS from **30, 60, 120, 144, 165, and 240**; and quality from **Balanced and High Quality**. Changing these reconnects to the same display. The default is FHD, 60 FPS, Balanced. High Quality requests a higher encoder bitrate. **Transmission Priority → Prioritize Quality** waits longer to transmit a frame for better clarity, while **Prioritize Speed** uses a shorter wait to prioritize responsiveness. Both modes reduce encoder output and transmission volume when the connection slows, so quality or FPS may decrease. Prioritize Quality does not wait several seconds to transmit ordinary frames, and it retains the configured resolution. Transmission limits follow the [development contract](../../.mew/docs/development/remote-desktop.md#transport-and-latency). The default is Prioritize Speed; previously saved High Quality settings without a priority are restored as Prioritize Quality. For clearer text, select High Quality and Prioritize Quality, but also check the actual received resolution and connection conditions. On very slow or highly lossy connections, both modes may discard and recover frames.
 
-높은 해상도와 FPS를 동시에 선택하면 화면·GPU·브라우저가 지원하는 범위로 조정된다. 현재 Chromium에서는 FHD 240 요청이 165FPS, QHD 165 요청이 144FPS, 4K 144 요청이 60FPS로 낮아질 수 있다.
+Selecting high resolution and high FPS together adjusts them to what the display, GPU, and browser support. In current Chromium, an FHD 240 request may drop to 165 FPS, a QHD 165 request to 144 FPS, and a 4K 144 request to 60 FPS.
 
-FHD 원본 크기로 비교하려면 원격 화면을 1920×1080으로 두고 **FHD·60FPS·고화질**에서 시작한다. 통계의 실제 수신 크기도 1920×1080인지 확인한다. 이 모드의 초기 영상 요청은 12Mbps이며 헤더·재전송 등은 별도다. 같은 기기·표시 배율·망에서 정지 글자와 스크롤을 나누어 비교한다. 송신과 다음 프레임 준비를 겹치지만 실제 혼잡에서는 압축량을 조절하며, 고화질이 무손실 전송을 뜻하지는 않는다. 합성 검사와 실제 기기의 성능은 [FHD 검증 범위](../../.mew/docs/development/remote-desktop.md#단계별-진단과-fhd-검증)에서 구분한다.
+To compare FHD at native size, set the remote display to 1920×1080 and start with **FHD, 60 FPS, High Quality**. Check that the actual received dimensions in the statistics are also 1920×1080. This mode initially requests 12 Mbps for video, excluding headers, retransmissions, and other overhead. Compare static text and scrolling separately using the same device, display scale, and network. Transmission overlaps preparation of the next frame, but compression is adjusted under actual congestion; High Quality does not mean lossless transmission. [FHD verification scope](../../.mew/docs/development/remote-desktop.md#stage-by-stage-diagnostics-and-fhd-verification) distinguishes synthetic checks from performance on actual devices.
 
-설정 창의 통계에서 **실제 수신 해상도·수신 FPS / 적용 목표 FPS·왕복 시간·Mbps·전송 대기**를 확인한다. 수신 FPS는 디코드한 프레임 수라서 화면이 정지해 있을 때 낮아지는 것은 정상이다. 왕복 시간은 네트워크 RTT이며 클릭부터 화면 표시까지의 지연과 다르다. 144FPS 이상을 실제로 보려면 원격 화면·인코더·이 기기의 디코더와 화면 주사율도 따라줘야 한다. 영상 설정은 모니터 주사율을 바꾸지 않으며 현재 **Mew 가상 화면**은 1080p·60Hz다. 고주사율·4K의 실제 하드웨어 성능은 [검증 범위](../../.mew/docs/development/remote-desktop.md#검증)를 따른다.
+In the Settings statistics, check **actual received resolution, received FPS / applied target FPS, round-trip time, Mbps, and transmission wait**. Received FPS counts decoded frames, so a lower value when the screen is static is normal. Round-trip time is network RTT and differs from the delay between a click and its appearance on screen. To actually see 144 FPS or more, the remote display, encoder, this device's decoder, and display refresh rate must also keep up. Video settings do not change the monitor refresh rate; the current **Mew Virtual Display** is 1080p at 60 Hz. See the [verification scope](../../.mew/docs/development/remote-desktop.md#verification) for actual hardware performance at high refresh rates and 4K.
 
-왼쪽 세로 **핫키** 바에는 Esc·Tab·Enter·Backspace·복사·붙여넣기·실행 취소·앱 전환이 있다. 설정의 보조키에 따라 Ctrl 또는 Cmd 조합을 전송한다. 핫키의 붙여넣기는 **원격 컴퓨터의 클립보드**를 사용한다. 내 기기의 텍스트를 보내려면 상단 입력 창을 사용한다. 위쪽 화살표를 누르면 핫키 목록을 접고 펼친다. 접힌 상태에서도 바 아래 핸들을 끌거나 포커스 후 방향키를 눌러 위치를 옮긴다. 화면 크기가 바뀌면 바를 화면 안에 제한하고, 가로로 낮은 화면에서는 핫키 목록을 스크롤한다.
+The vertical **Hotkeys** bar on the left provides Esc, Tab, Enter, Backspace, Copy, Paste, Undo, and Switch Apps. It sends Ctrl or Cmd combinations according to the modifier selected in Settings. The Paste hotkey uses the **remote computer's clipboard**. To send text from your device, use the Input window at the top. Press the up arrow to collapse or expand the hotkey list. Even when collapsed, you can move the bar by dragging its bottom handle or focusing it and pressing the arrow keys. When the screen size changes, the bar is kept within the screen; on short landscape screens, the hotkey list scrolls.
 
-원격 화면에 포커스가 있으면 Esc도 원격으로 전달한다. 설정·입력·도움말이 열려 있으면 Esc·뒤로가기는 그 창부터 닫는다. 전체화면 상태에서는 전체화면을 먼저 해제하며, 일반 상태에서는 원격 연결을 닫는다. 왼쪽 **원격 Esc**는 뷰어를 닫지 않고 원격 컴퓨터에 Escape를 보낸다.
+When the remote screen has focus, Esc is also sent remotely. If Settings, Input, or Help is open, Esc or Back closes that window first. In fullscreen, it exits fullscreen first; in normal mode, it closes the remote connection. **Remote Esc** on the left sends Escape to the remote computer without closing the viewer.
 
-### 마우스와 터치
+### Mouse and Touch
 
-마우스·트랙패드가 감지되면 가상 마우스 묶음을 자동으로 숨긴다. 브라우저가 포인터 분리를 알리거나, 마우스가 감지되지 않는 상태에서 화면을 터치하면 다시 표시한다. 원격 화면에서 키보드를 한 번 입력하면 왼쪽 핫키 바를 숨긴다. 브라우저는 키보드의 연결·분리를 직접 알려 주지 않으므로 핫키는 화면을 닫았다 다시 열면 표시한다. 키보드 감지는 마우스 표시 여부에 영향을 주지 않는다.
+The virtual mouse controls hide automatically when a mouse or trackpad is detected. They reappear when the browser reports that a pointer has disconnected, or when you touch the screen while no mouse is detected. Typing once on the remote screen hides the left hotkey bar. Browsers do not directly report keyboard connection or disconnection, so the hotkeys reappear when you close and reopen the screen. Keyboard detection does not affect mouse visibility.
 
-오른쪽 아래 컨트롤은 마우스 모양이다. 위쪽에 좌클릭(1)·휠(2)·우클릭(3), 아래쪽에 세 칸을 합친 커서 이동(0)이 있다. 화면 이동(4)·확대(5)는 오른쪽 컨테이너에 배치하고, 위치 이동 핸들은 그 아래에 둔다. 오른쪽 컨테이너와 핸들을 합친 높이는 왼쪽 마우스와 같다.
+The controls at the bottom right are shaped like a mouse. The top has left click (1), wheel (2), and right click (3); the bottom combines three cells into cursor movement (0). Pan (4) and Zoom (5) are placed in the right container, with the repositioning handle below it. The combined height of the right container and handle matches the mouse on the left.
 
 ```text
 ┌────┬────┬────┐
@@ -120,41 +120,41 @@ FHD 원본 크기로 비교하려면 원격 화면을 1920×1080으로 두고 **
 └─────────────┘
 ```
 
-터치패드처럼 손가락 이동 거리와 속도에 따라 커서가 움직인다. 손가락을 멈추면 커서도 멈추며, 가운데로 돌아올 필요가 없다. 손을 떼었다 다시 대서 이어 움직일 수 있다. 좌·우 버튼 드래그와 휠을 길게 눌러 하는 중간 버튼 드래그도 움직인 만큼만 반응한다.
+Like a touchpad, the cursor moves according to how far and how fast your finger moves. The cursor stops when your finger stops, without needing to return to the center. You can lift your finger and place it down again to continue moving. Left- and right-button dragging, and middle-button dragging by holding the wheel, also respond only to the distance moved.
 
-**휠·화면 이동·확대는 속도 조이스틱**이다. 밀기 시작한 뒤에는 컨트롤 중앙에서 멀리 떨어질수록 완만하게 빨라지고, 그 위치에 유지하면 계속 작동한다. 멀리 밀 때의 속도 증가폭과 최대 속도를 낮춰 과도하게 빨라지지 않도록 한다. 중앙 부근으로 돌아오거나 손을 떼면 멈춘다. 휠·확대는 위아래 방향만 사용한다. 마우스 컨트롤과 왼쪽 핫키 바는 반투명 배경으로 원격 화면을 비춰 보이며 글자와 아이콘은 선명하게 유지한다.
+**Wheel, Pan, and Zoom are speed joysticks**. Once you start pushing, speed increases gradually as you move farther from the control's center, and operation continues while you hold that position. The speed increase and maximum speed at larger distances are reduced to prevent excessive speed. Return near the center or lift your finger to stop. Wheel and Zoom use only vertical movement. The mouse controls and left hotkey bar have translucent backgrounds that show the remote screen through them while keeping text and icons clear.
 
-| 조이스틱 | 짧게 탭 | 바로 밀기 | 잠깐 꾹 누른 뒤 밀기 |
+| Joystick | Quick tap | Push immediately | Hold briefly, then push |
 | --- | --- | --- | --- |
-| 1 좌클릭 | 왼쪽 클릭 | 왼쪽 버튼을 누른 채 이동 | 동일 |
-| 2 휠 | 중간 버튼 클릭 | 위아래로 밀어 유지: 연속 스크롤 | 중간 버튼을 누른 채 모든 방향 이동 |
-| 3 우클릭 | 오른쪽 클릭 | 오른쪽 버튼을 누른 채 이동 | 동일 |
-| 0 커서 이동 | 클릭하지 않음 | 커서만 이동 | 동일 |
-| 4 화면 이동 | — | 밀어 유지: 확대된 화면에서 보는 위치 연속 이동 | 동일 |
-| 5 확대·축소 | — | 위로 밀어 유지: 확대, 아래로 유지: 축소 | 동일 |
+| 1 Left Click | Left click | Move while holding the left button | Same |
+| 2 Wheel | Middle click | Push up or down and hold: continuous scrolling | Move in any direction while holding the middle button |
+| 3 Right Click | Right click | Move while holding the right button | Same |
+| 0 Cursor Movement | No click | Move the cursor only | Same |
+| 4 Pan | — | Push and hold: continuously move the viewing position on the zoomed screen | Same |
+| 5 Zoom In/Out | — | Push up and hold: zoom in; hold down: zoom out | Same |
 
-좌·우 조이스틱은 이동을 시작하면 즉시 버튼을 누른다. 휠의 중간 버튼 드래그는 약 0.32초 꾹 누른 뒤 시작한다. 버튼을 잡으면 색이 바뀌고, 손을 떼거나 취소하면 해제한다. 마지막 **핸들**을 끌면 컨트롤 묶음이 함께 움직이며 화면 바깥으로 넘어가지 않는다. 조이스틱·핸들에 포커스를 두고 방향키로도 조작할 수 있다. 좌·우 조이스틱에서는 방향키를 누르는 동안 드래그하고 모든 방향키를 떼거나 포커스를 옮기면 해제한다.
+The left- and right-click joysticks press the button immediately when movement starts. Middle-button dragging with the wheel starts after holding for about 0.32 seconds. The color changes while a button is held; lifting your finger or canceling releases it. Dragging the final **handle** moves the control group together and keeps it within the screen. You can also focus a joystick or handle and operate it with the arrow keys. On the left- and right-click joysticks, dragging continues while arrow keys are held and releases when all arrow keys are released or focus moves elsewhere.
 
-휴대폰에서 원격 화면 자체를 밀면 보는 위치를 옮기고, 두 손가락으로 확대한다. 원격 클릭은 조이스틱으로 한다. **맞춤**은 확대·이동을 초기화한다. 확대는 1–6배이며 원격 해상도는 바꾸지 않는다.
+On a phone, swipe the remote screen itself to pan and use two fingers to zoom. Use the joysticks for remote clicks. **Fit** resets zoom and pan. Zoom ranges from 1–6× and does not change the remote resolution.
 
-마우스가 있으면 화면에서 직접 커서를 움직이고 클릭할 수 있다. Wayland는 조이스틱 상대 이동을 사용한다. 키보드는 화면을 선택한 뒤 입력한다. mew의 탭 단축키보다 원격 입력을 우선하므로 Ctrl/Cmd+W·N·Shift+N·T·숫자·Tab과 Esc·F6도 원격 컴퓨터에 전달하며 도구·닫기는 마우스로 선택한다. **뷰어의 전체화면 버튼**으로 전체화면을 켜고 원격 화면을 선택하면 HTTPS/localhost의 지원 브라우저에서 모든 허용 키의 잠금을 요청한다. F11만으로 켠 전체화면은 대신할 수 없다. 클라이언트에 별도 키보드 보조앱을 설치할 필요는 없다. 비전체화면·미지원 브라우저에서는 일부 예약키가 웹페이지에 도달하지 않고, Ctrl+Alt+Delete 및 환경에 따른 Windows 키·Alt+Tab은 로컬 OS에서 처리할 수 있다. Chrome에서는 Esc를 길게 눌러 전체화면 잠금을 해제할 수 있다. 원격 포커스를 벗어나면 전체화면의 mew 내부 탭 단축키 잠금으로 돌아간다. **입력 → 붙여넣기**는 작성한 텍스트로 원격 클립보드를 덮어쓰고 붙여넣는다. 같은 창의 **원격 Esc**는 원격 컴퓨터에 Escape 키를 보낸다.
+With a mouse, you can move the cursor and click directly on the screen. Wayland uses joystick-based relative movement. To type, select the screen first. Remote input takes priority over mew tab shortcuts, so Ctrl/Cmd+W, N, Shift+N, T, number keys, and Tab, as well as Esc and F6, are sent to the remote computer; select tools and close controls with the mouse. When you enter fullscreen using the **viewer's fullscreen button** and select the remote screen, supported browsers on HTTPS/localhost request a lock for all permitted keys. Fullscreen entered with F11 alone cannot substitute for this. No separate keyboard helper app needs to be installed on the client. Outside fullscreen or in unsupported browsers, some reserved keys do not reach the webpage, and Ctrl+Alt+Delete, as well as the Windows key and Alt+Tab depending on the environment, may be handled by the local OS. In Chrome, hold Esc to release the fullscreen lock. Leaving remote focus returns to the lock for mew's internal tab shortcuts in fullscreen. **Input → Paste** overwrites the remote clipboard with the text you entered and pastes it. **Remote Esc** in the same window sends the Escape key to the remote computer.
 
-원격 화면의 Ctrl/Cmd+C·X는 원격 텍스트를 내 클립보드로 가져오고, Ctrl/Cmd+V는 내 클립보드 텍스트를 원격에 붙여넣는다. 브라우저에서 클립보드 권한을 허용해야 하며 HTTPS 또는 localhost가 필요하다. 자동 공유가 실패하면 원격 Ctrl/Cmd+V를 보내 원격 클립보드의 기존 내용으로 붙여넣는다. **입력 → 원격 클립보드 가져오기 / 내 클립보드 붙여넣기**로 재시도하거나 기존 텍스트 입력을 사용할 수도 있다. 최대 4096 코드 유닛의 텍스트만 공유하며 이미지·파일은 지원하지 않는다.
+On the remote screen, Ctrl/Cmd+C or X retrieves remote text into your clipboard, and Ctrl/Cmd+V pastes text from your clipboard remotely. You must grant clipboard permission in the browser, and HTTPS or localhost is required. If automatic sharing fails, a remote Ctrl/Cmd+V is sent to paste the existing contents of the remote clipboard. You can retry with **Input → Get Remote Clipboard / Paste My Clipboard** or use the existing text input. Only text up to 4096 code units is shared; images and files are not supported.
 
-Windows/WSL과 macOS의 지원되는 화면에서는 커서를 내 기기에서 즉시 표시하므로 영상 갱신을 기다리지 않는다. Windows는 GPU 캡처와 커서를 분리하며 하드웨어 캡처·인코딩을 준비하지 못하면 오류 안내를 표시한다. 연결 후 **도움말 → 커서 표시**에서 실제로 적용됐는지 확인한다. **이 기기에서 즉시 표시**는 로컬 커서, **영상에 포함됨**은 기존 영상 커서다. 호버·클릭·드래그는 원격 컴퓨터에 전달한다. 화면 변화가 없으면 영상 전송을 쉬고, 화면이 바뀌면 재개한다. Mac은 ScreenCaptureKit으로 화면과 커서를 분리한다. 지원되지 않거나 초기 캡처가 실패한 화면 및 Linux는 기존 영상 커서를 사용한다.
+On supported displays on Windows/WSL and macOS, the cursor appears immediately on your device without waiting for a video update. Windows separates the cursor from GPU capture and displays error guidance if hardware capture or encoding cannot be prepared. After connecting, check **Help → Cursor Display** to see whether this is actually active. **Displayed Instantly on This Device** indicates a local cursor; **Included in Video** indicates the existing video cursor. Hover, click, and drag actions are sent to the remote computer. Video transmission pauses when the screen is unchanged and resumes when it changes. Mac uses ScreenCaptureKit to separate the screen and cursor. Unsupported displays, displays where initial capture fails, and Linux use the existing video cursor.
 
-공유 화면이 여러 개면 설정의 **공유 화면** 선택기로 바꾼다. 이전 연결을 종료하고 새 화면에 연결한다. 열린 보조 창과 전체화면이 없는 상태에서 도구에 포커스가 있을 때 Esc 또는 모바일 뒤로가기는 연결을 종료한다. 상단 닫기는 바로 연결을 종료한다. 백그라운드가 되면 연결을 종료하고, 돌아왔을 때 **다시 연결**을 누른다.
+If multiple displays are available to share, switch using the **Shared Display** selector in Settings. This ends the previous connection and connects to the new display. When no auxiliary window is open, fullscreen is off, and a tool has focus, Esc or mobile Back ends the connection. Close at the top ends the connection immediately. Moving to the background ends the connection; press **Reconnect** when you return.
 
-## 네트워크와 설정
+## Network and Configuration
 
-**별도 relay/TURN 서버 없이 직접 연결한다.** 로그인·협상에는 기존 Mew HTTPS/WebSocket을 사용하지만 영상·입력은 그 경로를 통과하지 않는다. 두 기기가 UDP로 서로 도달해야 한다. Mew는 STUN 직결을 먼저 시도하고 지연되면 공유기의 짧은 임시 NAT 매핑을 자동 요청한다. 사용자가 포트를 직접 지정하는 절차는 기본 경로가 아니다. 지원 없는 CGNAT·회사 방화벽에서는 직결이 실패할 수 있다. HTTPS 터널에 접속된다고 영상 연결까지 보장되지는 않는다.
+**Connections are direct, without a separate relay/TURN server.** Login and negotiation use the existing Mew HTTPS/WebSocket connection, but video and input do not pass through it. The two devices must be able to reach each other over UDP. Mew first attempts a direct STUN connection; if delayed, it automatically requests a short-lived temporary NAT mapping from the router. Manually specifying ports is not the default procedure. Direct connections may fail with unsupported CGNAT or corporate firewalls. Access through an HTTPS tunnel does not guarantee a video connection.
 
-지원 OS 모두 하드웨어 H.264 직접 연결을 사용하며 최대 4K·240FPS를 요청할 수 있다. 실제 적용값과 수신 FPS·입력 지연은 장치·브라우저·네트워크에 따라 달라진다. H.264를 지원하는 브라우저와 정상 GPU 드라이버가 필요하다.
+All supported operating systems use direct connections with hardware H.264 and can request up to 4K at 240 FPS. Actual applied values, received FPS, and input latency vary by device, browser, and network. A browser supporting H.264 and a working GPU driver are required.
 
-`MEW_DESKTOP_ICE_SERVERS` 기본값은 Google `stun:stun.l.google.com:19302`와 Cloudflare `stun:stun.cloudflare.com:3478`의 공개 STUN이다. 외부 주소만 확인하며 영상·입력을 중계하지 않는다. 외부 조회를 원하지 않으면 `[]`를 지정한다. `stun:`·`stuns:`만 허용하며 TURN은 거부한다. 공유기 임시 매핑 자동화는 `MEW_DESKTOP_AUTO_NAT=0`으로 별도로 끌 수 있다.
+`MEW_DESKTOP_ICE_SERVERS` defaults to Google's public STUN server `stun:stun.l.google.com:19302` and Cloudflare's `stun:stun.cloudflare.com:3478`. These only identify external addresses and do not relay video or input. Specify `[]` if you do not want external lookups. Only `stun:` and `stuns:` are allowed; TURN is rejected. Automatic temporary router mapping can be disabled separately with `MEW_DESKTOP_AUTO_NAT=0`.
 
-`MEW_DESKTOP_UDP_PORT=50020`처럼 지원 OS의 네이티브 호스트 UDP 포트를 고정할 수 있다. 방화벽 관리자가 특정 포트 허용을 요구할 때도 같은 설정을 사용한다. 공유기의 고정 수동 매핑은 운영자 선택 사항이다. 기본 자동 연결의 승인·지원 범위는 [외부 직결 문서](../../.mew/docs/development/remote-desktop-connectivity.md)를 따른다. CGNAT에서는 공유기 매핑만으로 공인 IPv4가 생기지 않는다.
+You can fix the native host's UDP port on supported operating systems, for example with `MEW_DESKTOP_UDP_PORT=50020`. Use the same setting when a firewall administrator requires allowing a specific port. A fixed manual router mapping is an operator option. See the [external direct connection documentation](../../.mew/docs/development/remote-desktop-connectivity.md) for the approval and support scope of default automatic connections. With CGNAT, router mapping alone does not provide a public IPv4 address.
 
-`MEW_DESKTOP_HELPER_DIR`은 설치 경로를 바꾸는 선택 설정이다. Mac/Linux는 절대 경로, WSL은 `C:\…` 같은 Windows 절대 경로다. 설치 버튼과 수동 설치 모두 이 위치에 보조 앱을 복사·설치하며, 연결도 같은 위치를 사용한다.
+`MEW_DESKTOP_HELPER_DIR` is an optional setting that changes the installation location. Use an absolute path on Mac/Linux or a Windows absolute path such as `C:\…` on WSL. Both the installation button and manual installation copy and install the helper app to this location, and connections use the same location.
 
-HTTPS 프록시/터널은 로그인·연결 협상만 전달한다. [환경변수](../configuration/environment.md), [검증 범위·지원하지 않는 화면](../../.mew/docs/development/remote-desktop.md), [배포 라이선스](../../.mew/docs/development/remote-desktop-distribution.md)를 참고한다.
+HTTPS proxies/tunnels forward only login and connection negotiation. See [environment variables](../configuration/environment.md), [verification scope and unsupported screens](../../.mew/docs/development/remote-desktop.md), and [distribution licenses](../../.mew/docs/development/remote-desktop-distribution.md).

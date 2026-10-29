@@ -1,29 +1,29 @@
 ---
-title: "제품 검색 노출 운영"
-description: "공개 제품 사이트의 검색·AI 인용 설정 조건과 운영 반영·재측정 절차. 설치된 작업 공간의 noindex 계약과 구분한다."
+title: "Product search visibility operations"
+description: "Configuration conditions for search and AI citations on the public product site, plus procedures for production rollout and remeasurement. Distinct from the noindex contract for installed workspaces."
 updated: "2026-10-29"
 ---
 
-## 공개 제품 사이트의 설정 조건
+## Configuration conditions for the public product site
 
-대표 공개 주소와 그 사이트의 소스·배포 소유권을 확정한 뒤 다음 순서로 설정한다. 호스트마다 다른 주소로 설치되는 작업 공간에는 임의 canonical·사이트맵·`llms.txt`를 만들지 않는다.
+Confirm the primary public address and ownership of the site's source and deployment, then configure it in the following order. Do not create arbitrary canonical URLs, sitemaps, or `llms.txt` for workspaces installed at different addresses on each host.
 
-1. 로그인 없이 받은 HTML에 제품의 실제 기능·설치 방법·출처 링크를 제공한다. 비공개 작업 문서·대화·기기 목록은 포함하지 않는다.
-2. 실제 공개 페이지에 고유 title·description·canonical·공유 메타를 넣는다. 구조화 데이터는 화면에 보이는 사실과 일치시킨다.
-3. 공개 정본 URL만 사이트맵에 담고 robots에서 연결한다. 없는 공개 페이지가 실제 404인지 확인한다.
-4. 검색·실시간 조회 크롤러와 학습 크롤러의 허용 정책을 운영자가 정한다. `llms.txt`에는 검증된 제품·설치·지원 문서만 안내한다. 이 파일의 존재만으로 AI 인용을 보장하지 않는다.
-5. 운영자가 Google Search Console·Bing Webmaster Tools·네이버 서치어드바이저에서 소유권을 확인하고 사이트맵을 제출한다. 계정이나 검증 토큰 없이 등록 완료로 표시하지 않는다.
+1. Provide the product's actual features, installation instructions, and source links in HTML received without logging in. Do not include private work documents, conversations, or device lists.
+2. Add unique title, description, canonical, and sharing metadata to actual public pages. Match structured data to facts visible on the page.
+3. Include only public canonical URLs in the sitemap and link to it from robots. Verify that nonexistent public pages actually return 404.
+4. The operator determines policies for allowing search and real-time retrieval crawlers and training crawlers. List only verified product, installation, and support documentation in `llms.txt`. The existence of this file alone does not guarantee AI citations.
+5. The operator verifies ownership in Google Search Console, Bing Webmaster Tools, and Naver Search Advisor and submits the sitemap. Do not mark registration complete without an account or verification token.
 
-공개 블로그는 반복해서 답할 실제 질문·원출처·검수 담당자·발행 리듬을 정한 뒤 만든다. 검색어·문의 데이터가 없는 상태에서 질문별 페이지나 발행 일정을 대량 생성하지 않는다.
+Create a public blog after defining real recurring questions to answer, original sources, reviewers, and a publishing cadence. Do not mass-generate question-specific pages or publishing schedules without search query or inquiry data.
 
 
-## 운영 반영과 재측정
+## Production rollout and remeasurement
 
-에이전트는 소스와 격리 검사를 수행하며 앱 빌드·서버 재시작·중앙 배포는 운영자가 수행한다. 로컬 검사 통과는 운영 적용이나 검색 성과를 뜻하지 않는다.
+The agent checks source code and performs isolated checks; the operator builds the app, restarts servers, and deploys centrally. Passing local checks does not mean changes have been applied to production or have achieved search results.
 
-2026-10-23 격리 HTTP fixture를 `curl`로 확인해 robots의 200·텍스트 본문과 HTML의 `X-Robots-Tag`·제목·설명·robots 메타를 검증했다. `server/search-indexing.test.ts`·`server/remote-ui.test.ts`·`server/vite-config.test.ts`의 5개 검사, 타입 검사·변경 TypeScript lint·문서 description/링크 검사도 통과했다. P2P 검사는 실제 dispatcher가 설치 HTML 메타와 헤더를 전달하는 범위이며, 중앙 공개 서비스의 배포·검색 수집은 검증하지 않았다.
+On 2026-10-23, the isolated HTTP fixture was checked with `curl` to verify robots' 200 and text body, and HTML's `X-Robots-Tag`, title, description, and robots metadata. The 5 checks in `server/search-indexing.test.ts`, `server/remote-ui.test.ts`, and `server/vite-config.test.ts` also passed, along with type checking, linting of changed TypeScript, and documentation description/link checks. The P2P checks cover the actual dispatcher forwarding installation HTML metadata and headers; they did not verify deployment or search crawling of the central public service.
 
-반영 직후 운영자는 공개 진입점에서 아래를 확인한다. `HOST`에는 본인이 관리하는 호스트 주소를 쓴다.
+Immediately after rollout, the operator checks the following at the public entry point. Use the address of a host you manage for `HOST`.
 
 ```bash
 curl -sS -D - "$HOST/robots.txt"
@@ -31,15 +31,15 @@ curl -sS -I "$HOST/"
 curl -sS "$HOST/" | rg '<title|name="(description|robots)"'
 ```
 
-robots는 위의 텍스트 응답이어야 하고 HTML·파일 응답의 `X-Robots-Tag`에는 `noindex`가 있어야 한다. P2P는 동일 설치본의 HTML 메타와 전달 헤더를 별도로 확인한다. 중앙 공개 소개는 호스트의 `noindex`를 상속하지 않는지 그 소유 배포에서 확인한다.
+robots must return the text response above, and `X-Robots-Tag` in HTML and file responses must contain `noindex`. For P2P, check the HTML metadata and forwarded headers of the same installation separately. For the central public introduction, verify in its owning deployment that it does not inherit the host's `noindex`.
 
-2026-10-23 반영을 가정한 첫 재측정 제안일은 **2026-11-06**이다. 자동 예약은 만들지 않았다. 실제 반영일이 다르면 그날부터 14일 뒤로 조정한다.
+Assuming rollout on 2026-10-23, the proposed first remeasurement date is **2026-11-06**. No automatic schedule was created. If the actual rollout date differs, adjust it to 14 days after that date.
 
-| 측정 대상 | 반영 직후 기준선 | 14일 뒤 확인 |
+| Measurement target | Baseline immediately after rollout | Check after 14 days |
 | --- | --- | --- |
-| 작업 공간 | HTML·헤더의 `noindex`, 게스트/로그인 권한 | Search Console 접근 권한이 있으면 제외 상태 확인. 개인 경로를 공개 검색창에 입력하지 않는다. |
-| 공개 사이트 SEO·네이버 | 최근 28일 노출·클릭·색인 상태를 GSC·Bing·서치어드바이저에서 기록 | 집계가 끝나지 않은 최근 2~3일을 빼고 같은 지표·페이지를 비교한다. |
-| 공개 사이트 AI 인용 | 실제 제품·설치 질문 5~10개와 ChatGPT 검색·Perplexity·네이버의 출처 URL을 기록 | 같은 질문·서비스에서 인용 여부와 주소를 다시 기록한다. |
-| 공개 콘텐츠 | URL·대상 질문·원출처·실제 수정일·노출/클릭을 글별로 기록 | 노출·인용된 글 비율과 사실 갱신 필요 여부를 확인한다. |
+| Workspace | `noindex` in HTML and headers, guest/login permissions | Check exclusion status if you have Search Console access. Do not enter private paths into public search boxes. |
+| Public site SEO and Naver | Record impressions, clicks, and indexing status for the past 28 days in GSC, Bing, and Search Advisor | Compare the same metrics and pages, excluding the most recent 2~3 days for which aggregation is incomplete. |
+| Public site AI citations | Record 5~10 actual product and installation questions and the source URLs from ChatGPT search, Perplexity, and Naver | Record citation presence and URLs again for the same questions and services. |
+| Public content | Record the URL, target question, original source, actual modification date, and impressions/clicks for each article | Check the proportion of articles that received impressions or citations and whether facts need updating. |
 
-현재 노출·클릭·인용 수치는 **미측정**이다. 0으로 기록하거나 개선을 주장하지 않는다.
+Current impression, click, and citation counts are **unmeasured**. Do not record them as 0 or claim improvement.

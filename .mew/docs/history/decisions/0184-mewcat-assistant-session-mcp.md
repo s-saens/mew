@@ -1,30 +1,30 @@
 ---
-provenance: "Liiiiv 중앙 ADR 이관본, 2026-10-14"
-description: "이관한 결정 기록: 뮤캣 도우미 전용 세션과 자동 MCP. 당시 선택·근거·후속 변경을 보존하며 현재 계약은 Mew 소유 문서에서 확인한다."
-title: "0184 — 뮤캣 도우미 전용 세션과 자동 MCP"
+provenance: "Migrated copy of a Liiiiv central ADR, 2026-10-14"
+description: "Migrated decision record: dedicated Mewcat assistant sessions and automatic MCP. Preserves the choices, rationale, and subsequent changes at the time; consult the Mew owning document for the current contract."
+title: "0184 — Dedicated Mewcat assistant sessions and automatic MCP"
 created: 2026-09-30
 updated: 2026-09-30
 ---
 
-- 날짜: 2026-09-30
-- 상태: 채택
-- 부분 대체: [0157](0157-mew-native-agent-harness-management.md) — 뮤캣 전용 내장 MCP의 세션별 자동 주입을 추가하며 원본 MCP 관리 계약은 유지
-- 결정자: 사용자(뮤캣 대화·직접 조작·자동 MCP 요청), Codex(구현)
+- Date: 2026-09-30
+- Status: Adopted
+- Partially supersedes: [0157](0157-mew-native-agent-harness-management.md) — Add automatic per-session injection of the built-in MCP dedicated to Mewcat while preserving the original MCP management contract
+- Decision makers: user (requested Mewcat conversations, direct actions, and automatic MCP), Codex (implementation)
 
-## 배경
+## Background
 
-사용자가 Mew 환경 설정을 공부하지 않고 프로젝트를 시작하도록, 기존 뮤캣의 알림·리소스 팝업에서 질문하고 실제 기능을 실행할 수 있어야 한다.
+Users must be able to ask questions and execute actual features from the existing Mewcat notification and resource popup so they can start projects without studying Mew configuration.
 
-## 결정
+## Decision
 
-- 뮤캣은 계정·브라우저 탭·런타임별 전용 ACP 대화를 사용한다. 작업 디렉터리는 데이터 디렉터리의 전용 폴더로 고정하고 현재 프로젝트는 매 요청에 별도로 전달한다. 프로젝트 작업용 대화와 섞지 않는다.
-- 기존 독립 감독과 대화 저장·복원을 재사용한다. session/new와 session/load에 Mew 내장 stdio MCP를 주입하고 외부 런타임의 전역·프로젝트 설정 파일은 변경하지 않는다. 사용자는 에이전트를 선택·인증하며 별도 MCP 설치·연결은 하지 않는다.
-- MCP 브리지는 로컬 사용자 전용 Unix socket으로 앱 서버와 연결한다. 호출할 때마다 원래 웹 세션의 계정·권한을 재검사한다. 화면 이동은 해당 브라우저에 요청하고 실제 처리 결과를 받은 뒤 도구를 완료한다. 연결 종료·권한 회수·시간 초과에는 성공으로 처리하지 않는다.
-- 첫 도구 범위는 현재 맥락·제품 도움말, 프로젝트 생성·열기, 기존 문서를 보존하는 초기화, 파일·패널 열기, 프로젝트 작업용 대화 열기다. 삭제·배포·업데이트 도구는 제공하지 않는다.
-- UI·상태·오류·힌트·접근성 문구와 새 문서 템플릿은 네 언어를 지원한다. AI는 현재 UI 언어로 답하도록 매 요청에 지시한다. 기존 대화·문서·사용자 이름은 자동 번역하지 않는다.
+- Mewcat uses a dedicated ACP conversation per account, browser tab, and runtime. The working directory is fixed to a dedicated folder in the data directory, and the current project is passed separately with every request. Do not mix it with conversations for project work.
+- Reuse the existing independent supervisor and conversation storage and restoration. Inject Mew's built-in stdio MCP into session/new and session/load without changing the external runtime's global or project configuration files. Users select and authenticate an agent without separately installing or connecting MCP.
+- The MCP bridge connects to the app server through a Unix socket restricted to the local user. Recheck the original web session's account and permissions on every call. Request navigation in the corresponding browser and complete the tool only after receiving the actual result. Do not report success on disconnection, permission revocation, or timeout.
+- The initial tool scope covers current context and product help, creating and opening projects, initialization that preserves existing documents, opening files and panels, and opening conversations for project work. No deletion, deployment, or update tools are provided.
+- UI, status, error, hint, and accessibility text, along with new document templates, support four languages. Every request instructs the AI to respond in the current UI language. Existing conversations, documents, and user names are not automatically translated.
 
-## 근거
+## Rationale
 
-ACP의 세션별 MCP 전달은 수동 설정 없이 런타임의 기존 도구 호출 경로를 사용할 수 있다. 서버 기능과 화면 조작을 분리하면 기존 API 권한·UI 상태 복원을 재사용하면서 실행 완료를 확인할 수 있다. 에이전트 자체의 셸·파일 접근은 기존 실행 권한을 따르며 MCP가 OS 샌드박스가 되지는 않는다.
+ACP's per-session MCP delivery allows use of the runtime's existing tool invocation path without manual configuration. Separating server features from screen actions allows reuse of existing API permissions and UI state restoration while confirming execution completion. The agent's own shell and file access follows existing execution permissions; MCP does not serve as an OS sandbox.
 
-현행 계약: [뮤캣 도우미](../../specs/mewcat-assistant.md).
+Current contract: [Mewcat assistant](../../specs/mewcat-assistant.md).

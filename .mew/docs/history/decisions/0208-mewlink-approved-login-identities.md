@@ -1,31 +1,31 @@
 ---
-provenance: "Liiiiv 중앙 ADR 이관본, 2026-10-14"
-title: "0208 — Mewlink 신원은 승인된 로컬 사용자의 로그인 수단으로 연결한다"
-description: "중앙 신원과 로컬 사용자를 분리하고, 서명된 Mewlink 계정의 접근 요청·owner 승인·비밀번호 없는 사용자와 연결 회수의 경계를 결정한다. 기존 비로그인 기기 연결·로컬 비밀번호 로그인은 유지한다. 본인 계정 연결과 즉시 승인 UI는 후속 0007에서 확장했다."
+provenance: "Migrated copy of a Liiiiv central ADR, 2026-10-14"
+title: "0208 — Link Mewlink identities as login methods for approved local users"
+description: "Separate central identities from local users and define boundaries for access requests from signed Mewlink accounts, owner approval, passwordless users, and link revocation. Retain existing unauthenticated device connections and local password login. Linking one's own account and the immediate approval UI were extended in subsequent decision 0007."
 created: 2026-10-12
 updated: 2026-10-16
 ---
 
-- 날짜: 2026-10-12
-- 상태: 채택
-- 적용 상태: 구현·격리 자동 검증 완료 · 운영 미반영
-- 후속 확장: [0007 — Mewlink 즉시 승인과 본인 이메일 계정 연결](../../decisions/0007-mewlink-self-service-linking.md). 아래 원래 결정은 당시의 근거로 보존한다.
-- 부분 대체: [0207](0207-mewlink-device-access-local-auth.md) — 로컬 비밀번호만을 기기 사용 인증 수단으로 두던 범위. 비로그인 기기 연결·로컬 최종 인가·중앙 관리 계정 분리는 유지한다.
-- 결정자: 사용자 (특정 OAuth 계정의 mew 접속과 신원 분리 구현 요청), Codex (구현 계약)
+- Date: 2026-10-12
+- Status: Adopted
+- Application status: implementation and isolated automated verification complete · not applied to production
+- Subsequent extension: [0007 — Mewlink Immediate Approval and Linking One's Own Email Account](../../decisions/0007-mewlink-self-service-linking.md). Preserve the original decision below as the rationale at the time.
+- Partially supersedes: [0207](0207-mewlink-device-access-local-auth.md) — The scope that made local passwords the sole authentication method for device use. Retain unauthenticated device connections, final local authorization, and separation of central management accounts.
+- Decision makers: user (requested mew access for specific OAuth accounts and implementation of identity separation), Codex (implementation contract)
 
-## 결정
+## Decision
 
-- Mewlink 계정과 로컬 mew 사용자는 별개다. 중앙 로그인이 신원을 증명해도 기기 소유자·주소·이메일 일치만으로 로컬 권한을 얻지 않는다. 이전 등록 설정의 `accounts` 매핑은 신규 OAuth 승인을 대신하지 않는다.
-- 기존 비로그인 기기 연결과 이메일·비밀번호 로그인을 유지한다. 선택적으로 중앙 로그인한 브라우저의 연결에는 중앙 origin·불변 계정 ID·제공자·표시 이름의 서명된 신원을 전달한다. 신원은 일회용 launch·중앙 세션·기기·브라우저 키·협상 ticket에 결합한다. 호스트는 ticket의 서명과 대상 검증 후에만 신원을 신뢰한다.
-- 미승인 신원은 정적 UI와 인증·접근 요청 API만 사용한다. owner가 확인한 요청을 기존 로컬 사용자에 연결하거나, 역할을 명시하여 비밀번호 없는 로컬 사용자를 생성한다. 신규 사용자의 기본 역할은 member이며 공개 회원가입·자동 병합·자동 승격은 제공하지 않는다.
-- 로컬 사용자의 프로필·권한과 비밀번호 자격증명·외부 신원 연결은 별도로 저장한다. 사용자 생성과 신원 승인 상태는 하나의 원자적 저장으로 반영한다. 기존 이메일 기반 사용자 ID·파일 권한·개인 데이터는 그대로 유지하며 새 비밀번호 없는 사용자는 독립적인 불변 ID를 쓴다. 호환 API의 `email`은 기존 내부 계정 키를 뜻하고 실제 연락처·외부 신원의 자동 연결 근거가 아니다.
-- 외부 인증의 비밀번호 변경 요구는 비밀번호 로그인 수단에만 적용한다. 프로필 변경으로 기존 비밀번호의 변경 요구를 지우지 않는다. OAuth 전용 사용자는 비밀번호 없이 작업하지만 역할·기능·파일 권한과 계정별 저장소 경계는 동일하다.
-- 외부 로그인 권한은 살아 있는 연결과 로컬 신원 연결에서 매번 다시 계산한다. 외부 로그인으로 장기 로컬 비밀번호 세션을 발급하지 않는다. 연결 회수·계정 삭제·역할/권한 변경·중앙 인증 세션 만료는 기존 요청·WS를 재검증한다. 로그아웃 뒤 중앙 신원으로 즉시 재로그인하지 않는다.
-- 중앙 로그인·로그아웃 이동은 정확한 프레임의 MessagePort에서 행동만 요청한다. 대상 기기 경로는 중앙 런처가 결정한다. 설치된 앱은 중앙 쿠키·launch·장기 로컬 세션 토큰을 받지 않는다.
-- 중앙 소스의 공개 Git 제외·로컬 owner 복구 로그인·origin 분리·직접 DataChannel 전송·TURN 미사용을 유지한다. 실제 적용을 위해 사용자가 로컬 업데이트와 중앙 배포를 진행한다.
+- Mewlink accounts and local mew users are separate. Even when central login proves identity, device ownership, addresses, or matching email addresses alone do not grant local permissions. The `accounts` mapping in previous registration settings does not replace new OAuth approval.
+- Retain existing unauthenticated device connections and email and password login. Optionally, pass a signed identity containing the central origin, immutable account ID, provider, and display name for connections from browsers logged in centrally. Bind the identity to the one-time launch, central session, device, browser key, and negotiation ticket. The host trusts the identity only after verifying the ticket's signature and target.
+- Unapproved identities may use only the static UI and authentication and access-request APIs. Link an owner-reviewed request to an existing local user, or create a passwordless local user with an explicitly specified role. The default role for new users is member; do not provide public signup, automatic merging, or automatic privilege elevation.
+- Store local user profiles and permissions separately from password credentials and external identity links. Apply user creation and identity approval status in a single atomic save. Preserve existing email-based user IDs, file permissions, and personal data; use independent immutable IDs for new passwordless users. In the compatibility API, `email` means the existing internal account key and is not a basis for automatically linking actual contact information or external identities.
+- For external authentication, apply password-change requirements only to the password login method. Profile changes must not clear an existing password's change requirement. OAuth-only users work without passwords, but the same role, feature, file-permission, and per-account storage boundaries apply.
+- Recalculate external login permissions each time from the active connection and local identity link. Do not issue long-lived local password sessions through external login. Link revocation, account deletion, role or permission changes, and central authentication session expiration trigger revalidation of existing requests and WS connections. Do not immediately log in again with the central identity after logout.
+- For navigation to central login or logout, request only the action through the MessagePort of the exact frame. The central launcher determines the target device path. The installed app does not receive central cookies, launches, or long-lived local session tokens.
+- Retain exclusion of central source code from public Git, local owner recovery login, origin separation, direct DataChannel transport, and no TURN usage. The user performs the local update and central deployment for actual application.
 
-## 근거와 현재 계약
+## Rationale and current contract
 
-사용자와 로그인 수단을 분리하면 권한·개인 설정을 같은 로컬 사용자에 유지하면서 이메일 비밀번호와 명시적으로 승인된 OAuth를 함께 사용할 수 있다. 이메일은 안정적인 외부 신원 식별자가 아니므로 연결은 중앙 issuer와 불변 계정 ID를 기준으로 한다. [OIDC 신원 식별 규칙](https://openid.net/specs/openid-connect-core-1_0.html#ClaimStability).
+Separating users from login methods allows email and password login and explicitly approved OAuth to coexist while keeping permissions and personal settings on the same local user. Email is not a stable external identity identifier, so links use the central issuer and immutable account ID. [OIDC Identity Identification Rules](https://openid.net/specs/openid-connect-core-1_0.html#ClaimStability).
 
-현재 구현과 검증·운영 적용 범위는 [원격 접속 계약](../../development/remote-access.md)과 [권한 계약](../../development/access-control.md)이 소유한다.
+The [Remote Access Contract](../../development/remote-access.md) and [Permissions Contract](../../development/access-control.md) own the current implementation, verification, and production application scope.

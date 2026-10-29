@@ -1,25 +1,25 @@
 ---
-title: "0051 — 태스크 패널 제거와 DB 간트 통합"
-description: "간트를 에디터 DB의 공유 데이터·날짜 열·표시 설정·상세 편집에 통합한 결정이다. 태스크 패널 제거와 Alt+T 제거는 후속 결정 0052로 대체됐으며 DB 통합과 데이터 분리 경계는 유지한다."
+title: "0051 — Remove the task panel and integrate database Gantt"
+description: "The decision integrates Gantt into the editor database's shared data, date columns, display settings, and detail editing. The removal of the task panel and Alt+T was superseded by subsequent decision 0052; database integration and data separation boundaries remain unchanged."
 created: 2026-10-23
 updated: 2026-10-23
 ---
 
-상태: 부분 대체 — [0052 — 태스크 패널 복원과 DB 간트 병행](0052-restore-task-panel.md)이 태스크 패널·저장 배치·단축키 제거를 대체한다. DB 간트 통합과 기존 태스크·DB 데이터의 분리 경계는 유지한다.
+Status: Partially superseded — [0052 — Restore the task panel alongside database Gantt](0052-restore-task-panel.md) supersedes the removal of the task panel, saved layouts, and shortcuts. Database Gantt integration and the separation boundary between existing task and database data remain unchanged.
 
-## 배경
+## Background
 
-사용자가 독립 태스크 패널을 없애고 간트를 에디터 데이터베이스 보기에 통합하도록 요청했다. 태스크 전용 데이터와 별도 패널 대신 기존 DB의 행·날짜 열·편집기를 사용한다.
+The user requested removal of the standalone task panel and integration of Gantt into editor database views. Use existing database rows, date columns, and editors instead of task-specific data and a separate panel.
 
-## 결정
+## Decision
 
-- 독·설정·모바일 패널·새 항목 및 보기 전환 단축키에서 태스크 패널을 제거한다. 과거 레이아웃의 태스크 그룹·탭 할당·열림 상태는 버리고 이웃 패널은 보존한다.
-- [0028](0028-database-multiple-views.md)의 DB 보기 계약에 간트를 추가한다. 캘린더와 날짜 기준 열·항목 상세·읽기 전용·검색·저장 컨트롤러를 공유한다. 문서와 독립 DB 팝업의 표시 설정 저장 범위를 유지한다.
-- 기존 태스크 Markdown·메타데이터·저장 API는 보존한다. DB로 자동 복사하거나 원본을 삭제하지 않는다. 태스크 전용 완료·태그·담당자·계층 합산은 DB 간트의 계약에 포함하지 않는다.
-- 기능 패널은 기본 Alt+F로 열고 닫는다. Alt+T 패널 단축키는 제거하며 터미널의 Ctrl+백틱은 유지한다.
+- Remove the task panel from the dock, settings, mobile panels, and new-item and view-switching shortcuts. Discard task groups, tab assignments, and open states from old layouts while preserving neighboring panels.
+- Add Gantt to the database view contract in [0028](0028-database-multiple-views.md). Share the date reference column, item details, read-only behavior, search, and save controller with the calendar. Preserve the scope for saving display settings in documents and standalone database popups.
+- Preserve existing task Markdown, metadata, and storage APIs. Do not automatically copy them to the database or delete the originals. Task-specific completion, tags, assignees, and hierarchical aggregation are outside the database Gantt contract.
+- Use Alt+F by default to toggle the feature panel. Remove the Alt+T panel shortcut and preserve Ctrl+backtick for the terminal.
 
-## 근거와 영향
+## Rationale and Impact
 
-일정 편집이 문서 DB의 다른 보기와 같은 데이터를 사용한다. 기존 태스크 문서는 Documents에서 계속 편집할 수 있으며 DB 데이터와 자동 동기화하지 않는다. DB 사용에는 기존 Postgres·권한 준비가 필요하다. 앱 빌드와 운영 적용은 사용자가 수행한다.
+Schedule editing uses the same data as other document database views. Existing task documents remain editable in Documents and are not automatically synchronized with database data. Database use requires the existing Postgres and permission setup. The user performs app builds and production rollout.
 
-현재 조작과 검증은 [DB 안내](../../../docs/guides/database.md#뷰-바꾸기)와 [DB 기능 계약](../features/%EB%AC%B8%EC%84%9C%20%EB%8D%B0%EC%9D%B4%ED%84%B0%EB%B2%A0%EC%9D%B4%EC%8A%A4/%EB%AC%B8%EC%84%9C%20%EB%8D%B0%EC%9D%B4%ED%84%B0%EB%B2%A0%EC%9D%B4%EC%8A%A4%C2%B7%EC%A0%84%EC%B2%B4%20%EB%AA%A9%EB%A1%9D.md)을 따른다.
+Current operations and verification follow the [database guide](../../../docs/guides/database.md#switching-views) and [database feature contract](../features/document-databases/document-databases-and-catalog.md).

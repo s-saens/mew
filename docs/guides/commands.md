@@ -1,47 +1,47 @@
 ---
-title: "명령 버튼과 예약 작업"
-description: "상단바·프로젝트 사이드바의 명령 버튼과 현재 화면을 유지하는 다른 프로젝트 명령 실행, Alt+R 열기·숫자 선택·핸들 정렬과 행 전체 실행 상태를 안내한다. 명령 등록·중단·포트 앱 열기, 터미널 입력·에이전트 반복 예약과 완료 후 터미널 종료 옵션을 다룬다."
+title: "Command Buttons and Scheduled Tasks"
+description: "Covers command buttons in the top bar and project sidebar, running commands in other projects while keeping the current view, opening with Alt+R, selecting by number, reordering with handles, and full-row running status. Also covers adding and stopping commands, opening port apps, terminal input, recurring agent schedules, and the option to close the terminal after completion."
 updated: "2026-10-28"
 상위파일:
   - "../../.mew/docs/MOC.md"
   - "MOC.md"
 ---
-자주 실행하는 명령을 버튼으로 만들거나 에이전트 작업을 반복 예약할 때 사용하는 안내다. 작업할 프로젝트를 먼저 열고, 터미널·예약 작업 등 필요한 기능 권한을 확인한다. 에이전트 작업에는 [런타임 설치·인증](../configuration/agent-runtimes.md)도 필요하다.
+Use this guide to turn frequently run commands into buttons or schedule recurring agent tasks. First open the project you will work in and check the required feature permissions, such as terminals and scheduled tasks. Agent tasks also require [runtime installation and authentication](../configuration/agent-runtimes.md).
 
-| 하려는 일 | 사용할 기능 |
+| What you want to do | Feature to use |
 | --- | --- |
-| 특정 프로젝트에서 빌드·개발 서버 등 실행 | 상단바 또는 프로젝트 사이드바의 **▶ 명령어 버튼** |
-| 지금 보고 있는 셸에 자주 쓰는 문자열 입력 | 터미널의 **명령 버튼** |
-| 지정 시각·주기마다 새 에이전트 작업 실행 | 메뉴 → **예약 작업** |
-| 현재 대화에 메시지를 한 번 나중에 보내기 | 에이전트 입력줄의 [예약 메시지](../../.mew/docs/features/%ED%84%B0%EB%AF%B8%EB%84%90%C2%B7%EC%97%90%EC%9D%B4%EC%A0%84%ED%8A%B8%C2%B7%EC%9E%90%EB%8F%99%ED%99%94/%EC%97%90%EC%9D%B4%EC%A0%84%ED%8A%B8%20%EC%98%88%EC%95%BD%20%EB%A9%94%EC%8B%9C%EC%A7%80.md) |
+| Run builds, development servers, and other commands in a specific project | **▶ Command Button** in the top bar or project sidebar |
+| Type a frequently used string into the shell you are currently viewing | Terminal **Command Buttons** |
+| Run a new agent task at a specified time or interval | Menu → **Scheduled Tasks** |
+| Send a message once later in the current conversation | [Scheduled Message](../../.mew/docs/features/terminals-agents-automation/agent-scheduled-messages.md) in the agent input bar |
 
-## 명령어 버튼 — 두 종류
+## Command buttons — two types
 
-이름이 비슷하지만 별개 기능이다. 상단바의 ▶는 **프로젝트별 배치 실행**, 터미널 줄의 버튼은 **지금 보고 있는 세션에 타이핑**이다.
+These have similar names but are separate features. The top bar's ▶ is for **per-project batch execution**; the buttons in the terminal row **type into the session you are currently viewing**.
 
-|  | 상단바 프로젝트 ▶ 버튼 | 터미널 버튼 |
+|  | Top bar project ▶ button | Terminal buttons |
 | --- | --- | --- |
-| 설정 파일 | `<프로젝트>/.mew/cmd-button.json` | `.data/term-button.json` (**전역** — 모든 프로젝트·탭 공통) |
-| 편집 방법 | UI의 `＋ 명령 추가`·줄 꾹 누르기(우클릭), 또는 파일 직접 편집 | UI의 `+`·버튼 꾹 누르기(우클릭) |
-| 실행 위치 | 전용 숨김 세션 `mewcmd-<해시>` | 지금 열려 있는 tmux 세션 |
-| 실행 주체 | 서버(`tmux send-keys`) | 클라이언트(터미널 WebSocket에 직접 타이핑) |
+| Configuration file | `<프로젝트>/.mew/cmd-button.json` | `.data/term-button.json` (**global** — shared across all projects and tabs) |
+| How to edit | Use `＋ 명령 추가` in the UI, long-press (right-click) a row, or edit the file directly | Use `+` in the UI or long-press (right-click) a button |
+| Execution location | Dedicated hidden session `mewcmd-<해시>` | Currently open tmux session |
+| Executed by | Server (`tmux send-keys`) | Client (types directly into the terminal WebSocket) |
 
-## 상단바 프로젝트 ▶ 버튼 (.mew/cmd-button.json)
+## Top Bar Project ▶ Button (.mew/cmd-button.json)
 
-상단바의 ▶를 누르면 현재 프로젝트의 명령 목록이 드롭다운으로 열린다. 데스크톱에서 [프로젝트 사이드바](projects.md#프로젝트-탭)가 열려 있으면 각 프로젝트 행의 ▶를 사용한다. 다른 프로젝트의 ▶를 눌러도 지금 보고 있는 프로젝트·문서·배치는 유지되고 해당 프로젝트의 명령 목록만 열린다. 각 프로젝트의 `.mew/cmd-button.json`에 정의한 명령을 tmux에서 바로 실행한다(터미널 기능 권한 필요). 목록에 없는 하위 프로젝트는 해당 프로젝트를 연 뒤 ▶를 사용한다. 프로젝트 전환은 owner·manager 권한을 따른다.
+Click ▶ in the top bar to open a dropdown of the current project's commands. On desktop, if the [project sidebar](projects.md#프로젝트-탭) is open, use ▶ in each project row. Clicking ▶ for another project keeps the current project, document, and layout in place and opens only that project's command list. Commands defined in each project's `.mew/cmd-button.json` run directly in tmux (terminal feature permission required). For a subproject not in the list, open that project first, then use ▶. Project switching follows owner/manager permissions.
 
-**Alt+R**로 현재 프로젝트의 명령 메뉴를 열 수 있다(기존 **Ctrl+E** 유지). 사이드바가 열려 있으면 현재 프로젝트 행의 ▶를 사용한다. 첫 명령으로 포커스가 이동하며, 메뉴 안에서 **1~9**를 누르면 표시 순서에 해당하는 명령을 바로 실행한다. 숫자패드도 지원한다. 실행 중인 명령도 이름을 누를 때처럼 재실행하며, 중단은 ■를 사용한다. 방향키로 행과 버튼을 이동하고 Enter로 선택할 수 있다. **Esc**로 닫으면 ▶ 버튼으로 포커스가 돌아가며 프로젝트 사이드바는 유지한다. 프로젝트 전환용 **Alt+1~9**는 그대로 동작한다.
+Use **Alt+R** to open the current project's command menu (the existing **Ctrl+E** shortcut remains available). If the sidebar is open, it uses ▶ in the current project's row. Focus moves to the first command. Within the menu, press **1–9** to run the command at that displayed position immediately. The numeric keypad is also supported. A running command is rerun just as when clicking its name; use ■ to stop it. Use arrow keys to move between rows and buttons, and Enter to select. Closing with **Esc** returns focus to the ▶ button and keeps the project sidebar open. **Alt+1–9** for switching projects continues to work as before.
 
-프로젝트 목록과 같이 왼쪽에는 정렬 핸들, 오른쪽 끝에는 숫자를 둔다. 핸들을 마우스·터치로 끌거나, 핸들에서 **↑/↓** 또는 항목에서 **Shift+↑/↓**를 누르면 순서를 바꾼다. 순서는 프로젝트 명령 파일에 저장되며 숫자도 함께 바뀐다. 실행 중인 명령은 항목 전체 배경으로 표시한다.
+As in the project list, a reorder handle is on the left and a number is at the far right. Drag the handle with a mouse or touch, press **↑/↓** on the handle, or press **Shift+↑/↓** on an item to reorder it. The order is saved in the project's command file, and the numbers change with it. Running commands are indicated by the background of the entire item.
 
-1. **＋ 명령 추가**에서 이름과 셸 명령을 입력하고 저장한다.
-2. 일회성 명령이면 **완료 후 터미널 종료**를 켠다. 개발 서버처럼 계속 실행할 명령은 끈다.
-3. 명령 줄의 ▶로 실행하고 터미널 아이콘으로 출력을 확인한다. 중단할 때는 ■를 누른다.
-4. 개발 서버가 포트를 열면 같은 항목의 아래 줄에 포트 번호 버튼이 나타난다. 번호를 누르면 **현재 Mew 주소/포트**를 새 탭에서 연다. 예를 들어 `https://mew.run/saens/windows`에서 `5555`를 누르면 `https://mew.run/saens/windows/5555`가 열린다.
+1. Under **＋ Add Command**, enter a name and shell command, then save.
+2. For a one-time command, enable **Close Terminal After Completion**. Disable it for commands that should keep running, such as development servers.
+3. Run a command with ▶ in its row and check its output with the terminal icon. Press ■ to stop it.
+4. When a development server opens a port, a port number button appears on the line below the same item. Click the number to open **current Mew URL/port** in a new tab. For example, clicking `5555` at `https://mew.run/saens/windows` opens `https://mew.run/saens/windows/5555`.
 
-포트는 메뉴가 열린 동안 약 3초마다 갱신한다. 명령의 실제 프로세스가 연 localhost 수신 포트만 표시하며 포트가 닫히면 다음 갱신에 사라진다. 여러 포트가 있으면 번호별 버튼을 표시하고 좁은 영역에서는 가로로 스크롤한다. 포트 버튼을 눌러도 명령은 다시 실행하지 않는다. 앱 열기에는 포트 미리보기 권한과 HTTP 앱이 필요하다. Mewlink에서는 중앙 업데이트와 프리뷰 도메인 준비도 필요하며, 자세한 조건은 [localhost 앱 프리뷰](../../.mew/docs/development/port-preview.md)를 따른다.
+Ports refresh approximately every 3 seconds while the menu is open. Only localhost listening ports opened by the command's actual process are shown; a closed port disappears on the next refresh. If there are multiple ports, a button appears for each number, with horizontal scrolling in narrow areas. Clicking a port button does not rerun the command. Opening an app requires port preview permission and an HTTP app. Mewlink also requires a central update and preview domain setup. For detailed conditions, follow [localhost app preview](../../.mew/docs/development/port-preview.md).
 
-파일 형식:
+File format:
 
 ```json
 {
@@ -52,18 +52,18 @@ updated: "2026-10-28"
 }
 ```
 
-- ▶ 아이콘을 누르면 그 명령이 **프로젝트 폴더를 cwd로** 하는 tmux 세션에서 실행된다. 같은 버튼은 늘 같은 세션(`mewcmd-<해시>`)으로 이어져, 다시 누르면 그 세션에서 재실행된다.
-- 루트 프로젝트 명령은 실제 폴더 경로도 세션 식별자에 포함하므로 서로 다른 프로젝트의 같은 이름 명령을 따로 실행한다. 이 변경 전에 실행한 루트 명령은 자동 종료하지 않으며 새 메뉴에 실행 상태가 나타나지 않을 수 있다. 기존 터미널에서 출력을 확인하거나 종료한다. 하위 디렉터리 명령의 식별자는 유지한다.
-- **실행 중인 줄의 ▶는 ■(정지)가 된다** — 누르면 그 명령의 세션만 죽는다(`DELETE /api/tmux/sessions/:name`). 실행 여부는 서버가 붙여주는 `running`이 정하므로, 다른 곳에서 세션이 죽으면 다음 갱신에 ▶로 돌아온다.
-- 명령어 세션은 **일반 터미널 탭 목록에 표시하지 않는다**. 각 줄의 터미널 아이콘으로 그 세션을 본다. 팝업의 **종료**는 세션을 끝내고, **닫기**는 실행을 유지한 채 팝업만 닫는다. `oneShot: true`로 저장한 명령은 완료 직후 세션이 종료되므로 남겨서 출력을 확인하려면 이 옵션을 끈다.
-- **실행할 명령 문자열은 언제나 서버가 파일에서 읽는다** — 실행 요청 본문의 명령은 신뢰하지 않는다. (편집은 별도 경로다: `PUT`으로 목록을 통째로 저장하면 그 다음 실행이 새 파일 내용을 읽는다.)
-- 편집: 드롭다운 맨 아래 `＋ 명령 추가`, 기존 줄을 **꾹 누르거나 우클릭**하면 수정·삭제. 저장은 목록 전체 쓰기라 손으로 고친 파일과 같은 자리를 덮어쓴다(`{ "commands": [...] }` 형태로 정규화되고 다른 최상위 키는 보존되지 않는다). **이름을 바꾸면 세션 이름 해시가 바뀐다** — 그전에 띄워둔 실행 세션은 살아 있되 이 버튼에서는 더 이상 보이지 않는다.
-- 이름은 프로젝트 안에서 겹칠 수 없다(겹치면 두 명령이 한 세션을 공유하게 되므로 400).
-- 서버: `server/cmdButtons.ts`(파일 파싱·정규화·쓰기·세션 이름) + `GET/PUT/POST /api/cmd-buttons*`(owner/manager). 클라이언트: `src/components/CommandButtonMenu.tsx`·`SessionTerminalPopup.tsx`(세션 팝업은 예약 작업과 **같은 컴포넌트**를 쓴다 — 세션 이름·제목·실행 함수만 다르게 넘긴다). 명령 메뉴는 헤더의 overflow에 잘리지 않도록 **body로 포털해 fixed로** 띄운다.
+- Clicking ▶ runs the command in a tmux session with **the project folder as its cwd**. The same button always connects to the same session (`mewcmd-<해시>`), so clicking it again reruns the command in that session.
+- Root project commands also include the actual folder path in the session identifier, so commands with the same name in different projects run separately. Root commands started before this change are not automatically terminated, and their running status may not appear in the new menu. Check their output or terminate them in the existing terminal. Subdirectory command identifiers remain unchanged.
+- **▶ in a running row becomes ■ (Stop)** — clicking it kills only that command's session (`DELETE /api/tmux/sessions/:name`). Running status is determined by the server-provided `running` value, so if the session is killed elsewhere, the button returns to ▶ on the next refresh.
+- Command sessions **do not appear in the regular terminal tab list**. View a session with the terminal icon in its row. In the popup, **Terminate** ends the session, while **Close** closes only the popup and keeps it running. Commands saved with `oneShot: true` terminate their sessions immediately after completion; disable this option to keep the session available for checking output.
+- **The server always reads the command string to execute from the file** — it does not trust commands in the execution request body. (Editing uses a separate path: saving the entire list with `PUT` makes the next execution read the new file contents.)
+- Editing: use `＋ 명령 추가` at the bottom of the dropdown; **long-press or right-click** an existing row to edit or delete it. Saving writes the entire list, overwriting the same file you may have edited manually (it is normalized to `{ "commands": [...] }`, and other top-level keys are not preserved). **Renaming changes the session name hash** — previously started sessions remain alive but are no longer visible through this button.
+- Names must be unique within a project (duplicates return 400 because the two commands would share one session).
+- Server: `server/cmdButtons.ts` (file parsing, normalization, writing, and session names) + `GET/PUT/POST /api/cmd-buttons*` (owner/manager). Client: `src/components/CommandButtonMenu.tsx` and `SessionTerminalPopup.tsx` (the session popup uses **the same component** as scheduled tasks, passing only a different session name, title, and execution function). The command menu is **portaled to body and displayed with fixed positioning** so the header's overflow does not clip it.
 
-## 터미널 버튼 (.data/term-button.json)
+## Terminal buttons (.data/term-button.json)
 
-터미널 패널의 **셸 탭** 버튼 줄(선택 모드 버튼과 같은 줄) 왼쪽에 뜬다. 누르면 지금 보고 있는 셸 세션에 하단 입력칸 전송과 똑같은 경로로 들어간다. 에이전트 TUI 탭에는 이 셸 명령 버튼을 표시하지 않는다.
+These appear on the left side of the terminal panel's **shell tab** button row (the same row as the selection mode button). Clicking one sends it to the shell session you are currently viewing through the same path as submitting the bottom input. These shell command buttons are not shown in agent TUI tabs.
 
 ```json
 {
@@ -75,54 +75,54 @@ updated: "2026-10-28"
 }
 ```
 
-- 목록은 **전역 하나**다 — 프로젝트나 터미널 탭마다 다르지 않다. 그래서 프로젝트 폴더가 아니라 서버가 `.data/`에 저장한다(`.data/`는 `paths.ts` deny 목록이라 편집 API로 열리지 않는다). 손으로 고칠 파일이 아니라 **UI가 편집 수단**이다: `+`로 추가하고, 버튼을 꾹 누르면(데스크톱은 우클릭) 이름·명령어·아이콘 수정과 삭제가 나온다.
-- `icon`은 **프로젝트 아이콘과 같은 표기**다 — `i:{키}` · 이모지 · `svg:{마크업}`. 고르는 칸도 같은 `IconPicker`라 SVG 직접 넣기까지 그대로 된다(검사는 `normalizeIconValue` 하나).
-- `iconOnly: true`면 그 버튼은 **이름을 감추고 아이콘만** 그린다(버튼마다 따로 정한다 — 편집 창의 `이름 숨기고 아이콘만 보이기`). 아이콘이 없으면 빈 칸이 되므로 무시하고 이름을 그대로 둔다.
-- 실행은 서버가 하지 않는다. 클라이언트가 이미 열려 있는 터미널 WebSocket으로 직접 보내므로 세션·cwd가 화면과 항상 일치한다. 그 소켓 자체가 owner/manager 경계라 별도 게이팅이 없다.
-- 서버: `server/termButtons.ts` + `GET/PUT /api/term-buttons`(owner/manager, 목록 읽기·쓰기만). 클라이언트: `src/components/TermButtonBar.tsx` — `AgentPanel`이 tmux 터미널 탭의 `TmuxTerminal`에 `renderCommandButtons` 렌더 프롭으로 주입한다(터미널 패키지는 이 기능의 API를 모른다).
+- There is **one global list** — it does not vary by project or terminal tab. The server therefore stores it in `.data/` rather than the project folder (`.data/` is on the `paths.ts` deny list and cannot be opened through the editing API). **The UI is the editing interface**, rather than manual file editing: add with `+`, and long-press a button (right-click on desktop) to edit its name, command, and icon or delete it.
+- `icon` uses **the same notation as project icons** — `i:{키}`, emoji, or `svg:{마크업}`. The picker is also the same `IconPicker`, including direct SVG input (validation uses only `normalizeIconValue`).
+- With `iconOnly: true`, the button **hides its name and displays only its icon** (configured separately for each button through `이름 숨기고 아이콘만 보이기` in the edit dialog). If there is no icon, this is ignored and the name remains visible to avoid a blank button.
+- The server does not execute commands. The client sends them directly through the already-open terminal WebSocket, so the session and cwd always match the screen. The socket itself enforces the owner/manager boundary, so there is no separate gating.
+- Server: `server/termButtons.ts` + `GET/PUT /api/term-buttons` (owner/manager, list reads and writes only). Client: `src/components/TermButtonBar.tsx` — `AgentPanel` injects it into `TmuxTerminal` in the tmux terminal tab through the `renderCommandButtons` render prop (the terminal package has no knowledge of this feature's API).
 
-## 예약 작업 (.data/schedules.json)
+## Scheduled jobs (.data/schedules.json)
 
-1. 에이전트 패널에서 작업에 쓸 **에이전트셋**을 만들고 설치·로그인 상태를 확인한다.
-2. 헤더 메뉴 → **예약 작업** → **+ 예약 작업 추가**를 누른다.
-3. 작업 이름·에이전트셋·프로젝트·실행 주기·작업 내용을 입력한다. 예약 시각은 서버의 cron 환경을 따르므로 브라우저와 서버의 시간대가 다른지도 확인한다.
-4. **저장**한 뒤 항목의 터미널 아이콘을 열어 **실행**으로 먼저 확인한다. 예약은 서버 컴퓨터가 켜져 있어야 실행할 수 있다.
+1. In the agent panel, create the **agent set** to use for the job and check its installation and login status.
+2. Open the header menu → **Scheduled Jobs** → **+ Add Scheduled Job**.
+3. Enter the job name, agent set, project, execution schedule, and job instructions. Scheduled times follow the server's cron environment, so also check whether the browser and server use different time zones.
+4. After clicking **Save**, open the item's terminal icon and test it first with **Run**. Scheduled jobs can run only while the server computer is on.
 
-에이전트셋을 나중에 고쳤다면 예약도 다시 저장해야 변경된 모델·역할을 사용한다. 현재 대화에서 한 번 보낼 메시지는 이 창이 아닌 입력줄의 예약 메시지를 쓴다.
+If you later edit the agent set, you must save the schedule again to use the updated model and role. To send a message once in the current conversation, use scheduled messages in the input bar instead of this window.
 
-실행 주기·에이전트셋·프로젝트는 앱 자체 드롭다운에서 선택한다. 방향키로 탐색하고 Enter로 확정하거나 마우스·터치로 선택하며, Esc·뒤로가기는 목록만 닫는다. 선택은 편집 초안에 반영되고 **저장**을 눌러야 예약 목록에 저장된다.
+Select the execution schedule, agent set, and project from the app's custom dropdowns. Navigate with the arrow keys and confirm with Enter, or select with a mouse or touch; Esc and Back close only the list. Selections update the editing draft and are saved to the schedule list only when you click **Save**.
 
-입력칸·선택 필드·요일·하단 버튼은 44px 높이로 통일한다. 작업 이름·내용은 전체 너비를 쓰고, 에이전트셋·프로젝트는 데스크톱에서는 2열, 모바일에서는 1열로 배치한다. 저장 중에는 모든 편집과 닫기를 막는다.
+Input boxes, selection fields, weekdays, and bottom buttons all use a height of 44px. The job name and instructions use the full width; the agent set and project use 2 columns on desktop and 1 column on mobile. All editing and closing are blocked while saving.
 
-헤더 메뉴 → **예약 작업** — "언제 / 어느 폴더에서 / 어떤 에이전트셋으로 / 어떤 프롬프트를" 을 등록하면 그 시각에 에이전트가 무인으로 돈다. owner/manager만(임의 프롬프트가 무인 실행되는 표면 — 셸과 같은 경계).
+Header menu → **Scheduled Jobs** — register "when / in which folder / with which agent set / with which prompt" to run the agent unattended at that time. owner/manager only (a surface for unattended execution of arbitrary prompts — the same boundary as the shell).
 
-팝업 오른쪽 위 **X** 또는 하단 **닫기**로 닫는다. 저장 중에는 닫기 버튼이 비활성화된다.
+Close the popup with **X** at the upper right or **Close** at the bottom. The close buttons are disabled while saving.
 
-예약 목록은 제목 왼쪽에 실행 시각을 크게 표시한다. 반복 주기·에이전트셋·프로젝트·마지막 실행은 제목 아래에서 확인한다. 매시·N분 간격·직접 입력 예약은 고정 시각 대신 실행 주기나 크론식을 표시한다. 항목을 누르면 작은 여백으로 정리된 편집 필드가 펼쳐진다.
+The schedule list prominently displays the execution time to the left of the title. The recurrence, agent set, project, and last run appear below the title. Hourly, every-N-minutes, and manually entered schedules display the execution interval or cron expression instead of a fixed time. Clicking an item expands compactly spaced editing fields.
 
-- 서버: `server/schedules.ts` + `server/runAgentJob.ts` + `GET/PUT /api/schedules`, `POST /api/schedules/run`(지금 실행). 클라이언트: `src/components/ScheduleModal.tsx`, 크론식↔GUI 변환은 `src/utils/cron.ts`.
-- 새 예약은 기존 에이전트셋을 선택한다. 셋이 없으면 에이전트 패널에서 먼저 만든다. `GET/PUT /api/schedules`는 선택 가능한 `agentSets`도 반환하며 저장 요청의 `agentSetId`를 서버 원장으로 검증한다. 클라이언트가 보내는 역할·모델은 실행 설정으로 신뢰하지 않는다.
-- 선택한 셋의 ID·이름·런타임·모델·역할을 예약의 `agentSet` 스냅샷으로 저장한다. 셋 편집은 예약을 **다시 저장할 때** 반영하고, 셋을 삭제해도 저장된 예약은 유지한다. 이전 런타임 전용 예약은 그대로 읽고 실행·저장할 수 있지만, 새 예약이나 실행 대상 변경에는 셋을 선택해야 한다.
-- **원본은** `.data/schedules.json`**, crontab은 파생물이다.** 저장할 때마다 `# mew-job:<id>` 마커가 붙은 줄만 걷어내고 다시 쓴다 — 손으로 쓴 크론 줄은 건드리지 않고, 창에도 읽기 전용으로 보여준다.
-- **실행은 잡 전용 tmux 세션 안에서 일어난다.** 크론 줄이 하는 일은 세 가지뿐이다 — `tmux new-session -d -s <세션> -c <설정한 폴더>`(이미 있으면 실패시키고 그 세션을 재사용) → `send-keys -l <에이전트 명령>` → `send-keys Enter`. 명령어 버튼과 같은 구조라, 무인 실행이 끝난 뒤에도 화면이 세션에 남아 각 줄의 **터미널 아이콘**으로 그대로 들여다볼 수 있다(같은 `SessionTerminalPopup`).
-- 세션 이름은 `mewcmd-job-<id 앞 8자>`다. 명령어 버튼과 같은 프리픽스라 **터미널 탭 목록에는 뜨지 않고**(`isCommandSession` 필터), 팝업의 \*\*\[종료\]\*\*는 그 세션을 죽인다(`DELETE /api/tmux/sessions/:name`). 팝업 안의 **실행** 버튼과 `POST /api/schedules/run`은 크론과 **똑같은 세션·똑같은 명령**을 쓴다 — 예약 시각을 기다리지 않고 확인할 수 있다. 실행 요청 본문에서 받는 건 잡 `id`뿐이다.
-- **프롬프트는 셸에 인라인하지 않는다.** `.data/schedules/<id>.prompt`에 쓰고 명령이 그 파일을 읽는다 — 따옴표·개행, 그리고 크론에서 stdin 구분자로 먹히는 `%`를 통째로 피한다(명령 쪽 `%`는 escape).
-- 실행 명령은 에이전트별 템플릿이 아니라 공통 ACP runner다: `node server/runAgentJob.ts --runtime <id> --prompt-file <프롬프트파일> --log-file <로그> --cwd <폴더>`. runner가 `server/agentRuntimes.ts`의 같은 등록표로 ACP 런타임을 띄운다([ADR 0060](../../.mew/docs/history/decisions/0060-mew-shared-agent-runtime-registry.md)). 사용자가 명령 문자열을 넣는 곳은 없다. `node`·`tmux`는 저장 시점에 `command -v`로 **절대 경로로 굳힌다** — cron의 PATH로는 이름만으로 못 찾는다.
-- 셋을 선택한 예약은 `--agent-set-file .data/schedules/<id>.agent-set.json`을 추가한다. 셋 스냅샷 파일은 저장 때 동기화하고 예약 삭제 때 함께 정리한다. 역할을 셸 문자열에 넣지 않으며 runner는 런타임 일치 여부를 검사하고, 지정 모델을 적용한 뒤 셋 역할·구분선·작업 프롬프트를 같은 첫 턴으로 보낸다. 모델 적용 실패 시 다른 모델로 실행하지 않는다. 빈 모델 ID는 런타임 기본값을 사용한다.
-- 크론 5필드는 `[A-Za-z0-9*/,-]`만 통과시킨다(crontab 주입 차단). 출력은 세션 화면에 보이면서 동시에 `runAgentJob.ts`가 `.data/schedules/<id>.log`에 덧붙이고, 그 파일의 mtime이 창의 "마지막 실행"이다. **로그는 자동으로 줄지 않는다** — 커지면 직접 지운다.
-- 앞 실행이 아직 돌고 있는데 다음 예약 시각이 오면 **같은 세션에 그대로 타이핑된다**(=돌고 있는 에이전트의 stdin으로 들어간다). 주기를 실행 시간보다 짧게 잡지 말 것.
-- 잡을 지우면 저장할 때 그 잡의 세션도 함께 죽인다 — 숨은 세션이라 UI 어디에서도 잡을 수 없기 때문.
+- Server: `server/schedules.ts` + `server/runAgentJob.ts` + `GET/PUT /api/schedules`, `POST /api/schedules/run` (run now). Client: `src/components/ScheduleModal.tsx`; cron expression ↔ GUI conversion: `src/utils/cron.ts`.
+- New schedules select an existing agent set. If no set exists, create one in the agent panel first. `GET/PUT /api/schedules` also returns the available `agentSets` and validates the save request's `agentSetId` against the server's authoritative records. Roles and models sent by the client are not trusted as execution settings.
+- The selected set's ID, name, runtime, model, and role are saved as the schedule's `agentSet` snapshot. Set edits take effect **when the schedule is saved again**, and saved schedules remain even if the set is deleted. Legacy runtime-only schedules can still be read, run, and saved, but new schedules or changes to the execution target require selecting a set.
+- **The source is** `.data/schedules.json`**; crontab is derived.** Each save removes and rewrites only lines marked with `# mew-job:<id>` — manually written cron lines are left untouched and are also shown read-only in the window.
+- **Execution takes place inside a dedicated tmux session for the job.** The cron line does only three things — `tmux new-session -d -s <세션> -c <설정한 폴더>` (let it fail if the session already exists and reuse that session) → `send-keys -l <에이전트 명령>` → `send-keys Enter`. This uses the same structure as command buttons, so the screen remains in the session after unattended execution finishes and can be inspected as is through each row's **terminal icon** (the same `SessionTerminalPopup`).
+- The session name is `mewcmd-job-<id 앞 8자>`. It uses the same prefix as command buttons, so it **does not appear in the terminal tab list** (the `isCommandSession` filter), and the popup's \*\*\[Terminate\]\*\* kills that session (`DELETE /api/tmux/sessions/:name`). The popup's **Run** button and `POST /api/schedules/run` use **the exact same session and command** as cron — you can test without waiting for the scheduled time. The run request body accepts only the job `id`.
+- **The prompt is not inlined into the shell.** It is written to `.data/schedules/<id>.prompt`, and the command reads that file — avoiding quotes, newlines, and `%`, which cron interprets as a stdin delimiter (command-side `%` is escaped).
+- The execution command uses a shared ACP runner rather than agent-specific templates: `node server/runAgentJob.ts --runtime <id> --prompt-file <프롬프트파일> --log-file <로그> --cwd <폴더>`. The runner starts the ACP runtime using the same registry in `server/agentRuntimes.ts` ([ADR 0060](../../.mew/docs/history/decisions/0060-mew-shared-agent-runtime-registry.md)). There is no place for users to enter a command string. At save time, `node` and `tmux` are **resolved to fixed absolute paths** using `command -v` — cron's PATH cannot find them by name alone.
+- Schedules with a selected set add `--agent-set-file .data/schedules/<id>.agent-set.json`. The set snapshot file is synchronized on save and removed when the schedule is deleted. The role is not placed in a shell string; the runner checks that the runtime matches, applies the specified model, and then sends the set role, a separator, and the job prompt in the same first turn. If applying the model fails, it does not run with another model. An empty model ID uses the runtime default.
+- The 5 cron fields allow only `[A-Za-z0-9*/,-]` (preventing crontab injection). Output appears on the session screen while `runAgentJob.ts` also appends it to `.data/schedules/<id>.log`; that file's mtime is the window's "Last Run." **Logs do not shrink automatically** — delete them manually if they grow large.
+- If the next scheduled time arrives while the previous run is still active, **the command is typed directly into the same session** (= it goes into the running agent's stdin). Do not set an interval shorter than the execution time.
+- Deleting a job also kills its session when you save — because it is a hidden session that cannot be accessed anywhere in the UI.
 
-## 시스템 자원 팝업
+## System resources popup
 
-헤더 메뉴 → **시스템 자원**에서 연다. 서버가 도는 기계의 CPU·메모리·GPU 사용량과 온도, 그리고 **프로세스별 점유**를 2초마다 새로 읽어 보여준다. 터미널이 열려 있어도 사용할 수 있다.
+Open it from the header menu → **System Resources**. It refreshes CPU, memory, and GPU usage and temperatures on the server machine, along with **per-process usage**, every 2 seconds. It can be used while a terminal is open.
 
-제목 줄 오른쪽 위 **X** 버튼으로 닫는다. 로딩 중이거나 오류가 나도 닫을 수 있으며, Esc·뒤로가기·팝업 바깥 누르기도 지원한다.
+Close it with the **X** button at the upper right of the title bar. It can be closed while loading or after an error; Esc, Back, and clicking outside the popup are also supported.
 
-- 서버: `server/sysStats.ts` + `GET /api/system-stats`(owner/manager — 셸과 같은 경계다). 클라이언트: `src/components/SystemStatsModal.tsx`.
-- CPU 사용률은 `os.cpus()` 누적 시간의 **직전 호출 대비 증분**이다. 표본을 모듈 하나가 들고 있어 창이 여럿이면 각자의 구간이 짧아질 뿐 값은 유효하다.
-- 메모리 여유는 `/proc/meminfo`의 `MemAvailable`을 쓴다 — `os.freemem()`은 캐시를 사용 중으로 세서 리눅스에서 항상 과장된다.
-- GPU는 `nvidia-smi --query-gpu=...` 한 번. 없으면 빈 배열이고 팝업은 "GPU 정보 없음"을 띄운다.
-- CPU 온도는 `/sys/class/thermal/thermal_zone*/temp`. \*\*WSL·컨테이너에는 노출되지 않아 `null`\*\*이고, 그때는 팝업이 그 사실을 한 줄로 알린다(GPU 온도는 `nvidia-smi`에서 따로 오므로 WSL에서도 뜬다).
-- `processes[]`는 `/proc/<pid>/stat`을 직접 읽는다 — `ps %cpu`는 **프로세스 수명 전체의 평균**이라 "지금 누가 먹고 있나"에 못 쓴다. CPU는 `utime+stime` tick의 직전 표본 대비 증분이고 코어 하나 기준이라 100%를 넘을 수 있다. RSS·CPU·GPU가 모두 0인 항목(커널 스레드)은 빼고 보낸다. 프로세스별 GPU는 `nvidia-smi --query-compute-apps`가 주는 **메모리(MB)뿐**이다 — 프로세스별 GPU 사용률은 그 쿼리에 없다. `/proc`이 없는 환경(비리눅스)에서는 빈 배열.
-- **추이 그래프는 클라이언트가 모은다** — 서버에 링버퍼가 없다. 팝업이 열려 있는 동안 최근 60표본 (2분)을 들고 있다가 닫으면 버린다. 개별 프로세스 그래프도 이 이력에서 pid로 뽑는다.
+- Server: `server/sysStats.ts` + `GET /api/system-stats` (owner/manager — the same boundary as the shell). Client: `src/components/SystemStatsModal.tsx`.
+- CPU usage is calculated from the **increase since the previous call** in `os.cpus()` cumulative times. A single module holds the samples, so multiple windows only shorten each window's sampling interval; the values remain valid.
+- Available memory uses `MemAvailable` from `/proc/meminfo` — `os.freemem()` counts cache as used memory, consistently overstating usage on Linux.
+- GPU data comes from one `nvidia-smi --query-gpu=...` call. If unavailable, the result is an empty array and the popup displays "No GPU information."
+- CPU temperature comes from `/sys/class/thermal/thermal_zone*/temp`. \*\*It is not exposed in WSL or containers, so it is `null`\*\*; the popup then explains this in one line (GPU temperature comes separately from `nvidia-smi`, so it also appears in WSL).
+- `processes[]` reads `/proc/<pid>/stat` directly — `ps %cpu` is an **average over the process's entire lifetime**, so it cannot show "who is using resources right now." CPU usage is the increase in `utime+stime` ticks since the previous sample, measured relative to one core, so it can exceed 100%. Entries with RSS, CPU, and GPU all at 0 (kernel threads) are omitted from the response. Per-process GPU data is **memory (MB) only**, as provided by `nvidia-smi --query-compute-apps` — that query does not include per-process GPU utilization. Returns an empty array in environments without `/proc` (non-Linux).
+- **The client collects trend graph data** — the server has no ring buffer. While the popup is open, it retains the latest 60 samples (2 minutes) and discards them when closed. Individual process graphs are also extracted from this history by pid.

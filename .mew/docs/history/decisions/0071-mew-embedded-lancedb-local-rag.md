@@ -1,53 +1,53 @@
 ---
-provenance: "Liiiiv 중앙 ADR 이관본, 2026-10-14"
-description: "이관한 결정 기록: mew RAG는 내장 LanceDB와 로컬 다국어 임베딩을 쓴다. 당시 선택·근거·후속 변경을 보존하며 현재 계약은 Mew 소유 문서에서 확인한다."
-title: "0071 — mew RAG는 내장 LanceDB와 로컬 다국어 임베딩을 쓴다"
+provenance: "Migrated copy of a Liiiiv central ADR, 2026-10-14"
+description: "Migrated decision record: mew RAG uses embedded LanceDB and local multilingual embeddings. Preserves the choices, rationale, and subsequent changes from that time; see the Mew owning document for the current contract."
+title: "0071 — mew RAG uses embedded LanceDB and local multilingual embeddings"
 created: 2026-08-21
 updated: 2026-09-29
 ---
 
-- 날짜: 2026-08-21
-- 상태: 대체됨: 0176
-- 후속 결정: [0176](0176-mew-remove-local-rag.md) — 로컬 RAG 전체 제거
-- 후속 결정: [0111](0111-mew-native-deployment-and-supervisor.md) — Docker 볼륨 배포 전제; 로컬 파생 색인 계약은 유지
-- 결정자: 사용자 (초안: Codex)
+- Date: 2026-08-21
+- Status: Superseded by: 0176
+- Subsequent decision: [0176](0176-mew-remove-local-rag.md) — Remove all local RAG functionality
+- Subsequent decision: [0111](0111-mew-native-deployment-and-supervisor.md) — Assumes Docker volume deployment; retains the local derived index contract
+- Decision maker: User (draft: Codex)
 
-## 배경
+## Background
 
-docs가 약 41만 토큰이 되어 MOC만으로는 질문 표현과 문서 제목이 다른 경우의 발견성이 부족하다. 그러나 Markdown이 SSoT여야 하고, mew는 네이티브 설치가 기본이며 Docker·Postgres는 선택 사항이다([ADR 0023](0023-mew-selfhost-packaging-repo.md)). 별도 Qdrant·pgvector를 필수로 만들면 mew 한 벌을 배포한다는 계약이 깨진다.
+The docs have grown to approximately 410,000 tokens, and MOCs alone provide insufficient discoverability when questions are phrased differently from document titles. However, Markdown must remain the SSoT, and mew defaults to native installation, with Docker and Postgres optional ([ADR 0023](0023-mew-selfhost-packaging-repo.md)). Requiring a separate Qdrant or pgvector instance would break the contract of deploying mew as a single package.
 
-RAG가 오래된 초안·대체 ADR을 현재 답처럼 올리거나, 게스트가 인덱스를 통해 승인 밖 문서를 읽는 것도 막아야 한다.
+RAG must also be prevented from presenting outdated drafts or superseded ADRs as current answers, or allowing guests to read documents outside their approved scope through the index.
 
-## 선택지
+## Options
 
-1. 외부 Qdrant — 기능은 풍부하지만 별도 서비스·백업·배포가 필요하다.
-2. 기존 선택 Postgres + pgvector — 운영 인프라는 재사용하지만 네이티브 기본 설치가 DB에 종속된다.
-3. SQLite BLOB + 전수 cosine — 의존성은 작지만 벡터 DB 인덱스·관리 기능을 직접 만든다.
-4. mew 내장 LanceDB + 로컬 임베딩 — 프로세스 안에서 파일로 영속화하고 외부 키 없이 동작한다.
+1. External Qdrant — feature-rich, but requires a separate service, backups, and deployment.
+2. Existing optional Postgres + pgvector — reuses operational infrastructure, but makes the default native installation dependent on a database.
+3. SQLite BLOB + exhaustive cosine similarity — few dependencies, but requires building vector database indexing and management features ourselves.
+4. LanceDB embedded in mew + local embeddings — persists to files within the process and works without external keys.
 
-## 결정
+## Decision
 
-4번을 채택한다.
+Adopt option 4.
 
-- `@lancedb/lancedb`를 mew 런타임 의존성으로 둔다. DB·manifest·모델 캐시는 `<MEW_DATA_DIR>/rag/` 아래에만 저장한다. Docker의 기존 `/data` 볼륨에도 함께 영속된다.
-- 기본 임베딩은 `@huggingface/transformers`의 `Xenova/multilingual-e5-small` q8 ONNX(384차원)다. 한국어·영어를 같은 공간에서 검색하고, 문서는 `passage:`, 질문은 `query:` 접두사를 쓴다.
-- 모델은 첫 인덱싱 때 내려받아 data dir에 캐시한다. 네트워크가 없고 캐시도 없으면 기존 정확 검색은 정상 유지하고 의미 검색만 `unavailable`로 응답한다.
-- Markdown·코드 파일이 SSoT다. LanceDB는 전부 삭제해도 재생성 가능한 파생 캐시이며 백업 대상이 아니다.
-- 스코프는 현재 mew 프로젝트다. 기본 트리에서 검색 가능한 텍스트 파일만 인덱싱하고, 파일 경로·줄 범위·제목·heading을 결과에 붙인다.
-- 의미 검색은 로그인 사용자만 쓴다. 게스트 승인 경로를 인덱스 쿼리로 우회시키지 않는다. 결과도 요청 시점의 가시 파일 집합으로 다시 거른다.
-- docs는 MOC 링크의 `Current`와 `History / raw`, ADR 상태를 인덱스 tier로 반영한다. 기본은 current만; 사용자가 명시할 때만 history를 포함한다([ADR 0070](0070-docs-hot-cold-context-layers.md)).
-- 파일 fingerprint로 변경분만 다시 임베딩한다. 모델·chunk schema가 바뀌면 해당 워크스페이스 인덱스를 자동 재생성한다.
-- 검색은 벡터 유사도에 로컬 키워드 겹침을 재점수하는 hybrid 방식이다. 답을 생성하는 외부 LLM은 이번 범위에 넣지 않고, 인용 가능한 관련 문맥 묶음을 돌려주는 retrieval API를 RAG 경계로 삼는다.
+- Add `@lancedb/lancedb` as a mew runtime dependency. Store the database, manifest, and model cache only under `<MEW_DATA_DIR>/rag/`. They are also persisted in Docker's existing `/data` volume.
+- The default embedding model is `Xenova/multilingual-e5-small` q8 ONNX (384 dimensions) via `@huggingface/transformers`. Search Korean and English in the same space, using the `passage:` prefix for documents and `query:` for questions.
+- Download the model during the first indexing run and cache it in the data dir. If neither network access nor a cache is available, existing exact search continues normally, and only semantic search responds with `unavailable`.
+- Markdown and code files are the SSoT. LanceDB is a derived cache that can be fully deleted and regenerated, and is excluded from backups.
+- The scope is the current mew project. Index only text files searchable in the default tree, and attach the file path, line range, title, and heading to results.
+- Only logged-in users can use semantic search. Index queries must not bypass guest path approvals. Filter results again against the set of visible files at request time.
+- For docs, reflect the MOC link categories `Current` and `History / raw` and ADR status in index tiers. Include only current by default, and include history only when users explicitly request it ([ADR 0070](0070-docs-hot-cold-context-layers.md)).
+- Use file fingerprints to re-embed only changed content. Automatically regenerate the workspace index when the model or chunk schema changes.
+- Search uses a hybrid approach that rescores vector similarity with local keyword overlap. External LLMs that generate answers are outside this scope; the RAG boundary is a retrieval API that returns bundles of relevant context suitable for citation.
 
-## 근거
+## Rationale
 
-- LanceDB JavaScript SDK는 Linux·macOS·Windows 네이티브 패키지를 제공하고 로컬 경로에 연결한다. mew의 단일 Node 프로세스·Docker 이미지 구조를 유지할 수 있다.
-- 로컬 ONNX 모델은 API 키·문서 외부 전송이 없고, 118MB q8 모델을 한 번 캐시하면 재사용한다.
-- 400K 토큰 규모에서는 외부 분산 DB보다 내장 저장소의 배포·운영비 절감이 크다. 규모가 커져 외부 DB가 필요해지면 `EmbeddingProvider`와 retrieval API 계약을 유지한 채 저장층만 새 ADR로 바꿀 수 있다.
-- 생성 답변보다 검색 결과·인용을 먼저 제공하면 환각과 권한 경계를 별도 문제로 만들지 않는다. 에이전트는 반환된 경로·줄을 직접 근거로 쓸 수 있다.
+- The LanceDB JavaScript SDK provides native packages for Linux, macOS, and Windows and connects to a local path. mew can retain its single Node process and Docker image structure.
+- The local ONNX model requires no API key and sends no documents externally; the 118MB q8 model is cached once and reused.
+- At a scale of 400K tokens, an embedded store offers greater deployment and operating cost savings than an external distributed DB. If growth makes an external DB necessary, a new ADR can replace only the storage layer while preserving `EmbeddingProvider` and the retrieval API contract.
+- Providing search results and citations before generated answers avoids making hallucinations and permission boundaries separate problems. Agents can use the returned paths and lines directly as evidence.
 
-## 결과
+## Results
 
-- mew 배포물만으로 의미 검색을 사용할 수 있다. Postgres·Qdrant·OpenAI 키는 필요 없다.
-- 최초 사용은 모델 다운로드·전체 인덱싱 때문에 느리고 약 130MB 모델 캐시 + 벡터 인덱스 용량을 쓴다. 이후에는 변경 파일만 처리한다.
-- 모델 런타임의 이미지 처리 의존성은 RAG 경로에서 호출하지 않는다. 공급망 취약점은 정기 `npm audit` 대상으로 유지하고, 텍스트 입력만 모델에 전달한다.
+- Semantic search is available with the mew distribution alone. No Postgres, Qdrant, or OpenAI key is required.
+- First use is slow due to model downloading and full indexing, and uses approximately 130MB for the model cache plus space for the vector index. After that, only changed files are processed.
+- The model runtime's image processing dependencies are not invoked in the RAG path. Supply chain vulnerabilities remain subject to regular `npm audit` checks, and only text input is passed to the model.

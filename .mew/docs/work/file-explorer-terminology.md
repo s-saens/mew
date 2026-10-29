@@ -1,21 +1,21 @@
 ---
-title: "파일 탐색기 명칭 통일"
-description: "2026-10-28 파일·문서 탐색과 검색 패널의 화면 이름을 사이드바에서 파일 탐색기로 통일한 구현 기록. 네 언어의 UI·단축키 표시와 현재 한국어 문서 변경, 검증 결과 및 운영 미적용 범위를 남긴다."
+title: "Standardizing file explorer terminology"
+description: "Implementation record dated 2026-10-28 standardizing the on-screen name of the file and document navigation and search panel from Sidebar to File Explorer. Records UI and keyboard shortcut label changes in four languages, changes to current Korean documentation, verification results, and the scope not applied to production."
 created: "2026-10-28"
 updated: "2026-10-28"
 ---
 
-## 목적과 결과
+## Purpose and results
 
-위치만 가리키던 이름의 모호함을 줄이기 위해 Documents·Files 탐색과 파일명·내용 검색을 포함한 패널을 **파일 탐색기**로 부른다. 독의 패널 이름, 열기·닫기 버튼의 접근성 이름·툴팁, 빈 에디터 안내와 단축키 설정의 표시를 통일했다. 영어·중국어·일본어 UI도 같은 의미의 이름을 사용한다.
+To reduce the ambiguity of a name that only indicated location, the panel that includes Documents and Files browsing and filename and content search is called **File Explorer**. The dock panel name, accessibility names and tooltips for open and close buttons, empty editor guidance, and shortcut settings labels have been standardized. The English, Chinese, and Japanese UIs use names with the same meaning.
 
-현재 한국어 사용법·설정·개발·기능 문서의 용어와 관련 헤딩·앵커를 맞췄다. 과거 결정·작업·연구 기록과 스냅샷은 보존한다. 내부 패널 ID `sidebar`, 저장 키와 기본 단축키 `Ctrl+B`는 유지한다. 명칭의 범위는 [파일·폴더 탐색과 조작](../features/%ED%94%84%EB%A1%9C%EC%A0%9D%ED%8A%B8%C2%B7%ED%8C%8C%EC%9D%BC%C2%B7%EA%B2%80%EC%83%89/%ED%8C%8C%EC%9D%BC%C2%B7%ED%8F%B4%EB%8D%94%20%ED%83%90%EC%83%89%EA%B3%BC%20%EC%A1%B0%EC%9E%91.md)이 소유한다.
+Terminology and related headings and anchors have been aligned across the current Korean usage, settings, development, and feature documentation. Historical decision, work, and research records and snapshots are preserved. The internal panel ID `sidebar`, storage keys, and default shortcut `Ctrl+B` remain unchanged. [File and Folder Browsing and Operations](../features/projects-files-search/file-folder-exploration-and-operations.md) owns the scope of the name.
 
-## 검증과 적용
+## Verification and application
 
-- `node --test packages/ui/src/i18n.test.ts src/i18n.test.ts server/file-explorer-labels-ui.test.ts`: 7개 통과. 네 언어의 열기·닫기 번역과 단축키, 격리 Chromium의 1100/390px 독 접근성 이름·툴팁·언어 전환·기존 패널 ID 선택을 확인했다.
-- `npx tsc -b`와 변경 TypeScript 파일의 `npx oxlint`: 통과. 린트에는 기존 React 관련 경고가 있다.
-- 추가 실행한 `src/ui-localization.test.ts`의 전체 한국어 리터럴 검사는 기존 소스의 번역 호출 밖 문자열 때문에 실패했다. 같은 파일의 Markdown·시간 번역 검사는 통과했다. `server/i18n-ui.test.ts`는 에이전트 입력 영역을 기다리다 시간 초과로 실패해, 명칭 검증은 별도 독 fixture에서 수행했다.
-- `npm run check:docs`: description 검사는 통과했다. 전체 링크 검사는 삭제된 기능 MOC·태스크 문서로 향하는 기존 링크 18건 때문에 실패했다. 변경 문서의 옛 헤딩 링크는 보정하거나 호환 앵커로 보존했다.
+- `node --test packages/ui/src/i18n.test.ts src/i18n.test.ts server/file-explorer-labels-ui.test.ts`: 7 tests passed. Verified open and close translations and shortcuts in four languages, plus dock accessibility names, tooltips, language switching, and selection using the existing panel ID in isolated Chromium at 1100/390px.
+- `npx tsc -b` and `npx oxlint` for the changed TypeScript files: passed. Lint has existing React-related warnings.
+- The additional full Korean literal check in `src/ui-localization.test.ts` failed because of strings outside translation calls in the existing source. The Markdown and time translation checks in the same file passed. `server/i18n-ui.test.ts` failed while waiting for the agent input area to appear, so naming was verified in a separate dock fixture.
+- `npm run check:docs`: the description check passed. The full link check failed because of 18 existing links to deleted feature MOC and task documents. Links to old headings in the changed documents were corrected or preserved with compatibility anchors.
 
-앱 빌드·배포·서버 시작·종료·재시작은 수행하지 않았다. 실행 중인 인스턴스에는 아직 적용하지 않았으며 사용자가 빌드 후 반영해야 한다.
+No app build, deployment, or server start, stop, or restart was performed. The changes have not yet been applied to the running instance; the user must build and apply them.

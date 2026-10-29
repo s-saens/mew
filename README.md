@@ -6,7 +6,7 @@ Open a folder on your computer or server and work with it in your browser. Write
 
 [Get started](#get-started) · [Screenshot tour](docs/guides/overview.md) · [User guides](docs/guides/MOC.md) · [Documentation](docs/README.md)
 
-**Installation guides:** [한국어](docs/guides/getting-started-ko.md) · [English](docs/guides/getting-started-en.md) · [简体中文](docs/guides/getting-started-zh.md) · [日本語](docs/guides/getting-started-ja.md)
+**Installation guide:** [Get started](docs/guides/getting-started-en.md)
 
 ![mew in the dark theme, with a Markdown note and TypeScript code side by side and the capybara Mewpet at the bottom](docs/assets/screenshots/split.png)
 
@@ -34,15 +34,15 @@ See changed files and commit history without leaving the workspace. Open a diff,
 
 ![mew showing a project document alongside Git commit history and changed files](docs/assets/screenshots/git.png)
 
-[Git workflow](docs/guides/projects.md#git-%EC%9E%91%EC%97%85-%ED%8C%A8%EB%84%90)
+[Git workflow](docs/guides/projects.md#git-operations-panel)
 
 ### Work together, or connect from your phone
 
 Edit documents together, leave comments, chat, and share documents with guests. Account roles and file permissions control access. On a phone, switch between the editor and tools with the bottom dock.
 
-[Collaboration and sharing](docs/guides/collaboration.md) · [Mobile controls](docs/guides/editor.md#%EB%AA%A8%EB%B0%94%EC%9D%BC%EA%B3%BC-%EC%A0%84%EC%B2%B4%ED%99%94%EB%A9%B4)
+[Collaboration and sharing](docs/guides/collaboration.md) · [Mobile controls](docs/guides/editor.md#mobile-and-fullscreen)
 
-Also available: [PDF annotation](docs/guides/editor.md#pdf-%EC%9D%BD%EA%B8%B0%EC%99%80-%ED%95%84%EA%B8%B0), a [sign-in screens, localhost apps, and Android](docs/guides/browser.md), [remote desktop](docs/guides/remote-desktop.md), [Postgres tables](docs/guides/database.md), and [command buttons and schedules](docs/guides/commands.md). Remote desktop and Android need their own environment setup; database tables need a Postgres connection.
+Also available: [PDF annotation](docs/guides/editor.md#reading-and-annotating-pdfs), a [sign-in screens, localhost apps, and Android](docs/guides/browser.md), [remote desktop](docs/guides/remote-desktop.md), [Postgres tables](docs/guides/database.md), and [command buttons and schedules](docs/guides/commands.md). Remote desktop and Android need their own environment setup; database tables need a Postgres connection.
 
 ## Get started
 
@@ -82,7 +82,7 @@ Sign in at `https://mew.run/you` to see your registered devices. This dashboard 
 
 Keep the host awake, online, and running mew. Networks that block direct connections can prevent access. Mewlink registration and local mew sign-in are separate; connecting devices do not need registration.
 
-[한국어 연결 안내](docs/guides/getting-started-ko.md#%EC%99%B8%EB%B6%80%EC%97%90%EC%84%9C-%EC%A0%91%EC%86%8D%ED%95%98%EA%B8%B0) · [English instructions, account access, and alternatives](docs/guides/getting-started-en.md#remote-access) · [Connection validation scope](.mew/docs/development/remote-access.md#%EA%B2%80%EC%A6%9D%EA%B3%BC-%EB%82%A8%EC%9D%80-%EA%B2%8C%EC%9D%B4%ED%8A%B8)
+[Remote access, account access, and alternatives](docs/guides/getting-started-en.md#remote-access) · [Connection validation scope](.mew/docs/development/remote-access.md#verification-and-remaining-gates)
 
 ## Documentation
 
@@ -95,7 +95,7 @@ Keep the host awake, online, and running mew. Networks that block direct connect
 | Architecture, implementation contracts, and verification | [Development](.mew/docs/development/MOC.md) |
 | Features, work records, research, and history | [Project knowledge](.mew/docs/AGENT.md) |
 
-Getting-started guides are available in four languages. Most detailed guides are currently in Korean.
+Project documentation is maintained in English. Earlier locale-specific guide paths are retained for existing links.
 
 ## Security
 

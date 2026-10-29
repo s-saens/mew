@@ -1,21 +1,21 @@
 ---
-title: "첨부 원형 인디케이터 복원 작업 기록"
-description: "2026-10-27 에이전트 첨부 업로드 태그의 원형 복원과 공용 로고·세 점·원형 분류를 정리한 구현 작업 기록. 검증 결과와 운영 적용 여부를 구분한다."
+title: "Attachment Circular Indicator Restoration Work Record"
+description: "Implementation work record for 2026-10-27 covering the restoration of circular indicators in agent attachment upload tags and the classification of shared logo, three-dot, and circular indicators. Distinguishes verification results from production application status."
 created: "2026-10-27"
 updated: "2026-10-27"
 ---
 
-## 목적과 결과 동작
+## Purpose and resulting behavior
 
-첨부 업로드 태그에 사용하던 세 점을 기존 원형 표시로 복원하고, 공용 인디케이터의 세 종류와 선택 기준을 문서화한다. 새 입력·대기 큐 편집의 업로드 대기 태그는 12px 원형을 선택하며 완료 후 파일 종류 아이콘으로 바뀐다. 사용자 버블 태그는 완료된 아이콘을 유지한다.
+Restore the three dots used in attachment upload tags to the previous circular indicator and document the three shared indicator types and their selection criteria. Upload-pending tags in new input and pending queue editing use a 12px circular indicator, which changes to a file type icon on completion. User bubble tags retain the completed icons.
 
-현재 계약은 [공용 로딩 인디케이터](../development/ui-contracts.md#공용-로딩-인디케이터)와 [입력·첨부 기능 계약](../features/%ED%84%B0%EB%AF%B8%EB%84%90%C2%B7%EC%97%90%EC%9D%B4%EC%A0%84%ED%8A%B8%C2%B7%EC%9E%90%EB%8F%99%ED%99%94/%EC%97%90%EC%9D%B4%EC%A0%84%ED%8A%B8%20%EC%9E%85%EB%A0%A5%C2%B7%EB%A9%98%EC%85%98%C2%B7%EC%8A%A4%ED%82%AC%C2%B7%EC%B2%A8%EB%B6%80.md), 결정은 [ADR 0075](../decisions/0075-attachment-spinner-indicator.md)가 소유한다.
+The current contracts are owned by [Shared Loading Indicators](../development/ui-contracts.md#shared-loading-indicators) and the [Input and Attachment Feature Contract](../features/terminals-agents-automation/agent-input-mentions-skills-and-attachments.md), and the decision is owned by [ADR 0075](../decisions/0075-attachment-spinner-indicator.md).
 
-## 검증과 적용
+## Verification and application
 
-- `node --test packages/ui/src/loading-indicator.browser.test.ts server/agent-composer-attachments-ui.test.ts`: 47개 검사 통과. 공용 원형의 크기·색·회전·정지·모션 감소·강제 색상과 1100/390px·밝은/어두운 테마의 첨부 업로드 원형 표시·완료 후 아이콘 복원·편집·실행 취소를 확인했다.
-- `npx tsc -b`와 변경한 TypeScript 파일 4개의 `npx oxlint`: 통과.
-- 격리 Chromium에서 12px 원형 첨부 태그를 밝은/어두운 배경으로 렌더링해 시각적으로 확인했다.
-- `npm run check:docs`: description 488개는 오류 없이 통과했다. 전체 링크 검사는 이번 작업과 무관하게 삭제된 기능 MOC·태스크 문서의 기존 링크 17건 때문에 실패했다. 이번 변경 문서의 링크 오류는 없다.
+- `node --test packages/ui/src/loading-indicator.browser.test.ts server/agent-composer-attachments-ui.test.ts`: 47 checks passed. Verified the shared circular indicator's size, color, rotation, stopped state, reduced motion, and forced colors, along with circular attachment upload indicators at 1100/390px in light/dark themes, icon restoration after completion, editing, and undo.
+- `npx tsc -b` and `npx oxlint` on the 4 changed TypeScript files: passed.
+- Rendered 12px circular attachment tags on light/dark backgrounds in isolated Chromium and visually verified them.
+- `npm run check:docs`: 488 descriptions passed without errors. The full link check failed due to 17 existing links to deleted feature MOC and task documents unrelated to this work. There are no link errors in the documents changed in this work.
 
-앱 빌드·배포·서버 시작·종료·재시작은 수행하지 않는다. 실행 중인 인스턴스 적용은 사용자가 빌드 후 수행해야 하며, 실제 모바일 기기의 시각적 확인은 별도다.
+Do not build or deploy the app, or start, stop, or restart the server. The user must apply the changes to the running instance after building; visual verification on actual mobile devices is separate.

@@ -1,43 +1,43 @@
 ---
-provenance: "Liiiiv 중앙 ADR 이관본, 2026-10-14"
-description: "이관한 결정 기록: 에이전트 창 헤더 아이콘에서 탭 런타임을 갈아탄다. 당시 선택·근거·후속 변경을 보존하며 현재 계약은 Mew 소유 문서에서 확인한다."
-title: "0074 — 에이전트 창 헤더 아이콘에서 탭 런타임을 갈아탄다"
+provenance: "Migrated copy of a Liiiiv central ADR, 2026-10-14"
+description: "Migrated decision record: Switch a tab's runtime using the agent window header icon. Preserves the choices, rationale, and subsequent changes from that time; consult the Mew owning document for the current contract."
+title: "0074 — Switch a tab's runtime using the agent window header icon"
 created: 2026-08-22
 updated: 2026-08-22
 ---
 
-- 날짜: 2026-08-22
-- 상태: 채택
-- 부분 대체: [0062](0062-mew-agent-tab-runtime-gate-and-install.md) — "탭 안에서 런타임을 갈아탄다" 금지를 해제. 새 탭은 런타임을 고른 뒤에만 세션을 띄운다는 게이트는 유지
-- 결정자: 송상훈 (지시)
-- 관련: [ADR 0046](0046-mew-agent-panel-tabs-one-session-per-tab.md), [ADR 0060](0060-mew-shared-agent-runtime-registry.md)
+- Date: 2026-08-22
+- Status: Adopted
+- Partially supersedes: [0062](0062-mew-agent-tab-runtime-gate-and-install.md) — Lifts the prohibition on "switching runtimes within a tab." Retains the gate that starts a session in a new tab only after a runtime is selected
+- Decision maker: Song Sanghoon (directive)
+- Related: [ADR 0046](0046-mew-agent-panel-tabs-one-session-per-tab.md), [ADR 0060](0060-mew-shared-agent-runtime-registry.md)
 
-## 배경
+## Background
 
-0062가 탭 안 런타임 전환을 막으면서 "다른 에이전트로 바꾸려면 새 탭을 열어야" 한다. 그런데
-탭이 곧 세션인 구조라, 하던 대화 옆에 새 탭이 계속 쌓인다. 에이전트를 옮겨 가며 같은 주제를
-이어 묻는 사용 흐름에서 탭 낭비가 컸다.
+With 0062 blocking runtime switching within a tab, users "must open a new tab to switch to another agent." But because each
+tab is a session, new tabs keep accumulating alongside the ongoing conversation. This wasted many tabs for users continuing
+questions on the same topic across agents.
 
-## 결정
+## Decision
 
-- 세션 창 헤더 맨 왼쪽의 런타임 아이콘은 **버튼**이다. 누르면 새 탭의 런타임 목록
-  (`RuntimePicker`)과 같은 등록표·같은 설치 흐름을 드롭다운으로 펼친다 — 아이콘·이름·설치
-  상태·`사용`/`설치` 버튼. 목록은 열 때마다 `GET /api/agent-runtimes`로 새로 읽는다.
-- 드롭다운에서 다른 런타임을 고르면 **그 탭의 `runtime`이 바뀐다** — 탭을 새로 만들지 않는다.
-  WS 연결 effect가 `runtime` 의존으로 재실행되어 새 세션으로 붙고, 옛 세션은 서버 감독 프로세스에
-  그대로 남는다(ADR 0048 — 되감기로 돌아올 수 있다). 지금까지 그린 대화는 화면에서 비운다.
-- 설치도 드롭다운 안에서 한다 — 0062의 서버 등록표 고정 설치 명령 경로를 그대로 쓴다. 설치가
-  끝나면 그 런타임으로 갈아탄다.
-- 새 탭은 여전히 런타임을 고르기 전에 WS·프로세스를 만들지 않는다(0062 §1 유지).
+- The runtime icon at the far left of the session window header is a **button**. Clicking
+  it opens a dropdown using the same registry and installation flow as the new-tab runtime list (`RuntimePicker`), with icons,
+  names, installation status, and `사용`/`설치` buttons. Fetch the list again through `GET /api/agent-runtimes` each time it opens.
+- Choosing another runtime from the dropdown **changes that tab's `runtime`** without creating a new tab. The WS connection
+  effect reruns because it depends on `runtime` and connects to a new session, while the old session remains in the server supervisor
+  process (ADR 0048; it can be revisited through rewind). Clear the conversation rendered so far from the screen.
+- Installation also happens within the dropdown, using the same fixed installation command path in the server registry from 0062. Switch to
+  that runtime when installation finishes.
+- New tabs still do not create a WS connection or process before a runtime is selected (retains 0062 §1).
 
-## 근거
+## Rationale
 
-"탭 하나 = 세션 하나"(0046)는 지키면서 전환만 다시 연다. 전환은 탭 생성과 달리 사용자가
-명시적으로 눌렀을 때만 일어나므로 0062가 막으려던 "탭을 만들었는데 프로세스가 저절로 뜨는"
-문제는 재발하지 않는다. 등록표·설치 판정은 서버 몫이라는 0060 경계도 그대로다.
+Reenable switching while preserving "one tab = one session" (0046). Unlike tab creation, switching happens only when the user explicitly
+clicks, so the problem 0062 sought to prevent—"creating a tab automatically starts a process"—does not recur. The
+0060 boundary that assigns the registry and installation detection to the server also remains unchanged.
 
-## 결과
+## Results
 
-- 헤더 아이콘의 `title`은 "에이전트: X — 눌러서 바꾸기"를 알려준다.
-- 전환 직후 모델·권한 모드 선택기는 새 세션의 `models`·`modes` 이벤트를 기다린다 — 저장된
-  기본값(ADR 0063)이 있으면 서버가 `session/new` 뒤에 자동으로 걸어 준다.
+- The header icon's `title` says "Agent: X — Click to switch."
+- Immediately after switching, the model and permission mode selectors wait for the new session's `models` and `modes`
+  events. If saved defaults exist (ADR 0063), the server applies them automatically after `session/new`.
