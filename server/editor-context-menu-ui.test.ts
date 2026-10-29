@@ -46,9 +46,9 @@ async function point(page: Page, text: string, offset = 0) {
   }, { text, offset })
 }
 
-async function select(page: Page, text: string) {
+async function select(page: Page, text: string, click = true) {
   const editor = surface(page)
-  await editor.click()
+  if (click) await editor.click()
   await editor.evaluate((el, text) => {
     const doc = el.ownerDocument, walker = doc.createTreeWalker(el, 4)
     el.focus({ preventScroll: true })
@@ -70,6 +70,34 @@ async function select(page: Page, text: string) {
     const fixture = el.ownerDocument.defaultView as unknown as { contextFixtureSelection: () => string | null }
     return fixture.contextFixtureSelection() === text
   }, { el: await editor.elementHandle(), text })
+}
+
+async function touchPointer(page: Page, type: 'pointerdown' | 'pointerup' | 'pointercancel', text: string) {
+  const at = await point(page, text, 2)
+  await surface(page).evaluate((el, { type, at }) => {
+    const win = el.ownerDocument.defaultView!
+    el.dispatchEvent(new win.PointerEvent(type, { bubbles: true, cancelable: true, pointerType: 'touch', pointerId: 7, isPrimary: true, clientX: at.x, clientY: at.y, buttons: type === 'pointerdown' ? 1 : 0 }))
+  }, { type, at })
+}
+
+async function touchContextMenu(page: Page, text: string, pointerEvent = true) {
+  const at = await point(page, text, 2)
+  return surface(page).evaluate((el, { at, pointerEvent }) => {
+    const doc = el.ownerDocument, win = doc.defaultView!
+    let bubbled = false
+    const observe = () => { bubbled = true }
+    doc.addEventListener('contextmenu', observe)
+    const options = { bubbles: true, cancelable: true, clientX: at.x, clientY: at.y, button: 2 }
+    const event = pointerEvent ? new win.PointerEvent('contextmenu', { ...options, pointerType: 'touch', pointerId: 7 }) : new win.MouseEvent('contextmenu', options)
+    el.dispatchEvent(event)
+    doc.removeEventListener('contextmenu', observe)
+    return { prevented: event.defaultPrevented, bubbled }
+  }, { at, pointerEvent })
+}
+
+async function assertNoAutomaticMenu(page: Page, message: string) {
+  await page.waitForTimeout(400)
+  assert.equal(await menu(page).count(), 0, message)
 }
 
 async function open(page: Page, text: string, offset = 0) {
@@ -168,6 +196,102 @@ function Fixture(){const [state,setState]=React.useState({...defaults,generation
     await surface(page).getByText('Alpha selected text omega.', { exact: true }).waitFor()
     return page
   }
+
+  await t.test('touch text selection opens a scoped menu only after the gesture settles', async () => {
+    const mobile = await createPage(390, 'light')
+    const selectionMarkdown = markdown.replace('\n<br/>\n', '')
+    try {
+      for (const fixture of [
+        { viewMode: 'hotview', path: 'fixture.md', value: selectionMarkdown, selected: 'selected text', next: 'paragraph target' },
+        { viewMode: 'plain', path: 'fixture.md', value: selectionMarkdown, selected: 'selected text', next: 'paragraph target' },
+        { viewMode: 'plain', path: 'fixture.ts', value: code, selected: 'selected', next: 'target' },
+      ]) {
+        await reset(mobile, fixture)
+        await touchPointer(mobile, 'pointerdown', fixture.selected)
+        assert.deepEqual(await touchContextMenu(mobile, fixture.selected, fixture.viewMode === 'hotview'), { prevented: false, bubbled: false }, `${fixture.path}/${fixture.viewMode}: long press preserves browser text selection and stays inside the editor`)
+        await assertNoAutomaticMenu(mobile, 'long press without a selected range does not open the menu')
+        await select(mobile, fixture.selected, false)
+        await assertNoAutomaticMenu(mobile, 'the menu waits while a finger is still selecting text')
+        await touchPointer(mobile, 'pointerup', fixture.selected)
+        await menu(mobile).waitFor()
+        await assertMenu(menu(mobile), 390, 844)
+        assert.equal(await surface(mobile).evaluate(el => el.ownerDocument.defaultView!.getSelection()?.toString()), fixture.selected, 'opening the automatic menu preserves the native selected range')
+        assert.equal(await surface(mobile).evaluate(el => el === el.ownerDocument.activeElement || el.contains(el.ownerDocument.activeElement)), true, 'opening the automatic menu keeps focus in the editor')
+        if (captures && fixture.viewMode === 'hotview') await mobile.screenshot({ path: path.join(captures, 'editor-touch-selection-390-light.png') })
+        await item(mobile, '복사').click()
+        assert.equal(await mobile.locator('[data-context-fixture]').evaluate(el => (el.ownerDocument.defaultView as unknown as { contextClipboard: { text: string } }).contextClipboard.text), fixture.selected, 'automatic menu copies the exact native selection')
+
+        const at = await point(mobile, fixture.selected, 2)
+        await mobile.touchscreen.tap(at.x, at.y)
+        await mobile.touchscreen.tap(at.x, at.y)
+        // Supply the resulting native range because Chromium emulation does not expose OS selection handles.
+        await select(mobile, fixture.selected, false)
+        await menu(mobile).waitFor()
+        await touchPointer(mobile, 'pointerdown', fixture.next)
+        await select(mobile, fixture.next, false)
+        await assertNoAutomaticMenu(mobile, 'selection handles hide the old menu while the range changes')
+        await touchPointer(mobile, 'pointerup', fixture.next)
+        await menu(mobile).waitFor()
+        await item(mobile, '삭제').click()
+        assert.equal(await value(mobile), fixture.value.replace(fixture.next, ''), 'the reopened menu deletes only the updated range')
+
+        await reset(mobile, { ...fixture, editable: false })
+        await touchPointer(mobile, 'pointerdown', fixture.selected)
+        await select(mobile, fixture.selected, false)
+        await touchPointer(mobile, 'pointerup', fixture.selected)
+        await menu(mobile).waitFor()
+        assert.equal(await item(mobile, '복사').isDisabled(), false, 'readonly touch selection still supports copy')
+        for (const label of ['주석 추가', '댓글 달기', '잘라내기', '붙여넣기', '삭제']) assert.equal(await item(mobile, label).isDisabled(), true, `readonly selection disables ${label}`)
+        await item(mobile, '복사').click()
+        assert.equal(await value(mobile), fixture.value)
+      }
+
+      await reset(mobile, { value: '| H1 | H2 |\n|---|---|\n| A1 | A2 |\n' })
+      await touchPointer(mobile, 'pointerdown', 'A2')
+      assert.deepEqual(await touchContextMenu(mobile, 'A2'), { prevented: false, bubbled: false })
+      await assertNoAutomaticMenu(mobile, 'a cell long press does not trigger the table context menu before selection')
+      await select(mobile, 'A2', false)
+      await touchPointer(mobile, 'pointerup', 'A2')
+      await menu(mobile).waitFor()
+      assert.equal(await item(mobile, '복사').isDisabled(), false)
+      for (const name of ['행 추가', '열 추가', 'csv로 복사', '이미지로 복사']) await menu(mobile).getByRole('menuitem', { name, exact: true }).waitFor()
+      await mobile.keyboard.press('Escape')
+
+      for (const change of [{ path: 'other.md' }, { viewMode: 'plain' }, { workspace: '/fixture/workspace-b' }]) {
+        await reset(mobile)
+        await touchPointer(mobile, 'pointerdown', 'selected text')
+        await select(mobile, 'selected text', false)
+        await touchPointer(mobile, 'pointerup', 'selected text')
+        await control(mobile, 'set', change)
+        await assertNoAutomaticMenu(mobile, `a pending selection menu is discarded after ${JSON.stringify(change)}`)
+      }
+      await reset(mobile)
+      await touchPointer(mobile, 'pointerdown', 'selected text')
+      await select(mobile, 'selected text', false)
+      await touchPointer(mobile, 'pointercancel', 'selected text')
+      await assertNoAutomaticMenu(mobile, 'a cancelled gesture does not open the menu')
+      await touchPointer(mobile, 'pointerdown', 'selected text')
+      await touchPointer(mobile, 'pointerup', 'selected text')
+      await menu(mobile).waitFor()
+      await mobile.keyboard.press('Escape')
+      await assertNoAutomaticMenu(mobile, 'Escape keeps the automatically opened menu dismissed')
+    } finally {
+      await mobile.close()
+    }
+  })
+
+  await t.test('desktop text selection does not automatically open the menu', async () => {
+    const desktop = await createPage(1280, 'light')
+    try {
+      for (const fixture of [{}, { viewMode: 'plain' }, { path: 'fixture.ts', value: code, viewMode: 'plain' }]) {
+        await reset(desktop, fixture)
+        await select(desktop, fixture.path ? 'selected' : 'selected text')
+        await assertNoAutomaticMenu(desktop, 'ordinary mouse selection keeps the editor menu closed')
+      }
+    } finally {
+      await desktop.close()
+    }
+  })
 
   for (const width of [1280, 390]) for (const theme of ['light', 'dark']) {
     const page = await createPage(width, theme)

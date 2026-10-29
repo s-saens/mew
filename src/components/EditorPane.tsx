@@ -41,6 +41,7 @@ import { canOpenEditorFile } from '../utils/editor-open-policy.ts'
 import { editorFile, editorTabPath, editorLinkTabPath } from '../utils/editor-files'
 import { saveScroll, getScroll } from '../utils/scrollMemory'
 import { useCollab } from '../hooks/useCollab'
+import { useEditorTouchSelection } from '../hooks/useEditorTouchSelection'
 import type { Pane, Tab } from '../hooks/useTabs'
 import type { DropZone } from '../utils/paneTree'
 import { externalAbsolutePath, isExternalTabPath } from '../utils/externalFiles'
@@ -93,6 +94,7 @@ type EditorMenuSession = {
   y: number
   busy: boolean
   closed: boolean
+  touchSelection?: boolean
 }
 
 // 실시간 협업은 파일별 "주 편집화면"에서만 지원한다 — .md는 Hotview, 그 외는 Plain.
@@ -549,6 +551,30 @@ export function EditorPane({
   const startCommentRef = useRef(startComment)
   startCommentRef.current = startComment
 
+  const editorMenuRoot = useRef<HTMLDivElement>(null)
+  const selectionScope = JSON.stringify([workspace?.path, project, activePath, authEmail, role, canComment, canWriteComment, annotationReadOnly, activeTab?.viewMode])
+  const showEditorMenu = (target: EditorContextTarget, x: number, y: number, touchSelection = false) => {
+    disarmRestoreRef.current()
+    setAnnotationPopup(null)
+    setCommentPopup(null)
+    setCommentListOpen(false)
+    editorMenuTargets.current.add(target)
+    setEditorMenu({ target, x, y, touchSelection, scope: editorMenuScope.current, busy: false, closed: false })
+  }
+  const isTouchContextMenu = useEditorTouchSelection({
+    root: editorMenuRoot, scope: selectionScope,
+    enabled: !!activeTab && !loading && !revalidating && !diffTarget && !unsupportedFile && !mediaKind(activeTab.path)
+      && !(activeTab.path.endsWith('.svg') && activeTab.viewMode === 'hotview'),
+    onDismiss: () => setEditorMenu(current => current?.touchSelection ? null : current),
+    onSelect: ({ x, y, selectionX, selectionY }) => {
+      const pane = annotationPane()
+      if (!pane?.getSelectedText()) return
+      const target = pane.prepareContextMenu(selectionX, selectionY)
+      if (!target) return
+      if (!target.hasSelection) { target.dispose(); return }
+      showEditorMenu(target, x, y, true)
+    },
+  })
   const openEditorMenu = (event: ReactMouseEvent<HTMLDivElement>) => {
     if (!activeTab || loading || revalidating || diffTarget || unsupportedFile || mediaKind(activeTab.path)
       || (activeTab.path.endsWith('.svg') && activeTab.viewMode === 'hotview')) return
@@ -556,16 +582,15 @@ export function EditorPane({
     if (!element || element.closest('input, textarea, select, button, [role="dialog"], [role="menu"], [role="listbox"], [inert]')) return
     const surface = event.currentTarget.querySelector('.ProseMirror, .cm-editor')
     if (!surface || (!surface.contains(element) && !element.contains(surface))) return
+    if (isTouchContextMenu(event.nativeEvent)) {
+      event.stopPropagation()
+      return
+    }
     const target = annotationPane()?.prepareContextMenu(event.clientX, event.clientY)
     if (!target) return
     event.preventDefault()
     event.stopPropagation()
-    disarmRestoreRef.current()
-    setAnnotationPopup(null)
-    setCommentPopup(null)
-    setCommentListOpen(false)
-    editorMenuTargets.current.add(target)
-    setEditorMenu({ target, x: event.clientX, y: event.clientY, scope: editorMenuScope.current, busy: false, closed: false })
+    showEditorMenu(target, event.clientX, event.clientY)
   }
 
   const runEditorAction = (session: EditorMenuSession, action: EditorContextAction) => {
@@ -969,7 +994,7 @@ export function EditorPane({
               </div>
               {/* 뷰어는 남는 높이를 전부 차지한다 — 그래야 아래 상태줄이 짧은 문서에서도 칸 맨 밑에 선다.
                   min-h-0이 없으면 내용이 긴 문서에서 뷰어가 칸 밖으로 자라 상태줄을 밀어낸다. */}
-              <div className="relative min-h-0 flex-1" onContextMenuCapture={openEditorMenu}>
+              <div ref={editorMenuRoot} className="relative min-h-0 flex-1" onContextMenuCapture={openEditorMenu}>
                 {fileLoadFailed ? (
                   <div role="alert" className="flex h-full items-center justify-center overflow-auto px-3 py-2 text-sm text-danger-ink">
                     <p className="select-text whitespace-pre-wrap break-words">{fileError}</p>
@@ -1066,7 +1091,7 @@ export function EditorPane({
                 onClose={() => onSetTocOpen(false)}
               />
             )}
-            {editorMenu && <EditorContextMenu {...editorMenu} canAnnotate={isMd && !annotationReadOnly} canComment={canWriteComment}
+            {editorMenu && <EditorContextMenu {...editorMenu} selectionRoot={editorMenu.touchSelection ? editorMenuRoot : undefined} canAnnotate={isMd && !annotationReadOnly} canComment={canWriteComment}
               onClose={() => setEditorMenu(null)} onAction={action => runEditorAction(editorMenu, action)} />}
             {/* 댓글 작성·스레드 보기 — 하이라이트나 커서 자리에 붙는 카드 하나. 둘이 동시에 뜨지 않는다 */}
             {annotationPopup && isMd && (

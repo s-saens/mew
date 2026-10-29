@@ -1,4 +1,5 @@
 import { ActionMenu, ActionMenuItem, ActionMenuSeparator } from '@mew/ui'
+import type { RefObject } from 'react'
 import { uiText } from '@mew/ui/i18n-core'
 import { useUiLocale } from '@mew/ui/i18n'
 import type { EditorContextTarget } from '@mew/editor'
@@ -7,7 +8,7 @@ import { useI18n } from '../i18n'
 
 export type EditorContextAction = 'annotation' | 'comment' | 'copy' | 'cut' | 'paste' | 'delete' | 'selectAll'
 
-export function EditorContextMenu({ x, y, target, canAnnotate, canComment, onAction, onClose }: {
+export function EditorContextMenu({ x, y, target, canAnnotate, canComment, onAction, onClose, selectionRoot }: {
   x: number
   y: number
   target: EditorContextTarget
@@ -15,10 +16,12 @@ export function EditorContextMenu({ x, y, target, canAnnotate, canComment, onAct
   canComment: boolean
   onAction: (action: EditorContextAction) => void
   onClose: () => void
+  selectionRoot?: RefObject<HTMLDivElement | null>
 }) {
   useUiLocale()
   const { t } = useI18n()
-  return <ActionMenu x={x} y={y} label={uiText('에디터 메뉴')} onClose={onClose}>
+  return <ActionMenu x={x} y={y} label={uiText('에디터 메뉴')} onClose={onClose}
+    autoFocus={!selectionRoot} outsideIgnore={selectionRoot ? () => selectionRoot.current : undefined}>
     <ActionMenuItem icon={<Quote />} disabled={!canAnnotate || !target.editable} onClick={() => onAction('annotation')}>{uiText('주석 추가')}</ActionMenuItem>
     <ActionMenuItem icon={<ChatBubble />} disabled={!canComment || !target.editable || !target.canComment} onClick={() => onAction('comment')}>{t('comment.add')}</ActionMenuItem>
     <ActionMenuSeparator />

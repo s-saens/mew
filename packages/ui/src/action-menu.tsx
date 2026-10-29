@@ -21,6 +21,8 @@ export type ActionMenuProps = {
   trigger?: HTMLElement | SVGElement | null
   portalContainer?: HTMLElement | null
   outsideIgnore?: () => Element | null
+  /** Native selection menus keep the editor focused so its touch handles remain usable. */
+  autoFocus?: boolean
   ref?: Ref<HTMLDivElement>
   /** Compatibility marker for file explorer integrations. */
   fileMenu?: boolean
@@ -28,7 +30,7 @@ export type ActionMenuProps = {
 }
 
 /** Shared action popup. Feature wrappers supply actions, never menu styles. */
-export function ActionMenu({ x, y, onClose, children, label, trigger, portalContainer, ref: forwardedRef, fileMenu = false, variant = 'default', outsideIgnore }: ActionMenuProps) {
+export function ActionMenu({ x, y, onClose, children, label, trigger, portalContainer, ref: forwardedRef, fileMenu = false, variant = 'default', outsideIgnore, autoFocus = true }: ActionMenuProps) {
   const marker = useRef<HTMLSpanElement>(null)
   const [container, setContainer] = useState<HTMLElement | null>(null)
   const previous = useRef<HTMLElement | SVGElement | null>(trigger ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null))
@@ -148,9 +150,9 @@ export function ActionMenu({ x, y, onClose, children, label, trigger, portalCont
   }, [x, y, container])
 
   useLayoutEffect(() => {
-    if (!container) return
+    if (!container || !autoFocus) return
     ref.current?.querySelector<HTMLButtonElement>('[data-action-menu-item]:not(:disabled)')?.focus({ preventScroll: true })
-  }, [container])
+  }, [container, autoFocus])
 
   const menu = (
     <MenuContext.Provider value={() => close()}>
