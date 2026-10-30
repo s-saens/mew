@@ -1,28 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { nextAgentTabLabel, sessionIdOf, sessionIdsExcept, withAutoLabel, withProjectLabel, withRename, withSessionId } from './agentTabs.ts'
-
-test('새 런타임 탭은 현재 이름과 겹치면 하이픈 번호를 붙인다', () => {
-  const tabs = [{ id: 'other', label: 'Claude Agent' }]
-  for (const expected of ['Codex', 'Codex-1', 'Codex-2']) {
-    const label = nextAgentTabLabel(tabs, 'Codex')
-    assert.equal(label, expected)
-    tabs.push({ id: expected, label })
-  }
-  assert.equal(nextAgentTabLabel(tabs, 'Kimi Code'), 'Kimi Code')
-})
-
-test('새 탭 이름은 수동 이름과 번호 충돌도 피하고 비어 있는 이름을 재사용한다', () => {
-  const tabs = [
-    { id: 'a', label: 'Codex', runtime: 'claude', renamed: true },
-    { id: 'b', label: 'Codex-1' },
-    { id: 'c', label: 'Codex-3' },
-  ]
-  assert.equal(nextAgentTabLabel(tabs, 'Codex'), 'Codex-2')
-  assert.equal(nextAgentTabLabel(tabs.slice(1), 'Codex'), 'Codex')
-  assert.equal(nextAgentTabLabel(tabs, 'Codex-1'), 'Codex-1-1', '프리셋 이름 끝의 숫자도 이름의 일부다')
-  assert.deepEqual(tabs.map(tab => tab.label), ['Codex', 'Codex-1', 'Codex-3'], '기존 이름은 바꾸지 않는다')
-})
+import { sessionIdOf, sessionIdsExcept, withAutoLabel, withProjectLabel, withRename, withSessionId } from './agentTabs.ts'
 
 test('사람이 붙인 이름은 대화에서 뽑은 이름이 덮지 않는다', () => {
   const tabs = [{ id: 'a', label: '새 대화' }]

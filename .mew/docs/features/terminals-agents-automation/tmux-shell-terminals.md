@@ -4,11 +4,11 @@ parent: "mew-agents"
 title: "tmux shell terminal"
 status: "implemented"
 created: "2026-09-18"
-updated: "2026-10-27"
+updated: "2026-10-30"
 status_hash: "b19a2771f0bfb2f727bc14539350c69b524d222b67a2322b322f359fefd6a804"
 files: ["src/components/AgentPanel.tsx", "src/components/TermButtonBar.tsx", "src/components/CommandButtonMenu.tsx", "server/termButtons.ts", "server/command-ports.ts", "packages/tmux-term/src/TmuxTerminal.tsx", "packages/tmux-term/src/server/tmuxWs.ts"]
 commits: []
-description: "Covers creation, input, reconnection, and termination of per-project shell tabs; command buttons and automatic detection of listening ports opened by executed commands; wide, compact preview menus; focus-dependent new tabs, closed-tab restoration, renaming, context menus, and panel maximization/restoration. Defines Linux/macOS tmux and Windows psmux/PowerShell behavior, transparent backgrounds, shared input areas, accessible names, and actual verification boundaries."
+description: "Covers creation, input, reconnection, and termination of per-project shell tabs; command buttons and automatic detection of listening ports opened by executed commands; wide, compact preview menus; focus-dependent new tabs, closed-tab restoration, live tab position numbers, renaming, context menus, and panel maximization/restoration. Defines Linux/macOS tmux and Windows psmux/PowerShell behavior, transparent backgrounds, shared input areas, accessible names, and actual verification boundaries."
 상위파일:
   - "MOC.md"
   - "_terminals-agents-automation.md"
@@ -22,6 +22,7 @@ description: "Covers creation, input, reconnection, and termination of per-proje
 
 - The terminal's default background is transparent, allowing the panel background to show through. Text, cursors, the ANSI palette, and the selection-mode screen follow mew's light and dark themes.
 
+- Shell tabs show their current one-based position in muted gray immediately before the close button, following the shared [tab position contract](agent-sets-and-tab-creation.md#scope).
 - Provides regular shell tab creation, reconnection, input, session termination, and terminal command buttons.
 - Detects localhost TCP listening ports opened by project commands and opens the app from the same command row.
 - Unifies the input area's background, input field, and send button design with the agent panel.

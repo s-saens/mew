@@ -84,7 +84,7 @@ window.showTerminal=()=>{rootView.unmount();rootView=createRoot(document.getElem
         if (pathname === '/api/agent-cwd') return route.fulfill({ json: { cwd: '/workspace' } })
         if (pathname === '/api/projects') return route.fulfill({ json: [] })
         if (pathname === '/api/agent/commands') return route.fulfill({ json: { commands: [] } })
-        if (pathname === '/api/agent-sets') return route.fulfill({ json: { sets: [] } })
+        if (pathname === '/api/agent-sets') return route.fulfill({ json: { sets: [{ id: 'codex-preset', name: 'Codex', runtime: 'codex', modelId: '', role: 'Test preset' }] } })
         if (pathname.startsWith('/api/')) return route.fulfill({ json: { settings: null, skills: [], jobs: [], commands: [], runtimes: [] } })
         return route.fulfill({ contentType: 'text/html', body: `<html class="${dark ? 'dark' : ''}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}html,body,#root{height:100%;margin:0}</style></head><body><div id="root"></div><script src="/app.js"></script></body></html>` })
       })
@@ -94,6 +94,18 @@ window.showTerminal=()=>{rootView.unmount();rootView=createRoot(document.getElem
       await page.evaluate('window.sockets.first.open()')
       const first = page.getByRole('tab', { name: /first/ })
       const add = page.getByRole('button', { name: '새 탭', exact: true })
+      const expectPositions = async (count: number) => {
+        assert.deepEqual(await page.getByRole('tab').locator('[data-tab-position]').allTextContents(), Array.from({ length: count }, (_, index) => String(index + 1)))
+        assert.equal(await page.getByRole('tab').evaluateAll(tabs => tabs.every(tab => {
+          const number = tab.querySelector('[data-tab-position]')!
+          const close = number.nextElementSibling!
+          const style = tab.ownerDocument.defaultView!.getComputedStyle(number)
+          return number.getAttribute('aria-hidden') === 'true' && close.tagName === 'BUTTON'
+            && style.color === tab.ownerDocument.defaultView!.getComputedStyle(tab.querySelector('span[title][aria-label]')!).color
+            && number.getBoundingClientRect().right <= close.getBoundingClientRect().left
+        })), true, 'positions use muted text immediately before close without changing tab names')
+      }
+      await expectPositions(2)
       const moveTab = async (direction: number, selected: string | null) => {
         if (width === 390) {
           const cdp = await page.context().newCDPSession(page)
@@ -138,6 +150,7 @@ window.showTerminal=()=>{rootView.unmount();rootView=createRoot(document.getElem
       await page.keyboard.press('Control+1')
       await page.keyboard.press('Control+w')
       await first.waitFor({ state: 'detached' })
+      await expectPositions(1)
       await page.waitForFunction('!!window.sockets.second')
       const second = page.getByRole('tab', { name: /second/ })
       await moveTab(1, null)
@@ -159,6 +172,7 @@ window.showTerminal=()=>{rootView.unmount();rootView=createRoot(document.getElem
       assert.notEqual(restored, 'first', 'restored host does not reuse the closing host ID')
       await page.evaluate("Object.values(window.sockets).find(s=>new URL(s.url).searchParams.get('resume')==='first').open()")
       assert.deepEqual(await page.getByRole('tab').locator('span.truncate').allTextContents(), ['first', 'second'])
+      await expectPositions(2)
       await first.focus(); await page.keyboard.press('Control+Shift+t')
       assert.equal(await page.getByRole('tab').count(), 2, 'empty history cannot create duplicates')
       for (const surface of [page.locator('[data-agent-composer] [contenteditable="true"]:visible'), first]) for (const combo of ['Alt+n', 'Control+n', 'Control+t', 'Meta+t', 'Meta+n']) {
@@ -246,19 +260,45 @@ window.showTerminal=()=>{rootView.unmount();rootView=createRoot(document.getElem
       await add.click()
       await page.locator('[data-runtime-id="codex"]').getByRole('button', { name: 'Codex', exact: true }).click()
       await page.waitForFunction("document.querySelectorAll('[role=tab]').length===4")
-      assert.deepEqual(await page.getByRole('tab').locator('span.truncate').allTextContents(), ['first', 'second', 'Codex', 'Codex-1'])
+      assert.deepEqual(await page.getByRole('tab').locator('span.truncate').allTextContents(), ['first', 'second', 'Codex', 'Codex'])
+      await expectPositions(4)
       await composer.waitFor()
       assert.equal(await composer.evaluate(el => el === el.ownerDocument.activeElement), width === 1100, 'runtime click also focuses the new desktop composer only')
       await add.click()
       await page.locator('[data-runtime-id="codex"]').getByRole('button', { name: 'Codex', exact: true }).click()
       await page.waitForFunction("document.querySelectorAll('[role=tab]').length===5")
-      assert.deepEqual(await page.getByRole('tab').locator('span.truncate').allTextContents(), ['first', 'second', 'Codex', 'Codex-1', 'Codex-2'])
+      assert.deepEqual(await page.getByRole('tab').locator('span.truncate').allTextContents(), ['first', 'second', 'Codex', 'Codex', 'Codex'])
+      await expectPositions(5)
+      await second.getByRole('button', { name: '탭 닫기', exact: true }).click()
+      await second.waitFor({ state: 'detached' })
+      await expectPositions(4)
+      assert.equal(await page.getByRole('tab').nth(2).locator('[data-tab-position]').textContent(), '3', 'the former fourth tab becomes third when the second closes')
+      await first.focus(); await page.keyboard.press('Control+Shift+t')
+      await second.waitFor()
+      await expectPositions(5)
+      // Reordering must change the position of each tab, independently of its stored label.
+      await first.scrollIntoViewIfNeeded()
+      const dragStart = (await first.boundingBox())!, dragEnd = (await second.boundingBox())!
+      await page.mouse.move(dragStart.x + dragStart.width / 2, dragStart.y + dragStart.height / 2)
+      await page.mouse.down()
+      await page.mouse.move(dragEnd.x + dragEnd.width * 0.8, dragEnd.y + dragEnd.height / 2, { steps: 6 })
+      await page.mouse.up()
+      assert.deepEqual((await page.getByRole('tab').locator('span.truncate').allTextContents()).slice(0, 2), ['second', 'first'])
+      await expectPositions(5)
+      await add.click()
+      await page.getByRole('button', { name: '에이전트셋', exact: true }).click()
+      await page.getByRole('button', { name: '사용', exact: true }).click()
+      await page.waitForFunction("document.querySelectorAll('[role=tab]').length===6")
+      assert.equal(await page.getByRole('tab').last().locator('span.truncate').textContent(), 'Codex', 'agent sets also keep their exact default name')
+      await expectPositions(6)
+      await page.screenshot({ path: `/tmp/mew-agent-tab-positions-${width}-${dark ? 'dark' : 'light'}.png` })
       assert.equal(await page.evaluate('window.fileCreates'), 2)
       if (width === 1100) {
         terminalMode = true
         await page.evaluate('window.showTerminal()')
         await page.locator('[data-test-terminal]:visible').waitFor()
         await page.waitForFunction('document.querySelectorAll("[role=tab]").length===2')
+        await expectPositions(2)
         await page.getByRole('tab', { name: /first/ }).click()
         await moveTab(1, 'second')
         await moveTab(1, 'first')

@@ -1,7 +1,7 @@
 ---
 title: "Terminal and Agent Tabs"
-description: "Covers opening a shell with Ctrl+backtick, starting AI conversations and preparing runtimes, selecting with number keys and reordering by dragging, closing tabs and panels, the waiting queue and restoring history by topic, content, or session ID, and entry points for the CLI, Paint, agent sets, skills, and MCP."
-updated: "2026-10-28"
+description: "Covers opening a shell with Ctrl+backtick, starting AI conversations and preparing runtimes, selecting with number keys, live tab positions, duplicate default names, and reordering by dragging, closing tabs and panels, the waiting queue and restoring history by topic, content, or session ID, and entry points for the CLI, Paint, agent sets, skills, and MCP."
+updated: "2026-10-30"
 상위파일:
   - "../../.mew/docs/MOC.md"
   - "MOC.md"
@@ -58,6 +58,8 @@ After using `resume` to continue the same session in Codex CLI and returning to 
 Supervisors started before the restoration code update may survive a server restart. In that case, after work finishes, close the existing agent tab and select the same session from history in a new Codex tab for the new restoration code to take effect. Closing a tab does not delete the original Codex history.
 
 ## Creating and Arranging Tabs
+
+New agent tabs keep the runtime or agent set name, so several tabs can all be named `Codex`. The gray number immediately before each tab’s `×` shows its current position in that agent or terminal tab row. Closing, restoring, or reordering tabs updates the numbers automatically; each split panel counts its own tabs from 1. Use `Ctrl/Cmd+1…9` to select the corresponding position in the focused panel.
 
 Runtime selection when creating or editing an agent set uses the app's own dropdown. The list supports keyboard and touch controls, and Esc closes only the list. Runtime selection is also locked while saving.
 

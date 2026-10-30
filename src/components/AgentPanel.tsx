@@ -134,7 +134,7 @@ import { AgentSetPicker } from './AgentSetPicker'
 import { ScrollDateTimePicker } from './ScrollDateTimePicker'
 import { cachedAgentRuntimes, refreshAgentRuntimes, subscribeAgentRuntimes, updateAgentRuntimesCache } from '../utils/agentPickerCache'
 import { useGridDrag } from '../hooks/useGridDrag'
-import { nextAgentTabLabel, sessionIdOf, sessionIdsExcept, withAutoLabel, withProjectLabel, withRename, withSessionId, type AgentTab } from '../utils/agentTabs'
+import { sessionIdOf, sessionIdsExcept, withAutoLabel, withProjectLabel, withRename, withSessionId, type AgentTab } from '../utils/agentTabs'
 import { agentTabStorageKey } from '../utils/agentTabStorage'
 import {
   DEFAULT_AGENT_QUEUE_EDIT_HEIGHT,
@@ -998,6 +998,7 @@ function AgentTabBar({
                   {tab.label}
                 </span>
               )}
+              <span data-tab-position aria-hidden="true" className="pointer-events-none shrink-0 text-xs tabular-nums text-ink-muted">{i + 1}</span>
               <button
                 type="button"
                 onClick={(e) => {
@@ -1755,7 +1756,7 @@ export function AgentPanel({ requestedPicker = false, onPickerRuntimeChosen, onR
       .then(({ cwd }) => {
         const tab = newTab(runtime, preset?.name ?? runtimeOf(runtime).label, cwd, preset)
         setDefaultCwd(cwd)
-        setTabs((prev) => [...prev, runtime === 'tmux' ? tab : { ...tab, label: nextAgentTabLabel(prev, tab.label) }])
+        setTabs((prev) => [...prev, tab])
         setAutoFocusTabId(tab.id)
         setActiveId(tab.id)
         latestDock.current?.assign(destination, tab.id)

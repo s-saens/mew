@@ -17,13 +17,6 @@ export type AgentTab = {
   preset?: { id: string; name: string; thinkingId?: string; thinkingConfigId?: string; modelId: string; role: string }
 }
 
-export function nextAgentTabLabel(tabs: AgentTab[], base: string): string {
-  const used = new Set(tabs.map(tab => tab.label))
-  let label = base
-  for (let number = 1; used.has(label); number += 1) label = `${base}-${number}`
-  return label
-}
-
 function sessionSlot(runtime: string, cwd: string): string {
   return JSON.stringify([runtime, cwd])
 }
