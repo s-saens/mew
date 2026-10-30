@@ -1,8 +1,8 @@
 ---
 title: "Mewlink device registration and locally authenticated P2P access contract"
-description: "Defines Mewlink integration exclusively with production servers and the exclusion of development servers, public device addresses, public base forwarding for port links, local authentication, browser trust, revocation, and reconnection. Explains security and operational boundaries for one-time setup, resource validation, body timeouts, host heartbeat rechecks, lightweight presence queries, cause-specific retries, inactive waiting, RTC recovery, and signaling reattachment."
+description: "Defines Mewlink integration exclusively with production servers and the exclusion of development servers, public device addresses, public base forwarding for port and scoped public file/folder links, local authentication and anonymous capability admission, browser trust, revocation, and reconnection. Explains security and operational boundaries for one-time setup, resource validation, body timeouts, host heartbeat rechecks, lightweight presence queries, cause-specific retries, inactive waiting, RTC recovery, and signaling reattachment."
 created: 2026-10-07
-updated: "2026-10-29"
+updated: "2026-10-30"
 ---
 
 [Work and release criteria](<../work/remote-access.md>) · [Central service installation](../operations/remote-central.md) · [ADR 0195](../history/decisions/0195-mew-account-based-p2p-remote-access.md) · [Follow-up ADR 0203](../history/decisions/0203-mewlink-workers-p2p-ui.md) · [Local authentication ADR 0207](../history/decisions/0207-mewlink-device-access-local-auth.md) · [Permissions](access-control.md)
@@ -20,6 +20,16 @@ Command port buttons append `/<port>` to the public device address rather than t
 The internal execution origin is `https://app.mew.run`. It is separated from the management screen on a different origin within the same site to reduce mobile browser cross-site storage restrictions while preserving central cookie and API isolation. Screen addresses on the former `mew.saens.kr` redirect to the new domain, but registration, persistent WSS, signing keys, and device IDs are retained. The central service allows only configured previous origins, and validates the host proof audience and ticket issuer against the origin of the host actually connected to. New browsers validate ticket issuers only against the current and previous origin list allowed by central configuration, while retaining validation of the same signing key and instance audience. Launch does not require new RPC methods on existing Durable Objects. The issuer of approved local Mewlink identities remains the corresponding host's origin, and the identity namespace for direct email accounts is also fixed to its previous value to prevent creation of a different account with the same email.
 
 When retaining previous provider callbacks, OAuth is handled at `OAUTH_ORIGIN`, and a new management session is issued after consuming a single-use proof valid for 60 seconds and bound to a browser verification cookie on the new management origin. Requests that fail origin, cookie, or expiration validation do not create a session. This route is not provided on the app origin. [Domain migration decision](../decisions/0005-mewlink-domain-and-private-dashboard.md).
+
+## Public file and folder links
+
+A public link appends `/share/f/{id}` or `/share/d/{id}` to `https://mew.run/{username}/{device}`. The central worker preserves that typed share path through the connection parent, app launcher, and `mew:context` handoff. The installed app selects its standalone public editor after remote transport initialization, without opening the workspace or login UI. Direct localhost and custom-domain links select the same editor from their pathname.
+
+The host dispatcher permits only the exact `/api/public-shares/{f|d}/{id}` capability endpoints before local login. Metadata, tree, file, and raw reads and existing-file content updates are authorized by the [public capability service](access-control.md#public-capability-links). Management routes, other work APIs, and work WebSockets still require local authentication. Invalid IDs do not retain a public connection. A validated capability supplies a live revalidation callback for connection lifetime; disabling publication or losing creator permissions removes that anonymous authorization. Authenticated session revocation remains unchanged.
+
+`publicShareUrl` uses the validated public device base forwarded through `previewBaseUrl`; an invalid remote base fails instead of copying the internal app origin. Public raw responses forward CSP, Referrer-Policy, X-Content-Type-Options, and X-Frame-Options across the data channel.
+
+The central source is maintained in the excluded `mewlink/` directory and is applied separately from the host repository commit. Host tests and isolated launcher checks do not establish deployment. The user must apply both host and central changes and verify a copied link from another browser before relying on Mewlink publication. The host must remain awake, online, and reachable through the direct connection.
 
 ## Connection information display
 

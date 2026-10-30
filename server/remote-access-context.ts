@@ -11,6 +11,8 @@ export interface RemoteContext {
   setSessionToken?(token: string | null): void
   identity?(): MewlinkIdentity | null
   activateMewlink?(): void
+  /** A validated public share can keep an anonymous connection alive without account authority. */
+  allowPublicShare?(valid: () => boolean): void
   /** Preserve only the initiating request across its synchronous account access update. */
   updateAccountAccess?<T>(action: () => T): T
   /** Changes connection authority synchronously before returning its resolved token. */

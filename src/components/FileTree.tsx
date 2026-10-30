@@ -28,6 +28,9 @@ import { GitButton } from './GitButton'
 import { VirtualTreeRows } from './virtual-tree-rows'
 import { explorerSearchTree, type ExplorerSearch } from '../utils/explorer-search'
 import { ExplorerSearchPreview } from './explorer-search-preview'
+import type { PublicShareMode } from '../../shared/public-share'
+import { listPublicShares } from '../api/public-shares'
+import { PublicShareBadge, PublicShareDialog } from './public-share-dialog'
 import {
   childrenForOpenDirs,
   visibleOpenDirectories,
@@ -67,6 +70,7 @@ interface NodeCtx {
   openDirs: Set<string>
   editing: EditingState
   readOnly: boolean
+  publicShares: ReadonlyMap<string, PublicShareMode> | null
   canUseCommands: boolean
   openProject?: (path: string) => void
   canOpenProjects: boolean
@@ -143,6 +147,8 @@ function MocItem({
   documentPages = false,
   search,
   onSelect,
+  publicShare,
+  onMenu,
 }: {
   path: string
   depth: number
@@ -153,15 +159,21 @@ function MocItem({
   documentPages?: boolean
   search?: ExplorerSearch
   onSelect: (path: string, opts?: TreeOpenOptions) => void
+  publicShare?: PublicShareMode
+  onMenu?: (x: number, y: number) => void
 }) {
   useUiLocale()
+  const { ref: setTouchElement, ...touch } = useTreeTouchGesture({ enabled: !!onMenu, onMenu: (x, y) => onMenu?.(x, y), onDragCancel: () => {} })
   return (
     <button
       type="button"
       data-path={path}
       data-search-match={search?.paths.includes(path) || undefined}
       data-search-file={search?.paths.includes(path) ? path : undefined}
-      onClick={event => onSelect(path, documentPages ? { replaceActive: !event.ctrlKey && !event.metaKey, forceNewTab: event.ctrlKey || event.metaKey, preview: false } : undefined)}
+      ref={setTouchElement}
+      onPointerDown={touch.onPointerDown}
+      onContextMenu={event => { if (!onMenu) return; event.preventDefault(); if (!touch.isTouchInput()) onMenu(event.clientX, event.clientY) }}
+      onClick={event => { if (!touch.consumeClick()) onSelect(path, documentPages ? { replaceActive: !event.ctrlKey && !event.metaKey, forceNewTab: event.ctrlKey || event.metaKey, preview: false } : undefined) }}
       onDoubleClick={() => onSelect(path, { preview: false })}
       title={path}
       className={`mb-0.5 flex w-full items-center gap-1.5 rounded px-2 py-1 text-left text-sm select-none hover:bg-surface-raised ${
@@ -172,6 +184,7 @@ function MocItem({
       <MapIcon size={14} />
       <span className="min-w-0 flex-1 truncate">{search?.paths.includes(path) ? <mark className="rounded bg-accent/25 px-0.5 font-semibold text-ink">{label}</mark> : label}</span>
       <PresenceDots colors={presenceColors} />
+      <PublicShareBadge mode={publicShare} />
     </button>
   )
 }
@@ -287,6 +300,7 @@ function TreeHeader({ depth, open, children }: { depth: number; open: boolean; c
 function Node({ node, depth, ctx }: { node: TreeNode; depth: number; ctx: NodeCtx }) {
   useUiLocale()
   const readOnly = ctx.readOnly || node.editable === false
+  const publicShare = ctx.publicShares ? ctx.publicShares.get(node.path) : node.publicShare
   const matchPath = ctx.searchPaths?.get(node.path)
   const searchProps = { 'data-search-match': matchPath ? true : undefined, 'data-search-file': matchPath }
   const highlight = (label: string) => matchPath ? <mark className="rounded bg-accent/25 px-0.5 font-semibold text-ink">{label}</mark> : label
@@ -389,6 +403,7 @@ function Node({ node, depth, ctx }: { node: TreeNode; depth: number; ctx: NodeCt
             onClick={() => ctx.startCreate(node.path, 'file')} className="mr-1 flex h-7 w-6 shrink-0 items-center justify-center rounded text-ink-muted hover:text-ink focus-visible:outline-2 focus-visible:outline-accent sm:opacity-0 sm:group-hover/page:opacity-100 sm:group-focus-within/page:opacity-100">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
           </button>}
+          <PublicShareBadge mode={publicShare} className="mr-2" />
         </div>
       </TreeHeader>
       {(open || creating) && <TreeChildren depth={depth} documentPages>
@@ -423,6 +438,7 @@ function Node({ node, depth, ctx }: { node: TreeNode; depth: number; ctx: NodeCt
           <FileTypeIcon name={node.path} />
           <span className="min-w-0 flex-1 truncate">{highlight(ctx.documentTitles[node.path] !== undefined ? `${ctx.documentTitles[node.path] || uiText('제목 없음')}.md` : node.name)}</span>
           <PresenceDots colors={ctx.presence[node.path] ?? []} />
+          <PublicShareBadge mode={publicShare} />
         </button>
       </div>
     )
@@ -500,6 +516,7 @@ function Node({ node, depth, ctx }: { node: TreeNode; depth: number; ctx: NodeCt
           </button>}
           {node.git && !projectLink && ctx.openGit && <span className="relative z-10 flex shrink-0"><GitButton onClick={() => ctx.openGit?.(node.path)} title={uiText("{p0} Git 열기", { p0: node.name })} /></span>}
           {node.project && !projectLink && ctx.canUseCommands && <span className="relative z-10 flex shrink-0"><CommandButtonMenu project={ctx.project} directory={node.path} /></span>}
+          <PublicShareBadge mode={publicShare} className="relative z-10 ml-auto mr-2" />
         </div>
       </TreeHeader>
       {isOpen && (
@@ -513,6 +530,8 @@ function Node({ node, depth, ctx }: { node: TreeNode; depth: number; ctx: NodeCt
               presenceColors={ctx.presence[moc.path] ?? []}
               onSelect={ctx.onSelect}
               search={ctx.search}
+              publicShare={ctx.publicShares ? ctx.publicShares.get(moc.path) : moc.publicShare}
+              onMenu={ctx.readOnly ? undefined : (x, y) => ctx.openPopover(moc.path, 'file', x, y)}
             />
           )}
           {createEditing && (
@@ -571,6 +590,7 @@ export function FileTree({
   canUseCommands = false,
   onOpenProject,
   canOpenProjects = false,
+  canManagePublicShares = false,
   canUseGit = false,
   compact = false,
   roots,
@@ -620,6 +640,7 @@ export function FileTree({
   /** Treat marked directories as navigation boundaries instead of expandable folders. */
   onOpenProject?: (path: string) => void
   canOpenProjects?: boolean
+  canManagePublicShares?: boolean
   canUseGit?: boolean
   /** 다른 트리 안에 넣을 때 독립 스크롤을 숨긴다. */
   compact?: boolean
@@ -706,6 +727,19 @@ export function FileTree({
   const [hadSavedOpenDirs] = useState(() => accountState !== undefined || loadOpenDirs(persistedProject) !== null)
   const [editing, setEditing] = useState<EditingState>(null)
   const [popover, setPopover] = useState<PopoverState>(null)
+  const [shareTarget, setShareTarget] = useState<{ path: string } | null>(null)
+  const [publicShares, setPublicShares] = useState<Map<string, PublicShareMode> | null>(null)
+  const [shareRefresh, setShareRefresh] = useState(0)
+  const shareRevision = useRef(0)
+  useEffect(() => {
+    if (!canManagePublicShares) { setPublicShares(null); setShareTarget(null); return }
+    const controller = new AbortController()
+    const revision = shareRevision.current
+    void listPublicShares(project, controller.signal).then(shares => {
+      if (!controller.signal.aborted && shareRevision.current === revision) setPublicShares(new Map(shares.map(share => [share.path, share.mode])))
+    }).catch(() => {})
+    return () => controller.abort()
+  }, [project, canManagePublicShares, refreshSignal, treeInvalidation, shareRefresh])
   const [deleteTarget, setDeleteTarget] = useState<{ path: string; type: 'file' | 'dir' } | null>(null)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [clipboard, setClipboardState] = useState<FileClipboard>(() => readFileClipboard())
@@ -1458,6 +1492,7 @@ export function FileTree({
     openDirs: displayedOpenDirs,
     editing,
     readOnly,
+    publicShares,
     canUseCommands,
     openProject: onOpenProject,
     canOpenProjects,
@@ -1554,6 +1589,8 @@ export function FileTree({
                 presenceColors={presence[rootMoc.path] ?? []}
                 onSelect={ctx.onSelect}
                 search={search}
+                publicShare={publicShares ? publicShares.get(rootMoc.path) : rootMoc.publicShare}
+                onMenu={readOnly ? undefined : (x, y) => openPopover(rootMoc.path, 'file', x, y)}
               />
             )}
             {rootCreateEditing && (
@@ -1574,6 +1611,7 @@ export function FileTree({
         <ActionPopover
           x={popover.x}
           y={popover.y}
+          onPublicShare={canManagePublicShares && popover.path !== '' ? () => { setShareTarget({ path: popover.path }); setPopover(null) } : undefined}
           onRename={
             popover.path === ''
               ? undefined
@@ -1656,6 +1694,23 @@ export function FileTree({
           onClose={() => setPopover(null)}
         />
       )}
+      {shareTarget && canManagePublicShares && <PublicShareDialog key={`${project}:${shareTarget.path}`} project={project} path={shareTarget.path}
+        onChanged={share => {
+          shareRevision.current++
+          setPublicShares(current => {
+            const next = new Map(current ?? [])
+            if (!current) {
+              const visit = (nodes: TreeNode[]) => nodes.forEach(node => { if (node.publicShare) next.set(node.path, node.publicShare); if (node.children) visit(node.children) })
+              visit(tree)
+              Object.values(directoryChildren).forEach(visit)
+            }
+            if (share) next.set(shareTarget.path, share.mode)
+            else next.delete(shareTarget.path)
+            return next
+          })
+          setShareRefresh(value => value + 1)
+        }}
+        onClose={() => setShareTarget(null)} />}
       <input
         ref={uploadInputRef}
         type="file"

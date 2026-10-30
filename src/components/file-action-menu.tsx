@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react'
-import { Copy, EditPencil, Folder, FolderPlus, FolderSettings, GitBranch, MultiplePagesPlus, PagePlus, PasteClipboard, Scissor, Star, Trash, Upload } from 'iconoir-react'
+import { Copy, EditPencil, Eye, Folder, FolderPlus, FolderSettings, GitBranch, MultiplePagesPlus, PagePlus, PasteClipboard, Scissor, Star, Trash, Upload } from 'iconoir-react'
 import { ActionMenu, ActionMenuItem } from '@mew/ui'
 import { useI18n } from '../i18n'
+import { publicShareCopy } from './public-share-copy'
 
 export function FileActionMenu({
   x,
@@ -20,6 +21,7 @@ export function FileActionMenu({
   onCreateSubproject,
   onAddFavorite,
   onOpenProject,
+  onPublicShare,
   pasteDisabled = false,
   onClose,
 }: {
@@ -42,10 +44,11 @@ export function FileActionMenu({
   onCreateSubproject?: () => void
   onAddFavorite?: () => void
   onOpenProject?: () => void
+  onPublicShare?: () => void
   pasteDisabled?: boolean
   onClose: () => void
 }) {
-  const { t } = useI18n()
+  const { t, locale } = useI18n()
   return <ActionMenu x={x} y={y} onClose={onClose} fileMenu>
     {onRename && <ActionMenuItem icon={<EditPencil />} onClick={onRename}>{t('fileExplorer.rename')}</ActionMenuItem>}
     {onDuplicate && <ActionMenuItem icon={<MultiplePagesPlus />} onClick={onDuplicate}>{t('fileExplorer.duplicate')}</ActionMenuItem>}
@@ -53,6 +56,7 @@ export function FileActionMenu({
     {onCutClip && <ActionMenuItem icon={<Scissor />} onClick={onCutClip}>{t('fileExplorer.cut')}</ActionMenuItem>}
     {onPasteClip && <ActionMenuItem icon={<PasteClipboard />} onClick={onPasteClip} disabled={pasteDisabled}>{t('fileExplorer.paste')}</ActionMenuItem>}
     {onDownload}
+    {onPublicShare && <ActionMenuItem icon={<Eye />} onClick={onPublicShare}>{publicShareCopy[locale].title}</ActionMenuItem>}
     {onNewFile && <ActionMenuItem icon={<PagePlus />} onClick={onNewFile}>{t('sidebar.newFile')}</ActionMenuItem>}
     {onNewFolder && <ActionMenuItem icon={<FolderPlus />} onClick={onNewFolder}>{t('sidebar.newFolder')}</ActionMenuItem>}
     {onUpload && <ActionMenuItem icon={<Upload />} onClick={onUpload}>{t('fileExplorer.upload')}</ActionMenuItem>}

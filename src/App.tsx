@@ -2227,6 +2227,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
               >
                 {search => <>
                     {(isGuest || (workspaceUiLoaded && sidebarStateLoadedRootRef.current === projectUiPath)) && <FileTree
+                      canManagePublicShares={canOpenProjects}
                       search={search}
                       key={`${isGuest || docsExpanded ? DEFAULT_PROJECT : WORKSPACE_PROJECT}:${rootProjectPath ?? ''}:${workspaceUiRevision}`}
                       {...sidebarCreate.treeProps(isGuest || docsExpanded ? 'docs' : 'root')}

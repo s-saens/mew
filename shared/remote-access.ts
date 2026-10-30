@@ -20,6 +20,11 @@ export type RemoteFrame =
   | { type: 'message'; id: string; data: string; binary: boolean; sequence?: number; final?: boolean }
   | { type: 'close'; id: string; code?: number }
   | { type: 'error'; id: string; code: string }
+export function publicShareRequest(method: string, path: string): boolean {
+  const pathname = path.split('?')[0]
+  return (['GET', 'HEAD'].includes(method) && /^\/api\/public-shares\/[fd]\/[A-Za-z0-9_-]{43}(?:\/(?:tree|file|raw))?$/.test(pathname))
+    || (method === 'PUT' && /^\/api\/public-shares\/[fd]\/[A-Za-z0-9_-]{43}\/file$/.test(pathname))
+}
 export function remotePath(path: unknown, socket = false, capability?: 'port-preview'): path is string {
   if (capability === 'port-preview') return previewRemotePath(path, socket)
   if (typeof path !== 'string' || path.length > 8192 || /[\r\n\\#]/.test(path) || /%(?:00|0d|0a)/i.test(path) || /%(?:2f|5c)/i.test(path.split('?')[0])) return false

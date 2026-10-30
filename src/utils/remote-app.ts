@@ -36,7 +36,7 @@ export async function initializeRemoteApp() {
   const token = /^\/__mew_ui\/([A-Za-z0-9_-]{20,64})\//.exec(location.pathname)?.[1]
   if (!token || parent === window) throw new Error('P2P 연결 페이지에서 mew를 다시 열어 주세요.')
   const channel = new MessageChannel()
-  const context = await new Promise<{ instance: string; reconnecting?: boolean; initialAuth?: AuthStatus; authStatusPending?: boolean; previewDomain?: string; previewPort?: number; previewPath?: string; previewBaseUrl?: string }>((resolve, reject) => {
+  const context = await new Promise<{ instance: string; reconnecting?: boolean; initialAuth?: AuthStatus; authStatusPending?: boolean; previewDomain?: string; previewPort?: number; previewPath?: string; previewBaseUrl?: string; sharePath?: string }>((resolve, reject) => {
     const timer = setTimeout(() => { channel.port1.close(); reject(new Error('앱 연결 시간이 초과됐습니다. 다시 연결해 주세요.')) }, 10000)
     channel.port1.onmessage = ({ data }) => {
       if (data?.type === 'mew-app-disconnected') { clearTimeout(timer); channel.port1.close(); reject(new Error('기기 연결이 종료됐습니다. 다시 연결해 주세요.')); return }
@@ -47,6 +47,11 @@ export async function initializeRemoteApp() {
   })
   configureRemotePortPreview(context.previewDomain)
   configurePortPreviewBaseUrl(context.previewBaseUrl ?? null)
+  if (typeof context.sharePath === 'string' && /^\/share\/[fd]\/[A-Za-z0-9_-]{43}$/.test(context.sharePath)) {
+    const address = new URL(location.href)
+    address.searchParams.set('sharePath', context.sharePath)
+    history.replaceState(null, '', address)
+  }
   if (Number.isInteger(context.previewPort) && context.previewPort! >= 1 && context.previewPort! <= 65535) {
     const address = new URL(location.href)
     address.searchParams.set('preview', String(context.previewPort))

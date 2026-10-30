@@ -1,14 +1,14 @@
 ---
 title: "Collaborative Editing, Comments, Chat, and Guest Sharing"
-description: "Covers preparing accounts and file permissions for collaboration; adding comments with Ctrl+Shift+C or the body context menu; threads, lists, and retaining drafts on failure; collaborative editing; shared notes; active sessions and history; chat; and DMs. Also distinguishes guest sharing, which applies to all visitors who are not logged in."
-updated: "2026-10-28"
+description: "Covers preparing accounts and file permissions for collaboration; adding comments with Ctrl+Shift+C or the body context menu; threads, lists, and retaining drafts on failure; collaborative editing; shared notes; active sessions and history; chat; and DMs. Includes revocable public file/folder links and distinguishes them from guest path permissions."
+updated: "2026-10-30"
 상위파일:
   - "../../.mew/docs/MOC.md"
   - "MOC.md"
 ---
 This guide explains user actions for collaborative editing, comments, chat, and sharing. Review [Security and Roles](../operations/security.md) before inviting others.
 
-[Collaborative Editing](#collaborative-editing-and-participants) · [Shared Notes](#shared-memo) · [Active Sessions](#active-mew-sessions) · [Comments](#comments-and-replies) · [Chat](#group-chat-and-dms) · [Guest Sharing](#guest-sharing)
+[Collaborative Editing](#collaborative-editing-and-participants) · [Shared Notes](#shared-memo) · [Active Sessions](#active-mew-sessions) · [Comments](#comments-and-replies) · [Chat](#group-chat-and-dms) · [Public Links](#public-file-and-folder-links) · [Guest Sharing](#guest-sharing)
 
 ## Before Working Together
 
@@ -73,9 +73,21 @@ If you insert a file reference in the input and send it, recipients can click th
 
 Chat is only available to logged-in users with chat permission. The app delivers DMs only to the participants, but they are stored in server files, so they are not secret conversations hidden from the server administrator. Storage and read-status handling follow the [chat contract](../../.mew/docs/development/collaboration.md); permission policies follow [Security](../operations/security.md).
 
+## Public file and folder links
+
+1. As an owner or manager, right-click a file or folder in the explorer and choose **Publish**. On touch screens, long-press the item.
+2. Choose **Public viewing** or **Allow editing**. Copy the displayed link and send it to visitors. Anyone with the link can use that selected access level without an account.
+3. To stop access, reopen **Publish** and choose **Not public**. The old link stops working. Publishing again creates a different link.
+
+An eye on the right of an explorer item indicates a viewing link; a pencil indicates an editing link. File links open only the document editor or media view. Folder links include an explorer limited to the published folder. Editing saves changes automatically; a save conflict keeps your draft so a newer version is not overwritten. Creation, deletion, renaming, comments, databases, and real-time collaboration are unavailable through these links.
+
+A file link does not publish sibling images or attachments. To include local resources, publish a folder that contains both the document and those resources. Secret files, server data, symbolic links, and paths outside the published folder remain unavailable.
+
+Links work at the localhost or custom-domain address used to copy them, subject to that address being reachable by the visitor. Through Mewlink, the link uses the public device address. The host must remain online, and both the host app and central Mewlink launcher must have the sharing update applied. See the [connection contract](../../.mew/docs/development/remote-access.md#public-file-and-folder-links) for application and verification boundaries.
+
 ## Guest Sharing
 
-Visitors who are not logged in are guests. The owner selects a path under **Account Management → File and Folder Permissions** and sets Inherit, Block, View, or Modify in the guest row. Modify includes View. Do not use the eye and pencil settings in the file explorer. After configuring permissions, share the mew access URL so visitors can browse allowed paths.
+Visitors who are not logged in are guests. The owner selects a path under **Account Management → File and Folder Permissions** and sets Inherit, Block, View, or Modify in the guest row. Modify includes View. After configuring permissions, share the mew access URL so visitors can browse allowed paths.
 
 This permission is a **path rule that applies to all visitors who are not logged in**, rather than an invitation issued only to a specific recipient. Allowing a folder also applies to its subpaths, and more specific path rules take precedence. To stop sharing, remove the rule and check for separate allowances on child items.
 

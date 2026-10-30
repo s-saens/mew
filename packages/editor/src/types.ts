@@ -20,6 +20,7 @@ export interface TreeNode {
   /** 폴더 자체가 Git 저장소 루트인지 */
   git?: boolean
   guestAccess?: { view: boolean; edit: boolean }
+  publicShare?: 'view' | 'edit'
 }
 
 /** 호스트 앱의 useCollab이 넘기는 협업 세션 — 있으면 Y.XmlFragment가 본문의 진실 원천이 된다 */

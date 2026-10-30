@@ -9,6 +9,7 @@ export function createRemoteAuthentication(identity: MewlinkIdentity | null, bro
   let token: string | null = null
   let external = identity ? resolveMewlinkSession(identity) : null
   let loginDeadline: number | null = Date.now() + REMOTE_LOGIN_TIMEOUT
+  let publicShare: (() => boolean) | undefined
 
   function current(): AuthenticatedSession | null {
     if (token) return getSession(token, browserKey)
@@ -23,6 +24,7 @@ export function createRemoteAuthentication(identity: MewlinkIdentity | null, bro
 
   function ready() {
     const session = current()
+    if (!session && publicShare) return publicShare()
     if (session && !session.user.mustChangePassword) loginDeadline = null
     else loginDeadline ??= Date.now() + REMOTE_LOGIN_TIMEOUT
     return loginDeadline === null || loginDeadline > Date.now()
@@ -56,5 +58,5 @@ export function createRemoteAuthentication(identity: MewlinkIdentity | null, bro
     return Promise.resolve(next)
   }
 
-  return { current, ready, resume, trustDevice, setSessionToken, activateMewlink, sessionToken: () => token, identity: () => identity }
+  return { current, ready, resume, trustDevice, setSessionToken, activateMewlink, allowPublicShare: (valid: () => boolean) => { publicShare = valid }, sessionToken: () => token, identity: () => identity }
 }

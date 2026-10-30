@@ -15,6 +15,7 @@ import { hasProjectMarker } from './subprojects.ts'
 import { readIgnoreSet } from './ignoreList.ts'
 
 export interface TreeNode {
+  publicShare?: import('../shared/public-share.ts').PublicShareMode
   editable?: boolean
   name: string
   path: string

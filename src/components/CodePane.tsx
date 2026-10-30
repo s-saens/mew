@@ -313,6 +313,7 @@ export const CodePane = forwardRef<
     value: string
     onChange: (content: string) => void
     readOnly: boolean
+    serverLint?: boolean
     /** The file editor enables its mobile tab-swipe surface; embedded editors can omit it. */
     showMobileKeyBar?: boolean
     /** 있으면 이 방의 Y.Text가 문서 내용의 진실 원천이 된다 — value/onChange는 그 결과를 반영만 한다 */
@@ -326,7 +327,7 @@ export const CodePane = forwardRef<
     lineOffset?: number
     debuggerContext?: { root: string; account: string }
   }
->(function CodePane({ path, project, value, onChange, readOnly, showMobileKeyBar = false, collab, commentThreads, onCommentClick, onAnnotationOpen, onOpenDatabase, lineOffset = 0, debuggerContext }, ref) {
+>(function CodePane({ path, project, value, onChange, readOnly, serverLint = true, showMobileKeyBar = false, collab, commentThreads, onCommentClick, onAnnotationOpen, onOpenDatabase, lineOffset = 0, debuggerContext }, ref) {
   const containerRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
   const mobileLayout = useMobileLayout()
@@ -410,7 +411,7 @@ export const CodePane = forwardRef<
         ...languageFor(path),
         ...(['md', 'mdx'].includes(extOf(path)) && databaseLinksEnabled ? databaseLinks(reference => onOpenDatabaseRef.current?.(reference)) : []),
         ...(isProse(path) ? [EditorView.lineWrapping] : []),
-        ...(readOnly ? [] : lintExtensions(path, project)),
+        ...(readOnly || !serverLint ? [] : lintExtensions(path, project)),
         EditorState.readOnly.of(readOnly),
         EditorView.editable.of(!readOnly),
         commentField,
@@ -485,7 +486,7 @@ export const CodePane = forwardRef<
       viewRef.current = null
     }
     // 파일이 바뀌면 언어·lint 구성이 달라지므로 뷰를 새로 만든다 (문서 내용은 valueRef로 최신값 사용)
-  }, [project, path, readOnly, collab?.ydoc, lineOffset, debugRoot, debugAccount, databaseLinksEnabled])
+  }, [project, path, readOnly, serverLint, collab?.ydoc, lineOffset, debugRoot, debugAccount, databaseLinksEnabled])
 
   // 방을 처음 만든 클라이언트가 이미 로드해 둔 탭 내용으로 Y.Text를 시딩한다 (디스크 재조회 아님) —
   // 이미 누군가 협업 중이던 방이면 ytext가 비어 있지 않으므로 아무 일도 하지 않는다

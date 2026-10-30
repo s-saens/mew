@@ -115,6 +115,7 @@ export function createRemoteAgent(server: Server, options: { network?: ReturnTyp
           setSessionToken: authentication.setSessionToken,
           identity: () => alive() ? identity : null,
           activateMewlink: authentication.activateMewlink,
+          allowPublicShare: authentication.allowPublicShare,
           trustDevice: label => {
             const token = authentication.trustDevice(label)
             emit({ type: 'trusted-browser', connection, label })

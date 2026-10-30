@@ -1,5 +1,7 @@
 import { DocumentLinkIndex } from './document-link-index.ts'
 import { protectFileResponse } from './file-response.ts'
+import { createPublicSharesRouter } from './public-share-routes.ts'
+import { decoratePublicShares } from './public-shares.ts'
 import { createDocumentBacklinksRouter } from './document-backlinks-routes.ts'
 import { createDebuggerRouter } from './debugger-routes.ts'
 import { mergeTaskFrontmatter, TaskFrontmatterConflict } from '../packages/editor/src/utils/task-frontmatter-merge.ts'
@@ -423,6 +425,7 @@ export function createApiApp() {
   app.use((req, _res, next) => runAccountWorkspace(authOf(req).email, next))
   app.use('/agent/drawings', createAgentDrawingsRouter())
   app.use(express.json({ limit: '10mb' }))
+  app.use('/public-shares', createPublicSharesRouter())
   app.use('/admin/access', createAccessRouter())
   app.use('/presence/history', createPresenceHistoryRouter())
   app.use((_req, res, next) => { res.setHeader('Cache-Control', 'private, no-store'); next() })
@@ -1369,7 +1372,7 @@ export function createApiApp() {
       // 이 프로젝트를 보는 세션이 있으니 트리 감시를 지연 등록한다 — 터미널·다른 세션이 만든 파일이
       // 사이드바에 바로 반영되도록(멱등). docs는 부팅 때부터 감시 중. 게스트는 감시를 유발하지 않는다.
       if (role !== 'guest') watchProjectTree(project)
-      const filtered = filterTreeForAccess(authOf(req), project, tree)
+      const filtered = decoratePublicShares(project, filterTreeForAccess(authOf(req), project, tree))
       const entries = requestedPath !== null && !unrestrictedFiles(authOf(req), project) ? childrenAt(filtered, requestedPath) : filtered
       if (req.query.v === '1') res.json({ version: catalogVersion, state: catalogState, entries })
       else res.json(entries)

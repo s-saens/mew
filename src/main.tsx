@@ -1,6 +1,6 @@
 import { initializeRemoteApp } from './utils/remote-app'
 import { startBrowserStorageMaintenance } from '@mew/ui/browser-storage'
-import { StrictMode } from 'react'
+import { StrictMode, type ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import { I18nProvider } from './i18n.tsx'
@@ -13,6 +13,7 @@ import { StartupScreen } from './components/startup-screen.tsx'
 import { getAppRuntime } from './runtime/app-runtime.ts'
 import { startAppInstallTracking } from './utils/app-install.ts'
 import { uiText } from '@mew/ui/i18n-core'
+import { parsePublicSharePath } from './utils/public-share-route.ts'
 
 startAppInstallTracking()
 
@@ -40,14 +41,22 @@ async function startApp() {
   root.render(<StartupScreen />)
 
   try {
-    // Download the selected entrypoint while the remote port and identity are prepared.
-    const [pageModule, initialAuth] = await Promise.all([
-      import('./AppBootstrap.tsx'),
-      document.querySelector('meta[name="mew-p2p-app"]') ? initializeRemoteApp() : getAppRuntime().initialAuth,
+    const remoteApp = document.querySelector('meta[name="mew-p2p-app"]')
+    const bootstrapModule = parsePublicSharePath(location.pathname) ? null : import('./AppBootstrap.tsx')
+    const [bootstrap, initialAuth] = await Promise.all([
+      bootstrapModule,
+      remoteApp ? initializeRemoteApp() : getAppRuntime().initialAuth,
     ])
-
-    const { default: AppBootstrap } = pageModule
-    const page = <AppBootstrap initialAuth={initialAuth} />
+    const sharePath = remoteApp ? new URLSearchParams(location.search).get('sharePath') : location.pathname
+    const share = sharePath ? parsePublicSharePath(sharePath) : null
+    let page: ReactNode
+    if (share) {
+      const { PublicSharePage } = await import('./components/public-share-page.tsx')
+      page = <PublicSharePage share={share} />
+    } else {
+      const { default: AppBootstrap } = bootstrap ?? await import('./AppBootstrap.tsx')
+      page = <AppBootstrap initialAuth={initialAuth} />
+    }
 
     // Migrate old disposable caches before any workspace effect persists state.
     const stopStorageMaintenance = startBrowserStorageMaintenance()

@@ -16,6 +16,10 @@ export function configurePortPreviewBaseUrl(value?: string | null) {
 
 export function portPreviewUrl(port: number): string {
   if (!validPreviewPort(port)) throw new Error('포트가 올바르지 않습니다.')
+  return `${publicMewBaseUrl()}/${port}`
+}
+
+export function publicMewBaseUrl(): string {
   if (previewBaseUrl === null) throw new Error('Mewlink 기기 주소를 확인하지 못했습니다. 페이지를 다시 열어 주세요.')
-  return `${previewBaseUrl ?? location.origin}/${port}`
+  return previewBaseUrl ?? location.origin
 }

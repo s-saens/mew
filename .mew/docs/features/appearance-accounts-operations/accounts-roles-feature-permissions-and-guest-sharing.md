@@ -4,11 +4,11 @@ parent: "mew-settings"
 title: "Accounts, roles, feature permissions, and guest sharing"
 status: "implemented"
 created: "2026-09-18"
-updated: "2026-10-26"
+updated: "2026-10-30"
 status_hash: "65b2a28fe6a84c2ae5140eff868f32aefcd8cd25f5aabc3ea17d470b8cd0ec3d"
 files: ["src/components/account-access-matrix.tsx", "src/components/account-role-select.tsx", "src/components/account-column-headers.tsx", "src/components/account-profile-form.tsx", "src/components/AdminSettingsModal.tsx", "src/components/mewlink-access-settings.tsx", "src/components/mewlink-account-connection.tsx", "src/components/SettingsModal.tsx", "src/components/LoginPage.tsx", "server/access-policy.ts", "server/auth.ts", "server/authRoutes.ts", "server/mewlink-identities.ts", "server/mewlink-auth-routes.ts"]
 commits: []
-description: "Defines My Account with a photo menu and a Save button beside the name, an account management dialog the same size as Settings, a responsive add form, permission tables with profile photo columns and item rows, and account popups and role lists within the modal. Covers passwords, logout, owner management of roles, feature/file permissions and deletion, Mewlink access approval, email account linking, merging and revocation, and guest sharing; excludes device registration and public sign-up."
+description: "Defines My Account with a photo menu and a Save button beside the name, an account management dialog the same size as Settings, a responsive add form, permission tables with profile photo columns and item rows, and account popups and role lists within the modal. Covers passwords, logout, owner management of roles, feature/file permissions and deletion, Mewlink access approval, email account linking, merging and revocation, guest path permissions, and revocable public file/folder links with viewing or editing, explorer badges, and a minimal anonymous editor; excludes device registration and public sign-up."
 상위파일:
   - "MOC.md"
   - "_appearance-accounts-operations.md"
@@ -35,16 +35,29 @@ description: "Defines My Account with a photo menu and a Save button beside the 
 ### Boundaries and limitations
 
 - There is no public sign-up.
-- Guest sharing is a path rule for all visitors who are not logged in, not a personal invitation link.
+- Guest path permissions apply to ordinary logged-out workspace visitors. Public links separately authorize only the published file or folder, without creating an account or granting workspace access.
 - Server control features are not sandboxed by file permissions.
+
+### Public file and folder links
+
+- An owner or manager with the required file permissions opens **Publish** from a file or folder context menu. The compact dialog offers **Not public**, **Public viewing**, and **Allow editing**, with a copyable link when published. An eye at the far right of an explicitly published explorer item indicates viewing; a pencil indicates editing. Unpublished items have no badge. Publishing a folder does not add badges to each child.
+- Links use `/share/f/{id}` for a file and `/share/d/{id}` for a directory. The ID is generated from 32 random bytes. Direct links use the current mew origin; Mewlink links append the share path to the validated public device address. They do not contain local workspace paths.
+- A file link opens its editor or media view without workspace panels, account controls, terminals, agents, or project navigation. A folder link adds a lazy explorer rooted at that folder. Markdown uses the existing document editor, with a source toggle; code and text use the existing source editor. Public editing saves existing UTF-8 text content up to 10 MiB, without NUL bytes, with serialized revision checks. Conflicts preserve the visitor's draft instead of overwriting a newer file.
+- **Not public** deletes the stored record and invalidates its ID. Publishing again generates a new ID. Changing View/Allow editing keeps the existing ID and updates server authorization immediately. Every public request validates the record, target identity, creator account, and current permissions. Open pages recheck on focus and every 15 seconds while visible; revocation hides their editor at the next successful check.
+- Public capabilities do not alter the guest feature or path rules. They do not grant creation, deletion, renaming, uploads, comments, database operations, or collaborative editing. File links cannot read sibling attachments. Folder links can resolve local links and media only inside their published root. External image URLs remain external resources. Unsupported binary formats provide a download.
+- Server state, secret files, blocked path segments, symbolic links, and worktree internals are excluded. The publishing account must retain its management role and file permissions. The host must remain running and reachable. Mewlink requires the corresponding central launcher changes to be applied separately.
 
 ### Detailed contracts
 
+- [Public sharing decision](../../decisions/0097-public-file-folder-links.md) · [Implementation and verification record](../../work/public-file-folder-links.md)
 - [Account and appearance settings](../../../../docs/configuration/accounts.md) · [Permissions contract](../../development/access-control.md) · [Security policy](../../../../docs/operations/security.md)
 - [Mewlink identity, access request, and account storage contract](../../development/remote-access.md#approved-mewlink-account-login)
 
 <!-- mew:implementation:start -->
 ## Implementation details
+
+- `server/public-shares.ts` stores capability records in `MEW_DATA_DIR/public-shares.json` with atomic writes and private permissions. Records bind to the publishing account and canonical workspace, project root, and target. `server/public-share-routes.ts` provides owner/manager management routes and the separate anonymous capability API before ordinary file middleware. `shared/public-share.ts` owns wire types; explorer trees carry only explicit `publicShare` mode metadata.
+- `src/components/public-share-dialog.tsx` and `FileTree.tsx` manage publication and badges. `src/components/public-share-page.tsx` hosts the constrained editor; its serial save model retains drafts and sends the last confirmed version. Public raw responses retain sandbox headers over HTTP and Mewlink. The dispatcher admits only the exact capability routes without local login; other work APIs and all work WebSockets retain their authentication requirements.
 
 - The photo button in My Account displays a black overlay and pencil icon on hover or keyboard focus. In the shared `ActionMenu`, **Default** resets the draft photo to the default display, while **Choose Photo** and **Paste from Clipboard** update the image draft. The photo and display name are applied together with **Save**. Validation for JPG, PNG, WebP, GIF, and a maximum size of 512KB is retained, and selecting or pasting an image that does not meet these conditions displays an error. Unsupported clipboard reading, denied permission, and no image on the clipboard are also reported as errors.
 - The account management dialog uses the shared `DialogFrame` focus trapping/restoration and Esc/back navigation rules. A small title, account count, and add/close icons are grouped in the header, and the Add button expands the email addition form. Short tabs switch between feature and file permissions, repeated guidance is collapsed, and Mewlink access management is placed below. The dialog size is fixed to match Settings: 740px wide and 70vh high on desktop, fullscreen on mobile, with scrolling inside the body.

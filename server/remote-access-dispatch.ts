@@ -3,11 +3,11 @@ import { duplexPair } from 'node:stream'
 import { WebSocket } from 'ws'
 import type { AuthenticatedSession } from './auth.ts'
 import { bindRemoteSocket, remoteUiRequest, type RemoteContext } from './remote-access-context.ts'
-import { REMOTE_LIMITS, REMOTE_REQUEST_HEADERS, parseRemoteFrame, type RemoteFrame } from '../shared/remote-access.ts'
+import { REMOTE_LIMITS, REMOTE_REQUEST_HEADERS, parseRemoteFrame, publicShareRequest, type RemoteFrame } from '../shared/remote-access.ts'
 import { RemoteSendWindow } from './remote-send-window.ts'
 import { REMOTE_UI_REVALIDATION_HEADER } from '../shared/remote-ui-revalidation.ts'
 const REQUEST_HEADERS = new Set<string>(REMOTE_REQUEST_HEADERS)
-const RESPONSE_HEADERS = new Set(['content-type', 'content-length', 'content-range', 'accept-ranges', 'content-disposition', 'etag', 'cache-control', 'x-robots-tag', 'x-mew-pdf-revision', 'x-mew-pdf-editable', REMOTE_UI_REVALIDATION_HEADER])
+const RESPONSE_HEADERS = new Set(['content-type', 'content-length', 'content-range', 'accept-ranges', 'content-disposition', 'content-security-policy', 'x-content-type-options', 'x-frame-options', 'referrer-policy', 'etag', 'cache-control', 'x-robots-tag', 'x-mew-pdf-revision', 'x-mew-pdf-editable', REMOTE_UI_REVALIDATION_HEADER])
 const bodyBudgets = new WeakMap<Server, { bytes: number }>()
 export interface RemoteWire { send(value: string): Promise<void>; close(): void }
 /** Uses the same HTTP parser/routes and WS handlers without opening a localhost proxy port. */
@@ -73,7 +73,7 @@ export function remoteDispatcher(server: Server, wire: RemoteWire, current: () =
       if (value.flowControl?.separateStreams) separateStreams = true
       const sameKind = [...operations.values()].filter(operation => operation.socket === (value.type === 'socket')).length
       if (operations.has(value.id) || operations.size >= REMOTE_LIMITS.streams * (separateStreams ? 2 : 1) || (separateStreams && sameKind >= REMOTE_LIMITS.streams)) throw new Error('stream-limit')
-      const bootstrap = value.type === 'request' && (remoteUiRequest(value.method, value.path) || (value.method === 'GET' && ['/api/auth/me', '/api/auth/mewlink'].includes(value.path.split('?')[0])) || (value.method === 'POST' && ['/api/auth/login', '/api/auth/logout', '/api/auth/change-password', '/api/auth/mewlink/request', '/api/auth/mewlink/login'].includes(value.path.split('?')[0])))
+      const bootstrap = value.type === 'request' && (remoteUiRequest(value.method, value.path) || publicShareRequest(value.method, value.path) || (value.method === 'GET' && ['/api/auth/me', '/api/auth/mewlink'].includes(value.path.split('?')[0])) || (value.method === 'POST' && ['/api/auth/login', '/api/auth/logout', '/api/auth/change-password', '/api/auth/mewlink/request', '/api/auth/mewlink/login'].includes(value.path.split('?')[0])))
       const session = current()
       let required = local && !(value.type === 'request' && remoteUiRequest(value.method, value.path)) ? authority() : undefined
       if (local && !bootstrap && (!session || session.user.mustChangePassword)) {
