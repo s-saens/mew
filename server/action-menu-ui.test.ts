@@ -73,8 +73,8 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><I18nProvid
         const url = new URL(route.request().url())
         if (url.pathname === '/api/cmd-buttons') return route.fulfill({ json: { buttons: [{ name: '서버 시작', command: 'echo test', session: 'fixture', running: false, oneShot: false }, { name: '서버 확인', command: 'echo ok', session: 'fixture2', running: false, oneShot: false }] } })
         return route.fulfill({ contentType: 'text/html', body: `<!doctype html><html lang="ko" class="${dark ? 'dark' : ''} ${gradient ? 'theme-gradient' : ''}"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>
-        :root{--color-surface:${dark ? '#151515' : '#fff'};--color-surface-raised:${dark ? '#252525' : '#fff'};--color-surface-hover:${dark ? '#333' : '#eee'};--color-ink:${dark ? '#eee' : '#222'};--color-ink-muted:${dark ? '#aaa' : '#666'};--color-edge:#888;--color-danger:${dark ? '#ff7676' : '#b00'};--color-accent:#679eff}
-        :root{--color-surface-solid:${dark ? '#151515' : '#fff'};--color-surface-raised-solid:${dark ? '#252525' : '#fff'};--color-surface-hover-solid:${dark ? '#333' : '#eee'}}
+        :root{--color-surface-deep:${dark ? '#101318' : '#dde3eb'};--color-surface:${dark ? '#18202b' : '#e6ebf2'};--color-surface-raised:${dark ? '#39414c' : '#fff'};--color-surface-hover:${dark ? '#46505e' : '#d5dce5'};--color-ink:${dark ? '#eee' : '#222'};--color-ink-muted:${dark ? '#aaa' : '#666'};--color-edge:#888;--color-danger:${dark ? '#ff7676' : '#b00'};--color-accent:#679eff}
+        :root{--color-surface-solid:${dark ? '#18202b' : '#e6ebf2'};--color-surface-raised-solid:${dark ? '#39414c' : '#fff'};--color-surface-hover-solid:${dark ? '#46505e' : '#d5dce5'}}
         *{box-sizing:border-box}body{background:var(--color-surface);color:var(--color-ink);font:14px sans-serif}button{color:inherit}svg{width:16px;height:16px}
         ${css}
         .mew-action-menu{--mew-action-menu-min-width:190px}.mew-action-menu-item{gap:9px}
@@ -88,9 +88,19 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><I18nProvid
         const first = menu.locator('[data-action-menu-item]').first()
         const style = await first.evaluate(el => {
           const view = el.ownerDocument.defaultView!, item = view.getComputedStyle(el), popup = view.getComputedStyle(el.closest('[role=menu]')!)
-          return { gap: item.gap, padding: item.padding, fontSize: item.fontSize, minWidth: popup.minWidth, radius: popup.borderRadius, icon: view.getComputedStyle(el.querySelector('svg')!).width }
+          return { gap: item.gap, padding: item.padding, fontSize: item.fontSize, minWidth: popup.minWidth, radius: popup.borderRadius, surfacePadding: popup.padding, rowRadius: item.borderRadius, height: el.getBoundingClientRect().height, icon: view.getComputedStyle(el.querySelector('svg')!).width }
         })
-        assert.deepEqual(style, { gap: '9px', padding: '4px 8px', fontSize: '14px', minWidth: '190px', radius: '0px', icon: '16px' }, `${id} uses the shared stylesheet`)
+        assert.deepEqual(style, { gap: '9px', padding: '3px 6px', fontSize: '14px', minWidth: '190px', radius: '6px', surfacePadding: '3px', rowRadius: '3px', height: width === 390 ? 32 : 26, icon: '16px' }, `${id} uses the compact shared stylesheet and preserves touch targets`)
+        const colors = await menu.evaluate(el => {
+          const view = el.ownerDocument.defaultView!, probe = el.ownerDocument.createElement('span')
+          const translucent = el.ownerDocument.documentElement.matches('.theme-gradient, :not(.dark)')
+          probe.style.backgroundColor = translucent ? 'color-mix(in srgb, var(--color-surface-solid) 75%, transparent)' : 'var(--color-surface-solid)'
+          el.append(probe)
+          const expected = view.getComputedStyle(probe).backgroundColor
+          probe.remove()
+          return { actual: view.getComputedStyle(el).backgroundColor, expected }
+        })
+        assert.equal(colors.actual, colors.expected, `${id} follows the workspace surface instead of the raised popup tint`)
         const rect = await menu.boundingBox(); assert.ok(rect)
         assert.ok(rect.x >= 4 && rect.x + rect.width <= width - 4)
         assert.ok(rect.y + rect.height <= (width < 768 ? 746 : 796))

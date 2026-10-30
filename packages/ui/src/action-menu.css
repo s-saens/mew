@@ -13,6 +13,13 @@
   line-height: 20px;
   box-shadow: none;
 }
+:root .mew-action-menu.mew-overlay-surface[data-menu-variant="default"] {
+  --mew-overlay-fill: var(--color-surface-solid, var(--color-surface));
+  --mew-overlay-background-weight: 0%;
+  padding: 3px;
+  border-radius: 6px;
+  background-color: var(--mew-overlay-background, var(--color-surface-solid, var(--color-surface)));
+}
 .mew-action-menu-item {
   display: flex;
   align-items: center;
@@ -29,6 +36,11 @@
   text-align: left;
   touch-action: manipulation;
 }
+.mew-action-menu[data-menu-variant="default"] .mew-action-menu-item {
+  min-height: 26px;
+  padding: 3px 6px;
+  border-radius: 3px;
+}
 .mew-action-menu-item:hover:not(:disabled), .mew-action-menu-item:focus-visible {
   background: var(--color-surface-hover);
 }
@@ -39,7 +51,10 @@
 .mew-action-menu-item svg { width: 16px; height: 16px; flex-shrink: 0; stroke-width: 1.6; }
 .mew-action-menu-hint { margin-left: auto; flex-shrink: 0; color: var(--color-ink-muted); font-size: 12px; }
 .mew-action-menu-separator { margin: 4px 0; border-top: 1px solid var(--color-edge); }
-@media (pointer: coarse) { .mew-action-menu-item { min-height: 32px; } }
+@media (pointer: coarse) {
+  .mew-action-menu-item,
+  .mew-action-menu[data-menu-variant="default"] .mew-action-menu-item { min-height: 32px; }
+}
 
 .mew-action-menu[data-menu-variant="header"] {
   --mew-action-menu-min-width: 220px;
