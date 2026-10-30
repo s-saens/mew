@@ -1,6 +1,6 @@
 ---
 title: "Table Databases (/db)"
-description: "Explains inserting Postgres document databases, table conversion and undo, borderless views, calendar and Gantt ranges, keyboard cell navigation, column-header type menus, search, grouping, sorting, and primary columns. Also covers immediate linked-page title previews, filename changes after saving, row-page sharing, read-only references, and backups."
+description: "Explains inserting Postgres document databases, matching plus-only row/column addition bars, table conversion and undo, calendar and Gantt ranges, keyboard cell navigation, header type menus, search, grouping, and sorting. Also covers primary columns, immediate linked-page title previews, filename changes after saving, row-page sharing, read-only references, and backups."
 updated: "2026-10-30"
 상위파일:
   - "../../.mew/docs/MOC.md"
@@ -14,7 +14,7 @@ An operator must first configure `DATABASE_URL` on the server. The logged-in acc
 
 1. Open a Markdown document in the project in **Hotview**.
 2. Type `/db` at the insertion point and select **Database**.
-3. Edit the table title and cells. Use `+` in the column header to add text, number, checkbox, date, single-select, or multi-select columns, and click a column name to rename it. To use the page type, change the primary column's type.
+3. Edit the table title and cells. Use the `+` bar to the right of the table to add text, number, checkbox, date, single-select, or multi-select columns. The `+` bar below the table adds a row. Click a column name to rename it. To use the page type, change the primary column's type.
 4. To find tables in other documents, open the full list for this project from the header menu → **Databases**.
 
 A new table has a **Title** primary column and a **Text** column, with 2 example rows: `항목 1` / `첫 번째 내용` and `항목 2` / `두 번째 내용`. Replace the cells and column names with your own content.

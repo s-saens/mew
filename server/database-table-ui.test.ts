@@ -88,8 +88,9 @@ test('database table retains compact styling inside the editor and standalone pa
   const source = `import React from ${JSON.stringify(import.meta.resolve('react'))};
 import {createRoot} from ${JSON.stringify(import.meta.resolve('react-dom/client'))};
 import {DatabaseTable} from ${JSON.stringify(path.join(root, 'packages/editor/src/database/DatabaseTable.tsx'))};
+window.addedRows=0;
 function Fixture(){const [name,setName]=React.useState('Review');const [editable,setEditable]=React.useState(true);const [title,setTitle]=React.useState('Tasks');
-const ctrl={view:{title,kind:'managed',columns:[{id:'name',name:'Name',type:'text'},{id:'age',name:'Age',type:'number'}],rows:[{id:'a',cells:{name,age:7}},{id:'b',cells:{name:'Hi',age:8}}]},editable,loading:false,error:null,addRow(){},setTitleDraft:setTitle,renameTitle(){},localCell(row,col,value){if(col==='name')setName(value)},commitCell(){}};
+const ctrl={view:{title,kind:'managed',columns:[{id:'name',name:'Name',type:'text'},{id:'age',name:'Age',type:'number'}],rows:[{id:'a',cells:{name,age:7}},{id:'b',cells:{name:'Hi',age:8}}]},editable,loading:false,error:null,addRow(){window.addedRows++},setTitleDraft:setTitle,renameTitle(){},localCell(row,col,value){if(col==='name')setName(value)},commitCell(){}};
 return <><button onClick={()=>setEditable(false)}>Read only</button><div className="tiptap"><DatabaseTable ctrl={ctrl}/><div className="tableWrapper"><table><thead><tr><th>Markdown</th></tr></thead><tbody><tr><td>Body</td></tr></tbody></table></div></div><div id="panel"><DatabaseTable ctrl={ctrl}/></div></>}
 createRoot(document.getElementById('root')).render(<Fixture/>);`
   const { code, css } = await databaseFixture(source)
@@ -106,13 +107,14 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
         const win = table.ownerDocument.defaultView!
         const cell = win.getComputedStyle(table.querySelector('td')!)
         const head = win.getComputedStyle(table.querySelector('th')!)
-        const container = win.getComputedStyle(table.parentElement!.parentElement!)
-        const title = win.getComputedStyle(table.parentElement!.parentElement!.firstElementChild!)
+        const surface = table.closest('[data-db-surface]') ?? table.parentElement!.parentElement!
+        const container = win.getComputedStyle(surface)
+        const title = win.getComputedStyle(surface.firstElementChild!)
         const grid = win.getComputedStyle(table.parentElement!)
         const header = win.getComputedStyle(table.querySelector('thead')!)
         return { padding: cell.padding, background: head.backgroundColor, headerSurface: header.backgroundColor, titleSurface: title.backgroundColor,
           cellBorder: cell.borderRightColor, border: container.borderWidth, titleBorder: title.borderWidth, gridBorder: grid.borderColor,
-          fillsHost: Math.abs(table.parentElement!.parentElement!.getBoundingClientRect().width - table.parentElement!.parentElement!.parentElement!.getBoundingClientRect().width) < 1,
+          fillsHost: Math.abs(surface.getBoundingClientRect().width - surface.parentElement!.getBoundingClientRect().width) < 1,
           fillsContainer: Math.abs(table.getBoundingClientRect().width - table.parentElement!.clientWidth) < 1, radius: grid.borderRadius, surface: container.backgroundColor }
       })
       const editor = await measure('.tiptap .mew-database-table')
@@ -132,6 +134,33 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
       assert.equal(editor.gridBorder, markdown.cellBorder, 'only the table grid has an outer border')
       assert.equal(editor.border, '0px', 'the database block has no border')
       assert.equal(editor.titleBorder, '0px', 'the title has no border')
+      for (const surface of [page.locator('.tiptap [data-db-surface]'), page.locator('#panel [data-db-surface]')]) {
+        const addRow = surface.getByRole('button', { name: '행 추가', exact: true })
+        const addColumn = surface.getByRole('button', { name: '열 추가', exact: true })
+        assert.equal(await addRow.textContent(), '', 'row addition displays only its icon')
+        assert.equal(await addColumn.textContent(), '', 'column addition displays only its icon')
+        const bars = await surface.evaluate(element => {
+          const win = element.ownerDocument.defaultView!, grid = element.querySelector('[data-db-grid]')!
+          const row = element.querySelector('[data-db-add-row]')!, column = element.querySelector('[data-db-add-column]')!
+          const bounds = grid.getBoundingClientRect(), rowBounds = row.getBoundingClientRect(), columnBounds = column.getBoundingClientRect()
+          return { rowHeight: rowBounds.height, columnWidth: columnBounds.width, rowWidth: rowBounds.width, columnHeight: columnBounds.height,
+            gridWidth: bounds.width, gridHeight: bounds.height, rowBelow: rowBounds.top >= bounds.bottom, columnAfter: columnBounds.left >= bounds.right,
+            rowBorder: win.getComputedStyle(row).borderWidth, columnBorder: win.getComputedStyle(column).borderWidth,
+            controlsOutside: !grid.contains(row) && !grid.contains(column) }
+        })
+        assert.equal(bars.rowHeight, width < 500 ? 32 : 20)
+        assert.equal(bars.columnWidth, bars.rowHeight, 'both bars have the same thin cross-axis size')
+        assert.equal(bars.rowWidth, bars.gridWidth)
+        assert.equal(bars.columnHeight, bars.gridHeight)
+        assert.equal(bars.rowBelow && bars.columnAfter && bars.controlsOutside, true, 'add bars sit outside the bordered data grid')
+        assert.equal(bars.rowBorder, '0px')
+        assert.equal(bars.columnBorder, '0px')
+        assert.equal(await surface.locator('thead th').count(), 2, 'the add bar is not an empty table column')
+        assert.equal(await surface.locator('tbody tr').first().locator('td').count(), 2)
+        if (width < 500) await addRow.tap()
+        else { await addRow.focus(); await addRow.press('Enter') }
+      }
+      assert.equal(await page.evaluate('window.addedRows'), 2, 'both icon-only row controls retain their action')
       const sortedTable = page.locator('.tiptap .mew-database-table')
       const names = async () => Promise.all((await sortedTable.locator('tbody tr td:first-child input').all()).map(input => input.inputValue()))
       const sortClick = async (label: string) => {
@@ -182,6 +211,8 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
       }
       await assertScroll()
       await page.getByRole('button', { name: 'Read only', exact: true }).click()
+      assert.equal(await page.getByRole('button', { name: '행 추가', exact: true }).count(), 0)
+      assert.equal(await page.getByRole('button', { name: '열 추가', exact: true }).count(), 0)
       await assertScroll()
       await sortClick('Name 오름차순 정렬')
       assert.equal(await sortedTable.locator('th').first().getAttribute('aria-sort'), 'ascending', 'read-only tables also allow local sorting')
@@ -354,6 +385,10 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
       for (const mode of ['readonly', 'busy']) {
         await page.getByRole('button', { name: mode, exact: true }).click()
         assert.equal(await typeButton.isDisabled(), true)
+        if (mode === 'busy') {
+          assert.equal(await page.getByRole('button', { name: '행 추가', exact: true }).isDisabled(), true)
+          assert.equal(await page.getByRole('button', { name: '열 추가', exact: true }).isDisabled(), true)
+        }
         await header.click({ button: 'right' })
         assert.equal(await menu.count(), 0, `${mode}: no type menu on right-click`)
         const sortButton = header.getByRole('button', { name: 'Title 오름차순 정렬', exact: true })
@@ -484,6 +519,7 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
       await search.press('Enter')
       await choice.waitFor({ state: 'detached' })
       assert.equal(await cell(0, 3).getByRole('combobox').textContent(), 'Draft')
+      await focused(cell(0, 3).getByRole('combobox'))
       await page.keyboard.press('Escape')
       await focused(cell(0, 3))
       await arrow('ArrowRight', cell(0, 4))

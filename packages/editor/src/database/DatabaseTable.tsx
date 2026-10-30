@@ -28,6 +28,12 @@ export function DatabaseTable({ ctrl, onOpenPage, toolbar, content, wide = false
   const typeColumn = view?.columns.find(col => col.id === typeMenu?.columnId)
   const primaryColumn = view?.kind === 'managed' ? view.columns[0]?.id : undefined
   const typeChoices: DbColumnType[] = typeColumn?.id === primaryColumn ? ['text', 'page'] : ADD_TYPES
+  const rowAdder = view && editable ? <button
+    type="button" data-db-add-row aria-label={uiText('행 추가')} data-tip={uiText('행 추가')}
+    disabled={!!ctrl.changingColumn}
+    onClick={onAddRow ?? ctrl.addRow}
+    className="col-start-1 row-start-2 flex h-5 w-full items-center justify-center rounded border-0 p-0 text-ink-muted hover:bg-surface hover:text-ink focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent disabled:opacity-50 pointer-coarse:h-8"
+  ><PlusIcon /></button> : null
 
   return (
     <div data-db-surface style={toolbar && !wide ? { minWidth: 'min(100%, 208px)' } : undefined} className={`min-w-0 max-w-full ${wide ? '@container/db w-full' : 'w-fit'}`}
@@ -82,7 +88,8 @@ export function DatabaseTable({ ctrl, onOpenPage, toolbar, content, wide = false
       ) : !view ? (
         <div className="px-2 py-4 text-center text-xs text-ink-muted">{uiText("데이터베이스를 찾을 수 없습니다")}</div>
       ) : content ? content : (
-        <div data-db-grid className="w-fit max-w-full overflow-x-auto rounded-md border border-edge-strong bg-surface-deep">
+        <div className="grid w-fit max-w-full grid-cols-[minmax(0,1fr)_auto]">
+        <div data-db-grid className="col-start-1 row-start-1 min-w-0 overflow-x-auto rounded-md border border-edge-strong bg-surface-deep">
           <table className="mew-database-table w-max max-w-none border-collapse whitespace-nowrap text-sm">
             <thead className="bg-surface-raised/20">
               <tr className="border-b border-edge-strong">
@@ -104,19 +111,6 @@ export function DatabaseTable({ ctrl, onOpenPage, toolbar, content, wide = false
                     onDelete={() => ctrl.deleteColumn(col.id)}
                   />
                 ))}
-                {editable && (
-                  <th className="w-10 p-0 align-middle">
-                    <button type="button" aria-label={uiText("열 추가")} data-tip={uiText("열 추가")}
-                      disabled={!!ctrl.changingColumn}
-                      onClick={event => {
-                        const rect = event.currentTarget.getBoundingClientRect()
-                        setAddMenu({ x: rect.left, y: rect.bottom + 4, trigger: event.currentTarget })
-                      }}
-                      className="flex h-full w-full items-center justify-center py-1.5 text-ink-muted hover:bg-surface hover:text-ink focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-50">
-                      <PlusIcon />
-                    </button>
-                  </th>
-                )}
               </tr>
             </thead>
             <tbody>
@@ -137,13 +131,12 @@ export function DatabaseTable({ ctrl, onOpenPage, toolbar, content, wide = false
                       />
                     </td>
                   ))}
-                  {editable && <td />}
                 </tr>
               ))}
               {rows.length === 0 && (
                 <tr>
                   <td
-                    colSpan={view.columns.length + (editable ? 1 : 0)}
+                    colSpan={view.columns.length}
                     className="px-2 py-3 text-center text-xs text-ink-muted"
                   >
                     {uiText("아직 행이 없습니다")}</td>
@@ -152,18 +145,20 @@ export function DatabaseTable({ ctrl, onOpenPage, toolbar, content, wide = false
             </tbody>
           </table>
         </div>
+        {editable && <button type="button" data-db-add-column aria-label={uiText('열 추가')} data-tip={uiText('열 추가')}
+          disabled={!!ctrl.changingColumn}
+          onClick={event => {
+            const rect = event.currentTarget.getBoundingClientRect()
+            setAddMenu({ x: rect.left, y: rect.bottom + 4, trigger: event.currentTarget })
+          }}
+          className="col-start-2 row-start-1 flex w-5 items-center justify-center rounded border-0 p-0 text-ink-muted hover:bg-surface hover:text-ink focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent disabled:opacity-50 pointer-coarse:w-8">
+          <PlusIcon />
+        </button>}
+        {rowAdder}
+        </div>
       )}
 
-      {view && editable && (
-        <button
-          type="button"
-          disabled={!!ctrl.changingColumn}
-          onClick={onAddRow ?? ctrl.addRow}
-          className="flex w-full items-center gap-1.5 rounded px-2 py-1.5 text-left text-xs text-ink-muted hover:bg-surface hover:text-ink"
-        >
-          <PlusIcon />
-          {uiText("행 추가")}</button>
-      )}
+      {content && rowAdder}
       {editable && addMenu && <ActionMenu {...addMenu} label={uiText('열 추가')} onClose={() => setAddMenu(null)}>
         {ADD_TYPES.map(type => <ActionMenuItem key={type} icon={<TypeIcon type={type} />} onClick={() => ctrl.addColumn(type)}>{TYPE_LABELS[type]}</ActionMenuItem>)}
       </ActionMenu>}
@@ -441,7 +436,7 @@ export function DbGlyph({ className, size = 15 }: { className?: string; size?: n
 function PlusIcon() {
   useUiLocale()
   return (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true">
       <path d="M12 5v14M5 12h14" />
     </svg>
   )
