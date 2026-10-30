@@ -83,3 +83,44 @@ test('preview reads stay bounded and selection reuses or bypasses the speculativ
   assert.deepEqual(await Promise.all([preview, next, foreground]), ['first', 'second', 'selected'])
   assert.equal(await cache.prefetch('/a', () => { throw new Error('warm preview read') }), 'first')
 })
+
+test('switch cancellation preserves the displayed and selected roots and aborts obsolete metadata', async () => {
+  const cache = new WorkspaceSnapshotCache<string>()
+  const requests = new Map<string, { signal: AbortSignal; promise: Promise<string> }>()
+  const load = (key: string) => cache.load(key, signal => {
+    const promise = new Promise<string>((_resolve, reject) => {
+      signal.addEventListener('abort', () => reject(signal.reason), { once: true })
+    })
+    requests.set(key, { signal, promise })
+    return promise
+  })
+  const displayed = load('/a'), obsolete = load('/b'), selected = load('/c')
+  const canceled = assert.rejects(obsolete, { name: 'AbortError' })
+  cache.cancelPending(['/a', '/c'])
+  await canceled
+  assert.equal(requests.get('/a')!.signal.aborted, false, 'the displayed root can finish restoring if the next switch fails')
+  assert.equal(requests.get('/b')!.signal.aborted, true)
+  assert.equal(requests.get('/c')!.signal.aborted, false)
+  assert.equal(cache.load('/c', () => { throw new Error('duplicate selected root') }), selected)
+  const remaining = Promise.all([assert.rejects(displayed, { name: 'AbortError' }), assert.rejects(selected, { name: 'AbortError' })])
+  cache.clear()
+  await remaining
+})
+
+test('returning to a canceled root starts immediately and ignored cancellation cannot replace its new read', async () => {
+  const cache = new WorkspaceSnapshotCache<string>()
+  const obsolete = deferred<string>(), fresh = deferred<string>()
+  let oldSignal!: AbortSignal
+  const first = cache.load('/b', signal => { oldSignal = signal; return obsolete.promise })
+  cache.cancelPending(['/c'])
+  assert.equal(oldSignal.aborted, true)
+  const next = cache.load('/b', () => fresh.promise)
+  assert.notEqual(first, next)
+  obsolete.resolve('obsolete')
+  await first
+  assert.equal(cache.get('/b'), undefined, 'a transport ignoring abort cannot warm the root with an obsolete response')
+  assert.equal(cache.load('/b', () => { throw new Error('replacement lost') }), next, 'old cleanup preserves the replacement request')
+  fresh.resolve('current')
+  assert.equal(await next, 'current')
+  assert.equal(cache.get('/b'), 'current')
+})

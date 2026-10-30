@@ -4,11 +4,11 @@ parent: "mew-projects"
 title: "Opening, Selecting, and Switching Projects"
 status: "implemented"
 created: "2026-09-18"
-updated: "2026-10-28"
+updated: "2026-10-30"
 status_hash: "03b352e53f93242f9efdfd05c5bd632f9bf92dd1a456279d6b0eb0efd066cd3f"
 files: ["src/components/file-action-menu.tsx", "src/hooks/use-external-file-actions.tsx", "src/components/file-browser-favorites.tsx", "server/file-favorites.ts", "src/components/file-browser.tsx", "src/components/OpenProjectDialog.tsx", "src/components/ProjectSwitcher.tsx", "server/projects.ts", "server/cloud-storage.ts"]
 commits: []
-description: "Defines the project sidebar on the left of the file explorer opened from the desktop header, per-project command buttons, independent restoration of open state and width, and the mobile dropdown. Explains shared handle sorting, numbers on the right, full-row active highlighting, right-click editing, list removal and addition, Alt+P and Alt+1…9, shared icons, per-account restoration of switching state, and the boundaries of server folder browsing, subprojects, worktrees, access permissions, and running sessions."
+description: "Defines the project sidebar on the left of the file explorer opened from the desktop header, per-project command buttons, independent restoration of open state and width, and the mobile dropdown. Explains shared handle sorting, numbers on the right, full-row active highlighting, right-click editing, list removal and addition, Alt+P and Alt+1…9, shared icons, per-account restoration, cancellation when another project is selected during loading, and the boundaries of server folder browsing, subprojects, worktrees, access permissions, and running sessions."
 상위파일:
   - "MOC.md"
   - "_projects-files-search.md"
@@ -36,6 +36,7 @@ description: "Defines the project sidebar on the left of the file explorer opene
 - Drag the handle on the left of a list row up or down with a mouse or touch to reorder it. The name area is used to select projects and scroll the list. Rows can also be moved using `Shift+↑/↓` on the row or `↑/↓` on the focused handle. Reordering does not switch projects or close the menu and is saved to the account's path list and browser copy. The final Add Project item does not move. Follow [Decision 0071](../../decisions/0071-project-list-reorder.md).
 - `Alt+P` opens the desktop project sidebar or mobile list for an owner or manager and focuses the first item. If it is already open, it only moves focus to the first item. If a work panel is maximized, it restores the panel before opening the sidebar. It also works in regular input fields, but does not open the list when combined with Shift or Ctrl/Cmd, during IME composition, key repeat, or modal input, or without permission. Special characters produced by macOS Option are also recognized using the physical `KeyP` key, and the remote keyboard takes priority when a remote screen has focus. The invoking button provides `aria-keyshortcuts="Alt+P"`.
 - Project selection, icon changes, and per-account screen restoration are provided. `Alt+1…9` selects projects in list order. The first 9 items display `Alt+1` through `Alt+9` on the right and also expose them through `aria-keyshortcuts`. Reordering updates the displayed numbers. No number is displayed for the 10th item onward or for Add Project.
+- Selecting another project during loading immediately starts the latest selection and cancels the previous switch request and unused preparation. Repeating the pending selection does not send another switch. Selecting the displayed current project while another selection is pending restores that project through the server, because the canceled request may already have changed the account's root. Mouse, touch, and `Alt+1…9` use the same behavior; subproject and worktree operations retain their existing switching locks.
 - The current project is highlighted with a background across the entire row, including the handle, without a check icon, and retains its `aria-checked` state. It shares handle and row highlight styles with the command list, and hover and focus also appear across the entire item background.
 
 ### Boundaries and limitations
@@ -54,7 +55,7 @@ description: "Defines the project sidebar on the left of the file explorer opene
 
 - Direct and nested subprojects appear at their actual locations and sort positions in the regular file tree, and clicking a folder only expands or collapses it. The adjacent arrow selects that project through the existing project-opening API, adding only paths not already in the list. Owner and manager permissions, reuse of duplicate paths, per-account restoration, and running agents' working paths are preserved. Folder browsing follows the [subproject browsing decision](../../decisions/0004-subproject-folder-exploration.md), and the header and panel follow the [project sidebar decision](../../decisions/0082-desktop-project-sidebar.md).
 
-- The project selector's global capture listener opens the desktop panel or mobile `ActionMenu` with Alt+P and maps Alt+1…9 to projects in saved list order. It uses the same switching path as existing clicks, including from regular panel inputs. It supports the numeric keypad and macOS Option physical keys, and does not switch for the current project, nonexistent numbers, modals, key repeat, or users without owner or manager permissions. Ctrl/Cmd+number remains assigned to internal panel tabs, and Alt+number and Alt+P are also forwarded remotely when the login video or remote screen has focus.
+- The project selector's global capture listener opens the desktop panel or mobile `ActionMenu` with Alt+P and maps Alt+1…9 to projects in saved list order. It uses the same switching path as existing clicks, including from regular panel inputs. It supports the numeric keypad and macOS Option physical keys, and does not switch for the current project when no other target is pending, duplicate pending targets, nonexistent numbers, modals, key repeat, or users without owner or manager permissions. Ctrl/Cmd+number remains assigned to internal panel tabs, and Alt+number and Alt+P are also forwarded remotely when the login video or remote screen has focus.
 
 - The active project is stored in `activeWorkspace` in the account UI ledger. HTTP and project WebSocket requests pin the account's root in the async context, and switching does not change the server startup root, environment settings, or other accounts' watchers or collaborative editing rooms. File lists, search, watchers, and collaboration rooms are separated by root path. If no value is saved or the folder no longer exists, the server's default root is used. Follow the [per-account path contract](../../development/architecture.md#per-account-active-project).
 
@@ -80,13 +81,16 @@ description: "Defines the project sidebar on the left of the file explorer opene
 - The project selection window provides folder browsing, cloud shortcuts, New Folder, Git clone, and Git initialization.
 
 - The project list shares rows, icons, and ordering between the desktop panel and mobile menu. Use Up/Down arrow keys and Home/End to navigate, and Enter/Space to select. Only the mobile menu closes on selection, Esc, Back, or an outside click and restores focus to the invoking button. Hovering or focusing a list item prepares only the screen state in advance and reuses the same request when the item is actually selected. Files, trees, and agent occupancy are not queried in advance; follow the [fast switching contract](../../development/ui-contracts.md#fast-root-project-switching).
-- A centered loading indicator is shown during project switching and closed after completion or failure.
+- Regular root selections share a cancelable switch operation. A replacement selection cancels the obsolete root POST, agent preparation that has not been applied, and pending UI metadata reads outside the applied root and new target. The applied root's restoration remains valid until a replacement is confirmed. Obsolete responses, failures, and cleanup cannot replace the latest screen, show an error, or clear its loading indicator. See the [fast switching contract](../../development/ui-contracts.md#fast-root-project-switching) for cache and restoration details.
+- A centered loading indicator is shown during project switching and closed after the latest operation completes or fails.
 - Click, touch, and keyboard interactions remain available without a black overlay.
 
 <!-- mew:implementation:end -->
 
 <!-- mew:validation:start -->
 ## Verification
+
+- For the 2026-10-30 rapid-switch cancellation change, regression checks, and application status, see the [work record](../../work/project-switch-cancellation.md).
 
 - For the checks performed, results, and scope not applied to production for the desktop project sidebar and per-project command buttons on 2026-10-28, see the [work record](../../work/desktop-project-sidebar.md).
 
@@ -114,7 +118,7 @@ description: "Defines the project sidebar on the left of the file explorer opene
 
 - The following items are user verification criteria, not results of tests run during this documentation cleanup:
   - Verify the icon, name, and command button in the collapsed header, and selection and the final Add item in the desktop panel and mobile dropdown.
-  - Verify that documents and layout are restored when switching to another project and back, and that selecting the current project again does not trigger a duplicate switch.
+  - Verify that documents and layout are restored when switching to another project and back, that selecting the current project with no pending switch does not trigger a duplicate switch, and that selecting it while another target is pending restores it through the server.
 
 - 2026-09-24:
   - Isolated Chromium verified Favorites dropdowns on desktop and mobile in both themes, keyboard/touch navigation and removal, Esc, Back, outside presses, and existing file operations.

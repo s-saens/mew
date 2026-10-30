@@ -279,13 +279,13 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     return () => { workspaceUiOwnerAlive.current = false }
   }, [])
 
-  const readWorkspaceUi = useCallback(async (path: string) => restoreDeviceLayout(authEmail ?? 'guest', path, (await fetchWorkspaceUi(path)).state ?? {}), [authEmail])
-  const prepareWorkspaceUi = useCallback((path: string) => workspaceUiCache.current.load(path, () => readWorkspaceUi(path)), [readWorkspaceUi])
+  const readWorkspaceUi = useCallback(async (path: string, signal: AbortSignal) => restoreDeviceLayout(authEmail ?? 'guest', path, (await fetchWorkspaceUi(path, signal)).state ?? {}), [authEmail])
+  const prepareWorkspaceUi = useCallback((path: string) => workspaceUiCache.current.load(path, signal => readWorkspaceUi(path, signal)), [readWorkspaceUi])
   const previewRootProject = useCallback((path: string) => {
     if (!canOpenProjects || path === rootProjectPathRef.current) return
     // Only explicitly root-keyed UI metadata is safe before the handoff. Do not
     // let sweeping the list flood the connection used by an actual selection.
-    void workspaceUiCache.current.prefetch(path, () => readWorkspaceUi(path))?.catch(() => {})
+    void workspaceUiCache.current.prefetch(path, signal => readWorkspaceUi(path, signal))?.catch(() => {})
   }, [canOpenProjects, readWorkspaceUi])
   const persistWorkspaceUi = useCallback((path: string, state: WorkspaceUiState) => {
     saveDeviceLayout(authEmail ?? 'guest', path, state)
@@ -300,10 +300,18 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
   const [rootProjectTabsSynced, setRootProjectTabsSynced] = useState(!canOpenProjects)
   const [openProjectDialog, setOpenProjectDialog] = useState(false)
   const [switchingRootProject, setSwitchingRootProject] = useState(false)
+  const [pendingRootProjectPath, setPendingRootProjectPath] = useState<string | null>(null)
+  const rootProjectSwitchRef = useRef<{ path: string; controller: AbortController } | null>(null)
   const projectOpeningRef = useRef(false)
   const workspaceReadSequence = useRef(0)
   const workspaceBroadcastPending = useRef(false)
   const fullscreenGuardRef = useRef(false)
+
+  useEffect(() => () => {
+    rootProjectSwitchRef.current?.controller.abort()
+    rootProjectSwitchRef.current = null
+    workspaceUiCache.current.cancelPending()
+  }, [])
 
   const [tree, setTree] = useState<TreeNode[]>([])
   // 문서와 일반 파일은 같은 에디터를 사용하며 탐색 목록만 전환한다.
@@ -652,7 +660,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
           setWorkspaceUiRevision(revision => revision + 1)
           setWorkspaceUiLoaded(true)
         })
-        .catch(console.error)
+        .catch(error => { if (error?.name !== 'AbortError') console.error(error) })
     }
     return () => { alive = false }
   }, [isGuest, projectUiPath, workspaceEpoch, prepareWorkspaceUi, trackRefresh])
@@ -799,6 +807,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     const uiPath = info.projectPath ?? info.path
     const sameProject = (previous?.projectPath ?? previous?.path) === uiPath
     if (previous?.path === info.path && previous.docsPath === info.docsPath && sameProject) return
+    workspaceUiCache.current.cancelPending([uiPath])
     if (previous?.path === info.path) rootTreeCache.current.clear()
     if (!sameProject) setPreparedAgentTabs(agentTabsPrefetch.current?.path === uiPath ? agentTabsPrefetch.current.promise : undefined)
     agentTabsPrefetch.current = null
@@ -848,42 +857,58 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
   }, [applyWorkspace, trackRefresh])
 
   const openRootProject = useCallback(async (projectPath: string) => {
-    if (!canOpenProjects || projectOpeningRef.current) return
-    if (projectPath === projectUiPath) {
+    if (!canOpenProjects || (projectOpeningRef.current && !rootProjectSwitchRef.current)) return
+    if (rootProjectSwitchRef.current?.path === projectPath) return
+    if (!rootProjectSwitchRef.current && projectPath === projectUiPathRef.current) {
       setProject(WORKSPACE_PROJECT)
       setActiveProject(WORKSPACE_PROJECT)
       setOpenProjectDialog(false)
       return true
     }
+    rootProjectSwitchRef.current?.controller.abort()
+    const request = { path: projectPath, controller: new AbortController() }
+    rootProjectSwitchRef.current = request
     projectOpeningRef.current = true
     workspaceReadSequence.current++
     setSwitchingRootProject(true)
+    setPendingRootProjectPath(projectPath)
+    // Keep the displayed root usable if the replacement fails, but release all
+    // other metadata reads so they cannot delay the latest selection.
+    workspaceUiCache.current.cancelPending([projectPath, ...(projectUiPathRef.current ? [projectUiPathRef.current] : [])])
     // Account metadata is explicitly keyed by absolute root and can load in parallel.
     // Tree/file APIs still wait for the server to confirm its active root.
-    void prepareWorkspaceUi(projectPath).catch(console.error)
+    void prepareWorkspaceUi(projectPath).catch(error => { if (error?.name !== 'AbortError') console.error(error) })
     if (caps.agent || caps.terminal) {
-      const promise = fetchAgentTabs(projectPath)
+      const promise = fetchAgentTabs(projectPath, request.controller.signal)
       void promise.catch(() => {}) // The mounted panel owns error handling.
       agentTabsPrefetch.current = { path: projectPath, promise }
     }
     try {
-      const info = await switchWorkspace(projectPath)
+      const info = await switchWorkspace(projectPath, undefined, request.controller.signal)
+      if (rootProjectSwitchRef.current !== request) return false
       applyWorkspace(info)
       setOpenProjectDialog(false)
       return true
     } catch (err) {
+      if (rootProjectSwitchRef.current !== request || request.controller.signal.aborted) return false
+      request.controller.abort()
+      workspaceUiCache.current.cancelPending(projectUiPathRef.current ? [projectUiPathRef.current] : [])
       showToast(err instanceof Error ? err.message : String(err))
       return false
     } finally {
-      agentTabsPrefetch.current = null
-      projectOpeningRef.current = false
-      setSwitchingRootProject(false)
-      if (workspaceBroadcastPending.current) {
-        workspaceBroadcastPending.current = false
-        handleWorkspaceBroadcast()
+      if (rootProjectSwitchRef.current === request) {
+        rootProjectSwitchRef.current = null
+        agentTabsPrefetch.current = null
+        projectOpeningRef.current = false
+        setSwitchingRootProject(false)
+        setPendingRootProjectPath(null)
+        if (workspaceBroadcastPending.current) {
+          workspaceBroadcastPending.current = false
+          handleWorkspaceBroadcast()
+        }
       }
     }
-  }, [applyWorkspace, caps.agent, caps.terminal, handleWorkspaceBroadcast, canOpenProjects, projectUiPath, showToast, prepareWorkspaceUi])
+  }, [applyWorkspace, caps.agent, caps.terminal, handleWorkspaceBroadcast, canOpenProjects, showToast, prepareWorkspaceUi])
 
   useEffect(() => {
     const open = (event: Event) => {
@@ -2074,6 +2099,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
             canUseCommands={canUseTerminal && !isGuest} activeWorkingPath={rootProjectPath}
             paths={projectPaths}
             activePath={projectUiPath}
+            pendingPath={pendingRootProjectPath}
             fallbackLabel={projectLabel(projectUiPath)}
             canOpen={canOpenProjects}
             canChangeIcon={canOpenProjects}

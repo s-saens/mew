@@ -138,8 +138,8 @@ export function saveRootProjectIcon(path: string, icon: string): Promise<{ icon:
 /** 로그인 계정의 루트 프로젝트별 에이전트 탭·ACP 세션 포인터. */
 export type AgentSessionClaim = { workspacePath: string; tabId: string; sessionId: string }
 
-export function fetchAgentTabs(workspacePath: string): Promise<{ state: AgentTabsState | null; claims: AgentSessionClaim[] }> {
-  return mewFetch(`/api/user-ui/agent-tabs?workspace=${encodeURIComponent(workspacePath)}`).then(json<{ state: AgentTabsState | null; claims: AgentSessionClaim[] }>)
+export function fetchAgentTabs(workspacePath: string, signal?: AbortSignal): Promise<{ state: AgentTabsState | null; claims: AgentSessionClaim[] }> {
+  return mewFetch(`/api/user-ui/agent-tabs?workspace=${encodeURIComponent(workspacePath)}`, { signal }).then(json<{ state: AgentTabsState | null; claims: AgentSessionClaim[] }>)
 }
 
 export function saveAgentTabs(workspacePath: string, state: AgentTabsState): Promise<{ state: AgentTabsState }> {
@@ -150,8 +150,8 @@ export function saveAgentTabs(workspacePath: string, state: AgentTabsState): Pro
   }).then(json<{ state: AgentTabsState }>)
 }
 
-export function fetchWorkspaceUi(workspacePath: string): Promise<{ state: WorkspaceUiState | null }> {
-  return mewFetch(`/api/user-ui/workspace?workspace=${encodeURIComponent(workspacePath)}`).then(json<{ state: WorkspaceUiState | null }>)
+export function fetchWorkspaceUi(workspacePath: string, signal?: AbortSignal): Promise<{ state: WorkspaceUiState | null }> {
+  return mewFetch(`/api/user-ui/workspace?workspace=${encodeURIComponent(workspacePath)}`, { signal }).then(json<{ state: WorkspaceUiState | null }>)
 }
 
 export function saveWorkspaceUi(workspacePath: string, state: WorkspaceUiState): Promise<{ state: WorkspaceUiState }> {
@@ -636,11 +636,12 @@ export function fetchWorkspace(): Promise<WorkspaceInfo> {
 }
 
 /** 워크스페이스를 통째로 바꾼다 — owner 전용. 성공하면 클라이언트가 새 루트 상태로 교체한다. */
-export function switchWorkspace(path: string, workspace?: string): Promise<WorkspaceInfo> {
+export function switchWorkspace(path: string, workspace?: string, signal?: AbortSignal): Promise<WorkspaceInfo> {
   return mewFetch('/api/workspace', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ path, ...(workspace ? { worktree: true, workspace } : {}) }),
+    signal,
   }).then(json<WorkspaceInfo>)
 }
 

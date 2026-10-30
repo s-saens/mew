@@ -10,12 +10,12 @@ import { applyTaskChanges, type TaskItem } from '../shared/task-list.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 
-for (const mode of ['keyboard', 'workspace', 'documents', 'permissions', 'panels', 'worktree', 'swipes'] as const) test(mode === 'swipes' ? 'App mobile dock swipes select panels and explorer swipes preserve search mode' : mode === 'worktree' ? 'linked worktree swaps retain project layout and sessions and settle outgoing file saves' : mode === 'panels' ? 'App restores Tasks with Alt+T and task sessions survive close and reload' : mode === 'permissions' ? 'permission invalidation replaces pending workspace metadata and ignores the old response' : mode === 'documents' ? 'Files opens Documents as a filesystem folder with a separate navigation arrow' : mode === 'keyboard' ? 'App keyboard aliases open files and projects and create files and folders in the current explorer scope' : 'App overlaps workspace metadata, restores warm roots and ignores duplicate handoffs', { skip: !domBrowserExecutable(), timeout: 60_000 }, async () => {
+for (const mode of ['keyboard', 'workspace', 'documents', 'permissions', 'panels', 'worktree', 'swipes', 'rapid'] as const) test(mode === 'rapid' ? 'App rapid project selections cancel superseded handoffs and restore the latest root' : mode === 'swipes' ? 'App mobile dock swipes select panels and explorer swipes preserve search mode' : mode === 'worktree' ? 'linked worktree swaps retain project layout and sessions and settle outgoing file saves' : mode === 'panels' ? 'App restores Tasks with Alt+T and task sessions survive close and reload' : mode === 'permissions' ? 'permission invalidation replaces pending workspace metadata and ignores the old response' : mode === 'documents' ? 'Files opens Documents as a filesystem folder with a separate navigation arrow' : mode === 'keyboard' ? 'App keyboard aliases open files and projects and create files and folders in the current explorer scope' : 'App overlaps workspace metadata, restores warm roots and ignores duplicate handoffs', { skip: !domBrowserExecutable(), timeout: 60_000 }, async () => {
   const keyboardOnly = mode === 'keyboard'
   const appSource = await fs.readFile(`${root}/src/App.tsx`, 'utf8')
   // Keep App, useTabs, FileTree, project switching and docking real. Unrelated panels and the
   // editor renderer are inert so this measures handoff work rather than editor startup.
-  const keep = new Set(['deferredComponent', 'ProjectSwitcher', 'ProjectLoadingOverlay', 'FileTree', 'SearchPanel', 'DockWorkspace', 'ProjectIcon', 'SubprojectLink', 'SidebarCreateButtons', 'MobileDock', 'HeaderMenu', 'TaskPanel'])
+  const keep = new Set(['deferredComponent', 'ProjectSwitcher', 'ProjectLoadingOverlay', 'FileTree', 'SearchPanel', 'DockWorkspace', 'ProjectIcon', 'SubprojectLink', 'SidebarCreateButtons', 'MobileDock', 'HeaderMenu', 'TaskPanel', 'IconPackProvider'])
   if (keyboardOnly) { keep.add('OpenProjectDialog'); keep.add('ServerFileExplorer') }
   const stubs = new Map<string, string>()
   const componentImports = appSource.replace(/const \w+ = deferredComponent\(async \(\) => \(\{ default: \(await import\('([^']+)'\)\)\.(\w+) \}\)(?:, null)?\)/g, (_match, module, name) => `import { ${name} } from '${module}'`)
@@ -39,10 +39,12 @@ for (const mode of ['keyboard', 'workspace', 'documents', 'permissions', 'panels
   const bundle = await build({ input: 'virtual:switch.tsx', write: false, platform: 'browser', output: { format: 'iife', codeSplitting: false }, transform: { jsx: 'react-jsx', define: { 'process.env.NODE_ENV': JSON.stringify('test') } }, plugins: [{ name: 'fixture', resolveId(id, importer) {
     if (id === 'virtual:switch.tsx') return id
     if (importer === `${root}/src/App.tsx` && stubs.has(id)) return `virtual:stub:${id}`
+    if (/\/file-type-icon(?:\.tsx)?$/.test(id)) return 'virtual:file-icons'
     if (id.endsWith('.css')) return 'virtual:style'
   }, async load(id) {
     if (id === 'virtual:switch.tsx') return source
     if (id === 'virtual:style') return ''
+    if (id === 'virtual:file-icons') return 'export function FileTypeIcon(){return null} export function FolderTypeIcon(){return null}'
     if (id.startsWith('virtual:stub:')) return `import React from '${root}/node_modules/react/index.js';\n${stubs.get(id.slice('virtual:stub:'.length))}`
     if (id.endsWith('?raw')) return 'export default ' + JSON.stringify(await fs.readFile(id.slice(0, -4), 'utf8'))
   } }] })
@@ -79,6 +81,10 @@ for (const mode of ['keyboard', 'workspace', 'documents', 'permissions', 'panels
     const fileWrites: { root: string; path: string; content: string; expectedContent?: string }[] = []
     const fileContents = new Map<string, string>()
     const workspacePosts: { path: string; worktree?: boolean; workspace?: string }[] = []
+    const heldSwitchPaths = new Set<string>()
+    const heldSwitchResponses: { path: string; release(error?: boolean): void }[] = []
+    const heldUiPaths = new Set<string>()
+    const heldUiResponses: { path: string; release(): void }[] = []
     const stateFor = (name: string) => ({ sidebar: { docsExpanded: false, expandedSubprojects: [] }, chrome: { sidebarOpen: true, sidebarView: 'tree', ragOpen: true, ...(mode === 'worktree' ? { agentOpen: true, terminalOpen: true, gitOpen: true } : {}) }, tabs: { '.workspace': { panes: [{ id: 'main', tabs: [{ path: 'README.md', preview: false, viewMode: 'plain' }, { path: 'extra.md', preview: false, viewMode: 'plain' }], activePath: 'README.md' }, ...(mode === 'worktree' && name === '/alpha' ? [{ id: 'side', tabs: [{ path: 'side.md', preview: false, viewMode: 'plain' }], activePath: 'side.md' }] : [])], layout: mode === 'worktree' && name === '/alpha' ? { kind: 'split', dir: 'row', kids: [{ kind: 'leaf', pane: 'main' }, { kind: 'leaf', pane: 'side' }] } : { kind: 'leaf', pane: 'main' }, focusedPaneId: 'main' } }, label: name })
     await page.addInitScript(() => {
       localStorage.setItem('mew:locale', 'ko')
@@ -115,6 +121,18 @@ for (const mode of ['keyboard', 'workspace', 'documents', 'permissions', 'panels
         if (method === 'POST') {
           const body = route.request().postDataJSON()
           workspacePosts.push(body)
+          if (mode === 'rapid') {
+            if (failSwitch) return route.fulfill({ status: 400, json: { error: 'missing folder' } })
+            // A regular server switch commits synchronously; only its response
+            // can remain in flight while a later project selection is accepted.
+            active = body.path
+            projectPath = active
+            const info = { path: active, projectPath, docs: 'docs', docsPath: active + '/docs', projects: [] }
+            await page.evaluate(() => (globalThis as unknown as { presence: { onmessage: (e: { data: string }) => void } }).presence.onmessage({ data: JSON.stringify({ type: 'workspace' }) }))
+            let lateError = false
+            if (heldSwitchPaths.has(body.path)) await new Promise<void>(resolve => heldSwitchResponses.push({ path: body.path, release(error = false) { lateError = error; resolve() } }))
+            return lateError ? route.fulfill({ status: 400, json: { error: 'obsolete project error' } }) : json(info)
+          }
           if (blockSwitch) await new Promise<void>(resolve => { releaseSwitch = resolve })
           if (failSwitch) return route.fulfill({ status: 400, json: { error: 'missing folder' } })
           active = body.path
@@ -126,12 +144,13 @@ for (const mode of ['keyboard', 'workspace', 'documents', 'permissions', 'panels
         return json({ path: active, projectPath: mode === 'worktree' ? projectPath : active, docs: 'docs', docsPath: active + '/docs', projects: [] })
       }
       if (url.pathname === '/api/project-icons/read') return json({ icons: {} })
-      if (url.pathname === '/api/user-ui/root-projects') return json({ state: { paths: ['/alpha', '/beta', ...(mode === 'worktree' ? ['/alpha-worktree'] : [])], icons: {}, groups: [] } })
+      if (url.pathname === '/api/user-ui/root-projects') return json({ state: { paths: ['/alpha', '/beta', ...(mode === 'worktree' ? ['/alpha-worktree'] : mode === 'rapid' ? ['/gamma'] : [])], icons: {}, groups: [] } })
       if (url.pathname === '/api/user-ui/agent-tabs') return json({ state: null, claims: [], workspace: url.searchParams.get('workspace') })
       if (url.pathname === '/api/user-ui/workspace') {
         if (method === 'PUT') { const body = route.request().postDataJSON(); persisted.set(body.workspacePath, body.state); return json({ state: body.state }) }
         if (blockUi) await new Promise<void>(resolve => { releaseUi = resolve; uiWaiters.push(resolve) })
         const name = url.searchParams.get('workspace')!
+        if (mode === 'rapid' && heldUiPaths.has(name)) await new Promise<void>(resolve => heldUiResponses.push({ path: name, release: resolve }))
         return json({ state: persisted.get(name) ?? stateFor(name) })
       }
       if (url.pathname === '/api/tree') {
@@ -463,6 +482,84 @@ for (const mode of ['keyboard', 'workspace', 'documents', 'permissions', 'panels
       }
     }
     const countUi = (root: string) => requests.filter(r => r.path === '/api/user-ui/workspace' && r.method === 'GET' && r.root === root).length
+    if (mode === 'rapid') {
+      const failedRequests: { path: string; method: string; root?: string }[] = []
+      page.on('requestfailed', request => {
+        const url = new URL(request.url())
+        failedRequests.push({ path: url.pathname, method: request.method(), root: request.method() === 'POST' ? request.postDataJSON()?.path : url.searchParams.get('workspace') ?? undefined })
+      })
+      const until = async (condition: () => boolean, message: string) => {
+        const deadline = Date.now() + 3000
+        while (!condition() && Date.now() < deadline) await page.waitForTimeout(10)
+        assert.ok(condition(), message)
+      }
+      const held = async (root: string) => {
+        await until(() => heldSwitchResponses.some(response => response.path === root), `${root} starts without waiting for the previous response`)
+        return heldSwitchResponses.find(response => response.path === root)!
+      }
+      const releaseHeld = (root: string, error = false) => {
+        heldSwitchPaths.delete(root)
+        for (let index = heldSwitchResponses.length - 1; index >= 0; index--) {
+          if (heldSwitchResponses[index].path === root) heldSwitchResponses.splice(index, 1)[0].release(error)
+        }
+      }
+      const content = (root: string) => page.locator('[data-test-content]').getByText(`Content of ${root}`, { exact: true })
+      heldSwitchPaths.add('/beta'); heldSwitchPaths.add('/gamma'); heldUiPaths.add('/beta')
+      await selectProject('/beta')
+      await held('/beta')
+      await until(() => heldUiResponses.some(response => response.path === '/beta'), 'beta UI preparation starts')
+      assert.equal(active, '/beta', 'the server commits beta before its response arrives')
+      await selectProject('/beta')
+      assert.equal(workspacePosts.filter(post => post.path === '/beta').length, 1, 'duplicate pending selections do not restart the request')
+      const started = Date.now()
+      await selectProject('/gamma')
+      await held('/gamma')
+      await until(() => failedRequests.some(request => request.path === '/api/workspace' && request.root === '/beta'), 'superseded beta POST is aborted')
+      await until(() => failedRequests.some(request => request.path === '/api/user-ui/workspace' && request.root === '/beta'), 'obsolete beta UI preparation is aborted')
+      releaseHeld('/beta', true)
+      heldUiPaths.delete('/beta')
+      for (const response of heldUiResponses.splice(0)) response.release()
+      await loading.waitFor()
+      await content('/alpha').waitFor()
+      assert.equal(await page.getByText('obsolete project error', { exact: true }).count(), 0, 'an obsolete failure does not show a toast')
+      releaseHeld('/gamma')
+      await content('/gamma').waitFor({ state: 'attached' })
+      await loading.waitFor({ state: 'detached' })
+      assert.equal(active, '/gamma')
+      assert.equal(requests.some(request => request.path === '/api/tree' && request.root === '/beta'), false, 'canceled beta never hydrates its file tree')
+      console.log(`latest project starts while obsolete response is held; gamma ready in ${Date.now() - started}ms`)
+      // On mobile, tapping another root and then selecting the displayed root
+      // must restore it through POST: beta may already be committed server-side.
+      await page.setViewportSize({ width: 390, height: 700 })
+      await page.locator('button[data-project-switcher][data-header-menu-trigger]').waitFor()
+      heldSwitchPaths.add('/beta')
+      await page.keyboard.press('Alt+p')
+      await page.locator('[data-project-option="/beta"]').tap()
+      await held('/beta')
+      const gammaPosts = workspacePosts.filter(post => post.path === '/gamma').length
+      await page.keyboard.press('Alt+3')
+      await until(() => workspacePosts.filter(post => post.path === '/gamma').length === gammaPosts + 1, 'selecting the displayed root supersedes the pending project')
+      await until(() => active === '/gamma', 'the server returns to the displayed root')
+      releaseHeld('/beta')
+      await loading.waitFor({ state: 'detached' })
+      await content('/gamma').waitFor({ state: 'attached' })
+      // A failed replacement preserves restoration already owned by the
+      // displayed root, even if its metadata was still pending at selection.
+      heldUiPaths.add('/gamma')
+      await page.locator('header').evaluate(element => element.ownerDocument.defaultView!.dispatchEvent(new Event('mew:permissions-changed')))
+      await until(() => heldUiResponses.some(response => response.path === '/gamma'), 'the current root begins uncached restoration')
+      failSwitch = true
+      await page.keyboard.press('Alt+1')
+      await page.getByText('missing folder', { exact: true }).waitFor()
+      assert.equal(failedRequests.some(request => request.path === '/api/user-ui/workspace' && request.root === '/gamma'), false, 'failed selection does not cancel the displayed root metadata')
+      heldUiPaths.delete('/gamma')
+      for (const response of heldUiResponses.splice(0)) response.release()
+      await content('/gamma').waitFor({ state: 'attached' })
+      await loading.waitFor({ state: 'detached' })
+      assert.equal(active, '/gamma')
+      assert.deepEqual(errors, [])
+      return
+    }
     const explorerToggle = page.locator('[data-explorer-toggle]')
     const explorerScope = explorerToggle.locator('button[aria-pressed="true"]')
     assert.equal(await explorerToggle.getByRole('combobox').count(), 0, 'file/document scope keeps its two-button toggle')
@@ -685,7 +782,7 @@ for (const mode of ['keyboard', 'workspace', 'documents', 'permissions', 'panels
     assert.equal(dockBounds.y, 44)
     assert.ok(dockBounds.width <= 48 && dockBounds.height > dockBounds.width)
     const projectPanelBounds = (await page.locator('[data-project-sidebar]').boundingBox())!
-    assert.equal(projectPanelBounds.x, dockBounds.width + 1)
+    assert.ok(Math.abs(projectPanelBounds.x - (dockBounds.x + dockBounds.width)) <= 1, 'the project panel follows the dock with at most a divider between them')
     assert.equal(railSidebarBounds.x, projectPanelBounds.x + projectPanelBounds.width)
     const railToggleBounds = (await page.locator('[data-sidebar-toggle]').boundingBox())!
     assert.equal(railToggleBounds.x, railSidebarBounds.x + railSidebarBounds.width - 1)

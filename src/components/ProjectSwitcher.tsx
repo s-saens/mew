@@ -16,10 +16,11 @@ function labelOf(projectPath: string): string {
   return parts.at(-1) || projectPath
 }
 
-export function ProjectSwitcher({ paths, activePath, fallbackLabel, canOpen, canChangeIcon, icons, onActivate, onIconChange, onOpen, onPreview, onRemove, onReorder,
+export function ProjectSwitcher({ paths, activePath, pendingPath, fallbackLabel, canOpen, canChangeIcon, icons, onActivate, onIconChange, onOpen, onPreview, onRemove, onReorder,
   sidebarHost, sidebarEnabled = false, sidebarOpen = false, onSidebarOpenChange, sidebarWidth = 240, onSidebarResize, onSidebarWidthChange, canUseCommands = false, activeWorkingPath }: {
   paths: string[]
   activePath: string | null
+  pendingPath?: string | null
   fallbackLabel: string
   canOpen: boolean
   canChangeIcon: boolean
@@ -52,6 +53,7 @@ export function ProjectSwitcher({ paths, activePath, fallbackLabel, canOpen, can
   const hold = useRef<{ timer: ReturnType<typeof setTimeout>; x: number; y: number } | null>(null)
   const suppressClickUntil = useRef(0)
   const label = activePath ? labelOf(activePath) : fallbackLabel
+  const selectionPath = pendingPath ?? activePath
   const showingSidebar = sidebarEnabled && sidebarOpen && canOpen
   const panelId = useId()
   const labels = useMemo(() => {
@@ -115,11 +117,11 @@ export function ProjectSwitcher({ paths, activePath, fallbackLabel, canOpen, can
       }
       if (index === null) return
       const path = paths[index]
-      if (path && path !== activePath) { setMenu(null); onActivate(path) }
+      if (path && path !== selectionPath) { setMenu(null); onActivate(path) }
     }
     window.addEventListener('keydown', select, true)
     return () => window.removeEventListener('keydown', select, true)
-  }, [paths, activePath, canOpen, onActivate, sidebarEnabled, sidebarOpen, onSidebarOpenChange])
+  }, [paths, selectionPath, canOpen, onActivate, sidebarEnabled, sidebarOpen, onSidebarOpenChange])
 
   useLayoutEffect(() => {
     if (showingSidebar) sidebarList.current?.querySelector<HTMLButtonElement>('[data-project-option]')?.focus({ preventScroll: true })
@@ -155,7 +157,7 @@ export function ProjectSwitcher({ paths, activePath, fallbackLabel, canOpen, can
         icon={<span className="flex h-4 w-4 shrink-0 items-center justify-center" aria-hidden="true"><ProjectIcon icon={icons[path] ?? 'i:folder'} size={16} /></span>}
         hint={index < 9 && <kbd className="whitespace-nowrap font-sans text-[11px]">Alt+{index + 1}</kbd>}
         onPointerEnter={() => { if (path !== activePath) onPreview?.(path) }} onFocus={() => { if (path !== activePath) onPreview?.(path) }}
-        onClick={() => { if (path !== activePath) onActivate(path) }}
+        onClick={() => { if (path !== selectionPath) onActivate(path) }}
         onContextMenu={event => { if (canChangeIcon) { event.preventDefault(); openContextMenu(path, event.clientX, event.clientY, event.currentTarget) } }}
         onKeyDown={event => { if (onReorder && event.shiftKey && (event.key === 'ArrowUp' || event.key === 'ArrowDown')) { event.preventDefault(); event.stopPropagation(); move(event.key === 'ArrowUp' ? -1 : 1); return } if (canChangeIcon && (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10'))) { event.preventDefault(); const box = event.currentTarget.getBoundingClientRect(); openContextMenu(path, box.left, box.bottom, event.currentTarget) } }}>
         <span className="min-w-0 flex-1 text-left"><span className="block truncate">{labelOf(path)}</span>

@@ -1,7 +1,7 @@
 /** Short-lived, account-session-local UI snapshots. Never use this to prefetch files from another root. */
 export class WorkspaceSnapshotCache<T> {
   private entries = new Map<string, { value: T; expires: number; bytes: number }>()
-  private pending = new Map<string, Promise<T>>()
+  private pending = new Map<string, { promise: Promise<T>; controller: AbortController }>()
   private generation = 0
 
   private readonly maxEntries: number
@@ -36,32 +36,33 @@ export class WorkspaceSnapshotCache<T> {
     }
   }
 
-  load(key: string, read: () => Promise<T>): Promise<T> {
+  load(key: string, read: (signal: AbortSignal) => Promise<T>): Promise<T> {
     const cached = this.get(key)
     if (cached !== undefined) return Promise.resolve(cached)
     const existing = this.pending.get(key)
-    if (existing) return existing
+    if (existing) return existing.promise
     const generation = this.generation
-    const request = read().then(value => {
-      if (generation !== this.generation) return value
+    const controller = new AbortController()
+    const request = read(controller.signal).then(value => {
+      if (controller.signal.aborted || generation !== this.generation) return value
       // A local edit while GET was in flight is newer than its server snapshot.
       const newer = this.get(key)
       if (newer !== undefined) return newer
       this.set(key, value)
       return value
     }).finally(() => {
-      if (this.pending.get(key) === request) this.pending.delete(key)
+      if (this.pending.get(key)?.promise === request) this.pending.delete(key)
     })
-    this.pending.set(key, request)
+    this.pending.set(key, { promise: request, controller })
     return request
   }
 
   /** Bound speculative metadata reads; an explicit load is never held behind this limit. */
-  prefetch(key: string, read: () => Promise<T>, maxPending = 2): Promise<T> | undefined {
+  prefetch(key: string, read: (signal: AbortSignal) => Promise<T>, maxPending = 2): Promise<T> | undefined {
     const cached = this.get(key)
     if (cached !== undefined) return Promise.resolve(cached)
     const existing = this.pending.get(key)
-    if (existing) return existing
+    if (existing) return existing.promise
     if (this.pending.size >= maxPending) return undefined
     return this.load(key, read)
   }
@@ -69,6 +70,15 @@ export class WorkspaceSnapshotCache<T> {
   clear(): void {
     this.generation++
     this.entries.clear()
-    this.pending.clear()
+    this.cancelPending()
+  }
+
+  /** Release obsolete reads immediately so returning to a root can start a fresh request. */
+  cancelPending(keep: readonly string[] = []): void {
+    for (const [key, entry] of this.pending) {
+      if (keep.includes(key)) continue
+      this.pending.delete(key)
+      entry.controller.abort()
+    }
   }
 }
