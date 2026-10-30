@@ -1,29 +1,37 @@
 import { uiText } from '@mew/ui/i18n-core'
+import { HoverTipLayer } from '@mew/ui'
 import { useUiLocale } from '@mew/ui/i18n'
 import { getVirtualKeyboard, virtualKeyboardViewportBottom } from '@mew/ui/virtual-keyboard'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
 // 모바일 입력 영역의 보조키 바 (Termux의 extra keys 같은 역할).
 // 키보드가 떠 있을 때만 쓰는 게 아니라 — 키보드를 내린 채 방향키로 스크롤하거나 Esc를 보내는 데도
 // 쓰므로 — 띄울지 말지는 useMobileLayout(화면 폭)이 정한다.
 // 이 컴포넌트는 Ctrl/Shift 토글 상태만 노출한다. 그 토글을 다음에 입력될 글자에 어떻게 결합할지는
 // 호스트가 정한다 — 터미널은 onData를 가로채고, 에디터는 beforeinput을 가로채 단축키로 처리한다.
-function KeyButton({ label, ariaLabel, active, onClick, stretch = false }: { label: string; ariaLabel?: string; active?: boolean; onClick: () => void; stretch?: boolean }) {
-  useUiLocale()
+function KeyButton({ label, ariaLabel, active, onClick, stretch = false, children }: { label: string; ariaLabel?: string; active?: boolean; onClick: () => void; stretch?: boolean; children?: ReactNode }) {
   return (
     <button
       type="button"
       onMouseDown={(e) => e.preventDefault()} // 포커스(=키보드)를 안 뺏기게 — 버튼 탭이 blur를 유발하면 안 됨
       onClick={onClick}
-      aria-label={ariaLabel}
-      title={ariaLabel}
+      aria-label={ariaLabel ?? label}
+      data-tip={ariaLabel ?? label}
       aria-pressed={active}
-      className={`flex h-6 items-center justify-center rounded text-[10px] leading-none font-medium focus-visible:outline-2 focus-visible:outline-ink ${stretch ? 'min-w-0 flex-1 px-0.5' : 'min-w-6 shrink-0 px-1.5'} ${
-        active ? 'bg-accent text-ink-on-accent' : 'bg-surface-raised text-ink-secondary hover:bg-surface-hover'
+      className={`flex h-8 flex-1 items-center justify-center rounded select-none leading-none font-medium whitespace-nowrap focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ink max-[360px]:inset-ring max-[360px]:inset-ring-surface-deep ${stretch ? 'min-w-0 px-0.5 text-[10px]' : 'min-w-6 px-1 text-[11px] max-[360px]:text-[10px]'} ${
+        active ? 'bg-accent text-ink-on-accent active:bg-accent-strong' : 'bg-surface-raised text-ink-secondary hover:bg-surface-hover active:bg-surface-hover active:text-ink'
       }`}
     >
-      {label}
+      {children ?? label}
     </button>
   )
+}
+
+function KeyIcon({ children }: { children: ReactNode }) {
+  return <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">{children}</svg>
+}
+
+function KeySeparator() {
+  return <div aria-hidden="true" className="mx-0.5 h-4 w-px shrink-0 bg-edge max-[360px]:hidden" />
 }
 
 export function MobileKeyBar({
@@ -96,111 +104,39 @@ export function MobileKeyBar({
   return (
     // z-20 — 전체 화면 오버레이(사이드바·채팅·에이전트·터미널)는 z-30이다. 같은 z-30으로 두면
     // DOM 순서상 에디터가 사이드바보다 뒤라 보조키가 사이드바 위에 떠 버린다
-    <div ref={barRef} data-mobile-key-bar className={`${placement === 'fixed' ? 'fixed inset-x-0 bottom-0 z-20' : 'relative z-20 shrink-0'} flex items-center gap-0.5 overflow-x-auto border-t border-edge bg-surface-deep px-1.5 py-1 shadow-[0_-3px_12px_rgba(0,0,0,0.16)]`}>
-      <KeyButton stretch={stretch} label="Esc" onClick={onEsc} />
-      <KeyButton stretch={stretch} label="Tab" onClick={onTab} />
-      <KeyButton stretch={stretch} label="Ctrl" active={ctrlActive} onClick={onToggleCtrl} />
-      <KeyButton stretch={stretch} label="Shift" active={shiftActive} onClick={onToggleShift} />
-      {!stretch && <div className="mx-0.5 h-3.5 w-px shrink-0 bg-edge" />}
-      <KeyButton stretch={stretch} label="←" onClick={() => onArrow('left')} />
-      <KeyButton stretch={stretch} label="↑" onClick={() => onArrow('up')} />
-      <KeyButton stretch={stretch} label="↓" onClick={() => onArrow('down')} />
-      <KeyButton stretch={stretch} label="→" onClick={() => onArrow('right')} />
-      {extraKeys.map(key => <KeyButton key={key.label} stretch={stretch} {...key} />)}
-      {onComment && (
-        <>
-          <div className="mx-0.5 h-3.5 w-px shrink-0 bg-edge" />
-          <button
-            type="button"
-            // 선택을 살려야 그 자리에 댓글이 붙는다 — 탭이 blur를 일으키면 선택이 풀린다
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={onComment}
-            className="flex h-6 min-w-6 shrink-0 items-center justify-center rounded bg-surface-raised px-1.5 text-ink-secondary hover:bg-surface-hover"
-            aria-label={uiText("선택한 곳에 댓글")}
-            title={uiText("선택한 곳에 댓글")}
-          >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 11.5a8.38 8.38 0 0 1-9 8.4 8.5 8.5 0 0 1-3.8-.9L3 21l1.9-5.2A8.5 8.5 0 0 1 4 11.5a8.38 8.38 0 0 1 8.5-8.4 8.38 8.38 0 0 1 8.5 8.4z" />
-            </svg>
-          </button>
-        </>
-      )}
-      {(onCodeBlock || onTable || onUndo || onRedo) && (
-        <>
-          {(onCodeBlock || onTable) && <div className="mx-0.5 h-3.5 w-px shrink-0 bg-edge" />}
-          {onCodeBlock && (
-            <button
-              type="button"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={onCodeBlock}
-              className="flex h-6 min-w-6 shrink-0 items-center justify-center rounded bg-surface-raised px-1.5 text-ink-secondary hover:bg-surface-hover"
-              aria-label={uiText("코드블럭")}
-              title={uiText("코드블럭")}
-            >
-              {/* 코드블럭 — 꺾쇠괄호 사이 빗금(lucide code) */}
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="16 18 22 12 16 6" />
-                <polyline points="8 6 2 12 8 18" />
-              </svg>
-            </button>
-          )}
-          {onTable && (
-            <button
-              type="button"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={onTable}
-              className="flex h-6 min-w-6 shrink-0 items-center justify-center rounded bg-surface-raised px-1.5 text-ink-secondary hover:bg-surface-hover"
-              aria-label={uiText("표 삽입")}
-              title={uiText("표 삽입")}
-            >
-              {/* 표 — 테두리 안 헤더 행 + 열 구분선(lucide table) */}
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                <line x1="3" y1="9" x2="21" y2="9" />
-                <line x1="9" y1="21" x2="9" y2="9" />
-                <line x1="15" y1="21" x2="15" y2="9" />
-              </svg>
-            </button>
-          )}
-          {(onUndo || onRedo) && (
-            <>
-              <div className="mx-0.5 h-3.5 w-px shrink-0 bg-edge" />
-              {onUndo && (
-                <button
-                  type="button"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={onUndo}
-                  className="flex h-6 min-w-6 shrink-0 items-center justify-center rounded bg-surface-raised px-1.5 text-ink-secondary hover:bg-surface-hover"
-                  aria-label={uiText("되돌리기")}
-                  title={uiText("되돌리기")}
-                >
-                  {/* 되돌리기 — 왼쪽으로 도는 화살표(lucide undo-2) */}
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="9 14 4 9 9 4" />
-                    <path d="M20 20v-7a4 4 0 0 0-4-4H4" />
-                  </svg>
-                </button>
-              )}
-              {onRedo && (
-                <button
-                  type="button"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={onRedo}
-                  className="flex h-6 min-w-6 shrink-0 items-center justify-center rounded bg-surface-raised px-1.5 text-ink-secondary hover:bg-surface-hover"
-                  aria-label={uiText("다시 실행")}
-                  title={uiText("다시 실행")}
-                >
-                  {/* 다시 실행 — 오른쪽으로 도는 화살표(lucide redo-2, undo-2의 좌우 대칭) */}
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="15 14 20 9 15 4" />
-                    <path d="M4 20v-7a4 4 0 0 1 4-4h12" />
-                  </svg>
-                </button>
-              )}
-            </>
-          )}
-        </>
-      )}
-    </div>
+    <HoverTipLayer className="contents">
+      <div ref={barRef} data-mobile-key-bar className={`${placement === 'fixed' ? 'fixed inset-x-0 bottom-0 z-20' : 'relative z-20 shrink-0'} flex items-center gap-0.5 overflow-x-auto border-t border-edge bg-surface-deep px-1.5 py-1 max-[360px]:gap-0 max-[360px]:px-1`}>
+        <KeyButton stretch={stretch} label="Esc" onClick={onEsc} />
+        <KeyButton stretch={stretch} label="Tab" onClick={onTab} />
+        <KeyButton stretch={stretch} label="Ctrl" active={ctrlActive} onClick={onToggleCtrl} />
+        <KeyButton stretch={stretch} label="Shift" active={shiftActive} onClick={onToggleShift} />
+        {!stretch && <KeySeparator />}
+        <KeyButton stretch={stretch} label="←" onClick={() => onArrow('left')}><KeyIcon><path d="m12 5-7 7 7 7M5 12h14" /></KeyIcon></KeyButton>
+        <KeyButton stretch={stretch} label="↑" onClick={() => onArrow('up')}><KeyIcon><path d="m5 12 7-7 7 7M12 5v14" /></KeyIcon></KeyButton>
+        <KeyButton stretch={stretch} label="↓" onClick={() => onArrow('down')}><KeyIcon><path d="m5 12 7 7 7-7M12 5v14" /></KeyIcon></KeyButton>
+        <KeyButton stretch={stretch} label="→" onClick={() => onArrow('right')}><KeyIcon><path d="m12 5 7 7-7 7M5 12h14" /></KeyIcon></KeyButton>
+        {extraKeys.map(key => <KeyButton key={key.label} stretch={stretch} {...key} />)}
+        {onComment && <>
+          <KeySeparator />
+          <KeyButton label={uiText("선택한 곳에 댓글")} onClick={onComment}>
+            <KeyIcon><path d="M21 11.5a8.38 8.38 0 0 1-9 8.4 8.5 8.5 0 0 1-3.8-.9L3 21l1.9-5.2A8.5 8.5 0 0 1 4 11.5a8.38 8.38 0 0 1 8.5-8.4 8.38 8.38 0 0 1 8.5 8.4z" /></KeyIcon>
+          </KeyButton>
+        </>}
+        {(onCodeBlock || onTable) && <KeySeparator />}
+        {onCodeBlock && <KeyButton label={uiText("코드블럭")} onClick={onCodeBlock}>
+          <KeyIcon><path d="m16 18 6-6-6-6M8 6l-6 6 6 6" /></KeyIcon>
+        </KeyButton>}
+        {onTable && <KeyButton label={uiText("표 삽입")} onClick={onTable}>
+          <KeyIcon><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M3 9h18M9 9v12m6-12v12" /></KeyIcon>
+        </KeyButton>}
+        {(onUndo || onRedo) && <KeySeparator />}
+        {onUndo && <KeyButton label={uiText("되돌리기")} onClick={onUndo}>
+          <KeyIcon><path d="m9 14-5-5 5-5m11 16v-7a4 4 0 0 0-4-4H4" /></KeyIcon>
+        </KeyButton>}
+        {onRedo && <KeyButton label={uiText("다시 실행")} onClick={onRedo}>
+          <KeyIcon><path d="m15 14 5-5-5-5M4 20v-7a4 4 0 0 1 4-4h12" /></KeyIcon>
+        </KeyButton>}
+      </div>
+    </HoverTipLayer>
   )
 }
