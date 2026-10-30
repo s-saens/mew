@@ -132,17 +132,21 @@ async function settle(page: Page) {
 
 async function assertMenu(menu: Locator, width: number, height: number) {
   assert.equal(await menu.getByRole('menuitem').count(), labels.length)
+  assert.equal(await menu.getAttribute('aria-orientation'), 'horizontal')
+  let centerY: number | undefined
   for (const label of labels) {
     const row = menu.getByRole('menuitem', { name: label, exact: true })
     assert.equal(await row.count(), 1)
+    assert.equal(await row.getAttribute('data-tip'), label)
+    assert.equal(await row.getAttribute('data-icon-only'), 'true')
     assert.equal(await row.evaluate(el => {
-      const nodes = el.childNodes as ArrayLike<{ nodeType: number; textContent: string | null }>
-      const icon = el.querySelector('svg'), text = Array.from(nodes).find(node => node.nodeType === 3 && node.textContent?.trim())
-      if (!icon || !text) return false
-      const range = el.ownerDocument.createRange()
-      range.selectNodeContents(text)
-      return icon.getBoundingClientRect().right < range.getBoundingClientRect().left
-    }), true, `${label} has its icon before its text`)
+      const icon = el.querySelector('svg'), text = el.querySelector('.sr-only')?.getBoundingClientRect()
+      return !!icon && icon.getAttribute('aria-hidden') === 'true' && !!text && text.width <= 1 && text.height <= 1
+    }), true, `${label} has only its icon visible and retains an accessible label`)
+    const box = (await row.boundingBox())!
+    centerY ??= box.y + box.height / 2
+    assert.ok(Math.abs(box.y + box.height / 2 - centerY) < 1, 'all actions share one horizontal row')
+    assert.ok(box.width >= 32 && box.height >= 32)
   }
   const box = await menu.boundingBox()
   assert.ok(box && box.x >= 0 && box.y >= 0 && box.x + box.width <= width && box.y + box.height <= height)

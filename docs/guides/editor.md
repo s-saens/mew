@@ -1,6 +1,6 @@
 ---
 title: "Document Editing and Storage Formats"
-description: "Explains editing Markdown, code, document properties, tables, links, attachments, and PDFs; adding and deleting rows and columns through the body context menu; and the automatic Mew menu that stays open while scrolling, browser-menu suppression, and explicit keyboard-button activation and outside-tap dismissal on mobile. Covers Hotview @ file autocomplete across all folders, annotations, internal document navigation, table/DB conversion, inline subpage naming, autosave, split views, panel switching in the mobile dock, tab switching in the body and Plain modifier key bars, and installation controls."
+description: "Explains editing Markdown, code, document properties, tables, links, attachments, and PDFs; adding and deleting rows and columns through the body context menu; and the horizontal icon menu with hover labels that stays open while scrolling, browser-menu suppression, and explicit keyboard-button activation and outside-tap dismissal on mobile. Covers Hotview @ file autocomplete across all folders, annotations, internal document navigation, table/DB conversion, inline subpage naming, autosave, split views, panel switching in the mobile dock, tab switching in the body and Plain modifier key bars, and installation controls."
 updated: "2026-10-30"
 상위파일:
   - "../../.mew/docs/MOC.md"
@@ -31,7 +31,7 @@ An editor pane with no open file displays a vertical list of shortcuts for openi
 
 ### Body Context Menu
 
-Right-click the Hotview, Plain, or code body to open the **Add Annotation · Add Comment · Copy · Cut · Paste · Delete · Select All** menu. Each item shows an icon on the left and its name on the right. Right-clicking within selected text preserves the selection; right-clicking outside it moves the cursor to that position.
+Right-click the Hotview, Plain, or code body to open the **Add Annotation · Add Comment · Copy · Cut · Paste · Delete · Select All** menu. The menu shows a horizontal row of icons. Hover an icon with a mouse to see its action name. When table actions extend the row beyond the available space, scroll the menu horizontally to reach them. Right-clicking within selected text preserves the selection; right-clicking outside it moves the cursor to that position.
 
 On mobile, long-press or double-tap the body to select text. For selected body text, Mew suppresses the browser's selection menu. Once you lift your finger and the selection stabilizes, the Mew menu opens automatically. The menu stays open while you scroll or drag, including when the touch starts outside the editor. Click or tap outside the menu to close it; starting a scrolling gesture does not close it. Adjusting the range with selection handles closes the menu, which reopens for the new range when adjustment finishes. You can also copy selected text from a read-only body. Body taps and text selection keep the mobile keyboard closed. Use the floating keyboard button to start typing. Browsers without direct keyboard control use an input-suppression hint; actual behavior depends on the browser.
 

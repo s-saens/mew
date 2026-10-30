@@ -5,7 +5,7 @@ import type { Node as PMNode } from '@tiptap/pm/model'
 import { TextSelection } from '@tiptap/pm/state'
 import { findTable, TableMap } from '@tiptap/pm/tables'
 import { ActionMenu, ActionMenuItem, ActionMenuSeparator } from '@mew/ui'
-import { Copy, MediaImage, Table2Columns, ArrowDown, ArrowRight, Trash } from 'iconoir-react'
+import { Code, Database, MediaImage, TableRows, Table2Columns, ArrowDown, ArrowRight } from 'iconoir-react'
 import { convertTableToDatabase, editorDatabaseApi, isTableConversionPending } from '../database/tableConversion'
 
 // 표 우클릭 메뉴 — 셀 기준 행·열 추가·삭제와 md(기본)·csv·이미지 복사. pos는 표 노드 시작 위치(문서 좌표),
@@ -218,17 +218,17 @@ export function TableCopyMenu({
     [uiText("이미지로 복사"), () => copyAsImage(tableDom)],
   ]
 
-  const icons = [Copy, Table2Columns, MediaImage]
+  const icons = [Code, Table2Columns, MediaImage]
   const content = <>
     {!readOnly && editor.isEditable && cellDom && <>
       <ActionMenuItem icon={<ArrowDown />} onClick={() => editCell('addRowAfter')}>{uiText('행 추가')}</ActionMenuItem>
       <ActionMenuItem icon={<ArrowRight />} onClick={() => editCell('addColumnAfter')}>{uiText('열 추가')}</ActionMenuItem>
-      <ActionMenuItem icon={<Trash />} danger onClick={() => editCell('deleteRow')}>{uiText('행 삭제')}</ActionMenuItem>
-      <ActionMenuItem icon={<Trash />} danger onClick={() => editCell('deleteColumn')}>{uiText('열 삭제')}</ActionMenuItem>
+      <ActionMenuItem icon={<TableRows />} danger onClick={() => editCell('deleteRow')}>{uiText('행 삭제')}</ActionMenuItem>
+      <ActionMenuItem icon={<Table2Columns />} danger onClick={() => editCell('deleteColumn')}>{uiText('열 삭제')}</ActionMenuItem>
       <ActionMenuSeparator />
     </>}
     {!readOnly && editor.isEditable && databaseApi?.create && <>
-      <ActionMenuItem icon={<Table2Columns />} disabled={!!tableNode && isTableConversionPending(editor, tableNode)} onClick={convert}>{uiText('데이터베이스로 전환')}</ActionMenuItem>
+      <ActionMenuItem icon={<Database />} disabled={!!tableNode && isTableConversionPending(editor, tableNode)} onClick={convert}>{uiText('데이터베이스로 전환')}</ActionMenuItem>
       <ActionMenuSeparator />
     </>}
     {items.map(([label, action], i) => { const Icon = icons[i]; return <ActionMenuItem key={label} icon={<Icon />} hint={i === 0 ? uiText('기본') : undefined} onClick={() => run(action)}>{label}</ActionMenuItem> })}

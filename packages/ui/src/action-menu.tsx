@@ -2,8 +2,9 @@ import { cloneElement, isValidElement, createContext, useContext, useEffect, use
 import { createPortal } from 'react-dom'
 import { useOverlayDismiss } from './useOverlayDismiss'
 import { getFixedPopupLayout } from './fixed-popup-layout'
+import { HoverTipLayer } from './HoverTipLayer'
 
-const MenuContext = createContext<(() => void) | null>(null)
+const MenuContext = createContext<{ close: () => void; orientation: 'vertical' | 'horizontal' } | null>(null)
 
 export function ActionMenuSurface({ variant = 'default', className = '', ref, ...props }: HTMLAttributes<HTMLDivElement> & {
   variant?: 'default' | 'header'
@@ -29,10 +30,11 @@ export type ActionMenuProps = {
   /** Compatibility marker for file explorer integrations. */
   fileMenu?: boolean
   variant?: 'default' | 'header'
+  orientation?: 'vertical' | 'horizontal'
 }
 
 /** Shared action popup. Feature wrappers supply actions, never menu styles. */
-export function ActionMenu({ x, y, onClose, children, label, trigger, portalContainer, ref: forwardedRef, fileMenu = false, variant = 'default', outsideIgnore, autoFocus = true, outsideDismiss = 'pointerdown' }: ActionMenuProps) {
+export function ActionMenu({ x, y, onClose, children, label, trigger, portalContainer, ref: forwardedRef, fileMenu = false, variant = 'default', orientation = 'vertical', outsideIgnore, autoFocus = true, outsideDismiss = 'pointerdown' }: ActionMenuProps) {
   const marker = useRef<HTMLSpanElement>(null)
   const [container, setContainer] = useState<HTMLElement | null>(null)
   const previous = useRef<HTMLElement | SVGElement | null>(trigger ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null))
@@ -145,7 +147,7 @@ export function ActionMenu({ x, y, onClose, children, label, trigger, portalCont
       const maxWidth = Math.max(0, right - left)
       // Apply limits before measuring so a tall menu scrolls above the dock.
       const limits = layout.toStyle({ maxHeight, maxWidth,
-        minWidth: Math.min(parseFloat(getComputedStyle(menu).getPropertyValue('--mew-action-menu-min-width')) || 168, maxWidth) })
+        minWidth: orientation === 'horizontal' ? 0 : Math.min(parseFloat(getComputedStyle(menu).getPropertyValue('--mew-action-menu-min-width')) || 168, maxWidth) })
       for (const key of ['maxHeight', 'maxWidth', 'minWidth'] as const) menu.style[key] = `${limits[key]}px`
       const rect = menu.getBoundingClientRect()
       const next = layout.toStyle({
@@ -177,17 +179,17 @@ export function ActionMenu({ x, y, onClose, children, label, trigger, portalCont
       viewport?.removeEventListener('resize', place)
       viewport?.removeEventListener('scroll', place)
     }
-  }, [x, y, container])
+  }, [x, y, container, orientation])
 
   useLayoutEffect(() => {
     if (!container || !autoFocus) return
     ref.current?.querySelector<HTMLButtonElement>('[data-action-menu-item]:not(:disabled)')?.focus({ preventScroll: true })
   }, [container, autoFocus])
 
-  const menu = (
-    <MenuContext.Provider value={() => close()}>
+  const surface = (
     <ActionMenuSurface
       variant={variant}
+      data-menu-orientation={orientation}
       data-header-menu={variant === 'header' ? '' : undefined}
       ref={element => {
         ref.current = element
@@ -198,6 +200,7 @@ export function ActionMenu({ x, y, onClose, children, label, trigger, portalCont
       data-action-menu
       role="menu"
       aria-label={label}
+      aria-orientation={orientation}
       onPointerDown={event => event.stopPropagation()}
       onClick={event => event.stopPropagation()}
       onContextMenu={event => event.preventDefault()}
@@ -215,17 +218,23 @@ export function ActionMenu({ x, y, onClose, children, label, trigger, portalCont
         else return
         event.preventDefault()
         items[next]?.focus()
+        if (orientation === 'horizontal') items[next]?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
       }}
       style={pos}
     >
-      {children}
+      {orientation === 'horizontal' ? <div className="mew-action-menu-content">{children}</div> : children}
     </ActionMenuSurface>
-    </MenuContext.Provider>
   )
+  const menu = <MenuContext.Provider value={{ close: () => close(), orientation }}>
+    {orientation === 'horizontal'
+      ? <HoverTipLayer className="contents" portalTarget={container}>{surface}</HoverTipLayer>
+      : surface}
+  </MenuContext.Provider>
   return <><span ref={marker} hidden />{container && createPortal(menu, container)}</>
 }
 
 export type ActionMenuItemProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'className'> & {
+  'data-tip'?: string
   icon?: ReactNode
   hint?: ReactNode
   danger?: boolean
@@ -234,14 +243,21 @@ export type ActionMenuItemProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, 
 }
 
 export function ActionMenuItem({ icon, hint, danger, checked, closeOnSelect = true, children, onClick, ...props }: ActionMenuItemProps) {
-  const close = useContext(MenuContext)
+  const menu = useContext(MenuContext)
+  const iconOnly = menu?.orientation === 'horizontal' && !!icon
+  const label = props['aria-label'] ?? (typeof children === 'string' || typeof children === 'number' ? String(children) : undefined)
   return <button {...props} type="button" role={props.role ?? (checked === undefined ? 'menuitem' : 'menuitemcheckbox')}
+    aria-label={iconOnly ? label : props['aria-label']} data-tip={iconOnly ? props['data-tip'] ?? label : props['data-tip']}
+    data-icon-only={iconOnly || undefined}
     aria-checked={checked} data-action-menu-item data-danger={danger || undefined} className="mew-action-menu-item"
-    onClick={event => { if (closeOnSelect) close?.(); onClick?.(event) }}>
-    {isValidElement(icon) ? cloneElement(icon as ReactElement<SVGProps<SVGSVGElement>>, { 'aria-hidden': true, focusable: false }) : icon}{children}{hint && <span className="mew-action-menu-hint">{hint}</span>}
+    onClick={event => { if (closeOnSelect) menu?.close(); onClick?.(event) }}>
+    {isValidElement(icon) ? cloneElement(icon as ReactElement<SVGProps<SVGSVGElement>>, { 'aria-hidden': true, focusable: false }) : icon}
+    {iconOnly ? <span className="sr-only">{children}</span> : children}
+    {hint && <span className={iconOnly ? 'sr-only' : 'mew-action-menu-hint'}>{hint}</span>}
   </button>
 }
 
 export function ActionMenuSeparator() {
-  return <div role="separator" className="mew-action-menu-separator" />
+  const menu = useContext(MenuContext)
+  return <div role="separator" aria-orientation={menu?.orientation === 'horizontal' ? 'vertical' : 'horizontal'} className="mew-action-menu-separator" />
 }

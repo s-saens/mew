@@ -14,7 +14,7 @@ const GAP_PX = 6
 /** 화면 좌우에서 이만큼은 띄운다 */
 const MARGIN_PX = 8
 
-type Tip = { label: string; centerX: number; top: number }
+type Tip = { label: string; centerX: number; top: number; height: number }
 
 function closestTipEl(target: EventTarget | null): Element | null {
   if (!(target instanceof Element)) return null
@@ -38,8 +38,15 @@ export function HoverTipLayer({ className, children, placement = 'top', portalTa
     const el = tipRef.current
     if (!el || !tip) return
     const layout = getFixedPopupLayout(el.parentElement)
-    const y = placement === 'bottom' ? '0%' : '-100%'
-    const position = layout.toStyle({ left: tip.centerX, top: tip.top })
+    const height = el.getBoundingClientRect().height
+    const targetTop = placement === 'bottom' ? tip.top - GAP_PX - tip.height : tip.top + GAP_PX
+    const targetBottom = targetTop + tip.height
+    const above = targetTop - GAP_PX - layout.bounds.top - MARGIN_PX
+    const below = layout.bounds.bottom - MARGIN_PX - targetBottom - GAP_PX
+    const useBottom = placement === 'bottom' ? below >= height || below >= above : above < height && below > above
+    const top = useBottom ? targetBottom + GAP_PX : targetTop - GAP_PX
+    const y = useBottom ? '0%' : '-100%'
+    const position = layout.toStyle({ left: tip.centerX, top })
     el.style.left = `${position.left}px`
     el.style.top = `${position.top}px`
     el.style.transform = `translate(-50%, ${y})`
@@ -48,6 +55,10 @@ export function HoverTipLayer({ className, children, placement = 'top', portalTa
     if (r.left < layout.bounds.left + MARGIN_PX) dx = layout.bounds.left + MARGIN_PX - r.left
     else if (r.right > layout.bounds.right - MARGIN_PX) dx = layout.bounds.right - MARGIN_PX - r.right
     if (dx !== 0) el.style.transform = `translate(calc(-50% + ${layout.toStyle({ width: dx }).width}px), ${y})`
+    let dy = 0
+    if (r.top < layout.bounds.top + MARGIN_PX) dy = layout.bounds.top + MARGIN_PX - r.top
+    else if (r.bottom > layout.bounds.bottom - MARGIN_PX) dy = layout.bounds.bottom - MARGIN_PX - r.bottom
+    if (dy !== 0) el.style.top = `${layout.toStyle({ top: top + dy }).top}px`
   }, [tip, placement])
 
   function onPointerOver(e: React.PointerEvent) {
@@ -56,7 +67,7 @@ export function HoverTipLayer({ className, children, placement = 'top', portalTa
     if (!el || el === shownForRef.current) return
     shownForRef.current = el
     const r = el.getBoundingClientRect()
-    setTip({ label: el.getAttribute('data-tip')!, centerX: r.left + r.width / 2, top: placement === 'bottom' ? r.bottom + GAP_PX : r.top - GAP_PX })
+    setTip({ label: el.getAttribute('data-tip')!, centerX: r.left + r.width / 2, top: placement === 'bottom' ? r.bottom + GAP_PX : r.top - GAP_PX, height: r.height })
   }
 
   function onPointerOut(e: React.PointerEvent) {
@@ -75,7 +86,7 @@ export function HoverTipLayer({ className, children, placement = 'top', portalTa
   }
 
   return (
-    <div className={className} onPointerOver={onPointerOver} onPointerOut={onPointerOut} onPointerDown={hide}>
+    <div className={className} onPointerOver={onPointerOver} onPointerOut={onPointerOut} onPointerDownCapture={hide} onScrollCapture={hide}>
       {children}
       {tip &&
         createPortal(
@@ -85,8 +96,8 @@ export function HoverTipLayer({ className, children, placement = 'top', portalTa
             // width:max-content가 없으면 폭이 `left`에 딸려 간다 — fixed 요소의 남는 자리는
             // (뷰포트 너비 − left)라, 오른쪽 끝 버튼에서는 이름표가 한 글자씩 접힌 기둥이 된다.
             // 내용만큼 펴 두고 아래 useLayoutEffect가 화면 안으로 밀어 넣는다.
-            style={{ left: tip.centerX, top: tip.top, transform: `translate(-50%, ${placement === 'bottom' ? '0%' : '-100%'})`, width: 'max-content', maxWidth: 'min(20rem, calc(100vw - 16px))', overflowWrap: 'anywhere' }}
-            className="pointer-events-none fixed z-[1200] max-w-xs rounded border border-edge-bright bg-surface-raised px-2 py-1 text-xs whitespace-pre-line text-ink shadow-lg"
+            style={{ left: tip.centerX, top: tip.top, transform: `translate(-50%, ${placement === 'bottom' ? '0%' : '-100%'})`, width: 'max-content', maxWidth: 'min(20rem, calc(100vw - 16px))', overflowWrap: 'anywhere', zIndex: 'var(--layer-tooltip, 1900)' }}
+            className="pointer-events-none fixed max-w-xs rounded border border-edge-bright bg-surface-raised px-2 py-1 text-xs whitespace-pre-line text-ink shadow-lg"
           >
             {tip.label}
           </div>,
