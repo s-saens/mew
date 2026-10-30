@@ -1,8 +1,8 @@
 ---
-title: "Attachment Circular Indicator Restoration Work Record"
-description: "Implementation work record for 2026-10-27 covering the restoration of circular indicators in agent attachment upload tags and the classification of shared logo, three-dot, and circular indicators. Distinguishes verification results from production application status."
+title: "Shared Loading Indicator Work Record"
+description: "Records circular attachment indicator restoration on 2026-10-27 and continuous logo highlight rotation across React loading-stage replacements on 2026-10-30. Distinguishes isolated verification from application to the running instance."
 created: "2026-10-27"
-updated: "2026-10-27"
+updated: "2026-10-30"
 ---
 
 ## Purpose and resulting behavior
@@ -19,3 +19,16 @@ The current contracts are owned by [Shared Loading Indicators](../development/ui
 - `npm run check:docs`: 488 descriptions passed without errors. The full link check failed due to 17 existing links to deleted feature MOC and task documents unrelated to this work. There are no link errors in the documents changed in this work.
 
 Do not build or deploy the app, or start, stop, or restart the server. The user must apply the changes to the running instance after building; visual verification on actual mobile devices is separate.
+
+## Continuous logo rotation — 2026-10-30
+
+Loading-stage changes replaced the React logo element, restarting its highlight at zero. `LoadingIndicator` now aligns each running logo animation to the document timeline origin in a layout effect before paint. Startup, authentication, workspace preparation, and restoration indicators therefore share the same rotation phase within the page. The existing 2.4-second CSS transform animation continues without a JavaScript frame loop. Paused indicators, reduced motion, dots, and circular spinners retain their existing behavior.
+
+The regression fixture replaces the logo three times at desktop and mobile widths, comparing its animation time and phase against a continuously mounted logo. The original implementation failed the initial regression check; the corrected implementation passed the shared indicator, workspace-loading, and editor-loading browser tests (12 tests total). The refined regression assertions also passed in a separate shared-indicator test run.
+
+- `npx tsc -b`: passed.
+- `npx oxlint packages/ui/src/loading-indicator.tsx packages/ui/src/loading-indicator.browser.test.ts`: passed.
+- `npm run check:docs`: 559 descriptions and all document links passed.
+- Impeccable's detector reported no findings for the changed component; `git diff --check` passed.
+
+This change has not been built or applied to the running instance. Separate Mewlink launcher documents and frame transitions are outside this page-local synchronization.

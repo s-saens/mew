@@ -14,7 +14,14 @@ test('shared loading indicators support dots, startup logos and circular attachm
 import React from '${root}/node_modules/react/index.js';
 import {createRoot} from '${root}/node_modules/react-dom/client.js';
 import {LoadingIndicator} from '${root}/packages/ui/src/loading-indicator.tsx';
+function Handoff() {
+  const [phase, setPhase] = React.useState(0);
+  return React.createElement('div', {id:'handoff', 'data-phase':phase},
+    React.createElement(LoadingIndicator,{key:phase,variant:'logo',size:56}),
+    React.createElement('button',{onClick:()=>setPhase(value=>value+1)},'Next loading phase'));
+}
 createRoot(document.getElementById('react')).render(React.createElement(React.Fragment,null,
+  React.createElement(Handoff),
   ...${JSON.stringify(sizes)}.flatMap(size=>[
     React.createElement(LoadingIndicator,{key:'logo-'+size,variant:'logo',size,className:'size-'+size}),
     React.createElement(LoadingIndicator,{key:'dots-'+size,size,className:'dots-size-'+size}),
@@ -57,6 +64,27 @@ createRoot(document.getElementById('react')).render(React.createElement(React.Fr
     </div>`)
   await page.addScriptTag({ content: code })
   await page.locator('.size-56').waitFor()
+
+  for (const width of [1100, 390]) {
+    await page.setViewportSize({ width, height: 800 })
+    for (let phase = 0; phase < 3; phase++) {
+      await page.getByRole('button', { name: 'Next loading phase' }).click()
+      const motion = await page.locator('#handoff .mew-loading-logo').evaluate(async el => {
+        const animation = el.getAnimations({ subtree: true })[0]
+        await animation.ready
+        const reference = el.ownerDocument.querySelector('.size-56')!.getAnimations({ subtree: true })[0]
+        return {
+          time: Number(animation.currentTime), referenceTime: Number(reference.currentTime),
+          progress: animation.effect!.getComputedTiming().progress,
+          referenceProgress: reference.effect!.getComputedTiming().progress,
+          transform: el.ownerDocument.defaultView!.getComputedStyle(el, '::after').transform,
+        }
+      })
+      assert.ok(Math.abs(motion.time - motion.referenceTime) < 1, `${width}px phase ${phase}: a replacement continues from the existing logo's angle`)
+      assert.ok(Math.abs(Number(motion.progress) - Number(motion.referenceProgress)) < 0.001)
+      assert.notEqual(motion.transform, 'none', 'the highlight still rotates after replacement')
+    }
+  }
 
   for (const size of sizes) {
     const spinner = await page.locator(`.spinner-size-${size}`).evaluate(el => {
