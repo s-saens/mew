@@ -8,7 +8,7 @@ updated: "2026-10-30"
 status_hash: "4d8fe6026b3341576de674bb4b2ae85cd1124f3eb3638b2e33e15d8697ed1fc1"
 files: ["src/components/EditorPane.tsx", "src/components/mobile-editor-keyboard-button.tsx", "src/hooks/use-mobile-editor-keyboard.ts", "src/hooks/useTabs.ts", "src/components/CodePane.tsx", "src/utils/codeSearch.ts", "src/utils/code-search-panel.ts", "src/utils/code-pinch-zoom.ts", "packages/editor/src/editor/EditorSearchBar.tsx"]
 commits: []
-description: "A feature contract covering line numbers, syntax highlighting, supported diagnostics for code and plain text, and compact Find and collapsible Replace controls at the top of the document, result counts, search options, and keyboard behavior. Explains touch pinch zoom for non-Markdown files, mobile keyboard activation through the floating button, dismissal on outside presses, and the Plain auxiliary key bar, and tab switching that preserves horizontal scrolling in the body."
+description: "A feature contract covering line numbers, syntax highlighting, supported diagnostics for code and plain text, compact Find and collapsible Replace controls, result counts, search options, and keyboard behavior. Explains touch pinch zoom, explicit mobile keyboard activation and outside-press dismissal, floating Plain auxiliary keys with a rightmost inverted-T arrow cluster, and tab switching that preserves body horizontal scrolling."
 상위파일:
   - "MOC.md"
   - "_document-code-media-editing.md"
@@ -27,7 +27,7 @@ description: "A feature contract covering line numbers, syntax highlighting, sup
 - On mobile, editable Hotview, Plain, and code bodies show a translucent circular keyboard button at the bottom center. Only this button opens the body keyboard at the current selection; tapping the body moves the cursor or selects text without opening input. Pressing anywhere in the app outside the OS keyboard, including the body and auxiliary keys, dismisses it. The button hides while the keyboard is open and returns after dismissal. Read-only, loading, partial-preview, and media views do not show it. See [Mobile Editor and Keyboard](../../development/ui-contracts.md#mobile-editor-and-keyboard).
 
 - When the mobile keyboard opens, reduce the editor height to keep the tapped cursor line and the status bar showing the selected character count and file size above the keyboard.
-- The mobile Plain editor displays the shared auxiliary key bar even when the keyboard is closed. It provides Esc, Tab, Ctrl, Shift, arrow keys, and undo and redo for editable files. Horizontal scrolling in the body does not switch tabs; only swiping left or right on the auxiliary key bar selects the previous or next tab. Markdown Plain follows the same rules.
+- The mobile Plain editor displays the shared auxiliary keys even when the keyboard is closed. Esc, Tab, Ctrl, Shift, and undo and redo for editable files appear as individual rounded translucent floating buttons without an enclosing bar surface. The arrow keys sit at the far right in an inverted T, with Up above Left/Down/Right. Layout and focus follow [Mobile auxiliary key bar](../../development/ui-contracts.md#mobile-auxiliary-key-bar). Horizontal scrolling in the body does not switch tabs; only swiping left or right on the auxiliary-key area selects the previous or next tab. Markdown Plain follows the same rules.
 
 ### Boundaries and limitations
 

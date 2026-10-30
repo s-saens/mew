@@ -77,6 +77,10 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
         // A second touch on the same cursor position need not produce a selection transaction.
         await target.click()
         await page.waitForFunction('window.handle.current.getSelectedLineRange().start === 28')
+        if (width < 768) await page.waitForFunction(`(() => {
+          const bar = document.querySelector('[data-mobile-key-bar]');
+          return bar && document.querySelector('[data-editor-status-bar]').getBoundingClientRect().bottom <= bar.getBoundingClientRect().top;
+        })()`)
         const original = await scroller.boundingBox()
         if (width >= 768) {
           await page.evaluate('window.setVisibleViewport(500)')
@@ -102,14 +106,14 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
         await page.keyboard.type('typed')
         assert.ok((await page.evaluate('window.value') as string).includes('typed'))
         await page.evaluate('window.setVisibleViewport(null)')
-        await page.waitForFunction(`document.querySelector('${selector}').getBoundingClientRect().height > 730`)
+        await page.waitForFunction(`Math.abs(document.querySelector('${selector}').getBoundingClientRect().height - ${original!.height}) < 1`)
         await page.getByRole('button', { name: 'Reset', exact: true }).click()
         // Chromium's resizes-content path: both layout and visual viewport shrink.
         await target.click()
         await page.setViewportSize({ width, height: 500 })
         await page.waitForFunction(`document.querySelector('${selector}').getBoundingClientRect().bottom <= 501`)
         await page.setViewportSize({ width, height: 844 })
-        await page.waitForFunction(`document.querySelector('${selector}').getBoundingClientRect().height > 730`)
+        await page.waitForFunction(`Math.abs(document.querySelector('${selector}').getBoundingClientRect().height - ${original!.height}) < 1`)
         await page.locator('body').click({ position: { x: width - 1, y: 2 } })
         const readingScroll = await scroller.evaluate(el => el.scrollTop)
         await page.evaluate('window.setVisibleViewport(500)')
