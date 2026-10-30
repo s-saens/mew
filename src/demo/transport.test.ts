@@ -8,6 +8,7 @@ import { MEWPET_ANIMATIONS, type MewpetSkinCatalog } from '../../shared/mewpet-s
 import { THEME_PRESETS } from '../../shared/theme.ts'
 import { createDemoSocketFactory } from './socket.ts'
 import type { AdminUser } from '../api/client.ts'
+import { defaultCapabilities, type AccessSettings } from '../../shared/access-policy.ts'
 
 function write(method: string, body: unknown): RequestInit { return { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } }
 async function data(store: DemoWorkspaceStore, path: string, init?: RequestInit) {
@@ -243,6 +244,51 @@ test('new demo password accounts can reset passwords in every account role', asy
     assert.equal(user.hasPassword, true)
     assert.equal(user.mustChangePassword, true)
   }
+})
+
+test('demo account feature reset restores role defaults and preserves other accounts and file rules', async t => {
+  const store = new DemoWorkspaceStore()
+  t.after(() => store.close())
+  const users = await data(store, '/api/admin/users') as AdminUser[]
+  const owner = store.authStatus().email!, member = 'member@example.test'
+  for (const [subject, role] of [[member, 'member'], [owner, 'owner'], ['guest', 'guest']] as const) {
+    const otherSubject = subject === member ? owner : member
+    await data(store, '/api/admin/access/feature', write('PUT', { subject, feature: 'filesRead', enabled: false }))
+    await data(store, '/api/admin/access/feature', write('PUT', { subject, feature: 'filesWrite', enabled: false }))
+    await data(store, '/api/admin/access/feature', write('PUT', { subject: otherSubject, feature: 'terminal', enabled: false }))
+    for (const project of ['docs', '.workspace']) await data(store, '/api/admin/access/path', write('PUT', { subject, project, path: '', access: 'deny' }))
+    const before = await data(store, '/api/admin/access') as AccessSettings
+    const rules = store.getState('admin-path-rules', {})
+    const result = await data(store, '/api/admin/access/features/reset', write('POST', { subject })) as AccessSettings
+    const row = result.rows.find(row => row.subject === subject)!
+    assert.deepEqual(row.overrides, {})
+    assert.deepEqual(row.capabilities, defaultCapabilities(role))
+    assert.equal(row.role, role)
+    assert.deepEqual(result.rows.filter(row => row.subject !== subject), before.rows.filter(row => row.subject !== subject))
+    assert.deepEqual(store.getState('admin-path-rules', {}), rules)
+    assert.deepEqual(await data(store, '/api/admin/users'), users)
+    assert.deepEqual(await data(store, '/api/admin/access'), result)
+    assert.deepEqual(await data(store, '/api/admin/access/features/reset', write('POST', { subject })), result)
+  }
+})
+
+test('demo feature reset requires an owner POST and an exact account or guest subject', async t => {
+  const store = new DemoWorkspaceStore()
+  t.after(() => store.close())
+  const subject = 'member@example.test', route = '/api/admin/access/features/reset'
+  await data(store, '/api/admin/access/feature', write('PUT', { subject, feature: 'terminal', enabled: true }))
+  const before = await data(store, '/api/admin/access')
+  assert.equal((await demoFetch(store, route)).status, 405)
+  for (const body of [{}, { subject: null }, { subject: 1 }, { subject: 'missing@example.test' }, { subject: subject.toUpperCase() }, { subject: ` ${subject} ` }]) {
+    assert.equal((await demoFetch(store, route, write('POST', body))).status, 400)
+  }
+  const auth = store.authStatus()
+  for (const role of ['member', 'manager', 'guest'] as const) {
+    store.authStatus = () => ({ ...auth, role })
+    assert.equal((await demoFetch(store, route, write('POST', { subject }))).status, 403)
+  }
+  store.authStatus = () => auth
+  assert.deepEqual(await data(store, '/api/admin/access'), before)
 })
 
 test('the demo pet reuses shipped sprite manifests and fetches only allowlisted public assets', async () => {

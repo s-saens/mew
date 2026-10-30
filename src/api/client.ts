@@ -1216,6 +1216,9 @@ export function fetchAccessSettings(): Promise<AccessSettings> { return mewFetch
 export function saveFeatureAccess(subject: string, feature: Feature, enabled: boolean | null): Promise<AccessSettings> {
   return mewFetch('/api/admin/access/feature', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subject, feature, enabled }) }).then(json<AccessSettings>)
 }
+export function resetFeatureAccess(subject: string): Promise<AccessSettings> {
+  return mewFetch('/api/admin/access/features/reset', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subject }) }).then(json<AccessSettings>)
+}
 export function fetchAccessPath(project: string, path: string): Promise<AccessPathSettings> {
   return mewFetch(`/api/admin/access/path?project=${encodeURIComponent(project)}&path=${encodeURIComponent(path)}`).then(json<AccessPathSettings>)
 }

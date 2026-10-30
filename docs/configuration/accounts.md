@@ -1,6 +1,6 @@
 ---
 title: "Accounts, permissions, and Mewlink identity linking"
-description: "Covers personal profiles, owner management of account roles and feature/file permissions, temporary password resets from account popups, Mewlink identity linking and merging, and the host user management CLI. Links to owning security and implementation contracts."
+description: "Covers personal profiles, owner management of account roles and feature/file permissions, per-account restoration of all feature defaults, temporary password resets from account popups, Mewlink identity linking and merging, and the host user management CLI. Links to owning security and implementation contracts."
 created: 2026-10-22
 updated: 2026-10-31
 상위파일: "MOC.md"
@@ -14,7 +14,7 @@ Covers account actions in the app and user management commands on the host. Foll
 
 - **Log in**: Sign in with the email address and temporary password registered by an administrator, and change your password on your first password login. When accessing through Mewlink, you can also log in with an approved external account. Public signup is not available.
 - **My Account**: Go to Menu → Settings → Account to change your display name, profile image, or password, or to log out. Changing your password invalidates password sessions on other devices. The password form is not shown to external-only users without passwords, and external logout ends the central session.
-- **Account Management (owner)**: Go to Menu → Account Management, choose an email and role to add an account, and send the issued temporary password to that user. The permission tables show accounts and guest as columns, with roles and permission items as rows. Click an account photo or initial for account actions. Checkbox changes are saved immediately, and Reset beside a permission restores the role default.
+- **Account Management (owner)**: Go to Menu → Account Management, choose an email and role to add an account, and send the issued temporary password to that user. The permission tables show accounts and guest as columns, with roles and permission items as rows. Click an account photo or initial for account actions. Checkbox changes are saved immediately. The reset icon below each account photo in **Feature Permissions** restores all of that account's feature permissions to its role defaults. It is disabled when there are no overrides and leaves other accounts, roles, and file/folder rules unchanged.
 - **Remote Access (owner)**: In local mew, click **Header Menu → Mewlink → Remote Access → Register Device**. Mewlink login manages device registration, listing, and deletion, while visitors to a device address log in with a local password or an approved external identity. Approving a request in **Account Management → Mewlink Account Access** immediately registers a member without a password; revoke external login on the same screen. Change roles in Account Management. Registration itself does not grant external access permissions. [Device registration](../../.mew/docs/operations/remote-central.md#5-connect-your-mew) · [Identity linking](../../.mew/docs/development/remote-access.md#approved-mewlink-account-login).
 - **Host Administration**: Use the CLI below to create the initial owner, reissue passwords, or delete accounts. [Security](../operations/security.md#roles) is the canonical source for permissions by role.
 

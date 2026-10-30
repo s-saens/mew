@@ -1,6 +1,6 @@
 import { useId, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Check, Copy, Group, Key, Trash, Xmark } from 'iconoir-react'
+import { Check, Copy, Group, Key, Trash, Undo, Xmark } from 'iconoir-react'
 import { copyText, getFixedPopupLayout, useOverlayDismiss } from '@mew/ui'
 import type { AccessRow } from '../../shared/access-policy'
 import { uiText } from '@mew/ui/i18n-core'
@@ -145,12 +145,19 @@ function AccountIcon({ account, onRoleChange, onDelete, onResetPassword, canRese
   </>
 }
 
-export function AccountColumnHeaders({ accounts, passwordAccounts, onRoleChange, onDelete, onResetPassword, disabled }: { accounts: AccessRow[]; passwordAccounts: string[] } & Omit<AccountControls, 'lastOwner' | 'canResetPassword'>) {
+export function AccountColumnHeaders({ accounts, passwordAccounts, onRoleChange, onDelete, onResetPassword, onResetFeatures, disabled }: {
+  accounts: AccessRow[]
+  passwordAccounts: string[]
+  onResetFeatures?: (subject: string) => void
+} & Omit<AccountControls, 'lastOwner' | 'canResetPassword'>) {
   const { t } = useI18n()
   return <thead><tr>
     <th scope="col" className="sticky left-0 top-0 z-20 w-32 min-w-32 max-w-32 border-b border-r border-edge bg-surface-raised px-3 py-2 text-left text-xs font-medium">{t('access.account')}</th>
     {accounts.map(account => <th key={account.subject} scope="col" className="sticky top-0 z-10 w-16 min-w-16 border-b border-edge bg-surface-raised px-1 py-2">
       <AccountIcon account={account} onRoleChange={onRoleChange} onDelete={onDelete} onResetPassword={onResetPassword} canResetPassword={passwordAccounts.includes(account.subject)} disabled={disabled} lastOwner={account.role === 'owner' && accounts.filter(row => row.role === 'owner').length === 1} />
+      {onResetFeatures && <button type="button" disabled={disabled || Object.keys(account.overrides).length === 0}
+        onClick={() => onResetFeatures(account.subject)} aria-label={`${account.subject} ${t('access.accountFeatureReset')}`} data-tip={t('access.accountFeatureReset')}
+        className="mx-auto mt-1 flex h-7 w-7 items-center justify-center rounded text-ink-secondary hover:bg-surface-hover hover:text-ink disabled:opacity-30 focus-visible:ring-2 focus-visible:ring-accent pointer-coarse:h-11 pointer-coarse:w-11"><Undo width={14} height={14} aria-hidden="true" /></button>}
     </th>)}
   </tr></thead>
 }

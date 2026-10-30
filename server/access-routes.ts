@@ -2,7 +2,7 @@ import express from 'express'
 import fs from 'node:fs'
 import { listUsers, getUser, userProfile } from './auth.ts'
 import { requireRole } from './reqAuth.ts'
-import { capabilitiesFor, featureOverrides, fileAccess, fileRules, policyPath, setFeature, setFileRule, workspaceScope } from './access-policy.ts'
+import { capabilitiesFor, featureOverrides, fileAccess, fileRules, policyPath, resetFeatureOverrides, setFeature, setFileRule, workspaceScope } from './access-policy.ts'
 import { resolveProjectPath } from './paths.ts'
 import { listCatalogChildren } from './fileCatalog.ts'
 import { FEATURES, type Feature } from '../shared/access-policy.ts'
@@ -27,6 +27,14 @@ export function createAccessRouter() {
       res.status(400).json({ error: '계정과 기능 권한을 확인하세요' }); return
     }
     try { setFeature(subject, feature as Feature, enabled); res.json({ rows: rows(), workspace: workspaceScope() }) }
+    catch (error) { res.status(400).json({ error: (error as Error).message }) }
+  })
+  router.post('/features/reset', (req, res) => {
+    const { subject } = req.body ?? {}
+    if (typeof subject !== 'string' || (subject !== 'guest' && !listUsers().some(user => user.email === subject))) {
+      res.status(400).json({ error: '계정을 확인하세요' }); return
+    }
+    try { resetFeatureOverrides(subject); res.json({ rows: rows(), workspace: workspaceScope() }) }
     catch (error) { res.status(400).json({ error: (error as Error).message }) }
   })
   router.get('/path', async (req, res) => {

@@ -79,6 +79,13 @@ export function setFeature(subject: string, feature: Feature, enabled: boolean |
   save(data)
 }
 
+export function resetFeatureOverrides(subject: string): void {
+  const data = structuredClone(load())
+  if (!Object.hasOwn(data.features, subject)) return
+  delete data.features[subject]
+  save(data)
+}
+
 export function removeAccountAccess(subject: string): void {
   if (subject === 'guest') throw new Error('guest 권한은 계정 삭제로 지울 수 없습니다')
   const data = structuredClone(load())

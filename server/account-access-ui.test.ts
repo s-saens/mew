@@ -33,6 +33,8 @@ test('account controls save roles, features and file rules and confirm deletion 
   const rows: AccessRow[] = (['owner', 'manager', 'member', 'guest'] as const).map(role => ({ subject: role === 'guest' ? 'guest' : `${role}@example.test`, displayName: role === 'member' ? 'Member with a long name' : role, role, avatarDataUrl: role === 'member' ? avatar : role === 'manager' ? 'data:image/png;base64,broken' : null, capabilities: defaultCapabilities(role), overrides: {} }))
   const rules = new Map<string, string>()
   let failNext = false
+  let failNextFeaturesReset = true
+  const featuresResetRequests: string[] = []
   let failNextDelete = false
   let failNextReset = true
   let holdNextReset = true
@@ -71,6 +73,16 @@ test('account controls save roles, features and file rules and confirm deletion 
         return json({ ok: true })
       }
       if (url.pathname === '/api/admin/access') return json({ rows, workspace: '/projects/mew' })
+      if (url.pathname === '/api/admin/access/features/reset') {
+        assert.equal(method, 'POST')
+        const { subject } = route.request().postDataJSON() as { subject: string }
+        featuresResetRequests.push(subject)
+        if (failNextFeaturesReset) { failNextFeaturesReset = false; return json({ error: '권한 초기화 테스트 실패' }, 500) }
+        const row = rows.find(row => row.subject === subject)!
+        row.overrides = {}
+        row.capabilities = defaultCapabilities(row.role)
+        return json({ rows, workspace: '/projects/mew' })
+      }
       if (url.pathname === '/api/admin/access/feature') {
         if (failNext) { failNext = false; return json({ error: '권한 저장 테스트 실패' }, 500) }
         const { subject, feature, enabled } = route.request().postDataJSON() as { subject: string; feature: keyof AccessRow['capabilities']; enabled: boolean | null }
@@ -118,7 +130,10 @@ test('account controls save roles, features and file rules and confirm deletion 
     await addAccount.click()
     await page.getByRole('textbox', { name: '이메일', exact: true }).waitFor({ state: 'hidden' })
     const agent = page.getByRole('checkbox', { name: 'member@example.test 에이전트 창', exact: true })
+    const resetFeatures = page.getByRole('columnheader').getByRole('button', { name: 'member@example.test 모든 기능 권한을 역할 기본값으로 되돌리기', exact: true })
     await agent.waitFor()
+    assert.equal(await resetFeatures.isDisabled(), true, 'accounts at defaults cannot reset')
+    assert.equal(await page.getByRole('columnheader').getByRole('button', { name: /모든 기능 권한을 역할 기본값으로 되돌리기$/ }).count(), rows.length, 'one reset control belongs to each account header')
     await assertAvatarFallbacks()
     assert.equal(await page.getByRole('columnheader').count(), rows.length + 1)
     assert.equal(await page.getByRole('row').filter({ has: page.getByRole('rowheader', { name: '에이전트 창', exact: true }) }).getByRole('checkbox').count(), rows.length)
@@ -149,13 +164,30 @@ test('account controls save roles, features and file rules and confirm deletion 
     await agent.click()
     await page.getByRole('status').getByText('저장됨').waitFor()
     assert.equal(rows[2].capabilities.agent, true)
+    assert.equal(await resetFeatures.isEnabled(), true)
     assert.equal(await page.getByRole('checkbox', { name: 'member@example.test 터미널', exact: true }).isChecked(), false)
     failNext = true
     await agent.click()
     await page.getByRole('alert').getByText('권한 저장 테스트 실패').waitFor()
     assert.equal(await agent.isChecked(), true)
-    await page.getByRole('button', { name: 'member@example.test 에이전트 창 역할 기본값으로 되돌리기' }).click()
+    const terminal = page.getByRole('checkbox', { name: 'member@example.test 터미널', exact: true })
+    await terminal.click()
+    await page.getByRole('status').getByText('저장됨').waitFor()
+    assert.equal(await page.getByRole('row').filter({ has: agent }).getByRole('button').count(), 0, 'feature checkboxes no longer have individual reset buttons')
+    const featureHeader = resetFeatures.locator('..')
+    const photoBox = await featureHeader.getByRole('button', { name: 'Member with a long name (member@example.test)', exact: true }).boundingBox()
+    const resetBox = await resetFeatures.boundingBox()
+    assert.ok(photoBox && resetBox && resetBox.y >= photoBox.y + photoBox.height, 'reset sits beneath the account photo in the header')
+    await resetFeatures.click()
+    await page.getByRole('alert').getByText('권한 초기화 테스트 실패', { exact: true }).waitFor()
+    assert.equal(await agent.isChecked(), true, 'failed reset retains all overrides')
+    assert.equal(await terminal.isChecked(), true)
+    assert.equal(await resetFeatures.isEnabled(), true, 'failed reset can be retried')
+    await resetFeatures.click()
     await page.waitForFunction("!document.querySelector('input[aria-label=\"member@example.test 에이전트 창\"]').checked")
+    assert.equal(await terminal.isChecked(), false, 'one reset restores every feature default for the account')
+    assert.equal(await resetFeatures.isDisabled(), true)
+    assert.deepEqual(featuresResetRequests, ['member@example.test', 'member@example.test'])
     const memberRole = page.getByRole('combobox', { name: /^member@example\.test 역할:/ })
     assert.equal(await memberRole.innerText(), '')
     assert.equal(await memberRole.locator('svg').count(), 1)
@@ -198,6 +230,8 @@ test('account controls save roles, features and file rules and confirm deletion 
       await addAccount.click()
       const accountWidths = await page.getByRole('columnheader').evaluateAll(headers => headers.slice(1).map(el => el.getBoundingClientRect().width))
       assert.ok(accountWidths.every(width => width <= 65), JSON.stringify(accountWidths))
+      assert.equal(await resetFeatures.isVisible(), true)
+      assert.equal(await resetFeatures.isDisabled(), true)
       await memberRole.click()
       const roleMenu = page.getByRole('listbox', { name: 'member@example.test 역할: member', exact: true })
       for (const role of ['member', 'manager', 'owner']) {
@@ -288,6 +322,7 @@ test('account controls save roles, features and file rules and confirm deletion 
         page.getByRole('button', { name: 'readme.md', exact: true }).click(),
       ])
       await page.getByRole('rowheader', { name: '설정', exact: true }).waitFor()
+      assert.equal(await page.getByRole('columnheader').getByRole('button', { name: /모든 기능 권한을 역할 기본값으로 되돌리기$/ }).count(), 0, 'file ACL headers do not reset feature permissions')
       await assertAvatarFallbacks()
       const fileMemberIcon = page.getByRole('columnheader').getByRole('button', { name: 'Member with a long name (member@example.test)', exact: true })
       await fileMemberIcon.click()

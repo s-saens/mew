@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { SelectField, TabScrollArea } from '@mew/ui'
-import { Undo } from 'iconoir-react'
 import { FEATURES, GUEST_FEATURES, type AccessSettings, type Feature } from '../../shared/access-policy'
-import { fetchAccessSettings, fetchAccessPath, saveFeatureAccess, saveFileAccess, type AccessPathSettings, type AdminUser, type Role } from '../api/client'
+import { fetchAccessSettings, fetchAccessPath, resetFeatureAccess, saveFeatureAccess, saveFileAccess, type AccessPathSettings, type AdminUser, type Role } from '../api/client'
 import { uiText } from '@mew/ui/i18n-core'
 import { useI18n } from '../i18n'
 import { AccountColumnHeaders } from './account-column-headers'
@@ -72,7 +71,8 @@ export function AccountAccessMatrix({ users, currentEmail, disabled, onRoleChang
     {!settings ? <p role="status" className="py-5 text-sm text-ink-secondary">{t('common.loading')}</p> : tab === 'features' ? <>
       <div className="min-h-24 overflow-auto rounded-lg border border-edge" role="tabpanel">
         <table className="w-max border-separate border-spacing-0 text-sm">
-          <AccountColumnHeaders accounts={settings.rows} passwordAccounts={passwordAccounts} onRoleChange={changeRole} onDelete={deleteAccount} onResetPassword={onResetPassword} disabled={busy || disabled} />
+          <AccountColumnHeaders accounts={settings.rows} passwordAccounts={passwordAccounts} onRoleChange={changeRole} onDelete={deleteAccount} onResetPassword={onResetPassword}
+            onResetFeatures={subject => void mutate(async () => { setSettings(await resetFeatureAccess(subject)) })} disabled={busy || disabled} />
           <tbody>
             <tr>
               <th scope="row" className="sticky left-0 z-10 border-b border-r border-edge bg-surface px-3 py-1 text-left text-xs font-medium">{t('access.role')}</th>
@@ -87,9 +87,8 @@ export function AccountAccessMatrix({ users, currentEmail, disabled, onRoleChang
               {settings.rows.map(row => {
               const locked = row.subject === 'guest' && !GUEST_FEATURES.includes(feature)
               return <td key={row.subject} className="border-b border-edge px-1 text-center">
-                <div className={`relative flex items-center ${row.overrides[feature] !== undefined ? 'justify-start' : 'justify-center'}`}>
+                <div className="flex items-center justify-center">
                   <label className="flex h-8 w-8 items-center justify-center" data-tip={locked ? t('access.guestHint') : t(`access.${feature}`)}><input type="checkbox" aria-label={`${row.subject} ${t(`access.${feature}`)}`} checked={row.capabilities[feature]} disabled={busy || disabled || locked} onChange={event => toggle(row.subject, feature, event.target.checked)} className="h-4 w-4 accent-accent disabled:opacity-30" /></label>
-                  {row.overrides[feature] !== undefined && <button type="button" disabled={busy || disabled} onClick={() => toggle(row.subject, feature, null)} aria-label={`${row.subject} ${t(`access.${feature}`)} ${t('access.featureReset')}`} data-tip={t('access.featureReset')} className="absolute right-0 flex h-7 w-7 items-center justify-center rounded text-ink-secondary hover:bg-surface-raised hover:text-ink focus-visible:ring-2 focus-visible:ring-accent"><Undo width={14} height={14} aria-hidden="true" /></button>}
                 </div>
               </td>
             })}</tr>)}

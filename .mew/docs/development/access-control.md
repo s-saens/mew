@@ -2,7 +2,7 @@
 title: "Per-account feature and file permissions"
 created: "2026-09-16"
 updated: "2026-10-31"
-description: "Defines project access for owner and manager, per-account feature and file permissions, owner-issued password reset boundaries and browser-token revocation, blocking of actual server data paths, WebSocket Origin validation and real-time revocation, raw-content isolation, guest editing, and isolated public file/folder capabilities. Also covers Git credential cleanup and permission boundaries for Mewlink, debuggers, MCP, and global skins."
+description: "Defines project and per-account feature/file access, atomic feature-default reset per account, owner-issued password reset and browser-token revocation, server data path blocking, WebSocket Origin validation and live revocation, raw-content isolation, guest editing, and public capabilities. Also covers Git cleanup and Mewlink, debugger, MCP, and global skin boundaries."
 상위파일: "MOC.md"
 ---
 
@@ -25,6 +25,8 @@ The owner's **Account Management → Feature Permissions** displays accounts as 
 owner and manager can use all features by default. Both roles can also list, add, and switch projects, change icons, create folders and perform Git operations in the selection dialog, and switch subprojects and worktrees. Lists and active roots are saved per account, and these APIs are unavailable to member and guest. Account management, Documents settings/import/export, and the existing `/project` create, rename, and delete APIs are owner-only. This follows [decision 0070](../decisions/0070-manager-project-access.md). member can use file viewing and editing, databases, collaborative editing and comments, and chat. Only file viewing and editing can be configured for guest; all other features are limited to logged-in accounts. All are blocked while a temporary password remains unchanged. Terminal-based agents require both agent and terminal features.
 
 Under **File and Folder Permissions**, select the workspace or Documents and browse or enter a relative path. Each account's rules are inherit, block, view, or edit, with the effective result displayed alongside them. The feature-level file viewing and editing toggles set the upper limit. The most specific file/folder rule takes precedence, and editing includes viewing. Without a rule, logged-in accounts are allowed and guest is blocked. The file explorer manages public capability links separately; it does not edit account or guest path rules.
+
+Feature default restoration uses one icon in each account's sticky feature-table header, enabled when any explicit override exists. `POST /api/admin/access/features/reset` accepts `{ subject }` for an exact existing account ID or `guest` and requires owner access. `resetFeatureOverrides` removes that subject's feature entry in one atomic policy save and emits one change event; a subject with no entry is a successful no-op. The response is the full current access settings. Roles, profiles, other subjects, and file rules across every workspace are preserved. The UI keeps the previous matrix on failure and permits retry. File-permission headers do not expose this action. See [decision 0101](../decisions/0101-account-feature-reset.md) and the [verification record](../work/account-feature-reset.md).
 
 ## Owner-issued password resets
 

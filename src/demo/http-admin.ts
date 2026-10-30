@@ -1,4 +1,4 @@
-import { defaultCapabilities, FEATURES, type AccessSettings, type FileRule } from '../../shared/access-policy.ts'
+import { defaultCapabilities, FEATURES, GUEST_FEATURES, type AccessSettings, type FileRule } from '../../shared/access-policy.ts'
 import type { MewlinkAccessOverview } from '../../shared/mewlink-identity.ts'
 import type { AdminUser } from '../api/client.ts'
 import type { TreeNode } from '../../packages/editor/src/types.ts'
@@ -20,6 +20,9 @@ export const handleDemoAdmin: DemoHttpHandler = ({ store, request, url, body, pr
     const overrides = store.getState<AccessSettings['rows'][number]['overrides']>(`admin-features:${user.email}`, {})
     return { subject: user.email, role: user.role, displayName: user.displayName ?? user.email, avatarDataUrl: user.email === store.authStatus().email ? store.authStatus().avatarDataUrl : null, capabilities: { ...defaultCapabilities(user.role), ...overrides }, overrides }
   }) }
+  const guestOverrides = store.getState<AccessSettings['rows'][number]['overrides']>('admin-features:guest', {})
+  settings.rows.push({ subject: 'guest', role: 'guest', displayName: 'guest', avatarDataUrl: null, overrides: guestOverrides,
+    capabilities: { ...defaultCapabilities('guest'), ...guestOverrides } })
   if (route === '/api/admin/users') {
     requireMethod(request, 'GET', 'POST')
     if (method === 'GET') return demoJson(users)
@@ -68,10 +71,21 @@ export const handleDemoAdmin: DemoHttpHandler = ({ store, request, url, body, pr
     return demoJson({ ok: true })
   }
   if (route === '/api/admin/access') { requireMethod(request, 'GET'); return demoJson(settings) }
+  if (route === '/api/admin/access/features/reset') {
+    if (store.authStatus().role !== 'owner') throw new DemoError('owner만 기능 권한을 초기화할 수 있습니다.', 403)
+    requireMethod(request, 'POST')
+    const row = settings.rows.find(row => row.subject === stringField(body, 'subject'))
+    if (!row) throw new DemoError('계정을 확인해 주세요.')
+    row.overrides = {}
+    row.capabilities = defaultCapabilities(row.role)
+    store.setState(`admin-features:${row.subject}`, {})
+    return demoJson(settings)
+  }
   if (route === '/api/admin/access/feature') {
     requireMethod(request, 'PUT')
     const row = settings.rows.find(row => row.subject === stringField(body, 'subject')), feature = FEATURES.find(feature => feature === body.feature)
     if (!row || !feature || body.enabled !== null && typeof body.enabled !== 'boolean') throw new DemoError('기능 권한을 확인해 주세요.')
+    if (row.subject === 'guest' && !GUEST_FEATURES.includes(feature)) throw new DemoError('이 기능은 로그인 계정만 사용할 수 있습니다.')
     if (body.enabled === null) delete row.overrides[feature]; else row.overrides[feature] = body.enabled as boolean
     row.capabilities = { ...defaultCapabilities(row.role), ...row.overrides }
     store.setState(`admin-features:${row.subject}`, row.overrides); return demoJson(settings)
