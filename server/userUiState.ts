@@ -41,7 +41,7 @@ type UserUiState = {
 
 export function readAccountTheme(email: string): ThemeSettings | null {
   const saved = userState(readAll(), email).theme
-  return saved ? parseThemeSettings(saved) : null
+  return saved ? parseThemeSettings(saved, { persisted: true }) : null
 }
 
 /** Initial browser migration must never overwrite a theme saved by another device. */
@@ -49,7 +49,7 @@ export function writeAccountTheme(email: string, input: unknown, initialize = fa
   if (JSON.stringify(input)?.length > 64 * 1024) throw new ThemeSettingsError('Theme settings are too large')
   const value = parseThemeSettings(input)
   const all = readAll(), key = normalizeEmail(email), previous = userState(all, key)
-  if (initialize && previous.theme) return parseThemeSettings(previous.theme)
+  if (initialize && previous.theme) return parseThemeSettings(previous.theme, { persisted: true })
   all[key] = { ...previous, theme: value }
   writeAll(all)
   return value

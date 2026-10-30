@@ -135,6 +135,20 @@ test('active and multiple custom themes round-trip together without derived toke
   assert.deepEqual(normalizeThemeSettings({ palette: DEFAULT_THEME_PALETTE, custom: [other, other] }).custom, [other])
 })
 
+test('file icon pack choices survive saving and old or unknown preferences use Material', () => {
+  const values = new Map<string, string>()
+  const storage = { getItem: (key: string) => values.get(key) ?? null, setItem: (key: string, value: string) => { values.set(key, value) } }
+  for (const iconPack of ['material', 'catppuccin', 'none'] as const) {
+    const settings = { palette: DEFAULT_THEME_PALETTE, custom: [], iconPack }
+    assert.deepEqual(saveThemeSettings(settings, storage), settings)
+    assert.deepEqual(loadThemeSettings(storage), settings)
+  }
+  values.set(THEME_SETTINGS_KEY, JSON.stringify({ palette: DEFAULT_THEME_PALETTE, custom: [], iconPack: 'retired-pack' }))
+  assert.deepEqual(loadThemeSettings(storage), { palette: DEFAULT_THEME_PALETTE, custom: [], iconPack: 'material' })
+  values.set(THEME_SETTINGS_KEY, JSON.stringify({ palette: DEFAULT_THEME_PALETTE, custom: [] }))
+  assert.deepEqual(loadThemeSettings(storage), { palette: DEFAULT_THEME_PALETTE, custom: [] })
+})
+
 test('all preset palettes use the selected three colors and readable links and solid button labels', () => {
   for (const { id, palette } of THEME_PRESETS) {
     const colors = deriveThemePalette(palette)

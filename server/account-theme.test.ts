@@ -13,7 +13,7 @@ import { attachAuthContext, resolveAuth } from './reqAuth.ts'
 import { createSession, destroySession, upsertUser } from './auth.ts'
 import { attachPresenceWebSocket, broadcast } from './presence.ts'
 import { readAccountTheme, writeAccountTheme } from './userUiState.ts'
-import { DATA_DIR, readJsonRecord } from './dataDir.ts'
+import { DATA_DIR, readJsonRecord, writeFileAtomic } from './dataDir.ts'
 import { THEME_PRESETS, type ThemeSettings } from '../shared/theme.ts'
 
 const theme = (index: number): ThemeSettings => ({ palette: THEME_PRESETS[index].palette, custom: [] })
@@ -52,10 +52,10 @@ test('account themes persist and synchronize across authenticated devices', { ti
       assert.deepEqual(await (await request(tokens[0])).json(), { state: null })
       const clients = await Promise.all([connect(tokens[0]), connect(tokens[1]), connect(tokens[2]), connect()])
       clients.forEach(client => { client.messages.length = 0 })
-      const saved = { palette: { background: '#ABCDEF', text: '#123456', primary: '#654321', gradient: { colors: ['#ABCDEF', '#FEDCBA'], angle: 450, animated: true } }, custom: [] }
+      const saved = { palette: { background: '#ABCDEF', text: '#123456', primary: '#654321', gradient: { colors: ['#ABCDEF', '#FEDCBA'], angle: 450, animated: true } }, custom: [], iconPack: 'catppuccin' }
       const result = await request(tokens[1], { state: saved, email: otherEmail })
       assert.equal(result.status, 200)
-      const expected = { palette: { ...saved.palette, background: '#abcdef', gradient: { colors: ['#abcdef', '#fedcba'], angle: 90, animated: true } }, custom: [] as unknown[] }
+      const expected = { palette: { ...saved.palette, background: '#abcdef', gradient: { colors: ['#abcdef', '#fedcba'], angle: 90, animated: true } }, custom: [] as unknown[], iconPack: 'catppuccin' }
       expected.custom = [expected.palette]
       assert.deepEqual(await result.json(), { state: expected })
       assert.deepEqual(await (await request(tokens[0])).json(), { state: expected })
@@ -74,9 +74,34 @@ test('account themes persist and synchronize across authenticated devices', { ti
       clients.forEach(client => client.ws.terminate())
     })
 
+    await t.test('curated icon pack API validates selections and tolerates retired persisted packs', async () => {
+      const other = { ...theme(4), iconPack: 'none' as const }
+      writeAccountTheme(otherEmail, other)
+      for (const iconPack of ['material', 'catppuccin', 'none'] as const) {
+        const selected = { ...theme(3), iconPack }
+        const response = await request(tokens[0], { state: selected })
+        assert.equal(response.status, 200)
+        assert.deepEqual(await response.json(), { state: selected })
+        assert.deepEqual(readAccountTheme(email), selected)
+        assert.deepEqual(readAccountTheme(otherEmail), other)
+      }
+      for (const iconPack of ['unreviewed-pack', 'https://example.invalid/icons', null, 17, {}]) {
+        assert.equal((await request(tokens[0], { state: { ...theme(3), iconPack } })).status, 400)
+        assert.deepEqual(readAccountTheme(email), { ...theme(3), iconPack: 'none' })
+      }
+      const file = `${DATA_DIR}/user-ui-state.json`
+      const persisted = readJsonRecord<{ theme: Omit<ThemeSettings, 'iconPack'> & { iconPack?: string } }>(file)!
+      persisted[email].theme.iconPack = 'retired-pack'
+      writeFileAtomic(file, JSON.stringify(persisted))
+      const restored = { ...theme(3), iconPack: 'material' }
+      assert.deepEqual(await (await request(tokens[0])).json(), { state: restored })
+      assert.deepEqual(await (await request(tokens[0], { state: { ...theme(0), iconPack: 'catppuccin' }, initialize: true })).json(), { state: restored })
+      assert.deepEqual(readAccountTheme(otherEmail), other)
+    })
+
     await t.test('two independent browsers share choices and custom themes, recover missed signals and isolate accounts', { skip: !domBrowserExecutable() }, async () => {
       writeAccountTheme(email, theme(0))
-      writeAccountTheme(otherEmail, theme(4))
+      writeAccountTheme(otherEmail, { ...theme(4), iconPack: 'none' })
       const root = new URL('../', import.meta.url).pathname
       const source = `import React from '${root}node_modules/react/index.js';
 import {createRoot} from '${root}node_modules/react-dom/client.js';
@@ -87,9 +112,10 @@ const account=new URL(location.href).searchParams.get('account');
 if(new URL(location.href).searchParams.has('blocked'))Object.defineProperty(window,'localStorage',{get(){throw new Error('storage disabled')}});
 function Fixture(){const [settings,change]=useAccountTheme(account,error=>{window.fixtureError=String(error)});
 const presence=usePresence('.workspace',null,account,()=>{});
-return <><output id="settings" data-background={settings.palette.background}>{JSON.stringify(settings)}</output><output id="connected">{String(!!presence.activeSessions)}</output>
+return <><output id="settings" data-background={settings.palette.background} data-icon-pack={settings.iconPack??'material'}>{JSON.stringify(settings)}</output><output id="connected">{String(!!presence.activeSessions)}</output>
 {THEME_PRESETS.map(p=><button key={p.id} onClick={()=>change({...settings,palette:p.palette})}>{p.id}</button>)}
-<button onClick={()=>change({palette:{background:'#182532',text:'#f1f2f3',primary:'#cc7744',gradient:{colors:['#234567','#432156'],angle:45,animated:false}},custom:[]})}>custom</button></>}
+{['material','catppuccin','none'].map(iconPack=><button key={iconPack} onClick={()=>change({...settings,iconPack})}>icons-{iconPack}</button>)}
+<button onClick={()=>change({...settings,palette:{background:'#182532',text:'#f1f2f3',primary:'#cc7744',gradient:{colors:['#234567','#432156'],angle:45,animated:false}},custom:[]})}>custom</button></>}
 createRoot(document.getElementById('root')).render(<Fixture/>);`
       const bundle = await build({ input: 'virtual:account-theme.tsx', write: false, platform: 'browser', output: { format: 'iife' }, transform: { jsx: 'react-jsx', define: { 'process.env.NODE_ENV': JSON.stringify('test') } }, plugins: [{ name: 'fixture', resolveId(id) { if (id === 'virtual:account-theme.tsx') return id }, load(id) { if (id === 'virtual:account-theme.tsx') return source } }] })
       const chunk = bundle.output.find(item => item.type === 'chunk'); assert.ok(chunk); fixture = chunk.code
@@ -107,18 +133,26 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
         const [a, b, other] = pages
         await Promise.all(pages.map((page, index) => page.goto(`${origin}/fixture?account=${encodeURIComponent(index === 2 ? otherEmail : email)}${index === 2 ? '&blocked=1' : ''}`)))
         const waitPalette = (page: typeof a, color: string) => page.locator(`#settings[data-background="${color}"]`).waitFor()
+        const waitIcons = (page: typeof a, iconPack: string) => page.locator(`#settings[data-icon-pack="${iconPack}"]`).waitFor()
         await Promise.all([waitPalette(a, theme(0).palette.background), waitPalette(b, theme(0).palette.background), waitPalette(other, theme(4).palette.background)])
         await a.getByText('true', { exact: true }).waitFor()
+        await Promise.all([waitIcons(a, 'material'), waitIcons(b, 'material'), waitIcons(other, 'none')])
+        await b.getByRole('button', { name: 'icons-catppuccin', exact: true }).click()
+        await Promise.all([waitIcons(a, 'catppuccin'), waitIcons(b, 'catppuccin')])
+        assert.equal(readAccountTheme(email)?.iconPack, 'catppuccin')
         await b.getByRole('button', { name: 'ocean', exact: true }).click()
         await Promise.all([waitPalette(a, theme(6).palette.background), waitPalette(b, theme(6).palette.background)])
         assert.equal(readAccountTheme(email)?.palette.background, theme(6).palette.background)
+        assert.equal(readAccountTheme(email)?.iconPack, 'catppuccin')
         await b.getByRole('button', { name: 'custom', exact: true }).click()
         await waitPalette(a, '#182532')
         const custom = JSON.parse((await a.locator('#settings').textContent())!) as ThemeSettings
         assert.equal(custom.custom.length, 1)
         assert.equal(custom.palette.gradient?.animated, false)
+        assert.equal(custom.iconPack, 'catppuccin')
         assert.deepEqual(custom, readAccountTheme(email))
         await a.reload(); await waitPalette(a, '#182532')
+        await waitIcons(a, 'catppuccin')
         assert.equal(readAccountTheme(otherEmail)?.palette.background, theme(4).palette.background)
         await contexts[0].setOffline(true)
         await b.getByRole('button', { name: 'forest', exact: true }).click()
@@ -126,15 +160,17 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
         await contexts[0].setOffline(false)
         await waitPalette(a, theme(3).palette.background)
         // A background/bfcache return also reconciles a persisted change with no broadcast.
-        writeAccountTheme(email, theme(5))
+        writeAccountTheme(email, { ...theme(5), iconPack: 'none' })
         await a.locator('#settings').evaluate(el => el.ownerDocument.dispatchEvent(new Event('visibilitychange')))
         await waitPalette(a, theme(5).palette.background)
+        await waitIcons(a, 'none')
         writeAccountTheme(email, theme(1))
         await a.locator('#settings').evaluate(el => { const view = el.ownerDocument.defaultView!; view.dispatchEvent(new view.PageTransitionEvent('pageshow', { persisted: true })) })
         await waitPalette(a, theme(1).palette.background)
         await contexts[0].addCookies([{ name: 'mew_session', value: tokens[2], url: origin }])
         await a.goto(`${origin}/fixture?account=${encodeURIComponent(otherEmail)}`)
         await waitPalette(a, theme(4).palette.background)
+        await waitIcons(a, 'none')
         assert.deepEqual(errors, [])
         assert.equal(await a.evaluate('window.fixtureError'), undefined)
         assert.equal(await b.evaluate('window.fixtureError'), undefined)

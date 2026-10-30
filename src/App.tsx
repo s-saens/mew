@@ -99,6 +99,7 @@ import { useWorkspacePanelDismissals } from './hooks/use-panel-dismissals'
 import { useI18n } from './i18n'
 import { applyFontPreferences, loadFontPreferences, normalizeFontPreferences, saveFontPreferences } from './utils/fontPreferences'
 import { useAccountTheme } from './hooks/use-account-theme'
+import { IconPackProvider } from './components/icon-pack-context'
 import { loadMewcatSkin, saveMewcatSkin, loadMewcatHideDesktop, MEWCAT_HIDE_DESKTOP_KEY, type MewcatSkinSelection } from './utils/mewcatSkin'
 import { externalTabPath, isExternalTabPath } from './utils/externalFiles'
 import { loadSidebarState, saveSidebarState } from './utils/sidebarState'
@@ -2089,6 +2090,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
   })
 
   return (
+    <IconPackProvider value={themeSettings.iconPack}>
     <div className="mew-workspace flex flex-col overflow-hidden bg-surface text-ink" data-mobile-keyboard={mobileKeyboardOpen || undefined} style={{ height: 'var(--app-height, 100dvh)' }}>
       {/* 프로젝트 선택기와 도구 버튼은 전체 너비 헤더에, 문서 탭은 각 편집 칸에 둔다. */}
       <div className="flex flex-col">
@@ -2493,6 +2495,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
       {toast}
       {(switchingRootProject || refreshing || refreshingWorkspace || refreshingTabs) && <ProjectLoadingOverlay />}
     </div>
+    </IconPackProvider>
   )
 }
 

@@ -97,7 +97,7 @@ export function loadThemeSettings(storage: Pick<Storage, 'getItem'> = globalBrow
         const preset = THEME_PRESETS.find(preset => preset.palette.gradient && sameThemePalette(palette, { background: preset.palette.background, text: preset.palette.text, primary: preset.palette.primary }))
         if (preset) active = preset.palette
       }
-      return normalizeThemeSettings({ palette: active, custom })
+      return normalizeThemeSettings({ palette: active, custom, ...(saved.iconPack !== undefined ? { iconPack: saved.iconPack } : {}) })
     }
   } catch { /* Invalid saved palettes fall back to the previous appearance. */ }
   let mode: ThemeMode = 'dark'

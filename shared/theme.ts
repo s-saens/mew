@@ -1,3 +1,5 @@
+import { normalizeIconPack, type IconPackId } from './icon-packs.ts'
+
 export interface ThemePalette {
   background: string
   text: string
@@ -14,6 +16,7 @@ export interface ThemeGradient {
 export interface ThemeSettings {
   palette: ThemePalette
   custom: ThemePalette[]
+  iconPack?: IconPackId
 }
 
 export const THEME_PRESETS = [
@@ -69,14 +72,15 @@ export function uniqueCustomThemes(value: unknown): ThemePalette[] {
 
 export function normalizeThemeSettings(value: ThemeSettings): ThemeSettings {
   const palette = normalizePalette(value.palette) ?? DEFAULT_THEME_PALETTE
-  return { palette, custom: uniqueCustomThemes([...value.custom, palette]) }
+  return { palette, custom: uniqueCustomThemes([...value.custom, palette]), ...(value.iconPack !== undefined ? { iconPack: normalizeIconPack(value.iconPack) } : {}) }
 }
 
 export class ThemeSettingsError extends Error {}
 
-export function parseThemeSettings(input: unknown): ThemeSettings {
+export function parseThemeSettings(input: unknown, options: { persisted?: boolean } = {}): ThemeSettings {
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw new ThemeSettingsError('Invalid theme settings')
   const value = input as ThemeSettings
   if (!normalizePalette(value.palette) || !Array.isArray(value.custom)) throw new ThemeSettingsError('Invalid theme settings')
+  if (!options.persisted && value.iconPack !== undefined && value.iconPack !== normalizeIconPack(value.iconPack)) throw new ThemeSettingsError('Invalid icon pack')
   return normalizeThemeSettings(value)
 }

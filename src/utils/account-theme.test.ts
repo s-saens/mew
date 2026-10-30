@@ -1,7 +1,8 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createAccountThemeSync, loadAccountThemeCache, saveAccountThemeCache } from './account-theme.ts'
-import { DEFAULT_THEME_PALETTE, THEME_PRESETS, type ThemeSettings } from '../../shared/theme.ts'
+import { DEFAULT_THEME_PALETTE, THEME_PRESETS, normalizeThemeSettings, parseThemeSettings, ThemeSettingsError, type ThemeSettings } from '../../shared/theme.ts'
+import { DEFAULT_ICON_PACK, normalizeIconPack, type IconPackId } from '../../shared/icon-packs.ts'
 
 const theme = (index: number): ThemeSettings => ({ palette: THEME_PRESETS[index].palette, custom: [] })
 const tick = () => new Promise(resolve => setTimeout(resolve, 0))
@@ -14,6 +15,61 @@ function memoryStorage() {
   const values = new Map<string, string>()
   return { getItem: (key: string) => values.get(key) ?? null, setItem: (key: string, value: string) => { values.set(key, value) } }
 }
+
+test('curated icon packs normalize old preferences and reject unsupported API selections', () => {
+  assert.equal(DEFAULT_ICON_PACK, 'material')
+  assert.deepEqual(normalizeThemeSettings(theme(0)), theme(0), 'existing settings retain their serialized shape')
+  for (const iconPack of ['material', 'catppuccin', 'none'] as const) {
+    const value = { ...theme(0), iconPack }
+    assert.equal(normalizeIconPack(iconPack), iconPack)
+    assert.deepEqual(normalizeThemeSettings(value), value)
+    assert.deepEqual(parseThemeSettings(value), value)
+  }
+  for (const iconPack of ['missing-pack', 'https://example.invalid/icons', '', null, 17, {}, []]) {
+    const value = { ...theme(0), iconPack }
+    assert.equal(normalizeIconPack(iconPack), 'material')
+    assert.deepEqual(normalizeThemeSettings(value as ThemeSettings), { ...theme(0), iconPack: 'material' })
+    assert.deepEqual(parseThemeSettings(value, { persisted: true }), { ...theme(0), iconPack: 'material' })
+    assert.throws(() => parseThemeSettings(value), ThemeSettingsError)
+  }
+})
+
+test('icon pack cache migrates browser preferences, preserves account choices and recovers retired packs', () => {
+  const legacy = memoryStorage(), storage = memoryStorage()
+  const imported: ThemeSettings = { ...theme(1), iconPack: 'catppuccin' }
+  legacy.setItem('mew:themes', JSON.stringify(imported))
+  assert.deepEqual(loadAccountThemeCache('a', storage, legacy), imported)
+  saveAccountThemeCache('a', imported, storage, legacy)
+  saveAccountThemeCache('b', { ...theme(3), iconPack: 'none' }, storage, legacy)
+  assert.deepEqual(loadAccountThemeCache('a', storage, legacy), imported)
+  assert.deepEqual(loadAccountThemeCache('b', storage, legacy), { ...theme(3), iconPack: 'none' })
+  storage.setItem('mew:themes:"a"', JSON.stringify({ ...theme(1), iconPack: 'retired-pack' }))
+  assert.deepEqual(loadAccountThemeCache('a', storage, legacy), { ...theme(1), iconPack: 'material' })
+})
+
+test('icon pack first-device migration and later changes synchronize across devices', async () => {
+  let remote: ThemeSettings | null = null
+  let first: ThemeSettings = { ...theme(1), iconPack: 'catppuccin' }, second = theme(0)
+  const writes: { iconPack: IconPackId | undefined; initialize: boolean }[] = []
+  const write = async (value: ThemeSettings, initialize: boolean) => {
+    writes.push({ iconPack: value.iconPack, initialize })
+    if (!initialize || remote === null) remote = value
+    return remote
+  }
+  const a = createAccountThemeSync(first, { read: async () => remote, write, apply: value => { first = value }, onError: assert.fail })
+  const b = createAccountThemeSync(second, { read: async () => remote, write, apply: value => { second = value }, onError: assert.fail })
+  try {
+    a.refresh(); await tick()
+    b.refresh(); await tick()
+    assert.deepEqual(second, first)
+    assert.deepEqual(writes, [{ iconPack: 'catppuccin', initialize: true }])
+    b.change({ ...second, iconPack: 'none' }); await tick()
+    a.refresh(); await tick()
+    assert.deepEqual(first, { ...theme(1), iconPack: 'none' })
+    assert.deepEqual(second, first)
+    assert.deepEqual(writes, [{ iconPack: 'catppuccin', initialize: true }, { iconPack: 'none', initialize: false }])
+  } finally { a.dispose(); b.dispose() }
+})
 
 test('legacy theme is claimed once, caches stay separate by account and remote instance', () => {
   const legacy = memoryStorage(), firstInstance = memoryStorage(), secondInstance = memoryStorage()

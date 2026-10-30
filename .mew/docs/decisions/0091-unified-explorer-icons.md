@@ -1,10 +1,12 @@
 ---
 title: "Unified explorer file and folder artwork"
-description: "Extends Material Icon Theme to ordinary folder rows and synchronous generic file and folder artwork, superseding ADR 0089's preservation of old folder icons."
+description: "Extends Material Icon Theme to ordinary folder rows and synchronous generic artwork, superseding ADR 0089's old folder icons. ADR 0092 retains this consistency while adding account-selected Material/Catppuccin/basic icons."
 created: "2026-10-30"
 updated: "2026-10-30"
 status: accepted
 ---
+
+[ADR 0092](0092-curated-icon-packs.md) extends the single-pack choice below with account-selected Material/Catppuccin/basic icons while retaining consistent generic files and folder states.
 
 ## Context
 

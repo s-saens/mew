@@ -1,12 +1,12 @@
 ---
 title: "File-type icons from Material Icon Theme"
-description: "Chooses Material Icon Theme 5.40.0 under MIT for explorer file icons, generated filename and extension mappings, theme variants, and locally bundled SVG artwork. ADR 0091 supersedes preservation of the old ordinary folder icons and defines matching synchronous defaults."
+description: "Chooses Material Icon Theme 5.40.0 for generated file mappings, variants, and local SVGs. ADR 0091 replaces the old folder icons; ADR 0092 extends the fixed pack choice with account-selected packs and supplemental source notices."
 created: "2026-10-30"
 updated: "2026-10-30"
 status: accepted
 ---
 
-The ordinary-folder preservation clause below is superseded by [ADR 0091](0091-unified-explorer-icons.md). The pack choice and file association rules remain in effect.
+The ordinary-folder preservation clause below is superseded by [ADR 0091](0091-unified-explorer-icons.md). [ADR 0092](0092-curated-icon-packs.md) extends the fixed pack choice with account-selected Material/Catppuccin/basic icons and supplemental Material source notices. The original file association rules remain in effect.
 
 ## Context
 

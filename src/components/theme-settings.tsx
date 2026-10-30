@@ -3,6 +3,7 @@ import { Check, FloppyDisk, Plus, Trash } from 'iconoir-react'
 import { ColorPicker, useOverlayDismiss } from '@mew/ui'
 import { useI18n } from '../i18n'
 import { ThemeGradientAngle } from './theme-gradient-angle'
+import { IconPackSettings } from './icon-pack-settings'
 import { DEFAULT_THEME_PALETTE, deriveThemePalette, normalizeThemeSettings, sameThemePalette, themeBackgroundImage, themePaletteContrast, THEME_PRESETS, type ThemeGradient, type ThemePalette, type ThemeSettings } from '../utils/theme-color'
 
 function sampleStyle(palette: ThemePalette): CSSProperties {
@@ -61,7 +62,7 @@ export function ThemeSettingsPanel({ value, onChange }: { value: ThemeSettings; 
   function save() {
     if (!draft) return
     const custom = editingIndex === null ? [...value.custom, draft] : value.custom.map((palette, index) => index === editingIndex ? draft : palette)
-    onChange(normalizeThemeSettings({ palette: draft, custom }))
+    onChange(normalizeThemeSettings({ ...value, palette: draft, custom }))
     close()
   }
 
@@ -98,7 +99,7 @@ export function ThemeSettingsPanel({ value, onChange }: { value: ThemeSettings; 
             <FloppyDisk width={18} height={18} aria-hidden="true" />
           </button>
           {editingIndex !== null && <button type="button" onClick={() => {
-            onChange({ palette: DEFAULT_THEME_PALETTE, custom: value.custom.filter((_, index) => index !== editingIndex) })
+            onChange({ ...value, palette: DEFAULT_THEME_PALETTE, custom: value.custom.filter((_, index) => index !== editingIndex) })
             editButton.current = null
             close()
           }} className={`${iconButton} text-danger-ink`} aria-label={t('settings.removeTheme')} data-tip={t('settings.removeTheme')}>
@@ -144,5 +145,6 @@ export function ThemeSettingsPanel({ value, onChange }: { value: ThemeSettings; 
       </div>
       {themePaletteContrast(draft) < 4.5 && <p role="status" className="mt-2 text-xs text-warning-ink">{t('settings.themeLowContrast')}</p>}
     </div>}
+    <IconPackSettings value={value.iconPack} onChange={iconPack => onChange({ ...value, iconPack })} />
   </div>
 }

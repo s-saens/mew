@@ -8,7 +8,7 @@ type ThemeStorage = Pick<Storage, 'getItem' | 'setItem'>
 export function loadAccountThemeCache(account: string, storage: ThemeStorage, legacyStorage: ThemeStorage = storage): ThemeSettings {
   try {
     const cached = storage.getItem(accountKey(account))
-    if (cached) return parseThemeSettings(JSON.parse(cached))
+    if (cached) return parseThemeSettings(JSON.parse(cached), { persisted: true })
     const claimed = legacyStorage.getItem(LEGACY_ACCOUNT_KEY)
     if (!claimed || claimed === account) return loadThemeSettings(legacyStorage)
   } catch { /* The server remains authoritative when local storage is unavailable. */ }

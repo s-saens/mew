@@ -48,6 +48,22 @@ test('light theme associations override only the matching filename or extension'
   assert.equal(fileIconId('main.ts', true), 'typescript')
 })
 
+test('curated Catppuccin resolves files and generic folder states in both palettes', () => {
+  for (const [light, prefix] of [[false, 'mocha-'], [true, 'latte-']] as const) {
+    assert.equal(fileIconId('MAIN.TS', light, 'catppuccin'), `${prefix}typescript`)
+    assert.equal(fileIconId('src\\note.md', light, 'catppuccin'), `${prefix}markdown`)
+    assert.equal(fileIconId('/project/README.md', light, 'catppuccin'), `${prefix}readme`)
+    assert.equal(fileIconId('main.test.ts', light, 'catppuccin'), `${prefix}typescript-test`)
+    for (const name of ['', 'mew', 'unknown.xyz', '__proto__', 'x.constructor']) {
+      assert.equal(fileIconId(name, light, 'catppuccin'), `${prefix}_file`, name)
+    }
+    assert.equal(folderIconId(false, light, 'catppuccin'), `${prefix}_folder`)
+    assert.equal(folderIconId(true, light, 'catppuccin'), `${prefix}_folder_open`)
+  }
+  assert.equal(fileIconId('main.ts', false, 'none'), manifest.file)
+  assert.equal(fileIconId('main.ts'), 'typescript')
+})
+
 test('generated maps cover the pinned upstream pack and every selected SVG exists', async () => {
   const upstream = generateManifest()
   const normalize = (table: Record<string, string>) => Object.fromEntries(Object.entries(table).map(([key, value]) => [key.toLowerCase(), value]))

@@ -1,0 +1,21 @@
+{
+  "name": "Catppuccin Icons",
+  "version": "1.26.0",
+  "repository": "https://github.com/catppuccin/vscode-icons",
+  "commit": "b6915da9f6889b683a110aa747de96c2820a537d",
+  "archive": "https://github.com/catppuccin/vscode-icons/releases/download/v1.26.0/catppuccin-vsc-icons-1.26.0.vsix",
+  "sha256": "57566136d0a8ba8d040eb6e5be866c88ccbb04f3d219d3a7e52a19978900ff3d",
+  "license": "MIT",
+  "licenseUrl": "https://github.com/catppuccin/vscode-icons/blob/b6915da9f6889b683a110aa747de96c2820a537d/LICENSE",
+  "licenseFile": "public/licenses/catppuccin-icons.txt",
+  "variants": {
+    "dark": "mocha",
+    "light": "latte"
+  },
+  "generated": {
+    "src/utils/catppuccin-icon-manifest.json": "72ba0f630545b815023148f04901bd36fa51d469df4a1e43e14d729682a62a90",
+    "src/utils/catppuccin-icon-artwork.json": "8ed604f6144b8fe8bbc1d3d430f0fb2aaeb7a3c6bfe8a9cfb250c6c1026312f3",
+    "src/utils/catppuccin-icon-default-artwork.json": "05003121d455b03b5c7d90094d1b97b9abb0e5b340f2a5dbfcc251b6f586834e",
+    "public/licenses/catppuccin-icons.txt": "dab37945e3097e43c74c08437196152a50f8d5d5e1d0335f469b203e183e21b8"
+  }
+}

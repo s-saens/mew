@@ -30,7 +30,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
       async load(id) { if (id === 'virtual:file-icons.tsx') return source; if (id === 'virtual:style') return ''; if (id.endsWith('?raw')) return 'export default ' + JSON.stringify(await fs.readFile(id.slice(0, -4), 'utf8')) } }],
   })
   const chunk = bundle.output.find(item => item.type === 'chunk')!
-  const content = (await Promise.all(['src/components/FileTree.tsx', 'src/components/file-type-icon.tsx', 'src/components/file-type-icon-image.tsx', 'src/components/file-browser.tsx'].map(file => fs.readFile(path.join(root, file), 'utf8')))).join('\n')
+  const content = (await Promise.all(['src/components/FileTree.tsx', 'src/components/file-type-icon.tsx', 'src/components/file-icon-artwork.tsx', 'src/components/file-type-icon-image.tsx', 'src/components/file-browser.tsx'].map(file => fs.readFile(path.join(root, file), 'utf8')))).join('\n')
   const compiler = await compile(await fs.readFile(`${root}/src/index.css`, 'utf8'), { base: `${root}/src`, onDependency() {} })
   const css = compiler.build([...new Set((source + content).match(/[A-Za-z0-9_@:/.[\]()%,-]+/g))])
   const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })

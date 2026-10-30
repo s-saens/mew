@@ -1,10 +1,12 @@
 ---
 title: "Account-level theme storage and cross-device synchronization"
-description: "Decision to move the canonical source for the selected theme and custom list from the browser to the signed-in account, and define conditional initial migration, per-account change notifications, refetching on return, and protection against late responses. Preserves the scope of per-device settings such as language and fonts."
+description: "Moves the selected theme and custom list to account storage with conditional migration, account change signals, return refetching, and late-response protection. ADR 0092 adds icon pack choice to the same contract while preserving per-device language and font settings."
 created: 2026-10-20
-updated: 2026-10-20
+updated: "2026-10-30"
 status: accepted
 ---
+
+[ADR 0092](0092-curated-icon-packs.md) adds optional icon pack selection to this account synchronization contract. Palette, custom-theme, migration, and account isolation behavior remain.
 
 ## Background
 
