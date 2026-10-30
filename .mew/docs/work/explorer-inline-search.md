@@ -1,8 +1,8 @@
 ---
 title: "Unified explorer search box and hierarchical results"
-description: "Records the 2026-10-29 consolidation of search tabs into a single search box and content toggle, and implementation of file/document hierarchical results and tooltips with context around matches. Distinguishes isolated validation, existing documentation errors, and the scope not applied to production from restoration of the document/file toggle and correction of the close button position to the right of the search box."
+description: "Records the explorer's unified search box, hierarchical results, context tooltips, restored Documents/Files toggle, right-side close button, and the 2026-10-30 correction from implicit fuzzy matching to literal filename queries. Distinguishes local verification and earlier documentation errors from application to the running instance."
 created: "2026-10-29"
-updated: "2026-10-29"
+updated: "2026-10-30"
 ---
 
 ## Purpose and results
@@ -33,3 +33,16 @@ Validation: 8 App switching and unified-search regression tests and 3 startup UI
 Moved the file explorer close X from the document/file scope row to the same line, outside and to the right of the search box. It reuses the shared `PanelCloseButton` and is always displayed even when the search query is empty. The document/file toggle, clear search, and search options are preserved.
 
 Validation: Within 1 unified-search UI test, checked the X display with an empty search box, right-side placement, vertical alignment, 240px panel boundaries, and close callback across 4 file/document × desktop/mobile combinations. `npx tsc -b`, oxlint for the changed code (with warnings), the UI detector, and description and local-link checks for the 3 changed documents passed. Full documentation validation failed due to the existing frontmatter error. No app build or application to the server was performed.
+
+## Literal filename matching
+
+On 2026-10-30, reproduced `Agents.md` returning `agent-sessions.md`, `0031-agent-display-events.md`, and `agents-sdk/SKILLS.md`. The host scorer accepted characters in order anywhere in a path; the demo inserted `.*` between query characters. Replaced both implicit subsequence matchers with contiguous literal matching. The host retains basename-first ranking, partial names and paths, case sensitivity, explicit wildcard and regex modes, permissions, scopes, and the 50-result limit. The current behavior is owned by the [feature contract](../features/projects-files-search/filename-content-search-and-replacement.md); [ADR 0090](../decisions/0090-literal-filename-search.md) records the contract change.
+
+Verification:
+
+- Confirmed four new or updated regression scenarios failed before the implementation change, including both catalog-backed host search and demo HTTP search.
+- Passed 54 tests across `server/fileNameSearch.test.ts`, `server/search-pattern.test.ts`, `server/search.test.ts`, `server/searchApi.test.ts`, `server/perf.test.ts`, `src/demo/lazy-files.test.ts`, and `src/demo/transport.test.ts`. These cover literal matching, case sensitivity, Unicode and punctuation, partial names and paths, explicit patterns, scopes and permissions, 50-result limits, 10,000 catalog entries, content search and replacement, and demo filename lookup without loading bodies.
+- `npx tsc -b` and targeted oxlint for the four changed source and test files passed.
+- `npm run check:docs` passed with 556 descriptions and no description or local-link errors.
+
+No app build, deployment, launcher execution, or runtime server changes were performed. The running instance still requires the user to apply the source changes. No live-browser or physical-device verification was performed for this matching-only correction.

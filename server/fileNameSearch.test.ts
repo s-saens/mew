@@ -18,8 +18,21 @@ test('파일명 ranking은 basename exact와 prefix를 깊은 경로보다 먼�
   ])
 })
 
-test('파일명 ranking은 한글·kebab subsequence와 대소문자를 지원한다', () => {
-  assert.deepEqual(rankFileNamePaths('검계', ['문서/검색-계획.md', '문서/검색.md'], { caseSensitive: false }), ['문서/검색-계획.md'])
+test('plain filename queries require contiguous literal text instead of subsequences', () => {
+  const paths = ['AGENTS.md', 'nested/Agents.md', '0031-agent-display-events.md', 'agent-sessions.md', 'agents-sdk/SKILLS.md']
+  assert.deepEqual(rankFileNamePaths('Agents.md', paths, { caseSensitive: false }), ['AGENTS.md', 'nested/Agents.md'])
+  assert.deepEqual(rankFileNamePaths('Agents.md', paths, { caseSensitive: true }), ['nested/Agents.md'])
+  assert.deepEqual(rankFileNamePaths('missing.md', paths, { caseSensitive: false }), [])
+  assert.deepEqual(rankFileNamePaths('검계', ['문서/검색-계획.md', '문서/검색.md'], { caseSensitive: false }), [])
+  assert.deepEqual(rankFileNamePaths('검색-계획', ['문서/검색-계획.md', '문서/검색.md'], { caseSensitive: false }), ['문서/검색-계획.md'])
+  assert.deepEqual(rankFileNamePaths('a[1].md', ['a[1].md', 'a1.md', 'aX1Y.md'], { caseSensitive: false }), ['a[1].md'])
+})
+
+test('literal filename ranking supports substrings and relative paths with basename matches first', () => {
+  const paths = ['src/my-agent.ts', 'agent.ts', 'agent-tools/other.ts', 'src/other-agent.ts', 'src/a-g-e-n-t.ts']
+  assert.deepEqual(rankFileNamePaths('agent', paths, { caseSensitive: false }), ['agent.ts', 'src/my-agent.ts', 'src/other-agent.ts', 'agent-tools/other.ts'])
+  assert.deepEqual(rankFileNamePaths('src/my-agent.ts', paths, { caseSensitive: false }), ['src/my-agent.ts'])
+  assert.deepEqual(rankFileNamePaths('srcmy-agent.ts', paths, { caseSensitive: false }), [])
   assert.deepEqual(rankFileNamePaths('src/App*', ['src/app.ts', 'src/App.tsx'], { caseSensitive: true }), ['src/App.tsx'])
 })
 
@@ -41,7 +54,7 @@ test('와일드카드는 경로·연속 별표·빈 매치·결과 상한을 지
 })
 
 
-test('파일명 정규식 옵션은 기본 와일드카드·퍼지보다 우선한다', () => {
+test('파일명 정규식 옵션은 기본 와일드카드·리터럴보다 우선한다', () => {
   const paths = ['src/App.tsx', 'src/App.test.tsx', 'docs/app.md', 'file😀.txt']
   assert.deepEqual(rankFileNamePaths('^App\\.tsx$', paths, { regex: true, caseSensitive: true }), ['src/App.tsx'])
   assert.deepEqual(rankFileNamePaths('^app', paths, { regex: true, caseSensitive: false }), ['docs/app.md', 'src/App.test.tsx', 'src/App.tsx'])
@@ -50,6 +63,31 @@ test('파일명 정규식 옵션은 기본 와일드카드·퍼지보다 우선�
   assert.throws(() => rankFileNamePaths('(', paths, { regex: true, caseSensitive: false }), SyntaxError)
   assert.throws(() => rankFileNamePaths('App(?=\\.tsx)', paths, { regex: true, caseSensitive: false }), SyntaxError)
   assert.throws(() => rankFileNamePaths('(App)\\1', paths, { regex: true, caseSensitive: false }), SyntaxError)
+})
+
+test('catalog filename search excludes fuzzy matches before the result limit', async () => {
+  const original = WORKSPACE_ROOT
+  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'mew-filename-literal-')))
+  setWorkspaceRoot(root)
+  try {
+    fs.mkdirSync(path.join(root, 'nested'), { recursive: true })
+    fs.mkdirSync(path.join(root, 'agents-sdk'), { recursive: true })
+    fs.writeFileSync(path.join(root, 'AGENTS.md'), '')
+    fs.writeFileSync(path.join(root, 'nested', 'Agents.md'), '')
+    fs.writeFileSync(path.join(root, 'agents-sdk', 'SKILLS.md'), '')
+    for (let index = 0; index < 55; index++) fs.writeFileSync(path.join(root, `${index}-agent-sessions.md`), '')
+    const options = { caseSensitive: false, showAll: true, scopes: ['root'] }
+    const result = await searchFileNames('Agents.md', options)
+    assert.deepEqual(result.results.map(row => [row.project, row.path]), [[WORKSPACE_PROJECT, 'AGENTS.md'], [WORKSPACE_PROJECT, 'nested/Agents.md']])
+    const exactCase = await searchFileNames('Agents.md', { ...options, caseSensitive: true })
+    assert.deepEqual(exactCase.results.map(row => row.path), ['nested/Agents.md'])
+    const wildcard = await searchFileNames('Agent*.md', options)
+    assert.deepEqual(wildcard.results.map(row => row.path), ['AGENTS.md', 'nested/Agents.md', 'agents-sdk/SKILLS.md'])
+  } finally {
+    resetFileCatalogs()
+    setWorkspaceRoot(original)
+    fs.rmSync(root, { recursive: true, force: true })
+  }
 })
 
 test('파일명 root 범위는 Documents 중복을 상한 전에 제외하고 하위 프로젝트·권한을 유지한다', async () => {

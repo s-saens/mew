@@ -18,27 +18,16 @@ export interface FileNameSearchResult {
   scope: { id: string; label: string; icon: string }
 }
 
-function fuzzyScore(query: string, targetPath: string, caseSensitive: boolean): number | null {
+function literalScore(query: string, targetPath: string, caseSensitive: boolean): number | null {
   const target = caseSensitive ? targetPath : targetPath.toLowerCase()
   const needle = caseSensitive ? query : query.toLowerCase()
   const basename = target.slice(target.lastIndexOf('/') + 1)
   if (basename === needle) return 0
   if (basename.startsWith(needle)) return 10 + basename.length - needle.length
-  const segments = target.split('/')
-  const segment = segments.findIndex((part) => part.startsWith(needle))
-  if (segment >= 0) return 100 + segment * 10 + segments[segment].length - needle.length
-
-  let offset = 0
-  let first = -1
-  let gaps = 0
-  for (const char of needle) {
-    const next = target.indexOf(char, offset)
-    if (next < 0) return null
-    if (first < 0) first = next
-    if (offset && next > offset) gaps += next - offset
-    offset = next + 1
-  }
-  return 1_000 + gaps * 100 + (offset - first) * 10 + first
+  const nameIndex = basename.indexOf(needle)
+  if (nameIndex >= 0) return 1_000 + nameIndex
+  const pathIndex = target.indexOf(needle)
+  return pathIndex >= 0 ? 10_000 + pathIndex : null
 }
 
 function fileNameScorer(query: string, caseSensitive: boolean, regex = false): (targetPath: string) => number | null {
@@ -46,7 +35,7 @@ function fileNameScorer(query: string, caseSensitive: boolean, regex = false): (
     const pattern = compileSearchPattern(query, { regex: true, caseSensitive })
     return targetPath => pattern.test(path.posix.basename(targetPath)) ? 0 : pattern.test(targetPath) ? 1 : null
   }
-  if (!/[*?]/.test(query)) return targetPath => fuzzyScore(query, targetPath, caseSensitive)
+  if (!/[*?]/.test(query)) return targetPath => literalScore(query, targetPath, caseSensitive)
   const pattern = Array.from(caseSensitive ? query : query.toLowerCase())
   const matches = (value: string): boolean => {
     const characters = Array.from(value)

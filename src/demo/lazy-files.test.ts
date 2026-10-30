@@ -67,6 +67,29 @@ test('opening one lazy file fetches once and reuses its cache without dirtying G
   assert.deepEqual(store.gitWorkingTree().files, [])
 })
 
+test('demo filename search requires contiguous literal text without loading file bodies', async t => {
+  const { store, fetched } = fixture({
+    'src/literal-names/AGENTS.md': '# Agents\n',
+    'src/literal-names/nested/Agents.md': '# Agents\n',
+    'src/literal-names/agent-sessions.md': '# Sessions\n',
+    'src/literal-names/agents-sdk/SKILLS.md': '# Skills\n',
+    'src/literal-names/a[1].md': '# Literal\n',
+    'src/literal-names/a1.md': '# Other\n',
+  })
+  t.after(() => store.close())
+  const search = async (query: string, options = '') => {
+    const result = await json(store, `/api/search/files?q=${encodeURIComponent(query)}&scopes=src/literal-names${options}`)
+    return result.results.map((row: { path: string }) => row.path).sort()
+  }
+  const expected = ['src/literal-names/AGENTS.md', 'src/literal-names/nested/Agents.md']
+  assert.deepEqual(await search('Agents.md'), expected)
+  assert.deepEqual(await search('Agents.md', '&case=1'), [expected[1]])
+  assert.deepEqual(await search('missing.md'), [])
+  assert.deepEqual(await search('a[1].md'), ['src/literal-names/a[1].md'])
+  assert.deepEqual(await search('nested/Agents.md'), [expected[1]])
+  assert.deepEqual(fetched, [])
+})
+
 test('Documents rename and copy preserve unread code and binary refs while loading only Markdown', async t => {
   const content = '# Lazy parent\n\n[Source](unread.ts)\n'
   const { store, fetched } = fixture({

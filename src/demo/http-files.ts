@@ -14,9 +14,9 @@ function requireProjectRoot(store: DemoWorkspaceStore, project: string, root: st
   if (store.projectRootPath(project) !== root) throw new DemoError('프로젝트가 변경되었습니다. 현재 프로젝트에서 다시 열어 주세요.', 409)
 }
 
-function queryPattern(query: string, regex: boolean, caseSensitive: boolean, filename = false): RegExp {
+function queryPattern(query: string, regex: boolean, caseSensitive: boolean): RegExp {
   if (query.length > 300) throw new DemoError('데모 검색어는 300자 이하여야 합니다.')
-  const source = regex ? query : /[*?]/.test(query) ? [...query].map(char => char === '*' ? '.*' : char === '?' ? '.' : escape(char)).join('') : filename ? [...query].map(escape).join('.*') : escape(query)
+  const source = regex ? query : /[*?]/.test(query) ? [...query].map(char => char === '*' ? '.*' : char === '?' ? '.' : escape(char)).join('') : escape(query)
   try { return new RegExp(source, caseSensitive ? 'g' : 'gi') } catch { throw new DemoError('정규식 검색어를 확인해 주세요.') }
 }
 
@@ -121,7 +121,7 @@ export const handleDemoFiles: DemoHttpHandler = async ({ store, request, url, bo
   if (route === '/api/search/files' || route === '/api/search' || route === '/api/search/stream') {
     requireMethod(request, 'GET')
     const query = url.searchParams.get('q') ?? '', filenames = route === '/api/search/files'
-    const pattern = queryPattern(query, url.searchParams.get('regex') === '1', url.searchParams.get('case') === '1', filenames)
+    const pattern = queryPattern(query, url.searchParams.get('regex') === '1', url.searchParams.get('case') === '1')
     const scopes = (url.searchParams.get('scopes') ?? '').split(',').filter(Boolean)
     const files = store.fileMetadata(filenames ? '.workspace' : project).filter(file => !scopes.length || scopes.some(scope => scope === 'root' || scope === '.workspace' || file.path === scope || file.path.startsWith(scope.replace(/^docs$/, 'docs') + '/')))
     if (filenames) return demoJson({ version: store.revision, state: 'ready', results: files.filter(file => { pattern.lastIndex = 0; return pattern.test(file.path) }).slice(0, 50).map(file => ({ path: file.path, project: '.workspace', scope: { id: 'root', label: 'mew-playground', icon: 'folder' } })) })
