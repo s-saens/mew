@@ -37,7 +37,7 @@ function fileLinkRanges(doc: ProseMirrorNode, name: string) {
 }
 
 function placeFileLinkCaret(view: EditorView) {
-  if (!view.hasFocus() || !view.state.selection.empty) return false
+  if (view.composing || !view.hasFocus() || !view.state.selection.empty) return false
   const pos = view.state.selection.head
   for (const slot of view.dom.querySelectorAll('.mew-file-link-caret')) {
     if (view.posAtDOM(slot, 0) !== pos) continue
@@ -101,6 +101,7 @@ export const EditorLink = Link.extend<LinkOptions & { getFileLinkContext: () => 
     }
   },
   addProseMirrorPlugins() {
+    let startingComposition = false
     let decoratedDoc: ProseMirrorNode | undefined
     let decoratedVisible: ReadonlySet<number> | undefined
     let virtualPlugin: Plugin<VirtualBlocksState> | null | undefined
@@ -125,7 +126,7 @@ export const EditorLink = Link.extend<LinkOptions & { getFileLinkContext: () => 
               const kind = fileLinkKind(anchor.getAttribute('href') ?? '', this.options.getFileLinkContext())
               if (kind && anchor.getAttribute('data-file-link-kind') !== kind) anchor.setAttribute('data-file-link-kind', kind)
             }
-            placeFileLinkCaret(view)
+            if (!startingComposition) placeFileLinkCaret(view)
           }
           update()
           return { update }
@@ -215,6 +216,21 @@ export const EditorLink = Link.extend<LinkOptions & { getFileLinkContext: () => 
             return deleteLink(view, event.key === 'Backspace')
           },
           handleDOMEvents: {
+            compositionstart: view => {
+              if (!view.editable || !view.state.selection.empty) return false
+              const native = view.dom.ownerDocument.getSelection()
+              const focus = native?.focusNode
+              const element = focus?.nodeType === 3 ? focus.parentElement : focus?.nodeType === 1 ? focus as typeof view.dom : null
+              const slot = element?.closest('.mew-file-link-caret')
+              if (!native?.isCollapsed || !slot || !view.dom.contains(slot)
+                || view.posAtDOM(slot, 0) !== view.state.selection.head) return false
+              // Explicit stored marks let ProseMirror start composition outside ignored widget DOM.
+              startingComposition = true
+              queueMicrotask(() => { startingComposition = false })
+              const marks = view.state.storedMarks ?? view.state.selection.$from.marks()
+              view.dispatch(view.state.tr.setStoredMarks(marks.filter(mark => mark.type !== this.type)))
+              return false
+            },
             beforeinput: (view, event) => {
               const input = event as { inputType?: string; data?: string | null; isComposing?: boolean; cancelable?: boolean }
               if (input.inputType === 'insertText' && input.data && input.cancelable

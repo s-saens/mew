@@ -1,8 +1,8 @@
 ---
 title: "Hotview Input and Block Rendering Contract"
-description: "Defines Hotview's per-block Markdown serialization and line number caches, Pretext height prediction and offscreen DOM placeholders, preservation guarantees for file link boundary input, selection, collaboration, navigation, and font changes, and verification methods."
+description: "Defines Hotview's per-block Markdown serialization and line number caches, Pretext height prediction and offscreen DOM placeholders, preservation guarantees for ordinary and IME composition input at file link boundaries, selection, collaboration, navigation, and font changes, and verification methods."
 created: 2026-10-19
-updated: 2026-10-19
+updated: 2026-10-30
 ---
 
 # Hotview Input and Block Rendering Contract
@@ -19,6 +19,8 @@ Hotview separates computation for changed blocks from the DOM displayed onscreen
 - Clipboard `Fragment` retains the existing serialization path. When a selected line range is requested, completed preceding blocks are reused and only the prefix of the relevant block is rendered.
 - `onUpdate` save notifications continue to be delivered synchronously. Latency is not hidden by delaying saves or dropping some input. Reserialization is skipped when React returns the body just emitted. Lightweight transactions that align the browser cursor on either side of links are retained, and line number and body analysis reuse caches during these transactions.
 - Cancelable, non-composition `insertText` occurring inside the cursor widget at a [file link boundary](../../../packages/editor/src/editor/file-link.ts) is applied as a model transaction in `beforeinput`. This prevents input loss where characters remain only in widget DOM ignored by ProseMirror, and keeps the widget's zero-width characters out of the source. This handling does not apply during composition or to read-only input.
+
+- When IME composition starts in the same cursor widget, explicit stored marks retain surrounding formatting and exclude the file link mark. ProseMirror then starts its normal composition in the document DOM outside the widget. Cursor alignment waits until composition ends so ongoing preedit text stays in editable content. The handler preserves the native composition lifecycle and leaves the document unchanged until text is entered.
 
 [LineFocus](../../../packages/editor/src/editor/lineFocus.ts) stores line numbers in plugin state. Initially loaded source uses a Markdown line map to account for spacing, comments, and blank lines; after edits, numbers are updated using cached blocks' contributions to the source. Cursor movement and viewport updates do not rerun line number analysis. External body replacement resets source mapping with explicit `source` metadata even if the model or saved string is identical. Local echoes and changes to the number of property rows pass `offset` metadata to reuse the existing body cache.
 
@@ -53,5 +55,7 @@ node --test packages/editor/src/editor/incrementalMarkdown.test.ts packages/edit
 node --test server/editor-virtual-blocks-ui.test.ts
 MEW_BENCH_SAMPLES=20 node server/editor-performance-benchmark.mjs
 ```
+
+`server/editor-ime-ui.test.ts` sends trusted Chromium composition updates and commits through CDP. It checks Hotview, Plain, and code before and after selection-menu actions and keyboard reopening, file-link boundaries on mobile and desktop, adjacent links, surrounding bold formatting, cancellation and reentry, and Hotview code blocks. The [IME input work record](../work/editor-ime-input.md) records debugger evidence, verification, and physical-device limits.
 
 Unit tests verify exact matches with the existing native serializer, changed-block recomputation, line number preservation, display ranges, selection, IME, focus, playback positions, cleanup, and position distinctions between copies of the same node object. UI tests verify input, undo, copying, table of contents, search, source line navigation, restoration of table and image node views for hidden blocks, and preservation of DB title drafts while scrolling and saving on blur, across desktop and mobile and local and Yjs editing. Performance figures are based on ASCII input in synthetic Markdown and do not guarantee field INP or performance on actual mobile devices.

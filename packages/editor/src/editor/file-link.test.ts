@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { Window } from 'happy-dom'
+import type { DecorationSet } from '@tiptap/pm/view'
 
 const win = new Window({ url: 'http://localhost' })
 const globals = win as unknown as Record<string, unknown>
@@ -30,17 +31,22 @@ function linkPlugin(editor: InstanceType<typeof Editor>) {
   return editor.state.plugins.find(plugin => plugin.props.handleDOMEvents?.beforeinput && plugin.props.decorations)!
 }
 
+function linkDecorations(editor: InstanceType<typeof Editor>): DecorationSet {
+  const plugin = linkPlugin(editor)
+  return plugin.props.decorations!.call(plugin, editor.state) as DecorationSet
+}
+
 test('가상화된 파일 링크는 표시 블록의 caret widget만 만들고 범위 변경을 반영한다', () => {
   const editor = createEditor(true)
   try {
     const plugin = linkPlugin(editor)
-    const initial = plugin.props.decorations!.call(plugin, editor.state)!
+    const initial = linkDecorations(editor)
     assert.equal(initial.find().length, virtualBlocksKey.getState(editor.state)!.visible.size * 2)
     assert.ok(initial.find().length < 10)
     assert.equal(plugin.props.decorations!.call(plugin, editor.state), initial)
     const pos = editor.state.doc.content.size - editor.state.doc.lastChild!.nodeSize
     materializeVirtualPosition(editor.view, pos)
-    const shown = plugin.props.decorations!.call(plugin, editor.state)!
+    const shown = linkDecorations(editor)
     assert.notEqual(shown, initial)
     assert.ok(shown.find().some(decoration => decoration.from > pos))
     assert.equal(editor.view.dom.querySelectorAll('.mew-file-link-caret').length, shown.find().length)
@@ -58,8 +64,7 @@ test('화면 밖 파일 링크도 모델 선택을 링크 밖으로 이동하고
     editor.view.dispatch(editor.state.tr.setSelection(TextSelection.create(editor.state.doc, start + 1)))
     assert.equal(editor.state.selection.head, start + label.length)
     assert.equal((editor.view.nodeDOM(pos) as HTMLElement).hasAttribute('data-mew-virtual-hidden'), false)
-    const plugin = linkPlugin(editor)
-    assert.ok(plugin.props.decorations!.call(plugin, editor.state)!.find().some(decoration => decoration.from === start))
+    assert.ok(linkDecorations(editor).find().some(decoration => decoration.from === start))
   } finally { editor.destroy() }
 })
 
@@ -67,7 +72,7 @@ test('비가상 파일 링크는 전체 caret 장식을 재사용하고 읽기 �
   const editor = createEditor(false)
   try {
     const plugin = linkPlugin(editor)
-    const decorations = plugin.props.decorations!.call(plugin, editor.state)!
+    const decorations = linkDecorations(editor)
     assert.equal(decorations.find().length, 60)
     editor.commands.setTextSelection(2)
     assert.equal(plugin.props.decorations!.call(plugin, editor.state), decorations)
@@ -95,13 +100,39 @@ test('파일 링크 양쪽 caret의 일반 입력은 위젯 대신 Markdown 모�
       document.getSelection()!.addRange(range)
       const input = Object.assign(new win.Event('beforeinput', { cancelable: true }), { inputType: 'insertText', data: 'Z한', isComposing: false })
       const plugin = linkPlugin(editor)
-      assert.equal(plugin.props.handleDOMEvents!.beforeinput!.call(plugin, editor.view, input as unknown as Event), true)
+      assert.equal(plugin.props.handleDOMEvents!.beforeinput!.call(plugin, editor.view, input as unknown as InputEvent), true)
       assert.equal(input.defaultPrevented, true)
       assert.equal(editor.state.doc.textContent, side === 0 ? 'Z한링크' : '링크Z한')
       assert.equal(editor.state.selection.head, pos + 2)
       const markdown = (editor.storage as any).markdown.getMarkdown()
       assert.ok(markdown.includes(side === 0 ? 'Z한[링크](./target.md)' : '[링크](./target.md)Z한'))
       assert.doesNotMatch(markdown, /\u200b|mew-file-link-caret/)
+    } finally { editor.view.dom.remove(); editor.destroy() }
+  }
+})
+
+test('파일 링크 caret의 조합 시작은 링크 밖 기본 조합 커서에 기존 서식을 전달한다', () => {
+  for (const side of [0, 1]) for (const bold of [false, true]) {
+    const editor = new Editor({ element: document.createElement('div'), extensions: serverEditorExtensions(), content: '[링크](./target.md)' })
+    document.body.append(editor.view.dom)
+    try {
+      const slot = editor.view.dom.querySelectorAll('.mew-file-link-caret')[side]
+      const pos = editor.view.posAtDOM(slot, 0)
+      const marks = [editor.schema.marks.link.create({ href: './target.md' }), ...(bold ? [editor.schema.marks.bold.create()] : [])]
+      editor.view.dispatch(editor.state.tr.setSelection(TextSelection.create(editor.state.doc, pos)).setStoredMarks(marks))
+      const range = document.createRange()
+      range.setStart(slot.firstChild!, 0)
+      range.collapse(true)
+      document.getSelection()!.removeAllRanges()
+      document.getSelection()!.addRange(range)
+      const doc = editor.state.doc
+      const input = new win.CompositionEvent('compositionstart', { bubbles: true, cancelable: true })
+      const plugin = linkPlugin(editor)
+      assert.equal(plugin.props.handleDOMEvents!.compositionstart!.call(plugin, editor.view, input as unknown as CompositionEvent), false)
+      assert.equal(input.defaultPrevented, false, 'ProseMirror retains its native composition handler')
+      assert.deepEqual(editor.state.storedMarks?.map(mark => mark.type.name), bold ? ['bold'] : [], 'explicit marks start composition outside the link and preserve other formatting')
+      assert.equal(editor.state.selection.head, pos)
+      assert.equal(editor.state.doc, doc, 'starting composition does not insert placeholder text into the model')
     } finally { editor.view.dom.remove(); editor.destroy() }
   }
 })
@@ -125,9 +156,16 @@ test('파일 링크 caret은 조합 입력과 취소 불가 입력, 모델과 �
     const doc = editor.state.doc
     const expectIgnored = (type: string, composing = false, cancelable = true) => {
       const input = Object.assign(new win.Event('beforeinput', { cancelable }), { inputType: type, data: '한', isComposing: composing })
-      assert.equal(plugin.props.handleDOMEvents!.beforeinput!.call(plugin, editor.view, input as unknown as Event), false)
+      assert.equal(plugin.props.handleDOMEvents!.beforeinput!.call(plugin, editor.view, input as unknown as InputEvent), false)
       assert.equal(input.defaultPrevented, false)
       assert.equal(editor.state.doc, doc)
+    }
+    const expectCompositionStartIgnored = () => {
+      const state = editor.state
+      const input = new win.CompositionEvent('compositionstart', { cancelable: true })
+      assert.equal(plugin.props.handleDOMEvents!.compositionstart!.call(plugin, editor.view, input as unknown as CompositionEvent), false)
+      assert.equal(input.defaultPrevented, false)
+      assert.equal(editor.state, state, 'unrelated or read-only composition does not change stored marks')
     }
     expectIgnored('insertCompositionText', true)
     expectIgnored('insertText', true)
@@ -135,9 +173,14 @@ test('파일 링크 caret은 조합 입력과 취소 불가 입력, 모델과 �
     editor.view.dispatch(editor.state.tr.setSelection(TextSelection.create(editor.state.doc, pos + 2)))
     selectSlot()
     expectIgnored('insertText')
+    expectCompositionStartIgnored()
+    editor.view.dispatch(editor.state.tr.setSelection(TextSelection.create(editor.state.doc, pos, pos + 2)))
+    selectSlot()
+    expectCompositionStartIgnored()
     editor.view.dispatch(editor.state.tr.setSelection(TextSelection.create(editor.state.doc, pos)))
     editor.setEditable(false)
     selectSlot()
     expectIgnored('insertText')
+    expectCompositionStartIgnored()
   } finally { editor.view.dom.remove(); editor.destroy() }
 })
