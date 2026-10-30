@@ -6,9 +6,9 @@ status: "implemented"
 created: "2026-09-18"
 updated: "2026-10-30"
 status_hash: "4d8fe6026b3341576de674bb4b2ae85cd1124f3eb3638b2e33e15d8697ed1fc1"
-files: ["src/components/EditorPane.tsx", "src/hooks/useTabs.ts", "src/components/CodePane.tsx", "src/utils/codeSearch.ts", "src/utils/code-search-panel.ts", "src/utils/code-pinch-zoom.ts", "packages/editor/src/editor/EditorSearchBar.tsx"]
+files: ["src/components/EditorPane.tsx", "src/components/mobile-editor-keyboard-button.tsx", "src/hooks/use-mobile-editor-keyboard.ts", "src/hooks/useTabs.ts", "src/components/CodePane.tsx", "src/utils/codeSearch.ts", "src/utils/code-search-panel.ts", "src/utils/code-pinch-zoom.ts", "packages/editor/src/editor/EditorSearchBar.tsx"]
 commits: []
-description: "A feature contract covering line numbers, syntax highlighting, supported diagnostics for code and plain text, and compact Find and collapsible Replace controls at the top of the document, result counts, search options, and keyboard behavior. Explains touch pinch zoom for non-Markdown files, the floating mobile keyboard button and Plain auxiliary key bar, and tab switching that preserves horizontal scrolling in the body."
+description: "A feature contract covering line numbers, syntax highlighting, supported diagnostics for code and plain text, and compact Find and collapsible Replace controls at the top of the document, result counts, search options, and keyboard behavior. Explains touch pinch zoom for non-Markdown files, mobile keyboard activation through the floating button, dismissal on outside presses, and the Plain auxiliary key bar, and tab switching that preserves horizontal scrolling in the body."
 상위파일:
   - "MOC.md"
   - "_document-code-media-editing.md"
@@ -24,7 +24,7 @@ description: "A feature contract covering line numbers, syntax highlighting, sup
 - Provides in-document find and replace, undo, and redo.
 - On mobile, pinch out or in with two fingers to enlarge or shrink text and line numbers in code and plain text. This also applies to read-only files.
 
-- On mobile, editable Hotview, Plain, and code bodies show a translucent circular keyboard button at the bottom center. Tapping it opens the keyboard at the current selection; it hides while the keyboard is open and returns after dismissal. Read-only, loading, partial-preview, and media views do not show it. See [Mobile Editor and Keyboard](../../development/ui-contracts.md#mobile-editor-and-keyboard).
+- On mobile, editable Hotview, Plain, and code bodies show a translucent circular keyboard button at the bottom center. Only this button opens the body keyboard at the current selection; tapping the body moves the cursor or selects text without opening input. Pressing anywhere in the app outside the OS keyboard, including the body and auxiliary keys, dismisses it. The button hides while the keyboard is open and returns after dismissal. Read-only, loading, partial-preview, and media views do not show it. See [Mobile Editor and Keyboard](../../development/ui-contracts.md#mobile-editor-and-keyboard).
 
 - When the mobile keyboard opens, reduce the editor height to keep the tapped cursor line and the status bar showing the selected character count and file size above the keyboard.
 - The mobile Plain editor displays the shared auxiliary key bar even when the keyboard is closed. It provides Esc, Tab, Ctrl, Shift, arrow keys, and undo and redo for editable files. Horizontal scrolling in the body does not switch tabs; only swiping left or right on the auxiliary key bar selects the previous or next tab. Markdown Plain follows the same rules.
@@ -72,7 +72,7 @@ description: "A feature contract covering line numbers, syntax highlighting, sup
 <!-- mew:validation:start -->
 ## Verification
 
-- `server/mobile-editor-keyboard-ui.test.ts` covers the floating button in Hotview, Markdown Plain, and code, keyboard visibility, selection preservation, keyboard API and native-focus paths, translated labels, and excluded views. Physical OS keyboard behavior still requires device verification.
+- `server/mobile-editor-keyboard-ui.test.ts` covers the floating button in Hotview, Markdown Plain, and code, keyboard visibility, suppressed body taps, outside-tap dismissal, selection preservation, keyboard API and native-focus paths, translated labels, and excluded views. `server/mobile-editor-keyboard-policy-ui.test.ts` covers pane isolation and restoration after editor replacement, permission changes, desktop resize, and unmount. Physical OS keyboard behavior still requires device verification.
 
 - `server/code-search-ui.test.ts` passed at 680px with Midnight and Korean, 390px with Rose and English, and 320px with Ocean and Japanese. Checks covered expanding find and replace, result counts, search options, recovery from regular expression errors, Previous, Next, Select All, IME input, keyboard navigation and closing, single and all replacements and undo, read-only mode, and preservation of input and expanded state after language changes. Horizontal overflow, button heights of at least 24px, shared tooltips, blocking Esc propagation, the `10000+` display for 10,001 results, the Select All limit, and continued navigation were also verified.
 

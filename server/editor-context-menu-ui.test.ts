@@ -351,7 +351,7 @@ function Fixture(){const [state,setState]=React.useState({...defaults,generation
     }
   })
 
-  await t.test('touch selection suppresses keyboard activation while a settled single tap still edits', async () => {
+  await t.test('mobile body taps and touch selection keep keyboard control exclusive to the button', async () => {
     const mobile = await createPage(390, 'light')
     try {
       await surface(mobile).evaluate(el => {
@@ -389,10 +389,16 @@ function Fixture(){const [state,setState]=React.useState({...defaults,generation
         await reset(mobile, fixture)
         const at = await point(mobile, fixture.selected, 2)
         await mobile.touchscreen.tap(at.x, at.y)
-        await mobile.waitForFunction(({ el, previous }) => Number(el.getAttribute('data-keyboard-shows')) === previous + 1,
-          { el: await mobile.locator('html').elementHandle(), previous })
+        await mobile.waitForTimeout(350)
+        assert.equal(Number(await shows()), previous, 'a settled single tap no longer opens the keyboard')
+        assert.equal(await surface(mobile).getAttribute('virtualkeyboardpolicy'), 'manual')
+        assert.equal(await surface(mobile).getAttribute('inputmode'), 'none')
+        await mobile.getByRole('button', { name: '키보드 열기', exact: true }).tap()
+        assert.equal(Number(await shows()), previous + 1, 'only the explicit keyboard button requests input')
         assert.equal(await mobile.locator('html').getAttribute('data-keyboard-policy-at-show'), 'manual')
-        assert.equal(await surface(mobile).getAttribute('virtualkeyboardpolicy'), null, 'single-tap editing restores the original policy')
+        await touchPointer(mobile, 'pointerdown', fixture.selected)
+        assert.equal(await surface(mobile).getAttribute('inputmode'), 'none', 'touching the editor again dismisses the keyboard')
+        await touchPointer(mobile, 'pointercancel', fixture.selected)
 
         await reset(mobile, fixture)
         const beforeDoubleTap = Number(await shows())
@@ -412,9 +418,9 @@ function Fixture(){const [state,setState]=React.useState({...defaults,generation
         await surface(mobile).evaluate(el => el.setAttribute('virtualkeyboardpolicy', 'auto'))
         await touchPointer(mobile, 'pointerdown', fixture.selected)
         await touchPointer(mobile, 'pointercancel', fixture.selected)
-        assert.equal(await surface(mobile).getAttribute('virtualkeyboardpolicy'), 'auto', 'cancel restores an existing attribute')
+        assert.equal(await surface(mobile).getAttribute('virtualkeyboardpolicy'), 'manual', 'gesture cancellation keeps the mobile keyboard policy')
       }
-      assert.equal(await mobile.locator('html').getAttribute('data-keyboard-hides'), '0', 'manual policy does not force-hide an already-open keyboard')
+      assert.ok(Number(await mobile.locator('html').getAttribute('data-keyboard-hides')) >= 3, 'body taps dismiss each explicitly opened keyboard')
       await reset(mobile)
       await surface(mobile).evaluate(el => {
         Object.defineProperty(el.ownerDocument.defaultView!.navigator, 'virtualKeyboard', { configurable: true, value: undefined })
@@ -424,9 +430,9 @@ function Fixture(){const [state,setState]=React.useState({...defaults,generation
       await select(mobile, 'selected text', false)
       await touchPointer(mobile, 'pointerup', 'selected text')
       await menu(mobile).waitFor()
-      assert.equal(await surface(mobile).getAttribute('inputmode'), 'none', 'unsupported browsers receive a keyboard hint after selection')
+      assert.equal(await surface(mobile).getAttribute('inputmode'), 'none', 'unsupported browsers retain keyboard suppression during selection')
       await touchPointer(mobile, 'pointerdown', 'paragraph target')
-      assert.equal(await surface(mobile).getAttribute('inputmode'), 'text', 'restore the original input hint before the next native tap')
+      assert.equal(await surface(mobile).getAttribute('inputmode'), 'none', 'the next native tap also keeps the keyboard closed')
       await touchPointer(mobile, 'pointercancel', 'paragraph target')
     } finally { await mobile.close() }
   })

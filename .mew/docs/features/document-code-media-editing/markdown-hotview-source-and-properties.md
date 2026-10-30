@@ -6,9 +6,9 @@ status: "implemented"
 created: "2026-09-18"
 updated: "2026-10-30"
 status_hash: "2741d359b18c61eecb53b8ce0ba2862f0f42c088d7d02cf55c88a23d1d44a98e"
-files: ["packages/editor/src/editor/FrontmatterSelect.tsx", "server/frontmatter-options.ts", "src/hooks/useTabs.ts", "src/components/EditorPane.tsx", "src/components/markdown-error-boundary.tsx", "packages/editor/src/Editor.tsx", "packages/editor/src/editor/FrontmatterPanel.tsx", "src/components/TableOfContents.tsx"]
+files: ["packages/editor/src/editor/FrontmatterSelect.tsx", "server/frontmatter-options.ts", "src/hooks/useTabs.ts", "src/components/EditorPane.tsx", "src/components/mobile-editor-keyboard-button.tsx", "src/hooks/use-mobile-editor-keyboard.ts", "src/components/markdown-error-boundary.tsx", "packages/editor/src/Editor.tsx", "packages/editor/src/editor/FrontmatterPanel.tsx", "src/components/TableOfContents.tsx"]
 commits: []
-description: "A feature contract covering Markdown Hotview and Plain editing, per-block computation caching and Pretext-based DOM virtualization, preservation of code-block line breaks and internal horizontal scrolling, retaining the line being read when switching views and cursor restoration boundaries in the properties area, checkboxes, document tables of contents, frontmatter properties, and navigation through backlinks and parent-file arrows beside the title. Includes parent-file exclusion, cross-project references, YAML preservation, the floating mobile keyboard button, and source-saving boundaries."
+description: "A feature contract covering Markdown Hotview and Plain editing, per-block computation caching and Pretext-based DOM virtualization, preservation of code-block line breaks and internal horizontal scrolling, retaining the line being read when switching views and cursor restoration boundaries in the properties area, checkboxes, document tables of contents, frontmatter properties, and navigation through backlinks and parent-file arrows beside the title. Includes parent-file exclusion, cross-project references, YAML preservation, mobile keyboard activation through the floating button and dismissal on outside presses, and source-saving boundaries."
 상위파일:
   - "MOC.md"
   - "_document-code-media-editing.md"
@@ -36,7 +36,7 @@ description: "A feature contract covering Markdown Hotview and Plain editing, pe
 - Use the handle to the left of a property to reorder it, and the type menu to assign document link, single-select, multi-select, date, text, or number. Each type entry displays a type icon to the left of its name.
 - Preserve the visible cursor line or the body line being read when switching between Hotview and Plain.
 
-- On mobile, editable Hotview, Plain, and code bodies show a translucent circular keyboard button at the bottom center. Tapping it opens the keyboard at the current selection; it hides while the keyboard is open and returns after dismissal. Read-only, loading, partial-preview, and media views do not show it. See [Mobile Editor and Keyboard](../../development/ui-contracts.md#mobile-editor-and-keyboard).
+- On mobile, editable Hotview, Plain, and code bodies show a translucent circular keyboard button at the bottom center. Only this button opens the body keyboard at the current selection; tapping the body moves the cursor or selects text without opening input. Pressing anywhere in the app outside the OS keyboard, including the body and auxiliary keys, dismisses it. The button hides while the keyboard is open and returns after dismissal. Read-only, loading, partial-preview, and media views do not show it. See [Mobile Editor and Keyboard](../../development/ui-contracts.md#mobile-editor-and-keyboard).
 
 - When the mobile keyboard opens, reduce the editor height to keep the tapped cursor line and the status bar showing the selected character count and file size above the keyboard.
 
@@ -96,7 +96,7 @@ description: "A feature contract covering Markdown Hotview and Plain editing, pe
 <!-- mew:validation:start -->
 ## Verification
 
-- `server/mobile-editor-keyboard-ui.test.ts` covers the floating button in Hotview, Markdown Plain, and code, keyboard visibility, selection preservation, keyboard API and native-focus paths, translated labels, and excluded views. Physical OS keyboard behavior still requires device verification.
+- `server/mobile-editor-keyboard-ui.test.ts` covers the floating button in Hotview, Markdown Plain, and code, keyboard visibility, suppressed body taps, outside-tap dismissal, selection preservation, keyboard API and native-focus paths, translated labels, and excluded views. `server/mobile-editor-keyboard-policy-ui.test.ts` covers pane isolation and restoration after editor replacement, permission changes, desktop resize, and unmount. Physical OS keyboard behavior still requires device verification.
 
 - 2026-10-29: `server/editor-code-block-scroll-ui.test.ts` verified preservation of the original two lines, spaces, and tabs in dark and light themes at 1100px and 390px; internal horizontal scrolling for long lines while retaining the editor width; copy button position; regular paragraph wrapping; and read-only mode. Scope and check results follow the [Work Record](../../work/editor-code-block-scroll.md).
 

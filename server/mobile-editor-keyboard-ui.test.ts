@@ -20,7 +20,7 @@ const noop=()=>{},defaults={path:'fixture.md',content:'Alpha selected text omega
 const callbacks=Object.fromEntries(['registerElement','registerTabBar','onFocus','onActivate','onPin','onCloseTab','onReorder','onOpenLink','onOpenHistory','onSetTocOpen','onOpenSidebar','onTabDragMove','onTabDrop'].map(key=>[key,noop]));
 function Fixture(){const [state,setState]=React.useState(defaults);const handle=React.useRef(null);
  window.resetFixture=values=>setState({...defaults,...values});window.selectFixture=()=>handle.current?.getSelectedText();window.language=setUiLocale;
- return <div data-fixture data-value={state.content} className="flex h-dvh flex-col"><EditorPane {...callbacks}
+ return <div data-fixture data-value={state.content} className="flex h-dvh flex-col"><button data-outside onClick={()=>window.outsideClicks=(window.outsideClicks??0)+1}>Outside editor</button><EditorPane {...callbacks}
  registerHandle={(_,value)=>handle.current=value} pane={{id:'main',tabs:[{...state,preview:false}],activePath:state.path}}
  onChangeContent={(_,content)=>setState(old=>({...old,content}))} onSetViewMode={(_,viewMode)=>setState(old=>({...old,viewMode}))}
  role="owner" authEmail="fixture@example.test" project="docs" focused tree={[]} presence={{}} canCollaborate={false}
@@ -49,8 +49,8 @@ function Fixture(){const [state,setState]=React.useState(defaults);const handle=
     const errors: string[] = []
     page.on('pageerror', error => errors.push(error.message))
     await page.addInitScript(`localStorage.setItem('mew:locale','ko');localStorage.setItem('mew:ui-locale','ko');
-      window.keyboardCalls=[];
-      Object.defineProperty(navigator,'virtualKeyboard',{configurable:true,value:${nativeApi ? `Object.assign(new EventTarget(),{overlaysContent:false,boundingRect:new DOMRect(),show(){if(window.keyboardFailure)throw Error('Unavailable');const el=document.activeElement;window.keyboardCalls.push({active:el?.matches('.ProseMirror,.cm-content'),policy:el?.getAttribute('virtualkeyboardpolicy'),activation:navigator.userActivation.isActive})}})` : 'undefined'}});`)
+      window.keyboardCalls=[];window.keyboardHides=0;window.keyboardHideModes=[];
+      Object.defineProperty(navigator,'virtualKeyboard',{configurable:true,value:${nativeApi ? `Object.assign(new EventTarget(),{overlaysContent:false,boundingRect:new DOMRect(),show(){if(window.keyboardFailure)throw Error('Unavailable');const el=document.activeElement;window.keyboardCalls.push({active:el?.matches('.ProseMirror,.cm-content'),policy:el?.getAttribute('virtualkeyboardpolicy'),activation:navigator.userActivation.isActive})},hide(){window.keyboardHides++;const el=document.activeElement;window.keyboardHideModes.push({policy:el?.getAttribute('virtualkeyboardpolicy'),mode:el?.getAttribute('inputmode')})}})` : 'undefined'}});`)
     await page.route('http://mew-mobile-editor-keyboard.test/**', route => {
       const url = new URL(route.request().url())
       if (url.pathname === '/api/comments') return route.fulfill({ json: { threads: [] } })
@@ -65,8 +65,20 @@ function Fixture(){const [state,setState]=React.useState(defaults);const handle=
       await page.evaluate(`window.resetFixture(${JSON.stringify(mode)})`)
       const content = page.locator('.ProseMirror, .cm-content')
       await content.waitFor()
-      if (width >= 768) { assert.equal(await button.count(), 0); continue }
+      if (width >= 768) {
+        assert.equal(await button.count(), 0)
+        assert.equal(await content.getAttribute('virtualkeyboardpolicy'), null)
+        assert.equal(await content.getAttribute('inputmode'), null)
+        continue
+      }
       await button.waitFor()
+      assert.equal(await content.getAttribute('virtualkeyboardpolicy'), 'manual')
+      assert.equal(await content.getAttribute('inputmode'), 'none', 'suppress native keyboard from the first body tap')
+      const beforeTap = await page.evaluate('window.keyboardCalls.length')
+      await content.tap({ position: { x: 40, y: 10 } })
+      await page.waitForTimeout(350)
+      assert.equal(await page.evaluate('window.keyboardCalls.length'), beforeTap, 'body taps never request the keyboard, including after the former single-tap delay')
+      assert.equal(await content.getAttribute('inputmode'), 'none')
       const box = (await button.boundingBox())!
       const host = (await content.locator('xpath=ancestor::div[contains(@class,"relative")][1]').boundingBox())!
       assert.equal(box.width, 44)
@@ -96,11 +108,11 @@ function Fixture(){const [state,setState]=React.useState(defaults);const handle=
       assert.equal(await page.locator('[data-fixture]').getAttribute('data-value'), 'Alpha selected text omega.')
       if (nativeApi) {
         assert.deepEqual(await page.evaluate('window.keyboardCalls.at(-1)'), { active: true, policy: 'manual', activation: true })
-        assert.equal(await content.getAttribute('virtualkeyboardpolicy'), null, 'restores automatic keyboard policy')
+        assert.equal(await content.getAttribute('virtualkeyboardpolicy'), 'manual', 'manual policy stays enabled throughout the mobile session')
         await page.evaluate('window.keyboardFailure = true')
         await button.tap()
         assert.equal(await content.evaluate(el => el === el.ownerDocument.activeElement), true, 'a rejected keyboard API request falls back to native focus')
-        assert.equal(await content.getAttribute('virtualkeyboardpolicy'), null)
+        assert.equal(await content.getAttribute('virtualkeyboardpolicy'), 'manual')
         await page.evaluate('window.keyboardFailure = false')
       }
       // Headless Chromium cannot open the OS keyboard; exercise its viewport signal separately.
@@ -110,16 +122,36 @@ function Fixture(){const [state,setState]=React.useState(defaults);const handle=
         win.visualViewport!.dispatchEvent(new win.Event('resize'))
       })
       await button.waitFor({ state: 'hidden' })
+      const hides = Number(await page.evaluate('window.keyboardHides'))
+      await content.tap({ position: { x: 40, y: 10 } })
+      assert.equal(await content.getAttribute('inputmode'), 'none', 'tapping the body while typing dismisses and suppresses reopening')
+      if (nativeApi) {
+        assert.ok(Number(await page.evaluate('window.keyboardHides')) > hides)
+        assert.deepEqual(await page.evaluate('window.keyboardHideModes.at(-1)'), { policy: 'manual', mode: null }, 'hide runs before suppression, while the browser accepts keyboard control')
+      }
       await content.evaluate(el => {
         const win = el.ownerDocument.defaultView!
         Reflect.deleteProperty(win.visualViewport!, 'height')
         win.visualViewport!.dispatchEvent(new win.Event('resize'))
       })
       await button.waitFor()
+      // Restore a known range after the user's deliberate cursor move above.
+      await content.evaluate(el => {
+        el.focus()
+        const doc = el.ownerDocument, node = doc.createTreeWalker(el, 4).nextNode()!
+        const range = doc.createRange(); range.setStart(node, 6); range.setEnd(node, 14)
+        const selection = doc.getSelection()!; selection.removeAllRanges(); selection.addRange(range)
+        doc.dispatchEvent(new doc.defaultView!.Event('selectionchange'))
+      })
       await button.tap()
       assert.equal(await page.evaluate('window.selectFixture()'), 'selected', 'reopening with the editor still focused preserves selection')
       await page.keyboard.type('typed')
       await page.waitForFunction('document.querySelector("[data-fixture]").dataset.value.includes("typed")')
+      const clicks = Number(await page.evaluate('window.outsideClicks ?? 0'))
+      await page.locator('[data-outside]').tap()
+      assert.equal(await content.getAttribute('inputmode'), 'none')
+      assert.equal(await content.evaluate(el => el === el.ownerDocument.activeElement), false, 'an outside tap blurs the editor even without keyboard API support')
+      assert.equal(await page.evaluate('window.outsideClicks'), clicks + 1, 'dismissing the keyboard preserves the outside control action')
       if (process.env.MEW_KEYBOARD_BUTTON_SCREENSHOT_DIR) {
         await fs.mkdir(process.env.MEW_KEYBOARD_BUTTON_SCREENSHOT_DIR, { recursive: true })
         await page.screenshot({ path: `${process.env.MEW_KEYBOARD_BUTTON_SCREENSHOT_DIR}/${width}-${theme}-${'viewMode' in mode ? mode.path ?? 'plain' : 'hotview'}.png` })

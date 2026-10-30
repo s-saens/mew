@@ -43,6 +43,7 @@ import { saveScroll, getScroll } from '../utils/scrollMemory'
 import { useCollab } from '../hooks/useCollab'
 import { useEditorTouchSelection } from '../hooks/useEditorTouchSelection'
 import { MobileEditorKeyboardButton } from './mobile-editor-keyboard-button'
+import { useMobileEditorKeyboard } from '../hooks/use-mobile-editor-keyboard'
 import type { Pane, Tab } from '../hooks/useTabs'
 import type { DropZone } from '../utils/paneTree'
 import { externalAbsolutePath, isExternalTabPath } from '../utils/externalFiles'
@@ -553,6 +554,10 @@ export function EditorPane({
 
   const editorMenuRoot = useRef<HTMLDivElement>(null)
   const selectionScope = JSON.stringify([workspace?.path, project, activePath, authEmail, role, canComment, canWriteComment, annotationReadOnly, activeTab?.viewMode])
+  const mobileEditorEditable = !!activeTab && !fileLoadFailed && !unsupportedFile && !diffTarget && !mediaKind(activeTab.path)
+    && !(activeTab.path.endsWith('.svg') && activeTab.viewMode === 'hotview') && !loading && !revalidating
+    && !collaborationPending && activeTab.editable && !isArchivedPath(activeTab.path, project) && !activeTab.anchorPreview
+  const openMobileKeyboard = useMobileEditorKeyboard(editorMenuRoot, mobileEditorEditable, selectionScope)
   const showEditorMenu = (target: EditorContextTarget, x: number, y: number, touchSelection = false) => {
     disarmRestoreRef.current()
     setAnnotationPopup(null)
@@ -1068,11 +1073,7 @@ export function EditorPane({
                     />
                   </MarkdownErrorBoundary>
                 )}
-                <MobileEditorKeyboardButton root={editorMenuRoot}
-                  enabled={!fileLoadFailed && !unsupportedFile && !mediaKind(activeTab.path)
-                    && !(isSvg && activeTab.viewMode === 'hotview') && !loading && !revalidating
-                    && !collaborationPending && activeTab.editable && !isArchivedPath(activeTab.path, project)
-                    && !activeTab.anchorPreview} />
+                <MobileEditorKeyboardButton enabled={mobileEditorEditable} onActivate={openMobileKeyboard} />
               </div>
               {fileError && !fileLoadFailed && (
                 <div role="alert" className="select-text max-h-24 shrink-0 overflow-auto whitespace-pre-wrap break-words border-t border-edge px-3 py-2 text-sm text-danger-ink">
