@@ -1,6 +1,6 @@
 ---
 title: "Separate swipes for the mobile dock, panel body, and Plain auxiliary key bar"
-description: "Records mobile dock, panel body, and Plain auxiliary key bar swipe separation, internal horizontal scrolling priority, and the 2026-10-30 attachment tag gesture exclusion and agent navigation through the + picker. Distinguishes local regression, type, lint, and documentation checks from physical-device verification and production application."
+description: "Records mobile dock, panel body, and Plain auxiliary key bar swipe separation, internal horizontal scrolling priority, and the 2026-10-30 attachment tag gesture exclusion, agent navigation through the + picker, and Documents/Files scope swipes in the file explorer. Distinguishes local regression, type, lint, and documentation checks from physical-device verification and production application."
 created: "2026-10-27"
 updated: "2026-10-30"
 ---
@@ -63,3 +63,17 @@ Verification results:
 - `npm run check:docs`: All 553 descriptions and document links passed.
 
 No build, deployment, or server restart was performed; physical phones and production application remain unverified.
+
+## 2026-10-30 Switch Documents and Files with explorer swipes
+
+File explorer body swipes previously reached a tab-switching handler that returned without changing the scope. `App` now selects Files on a leftward swipe and Documents on a rightward swipe, stopping at either end. Swipes and the existing toggle share scope selection and creation-destination handling. The query, filename/content search mode, editor tabs, and foreground panel are preserved; guests retain Documents. The current behavior is owned by [File and Folder Navigation](../features/projects-files-search/file-folder-exploration-and-operations.md#scope) and the [shared gesture contract](../development/ui-contracts.md#mobile-dock-and-panel-switching); usage is documented in [Projects and file navigation](../../../docs/guides/projects.md#projects-subprojects-and-documents-in-the-file-explorer).
+
+Verification results:
+
+- The new scope assertions in `server/workspace-switch-ui.test.ts` failed against the previous `App` implementation, confirming the missing transition.
+- `node --test --test-name-pattern='App mobile dock swipes|Files opens Documents' server/workspace-switch-ui.test.ts`: Both isolated Chromium tests passed. Actual touch input verified both directions, repeated gestures at either end, query and search-mode retention, desktop exclusion, dock navigation, editor-tab retention, and existing Documents folder navigation. The swipe helper waits for its target to be visible during responsive dock relocation.
+- `node --test server/mobile-panel-swipe-ui.test.ts`: Passed existing native horizontal scrolling, gesture cancellation, multitouch, attachment, dock, Hotview body, and Plain key-bar checks.
+- `npx tsc -b`, targeted `npx oxlint`, the Impeccable detector for `src/App.tsx`, and targeted `git diff --check` passed. Existing lint warnings remain.
+- `npm run check:docs`: Document descriptions and links passed.
+
+Only local isolated checks were performed. No app build, deployment, or server startup/restart was performed. Actual phones and application to the running instance remain unverified.

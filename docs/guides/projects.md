@@ -1,7 +1,7 @@
 ---
 title: "Projects and file navigation"
-description: "Explains the desktop project sidebar and mobile list opened with Alt+P, per-project command buttons, and the tabless file explorer's single search box, existing Documents/Files two-button toggle, hierarchical results, and contextual tooltips. Covers Git changes, current-branch commit history, local branch deletion, branch switching in the graph, and list, calendar, and Gantt operations in the Alt+T task panel."
-updated: "2026-10-29"
+description: "Explains the desktop project sidebar and mobile list opened with Alt+P, per-project command buttons, and the tabless file explorer's single search box, Documents/Files toggle and mobile scope swipes, hierarchical results, and contextual tooltips. Covers Git changes, current-branch commit history, local branch deletion, branch switching in the graph, and list, calendar, and Gantt operations in the Alt+T task panel."
+updated: "2026-10-30"
 상위파일:
   - "../../.mew/docs/MOC.md"
   - "MOC.md"
@@ -72,6 +72,8 @@ Cloud folder shortcuts were integrated into **Favorites** at the top of both exp
 ## Projects, subprojects, and Documents in the file explorer
 
 The file explorer has a search field at the top, with no separate search tab. Switch directly using the existing two-button **Documents / Files** toggle below it (English: **Documents / Files**). Documents view shows only the linked Documents folder; Files view shows regular files and folders, subprojects, and the documents folder. The selected view and each list's expansion and scroll state are remembered per account and project. Guests retain their existing document scope. The toggle also supports switching with the Left/Right arrow keys and Home/End.
+
+On mobile, swipe left in the file explorer panel to select **Files**, or right to select **Documents**. Swiping farther in the same direction keeps the current view. The search query and filename/content search mode stay selected. Horizontal scrolling areas and search-field touches keep their existing gestures.
 
 With the content search icon in the search field off, search matches filenames; with it on, search matches body text. Results retain only matching items and their parent paths in the current view's tree, expand ancestors, and highlight names. Hovering over a content result shows a tooltip with the matching line, up to 3 lines above and below, and about 10 words on either side. Clearing the query restores the previous navigation position. For `Ctrl+P`, `Ctrl+Shift+F`, patterns, and replacement, follow the [search guide](../configuration/search.md).
 

@@ -208,7 +208,9 @@ for (const mode of ['keyboard', 'workspace', 'documents', 'permissions', 'panels
       const selected = await page.locator('[data-test-editor]').getAttribute('data-test-active')
       const cdp = await page.context().newCDPSession(page)
       const swipe = async (selector: string, dx: number) => {
-        const box = (await page.locator(selector).boundingBox())!
+        const target = page.locator(selector)
+        await target.waitFor({ state: 'visible' })
+        const box = (await target.boundingBox())!
         const x = box.x + box.width / 2, y = box.y + box.height / 2
         await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] })
         await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x + dx, y }] })
@@ -223,16 +225,24 @@ for (const mode of ['keyboard', 'workspace', 'documents', 'permissions', 'panels
       const sidebar = page.locator('[data-sidebar]')
       const input = sidebar.getByRole('textbox')
       const contentToggle = sidebar.getByRole('button', { name: '파일 내용 검색', exact: true })
+      await input.fill('beta')
       for (const enabled of [false, true]) {
         if (enabled) await contentToggle.tap()
-        for (const dx of [-90, 90]) {
+        for (const [dx, scope] of [[-90, '파일'], [90, '문서'], [90, '문서'], [-90, '파일'], [-90, '파일'], [90, '문서']] as const) {
           await swipe('[data-sidebar]', dx)
+          const scopeButton = sidebar.getByRole('button', { name: scope, exact: true })
+          await page.waitForFunction(el => el?.getAttribute('aria-pressed') === 'true', await scopeButton.elementHandle())
           await foreground('sidebar')
           assert.equal(await input.isVisible(), true, 'body swipes preserve the shared explorer search field')
+          assert.equal(await input.inputValue(), 'beta', 'scope swipes preserve the search query')
           assert.equal(await contentToggle.getAttribute('aria-pressed'), String(enabled), 'body swipes preserve the content-search mode')
           assert.equal(await sidebar.locator('[data-numbered-tab], [role="tab"]').count(), 0, 'the explorer has no search tabs')
         }
       }
+      await page.setViewportSize({ width: 1100, height: 700 })
+      await swipe('[data-sidebar]', -90)
+      assert.equal(await sidebar.getByRole('button', { name: '문서', exact: true }).getAttribute('aria-pressed'), 'true', 'desktop body swipes preserve the scope')
+      await page.setViewportSize({ width: 390, height: 700 })
       await swipe('.mobile-dock', -65)
       await foreground('editor')
       await swipe('.mobile-dock', -65)

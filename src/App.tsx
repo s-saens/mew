@@ -525,6 +525,10 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     setProjectSearchClearSignal(value => value + 1)
     setDocsExpanded(scope === 'docs')
   }, docsExpanded ? 'docs' : 'root')
+  const selectExplorerScope = (scope: 'docs' | 'files') => {
+    setDocsExpanded(scope === 'docs')
+    sidebarCreate.selectDirectory(scope === 'docs' ? 'docs' : 'root', '')
+  }
   // 사이드바에서 지금 문서 자리를 드러내라는 신호(부모 폴더 펼치기 + 스크롤). 경로가 아니라 신호인 이유는
   // **이미 열려 있는 탭을 다시 눌렀을 때**다 — 그때는 활성 경로가 그대로라 경로만 보면 아무 일도 안 일어난다
   const [revealSignal, setRevealSignal] = useState(0)
@@ -1319,6 +1323,10 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
   const mobileSwipeRoot = useMobilePanelSwipe((panel, direction) => {
     if (remoteDesktopOpen || panel !== (mobileForegroundPanel ?? 'editor')) return
     activeTabbedSurfaceRef.current = panel
+    if (panel === 'sidebar') {
+      if (!isGuest && docsExpanded !== (direction < 0)) selectExplorerScope(direction < 0 ? 'docs' : 'files')
+      return
+    }
     if (direction < 0) switchCurrentWindowTabLeft()
     else switchCurrentWindowTabRight()
   })
@@ -2167,15 +2175,14 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
                   {!isGuest && <div role="group" aria-label={uiText('탐색 범위')} className="flex min-w-0 flex-1 rounded-md bg-surface p-0.5 text-xs">
                     {(['docs', 'files'] as const).map(scope => {
                       const selected = (scope === 'docs') === docsExpanded
-                      const select = (next: 'docs' | 'files') => { setDocsExpanded(next === 'docs'); sidebarCreate.selectDirectory(next === 'docs' ? 'docs' : 'root', '') }
                       return <button key={scope} type="button" aria-pressed={selected}
-                        onClick={() => select(scope)}
+                        onClick={() => selectExplorerScope(scope)}
                         onContextMenu={scope === 'docs' && isOwner ? event => { event.preventDefault(); setDocsSettingsOpen(true) } : undefined}
                         onKeyDown={event => {
                           if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
                           event.preventDefault()
                           const next = event.key === 'Home' ? 'docs' : event.key === 'End' ? 'files' : scope === 'docs' ? 'files' : 'docs'
-                          select(next)
+                          selectExplorerScope(next)
                           event.currentTarget.parentElement?.querySelectorAll('button')[next === 'docs' ? 0 : 1]?.focus()
                         }}
                         className={`min-w-0 flex-1 rounded px-3 py-1.5 focus-visible:outline-2 focus-visible:outline-accent ${selected ? 'bg-surface-raised text-ink' : 'text-ink-muted hover:text-ink-secondary'}`}>
