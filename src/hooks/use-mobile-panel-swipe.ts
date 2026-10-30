@@ -3,7 +3,7 @@ import type { DockDirection } from '../utils/mobile-dock'
 
 type TabbedPanel = 'sidebar' | 'editor' | 'agent' | 'terminal' | 'git' | 'tasks'
 const tabbedPanels: readonly string[] = ['sidebar', 'editor', 'agent', 'terminal', 'git', 'tasks']
-const excluded = '.mobile-dock, [data-dock-tab-bar], [role="dialog"], [role="menu"], [role="listbox"], input, textarea, select, [role="slider"], .task-swipe, [data-gantt-grab], .task-gantt-scroller, [data-popup-resize]'
+const excluded = '.mobile-dock, [data-dock-tab-bar], [role="dialog"], [role="menu"], [role="listbox"], input, textarea, select, [role="slider"], [data-attachment-token], .task-swipe, [data-gantt-grab], .task-gantt-scroller, [data-popup-resize]'
 
 function swipePanel(target: Element): TabbedPanel | null {
   if (target.closest(excluded)) return null

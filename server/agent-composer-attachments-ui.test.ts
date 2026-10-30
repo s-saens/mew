@@ -58,15 +58,19 @@ import React from '${root}/node_modules/react/index.js';
 import {createRoot} from '${root}/node_modules/react-dom/client.js';
 import {EditorView} from '${root}/node_modules/@codemirror/view/dist/index.js';
 import {AgentComposerInput} from '${root}/src/components/agent-composer-input.tsx';
+import {useMobilePanelSwipe} from '${root}/src/hooks/use-mobile-panel-swipe.ts';
 localStorage.setItem('mew:locale','ko');
 window.previewed=[];
 function Fixture(){
   const [value,setValue]=React.useState('');
   const [generation,setGeneration]=React.useState(0);
+  const [tab,setTab]=React.useState(0);
+  const swipe=useMobilePanelSwipe((panel,direction)=>setTab(current=>current+direction));
   const input=React.useRef(null);
   const results=React.useRef(new Map());
   const view=()=>EditorView.findFromDOM(input.current.element);
   window.composerFixture={
+    tab,
     raw:()=>input.current.value,
     selected:()=>({from:input.current.selectionStart,to:input.current.selectionEnd}),
     select:(from,to=from)=>{input.current.focus();input.current.setSelectionRange(from,to)},
@@ -81,8 +85,8 @@ function Fixture(){
     },
     reset:text=>{results.current.clear();setValue(text);setGeneration(current=>current+1)},
   };
-  return <main style={{maxWidth:640,margin:'80px auto',padding:16}}>
-    <div data-composer-shell onPointerDownCapture={event=>event.currentTarget.dataset.pointerType=event.pointerType} style={{height:156,padding:8,border:'1px solid var(--color-edge)',borderRadius:8,background:'var(--color-surface)',color:'var(--color-ink)',fontSize:16,lineHeight:'28px'}}>
+  return <main ref={swipe} data-workspace-panel="agent" style={{maxWidth:640,margin:'80px auto',padding:16}}>
+    <div data-agent-composer data-composer-shell onPointerDownCapture={event=>event.currentTarget.dataset.pointerType=event.pointerType} style={{height:156,padding:8,border:'1px solid var(--color-edge)',borderRadius:8,background:'var(--color-surface)',color:'var(--color-ink)',fontSize:16,lineHeight:'28px'}}>
       <AgentComposerInput key={generation} value={value} onChange={next=>setValue(next)} onKeyDown={()=>{}}
         inputRef={input} label="첨부 테스트 입력" placeholder="텍스트 입력" style={{height:'100%'}}
         resolvePendingToken={token=>results.current.get(token)}
@@ -339,7 +343,7 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
       })
 
       if (width === 390 && dark) await matrix.test('native touch long press moves the attachment with pointer capture', async touchTest => {
-        const original = `Start ${photoToken} middle end`
+        const original = `Starting text ${photoToken} middle end`
         await reset(page, original)
         const button = input.getByRole('button', { name: 'photo copy.png 사진 미리보기', exact: true })
         const box = await button.boundingBox()
@@ -348,18 +352,21 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
         const client = await page.context().newCDPSession(page)
         touchTest.after(() => client.detach())
         const previous = await page.evaluate<number>('window.previewed.length')
+        const previousTab = await page.evaluate<number>('window.composerFixture.tab')
         await client.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: box.x + box.width / 2, y: box.y + box.height / 2, id: 1 }] })
         try {
           await page.locator(dragOverlay).waitFor({ state: 'attached' })
           assert.equal(await page.locator('[data-composer-shell]').getAttribute('data-pointer-type'), 'touch')
           const coords = await page.evaluate<Position>('window.composerFixture.coords(0)')
           assert.ok(coords)
+          assert.ok(box.x + box.width / 2 - coords.left > 60, 'attachment movement exceeds the tab-swipe threshold')
           await client.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: coords.left + 1, y: (coords.top + coords.bottom) / 2, id: 1 }] })
           await settlePointer(page)
         } finally {
           await client.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
         }
-        assert.equal(await rawDocument(page), `${photoToken}Start  middle end`)
+        assert.equal(await rawDocument(page), `${photoToken}Starting text  middle end`)
+        assert.equal(await page.evaluate<number>('window.composerFixture.tab'), previousTab, 'long-press attachment moves must not switch agent tabs')
         assert.equal(await page.evaluate<number>('window.previewed.length'), previous)
         assert.equal(await page.locator('body > [aria-hidden="true"]').count(), 0)
         await input.press('Control+z')

@@ -37,6 +37,7 @@ function Fixture(){
         <div data-panel-body style={{flex:1}}>Body
           <div className="task-swipe" style={{height:40}}>Task deletion</div><div className="task-gantt-scroller" style={{height:40}}>Gantt scrolling</div><div data-gantt-grab style={{height:40}}>Gantt editing</div>
           <div role="dialog" style={{height:40}}>Dialog</div>
+          <div data-agent-composer style={{height:40}}><span data-attachment-token="attachment" style={{display:'block',width:180}}><button type="button" style={{width:'100%'}}>Attachment</button></span></div>
           <div data-scroll-zone style={{width:280,height:80,overflowX:'auto'}}>
             <table style={{width:960,tableLayout:'fixed'}}><tbody><tr><td><span data-scroll-target style={{display:'block',height:56}}>Wide table</span></td></tr></tbody></table>
           </div>
@@ -136,6 +137,14 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><I18nProvid
       await swipe(`[data-workspace-panel="tasks"] ${selector}`)
       assert.deepEqual(await state(), before, `${selector} retains its existing gestures`)
     }
+    await selectPanel('agent')
+    const agentBefore = await state()
+    for (const dx of [-100, 100]) {
+      await swipe('[data-workspace-panel="agent"] [data-attachment-token]', dx)
+      assert.deepEqual(await state(), agentBefore, 'touches starting on attachment tags never switch agent tabs')
+    }
+    await swipe('[data-workspace-panel="agent"] [data-agent-composer]', -100)
+    assert.equal((await state()).index, (agentBefore.index + 1) % 3, 'the rest of the composer retains tab swipes')
     for (const panel of ['sidebar', 'agent', 'terminal', 'git', 'tasks']) {
       await selectPanel(panel)
       const zone = `[data-workspace-panel="${panel}"] [data-scroll-zone]`
