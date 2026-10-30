@@ -70,7 +70,7 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
     await page.locator('.mew-database-table').first().getByRole('textbox', { name: 'Name', exact: true }).first().waitFor()
     assert.equal(await page.evaluate('window.created'), createdId)
     assert.equal(await page.evaluate("window.calls.filter(call=>call.kind==='create').length"), 2, 'redo makes no new database request')
-    await page.locator('.mew-database-table').first().getByRole('textbox', { name: 'Name', exact: true }).first().click({ button: 'right' })
+    await page.locator('.mew-database-table').first().locator('thead th').first().click({ button: 'right' })
     await page.getByRole('menuitem', { name: '표로 전환', exact: true }).waitFor()
     assert.ok(await page.getByRole('menuitemcheckbox').count() > 0, 'column type actions remain available')
     await page.screenshot({ path: `/tmp/mew-conversion-${width}-${theme}-${collaborative}-db-menu.png`, fullPage: true })

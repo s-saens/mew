@@ -225,11 +225,22 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
       await title.focus()
       await page.keyboard.press('Shift+F10')
       const menu = page.getByRole('menu', { name: '열 타입 변경', exact: true })
+      assert.equal(await menu.count(), 0, 'cell keyboard menus do not change column types')
+      await title.click({ button: 'right' })
+      assert.equal(await menu.count(), 0, 'cell right-clicks do not change column types')
+      const titleHeader = page.locator('thead th').first()
+      await titleHeader.click({ button: 'right' })
       assert.deepEqual(await menu.getByRole('menuitemcheckbox').allTextContents(), ['텍스트', '페이지'])
+      await page.screenshot({ path: `/tmp/mew-db-header-menu-${width}.png` })
       await page.keyboard.press('Escape')
-      assert.equal(await title.evaluate(el => el === el.ownerDocument.activeElement), true)
+      const typeButton = page.getByRole('button', { name: '제목 열 타입 변경', exact: true })
+      await typeButton.focus()
+      await page.keyboard.press('Shift+F10')
+      await menu.waitFor()
+      await page.keyboard.press('Escape')
+      assert.equal(await typeButton.evaluate(el => el === el.ownerDocument.activeElement), true)
 
-      await page.getByRole('textbox', { name: '상태', exact: true }).click({ button: 'right' })
+      await page.locator('thead th').nth(1).click({ button: 'right' })
       assert.equal(await menu.getByRole('menuitemcheckbox', { name: '페이지', exact: true }).count(), 0)
       await menu.getByRole('menuitemcheckbox', { name: '단일선택', exact: true }).click()
       await page.getByRole('combobox', { name: '상태', exact: true }).click()
@@ -273,7 +284,7 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
       assert.equal(await page.getByRole('combobox', { name: '상태', exact: true }).textContent(), '선택')
       await page.keyboard.press('Escape')
 
-      await page.getByRole('button', { name: '제목 열 타입 변경', exact: true }).click()
+      await titleHeader.getByText('제목', { exact: true }).click({ button: 'right' })
       await menu.getByRole('menuitemcheckbox', { name: '페이지', exact: true }).click()
       await page.getByRole('button', { name: '송상훈 페이지 열기', exact: true }).click()
       assert.equal(await page.locator('body').evaluate(el => Reflect.get(el.ownerDocument.defaultView!, 'openedPage')), 'People/송상훈.md')
@@ -283,9 +294,11 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
       }), true, 'the page title input stays inside its own column')
       const pageButton = page.getByRole('button', { name: '송상훈 페이지 열기', exact: true })
       await pageButton.locator('svg path').click({ button: 'right' })
+      assert.equal(await menu.count(), 0, 'page cells do not open column type menus')
+      await typeButton.locator('svg path').click({ button: 'right' })
       await menu.waitFor()
       await page.keyboard.press('Escape')
-      assert.equal(await pageButton.evaluate(el => el === el.ownerDocument.activeElement), true, 'SVG context menus restore the enclosing button')
+      assert.equal(await typeButton.evaluate(el => el === el.ownerDocument.activeElement), true, 'header SVG context menus restore the enclosing button')
       await title.fill('')
       await title.press('Tab')
       await page.getByRole('alert').filter({ hasText: '대표열 값은 필수입니다' }).waitFor()
@@ -294,7 +307,10 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
       await page.getByRole('button', { name: '제목 열 타입 변경', exact: true }).click()
       const bounds = await menu.boundingBox()
       assert.ok(bounds && bounds.x >= 0 && bounds.x + bounds.width <= width, 'type menu fits the viewport')
-      await page.keyboard.press('Escape')
+      assert.equal(await menu.getByRole('menuitemcheckbox', { name: '페이지', exact: true }).getAttribute('aria-checked'), 'true')
+      await menu.getByRole('menuitemcheckbox', { name: '텍스트', exact: true }).click()
+      await page.getByRole('button', { name: '송상훈 페이지 열기', exact: true }).waitFor({ state: 'detached' })
+      assert.equal(await title.inputValue(), '송상훈', 'page-to-text conversion keeps the primary value')
       for (const name of ['텍스트', '텍스트 2']) {
         await page.getByRole('button', { name: '열 추가', exact: true }).click()
         await page.getByRole('menu', { name: '열 추가', exact: true }).getByRole('menuitem', { name: '텍스트', exact: true }).click()
@@ -302,6 +318,54 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
       }
       assert.equal(await page.locator('select, datalist').count(), 0)
       assert.deepEqual(errors, [])
+      await page.close()
+    }
+  } finally { await browser.close() }
+})
+
+test('empty database headers allow type changes while read-only and busy headers block them', { skip: !domBrowserExecutable(), timeout: 30_000 }, async () => {
+  const source = `import React from ${JSON.stringify(import.meta.resolve('react'))};
+import {createRoot} from ${JSON.stringify(import.meta.resolve('react-dom/client'))};
+import {DatabaseTable} from ${JSON.stringify(path.join(root, 'packages/editor/src/database/DatabaseTable.tsx'))};
+function Fixture(){const [mode,setMode]=React.useState('editable');const [type,setType]=React.useState('text');
+const ctrl={view:{id:'empty',title:'Empty',kind:'managed',columns:[{id:'name',name:'Title',type}],rows:[]},editable:mode!=='readonly',changingColumn:mode==='busy'?'name':null,loading:false,error:null,setTitleDraft(){},renameTitle(){},changeColumnType(id,value){setType(value)}};
+return <>{['editable','readonly','busy'].map(value=><button key={value} onClick={()=>setMode(value)}>{value}</button>)}<DatabaseTable ctrl={ctrl}/></>}
+createRoot(document.getElementById('root')).render(<Fixture/>);`
+  const { code, css } = await databaseFixture(source)
+  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  try {
+    for (const width of [1100, 390]) {
+      const page = await browser.newPage({ viewport: { width, height: 800 }, isMobile: width < 500, hasTouch: width < 500 })
+      page.setDefaultTimeout(4000)
+      await page.route('http://mew-db.test/**', route => route.fulfill(route.request().url().endsWith('/app.js')
+        ? { contentType: 'text/javascript', body: code }
+        : { contentType: 'text/html', body: `<!doctype html><html lang="ko"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}</style><div id="root"></div><script type="module" src="/app.js"></script></html>` }))
+      await page.goto('http://mew-db.test/')
+      const header = page.locator('thead th').first()
+      const menu = page.getByRole('menu', { name: '열 타입 변경', exact: true })
+      await header.click({ button: 'right' })
+      assert.deepEqual(await menu.getByRole('menuitemcheckbox').allTextContents(), ['텍스트', '페이지'])
+      await menu.getByRole('menuitemcheckbox', { name: '페이지', exact: true }).click()
+      const typeButton = header.getByRole('button', { name: 'Title 열 타입 변경', exact: true })
+      await typeButton.focus()
+      await typeButton.press('ContextMenu')
+      assert.equal(await menu.getByRole('menuitemcheckbox', { name: '페이지', exact: true }).getAttribute('aria-checked'), 'true')
+      await page.keyboard.press('Escape')
+      for (const mode of ['readonly', 'busy']) {
+        await page.getByRole('button', { name: mode, exact: true }).click()
+        assert.equal(await typeButton.isDisabled(), true)
+        await header.click({ button: 'right' })
+        assert.equal(await menu.count(), 0, `${mode}: no type menu on right-click`)
+        const sortButton = header.getByRole('button', { name: 'Title 오름차순 정렬', exact: true })
+        await sortButton.focus()
+        await sortButton.press('Shift+F10')
+        assert.equal(await menu.count(), 0, `${mode}: no keyboard type menu`)
+      }
+      await page.getByRole('button', { name: 'editable', exact: true }).click()
+      await typeButton.click()
+      await menu.getByRole('menuitemcheckbox', { name: '텍스트', exact: true }).click()
+      await header.click({ button: 'right' })
+      assert.equal(await menu.getByRole('menuitemcheckbox', { name: '텍스트', exact: true }).getAttribute('aria-checked'), 'true')
       await page.close()
     }
   } finally { await browser.close() }

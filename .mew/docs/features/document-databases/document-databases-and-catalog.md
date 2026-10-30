@@ -4,11 +4,11 @@ parent: "mew-database"
 title: "Document Databases·Full List"
 status: "implemented"
 created: "2026-09-18"
-updated: "2026-10-23"
+updated: "2026-10-30"
 status_hash: "ea759314baf1dca2105e78500c7277302e925451b58b01f45479cf00db9e02ad"
 files: ["src/components/DatabaseListModal.tsx", "packages/editor/src/database/DatabaseTable.tsx", "packages/editor/src/database/DatabaseCollection.tsx", "packages/editor/src/database/DatabaseBoard.tsx", "packages/editor/src/database/DatabaseCalendar.tsx", "packages/editor/src/database/DatabaseGantt.tsx", "packages/editor/src/database/DatabaseRowDialog.tsx", "packages/editor/src/database/databaseLayout.ts", "packages/editor/src/database/databaseSchema.ts", "server/db/databaseService.ts", "server/db/rowPages.ts", "server/db/routes.ts"]
 commits: []
-description: "Defines bidirectional conversion between Postgres document DBs and Markdown tables, undo and redo, borderless views, rounded field grids, and calendar and Gantt date-range editing and display settings. Also covers text import, retrieval of all rows, search, moving between groups, primary columns, row-page synchronization, access boundaries, and data separation from the independent task panel."
+description: "Defines bidirectional conversion between Postgres document DBs and Markdown tables, undo and redo, borderless views, rounded field grids, and calendar and Gantt date-range editing and display settings. Also covers column-header type menus, text import, retrieval of all rows, search, moving between groups, primary columns, row-page synchronization, access boundaries, and data separation from the independent task panel."
 상위파일:
   - "MOC.md"
   - "_document-databases.md"
@@ -27,7 +27,7 @@ description: "Defines bidirectional conversion between Postgres document DBs and
 - View and edit DBs in the current project from the database list in the menu.
 - Ctrl/Cmd+click a DB reference in Plain to open a popup with that DB selected.
 - Use the sort button to the right of each column title to cycle through ascending → descending → off. Read-only tables can also be sorted.
-- Right-click a cell to change its column's type. The type change applies to the entire column, not just the clicked cell.
+- Right-click a column header to change its type. The type change applies to every row in that column; data cells do not offer type changes.
 - The first data column is the primary column for each row and contains nonempty, unique titles. Its default type is text, and it can be converted to a page type.
 - A new DB starts with a primary column named `제목`, a regular column named `텍스트`, and 2 rows populated with example values.
 - Converting the primary column to a page type creates a subpage for each row directly under the document containing the DB, using the row's title as the filename, and shares the remaining column values bidirectionally with the page's frontmatter fields.
@@ -49,7 +49,7 @@ description: "Defines bidirectional conversion between Postgres document DBs and
 
 ### Markdown Tables and Conversion
 
-- Right-clicking a DB in an editable Hotview document offers `표로 전환`. The same item is also added to the existing column type menu for editable cells. Conversion applies to the entire DB from its title, card, board, or calendar view as well; the option is not shown in standalone DB popups. Read-only DB references and external tables can also be converted to snapshot tables if the document is editable. Neither conversion direction is offered if the document itself is read-only.
+- Right-clicking a DB in an editable Hotview document offers `표로 전환`. The same item is also added to the column type menu for editable column headers. Conversion applies to the entire DB from its title, card, board, or calendar view as well; the option is not shown in standalone DB popups. Read-only DB references and external tables can also be converted to snapshot tables if the document is editable. Neither conversion direction is offered if the document itself is read-only.
 - DB→table uses `getView(id, {allRows: true})` to read all rows and columns regardless of search, sorting, or view settings and creates a regular table in the document body. The default query limit of 1,000 rows does not apply. Column names become headers; numbers, checkboxes, dates, and page titles become text; multi-select values become comma-separated text; and empty values become empty cells. Line breaks are preserved. DB types, selection colors, and row-page bodies are not copied to the regular table.
 - Table→DB saves the table's cell text to a new DB using `데이터베이스로 전환` in `TableCopyMenu`. It validates the optional `table: {columns: string[], rows: string[][]}` in `POST /api/db`, creates all columns as text, and saves column definitions and rows in one transaction. Default `/db` insertion retains the existing 2 example rows, while imports that send `table` do not create example rows. Imports are limited to 200 columns and 10,000 rows. The browser demo uses the same normalization.
 - If the first column contains nonempty, unique values, it is used as the primary column. If it contains empty or duplicate values, a separate text primary column populated starting with `항목 1` is prepended, preserving the original cells. Empty, duplicate, or reserved column names are replaced with distinct names. Tables without headers and merged cells follow the [Markdown Table Contract](../document-code-media-editing/markdown-table-editing-and-copying.md#detailed-contracts).
@@ -106,7 +106,7 @@ description: "Defines bidirectional conversion between Postgres document DBs and
 
 - Renaming updates single-select and multi-select values and subpage properties for every row using that option. Deletion removes the option, its color, and corresponding selected values together. Single-select values become empty, while multi-select values retain other selections. Duplicate names, empty names, and unsupported colors are not saved.
 
-- The cell context menu changes the type of the entire column. The primary column allows only text↔page conversion, and regular columns cannot use the page type. The primary column's internal value remains a title string even in page mode, and the row UUID is the primary key.
+- The column header context menu changes the type of the entire column, including when the DB has no rows. Right-click anywhere in the header, click its type icon, or press ContextMenu/Shift+F10 with a header control focused to open the same menu. Esc closes it and restores focus to the invoking control, including clicks on its SVG icon. Read-only and busy headers do not open type menus. Data-cell right-clicks and keyboard context menus do not offer type changes; document-level conversion remains available there. The primary column allows only text↔page conversion, and regular columns cannot use the page type. The primary column's internal value remains a title string even in page mode, and the row UUID is the primary key.
 
 - A new row's primary value starts with a unique `제목 없음`. When primary-column constraints are first applied to an existing DB, empty values are filled with a default title and duplicate values are distinguished by appended numbers. Subsequent saves of empty or duplicate values and deletion of the primary column are rejected.
 
@@ -133,6 +133,7 @@ description: "Defines bidirectional conversion between Postgres document DBs and
 - `server/database-links-ui.test.ts`: Verifies Ctrl/Cmd+click, normal clicks, exclusion of code examples, invalid UUIDs, read-only behavior, and missing-DB errors in the actual Plain editor pane. Also checks document project scope, body preservation, cell editing, and the shared popup's theme-specific backgrounds, blur, mobile boundaries, closing, and focus restoration.
 - `server/database-table-ui.test.ts`: Verifies editor/standalone table cell padding, the field grid's 6px corners, content-based block and column widths, and internal horizontal scrolling at 390px and 1100px in dark and light themes. Also checks that long DB titles do not widen the overall block, border colors match regular Markdown tables, titles have no background or border, and column header backgrounds have 20% opacity. Verifies per-column sort button cycling, `aria-sort`, keyboard and touch operation, independent per-table state, and read-only sorting.
 - `packages/editor/src/database/databaseSort.test.ts`: Verifies numbers, dates, checkboxes, text, pages, options, empty and equal values, preservation of original order, clearing sorting, and deleted columns.
+- `server/database-table-ui.test.ts` also covers header right-clicks, header keyboard menus, SVG focus restoration, absence of type menus on data cells, primary text↔page conversion, regular-column choices, empty DBs, and read-only/busy restrictions at 390px and 1100px. See the [header menu work record](../../work/database-column-header-menu.md) for execution results and application boundaries.
 - `server/db/databaseService.test.ts` and `server/db/routes.test.ts`: Verify creation responses and storage for the primary column, text column, and 2 example rows in isolated Postgres. `src/demo/transport.test.ts` verifies demo creation, requerying, and adding a third row.
 - `server/db/selection-options.test.ts`: Verifies option color preservation, propagation of renames and deletions to all rows and subpages, and no changes from invalid edits in isolated Postgres.
 
@@ -146,7 +147,7 @@ description: "Defines bidirectional conversion between Postgres document DBs and
 
 - The following items are user verification criteria, not results of tests run during this documentation cleanup:
   - Verify that cell and column changes propagate between two sessions and that access using a DB ID from another project is denied.
-  - Verify that changing a type through the cell context menu applies to the entire column, and that empty values, duplicate values, prohibited types, and deletion are rejected for the primary column.
+  - Verify that changing a type through the column header context menu applies to the entire column, and that empty values, duplicate values, prohibited types, and deletion are rejected for the primary column.
   - Verify that converting a row with `제목: 송상훈` and `나이: 27` to a page preserves the page title and YAML number.
   - Change table and page properties separately and verify that changes propagate in both directions while preserving the body and user properties.
   - Verify that existing subpage bodies remain when page mode is disabled or a row or DB is deleted.

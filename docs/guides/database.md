@@ -1,7 +1,7 @@
 ---
 title: "Table Databases (/db)"
-description: "Explains inserting Postgres document databases, converting between databases and regular tables in both directions and undoing conversions, borderless views, and editing date ranges in calendar and Gantt views. Also covers importing text fields, search, moving between groups, property editing, column sorting, primary columns, row page sharing, read-only references, and backup scope."
-updated: "2026-10-23"
+description: "Explains inserting Postgres document databases, converting between databases and regular tables in both directions and undoing conversions, borderless views, and editing date ranges in calendar and Gantt views. Also covers column-header type menus, importing text fields, search, moving between groups, property editing, column sorting, primary columns, row page sharing, read-only references, and backup scope."
+updated: "2026-10-30"
 상위파일:
   - "../../.mew/docs/MOC.md"
   - "MOC.md"
@@ -61,7 +61,7 @@ Sorting is also available in read-only tables. It applies only to the table curr
 
 ## Changing Column Types
 
-Right-click a cell in the column you want to change and choose a type. The type icon to the left of the column name opens the same menu. The new type applies to all rows in that column. Use single-select to choose one value and multi-select to choose multiple values. You can add new options while editing a select cell.
+Right-click the header of the column you want to change and choose a type. The type icon to the left of the column name opens the same menu. With a header control focused, press **Shift+F10** or the **Context Menu** key to open it, and **Esc** to close it. This works even when the table has no rows. The new type applies to all rows in that column; data cells do not offer type changes. Use single-select to choose one value and multi-select to choose multiple values. You can add new options while editing a select cell.
 
 If any value cannot be converted, the type change is not applied. For example, if a multi-select row has multiple selected values, reduce it to one before changing the column to single-select.
 

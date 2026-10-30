@@ -3,7 +3,7 @@ import { uiText } from '@mew/ui/i18n-core'
 import { useUiLocale } from '@mew/ui/i18n'
 // /db 표의 프레젠테이션 — 서버 연동은 useDatabaseView(controller)가 넘겨주고, 여기선 렌더만 한다.
 // TipTap을 모르므로 노드뷰(DatabaseView)와 독립 팝업(DatabasePanel)이 그대로 재사용한다.
-import { useMemo, useState, type InputHTMLAttributes, type ReactNode } from 'react'
+import { useMemo, useState, type InputHTMLAttributes, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
 import type { EditorOpenLink, DbColumn, DbColumnType, DbRow } from '../types'
 import { FrontmatterSelect } from '../editor/FrontmatterSelect'
 import { Check } from '../editor/FrontmatterFieldMenu'
@@ -86,14 +86,15 @@ export function DatabaseTable({ ctrl, onOpenPage, toolbar, content, wide = false
                   <ColumnHeader
                     key={col.id}
                     col={col}
-                    editable={editable}
+                    editable={editable && !ctrl.changingColumn}
                     primary={col.id === primaryColumn}
                     sortDirection={activeSort?.columnId === col.id ? activeSort.direction : undefined}
                     onSort={() => setSort(activeSort?.columnId !== col.id ? { databaseId: view.id, columnId: col.id, direction: 'ascending' }
                       : activeSort.direction === 'ascending' ? { ...activeSort, direction: 'descending' } : null)}
-                    onTypeMenu={(trigger) => {
+                    onTypeMenu={(trigger, position) => {
                       const rect = trigger.getBoundingClientRect()
-                      setTypeMenu({ columnId: col.id, x: rect.left, y: rect.bottom + 4, trigger })
+                      setConvertMenu(null); setAddMenu(null)
+                      setTypeMenu({ columnId: col.id, x: position?.x ?? rect.left, y: position?.y ?? rect.bottom + 4, trigger })
                     }}
                     onRename={(name) => ctrl.renameColumn(col.id, name)}
                     onDelete={() => ctrl.deleteColumn(col.id)}
@@ -118,19 +119,7 @@ export function DatabaseTable({ ctrl, onOpenPage, toolbar, content, wide = false
               {rows.map((row) => (
                 <tr key={row.id} className="border-b border-edge-strong last:border-b-0 hover:bg-surface">
                   {view.columns.map((col) => (
-                    <td key={col.id} className="border-r border-edge-strong p-0 align-top last:border-r-0"
-                      onContextMenu={event => {
-                        if (!editable || ctrl.changingColumn) return
-                        event.preventDefault(); event.stopPropagation()
-                        const trigger = (event.target as Element).closest<HTMLElement>('input, button, [tabindex]') ?? event.currentTarget
-                        setTypeMenu({ columnId: col.id, x: event.clientX, y: event.clientY, trigger })
-                      }}
-                      onKeyDown={event => {
-                        if (!editable || ctrl.changingColumn || !(event.key === 'ContextMenu' || event.key === 'F10' && event.shiftKey)) return
-                        event.preventDefault(); event.stopPropagation()
-                        const rect = event.currentTarget.getBoundingClientRect()
-                        setTypeMenu({ columnId: col.id, x: rect.left, y: rect.bottom, trigger: event.target as HTMLElement })
-                      }}>
+                    <td key={col.id} className="border-r border-edge-strong p-0 align-top last:border-r-0">
                       <DatabaseCell
                         col={col}
                         row={row}
@@ -202,7 +191,7 @@ function ColumnHeader({
   onRename: (name: string) => void
   onDelete: () => void
   primary: boolean
-  onTypeMenu: (trigger: HTMLElement) => void
+  onTypeMenu: (trigger: HTMLElement, position?: { x: number; y: number }) => void
   sortDirection?: DbSort['direction']
   onSort: () => void
 }) {
@@ -212,10 +201,23 @@ function ColumnHeader({
 
   const sortLabel = sortDirection === 'ascending' ? uiText('{p0} 내림차순 정렬', { p0: col.name })
     : sortDirection === 'descending' ? uiText('{p0} 정렬 해제', { p0: col.name }) : uiText('{p0} 오름차순 정렬', { p0: col.name })
+  const typeMenuHandlers = {
+    onContextMenu: (event: MouseEvent<HTMLTableCellElement>) => {
+      if (!editable) return
+      event.preventDefault(); event.stopPropagation()
+      const trigger = (event.target as Element).closest<HTMLElement>('input, button, [tabindex]') ?? event.currentTarget
+      onTypeMenu(trigger, { x: event.clientX, y: event.clientY })
+    },
+    onKeyDown: (event: KeyboardEvent<HTMLTableCellElement>) => {
+      if (!editable || !(event.key === 'ContextMenu' || event.key === 'F10' && event.shiftKey)) return
+      event.preventDefault(); event.stopPropagation()
+      onTypeMenu(event.target as HTMLElement)
+    },
+  }
 
   if (renaming) {
     return (
-      <th aria-sort={sortDirection ?? 'none'} className="border-r border-edge-strong p-0 last:border-r-0">
+      <th {...typeMenuHandlers} aria-sort={sortDirection ?? 'none'} className="border-r border-edge-strong p-0 last:border-r-0">
         <ContentSizedInput
           autoFocus={canAutoFocusInput()}
           value={draft}
@@ -240,7 +242,7 @@ function ColumnHeader({
   }
 
   return (
-    <th aria-sort={sortDirection ?? 'none'} className="group/col border-r border-edge-strong px-2 py-1.5 text-left align-middle last:border-r-0">
+    <th {...typeMenuHandlers} aria-sort={sortDirection ?? 'none'} className="group/col border-r border-edge-strong px-2 py-1.5 text-left align-middle last:border-r-0">
       <div className="flex items-center justify-between gap-1">
         <button type="button" disabled={!editable} aria-label={uiText('{p0} 열 타입 변경', { p0: col.name })}
           data-tip={TYPE_LABELS[col.type]} onClick={event => onTypeMenu(event.currentTarget)}
