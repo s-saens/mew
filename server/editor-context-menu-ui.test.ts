@@ -80,6 +80,16 @@ async function touchPointer(page: Page, type: 'pointerdown' | 'pointerup' | 'poi
   }, { type, at })
 }
 
+async function nativeTouch(page: Page, type: 'touchstart' | 'touchend' | 'touchcancel', text: string) {
+  const at = await point(page, text, 2)
+  await surface(page).evaluate((el, { type, at }) => {
+    const win = el.ownerDocument.defaultView!
+    const touch = new win.Touch({ identifier: 7, target: el, clientX: at.x, clientY: at.y })
+    const touches = type === 'touchstart' ? [touch] : []
+    el.dispatchEvent(new win.TouchEvent(type, { bubbles: true, cancelable: true, touches, targetTouches: touches, changedTouches: [touch] }))
+  }, { type, at })
+}
+
 async function touchContextMenu(page: Page, text: string, pointerEvent = true) {
   const at = await point(page, text, 2)
   return surface(page).evaluate((el, { at, pointerEvent }) => {
@@ -342,10 +352,10 @@ function Fixture(){const [state,setState]=React.useState({...defaults,generation
       }
       await reset(mobile)
       await touchPointer(mobile, 'pointerdown', 'selected text')
-      await select(mobile, 'selected text', false)
       await touchPointer(mobile, 'pointercancel', 'selected text')
-      await assertNoAutomaticMenu(mobile, 'a cancelled gesture does not open the menu')
+      await assertNoAutomaticMenu(mobile, 'a cancelled gesture without a selected range does not open the menu')
       await touchPointer(mobile, 'pointerdown', 'selected text')
+      await select(mobile, 'selected text', false)
       await touchPointer(mobile, 'pointerup', 'selected text')
       await menu(mobile).waitFor()
       await mobile.keyboard.press('Escape')
@@ -353,6 +363,53 @@ function Fixture(){const [state,setState]=React.useState({...defaults,generation
     } finally {
       await mobile.close()
     }
+  })
+
+  await t.test('mobile native selection handoff recovers after pointer and touch cancellation', async () => {
+    const mobile = await createPage(390, 'light')
+    try {
+      for (const fixture of [
+        { viewMode: 'hotview', path: 'fixture.md', value: markdown, selected: 'selected text' },
+        { viewMode: 'plain', path: 'fixture.md', value: markdown, selected: 'selected text' },
+        { viewMode: 'plain', path: 'fixture.ts', value: code, selected: 'selected' },
+      ]) {
+        for (const ending of ['touchend', 'touchcancel', 'pointercancel', 'late-selection'] as const) {
+          await reset(mobile, fixture)
+          await touchPointer(mobile, 'pointerdown', fixture.selected)
+          const nativeLifecycle = ending === 'touchend' || ending === 'touchcancel'
+          if (nativeLifecycle) await nativeTouch(mobile, 'touchstart', fixture.selected)
+          if (ending !== 'late-selection') await select(mobile, fixture.selected, false)
+          await touchPointer(mobile, 'pointercancel', fixture.selected)
+          if (nativeLifecycle) {
+            await assertNoAutomaticMenu(mobile, `${fixture.path}/${fixture.viewMode}/${ending}: pointer cancellation waits for the active native touch`)
+            await nativeTouch(mobile, ending, fixture.selected)
+          }
+          if (ending === 'late-selection') await select(mobile, fixture.selected, false)
+          await menu(mobile).waitFor()
+          assert.equal(await surface(mobile).evaluate(el => el.ownerDocument.defaultView!.getSelection()?.toString()), fixture.selected,
+            `${fixture.path}/${fixture.viewMode}/${ending}: recovering the menu preserves the native range`)
+          assert.equal(await surface(mobile).evaluate(el => el === el.ownerDocument.activeElement || el.contains(el.ownerDocument.activeElement)), true,
+            `${fixture.path}/${fixture.viewMode}/${ending}: recovering the menu keeps editor focus`)
+          await item(mobile, '복사').click()
+          assert.equal(await mobile.locator('[data-context-fixture]').evaluate(el => (el.ownerDocument.defaultView as unknown as { contextClipboard: { text: string } }).contextClipboard.text), fixture.selected,
+            `${fixture.path}/${fixture.viewMode}/${ending}: copy uses the recovered selection`)
+        }
+
+        await reset(mobile, fixture)
+        await touchPointer(mobile, 'pointerdown', fixture.selected)
+        await nativeTouch(mobile, 'touchstart', fixture.selected)
+        await touchPointer(mobile, 'pointercancel', fixture.selected)
+        await nativeTouch(mobile, 'touchcancel', fixture.selected)
+        await assertNoAutomaticMenu(mobile, `${fixture.path}/${fixture.viewMode}: cancellation without a range stays closed`)
+
+        await reset(mobile, fixture)
+        await touchPointer(mobile, 'pointerdown', fixture.selected)
+        await select(mobile, fixture.selected, false)
+        await touchPointer(mobile, 'pointercancel', fixture.selected)
+        await control(mobile, 'set', { path: fixture.path === 'fixture.ts' ? 'other.ts' : 'other.md' })
+        await assertNoAutomaticMenu(mobile, `${fixture.path}/${fixture.viewMode}: changing files cancels pending native-selection recovery`)
+      }
+    } finally { await mobile.close() }
   })
 
   await t.test('selection menus survive scrolling and dragging and dismiss on actual outside clicks', async () => {

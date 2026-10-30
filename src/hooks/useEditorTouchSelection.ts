@@ -88,7 +88,8 @@ export function useEditorTouchSelection({ root, scope, enabled, menuOpen, onSele
     const pointerCancel = () => {
       pressed = false
       if (gesture) gesture.moved = true
-      cancel()
+      // Native selection can take over pointer delivery while keeping a valid range.
+      schedule()
     }
     const touchStart = () => { touching = true; cancel() }
     const touchEnd = (event: TouchEvent) => { touching = event.touches.length > 0; if (!touching) up() }

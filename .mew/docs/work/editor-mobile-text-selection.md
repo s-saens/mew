@@ -1,6 +1,6 @@
 ---
 title: "Body text selection colors and automatic mobile menus"
-description: "Records the 2026-10-29 application of the theme primary color to Hotview, Plain, and code selections; preservation of native mobile text selection and automatic menus after selection; selection adjustment, focus, and lifecycle handling; the 2026-10-30 suppression of native context menus for existing body selections and keyboard activation during touch selection; scroll and drag preservation with click-only outside dismissal; isolated validation; and the scope of physical-device verification and production application."
+description: "Records the 2026-10-29 application of the theme primary color to Hotview, Plain, and code selections; preservation of native mobile text selection and automatic menus after selection; selection adjustment, focus, and lifecycle handling; the 2026-10-30 suppression of native context menus for existing body selections and keyboard activation during touch selection; scroll and drag preservation with click-only outside dismissal; recovery after native pointer and touch cancellation; isolated validation; and the scope of physical-device verification and production application."
 created: "2026-10-29"
 updated: "2026-10-30"
 ---
@@ -71,3 +71,16 @@ Current behavior is owned by the [editor menu contract](../development/ui-contra
 - `npx tsc -b` and targeted oxlint checks passed; the shared `ActionMenu` retained its 2 existing React ref warnings. `npm run check:docs` passed with 575 descriptions and no metadata or local-link errors. `git diff --check` passed.
 
 Physical-device native selection handles remain outside Chromium emulation. No app build, deployment, launcher, or server start, stop, or restart was performed; applying the change to the running instance remains the user's step.
+
+
+## Recover menus after native selection takes over a gesture
+
+On 2026-10-30, investigated intermittent mobile editor menus and reproduced a missing-menu path in an isolated browser regression. The selection hook canceled its timer on `pointercancel` and `touchcancel` even when a nonempty body selection remained. When the browser took over native selection without a later `pointerup` or selection change, the menu had no pending display request.
+
+The hook now rechecks selection on cancellation and uses the existing stability delay. Active native touches continue to defer display until `touchend` or `touchcancel`; cancellation without a selected range stays closed. Existing selection targets, focus, scroll preservation, keyboard ownership, and scope cleanup retain their existing paths. The [editor body menu contract](../development/ui-contracts.md#editor-body-context-menu) owns the current behavior.
+
+The regression in `server/editor-context-menu-ui.test.ts` covers Hotview, Plain Markdown, and code: pointer cancellation followed by native touch end or cancellation, pointer cancellation without a touch-event stream, selection arriving after cancellation, no-range cancellation, and file changes during recovery. Recovery checks preserve the native range and editor focus and copy the exact selected text. The focused regression failed before the fix because the menu did not become visible.
+
+`node --test server/editor-context-menu-ui.test.ts server/action-menu-ui.test.ts server/mobile-editor-keyboard-ui.test.ts server/mobile-editor-keyboard-policy-ui.test.ts` passed all 10 tests without skips after the fix. Existing scrolling, outside-click dismissal, desktop actions, and keyboard-button checks passed alongside the new recovery cases. `npx tsc -b`, targeted oxlint, `git diff --check`, and `npm run check:docs` passed; the documentation check reported 577 descriptions and no metadata or link errors. Impeccable's detector reported no findings in the changed hook.
+
+No app build, deployment, launcher, or server start, stop, or restart was performed. These checks inject native ranges and gesture events into isolated Chromium; actual Android/iOS selection handles and application to the running instance remain unverified. The user builds and applies the change.
