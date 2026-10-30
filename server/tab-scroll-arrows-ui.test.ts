@@ -36,7 +36,7 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><Fixture/><
   t.after(() => browser.close())
   for (const width of [1100, 390]) {
     await t.test(`${width}px ${width > 500 ? 'dark' : 'light'} tabs`, async () => {
-      const page = await browser.newPage({ viewport: { width, height: 420 }, hasTouch: width < 500 })
+      const page = await browser.newPage({ viewport: { width, height: 420 }, hasTouch: width < 500, reducedMotion: 'no-preference' })
       page.setDefaultTimeout(3000)
       const errors: string[] = []
       page.on('pageerror', error => errors.push(error.message))
@@ -59,6 +59,7 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><Fixture/><
       }
       await until(() => right.isVisible())
       assert.equal(await left.isVisible(), false, 'the leftmost position offers only a right arrow')
+      assert.equal(await left.locator('svg').evaluate(el => el.getAnimations().length), 0, 'a hidden arrow has no running animation')
       const stripWidth = await viewport.evaluate(el => el.clientWidth)
       const arrowBox = (await right.boundingBox())!, stripBox = (await viewport.boundingBox())!
       assert.ok(Math.abs(arrowBox.x + arrowBox.width - stripBox.x - stripBox.width) < 1, 'the arrow is pinned to the visible edge')
@@ -91,6 +92,38 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><Fixture/><
       assert.equal(await input.evaluate(el => el.ownerDocument.activeElement === el), true, 'pointer navigation preserves the draft focus')
       assert.equal(await viewport.locator('[aria-selected="true"]').getAttribute('data-editor-tab-id'), '1', 'scrolling does not activate a tab')
       assert.equal(await viewport.evaluate(el => el.clientWidth), stripWidth, 'arrows reserve no tab space')
+      const motion = await Promise.all([left, right].map(button => button.evaluate(el => {
+        const win = el.ownerDocument.defaultView!, icon = el.querySelector('svg')!
+        const animation = icon.getAnimations()[0]
+        if (!animation) return null
+        const duration = Number(animation.effect!.getComputedTiming().duration)
+        const before = el.getBoundingClientRect()
+        animation.pause()
+        const positions = [0, 0.125, 0.25, 0.375, 0.5, 0.625, 0.75, 0.875, 1].map(progress => {
+          animation.currentTime = duration * progress
+          return new win.DOMMatrix(win.getComputedStyle(icon).transform).m41
+        })
+        const after = el.getBoundingClientRect()
+        const timing = animation.effect!.getComputedTiming()
+        animation.play()
+        return { positions, duration, iterations: timing.iterations, buttonMoved: before.x !== after.x || before.width !== after.width }
+      })))
+      for (const [index, sample] of motion.entries()) {
+        assert.ok(sample, 'each visible arrow has an icon animation')
+        assert.equal(sample.iterations, Infinity, 'the directional cue repeats')
+        assert.ok(sample.duration >= 800 && sample.duration <= 1600, 'the loop has a subtle cadence')
+        assert.equal(sample.buttonMoved, false, 'the animated icon keeps its hit area fixed')
+        const outward = sample.positions.map(position => position * (index === 0 ? -1 : 1))
+        assert.ok(outward[0] < 0 && outward[4] > 0, 'each arrow moves toward its own outer wall')
+        assert.ok(outward.every(position => Math.abs(position) <= 2.1), 'the motion stays within two pixels of center')
+        const steps = outward.slice(1).map((position, i) => position - outward[i])
+        assert.ok(steps.slice(0, 4).every(step => step > 0), 'the icon travels outward before impact')
+        assert.ok(steps[3] > steps[0] * 3, 'the icon accelerates toward the wall')
+        assert.ok(steps.slice(4).every(step => step < 0), 'the icon rebounds immediately after impact')
+        assert.ok(Math.abs(steps[4]) > Math.abs(steps[7]) * 3, 'the rebound slows as it travels inward')
+        assert.ok(Math.abs(outward[0] - outward[8]) < 0.01, 'the loop joins without a position jump')
+      }
+      motion[0]!.positions.forEach((position, i) => assert.ok(Math.abs(position + motion[1]!.positions[i]) < 0.01, 'left and right trajectories are mirrored'))
       await page.mouse.move(10, 10)
       await page.screenshot({ path: `/tmp/mew-tab-arrows-${width}.png` })
 
@@ -121,6 +154,10 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><Fixture/><
       await until(() => right.isVisible())
 
       await page.emulateMedia({ reducedMotion: 'reduce' })
+      for (const button of [left, right]) {
+        assert.equal(await button.locator('svg').evaluate(el => el.ownerDocument.defaultView!.getComputedStyle(el).animationName), 'none', 'reduced motion removes the decorative loop')
+        assert.equal(await button.locator('svg').evaluate(el => el.ownerDocument.defaultView!.getComputedStyle(el).transform), 'none', 'reduced motion leaves the icon centered')
+      }
       await input.focus()
       await hold(right, 250)
       assert.ok(await viewport.evaluate(el => el.scrollLeft) > 40, 'reduced motion retains direct held scrolling')

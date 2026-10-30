@@ -17,9 +17,23 @@
   touch-action: none;
 }
 .mew-tab-scroll-button[hidden] { display: none; }
-.mew-tab-scroll-button[data-tab-scroll-direction="left"] { left: 0; }
-.mew-tab-scroll-button[data-tab-scroll-direction="right"] { right: 0; }
-.mew-tab-scroll-button svg { filter: drop-shadow(0 1px 2px color-mix(in srgb, var(--color-surface-deep) 90%, transparent)) drop-shadow(0 2px 5px color-mix(in srgb, var(--color-surface-deep) 75%, transparent)); }
+.mew-tab-scroll-button[data-tab-scroll-direction="left"] { left: 0; --mew-tab-scroll-bounce-offset: -2px; }
+.mew-tab-scroll-button[data-tab-scroll-direction="right"] { right: 0; --mew-tab-scroll-bounce-offset: 2px; }
+.mew-tab-scroll-button svg {
+  filter: drop-shadow(0 1px 2px color-mix(in srgb, var(--color-surface-deep) 90%, transparent)) drop-shadow(0 2px 5px color-mix(in srgb, var(--color-surface-deep) 75%, transparent));
+  animation: mew-tab-scroll-bounce 1.2s infinite;
+}
+@keyframes mew-tab-scroll-bounce {
+  0%, 100% {
+    transform: translateX(calc(-1 * var(--mew-tab-scroll-bounce-offset)));
+    animation-timing-function: cubic-bezier(0.333333, 0, 0.666667, 0.333333);
+  }
+  50% {
+    transform: translateX(var(--mew-tab-scroll-bounce-offset));
+    animation-timing-function: cubic-bezier(0.333333, 0.666667, 0.666667, 1);
+  }
+}
 .mew-tab-scroll-button:hover { color: var(--color-accent); }
 .mew-tab-scroll-button:focus-visible { outline: 2px solid var(--color-accent); outline-offset: -2px; }
 @media (pointer: coarse) { .mew-tab-scroll-button { width: 32px; } }
+@media (prefers-reduced-motion: reduce) { .mew-tab-scroll-button svg { animation: none; } }
