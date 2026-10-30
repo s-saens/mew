@@ -582,6 +582,11 @@ export function EditorPane({
     const surface = event.currentTarget.querySelector('.ProseMirror, .cm-editor')
     if (!surface || (!surface.contains(element) && !element.contains(surface))) return
     if (isTouchContextMenu(event.nativeEvent)) {
+      const selection = event.currentTarget.ownerDocument.getSelection()
+      const range = selection && !selection.isCollapsed && selection.rangeCount ? selection.getRangeAt(0) : null
+      const body = event.currentTarget.querySelector('.ProseMirror, .cm-content')
+      // Leave initial word selection to the browser; suppress only its menu once a body range exists.
+      if (range && body?.contains(range.startContainer) && body.contains(range.endContainer)) event.preventDefault()
       event.stopPropagation()
       return
     }

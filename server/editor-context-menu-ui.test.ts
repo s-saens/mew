@@ -95,6 +95,19 @@ async function touchContextMenu(page: Page, text: string, pointerEvent = true) {
   }, { at, pointerEvent })
 }
 
+async function assertSelectionContextMenu(page: Page, text: string) {
+  for (const pointerEvent of [true, false]) {
+    const focused = await surface(page).evaluateHandle(el => el.ownerDocument.activeElement)
+    assert.deepEqual(await touchContextMenu(page, text, pointerEvent), { prevented: true, bubbled: false },
+      `selected text suppresses the native menu for ${pointerEvent ? 'touch' : 'mouse-compatible'} context events`)
+    assert.equal(await surface(page).evaluate(el => el.ownerDocument.defaultView!.getSelection()?.toString()), text,
+      'suppressing the native menu preserves the selected range')
+    assert.equal(await surface(page).evaluate((el, focused) => el.ownerDocument.activeElement === focused, focused), true,
+      'suppressing the native menu preserves focus, including in readonly bodies')
+    await focused.dispose()
+  }
+}
+
 async function assertNoAutomaticMenu(page: Page, message: string) {
   await page.waitForTimeout(400)
   assert.equal(await menu(page).count(), 0, message)
@@ -265,6 +278,7 @@ function Fixture(){const [state,setState]=React.useState({...defaults,generation
         assert.deepEqual(await touchContextMenu(mobile, fixture.selected, fixture.viewMode === 'hotview'), { prevented: false, bubbled: false }, `${fixture.path}/${fixture.viewMode}: long press preserves browser text selection and stays inside the editor`)
         await assertNoAutomaticMenu(mobile, 'long press without a selected range does not open the menu')
         await select(mobile, fixture.selected, false)
+        await assertSelectionContextMenu(mobile, fixture.selected)
         await assertNoAutomaticMenu(mobile, 'the menu waits while a finger is still selecting text')
         await touchPointer(mobile, 'pointerup', fixture.selected)
         await menu(mobile).waitFor()
@@ -283,6 +297,7 @@ function Fixture(){const [state,setState]=React.useState({...defaults,generation
         await menu(mobile).waitFor()
         await touchPointer(mobile, 'pointerdown', fixture.next)
         await select(mobile, fixture.next, false)
+        await assertSelectionContextMenu(mobile, fixture.next)
         await assertNoAutomaticMenu(mobile, 'selection handles hide the old menu while the range changes')
         await touchPointer(mobile, 'pointerup', fixture.next)
         await menu(mobile).waitFor()
@@ -292,6 +307,7 @@ function Fixture(){const [state,setState]=React.useState({...defaults,generation
         await reset(mobile, { ...fixture, editable: false })
         await touchPointer(mobile, 'pointerdown', fixture.selected)
         await select(mobile, fixture.selected, false)
+        await assertSelectionContextMenu(mobile, fixture.selected)
         await touchPointer(mobile, 'pointerup', fixture.selected)
         await menu(mobile).waitFor()
         assert.equal(await item(mobile, '복사').isDisabled(), false, 'readonly touch selection still supports copy')
@@ -305,6 +321,7 @@ function Fixture(){const [state,setState]=React.useState({...defaults,generation
       assert.deepEqual(await touchContextMenu(mobile, 'A2'), { prevented: false, bubbled: false })
       await assertNoAutomaticMenu(mobile, 'a cell long press does not trigger the table context menu before selection')
       await select(mobile, 'A2', false)
+      await assertSelectionContextMenu(mobile, 'A2')
       await touchPointer(mobile, 'pointerup', 'A2')
       await menu(mobile).waitFor()
       assert.equal(await item(mobile, '복사').isDisabled(), false)

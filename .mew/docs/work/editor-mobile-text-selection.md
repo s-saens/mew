@@ -1,8 +1,8 @@
 ---
 title: "Body text selection colors and automatic mobile menus"
-description: "Records the 2026-10-29 application of the theme primary color to Hotview, Plain, and code selections; preservation of native mobile text selection and automatic menus after selection; selection adjustment, focus, and lifecycle handling; isolated validation; and the scope of physical-device verification and production application."
+description: "Records the 2026-10-29 application of the theme primary color to Hotview, Plain, and code selections; preservation of native mobile text selection and automatic menus after selection; selection adjustment, focus, and lifecycle handling; the 2026-10-30 suppression of native context menus for existing body selections; isolated validation; and the scope of physical-device verification and production application."
 created: "2026-10-29"
-updated: "2026-10-29"
+updated: "2026-10-30"
 ---
 
 Fixed an issue where the context menu blocked native text selection when long-pressing or double-tapping body text on mobile. Current behavior is owned by the [editor menu contract](../development/ui-contracts.md#editor-body-context-menu), and user actions are owned by the [body text menu guide](../../../docs/guides/editor.md#body-context-menu).
@@ -28,3 +28,13 @@ All 4 tests in `MEW_CONTEXT_MENU_SCREENSHOT_DIR=/tmp/mew-theme-selection-capture
 `npx tsc -b`, `npx oxlint` for the changed code and tests, and `git diff --check` for the changed scope passed. Existing CodePane React warnings remained. `npm run check:docs` failed with 1 existing frontmatter error, and the separate link validation function returned 19 existing link errors. Descriptions and local links in the 2 documents changed this time passed separate checks. Temporary CDP diagnostic connections and test code were cleaned up.
 
 No app build or application to the server was performed. Colors of OS selection handles and native toolbars, and actual iOS rendering, are outside the validation scope of this CSS change.
+
+## Suppress the native menu for selected body text
+
+On 2026-10-30, narrowed the earlier default-event allowance so the browser selection menu does not accompany Mew's automatic menu for selected body text. `EditorPane` now cancels touch-generated `contextmenu` events only when a nonempty native range is contained within the current Hotview, Plain, or code body. Mouse-compatible context events after touch input follow the same rule. Without a body selection, the handler retains browser defaults so the initial word-selection gesture remains available. The existing delayed Mew menu, native range, body focus, selection adjustment, read-only actions, and table actions retain their current paths. See the [current menu contract](../development/ui-contracts.md#editor-body-context-menu).
+
+Extended `server/editor-context-menu-ui.test.ts` to check cancellation for touch and mouse-compatible context events after selecting text, preserving the selected range and body focus. The checks cover Hotview, Plain, code, adjusted selections, read-only copying, and table cells; the existing no-selection checks still require uncanceled defaults. The new regression failed against the previous implementation because the selected-text event was not canceled.
+
+All 4 tests in `node --test server/editor-context-menu-ui.test.ts` passed after the change. The table-menu and shared text-selection tests also passed in `node --test server/editor-context-menu-ui.test.ts server/editor-table-menu-ui.test.ts server/text-selection-ui.test.ts`; that earlier run exposed a new assertion that incorrectly required read-only bodies to receive focus, which was corrected to compare focus before and after the event. `npx tsc -b`, `npx oxlint src/components/EditorPane.tsx server/editor-context-menu-ui.test.ts`, and `git diff --check` passed. Lint retained existing React warnings. `npm run check:docs` passed with 553 descriptions and no document link errors.
+
+No app build, deployment, or server lifecycle command was run. The tests use isolated Chromium, synthetic context events, and injected DOM ranges; actual Android Brave/Chrome and iOS Safari toolbar and handle behavior still require physical-device verification. The user applies changes to the running instance.
