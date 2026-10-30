@@ -507,7 +507,7 @@ strong {
   border-radius: 12px;
   background: var(--color-surface);
   color: var(--color-ink);
-  filter: drop-shadow(0 4px 10px rgb(0 0 0 / 24%));
+  filter: drop-shadow(0 4px 10px color-mix(in srgb, var(--color-surface-deep) 24%, transparent));
 }
 .mewcat-notifications-content { max-height: inherit; overflow-y: auto; border-radius: inherit; }
 .mewcat-assistant-menu { z-index: var(--layer-popover); }

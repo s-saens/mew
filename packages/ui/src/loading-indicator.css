@@ -37,7 +37,7 @@
 }
 .mew-loading-logo-shadow {
   display: inline-flex;
-  filter: drop-shadow(0 3px 4px rgb(0 0 0 / .8)) drop-shadow(0 8px 14px rgb(0 0 0 / .6));
+  filter: drop-shadow(0 3px 4px color-mix(in srgb, var(--color-surface-deep) 80%, transparent)) drop-shadow(0 8px 14px color-mix(in srgb, var(--color-surface-deep) 60%, transparent));
 }
 .mew-loading-logo {
   background: linear-gradient(135deg, #77758f, #617a8d 55%, #6c8790);
