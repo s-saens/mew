@@ -1,6 +1,6 @@
 ---
 title: "Table Databases (/db)"
-description: "Explains inserting Postgres document databases, converting between databases and regular tables in both directions and undoing conversions, borderless views, and editing date ranges in calendar and Gantt views. Also covers column-header type menus, importing text fields, search, moving between groups, property editing, column sorting, primary columns, row page sharing, read-only references, and backup scope."
+description: "Explains inserting Postgres document databases, converting between databases and regular tables in both directions and undoing conversions, borderless views, and editing date ranges in calendar and Gantt views. Also covers keyboard navigation through titles, headers, and cells, column-header type menus, importing text fields, search, moving between groups, property editing, column sorting, primary columns, row page sharing, read-only references, and backup scope."
 updated: "2026-10-30"
 상위파일:
   - "../../.mew/docs/MOC.md"
@@ -58,6 +58,14 @@ Use the search icon to search all properties in the current DB. In editable docu
 Click the sort button to the right of a column title to cycle through **Ascending → Descending → Clear Sort**. Clicking another column's button sorts by that column. Numbers and dates are sorted by value, and empty values always appear last.
 
 Sorting is also available in read-only tables. It applies only to the table currently being viewed and does not change the saved row order or sorting in other tables. Clearing the sort restores the original order.
+
+## Moving Between Cells with the Keyboard
+
+Use the arrow keys to move between cells. The DB title acts as a cell above the column headers: **Down** moves from the title to a header, then into the data rows; **Up** returns along the same path. **Left/Right** move between columns. Moving back down from the title returns to the previous column. Movement follows the currently sorted and filtered rows and stops at the table edges. This also works in read-only tables and between the title and headers of an empty table.
+
+Press **Enter** or **F2** on a focused cell to edit it, open its selection list, or toggle its checkbox. On a column header, this edits the column name. **Enter** finishes text editing and returns focus to the cell; **Esc** returns to navigation. Esc during a column rename cancels the change. Existing cell edits save when focus leaves the input.
+
+While editing text, Left/Right move the text cursor; at the beginning or end they move to the neighboring cell. Up/Down move to the adjacent row. Open selection menus keep their own arrow-key controls. To use cell navigation again after choosing an option, press Esc to return focus from the selection control to its cell.
 
 ## Changing Column Types
 

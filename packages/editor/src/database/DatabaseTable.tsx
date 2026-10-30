@@ -3,13 +3,14 @@ import { uiText } from '@mew/ui/i18n-core'
 import { useUiLocale } from '@mew/ui/i18n'
 // /db 표의 프레젠테이션 — 서버 연동은 useDatabaseView(controller)가 넘겨주고, 여기선 렌더만 한다.
 // TipTap을 모르므로 노드뷰(DatabaseView)와 독립 팝업(DatabasePanel)이 그대로 재사용한다.
-import { useMemo, useState, type InputHTMLAttributes, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
+import { useMemo, useRef, useState, type InputHTMLAttributes, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
 import type { EditorOpenLink, DbColumn, DbColumnType, DbRow } from '../types'
 import { FrontmatterSelect } from '../editor/FrontmatterSelect'
 import { Check } from '../editor/FrontmatterFieldMenu'
 import { ADD_TYPES, TYPE_LABELS, type DatabaseController } from './useDatabaseView'
 import { sortDatabaseRows, type DbSort } from './databaseSort'
 import { DatabaseLayoutIcon } from './DatabaseLayoutIcon'
+import { navigateDatabaseTable } from './databaseNavigation'
 
 type TypeMenu = { columnId: string; x: number; y: number; trigger: HTMLElement }
 
@@ -20,6 +21,7 @@ export function DatabaseTable({ ctrl, onOpenPage, toolbar, content, wide = false
   const [typeMenu, setTypeMenu] = useState<TypeMenu | null>(null)
   const [convertMenu, setConvertMenu] = useState<{ x: number; y: number; trigger: HTMLElement } | null>(null)
   const [sort, setSort] = useState<(DbSort & { databaseId: string }) | null>(null)
+  const navigationColumn = useRef(0)
   const activeSort = sort?.databaseId === view?.id ? sort : null
   const sortColumn = view?.columns.find(column => column.id === activeSort?.columnId)
   const rows = useMemo(() => sortDatabaseRows(visibleRows ?? view?.rows ?? [], sortColumn, activeSort, locale), [visibleRows, view?.rows, sortColumn, activeSort, locale])
@@ -35,16 +37,18 @@ export function DatabaseTable({ ctrl, onOpenPage, toolbar, content, wide = false
         setConvertMenu({ x: event.clientX, y: event.clientY, trigger: event.target as HTMLElement })
       }}
       onKeyDown={event => {
+        if (navigateDatabaseTable(event, navigationColumn)) return
         if (!onConvertToTable || !(event.key === 'ContextMenu' || event.key === 'F10' && event.shiftKey)) return
         event.preventDefault(); event.stopPropagation()
         const trigger = event.target as HTMLElement, rect = trigger.getBoundingClientRect()
         setTypeMenu(null); setAddMenu(null); setConvertMenu({ x: rect.left, y: rect.bottom, trigger })
       }}>
       {/* 헤더: 원통 아이콘 + 제목 + 배지 + 행 수 */}
-      <div className="flex items-center gap-1.5 px-2 py-1 [contain:inline-size]">
+      <div data-db-cell data-db-title-cell tabIndex={editable ? -1 : 0} className="flex items-center gap-1.5 px-2 py-1 [contain:inline-size] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent">
         <DbGlyph className="shrink-0 text-ink-muted" />
         {editable ? (
           <input
+            aria-label={uiText('데이터베이스')}
             value={view?.title ?? ''}
             onChange={(e) => ctrl.setTitleDraft(e.target.value)}
             onBlur={(e) => ctrl.renameTitle(e.target.value)}
@@ -119,7 +123,7 @@ export function DatabaseTable({ ctrl, onOpenPage, toolbar, content, wide = false
               {rows.map((row) => (
                 <tr key={row.id} className="border-b border-edge-strong last:border-b-0 hover:bg-surface">
                   {view.columns.map((col) => (
-                    <td key={col.id} className="border-r border-edge-strong p-0 align-top last:border-r-0">
+                    <td key={col.id} data-db-cell tabIndex={-1} className="border-r border-edge-strong p-0 align-top last:border-r-0 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent">
                       <DatabaseCell
                         col={col}
                         row={row}
@@ -196,7 +200,7 @@ function ColumnHeader({
   onSort: () => void
 }) {
   useUiLocale()
-  const [renaming, setRenaming] = useState(false)
+  const [renaming, setRenaming] = useState<'pointer' | 'keyboard' | null>(null)
   const [draft, setDraft] = useState(col.name)
 
   const sortLabel = sortDirection === 'ascending' ? uiText('{p0} 내림차순 정렬', { p0: col.name })
@@ -217,13 +221,13 @@ function ColumnHeader({
 
   if (renaming) {
     return (
-      <th {...typeMenuHandlers} aria-sort={sortDirection ?? 'none'} className="border-r border-edge-strong p-0 last:border-r-0">
+      <th {...typeMenuHandlers} data-db-cell tabIndex={-1} aria-sort={sortDirection ?? 'none'} className="border-r border-edge-strong p-0 last:border-r-0 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent">
         <ContentSizedInput
-          autoFocus={canAutoFocusInput()}
+          autoFocus={renaming === 'keyboard' || canAutoFocusInput()}
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onBlur={() => {
-            setRenaming(false)
+            setRenaming(null)
             if (draft !== col.name) onRename(draft)
           }}
           onKeyDown={(e) => {
@@ -231,8 +235,10 @@ function ColumnHeader({
             if (e.key === 'Escape') {
               // 여기서 멈추지 않으면 오버레이 스택까지 올라가 사이드바·터미널이 같이 닫힌다
               e.stopPropagation()
+              const header = e.currentTarget.closest('th')
               setDraft(col.name)
-              setRenaming(false)
+              setRenaming(null)
+              requestAnimationFrame(() => header?.focus({ preventScroll: true }))
             }
           }}
           className="bg-surface-hover px-2 py-1.5 text-xs font-medium text-ink outline-none"
@@ -242,7 +248,7 @@ function ColumnHeader({
   }
 
   return (
-    <th {...typeMenuHandlers} aria-sort={sortDirection ?? 'none'} className="group/col border-r border-edge-strong px-2 py-1.5 text-left align-middle last:border-r-0">
+    <th {...typeMenuHandlers} data-db-cell tabIndex={-1} aria-sort={sortDirection ?? 'none'} className="group/col border-r border-edge-strong px-2 py-1.5 text-left align-middle last:border-r-0 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent">
       <div className="flex items-center justify-between gap-1">
         <button type="button" disabled={!editable} aria-label={uiText('{p0} 열 타입 변경', { p0: col.name })}
           data-tip={TYPE_LABELS[col.type]} onClick={event => onTypeMenu(event.currentTarget)}
@@ -251,11 +257,12 @@ function ColumnHeader({
         </button>
         <button
           type="button"
+          data-db-cell-editor
           disabled={!editable}
-          onClick={() => {
+          onClick={event => {
             if (editable) {
               setDraft(col.name)
-              setRenaming(true)
+              setRenaming(event.detail === 0 ? 'keyboard' : 'pointer')
             }
           }}
           className="flex min-w-0 flex-1 items-center disabled:cursor-default"
