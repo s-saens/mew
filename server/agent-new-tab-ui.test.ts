@@ -18,6 +18,7 @@ import {I18nProvider} from '${root}/src/i18n.tsx';
 import {setBinding} from '${root}/packages/shortcuts/src/index.ts';
 import {captureAppTabShortcuts} from '${root}/src/utils/app-tab-shortcuts.ts';
 import {useFocusedWorkspacePanel} from '${root}/src/hooks/use-focused-workspace-panel.ts';
+import {useMobilePanelSwipe} from '${root}/src/hooks/use-mobile-panel-swipe.ts';
 localStorage.setItem('mew:locale','ko');window.messages=[];window.sockets={};
 const tabs=['first','second'].map(id=>({id,label:id,renamed:true,runtime:'codex',cwd:'/workspace'}));
 localStorage.setItem('mew:agent-tabs:'+JSON.stringify('/workspace'),JSON.stringify(tabs));
@@ -35,9 +36,13 @@ window.fileCreates=0;window.editorCloses=0;window.setNewBinding=keys=>setBinding
 captureAppTabShortcuts({closeEditorTab(){window.editorCloses++},create(){window.fileCreates++}});
 function Fixture({terminal=false}){
  useFocusedWorkspacePanel();
+ const [next,setNext]=React.useState(0),[previous,setPrevious]=React.useState(0);
+ const navigate=direction=>direction>0?setNext(value=>value+1):setPrevious(value=>value+1);
+ window.moveAgentTab=navigate;
+ const swipe=useMobilePanelSwipe((panel,direction)=>navigate(direction));
  const group=terminal?'terminal:restored':'agent:restored',kind=terminal?'terminal':'agent';
  const [layout,setLayout]=React.useState({version:1,groups:[{id:group,kind}],tabs:{[kind+':first']:group,[kind+':second']:group},active:{[group]:'first'},tree:{id:group}});
- const panel=<div data-workspace-panel={kind} style={{height:'100%',width:'100%'}}><AgentPanel terminalOpen={terminal} agentOpen={!terminal} project="test" workspacePath="/workspace" tree={[]} focusedFilePath={null} onOpenFile={()=>{}} onClose={()=>{}} /></div>;
+ const panel=<div ref={swipe} data-workspace-panel={kind} style={{height:'100%',width:'100%'}}><AgentPanel nextTabSignal={next} previousTabSignal={previous} terminalOpen={terminal} agentOpen={!terminal} project="test" workspacePath="/workspace" tree={[]} focusedFilePath={null} onOpenFile={()=>{}} onClose={()=>{}} /></div>;
  return <><button id="outside" data-sidebar data-workspace-panel="sidebar">Sidebar</button><input id="editor" data-workspace-panel="editor"/><div style={{height:'calc(100% - 40px)',position:'relative',display:'flex'}}>{matchMedia('(min-width:768px)').matches?<DockWorkspace value={layout} onChange={setLayout} foreground={kind} apiRef={null} onEditorDrop={()=>'main'}>{panel}</DockWorkspace>:panel}</div></>;
 }
 let rootView=createRoot(document.getElementById('root'));
@@ -89,6 +94,31 @@ window.showTerminal=()=>{rootView.unmount();rootView=createRoot(document.getElem
       await page.evaluate('window.sockets.first.open()')
       const first = page.getByRole('tab', { name: /first/ })
       const add = page.getByRole('button', { name: '새 탭', exact: true })
+      const moveTab = async (direction: number, selected: string | null) => {
+        if (width === 390) {
+          const cdp = await page.context().newCDPSession(page)
+          const x = direction > 0 ? 270 : 70, y = 300
+          await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] })
+          for (let step = 1; step <= 6; step++) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x - direction * 100 * step / 6, y }] })
+          await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+          await cdp.detach()
+        } else await page.evaluate(`window.moveAgentTab(${direction})`)
+        if (selected === null) {
+          await page.locator('[aria-label="새 탭"][aria-pressed="true"]').waitFor()
+          assert.equal(await page.getByRole('tab', { selected: true }).count(), 0, 'only the picker is selected')
+        } else {
+          await page.getByRole('tab', { name: new RegExp(selected), selected: true }).waitFor()
+          assert.equal(await add.getAttribute('aria-pressed'), 'false')
+        }
+      }
+      await first.click()
+      await moveTab(1, 'second')
+      await moveTab(1, null)
+      await moveTab(1, 'first')
+      await moveTab(-1, null)
+      await moveTab(-1, 'second')
+      await moveTab(-1, 'first')
+      assert.equal(await page.getByRole('tab').count(), 2, 'swiping through + does not create a tab')
       await page.evaluate("window.sockets.first.emit({type:'meta',meta:{sessionId:'first',busy:true,queued:[],canLoad:true,canList:true}})")
       await page.locator('[data-agent-composer] [contenteditable="true"]:visible').focus()
       await page.keyboard.press('Control+2')
@@ -110,6 +140,10 @@ window.showTerminal=()=>{rootView.unmount();rootView=createRoot(document.getElem
       await first.waitFor({ state: 'detached' })
       await page.waitForFunction('!!window.sockets.second')
       const second = page.getByRole('tab', { name: /second/ })
+      await moveTab(1, null)
+      await moveTab(1, 'second')
+      await moveTab(-1, null)
+      await moveTab(-1, 'second')
       await second.focus(); await page.keyboard.press('Meta+w')
       await second.waitFor({ state: 'detached' })
       const emptyBar = page.locator('[data-agent-tab-bar]:visible')
@@ -183,6 +217,7 @@ window.showTerminal=()=>{rootView.unmount();rootView=createRoot(document.getElem
       await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
       await cdp.detach()
       assert.equal(await codexRow.locator('kbd').textContent(), '3', 'touch handle reorders without long press')
+      await page.waitForFunction("[...document.querySelectorAll('[data-runtime-id]')].every(el => el.getAnimations().length === 0)")
       await page.emulateMedia({ reducedMotion: 'reduce' })
       await handle.focus(); await page.keyboard.press('ArrowUp')
       assert.equal(await rows.evaluateAll(els => els.some(el => el.getAnimations().length > 0)), false)
@@ -224,6 +259,11 @@ window.showTerminal=()=>{rootView.unmount();rootView=createRoot(document.getElem
         await page.evaluate('window.showTerminal()')
         await page.locator('[data-test-terminal]:visible').waitFor()
         await page.waitForFunction('document.querySelectorAll("[role=tab]").length===2')
+        await page.getByRole('tab', { name: /first/ }).click()
+        await moveTab(1, 'second')
+        await moveTab(1, 'first')
+        await moveTab(-1, 'second')
+        assert.equal(await page.getByRole('tab').count(), 2, 'terminal navigation does not create a shell')
         let count = 2
         for (const surface of [page.getByRole('tab', { name: /first/ }), page.locator('[data-test-terminal]:visible')]) for (const combo of ['Control+t', 'Meta+t']) {
           await surface.focus(); await page.keyboard.press(combo)

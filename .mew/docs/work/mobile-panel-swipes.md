@@ -1,6 +1,6 @@
 ---
 title: "Separate swipes for the mobile dock, panel body, and Plain auxiliary key bar"
-description: "Records mobile dock, panel body, and Plain auxiliary key bar swipe separation, internal horizontal scrolling priority, and the 2026-10-30 exclusion of inline attachment tag gestures from tab switching. Distinguishes local regression, type, lint, and documentation checks from physical-device verification and production application."
+description: "Records mobile dock, panel body, and Plain auxiliary key bar swipe separation, internal horizontal scrolling priority, and the 2026-10-30 attachment tag gesture exclusion and agent navigation through the + picker. Distinguishes local regression, type, lint, and documentation checks from physical-device verification and production application."
 created: "2026-10-27"
 updated: "2026-10-30"
 ---
@@ -49,3 +49,17 @@ Verification results:
 - `npm run check:docs`: All 553 descriptions and document links passed.
 
 Only local isolated checks were performed. No app build, deployment, or server startup/restart was performed. Actual phones remain unverified.
+
+## 2026-10-30 Include the agent picker in swipe navigation
+
+Agent body swipes previously wrapped directly between conversation tabs and did nothing with a single conversation. `AgentPanel` now treats the `+` picker as the final navigation position in the focused agent group. Swiping out of the picker selects the first or last conversation according to direction. Visiting the picker creates no session; regular terminal groups retain their existing shell-only cycle. The current behavior is owned by [Agent Sets and Tab Creation](../features/terminals-agents-automation/agent-sets-and-tab-creation.md#scope).
+
+Extended `server/agent-new-tab-ui.test.ts` with forward and backward cycles through `+`, single-conversation navigation, unchanged tab counts, and regular terminal navigation. Mobile checks use actual touch events through `useMobilePanelSwipe`; desktop checks send the corresponding panel navigation signals to a restored docking group. The existing reduced-motion check waits for the preceding touch-reorder animation to finish before changing the motion preference.
+
+Verification results:
+
+- `node --test server/agent-new-tab-ui.test.ts`: Passed in isolated Chromium at 390px and 1100px in both themes. Verified bidirectional picker cycling with two conversations and one conversation, unchanged tab counts, terminal navigation, and existing creation, restoration, focus, and runtime-order checks. Runtime connections used test doubles.
+- `npx tsc -b`, targeted `npx oxlint`, the Impeccable detector for `AgentPanel.tsx`, and `git diff --check`: Passed. Existing lint warnings remain.
+- `npm run check:docs`: All 553 descriptions and document links passed.
+
+No build, deployment, or server restart was performed; physical phones and production application remain unverified.

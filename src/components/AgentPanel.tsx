@@ -1892,13 +1892,17 @@ export function AgentPanel({ requestedPicker = false, onPickerRuntimeChosen, onR
     },
   })
 
-  // 화면 위 40% 좌우 스와이프로 탭 전환 — 터미널·에디터와 같은 손짓 (우→좌면 오른쪽 탭, 좌→우면 왼쪽 탭)
+  // Swipes include the agent picker as the final tab without creating a session.
   const switchTab = (dir: 'left' | 'right') => {
     const list = dock ? groupTabs(focusedGroup) : tabs
-    if (list.length < 2) return
-    const idx = list.findIndex((tab) => tab.id === focusedActiveId)
+    if (!list.length) return
+    const includePicker = !dock || !focusedGroup.startsWith('terminal')
+    const picking = includePicker && pickerOpen && (!dock || pickerGroup === focusedGroup)
+    const idx = picking ? list.length : list.findIndex((tab) => tab.id === focusedActiveId)
     if (idx < 0) return
-    const next = dir === 'left' ? (idx + 1) % list.length : (idx - 1 + list.length) % list.length
+    const count = list.length + Number(includePicker)
+    const next = (idx + (dir === 'left' ? 1 : -1) + count) % count
+    if (next === list.length) { addTab(); return }
     activate(list[next].id)
   }
   const seenNextTabSignal = useRef(nextTabSignal)
