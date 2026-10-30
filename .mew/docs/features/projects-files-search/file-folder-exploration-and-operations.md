@@ -4,11 +4,11 @@ parent: "mew-projects"
 title: "File and Folder Navigation and Operations"
 status: "implemented"
 created: "2026-09-18"
-updated: "2026-10-28"
+updated: "2026-10-30"
 status_hash: "67a95247d8f805106459a6f3cc3fd61abca57f6504dbe508c57550c824406a0a"
-files: ["src/components/file-action-menu.tsx", "src/hooks/use-external-file-actions.tsx", "src/components/file-browser-favorites.tsx", "server/file-favorites.ts", "src/components/file-browser.tsx", "src/components/FileTree.tsx", "src/App.tsx", "src/components/virtual-tree-rows.tsx", "src/utils/treePersistence.ts", "server/fsBrowse.ts", "src/components/ServerFileExplorer.tsx", "server/api.ts", "server/fileCatalog.ts"]
+files: ["src/components/file-action-menu.tsx", "src/hooks/use-external-file-actions.tsx", "src/components/file-browser-favorites.tsx", "server/file-favorites.ts", "src/components/file-browser.tsx", "src/components/FileTree.tsx", "src/App.tsx", "src/components/virtual-tree-rows.tsx", "src/utils/treePersistence.ts", "server/fsBrowse.ts", "src/components/ServerFileExplorer.tsx", "server/api.ts", "server/fileCatalog.ts", "src/components/file-type-icon.tsx", "src/components/file-type-icon-image.tsx", "src/utils/file-icons.ts", "src/utils/file-icon-manifest.json", "src/utils/file-icon-artwork.json", "tools/generate-file-icons.mjs"]
 commits: []
-description: "The file explorer naming and scope contract, including Documents, Files, and filename/content search, plus hierarchical navigation, operations, virtualization, list caching, shortcuts, and one-time location reveal on file selection in Documents and Files. Describes compact lists and parent-path navigation in Add Project and the server explorer, server catalog visibility and permissions, and exclusion of .worktrees copies."
+description: "The file explorer naming and scope contract, including Documents, Files, and filename/content search, plus hierarchical navigation, operations, virtualization, list caching, shortcuts, and one-time location reveal on file selection in Documents and Files. Describes compact lists and parent-path navigation in Add Project and the server explorer, server catalog visibility and permissions, exclusion of .worktrees copies, and local filename/extension icons with theme variants and a generic fallback."
 상위파일:
   - "MOC.md"
   - "_projects-files-search.md"
@@ -19,6 +19,7 @@ description: "The file explorer naming and scope contract, including Documents, 
 File Explorer is the panel name encompassing hierarchical navigation in Documents and Files, filename search, and file content search.
 
 - Browse, create, move, upload, and download files.
+- Show a file-type icon for every file row in Documents, Files, search results, and the shared server file browser. Match known path suffixes, filenames, and extensions; use a generic file icon for unrecognized names and extensions. Preserve existing folder, project, and Map Of Contents icons.
 
 ### Scope
 
@@ -54,6 +55,18 @@ File Explorer is the panel name encompassing hierarchical navigation in Document
 
 - `use-tree-move-animation.ts` records existing row positions after a successful move and maps paths after the asynchronous tree update. Detailed behavior follows the [shared motion contract](../../development/ui-contracts.md#drag-reordering-motion).
 ## Implementation details
+
+### File-type icons
+
+`FileTypeIcon` uses artwork from Material Icon Theme 5.40.0 (MIT), pinned as a development dependency, for file rows in `FileTree` and the shared `file-browser.tsx`, including Add Project and the server file explorer. Documents page rows use their representative file path, or a Markdown filename while that path is unavailable. Existing ordinary folder, project, and Map Of Contents icons remain.
+
+`fileIconId` normalizes Windows separators and case, checks filename associations against path suffixes from longest to shortest (including the basename), then tries compound extensions from longest to shortest. This preserves path-specific upstream associations such as `.config/graphqlrc`. Unknown names fall back to the theme's generic `file` icon. Light-theme associations override the default association for the same match; theme changes select the corresponding artwork.
+
+Run `node tools/generate-file-icons.mjs` after changing the pinned icon package. It lowercases upstream mapping keys and generates the full filename and extension maps with light variants in `src/utils/file-icon-manifest.json`, stores 636 original SVG strings in `src/utils/file-icon-artwork.json`, and copies the license to `public/licenses/material-icon-theme.txt`. Use `node tools/generate-file-icons.mjs --check` to detect stale generated files. The generator does not build or apply the app.
+
+`FileTypeIcon` lazy-loads `FileTypeIconImage` as its `Artwork` component, keeping artwork JSON in that chunk and showing the existing Page icon in the same 16px space while loading. The icon package and its `chroma-js` dependency are not imported at runtime. Artwork is displayed through cached SVG data URLs in decorative, non-draggable images; it does not fetch icons from a CDN or expose icon text to assistive technology. See [ADR 0089](../../decisions/0089-file-type-icons.md) for the choice and the [work record](../../work/file-type-icons.md) for verification and application status.
+
+### Navigation and operations
 
 - Server `FileCatalog` list retrieval prepares the project root, server data base path, and hidden list once within the same synchronous operation and reuses them for each entry. Checks resolving each file's real path continue to run, and per-account file permissions are applied separately in the existing API. The prepared predicate is not passed to the next request or asynchronous work, so the next retrieval rechecks hidden settings, account roots, and symbolic link changes. The catalog's path list is not used as a permission result cache. Follows [Decision 0058](../../decisions/0058-search-query-and-catalog-batches.md).
 - With `MEW_PERF_LOG=1`, `catalog.visibility` records the time spent evaluating catalog list visibility and looking up icons, the input entry count (`entries`), and whether all entries are shown (`showAll`). Logs do not include real paths or per-account permission results, and the timing excludes subsequent API permission filtering, serialization, transfer, and screen rendering.
@@ -108,6 +121,8 @@ File Explorer is the panel name encompassing hierarchical navigation in Document
 <!-- mew:implementation:end -->
 
 <!-- mew:validation:start -->
+
+- 2026-10-30: File-type icon unit and isolated browser checks, together with existing explorer virtualization and touch regressions, passed (7 tests). Verified Documents, Files, filename search, and the shared browser at desktop/mobile widths in both themes, including image decoding, size, accessibility, renaming, and selection. Type, lint (pre-existing warnings), generated-file, and documentation checks passed. See the [work record](../../work/file-type-icons.md) for details. No app build or server application was performed.
 
 - 2026-10-24: 5 new checks in `catalog-visibility.test.ts` verified root and hidden-setting preparation counts, real-path rechecks for all files, changes to hidden/show-all settings, symbolic-link replacement pointing to server data, and different roots for two accounts. Together with existing search, tree, access-control, file-read, and platform checks, 58 passed and 2 Windows-only checks were skipped on Linux. TypeScript and full lint passed (with existing warnings), and comparison conditions and results were recorded in [isolated performance measurements](../../research/search-catalog-performance.md). No app build or server restart was performed.
 

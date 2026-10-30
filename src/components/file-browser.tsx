@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { ArrowUp, Page, Folder, GitBranch, HomeSimple, NavArrowDown, NavArrowRight, RefreshDouble, Search, Xmark } from 'iconoir-react'
+import { ArrowUp, Folder, GitBranch, HomeSimple, NavArrowDown, NavArrowRight, RefreshDouble, Search, Xmark } from 'iconoir-react'
 import { fetchAgentCwdSuggestions, type ExternalEntriesResult, type ExternalEntry } from '../api/client'
 import { useI18n } from '../i18n'
 import { FileBrowserFavorites } from './file-browser-favorites'
 import { useExternalFileActions } from '../hooks/use-external-file-actions'
 import { useLongPress } from '../hooks/useLongPress'
+import { FileTypeIcon } from './file-type-icon'
 
 type EntryMenu = (entry: ExternalEntry, x: number, y: number) => void
 
@@ -32,7 +33,6 @@ export function FileBrowserEntry({ entry, busy, depth = 0, expanded, onClick, on
 }) {
   const pointer = useRef({ x: 0, y: 0 })
   const touch = useLongPress(() => onMenu?.(entry, pointer.current.x, pointer.current.y))
-  const Icon = entry.type === 'dir' ? Folder : Page
   const Chevron = expanded ? NavArrowDown : NavArrowRight
   return <button type="button" disabled={busy} onClick={() => { if (!touch.consumeClick()) onClick() }}
     onPointerDown={(event) => {
@@ -56,7 +56,7 @@ export function FileBrowserEntry({ entry, busy, depth = 0, expanded, onClick, on
     aria-expanded={entry.type === 'dir' ? expanded : undefined}
     className={fileBrowserRow}
     style={depth ? { paddingLeft: depth * 16 + 8 } : undefined} title={entry.path}>
-    <Icon width={16} height={16} className="shrink-0 text-ink-secondary" />
+    {entry.type === 'dir' ? <Folder width={16} height={16} aria-hidden="true" className="shrink-0 text-ink-secondary" /> : <FileTypeIcon name={entry.path} />}
     <span className="min-w-0 flex-1 truncate font-medium">{entry.name}</span>
     {entry.git && <span className="flex shrink-0 items-center gap-1 text-xs text-ink-secondary"><GitBranch width={13} height={13} />Git</span>}
     {entry.type === 'dir' && <Chevron width={15} height={15} className="shrink-0 text-ink-secondary" />}
