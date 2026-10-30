@@ -42,6 +42,7 @@ import { editorFile, editorTabPath, editorLinkTabPath } from '../utils/editor-fi
 import { saveScroll, getScroll } from '../utils/scrollMemory'
 import { useCollab } from '../hooks/useCollab'
 import { useEditorTouchSelection } from '../hooks/useEditorTouchSelection'
+import { MobileEditorKeyboardButton } from './mobile-editor-keyboard-button'
 import type { Pane, Tab } from '../hooks/useTabs'
 import type { DropZone } from '../utils/paneTree'
 import { externalAbsolutePath, isExternalTabPath } from '../utils/externalFiles'
@@ -1067,6 +1068,11 @@ export function EditorPane({
                     />
                   </MarkdownErrorBoundary>
                 )}
+                <MobileEditorKeyboardButton root={editorMenuRoot}
+                  enabled={!fileLoadFailed && !unsupportedFile && !mediaKind(activeTab.path)
+                    && !(isSvg && activeTab.viewMode === 'hotview') && !loading && !revalidating
+                    && !collaborationPending && activeTab.editable && !isArchivedPath(activeTab.path, project)
+                    && !activeTab.anchorPreview} />
               </div>
               {fileError && !fileLoadFailed && (
                 <div role="alert" className="select-text max-h-24 shrink-0 overflow-auto whitespace-pre-wrap break-words border-t border-edge px-3 py-2 text-sm text-danger-ink">

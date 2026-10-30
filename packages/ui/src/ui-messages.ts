@@ -51,6 +51,7 @@ export const uiMessages = {
   "로그인 화면에 연결하지 못했습니다. 다시 연결해 주세요.": ["Could not connect to the sign-in screen. Please reconnect.", "无法连接登录画面，请重新连接。", "ログイン画面に接続できませんでした。再接続してください。"],
   "다시 연결하지 못했습니다.": ["Could not reconnect.", "重新连接失败。", "再接続できませんでした。"],
   "키보드 입력": ["Keyboard input", "键盘输入", "キーボード入力"],
+  "키보드 열기": ["Open keyboard", "打开键盘", "キーボードを開く"],
   "로그인 화면": ["Sign-in screen", "登录画面", "ログイン画面"],
   "서버의 로그인 화면": ["Server sign-in screen", "服务器登录画面", "サーバーのログイン画面"],
   "로그인 키보드 입력": ["Sign-in keyboard input", "登录键盘输入", "ログイン用キーボード入力"],
