@@ -351,6 +351,86 @@ function Fixture(){const [state,setState]=React.useState({...defaults,generation
     }
   })
 
+  await t.test('touch selection suppresses keyboard activation while a settled single tap still edits', async () => {
+    const mobile = await createPage(390, 'light')
+    try {
+      await surface(mobile).evaluate(el => {
+        const doc = el.ownerDocument, win = doc.defaultView!, metrics = doc.documentElement.dataset
+        metrics.keyboardShows = '0'
+        metrics.keyboardHides = '0'
+        const keyboard = Object.assign(new win.EventTarget(), {
+          overlaysContent: false, boundingRect: new win.DOMRect(),
+          show() {
+            metrics.keyboardShows = String(Number(metrics.keyboardShows) + 1)
+            metrics.keyboardPolicyAtShow = doc.activeElement?.getAttribute('virtualkeyboardpolicy') ?? ''
+          },
+          hide() { metrics.keyboardHides = String(Number(metrics.keyboardHides) + 1) },
+        })
+        Object.defineProperty(win.navigator, 'virtualKeyboard', { configurable: true, value: keyboard })
+      })
+      const shows = () => mobile.locator('html').getAttribute('data-keyboard-shows')
+      for (const fixture of [
+        { path: 'fixture.md', viewMode: 'hotview', value: markdown, selected: 'selected text' },
+        { path: 'fixture.md', viewMode: 'plain', value: markdown, selected: 'selected text' },
+        { path: 'fixture.ts', viewMode: 'plain', value: code, selected: 'selected' },
+      ]) {
+        await reset(mobile, fixture)
+        const previous = Number(await shows())
+        await touchPointer(mobile, 'pointerdown', fixture.selected)
+        assert.equal(await surface(mobile).getAttribute('virtualkeyboardpolicy'), 'manual', 'suppress keyboard before native focus')
+        await select(mobile, fixture.selected, false)
+        await touchPointer(mobile, 'pointerup', fixture.selected)
+        await menu(mobile).waitFor()
+        await item(mobile, '복사').click()
+        await mobile.waitForTimeout(350)
+        assert.equal(Number(await shows()), previous, 'selecting and copying never request the keyboard')
+        assert.equal(await surface(mobile).getAttribute('virtualkeyboardpolicy'), 'manual')
+
+        await reset(mobile, fixture)
+        const at = await point(mobile, fixture.selected, 2)
+        await mobile.touchscreen.tap(at.x, at.y)
+        await mobile.waitForFunction(({ el, previous }) => Number(el.getAttribute('data-keyboard-shows')) === previous + 1,
+          { el: await mobile.locator('html').elementHandle(), previous })
+        assert.equal(await mobile.locator('html').getAttribute('data-keyboard-policy-at-show'), 'manual')
+        assert.equal(await surface(mobile).getAttribute('virtualkeyboardpolicy'), null, 'single-tap editing restores the original policy')
+
+        await reset(mobile, fixture)
+        const beforeDoubleTap = Number(await shows())
+        const next = await point(mobile, fixture.selected, 2)
+        await mobile.touchscreen.tap(next.x, next.y)
+        await mobile.touchscreen.tap(next.x, next.y)
+        await select(mobile, fixture.selected, false)
+        await menu(mobile).waitFor()
+        assert.equal(Number(await shows()), beforeDoubleTap, 'the first tap does not open a keyboard before double-tap selection')
+        const old = await surface(mobile).elementHandle()
+        await control(mobile, 'set', { path: 'other.md' })
+        await mobile.waitForTimeout(350)
+        assert.equal(await old!.getAttribute('virtualkeyboardpolicy'), null, 'file changes restore the previous policy')
+        await old!.dispose()
+
+        await reset(mobile, fixture)
+        await surface(mobile).evaluate(el => el.setAttribute('virtualkeyboardpolicy', 'auto'))
+        await touchPointer(mobile, 'pointerdown', fixture.selected)
+        await touchPointer(mobile, 'pointercancel', fixture.selected)
+        assert.equal(await surface(mobile).getAttribute('virtualkeyboardpolicy'), 'auto', 'cancel restores an existing attribute')
+      }
+      assert.equal(await mobile.locator('html').getAttribute('data-keyboard-hides'), '0', 'manual policy does not force-hide an already-open keyboard')
+      await reset(mobile)
+      await surface(mobile).evaluate(el => {
+        Object.defineProperty(el.ownerDocument.defaultView!.navigator, 'virtualKeyboard', { configurable: true, value: undefined })
+        el.setAttribute('inputmode', 'text')
+      })
+      await touchPointer(mobile, 'pointerdown', 'selected text')
+      await select(mobile, 'selected text', false)
+      await touchPointer(mobile, 'pointerup', 'selected text')
+      await menu(mobile).waitFor()
+      assert.equal(await surface(mobile).getAttribute('inputmode'), 'none', 'unsupported browsers receive a keyboard hint after selection')
+      await touchPointer(mobile, 'pointerdown', 'paragraph target')
+      assert.equal(await surface(mobile).getAttribute('inputmode'), 'text', 'restore the original input hint before the next native tap')
+      await touchPointer(mobile, 'pointercancel', 'paragraph target')
+    } finally { await mobile.close() }
+  })
+
   await t.test('desktop text selection does not automatically open the menu', async () => {
     const desktop = await createPage(1280, 'light')
     try {

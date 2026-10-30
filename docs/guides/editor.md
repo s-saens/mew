@@ -1,6 +1,6 @@
 ---
 title: "Document Editing and Storage Formats"
-description: "Explains editing Markdown, code, document properties, tables, links, attachments, and PDFs; adding and deleting rows and columns through the body context menu; and the automatic Mew menu that suppresses the browser menu for selected body text on mobile. Covers Hotview @ file autocomplete across all folders, annotations, internal document navigation, table/DB conversion, inline subpage naming, autosave, split views, panel switching in the mobile dock, tab switching in the body and Plain modifier key bars, and installation controls."
+description: "Explains editing Markdown, code, document properties, tables, links, attachments, and PDFs; adding and deleting rows and columns through the body context menu; and the automatic Mew menu, browser-menu suppression, and selection keyboard behavior on mobile. Covers Hotview @ file autocomplete across all folders, annotations, internal document navigation, table/DB conversion, inline subpage naming, autosave, split views, panel switching in the mobile dock, tab switching in the body and Plain modifier key bars, and installation controls."
 updated: "2026-10-30"
 상위파일:
   - "../../.mew/docs/MOC.md"
@@ -33,7 +33,7 @@ An editor pane with no open file displays a vertical list of shortcuts for openi
 
 Right-click the Hotview, Plain, or code body to open the **Add Annotation · Add Comment · Copy · Cut · Paste · Delete · Select All** menu. Each item shows an icon on the left and its name on the right. Right-clicking within selected text preserves the selection; right-clicking outside it moves the cursor to that position.
 
-On mobile, long-press or double-tap the body to select text. For selected body text, Mew suppresses the browser's selection menu. Once you lift your finger and the selection stabilizes, the Mew menu opens automatically. Adjusting the range with selection handles closes the menu, which reopens for the new range when adjustment finishes. You can also copy selected text from a read-only body.
+On mobile, long-press or double-tap the body to select text. For selected body text, Mew suppresses the browser's selection menu. Once you lift your finger and the selection stabilizes, the Mew menu opens automatically. Adjusting the range with selection handles closes the menu, which reopens for the new range when adjustment finishes. You can also copy selected text from a read-only body. On browsers with keyboard control, selecting text keeps the keyboard closed; a single tap to edit opens it after a brief delay that distinguishes double-tap selection. Other browsers receive a keyboard-suppression hint after selection, with behavior depending on the browser.
 
 Copy, Cut, and Delete are disabled when no text is selected. Actions that modify the body are unavailable in read-only mode, and Add Annotation is unavailable for files other than Markdown. Add Comment targets the selected text; without a selection, it automatically selects the relevant paragraph in Hotview or line in Plain or code. You cannot comment where there is no text.
 

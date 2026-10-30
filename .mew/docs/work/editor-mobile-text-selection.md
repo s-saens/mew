@@ -1,6 +1,6 @@
 ---
 title: "Body text selection colors and automatic mobile menus"
-description: "Records the 2026-10-29 application of the theme primary color to Hotview, Plain, and code selections; preservation of native mobile text selection and automatic menus after selection; selection adjustment, focus, and lifecycle handling; the 2026-10-30 suppression of native context menus for existing body selections; isolated validation; and the scope of physical-device verification and production application."
+description: "Records the 2026-10-29 application of the theme primary color to Hotview, Plain, and code selections; preservation of native mobile text selection and automatic menus after selection; selection adjustment, focus, and lifecycle handling; the 2026-10-30 suppression of native context menus for existing body selections and keyboard activation during touch selection; isolated validation; and the scope of physical-device verification and production application."
 created: "2026-10-29"
 updated: "2026-10-30"
 ---
@@ -38,3 +38,15 @@ Extended `server/editor-context-menu-ui.test.ts` to check cancellation for touch
 All 4 tests in `node --test server/editor-context-menu-ui.test.ts` passed after the change. The table-menu and shared text-selection tests also passed in `node --test server/editor-context-menu-ui.test.ts server/editor-table-menu-ui.test.ts server/text-selection-ui.test.ts`; that earlier run exposed a new assertion that incorrectly required read-only bodies to receive focus, which was corrected to compare focus before and after the event. `npx tsc -b`, `npx oxlint src/components/EditorPane.tsx server/editor-context-menu-ui.test.ts`, and `git diff --check` passed. Lint retained existing React warnings. `npm run check:docs` passed with 553 descriptions and no document link errors.
 
 No app build, deployment, or server lifecycle command was run. The tests use isolated Chromium, synthetic context events, and injected DOM ranges; actual Android Brave/Chrome and iOS Safari toolbar and handle behavior still require physical-device verification. The user applies changes to the running instance.
+
+## Keep touch selection from opening the keyboard
+
+A follow-up on 2026-10-30 reported that the mobile keyboard opened along with selection. Menu preparation does not itself focus the editor, and the automatic menu already disables autofocus. Added a temporary keyboard policy in `useEditorTouchSelection` before the browser handles a touch press. Supported browsers retain native focus and selection under a manual policy; only a settled single editing tap requests the keyboard after 250ms. Double-tap selection and copying retain suppression. The hook restores original attributes on scope changes, cancellation, mouse/keyboard input, and outside interaction. It preserves the policy when native pointer cancellation already has a selection range.
+
+Browsers without the show API receive an input-mode hint after a range exists. Their next body press restores the original hint synchronously. This fallback does not blur/refocus the body and cannot guarantee that the initial native keyboard stays closed; it may dismiss an existing keyboard. The current behavior and platform limits are owned by the [editor menu contract](../development/ui-contracts.md#editor-body-context-menu).
+
+Extended the isolated editor regression with a controllable keyboard API to check early manual policy, no keyboard request for selection/copy, delayed single-tap activation under the correct policy, double-tap suppression, original attribute restoration on file changes and cancellation, no forced API hide, and the unsupported-browser input hint lifecycle in Hotview, Plain, and code. These checks inspect policy and API calls, not a physical OS keyboard.
+
+All 5 tests in `node --test server/editor-context-menu-ui.test.ts` passed. `npx tsc -b`, `npx tsc -p tsconfig.app.json --incremental false`, `npx oxlint src/hooks/useEditorTouchSelection.ts server/editor-context-menu-ui.test.ts`, `git diff --check`, and `npm run check:docs` passed; the documentation check reported 555 descriptions and no link errors.
+
+No app build, deployment, or server start, stop, or restart was performed. Physical Android Brave/Chrome and iOS keyboard/selection-handle checks and application to the running instance remain pending.
