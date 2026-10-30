@@ -21,6 +21,7 @@ export function EditorContextMenu({ x, y, target, canAnnotate, canComment, onAct
   useUiLocale()
   const { t } = useI18n()
   return <ActionMenu x={x} y={y} label={uiText('에디터 메뉴')} onClose={onClose}
+    outsideDismiss="click"
     autoFocus={!selectionRoot} outsideIgnore={selectionRoot ? () => selectionRoot.current : undefined}>
     <ActionMenuItem icon={<Quote />} disabled={!canAnnotate || !target.editable} onClick={() => onAction('annotation')}>{uiText('주석 추가')}</ActionMenuItem>
     <ActionMenuItem icon={<ChatBubble />} disabled={!canComment || !target.editable || !target.canComment} onClick={() => onAction('comment')}>{t('comment.add')}</ActionMenuItem>

@@ -568,6 +568,7 @@ export function EditorPane({
   }
   const isTouchContextMenu = useEditorTouchSelection({
     root: editorMenuRoot, scope: selectionScope,
+    menuOpen: !!editorMenu,
     enabled: !!activeTab && !loading && !revalidating && !diffTarget && !unsupportedFile && !mediaKind(activeTab.path)
       && !(activeTab.path.endsWith('.svg') && activeTab.viewMode === 'hotview'),
     onDismiss: () => setEditorMenu(current => current?.touchSelection ? null : current),

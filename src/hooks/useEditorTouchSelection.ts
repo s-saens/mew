@@ -3,15 +3,16 @@ import { useLayoutEffect, useRef, type RefObject } from 'react'
 type SelectionPoint = { x: number; y: number; selectionX: number; selectionY: number }
 
 /** Observe native touch selection without cancelling the gesture that creates it. */
-export function useEditorTouchSelection({ root, scope, enabled, onSelect, onDismiss }: {
+export function useEditorTouchSelection({ root, scope, enabled, menuOpen, onSelect, onDismiss }: {
   root: RefObject<HTMLDivElement | null>
   scope: string
   enabled: boolean
+  menuOpen: boolean
   onSelect: (point: SelectionPoint) => void
   onDismiss: () => void
 }) {
-  const callbacks = useRef({ onSelect, onDismiss })
-  useLayoutEffect(() => { callbacks.current = { onSelect, onDismiss } })
+  const callbacks = useRef({ onSelect, onDismiss, menuOpen })
+  useLayoutEffect(() => { callbacks.current = { onSelect, onDismiss, menuOpen } })
   const touchInput = useRef(false)
 
   useLayoutEffect(() => {
@@ -21,6 +22,7 @@ export function useEditorTouchSelection({ root, scope, enabled, onSelect, onDism
     let pressed = false
     let touching = false
     let shown: Range | null = null
+    let gesture: { id: number; x: number; y: number; moved: boolean } | null = null
     const cancel = () => { clearTimeout(timer); timer = undefined }
     const contentAt = (node: Node | null) => {
       const element = node instanceof Element ? node : node?.parentElement
@@ -42,6 +44,7 @@ export function useEditorTouchSelection({ root, scope, enabled, onSelect, onDism
       if (!touchInput.current) return
       const range = selectedRange()
       if (!range) {
+        if (shown && (pressed || touching || gesture?.moved)) return
         shown = null
         callbacks.current.onDismiss()
         return
@@ -62,16 +65,29 @@ export function useEditorTouchSelection({ root, scope, enabled, onSelect, onDism
     }
     const down = (event: PointerEvent) => {
       cancel()
-      if (event.target instanceof Element && event.target.closest('[role="menu"]')) return
+      if (event.target instanceof Element && event.target.closest('[role="menu"]')) { touchInput.current = false; return }
+      gesture = { id: event.pointerId, x: event.clientX, y: event.clientY, moved: false }
       const content = contentAt(event.target as Node)
       touchInput.current = event.pointerType === 'touch' && !!content
       pressed = touchInput.current
+      if (!callbacks.current.menuOpen) shown = null
+    }
+    const move = (event: PointerEvent) => {
+      if (gesture?.id === event.pointerId && Math.hypot(event.clientX - gesture.x, event.clientY - gesture.y) > 8) gesture.moved = true
+    }
+    const click = (event: MouseEvent) => {
+      if (!callbacks.current.menuOpen || !(event.target instanceof Node) || !root.current?.contains(event.target)
+        || event.target instanceof Element && event.target.closest('[role="menu"]')) return
+      if (event.detail !== 0 && gesture?.moved) return
+      cancel()
       shown = null
+      touchInput.current = false
       callbacks.current.onDismiss()
     }
     const up = () => { pressed = false; schedule() }
     const pointerCancel = () => {
       pressed = false
+      if (gesture) gesture.moved = true
       cancel()
     }
     const touchStart = () => { touching = true; cancel() }
@@ -84,10 +100,11 @@ export function useEditorTouchSelection({ root, scope, enabled, onSelect, onDism
     }
     const scroll = (event: Event) => {
       if (event.target instanceof Element && event.target.closest('[role="menu"]')) return
-      cancel()
-      callbacks.current.onDismiss()
+      if (gesture) gesture.moved = true
     }
     document.addEventListener('pointerdown', down, true)
+    document.addEventListener('pointermove', move, true)
+    document.addEventListener('click', click, true)
     document.addEventListener('pointerup', up, true)
     document.addEventListener('pointercancel', pointerCancel, true)
     document.addEventListener('touchstart', touchStart, { capture: true, passive: true })
@@ -100,6 +117,8 @@ export function useEditorTouchSelection({ root, scope, enabled, onSelect, onDism
     return () => {
       cancel()
       document.removeEventListener('pointerdown', down, true)
+      document.removeEventListener('pointermove', move, true)
+      document.removeEventListener('click', click, true)
       document.removeEventListener('pointerup', up, true)
       document.removeEventListener('pointercancel', pointerCancel, true)
       document.removeEventListener('touchstart', touchStart, true)

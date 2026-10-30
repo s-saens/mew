@@ -23,6 +23,8 @@ export type ActionMenuProps = {
   outsideIgnore?: () => Element | null
   /** Native selection menus keep the editor focused so its touch handles remain usable. */
   autoFocus?: boolean
+  /** Click dismissal lets selection menus remain open while the surrounding page is dragged. */
+  outsideDismiss?: 'pointerdown' | 'click'
   ref?: Ref<HTMLDivElement>
   /** Compatibility marker for file explorer integrations. */
   fileMenu?: boolean
@@ -30,7 +32,7 @@ export type ActionMenuProps = {
 }
 
 /** Shared action popup. Feature wrappers supply actions, never menu styles. */
-export function ActionMenu({ x, y, onClose, children, label, trigger, portalContainer, ref: forwardedRef, fileMenu = false, variant = 'default', outsideIgnore, autoFocus = true }: ActionMenuProps) {
+export function ActionMenu({ x, y, onClose, children, label, trigger, portalContainer, ref: forwardedRef, fileMenu = false, variant = 'default', outsideIgnore, autoFocus = true, outsideDismiss = 'pointerdown' }: ActionMenuProps) {
   const marker = useRef<HTMLSpanElement>(null)
   const [container, setContainer] = useState<HTMLElement | null>(null)
   const previous = useRef<HTMLElement | SVGElement | null>(trigger ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null))
@@ -56,6 +58,7 @@ export function ActionMenu({ x, y, onClose, children, label, trigger, portalCont
   useEffect(() => {
     if (!container) return
     let switchTimer: ReturnType<typeof setTimeout> | undefined
+    let gesture: { id: number; x: number; y: number; moved: boolean } | null = null
     function isOtherHeaderTrigger(e: MouseEvent) {
       const nextTrigger = e.target instanceof Element ? e.target.closest<HTMLButtonElement>('button[data-header-menu-trigger]') : null
       return variant === 'header' && e.button === 0 && nextTrigger && !nextTrigger.disabled && nextTrigger !== trigger
@@ -63,10 +66,24 @@ export function ActionMenu({ x, y, onClose, children, label, trigger, portalCont
     function onClick(e: MouseEvent) {
       // 새 메뉴의 클릭 처리가 끝난 뒤 닫아 뒤로가기 가드가 중간에 제거되지 않게 한다.
       if (isOtherHeaderTrigger(e)) switchTimer = setTimeout(() => close(false), 0)
+      if (outsideDismiss !== 'click' || !ref.current || ref.current.contains(e.target as Node)
+        || outsideIgnoreRef.current?.()?.contains(e.target as Node) || isOtherHeaderTrigger(e)) return
+      const dragged = e.detail !== 0 && gesture?.moved
+      gesture = null
+      if (dragged) return
+      e.preventDefault()
+      e.stopPropagation()
+      close()
     }
     function onDown(e: PointerEvent) {
-      if (!ref.current || ref.current.contains(e.target as Node) || outsideIgnoreRef.current?.()?.contains(e.target as Node)) return
+      gesture = null
+      if (!ref.current) return
       if (isOtherHeaderTrigger(e)) return
+      if (outsideDismiss === 'click') {
+        gesture = { id: e.pointerId, x: e.clientX, y: e.clientY, moved: false }
+        return
+      }
+      if (ref.current.contains(e.target as Node) || outsideIgnoreRef.current?.()?.contains(e.target as Node)) return
       e.preventDefault()
       e.stopPropagation()
       close()
@@ -86,14 +103,27 @@ export function ActionMenu({ x, y, onClose, children, label, trigger, portalCont
       document.addEventListener('pointerdown', clear, { capture: true, once: true })
       const timer = setTimeout(clear, 1000)
     }
+    function onMove(e: PointerEvent) {
+      if (gesture?.id === e.pointerId && Math.hypot(e.clientX - gesture.x, e.clientY - gesture.y) > 8) gesture.moved = true
+    }
+    function onCancel(e: PointerEvent) { if (gesture?.id === e.pointerId) gesture.moved = true }
+    function onScroll() { if (gesture) gesture.moved = true }
     document.addEventListener('pointerdown', onDown, true)
     document.addEventListener('click', onClick, true)
+    if (outsideDismiss === 'click') {
+      document.addEventListener('pointermove', onMove, true)
+      document.addEventListener('pointercancel', onCancel, true)
+      document.addEventListener('scroll', onScroll, true)
+    }
     return () => {
       clearTimeout(switchTimer)
       document.removeEventListener('pointerdown', onDown, true)
       document.removeEventListener('click', onClick, true)
+      document.removeEventListener('pointermove', onMove, true)
+      document.removeEventListener('pointercancel', onCancel, true)
+      document.removeEventListener('scroll', onScroll, true)
     }
-  }, [container, variant, trigger])
+  }, [container, variant, trigger, outsideDismiss])
 
   useLayoutEffect(() => {
     const menu = ref.current

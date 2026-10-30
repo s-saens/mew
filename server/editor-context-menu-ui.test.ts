@@ -351,6 +351,108 @@ function Fixture(){const [state,setState]=React.useState({...defaults,generation
     }
   })
 
+  await t.test('selection menus survive scrolling and dragging and dismiss on actual outside clicks', async () => {
+    for (const width of [390, 1280]) {
+      const page = await createPage(width, width === 390 ? 'light' : 'dark')
+      const client = await page.context().newCDPSession(page)
+      try {
+        await surface(page).evaluate(el => {
+          const doc = el.ownerDocument
+          const outside = doc.createElement('button')
+          outside.textContent = 'Outside selection menu'
+          outside.setAttribute('data-selection-outside', '')
+          outside.style.cssText = 'position:fixed;right:0;top:0;width:150px;height:32px;z-index:100'
+          outside.dataset.clicks = '0'
+          outside.onclick = () => { outside.dataset.clicks = String(Number(outside.dataset.clicks) + 1) }
+          const scroll = doc.createElement('aside')
+          scroll.setAttribute('data-selection-scroll', '')
+          scroll.style.cssText = 'position:fixed;right:0;top:430px;width:70px;height:160px;overflow:auto;z-index:100;background:#777'
+          const inner = doc.createElement('div')
+          inner.style.height = '1500px'
+          inner.textContent = 'Scroll outside editor'
+          scroll.append(inner)
+          doc.body.append(outside, scroll)
+        })
+        const drag = async (x: number, from: number, to: number) => {
+          await client.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y: from }] })
+          await menu(page).waitFor()
+          for (let i = 1; i <= 5; i++) {
+            await client.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x, y: from + (to - from) * i / 5 }] })
+            await page.waitForTimeout(20)
+          }
+          await client.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+        }
+        for (const mode of ['hotview', 'plain', 'code']) {
+          const longMarkdown = markdown + Array.from({ length: 100 }, (_, i) => `Paragraph ${i}`).join('\n\n')
+          const fixture = mode === 'code'
+            ? { path: 'fixture.ts', viewMode: 'plain', value: code + 'const line = 1;\n'.repeat(100), selected: 'selected' }
+            : { path: 'fixture.md', viewMode: mode, value: longMarkdown, selected: 'selected text' }
+          await reset(page, fixture)
+          const scroller = page.locator(mode === 'hotview' ? '.editor-root' : '.cm-scroller')
+          const openSelection = async () => {
+            if (width === 390) {
+              await touchPointer(page, 'pointerdown', fixture.selected)
+              await select(page, fixture.selected, false)
+              await touchPointer(page, 'pointerup', fixture.selected)
+            } else {
+              await select(page, fixture.selected, false)
+              await open(page, fixture.selected)
+            }
+            await menu(page).waitFor()
+          }
+          await openSelection()
+          if (width === 390) await drag(45, 620, 420)
+          else { await page.mouse.move(45, 620); await page.mouse.wheel(0, 200) }
+          await page.waitForFunction(el => el.scrollTop > 50, await scroller.elementHandle())
+          await menu(page).waitFor()
+          const external = page.locator('[data-selection-scroll]')
+          if (width === 390) await drag(width - 35, 570, 470)
+          else { await page.mouse.move(width - 35, 500); await page.mouse.wheel(0, 100) }
+          await page.waitForFunction(el => el.scrollTop > 20, await external.elementHandle())
+          await menu(page).waitFor()
+          // Include a browser-compatible click after a drag; it must not dismiss the menu.
+          await external.evaluate(el => {
+            const win = el.ownerDocument.defaultView!
+            el.dispatchEvent(new win.PointerEvent('pointerdown', { bubbles: true, pointerId: 4, clientX: 10, clientY: 500, pointerType: 'touch' }))
+            el.dispatchEvent(new win.PointerEvent('pointermove', { bubbles: true, pointerId: 4, clientX: 10, clientY: 450, pointerType: 'touch' }))
+            el.dispatchEvent(new win.PointerEvent('pointercancel', { bubbles: true, pointerId: 4, pointerType: 'touch' }))
+            el.dispatchEvent(new win.MouseEvent('click', { bubbles: true, cancelable: true, detail: 1 }))
+          })
+          assert.equal(await menu(page).isVisible(), true, `${mode}/${width}: scrolling and canceled drags retain the menu`)
+          await surface(page).evaluate(el => {
+            const doc = el.ownerDocument, win = doc.defaultView!, outside = doc.querySelector('[data-selection-scroll]')!
+            el.dispatchEvent(new win.PointerEvent('pointerdown', { bubbles: true, pointerId: 5, clientX: 10, clientY: 500, pointerType: 'touch' }))
+            outside.dispatchEvent(new win.PointerEvent('pointermove', { bubbles: true, pointerId: 5, clientX: 350, clientY: 450, pointerType: 'touch' }))
+            outside.dispatchEvent(new win.PointerEvent('pointercancel', { bubbles: true, pointerId: 5, pointerType: 'touch' }))
+            outside.dispatchEvent(new win.MouseEvent('click', { bubbles: true, cancelable: true, detail: 1 }))
+          })
+          assert.equal(await menu(page).isVisible(), true, `${mode}/${width}: drags starting inside the editor and ending outside do not dismiss`)
+          await item(page, '복사').click()
+          await assertNoAutomaticMenu(page, 'a menu action after dragging does not reopen the menu')
+          assert.equal(await page.locator('[data-context-fixture]').evaluate(el => (el.ownerDocument.defaultView as unknown as { contextClipboard: { text: string } }).contextClipboard.text), fixture.selected, 'copy after scrolling uses the original selection')
+
+          await scroller.evaluate(el => { el.scrollTop = 0 })
+          await settle(page)
+          await openSelection()
+          await page.locator('[data-selection-outside]').click()
+          await menu(page).waitFor({ state: 'hidden' })
+          assert.equal(await page.locator('[data-selection-outside]').getAttribute('data-clicks'), '0', 'outside click dismissal still consumes the underlying action')
+          await assertNoAutomaticMenu(page, 'a real outside click leaves the menu closed')
+          await openSelection()
+          // A body tap is handled by the selection hook without blocking native cursor placement.
+          await surface(page).evaluate(el => {
+            const win = el.ownerDocument.defaultView!
+            el.dispatchEvent(new win.PointerEvent('pointerdown', { bubbles: true, pointerId: 8, pointerType: 'touch' }))
+            el.dispatchEvent(new win.PointerEvent('pointerup', { bubbles: true, pointerId: 8, pointerType: 'touch' }))
+            el.dispatchEvent(new win.MouseEvent('click', { bubbles: true, cancelable: true, detail: 1 }))
+          })
+          await menu(page).waitFor({ state: 'hidden' })
+          await assertNoAutomaticMenu(page, 'a body click closes the menu without reopening it')
+        }
+      } finally { await client.detach(); await page.close() }
+    }
+  })
+
   await t.test('mobile body taps and touch selection keep keyboard control exclusive to the button', async () => {
     const mobile = await createPage(390, 'light')
     try {

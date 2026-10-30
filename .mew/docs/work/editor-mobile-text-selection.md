@@ -1,6 +1,6 @@
 ---
 title: "Body text selection colors and automatic mobile menus"
-description: "Records the 2026-10-29 application of the theme primary color to Hotview, Plain, and code selections; preservation of native mobile text selection and automatic menus after selection; selection adjustment, focus, and lifecycle handling; the 2026-10-30 suppression of native context menus for existing body selections and keyboard activation during touch selection; isolated validation; and the scope of physical-device verification and production application."
+description: "Records the 2026-10-29 application of the theme primary color to Hotview, Plain, and code selections; preservation of native mobile text selection and automatic menus after selection; selection adjustment, focus, and lifecycle handling; the 2026-10-30 suppression of native context menus for existing body selections and keyboard activation during touch selection; scroll and drag preservation with click-only outside dismissal; isolated validation; and the scope of physical-device verification and production application."
 created: "2026-10-29"
 updated: "2026-10-30"
 ---
@@ -50,3 +50,24 @@ Extended the isolated editor regression with a controllable keyboard API to chec
 All 5 tests in `node --test server/editor-context-menu-ui.test.ts` passed. `npx tsc -b`, `npx tsc -p tsconfig.app.json --incremental false`, `npx oxlint src/hooks/useEditorTouchSelection.ts server/editor-context-menu-ui.test.ts`, `git diff --check`, and `npm run check:docs` passed; the documentation check reported 555 descriptions and no link errors.
 
 No app build, deployment, or server start, stop, or restart was performed. Physical Android Brave/Chrome and iOS keyboard/selection-handle checks and application to the running instance remain pending.
+
+
+## Preserve selection menus during scrolling
+
+On 2026-10-30, changed editor body menus to remain visible while the user scrolls or drags within the editor or elsewhere in the app. Previously, both the selection hook and the shared menu closed on pointer start, and the hook also closed on scroll. `ActionMenu` now offers an optional click-dismissal mode that preserves native gesture initiation and distinguishes clicks from pointer movement, scroll, and cancellation. Editor menus opt in; other menus retain pointerdown dismissal.
+
+The selection hook keeps its prepared range across scrolling, dismisses on actual body clicks, and rebuilds the menu when the selection changes. Clicks outside the editor body are closed and consumed by the shared menu. Gestures starting within the editor and ending outside are tracked too. Pending menu display is canceled on an actual body click even for mixed mouse/touch input, preventing immediate reopening after dismissal. Menu actions after dragging also leave the menu closed.
+
+Current behavior is owned by the [editor menu contract](../development/ui-contracts.md#editor-body-context-menu), [shared menu contract](../development/ui-contracts.md#shared-action-menus), and [0095](../decisions/0095-editor-menu-scroll-preservation.md). Earlier temporary keyboard-policy handling recorded above was replaced by the dedicated explicit-activation owner in [0094](../decisions/0094-explicit-mobile-editor-keyboard.md) and the [keyboard-button work record](mobile-editor-keyboard-button.md).
+
+### Verification
+
+- `server/editor-context-menu-ui.test.ts` adds actual Chromium touch scrolling through CDP in 390px Hotview, Plain, and code, and wheel scrolling at 1280px. The regression covers scrolling inside and outside the editor, canceled drags and their compatibility clicks, crossing from the editor to an outside target, copying the original selection after scrolling, outside-click consumption, and actual body-click dismissal without reopening. Existing selection-handle range changes, read-only copying, keyboard policy, and desktop action tests remain in the suite.
+- Initial regression runs exposed a pending selection timer canceled by a subsequent scroll event and a menu reopening after a mixed mouse/touch body click. Keeping pending stable-selection timers during scroll and tracking whether any editor menu is open resolved those cases. Review also identified drags starting in the ignored editor wrapper; click-mode tracking now starts before the containment check.
+
+- `node --test server/editor-context-menu-ui.test.ts` passed all 6 tests without skips, including the scroll/drag regression.
+- `node --test server/action-menu-ui.test.ts` passed, preserving shared menu defaults, header behavior, keyboard navigation, focus, and click consumption.
+- `node --test server/mobile-editor-keyboard-ui.test.ts server/mobile-editor-keyboard-policy-ui.test.ts` passed both keyboard regressions.
+- `npx tsc -b` and targeted oxlint checks passed; the shared `ActionMenu` retained its 2 existing React ref warnings. `npm run check:docs` passed with 575 descriptions and no metadata or local-link errors. `git diff --check` passed.
+
+Physical-device native selection handles remain outside Chromium emulation. No app build, deployment, launcher, or server start, stop, or restart was performed; applying the change to the running instance remains the user's step.
