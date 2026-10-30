@@ -1,8 +1,8 @@
 ---
 title: "Conversation Storage and Range Synchronization"
 created: 2026-09-30
-updated: 2026-10-26
-description: "Defines SQLite storage of originals and attachments, prioritized display of the latest 3 turns and lazy loading of work details, early display during restoration and its limits using sequence-based synchronization and reverse searches for recent question boundaries to reduce unnecessary parsing of originals, per-frame conversation assembly, and the storage lifetimes and measurement of the IndexedDB sliding cache and local sends pending before initialization."
+updated: 2026-10-30
+description: "Defines SQLite originals and attachments, recent-turn and lazy work-detail synchronization, early restoration display, per-frame assembly, immediate local prompt feedback outside sequenced history, and IndexedDB cache and startup-queue lifetimes and limits."
 상위파일: "MOC.md"
 ---
 
@@ -80,6 +80,10 @@ Original sizes are checked in SQL first, and each selected row is read separatel
 The browser displays only records matching the current restoration target ID in separate temporary state. The existing conversation, device cache, tab pointer, and reconnection cursor are preserved, and the early display is not saved. Expanding questions and answers, copying, and scrolling are allowed; sending, approvals, and requests for earlier ranges are blocked. CLI history from the previous conversation is not mixed in. The conversation's `aria-busy` is retained until restoration finishes. Temporary display is cleared on final `history`, `replay`/`meta`, `reset`, errors, authentication transitions, or connection closure. Failure preserves the existing conversation; success replaces it with the latest ACP transcript. Provider restoration time and writer replacement rules remain unchanged.
 
 ### Incremental Screen Updates
+
+`src/hooks/use-agent-prompt-feedback.ts` overlays one locally submitted idle question and a waiting reply on the folded display items. It does not append synthetic events to `events` or `historyRef`, allocate server sequence numbers, or persist optimistic content in transcript caches. Observe new live event batches alongside the frame's actual event append: a matching question echo removes the local question, and its `turn_start` removes the waiting reply. Only new events acknowledge a send, so identical text in older turns cannot consume it. Buffered echoes take priority over a later queue acknowledgment containing identical text.
+
+Server queue acknowledgments, errors, disconnects, conversation changes, and authoritative history replacement reconcile this overlay. Startup feedback remains attached to its cancellable in-memory queue entry until sending. Local feedback is not proof of server acceptance, is not automatically resent after disconnection, and does not survive refresh. The [feature contract](../features/terminals-agents-automation/agent-conversations-queue-and-restoration.md#immediate-message-and-reply-feedback) owns the visible behavior.
 
 Real-time events are appended to a socket-specific buffer, and sequence numbers are updated immediately. The full history array is not copied for every event, and a separate array is passed to React screen state. Copying the screen state's event array and assembling the conversation occur once per animation frame.
 

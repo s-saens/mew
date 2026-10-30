@@ -1,4 +1,5 @@
 import { useAgentControlSelection } from '../hooks/use-agent-control-selection'
+import { useAgentPromptFeedback } from '../hooks/use-agent-prompt-feedback'
 import { HeaderSelect } from './agent-header-select'
 import { RuntimeInstallProgress } from './RuntimeInstallProgress'
 import { AgentAttachmentIcon } from './agent-attachment-icon'
@@ -56,7 +57,7 @@ import {
 import { flushSync } from 'react-dom'
 import { EditPencil, NavArrowRight, Terminal as TerminalIcon } from 'iconoir-react'
 import { AgentCommandBubble, AgentCommandPopup } from './agent-command-bubble'
-import { AgentLoadingBubbles } from './agent-loading-bubbles'
+import { AgentLoadingBubbles, AgentReplyPending } from './agent-loading-bubbles'
 import { useAgentCommands } from '../hooks/use-agent-commands'
 import { useAgentClearFeedback } from '../hooks/use-agent-clear-feedback'
 import { useAgentEventState } from '../hooks/use-agent-event-state'
@@ -2297,6 +2298,10 @@ function AgentSessionView({
   const [usersBefore, setUsersBefore] = useState(0)
   const prependScrollRef = useRef<{ height: number; top: number } | null>(null)
   const { events, items, hasError, lastAccessError, setEvents, appendEvents } = useAgentEventState(uiLocale, historyStart)
+  const { displayItems: promptItems, waiting: promptWaiting, replyKey: pendingReplyKey,
+    begin: beginPrompt, markSent: markPromptSent, cancelStartup: cancelStartupFeedback,
+    observe: observePromptEvents, acknowledgeQueue: acknowledgePromptQueue, replace: replacePromptFeedback,
+    disconnect: disconnectPromptFeedback, clear: clearPromptFeedback } = useAgentPromptFeedback(items)
   const [connected, setConnected] = useState(false)
   const [startupQueue] = useState(() => new AgentStartupQueue<StartupPrompt>())
   const [startupPrompts, setStartupPrompts] = useState(startupQueue.snapshot())
@@ -2305,11 +2310,13 @@ function AgentSessionView({
   const clearStartupPrompts = useCallback(() => {
     startupQueue.clear()
     setStartupPrompts(startupQueue.snapshot())
-  }, [startupQueue])
+    clearPromptFeedback()
+  }, [startupQueue, clearPromptFeedback])
   const cancelStartupPrompt = useCallback((id: number) => {
     startupQueue.remove(id)
     setStartupPrompts(startupQueue.snapshot())
-  }, [startupQueue])
+    cancelStartupFeedback(id)
+  }, [startupQueue, cancelStartupFeedback])
   const { feedback: clearFeedback, request: requestClear, complete: completeClear, observeQueue: observeClearQueue, cancel: cancelClear } = useAgentClearFeedback()
   const [draft, setDraft] = useState(() => readAgentInputDraft(tabId).replace(/\[\[mew-upload:[^\]\n]+\]\]/g, ''))
   const [cliMode, setCliMode] = useState(false)
@@ -2643,9 +2650,10 @@ function AgentSessionView({
       // 갈아끼우기 여부는 여기서 소비한다 — setEvents 콜백 안에서 ref를 건드리면 순수하지 않다
       const swap = swapRef.current
       swapRef.current = false
+      observePromptEvents(batch)
       appendEvents(batch, swap)
     })
-  }, [appendEvents])
+  }, [appendEvents, observePromptEvents])
 
   const publishWorkHistory = useCallback(() => {
     if (!historyRef.current) return
@@ -2782,6 +2790,7 @@ function AgentSessionView({
           setUsersBefore(next.usersBefore)
           pendingRef.current = []
           swapRef.current = false
+          if (event.page.mode !== 'prepend') replacePromptFeedback()
           setEvents(next.events.slice())
           adoptControls(event.page.controls)
           return
@@ -2809,6 +2818,7 @@ function AgentSessionView({
         if (event.type === 'thinking') return adoptThinking(event.thinking)
         if (event.type === 'meta') {
           if (wsRef.current === startupClosingSocketRef.current) return
+          acknowledgePromptQueue(event.meta, pendingRef.current)
           setStartupReady(!!event.meta.sessionId)
           observeClearQueue(event.meta.queued, event.meta.queuedKinds)
           clearPreview()
@@ -2829,6 +2839,7 @@ function AgentSessionView({
               return setMeta(event.meta)
             }
             const sameSession = cacheSessionIdRef.current === event.meta.sessionId
+            replacePromptFeedback()
             setEvents((cached) => mergeAgentReplay(cached, replayed.events, sameSession, replayed.restored))
           } else if (cacheSessionIdRef.current && cacheSessionIdRef.current !== event.meta.sessionId) {
             // 인증 뒤 새 세션이 생긴 경우처럼 replay 없이 sessionId만 바뀌어도 옛 전사를 남기지 않는다.
@@ -2944,6 +2955,7 @@ function AgentSessionView({
         previewTargetRef.current = resumeSessionIdRef.current
         setHistoryPreview(null)
         setConnected(false)
+        disconnectPromptFeedback()
         // 대화는 지우지 않는다 — 잠깐 끊긴 사이 화면이 빈 탭(히스토리 드롭다운)으로 보이던 원인이다.
         // 다시 붙으면 서버가 보내는 replay가 통째로 갈아끼운다
         setMeta(null)
@@ -2979,7 +2991,7 @@ function AgentSessionView({
     }
     // 런타임을 바꾸면 저쪽 세션으로 갈아탄다 — 이쪽 세션은 서버에 그대로 남아 돌아오면 이어진다
     // (queueEvent는 값이 바뀌지 않는 useCallback이라 여기 있어도 재접속을 부르지 않는다)
-  }, [cacheKey, runtime, tabId, cwd, notificationWorkspace, preset?.modelId, preset?.thinkingId, preset?.thinkingConfigId, preset?.role, queueEvent, setEvents, adoptModels, adoptModes, adoptThinking, closeAuthBrowser, closeAcpLoginSessions, observeClearQueue, completeClear, cancelClear, acceptWorkDetails, resetWorkDetails, clearStartupPrompts, resetSelection])
+  }, [cacheKey, runtime, tabId, cwd, notificationWorkspace, preset?.modelId, preset?.thinkingId, preset?.thinkingConfigId, preset?.role, queueEvent, setEvents, adoptModels, adoptModes, adoptThinking, closeAuthBrowser, closeAcpLoginSessions, observeClearQueue, completeClear, cancelClear, acceptWorkDetails, resetWorkDetails, clearStartupPrompts, resetSelection, acknowledgePromptQueue, replacePromptFeedback, disconnectPromptFeedback])
 
   // 경과 시간만 흐르게 한다 — 나머지 값은 서버 meta가 밀어 준다
   useEffect(() => {
@@ -2994,8 +3006,8 @@ function AgentSessionView({
   // Info는 대화 흐름을 밀지 않는 팝업이다. 트리거까지 같은 경계에 넣어 버튼을 다시 눌러 닫을 수 있다.
   useOverlayDismiss(showInfo ? closeInfo : false, { outside: () => infoOverlayRef.current })
 
-  const displayItems = useMemo(() => historyPreview ? foldEvents(historyPreview.events, uiLocale, historyPreview.start) : items,
-    [historyPreview, items, uiLocale])
+  const displayItems = useMemo(() => historyPreview ? foldEvents(historyPreview.events, uiLocale, historyPreview.start) : promptItems,
+    [historyPreview, promptItems, uiLocale])
   const timeline = useMemo(() => historyPreview ? displayItems : commandTimeline(displayItems, cli.records, usersBefore),
     [historyPreview, displayItems, cli.records, usersBefore])
   const settingsChanges = useMemo(() => {
@@ -3097,11 +3109,14 @@ function AgentSessionView({
   }, [scrollToQuestion])
 
   const send = useCallback((payload: Record<string, unknown>) => {
-    if (payload.type === 'clear_session' || payload.type === 'close_session') clearStartupPrompts()
+    if (payload.type === 'clear_session' || payload.type === 'close_session' || payload.type === 'load_session') clearStartupPrompts()
     const socket = wsRef.current
-    if (socket?.readyState !== WebSocket.OPEN) return
-    if (payload.type === 'clear_session') requestClear(socket)
-    else socket.send(JSON.stringify(payload))
+    if (socket?.readyState !== WebSocket.OPEN) return false
+    try {
+      if (payload.type === 'clear_session') requestClear(socket)
+      else socket.send(JSON.stringify(payload))
+      return true
+    } catch { return false }
   }, [requestClear, clearStartupPrompts])
 
   const searchSessions = useCallback((query: string) => {
@@ -3189,8 +3204,8 @@ function AgentSessionView({
 
   useEffect(() => {
     if (restoreFailureRef.current) return
-    onInfo(tabId, runtime, cwd, { busy: startupPrompts.length > 0 || connected && ((meta?.busy ?? false) || cli.records.some(command => command.state === 'running')), awaitingApproval: connected && pending, sessionId: meta?.sessionId ?? '' })
-  }, [connected, cwd, meta?.busy, meta?.sessionId, cli.records, pending, onInfo, runtime, tabId, startupPrompts.length])
+    onInfo(tabId, runtime, cwd, { busy: promptWaiting || startupPrompts.length > 0 || connected && ((meta?.busy ?? false) || cli.records.some(command => command.state === 'running')), awaitingApproval: connected && pending, sessionId: meta?.sessionId ?? '' })
+  }, [connected, cwd, meta?.busy, meta?.sessionId, cli.records, pending, onInfo, runtime, tabId, startupPrompts.length, promptWaiting])
 
   /** 다른 탭이 붙들고 있는 세션 — 이 탭에서 또 열지 못하게 막는다 */
   const takenIds = useMemo(
@@ -3397,9 +3412,13 @@ function AgentSessionView({
       attachments: draftAttachments.map(({ image: _image, ...file }) => queuedAttachmentInput(file)),
       skills: selectedSkillNames(text, skills), settings: messageSettings }
     if (canQueueStartup || startupQueue.snapshot().length > 0) {
-      startupQueue.enqueue(prompt)
+      const id = startupQueue.enqueue(prompt)
+      if (!busy) beginPrompt(prompt, items.at(-1)?.key ?? null, queued, id)
       setStartupPrompts(startupQueue.snapshot())
-    } else send(prompt)
+    } else {
+      if (!send(prompt)) return
+      if (!busy) beginPrompt(prompt, items.at(-1)?.key ?? null, queued)
+    }
     recordAgentInputHistory(tabId, written)
     historyIndexRef.current = null
     historyDraftRef.current = ''
@@ -3583,10 +3602,12 @@ function AgentSessionView({
         thinkingConfigId: prompt.settings.thinkingConfigId, modeId: prompt.settings.modeId }
       const knownSkills = [...new Set([...prompt.skills, ...selectedSkillNames(prompt.text, skills)])]
       socket.send(JSON.stringify({ ...prompt, settings, skills: knownSkills }))
+      if (!meta.busy) beginPrompt({ ...prompt, settings }, items.at(-1)?.key ?? null, meta.queued)
+      markPromptSent(prompt.text)
       return true
     })
     setStartupPrompts(startupQueue.snapshot())
-  }, [startupQueue, startupPrompts, startupReady, connected, meta?.sessionId, auth, loadingSession, historyPreview, messageSettings, skills])
+  }, [startupQueue, startupPrompts, startupReady, connected, meta, auth, loadingSession, historyPreview, messageSettings, skills, beginPrompt, markPromptSent, items])
   const editingSettings = editingQueued?.settings
   const composerModelId = editingSettings?.modelId
     ? hasModelEffort(runtime) ? splitModelVariant(runtime, editingSettings.modelId, models?.availableModels).model : editingSettings.modelId
@@ -4002,7 +4023,7 @@ function AgentSessionView({
           ? <AgentCommandBubble key={item.key} command={item.command} onOpen={() => setCommandPopupId(item.command.id)} />
           : <AgentConversationItem key={item.key} item={item} expanded={expanded} showSettings={settingsChanges.has(item.key)}
             workError={workErrors[item.key]} onLoadWork={loadWorkDetails}
-            project={project} readOnly={!!historyPreview} busy={!historyPreview && item.kind === 'turn' && !item.done ? meta?.activeTask === 'cli' ? false : meta?.busy ?? null : false}
+            project={project} readOnly={!!historyPreview} loadingActive={visible} busy={item.key === pendingReplyKey ? null : !historyPreview && item.kind === 'turn' && !item.done ? meta?.activeTask === 'cli' ? false : meta?.busy ?? null : false}
             now={item.kind === 'turn' && !item.done ? now : 0} toggle={toggle} send={send} onOpenFile={onOpenFile} onOpenError={setErrorDetail}
             onRunCommand={allowTerminal ? runCodeCommand : undefined} codeRunDisabled={codeRunDisabled || (item.kind === 'turn' && !item.done)} />)}
         {/* 올려 읽는 동안 밑에서 대화가 자랐다는 표시 — 누르면 바닥으로 간다(바닥에 닿으면 스스로 사라진다).
@@ -4732,13 +4753,14 @@ const AgentMarkdownText = memo(function AgentMarkdownText({ text, onOpenFile, on
   />
 })
 
-const AgentConversationItem = memo(function AgentConversationItem({ item, expanded, showSettings, project, busy, now,
+const AgentConversationItem = memo(function AgentConversationItem({ item, expanded, showSettings, project, busy, now, loadingActive,
   toggle, send, onOpenFile, onOpenError, readOnly, onRunCommand, codeRunDisabled, workError, onLoadWork }: {
   item: Item
   expanded: Set<string>
   showSettings: boolean
   project: string
   busy: boolean | null
+  loadingActive: boolean
   now: number
   toggle: (key: string) => void
   send: (payload: Record<string, unknown>) => void
@@ -4813,6 +4835,8 @@ const AgentConversationItem = memo(function AgentConversationItem({ item, expand
     const state = turnState(item, busy)
     // 마지막 답변을 패널 폭에 맞춰 두 줄로 요약한다.
     const lastAgent = item.children.findLast((c) => c.kind === 'agent')
+    const waitingForReply = state === 'running' && !(lastAgent?.kind === 'agent' && lastAgent.text.trim())
+      && !item.children.some(child => child.kind === 'error')
     const summary = lastAgent && lastAgent.kind === 'agent'
       ? lastAgent.text
       : state === 'awaitingApproval'
@@ -4862,13 +4886,14 @@ const AgentConversationItem = memo(function AgentConversationItem({ item, expand
             </> : (
               <span className="min-w-0 flex-1 line-clamp-2 break-words [overflow-wrap:anywhere] text-ink">
                 <span aria-hidden="true" className="float-right h-[1lh]" style={{ width: actionSpace }} />
-                <span data-agent-summary className="select-text">{summary}</span>
+                <span data-agent-summary className="select-text">{waitingForReply
+                  ? <AgentReplyPending label={t('common.loading')} active={loadingActive} /> : summary}</span>
               </span>
             )}
           </button>
           <div className={`flex shrink-0 items-center ${open ? '' : 'absolute right-0 top-0'}`}>
           {/* 답변만 모아 복사한다 — 생각·도구 기록은 빼고 사람이 읽으라고 쓴 글만 */}
-          {open && <CopyButton
+          {open && answerText && <CopyButton
             text={answerText}
             compact
             label={uiText("이 답변 복사")}
@@ -4889,6 +4914,7 @@ const AgentConversationItem = memo(function AgentConversationItem({ item, expand
         </div>
         {open && (
           <div className="space-y-2 px-3 py-2">
+            {waitingForReply && <AgentReplyPending label={t('common.loading')} active={loadingActive} />}
             {item.children.map((child) => {
               if (child.kind === 'agent')
                 // 답변은 마크다운이다 — 목록·굵기·코드블럭을 글자 그대로 두지 않고 그린다

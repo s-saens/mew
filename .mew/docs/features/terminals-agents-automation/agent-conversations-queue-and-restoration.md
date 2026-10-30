@@ -4,11 +4,11 @@ parent: "mew-agents"
 title: "Agent Conversations, Queues, and Restoration"
 status: "implemented"
 created: "2026-09-18"
-updated: "2026-10-28"
+updated: "2026-10-30"
 status_hash: "b325d279cf16e291b2bcddda7cc0d70268647e336403acba780cb1081da44668"
 files: ["src/components/AgentPanel.tsx", "src/components/agent-startup-queue.tsx", "src/utils/agent-startup-queue.ts", "src/hooks/use-agent-event-state.ts", "src/hooks/use-agent-work-history.ts", "src/utils/agent-work-loader.ts", "src/utils/agentFold.ts", "src/hooks/useGridDrag.ts", "server/agentHost.ts", "server/agentWs.ts", "server/agentTranscript.ts", "server/agent-history-preview.ts", "server/agent-session-search-service.ts", "server/agent-transcript-search.ts", "server/agent-runtime-history-search.ts"]
 commits: []
-description: "Feature contract for agent conversations, stopping, queues, restoration, history searches by topic, content, and session ID, prevention of out-of-order requests and session conflicts, and local indexing scope. Also covers new tabs, drafts, the latest 3 turns, work details, attachments, question navigation, memory protection, and model capacity retries."
+description: "Feature contract for immediate local question bubbles and reply waiting dots, agent conversations, stopping, queues, restoration, history search, request ordering, and session conflicts. Also covers new tabs, drafts, the latest 3 turns, work details, attachments, question navigation, memory protection, and model capacity retries."
 상위파일:
   - "MOC.md"
   - "_terminals-agents-automation.md"
@@ -52,6 +52,14 @@ description: "Feature contract for agent conversations, stopping, queues, restor
 - [Terminal and agent usage](../../../../docs/guides/terminal-agents.md) · [Supervision, queue, and restoration contract](../../development/agent-sessions.md)
 
 ## Detailed behavior
+
+### Immediate message and reply feedback
+
+Sending a prompt from an idle conversation immediately displays the user's question, including attachment tags and the selected settings, together with a response bubble containing the shared three-dot loading indicator. Display this feedback before any server echo or provider response. The first locally queued prompt in a new conversation also receives this feedback while initialization is pending; subsequent prompts retain the existing queue behavior and cancellation controls.
+
+When the server echoes the question, replace its local display without duplication and retain the waiting response until the actual turn begins. Running response bubbles show the dots, both collapsed and expanded, until answer text arrives. Completed, interrupted, failed, and approval-waiting turns do not show reply waiting dots. Pause animation in hidden panels and honor the shared reduced-motion setting.
+
+Local feedback is temporary display state, separate from the authoritative transcript, history positions, and device caches; see [conversation storage](../../development/conversation-storage.md#incremental-screen-updates). Queue acknowledgments move a prompt to the normal server queue. Errors and disconnection stop local reply waiting; confirmed history replaces sent local feedback without resending it. Clearing or switching conversations and canceling the corresponding startup prompt remove that feedback. A closed socket or a synchronous send failure preserves the input and attachments. Verification and application limits are recorded in [the implementation record](../../work/agent-prompt-feedback.md).
 
 ### Clear conversation shortcut
 

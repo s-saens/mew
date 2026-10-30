@@ -1,5 +1,11 @@
 import { LoadingIndicator } from '@mew/ui'
 
+export function AgentReplyPending({ label, active }: { label: string; active: boolean }) {
+  return <span data-agent-reply-pending role="status" aria-label={label} className="inline-flex items-center align-middle">
+    <LoadingIndicator size={16} active={active} />
+  </span>
+}
+
 export function AgentLoadingBubbles({ label, active = true, compact = false }: {
   label: string
   active?: boolean
