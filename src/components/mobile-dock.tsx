@@ -128,7 +128,7 @@ export function MobileDock({ active, openPanels, available, hidden, portalTarget
     const tapped = !current.dragging && !current.moved && current.item
     const dx = event.clientX - current.x, dy = event.clientY - current.y
     if (current.dragging) commit(current.order)
-    else if (Math.abs(dx) >= 40 && Math.abs(dx) > Math.abs(dy) * 1.5) { suppressClick.current = true; onNavigate(dx > 0 ? -1 : 1, visible) }
+    else if (Math.abs(dx) >= 20 && Math.abs(dx) > Math.abs(dy) * 1.5) { suppressClick.current = true; onNavigate(dx > 0 ? -1 : 1, visible) }
     else if (!current.moved && current.item) { suppressClick.current = true; onSelect(current.item) }
     gesture.current = null
     cancel()

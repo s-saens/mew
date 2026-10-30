@@ -96,12 +96,19 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><I18nProvid
     await swipe('.cm-scroller')
     assert.equal((await state()).active, 'code.js')
     assert.ok(await page.locator('.cm-scroller').evaluate(el => el.scrollLeft) > 0, 'source text retains native horizontal scrolling')
-    await swipe('[data-mobile-key-bar]')
+    for (const dx of [-29, 29]) {
+      await swipe('[data-mobile-key-bar]', dx)
+      assert.equal((await state()).active, 'code.js', 'key-bar movements below 30px do not switch tabs')
+    }
+    await swipe('[data-mobile-key-bar]', -30)
     assert.equal((await state()).active, 'second.md')
     assert.equal((await state()).panel, 'editor')
+    await select('code.js')
+    await swipe('[data-mobile-key-bar]', 30)
+    assert.equal((await state()).active, 'first.md', '30px key-bar swipes work in both directions')
     for (const y of [90, 420, 720]) {
       await select('first.md')
-      await swipe('.editor-root', -100, 0, y)
+      await swipe('.editor-root', -30, 0, y)
       assert.equal((await state()).active, 'code.js', `Hotview body swipes work at y=${y}`)
     }
     await select('first.md')
@@ -114,21 +121,29 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><I18nProvid
     await select('code.js')
     await swipe('[data-workspace-panel="editor"] [data-dock-tab-bar]')
     assert.equal((await state()).active, 'code.js', 'tab strips retain their own scrolling')
-    await swipe('.mobile-dock', 65)
+    for (const dx of [-19, 19]) {
+      await swipe('.mobile-dock', dx)
+      assert.equal((await state()).panel, 'editor', 'dock movements below 20px do not switch panels')
+    }
+    await swipe('.mobile-dock', 20)
     assert.equal((await state()).panel, 'sidebar')
     assert.equal((await state()).active, 'code.js', 'dock leaves the editor tab unchanged')
-    await swipe('.mobile-dock', 65)
+    await swipe('.mobile-dock', 20)
     assert.equal((await state()).panel, 'sidebar', 'dock navigation stops at the first panel')
-    await swipe('.mobile-dock', -65)
+    await swipe('.mobile-dock', -20)
     assert.equal((await state()).panel, 'editor')
 
     for (const panel of ['sidebar', 'agent', 'terminal', 'git', 'tasks']) {
       await selectPanel(panel)
       const before = (await state()).index
       const body = `[data-workspace-panel="${panel}"] [data-panel-body]`
-      await swipe(body, -100, 0, 400)
+      for (const dx of [-29, 29]) {
+        await swipe(body, dx, 0, 400)
+        assert.equal((await state()).index, before, `${panel} body ignores movements below 30px`)
+      }
+      await swipe(body, -30, 0, 400)
       assert.equal((await state()).index, (before + 1) % 3, `${panel} body selects the next tab`)
-      await swipe(body, 100, 0, 400)
+      await swipe(body, 30, 0, 400)
       assert.equal((await state()).index, before, `${panel} body selects the previous tab`)
       assert.equal((await state()).panel, panel)
     }
@@ -181,7 +196,7 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><I18nProvid
 
     await select('code.js')
     const bar = '[data-mobile-key-bar]'
-    for (const [dx, dy] of [[-30, 0], [-100, 150]]) {
+    for (const [dx, dy] of [[-29, 0], [29, 0], [-30, 45], [30, 45]]) {
       await swipe(bar, dx, dy)
       assert.equal((await state()).active, 'code.js', 'short and vertical swipes keep the current tab')
     }

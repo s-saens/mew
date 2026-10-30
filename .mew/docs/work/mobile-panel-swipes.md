@@ -1,6 +1,6 @@
 ---
 title: "Separate swipes for the mobile dock, panel body, and Plain auxiliary key bar"
-description: "Records mobile dock, panel body, and Plain auxiliary key bar swipe separation, internal horizontal scrolling priority, and the 2026-10-30 attachment tag gesture exclusion, agent navigation through the + picker, and Documents/Files scope swipes in the file explorer. Distinguishes local regression, type, lint, and documentation checks from physical-device verification and production application."
+description: "Records mobile dock, panel body, and Plain auxiliary key bar swipe separation, internal horizontal scrolling priority, and the 2026-10-30 attachment tag gesture exclusion, agent navigation through the + picker, and Documents/Files scope swipes in the file explorer, and halved dock/body swipe distances. Distinguishes local regression, type, lint, and documentation checks from physical-device verification and production application."
 created: "2026-10-27"
 updated: "2026-10-30"
 ---
@@ -77,3 +77,19 @@ Verification results:
 - `npm run check:docs`: Document descriptions and links passed.
 
 Only local isolated checks were performed. No app build, deployment, or server startup/restart was performed. Actual phones and application to the running instance remain unverified.
+
+
+## 2026-10-30 Halve swipe recognition distances
+
+Reduced the required horizontal movement from 60px to 30px in mobile panel content and the Plain modifier key bar, and from 40px to 20px on the dock, so shorter left/right gestures trigger navigation. Direction filtering, native horizontal scrolling, cancellation, click suppression, and long-press reordering retain their existing behavior. Current thresholds are owned by [Shared UI contracts](../development/ui-contracts.md#mobile-dock-and-panel-switching) and linked from [Panel layout and mobile](../features/appearance-accounts-operations/panel-layout-mobile-and-state-restoration.md).
+
+Extended `server/mobile-panel-swipe-ui.test.ts` to exercise actual touch gestures at 30px in both directions in the key bar and each tabbed panel body, 20px dock navigation, and rejection of 29px body/key-bar and 19px dock movements. Hotview checks use 30px at multiple screen heights, and vertical gestures remain rejected at the shorter distance.
+
+Verification results:
+
+- The new 30px key-bar regression failed against the previous 60px implementation before the fix.
+- The dock UI and dock utility checks passed all 7 tests. A concurrent run of `server/mobile-panel-swipe-ui.test.ts` passed the new distance assertions but failed the existing native table scroll-back assertion; the separate rerun passed the full panel test, including native table scrolling, cancellation, multitouch, modifiers, and desktop exclusion.
+- `npx tsc -b`, targeted `npx oxlint`, the Impeccable detector, and `git diff --check` passed. Existing dock refs/effects/dependency lint warnings remain.
+- `npm run check:docs`: All 582 descriptions and document links passed.
+
+Only isolated local checks were performed. No app build, deployment, or server startup/restart was performed. Physical phones and application to the running instance remain unverified.
