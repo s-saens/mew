@@ -1,8 +1,8 @@
 ---
 title: "Desktop project sidebar work record"
-description: "Implementation and verification record for replacing the desktop project dropdown with an independent panel to the left of the file explorer and adding per-project command buttons on 2026-10-28. Distinguishes retention of the mobile dropdown, fixed command targets, root session isolation, previously running sessions, and the scope not applied to production from the shared panel background fix and verification on 2026-10-29."
+description: "Implementation and verification record for replacing the desktop project dropdown with an independent panel to the left of the file explorer and adding per-project command buttons on 2026-10-28. Distinguishes retention of the mobile dropdown, fixed command targets, root session isolation, previously running sessions, and the scope not applied to production from the shared panel background fix on 2026-10-29 and leftmost project panel correction with local regression verification on 2026-10-31."
 created: "2026-10-28"
-updated: "2026-10-29"
+updated: "2026-10-31"
 ---
 
 ## Purpose and results
@@ -37,3 +37,15 @@ Fixed an issue where only the project sidebar retained a solid background while 
 - `npm run check:docs`: no description check errors. The full link check failed on 19 temporary asset URLs in README and references to deleted documents that predated this work. No link errors in the documents changed here.
 
 No build, deployment, or server restart was performed. The user applies the changes to actual instances after building.
+
+
+## Leftmost project panel fix (2026-10-31)
+
+The Dock edge layout had wrapped the project sidebar, placing a left Dock before project selection. Moved the project sidebar host into its own leftmost workspace grid column. The left-edge order is now project sidebar → Dock → file explorer → work panels; top and bottom Docks span only the area to the right of project selection. Updated the explorer toggle offset and maximization hiding rule for the new host location. Current behavior is defined by the [project feature](../features/projects-files-search/opening-projects-tabs-and-groups.md) and [shared UI contract](../development/ui-contracts.md#header-project-switcher).
+
+- Added regression assertions to the actual App fixture for leftmost project selection across all four Dock edges, the explorer toggle boundary, and the mobile sidebar exclusion. The pre-fix run failed because the top Dock extended left of the project panel.
+- `node --test server/workspace-switch-ui.test.ts server/project-sidebar-ui.test.ts server/mobile-dock-ui.test.ts`: 11 passed. Coverage includes project switching, panel opening and closing, resizing and restoration, maximization, desktop/mobile Dock boundaries, and existing swipe behavior. Reviewed the actual App desktop capture with project selection before the left Dock.
+- `npx tsc -b`: passed. Targeted oxlint passed without errors, with existing warnings. The Impeccable layout detector reported no findings.
+- `npm run check:docs`: passed with no description or local-link errors.
+
+No app build, deployment, launcher, server start, or restart was performed. Applying the changes to a running instance and physical-device verification remain with the user.

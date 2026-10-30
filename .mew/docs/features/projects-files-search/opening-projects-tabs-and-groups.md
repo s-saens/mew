@@ -4,11 +4,11 @@ parent: "mew-projects"
 title: "Opening, Selecting, and Switching Projects"
 status: "implemented"
 created: "2026-09-18"
-updated: "2026-10-30"
+updated: "2026-10-31"
 status_hash: "03b352e53f93242f9efdfd05c5bd632f9bf92dd1a456279d6b0eb0efd066cd3f"
 files: ["src/components/file-action-menu.tsx", "src/hooks/use-external-file-actions.tsx", "src/components/file-browser-favorites.tsx", "server/file-favorites.ts", "src/components/file-browser.tsx", "src/components/OpenProjectDialog.tsx", "src/components/ProjectSwitcher.tsx", "server/projects.ts", "server/cloud-storage.ts"]
 commits: []
-description: "Defines the project sidebar on the left of the file explorer opened from the desktop header, per-project command buttons, independent restoration of open state and width, and the mobile dropdown. Explains shared handle sorting, numbers on the right, full-row active highlighting, right-click editing, list removal and addition, Alt+P and Alt+1…9, shared icons, per-account restoration, cancellation when another project is selected during loading, and the boundaries of server folder browsing, subprojects, worktrees, access permissions, and running sessions."
+description: "Defines the leftmost desktop project sidebar, outside the Dock and file explorer, opened from the header, per-project command buttons, independent restoration of open state and width, and the mobile dropdown. Explains shared handle sorting, numbers on the right, full-row active highlighting, right-click editing, list removal and addition, Alt+P and Alt+1…9, shared icons, per-account restoration, cancellation when another project is selected during loading, and the boundaries of server folder browsing, subprojects, worktrees, access permissions, and running sessions."
 상위파일:
   - "MOC.md"
   - "_projects-files-search.md"
@@ -30,7 +30,7 @@ description: "Defines the project sidebar on the left of the file explorer opene
 - Provide default OS/cloud folders and per-account favorites at the top of Add Project and the server file explorer.
 - The project selection window provides folder browsing, cloud shortcuts, New Folder, Git clone, and Git initialization.
 - When the project sidebar is closed, the left side of the header shows the current project's icon and name with a command button beside them. The project button has equal left and right padding of 10px, and the icon fills a 16×16px area so no extra internal spacing is added on the left. Clicking it on desktop (768px or wider) opens the **project sidebar** to the left of the file explorer; on mobile, it opens the existing dropdown. The last list item is **Add Project**. No tab listing or group UI is provided.
-- The project sidebar is a fixed panel that does not cover the work content. It opens and closes independently of the file explorer and can be resized using its right edge. Its open state and width are saved in per-account browser settings and retained across project switches. Selection, clicking outside, Esc, and Back do not close the panel. Closing it with the Close button or header selector restores the existing header display. It is hidden while a work panel is maximized and returns to its previous state when the panel is restored.
+- The project sidebar occupies the leftmost workspace column, before the Dock and file explorer. With a left Dock, the order is project sidebar → Dock → file explorer → work panels. Top and bottom Docks span only the area to its right. The project sidebar is a fixed panel that does not cover the work content. It opens and closes independently of the file explorer and can be resized using its right edge. Its open state and width are saved in per-account browser settings and retained across project switches. Selection, clicking outside, Esc, and Back do not close the panel. Closing it with the Close button or header selector restores the existing header display. It is hidden while a work panel is maximized and returns to its previous state when the panel is restored.
 - Each row in the project sidebar provides a ▶ command button. Clicking another project's command button opens that project's command list without switching the current project. When the panel is open, the duplicate header command button is hidden. Command execution, editing, output, Alt+R, and Ctrl+E follow the [command button contract](../terminals-agents-automation/project-command-buttons.md).
 - Right-clicking, `Shift+F10`, or pressing the Menu key on the current project button or a list row opens a menu with **Edit** and **Delete**. Touching and holding the current button opens the same menu. Opening a menu from a list row keeps the project list open. Esc and Back first close only the Edit/Delete menu and return focus to the invoking row. Deleting an inactive project removes only that row from the open list. Edit opens the existing icon picker; Delete removes the project only from the account's project list and preserves the actual folders and files. Deleting the current project switches to another project before removing it; if switching fails, the list is preserved. Deletion is disabled for the last remaining current project.
 - Drag the handle on the left of a list row up or down with a mouse or touch to reorder it. The name area is used to select projects and scroll the list. Rows can also be moved using `Shift+↑/↓` on the row or `↑/↓` on the focused handle. Reordering does not switch projects or close the menu and is saved to the account's path list and browser copy. The final Add Project item does not move. Follow [Decision 0071](../../decisions/0071-project-list-reorder.md).
@@ -89,6 +89,8 @@ description: "Defines the project sidebar on the left of the file explorer opene
 
 <!-- mew:validation:start -->
 ## Verification
+
+- For the 2026-10-31 leftmost project panel correction, regression checks, and application boundary, see the [work record](../../work/desktop-project-sidebar.md#leftmost-project-panel-fix-2026-10-31).
 
 - For the 2026-10-30 rapid-switch cancellation change, regression checks, and application status, see the [work record](../../work/project-switch-cancellation.md).
 

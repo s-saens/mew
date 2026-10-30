@@ -224,6 +224,12 @@ for (const mode of ['keyboard', 'workspace', 'documents', 'permissions', 'panels
       const dock = page.getByRole('navigation', { name: '작업 독', exact: true })
       for (const width of [390, 1100]) {
         await page.setViewportSize({ width, height: 700 })
+        if (width >= 768) {
+          await page.locator('button[data-project-switcher]:not([aria-haspopup])').click()
+          await page.locator('[data-project-sidebar]').waitFor()
+        } else {
+          assert.equal(await page.locator('[data-project-sidebar]').count(), 0)
+        }
         for (const position of ['top', 'bottom', 'left', 'right']) {
           await page.evaluate(`window.fixtureDockPosition('${width >= 768 ? 'desktop' : 'mobile'}','${position}')`)
           await page.waitForFunction(`document.querySelector('.workspace-dock-layout').dataset.dockPosition === '${position}' && document.querySelector('.mobile-dock').dataset.position === '${position}'`)
@@ -237,10 +243,14 @@ for (const mode of ['keyboard', 'workspace', 'documents', 'permissions', 'panels
           if (position === 'left') assert.ok(rail.x + rail.width <= content.x + 1)
           if (position === 'right') assert.ok(content.x + content.width <= rail.x + 1)
           if (width >= 768) {
+            const projects = (await page.locator('[data-project-sidebar]').boundingBox())!
+            assert.equal(projects.x, 0, `${position} dock keeps project selection at the leftmost edge`)
+            assert.ok(projects.x + projects.width <= rail.x + 1, `${position} dock stays to the right of project selection`)
             const sidebar = (await page.locator('[data-sidebar]').boundingBox())!
             const toggle = (await page.locator('[data-sidebar-toggle]').boundingBox())!
             assert.equal(toggle.x, sidebar.x + sidebar.width - 1, `${position} dock keeps the explorer toggle at the sidebar boundary`)
             assert.ok(toggle.y >= content.y && toggle.y + toggle.height <= content.y + content.height)
+            if (position === 'left') await page.screenshot({ path: '/tmp/mew-project-sidebar-before-dock.png' })
           }
         }
       }
@@ -476,7 +486,8 @@ for (const mode of ['keyboard', 'workspace', 'documents', 'permissions', 'panels
         assert.equal(await page.locator('[data-project-sidebar]').isVisible(), true, 'desktop project selection retains its panel')
         const projects = await page.locator('[data-project-sidebar]').boundingBox()
         const files = await page.locator('[data-sidebar]').boundingBox()
-        assert.ok(projects && files && Math.abs(projects.x + projects.width - files.x) < 1, 'project panel precedes the file explorer')
+        const rail = await page.locator('[data-sidebar-dock]').boundingBox()
+        assert.ok(projects && files && rail && Math.abs(projects.x + projects.width - rail.x) < 1 && Math.abs(rail.x + rail.width - files.x) < 1, 'project panel precedes the dock and file explorer')
         const toggle = await page.locator('[data-sidebar-toggle]').boundingBox()
         assert.ok(toggle && Math.abs(toggle.x - (files.x + files.width - 1)) < 1, 'file explorer toggle follows both panels')
       }
@@ -778,12 +789,12 @@ for (const mode of ['keyboard', 'workspace', 'documents', 'permissions', 'panels
     const layoutDock = page.getByRole('navigation', { name: '작업 독' })
     const dockBounds = (await layoutDock.boundingBox())!
     const railSidebarBounds = (await page.locator('[data-sidebar]').boundingBox())!
-    assert.equal(dockBounds.x, 0)
     assert.equal(dockBounds.y, 44)
     assert.ok(dockBounds.width <= 48 && dockBounds.height > dockBounds.width)
     const projectPanelBounds = (await page.locator('[data-project-sidebar]').boundingBox())!
-    assert.ok(Math.abs(projectPanelBounds.x - (dockBounds.x + dockBounds.width)) <= 1, 'the project panel follows the dock with at most a divider between them')
-    assert.equal(railSidebarBounds.x, projectPanelBounds.x + projectPanelBounds.width)
+    assert.equal(projectPanelBounds.x, 0)
+    assert.ok(Math.abs(dockBounds.x - (projectPanelBounds.x + projectPanelBounds.width)) <= 1, 'the dock follows the leftmost project panel')
+    assert.equal(railSidebarBounds.x, dockBounds.x + dockBounds.width)
     const railToggleBounds = (await page.locator('[data-sidebar-toggle]').boundingBox())!
     assert.equal(railToggleBounds.x, railSidebarBounds.x + railSidebarBounds.width - 1)
     await page.locator('[data-sidebar-toggle]').click()

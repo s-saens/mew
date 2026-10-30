@@ -744,6 +744,13 @@ strong {
 .workspace-dock-layout[data-dock-position="right"] { grid-template: "content dock" minmax(0, 1fr) / minmax(0, 1fr) auto; }
 .workspace-dock-layout[data-dock-position="top"] { grid-template: "dock" auto "content" minmax(0, 1fr) / minmax(0, 1fr); }
 .workspace-dock-layout[data-dock-position="bottom"] { grid-template: "content" minmax(0, 1fr) "dock" auto / minmax(0, 1fr); }
+@media (width >= 768px) {
+  .workspace-dock-layout > .mew-project-sidebar-host { grid-area: projects; }
+  .workspace-dock-layout[data-dock-position="left"] { grid-template: "projects dock content" minmax(0, 1fr) / auto auto minmax(0, 1fr); }
+  .workspace-dock-layout[data-dock-position="right"] { grid-template: "projects content dock" minmax(0, 1fr) / auto minmax(0, 1fr) auto; }
+  .workspace-dock-layout[data-dock-position="top"] { grid-template: "projects dock" auto "projects content" minmax(0, 1fr) / auto minmax(0, 1fr); }
+  .workspace-dock-layout[data-dock-position="bottom"] { grid-template: "projects content" minmax(0, 1fr) "projects dock" auto / auto minmax(0, 1fr); }
+}
 .workspace-dock-layout > .mew-workspace-content { grid-area: content; min-width: 0; margin-bottom: 0; }
 .workspace-dock-layout > .desktop-dock-rail {
   grid-area: dock;
@@ -754,7 +761,7 @@ strong {
   background: var(--color-surface-deep);
 }
 .workspace-dock-layout > .desktop-dock-rail:empty { display: none; }
-.workspace-dock-layout:has([data-dock-maximized]) > .desktop-dock-rail { visibility: hidden; pointer-events: none; }
+.workspace-dock-layout:has([data-dock-maximized]) > :is(.desktop-dock-rail, .mew-project-sidebar-host) { visibility: hidden; pointer-events: none; }
 .mobile-dock[data-position]:not([hidden]) {
   position: relative;
   inset: auto;
