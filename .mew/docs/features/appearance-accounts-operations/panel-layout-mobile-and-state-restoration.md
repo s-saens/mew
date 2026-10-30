@@ -8,7 +8,7 @@ updated: "2026-10-30"
 status_hash: "018bca32e486b43c386b29de3e2087d6d1447fae6a33abc99d745367947a9382"
 files: ["src/components/tool-presentation-toggle.tsx", "src/components/SettingsModal.tsx", "src/hooks/use-refresh-tasks.ts", "src/hooks/usePresence.ts", "src/components/project-loading-overlay.tsx", "src/App.tsx", "src/components/DockWorkspace.tsx", "src/components/EditorPane.tsx", "src/components/TabBar.tsx", "src/components/AgentPanel.tsx", "src/components/mobile-dock.tsx", "src/components/layout-presets.tsx", "src/utils/layout-presets.ts", "server/layout-icon-cli.ts", "src/utils/mobile-dock.ts", "src/hooks/use-mobile-keyboard.ts", "src/hooks/use-mobile-panel-swipe.ts", "src/hooks/useTabs.ts", "server/userUiState.ts"]
 commits: []
-description: "Feature contract covering automatic scrolling to active and focused tabs in all horizontal tab bars, chevron buttons with theme-background-colored shadows in directions with remaining scroll space, constant-speed movement while held, normal wheel scrolling, returning to the most recently active tab when closing an editor tab, per-tab document navigation, maximizing panels by double-clicking their handles, renaming agent and terminal tabs by double-clicking, hiding and restoring surrounding panels and the side dock while maximized, and docking and splitting work panels. Explains panel switching through the desktop vertical dock and mobile bottom dock, content-area tab switching that preserves internal horizontal scrolling, the Plain modifier key bar, panel visit history, layout presets shared by the header and account settings, per-device layout storage, loading and focus on session return, the restored task panel, and migration of removed browser storage nodes."
+description: "Feature contract covering automatic scrolling to active and focused tabs in all horizontal tab bars, chevron buttons with theme-background-colored shadows in directions with remaining scroll space, constant-speed movement while held, normal wheel scrolling, returning to the most recently active tab when closing an editor tab, per-tab document navigation, maximizing panels by double-clicking their handles, renaming agent and terminal tabs by double-clicking, hiding and restoring surrounding panels and the side dock while maximized, and docking and splitting work panels. Explains panel switching through the independently positioned desktop and mobile docks, content-area tab switching that preserves internal horizontal scrolling, the Plain modifier key bar, panel visit history, layout presets shared by the header and account settings, per-device layout storage, loading and focus on session return, the restored task panel, and migration of removed browser storage nodes."
 상위파일:
   - "MOC.md"
   - "_appearance-accounts-operations.md"
@@ -35,7 +35,7 @@ description: "Feature contract covering automatic scrolling to active and focuse
 
 - On mobile, opening dropdowns, windows, or search panels must not automatically focus input fields and bring up the keyboard.
 
-- Provide document tabs, splitting, docking, resizing, per-account restoration, and a mobile bottom dock, fullscreen, and Back navigation.
+- Provide document tabs, splitting, docking, resizing, per-account restoration, and a mobile dock with configurable edge placement, fullscreen, and Back navigation.
 - Preserve the same tab list, editor panes, and docking layout when switching between Documents and regular files.
 - When the active editor tab closes, open the remaining tab most recently used in the same editor pane. Manage same-tab navigation through internal document links using per-tab document visit history.
 - All horizontal tab bars scroll smoothly to reveal the target tab when opening a new tab, selecting one with a shortcut, or moving focus within tabs. Keep the position if the tab is already visible, and scroll instantly when reduced motion is enabled.
@@ -84,7 +84,7 @@ description: "Feature contract covering automatic scrolling to active and focuse
 
 - The mobile selector for switching between multiple editor panes uses the shared custom dropdown and preserves existing pane and document state.
 
-- Provide document tabs, splitting, docking, resizing, per-account restoration, and a mobile bottom dock, fullscreen, and Back navigation.
+- Provide document tabs, splitting, docking, resizing, per-account restoration, and a mobile dock with configurable edge placement, fullscreen, and Back navigation.
 
 - Closing the active editor tab prioritizes the most recently active tab in the same editor pane over the visually adjacent tab. For example, with tabs 1, 2, and 3 open, opening an internal document from 1 in a new tab 4 and then closing 4 returns to 1. Closing an inactive tab preserves the current active tab. Per-tab document Back and Forward navigation and detailed state contracts follow [Editor Tab Visits and Document Navigation](../../development/ui-contracts.md#editor-tab-visits-and-document-navigation).
 
@@ -108,8 +108,8 @@ description: "Feature contract covering automatic scrolling to active and focuse
 - Maximizing, restoring, and switching targets do not remount sessions.
 - Detailed exit conditions and mobile boundaries follow [Work Panel Layout](../../development/ui-contracts.md#workspace-panel-layout).
 
-- On desktop, fix the dock vertically at the far left of the work area below the header, to the left of the file explorer. Keep the dock visible when the file explorer is collapsed, and reorder icons by vertical dragging or Alt+Up/Down. Retain the mobile bottom dock and remote viewer toolbar layouts.
-- Display dock icon hover tooltips below the icons and ensure they are not obscured in the remote viewer.
+- Place the workspace dock at the top, bottom, left, or right below the header, independently for desktop and mobile through Settings → Dock. Defaults remain left on desktop and bottom on mobile. Reserve space at the chosen edge, keep the dock available when the file explorer collapses, and retain the remote viewer toolbar layout. Left/right docks use vertical dragging and Alt+Up/Down; top/bottom docks use horizontal dragging and Alt+Left/Right.
+- Display dock icon hover tooltips toward the work area for top/bottom docks and ensure they are not obscured in the remote viewer.
 - Clicking an icon opens a closed panel; if the panel is open but unfocused, move focus to it without closing it. Preserve other panels.
 - Lightly highlight open panels, and use a stronger highlight for the single work panel that currently has focus.
 - Close a panel and remove its highlight only when its focused icon is clicked again.
@@ -121,10 +121,10 @@ description: "Feature contract covering automatic scrolling to active and focuse
 - On both desktop and mobile, pressing and holding an icon makes it follow the mouse or finger to reorder it.
 - A placeholder shows the insertion position. Releasing saves the order; Esc or touch cancellation restores the original order.
 
-- Provide a rectangular dock spanning the screen width at the bottom on mobile.
+- Provide a rectangular mobile dock spanning the selected workspace edge, with safe-area insets.
 - Icons open panels or bring them to the front. Tapping the same icon again does not close the panel.
-- The height is 48px plus the bottom safe-area inset.
-- Use a top divider and the selected icon's brightness and weight for distinction, without rounded outlines or icon backgrounds.
+- Horizontal mobile docks are 48px high; bottom placement adds the bottom safe-area inset. Vertical mobile docks are 48px wide plus the corresponding side safe-area inset, with 44px-high buttons.
+- Use a divider toward the content and the selected icon's brightness and weight for distinction, without rounded outlines or icon backgrounds.
 - The default order is file explorer, editor, agent panel, terminal, Git, memo, and tasks, with visibility based on permissions.
 - Press and hold to reorder; the browser remembers the order.
 - Tasks displays List, Calendar, and Gantt as title bar tabs. Swiping the content on mobile cycles through them, wrapping at either end. Row deletion, horizontal Gantt scrolling, and schedule dragging retain their existing gestures.
@@ -135,8 +135,8 @@ description: "Feature contract covering automatic scrolling to active and focuse
 - The dock also appears in the remote desktop viewer and is hidden in fullscreen mode.
 - Selecting another panel from the dock ends the remote connection and switches panels. Closing the viewer returns to the previous workspace screen.
 - The 2026-10-27 [decision to separate dock and content swipes](../../decisions/0079-mobile-panel-swipes.md) replaced the dock's tab-first behavior from 2026-10-03. Gesture thresholds, cancellation, and input preservation follow the [mobile dock contract](../../development/ui-contracts.md#mobile-dock-and-panel-switching).
-- Mouse hover shows a tooltip with the icon name. A touch tap shows a name toast centered directly above the dock, which disappears after 0.5 seconds.
-- When the mobile keyboard opens, hide both the dock and its reserved bottom space. Maintain keyboard detection while zoomed in and account for fullscreen changes and viewport scrolling.
+- Mouse hover shows a tooltip with the icon name. A touch tap shows a name toast beside the selected dock edge, which disappears after 0.5 seconds.
+- When the mobile keyboard opens, hide both the dock and its reserved edge space. Maintain keyboard detection while zoomed in and account for fullscreen changes and viewport scrolling.
 - Desktop and mobile floating handles and the left-side file explorer button have been replaced by the dock and top menu. Do not reintroduce them until the user requests it.
 - 2026-10-05: At the user's request to remove duplicate entry points, deleted the remaining desktop handle component, position/pinning storage logic, directional gestures, dedicated translations, and tests. Editor and file explorer names, also used in the dock, remain as shared panel translations.
 - Detailed gesture, layout, and storage contracts follow the linked development documents.
@@ -214,10 +214,10 @@ Input includes `version`, `dock` (existing DockState), `open` (a boolean per pan
 
 - 2026-09-29: In `unified-editor-ui.test.ts`, verified that after moving a panel containing Documents with its handle, opening a regular file preserved the tab list and panel position, and refreshing restored the same layout.
 
-- On desktop, verify that the dock stays vertical to the left of the file explorer and tooltips appear below the icons. Also check the 768px breakpoint, return to the mobile bottom position, remote viewer, fullscreen transitions, and icon reordering.
+- Verify all four Dock positions independently for desktop and mobile, default left/bottom placement, content boundaries, tooltip placement, the 768px breakpoint, remote viewer, fullscreen transitions, and axis-aware icon reordering.
 
 - On desktop, verify that selecting an open, unfocused panel by clicking or pressing Enter moves focus to it, and that it closes only when selected again.
-- Use the linked development contract's isolated Chromium tests to check dock selection, swiping, reordering, cancellation, saved-state restoration, hiding for the keyboard, both mobile themes, desktop left-side vertical layout, tooltips below icons, ignoring saved positions, and window-shrink boundaries.
+- Use the linked development contract's isolated Chromium tests to check dock selection, swiping, reordering, cancellation, saved-state restoration, hiding for the keyboard, both themes, all four edges on desktop and mobile, position persistence and reset, tooltip placement, ignoring legacy floating coordinates, and window-shrink boundaries.
 - For panel double-click maximize/restore, use `dock-maximize-ui.test.ts` to check panel types with tabs, Esc restoration/popup-first closing, full width of the selected tab bar, hiding other tab bars and blocking their keyboard interaction, hiding/restoring surrounding panels and the side dock, vertical splits, draft/mount preservation, and mobile transitions.
 
 - The following items are user verification criteria, not results of tests run during this documentation cleanup:

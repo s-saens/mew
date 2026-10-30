@@ -4,11 +4,11 @@ parent: "mew-settings"
 title: "Appearance, language, font, and shortcut settings"
 status: "implemented"
 created: "2026-09-18"
-updated: "2026-10-29"
+updated: "2026-10-30"
 status_hash: "4f239b57ff4cc09aac87a665e96e137692355fb592ecb3c0965c8ea2b7ff2181"
 files: ["src/components/SettingsModal.tsx", "src/components/theme-settings.tsx", "src/components/theme-gradient-angle.tsx", "src/components/overlay-layers.css", "packages/ui/src/color-picker.tsx", "src/i18n.tsx", "packages/ui/src/ui-messages.ts", "packages/ui/src/i18n-core.ts", "src/index.css", "src/utils/theme-color.ts", "shared/theme.ts", "src/hooks/use-account-theme.ts", "src/utils/account-theme.ts", "src/api/theme.ts", "server/userUiState.ts", "server/api.ts", "src/hooks/usePresence.ts", "src/App.tsx", "src/main.tsx", "index.html", "server/serve.ts", "public/fonts/ibm-plex/fonts.css"]
 commits: []
-description: "Includes unified placement of theme color buttons, save/delete icons beside the title, a color picker that does not shift the form, clock-style direction dragging sized to match the color square, numeric input, keyboard adjustment, and a single-row arrangement of interface/document/code fonts. A feature contract covering default Midnight and preservation of existing theme selections; adding solid-color and gradient themes combining background, text, and accent colors; immediate editing on card selection; cancellation; deletion; animation; display in the actual docked workspace and initial connection screen; per-account storage; synchronization across devices; language, font, shortcut, and Dock settings; opening the settings popup with Ctrl/Cmd+,; and back navigation and return to the list from mobile detail screens. Describes the shared gradient background for all workspace panels, tabs, and previews; translucent components; 75% backgrounds and 6px blur for popups such as Mewpet, editor, and date popups; bright tints for all light popups; the overlay outside modal panels; solid light surface brightness; reduced motion; derived color contrast; local web fonts; shared selectors; focus-specific shortcuts; fullscreen locking; remote input priority; and reserved-key limitations. When the login video has focus, remote Chrome input takes priority."
+description: "Includes unified placement of theme color buttons, save/delete icons beside the title, a color picker that does not shift the form, clock-style direction dragging sized to match the color square, numeric input, keyboard adjustment, and a single-row arrangement of interface/document/code fonts. A feature contract covering default Midnight and preservation of existing theme selections; adding solid-color and gradient themes combining background, text, and accent colors; immediate editing on card selection; cancellation; deletion; animation; display in the actual docked workspace and initial connection screen; per-account storage; synchronization across devices; language, font, shortcut, and independent desktop/mobile Dock edge settings; opening the settings popup with Ctrl/Cmd+,; and back navigation and return to the list from mobile detail screens. Describes the shared gradient background for all workspace panels, tabs, and previews; translucent components; 75% backgrounds and 6px blur for popups such as Mewpet, editor, and date popups; bright tints for all light popups; the overlay outside modal panels; solid light surface brightness; reduced motion; derived color contrast; local web fonts; shared selectors; focus-specific shortcuts; fullscreen locking; remote input priority; and reserved-key limitations. When the login video has focus, remote Chrome input takes priority."
 상위파일:
   - "MOC.md"
   - "_appearance-accounts-operations.md"
@@ -25,7 +25,7 @@ description: "Includes unified placement of theme color buttons, save/delete ico
 
 - Select background, text, and accent colors as one theme, with solid-color and gradient presets and custom themes available. Gradients support configuring two colors, direction, and background animation. Also provide language, font, and shortcut configuration and reset.
 
-- The **Dock** category provides item visibility, ordering, a live preview, and restoration of defaults.
+- The **Dock** category provides independent desktop and mobile placement (top, bottom, left, or right), item visibility, ordering, a live preview, and restoration of defaults. Desktop defaults to left; mobile defaults to bottom.
 
 ### Boundaries and limitations
 
@@ -46,7 +46,7 @@ description: "Includes unified placement of theme color buttons, save/delete ico
 
 - On mobile screens (below 768px), browser or device Back from a settings detail screen returns to the settings list. Pressing Back again from the list closes only the settings window. This also applies when entering Mewpet or debugger settings directly. Open dropdowns, color pickers, and custom editing areas handle Back first; the Back button within the settings screen returns to the list. `useOverlayDismiss.closeOnBack` in `SettingsModal` checks the current screen width and detail state and returns `false` when returning to the list to retain the shared History guard. Desktop Back and Esc and Close buttons on all screens close the settings window as before.
 
-- `DockSettingsPanel` and `useDockPreferences` share dock visibility and order. Only available items are shown, and hiding an item keeps its open panel intact. Mobile and PC, light and dark themes, and four languages are supported. Storage, permissions, and reset scope follow [Dock settings](../../../../docs/configuration/appearance.md#dock-settings).
+- `DockSettingsPanel` and `useDockPreferences` share dock visibility, order, and per-device-class edge preferences. Position fields use the shared custom `SelectField` inside the settings portal and apply immediately. Only available items are shown, and hiding an item keeps its open panel intact. Mobile and PC, light and dark themes, and four languages are supported. Storage, permissions, and reset scope follow [Dock settings](../../../../docs/configuration/appearance.md#dock-settings).
 
 - `Ctrl/Cmd+N/T` opens a new tab in the focused agent or terminal, or opens the new file name input in the editor or file explorer. `Ctrl/Cmd+Shift+N` uses the existing new folder flow (new document in the document tree). Existing Alt combinations and user remappings are also retained.
 - `Ctrl/Cmd+Tab/Shift+Tab/PageUp/PageDown` and the existing `Alt+Q/E` cycle through the focused panel's previous and next tabs. `Ctrl/Cmd+1…9` selects internal tabs in display order and ignores numbers with no matching tab. The same boundaries apply to split editors, portal terminals, browser iframes, the file explorer, and tasks.
@@ -77,6 +77,8 @@ description: "Includes unified placement of theme color buttons, save/delete ico
 <!-- mew:implementation:end -->
 
 <!-- mew:validation:start -->
+
+- 2026-10-30 Dock edge settings: Added independent desktop/mobile position selectors and scoped persistence, reset, responsive space reservation, and axis-aware reordering. Verification and the existing maximization regression failure are recorded in the [work record](../../work/dock-edge-settings.md). No build or server application was performed.
 
 - 2026-10-27 theme editing: Verified color grouping, unchanged form height and Save button position when opening the picker, screen boundaries, input, and existing save/cancel behavior at 320/390/1100px in light and dark modes. Passed 22 checks covering circular direction controls, numbers, keyboard input, capture/cancellation on PC and touch, and shared coordinate and palette regressions. Type checking passed, and lint had only warnings. The full document link check failed with 18 existing errors. No build or server application was performed; details are in the [work record](../../work/theme-editor-layout.md).
 

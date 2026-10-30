@@ -4,16 +4,17 @@ import { HoverTipLayer, useReorderAnimation, reorderLayoutRect } from '@mew/ui'
 import { useI18n } from '../i18n'
 import { dockIcons, useDockLabel } from './dock-items'
 import { useDockPreferences, setDockOrder } from '../hooks/use-dock-preferences'
-import { visibleDockPanels, moveDockPanel, type DockDirection, type MobileDockPanel } from '../utils/mobile-dock'
+import { visibleDockPanels, moveDockPanel, type DockDirection, type DockPosition, type MobileDockPanel } from '../utils/mobile-dock'
 
 
 
 type DragPreview = { x: number; y: number; width: number; height: number }
 
-export function MobileDock({ active, openPanels, available, hidden, portalTarget, vertical = false, onSelect, onNavigate }: {
+export function MobileDock({ active, openPanels, available, hidden, portalTarget, position, vertical = false, onSelect, onNavigate }: {
   openPanels?: readonly MobileDockPanel[]
   active: string; available: readonly MobileDockPanel[]; hidden: boolean
   vertical?: boolean
+  position?: DockPosition
   portalTarget?: HTMLElement | null
   onSelect: (panel: MobileDockPanel) => void
   onNavigate: (direction: DockDirection, order: MobileDockPanel[]) => void
@@ -28,7 +29,7 @@ export function MobileDock({ active, openPanels, available, hidden, portalTarget
     media.addEventListener('change', update)
     return () => media.removeEventListener('change', update)
   }, [])
-  const verticalLayout = desktop && vertical
+  const verticalLayout = position ? position === 'left' || position === 'right' : desktop && vertical
   const [draftOrder, setOrder] = useState(preferences.order)
   const [dragging, setDragging] = useState<MobileDockPanel | null>(null)
   const order = dragging ? draftOrder : preferences.order
@@ -38,7 +39,7 @@ export function MobileDock({ active, openPanels, available, hidden, portalTarget
   const clearNotice = () => { clearTimeout(noticeTimer.current); setNotice(null) }
   const root = useRef<HTMLElement>(null)
   const captureReorder = useReorderAnimation(() => root.current?.querySelectorAll<HTMLElement>('[data-dock-item]') ?? [])
-  const gesture = useRef<{ id: number; x: number; y: number; item?: MobileDockPanel; box?: DOMRect; capture: HTMLElement; moved: boolean; dragging: boolean; order: MobileDockPanel[]; original: MobileDockPanel[] } | null>(null)
+  const gesture = useRef<{ id: number; x: number; y: number; scrollTop: number; item?: MobileDockPanel; box?: DOMRect; capture: HTMLElement; moved: boolean; dragging: boolean; order: MobileDockPanel[]; original: MobileDockPanel[] } | null>(null)
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const suppressClick = useRef(false)
   const visible = visibleDockPanels(order, available, preferences.hidden)
@@ -69,7 +70,7 @@ export function MobileDock({ active, openPanels, available, hidden, portalTarget
   }, [])
   useEffect(() => { cancel() }, [preferences.order])
   const availableKey = available.join(',') + ':' + preferences.hidden.join(',')
-  useEffect(() => { cancel() }, [hidden, portalTarget, availableKey])
+  useEffect(() => { cancel() }, [hidden, portalTarget, availableKey, position])
   const commit = (next: MobileDockPanel[]) => { setOrder(next); setDockOrder(next) }
   const updatePreview = (x: number, y: number) => {
     const current = gesture.current, dock = root.current
@@ -84,7 +85,7 @@ export function MobileDock({ active, openPanels, available, hidden, portalTarget
     const element = (event.target as Element).closest<HTMLElement>('[data-dock-item]')
     const item = element?.dataset.dockItem as MobileDockPanel | undefined
     suppressClick.current = false
-    gesture.current = { id: event.pointerId, x: event.clientX, y: event.clientY, item, box: element?.getBoundingClientRect(), capture: event.currentTarget, moved: false, dragging: false, order, original: order }
+    gesture.current = { id: event.pointerId, x: event.clientX, y: event.clientY, scrollTop: event.currentTarget.scrollTop, item, box: element?.getBoundingClientRect(), capture: event.currentTarget, moved: false, dragging: false, order, original: order }
     event.currentTarget.setPointerCapture(event.pointerId)
     if (item) timer.current = setTimeout(() => {
       const current = gesture.current
@@ -101,6 +102,9 @@ export function MobileDock({ active, openPanels, available, hidden, portalTarget
     if (!current || current.id !== event.pointerId) return
     if (Math.hypot(event.clientX - current.x, event.clientY - current.y) > 10) {
       current.moved = true; suppressClick.current = true; clearTimeout(timer.current)
+    }
+    if (verticalLayout && !current.dragging && current.moved && root.current && Math.abs(event.clientY - current.y) > Math.abs(event.clientX - current.x)) {
+      root.current.scrollTop = current.scrollTop + current.y - event.clientY
     }
     if (!current.dragging || !current.item) return
     updatePreview(event.clientX, event.clientY)
@@ -136,8 +140,8 @@ export function MobileDock({ active, openPanels, available, hidden, portalTarget
   }
   if (hidden || !visible.length) return null
   const DragIcon = dragging ? dockIcons[dragging] : null
-  const content = <HoverTipLayer className="contents" placement={desktop ? 'bottom' : 'top'} portalTarget={portalTarget?.closest('[role="dialog"]')}><nav ref={root} className="mobile-dock" hidden={hidden} aria-label={t('dock.label')}
-    data-vertical={verticalLayout || undefined} data-reordering={dragging ? true : undefined}
+  const content = <HoverTipLayer className="contents" placement={position ? position === 'bottom' ? 'top' : 'bottom' : desktop ? 'bottom' : 'top'} portalTarget={portalTarget?.closest('[role="dialog"]')}><nav ref={root} className="mobile-dock" hidden={hidden} aria-label={t('dock.label')}
+    data-position={position} data-vertical={verticalLayout || undefined} data-reordering={dragging ? true : undefined}
     onPointerDown={down} onPointerMove={move} onPointerUp={up}
     onPointerCancel={() => { suppressClick.current = true; cancel() }} onLostPointerCapture={() => { if (gesture.current) cancel() }}
     onContextMenu={event => event.preventDefault()}>
@@ -163,7 +167,7 @@ export function MobileDock({ active, openPanels, available, hidden, portalTarget
     </span>}
     <span id="mobile-dock-hint" className="sr-only">{t(verticalLayout ? 'dock.verticalHint' : 'dock.hint')}</span>
   </nav>
-    {notice && createPortal(<div role="status" data-dock-notice style={{ bottom: 'calc(56px + env(safe-area-inset-bottom, 0px))' }}
+    {notice && createPortal(<div role="status" data-dock-notice style={position === 'top' ? { top: (root.current?.getBoundingClientRect().bottom ?? 0) + 8 } : { bottom: verticalLayout ? 'calc(8px + env(safe-area-inset-bottom, 0px))' : 'calc(56px + env(safe-area-inset-bottom, 0px))', maxWidth: verticalLayout ? 'calc(100vw - 112px)' : undefined }}
       className="pointer-events-none fixed left-1/2 z-[var(--layer-notice)] max-w-[calc(100vw-16px)] -translate-x-1/2 rounded border border-edge-bright bg-surface-raised px-2 py-1 text-xs text-ink shadow-lg md:hidden">
       {labelFor(notice)}
     </div>, document.body)}

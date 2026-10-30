@@ -2,6 +2,17 @@ export const MOBILE_DOCK_ORDER = ['sidebar', 'editor', 'agent', 'terminal', 'git
 export type MobileDockPanel = typeof MOBILE_DOCK_ORDER[number]
 export type DockDirection = -1 | 1
 export const MOBILE_DOCK_ORDER_KEY = 'mew:mobile-dock-order'
+export const DOCK_POSITIONS = ['top', 'bottom', 'left', 'right'] as const
+export type DockPosition = typeof DOCK_POSITIONS[number]
+export type DockDevice = 'desktop' | 'mobile'
+export const DOCK_POSITIONS_KEY = 'mew:dock-positions'
+
+export function normalizeDockPositions(value: unknown): Record<DockDevice, DockPosition> {
+  const stored = value && typeof value === 'object' ? value as Record<string, unknown> : {}
+  const position = (device: DockDevice, fallback: DockPosition): DockPosition =>
+    DOCK_POSITIONS.includes(stored[device] as DockPosition) ? stored[device] as DockPosition : fallback
+  return { desktop: position('desktop', 'left'), mobile: position('mobile', 'bottom') }
+}
 
 export function normalizeMobileDockOrder(value: unknown): MobileDockPanel[] {
   const known = Array.isArray(value) ? value.filter((id): id is MobileDockPanel => MOBILE_DOCK_ORDER.includes(id)) : []

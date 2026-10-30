@@ -15,8 +15,9 @@ import {createRoot} from '${root}/node_modules/react-dom/client.js';
 import {I18nProvider} from '${root}/src/i18n.tsx';
 import {SettingsModal} from '${root}/src/components/SettingsModal.tsx';
 import {MobileDock} from '${root}/src/components/mobile-dock.tsx';
+import {useDockPreferences} from '${root}/src/hooks/use-dock-preferences.ts';
 const available=['sidebar','editor','agent','terminal','git','memo','tasks'];
-function Fixture(){return <><MobileDock active="editor" available={available} hidden={false} onSelect={()=>{}} onNavigate={()=>{}}/><SettingsModal email={null} displayName={null} avatarDataUrl={null} canEditIgnore={false} theme="dark" fontPreferences={{ui:'Arial',markdown:'Arial',mono:'monospace'}} themeColor="#9082da" mewcatSkin={null} mewcatHideDesktop={false} dockAvailable={available} onClose={()=>{}} onLoggedOut={()=>{}} onProfileChanged={()=>{}} onToggleTheme={()=>{}} onFontPreferencesChange={()=>{}} onThemeColorChange={()=>{}} onMewcatSkinChange={()=>{}} onMewcatHideDesktopChange={()=>{}}/></>}
+function Fixture(){const {positions}=useDockPreferences();const [desktop,setDesktop]=React.useState(window.innerWidth>=768);React.useEffect(()=>{const update=()=>setDesktop(window.innerWidth>=768);window.addEventListener('resize',update);return()=>window.removeEventListener('resize',update)},[]);return <><MobileDock position={positions[desktop?'desktop':'mobile']} active="editor" available={available} hidden={false} onSelect={()=>{}} onNavigate={()=>{}}/><SettingsModal email={null} displayName={null} avatarDataUrl={null} canEditIgnore={false} theme="dark" fontPreferences={{ui:'Arial',markdown:'Arial',mono:'monospace'}} themeColor="#9082da" mewcatSkin={null} mewcatHideDesktop={false} dockAvailable={available} onClose={()=>{}} onLoggedOut={()=>{}} onProfileChanged={()=>{}} onToggleTheme={()=>{}} onFontPreferencesChange={()=>{}} onThemeColorChange={()=>{}} onMewcatSkinChange={()=>{}} onMewcatHideDesktopChange={()=>{}}/></>}
 createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18nProvider>);`
   const bundle = await build({ input: 'virtual:dock.tsx', write: false, platform: 'browser', output: { format: 'iife', codeSplitting: false }, transform: { jsx: 'react-jsx', define: { 'process.env.NODE_ENV': JSON.stringify('test') } }, plugins: [{ name: 'fixture', async resolveId(id, importer) {
     if (id === 'virtual:dock.tsx') return id
@@ -32,7 +33,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
   } }] })
   const chunk = bundle.output.find(item => item.type === 'chunk')!
   const compiler = await compile(await fs.readFile(`${root}/src/index.css`, 'utf8'), { base: `${root}/src`, onDependency() {} })
-  const content = (await Promise.all(['src/components/mobile-dock.tsx', 'src/components/dock-settings-panel.tsx', 'src/components/SettingsModal.tsx', 'packages/ui/src/HoverTipLayer.tsx'].map(file => fs.readFile(`${root}/${file}`, 'utf8')))).join('\n')
+  const content = (await Promise.all(['src/components/mobile-dock.tsx', 'src/components/dock-settings-panel.tsx', 'src/components/SettingsModal.tsx', 'packages/ui/src/HoverTipLayer.tsx', 'packages/ui/src/select-field.tsx'].map(file => fs.readFile(`${root}/${file}`, 'utf8')))).join('\n')
   const css = compiler.build([...new Set((source + content).match(/[A-Za-z0-9_@:/.[\]()%,-]+/g))])
   const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
   try {
@@ -47,6 +48,24 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     const panel = page.locator('[data-dock-settings]')
     const dock = page.getByRole('navigation', { name: 'Workspace dock' })
     const ids = () => dock.locator('[data-dock-item]').evaluateAll(elements => elements.map(el => el.getAttribute('data-dock-item')))
+    const desktopPosition = panel.getByRole('combobox', { name: 'Desktop position', exact: true })
+    const mobilePosition = panel.getByRole('combobox', { name: 'Mobile position', exact: true })
+    const savedPositions = () => page.evaluate(() => JSON.parse(localStorage.getItem('mew:dock-positions') ?? 'null'))
+    assert.equal(await desktopPosition.textContent(), 'Left')
+    assert.equal(await mobilePosition.textContent(), 'Bottom')
+    assert.equal(await dock.getAttribute('data-position'), 'left')
+    assert.equal(await panel.locator('select').count(), 0, 'position choices use the shared custom selector')
+    for (const [field, choice] of [[desktopPosition, 'Right'], [mobilePosition, 'Top']] as const) {
+      await field.click()
+      assert.deepEqual(await page.getByRole('listbox').getByRole('option').allTextContents(), ['Top', 'Bottom', 'Left', 'Right'])
+      await page.getByRole('option', { name: choice, exact: true }).click()
+    }
+    assert.deepEqual(await savedPositions(), { desktop: 'right', mobile: 'top' })
+    assert.equal(await dock.getAttribute('data-position'), 'right')
+    await page.setViewportSize({ width: 390, height: 850 })
+    await page.waitForFunction("document.querySelector('.mobile-dock').dataset.position === 'top'")
+    await page.setViewportSize({ width: 1100, height: 850 })
+    await page.waitForFunction("document.querySelector('.mobile-dock').dataset.position === 'right'")
     const toggle = panel.getByRole('switch', { name: 'Agent', exact: true })
     await toggle.uncheck()
     assert.equal((await ids()).includes('agent'), false)
@@ -56,10 +75,20 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     assert.deepEqual((await ids()).slice(0, 4), ['sidebar', 'editor', 'git', 'terminal'])
     await page.reload()
     await page.getByRole('button', { name: 'Dock', exact: true }).click()
+    assert.equal(await desktopPosition.textContent(), 'Right')
+    assert.equal(await mobilePosition.textContent(), 'Top')
+    assert.equal(await dock.getAttribute('data-position'), 'right')
     assert.equal(await toggle.isChecked(), false)
     assert.deepEqual((await ids()).slice(0, 4), ['sidebar', 'editor', 'git', 'terminal'])
     await panel.getByRole('button', { name: 'Reset', exact: true }).click()
     assert.equal(await toggle.isChecked(), true)
+    assert.deepEqual(await savedPositions(), { desktop: 'left', mobile: 'bottom' })
+    assert.equal(await desktopPosition.textContent(), 'Left')
+    assert.equal(await mobilePosition.textContent(), 'Bottom')
+    await mobilePosition.focus()
+    await page.keyboard.press('ArrowDown')
+    assert.deepEqual(await savedPositions(), { desktop: 'left', mobile: 'left' }, 'keyboard changes only the selected device')
+    await panel.getByRole('button', { name: 'Reset', exact: true }).click()
     for (const theme of ['dark', 'light']) {
       await page.locator('html').evaluate((el, theme) => el.className = theme, theme)
       for (const width of [1100, 390, 320]) {
@@ -82,9 +111,14 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
       const view = el.ownerDocument.defaultView!
       view.localStorage.setItem('mew:mobile-dock-hidden', '["git"]')
       view.dispatchEvent(new view.StorageEvent('storage', { key: 'mew:mobile-dock-hidden' }))
+      view.localStorage.setItem('mew:dock-positions', '{"desktop":"top","mobile":"right"}')
+      view.dispatchEvent(new view.StorageEvent('storage', { key: 'mew:dock-positions' }))
     })
     assert.equal(await toggle.isChecked(), true)
     assert.equal((await ids()).includes('git'), false)
+    assert.equal(await desktopPosition.textContent(), 'Top')
+    assert.equal(await mobilePosition.textContent(), 'Right')
+    await page.waitForFunction("document.querySelector('.mobile-dock').dataset.position === 'right'")
     assert.deepEqual(errors, [])
   } finally { await browser.close() }
 })

@@ -1,21 +1,28 @@
-import { HoverTipLayer } from '@mew/ui'
+import { HoverTipLayer, SelectField } from '@mew/ui'
 import { ArrowLeft, ArrowRight, Undo } from 'iconoir-react'
 import { useI18n } from '../i18n'
-import { resetDockPreferences, setDockOrder, setDockPanelVisible, useDockPreferences } from '../hooks/use-dock-preferences'
-import { MOBILE_DOCK_ORDER, moveDockPanel, visibleDockPanels, type MobileDockPanel } from '../utils/mobile-dock'
+import { resetDockPreferences, setDockOrder, setDockPanelVisible, setDockPosition, useDockPreferences } from '../hooks/use-dock-preferences'
+import { DOCK_POSITIONS, MOBILE_DOCK_ORDER, moveDockPanel, visibleDockPanels, type DockPosition, type MobileDockPanel } from '../utils/mobile-dock'
 import { dockIcons, useDockLabel } from './dock-items'
 
 const defaultAvailable = MOBILE_DOCK_ORDER.filter(id => id !== 'desktop')
 const actionClass = 'flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-ink-secondary hover:bg-surface-hover hover:text-ink focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-25 disabled:hover:bg-transparent'
 
-export function DockSettingsPanel({ available = defaultAvailable }: { available?: readonly MobileDockPanel[] }) {
+export function DockSettingsPanel({ available = defaultAvailable, portalContainer }: { available?: readonly MobileDockPanel[]; portalContainer?: HTMLElement | null }) {
   const { t } = useI18n()
   const labelFor = useDockLabel()
-  const { order, hidden } = useDockPreferences()
+  const { order, hidden, positions } = useDockPreferences()
   const items = order.filter(id => available.includes(id))
   const visible = visibleDockPanels(order, available, hidden)
-  const customized = hidden.length > 0 || order.some((id, index) => id !== MOBILE_DOCK_ORDER[index])
-  return <div data-dock-settings><HoverTipLayer className="flex flex-col gap-4">
+  const customized = hidden.length > 0 || order.some((id, index) => id !== MOBILE_DOCK_ORDER[index]) || positions.desktop !== 'left' || positions.mobile !== 'bottom'
+  const positionOptions = DOCK_POSITIONS.map(value => ({ value, label: t(`dock.position.${value}`) }))
+  return <div data-dock-settings><HoverTipLayer className="flex flex-col gap-4" portalTarget={portalContainer}>
+    <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 gap-y-2">
+      {(['desktop', 'mobile'] as const).map(device => <div key={device} className="contents">
+        <label htmlFor={`dock-position-${device}`} className="text-sm text-ink">{t(`dock.${device}Position`)}</label>
+        <SelectField id={`dock-position-${device}`} label={t(`dock.${device}Position`)} value={positions[device]} options={positionOptions} portalContainer={portalContainer} onChange={value => setDockPosition(device, value as DockPosition)} />
+      </div>)}
+    </div>
     <div>
       <div className="mb-2 flex items-center justify-between gap-2">
         <h3 className="text-xs font-medium text-ink-secondary">{t('dock.preview')}</h3>

@@ -1,8 +1,8 @@
 ---
 title: "Appearance, notifications, Dock, and keyboard shortcut settings"
-description: "Explains controls and storage scope for per-account theme color sets, save/delete icons next to the title, overlay color pickers, circular direction controls, per-browser language settings, single-line layouts for UI/document/code fonts, notifications, Dock, keyboard shortcuts, and the Alt+T task panel. Describes navigating back from detail screens to the list in mobile settings and links to the relevant development and feature documents for implementation criteria."
+description: "Explains controls and storage scope for per-account theme color sets, save/delete icons next to the title, overlay color pickers, circular direction controls, per-browser language settings, single-line layouts for UI/document/code fonts, notifications, independent desktop/mobile Dock positions, keyboard shortcuts, and the Alt+T task panel. Describes navigating back from detail screens to the list in mobile settings and links to the relevant development and feature documents for implementation criteria."
 created: 2026-10-22
-updated: "2026-10-29"
+updated: "2026-10-30"
 상위파일: "MOC.md"
 ---
 
@@ -52,9 +52,11 @@ Activating a Mewpet skin displays **Also show notifications through Mewpet** in 
 
 ## Dock settings
 
-Use Header menu → **Settings → Dock** to change the visibility and order of currently available items. Changes appear immediately in the preview and the actual dock; Reset restores all visibility settings and ordering to their defaults. The same settings apply to the bottom dock on mobile and the vertical left dock on PC. Open Remote Desktop from the header menu. Open localhost apps by appending `/포트번호` to the current Mew address.
+Choose **Desktop position** and **Mobile position** independently: **Top**, **Bottom**, **Left**, or **Right**. Changes apply immediately. Desktop defaults to **Left** at widths of 768px or more; mobile defaults to **Bottom** below 768px. The workspace reserves space at the selected edge. Left and right docks arrange icons vertically; top and bottom docks arrange them horizontally. The remote viewer retains its existing toolbar layout.
 
-Hiding an icon does not close open panels or task sessions. Hiding all items hides the dock; you can reopen settings from the header menu. Items unavailable due to permissions, login, or project conditions are excluded from both the settings list and the dock. Visibility settings are saved in `mew:mobile-dock-hidden` and ordering in the existing `mew:mobile-dock-order` per browser, including settings for items excluded by permissions. If storage is unavailable, settings continue to apply on the current page. Changes are synchronized between settings and the dock on the same page and with storage changes from other windows. Existing long-press and keyboard reordering in the dock remain available.
+Use Header menu → **Settings → Dock** to change the visibility and order of currently available items. Changes appear immediately in the preview and the actual dock; Reset restores default positions, visibility, and ordering. Visibility and ordering are shared between the mobile and desktop docks. Open Remote Desktop from the header menu. Open localhost apps by appending `/포트번호` to the current Mew address.
+
+Hiding an icon does not close open panels or task sessions. Hiding all items hides the dock; you can reopen settings from the header menu. Items unavailable due to permissions, login, or project conditions are excluded from both the settings list and the dock. Visibility settings are saved in `mew:mobile-dock-hidden` and ordering in the existing `mew:mobile-dock-order`, with positions in `mew:dock-positions`, per browser, including settings for items excluded by permissions. If storage is unavailable, settings continue to apply on the current page. Changes are synchronized between settings and the dock on the same page and with storage changes from other windows. Existing long-press and keyboard reordering in the dock remain available.
 
 ## Keyboard shortcut settings
 

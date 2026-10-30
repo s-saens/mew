@@ -54,6 +54,7 @@ import { useSharedMemo } from './hooks/use-shared-memo'
 import { HeaderMenu, type HeaderMenuItem } from './components/HeaderMenu'
 import { ActiveSessionsButton } from './components/active-sessions-button'
 import { MobileDock } from './components/mobile-dock'
+import { useDockPreferences } from './hooks/use-dock-preferences'
 import { useMobileKeyboard } from './hooks/use-mobile-keyboard'
 import { adjacentDockPanel, type MobileDockPanel } from './utils/mobile-dock'
 import { useMewcatNotifications } from './hooks/use-mewcat-notifications'
@@ -322,6 +323,8 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
   const [focusedWorkspacePanel, setFocusedWorkspacePanel, focusWorkspacePanel] = useFocusedWorkspacePanel()
   useEffect(() => captureAppKeyboardLock(), [])
   const [desktopMode, setDesktopMode] = useState(isDesktop)
+  const dockPreferences = useDockPreferences()
+  const dockPosition = dockPreferences.positions[desktopMode ? 'desktop' : 'mobile']
   const [editorOpen, setEditorOpen] = useState(true)
   useEffect(() => {
     const query = window.matchMedia('(min-width: 768px)')
@@ -2125,6 +2128,8 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
         </header>
       </div>
 
+      <div className="workspace-dock-layout" data-dock-position={dockPosition}>
+        <div ref={setSidebarDockHost} className="desktop-dock-rail" data-sidebar-dock />
       <div
         ref={mobileSwipeRoot}
         className="mew-workspace-content relative flex min-h-0 flex-1 overflow-hidden"
@@ -2136,11 +2141,10 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
           if (!e.currentTarget.contains(e.relatedTarget as Node)) setDropTarget(null)
         }}
       >
-        <div ref={setSidebarDockHost} className="desktop-dock-rail" data-sidebar-dock />
         <div ref={setProjectSidebarHost} className="mew-project-sidebar-host" data-project-sidebar-host />
         <button type="button" data-sidebar-toggle aria-expanded={sidebarOpen} aria-label={uiText(sidebarOpen ? '파일 탐색기 닫기' : '파일 탐색기 열기')} data-tip={uiText(sidebarOpen ? '파일 탐색기 닫기' : '파일 탐색기 열기')} onClick={() => toggleWorkspacePanel('sidebar')}
           className="absolute top-1/2 z-50 hidden h-9 w-5 -translate-y-1/2 items-center justify-center rounded-r border border-edge-strong bg-surface-deep text-ink-secondary hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-accent md:flex"
-          style={{ left: `calc(var(--desktop-dock-width) + ${(showProjectSidebar ? projectSidebarWidth : 0) + (sidebarOpen ? sidebarWidth - 1 : 0)}px)` }}>
+          style={{ left: (showProjectSidebar ? projectSidebarWidth : 0) + (sidebarOpen ? sidebarWidth - 1 : 0) }}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d={sidebarOpen ? 'm15 6-6 6 6 6' : 'm9 6 6 6-6 6'} /></svg>
         </button>
         {sidebarOpen && (
@@ -2358,11 +2362,12 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
           </div>
         )}
       </div>
+      </div>
 
       <Mewcat onOpenSettings={() => { setMewcatSettingsRequest(request => request + 1); setSettingsOpen(true) }} portalTarget={settingsOpen && !desktopMode ? settingsMewcatHost : remoteDesktopOpen ? remoteMewcatHost : null} hidden={remoteDesktopOpen && mewcatHideDesktop} skin={mewcatSkin} assistant={{ account: auth.email ?? 'guest', enabled: caps.agent, runtime: mewcatRuntime, projectRoot: rootProjectPath, onAction: handleMewcatAction, onRuntimeChange: selectMewcatRuntime, onConnect: () => { setMewcatPicker(true); openWorkspacePanel('agent'); showToast(t('mewcat.assistant.guide')) } }} />
 
-      <MobileDock active={remoteDesktopOpen ? 'desktop' : desktopMode ? focusedDockPanel ?? '' : mobileForegroundPanel ?? 'editor'} openPanels={desktopMode ? mobileDockPanels.filter(panel => panel === 'editor' ? editorOpen : panel === 'desktop' ? remoteDesktopOpen : panel === 'memo' ? memoOpen : workspacePanelOpen[panel]) : undefined} available={mobileDockPanels} hidden={mobileKeyboardOpen} portalTarget={remoteDockHost ?? (desktopMode ? sidebarDockHost : null)}
-        vertical={desktopMode && !remoteDockHost} onSelect={selectDockPanel} onNavigate={navigateMobileDock} />
+      <MobileDock active={remoteDesktopOpen ? 'desktop' : desktopMode ? focusedDockPanel ?? '' : mobileForegroundPanel ?? 'editor'} openPanels={desktopMode ? mobileDockPanels.filter(panel => panel === 'editor' ? editorOpen : panel === 'desktop' ? remoteDesktopOpen : panel === 'memo' ? memoOpen : workspacePanelOpen[panel]) : undefined} available={mobileDockPanels} hidden={mobileKeyboardOpen} portalTarget={remoteDockHost ?? sidebarDockHost}
+        position={remoteDockHost ? undefined : dockPosition} onSelect={selectDockPanel} onNavigate={navigateMobileDock} />
 
       {settingsOpen && (
         <SettingsModal

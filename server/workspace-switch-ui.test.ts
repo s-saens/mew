@@ -35,7 +35,7 @@ for (const mode of ['keyboard', 'workspace', 'documents', 'permissions', 'panels
       return `${stub}\nexport { ${local} as ${exported} }`
     }).join('\n'))
   }
-  const source = `import React from '${root}/node_modules/react/index.js';import {createRoot} from '${root}/node_modules/react-dom/client.js';import App from '${root}/src/AppBootstrap.tsx';import {I18nProvider} from '${root}/src/i18n.tsx';createRoot(document.getElementById('root')).render(<I18nProvider><App/></I18nProvider>);`
+  const source = `import React from '${root}/node_modules/react/index.js';import {createRoot} from '${root}/node_modules/react-dom/client.js';import App from '${root}/src/AppBootstrap.tsx';import {I18nProvider} from '${root}/src/i18n.tsx';import {setDockPosition} from '${root}/src/hooks/use-dock-preferences.ts';window.fixtureDockPosition=setDockPosition;createRoot(document.getElementById('root')).render(<I18nProvider><App/></I18nProvider>);`
   const bundle = await build({ input: 'virtual:switch.tsx', write: false, platform: 'browser', output: { format: 'iife', codeSplitting: false }, transform: { jsx: 'react-jsx', define: { 'process.env.NODE_ENV': JSON.stringify('test') } }, plugins: [{ name: 'fixture', resolveId(id, importer) {
     if (id === 'virtual:switch.tsx') return id
     if (importer === `${root}/src/App.tsx` && stubs.has(id)) return `virtual:stub:${id}`
@@ -202,8 +202,32 @@ for (const mode of ['keyboard', 'workspace', 'documents', 'permissions', 'panels
     releaseUi(); blockUi = false
     await page.locator('[data-test-content]').getByText('Content of /alpha', { exact: true }).waitFor()
     if (mode === 'swipes') {
-      await page.setViewportSize({ width: 390, height: 700 })
       const dock = page.getByRole('navigation', { name: '작업 독', exact: true })
+      for (const width of [390, 1100]) {
+        await page.setViewportSize({ width, height: 700 })
+        for (const position of ['top', 'bottom', 'left', 'right']) {
+          await page.evaluate(`window.fixtureDockPosition('${width >= 768 ? 'desktop' : 'mobile'}','${position}')`)
+          await page.waitForFunction(`document.querySelector('.workspace-dock-layout').dataset.dockPosition === '${position}' && document.querySelector('.mobile-dock').dataset.position === '${position}'`)
+          const dockBounds = (await dock.boundingBox())!
+          const rail = (await page.locator('[data-sidebar-dock]').boundingBox())!
+          const content = (await page.locator('.workspace-dock-layout > .mew-workspace-content').boundingBox())!
+          assert.ok(dockBounds.x >= 0 && dockBounds.y >= 0 && dockBounds.x + dockBounds.width <= width && dockBounds.y + dockBounds.height <= 700, `${width}px ${position} dock stays within the App viewport`)
+          assert.ok(content.width > 0 && content.height > 0)
+          if (position === 'top') assert.ok(rail.y + rail.height <= content.y + 1)
+          if (position === 'bottom') assert.ok(content.y + content.height <= rail.y + 1)
+          if (position === 'left') assert.ok(rail.x + rail.width <= content.x + 1)
+          if (position === 'right') assert.ok(content.x + content.width <= rail.x + 1)
+          if (width >= 768) {
+            const sidebar = (await page.locator('[data-sidebar]').boundingBox())!
+            const toggle = (await page.locator('[data-sidebar-toggle]').boundingBox())!
+            assert.equal(toggle.x, sidebar.x + sidebar.width - 1, `${position} dock keeps the explorer toggle at the sidebar boundary`)
+            assert.ok(toggle.y >= content.y && toggle.y + toggle.height <= content.y + content.height)
+          }
+        }
+      }
+      await page.evaluate("window.fixtureDockPosition('desktop','left');window.fixtureDockPosition('mobile','bottom')")
+      await page.setViewportSize({ width: 390, height: 700 })
+      await page.waitForFunction("document.querySelector('.mobile-dock').dataset.position === 'bottom'")
       await dock.locator('[data-dock-item=editor]').tap()
       const selected = await page.locator('[data-test-editor]').getAttribute('data-test-active')
       const cdp = await page.context().newCDPSession(page)

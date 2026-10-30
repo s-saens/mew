@@ -1,6 +1,20 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { adjacentDockPanel, MOBILE_DOCK_ORDER, moveDockPanel, normalizeMobileDockOrder, normalizeHiddenDockPanels, visibleDockPanels } from './mobile-dock.ts'
+import { adjacentDockPanel, DOCK_POSITIONS, MOBILE_DOCK_ORDER, moveDockPanel, normalizeDockPositions, normalizeMobileDockOrder, normalizeHiddenDockPanels, visibleDockPanels } from './mobile-dock.ts'
+
+test('dock positions default independently and accept each supported edge', () => {
+  const defaults = { desktop: 'left', mobile: 'bottom' }
+  for (const invalid of [undefined, null, false, 42, 'top', [], ['right']]) {
+    assert.deepEqual(normalizeDockPositions(invalid), defaults)
+  }
+  for (const position of DOCK_POSITIONS) {
+    assert.deepEqual(normalizeDockPositions({ desktop: position }), { desktop: position, mobile: 'bottom' })
+    assert.deepEqual(normalizeDockPositions({ mobile: position }), { desktop: 'left', mobile: position })
+  }
+  assert.deepEqual(normalizeDockPositions({ desktop: 'right', mobile: 'top' }), { desktop: 'right', mobile: 'top' })
+  assert.deepEqual(normalizeDockPositions({ desktop: 'floating', mobile: 'right', unrelated: 'top' }), { desktop: 'left', mobile: 'right' })
+  assert.deepEqual(normalizeDockPositions({ desktop: 'bottom', mobile: 0 }), { desktop: 'bottom', mobile: 'bottom' })
+})
 
 test('dock order preserves customization and inserts new entries before desktop', () => {
   assert.deepEqual(normalizeMobileDockOrder(null), MOBILE_DOCK_ORDER)

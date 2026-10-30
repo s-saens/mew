@@ -9,6 +9,122 @@ import { domBrowserExecutable } from './browser-dom-executable.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 
+test('dock edges reserve content space and reorder along their orientation on mobile and desktop', { skip: !domBrowserExecutable(), timeout: 30_000 }, async () => {
+  const source = `import React from '${root}/node_modules/react/index.js';
+import {createRoot} from '${root}/node_modules/react-dom/client.js';
+import {I18nProvider} from '${root}/src/i18n.tsx';
+import {MobileDock} from '${root}/src/components/mobile-dock.tsx';
+import {useDockPreferences,setDockPosition,setDockPanelVisible} from '${root}/src/hooks/use-dock-preferences.ts';
+const available=['sidebar','editor','agent','terminal','git','debugger','memo','tasks'];
+window.actions=[];
+function Fixture(){const {positions}=useDockPreferences();const [desktop,setDesktop]=React.useState(window.innerWidth>=768);const [host,setHost]=React.useState(null);const [hidden,setHidden]=React.useState(false);React.useEffect(()=>{const update=()=>setDesktop(window.innerWidth>=768);window.addEventListener('resize',update);return()=>window.removeEventListener('resize',update)},[]);window.setPosition=position=>setDockPosition(window.innerWidth>=768?'desktop':'mobile',position);window.setDockHidden=setHidden;window.setAllVisible=visible=>available.forEach(id=>setDockPanelVisible(id,visible));const position=positions[desktop?'desktop':'mobile'];return <div className="mew-workspace" data-mobile-keyboard={hidden||undefined} style={{height:'100dvh',display:'flex',flexDirection:'column'}}><header style={{height:48,flexShrink:0}}>Workspace</header><div className="workspace-dock-layout" data-dock-position={position}><aside className="desktop-dock-rail" data-sidebar-dock ref={setHost}/><main className="mew-workspace-content" data-content style={{minWidth:0,minHeight:0,overflow:'auto'}}>Document content</main></div>{host&&<MobileDock position={position} portalTarget={host} active="editor" available={available} hidden={hidden} onSelect={id=>window.actions.push({select:id})} onNavigate={direction=>window.actions.push({navigate:direction})}/>}</div>}
+createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18nProvider>);`
+  const bundle = await build({ input: 'virtual:dock-edges.tsx', write: false, platform: 'browser', output: { format: 'iife', codeSplitting: false }, transform: { jsx: 'react-jsx', define: { 'process.env.NODE_ENV': JSON.stringify('test') } }, plugins: [{ name: 'fixture', resolveId(id) {
+    if (id === 'virtual:dock-edges.tsx') return id
+    if (id.endsWith('.css')) return 'virtual:style'
+  }, load(id) {
+    if (id === 'virtual:dock-edges.tsx') return source
+    if (id === 'virtual:style') return ''
+  } }] })
+  const chunk = bundle.output.find(item => item.type === 'chunk')!
+  const compiler = await compile(await fs.readFile(`${root}/src/index.css`, 'utf8'), { base: `${root}/src`, onDependency() {} })
+  const content = (await Promise.all(['src/components/mobile-dock.tsx', 'packages/ui/src/HoverTipLayer.tsx'].map(file => fs.readFile(`${root}/${file}`, 'utf8')))).join('\n')
+  const css = compiler.build([...new Set((source + content).match(/[A-Za-z0-9_@:/.[\]()%,-]+/g))])
+  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  try {
+    const page = await browser.newPage({ viewport: { width: 390, height: 844 }, hasTouch: true })
+    page.setDefaultTimeout(3000)
+    const errors: string[] = []
+    page.on('pageerror', error => errors.push(error.message))
+    await page.addInitScript("localStorage.setItem('mew:locale','en')")
+    await page.route('http://mew-dock-edges.test/**', route => route.fulfill({ contentType: 'text/html', body: `<!doctype html><html class="dark"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}</style><div id="root"></div><script>${chunk.code}</script></html>` }))
+    await page.goto('http://mew-dock-edges.test/')
+    const dock = page.getByRole('navigation', { name: 'Workspace dock' })
+    const ids = () => dock.locator('[data-dock-item]').evaluateAll(elements => elements.map(el => el.getAttribute('data-dock-item')))
+    for (const width of [320, 390, 1024]) for (const theme of ['dark', 'light']) {
+      await page.setViewportSize({ width, height: 844 })
+      await page.locator('html').evaluate((el, theme) => el.className = theme, theme)
+      for (const position of ['top', 'bottom', 'left', 'right']) {
+        await page.evaluate(`window.setPosition('${position}')`)
+        await page.waitForFunction(`document.querySelector('.mobile-dock').dataset.position === '${position}'`)
+        const vertical = position === 'left' || position === 'right'
+        assert.equal(await dock.getAttribute('data-vertical'), vertical ? 'true' : null)
+        const bounds = (await dock.boundingBox())!
+        const content = (await page.locator('[data-content]').boundingBox())!
+        assert.ok(bounds.x >= 0 && bounds.y >= 48 && bounds.x + bounds.width <= width && bounds.y + bounds.height <= 844, `${width}px ${position} dock stays in the workspace`)
+        assert.ok(content.width > 0 && content.height > 0, 'dock leaves usable content space')
+        if (position === 'left') assert.ok(bounds.x + bounds.width <= content.x + 1)
+        if (position === 'right') assert.ok(content.x + content.width <= bounds.x + 1)
+        if (position === 'top') assert.ok(bounds.y + bounds.height <= content.y + 1)
+        if (position === 'bottom') assert.ok(content.y + content.height <= bounds.y + 1)
+        const buttons = dock.locator('[data-dock-item]')
+        const first = (await buttons.nth(0).boundingBox())!
+        const second = (await buttons.nth(1).boundingBox())!
+        assert.equal(vertical ? first.x : first.y, vertical ? second.x : second.y)
+        assert.ok(vertical ? second.y > first.y : second.x > first.x)
+        if (theme === 'dark' && ((width === 390 && ['top', 'right'].includes(position)) || (width === 1024 && ['bottom', 'left'].includes(position)))) {
+          await page.screenshot({ path: `/tmp/mew-dock-edge-${width}-${position}.png`, animations: 'disabled' })
+        }
+        const before = await ids()
+        await buttons.nth(0).focus()
+        await page.keyboard.press(vertical ? 'Alt+ArrowRight' : 'Alt+ArrowDown')
+        assert.deepEqual(await ids(), before, 'the other axis does not reorder')
+        await page.keyboard.press(vertical ? 'Alt+ArrowDown' : 'Alt+ArrowRight')
+        assert.deepEqual((await ids()).slice(0, 2), [before[1], before[0]], `${position} keyboard reorder follows the dock axis`)
+        assert.ok(await page.locator('html').evaluate(el => el.scrollWidth <= el.clientWidth))
+        for (const hide of ['window.setDockHidden(true)', 'window.setAllVisible(false)']) {
+          await page.evaluate(hide)
+          await dock.waitFor({ state: 'detached' })
+          const fullContent = (await page.locator('[data-content]').boundingBox())!
+          assert.equal(fullContent.width, width, 'hidden dock releases its column')
+          assert.equal(fullContent.height, 844 - 48, 'hidden dock releases its row')
+          await page.evaluate('window.setDockHidden(false);window.setAllVisible(true)')
+          await dock.waitFor({ state: 'visible' })
+        }
+      }
+    }
+    const beforeDrag = await ids()
+    const first = (await dock.locator('[data-dock-item]').nth(0).boundingBox())!
+    const target = (await dock.locator('[data-dock-item]').nth(2).boundingBox())!
+    await page.mouse.move(first.x + first.width / 2, first.y + first.height / 2)
+    await page.mouse.down()
+    await page.waitForTimeout(480)
+    await dock.locator('.dock-drag-preview').waitFor()
+    await page.mouse.move(target.x + target.width / 2, target.y + target.height / 2)
+    assert.notDeepEqual(await ids(), beforeDrag, 'drag previews a changed order')
+    await page.evaluate("window.setPosition('top')")
+    await dock.locator('.dock-drag-preview').waitFor({ state: 'detached' })
+    await page.mouse.up()
+    assert.deepEqual(await ids(), beforeDrag, 'changing dock edge cancels the pending reorder')
+    await page.setViewportSize({ width: 390, height: 260 })
+    const cdp = await page.context().newCDPSession(page)
+    for (const position of ['left', 'right']) {
+      await page.evaluate(`window.setPosition('${position}');window.actions=[]`)
+      await page.waitForFunction(`document.querySelector('.mobile-dock').dataset.position === '${position}'`)
+      await dock.evaluate(el => { el.scrollTop = 0 })
+      const beforeScroll = await ids()
+      const bounds = (await dock.boundingBox())!
+      const last = dock.locator('[data-dock-item]').last()
+      const lastBefore = (await last.boundingBox())!
+      assert.ok(lastBefore.y + lastBefore.height > bounds.y + bounds.height, 'short docks initially clip the final item')
+      const x = bounds.x + bounds.width / 2, startY = bounds.y + bounds.height - 20, endY = bounds.y + 20
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y: startY }] })
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x, y: endY }] })
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+      assert.ok(await dock.evaluate(el => el.scrollTop > 0), `${position} dock scrolls vertically by touch`)
+      const lastAfter = (await last.boundingBox())!
+      assert.ok(lastAfter.y >= bounds.y && lastAfter.y + lastAfter.height <= bounds.y + bounds.height, 'scrolling reveals the final item')
+      assert.deepEqual(await page.evaluate('window.actions'), [], 'vertical scrolling neither selects nor navigates panels')
+      assert.deepEqual(await ids(), beforeScroll, 'quick vertical scrolling preserves the item order')
+      assert.equal(await dock.locator('.dock-drag-preview').count(), 0, 'quick vertical scrolling never starts a reorder')
+      await last.tap()
+      assert.deepEqual(await page.evaluate('window.actions'), [{ select: beforeScroll.at(-1) }], 'the revealed final item remains tappable')
+    }
+    await cdp.detach()
+    assert.deepEqual(errors, [])
+  } finally { await browser.close() }
+})
+
 test('mobile dock handles touch selection, swipes, reorder, cancellation, keyboard and themes', { skip: !domBrowserExecutable(), timeout: 30_000 }, async () => {
   const source = `import React from '${root}/node_modules/react/index.js';
 import {createRoot} from '${root}/node_modules/react-dom/client.js';
@@ -151,6 +267,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     await page.emulateMedia({ reducedMotion: 'no-preference' })
     // The app exposes remote desktop in the menu, leaving eight dock panels at most.
     await page.evaluate("window.setAvailable(['sidebar','editor','agent','terminal','git','debugger','memo','tasks'])")
+    await page.waitForFunction("document.querySelectorAll('.mobile-dock [data-dock-item]').length === 8")
     for (const width of [320, 390, 767]) for (const dark of [true, false]) {
       await page.setViewportSize({ width, height: 844 })
       await page.evaluate(`document.documentElement.classList.toggle('dark', ${dark})`)
