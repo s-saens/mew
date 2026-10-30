@@ -3428,6 +3428,8 @@ function AgentSessionView({
     stickRef.current = true
   }
 
+  const focusComposerInput = () => agentInputRef.current?.focus()
+
   const attachFiles = useCallback(async (files: File[], target: 'composer' | 'queue' = 'composer', scope?: { projectRoot: string; isCurrent: () => boolean }): Promise<boolean> => {
     if ((target === 'queue' ? attachingQueued : attaching) || files.length === 0) return false
     const version = queuedEditVersionRef.current
@@ -4309,12 +4311,12 @@ function AgentSessionView({
               className={`flex h-7 w-8 shrink-0 items-center justify-center rounded border focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink-secondary disabled:opacity-40 ${composerCliMode ? 'border-accent bg-accent text-ink-on-accent' : 'border-transparent text-ink-secondary hover:bg-surface-raised hover:text-ink'}`}>
               <TerminalIcon width={16} height={16} aria-hidden="true" />
             </button>
-            <HeaderSelect className="flex-1" caretEnd value={composerModelId} options={modelOptions} onPick={(modelId) => { if (editingQueued) editQueueModel(modelId); else send({ type: 'set_model', modelId: selectModel(modelId) }) }} title={uiText("모델")} searchable disabled={!selectableModels || selectableModels.availableModels.length < 2} />
-            <HeaderSelect value={composerThinkingId} options={composerThinkingOptions} onPick={(value) => {
+            <HeaderSelect className="flex-1" caretEnd value={composerModelId} options={modelOptions} onPick={(modelId) => { if (editingQueued) editQueueModel(modelId); else send({ type: 'set_model', modelId: selectModel(modelId) }) }} title={uiText("모델")} searchable disabled={!selectableModels || selectableModels.availableModels.length < 2} onReturnToInput={focusComposerInput} onSubmit={submit} />
+            <HeaderSelect value={composerThinkingId} options={composerThinkingOptions} onReturnToInput={focusComposerInput} onSubmit={submit} onPick={(value) => {
               if (editingQueued) setEditingQueued(current => current ? { ...current, settings: { ...current.settings, thinkingId: value, thinking: composerThinkingOptions.find(option => option.id === value)?.label ?? value, ...(hasModelEffort(runtime) ? { modelId: modelVariantId(runtime, models?.availableModels ?? [], composerModelId, value) } : {}) } } : current)
               else if (thinking) { selectThinking(value); send({ type: 'set_thinking', configId: thinking.configId, value }) }
             }} title={uiText("사고")} disabled={!thinking || composerThinkingOptions.length < 2} />
-            <HeaderSelect value={composerModeId} options={modeOptions} onPick={(modeId) => {
+            <HeaderSelect value={composerModeId} options={modeOptions} onReturnToInput={focusComposerInput} onSubmit={submit} onPick={(modeId) => {
               if (editingQueued) setEditingQueued(current => current ? { ...current, settings: { ...current.settings, modeId, permission: modeOptions.find(option => option.id === modeId)?.label ?? modeId } } : current)
               else { selectMode(modeId); send({ type: 'set_mode', modeId }) }
             }} title={uiText("권한")} disabled={!modes || modes.availableModes.length < 2} />

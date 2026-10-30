@@ -13,6 +13,8 @@ export function HeaderSelect({
   value,
   options,
   onPick,
+  onReturnToInput,
+  onSubmit,
   title,
   trigger,
   searchable,
@@ -23,6 +25,8 @@ export function HeaderSelect({
   value: string
   options: { id: string; label: string }[]
   onPick: (id: string) => void
+  onReturnToInput?: () => void
+  onSubmit?: () => void
   title: string
   /** 버튼에 이름 대신 그릴 것(런타임 아이콘) */
   trigger?: ReactNode
@@ -94,7 +98,22 @@ export function HeaderSelect({
   const activeIndex = Math.max(0, shown.findIndex(option => option.id === active))
   const pick = (id: string) => { if (id !== value) onPick(id); close() }
   const onKeyDown = (event: ReactKeyboardEvent<HTMLElement>) => {
-    if (disabled || event.nativeEvent.isComposing || event.altKey || event.ctrlKey || event.metaKey) return
+    if (disabled || event.nativeEvent.isComposing || event.altKey) return
+    if (event.key === 'Enter' && !event.shiftKey && onReturnToInput) {
+      event.preventDefault(); event.stopPropagation()
+      if (event.repeat) return
+      if (event.ctrlKey || event.metaKey) {
+        setOpen(false)
+        onReturnToInput()
+        onSubmit?.()
+      } else {
+        if (open && shown[activeIndex]) pick(shown[activeIndex].id)
+        else setOpen(false)
+        onReturnToInput()
+      }
+      return
+    }
+    if (event.ctrlKey || event.metaKey) return
     if (event.key === 'Tab') { setOpen(false); return }
     const step = event.key === 'ArrowDown' ? 1 : event.key === 'ArrowUp' ? -1 : 0
     if (!open && step) {

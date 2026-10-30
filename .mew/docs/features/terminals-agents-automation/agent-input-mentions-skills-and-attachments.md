@@ -8,7 +8,7 @@ updated: "2026-10-30"
 status_hash: "a10e27bcc06cebe98975858548ff907b5953bfbcf197fe2ef971d9294144858f"
 files: ["src/components/AgentPanel.tsx", "src/components/MentionTextarea.tsx", "src/components/agent-composer-input.tsx", "src/components/agent-composer-attachments.tsx", "src/components/agent-media-preview-dialog.tsx", "src/utils/agent-composer-document.ts", "src/components/drawing/DrawingEditor.tsx", "src/utils/clipboard-images.ts", "src/utils/agentInputMentions.ts", "server/skills.ts"]
 commits: []
-description: "Feature contract covering project, file, and folder @mentions and autocomplete lists in agent input, /skill selection, circular upload indicators for attachment tags inserted at the cursor and moved by mouse drag or touch long press without mobile tab switching, and inline attachments within user message bubbles after sending. Explains mobile keyboard image pasting, photo and video popup previews, input history, input resizing, CLI switching, queue editing, entry points for SVG history and PNG attachments from the drawing tool, candidate scope, attachment storage in `.mew/temp/assets`, and compatibility boundaries for existing references."
+description: "Feature contract covering project, file, and folder @mentions and autocomplete lists in agent input, /skill selection, circular upload indicators for attachment tags inserted at the cursor and moved by mouse drag or touch long press without mobile tab switching, and inline attachments within user message bubbles after sending. Explains Enter focus return and Ctrl/Cmd+Enter submission from model, reasoning, and permission selectors, mobile keyboard image pasting, photo and video popup previews, input history, input resizing, CLI switching, queue editing, entry points for SVG history and PNG attachments from the drawing tool, candidate scope, attachment storage in `.mew/temp/assets`, and compatibility boundaries for existing references."
 상위파일:
   - "MOC.md"
   - "_terminals-agents-automation.md"
@@ -37,6 +37,8 @@ description: "Feature contract covering project, file, and folder @mentions and 
 - [Vector drawing tool and saved history](agent-drawing-editor.md)
 
 ## Detailed behavior
+
+When a model, reasoning level, or permission selector above the agent input has keyboard focus, Enter returns focus to the input without sending. If its dropdown is open, Enter first confirms the highlighted option and closes the list. Ctrl+Enter or Cmd+Enter closes any open list, returns focus to the input, and invokes the same submit action as the input shortcut, using the selected settings rather than an unconfirmed search result. This also preserves CLI execution and pending queue save behavior, including their existing submission guards. Ignore composition events and repeated Enter events for these shortcuts. Shift+Tab navigation, arrow-key selection, and opening a list with Space or a pointer remain available.
 
 If a path hint for an `@` file or folder candidate exceeds the available width, truncate the beginning with an ellipsis and show the end. Preserve the path string's reading order and the trailing `/` on folders. Subproject descriptions and `/` skill descriptions continue to be truncated at the end.
 
@@ -114,6 +116,8 @@ Store new attachments in `.mew/temp/assets/`. Continue recognizing historical `.
 
 <!-- mew:validation:start -->
 ## Verification
+
+- For Enter focus return and Ctrl/Cmd+Enter submission from agent settings, see the [keyboard work record](../../work/agent-settings-keyboard.md).
 
 - For the 2026-10-27 fixes, regression checks, and scope unverified on real devices for mobile keyboard image pasting, see the [work record](../../work/agent-keyboard-image-paste.md).
 

@@ -72,6 +72,26 @@ createRoot(document.getElementById('root')).render(<I18nProvider><AgentPanel pro
       await page.evaluate(`window.socket.emit({type:'modes',modes:{currentModeId:'default',availableModes:[{id:'default',name:'Default'},{id:'bypassPermissions',name:'Bypass'}]}})`)
       const permission = page.getByTitle('권한', { exact: true })
       await permission.filter({ hasText: '승인 필요' }).waitFor()
+      const draft = page.locator('[contenteditable="true"][aria-placeholder="텍스트 입력"]')
+      await draft.fill('설정에서 입력으로 돌아오기')
+      for (const control of [permission, effort, model]) {
+        await control.focus()
+        await control.press('Enter')
+        assert.equal(await draft.evaluate(el => el === el.ownerDocument.activeElement), true, 'Enter returns from each setting to the composer')
+        assert.equal(await control.getAttribute('aria-expanded'), 'false')
+        assert.deepEqual(await page.evaluate('window.messages.filter(message => message.type === "prompt")'), [], 'Enter must not send the draft')
+      }
+      await model.click()
+      const search = page.getByRole('combobox', { name: '검색', exact: true })
+      await search.fill('Astra')
+      for (const ctrlKey of [false, true]) {
+        await search.dispatchEvent('keydown', { key: 'Enter', code: 'Enter', isComposing: true, ctrlKey, bubbles: true })
+        assert.equal(await model.getAttribute('aria-expanded'), 'true', 'IME Enter keeps the menu open')
+        assert.deepEqual(await page.evaluate('window.messages.filter(message => message.type === "prompt")'), [], 'IME Enter must not send')
+      }
+      await search.press('Enter')
+      assert.equal(await model.getAttribute('aria-expanded'), 'false')
+      assert.equal(await draft.evaluate(el => el === el.ownerDocument.activeElement), true, 'confirming a searched option returns to the composer')
       // No control responses are emitted until the assertions explicitly release them.
       await model.focus()
       await model.press('ArrowDown')
@@ -89,7 +109,6 @@ createRoot(document.getElementById('root')).render(<I18nProvider><AgentPanel pro
       assert.equal((await effort.innerText()).trim(), 'High', 'effort updates before an ACP response')
       await permission.focus(); await permission.press('ArrowDown')
       assert.equal((await permission.innerText()).trim(), '권한 무시', 'permission updates before an ACP response')
-      const draft = page.locator('[contenteditable="true"][aria-placeholder="텍스트 입력"]')
       await draft.fill('선택 직후 전송')
       await draft.press('Control+Enter')
       const sent = await page.evaluate<any>('window.messages.find(message => message.type === "prompt")')
@@ -103,6 +122,33 @@ createRoot(document.getElementById('root')).render(<I18nProvider><AgentPanel pro
       // A server change after acknowledgement is authoritative again.
       await page.evaluate(`window.socket.emit({type:'modes',modes:{currentModeId:'bypassPermissions',availableModes:[{id:'default',name:'Default'},{id:'bypassPermissions',name:'Bypass'}]}})`)
       assert.equal((await permission.innerText()).trim(), '권한 무시')
+      for (const [index, control] of [permission, effort, model].entries()) {
+        const text = `설정에서 전송 ${index}`
+        await draft.fill(text)
+        await draft.press('Shift+Tab')
+        for (let step = 0; step < index; step++) await page.keyboard.press('Shift+Tab')
+        assert.equal(await control.evaluate(el => el === el.ownerDocument.activeElement), true, 'Shift+Tab reaches each setting')
+        await control.dispatchEvent('keydown', { key: 'Enter', code: 'Enter', ctrlKey: true, repeat: true, bubbles: true })
+        assert.equal(await control.evaluate(el => el === el.ownerDocument.activeElement), true, 'key repeat does not submit or move focus')
+        await control.press('Control+Enter')
+        assert.equal(await draft.evaluate(el => el === el.ownerDocument.activeElement), true, 'sending returns focus to the composer')
+        const prompts = await page.evaluate<any[]>('window.messages.filter(message => message.type === "prompt")')
+        assert.equal(prompts.length, index + 2, 'each shortcut sends exactly once')
+        assert.equal(prompts.at(-1).text, text)
+        assert.equal(prompts.at(-1).settings.modeId, 'bypassPermissions')
+        await control.focus()
+        await control.press('Control+Enter')
+        assert.equal(await page.evaluate('window.messages.filter(message => message.type === "prompt").length'), index + 2, 'empty input is not sent')
+      }
+      await draft.fill('검색 목록에서 전송')
+      await model.click()
+      await search.fill('Other')
+      await search.press('Meta+Enter')
+      assert.equal(await model.getAttribute('aria-expanded'), 'false')
+      assert.equal(await draft.evaluate(el => el === el.ownerDocument.activeElement), true)
+      const menuPrompt = await page.evaluate<any>('window.messages.filter(message => message.type === "prompt").at(-1)')
+      assert.equal(menuPrompt.text, '검색 목록에서 전송')
+      assert.equal(menuPrompt.settings.modelId, 'astra[low]', 'submit uses the selected model rather than an unconfirmed search result')
       assert.deepEqual(errors, [])
       await page.close()
     }
