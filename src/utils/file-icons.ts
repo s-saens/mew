@@ -4,6 +4,10 @@ type Associations = { fileNames: Record<string, string>; fileExtensions: Record<
 const defaults: Associations = manifest
 const light: Associations = manifest.light
 
+export function folderIconId(open = false): string {
+  return open ? manifest.folderExpanded : manifest.folder
+}
+
 export function fileIconId(path: string, lightTheme = false): string {
   const normalized = path.replaceAll('\\', '/').toLowerCase()
   const name = normalized.split('/').at(-1)!

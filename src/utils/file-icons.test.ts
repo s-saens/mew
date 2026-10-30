@@ -3,8 +3,9 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { generateManifest } from 'material-icon-theme'
-import { fileIconId } from './file-icons.ts'
+import { fileIconId, folderIconId } from './file-icons.ts'
 import manifest from './file-icon-manifest.json' with { type: 'json' }
+import defaultArtwork from './file-icon-default-artwork.json' with { type: 'json' }
 
 test('file icons distinguish languages, documents, media, archives and special filenames', () => {
   for (const [name, icon] of Object.entries({
@@ -23,8 +24,19 @@ test('file icons match basename and longest compound extensions without case sen
   assert.equal(fileIconId('/project/PACKAGE.JSON'), 'nodejs')
   assert.equal(fileIconId('/project/.CONFIG/graphqlrc'), 'graphql')
   assert.equal(fileIconId('archive.tar.gz'), 'zip')
-  for (const name of ['no-extension', 'file.unknown-extension', 'constructor', '__proto__', 'x.constructor', '']) {
+  for (const name of ['mew', '/project/mew', 'no-extension', 'file.unknown-extension', 'constructor', '__proto__', 'x.constructor', '']) {
     assert.equal(fileIconId(name), 'file', name)
+  }
+})
+
+test('generic files and both folder states use the pinned pack artwork without lazy loading', async () => {
+  const upstream = generateManifest()
+  assert.equal(folderIconId(), upstream.folder)
+  assert.equal(folderIconId(true), upstream.folderExpanded)
+  assert.equal(manifest.file, upstream.file)
+  assert.deepEqual(Object.keys(defaultArtwork).sort(), [upstream.file, upstream.folder, upstream.folderExpanded].sort())
+  for (const [id, svg] of Object.entries(defaultArtwork)) {
+    assert.equal(svg, await fs.readFile(path.resolve('node_modules/material-icon-theme/dist', upstream.iconDefinitions[id].iconPath), 'utf8'), id)
   }
 })
 

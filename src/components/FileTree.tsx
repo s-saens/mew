@@ -23,7 +23,7 @@ import { getTreeScroll, saveTreeScroll, setScrollSaveSuppressed } from '../utils
 import { readFileClipboard, writeFileClipboard, type FileClipboard } from '../utils/fileClipboard'
 import { SubprojectLink } from './subproject-link'
 import { ProjectIcon } from './ProjectIcon'
-import { FileTypeIcon } from './file-type-icon'
+import { FileTypeIcon, FolderTypeIcon } from './file-type-icon'
 import { GitButton } from './GitButton'
 import { VirtualTreeRows } from './virtual-tree-rows'
 import { explorerSearchTree, type ExplorerSearch } from '../utils/explorer-search'
@@ -127,23 +127,6 @@ function MapIcon({ size = 13 }: { size?: number }) {
       <path d="M3 6 9 3l6 3 6-3v15l-6 3-6-3-6 3Z" />
       <path d="M9 3v15" />
       <path d="M15 6v15" />
-    </svg>
-  )
-}
-
-/** 일반 폴더의 펼침 상태는 삼각형 대신 폴더 모양으로 드러낸다. */
-function FolderIcon({ open, size = 14 }: { open: boolean; size?: number }) {
-  useUiLocale()
-  return (
-    <svg aria-hidden="true" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
-      {open ? (
-        <>
-          <path d="M3 10V6.5A1.5 1.5 0 0 1 4.5 5H9l2 2h8.5A1.5 1.5 0 0 1 21 8.5V10" />
-          <path d="M3.4 10h17.3a1 1 0 0 1 .96 1.28l-2 7a1 1 0 0 1-.96.72H4.3a1 1 0 0 1-.96-.72l-1.9-7A1 1 0 0 1 2.4 10Z" />
-        </>
-      ) : (
-        <path d="M3 6.5A1.5 1.5 0 0 1 4.5 5H9l2 2h8.5A1.5 1.5 0 0 1 21 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5Z" />
-      )}
     </svg>
   )
 }
@@ -499,7 +482,7 @@ function Node({ node, depth, ctx }: { node: TreeNode; depth: number; ctx: NodeCt
             className={`flex min-w-0 ${projectLink || node.path === ctx.documentsFolder?.path ? 'max-w-[calc(100%-28px)]' : 'flex-1'} items-center gap-1.5 rounded px-2 py-1 text-left text-sm font-medium text-ink-secondary select-none [-webkit-touch-callout:none] ${projectLink || node.path === ctx.documentsFolder?.path ? 'after:absolute after:inset-0 after:rounded' : ''} before:absolute before:inset-0 before:-z-10 before:rounded data-[touch-holding=true]:before:bg-surface-raised data-[touch-dragging=true]:before:bg-accent/15 data-[touch-dragging=true]:before:ring-1 data-[touch-dragging=true]:before:ring-accent hover:before:bg-surface-raised focus-visible:outline-none focus-visible:before:outline-2 focus-visible:before:outline-accent ${isDropTarget ? 'before:bg-accent/15 before:ring-1 before:ring-accent' : isMenuTarget ? 'before:bg-surface-raised' : ''}`}
             style={{ paddingLeft: `${depth * 14 + 8}px`, scrollMarginTop: `${depth * 1.75}rem` }}
           >
-            {node.project && node.icon ? <ProjectIcon icon={node.icon} size={14} /> : <FolderIcon open={isOpen} />}
+            {node.project && node.icon ? <ProjectIcon icon={node.icon} size={14} /> : <FolderTypeIcon open={isOpen} />}
             <span className="min-w-0 truncate">{node.name}</span>
             {node.project && (
               <span className="ml-1 rounded bg-accent/15 px-1 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-accent">

@@ -5,7 +5,7 @@ import { useI18n } from '../i18n'
 import { FileBrowserFavorites } from './file-browser-favorites'
 import { useExternalFileActions } from '../hooks/use-external-file-actions'
 import { useLongPress } from '../hooks/useLongPress'
-import { FileTypeIcon } from './file-type-icon'
+import { FileTypeIcon, FolderTypeIcon } from './file-type-icon'
 
 type EntryMenu = (entry: ExternalEntry, x: number, y: number) => void
 
@@ -56,7 +56,7 @@ export function FileBrowserEntry({ entry, busy, depth = 0, expanded, onClick, on
     aria-expanded={entry.type === 'dir' ? expanded : undefined}
     className={fileBrowserRow}
     style={depth ? { paddingLeft: depth * 16 + 8 } : undefined} title={entry.path}>
-    {entry.type === 'dir' ? <Folder width={16} height={16} aria-hidden="true" className="shrink-0 text-ink-secondary" /> : <FileTypeIcon name={entry.path} />}
+    {entry.type === 'dir' ? <FolderTypeIcon open={expanded} /> : <FileTypeIcon name={entry.path} />}
     <span className="min-w-0 flex-1 truncate font-medium">{entry.name}</span>
     {entry.git && <span className="flex shrink-0 items-center gap-1 text-xs text-ink-secondary"><GitBranch width={13} height={13} />Git</span>}
     {entry.type === 'dir' && <Chevron width={15} height={15} className="shrink-0 text-ink-secondary" />}

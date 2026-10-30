@@ -14,13 +14,14 @@ import {createRoot} from '${root}/node_modules/react-dom/client.js';
 import {FileTree} from '${root}/src/components/FileTree.tsx';
 import {FileBrowserEntry} from '${root}/src/components/file-browser.tsx';
 import {I18nProvider} from '${root}/src/i18n.tsx';
-const noop=()=>{};const file=name=>({name,path:name,type:'file'});
+const noop=()=>{};const file=name=>({name,path:name,type:'file'});const folder={name:'src',path:'src',type:'dir',children:[file('src/child.ts')]};
 const props={project:'.workspace',readOnly:true,selectedPath:null,searchFocusSignal:0,newFileSignal:{n:0,parentPath:null},revealSignal:0,presence:{},onSelect:path=>window.selected=path,onFileCreated:noop,onFolderCreated:noop,onRenamed:noop,onDeleted:noop,onNotice:noop,registerSearchCancel:noop};
-function Fixture(){const [renamed,setRenamed]=React.useState(false);window.rename=()=>setRenamed(true);return <>
-<section id="files" style={{height:260}}><FileTree {...props} tree={['main.ts','photo.png','archive.zip','unknown.xyz','config.toml',renamed?'note.py':'note.md'].map(file)}/></section>
+function Fixture(){const [renamed,setRenamed]=React.useState(false);const [expanded,setExpanded]=React.useState(false);window.rename=()=>setRenamed(true);return <>
+<section id="files" style={{height:300}}><FileTree {...props} tree={[...['main.ts','photo.png','archive.zip','unknown.xyz','mew','config.toml',renamed?'note.py':'note.md'].map(file),folder]}/></section>
 <section id="docs" style={{height:100}}><FileTree {...props} documentPages tree={[file('note.md')]}/></section>
 <section id="search" style={{height:100}}><FileTree {...props} tree={[file('main.ts'),file('photo.png')]} search={{query:'main',paths:['main.ts'],matches:new Map(),onOpenMatch:noop}}/></section>
-<section id="server"><FileBrowserEntry entry={{...file('package.json'),path:'/tmp/package.json'}} onClick={()=>window.serverOpened=true}/></section></>}
+<section id="server"><FileBrowserEntry entry={{...file('package.json'),path:'/tmp/package.json'}} onClick={()=>window.serverOpened=true}/><FileBrowserEntry entry={{...file('mew'),path:'/tmp/mew'}} onClick={noop}/></section>
+<section id="server-folder"><FileBrowserEntry entry={{...folder,path:'/tmp/src'}} expanded={expanded} onClick={()=>setExpanded(value=>!value)}/></section></>}
 createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18nProvider>);`
   const bundle = await build({ input: 'virtual:file-icons.tsx', write: false, platform: 'browser', output: { format: 'iife', codeSplitting: false },
     onwarn(warning, defaultHandler) { if (warning.code !== 'MODULE_LEVEL_DIRECTIVE') defaultHandler(warning) },
@@ -50,9 +51,11 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
       for (const [selector, icon] of [
         ['#files [data-path="main.ts"]', 'typescript'], ['#files [data-path="photo.png"]', 'image'],
         ['#files [data-path="archive.zip"]', 'zip'], ['#files [data-path="unknown.xyz"]', 'file'],
+        ['#files [data-path="mew"]', 'file'], ['#files [data-path="src"]', 'folder'],
         ['#files [data-path="config.toml"]', theme === 'light' ? 'toml_light' : 'toml'],
         ['#docs [data-path="note.md"]', 'markdown'], ['#search [data-path="main.ts"]', 'typescript'],
-        ['#server button', 'nodejs'],
+        ['#server [title="/tmp/package.json"]', 'nodejs'], ['#server [title="/tmp/mew"]', 'file'],
+        ['#server-folder button', 'folder'],
       ]) {
         const image = page.locator(`${selector} img[data-file-icon="${icon}"]`)
         await image.waitFor()
@@ -64,11 +67,21 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
         assert.equal(bounds.width, 16)
         assert.equal(bounds.height, 16)
       }
+      for (const selector of ['#files [data-path="src"]', '#server-folder button']) {
+        const folder = page.locator(selector)
+        await folder.click()
+        await folder.locator('img[data-file-icon="folder-open"]').waitFor()
+        assert.equal(await folder.getAttribute('aria-expanded'), 'true')
+        if (selector.startsWith('#files')) await page.locator('#files [data-path="src/child.ts"] img[data-file-icon="typescript"]').waitFor()
+        await folder.click()
+        await folder.locator('img[data-file-icon="folder"]').waitFor()
+        assert.equal(await folder.getAttribute('aria-expanded'), 'false')
+      }
       await page.screenshot({ path: `/tmp/mew-file-icons-${width}-${theme}.png` })
     }
     await page.locator('#files [data-path="main.ts"]').click()
     assert.equal(await page.evaluate('window.selected'), 'main.ts')
-    await page.locator('#server button').click()
+    await page.locator('#server [title="/tmp/package.json"]').click()
     assert.equal(await page.evaluate('window.serverOpened'), true)
     await page.evaluate('window.rename()')
     await page.locator('#files [data-path="note.py"] img[data-file-icon="python"]').waitFor()

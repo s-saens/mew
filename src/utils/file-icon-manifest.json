@@ -1,5 +1,7 @@
 {
   "file": "file",
+  "folder": "folder",
+  "folderExpanded": "folder-open",
   "fileNames": {
     ".pug-lintrc": "pug",
     ".pug-lintrc.js": "pug",

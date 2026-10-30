@@ -6,9 +6,9 @@ status: "implemented"
 created: "2026-09-18"
 updated: "2026-10-30"
 status_hash: "67a95247d8f805106459a6f3cc3fd61abca57f6504dbe508c57550c824406a0a"
-files: ["src/components/file-action-menu.tsx", "src/hooks/use-external-file-actions.tsx", "src/components/file-browser-favorites.tsx", "server/file-favorites.ts", "src/components/file-browser.tsx", "src/components/FileTree.tsx", "src/App.tsx", "src/components/virtual-tree-rows.tsx", "src/utils/treePersistence.ts", "server/fsBrowse.ts", "src/components/ServerFileExplorer.tsx", "server/api.ts", "server/fileCatalog.ts", "src/components/file-type-icon.tsx", "src/components/file-type-icon-image.tsx", "src/utils/file-icons.ts", "src/utils/file-icon-manifest.json", "src/utils/file-icon-artwork.json", "tools/generate-file-icons.mjs"]
+files: ["src/components/file-action-menu.tsx", "src/hooks/use-external-file-actions.tsx", "src/components/file-browser-favorites.tsx", "server/file-favorites.ts", "src/components/file-browser.tsx", "src/components/FileTree.tsx", "src/App.tsx", "src/components/virtual-tree-rows.tsx", "src/utils/treePersistence.ts", "server/fsBrowse.ts", "src/components/ServerFileExplorer.tsx", "server/api.ts", "server/fileCatalog.ts", "src/components/file-type-icon.tsx", "src/components/file-type-icon-image.tsx", "src/utils/file-icons.ts", "src/utils/file-icon-manifest.json", "src/utils/file-icon-artwork.json", "src/utils/file-icon-default-artwork.json", "tools/generate-file-icons.mjs"]
 commits: []
-description: "The file explorer naming and scope contract, including Documents, Files, mobile swipes between those scopes, and filename/content search, plus hierarchical navigation, operations, virtualization, list caching, shortcuts, and one-time location reveal on file selection in Documents and Files. Describes compact lists and parent-path navigation in Add Project and the server explorer, server catalog visibility and permissions, exclusion of .worktrees copies, and local filename/extension icons with theme variants and a generic fallback."
+description: "The file explorer naming and scope contract, including Documents, Files, mobile swipes between those scopes, and filename/content search, plus hierarchical navigation, operations, virtualization, list caching, shortcuts, and one-time location reveal on file selection in Documents and Files. Describes compact lists and parent-path navigation in Add Project and the server explorer, server catalog visibility and permissions, exclusion of .worktrees copies, and unified Material Icon Theme file, fallback, and folder icons."
 상위파일:
   - "MOC.md"
   - "_projects-files-search.md"
@@ -19,7 +19,7 @@ description: "The file explorer naming and scope contract, including Documents, 
 File Explorer is the panel name encompassing hierarchical navigation in Documents and Files, filename search, and file content search.
 
 - Browse, create, move, upload, and download files.
-- Show a file-type icon for every file row in Documents, Files, search results, and the shared server file browser. Match known path suffixes, filenames, and extensions; use a generic file icon for unrecognized names and extensions. Preserve existing folder, project, and Map Of Contents icons.
+- Show a file-type icon for every file row in Documents, Files, search results, and the shared server file browser. Match known path suffixes, filenames, and extensions; use the same pack's generic file icon for unrecognized names and extensions, including extensionless files such as `mew`. Ordinary folders use the pack's closed and open folder icons. Preserve custom project and Map Of Contents icons.
 
 ### Scope
 
@@ -59,13 +59,13 @@ File Explorer is the panel name encompassing hierarchical navigation in Document
 
 ### File-type icons
 
-`FileTypeIcon` uses artwork from Material Icon Theme 5.40.0 (MIT), pinned as a development dependency, for file rows in `FileTree` and the shared `file-browser.tsx`, including Add Project and the server file explorer. Documents page rows use their representative file path, or a Markdown filename while that path is unavailable. Existing ordinary folder, project, and Map Of Contents icons remain.
+`FileTypeIcon` and `FolderTypeIcon` use artwork from Material Icon Theme 5.40.0 (MIT), pinned as a development dependency, for file and ordinary folder rows in `FileTree` and the shared `file-browser.tsx`, including Add Project and the server file explorer. File and folder artwork occupies the same 16px square. `folderIconId` selects the pack's `folder` or `folder-open` artwork from the row's expansion state. Documents page rows use their representative file path, or a Markdown filename while that path is unavailable. Custom project and Map Of Contents icons remain.
 
 `fileIconId` normalizes Windows separators and case, checks filename associations against path suffixes from longest to shortest (including the basename), then tries compound extensions from longest to shortest. This preserves path-specific upstream associations such as `.config/graphqlrc`. Unknown names fall back to the theme's generic `file` icon. Light-theme associations override the default association for the same match; theme changes select the corresponding artwork.
 
-Run `node tools/generate-file-icons.mjs` after changing the pinned icon package. It lowercases upstream mapping keys and generates the full filename and extension maps with light variants in `src/utils/file-icon-manifest.json`, stores 636 original SVG strings in `src/utils/file-icon-artwork.json`, and copies the license to `public/licenses/material-icon-theme.txt`. Use `node tools/generate-file-icons.mjs --check` to detect stale generated files. The generator does not build or apply the app.
+Run `node tools/generate-file-icons.mjs` after changing the pinned icon package. It lowercases upstream mapping keys and generates the full filename and extension maps with light variants and generic folder IDs in `src/utils/file-icon-manifest.json`, stores 638 original SVG strings in `src/utils/file-icon-artwork.json`, and copies the license to `public/licenses/material-icon-theme.txt`. It also generates `src/utils/file-icon-default-artwork.json` with the generic file and two folder SVGs for synchronous rendering. Use `node tools/generate-file-icons.mjs --check` to detect stale generated files. The generator does not build or apply the app.
 
-`FileTypeIcon` lazy-loads `FileTypeIconImage` as its `Artwork` component, keeping artwork JSON in that chunk and showing the existing Page icon in the same 16px space while loading. The icon package and its `chroma-js` dependency are not imported at runtime. Artwork is displayed through cached SVG data URLs in decorative, non-draggable images; it does not fetch icons from a CDN or expose icon text to assistive technology. See [ADR 0089](../../decisions/0089-file-type-icons.md) for the choice and the [work record](../../work/file-type-icons.md) for verification and application status.
+`FileTypeIcon` lazy-loads `FileTypeIconImage` as its `Artwork` component for associated file types. Generic files and folders render synchronously from the small default artwork module; the same pack's generic file icon fills the space while associated artwork loads. The icon package and its `chroma-js` dependency are not imported at runtime. Artwork is displayed through cached SVG data URLs in decorative, non-draggable images; it does not fetch icons from a CDN or expose icon text to assistive technology. See [ADR 0089](../../decisions/0089-file-type-icons.md) for the pack choice, [ADR 0091](../../decisions/0091-unified-explorer-icons.md) for generic file and folder consistency, and the [work record](../../work/file-type-icons.md) for verification and application status.
 
 ### Navigation and operations
 
@@ -122,6 +122,8 @@ Run `node tools/generate-file-icons.mjs` after changing the pinned icon package.
 <!-- mew:implementation:end -->
 
 <!-- mew:validation:start -->
+
+- 2026-10-30 follow-up: Generic files and open/closed folders now share the icon pack and 16px sizing. Six icon checks and the existing performance and touch checks passed. The sticky-row pixel comparison also failed with pre-change icon code; see the [follow-up record](../../work/file-type-icons.md#unified-generic-file-and-folder-icons). No app build or server application was performed.
 
 - 2026-10-30: File-type icon unit and isolated browser checks, together with existing explorer virtualization and touch regressions, passed (7 tests). Verified Documents, Files, filename search, and the shared browser at desktop/mobile widths in both themes, including image decoding, size, accessibility, renaming, and selection. Type, lint (pre-existing warnings), generated-file, and documentation checks passed. See the [work record](../../work/file-type-icons.md) for details. No app build or server application was performed.
 

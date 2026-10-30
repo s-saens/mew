@@ -8,6 +8,8 @@ const manifest = generateManifest()
 const normalize = entries => Object.fromEntries(Object.entries(entries).map(([key, value]) => [key.toLowerCase(), value]))
 const mappings = {
   file: manifest.file,
+  folder: manifest.folder,
+  folderExpanded: manifest.folderExpanded,
   fileNames: normalize(manifest.fileNames),
   fileExtensions: normalize(manifest.fileExtensions),
   light: {
@@ -15,7 +17,8 @@ const mappings = {
     fileExtensions: normalize(manifest.light.fileExtensions),
   },
 }
-const ids = [...new Set([mappings.file, ...[mappings, mappings.light].flatMap(theme => [
+const defaultIds = [mappings.file, mappings.folder, mappings.folderExpanded]
+const ids = [...new Set([...defaultIds, ...[mappings, mappings.light].flatMap(theme => [
   ...Object.values(theme.fileNames), ...Object.values(theme.fileExtensions),
 ])])].sort()
 const artwork = Object.fromEntries(await Promise.all(ids.map(async id => {
@@ -24,6 +27,7 @@ const artwork = Object.fromEntries(await Promise.all(ids.map(async id => {
 })))
 for (const [file, content] of [
   ['src/utils/file-icon-manifest.json', JSON.stringify(mappings, null, 2) + '\n'],
+  ['src/utils/file-icon-default-artwork.json', JSON.stringify(Object.fromEntries(defaultIds.map(id => [id, artwork[id]])), null, 2) + '\n'],
   ['src/utils/file-icon-artwork.json', JSON.stringify(artwork, null, 2) + '\n'],
   ['public/licenses/material-icon-theme.txt', await fs.readFile(path.join(root, 'node_modules/material-icon-theme/LICENSE'), 'utf8')],
 ]) {

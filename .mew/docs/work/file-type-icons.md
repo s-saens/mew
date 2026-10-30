@@ -1,6 +1,6 @@
 ---
 title: "Explorer file-type icons"
-description: "Records the 2026-10-30 implementation of Material Icon Theme file icons, generated upstream associations and light variants, and lazy local SVG artwork. Includes passing unit, isolated browser, type, lint, generation, and documentation checks; changes have not been applied to the running instance."
+description: "Records the 2026-10-30 Material Icon Theme implementation and follow-up unification of generic file, loading, and open/closed folder artwork, with local regression checks and the boundary before user build and application."
 created: "2026-10-30"
 updated: "2026-10-30"
 ---
@@ -21,3 +21,12 @@ The [feature document](../features/projects-files-search/file-folder-exploration
 - `npm run check:docs` checked 555 descriptions with no description or local-link errors. The Impeccable detector returned no findings; desktop light and mobile dark captures were reviewed.
 - No app build, deployment, launcher execution, or server restart was performed. The user must build and apply the change before checking the running instance.
 - Actual-server, physical-device, and production application checks remain pending.
+
+## Unified generic file and folder icons
+
+Replaced the separate outline folder icons in the Files tree and shared browser with Material Icon Theme's `folder` and `folder-open` artwork at 16px. The same pack's generic `file` artwork renders extensionless names such as `mew` and unknown extensions. The three default SVGs are generated into a small synchronous module, so default files and folders do not wait for the larger artwork module. The associated-file loading fallback now uses the same generic artwork. Custom project and Map Of Contents icons retain their existing behavior. [ADR 0091](../decisions/0091-unified-explorer-icons.md) records this extension of the original decision.
+
+- `node --test src/utils/file-icons.test.ts server/file-type-icons-ui.test.ts`: 6 passed. Verified exact upstream default SVGs, extensionless `mew`, decorative 16px images, and open/closed folder state changes in Files and the shared browser at 1100px and 390px in both themes. Desktop light and mobile dark captures were reviewed.
+- Existing `server/explorer-performance-ui.test.ts` and `server/sidebar-touch-ui.test.ts` passed. `server/sidebar-sticky-ui.test.ts` failed its ancestor-guide pixel comparison, including on a rerun. An isolated temporary fixture loading the pre-change icon modules from Git HEAD reproduced the same assertion failure; the temporary fixture was removed. This existing check remains unresolved outside the icon change.
+- `npx tsc -b`, `npm run lint` (existing warnings), `node tools/generate-file-icons.mjs --check`, and the changed-file diff whitespace check passed. `npm run check:docs` checked 562 descriptions with no description or local-link errors. The Impeccable detector reported no findings.
+- No app build, deployment, launcher execution, or server restart was performed. User build and application remain required; actual-server and physical-device checks remain pending.
