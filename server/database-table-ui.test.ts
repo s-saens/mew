@@ -112,7 +112,10 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
         const title = win.getComputedStyle(surface.firstElementChild!)
         const grid = win.getComputedStyle(table.parentElement!)
         const header = win.getComputedStyle(table.querySelector('thead')!)
-        return { padding: cell.padding, background: head.backgroundColor, headerSurface: header.backgroundColor, titleSurface: title.backgroundColor,
+        const input = table.querySelector('td input')
+        return { padding: cell.padding, inputFont: input ? win.getComputedStyle(input).fontSize : null,
+          rowHeight: table.querySelector('tbody tr')!.getBoundingClientRect().height, headerHeight: table.querySelector('thead tr')!.getBoundingClientRect().height,
+          background: head.backgroundColor, headerSurface: header.backgroundColor, titleSurface: title.backgroundColor,
           cellBorder: cell.borderRightColor, border: container.borderWidth, titleBorder: title.borderWidth, gridBorder: grid.borderColor,
           fillsHost: Math.abs(surface.getBoundingClientRect().width - surface.parentElement!.getBoundingClientRect().width) < 1,
           fillsContainer: Math.abs(table.getBoundingClientRect().width - table.parentElement!.clientWidth) < 1, radius: grid.borderRadius, surface: container.backgroundColor }
@@ -123,6 +126,9 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
       assert.equal(editor.fillsContainer, true, 'the database container hugs the table without unused space')
       assert.equal(editor.fillsHost, false, 'short database blocks do not fill the editor width')
       assert.equal(editor.padding, '0px')
+      assert.equal(editor.inputFont, '12px')
+      assert.ok(editor.rowHeight <= (width < 500 ? 29 : 25), 'compact text rows leave room for more data')
+      assert.ok(editor.headerHeight <= (width < 500 ? 37 : 29), 'headers trim padding around usable type and sort buttons')
       assert.equal(editor.background, 'rgba(0, 0, 0, 0)')
       assert.equal(editor.radius, '6px')
       const markdown = await measure('.tableWrapper table')

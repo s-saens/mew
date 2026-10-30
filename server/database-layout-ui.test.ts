@@ -33,7 +33,7 @@ async addColumn(id,name,type){if(window.failAdd)throw Error('열 추가 실패')
 async rename(id,title){view.title=title},async renameColumn(id,col,name){view.columns.find(c=>c.id===col).name=name;return clone().columns.find(c=>c.id===col)},
 async updateColumnOptions(id,col,options){view.columns.find(c=>c.id===col).options=options;return clone().columns.find(c=>c.id===col)}};
 window.setRowTitle=value=>api.updateCell('layout-demo','a','title',value);
-function Fixture(){const [readonly,setReadonly]=React.useState(false);const ctrl=useDatabaseView(api,'layout-demo',readonly);return <main className="mx-auto max-w-6xl p-3 sm:p-6"><div className="mb-4 flex items-center justify-between"><span className="text-sm text-ink-muted">프로젝트 노트</span><button className="rounded px-2 py-1 text-xs text-ink-muted hover:bg-surface-hover" onClick={()=>setReadonly(v=>!v)}>읽기 전용 전환</button></div><DatabaseCollection ctrl={ctrl} onOpenPage={path=>window.openedPage=path}/></main>};
+function Fixture(){const [readonly,setReadonly]=React.useState(false);const ctrl=useDatabaseView(api,'layout-demo',readonly);return <main className="mx-auto max-w-6xl p-3 sm:p-6"><div className="mb-4 flex items-center justify-between"><span className="text-sm text-ink-muted">프로젝트 노트</span><button className="rounded px-2 py-1 text-xs text-ink-muted hover:bg-surface-hover" onClick={()=>setReadonly(v=>!v)}>읽기 전용 전환</button></div><div data-db-host><DatabaseCollection ctrl={ctrl} onOpenPage={path=>window.openedPage=path}/></div></main>};
 createRoot(document.getElementById('root')).render(<Fixture/>);`
   const candidates = [source]
   const bundle = await build({ input: 'virtual:database-layout.tsx', write: false, platform: 'browser', output: { format: 'esm' }, transform: { jsx: 'react-jsx', define: { 'process.env.NODE_ENV': JSON.stringify('test') } },
@@ -54,6 +54,49 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
     await page.goto('http://mew-layout.test/')
     const tab = (name: string) => page.getByRole('tab', { name, exact: true })
     await page.locator('.mew-database-table').waitFor()
+    const checkDensity = async (mode: string) => {
+      const measurements = []
+      for (const editor of [false, true]) {
+        await page.locator('[data-db-host]').evaluate((host, editor) => {
+          host.classList.toggle('tiptap', editor)
+          host.setAttribute('style', 'font-size:22px;line-height:40px;font-weight:500;padding:0;min-height:0')
+        }, editor)
+        measurements.push(await page.locator('[data-db-surface]').evaluate(surface => {
+          const win = surface.ownerDocument.defaultView!
+          const style = (node: Parameters<typeof win.getComputedStyle>[0]) => win.getComputedStyle(node)
+          const card = surface.querySelector('[data-db-card] > button')
+          const row = surface.querySelector('[data-db-gantt-row]')
+          const bar = surface.querySelector('[data-db-gantt-bar]')
+          const day = surface.querySelector('[data-db-day]')
+          return {
+            font: style(surface).fontSize, line: style(surface).lineHeight,
+            tabHeight: surface.querySelector('[role="tab"]')!.getBoundingClientRect().height,
+            headings: [...surface.querySelectorAll('h3,h4')].map(heading => ({ font: style(heading).fontSize, margin: style(heading).marginTop })),
+            inputFonts: [...surface.querySelectorAll('tbody input')].map(input => style(input).fontSize),
+            cardPadding: card ? style(card).padding : null, cardGap: card ? style(card).gap : null,
+            dayHeight: day ? style(day).minHeight : null,
+            rowHeight: row?.getBoundingClientRect().height, barHeight: bar?.getBoundingClientRect().height,
+          }
+        }))
+      }
+      assert.deepEqual(measurements[1], measurements[0], `${mode}: document typography does not enlarge database controls`)
+      const measured = measurements[0]
+      assert.equal(measured.font, '12px')
+      assert.equal(measured.line, '16px')
+      assert.equal(measured.tabHeight, width < 500 ? 40 : 28)
+      for (const heading of measured.headings) assert.deepEqual(heading, { font: '12px', margin: '0px' })
+      for (const font of measured.inputFonts) assert.equal(font, '12px', 'text, date and number inputs share compact type')
+      if (mode === 'cards' || mode === 'board') {
+        assert.equal(measured.cardPadding, '8px')
+        assert.equal(measured.cardGap, '8px')
+      }
+      if (mode === 'calendar') assert.equal(measured.dayHeight, width < 500 ? '64px' : '88px')
+      if (mode === 'gantt') {
+        assert.equal(measured.rowHeight, width < 500 ? 32 : 28)
+        assert.equal(measured.barHeight, width < 500 ? 24 : 20)
+      }
+    }
+    await checkDensity('table')
     const borders = await page.locator('[data-db-surface]').evaluate(element => {
       const win = element.ownerDocument.defaultView!
       return [element, element.firstElementChild!, element.querySelector('[role="tablist"]')!.parentElement!.parentElement!].map(node => win.getComputedStyle(node).borderWidth)
@@ -63,6 +106,7 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
     await tab('카드').click()
     await page.locator('[data-db-card="a"]').waitFor()
     assert.equal(await page.locator('[data-db-card]').count(), 6)
+    await checkDensity('cards')
     await page.screenshot({ path: `/tmp/mew-db-layout-${width}-${theme}-cards.png`, fullPage: true })
     await page.locator('[data-db-card="a"]').getByRole('button', { name: '페이지 열기', exact: true }).click()
     assert.equal(await page.evaluate('window.openedPage'), 'People/a.md')
@@ -89,6 +133,7 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
     await tab('보드').click()
     await page.getByRole('combobox', { name: '그룹 기준', exact: true }).waitFor()
     assert.equal(await page.locator('[data-db-group]').count(), 4)
+    await checkDensity('board')
     if (width > 500) {
       await page.locator('[data-db-card="a"]').dragTo(page.locator('[data-db-group="\\"완료\\""]'))
       await page.waitForFunction('window.calls.some(call=>call.rowId==="a"&&call.columnId==="status"&&call.value==="완료")')
@@ -97,6 +142,7 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
     await tab('캘린더').click()
     await page.getByRole('combobox', { name: '종료일', exact: true }).waitFor()
     assert.equal(await page.locator('[data-db-day]').count(), 42)
+    await checkDensity('calendar')
     assert.equal(await page.locator('[data-db-day]').first().evaluate(element => element.ownerDocument.defaultView!.getComputedStyle(element).borderWidth), '0px')
     await page.getByRole('region', { name: '날짜 없음', exact: true }).getByRole('button', { name: '항목 열기: 독서 기록 정리', exact: true }).waitFor()
     const today = await page.evaluate('window.today') as string
@@ -156,6 +202,7 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
     const gantt = page.getByRole('region', { name: '간트', exact: true })
     const bar = page.locator('[data-db-gantt-bar="a"]')
     assert.equal(await page.locator('[data-db-gantt-row]').count(), 6)
+    await checkDensity('gantt')
     assert.equal(await page.locator('[data-db-gantt-row="c"]').getByText('날짜 없음', { exact: true }).count(), 1)
     const beforeUndated = await page.evaluate('window.calls.length')
     await page.locator('[data-db-gantt-row="c"]').getByRole('button', { name: '날짜 없음', exact: true }).click()

@@ -62,33 +62,33 @@ export function DatabaseGantt({ view, rows, column, startColumn, editable, onOpe
     if (active && (active.moved || active.mode === 'draw')) { save(active.row, active.next); suppressClick.current = true }
     cancel()
   }
-  const button = 'flex h-8 w-8 shrink-0 items-center justify-center rounded text-ink-secondary hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-40'
+  const button = 'flex h-7 w-7 shrink-0 items-center justify-center rounded text-ink-secondary hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-40 pointer-coarse:h-8 pointer-coarse:w-8'
   return <section aria-label={uiText('간트')}>
     <header className="flex flex-wrap items-center gap-1 px-2 py-1">
       <span aria-live="polite" className="min-w-0 flex-1 truncate text-xs tabular-nums text-ink-secondary">{dayKey(start)} – {dayKey(end)}</span>
       <button type="button" className={button} aria-label={uiText('이전 달')} data-tip={uiText('이전 달')} onClick={() => { setFit(false); setMonth(shiftCalendarMonth(month, -1)) }}><DatabaseLayoutIcon kind="left" size={14} /></button>
-      <button type="button" className="h-8 rounded px-2 text-xs text-ink-secondary hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-accent" onClick={() => { setFit(false); setMonth(today.slice(0, 7)) }}>{uiText('오늘')}</button>
+      <button type="button" className="h-7 rounded px-2 text-xs text-ink-secondary hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:h-8" onClick={() => { setFit(false); setMonth(today.slice(0, 7)) }}>{uiText('오늘')}</button>
       <button type="button" className={button} aria-label={uiText('다음 달')} data-tip={uiText('다음 달')} onClick={() => { setFit(false); setMonth(shiftCalendarMonth(month, 1)) }}><DatabaseLayoutIcon kind="right" size={14} /></button>
-      <button type="button" aria-pressed={fit} className="h-8 rounded px-2 text-xs text-ink-secondary hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-accent" onClick={() => setFit(!fit)}>{uiText('전체')}</button>
+      <button type="button" aria-pressed={fit} className="h-7 rounded px-2 text-xs text-ink-secondary hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:h-8" onClick={() => setFit(!fit)}>{uiText('전체')}</button>
       <button type="button" className={button} disabled={scale <= 8} aria-label={uiText('축소')} data-tip={uiText('축소')} onClick={() => { setFit(false); setScale(Math.max(8, scale / 1.5)) }}><DatabaseLayoutIcon kind="minus" size={14} /></button>
       <button type="button" className={button} disabled={scale >= 64} aria-label={uiText('확대')} data-tip={uiText('확대')} onClick={() => { setFit(false); setScale(Math.min(64, scale * 1.5)) }}><DatabaseLayoutIcon kind="plus" size={14} /></button>
     </header>
     <div className="overflow-x-auto overscroll-x-contain" onPointerMove={move} onPointerUp={finish} onPointerCancel={cancel} onLostPointerCapture={cancel}>
       <div style={{ minWidth: `calc(8rem + ${width}px)` }}>
-        <div className="flex h-8 text-[10px] tabular-nums text-ink-muted">
-          <span className="sticky left-0 z-10 w-32 shrink-0 bg-surface px-2 py-2">{view.columns[0]?.name}</span>
+        <div className="flex h-7 text-[10px] tabular-nums text-ink-muted">
+          <span className="sticky left-0 z-10 w-32 shrink-0 bg-surface px-2 py-1.5">{view.columns[0]?.name}</span>
           <div className="relative" style={{ width }}>{ticks.map(day => <span key={day} className="absolute top-2 whitespace-nowrap" style={{ left: (day - start) * ppd + 4 }}>{label(day)}</span>)}</div>
         </div>
         {rows.map(row => {
           const range = preview?.id === row.id ? preview.range : databaseDateRange(row, column.id, startColumn?.id)
           const first = range ? Math.max(start, dayNumber(range.start)) : start, last = range ? Math.min(end, dayNumber(range.end)) : start - 1
           const title = databaseRowTitle(row, view.columns) || uiText('제목 없음')
-          return <div key={row.id} data-db-gantt-row={row.id} className="flex h-9 border-t border-edge/50 text-xs">
+          return <div key={row.id} data-db-gantt-row={row.id} className="flex h-7 border-t border-edge/50 text-xs pointer-coarse:h-8">
             <button type="button" onClick={() => onOpen(row)} title={title} aria-label={uiText('항목 열기: {p0}', { p0: title })} className="sticky left-0 z-10 w-32 shrink-0 truncate bg-surface px-2 text-left text-ink hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-accent">{title}</button>
             <div className="relative" style={{ width, touchAction: editable && !fit && !range ? 'pan-y' : undefined }} onPointerDown={!range ? event => begin(event, row, 'draw') : undefined}>
               {ticks.map(day => <span key={day} className="pointer-events-none absolute inset-y-0 border-l border-edge/50" style={{ left: (day - start) * ppd }} />)}
               {dayNumber(today) >= start && dayNumber(today) <= end && <span className="pointer-events-none absolute inset-y-0 border-l border-accent" style={{ left: (dayNumber(today) - start) * ppd }} />}
-              {range && last >= first && <button type="button" data-db-gantt-bar={row.id} aria-label={`${title} · ${range.start} – ${range.end}`} title={`${title} · ${range.start} – ${range.end}`} className="absolute top-1 flex h-7 items-center overflow-hidden rounded bg-accent/20 text-ink hover:bg-accent/30 focus-visible:outline-2 focus-visible:outline-accent" style={{ left: (first - start) * ppd, width: Math.max(4, (last - first + 1) * ppd - 1), touchAction: editable && !fit ? 'pan-y' : undefined }}
+              {range && last >= first && <button type="button" data-db-gantt-bar={row.id} aria-label={`${title} · ${range.start} – ${range.end}`} title={`${title} · ${range.start} – ${range.end}`} className="absolute top-1 flex h-5 items-center overflow-hidden rounded bg-accent/20 text-ink hover:bg-accent/30 focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:h-6" style={{ left: (first - start) * ppd, width: Math.max(4, (last - first + 1) * ppd - 1), touchAction: editable && !fit ? 'pan-y' : undefined }}
                 onPointerDown={event => begin(event, row, 'move')} onClick={() => { if (suppressClick.current) { suppressClick.current = false; return }; onOpen(row) }}
                 onKeyDown={event => {
                   if (!editable || !['ArrowLeft', 'ArrowRight'].includes(event.key)) return

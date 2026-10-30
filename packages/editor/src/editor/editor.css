@@ -100,14 +100,15 @@
   pointer-events: none;
   height: 0;
 }
-.tiptap h1 { font-size: 2em; font-weight: 700; margin: 0.5em 0; color: var(--color-ink-bright); }
-.tiptap h2 { font-size: 1.5em; font-weight: 700; margin: 0.5em 0; color: var(--color-ink-bright); }
-.tiptap h3 { font-size: 1.25em; font-weight: 600; margin: 0.5em 0; color: var(--color-ink-bright); }
-.tiptap h4 { font-size: 1.1em; font-weight: 600; margin: 0.5em 0; color: var(--color-ink-bright); }
-.tiptap h5 { font-size: 1em; font-weight: 600; margin: 0.5em 0; color: var(--color-ink-bright); }
-.tiptap h6 { font-size: 0.9em; font-weight: 600; margin: 0.5em 0; color: var(--color-ink-secondary); }
+/* Database controls own their typography in both document and popup views. */
+.tiptap h1:not(:where([data-db-surface] *)) { font-size: 2em; font-weight: 700; margin: 0.5em 0; color: var(--color-ink-bright); }
+.tiptap h2:not(:where([data-db-surface] *)) { font-size: 1.5em; font-weight: 700; margin: 0.5em 0; color: var(--color-ink-bright); }
+.tiptap h3:not(:where([data-db-surface] *)) { font-size: 1.25em; font-weight: 600; margin: 0.5em 0; color: var(--color-ink-bright); }
+.tiptap h4:not(:where([data-db-surface] *)) { font-size: 1.1em; font-weight: 600; margin: 0.5em 0; color: var(--color-ink-bright); }
+.tiptap h5:not(:where([data-db-surface] *)) { font-size: 1em; font-weight: 600; margin: 0.5em 0; color: var(--color-ink-bright); }
+.tiptap h6:not(:where([data-db-surface] *)) { font-size: 0.9em; font-weight: 600; margin: 0.5em 0; color: var(--color-ink-secondary); }
 /* 제목 위 여백만 4px 더 — 0.5em은 제목마다 실제 크기가 다르므로 고정값을 얹는다 */
-.tiptap :is(h1, h2, h3, h4, h5, h6) { margin-top: calc(1em + 6px); }
+.tiptap :is(h1, h2, h3, h4, h5, h6):not(:where([data-db-surface] *)) { margin-top: calc(1em + 6px); }
 .tiptap ul, .tiptap ol { padding-left: 24px; margin: 0.5em 0; list-style: revert; }
 .tiptap ul li::marker { color: var(--color-ink-muted); font-size: 1.2em; }
 .tiptap ol li::marker { color: var(--color-ink-muted); font-weight: 600; }

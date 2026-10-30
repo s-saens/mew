@@ -36,7 +36,7 @@ export function DatabaseTable({ ctrl, onOpenPage, toolbar, content, wide = false
   ><PlusIcon /></button> : null
 
   return (
-    <div data-db-surface style={toolbar && !wide ? { minWidth: 'min(100%, 208px)' } : undefined} className={`min-w-0 max-w-full ${wide ? '@container/db w-full' : 'w-fit'}`}
+    <div data-db-surface style={toolbar && !wide ? { minWidth: 'min(100%, 208px)' } : undefined} className={`min-w-0 max-w-full font-sans text-xs font-normal leading-4 ${wide ? '@container/db w-full' : 'w-fit'}`}
       onContextMenu={event => {
         if (!onConvertToTable) return
         event.preventDefault(); event.stopPropagation(); setTypeMenu(null); setAddMenu(null)
@@ -62,10 +62,10 @@ export function DatabaseTable({ ctrl, onOpenPage, toolbar, content, wide = false
               if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
             }}
             placeholder={uiText("제목 없음")}
-            className="min-w-0 flex-1 rounded bg-transparent px-1 py-0.5 text-sm font-semibold text-ink outline-none hover:bg-surface focus:bg-surface"
+            className="min-w-0 flex-1 rounded bg-transparent px-1 py-0.5 text-[13px] font-semibold leading-5 text-ink outline-none hover:bg-surface focus:bg-surface"
           />
         ) : (
-          <span className="min-w-0 flex-1 truncate text-sm font-semibold text-ink">{view?.title ?? uiText("데이터베이스")}</span>
+          <span className="min-w-0 flex-1 truncate text-[13px] font-semibold leading-5 text-ink">{view?.title ?? uiText("데이터베이스")}</span>
         )}
         {view && !editable && (
           <span className="shrink-0 rounded bg-surface-hover px-1.5 py-0.5 text-[10px] font-medium text-ink-muted">
@@ -90,7 +90,7 @@ export function DatabaseTable({ ctrl, onOpenPage, toolbar, content, wide = false
       ) : content ? content : (
         <div className="grid w-fit max-w-full grid-cols-[minmax(0,1fr)_auto]">
         <div data-db-grid className="col-start-1 row-start-1 min-w-0 overflow-x-auto rounded-md border border-edge-strong bg-surface-deep">
-          <table className="mew-database-table w-max max-w-none border-collapse whitespace-nowrap text-sm">
+          <table className="mew-database-table w-max max-w-none border-collapse whitespace-nowrap text-xs">
             <thead className="bg-surface-raised/20">
               <tr className="border-b border-edge-strong">
                 {view.columns.map((col) => (
@@ -236,14 +236,14 @@ function ColumnHeader({
               requestAnimationFrame(() => header?.focus({ preventScroll: true }))
             }
           }}
-          className="bg-surface-hover px-2 py-1.5 text-xs font-medium text-ink outline-none"
+          className="min-h-7 bg-surface-hover px-2 py-1 text-xs font-medium text-ink outline-none pointer-coarse:min-h-9"
         />
       </th>
     )
   }
 
   return (
-    <th {...typeMenuHandlers} data-db-cell tabIndex={-1} aria-sort={sortDirection ?? 'none'} className="group/col border-r border-edge-strong px-2 py-1.5 text-left align-middle last:border-r-0 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent">
+    <th {...typeMenuHandlers} data-db-cell tabIndex={-1} aria-sort={sortDirection ?? 'none'} className="group/col border-r border-edge-strong px-2 py-0.5 text-left align-middle last:border-r-0 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent">
       <div className="flex items-center justify-between gap-1">
         <button type="button" disabled={!editable} aria-label={uiText('{p0} 열 타입 변경', { p0: col.name })}
           data-tip={TYPE_LABELS[col.type]} onClick={event => onTypeMenu(event.currentTarget)}
@@ -313,7 +313,7 @@ export function DatabaseCell({
 
   if (col.type === 'select' || col.type === 'multi_select') {
     const selected = col.type === 'multi_select' ? Array.isArray(value) ? value.filter(v => typeof v === 'string') : value == null ? [] : [String(value)] : value == null ? '' : String(value)
-    return <div className="w-max min-w-full px-1 py-0.5">
+    return <div className="w-max min-w-full px-1 pointer-coarse:py-0.5">
       <FrontmatterSelect field={{ key: col.name, type: col.type === 'multi_select' ? 'multi-select' : 'select',
         options: col.options, optionColors: col.optionColors, value: Array.isArray(selected) ? JSON.stringify(selected) : selected }}
         onEditOption={onEditOption}
@@ -339,19 +339,19 @@ export function DatabaseCell({
       <button type="button" disabled={!row.pagePath || !onOpenPage}
         aria-label={uiText('{p0} 페이지 열기', { p0: value == null ? '' : String(value) })}
         data-tip={uiText('페이지 열기')} onClick={event => { if (row.pagePath) onOpenPage?.(row.pagePath, { newTab: event.ctrlKey || event.metaKey }) }}
-        className={`flex min-w-0 items-center gap-1.5 px-2 py-1.5 text-left text-link hover:bg-surface focus-visible:outline-2 focus-visible:outline-accent disabled:text-ink-muted ${editable ? 'shrink-0' : 'flex-1'}`}>
+        className={`flex min-w-0 items-center gap-1.5 px-2 py-1 text-xs text-left text-link hover:bg-surface focus-visible:outline-2 focus-visible:outline-accent disabled:text-ink-muted pointer-coarse:py-1.5 ${editable ? 'shrink-0' : 'flex-1'}`}>
         <TypeIcon type="page" />{!editable && <span className="truncate">{value == null ? '' : String(value)}</span>}
       </button>
       {editable && <ContentSizedInput fill={false} aria-label={col.name} required value={value == null ? '' : String(value)}
         onChange={event => onLocal(event.target.value)} onBlur={event => onCommit(event.target.value)}
         onKeyDown={event => { if (event.key === 'Enter' && !event.nativeEvent.isComposing) event.currentTarget.blur() }}
-        className="bg-transparent py-1.5 pr-2 text-sm text-ink outline-none focus:bg-surface" />}
+        className="bg-transparent py-1 pr-2 text-xs text-ink outline-none focus:bg-surface pointer-coarse:py-1.5" />}
     </div>
   }
 
   if (col.type === 'checkbox') {
     return (
-      <div className="flex items-center justify-center py-1.5">
+      <div className="flex min-h-6 items-center justify-center py-1 pointer-coarse:min-h-7 pointer-coarse:py-1.5">
         <input
           type="checkbox"
           aria-label={col.name}
@@ -368,7 +368,7 @@ export function DatabaseCell({
   }
 
   if (!editable) {
-    return <div className="select-text min-h-8 px-2 py-1.5 text-sm text-ink">{value == null ? '' : String(value)}</div>
+    return <div className="select-text min-h-6 px-2 py-1 text-xs text-ink pointer-coarse:min-h-7 pointer-coarse:py-1.5">{value == null ? '' : String(value)}</div>
   }
 
   const inputType = col.type === 'number' ? 'number' : col.type === 'date' ? 'date' : 'text'
@@ -383,7 +383,7 @@ export function DatabaseCell({
       onKeyDown={(e) => {
         if (e.key === 'Enter' && !e.nativeEvent.isComposing) (e.target as HTMLInputElement).blur()
       }}
-      className="bg-transparent px-2 py-1.5 text-sm text-ink outline-none focus:bg-surface"
+      className="bg-transparent px-2 py-1 text-xs text-ink outline-none focus:bg-surface pointer-coarse:py-1.5"
     />
   )
 }
