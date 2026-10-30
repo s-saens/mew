@@ -8,7 +8,7 @@ updated: "2026-10-30"
 status_hash: "b19a2771f0bfb2f727bc14539350c69b524d222b67a2322b322f359fefd6a804"
 files: ["src/components/AgentPanel.tsx", "src/components/TermButtonBar.tsx", "src/components/CommandButtonMenu.tsx", "server/termButtons.ts", "server/command-ports.ts", "packages/tmux-term/src/TmuxTerminal.tsx", "packages/tmux-term/src/server/tmuxWs.ts"]
 commits: []
-description: "Covers creation, input, reconnection, and termination of per-project shell tabs; command buttons and automatic detection of listening ports opened by executed commands; wide, compact preview menus; focus-dependent new tabs, closed-tab restoration, live tab position numbers, renaming, context menus, and panel maximization/restoration. Defines Linux/macOS tmux and Windows psmux/PowerShell behavior, transparent backgrounds, shared input areas, accessible names, and actual verification boundaries."
+description: "Covers creation, input, reconnection, and termination of per-project shell tabs; quiet connection recovery indicators; command buttons and automatic detection of listening ports opened by executed commands; wide, compact preview menus; focus-dependent new tabs, closed-tab restoration, live tab position numbers, renaming, context menus, and panel maximization/restoration. Defines Linux/macOS tmux and Windows psmux/PowerShell behavior, transparent backgrounds, shared input areas, accessible names, and actual verification boundaries."
 상위파일:
   - "MOC.md"
   - "_terminals-agents-automation.md"
@@ -54,7 +54,7 @@ description: "Covers creation, input, reconnection, and termination of per-proje
 
 - Right-clicking the shared `AgentTabBar` or pressing Shift+F10 opens a menu with Rename, Close Tab, and, on desktop, Maximize Tab/Restore Original Size. Maximizing selects the target tab and expands its panel; closing uses the existing session termination and confirmation flow. The maximize item is not shown on mobile. Menu appearance, positioning, and dismissal use `ActionMenu`, shared with the file explorer, and each item displays an Iconoir icon and translated text.
 
-- Connection and reconnection status and terminal opening failures appear as small, translucent floating notifications at the top of the body. They do not shift the command button bar or resize the body.
+- Initial connection and automatic reconnection show only the shared three-dot loading indicator at the body's upper right, with a translated loading name for assistive technology. The indicator disappears when the socket opens. Preserve the shell display, composer draft, and focus while reconnecting; the indicator does not shift or resize the body or command button bar. Terminal opening and explicit run/stop failures retain their existing error notices. Presentation follows the [shared UI contract](../../development/ui-contracts.md).
 
 - xterm enables `allowTransparency` and sets the default background to fully transparent (`#00000000`). The body container and padding also have no background color, and `terminal.css` removes the xterm viewport's default black background. Text snapshots in selection mode retain the existing theme background for readability and to obscure the output beneath them. Initial text and cursor colors read app tokens, and root theme changes update only the colors of existing terminals. Light mode uses an ANSI palette for light backgrounds. Global tmux settings and explicit RGB/256-color settings in programs running inside it are not changed.
 
@@ -71,6 +71,8 @@ description: "Covers creation, input, reconnection, and termination of per-proje
 
 <!-- mew:validation:start -->
 ## Verification
+
+- `server/terminal-keybar-ui.test.ts` checks indicator-only initial connection and automatic recovery, removal after the socket opens, preserved input drafts, and the existing auxiliary-key input, focus, responsive layout, and transparent-background behavior.
 
 - 2026-10-27: Verified IPv4/IPv6, multiple listening ports, termination, and isolation from other sessions for actual Linux descendant processes; permissions and retrieval failures for command list GET/PUT; and port button placement, keyboard operation, horizontal scrolling, new-tab URLs, and prevention of command reruns at 1100/390px in both themes. The checks performed and OS and production application limitations are recorded in the [work record](../../work/command-port-previews.md).
 

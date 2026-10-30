@@ -33,13 +33,16 @@ test('jitter spreads retry times while enforcing the thirty second maximum', () 
   }
 })
 
-test('recovery messages distinguish waiting for the host, network, authentication, and rate limits', () => {
+test('exhausted recovery messages explain the cause and recovery without promising another automatic attempt', () => {
   assert.match(remoteRecoveryMessage('offline'), /호스트.*오프라인/)
   assert.match(remoteRecoveryMessage('network-offline'), /인터넷/)
   assert.match(remoteRecoveryMessage('authentication-timeout'), /로그인/)
   assert.match(remoteRecoveryMessage('rate-limited'), /요청이 많/)
   assert.equal(remoteRecoveryMessage('unknown', 'fixture diagnostic'), 'fixture diagnostic')
-  assert.equal(remoteRecoveryMessage(), '연결 복구 중')
+  assert.match(remoteRecoveryMessage(), /호스트에 연결할 수 없습니다/)
+  for (const code of [undefined, 'offline', 'network-offline', 'authentication-timeout', 'rate-limited']) {
+    assert.doesNotMatch(remoteRecoveryMessage(code), /기다리는 중|연결하는 중|다시 연결합니다/)
+  }
 })
 
 test('the response deadline bounds work that ignores its abort signal', async t => {

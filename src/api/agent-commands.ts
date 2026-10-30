@@ -6,8 +6,8 @@ async function request<T>(suffix: string, body?: unknown): Promise<T> {
   const response = await mewFetch(`/api/agent/commands${suffix}`, body === undefined ? { cache: 'no-store' } : {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
   })
-  const value = await response.json()
-  if (!response.ok) throw new Error(value.error ?? uiText("명령 요청에 실패했습니다"))
+  const value = await response.json().catch(error => { if (response.ok) throw error; return {} })
+  if (!response.ok) throw Object.assign(new Error(value?.error ?? uiText("명령 요청에 실패했습니다")), { status: response.status })
   return value as T
 }
 

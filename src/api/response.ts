@@ -1,3 +1,13 @@
+export class ApiResponseError extends Error {
+  readonly status: number
+
+  constructor(message: string, status: number) {
+    super(message)
+    this.name = 'ApiResponseError'
+    this.status = status
+  }
+}
+
 export async function json<T>(res: Response): Promise<T> {
   if (!res.ok) {
     if (res.status === 401) {
@@ -5,7 +15,7 @@ export async function json<T>(res: Response): Promise<T> {
       window.dispatchEvent(new Event('mew:auth-expired'))
     }
     const body = await res.json().catch(() => ({ error: res.statusText }))
-    throw new Error(body.error ?? `HTTP ${res.status}`)
+    throw new ApiResponseError(body.error ?? `HTTP ${res.status}`, res.status)
   }
   return res.json() as Promise<T>
 }

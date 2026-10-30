@@ -4,11 +4,11 @@ parent: "mew-agents"
 title: "Project command button"
 status: "implemented"
 created: "2026-09-18"
-updated: "2026-10-28"
+updated: "2026-10-30"
 status_hash: "11b4825abce468fc30154b3c9ff1e214231099d5c6effbd50778959e7f752969"
 files: ["src/components/CommandButtonMenu.tsx", "src/components/SessionTerminalPopup.tsx", "server/cmdButtons.ts"]
 commits: []
-description: "Contract for registering, running, and stopping per-project commands and viewing output from ▶ in the top bar and desktop project sidebar. Explains Alt+R, Ctrl+E, number selection, handle-based reordering, highlighting the entire running row, pinning request targets without switching projects, per-root session isolation, legacy session limitations, and the boundary with global terminal buttons."
+description: "Contract for registering, running, and stopping per-project commands and viewing output from ▶ in the top bar and desktop project sidebar. Covers quiet metadata recovery with retained cached rows, eleven automatic retries, disabled stale actions, and scoped manual recovery, plus Alt+R, Ctrl+E, number selection, handle-based reordering, running-row highlights, pinned request targets, per-root session isolation, legacy session limitations, and the boundary with global terminal buttons."
 상위파일:
   - "MOC.md"
   - "_terminals-agents-automation.md"
@@ -48,11 +48,16 @@ description: "Contract for registering, running, and stopping per-project comman
 ## Implementation details
 
 - The top bar and project sidebar use the same `CommandButtonMenu`. Keep the sidebar menu's `workspacePath` as the target for requests, responses, and polling, independently of switching the account's active root. The dropdown provides per-project command registration, editing, execution, stopping, and a dedicated terminal popup.
+- Fetch command metadata while the menu is open and poll every 3 seconds. Initial loading and recoverable polling failures show only the shared three-dot loading indicator. Keep the last verified rows visible during recovery, and disable running, stopping, adding, editing, and reordering until metadata is healthy. Serialize metadata reads so a slow request can finish without a later poll superseding it.
+- After an initial recoverable failure, allow up to eleven automatic retries. Stop polling when that budget is exhausted or a permanent API error occurs, and show a scoped error with an accessible Retry icon. An explicit retry starts a fresh budget without reloading the page. Authentication, permission, and other permanent client errors require explicit recovery immediately; HTTP 408, 429, server errors, and transport failures remain retryable.
+- Keep metadata failures separate from explicit execution, stopping, saving, and preview errors. Successful polling must not erase a failed action, and automatic metadata recovery must never replay a command or other mutation. Shared loading and recovery presentation follows the [UI contract](../../development/ui-contracts.md).
 
 <!-- mew:implementation:end -->
 
 <!-- mew:validation:start -->
 ## Verification
+
+- `server/command-button-recovery-ui.test.ts` checks quiet initial loading and polling recovery, retained cached rows with disabled actions, eleven retries after the initial failure, stopped polling and explicit recovery after exhaustion or permission failure, preserved command execution errors without replay, and a slow successful request that is not superseded by polling.
 
 - `server/cmd-button-workspace.test.ts` and `server/cmd-button-workspace-ui.test.ts` test target-specific command requests that do not change the current project, along with server permission and execution boundaries. Per-folder session identifiers for root commands are tested in `server/cmd-button-workspace.test.ts`. Results and legacy session limitations follow the [project sidebar work record](../../work/desktop-project-sidebar.md).
 - `server/header-menu-switch-ui.test.ts` tests single-press switching between project, command, and hamburger menus, closing the existing menu, focus, Esc/Back, and blocking ordinary outside clicks on desktop and mobile with light and dark solid and gradient backgrounds.

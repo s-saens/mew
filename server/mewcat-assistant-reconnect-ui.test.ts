@@ -5,12 +5,13 @@ import { build } from 'rolldown'
 import { chromium } from 'playwright-core'
 import { domBrowserExecutable } from './browser-dom-executable.ts'
 
-test('assistant reconnect preserves conversation, resumes its session, never resends prompts and cleans up retries', { skip: !domBrowserExecutable(), timeout: 20_000 }, async t => {
+test('assistant reconnect shows neutral loading, bounds retries, preserves conversation and never resends prompts', { skip: !domBrowserExecutable(), timeout: 20_000 }, async t => {
   const root = path.resolve(import.meta.dirname, '..')
   const source = `
 import React from '${root}/node_modules/react/index.js';
 import {createRoot} from '${root}/node_modules/react-dom/client.js';
 import {useMewcatAssistant} from '${root}/src/hooks/use-mewcat-assistant.ts';
+import {MewcatAssistant} from '${root}/src/components/mewcat-assistant.tsx';
 window.sockets=[];window.actionCalls=0;
 class Socket {
   static CONNECTING=0;static OPEN=1;static CLOSED=3;readyState=0;frames=[];
@@ -21,13 +22,14 @@ class Socket {
   close(){if(this.readyState===3)return;this.readyState=3;this.onclose?.()}
 }
 window.WebSocket=Socket;
-function Harness(){window.assistant=useMewcatAssistant({account:'owner@test',enabled:true,runtime:'codex',projectRoot:'/project',onAction:()=>{window.actionCalls++;return new Promise(resolve=>window.finishAction=resolve)}});return null}
+function Harness(){window.assistant=useMewcatAssistant({account:'owner@test',enabled:true,runtime:'codex',projectRoot:'/project',onAction:()=>{window.actionCalls++;return new Promise(resolve=>window.finishAction=resolve)}});return React.createElement(MewcatAssistant,{state:window.assistant,runtime:'codex',onConnect:()=>{},onRuntimeChange:()=>{}})}
 const app=createRoot(document.getElementById('root'));let key=0;
 window.mount=()=>app.render(React.createElement(Harness,{key:++key}));window.unmount=()=>app.unmount();window.mount();`
-  const bundle = await build({ input: 'virtual:assistant-reconnect.ts', write: false, platform: 'browser', output: { format: 'iife', codeSplitting: false }, transform: { define: { 'process.env.NODE_ENV': JSON.stringify('test') } }, plugins: [{ name: 'fixture', resolveId(id, importer) {
+  const bundle = await build({ input: 'virtual:assistant-reconnect.ts', write: false, platform: 'browser', output: { format: 'iife', codeSplitting: false }, transform: { jsx: 'react-jsx', define: { 'process.env.NODE_ENV': JSON.stringify('test') } }, plugins: [{ name: 'fixture', resolveId(id, importer) {
     if (id === 'virtual:assistant-reconnect.ts') return id
-    if (id === '../i18n' && importer?.endsWith('/use-mewcat-assistant.ts')) return 'virtual:i18n'
-  }, load(id) { if (id === 'virtual:assistant-reconnect.ts') return source; if (id === 'virtual:i18n') return `export function useI18n(){return {locale:'ko'}}` } }] })
+    if (id === '../i18n' && (importer?.endsWith('/use-mewcat-assistant.ts') || importer?.endsWith('/mewcat-assistant.tsx'))) return 'virtual:i18n'
+    if (id.endsWith('.css')) return 'virtual:style'
+  }, load(id) { if (id === 'virtual:assistant-reconnect.ts') return source; if (id === 'virtual:i18n') return `export function useI18n(){return {locale:'ko',t:key=>key}}`; if (id === 'virtual:style') return '' } }] })
   const code = bundle.output.find(item => item.type === 'chunk')!.code
   const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
   t.after(() => browser.close())
@@ -42,6 +44,9 @@ window.mount=()=>app.render(React.createElement(Harness,{key:++key}));window.unm
   await page.waitForFunction('window.assistant.ready')
   await page.evaluate(`window.assistant.ask('run-once');window.sockets[0].receive({type:'update',update:{sessionUpdate:'user_message_chunk',content:{type:'text',text:'run-once'}}});window.sockets[0].receive({type:'update',update:{sessionUpdate:'agent_message_chunk',content:{type:'text',text:'saved reply'}}});window.stale=window.sockets[0].onmessage;window.sockets[0].close()`)
   await page.waitForFunction('!window.assistant.ready && window.assistant.messages.length===2')
+  assert.equal(await page.evaluate('window.assistant.error'), null, 'temporary disconnect does not claim failure while retrying')
+  assert.equal(await page.getByRole('alert').count(), 0)
+  assert.equal(await page.getByRole('status', { name: 'common.loading' }).locator('.mew-loading-dot').count(), 3)
   await page.clock.runFor(499)
   assert.equal(await page.evaluate('window.sockets.length'), 1)
   await page.clock.runFor(1)
@@ -60,10 +65,33 @@ window.mount=()=>app.render(React.createElement(Harness,{key:++key}));window.unm
   await page.evaluate(`window.sockets[2].receive({type:'fatal',message:'access stopped'});window.sockets[2].close();window.dispatchEvent(new Event('online'))`)
   await page.clock.runFor(60_000)
   assert.equal(await page.evaluate('window.sockets.length'), 3, 'terminal server errors require an explicit retry')
-  await page.evaluate('window.mount()')
+  await page.evaluate('window.assistant.reconnect()')
   await page.waitForFunction('window.sockets.length===4')
-  await page.evaluate('window.sockets[3].close();window.unmount();window.dispatchEvent(new Event("online"))')
+  assert.equal(await page.evaluate('window.assistant.messages[1].text'), 'saved reply', 'explicit reconnect preserves the prior conversation before any server response')
+  await page.evaluate('window.sockets[3].readyState=2;window.dispatchEvent(new Event("online"))')
+  assert.equal(await page.evaluate('window.sockets.length'), 4, 'online cannot open an uncounted retry before the closing socket reports its loss')
+  await page.evaluate('window.sockets[3].close()')
+  for (let attempt = 1; attempt <= 11; attempt++) {
+    await page.clock.runFor(15_000)
+    await page.waitForFunction(`window.sockets.length===${4 + attempt}`)
+    assert.equal(await page.evaluate('window.assistant.error'), null, 'automatic attempts remain a loading state')
+    await page.evaluate('window.sockets.at(-1).close()')
+  }
+  await page.waitForFunction('window.assistant.error==="MEWCAT_CONNECTION_FAILED" && !window.assistant.connecting')
+  await page.getByRole('alert').waitFor()
+  assert.equal(await page.getByRole('status', { name: 'common.loading' }).count(), 0)
   await page.clock.runFor(60_000)
-  assert.equal(await page.evaluate('window.sockets.length'), 4, 'unmount removes retry timers and online listeners')
+  assert.equal(await page.evaluate('window.sockets.length'), 15, 'eleven unsuccessful retries stop until explicitly requested')
+  await page.evaluate('window.assistant.reconnect()')
+  await page.waitForFunction('window.sockets.length===16')
+  assert.equal(await page.evaluate('window.assistant.messages[1].text'), 'saved reply', 'failed recovery and another explicit retry keep the existing conversation')
+  await page.evaluate(`window.sockets.at(-1).open();window.sockets.at(-1).receive({type:'meta',meta:{sessionId:'session-two',busy:false}})`)
+  await page.waitForFunction('window.assistant.ready && !window.assistant.connecting && !window.assistant.error')
+  await page.evaluate('window.sockets.at(-1).close()')
+  await page.clock.runFor(500)
+  await page.waitForFunction('window.sockets.length===17')
+  await page.evaluate('window.unmount();window.dispatchEvent(new Event("online"))')
+  await page.clock.runFor(60_000)
+  assert.equal(await page.evaluate('window.sockets.length'), 17, 'unmount removes retry timers and online listeners')
   assert.deepEqual(errors, [])
 })

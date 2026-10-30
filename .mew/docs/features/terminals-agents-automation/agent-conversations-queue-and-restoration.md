@@ -8,7 +8,7 @@ updated: "2026-10-30"
 status_hash: "b325d279cf16e291b2bcddda7cc0d70268647e336403acba780cb1081da44668"
 files: ["src/components/AgentPanel.tsx", "src/components/agent-startup-queue.tsx", "src/utils/agent-startup-queue.ts", "src/hooks/use-agent-event-state.ts", "src/hooks/use-agent-work-history.ts", "src/utils/agent-work-loader.ts", "src/utils/agentFold.ts", "src/hooks/useGridDrag.ts", "server/agentHost.ts", "server/agentWs.ts", "server/agentTranscript.ts", "server/agent-history-preview.ts", "server/agent-session-search-service.ts", "server/agent-transcript-search.ts", "server/agent-runtime-history-search.ts"]
 commits: []
-description: "Feature contract for immediate local question bubbles and reply waiting dots, agent conversations, stopping, queues, restoration, history search, request ordering, and session conflicts. Also covers new tabs, drafts, the latest 3 turns, work details, attachments, question navigation, memory protection, and model capacity retries."
+description: "Feature contract for immediate local question bubbles and reply waiting dots, agent conversations, stopping, queues, restoration, history search, request ordering, and session conflicts. Covers quiet automatic recovery for agent connections, the Mewpet assistant, and CLI status polling with eleven retries and scoped manual recovery, plus new tabs, preserved drafts and records, the latest 3 turns, work details, attachments, question navigation, memory protection, and model capacity retries."
 상위파일:
   - "MOC.md"
   - "_terminals-agents-automation.md"
@@ -311,7 +311,7 @@ Completed tasks preserve the full transcript at termination. Thus, even after th
 
 - Move question copy outside the bubble background and show answer copy only in the expanded header. Align the expanded header's status dot, copy button, and stop button on the same vertical centerline ([Bubble display contract](#task-bubble-status)).
 
-- Show command lookup/execution and runtime open errors as small translucent floating notices over the content area. Scroll long errors inside the notice, and retain existing task error records and detail windows.
+- Show explicit command execution and runtime open errors as small translucent floating notices over the content area. Scroll long errors inside the notice, and retain existing task error records and detail windows. Recoverable command-status polling and connection failures use the loading behavior below while automatic recovery remains active.
 
 - Make expanded answer headers sticky within their own bubbles and compensate for the conversation viewport's top padding so they stick to its edge. Make the bottom `접기` button sticky as well and compensate for the conversation viewport's bottom padding. Give the top header a higher stacking priority than the bottom area. Reduce expanded top and bottom bar heights to 26px, scaling down buttons, icons, status dots, and time text together. Remove the top `질문으로` button at the user's request and do not add it again without an explicit follow-up request. Retain ↑/↓ question navigation. Preserve collapse state and copy, stop, and input behavior ([Bubble display contract](#task-bubble-status)).
 
@@ -346,6 +346,8 @@ Completed tasks preserve the full transcript at termination. Thus, even after th
 - The three dots use the theme's secondary text color, with staggered phases that sequentially change their size and opacity.
 - Preserve the conversation and draft, and display the actual conversation once preparation finishes. Keep the input editable during connection and history loading, blocking only sending. Dots animate in visible tabs regardless of input focus. Display them statically with reduced motion, and stop them in hidden tabs.
 - Tab switching remains available, and no disconnection Mewcat notification is sent.
+- Agent connection recovery, the Mewpet assistant, and CLI status polling show only loading dots while automatically retrying. Preserve conversation records and drafts; failed CLI status reads also retain the last known command records. After an initial recoverable failure, allow up to eleven automatic retries, then stop and expose a scoped error with an accessible Retry or Reconnect control. Permanent access or runtime failures appear immediately. Explicit recovery starts a new retry budget in the same panel without a page refresh.
+- Keep connection and read recovery separate from failed prompts, assistant actions, command execution, and other mutations. Retain genuine action errors until the user resolves or explicitly retries them; a successful status poll must not erase them. Automatic recovery reconnects or reads state and does not resend prompts or rerun commands. Presentation follows the [shared UI contract](../../development/ui-contracts.md).
 
 - Provide message sending, stopping, work records, editing and reordering queued messages, /clear, and history restoration.
 
@@ -357,6 +359,8 @@ Completed tasks preserve the full transcript at termination. Thus, even after th
 
 <!-- mew:validation:start -->
 ## Verification
+
+- `server/agent-connection-ui.test.ts` covers quiet connection loading, preserved drafts, eleven automatic connection retries, and explicit recovery after exhaustion. `server/mewcat-assistant-reconnect-ui.test.ts` checks neutral assistant recovery, preserved conversation, retry limits, permanent runtime errors, and no prompt replay. `server/agent-command-recovery-ui.test.ts` checks retained CLI records during read recovery, eleven retries after the initial failed read, immediate permission errors, explicit retry, preserved command execution errors, idempotency keys, and polling cleanup on unmount.
 
 - Record automated checks and production application status for history search in the [work record](../../work/agent-history-search.md). User verification criteria are to find relevant conversations using `에이전트패널`, Korean with spaces, English expressions, and session IDs, and to confirm that Enter only searches and that existing occupancy and work restrictions apply when selecting results.
 

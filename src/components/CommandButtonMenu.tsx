@@ -1,4 +1,5 @@
-import { ActionMenuSurface, canAutoFocusInput, getFixedPopupLayout, HoverTipLayer, MenuReorderHandle, useDragReorder, type DragItemProps } from '@mew/ui'
+import { ActionMenuSurface, canAutoFocusInput, getFixedPopupLayout, HoverTipLayer, LoadingIndicator, MenuReorderHandle, useDragReorder, type DragItemProps } from '@mew/ui'
+import { RefreshDouble } from 'iconoir-react'
 import { uiText } from '@mew/ui/i18n-core'
 import { useUiLocale } from '@mew/ui/i18n'
 // 프로젝트 탭의 ▶ 아이콘 버튼 = 명령어 버튼. 누르면 그 프로젝트의 <프로젝트>/.mew/cmd-button.json 에
@@ -14,10 +15,12 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProp
 import { createPortal } from 'react-dom'
 import { useOverlayDismiss } from '@mew/ui'
 import { fetchCmdButtons, killTmuxSession, runCmdButton, saveCmdButtons, type CmdButtonState } from '../api/client'
+import { ApiResponseError } from '../api/response'
 import { SessionTerminalPopup } from './SessionTerminalPopup'
 import { WORKSPACE_PROJECT } from '../utils/active-project'
 import { captureCommandMenuShortcut, focusFirstCommand, navigateCommandMenu } from '../utils/command-menu-keyboard'
 import { portPreviewUrl } from '../utils/port-preview-url'
+import { AUTOMATIC_RETRY_LIMIT } from '../utils/recovery-policy'
 
 const LONG_PRESS_MS = 500
 const MENU_WIDTH = 308
@@ -25,20 +28,7 @@ const MENU_WIDTH = 308
 /** 편집 중인 명령. index가 null이면 새로 추가하는 중 */
 type Editing = { index: number | null; name: string; command: string; oneShot: boolean }
 
-export function CommandButtonMenu({
-  project,
-  directory = '',
-  workspacePath,
-  shortcutEnabled = true,
-  title,
-  className,
-  open: controlledOpen,
-  onOpenChange,
-  inline = false,
-  hideTrigger = false,
-  alwaysOpen = false,
-  triggerRef,
-}: {
+type CommandButtonMenuProps = {
   project: string
   directory?: string
   workspacePath?: string
@@ -53,7 +43,26 @@ export function CommandButtonMenu({
   alwaysOpen?: boolean
   /** 인라인 메뉴를 여는 외부 버튼도 바깥 클릭 판정에서는 메뉴 안으로 친다. */
   triggerRef?: RefObject<HTMLElement | null>
-}) {
+}
+
+export function CommandButtonMenu(props: CommandButtonMenuProps) {
+  return <ScopedCommandButtonMenu key={JSON.stringify([props.project, props.directory ?? '', props.workspacePath])} {...props} />
+}
+
+function ScopedCommandButtonMenu({
+  project,
+  directory = '',
+  workspacePath,
+  shortcutEnabled = true,
+  title,
+  className,
+  open: controlledOpen,
+  onOpenChange,
+  inline = false,
+  hideTrigger = false,
+  alwaysOpen = false,
+  triggerRef,
+}: CommandButtonMenuProps) {
   useUiLocale()
   const [uncontrolledOpen, setUncontrolledOpen] = useState(false)
   const open = alwaysOpen || (controlledOpen ?? uncontrolledOpen)
@@ -65,6 +74,8 @@ export function CommandButtonMenu({
   }, [alwaysOpen, controlledOpen, onOpenChange, open])
   const [buttons, setButtons] = useState<CmdButtonState[] | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [recovering, setRecovering] = useState(false)
   // 실행·종료 요청이 날아가 있는 동안의 명령 이름 — 그 줄의 버튼을 잠근다(button.running과 다르다)
   const [busyName, setBusyName] = useState<string | null>(null)
   const [popup, setPopup] = useState<CmdButtonState | null>(null)
@@ -75,6 +86,9 @@ export function CommandButtonMenu({
   const buttonsRef = useRef(buttons)
   useLayoutEffect(() => { buttonsRef.current = buttons }, [buttons])
   const refreshSequence = useRef(0)
+  const pendingRefresh = useRef<number | null>(null)
+  const loadFailures = useRef(0)
+  const loadStopped = useRef(false)
   const savingOrder = useRef(false)
   const queuedOrder = useRef<CmdButtonState[] | null>(null)
 
@@ -84,6 +98,7 @@ export function CommandButtonMenu({
     trigger?.focus({ preventScroll: true })
   }, [setOpen, triggerRef])
   const startEditing = (next: Editing) => {
+    if (buttons === null || recovering || loadError !== null) return
     closeMenu()
     setEditing(next)
   }
@@ -109,20 +124,45 @@ export function CommandButtonMenu({
   useOverlayDismiss(open && !inline && closeMenu)
 
   const refresh = useCallback(() => {
-    if (savingOrder.current) return
+    if (savingOrder.current || pendingRefresh.current !== null || loadStopped.current) return
     const sequence = ++refreshSequence.current
+    pendingRefresh.current = sequence
     fetchCmdButtons(project, directory, workspacePath)
       .then((res) => {
         if (sequence !== refreshSequence.current || savingOrder.current) return
         setButtons(res.buttons)
-        setError(null)
+        setLoadError(null)
+        setRecovering(false)
+        loadFailures.current = 0
       })
       .catch((err) => {
         if (sequence !== refreshSequence.current || savingOrder.current) return
-        setButtons([])
-        setError(err instanceof Error ? err.message : uiText("불러오기 실패"))
+        const retryable = !(err instanceof ApiResponseError) || err.status >= 500 || err.status === 408 || err.status === 429
+        if (retryable && ++loadFailures.current <= AUTOMATIC_RETRY_LIMIT) {
+          setRecovering(true)
+          return
+        }
+        loadStopped.current = true
+        setRecovering(false)
+        setLoadError(err instanceof Error ? err.message : uiText("불러오기 실패"))
+      })
+      .finally(() => {
+        if (pendingRefresh.current === sequence) pendingRefresh.current = null
       })
   }, [project, directory, workspacePath])
+
+  const invalidateRefresh = useCallback(() => {
+    refreshSequence.current++
+    pendingRefresh.current = null
+  }, [])
+
+  function retryLoading() {
+    loadFailures.current = 0
+    loadStopped.current = false
+    setLoadError(null)
+    setRecovering(true)
+    refresh()
+  }
 
   // 메뉴가 열려 있는 동안 목록·실행 상태를 불러오고 가볍게 폴링한다(실행 표시 갱신용).
   // 인라인 사이드바도 항상 열린 메뉴이므로 여기서 제외하면 첫 요청을 보내지 않아
@@ -131,8 +171,11 @@ export function CommandButtonMenu({
     if (!open) return
     refresh()
     const timer = setInterval(refresh, 3000)
-    return () => clearInterval(timer)
-  }, [open, refresh])
+    return () => {
+      clearInterval(timer)
+      invalidateRefresh()
+    }
+  }, [open, refresh, invalidateRefresh])
 
   // 버튼 위치에 맞춰 드롭다운을 놓는다 — 탭 줄이 스크롤되거나 창이 바뀌면 다시 잰다
   useLayoutEffect(() => {
@@ -200,8 +243,9 @@ export function CommandButtonMenu({
   }, [open, setOpen, triggerRef])
 
   async function run(button: CmdButtonState) {
-    if (busyName) return
+    if (busyName || buttons === null || recovering || loadError !== null) return
     setBusyName(button.name)
+    setError(null)
     try {
       await runCmdButton(project, button.name, directory, workspacePath)
       refresh()
@@ -214,8 +258,9 @@ export function CommandButtonMenu({
 
   /** 실행 중일 때 재생 버튼은 정지 버튼이 된다 — 이 명령 전용 세션(mewcmd-*)만 죽인다 */
   async function stop(button: CmdButtonState) {
-    if (busyName) return
+    if (busyName || buttons === null || recovering || loadError !== null) return
     setBusyName(button.name)
+    setError(null)
     try {
       await killTmuxSession(button.session)
       refresh()
@@ -243,7 +288,9 @@ export function CommandButtonMenu({
   }
 
   const list = buttons ?? []
+  const metadataUnavailable = buttons === null || recovering || loadError !== null
   function reorder(from: number, to: number) {
+    if (metadataUnavailable) return
     const current = buttonsRef.current ?? []
     if (from === to || from < 0 || to < 0 || from >= current.length || to >= current.length) return
     const next = [...current]
@@ -290,16 +337,19 @@ export function CommandButtonMenu({
         : undefined}
     >
       {error && <div className="select-text px-3 py-2 text-xs text-danger-strong">{error}</div>}
-      {buttons === null ? (
-        <div className="px-3 py-3 text-xs text-ink-muted">{uiText("불러오는 중…")}</div>
-      ) : (
+      {loadError && <div role="alert" className="flex items-start gap-2 px-3 py-2 text-xs text-ink-secondary">
+        <span className="min-w-0 flex-1 select-text whitespace-pre-wrap break-words">{loadError}</span>
+        <HoverTipLayer className="contents"><button type="button" onClick={retryLoading} aria-label={uiText('다시 시도')} data-tip={uiText('다시 시도')} className="mew-action-menu-item mew-action-menu-icon shrink-0"><RefreshDouble width={14} height={14} aria-hidden="true" /></button></HoverTipLayer>
+      </div>}
+      {((buttons === null && !loadError) || recovering) && <div role="status" aria-label={uiText("불러오는 중…")} className="flex items-center px-3 py-2 text-ink-muted"><LoadingIndicator size={16} /></div>}
+      {buttons !== null && (
         list.map((b, i) => (
-          <CmdRow key={b.name} button={b} shortcut={i < 9 ? String(i + 1) : undefined} dragProps={list.length > 1 ? drag.getItemProps(i) : undefined} dragging={drag.dragIndex === i} onMove={direction => reorder(i, i + direction)} onConsumeClick={drag.consumeClick} busy={busyName === b.name} onRun={() => run(b)} onStop={() => stop(b)} onOpenPort={openPort} onOpenSession={() => { setPopup(b); setOpen(false) }} onEdit={() => startEditing({ index: i, name: b.name, command: b.command, oneShot: b.oneShot })} />
+          <CmdRow key={b.name} button={b} shortcut={i < 9 ? String(i + 1) : undefined} dragProps={list.length > 1 ? drag.getItemProps(i) : undefined} dragging={drag.dragIndex === i} onMove={direction => reorder(i, i + direction)} onConsumeClick={drag.consumeClick} busy={busyName === b.name || metadataUnavailable} onRun={() => run(b)} onStop={() => stop(b)} onOpenPort={openPort} onOpenSession={() => { setPopup(b); setOpen(false) }} onEdit={() => startEditing({ index: i, name: b.name, command: b.command, oneShot: b.oneShot })} />
         ))
       )}
-      {buttons !== null && list.length === 0 && !error && <div className="px-3 py-2 text-xs text-ink-muted">{uiText("아직 명령이 없습니다.")}</div>}
+      {buttons !== null && list.length === 0 && !error && !metadataUnavailable && <div className="px-3 py-2 text-xs text-ink-muted">{uiText("아직 명령이 없습니다.")}</div>}
       <div role="separator" className="mew-action-menu-separator" />
-      <div data-command-row><button type="button" onClick={() => startEditing({ index: null, name: '', command: '', oneShot: false })} className="mew-action-menu-item">
+      <div data-command-row><button type="button" disabled={metadataUnavailable} onClick={() => startEditing({ index: null, name: '', command: '', oneShot: false })} className="mew-action-menu-item">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>{uiText("명령 추가")}</button>
       </div>
     </MenuSurface>
@@ -426,7 +476,7 @@ function CmdRow({
           onMove(event.key === 'ArrowUp' ? -1 : 1)
         }
       }}>
-      {dragProps && <MenuReorderHandle {...handleProps} data-command-drag-handle={button.name}
+      {dragProps && <MenuReorderHandle {...handleProps} disabled={busy} data-command-drag-handle={button.name}
         aria-label={`${button.name} · ${uiText('드래그해서 순서 변경')}`} data-tip={uiText('드래그해서 순서 변경')}
         onClick={event => { event.stopPropagation(); onConsumeClick() }} onMove={onMove} />}
       <button

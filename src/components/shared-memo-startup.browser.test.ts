@@ -4,7 +4,7 @@ import { build } from 'rolldown'
 import { chromium } from 'playwright-core'
 import { domBrowserExecutable } from '../../server/browser-dom-executable.ts'
 
-test('delayed memo focus protects the existing editor and preserves each reopen target', { skip: !domBrowserExecutable(), timeout: 15_000 }, async t => {
+test('memo preserves focus and content while initial connection and recovery show only an indicator', { skip: !domBrowserExecutable(), timeout: 15_000 }, async t => {
   const memo = new URL('./shared-memo.tsx', import.meta.url).pathname
   const hook = new URL('../hooks/use-shared-memo.ts', import.meta.url).pathname
   const deferred = new URL('./deferred-component.tsx', import.meta.url).pathname
@@ -24,7 +24,7 @@ test('delayed memo focus protects the existing editor and preserves each reopen 
       load(id) {
         if (id === 'virtual:style') return ''
         if (id === code) return 'export function CodePane(){return null}'
-        if (id === 'virtual:editor.tsx') return `import React from ${JSON.stringify(react)}; export const Editor=React.forwardRef(()=> <div contentEditable className="tiptap"/>);`
+        if (id === 'virtual:editor.tsx') return `import React from ${JSON.stringify(react)}; export const Editor=React.forwardRef(({readOnly})=> <div contentEditable={!readOnly} className="tiptap"/>);`
         if (id === 'virtual:memo.tsx') return `
           import React from ${JSON.stringify(react)};
           import {createRoot} from ${JSON.stringify(reactDom)};
@@ -36,9 +36,11 @@ test('delayed memo focus protects the existing editor and preserves each reopen 
           window.WebSocket=class {static OPEN=1;readyState=0;send(){}close(){this.readyState=3}};
           function Fixture(){
             const [open,setOpen]=React.useState(false);
+            const [connected,setConnected]=React.useState(false),[synced,setSynced]=React.useState(false);
             const session=useSharedMemo({authEmail:'fixture@test',open,onOpenChange:setOpen});
+            const memoSession={...session,collab:session.collab&&{...session.collab,connected,synced}};
             const mounted=React.useRef(false);if(open)mounted.current=true;
-            return <><textarea aria-label="Existing editor" defaultValue="Keep this text"/><textarea aria-label="Other editor"/><button onMouseDown={event=>event.preventDefault()} onClick={()=>setOpen(true)}>Open memo</button>{mounted.current && <div hidden={!open}><SharedMemo session={session} open={open}/></div>}</>;
+            return <><textarea aria-label="Existing editor" defaultValue="Keep this text"/><textarea aria-label="Other editor"/><button onMouseDown={event=>event.preventDefault()} onClick={()=>setOpen(true)}>Open memo</button><button onClick={()=>{setConnected(true);setSynced(true)}}>Connect memo</button><button onClick={()=>setConnected(false)}>Recover memo</button>{mounted.current && <div hidden={!open}><SharedMemo session={memoSession} open={open}/></div>}</>;
           }
           createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18nProvider>);`
       },
@@ -80,6 +82,22 @@ test('delayed memo focus protects the existing editor and preserves each reopen 
   assert.equal(await region.locator('.tiptap').evaluate(el => el === el.ownerDocument.activeElement), false, 'opening a memo does not force focus into its text input')
   await page.keyboard.type('unrelated keystrokes')
   assert.equal(await existing.inputValue(), 'Keep this text', 'keystrokes cannot modify the previously focused editor')
+  const loading = region.getByRole('status', { name: '불러오는 중…', exact: true })
+  await loading.waitFor({ state: 'attached' })
+  assert.equal(await loading.innerText(), '', 'initial connection uses only the loading indicator')
+  assert.equal(await loading.locator('.mew-loading-dots').count(), 1)
+  assert.equal(await region.locator('.tiptap').getAttribute('contenteditable'), 'false', 'the memo remains read-only until connected')
+  await page.getByRole('button', { name: 'Connect memo', exact: true }).click()
+  await loading.waitFor({ state: 'detached' })
+  await region.locator('.tiptap[contenteditable=true]').fill('Keep this memo')
+  await page.getByRole('button', { name: 'Recover memo', exact: true }).click()
+  await loading.waitFor({ state: 'attached' })
+  assert.equal(await loading.innerText(), '', 'automatic recovery does not ask the user to reconnect')
+  assert.equal(await region.locator('.tiptap').getAttribute('contenteditable'), 'false')
+  assert.equal(await region.locator('.tiptap').innerText(), 'Keep this memo', 'recovery preserves the visible memo')
+  await page.getByRole('button', { name: 'Connect memo', exact: true }).click()
+  await loading.waitFor({ state: 'detached' })
+  assert.equal(await region.locator('.tiptap').innerText(), 'Keep this memo')
   await region.getByRole('button', { name: '닫기', exact: true }).click()
   await region.waitFor({ state: 'hidden' })
   assert.equal(await existing.evaluate(el => el === el.ownerDocument.activeElement), true)

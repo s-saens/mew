@@ -8,6 +8,7 @@ import { AgentMediaPreviewDialog } from './agent-media-preview-dialog'
 import { scopedBrowserStorage } from '@mew/ui/browser-storage-scope'
 import { workspaceViewportBottom } from '../utils/workspace-viewport'
 import { openMewSocket } from '../utils/remote-transport.ts'
+import { AUTOMATIC_RETRY_LIMIT } from '../utils/recovery-policy'
 import { PanelCloseButton } from './panel-close-button'
 import { TabActionMenu } from './tab-action-menu'
 import { ConfirmDialog, HoverTipLayer, PanelNotice, canAutoFocusInput } from '@mew/ui'
@@ -55,7 +56,7 @@ import {
   type ReactNode,
 } from 'react'
 import { flushSync } from 'react-dom'
-import { EditPencil, NavArrowRight, Terminal as TerminalIcon } from 'iconoir-react'
+import { EditPencil, NavArrowRight, RefreshDouble, Terminal as TerminalIcon } from 'iconoir-react'
 import { AgentCommandBubble, AgentCommandPopup } from './agent-command-bubble'
 import { AgentLoadingBubbles, AgentReplyPending } from './agent-loading-bubbles'
 import { useAgentCommands } from '../hooks/use-agent-commands'
@@ -2304,6 +2305,8 @@ function AgentSessionView({
     observe: observePromptEvents, acknowledgeQueue: acknowledgePromptQueue, replace: replacePromptFeedback,
     disconnect: disconnectPromptFeedback, clear: clearPromptFeedback } = useAgentPromptFeedback(items)
   const [connected, setConnected] = useState(false)
+  const [connectionFailed, setConnectionFailed] = useState(false)
+  const [connectionRetry, setConnectionRetry] = useState(0)
   const [startupQueue] = useState(() => new AgentStartupQueue<StartupPrompt>())
   const [startupPrompts, setStartupPrompts] = useState(startupQueue.snapshot())
   const [startupReady, setStartupReady] = useState(false)
@@ -2681,6 +2684,8 @@ function AgentSessionView({
 
   useEffect(() => {
     let closed = false
+    let terminal = false
+    let failures = 0
     let retry: number | undefined
     let ws: WebSocket | undefined
     const target = { tabId, cwd, workspacePath: notificationWorkspace }
@@ -2713,6 +2718,7 @@ function AgentSessionView({
     setAuthTerminal(null)
     setAuthTerminalOpen(false)
     setConnected(false)
+    setConnectionFailed(false)
     setStartupReady(false)
 
     const adoptControls = (controls: AgentEvent[]) => {
@@ -2723,7 +2729,16 @@ function AgentSessionView({
       }
     }
 
+    const scheduleReconnect = () => {
+      if (closed || terminal || retry !== undefined) return
+      if (failures++ >= AUTOMATIC_RETRY_LIMIT) {
+        setConnectionFailed(true)
+        return
+      }
+      retry = window.setTimeout(() => { retry = undefined; connect() }, 1000)
+    }
     const connect = () => {
+      if (closed || terminal) return
       const proto = location.protocol === 'https:' ? 'wss:' : 'ws:'
       const query = new URLSearchParams({
         runtime,
@@ -2738,7 +2753,8 @@ function AgentSessionView({
         ...(preset?.thinkingId && preset?.thinkingConfigId ? { thinking: preset.thinkingId, thinkingConfig: preset.thinkingConfigId } : {}),
         ...(preset?.role ? { role: preset.role } : {}),
       }).toString()
-      ws = openMewSocket(`${proto}//${location.host}/api/agent/ws?${query}`)
+      try { ws = openMewSocket(`${proto}//${location.host}/api/agent/ws?${query}`) }
+      catch { scheduleReconnect(); return }
       wsRef.current = ws
       ws.onopen = () => {
         // 다시 붙었다 — 다음에 오는 대화는 이어 붙이는 것이 아니라 지금 화면을 대신할 것이다
@@ -2818,6 +2834,9 @@ function AgentSessionView({
         if (event.type === 'modes') return adoptModes(event.modes)
         if (event.type === 'thinking') return adoptThinking(event.thinking)
         if (event.type === 'meta') {
+          clearTimeout(retry)
+          retry = undefined
+          failures = 0
           if (wsRef.current === startupClosingSocketRef.current) return
           acknowledgePromptQueue(event.meta, pendingRef.current)
           setStartupReady(!!event.meta.sessionId)
@@ -2937,6 +2956,7 @@ function AgentSessionView({
         }
         // session/load가 reset 전에 실패하면 오류만 온다. 선택기를 계속 "불러오는 중"에 가두지 않는다.
         if (event.type === 'error' || event.type === 'fatal') {
+          if (event.type === 'fatal') { terminal = true; setConnectionFailed(true) }
           resetSelection()
           setStartupReady(false)
           cancelClear()
@@ -2960,7 +2980,7 @@ function AgentSessionView({
         // 대화는 지우지 않는다 — 잠깐 끊긴 사이 화면이 빈 탭(히스토리 드롭다운)으로 보이던 원인이다.
         // 다시 붙으면 서버가 보내는 replay가 통째로 갈아끼운다
         setMeta(null)
-        retry = window.setTimeout(connect, 1000)
+        scheduleReconnect()
       }
     }
     let cacheDeadline: ReturnType<typeof setTimeout> | undefined
@@ -2992,7 +3012,7 @@ function AgentSessionView({
     }
     // 런타임을 바꾸면 저쪽 세션으로 갈아탄다 — 이쪽 세션은 서버에 그대로 남아 돌아오면 이어진다
     // (queueEvent는 값이 바뀌지 않는 useCallback이라 여기 있어도 재접속을 부르지 않는다)
-  }, [cacheKey, runtime, tabId, cwd, notificationWorkspace, preset?.modelId, preset?.thinkingId, preset?.thinkingConfigId, preset?.role, queueEvent, setEvents, adoptModels, adoptModes, adoptThinking, closeAuthBrowser, closeAcpLoginSessions, observeClearQueue, completeClear, cancelClear, acceptWorkDetails, resetWorkDetails, clearStartupPrompts, resetSelection, acknowledgePromptQueue, replacePromptFeedback, disconnectPromptFeedback])
+  }, [cacheKey, runtime, tabId, cwd, notificationWorkspace, preset?.modelId, preset?.thinkingId, preset?.thinkingConfigId, preset?.role, queueEvent, setEvents, adoptModels, adoptModes, adoptThinking, closeAuthBrowser, closeAcpLoginSessions, observeClearQueue, completeClear, cancelClear, acceptWorkDetails, resetWorkDetails, clearStartupPrompts, resetSelection, acknowledgePromptQueue, replacePromptFeedback, disconnectPromptFeedback, connectionRetry])
 
   // 경과 시간만 흐르게 한다 — 나머지 값은 서버 meta가 밀어 준다
   useEffect(() => {
@@ -3663,7 +3683,7 @@ function AgentSessionView({
             ? uiText("진행 중")
             : ''
   const totalTokens = usage ? usage.input + usage.output + usage.cacheWrite + usage.cacheRead : 0
-  const conversationLoading = !historyPreview && (loadingSession !== null || (!!resumeSessionIdRef.current
+  const conversationLoading = !connectionFailed && !historyPreview && (loadingSession !== null || (!!resumeSessionIdRef.current
     && !newConversationPending && !historyRef.current && (!connected
     || (!meta && !auth && !hasError))))
   useEffect(() => {
@@ -4046,15 +4066,21 @@ function AgentSessionView({
       </div>
 
       {conversationLoading && <div data-agent-loading className="absolute inset-0 overflow-hidden">
-        <AgentLoadingBubbles label={t(!connected ? 'agent.connecting' : 'common.loading')} active={visible} />
+        <AgentLoadingBubbles label={t('common.loading')} active={visible} />
       </div>}
+      {!conversationLoading && ((!connected && !connectionFailed && !!resumeSessionIdRef.current && !newConversationPending) || cli.recovering) && <div data-agent-recovering className="pointer-events-none absolute inset-x-0 top-2 flex justify-center text-ink-secondary">
+        <AgentReplyPending label={t('common.loading')} active={visible} />
+      </div>}
+      {connectionFailed && <PanelNotice>
+        <HoverTipLayer className="flex items-center gap-2">{uiText("다시 연결하지 못했습니다.")}<button type="button" onClick={() => setConnectionRetry(value => value + 1)} aria-label={uiText("다시 연결")} data-tip={uiText("다시 연결")} className="rounded p-1 text-ink-secondary hover:bg-surface-raised focus-visible:outline-2 focus-visible:outline-ink"><RefreshDouble width={16} height={16} aria-hidden="true" /></button></HoverTipLayer>
+      </PanelNotice>}
       {clearFeedback && <div className="pointer-events-none absolute inset-x-0 top-2 flex justify-center px-3" data-agent-clear-feedback={clearFeedback}>
         <div role="status" className="flex max-w-full items-center gap-2 rounded bg-surface-raised px-3 py-2 text-xs text-ink shadow-md">
           <span aria-hidden="true" className={clearFeedback === 'clearing' && visible ? 'motion-safe:animate-pulse' : ''}><ClearGlyph /></span>
           {clearFeedback === 'clearing' ? uiText("대화 비우는 중…") : clearFeedback === 'queued' ? uiText("/clear를 대기열에 추가했습니다") : uiText("대화를 비웠습니다")}
         </div>
       </div>}
-      {cli.error && <PanelNotice>{cli.error}</PanelNotice>}
+      {cli.error && <PanelNotice><HoverTipLayer className="flex items-center gap-2">{cli.error}{cli.readFailed && <button type="button" onClick={cli.retryRefresh} aria-label={uiText("다시 시도")} data-tip={uiText("다시 시도")} className="rounded p-1 text-ink-secondary hover:bg-surface-raised focus-visible:outline-2 focus-visible:outline-ink"><RefreshDouble width={16} height={16} aria-hidden="true" /></button>}</HoverTipLayer></PanelNotice>}
       </div>
 
       {errorDetail && <AgentErrorDialog title={errorDetail.title} detail={errorDetail.detail} onClose={() => setErrorDetail(null)} />}

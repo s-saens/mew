@@ -1,13 +1,15 @@
 ---
 title: "Cause-specific Mewlink recovery and offline waiting"
-description: "Decision to use a short host heartbeat response deadline, lightweight presence queries after offline confirmation, retries based on visibility and network state, and an authentication body timeout. Preserves existing RTC, lease, and authentication boundaries and distinguishes central and host application scope."
+description: "Decision to use a short host heartbeat response deadline, lightweight presence queries after offline confirmation, retries based on visibility and network state, and an authentication body timeout. Preserves existing RTC, lease, and authentication boundaries and distinguishes central and host application scope. ADR 0099 supersedes visible recovery messages and unbounded automatic retries."
 created: "2026-10-29"
-updated: "2026-10-29"
+updated: "2026-10-30"
 ---
 
 ## Status
 
 Accepted. Implemented locally and validated in isolation; the user applies it to production. [Remote access](../development/remote-access.md#reattaching-the-same-rtc-after-a-brief-signaling-interruption) owns the current contract, and the [Work record](../work/mewlink-efficient-recovery.md) owns validation and application scope.
+
+[ADR 0099](0099-quiet-automatic-recovery.md) supersedes this decision's visible cause-specific recovery messages and unbounded retries. Its backoff, presence, authentication, heartbeat, and lease contracts remain.
 
 ## Background
 

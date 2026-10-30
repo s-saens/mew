@@ -127,7 +127,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider>
     el.scrollTop = button.offsetTop + button.offsetHeight - el.clientHeight + 2
   })
   await bottomTrigger.click()
-  await menu.getByText('불러오는 중…', { exact: true }).waitFor()
+  await menu.getByRole('status', { name: '불러오는 중…', exact: true }).waitFor()
   const loadingBox = await menu.boundingBox(), triggerBox = await bottomTrigger.boundingBox()
   assert.ok(loadingBox && triggerBox)
   assert.ok(loadingBox.y >= 8 && loadingBox.y + loadingBox.height <= triggerBox.y, 'the bottom-row loading menu flips above its trigger')

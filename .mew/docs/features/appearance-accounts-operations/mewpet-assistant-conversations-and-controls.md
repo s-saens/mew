@@ -4,10 +4,10 @@ parent: "mew-settings"
 title: "Mewpet assistant, conversations, and Mew operations"
 status: "changed"
 created: "2026-09-30"
-updated: "2026-10-29"
+updated: "2026-10-30"
 files: ["src/components/mewcat-assistant.tsx", "src/hooks/use-mewcat-assistant.ts", "server/mewcat-assistant.ts", "server/mewcat-mcp-stdio.ts", "src/App.tsx"]
 commits: []
-description: "Contract for the Mewpet assistant's independent agent conversations, runtime selection, screen operations, project creation, Documents setup, permissions, result verification, and built-in MCP tool help in resources/help의."
+description: "Contract for the Mewpet assistant's independent agent conversations, runtime selection, screen operations, project creation, Documents setup, permissions, result verification, and built-in MCP tool help in resources/help/. Covers quiet automatic connection recovery, eleven retries before scoped manual recovery, preserved conversations and drafts, and action failures that require explicit handling."
 상위파일:
   - "MOC.md"
   - "_appearance-accounts-operations.md"
@@ -62,6 +62,10 @@ Store runtime selection in per-account browser localStorage, the browser tab ide
 
 Conversation transcripts use the existing [Storage contract](../../development/conversation-storage.md). Display up to 200 recent conversations on the current screen. Preserve existing conversation and project names when the language changes.
 
+Initial connection and automatic recovery show only the shared three-dot loading indicator with a translated loading name for assistive technology. Keep the conversation and input draft visible, and block sending until the agent is ready. Temporary connection failures do not display error guidance or ask the user to reconnect while retries remain active. Follow the [shared UI contract](../../development/ui-contracts.md).
+
+After an initial connection failure, allow up to eleven automatic retries. If they all fail, stop retrying and show an error in the assistant with an explicit Reconnect control. Permanent runtime failures appear immediately and also require explicit recovery. Reconnecting preserves the conversation and starts a new retry budget without refreshing the page. Preserve genuine prompt, tool, and screen-action errors independently of connection recovery; reconnecting does not resend prompts or repeat actions.
+
 ### Automatic MCP
 
 Inject Mew's own stdio MCP bridge into session/new and session/load. Do not require users to provide an MCP address or token, install MCP, or edit configuration files. Do not change the global or project MCP source settings or the existing [MCP management window](../../../../docs/configuration/agent-harness.md). Authentication retries, new conversations, and ACP restarts for restoration use the same MCP information.
@@ -112,6 +116,8 @@ Use isolated MCP/ACP tests to check automatic injection on session creation, new
 
 <!-- mew:validation:start -->
 ## Verification
+
+- `server/mewcat-assistant-reconnect-ui.test.ts` checks quiet initial connection and recovery, retained conversation records, no prompt replay, stopping after eleven retries, explicit recovery, immediate permanent runtime errors, and removal of retry timers and online listeners on unmount.
 
 - 2026-10-17: In isolated Chromium at 390/1100px, verified 80% background opacity for the Mewpet body and tail in Midnight, Rose, and Ocean, a 6px backdrop blur on the body, solid colors for inner bubbles and the input field, and restoration when switching between dark and light modes. Existing checks for all four languages, input, IME, conversation persistence, and runtime switching also passed.
 

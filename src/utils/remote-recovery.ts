@@ -6,11 +6,11 @@ export function remoteRecoveryDelay(failures: number, offline = false, random = 
 }
 
 export function remoteRecoveryMessage(code?: string, message?: string) {
-  if (code === 'offline') return '호스트가 오프라인입니다. 다시 연결을 기다리는 중입니다.'
-  if (code === 'network-offline') return '인터넷 연결을 기다리는 중입니다.'
-  if (code === 'authentication-timeout') return '로그인 상태 확인이 지연되고 있습니다. 다시 연결하는 중입니다.'
-  if (code === 'rate-limited') return '연결 요청이 많습니다. 잠시 후 다시 연결합니다.'
-  return message || '연결 복구 중'
+  if (code === 'offline') return '호스트가 오프라인입니다. mew가 실행 중인지 확인해 주세요.'
+  if (code === 'network-offline') return '인터넷에 연결할 수 없습니다. 네트워크 상태를 확인해 주세요.'
+  if (code === 'authentication-timeout') return '호스트의 로그인 상태를 확인하지 못했습니다. 호스트와 네트워크 상태를 확인해 주세요.'
+  if (code === 'rate-limited') return '연결 요청이 많습니다. 잠시 후 다시 시도해 주세요.'
+  return message || '호스트에 연결할 수 없습니다. mew와 네트워크 상태를 확인해 주세요.'
 }
 
 export async function remoteDeadline<T>(read: (signal: AbortSignal) => Promise<T>, signal?: AbortSignal, message = '연결 응답 시간이 초과됐습니다.') {

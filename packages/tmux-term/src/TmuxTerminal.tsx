@@ -6,7 +6,7 @@ import { FitAddon } from '@xterm/addon-fit'
 import '@xterm/xterm/css/xterm.css'
 import './terminal.css'
 import { Check, Copy, FastArrowDown, FrameSelect, Lock, Xmark } from 'iconoir-react'
-import { PanelNotice, HoverTipLayer, hasPathDrag, isTextareaCaretOnVisualBoundary, keepFocusOnPress, pathFromDrag } from '@mew/ui'
+import { LoadingIndicator, HoverTipLayer, hasPathDrag, isTextareaCaretOnVisualBoundary, keepFocusOnPress, pathFromDrag } from '@mew/ui'
 import { MobileKeyBar, useMobileLayout } from '@mew/mobile-keys'
 import { getBinding, matchesShortcut } from '@mew/shortcuts'
 import { readInputDraft, readInputHistory, recordInputHistory, writeInputDraft } from './inputDrafts'
@@ -724,9 +724,9 @@ export function TmuxTerminal({
             {selectSnapshot}
           </pre>
         )}
-        {connState !== 'open' && <PanelNotice tone="status">
-          {connState === 'connecting' ? uiText("연결 중…") : uiText("재연결 중…")}
-        </PanelNotice>}
+        {connState !== 'open' && <div role="status" aria-label={uiText('불러오는 중…')} className="pointer-events-none absolute right-2 top-2 z-30 flex text-ink-secondary">
+          <LoadingIndicator size={16} />
+        </div>}
       </div>
       {/* 이 줄의 버튼은 전부 아이콘 하나짜리라 이름이 안 보인다 — data-tip이 붙은 것에 마우스를
           올리면 HoverTipLayer가 곧바로 이름표를 띄운다(기본 title은 1초쯤 기다려야 나온다). */}

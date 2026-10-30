@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { AgentCommandRecord, AgentCommandScope } from '../../shared/agent-command'
 import { listAgentCommands, startAgentCommand } from '../api/agent-commands'
+import { AUTOMATIC_RETRY_LIMIT } from '../utils/recovery-policy'
 
 const EMPTY_RECORDS: AgentCommandRecord[] = []
 
@@ -23,6 +24,9 @@ export function useAgentCommands(scope: AgentCommandScope, enabled: boolean) {
   const pending = useRef(false)
   const retry = useRef<{ key: string; command: string; id: string } | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [readError, setReadError] = useState<string | null>(null)
+  const [recovering, setRecovering] = useState(false)
+  const [readRetry, setReadRetry] = useState(0)
   const refresh = useCallback(async () => {
     if (!enabled || !scope.sessionId) return
     const result = await listAgentCommands(scope)
@@ -34,7 +38,8 @@ export function useAgentCommands(scope: AgentCommandScope, enabled: boolean) {
       const records = [...incoming.values()].sort((a, b) => a.startedAt - b.startedAt)
       return previous.key === key && JSON.stringify(previous.records) === JSON.stringify(records) ? previous : { key, records }
     })
-    setError(null)
+    setReadError(null)
+    setRecovering(false)
   // The serialized scope is the dependency; object identity changes each render.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, enabled])
@@ -42,17 +47,28 @@ export function useAgentCommands(scope: AgentCommandScope, enabled: boolean) {
   useEffect(() => {
     let disposed = false
     let timer: number | undefined
+    let failures = 0
     setError(null)
+    setReadError(null)
+    setRecovering(false)
     if (!enabled || !scope.sessionId) return
     const poll = async () => {
-      try { await refresh() } catch (error) {
-        if (!disposed) setError(error instanceof Error ? error.message : String(error))
+      try { await refresh(); failures = 0 } catch (error) {
+        if (disposed) return
+        const status = (error as { status?: number } | null)?.status
+        if (error instanceof SyntaxError || (status !== undefined && status >= 400 && status < 500 && status !== 408 && status !== 429)
+          || ++failures > AUTOMATIC_RETRY_LIMIT) {
+          setRecovering(false)
+          setReadError(error instanceof Error ? error.message : String(error))
+          return
+        }
+        setRecovering(true)
       }
       if (!disposed) timer = window.setTimeout(poll, 1500)
     }
     void poll()
     return () => { disposed = true; clearTimeout(timer) }
-  }, [refresh, enabled, scope.sessionId])
+  }, [refresh, enabled, scope.sessionId, readRetry])
 
   const submit = useCallback(async (tab: string, command: string, afterUserCount: number) => {
     if (!enabled || !scope.sessionId || pending.current) return false
@@ -76,5 +92,7 @@ export function useAgentCommands(scope: AgentCommandScope, enabled: boolean) {
   // The serialized scope is the dependency; object identity changes each render.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, enabled])
-  return { records: enabled && snapshot.key === key ? snapshot.records : EMPTY_RECORDS, submitting, error, submit, refresh }
+  return { records: enabled && snapshot.key === key ? snapshot.records : EMPTY_RECORDS, submitting, error: error ?? readError, readFailed: !error && readError !== null, recovering, submit, refresh,
+    retryRefresh: () => setReadRetry(value => value + 1),
+  }
 }

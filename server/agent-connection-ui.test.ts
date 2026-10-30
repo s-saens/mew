@@ -24,7 +24,7 @@ import {I18nProvider} from '${root}/src/i18n.tsx';
 import {onMewcatNotice,setNotificationPreferences} from '${root}/src/utils/mewcat-notifications.ts';
 import {useMewcatNotifications} from '${root}/src/hooks/use-mewcat-notifications.ts';
 window.setNoticePreferences=setNotificationPreferences;
-localStorage.setItem('mew:locale','ko');window.messages=[];window.clearTabs=[];window.notices=[];window.sockets={};window.fail=false;window.outsideClicks=0;
+localStorage.setItem('mew:locale','ko');window.messages=[];window.clearTabs=[];window.notices=[];window.sockets={};window.socketAttempts={};window.fail=false;window.outsideClicks=0;
 const fresh=new URLSearchParams(location.search).has('fresh');
 const tabs=(fresh?['fresh']:['first','second']).map(id=>({id,label:id,renamed:true,runtime:'codex',cwd:'/workspace'}));
 localStorage.setItem('mew:agent-tabs:'+JSON.stringify('/workspace'),JSON.stringify(tabs));
@@ -33,7 +33,7 @@ if(!fresh)writeAgentEventCache('codex','first','/workspace',{sessionId:'first',e
 onMewcatNotice(notice=>window.notices.push(notice));
 class Socket {
  static OPEN=1;readyState=0;
- constructor(url){this.tab=new URL(url).searchParams.get('tab');window.sockets[this.tab]=this;if(window.fail)setTimeout(()=>this.close(),20)}
+ constructor(url){this.tab=new URL(url).searchParams.get('tab');window.socketAttempts[this.tab]=(window.socketAttempts[this.tab]||0)+1;if(window.throwSocket)throw new Error('Socket construction unavailable');window.sockets[this.tab]=this;if(window.fail)setTimeout(()=>this.close(),20)}
  emit(value){this.onmessage?.({data:JSON.stringify(value)})}
  open(restore=true){this.readyState=1;this.onopen?.();if(!restore)return;this.emit({type:'replay',restored:true,events:[{type:'update',update:{sessionUpdate:'user_message_chunk',content:{type:'text',text:'Saved conversation'}}}]});this.emit({type:'meta',meta:{sessionId:this.tab,startedAt:new Date().toISOString(),turns:1,busy:false,queued:[],usage:null,canLoad:true,canList:true}})}
  send(raw){if(this.readyState!==1)throw new Error('sent while disconnected');const message=JSON.parse(raw);window.messages.push(message);if(message.type==='clear_session'){window.clearTabs.push(this.tab);window.clearFeedbackAtSend=document.querySelector('[data-agent-session]:not([hidden]) [data-agent-clear-feedback]')?.dataset.agentClearFeedback;if(!window.holdClear){this.clearCount=(this.clearCount||0)+1;this.emit({type:'meta',meta:{sessionId:this.tab,busy:true,queued:Array(this.clearCount).fill('/clear'),queuedKinds:Array(this.clearCount).fill('clear'),canLoad:true,canList:true}})}}}
@@ -66,7 +66,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
   }] })
   const chunk = bundle.output.find(item => item.type === 'chunk')!
   const compiler = await compile(await fs.readFile(`${root}/src/index.css`, 'utf8'), { base: `${root}/src`, onDependency() {} })
-  const content = (await Promise.all(['src/components/AgentPanel.tsx', 'src/components/MentionTextarea.tsx', 'src/components/DockWorkspace.tsx'].map(file => fs.readFile(`${root}/${file}`, 'utf8')))).join('\n')
+  const content = (await Promise.all(['src/components/AgentPanel.tsx', 'src/components/MentionTextarea.tsx', 'src/components/DockWorkspace.tsx', 'packages/ui/src/panel-notice.tsx'].map(file => fs.readFile(`${root}/${file}`, 'utf8')))).join('\n')
   const css = compiler.build([...new Set((source + content).match(/[A-Za-z0-9_@!:/.[\]()%,-]+/g))])
     + await fs.readFile(`${root}/packages/ui/src/loading-indicator.css`, 'utf8')
   const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
@@ -106,7 +106,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
       const overlay = page.locator('[data-agent-loading]:visible')
       await overlay.waitFor().catch(error => { throw new Error(`${error.message}\n${JSON.stringify(errors)}`) })
       assert.equal(await overlay.evaluate(el => el.ownerDocument.defaultView!.getComputedStyle(el).backgroundColor), 'rgba(0, 0, 0, 0)', 'loading overlay lets the panel background show through')
-      assert.equal(await overlay.getByRole('status').getAttribute('aria-label'), '연결 중…')
+      assert.equal(await overlay.getByRole('status').getAttribute('aria-label'), '불러오는 중…')
       assert.equal(await overlay.locator('.mew-loading-dot').count(), 3)
       assert.equal(await overlay.locator('.mew-loading-logo').count(), 0, 'conversation loading uses quiet dots instead of the entry logo')
       assert.equal(await overlay.locator('.animate-spin').count(), 0)
@@ -313,7 +313,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
       assert.equal(await page.evaluate('window.messages.length'), sentBefore)
       assert.equal(await composerValue(draft), 'Edited while connecting')
       assert.equal(await session.getByText('Saved conversation', { exact: true }).count(), 1)
-      await page.clock.runFor(12_000)
+      await page.clock.runFor(9000)
       assert.deepEqual(await page.evaluate('window.notices'), [], 'even prolonged retry failure produces no notification or sound/desktop delivery')
       await page.screenshot({ path: `/tmp/mew-agent-connection-${width}-${dark ? 'dark' : 'light'}.png` })
       await page.getByRole('tab', { name: 'second', exact: false }).click()
@@ -328,6 +328,27 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
       assert.equal(await composerValue(draft), 'Edited while connecting')
       assert.equal(await session.locator('[inert]').count(), 0)
       assert.equal(await send.isEnabled(), true)
+      const previousAttempts = await page.evaluate<number>('window.socketAttempts.first')
+      await page.evaluate('window.fail=true;window.sockets.first.close()')
+      await overlay.waitFor()
+      assert.equal(await session.getByRole('alert').count(), 0, 'recoverable connection loss only shows loading')
+      await page.clock.runFor(15_000)
+      await session.getByRole('alert').filter({ hasText: '다시 연결하지 못했습니다.' }).waitFor()
+      assert.equal(await session.locator('[data-agent-loading]').count(), 0, 'exhausted recovery does not keep loading')
+      assert.equal(await page.evaluate('window.socketAttempts.first'), previousAttempts + 11, 'allow eleven automatic attempts after the initial loss')
+      await page.clock.runFor(5000)
+      assert.equal(await page.evaluate('window.socketAttempts.first'), previousAttempts + 11, 'exhausted recovery waits for an explicit retry')
+      await page.evaluate('window.fail=false;window.throwSocket=true;window.previousSocket=window.sockets.first')
+      await session.getByRole('button', { name: '다시 연결', exact: true }).click()
+      await page.waitForFunction(`window.socketAttempts.first===${previousAttempts + 12}`)
+      await overlay.waitFor()
+      assert.equal(await session.getByRole('alert').count(), 0, 'a thrown socket constructor is recovered without a false failure alert')
+      await page.evaluate('window.throwSocket=false')
+      await page.clock.runFor(1000)
+      await page.waitForFunction('window.sockets.first!==window.previousSocket')
+      await page.evaluate('window.sockets.first.open()')
+      await overlay.waitFor({ state: 'hidden' })
+      assert.equal(await composerValue(draft), 'Edited while connecting', 'terminal connection errors preserve the unsent draft')
       await send.click()
       assert.equal(await page.evaluate('window.messages.at(-1).text'), 'Edited while connecting')
       assert.equal(await composerValue(draft), '')
@@ -335,8 +356,14 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
       const openHistory = async (id: string) => {
         await session.getByRole('button', { name: '히스토리', exact: true }).click()
         await session.getByRole('region', { name: '지난 세션' }).locator('.agent-loading-bubbles[data-compact="true"]').waitFor()
-        await session.getByLabel('세션 ID', { exact: true }).fill(id)
-        await session.getByRole('button', { name: '열기', exact: true }).click()
+        await session.getByRole('textbox', { name: '대화 검색', exact: true }).fill(id)
+        await session.getByRole('button', { name: '검색', exact: true }).click()
+        await page.evaluate(id => {
+          const fixture = globalThis as unknown as { messages: { type: string; query?: string; requestId?: string }[]; sockets: { first: { emit: (event: object) => void } } }
+          const request = fixture.messages.findLast(message => message.type === 'list_sessions' && message.query === id)!
+          fixture.sockets.first.emit({ type: 'sessions', requestId: request.requestId, sessions: [{ sessionId: id, title: id, cwd: '/workspace', updatedAt: null }] })
+        }, id)
+        await session.getByRole('button', { name: id, exact: false }).click()
         await overlay.waitFor()
         assert.equal(await session.locator('[data-agent-conversation]').getAttribute('aria-busy'), 'true')
         assert.equal(await send.isDisabled(), true)

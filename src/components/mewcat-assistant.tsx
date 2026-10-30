@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { ArrowUp, Settings, Square } from 'iconoir-react'
-import { SelectField } from '@mew/ui'
+import { LoadingIndicator, SelectField } from '@mew/ui'
 import { useI18n } from '../i18n'
 import { fetchAgentRuntimes, type AgentRuntimeStatus } from '../api/client'
 import type { MewcatAssistantState } from '../hooks/use-mewcat-assistant'
@@ -52,7 +52,8 @@ export function MewcatAssistant({ state, runtime, onConnect, onRuntimeChange }: 
       <div className="mewcat-assistant-conversation space-y-2" role="log" aria-label={t('mewcat.assistant.title')} aria-live="polite" aria-relevant="additions">
         {state.messages.map((message, index) => <p key={index} className={`whitespace-pre-wrap break-words rounded-lg px-2.5 py-2 text-xs leading-5 ${message.role === 'user' ? 'ml-5 bg-surface-raised text-ink-secondary' : 'mr-3 bg-surface-hover text-ink'}`}>{message.text}</p>)}
       </div>
-      {(state.busy || (!state.ready && !state.error)) && <p role="status" className="my-2 text-xs text-ink-secondary">{state.action ? t(`mewcat.assistant.${state.action}`) : t(state.busy ? 'mewcat.assistant.thinking' : 'mewcat.assistant.preparing')}</p>}
+      {state.connecting && <div role="status" aria-label={t('common.loading')} className="my-2 flex justify-center text-ink-secondary"><LoadingIndicator size={20} /></div>}
+      {state.busy && <p role="status" className="my-2 text-xs text-ink-secondary">{state.action ? t(`mewcat.assistant.${state.action}`) : t('mewcat.assistant.thinking')}</p>}
       {state.permission && <div className="my-2 space-y-2" role="alert">
         <p className="text-xs text-ink">{t('mewcat.assistant.permission')}</p>
         <p className="break-words text-xs text-ink-secondary">{state.permission.toolCall.title}</p>

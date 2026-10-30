@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { MewcatAction, MewcatActionRequest } from '../../shared/mewcat-assistant'
 import type { AgentEvent } from '../utils/agentFold'
 import { useI18n } from '../i18n'
+import { AUTOMATIC_RETRY_LIMIT } from '../utils/recovery-policy'
 
 export interface AssistantMessage { role: 'user' | 'assistant'; text: string }
 export function appendAssistantEvent(messages: AssistantMessage[], event: AgentEvent): AssistantMessage[] {
@@ -32,8 +33,10 @@ export function useMewcatAssistant(options: MewcatAssistantOptions) {
   const socket = useRef<WebSocket | null>(null)
   const needsAuth = useRef(false)
   const browserIdentity = useRef<{ account: string; id: string } | null>(null)
+  const messageScope = useRef<string | null>(null)
   const [messages, setMessages] = useState<AssistantMessage[]>([])
   const [ready, setReady] = useState(false)
+  const [connecting, setConnecting] = useState(false)
   const [busy, setBusy] = useState(false)
   const [login, setLogin] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -45,7 +48,9 @@ export function useMewcatAssistant(options: MewcatAssistantOptions) {
     socket.current.send(JSON.stringify(message)); return true
   }
   useEffect(() => {
-    setMessages([]); setReady(false); setBusy(false); setLogin(false); setError(null); setPermission(null); needsAuth.current = false
+    const scope = JSON.stringify([options.account, options.runtime, options.enabled])
+    if (messageScope.current !== scope) { messageScope.current = scope; setMessages([]) }
+    setReady(false); setConnecting(false); setBusy(false); setLogin(false); setError(null); setPermission(null); needsAuth.current = false
     if (!options.enabled || !options.runtime) return
     let closed = false, terminal = false, attempts = 0
     let ws: WebSocket | null = null, reconnectTimer: ReturnType<typeof setTimeout> | undefined
@@ -63,7 +68,7 @@ export function useMewcatAssistant(options: MewcatAssistantOptions) {
       if (event.type === 'meta') {
         needsAuth.current = false
         attempts = 0
-        setReady(true); setLogin(false); setBusy(event.meta.busy); setError(value => value === 'MEWCAT_CONNECTION_FAILED' || value === 'MEWCAT_DISCONNECTED' ? null : value)
+        setReady(true); setConnecting(false); setLogin(false); setBusy(event.meta.busy)
         if (event.meta.sessionId) {
           query.set('resume', event.meta.sessionId)
           try { scopedBrowserStorage().setItem(sessionKey, event.meta.sessionId) } catch { /* No persistence. */ }
@@ -71,9 +76,9 @@ export function useMewcatAssistant(options: MewcatAssistantOptions) {
       }
       if (event.type === 'turn_start') { setBusy(true); setError(null) }
       if (event.type === 'turn_end') { setBusy(false); setAction(null) }
-      if (event.type === 'auth') { needsAuth.current = true; setLogin(true); setReady(false) }
+      if (event.type === 'auth') { needsAuth.current = true; setLogin(true); setReady(false); setConnecting(false) }
       if (event.type === 'auth_complete') setLogin(false)
-      if (event.type === 'error') { setError(event.message); setBusy(false) }
+      if (event.type === 'error') { setError(event.message); setBusy(false); setConnecting(false) }
       if (event.type === 'permission') setPermission(event)
       if (event.type === 'permission_done') setPermission(current => current?.id === event.id ? null : current)
       setMessages(current => appendAssistantEvent(current, event))
@@ -83,14 +88,19 @@ export function useMewcatAssistant(options: MewcatAssistantOptions) {
     }
     const canReconnect = () => !closed && !terminal && (!isRemoteMode() || !!activeRemoteTransport())
     const scheduleReconnect = () => {
-      if (!canReconnect() || reconnectTimer !== undefined) return
+      if (closed || terminal || reconnectTimer !== undefined) return
+      if (attempts >= AUTOMATIC_RETRY_LIMIT) {
+        terminal = true; setConnecting(false); setError(value => value ?? 'MEWCAT_CONNECTION_FAILED'); return
+      }
+      setConnecting(true)
       reconnectTimer = setTimeout(() => { reconnectTimer = undefined; connect() }, Math.min(15_000, 500 * 2 ** Math.min(attempts++, 5)))
     }
     const connect = () => {
       if (!canReconnect()) return
+      setConnecting(true)
       let current: WebSocket
       try { current = openMewSocket(`${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/api/agent/ws?${query}`) }
-      catch { setError('MEWCAT_CONNECTION_FAILED'); scheduleReconnect(); return }
+      catch { scheduleReconnect(); return }
       ws = current; socket.current = current
       current.onopen = () => { if (!closed && ws === current) current.send(JSON.stringify(context())) }
       current.onmessage = raw => {
@@ -107,20 +117,19 @@ export function useMewcatAssistant(options: MewcatAssistantOptions) {
             if (!closed && ws === current && current.readyState === WebSocket.OPEN) current.send(JSON.stringify({ type: 'mewcat_action_result', id: request.id, ok: false }))
             if (!closed && ws === current) setError('MEWCAT_ACTION_FAILED')
           }).finally(() => { if (!closed && ws === current) setAction(null) })
-        } else if (message.type === 'fatal') { terminal = true; setError(message.message ?? 'MEWCAT_CONNECTION_FAILED'); setReady(false); setBusy(false) }
+        } else if (message.type === 'fatal') { terminal = true; setConnecting(false); setError(message.message ?? 'MEWCAT_CONNECTION_FAILED'); setReady(false); setBusy(false) }
         else receive(message)
       }
-      current.onerror = () => { if (!closed && ws === current) setError('MEWCAT_CONNECTION_FAILED') }
       current.onclose = () => {
         if (closed || ws !== current) return
         ws = null; if (socket.current === current) socket.current = null
-        setReady(false); setBusy(false); setAction(null); setError(value => value ?? 'MEWCAT_DISCONNECTED')
+        setReady(false); setBusy(false); setAction(null)
         scheduleReconnect()
       }
     }
     const reconnectNow = () => {
-      if (!canReconnect() || ws && ws.readyState <= WebSocket.OPEN) return
-      clearTimeout(reconnectTimer); reconnectTimer = undefined; attempts = 0; connect()
+      if (!canReconnect() || ws) return
+      clearTimeout(reconnectTimer); reconnectTimer = undefined; connect()
     }
     const onVisible = () => { if (document.visibilityState === 'visible') reconnectNow() }
     window.addEventListener('mew:mewcat-agent-ready', runtimeReady)
@@ -130,7 +139,7 @@ export function useMewcatAssistant(options: MewcatAssistantOptions) {
     return () => { closed = true; clearTimeout(reconnectTimer); window.removeEventListener('mew:mewcat-agent-ready', runtimeReady); window.removeEventListener('online', reconnectNow); document.removeEventListener('visibilitychange', onVisible); ws?.close(); if (socket.current === ws) socket.current = null }
   }, [options.account, options.enabled, options.runtime, retry])
   useEffect(() => { send({ type: 'mewcat_context', context: { projectRoot: options.projectRoot, locale } }) }, [options.projectRoot, locale])
-  return { messages, ready, busy, login, error, permission, action,
+  return { messages, ready, connecting, busy, login, error, permission, action,
     ask: (text: string) => {
       if (!ready || busy || !text.trim()) return false
       setBusy(true); setError(null)

@@ -3,6 +3,7 @@ import { PanelCloseButton } from './panel-close-button'
 import { useEffect, useRef } from 'react'
 import { Notes } from 'iconoir-react'
 import { Editor, type EditorHandle } from '@mew/editor'
+import { LoadingIndicator } from '@mew/ui'
 import { uiText } from '@mew/ui/i18n-core'
 import { useUiLocale } from '@mew/ui/i18n'
 import { editorApi } from '../api/client'
@@ -28,6 +29,7 @@ export function SharedMemo({ session, open }: { session: SharedMemoSession; open
       <DockGrip group="memo" />
       <div role="tab" aria-selected="true" tabIndex={0} className="flex min-w-0 flex-1 items-center gap-1.5 px-2.5 text-xs text-ink">
         <Notes width={14} height={14} aria-hidden="true" /><span>{uiText('메모')}</span><PresenceDots colors={colors} />
+        {activated && !collab?.connected && <span role="status" aria-label={uiText('불러오는 중…')} className="inline-flex text-ink-muted"><LoadingIndicator size={12} /></span>}
       </div>
       <div className="flex overflow-hidden rounded border border-edge-strong">
         {(['hotview', 'plain'] as const).map(mode => <button key={mode} type="button"
@@ -43,7 +45,6 @@ export function SharedMemo({ session, open }: { session: SharedMemoSession; open
       <PanelCloseButton onClick={close} aria-label={uiText('닫기')} />
     </header>
     <DockInlineBody group="memo" className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      {activated && !collab?.connected && <div role="status" className="px-3 py-2 text-xs text-ink-muted">{uiText(collab?.synced ? '재연결 중…' : '연결 중…')}</div>}
       <div className="min-h-0 flex-1">
         {/* Keep the same Y.XmlFragment connected in both views; CodePane must not create a separate Y.Text. */}
         <div hidden={viewMode !== 'hotview'} className="h-full">

@@ -9,12 +9,13 @@ import { domBrowserExecutable } from './browser-dom-executable.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 
-test('terminal extra keys fill one row above the composer and send keys without losing its draft or focus', { skip: !domBrowserExecutable(), timeout: 30_000 }, async () => {
+test('terminal recovery stays neutral and extra keys preserve the composer draft and focus', { skip: !domBrowserExecutable(), timeout: 30_000 }, async () => {
   const source = `import React from '${root}/node_modules/react/index.js';
 import {createRoot} from '${root}/node_modules/react-dom/client.js';
 import {TmuxTerminal} from '${root}/packages/tmux-term/src/TmuxTerminal.tsx';
 window.inputs=[];
-class Socket {static OPEN=1;readyState=1;constructor(){setTimeout(()=>{this.onopen?.();this.onmessage?.({data:'$ terminal ready\\r\\n'})},10)}send(data){const value=JSON.parse(data);if(value.type==='input')window.inputs.push(value.data)}close(){this.readyState=3}}
+window.sockets=[];
+class Socket {static OPEN=1;readyState=0;constructor(){window.sockets.push(this)}connect(){this.readyState=1;this.onopen?.();this.onmessage?.({data:'$ terminal ready\\r\\n'})}disconnect(){this.readyState=3;this.onclose?.()}send(data){const value=JSON.parse(data);if(value.type==='input')window.inputs.push(value.data)}close(){this.readyState=3}}
 window.WebSocket=Socket;
 createRoot(document.getElementById('root')).render(<TmuxTerminal sessionName="keybar-fixture" inputPlaceholder="Message"/>);`
   const bundle = await build({ input: 'virtual:keys.tsx', write: false, platform: 'browser', output: { format: 'iife', codeSplitting: false }, transform: { jsx: 'react-jsx', define: { 'process.env.NODE_ENV': JSON.stringify('test') } }, plugins: [{ name: 'fixture', resolveId(id) { if (id === 'virtual:keys.tsx') return id; if (id.endsWith('.css')) return 'virtual:style' }, load(id) { if (id === 'virtual:keys.tsx') return source; if (id === 'virtual:style') return '' } }] })
@@ -22,7 +23,7 @@ createRoot(document.getElementById('root')).render(<TmuxTerminal sessionName="ke
   const compiler = await compile(await fs.readFile(`${root}/src/index.css`, 'utf8'), { base: `${root}/src`, onDependency() {} })
   const content = (await Promise.all(['packages/tmux-term/src/TmuxTerminal.tsx', 'packages/mobile-keys/src/MobileKeyBar.tsx', 'packages/ui/src/HoverTipLayer.tsx'].map(file => fs.readFile(`${root}/${file}`, 'utf8')))).join('\n')
   const css = compiler.build([...new Set((source + content).match(/[A-Za-z0-9_@:/.[\]()%,-]+/g))])
-  const xterm = (await Promise.all(['node_modules/@xterm/xterm/css/xterm.css', 'packages/tmux-term/src/terminal.css'].map(file => fs.readFile(`${root}/${file}`, 'utf8')))).join('\n')
+  const xterm = (await Promise.all(['node_modules/@xterm/xterm/css/xterm.css', 'packages/tmux-term/src/terminal.css', 'packages/ui/src/loading-indicator.css'].map(file => fs.readFile(`${root}/${file}`, 'utf8')))).join('\n')
   const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
   try {
     const page = await browser.newPage({ viewport: { width: 390, height: 700 }, hasTouch: true })
@@ -33,8 +34,24 @@ createRoot(document.getElementById('root')).render(<TmuxTerminal sessionName="ke
     await page.goto('http://mew-keys.test/')
     const bar = page.locator('[data-mobile-key-bar]')
     await bar.waitFor()
+    const loading = page.getByRole('status', { name: '불러오는 중…', exact: true })
+    await loading.waitFor()
+    assert.equal(await loading.innerText(), '', 'initial terminal connection shows only an indicator')
+    assert.equal(await loading.locator('.mew-loading-dots').count(), 1)
+    await page.evaluate('window.sockets[0].connect()')
+    await loading.waitFor({ state: 'detached' })
     const draft = page.getByPlaceholder('Message')
     await draft.fill('keep this draft')
+    await page.evaluate('window.sockets[0].disconnect()')
+    await loading.waitFor()
+    assert.equal(await loading.innerText(), '', 'automatic terminal recovery has no reconnect warning')
+    assert.equal(await page.getByRole('alert').count(), 0)
+    assert.equal(await draft.inputValue(), 'keep this draft')
+    await page.evaluate('window.dispatchEvent(new Event("online"))')
+    assert.equal(await page.evaluate('window.sockets.length'), 2)
+    await page.evaluate('window.sockets[1].connect()')
+    await loading.waitFor({ state: 'detached' })
+    assert.equal(await draft.inputValue(), 'keep this draft', 'successful recovery keeps the pending input')
     for (const [label, sequence] of [['Home', '\x1b[H'], ['End', '\x1b[F'], ['Ctrl+C', '\x03'], ['Esc', '\x1b'], ['Tab', '\t'], ['←', '\x1b[D']]) {
       await bar.getByRole('button', { name: label, exact: true }).tap()
       assert.equal(await page.evaluate('window.inputs.at(-1)'), sequence)
