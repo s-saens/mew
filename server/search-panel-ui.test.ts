@@ -146,6 +146,11 @@ test('explorer search filters file and document trees with contextual content pr
             assert.equal(fieldStyle.borderWidth, '0px', 'the search field has no enclosing border')
             assert.equal(fieldStyle.background, 'rgba(0, 0, 0, 0)', 'the search field uses the panel background')
             assert.equal(fieldStyle.radius, '0px', 'the search field has no rounded container')
+            assert.equal(await searchBar.locator('input').getAttribute('placeholder'), null, 'search uses an icon instead of placeholder text in either mode')
+            const searchIcon = searchBar.locator('input').locator('..').locator(':scope > svg[aria-hidden="true"]')
+            assert.equal(await searchIcon.count(), 1, 'one decorative search icon identifies the input')
+            const iconBox = (await searchIcon.boundingBox())!, inputBox = (await searchBar.locator('input').boundingBox())!
+            assert.ok(iconBox.width > 0 && iconBox.x + iconBox.width <= inputBox.x, 'the search icon stays before the editable input')
             const bounds = await searchBar.locator('input, button').evaluateAll(elements => elements.map(el => {
               const rect = el.getBoundingClientRect()
               return { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom, width: rect.width, height: rect.height }

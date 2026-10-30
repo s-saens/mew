@@ -1,6 +1,6 @@
 ---
 title: "Unified explorer search box and hierarchical results"
-description: "Records the explorer's unified search box, hierarchical results, context tooltips, restored Documents/Files toggle, right-side close button, and the 2026-10-30 corrections for literal filename queries and a borderless 36px search header aligned with panel tab bars. Distinguishes local verification and earlier documentation errors from application to the running instance."
+description: "Records the explorer's unified search box, hierarchical results, context tooltips, restored Documents/Files toggle, right-side close button, and the 2026-10-30 corrections for literal filename queries and a borderless 36px search header aligned with panel tab bars, and a search icon replacing placeholder text. Distinguishes local verification and earlier documentation errors from application to the running instance."
 created: "2026-10-29"
 updated: "2026-10-30"
 ---
@@ -60,3 +60,9 @@ Verification:
 - `npm run check:docs` passed with 561 descriptions and no description or local-link errors. `git diff --check` passed.
 
 No app build, deployment, launcher execution, or runtime server changes were performed. The user must build and apply the changes to update the running instance.
+
+## Search icon instead of placeholder text
+
+On 2026-10-30, replaced filename and content search placeholder text with one decorative magnifying-glass icon from the existing icon library. The input keeps its translated, mode-specific accessible name and keyboard focus behavior. The icon remains before the input with or without a query; the 36px header and existing search controls are preserved. Current behavior is defined in the [feature contract](../features/projects-files-search/filename-content-search-and-replacement.md).
+
+Verification: `node --test server/search-panel-ui.test.ts` passed across the four desktop/mobile and Files/Documents combinations, including new assertions for no placeholder text and one visible, decorative icon before the input in both search modes. Existing search, clear, close, focus, and compact geometry checks passed. Reviewed isolated desktop/mobile screenshots with mocked responses. `npx tsc -b`, targeted oxlint (five existing warnings), the layout detector, `npm run check:docs` (562 descriptions and no errors), and `git diff --check` passed. No app build, deployment, launcher execution, or server changes were performed; application to the running instance remains the user's step.

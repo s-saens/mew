@@ -1,12 +1,12 @@
 import { canAutoFocusInput, HoverTipLayer, useDialog } from '@mew/ui'
 import { uiText } from '@mew/ui/i18n-core'
 import { useUiLocale } from '@mew/ui/i18n'
+import { Search } from 'iconoir-react'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { replaceInProjectFile, searchFileNames, searchProjectStream, type SearchFileResult, type SearchMatch, type SearchOptions } from '../api/client'
 import type { ExplorerSearch } from '../utils/explorer-search'
 import { ProjectIcon } from './ProjectIcon'
 import { PanelCloseButton } from './panel-close-button'
-import { useI18n } from '../i18n'
 
 export interface SearchScopeOption { id: string; label: string; icon: string }
 
@@ -28,7 +28,6 @@ export function SearchPanel({ focusSignal, readOnly, project, scope, scopes, mod
   children: (search: ExplorerSearch | undefined) => ReactNode
 }) {
   useUiLocale()
-  const { t } = useI18n()
   const dialogs = useDialog()
   const [query, setQuery] = useState('')
   const [replace, setReplace] = useState('')
@@ -146,8 +145,8 @@ export function SearchPanel({ focusSignal, readOnly, project, scope, scopes, mod
     <HoverTipLayer className="shrink-0" placement="bottom">
       <div data-explorer-search-bar className="flex h-9 min-w-0 items-center gap-1 border-b border-edge pl-1">
       <div className="relative flex min-w-0 flex-1 items-center gap-0.5">
+        <Search width={14} height={14} className="ml-1 shrink-0 text-ink-muted" aria-hidden="true" />
         <input ref={inputRef} value={query} onChange={event => setQuery(event.target.value)}
-          placeholder={mode === 'files' ? t('search.fileNamePlaceholder') : t('search.fileContentPlaceholder')}
           aria-label={uiText(mode === 'files' ? '파일명 검색' : '파일 내용 검색')}
           onKeyDown={event => {
             if (event.key === '@' && scope === 'root' && scopes.length) { event.preventDefault(); setScopeMenuOpen(true) }
