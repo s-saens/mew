@@ -3,7 +3,7 @@ import path from 'node:path'
 import { isDbConfigured, exec } from './pool.ts'
 import { getView } from './databaseService.ts'
 import { projectRoot, resolveProjectPath } from '../paths.ts'
-import { withRowPageDraft, RowPageError, hasDatabasePageBinding } from './rowPages.ts'
+import { withRowPageDraft, withDeferredRowPageMoves, RowPageError, hasDatabasePageBinding } from './rowPages.ts'
 import type { DocumentPageMove } from '../../shared/document-pages.ts'
 import { remapPagePath } from '../../shared/document-pages.ts'
 
@@ -59,7 +59,7 @@ export async function refreshDatabaseRowPages(project: string, paths: readonly s
     } catch { /* Optional DB outages must not break the file tree. */ }
   }
   for (const id of ids) {
-    try { await getView(project, id) }
+    try { await withDeferredRowPageMoves(() => getView(project, id)) }
     catch (error) { console.error('[mew] database page sync:', (error as Error).message) }
   }
 }

@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { collectDatabasePageMutations, registerDatabasePageMutations, withDatabasePageMutations } from './database-page-mutations.ts'
+import { collectDatabasePageMutations, previewDatabasePageTitle, registerDatabasePageMutations, withDatabasePageMutations } from './database-page-mutations.ts'
 
 const mutation = { path: 'Books/_Books.md', moves: [{ from: 'Books.md', to: 'Books/_Books.md' }], changed: ['Books.md', 'Books/_Books.md'] }
 
@@ -36,4 +36,21 @@ test('queued DB requests do not run against a replacement workspace', async () =
   release()
   await first
   await rejected
+})
+
+test('database title previews use their captured host scope without saving or requesting', () => {
+  const events: string[] = []
+  const unregister = registerDatabasePageMutations({
+    async prepare() { assert.fail('a title preview must not flush drafts') },
+    apply() { assert.fail('a title preview must not apply a path mutation') },
+    previewTitle(project, path, title) {
+      events.push(`${project}:${path}:${title}`)
+      return confirmed => { events.push(`confirmed:${confirmed}`) }
+    },
+  })
+  const finish = previewDatabasePageTitle('nested/project', 'Books/Old.md', 'Typing')
+  unregister()
+  finish('Saved')
+  previewDatabasePageTitle('docs', 'Other.md', 'Ignored')()
+  assert.deepEqual(events, ['nested/project:Books/Old.md:Typing', 'confirmed:Saved'])
 })

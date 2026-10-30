@@ -2,7 +2,7 @@ import { uiText } from '@mew/ui/i18n-core'
 // /db 뷰의 서버 연동·실시간 상태를 캡슐화한 훅 — TipTap 노드뷰(DatabaseView)와
 // 독립 패널(DatabasePanel, 전체 DB 팝업용)이 같은 로직을 공유하도록 분리했다.
 // 렌더는 DatabaseTable이, 순수 상태 계산은 databaseState.ts가 담당한다.
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { DbColumn, DbColumnType, DbRow, DbView, EditorDbApi } from '../types'
 import { applyDbEvent, setCell } from './databaseState'
 
@@ -17,6 +17,13 @@ export const TYPE_LABELS: Record<DbColumnType, string> = {
   get page() { return uiText("페이지") },
 }
 export const ADD_TYPES: DbColumnType[] = ['text', 'number', 'checkbox', 'date', 'select', 'multi_select']
+
+type PageTitleDraft = { value: string; baseline: string; finish: (confirmedTitle?: string) => void }
+
+function withPagePaths(view: DbView, confirmed: DbView): DbView {
+  const rows = new Map(confirmed.rows.map(row => [row.id, row]))
+  return { ...view, rows: view.rows.map(row => rows.has(row.id) ? { ...row, pagePath: rows.get(row.id)!.pagePath } : row) }
+}
 
 export interface DatabaseController {
   view: DbView | null
@@ -46,6 +53,25 @@ export function useDatabaseView(api: EditorDbApi | null, dbId: string | null, re
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [changingColumn, setChangingColumn] = useState<string | null>(null)
+  const viewRef = useRef(view)
+  const scope = useMemo(() => ({ api, dbId }), [api, dbId])
+  const scopeRef = useRef(scope)
+  const pageTitleDrafts = useRef(new Map<string, PageTitleDraft>())
+  const pagePathReadSequence = useRef(0)
+
+  useLayoutEffect(() => { viewRef.current = view; scopeRef.current = scope }, [view, scope])
+
+  useEffect(() => {
+    const drafts = pageTitleDrafts.current = new Map<string, PageTitleDraft>()
+    return () => { for (const draft of drafts.values()) draft.finish(draft.baseline) }
+  }, [api, dbId])
+
+  const retainPageTitleDrafts = useCallback((next: DbView): DbView => {
+    const primary = next.columns[0]
+    if (primary?.type !== 'page') return next
+    for (const [rowId, draft] of pageTitleDrafts.current) next = setCell(next, rowId, primary.id, draft.value)
+    return next
+  }, [])
 
   // 최초 로드
   useEffect(() => {
@@ -54,11 +80,12 @@ export function useDatabaseView(api: EditorDbApi | null, dbId: string | null, re
       return
     }
     let cancelled = false
+    const sequence = ++pagePathReadSequence.current
     setLoading(true)
     api
       .getView(dbId)
       .then((v) => {
-        if (!cancelled) {
+        if (!cancelled && sequence === pagePathReadSequence.current) {
           setView(v)
           setError(null)
         }
@@ -79,14 +106,18 @@ export function useDatabaseView(api: EditorDbApi | null, dbId: string | null, re
     if (!dbId || !api) return
     let cancelled = false
     const unsubscribe = api.subscribe(dbId, (event) => {
-      setView((prev) => (prev ? applyDbEvent(prev, event) : prev))
-      if (event.type === 'schema') {
-        void api.getView(dbId).then(next => { if (!cancelled) setView(next) })
+      setView((prev) => (prev ? retainPageTitleDrafts(applyDbEvent(prev, event)) : prev))
+      const primary = viewRef.current?.columns[0]
+      if (event.type === 'schema' || event.type === 'row.update' && primary?.type === 'page' && event.columnId === primary.id) {
+        const sequence = ++pagePathReadSequence.current
+        void api.getView(dbId).then(next => {
+          if (!cancelled && sequence === pagePathReadSequence.current) setView(prev => event.type === 'schema' || !prev ? retainPageTitleDrafts(next) : withPagePaths(prev, next))
+        })
           .catch(e => { if (!cancelled) setError(e instanceof Error ? e.message : uiText("데이터베이스를 불러오지 못했습니다")) })
       }
     })
     return () => { cancelled = true; unsubscribe() }
-  }, [dbId, api])
+  }, [dbId, api, retainPageTitleDrafts])
 
   // 참조(readonly)거나 external이면 편집 UI를 전부 감춘다 — 원본은 다른 노드/패널에서 편집한다
   const editable = (view?.editable ?? false) && !readonly
@@ -94,21 +125,63 @@ export function useDatabaseView(api: EditorDbApi | null, dbId: string | null, re
   const commitCell = useCallback(
     async (rowId: string, columnId: string, value: unknown) => {
       if (!api || !dbId) return
+      const primary = viewRef.current?.columns[0]
+      const pageTitle = primary?.type === 'page' && primary.id === columnId
+      const draft = pageTitle ? pageTitleDrafts.current.get(rowId) : undefined
       try {
         const saved = await api.updateCell(dbId, rowId, columnId, value)
-        setView(prev => prev ? setCell(prev, rowId, columnId, saved) : prev)
+        if (scopeRef.current !== scope) return
+        const currentDraft = pageTitleDrafts.current.get(rowId)
+        const newer = pageTitle && currentDraft !== draft && currentDraft !== undefined
+        if (pageTitle) {
+          draft?.finish(String(saved ?? ''))
+          if (currentDraft === draft) pageTitleDrafts.current.delete(rowId)
+          else if (currentDraft) currentDraft.baseline = String(saved ?? '')
+        }
+        setView(prev => prev && !newer ? setCell(prev, rowId, columnId, saved) : prev)
         setError(null)
+        if (pageTitle) {
+          const sequence = ++pagePathReadSequence.current
+          try {
+            const confirmed = await api.getView(dbId)
+            if (scopeRef.current === scope && sequence === pagePathReadSequence.current) setView(prev => prev ? withPagePaths(prev, confirmed) : prev)
+          } catch (e) {
+            if (scopeRef.current === scope && sequence === pagePathReadSequence.current) setError(e instanceof Error ? e.message : uiText("데이터베이스를 불러오지 못했습니다"))
+          }
+        }
       } catch (e) {
+        if (scopeRef.current !== scope) return
         setError(e instanceof Error ? e.message : uiText("저장 실패"))
-        try { setView(await api.getView(dbId)) } catch { /* Keep the editable draft when reloading also fails. */ }
+        const sequence = ++pagePathReadSequence.current
+        let confirmed: DbView | undefined
+        try { confirmed = await api.getView(dbId) } catch { /* Keep the editable draft when reloading also fails. */ }
+        if (scopeRef.current !== scope) return
+        if (pageTitle) {
+          const confirmedTitle = confirmed?.rows.find(row => row.id === rowId)?.cells[columnId] ?? draft?.baseline
+          draft?.finish(confirmedTitle === undefined ? undefined : String(confirmedTitle))
+          if (pageTitleDrafts.current.get(rowId) === draft) {
+            pageTitleDrafts.current.delete(rowId)
+            if (confirmedTitle !== undefined) setView(prev => prev ? setCell(prev, rowId, columnId, confirmedTitle) : prev)
+          }
+          if (confirmed && sequence === pagePathReadSequence.current) setView(prev => prev ? withPagePaths(prev, confirmed) : prev)
+        } else if (confirmed && sequence === pagePathReadSequence.current) setView(retainPageTitleDrafts(confirmed))
       }
     },
-    [api, dbId],
+    [api, dbId, scope, retainPageTitleDrafts],
   )
 
   const localCell = useCallback((rowId: string, columnId: string, value: unknown) => {
+    const current = viewRef.current, row = current?.rows.find(item => item.id === rowId)
+    if (current?.kind === 'managed' && current.columns[0]?.type === 'page' && current.columns[0].id === columnId && row?.pagePath) {
+      const title = String(value ?? ''), previous = pageTitleDrafts.current.get(rowId)
+      pageTitleDrafts.current.set(rowId, {
+        value: title,
+        baseline: previous?.baseline ?? String(row.cells[columnId] ?? ''),
+        finish: api?.previewPageTitle?.(row.pagePath, title) ?? (() => {}),
+      })
+    }
     setView((prev) => (prev ? setCell(prev, rowId, columnId, value) : prev))
-  }, [])
+  }, [api])
 
   const setTitleDraft = useCallback((title: string) => {
     setView((prev) => (prev ? { ...prev, title } : prev))

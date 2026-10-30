@@ -6,11 +6,13 @@ import { isDeepStrictEqual } from 'node:util'
 import { isMap, isNode, isSeq, parseDocument, type Document } from 'yaml'
 import { isDeniedSegment, projectRoot, resolveProjectPath } from '../paths.ts'
 import { noteFileContentChanged } from '../fileCatalog.ts'
+import { DocumentPages, DocumentPageError } from '../document-pages.ts'
+import { ConflictError } from '../documents.ts'
 import type { DatabaseView } from './databaseService.ts'
 import type { Exec } from './pool.ts'
 import { documentPageTarget, representativeName, remapPagePath, rewritePageLinks, type DocumentPageMove, type DocumentPageMutation } from '../../shared/document-pages.ts'
 
-type Baseline = { columns: Array<{ id: string; name: string; type: string }>; cells: Record<string, unknown> }
+type Baseline = { columns: Array<{ id: string; name: string; type: string }>; cells: Record<string, unknown>; pathTitle?: string }
 type PageRecord = { row_id: string; path: string; baseline: Baseline }
 export type PageEdit = { rowId: string; columnId: string; value: unknown }
 export class RowPageError extends Error { status: number; constructor(message: string, status = 400) { super(message); this.status = status } }
@@ -18,6 +20,11 @@ export class RowPageError extends Error { status: number; constructor(message: s
 const drafts = new AsyncLocalStorage<Map<string, { content: string; expected?: string }>>()
 export function withRowPageDraft<T>(project: string, relative: string, content: string, run: () => Promise<T>, expected?: string): Promise<T> {
   return drafts.run(new Map([[resolveProjectPath(project, relative), { content, expected }]]), run)
+}
+
+/** Background refreshes cannot deliver path mutations to the initiating browser. */
+export function withDeferredRowPageMoves<T>(run: () => Promise<T>): Promise<T> {
+  return drafts.run(drafts.getStore() ?? new Map(), run)
 }
 
 function absolute(project: string, relative: string): string {
@@ -148,10 +155,41 @@ export function rowPageName(title: string): string {
   return name
 }
 
+async function remapBindings(q: Exec, project: string, moves: DocumentPageMove[]): Promise<void> {
+  const databases = await q<{ id: string; owner_path: string }>('SELECT id, owner_path FROM mew.databases WHERE project = $1 AND owner_path IS NOT NULL', [project])
+  for (const database of databases.rows) {
+    const next = remapPagePath(database.owner_path, moves)
+    if (next !== database.owner_path) await q('UPDATE mew.databases SET owner_path = $1 WHERE id = $2', [next, database.id])
+  }
+  const pages = await q<{ database_id: string; row_id: string; path: string }>(`SELECT p.database_id, p.row_id, p.path FROM mew.row_pages p
+    JOIN mew.databases d ON d.id = p.database_id WHERE d.project = $1`, [project])
+  for (const page of pages.rows) {
+    const next = remapPagePath(page.path, moves)
+    if (next !== page.path) await q('UPDATE mew.row_pages SET path = $1 WHERE database_id = $2 AND row_id = $3', [next, page.database_id, page.row_id])
+  }
+}
+
+function combinedMutation(path: string, changes: DocumentPageMutation[]): DocumentPageMutation | undefined {
+  if (!changes.length) return undefined
+  const moves: DocumentPageMove[] = []
+  for (const change of changes) {
+    const inverse = moves.map(move => ({ ...move, from: move.to, to: move.from }))
+    for (const move of moves) move.to = remapPagePath(move.to, change.moves)
+    for (const move of change.moves) {
+      const from = remapPagePath(move.from, inverse)
+      const previous = moves.find(candidate => candidate.from === from)
+      if (previous) previous.to = move.to
+      else moves.push({ ...move, from })
+    }
+  }
+  return { path, moves, changed: [...new Set(changes.flatMap(change => change.changed))] }
+}
+
 /** File writes participate in the caller's DB transaction through explicit undo/commit. */
 export async function syncDatabasePages(project: string, view: DatabaseView, q: Exec): Promise<{ rollback(): void; commit(): void; mutation?: DocumentPageMutation }> {
   const pending = new Map<string, string>(), before = new Map<string, string | null>(), madeDirs: string[] = []
   const moves: DocumentPageMove[] = [], removals = new Set<string>()
+  const renames: DocumentPageMutation[] = [], renameUndos: Array<() => void> = []
   const previous = view.kind === 'managed' ? await records(q, view.id) : []
   const primary = view.columns[0]
   const rollback = () => {
@@ -161,6 +199,7 @@ export async function syncDatabasePages(project: string, view: DatabaseView, q: 
       else fs.writeFileSync(file, original, 'utf8')
     }
     for (const directory of madeDirs.reverse()) { try { fs.rmdirSync(directory) } catch { /* Existing content is preserved. */ } }
+    for (const undo of [...renameUndos].reverse()) undo()
   }
   const commit = () => {
     for (const relative of removals) {
@@ -170,7 +209,7 @@ export async function syncDatabasePages(project: string, view: DatabaseView, q: 
         directory = path.dirname(directory)
       }
     }
-    for (const relative of new Set([...pending.keys(), ...removals])) noteFileContentChanged(project, relative)
+    for (const relative of new Set([...pending.keys(), ...removals, ...renames.flatMap(change => change.changed)])) noteFileContentChanged(project, relative)
   }
   if (view.kind !== 'managed') return { rollback, commit }
   try {
@@ -180,6 +219,32 @@ export async function syncDatabasePages(project: string, view: DatabaseView, q: 
       await q('DELETE FROM mew.row_pages WHERE database_id = $1 AND row_id = $2', [view.id, record.row_id])
     }
     if (primary?.type === 'page') {
+      if (!drafts.getStore()) for (const row of view.rows) {
+        const record = previous.find(page => page.row_id === row.id)
+        const title = String(row.cells[primary.id])
+        const pathTitle = record?.baseline.pathTitle ?? record?.baseline.cells?.[primary.id]
+        if (!record || pathTitle === undefined || pathTitle === title || record.path.includes(`데이터베이스/${view.id}/`)) continue
+        const content = read(project, record.path)
+        if (content === null) continue
+        assertBinding(frontmatter(content).doc, view.id, row.id)
+        const target = documentPageTarget(record.path), directory = target !== record.path
+        if (!target) throw new RowPageError('프로젝트의 대표 문서는 행 제목으로 바꿀 수 없습니다')
+        const parent = path.posix.dirname(target), name = rowPageName(title)
+        let nextName = name, index = 1
+        while (true) {
+          const next = path.posix.join(parent, nextName + (directory ? '' : '.md'))
+          const counterpart = directory ? `${next}.md` : next.slice(0, -3)
+          if ((next === target || !fs.existsSync(absolute(project, next))) && !fs.existsSync(absolute(project, counterpart))) break
+          nextName = `${name} ${++index}`
+        }
+        const change = new DocumentPages(projectRoot(project)).rename(record.path, nextName, undo => renameUndos.push(undo))
+        if (!change.moves.length) continue
+        renames.push(change)
+        for (const page of previous) page.path = remapPagePath(page.path, change.moves)
+        if (view.ownerPath) view.ownerPath = remapPagePath(view.ownerPath, change.moves)
+      }
+      const renamed = combinedMutation(view.ownerPath ?? '', renames)
+      if (renamed) await remapBindings(q, project, renamed.moves)
       let ownerPath = view.ownerPath
       if (!ownerPath || read(project, ownerPath) === null) {
         const matches = markdownFiles(project).filter(relative => read(project, relative)?.includes(`data-mew-db="${view.id}"`))
@@ -215,7 +280,7 @@ export async function syncDatabasePages(project: string, view: DatabaseView, q: 
         }
         const oldPath = relative
         const legacy = relative.endsWith(`/데이터베이스/${view.id}/${row.id}.md`) || relative === `데이터베이스/${view.id}/${row.id}.md`
-        // Existing user-selected paths stay stable, including after a title edit.
+        // Keep a manually selected directory; title changes are handled above.
         if (!relative || legacy && !drafts.getStore()) {
           const name = rowPageName(String(row.cells[primary.id]))
           let index = 1
@@ -255,7 +320,8 @@ export async function syncDatabasePages(project: string, view: DatabaseView, q: 
         else doc.delete('상위파일')
         if (!doc.has('description')) doc.set('description', String(row.cells[primary.id]))
         pending.set(relative, `---\n${doc.toString()}---\n${body}`)
-        const baseline: Baseline = { columns: view.columns.map(({ id, name, type }) => ({ id, name, type })), cells: row.cells }
+        const pathTitle = drafts.getStore() && record ? record.baseline.pathTitle ?? record.baseline.cells?.[primary.id] : row.cells[primary.id]
+        const baseline: Baseline = { columns: view.columns.map(({ id, name, type }) => ({ id, name, type })), cells: row.cells, pathTitle: String(pathTitle ?? row.cells[primary.id]) }
         await q(`INSERT INTO mew.row_pages (database_id, row_id, path, baseline) VALUES ($1, $2, $3, $4::jsonb)
           ON CONFLICT (database_id, row_id) DO UPDATE SET path = EXCLUDED.path, baseline = EXCLUDED.baseline`, [view.id, row.id, relative, JSON.stringify(baseline)])
       }
@@ -280,11 +346,7 @@ export async function syncDatabasePages(project: string, view: DatabaseView, q: 
         const rewritten = rewritePageLinks(content, relative, next, moves)
         if (next !== relative || rewritten !== original) pending.set(next, rewritten)
       }
-      for (const move of moves) {
-        await q('UPDATE mew.databases SET owner_path = $1 WHERE project = $2 AND owner_path = $3', [move.to, project, move.from])
-        await q(`UPDATE mew.row_pages p SET path = $1 FROM mew.databases d
-          WHERE d.id = p.database_id AND d.project = $2 AND p.path = $3`, [move.to, project, move.from])
-      }
+      await remapBindings(q, project, moves)
     }
     for (const relative of removals) before.set(relative, fs.existsSync(absolute(project, relative)) ? fs.readFileSync(absolute(project, relative), 'utf8') : null)
     for (const [relative, content] of pending) {
@@ -306,8 +368,13 @@ export async function syncDatabasePages(project: string, view: DatabaseView, q: 
     }
     for (const relative of removals) fs.rmSync(absolute(project, relative), { force: true })
     const changed = [...new Set([...pending.keys(), ...removals])]
-    return { rollback, commit, ...(moves.length ? { mutation: { path: view.ownerPath ?? '', moves, changed } } : {}) }
-  } catch (error) { rollback(); throw error }
+    const mutation = combinedMutation(view.ownerPath ?? '', [...renames, ...(moves.length ? [{ path: view.ownerPath ?? '', moves, changed }] : [])])
+    return { rollback, commit, ...(mutation ? { mutation } : {}) }
+  } catch (error) {
+    rollback()
+    if (error instanceof DocumentPageError || error instanceof ConflictError) throw new RowPageError(error.message, error instanceof DocumentPageError ? error.status : 409)
+    throw error
+  }
 }
 
 export async function decoratePageRows(project: string, view: DatabaseView, q: Exec): Promise<DatabaseView> {

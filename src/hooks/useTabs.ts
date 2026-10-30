@@ -22,7 +22,7 @@ import { uiText } from '@mew/ui/i18n-core'
 import { activePaneTab, mostRecentTab, nextTabNavigation, recordPaneActivation, remapTabNavigation, type TabNavigation } from '../utils/editor-tab-navigation'
 import { registerTaskDocumentSync, type TaskDocumentChange } from '../utils/task-document-sync'
 import { splitFrontmatter } from '@mew/editor/frontmatter'
-import { clearTitlePreviews, documentAbsolutePath, previewDocumentTitle, remapTitlePreviews, subscribeTitlePreviews, titlePreviews, withDocumentTitle } from '../utils/document-title-preview'
+import { clearTitlePreviews, documentAbsolutePath, previewDatabaseDocumentTitle, previewDocumentTitle, remapTitlePreviews, subscribeTitlePreviews, titlePreviews, withDocumentTitle } from '../utils/document-title-preview'
 
 function savedBuffer(current: string, submitted: string, saved: string): string {
   if (saved === submitted) return current
@@ -1226,7 +1226,10 @@ export function useTabs(
   useEffect(() => registerDatabasePageMutations({
     prepare: prepareDocumentPageMutation,
     apply: applyDocumentPageMutation,
-  }), [prepareDocumentPageMutation, applyDocumentPageMutation, workspaceScope])
+    previewTitle: (fileProject, path, title) => workspaceScope
+      ? previewDatabaseDocumentTitle(documentAbsolutePath(workspaceScope, workspaceDocsPath, fileProject, path), title)
+      : () => {},
+  }), [prepareDocumentPageMutation, applyDocumentPageMutation, workspaceScope, workspaceDocsPath])
 
   const refreshTaskDocuments = useCallback(async (changes: TaskDocumentChange[]) => {
     const p = projectRef.current, epoch = workspaceRequestRef.current.epoch

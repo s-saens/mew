@@ -2,17 +2,42 @@ import { useSyncExternalStore } from 'react'
 import { parseDocument } from 'yaml'
 import { remapPagePath, type DocumentPageMove } from '../../shared/document-pages.ts'
 
-type Preview = { title: string; source: 'editor' | 'task' }
+type Preview = { title: string; source: 'editor' | 'task' | 'database' }
 let previews: Readonly<Record<string, Preview>> = {}
+const databasePreviewOrigins = new Map<string, Preview>()
 const listeners = new Set<() => void>()
 export const titlePreviews = () => previews
 export const subscribeTitlePreviews = (listener: () => void) => { listeners.add(listener); return () => { listeners.delete(listener) } }
-const publish = (next: typeof previews) => { previews = next; for (const listener of listeners) listener() }
+const publish = (next: typeof previews) => {
+  previews = next
+  const retained = new Set(Object.values(next))
+  for (const [path, preview] of databasePreviewOrigins) if (!retained.has(preview)) databasePreviewOrigins.delete(path)
+  for (const listener of listeners) listener()
+}
 export const useTitlePreviews = () => useSyncExternalStore(subscribeTitlePreviews, titlePreviews, titlePreviews)
 
 export function previewDocumentTitle(path: string, title: string, source: Preview['source']): void {
   if (previews[path]?.title === title && previews[path]?.source === source) return
   publish({ ...previews, [path]: { title, source } })
+}
+
+export function previewDatabaseDocumentTitle(path: string, title: string): (confirmedTitle?: string) => void {
+  const previous = databasePreviewOrigins.get(path) ?? previews[path]
+  const currentPath = Object.entries(previews).find(([, value]) => value === previous)?.[0] ?? path
+  const origins = [...databasePreviewOrigins].filter(([, value]) => value === previous).map(([origin]) => origin)
+  previewDocumentTitle(currentPath, title, 'database')
+  const preview = previews[currentPath]
+  for (const origin of new Set([path, ...origins])) databasePreviewOrigins.set(origin, preview)
+  return confirmedTitle => {
+    // Moves retain the preview object, while newer typing replaces it.
+    const current = Object.entries(previews).find(([, value]) => value === preview)
+    if (!current) return
+    const [currentPath] = current
+    if (confirmedTitle !== undefined && confirmedTitle !== title) publish({ ...previews, [currentPath]: { title: confirmedTitle, source: 'database' } })
+    const next = { ...previews }
+    delete next[currentPath]
+    publish(next)
+  }
 }
 
 export function remapTitlePreviews(moves: DocumentPageMove[]): void {

@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { clearTitlePreviews, documentAbsolutePath, previewDocumentTitle, remapTitlePreviews, titlePreviews, withDocumentTitle } from './document-title-preview.ts'
+import { clearTitlePreviews, documentAbsolutePath, previewDatabaseDocumentTitle, previewDocumentTitle, remapTitlePreviews, subscribeTitlePreviews, titlePreviews, withDocumentTitle } from './document-title-preview.ts'
 
 test('confirmed titles preserve newer typing and cleanup stays within the workspace', () => {
   previewDocumentTitle('/one/task.md', 'Newer', 'editor')
@@ -49,4 +49,36 @@ test('document scopes map to the same absolute path with a custom Documents root
   assert.equal(documentAbsolutePath('/workspace', '/workspace/notes', 'docs', 'task.md'), '/workspace/notes/task.md')
   assert.equal(documentAbsolutePath('/workspace', undefined, '.workspace', 'docs/task.md'), '/workspace/docs/task.md')
   assert.equal(documentAbsolutePath('/workspace', undefined, 'project', 'task.md'), '/workspace/project/task.md')
+})
+
+test('database preview completion follows confirmed moves and preserves newer typing', () => {
+  const settleOlder = previewDatabaseDocumentTitle('/database/Old.md', 'First')
+  const settleNewer = previewDatabaseDocumentTitle('/database/Old.md', 'Still typing')
+  try {
+    remapTitlePreviews([{ from: '/database/Old.md', to: '/database/First.md' }])
+    settleOlder('First')
+    assert.deepEqual(titlePreviews()['/database/First.md'], { title: 'Still typing', source: 'database' })
+    const settleLatest = previewDatabaseDocumentTitle('/database/Old.md', 'Typed while tabs refresh')
+    assert.equal(titlePreviews()['/database/Old.md'], undefined, 'a cell using the old operational path follows its moved preview')
+    assert.equal(titlePreviews()['/database/First.md'].title, 'Typed while tabs refresh')
+    settleNewer('Still typing')
+    assert.equal(titlePreviews()['/database/First.md'].title, 'Typed while tabs refresh')
+    settleLatest('Typed while tabs refresh')
+    assert.equal(titlePreviews()['/database/First.md'], undefined)
+  } finally { clearTitlePreviews('/database') }
+})
+
+test('a failed database title restores the confirmed title before removing its own preview', () => {
+  const observed: string[] = []
+  const settle = previewDatabaseDocumentTitle('/database/Old.md', 'Duplicate')
+  const unsubscribe = subscribeTitlePreviews(() => { observed.push(titlePreviews()['/database/Old.md']?.title ?? 'cleared') })
+  try {
+    settle('Old')
+    settle('Unexpected second completion')
+    assert.deepEqual(observed, ['Old', 'cleared'])
+    const stale = previewDatabaseDocumentTitle('/database/Old.md', 'Database input')
+    previewDocumentTitle('/database/Old.md', 'Editor input', 'editor')
+    stale('Old')
+    assert.equal(titlePreviews()['/database/Old.md'].title, 'Editor input')
+  } finally { unsubscribe(); clearTitlePreviews('/database') }
 })

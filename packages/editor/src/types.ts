@@ -88,6 +88,8 @@ export interface EditorDbApi {
   rename: (id: string, title: string) => Promise<void>
   insertRow: (id: string) => Promise<DbRow>
   updateCell: (id: string, rowId: string, columnId: string, value: unknown) => Promise<unknown>
+  /** Preview a linked page title without changing its path; settle only this draft after saving. */
+  previewPageTitle?: (path: string, title: string) => (confirmedTitle?: string) => void
   deleteRow: (id: string, rowId: string) => Promise<void>
   addColumn: (id: string, name: string, type: DbColumnType) => Promise<DbColumn>
   renameColumn: (id: string, columnId: string, name: string) => Promise<DbColumn>

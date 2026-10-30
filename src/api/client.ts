@@ -1,4 +1,4 @@
-import { collectDatabasePageMutations, withDatabasePageMutations } from '../utils/database-page-mutations'
+import { collectDatabasePageMutations, previewDatabasePageTitle, withDatabasePageMutations } from '../utils/database-page-mutations'
 import { json } from './response.ts'
 import type { Role } from './auth.ts'
 export { fetchAuthStatus, login, logout, changePassword } from './auth.ts'
@@ -1908,6 +1908,7 @@ function createDbApi(project?: string, ownerPath?: string): EditorDbApi {
     rename: (id, title) => dbRename(id, title, project),
     insertRow: id => dbInsertRow(id, project),
     updateCell: (id, rowId, columnId, value) => dbUpdateCell(id, rowId, columnId, value, project),
+    previewPageTitle: (path, title) => previewDatabasePageTitle(project ?? currentProject, path, title),
     deleteRow: (id, rowId) => dbDeleteRow(id, rowId, project),
     addColumn: (id, name, type) => dbAddColumn(id, name, type, project),
     renameColumn: (id, columnId, name) => dbRenameColumn(id, columnId, name, project),
@@ -1922,7 +1923,7 @@ function createDbApi(project?: string, ownerPath?: string): EditorDbApi {
   return new Proxy(api, {
     get(target, key: keyof EditorDbApi) {
       const method = target[key]
-      if (key === 'subscribe' || key === 'list' || !method) return method
+      if (key === 'subscribe' || key === 'list' || key === 'previewPageTitle' || !method) return method
       return (...args: unknown[]) => withDatabasePageMutations(project ?? currentProject, () => Reflect.apply(method, target, args))
     },
   })

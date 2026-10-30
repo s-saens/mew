@@ -1,6 +1,6 @@
 ---
 title: "Table Databases (/db)"
-description: "Explains inserting Postgres document databases, converting between databases and regular tables in both directions and undoing conversions, borderless views, and editing date ranges in calendar and Gantt views. Also covers keyboard navigation through titles, headers, and cells, column-header type menus, importing text fields, search, moving between groups, property editing, column sorting, primary columns, row page sharing, read-only references, and backup scope."
+description: "Explains inserting Postgres document databases, table conversion and undo, borderless views, calendar and Gantt ranges, keyboard cell navigation, column-header type menus, search, grouping, sorting, and primary columns. Also covers immediate linked-page title previews, filename changes after saving, row-page sharing, read-only references, and backups."
 updated: "2026-10-30"
 상위파일:
   - "../../.mew/docs/MOC.md"
@@ -79,7 +79,9 @@ New rows start with a unique `제목 없음` value. When an existing table is fi
 
 ## Opening Rows as Subpages
 
-Changing the primary column's type to **Page** creates a subpage for each row, using its value as the title. Open the document from a page cell to edit its body and properties. Pages are saved by name directly beneath the document containing the DB. For example, the `송상훈` row in the `Books` document becomes `Books/송상훈.md`. If a document with the same name exists, a number is appended. Opening the DB also moves existing UUID files into this structure while preserving their bodies. Changing a title after creation preserves the existing file path.
+Changing the primary column's type to **Page** creates a subpage for each row, using its value as the title. Open the document from a page cell to edit its body and properties. Pages are saved by name directly beneath the document containing the DB. For example, the `송상훈` row in the `Books` document becomes `Books/송상훈.md`. If a document with the same name exists, a number is appended. Opening the DB also moves existing UUID files into this structure while preserving their bodies.
+
+Editing a page-type primary value immediately updates its displayed name in the explorer and open tabs, like editing a Task title. After saving, the linked file is renamed to match, and the page button uses its confirmed new path. Existing bodies, supported links, and open drafts are retained. If the page has children, its folder and representative file are renamed together. A page moved elsewhere stays in that location; later title edits rename it there. Failed saves restore the confirmed title without overwriting newer input.
 
 Saving a linked subpage also requires the database feature and permission to modify all project files, as required for DB editing.
 

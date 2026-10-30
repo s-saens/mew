@@ -1,13 +1,15 @@
 ---
 title: "0026 — Name-based storage of DB row pages directly under the source document"
-description: "Decision to store DB row pages directly under the document containing the DB, using primary column values, preserve UUID associations, existing bodies, links, and drafts, and migrate old UUID files. Supersedes the UUID filename choice in 0012."
+description: "Decision to store DB row pages directly under their source document using primary values, preserve UUID associations, bodies, links, and drafts, and migrate old UUID files. Supersedes UUID filenames in 0012; 0093 supersedes its title-change path stability choice."
 created: 2026-10-20
-updated: 2026-10-20
+updated: 2026-10-30
 ---
 
 # 0026 — Name-based storage of DB row pages directly under the source document
 
 Status: Approved
+
+The title-change path stability choice below is superseded by [0093 — Rename linked database pages with primary titles](0093-database-row-title-renames.md). The rest of this decision remains in effect.
 
 ## Background
 

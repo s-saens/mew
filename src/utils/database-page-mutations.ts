@@ -3,6 +3,7 @@ import type { DocumentPageMutation } from '../../shared/document-pages'
 type Handler = {
   prepare(project: string): Promise<() => void>
   apply(mutation: DocumentPageMutation, project: string): void | Promise<void>
+  previewTitle?(project: string, path: string, title: string): (confirmedTitle?: string) => void
 }
 let handler: Handler | undefined
 let activeChanges: DocumentPageMutation[] | undefined
@@ -16,6 +17,10 @@ let queue: Promise<unknown> = Promise.resolve()
 export function registerDatabasePageMutations(next: Handler): () => void {
   handler = next
   return () => { if (handler === next) handler = undefined }
+}
+
+export function previewDatabasePageTitle(project: string, path: string, title: string): (confirmedTitle?: string) => void {
+  return handler?.previewTitle?.(project, path, title) ?? (() => {})
 }
 
 /** Save drafts and pause autosave while a DB request may promote its owner document. */

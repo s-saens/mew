@@ -68,7 +68,7 @@ export class DocumentPages {
     }
     return files
   }
-  private commit(moves: DocumentPageMove[], creations: Map<string, string>, resultPath: string, removed?: { path: string; directory: boolean }, directoryMoves: [string, string][] = [], copies: [string, string][] = [], renamedTitle?: { path: string; title: string }): DocumentPageMutation {
+  private commit(moves: DocumentPageMove[], creations: Map<string, string>, resultPath: string, removed?: { path: string; directory: boolean }, directoryMoves: [string, string][] = [], copies: [string, string][] = [], renamedTitle?: { path: string; title: string }, retainRollback?: (rollback: () => void) => void): DocumentPageMutation {
     // Directory moves run first; representative renames then use their new physical parent.
     const operations: [string, string][] = [...directoryMoves]
     for (const move of moves) if (!move.directory) {
@@ -143,6 +143,10 @@ export class DocumentPages {
       const emptyDirs = moves.filter(move => !move.directory && path.posix.dirname(move.from) !== path.posix.dirname(move.to)).map(move => path.posix.dirname(move.from))
       for (const dir of emptyDirs) if (dir !== '.' && fs.existsSync(this.abs(dir)) && fs.readdirSync(this.abs(dir)).length === 0) { fs.rmdirSync(this.abs(dir)); undo.push(() => fs.mkdirSync(this.abs(dir), { recursive: true })) }
       if (staged) fs.rmSync(staged, { recursive: true, force: true })
+      retainRollback?.(() => {
+        for (const revert of [...undo].reverse()) revert()
+        for (const dir of [...madeDirs].reverse()) { try { fs.rmdirSync(dir) } catch { /* Restored data can keep an ancestor nonempty. */ } }
+      })
       return { path: resultPath, moves, changed: [...new Set([...moves.flatMap(move => [move.from, move.to]), ...creations.keys(), ...updates.keys(), ...copies.map(([, to]) => to), ...(removed ? [removed.path] : [])])], ...(removed ? { removed } : {}) }
     } catch (error) {
       for (const revert of undo.reverse()) { try { revert() } catch { /* Preserve the original failure; staged files remain recoverable. */ } }
@@ -194,7 +198,7 @@ export class DocumentPages {
     const parent = path.posix.dirname(target), moves = this.demotion(parent, target)
     return this.commit(moves, new Map(), moves[0]?.to ?? '', { path: target, directory })
   }
-  rename(target: string, rawName: string): DocumentPageMutation {
+  rename(target: string, rawName: string, retainRollback?: (rollback: () => void) => void): DocumentPageMutation {
     target = this.logicalTarget(target)
     this.writable(target, true)
     const name = this.name(rawName), dir = fs.statSync(this.abs(target)).isDirectory(), parent = path.posix.dirname(target)
@@ -210,7 +214,7 @@ export class DocumentPages {
       else creations.set(canonical, buildFrontmatter(name))
     }
     const resultPath = dir ? `${next}/${representativeName(next)}` : next
-    return this.commit(moves, creations, resultPath, undefined, dir ? [[target, next]] : [], [], { path: resultPath, title: name })
+    return this.commit(moves, creations, resultPath, undefined, dir ? [[target, next]] : [], [], { path: resultPath, title: name }, retainRollback)
   }
   move(source: string, destination: string, copy = false): DocumentPageMutation {
     source = this.logicalTarget(source)

@@ -10,6 +10,7 @@ import { closePool, exec } from './pool.ts'
 import * as svc from './databaseService.ts'
 import { saveDatabaseRowPage, refreshDatabaseRowPages, remapDatabaseRowPages } from './rowPageIntegration.ts'
 import { RowPageError } from './rowPages.ts'
+import { capturePageMutations } from './page-mutations.ts'
 import { joinFrontmatter, splitFrontmatter } from '../../packages/editor/src/utils/frontmatter.ts'
 
 test('database row pages preserve autosaves, permissions and file moves', { skip: !process.env.MEW_DB_TEST_DATABASE_URL }, async t => {
@@ -126,6 +127,28 @@ test('database row pages preserve autosaves, permissions and file moves', { skip
         assert.equal(fs.readFileSync(resolveProjectPath(project, next), 'utf8'), before)
         fs.renameSync(resolveProjectPath(project, next), file)
         await remapDatabaseRowPages(project, [{ from: next, to: relative }])
+      })
+
+      await t.test('primary page title saves rename the file and return canonical path mutations', async () => {
+        const before = fs.readFileSync(file, 'utf8')
+        const next = path.posix.join(path.posix.dirname(relative), '새 이름.md')
+        await capturePageMutations(async changes => {
+          await svc.updateCell(project, dbId, row.id, title.id, '새 이름')
+          assert.ok(changes.some(change => change.moves.some(move => move.from === relative && move.to === next)))
+        })
+        current = await svc.getView(project, dbId)
+        assert.equal(current.rows[0].pagePath, next)
+        assert.equal(current.rows[0].id, row.id)
+        assert.equal(fs.existsSync(file), false)
+        const renamed = fs.readFileSync(resolveProjectPath(project, next), 'utf8')
+        assert.equal(fields(renamed).title, '새 이름')
+        assert.equal(renamed.slice(renamed.indexOf('---', 4)), before.slice(before.indexOf('---', 4)), 'row body remains unchanged')
+        const submitted = contents({ ...fields(renamed), title: '페이지에서 수정' }, '\nSaved page body\n')
+        await saveDatabaseRowPage(project, next, submitted, renamed)
+        assert.equal(fs.existsSync(resolveProjectPath(project, next)), true, 'the save request keeps its original path until completion')
+        current = await svc.getView(project, dbId)
+        assert.equal(current.rows[0].pagePath, path.posix.join(path.posix.dirname(relative), '페이지에서 수정.md'))
+        assert.match(fs.readFileSync(resolveProjectPath(project, current.rows[0].pagePath!), 'utf8'), /Saved page body/)
       })
     } finally {
       if (dbId) await svc.deleteDatabase(project, dbId)
