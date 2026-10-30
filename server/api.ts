@@ -153,6 +153,7 @@ import {
   listUsers,
   normalizeEmail,
   removeUser,
+  revokeUserSessions,
   upsertUser,
   userProfile,
 } from './auth.ts'
@@ -2326,6 +2327,26 @@ export function createApiApp() {
     upsertUser(email, { ...user, role })
     accessChanges.emit('change')
     res.json({ ok: true })
+  })
+
+  app.post('/admin/users/:accountId/reset-password', requireRole('owner'), (req, res) => {
+    const accountId = normalizeEmail(req.params.accountId), user = getUser(accountId)
+    if (!user) { res.status(404).json({ error: '등록되지 않은 사용자입니다' }); return }
+    if (accountId === authOf(req).email) {
+      res.status(400).json({ error: '현재 로그인한 계정의 비밀번호는 설정에서 변경하세요' }); return
+    }
+    if (!user.hash) {
+      res.status(400).json({ error: '비밀번호로 로그인하는 계정만 초기화할 수 있습니다' }); return
+    }
+    const tempPassword = generateTempPassword()
+    upsertUser(accountId, {
+      ...user, hash: hashPassword(tempPassword), mustChangePassword: true,
+      passwordChangedAt: Math.max(Date.now(), user.passwordChangedAt),
+    })
+    revokeUserSessions(accountId)
+    accessChanges.emit('change')
+    res.setHeader('Cache-Control', 'no-store')
+    res.json({ ok: true, email: accountId, tempPassword })
   })
 
   app.delete('/admin/users/:accountId', requireRole('owner'), (req, res) => {

@@ -2436,7 +2436,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
 
       {remoteAccessOpen && isOwner && <RemoteAccessModal onClose={() => setRemoteAccessOpen(false)} />}
 
-      {adminOpen && isOwner && <AdminSettingsModal onClose={() => setAdminOpen(false)} />}
+      {adminOpen && isOwner && <AdminSettingsModal currentEmail={authEmail} onClose={() => setAdminOpen(false)} />}
 
       {documentGraphOpen && caps.filesRead && <DocumentGraph key={`${rootProjectPath}:${workspaceInfoRef.current?.docsPath ?? ''}`}
         revision={treeInvalidation.n} onClose={() => setDocumentGraphOpen(false)}

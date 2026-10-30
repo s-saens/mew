@@ -1,8 +1,8 @@
 ---
 title: "Per-account feature and file permissions"
 created: "2026-09-16"
-updated: "2026-10-30"
-description: "Defines project access for owner and manager, per-account feature and file permissions, blocking of actual server data paths, the scope of normal project work for accounts with server file permissions, WebSocket Origin validation and real-time revocation, isolation of raw-content responses, guest editing boundaries, and isolated public file/folder capabilities with live creator checks and revocation. Also covers Git credential cleanup and permission boundaries for Mewlink, debuggers, MCP, and global skins."
+updated: "2026-10-31"
+description: "Defines project access for owner and manager, per-account feature and file permissions, owner-issued password reset boundaries and browser-token revocation, blocking of actual server data paths, WebSocket Origin validation and real-time revocation, raw-content isolation, guest editing, and isolated public file/folder capabilities. Also covers Git credential cleanup and permission boundaries for Mewlink, debuggers, MCP, and global skins."
 상위파일: "MOC.md"
 ---
 
@@ -16,15 +16,23 @@ When the owner approves a verified identity request under **Account Management �
 
 ## Management UI and defaults
 
-The shared modal header contains a title, account count, and add/close icons; the account creation form and permission guidance expand when needed. Clicking a profile photo opens an account control popup for changing roles or deleting accounts. Deletion requires confirmation within the popup and can be retried on failure.
+The shared modal header contains a title, account count, and add/close icons; the account creation form and permission guidance expand when needed. Clicking a profile photo opens an account control popup for changing roles, resetting another password account, or deleting accounts. Password reset and deletion require confirmation within the popup and can be retried on failure.
 
 The role in account creation, roles in account rows and photo popups, file path scopes, and per-path permissions use the shared `SelectField`. Selection supports keyboard and touch without native popups, and lists appear outside the table's scroll area. Fields are disabled while role or file permissions are being saved, and existing save-failure notices, refetching, and server permission checks are retained.
 
-The owner's **Account Management → Feature Permissions** displays accounts as columns and roles and features as rows. Account headers in the feature and file permission tables display saved profile photos, or a person icon if no photo exists or loading fails. guest retains a group icon, and clicking a header shows the name and email. The owner-only `/api/admin/access` and feature permission save responses include per-account `avatarDataUrl`. Features are file viewing and editing, agents, terminal, remote desktop, localhost app access, Android, server file explorer, Git, databases, collaborative editing and comments, chat, system administration, and scheduled tasks. Roles provide defaults, and checkbox changes are per-account overrides. Resetting restores that role's defaults. The last owner cannot be demoted or deleted, and currently logged-in users cannot delete themselves. Owner-only administrative functions such as account and workspace management cannot be delegated through the feature table.
+The owner's **Account Management → Feature Permissions** displays accounts as columns and roles and features as rows. Account headers in the feature and file permission tables display saved profile photos, or name/account initials if no photo exists or loading fails. guest retains a group icon, and clicking a header shows the name and email. The owner-only `/api/admin/access` and feature permission save responses include per-account `avatarDataUrl`. Features are file viewing and editing, agents, terminal, remote desktop, localhost app access, Android, server file explorer, Git, databases, collaborative editing and comments, chat, system administration, and scheduled tasks. Roles provide defaults, and checkbox changes are per-account overrides. Resetting restores that role's defaults. The last owner cannot be demoted or deleted, and currently logged-in users cannot delete themselves. Owner-only administrative functions such as account and workspace management cannot be delegated through the feature table.
 
 owner and manager can use all features by default. Both roles can also list, add, and switch projects, change icons, create folders and perform Git operations in the selection dialog, and switch subprojects and worktrees. Lists and active roots are saved per account, and these APIs are unavailable to member and guest. Account management, Documents settings/import/export, and the existing `/project` create, rename, and delete APIs are owner-only. This follows [decision 0070](../decisions/0070-manager-project-access.md). member can use file viewing and editing, databases, collaborative editing and comments, and chat. Only file viewing and editing can be configured for guest; all other features are limited to logged-in accounts. All are blocked while a temporary password remains unchanged. Terminal-based agents require both agent and terminal features.
 
 Under **File and Folder Permissions**, select the workspace or Documents and browse or enter a relative path. Each account's rules are inherit, block, view, or edit, with the effective result displayed alongside them. The feature-level file viewing and editing toggles set the upper limit. The most specific file/folder rule takes precedence, and editing includes viewing. Without a rule, logged-in accounts are allowed and guest is blocked. The file explorer manages public capability links separately; it does not edit account or guest path rules.
+
+## Owner-issued password resets
+
+`POST /api/admin/users/:accountId/reset-password` requires owner access and an existing password credential on another account. It never creates a password for an external-only identity. The caller changes their own password through the authenticated Settings flow. A successful reset returns a newly generated temporary password once with `Cache-Control: no-store`, persists only its hash, sets `mustChangePassword`, and emits `accessChanges`.
+
+`revokeUserSessions` explicitly removes every persisted browser token belonging to the target, including trusted tokens, without deleting Git credentials or Mewlink links. This prevents an old token from surviving a reset in its creation millisecond. `passwordChangedAt` stays nondecreasing without moving ahead of the clock, allowing immediate temporary-password login. The existing password-change flow remains required before work access. An already approved external identity connection is independent of the password reset and remains authorized; revoke its link separately when needed. Profile, roles, ACLs, files, and account creation time are preserved.
+
+See the [accounts feature](../features/appearance-accounts-operations/accounts-roles-feature-permissions-and-guest-sharing.md), [reset decision](../decisions/0100-owner-password-reset.md), and [verification record](../work/account-password-reset.md).
 
 ## Public capability links
 

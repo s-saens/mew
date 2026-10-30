@@ -23,7 +23,7 @@ async function assertAnchoredMenu(trigger: Locator, menu: Locator, width: number
 }
 
 test('account controls save roles, features and file rules and confirm deletion on desktop and mobile', { skip: !domBrowserExecutable(), timeout: 45_000 }, async () => {
-  const source = `import React from '${root}/node_modules/react/index.js';import{createRoot}from '${root}/node_modules/react-dom/client.js';import{AdminSettingsModal}from '${root}/src/components/AdminSettingsModal.tsx';import{I18nProvider}from '${root}/src/i18n.tsx';import{applyThemePalette,THEME_PRESETS}from '${root}/src/utils/theme-color.ts';window.fixtureTheme=id=>applyThemePalette(THEME_PRESETS.find(theme=>theme.id===id).palette);window.fixtureTheme('light');localStorage.setItem('mew:locale','ko');createRoot(document.getElementById('root')).render(<I18nProvider><AdminSettingsModal onClose={()=>{window.fixtureClosed=true}}/></I18nProvider>);`
+  const source = `import React from '${root}/node_modules/react/index.js';import{createRoot}from '${root}/node_modules/react-dom/client.js';import{AdminSettingsModal}from '${root}/src/components/AdminSettingsModal.tsx';import{I18nProvider}from '${root}/src/i18n.tsx';import{applyThemePalette,THEME_PRESETS}from '${root}/src/utils/theme-color.ts';window.fixtureTheme=id=>applyThemePalette(THEME_PRESETS.find(theme=>theme.id===id).palette);window.fixtureTheme('light');localStorage.setItem('mew:locale','ko');Object.defineProperty(navigator,'clipboard',{value:{writeText:async text=>{window.copiedPassword=text}}});createRoot(document.getElementById('root')).render(<I18nProvider><AdminSettingsModal currentEmail="owner@example.test" onClose={()=>{window.fixtureClosed=true}}/></I18nProvider>);`
   const bundle = await build({ input: 'virtual:access.tsx', write: false, platform: 'browser', output: { format: 'iife' }, transform: { jsx: 'react-jsx', define: { 'process.env.NODE_ENV': JSON.stringify('test') } }, plugins: [{ name: 'fixture', resolveId(id) { if (id === 'virtual:access.tsx') return id; if (id.endsWith('.css')) return 'virtual:style' }, async load(id) { if (id === 'virtual:access.tsx') return source; if (id === 'virtual:style') return ''; if (id.endsWith('?raw')) return 'export default ' + JSON.stringify(await fs.readFile(id.slice(0, -4), 'utf8')) } }] })
   const content = (await Promise.all(['src/components/AdminSettingsModal.tsx', 'src/components/account-access-matrix.tsx', 'src/components/account-column-headers.tsx', 'src/components/account-role-select.tsx', 'src/components/mewlink-access-settings.tsx', 'packages/ui/src/dialog-frame.tsx', 'packages/ui/src/select-field.tsx', 'packages/ui/src/HoverTipLayer.tsx'].map(file => fs.readFile(path.join(root, file), 'utf8')))).join('\n')
   const compiler = await compile(await fs.readFile(`${root}/src/index.css`, 'utf8'), { base: `${root}/src`, onDependency() {} })
@@ -34,13 +34,26 @@ test('account controls save roles, features and file rules and confirm deletion 
   const rules = new Map<string, string>()
   let failNext = false
   let failNextDelete = false
+  let failNextReset = true
+  let holdNextReset = true
+  let releaseReset: (() => void) | undefined
+  let resetStarted: () => void
+  const pendingReset = new Promise<void>(resolve => { resetStarted = resolve })
+  const resetRequests: string[] = []
   const deleteRequests: string[] = []
   try {
     const context = await browser.newContext({ viewport: { width: 1366, height: 900 }, hasTouch: true })
     await context.route('http://mew-access.test/**', async route => {
       const url = new URL(route.request().url()), method = route.request().method()
       const json = (value: unknown, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(value) })
-      if (url.pathname === '/api/admin/users') return json(rows.filter(row => row.role !== 'guest').map(row => ({ email: row.subject, role: row.role, mustChangePassword: false, createdAt: 0 })))
+      if (url.pathname === '/api/admin/users') return json(rows.filter(row => row.role !== 'guest').map(row => ({ email: row.subject, role: row.role, hasPassword: row.subject !== 'manager@example.test', mustChangePassword: false, createdAt: 0 })))
+      if (method === 'POST' && url.pathname.endsWith('/reset-password')) {
+        const subject = decodeURIComponent(url.pathname.split('/')[4])
+        resetRequests.push(subject)
+        if (holdNextReset) { holdNextReset = false; await new Promise<void>(resolve => { releaseReset = resolve; resetStarted() }) }
+        if (failNextReset) { failNextReset = false; return json({ error: '비밀번호 초기화 테스트 실패' }, 500) }
+        return json({ ok: true, email: subject, tempPassword: `TEMP-FIXTURE-${resetRequests.length}` })
+      }
       if (url.pathname.startsWith('/api/admin/users/') && url.pathname.endsWith('/role')) {
         const subject = decodeURIComponent(url.pathname.split('/')[4])
         const row = rows.find(row => row.subject === subject)!
@@ -94,6 +107,7 @@ test('account controls save roles, features and file rules and confirm deletion 
       const popup = page.getByRole('region', { name: '계정: manager', exact: true })
       await popup.waitFor()
       assert.equal(await popup.locator('div[aria-hidden="true"]').innerText(), 'M', 'the popup shares the initial fallback')
+      assert.equal(await popup.getByRole('button', { name: '비밀번호 초기화', exact: true }).count(), 0, 'external-only accounts have no local password reset')
       await page.keyboard.press('Escape')
       await popup.waitFor({ state: 'hidden' })
     }
@@ -109,6 +123,12 @@ test('account controls save roles, features and file rules and confirm deletion 
     assert.equal(await page.getByRole('columnheader').count(), rows.length + 1)
     assert.equal(await page.getByRole('row').filter({ has: page.getByRole('rowheader', { name: '에이전트 창', exact: true }) }).getByRole('checkbox').count(), rows.length)
     assert.equal(await agent.isChecked(), false)
+    const ownerIcon = page.getByRole('columnheader').getByRole('button', { name: 'owner (owner@example.test)', exact: true })
+    await ownerIcon.click()
+    const ownerPopup = page.getByRole('region', { name: '계정: owner', exact: true })
+    await ownerPopup.waitFor()
+    assert.equal(await ownerPopup.getByRole('button', { name: '비밀번호 초기화', exact: true }).count(), 0, 'the current account uses Settings to change its password')
+    await page.keyboard.press('Escape')
     for (const [displayName, initial] of [['   ', 'O'], ['  김뮤  ', '김'], ['𐐨', '𐐀'], ['owner', 'O']]) {
       rows[0].displayName = displayName
       rows[1].avatarDataUrl = displayName === '𐐨' ? avatar : 'data:image/png;base64,broken'
@@ -199,6 +219,35 @@ test('account controls save roles, features and file rules and confirm deletion 
       const identity = page.getByRole('region', { name: '계정: Member with a long name', exact: true })
       await identity.waitFor()
       assert.equal(await identity.getByText('member@example.test', { exact: true }).isVisible(), true)
+      const reset = identity.getByRole('button', { name: '비밀번호 초기화', exact: true })
+      const attemptsBefore = resetRequests.length
+      await reset.click()
+      await identity.getByRole('button', { name: '취소', exact: true }).click()
+      assert.equal(resetRequests.length, attemptsBefore, 'cancelling does not issue a password')
+      await reset.click()
+      const confirmReset = identity.getByRole('button', { name: '초기화 확인', exact: true })
+      await confirmReset.click()
+      if (attemptsBefore === 0) {
+        await pendingReset
+        await page.getByRole('button', { name: '저장 중…', exact: true }).waitFor()
+        assert.equal(await page.getByRole('tab', { name: '파일·폴더 권한', exact: true }).isDisabled(), true)
+        assert.equal(await agent.isDisabled(), true)
+        assert.equal(await memberRole.isDisabled(), true)
+        assert.equal(await page.getByRole('dialog').getByRole('button', { name: '닫기', exact: true }).first().isDisabled(), true)
+        await page.keyboard.press('Escape')
+        assert.equal(await identity.isVisible(), true)
+        assert.equal(await page.evaluate('window.fixtureClosed'), undefined)
+        releaseReset!()
+        await identity.getByRole('alert').getByText('비밀번호 초기화 테스트 실패', { exact: true }).waitFor()
+        await confirmReset.click()
+      }
+      await identity.locator('code').waitFor()
+      const temporaryPassword = `TEMP-FIXTURE-${resetRequests.length}`
+      assert.equal(await identity.locator('code').innerText(), temporaryPassword)
+      await identity.getByRole('button', { name: '임시 비밀번호 복사', exact: true }).click()
+      await identity.getByRole('button', { name: '복사됨', exact: true }).waitFor()
+      assert.equal(await page.evaluate('window.copiedPassword'), temporaryPassword)
+      await page.screenshot({ path: `/tmp/mew-account-password-reset-${theme}-${width}.png` })
       const identityBox = await identity.boundingBox()
       const memberBox = await memberIcon.boundingBox()
       assert.ok(identityBox && memberBox)
@@ -221,6 +270,7 @@ test('account controls save roles, features and file rules and confirm deletion 
       assert.equal(await memberIcon.evaluate(el => el.ownerDocument.activeElement === el), true)
       await memberIcon.click()
       await identity.waitFor()
+      assert.equal(await identity.locator('code').count(), 0, 'closing discards the temporary password')
       await page.getByRole('tab', { name: '기능 권한', exact: true }).click()
       await identity.waitFor({ state: 'hidden' })
       await memberIcon.click()
@@ -239,6 +289,24 @@ test('account controls save roles, features and file rules and confirm deletion 
       ])
       await page.getByRole('rowheader', { name: '설정', exact: true }).waitFor()
       await assertAvatarFallbacks()
+      const fileMemberIcon = page.getByRole('columnheader').getByRole('button', { name: 'Member with a long name (member@example.test)', exact: true })
+      await fileMemberIcon.click()
+      const fileIdentity = page.getByRole('region', { name: '계정: Member with a long name', exact: true })
+      await fileIdentity.waitFor()
+      assert.equal(await fileIdentity.getByRole('button', { name: '비밀번호 초기화', exact: true }).isEnabled(), true, 'file permission headers expose the same reset action')
+      if (theme === 'light' && width === 1366) {
+        holdNextReset = true
+        const filePendingReset = new Promise<void>(resolve => { resetStarted = resolve })
+        await fileIdentity.getByRole('button', { name: '비밀번호 초기화', exact: true }).click()
+        await fileIdentity.getByRole('button', { name: '초기화 확인', exact: true }).click()
+        await filePendingReset
+        assert.equal(await page.getByRole('button', { name: '상위 폴더', exact: false }).isDisabled(), true, 'navigation must not unmount the popup before the password arrives')
+        assert.equal(await page.getByRole('combobox', { name: '프로젝트 경로', exact: true }).isDisabled(), true)
+        releaseReset!()
+        await fileIdentity.locator('code').waitFor()
+        assert.equal(await fileIdentity.locator('code').innerText(), `TEMP-FIXTURE-${resetRequests.length}`)
+      }
+      await page.keyboard.press('Escape')
       const fileAvatar = page.getByRole('columnheader').getByRole('button', { name: 'Member with a long name (member@example.test)', exact: true }).locator('img')
       assert.equal(await fileAvatar.getAttribute('src'), avatar)
       assert.equal(await fileAvatar.evaluate(el => el.complete && el.naturalWidth > 0), true)
@@ -321,5 +389,5 @@ test('account controls save roles, features and file rules and confirm deletion 
     await page.keyboard.press('Escape')
     assert.equal(await page.evaluate('window.fixtureClosed'), true)
     assert.deepEqual(errors, [])
-  } finally { await browser.close() }
+  } finally { releaseReset?.(); await browser.close() }
 })

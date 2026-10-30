@@ -26,8 +26,20 @@ export const handleDemoAdmin: DemoHttpHandler = ({ store, request, url, body, pr
     const email = stringField(body, 'email').trim(), role = stringField(body, 'role')
     if (!email.includes('@') || !['owner', 'manager', 'member'].includes(role)) throw new DemoError('계정과 역할을 확인해 주세요.')
     if (users.some(user => user.email === email)) throw new DemoError('이미 추가한 데모 계정입니다.', 409)
-    users.push({ email, role: role as AdminUser['role'], mustChangePassword: true, createdAt: Date.now() })
+    users.push({ email, role: role as AdminUser['role'], hasPassword: true, mustChangePassword: true, createdAt: Date.now() })
     store.setState('admin-users', users); return demoJson({ ok: true, email, tempPassword: 'DEMO-ONLY-NOT-A-PASSWORD' })
+  }
+  const resetPassword = route.match(/^\/api\/admin\/users\/([^/]+)\/reset-password$/)
+  if (resetPassword) {
+    if (store.authStatus().role !== 'owner') throw new DemoError('owner만 비밀번호를 초기화할 수 있습니다.', 403)
+    requireMethod(request, 'POST')
+    const accountId = decodeURIComponent(resetPassword[1]).trim().toLowerCase(), user = users.find(user => user.email === accountId)
+    if (!user) throw new DemoError('데모 계정을 찾을 수 없습니다.', 404)
+    if (user.email === store.authStatus().email) throw new DemoError('현재 로그인한 계정은 내 계정에서 비밀번호를 변경해 주세요.')
+    if (!user.hasPassword) throw new DemoError('비밀번호가 없는 계정은 초기화할 수 없습니다.')
+    user.mustChangePassword = true
+    store.setState('admin-users', users)
+    return demoJson({ ok: true, email: user.email, tempPassword: 'DEMO-ONLY-NOT-A-PASSWORD' })
   }
   const role = route.match(/^\/api\/admin\/users\/([^/]+)\/role$/)
   if (role) {

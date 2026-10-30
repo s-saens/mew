@@ -2,17 +2,18 @@ import { MewlinkAccessSettings } from './mewlink-access-settings'
 import { useCallback, useEffect, useId, useState } from 'react'
 import { DialogFrame, HoverTipLayer } from '@mew/ui'
 import { Plus, Xmark } from 'iconoir-react'
-import { addUser, deleteUser, fetchUsers, setUserRole, type AdminUser, type Role } from '../api/client'
+import { addUser, deleteUser, fetchUsers, resetUserPassword, setUserRole, type AdminUser, type Role } from '../api/client'
 import { AccountAccessMatrix } from './account-access-matrix'
 import { useI18n } from '../i18n'
 import { AccountRoleSelect } from './account-role-select'
 
 interface AdminSettingsModalProps {
   onClose: () => void
+  currentEmail: string | null
 }
 
 /** owner 계정·역할·권한 관리. */
-export function AdminSettingsModal({ onClose }: AdminSettingsModalProps) {
+export function AdminSettingsModal({ onClose, currentEmail }: AdminSettingsModalProps) {
   const { t } = useI18n()
   const titleId = useId()
   const [showAdd, setShowAdd] = useState(false)
@@ -23,6 +24,7 @@ export function AdminSettingsModal({ onClose }: AdminSettingsModalProps) {
   const [newEmail, setNewEmail] = useState('')
   const [newRole, setNewRole] = useState<Role>('member')
   const [addBusy, setAddBusy] = useState(false)
+  const [resetBusy, setResetBusy] = useState(false)
   const [addError, setAddError] = useState<string | null>(null)
   const [tempPassword, setTempPassword] = useState<{ email: string; password: string } | null>(null)
 
@@ -66,18 +68,27 @@ export function AdminSettingsModal({ onClose }: AdminSettingsModalProps) {
     setUsers(current => current.filter(user => user.email !== email))
   }
 
+  async function handlePasswordReset(email: string) {
+    setResetBusy(true)
+    try {
+      const result = await resetUserPassword(email)
+      setUsers(current => current.map(user => user.email === email ? { ...user, mustChangePassword: true } : user))
+      return result.tempPassword
+    } finally { setResetBusy(false) }
+  }
+
   const inputClass =
     'min-h-8 w-full rounded border border-edge-strong bg-surface px-2 py-1 text-sm text-ink outline-none placeholder:text-ink-faint focus:border-edge-bright disabled:opacity-60 pointer-coarse:min-h-11'
 
   return (
-    <DialogFrame labelledBy={titleId} onClose={onClose} busy={addBusy} size="settings" className="flex flex-col">
+    <DialogFrame labelledBy={titleId} onClose={onClose} busy={addBusy || resetBusy} size="settings" className="flex flex-col">
       <HoverTipLayer className="flex min-h-0 flex-1 flex-col">
         <header className="flex shrink-0 items-center gap-2 border-b border-edge px-3 py-2">
           <h2 id={titleId} className="text-sm font-semibold text-ink-bright">{t('admin.title')}</h2>
           {!loading && <span className="text-xs tabular-nums text-ink-secondary">{users.length}</span>}
           <div className="ml-auto flex items-center gap-1">
-            <button type="button" disabled={addBusy} aria-label={t('admin.addAllowedEmail')} aria-expanded={showAdd} aria-controls={showAdd ? `${titleId}-add` : undefined} data-tip={t('admin.addAllowedEmail')} onClick={() => setShowAdd(value => !value)} className={`flex h-8 w-8 items-center justify-center rounded-md focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-40 ${showAdd ? 'bg-accent/15 text-accent' : 'text-ink-secondary hover:bg-surface-hover hover:text-ink'}`}><Plus width={18} height={18} aria-hidden="true" /></button>
-            <button type="button" onClick={onClose} disabled={addBusy} aria-label={t('common.close')} data-tip={t('common.close')} className="flex h-8 w-8 items-center justify-center rounded-md text-ink-secondary hover:bg-surface-hover hover:text-ink focus-visible:ring-2 focus-visible:ring-accent"><Xmark width={18} height={18} aria-hidden="true" /></button>
+            <button type="button" disabled={addBusy || resetBusy} aria-label={t('admin.addAllowedEmail')} aria-expanded={showAdd} aria-controls={showAdd ? `${titleId}-add` : undefined} data-tip={t('admin.addAllowedEmail')} onClick={() => setShowAdd(value => !value)} className={`flex h-8 w-8 items-center justify-center rounded-md focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-40 ${showAdd ? 'bg-accent/15 text-accent' : 'text-ink-secondary hover:bg-surface-hover hover:text-ink'}`}><Plus width={18} height={18} aria-hidden="true" /></button>
+            <button type="button" onClick={onClose} disabled={addBusy || resetBusy} aria-label={t('common.close')} data-tip={t('common.close')} className="flex h-8 w-8 items-center justify-center rounded-md text-ink-secondary hover:bg-surface-hover hover:text-ink focus-visible:ring-2 focus-visible:ring-accent"><Xmark width={18} height={18} aria-hidden="true" /></button>
           </div>
         </header>
         {showAdd && <form id={`${titleId}-add`} aria-label={t('admin.addAllowedEmail')} onSubmit={handleAddUser} className="flex shrink-0 flex-col gap-2 border-b border-edge bg-surface-deep p-3">
@@ -89,15 +100,15 @@ export function AdminSettingsModal({ onClose }: AdminSettingsModalProps) {
               aria-label={t('auth.email')}
               placeholder={t('auth.email')}
               autoComplete="off"
-              disabled={addBusy}
+              disabled={addBusy || resetBusy}
               required
               className={`${inputClass} col-span-2 min-w-0 sm:col-span-1`}
             />
-            <AccountRoleSelect iconOnly={false} label={t('access.role')} value={newRole} disabled={addBusy}
+            <AccountRoleSelect iconOnly={false} label={t('access.role')} value={newRole} disabled={addBusy || resetBusy}
               onChange={setNewRole} className="min-w-0" />
             <button
               type="submit"
-              disabled={addBusy || !newEmail.trim()}
+              disabled={addBusy || resetBusy || !newEmail.trim()}
               className="min-h-8 rounded-md bg-accent px-3 py-1 text-sm font-medium text-ink-on-accent hover:bg-accent-strong disabled:opacity-40 pointer-coarse:min-h-11"
             >
               {addBusy ? t('admin.adding') : t('common.add')}
@@ -128,7 +139,7 @@ export function AdminSettingsModal({ onClose }: AdminSettingsModalProps) {
         <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-3">
           {loading && <p role="status" className="text-sm text-ink-secondary">{t('common.loading')}</p>}
           {loadError && <p role="alert" className="text-sm text-danger">{loadError}</p>}
-          {!loading && <AccountAccessMatrix users={users} onRoleChange={handleRoleChange} onDelete={handleDelete} />}
+          {!loading && <AccountAccessMatrix users={users} currentEmail={currentEmail} disabled={resetBusy} onRoleChange={handleRoleChange} onDelete={handleDelete} onResetPassword={handlePasswordReset} />}
         </div>
         <div className="shrink-0 border-t border-edge px-3 py-2"><MewlinkAccessSettings users={users} onUsersChanged={loadUsers} /></div>
       </HoverTipLayer>

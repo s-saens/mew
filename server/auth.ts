@@ -354,6 +354,12 @@ export function upsertUser(accountId: string, record: UserRecord) {
 export function revokeAccountCredentials(accountId: string): void {
   const key = normalizeEmail(accountId)
   for (const provider of gitProviders) gitConnections.remove(key, provider.id, provider.host)
+  revokeUserSessions(key)
+}
+
+/** Revoke browser tokens without deleting independent Git or Mewlink credentials. */
+export function revokeUserSessions(accountId: string): void {
+  const key = normalizeEmail(accountId)
   ensureSessionsLoaded()
   let sessionsChanged = false
   for (const [hash, session] of sessions) {

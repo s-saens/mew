@@ -1,8 +1,8 @@
 ---
 title: "Accounts, permissions, and Mewlink identity linking"
-description: "Covers the photo menu and saving the display name for your account; owner management of accounts and feature/file permissions; linking Mewlink identities to existing email accounts, including deletion of the previous account when merging; and the host user management CLI. Links to separate owning documents for role and sharing security standards and implementation contracts."
+description: "Covers personal profiles, owner management of account roles and feature/file permissions, temporary password resets from account popups, Mewlink identity linking and merging, and the host user management CLI. Links to owning security and implementation contracts."
 created: 2026-10-22
-updated: 2026-10-26
+updated: 2026-10-31
 상위파일: "MOC.md"
 ---
 
@@ -14,13 +14,15 @@ Covers account actions in the app and user management commands on the host. Foll
 
 - **Log in**: Sign in with the email address and temporary password registered by an administrator, and change your password on your first password login. When accessing through Mewlink, you can also log in with an approved external account. Public signup is not available.
 - **My Account**: Go to Menu → Settings → Account to change your display name, profile image, or password, or to log out. Changing your password invalidates password sessions on other devices. The password form is not shown to external-only users without passwords, and external logout ends the central session.
-- **Account Management (owner)**: Go to Menu → Account Management, choose an email and role to add an account, and send the issued temporary password to that user. The feature permissions table shows each account and guest as rows and features as columns. Checkbox changes are saved immediately, and Reset restores the role defaults. Roles are also changed in the same table.
+- **Account Management (owner)**: Go to Menu → Account Management, choose an email and role to add an account, and send the issued temporary password to that user. The permission tables show accounts and guest as columns, with roles and permission items as rows. Click an account photo or initial for account actions. Checkbox changes are saved immediately, and Reset beside a permission restores the role default.
 - **Remote Access (owner)**: In local mew, click **Header Menu → Mewlink → Remote Access → Register Device**. Mewlink login manages device registration, listing, and deletion, while visitors to a device address log in with a local password or an approved external identity. Approving a request in **Account Management → Mewlink Account Access** immediately registers a member without a password; revoke external login on the same screen. Change roles in Account Management. Registration itself does not grant external access permissions. [Device registration](../../.mew/docs/operations/remote-central.md#5-connect-your-mew) · [Identity linking](../../.mew/docs/development/remote-access.md#approved-mewlink-account-login).
 - **Host Administration**: Use the CLI below to create the initial owner, reissue passwords, or delete accounts. [Security](../operations/security.md#roles) is the canonical source for permissions by role.
 
 Click the profile photo in My Account to open the **Default**, **Choose Photo**, and **Paste from Clipboard** menu. **Default** restores the default photo display. After changing the photo or display name, click **Save** to the right of the name field.
 
 In the **File and Folder Permissions** tab, browse folders or enter a relative path, then select Inherit, Block, Read, or Edit for each account. Folder rules apply to descendants, and more specific rules take precedence. Disabling file reading or editing in the feature table overrides per-file allowances. Guest settings apply to all visitors who are not logged in.
+
+To reset another user's password, click their photo or initial in either permission table, choose **Reset password**, and confirm. Copy the temporary password from the popup and send it securely to that user before closing it; it is not displayed again. Existing browser login sessions for that account end, and the user must choose a new password when they next sign in with a password. A failed reset can be retried in the same popup. Your own password is changed in **Settings → Account**. Accounts that only use Mewlink have no local password to reset; manage their external access under **Mewlink Account Access** instead. Password reset preserves account roles and permissions and does not revoke approved external identity connections.
 
 ### Linking Mewlink to an Existing Email Account
 

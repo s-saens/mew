@@ -7,6 +7,7 @@ import fs from 'node:fs'
 import { MEWPET_ANIMATIONS, type MewpetSkinCatalog } from '../../shared/mewpet-skins.ts'
 import { THEME_PRESETS } from '../../shared/theme.ts'
 import { createDemoSocketFactory } from './socket.ts'
+import type { AdminUser } from '../api/client.ts'
 
 function write(method: string, body: unknown): RequestInit { return { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } }
 async function data(store: DemoWorkspaceStore, path: string, init?: RequestInit) {
@@ -184,6 +185,63 @@ test('profile updates use the real account contract without introducing real cre
     const response = await demoFetch(store, path, write('POST', { email: 'real@example.test', password: 'never store credentials' }))
     assert.equal(response.status, 501)
     assert.match((await response.json()).error, /실제 계정/)
+  }
+})
+
+test('administrator password resets preserve demo account identity and access without issuing real credentials', async t => {
+  const store = new DemoWorkspaceStore(), other = new DemoWorkspaceStore()
+  t.after(() => { store.close(); other.close() })
+  const subject = 'member@example.test'
+  await data(store, '/api/admin/access/feature', write('PUT', { subject, feature: 'terminal', enabled: true }))
+  await data(store, '/api/admin/access/path', write('PUT', { subject, project: '.workspace', path: 'src', access: 'deny' }))
+  const users = await data(store, '/api/admin/users') as AdminUser[]
+  const settings = await data(store, '/api/admin/access')
+  const permissions = await data(store, '/api/admin/access/path?project=.workspace&path=src')
+  const reset = await data(store, `/api/admin/users/${encodeURIComponent(subject)}/reset-password`, { method: 'POST' })
+  assert.deepEqual(reset, { ok: true, email: subject, tempPassword: 'DEMO-ONLY-NOT-A-PASSWORD' })
+  assert.deepEqual(await data(store, '/api/admin/users'), users.map(user => user.email === subject ? { ...user, mustChangePassword: true } : user))
+  assert.deepEqual(await data(store, '/api/admin/access'), settings)
+  assert.deepEqual(await data(store, '/api/admin/access/path?project=.workspace&path=src'), permissions)
+  assert.deepEqual(await data(other, '/api/admin/users'), users)
+  assert.deepEqual(store.gitWorkingTree().files, [])
+  store.reset()
+  assert.deepEqual(await data(store, '/api/admin/users'), users)
+})
+
+test('demo password resets protect self and passwordless accounts and require an owner POST', async t => {
+  const store = new DemoWorkspaceStore()
+  t.after(() => store.close())
+  const current = store.authStatus().email!
+  const users = await data(store, '/api/admin/users') as AdminUser[]
+  const passwordless: AdminUser = { email: 'mewlink@example.test', displayName: 'Mewlink member', role: 'member', hasPassword: false, mustChangePassword: false, createdAt: 0 }
+  store.setState('admin-users', [...users, passwordless])
+  const before = await data(store, '/api/admin/users')
+  for (const [subject, status] of [[current, 400], [passwordless.email, 400], ['missing@example.test', 404]] as const) {
+    const response = await demoFetch(store, `/api/admin/users/${encodeURIComponent(subject)}/reset-password`, { method: 'POST' })
+    assert.equal(response.status, status)
+  }
+  assert.equal((await demoFetch(store, '/api/admin/users/member%40example.test/reset-password')).status, 405)
+  assert.deepEqual(await data(store, '/api/admin/users'), before)
+  const auth = store.authStatus()
+  for (const role of ['manager', 'member', 'guest'] as const) {
+    store.authStatus = () => ({ ...auth, role })
+    assert.equal((await demoFetch(store, '/api/admin/users/member%40example.test/reset-password', { method: 'POST' })).status, 403)
+  }
+  store.authStatus = () => auth
+  assert.deepEqual(await data(store, '/api/admin/users'), before)
+})
+
+test('new demo password accounts can reset passwords in every account role', async t => {
+  const store = new DemoWorkspaceStore()
+  t.after(() => store.close())
+  for (const role of ['member', 'manager', 'owner']) {
+    const email = `new-${role}@example.test`
+    await data(store, '/api/admin/users', write('POST', { email, role }))
+    assert.deepEqual(await data(store, `/api/admin/users/${encodeURIComponent(email)}/reset-password`, { method: 'POST' }), { ok: true, email, tempPassword: 'DEMO-ONLY-NOT-A-PASSWORD' })
+    const user = (await data(store, '/api/admin/users') as AdminUser[]).find(user => user.email === email)!
+    assert.equal(user.role, role)
+    assert.equal(user.hasPassword, true)
+    assert.equal(user.mustChangePassword, true)
   }
 })
 

@@ -1243,6 +1243,11 @@ export async function deleteUser(email: string): Promise<void> {
   await mewFetch(`/api/admin/users/${encodeURIComponent(email)}`, { method: 'DELETE' }).then(json<{ ok: true }>)
 }
 
+export function resetUserPassword(email: string): Promise<{ ok: true; email: string; tempPassword: string }> {
+  return mewFetch(`/api/admin/users/${encodeURIComponent(email)}/reset-password`, { method: 'POST' })
+    .then(json<{ ok: true; email: string; tempPassword: string }>)
+}
+
 export interface FileHistoryEntry {
   hash: string
   date: string
