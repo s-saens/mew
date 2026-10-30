@@ -1,6 +1,6 @@
 ---
 title: "Mewlink device registration and locally authenticated P2P access contract"
-description: "Defines Mewlink integration exclusively with production servers and the exclusion of development servers, public device addresses, public base forwarding for port and scoped public file/folder links, local authentication and anonymous capability admission, browser trust, revocation, and reconnection. Explains security and operational boundaries for one-time setup, resource validation, body timeouts, host heartbeat rechecks, lightweight presence queries, cause-specific retries, inactive waiting, RTC recovery, and signaling reattachment."
+description: "Defines Mewlink integration exclusively with production servers and the exclusion of development servers, public device addresses, public base forwarding for port and scoped public file/folder links, local authentication and anonymous capability admission, browser trust, revocation, and reconnection. Explains direct deep-link versus connection-relative startup resources, security and operational boundaries for one-time setup, resource validation, body timeouts, host heartbeat rechecks, lightweight presence queries, cause-specific retries, inactive waiting, RTC recovery, and signaling reattachment."
 created: 2026-10-07
 updated: "2026-10-30"
 ---
@@ -24,6 +24,8 @@ When retaining previous provider callbacks, OAuth is handled at `OAUTH_ORIGIN`, 
 ## Public file and folder links
 
 A public link appends `/share/f/{id}` or `/share/d/{id}` to `https://mew.run/{username}/{device}`. The central worker preserves that typed share path through the connection parent, app launcher, and `mew:context` handoff. The installed app selects its standalone public editor after remote transport initialization, without opening the workspace or login UI. Direct localhost and custom-domain links select the same editor from their pathname.
+
+The shared Vite output keeps `base: './'` for per-connection Mewlink resource URLs. The host's direct SPA fallback uses `server/direct-ui.ts` to rewrite relative startup script and link attributes in its HTML response to host-root paths. This lets `/share/f/{id}` and `/share/d/{id}` load scripts and styles from `/assets/`. Document links and inline script text retain their original content, and the saved HTML remains unchanged. `/api/remote-ui/file?path=/index.html` reads that unchanged artifact for the isolated Mewlink resource entrypoint.
 
 The host dispatcher permits only the exact `/api/public-shares/{f|d}/{id}` capability endpoints before local login. Metadata, tree, file, and raw reads and existing-file content updates are authorized by the [public capability service](access-control.md#public-capability-links). Management routes, other work APIs, and work WebSockets still require local authentication. Invalid IDs do not retain a public connection. A validated capability supplies a live revalidation callback for connection lifetime; disabling publication or losing creator permissions removes that anonymous authorization. Authenticated session revocation remains unchanged.
 

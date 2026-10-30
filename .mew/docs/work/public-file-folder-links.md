@@ -1,6 +1,6 @@
 ---
 title: "Public file and folder links work record"
-description: "Records the 2026-10-30 implementation of revocable public file/folder links, explorer controls and badges, constrained anonymous editing, local verification, and pending host and central deployment."
+description: "Records the 2026-10-30 public file/folder link implementation and follow-up for blank direct deep links: startup asset URL correction, regression checks, and read-only evidence that deployed Mewlink lacks the public routes and handoff. Distinguishes local verification from pending host and central application."
 created: "2026-10-30"
 updated: "2026-10-30"
 ---
@@ -36,3 +36,18 @@ Current behavior belongs to the [feature contract](../features/appearance-accoun
 No app build, deployment, launcher execution, or server start/restart was performed. The user must build and apply the host changes. Mewlink additionally needs the separate central source changes applied from the excluded `mewlink/` directory; those files are not included in the host Git commit. Localhost and custom-domain links use the current origin, which visitors must be able to reach.
 
 File links do not publish sibling resources. Directory links restrict local resources to the shared root. Public editing does not provide real-time collaboration, uploads, comments, database operations, or file creation/deletion/renaming. Live external-network and physical-device checks remain pending.
+
+## Follow-up: blank direct links and Mewlink 404
+
+The user reported a blank page through a tunnel and a missing page through Mewlink. A read-only check against the already running local instance reproduced the direct failure: a public URL returned HTML containing `./assets/index-….js`, which resolved under `/share/f/assets/`. That script request received HTML rather than JavaScript. The earlier browser fixture used root-level script URLs and did not reproduce the generated production HTML's relative asset layout.
+
+`server/direct-ui.ts` now transforms startup resource attributes only in direct SPA responses. Script, stylesheet, and module-preload URLs resolve from the host root at nested entrypoints; document anchors, relative document links, inline script text, and saved artifacts are preserved. The Mewlink resource router continues reading the original relative build output. The existing themed-404 routing from concurrent work is preserved.
+
+Read-only Mewlink checks used synthetic device names and capability IDs. The deployed service returned 200 for a device launcher but 404 with an empty body for both typed public paths. Its served connection bundle lacked the `sharePath` handoff present in current private source. This confirms that the central Worker and connection frontend need separate user deployment; host source changes alone cannot make those deployed routes available.
+
+Follow-up checks:
+
+- `node --test server/public-share-entry-ui.test.ts`: 2 passed. Chromium loads root, file, and directory entrypoints through real Express/static handlers and an in-memory HTTP connection, including generated relative scripts, styles, and a dynamic import. Assertions cover HEAD responses, cache headers, unchanged artifacts, and preservation of document links and inline code. The fixture opens no listening server and does not modify the running instance.
+- `npx tsc -b` and targeted oxlint for the response helper and regression fixture passed.
+
+The source fix has not been applied to the running host, and no central deployment was performed. The user must apply the host server change and deploy the current central Worker/frontend before verifying both public entrypoints again.

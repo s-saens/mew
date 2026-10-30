@@ -33,6 +33,7 @@ import { watchDocsTree } from './watcher.ts'
 import { refreshWindowsScheduledTask } from './platform/windows/scheduler.ts'
 import { DATA_DIR } from './dataDir.ts'
 import { workspaceSearchPolicy } from './search-indexing.ts'
+import { sendDirectUiHtml } from './direct-ui.ts'
 import { appRoute } from '../shared/app-route.ts'
 
 // 프로덕션 서버 — `npm run build` 후 `npm run serve`.
@@ -91,14 +92,14 @@ function addStaticAndSpaFallback(app: express.Express) {
   // vite가 해시를 붙이는 /assets는 영구 캐시, 그 외(index.html 등)는 항상 재검증
   app.use('/assets', express.static(path.join(DIST, 'assets'), { immutable: true, maxAge: '30d' }))
   app.use(express.static(DIST, { index: false }))
-  app.use((req, res) => {
+  app.use(async (req, res) => {
     if (req.method !== 'GET' && req.method !== 'HEAD') {
       res.status(404).end()
       return
     }
     res.setHeader('Cache-Control', 'no-cache')
     if (appRoute(req.path) === 'not-found') res.status(404)
-    res.sendFile(INDEX_HTML)
+    await sendDirectUiHtml(res, INDEX_HTML)
   })
 }
 
