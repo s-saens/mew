@@ -4,11 +4,11 @@ parent: "mew-settings"
 title: "Accounts, roles, feature permissions, and guest sharing"
 status: "implemented"
 created: "2026-09-18"
-updated: "2026-10-30"
+updated: "2026-10-31"
 status_hash: "65b2a28fe6a84c2ae5140eff868f32aefcd8cd25f5aabc3ea17d470b8cd0ec3d"
 files: ["src/components/account-access-matrix.tsx", "src/components/account-role-select.tsx", "src/components/account-column-headers.tsx", "src/components/account-profile-form.tsx", "src/components/AdminSettingsModal.tsx", "src/components/mewlink-access-settings.tsx", "src/components/mewlink-account-connection.tsx", "src/components/SettingsModal.tsx", "src/components/LoginPage.tsx", "server/access-policy.ts", "server/auth.ts", "server/authRoutes.ts", "server/mewlink-identities.ts", "server/mewlink-auth-routes.ts"]
 commits: []
-description: "Defines My Account with a photo menu and a Save button beside the name, an account management dialog the same size as Settings, a responsive add form, permission tables with profile photo columns and item rows, and account popups and role lists within the modal. Covers passwords, logout, owner management of roles, feature/file permissions and deletion, Mewlink access approval, email account linking, merging and revocation, guest path permissions, and revocable public file/folder links with viewing or editing, explorer badges, a minimal anonymous editor, and deep-link resource loading; excludes device registration and public sign-up."
+description: "Defines My Account with a photo menu and a Save button beside the name, an account management dialog the same size as Settings, a responsive add form, permission tables and account popups with profile photos or initial fallbacks, and role lists within the modal. Covers passwords, logout, owner management of roles, feature/file permissions and deletion, Mewlink access approval, email account linking, merging and revocation, guest path permissions, and revocable public file/folder links with viewing or editing, explorer badges, a minimal anonymous editor, and deep-link resource loading; excludes device registration and public sign-up."
 상위파일:
   - "MOC.md"
   - "_appearance-accounts-operations.md"
@@ -24,7 +24,7 @@ description: "Defines My Account with a photo menu and a Save button beside the 
 
 - My Account places **My Account** and the email address at the upper right of the profile photo, with the display name input and **Save** button side by side below them. The profile photo serves as a button that opens a menu with **Default**, **Choose Photo**, and **Paste from Clipboard**. No separate file selection or photo removal buttons, or file extension/size guidance, are displayed.
 
-- Feature and file permission tables place profile photos in columns and roles and permission items in rows. A default icon is displayed if a photo is missing or fails to load. Pressing a photo provides the name, account ID, role changes, and account deletion. For guest, only a group icon and name are displayed.
+- Feature and file permission tables place profile photos in columns and roles and permission items in rows. If a photo is missing or fails to load, both the column header and account popup display the uppercase first Unicode code point of the trimmed display name, falling back to the account ID when the name is blank. A changed photo URL is attempted even after a previous image failed. Pressing a photo or initial provides the name, account ID, role changes, and account deletion. For guest, only a group icon and name are displayed.
 - Deletion requires confirmation within the popup, and failures can be retried in the same place. Users cannot delete themselves or the last owner. Account deletion revokes login and feature/file permissions while preserving project files, personal settings, and work records.
 
 - When an owner approves an access request from a Mewlink login identity, a member without a password is registered immediately and displayed in the approved account list. Roles are changed in account management.
@@ -83,6 +83,7 @@ description: "Defines My Account with a photo menu and a Save button beside the 
 <!-- mew:validation:start -->
 ## Verification
 
+- `account-access-ui.test.ts` includes regression coverage for missing and broken photos, initial fallbacks in both permission tables and account popups, blank names, Korean and supplementary Unicode initials, photo replacement after a load failure, and the unchanged guest group icon. See the [initial fallback work record](../../work/account-avatar-fallback.md) for local results and application limits.
 - `account-access-ui.test.ts` checks dialog size, 64px account columns, add-form alignment, photo popup modal boundaries and spacing from the triggering photo, role/file permission list positions and actual click targets, and nested Esc dismissal across 9 combinations of light, midnight, and dark themes at 1366px, 390px, and 320px. At 1366×360 and 390×480, it also checks popup screen boundaries during deletion confirmation and theme changes. It also verifies saving role, feature, and file permissions, keyboard input, deletion cancellation, retry after failure, and removal of the account from both permission tables on success. These are isolated Chromium checks; changes in the actual production UI are checked after the user builds the app.
 - `admin-users.test.ts` verifies owner authorization, protection of the current user and last owner, deletion of password/external accounts, revocation of all login and workspace permissions, preservation of files and records, and invalidation of previous sessions when the same ID is registered again, in an isolated environment. Demo deletion and re-registration were checked with `src/demo/host.test.ts`.
 

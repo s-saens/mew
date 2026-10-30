@@ -81,6 +81,22 @@ test('account controls save roles, features and file rules and confirm deletion 
     })
     const page = await context.newPage(); page.setDefaultTimeout(4000)
     const errors: string[] = []; page.on('pageerror', error => errors.push(error.message))
+    async function assertAvatarFallbacks() {
+      const headers = page.getByRole('columnheader')
+      const owner = headers.getByRole('button', { name: 'owner (owner@example.test)', exact: true })
+      const manager = headers.getByRole('button', { name: 'manager (manager@example.test)', exact: true })
+      await owner.getByText('O', { exact: true }).waitFor()
+      await manager.getByText('M', { exact: true }).waitFor()
+      assert.equal(await owner.locator('img, svg').count(), 0, 'a missing photo displays an initial')
+      assert.equal(await manager.locator('img, svg').count(), 0, 'a failed photo displays an initial')
+      assert.equal(await headers.getByRole('button', { name: 'guest', exact: true }).locator('svg').count(), 1, 'guest keeps its group icon')
+      await manager.click()
+      const popup = page.getByRole('region', { name: '계정: manager', exact: true })
+      await popup.waitFor()
+      assert.equal(await popup.locator('div[aria-hidden="true"]').innerText(), 'M', 'the popup shares the initial fallback')
+      await page.keyboard.press('Escape')
+      await popup.waitFor({ state: 'hidden' })
+    }
     await page.goto('http://mew-access.test/')
     const addAccount = page.getByRole('button', { name: '허용 이메일 추가', exact: true })
     await addAccount.click()
@@ -89,8 +105,25 @@ test('account controls save roles, features and file rules and confirm deletion 
     await page.getByRole('textbox', { name: '이메일', exact: true }).waitFor({ state: 'hidden' })
     const agent = page.getByRole('checkbox', { name: 'member@example.test 에이전트 창', exact: true })
     await agent.waitFor()
+    await assertAvatarFallbacks()
     assert.equal(await page.getByRole('columnheader').count(), rows.length + 1)
     assert.equal(await page.getByRole('row').filter({ has: page.getByRole('rowheader', { name: '에이전트 창', exact: true }) }).getByRole('checkbox').count(), rows.length)
+    assert.equal(await agent.isChecked(), false)
+    for (const [displayName, initial] of [['   ', 'O'], ['  김뮤  ', '김'], ['𐐨', '𐐀'], ['owner', 'O']]) {
+      rows[0].displayName = displayName
+      rows[1].avatarDataUrl = displayName === '𐐨' ? avatar : 'data:image/png;base64,broken'
+      await Promise.all([
+        page.waitForResponse(response => new URL(response.url()).pathname === '/api/admin/access/feature'),
+        agent.click(),
+      ])
+      const headers = page.getByRole('columnheader')
+      await headers.getByRole('button', { name: /\(owner@example\.test\)$/ }).getByText(initial, { exact: true }).waitFor()
+      const manager = headers.getByRole('button', { name: 'manager (manager@example.test)', exact: true })
+      if (displayName === '𐐨') {
+        await manager.locator('img').waitFor()
+        assert.equal(await manager.locator('img').evaluate(el => el.complete && el.naturalWidth > 0), true, 'a new photo replaces a previously failed one')
+      } else await manager.getByText('M', { exact: true }).waitFor()
+    }
     assert.equal(await agent.isChecked(), false)
     assert.equal(await page.getByRole('checkbox', { name: 'guest 터미널', exact: true }).isDisabled(), true)
     await agent.click()
@@ -119,6 +152,7 @@ test('account controls save roles, features and file rules and confirm deletion 
       await page.locator('html').evaluate((el, theme) => (el.ownerDocument.defaultView as unknown as { fixtureTheme: (theme: string) => void }).fixtureTheme(theme), theme)
       await page.setViewportSize({ width, height: 900 })
       await page.getByRole('tab', { name: '기능 권한', exact: true }).click()
+      await assertAvatarFallbacks()
       const dialog = page.getByRole('dialog')
       const dialogBox = await dialog.boundingBox()
       assert.ok(dialogBox)
@@ -204,6 +238,7 @@ test('account controls save roles, features and file rules and confirm deletion 
         page.getByRole('button', { name: 'readme.md', exact: true }).click(),
       ])
       await page.getByRole('rowheader', { name: '설정', exact: true }).waitFor()
+      await assertAvatarFallbacks()
       const fileAvatar = page.getByRole('columnheader').getByRole('button', { name: 'Member with a long name (member@example.test)', exact: true }).locator('img')
       assert.equal(await fileAvatar.getAttribute('src'), avatar)
       assert.equal(await fileAvatar.evaluate(el => el.complete && el.naturalWidth > 0), true)

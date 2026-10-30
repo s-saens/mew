@@ -1,6 +1,6 @@
 import { useId, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Group, Trash, User, Xmark } from 'iconoir-react'
+import { Group, Trash, Xmark } from 'iconoir-react'
 import { getFixedPopupLayout, useOverlayDismiss } from '@mew/ui'
 import type { AccessRow } from '../../shared/access-policy'
 import { uiText } from '@mew/ui/i18n-core'
@@ -78,20 +78,21 @@ function AccountIcon({ account, onRoleChange, onDelete, disabled, lastOwner }: {
     finally { setBusy(false) }
   }
   const showAvatar = account.subject !== 'guest' && account.avatarDataUrl && account.avatarDataUrl !== failedAvatar
-  const Icon = account.subject === 'guest' ? Group : User
+  const initial = [...(account.displayName.trim() || account.subject.trim())][0]?.toUpperCase() ?? '?'
+  const fallback = <span aria-hidden="true" className="text-sm font-semibold leading-none">{initial}</span>
   return <>
     <button ref={trigger} type="button" aria-label={name} aria-expanded={open} aria-controls={open ? id : undefined} data-tip={name}
       onClick={event => { if (open) close(); else { setPortalContainer(event.currentTarget.closest<HTMLElement>('[role="dialog"]')); setOpen(true) } }}
       className={`mx-auto flex h-9 w-9 items-center justify-center rounded-full outline-none ring-offset-2 ring-offset-surface focus-visible:ring-2 focus-visible:ring-accent pointer-coarse:h-11 pointer-coarse:w-11 ${open ? 'bg-accent/15 text-ink ring-2 ring-accent' : 'bg-surface-raised text-ink-secondary hover:ring-2 hover:ring-edge-bright hover:text-ink'}`}>
       {showAvatar
         ? <img src={account.avatarDataUrl!} alt="" className="h-full w-full rounded-full object-cover" onError={() => setFailedAvatar(account.avatarDataUrl)} />
-        : <Icon width={18} height={18} aria-hidden="true" />}
+        : account.subject === 'guest' ? <Group width={18} height={18} aria-hidden="true" /> : fallback}
     </button>
     {open && createPortal(<div ref={popup} id={id} role="region" aria-label={`${t('access.account')}: ${account.displayName}`}
       className="mew-dialog fixed z-[1300] overflow-y-auto overscroll-contain rounded-lg border border-edge-bright bg-surface p-3 text-left text-sm font-normal text-ink shadow-xl">
       <div className="flex items-start gap-2.5">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-surface-raised text-ink-secondary" aria-hidden="true">
-          {showAvatar ? <img src={account.avatarDataUrl!} alt="" className="h-full w-full object-cover" onError={() => setFailedAvatar(account.avatarDataUrl)} /> : <Icon width={20} height={20} />}
+          {showAvatar ? <img src={account.avatarDataUrl!} alt="" className="h-full w-full object-cover" onError={() => setFailedAvatar(account.avatarDataUrl)} /> : account.subject === 'guest' ? <Group width={20} height={20} /> : fallback}
         </div>
         <div className="min-w-0 flex-1 py-0.5">
           <div className="select-text break-words font-semibold text-ink-bright">{account.displayName}</div>
