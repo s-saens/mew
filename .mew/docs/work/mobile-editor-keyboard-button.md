@@ -1,6 +1,6 @@
 ---
 title: "Floating mobile editor keyboard button"
-description: "Records the initial mobile keyboard button and the follow-up explicit-only activation and outside-tap dismissal policy, automated verification, and pending physical-device and runtime application checks."
+description: "Records the initial mobile keyboard button, explicit-only activation follow-up, and subsequent removal in favor of native body-tap input, with local verification and device/runtime limitations."
 created: "2026-10-30"
 updated: "2026-10-30"
 ---
@@ -9,7 +9,7 @@ updated: "2026-10-30"
 
 Added a translucent circular keyboard button at the bottom center of editable mobile Hotview, Markdown Plain, and code bodies. It opens input at the current selection, hides when the keyboard is detected, and returns after dismissal. Activation releases the touch-selection suppression hint and uses the keyboard API when available, restoring its policy afterward. Unsupported or rejected API calls use native focus. Desktop, read-only, loading, revalidating, partial-preview, and media views exclude the button.
 
-Current behavior is owned by [Mobile editor and keyboard](../development/ui-contracts.md#mobile-editor-and-keyboard), the [Markdown feature](../features/document-code-media-editing/markdown-hotview-source-and-properties.md), and the [code editing feature](../features/document-code-media-editing/code-text-editing-and-document-search.md). The [editing guide](../../../docs/guides/editor.md#basic-editing) describes the control for users.
+Current behavior is owned by [Mobile editor and keyboard](../development/ui-contracts.md#mobile-editor-and-keyboard), the [Markdown feature](../features/document-code-media-editing/markdown-hotview-source-and-properties.md), and the [code editing feature](../features/document-code-media-editing/code-text-editing-and-document-search.md). The [editing guide](../../../docs/guides/editor.md#basic-editing) describes current input behavior for users.
 
 ## Initial addition: verification
 
@@ -39,3 +39,14 @@ This supersedes the initial addition's temporary-policy behavior above. The curr
 - `npm run check:docs` passed with 574 descriptions and no metadata or local-link errors. `git diff --check` passed.
 
 Physical OS keyboard opening and dismissal remain unverified. This follow-up did not build the application, deploy, run the launcher, or start, stop, or restart servers.
+
+## Follow-up: restore direct body input
+
+Removed the floating button, its keyboard-policy hook, and the hook-only regression fixture. Editable Hotview, Markdown Plain, and code now use native editing focus on the original tap. Repeated body taps no longer force dismissal or reinstall input suppression. Native selection menus and viewport geometry remain in place. [0098](../decisions/0098-native-mobile-editor-keyboard.md) supersedes the explicit-only interaction in 0094; current behavior follows the contracts linked above.
+
+### Verification and application
+
+- `node --test server/mobile-editor-keyboard-ui.test.ts` passed its updated regression at 390px dark, 320px light without the keyboard API, and 1280px desktop. It verifies immediate focus during the original user gesture, native input eligibility, repeated taps without blur, selection replacement by typing, viewport changes, and absence of the removed control. An initial assertion was corrected to allow Hotview's existing trailing-newline normalization.
+- `server/editor-context-menu-ui.test.ts`, `server/editor-keyboard-ui.test.ts`, and `server/mobile-keyboard-ui.test.ts` passed all 9 tests without skips in the combined run. Selection menus, gesture cancellation, keyboard viewport geometry, and Dock restoration remain covered.
+- `npx tsc -b` passed. Targeted oxlint passed with the existing `EditorPane.tsx` React warnings. `git diff --check` passed.
+- The final `npm run check:docs` passed with 582 descriptions and no metadata or local-link errors. An earlier check reported an unrelated missing work-record link while another task was editing its owning document; that target existed by the final check. Physical Android and iOS keyboard appearance remains unverified. No application build, deployment, launcher, or server start, stop, or restart was performed.

@@ -1,13 +1,13 @@
 ---
 title: "0094 — Open the mobile editor keyboard explicitly"
-description: "Decision to reserve mobile editor body keyboard activation for the floating button, dismiss it on outside app presses, and separate persistent keyboard policy from native text selection."
+description: "Superseded decision reserving mobile editor keyboard activation for a floating button and dismissing it on app presses; decision 0098 restores native body-tap input."
 created: "2026-10-30"
 updated: "2026-10-30"
 ---
 
 # 0094 — Open the mobile editor keyboard explicitly
 
-Status: Approved
+Status: Superseded by [0098](0098-native-mobile-editor-keyboard.md). The decision below is preserved as history.
 
 ## Background
 

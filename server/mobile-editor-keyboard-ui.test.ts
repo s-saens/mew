@@ -7,7 +7,7 @@ import { compile } from '@tailwindcss/node'
 import { chromium } from 'playwright-core'
 import { domBrowserExecutable } from './browser-dom-executable.ts'
 
-test('mobile editor keyboard button preserves selection, follows keyboard visibility, and excludes noneditable views', {
+test('editor body taps allow native keyboard focus and typing without a floating button', {
   skip: !domBrowserExecutable(), timeout: 60_000,
 }, async t => {
   const repo = path.resolve(import.meta.dirname, '..')
@@ -15,11 +15,10 @@ test('mobile editor keyboard button preserves selection, follows keyboard visibi
 import React from 'react';import {createRoot} from 'react-dom/client';
 import {EditorPane} from ${JSON.stringify(path.join(repo, 'src/components/EditorPane.tsx'))};
 import {I18nProvider} from ${JSON.stringify(path.join(repo, 'src/i18n.tsx'))};
-import {setUiLocale} from '@mew/ui/i18n-core';
 const noop=()=>{},defaults={path:'fixture.md',content:'Alpha selected text omega.',viewMode:'hotview',editable:true};
 const callbacks=Object.fromEntries(['registerElement','registerTabBar','onFocus','onActivate','onPin','onCloseTab','onReorder','onOpenLink','onOpenHistory','onSetTocOpen','onOpenSidebar','onTabDragMove','onTabDrop'].map(key=>[key,noop]));
 function Fixture(){const [state,setState]=React.useState(defaults);const handle=React.useRef(null);
- window.resetFixture=values=>setState({...defaults,...values});window.selectFixture=()=>handle.current?.getSelectedText();window.language=setUiLocale;
+ window.resetFixture=values=>setState({...defaults,...values});window.selectFixture=()=>handle.current?.getSelectedText();
  return <div data-fixture data-value={state.content} className="flex h-dvh flex-col"><button data-outside onClick={()=>window.outsideClicks=(window.outsideClicks??0)+1}>Outside editor</button><EditorPane {...callbacks}
  registerHandle={(_,value)=>handle.current=value} pane={{id:'main',tabs:[{...state,preview:false}],activePath:state.path}}
  onChangeContent={(_,content)=>setState(old=>({...old,content}))} onSetViewMode={(_,viewMode)=>setState(old=>({...old,viewMode}))}
@@ -49,8 +48,9 @@ function Fixture(){const [state,setState]=React.useState(defaults);const handle=
     const errors: string[] = []
     page.on('pageerror', error => errors.push(error.message))
     await page.addInitScript(`localStorage.setItem('mew:locale','ko');localStorage.setItem('mew:ui-locale','ko');
-      window.keyboardCalls=[];window.keyboardHides=0;window.keyboardHideModes=[];
-      Object.defineProperty(navigator,'virtualKeyboard',{configurable:true,value:${nativeApi ? `Object.assign(new EventTarget(),{overlaysContent:false,boundingRect:new DOMRect(),show(){if(window.keyboardFailure)throw Error('Unavailable');const el=document.activeElement;window.keyboardCalls.push({active:el?.matches('.ProseMirror,.cm-content'),policy:el?.getAttribute('virtualkeyboardpolicy'),activation:navigator.userActivation.isActive})},hide(){window.keyboardHides++;const el=document.activeElement;window.keyboardHideModes.push({policy:el?.getAttribute('virtualkeyboardpolicy'),mode:el?.getAttribute('inputmode')})}})` : 'undefined'}});`)
+      window.keyboardCalls=0;window.keyboardHides=0;window.bodyFocus=[];
+      addEventListener('focusin',event=>{const el=event.target;if(el.matches('.ProseMirror,.cm-content'))window.bodyFocus.push({policy:el.getAttribute('virtualkeyboardpolicy'),mode:el.getAttribute('inputmode'),activation:navigator.userActivation.isActive})});
+      Object.defineProperty(navigator,'virtualKeyboard',{configurable:true,value:${nativeApi ? `Object.assign(new EventTarget(),{overlaysContent:false,boundingRect:new DOMRect(),show(){window.keyboardCalls++},hide(){window.keyboardHides++}})` : 'undefined'}});`)
     await page.route('http://mew-mobile-editor-keyboard.test/**', route => {
       const url = new URL(route.request().url())
       if (url.pathname === '/api/comments') return route.fulfill({ json: { threads: [] } })
@@ -60,112 +60,68 @@ function Fixture(){const [state,setState]=React.useState(defaults);const handle=
         : { contentType: 'text/html', body: `<!doctype html><html class="${theme === 'dark' ? 'dark' : ''}"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}</style><div id="root"></div><script type="module" src="/app.js"></script></html>` })
     })
     await page.goto('http://mew-mobile-editor-keyboard.test/')
-    const button = page.getByRole('button', { name: '키보드 열기', exact: true })
+    const button = page.locator('[data-mobile-editor-keyboard-button]')
+    const pressBody = (content: ReturnType<typeof page.locator>, x: number) => width < 768
+      ? content.tap({ position: { x, y: 10 } })
+      : content.click({ position: { x, y: 10 } })
     for (const mode of [{}, { viewMode: 'plain' }, { path: 'fixture.ts', viewMode: 'plain' }]) {
       await page.evaluate(`window.resetFixture(${JSON.stringify(mode)})`)
       const content = page.locator('.ProseMirror, .cm-content')
       await content.waitFor()
-      if (width >= 768) {
-        assert.equal(await button.count(), 0)
-        assert.equal(await content.getAttribute('virtualkeyboardpolicy'), null)
-        assert.equal(await content.getAttribute('inputmode'), null)
-        continue
-      }
-      await button.waitFor()
-      assert.equal(await content.getAttribute('virtualkeyboardpolicy'), 'manual')
-      assert.equal(await content.getAttribute('inputmode'), 'none', 'suppress native keyboard from the first body tap')
-      const beforeTap = await page.evaluate('window.keyboardCalls.length')
-      await content.tap({ position: { x: 40, y: 10 } })
-      await page.waitForTimeout(350)
-      assert.equal(await page.evaluate('window.keyboardCalls.length'), beforeTap, 'body taps never request the keyboard, including after the former single-tap delay')
-      assert.equal(await content.getAttribute('inputmode'), 'none')
-      const box = (await button.boundingBox())!
-      const host = (await content.locator('xpath=ancestor::div[contains(@class,"relative")][1]').boundingBox())!
-      assert.equal(box.width, 44)
-      assert.equal(box.height, 44)
-      assert.ok(Math.abs(box.x + box.width / 2 - width / 2) <= 1, 'button is centered within the editor')
-      assert.ok(box.y + box.height <= host.y + host.height, 'button stays inside the editor above its status and modifier bars')
-      const appearance = await button.evaluate(el => {
-        const style = el.ownerDocument.defaultView!.getComputedStyle(el)
-        return { background: style.backgroundColor, radius: style.borderRadius, tip: el.getAttribute('data-tip') }
-      })
-      assert.match(appearance.background, /0\.7\)/, 'surface is translucent')
-      assert.ok(parseFloat(appearance.radius) >= box.width / 2, 'button is circular')
-      assert.equal(appearance.tip, '키보드 열기')
+      assert.equal(await button.count(), 0, 'the editor has no floating keyboard control')
+      assert.equal(await content.getAttribute('virtualkeyboardpolicy'), null)
+      assert.equal(await content.getAttribute('inputmode'), null)
+      await page.locator('[data-outside]').click()
+      await pressBody(content, 40)
+      assert.equal(await content.evaluate(el => el === el.ownerDocument.activeElement), true, 'a body tap immediately focuses the editor')
+      assert.deepEqual(await page.evaluate('window.bodyFocus.at(-1)'), { policy: null, mode: null, activation: true }, 'native keyboard input is allowed during the original user gesture')
+      const focusCount = Number(await page.evaluate('window.bodyFocus.length'))
+      await pressBody(content, 65)
+      assert.equal(await content.evaluate(el => el === el.ownerDocument.activeElement), true)
+      assert.equal(await page.evaluate('window.bodyFocus.length'), focusCount, 'moving the cursor does not blur and refocus the editor')
       await content.evaluate(el => {
-        el.setAttribute('inputmode', 'none')
-        el.focus()
         const doc = el.ownerDocument, node = doc.createTreeWalker(el, 4).nextNode()!
         const range = doc.createRange(); range.setStart(node, 6); range.setEnd(node, 14)
         const selection = doc.getSelection()!; selection.removeAllRanges(); selection.addRange(range)
         doc.dispatchEvent(new doc.defaultView!.Event('selectionchange'))
       })
       await page.waitForFunction('window.selectFixture() === "selected"')
-      await button.tap()
-      assert.equal(await content.getAttribute('inputmode'), null, 'explicit input releases touch-selection suppression')
-      assert.equal(await content.evaluate(el => el === el.ownerDocument.activeElement), true)
-      assert.equal(await page.evaluate('window.selectFixture()'), 'selected', 'opening the keyboard preserves the selected range')
       assert.equal(await page.locator('[data-fixture]').getAttribute('data-value'), 'Alpha selected text omega.')
-      if (nativeApi) {
-        assert.deepEqual(await page.evaluate('window.keyboardCalls.at(-1)'), { active: true, policy: 'manual', activation: true })
-        assert.equal(await content.getAttribute('virtualkeyboardpolicy'), 'manual', 'manual policy stays enabled throughout the mobile session')
-        await page.evaluate('window.keyboardFailure = true')
-        await button.tap()
-        assert.equal(await content.evaluate(el => el === el.ownerDocument.activeElement), true, 'a rejected keyboard API request falls back to native focus')
-        assert.equal(await content.getAttribute('virtualkeyboardpolicy'), 'manual')
-        await page.evaluate('window.keyboardFailure = false')
-      }
-      // Headless Chromium cannot open the OS keyboard; exercise its viewport signal separately.
+      await page.keyboard.type('typed')
+      await page.waitForFunction('document.querySelector("[data-fixture]").dataset.value.includes("typed")')
+      assert.equal((await page.locator('[data-fixture]').getAttribute('data-value'))!.trimEnd(), 'Alpha typed text omega.')
+      // Headless Chromium cannot show an OS keyboard; exercise the viewport signal separately.
       await content.evaluate(el => {
         const win = el.ownerDocument.defaultView!
         Object.defineProperty(win.visualViewport!, 'height', { configurable: true, value: 440 })
         win.visualViewport!.dispatchEvent(new win.Event('resize'))
       })
-      await button.waitFor({ state: 'hidden' })
-      const hides = Number(await page.evaluate('window.keyboardHides'))
-      await content.tap({ position: { x: 40, y: 10 } })
-      assert.equal(await content.getAttribute('inputmode'), 'none', 'tapping the body while typing dismisses and suppresses reopening')
-      if (nativeApi) {
-        assert.ok(Number(await page.evaluate('window.keyboardHides')) > hides)
-        assert.deepEqual(await page.evaluate('window.keyboardHideModes.at(-1)'), { policy: 'manual', mode: null }, 'hide runs before suppression, while the browser accepts keyboard control')
-      }
+      assert.equal(await button.count(), 0)
       await content.evaluate(el => {
         const win = el.ownerDocument.defaultView!
         Reflect.deleteProperty(win.visualViewport!, 'height')
         win.visualViewport!.dispatchEvent(new win.Event('resize'))
       })
-      await button.waitFor()
-      // Restore a known range after the user's deliberate cursor move above.
-      await content.evaluate(el => {
-        el.focus()
-        const doc = el.ownerDocument, node = doc.createTreeWalker(el, 4).nextNode()!
-        const range = doc.createRange(); range.setStart(node, 6); range.setEnd(node, 14)
-        const selection = doc.getSelection()!; selection.removeAllRanges(); selection.addRange(range)
-        doc.dispatchEvent(new doc.defaultView!.Event('selectionchange'))
-      })
-      await button.tap()
-      assert.equal(await page.evaluate('window.selectFixture()'), 'selected', 'reopening with the editor still focused preserves selection')
-      await page.keyboard.type('typed')
-      await page.waitForFunction('document.querySelector("[data-fixture]").dataset.value.includes("typed")')
       const clicks = Number(await page.evaluate('window.outsideClicks ?? 0'))
-      await page.locator('[data-outside]').tap()
-      assert.equal(await content.getAttribute('inputmode'), 'none')
-      assert.equal(await content.evaluate(el => el === el.ownerDocument.activeElement), false, 'an outside tap blurs the editor even without keyboard API support')
-      assert.equal(await page.evaluate('window.outsideClicks'), clicks + 1, 'dismissing the keyboard preserves the outside control action')
-      if (process.env.MEW_KEYBOARD_BUTTON_SCREENSHOT_DIR) {
-        await fs.mkdir(process.env.MEW_KEYBOARD_BUTTON_SCREENSHOT_DIR, { recursive: true })
-        await page.screenshot({ path: `${process.env.MEW_KEYBOARD_BUTTON_SCREENSHOT_DIR}/${width}-${theme}-${'viewMode' in mode ? mode.path ?? 'plain' : 'hotview'}.png` })
-      }
+      await page.locator('[data-outside]').click()
+      assert.equal(await page.evaluate('window.outsideClicks'), clicks + 1, 'outside controls retain their action')
+      assert.equal(await content.getAttribute('inputmode'), null, 'outside presses do not reinstall keyboard suppression')
+      assert.equal(await content.getAttribute('virtualkeyboardpolicy'), null)
+      assert.equal(await page.evaluate('window.keyboardCalls'), 0, 'native focus works without explicit keyboard API requests')
+      assert.equal(await page.evaluate('window.keyboardHides'), 0, 'body and outside taps do not force API dismissal')
     }
-    if (width < 768) {
-      for (const state of [{ editable: false }, { loading: true }, { revalidating: true }, { anchorPreview: { lineStart: 1, lineEnd: 1 } }, { path: 'preview.svg', content: '<svg/>', viewMode: 'hotview' }, { path: 'image.png' }]) {
-        await page.evaluate(`window.resetFixture(${JSON.stringify(state)})`)
-        await page.waitForTimeout(50)
-        assert.equal(await button.count(), 0, JSON.stringify(state))
-      }
-      await page.evaluate('window.resetFixture({}); window.language("en")')
-      await page.getByRole('button', { name: 'Open keyboard', exact: true }).waitFor()
+    for (const state of [{ editable: false }, { loading: true }, { revalidating: true }, { anchorPreview: { lineStart: 1, lineEnd: 1 } }, { path: 'preview.svg', content: '<svg/>', viewMode: 'hotview' }, { path: 'image.png' }]) {
+      await page.evaluate(`window.resetFixture(${JSON.stringify(state)})`)
+      await page.waitForTimeout(50)
+      assert.equal(await button.count(), 0, JSON.stringify(state))
     }
+    await page.evaluate('window.resetFixture({})')
+    await page.locator('.ProseMirror').waitFor()
+    await page.setViewportSize({ width: width < 768 ? 1280 : 390, height: 844 })
+    await pressBody(page.locator('.ProseMirror'), 40)
+    assert.equal(await page.locator('.ProseMirror').getAttribute('inputmode'), null, 'layout changes keep native input enabled')
+    assert.equal(await page.locator('.ProseMirror').getAttribute('virtualkeyboardpolicy'), null)
+    assert.equal(await button.count(), 0)
     assert.deepEqual(errors, [])
     await page.close()
   }
