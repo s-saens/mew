@@ -1,8 +1,8 @@
 ---
 title: "mewlink Cloudflare Deployment"
-description: "Maintainer runbook covering Mewlink central service configuration, deployment, key preservation, access revocation, verification, rollback, and localhost preview DNS and HTTPS preparation. Links to work records for deployment results by date."
+description: "Maintainer runbook covering Mewlink's independent local Git repository and parent-checkout dependencies, central service configuration, deployment, key preservation, access revocation, verification, rollback, and localhost preview DNS and HTTPS preparation. Links to work records for deployment results by date."
 created: "2026-10-07"
-updated: "2026-10-29"
+updated: "2026-10-30"
 ---
 
 Recurring deployment, configuration, and recovery procedures for central service maintainers. Results of changes by date are preserved in the [deployment history](../work/mewlink-deployment-history.md).
@@ -130,7 +130,11 @@ Read the following for additional login configuration, troubleshooting, and oper
 
 ## Location and deployment configuration
 
-The central project is `mew/mewlink/`. The `/mewlink/` exclusion in the parent [.gitignore](../../../.gitignore) and the npm workspace exclusion remain in place; no separate Git repository has been created yet. The public mew project's default installation, type checking, and tests work without this folder. Central source code, dependencies, and lockfiles exist only in this folder, so the folder must be kept in a separate repository or backup.
+The central project is `mew/mewlink/`. It has an independent local Git repository initialized on `main` on 2026-10-30. The `/mewlink/` exclusion in the parent [.gitignore](../../../.gitignore) and the npm workspace exclusion remain in place. Run central Git commands inside `mewlink/`; parent commits do not record those changes. Initialization does not configure a remote or push, and source commits do not deploy the central service.
+
+The central repository tracks source, tests, migrations, package and lockfiles, deployment configuration, and required Worker type declarations. Secrets, deployment state, environment files, dependencies, build output, Wrangler state, logs, and private key files remain local and ignored. Keep separate protected backups of required credentials. The public mew project's default installation, type checking, and tests still work without this folder.
+
+The independent repository retains its existing parent-checkout dependencies: shared protocols in `../shared/`, the client TypeScript configuration in `../tsconfig.app.json`, and browser integration tooling. Keep it checked out at `mew/mewlink/` with a compatible Mew revision. Repository initialization does not make the central project a self-contained checkout or convert it into a submodule.
 
 Also exclude the previous central implementation `server/remote-central/`, dedicated tests `server/remote-central.test.ts` and `server/remote-access-authenticated.test.ts`, and previous central UI `src/components/remote-dashboard.tsx` from the public mew Git history. Deleting current files and updating [.gitignore](../../../.gitignore) alone do not clean up past commits. Keep the public connection client and shared protocol, and store central source code and recovery backups made before rewriting history outside the public repository. When restoring, ensure these files do not reenter public history.
 
