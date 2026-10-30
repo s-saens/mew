@@ -1,6 +1,6 @@
 ---
 title: "Unified explorer search box and hierarchical results"
-description: "Records the explorer's unified search box, hierarchical results, context tooltips, restored Documents/Files toggle, right-side close button, and the 2026-10-30 correction from implicit fuzzy matching to literal filename queries. Distinguishes local verification and earlier documentation errors from application to the running instance."
+description: "Records the explorer's unified search box, hierarchical results, context tooltips, restored Documents/Files toggle, right-side close button, and the 2026-10-30 corrections for literal filename queries and a borderless 36px search header aligned with panel tab bars. Distinguishes local verification and earlier documentation errors from application to the running instance."
 created: "2026-10-29"
 updated: "2026-10-30"
 ---
@@ -46,3 +46,17 @@ Verification:
 - `npm run check:docs` passed with 556 descriptions and no description or local-link errors.
 
 No app build, deployment, launcher execution, or runtime server changes were performed. The running instance still requires the user to apply the source changes. No live-browser or physical-device verification was performed for this matching-only correction.
+
+## Compact search header
+
+On 2026-10-30, removed the search field's rounded border, inset background, and stacked outer padding. The search row now matches the panel tab bars at 36px including its bottom divider. The input retains a visible keyboard-focus outline, and option and close buttons retain their 24px interaction areas. Scope tags and expanded replacement controls keep their own spacing below the fixed-height row. The [feature contract](../features/projects-files-search/filename-content-search-and-replacement.md) and [shared UI contract](../development/ui-contracts.md#search-within-the-file-explorer) own the current behavior.
+
+Verification:
+
+- Added a regression assertion against the actual editor `TabBar`; it failed before the source change because the search row had a different height.
+- `node --test server/search-panel-ui.test.ts` passed. Its four Files/Documents × desktop midnight/mobile rose combinations check matching header heights, absence of a decorated field container, visible keyboard focus, control dimensions and non-overlap in a 240px panel, and alignment with empty, filename, and content queries. Existing search, clear, close, option, preview, navigation, and late-response checks also passed.
+- Reviewed isolated desktop and mobile screenshots. These use mocked responses and do not verify the running server or physical devices.
+- `npx tsc -b`, targeted oxlint, and the layout detector passed. Oxlint reported five warnings in existing search logic; the detector reported no findings.
+- `npm run check:docs` passed with 561 descriptions and no description or local-link errors. `git diff --check` passed.
+
+No app build, deployment, launcher execution, or runtime server changes were performed. The user must build and apply the changes to update the running instance.

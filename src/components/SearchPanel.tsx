@@ -143,9 +143,9 @@ export function SearchPanel({ focusSignal, readOnly, project, scope, scopes, mod
 
   return <div className="flex h-full min-h-0 min-w-0 flex-col text-sm">
     {dialogs.dialog}
-    <HoverTipLayer className="shrink-0 border-b border-edge p-1.5" placement="bottom">
-      <div data-explorer-search-bar className="flex min-w-0 items-center gap-1">
-      <div className="relative flex min-w-0 flex-1 items-center gap-0.5 rounded border border-edge-strong bg-surface-deep px-1 focus-within:border-accent">
+    <HoverTipLayer className="shrink-0" placement="bottom">
+      <div data-explorer-search-bar className="flex h-9 min-w-0 items-center gap-1 border-b border-edge pl-1">
+      <div className="relative flex min-w-0 flex-1 items-center gap-0.5">
         <input ref={inputRef} value={query} onChange={event => setQuery(event.target.value)}
           placeholder={mode === 'files' ? t('search.fileNamePlaceholder') : t('search.fileContentPlaceholder')}
           aria-label={uiText(mode === 'files' ? '파일명 검색' : '파일 내용 검색')}
@@ -153,7 +153,7 @@ export function SearchPanel({ focusSignal, readOnly, project, scope, scopes, mod
             if (event.key === '@' && scope === 'root' && scopes.length) { event.preventDefault(); setScopeMenuOpen(true) }
             if (event.key === 'Escape' && (query || scopeMenuOpen)) { event.preventDefault(); event.stopPropagation(); if (scopeMenuOpen) setScopeMenuOpen(false); else setQuery('') }
           }}
-          className="w-0 min-w-0 flex-1 bg-transparent px-1 py-1.5 text-sm text-ink outline-none placeholder:text-ink-faint" spellCheck={false} />
+          className="h-7 w-0 min-w-0 flex-1 bg-transparent px-1 text-sm text-ink outline-none focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-accent placeholder:text-ink-faint" spellCheck={false} />
         {query && <button type="button" className={optionClass(false)} onClick={() => { setQuery(''); inputRef.current?.focus() }} aria-label={uiText('검색 지우기')} data-tip={uiText('검색 지우기')}>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg>
         </button>}
@@ -174,8 +174,8 @@ export function SearchPanel({ focusSignal, readOnly, project, scope, scopes, mod
       </div>
       {onClose && <PanelCloseButton onClick={onClose} aria-label={uiText('파일 탐색기 닫기')} />}
       </div>
-      {scope === 'root' && selectedScopes.length > 0 && <div className="mt-1 flex flex-wrap gap-1">{selectedScopes.map(id => <button key={id} type="button" onClick={() => setSelectedScopes(values => values.filter(value => value !== id))} className="flex min-w-0 items-center gap-1 rounded bg-accent/15 px-1 text-xs text-ink" aria-label={uiText('{p0} 범위 제거', { p0: scopes.find(item => item.id === id)?.label ?? id })}><span className="truncate">{scopes.find(item => item.id === id)?.label}</span><span aria-hidden="true">×</span></button>)}</div>}
-      {mode === 'content' && showReplace && !readOnly && <div className="mt-1 flex items-center gap-1">
+      {scope === 'root' && selectedScopes.length > 0 && <div className="flex flex-wrap gap-1 p-1.5">{selectedScopes.map(id => <button key={id} type="button" onClick={() => setSelectedScopes(values => values.filter(value => value !== id))} className="flex min-w-0 items-center gap-1 rounded bg-accent/15 px-1 text-xs text-ink" aria-label={uiText('{p0} 범위 제거', { p0: scopes.find(item => item.id === id)?.label ?? id })}><span className="truncate">{scopes.find(item => item.id === id)?.label}</span><span aria-hidden="true">×</span></button>)}</div>}
+      {mode === 'content' && showReplace && !readOnly && <div className="flex items-center gap-1 p-1.5">
         <input value={replace} onChange={event => setReplace(event.target.value)} placeholder={uiText('바꾸기')} aria-label={uiText('바꾸기')} spellCheck={false} className="min-w-0 flex-1 rounded border border-edge-strong bg-surface-deep px-2 py-1 text-sm text-ink outline-none focus:border-accent" />
         <button type="button" onClick={() => void replaceFiles(results, true)} disabled={busy || loading || !results.length} className="shrink-0 rounded px-1.5 py-1 text-xs text-ink-muted enabled:hover:bg-surface-hover disabled:opacity-40" data-tip={uiText('모든 파일에서 모두 바꾸기 (커밋)')}>{uiText('모두')}</button>
       </div>}

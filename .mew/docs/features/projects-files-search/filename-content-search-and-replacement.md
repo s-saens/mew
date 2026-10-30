@@ -8,7 +8,7 @@ updated: "2026-10-30"
 status_hash: "79a1e8766564a2bf356422b60d751638dcc7b3a1ae78f96ce4deb3c240d57085"
 files: ["src/components/FileTree.tsx", "src/components/explorer-search-preview.tsx", "src/utils/explorer-search.ts", "src/components/SearchPanel.tsx", "server/fileNameSearch.ts", "server/search.ts", "server/search-pattern.ts", "server/searchCatalog.ts"]
 commits: []
-description: "Feature contract covering the explorer's single search field, literal filename and path matching, explicit wildcards and RE2 regular expressions, Documents/Files scope, hierarchical results, context tooltips, replacement, and limits. Explains FTS v2 project-scoped queries, candidate extraction, Unicode supplementation, source verification, instrumentation, and removed RAG functionality."
+description: "Feature contract covering the explorer's borderless search field in a 36px header aligned with panel tab bars, literal filename and path matching, explicit wildcards and RE2 regular expressions, Documents/Files scope, hierarchical results, context tooltips, replacement, and limits. Explains FTS v2 project-scoped queries, candidate extraction, Unicode supplementation, source verification, instrumentation, and removed RAG functionality."
 상위파일:
   - "MOC.md"
   - "_projects-files-search.md"
@@ -37,6 +37,8 @@ description: "Feature contract covering the explorer's single search field, lite
 ## Detailed behavior
 
 The file explorer has no Browse, Filename, or Content Search tabs. In the top search field, turning off the content-search icon beside `Aa` and `.*` searches filenames; turning it on searches content. Ctrl+P and Ctrl+Shift+F select the respective modes and focus the same input. Input is retained when changing modes or Documents/Files scope. Automatic input focus follows the shared desktop conditions. A shared X button outside the right side of the search field closes the file explorer regardless of whether a query is present. The Documents/Files scope row does not duplicate the close button.
+
+The search row is 36px high, including its bottom divider, matching other panels' tab bars. The input and option icons sit directly on the panel surface without a surrounding rounded border or inset background. Extra outer vertical padding is omitted; the input retains a visible keyboard-focus outline, and icon buttons retain 24px interaction areas. Selected scope tags and expanded replacement controls appear below the fixed-height search row only when needed.
 
 The existing two-button Documents/Files toggle below the search field remains. Select directly by click or touch, or switch with Left/Right arrow keys and Home/End. Removing separate search tabs does not change this scope toggle's appearance or direct switching. Documents view searches only Documents; Files view searches the entire `.workspace` filesystem. The actual Documents path in Files view is also searched as a regular file path and is not mixed with separate Documents-scope results. Selecting one or more direct subprojects with `@` in Files view narrows the scope using OR. The HTTP API's existing unscoped unified search and docs/subproject OR remain for compatibility; the new `root` scope selects all of `.workspace` before applying the result limit.
 

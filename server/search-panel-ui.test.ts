@@ -40,6 +40,7 @@ test('explorer search filters file and document trees with contextual content pr
     'import React,{useState} from ' + JSON.stringify(import.meta.resolve('react')) + ';',
     'import {createRoot} from ' + JSON.stringify(import.meta.resolve('react-dom/client')) + ';',
     'import {SearchPanel} from ' + JSON.stringify(path.join(root, 'src/components/SearchPanel.tsx')) + ';',
+    'import {TabBar} from ' + JSON.stringify(path.join(root, 'src/components/TabBar.tsx')) + ';',
     'import {FileTree} from ' + JSON.stringify(path.join(root, 'src/components/FileTree.tsx')) + ';',
     'import {I18nProvider} from ' + JSON.stringify(path.join(root, 'src/i18n.tsx')) + ';',
     'import {applyThemePalette,THEME_PRESETS} from ' + JSON.stringify(path.join(root, 'src/utils/theme-color.ts')) + ';',
@@ -50,7 +51,7 @@ test('explorer search filters file and document trees with contextual content pr
     'const readDir=(nodes,path)=>{for(const node of nodes){if(node.path===path)return node.children??[];const found=node.children&&readDir(node.children,path);if(found)return found}return null};',
     'const loadChildren=path=>window.deferPageLoad&&path==="a1"?new Promise(resolve=>{window.resolvePageLoad=resolve;window.pageLoadPending=true}):Promise.resolve(readDir(tree,path)??[]);',
     'function Fixture(){const [mode,setMode]=useState("files"),[docs,setDocs]=useState(initialDocs),[selectedPath,setSelectedPath]=useState(null);window.setDocs=setDocs;return <I18nProvider><main className="h-full bg-surface-deep" style={{width:240,maxWidth:"100vw"}}><SearchPanel focusSignal={0} readOnly project=".workspace" scope={docs?"docs":"root"} scopes={scopes} mode={mode} onModeChange={setMode} onOpenResult={(...args)=>{window.openedResult=args;setSelectedPath(args[0])}} onReplaced={noop} onClose={()=>window.explorerCloseCount=(window.explorerCloseCount??0)+1} registerSearchCancel={fn=>window.cancelSearch=fn}>{search=><FileTree project=".workspace" tree={tree} search={search} loadChildren={loadChildren} documentPages={docs} selectedPath={selectedPath} readOnly newFileSignal={{n:0,parentPath:null}} revealSignal={0} presence={{}} onSelect={path=>{window.openedFile=path;setSelectedPath(path)}} onFileCreated={noop} onFolderCreated={noop} onRenamed={noop} onDeleted={noop} onNotice={noop}/>}</SearchPanel></main></I18nProvider>}',
-    'createRoot(document.getElementById("root")).render(<Fixture/>);',
+    'createRoot(document.getElementById("root")).render(<I18nProvider><Fixture/><aside id="reference-tab-bar" style={{position:"fixed",left:260,top:0,width:120}}><TabBar tabs={[]} activePath={null} presence={{}} onActivate={noop} onPin={noop} onClose={noop} onReorder={noop}/></aside></I18nProvider>);',
   ].join('\n')
   const candidates = [source], styles: string[] = []
   const bundle = await build({
@@ -129,6 +130,41 @@ test('explorer search filters file and document trees with contextual content pr
             : row(path)
           const input = page.getByRole('textbox', { name: '파일명 검색', exact: true })
           await input.waitFor()
+          const searchBar = page.locator('[data-explorer-search-bar]')
+          const referenceBox = (await page.locator('#reference-tab-bar > div').boundingBox())!
+          const assertCompactHeader = async () => {
+            const box = (await searchBar.boundingBox())!
+            const headerBox = (await searchBar.locator('..').boundingBox())!
+            assert.equal(box.height, referenceBox.height, 'the search row matches the editor tab bar height')
+            assert.equal(headerBox.height, referenceBox.height, 'outer padding does not add height to the search header')
+            assert.equal(box.height, 36)
+            assert.equal(box.y, (await page.locator('main').boundingBox())!.y, 'the search row aligns with adjacent panel headers')
+            const fieldStyle = await searchBar.locator('input').locator('..').evaluate(el => {
+              const style = el.ownerDocument.defaultView!.getComputedStyle(el)
+              return { borderWidth: style.borderWidth, background: style.backgroundColor, radius: style.borderRadius }
+            })
+            assert.equal(fieldStyle.borderWidth, '0px', 'the search field has no enclosing border')
+            assert.equal(fieldStyle.background, 'rgba(0, 0, 0, 0)', 'the search field uses the panel background')
+            assert.equal(fieldStyle.radius, '0px', 'the search field has no rounded container')
+            const bounds = await searchBar.locator('input, button').evaluateAll(elements => elements.map(el => {
+              const rect = el.getBoundingClientRect()
+              return { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom, width: rect.width, height: rect.height }
+            }))
+            for (const [index, control] of bounds.entries()) {
+              assert.ok(control.width > 0 && control.height >= 24, 'search controls retain usable dimensions')
+              assert.ok(control.left >= box.x && control.right <= box.x + box.width && control.top >= box.y && control.bottom <= box.y + box.height, 'controls fit inside the search row')
+              if (index) assert.ok(control.left >= bounds[index - 1].right, 'search controls do not overlap')
+            }
+          }
+          await assertCompactHeader()
+          await page.keyboard.press('Tab')
+          assert.equal(await input.evaluate(el => el === el.ownerDocument.activeElement), true, 'the search input stays first in keyboard order')
+          const focusStyle = await input.evaluate(el => {
+            const style = el.ownerDocument.defaultView!.getComputedStyle(el)
+            return { width: style.outlineWidth, style: style.outlineStyle }
+          })
+          assert.notEqual(focusStyle.style, 'none', 'keyboard focus remains visible without the field container')
+          assert.ok(parseFloat(focusStyle.width) >= 2)
           const closeExplorer = page.getByRole('button', { name: '파일 탐색기 닫기', exact: true })
           assert.equal(await closeExplorer.count(), 1, 'one close button is visible with an empty search')
           const fieldBox = (await input.locator('..').boundingBox())!, closeBox = (await closeExplorer.boundingBox())!, mainBox = (await page.locator('main').boundingBox())!
@@ -152,6 +188,7 @@ test('explorer search filters file and document trees with contextual content pr
           }
           await input.fill('c*.md')
           await page.locator('[data-search-match="true"]').nth(1).waitFor()
+          await assertCompactHeader()
           assert.deepEqual(await page.locator('[data-search-match="true"]').evaluateAll(elements => elements.map(el => el.getAttribute('data-path'))), paths)
           for (const path of ['a1', 'a1/b1', 'a1/b2']) assert.equal(await expansion(path).getAttribute('aria-expanded'), 'true', path + ' is expanded for its matching descendant')
           assert.equal(await row('a1/b3.md').count(), 0, 'siblings that do not match are excluded')
@@ -207,6 +244,7 @@ test('explorer search filters file and document trees with contextual content pr
           const contentInput = page.getByRole('textbox', { name: '파일 내용 검색', exact: true })
           assert.equal(await contentInput.inputValue(), query, 'the content toggle preserves the query')
           await page.locator('[data-search-match="true"]').nth(1).waitFor()
+          await assertCompactHeader()
           assert.equal(await page.getByRole('button', { name: '파일 내용 검색', exact: true }).getAttribute('aria-pressed'), 'true')
           assert.equal(requests.at(-1)!.searchParams.get('scopes'), docs ? 'docs' : 'root')
           assert.equal(await row('a1/b3.md').count(), 0)
