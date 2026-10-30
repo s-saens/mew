@@ -33,6 +33,7 @@ import { watchDocsTree } from './watcher.ts'
 import { refreshWindowsScheduledTask } from './platform/windows/scheduler.ts'
 import { DATA_DIR } from './dataDir.ts'
 import { workspaceSearchPolicy } from './search-indexing.ts'
+import { appRoute } from '../shared/app-route.ts'
 
 // 프로덕션 서버 — `npm run build` 후 `npm run serve`.
 // 단일 서버(5000) — 로그인 없이 접속하면 게스트(뷰어), 로그인하면 owner/manager/member.
@@ -96,6 +97,7 @@ function addStaticAndSpaFallback(app: express.Express) {
       return
     }
     res.setHeader('Cache-Control', 'no-cache')
+    if (appRoute(req.path) === 'not-found') res.status(404)
     res.sendFile(INDEX_HTML)
   })
 }

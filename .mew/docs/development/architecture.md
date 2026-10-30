@@ -1,7 +1,7 @@
 ---
 title: "App Startup, Server Architecture, and State Files"
-description: "Describes per-account project switching for owner·manager, the startup screen before authentication waits, parallel downloads, initial/authentication/workspace screen chunk grouping, reuse of current P2P authentication, startup failure display, and rendering the workspace screen and editor with regular state. Distinguishes asynchronous loading by identity and permissions, server·CLI·OS execution layers, state files, and the boundaries between isolated startup verification and production application."
-updated: "2026-10-29"
+description: "Defines workspace, public-share, and unknown application routes, the themed 404 recovery screen, and production fallback status. Describes per-account project switching for owner·manager, the startup screen before authentication waits, parallel downloads, initial/authentication/workspace screen chunk grouping, reuse of current P2P authentication, startup failure display, and rendering the workspace screen and editor with regular state. Distinguishes asynchronous loading by identity and permissions, server·CLI·OS execution layers, state files, and the boundaries between isolated startup verification and production application."
+updated: "2026-10-30"
 상위파일:
   - "../MOC.md"
   - "MOC.md"
@@ -28,6 +28,16 @@ updated: "2026-10-29"
 `vite.config.ts` loads `server/plugin.ts` only from the development server's `configureServer` hook. It passes a module URL to dynamic import so the Vite configuration bundler does not preload server dependencies, keeping native `node-pty` unnecessary for loading configuration during browser builds. Running the development or production server still requires a native PTY installed for the platform. `server/vite-config.test.ts` loads the configuration without building the app or running the server to check this dependency boundary.
 
 ## Initial Browser Startup
+
+### Application routes and missing pages
+
+`shared/app-route.ts` classifies the workspace entry (`/` or `/index.html`), valid typed public-share paths, and unknown paths. The browser also accepts the runtime's configured base path for the demo. A Mewlink app frame uses its existing authenticated bootstrap and the `sharePath` supplied by its parent, rather than classifying its opaque resource URL as a workspace path.
+
+Unknown direct paths, including malformed public-share paths, lazy-load `NotFoundPage` before importing the authentication or workspace screens. The production SPA fallback serves the application shell with HTTP 404 for unknown paths; workspace and syntactically valid share entries retain their normal response. Existing API, static-file, and port-preview handlers run before this fallback. An unavailable or revoked syntactically valid share still uses the public-share screen's existing error handling.
+
+The missing-page screen inherits the saved theme and local fonts. Its 404 graphic contains a tilted M, with one short settling animation disabled by reduced-motion preferences. Korean, English, Simplified Chinese, and Japanese copy provides workspace recovery and browser back navigation; back falls back to the workspace entry when no prior history exists. Workspace recovery uses the runtime base path, or the current frame entry without the share query for Mewlink. Controls retain visible keyboard focus and touch targets at least 44px high. The [implementation record](../work/not-found-page.md) covers isolated checks and deployment limits.
+
+### Workspace initialization
 
 Separately from regular and remote access, `demo.html` prepares an in-memory runtime environment, then loads the same `main`·`AppBootstrap`·`App`. `src/runtime/app-runtime.ts` injects transport, collaboration, initial authentication, and the base path, distinguishing them from actual P2P state. [Browser Demo](demo.md) owns the state, deployment, and verification contract for the demo, which does not duplicate the UI.
 

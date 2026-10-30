@@ -1,9 +1,4 @@
-import type { PublicShareIdentity } from '../api/public-share-content.ts'
-
-export function parsePublicSharePath(path: string): PublicShareIdentity | null {
-  const match = /^\/share\/(f|d)\/([A-Za-z0-9_-]{43})\/?$/.exec(path)
-  return match ? { type: match[1] as 'f' | 'd', id: match[2]! } : null
-}
+export { parsePublicSharePath } from '../../shared/app-route.ts'
 
 /** Resolve document links inside the capability's root, without workspace aliases. */
 export function publicShareRelativePath(documentPath: string, href: string): string | null {

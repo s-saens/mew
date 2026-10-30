@@ -1,6 +1,10 @@
 // Source-message keys keep shared UI packages independent of the host app.
 // Every entry supplies English, Simplified Chinese and Japanese; the key is Korean.
 export const uiMessages = {
+  "이 페이지는 잠시 길을 잃었어요.": ["This page has wandered off.", "这个页面迷路了。", "このページは迷子になったようです。"],
+  "주소가 바뀌었거나, 더 이상 존재하지 않는 페이지입니다.": ["The address may have changed, or the page no longer exists.", "地址可能已更改，或页面已不存在。", "アドレスが変更されたか、ページが削除された可能性があります。"],
+  "작업 공간으로 돌아가기": ["Back to workspace", "返回工作区", "ワークスペースに戻る"],
+  "이전 페이지로": ["Previous page", "上一页", "前のページへ"],
   "탭을 왼쪽으로 스크롤": ["Scroll tabs left", "向左滚动标签页", "タブを左にスクロール"],
   "탭을 오른쪽으로 스크롤": ["Scroll tabs right", "向右滚动标签页", "タブを右にスクロール"],
   "에디터 메뉴": ["Editor actions", "编辑器菜单", "エディターメニュー"],

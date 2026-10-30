@@ -14,6 +14,7 @@ import { getAppRuntime } from './runtime/app-runtime.ts'
 import { startAppInstallTracking } from './utils/app-install.ts'
 import { uiText } from '@mew/ui/i18n-core'
 import { parsePublicSharePath } from './utils/public-share-route.ts'
+import { appRoute } from '../shared/app-route.ts'
 
 startAppInstallTracking()
 
@@ -42,7 +43,8 @@ async function startApp() {
 
   try {
     const remoteApp = document.querySelector('meta[name="mew-p2p-app"]')
-    const bootstrapModule = parsePublicSharePath(location.pathname) ? null : import('./AppBootstrap.tsx')
+    const initialRoute = remoteApp ? 'workspace' : appRoute(location.pathname, getAppRuntime().basePath)
+    const bootstrapModule = initialRoute === 'workspace' ? import('./AppBootstrap.tsx') : null
     const [bootstrap, initialAuth] = await Promise.all([
       bootstrapModule,
       remoteApp ? initializeRemoteApp() : getAppRuntime().initialAuth,
@@ -50,7 +52,10 @@ async function startApp() {
     const sharePath = remoteApp ? new URLSearchParams(location.search).get('sharePath') : location.pathname
     const share = sharePath ? parsePublicSharePath(sharePath) : null
     let page: ReactNode
-    if (share) {
+    if (initialRoute === 'not-found' || remoteApp && sharePath && !share) {
+      const { NotFoundPage } = await import('./components/not-found-page.tsx')
+      page = <NotFoundPage homeHref={remoteApp ? location.pathname : getAppRuntime().basePath ?? '/'} />
+    } else if (share) {
       const { PublicSharePage } = await import('./components/public-share-page.tsx')
       page = <PublicSharePage share={share} />
     } else {
