@@ -49,7 +49,7 @@ async function grabPoint(cat: Locator) {
   })
 }
 
-test('the capybara builtin plays two-frame transitions and autonomous jumps; missing transitions and reduced motion remain usable', { skip: !domBrowserExecutable(), timeout: 120_000 }, async () => {
+test('optional skin transitions play once; the bundled capybara and reduced motion remain usable without transitions', { skip: !domBrowserExecutable(), timeout: 120_000 }, async () => {
   const source = `
 import React from '${root}/node_modules/react/index.js';
 import {createRoot} from '${root}/node_modules/react-dom/client.js';
@@ -66,6 +66,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Mewcat skin={n
   const chunk = bundle.output.find(item => item.type === 'chunk')!
   const compiler = await compile(await fs.readFile(`${root}/src/index.css`, 'utf8'), { base: `${root}/src`, onDependency() {} })
   const definitions = ['capybara'].map(id => [id, id])
+  const bundledManifest = JSON.parse(await fs.readFile(`${root}/public/mewcat/capybara/skin.json`, 'utf8'))
   const catalog = { failed: false, skins: await Promise.all(definitions.map(async ([id, folder]) => ({ id, name: id, revision: 'test', managed: false, sprites: Object.fromEntries(await Promise.all(MEWCAT_ALL_SPRITE_ACTIONS.map(async action => {
     const image = await fs.readFile(`${root}/assets/mewpet/${folder}/source/${action}.png`)
     return [action, { width: image.readUInt32BE(16), height: image.readUInt32BE(20), frames: MEWCAT_TRANSITION_ACTIONS.some(transition => transition === action) ? 2 : 8, url: `/api/mewpet/skins/${id}/${action}?v=test` }]
@@ -74,7 +75,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Mewcat skin={n
     await page.route('**/api/mewpet/skins**', async route => {
       const url = new URL(route.request().url())
       if (url.pathname === '/api/mewpet/skins') {
-        const skins = catalog.skins.map(skin => ({ ...skin, motion, sprites: Object.fromEntries(Object.entries(skin.sprites).filter(([action]) => !missing || !MEWCAT_TRANSITION_ACTIONS.some(transition => transition === action))) }))
+        const skins = catalog.skins.map(skin => ({ ...skin, motion, sprites: Object.fromEntries(Object.entries(skin.sprites).filter(([action]) => !missing || Object.hasOwn(bundledManifest.sprites, action))) }))
         return route.fulfill({ json: { skins, failed: false, canManage: false } })
       }
       const [, id, action] = url.pathname.match(/^\/api\/mewpet\/skins\/([^/]+)\/([^/]+)$/) ?? []

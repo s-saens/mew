@@ -38,6 +38,22 @@ test('bundled Mewpet assets contain only manifests and their runtime sprites', (
   }
 })
 
+test('bundled Mewpets retain basic motions and omit every optional transition', () => {
+  const { store, cleanup } = fixture()
+  try {
+    const catalog = store.list()
+    assert.equal(catalog.failed, false)
+    assert.ok(catalog.skins.length > 0)
+    for (const skin of catalog.skins) {
+      assert.deepEqual(Object.keys(skin.sprites).sort(), [...MEWPET_ACTIONS].sort())
+      for (const action of MEWPET_TRANSITIONS) {
+        assert.equal(skin.sprites[action], undefined, `${skin.id}/${action} is absent`)
+        assert.throws(() => store.image(skin.id, action), /SKIN_NOT_FOUND/)
+      }
+    }
+  } finally { cleanup() }
+})
+
 test('global registry reads bundled Mewpet manifests and hot-added files without a build', () => {
   const { store, cleanup } = fixture()
   try {
@@ -46,8 +62,8 @@ test('global registry reads bundled Mewpet manifests and hot-added files without
     assert.equal(initial.failed, false)
     assert.deepEqual(initial.skins.map(skin => skin.id), ['capybara'])
     assert.equal(initial.skins[0].name, '카피바라')
-    for (const skin of initial.skins) for (const action of MEWPET_ANIMATIONS) {
-      const frames = MEWPET_TRANSITIONS.some(transition => transition === action) ? 2 : 8
+    for (const skin of initial.skins) for (const action of MEWPET_ACTIONS) {
+      const frames = 8
       assert.equal(skin.sprites[action]?.frames, frames, `${skin.id}/${action} frame count`)
       assert.equal(skin.sprites[action]?.width, frames * 128, `${skin.id}/${action} equal square cells`)
       assert.equal(skin.sprites[action]?.height, 128)

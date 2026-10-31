@@ -7,7 +7,7 @@ import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
 import { chromium } from 'playwright-core'
 import { domBrowserExecutable } from './browser-dom-executable.ts'
-import { MEWPET_ANIMATIONS as MEWCAT_ALL_SPRITE_ACTIONS } from '../shared/mewpet-skins.ts'
+import { MEWPET_ACTIONS as MEWCAT_SPRITE_ACTIONS } from '../shared/mewpet-skins.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 
@@ -51,7 +51,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
   try {
     for (const mobile of [false, true]) {
       const stride = { walk: 64, run: 128 }
-      const sources = Object.fromEntries(MEWCAT_ALL_SPRITE_ACTIONS.map(action => {
+      const sources = Object.fromEntries(MEWCAT_SPRITE_ACTIONS.map(action => {
         const image = petFiles.store.image('capybara', action)
         return [action, { bytes: image.bytes, frames: image.frames }]
       }))
@@ -90,7 +90,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
       await settings.getByRole('button', { name: '저장', exact: true }).click()
       await settings.getByRole('textbox', { name: '스킨 이름', exact: true }).waitFor({ state: 'detached' })
       const editedBuiltin = petFiles.store.list().skins.find(item => item.id === 'capybara')!
-      assert.equal(Object.keys(editedBuiltin.sprites).length, 16, 'all builtin images fit one upload')
+      assert.equal(Object.keys(editedBuiltin.sprites).length, 7, 'editing the builtin preserves its seven basic motions without adding transitions')
       assert.equal(editedBuiltin.motion?.durations.walk, 1200)
       assert.equal(editedBuiltin.motion?.movementSpeed, 1.5)
       assert.equal(editedBuiltin.motion?.enabled.jump, false)
@@ -107,7 +107,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
       await settings.locator('summary').filter({ hasText: '전환 모션 (선택)' }).click()
       for (const name of ['뛰기 → 걷기', '바닥 → 점프', '상승 → 하강']) assert.equal(await settings.getByLabel(`${name} 프레임 수`, { exact: true }).inputValue(), '2')
       const allSamples = await settings.getByRole('link', { name: /예제 이미지 다운로드$/ }).evaluateAll(links => links.map(link => link.getAttribute('href')))
-      assert.deepEqual(allSamples.map(url => new URL(url!, 'http://skins.test').pathname), MEWCAT_ALL_SPRITE_ACTIONS.map(action => `/api/mewpet/skins/capybara/${action}`))
+      assert.deepEqual(allSamples.map(url => new URL(url!, 'http://skins.test').pathname), MEWCAT_SPRITE_ACTIONS.map(action => `/api/mewpet/skins/capybara/${action}`))
       await settings.getByRole('button', { name: '취소', exact: true }).click()
       await page.reload()
       await settings.getByRole('button', { name: '뮤펫', exact: true }).click()
@@ -291,7 +291,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
       await fs.mkdir(directory, { recursive: true })
       const manifest = JSON.parse(await fs.readFile(`${root}/public/mewcat/capybara/skin.json`, 'utf8'))
       manifest.id = 'hot-pet'; manifest.name = 'Hot pet'; manifest.translated = false
-      for (const action of MEWCAT_ALL_SPRITE_ACTIONS) {
+      for (const action of MEWCAT_SPRITE_ACTIONS) {
         const file = manifest.sprites[action]?.file
         if (!file) continue
         try { await fs.copyFile(`${root}/public/mewcat/capybara/${file}`, `${directory}/${file}`) }

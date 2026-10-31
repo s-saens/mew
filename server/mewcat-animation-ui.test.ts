@@ -7,7 +7,7 @@ import { compile } from '@tailwindcss/node'
 import { chromium } from 'playwright-core'
 import { domBrowserExecutable } from './browser-dom-executable.ts'
 import { mewpetUiFixture } from './mewpet-ui-fixture.ts'
-import { MEWCAT_ALL_SPRITE_ACTIONS, MEWCAT_CYCLE_MS } from '../src/utils/mewcat-sprites.ts'
+import { MEWCAT_SPRITE_ACTIONS, MEWCAT_CYCLE_MS } from '../src/utils/mewcat-sprites.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 
@@ -57,7 +57,7 @@ start();`
       await walking.waitFor()
       const ids = await page.locator('#previews > [data-skin]').evaluateAll(elements => elements.map(el => el.getAttribute('data-skin')))
       assert.deepEqual(ids, ['capybara'])
-      for (const action of MEWCAT_ALL_SPRITE_ACTIONS) {
+      for (const action of MEWCAT_SPRITE_ACTIONS) {
         await page.evaluate(`window.setPreviewAction(${JSON.stringify(action)})`)
         await page.waitForFunction(`document.querySelector('#previews')?.getAttribute('data-action') === ${JSON.stringify(action)} && [...document.querySelectorAll('#previews .mewcat-sprite')].every(el => el.getAttribute('data-frame') === '0')`)
         assert.deepEqual(await previews.evaluateAll(elements => elements.map(el => el.getAttribute('data-frame'))), Array(ids.length).fill('0'))
@@ -98,6 +98,7 @@ start();`
           assert.notDeepEqual(after, before[index], `${id} walk changes visible pixels`)
         }
       }
+      for (let elapsed = 0; elapsed < 6000 && await cat.getAttribute('data-activity') !== 'walk'; elapsed += 32) await page.clock.runFor(32)
       assert.equal(await cat.getAttribute('data-activity'), 'walk')
       const frame = await walking.getAttribute('data-frame')
       await page.clock.runFor(MEWCAT_CYCLE_MS.walk / 8 + 16)
