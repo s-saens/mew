@@ -1413,7 +1413,6 @@ export const Editor = forwardRef<
     if (pos !== null) {
       const view = editor.view
       view.dispatch(view.state.tr.setSelection(TextSelection.near(view.state.doc.resolve(pos))))
-      view.focus()
     }
     try {
       const caret = editor.view.coordsAtPos(editor.state.selection.head)
@@ -1436,18 +1435,18 @@ export const Editor = forwardRef<
 
     // 리스트 항목은 텍스트 앞에 \t를 넣어도 불렛이 안 움직이므로 중첩 리스트로 처리
     if (editor.isActive('taskItem')) {
-      if (shift) editor.chain().focus().liftListItem('taskItem').run()
-      else editor.chain().focus().sinkListItem('taskItem').run()
+      if (shift) editor.chain().liftListItem('taskItem').run()
+      else editor.chain().sinkListItem('taskItem').run()
       return
     }
     if (editor.isActive('listItem')) {
       if (shift) {
         // 기본 lift가 안 되는 자리(자기 줄 없는 부모 항목 안)는 직접 꺼낸다 — 아니면 들여쓴 걸 되돌릴 수 없다
-        if (!editor.chain().focus().liftListItem('listItem').run()) {
+        if (!editor.chain().liftListItem('listItem').run()) {
           const tr = liftFirstListItemTransaction(editor.state)
           if (tr) editor.view.dispatch(tr)
         }
-      } else if (editor.can().sinkListItem('listItem')) editor.chain().focus().sinkListItem('listItem').run()
+      } else if (editor.can().sinkListItem('listItem')) editor.chain().sinkListItem('listItem').run()
       else if (!nestBlockIntoPrevList(editor)) {
         // 앞줄이 다른 형태(불렛↔숫자)면 앞 형제 리스트로 통째 중첩(nest), 그것도 아니면
         // 앞 형제 항목이 없는 첫 항목이라 빈 부모 항목을 만들어 들여쓴다
@@ -1476,7 +1475,6 @@ export const Editor = forwardRef<
   }
 
   function handleKeyBarTab() {
-    editorRef.current?.view.focus()
     applyEditorTab(keyBarShift)
     setKeyBarShift(false)
   }
@@ -1522,12 +1520,12 @@ export const Editor = forwardRef<
 
   // 코드블럭 버튼 — 커서 문단을 코드블럭으로 바꾸거나 되돌린다(toggle). 마크다운 단축어 ```와 같은 결과.
   function handleKeyBarCodeBlock() {
-    editorRef.current?.chain().focus().toggleCodeBlock().run()
+    editorRef.current?.chain().toggleCodeBlock().run()
   }
 
   // 표 버튼 — 슬래시 메뉴 '표'와 같은 3×3 표를 삽입한다.
   function handleKeyBarTable() {
-    editorRef.current?.chain().focus().insertTable({ rows: 3, cols: 3 }).run()
+    editorRef.current?.chain().insertTable({ rows: 3, cols: 3 }).run()
   }
 
   // 되돌리기·다시 실행 버튼 — Ctrl+Z/Y 단축키와 같은 경로(runUndoRedoKeepingView)라 커서가

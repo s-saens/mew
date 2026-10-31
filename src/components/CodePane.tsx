@@ -341,7 +341,6 @@ export const CodePane = forwardRef<
     if (!view) return
     const primary = ctrl && key.length === 1
     const mac = /Mac|iPhone|iPad|iPod/.test(navigator.platform)
-    view.focus()
     runScopeHandlers(view, new KeyboardEvent('keydown', { key, ctrlKey: ctrl && !(primary && mac), metaKey: primary && mac, shiftKey: shift }), 'editor')
     resetKeyBar()
   }

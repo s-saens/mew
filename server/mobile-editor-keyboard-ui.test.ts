@@ -48,7 +48,9 @@ function Fixture(){const [state,setState]=React.useState(defaults);const handle=
     const errors: string[] = []
     page.on('pageerror', error => errors.push(error.message))
     await page.addInitScript(`localStorage.setItem('mew:locale','ko');localStorage.setItem('mew:ui-locale','ko');
-      window.keyboardCalls=0;window.keyboardHides=0;window.bodyFocus=[];
+      window.keyboardCalls=0;window.keyboardHides=0;window.bodyFocus=[];window.bodyFocusRequests=[];
+      const nativeFocus=HTMLElement.prototype.focus;
+      HTMLElement.prototype.focus=function(...args){if(this.matches('.ProseMirror,.cm-content'))window.bodyFocusRequests.push(this.className);return nativeFocus.apply(this,args)};
       addEventListener('focusin',event=>{const el=event.target;if(el.matches('.ProseMirror,.cm-content'))window.bodyFocus.push({policy:el.getAttribute('virtualkeyboardpolicy'),mode:el.getAttribute('inputmode'),activation:navigator.userActivation.isActive})});
       Object.defineProperty(navigator,'virtualKeyboard',{configurable:true,value:${nativeApi ? `Object.assign(new EventTarget(),{overlaysContent:false,boundingRect:new DOMRect(),show(){window.keyboardCalls++},hide(){window.keyboardHides++}})` : 'undefined'}});`)
     await page.route('http://mew-mobile-editor-keyboard.test/**', route => {
@@ -109,6 +111,46 @@ function Fixture(){const [state,setState]=React.useState(defaults);const handle=
       assert.equal(await content.getAttribute('virtualkeyboardpolicy'), null)
       assert.equal(await page.evaluate('window.keyboardCalls'), 0, 'native focus works without explicit keyboard API requests')
       assert.equal(await page.evaluate('window.keyboardHides'), 0, 'body and outside taps do not force API dismissal')
+    }
+    if (width < 768) for (const mode of [{}, { viewMode: 'plain' }, { path: 'fixture.ts', viewMode: 'plain' }]) {
+      await page.evaluate(`window.resetFixture(${JSON.stringify(mode)})`)
+      const content = page.locator('.ProseMirror, .cm-content')
+      await content.waitFor()
+      await pressBody(content, 40)
+      const keys = page.locator('[data-mobile-key-bar]')
+      await keys.waitFor()
+      // Dismissing an OS keyboard can leave editing focus in place. A repeated
+      // focus() request can reopen it even without another focusin event.
+      for (const label of ['Tab', '←', '→', '↑', '↓', 'Ctrl', 'Ctrl', 'Shift', 'Tab', '되돌리기', '다시 실행',
+        ...(mode.viewMode ? [] : ['코드블럭', '코드블럭', '표 삽입'])]) {
+        const before = await page.locator('[data-fixture]').getAttribute('data-value')
+        await page.evaluate('window.bodyFocusRequests=[]')
+        await keys.getByRole('button', { name: label, exact: true }).tap()
+        await page.waitForTimeout(80)
+        assert.deepEqual(await page.evaluate('window.bodyFocusRequests'), [], `${JSON.stringify(mode)} ${label} never requests editing focus`)
+        assert.equal(await content.evaluate(el => el === el.ownerDocument.activeElement), true, `${label} retains existing editing focus`)
+        if (label === 'Tab') assert.notEqual(await page.locator('[data-fixture]').getAttribute('data-value'), before, 'indentation still changes the document')
+        if (label === '표 삽입') assert.equal(await content.locator('table').count(), 1, 'table insertion still executes')
+      }
+      await keys.getByRole('button', { name: 'Esc', exact: true }).tap()
+      await page.locator('[data-outside]').tap()
+      assert.equal(await content.evaluate(el => el === el.ownerDocument.activeElement), false)
+      for (const label of ['Tab', '←', '→', '↑', '↓', '되돌리기', '다시 실행',
+        ...(mode.viewMode ? [] : ['코드블럭', '코드블럭', '표 삽입'])]) {
+        await page.evaluate('window.bodyFocusRequests=[]')
+        await keys.getByRole('button', { name: label, exact: true }).tap()
+        await page.waitForTimeout(80)
+        assert.deepEqual(await page.evaluate('window.bodyFocusRequests'), [], `unfocused ${label} never requests editing focus`)
+        assert.equal(await content.evaluate(el => el === el.ownerDocument.activeElement), false, `${label} does not focus a blurred body`)
+      }
+      await pressBody(content, 40)
+      assert.equal(await content.evaluate(el => el === el.ownerDocument.activeElement), true, 'body taps still activate native editing after auxiliary keys')
+      await page.keyboard.type('after-keys')
+      await page.waitForFunction('document.querySelector("[data-fixture]").dataset.value.includes("after-keys")')
+      assert.equal(await content.getAttribute('inputmode'), null)
+      assert.equal(await content.getAttribute('virtualkeyboardpolicy'), null)
+      assert.equal(await page.evaluate('window.keyboardCalls'), 0)
+      assert.equal(await page.evaluate('window.keyboardHides'), 0)
     }
     for (const state of [{ editable: false }, { loading: true }, { revalidating: true }, { anchorPreview: { lineStart: 1, lineEnd: 1 } }, { path: 'preview.svg', content: '<svg/>', viewMode: 'hotview' }, { path: 'image.png' }]) {
       await page.evaluate(`window.resetFixture(${JSON.stringify(state)})`)

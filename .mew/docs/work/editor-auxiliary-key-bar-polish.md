@@ -1,6 +1,6 @@
 ---
 title: "Editor auxiliary key bar polish"
-description: "Records the 2026-10-30 initial auxiliary-key polish and subsequent replacement of the editor bar surface with rounded translucent floating keys and a rightmost inverted-T arrow cluster. Covers the 2026-10-31 immediate arrow contact, hold repetition, and drag-direction follow-up, terminal compatibility, local regression checks, and pending application to the running instance."
+description: "Records the 2026-10-30 initial auxiliary-key polish and subsequent replacement of the editor bar surface with rounded translucent floating keys and a rightmost inverted-T arrow cluster. Covers the 2026-10-31 immediate arrow contact, hold repetition, and drag-direction follow-up, terminal compatibility, removal of keyboard-opening editor focus requests, local regression checks, and physical-device verification limits."
 created: "2026-10-30"
 updated: "2026-10-31"
 ---
@@ -53,3 +53,17 @@ Local verification:
 - `npx tsc -b`, scoped oxlint, `npm run check:docs`, and `git diff --check` passed without errors.
 
 Checks use isolated browser fixtures. No app build, deployment, launcher, or running-server operation was performed. User application and physical-device verification remain pending.
+
+## Auxiliary actions without keyboard activation
+
+On 2026-10-31, removed editing-focus requests from Plain/code auxiliary dispatch and Hotview Tab, list indentation, undo/redo caret restoration, code-block toggling, and table insertion. A keyboard can be closed while its editor retains focus; another `focus()` call can reopen it. Actions now use the existing editor state and preserve whether the body was focused. Direct body taps retain native keyboard activation under [0098](../decisions/0098-native-mobile-editor-keyboard.md). The current contract is [Mobile auxiliary key bar](../development/ui-contracts.md#mobile-auxiliary-key-bar).
+
+Extended `server/mobile-editor-keyboard-ui.test.ts` to track editing-focus requests, including redundant requests that produce no `focusin` event. It exercises actual Hotview, Markdown Plain, and code auxiliary actions with the body focused and blurred, continued indentation and table insertion, subsequent body-tap typing, and browsers with and without the keyboard API. The regression first failed on Hotview Tab before the fix.
+
+Local verification:
+
+- The combined run of `server/mobile-editor-keyboard-ui.test.ts`, `server/mobile-arrow-keys-ui.test.ts`, `server/mobile-key-bar-ui.test.ts`, `server/mobile-panel-swipe-ui.test.ts`, `server/terminal-keybar-ui.test.ts`, `server/editor-keyboard-ui.test.ts`, `server/mobile-keyboard-ui.test.ts`, `packages/editor/src/editor/listIndent.test.ts`, and `packages/editor/src/editor/undoCaret.test.ts` passed all 23 tests without skips. Browser fixtures use intercepted requests and in-memory bundles without an app server.
+- `npm run build` passed, including TypeScript checks, and refreshed `dist/`. Vite reported its large-chunk advisory.
+- Scoped oxlint completed without errors; existing React ref, effect, memoization, and dependency warnings remain in the editor components. The Impeccable detector found no issues in the changed components. Scoped `git diff --check` passed.
+
+Headless Chromium cannot display an OS keyboard. Physical Android/iOS keyboard behavior remains unverified. No deployment, launcher, or server lifecycle operation was performed.
