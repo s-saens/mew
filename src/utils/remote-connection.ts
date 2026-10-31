@@ -1,5 +1,5 @@
 import type { JWK } from 'jose'
-import { REMOTE_LIMITS, REMOTE_PROTOCOL, REMOTE_TOKEN_CLOCK_TOLERANCE, sdpFingerprint } from '../../shared/remote-access.ts'
+import { REMOTE_LIMITS, REMOTE_PROTOCOL, REMOTE_TOKEN_CLOCK_TOLERANCE, parseRemoteFrame, sdpFingerprint } from '../../shared/remote-access.ts'
 import { DataChannelTransport, setRemoteTransport } from './remote-transport.ts'
 import { parseRemoteBootstrap, remoteBootstrapUrl, REMOTE_ADMISSION_PROTOCOL, REMOTE_ADMISSION_PREFIX, type RemoteBootstrapContext, type RemoteConnectionTarget } from '../../shared/remote-bootstrap.ts'
 import { takePrimedRemoteSignal } from './remote-signal-prime.ts'
@@ -8,6 +8,8 @@ type ConnectionObserver = (state: string, error?: string, code?: string) => void
 type ConnectionCredentials = { session?: string; keyPair: CryptoKeyPair }
 type ConnectionOptions = { centralOrigin?: string; ticketIssuers?: string[]; launch?: string; session?: string; keyPair?: CryptoKeyPair }
 const RTC_RECOVERY_GRACE = 5000, RTC_RECOVERY_NOTICE_DELAY = 1000
+const FOREGROUND_CHECK_TIMEOUT = 250
+type ForegroundCheck = { id: string; timer: ReturnType<typeof setTimeout>; sentAt?: number; timeout: number; received(event: MessageEvent): void }
 type Bootstrap = {
   target: RemoteConnectionTarget
   identity?: boolean
@@ -57,10 +59,12 @@ function createRemoteConnection(instance: string, onState: ConnectionObserver, o
   if (typeof RTCPeerConnection === 'undefined' || !crypto.subtle) { onState('error', '이 브라우저는 안전한 원격 연결을 지원하지 않습니다. 최신 브라우저를 사용해 주세요.'); return () => {} }
   let stopped = false, authenticated = false, connection = '', ticket = '', privateKey: CryptoKey, claims: Record<string, any>, renew: ReturnType<typeof setInterval> | undefined, disconnected: ReturnType<typeof setTimeout> | undefined, timeout: ReturnType<typeof setTimeout> | undefined
   let disconnectNotice: ReturnType<typeof setTimeout> | undefined, recoveryNotified = false
-  let signalResume = false, signalInterrupted = false, signalAttempt = 0, connectSentAt = 0, leaseDeadline = 0, resumeNonce = '', resumeSentAt = 0
+  let signalResume = false, signalInterrupted = false, signalAttempt = 0, connectSentAt = 0, connectWallSentAt = 0, leaseDeadline = 0, leaseWallDeadline = 0, resumeNonce = '', resumeSentAt = 0, resumeWallSentAt = 0
+  let transport: DataChannelTransport | undefined, foregroundCheck: ForegroundCheck | undefined, lastForegroundCheck = -Infinity
   let recoveringSignal: WebSocket | undefined
   let signalRetry: ReturnType<typeof setTimeout> | undefined, signalTimeout: ReturnType<typeof setTimeout> | undefined, leaseTimeout: ReturnType<typeof setTimeout> | undefined
-  const renewals = new Map<string, number>()
+  const renewals = new Map<string, { monotonic: number; wall: number }>()
+  const remainingLease = () => Math.min(leaseDeadline - performance.now(), leaseWallDeadline - Date.now())
   const keyRequest = new AbortController()
   // Fetch the trusted origin's key during negotiation instead of adding a round trip after the ticket.
   let centralKey: Promise<{ key: JWK } | { error: unknown }> | undefined = bootstrap ? undefined : fetch('/central/key', { cache: 'no-store', signal: keyRequest.signal }).then(async response => {
@@ -91,7 +95,7 @@ function createRemoteConnection(instance: string, onState: ConnectionObserver, o
     if (value.type === 'renew' && signalInterrupted) return false
     if (value.type === 'renew' && signalResume) {
       const request = crypto.randomUUID()
-      renewals.set(request, performance.now())
+      renewals.set(request, { monotonic: performance.now(), wall: Date.now() })
       while (renewals.size > 8) renewals.delete(renewals.keys().next().value!)
       value = { ...value, request }
     }
@@ -106,32 +110,85 @@ function createRemoteConnection(instance: string, onState: ConnectionObserver, o
     return true
   }
   const flushCandidates = () => { while (localCandidates.length && sendCandidate(localCandidates[0])) localCandidates.shift() }
-  const resume = () => {
-    if (!authenticated || stopped || document.visibilityState !== 'visible') return
-    if (signalInterrupted) { if (signalRetry === undefined) return; clearTimeout(signalRetry); clearTimeout(signalTimeout); signalRetry = undefined; reconnectSignal() }
-    else emit({ type: 'renew' })
+  const cancelForegroundCheck = () => {
+    const check = foregroundCheck
+    if (!check) return
+    foregroundCheck = undefined; clearTimeout(check.timer); channel.removeEventListener('message', check.received)
+    void transport?.forward({ type: 'cancel', id: check.id }).catch(() => {})
   }
-  const close = () => { if (stopped) return; if (authenticated && signalResume) emit({ type: 'end' }); stopped = true; keyRequest.abort(); bootstrap?.cancel(); clearTimeout(timeout); clearTimeout(disconnected); clearTimeout(disconnectNotice); clearTimeout(signalRetry); clearTimeout(signalTimeout); clearTimeout(leaseTimeout); clearInterval(renew); renewals.clear(); document.removeEventListener('visibilitychange', resume); window.removeEventListener('pageshow', resume); window.removeEventListener('online', resume); setRemoteTransport(null)
+  const checkForeground = () => {
+    if (!transport || foregroundCheck || performance.now() - lastForegroundCheck < FOREGROUND_CHECK_TIMEOUT || channel.bufferedAmount > REMOTE_LIMITS.queue) return
+    lastForegroundCheck = performance.now()
+    const check: ForegroundCheck = {
+      id: `remote-check-${crypto.randomUUID()}`,
+      timer: setTimeout(() => { if (foregroundCheck === check) cancelForegroundCheck() }, FOREGROUND_CHECK_TIMEOUT),
+      timeout: FOREGROUND_CHECK_TIMEOUT,
+      received(event: MessageEvent) {
+        if (foregroundCheck !== check) return
+        try {
+          const frame = parseRemoteFrame(event.data)
+          if (frame.id === check.id && ['response', 'end', 'error'].includes(frame.type)) cancelForegroundCheck()
+        } catch { /* Unrelated or invalid frames cannot prove a fresh round trip. */ }
+      },
+    }
+    foregroundCheck = check
+    channel.addEventListener('message', check.received)
+    const arm = () => {
+      if (stopped || foregroundCheck !== check || check.sentAt === undefined) return
+      clearTimeout(check.timer)
+      check.timer = setTimeout(() => {
+        if (foregroundCheck !== check) return
+        cancelForegroundCheck()
+        fail('기기가 응답하지 않아 다시 연결합니다.', 'error', 'connection-unresponsive')
+      }, Math.max(0, check.sentAt + check.timeout - performance.now()))
+    }
+    if (typeof peer.getStats === 'function') void Promise.resolve().then(() => peer.getStats()).then(report => {
+      if (stopped || foregroundCheck !== check) return
+      report.forEach(stat => {
+        if (stat.type !== 'transport' || typeof stat.selectedCandidatePairId !== 'string') return
+        const pair = report.get(stat.selectedCandidatePairId), rtt = pair?.currentRoundTripTime
+        if (pair?.type !== 'candidate-pair' || typeof rtt !== 'number' || !Number.isFinite(rtt) || rtt < 0) return
+        check.timeout = Math.max(check.timeout, Math.min(1000, rtt * 3000 + 50))
+      })
+      arm()
+    }).catch(() => {})
+    // A queued probe cannot distinguish a stalled peer from local stream congestion.
+    void transport.forward({ type: 'request', id: check.id, method: 'HEAD', path: '/api/remote-ui/file?path=/favicon.ico', headers: {} }).then(() => {
+      if (stopped || foregroundCheck !== check) return
+      check.sentAt = performance.now(); arm()
+    }).catch(() => { if (foregroundCheck === check) cancelForegroundCheck() })
+  }
+  const resume = (event?: Event) => {
+    if (document.visibilityState !== 'visible') { cancelForegroundCheck(); lastForegroundCheck = -Infinity; return }
+    if (!authenticated || stopped) return
+    if (signalResume && remainingLease() <= 0) { fail('인증 연결이 만료되어 다시 연결합니다.'); return }
+    if (signalInterrupted) { if (signalRetry !== undefined) { clearTimeout(signalRetry); clearTimeout(signalTimeout); signalRetry = undefined; reconnectSignal() } }
+    else emit({ type: 'renew' })
+    if (event) checkForeground()
+  }
+  const close = () => { if (stopped) return; if (authenticated && signalResume) emit({ type: 'end' }); stopped = true; cancelForegroundCheck(); keyRequest.abort(); bootstrap?.cancel(); clearTimeout(timeout); clearTimeout(disconnected); clearTimeout(disconnectNotice); clearTimeout(signalRetry); clearTimeout(signalTimeout); clearTimeout(leaseTimeout); clearInterval(renew); renewals.clear(); document.removeEventListener('visibilitychange', resume); window.removeEventListener('pageshow', resume); window.removeEventListener('online', resume); setRemoteTransport(null)
     channel.close(); peer.close(); signal.close() }
   const fail = (error = '기기와 직접 연결하지 못했습니다. 기기의 실행 상태와 네트워크를 확인해 주세요.', state = 'error', code?: string) => { if (stopped) return; close(); onState(state, error, code) }
-  const authorizeLease = (remaining: unknown, sentAt: number) => {
+  const authorizeLease = (remaining: unknown, sentAt: number, sentWall: number) => {
     if (typeof remaining !== 'number' || !Number.isFinite(remaining) || remaining < 0 || remaining > REMOTE_LIMITS.lease) throw new Error('연결 유효 시간을 확인하지 못했습니다.')
     // Count from the request start, so network latency and clock skew cannot extend authorization.
     leaseDeadline = sentAt + remaining - 1000
+    leaseWallDeadline = sentWall + remaining - 1000
+    if (remainingLease() <= 0) throw new Error('인증 연결이 만료되어 다시 연결합니다.')
     clearTimeout(leaseTimeout)
-    leaseTimeout = setTimeout(() => fail('인증 연결을 복구하지 못했습니다. 다시 연결해 주세요.'), Math.max(0, leaseDeadline - performance.now()))
+    leaseTimeout = setTimeout(() => fail('인증 연결을 복구하지 못했습니다. 다시 연결해 주세요.'), Math.max(0, remainingLease()))
   }
   const reconnectSignal = () => {
     signalRetry = undefined
-    if (stopped || leaseDeadline <= performance.now()) return
+    if (stopped || remainingLease() <= 0) return
     const previous = signal, socket = new WebSocket(`${location.origin.replace('https:', 'wss:')}/central/signal?instance=${encodeURIComponent(instance)}&role=browser`)
     signal = socket; recoveringSignal = socket; resumeNonce = ''; previous.close(4000, 'signaling-interrupted')
     bindSignal(socket)
-    signalTimeout = setTimeout(() => { interruptSignal(socket); socket.close(4000, 'signaling-interrupted') }, Math.min(8000, Math.max(0, leaseDeadline - performance.now())))
+    signalTimeout = setTimeout(() => { interruptSignal(socket); socket.close(4000, 'signaling-interrupted') }, Math.min(8000, Math.max(0, remainingLease())))
   }
   const interruptSignal = (socket: WebSocket, normal = false) => {
     if (stopped || socket !== signal) return
-    if (normal || !authenticated || !signalResume || leaseDeadline <= performance.now()) { fail('인증 연결이 종료됐습니다. 다시 연결해 주세요.'); return }
+    if (normal || !authenticated || !signalResume || remainingLease() <= 0) { fail('인증 연결이 종료됐습니다. 다시 연결해 주세요.'); return }
     signalInterrupted = true
     clearTimeout(signalTimeout)
     if (signalRetry !== undefined) return
@@ -179,7 +236,7 @@ function createRemoteConnection(instance: string, onState: ConnectionObserver, o
           if (stopped || socket !== signal) return
           const proof = await new SignJWT({ instance, nonce: resumeNonce, connection, generation: claims.generation, fingerprint: claims.fingerprint }).setProtectedHeader({ alg: 'EdDSA' }).setIssuer('mew-browser').setAudience(`${location.origin}/signal-resume`).setSubject(claims.sub).setJti(crypto.randomUUID()).setIssuedAt().setExpirationTime('60s').sign(privateKey)
           if (stopped || socket !== signal) return
-          resumeSentAt = performance.now()
+          resumeSentAt = performance.now(); resumeWallSentAt = Date.now()
           emit({ type: 'resume', connection, proof }); return
         }
         if (challenged) throw new Error('중복된 연결 요청입니다.')
@@ -201,7 +258,7 @@ function createRemoteConnection(instance: string, onState: ConnectionObserver, o
         if (stopped || socket !== signal || signalInterrupted) return
         if ('error' in prepared) throw prepared.error
         if (!prepared.value) return
-        connectSentAt = performance.now()
+        connectSentAt = performance.now(); connectWallSentAt = Date.now()
         if (emit({ type: 'connect', instance, sdp: offer, publicKey: prepared.value.publicKey, serverRenewal: true, signalResume: value.signalResume === true, ...(bootstrap ? { nonce: value.nonce } : options.launch ? { launch: options.launch } : {}) })) { connectSocket = socket; flushCandidates() }
         return
       }
@@ -224,7 +281,7 @@ function createRemoteConnection(instance: string, onState: ConnectionObserver, o
         claims = verified.payload; if (claims.fingerprint !== sdpFingerprint(offer) || claims.connection !== value.connection || !claims.instanceKey) throw new Error('연결 증명이 일치하지 않습니다.')
         if (claims.authMode !== 'local') throw new Error('중앙 서비스를 업데이트한 뒤 다시 연결해 주세요.')
         connection = value.connection; ticket = value.ticket
-        if (claims.signalResume === true) { signalResume = true; authorizeLease(claims.leaseRemaining, connectSentAt) }
+        if (claims.signalResume === true) { signalResume = true; authorizeLease(claims.leaseRemaining, connectSentAt, connectWallSentAt) }
         flushCandidates()
         await prove(); return
       }
@@ -233,15 +290,16 @@ function createRemoteConnection(instance: string, onState: ConnectionObserver, o
       if (value.type === 'lease' && signalResume) {
         const sentAt = renewals.get(value.request)
         if (sentAt === undefined || signalInterrupted) throw new Error('연결 갱신 증명을 확인하지 못했습니다.')
-        renewals.delete(value.request); authorizeLease(value.remaining, sentAt); return
+        renewals.delete(value.request); authorizeLease(value.remaining, sentAt.monotonic, sentAt.wall); return
       }
       if (value.type === 'resumed' && signalResume && signalInterrupted) {
         if (value.nonce !== resumeNonce || !resumeNonce) throw new Error('연결 복구 증명을 확인하지 못했습니다.')
         // Reattachment restores the same lease; only a subsequent verified renewal may extend it.
-        const deadline = leaseDeadline
-        authorizeLease(value.remaining, resumeSentAt)
+        const deadline = leaseDeadline, wallDeadline = leaseWallDeadline
+        authorizeLease(value.remaining, resumeSentAt, resumeWallSentAt)
         leaseDeadline = Math.min(deadline, leaseDeadline)
-        clearTimeout(leaseTimeout); leaseTimeout = setTimeout(() => fail('인증 연결을 복구하지 못했습니다. 다시 연결해 주세요.'), Math.max(0, leaseDeadline - performance.now()))
+        leaseWallDeadline = Math.min(wallDeadline, leaseWallDeadline)
+        clearTimeout(leaseTimeout); leaseTimeout = setTimeout(() => fail('인증 연결을 복구하지 못했습니다. 다시 연결해 주세요.'), Math.max(0, remainingLease()))
         signalInterrupted = false; recoveringSignal = undefined; signalAttempt = 0; clearTimeout(signalTimeout); clearTimeout(signalRetry); signalRetry = undefined
         renewals.clear(); flushCandidates(); emit({ type: 'renew' }); return
       }
@@ -292,7 +350,7 @@ function createRemoteConnection(instance: string, onState: ConnectionObserver, o
     try {
       const value = JSON.parse(event.data)
       if (value.type !== 'authenticated' || value.protocol !== REMOTE_PROTOCOL) throw new Error('invalid-auth')
-      authenticated = true; clearTimeout(timeout); setRemoteTransport(new DataChannelTransport(channel)); onState('connected')
+      authenticated = true; clearTimeout(timeout); transport = new DataChannelTransport(channel); setRemoteTransport(transport); onState('connected')
       renew = setInterval(() => emit({ type: 'renew' }), REMOTE_LIMITS.renew); emit({ type: 'renew' })
     } catch { fail() }
   })

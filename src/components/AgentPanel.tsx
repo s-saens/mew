@@ -2979,6 +2979,13 @@ function AgentSessionView({
         scheduleReconnect()
       }
     }
+    const reconnectAfterRemoteRecovery = () => {
+      if (closed || terminal || retry === undefined || (ws && ws.readyState !== WebSocket.CLOSED)) return
+      clearTimeout(retry)
+      retry = undefined
+      connect()
+    }
+    window.addEventListener('mew:remote-reconnected', reconnectAfterRemoteRecovery)
     let cacheDeadline: ReturnType<typeof setTimeout> | undefined
     const cachedRestoration = resumeSessionIdRef.current
       ? Promise.race([Promise.all([readHistoryCache(cacheKey), readQueueCache(cacheKey)]), new Promise<null>(resolve => { cacheDeadline = setTimeout(() => resolve(null), 200) })])
@@ -3002,6 +3009,7 @@ function AgentSessionView({
       closed = true
       cancelClear()
       if (retry) clearTimeout(retry)
+      window.removeEventListener('mew:remote-reconnected', reconnectAfterRemoteRecovery)
       ws?.close()
       wsRef.current = null
       resetWorkDetails()

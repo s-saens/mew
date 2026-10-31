@@ -31,6 +31,7 @@ class FakePeer {
   createDataChannel() { return this.channel }
   async createOffer() { return { type: 'offer', sdp } }
   async setLocalDescription() {}
+  async getStats(): Promise<Map<string, Record<string, unknown>>> { return new Map() }
   state(value: string) { this.connectionState = value; this.onconnectionstatechange?.() }
   close() { this.state('closed') }
   candidate(index: number) { const candidate = { candidate: `candidate:fixture-${index} 1 udp 1 192.0.2.1 5000 typ host`, sdpMid: '0' }; this.onicecandidate?.({ candidate: { ...candidate, toJSON: () => candidate } }) }
@@ -721,4 +722,277 @@ test('queued renewal acknowledgments from the interrupted socket cannot terminat
   await new Promise(resolve => setImmediate(resolve))
   assert.deepEqual(f.errors, [])
   assert.equal(activeRemoteTransport(), transport)
+})
+
+function foregroundFrames(peer: FakePeer) {
+  return peer.channel.sent.map(value => JSON.parse(value) as { type: string; id: string; method?: string; path?: string })
+}
+async function foregroundProbe(peer: FakePeer) {
+  await until(() => foregroundFrames(peer).some(frame => frame.type === 'request' && frame.id.startsWith('remote-check-')))
+  return foregroundFrames(peer).find(frame => frame.type === 'request' && frame.id.startsWith('remote-check-'))!
+}
+
+test('foreground events share one safe probe and an HTTP error response preserves the same live peer', async t => {
+  const f = fixture(t), transport = activeRemoteTransport()
+  f.browser.dispatchEvent(new Event('online'))
+  f.browser.dispatchEvent(new Event('pageshow'))
+  f.document.dispatchEvent(new Event('visibilitychange'))
+  const probe = await foregroundProbe(f.peer)
+  assert.equal(probe.method, 'HEAD')
+  assert.equal(probe.path, '/api/remote-ui/file?path=/favicon.ico')
+  assert.equal(foregroundFrames(f.peer).filter(frame => frame.type === 'request').length, 1)
+  f.peer.channel.message({ type: 'response', id: probe.id, status: 404, headers: {} })
+  t.mock.timers.tick(500)
+  assert.equal(activeRemoteTransport(), transport)
+  assert.deepEqual(f.states, ['connected'])
+})
+
+test('an unrelated incoming frame cannot mask a stalled foreground probe or cancel another operation', async t => {
+  const f = fixture(t), transport = activeRemoteTransport()!
+  await transport.forward({ type: 'socket', id: 'existing-subscription', path: '/api/presence' })
+  f.browser.dispatchEvent(new Event('online'))
+  await foregroundProbe(f.peer)
+  t.mock.timers.tick(100)
+  f.peer.channel.message({ type: 'open', id: 'existing-subscription' })
+  t.mock.timers.tick(150)
+  assert.equal(f.peer.channel.readyState, 'closed')
+  assert.equal(f.codes.at(-1), 'connection-unresponsive')
+  assert.equal(foregroundFrames(f.peer).some(frame => frame.type === 'close' && frame.id === 'existing-subscription'), false)
+})
+
+test('a wall-clock rollback cannot suppress later foreground checks', async t => {
+  const f = fixture(t)
+  let now = 0
+  t.mock.method(performance, 'now', () => now)
+  f.browser.dispatchEvent(new Event('online'))
+  await new Promise(resolve => setImmediate(resolve))
+  const first = foregroundFrames(f.peer).find(frame => frame.id?.startsWith('remote-check-'))!
+  f.peer.channel.message({ type: 'response', id: first.id, status: 200, headers: {} })
+  now += 300
+  t.mock.timers.setTime(Date.now() - 60 * 60 * 1000)
+  f.browser.dispatchEvent(new Event('pageshow'))
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(foregroundFrames(f.peer).filter(frame => frame.type === 'request' && frame.id.startsWith('remote-check-')).length, 2)
+})
+
+test('a new outgoing app request at 95ms cannot cancel a stalled foreground determination', async t => {
+  const f = fixture(t), transport = activeRemoteTransport()!
+  f.browser.dispatchEvent(new Event('online'))
+  await foregroundProbe(f.peer)
+  await new Promise(resolve => setImmediate(resolve))
+  t.mock.timers.tick(95)
+  await transport.forward({ type: 'request', id: 'new-app-read', method: 'GET', path: '/api/files', headers: {} })
+  t.mock.timers.tick(154)
+  assert.equal(f.peer.channel.readyState, 'open')
+  t.mock.timers.tick(1)
+  assert.equal(f.peer.channel.readyState, 'closed')
+  assert.equal(f.codes.at(-1), 'connection-unresponsive')
+  assert.equal(foregroundFrames(f.peer).filter(frame => frame.id === 'new-app-read' && frame.type === 'request').length, 1)
+})
+
+test('an old response queued before sleep cannot satisfy the fresh foreground probe', async t => {
+  const f = fixture(t), transport = activeRemoteTransport()!
+  await transport.forward({ type: 'request', id: 'pre-sleep-read', method: 'GET', path: '/api/files', headers: {} })
+  f.browser.dispatchEvent(new Event('online'))
+  await foregroundProbe(f.peer)
+  await new Promise(resolve => setImmediate(resolve))
+  t.mock.timers.tick(200)
+  f.peer.channel.message({ type: 'response', id: 'pre-sleep-read', status: 200, headers: {} })
+  t.mock.timers.tick(50)
+  assert.equal(f.peer.channel.readyState, 'closed')
+  assert.equal(f.codes.at(-1), 'connection-unresponsive')
+})
+
+function candidateStats(rtt: number) {
+  return new Map<string, Record<string, unknown>>([
+    ['transport', { type: 'transport', selectedCandidatePairId: 'selected-pair' }],
+    ['selected-pair', { type: 'candidate-pair', currentRoundTripTime: rtt }],
+  ])
+}
+
+test('known 400ms path RTT gives a healthy foreground response at 500ms time to arrive', async t => {
+  const f = fixture(t), transport = activeRemoteTransport()
+  let now = 0
+  t.mock.method(performance, 'now', () => now)
+  t.mock.method(f.peer, 'getStats', async () => candidateStats(0.4))
+  f.browser.dispatchEvent(new Event('online'))
+  const probe = await foregroundProbe(f.peer)
+  now += 500; t.mock.timers.tick(500)
+  assert.equal(activeRemoteTransport(), transport)
+  f.peer.channel.message({ type: 'response', id: probe.id, status: 200, headers: {} })
+  now += 1000; t.mock.timers.tick(1000)
+  assert.equal(activeRemoteTransport(), transport)
+  assert.deepEqual(f.errors, [])
+})
+
+test('adaptive RTT allowance stays anchored to probe transmission rather than late stats receipt', async t => {
+  const f = fixture(t)
+  let now = 0, release!: (value: ReturnType<typeof candidateStats>) => void
+  t.mock.method(performance, 'now', () => now)
+  t.mock.method(f.peer, 'getStats', () => new Promise(resolve => { release = resolve }))
+  f.browser.dispatchEvent(new Event('online'))
+  await foregroundProbe(f.peer)
+  now += 150; t.mock.timers.tick(150)
+  release(candidateStats(0.2))
+  await new Promise(resolve => setImmediate(resolve))
+  now += 499; t.mock.timers.tick(499)
+  assert.equal(f.peer.channel.readyState, 'open')
+  now += 1; t.mock.timers.tick(1)
+  assert.equal(f.peer.channel.readyState, 'closed', '3 × 200ms RTT + 50ms expires 650ms after transmission')
+})
+
+test('reported RTT cannot extend a foreground determination beyond one second', async t => {
+  const f = fixture(t)
+  let now = 0
+  t.mock.method(performance, 'now', () => now)
+  t.mock.method(f.peer, 'getStats', async () => candidateStats(3))
+  f.browser.dispatchEvent(new Event('online'))
+  await foregroundProbe(f.peer)
+  now += 999; t.mock.timers.tick(999)
+  assert.equal(f.peer.channel.readyState, 'open')
+  now += 1; t.mock.timers.tick(1)
+  assert.equal(f.peer.channel.readyState, 'closed')
+})
+
+test('slow stats cannot delay the default deadline or revive a completed foreground check', async t => {
+  const f = fixture(t)
+  let now = 0, release!: (value: ReturnType<typeof candidateStats>) => void
+  t.mock.method(performance, 'now', () => now)
+  t.mock.method(f.peer, 'getStats', () => new Promise(resolve => { release = resolve }))
+  f.browser.dispatchEvent(new Event('online'))
+  await foregroundProbe(f.peer)
+  now += 250; t.mock.timers.tick(250)
+  assert.equal(f.peer.channel.readyState, 'closed')
+  release(candidateStats(0.4))
+  await new Promise(resolve => setImmediate(resolve))
+  now += 2000; t.mock.timers.tick(2000)
+  assert.equal(f.errors.length, 1)
+  assert.equal(f.states.filter(state => state === 'connected').length, 1)
+})
+
+for (const stats of ['missing', 'throwing', 'rejected']) test(`${stats} RTC stats preserve the default fast foreground deadline`, async t => {
+  const f = fixture(t)
+  if (stats === 'missing') Object.defineProperty(f.peer, 'getStats', { value: undefined })
+  else t.mock.method(f.peer, 'getStats', stats === 'throwing'
+    ? () => { throw new Error('stats unavailable') }
+    : () => Promise.reject(new Error('stats unavailable')))
+  f.browser.dispatchEvent(new Event('online'))
+  await foregroundProbe(f.peer)
+  await new Promise(resolve => setImmediate(resolve))
+  t.mock.timers.tick(250)
+  assert.equal(f.peer.channel.readyState, 'closed')
+  assert.equal(f.codes.at(-1), 'connection-unresponsive')
+})
+
+test('a central lease acknowledgment does not prove that the RTC data path can receive', async t => {
+  const f = await resumableFixture(t)
+  f.browser.dispatchEvent(new Event('online'))
+  await foregroundProbe(f.peer)
+  const renewal = f.signal.sent.findLast(value => value.type === 'renew') as { type: string; request: string }
+  f.signal.onmessage?.({ data: JSON.stringify({ type: 'lease', connection: 'connection', request: renewal.request, remaining: 60_000 }) })
+  await new Promise(resolve => setImmediate(resolve))
+  t.mock.timers.tick(250)
+  assert.equal(f.peer.channel.readyState, 'closed')
+  assert.equal(f.codes.at(-1), 'connection-unresponsive')
+})
+
+test('receiving RTC data cannot extend an authorization lease without its central acknowledgment', async t => {
+  const f = await resumableFixture(t), transport = activeRemoteTransport()
+  f.browser.dispatchEvent(new Event('online'))
+  const probe = await foregroundProbe(f.peer)
+  f.peer.channel.message({ type: 'response', id: probe.id, status: 200, headers: {} })
+  t.mock.timers.tick(250)
+  assert.equal(activeRemoteTransport(), transport)
+  t.mock.timers.tick(58_751)
+  assert.equal(f.peer.channel.readyState, 'closed')
+  assert.match(f.errors.at(-1)!, /인증 연결/)
+})
+
+test('an expired authorization fails immediately on foreground even before frozen timers resume', async t => {
+  const f = await resumableFixture(t), before = f.signal.sent.filter(value => value.type === 'renew').length
+  f.document.visibilityState = 'hidden'; f.document.dispatchEvent(new Event('visibilitychange'))
+  t.mock.timers.setTime(Date.now() + 60 * 60 * 1000)
+  f.document.visibilityState = 'visible'; f.document.dispatchEvent(new Event('visibilitychange'))
+  assert.equal(f.peer.channel.readyState, 'closed')
+  assert.equal(f.signal.sent.filter(value => value.type === 'renew').length, before, 'return events cannot renew expired authorization')
+  assert.equal(foregroundFrames(f.peer).some(frame => frame.id?.startsWith('remote-check-')), false)
+})
+
+test('a queued renewal acknowledgment cannot revive authorization after sleep when the monotonic clock barely advances', async t => {
+  const f = await resumableFixture(t)
+  const renewal = f.signal.sent.findLast(value => value.type === 'renew') as { type: string; request: string }
+  f.document.visibilityState = 'hidden'; f.document.dispatchEvent(new Event('visibilitychange'))
+  t.mock.timers.setTime(Date.now() + 10 * 60 * 1000)
+  f.signal.onmessage?.({ data: JSON.stringify({ type: 'lease', connection: 'connection', request: renewal.request, remaining: 60_000 }) })
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(f.peer.channel.readyState, 'closed', 'lease time is counted from request transmission on both clocks')
+  f.document.visibilityState = 'visible'; f.document.dispatchEvent(new Event('visibilitychange'))
+  assert.equal(f.states.filter(state => state === 'connected').length, 1)
+})
+
+test('a queued signaling resume acknowledgment cannot revive a lease after wall-clock sleep', async t => {
+  const f = await resumableFixture(t)
+  f.signal.close(1006); t.mock.timers.tick(0)
+  const signal = FakeSignal.latest, nonce = 'n'.repeat(32)
+  signal.onmessage?.({ data: JSON.stringify({ type: 'challenge', protocol: 1, nonce, signalResume: true }) })
+  await until(() => signal.sent.some(value => value.type === 'resume'))
+  t.mock.timers.setTime(Date.now() + 10 * 60 * 1000)
+  signal.onmessage?.({ data: JSON.stringify({ type: 'resumed', connection: 'connection', nonce, remaining: 58_000 }) })
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(f.peer.channel.readyState, 'closed')
+  assert.equal(f.states.filter(state => state === 'connected').length, 1)
+})
+
+test('stream quota waiting cancels only its queued foreground probe instead of declaring a live peer dead', async t => {
+  const f = fixture(t), transport = activeRemoteTransport()!
+  await Promise.all(Array.from({ length: 16 }, (_, index) => transport.forward({ type: 'request', id: `busy-${index}`, method: 'GET', path: '/api/files', headers: {} })))
+  f.browser.dispatchEvent(new Event('online'))
+  await new Promise(resolve => setImmediate(resolve))
+  t.mock.timers.tick(250)
+  assert.equal(activeRemoteTransport(), transport)
+  assert.equal(f.peer.channel.readyState, 'open')
+  f.peer.channel.message({ type: 'end', id: 'busy-0' })
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(foregroundFrames(f.peer).some(frame => frame.id.startsWith('remote-check-')), false, 'canceled admission cannot send a late probe')
+  await transport.forward({ type: 'request', id: 'next-app-read', method: 'GET', path: '/api/files', headers: {} })
+  assert.deepEqual(f.errors, [])
+})
+
+test('local DataChannel backpressure does not start a foreground failure deadline', async t => {
+  const f = fixture(t), transport = activeRemoteTransport()
+  f.peer.channel.bufferedAmount = 1024 * 1024
+  f.browser.dispatchEvent(new Event('online'))
+  t.mock.timers.tick(500)
+  assert.equal(activeRemoteTransport(), transport)
+  assert.equal(foregroundFrames(f.peer).some(frame => frame.id?.startsWith('remote-check-')), false)
+  assert.deepEqual(f.errors, [])
+})
+
+for (const action of ['hide', 'dispose', 'access-revoked', 'session-expired']) test(`${action} cancels a foreground probe without a late failure or transport resurrection`, async t => {
+  const f = fixture(t)
+  f.browser.dispatchEvent(new Event('online'))
+  const probe = await foregroundProbe(f.peer)
+  if (action === 'hide') { f.document.visibilityState = 'hidden'; f.document.dispatchEvent(new Event('visibilitychange')) }
+  else if (action === 'dispose') f.close()
+  else {
+    f.signal.onmessage?.({ data: JSON.stringify({ type: 'error', code: action }) })
+    await until(() => f.peer.channel.readyState === 'closed')
+  }
+  f.peer.channel.message({ type: 'response', id: probe.id, status: 200, headers: {} })
+  t.mock.timers.tick(500)
+  assert.equal(f.errors.length, 0)
+  assert.equal(f.peer.channel.readyState, action === 'hide' ? 'open' : 'closed')
+  assert.equal(f.states.filter(state => state === 'connected').length, 1)
+})
+
+test('foreground probing bypasses the ordinary five-second RTC disconnected grace only when its data path stalls', async t => {
+  const f = fixture(t)
+  f.peer.state('disconnected')
+  f.browser.dispatchEvent(new Event('online'))
+  await foregroundProbe(f.peer)
+  await new Promise(resolve => setImmediate(resolve))
+  t.mock.timers.tick(250)
+  assert.equal(f.peer.channel.readyState, 'closed')
+  assert.equal(f.codes.at(-1), 'connection-unresponsive')
+  assert.equal(f.states.includes('reconnecting'), false)
 })

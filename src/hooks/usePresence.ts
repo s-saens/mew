@@ -113,7 +113,7 @@ export function usePresence(
         if (!cancelled) {
           setActiveSessions(null)
           setParticipants({})
-          retryTimer = setTimeout(connect, 3000)
+          retryTimer = setTimeout(() => { retryTimer = null; connect() }, 3000)
         }
       }
     }
@@ -132,8 +132,15 @@ export function usePresence(
       wasHidden = hidden
     }
     const onPageShow = (event: PageTransitionEvent) => { if (event.persisted) refreshSession() }
+    const reconnectAfterRemoteRecovery = () => {
+      if (cancelled || retryTimer === null || ws?.readyState !== WebSocket.CLOSED) return
+      clearTimeout(retryTimer)
+      retryTimer = null
+      connect()
+    }
     document.addEventListener('visibilitychange', onVisibility)
     window.addEventListener('pageshow', onPageShow)
+    window.addEventListener('mew:remote-reconnected', reconnectAfterRemoteRecovery)
     const activityTimer = setInterval(sendActivity, SESSION_ACTIVITY_INTERVAL_MS)
     connect()
 
@@ -143,6 +150,7 @@ export function usePresence(
       clearInterval(activityTimer)
       document.removeEventListener('visibilitychange', onVisibility)
       window.removeEventListener('pageshow', onPageShow)
+      window.removeEventListener('mew:remote-reconnected', reconnectAfterRemoteRecovery)
       ws?.close()
     }
     // focusMessage only reads refs; reconnect only when the identity changes.

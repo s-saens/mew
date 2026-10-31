@@ -12,6 +12,56 @@ import type { MewSessionRecord } from '../shared/active-sessions.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 
+test('verified Mewlink recovery immediately reconnects presence once and cancels pending retries', { skip: !domBrowserExecutable(), timeout: 30_000 }, async t => {
+  const source = `import React from '${root}/node_modules/react/index.js';
+import {createRoot} from '${root}/node_modules/react-dom/client.js';
+import {usePresence} from '${root}/src/hooks/usePresence.ts';
+window.sockets=[];window.permissionRefreshes=0;
+window.addEventListener('mew:permissions-changed',()=>window.permissionRefreshes++);
+class Socket {static OPEN=1;static CLOSED=3;readyState=0;sent=[];constructor(){window.sockets.push(this)}open(){this.readyState=1;this.onopen?.()}send(raw){this.sent.push(JSON.parse(raw))}close(){this.readyState=3;this.onclose?.()}}
+window.WebSocket=Socket;
+function Fixture(){usePresence('work','readme.md','owner@example.test',()=>{});return React.createElement('textarea',{'aria-label':'Draft',defaultValue:'Keep this draft'})}
+const app=createRoot(document.getElementById('root'));app.render(React.createElement(Fixture));window.unmount=()=>app.unmount();`
+  const bundle = await build({ input: 'virtual:presence-recovery.tsx', write: false, platform: 'browser', output: { format: 'iife' }, transform: { jsx: 'react-jsx', define: { 'process.env.NODE_ENV': JSON.stringify('test') } }, plugins: [{ name: 'fixture', resolveId(id) { if (id === 'virtual:presence-recovery.tsx') return id }, load(id) { if (id === 'virtual:presence-recovery.tsx') return source } }] })
+  const code = bundle.output.find(item => item.type === 'chunk')!.code
+  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  t.after(() => browser.close())
+  for (const width of [390, 1100]) {
+    const page = await browser.newPage({ viewport: { width, height: 844 } })
+    const errors: string[] = []
+    page.on('pageerror', error => errors.push(error.message))
+    await page.clock.install({ time: new Date('2030-01-01T00:00:00Z') })
+    await page.clock.pauseAt(new Date('2030-01-01T00:00:01Z'))
+    await page.route('https://mew-presence-recovery.test/**', route => route.fulfill({ contentType: 'text/html', body: `<div id="root"></div><script>${code}</script>` }))
+    await page.goto('https://mew-presence-recovery.test/')
+    await page.waitForFunction('window.sockets.length===1')
+    await page.evaluate('window.sockets[0].open()')
+    const draft = page.getByRole('textbox', { name: 'Draft', exact: true })
+    await draft.fill('Unsent text survives recovery')
+    await draft.focus()
+    await draft.evaluate(element => element.setAttribute('data-retained', 'true'))
+    await page.evaluate(`window.sockets[0].close();window.dispatchEvent(new Event('online'))`)
+    assert.equal(await page.evaluate('window.sockets.length'), 1, 'network availability alone cannot bypass remote readiness')
+    await page.evaluate(`window.dispatchEvent(new Event('mew:remote-reconnected'));window.dispatchEvent(new Event('mew:remote-reconnected'))`)
+    assert.equal(await page.evaluate('window.sockets.length'), 2, 'verified recovery bypasses the three-second retry without advancing time')
+    assert.equal(await page.evaluate('window.sockets[1].readyState'), 0, 'duplicate wake events leave one connecting socket')
+    await page.evaluate('window.sockets[1].open()')
+    await page.clock.runFor(3000)
+    assert.equal(await page.evaluate('window.sockets.length'), 2, 'the displaced retry timer cannot open another socket')
+    assert.equal(await page.evaluate('window.permissionRefreshes'), 2, 'fresh presence checks existing permissions once per socket')
+    assert.equal(await page.evaluate('window.sockets[1].sent.length'), 1, 'recovery sends only the current presence subscription')
+    assert.equal(await page.evaluate('window.sockets[1].sent[0].type'), 'focus')
+    assert.equal(await draft.inputValue(), 'Unsent text survives recovery')
+    assert.equal(await draft.getAttribute('data-retained'), 'true')
+    assert.equal(await draft.evaluate(element => element === element.ownerDocument.activeElement), true)
+    await page.evaluate(`window.sockets[1].close();window.unmount();window.dispatchEvent(new Event('mew:remote-reconnected'))`)
+    await page.clock.runFor(4000)
+    assert.equal(await page.evaluate('window.sockets.length'), 2, 'unmount removes the immediate recovery listener and retry timer')
+    assert.deepEqual(errors, [])
+    await page.close()
+  }
+})
+
 test('total session count and session popup stay live across mobile layout and reconnects', { skip: !domBrowserExecutable(), timeout: 45_000 }, async () => {
   const source = `import React,{useState} from '${root}/node_modules/react/index.js';
 import {createRoot} from '${root}/node_modules/react-dom/client.js';

@@ -1,11 +1,13 @@
 ---
 title: "Recovery wait and status display for transient Mewlink RTC interruptions"
-description: "This decision selects a browser recovery wait of 5 seconds and a display delay of 1 second to reduce full reconnections and recovery indicators for brief P2P interruptions. Existing permission revocation, lease expiration, and immediate termination on actual connection failure remain; subsequent ADR 0086 adds cause-specific long-term recovery."
+description: "Selects a five-second browser recovery wait and one-second display delay for ordinary brief P2P interruptions. ADR 0086 adds cause-specific long-term recovery, and ADR 0105 bypasses the grace for foreground-confirmed unresponsive paths while retaining permission, lease, and actual-failure termination."
 created: "2026-10-28"
-updated: "2026-10-29"
+updated: "2026-10-31"
 ---
 
 ## Status
+
+[ADR 0105](0105-mewlink-foreground-recovery.md) adds a foreground-only liveness check and prompt replacement for unresponsive data paths. The ordinary five-second interruption grace below remains in effect.
 
 Adopted. Implemented locally; the user applies it to production. Verification results and remaining limitations are in the [work record](../work/mewlink-transient-recovery.md).
 

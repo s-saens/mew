@@ -32,7 +32,7 @@ localStorage.setItem('mew:agent-active-tab:'+JSON.stringify('/workspace'),tabs[0
 if(!fresh)writeAgentEventCache('codex','first','/workspace',{sessionId:'first',events:[{type:'update',update:{sessionUpdate:'user_message_chunk',content:{type:'text',text:'Cached text must not flash'}}}]});
 onMewcatNotice(notice=>window.notices.push(notice));
 class Socket {
- static OPEN=1;readyState=0;
+ static OPEN=1;static CLOSED=3;readyState=0;
  constructor(url){this.tab=new URL(url).searchParams.get('tab');window.socketAttempts[this.tab]=(window.socketAttempts[this.tab]||0)+1;if(window.throwSocket)throw new Error('Socket construction unavailable');window.sockets[this.tab]=this;if(window.fail)setTimeout(()=>this.close(),20)}
  emit(value){this.onmessage?.({data:JSON.stringify(value)})}
  open(restore=true){this.readyState=1;this.onopen?.();if(!restore)return;this.emit({type:'replay',restored:true,events:[{type:'update',update:{sessionUpdate:'user_message_chunk',content:{type:'text',text:'Saved conversation'}}}]});this.emit({type:'meta',meta:{sessionId:this.tab,startedAt:new Date().toISOString(),turns:1,busy:false,queued:[],usage:null,canLoad:true,canList:true}})}
@@ -272,6 +272,19 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
       await clearFeedback.filter({ hasText: '대화 비우는 중…' }).waitFor()
       await page.clock.install()
       await page.clock.pauseAt(new Date(Date.now() + 1000))
+      const beforeRemoteRecovery = await page.evaluate<number>('window.socketAttempts.first')
+      const messagesBeforeRemoteRecovery = await page.evaluate<number>('window.messages.length')
+      await page.evaluate(`window.sockets.first.close();window.dispatchEvent(new Event('online'))`)
+      assert.equal(await page.evaluate('window.socketAttempts.first'), beforeRemoteRecovery, 'network availability does not bypass the verified remote recovery boundary')
+      await page.evaluate(`window.dispatchEvent(new Event('mew:remote-reconnected'));window.dispatchEvent(new Event('mew:remote-reconnected'))`)
+      assert.equal(await page.evaluate('window.socketAttempts.first'), beforeRemoteRecovery + 1, 'verified remote recovery opens immediately without advancing the one-second retry clock')
+      assert.equal(await page.evaluate('window.sockets.first.readyState'), 0, 'a recovery burst leaves one connecting socket')
+      assert.equal(await page.evaluate('window.messages.length'), messagesBeforeRemoteRecovery, 'recovery never resends a pending clear or prompt')
+      await page.evaluate('window.sockets.first.open()')
+      await overlay.waitFor({ state: 'hidden' })
+      await page.clock.runFor(1000)
+      assert.equal(await page.evaluate('window.socketAttempts.first'), beforeRemoteRecovery + 1, 'the displaced retry timer cannot create a second socket')
+      assert.equal(await composerValue(draft), 'Keep this unsent draft')
       await page.evaluate('window.fail=true;window.sockets.first.close()')
       await overlay.waitFor()
       await clearFeedback.waitFor({ state: 'hidden' })
@@ -338,6 +351,8 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
       assert.equal(await page.evaluate('window.socketAttempts.first'), previousAttempts + 11, 'allow eleven automatic attempts after the initial loss')
       await page.clock.runFor(5000)
       assert.equal(await page.evaluate('window.socketAttempts.first'), previousAttempts + 11, 'exhausted recovery waits for an explicit retry')
+      await page.evaluate(`window.dispatchEvent(new Event('mew:remote-reconnected'))`)
+      assert.equal(await page.evaluate('window.socketAttempts.first'), previousAttempts + 11, 'verified recovery cannot restart an exhausted retry budget')
       await page.evaluate('window.fail=false;window.throwSocket=true;window.previousSocket=window.sockets.first')
       await session.getByRole('button', { name: '다시 연결', exact: true }).click()
       await page.waitForFunction(`window.socketAttempts.first===${previousAttempts + 12}`)

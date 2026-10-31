@@ -243,10 +243,14 @@ test('queued fetches and uploads cannot survive a suspend and immediate resume',
   assert.equal(transport.closed, false)
 })
 
-test('app reconnect controls preserve the MessagePort and resume the existing transport with one online event', async t => {
+test('app reconnect controls preserve the MessagePort and announce verified recovery exactly once', async t => {
   const browser = new EventTarget(), frames: RemoteFrame[] = []
-  let launcherPort!: MessagePort, handshakes = 0, online = 0
+  let launcherPort!: MessagePort, handshakes = 0, online = 0, recovered = 0
   browser.addEventListener('online', () => online++)
+  browser.addEventListener('mew:remote-reconnected', () => {
+    recovered++
+    assert.equal((activeRemoteTransport() as DataChannelTransport).suspended, false)
+  })
   const restore = globals({ location: new URL('https://app.example.test/__mew_ui/abcdefghijklmnopqrst/index.html'), window: browser, WebSocket: SocketConstants, CloseEvent: TestCloseEvent, parent: { postMessage(_value: unknown, _origin: string, ports: MessagePort[]) {
     handshakes++
     launcherPort = ports[0]!
@@ -271,11 +275,13 @@ test('app reconnect controls preserve the MessagePort and resume the existing tr
   launcherPort.postMessage({ type: 'mew-app-reconnecting' })
   await pending
   assert.equal(transport.suspended, true)
+  assert.equal(recovered, 0)
   assert.equal(transport.channel.readyState, 'open')
   const waitingRead = transport.fetch('/api/auth/me')
   launcherPort.postMessage({ type: 'mew-app-reconnected' })
   launcherPort.postMessage({ type: 'mew-app-reconnected' })
   await until(() => online === 1)
+  assert.equal(recovered, 1)
   assert.equal(activeRemoteTransport(), transport)
   assert.equal(transport.suspended, false)
   assert.equal((await waitingRead).status, 200)

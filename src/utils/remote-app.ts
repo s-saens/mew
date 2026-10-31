@@ -78,7 +78,7 @@ export async function initializeRemoteApp() {
     else if (data?.type === 'mew-app-install-state' || data?.type === 'mew-app-install-result') install.update(data)
     else if (data?.type === 'mew-app-reconnecting' && !transport.suspended) { generation++; initialAuth = undefined; transport.suspendForReconnect() }
     else if (data?.type === 'mew-app-auth-status') { if (validStatus(data.status)) { initialAuth = data.status; finishAuthentication(initialAuth) } else wire.close() }
-    else if (data?.type === 'mew-app-reconnected' && transport.suspended) { transport.resumeAfterReconnect(); finishWaiting(); window.dispatchEvent(new Event('online')) }
+    else if (data?.type === 'mew-app-reconnected' && transport.suspended) { transport.resumeAfterReconnect(); finishWaiting(); window.dispatchEvent(new Event('mew:remote-reconnected')); window.dispatchEvent(new Event('online')) }
     else if (data?.type === 'mew-app-disconnected') { wire.close(); setRemoteTransport(null) }
   }
   channel.port1.start()
