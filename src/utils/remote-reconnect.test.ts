@@ -47,14 +47,14 @@ function transportFixture(t: TestContext) {
   return { wire, transport }
 }
 
-test('reconnect cancels active responses, pending fetches and virtual sockets while keeping the wire open', async t => {
+test('reconnect interrupts active response bodies and writes while keeping the wire open for fresh reads and subscriptions', async t => {
   const { wire, transport } = transportFixture(t)
   const responsePromise = transport.fetch('/api/files')
   await until(() => wire.frames.length > 0)
   const id = wire.frames[0]!.id
   wire.message({ type: 'response', id, status: 200, headers: {}, responseWindow: 1 })
   const response = await responsePromise, reading = assert.rejects(response.text(), /결과를 확인/)
-  const pending = assert.rejects(transport.fetch('/api/files'), /결과를 확인/)
+  const pending = assert.rejects(transport.fetch('/api/files', { method: 'POST', body: 'once' }), /결과를 확인/)
   const socket = transport.socket('/api/presence')
   let closed = 0
   socket.onclose = event => { assert.equal(event.code, 1006); closed++ }
@@ -65,18 +65,148 @@ test('reconnect cancels active responses, pending fetches and virtual sockets wh
   assert.equal(wire.readyState, 'open')
   assert.equal(transport.requests.size, 0)
   assert.equal(transport.sockets.size, 0)
-  await assert.rejects(transport.fetch('/api/files'), /다시 연결/)
-  const retry = transport.socket('/api/presence')
-  const failedRetry = new Promise<void>(resolve => { retry.onclose = () => resolve() })
-  await failedRetry
-  assert.equal(retry.readyState, SocketConstants.CLOSED)
-  transport.resumeAfterReconnect()
   const fresh = transport.fetch('/api/files')
-  await until(() => wire.frames.some(frame => frame.type === 'request' && frame.id !== id))
+  const retry = transport.socket('/api/presence')
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(retry.readyState, SocketConstants.CONNECTING)
+  const beforeResume = wire.frames.length
+  transport.resumeAfterReconnect()
+  await until(() => wire.frames.slice(beforeResume).some(frame => frame.type === 'request') && wire.frames.some(frame => frame.type === 'socket'))
   const freshFrame = wire.frames.filter(frame => frame.type === 'request').at(-1)!
   wire.message({ type: 'response', id: freshFrame.id, status: 204, headers: {} })
   wire.message({ type: 'end', id: freshFrame.id })
   assert.equal((await fresh).status, 204)
+  assert.equal(wire.frames.filter(frame => frame.type === 'request' && frame.method === 'GET').length, 2, 'an interrupted response body is never replayed')
+  const subscription = wire.frames.find(frame => frame.type === 'socket')!
+  wire.message({ type: 'open', id: subscription.id })
+  assert.equal(retry.readyState, SocketConstants.OPEN)
+})
+
+for (const method of ['GET', 'HEAD']) {
+  test(`${method} reads started during recovery wait and complete on the same transport`, async t => {
+    const { wire, transport } = transportFixture(t)
+    transport.suspendForReconnect()
+    let settled = false
+    const reading = transport.fetch('/api/files', { method }).finally(() => { settled = true })
+    await new Promise(resolve => setImmediate(resolve))
+    assert.equal(settled, false)
+    assert.deepEqual(wire.frames, [])
+    transport.resumeAfterReconnect()
+    await until(() => wire.frames.some(frame => frame.type === 'request'))
+    const request = wire.frames.find(frame => frame.type === 'request')!
+    assert.equal(request.type === 'request' && request.method, method)
+    wire.message({ type: 'response', id: request.id, status: 204, headers: {} })
+    wire.message({ type: 'end', id: request.id })
+    assert.equal((await reading).status, 204)
+    assert.equal(transport.closed, false)
+  })
+
+  test(`${method} interrupted before response headers is retried once after recovery`, async t => {
+    const { wire, transport } = transportFixture(t)
+    const reading = transport.fetch('/api/files', { method })
+    await until(() => wire.frames.some(frame => frame.type === 'request'))
+    const first = wire.frames.find(frame => frame.type === 'request')!
+    transport.suspendForReconnect()
+    await new Promise(resolve => setImmediate(resolve))
+    assert.equal(wire.frames.filter(frame => frame.type === 'request').length, 1)
+    transport.resumeAfterReconnect()
+    await until(() => wire.frames.filter(frame => frame.type === 'request').length === 2)
+    const retry = wire.frames.filter(frame => frame.type === 'request').at(-1)!
+    assert.notEqual(retry.id, first.id)
+    wire.message({ type: 'response', id: first.id, status: 403, headers: {} })
+    wire.message({ type: 'end', id: first.id })
+    wire.message({ type: 'response', id: retry.id, status: 204, headers: {} })
+    wire.message({ type: 'end', id: retry.id })
+    assert.equal((await reading).status, 204)
+    assert.equal(wire.frames.filter(frame => frame.type === 'request').length, 2)
+  })
+}
+
+test('safe response headers queued just before suspension are not exposed from an obsolete generation', async t => {
+  const { wire, transport } = transportFixture(t)
+  const reading = transport.fetch('/api/files')
+  await until(() => wire.frames.some(frame => frame.type === 'request'))
+  const first = wire.frames.find(frame => frame.type === 'request')!
+  wire.message({ type: 'response', id: first.id, status: 403, headers: {} })
+  wire.message({ type: 'end', id: first.id })
+  transport.suspendForReconnect(); transport.resumeAfterReconnect()
+  await until(() => wire.frames.filter(frame => frame.type === 'request').length === 2)
+  const retry = wire.frames.filter(frame => frame.type === 'request').at(-1)!
+  wire.message({ type: 'response', id: retry.id, status: 204, headers: {} })
+  wire.message({ type: 'end', id: retry.id })
+  assert.equal((await reading).status, 204)
+})
+
+test('safe reads awaiting stream admission recover without replaying the previous writes', async t => {
+  const { wire, transport } = transportFixture(t)
+  for (let index = 0; index < REMOTE_LIMITS.streams; index++) await transport.forward({ type: 'request', id: `write-${index}`, method: 'POST', path: '/api/files', headers: {} })
+  const reading = transport.fetch('/api/files')
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(wire.frames.filter(frame => frame.type === 'request' && frame.method === 'GET').length, 0)
+  transport.suspendForReconnect(); transport.resumeAfterReconnect()
+  await until(() => wire.frames.some(frame => frame.type === 'request' && frame.method === 'GET'))
+  const request = wire.frames.find(frame => frame.type === 'request' && frame.method === 'GET')!
+  wire.message({ type: 'response', id: request.id, status: 204, headers: {} })
+  wire.message({ type: 'end', id: request.id })
+  assert.equal((await reading).status, 204)
+  assert.equal(wire.frames.filter(frame => frame.type === 'request' && frame.method === 'POST').length, REMOTE_LIMITS.streams)
+})
+
+test('suspended writes fail without being queued or sent after recovery', async t => {
+  const { wire, transport } = transportFixture(t)
+  transport.suspendForReconnect()
+  for (const method of ['POST', 'PUT', 'PATCH', 'DELETE']) await assert.rejects(transport.fetch('/api/files', { method, body: 'once' }), /결과를 확인/)
+  transport.resumeAfterReconnect()
+  await new Promise(resolve => setImmediate(resolve))
+  assert.deepEqual(wire.frames, [])
+})
+
+test('aborted recovery reads and closed subscriptions are removed without sending on resume', async t => {
+  const { wire, transport } = transportFixture(t)
+  transport.suspendForReconnect()
+  const abort = new AbortController()
+  const reading = assert.rejects(transport.fetch('/api/files', { signal: abort.signal }), { name: 'AbortError' })
+  const socket = transport.socket('/api/presence')
+  let closed = 0
+  socket.onclose = () => closed++
+  abort.abort(); socket.close()
+  await reading
+  transport.resumeAfterReconnect()
+  await new Promise(resolve => setImmediate(resolve))
+  assert.deepEqual(wire.frames, [])
+  assert.equal(socket.readyState, SocketConstants.CLOSED)
+  assert.equal(closed, 1)
+})
+
+test('recovery waiting is bounded and releases aborted and closed requests', async t => {
+  const { wire, transport } = transportFixture(t)
+  transport.suspendForReconnect()
+  const abort = new AbortController()
+  const first = assert.rejects(transport.fetch('/api/files', { signal: abort.signal }), { name: 'AbortError' })
+  const waiting = Array.from({ length: REMOTE_LIMITS.streams * 4 - 1 }, () => assert.rejects(transport.fetch('/api/files'), /연결이 종료/))
+  await assert.rejects(transport.fetch('/api/files'), /대기열이 가득/)
+  abort.abort(); await first
+  waiting.push(assert.rejects(transport.fetch('/api/files'), /연결이 종료/))
+  transport.close()
+  await Promise.all(waiting)
+  assert.equal(transport.requests.size, 0)
+  assert.deepEqual(wire.frames, [])
+})
+
+test('terminal close rejects recovery reads and closes waiting subscriptions exactly once', async t => {
+  const { wire, transport } = transportFixture(t)
+  transport.suspendForReconnect()
+  const reading = assert.rejects(transport.fetch('/api/files'), /연결이 종료/)
+  const socket = transport.socket('/api/presence')
+  let closed = 0
+  socket.onclose = () => closed++
+  transport.close(); transport.resumeAfterReconnect()
+  await reading
+  await new Promise(resolve => setImmediate(resolve))
+  assert.deepEqual(wire.frames, [])
+  assert.equal(socket.readyState, SocketConstants.CLOSED)
+  assert.equal(closed, 1)
+  assert.equal(transport.sockets.size, 0)
 })
 
 test('a reconnect never replays writes waiting for backpressure or admission into the replacement bridge', async t => {
@@ -142,12 +272,13 @@ test('app reconnect controls preserve the MessagePort and resume the existing tr
   await pending
   assert.equal(transport.suspended, true)
   assert.equal(transport.channel.readyState, 'open')
-  await assert.rejects(transport.fetch('/api/files'), /다시 연결/)
+  const waitingRead = transport.fetch('/api/auth/me')
   launcherPort.postMessage({ type: 'mew-app-reconnected' })
   launcherPort.postMessage({ type: 'mew-app-reconnected' })
   await until(() => online === 1)
   assert.equal(activeRemoteTransport(), transport)
   assert.equal(transport.suspended, false)
+  assert.equal((await waitingRead).status, 200)
   assert.equal(portPreviewUrl(5555), 'https://mew.run/user/home/5555')
   assert.equal(handshakes, 1)
   const fresh = transport.fetch('/api/auth/me')
@@ -251,6 +382,20 @@ for (const stage of ['headers', 'body']) {
     assert.equal(fixture.frames.filter(frame => frame.type === 'request' && frame.method === 'POST').length, 1)
   })
 }
+
+test('a malformed authentication body after header recovery fails without a third request', async t => {
+  const fixture = bootstrapFixture(t)
+  const rejected = assert.rejects(fixture.initializing, SyntaxError)
+  await until(() => fixture.frames.some(frame => frame.type === 'request'))
+  fixture.control('mew-app-reconnecting'); fixture.control('mew-app-reconnected')
+  await until(() => fixture.frames.filter(frame => frame.type === 'request').length === 2)
+  const retry = fixture.frames.filter(frame => frame.type === 'request').at(-1)!
+  fixture.send({ type: 'response', id: retry.id, status: 200, headers: {}, responseWindow: 1 })
+  fixture.send({ type: 'chunk', id: retry.id, data: btoa('invalid JSON') })
+  fixture.send({ type: 'end', id: retry.id })
+  await rejected
+  assert.equal(fixture.frames.filter(frame => frame.type === 'request').length, 2)
+})
 
 test('disconnecting during app bootstrap rejects the recovery waiter and closes the transport', async t => {
   const fixture = bootstrapFixture(t, true)

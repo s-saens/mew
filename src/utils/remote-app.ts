@@ -104,9 +104,10 @@ export async function initializeRemoteApp() {
     const readInitialStatus = async () => {
       while (true) {
         await waitForConnection()
-        const attempt = generation
+        let attempt = generation
         try {
           const response = await transport.fetch('/api/auth/me', { signal: authenticationRequest.signal })
+          attempt = generation
           if (!response.ok) throw new Error('기기의 로그인 상태를 확인하지 못했습니다. 다시 연결해 주세요.')
           const status = await response.json() as AuthStatus
           if (transport.closed || wire.readyState !== 'open') throw new Error('기기 연결이 종료됐습니다. 다시 연결해 주세요.')

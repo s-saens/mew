@@ -4,11 +4,11 @@ parent: "mew-agents"
 title: "Agent Conversations, Queues, and Restoration"
 status: "implemented"
 created: "2026-09-18"
-updated: "2026-10-30"
+updated: "2026-10-31"
 status_hash: "b325d279cf16e291b2bcddda7cc0d70268647e336403acba780cb1081da44668"
 files: ["src/components/AgentPanel.tsx", "src/components/agent-startup-queue.tsx", "src/utils/agent-startup-queue.ts", "src/hooks/use-agent-event-state.ts", "src/hooks/use-agent-work-history.ts", "src/utils/agent-work-loader.ts", "src/utils/agentFold.ts", "src/hooks/useGridDrag.ts", "server/agentHost.ts", "server/agentWs.ts", "server/agentTranscript.ts", "server/agent-history-preview.ts", "server/agent-session-search-service.ts", "server/agent-transcript-search.ts", "server/agent-runtime-history-search.ts"]
 commits: []
-description: "Feature contract for immediate local question bubbles and reply waiting dots, agent conversations, stopping, queues, restoration, history search, request ordering, and session conflicts. Covers quiet automatic recovery for agent connections, the Mewpet assistant, and CLI status polling with eleven retries and scoped manual recovery, plus new tabs, preserved drafts and records, the latest 3 turns, work details, attachments, question navigation, memory protection, and model capacity retries."
+description: "Feature contract for immediate local question bubbles and reply waiting dots, agent conversations, stopping, queues, restoration, history search, request ordering, and session conflicts. Covers quiet automatic recovery for agent connections, the Mewpet assistant, and CLI status polling with eleven retries and scoped manual recovery, Mewlink background waits that preserve retry budgets, new tabs, preserved drafts and records, the latest 3 turns, work details, attachments, question navigation, memory protection, and model capacity retries."
 상위파일:
   - "MOC.md"
   - "_terminals-agents-automation.md"
@@ -312,6 +312,8 @@ Completed tasks preserve the full transcript at termination. Thus, even after th
 - Move question copy outside the bubble background and show answer copy only in the expanded header. Align the expanded header's status dot, copy button, and stop button on the same vertical centerline ([Bubble display contract](#task-bubble-status)).
 
 - Show explicit command execution and runtime open errors as small translucent floating notices over the content area. Scroll long errors inside the notice, and retain existing task error records and detail windows. Recoverable command-status polling and connection failures use the loading behavior below while automatic recovery remains active.
+
+- During Mewlink suspension, command-status reads and new agent sockets wait for verified reconnection without consuming panel retries. A long background interval must not leave a stale reconnect warning requiring manual retry. Preserve rows, conversations, and drafts; resume reads and subscriptions automatically under the [remote transport contract](../../development/remote-access.md#reattaching-the-same-rtc-after-a-brief-signaling-interruption).
 
 - Make expanded answer headers sticky within their own bubbles and compensate for the conversation viewport's top padding so they stick to its edge. Make the bottom `접기` button sticky as well and compensate for the conversation viewport's bottom padding. Give the top header a higher stacking priority than the bottom area. Reduce expanded top and bottom bar heights to 26px, scaling down buttons, icons, status dots, and time text together. Remove the top `질문으로` button at the user's request and do not add it again without an explicit follow-up request. Retain ↑/↓ question navigation. Preserve collapse state and copy, stop, and input behavior ([Bubble display contract](#task-bubble-status)).
 

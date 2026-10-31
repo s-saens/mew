@@ -31,6 +31,7 @@ export class DataChannelTransport implements AppTransport {
   suspended = false
   private generation = 0
   private slots = new RemoteStreamSlots()
+  private connectionWaiters = new Set<{ finish(error?: Error): void }>()
   private forwarded = new Map<string, { ready: Promise<void>; outgoing: Promise<void>; admission: AbortController; release?: () => void; socket: boolean }>()
   get resourceGeneration(): number | undefined {
     return !this.closed && !this.suspended && this.channel.readyState === 'open' ? this.generation : undefined
@@ -97,14 +98,43 @@ export class DataChannelTransport implements AppTransport {
       finally { entry.release?.() }
     }))
   }
+  private waitForConnection(signal: AbortSignal): Promise<void> {
+    if (signal.aborted) return Promise.reject(new DOMException('취소됐습니다.', 'AbortError'))
+    if (this.closed) return Promise.reject(new Error('원격 연결이 종료됐습니다.'))
+    if (!this.suspended) return Promise.resolve()
+    if (this.connectionWaiters.size >= REMOTE_LIMITS.streams * 4) return Promise.reject(new Error('원격 요청 대기열이 가득 찼습니다. 잠시 후 다시 시도해 주세요.'))
+    return new Promise((resolve, reject) => {
+      const waiter = { finish: (error?: Error) => {
+        this.connectionWaiters.delete(waiter)
+        signal.removeEventListener('abort', abort)
+        if (error) reject(error); else resolve()
+      } }
+      const abort = () => waiter.finish(new DOMException('취소됐습니다.', 'AbortError'))
+      this.connectionWaiters.add(waiter)
+      signal.addEventListener('abort', abort, { once: true })
+    })
+  }
   fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     if (this.closed) throw new Error('원격 연결이 종료됐습니다.')
-    if (this.suspended) throw new Error('기기와 다시 연결하는 중입니다. 연결 후 다시 시도해 주세요.')
-    const generation = this.generation
     const request = new Request(input instanceof Request ? input : new URL(String(input), location.origin), init)
     const url = new URL(request.url)
     const capability = previewRemotePath(url.pathname + url.search) ? 'port-preview' as const : undefined
     if (url.origin !== location.origin || !remotePath(url.pathname + url.search, false, capability)) throw new Error('이 요청은 원격 접속에서 지원되지 않습니다.')
+    const safe = ['GET', 'HEAD'].includes(request.method)
+    while (true) {
+      if (this.suspended) {
+        if (!safe) throw new Error('원격 요청이 중단됐습니다. 결과를 확인한 뒤 다시 시도해 주세요.')
+        await this.waitForConnection(request.signal)
+      }
+      const generation = this.generation
+      try {
+        const response = await this.fetchRequest(request, url, capability, generation)
+        if (!safe || generation === this.generation) return response
+      }
+      catch (error) { if (!safe || this.closed || request.signal.aborted || generation === this.generation) throw error }
+    }
+  }
+  private async fetchRequest(request: Request, url: URL, capability: 'port-preview' | undefined, generation: number): Promise<Response> {
     const signal = request.signal, release = await this.slots.acquire(signal)
     if (this.closed || this.suspended || generation !== this.generation) { release(); throw new Error('원격 요청이 중단됐습니다. 결과를 확인한 뒤 다시 시도해 주세요.') }
     const id = crypto.randomUUID()
@@ -147,8 +177,7 @@ export class DataChannelTransport implements AppTransport {
     if (requested.length > 16 || new Set(requested).size !== requested.length || requested.some(protocol => typeof protocol !== 'string' || protocol.length > 256 || !/^[!#$%&'*+\-.^_`|~\w]+$/.test(protocol))) throw new DOMException('잘못된 WebSocket 프로토콜입니다.', 'SyntaxError')
     const id = crypto.randomUUID(), socket = new RemoteSocket(this, id, url)
     this.sockets.set(id, socket)
-    if (this.suspended) { queueMicrotask(() => socket.finish(1006)); return socket as unknown as WebSocket }
-    void this.slots.acquire(socket.admission.signal, 'socket').then(release => {
+    void this.waitForConnection(socket.admission.signal).then(() => this.slots.acquire(socket.admission.signal, 'socket')).then(release => {
       if (socket.readyState !== WebSocket.CONNECTING) { release(); return }
       socket.release = release
       socket.sentAt = performance.now()
@@ -248,11 +277,13 @@ export class DataChannelTransport implements AppTransport {
     if (this.closed || !this.suspended) return
     this.slots = new RemoteStreamSlots()
     this.suspended = false
+    for (const waiter of this.connectionWaiters) waiter.finish()
   }
   close() {
     if (this.closed) return
     this.closed = true
     this.generation++
+    for (const waiter of this.connectionWaiters) waiter.finish(new Error('원격 연결이 종료됐습니다.'))
     this.disconnectPending(new Error('원격 연결이 종료됐습니다.'))
     this.channel.removeEventListener('message', this.receive)
     this.channel.close()
