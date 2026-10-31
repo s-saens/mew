@@ -1,8 +1,8 @@
 ---
 title: "Agent memory protection"
 created: 2026-09-21
-updated: 2026-10-09
-description: "Explains how to install an aggregate agent limit of 90% of dynamically available memory on Linux systemd and cgroup v2, pause and resume tasks, diagnose and recover from issues, and understand WSL support boundaries."
+updated: "2026-10-31"
+description: "Explains how to install an aggregate agent limit of 90% of dynamically available memory on Linux systemd and cgroup v2, pause and resume tasks, diagnose and recover from issues, and understand WSL support boundaries; includes required agent build verification and user-owned server lifecycle operations."
 상위파일: "MOC.md"
 ---
 
@@ -57,7 +57,7 @@ journalctl --user --since '1 hour ago' --grep='mew-agent|oom|Killed'
 
 Check `memory.current`, `memory.max`, and `memory.events` at the path formed by prefixing `ControlGroup` with `/sys/fs/cgroup`. `oom_kill` is the cumulative count of OOM kills in that group. Find mew errors under `[mew:agent-memory]` in `<MEW_DATA_DIR>/agent/<runtime>-<hash>.log`. `SIGKILL`/137 alone is not conclusive evidence of insufficient memory, so assess it together with the journal.
 
-New code applies starting with new supervisors. After ongoing work finishes, close existing agent tabs and open new tabs to apply it. Scheduling and feature execution code already loaded in the mew server takes effect after the user restarts the server. Restarting only the mew server leaves existing independent supervisors running, so that alone does not give existing agents the new protection. Agents do not build or restart the server.
+New code applies starting with new supervisors. After ongoing work finishes, close existing agent tabs and open new tabs to apply it. Scheduling and feature execution code already loaded in the mew server takes effect after the user restarts the server. Restarting only the mew server leaves existing independent supervisors running, so that alone does not give existing agents the new protection. Agents must run the required build after implementation changes under the [execution rules](../../.mew/docs/development/getting-started.md); they must not start, stop, or restart servers.
 
 ## WSL and scope
 

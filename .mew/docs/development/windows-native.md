@@ -1,7 +1,7 @@
 ---
 title: "OS execution layer and Windows native support"
-description: "Owns the design that separates Windows, POSIX, and Linux implementations while retaining the shared mew server and UI, along with the contracts for psmux, Job Objects, private ACLs, mutually authenticated named pipes, and platform-specific releases. Distinguishes implementation and isolated checks from actual Windows and external-network release gates."
-updated: "2026-10-14"
+description: "Owns the design that separates Windows, POSIX, and Linux implementations while retaining the shared mew server and UI, along with the contracts for psmux, Job Objects, private ACLs, mutually authenticated named pipes, and platform-specific releases. Distinguishes implementation and isolated checks from actual Windows and external-network release gates, required implementation builds, and server lifecycle restrictions."
+updated: "2026-10-31"
 상위파일:
   - "architecture.md"
   - "../operations/cli-release.md"
@@ -84,4 +84,4 @@ On 2026-10-14, the shared/OS execution layers, Windows CLI, releases, scheduling
 
 Job Object descendant/parent termination, CMD argv, actual psmux creation/input/capture/attach, ConPTY resize, and command archive/exit/cancellation in `server/windows-native.test.ts` were connected to Windows x64/arm64 CI. There are still no results from running MSVC compilation, the full native fixtures, or compiled mew host startup. Actual Task Scheduler registration/permissions, logon/sleep/DST, native dependency installation on both architectures, actual provider authentication, Git credentials, DAP, and external-network/mobile access are also tests on actual machines required before public support.
 
-The first npm/GitHub release and actual external-network and remote desktop verification follow the existing contracts. Implementation and partial verification in a real environment must not be described as an already published runtime or full compatibility with all providers. Agents do not build the production app or start/restart the server.
+The first npm/GitHub release and actual external-network and remote desktop verification follow the existing contracts. Implementation and partial verification in a real environment must not be described as an already published runtime or full compatibility with all providers. Agents follow the [required implementation build](getting-started.md) and must not start, stop, or restart the server.

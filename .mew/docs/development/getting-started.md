@@ -1,8 +1,8 @@
 ---
 title: "Development setup and rules"
 created: 2026-09-29
-updated: "2026-10-26"
-description: "Defines development commands; repository-internal document checks, CLI and isolated Postgres tests, type checks, tests, and lint validation; restrictions on agent builds and server execution limited to this Mew source repository; document ownership and updates; required UI implementation rules; and ownership of feature documentation after removal of the feature panel."
+updated: "2026-10-31"
+description: "Defines development commands; repository-internal document checks, CLI and isolated Postgres tests, type checks, tests, and lint validation; mandatory agent build verification after implementation changes and restrictions on deployments and server execution limited to this Mew source repository; document ownership and updates; required UI implementation rules; and ownership of feature documentation after removal of the feature panel."
 상위파일:
   - "../MOC.md"
   - "MOC.md"
@@ -12,7 +12,7 @@ description: "Defines development commands; repository-internal document checks,
 
 Development environment setup and standard commands are in the [public contributor guide](../../../docs/development/getting-started.md).
 
-The server serves `dist/` directly. Building changes what a running instance serves; it is not an isolated validation step. Keep the development server private.
+The server serves `dist/` directly. The required build updates the UI assets served by a running instance; it does not restart the server or reload server-side code. Keep the development server private.
 
 Mew owns its development rules, documentation, and decision records. Run documentation checks from the repository root without another workspace's scripts or hooks:
 
@@ -22,7 +22,9 @@ npm run check:docs
 
 This checks descriptions, including history, and local links within the repository. MOC registration is optional. Repair existing links when files move. New decisions belong in [Mew's decision records](../decisions/README.md); imported decisions remain in history. If this clone still has a Liiiiv shared hook configured, remove that local setting with `git config --local --unset core.hooksPath`.
 
-**In this Mew source repository, coding agents must not run** `mew`**, build, deploy, or restart the server.** This includes `npm run build`, `npm start`, `./mew start|stop|restart|update`, killing server processes, and starting them in the background. Agents may run checks that leave the running instance alone, such as `npm test`, `npm run lint`, and `npx tsc -b`. The user runs builds and applies changes. These restrictions belong to this project's instructions; do not add them to Mew-wide agent guidance or apply them to other projects opened in Mew.
+**After changing code, features, dependencies, or build configuration in this Mew source repository, coding agents must run `npm run build` before reporting completion.** Fix build failures and rerun the build. If a missing prerequisite or another blocker prevents success, report the actual failure and keep the work explicitly incomplete. Type checks, relevant tests, lint, and documentation checks remain required as applicable; passing them does not replace the build. Documentation-only changes do not require an app build.
+
+**Agents must not deploy, run the `mew` launcher, or start, stop, or restart servers.** Prohibited commands include `npm start`, `npm run serve`, `npm run dev`, `./mew start|stop|restart|update`, killing server processes, and starting them in the background. The user performs deployment and server lifecycle operations. Use `npm run build` for build verification without chaining a restart. These requirements belong to this project's instructions; do not add them to Mew-wide agent guidance or apply them to other projects opened in Mew.
 
 Browser tests under `server/` use the Node.js TypeScript configuration, which excludes DOM globals. For DOM operations in Playwright callbacks, use `locator.evaluate` and its element argument (or `el.ownerDocument`) instead of directly referencing `document`.
 
@@ -52,4 +54,4 @@ MEW_DB_TEST_DATABASE_URL='<격리 테스트 DB URL>' node --test server/db/datab
 
 ### CLI release verification
 
-The canonical sources for the prebuilt launcher are the [CLI distribution contract](cli-distribution.md) and [release procedure](../operations/cli-release.md). `npm ci --prefix apps/cli --ignore-scripts`, `npm run test:cli`, and `node --test server/cli-host.test.ts server/instance-lock.test.ts server/release-runtime.test.ts server/mew-release-actions.test.ts` are isolated checks that do not modify the actual server or dist. `npm run release:runtime -- --output <폴더>` is a command for release maintainers/CI that packages an already-built dist and platform-specific native dependencies; it does not change the rule prohibiting agents from building, deploying, or restarting the app.
+The canonical sources for the prebuilt launcher are the [CLI distribution contract](cli-distribution.md) and [release procedure](../operations/cli-release.md). `npm ci --prefix apps/cli --ignore-scripts`, `npm run test:cli`, and `node --test server/cli-host.test.ts server/instance-lock.test.ts server/release-runtime.test.ts server/mew-release-actions.test.ts` are isolated checks that do not modify the actual server or dist. `npm run release:runtime -- --output <폴더>` is a command for release maintainers/CI that packages an already-built dist and platform-specific native dependencies; it does not replace the required implementation build or authorize agents to deploy or restart the app.

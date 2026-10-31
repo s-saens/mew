@@ -1,8 +1,8 @@
 ---
 title: "PDF Rendering, Ink Annotation, and Saving Contract"
 created: 2026-09-15
-updated: 2026-10-19
-description: "Defines the contracts for PDF.js Range rendering and virtualization, color inversion, fullscreen, compact floating tools, conditional saving to the original file, draft lifetime, file limits, and verification."
+updated: "2026-10-31"
+description: "Defines the contracts for PDF.js Range rendering and virtualization, color inversion, fullscreen, compact floating tools, conditional saving to the original file, draft lifetime, file limits, and verification; includes required agent build verification and user-owned server lifecycle operations."
 상위파일: "MOC.md"
 ---
 
@@ -70,6 +70,6 @@ Drafts are important data under the [browser storage contract](browser-storage.m
 - `server/pdf-assets.test.ts`: output of the worker, CJK resources, fonts, decoders, and licenses matching the installed version.
 - `server/pdf-viewer-ui.test.ts`: checks opening a 500-page document, navigating to page 250, virtualization, text layers, ink, undo/redo, draft recovery after tab reopening/refresh, PDF saving, copy download after conflicts, mobile/dark/light UI, and read-only behavior in actual Chromium with production CSP. APIs and files are isolated fixtures. Measured times depend on fixtures and host load and do not guarantee performance for actual scanned documents or mobile devices.
 
-Actual iOS/Android pen devices and the full range of large scans, CJK fonts, and complex vector documents require separate device validation. Do not build or restart running servers during development.
+Actual iOS/Android pen devices and the full range of large scans, CJK fonts, and complex vector documents require separate device validation. After implementation changes, run the required build under the [execution rules](getting-started.md); agents must not start, stop, or restart servers.
 
 API references: [PDF.js display API](https://mozilla.github.io/pdf.js/api/draft/module-pdfjsLib.html), [PDF.js Canvas examples](https://mozilla.github.io/pdf.js/examples/), [PDF-LIB save API](https://pdf-lib.js.org/docs/api/classes/pdfdocument).

@@ -1,7 +1,7 @@
 ---
 title: "Product search visibility operations"
-description: "Configuration conditions for search and AI citations on the public product site, plus procedures for production rollout and remeasurement. Distinct from the noindex contract for installed workspaces."
-updated: "2026-10-29"
+description: "Configuration conditions for search and AI citations on the public product site, plus procedures for production rollout and remeasurement. Distinct from the noindex contract for installed workspaces; includes required agent build verification and user-owned server lifecycle operations."
+updated: "2026-10-31"
 ---
 
 ## Configuration conditions for the public product site
@@ -19,7 +19,7 @@ Create a public blog after defining real recurring questions to answer, original
 
 ## Production rollout and remeasurement
 
-The agent checks source code and performs isolated checks; the operator builds the app, restarts servers, and deploys centrally. Passing local checks does not mean changes have been applied to production or have achieved search results.
+The agent checks source code and runs the required build after implementation changes under the [execution rules](../development/getting-started.md); the operator restarts servers and deploys centrally. Passing local checks does not mean changes have been applied to production or have achieved search results.
 
 On 2026-10-23, the isolated HTTP fixture was checked with `curl` to verify robots' 200 and text body, and HTML's `X-Robots-Tag`, title, description, and robots metadata. The 5 checks in `server/search-indexing.test.ts`, `server/remote-ui.test.ts`, and `server/vite-config.test.ts` also passed, along with type checking, linting of changed TypeScript, and documentation description/link checks. The P2P checks cover the actual dispatcher forwarding installation HTML metadata and headers; they did not verify deployment or search crawling of the central public service.
 

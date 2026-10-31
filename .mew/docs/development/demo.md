@@ -1,8 +1,8 @@
 ---
 title: "Browser demo using the shared UI"
-description: "Defines the full public file list, initial copy, on-demand body loading, and size budgets for the browser demo using the actual Mew UI, along with the task, virtual host, account theme, and in-memory storage contracts after removal of the feature panel. Explains static files, origins, CSP, test boundaries for using verified public materials when pinned Git objects are unavailable, and user deployment procedures."
+description: "Defines the full public file list, initial copy, on-demand body loading, and size budgets for the browser demo using the actual Mew UI, along with the task, virtual host, account theme, and in-memory storage contracts after removal of the feature panel. Explains static files, origins, CSP, test boundaries for using verified public materials when pinned Git objects are unavailable, and user deployment procedures; includes required agent build verification and user-owned server lifecycle operations."
 created: "2026-10-19"
-updated: "2026-10-26"
+updated: "2026-10-31"
 ---
 
 # Browser demo using the shared UI
@@ -105,7 +105,7 @@ The public `shared/mewlink-demo.ts` owns routing, static paths, CSP, and reserve
 
 Central deployment copies demo artifacts to the central `dist/demo/` and renames `demo.html` to `index.html`. `tools/demo-distribution.mjs` checks source hashes before and after the build and the artifact manifest, including original-content files. Deployment fails for stale or modified artifacts. After modifying the Mew UI, central demo deployment must also be completed to update the public screen.
 
-The user runs the commands below. The agent does not build the app, run a server, or deploy.
+Agents must run the required build after implementation changes under the [execution rules](getting-started.md). The user runs development servers and deployments; agents must not start, stop, or restart servers or deploy. The commands below distinguish demo development, build verification, and deployment.
 
 ```bash
 # 데모 전용 개발 서버: 기존 Mew 서버·API를 띄우지 않음

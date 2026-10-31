@@ -1,8 +1,8 @@
 ---
 title: "mew documentation authoring and navigation rules"
-description: "Defines ownership and English-language maintenance of project knowledge, tasks, public guides, and first-party resources; description-based discovery, checks, and current versus historical sources."
+description: "Defines ownership and English-language maintenance of project knowledge, tasks, public guides, and first-party resources; description-based discovery, checks, and current versus historical sources; includes required agent build verification and user-owned server lifecycle operations."
 created: "2026-10-06"
-updated: "2026-10-29"
+updated: "2026-10-31"
 ---
 
 # Documentation authoring and navigation rules
@@ -85,7 +85,7 @@ The current link check verifies that target files exist and remain within the re
 - Usage instructions explain the intended task, starting location, and result, and link to owning documents for implementation contracts and verification evidence.
 - Group and link topics in subject-area homes. Put current usage and contracts first, followed by work, research, and history with their nature clearly identified.
 - Keep public screenshots in `docs/assets/screenshots/` in the repository, and use relative links and specific alt text. The default capture conditions are **the default Midnight theme with Mewpet visible**. Change these conditions only when explaining another theme or a hidden state.
-- Capture the actual running UI. Use example data in a new browser context, and record the capture date, screen size, whether mock responses were used, and whether a physical device was used in the document introducing the image. Do not include accounts, personal files, conversations, or secrets. Do not build the app or restart the server to capture screenshots.
+- Capture the actual running UI. Use example data in a new browser context, and record the capture date, screen size, whether mock responses were used, and whether a physical device was used in the document introducing the image. Do not include accounts, personal files, conversations, or secrets. Follow the [required build verification rules](development/getting-started.md) after implementation changes. Screenshot capture does not authorize starting or restarting the server.
 - Keep the core sequence and scope aligned across language editions of the same content. When changing existing heading anchors or reference paths, also check incoming links.
 
 The separation of introduction, installation, and detailed guides drew on the [code-server README](https://github.com/coder/code-server) and [HedgeDoc documentation home](https://docs.hedgedoc.org/); the feature-focused introduction drew on the [AFFiNE README](https://github.com/toeverything/AFFiNE). Follow mew's folder ownership and description-based navigation rules as defined.

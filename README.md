@@ -121,7 +121,7 @@ npm run lint
 npm run check:docs
 ```
 
-The server serves `dist/` directly, so a build changes what a running instance serves. When working on this Mew source repository, coding agents must not build, deploy, run the launcher, or restart the server. The user applies those changes. This project rule does not apply to other projects opened in Mew and is not part of Mew-wide agent instructions.
+The server serves `dist/` directly, so a build changes the UI assets a running instance serves. When working on this Mew source repository, coding agents must run `npm run build` after implementation changes, fix failures, and rerun it before reporting completion. Agents must not deploy, run the launcher, or start, stop, or restart servers; the user performs those operations. This project rule does not apply to other projects opened in Mew and is not part of Mew-wide agent instructions.
 
 For documentation work, follow the [writing rules](.mew/docs/README.md); agents start at [.mew/docs/AGENT.md](.mew/docs/AGENT.md).
 

@@ -1,7 +1,7 @@
 ---
 title: "CLI Releases and npm Publishing"
-description: "Covers s-saens/mew Linux, macOS, and Windows x64/arm64 executables; pinned tmux, psmux, and Job Object helpers; checksums, third-party notices, and Windows CI verification; and npm publishing, OIDC configuration after repository transfer, and updates for @liiiiv/mew-cli. Also includes checks for Mew's own license copies, metadata, and inclusion in the npm package. The first public publication and hands-on checks across all platforms have not yet been performed."
-updated: "2026-10-23"
+description: "Covers s-saens/mew Linux, macOS, and Windows x64/arm64 executables; pinned tmux, psmux, and Job Object helpers; checksums, third-party notices, and Windows CI verification; and npm publishing, OIDC configuration after repository transfer, and updates for @liiiiv/mew-cli. Also includes checks for Mew's own license copies, metadata, and inclusion in the npm package. The first public publication and hands-on checks across all platforms have not yet been performed; includes required agent build verification and user-owned server lifecycle operations."
+updated: "2026-10-31"
 상위파일:
   - "../../../docs/deployment/native.md"
   - "../development/cli-distribution.md"
@@ -36,7 +36,7 @@ Before publishing, verify that the full texts of the root `LICENSE`, `apps/cli/L
 3. Only tag runs publish the 6 executables and `SHA256SUMS` to GitHub Release after passing the protected `cli-release` environment. Do not overwrite executables for existing versions.
 4. For npm publishing, select the matching tag in `workflow_dispatch` and set `publish_npm=true`. After verifying the 6 already-published runtimes and all checksums, publish to npm through the protected `npm-publish` environment. Do not change the release cache version.
 
-Assign reviewers for both environments in the repository settings. The workflow uses the current repository through `${{ github.repository }}`. After a transfer, follow the [Repository Transfer Checks](repository-maintenance.md#transferring-github-ownership) to verify reviewers, allowed tags, protection rules, and settings previously supplied by the organization for both environments. The [Agent Execution Rules](../development/getting-started.md), which prohibit app builds and deployments, remain in effect; agents do not push tags, run workflows, or deploy on the user's behalf.
+Assign reviewers for both environments in the repository settings. The workflow uses the current repository through `${{ github.repository }}`. After a transfer, follow the [Repository Transfer Checks](repository-maintenance.md#transferring-github-ownership) to verify reviewers, allowed tags, protection rules, and settings previously supplied by the organization for both environments. The [agent execution rules](../development/getting-started.md) require a build after implementation changes and prohibit deployment and server lifecycle operations; agents do not push tags, run workflows, or deploy on the user's behalf.
 
 ## Initial Publication and Subsequent Versions
 
