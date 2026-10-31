@@ -92,6 +92,10 @@ export function useCollab(project: string, path: string | null, authEmail: strin
       if (syncTimer !== null) clearTimeout(syncTimer)
       syncTimer = null
     }
+    function armSyncTimer(socket: WebSocket) {
+      clearSyncTimer()
+      syncTimer = setTimeout(() => reconnect(socket), SYNC_TIMEOUT_MS)
+    }
 
     function reconnect(socket: WebSocket) {
       if (cancelled || ws !== socket) return
@@ -116,7 +120,7 @@ export function useCollab(project: string, path: string | null, authEmail: strin
       ws = socket
       socket.binaryType = 'arraybuffer'
       // Bound both the WebSocket handshake and the first document response.
-      syncTimer = setTimeout(() => reconnect(socket), SYNC_TIMEOUT_MS)
+      armSyncTimer(socket)
 
       socket.onopen = () => {
         if (cancelled || ws !== socket) return
@@ -166,7 +170,12 @@ export function useCollab(project: string, path: string | null, authEmail: strin
       socket.onclose = () => reconnect(socket)
     }
     const reconnectAfterRemoteRecovery = () => {
-      if (cancelled || retryTimer === null || ws !== null) return
+      if (cancelled) return
+      if (ws !== null) {
+        if (syncTimer !== null && ws.readyState <= WebSocket.OPEN) armSyncTimer(ws)
+        return
+      }
+      if (retryTimer === null) return
       clearTimeout(retryTimer)
       retryTimer = null
       connect()

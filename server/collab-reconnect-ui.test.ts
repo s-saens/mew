@@ -33,7 +33,8 @@ root.render(<Fixture/>);`
     const page = await browser.newPage()
     const errors: string[] = []
     page.on('pageerror', error => errors.push(error.message))
-    await page.clock.install()
+    await page.clock.install({ time: new Date('2030-01-01T00:00:00Z') })
+    await page.clock.pauseAt(new Date('2030-01-01T00:00:01Z'))
     // Explicitly model a transport that never emits close, even when asked to close.
     await page.addInitScript(`
       window.sockets=[];
@@ -59,7 +60,15 @@ root.render(<Fixture/>);`
       window.collab.ydoc.getText('draft').insert(0,'unsent edit');
       window.lateMessage=window.sockets[0].onmessage;
     })()`)
-    await page.clock.runFor(10_300)
+    await page.clock.runFor(9999)
+    await page.evaluate(`window.dispatchEvent(new Event('mew:remote-reconnected'))`)
+    await page.clock.runFor(1)
+    assert.equal(await page.evaluate('window.sockets[0].readyState'), 0, 'verified recovery keeps the connecting socket past its previous sync deadline')
+    await page.clock.runFor(9998)
+    assert.equal(await page.evaluate('window.sockets[0].readyState'), 0, 'the connecting socket receives a fresh ten-second sync deadline')
+    await page.clock.runFor(1)
+    assert.equal(await page.evaluate('window.sockets[0].readyState'), 3, 'a genuine stall still expires at the new deadline')
+    await page.clock.runFor(300)
     assert.equal(await page.evaluate('window.sockets.length'), 2, 'a stalled CONNECTING socket must retry without waiting for close')
     await page.evaluate(`(() => {
       window.lateMessage({data:new Uint8Array([0,1,2,0,0]).buffer});
@@ -67,6 +76,10 @@ root.render(<Fixture/>);`
       window.sockets[1].message([0,0,1,0]);
     })()`)
     assert.equal(await page.evaluate('window.collab.synced'), false, 'late responses and syncStep1 must not complete initial sync')
+    await page.clock.runFor(9999)
+    await page.evaluate(`window.dispatchEvent(new Event('mew:remote-reconnected'))`)
+    await page.clock.runFor(1)
+    assert.equal(await page.evaluate('window.sockets[1].readyState'), 1, 'an open socket awaiting its first document response also keeps its connection on verified recovery')
     await page.clock.runFor(10_600)
     assert.equal(await page.evaluate('window.sockets.length'), 3, 'an open socket with no document response must also retry')
     await page.evaluate(`window.dispatchEvent(new Event('mew:remote-reconnected'))`)
