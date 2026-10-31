@@ -7,6 +7,7 @@ export const WORKSPACE_PANEL_IDS = [
   'git',
   'android',
   'debugger',
+  'browser',
   'memo', 'tasks',
 ] as const
 

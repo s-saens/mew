@@ -2,6 +2,7 @@ import './config.ts'
 import { watchSocketAccess } from './access-socket.ts' // 반드시 첫 줄 — 설정 파일을 다른 모듈보다 먼저 읽는다
 import { webSocketOriginAllowed } from './websocket-origin.ts'
 import { attachLoginDesktopWebSocket } from './login-desktop.ts'
+import { attachDomBrowserWebSocket } from './dom-browser.ts'
 import { attachRemoteDesktopWebSocket } from './remote-desktop.ts'
 import type { ViteDevServer } from 'vite'
 import express from 'express'
@@ -44,6 +45,7 @@ export function configureDocsServer(server: ViteDevServer): void {
     attachDbWebSocket(server.httpServer, { authorize: authorizeFeature('database'), authorizeProject: authorizeDatabase })
     attachAgentWebSocket(server.httpServer, { authorize: authorizeFeature('agent') })
     attachLoginDesktopWebSocket(server.httpServer)
+    attachDomBrowserWebSocket(server.httpServer)
     attachRemoteDesktopWebSocket(server.httpServer)
     attachPortPreviewWebSocket(server.httpServer)
     // 지난 실행이 SIGKILL로 끊겼다면 그때 남은 에이전트 자식이 아직 램을 물고 있다

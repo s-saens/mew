@@ -1,4 +1,4 @@
-export type DockKind = 'editor' | 'agent' | 'terminal' | 'git' | 'memo' | 'tasks' | 'debugger'
+export type DockKind = 'editor' | 'agent' | 'terminal' | 'git' | 'memo' | 'tasks' | 'debugger' | 'browser'
 export type DockSide = 'left' | 'right' | 'top' | 'bottom'
 export type DockNode = { id: string } | { axis: 'row' | 'col'; ratio: number; first: DockNode; second: DockNode }
 export type DockGroup = { id: string; kind: DockKind }
@@ -78,9 +78,8 @@ export function dockRects(tree: DockNode | null, rect: DockRect, result: Record<
 export function normalizeDock(value: unknown): DockState {
   if (!value || typeof value !== 'object' || (value as DockState).version !== 1) return emptyDock()
   const raw = value as DockState, seen = new Set<string>()
-  const groups = Array.isArray(raw.groups) ? raw.groups.filter((g) => g && typeof g.id === 'string' && g.id.length < 300 && ['editor', 'agent', 'terminal', 'git', 'memo', 'tasks', 'debugger'].includes(g.kind) && !seen.has(g.id) && !!seen.add(g.id)).slice(0, 64) : []
-  const retired = new Set((Array.isArray(raw.groups) ? raw.groups : []).filter(group => group && typeof group.id === 'string' && ['browser', 'features'].includes((group as { kind: string }).kind)).map(group => group.id))
-  retired.add('browser')
+  const groups = Array.isArray(raw.groups) ? raw.groups.filter((g) => g && typeof g.id === 'string' && g.id.length < 300 && ['editor', 'agent', 'terminal', 'git', 'memo', 'tasks', 'debugger', 'browser'].includes(g.kind) && !seen.has(g.id) && !!seen.add(g.id)).slice(0, 64) : []
+  const retired = new Set((Array.isArray(raw.groups) ? raw.groups : []).filter(group => group && typeof group.id === 'string' && (group.kind as string) === 'features').map(group => group.id))
   retired.add('features')
   const used = new Set<string>()
   const walk = (node: DockNode | null, depth = 0): DockNode | null => {
@@ -94,7 +93,7 @@ export function normalizeDock(value: unknown): DockState {
     if (!first || !second) return first ?? second
     return { axis: node.axis, ratio: Number.isFinite(node.ratio) ? Math.max(.15, Math.min(.85, node.ratio)) : .5, first, second }
   }
-  const strings = (record: unknown): Record<string, string> => record && typeof record === 'object' && !Array.isArray(record) ? Object.fromEntries(Object.entries(record).filter(([k, v]) => k.length < 1000 && !k.startsWith('browser:') && !retired.has(k) && typeof v === 'string' && v.length < 1000 && !retired.has(v)).slice(0, 2000)) : {}
+  const strings = (record: unknown): Record<string, string> => record && typeof record === 'object' && !Array.isArray(record) ? Object.fromEntries(Object.entries(record).filter(([k, v]) => k.length < 1000 && !retired.has(k) && typeof v === 'string' && v.length < 1000 && !retired.has(v)).slice(0, 2000)) : {}
   return { version: 1, groups, tree: walk(raw.tree), tabs: strings(raw.tabs), active: strings(raw.active) }
 }
 

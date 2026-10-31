@@ -7,14 +7,15 @@ import { compile } from '@tailwindcss/node'
 import { chromium } from 'playwright-core'
 import { domBrowserExecutable } from './browser-dom-executable.ts'
 
-test('command ports open local and public device previews without executing commands and stay usable at compact widths', { skip: !domBrowserExecutable(), timeout: 60_000 }, async t => {
+test('command ports open the internal DOM browser without executing commands at compact widths', { skip: !domBrowserExecutable(), timeout: 60_000 }, async t => {
   const root = path.resolve(import.meta.dirname, '..')
   const source = `
 import React from 'react';import {createRoot} from 'react-dom/client';
 import {I18nProvider} from '${root}/src/i18n.tsx';
 import {CommandButtonMenu} from '${root}/src/components/CommandButtonMenu.tsx';
 import {configurePortPreviewBaseUrl} from '${root}/src/utils/port-preview-url.ts';
-localStorage.setItem('mew:locale','ko');window.opened=[];
+localStorage.setItem('mew:locale','ko');window.opened=[];window.browserRequests=[];
+window.addEventListener('mew:open-local-browser',event=>window.browserRequests.push(event.detail.url));
 window.open=(url,target,features)=>{window.opened.push({url,target,features});return null};
 window.configurePortPreviewBaseUrl=configurePortPreviewBaseUrl;
 createRoot(document.getElementById('root')).render(<I18nProvider><CommandButtonMenu project=".workspace" title="명령 목록"/></I18nProvider>);`
@@ -68,6 +69,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><CommandButtonM
       </style><div id="root"></div><script>${bundle.output.find(item => item.type === 'chunk')!.code}</script></html>` })
     })
     await page.goto('http://mew-command.test/')
+    const trigger = page.getByRole('button', { name: '명령 목록', exact: true })
     await page.keyboard.press('Alt+r')
     const menu = page.locator('[data-cmd-overlay]'), row = menu.locator('[data-command-row]').first()
     const command = row.getByRole('button', { name: '개발 서버 이름이 길어도 동작', exact: true })
@@ -114,23 +116,27 @@ createRoot(document.getElementById('root')).render(<I18nProvider><CommandButtonM
     assert.notEqual(density.background, 'rgba(0, 0, 0, 0)', 'port numbers have their own visible surface')
     assert.equal(density.portHeight, width <= 390 ? 32 : 26)
     await preview.click()
-    assert.deepEqual(await page.evaluate('window.opened.at(-1)'), { url: 'http://mew-command.test/5555', target: '_blank', features: 'noopener,noreferrer' })
+    assert.equal(await page.evaluate('window.browserRequests.at(-1)'), 'http://localhost:5555/')
+    await trigger.click()
     assert.equal(runs, 1); assert.equal(stops, 0)
     await row.getByRole('button', { name: '개발 서버 이름이 길어도 동작', exact: true }).focus()
     await page.keyboard.press('ArrowRight')
     assert.equal(await row.getByRole('button', { name: /포트 3333 미리보기 열기/ }).evaluate(el => el === el.ownerDocument.activeElement), true)
     await page.keyboard.press('ArrowRight'); await page.keyboard.press('Enter')
-    assert.equal(await page.evaluate('window.opened.at(-1).url'), 'http://mew-command.test/5555')
+    assert.equal(await page.evaluate('window.browserRequests.at(-1)'), 'http://localhost:5555/')
+    await trigger.click()
     await page.evaluate("window.configurePortPreviewBaseUrl('https://mew.run/saens/windows')")
     await preview.click()
-    assert.equal(await page.evaluate('window.opened.at(-1).url'), 'https://mew.run/saens/windows/5555')
+    assert.equal(await page.evaluate('window.browserRequests.at(-1)'), 'http://localhost:5555/')
+    await trigger.click()
     await page.evaluate('window.configurePortPreviewBaseUrl(null)')
     await preview.click()
-    await menu.getByText('Mewlink 기기 주소를 확인하지 못했습니다. 페이지를 다시 열어 주세요.', { exact: true }).waitFor()
-    assert.equal(await page.evaluate('window.opened.length'), 3, 'invalid remote context never opens the installed app origin')
+    assert.equal(await page.evaluate('window.browserRequests.at(-1)'), 'http://localhost:5555/')
+    assert.equal(await page.evaluate('window.opened.length'), 0, 'DOM relay needs no public preview origin or popup')
+    assert.equal(await page.evaluate('window.browserRequests.length'), 4)
+    await trigger.click()
     assert.equal(runs, 1); assert.equal(stops, 0)
     await page.evaluate('window.configurePortPreviewBaseUrl()')
-    await preview.click()
     if (process.env.MEW_COMMAND_PORT_SCREENSHOTS) {
       await fs.mkdir(process.env.MEW_COMMAND_PORT_SCREENSHOTS, { recursive: true })
       await menu.screenshot({ path: path.join(process.env.MEW_COMMAND_PORT_SCREENSHOTS, `commands-${width}-${dark ? 'dark' : 'light'}.png`) })

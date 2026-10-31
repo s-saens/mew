@@ -112,10 +112,10 @@ test('memo and task layouts persist without losing neighboring panels', () => {
   assert.deepEqual(dockIds(state.tree), ['tasks', 'memo', 'editor'])
 })
 
-test('retired browser and feature panels disappear from saved geometry and tab assignments', () => {
+test('DOM browser geometry and tabs survive normalization while retired features disappear', () => {
   const state = normalizeDock({ version: 1, groups: [{ id: 'browser', kind: 'browser' }, { id: 'browser:split', kind: 'browser' }, { id: 'feature-work', kind: 'features' }, { id: 'editor', kind: 'editor' }], tree: { axis: 'row', ratio: .5, first: { id: 'browser' }, second: { id: 'editor' } }, tabs: { 'browser:one': 'browser', 'browser:two': 'browser:split', 'editor:main': 'editor', feature: 'feature-work' }, active: { 'feature-work': 'feature', browser: 'one', 'browser:split': 'two', editor: 'main' } })
-  assert.deepEqual(state.groups, [{ id: 'editor', kind: 'editor' }])
-  assert.deepEqual(state.tree, { id: 'editor' })
-  assert.deepEqual(state.tabs, { 'editor:main': 'editor' })
-  assert.deepEqual(state.active, { editor: 'main' })
+  assert.deepEqual(state.groups, [{ id: 'browser', kind: 'browser' }, { id: 'browser:split', kind: 'browser' }, { id: 'editor', kind: 'editor' }])
+  assert.deepEqual(state.tree, { axis: 'row', ratio: .5, first: { id: 'browser' }, second: { id: 'editor' } })
+  assert.deepEqual(state.tabs, { 'browser:one': 'browser', 'browser:two': 'browser:split', 'editor:main': 'editor' })
+  assert.deepEqual(state.active, { browser: 'one', 'browser:split': 'two', editor: 'main' })
 })

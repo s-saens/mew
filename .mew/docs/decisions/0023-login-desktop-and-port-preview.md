@@ -1,13 +1,13 @@
 ---
 title: "Separate the Virtual Login Desktop from localhost App Access"
-description: "Decision to remove the internal DOM browser, provide OAuth through video and input on an independent Linux virtual desktop, and provide development apps through authenticated localhost HTTP and WebSocket previews. Distinguishes execution origins and deployment conditions for direct addresses and Mewlink."
+description: "Decision to remove the internal DOM browser, provide OAuth through video and input on an independent Linux virtual desktop, and provide development apps through authenticated localhost HTTP and WebSocket previews. Distinguishes execution origins and deployment conditions for direct addresses and Mewlink; decision 0103 restores DOM relay for local-app link and command-port entry."
 created: "2026-10-20"
-updated: "2026-10-20"
+updated: "2026-10-31"
 ---
 
 ## Status
 
-Adopted. To apply this to production, the user must apply both the local changes and the Mewlink central changes.
+Partially superseded by [0103 — Localhost DOM browser](0103-localhost-dom-browser.md) for localhost links and command-port entry. The independent login video and legacy proxy decisions remain. To apply this to production, the user must apply both the local changes and the Mewlink central changes.
 
 ## Background
 

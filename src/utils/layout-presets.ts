@@ -1,7 +1,7 @@
 import { scopedBrowserStorage } from '@mew/ui/browser-storage-scope'
 import { defaultDockTree, dockIds, normalizeDock, pruneDock, type DockKind, type DockNode, type DockState } from './dock-layout.ts'
 
-export const layoutPanels = ['sidebar', 'editor', 'agent', 'terminal', 'git', 'memo', 'tasks', 'debugger', 'chat', 'android'] as const
+export const layoutPanels = ['sidebar', 'editor', 'agent', 'terminal', 'git', 'memo', 'tasks', 'debugger', 'browser', 'chat', 'android'] as const
 export type LayoutPanel = typeof layoutPanels[number]
 export type PopupRect = { x: number; y: number; width: number; height: number }
 export type LayoutSnapshot = {

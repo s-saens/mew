@@ -11,6 +11,7 @@ import { MobileKeyBar, useMobileLayout } from '@mew/mobile-keys'
 import { getBinding, matchesShortcut } from '@mew/shortcuts'
 import { readInputDraft, readInputHistory, recordInputHistory, writeInputDraft } from './inputDrafts'
 import { readKeyboardLock, writeKeyboardLock } from './keyboardLock'
+import { activateTerminalHyperlink, createLocalBrowserLinkProvider } from './localBrowserLinks'
 
 function arrowSequence(dir: 'up' | 'down' | 'left' | 'right' | 'home' | 'end', ctrl: boolean, shift: boolean): string {
   const letter = { up: 'A', down: 'B', right: 'C', left: 'D', home: 'H', end: 'F' }[dir]
@@ -436,12 +437,14 @@ export function TmuxTerminal({
       fontSize: 13,
       fontFamily: configuredMonoFont(),
       theme: configuredTerminalTheme(),
+      linkHandler: { activate: activateTerminalHyperlink },
     })
     const fitAddon = new FitAddon()
     term.loadAddon(fitAddon)
     term.open(container)
     fitAddon.fit()
     termRef.current = term
+    const localLinksDisposable = term.registerLinkProvider(createLocalBrowserLinkProvider(term))
 
     // 세션·소켓·스크롤백을 유지한 채 라이트/다크 전환을 즉시 반영한다.
     const themeObserver = new MutationObserver(() => {
@@ -659,6 +662,7 @@ export function TmuxTerminal({
       themeObserver.disconnect()
       if (selectionTimer !== null) window.clearTimeout(selectionTimer)
       osc52Disposable.dispose()
+      localLinksDisposable.dispose()
       selectionDisposable.dispose()
       dataDisposable.dispose()
       resizeDisposable.dispose()

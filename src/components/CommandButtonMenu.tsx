@@ -19,7 +19,7 @@ import { ApiResponseError } from '../api/response'
 import { SessionTerminalPopup } from './SessionTerminalPopup'
 import { WORKSPACE_PROJECT } from '../utils/active-project'
 import { captureCommandMenuShortcut, focusFirstCommand, navigateCommandMenu } from '../utils/command-menu-keyboard'
-import { portPreviewUrl } from '../utils/port-preview-url'
+import { requestLocalBrowser } from '@mew/ui/local-browser'
 import { AUTOMATIC_RETRY_LIMIT } from '../utils/recovery-policy'
 
 const LONG_PRESS_MS = 500
@@ -273,7 +273,8 @@ function ScopedCommandButtonMenu({
 
   function openPort(port: number) {
     try {
-      window.open(portPreviewUrl(port), '_blank', 'noopener,noreferrer')
+      if (!Number.isInteger(port) || port < 1 || port > 65535 || !requestLocalBrowser(`http://localhost:${port}/`)) throw new Error(uiText('미리보기를 열지 못했습니다.'))
+      setOpen(false)
       setError(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : uiText("미리보기를 열지 못했습니다."))

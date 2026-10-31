@@ -580,6 +580,7 @@ export const uiMessages = {
   "붙여넣기": ["Paste","粘贴","貼り付け"],
   "브라우저": ["Browser","浏览器","ブラウザー"],
   "브라우저 닫기": ["Close browser","关闭浏览器","ブラウザーを閉じる"],
+  "브라우저 주소": ["Browser address","浏览器地址","ブラウザーのアドレス"],
   "새 비밀번호가 서로 다릅니다": ["The new passwords do not match","新密码不一致","新しいパスワードが一致しません"],
   "비밀번호 변경에 실패했습니다": ["Could not change the password","无法修改密码","パスワードを変更できませんでした"],
   "탭 닫기": ["Close tab","关闭标签页","タブを閉じる"],

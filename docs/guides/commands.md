@@ -1,7 +1,7 @@
 ---
 title: "Command Buttons and Scheduled Tasks"
-description: "Covers command buttons in the top bar and project sidebar, running commands in other projects while keeping the current view, opening with Alt+R, selecting by number, reordering with handles, and full-row running status. Also covers adding and stopping commands, opening port apps, terminal input, recurring agent schedules, and the option to close the terminal after completion."
-updated: "2026-10-28"
+description: "Covers command buttons in the top bar and project sidebar, running commands in other projects while keeping the current view, opening with Alt+R, selecting by number, reordering with handles, and full-row running status. Also covers adding and stopping commands, opening port apps in the internal DOM browser, terminal input, recurring agent schedules, and the option to close the terminal after completion."
+updated: "2026-10-31"
 상위파일:
   - "../../.mew/docs/MOC.md"
   - "MOC.md"
@@ -37,9 +37,9 @@ As in the project list, a reorder handle is on the left and a number is at the f
 1. Under **＋ Add Command**, enter a name and shell command, then save.
 2. For a one-time command, enable **Close Terminal After Completion**. Disable it for commands that should keep running, such as development servers.
 3. Run a command with ▶ in its row and check its output with the terminal icon. Press ■ to stop it.
-4. When a development server opens a port, a port number button appears on the line below the same item. Click the number to open **current Mew URL/port** in a new tab. For example, clicking `5555` at `https://mew.run/saens/windows` opens `https://mew.run/saens/windows/5555`.
+4. When a development server opens a port, a port number button appears on the line below the same item. Click the number to open the host app in Mew's internal **Browser** panel. For example, `5555` opens the host's `http://localhost:5555/` through DOM relay, including over Mewlink.
 
-Ports refresh approximately every 3 seconds while the menu is open. Only localhost listening ports opened by the command's actual process are shown; a closed port disappears on the next refresh. If there are multiple ports, a button appears for each number, with horizontal scrolling in narrow areas. Clicking a port button does not rerun the command. Opening an app requires port preview permission and an HTTP app. Mewlink also requires a central update and preview domain setup. For detailed conditions, follow [localhost app preview](../../.mew/docs/development/port-preview.md).
+Ports refresh approximately every 3 seconds while the menu is open. Only localhost listening ports opened by the command's actual process are shown; a closed port disappears on the next refresh. If there are multiple ports, a button appears for each number, with horizontal scrolling in narrow areas. Clicking a port button does not rerun the command. Opening an app requires port preview permission and an HTTP app. The host needs Chrome/Chromium; the internal browser uses the existing Mew connection and needs no preview domain setup. Mewlink's central launcher must also include the new DOM socket allowlist. For detailed conditions, follow [localhost app preview](../../.mew/docs/development/port-preview.md).
 
 File format:
 

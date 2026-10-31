@@ -1,8 +1,8 @@
 ---
 title: "Login Screen, localhost Apps, and Android"
-description: "Explains the standalone login video screen; app access through /port-number on custom domains, Cloudflare Tunnel, Tailscale, and Mewlink; compatibility with standard SPA routes; per-branch port settings; opening in a new tab; Android environment checks; and gateway usage."
+description: "Explains the restored internal DOM browser for localhost links and command ports, host Chromium prerequisites and limits, separate login video, retained proxy URLs, and Android environment checks and gateways."
 created: "2026-09-04"
-updated: "2026-10-28"
+updated: "2026-10-31"
 ---
 
 ## Login screen
@@ -11,29 +11,21 @@ Clicking **Open Login Page** for an agent displays the host Chrome login screen 
 
 Currently supported hosts are Linux/WSL. Chrome/Chromium, Xvfb, FFmpeg, Python 3, and libX11/libXtst are required. The Debian/Ubuntu packages are `xvfb ffmpeg python3 libx11-6 libxtst6`; install Chrome separately. Use `MEW_BROWSER_EXECUTABLE` to specify the executable's absolute path. Regular Chrome is preferred, and an existing Playwright Chromium installation is also checked as an alternative executable. In an unprepared environment, it does not control the actual host desktop as a substitute.
 
-This screen is for login and account management. The general internal browser panel, address bar, shortcuts, and standalone `/browser` screen have been removed. Do not attach CDP or a DOM recorder to login pages. Detailed behavior and lifecycle follow [Login Virtual Screen](../../.mew/docs/development/login-desktop.md). Successful authentication with actual Google and Antigravity accounts must be verified in the user's environment.
+This video screen is for login and account management. The localhost DOM browser described below is a separate workspace panel. Do not attach CDP or a DOM recorder to login pages. Detailed behavior and lifecycle follow [Login Virtual Screen](../../.mew/docs/development/login-desktop.md). Successful authentication with actual Google and Antigravity accounts must be verified in the user's environment.
 
 ## Open host localhost apps
 
-If the app running on the host is at `localhost:3333`, append `/3333` to the current Mew URL.
+Click a `http://localhost:3333` link in a document, agent response, or terminal output, or click a command's port number in the command menu. Mew opens the host app in its internal **Browser** panel. The command keeps running; clicking the port does not execute it again. You can also select **Browser** in the dock and enter a localhost address. Paths, queries, and fragments are preserved.
 
-| Mew access method | Example app entry URL |
-| --- | --- |
-| Custom domain | `https://mew.example/3333` |
-| Tailscale IP | `http://100.x.y.z:5000/3333` |
-| Mewlink | `https://mew.run/<user>/<device>/3333` |
+The Browser toolbar provides Back, Forward, refresh, an address field, and close. Type and click in the app as usual; its JavaScript and network requests run in headless Chromium on the host. Only the resulting DOM and your input travel through Mew. The same flow works through direct access and Mewlink without a separate preview domain or wildcard DNS setup. Mewlink also needs its central launcher updated to admit the new DOM browser connection; updating only the host is insufficient with an older launcher.
 
-If Mew is served on a different port, include that port too. For example, if you use Mew at `http://100.x.y.z:5000`, append `/3333`. The app's subpath and query are also forwarded.
+The app must already be running, and Chrome/Chromium must be installed on the Mew host. Set `MEW_BROWSER_EXECUTABLE` to its absolute executable path if automatic detection fails. Mew login and **Access localhost Apps** permission are required; owner and manager have it by default. The browser accepts loopback HTTP(S) addresses and blocks Mew's own listening ports. This browser does not open general external sites or replace agent login screens.
 
-In the dock's **Features** panel, click the branch's **Port Settings** to save the running app's port and subpath, then click **Open in New Tab**. Each worktree's app must already be running on a different port. The displayed status indicates port connectivity, not a successful check or completed user verification. Follow the [work branch verification steps](projects.md#기능-패널에서-작업-브랜치-확인).
+Closing the panel disposes of its isolated browser context. If the connection closes or the session expires, use **Reconnect** or reopen the link. Reconnection starts a fresh context; app cookies and local storage are not kept across it. Logging out or losing permission closes the browser too.
 
-If you connected a custom domain to Mew through Cloudflare Tunnel, open the app at a path on the same domain, such as `https://mew.example/3333`. The app must be running on port `3333` on the Mew host; you do not need to register the app port separately in the Tunnel. The Tunnel must also forward requests for that path and WebSocket requests to Mew.
+DOM-based forms and SPA navigation are supported. Canvas/WebGL, nested frames, file uploads, native dialogs, media, and drag interactions may need a regular browser. See the [implementation and compatibility contract](../../.mew/docs/development/port-preview.md#internal-dom-browser).
 
-Mew login and the **Access localhost Apps** permission are required. If you are not logged in, the login screen appears first, and you return to the app after logging in. Access is allowed by default for owner and manager; the owner grants the feature permission to other accounts. The app runs in the browser on the connecting device, with its execution area separated from Mew's login and administration screens. Logging out or revoking permission also stops open forwarding connections.
-
-Direct access through a domain or Tailscale uses an HTTP/WebSocket proxy, so HTTP IP addresses are also supported. Mewlink requires the central `PREVIEW_DOMAIN` setting and wildcard HTTPS setup. If the app hardcodes a separate backend's `localhost` address, it may point to the connecting device, so configure it to use a same-port `/api` proxy or similar setup. Follow [localhost app preview](../../.mew/docs/development/port-preview.md) for configuration and compatibility limitations.
-
-A typical SPA opens at its root and subpaths without a separate basename setting. Use a Mewlink URL for apps that depend on Next static chunks or the original browser URL. API-only ports may not have a `/` page, so open the frontend port that serves the web UI. Previews expire after 30 minutes; reopen the entry URL to continue using them.
+Existing `https://mew.example/3333`, `http://100.x.y.z:5000/3333`, and `https://mew.run/<user>/<device>/3333` addresses remain legacy proxy entries. Their URL rewriting and Mewlink preview-domain prerequisites still apply. These entries are separate from the internal DOM browser opened by links and port buttons.
 
 ## Android Panel
 

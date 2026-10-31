@@ -1,11 +1,23 @@
 ---
-title: "Authenticated localhost app previews"
-description: "Defines command-session port detection and /port-number links, module forwarding and virtual SPA paths in the direct proxy, remote initialization failures and the 15-second limit, and read-only DNS, HTTPS, and shared asset readiness checks for random hosts. Also explains login and port capabilities for localhost HTTP and WebSocket, compatibility limits of origin isolation and syntax transformation, and the scope of validation."
+title: "Localhost DOM browser and legacy port previews"
+description: "Defines localhost links and command ports opening the authenticated host Chromium DOM browser, isolated replay and input, navigation generations, asset lifetimes, compatibility limits, and host/central update requirements. Also covers command-session port detection and retained legacy direct/Mewlink proxies, module and SPA rewriting, port capabilities, remote initialization and DNS readiness checks."
 created: "2026-10-20"
-updated: "2026-10-28"
+updated: "2026-10-31"
 ---
 
-## Entry and execution
+## Internal DOM browser
+
+Clicking a localhost HTTP(S) link in Mew, including a terminal URL or a command menu port number, opens the **Browser** workspace panel. The same panel is available from the dock. `localhost`, IPv4 loopback addresses, and `[::1]` links preserve their path, query, and fragment. The port button opens `http://localhost:<port>/` and closes its command menu without running, stopping, or opening a terminal session. Repeated requests navigate the existing panel, including repeated clicks on the same URL.
+
+The host must have Chrome/Chromium available through the existing executable resolver or `MEW_BROWSER_EXECUTABLE`. The app must already be running. `server/dom-browser.ts` launches a headless Chromium context for the viewer's authenticated WebSocket at `/api/dom-browser/ws`. The app's JavaScript, API calls, navigation, and HMR execute on the host at the app's native URL. rrweb records snapshots and DOM mutations; `DomBrowserPanel` reconstructs them without executing the app's scripts on the connecting device. Clicks, edited values, keys, scrolling, and viewport changes return to the host page by rrweb node ID. Input also carries the document generation, so queued input from an old document cannot act on reused IDs after navigation. The viewer blocks input until the current document has loaded and its full snapshot is rebuilt; Ctrl/Cmd+W closes this panel instead of an editor tab or host page. Back, Forward, refresh, address entry, close, and manual reconnection use the same session.
+
+The existing Mew WebSocket transport carries the DOM stream for direct and Mewlink connections. This panel needs no random preview hostname, Service Worker, or `PREVIEW_DOMAIN` configuration. Mewlink's central launcher also imports `shared/remote-access.ts`; rebuild and deploy that launcher with the new `/api/dom-browser/ws` allowlist before using this panel remotely. An older launcher rejects the new socket path even after a host update. It does not change agent OAuth: the dedicated login video display remains separate.
+
+Login and `portPreview` permission are required; guests and temporary-password sessions are rejected. The socket checks Origin and current access, and revocation or logout closes the context. Each viewer has an ephemeral, isolated context, without the user's regular Chrome profile or Mew cookies. Document navigation is restricted to host loopback HTTP(S) apps, with Mew's own ports blocked. External HTTP(S) subresources remain available for app assets and APIs. Popup links and `window.open` reuse the current page; unexpected extra pages and downloads are closed, and dialogs are dismissed. Service Workers are disabled. Closing or reconnecting disposes of the owned browser. Sessions and transport queues have bounded lifetimes and sizes.
+
+Replay uses a script-disabled iframe, a restrictive resource policy, sanitized recorded attributes, and bounded inlined images, fonts, and CSS assets. Local asset URLs never need to resolve on the connecting device. Full document navigation and reload replace the asset cache and abort old fetches; old in-flight assets cannot consume the new document's budget. Popup and nested-frame document requests are blocked at the browser context before their first network request, in addition to checking redirect hops on the main page. DOM replay is intended for document-based app interfaces; canvas/WebGL, nested frames, native dialogs, media, drag gestures, file uploads, and full browser extensions are not guaranteed. Reconnecting creates a new ephemeral context, so app login/storage from the previous context is not retained. This restores the local-app part of the former browser, not a general external-site or OAuth browser. See [ADR 0103](../decisions/0103-localhost-dom-browser.md).
+
+## Legacy proxy entry and execution
 
 `https://mew.example/3333`, `http://<tailscale-IP>:5000/3333`, and `https://mew.run/<user>/<device>/3333` are entry points for opening the host's `localhost:3333` app. Include the Mew port in the address when required. The app must be running on the host; Mew does not build it or start a development server.
 
@@ -21,7 +33,7 @@ Linux reads the process and TCP tables in `/proc` and the target processes' FDs;
 
 Targets are `127.0.0.1`, `::1`, and wildcard listening sockets. LAN-only bindings and separate daemon or container processes outside the pane's descendants are not connected automatically. Detection does not determine whether a TCP port serves an HTTP app, so non-HTTP services cannot be opened in a preview. Mew's own listening port remains blocked at the existing preview boundary.
 
-Port numbers in the command menu use `src/utils/port-preview-url.ts` to create new-tab URLs. Direct access uses `/<port>` on the current origin; Mewlink appends `/<port>` to the public device base below. The [shell terminal feature contract](../features/terminals-agents-automation/tmux-shell-terminals.md) owns button placement, updates, and interactions; the [command button guide](../../../docs/guides/commands.md) owns the usage sequence.
+Port numbers in the command menu now use `@mew/ui/local-browser` to request the internal DOM browser. `src/utils/port-preview-url.ts` remains available for legacy proxy URLs; it uses `/<port>` on the direct origin or appends it to the Mewlink device base. The [shell terminal feature contract](../features/terminals-agents-automation/tmux-shell-terminals.md) owns button placement, updates, and interactions; the [command button guide](../../../docs/guides/commands.md) owns the usage sequence.
 
 ## Permission and port boundaries
 

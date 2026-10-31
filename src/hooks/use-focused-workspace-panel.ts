@@ -25,7 +25,7 @@ export function useFocusedWorkspacePanel() {
       const consume = () => { event.preventDefault(); event.stopImmediatePropagation() }
       const browserShortcut = event.ctrlKey || event.metaKey
       const target = event.target instanceof Element ? event.target : document.activeElement
-      if (target?.closest('[data-login-desktop]')) return
+      if (target?.closest('[data-login-desktop], [data-dom-browser]')) return
       // A modal has its own keyboard scope; do not switch the panel behind it.
       if (target?.closest('[role="dialog"], [aria-modal="true"]')) { if (browserShortcut) consume(); return }
       const surface = target?.closest<HTMLElement>('[data-workspace-panel]') ?? lastSurface
