@@ -4,11 +4,11 @@ parent: "mew-editor"
 title: "Autosave and undo"
 status: "implemented"
 created: "2026-09-18"
-updated: "2026-10-26"
+updated: "2026-10-31"
 status_hash: "49e8886c9db372cf3f0f2fde067a315ec7873a16ef66013708de4d051926c0d4"
-files: ["src/components/EditorPane.tsx", "src/components/CodePane.tsx", "server/collab.ts"]
+files: ["src/components/EditorPane.tsx", "src/components/CodePane.tsx", "packages/editor/src/Editor.tsx", "server/collab.ts", "server/editor-undo-baseline-ui.test.ts"]
 commits: []
-description: "A feature contract covering body autosave, undo, and redo. Explains distinctions from Git commits, file history, and Revert File; external changes, task property merging, and save conflicts; completing saves before branch or worktree switches; and blocking late saves from the previous root."
+description: "Defines body autosave and local undo/redo, including protection of loaded contents and external refreshes from undo and mobile Redo shortcut handling. Covers Git and file-history boundaries, task property merging, save conflicts, and save completion and isolation during branch or worktree switches."
 상위파일:
   - "MOC.md"
   - "_document-code-media-editing.md"
@@ -21,6 +21,7 @@ description: "A feature contract covering body autosave, undo, and redo. Explain
 ### Scope
 
 - Automatically saves body changes and provides undo and redo.
+- Loading existing contents or applying an external refresh does not create an undo step. Repeated Undo stops at the loaded baseline; it must not clear the initial body or restore a stale buffer over an external update. Local edits remain undoable and redoable.
 
 ### Boundaries and limitations
 
@@ -34,6 +35,8 @@ description: "A feature contract covering body autosave, undo, and redo. Explain
 <!-- mew:implementation:start -->
 ## Implementation details
 
+- Plain and code collaboration seed `Y.Text` inside a transaction with an untracked origin, so the seed cannot merge with the first local edit or be undone. Standalone CodeMirror and Hotview mark external content replacement with `addToHistory: false`. Mobile CodeMirror keys use shifted character casing and key codes consistent with physical shortcuts, so Redo reaches the redo binding instead of the undo binding.
+
 - Task document saves pass the last saved source text. If only the body changes, the latest tags and assignees changed in the task panel are retained; conflicting changes to the same list abort with 409. The merged source returned by the server is applied to the editor and cache while preserving additional input entered while the save was pending. Application paths and API and tab regressions follow the [task save contract](../../development/task-list.md#saving-and-concurrent-edits).
 
 - Preparation for a branch or worktree switch waits for pending autosaves and in-progress saves in `useTabs` to finish, then saves modified tabs, including external files opened by absolute path. New edits and autosaves are blocked during preparation; if saving fails, the switch does not proceed and the failed save is not immediately retried automatically. Late save callbacks from the previous root check the switch generation, and if the optional `workspace` passed to `PUT /api/file` differs from the request's actual root, the server rejects it with 409. After saving finishes, the target worktree's content and permissions are rechecked while preserving the tab structure. Follows the [worktree switching contract](../../development/ui-contracts.md#switching-worktrees-within-the-same-project).
@@ -44,6 +47,8 @@ description: "A feature contract covering body autosave, undo, and redo. Explain
 
 <!-- mew:validation:start -->
 ## Verification
+
+- `server/editor-undo-baseline-ui.test.ts` checks initial and repeated Undo, local edit Undo/Redo through the mobile buttons, and standalone external refreshes in Hotview, Plain, and code, with and without collaboration. See the [implementation record](../../work/editor-undo-baseline.md) for results and recovery limits.
 
 - `task-document-save.test.ts` checks the sequence of opening a document → changing tags/assignees in the panel → saving the body, explicit tag deletion, and file preservation on conflicts. `task-document-save-ui.test.ts` checks preservation of tags, assignees, and body content when additional input occurs during an actual `useTabs` autosave response and in subsequent saves.
 

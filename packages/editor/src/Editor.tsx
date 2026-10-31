@@ -1741,7 +1741,7 @@ export const Editor = forwardRef<
         const selection = editor.state.selection.getBookmark()
         const scrollTop = containerRef.current?.scrollTop
         // 프로그램적 로드는 onUpdate를 발생시키지 않아야 함 (탭 dirty/승격 오작동 방지)
-        editor.commands.setContent(body, { emitUpdate: false })
+        editor.chain().command(({ tr }) => { tr.setMeta('addToHistory', false); return true }).setContent(body, { emitUpdate: false }).run()
         try { editor.view.dispatch(editor.state.tr.setSelection(selection.resolve(editor.state.doc))) } catch { /* The new body may have removed the selection. */ }
         if (containerRef.current && scrollTop !== undefined) containerRef.current.scrollTop = scrollTop
       }

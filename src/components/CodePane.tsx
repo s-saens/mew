@@ -2,7 +2,7 @@ import { insertSourceAnnotation, updateSourceAnnotation, deleteSourceAnnotation,
 import { subscribeUiLocale } from '@mew/ui/i18n-core'
 import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from 'react'
 import { MobileKeyBar, useMobileLayout } from '@mew/mobile-keys'
-import { Annotation, EditorState, StateEffect, StateField, type Extension } from '@codemirror/state'
+import { Annotation, EditorState, StateEffect, StateField, Transaction, type Extension } from '@codemirror/state'
 import {
   Decoration,
   EditorView,
@@ -49,6 +49,7 @@ import { makeCommentAnchor, resolveCommentAnchor, type CommentAnchor, type Comme
 // value prop 동기화로 들어온 트랜잭션 표시 — 이걸 다시 onChange로 올리면 열기만 한
 // 미리보기 탭이 "편집됨"으로 승격되고 무의미한 자동저장이 잡힌다
 const externalSync = Annotation.define<boolean>()
+const SEED_ORIGIN = Symbol('code-pane-seed')
 
 // collab 방의 Y.Text 공유 키 — 방마다 이 이름 하나만 쓰므로 컴포넌트 내부 상수면 충분하다
 const COLLAB_TEXT_KEY = 'content'
@@ -341,7 +342,11 @@ export const CodePane = forwardRef<
     if (!view) return
     const primary = ctrl && key.length === 1
     const mac = /Mac|iPhone|iPad|iPod/.test(navigator.platform)
-    runScopeHandlers(view, new KeyboardEvent('keydown', { key, ctrlKey: ctrl && !(primary && mac), metaKey: primary && mac, shiftKey: shift }), 'editor')
+    runScopeHandlers(view, new KeyboardEvent('keydown', {
+      key: shift && key.length === 1 ? key.toUpperCase() : key,
+      keyCode: key.length === 1 ? key.toUpperCase().charCodeAt(0) : 0,
+      ctrlKey: ctrl && !(primary && mac), metaKey: primary && mac, shiftKey: shift,
+    }), 'editor')
     resetKeyBar()
   }
   useEffect(resetKeyBar, [path, mobileLayout])
@@ -492,7 +497,9 @@ export const CodePane = forwardRef<
   useEffect(() => {
     if (!collab || !collab.synced) return
     const ytext = collab.ydoc.getText(COLLAB_TEXT_KEY)
-    if (ytext.length === 0 && valueRef.current) ytext.insert(0, valueRef.current)
+    if (ytext.length === 0 && valueRef.current) {
+      collab.ydoc.transact(() => ytext.insert(0, valueRef.current), SEED_ORIGIN)
+    }
   }, [collab?.synced, collab?.ydoc])
 
   // 외부 갱신(파일 fetch 완료, 다른 세션의 변경 반영 등)을 에디터에 흘려넣는다.
@@ -504,7 +511,7 @@ export const CodePane = forwardRef<
     if (!view) return
     const current = view.state.doc.toString()
     if (value !== current) {
-      view.dispatch({ changes: { from: 0, to: current.length, insert: value }, annotations: externalSync.of(true) })
+      view.dispatch({ changes: { from: 0, to: current.length, insert: value }, annotations: [externalSync.of(true), Transaction.addToHistory.of(false)] })
     }
   }, [value, collab])
 
