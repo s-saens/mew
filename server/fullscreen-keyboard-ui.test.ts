@@ -28,7 +28,7 @@ class Socket {
  close(){this.readyState=3;this.onclose?.()}
 }
 window.WebSocket=Socket;
-function EditorFixture(){const host=React.useRef(null);const mobile=useMobileLayout();const [value,setValue]=React.useState('Mobile editing');React.useEffect(()=>observeEditorViewport(host.current,()=>{},true),[]);return <section ref={host} style={{display:'flex',flexDirection:'column',height:'100%',minHeight:0,width:'100%'}}><div style={{flex:1,minHeight:0}}><CodePane path="fixture.txt" value={value} onChange={setValue} readOnly={false} showMobileKeyBar/></div><footer data-editor-status-bar style={{height:16,flexShrink:0,marginTop:'var(--editor-key-bar-height,0px)'}}>File size</footer>{!mobile&&<MobileKeyBar ctrlActive={false} shiftActive={false} onToggleCtrl={()=>{}} onToggleShift={()=>{}} onEsc={()=>{}} onTab={()=>{}} onArrow={()=>{}}/>}</section>}
+function EditorFixture(){const host=React.useRef(null);const mobile=useMobileLayout();const [value,setValue]=React.useState('Mobile editing');React.useEffect(()=>observeEditorViewport(host.current,()=>{},true),[]);return <section ref={host} style={{display:'flex',flexDirection:'column',height:'100%',minHeight:0,width:'100%'}}><div style={{flex:1,minHeight:0}}><CodePane path="fixture.txt" value={value} onChange={setValue} readOnly={false} showMobileKeyBar/></div><footer data-editor-status-bar style={{height:16,flexShrink:0}}>File size</footer>{!mobile&&<MobileKeyBar ctrlActive={false} shiftActive={false} onToggleCtrl={()=>{}} onToggleShift={()=>{}} onEsc={()=>{}} onTab={()=>{}} onArrow={()=>{}}/>}</section>}
 function Fixture(){
  const hidden=useMobileKeyboard(),[editor,setEditor]=React.useState(false);window.setEditor=setEditor;
  React.useEffect(()=>{const stop=observeWorkspaceViewport();window.stopViewport=stop;return stop},[]);
@@ -131,6 +131,8 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
       const barBounds = (await bar.boundingBox())!
       assert.ok(status.y >= barBounds.y + barBounds.height, 'editor status remains below the fixed key bar')
       assert.equal(status.y + status.height, 480, 'status remains above the keyboard')
+      const bodyBounds = (await page.locator('.cm-scroller').boundingBox())!
+      assert.ok(Math.abs(bodyBounds.y + bodyBounds.height - status.y) <= 1, 'the editor extends behind the keys to the status row')
       await page.evaluate('window.coverWithKeyboard(0)')
       await page.waitForFunction(`document.querySelector('[data-mobile-key-bar]').getBoundingClientRect().bottom === ${width < 768 ? 780 : 828}`)
       await page.evaluate('window.coverWithKeyboard(364)')

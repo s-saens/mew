@@ -72,7 +72,7 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><I18nProvid
             const keys = document.querySelector('[data-mobile-key-bar]').getBoundingClientRect();
             const status = document.querySelector('[data-editor-status-bar]').getBoundingClientRect();
             const body = document.querySelector('.editor-root, .cm-scroller').getBoundingClientRect();
-            return body.bottom <= keys.top + 1 && keys.bottom <= status.top + 1 && status.bottom <= innerHeight;
+            return Math.abs(body.bottom - status.top) <= 1 && body.bottom > keys.top && keys.bottom <= status.top + 1 && status.bottom <= innerHeight;
           })()`)
         } else assert.equal(await keys.count(), 0)
         if (process.env.MEW_EDITOR_SCREENSHOT_DIR) {

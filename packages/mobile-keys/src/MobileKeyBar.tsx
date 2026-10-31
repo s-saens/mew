@@ -18,7 +18,7 @@ function KeyButton({ label, ariaLabel, active, onClick, stretch = false, floatin
       data-tip={ariaLabel ?? label}
       aria-pressed={active}
       className={`flex h-8 flex-1 items-center justify-center select-none leading-none font-medium whitespace-nowrap focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ink ${floating
-        ? 'min-w-6 max-w-10 rounded-[10px] px-0.5 text-[11px] shadow-sm backdrop-blur-sm max-[360px]:text-[10px]'
+        ? 'pointer-events-auto min-w-6 max-w-10 rounded-[10px] px-0.5 text-[11px] shadow-sm backdrop-blur-sm max-[360px]:text-[10px]'
         : `rounded max-[360px]:inset-ring max-[360px]:inset-ring-surface-deep ${stretch ? 'min-w-0 px-0.5 text-[10px]' : 'min-w-6 px-1 text-[11px] max-[360px]:text-[10px]'}`
       } ${active
         ? 'bg-accent text-ink-on-accent active:bg-accent-strong'
@@ -117,7 +117,7 @@ export function MobileKeyBar({
     // DOM 순서상 에디터가 사이드바보다 뒤라 보조키가 사이드바 위에 떠 버린다
     <HoverTipLayer className="contents">
       <div ref={barRef} data-mobile-key-bar className={floating
-        ? 'fixed inset-x-0 bottom-0 z-20 flex items-end gap-1.5 px-1.5 py-1.5 max-[360px]:gap-1 max-[360px]:px-1'
+        ? 'pointer-events-none fixed inset-x-0 bottom-0 z-20 flex items-end gap-1.5 px-1.5 py-1.5 max-[360px]:gap-1 max-[360px]:px-1'
         : 'relative z-20 flex shrink-0 items-center gap-0.5 overflow-x-auto border-t border-edge bg-surface-deep px-1.5 py-1 max-[360px]:gap-0 max-[360px]:px-1'}>
         <div className={floating ? 'flex min-w-0 flex-1 items-center gap-0.5 min-[400px]:gap-1' : 'contents'}>
           <KeyButton stretch={stretch} floating={floating} label="Esc" onClick={onEsc} />

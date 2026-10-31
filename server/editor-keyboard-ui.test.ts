@@ -22,7 +22,7 @@ function Fixture(){
  const host=React.useRef(null); React.useEffect(()=>observeEditorViewport(host.current,()=>{},true),[]);
  const handle=React.useRef(null); window.value=value; window.handle=handle;
  return <><header style={{height:40}}><button onClick={()=>setMode('hotview')}>Hotview</button><button onClick={()=>setMode('plain')}>Plain</button><button onClick={()=>setValue(${JSON.stringify(content)})}>Reset</button></header>
- <main ref={host} style={{display:'flex',flexDirection:'column',height:window.innerHeight-40,position:'relative'}}><div style={{flex:1,minHeight:0}}>{mode==='hotview'?<Editor ref={handle} value={value} onChange={setValue} api={api} path="fixture.md"/>:<CodePane ref={handle} path="fixture.md" value={value} onChange={setValue} readOnly={false} showMobileKeyBar/>}</div><div data-editor-status-bar style={{flexShrink:0,height:16,marginTop:'var(--editor-key-bar-height,0px)'}}>File size · selected characters</div></main>
+ <main ref={host} style={{display:'flex',flexDirection:'column',height:window.innerHeight-40,position:'relative'}}><div style={{flex:1,minHeight:0}}>{mode==='hotview'?<Editor ref={handle} value={value} onChange={setValue} api={api} path="fixture.md"/>:<CodePane ref={handle} path="fixture.md" value={value} onChange={setValue} readOnly={false} showMobileKeyBar/>}</div><div data-editor-status-bar style={{flexShrink:0,height:16}}>File size · selected characters</div></main>
  <div id="keyboard" style={{position:'fixed',left:0,right:0,bottom:0,height:0,background:'#454545',zIndex:100,pointerEvents:'none'}}/></>;
 }
 createRoot(document.getElementById('root')).render(<Fixture/>);`
@@ -100,14 +100,25 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
             const cursor=${mode === 'hotview' ? 'window.getSelection().getRangeAt(0).getBoundingClientRect()' : "document.querySelector('.cm-cursor').getBoundingClientRect()"};
             const bar=document.querySelector('[data-mobile-key-bar]')?.getBoundingClientRect();
             const status=document.querySelector('[data-editor-status-bar]').getBoundingClientRect();
-            return status.height===16 && status.bottom<=bottom+1 && (!bar||status.top>=bar.bottom-1) && box.bottom<=Math.min(status.top,bar?bar.top:Infinity)+1 && cursor.top>=Math.max(box.top,viewport.offsetTop) && cursor.bottom<=Math.min(box.bottom,bottom,bar?bar.top:Infinity)-10 && (!bar||bar.bottom<=bottom+1);
+            return status.height===16 && status.bottom<=bottom+1 && (!bar||status.top>=bar.bottom-1) && Math.abs(box.bottom-status.top)<=1 && box.bottom>bar.top && cursor.top>=Math.max(box.top,viewport.offsetTop) && cursor.bottom<=Math.min(box.bottom,bottom,bar?bar.top:Infinity)-10 && (!bar||bar.bottom<=bottom+1);
           })()`, undefined, { timeout: 5000 })
           assert.equal(await page.evaluate('window.handle.current.getSelectedLineRange().start'), 28)
           assert.equal(await page.evaluate('window.value'), content, 'keyboard layout changes never write to the document')
+          assert.equal(await scroller.evaluate(el => {
+            const bar = el.ownerDocument.querySelector('[data-mobile-key-bar]')!.getBoundingClientRect()
+            return el.contains(el.ownerDocument.elementFromPoint(bar.width / 3, bar.top + 10))
+          }), true, 'the document remains visible and receives input between floating keys')
         }
         if (process.env.MEW_EDITOR_SCREENSHOT_DIR) await page.screenshot({ path: `${process.env.MEW_EDITOR_SCREENSHOT_DIR}/keyboard-${mode}.png` })
         await page.keyboard.type('typed')
         assert.ok((await page.evaluate('window.value') as string).includes('typed'))
+        await page.keyboard.press('ControlOrMeta+End')
+        await page.waitForFunction(`(() => {
+          const cursor=${mode === 'hotview' ? 'window.getSelection().getRangeAt(0).getBoundingClientRect()' : "document.querySelector('.cm-cursor').getBoundingClientRect()"};
+          const bar=document.querySelector('[data-mobile-key-bar]').getBoundingClientRect();
+          return cursor.height>0 && cursor.bottom<=bar.top-10;
+        })()`, undefined, { timeout: 5000 })
+        await page.keyboard.press('ControlOrMeta+Home')
         await page.evaluate('window.setVisibleViewport(null)')
         await page.waitForFunction(`Math.abs(document.querySelector('${selector}').getBoundingClientRect().height - ${original!.height}) < 1`)
         await page.getByRole('button', { name: 'Reset', exact: true }).click()

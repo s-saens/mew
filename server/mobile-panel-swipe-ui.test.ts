@@ -83,6 +83,11 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><I18nProvid
       await page.locator(selector).waitFor({ state: 'visible' })
       const box = (await page.locator(selector).boundingBox())!
       const start = { x: dx < 0 ? box.x + Math.min(box.width - 8, 270) : box.x + 70, y: y ?? box.y + box.height / 2 }
+      if (selector === '[data-mobile-key-bar]' && y === undefined) {
+        const key = (await page.locator(selector).getByRole('button', { name: 'Ctrl', exact: true }).boundingBox())!
+        start.x = key.x + key.width / 2
+        start.y = key.y + key.height / 2
+      }
       await touch('touchStart', [start])
       for (let step = 1; step <= 6; step++) await touch('touchMove', [{ x: start.x + dx * step / 6, y: start.y + dy * step / 6 }])
       await touch('touchEnd', [])

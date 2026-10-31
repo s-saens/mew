@@ -9,7 +9,7 @@ export function visibleEditorBounds(container: HTMLElement) {
   const box = container.getBoundingClientRect()
   const viewportTop = viewport?.offsetTop ?? 0
   const viewportBottom = Math.min(viewportTop + (viewport?.height ?? win.innerHeight), virtualKeyboardViewportBottom(win))
-  const bar = container.querySelector<HTMLElement>('[data-mobile-key-bar]')?.getBoundingClientRect()
+  const bar = (container.closest('[data-editor-body]') ?? container).querySelector<HTMLElement>('[data-mobile-key-bar]')?.getBoundingClientRect()
   return {
     top: Math.max(box.top, viewportTop) + CARET_MARGIN,
     bottom: Math.min(box.bottom, viewportBottom, bar && bar.height > 0 ? bar.top : Infinity) - CARET_MARGIN,
@@ -21,11 +21,12 @@ export function observeEditorViewport(container: HTMLElement, onResize: () => vo
   const win = container.ownerDocument.defaultView!
   const viewport = win.visualViewport
   const keyboard = getVirtualKeyboard(win)
+  const keyScope = container.closest('[data-editor-body]') ?? container
   const originalMaxHeight = container.style.maxHeight
-  const reservationProperties = ['--editor-key-bar-height', '--editor-status-bar-height'] as const
+  const reservationProperties = reserveKeyBar ? ['--editor-key-bar-height', '--editor-status-bar-height'] : ['--editor-key-bar-height']
   const originalReservations = reservationProperties.map(name => container.style.getPropertyValue(name))
   const restoreReservations = () => {
-    if (reserveKeyBar) reservationProperties.forEach((name, index) => {
+    reservationProperties.forEach((name, index) => {
       if (originalReservations[index]) container.style.setProperty(name, originalReservations[index])
       else container.style.removeProperty(name)
     })
@@ -40,7 +41,7 @@ export function observeEditorViewport(container: HTMLElement, onResize: () => vo
       return
     }
     const bottom = Math.min((viewport?.offsetTop ?? 0) + (viewport?.height ?? win.innerHeight), virtualKeyboardViewportBottom(win))
-    const bar = reserveKeyBar ? container.querySelector<HTMLElement>('[data-mobile-key-bar]') : null
+    const bar = keyScope.querySelector<HTMLElement>('[data-mobile-key-bar]')
     const status = reserveKeyBar ? container.querySelector<HTMLElement>('[data-editor-status-bar]') : null
     if (bar !== measuredBar) {
       if (measuredBar) observer.unobserve(measuredBar)
@@ -54,16 +55,16 @@ export function observeEditorViewport(container: HTMLElement, onResize: () => vo
     }
     const fixedBar = bar && win.getComputedStyle(bar).position === 'fixed' && bar.getBoundingClientRect().height > 0
     const statusHeight = fixedBar && status ? status.getBoundingClientRect().height : 0
+    container.style.setProperty('--editor-key-bar-height', `${fixedBar ? bar.getBoundingClientRect().height : 0}px`)
     if (reserveKeyBar) {
       container.style.setProperty('--editor-status-bar-height', `${statusHeight}px`)
-      container.style.setProperty('--editor-key-bar-height', `${status && fixedBar ? bar.getBoundingClientRect().height : 0}px`)
     }
     if (viewportZoomRatio(win) !== 1) {
       container.style.maxHeight = originalMaxHeight
       return
     }
-    // Reserve the keys before the status row; both must fit above the keyboard or Dock.
-    const availableBottom = fixedBar ? status ? bar.getBoundingClientRect().bottom + statusHeight : bar.getBoundingClientRect().top : bottom
+    // The body continues behind the floating keys; only the status row occupies footer space.
+    const availableBottom = fixedBar ? bar.getBoundingClientRect().bottom + statusHeight : bottom
     const height = Math.max(0, Math.min(bottom, availableBottom) - container.getBoundingClientRect().top)
     const maxHeight = `${height}px`
     if (container.style.maxHeight !== maxHeight) container.style.maxHeight = maxHeight
@@ -85,8 +86,8 @@ export function observeEditorViewport(container: HTMLElement, onResize: () => vo
   }
   const observer = new ResizeObserver(schedule)
   observer.observe(container)
-  const mutations = reserveKeyBar ? new MutationObserver(schedule) : null
-  mutations?.observe(container, { childList: true, subtree: true })
+  const mutations = new MutationObserver(schedule)
+  mutations.observe(keyScope, { childList: true, subtree: true })
   const workspace = container.closest('.mew-workspace')
   if (workspace) mutations?.observe(workspace, { attributes: true, attributeFilter: ['data-mobile-keyboard', 'style'] })
   viewport?.addEventListener('resize', schedule)

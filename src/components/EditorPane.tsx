@@ -1076,7 +1076,7 @@ export function EditorPane({
               )}
               {/* 상태줄은 늘 떠 있다 — 가운데는 파일 크기, 오른쪽은 선택했을 때만 글자 수.
                   양옆 칸을 같은 flex-1로 둬야 가운데가 바 한가운데에 선다. */}
-              <div data-editor-status-bar style={{ marginTop: 'var(--editor-key-bar-height, 0px)' }} className="flex min-h-4 shrink-0 items-center border-t border-edge bg-surface-deep px-2 py-0.5 text-[10px] leading-none text-ink-muted">
+              <div data-editor-status-bar className="flex min-h-4 shrink-0 items-center border-t border-edge bg-surface-deep px-2 py-0.5 text-[10px] leading-none text-ink-muted">
                 <span className="flex-1" />
                 <span>
                   {activeTab.anchorPreview

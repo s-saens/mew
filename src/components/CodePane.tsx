@@ -633,7 +633,7 @@ export const CodePane = forwardRef<
   // 찾기 패널이 Esc를 먹었으면 거기서 끊는다 — 흘려보내면 같은 Esc로 사이드바·터미널까지 닫힌다
   // (useOverlayDismiss는 window bubble 단계에서 듣는다)
   return (
-    <>
+    <div data-editor-body className="h-full w-full">
       <HoverTipLayer className="h-full w-full" placement="bottom">
         <div
           ref={containerRef}
@@ -655,6 +655,6 @@ export const CodePane = forwardRef<
         onArrow={direction => runKey({ up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight' }[direction])}
         onUndo={readOnly ? undefined : () => runKey('z', true, false)}
         onRedo={readOnly ? undefined : () => runKey('z', true, true)} />}
-    </>
+    </div>
   )
 })

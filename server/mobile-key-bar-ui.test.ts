@@ -80,6 +80,10 @@ function Fixture(){
         assert.ok(wrapper.borders.every(border => parseFloat(border) === 0), 'the layout wrapper has no enclosing border')
         assert.ok(!['auto', 'scroll'].includes(wrapper.overflowX), 'editor keys do not use a horizontal scrolling bar')
         assert.equal(wrapper.fits, true, `all Hotview actions fit without clipping at ${width}px`)
+        assert.equal(await bar.evaluate(el => {
+          const box = el.getBoundingClientRect()
+          return !el.contains(el.ownerDocument.elementFromPoint(box.left + 12, box.top + 12))
+        }), true, 'empty space above the bottom row passes touches through to the document')
         const keys = await buttons.evaluateAll(els => els.map(el => {
           const box = el.getBoundingClientRect()
           const style = el.ownerDocument.defaultView!.getComputedStyle(el)

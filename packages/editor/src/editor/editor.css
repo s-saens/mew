@@ -6,6 +6,7 @@
   --mew-pad-x: 2rem;
   --mew-body-line-height: calc(15px * 1.7);
   padding: var(--mew-pad-x);
+  padding-bottom: calc(var(--mew-pad-x) + var(--editor-key-bar-height, 0px));
   min-height: 100%;
   color: var(--color-ink);
   font-size: 15px;

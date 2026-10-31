@@ -2169,6 +2169,7 @@ export const Editor = forwardRef<
   return (
     <div
       ref={containerRef}
+      data-editor-body
       className={`editor-root relative flex h-full flex-col overflow-auto bg-surface-deep${frontmatter ? ' has-frontmatter' : ''}`}
     >
       {/* /upload 커맨드 전용 숨은 파일 인풋 — accept 없이 모든 타입, 모바일에서도 네이티브 피커가 뜬다 */}
