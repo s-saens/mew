@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import { HoverTipLayer, SelectField } from '@mew/ui'
 import { RefreshDouble, Check, Play, Download } from 'iconoir-react'
 import { useI18n } from '../i18n'
@@ -10,6 +10,7 @@ import { DebugSection } from './debugger-controls'
 
 export default function DebuggerSettings({ root, portalContainer, onOpen }: { root: string; portalContainer?: HTMLElement | null; onOpen: () => void }) {
   const { locale } = useI18n(), c = { ...debuggerCopy[locale] ?? debuggerCopy.en, ...debuggerExtra(locale) }
+  const transportId = useId()
   const [config, setConfig] = useState<DebugConfig | null>(null)
   const [args, setArgs] = useState('[]'), [launch, setLaunch] = useState('{}'), [profiles, setProfiles] = useState('[]'), [compounds, setCompounds] = useState('[]')
   const [adapter, setAdapter] = useState<DebuggerStatus['adapter'] | null>(null)
@@ -50,7 +51,7 @@ export default function DebuggerSettings({ root, portalContainer, onOpen }: { ro
     } catch (e) { setError(e instanceof Error ? e.message : c.error) }
     finally { setBusy(false) }
   }
-  const input = `${debugInput} w-full`
+  const input = `${debugInput} block w-full`
   return <HoverTipLayer className="min-w-0" portalTarget={portalContainer}>
     {!config && !error && <div role="status" className="px-2 py-1 text-xs text-ink-secondary">{c.loading}</div>}
     {error && <div role="alert" className={`m-2 ${debugError}`}>{error}</div>}
@@ -63,7 +64,13 @@ export default function DebuggerSettings({ root, portalContainer, onOpen }: { ro
       <fieldset disabled={busy || live} className="min-w-0 space-y-2 disabled:opacity-60">
         <label className="block text-xs text-ink-secondary">{c.command}<input className={input} value={config.command} onChange={event => setConfig({ ...config, command: event.target.value })} autoComplete="off" spellCheck={false} /></label>
         <label className="block text-xs text-ink-secondary">{c.args}<textarea className={`${input} font-mono`} rows={2} value={args} onChange={event => setArgs(event.target.value)} spellCheck={false} /></label>
-        <div className="grid grid-cols-2 gap-2"><SelectField compact label={c.transport} value={config.transport} portalContainer={portalContainer} options={[{ value: 'stdio', label: 'stdio' }, { value: 'tcp', label: 'TCP · 127.0.0.1' }]} onChange={value => setConfig({ ...config, transport: value as DebugConfig['transport'] })} />{config.transport === 'tcp' && <label className="block text-xs text-ink-secondary">{c.port}<input type="number" min={0} max={65535} className={input} value={config.port} onChange={event => setConfig({ ...config, port: Number(event.target.value) })} /></label>}</div>
+        <div className={`grid items-end gap-2 ${config.transport === 'tcp' ? 'grid-cols-2' : 'grid-cols-1'}`}>
+          <div className="min-w-0">
+            <label htmlFor={transportId} className="block text-xs text-ink-secondary">{c.transport}</label>
+            <SelectField id={transportId} compact label={c.transport} value={config.transport} portalContainer={portalContainer} options={[{ value: 'stdio', label: 'stdio' }, { value: 'tcp', label: 'TCP · 127.0.0.1' }]} onChange={value => setConfig({ ...config, transport: value as DebugConfig['transport'] })} />
+          </div>
+          {config.transport === 'tcp' && <label className="block min-w-0 text-xs text-ink-secondary">{c.port}<input type="number" min={0} max={65535} className={input} value={config.port} onChange={event => setConfig({ ...config, port: Number(event.target.value) })} /></label>}
+        </div>
       </fieldset>
       <p className="py-1 text-xs leading-5 text-ink-secondary">{c.external}</p>
       </DebugSection>
