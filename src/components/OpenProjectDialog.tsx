@@ -6,6 +6,7 @@ import { browseExternalEntries, cloneExternalGit, createExternalDirectory, creat
 import type { MissingDirectory } from '../../shared/external-path'
 import { useI18n } from '../i18n'
 import { FileBrowser, FileBrowserHeader, fileBrowserButton as button, fileBrowserInput as input } from './file-browser'
+import { resolveFileBrowserDraft } from './file-browser-path-suggestions'
 
 type Action = 'folder' | 'clone' | 'init'
 
@@ -27,6 +28,7 @@ export function OpenProjectDialog({ basePath, onOpen, onClose }: {
   const [notice, setNotice] = useState('')
   const [missing, setMissing] = useState<MissingDirectory | null>(null)
   const requestSeq = useRef(0)
+  const draftRevision = useRef(0)
   const busyRef = useRef(false)
   const actionInput = useRef<HTMLInputElement>(null)
   const actionBack = useRef<HTMLButtonElement>(null)
@@ -39,11 +41,12 @@ export function OpenProjectDialog({ basePath, onOpen, onClose }: {
     setError(null)
     setMissing(null)
     setDraft(nextPath)
+    const revision = ++draftRevision.current
     browseExternalEntries(nextPath).then((next) => {
       if (requestSeq.current !== seq) return
       setResult(next)
       setPath(next.path)
-      setDraft(next.path)
+      if (draftRevision.current === revision) setDraft(next.path)
     }).catch((err: unknown) => {
       if (requestSeq.current !== seq) return
       setError(err instanceof Error ? err.message : String(err))
@@ -77,14 +80,19 @@ export function OpenProjectDialog({ basePath, onOpen, onClose }: {
     setNotice('')
     setAction(next)
   }
-  const run = async (operation: () => Promise<unknown>, after?: () => void) => {
+  const run = async (operation: () => Promise<unknown>, after?: (value: unknown) => void) => {
     if (busyRef.current) return
     const seq = requestSeq.current
     busyRef.current = true
     setBusy(true)
     setError(null)
-    try { await operation(); if (requestSeq.current === seq) after?.() }
-    catch (err) { if (requestSeq.current === seq) setError(err instanceof Error ? err.message : String(err)) }
+    try { const value = await operation(); if (requestSeq.current === seq) after?.(value) }
+    catch (err) {
+      if (requestSeq.current === seq) {
+        setError(err instanceof Error ? err.message : String(err))
+        if (err instanceof MissingDirectoryError) { setMissing(err.missing); setResult(null) }
+      }
+    }
     finally { busyRef.current = false; setBusy(false) }
   }
 
@@ -97,17 +105,24 @@ export function OpenProjectDialog({ basePath, onOpen, onClose }: {
     const operation = action === 'folder' ? () => createExternalFolder(path, folderName)
       : action === 'clone' ? () => cloneExternalGit(path, url.trim(), folderName)
       : () => initializeExternalGit(path)
-    void run(operation, () => {
+    void run(operation, (created) => {
       setNotice(t(action === 'init' ? 'project.initialized' : 'project.created', { name: folderName }))
       back()
-      load(path)
+      const target = action !== 'init' && created && typeof created === 'object' && 'path' in created && typeof created.path === 'string' ? created.path : path
+      load(target)
     })
   }
   const currentIsGit = result?.entries.some((entry) => entry.name === '.git') ?? false
   const actionTitle = action === 'folder' ? t('sidebar.newFolder') : action === 'clone' ? t('project.clone') : t('project.init')
+  const targetPath = resolveFileBrowserDraft(draft, path)
+  const openFolder = () => void run(async () => {
+    if (!targetPath) return
+    const selected = targetPath === path ? result : await browseExternalEntries(targetPath)
+    if (selected) await onOpen(selected.path)
+  })
 
-  return <DialogFrame labelledBy={id} describedBy={`${id}-hint`} busy={busy} onClose={action ? back : onClose} className="flex h-[min(680px,90dvh)] max-w-2xl flex-col">
-    <FileBrowserHeader id={id} title={t('project.open')} hint={t('project.browseHint')} busy={busy} onClose={onClose} initialFocus />
+  return <DialogFrame labelledBy={id} busy={busy} onClose={action ? back : onClose} className="flex h-[min(600px,90dvh)] max-w-2xl flex-col">
+    <FileBrowserHeader id={id} title={t('project.open')} busy={busy} onClose={onClose} initialFocus />
 
     {action ? <form noValidate className="flex min-h-0 flex-1 flex-col" onSubmit={(event) => { event.preventDefault(); submitAction() }}>
       <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-3 sm:px-4">
@@ -133,17 +148,18 @@ export function OpenProjectDialog({ basePath, onOpen, onClose }: {
       </footer>
     </form> : <FileBrowser
       onFilesChanged={() => load(path)}
-      result={result} error={error} draft={draft} onDraftChange={setDraft}
-      onNavigate={(nextPath) => { setNotice(''); load(nextPath, true) }} busy={busy} foldersOnly autoFocusPath={false}
+      result={result} error={error} draft={draft} onDraftChange={(value) => { draftRevision.current++; setDraft(value) }}
+      onNavigate={(nextPath) => { setNotice(''); load(nextPath, true) }} busy={busy} foldersOnly autocomplete autoFocusPath={false}
+      selectedPath={targetPath || undefined}
       toolbar={<>
-      <div className="flex shrink-0 flex-wrap gap-1 border-y border-edge bg-surface-deep px-2 py-1 sm:px-3">
+      <div className="flex shrink-0 flex-wrap gap-1">
         <button type="button" disabled={!result || busy} ref={(element) => { actionTriggers.current.folder = element }} onClick={() => begin('folder')} className={button}><FolderPlus width={17} height={17} />{t('sidebar.newFolder')}</button>
         <button type="button" disabled={!result || busy} ref={(element) => { actionTriggers.current.clone = element }} onClick={() => begin('clone')} className={button}><GitBranch width={17} height={17} />{t('project.clone')}</button>
-        <button type="button" disabled={!result || busy || currentIsGit} ref={(element) => { actionTriggers.current.init = element }} onClick={() => begin('init')} className={`${button} sm:ml-auto`}>{currentIsGit ? <><Check width={16} height={16} />{t('project.gitRepository')}</> : t('project.init')}</button>
+        <button type="button" disabled={!result || busy || currentIsGit} ref={(element) => { actionTriggers.current.init = element }} onClick={() => begin('init')} className={button}>{currentIsGit ? <><Check width={16} height={16} />{t('project.gitRepository')}</> : t('project.init')}</button>
       </div>
       </>}
       notice={notice && <p role="status" className="mx-3 mt-2 flex items-center gap-2 text-xs text-success-ink sm:mx-4"><Check width={16} height={16} />{notice}</p>}
-      footerActions={<><button type="button" disabled={busy} onClick={onClose} className={button}>{t('common.cancel')}</button><button type="button" disabled={busy || !result} onClick={() => void run(() => Promise.resolve(onOpen(path)))} className={`${button} bg-accent !text-ink-on-accent hover:bg-accent-strong`}>{busy ? t('project.working') : t('project.openHere')}<NavArrowRight width={16} height={16} /></button></>}
+      footerActions={<button type="button" disabled={busy || !result || !targetPath} onClick={openFolder} className={`${button} min-h-9 bg-accent px-3 !text-ink-on-accent hover:bg-accent-strong`}>{busy ? t('project.working') : t('project.openHere')}<NavArrowRight width={16} height={16} /></button>}
     />}
     {missing && <ConfirmDialog message={t('project.createMissingPath', { parent: missing.existingPath, name: missing.missingName })}
       detail={t('project.createPathDetail', { path: missing.path })} confirmLabel={t('project.createPath')} cancelLabel={t('common.cancel')}

@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { ArrowUp, Folder, GitBranch, HomeSimple, NavArrowDown, NavArrowRight, RefreshDouble, Search, Xmark } from 'iconoir-react'
-import { fetchAgentCwdSuggestions, type ExternalEntriesResult, type ExternalEntry } from '../api/client'
+import type { ExternalEntriesResult, ExternalEntry } from '../api/client'
 import { useI18n } from '../i18n'
 import { FileBrowserFavorites } from './file-browser-favorites'
 import { useExternalFileActions } from '../hooks/use-external-file-actions'
 import { useLongPress } from '../hooks/useLongPress'
 import { FileTypeIcon, FolderTypeIcon } from './file-type-icon'
+import { FileBrowserPath } from './file-browser-path'
 
 type EntryMenu = (entry: ExternalEntry, x: number, y: number) => void
 
@@ -22,7 +23,7 @@ export function FileBrowserHeader({ id, title, hint, busy, onClose, initialFocus
       <h2 id={id} tabIndex={initialFocus ? -1 : undefined} data-dialog-autofocus={initialFocus || undefined} className="text-base font-semibold text-ink-bright outline-none">{title}</h2>
       {hint && <p id={`${id}-hint`} className="mt-1 text-xs text-ink-secondary">{hint}</p>}
     </div>
-    <button type="button" disabled={busy} onClick={onClose} className={`${fileBrowserButton} -mr-1 px-2`} aria-label={t('common.close')}><Xmark width={20} height={20} /></button>
+    <button type="button" disabled={busy} onClick={onClose} className={`${fileBrowserButton} -mr-1 px-2`} aria-label={t('common.close')} data-tip={t('common.close')}><Xmark width={20} height={20} aria-hidden="true" /></button>
   </header>
 }
 
@@ -64,11 +65,12 @@ export function FileBrowserEntry({ entry, busy, depth = 0, expanded, onClick, on
 }
 
 /** Shared browsing surface; callers own permissions, loading and file operations. */
-export function FileBrowser({ result, error, draft, onDraftChange, onNavigate, busy = false, foldersOnly = false, autocomplete = false, autoFocusPath = true, toolbar, notice, footerActions, renderEntry, onFilesChanged, onRenamed, onDeleted, onOpenProject }: {
+export function FileBrowser({ result, error, draft, onDraftChange, onNavigate, busy = false, foldersOnly = false, autocomplete = false, autoFocusPath = true, toolbar, notice, footerActions, selectedPath, renderEntry, onFilesChanged, onRenamed, onDeleted, onOpenProject }: {
   result: ExternalEntriesResult | null; error: string | null; draft: string
   onDraftChange: (value: string) => void; onNavigate: (path: string) => void
   busy?: boolean; foldersOnly?: boolean; autocomplete?: boolean; autoFocusPath?: boolean
   toolbar?: ReactNode; notice?: ReactNode; footerActions?: ReactNode
+  selectedPath?: string
   renderEntry?: (entry: ExternalEntry, onMenu: EntryMenu) => ReactNode
   onFilesChanged: (directories: string[]) => void
   onRenamed?: (oldPath: string, newPath: string, type: ExternalEntry['type']) => void
@@ -79,38 +81,24 @@ export function FileBrowser({ result, error, draft, onDraftChange, onNavigate, b
   const actions = useExternalFileActions({ onRefresh: onFilesChanged, onRenamed, onDeleted, onOpenProject })
   const locked = busy || actions.busy
   const [filter, setFilter] = useState('')
-  const [focused, setFocused] = useState(false)
-  const [suggestions, setSuggestions] = useState<{ name: string; path: string }[]>([])
   useEffect(() => { setFilter('') }, [result])
-  useEffect(() => {
-    setSuggestions([])
-    if (!autocomplete || !focused || !result) return
-    let cancelled = false
-    const timer = window.setTimeout(() => {
-      fetchAgentCwdSuggestions(draft, result.path, draft === result.path)
-        .then((next) => { if (!cancelled) setSuggestions(next.dirs) })
-        .catch(() => { if (!cancelled) setSuggestions([]) })
-    }, 100)
-    return () => { cancelled = true; clearTimeout(timer) }
-  }, [autocomplete, focused, draft, result])
-  const navigate = (path: string) => { actions.closeMenu(); setFocused(false); onNavigate(path) }
+  const navigate = (path: string) => { actions.closeMenu(); onNavigate(path) }
   const entries = result?.entries.filter((entry) => !foldersOnly || entry.type === 'dir') ?? []
   const visible = entries.filter((entry) => entry.name.toLocaleLowerCase().includes(filter.toLocaleLowerCase()))
   const filterLabel = t(foldersOnly ? 'project.filter' : 'fileExplorer.filter')
+  const target = selectedPath ?? result?.path
+  const folderName = target?.replace(/[\\/]+$/, '').split(/[\\/]/).at(-1) || target
 
   return <>
-    <FileBrowserFavorites currentPath={result?.canonicalPath ?? result?.path} disabled={locked} onSelect={navigate} />
-    <form noValidate className="flex shrink-0 gap-1 px-3 pb-2 sm:px-4" onSubmit={(event) => { event.preventDefault(); if (!locked) navigate(draft) }}>
+    {autocomplete ? <FileBrowserPath draft={draft} result={result} disabled={locked} autoFocus={autoFocusPath} label={t(foldersOnly ? 'project.path' : 'fileExplorer.pathPlaceholder')} onDraftChange={onDraftChange} onNavigate={navigate} /> : <form noValidate className="flex shrink-0 gap-1 px-3 pb-2 sm:px-4" onSubmit={(event) => { event.preventDefault(); if (!locked) navigate(draft) }}>
       <button type="button" disabled={locked} onClick={() => navigate('')} className={`${fileBrowserButton} px-2`} aria-label={t('project.home')} title={t('project.home')}><HomeSimple width={18} height={18} /></button>
-      <div className="relative min-w-0 flex-1" onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setFocused(false) }}>
-        <input data-dialog-autofocus={autoFocusPath || undefined} value={draft} disabled={locked} onChange={(event) => { onDraftChange(event.target.value); setFocused(true) }} onFocus={() => setFocused(true)} spellCheck={false} autoComplete="off" className={`${fileBrowserInput} font-mono !text-xs`} aria-label={t(foldersOnly ? 'project.path' : 'fileExplorer.pathPlaceholder')} />
-        {focused && suggestions.length > 0 && <div className="absolute inset-x-0 top-full z-20 mt-1 max-h-52 overflow-y-auto rounded-md border border-edge bg-surface-raised py-1 shadow-lg">
-          {suggestions.map((entry) => <button key={entry.path} type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => navigate(entry.path)} className="block min-h-8 w-full truncate px-2 text-left font-mono text-xs text-ink hover:bg-surface-hover">{entry.path}</button>)}
-        </div>}
-      </div>
+      <input data-dialog-autofocus={autoFocusPath || undefined} value={draft} disabled={locked} onChange={(event) => onDraftChange(event.target.value)} spellCheck={false} autoComplete="off" className={`${fileBrowserInput} font-mono !text-xs`} aria-label={t(foldersOnly ? 'project.path' : 'fileExplorer.pathPlaceholder')} />
       <button type="submit" disabled={locked} className={fileBrowserButton}>{t('folder.go')}</button>
-    </form>
-    {toolbar}
+    </form>}
+    <div className="flex shrink-0 flex-wrap items-center gap-x-2 gap-y-1 border-y border-edge px-2 py-1 sm:px-3">
+      <FileBrowserFavorites compact currentPath={result?.canonicalPath ?? result?.path} disabled={locked} onSelect={navigate} />
+      {toolbar}
+    </div>
     {notice}
     {actions.error && <p role="alert" className="select-text mx-3 mb-2 break-words text-xs text-danger-ink sm:mx-4">{actions.error}</p>}
     <div className="flex shrink-0 items-center gap-2 px-3 py-1 sm:px-4">
@@ -127,9 +115,12 @@ export function FileBrowser({ result, error, draft, onDraftChange, onNavigate, b
         : visible.length === 0 ? <div className="flex flex-col items-center px-3 py-6 text-center"><Folder width={28} height={28} className="mb-3 text-ink-secondary" /><p className="text-sm font-medium text-ink">{t(filter ? (foldersOnly ? 'project.noMatches' : 'fileExplorer.noMatches') : (foldersOnly ? 'folder.empty' : 'fileExplorer.empty'))}</p>{foldersOnly && <p className="mt-2 text-xs text-ink-secondary">{t(filter ? 'project.filterHint' : 'project.emptyHint')}</p>}</div>
         : visible.map((entry) => renderEntry ? renderEntry(entry, actions.openMenu) : <FileBrowserEntry key={entry.path} entry={entry} busy={locked} onMenu={actions.openMenu} onClick={() => navigate(entry.path)} />)}
     </div>
-    <footer className="shrink-0 border-t border-edge bg-surface-deep px-3 py-2 sm:px-4">
-      <div className={`flex min-w-0 items-center gap-2 ${footerActions ? 'mb-2' : ''}`}><p className="shrink-0 text-xs text-ink-secondary">{t(foldersOnly ? 'project.selectedFolder' : 'fileExplorer.currentFolder')}</p><p className="select-text min-w-0 truncate font-mono text-xs text-ink" title={result?.path}>{result?.path ?? '—'}</p></div>
-      {footerActions && <div className="flex items-center justify-end gap-2">{footerActions}</div>}
+    <footer className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-edge bg-surface-deep px-3 py-2 sm:px-4">
+      <div className="min-w-0 flex-1" aria-live={foldersOnly ? 'polite' : undefined}>
+        <p className="mb-0.5 flex items-center gap-1.5 text-xs text-ink-secondary">{foldersOnly && <Folder width={14} height={14} aria-hidden="true" />}{t(foldersOnly ? 'project.selectedFolder' : 'fileExplorer.currentFolder')}{foldersOnly && <span className="truncate font-medium text-ink">{folderName ?? '—'}</span>}</p>
+        <p className="select-text truncate font-mono text-xs text-ink-secondary" title={target}>{target ?? '—'}</p>
+      </div>
+      {footerActions && <div className="flex shrink-0 items-center gap-2">{footerActions}</div>}
     </footer>
     {actions.menu}
     {actions.dialog}

@@ -6,8 +6,8 @@ import { fetchFileFavorites, setFileFavorite, FILE_FAVORITES_CHANGED } from '../
 import { useI18n } from '../i18n'
 import type { FileFavorite } from '../../shared/file-favorites'
 
-export function FileBrowserFavorites({ currentPath, disabled, onSelect }: {
-  currentPath?: string; disabled: boolean; onSelect: (path: string) => void
+export function FileBrowserFavorites({ currentPath, disabled, onSelect, compact = false }: {
+  currentPath?: string; disabled: boolean; onSelect: (path: string) => void; compact?: boolean
 }) {
   const { t } = useI18n()
   const id = useId()
@@ -60,7 +60,7 @@ export function FileBrowserFavorites({ currentPath, disabled, onSelect }: {
   const active = folders.some(folder => folder.path === currentPath)
   const locked = disabled || saving || loading
 
-  return <section aria-labelledby={id} aria-busy={loading || saving} className="mb-2 shrink-0 border-b border-edge px-3 pb-2 sm:px-4">
+  return <section aria-labelledby={id} aria-busy={loading || saving} className={compact ? 'w-full min-w-0 sm:w-auto sm:flex-1' : 'mb-2 shrink-0 border-b border-edge px-3 pb-2 sm:px-4'}>
     <div className="flex min-h-8 items-center gap-1">
       <FavoritesDropdown id={id} label={t('favorites.title')} disabled={disabled}>
         {close => loading && !loaded ? <p role="status" className="px-3 py-2 text-xs text-ink-secondary">{t('common.loading')}</p>
@@ -79,7 +79,7 @@ export function FileBrowserFavorites({ currentPath, disabled, onSelect }: {
             </div>
           })}
       </FavoritesDropdown>
-      <button type="button" disabled={locked || !loaded || !currentPath} aria-pressed={active} onClick={() => { if (currentPath) void change(currentPath, !active) }} className="ml-auto inline-flex min-h-8 min-w-8 items-center justify-center gap-1.5 rounded-md px-2 text-xs text-ink-secondary hover:bg-surface-hover disabled:opacity-40" title={t(active ? 'favorites.unpinCurrent' : 'favorites.pinCurrent')} aria-label={t(active ? 'favorites.unpinCurrent' : 'favorites.pinCurrent')}><Star width={15} height={15} fill={active ? 'currentColor' : 'none'} /><span>{t(active ? 'favorites.saved' : 'favorites.pin')}</span></button>
+      <button type="button" disabled={locked || !loaded || !currentPath} aria-pressed={active} onClick={() => { if (currentPath) void change(currentPath, !active) }} className="ml-auto inline-flex min-h-8 min-w-8 items-center justify-center gap-1.5 rounded-md px-2 text-xs text-ink-secondary hover:bg-surface-hover disabled:opacity-40" data-tip={t(active ? 'favorites.unpinCurrent' : 'favorites.pinCurrent')} aria-label={t(active ? 'favorites.unpinCurrent' : 'favorites.pinCurrent')}><Star width={15} height={15} aria-hidden="true" fill={active ? 'currentColor' : 'none'} />{!compact && <span>{t(active ? 'favorites.saved' : 'favorites.pin')}</span>}</button>
       <button type="button" disabled={locked} onClick={() => void refresh()} aria-label={t('favorites.refresh')} title={t('favorites.refresh')} className="inline-flex min-h-8 min-w-8 items-center justify-center rounded-md text-ink-secondary hover:bg-surface-hover disabled:opacity-40"><RefreshDouble width={15} height={15} /></button>
     </div>
     {error && <p role="alert" className="select-text mt-1 break-words text-xs text-danger-ink">{t('favorites.failed')} {error}</p>}

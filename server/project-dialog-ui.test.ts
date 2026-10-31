@@ -19,9 +19,9 @@ import {useDialog} from '${root}/packages/ui/src/use-dialog.tsx';
 localStorage.setItem('mew:locale',new URL(location.href).searchParams.get('locale')||'ko');
 function Fixture(){const [open,setOpen]=useState(false);const [explorer,setExplorer]=useState(false);const dialogs=useDialog();return <><button onClick={()=>setExplorer(true)}>파일 탐색</button>{explorer&&<ServerFileExplorer isOwner={false} onClose={()=>setExplorer(false)} onOpenFile={p=>window.openedFile=p} onRenamed={(...args)=>window.renamed=args} onDeleted={(...args)=>window.deleted=args}/>}<button onClick={()=>setOpen(true)}>프로젝트 추가</button><button onClick={async()=>{window.answer=await dialogs.prompt({message:'이름 변경',defaultValue:'before',confirmLabel:'저장'})}}>이름 바꾸기</button><button onClick={async()=>{window.answer=await dialogs.confirm({message:'삭제할까요?',danger:true,confirmLabel:'삭제'})}}>삭제 확인</button>{dialogs.dialog}{open&&<OpenProjectDialog basePath='/home/test' onClose={()=>setOpen(false)} onOpen={p=>{window.opened=p;setOpen(false)}}/>}</>}
 createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18nProvider>);`
-  const bundle = await build({ input: 'virtual:project.tsx', write: false, platform: 'browser', output: { format: 'iife' }, transform: { jsx: 'react-jsx', define: { 'process.env.NODE_ENV': JSON.stringify('test') } }, plugins: [{ name: 'fixture', resolveId(id) { if (id === 'virtual:project.tsx') return id; if (id.endsWith('.css')) return 'virtual:style' }, load(id) { if (id === 'virtual:project.tsx') return source; if (id === 'virtual:style') return '' } }] })
+  const bundle = await build({ input: 'virtual:project.tsx', onLog(level, log, handler) { if (log.code !== 'MODULE_LEVEL_DIRECTIVE') handler(level, log) }, write: false, platform: 'browser', output: { format: 'iife' }, transform: { jsx: 'react-jsx', define: { 'process.env.NODE_ENV': JSON.stringify('test') } }, plugins: [{ name: 'fixture', resolveId(id) { if (id === 'virtual:project.tsx') return id; if (id.endsWith('.css')) return 'virtual:style' }, load(id) { if (id === 'virtual:project.tsx') return source; if (id === 'virtual:style') return '' } }] })
   const chunk = bundle.output.find(item => item.type === 'chunk')!
-  const files = ['src/components/file-action-menu.tsx', 'src/hooks/use-external-file-actions.tsx', 'src/components/file-browser.tsx', 'src/components/ServerFileExplorer.tsx', 'src/components/OpenProjectDialog.tsx', 'src/components/file-browser-favorites.tsx', 'packages/ui/src/dialog-frame.tsx', 'packages/ui/src/ConfirmDialog.tsx', 'packages/ui/src/prompt-dialog.tsx']
+  const files = ['src/components/file-action-menu.tsx', 'src/hooks/use-external-file-actions.tsx', 'src/components/file-browser.tsx', 'src/components/file-browser-path.tsx', 'src/components/ServerFileExplorer.tsx', 'src/components/OpenProjectDialog.tsx', 'src/components/file-browser-favorites.tsx', 'packages/ui/src/dialog-frame.tsx', 'packages/ui/src/ConfirmDialog.tsx', 'packages/ui/src/prompt-dialog.tsx']
   const content = (await Promise.all(files.map(file => fs.readFile(path.join(root, file), 'utf8')))).join('\n')
   const compiler = await compile(await fs.readFile(`${root}/src/index.css`, 'utf8'), { base: `${root}/src`, onDependency() {} })
   const css = compiler.build([...new Set((source + content).match(/[A-Za-z0-9_@!:/.[\]()%,-]+/g))])
@@ -116,7 +116,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     }
     const checkParentNavigation = async (owner: typeof dialog, pathLabel: string, filterLabel: string) => {
       const parent = owner.getByRole('button', { name: '상위경로', exact: true })
-      const address = owner.getByRole('textbox', { name: pathLabel, exact: true })
+      const address = owner.getByRole('combobox', { name: pathLabel, exact: true })
       const filter = owner.getByRole('textbox', { name: filterLabel, exact: true })
       await parent.waitFor()
       assert.equal(await parent.evaluate(el => el.parentElement?.querySelector('button') === el), true, 'parent navigation is the first list row')
@@ -169,7 +169,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
       await page.evaluate(`document.documentElement.classList.toggle('dark', ${dark})`)
       await trigger.click()
       await dialog.getByRole('button', { name: 'mew Git' }).waitFor()
-      assert.equal(await dialog.getByRole('textbox', { name: '프로젝트 경로' }).evaluate(el => el === el.ownerDocument.activeElement), false)
+      assert.equal(await dialog.getByRole('combobox', { name: '프로젝트 경로' }).evaluate(el => el === el.ownerDocument.activeElement), false)
       assert.equal(await dialog.getByRole('heading', { name: '새 프로젝트 열기' }).evaluate(el => el === el.ownerDocument.activeElement), true)
       assert.equal(await dialog.getByRole('button', { name: 'OneDrive - Work 폴더로 이동' }).count(), 0)
       await openFavorites(dialog)
@@ -208,7 +208,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
       await dialog.getByRole('button', { name: 'mew Git', exact: true }).click({ button: 'right' })
       await dialog.getByRole('button', { name: 'sleeeep', exact: true }).click({ position: { x: 8, y: 10 } })
       await menu.waitFor({ state: 'detached' })
-      assert.equal(await dialog.getByRole('textbox', { name: '프로젝트 경로' }).inputValue(), '/home/test', 'outside dismissal does not navigate underneath')
+      assert.equal(await dialog.getByRole('combobox', { name: '프로젝트 경로' }).inputValue(), '/home/test', 'outside dismissal does not navigate underneath')
 
       await page.screenshot({ path: `/tmp/mew-project-${width}-${dark ? 'dark' : 'light'}.png` })
       await page.keyboard.press('Escape')
@@ -230,6 +230,8 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     assert.equal(await name.inputValue(), '새 프로젝트')
     await page.screenshot({ path: '/tmp/mew-project-create-error-mobile.png' })
     await dialog.getByRole('button', { name: '새 폴더', exact: true }).click()
+    assert.equal(await dialog.getByRole('combobox', { name: '프로젝트 경로' }).inputValue(), '/home/test/새 프로젝트')
+    await dialog.getByRole('button', { name: '홈 폴더', exact: true }).click()
     await dialog.getByRole('button', { name: '새 프로젝트', exact: true }).waitFor()
     assert.deepEqual(mutations.slice(0, 2).map(item => item.body), [{ parent: '/home/test', name: '새 프로젝트' }, { parent: '/home/test', name: '새 프로젝트' }])
     await dialog.getByRole('button', { name: 'Git 복제', exact: true }).click()
@@ -243,6 +245,8 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     assert.equal(await dialog.getByRole('button', { name: '취소', exact: true }).isDisabled(), true)
     while (!releaseClone) await new Promise(resolve => setTimeout(resolve, 10))
     releaseClone()
+    assert.equal(await dialog.getByRole('combobox', { name: '프로젝트 경로' }).inputValue(), '/home/test/cloned')
+    await dialog.getByRole('button', { name: '홈 폴더', exact: true }).click()
     await dialog.getByRole('button', { name: 'cloned', exact: true }).waitFor()
     assert.deepEqual(mutations.at(-1)?.body, { parent: '/home/test', url: 'https://github.com/team/cloned.git', name: 'cloned' })
     await dialog.getByRole('button', { name: 'Git 초기화', exact: true }).click()
@@ -253,7 +257,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     await dialog.getByRole('button', { name: 'Git 초기화', exact: true }).click()
     await dialog.getByRole('button', { name: 'Git 저장소', exact: true }).waitFor()
     assert.equal(await dialog.getByRole('button', { name: 'Git 저장소', exact: true }).isDisabled(), true)
-    const address = dialog.getByRole('textbox', { name: '프로젝트 경로' })
+    const address = dialog.getByRole('combobox', { name: '프로젝트 경로' })
     await address.fill('/missing')
     await address.press('Enter')
     await dialog.getByRole('alert').waitFor()
@@ -274,7 +278,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     failDirectory = false
     await address.press('Enter'); await createPath.waitFor()
     await createPath.getByRole('button', { name: '경로 생성', exact: true }).click()
-    await page.waitForFunction(`document.querySelector('input[aria-label="프로젝트 경로"]').value === '/home/test/new-parent/new-project' && !document.querySelector('[role=alert]')`)
+    await page.waitForFunction(`document.querySelector('input[role="combobox"]').value === '/home/test/new-parent/new-project' && !document.querySelector('[role=alert]')`)
     assert.deepEqual(mutations.at(-1), { endpoint: '/api/fs/directory', body: { path: '/home/test/new-parent/new-project' } })
     assert.equal(await page.evaluate('window.opened'), undefined, 'creation only navigates; project opening is explicit')
     await address.fill('/home/test/mew')
@@ -311,10 +315,10 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
       return bounds.top >= region.top && bounds.bottom <= region.bottom
     }), true)
     await icloud.tap()
-    await page.waitForFunction(`document.querySelector('input[aria-label="프로젝트 경로"]').value === '/cloud/iCloud'`)
+    await page.waitForFunction(`document.querySelector('input[role="combobox"]').value === '/cloud/iCloud'`)
     await openFavorites(dialog)
     await otherDrive.tap()
-    await page.waitForFunction(`document.querySelector('input[aria-label="프로젝트 경로"]').value === '/cloud/OtherDrive'`)
+    await page.waitForFunction(`document.querySelector('input[role="combobox"]').value === '/cloud/OtherDrive'`)
     await page.screenshot({ path: '/tmp/mew-project-duplicate-mobile.png' })
     await page.keyboard.press('Escape')
     cloudMode = 'failed'
@@ -383,8 +387,8 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     await openFavorites(explorer)
     await favorites.getByRole('button', { name: 'mew 폴더로 이동', exact: true }).waitFor()
     const favoritesBox = await explorer.getByRole('region', { name: '즐겨찾기', exact: true }).boundingBox()
-    const addressBox = await explorer.getByRole('textbox', { name: '서버 경로 입력', exact: true }).boundingBox()
-    assert.ok(favoritesBox && addressBox && favoritesBox.y + favoritesBox.height <= addressBox.y, 'favorites are above the address bar')
+    const addressBox = await explorer.getByRole('combobox', { name: '서버 경로 입력', exact: true }).boundingBox()
+    assert.ok(favoritesBox && addressBox && addressBox.y + addressBox.height <= favoritesBox.y, 'the path field comes before favorites')
     failFavoriteSave = true
     await favorites.getByRole('button', { name: 'mew 즐겨찾기 제거', exact: true }).click()
     await favorites.getByRole('alert').waitFor()
@@ -448,7 +452,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     await filter.fill('zzz')
     await explorer.getByText('일치하는 항목이 없습니다', { exact: true }).waitFor()
     await filter.fill('')
-    const serverAddress = explorer.getByRole('textbox', { name: '서버 경로 입력', exact: true })
+    const serverAddress = explorer.getByRole('combobox', { name: '서버 경로 입력', exact: true })
     await serverAddress.fill('/missing')
     await serverAddress.press('Enter')
     await explorer.getByRole('alert').waitFor()
@@ -495,7 +499,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
       await localized.getByRole('button', { name: '프로젝트 추가', exact: true }).click()
       const panel = localized.getByRole('dialog')
       await panel.getByRole('button', { name: 'mew Git', exact: true }).waitFor()
-      const pathField = panel.getByRole('textbox').first()
+      const pathField = panel.getByRole('combobox')
       await pathField.fill('/home/test/new-parent/new-project'); await pathField.press('Enter')
       const question = localized.getByRole('dialog', { name: message, exact: true })
       await question.getByRole('button', { name: label, exact: true }).waitFor()

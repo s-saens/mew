@@ -835,7 +835,7 @@ export function createApiApp() {
     }
   })
 
-  app.get('/agent-cwd/suggestions', requireAnyFeature('agent', 'terminal'), (req, res) => {
+  app.get('/agent-cwd/suggestions', requireAnyFeature('serverFiles', 'agent', 'terminal'), (req, res) => {
     try {
       const base = resolveAgentCwd(String(req.query.base ?? ''), workspacePaths.root)
       res.json(suggestAgentCwds(String(req.query.input ?? ''), workspacePaths.root, base, req.query.entered === 'true'))

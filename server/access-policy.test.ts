@@ -121,7 +121,18 @@ test('account capabilities and canonical file rules are enforced across HTTP and
     assert.equal((await request('/fs/favorites', 'PUT', { path: temp, favorite: true }, 'owner')).status, 200)
     const ownerFavorites = await (await request('/fs/favorites', 'GET', undefined, 'owner')).json() as { folders: { path: string }[] }
     assert.ok(ownerFavorites.folders.some(folder => folder.path === fs.realpathSync(temp)))
+    const cwdSuggestions = `/agent-cwd/suggestions?input=${encodeURIComponent(paths.WORKSPACE_ROOT + path.sep)}`
+    for (const account of ['member', 'guest']) {
+      assert.equal((await request(cwdSuggestions, 'GET', undefined, account)).status, 403)
+    }
+    assert.equal((await request(cwdSuggestions, 'GET', undefined, 'owner')).status, 200)
     policy.setFeature(member.email!, 'serverFiles', true)
+    assert.equal(policy.canUse(member, 'agent'), false)
+    assert.equal(policy.canUse(member, 'terminal'), false)
+    const serverFileSuggestions = await request(cwdSuggestions)
+    assert.equal(serverFileSuggestions.status, 200, 'project folder suggestions work with serverFiles alone')
+    assert.ok((await serverFileSuggestions.json() as { dirs: { name: string; path: string }[] }).dirs.some(folder => folder.name === 'docs' && folder.path === paths.DOCS_ROOT))
+    assert.equal((await request('/agent-cwd')).status, 403, 'serverFiles does not grant agent session cwd validation')
     const memberResponse = await request('/fs/favorites')
     assert.equal(memberResponse.status, 200)
     const memberFavorites = await memberResponse.json() as { folders: { path: string }[] }
@@ -131,6 +142,7 @@ test('account capabilities and canonical file rules are enforced across HTTP and
     const ownerAgain = await (await request('/fs/favorites', 'GET', undefined, 'owner')).json() as { folders: { path: string }[] }
     assert.ok(ownerAgain.folders.some(folder => folder.path === fs.realpathSync(temp)))
     policy.setFeature(member.email!, 'serverFiles', null)
+    assert.equal((await request(cwdSuggestions)).status, 403, 'revoking serverFiles removes folder suggestion access')
     assert.equal((await request('/admin/access')).status, 403)
     const access = await (await request('/admin/access', 'GET', undefined, 'owner')).json() as AccessSettings
     assert.equal(access.rows.find(row => row.subject === member.email)?.avatarDataUrl, avatar)
@@ -138,6 +150,7 @@ test('account capabilities and canonical file rules are enforced across HTTP and
     assert.equal((await request('/admin/access/feature', 'PUT', { subject: member.email, feature: 'agent', enabled: true }, 'owner')).status, 200)
     assert.equal(policy.canUse(member, 'agent'), true)
     assert.equal(policy.canUse(member, 'terminal'), false)
+    assert.equal((await request(cwdSuggestions)).status, 200, 'agent-only folder suggestions remain available')
     assert.equal((await request('/agent-sets')).status, 200)
     assert.equal((await request('/agent-runtimes/unknown/models')).status, 400)
     assert.equal((await request('/agent-runtimes/tmux/models')).status, 400)
@@ -148,6 +161,10 @@ test('account capabilities and canonical file rules are enforced across HTTP and
     assert.equal((await request('/admin/users/owner%40example.test/role', 'PUT', { role: 'member' }, 'owner')).status, 400)
     policy.setFeature(member.email!, 'agent', null)
     assert.equal(policy.canUse(member, 'agent'), false)
+    policy.setFeature(member.email!, 'terminal', true)
+    assert.equal((await request(cwdSuggestions)).status, 200, 'terminal-only folder suggestions remain available')
+    policy.setFeature(member.email!, 'terminal', null)
+    assert.equal((await request(cwdSuggestions)).status, 403)
     policy.setFileRule(member.email!, 'docs', '', 'deny')
     policy.setFileRule(member.email!, 'docs', 'public', 'edit')
     policy.setFileRule(member.email!, 'docs', 'public/hidden.md', 'deny')
