@@ -2,6 +2,7 @@ import express from 'express'
 import fs from 'node:fs'
 import { listUsers, getUser, userProfile } from './auth.ts'
 import { requireRole } from './reqAuth.ts'
+import { updateAccountAccess } from './remote-access-context.ts'
 import { capabilitiesFor, featureOverrides, fileAccess, fileRules, policyPath, resetFeatureOverrides, setFeature, setFileRule, workspaceScope } from './access-policy.ts'
 import { resolveProjectPath } from './paths.ts'
 import { listCatalogChildren } from './fileCatalog.ts'
@@ -26,7 +27,7 @@ export function createAccessRouter() {
     if (typeof subject !== 'string' || (subject !== 'guest' && !getUser(subject)) || !FEATURES.includes(feature) || (enabled !== null && typeof enabled !== 'boolean')) {
       res.status(400).json({ error: '계정과 기능 권한을 확인하세요' }); return
     }
-    try { setFeature(subject, feature as Feature, enabled); res.json({ rows: rows(), workspace: workspaceScope() }) }
+    try { updateAccountAccess(req, () => setFeature(subject, feature as Feature, enabled)); res.json({ rows: rows(), workspace: workspaceScope() }) }
     catch (error) { res.status(400).json({ error: (error as Error).message }) }
   })
   router.post('/features/reset', (req, res) => {
@@ -34,7 +35,7 @@ export function createAccessRouter() {
     if (typeof subject !== 'string' || (subject !== 'guest' && !listUsers().some(user => user.email === subject))) {
       res.status(400).json({ error: '계정을 확인하세요' }); return
     }
-    try { resetFeatureOverrides(subject); res.json({ rows: rows(), workspace: workspaceScope() }) }
+    try { updateAccountAccess(req, () => resetFeatureOverrides(subject)); res.json({ rows: rows(), workspace: workspaceScope() }) }
     catch (error) { res.status(400).json({ error: (error as Error).message }) }
   })
   router.get('/path', async (req, res) => {
@@ -56,7 +57,7 @@ export function createAccessRouter() {
       res.status(400).json({ error: '계정과 파일 경로를 확인하세요' }); return
     }
     if (workspace !== workspaceScope()) { res.status(409).json({ error: '프로젝트가 변경되었습니다. 설정 창을 다시 여세요.' }); return }
-    try { setFileRule(subject, project, relPath, access); res.json({ ok: true }) }
+    try { updateAccountAccess(req, () => setFileRule(subject, project, relPath, access)); res.json({ ok: true }) }
     catch (error) { res.status(400).json({ error: (error as Error).message }) }
   })
   return router

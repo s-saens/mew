@@ -6,9 +6,9 @@ status: "implemented"
 created: "2026-09-18"
 updated: "2026-10-31"
 status_hash: "65b2a28fe6a84c2ae5140eff868f32aefcd8cd25f5aabc3ea17d470b8cd0ec3d"
-files: ["src/components/account-access-matrix.tsx", "src/components/account-role-select.tsx", "src/components/account-column-headers.tsx", "src/components/account-profile-form.tsx", "src/components/AdminSettingsModal.tsx", "src/components/mewlink-access-settings.tsx", "src/components/mewlink-account-connection.tsx", "src/components/SettingsModal.tsx", "src/components/LoginPage.tsx", "server/access-policy.ts", "server/auth.ts", "server/authRoutes.ts", "server/mewlink-identities.ts", "server/mewlink-auth-routes.ts"]
+files: ["src/components/account-access-matrix.tsx", "src/components/account-role-select.tsx", "src/components/account-column-headers.tsx", "src/components/account-profile-form.tsx", "src/components/AdminSettingsModal.tsx", "src/components/mewlink-access-settings.tsx", "src/components/mewlink-account-connection.tsx", "src/components/SettingsModal.tsx", "src/components/LoginPage.tsx", "server/access-policy.ts", "server/access-routes.ts", "server/api.ts", "server/remote-access-context.ts", "server/auth.ts", "server/authRoutes.ts", "server/mewlink-identities.ts", "server/mewlink-auth-routes.ts"]
 commits: []
-description: "Defines My Account, compact account management, photo/initial account popups, one feature-default reset per account column, and owner-issued temporary password resets. Covers logout, roles, feature/file permissions and deletion, Mewlink access approval and identity linking, guest path permissions, and revocable public file/folder links with constrained viewing/editing; excludes device registration and public sign-up."
+description: "Defines My Account, compact account management, photo/initial account popups, one feature-default reset per account column, and owner-issued temporary password resets. Covers successful Mewlink permission-save responses with live revocation, logout, roles, feature/file permissions and deletion, Mewlink approval and identity linking, guest permissions, and constrained public file/folder links; excludes device registration and public sign-up."
 상위파일:
   - "MOC.md"
   - "_appearance-accounts-operations.md"
@@ -17,6 +17,8 @@ description: "Defines My Account, compact account management, photo/initial acco
 ## Requirements
 
 - Manage accounts and the scope of file and feature access.
+
+- Account role, feature, feature-default reset, and file-rule changes and account deletion return their completed result over Mewlink. The access change must not cancel its own response or display an interrupted-request error after a successful save. Other work using previous permissions is invalidated immediately, and later requests enforce the new permissions. See the [access-change response contract](../../development/access-control.md#mewlink-local-login).
 
 ### Scope
 

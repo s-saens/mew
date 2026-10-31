@@ -23,6 +23,10 @@ const remoteSockets = new WeakMap<Duplex, RemoteContext>()
 /** Only the verified P2P dispatcher can attach authority to an in-process socket. */
 export function bindRemoteSocket(socket: Duplex, context: RemoteContext | (() => AuthenticatedSession | null)) { remoteSockets.set(socket, typeof context === 'function' ? { current: context } : context) }
 export function remoteContext(req: IncomingMessage): RemoteContext | undefined { return remoteSockets.get(req.socket) }
+export function updateAccountAccess<T>(req: IncomingMessage, action: () => T): T {
+  const context = remoteContext(req)
+  return context?.updateAccountAccess ? context.updateAccountAccess(action) : action()
+}
 export function remoteSession(req: IncomingMessage): AuthenticatedSession | null | undefined { return remoteContext(req)?.current() }
 export function remoteTransport(req: IncomingMessage): boolean { const context = remoteContext(req); return !!context && (context.alive?.() ?? !!context.current()) }
 export function remoteUiRequest(method: string, path: string): boolean { return ['GET', 'HEAD'].includes(method) && ['/api/remote-ui', '/api/remote-ui/file'].includes(path.split('?')[0]) }

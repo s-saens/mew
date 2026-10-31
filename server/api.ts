@@ -143,6 +143,7 @@ import { measure, measureSync } from './perfMarks.ts'
 import { authOf, requireAuthenticated, requireRole, requireFeature, requireAnyFeature, seesEveryFile } from './reqAuth.ts'
 import { canUse, fileAccess, filterTreeForAccess, subtreeAccess, unrestrictedFiles, accessChanges, removeAccountAccess } from './access-policy.ts'
 import { createAccessRouter } from './access-routes.ts'
+import { updateAccountAccess } from './remote-access-context.ts'
 import { createMewlinkAdminRouter } from './mewlink-auth-routes.ts'
 import {
   generateTempPassword,
@@ -2324,8 +2325,10 @@ export function createApiApp() {
     if (user.role === 'owner' && role !== 'owner' && listUsers().filter(entry => entry.record.role === 'owner').length === 1) {
       res.status(400).json({ error: '마지막 owner의 역할은 변경할 수 없습니다' }); return
     }
-    upsertUser(email, { ...user, role })
-    accessChanges.emit('change')
+    updateAccountAccess(req, () => {
+      upsertUser(email, { ...user, role })
+      accessChanges.emit('change')
+    })
     res.json({ ok: true })
   })
 
@@ -2339,12 +2342,14 @@ export function createApiApp() {
       res.status(400).json({ error: '비밀번호로 로그인하는 계정만 초기화할 수 있습니다' }); return
     }
     const tempPassword = generateTempPassword()
-    upsertUser(accountId, {
-      ...user, hash: hashPassword(tempPassword), mustChangePassword: true,
-      passwordChangedAt: Math.max(Date.now(), user.passwordChangedAt),
+    updateAccountAccess(req, () => {
+      upsertUser(accountId, {
+        ...user, hash: hashPassword(tempPassword), mustChangePassword: true,
+        passwordChangedAt: Math.max(Date.now(), user.passwordChangedAt),
+      })
+      revokeUserSessions(accountId)
+      accessChanges.emit('change')
     })
-    revokeUserSessions(accountId)
-    accessChanges.emit('change')
     res.setHeader('Cache-Control', 'no-store')
     res.json({ ok: true, email: accountId, tempPassword })
   })
@@ -2358,9 +2363,11 @@ export function createApiApp() {
     if (accountId === authOf(req).email) {
       res.status(400).json({ error: '현재 로그인한 계정은 삭제할 수 없습니다' }); return
     }
-    removeAccountAccess(accountId)
-    removeUser(accountId)
-    accessChanges.emit('change')
+    updateAccountAccess(req, () => {
+      removeAccountAccess(accountId)
+      removeUser(accountId)
+      accessChanges.emit('change')
+    })
     res.json({ ok: true })
   })
 
