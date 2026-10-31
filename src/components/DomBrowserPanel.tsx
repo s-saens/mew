@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Replayer } from '@rrweb/replay'
-import type { eventWithTime } from '@rrweb/types'
+import { EventType, IncrementalSource, type eventWithTime } from '@rrweb/types'
 import { ArrowLeft, ArrowRight, Refresh } from 'iconoir-react'
 import { HoverTipLayer, LoadingIndicator } from '@mew/ui'
 import { uiText } from '@mew/ui/i18n-core'
@@ -9,6 +9,7 @@ import { useFocusedShortcutScope } from '@mew/shortcuts'
 import { DOM_BROWSER_WS, type DomBrowserCommand, type DomBrowserMessage, type DomBrowserState } from '../../shared/dom-browser'
 import { openMewSocket } from '../utils/remote-transport'
 import { appTabShortcut } from '../utils/app-tab-shortcuts'
+import { bindDomBrowserScroll, type DomBrowserScroll } from '../utils/dom-browser-scroll'
 import { PanelCloseButton } from './panel-close-button'
 import { DockGrip } from './DockWorkspace'
 
@@ -60,8 +61,7 @@ export function DomBrowserPanel({ url, navigationRequest = 0, onClose }: { url: 
   useEffect(() => {
     let disposed = false, replay: Replayer | undefined, replayGeneration = -1, snapshotGeneration = -1, unbind = () => {}
     let resizeTimer: ReturnType<typeof setTimeout> | undefined
-    const scrollTimers = new Map<number, ReturnType<typeof setTimeout>>()
-    const reportedScrolls = new Map<number, string>()
+    let applyHostScroll = (_data: DomBrowserScroll) => {}
     const reportedInputs = new Map<number, string>()
     interactionReady.current = false; currentGeneration.current = -1; requiredGeneration.current = 0; documentLoading.current = true
     setConnection('connecting'); setError(''); setHasSnapshot(false)
@@ -99,12 +99,14 @@ export function DomBrowserPanel({ url, navigationRequest = 0, onClose }: { url: 
       const relayInput = (command: DomBrowserCommand) => {
         if (interactionReady.current && generation === currentGeneration.current) relay(command)
       }
-      reportedScrolls.clear(); reportedInputs.clear()
+      reportedInputs.clear()
       const policy = doc.createElement('meta')
       policy.httpEquiv = 'Content-Security-Policy'
       policy.content = "default-src 'none'; style-src 'unsafe-inline' data: blob: https:; img-src data: blob: https:; font-src data: blob: https:; media-src data: blob: https:; form-action 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'"
       doc.head?.prepend(policy)
       const idOf = (node: EventTarget | null) => node && 'nodeType' in node ? player.getMirror().getId(node as Node) : -1
+      const scrolling = bindDomBrowserScroll(doc, idOf, data => relayInput({ type: 'scroll', generation, ...data }))
+      applyHostScroll = data => scrolling.applyHostScroll(data, player.getMirror().getNode(data.id))
       const click = (event: MouseEvent) => {
         if (event.button !== 0) { event.preventDefault(); return }
         const target = event.target as Element | null, id = idOf(target)
@@ -145,19 +147,6 @@ export function DomBrowserPanel({ url, navigationRequest = 0, onClose }: { url: 
         if (event.key !== 'Tab') event.preventDefault()
         relayInput({ type: 'key', generation, key: event.key, ctrlKey: event.ctrlKey, metaKey: event.metaKey, altKey: event.altKey, shiftKey: event.shiftKey })
       }
-      const scroll = (event: Event) => {
-        const target = event.target, id = idOf(target)
-        if (id < 0) return
-        clearTimeout(scrollTimers.get(id))
-        scrollTimers.set(id, setTimeout(() => {
-          scrollTimers.delete(id)
-          const element = target === doc ? doc.scrollingElement : target as Element | null
-          if (!element) return
-          const x = Math.round(element.scrollLeft), y = Math.round(element.scrollTop), position = `${x}:${y}`
-          if (reportedScrolls.get(id) === position) return
-          reportedScrolls.set(id, position); relayInput({ type: 'scroll', generation, id, x, y })
-        }, 60))
-      }
       const submit = (event: Event) => event.preventDefault()
       doc.addEventListener('click', click, true)
       doc.addEventListener('focusin', focus, true)
@@ -166,13 +155,13 @@ export function DomBrowserPanel({ url, navigationRequest = 0, onClose }: { url: 
       doc.addEventListener('change', input, true)
       doc.addEventListener('compositionend', input, true)
       doc.addEventListener('keydown', key, true)
-      doc.addEventListener('scroll', scroll, true)
       doc.addEventListener('submit', submit, true)
       unbind = () => {
+        scrolling.dispose(); applyHostScroll = () => {}
         doc.removeEventListener('click', click, true); doc.removeEventListener('auxclick', submit, true)
         doc.removeEventListener('focusin', focus, true)
         doc.removeEventListener('input', input, true); doc.removeEventListener('change', input, true); doc.removeEventListener('compositionend', input, true)
-        doc.removeEventListener('keydown', key, true); doc.removeEventListener('scroll', scroll, true); doc.removeEventListener('submit', submit, true)
+        doc.removeEventListener('keydown', key, true); doc.removeEventListener('submit', submit, true)
       }
       snapshotGeneration = generation; updateReady()
     }
@@ -210,10 +199,24 @@ export function DomBrowserPanel({ url, navigationRequest = 0, onClose }: { url: 
             replay.wrapper.querySelector<HTMLElement>('.replayer-mouse')?.style.setProperty('display', 'none')
             replay.enableInteract()
             const generation = replayGeneration
-            replay.on('fullsnapshot-rebuilded', () => bindReplay(generation))
+            replay.on('fullsnapshot-rebuilded', event => {
+              bindReplay(generation)
+              const snapshot = event as Extract<eventWithTime, { type: EventType.FullSnapshot }>
+              applyHostScroll({ id: snapshot.data.node.id, x: snapshot.data.initialOffset.left, y: snapshot.data.initialOffset.top })
+            })
+            replay.on('custom-event', event => {
+              const custom = event as Extract<eventWithTime, { type: EventType.Custom }>
+              if (custom.data.tag === 'mew-dom-scroll') applyHostScroll(custom.data.payload as DomBrowserScroll)
+            })
             replay.startLive()
           }
-          for (const event of message.events) replay.addEvent(event as eventWithTime)
+          for (const event of message.events) {
+            const recorded = event as eventWithTime
+            // Keep scroll ordering with DOM mutations while bypassing rrweb's smooth scroll.
+            replay.addEvent(recorded.type === EventType.IncrementalSnapshot && recorded.data.source === IncrementalSource.Scroll
+              ? { type: EventType.Custom, timestamp: recorded.timestamp, data: { tag: 'mew-dom-scroll', payload: recorded.data } }
+              : recorded)
+          }
         }
       } catch { setError(uiText('브라우저 화면을 복원하지 못했습니다. 다시 연결해 주세요.')) }
     }
@@ -221,7 +224,6 @@ export function DomBrowserPanel({ url, navigationRequest = 0, onClose }: { url: 
     ws.onclose = () => { if (!disposed) { interactionReady.current = false; setConnection('closed'); setError(current => current || uiText('연결이 끊겼습니다. 다시 연결해 주세요.')) } }
     return () => {
       disposed = true; interactionReady.current = false; unbind(); observer.disconnect(); clearTimeout(resizeTimer)
-      for (const timer of scrollTimers.values()) clearTimeout(timer)
       ws.onopen = null; ws.onmessage = null; ws.onerror = null; ws.onclose = null
       if (socket.current === ws) socket.current = null
       ws.close(); replay?.destroy()

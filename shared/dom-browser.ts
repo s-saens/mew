@@ -6,7 +6,7 @@ export type DomBrowserCommand =
   | { type: 'click'; generation: number; id: number }
   | { type: 'focus'; generation: number; id: number }
   | { type: 'input'; generation: number; id: number; value: string; checked?: boolean }
-  | { type: 'scroll'; generation: number; id: number; x: number; y: number }
+  | { type: 'scroll'; generation: number; id: number; x: number; y: number; scrollRevision?: number }
   | { type: 'key'; generation: number; key: string; ctrlKey?: boolean; metaKey?: boolean; altKey?: boolean; shiftKey?: boolean }
   | { type: 'back' | 'forward' | 'reload' }
 

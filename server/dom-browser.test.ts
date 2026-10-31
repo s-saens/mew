@@ -55,9 +55,78 @@ test('DOM browser rejects external addresses, credentials, Mew ports, and malfor
   assert.equal(domBrowserTarget('http://127.0.0.2:3000', new Set([5000])).hostname, '127.0.0.2')
   assert.equal(domBrowserTarget('http://127.1:3000', new Set([5000])).hostname, '127.0.0.1')
   for (const command of [{ type: 'input', id: -1, value: '' }, { type: 'resize', width: 1, height: 1 }, { type: 'key', key: 'Control+Escape' }, { type: 'scroll', id: 1, x: null, y: 0 }, { type: 'key', key: 'Enter', ctrlKey: 'true' }]) assert.throws(() => parseDomBrowserCommand(JSON.stringify(command)))
+  for (const scrollRevision of [0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1, '1', null]) assert.throws(() => parseDomBrowserCommand(JSON.stringify({ type: 'scroll', generation: 1, id: 1, x: 0, y: 100, scrollRevision })))
+  for (const scrollRevision of [1, Number.MAX_SAFE_INTEGER]) assert.equal((parseDomBrowserCommand(JSON.stringify({ type: 'scroll', generation: 1, id: 1, x: 0, y: 100, scrollRevision })) as { scrollRevision: number }).scrollRevision, scrollRevision)
+  assert.deepEqual(parseDomBrowserCommand('{"type":"scroll","generation":1,"id":1,"x":0,"y":100}'), { type: 'scroll', generation: 1, id: 1, x: 0, y: 100 })
   assert.deepEqual(parseDomBrowserCommand('{"type":"key","generation":1,"key":"Enter","ctrlKey":true}'), { type: 'key', generation: 1, key: 'Enter', ctrlKey: true })
   assert.equal(remotePath(DOM_BROWSER_WS, true), true)
   assert.equal(remotePath(DOM_BROWSER_WS, true, 'port-preview'), false)
+})
+
+test('host scrolls apply instantly, echo viewer revisions per node, and reset revisions after document or SPA history navigation', { timeout: 45_000, skip: !domBrowserExecutable() }, async t => {
+  let documentRequests = 0
+  const fixture = http.createServer((req, res) => {
+    if (req.headers['sec-fetch-dest'] === 'document') documentRequests++
+    res.setHeader('content-type', 'text/html')
+    res.end('<!doctype html><html><head><style>.scroller{height:100px;overflow:auto;scroll-behavior:smooth}.scroller>div{height:1000px}</style></head><body><button id="host-scroll" onclick="document.querySelector(\'#first\').scrollTo({top:300,behavior:\'instant\'})">Host scroll</button><button id="route" onclick="history.pushState({},\'\',\'/next\')">SPA route</button><div id="first" class="scroller"><div>first</div></div><div id="second" class="scroller"><div>second</div></div></body></html>')
+  })
+  const target = await start(fixture); t.after(() => stop(fixture))
+  const host = http.createServer(); attachDomBrowserWebSocket(host, () => owner)
+  const origin = await start(host); t.after(async () => { await closeDomBrowsers(); await stop(host) })
+  const client = connection(origin); await once(client.ws, 'open'); t.after(() => client.ws.terminate())
+  const node = (from: number, id: string) => client.wait(() => findNode(client.messages.slice(from), entry => (entry.attributes as Record<string, unknown> | undefined)?.id === id), `recorded node ${id}`)
+  const scroll = (from: number, id: number) => client.wait(() => findNode(client.messages.slice(from), entry => entry.source === 3 && entry.id === id), `scroll event for ${id}`)
+  client.send({ type: 'navigate', url: target })
+  const firstId = Number((await node(0, 'first')).id), secondId = Number((await node(0, 'second')).id)
+  const beforeFirst = client.messages.length
+  client.send({ type: 'scroll', id: firstId, x: 0, y: 200, scrollRevision: 7 })
+  const first = await scroll(beforeFirst, firstId)
+  assert.equal(first.y, 200, 'the first scroll event already has the final coordinate despite smooth CSS')
+  assert.equal(first.scrollRevision, 7)
+  const beforeSecond = client.messages.length
+  client.send({ type: 'scroll', id: secondId, x: 0, y: 250, scrollRevision: 8 })
+  assert.equal((await scroll(beforeSecond, secondId)).scrollRevision, 8)
+  const beforeHost = client.messages.length
+  client.send({ type: 'click', id: Number((await node(0, 'host-scroll')).id) })
+  const hostScroll = await scroll(beforeHost, firstId)
+  assert.equal(hostScroll.y, 300)
+  assert.equal(hostScroll.scrollRevision, 7, 'other nodes do not replace this node\'s last viewer revision')
+  const beforeLegacy = client.messages.length
+  client.send({ type: 'scroll', id: firstId, x: 0, y: 400 })
+  const legacy = await scroll(beforeLegacy, firstId)
+  assert.equal(legacy.y, 400)
+  assert.equal(legacy.scrollRevision, undefined, 'legacy input does not reuse an earlier viewer revision')
+  const beforeLastRevision = client.messages.length
+  client.send({ type: 'scroll', id: firstId, x: 0, y: 450, scrollRevision: 9 })
+  assert.equal((await scroll(beforeLastRevision, firstId)).scrollRevision, 9)
+  const beforeReload = client.messages.length
+  client.send({ type: 'reload' })
+  await node(beforeReload, 'first')
+  const beforeFreshHost = client.messages.length
+  client.send({ type: 'click', id: Number((await node(beforeReload, 'host-scroll')).id) })
+  const fresh = await scroll(beforeFreshHost, firstId)
+  assert.equal(fresh.y, 300)
+  assert.equal(fresh.scrollRevision, undefined, 'a new document starts without revisions for reused node IDs')
+  client.send({ type: 'click', id: Number((await node(beforeReload, 'route')).id) })
+  await client.wait(() => client.messages.findLast(message => message.type === 'state' && message.url === target + '/next'), 'SPA route')
+  const beforeHistoryDocuments = documentRequests
+  for (const [navigation, url, revision] of [['back', target + '/', 1000], ['forward', target + '/next', 2000]] as const) {
+    const beforeRevision = client.messages.length
+    client.send({ type: 'scroll', id: firstId, x: 0, y: 450, scrollRevision: revision })
+    assert.equal((await scroll(beforeRevision, firstId)).scrollRevision, revision)
+    const beforeNavigation = client.messages.length
+    const previousGeneration = client.messages.findLast(message => message.type === 'state')!.generation
+    client.send({ type: navigation })
+    await node(beforeNavigation, 'first')
+    const navigated = await client.wait(() => client.messages.slice(beforeNavigation).findLast(message => message.type === 'state' && !message.loading && message.url === url), `${navigation} state and snapshot`)
+    assert.ok('generation' in navigated && navigated.generation > previousGeneration)
+    const beforeHistoryScroll = client.messages.length
+    client.send({ type: 'click', id: Number((await node(beforeNavigation, 'host-scroll')).id) })
+    const historyScroll = await scroll(beforeHistoryScroll, firstId)
+    assert.equal(historyScroll.y, 300)
+    assert.equal(historyScroll.scrollRevision, undefined, `${navigation} snapshot starts a new viewer revision scope`)
+    assert.equal(documentRequests, beforeHistoryDocuments, `${navigation} remains in the existing SPA document`)
+  }
 })
 
 test('DOM browser websocket requires login, current capability, and the Mew origin', async t => {

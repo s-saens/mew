@@ -42,7 +42,7 @@ export function parseDomBrowserCommand(raw: string): DomBrowserCommand {
   if (value.type === 'resize' && Number.isInteger(value.width) && Number.isInteger(value.height) && value.width >= 240 && value.width <= 3840 && value.height >= 160 && value.height <= 2160) return value
   if ((value.type === 'click' || value.type === 'focus') && id()) return value
   if (value.type === 'input' && id() && typeof value.value === 'string' && value.value.length <= 65536 && (value.checked === undefined || typeof value.checked === 'boolean')) return value
-  if (value.type === 'scroll' && id() && Number.isFinite(value.x) && Number.isFinite(value.y) && Math.abs(value.x) <= 1e7 && Math.abs(value.y) <= 1e7) return value
+  if (value.type === 'scroll' && id() && Number.isFinite(value.x) && Number.isFinite(value.y) && Math.abs(value.x) <= 1e7 && Math.abs(value.y) <= 1e7 && (!Object.hasOwn(value, 'scrollRevision') || (typeof value.scrollRevision === 'number' && Number.isSafeInteger(value.scrollRevision) && value.scrollRevision > 0))) return value
   if (value.type === 'key' && generation() && typeof value.key === 'string' && /^(Enter|Tab|Backspace|Delete|Escape|Arrow(Up|Down|Left|Right)|Home|End|Page(Up|Down)| |[a-zA-Z0-9])$/.test(value.key) && ['ctrlKey', 'metaKey', 'altKey', 'shiftKey'].every(key => !Object.hasOwn(value, key) || typeof (value as unknown as Record<string, unknown>)[key] === 'boolean')) return value
   if (['back', 'forward', 'reload'].includes(value.type)) return value
   throw new Error('잘못된 브라우저 요청입니다.')
@@ -185,10 +185,11 @@ class DomBrowserSession {
     })
     await page.addInitScript({ content: `${recordBundle()}; if (window === window.top) {
       const documentToken = crypto.randomUUID();
+      window.__mewDomScrollRevisions = new Map();
       window.open = url => { if (url) window.location.assign(String(url)); return null; };
       document.addEventListener('click', event => { const anchor = event.target?.closest?.('a[target]'); if (anchor) anchor.target = '_self'; }, true);
       document.addEventListener('submit', event => { if (event.target?.target) event.target.target = '_self'; }, true);
-      window.__mewDomRecord = rrwebRecord.record; rrwebRecord.record({ emit: event => { void window.__mewDomEmit(documentToken, event).catch(() => {}); }, inlineStylesheet: true, inlineImages: true, collectFonts: true, recordCanvas: false, maskAllInputs: false, maskInputOptions: { password: false }, sampling: { mousemove: false }, recordCrossOriginIframes: false });
+      window.__mewDomRecord = rrwebRecord.record; rrwebRecord.record({ emit: event => { if (event.type === 3 && event.data.source === 3) { const revision = window.__mewDomScrollRevisions.get(event.data.id); if (revision !== undefined) event.data.scrollRevision = revision; } void window.__mewDomEmit(documentToken, event).catch(() => {}); }, inlineStylesheet: true, inlineImages: true, collectFonts: true, recordCanvas: false, maskAllInputs: false, maskInputOptions: { password: false }, sampling: { mousemove: false }, recordCrossOriginIframes: false });
     }` })
     page.on('domcontentloaded', () => { this.loading = false; void this.sendState() })
     page.on('framenavigated', frame => {
@@ -309,6 +310,7 @@ class DomBrowserSession {
       this.generation++
       this.loading = true; await this.sendState()
       try {
+        await page.evaluate('window.__mewDomScrollRevisions?.clear()').catch(() => {})
         if (command.type === 'navigate') await page.goto(command.url, { waitUntil: 'domcontentloaded' })
         else if (command.type === 'back') await page.goBack({ waitUntil: 'domcontentloaded' })
         else if (command.type === 'forward') await page.goForward({ waitUntil: 'domcontentloaded' })
@@ -337,7 +339,7 @@ class DomBrowserSession {
       await page.evaluate(`(() => { const c = ${JSON.stringify(command)}; const e = window.__mewDomRecord?.mirror.getNode(c.id); if (!e || e.nodeType !== 1) return; if (e.type === 'file') return; e.focus?.(); if (e.isContentEditable) e.textContent = c.value; else { const proto = e.tagName === 'TEXTAREA' ? HTMLTextAreaElement.prototype : e.tagName === 'SELECT' ? HTMLSelectElement.prototype : HTMLInputElement.prototype; Object.getOwnPropertyDescriptor(proto, 'value')?.set?.call(e, c.value); if (typeof c.checked === 'boolean') Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'checked')?.set?.call(e, c.checked); } e.dispatchEvent(new Event('input', {bubbles:true})); e.dispatchEvent(new Event('change', {bubbles:true})); })()`)
       return
     }
-    if (command.type === 'scroll') await page.evaluate(`(() => { const n = window.__mewDomRecord?.mirror.getNode(${command.id}); const e = n?.nodeType === 9 ? n.scrollingElement : n; e?.scrollTo?.(${command.x}, ${command.y}); })()`)
+    if (command.type === 'scroll') await page.evaluate(`(() => { const c = ${JSON.stringify(command)}; const n = window.__mewDomRecord?.mirror.getNode(c.id); const e = n?.nodeType === 9 ? n.scrollingElement : n; if (!e) return; if (c.scrollRevision === undefined) window.__mewDomScrollRevisions.delete(c.id); else window.__mewDomScrollRevisions.set(c.id, c.scrollRevision); e.scrollTo?.({left: c.x, top: c.y, behavior: 'instant'}); })()`)
   }
 
   async close(): Promise<void> {
