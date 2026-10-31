@@ -165,12 +165,20 @@ export function useCollab(project: string, path: string | null, authEmail: strin
 
       socket.onclose = () => reconnect(socket)
     }
+    const reconnectAfterRemoteRecovery = () => {
+      if (cancelled || retryTimer === null || ws !== null) return
+      clearTimeout(retryTimer)
+      retryTimer = null
+      connect()
+    }
+    window.addEventListener('mew:remote-reconnected', reconnectAfterRemoteRecovery)
     connect()
 
     return () => {
       cancelled = true
       if (retryTimer) clearTimeout(retryTimer)
       clearSyncTimer()
+      window.removeEventListener('mew:remote-reconnected', reconnectAfterRemoteRecovery)
       awareness.setLocalState(null)
       ws?.close()
       awareness.destroy()

@@ -1,6 +1,6 @@
 ---
 title: "Fast verified Mewlink recovery on foreground return"
-description: "Accepts a fresh bounded P2P read probe on foreground return, immediate replacement of unresponsive or expired connections, RTT-aware deadlines, verified app retry acceleration, and focus preservation without relaxing identity or lease checks."
+description: "Accepts a fresh bounded P2P read probe on foreground return, immediate replacement of unresponsive or expired connections, RTT-aware deadlines, verified panel and collaboration retry acceleration, and focus preservation without relaxing identity or lease checks."
 created: "2026-10-31"
 updated: "2026-10-31"
 ---
@@ -18,7 +18,7 @@ After background suspension, the browser can still report an open signaling sock
 - On visible, pageshow, or online return, coalesce events and check the retained authenticated P2P path with a fresh random-ID `HEAD` request through the existing request quota. Only a response for this new probe proves the round trip; queued old data and signaling renewal acknowledgments do not.
 - Start the failure deadline after the probe is sent. Use 250ms by default, increasing it within a one-second ceiling for a known slower selected ICE path. Read RTT statistics concurrently so missing or late statistics do not block the default decision. If quota admission or local backpressure prevents the probe, cancel only that check and retain ordinary recovery.
 - Replace an unresponsive peer through the existing bootstrap, browser key, ticket, and same-account authentication checks. Already-expired authorization starts fresh recovery immediately. Bind both monotonic and wall-clock expiry to request transmission, including renewal and signaling reattachment, so queued acknowledgments after sleep cannot extend an expired lease.
-- After verified replacement, emit one app-local `mew:remote-reconnected` event. Pending agent and presence subscription retries may bypass their existing delays; connected, connecting, exhausted, terminal, and unauthorized states retain their guards. No prompt, save, or command is replayed.
+- After verified replacement, emit one app-local `mew:remote-reconnected` event. Pending agent, presence, and collaboration subscription retries may bypass their existing delays; connected, connecting, exhausted, terminal, and unauthorized states retain their guards where applicable. Collaboration retains its existing Y.Doc, unsent changes, and undo history through its normal sync protocol. No prompt, save, or command is replayed.
 - Preserve the same app and drafts. Restore the previously focused input only when it remains connected and the parent still permits restoring app focus; keep the inert and authentication gates during replacement.
 
 ## Alternatives and rationale

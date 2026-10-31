@@ -9,6 +9,8 @@ test('collab recovers stalled handshakes and sync without losing local edits', {
 import React from ${JSON.stringify(import.meta.resolve('react'))};
 import {createRoot} from ${JSON.stringify(import.meta.resolve('react-dom/client'))};
 import {useCollab} from ${JSON.stringify(new URL('../src/hooks/useCollab.ts', import.meta.url).pathname)};
+import * as Y from ${JSON.stringify(import.meta.resolve('yjs'))};
+window.createUndo=()=>new Y.UndoManager(window.collab.ydoc.getText('draft'));
 function Fixture(){
   const [path,setPath]=React.useState('file.md');
   window.changePath=setPath;
@@ -37,9 +39,9 @@ root.render(<Fixture/>);`
       window.sockets=[];
       window.WebSocket=class {
         static OPEN=1;
-        readyState=0;
+        readyState=0;sent=[];
         constructor(){window.sockets.push(this)}
-        send(){}
+        send(bytes){this.sent.push(Array.from(bytes))}
         close(){this.readyState=3}
         open(){this.readyState=1;this.onopen?.({})}
         message(bytes){this.onmessage?.({data:new Uint8Array(bytes).buffer})}
@@ -53,6 +55,7 @@ root.render(<Fixture/>);`
     await page.waitForFunction('window.collab && window.sockets.length === 1')
     await page.evaluate(`(() => {
       window.originalDoc=window.collab.ydoc;
+      window.undo=window.createUndo();
       window.collab.ydoc.getText('draft').insert(0,'unsent edit');
       window.lateMessage=window.sockets[0].onmessage;
     })()`)
@@ -66,22 +69,40 @@ root.render(<Fixture/>);`
     assert.equal(await page.evaluate('window.collab.synced'), false, 'late responses and syncStep1 must not complete initial sync')
     await page.clock.runFor(10_600)
     assert.equal(await page.evaluate('window.sockets.length'), 3, 'an open socket with no document response must also retry')
-    await page.evaluate('window.sockets[2].open(); window.sockets[2].message([0,1,2,0,0])')
+    await page.evaluate(`window.dispatchEvent(new Event('mew:remote-reconnected'))`)
+    assert.equal(await page.evaluate('window.sockets.length'), 3, 'verified recovery cannot replace a socket that is already connecting')
+    await page.evaluate(`window.sockets[2].disconnect();window.dispatchEvent(new Event('online'));
+      window.collab.ydoc.getText('draft').insert(11,' while disconnected')`)
+    assert.equal(await page.evaluate('window.sockets.length'), 3, 'network availability does not bypass verified Mewlink readiness')
+    for (const count of [4, 5, 6]) {
+      await page.evaluate(`window.dispatchEvent(new Event('mew:remote-reconnected'));window.dispatchEvent(new Event('mew:remote-reconnected'))`)
+      assert.equal(await page.evaluate('window.sockets.length'), count, 'verified recovery opens exactly one socket without advancing its pending backoff')
+      assert.equal(await page.evaluate('window.sockets.at(-1).sent.length'), 0, 'recovery never replays application operations before the new socket opens')
+      if (count < 6) await page.evaluate('window.sockets.at(-1).disconnect()')
+    }
+    await page.clock.runFor(3000)
+    assert.equal(await page.evaluate('window.sockets.length'), 6, 'the canceled three-second retry cannot open a duplicate socket')
+    await page.evaluate('window.sockets[5].open(); window.sockets[5].message([0,1,2,0,0])')
     await page.getByText('connected', { exact: true }).waitFor()
     assert.equal(await page.evaluate('window.collab.ydoc === window.originalDoc'), true)
+    assert.equal(await page.evaluate("window.collab.ydoc.getText('draft').toString()"), 'unsent edit while disconnected')
+    await page.evaluate(`window.dispatchEvent(new Event('mew:remote-reconnected'));window.undo.undo()`)
+    assert.equal(await page.evaluate('window.sockets.length'), 6, 'verified recovery cannot replace an open synchronized socket')
     assert.equal(await page.evaluate("window.collab.ydoc.getText('draft').toString()"), 'unsent edit')
+    await page.evaluate('window.undo.redo()')
+    assert.equal(await page.evaluate("window.collab.ydoc.getText('draft').toString()"), 'unsent edit while disconnected', 'the same undo history survives reconnection')
     await page.clock.runFor(30_000)
-    assert.equal(await page.evaluate('window.sockets.length'), 3, 'successful sync cancels the deadline')
-    await page.evaluate('window.sockets[2].disconnect()')
+    assert.equal(await page.evaluate('window.sockets.length'), 6, 'successful sync cancels the deadline')
+    await page.evaluate('window.sockets[5].disconnect()')
     await page.clock.runFor(300)
-    assert.equal(await page.evaluate('window.sockets.length'), 4, 'successful sync resets the reconnect backoff')
+    assert.equal(await page.evaluate('window.sockets.length'), 7, 'successful sync resets the reconnect backoff')
     await page.evaluate("window.changePath('other.md')")
-    await page.waitForFunction('window.sockets.length === 5')
+    await page.waitForFunction('window.sockets.length === 8')
     assert.equal(await page.evaluate('window.staleDocExposed === true'), false, 'a new path must never receive the previous room document, including the render before effects')
     assert.equal(await page.evaluate('window.originalDoc.isDestroyed'), true, 'path changes retire the previous document')
-    await page.evaluate('window.unmount()')
+    await page.evaluate(`window.sockets[7].disconnect();window.unmount();window.dispatchEvent(new Event('mew:remote-reconnected'))`)
     await page.clock.runFor(20_000)
-    assert.equal(await page.evaluate('window.sockets.length'), 5, 'unmount cancels pending recovery')
+    assert.equal(await page.evaluate('window.sockets.length'), 8, 'unmount cancels pending retries and removes the verified recovery listener')
     assert.deepEqual(errors, [])
   } finally { await browser.close() }
 })
