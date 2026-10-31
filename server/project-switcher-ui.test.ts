@@ -69,6 +69,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
       await page.keyboard.press('Alt+1')
       await page.waitForFunction('window.active==="/alpha"')
     }
+    await page.setViewportSize({ width: 1100, height: 600 })
     await page.evaluate('window.activations=[]')
 
     assert.equal(await trigger.textContent(), 'alpha')

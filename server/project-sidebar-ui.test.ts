@@ -9,7 +9,7 @@ import { domBrowserExecutable } from './browser-dom-executable.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 
-test('desktop projects remain in a resizable workspace panel while mobile keeps the project dropdown', { skip: !domBrowserExecutable(), timeout: 60_000 }, async () => {
+test('desktop projects remain in a resizable workspace panel while mobile opens a full-screen panel', { skip: !domBrowserExecutable(), timeout: 60_000 }, async () => {
   const source = `import React,{useEffect,useState} from '${root}/node_modules/react/index.js';
 import {createRoot} from '${root}/node_modules/react-dom/client.js';
 import {ProjectSwitcher} from '${root}/src/components/ProjectSwitcher.tsx';
@@ -27,7 +27,7 @@ const [host,setHost]=useState(null),[open,setOpen]=useState(()=>localStorage.get
 const [enabled,setEnabled]=useState(true),[dialog,setDialog]=useState(false),[maximized,setMaximized]=useState(false);
 const {width,restoreWidth,startResize}=usePanelWidth('fixture:projects-width',{min:200,max:360,initial:240});
 useEffect(()=>{const q=matchMedia('(min-width:768px)'),update=()=>setDesktop(q.matches);q.addEventListener('change',update);return()=>q.removeEventListener('change',update)},[]);
-window.active=active;window.setEnabled=setEnabled;window.setDialog=setDialog;window.setMaximized=setMaximized;
+window.active=active;window.setEnabled=setEnabled;window.setDialog=setDialog;window.setMaximized=setMaximized;window.setPaths=setPaths;
 const showing=desktop&&open&&enabled;
 const changeOpen=value=>{setOpen(value);localStorage.setItem('fixture:projects-open',value?'1':'0')};
 return <main className="mew-workspace flex h-screen flex-col overflow-hidden bg-surface text-ink">
@@ -208,10 +208,52 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     await sidebar.waitFor({ state: 'detached' })
     await trigger.click()
     await menu.waitFor()
-    assert.equal(await menu.locator('.mew-project-command').count(), 0, 'mobile keeps the original project menu rows')
-    assert.equal((await surface(menu)).blur, 'blur(6px)', 'mobile dropdowns retain the gradient popup treatment')
-    const mobileBox = await menu.boundingBox(); assert.ok(mobileBox && mobileBox.x >= 0 && mobileBox.x + mobileBox.width <= 390)
+    const mobilePanel = page.getByRole('dialog', { name: '프로젝트', exact: true })
+    assert.equal(await trigger.getAttribute('aria-haspopup'), 'dialog')
+    assert.equal(await mobilePanel.getAttribute('aria-modal'), 'true')
+    assert.equal(await trigger.getAttribute('aria-controls'), await mobilePanel.locator('[data-mobile-project-panel]').getAttribute('id'))
+    assert.equal(await menu.locator('.mew-project-command').count(), 0)
+    assert.equal((await surface(menu)).blur, 'none', 'mobile project rows use the inline panel surface')
+    const mobileBox = await mobilePanel.boundingBox()
+    assert.deepEqual(mobileBox, { x: 0, y: 0, width: 390, height: 700 }, 'the mobile panel covers the complete screen')
+    assert.equal(await option('/alpha').evaluate(el => el === el.ownerDocument.activeElement), true)
     await page.screenshot({ path: '/tmp/mew-project-sidebar-mobile.png' })
+    await page.keyboard.press('Alt+p')
+    assert.equal(await option('/alpha').evaluate(el => el === el.ownerDocument.activeElement), true)
+    await mobilePanel.getByRole('button', { name: '프로젝트 · 닫기', exact: true }).focus()
+    await page.keyboard.press('Shift+Tab')
+    assert.equal(await mobilePanel.getByRole('menuitem', { name: '프로젝트 추가', exact: true }).evaluate(el => el === el.ownerDocument.activeElement), true, 'Tab stays within the full-screen panel')
+    await page.keyboard.press('Tab')
+    assert.equal(await mobilePanel.getByRole('button', { name: '프로젝트 · 닫기', exact: true }).evaluate(el => el === el.ownerDocument.activeElement), true)
+    await option('/alpha').focus()
+    await page.keyboard.press('Shift+F10')
+    await page.getByRole('menuitem', { name: '삭제', exact: true }).waitFor()
+    await page.keyboard.press('Escape')
+    assert.equal(await mobilePanel.isVisible(), true, 'Escape dismisses only the nested project action menu')
+    assert.equal(await option('/alpha').evaluate(el => el === el.ownerDocument.activeElement), true)
+    await page.keyboard.press('Shift+F10')
+    await page.getByRole('menuitem', { name: '삭제', exact: true }).waitFor()
+    await page.goBack()
+    await page.getByRole('menuitem', { name: '삭제', exact: true }).waitFor({ state: 'detached' })
+    assert.equal(await mobilePanel.isVisible(), true, 'Back preserves the parent project panel')
+    const savedOrder = await order()
+    await page.evaluate('window.setPaths(Array.from({length:60},(_,i)=>"/long/project-"+i))')
+    for (const viewport of [{ width: 320, height: 568 }, { width: 767, height: 400 }]) {
+      await page.setViewportSize(viewport)
+      assert.deepEqual(await mobilePanel.boundingBox(), { x: 0, y: 0, ...viewport })
+      assert.equal(await menu.evaluate(el => el.scrollHeight > el.clientHeight), true, 'long lists scroll inside the panel')
+      await menu.getByRole('menuitem', { name: '프로젝트 추가', exact: true }).scrollIntoViewIfNeeded()
+      const addBox = await menu.getByRole('menuitem', { name: '프로젝트 추가', exact: true }).boundingBox()
+      assert.ok(addBox && addBox.y >= 44 && addBox.y + addBox.height <= viewport.height)
+      assert.equal(await mobilePanel.getByRole('button', { name: '프로젝트 · 닫기', exact: true }).isVisible(), true)
+    }
+    await page.evaluate(`window.setPaths(${JSON.stringify(savedOrder)})`)
+    await page.setViewportSize({ width: 390, height: 700 })
+    await mobilePanel.getByRole('button', { name: '프로젝트 · 닫기', exact: true }).tap()
+    assert.equal(await mobilePanel.count(), 0)
+    assert.equal(await trigger.evaluate(el => el === el.ownerDocument.activeElement), true)
+    await trigger.tap()
+    await mobilePanel.waitFor()
     await option('/alpha').click()
     assert.equal(await menu.count(), 0)
     assert.equal(await page.evaluate('window.active'), '/alpha')
@@ -219,6 +261,10 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     await menu.waitFor()
     await page.keyboard.press('Escape')
     assert.equal(await menu.count(), 0)
+    assert.equal(await trigger.evaluate(el => el === el.ownerDocument.activeElement), true)
+    await trigger.tap()
+    await page.goBack()
+    await mobilePanel.waitFor({ state: 'detached' })
     assert.equal(await trigger.evaluate(el => el === el.ownerDocument.activeElement), true)
     await trigger.click()
     await page.setViewportSize({ width: 1100, height: 700 })

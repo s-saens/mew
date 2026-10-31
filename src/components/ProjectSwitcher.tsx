@@ -47,7 +47,8 @@ export function ProjectSwitcher({ paths, activePath, pendingPath, fallbackLabel,
   const sidebarList = useRef<HTMLDivElement>(null)
   const contextMenuElement = useRef<HTMLDivElement>(null)
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
-  const [contextMenu, setContextMenu] = useState<{ path: string; x: number; y: number; trigger: HTMLElement | null } | null>(null)
+  const [mobile, setMobile] = useState(() => window.matchMedia('(width < 768px)').matches)
+  const [contextMenu, setContextMenu] = useState<{ path: string; x: number; y: number; trigger: HTMLElement | null; container: HTMLElement | null } | null>(null)
   const [editingPath, setEditingPath] = useState<string | null>(null)
   const iconTitleId = useId()
   const hold = useRef<{ timer: ReturnType<typeof setTimeout>; x: number; y: number } | null>(null)
@@ -56,11 +57,25 @@ export function ProjectSwitcher({ paths, activePath, pendingPath, fallbackLabel,
   const selectionPath = pendingPath ?? activePath
   const showingSidebar = sidebarEnabled && sidebarOpen && canOpen
   const panelId = useId()
+  const mobileTitleId = useId()
   const labels = useMemo(() => {
     const counts = new Map<string, number>()
     for (const path of paths) counts.set(labelOf(path), (counts.get(labelOf(path)) ?? 0) + 1)
     return counts
   }, [paths])
+
+  useEffect(() => {
+    const query = window.matchMedia('(width < 768px)')
+    const update = () => setMobile(query.matches)
+    query.addEventListener('change', update)
+    return () => query.removeEventListener('change', update)
+  }, [])
+
+  function closeMenu() {
+    setContextMenu(null)
+    setMenu(null)
+    trigger.current?.focus({ preventScroll: true })
+  }
 
   function cancelHold() {
     if (hold.current) clearTimeout(hold.current.timer)
@@ -74,7 +89,7 @@ export function ProjectSwitcher({ paths, activePath, pendingPath, fallbackLabel,
   }
   function openContextMenu(path: string, x: number, y: number, origin: HTMLElement | null = trigger.current) {
     cancelHold()
-    setContextMenu({ path, x, y, trigger: origin })
+    setContextMenu({ path, x, y, trigger: origin, container: origin?.closest<HTMLElement>('[role="dialog"]') ?? null })
   }
   function focusSidebar() {
     const first = sidebarList.current?.querySelector<HTMLButtonElement>('[data-project-option]')
@@ -90,6 +105,7 @@ export function ProjectSwitcher({ paths, activePath, pendingPath, fallbackLabel,
       return
     }
     const box = trigger.current.getBoundingClientRect()
+    if (mobile) trigger.current.focus({ preventScroll: true })
     setMenu({ x: box.left, y: box.bottom + 4 })
   }
 
@@ -103,7 +119,7 @@ export function ProjectSwitcher({ paths, activePath, pendingPath, fallbackLabel,
       event.preventDefault()
       event.stopImmediatePropagation()
       const target = event.target instanceof Element ? event.target : document.activeElement
-      if (event.repeat || target?.closest('[role="dialog"], [aria-modal="true"]')) return
+      if (event.repeat || (target?.closest('[role="dialog"], [aria-modal="true"]') && !target.closest('[data-mobile-project-panel]'))) return
       if (chooseMenu) {
         if (sidebarEnabled) {
           onSidebarOpenChange?.(true)
@@ -111,17 +127,18 @@ export function ProjectSwitcher({ paths, activePath, pendingPath, fallbackLabel,
           return
         }
         const box = trigger.current?.getBoundingClientRect()
+        if (mobile && !menuElement.current) trigger.current?.focus({ preventScroll: true })
         if (box) setMenu({ x: box.left, y: box.bottom + 4 })
         menuElement.current?.querySelector<HTMLButtonElement>('[data-action-menu-item]:not(:disabled)')?.focus({ preventScroll: true })
         return
       }
       if (index === null) return
       const path = paths[index]
-      if (path && path !== selectionPath) { setMenu(null); onActivate(path) }
+      if (path && path !== selectionPath) { if (mobile && menuElement.current) closeMenu(); else setMenu(null); onActivate(path) }
     }
     window.addEventListener('keydown', select, true)
     return () => window.removeEventListener('keydown', select, true)
-  }, [paths, selectionPath, canOpen, onActivate, sidebarEnabled, sidebarOpen, onSidebarOpenChange])
+  }, [paths, selectionPath, canOpen, onActivate, sidebarEnabled, sidebarOpen, onSidebarOpenChange, mobile])
 
   useLayoutEffect(() => {
     if (showingSidebar) sidebarList.current?.querySelector<HTMLButtonElement>('[data-project-option]')?.focus({ preventScroll: true })
@@ -154,10 +171,11 @@ export function ProjectSwitcher({ paths, activePath, pendingPath, fallbackLabel,
   function projectItems(inSidebar: boolean) {
     return <ProjectOrder paths={paths} activePath={activePath} onReorder={onReorder} renderItem={(path, move, index) => <>
       <ActionMenuItem style={{ flex: 1, minWidth: 0, width: 'auto' }} data-project-option={path} title={path} aria-keyshortcuts={index < 9 ? `Alt+${index + 1}` : undefined} role="menuitemradio" checked={path === activePath} closeOnSelect={!inSidebar}
+        data-dialog-autofocus={!inSidebar && index === 0 || undefined}
         icon={<span className="flex h-4 w-4 shrink-0 items-center justify-center" aria-hidden="true"><ProjectIcon icon={icons[path] ?? 'i:folder'} size={16} /></span>}
         hint={index < 9 && <kbd className="whitespace-nowrap font-sans text-[11px]">Alt+{index + 1}</kbd>}
         onPointerEnter={() => { if (path !== activePath) onPreview?.(path) }} onFocus={() => { if (path !== activePath) onPreview?.(path) }}
-        onClick={() => { if (path !== selectionPath) onActivate(path) }}
+        onClick={() => { if (mobile && !inSidebar) closeMenu(); if (path !== selectionPath) onActivate(path) }}
         onContextMenu={event => { if (canChangeIcon) { event.preventDefault(); openContextMenu(path, event.clientX, event.clientY, event.currentTarget) } }}
         onKeyDown={event => { if (onReorder && event.shiftKey && (event.key === 'ArrowUp' || event.key === 'ArrowDown')) { event.preventDefault(); event.stopPropagation(); move(event.key === 'ArrowUp' ? -1 : 1); return } if (canChangeIcon && (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10'))) { event.preventDefault(); const box = event.currentTarget.getBoundingClientRect(); openContextMenu(path, box.left, box.bottom, event.currentTarget) } }}>
         <span className="min-w-0 flex-1 text-left"><span className="block truncate">{labelOf(path)}</span>
@@ -175,8 +193,8 @@ export function ProjectSwitcher({ paths, activePath, pendingPath, fallbackLabel,
       {canOpen || canChangeIcon ? <button ref={trigger} type="button" data-project-switcher data-current-project={activePath ?? ''}
         data-header-menu-trigger={canOpen && !sidebarEnabled || undefined}
         aria-keyshortcuts={canOpen ? 'Alt+P' : undefined}
-        aria-label={canOpen ? `${label} — ${t('project.choose')}` : label} aria-haspopup={canOpen && !sidebarEnabled ? 'menu' : undefined} aria-expanded={canOpen ? sidebarEnabled ? showingSidebar : !!menu : undefined}
-        aria-controls={sidebarEnabled && showingSidebar ? panelId : undefined}
+        aria-label={canOpen ? `${label} — ${t('project.choose')}` : label} aria-haspopup={canOpen && !sidebarEnabled ? mobile ? 'dialog' : 'menu' : undefined} aria-expanded={canOpen ? sidebarEnabled ? showingSidebar : !!menu : undefined}
+        aria-controls={sidebarEnabled && showingSidebar ? panelId : mobile && menu ? panelId : undefined}
         title={activePath ?? label} className="flex h-full min-w-0 select-none items-center gap-1.5 px-2.5 text-xs text-ink hover:bg-surface-raised focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
         style={{ WebkitTouchCallout: 'none' }}
         onClick={() => { if (Date.now() >= suppressClickUntil.current) openMenu() }}
@@ -239,12 +257,34 @@ export function ProjectSwitcher({ paths, activePath, pendingPath, fallbackLabel,
           }
         }} />
     </aside>, sidebarHost)}
-    {canOpen && !sidebarEnabled && menu && <ActionMenu ref={menuElement} variant="header" x={menu.x} y={menu.y} label={t('project.choose')} trigger={trigger.current} outsideIgnore={() => contextMenuElement.current} onClose={() => { setContextMenu(null); setMenu(null) }}>
+    {canOpen && !sidebarEnabled && menu && (mobile ? <DialogFrame labelledBy={mobileTitleId} onClose={closeMenu} size="settings" className="mew-mobile-project-panel">
+      <div id={panelId} data-mobile-project-panel className="mew-project-sidebar-body min-h-0">
+        <div className="mew-project-sidebar-heading">
+          <Folder width={14} height={14} aria-hidden="true" />
+          <h2 id={mobileTitleId} className="min-w-0 flex-1 truncate">{t('project.sidebar')}</h2>
+          <PanelCloseButton aria-label={`${t('project.sidebar')} · ${t('common.close')}`} onClick={closeMenu} />
+        </div>
+        <div ref={menuElement} role="menu" data-inline-menu aria-label={t('project.choose')} className="mew-project-sidebar-list"
+          onKeyDown={event => {
+            if (event.defaultPrevented || event.nativeEvent.isComposing || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return
+            const items = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-action-menu-item]:not(:disabled)'))
+            const index = items.indexOf(document.activeElement as HTMLButtonElement)
+            const next = event.key === 'Home' ? 0 : event.key === 'End' ? items.length - 1
+              : event.key === 'ArrowDown' ? (index + 1) % items.length
+              : event.key === 'ArrowUp' ? (index - 1 + items.length) % items.length : null
+            if (next !== null) { event.preventDefault(); items[next]?.focus({ preventScroll: true }) }
+          }}>
+          {projectItems(false)}
+          <div className="mew-project-sidebar-footer"><ActionMenuItem icon={<Plus />} onClick={() => { closeMenu(); onOpen() }}>{t('project.add')}</ActionMenuItem></div>
+        </div>
+      </div>
+    </DialogFrame> : <ActionMenu ref={menuElement} variant="header" x={menu.x} y={menu.y} label={t('project.choose')} trigger={trigger.current} outsideIgnore={() => contextMenuElement.current} onClose={() => { setContextMenu(null); setMenu(null) }}>
       {projectItems(false)}
       {paths.length > 0 && <ActionMenuSeparator />}
       <ActionMenuItem icon={<Plus />} onClick={onOpen}>{t('project.add')}</ActionMenuItem>
-    </ActionMenu>}
-    {contextMenu && canChangeIcon && <ActionMenu key="project-actions" x={contextMenu.x} y={contextMenu.y} label={labelOf(contextMenu.path)} ref={contextMenuElement} trigger={contextMenu.trigger} onClose={() => setContextMenu(null)}>
+    </ActionMenu>)}
+    {contextMenu && canChangeIcon && <ActionMenu key="project-actions" x={contextMenu.x} y={contextMenu.y} label={labelOf(contextMenu.path)} ref={contextMenuElement} trigger={contextMenu.trigger}
+      portalContainer={contextMenu.container} onClose={() => setContextMenu(null)}>
       <ActionMenuItem icon={<EditPencil />} onClick={() => editIcon(contextMenu.path)}>{t('project.edit')}</ActionMenuItem>
       {canOpen && onRemove && <ActionMenuItem icon={<Trash />} danger disabled={contextMenu.path === activePath && !paths.some(path => path !== activePath)} onClick={() => onRemove(contextMenu.path)}>{t('common.delete')}</ActionMenuItem>}
     </ActionMenu>}

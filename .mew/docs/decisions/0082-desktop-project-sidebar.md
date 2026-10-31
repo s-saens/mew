@@ -1,11 +1,11 @@
 ---
 title: "0082 — Desktop project sidebar"
-description: "The decision to move desktop project selection into an independent panel to the left of the file explorer and provide command buttons for each project. Retains the mobile dropdown and existing list sorting, and defines project binding for command requests, root session isolation, and migration limitations for previously running sessions."
+description: "The decision to move desktop project selection into an independent panel to the left of the file explorer and provide command buttons for each project. Originally retained the mobile dropdown, replaced by full-screen selection in subsequent decision 0102. Retains existing list sorting, and defines project binding for command requests, root session isolation, and migration limitations for previously running sessions."
 created: "2026-10-28"
-updated: "2026-10-28"
+updated: "2026-10-31"
 ---
 
-- Status: Adopted
+- Status: Adopted; the retained mobile dropdown is superseded by [0102](0102-mobile-project-panel.md).
 - Partially replaces the desktop dropdown in [0019 — Header project selector](0019-project-selector.md). Retains the mobile dropdown, project path list, and per-account switching and restoration.
 
 ## Background

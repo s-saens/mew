@@ -1,12 +1,12 @@
 ---
 title: "0019 — Header Project Selector"
-description: "Decision to replace the header's project tabs, close, reorder, and group UI with the current project's icon and name and a dropdown selector. The project sidebar in subsequent decision 0082 replaces the desktop list, while the mobile dropdown, path order, restoration on switching, and metadata preparation remain. Access roles and handle-based reordering follow subsequent decisions 0070 and 0071."
+description: "Decision to replace the header's project tabs, close, reorder, and group UI with the current project's icon and name and a dropdown selector. The project sidebar in subsequent decision 0082 replaces the desktop list, and decision 0102 replaces the mobile dropdown with a full-screen panel. Path order, restoration on switching, and metadata preparation remain. Access roles and handle-based reordering follow subsequent decisions 0070 and 0071."
 created: 2026-10-19
-updated: 2026-10-28
+updated: "2026-10-31"
 ---
 
 - Status: Adopted
-- Partially superseded: [0082](0082-desktop-project-sidebar.md) replaces the desktop dropdown with a project sidebar to the left of the file explorer. The mobile dropdown and collapsed header display remain.
+- Partially superseded: [0082](0082-desktop-project-sidebar.md) replaces the desktop dropdown with a project sidebar to the left of the file explorer. The collapsed header display remains. [0102](0102-mobile-project-panel.md) subsequently replaces the mobile dropdown with a full-screen project panel.
 - Subsequent change: [0071](0071-project-list-reorder.md) adds handle-based reordering to the dropdown list. Project tabs and group UI remain removed.
 - Subsequent change: [0070](0070-manager-project-access.md) expands project access from owner-only to owner and manager.
 - Partially supersedes: the UI in [ADR 0004](0004-subproject-folder-exploration.md) that displays projects as separate header tabs. General folder navigation, separate navigation arrows, owner permissions, and per-account active root boundaries remain unchanged.
