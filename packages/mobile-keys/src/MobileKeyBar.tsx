@@ -3,17 +3,19 @@ import { HoverTipLayer } from '@mew/ui'
 import { useUiLocale } from '@mew/ui/i18n'
 import { getVirtualKeyboard, virtualKeyboardViewportBottom } from '@mew/ui/virtual-keyboard'
 import { useEffect, useRef, type ReactNode } from 'react'
+import { useArrowKeyPress } from './useArrowKeyPress'
 // 모바일 입력 영역의 보조키 바 (Termux의 extra keys 같은 역할).
 // 키보드가 떠 있을 때만 쓰는 게 아니라 — 키보드를 내린 채 방향키로 스크롤하거나 Esc를 보내는 데도
 // 쓰므로 — 띄울지 말지는 useMobileLayout(화면 폭)이 정한다.
 // 이 컴포넌트는 Ctrl/Shift 토글 상태만 노출한다. 그 토글을 다음에 입력될 글자에 어떻게 결합할지는
 // 호스트가 정한다 — 터미널은 onData를 가로채고, 에디터는 beforeinput을 가로채 단축키로 처리한다.
-function KeyButton({ label, ariaLabel, active, onClick, stretch = false, floating = false, className = '', children }: { label: string; ariaLabel?: string; active?: boolean; onClick: () => void; stretch?: boolean; floating?: boolean; className?: string; children?: ReactNode }) {
+function KeyButton({ label, ariaLabel, active, onClick, arrow, stretch = false, floating = false, className = '', children }: { label: string; ariaLabel?: string; active?: boolean; onClick: () => void; arrow?: 'up' | 'down' | 'left' | 'right'; stretch?: boolean; floating?: boolean; className?: string; children?: ReactNode }) {
   return (
     <button
       type="button"
       onMouseDown={(e) => e.preventDefault()} // 포커스(=키보드)를 안 뺏기게 — 버튼 탭이 blur를 유발하면 안 됨
-      onClick={onClick}
+      onClick={event => { if (!arrow || event.detail === 0) onClick() }}
+      data-mobile-arrow={arrow}
       aria-label={ariaLabel ?? label}
       data-tip={ariaLabel ?? label}
       aria-pressed={active}
@@ -23,7 +25,7 @@ function KeyButton({ label, ariaLabel, active, onClick, stretch = false, floatin
       } ${active
         ? 'bg-accent text-ink-on-accent active:bg-accent-strong'
         : floating ? 'bg-surface-raised/75 text-ink hover:bg-surface-hover/90 active:bg-surface-hover' : 'bg-surface-raised text-ink-secondary hover:bg-surface-hover active:bg-surface-hover active:text-ink'
-      } ${className}`}
+      } ${arrow ? 'touch-none data-[held]:bg-surface-hover' : ''} ${className}`}
     >
       {children ?? label}
     </button>
@@ -81,12 +83,13 @@ export function MobileKeyBar({
   useUiLocale()
   const floating = placement === 'fixed'
   const arrows = <>
-    <KeyButton stretch={stretch} floating={floating} className={floating ? 'col-start-1 row-start-2' : ''} label="←" onClick={() => onArrow('left')}><KeyIcon><path d="m12 5-7 7 7 7M5 12h14" /></KeyIcon></KeyButton>
-    <KeyButton stretch={stretch} floating={floating} className={floating ? 'col-start-2 row-start-1' : ''} label="↑" onClick={() => onArrow('up')}><KeyIcon><path d="m5 12 7-7 7 7M12 5v14" /></KeyIcon></KeyButton>
-    <KeyButton stretch={stretch} floating={floating} className={floating ? 'col-start-2 row-start-2' : ''} label="↓" onClick={() => onArrow('down')}><KeyIcon><path d="m5 12 7 7 7-7M12 5v14" /></KeyIcon></KeyButton>
-    <KeyButton stretch={stretch} floating={floating} className={floating ? 'col-start-3 row-start-2' : ''} label="→" onClick={() => onArrow('right')}><KeyIcon><path d="m12 5 7 7-7 7M5 12h14" /></KeyIcon></KeyButton>
+    <KeyButton arrow="left" stretch={stretch} floating={floating} className={floating ? 'col-start-1 row-start-2' : ''} label="←" onClick={() => onArrow('left')}><KeyIcon><path d="m12 5-7 7 7 7M5 12h14" /></KeyIcon></KeyButton>
+    <KeyButton arrow="up" stretch={stretch} floating={floating} className={floating ? 'col-start-2 row-start-1' : ''} label="↑" onClick={() => onArrow('up')}><KeyIcon><path d="m5 12 7-7 7 7M12 5v14" /></KeyIcon></KeyButton>
+    <KeyButton arrow="down" stretch={stretch} floating={floating} className={floating ? 'col-start-2 row-start-2' : ''} label="↓" onClick={() => onArrow('down')}><KeyIcon><path d="m5 12 7 7 7-7M12 5v14" /></KeyIcon></KeyButton>
+    <KeyButton arrow="right" stretch={stretch} floating={floating} className={floating ? 'col-start-3 row-start-2' : ''} label="→" onClick={() => onArrow('right')}><KeyIcon><path d="m12 5 7 7-7 7M5 12h14" /></KeyIcon></KeyButton>
   </>
   const barRef = useRef<HTMLDivElement>(null)
+  useArrowKeyPress(barRef, onArrow, placement)
   useEffect(() => {
     if (placement !== 'fixed') return
     const viewport = window.visualViewport

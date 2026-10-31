@@ -3,7 +3,7 @@ import type { DockDirection } from '../utils/mobile-dock'
 
 type TabbedPanel = 'sidebar' | 'editor' | 'agent' | 'terminal' | 'git' | 'tasks'
 const tabbedPanels: readonly string[] = ['sidebar', 'editor', 'agent', 'terminal', 'git', 'tasks']
-const excluded = '.mobile-dock, [data-dock-tab-bar], [role="dialog"], [role="menu"], [role="listbox"], input, textarea, select, [role="slider"], [data-attachment-token], .task-swipe, [data-gantt-grab], .task-gantt-scroller, [data-popup-resize]'
+const excluded = '.mobile-dock, [data-dock-tab-bar], [role="dialog"], [role="menu"], [role="listbox"], input, textarea, select, [role="slider"], [data-attachment-token], [data-mobile-arrow], .task-swipe, [data-gantt-grab], .task-gantt-scroller, [data-popup-resize]'
 
 function swipePanel(target: Element): TabbedPanel | null {
   if (target.closest(excluded)) return null
@@ -48,6 +48,7 @@ export function useMobilePanelSwipe(onSwipe: (panel: TabbedPanel, direction: Doc
       if (!current) return
       if (event.touches.length !== 1 || event.touches[0].identifier !== current.id) { cancel(); return }
       const touch = event.touches[0]
+      if (element.ownerDocument.elementFromPoint(touch.clientX, touch.clientY)?.closest('[data-mobile-arrow]')) { cancel(); return }
       current.lastX = touch.clientX
       current.lastY = touch.clientY
       const dx = current.lastX - current.x, dy = current.lastY - current.y

@@ -1,8 +1,8 @@
 ---
 title: "Editor auxiliary key bar polish"
-description: "Records the 2026-10-30 initial auxiliary-key polish and subsequent replacement of the editor bar surface with rounded translucent floating keys and a rightmost inverted-T arrow cluster. Covers terminal compatibility, local regression checks, and pending application to the running instance."
+description: "Records the 2026-10-30 initial auxiliary-key polish and subsequent replacement of the editor bar surface with rounded translucent floating keys and a rightmost inverted-T arrow cluster. Covers the 2026-10-31 immediate arrow contact, hold repetition, and drag-direction follow-up, terminal compatibility, local regression checks, and pending application to the running instance."
 created: "2026-10-30"
-updated: "2026-10-30"
+updated: "2026-10-31"
 ---
 
 The current contract is [Mobile auxiliary key bar](../development/ui-contracts.md#mobile-auxiliary-key-bar). The initial polish below was followed by the floating editor controls described in the next section.
@@ -39,3 +39,17 @@ Local verification for the follow-up:
 - `npx tsc -b`, targeted `npx oxlint`, the Impeccable detector, and scoped `git diff --check` passed. `npm run check:docs` passed with 580 descriptions and no metadata or local-link errors.
 
 All checks were isolated from the running instance. No app build, deployment, launcher, server startup, or restart was performed. Runtime application and physical-device keyboard verification remain with the user.
+
+## Immediate arrow contact, hold, and drag
+
+On 2026-10-31, changed shared arrow buttons to move on primary pointer contact, repeat after 350ms and every 60ms while held, and immediately change direction when a held pointer enters a different arrow. The same behavior applies to fixed editor keys and terminal flow keys. Empty space pauses repetition; entering an arrow with an already pressed pointer also works. Coordinate hit testing supports touch implicit capture.
+
+The arrow interaction preserves text selection and editor focus. It consumes pointer-generated release clicks, preserves keyboard and assistive activation, and clears repetition on release, cancellation, capture loss, multiple pointers, blur, visibility change, placement change, or unmount. Arrow gestures cannot switch tabs, and swipes entering an arrow cancel tab navigation. Existing ordinary-key swipes remain available. The current contract is [Mobile auxiliary key bar](../development/ui-contracts.md#mobile-auxiliary-key-bar).
+
+Local verification:
+
+- `node --test server/mobile-arrow-keys-ui.test.ts` passed the fixed and flow subtests using a controlled browser clock, mouse input, and real CDP touch input. Coverage includes initial contact, repeat delay and cadence, drag direction changes, gap/reentry, entry after pressing elsewhere, release/cancel, duplicate-click prevention, secondary-button exclusion, focus and selection, keyboard and assistive clicks, tab-swipe exclusion, and blur/visibility/unmount cleanup.
+- `node --test server/mobile-key-bar-ui.test.ts server/mobile-panel-swipe-ui.test.ts server/terminal-keybar-ui.test.ts` passed all three existing compatibility regressions.
+- `npx tsc -b`, scoped oxlint, `npm run check:docs`, and `git diff --check` passed without errors.
+
+Checks use isolated browser fixtures. No app build, deployment, launcher, or running-server operation was performed. User application and physical-device verification remain pending.
