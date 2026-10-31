@@ -45,13 +45,13 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><I18nProvid
   })
   const root = path.resolve(import.meta.dirname, '..')
   const compiler = await compile(await fs.readFile(path.join(root, 'src/index.css'), 'utf8'), { base: path.join(root, 'src'), onDependency() {} })
-  const sources = await Promise.all(['src/components/EditorPane.tsx', 'src/components/TabBar.tsx', 'packages/editor/src/Editor.tsx'].map(file => fs.readFile(path.join(root, file), 'utf8')))
+  const sources = await Promise.all(['src/components/EditorPane.tsx', 'src/components/CodePane.tsx', 'src/components/TabBar.tsx', 'packages/editor/src/Editor.tsx', 'packages/mobile-keys/src/MobileKeyBar.tsx'].map(file => fs.readFile(path.join(root, file), 'utf8')))
   const css = compiler.build([...new Set((source + sources.join('\n')).match(/[A-Za-z0-9_@!:/.[\]()%,-]+/g))]) + styles.join('\n')
   const chunk = bundle.output.find(item => item.type === 'chunk')!
   const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
   try {
     for (const width of [1280, 390]) {
-      const page = await browser.newPage({ viewport: { width, height: 800 } })
+      const page = await browser.newPage({ viewport: { width, height: 800 }, hasTouch: width < 768 })
       const errors: string[] = []
       page.on('pageerror', error => errors.push(error.message))
       await page.route('http://mew-status.test/**', route => {
@@ -65,6 +65,20 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><I18nProvid
       for (const mode of ['Hotview', 'Plain']) {
         await page.getByRole('button', { name: mode, exact: true }).click()
         await page.waitForFunction('document.querySelector("[data-editor-status-bar]")?.textContent.includes(" B")')
+        const keys = page.locator('[data-mobile-key-bar]')
+        if (width < 768) {
+          await keys.waitFor()
+          await page.waitForFunction(`(() => {
+            const keys = document.querySelector('[data-mobile-key-bar]').getBoundingClientRect();
+            const status = document.querySelector('[data-editor-status-bar]').getBoundingClientRect();
+            const body = document.querySelector('.editor-root, .cm-scroller').getBoundingClientRect();
+            return body.bottom <= keys.top + 1 && keys.bottom <= status.top + 1 && status.bottom <= innerHeight;
+          })()`)
+        } else assert.equal(await keys.count(), 0)
+        if (process.env.MEW_EDITOR_SCREENSHOT_DIR) {
+          await fs.mkdir(process.env.MEW_EDITOR_SCREENSHOT_DIR, { recursive: true })
+          await page.screenshot({ path: `${process.env.MEW_EDITOR_SCREENSHOT_DIR}/status-${mode}-${width}.png` })
+        }
         const height = (await status.boundingBox())!.height
         // Hold animation frames to inspect the render before deferred size measurement.
         await page.evaluate(`(() => {
@@ -91,6 +105,8 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><I18nProvid
         })()`)
         await page.waitForFunction('document.querySelector("[data-editor-status-bar]").textContent.trim() === new TextEncoder().encode(window.value).length + " B"')
         assert.equal((await status.boundingBox())!.height, height)
+        await editor.blur()
+        if (width < 768) assert.equal(await keys.isVisible(), true, 'auxiliary keys remain visible outside editor focus')
       }
       assert.deepEqual(errors, [])
       await page.close()

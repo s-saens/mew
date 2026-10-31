@@ -28,7 +28,7 @@ class Socket {
  close(){this.readyState=3;this.onclose?.()}
 }
 window.WebSocket=Socket;
-function EditorFixture(){const host=React.useRef(null);const mobile=useMobileLayout();const [value,setValue]=React.useState('Mobile editing');React.useEffect(()=>observeEditorViewport(host.current,()=>{},true),[]);return <section ref={host} style={{display:'flex',flexDirection:'column',height:'100%',minHeight:0,width:'100%'}}><div style={{flex:1,minHeight:0}}><CodePane path="fixture.txt" value={value} onChange={setValue} readOnly={false} showMobileKeyBar/></div><footer data-editor-status-bar style={{height:16,flexShrink:0}}>File size</footer>{!mobile&&<MobileKeyBar ctrlActive={false} shiftActive={false} onToggleCtrl={()=>{}} onToggleShift={()=>{}} onEsc={()=>{}} onTab={()=>{}} onArrow={()=>{}}/>}</section>}
+function EditorFixture(){const host=React.useRef(null);const mobile=useMobileLayout();const [value,setValue]=React.useState('Mobile editing');React.useEffect(()=>observeEditorViewport(host.current,()=>{},true),[]);return <section ref={host} style={{display:'flex',flexDirection:'column',height:'100%',minHeight:0,width:'100%'}}><div style={{flex:1,minHeight:0}}><CodePane path="fixture.txt" value={value} onChange={setValue} readOnly={false} showMobileKeyBar/></div><footer data-editor-status-bar style={{height:16,flexShrink:0,marginTop:'var(--editor-key-bar-height,0px)'}}>File size</footer>{!mobile&&<MobileKeyBar ctrlActive={false} shiftActive={false} onToggleCtrl={()=>{}} onToggleShift={()=>{}} onEsc={()=>{}} onTab={()=>{}} onArrow={()=>{}}/>}</section>}
 function Fixture(){
  const hidden=useMobileKeyboard(),[editor,setEditor]=React.useState(false);window.setEditor=setEditor;
  React.useEffect(()=>{const stop=observeWorkspaceViewport();window.stopViewport=stop;return stop},[]);
@@ -125,15 +125,16 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
       await editor.fill('Editing above the keyboard')
       const bar = page.locator('[data-mobile-key-bar]')
       await bar.waitFor()
-      await page.waitForFunction('document.querySelector("[data-mobile-key-bar]").getBoundingClientRect().bottom === 480')
-      await page.waitForFunction('document.querySelector("[data-editor-status-bar]").getBoundingClientRect().bottom <= document.querySelector("[data-mobile-key-bar]").getBoundingClientRect().top')
+      await page.waitForFunction('document.querySelector("[data-mobile-key-bar]").getBoundingClientRect().bottom === 464')
+      await page.waitForFunction('document.querySelector("[data-editor-status-bar]").getBoundingClientRect().top >= document.querySelector("[data-mobile-key-bar]").getBoundingClientRect().bottom')
       const status = (await page.locator('[data-editor-status-bar]').boundingBox())!
       const barBounds = (await bar.boundingBox())!
-      assert.ok(status.y + status.height <= barBounds.y, 'editor status remains above the fixed key bar')
+      assert.ok(status.y >= barBounds.y + barBounds.height, 'editor status remains below the fixed key bar')
+      assert.equal(status.y + status.height, 480, 'status remains above the keyboard')
       await page.evaluate('window.coverWithKeyboard(0)')
-      await page.waitForFunction(`document.querySelector('[data-mobile-key-bar]').getBoundingClientRect().bottom === ${width < 768 ? 796 : 844}`)
+      await page.waitForFunction(`document.querySelector('[data-mobile-key-bar]').getBoundingClientRect().bottom === ${width < 768 ? 780 : 828}`)
       await page.evaluate('window.coverWithKeyboard(364)')
-      await page.waitForFunction('document.querySelector("[data-mobile-key-bar]").getBoundingClientRect().bottom === 480')
+      await page.waitForFunction('document.querySelector("[data-mobile-key-bar]").getBoundingClientRect().bottom === 464')
       await page.setViewportSize({ width: 1280, height: 844 })
       await page.waitForFunction('keyboard.overlaysContent === true && document.querySelector("main").getBoundingClientRect().bottom === 480')
       await page.getByRole('navigation', { name: 'Dock' }).waitFor({ state: 'hidden' })
@@ -141,10 +142,10 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
       await page.setViewportSize({ width: 390, height: 844 })
       await page.waitForFunction('keyboard.overlaysContent === true')
       await page.evaluate('window.coverWithKeyboard(364)')
-      await page.waitForFunction('document.querySelector("[data-mobile-key-bar]").getBoundingClientRect().bottom === 480')
+      await page.waitForFunction('document.querySelector("[data-mobile-key-bar]").getBoundingClientRect().bottom === 464')
       await page.locator('main').evaluate(el => el.ownerDocument.exitFullscreen())
       await page.waitForFunction('keyboard.overlaysContent === false')
-      await page.waitForFunction('document.querySelector("[data-mobile-key-bar]").getBoundingClientRect().bottom === 796')
+      await page.waitForFunction('document.querySelector("[data-mobile-key-bar]").getBoundingClientRect().bottom === 780')
       await page.getByRole('navigation', { name: 'Dock' }).waitFor({ state: 'visible' })
       await page.evaluate('window.coverWithKeyboard(0)')
       await page.locator('[data-fullscreen]').click()

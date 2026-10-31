@@ -4,11 +4,11 @@ parent: "mew-editor"
 title: "Markdown Hotview, source, and document properties"
 status: "implemented"
 created: "2026-09-18"
-updated: "2026-10-30"
+updated: "2026-10-31"
 status_hash: "2741d359b18c61eecb53b8ce0ba2862f0f42c088d7d02cf55c88a23d1d44a98e"
 files: ["packages/editor/src/editor/FrontmatterSelect.tsx", "server/frontmatter-options.ts", "src/hooks/useTabs.ts", "src/components/EditorPane.tsx", "src/components/markdown-error-boundary.tsx", "packages/editor/src/Editor.tsx", "packages/editor/src/editor/FrontmatterPanel.tsx", "src/components/TableOfContents.tsx"]
 commits: []
-description: "A feature contract covering Markdown Hotview and Plain editing, per-block computation caching and Pretext-based DOM virtualization, preservation of code-block line breaks and internal horizontal scrolling, retaining the line being read when switching views and cursor restoration boundaries in the properties area, checkboxes, document tables of contents, frontmatter properties, and navigation through backlinks and parent-file arrows beside the title. Includes parent-file exclusion, cross-project references, YAML preservation, native mobile keyboard activation through body taps, and source-saving boundaries."
+description: "A feature contract covering Markdown Hotview and Plain editing, per-block computation caching and Pretext-based DOM virtualization, preservation of code-block line breaks and internal horizontal scrolling, retaining the line being read when switching views and cursor restoration boundaries in the properties area, checkboxes, document tables of contents, frontmatter properties, and navigation through backlinks and parent-file arrows beside the title. Includes parent-file exclusion, cross-project references, YAML preservation, native mobile keyboard activation through body taps, always-visible mobile auxiliary keys above the status row, and source-saving boundaries."
 상위파일:
   - "MOC.md"
   - "_document-code-media-editing.md"
@@ -22,6 +22,7 @@ description: "A feature contract covering Markdown Hotview and Plain editing, pe
 
 - Repeated Hotview computations use per-block caches, and with 120 or more top-level blocks, Pretext height prediction avoids creating DOM for off-screen content. Cursor, selection, and IME positions and the full editing and collaboration model are preserved.
 - Provides Hotview/Plain switching, headings, lists, checkboxes, quotes, code blocks, and emphasis.
+- On mobile, Hotview and Plain auxiliary keys remain visible before focus and after blur or keyboard dismissal. The file-size/selection status row sits below the keys and above the Dock or keyboard. Embedded hosts retain their explicit visibility option. See [Mobile auxiliary key bar](../../development/ui-contracts.md#mobile-auxiliary-key-bar).
 - Hotview code blocks preserve original line breaks, spaces, and tabs. Long lines do not wrap automatically and scroll horizontally within the block, with the same behavior on mobile and in read-only mode. The copy button remains fixed at the block's upper right.
 - Typing `[] ` or `[ ] ` at the beginning of a line creates a checkbox line. Click to toggle completion, press Enter to continue the list, or return to a normal paragraph from an empty item.
 - Provides frontmatter property editing, a document table of contents, and list indentation.

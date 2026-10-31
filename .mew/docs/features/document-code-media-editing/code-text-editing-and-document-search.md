@@ -4,11 +4,11 @@ parent: "mew-editor"
 title: "Code and text editing and in-document search"
 status: "implemented"
 created: "2026-09-18"
-updated: "2026-10-30"
+updated: "2026-10-31"
 status_hash: "4d8fe6026b3341576de674bb4b2ae85cd1124f3eb3638b2e33e15d8697ed1fc1"
 files: ["src/components/EditorPane.tsx", "src/hooks/useTabs.ts", "src/components/CodePane.tsx", "src/utils/codeSearch.ts", "src/utils/code-search-panel.ts", "src/utils/code-pinch-zoom.ts", "packages/editor/src/editor/EditorSearchBar.tsx"]
 commits: []
-description: "A feature contract covering line numbers, syntax highlighting, supported diagnostics for code and plain text, compact Find and collapsible Replace controls, result counts, search options, and keyboard behavior. Explains touch pinch zoom, immediate native mobile keyboard activation through body taps, floating Plain auxiliary keys with a rightmost inverted-T arrow cluster, and tab switching that preserves body horizontal scrolling."
+description: "A feature contract covering line numbers, syntax highlighting, supported diagnostics for code and plain text, compact Find and collapsible Replace controls, result counts, search options, and keyboard behavior. Explains touch pinch zoom, immediate native mobile keyboard activation through body taps, always-visible mobile auxiliary keys above the status bar with a rightmost inverted-T arrow cluster, and tab switching that preserves body horizontal scrolling."
 상위파일:
   - "MOC.md"
   - "_document-code-media-editing.md"
@@ -27,7 +27,7 @@ description: "A feature contract covering line numbers, syntax highlighting, sup
 - On mobile, tapping an editable Hotview, Plain, or code body focuses it immediately and lets the browser open the keyboard. There is no floating keyboard button or separate activation step. Moving the cursor or using auxiliary keys does not force keyboard dismissal; native selection and the existing selection menu remain available. See [Mobile Editor and Keyboard](../../development/ui-contracts.md#mobile-editor-and-keyboard).
 
 - When the mobile keyboard opens, reduce the editor height to keep the tapped cursor line and the status bar showing the selected character count and file size above the keyboard.
-- The mobile Plain editor displays the shared auxiliary keys even when the keyboard is closed. Esc, Tab, Ctrl, Shift, and undo and redo for editable files appear as individual rounded translucent floating buttons without an enclosing bar surface. The arrow keys sit at the far right in an inverted T, with Up above Left/Down/Right. Layout and focus follow [Mobile auxiliary key bar](../../development/ui-contracts.md#mobile-auxiliary-key-bar). Horizontal scrolling in the body does not switch tabs; only swiping left or right on the auxiliary-key area selects the previous or next tab. Markdown Plain follows the same rules.
+- The mobile Plain editor displays the shared auxiliary keys before editor focus and after blur or keyboard dismissal. The file-size and selection status row sits below the auxiliary keys and above the Dock or keyboard. Esc, Tab, Ctrl, Shift, and undo and redo for editable files appear as individual rounded translucent floating buttons without an enclosing bar surface. The arrow keys sit at the far right in an inverted T, with Up above Left/Down/Right. Layout and focus follow [Mobile auxiliary key bar](../../development/ui-contracts.md#mobile-auxiliary-key-bar). Horizontal scrolling in the body does not switch tabs; only swiping left or right on the auxiliary-key area selects the previous or next tab. Markdown Plain follows the same rules.
 
 ### Boundaries and limitations
 
@@ -57,7 +57,7 @@ description: "A feature contract covering line numbers, syntax highlighting, sup
 ## Implementation details
 
 - Reposition the focused cursor after mobile viewport or editor height changes, and restore the height when the keyboard closes. The detailed contract follows [Mobile Editor and Keyboard](../../development/ui-contracts.md#mobile-editor-and-keyboard).
-- `EditorPane` enables the shared `MobileKeyBar` in `CodePane` and reserves space below the status bar. Modifier keys use CodeMirror's existing keymaps and collaborative undo. Panel swipes are owned by [Panel layout and mobile](../appearance-accounts-operations/panel-layout-mobile-and-state-restoration.md).
+- `EditorPane` enables the shared `MobileKeyBar` in `CodePane` and reserves its measured height above the status bar. Modifier keys use CodeMirror's existing keymaps and collaborative undo. Panel swipes are owned by [Panel layout and mobile](../appearance-accounts-operations/panel-layout-mobile-and-state-restoration.md).
 
 - Displays line numbers, syntax highlighting, and diagnostics for supported formats.
 - `src/utils/codeSearch.ts` connects the dedicated panel in `src/utils/code-search-panel.ts` to the CodeMirror search extension. Search and replace commands and state use CodeMirror, while panel layout, options, and result counts are displayed through the Mew UI.

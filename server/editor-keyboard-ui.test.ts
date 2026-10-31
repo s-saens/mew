@@ -22,7 +22,7 @@ function Fixture(){
  const host=React.useRef(null); React.useEffect(()=>observeEditorViewport(host.current,()=>{},true),[]);
  const handle=React.useRef(null); window.value=value; window.handle=handle;
  return <><header style={{height:40}}><button onClick={()=>setMode('hotview')}>Hotview</button><button onClick={()=>setMode('plain')}>Plain</button><button onClick={()=>setValue(${JSON.stringify(content)})}>Reset</button></header>
- <main ref={host} style={{display:'flex',flexDirection:'column',height:window.innerHeight-40,position:'relative'}}><div style={{flex:1,minHeight:0}}>{mode==='hotview'?<Editor ref={handle} value={value} onChange={setValue} api={api} path="fixture.md"/>:<CodePane ref={handle} path="fixture.md" value={value} onChange={setValue} readOnly={false} showMobileKeyBar/>}</div><div data-editor-status-bar style={{flexShrink:0,height:16}}>File size · selected characters</div></main>
+ <main ref={host} style={{display:'flex',flexDirection:'column',height:window.innerHeight-40,position:'relative'}}><div style={{flex:1,minHeight:0}}>{mode==='hotview'?<Editor ref={handle} value={value} onChange={setValue} api={api} path="fixture.md"/>:<CodePane ref={handle} path="fixture.md" value={value} onChange={setValue} readOnly={false} showMobileKeyBar/>}</div><div data-editor-status-bar style={{flexShrink:0,height:16,marginTop:'var(--editor-key-bar-height,0px)'}}>File size · selected characters</div></main>
  <div id="keyboard" style={{position:'fixed',left:0,right:0,bottom:0,height:0,background:'#454545',zIndex:100,pointerEvents:'none'}}/></>;
 }
 createRoot(document.getElementById('root')).render(<Fixture/>);`
@@ -72,6 +72,9 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
         const selector = mode === 'hotview' ? '.editor-root' : '.cm-scroller'
         const scroller = page.locator(selector)
         await scroller.waitFor()
+        const keys = page.locator('[data-mobile-key-bar]')
+        if (width < 768) await keys.waitFor({ timeout: 3000 })
+        else assert.equal(await keys.count(), 0, 'desktop editors omit auxiliary keys')
         const target = mode === 'hotview' ? page.locator('.tiptap [data-mew-line-numbers="28"]') : page.locator('.cm-line').filter({ hasText: /^Line 12$/ })
         await target.click()
         // A second touch on the same cursor position need not produce a selection transaction.
@@ -79,7 +82,7 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
         await page.waitForFunction('window.handle.current.getSelectedLineRange().start === 28')
         if (width < 768) await page.waitForFunction(`(() => {
           const bar = document.querySelector('[data-mobile-key-bar]');
-          return bar && document.querySelector('[data-editor-status-bar]').getBoundingClientRect().bottom <= bar.getBoundingClientRect().top;
+          return bar && document.querySelector('[data-editor-status-bar]').getBoundingClientRect().top >= bar.getBoundingClientRect().bottom;
         })()`)
         const original = await scroller.boundingBox()
         if (width >= 768) {
@@ -97,7 +100,7 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
             const cursor=${mode === 'hotview' ? 'window.getSelection().getRangeAt(0).getBoundingClientRect()' : "document.querySelector('.cm-cursor').getBoundingClientRect()"};
             const bar=document.querySelector('[data-mobile-key-bar]')?.getBoundingClientRect();
             const status=document.querySelector('[data-editor-status-bar]').getBoundingClientRect();
-            return status.height===16 && status.bottom<=Math.min(bottom,bar?bar.top:Infinity)+1 && box.bottom<=status.top+1 && box.bottom<=bottom+1 && cursor.top>=Math.max(box.top,viewport.offsetTop) && cursor.bottom<=Math.min(box.bottom,bottom,bar?bar.top:Infinity)-10 && (!bar||bar.bottom<=bottom+1);
+            return status.height===16 && status.bottom<=bottom+1 && (!bar||status.top>=bar.bottom-1) && box.bottom<=Math.min(status.top,bar?bar.top:Infinity)+1 && cursor.top>=Math.max(box.top,viewport.offsetTop) && cursor.bottom<=Math.min(box.bottom,bottom,bar?bar.top:Infinity)-10 && (!bar||bar.bottom<=bottom+1);
           })()`, undefined, { timeout: 5000 })
           assert.equal(await page.evaluate('window.handle.current.getSelectedLineRange().start'), 28)
           assert.equal(await page.evaluate('window.value'), content, 'keyboard layout changes never write to the document')
@@ -115,6 +118,7 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
         await page.setViewportSize({ width, height: 844 })
         await page.waitForFunction(`Math.abs(document.querySelector('${selector}').getBoundingClientRect().height - ${original!.height}) < 1`)
         await page.locator('body').click({ position: { x: width - 1, y: 2 } })
+        assert.equal(await keys.isVisible(), true, 'mobile auxiliary keys remain visible after blur')
         const readingScroll = await scroller.evaluate(el => el.scrollTop)
         await page.evaluate('window.setVisibleViewport(500)')
         await page.waitForTimeout(60)
@@ -126,6 +130,10 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
         await page.locator('.tiptap').click()
         const bar = page.locator('[data-mobile-key-bar]')
         await bar.waitFor()
+        await page.locator('[data-editor-status-bar]').evaluate(el => { el.style.height = '24px' })
+        await page.waitForFunction('document.querySelector("[data-mobile-key-bar]").getBoundingClientRect().bottom === 820')
+        await page.locator('[data-editor-status-bar]').evaluate(el => { el.style.height = '16px' })
+        await page.waitForFunction('document.querySelector("[data-mobile-key-bar]").getBoundingClientRect().bottom === 828')
         await page.locator('#root').evaluate(el => {
           el.classList.add('mew-workspace')
           const dock = el.ownerDocument.createElement('nav')
@@ -138,10 +146,11 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
           await page.locator('#root').evaluate((el, space) => {
             el.style.setProperty('--mobile-dock-space', `${space}px`)
           }, space)
-          await page.waitForFunction(`document.querySelector('[data-mobile-key-bar]').getBoundingClientRect().bottom === ${844 - space}`)
+          await page.waitForFunction(`document.querySelector('[data-mobile-key-bar]').getBoundingClientRect().bottom === ${844 - space - 16}`)
           const dockBox = (await page.locator('.mobile-dock').boundingBox())!
-          assert.equal((await bar.boundingBox())!.y + (await bar.boundingBox())!.height, dockBox.y, 'extra keys sit directly above the dock, including its safe area')
-          await page.waitForFunction('document.querySelector("[data-editor-status-bar]").getBoundingClientRect().bottom <= document.querySelector("[data-mobile-key-bar]").getBoundingClientRect().top')
+          const statusBox = (await page.locator('[data-editor-status-bar]').boundingBox())!
+          assert.equal(statusBox.y + statusBox.height, dockBox.y, 'status sits directly above the dock, including its safe area')
+          assert.equal((await bar.boundingBox())!.y + (await bar.boundingBox())!.height, statusBox.y, 'extra keys sit directly above status')
         }
         await page.locator('#root').evaluate(el => {
           el.style.removeProperty('--mobile-dock-space')
@@ -149,13 +158,13 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
           el.querySelector('.mobile-dock').setAttribute('hidden', '')
         })
         await page.evaluate('window.setVisibleViewport(500)')
-        await page.waitForFunction('document.querySelector("[data-mobile-key-bar]").getBoundingClientRect().bottom === 500')
+        await page.waitForFunction('document.querySelector("[data-mobile-key-bar]").getBoundingClientRect().bottom === 484')
         await page.evaluate('window.setVisibleViewport(null)')
         await page.locator('#root').evaluate(el => {
           el.removeAttribute('data-mobile-keyboard')
           el.querySelector('.mobile-dock').removeAttribute('hidden')
         })
-        await page.waitForFunction('document.querySelector("[data-mobile-key-bar]").getBoundingClientRect().bottom === document.querySelector(".mobile-dock").getBoundingClientRect().top')
+        await page.waitForFunction('document.querySelector("[data-editor-status-bar]").getBoundingClientRect().bottom === document.querySelector(".mobile-dock").getBoundingClientRect().top')
       }
       assert.deepEqual(errors, [])
       await page.close()

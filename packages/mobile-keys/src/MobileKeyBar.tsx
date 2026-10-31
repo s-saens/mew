@@ -95,7 +95,7 @@ export function MobileKeyBar({
     const originalBottom = bar?.style.bottom ?? ''
     const update = () => {
       const bottom = Math.min((viewport?.offsetTop ?? 0) + (viewport?.height ?? window.innerHeight), virtualKeyboardViewportBottom())
-      if (bar) bar.style.bottom = `max(var(--mobile-dock-space, 0px), ${Math.max(0, window.innerHeight - bottom)}px)`
+      if (bar) bar.style.bottom = `calc(max(var(--mobile-dock-space, 0px), ${Math.max(0, window.innerHeight - bottom)}px) + var(--editor-status-bar-height, 0px))`
     }
     update()
     viewport?.addEventListener('resize', update)

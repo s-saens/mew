@@ -388,7 +388,6 @@ export const Editor = forwardRef<
     position: { top: number; bottom: number; left: number }
     selectedIndex: number
   } | null>(null)
-  const [editorFocused, setEditorFocused] = useState(false)
   // /db 참조 커맨드로 여는 데이터베이스 선택 모달 — pos는 삽입 위치(문서 좌표)
   const [dbPicker, setDbPicker] = useState<{ pos: number } | null>(null)
   // 표 우클릭 메뉴 — pos는 표 노드 시작 위치, cellDom은 행·열 삽입 기준 셀
@@ -409,7 +408,7 @@ export const Editor = forwardRef<
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchSeed, setSearchSeed] = useState<{ q?: string; n: number }>({ n: 0 })
   const mobileLayout = useMobileLayout()
-  const mobileKeyBarVisible = mobileLayout && editorFocused && showMobileKeyBar
+  const mobileKeyBarVisible = mobileLayout && showMobileKeyBar
   useEffect(() => {
     if (showMobileKeyBar) return
     setKeyBarCtrl(false)
@@ -816,8 +815,6 @@ export const Editor = forwardRef<
       updateSelectedChars(editor)
       scheduleCaretVisibility(editor)
     },
-    onFocus: () => setEditorFocused(true),
-    onBlur: () => setEditorFocused(false),
     onSelectionUpdate: ({ editor }) => {
       updateMentionState(editor)
       updateSlashState(editor)
@@ -2295,7 +2292,7 @@ export const Editor = forwardRef<
       {/* 보조키 바는 스크롤 컨테이너 바닥에 붙는다. 상태줄은 파일 종류를 가리지 않아야 해서
           이 컴포넌트 밖(EditorPane)으로 나갔다 — 여기 남기면 md 문서에만 뜬다. */}
       <div className="sticky bottom-0 z-20 shrink-0">
-        {/* 기본은 모바일 폭·포커스를 따르며, 팝업 등 호스트가 키보드 상태로 제한할 수 있다. */}
+        {/* 모바일에서는 항상 표시하며, 팝업 등 호스트가 표시 상태를 제한할 수 있다. */}
         {mobileKeyBarVisible && (
           <MobileKeyBar
             ctrlActive={keyBarCtrl}

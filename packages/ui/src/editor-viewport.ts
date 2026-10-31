@@ -22,17 +22,49 @@ export function observeEditorViewport(container: HTMLElement, onResize: () => vo
   const viewport = win.visualViewport
   const keyboard = getVirtualKeyboard(win)
   const originalMaxHeight = container.style.maxHeight
+  const reservationProperties = ['--editor-key-bar-height', '--editor-status-bar-height'] as const
+  const originalReservations = reservationProperties.map(name => container.style.getPropertyValue(name))
+  const restoreReservations = () => {
+    if (reserveKeyBar) reservationProperties.forEach((name, index) => {
+      if (originalReservations[index]) container.style.setProperty(name, originalReservations[index])
+      else container.style.removeProperty(name)
+    })
+  }
+  let measuredBar: HTMLElement | null = null, measuredStatus: HTMLElement | null = null
   let frame: number | null = null
   const update = () => {
     frame = null
-    if (!usesTouchKeyboard(win) || viewportZoomRatio(win) !== 1) {
+    if (!usesTouchKeyboard(win)) {
       container.style.maxHeight = originalMaxHeight
+      restoreReservations()
       return
     }
     const bottom = Math.min((viewport?.offsetTop ?? 0) + (viewport?.height ?? win.innerHeight), virtualKeyboardViewportBottom(win))
     const bar = reserveKeyBar ? container.querySelector<HTMLElement>('[data-mobile-key-bar]') : null
-    const barTop = bar && win.getComputedStyle(bar).position === 'fixed' ? bar.getBoundingClientRect().top : bottom
-    const height = Math.max(0, Math.min(bottom, barTop) - container.getBoundingClientRect().top)
+    const status = reserveKeyBar ? container.querySelector<HTMLElement>('[data-editor-status-bar]') : null
+    if (bar !== measuredBar) {
+      if (measuredBar) observer.unobserve(measuredBar)
+      if (bar) observer.observe(bar)
+      measuredBar = bar
+    }
+    if (status !== measuredStatus) {
+      if (measuredStatus) observer.unobserve(measuredStatus)
+      if (status) observer.observe(status)
+      measuredStatus = status
+    }
+    const fixedBar = bar && win.getComputedStyle(bar).position === 'fixed' && bar.getBoundingClientRect().height > 0
+    const statusHeight = fixedBar && status ? status.getBoundingClientRect().height : 0
+    if (reserveKeyBar) {
+      container.style.setProperty('--editor-status-bar-height', `${statusHeight}px`)
+      container.style.setProperty('--editor-key-bar-height', `${status && fixedBar ? bar.getBoundingClientRect().height : 0}px`)
+    }
+    if (viewportZoomRatio(win) !== 1) {
+      container.style.maxHeight = originalMaxHeight
+      return
+    }
+    // Reserve the keys before the status row; both must fit above the keyboard or Dock.
+    const availableBottom = fixedBar ? status ? bar.getBoundingClientRect().bottom + statusHeight : bar.getBoundingClientRect().top : bottom
+    const height = Math.max(0, Math.min(bottom, availableBottom) - container.getBoundingClientRect().top)
     const maxHeight = `${height}px`
     if (container.style.maxHeight !== maxHeight) container.style.maxHeight = maxHeight
     onResize()
@@ -75,5 +107,6 @@ export function observeEditorViewport(container: HTMLElement, onResize: () => vo
     container.removeEventListener('focusin', schedule)
     if (frame !== null) win.cancelAnimationFrame(frame)
     container.style.maxHeight = originalMaxHeight
+    restoreReservations()
   }
 }
