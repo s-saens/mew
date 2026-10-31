@@ -1,4 +1,4 @@
-// 에이전트 런타임별 기본 모델·권한 모드. 에이전트 창 헤더의 저장 버튼이 현재 값을 여기 남기고,
+// 계정별로 보관하는 런타임 기본 모델·권한 모드. 기본값 API로 관리하며,
 // 새 ACP 세션은 session/new·session/load 직후 이 값을 다시 적용한다.
 // 계정별 서버 데이터 폴더에 저장하므로 브라우저·서버 재시작 뒤에도 남는다.
 import { agentSettingsPath } from './agent-account-settings.ts'

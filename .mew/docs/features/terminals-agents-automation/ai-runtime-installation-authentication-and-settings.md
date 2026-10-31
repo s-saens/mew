@@ -4,11 +4,11 @@ parent: "mew-agents"
 title: "AI runtime installation, authentication, and execution settings"
 status: "implemented"
 created: "2026-09-18"
-updated: "2026-10-20"
+updated: "2026-10-31"
 status_hash: "ce50d3fa70fce93520dfd200e419db9b718cebd2b370a52a9250e624fc80aed1"
 files: ["src/components/RuntimeInstallProgress.tsx", "src/components/AgentPanel.tsx", "src/components/RuntimeSettingsModal.tsx", "src/components/agentRuntimes.tsx", "server/agentRuntimes.ts", "server/agentRuntimeInstall.ts", "server/agentDefaults.ts"]
 commits: []
-description: "Feature contract covering supported agent runtime selection, installation progress logs, removal, authentication, and defaults for models, effort, and permissions. Describes ACP and official CLI interfaces, along with provider-specific settings and authentication support."
+description: "Feature contract covering supported agent runtime selection, installation progress logs, removal, authentication, and retained defaults for models, effort, and permissions, plus the composer button’s replacement with saved prompt drafts. Describes ACP and official CLI interfaces, along with provider-specific settings and authentication support."
 상위파일:
   - "MOC.md"
   - "_terminals-agents-automation.md"
@@ -41,7 +41,7 @@ description: "Feature contract covering supported agent runtime selection, insta
 
 - The runtime settings dialog appears above the list through the shared `DialogFrame` body portal, and interactions inside it do not close the dropdown behind it.
 
-- The input field's save-default icon is centered in a transparent container with the same height as the adjacent dropdown.
+- The input field's Save icon is centered in a transparent container with the same height as the adjacent dropdown. It now manages [saved prompt drafts](agent-input-mentions-skills-and-attachments.md#saved-prompt-drafts). Existing runtime defaults and their API remain available to session initialization.
 
 - Provides runtime selection, supported installation/removal, login/logout, execution settings, and defaults for models, reasoning, and permissions.
 - `AgentPanel` groups Codex's composite model list by base model. `AgentSession` synchronizes supported effort levels and actual model IDs on model changes, Thinking changes, and ACP configuration updates ([display contract](agent-conversations-queue-and-restoration.md#model-and-effort-selection)).
@@ -56,7 +56,7 @@ description: "Feature contract covering supported agent runtime selection, insta
 
 - Verify that the runtime list's settings dialog is not obscured by the list and remains open when interacting with input, save, and delete/logout confirmation dialogs.
 
-- Verify that the save-default icon matches the height and centerline of the model, effort, and permission dropdowns.
+- Verify that the prompt Save icon matches the height and centerline of the model, effort, and permission dropdowns.
 
 - The following items are user verification criteria, not results of tests run during this documentation cleanup:
   - Review whether supported runtime selection, authentication status, and model defaults match the actual selections and whether failure causes are available.

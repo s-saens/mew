@@ -1,6 +1,7 @@
 import { useAgentControlSelection } from '../hooks/use-agent-control-selection'
 import { useAgentPromptFeedback } from '../hooks/use-agent-prompt-feedback'
 import { HeaderSelect } from './agent-header-select'
+import { AgentPromptDrafts } from './agent-prompt-drafts'
 import { RuntimeInstallProgress } from './RuntimeInstallProgress'
 import { AgentAttachmentIcon } from './agent-attachment-icon'
 import { attachmentKind, conversationAttachments, uploadedAttachmentTokens, withoutAttachmentTokens } from '../utils/agent-attachments'
@@ -88,7 +89,6 @@ import {
 import { DEFAULT_RUNTIME_ID, RUNTIMES, runtimeOf } from './agentRuntimes'
 import {
   cancelAgentScheduledPrompt,
-  fetchAgentDefault,
   fetchAgentAuthTerminalStatus,
   fetchAgentTabs,
   fetchAgentCwdSuggestions,
@@ -105,14 +105,12 @@ import {
   openLoginDesktop,
   closeLoginDesktop,
   submitAgentAuthBrowserInput,
-  saveAgentDefault,
   saveAgentTabs,
   scheduleAgentPrompt,
   startAgentTerminal,
   stopAgentTerminal,
   updateAgentScheduledPrompt,
   uploadInto,
-  type AgentRuntimeDefault,
   type AgentRuntimeStatus,
   type AgentSessionClaim,
   type AgentCwdSuggestions,
@@ -2366,8 +2364,6 @@ function AgentSessionView({
   const [authTerminalOpen, setAuthTerminalOpen] = useState(false)
   const [loadingSession, setLoadingSession] = useState<string | null>(null)
   const [newConversationPending, setNewConversationPending] = useState(false)
-  const [savedDefault, setSavedDefault] = useState<AgentRuntimeDefault | null>(null)
-  const [savingDefault, setSavingDefault] = useState(false)
   const [now, setNow] = useState(() => Date.now())
   const wsRef = useRef<WebSocket | null>(null)
   const authBrowserDismissedRef = useRef(false)
@@ -3658,16 +3654,6 @@ function AgentSessionView({
         thinking: thinkingOptions.find(option => option.id === thinkingId)?.label ?? thinkingId ?? '—' } }
     })
   }
-  const currentDefault = useMemo<AgentRuntimeDefault | null>(() => {
-    const modelId = models?.currentModelId
-    const modeId = modes?.currentModeId
-    const thinkingId = thinking?.currentValue
-    return modelId || thinkingId || modeId ? { ...(modelId ? { modelId } : {}), ...(thinkingId ? { thinkingId } : {}), ...(modeId ? { modeId } : {}) } : null
-  }, [models?.currentModelId, modes?.currentModeId, thinking?.currentValue])
-  const defaultIsSaved = currentDefault !== null
-    && (savedDefault?.modelId ?? null) === (currentDefault.modelId ?? null)
-    && (savedDefault?.thinkingId ?? null) === (currentDefault.thinkingId ?? null)
-    && (savedDefault?.modeId ?? null) === (currentDefault.modeId ?? null)
   // meta가 오기 전 = 에이전트 프로세스가 아직 뜨는 중이다(질문은 그동안에도 받아 둔다 — 서버가 줄을 세운다)
   const status = !connected
     ? uiText("연결 중")
@@ -3718,32 +3704,6 @@ function AgentSessionView({
       alive = false
     }
   }, [])
-
-  useEffect(() => {
-    let alive = true
-    fetchAgentDefault(runtime)
-      .then(({ settings }) => {
-        if (alive) setSavedDefault(settings)
-      })
-      .catch(() => {
-        if (alive) setSavedDefault(null)
-      })
-    return () => {
-      alive = false
-    }
-  }, [runtime])
-
-  const saveCurrentDefault = () => {
-    if (!currentDefault || savingDefault) return
-    setSavingDefault(true)
-    saveAgentDefault(runtime, currentDefault)
-      .then(({ settings }) => setSavedDefault(settings))
-      .catch((err: unknown) => {
-        const detail = err instanceof Error ? err.message : String(err)
-        setErrorDetail({ title: uiText("에이전트 기본값 저장 실패"), detail })
-      })
-      .finally(() => setSavingDefault(false))
-  }
 
   const [mentionTrigger, setMentionTrigger] = useState<string | null>(null)
   const [documentsMentionTree, setDocumentsMentionTree] = useState<TreeNode[]>([])
@@ -4430,9 +4390,25 @@ function AgentSessionView({
             }}
           />
           <div className="flex h-7 shrink-0 items-center justify-center">
-            <div className="flex h-5 w-8 items-center justify-center bg-transparent">
-              <button type="button" onClick={saveCurrentDefault} disabled={!!editingQueued || !currentDefault || savingDefault} className={`flex h-full w-full items-center justify-center rounded hover:bg-surface-raised hover:text-ink disabled:opacity-40 ${defaultIsSaved ? 'text-accent' : 'text-ink-secondary'}`} aria-label={uiText("현재 모델·추론 정도·권한을 기본값으로 저장")} title={savingDefault ? uiText("기본값 저장 중…") : defaultIsSaved ? uiText("{p0}의 저장된 기본값입니다", { p0: currentRuntime.label }) : uiText("현재 모델·추론 정도·권한을 {p0} 기본값으로 저장", { p0: currentRuntime.label })}><SaveGlyph /></button>
-            </div>
+            <AgentPromptDrafts workspace={notificationWorkspace} text={draft} cliMode={cliMode}
+              attachments={draftAttachments.map(queuedAttachmentInput)}
+              disabled={!visible || !!editingQueued || composerAttaching || cli.submitting} allowTerminal={allowTerminal}
+              onRestore={prompt => {
+                historyIndexRef.current = null
+                historyDraftRef.current = ''
+                setDraft(prompt.text)
+                setCliMode(prompt.cliMode && allowTerminal)
+                setAttachments(prompt.attachments.map(file => ({
+                  project: file.project, relPath: file.path, mimeType: file.mimeType, image: file.image,
+                  extension: attachmentExtension(file.path), isImage: attachmentKind(file.mimeType, file.path) === 'image',
+                })))
+                requestAnimationFrame(() => {
+                  agentInputRef.current?.focus()
+                  agentInputRef.current?.setSelectionRange(prompt.text.length, prompt.text.length)
+                })
+              }}
+              onError={() => setErrorDetail({ title: uiText('프롬프트 임시저장 실패'), detail: uiText('브라우저 저장 공간을 확인하고 다시 시도하세요.') })}
+            />
           </div>
           <div className="flex flex-col gap-1.5">
             <button type="button" onPointerDown={keepFocusOnPress} onClick={() => {

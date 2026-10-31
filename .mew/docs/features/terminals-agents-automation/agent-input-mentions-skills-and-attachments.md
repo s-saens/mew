@@ -4,11 +4,11 @@ parent: "mew-agents"
 title: "Agent Input, Mentions, Skills, and Attachments"
 status: "implemented"
 created: "2026-09-18"
-updated: "2026-10-30"
+updated: "2026-10-31"
 status_hash: "a10e27bcc06cebe98975858548ff907b5953bfbcf197fe2ef971d9294144858f"
-files: ["src/components/AgentPanel.tsx", "src/components/MentionTextarea.tsx", "src/components/agent-composer-input.tsx", "src/components/agent-composer-attachments.tsx", "src/components/agent-media-preview-dialog.tsx", "src/utils/agent-composer-document.ts", "src/components/drawing/DrawingEditor.tsx", "src/utils/clipboard-images.ts", "src/utils/agentInputMentions.ts", "server/skills.ts"]
+files: ["src/components/AgentPanel.tsx", "src/components/agent-prompt-drafts.tsx", "src/utils/agent-saved-prompts.ts", "src/components/MentionTextarea.tsx", "src/components/agent-composer-input.tsx", "src/components/agent-composer-attachments.tsx", "src/components/agent-media-preview-dialog.tsx", "src/utils/agent-composer-document.ts", "src/components/drawing/DrawingEditor.tsx", "src/utils/clipboard-images.ts", "src/utils/agentInputMentions.ts", "server/skills.ts"]
 commits: []
-description: "Feature contract covering project, file, and folder @mentions and autocomplete lists in agent input, /skill selection, circular upload indicators for attachment tags inserted at the cursor and moved by mouse drag or touch long press without mobile tab switching, and inline attachments within user message bubbles after sending. Explains Enter focus return and Ctrl/Cmd+Enter submission from model, reasoning, and permission selectors, mobile keyboard image pasting, photo and video popup previews, input history, input resizing, CLI switching, queue editing, entry points for SVG history and PNG attachments from the drawing tool, candidate scope, attachment storage in `.mew/temp/assets`, and compatibility boundaries for existing references."
+description: "Feature contract covering project, file, and folder @mentions and autocomplete lists in agent input, /skill selection, circular upload indicators for attachment tags inserted at the cursor and moved by mouse drag or touch long press without mobile tab switching, and inline attachments within user message bubbles after sending. Explains Enter focus return and Ctrl/Cmd+Enter submission from model, reasoning, and permission selectors, mobile keyboard image pasting, photo and video popup previews, input history, manually saved prompt drafts, input resizing, CLI switching, queue editing, entry points for SVG history and PNG attachments from the drawing tool, candidate scope, attachment storage in `.mew/temp/assets`, and compatibility boundaries for existing references."
 상위파일:
   - "MOC.md"
   - "_terminals-agents-automation.md"
@@ -37,6 +37,16 @@ description: "Feature contract covering project, file, and folder @mentions and 
 - [Vector drawing tool and saved history](agent-drawing-editor.md)
 
 ## Detailed behavior
+
+### Saved prompt drafts
+
+The Save icon above the attachment button saves the current prompt and opens the saved prompt list. With an empty input it only opens the list. Selecting an entry restores its exact text, completed attachment metadata and image bytes, and CLI mode to the composer without sending it. Saving leaves the current input intact, and an identical snapshot is moved to the top instead of duplicated. Each entry has a separate Delete action. Saving the current input before showing the list preserves it when another entry is loaded. Runtime model, effort, and permission selections remain the current selections; this button no longer writes runtime defaults.
+
+Saved prompts are scoped to the current account, instance, browser, and logical project root through `scopedBrowserStorage`, under `mew:agent-saved-prompts:<JSON root path>`. They are shared by that project's agent tabs and survive sends, tab closure, and refresh. They are separate from tab-specific automatic input drafts and sent-input history, are not transferred between devices, and are not automatically expired or evicted as cache. Attachment references still depend on their original files remaining available. Storage failure preserves existing entries and shows an error; it never reports a successful save. Browser storage capacity limits apply, including image bytes.
+
+Disable this control while attachments are uploading, a CLI submission is pending, or a queued message is being edited. CLI drafts cannot be loaded without terminal permission. The shared action menu supplies keyboard navigation, Escape/Back and outside dismissal, viewport bounds, and trigger focus restoration; loading a prompt returns focus to the composer. Local verification and application limits are in the [work record](../../work/agent-prompt-drafts.md).
+
+### Composer input
 
 When a model, reasoning level, or permission selector above the agent input has keyboard focus, Enter returns focus to the input without sending. If its dropdown is open, Enter first confirms the highlighted option and closes the list. Ctrl+Enter or Cmd+Enter closes any open list, returns focus to the input, and invokes the same submit action as the input shortcut, using the selected settings rather than an unconfirmed search result. This also preserves CLI execution and pending queue save behavior, including their existing submission guards. Ignore composition events and repeated Enter events for these shortcuts. Shift+Tab navigation, arrow-key selection, and opening a list with Space or a pointer remain available.
 

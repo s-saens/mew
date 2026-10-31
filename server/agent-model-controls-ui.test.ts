@@ -56,7 +56,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><AgentPanel pro
   }] })
   const chunk = bundle.output.find(item => item.type === 'chunk')!
   const compiler = await compile(await fs.readFile(`${root}/src/index.css`, 'utf8'), { base: `${root}/src`, onDependency() {} })
-  const content = (await Promise.all(['src/components/AgentPanel.tsx', 'src/components/agent-header-select.tsx', 'src/components/MentionTextarea.tsx', 'src/components/DockWorkspace.tsx'].map(file => fs.readFile(`${root}/${file}`, 'utf8')))).join('\n')
+  const content = (await Promise.all(['src/components/AgentPanel.tsx', 'src/components/agent-header-select.tsx', 'src/components/agent-prompt-drafts.tsx', 'src/components/MentionTextarea.tsx', 'src/components/DockWorkspace.tsx'].map(file => fs.readFile(`${root}/${file}`, 'utf8')))).join('\n')
   const css = compiler.build([...new Set((source + content).match(/[A-Za-z0-9_@!:/.[\]()%,-]+/g))])
   const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
   try {
@@ -64,7 +64,9 @@ createRoot(document.getElementById('root')).render(<I18nProvider><AgentPanel pro
       const page = await browser.newPage({ viewport: { width, height: 844 } })
       page.setDefaultTimeout(4000)
       const errors: string[] = []
+      const defaultWrites: string[] = []
       page.on('pageerror', error => errors.push(error.message))
+      page.on('request', request => { if (request.method() === 'PUT' && request.url().includes('/agent-defaults/')) defaultWrites.push(request.url()) })
       await page.route('http://mew-models.test/**', route => {
         const pathname = new URL(route.request().url()).pathname
         if (pathname === '/app.js') return route.fulfill({ contentType: 'text/javascript', body: chunk.code })
@@ -105,6 +107,47 @@ createRoot(document.getElementById('root')).render(<I18nProvider><AgentPanel pro
         continue
       }
       const draft = page.locator('[contenteditable="true"][aria-placeholder="텍스트 입력"]')
+      const savePrompt = page.getByRole('button', { name: '프롬프트 임시저장', exact: true })
+      await draft.fill('보관할 프롬프트')
+      await savePrompt.click()
+      const savedPrompts = page.getByRole('menu', { name: '저장한 프롬프트', exact: true })
+      await savedPrompts.waitFor()
+      assert.equal(await savedPrompts.getByRole('menuitem', { name: '프롬프트 불러오기: 보관할 프롬프트', exact: true }).count(), 1)
+      const promptBox = await savedPrompts.boundingBox()
+      assert.ok(promptBox && promptBox.x >= 0 && promptBox.x + promptBox.width <= width && promptBox.y >= 0)
+      if (runtime === 'codex') await page.screenshot({ path: `/tmp/mew-agent-saved-prompts-${width}.png` })
+      await page.keyboard.press('Escape')
+      await savePrompt.click()
+      assert.equal(await savedPrompts.getByRole('menuitem', { name: /^프롬프트 불러오기:/ }).count(), 1, 'repeated saves do not create duplicates')
+      await page.keyboard.press('Escape')
+      await draft.fill('')
+      await page.reload()
+      await model.filter({ hasText: 'Astra' }).waitFor()
+      await savePrompt.click()
+      await savedPrompts.getByRole('menuitem', { name: '프롬프트 불러오기: 보관할 프롬프트', exact: true }).click()
+      assert.equal(await draft.innerText(), '보관할 프롬프트', 'explicitly saved prompts survive refresh even after clearing the automatic draft')
+      assert.equal(await draft.evaluate(el => el === el.ownerDocument.activeElement), true)
+      assert.equal(await page.evaluate('window.messages.some(message => message.type === "prompt")'), false, 'saving and restoring never sends a prompt')
+      assert.deepEqual(defaultWrites, [], 'the prompt button no longer writes runtime defaults')
+      await draft.fill('')
+      await savePrompt.click()
+      await savedPrompts.getByRole('menuitem', { name: '프롬프트 삭제: 보관할 프롬프트', exact: true }).click()
+      await savedPrompts.getByRole('status').filter({ hasText: '저장한 프롬프트가 없습니다.' }).waitFor()
+      await page.keyboard.press('Escape')
+      await savePrompt.click()
+      await savedPrompts.getByRole('status').filter({ hasText: '저장한 프롬프트가 없습니다.' }).waitFor()
+      await page.keyboard.press('Escape')
+      await page.evaluate(() => localStorage.setItem('mew:agent-saved-prompts:"/workspace"', JSON.stringify([{
+        id: 'photo', text: '사진 [[.workspace:.mew/temp/assets/example.png]]', cliMode: false,
+        attachments: [{ project: '.workspace', path: '.mew/temp/assets/example.png', mimeType: 'image/png', image: { data: 'cGhvdG8=', mimeType: 'image/png' } }],
+      }])))
+      await savePrompt.click()
+      await savedPrompts.getByRole('menuitem', { name: '프롬프트 불러오기: 사진', exact: true }).click()
+      await draft.press('Control+Enter')
+      const restoredImage = await page.evaluate<any>('window.messages.find(message => message.type === "prompt")')
+      assert.deepEqual(restoredImage.images, [{ data: 'cGhvdG8=', mimeType: 'image/png' }], 'restoring retains image bytes for the actual send path')
+      assert.deepEqual(restoredImage.imageRefs, [{ path: '.mew/temp/assets/example.png', mimeType: 'image/png' }])
+      await page.evaluate('window.messages=[]')
       await draft.fill('새 작업')
       await draft.press('Control+Enter')
       const sent = await page.evaluate<any>('window.messages.find(message => message.type === "prompt")')
@@ -117,6 +160,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><AgentPanel pro
       }, queuedSettings)
       for (const action of ['cancel', 'save']) {
         await page.locator('[data-queue-row="0"]').getByRole('button', { name:'편집', exact:true }).click()
+        assert.equal(await savePrompt.isDisabled(), true, 'queued editing cannot save or replace the independent composer draft')
         await model.filter({ hasText:'Other' }).waitFor()
         assert.equal((await effort.innerText()).trim(), 'medium')
         assert.equal((await permission.innerText()).trim(), '권한 무시')
