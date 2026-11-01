@@ -4,11 +4,11 @@ parent: "mew-editor"
 title: "Markdown Hotview, source, and document properties"
 status: "implemented"
 created: "2026-09-18"
-updated: "2026-10-31"
+updated: "2026-11-01"
 status_hash: "2741d359b18c61eecb53b8ce0ba2862f0f42c088d7d02cf55c88a23d1d44a98e"
 files: ["packages/editor/src/editor/FrontmatterSelect.tsx", "server/frontmatter-options.ts", "src/hooks/useTabs.ts", "src/components/EditorPane.tsx", "src/components/markdown-error-boundary.tsx", "packages/editor/src/Editor.tsx", "packages/editor/src/editor/FrontmatterPanel.tsx", "src/components/TableOfContents.tsx"]
 commits: []
-description: "A feature contract covering Markdown Hotview and Plain editing, per-block computation caching and Pretext-based DOM virtualization, preservation of code-block line breaks and internal horizontal scrolling, retaining the line being read when switching views and cursor restoration boundaries in the properties area, checkboxes, document tables of contents, frontmatter properties, and navigation through backlinks and parent-file arrows beside the title. Includes parent-file exclusion, cross-project references, YAML preservation, native mobile keyboard activation through body taps, always-visible mobile auxiliary keys floating over the document above the status row, and source-saving boundaries."
+description: "A feature contract covering Markdown Hotview and Plain editing, per-block computation caching and Pretext-based DOM virtualization, preservation of code-block line breaks and internal horizontal scrolling, retaining the line being read when switching views and cursor restoration boundaries in the properties area, checkboxes, document tables of contents, frontmatter properties, and navigation through backlinks and parent-file arrows beside the title. Includes parent-file exclusion, cross-project references, YAML preservation, native mobile keyboard activation through body taps, always-visible mobile auxiliary keys floating over the document above the status row, project-owned options shared by Documents and Files with legacy migration, and source-saving boundaries."
 상위파일:
   - "MOC.md"
   - "_document-code-media-editing.md"
@@ -33,7 +33,7 @@ description: "A feature contract covering Markdown Hotview and Plain editing, pe
 - The frontmatter title and each property row also display their Markdown source line numbers.
 - Property field indentation is limited to 12px, including the handle icon and right margin.
 - Property rows retain a minimum height of 32px and 4px spacing between rows regardless of type. Single-line values are vertically centered at the same height, while rows expand to fit wrapped multi-select values.
-- Single-select and multi-select popups support search, entering a new name, and pressing Enter to create and select an option together. Option lists are shared among fields with the same name in the same project.
+- Single-select and multi-select popups support search, entering a new name, and pressing Enter to create and select an option together. Option lists are shared among fields with the same name in the same project, including Documents and Files. Store the registry in the actual project's `.mew/frontmatter-options.json`; existing Documents-local registries merge under the [document metadata contract](../../development/architecture.md#project-owned-document-metadata).
 - Use the handle to the left of a property to reorder it, and the type menu to assign document link, single-select, multi-select, date, text, or number. Each type entry displays a type icon to the left of its name.
 - Preserve the visible cursor line or the body line being read when switching between Hotview and Plain.
 

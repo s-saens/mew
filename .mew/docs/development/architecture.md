@@ -1,7 +1,7 @@
 ---
 title: "App Startup, Server Architecture, and State Files"
-description: "Defines workspace, public-share, and unknown application routes, the themed 404 recovery screen, and production fallback status. Describes per-account project switching for owner·manager, the startup screen before authentication waits, parallel downloads, initial/authentication/workspace screen chunk grouping, reuse of current P2P authentication, startup failure display, and rendering the workspace screen and editor with regular state. Distinguishes asynchronous loading by identity and permissions, server·CLI·OS execution layers, state files, and the boundaries between isolated startup verification and production application."
-updated: "2026-10-30"
+description: "Defines workspace, public-share, and unknown application routes, the themed 404 recovery screen, and production fallback status. Describes per-account project switching for owner·manager, the startup screen before authentication waits, parallel downloads, initial/authentication/workspace screen chunk grouping, reuse of current P2P authentication, startup failure display, and rendering the workspace screen and editor with regular state. Distinguishes asynchronous loading by identity and permissions, server·CLI·OS execution layers, state files, project-owned document metadata and legacy migration, and the boundaries between isolated startup verification and production application."
+updated: "2026-11-01"
 상위파일:
   - "../MOC.md"
   - "MOC.md"
@@ -99,6 +99,14 @@ Users, sessions, per-account feature/file permissions, project layouts, terminal
 - **Writes use only a temporary file + rename**. Writing directly with `writeFileSync` briefly makes the file 0 bytes, and another process reading it at that moment mistakes it for an empty value.
 - **Do not return an empty value on read failure.** If the file is missing, return `null`; if it is corrupted, leave a copy (`*.corrupt-*`) and throw. Treating an unreadable file as `{}` and overwriting it would erase all remaining settings — project icons were actually reset through this path.
 - The location can be changed with `MEW_DATA_DIR`. `npm test` sets it to a temporary path so **tests do not touch actual production data** (tests create and delete projects while also modifying icons and layouts).
+
+## Project-owned document metadata
+
+`server/document-metadata.ts` resolves comments, Markdown table widths, and shared frontmatter options to `.mew/comments.json`, `.mew/table-layout.json`, and `.mew/frontmatter-options.json` under the actual project root. The special `docs` API scope is a Documents view of the active root, not a separate project. It uses the active root's `.mew`, never `<Documents>/.mew`. Named child projects retain their own `.mew` files.
+
+Comments and table layouts use project-relative file keys. With Documents set to `.mew/docs`, `docs:a.md` uses the `.mew/docs/a.md` key, matching the same file opened through Files (`.workspace`). Changing the Documents location keeps metadata for different physical files separate. Frontmatter option lists and colors are shared by field name across Documents and Files in the same project.
+
+On access through Documents, each known legacy file in `<Documents>/.mew` is migrated independently. Prefix legacy comment/layout keys with the configured Documents path. Merge comment threads and replies by ID, retaining canonical values for matching IDs; retain canonical widths on collisions. Union option lists and merge colors, retaining canonical colors on collisions. Atomically publish the merged destination before removing that legacy file. Remove the old directory only when empty; retain unrelated files. Invalid JSON, unsupported versions, symlink paths, and publication failures stop migration without deleting the original. Migration is synchronous within the request-local root and requires no recursive scan. See [ADR 0109](../decisions/0109-project-owned-document-metadata.md) and the [implementation record](../work/project-owned-document-metadata.md).
 
 ## Project Icon Canonical Source
 

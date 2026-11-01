@@ -1,12 +1,11 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { readJsonFile, writeFileAtomic } from './dataDir.ts'
-import { projectRoot } from './paths.ts'
-import { safeProjectPath } from './project-agent-settings.ts'
+import { documentMetadataFile } from './document-metadata.ts'
 import { SELECTION_PALETTE, type OptionColors } from '../shared/selection-options.ts'
 
 export class FrontmatterOptionsError extends Error {}
-const storagePath = (project: string) => safeProjectPath(projectRoot(project), '.mew/frontmatter-options.json')
+const storagePath = (project: string) => documentMetadataFile(project, 'frontmatter-options.json')
 const own = (object: object, key: string) => Object.prototype.hasOwnProperty.call(object, key)
 
 function fieldName(value: unknown): string {

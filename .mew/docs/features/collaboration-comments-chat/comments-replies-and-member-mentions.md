@@ -4,11 +4,11 @@ parent: "mew-collaboration"
 title: "Comments, replies, and member mentions"
 status: "implemented"
 created: "2026-09-18"
-updated: "2026-10-22"
+updated: "2026-11-01"
 status_hash: "7979e03691cf55ffafcd76ec7ddbc05edc3fd3d2bc53100f0b07b948ce9abe63"
 files: ["src/components/Comments.tsx", "server/comments.ts", "packages/editor/src/editor/commentHighlight.ts"]
 commits: []
-description: "A feature contract for adding comments with Ctrl+Shift+C or by right-clicking the body, and replying, mentioning, editing, and deleting through a small quote/input popup and threads showing authors and timestamps. It explains automatic paragraph/line selection on right-click, the list, draft retention on failure, separate storage, and management permissions."
+description: "A feature contract for adding comments with Ctrl+Shift+C or by right-clicking the body, and replying, mentioning, editing, and deleting through a small quote/input popup and threads showing authors and timestamps. It explains automatic paragraph/line selection on right-click, the list, draft retention on failure, project-owned storage shared by Documents and Files, legacy migration, and management permissions."
 상위파일:
   - "MOC.md"
   - "_collaboration-comments-chat.md"
@@ -25,6 +25,7 @@ description: "A feature contract for adding comments with Ctrl+Shift+C or by rig
 ### Boundaries and limitations
 
 - Manage comments separately from the body.
+- Store comments in the actual project's `.mew/comments.json`, sharing file identity across Documents and Files. Migrate existing Documents-local files under the [document metadata contract](../../development/architecture.md#project-owned-document-metadata).
 - Viewing the list requires file viewing permission; adding, editing, and deleting also require file editing permission.
 - For read-only or archived files, only viewing existing comments is available. Do not create or modify comments while the body is loading.
 - Keep comments in the list even when changes to the source text make their anchors unresolvable, and distinguish the management permissions of authors and the owner.

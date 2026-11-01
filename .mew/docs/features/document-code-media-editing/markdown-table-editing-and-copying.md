@@ -4,11 +4,11 @@ parent: "mew-editor"
 title: "Markdown Table Editing and Copying"
 status: "implemented"
 created: "2026-09-18"
-updated: "2026-10-28"
+updated: "2026-11-01"
 status_hash: "a4d3adb2072291555b6bd681a8a5b7e3b9de108e056a15951673f169dd30caf7"
 files: ["packages/editor/src/editor/TableTooltip.tsx", "packages/editor/src/editor/TableCopyMenu.tsx", "server/tableLayout.ts"]
 commits: []
-description: "Feature contract covering right-click row/column addition and deletion and conversion to a DB with text fields, integrated with the common body menu for Markdown tables; single-step undo/redo; column resizing; and copying as text, Markdown, CSV, and images. Also explains deletion of the last row or column, DB value preservation, and table width storage boundaries."
+description: "Feature contract covering right-click row/column addition and deletion and conversion to a DB with text fields, integrated with the common body menu for Markdown tables; single-step undo/redo; column resizing; and copying as text, Markdown, CSV, and images. Also explains deletion of the last row or column, DB value preservation, project-owned table widths shared by Documents and Files, and legacy migration."
 상위파일:
   - "MOC.md"
   - "_document-code-media-editing.md"
@@ -26,6 +26,7 @@ description: "Feature contract covering right-click row/column addition and dele
 
 - Store Markdown tables in the document body and document DB rows and columns in Postgres. Conversion replaces the document block and does not delete the DB.
 - The supplementary column width storage format follows the editing guide.
+- Store supplementary widths in the actual project's `.mew/table-layout.json`, sharing file identity across Documents and Files. Legacy migration follows the [document metadata contract](../../development/architecture.md#project-owned-document-metadata).
 
 ### Detailed contracts
 

@@ -1,10 +1,11 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { projectRoot } from './paths.ts'
+import { documentMetadataFile, documentMetadataKey } from './document-metadata.ts'
 
 // 표의 열 너비는 마크다운이 담지 못한다 — HTML `<table>`로 쓰면 담을 수 있지만 plain 모드가
 // 지저분해져서 본문은 순수 md 표로 유지한다. 그래서 본문과 레이아웃을 분리해, 너비만
 // <프로젝트>/.mew/table-layout.json 에 문서 경로별로 저장한다(.mew/cmd-button.json과 같은 자리).
+// Documents도 실제 프로젝트 루트의 파일을 공유하고, 키에 Documents 폴더의 상대 경로를 포함한다.
 //
 // 형식: { "version": 1, "docs": { "<문서 상대경로>": [[120, 80], null, [90, 90, 90]] } }
 // 바깥 배열 = 그 문서 안 표의 등장 순서, 안쪽 배열 = 그 표의 열 너비(px). null = 저장된 너비 없음.
@@ -19,7 +20,6 @@ interface LayoutFile {
   docs: Record<string, TableWidths>
 }
 
-const MEW_DIR = '.mew'
 const FILE_NAME = 'table-layout.json'
 const MAX_DOCS = 2000
 const MAX_TABLES = 200
@@ -30,13 +30,14 @@ const MAX_WIDTH = 4000
 export class TableLayoutError extends Error {}
 
 function layoutFile(project: string): string {
-  return path.join(projectRoot(project), MEW_DIR, FILE_NAME)
+  return documentMetadataFile(project, FILE_NAME)
 }
 
 function load(project: string): LayoutFile {
+  const file = layoutFile(project)
   let raw: string
   try {
-    raw = fs.readFileSync(layoutFile(project), 'utf-8')
+    raw = fs.readFileSync(file, 'utf-8')
   } catch {
     return { version: 1, docs: {} } // 없음 = 이 프로젝트엔 저장된 표 너비가 없다
   }
@@ -91,11 +92,12 @@ function sanitize(value: unknown): TableWidths {
 }
 
 export function readTableLayout(project: string, relPath: string): TableWidths {
-  return load(project).docs[relPath] ?? []
+  return load(project).docs[documentMetadataKey(project, relPath)] ?? []
 }
 
 export function writeTableLayout(project: string, relPath: string, widths: unknown): TableWidths {
   if (!relPath) throw new TableLayoutError('문서 경로가 필요합니다')
+  relPath = documentMetadataKey(project, relPath)
   const sanitized = sanitize(widths)
   const data = load(project)
   if (sanitized.length === 0) {

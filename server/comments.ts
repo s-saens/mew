@@ -1,10 +1,11 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { randomUUID } from 'node:crypto'
-import { projectRoot } from './paths.ts'
+import { documentMetadataFile, documentMetadataKey } from './document-metadata.ts'
 
 // 파일 댓글 — 본문(.md·코드)에는 아무 흔적도 남기지 않고, 그 프로젝트의
 // <프로젝트>/.mew/comments.json 에 문서 경로별 스레드로 저장한다(table-layout.json과 같은 자리·같은 이유).
+// Documents도 실제 프로젝트 루트에 저장하며, 키에는 Documents 폴더의 상대 경로를 포함한다.
 //
 // 앵커는 줄·오프셋이 아니라 **텍스트 문맥**이다: { text(선택 텍스트, 한 글자 이상), prefix(앞 문맥),
 // line(만들 당시 줄 — 동점 처리용 힌트) }. 화면이 열릴 때마다 에디터가 지금 본문에서 다시 찾는다
@@ -38,7 +39,6 @@ interface CommentsFile {
   docs: Record<string, CommentThread[]>
 }
 
-const MEW_DIR = '.mew'
 const FILE_NAME = 'comments.json'
 const MAX_DOCS = 2000
 const MAX_THREADS = 300
@@ -50,13 +50,14 @@ const MAX_PREFIX = 200
 export class CommentsError extends Error {}
 
 function commentsFile(project: string): string {
-  return path.join(projectRoot(project), MEW_DIR, FILE_NAME)
+  return documentMetadataFile(project, FILE_NAME)
 }
 
 function load(project: string): CommentsFile {
+  const file = commentsFile(project)
   let raw: string
   try {
-    raw = fs.readFileSync(commentsFile(project), 'utf-8')
+    raw = fs.readFileSync(file, 'utf-8')
   } catch {
     return { version: 1, docs: {} }
   }
@@ -124,11 +125,12 @@ function sanitizeText(text: unknown): string {
 }
 
 export function listThreads(project: string, relPath: string): CommentThread[] {
-  return load(project).docs[relPath] ?? []
+  return load(project).docs[documentMetadataKey(project, relPath)] ?? []
 }
 
 export function addThread(project: string, relPath: string, anchor: unknown, author: string, text: unknown): CommentThread {
   if (!relPath) throw new CommentsError('문서 경로가 필요합니다')
+  relPath = documentMetadataKey(project, relPath)
   const data = load(project)
   if (!(relPath in data.docs) && Object.keys(data.docs).length >= MAX_DOCS) throw new CommentsError('댓글이 달린 문서가 너무 많습니다')
   const threads = (data.docs[relPath] ??= [])
@@ -144,6 +146,7 @@ export function addThread(project: string, relPath: string, anchor: unknown, aut
 }
 
 export function addComment(project: string, relPath: string, threadId: string, author: string, text: unknown): CommentThread {
+  relPath = documentMetadataKey(project, relPath)
   const data = load(project)
   const thread = (data.docs[relPath] ?? []).find((t) => t.id === threadId)
   if (!thread) throw new CommentsError('스레드를 찾을 수 없습니다')
@@ -162,6 +165,7 @@ export function editComment(
   by: { email: string; isOwner: boolean },
   text: unknown,
 ): CommentThread {
+  relPath = documentMetadataKey(project, relPath)
   const data = load(project)
   const thread = (data.docs[relPath] ?? []).find((t) => t.id === threadId)
   const comment = thread?.comments.find((c) => c.id === commentId)
@@ -181,6 +185,7 @@ export function deleteComment(
   commentId: string,
   by: { email: string; isOwner: boolean },
 ): CommentThread | null {
+  relPath = documentMetadataKey(project, relPath)
   const data = load(project)
   const threads = data.docs[relPath] ?? []
   const thread = threads.find((t) => t.id === threadId)
