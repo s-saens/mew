@@ -1,8 +1,8 @@
 ---
 title: "Inline references and atomic editing for agent attachments"
-description: "A decision to turn agent attachments into atomic CodeMirror widgets at the cursor position and preserve existing upload reference positions in drafts, queues, and prompts. Describes upload history, compatibility with existing queues, and the 2026-10-23 extension for inline display in user conversation bubbles."
+description: "A decision to use atomic inline agent attachment widgets while preserving reference positions and existing storage. Includes sent attachment tags and the accepted 2026-11-01 extension replacing raw ordinary references in user bubbles with document icons and filename actions that open the editor."
 created: 2026-10-22
-updated: 2026-10-23
+updated: 2026-11-01
 status: accepted
 ---
 
@@ -29,3 +29,11 @@ The [Input Feature Contract](../features/terminals-agents-automation/agent-input
 ## 2026-10-23 Follow-up Changes
 
 Extend the conversation attachment display locations retained in the decision above. Sent user messages display inline tags at upload reference positions in the bubble body; historical metadata attachments without references appear at the end of the body inside the bubble. Keep the queue list, input editing, storage, and server delivery contracts. The [Input Feature Contract](../features/terminals-agents-automation/agent-input-mentions-skills-and-attachments.md) owns the current display and compatibility criteria.
+
+## 2026-11-01 Follow-up Changes
+
+Status: accepted. Ordinary document references currently expose long `[[project:path]]` strings in sent user messages. Extend the inline tag presentation to these references: first activate a document icon to reveal its filename, then activate the filename to open the exact scoped path in Mew's editor. This replaces the original decision's plain-text presentation of ordinary references within sent user bubbles.
+
+Keep raw tokens in copying, drafts, queues, and runtime delivery. Reuse the shared `ActionMenu` for the interactive filename popup, including keyboard operation, focus restoration, dismissal, and viewport placement. A hover-only tooltip cannot provide the requested touch interaction; direct icon navigation skips filename confirmation. Preserving raw text would retain the reported visual clutter. The shared popup provides the requested two-step interaction without another popup framework.
+
+Repeated references retain their positions. Ordinary references remain separate from uploaded attachment metadata and existing media previews. Because tokens do not encode whether a target is a file or folder, both use the document-reference presentation; opening follows the existing host editor callback. The [Input Feature Contract](../features/terminals-agents-automation/agent-input-mentions-skills-and-attachments.md) owns current behavior, and the [work record](../work/agent-document-tags.md) records verification and application limits.

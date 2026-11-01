@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { attachmentKind, conversationAttachments, uploadedAttachmentTokens, withoutAttachmentTokens } from './agent-attachments.ts'
+import { attachmentKind, conversationAttachments, documentReferenceTokens, uploadedAttachmentTokens, withoutAttachmentTokens } from './agent-attachments.ts'
 
 test('attachment icons use MIME and fall back to extensions for untyped uploads', () => {
   assert.equal(attachmentKind('image/jpeg', 'upload.bin'), 'image')
@@ -45,4 +45,27 @@ test('removing attachment tokens preserves surrounding whitespace and ordinary f
   assert.equal(withoutAttachmentTokens(text), '  앞  뒤\n\n [[docs:guide.md]]  ')
   assert.equal(withoutAttachmentTokens('텍스트만\n  입력 '), '텍스트만\n  입력 ')
   assert.equal(withoutAttachmentTokens('[[.workspace:.mew/assets/photo.jpg]][[.workspace:.mew/assets/photo.jpg]]'), '')
+})
+
+test('document references preserve scope, exact paths, repetition and text offsets without becoming uploads', () => {
+  const document = '[[.workspace:.mew/tasks/태스크 에이전트 #1%.md]]'
+  const guide = '[[docs:guide.md]]'
+  const text = `앞 ${document} 중간 [[.workspace:.mew/temp/assets/photo.png]]\n${guide} 뒤 ${document}`
+  const tokens = documentReferenceTokens(text)
+  assert.deepEqual(tokens.map(({ token, project, path }) => ({ token, project, path })), [
+    { token: document, project: '.workspace', path: '.mew/tasks/태스크 에이전트 #1%.md' },
+    { token: guide, project: 'docs', path: 'guide.md' },
+    { token: document, project: '.workspace', path: '.mew/tasks/태스크 에이전트 #1%.md' },
+  ])
+  assert.equal(tokens[0].from, text.indexOf(document))
+  assert.equal(tokens[2].from, text.lastIndexOf(document))
+  for (const { from, to, token } of tokens) assert.equal(text.slice(from, to), token)
+  assert.deepEqual(conversationAttachments(document, [], [], '.workspace'), [])
+  assert.equal(withoutAttachmentTokens(document), document, 'copy and transport retain ordinary reference tokens')
+})
+
+test('document tags exclude uploads, pending identifiers and incomplete or multiline references', () => {
+  const text = '[[mew-upload:pending]] [[docs:.mew/assets/photo.png]] [[docs:.mew/files/old.pdf]] [[docs:.mew/temp/assets/new.pdf]] [[docs:]] [[docs:broken\nname.md]] [[docs:broken\rname.md]] [[docs:unfinished'
+  assert.deepEqual(documentReferenceTokens(text), [])
+  assert.deepEqual(documentReferenceTokens('[[docs:README]] [[docs:folder/name/]]').map(token => token.path), ['README', 'folder/name/'])
 })

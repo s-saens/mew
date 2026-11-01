@@ -15,7 +15,7 @@ import {AgentPanel} from '${root}/src/components/AgentPanel.tsx';
 import {I18nProvider} from '${root}/src/i18n.tsx';
 import {HistoryIndex} from '${root}/shared/agent-history.ts';
 import * as cache from '${root}/src/utils/agent-history-cache.ts';
-localStorage.setItem('mew:locale','ko');window.cache=cache;window.requests=[];
+localStorage.setItem('mew:locale','ko');window.cache=cache;window.requests=[];window.openedFiles=[];
 Object.defineProperty(navigator,'clipboard',{value:{writeText:async text=>{window.copied=text}}});
 const events=JSON.parse(sessionStorage.getItem('fixture-events')||'[]');if(!events.length)for(let i=0;i<45;i++)events.push({type:'update',update:{sessionUpdate:'user_message_chunk',content:{type:'text',text:'Question '+i}}},{type:'turn_start'},{type:'update',update:{sessionUpdate:'agent_message_chunk',content:{type:'text',text:'Answer '+i+' '+(i===42||i===43?'long readable answer\\n\\n'.repeat(65):i===40?'long readable answer '.repeat(100):i===44?'short':'long readable answer '.repeat(15))}}},...(i===44?[
 {type:'update',update:{sessionUpdate:'tool_call',toolCallId:'saved-tool-1',title:'Read project requirements',status:'completed'}},
@@ -33,7 +33,7 @@ class Socket {
  close(){this.readyState=3;this.onclose?.()}
 }
 window.WebSocket=Socket;window.historyIndex=index;window.fixtureEvents=events;
-createRoot(document.getElementById('root')).render(<I18nProvider><div style={{height:'100vh',display:'flex'}}><AgentPanel cacheAccount="alice" project="test" workspacePath="/workspace" tree={[]} focusedFilePath={null} onOpenFile={()=>{}} onClose={()=>{}} /></div></I18nProvider>);`
+createRoot(document.getElementById('root')).render(<I18nProvider><div style={{height:'100vh',display:'flex'}}><AgentPanel cacheAccount="alice" project="test" workspacePath="/workspace" tree={[]} focusedFilePath={null} onOpenFile={(...args)=>window.openedFiles.push(args)} onClose={()=>{}} /></div></I18nProvider>);`
   const bundle = await build({ input: 'virtual:history.tsx', write: false, platform: 'browser', output: { format: 'iife' }, transform: { jsx: 'react-jsx', define: { 'process.env.NODE_ENV': JSON.stringify('test') } }, plugins: [{
     name: 'history-fixture',
     async resolveId(id, importer) {
@@ -51,12 +51,12 @@ createRoot(document.getElementById('root')).render(<I18nProvider><div style={{he
   }] })
   const chunk = bundle.output.find(item => item.type === 'chunk')!
   const compiler = await compile(await fs.readFile(`${root}/src/index.css`, 'utf8'), { base: `${root}/src`, onDependency() {} })
-  const content = (await Promise.all(['src/components/AgentPanel.tsx', 'src/components/agent-attachment-icon.tsx', 'src/components/MentionTextarea.tsx'].map(file => fs.readFile(`${root}/${file}`, 'utf8')))).join('\n')
+  const content = (await Promise.all(['src/components/AgentPanel.tsx', 'src/components/agent-attachment-icon.tsx', 'src/components/agent-document-tag.tsx', 'src/components/MentionTextarea.tsx', 'packages/ui/src/action-menu.tsx'].map(file => fs.readFile(`${root}/${file}`, 'utf8')))).join('\n')
   const css = compiler.build([...new Set((source + content).match(/[A-Za-z0-9_@!:/.[\]()%,-]+/g))])
   const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
   try {
     for (const width of [1100, 390]) for (const dark of [false, true]) {
-      const page = await browser.newPage({ viewport: { width, height: 844 } })
+      const page = await browser.newPage({ viewport: { width, height: 844 }, hasTouch: width === 390 })
       page.setDefaultTimeout(6000)
       const errors: string[] = []
       page.on('pageerror', error => errors.push(error.message))
@@ -543,9 +543,9 @@ createRoot(document.getElementById('root')).render(<I18nProvider><div style={{he
       const inline = page.locator('[data-agent-question-bubble]').filter({ has: page.getByRole('button', { name: '앞중간뒤 [[docs:guide.md]]', exact: true }) })
       await inline.getByRole('link', { name: 'notes.pdf', exact: true }).waitFor()
       const content = inline.locator('[data-agent-attachments]')
-      assert.equal(await content.textContent(), '앞중간뒤 [[docs:guide.md]]')
+      assert.equal(await content.textContent(), '앞중간뒤 ')
       assert.deepEqual(await content.evaluate(el => Array.from(el.childNodes, (node: { nodeType: number; textContent: string | null; getAttribute(name: string): string | null }) => node.nodeType === 3
-        ? node.textContent : node.getAttribute('title'))), ['앞', '사진 #1%.png', '중간', 'notes.pdf', '뒤', '사진 #1%.png', ' [[docs:guide.md]]'], 'inline order and repeated references survive metadata deduplication')
+        ? node.textContent : node.getAttribute('title'))), ['앞', '사진 #1%.png', '중간', 'notes.pdf', '뒤', '사진 #1%.png', ' ', 'guide.md'], 'inline order and repeated references survive metadata deduplication')
       assert.ok(await content.evaluate(el => {
         const text = el.ownerDocument.createRange()
         text.selectNode(el.firstChild!)
@@ -555,7 +555,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><div style={{he
         return el.ownerDocument.defaultView!.getComputedStyle(tag).display === 'inline-flex'
           && bounds.left >= before.right && bounds.top < before.bottom
       }), 'the first tag follows its preceding text on the same line')
-      const inlineDisclosure = inline.locator('button[aria-expanded]')
+      const inlineDisclosure = inline.locator(':scope > button[aria-expanded]')
       await inlineDisclosure.press('Enter')
       assert.equal(await inlineDisclosure.getAttribute('aria-expanded'), 'true')
       await inlineDisclosure.press('Space')
@@ -564,6 +564,16 @@ createRoot(document.getElementById('root')).render(<I18nProvider><div style={{he
       assert.equal(await inlineDisclosure.getAttribute('aria-expanded'), 'true', 'clicking text still toggles the question')
       await inline.locator('..').getByRole('button', { name: '이 질문 복사', exact: true }).click()
       assert.equal(await page.evaluate('window.copied'), '앞중간뒤 [[docs:guide.md]]', 'question copy keeps mentions and hides upload paths')
+      const guide = inline.locator('[data-agent-document]').getByRole('button', { name: 'guide.md', exact: true })
+      const guideMenu = page.getByRole('menu', { name: 'guide.md', exact: true })
+      if (width === 390) await guide.tap()
+      else await guide.click()
+      await guideMenu.waitFor()
+      assert.deepEqual(await page.evaluate('window.openedFiles'), [], 'the document icon reveals its name without navigating')
+      assert.equal(await inlineDisclosure.getAttribute('aria-expanded'), 'true', 'opening the document name preserves question disclosure')
+      await guideMenu.getByRole('menuitem', { name: 'guide.md', exact: true }).click()
+      await guideMenu.waitFor({ state: 'detached' })
+      assert.deepEqual(await page.evaluate('window.openedFiles'), [['docs', 'guide.md', null]], 'the filename opens the exact editor scope and path once')
       await inline.getByRole('button', { name: '사진 #1%.png 사진 미리보기', exact: true }).first().click()
       const inlinePreview = page.getByRole('dialog', { name: '사진 #1%.png 사진 미리보기', exact: true })
       const inlineUrl = new URL((await inlinePreview.locator('img').getAttribute('src'))!, page.url())
@@ -597,6 +607,88 @@ createRoot(document.getElementById('root')).render(<I18nProvider><div style={{he
       assert.equal(await focusedPhoto.evaluate(el => el.ownerDocument.activeElement === el), true)
       assert.equal(await longDisclosure.getAttribute('aria-expanded'), 'true', 'keyboard focus reveals attachments clipped by the collapsed question')
       assert.ok(await focusedPhoto.evaluate(el => el.getBoundingClientRect().bottom <= el.closest('[data-agent-question-bubble]')!.getBoundingClientRect().bottom))
+      const documentPath = '.mew/tasks/태스크 에이전트 통합 #1%.md'
+      const documentName = documentPath.split('/').at(-1)!
+      const documentRef = `[[.workspace:${documentPath}]]`
+      await page.evaluate(text => {
+        const socket = (globalThis as any).socket
+        socket.emit({ type: 'turn_start' })
+        socket.emit({ type: 'turn_end', stopReason: 'end_turn' })
+        socket.emit({ type: 'update', update: { sessionUpdate: 'user_message_chunk', content: { type: 'text', text } } })
+        ;(globalThis as any).openedFiles = []
+      }, documentRef)
+      const documentOnly = page.locator('[data-agent-question-bubble]').filter({ has: page.locator('[data-agent-document]').getByRole('button', { name: documentName, exact: true }) })
+      const documentButton = documentOnly.locator('[data-agent-document]').getByRole('button', { name: documentName, exact: true })
+      const documentDisclosure = documentOnly.locator(':scope > button[aria-expanded]')
+      const documentMenu = page.getByRole('menu', { name: documentName, exact: true })
+      await documentButton.waitFor()
+      assert.equal(await documentOnly.innerText(), '', 'a document-only message renders an icon without raw reference text')
+      assert.equal(await documentOnly.locator('[data-agent-attachment]').count(), 0, 'ordinary documents do not become upload attachments')
+      assert.equal(await documentOnly.locator('button button, button a').count(), 0, 'document controls are outside the question disclosure button')
+      assert.equal(await documentButton.getAttribute('aria-haspopup'), 'menu')
+      assert.equal(await documentButton.getAttribute('aria-expanded'), 'false')
+      await documentOnly.locator('..').getByRole('button', { name: '이 질문 복사', exact: true }).click()
+      assert.equal(await page.evaluate('window.copied'), documentRef, 'copy preserves a document-only reference exactly')
+      const documentExpanded = await documentDisclosure.getAttribute('aria-expanded')
+      for (const activation of ['Enter', 'Space']) {
+        await documentButton.press(activation)
+        await documentMenu.waitFor()
+        assert.equal(await documentButton.getAttribute('aria-expanded'), 'true')
+        assert.deepEqual(await page.evaluate('window.openedFiles'), [], 'keyboard activation first reveals the document name')
+        const bounds = await documentMenu.boundingBox()
+        assert.ok(bounds && bounds.x >= 0 && bounds.x + bounds.width <= width && bounds.y >= 0 && bounds.y + bounds.height <= 844, 'the filename popup stays within the viewport')
+        if (activation === 'Enter') {
+          await page.screenshot({ path: `/tmp/mew-agent-document-popup-${width}-${dark ? 'dark' : 'light'}.png` })
+          await documentMenu.press('Escape')
+          await documentMenu.waitFor({ state: 'detached' })
+          assert.equal(await documentButton.evaluate(el => el.ownerDocument.activeElement === el), true, 'Escape restores focus to the document icon')
+        } else {
+          await documentMenu.getByRole('menuitem', { name: documentName, exact: true }).press('Enter')
+          await documentMenu.waitFor({ state: 'detached' })
+        }
+        assert.equal(await documentDisclosure.getAttribute('aria-expanded'), documentExpanded, 'document keyboard actions preserve question disclosure')
+      }
+      assert.deepEqual(await page.evaluate('window.openedFiles'), [['.workspace', documentPath, null]], 'keyboard filename selection preserves spaces, Unicode, #, and %')
+      for (const dismissal of ['outside', 'Back']) {
+        if (width === 390) await documentButton.tap()
+        else await documentButton.click()
+        await documentMenu.waitFor()
+        if (dismissal === 'outside') await page.mouse.click(2, 2)
+        else await documentButton.evaluate(el => el.ownerDocument.defaultView!.history.back())
+        await documentMenu.waitFor({ state: 'detached' })
+        assert.equal(await documentButton.getAttribute('aria-expanded'), 'false')
+        assert.equal(await documentDisclosure.getAttribute('aria-expanded'), documentExpanded)
+      }
+      assert.deepEqual(await page.evaluate('window.openedFiles'), [['.workspace', documentPath, null]], 'dismissal never opens a document')
+      const scopedPath = 'guides/공유 문서 #2%.md'
+      const scopedRef = `[[docs:${scopedPath}]]`
+      const repeatedText = `문서 ${documentRef} 다음 ${scopedRef} 다시 ${documentRef}`
+      await page.evaluate(text => {
+        const socket = (globalThis as any).socket
+        socket.emit({ type: 'turn_start' })
+        socket.emit({ type: 'turn_end', stopReason: 'end_turn' })
+        socket.emit({ type: 'update', update: { sessionUpdate: 'user_message_chunk', content: { type: 'text', text } } })
+      }, repeatedText)
+      const repeated = page.locator('[data-agent-question-bubble]').filter({ has: page.getByRole('button', { name: repeatedText, exact: true }) })
+      await repeated.locator('[data-agent-document]').last().waitFor()
+      assert.equal(await repeated.locator('[data-agent-document]').count(), 3, 'every repeated document reference retains its own icon')
+      assert.equal(await repeated.locator('[data-agent-attachments]').textContent(), '문서  다음  다시 ')
+      await repeated.locator('..').getByRole('button', { name: '이 질문 복사', exact: true }).click()
+      assert.equal(await page.evaluate('window.copied'), repeatedText, 'mixed repeated document references retain their exact copy text')
+      await page.evaluate(() => { sessionStorage.setItem('fixture-events', JSON.stringify((globalThis as any).fixtureEvents)) })
+      await page.reload()
+      const scopedButton = repeated.locator('[data-agent-document]').getByRole('button', { name: scopedPath.split('/').at(-1)!, exact: true })
+      await scopedButton.waitFor()
+      assert.equal(await repeated.locator('[data-agent-document]').count(), 3, 'refresh restores ordinary document tags without attachment metadata')
+      if (width === 390) await scopedButton.tap()
+      else await scopedButton.click()
+      const scopedMenu = page.getByRole('menu', { name: scopedPath.split('/').at(-1)!, exact: true })
+      await scopedMenu.waitFor()
+      assert.deepEqual(await page.evaluate('window.openedFiles'), [])
+      await scopedMenu.getByRole('menuitem', { name: scopedPath.split('/').at(-1)!, exact: true }).click()
+      await scopedMenu.waitFor({ state: 'detached' })
+      assert.deepEqual(await page.evaluate('window.openedFiles'), [['docs', scopedPath, null]], 'restored document tags retain the Documents editor scope')
+      assert.equal(page.context().pages().length, 1, 'documents open in Mew without a new browser tab')
       assert.deepEqual(errors, [])
       await page.close()
     }

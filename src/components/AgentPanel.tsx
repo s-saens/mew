@@ -4,7 +4,8 @@ import { HeaderSelect } from './agent-header-select'
 import { AgentPromptDrafts } from './agent-prompt-drafts'
 import { RuntimeInstallProgress } from './RuntimeInstallProgress'
 import { AgentAttachmentIcon } from './agent-attachment-icon'
-import { attachmentKind, conversationAttachments, uploadedAttachmentTokens, withoutAttachmentTokens } from '../utils/agent-attachments'
+import { AgentDocumentTag } from './agent-document-tag'
+import { attachmentKind, conversationAttachments, documentReferenceTokens, uploadedAttachmentTokens, withoutAttachmentTokens } from '../utils/agent-attachments'
 import { AgentMediaPreviewDialog } from './agent-media-preview-dialog'
 import { scopedBrowserStorage } from '@mew/ui/browser-storage-scope'
 import { workspaceViewportBottom } from '../utils/workspace-viewport'
@@ -406,17 +407,18 @@ function AgentAttachmentTag({ attachment, onPreview }: {
   )
 }
 
-function agentMessageContent(text: string, files: AgentAttachment[], onPreview: (file: AgentAttachment) => void): ReactNode[] {
+function agentMessageContent(text: string, files: AgentAttachment[], onPreview: (file: AgentAttachment) => void, onOpenFile: OpenWorkspaceFile): ReactNode[] {
   const content: ReactNode[] = []
   const referenced = new Set<AgentAttachment>()
   let from = 0
-  for (const token of uploadedAttachmentTokens(text)) {
+  const tokens = [...uploadedAttachmentTokens(text), ...documentReferenceTokens(text)].sort((a, b) => a.from - b.from)
+  for (const token of tokens) {
     content.push(withoutAttachmentTokens(text.slice(from, token.from)))
     const file = files.find(file => file.project === token.project && file.relPath === token.path)
     if (file) {
       content.push(<AgentAttachmentTag key={token.from} attachment={file} onPreview={onPreview} />)
       referenced.add(file)
-    }
+    } else content.push(<AgentDocumentTag key={token.from} project={token.project} path={token.path} onOpenFile={onOpenFile} />)
     from = token.to
   }
   content.push(withoutAttachmentTokens(text.slice(from)))
@@ -4796,6 +4798,7 @@ const AgentConversationItem = memo(function AgentConversationItem({ item, expand
     // 내가 쓴 말이라 이미 아는 내용이다 — 턴 버블과 같게 접어 두고, 눌러야 다 보인다
     const open = expanded.has(item.key)
     const questionText = withoutAttachmentTokens(item.text).trim()
+    const hasReferences = files.length > 0 || documentReferenceTokens(item.text).length > 0
     const toggleQuestion = () => {
       if (!hasSelection()) toggle(item.key)
     }
@@ -4814,7 +4817,7 @@ const AgentConversationItem = memo(function AgentConversationItem({ item, expand
         {(questionText || files.length > 0) && (
           <div className="flex items-start gap-1">
             {questionText && <CopyButton text={questionText} label={uiText("이 질문 복사")} />}
-            {files.length > 0 ? <div
+            {hasReferences ? <div
               data-agent-question-bubble
               onClick={event => {
                 if ((event.target as Element).closest('button, a')) return
@@ -4831,7 +4834,7 @@ const AgentConversationItem = memo(function AgentConversationItem({ item, expand
                   if (!open && event.currentTarget.scrollHeight > event.currentTarget.clientHeight) toggle(item.key)
                 }}
                 className={`relative min-w-0 whitespace-pre-wrap break-words [overflow-wrap:anywhere] select-text ${open ? 'block' : 'line-clamp-2'}`}>
-                {agentMessageContent(item.text.trim(), files, setPreview)}
+                {agentMessageContent(item.text.trim(), files, setPreview, onOpenFile)}
               </span>
             </div> : <button type="button" aria-expanded={open} onClick={toggleQuestion}
               className="flex min-w-0 flex-1 items-start gap-2 rounded-lg rounded-tr-none bg-surface-raised px-3 py-2 text-left text-ink">

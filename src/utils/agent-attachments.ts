@@ -2,6 +2,12 @@ import type { AgentAttachmentRef } from '../../shared/agent-attachment'
 
 const UPLOADED_ATTACHMENT_TOKEN = /\[\[([^:\]\n]+):(\.mew\/(?:temp\/assets|assets|files)\/[^\]\n]+)\]\]/g
 
+export function documentReferenceTokens(text: string): { from: number; to: number; token: string; project: string; path: string }[] {
+  return [...text.matchAll(/\[\[([^:[\]\r\n]+):([^\r\n[\]]+)\]\]/g)]
+    .filter(match => match[1] !== 'mew-upload' && !/^\.mew\/(?:temp\/assets|assets|files)\//.test(match[2]))
+    .map(match => ({ from: match.index, to: match.index + match[0].length, token: match[0], project: match[1], path: match[2] }))
+}
+
 export function uploadedAttachmentTokens(text: string): { from: number; to: number; token: string; project: string; path: string }[] {
   return [...text.matchAll(UPLOADED_ATTACHMENT_TOKEN)].map(match => ({
     from: match.index,
