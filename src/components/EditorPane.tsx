@@ -823,14 +823,7 @@ export function EditorPane({
                 {uiText("보관 문서 · 읽기 전용")}</div>
             )}
             <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
-              {showSidebarButton && (
-                <div className="absolute left-3 top-3 z-20">
-                  <SidebarOpenButton onClick={onOpenSidebar} />
-                </div>
-              )}
-              {/* 에디터 우상단 도구 줄 — 히스토리·뷰 모드·목차는 md/svg 문서에만, 터미널은 파일 종류와
-                  무관하게 뜬다. right-5는 에디터 오른쪽 스크롤바를 비켜 앉기 위한 여백 */}
-              <div data-editor-tools className="absolute right-5 top-3 z-20 flex items-start gap-2">
+              <div className="absolute left-3 top-3 z-20 flex items-start gap-2">
                 <div data-editor-navigation className="flex gap-2">
                   <button
                     type="button"
@@ -853,6 +846,10 @@ export function EditorPane({
                     <ArrowRight width={14} height={14} aria-hidden="true" />
                   </button>
                 </div>
+                {showSidebarButton && <SidebarOpenButton onClick={onOpenSidebar} />}
+              </div>
+              {/* right-5 leaves room for the editor's scrollbar. */}
+              <div data-editor-tools className="absolute right-5 top-3 z-20 flex items-start gap-2">
                 {htmlUrl && (
                   <a
                     href={htmlUrl}

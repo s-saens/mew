@@ -24,8 +24,9 @@ const noop=()=>{}, stored={docs:{unifiedScopes:true,panes:[{id:'main',activePath
 const callbacks=Object.fromEntries(['registerHandle','registerElement','registerTabBar','onFocus','onOpenHistory','onSetTocOpen','onOpenSidebar','onTabDragMove','onTabDrop'].map(k=>[k,noop]));
 window.notices=[];
 function Fixture(){const tabs=useTabs('docs',noop,m=>window.notices.push(m),'/fixture',stored);window.tabs=tabs;
+const [showSidebarButton,setShowSidebarButton]=React.useState(false);window.setShowSidebarButton=setShowSidebarButton;
 return <div className="flex h-dvh flex-col bg-surface-deep text-ink"><EditorPane {...callbacks} pane={tabs.panes[0]}
-role="owner" authEmail="owner@example.test" canCollaborate={false} project="docs" tree={[]} presence={{}} focused isGuest={false} showSidebarButton={false} tocOpen={false} dropZone={null}
+role="owner" authEmail="owner@example.test" canCollaborate={false} project="docs" tree={[]} presence={{}} focused isGuest={false} showSidebarButton={showSidebarButton} tocOpen={false} dropZone={null}
 onActivate={(p,id)=>tabs.setActivePath(p,'main',id)} onPin={p=>tabs.pinTab(p,'main')} onCloseTab={(p,id)=>tabs.closeTab(p,'main',id)}
 onReorder={(a,b)=>tabs.reorderTabs(a,b,'main')} onSetViewMode={(p,m)=>tabs.setTabViewMode(p,m,'main')} onChangeContent={tabs.updateTabContent}
 onOpenLink={(p,o)=>tabs.openFile(p,{preview:false,forceNewTab:!!o?.newTab,replaceActive:!o?.newTab,paneId:'main'})}
@@ -89,10 +90,22 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
       await heading('One')
       assert.equal(await back.isDisabled(), true)
       assert.equal(await forward.isDisabled(), true)
-      assert.notEqual(await page.locator('[data-editor-tools] > :first-child').getAttribute('data-editor-navigation'), null)
+      assert.equal(await page.locator('[data-editor-tools] [data-editor-navigation]').count(), 0, 'navigation is separate from the right-hand tools')
       const a = (await back.boundingBox())!, b = (await forward.boundingBox())!, c = (await page.getByRole('button', { name: '히스토리', exact: true }).boundingBox())!
-      assert.ok(a.x < b.x && b.x < c.x)
+      assert.equal(a.x, 12, 'Back stays at the left edge of the editor body')
+      assert.ok(a.x + a.width < b.x && b.x + b.width < c.x)
       assert.equal(a.y, c.y); assert.equal(a.height, c.height)
+      const tools = (await page.locator('[data-editor-tools]').boundingBox())!
+      assert.equal(tools.x + tools.width, width - 20, 'file tools retain their right inset')
+      await page.evaluate('window.setShowSidebarButton(true)')
+      const explorer = page.getByRole('button', { name: '파일 탐색기 열기', exact: true })
+      await explorer.waitFor()
+      const explorerBox = (await explorer.boundingBox())!
+      assert.deepEqual(await back.boundingBox(), a, 'showing the explorer button does not move navigation')
+      assert.ok(explorerBox.x >= b.x + b.width, 'the explorer button does not overlap navigation')
+      assert.ok(explorerBox.x + explorerBox.width < tools.x, 'left controls remain separate from file tools')
+      await page.evaluate('window.setShowSidebarButton(false)')
+      await explorer.waitFor({ state: 'hidden' })
       await page.getByRole('link', { name: 'Four', exact: true }).click(); await heading('Four')
       assert.deepEqual(await paths(), ['nested/four.md', 'two.md', 'three.md'])
       assert.equal(await back.isDisabled(), false); assert.equal(await forward.isDisabled(), true)

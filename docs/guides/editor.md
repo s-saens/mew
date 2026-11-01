@@ -1,7 +1,7 @@
 ---
 title: "Document Editing and Storage Formats"
-description: "Explains editing Markdown, code, document properties, tables, links, attachments, and PDFs; adding and deleting rows and columns through the body context menu; and the horizontal icon menu with hover labels that stays open while scrolling, browser-menu suppression, and native keyboard activation by tapping the editor on mobile. Covers Hotview @ file autocomplete across all folders, annotations, internal document navigation, table/DB conversion, inline subpage naming, autosave, split views, panel switching in the mobile dock, tab switching in the body and Plain modifier key bars, and installation controls."
-updated: "2026-10-30"
+description: "Explains editing Markdown, code, document properties, tables, links, attachments, and PDFs; adding and deleting rows and columns through the body context menu; and the horizontal icon menu with hover labels that stays open while scrolling, browser-menu suppression, and native keyboard activation by tapping the editor on mobile. Covers Hotview @ file autocomplete across all folders, annotations, internal document navigation with upper-left Back/Forward buttons, table/DB conversion, inline subpage naming, autosave, split views, panel switching in the mobile dock, tab switching in the body and Plain modifier key bars, and installation controls."
+updated: "2026-11-01"
 상위파일:
   - "../../.mew/docs/MOC.md"
   - "MOC.md"
@@ -43,7 +43,7 @@ If copying, cutting, or pasting fails, follow the guidance to use `Ctrl/Cmd+C`·
 
 Internal document links, including subdocuments, **open in the same tab**. **Ctrl/Cmd+click** opens them in a new tab. Same-tab navigation uses the current tab even if another tab displays the same document, and each tab maintains its own document browsing history.
 
-Use **Back and Forward** at the far left of the floating file history toolbar to navigate documents visited in the current tab. A direction is disabled when there is no document to navigate to. New tabs start at their first visited document, so both buttons are disabled. Opening another document after going back replaces the forward path with the new path. Document browsing history persists when a tab moves to another pane, but refreshing restarts each tab's history at its current document.
+Use **Back and Forward** at the upper-left edge of the editor, separate from the file tools on the right, to navigate documents visited in the current tab. A direction is disabled when there is no document to navigate to. New tabs start at their first visited document, so both buttons are disabled. Opening another document after going back replaces the forward path with the new path. Document browsing history persists when a tab moves to another pane, but refreshing restarts each tab's history at its current document.
 
 Relative paths for Markdown images are resolved from the current document's folder. For example, `README.md` at the repository root uses `docs/assets/screenshots/split.png`, while `docs/guides/overview.md` uses `../assets/screenshots/split.png` to display the same file. Paths are converted to authenticated file API URLs only for display; saved Markdown retains the original relative paths. Files in projects, Documents, and outside projects follow existing file access permissions. `/api/asset` URLs created by uploads and external image URLs are used as is.
 
