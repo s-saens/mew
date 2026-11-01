@@ -233,7 +233,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
       assert.notEqual(await canvas.locator('.drawing-origin').getAttribute('transform'), originBeforePan)
       await canvas.press('Control+0')
       assert.match((await objects.first().evaluate(element => element.parentElement?.getAttribute('transform')))!, /scale\(1\)/)
-      await dialog.getByRole('button', { name: '그리드 설정', exact: true }).click()
+      await dialog.getByRole('button', { name: '스냅 설정', exact: true }).click()
       const gridSpacing = dialog.getByRole('spinbutton', { name: '격자 간격', exact: true })
       await gridSpacing.fill('25')
       await gridSpacing.press('Enter')

@@ -20,27 +20,29 @@
 .drawing-toolbar .drawing-icon > svg:not([fill]) { fill: none; stroke: currentColor; }
 .drawing-save { height: 30px; padding: 0 16px; border: 0; border-radius: 5px; background: var(--color-surface-inverse); color: var(--color-surface-deep); font-size: 12px; font-weight: 600; white-space: nowrap; }
 .drawing-save:hover { opacity: .85; }
-.drawing-stage { position: relative; flex: 1; min-height: 0; overflow: hidden; isolation: isolate; background: #fff; }
+.drawing-stage { position: relative; flex: 1; min-height: 0; overflow: hidden; isolation: isolate; background: transparent; }
 .drawing-stage > svg { position: absolute; inset: 0; width: 100%; height: 100%; outline: none; touch-action: none; user-select: none; }
 .drawing-stage[data-tool="select"] > svg { cursor: default; }
 .drawing-stage[data-tool="hand"] > svg { cursor: grab; }
 .drawing-stage[data-tool="text"] > svg { cursor: text; }
-.drawing-stage:is([data-tool="rect"], [data-tool="ellipse"], [data-tool="line"], [data-tool="path"]) > svg { cursor: crosshair; }
+.drawing-stage:is([data-tool="rect"], [data-tool="ellipse"], [data-tool="line"], [data-tool="path"], [data-tool="freehand"]) > svg { cursor: crosshair; }
 .drawing-stage[data-panning] > svg { cursor: grabbing; }
-.drawing-origin { color: #8b95a5; }
-.drawing-origin path, .drawing-origin circle { stroke: currentColor; stroke-width: 1; fill: #fff; }
-.drawing-origin text { fill: #647084; font: 10px var(--font-mono, monospace); }
+.drawing-origin { color: var(--color-ink-muted); }
+.drawing-origin path, .drawing-origin circle { stroke: currentColor; stroke-width: 1; fill: var(--color-surface); }
+.drawing-origin text { fill: var(--color-ink-secondary); font: 10px var(--font-mono, monospace); }
 .drawing-selection [data-resize-handle="nw"], .drawing-selection [data-resize-handle="se"] { cursor: nwse-resize; }
 .drawing-selection [data-resize-handle="ne"], .drawing-selection [data-resize-handle="sw"] { cursor: nesw-resize; }
 .drawing-selection [data-resize-handle="n"], .drawing-selection [data-resize-handle="s"] { cursor: ns-resize; }
 .drawing-selection [data-resize-handle="e"], .drawing-selection [data-resize-handle="w"] { cursor: ew-resize; }
 .drawing-selection [data-rotate-handle] { cursor: grab; }
 .drawing-toolbar, .drawing-bottom-left, .drawing-bottom-right { position: absolute; display: flex; align-items: center; gap: 2px; padding: 4px; border: 1px solid var(--color-edge-bright); border-radius: 8px; background: var(--color-surface); color: var(--color-ink); }
-.drawing-toolbar { top: 12px; left: 50%; transform: translateX(-50%); max-width: calc(100% - 16px); }
+.drawing-toolbar { top: 12px; left: 50%; transform: translateX(-50%); width: max-content; max-width: calc(100% - 16px); }
+.drawing-tool-list { display: flex; align-items: center; min-width: 0; gap: 2px; overflow-x: auto; scrollbar-width: thin; scrollbar-color: var(--color-edge-bright) transparent; }
+.drawing-stroke-width { position: absolute; bottom: 60px; left: 12px; width: 120px; border-radius: 4px; background: var(--color-surface); }
 .drawing-bottom-left { bottom: 12px; left: 12px; }
 .drawing-bottom-right { bottom: 12px; right: 12px; }
 .drawing-toolbar-separator { flex: 0 0 1px; height: 20px; margin: 0 3px; background: var(--color-edge-strong); }
-.drawing-paint-buttons { display: inline-flex; align-items: center; }
+.drawing-paint-buttons { display: inline-flex; align-items: center; flex-shrink: 0; }
 .drawing-fill-icon { display: block; width: 18px; height: 18px; border: 1px solid #a6a6a6; border-radius: 50%; }
 .drawing-stroke-icon { display: block; width: 22px; height: 4px; border: 1px solid #a6a6a6; border-radius: 2px; transform: rotate(-35deg); }
 .drawing-transparent { background: linear-gradient(135deg, transparent 44%, #ef4444 45%, #ef4444 54%, transparent 55%), #fff; }
@@ -62,6 +64,7 @@
 .drawing-grid-settings { display: flex; flex-direction: column; gap: 8px; padding: 4px; }
 .drawing-grid-settings > label:not(.drawing-number) { display: flex; align-items: center; gap: 8px; min-height: 30px; }
 .drawing-grid-settings input[type="checkbox"] { accent-color: var(--color-accent); }
+.drawing-grid-settings > label > svg { width: 16px; height: 16px; color: var(--color-ink-secondary); }
 .drawing-number { display: flex; align-items: center; min-width: 0; gap: 5px; height: 30px; padding: 0 7px; border: 1px solid var(--color-edge-strong); border-radius: 4px; color: var(--color-ink-secondary); font-size: 11px; }
 .drawing-number > span { flex-shrink: 0; }
 .drawing-number > span:last-child:not(:first-child) { color: var(--color-ink-muted); }
@@ -83,7 +86,7 @@
 .drawing-inspector-colors { display: flex; justify-content: center; margin-top: 4px; }
 .drawing-font-properties { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
 .drawing-text-frame { position: absolute; z-index: 1; transform-origin: center; }
-.drawing-text-editor { position: absolute; resize: none; padding: 0; border: none; outline: 1px solid #2563eb; background: #fffffff2; line-height: 1.2; overflow: hidden; caret-color: #2563eb; }
+.drawing-text-editor { position: absolute; resize: none; padding: 0; border: none; outline: 1px solid var(--color-accent); background: var(--color-surface); line-height: 1.2; overflow: hidden; caret-color: var(--color-accent); }
 .drawing-pen-done { position: absolute; bottom: 64px; left: 50%; transform: translateX(-50%); padding: 7px 12px; border: 1px solid var(--color-edge-bright); border-radius: 5px; color: var(--color-ink); background: var(--color-surface); font-size: 12px; }
 .drawing-pen-done:hover { background: var(--color-surface-raised); }
 .drawing-error { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: var(--color-surface-raised); color: var(--color-danger); font-size: 12px; }
@@ -103,6 +106,8 @@
   .drawing-header-actions { gap: 2px; }
   .drawing-save { padding: 0 10px; }
   .drawing-toolbar { top: 8px; gap: 0; padding: 3px; }
+  .drawing-tool-list { gap: 0; }
+  .drawing-stroke-width { left: 6px; bottom: 58px; }
   .drawing-toolbar-separator { margin: 0 2px; }
   .drawing-icon, .drawing-paint-buttons > button { width: 30px; height: 34px; flex-basis: 30px; }
   .drawing-bottom-left { left: 6px; bottom: 8px; padding: 2px; gap: 0; }

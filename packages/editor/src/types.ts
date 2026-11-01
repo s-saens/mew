@@ -7,6 +7,11 @@ export interface EditorOpenLinkOptions {
 
 export type EditorOpenLink = (path: string, options?: EditorOpenLinkOptions) => void
 
+export interface EditorDrawingOptions {
+  onClose: () => void
+  onSave: (file: File) => Promise<void>
+}
+
 /** 문서 트리 노드 — 호스트 앱이 서버에서 받아 Editor·FileTree 등에 넘긴다 */
 export interface TreeNode {
   editable?: boolean

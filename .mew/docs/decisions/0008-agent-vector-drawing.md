@@ -1,13 +1,15 @@
 ---
 title: "SVG Documents and PNG Attachments for the Agent Drawing Editor"
-description: "Decision to implement the agent drawing editor with browser SVG and a pure document model, without an external drawing editor dependency, and to separate per-project SVG records containing editing metadata, images, and fonts from the existing PNG attachment path. Explains the implications of single-user editing, feature-specific modules, and memory and storage limits; the storage location is superseded by subsequent decision 0055."
+description: "Decision to implement the agent drawing editor with browser SVG and a pure document model, without an external drawing editor dependency, and to separate per-project SVG records containing editing metadata, images, and fonts from the existing PNG attachment path. Explains single-user editing, module and storage limits; decision 0055 changes storage and decision 0115 extends the board to Hotview with transparent export and separate document uploads."
 created: "2026-10-16"
-updated: "2026-10-23"
+updated: "2026-11-02"
 ---
 
 # SVG Documents and PNG Attachments for the Agent Drawing Editor
 
 Status: Approved. The storage location is superseded by [0055 — Unifying Attachments and Drawings Under the Project Temporary Path](0055-project-temp-attachments.md).
+
+[0115 — Hotview drawing](0115-hotview-drawing.md) extends the shared board to document image insertion without agent-history access and adds transparent export, freehand paths, and object snapping. The original decision below remains the rationale for the agent workflow.
 
 ## Background
 

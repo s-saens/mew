@@ -4,13 +4,15 @@ parent: "mew-agents"
 title: "Agent Drawing Board"
 status: "implemented"
 created: "2026-10-16"
-updated: "2026-10-23"
-description: "Defines the origin and infinite workspace of the vector drawing board opened from agent input, grid, shape, curve, text, and image editing, and selection, transformation, grouping, layers, and shortcuts. Describes Google Fonts embedding, SVG history and PNG attachments under `.mew/temp`, preservation of read access to existing drawings and exclusion from Git, save APIs, permissions, module boundaries, and verification criteria."
+updated: "2026-11-02"
+description: "Defines the shared drawing board in agent input and Hotview, transparent previews and PNG exports, freehand and Bézier pens, grid and object snapping, transformations, fonts, and shortcuts. Covers agent SVG history, document image insertion without agent permissions, storage and access boundaries, geometry caching, and verification criteria."
 files: ["src/components/drawing/DrawingEditor.tsx", "src/components/drawing/model.ts", "src/components/drawing/geometry.ts", "src/components/drawing/svg.ts", "server/agent-drawings.ts", "src/components/AgentPanel.tsx"]
 상위파일: "_terminals-agents-automation.md"
 ---
 
 A vector editor for explaining context to an agent with shapes, text, and annotations on screenshots. Open it with the **Open Drawing Board** icon at the lower right inside the input or with `Ctrl/Cmd+Alt+D` in the input. **Save** retains an SVG history entry for re-editing and adds the same drawing to the current input as a PNG attachment. Send the message using the existing Send button.
+
+Editable project Markdown also opens the shared board through Hotview's `/paint` or `/그림` command. Saving there inserts a PNG at the command position through the document's existing upload API. This context does not access agent drawing history or require agent feature permission. See the [Hotview contract](../document-code-media-editing/markdown-hotview-source-and-properties.md#drawing-insertion) and [ADR 0115](../../decisions/0115-hotview-drawing.md).
 
 ## Scope and Entry Points
 
@@ -24,7 +26,9 @@ Draw while panning the workspace without setting a canvas width or height in adv
 
 **Go to Origin** or `0` centers the origin on the screen at the current zoom level. `Ctrl/Cmd+0` returns to a centered origin at 100%. `1` fits all objects in the view, and `2` fits the selected objects. The zoom range is 5–1600%. The wheel pans the view, and `Ctrl/Cmd/Alt+휠` zooms around the pointer. The pan tool, Space+drag, middle-button drag, two-finger panning, and pinching are also supported.
 
-The grid defaults to 20px, with visibility and snapping toggled independently. Change the spacing to 2–1000px in **Grid Settings**. Object creation, movement, resizing, and new pen points snap to the grid; holding Alt disables snapping. If grid dots become too dense when zooming out, only the display spacing increases. Saved images exclude the grid, origin, and selection indicators.
+The canvas background is transparent and shows the surrounding theme surface. New strokes use the theme's foreground color captured when the board opens; saved colors remain explicit. Saved SVGs and PNGs retain transparency and exclude the grid, origin, guides, and selection indicators.
+
+The grid defaults to 20px, with visibility and snapping toggled independently in **Snap Settings** (the magnet button). Set spacing to 2–1000px. Grid snapping rounds to the nearest grid point even when the grid is hidden. Enable **Snap to Objects** independently to align shape creation, curve nodes, movement, and resize pointers with other objects' edges and centers. **Object Snap Distance** sets a 1–24 screen-pixel tolerance, initially 6px, independent of zoom. Nearby object anchors take precedence over the grid on each axis; alignment guides appear during gestures. The selection and its group members are excluded as targets. Holding Alt bypasses both snap modes. Freehand strokes always follow the pointer without snapping. If grid dots become too dense when zooming out, only the display spacing increases. Grid and snap options survive SVG history restoration and support undo/redo.
 
 ## Drawing and Images
 
@@ -33,10 +37,13 @@ The grid defaults to 20px, with visibility and snapping toggled independently. C
 | Rectangle `R` | Drag to set two corners. Hold Shift to make a square. |
 | Ellipse `O` | Drag to set the bounding rectangle. Hold Shift to make a circle. |
 | Line `L` | Drag from the start point to the end point. Hold Shift to snap the direction to 45° increments. |
+| Pen `B` | Draw continuously with a mouse, touch, or stylus. Releasing finishes one stroke and keeps the pen active. A tap creates a dot. Each stroke is one undo step. |
 | Curve pen `P` | Click to add points, and click and drag to create curve direction handles. Finish with Enter, a double-click, or **Finish Curve**. With at least three points, click the first point to finish as a closed path. |
 | Text `T` | Click the desired position and enter multiple lines. Finish by clicking outside, pressing Esc, or pressing Ctrl/Cmd+Enter. Double-click the text to edit it again. |
 
 Paste a screenshot or image from the clipboard, or drop a file onto the canvas to create an image object. PNG, JPEG, WebP, GIF, and AVIF are supported, with a limit of 20 MiB per file. On initial placement, the displayed longer side is limited to 1600px, and the original bytes are preserved as a data URL. Images support moving, transforming, rotating, grouping, and layer operations alongside other objects. Clipboard support depends on the image clipboard data provided by the OS and browser.
+
+The canvas exposes **Stroke Width** beside the lower controls for drawing tools and stroke-bearing selections. Changes set the next stroke's width and apply to the current selection. The upper tool group scrolls horizontally when space is limited, keeping color controls available on narrow screens.
 
 ## Selection, Transforms, and Layers
 
@@ -66,7 +73,7 @@ The keys below apply when the drawing editor has focus and no text or numeric fi
 | --- | --- |
 | Open drawing editor | `Ctrl/Cmd+Alt+D` in the agent input field |
 | Select / Pan | `V` / `H`, drag while holding Space |
-| Rectangle / Ellipse / Line / Pen / Text | `R` / `O` / `L` / `P` / `T` |
+| Rectangle / Ellipse / Line / Freehand pen / Curve pen / Text | `R` / `O` / `L` / `B` / `P` / `T` |
 | Select all / Add to selection | `Ctrl/Cmd+A` / Shift+click |
 | Copy / Cut / Paste | `Ctrl/Cmd+C` / `X` / `V` |
 | Duplicate / Delete | `Ctrl/Cmd+D` / Delete·Backspace |
@@ -89,9 +96,9 @@ Esc closes open menus, property editing, palettes, or auxiliary panels, finishes
 
 ## Saving, History, and Attachments
 
-**Save** creates an SVG by adding 24px of padding and a white background around the outer bounds of all objects, including stroke widths. It does not crop to the visible area or origin position. The SVG's `<metadata id="mew-drawing">` contains the version, objects, and grid settings as XML-escaped JSON, and images and downloaded fonts are embedded as well. View position, selection, and undo history are not saved.
+**Save** creates a transparent SVG with 24px of padding around the outer bounds of all objects, including stroke widths. It does not crop to the visible area or origin position. The SVG's `<metadata id="mew-drawing">` contains the version, objects, and grid settings as XML-escaped JSON, and images and downloaded fonts are embedded as well. View position, selection, and undo history are not saved. In document context, the SVG is used only for local PNG conversion; no SVG history record is created.
 
-The browser converts the same SVG to PNG and uploads the PNG through the existing attachment flow after the SVG is saved successfully. The PNG defaults to 2× resolution, scaled down based on limits of 8192px per side and approximately 16.8 megapixels. If saving, conversion, or attachment fails, the drawing and error remain available for retry. If only attachment fails after the SVG is saved, retrying with the same drawing and name reuses the existing export to reduce duplicate history entries.
+In agent context, the browser converts the same SVG to PNG and uploads the PNG through the existing attachment flow after the SVG is saved successfully. Document context uploads through the document API without persisting that SVG. The PNG defaults to 2× resolution, scaled down based on limits of 8192px per side and approximately 16.8 megapixels. If saving, conversion, or attachment fails, the drawing and error remain available for retry. If only attachment fails after the SVG is saved, retrying with the same drawing and name reuses the existing export to reduce duplicate history entries.
 
 | Data | Location and lifetime |
 | --- | --- |
@@ -104,7 +111,7 @@ New SVG, JSON, and PNG files are saved only under `.mew/temp/`. Existing history
 
 The Mew repository also excludes existing untracked user drawings in `.mew/drawings/` from Git, preserving them at their original paths. It does not delete tracked drawings or attachments or change their storage locations in bulk.
 
-Each save adds a new UUID history entry. Select an entry by name and time from **Drawing History** at the top to restore the SVG's editing metadata and edit it again. The list reads only small JSON files, so it does not parse entire SVGs containing screenshots each time. Even when editing Documents, files are saved at the `.workspace` root; no nested `.mew` is created under Documents. Removing an attachment tag does not delete the original SVG or PNG from disk.
+Each agent-context save adds a new UUID history entry. Select an entry by name and time from **Drawing History** at the top to restore the SVG's editing metadata and edit it again. The list reads only small JSON files, so it does not parse entire SVGs containing screenshots each time. Agent drawing history is saved at the `.workspace` root; no nested `.mew` is created under Documents. Removing an attachment tag does not delete the original SVG or PNG from disk. Hotview drawing uploads follow the document API's existing project scope and temporary-attachment storage instead.
 
 ## APIs and Access Boundaries
 
@@ -126,6 +133,7 @@ The server allows only editor-generated SVG tags and attributes, raster image da
 | --- | --- |
 | `model.ts` | Versioned documents, objects, and grid; normalization, grouping, and layer order; undo history of up to 80 states |
 | `geometry.ts` | Coordinate conversion, selection bounds, actual shape hit testing, movement, resizing, rotation, and curve calculations |
+| `freehand.ts` / `snapping.ts` | Bounded stroke sampling and cubic smoothing / static sorted edge and center targets, screen-space tolerance, and alignment guides |
 | `DrawingObjectView.tsx` | Per-object SVG rendering and memoization |
 | `DrawingEditor.tsx` | Tools, selection, pointer gestures, panning, keyboard handling, and popup lifecycle |
 | `DrawingInspector.tsx` | Property editing using shared menus, select fields, and color pickers |
@@ -133,16 +141,20 @@ The server allows only editor-generated SVG tags and attributes, raster image da
 | `fonts.ts` | Google Fonts subset downloads, caching, and font embedding |
 | `storage.ts` / `server/agent-drawings.ts` | Authenticated transport / Per-project validation, history storage, and retrieval |
 | `AgentPanel.tsx` | Lazy-loaded entry point and integration with existing input and queue attachments |
+| `EditorPane.tsx` / `packages/editor/src/Editor.tsx` | Lazy-loaded document context / host-injected renderer, mapped insertion position, and document upload lifecycle |
 
 Drag previews are applied once per frame using `requestAnimationFrame`, and a single document snapshot is committed when the gesture ends. Intermediate pointer movement states are not added to undo history. Document object coordinates are separate from the viewport; internal object X/Y coordinates indicate the top-left corner before rotation. Center coordinates in the properties menu are calculated from the selection bounds. New object types require corresponding implementations in the document model, geometry calculations, renderer, and SVG conversion. The rationale for technical choices is documented in [ADR 0008](../../decisions/0008-agent-vector-drawing.md).
 
 Undo during a drag cancels the change in progress first and does not remove the previously committed object. Normalization during document restoration and export is capped at 5,000 objects and 10,000 path points per object. Actual editing latency for large documents has not been measured separately.
 
+Freehand collects coalesced pointer samples outside React state, updates its preview at most once per frame, and smooths the completed stroke into the existing path format. Sampling spacing follows zoom and decimates long strokes before the 10,000-point limit. Geometry caches path extrema by immutable point-array identity and rotation, size, and closure; translating unchanged paths reuses those extrema. Object snap targets and movement bounds are prepared once per gesture. These optimizations do not establish a real-device latency target; local measurements and checks are recorded in [Drawing board integration](../../work/hotview-drawing-tools.md).
+
 ## Acceptance Criteria and Verification
 
 The following are user acceptance criteria; this list itself does not establish that verification is complete.
 
-- Edit shapes, lines, curves, multiline text, and screenshots in one drawing, and change grid visibility, spacing, and snapping.
+- Edit shapes, lines, freehand strokes, curves, multiline text, and screenshots in one drawing, and change grid visibility, spacing, object snapping, and its tolerance.
+- Open the board from both Hotview aliases, save a transparent image at the original mapped insertion position, retry failed uploads, and reject late results after a document or project change.
 - Object pixel coordinates remain unchanged after returning to the origin, zooming, or panning, and resizing, rotation, grouping, and layer order remain consistent for rotated objects and multiple selections.
 - Palette number keys, transparency, custom colors, and Google fonts apply to the entire selection, and mixed-selection menus show only colors.
 - Undo, redo, copy, and paste preserve objects, images, and groups, and a single drag is undone in one step.

@@ -7,6 +7,7 @@ export type {
   EditorApi,
   EditorOpenLink,
   EditorOpenLinkOptions,
+  EditorDrawingOptions,
   DocumentBacklinksData,
   FrontmatterOptionsApi,
   EditorCollab,

@@ -1,7 +1,7 @@
 ---
 title: "Document Editing and Storage Formats"
-description: "Explains editing Markdown, code, document properties, tables, links, attachments, and PDFs; adding and deleting rows and columns through the body context menu; and the horizontal icon menu with hover labels that stays open while scrolling, browser-menu suppression, and native keyboard activation by tapping the editor on mobile. Covers Hotview @ file autocomplete across all folders, annotations, internal document navigation with upper-left Back/Forward buttons, table/DB conversion, inline subpage naming, autosave, split views, panel switching in the mobile dock, tab switching in the body and Plain modifier key bars, and installation controls."
-updated: "2026-11-01"
+description: "Explains editing Markdown, code, document properties, tables, links, attachments, and PDFs; /paint and /그림 image insertion with freehand pens, transparent exports, and snap settings; adding and deleting table rows and columns; and the body context menu and native mobile keyboard. Covers Hotview @ file autocomplete, annotations, internal document navigation, table/DB conversion, inline subpage naming, autosave, split views, mobile panels, and installation controls."
+updated: "2026-11-02"
 상위파일:
   - "../../.mew/docs/MOC.md"
   - "MOC.md"
@@ -52,6 +52,7 @@ Relative paths for Markdown images are resolved from the current document's fold
 - Clicking links to files in other folders outside the project also opens them in the same editor. Relative `../` paths, absolute paths such as `/etc/hosts`, and local `file://` links are supported. System files and hidden files readable by the server OS can also be opened, and permission to use server file features is required. External Markdown opens in Hotview, and its relative links are resolved from the external file's folder.
 - Check the destination in the link tooltip. Title and description previews for external sites are currently disabled. Pasting a supported YouTube URL inserts a video node, but playback requires [deployment policy updates](../../.mew/docs/work/deployment-readiness-review.md) because the production CSP does not allow external frames.
 - In Hotview, type `/` and select **Upload File**, or drag a file into the body. Pasting images from the clipboard is also supported. Use an inserted image's resize handles to change its display size.
+- To draw an image in an editable project document, type `/paint` or `/그림` and select **Drawing Editor**. Use **Pen** (`B`) for freehand strokes or **Bézier Pen** (`P`) for curves, and adjust **Stroke Width** beside the lower controls. **Snap Settings**, opened with the magnet button, controls grid visibility, grid spacing, grid snapping, object snapping, and its distance. Hold Alt to bypass snapping; freehand strokes always follow the pointer. **Save** inserts a transparent PNG where the command was entered. Failed uploads keep the drawing available for retry. This document entry point does not require agent access or save editable SVG history. See the [drawing board contract](../../.mew/docs/features/terminals-agents-automation/agent-drawing-editor.md).
 - Body attachments are saved in the project's `.mew/assets/`. Dropping a file in the file explorer saves it in the selected folder under its original name. Conflict handling, shared links, and Git integration follow the [drag-and-drop contract](#dragging-and-dropping-file-explorer-items).
 
 ## Editing and Copying Tables

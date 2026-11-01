@@ -56,7 +56,10 @@ function pathSegments(object: DrawingObject): [Point, Point, Point, Point][] {
   return segments
 }
 
-export function objectBounds(object: DrawingObject): Bounds {
+interface CachedPathBounds { rotation: number; width: number; height: number; closed: boolean; bounds: Bounds }
+const pathBoundsCache = new WeakMap<readonly DrawingPoint[], CachedPathBounds>()
+
+function calculateObjectBounds(object: DrawingObject): Bounds {
   const center = objectCenter(object)
   if (object.type === 'ellipse') {
     const cos = Math.cos(radians(object.rotation)), sin = Math.sin(radians(object.rotation))
@@ -73,6 +76,19 @@ export function objectBounds(object: DrawingObject): Bounds {
     return points.length ? boundsFromPoints(points) : boundsFromPoints([objectLocalToWorld(object, object.points?.[0] ?? { x: 0, y: 0 })])
   }
   return boundsFromPoints([{ x: 0, y: 0 }, { x: object.width, y: 0 }, { x: object.width, y: object.height }, { x: 0, y: object.height }].map(point => objectLocalToWorld(object, point)))
+}
+
+export function objectBounds(object: DrawingObject): Bounds {
+  const points = object.points
+  if ((object.type !== 'path' && object.type !== 'line') || !points?.length) return calculateObjectBounds(object)
+  const closed = object.closed === true
+  let cached = pathBoundsCache.get(points)
+  if (!cached || cached.rotation !== object.rotation || cached.width !== object.width || cached.height !== object.height || cached.closed !== closed) {
+    // Editing a node replaces the points array. Pure translations can reuse its local extrema.
+    cached = { rotation: object.rotation, width: object.width, height: object.height, closed, bounds: calculateObjectBounds({ ...object, x: 0, y: 0 }) }
+    pathBoundsCache.set(points, cached)
+  }
+  return { ...cached.bounds, x: cached.bounds.x + object.x, y: cached.bounds.y + object.y }
 }
 
 export function selectionBounds(objects: readonly DrawingObject[], ids?: SelectionIds): Bounds | null {

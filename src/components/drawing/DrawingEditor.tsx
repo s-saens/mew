@@ -1,7 +1,8 @@
 import { ActionMenu, ActionMenuItem, ActionMenuSeparator, DialogFrame, HoverTipLayer, useOverlayDismiss } from '@mew/ui'
 import { uiText } from '@mew/ui/i18n-core'
-import { ArrowDown, ArrowUp, Circle, ClockRotateRight, Copy, CursorPointer, DesignNib, DragHandGesture, Group, HelpCircle, Maximize, Minus, Plus, Redo, Square, Text, Trash, Undo, ViewGrid, Xmark, OnePointCircle } from 'iconoir-react'
-import { useCallback, useEffect, useId, useRef, useState, type PointerEvent as ReactPointerEvent, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react'
+import { useUiLocale } from '@mew/ui/i18n'
+import { ArrowDown, ArrowUp, Circle, ClockRotateRight, Copy, CursorPointer, DesignNib, DragHandGesture, EditPencil, Group, HelpCircle, Magnet, Maximize, Minus, Plus, Redo, Square, Text, Trash, Undo, ViewGrid, Xmark, OnePointCircle } from 'iconoir-react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react'
 import { createDocument, createObject, drawingId, DRAWING_MIME, DrawingHistory, expandSelection, normalizeDocument, reorderObjects, type Bounds, type DrawingDocument, type DrawingObject, type DrawingViewport, type LayerAction, type Point } from './model'
 import { hitTestObject, normalizePathObject, objectBounds, objectLocalToWorld, resizeObject, resizeObjectFromHandle, resizeSelection, rotateSelection, selectionBounds, translateSelection, type ResizeHandle } from './geometry'
 import { parseSvgDocument, rasterizeSvg, serializeSvg } from './svg'
@@ -9,25 +10,29 @@ import { embeddedDrawingFontCss, loadDrawingFont } from './fonts'
 import { getDrawingScope, loadDrawing, saveDrawing, type DrawingSummary } from './storage'
 import { DrawingObjectView } from './DrawingObjectView'
 import { DrawingInspector, DrawingPaintPopover, NumberField, PaintButtons, type PaintTarget } from './DrawingInspector'
+import { FreehandSampler, finalizeFreehand } from './freehand'
+import { buildSnapTargets, snapDrawingBounds, snapDrawingPoint, type SnapGuide, type SnapTargets } from './snapping'
 import './drawing.css'
 
-type Tool = 'select' | 'hand' | 'rect' | 'ellipse' | 'line' | 'path' | 'text'
+type Tool = 'select' | 'hand' | 'rect' | 'ellipse' | 'line' | 'path' | 'freehand' | 'text'
 type Gesture = {
-  mode: 'pan' | 'move' | 'draw' | 'marquee' | 'resize' | 'rotate' | 'pen' | 'pinch'
+  mode: 'pan' | 'move' | 'draw' | 'marquee' | 'resize' | 'rotate' | 'pen' | 'freehand' | 'pinch'
   start: Point; screen: Point; base: DrawingDocument; ids: string[]; view: DrawingViewport
   object?: DrawingObject; handle?: ResizeHandle; bounds?: Bounds; angle?: number
   distance?: number; midpoint?: Point
+  samples?: FreehandSampler; targets?: SnapTargets
 }
 let copiedObjects: DrawingObject[] = []
 const HANDLES: ResizeHandle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']
 const HANDLE_POSITIONS: Point[] = [{ x: 0, y: 0 }, { x: .5, y: 0 }, { x: 1, y: 0 }, { x: 1, y: .5 }, { x: 1, y: 1 }, { x: .5, y: 1 }, { x: 0, y: 1 }, { x: 0, y: .5 }]
-const TOOL_KEYS: Record<string, Tool> = { v: 'select', h: 'hand', r: 'rect', o: 'ellipse', l: 'line', p: 'path', t: 'text' }
+const TOOL_KEYS: Record<string, Tool> = { v: 'select', h: 'hand', r: 'rect', o: 'ellipse', l: 'line', p: 'path', b: 'freehand', t: 'text' }
 const editable = (target: EventTarget | null) => target instanceof Element && !!target.closest('input, textarea, [contenteditable="true"]')
 const distance = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y)
 const boundedZoom = (zoom: number) => Math.max(.05, Math.min(16, zoom))
 const round = (n: number, step: number) => Math.round(n / step) * step
 
-export function DrawingEditor({ onClose, onSave }: { onClose: () => void; onSave: (file: File) => Promise<void> }) {
+export function DrawingEditor({ onClose, onSave, context: destination = 'agent', projectRoot: requestedRoot }: { onClose: () => void; onSave: (file: File) => Promise<void>; context?: 'agent' | 'document'; projectRoot?: string }) {
+  useUiLocale()
   const titleId = useId(), gridId = useId()
   const history = useRef(new DrawingHistory())
   const [doc, setDoc] = useState<DrawingDocument>(() => history.current.current)
@@ -38,11 +43,13 @@ export function DrawingEditor({ onClose, onSave }: { onClose: () => void; onSave
   const viewRef = useRef(view); viewRef.current = view
   const [paint, setPaint] = useState<PaintTarget | null>(null)
   const [paintCustom, setPaintCustom] = useState(false)
-  const [defaults, setDefaults] = useState({ fill: 'none', stroke: '#1f2937', strokeWidth: 2 })
+  const [defaults, setDefaults] = useState(() => ({ fill: 'none', stroke: getComputedStyle(document.documentElement).getPropertyValue('--color-ink').trim() || '#1f2937', strokeWidth: 2 }))
   const [context, setContext] = useState<Point | null>(null)
   const [panel, setPanel] = useState<'grid' | 'history' | 'shortcuts' | null>(null)
   const [marquee, setMarquee] = useState<Bounds | null>(null)
   const [pen, setPen] = useState<DrawingObject | null>(null)
+  const [stroke, setStroke] = useState<DrawingObject | null>(null)
+  const [guides, setGuides] = useState<SnapGuide[]>([])
   const penRef = useRef(pen); penRef.current = pen
   const [textId, setTextId] = useState<string | null>(null)
   const textBase = useRef<DrawingDocument | null>(null)
@@ -52,8 +59,8 @@ export function DrawingEditor({ onClose, onSave }: { onClose: () => void; onSave
   const [confirmClose, setConfirmClose] = useState(false)
   const [name, setName] = useState('')
   const [records, setRecords] = useState<DrawingSummary[]>([])
-  const [recordsLoading, setRecordsLoading] = useState(true)
-  const projectRoot = useRef<string | null>(null)
+  const [recordsLoading, setRecordsLoading] = useState(destination === 'agent')
+  const projectRoot = useRef<string | null>(requestedRoot ?? null)
   const scopePromise = useRef<ReturnType<typeof getDrawingScope> | null>(null)
   const saved = useRef(JSON.stringify(createDocument()))
   const savedExport = useRef<{ document: string; svgName: string; png: File } | null>(null)
@@ -64,8 +71,9 @@ export function DrawingEditor({ onClose, onSave }: { onClose: () => void; onSave
   const pointers = useRef(new Map<number, Point>())
   const [panning, setPanning] = useState(false)
   const [size, setSize] = useState({ width: 1, height: 1 })
-  const selectedObjects = doc.objects.filter(object => selected.includes(object.id))
-  const bounds = selectionBounds(doc.objects, selected)
+  const selectedIds = useMemo(() => new Set(selected), [selected])
+  const selectedObjects = useMemo(() => doc.objects.filter(object => selectedIds.has(object.id)), [doc.objects, selectedIds])
+  const bounds = useMemo(() => selectionBounds(selectedObjects), [selectedObjects])
   const activeText = doc.objects.find(object => object.id === textId)
 
   const preview = (next: DrawingDocument) => { docRef.current = next; setDoc(next) }
@@ -90,14 +98,16 @@ export function DrawingEditor({ onClose, onSave }: { onClose: () => void; onSave
   })
 
   useEffect(() => {
+    if (destination === 'document') return
     let active = true
-    const pending = getDrawingScope(); scopePromise.current = pending
+    const pending = getDrawingScope(requestedRoot); scopePromise.current = pending
     void pending.then(result => {
       if (!active) return
       projectRoot.current = result.projectRoot; setRecords(result.drawings)
     }).catch(error => { scopePromise.current = null; if (active) setError(String(error instanceof Error ? error.message : error)) }).finally(() => { if (active) setRecordsLoading(false) })
-    return () => { active = false; if (frame.current !== null) cancelAnimationFrame(frame.current) }
-  }, [])
+    return () => { active = false }
+  }, [destination, requestedRoot])
+  useEffect(() => () => { if (frame.current !== null) cancelAnimationFrame(frame.current) }, [])
 
   useEffect(() => {
     const stage = stageRef.current!
@@ -109,7 +119,7 @@ export function DrawingEditor({ onClose, onSave }: { onClose: () => void; onSave
       previous = { width, height }
     })
     observer.observe(stage)
-    const release = () => { space.current = false; setPanning(false) }
+    const release = (event: Event) => { if (event instanceof KeyboardEvent && event.code !== 'Space') return; space.current = false; setPanning(false) }
     window.addEventListener('keyup', release)
     window.addEventListener('blur', release)
     return () => { observer.disconnect(); window.removeEventListener('keyup', release); window.removeEventListener('blur', release) }
@@ -141,11 +151,17 @@ export function DrawingEditor({ onClose, onSave }: { onClose: () => void; onSave
     return { x: event.clientX - rect.left, y: event.clientY - rect.top }
   }
   function worldAt(point: Point, viewport = viewRef.current): Point { return { x: (point.x - viewport.x) / viewport.zoom, y: (point.y - viewport.y) / viewport.zoom } }
-  function snapped(point: Point, skip = false): Point {
-    const grid = docRef.current.grid
-    return grid.snap && !skip ? { x: round(point.x, grid.size), y: round(point.y, grid.size) } : point
+  function snapped(point: Point, skip = false, targets?: SnapTargets): Point {
+    if (skip) { setGuides([]); return point }
+    const result = snapDrawingPoint(point, docRef.current.grid, viewRef.current.zoom, targets)
+    if (targets) setGuides(result.guides)
+    return result.point
   }
-  function hit(point: Point) { return [...docRef.current.objects].reverse().find(object => hitTestObject(object, point, 6 / viewRef.current.zoom)) }
+  function snapTargets(ids: string[] = []) { return docRef.current.grid.objectSnap ? buildSnapTargets(docRef.current.objects, ids) : undefined }
+  function hit(point: Point) {
+    const objects = docRef.current.objects
+    for (let i = objects.length - 1; i >= 0; i--) if (hitTestObject(objects[i], point, 6 / viewRef.current.zoom)) return objects[i]
+  }
   function fit(objects = docRef.current.objects) {
     const b = selectionBounds(objects, objects.map(object => object.id))
     if (!b) { setView({ x: size.width / 2, y: size.height / 2, zoom: 1 }); return }
@@ -176,17 +192,18 @@ export function DrawingEditor({ onClose, onSave }: { onClose: () => void; onSave
     if (keep) queuedMove.current?.()
     queuedMove.current = null
     const active = gesture.current
-    const changed = !!active && ['draw', 'move', 'resize', 'rotate'].includes(active.mode) && docRef.current !== active.base
+    const changed = !!active && (active.mode === 'freehand' || ['draw', 'move', 'resize', 'rotate'].includes(active.mode) && docRef.current !== active.base)
+    if (active?.mode === 'freehand' && keep) commit({ ...active.base, objects: [...active.base.objects, finalizeFreehand(active.samples!.points, active.object)] })
     if (active && ['draw', 'move', 'resize', 'rotate'].includes(active.mode)) {
       if (keep) commit(docRef.current)
       else preview(active.base)
     }
-    gesture.current = null; setMarquee(null); setPanning(false)
+    gesture.current = null; setMarquee(null); setStroke(null); setGuides([]); setPanning(false)
     for (const id of pointers.current.keys()) if (svgRef.current?.hasPointerCapture(id)) svgRef.current.releasePointerCapture(id)
     pointers.current.clear()
     return changed
   }
-  function chooseTool(next: Tool) { settleGesture(true); finishText(); if (penRef.current) finishPen(); setTool(next); setPaint(null); setPanel(null); focusCanvas() }
+  function chooseTool(next: Tool) { settleGesture(true); finishText(); if (penRef.current) finishPen(); setTool(next); if (next !== 'select') setSelected([]); setPaint(null); setPanel(null); focusCanvas() }
 
   function pointerDown(event: ReactPointerEvent<SVGSVGElement>) {
     if (busy || (event.button !== 0 && event.button !== 1)) return
@@ -199,44 +216,51 @@ export function DrawingEditor({ onClose, onSave }: { onClose: () => void; onSave
       const [a, b] = [...pointers.current.values()]
       if (gesture.current?.mode !== 'pan') preview(history.current.current)
       gesture.current = { mode: 'pinch', start, screen, base: history.current.current, ids: [], view: viewRef.current, distance: distance(a, b), midpoint: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 } }
-      setMarquee(null); return
+      setMarquee(null); setStroke(null); setGuides([]); return
     }
     if (space.current || tool === 'hand' || event.button === 1) {
       gesture.current = { mode: 'pan', start, screen, base, ids: [], view: viewRef.current }; setPanning(true); return
     }
     const target = event.target as Element
     const handle = target.getAttribute('data-resize-handle') as ResizeHandle | null
-    if (handle && bounds) { gesture.current = { mode: 'resize', start, screen, base, ids: selected, view, bounds, handle, object: selectedObjects.length === 1 ? selectedObjects[0] : undefined }; return }
+    if (handle && bounds) { gesture.current = { mode: 'resize', start, screen, base, ids: selected, view, bounds, handle, object: selectedObjects.length === 1 ? selectedObjects[0] : undefined, targets: snapTargets(selected) }; return }
     if (target.closest('[data-rotate-handle]') && bounds) {
       const center = { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 }
       gesture.current = { mode: 'rotate', start, screen, base, ids: selected, view, bounds, angle: Math.atan2(start.y - center.y, start.x - center.x) }; return
     }
     setContext(null); setPaint(null); setPanel(null)
+    if (tool === 'freehand') {
+      const samples = new FreehandSampler(view.zoom)
+      samples.append(start)
+      const object = createObject('path', { ...defaults, fill: 'none', x: 0, y: 0, width: 0, height: 0, points: [start] })
+      setSelected([]); setStroke(object)
+      gesture.current = { mode: 'freehand', start, screen, base, ids: [], view, object, samples }; return
+    }
     if (tool === 'path') {
       const previous = penRef.current
       if (previous && (previous.points?.length ?? 0) > 2 && distance(start, objectLocalToWorld(previous, previous.points![0])) < 10 / view.zoom) { finishPen(true); return }
-      const at = snapped(start, event.altKey)
+      const targets = snapTargets(), at = snapped(start, event.altKey, targets)
       const next = previous ? { ...previous, points: [...previous.points!, at] } : createObject('path', { ...defaults, x: 0, y: 0, width: 0, height: 0, points: [at] })
       penRef.current = next; setPen(next)
-      gesture.current = { mode: 'pen', start: at, screen, base, ids: [], view }; return
+      gesture.current = { mode: 'pen', start: at, screen, base, ids: [], view, targets }; return
     }
     if (tool === 'text') {
-      const at = snapped(start, event.altKey)
+      const at = snapped(start, event.altKey, snapTargets())
       const object = createObject('text', { x: at.x, y: at.y, width: 200, height: 32, fill: defaults.fill === 'none' ? defaults.stroke : defaults.fill, stroke: 'none', fontFamily: 'Arial' })
       preview({ ...base, objects: [...base.objects, object] }); startText(object); return
     }
     if (tool !== 'select') {
-      const at = snapped(start, event.altKey)
+      const targets = snapTargets(), at = snapped(start, event.altKey, targets)
       const object = createObject(tool, { ...defaults, x: at.x, y: at.y, width: 0, height: 0, ...(tool === 'line' ? { fill: 'none', points: [{ x: 0, y: 0 }, { x: 0, y: 0 }] } : {}) })
       preview({ ...base, objects: [...base.objects, object] }); setSelected([object.id])
-      gesture.current = { mode: 'draw', start: at, screen, base, ids: [object.id], object, view }; return
+      gesture.current = { mode: 'draw', start: at, screen, base, ids: [object.id], object, view, targets }; return
     }
     const object = hit(start)
     if (object) {
       const group = expandSelection(base.objects, [object.id])
       const ids = event.shiftKey ? selected.includes(object.id) ? selected.filter(id => !group.includes(id)) : [...new Set([...selected, ...group])] : selected.includes(object.id) ? selected : group
       setSelected(ids)
-      gesture.current = { mode: 'move', start, screen, base, ids, view }; return
+      gesture.current = { mode: 'move', start, screen, base, ids, view, bounds: selectionBounds(base.objects, ids) ?? undefined, targets: snapTargets(ids) }; return
     }
     const ids = event.shiftKey ? selected : []
     setSelected(ids); setMarquee({ x: start.x, y: start.y, width: 0, height: 0 })
@@ -257,6 +281,9 @@ export function DrawingEditor({ onClose, onSave }: { onClose: () => void; onSave
     }
     if (g.mode === 'pan') { setView({ ...g.view, x: g.view.x + screen.x - g.screen.x, y: g.view.y + screen.y - g.screen.y }); return }
     const world = worldAt(screen)
+    if (g.mode === 'freehand') {
+      setStroke({ ...g.object!, points: [...g.samples!.points] }); return
+    }
     if (g.mode === 'pen') {
       const current = penRef.current
       if (!current || distance(screen, g.screen) < 3) return
@@ -273,7 +300,7 @@ export function DrawingEditor({ onClose, onSave }: { onClose: () => void; onSave
     }
     let objects = g.base.objects
     if (g.mode === 'draw') {
-      const at = snapped(world, event.altKey)
+      const at = snapped(world, event.altKey, g.targets)
       let dx = at.x - g.start.x, dy = at.y - g.start.y
       if (event.shiftKey) {
         if (g.object!.type === 'line') { const angle = round(Math.atan2(dy, dx), Math.PI / 4), length = Math.hypot(dx, dy); dx = Math.cos(angle) * length; dy = Math.sin(angle) * length }
@@ -284,16 +311,24 @@ export function DrawingEditor({ onClose, onSave }: { onClose: () => void; onSave
       objects = [...g.base.objects, object]
     } else if (g.mode === 'move') {
       let delta = { x: world.x - g.start.x, y: world.y - g.start.y }
-      const b = selectionBounds(g.base.objects, g.ids)
-      if (b && docRef.current.grid.snap && !event.altKey) { const at = snapped({ x: b.x + delta.x, y: b.y + delta.y }); delta = { x: at.x - b.x, y: at.y - b.y } }
-      if (event.shiftKey) { if (Math.abs(delta.x) >= Math.abs(delta.y)) delta.y = 0; else delta.x = 0 }
+      let moveGuides: SnapGuide[] = []
+      const b = g.bounds
+      if (b && !event.altKey) {
+        const result = snapDrawingBounds({ ...b, x: b.x + delta.x, y: b.y + delta.y }, docRef.current.grid, viewRef.current.zoom, g.targets)
+        delta = { x: delta.x + result.delta.x, y: delta.y + result.delta.y }; moveGuides = result.guides
+      }
+      if (event.shiftKey) {
+        if (Math.abs(delta.x) >= Math.abs(delta.y)) { delta.y = 0; moveGuides = moveGuides.filter(guide => guide.axis === 'x') }
+        else { delta.x = 0; moveGuides = moveGuides.filter(guide => guide.axis === 'y') }
+      }
+      setGuides(moveGuides)
       objects = translateSelection(g.base.objects, g.ids, delta)
     } else if (g.mode === 'resize') {
       if (g.object) {
-        const resized = resizeObjectFromHandle(g.object, g.handle!, world, { snap: docRef.current.grid.snap && !event.altKey ? docRef.current.grid.size : undefined, preserveAspect: event.shiftKey })
+        const resized = resizeObjectFromHandle(g.object, g.handle!, snapped(world, event.altKey, g.targets), { preserveAspect: event.shiftKey })
         objects = objects.map(object => object.id === resized.id ? resized : object)
       } else {
-        const b = g.bounds!, at = snapped(world, event.altKey), h = g.handle!
+        const b = g.bounds!, at = snapped(world, event.altKey, g.targets), h = g.handle!
         let x = h.includes('w') ? Math.min(at.x, b.x + b.width - 1) : b.x
         let y = h.includes('n') ? Math.min(at.y, b.y + b.height - 1) : b.y
         let width = h.includes('w') ? b.x + b.width - x : h.includes('e') ? Math.max(1, at.x - x) : b.width
@@ -310,6 +345,13 @@ export function DrawingEditor({ onClose, onSave }: { onClose: () => void; onSave
     preview({ ...g.base, objects })
   }
   function pointerMove(event: ReactPointerEvent<SVGSVGElement>) {
+    const active = gesture.current
+    if (!active) return
+    if (active.mode === 'freehand' && pointers.current.has(event.pointerId)) {
+      const rect = stageRef.current!.getBoundingClientRect()
+      const samples = event.nativeEvent.getCoalescedEvents?.() ?? []
+      for (const sample of [...samples, event]) active.samples!.append(worldAt({ x: sample.clientX - rect.left, y: sample.clientY - rect.top }))
+    }
     const snapshot = { pointerId: event.pointerId, clientX: event.clientX, clientY: event.clientY, shiftKey: event.shiftKey, altKey: event.altKey }
     queuedMove.current = () => movePointer(snapshot)
     if (frame.current === null) frame.current = requestAnimationFrame(() => { frame.current = null; queuedMove.current?.(); queuedMove.current = null })
@@ -318,10 +360,15 @@ export function DrawingEditor({ onClose, onSave }: { onClose: () => void; onSave
     if (frame.current !== null) { cancelAnimationFrame(frame.current); frame.current = null }
     queuedMove.current?.(); queuedMove.current = null
     const g = gesture.current
+    if (g?.mode === 'freehand' && !cancelled) g.samples!.append(worldAt(pointOf(event)))
     pointers.current.delete(event.pointerId)
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
     if (!g) return
     if (cancelled) { preview(g.base); setMarquee(null) }
+    else if (g.mode === 'freehand') {
+      const object = finalizeFreehand(g.samples!.points, g.object)
+      commit({ ...g.base, objects: [...g.base.objects, object] })
+    }
     else if (['draw', 'move', 'resize', 'rotate'].includes(g.mode)) {
       let next = docRef.current
       if (g.mode === 'draw') {
@@ -335,7 +382,7 @@ export function DrawingEditor({ onClose, onSave }: { onClose: () => void; onSave
       commit(next)
     }
     if (g.mode === 'marquee') setMarquee(null)
-    gesture.current = null; setPanning(false)
+    gesture.current = null; setStroke(null); setGuides([]); setPanning(false)
     if (pointers.current.size === 1 && g.mode === 'pinch') {
       const remaining = [...pointers.current.values()][0]
       gesture.current = { mode: 'pan', start: worldAt(remaining), screen: remaining, base: docRef.current, ids: [], view: viewRef.current }
@@ -369,6 +416,10 @@ export function DrawingEditor({ onClose, onSave }: { onClose: () => void; onSave
     const target = paint ?? 'fill'
     setDefaults(current => ({ ...current, [target]: color }))
     if (selected.length) patch({ [target]: color })
+  }
+  function changeStrokeWidth(strokeWidth: number) {
+    setDefaults(current => ({ ...current, strokeWidth }))
+    if (selected.length) patch({ strokeWidth })
   }
   function changeGeometry(field: 'x' | 'y' | 'width' | 'height' | 'rotation', value: number) {
     if (!bounds) return
@@ -446,7 +497,7 @@ export function DrawingEditor({ onClose, onSave }: { onClose: () => void; onSave
   }
 
   async function save() {
-    if (busy) return
+    if (busyRef.current) return
     settleGesture(true)
     finishText(); if (penRef.current) finishPen()
     if (!docRef.current.objects.length) return
@@ -461,15 +512,20 @@ export function DrawingEditor({ onClose, onSave }: { onClose: () => void; onSave
       let cached = savedExport.current
       if (!cached || cached.document !== serialized || cached.svgName !== svgName) {
         const fontCss = await embeddedDrawingFontCss(current.objects.filter(object => object.type === 'text'))
-        const svg = serializeSvg(current, { padding: 24, background: '#ffffff', fontCss })
+        const svg = serializeSvg(current, { padding: 24, fontCss })
         const blob = await rasterizeSvg(svg, { scale: 2 })
-        const scope = projectRoot.current ?? (await (scopePromise.current ?? getDrawingScope())).projectRoot
-        const record = await saveDrawing(svg, svgName, scope)
-        setRecords(records => [record, ...records]); saved.current = serialized
-        cached = { document: serialized, svgName, png: new File([blob], `${record.id}.png`, { type: 'image/png' }) }
+        let filename = `${svgName}.png`
+        if (destination === 'agent') {
+          const scope = projectRoot.current ?? (await (scopePromise.current ?? getDrawingScope(requestedRoot))).projectRoot
+          const record = await saveDrawing(svg, svgName, scope)
+          setRecords(records => [record, ...records]); saved.current = serialized
+          filename = `${record.id}.png`
+        }
+        cached = { document: serialized, svgName, png: new File([blob], filename, { type: 'image/png' }) }
         savedExport.current = cached
       }
       await onSave(cached.png)
+      saved.current = serialized
       onClose()
     } catch (err) { setError(err instanceof Error ? err.message : uiText('그림을 저장하지 못했습니다. 다시 시도해 주세요.')) }
     finally { busyRef.current = false; setBusy(false) }
@@ -529,8 +585,8 @@ export function DrawingEditor({ onClose, onSave }: { onClose: () => void; onSave
     if (key === 'f' || key === 'x') { event.preventDefault(); setPaint(key === 'f' ? 'fill' : 'stroke'); setPaintCustom(false); return }
     if (key === '?') { event.preventDefault(); setPanel(panel === 'shortcuts' ? null : 'shortcuts') }
   }
-  function iconButton(label: Parameters<typeof uiText>[0], icon: ReactNode, action: () => void, options: { shortcut?: string; active?: boolean; disabled?: boolean } = {}) {
-    return <button type="button" className="drawing-icon" aria-label={uiText(label)} data-tip={uiText(label) + (options.shortcut ? ` · ${options.shortcut}` : '')} aria-pressed={options.active} disabled={busy || options.disabled} onClick={action}>{icon}</button>
+  function iconButton(label: string, icon: ReactNode, action: () => void, options: { shortcut?: string; active?: boolean; disabled?: boolean } = {}) {
+    return <button type="button" className="drawing-icon" aria-label={label} data-tip={label + (options.shortcut ? ` · ${options.shortcut}` : '')} aria-pressed={options.active} disabled={busy || options.disabled} onClick={action}>{icon}</button>
   }
   const single = selectedObjects.length === 1 ? selectedObjects[0] : undefined
   const box = single ? { x: single.x, y: single.y, width: single.width, height: single.height } : bounds
@@ -551,13 +607,13 @@ export function DrawingEditor({ onClose, onSave }: { onClose: () => void; onSave
         <header className="drawing-header"><div className="drawing-heading"><DesignNib aria-hidden="true" /><h2 id={titleId}>{uiText('그림판')}</h2></div>
           <input className="drawing-name" aria-label={uiText('그림 이름')} placeholder={uiText('제목 없는 그림')} value={name} onChange={event => setName(event.target.value)} maxLength={120} disabled={busy} />
           <div className="drawing-header-actions">
-            {iconButton('그림 기록', <ClockRotateRight />, () => setPanel(panel === 'history' ? null : 'history'), { active: panel === 'history' })}
+            {destination === 'agent' && iconButton(uiText('그림 기록'), <ClockRotateRight />, () => setPanel(panel === 'history' ? null : 'history'), { active: panel === 'history' })}
             <button type="button" className="drawing-save" disabled={busy || !doc.objects.length && !pen} onClick={() => void save()}>{uiText(busy ? '저장 중…' : '저장')}</button>
-            {iconButton('닫기', <Xmark />, requestClose)}
+            {iconButton(uiText('닫기'), <Xmark />, requestClose)}
           </div>
         </header>
         {error && <div className="drawing-error" role="alert"><span>{error}</span><button type="button" aria-label={uiText('오류 닫기')} onClick={() => setError('')}><Xmark /></button></div>}
-        <div ref={stageRef} className="drawing-stage" data-tool={tool} data-panning={panning || undefined} onDragOver={event => { if (event.dataTransfer.types.includes('Files')) { event.preventDefault(); event.dataTransfer.dropEffect = 'copy' } }} onDrop={event => { event.preventDefault(); void insertImages([...event.dataTransfer.files], worldAt(pointOf(event))) }}>
+        <div ref={stageRef} className="drawing-stage" inert={busy} data-tool={tool} data-panning={panning || undefined} onDragOver={event => { if (event.dataTransfer.types.includes('Files')) { event.preventDefault(); event.dataTransfer.dropEffect = 'copy' } }} onDrop={event => { event.preventDefault(); void insertImages([...event.dataTransfer.files], worldAt(pointOf(event))) }}>
           <svg ref={svgRef} data-drawing-canvas tabIndex={0} aria-label={uiText('그림 캔버스')} role="application" onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={event => pointerUp(event)} onPointerCancel={event => pointerUp(event, true)}
             onDoubleClick={event => {
               if (penRef.current) { finishPen(); return }
@@ -576,21 +632,23 @@ export function DrawingEditor({ onClose, onSave }: { onClose: () => void; onSave
                 event.preventDefault(); const rect = svgRef.current!.getBoundingClientRect(); setContext({ x: rect.left + size.width / 2, y: rect.top + size.height / 2 })
               }
             }}>
-            <defs><pattern id={gridId} width={gridStep * view.zoom} height={gridStep * view.zoom} patternUnits="userSpaceOnUse" x={view.x} y={view.y}><circle cx={0} cy={0} r={.8} fill="#a5adba" /></pattern></defs>
+            <defs><pattern id={gridId} width={gridStep * view.zoom} height={gridStep * view.zoom} patternUnits="userSpaceOnUse" x={view.x} y={view.y}><circle cx={0} cy={0} r={.8} fill="var(--color-ink-muted)" /></pattern></defs>
             {doc.grid.visible && <rect width="100%" height="100%" fill={`url(#${gridId})`} pointerEvents="none" />}
             <g transform={`translate(${view.x} ${view.y}) scale(${view.zoom})`}>
               {doc.objects.map(object => <DrawingObjectView key={object.id} object={object} />)}
+              {stroke && <DrawingObjectView object={stroke} />}
               {pen && <><DrawingObjectView object={pen} />{pen.points?.map((point, index) => <g key={index}>
-                {point.in && <path d={`M${point.in.x} ${point.in.y} L${point.x} ${point.y} L${point.out!.x} ${point.out!.y}`} fill="none" stroke="#3b82f6" strokeWidth={1 / view.zoom} />}
-                <circle cx={point.x} cy={point.y} r={4 / view.zoom} fill="white" stroke="#2563eb" strokeWidth={1.5 / view.zoom} />
-                {point.out && <circle cx={point.out.x} cy={point.out.y} r={2.5 / view.zoom} fill="#2563eb" />}
+                {point.in && <path d={`M${point.in.x} ${point.in.y} L${point.x} ${point.y} L${point.out!.x} ${point.out!.y}`} fill="none" stroke="var(--color-accent)" strokeWidth={1 / view.zoom} />}
+                <circle cx={point.x} cy={point.y} r={4 / view.zoom} fill="var(--color-surface)" stroke="var(--color-accent)" strokeWidth={1.5 / view.zoom} />
+                {point.out && <circle cx={point.out.x} cy={point.out.y} r={2.5 / view.zoom} fill="var(--color-accent)" />}
               </g>)}</>}
-              {marquee && <rect {...marquee} fill="#3b82f622" stroke="#3b82f6" strokeWidth={1 / view.zoom} />}
+              {guides.map((guide, index) => <line key={index} data-snap-guide x1={guide.axis === 'x' ? guide.value : guide.from - 12 / view.zoom} x2={guide.axis === 'x' ? guide.value : guide.to + 12 / view.zoom} y1={guide.axis === 'y' ? guide.value : guide.from - 12 / view.zoom} y2={guide.axis === 'y' ? guide.value : guide.to + 12 / view.zoom} stroke="var(--color-accent)" strokeWidth={1 / view.zoom} strokeDasharray={`${4 / view.zoom} ${3 / view.zoom}`} pointerEvents="none" />)}
+              {marquee && <rect {...marquee} fill="color-mix(in srgb, var(--color-accent) 12%, transparent)" stroke="var(--color-accent)" strokeWidth={1 / view.zoom} />}
               {box && !textId && <g transform={selectionTransform} className="drawing-selection">
-                <rect width={Math.max(1, box.width)} height={Math.max(1, box.height)} fill="none" stroke="#2563eb" strokeWidth={1 / view.zoom} pointerEvents="none" />
-                <line x1={box.width / 2} x2={box.width / 2} y1={0} y2={-27 / view.zoom} stroke="#2563eb" strokeWidth={1 / view.zoom} pointerEvents="none" />
-                <g data-rotate-handle transform={`translate(${box.width / 2} ${-33 / view.zoom}) scale(${1 / view.zoom})`} role="button" aria-label={uiText('회전')}><circle r={11} fill="white" stroke="#2563eb" /><path d="M-4 2a5 5 0 1 1 7-5M3-6v4h4" fill="none" stroke="#2563eb" strokeWidth={1.5} /></g>
-                {HANDLES.map((handle, index) => <rect key={handle} data-resize-handle={handle} x={box.width * HANDLE_POSITIONS[index].x - 4 / view.zoom} y={box.height * HANDLE_POSITIONS[index].y - 4 / view.zoom} width={8 / view.zoom} height={8 / view.zoom} fill="white" stroke="#2563eb" strokeWidth={1 / view.zoom} />)}
+                <rect width={Math.max(1, box.width)} height={Math.max(1, box.height)} fill="none" stroke="var(--color-accent)" strokeWidth={1 / view.zoom} pointerEvents="none" />
+                <line x1={box.width / 2} x2={box.width / 2} y1={0} y2={-27 / view.zoom} stroke="var(--color-accent)" strokeWidth={1 / view.zoom} pointerEvents="none" />
+                <g data-rotate-handle transform={`translate(${box.width / 2} ${-33 / view.zoom}) scale(${1 / view.zoom})`} role="button" aria-label={uiText('회전')}><circle r={11} fill="var(--color-surface)" stroke="var(--color-accent)" /><path d="M-4 2a5 5 0 1 1 7-5M3-6v4h4" fill="none" stroke="var(--color-accent)" strokeWidth={1.5} /></g>
+                {HANDLES.map((handle, index) => <rect key={handle} data-resize-handle={handle} x={box.width * HANDLE_POSITIONS[index].x - 4 / view.zoom} y={box.height * HANDLE_POSITIONS[index].y - 4 / view.zoom} width={8 / view.zoom} height={8 / view.zoom} fill="var(--color-surface)" stroke="var(--color-accent)" strokeWidth={1 / view.zoom} />)}
               </g>}
             </g>
             <g className="drawing-origin" transform={`translate(${view.x} ${view.y})`} pointerEvents="none"><path d="M-12 0H12M0-12V12" /><circle r={3} /><text x={8} y={-8}>0, 0</text></g>
@@ -602,39 +660,45 @@ export function DrawingEditor({ onClose, onSave }: { onClose: () => void; onSave
               preview({ ...docRef.current, objects: docRef.current.objects.map(object => object.id === textId ? measureText({ ...object, text }) : object) })
             }} onBlur={finishText} onKeyDown={event => { event.stopPropagation(); if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') { event.preventDefault(); void save() } else if (event.key === 'Escape' || (event.ctrlKey || event.metaKey) && event.key === 'Enter') { event.preventDefault(); finishText() } }} /></div>}
           <div className="drawing-toolbar" role="toolbar" aria-label={uiText('그리기 도구')}>
-            {iconButton('선택', <CursorPointer />, () => chooseTool('select'), { shortcut: 'V', active: tool === 'select' })}
-            {iconButton('이동', <DragHandGesture />, () => chooseTool('hand'), { shortcut: 'H / Space', active: tool === 'hand' })}
+            <div className="drawing-tool-list">
+            {iconButton(uiText('선택'), <CursorPointer />, () => chooseTool('select'), { shortcut: 'V', active: tool === 'select' })}
+            {iconButton(uiText('이동'), <DragHandGesture />, () => chooseTool('hand'), { shortcut: 'H / Space', active: tool === 'hand' })}
             <span className="drawing-toolbar-separator" />
-            {iconButton('직사각형', <Square />, () => chooseTool('rect'), { shortcut: 'R', active: tool === 'rect' })}
-            {iconButton('타원', <Circle />, () => chooseTool('ellipse'), { shortcut: 'O', active: tool === 'ellipse' })}
-            {iconButton('직선', <svg viewBox="0 0 24 24"><path d="M5 19L19 5" /></svg>, () => chooseTool('line'), { shortcut: 'L', active: tool === 'line' })}
-            {iconButton('펜', <DesignNib />, () => chooseTool('path'), { shortcut: 'P', active: tool === 'path' })}
-            {iconButton('텍스트', <Text />, () => chooseTool('text'), { shortcut: 'T', active: tool === 'text' })}
+            {iconButton(uiText('직사각형'), <Square />, () => chooseTool('rect'), { shortcut: 'R', active: tool === 'rect' })}
+            {iconButton(uiText('타원'), <Circle />, () => chooseTool('ellipse'), { shortcut: 'O', active: tool === 'ellipse' })}
+            {iconButton(uiText('직선'), <svg viewBox="0 0 24 24"><path d="M5 19L19 5" /></svg>, () => chooseTool('line'), { shortcut: 'L', active: tool === 'line' })}
+            {iconButton(uiText('펜'), <EditPencil />, () => chooseTool('freehand'), { shortcut: 'B', active: tool === 'freehand' })}
+            {iconButton(uiText('곡선 펜'), <DesignNib />, () => chooseTool('path'), { shortcut: 'P', active: tool === 'path' })}
+            {iconButton(uiText('텍스트'), <Text />, () => chooseTool('text'), { shortcut: 'T', active: tool === 'text' })}
+            </div>
             <span className="drawing-toolbar-separator" />
             <PaintButtons fill={single?.fill ?? defaults.fill} stroke={single?.stroke ?? defaults.stroke} active={paint} onActive={target => { setPaint(paint === target ? null : target); setPaintCustom(false) }} />
             {paint && !context && <DrawingPaintPopover key={`${paint}-${paintCustom}`} target={paint} value={single?.[paint] ?? defaults[paint]} onChange={changePaint} onClose={() => setPaint(null)} custom={paintCustom} />}
           </div>
-          <div className="drawing-bottom-left">{iconButton('실행 취소', <Undo />, () => undo(), { shortcut: '⌘/Ctrl Z', disabled: !history.current.canUndo })}{iconButton('다시 실행', <Redo />, () => undo(true), { shortcut: '⌘/Ctrl ⇧ Z', disabled: !history.current.canRedo })}</div>
+          {(tool === 'freehand' || tool === 'path' || tool === 'line' || tool === 'rect' || tool === 'ellipse' || selectedObjects.some(object => object.type !== 'text' && object.type !== 'image')) && <div className="drawing-stroke-width"><NumberField label={uiText('선 두께')} value={single?.strokeWidth ?? defaults.strokeWidth} min={.5} max={100} suffix="px" onChange={changeStrokeWidth} /></div>}
+          <div className="drawing-bottom-left">{iconButton(uiText('실행 취소'), <Undo />, () => undo(), { shortcut: '⌘/Ctrl Z', disabled: !history.current.canUndo })}{iconButton(uiText('다시 실행'), <Redo />, () => undo(true), { shortcut: '⌘/Ctrl ⇧ Z', disabled: !history.current.canRedo })}</div>
           <div className="drawing-bottom-right">
-            {iconButton('그리드 설정', <ViewGrid />, () => setPanel(panel === 'grid' ? null : 'grid'), { active: panel === 'grid' })}
-            {iconButton('원점으로', <OnePointCircle />, () => setView({ ...view, x: size.width / 2, y: size.height / 2 }), { shortcut: '0' })}
-            {iconButton('모두 보기', <Maximize />, () => fit(), { shortcut: '1' })}
+            {iconButton(uiText('스냅 설정'), <Magnet />, () => setPanel(panel === 'grid' ? null : 'grid'), { active: panel === 'grid' })}
+            {iconButton(uiText('원점으로'), <OnePointCircle />, () => setView({ ...view, x: size.width / 2, y: size.height / 2 }), { shortcut: '0' })}
+            {iconButton(uiText('모두 보기'), <Maximize />, () => fit(), { shortcut: '1' })}
             <span className="drawing-toolbar-separator" />
-            {iconButton('축소', <Minus />, () => zoomAt(view.zoom / 1.2), { shortcut: '−' })}
+            {iconButton(uiText('축소'), <Minus />, () => zoomAt(view.zoom / 1.2), { shortcut: '−' })}
             <button type="button" className="drawing-zoom" aria-label={uiText('확대 비율 초기화')} onClick={() => zoomAt(1)}>{Math.round(view.zoom * 100)}%</button>
-            {iconButton('확대', <Plus />, () => zoomAt(view.zoom * 1.2), { shortcut: '+' })}
-            {iconButton('단축키', <HelpCircle />, () => setPanel(panel === 'shortcuts' ? null : 'shortcuts'), { shortcut: '?' })}
+            {iconButton(uiText('확대'), <Plus />, () => zoomAt(view.zoom * 1.2), { shortcut: '+' })}
+            {iconButton(uiText('단축키'), <HelpCircle />, () => setPanel(panel === 'shortcuts' ? null : 'shortcuts'), { shortcut: '?' })}
           </div>
           {panel && <DrawingPanel onClose={() => setPanel(null)} type={panel}>
-            <div className="drawing-panel-heading"><strong>{uiText(panel === 'grid' ? '그리드 설정' : panel === 'history' ? '그림 기록' : '단축키')}</strong><button type="button" className="drawing-icon" aria-label={uiText('닫기')} onClick={() => setPanel(null)}><Xmark /></button></div>
+            <div className="drawing-panel-heading"><strong>{uiText(panel === 'grid' ? '스냅 설정' : panel === 'history' ? '그림 기록' : '단축키')}</strong><button type="button" className="drawing-icon" aria-label={uiText('닫기')} onClick={() => setPanel(null)}><Xmark /></button></div>
             {panel === 'grid' && <div className="drawing-grid-settings">
-              <label><input type="checkbox" checked={doc.grid.visible} onChange={event => commit({ ...doc, grid: { ...doc.grid, visible: event.target.checked } })} />{uiText('격자 표시')}</label>
+              <label><ViewGrid aria-hidden="true" /><input type="checkbox" checked={doc.grid.visible} onChange={event => commit({ ...doc, grid: { ...doc.grid, visible: event.target.checked } })} />{uiText('격자 표시')}</label>
               <label><input type="checkbox" checked={doc.grid.snap} onChange={event => commit({ ...doc, grid: { ...doc.grid, snap: event.target.checked } })} />{uiText('격자에 맞추기')}</label>
               <NumberField label={uiText('격자 간격')} value={doc.grid.size} min={2} max={1000} suffix="px" onChange={size => commit({ ...doc, grid: { ...doc.grid, size } })} />
+              <label><input type="checkbox" checked={doc.grid.objectSnap ?? false} onChange={event => commit({ ...doc, grid: { ...doc.grid, objectSnap: event.target.checked } })} />{uiText('개체에 맞추기')}</label>
+              <NumberField label={uiText('개체 스냅 거리')} value={doc.grid.snapTolerance ?? 6} min={1} max={24} suffix="px" onChange={snapTolerance => commit({ ...doc, grid: { ...doc.grid, snapTolerance } })} />
             </div>}
             {panel === 'history' && <div className="drawing-history-list">{recordsLoading ? <p role="status">{uiText('불러오는 중…')}</p> : records.length ? records.map(record => <button key={record.id} type="button" onClick={() => void reopen(record)} disabled={busy}><span>{record.name}</span><time>{new Date(record.createdAt).toLocaleString()}</time></button>) : <p>{uiText('저장한 그림이 없습니다.')}</p>}</div>}
             {panel === 'shortcuts' && <dl className="drawing-shortcuts">{[
-              [uiText('선택 / 이동'), 'V / H · Space'], [uiText('직사각형 / 타원 / 직선'), 'R / O / L'], [uiText('텍스트 / 곡선 펜'), 'T / P'], [uiText('곡선 점 / 방향 조절'), uiText('클릭 / 드래그')], [uiText('곡선 완성'), 'Enter · ' + uiText('더블 클릭')], [uiText('다중 선택'), 'Shift + ' + uiText('클릭')], [uiText('비율 유지 / 15° 회전'), 'Shift + ' + uiText('드래그')], [uiText('스냅 일시 해제'), 'Alt'], [uiText('복사 / 잘라내기 / 붙여넣기'), '⌘/Ctrl C / X / V'], [uiText('복제 / 삭제'), '⌘/Ctrl D · Delete'], [uiText('그룹 / 그룹 해제'), '⌘/Ctrl G / ⇧ G'], [uiText('뒤로 / 앞으로'), '⌘/Ctrl [ / ]'], [uiText('맨 뒤로 / 맨 앞으로'), '⌘/Ctrl ⇧ [ / ]'], [uiText('실행 취소 / 다시 실행'), '⌘/Ctrl Z / ⇧ Z'], [uiText('채우기 / 선 팔레트'), 'F / X'], [uiText('색상 / 투명 / 사용자 색상'), '1–8 / 0 / 9'], [uiText('격자 표시 / 스냅'), "' / ⇧ '"], [uiText('원점 / 모두 보기 / 선택 보기'), '0 / 1 / 2'], [uiText('확대 / 축소'), '⌘/Ctrl + ' + uiText('휠') + ' · + / −'], [uiText('이동'), uiText('휠') + ' · Space + ' + uiText('드래그')], [uiText('저장'), '⌘/Ctrl S'],
+              [uiText('선택 / 이동'), 'V / H · Space'], [uiText('직사각형 / 타원 / 직선'), 'R / O / L'], [uiText('펜'), 'B'], [uiText('텍스트 / 곡선 펜'), 'T / P'], [uiText('곡선 점 / 방향 조절'), uiText('클릭 / 드래그')], [uiText('곡선 완성'), 'Enter · ' + uiText('더블 클릭')], [uiText('다중 선택'), 'Shift + ' + uiText('클릭')], [uiText('비율 유지 / 15° 회전'), 'Shift + ' + uiText('드래그')], [uiText('스냅 일시 해제'), 'Alt'], [uiText('복사 / 잘라내기 / 붙여넣기'), '⌘/Ctrl C / X / V'], [uiText('복제 / 삭제'), '⌘/Ctrl D · Delete'], [uiText('그룹 / 그룹 해제'), '⌘/Ctrl G / ⇧ G'], [uiText('뒤로 / 앞으로'), '⌘/Ctrl [ / ]'], [uiText('맨 뒤로 / 맨 앞으로'), '⌘/Ctrl ⇧ [ / ]'], [uiText('실행 취소 / 다시 실행'), '⌘/Ctrl Z / ⇧ Z'], [uiText('채우기 / 선 팔레트'), 'F / X'], [uiText('색상 / 투명 / 사용자 색상'), '1–8 / 0 / 9'], [uiText('격자 표시 / 스냅'), "' / ⇧ '"], [uiText('원점 / 모두 보기 / 선택 보기'), '0 / 1 / 2'], [uiText('확대 / 축소'), '⌘/Ctrl + ' + uiText('휠') + ' · + / −'], [uiText('이동'), uiText('휠') + ' · Space + ' + uiText('드래그')], [uiText('저장'), '⌘/Ctrl S'],
             ].map(([label, shortcut]) => <div key={label}><dt>{label}</dt><dd>{shortcut}</dd></div>)}</dl>}
           </DrawingPanel>}
           {pen && <button type="button" className="drawing-pen-done" onClick={() => finishPen()}>{uiText('곡선 완성')}</button>}

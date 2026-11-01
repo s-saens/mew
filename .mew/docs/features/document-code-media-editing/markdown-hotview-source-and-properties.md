@@ -8,7 +8,7 @@ updated: "2026-11-02"
 status_hash: "2741d359b18c61eecb53b8ce0ba2862f0f42c088d7d02cf55c88a23d1d44a98e"
 files: ["packages/editor/src/editor/FrontmatterSelect.tsx", "server/frontmatter-options.ts", "src/hooks/useTabs.ts", "src/components/EditorPane.tsx", "src/components/markdown-error-boundary.tsx", "packages/editor/src/Editor.tsx", "packages/editor/src/editor/FrontmatterPanel.tsx", "src/components/TableOfContents.tsx"]
 commits: []
-description: "A feature contract covering Markdown Hotview and Plain editing, editor-local touch pinch font zoom, per-block computation caching and Pretext-based DOM virtualization, preservation of code-block line breaks and internal horizontal scrolling, retaining the line being read when switching views and cursor restoration boundaries in the properties area, checkboxes, document tables of contents, frontmatter properties, and navigation through backlinks and parent-file arrows beside the title. Includes parent-file exclusion, cross-project references, YAML preservation, native mobile keyboard activation through body taps, always-visible mobile auxiliary keys floating over the document above the status row, project-owned options shared by Documents and Files with legacy migration, and source-saving boundaries."
+description: "A feature contract covering Markdown Hotview and Plain editing, /paint and /그림 drawing insertion with mapped upload positions and document access boundaries, editor-local touch pinch font zoom, per-block caching and virtualization, code-block scrolling, view and cursor restoration, checkboxes, document properties, backlinks, mobile auxiliary keys, and source-saving boundaries."
 상위파일:
   - "MOC.md"
   - "_document-code-media-editing.md"
@@ -40,6 +40,12 @@ description: "A feature contract covering Markdown Hotview and Plain editing, ed
 - On mobile, tapping an editable Hotview, Plain, or code body focuses it immediately and lets the browser open the keyboard. There is no floating keyboard button or separate activation step. Moving the cursor or using auxiliary keys does not force keyboard dismissal; native selection and the existing selection menu remain available. See [Mobile Editor and Keyboard](../../development/ui-contracts.md#mobile-editor-and-keyboard).
 
 - When the mobile keyboard opens, reduce the editor height to keep the tapped cursor line and the status bar showing the selected character count and file size above the keyboard.
+
+### Drawing insertion
+
+In editable project Markdown, type `/paint` or `/그림` and choose **Drawing Editor** to open the shared [drawing board](../terminals-agents-automation/agent-drawing-editor.md). Saving inserts a transparent PNG through the current document's `EditorApi.uploadAsset`; it needs document upload permission and does not call agent drawing APIs. Document context has no SVG history picker or persisted editable original. Read-only documents, hosts without the renderer, and external server-file tabs do not offer this command.
+
+Selecting the command removes its slash text and records an insertion position. Map that position through subsequent transactions while the board or upload is open, so moving the caret does not redirect the image. Closing without saving restores focus at that position and leaves the rest of the document intact. Upload failures keep the board and drawing available for retry. A path, API, editor, or editability change invalidates the session; a late upload cannot insert into a different document. The host owns the popup and the editor package owns insertion, as recorded in [ADR 0115](../../decisions/0115-hotview-drawing.md).
 
 ### Touch zoom
 

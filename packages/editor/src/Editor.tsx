@@ -29,9 +29,9 @@ import { Fragment, type Node as PMNode } from '@tiptap/pm/model'
 import { findTable, selectionCell, TableMap } from '@tiptap/pm/tables'
 import type { EditorView } from '@tiptap/pm/view'
 import { Markdown } from 'tiptap-markdown'
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import type { EditorApi, EditorCollab, EditorOpenLink, TableWidths, TreeNode } from './types'
+import type { EditorApi, EditorCollab, EditorDrawingOptions, EditorOpenLink, TableWidths, TreeNode } from './types'
 import { ResizableImage } from './ResizableImage'
 import { ImageSourceContext } from './editor/image-source-context'
 import { AudioNode, VideoNode, Youtube, YOUTUBE_URL_RE } from './MediaNodes'
@@ -79,6 +79,15 @@ export interface EditorViewAnchor {
   line: number
   /** 줄 시작의 스크롤 영역 상단 기준 위치(px). */
   offset: number
+}
+
+interface DrawingSession {
+  editor: TiptapEditor
+  path: string
+  api: EditorApi
+  pos: number
+  saving: boolean
+  dispose: () => void
 }
 
 export interface EditorHandle {
@@ -301,6 +310,7 @@ export const Editor = forwardRef<
     tree?: TreeNode[]
     onOpenLink?: EditorOpenLink
     onCreateChildPage?: (name: string, insert: (link: { href: string; label: string }) => void) => Promise<void>
+    renderDrawingEditor?: (options: EditorDrawingOptions) => ReactNode
     /** 선택 글자 수를 호스트 상태줄에 넘긴다 — 상태줄은 파일 종류를 가리지 않으므로 에디터 밖(EditorPane)에 있다 */
     onSelectionChars?: (count: number) => void
     /** 있으면 이 방의 Y.XmlFragment가 본문의 진실 원천이 된다 — value/onChange는 그 결과를 반영만 한다 */
@@ -316,7 +326,7 @@ export const Editor = forwardRef<
     showMobileKeyBar?: boolean
   }
 >(function Editor(
-  { value, onChange, api, readOnly, path = '', fileLinkContext, tree = [], onOpenLink, onCreateChildPage, onSelectionChars, collab, collaborationPending, commentThreads, onCommentClick, onAnnotationOpen, onStartComment, showMobileKeyBar = true },
+  { value, onChange, api, readOnly, path = '', fileLinkContext, tree = [], onOpenLink, onCreateChildPage, renderDrawingEditor, onSelectionChars, collab, collaborationPending, commentThreads, onCommentClick, onAnnotationOpen, onStartComment, showMobileKeyBar = true },
   ref,
 ) {
   useUiLocale()
@@ -359,6 +369,11 @@ export const Editor = forwardRef<
   const uploadPosRef = useRef<number | null>(null)
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
+  const [drawing, setDrawing] = useState<DrawingSession | null>(null)
+  const drawingRef = useRef<DrawingSession | null>(null)
+  const canDraw = !!renderDrawingEditor && !readOnly
+  const drawingContextRef = useRef({ path, api, canDraw })
+  drawingContextRef.current = { path, api, canDraw }
   const creatingPageRef = useRef(false)
   const [pageName, setPageName] = useState<{ editor: TiptapEditor; mount: HTMLElement; path: string } | null>(null)
   const canCreateChildPage = !!onCreateChildPage && !readOnly
@@ -1660,11 +1675,73 @@ export const Editor = forwardRef<
     setPageName(null)
   }, [editor, path, canCreateChildPage])
 
+  function isCurrentDrawing(session: DrawingSession) {
+    const current = drawingContextRef.current
+    return drawingRef.current === session && current.canDraw && current.path === session.path && current.api === session.api
+      && editorRef.current === session.editor && !session.editor.isDestroyed && session.editor.isEditable
+  }
+
+  function closeDrawing(session: DrawingSession) {
+    if (drawingRef.current !== session) return
+    const restoreFocus = isCurrentDrawing(session)
+    session.dispose()
+    drawingRef.current = null
+    setDrawing(null)
+    if (restoreFocus) {
+      session.editor.commands.setTextSelection(session.pos)
+      session.editor.view.focus()
+      session.editor.view.dispatch(session.editor.state.tr)
+    }
+  }
+
+  function openDrawing(e: TiptapEditor, range: { from: number; to: number }) {
+    if (!canDraw || drawingRef.current || !e.isEditable) return
+    e.chain().deleteRange(range).run()
+    const trackPosition = ({ transaction }: { transaction: Transaction }) => {
+      session.pos = transaction.mapping.map(session.pos, -1)
+    }
+    const session: DrawingSession = {
+      editor: e, path, api, pos: range.from, saving: false,
+      dispose: () => { e.off('transaction', trackPosition) },
+    }
+    e.on('transaction', trackPosition)
+    drawingRef.current = session
+    setDrawing(session)
+  }
+
+  async function saveDrawingImage(session: DrawingSession, file: File) {
+    if (!isCurrentDrawing(session)) throw new Error(uiText('문서가 변경되었습니다. 그림판을 다시 여세요.'))
+    if (session.saving) return
+    session.saving = true
+    try {
+      const { url, name } = await session.api.uploadAsset(file)
+      if (!isCurrentDrawing(session)) throw new Error(uiText('문서가 변경되었습니다. 그림판을 다시 여세요.'))
+      session.editor.chain().focus().insertContentAt(session.pos, {
+        type: 'image', attrs: { src: url, alt: name.replace(/\.[^.]+$/, '') },
+      }).run()
+      session.pos = session.editor.state.selection.to
+    } finally {
+      session.saving = false
+    }
+  }
+
+  useLayoutEffect(() => () => {
+    const session = drawingRef.current
+    if (!session) return
+    session.dispose()
+    drawingRef.current = null
+    setDrawing(null)
+  }, [editor, path, api, canDraw])
+
   // 슬래시 커맨드 목록 — run은 항상 최신 에디터(editorRef)를 받고, 메뉴 텍스트(/query)는 range로 넘겨 미리 지운다.
   // openUploadPicker는 refs만 읽는 안정 참조라 매 렌더 재생성돼도 문제없다.
   // 슬래시 커맨드는 데이터·삽입 관련 명령만 노출한다 (제목·목록·인용 등 글 형식은 마크다운
   // 단축어 `#`·`-`·`1.`·```` ``` ````로 그대로 쓸 수 있으므로 메뉴에서 뺐다).
   const slashCommands: SlashCommand[] = [
+    ...(canDraw ? [{
+      id: 'paint', title: uiText('그림판'), description: uiText('그림을 그려 이미지로 삽입'), keywords: ['paint', 'drawing', '그림', '그림판'],
+      run: openDrawing,
+    }] : []),
     ...(onCreateChildPage && !readOnly ? [{
       id: 'page', title: uiText("하위 페이지"), description: uiText("새 하위 페이지 만들기"), keywords: ['page', '페이지', '하위', '문서'],
       run: (e: TiptapEditor, r: { from: number; to: number }) => {
@@ -2204,6 +2281,7 @@ export const Editor = forwardRef<
         <EditorContent editor={editor} />
       </ImageSourceContext.Provider>
       {pageName && createPortal(<InlinePageNameInput onSubmit={submitPageName} onCancel={() => closePageName()} />, pageName.mount)}
+      {drawing && canDraw && renderDrawingEditor?.({ onClose: () => closeDrawing(drawing), onSave: file => saveDrawingImage(drawing, file) })}
       {uploading && (
         <div className="absolute bottom-2 right-2 rounded bg-surface-inverse px-2 py-1 text-xs text-ink-inverse">
           {uiText("업로드 중…")}</div>

@@ -20,7 +20,7 @@ export interface DrawingObject extends Bounds {
   points?: DrawingPoint[]
   closed?: boolean
 }
-export interface DrawingGrid { size: number; visible: boolean; snap: boolean }
+export interface DrawingGrid { size: number; visible: boolean; snap: boolean; objectSnap?: boolean; snapTolerance?: number }
 export interface DrawingDocument { version: 1; objects: DrawingObject[]; grid: DrawingGrid }
 export interface DrawingViewport extends Point { zoom: number }
 export type Viewport = DrawingViewport
@@ -117,7 +117,11 @@ export function normalizeDocument(value: unknown): DrawingDocument | null {
     objects.push(object)
   }
   const grid = raw.grid && typeof raw.grid === 'object' ? raw.grid as Record<string, unknown> : {}
-  return { version: 1, objects, grid: { size: number(grid.size, 20, 2, 1000), visible: grid.visible !== false, snap: grid.snap !== false } }
+  return { version: 1, objects, grid: {
+    size: number(grid.size, 20, 2, 1000), visible: grid.visible !== false, snap: grid.snap !== false,
+    ...(typeof grid.objectSnap === 'boolean' ? { objectSnap: grid.objectSnap } : {}),
+    ...(grid.snapTolerance !== undefined ? { snapTolerance: number(grid.snapTolerance, 6, 1, 24) } : {}),
+  } }
 }
 
 export function selectionSet(ids: SelectionIds): ReadonlySet<string> { return ids instanceof Set ? ids : new Set(ids) }
@@ -160,7 +164,8 @@ export function reorderObjects(objects: readonly DrawingObject[], ids: Selection
 }
 
 function sameDocument(a: DrawingDocument, b: DrawingDocument): boolean {
-  if (a.objects.length !== b.objects.length || a.grid.size !== b.grid.size || a.grid.visible !== b.grid.visible || a.grid.snap !== b.grid.snap) return false
+  if (a.objects.length !== b.objects.length || a.grid.size !== b.grid.size || a.grid.visible !== b.grid.visible || a.grid.snap !== b.grid.snap ||
+    (a.grid.objectSnap ?? false) !== (b.grid.objectSnap ?? false) || (a.grid.snapTolerance ?? 6) !== (b.grid.snapTolerance ?? 6)) return false
   for (let index = 0; index < a.objects.length; index++) {
     const left = a.objects[index], right = b.objects[index]
     for (const key of ['id', 'type', 'x', 'y', 'width', 'height', 'rotation', 'fill', 'stroke', 'strokeWidth', 'groupId', 'text', 'fontFamily', 'fontSize', 'fontWeight', 'textScaleX', 'textScaleY', 'src', 'closed'] as const) {

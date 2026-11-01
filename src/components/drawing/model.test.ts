@@ -214,3 +214,51 @@ test('invalid and unsafe imported drawings are rejected or normalized', () => {
   assert.equal(parseSvgDocument('<svg><metadata id="mew-drawing">{bad}</metadata></svg>'), null)
   assert.deepEqual(cloneDocument(document).objects[0].x, Infinity)
 })
+
+test('optional object snapping settings preserve legacy documents and editable SVG round trips', () => {
+  const legacy = createDocument()
+  assert.deepEqual(normalizeDocument(legacy), legacy)
+  assert.equal(legacy.grid.objectSnap, undefined); assert.equal(legacy.grid.snapTolerance, undefined)
+  const document = { ...legacy, grid: { ...legacy.grid, objectSnap: true, snapTolerance: 12 } }
+  assert.deepEqual(normalizeDocument(document), document)
+  assert.deepEqual(parseSvgDocument(serializeSvg(document)), document)
+  assert.equal(normalizeDocument({ ...document, grid: { ...document.grid, snapTolerance: -4 } })!.grid.snapTolerance, 1)
+  assert.equal(normalizeDocument({ ...document, grid: { ...document.grid, snapTolerance: 100 } })!.grid.snapTolerance, 24)
+  assert.equal(normalizeDocument({ ...document, grid: { ...document.grid, snapTolerance: NaN } })!.grid.snapTolerance, 6)
+})
+
+test('object snap and tolerance changes enter undo history with effective legacy defaults', () => {
+  const document = createDocument(), history = new DrawingHistory(document)
+  history.commit({ ...document, grid: { ...document.grid, objectSnap: false, snapTolerance: 6 } })
+  assert.equal(history.canUndo, false)
+  const enabled = { ...document, grid: { ...document.grid, objectSnap: true } }
+  history.commit(enabled)
+  assert.equal(history.current.grid.objectSnap, true)
+  history.commit({ ...enabled, grid: { ...enabled.grid, snapTolerance: 10 } })
+  assert.equal(history.current.grid.snapTolerance, 10)
+  assert.equal(history.undo().grid.snapTolerance, undefined)
+  assert.equal(history.undo().grid.objectSnap, undefined)
+  assert.equal(history.redo().grid.objectSnap, true)
+})
+
+test('path bounds reuse local extrema on translations and invalidate immutable geometry changes', () => {
+  let coordinateReads = 0
+  const points = [{ get x() { coordinateReads++; return 0 }, y: 0, out: { x: 0, y: 100 } }, { x: 100, y: 0, in: { x: 100, y: 100 } }]
+  const path = createObject('path', { x: 10, y: -20, width: 100, height: 0, points })
+  const bounds = objectBounds(path), firstReads = coordinateReads
+  const moved = objectBounds({ ...path, x: -60, y: 70 })
+  assert.ok(firstReads > 0); assert.equal(coordinateReads, firstReads)
+  assert.deepEqual(moved, { ...bounds, x: bounds.x - 70, y: bounds.y + 90 })
+  moved.x = 1000
+  assert.deepEqual(objectBounds(path), bounds)
+  const changed = { ...path, points: points.map((point, index) => index ? { ...point, in: { x: 100, y: 200 } } : { ...point, out: { x: 0, y: 200 } }) }
+  near(objectBounds(changed).height, 150)
+  const rotated = objectBounds({ ...path, rotation: 90 })
+  near(rotated.width, 75); near(rotated.height, 100)
+  const resized = { ...path, width: 200, rotation: 90 }
+  const resizedBounds = objectBounds(resized)
+  near(resizedBounds.x, objectBounds({ ...resized, points: points.map(point => ({ ...point })) }).x)
+  const closed = createObject('path', { x: 0, y: 0, width: 100, height: 100, points: [{ x: 0, y: 0, in: { x: -100, y: 0 } }, { x: 100, y: 100 }] })
+  const openBounds = objectBounds(closed), closedBounds = objectBounds({ ...closed, closed: true })
+  assert.ok(closedBounds.width > openBounds.width)
+})
