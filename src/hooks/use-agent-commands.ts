@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { AgentCommandRecord, AgentCommandScope } from '../../shared/agent-command'
 import { listAgentCommands, startAgentCommand } from '../api/agent-commands'
-import { AUTOMATIC_RETRY_LIMIT } from '../utils/recovery-policy'
+import { agentRecoveryDelay } from '../utils/recovery-policy'
 
 const EMPTY_RECORDS: AgentCommandRecord[] = []
 
@@ -48,26 +48,46 @@ export function useAgentCommands(scope: AgentCommandScope, enabled: boolean) {
     let disposed = false
     let timer: number | undefined
     let failures = 0
+    let polling = false
+    let stopped = false
     setError(null)
     setReadError(null)
     setRecovering(false)
     if (!enabled || !scope.sessionId) return
     const poll = async () => {
+      if (disposed || polling || stopped) return
+      polling = true
+      timer = undefined
       try { await refresh(); failures = 0 } catch (error) {
         if (disposed) return
         const status = (error as { status?: number } | null)?.status
-        if (error instanceof SyntaxError || (status !== undefined && status >= 400 && status < 500 && status !== 408 && status !== 429)
-          || ++failures > AUTOMATIC_RETRY_LIMIT) {
+        if (error instanceof SyntaxError || (status !== undefined && status >= 400 && status < 500 && status !== 408 && status !== 429)) {
+          stopped = true
           setRecovering(false)
           setReadError(error instanceof Error ? error.message : String(error))
           return
         }
+        failures++
         setRecovering(true)
-      }
-      if (!disposed) timer = window.setTimeout(poll, 1500)
+      } finally { polling = false }
+      if (!disposed) timer = window.setTimeout(poll, agentRecoveryDelay(failures, 1500))
     }
+    const resume = () => {
+      if (disposed || stopped || polling || failures === 0 || document.visibilityState === 'hidden') return
+      clearTimeout(timer)
+      void poll()
+    }
+    window.addEventListener('mew:remote-reconnected', resume)
+    window.addEventListener('online', resume)
+    document.addEventListener('visibilitychange', resume)
     void poll()
-    return () => { disposed = true; clearTimeout(timer) }
+    return () => {
+      disposed = true
+      clearTimeout(timer)
+      window.removeEventListener('mew:remote-reconnected', resume)
+      window.removeEventListener('online', resume)
+      document.removeEventListener('visibilitychange', resume)
+    }
   }, [refresh, enabled, scope.sessionId, readRetry])
 
   const submit = useCallback(async (tab: string, command: string, afterUserCount: number) => {

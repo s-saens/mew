@@ -1,13 +1,13 @@
 ---
 title: "Quiet automatic recovery and explicit retry exhaustion"
-description: "Replaces visible transient connection failures with loading indicators, bounds automatic agent and Mewlink recovery to eleven retries, and preserves app drafts behind a full-screen connection error. Supersedes the presentation and retry-limit portions of ADR 0086."
+description: "Records quiet loading feedback and the original eleven-retry limit for agent and Mewlink recovery, with app drafts preserved behind a full-screen connection error. ADR 0110 supersedes only the agent-panel connection and command-status read limits; the other scopes retain this decision."
 created: "2026-10-30"
-updated: "2026-10-30"
+updated: "2026-11-01"
 ---
 
 ## Status
 
-Accepted. The user applies host and central frontend updates separately. Current contracts belong to [UI contracts](../development/ui-contracts.md#automatic-recovery-within-panels-and-menus) and [remote access](../development/remote-access.md#reattaching-the-same-rtc-after-a-brief-signaling-interruption); verification belongs to the [work record](../work/quiet-automatic-recovery.md).
+Accepted, with the agent-panel connection and command-status read retry limits superseded by [ADR 0110](0110-continuous-agent-panel-recovery.md). The original decision below remains as history for those scopes. Mewlink, Mewpet assistant connections, and project command metadata retain their eleven-retry limits. The user applies host and central frontend updates separately. Current contracts belong to [UI contracts](../development/ui-contracts.md#automatic-recovery-within-panels-and-menus) and [remote access](../development/remote-access.md#reattaching-the-same-rtc-after-a-brief-signaling-interruption); verification belongs to the [work record](../work/quiet-automatic-recovery.md).
 
 ## Context
 

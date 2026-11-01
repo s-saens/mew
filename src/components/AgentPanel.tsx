@@ -10,7 +10,7 @@ import { AgentMediaPreviewDialog } from './agent-media-preview-dialog'
 import { scopedBrowserStorage } from '@mew/ui/browser-storage-scope'
 import { workspaceViewportBottom } from '../utils/workspace-viewport'
 import { openMewSocket } from '../utils/remote-transport.ts'
-import { AUTOMATIC_RETRY_LIMIT } from '../utils/recovery-policy'
+import { agentRecoveryDelay } from '../utils/recovery-policy'
 import { PanelCloseButton } from './panel-close-button'
 import { TabActionMenu } from './tab-action-menu'
 import { ConfirmDialog, HoverTipLayer, PanelNotice, canAutoFocusInput } from '@mew/ui'
@@ -2316,7 +2316,6 @@ function AgentSessionView({
     disconnect: disconnectPromptFeedback, clear: clearPromptFeedback } = useAgentPromptFeedback(items)
   const [connected, setConnected] = useState(false)
   const [connectionFailed, setConnectionFailed] = useState(false)
-  const [connectionRetry, setConnectionRetry] = useState(0)
   const [startupQueue] = useState(() => new AgentStartupQueue<StartupPrompt>())
   const [startupPrompts, setStartupPrompts] = useState(startupQueue.snapshot())
   const [startupReady, setStartupReady] = useState(false)
@@ -2739,11 +2738,7 @@ function AgentSessionView({
 
     const scheduleReconnect = () => {
       if (closed || terminal || retry !== undefined) return
-      if (failures++ >= AUTOMATIC_RETRY_LIMIT) {
-        setConnectionFailed(true)
-        return
-      }
-      retry = window.setTimeout(() => { retry = undefined; connect() }, 1000)
+      retry = window.setTimeout(() => { retry = undefined; connect() }, agentRecoveryDelay(++failures, 1000))
     }
     const connect = () => {
       if (closed || terminal) return
@@ -2992,12 +2987,14 @@ function AgentSessionView({
       }
     }
     const reconnectAfterRemoteRecovery = () => {
-      if (closed || terminal || retry === undefined || (ws && ws.readyState !== WebSocket.CLOSED)) return
+      if (closed || terminal || document.visibilityState === 'hidden' || retry === undefined || (ws && ws.readyState !== WebSocket.CLOSED)) return
       clearTimeout(retry)
       retry = undefined
       connect()
     }
     window.addEventListener('mew:remote-reconnected', reconnectAfterRemoteRecovery)
+    window.addEventListener('online', reconnectAfterRemoteRecovery)
+    document.addEventListener('visibilitychange', reconnectAfterRemoteRecovery)
     let cacheDeadline: ReturnType<typeof setTimeout> | undefined
     const cachedRestoration = resumeSessionIdRef.current
       ? Promise.race([Promise.all([readHistoryCache(cacheKey), readQueueCache(cacheKey)]), new Promise<null>(resolve => { cacheDeadline = setTimeout(() => resolve(null), 200) })])
@@ -3022,13 +3019,15 @@ function AgentSessionView({
       cancelClear()
       if (retry) clearTimeout(retry)
       window.removeEventListener('mew:remote-reconnected', reconnectAfterRemoteRecovery)
+      window.removeEventListener('online', reconnectAfterRemoteRecovery)
+      document.removeEventListener('visibilitychange', reconnectAfterRemoteRecovery)
       ws?.close()
       wsRef.current = null
       resetWorkDetails()
     }
     // 런타임을 바꾸면 저쪽 세션으로 갈아탄다 — 이쪽 세션은 서버에 그대로 남아 돌아오면 이어진다
     // (queueEvent는 값이 바뀌지 않는 useCallback이라 여기 있어도 재접속을 부르지 않는다)
-  }, [cacheKey, runtime, tabId, cwd, notificationWorkspace, preset?.modelId, preset?.thinkingId, preset?.thinkingConfigId, preset?.role, queueEvent, setEvents, adoptModels, adoptModes, adoptThinking, closeAuthBrowser, closeAcpLoginSessions, observeClearQueue, completeClear, cancelClear, acceptWorkDetails, resetWorkDetails, clearStartupPrompts, resetSelection, acknowledgePromptQueue, replacePromptFeedback, disconnectPromptFeedback, connectionRetry])
+  }, [cacheKey, runtime, tabId, cwd, notificationWorkspace, preset?.modelId, preset?.thinkingId, preset?.thinkingConfigId, preset?.role, queueEvent, setEvents, adoptModels, adoptModes, adoptThinking, closeAuthBrowser, closeAcpLoginSessions, observeClearQueue, completeClear, cancelClear, acceptWorkDetails, resetWorkDetails, clearStartupPrompts, resetSelection, acknowledgePromptQueue, replacePromptFeedback, disconnectPromptFeedback])
 
   // 경과 시간만 흐르게 한다 — 나머지 값은 서버 meta가 밀어 준다
   useEffect(() => {
@@ -4065,9 +4064,6 @@ function AgentSessionView({
       {!conversationLoading && ((!connected && !connectionFailed && !!resumeSessionIdRef.current && !newConversationPending) || cli.recovering) && <div data-agent-recovering className="pointer-events-none absolute inset-x-0 top-2 flex justify-center text-ink-secondary">
         <AgentReplyPending label={t('common.loading')} active={visible} />
       </div>}
-      {connectionFailed && <PanelNotice>
-        <HoverTipLayer className="flex items-center gap-2">{uiText("다시 연결하지 못했습니다.")}<button type="button" onClick={() => setConnectionRetry(value => value + 1)} aria-label={uiText("다시 연결")} data-tip={uiText("다시 연결")} className="rounded p-1 text-ink-secondary hover:bg-surface-raised focus-visible:outline-2 focus-visible:outline-ink"><RefreshDouble width={16} height={16} aria-hidden="true" /></button></HoverTipLayer>
-      </PanelNotice>}
       {clearFeedback && <div className="pointer-events-none absolute inset-x-0 top-2 flex justify-center px-3" data-agent-clear-feedback={clearFeedback}>
         <div role="status" className="flex max-w-full items-center gap-2 rounded bg-surface-raised px-3 py-2 text-xs text-ink shadow-md">
           <span aria-hidden="true" className={clearFeedback === 'clearing' && visible ? 'motion-safe:animate-pulse' : ''}><ClearGlyph /></span>

@@ -5,14 +5,14 @@ import { build } from 'rolldown'
 import { chromium } from 'playwright-core'
 import { domBrowserExecutable } from './browser-dom-executable.ts'
 
-test('agent command polling recovers quietly, stops after eleven retries and preserves operation failures', { skip: !domBrowserExecutable(), timeout: 20_000 }, async t => {
+test('agent command polling keeps recovering quietly with bounded backoff and preserves operation failures', { skip: !domBrowserExecutable(), timeout: 20_000 }, async t => {
   const root = path.resolve(import.meta.dirname, '..')
   const source = `
 import React from '${root}/node_modules/react/index.js';
 import {createRoot} from '${root}/node_modules/react-dom/client.js';
 import {useAgentCommands} from '${root}/src/hooks/use-agent-commands.ts';
 window.reads=0;window.starts=[];window.mode='ready';window.rejectStart=false;
-window.list=async()=>{window.reads++;if(window.mode==='temporary')throw new TypeError('Network unavailable');if(window.mode==='permission')throw Object.assign(new Error('Access denied'),{status:403});return {commands:[{id:'existing',startedAt:1}]}};
+window.list=async()=>{window.reads++;if(window.holdRead)await new Promise(resolve=>window.finishRead=resolve);if(window.mode==='temporary')throw new TypeError('Failed to fetch');if(window.mode==='permission')throw Object.assign(new Error('Access denied'),{status:403});if(window.mode==='malformed')throw new SyntaxError('Invalid command response');return {commands:[{id:'existing',startedAt:1}]}};
 window.start=async command=>{window.starts.push(command);if(window.rejectStart)throw new Error('Command rejected');return {command:{id:command.id,startedAt:2}}};
 function Harness(){window.commands=useAgentCommands({runtime:'codex',cwd:'/workspace',sessionId:'session'},true);return null}
 const app=createRoot(document.getElementById('root'));app.render(React.createElement(Harness));window.unmount=()=>app.unmount();`
@@ -44,16 +44,49 @@ const app=createRoot(document.getElementById('root'));app.render(React.createEle
     assert.equal(await page.evaluate('window.commands.records[0].id'), 'existing', 'recovery preserves known commands')
   }
   await page.clock.runFor(1500)
-  await page.waitForFunction('window.commands.readFailed && !window.commands.recovering')
-  assert.equal(await page.evaluate('window.commands.error'), 'Network unavailable')
-  await page.clock.runFor(5000)
-  assert.equal(await page.evaluate('window.reads'), 13, 'the initial failed read plus eleven retries exhausts automatic recovery')
+  await page.waitForFunction('window.reads===13 && window.commands.recovering')
+  assert.equal(await page.evaluate('window.commands.error'), null, 'exceeding eleven retries never exposes the raw network failure')
+  assert.equal(await page.evaluate('window.commands.readFailed'), false)
+  for (const delay of [3000, 6000, 12_000, 24_000, 30_000]) {
+    const reads = await page.evaluate<number>('window.reads')
+    await page.clock.runFor(delay - 1)
+    assert.equal(await page.evaluate('window.reads'), reads, 'a prolonged outage slows automatic polling')
+    await page.clock.runFor(1)
+    await page.waitForFunction(`window.reads===${reads + 1}`)
+    assert.equal(await page.evaluate('window.commands.error'), null)
+    assert.equal(await page.evaluate('window.commands.recovering'), true)
+    assert.equal(await page.evaluate('window.commands.records[0].id'), 'existing')
+  }
   assert.equal(await page.evaluate('window.starts.length'), 0, 'polling never reruns a command')
-  await page.evaluate('window.mode="permission";window.commands.retryRefresh()')
+  const recoveryReads = await page.evaluate<number>('window.reads')
+  await page.evaluate('window.mode="ready";window.holdRead=true;document.dispatchEvent(new Event("visibilitychange"))')
+  await page.waitForFunction(`window.reads===${recoveryReads + 1}`)
+  await page.evaluate('window.dispatchEvent(new Event("online"));window.dispatchEvent(new Event("mew:remote-reconnected"));document.dispatchEvent(new Event("visibilitychange"))')
+  assert.equal(await page.evaluate('window.reads'), recoveryReads + 1, 'foreground recovery opens one read even when recovery events arrive together')
+  await page.evaluate('window.holdRead=false;window.finishRead()')
+  await page.waitForFunction('!window.commands.error && !window.commands.recovering')
+  await page.clock.runFor(1500)
+  assert.equal(await page.evaluate('window.reads'), recoveryReads + 2, 'successful synchronization restores the normal polling interval')
+  await page.evaluate('window.mode="temporary"')
+  await page.clock.runFor(1500)
+  await page.waitForFunction('window.commands.recovering')
+  const resetReads = await page.evaluate<number>('window.reads')
+  await page.clock.runFor(1499)
+  assert.equal(await page.evaluate('window.reads'), resetReads)
+  await page.clock.runFor(1)
+  assert.equal(await page.evaluate('window.reads'), resetReads + 1, 'successful reads reset the fast retry interval')
+  await page.evaluate('window.mode="permission";window.dispatchEvent(new Event("online"))')
   await page.waitForFunction('window.commands.error==="Access denied"')
   const deniedReads = await page.evaluate<number>('window.reads')
+  await page.evaluate('window.dispatchEvent(new Event("online"));window.dispatchEvent(new Event("mew:remote-reconnected"));document.dispatchEvent(new Event("visibilitychange"))')
   await page.clock.runFor(5000)
-  assert.equal(await page.evaluate('window.reads'), deniedReads, 'permission failures stop immediately')
+  assert.equal(await page.evaluate('window.reads'), deniedReads, 'permission failures stop immediately and recovery events cannot bypass them')
+  await page.evaluate('window.mode="malformed";window.commands.retryRefresh()')
+  await page.waitForFunction('window.commands.error==="Invalid command response" && window.commands.readFailed && !window.commands.recovering')
+  const malformedReads = await page.evaluate<number>('window.reads')
+  await page.evaluate('window.dispatchEvent(new Event("online"));window.dispatchEvent(new Event("mew:remote-reconnected"));document.dispatchEvent(new Event("visibilitychange"))')
+  await page.clock.runFor(30_000)
+  assert.equal(await page.evaluate('window.reads'), malformedReads, 'a malformed response stops automatic reads until explicit retry')
   await page.evaluate('window.mode="ready";window.commands.retryRefresh()')
   await page.waitForFunction('!window.commands.error && !window.commands.recovering')
   await page.evaluate('window.rejectStart=true;window.commands.submit("tab","run once",0)')
@@ -66,7 +99,7 @@ const app=createRoot(document.getElementById('root'));app.render(React.createEle
   await page.waitForFunction('window.commands.records.length===2 && !window.commands.error')
   assert.equal(await page.evaluate('window.starts[0].id===window.starts[1].id'), true, 'an explicit retry reuses the idempotency key')
   const reads = await page.evaluate<number>('window.reads')
-  await page.evaluate('window.unmount()')
+  await page.evaluate('window.unmount();window.dispatchEvent(new Event("online"));window.dispatchEvent(new Event("mew:remote-reconnected"));document.dispatchEvent(new Event("visibilitychange"))')
   await page.clock.runFor(60_000)
   assert.equal(await page.evaluate('window.reads'), reads, 'unmount cleans up polling')
   assert.deepEqual(errors, [])
