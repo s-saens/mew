@@ -73,6 +73,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
   const content = (await Promise.all(files.map(file => fs.readFile(path.join(root, file), 'utf8')))).join('\n')
   const compiler = await compile(await fs.readFile(`${root}/src/index.css`, 'utf8'), { base: `${root}/src`, onDependency() {} })
   const css = compiler.build([...new Set((source + content).match(/[A-Za-z0-9_@!:/.[\]()%,-]+/g))])
+    + await fs.readFile(`${root}/packages/ui/src/loading-indicator.css`, 'utf8')
   const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
   try {
     for (const width of [1100, 390]) {
@@ -172,31 +173,71 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
       await draft.fill('hello ! ')
       assert.equal(await toggle.getAttribute('aria-pressed'), 'false', 'embedded prefix does not toggle')
       await draft.fill('')
-      const assertComposerBottomAligned = async () => {
-        const inputBottom = await composer.locator('.cm-editor').evaluate(el => el.parentElement!.getBoundingClientRect().bottom)
-        const sendBox = await composer.getByRole('button', { name: '전송', exact: true }).boundingBox()
-        assert.ok(sendBox && Math.abs(sendBox.y + sendBox.height - inputBottom) < 0.5, 'send and input bottoms share the same y coordinate')
+      const assertComposerActionsContained = async (submitLabel = '전송', hasSchedule = true) => {
+        const input = composer.locator('[data-agent-input]')
+        const actions = input.locator('[data-agent-composer-actions]')
+        const expectedOrder = ['그림판 열기', '프롬프트 임시저장', '파일 첨부', ...(hasSchedule ? ['예약 메시지'] : []), submitLabel]
+        assert.deepEqual(await actions.getByRole('button').evaluateAll(buttons => buttons.map(button => button.getAttribute('aria-label'))), expectedOrder)
+        const inputBox = await input.boundingBox()
+        const actionBox = await actions.boundingBox()
+        const editorBox = await input.locator('.cm-scroller').boundingBox()
+        const composerBox = await composer.boundingBox()
+        assert.ok(inputBox && actionBox && editorBox && composerBox)
+        assert.equal(inputBox.width, composerBox.width - 16, 'the input uses the full width without a right action column')
+        assert.ok(editorBox.y + editorBox.height <= actionBox.y + 0.5, 'scrolling input never overlaps the action row')
+        let previousRight = inputBox.x
+        let centerY: number | undefined
+        for (const label of expectedOrder) {
+          const box = await actions.getByRole('button', { name: label, exact: true }).boundingBox()
+          assert.ok(box && box.x >= previousRight && box.x + box.width <= inputBox.x + inputBox.width
+            && box.y >= inputBox.y && box.y + box.height <= inputBox.y + inputBox.height, `${label} stays inside the input in left-to-right order`)
+          const middle = box.y + box.height / 2
+          if (centerY !== undefined) assert.ok(Math.abs(middle - centerY) < 0.5, 'all actions share one horizontal row')
+          centerY = middle
+          previousRight = box.x + box.width
+        }
       }
-      await assertComposerBottomAligned()
+      await assertComposerActionsContained()
+      assert.ok(await composer.getByRole('button', { name: '전송', exact: true }).evaluate(el => parseFloat(el.ownerDocument.defaultView!.getComputedStyle(el).borderRadius)) >= 12, 'send has rounder corners')
+      await draft.fill('버튼 순서 확인')
+      await composer.getByRole('button', { name: '그림판 열기', exact: true }).focus()
+      for (const label of ['프롬프트 임시저장', '파일 첨부', '예약 메시지', '전송']) {
+        await page.keyboard.press('Tab')
+        assert.equal(await composer.getByRole('button', { name: label, exact: true }).evaluate(el => el === el.ownerDocument.activeElement), true, 'keyboard focus follows the visual order')
+      }
+      if (width === 390) {
+        await page.setViewportSize({ width: 280, height: 844 })
+        await assertComposerActionsContained()
+        if (process.env.MEW_CLI_SCREENSHOTS) {
+          await fs.mkdir(process.env.MEW_CLI_SCREENSHOTS, { recursive: true })
+          await composer.screenshot({ path: path.join(process.env.MEW_CLI_SCREENSHOTS, 'composer-narrow-280.png') })
+        }
+        await page.setViewportSize({ width, height: 844 })
+      }
+      await draft.fill('')
       const resizeHandle = composer.getByRole('separator', { name: '입력창 높이 조절' })
       for (let i = 0; i < 20; i++) await resizeHandle.press('ArrowDown')
-      await assertComposerBottomAligned()
-      assert.equal((await composer.boundingBox())!.height, 137, 'minimum includes the 28px settings row and 1px top border')
+      await assertComposerActionsContained()
+      assert.equal((await composer.boundingBox())!.height, 117, 'minimum includes settings, a usable editing line, and the inset action row')
+      if (process.env.MEW_CLI_SCREENSHOTS) {
+        await fs.mkdir(process.env.MEW_CLI_SCREENSHOTS, { recursive: true })
+        await composer.screenshot({ path: path.join(process.env.MEW_CLI_SCREENSHOTS, `composer-minimum-${width}.png`) })
+      }
       // Intrinsic button size changes must update the minimum without a JS pixel sum.
       await composer.getByRole('button', { name: '전송', exact: true }).evaluate(el => { el.style.height = '48px' })
       await resizeHandle.evaluate(async el => {
         const view = el.ownerDocument.defaultView!
-        while (el.getAttribute('aria-valuemin') !== '153') await new Promise<void>(resolve => view.requestAnimationFrame(() => resolve()))
+        while (el.getAttribute('aria-valuemin') !== '133') await new Promise<void>(resolve => view.requestAnimationFrame(() => resolve()))
       })
-      assert.equal((await composer.boundingBox())!.height, 153)
-      await assertComposerBottomAligned()
+      assert.equal((await composer.boundingBox())!.height, 133)
+      await assertComposerActionsContained()
       await composer.getByRole('button', { name: '전송', exact: true }).evaluate(el => { el.style.height = '' })
       await resizeHandle.evaluate(async el => {
         const view = el.ownerDocument.defaultView!
-        while (el.getAttribute('aria-valuemin') !== '137') await new Promise<void>(resolve => view.requestAnimationFrame(() => resolve()))
+        while (el.getAttribute('aria-valuemin') !== '117') await new Promise<void>(resolve => view.requestAnimationFrame(() => resolve()))
       })
       for (let i = 0; i < 4; i++) await resizeHandle.press('ArrowUp')
-      await assertComposerBottomAligned()
+      await assertComposerActionsContained()
       const initialComposer = await composer.boundingBox()
       if (width === 390) assert.equal(initialComposer!.y + initialComposer!.height, 844 - 48, 'composer clears the mobile dock reservation')
       const longDraft = Array.from({ length: 80 }, (_, i) => `${i + 1}. 긴 입력 내용이 줄바꿈되어도 입력칸 안에서 모두 확인할 수 있어야 합니다.`).join('\n')
@@ -210,6 +251,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
         const bounds = await composer.boundingBox()
         const scroller = await page.locator('[data-keep-keyboard] .cm-scroller').boundingBox()
         assert.ok(bounds && scroller && scroller.y + scroller.height <= bounds.y + bounds.height, 'long input scrolls inside the composer')
+        await assertComposerActionsContained()
       }
       await assertInputContained()
       assert.deepEqual(await composer.boundingBox(), initialComposer, 'typing must not grow or move the composer')
@@ -291,7 +333,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
       assert.equal(uploads, 2)
       for (const body of uploadBodies) {
         assert.match(body, /name="project"\r\n\r\n\.workspace\r\n/, 'attachments belong to the root even when editing Documents')
-        assert.match(body, /name="destDir"\r\n\r\n\.mew\/assets\r\n/)
+        assert.match(body, /name="destDir"\r\n\r\n\.mew\/temp\/assets\r\n/)
       }
       assert.equal(await page.getByRole('button', { name: 'png 첨부 제거', exact: true }).count(), 2)
       assert.equal(await draft.locator('img:not(.cm-widgetBuffer)').count(), 0, 'photos stay in attachment tags, never the text document')
@@ -450,6 +492,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
       await page.locator('[data-agent-queue]').getByRole('button', { name: '편집', exact: true }).click()
       const queuedInput = page.getByRole('textbox', { name: '대기 메시지 수정칸', exact: true })
       await queuedInput.waitFor()
+      await assertComposerActionsContained('저장', false)
       assert.equal(await composerValue(queuedInput), '첨부 확인', 'attachment paths stay out of editable text')
       assert.equal(await page.getByRole('button', { name: '파일 첨부', exact: true }).count(), 1, 'queue edit reuses the composer attachment picker')
       assert.equal(await page.locator('[data-agent-queue]').getByRole('textbox').count(), 0, 'queue rows do not contain inline editors')
@@ -461,7 +504,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
       assert.equal(await page.locator('[data-agent-queue]').getByRole('button', { name: '취소', exact: true }).innerText(), '취소')
       assert.equal(await page.locator('[data-agent-composer]').getByRole('button', { name: '취소', exact: true }).count(), 0)
       assert.equal(await page.getByRole('button', { name: '예약 메시지', exact: true }).count(), 0)
-      await page.getByRole('button', { name: 'clipboard-1.png 사진 미리보기', exact: true }).click()
+      await queuedInput.getByRole('button', { name: 'clipboard-1.png 사진 미리보기', exact: true }).click()
       await page.getByRole('dialog').waitFor()
       assert.match(await page.getByRole('dialog').locator('img').getAttribute('src') ?? '', /clipboard-1.png/)
       await page.keyboard.press('Escape')
@@ -502,7 +545,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
       assert.deepEqual(edited.attachments.map(file => file.path), ['.mew/files/clipboard-1.png', '.mew/assets/clipboard-3.png'])
       assert.equal(edited.attachments[1].project, '.workspace')
       assert.match(uploadBodies[2], /name="project"\r\n\r\n\.workspace\r\n/)
-      assert.match(uploadBodies[2], /name="destDir"\r\n\r\n\.mew\/assets\r\n/)
+      assert.match(uploadBodies[2], /name="destDir"\r\n\r\n\.mew\/temp\/assets\r\n/)
       assert.equal(edited.attachments[0].image, undefined, 'existing bytes are retained by the supervisor')
       assert.ok(edited.attachments[1].image?.data)
       await showQueue('', edited.attachments)
@@ -553,6 +596,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
       await queuedInput.press('Escape')
       assert.equal(await composerValue(draft), '보존할 새 메시지')
       assert.equal(await page.getByRole('button', { name: 'CLI 명령 모드', exact: true }).getAttribute('aria-pressed'), 'true', 'cancel restores CLI mode')
+      await assertComposerActionsContained('명령 실행')
       await page.locator('[data-agent-queue]').getByRole('button', { name: '편집', exact: true }).click()
       await queuedInput.waitFor()
       await queuedInput.fill('뒤로가기로 취소할 수정')

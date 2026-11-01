@@ -1,5 +1,5 @@
-/** 설정·저장 행(28px) + 첨부·예약·전송(24+6+24+6+32px) + 상하 패딩(16px) + 상단 테두리(1px). */
-export const MIN_AGENT_INPUT_HEIGHT = 28 + 24 + 6 + 24 + 6 + 32 + 16 + 1
+/** Settings, gap, one editing line, inset action row, padding, and top border; the UI measures the rendered minimum. */
+export const MIN_AGENT_INPUT_HEIGHT = 28 + 4 + 32 + 36 + 16 + 1
 
 /** 입력칸을 끝까지 키워도 대화가 사라지지 않게 남겨 두는 최소 높이. */
 export const MIN_AGENT_CONVERSATION_HEIGHT = 48

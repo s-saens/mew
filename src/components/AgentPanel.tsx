@@ -59,7 +59,7 @@ import {
   type ReactNode,
 } from 'react'
 import { flushSync } from 'react-dom'
-import { EditPencil, NavArrowRight, RefreshDouble, Terminal as TerminalIcon } from 'iconoir-react'
+import { EditPencil, NavArrowRight, RefreshDouble, Send as SendIcon, Terminal as TerminalIcon } from 'iconoir-react'
 import { AgentCommandBubble, AgentCommandPopup } from './agent-command-bubble'
 import { AgentLoadingBubbles, AgentReplyPending } from './agent-loading-bubbles'
 import { useAgentCommands } from '../hooks/use-agent-commands'
@@ -2468,25 +2468,32 @@ function AgentSessionView({
   const questionScrollRef = useRef<{ key: string; top: number } | null>(null)
   const sessionRef = useRef<HTMLDivElement>(null)
   const composerRef = useRef<HTMLDivElement>(null)
+  const composerSettingsRef = useRef<HTMLDivElement>(null)
+  const composerEditorRef = useRef<HTMLDivElement>(null)
   const composerActionsRef = useRef<HTMLDivElement>(null)
   const [minInputHeight, setMinInputHeight] = useState(0)
   useLayoutEffect(() => {
     const composer = composerRef.current
+    const settings = composerSettingsRef.current
+    const editor = composerEditorRef.current
     const actions = composerActionsRef.current
-    if (!composer || !actions) return
+    if (!composer || !settings || !editor || !actions) return
     const measure = () => {
       const style = getComputedStyle(composer)
-      const actionsStyle = getComputedStyle(actions)
-      const rows = Array.from(actions.children).filter(row => getComputedStyle(row).display !== 'none')
-      const contentHeight = rows.reduce((height, row) => height + row.getBoundingClientRect().height, 0)
-        + Math.max(0, rows.length - 1) * (parseFloat(actionsStyle.rowGap) || 0)
+      const contentStyle = getComputedStyle(settings.parentElement!)
+      const contentHeight = settings.getBoundingClientRect().height
+        + (parseFloat(contentStyle.rowGap) || 0)
+        + (parseFloat(getComputedStyle(editor).minHeight) || 0)
+        + actions.getBoundingClientRect().height
       const height = Math.ceil(contentHeight + parseFloat(style.paddingTop) + parseFloat(style.paddingBottom)
         + parseFloat(style.borderTopWidth) + parseFloat(style.borderBottomWidth))
       setMinInputHeight(height)
     }
     const observer = new ResizeObserver(measure)
     observer.observe(composer)
-    for (const row of actions.children) observer.observe(row)
+    observer.observe(settings)
+    observer.observe(editor)
+    observer.observe(actions)
     measure()
     return () => observer.disconnect()
   }, [auth])
@@ -4361,10 +4368,8 @@ function AgentSessionView({
         >
           <span className="pointer-events-none absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-transparent group-hover:bg-accent group-focus-visible:bg-accent" />
         </div>
-        <div className="flex min-h-0 flex-1 items-stretch gap-2">
-        {/* 왼쪽 열은 실행 설정과 작성칸을 공유한다. */}
-        <div className="flex min-w-0 flex-1 flex-col gap-1">
-        <div className="flex min-w-0 shrink-0 items-center gap-1 overflow-visible">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-1">
+        <div ref={composerSettingsRef} className="flex min-w-0 shrink-0 items-center gap-1 overflow-visible">
           <div className="flex min-w-0 flex-1 items-center gap-1">
             <button type="button" onPointerDown={keepFocusOnPress} onClick={toggleCliMode}
               aria-label={uiText("CLI 명령 모드")} aria-pressed={composerCliMode}
@@ -4385,7 +4390,8 @@ function AgentSessionView({
             }} title={uiText("권한")} disabled={!modes || modes.availableModes.length < 2} />
           </div>
         </div>
-          <div className="relative flex min-h-0 flex-1">
+          <div data-agent-input className={`relative flex min-h-0 flex-1 flex-col rounded bg-surface ${composerCliMode ? 'ring-1 ring-inset ring-accent/40' : ''}`}>
+          <div ref={composerEditorRef} className="flex min-h-8 flex-1">
           <MentionTextarea
             key={editingQueued ? `queue:${editingQueued.index}` : 'draft'}
             autoFocus={autoFocus && !editingQueued}
@@ -4427,7 +4433,7 @@ function AgentSessionView({
             onSubmit={submit}
             rows={2}
             placeholder={t('common.textInput')}
-            className={`block min-h-0 w-full flex-1 resize-none rounded bg-surface px-2 py-1.5 pr-10 text-sm text-ink outline-none placeholder:text-ink-muted ${composerCliMode ? 'font-mono ring-1 ring-inset ring-accent/40' : ''}`}
+            className={`block min-h-0 w-full flex-1 resize-none rounded bg-surface px-2 py-1.5 text-sm text-ink outline-none placeholder:text-ink-muted ${composerCliMode ? 'font-mono' : ''}`}
             style={{ height: '100%' }}
             submitHint={editingQueued ? uiText("대기 메시지 수정칸") : composerCliMode ? uiText("Ctrl+Enter로 명령 실행") : uiText("Ctrl+Enter로 전송")}
             submitShortcut="mod-enter"
@@ -4439,7 +4445,9 @@ function AgentSessionView({
               if (option.id.startsWith('project:')) onProjectMention(tabId, option.label)
             }}
           />
-          <HoverTipLayer className="absolute right-1 bottom-1">
+          </div>
+          <div ref={composerActionsRef} data-agent-composer-actions className="flex shrink-0 items-center justify-end gap-1 px-1 pb-1">
+          <HoverTipLayer>
             <button type="button" aria-label={uiText('그림판 열기')} data-tip={uiText('그림판 열기')}
               aria-keyshortcuts="Control+Alt+D Meta+Alt+D"
               disabled={composerCliMode || composerAttaching}
@@ -4448,9 +4456,6 @@ function AgentSessionView({
               <EditPencil width={17} height={17} aria-hidden="true" />
             </button>
           </HoverTipLayer>
-          </div>
-        </div>
-        <div ref={composerActionsRef} className="flex shrink-0 flex-col justify-between">
           <input
             ref={attachmentInputRef}
             type="file"
@@ -4486,7 +4491,6 @@ function AgentSessionView({
               onError={() => setErrorDetail({ title: uiText('프롬프트 임시저장 실패'), detail: uiText('브라우저 저장 공간을 확인하고 다시 시도하세요.') })}
             />
           </div>
-          <div className="flex flex-col gap-1.5">
             <button type="button" onPointerDown={keepFocusOnPress} onClick={() => {
               attachmentPickerContext.current = { target: editingQueued ? 'queue' : 'composer', version: queuedEditVersionRef.current, projectRoot: notificationWorkspace }
               attachmentInputRef.current?.click()
@@ -4507,13 +4511,13 @@ function AgentSessionView({
               type="button"
               onClick={submit}
               disabled={(!connected && !(canQueueStartup && !composerCliMode && !editingQueued)) || !!loadingSession || !!historyPreview || composerAttaching || (composerCliMode && (cli.submitting || !meta?.sessionId || !allowTerminal)) || (!composerDraft.trim() && composerAttachments.length === 0)}
-              className="flex h-8 w-8 items-center justify-center rounded bg-accent text-ink-on-accent disabled:opacity-40"
+              className="flex h-8 w-8 items-center justify-center rounded-xl bg-accent text-ink-on-accent disabled:opacity-40"
               aria-label={editingQueued ? uiText("저장") : composerCliMode ? uiText("명령 실행") : uiText("전송")}
               title={editingQueued ? uiText("저장") : composerCliMode ? uiText("명령 실행 (Ctrl+Enter)") : uiText("전송 (Ctrl+Enter)")}
             >
-              {editingQueued ? <SaveGlyph /> : <SendGlyph />}
+              {editingQueued ? <SaveGlyph /> : <SendIcon width={17} height={17} aria-hidden="true" />}
             </button>
-          </div>
+        </div>
         </div>
         </div>
       </div>
@@ -5355,15 +5359,6 @@ function XGlyph({ small }: { small?: boolean }) {
   return (
     <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M6 6l12 12M18 6 6 18" />
-    </svg>
-  )
-}
-
-function SendGlyph() {
-  useUiLocale()
-  return (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M12 19V5m-6 6 6-6 6 6" />
     </svg>
   )
 }
