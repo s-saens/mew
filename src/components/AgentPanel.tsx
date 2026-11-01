@@ -134,7 +134,7 @@ import { AgentSetPicker } from './AgentSetPicker'
 import { ScrollDateTimePicker } from './ScrollDateTimePicker'
 import { cachedAgentRuntimes, refreshAgentRuntimes, subscribeAgentRuntimes, updateAgentRuntimesCache } from '../utils/agentPickerCache'
 import { useGridDrag } from '../hooks/useGridDrag'
-import { sessionIdOf, sessionIdsExcept, withAutoLabel, withProjectLabel, withRename, withSessionId, type AgentTab } from '../utils/agentTabs'
+import { sessionIdOf, sessionIdsExcept, withAutoLabel, withProjectLabel, withRename, withSessionId, type AgentTab, type RequestedAgentTab } from '../utils/agentTabs'
 import { agentTabStorageKey } from '../utils/agentTabStorage'
 import {
   DEFAULT_AGENT_QUEUE_EDIT_HEIGHT,
@@ -1543,7 +1543,7 @@ function RuntimePicker({ onSelect, onSelectSet }: { onSelect: (runtime: string) 
   )
 }
 
-export function AgentPanel({ requestedPicker = false, onPickerRuntimeChosen, onRuntimeReady, cacheAccount = 'local', notificationFocused = false, trackRestore, onRunningAgentsChange, requestedNoticeTab, onNoticeHandled, preparedTabs, requestedTab, onRequestedTabHandled, allowAgent = true, allowTerminal = true, project, workspacePath, workingPath = workspacePath, tree, focusedFilePath, getSelectedText, renderCommandButtons, onOpenFile, onOpenGuidanceFile, onClose, nextTabSignal = 0, previousTabSignal = 0, closeTabSignal = 0, agentOpen = true, terminalOpen = false, onCloseTerminal, onPanelFocus, foregroundKind }: { requestedPicker?: boolean; onPickerRuntimeChosen?: (runtime: string) => void; onRuntimeReady?: (runtime: string) => void; cacheAccount?: string; notificationFocused?: boolean; trackRestore?: <T>(request: Promise<T>) => Promise<T>; onRunningAgentsChange?: (count: number) => void; requestedNoticeTab?: string; onNoticeHandled?: () => void; preparedTabs?: ReturnType<typeof fetchAgentTabs>; requestedTab?: AgentTab | null; onRequestedTabHandled?: () => void; allowAgent?: boolean; allowTerminal?: boolean; foregroundKind?: string | null; agentOpen?: boolean; terminalOpen?: boolean; onCloseTerminal?: () => void; onPanelFocus?: (kind: 'agent' | 'terminal') => void; project: string; workspacePath: string | null; workingPath?: string | null; tree: TreeNode[]; focusedFilePath: string | null; getSelectedText?: () => string | null; renderCommandButtons?: (run: (command: string) => void) => ReactNode; onOpenFile: OpenWorkspaceFile; onOpenGuidanceFile?: (path: string) => void; onClose: () => void; nextTabSignal?: number; previousTabSignal?: number; closeTabSignal?: number }) {
+export function AgentPanel({ requestedPicker = false, onPickerRuntimeChosen, onRuntimeReady, cacheAccount = 'local', notificationFocused = false, trackRestore, onRunningAgentsChange, requestedNoticeTab, onNoticeHandled, preparedTabs, requestedTab, onRequestedTabHandled, allowAgent = true, allowTerminal = true, project, workspacePath, workingPath = workspacePath, tree, focusedFilePath, getSelectedText, renderCommandButtons, onOpenFile, onOpenGuidanceFile, onClose, nextTabSignal = 0, previousTabSignal = 0, closeTabSignal = 0, agentOpen = true, terminalOpen = false, onCloseTerminal, onPanelFocus, foregroundKind }: { requestedPicker?: boolean; onPickerRuntimeChosen?: (runtime: string) => void; onRuntimeReady?: (runtime: string) => void; cacheAccount?: string; notificationFocused?: boolean; trackRestore?: <T>(request: Promise<T>) => Promise<T>; onRunningAgentsChange?: (count: number) => void; requestedNoticeTab?: string; onNoticeHandled?: () => void; preparedTabs?: ReturnType<typeof fetchAgentTabs>; requestedTab?: RequestedAgentTab | null; onRequestedTabHandled?: () => void; allowAgent?: boolean; allowTerminal?: boolean; foregroundKind?: string | null; agentOpen?: boolean; terminalOpen?: boolean; onCloseTerminal?: () => void; onPanelFocus?: (kind: 'agent' | 'terminal') => void; project: string; workspacePath: string | null; workingPath?: string | null; tree: TreeNode[]; focusedFilePath: string | null; getSelectedText?: () => string | null; renderCommandButtons?: (run: (command: string) => void) => ReactNode; onOpenFile: OpenWorkspaceFile; onOpenGuidanceFile?: (path: string) => void; onClose: () => void; nextTabSignal?: number; previousTabSignal?: number; closeTabSignal?: number }) {
   useUiLocale()
   const { t } = useI18n()
   const dock = useDock()
@@ -1561,6 +1561,8 @@ export function AgentPanel({ requestedPicker = false, onPickerRuntimeChosen, onR
   const tabsKey = agentTabStorageKey(TABS_KEY, workspacePath)
   const activeTabKey = agentTabStorageKey(ACTIVE_TAB_KEY, workspacePath)
   const [tabs, setTabs] = useState<AgentTab[]>(() => loadTabs(workspacePath))
+  const [initialPrompts, setInitialPrompts] = useState<Record<string, string>>({})
+  const clearInitialPrompt = useCallback((id: string) => setInitialPrompts(previous => { const next = { ...previous }; delete next[id]; return next }), [])
   const closedTabs = useRef<{ tab: AgentTab; group: string; index: number }[]>([])
   const [autoFocusTabId, setAutoFocusTabId] = useState<string | null>(null)
   useEffect(() => { closedTabs.current = [] }, [workspacePath, cacheAccount])
@@ -1694,10 +1696,12 @@ export function AgentPanel({ requestedPicker = false, onPickerRuntimeChosen, onR
     return () => { alive = false }
   }, [workspacePath, docked, preparedTabs, trackRestore])
 
-  // Feature execution owns the host; opening its conversation only attaches the existing tab.
+  // External requests can attach a conversation and supply a one-shot startup message.
   useEffect(() => {
     if (!requestedTab || !tabsSynced || !allowAgent || requestedTab.cwd !== workspacePath) return
-    setTabs(previous => previous.some(tab => tab.id === requestedTab.id) ? previous : [...previous, requestedTab])
+    const { initialPrompt, ...tab } = requestedTab
+    setTabs(previous => previous.some(existing => existing.id === tab.id) ? previous : [...previous, tab])
+    if (initialPrompt) setInitialPrompts(previous => ({ ...previous, [tab.id]: initialPrompt }))
     setActiveId(requestedTab.id)
     setOpened(previous => new Set(previous).add(requestedTab.id))
     setPickerOpen(false)
@@ -2040,6 +2044,8 @@ export function AgentPanel({ requestedPicker = false, onPickerRuntimeChosen, onR
               notificationFocused={notificationFocused && agentOpen && isActive}
               allowTerminal={allowTerminal}
               tabId={tab.id}
+              initialPrompt={initialPrompts[tab.id]}
+              onInitialPromptHandled={clearInitialPrompt}
               active={isActive}
               autoFocus={isActive && tab.id === autoFocusTabId}
               visible={visible}
@@ -2231,6 +2237,8 @@ function AgentSessionView({
   tabId,
   active,
   autoFocus,
+  initialPrompt,
+  onInitialPromptHandled,
   runtime,
   cwd,
   preset,
@@ -2260,6 +2268,8 @@ function AgentSessionView({
   /** 입력·단축키 포커스 대상 */
   active: boolean
   autoFocus: boolean
+  initialPrompt?: string
+  onInitialPromptHandled: (id: string) => void
   /** 다른 패널에 포커스가 있어도 현재 표시 중인 탭은 로딩을 재생한다. */
   visible: boolean
   runtime: string
@@ -3619,6 +3629,20 @@ function AgentSessionView({
     thinking: thinking?.options.find((option) => option.id === thinking.currentValue)?.name ?? thinking?.currentValue ?? '—',
     permission: modes ? (MODE_LABEL[modes.currentModeId] ?? modes.currentModeId) : '—',
   }), [uiLocale, currentModel, models?.currentModelId, modes, thinking])
+  const initialPromptQueued = useRef(false)
+  useEffect(() => {
+    if (!initialPrompt || initialPromptQueued.current) return
+    initialPromptQueued.current = true
+    const prompt: StartupPrompt = {
+      type: 'prompt', text: initialPrompt, displayText: initialPrompt,
+      images: [], imageRefs: [], attachments: [], skills: [],
+      settings: { model: '—', thinking: '—', permission: '—' },
+    }
+    const id = startupQueue.enqueue(prompt)
+    beginPrompt(prompt, items.at(-1)?.key ?? null, queueMeta?.queued ?? [], id)
+    setStartupPrompts(startupQueue.snapshot())
+    onInitialPromptHandled(tabId)
+  }, [initialPrompt, tabId, onInitialPromptHandled, startupQueue, beginPrompt, items, queueMeta?.queued])
   useEffect(() => {
     if (!startupReady || !connected || !meta?.sessionId || auth || loadingSession || historyPreview || restoreFailureRef.current) return
     startupQueue.flush(prompt => {

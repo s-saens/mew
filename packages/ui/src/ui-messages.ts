@@ -397,6 +397,8 @@ export const uiMessages = {
   "올바른 날짜를 입력하세요 (YYYY-MM-DD)": ["Enter a valid date (YYYY-MM-DD)", "请输入有效日期（YYYY-MM-DD）", "有効な日付を入力してください（YYYY-MM-DD）"],
   "태스크": ["Tasks", "任务", "タスク"],
   "새 태스크": ["New task", "新任务", "新しいタスク"],
+  '태스크 실행': ['Run task', '执行任务', 'タスクを実行'],
+  '태스크 문서를 찾을 수 없습니다. 문서를 다시 열고 시도하세요.': ['The task document is no longer available. Reopen it and try again.', '找不到任务文档。请重新打开文档后再试。', 'タスク文書が見つかりません。文書を開き直して再試行してください。'],
   "태스크 내용": ["Task text", "任务内容", "タスクの内容"],
   "태스크 완료": ["Complete task", "完成任务", "タスクを完了"],
   "하위 태스크 추가": ["Add subtask", "添加子任务", "サブタスクを追加"],

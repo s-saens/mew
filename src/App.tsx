@@ -15,7 +15,7 @@ import { uuid } from './utils/uuid'
 import type { MewcatAction } from '../shared/mewcat-assistant'
 import { writeAgentInputDraft } from './utils/agentInputDrafts'
 import { GitLoginDialog } from './components/github-account'
-import { uiText } from '@mew/ui/i18n-core'
+import { getUiLocale, uiText } from '@mew/ui/i18n-core'
 import { useUiLocale } from '@mew/ui/i18n'
 import { useRefreshTasks } from './hooks/use-refresh-tasks'
 import { useFocusedWorkspacePanel } from './hooks/use-focused-workspace-panel'
@@ -64,7 +64,13 @@ import { useSidebarCreate } from './hooks/use-sidebar-create'
 import { FileTree, type TreePersistenceState } from './components/FileTree'
 import { CommandButtonMenu } from './components/CommandButtonMenu'
 import type { SearchMatch } from './api/client'
-import type { AgentTab } from './utils/agentTabs'
+import type { RequestedAgentTab } from './utils/agentTabs'
+import { taskAgentFile, taskAgentPrompt, taskAgentTitle } from './utils/task-agent'
+import { resolveTaskAgentLaunch } from './utils/task-agent-launch'
+import { fetchTaskList } from './api/task-list'
+import { syncTaskDocuments, withTaskDocumentSync } from './utils/task-document-sync'
+import { documentAbsolutePath } from './utils/document-title-preview'
+import { DEFAULT_RUNTIME_ID, runtimeOf } from './components/agentRuntimes'
 import { DockWorkspace, DockPanel, type DockHandle } from './components/DockWorkspace'
 import type { DockState } from './utils/dock-layout'
 import { getBinding, matchesShortcut } from '@mew/shortcuts'
@@ -364,7 +370,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
   const gitMounted = useRef(false)
   const [gitOpen, setGitOpen] = useState(() => caps.git && scopedBrowserStorage().getItem(GIT_OPEN_KEY) === '1')
   const [remoteDesktopOpen, setRemoteDesktopOpen] = useState(false)
-  const [requestedAgentTab, setRequestedAgentTab] = useState<AgentTab | null>(null)
+  const [requestedAgentTab, setRequestedAgentTab] = useState<RequestedAgentTab | null>(null)
   const [tasksOpen, setTasksOpen] = useState(false)
   const tasksMounted = useRef(false)
   if (tasksOpen) tasksMounted.current = true
@@ -1861,6 +1867,41 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
   // 사이드바 여는 버튼은 사이드바가 서는 자리와 붙은 맨 앞 칸(왼쪽·위)이 맡는다
   const sidebarPaneId = paneIds(layout)[0]
 
+  const runTask = async (path: string, content: string) => {
+    if (!caps.agent) return
+    const root = rootProjectPath
+    const workspace = workspaceInfoRef.current
+    const file = taskAgentFile(path, project, workspace)
+    if (!file || !root) return
+    const relative = documentAbsolutePath(root, workspace?.docsPath, file.project, file.path).slice(root.replace(/\/$/, '').length + 1)
+    const isCurrent = () => rootProjectPathRef.current === root
+    const before = taskSession.tasks
+    try {
+      const task = await resolveTaskAgentLaunch({
+        path: relative, tasks: before, isCurrent,
+        readBefore: () => withTaskDocumentSync(root, async () => {
+          const board = await fetchTaskList(root, auth.email ?? '')
+          if (isCurrent()) await syncTaskDocuments(root, before, board.tasks)
+          return board.tasks
+        }, 'read'),
+        prepare: () => prepareDocumentPageMutation(file.project),
+        readAfter: async () => (await fetchTaskList(root, auth.email ?? '')).tasks,
+        sync: (previous, next) => syncTaskDocuments(root, previous, next),
+      })
+      if (!task?.path || !isCurrent()) return
+      const selected = runtimeOf(scopedBrowserStorage().getItem('mew:agent-runtime') ?? DEFAULT_RUNTIME_ID)
+      const runtime = selected.surface === 'acp' ? selected.id : DEFAULT_RUNTIME_ID
+      setRequestedAgentTab({
+        id: `task-${uuid()}`, label: task.text || taskAgentTitle(content, task.path), renamed: true,
+        runtime, cwd: root, initialPrompt: taskAgentPrompt({ project: WORKSPACE_PROJECT, path: task.path }, getUiLocale()),
+      })
+      openWorkspacePanel('agent')
+    } catch (error) {
+      if (error instanceof Error && error.message === 'TASK_DOCUMENT_UNAVAILABLE') throw new Error(uiText('태스크 문서를 찾을 수 없습니다. 문서를 다시 열고 시도하세요.'))
+      throw error
+    }
+  }
+
   const renderEditorPane = (pane: (typeof panes)[number]) => {
     return (
         <DockPanel key={pane.id} id={`editor:${pane.id}`} kind="editor" visible={!desktopMode || editorOpen} tabs={pane.tabs.map(tab => tab.path)} mobileSelected={pane.id === focusedPaneId}>
@@ -1910,6 +1951,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
           onReorder={(from, to) => reorderTabs(from, to, pane.id)}
           onSetViewMode={(path, viewMode) => setTabViewMode(path, viewMode, pane.id)}
           onChangeContent={(...args) => { if (rootProjectPathRef.current === rootProjectPath) updateTabContent(...args) }}
+          onRunTask={caps.agent ? runTask : undefined}
           diffVisible={!desktopMode || editorOpen}
           onOpenDiffFile={(fileProject, path) => {
             openFile(editorTabPath(fileProject, path, project), { preview: false, forceNewTab: true, paneId: pane.id })

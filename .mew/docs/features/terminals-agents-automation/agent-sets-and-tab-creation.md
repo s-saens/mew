@@ -4,11 +4,11 @@ parent: "mew-agents"
 title: "Agent Sets and Tab Creation"
 status: "implemented"
 created: "2026-09-18"
-updated: "2026-10-30"
+updated: "2026-11-01"
 status_hash: "3e9a3293848b77d07af2e0bbeb65a930bb54c18ce2da6a1b7543c145fb06a0b9"
 files: ["src/components/AgentPanel.tsx", "src/components/AgentSetPicker.tsx", "server/agentSets.ts", "server/agentCwd.ts"]
 commits: []
-description: "A feature contract covering new-tab runtime selection with number keys 1–9, automatic focus on new conversation input, unchanged default tab names and live position numbers before each close button, number display between the install button and settings icon, handle-based drag reordering, per-browser order storage, creation/editing/selection of agent sets containing runtime/model/effort/role presets, and per-project tab creation. Provides tab renaming by double-click, a context menu, and panel maximization/restoration by double-clicking the panel handle. Describes creating new tabs and restoring closed tabs based on panel focus, bidirectional swipe cycling through conversation tabs and the final + picker, retaining the Ctrl/Cmd+W close target immediately after keyboard tab switching, saving exact models, direct entry, restoring existing tabs, and dedicated AI Commit execution."
+description: "A feature contract covering new-tab runtime selection with number keys 1–9, automatic focus on new conversation input, unchanged default tab names and live position numbers before each close button, number display between the install button and settings icon, handle-based drag reordering, per-browser order storage, creation/editing/selection of agent sets containing runtime/model/effort/role presets, and per-project tab creation. Provides tab renaming by double-click, a context menu, and panel maximization/restoration by double-clicking the panel handle. Describes creating new tabs and restoring closed tabs based on panel focus, bidirectional swipe cycling through conversation tabs and the final + picker, retaining the Ctrl/Cmd+W close target immediately after keyboard tab switching, saving exact models, direct entry, restoring existing tabs, dedicated AI Commit execution, and transient task-editor launch messages that wait for startup and are never replayed from saved tabs."
 상위파일:
   - "MOC.md"
   - "_terminals-agents-automation.md"
@@ -21,6 +21,8 @@ description: "A feature contract covering new-tab runtime selection with number 
 - Search by model name or ID and select from a runtime-specific candidate dropdown, or directly enter an ID that is not listed.
 
 ### Scope
+
+- The [task editor action](../projects-files-search/task-panel-list-calendar-and-gantt.md#requirements) can request a new tab with a fixed task title and a one-shot initial prompt. Consume the prompt into the existing startup queue, wait for a ready session, and preserve initialized runtime settings. Keep the initial prompt outside persisted `AgentTab` state: tab restoration and ordinary external requests without a prompt do not send messages automatically.
 
 - Provide agent set creation, editing, and selection, along with per-project tab and tab name management.
 - Switching with `Ctrl/Cmd+1…9` or the previous/next tab shortcuts also moves keyboard focus to the selected tab. Pressing `Ctrl/Cmd+W` afterward closes the active tab in the same agent group. Closing uses the same last pointerdown/focusin target as new-tab creation and restoration, so selecting an empty agent area does not close an editor tab even if actual focus remains in the editor or moves to body. Do not close tabs for hidden, inert, or removed targets, or during a modal, IME composition, or repeated input.

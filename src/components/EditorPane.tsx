@@ -5,7 +5,8 @@ import { LoadingIndicator, observeEditorViewport, useToast } from '@mew/ui'
 import { uiText } from '@mew/ui/i18n-core'
 import { useUiLocale } from '@mew/ui/i18n'
 import { useShortcutBindings } from '@mew/shortcuts'
-import { ArrowLeft, ArrowRight, OpenNewWindow, Quote } from 'iconoir-react'
+import { ArrowLeft, ArrowRight, Brain, OpenNewWindow, Quote } from 'iconoir-react'
+import { taskAgentFile } from '../utils/task-agent'
 import { useDock, DockGrip, DockInlineBody } from './DockWorkspace'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
 import {
@@ -176,6 +177,7 @@ export interface EditorPaneProps {
   onNavigateTab?: (direction: -1 | 1) => void
   onCreateChildPage?: (path: string, name: string, onCreated: (result: DocumentPageMutation) => void) => Promise<void>
   onOpenHistory: () => void
+  onRunTask?: (path: string, content: string) => Promise<void>
   onSetTocOpen: (open: boolean) => void
   onOpenSidebar: () => void
   onTabDragMove: (paneId: string, path: string, x: number, y: number, tabId?: string) => void
@@ -219,6 +221,7 @@ export function EditorPane({
   onOpenSidebar,
   diffVisible = true,
   onOpenDiffFile,
+  onRunTask,
   onTabDragMove,
   onTabDrop,
 }: EditorPaneProps) {
@@ -226,6 +229,8 @@ export function EditorPane({
   const dock = useDock()
   const { t } = useI18n()
   const { toast: commentToast, showToast } = useToast()
+  const [runningTask, setRunningTask] = useState(false)
+  const taskRunPending = useRef(false)
   const shortcutBindings = useShortcutBindings()
   const selectedTab = (pane.activeTabId ? pane.tabs.find((t) => t.id === pane.activeTabId) : undefined) ?? pane.tabs.find((t) => t.path === pane.activePath) ?? null
   const file = editorFile(pane.activePath ?? '', tabProject)
@@ -991,6 +996,25 @@ export function EditorPane({
                       <circle cx="4" cy="12" r="1" fill="currentColor" />
                       <circle cx="4" cy="18" r="1" fill="currentColor" />
                     </svg>
+                  </button>
+                )}
+                {!isGuest && onRunTask && taskAgentFile(selectedTab!.path, tabProject, workspace) && (
+                  <button
+                    type="button"
+                    aria-label={uiText('태스크 실행')}
+                    data-tip={uiText('태스크 실행')}
+                    disabled={runningTask || loading || revalidating || !activeTab.editable}
+                    onClick={() => {
+                      if (taskRunPending.current) return
+                      taskRunPending.current = true
+                      setRunningTask(true)
+                      void onRunTask(selectedTab!.path, activeTab.content)
+                        .catch(error => showToast(error instanceof Error ? error.message : String(error)))
+                        .finally(() => { taskRunPending.current = false; setRunningTask(false) })
+                    }}
+                    className="rounded border border-edge-strong bg-surface-raised p-1.5 text-ink-muted shadow-sm enabled:hover:bg-surface-hover disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-accent"
+                  >
+                    <Brain width={14} height={14} aria-hidden="true" />
                   </button>
                 )}
               </div>
