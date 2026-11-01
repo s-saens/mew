@@ -1,8 +1,8 @@
 ---
 title: "Command button port preview implementation and verification"
-description: "Records implementation and verification of port buttons, public device URLs, direct preview modules, and remote initialization failure handling. Distinguishes confirmation of the DNS failure remaining after redeployment on 2026-10-28, improvements to read-only readiness checks and deployment completion criteria, and the scope still not restored in production. Also records the direct SPA initial route fix, isolated Along verification, and status of not applied to production."
+description: "Records implementation and verification of port buttons, public device URLs, direct preview modules, and remote initialization failure handling. Distinguishes confirmation of the DNS failure remaining after redeployment on 2026-10-28, improvements to read-only readiness checks and deployment completion criteria, and the scope still not restored in production. Also records the direct SPA initial route fix, isolated Along verification, and the 2026-11-01 restoration of port buttons beside command names with responsive regression and build checks. Distinguishes local verification from runtime application."
 created: "2026-10-27"
-updated: "2026-10-28"
+updated: "2026-11-01"
 ---
 
 ## Purpose and resulting behavior
@@ -85,3 +85,16 @@ Global address references in executed scripts were connected to virtual Window a
 - `npm run check:docs` found no errors in 519 descriptions but failed because of 18 existing missing links outside this change. Links in the 6 changed documents have no errors.
 
 No app build, deployment, or start, stop, or restart of the running server was performed. The user must apply the changes to production for the actual user domain. Compatibility limits for dynamically executed code, Next static chunks, and original browser identity follow the current contract.
+
+
+## 2026-11-01 — Ports beside command names
+
+The user requested that command-port buttons share the command name's line. Removed the forced wrapping, second-line ordering, full-width basis, and extra margins from `packages/ui/src/action-menu.css`. The port group now stays between the name and stop/terminal actions and occupies at most 28% of the row; extra ports scroll horizontally. Names retain their flexible, truncated area, and badge heights, keyboard order, command actions, and browser entry remain unchanged. Current details belong in the [shared UI contract](../development/ui-contracts.md#dropdowns-and-selection-components) and [terminal feature contract](../features/terminals-agents-automation/tmux-shell-terminals.md).
+
+Updated `server/command-button-menu-ui.test.ts` to assert vertical alignment, horizontal action order, constrained overflow, and retained name width. The new regression failed before the CSS change because ports were below the name. Also corrected the terminal-position query to select the direct terminal button rather than a nested port button.
+
+- Seven relevant tests passed across the shared-menu, workspace-command, command-menu keyboard, and final port-menu runs: `server/action-menu-ui.test.ts`, `server/cmd-button-workspace-ui.test.ts`, `src/utils/command-menu-keyboard.test.ts`, and `server/command-button-menu-ui.test.ts`.
+- Actual Chromium checks covered desktop and touch widths of 1100/390/320px in both themes and resizing to 240px. Reviewed desktop dark and 320px light screenshots. Multiple-port scrolling, keyboard entry, browser opening without rerunning commands, stopping, and reorder persistence remain covered.
+- `npm run build` passed, including TypeScript, with the large-chunk warning. Targeted oxlint, documentation checks, and `git diff --check` passed. Impeccable detected no findings in the changed CSS.
+
+This is a UI layout change only. The build updated local UI assets; no deployment, launcher execution, or Mew server start, stop, or restart was performed. Existing unrelated working-tree changes were excluded.

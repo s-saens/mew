@@ -104,16 +104,13 @@
 .mew-menu-reorder-handle:active { cursor: grabbing; }
 .mew-menu-reorder-handle:focus-visible { outline: none; }
 .mew-command-shortcut { padding-inline: 6px 10px; }
-[data-command-menu] .mew-sortable-menu-row { flex-wrap: wrap; }
 .mew-action-menu-ports {
   display: flex;
   align-items: center;
   gap: 3px;
-  order: 1;
-  flex: 0 0 calc(100% - 38px);
+  flex: 0 1 auto;
   min-width: 0;
-  max-width: calc(100% - 38px);
-  margin: 0 10px 4px 28px;
+  max-width: 28%;
   overflow-x: auto;
 }
 .mew-action-menu-ports .mew-action-menu-item.mew-action-menu-port {

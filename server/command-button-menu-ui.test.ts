@@ -90,11 +90,16 @@ createRoot(document.getElementById('root')).render(<I18nProvider><CommandButtonM
       const handle = el.querySelector('[data-command-drag-handle]')!.getBoundingClientRect()
       const name = el.querySelector('[data-command-choice]')!.getBoundingClientRect()
       const hint = el.querySelector('kbd')!.getBoundingClientRect()
-      const terminal = el.querySelector('button:last-of-type')!.getBoundingClientRect()
+      const terminal = el.querySelector(':scope > button.mew-action-menu-icon:last-of-type')!.getBoundingClientRect()
       const port = el.querySelector('.mew-action-menu-port')!.getBoundingClientRect()
-      return { handleBeforeName: handle.right <= name.left, hintAfterActions: terminal.right <= hint.left, portsBelow: port.top >= name.bottom }
+      const ports = el.querySelector('.mew-action-menu-ports')!.getBoundingClientRect()
+      const stop = el.querySelector('.mew-action-menu-icon')!.getBoundingClientRect()
+      return { handleBeforeName: handle.right <= name.left, hintAfterActions: terminal.right <= hint.left,
+        portsInline: Math.abs(port.top + port.height / 2 - name.top - name.height / 2) < 1,
+        portsBetweenNameAndActions: name.right <= ports.left && ports.right <= stop.left }
     })
-    assert.deepEqual(positions, { handleBeforeName: true, hintAfterActions: true, portsBelow: true })
+    assert.deepEqual(positions, { handleBeforeName: true, hintAfterActions: true, portsInline: true, portsBetweenNameAndActions: true })
+    assert.equal(await row.locator('.mew-action-menu-ports').evaluate(el => el.scrollWidth > el.clientWidth), true, 'multiple ports scroll within the same row')
     const bounds = await menu.boundingBox(); assert.ok(bounds)
     assert.ok(bounds.x >= 0 && bounds.x + bounds.width <= width)
     assert.ok(Math.abs(bounds.width - Math.min(308, width * 0.9)) < 1, 'menu is 40% wider than 220px and never exceeds 90vw')
@@ -110,7 +115,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><CommandButtonM
     })
     assert.equal(density.font, '14px'); assert.equal(density.padding, '6px 10px')
     assert.equal(density.height, width <= 390 ? 40 : 32)
-    assert.ok(density.textWidth >= 80, 'long command names retain usable width even with four ports')
+    assert.ok(density.textWidth >= 64, 'long command names retain usable width beside four horizontally scrolling ports')
     assert.equal(density.iconWidth, 32)
     assert.equal(density.portFont, '12px'); assert.equal(density.border, '1px'); assert.equal(density.radius, '4px')
     assert.notEqual(density.background, 'rgba(0, 0, 0, 0)', 'port numbers have their own visible surface')
