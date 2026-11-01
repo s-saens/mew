@@ -167,6 +167,8 @@ body {
 
 .mew-workspace {
   background-color: var(--color-workspace);
+  box-sizing: border-box;
+  padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
 }
 
 :root.theme-gradient body {
@@ -483,6 +485,19 @@ strong {
 }
 
 /* App dialogs share theme-aware focus and input affordances. */
+.mew-dialog-overlay {
+  --dialog-gutter-x: 12px;
+  --dialog-gutter-y: 12px;
+  padding: max(var(--dialog-gutter-y), env(safe-area-inset-top, 0px)) max(var(--dialog-gutter-x), env(safe-area-inset-right, 0px)) max(var(--dialog-gutter-y), env(safe-area-inset-bottom, 0px)) max(var(--dialog-gutter-x), env(safe-area-inset-left, 0px));
+}
+.mew-dialog-overlay[data-size="settings"] { --dialog-gutter-x: 0px; --dialog-gutter-y: 0px; }
+@media (width >= 640px) {
+  .mew-dialog-overlay:not([data-size="settings"]) { --dialog-gutter-x: 24px; --dialog-gutter-y: 24px; }
+}
+@media (width >= 768px) {
+  .mew-dialog-overlay[data-size="settings"] { --dialog-gutter-x: 16px; }
+}
+
 .mew-dialog :is(button, input, textarea, a):focus-visible {
   outline: 2px solid var(--color-link);
   outline-offset: 2px;
@@ -792,14 +807,11 @@ strong {
     height: 48px;
     justify-content: space-around;
     gap: 0;
-    padding: 1px max(6px, env(safe-area-inset-right, 0px)) 2px max(6px, env(safe-area-inset-left, 0px));
+    padding: 1px 6px 2px;
     background: var(--color-surface);
   }
-  .mobile-dock[data-position="bottom"]:not([hidden]) { height: calc(48px + env(safe-area-inset-bottom, 0px)); padding-bottom: calc(2px + env(safe-area-inset-bottom, 0px)); }
-  .mobile-dock[data-position][data-vertical]:not([hidden]) { width: 48px; height: 100%; justify-content: flex-start; padding: 2px 1px calc(2px + env(safe-area-inset-bottom, 0px)); }
+  .mobile-dock[data-position][data-vertical]:not([hidden]) { width: 48px; height: 100%; justify-content: flex-start; padding: 2px 1px; }
   .mobile-dock[data-position][data-vertical] button { flex: 0 0 44px; width: 44px; }
-  .mobile-dock[data-position="left"]:not([hidden]) { width: calc(48px + env(safe-area-inset-left, 0px)); padding-left: calc(1px + env(safe-area-inset-left, 0px)); }
-  .mobile-dock[data-position="right"]:not([hidden]) { width: calc(48px + env(safe-area-inset-right, 0px)); padding-right: calc(1px + env(safe-area-inset-right, 0px)); }
 }
 
 /* Only the giant cat obstructs the workspace; transparent space passes pointer input through. */

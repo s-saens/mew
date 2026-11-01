@@ -42,7 +42,7 @@ export function DialogFrame({ children, labelledBy, describedBy, onClose, classN
   }, [])
 
   return createPortal(
-    <div className={`fixed inset-0 z-[1200] flex items-center justify-center bg-black/50 ${size === 'settings' ? 'max-md:px-0 md:px-4' : 'p-3 sm:p-6'}`} onPointerDown={(event) => {
+    <div className="mew-dialog-overlay fixed inset-0 z-[1200] flex flex-col items-center justify-center bg-black/50" data-size={size} onPointerDown={(event) => {
       event.stopPropagation()
       if (event.target === event.currentTarget && !busy) onClose()
     }} onMouseDown={(event) => event.stopPropagation()} onClick={(event) => event.stopPropagation()}>

@@ -104,7 +104,7 @@ export function SettingsModal({ mewcatHostRef, mewcatRequest, initialDebugger, d
   ]
 
   return createPortal(
-    <div ref={setPortalContainer} role="dialog" aria-modal="true" aria-label={t('settings.title')} style={{ zIndex: 'var(--layer-settings)' }} className="fixed inset-0 flex items-center justify-center bg-black/50 max-md:px-0 md:px-4" onClick={onClose}>
+    <div ref={setPortalContainer} role="dialog" aria-modal="true" aria-label={t('settings.title')} style={{ zIndex: 'var(--layer-settings)' }} className="mew-dialog-overlay fixed inset-0 flex flex-col items-center justify-center bg-black/50" data-size="settings" onClick={onClose}>
       <div
         className="flex h-[70vh] w-full max-w-[740px] overflow-hidden rounded-lg border border-edge bg-surface-deep max-md:h-full max-md:rounded-none"
         onClick={(e) => e.stopPropagation()}

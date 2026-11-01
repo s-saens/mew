@@ -4,17 +4,19 @@ parent: "mew-settings"
 title: "Panel Layout, Mobile, and State Restoration"
 status: "implemented"
 created: "2026-09-18"
-updated: "2026-10-30"
+updated: "2026-11-01"
 status_hash: "018bca32e486b43c386b29de3e2087d6d1447fae6a33abc99d745367947a9382"
 files: ["src/components/tool-presentation-toggle.tsx", "src/components/SettingsModal.tsx", "src/hooks/use-refresh-tasks.ts", "src/hooks/usePresence.ts", "src/components/project-loading-overlay.tsx", "src/App.tsx", "src/components/DockWorkspace.tsx", "src/components/EditorPane.tsx", "src/components/TabBar.tsx", "src/components/AgentPanel.tsx", "src/components/mobile-dock.tsx", "src/components/layout-presets.tsx", "src/utils/layout-presets.ts", "server/layout-icon-cli.ts", "src/utils/mobile-dock.ts", "src/hooks/use-mobile-keyboard.ts", "src/hooks/use-mobile-panel-swipe.ts", "src/hooks/useTabs.ts", "server/userUiState.ts"]
 commits: []
-description: "Feature contract covering automatic scrolling to active and focused tabs in all horizontal tab bars, chevron buttons with theme-background-colored shadows in directions with remaining scroll space, constant-speed movement while held, normal wheel scrolling, returning to the most recently active tab when closing an editor tab, per-tab document navigation, maximizing panels by double-clicking their handles, renaming agent and terminal tabs by double-clicking, hiding and restoring surrounding panels and the side dock while maximized, and docking and splitting work panels. Explains panel switching through the independently positioned desktop and mobile docks, 20px dock swipes and 30px content-area tab switching that preserves internal horizontal scrolling, the Plain modifier key bar with arrow gestures reserved for cursor movement, panel visit history, layout presets shared by the header and account settings, per-device layout storage, loading and focus on session return, the restored task panel, and migration of removed browser storage nodes."
+description: "Feature contract covering installed-app safe areas for the header, panels, Dock and dialogs, automatic scrolling to active and focused tabs in all horizontal tab bars, chevron buttons with theme-background-colored shadows in directions with remaining scroll space, constant-speed movement while held, normal wheel scrolling, returning to the most recently active tab when closing an editor tab, per-tab document navigation, maximizing panels by double-clicking their handles, renaming agent and terminal tabs by double-clicking, hiding and restoring surrounding panels and the side dock while maximized, and docking and splitting work panels. Explains panel switching through the independently positioned desktop and mobile docks, 20px dock swipes and 30px content-area tab switching that preserves internal horizontal scrolling, the Plain modifier key bar with arrow gestures reserved for cursor movement, panel visit history, layout presets shared by the header and account settings, per-device layout storage, loading and focus on session return, the restored task panel, and migration of removed browser storage nodes."
 상위파일:
   - "MOC.md"
   - "_appearance-accounts-operations.md"
 ---
 
 ## Requirements
+
+- Keep the installed app header, panels, Dock and full-screen dialogs inside device safe areas in portrait and landscape. Reserve each inset once without shrinking the existing header or touch controls; follow [Device safe areas](../../development/ui-contracts.md#device-safe-areas).
 
 - Restore the task panel to the dock, docking layouts, mobile foreground, per-account layouts, and layout presets. Restore saved task groups, tab assignments, and open states; for saved layouts without tasks, add the panel next to its default neighbor when opened. Retain the DB Gantt; their data storage is independent. Follow [0052](../../decisions/0052-restore-task-panel.md).
 - Switch notes and tasks between desktop popup and panel modes using the icon button in each tab header, and remove the selection from appearance settings. Preserve the mode, coordinates, and content, and switch each tool independently. On mobile, hide the button and display the panel.
