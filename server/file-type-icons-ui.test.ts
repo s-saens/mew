@@ -13,15 +13,17 @@ test('file icons render in Files, Documents, search and server browsing across t
 import {createRoot} from '${root}/node_modules/react-dom/client.js';
 import {FileTree} from '${root}/src/components/FileTree.tsx';
 import {FileBrowserEntry} from '${root}/src/components/file-browser.tsx';
+import {IconPackProvider} from '${root}/src/components/icon-pack-context.tsx';
 import {I18nProvider} from '${root}/src/i18n.tsx';
 const noop=()=>{};const file=name=>({name,path:name,type:'file'});const folder={name:'src',path:'src',type:'dir',children:[file('src/child.ts')]};
 const props={project:'.workspace',readOnly:true,selectedPath:null,searchFocusSignal:0,newFileSignal:{n:0,parentPath:null},revealSignal:0,presence:{},onSelect:path=>window.selected=path,onFileCreated:noop,onFolderCreated:noop,onRenamed:noop,onDeleted:noop,onNotice:noop,registerSearchCancel:noop};
-function Fixture(){const [renamed,setRenamed]=React.useState(false);const [expanded,setExpanded]=React.useState(false);window.rename=()=>setRenamed(true);return <>
+function Fixture(){const [renamed,setRenamed]=React.useState(false);const [expanded,setExpanded]=React.useState(false);const [pack,setPack]=React.useState('material');window.setPack=setPack;window.rename=()=>setRenamed(true);return <IconPackProvider value={pack}>
 <section id="files" style={{height:300}}><FileTree {...props} tree={[...['main.ts','photo.png','archive.zip','unknown.xyz','mew','config.toml',renamed?'note.py':'note.md'].map(file),folder]}/></section>
-<section id="docs" style={{height:100}}><FileTree {...props} documentPages tree={[file('note.md')]}/></section>
+<section id="docs" style={{height:100}}><FileTree {...props} documentPages tree={[file('note.md'),{name:'parent',path:'parent',type:'dir',children:[file('parent/_parent.md'),file('parent/child.md')]}]}/></section>
+<section id="docs-search" style={{height:80}}><FileTree {...props} documentPages tree={[file('note.md')]} search={{query:'note',paths:['note.md'],matches:new Map(),onOpenMatch:noop}}/></section>
 <section id="search" style={{height:100}}><FileTree {...props} tree={[file('main.ts'),file('photo.png')]} search={{query:'main',paths:['main.ts'],matches:new Map(),onOpenMatch:noop}}/></section>
 <section id="server"><FileBrowserEntry entry={{...file('package.json'),path:'/tmp/package.json'}} onClick={()=>window.serverOpened=true}/><FileBrowserEntry entry={{...file('mew'),path:'/tmp/mew'}} onClick={noop}/></section>
-<section id="server-folder"><FileBrowserEntry entry={{...folder,path:'/tmp/src'}} expanded={expanded} onClick={()=>setExpanded(value=>!value)}/></section></>}
+<section id="server-folder"><FileBrowserEntry entry={{...folder,path:'/tmp/src'}} expanded={expanded} onClick={()=>setExpanded(value=>!value)}/></section></IconPackProvider>}
 createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18nProvider>);`
   const bundle = await build({ input: 'virtual:file-icons.tsx', write: false, platform: 'browser', output: { format: 'iife', codeSplitting: false },
     onwarn(warning, defaultHandler) { if (warning.code !== 'MODULE_LEVEL_DIRECTIVE') defaultHandler(warning) },
@@ -53,7 +55,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
         ['#files [data-path="archive.zip"]', 'zip'], ['#files [data-path="unknown.xyz"]', 'file'],
         ['#files [data-path="mew"]', 'file'], ['#files [data-path="src"]', 'folder'],
         ['#files [data-path="config.toml"]', theme === 'light' ? 'toml_light' : 'toml'],
-        ['#docs [data-path="note.md"]', 'markdown'], ['#search [data-path="main.ts"]', 'typescript'],
+        ['#search [data-path="main.ts"]', 'typescript'],
         ['#server [title="/tmp/package.json"]', 'nodejs'], ['#server [title="/tmp/mew"]', 'file'],
         ['#server-folder button', 'folder'],
       ]) {
@@ -69,14 +71,36 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
       }
       for (const selector of ['#files [data-path="src"]', '#server-folder button']) {
         const folder = page.locator(selector)
-        await folder.click()
+        if (selector.startsWith('#files')) await folder.locator('[data-folder-toggle]').click()
+        else await folder.click()
         await folder.locator('img[data-file-icon="folder-open"]').waitFor()
         assert.equal(await folder.getAttribute('aria-expanded'), 'true')
         if (selector.startsWith('#files')) await page.locator('#files [data-path="src/child.ts"] img[data-file-icon="typescript"]').waitFor()
-        await folder.click()
+        if (selector.startsWith('#files')) await folder.locator('[data-folder-toggle]').click()
+        else await folder.click()
         await folder.locator('img[data-file-icon="folder"]').waitFor()
         assert.equal(await folder.getAttribute('aria-expanded'), 'false')
       }
+      for (const pack of ['material', 'catppuccin', 'none']) {
+        await page.evaluate(`window.setPack(${JSON.stringify(pack)})`)
+        for (const selector of ['#docs [data-path="note.md"]', '#docs [data-path="parent"]', '#docs-search [data-path="note.md"]']) {
+          const row = page.locator(selector)
+          assert.equal(await row.locator('[data-icon-pack], img').count(), 0, 'Documents pages never use file-type artwork')
+          const icon = row.locator('svg[aria-hidden="true"]')
+          assert.equal(await icon.count(), 1, 'leaf, parent and search pages retain the previous document icon')
+          assert.equal(await icon.locator('path').getAttribute('d'), 'M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9ZM14 3v6h6M8 13h8M8 17h5')
+          const bounds = await icon.boundingBox(); assert.ok(bounds)
+          assert.equal(bounds.width, 14)
+          assert.equal(bounds.height, 14)
+        }
+        const file = page.locator('#files [data-path="note.md"]')
+        await file.locator(`[data-icon-pack="${pack}"]`).waitFor()
+        if (pack !== 'none') {
+          const icon = pack === 'material' ? 'markdown' : `${theme === 'light' ? 'latte' : 'mocha'}-markdown`
+          await file.locator(`img[data-file-icon="${icon}"]`).waitFor()
+        } else assert.equal(await file.locator('svg').count(), 1)
+      }
+      await page.evaluate("window.setPack('material')")
       await page.screenshot({ path: `/tmp/mew-file-icons-${width}-${theme}.png` })
     }
     await page.locator('#files [data-path="main.ts"]').dblclick()

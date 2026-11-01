@@ -1,8 +1,8 @@
 ---
 title: "Explorer file-type icons"
-description: "Records the 2026-10-30 Material Icon Theme implementation and follow-up unification of generic file, loading, and open/closed folder artwork, with local regression checks and the boundary before user build and application."
+description: "Records the 2026-10-30 Material Icon Theme implementation and follow-up unification of generic file, loading, and open/closed folder artwork, with local regression checks and the boundary before user build and application. Includes the 2026-11-02 restoration of the previous outline Documents page icon while retaining file-type icons in Files."
 created: "2026-10-30"
-updated: "2026-10-30"
+updated: "2026-11-02"
 ---
 
 ## Purpose and results
@@ -30,3 +30,12 @@ Replaced the separate outline folder icons in the Files tree and shared browser 
 - Existing `server/explorer-performance-ui.test.ts` and `server/sidebar-touch-ui.test.ts` passed. `server/sidebar-sticky-ui.test.ts` failed its ancestor-guide pixel comparison, including on a rerun. An isolated temporary fixture loading the pre-change icon modules from Git HEAD reproduced the same assertion failure; the temporary fixture was removed. This existing check remains unresolved outside the icon change.
 - `npx tsc -b`, `npm run lint` (existing warnings), `node tools/generate-file-icons.mjs --check`, and the changed-file diff whitespace check passed. `npm run check:docs` checked 562 descriptions with no description or local-link errors. The Impeccable detector reported no findings.
 - No app build, deployment, launcher execution, or server restart was performed. User build and application remain required; actual-server and physical-device checks remain pending.
+
+## Documents page icons restored (2026-11-02)
+
+Restored the exact previous 14px muted outline document SVG for Documents leaf and parent pages, including Documents search results, independently of the account icon pack. Files view continues to show the selected pack's Markdown artwork for `.md` files. The shared server browser, Documents chevrons, and Map Of Contents icons retain their existing behavior. The [current feature contract](../features/projects-files-search/file-folder-exploration-and-operations.md#file-type-icons) and [ADR 0114](../decisions/0114-documents-page-icons.md) define this scope.
+
+- `node --test server/file-type-icons-ui.test.ts server/document-pages-ui.test.ts src/utils/file-icons.test.ts` passed (8/8). The final icon browser test rerun also passed after adjusting its TypeScript callback syntax. Coverage includes leaf and parent Documents pages, Documents search, all three icon packs, both themes, and 1100px/390px widths, plus retained Markdown artwork in Files.
+- `npm run lint` completed with existing warnings; targeted oxlint for the changed source and test was clean. `npm run check:docs` passed (634 descriptions, no metadata or local-link errors). `git diff --check` passed, and the Impeccable detector returned no findings (`[]`). Desktop light and mobile dark fixture captures were inspected.
+- The primary checkout's `npm run build` failed in concurrently edited code outside this task: new translation keys in `packages/editor/src/Editor.tsx` were not yet in the UI key type, and `src/components/EditorPane.tsx` passed a `context` prop not yet accepted by the drawing editor. Those changes were preserved. `npm run build` then passed in an isolated worktree at `7f48e14` with only this task's source and test changes, including TypeScript and Vite; the existing large-chunk warning remained.
+- Verification did not deploy assets to the primary checkout, run the launcher, or start, stop, or restart servers. The primary build remains blocked by the unrelated editor changes; physical-device and running-instance checks remain outside this task.

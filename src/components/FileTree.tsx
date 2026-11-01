@@ -410,7 +410,7 @@ function Node({ node, depth, ctx }: { node: TreeNode; depth: number; ctx: NodeCt
           </span>}
           <button type="button" {...searchProps} aria-current={active ? 'page' : undefined} data-path={node.path} data-page-file={pageFile} style={{ scrollMarginTop: `${depth * 1.75}rem` }} draggable={!readOnly} onDragStart={handleDragStart} onDragEnd={ctx.endDrag}
             onClick={handleClick} onDoubleClick={handleDoubleClick} {...touchProps} className={`flex min-w-0 flex-1 items-center gap-1.5 rounded py-1 pr-1 text-left text-sm text-ink select-none [-webkit-touch-callout:none] focus-visible:outline-2 focus-visible:outline-accent ${holdHighlight} ${isMenuTarget && !selected ? 'bg-surface-raised' : ''}`}>
-            <FileTypeIcon name={pageFile ?? (folder ? `${node.name}.md` : node.name)} />
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" className="shrink-0 text-ink-muted" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9ZM14 3v6h6M8 13h8M8 17h5" /></svg>
             <span className="min-w-0 flex-1 truncate">{highlight(label)}</span>
             <PresenceDots colors={ctx.presence[pageFile ?? node.path] ?? []} />
           </button>

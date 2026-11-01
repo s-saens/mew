@@ -1,12 +1,12 @@
 ---
 title: "File-type icons from Material Icon Theme"
-description: "Chooses Material Icon Theme 5.40.0 for generated file mappings, variants, and local SVGs. ADR 0091 replaces the old folder icons; ADR 0092 extends the fixed pack choice with account-selected packs and supplemental source notices."
+description: "Chooses Material Icon Theme 5.40.0 for generated file mappings, variants, and local SVGs. ADR 0091 replaces the old folder icons; ADR 0092 extends the fixed pack choice with account-selected packs and supplemental source notices. ADR 0114 restores outline icons for Documents pages only."
 created: "2026-10-30"
-updated: "2026-10-30"
+updated: "2026-11-02"
 status: accepted
 ---
 
-The ordinary-folder preservation clause below is superseded by [ADR 0091](0091-unified-explorer-icons.md). [ADR 0092](0092-curated-icon-packs.md) extends the fixed pack choice with account-selected Material/Catppuccin/basic icons and supplemental Material source notices. The original file association rules remain in effect.
+The ordinary-folder preservation clause below is superseded by [ADR 0091](0091-unified-explorer-icons.md). [ADR 0092](0092-curated-icon-packs.md) extends the fixed pack choice with account-selected Material/Catppuccin/basic icons and supplemental Material source notices. The original file association rules remain in effect for file rows; [ADR 0114](0114-documents-page-icons.md) restores the previous outline icon for Documents page rows.
 
 ## Context
 
