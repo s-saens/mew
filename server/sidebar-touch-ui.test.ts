@@ -9,7 +9,7 @@ import { domBrowserExecutable } from './browser-dom-executable.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 
-test('sidebar touch separates tap, stationary hold-for-menu and immediate drag after arming', { skip: !domBrowserExecutable(), timeout: 30_000 }, async () => {
+test('sidebar touch separates selection, double-tap opening, stationary menus and immediate drag after arming', { skip: !domBrowserExecutable(), timeout: 30_000 }, async () => {
   const source = `import React from '${root}/node_modules/react/index.js';
 import {createRoot} from '${root}/node_modules/react-dom/client.js';
 import {FileTree} from '${root}/src/components/FileTree.tsx';
@@ -71,6 +71,9 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><I18nProvid
     await scroller.evaluate(el => { el.scrollTop = 0 })
 
     await file.tap()
+    assert.deepEqual(await page.evaluate('window.selected'), [], 'a single tap only selects the file')
+    assert.equal(await file.getAttribute('data-selected'), 'true')
+    await file.tap()
     assert.deepEqual(await page.evaluate('window.selected'), ['note.md'])
     await page.evaluate('window.selected=[]')
     const start = await center(file)
@@ -89,7 +92,7 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><I18nProvid
     assert.deepEqual(await page.evaluate('window.selected'), [])
     await clearMenu()
     assert.equal(await file.getAttribute('data-menu-target'), null)
-    assert.equal(await file.evaluate(el => el.ownerDocument.defaultView!.getComputedStyle(el).backgroundColor), 'rgba(0, 0, 0, 0)')
+    assert.equal(await file.getAttribute('data-selected'), 'true', 'closing a menu retains the file selection')
 
     // A folder gets the same release-for-menu gesture, without toggling it open.
     await touch('touchStart', await center(folder))
@@ -97,6 +100,7 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><I18nProvid
     await touch('touchEnd')
     await menu.waitFor()
     assert.equal(await folder.getAttribute('data-menu-target'), 'true')
+    assert.equal(await folder.getAttribute('data-selected'), 'true', 'long press selects its folder before opening the item menu')
     assert.equal(await page.locator('button[data-path="folder/child.md"]').count(), 0)
     await clearMenu()
 
@@ -113,7 +117,10 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><I18nProvid
     await file.dispatchEvent('click')
     assert.deepEqual(await page.evaluate('window.selected'), [], 'post-drag click must not open the old path')
     await file.tap()
-    assert.deepEqual(await page.evaluate('window.selected'), ['note.md'], 'next deliberate tap is not swallowed')
+    assert.equal(await file.getAttribute('data-selected'), 'true', 'next deliberate tap is not swallowed')
+    assert.deepEqual(await page.evaluate('window.selected'), [], 'the deliberate tap selects without reopening the file')
+    await file.tap()
+    assert.deepEqual(await page.evaluate('window.selected'), ['note.md'], 'a second quick tap opens the file')
 
     // Arming without movement must not dispatch a drop, including in nested trees.
     const drops = await page.evaluate('window.drops')
@@ -205,6 +212,12 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><I18nProvid
     // Mouse input on the same touch-capable device still uses native drag/right-click.
     await scroller.evaluate(el => { el.scrollTop = 0 })
     await page.setViewportSize({ width: 1200, height: 800 })
+    await folder.click({ button: 'right' })
+    await actionMenu.waitFor()
+    assert.equal(await menu.count(), 0, 'right-clicking an unselected folder uses the root menu')
+    assert.equal(await folder.getAttribute('data-selected'), null, 'right-click does not select an unselected row')
+    await clearMenu()
+    await file.click()
     await file.click({ button: 'right' })
     await menu.waitFor()
     await clearMenu()

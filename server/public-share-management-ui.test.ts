@@ -63,7 +63,13 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     await page.addInitScript("localStorage.setItem('mew:locale','en');Object.defineProperty(navigator,'clipboard',{value:{writeText:async value=>window.copied=value}})")
     await page.goto('http://mew-share.test/')
     const row = (name: string) => page.locator(`button[data-path="${name}"]`)
+    const select = async (name: string) => {
+      await row(name).focus()
+      await row(name).press('Space')
+      assert.equal(await row(name).getAttribute('data-selected'), 'true')
+    }
     const openSettings = async (name: string) => {
+      await select(name)
       await row(name).click({ button: 'right' })
       await page.getByRole('menuitem', { name: 'Publish', exact: true }).click()
       await page.getByRole('dialog').waitFor()
@@ -137,6 +143,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     await page.locator('[data-document-page="notes"] [data-public-share="edit"]').waitFor()
     for (const locale of ['ko', 'ja', 'zh-CN']) {
       await page.evaluate(`window.fixture.setLocale(${JSON.stringify(locale)})`)
+      await select('README.md')
       await row('README.md').click({ button: 'right' })
       await page.getByRole('menuitem', { name: locale === 'ko' ? '공개' : '公开', exact: true }).or(page.getByRole('menuitem', { name: '公開', exact: true })).click()
       assert.equal(await page.getByRole('radio').count(), 3)
@@ -150,6 +157,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     assert.equal(shares.get('MOC.md')?.mode, 'view')
     await page.getByRole('button', { name: 'Close', exact: true }).click()
     await page.evaluate('window.fixture.setManage(false)')
+    await select('README.md')
     await row('README.md').click({ button: 'right' })
     await page.getByRole('menu').waitFor()
     assert.equal(await page.getByRole('menuitem', { name: 'Publish', exact: true }).count(), 0, 'file write access alone cannot manage public links')

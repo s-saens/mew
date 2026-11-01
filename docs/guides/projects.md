@@ -1,7 +1,7 @@
 ---
 title: "Projects and file navigation"
-description: "Explains the Add Project path field, immediate folder suggestions, new-folder and clone selection, the desktop project sidebar and mobile full-screen project panel opened with Alt+P, per-project command buttons, and the tabless file explorer's single search box, Documents/Files toggle and mobile scope swipes, hierarchical results, and contextual tooltips. Covers Git changes, current-branch commit history, local branch deletion, branch switching in the graph, and list, calendar, and Gantt operations in the Alt+T task panel."
-updated: "2026-10-31"
+description: "Explains project opening and switching, project commands, explorer search and scope controls, single-click selection, double-click opening, modifier multiselection, and selection-bound item menus and bulk operations. Covers Git changes, commit history and branches, and list, calendar, and Gantt operations in the task panel."
+updated: "2026-11-01"
 상위파일:
   - "../../.mew/docs/MOC.md"
   - "MOC.md"
@@ -84,7 +84,7 @@ The **Graph View** button at the Docs root appears above **Document Home**. View
 
 Documents is a navigation area that collects documents, not a separate editor. Documents files and regular files remain together in the same editor tab list, preserving their editor pane and dock position when switching.
 
-The document list is structured so parent documents contain child documents. Clicking the `development` name opens `development/_development.md`; the arrow on the left only expands the child list. The representative file is not duplicated among the children. Existing `development/MOC.md` files open the same way and remain compatible without modification. A representative document serves as the area's home, with a title and introductory guidance written in natural language. Actual file and folder names may also use natural language, spaces, uppercase letters, and Korean characters. Renaming also updates existing links. A regular click changes the document in the current tab; Ctrl/Cmd+click opens it in a separate tab. Unsaved body text is preserved.
+The document list is structured so parent documents contain child documents. Clicking the `development` name selects it; double-clicking it or pressing Enter opens `development/_development.md`. The arrow on the left only expands the child list. The representative file is not duplicated among the children. Existing `development/MOC.md` files open the same way and remain compatible without modification. A representative document serves as the area's home, with a title and introductory guidance written in natural language. Actual file and folder names may also use natural language, spaces, uppercase letters, and Korean characters. Renaming also updates existing links. Opening a document preserves unsaved body text.
 
 Use **+** to the right of each document to create a child. When the first child is added to `dev.md`, its body moves to `dev/_dev.md` and the child becomes `dev/child.md`. Deleting or moving away the last child returns it to `dev.md`. Renaming applies to both the folder and its representative file. Existing MOCs are not migrated in bulk; they switch to the new naming when children are created, renamed, or moved in that folder. For the detailed saving and link adjustment contract, see [Documents pages](../../.mew/docs/development/document-pages.md).
 
@@ -119,13 +119,22 @@ Development contract: Send `{path}` (a path relative to the current tree) to `PO
 
 Selected files, folders, documents, and subprojects in the file explorer are distinguished by their background, without a theme-colored border.
 
+Click a file or document once to select it, then double-click it or press Enter to open it. Space selects the focused row. In Files view, a plain click on a folder also expands or collapses it; modifier clicks only select it. Documents uses the separate arrow for expansion. On touch screens, tap to select and double-tap to open.
+
+- Ctrl/Cmd+click adds or removes an item from the selection.
+- Shift+click selects a range from the selection anchor through the clicked row. Ctrl/Cmd+Shift+click adds that range. Ranges follow the visible hierarchy, including expanded children and offscreen rows.
+- Ctrl/Cmd+A while the tree has focus selects every item in the visible hierarchy. Escape or clicking empty tree space clears selection.
+
+Ctrl/Cmd+Enter opens the focused file or document in a separate tab. Collapsing a folder or filtering the list removes hidden rows from selection; scrolling preserves selected rows. For a Documents folder without a representative page, double-click or Enter expands its children and keeps the editor unchanged.
+
 Project operations; renaming, deleting, and opening projects in the server file explorer; Git initialization in the file explorer; Git commit operations; and bulk replacement in search use the app's own input and confirmation components. Dialogs follow the app theme instead of using browser `prompt` and `confirm`, keep Tab focus within the dialog, and restore focus to the invoking control when closed. Destructive operations such as deletion initially focus the Cancel button.
 
-Right-click a file or folder in the file explorer, or press and hold on mobile, to open its item menu. Logged-in users can create, rename, duplicate, copy, cut, paste, delete, and perform other operations. Only menu options available for the selected item and role are shown.
+Right-click a selected item to open its menu and retain the whole selection. Right-clicking an unselected row clears the selection and opens the same root menu as right-clicking empty space. On mobile, press and hold to select the target and open its item menu. Only actions available for the selection and role are shown. Copy, Cut, and Delete operate on the whole selection; selecting a folder and its children processes the folder once. Actions for a single item, such as Rename, are hidden when multiple items are selected.
 
-- `F2` renames, `Delete` deletes, `Insert` creates a new file, and `Shift+Insert` creates a new folder. Copy or cut with `Ctrl+C` or `Ctrl+X`, then paste in the destination folder with `Ctrl+V`.
+- `F2` renames one selected item, `Delete` deletes the selection, `Insert` creates a new file, and `Shift+Insert` creates a new folder. Copy or cut with `Ctrl/Cmd+C` or `Ctrl/Cmd+X`, then paste in the destination folder with `Ctrl/Cmd+V`.
+- If a cut-and-paste operation partially fails, successfully moved items leave the clipboard and failed items remain available to retry. Bulk deletion stops at the first failure and leaves the remaining items selected.
 - Include the extension when entering a new filename. Omitting it creates a file without an extension.
-- Use Download in the file menu to download the original. Dragging files or folders onto another folder moves them; dragging files from your device into the file explorer uploads them ([Behavior by drop location](editor.md#dragging-and-dropping-file-explorer-items)).
+- Use Download in the file menu to download the original. Dragging a selected file or folder moves the selected group, processing selected descendants under a selected folder once. Read-only destinations and dropping a folder onto itself or its descendants reject the move. Dragging files from your device into the file explorer uploads them ([Behavior by drop location](editor.md#dragging-and-dropping-file-explorer-items)).
 - When recording Git history after moving files or cutting and pasting, the move completes normally even if the original path, which Git had not yet tracked, no longer exists. For previously tracked files and folders, both the deletion at the original path and the new path are recorded.
 - Managers and owners can initialize the folder itself using **Create Git Repository** in the folder menu. Creating a new project at an arbitrary server path is done through the owner's [project selection dialog](#프로젝트-탭).
 - The owner configures file permissions [for each account and guest](../configuration/accounts.md#my-account-and-account-management) in account management. The file explorer reflects permitted files and read-only status.

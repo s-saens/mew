@@ -79,7 +79,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
       }
       await page.screenshot({ path: `/tmp/mew-file-icons-${width}-${theme}.png` })
     }
-    await page.locator('#files [data-path="main.ts"]').click()
+    await page.locator('#files [data-path="main.ts"]').dblclick()
     assert.equal(await page.evaluate('window.selected'), 'main.ts')
     await page.locator('#server [title="/tmp/package.json"]').click()
     assert.equal(await page.evaluate('window.serverOpened'), true)

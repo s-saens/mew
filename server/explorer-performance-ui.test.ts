@@ -49,7 +49,7 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><I18nProvid
     await folder.waitFor()
     if (docs) {
       await page.evaluate('window.block=true')
-      await folder.click()
+      await folder.dblclick()
       await folder.locator('..').getByRole('button').first().click()
       await page.waitForFunction('!!window.waiting.folder')
       assert.deepEqual(await page.evaluate('window.loads'), ['folder'], 'page name and expand arrow share the pending request')
@@ -87,6 +87,9 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><I18nProvid
     await last.waitFor()
     await page.waitForFunction(`(() => {const row=document.querySelector('[data-path="folder/item-0999.md"]'); const list=document.querySelector('[data-tree-key] > div');const r=row.getBoundingClientRect(),s=list.getBoundingClientRect();return r.top>=s.top && r.bottom<=s.bottom})()`)
     await last.click()
+    assert.equal(await page.evaluate('window.selected'), undefined, 'selecting a virtualized row does not open it')
+    assert.equal(await last.getAttribute('data-selected'), 'true')
+    await last.dblclick()
     assert.equal(await page.evaluate('window.selected'), 'folder/item-0999.md')
     assert.ok(await page.locator('[data-path^="folder/item-"]').count() < 100)
 

@@ -4,11 +4,11 @@ parent: "mew-projects"
 title: "File and Folder Navigation and Operations"
 status: "implemented"
 created: "2026-09-18"
-updated: "2026-10-30"
+updated: "2026-11-01"
 status_hash: "67a95247d8f805106459a6f3cc3fd61abca57f6504dbe508c57550c824406a0a"
 files: ["src/components/file-action-menu.tsx", "src/hooks/use-external-file-actions.tsx", "src/components/file-browser-favorites.tsx", "server/file-favorites.ts", "src/components/file-browser.tsx", "src/components/FileTree.tsx", "src/App.tsx", "src/components/virtual-tree-rows.tsx", "src/utils/treePersistence.ts", "server/fsBrowse.ts", "src/components/ServerFileExplorer.tsx", "server/api.ts", "server/fileCatalog.ts", "src/components/file-type-icon.tsx", "src/components/file-type-icon-image.tsx", "src/utils/file-icons.ts", "src/utils/file-icon-manifest.json", "src/utils/file-icon-artwork.json", "src/utils/file-icon-default-artwork.json", "tools/generate-file-icons.mjs", "shared/icon-packs.ts", "src/components/icon-pack-context.tsx", "src/components/file-icon-artwork.tsx", "src/components/catppuccin-file-icon-image.tsx", "src/utils/catppuccin-icon-manifest.json", "src/utils/catppuccin-icon-artwork.json", "src/utils/catppuccin-icon-default-artwork.json", "src/utils/catppuccin-icon-source.json", "tools/generate-catppuccin-file-icons.mjs", "public/licenses/material-icon-theme-notices.txt", "public/licenses/catppuccin-icons.txt"]
 commits: []
-description: "Defines file explorer scopes, navigation, operations, search, virtualization, caching, shortcuts, and location reveal, plus shared browser visibility and permissions. Covers account-selected Material/Catppuccin/basic file and folder icons, local artwork, source and license preservation, and generator verification."
+description: "Defines file explorer scopes, explicit selection and double-click opening, modifier and keyboard multiselection, selection-bound context menus and bulk operations, search, virtualization, caching, and location reveal. Covers shared browser visibility and permissions, account-selected file and folder icons, local artwork, source and license preservation, and generator verification."
 상위파일:
   - "MOC.md"
   - "_projects-files-search.md"
@@ -32,8 +32,7 @@ File Explorer is the panel name encompassing hierarchical navigation in Document
 - The first item in file/folder lists is `상위경로`; clicking it or pressing Enter or Space navigates to the parent of the current path. It is displayed even with search filters and in empty folders, and disabled at the root. Remove the up arrow to the left of the address bar, and exclude the parent-path row from item counts.
 - Separate navigation lists with a full-width Documents/Files toggle at the top. Preserve the selected view and each tree's expansion and scroll state per project.
 - Below 768px, a leftward swipe in the file explorer selects Files and a rightward swipe selects Documents. Stop at either end rather than wrapping. Use the same scope selection as the toggle and reset the creation destination to the selected scope's root; preserve the search query, filename/content search mode, editor tabs, and foreground panel. Guests remain in Documents. Retain the shared [mobile gesture thresholds and exclusions](../../development/ui-contracts.md#mobile-dock-and-panel-switching), including native horizontal scrolling, input fields, menus, cancellation, and multitouch.
-- In the file explorer, distinguish the currently active file with the existing selection background and inactive files open in other tabs or split panes with a lighter background. Remove the open-file background when a tab is closed, and do not display a theme-colored border.
-- After expanding or collapsing a parent document or folder, do not retain background highlighting based solely on internal focus state. Retain the selection background for the currently open document and hover/keyboard focus indicators.
+- Give explicitly selected rows the selection background. Keep the active editor file, files open in other tabs or split panes, hover, and keyboard focus distinguishable from explorer selection; an open tab alone does not select its row. Remove the open-file background when a tab is closed, and do not display a theme-colored border.
 - Provide creation, renaming, duplication, copying, cutting, pasting, deletion, and drag-to-move in the file explorer.
 - When file/document moves are applied, animate the moved item and surrounding rows with the same 180ms motion as tabs and Dock; place them immediately when reduced motion is enabled.
 - Clicking an editor file tab once reveals that file's location in the file explorer.
@@ -47,6 +46,21 @@ File Explorer is the panel name encompassing hierarchical navigation in Document
 
 - Do not automatically append .md when the extension is omitted.
 - The server-wide explorer is a server control feature governed by OS permissions, not a sandbox governed by ordinary file permissions.
+- The selection and opening rules below apply to the project's Documents and Files trees. Add Project and the server-wide file browser retain their own navigation behavior.
+
+### Selection, opening, and context menus
+
+- A plain click selects one row without opening a file or document. Double-click or Enter opens the focused file or Documents page; Ctrl/Cmd+Enter opens it in a separate tab. Double-click with selection modifiers only changes selection. Opening preserves unsaved editor content. Space selects the focused row without opening it.
+- Ctrl/Cmd+click toggles one row. Shift+click selects the inclusive range from the selection anchor; Ctrl/Cmd+Shift+click adds that range to the selection. Calculate ranges in displayed tree order across expanded folders and Documents parents, including rows outside the virtualized DOM. Remove items hidden by collapsing or filtering from selection; offscreen virtualized rows remain selected.
+- Ctrl/Cmd+A in the tree selects all displayed items, including offscreen rows. Escape or clicking empty tree space clears selection. Keep tree shortcuts out of rename, creation, and other editable fields.
+- A plain click on a Files folder selects it and toggles expansion. Modifier clicks select folders without toggling. In Documents, a name click selects the row and the chevron expands or collapses children. Double-click or Enter opens the representative body, or expands the folder without changing the editor if no representative exists.
+- Right-clicking an already selected row preserves the selection and opens its item menu. Right-clicking an unselected row clears selection and opens the same root menu as empty tree space, with the root as the creation and paste destination. It must not implicitly select that row or act on its path. Keyboard context-menu activation follows the same selection rule.
+- Copy, Cut, and Delete apply to all selected items. If an ancestor folder or parent page and its descendants are selected together, operate on the ancestor once. Hide actions that require exactly one item, such as Rename or Download, for multiple selections. Keep existing permission checks and deletion confirmation.
+- Dragging a selected row moves the selected group, with the same ancestor deduplication. Reject read-only destinations and a selected folder's own path or descendants. Invalid drops must not fall through to another ancestor or the root.
+- After a cut-and-paste operation, remove successful items from the cut clipboard and retain failed items for retry. Bulk deletion stops at the first failure and keeps unprocessed selected items available for recovery.
+- Touch taps select, and double-taps open files or pages. A stationary long press explicitly selects its target before showing the item menu, allowing touch users to reach item actions. Preserve scrolling and the existing hold-to-drag cancellation and movement thresholds.
+
+The interaction choice follows [ADR 0107](../../decisions/0107-explorer-selection-and-opening.md). The [implementation record](../../work/explorer-selection.md) separates automated verification from runtime and physical-device checks.
 
 ### Detailed contracts
 
@@ -78,7 +92,7 @@ Run `node tools/generate-catppuccin-file-icons.mjs --check` for offline source-m
 
 - Structural path exclusion in `tree.ts` prevents synchronous/asynchronous tree traversal, single-level listing, and file catalog traversal under `.worktrees` regardless of hidden settings. `watcher.ts` also checks project-relative paths during initial collection and new-directory synchronization. The document backlink scanner does not read copies, so duplicate filenames do not change wiki link resolution. When the worktree itself is opened as the root, relative paths do not contain `.worktrees`, so navigation and watching work normally. Mew's regular and demo Vite development watchers also exclude internal worktrees. Placement criteria follow [Decision 0054](../../decisions/0054-internal-worktrees.md).
 
-- Subprojects use the same placement, sorting, expansion, child-list loading, and cache restoration as ordinary folders. Clicking a folder or pressing Enter or Space toggles expansion, and internal files open in the current project. File creation, uploads, and moves are also handled in the current tree; only the adjacent arrow opens that project as the active root. The path is added to or reused in the header project list. The arrow's owner permission restriction and project icon are retained. Follows the [folder navigation decision](../../decisions/0004-subproject-folder-exploration.md) and [header selector decision](../../decisions/0019-project-selector.md).
+- Subprojects use the same placement, sorting, expansion, child-list loading, selection, and cache restoration as ordinary folders. Plain clicking or pressing Enter toggles expansion; Space selects. Internal files open in the current project. File creation, uploads, and moves are also handled in the current tree; only the adjacent arrow opens that project as the active root. The path is added to or reused in the header project list. The arrow's owner permission restriction and project icon are retained. Follows the [folder navigation decision](../../decisions/0004-subproject-folder-exploration.md), updated selection rules in [ADR 0107](../../decisions/0107-explorer-selection-and-opening.md), and [header selector decision](../../decisions/0019-project-selector.md).
 
 - Folder rows, including document folders and subprojects, support expansion/collapse, right-click, and touch interaction in the empty space to the right of the navigation arrow beside the name; hover, long-press, menu, drag-target, and keyboard focus highlighting extend to the end of the row. The navigation arrow remains an independent button above the row and does not toggle folder expansion.
 
@@ -107,7 +121,7 @@ Run `node tools/generate-catppuccin-file-icons.mjs --check` for offline source-m
 
 - Right-clicking an item in either explorer provides Copy, Cut, Paste, Rename, and Delete through the same menu component as the file explorer, and shows Add to Favorites for folders.
 - Mobile long presses are also supported. As with tabs and the Dock, dragging becomes ready after 350ms and movement immediately starts a move; releasing after holding still for at least 500ms opens the menu.
-- In the file explorer, the pressed item receives a background highlight after 500ms. The highlight remains while the menu is open and is cleared when the menu closes or touch is canceled.
+- In the file explorer, the pressed item receives a background highlight after 500ms. Long-press menu activation selects that item; closing the menu preserves explicit selection. Canceling a touch before activation clears only the transient press highlight.
 - The mobile menu's position is adjusted to sit above the bottom dock. If height is insufficient, the menu scrolls internally so the last item remains selectable.
 
 - Favorites at the top of both explorers is a separate, initially collapsed dropdown that expands to let users navigate to or remove folders.

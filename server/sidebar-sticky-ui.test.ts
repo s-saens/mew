@@ -51,6 +51,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     const list=page.locator('[data-tree-key] > div[tabindex]');
     const header=(depth:number)=>page.locator('[data-tree-sticky-depth="'+depth+'"]');
     const scrollTo=async (path:string,offset:number)=>{
+      await list.dispatchEvent('wheel', { deltaY: 1 });
       await page.locator('[data-path="'+path+'"]').evaluate((el,offset)=>{
         const list=el.closest('[data-tree-key]')!.querySelector(':scope > div[tabindex]')!;
         list.scrollTop+=el.getBoundingClientRect().top-list.getBoundingClientRect().top-offset;
@@ -95,7 +96,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
           for (const pixel of guidePixels) assert.deepEqual(pixel, rgb, 'ancestor guide lines remain visible through each deeper pinned row');
 
         }
-        await page.locator('[data-path="parent/child/child/note-20.md"]').click();
+        await page.locator('[data-path="parent/child/child/note-20.md"]').dblclick();
         assert.ok((await page.evaluate('window.selected') as string[]).includes('parent/child/child/note-20.md'));
         await scrollTo('parent/child/after/note-2.md',84);
         const third=await header(2).boundingBox();assert.ok(third);

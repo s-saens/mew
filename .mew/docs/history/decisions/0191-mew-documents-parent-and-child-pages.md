@@ -1,10 +1,12 @@
 ---
 provenance: "Migrated copy of a Liiiiv central ADR, 2026-10-14"
-description: "Migrated decision record: Documents parent and child pages and representative files. Preserves the choices, rationale, and subsequent changes from that time; consult the Mew owning document for the current contract."
+description: "Migrated decision record for Documents parent/child pages and representative files. Preserves the original storage and single-click navigation rationale; decision 0107 supersedes its click and Ctrl/Cmd+click opening behavior."
 title: "0191 — Documents parent and child pages and representative files"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-11-01
 ---
+
+The click and Ctrl/Cmd+click opening rules below are superseded by [decision 0107](../../decisions/0107-explorer-selection-and-opening.md). The original storage and representative-file decisions remain in effect.
 
 - Date: 2026-10-02
 - Status: Adopted

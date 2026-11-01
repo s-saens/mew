@@ -28,6 +28,7 @@ import { GitButton } from './GitButton'
 import { VirtualTreeRows } from './virtual-tree-rows'
 import { explorerSearchTree, type ExplorerSearch } from '../utils/explorer-search'
 import { ExplorerSearchPreview } from './explorer-search-preview'
+import { selectTreeItem, topLevelTreeItems, type TreeSelection, type TreeSelectionItem } from '../utils/tree-selection'
 import type { PublicShareMode } from '../../shared/public-share'
 import { listPublicShares } from '../api/public-shares'
 import { PublicShareBadge, PublicShareDialog } from './public-share-dialog'
@@ -66,6 +67,9 @@ interface NodeCtx {
   selectedPath: string | null
   openPaths?: ReadonlySet<string>
   focused: Focused
+  selection: ReadonlySet<string>
+  selectionWritable: boolean
+  selectNode: (path: string, type: 'file' | 'dir', modifiers?: { shiftKey?: boolean; ctrlKey?: boolean; metaKey?: boolean }) => void
   menuPath: string | undefined
   openDirs: Set<string>
   editing: EditingState
@@ -86,7 +90,7 @@ interface NodeCtx {
   startRename: (path: string, type: 'file' | 'dir') => void
   startCreate: (parentPath: string, kind: 'file' | 'folder') => void
   requestDelete: (path: string, type: 'file' | 'dir') => void
-  openPopover: (path: string, type: 'file' | 'dir', x: number, y: number) => void
+  openPopover: (path: string, type: 'file' | 'dir', x: number, y: number, selectFirst?: boolean) => void
   setEditValue: (v: string) => void
   submitEdit: () => void
   cancelEdit: () => void
@@ -94,7 +98,7 @@ interface NodeCtx {
   beginDrag: (path: string, type: 'file' | 'dir') => void
   endDrag: () => void
   canDropInto: (dir: string) => boolean
-  onDragOverDir: (dir: string) => void
+  onDragOverDir: (dir: string | null) => void
   onDropDir: (dir: string) => void
   /** 바깥(파일 탐색기)에서 끌어온 파일을 그 폴더에 업로드 */
   onDropFiles: (dir: string, files: FileList) => void
@@ -147,6 +151,8 @@ function MocItem({
   documentPages = false,
   search,
   onSelect,
+  selected,
+  onPick,
   publicShare,
   onMenu,
 }: {
@@ -159,25 +165,30 @@ function MocItem({
   documentPages?: boolean
   search?: ExplorerSearch
   onSelect: (path: string, opts?: TreeOpenOptions) => void
+  selected: boolean
+  onPick: (event: React.MouseEvent) => void
   publicShare?: PublicShareMode
-  onMenu?: (x: number, y: number) => void
+  onMenu?: (x: number, y: number, selectFirst?: boolean) => void
 }) {
   useUiLocale()
-  const { ref: setTouchElement, ...touch } = useTreeTouchGesture({ enabled: !!onMenu, onMenu: (x, y) => onMenu?.(x, y), onDragCancel: () => {} })
+  const { ref: setTouchElement, ...touch } = useTreeTouchGesture({ enabled: !!onMenu, onMenu: (x, y) => onMenu?.(x, y, true), onDragCancel: () => {} })
   return (
     <button
       type="button"
       data-path={path}
+      data-selected={selected || undefined}
+      aria-pressed={selected}
+      aria-current={active ? 'page' : undefined}
       data-search-match={search?.paths.includes(path) || undefined}
       data-search-file={search?.paths.includes(path) ? path : undefined}
       ref={setTouchElement}
       onPointerDown={touch.onPointerDown}
-      onContextMenu={event => { if (!onMenu) return; event.preventDefault(); if (!touch.isTouchInput()) onMenu(event.clientX, event.clientY) }}
-      onClick={event => { if (!touch.consumeClick()) onSelect(path, documentPages ? { replaceActive: !event.ctrlKey && !event.metaKey, forceNewTab: event.ctrlKey || event.metaKey, preview: false } : undefined) }}
-      onDoubleClick={() => onSelect(path, { preview: false })}
+      onContextMenu={event => { if (!onMenu) return; event.preventDefault(); event.stopPropagation(); if (!touch.isTouchInput()) onMenu(event.clientX, event.clientY) }}
+      onClick={event => { if (!touch.consumeClick() && (event.detail < 2 || event.shiftKey || event.ctrlKey || event.metaKey)) onPick(event) }}
+      onDoubleClick={event => { if (!event.shiftKey && !event.ctrlKey && !event.metaKey && !touch.consumeClick()) onSelect(path, { preview: false, ...(documentPages ? { replaceActive: true } : {}) }) }}
       title={path}
-      className={`mb-0.5 flex w-full items-center gap-1.5 rounded px-2 py-1 text-left text-sm select-none hover:bg-surface-raised ${
-        active ? 'bg-surface-raised font-medium text-ink' : opened ? 'bg-surface-raised/50 text-ink-secondary' : 'text-ink-secondary'
+      className={`mb-0.5 flex w-full items-center gap-1.5 rounded px-2 py-1 text-left text-sm select-none focus-visible:outline-2 focus-visible:outline-accent ${
+        selected ? 'bg-accent/20 hover:bg-accent/25 font-medium text-ink' : `hover:bg-surface-raised ${active ? 'bg-surface-raised font-medium text-ink' : opened ? 'bg-surface-raised/50 text-ink-secondary' : 'text-ink-secondary'}`
       }`}
       style={{ paddingLeft: `${depth * 14 + 8}px`, scrollMarginTop: `${depth * 1.75}rem` }}
     >
@@ -307,43 +318,46 @@ function Node({ node, depth, ctx }: { node: TreeNode; depth: number; ctx: NodeCt
   const touch = useTreeTouchGesture({
     enabled: !readOnly,
     onMenu: (x, y) => {
-      ctx.focusNode(node.path, node.type)
-      ctx.openPopover(node.path, node.type, x, y)
+      ctx.openPopover(node.path, node.type, x, y, true)
     },
     onDragCancel: ctx.endDrag,
   })
 
   function handleClick(event: React.MouseEvent) {
-    if (touch.consumeClick()) return
-    if (ctx.documentPages && !node.project && (node.type === 'dir' || /\.md$/i.test(node.name))) {
-      ctx.openPage(node, { forceNewTab: event.ctrlKey || event.metaKey, replaceActive: !event.ctrlKey && !event.metaKey, preview: false })
-    } else if (node.type === 'dir') {
+    if (touch.consumeClick() || event.detail > 1 && !event.shiftKey && !event.ctrlKey && !event.metaKey) return
+    ctx.selectNode(node.path, node.type, event)
+    if (node.type === 'dir' && !ctx.documentPages && !event.shiftKey && !event.ctrlKey && !event.metaKey) {
       ctx.toggleDir(node.path)
-      ctx.focusNode(node.path, 'dir')
-    } else {
-      ctx.onSelect(node.path)
-      ctx.focusNode(node.path, 'file')
     }
   }
 
+  function handleDoubleClick(event: React.MouseEvent) {
+    if (event.shiftKey || event.ctrlKey || event.metaKey || touch.consumeClick()) return
+    if (ctx.documentPages && !node.project && (node.type === 'dir' || /\.md$/i.test(node.name))) ctx.openPage(node, { replaceActive: true, preview: false })
+    else if (node.type === 'file') ctx.onSelect(node.path, { preview: false })
+  }
+
   function handleContextMenu(e: React.MouseEvent) {
-    if (readOnly) return
     e.preventDefault()
+    e.stopPropagation()
     if (touch.isTouchInput()) return
-    ctx.focusNode(node.path, node.type)
     ctx.openPopover(node.path, node.type, e.clientX, e.clientY)
   }
 
   const isMenuTarget = ctx.menuPath === node.path
+  const selected = ctx.selection.has(node.path)
   const holdHighlight = 'data-[touch-holding=true]:bg-surface-raised'
   const touchProps = {
     'data-menu-target': isMenuTarget || undefined,
+    'data-selected': selected || undefined,
+    'aria-pressed': selected,
     ref: touch.ref,
     onPointerDown: touch.onPointerDown,
     onContextMenu: handleContextMenu,
   }
 
   function handleDragStart(e: React.DragEvent) {
+    if (ctx.selection.has(node.path) && !ctx.selectionWritable) { e.preventDefault(); return }
     // Touch uses its own 1s hold; reject an early browser-native drag takeover.
     if (touch.isTouchInput() && e.nativeEvent.isTrusted) {
       e.preventDefault()
@@ -383,10 +397,10 @@ function Node({ node, depth, ctx }: { node: TreeNode; depth: number; ctx: NodeCt
     const active = node.path === ctx.selectedPath || pageFile === ctx.selectedPath
     const creating = ctx.editing?.mode === 'create-file' && ctx.editing.parentPath === node.path ? ctx.editing : null
     return <div className="group/page isolate" data-document-page={node.path}
-      onDragOver={event => { if (!ctx.canDropInto(node.path)) return; event.preventDefault(); event.stopPropagation(); ctx.onDragOverDir(node.path) }}
-      onDrop={event => { if (!ctx.canDropInto(node.path)) return; event.preventDefault(); event.stopPropagation(); ctx.onDropDir(node.path) }}>
+      onDragOver={event => { if (hasExternalFiles(event.dataTransfer)) return; event.stopPropagation(); if (!ctx.canDropInto(node.path)) { ctx.onDragOverDir(null); return }; event.preventDefault(); ctx.onDragOverDir(node.path) }}
+      onDrop={event => { if (hasExternalFiles(event.dataTransfer)) return; event.preventDefault(); event.stopPropagation(); if (ctx.canDropInto(node.path)) ctx.onDropDir(node.path) }}>
       <TreeHeader depth={depth} open={open}>
-        <div className={`flex min-w-0 items-center rounded hover:bg-surface-raised ${active ? 'bg-surface-raised' : ctx.openPaths?.has(pageFile ?? node.path) ? 'bg-surface-raised/50' : ''} ${ctx.dropDir === node.path ? 'ring-1 ring-accent' : ''}`} style={{ paddingLeft: depth * 14 + 4 }}>
+        <div className={`flex min-w-0 items-center rounded ${selected ? 'bg-accent/20 hover:bg-accent/25' : `hover:bg-surface-raised ${active ? 'bg-surface-raised' : ctx.openPaths?.has(pageFile ?? node.path) ? 'bg-surface-raised/50' : ''}`} ${ctx.dropDir === node.path ? 'ring-1 ring-accent' : ''}`} style={{ paddingLeft: depth * 14 + 4 }}>
           {hasChildren ? <button type="button" aria-label={uiText('{p0} 하위 문서', { p0: label })} aria-expanded={open}
             onClick={() => { ctx.toggleDir(node.path); ctx.focusNode(node.path, 'dir') }} className="flex h-7 w-5 shrink-0 items-center justify-center rounded text-ink-muted hover:text-ink focus-visible:outline-2 focus-visible:outline-accent">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d={open ? 'm6 9 6 6 6-6' : 'm9 6 6 6-6 6'} /></svg>
@@ -394,7 +408,7 @@ function Node({ node, depth, ctx }: { node: TreeNode; depth: number; ctx: NodeCt
             <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor"><circle cx="6" cy="6" r="2" /></svg>
           </span>}
           <button type="button" {...searchProps} aria-current={active ? 'page' : undefined} data-path={node.path} data-page-file={pageFile} style={{ scrollMarginTop: `${depth * 1.75}rem` }} draggable={!readOnly} onDragStart={handleDragStart} onDragEnd={ctx.endDrag}
-            onClick={handleClick} {...touchProps} className={`flex min-w-0 flex-1 items-center gap-1.5 rounded py-1 pr-1 text-left text-sm text-ink select-none [-webkit-touch-callout:none] focus-visible:outline-2 focus-visible:outline-accent ${holdHighlight} ${isMenuTarget ? 'bg-surface-raised' : ''}`}>
+            onClick={handleClick} onDoubleClick={handleDoubleClick} {...touchProps} className={`flex min-w-0 flex-1 items-center gap-1.5 rounded py-1 pr-1 text-left text-sm text-ink select-none [-webkit-touch-callout:none] focus-visible:outline-2 focus-visible:outline-accent ${holdHighlight} ${isMenuTarget && !selected ? 'bg-surface-raised' : ''}`}>
             <FileTypeIcon name={pageFile ?? (folder ? `${node.name}.md` : node.name)} />
             <span className="min-w-0 flex-1 truncate">{highlight(label)}</span>
             <PresenceDots colors={ctx.presence[pageFile ?? node.path] ?? []} />
@@ -428,10 +442,11 @@ function Node({ node, depth, ctx }: { node: TreeNode; depth: number; ctx: NodeCt
           onDragStart={handleDragStart}
           onDragEnd={ctx.endDrag}
           onClick={handleClick}
-          onDoubleClick={() => { if (!touch.consumeClick()) ctx.onSelect(node.path, { preview: false }) }}
+          onDoubleClick={handleDoubleClick}
+          aria-current={isSelected ? 'page' : undefined}
           {...touchProps}
-          className={`flex min-w-0 flex-1 items-center gap-1.5 rounded px-2 py-1 text-left text-sm select-none [-webkit-touch-callout:none] ${holdHighlight} data-[touch-dragging=true]:bg-accent/15 data-[touch-dragging=true]:ring-1 data-[touch-dragging=true]:ring-accent hover:bg-surface-raised ${
-            isSelected || isMenuTarget ? 'bg-surface-raised font-medium' : ctx.openPaths?.has(node.path) ? 'bg-surface-raised/50' : ''
+          className={`flex min-w-0 flex-1 items-center gap-1.5 rounded px-2 py-1 text-left text-sm select-none [-webkit-touch-callout:none] focus-visible:outline-2 focus-visible:outline-accent ${holdHighlight} data-[touch-dragging=true]:bg-accent/15 data-[touch-dragging=true]:ring-1 data-[touch-dragging=true]:ring-accent ${
+            selected ? 'bg-accent/20 hover:bg-accent/25 font-medium' : `hover:bg-surface-raised ${isSelected || isMenuTarget ? 'bg-surface-raised font-medium' : ctx.openPaths?.has(node.path) ? 'bg-surface-raised/50' : ''}`
           }`}
           style={{ paddingLeft: `${depth * 14 + 8}px`, scrollMarginTop: `${depth * 1.75}rem` }}
         >
@@ -464,23 +479,21 @@ function Node({ node, depth, ctx }: { node: TreeNode; depth: number; ctx: NodeCt
       onDragOver={(e) => {
         // 바깥에서 끌어온 파일이면 이 폴더에 업로드, 사이드바 항목이면 이 폴더로 이동
         const external = hasExternalFiles(e.dataTransfer)
-        if (external ? readOnly : !ctx.canDropInto(node.path)) return
-        e.preventDefault()
         e.stopPropagation()
+        if (external ? readOnly : !ctx.canDropInto(node.path)) { ctx.onDragOverDir(null); return }
+        e.preventDefault()
         e.dataTransfer.dropEffect = external ? 'copy' : 'move'
         ctx.onDragOverDir(node.path)
       }}
       onDrop={(e) => {
+        e.preventDefault()
+        e.stopPropagation()
         if (hasExternalFiles(e.dataTransfer)) {
           if (readOnly) return
-          e.preventDefault()
-          e.stopPropagation()
           ctx.onDropFiles(node.path, e.dataTransfer.files)
           return
         }
         if (!ctx.canDropInto(node.path)) return
-        e.preventDefault()
-        e.stopPropagation()
         ctx.onDropDir(node.path)
       }}
     >
@@ -495,7 +508,7 @@ function Node({ node, depth, ctx }: { node: TreeNode; depth: number; ctx: NodeCt
             onDragEnd={ctx.endDrag}
             onClick={handleClick}
             {...touchProps}
-            className={`flex min-w-0 ${projectLink || node.path === ctx.documentsFolder?.path ? 'max-w-[calc(100%-28px)]' : 'flex-1'} items-center gap-1.5 rounded px-2 py-1 text-left text-sm font-medium text-ink-secondary select-none [-webkit-touch-callout:none] ${projectLink || node.path === ctx.documentsFolder?.path ? 'after:absolute after:inset-0 after:rounded' : ''} before:absolute before:inset-0 before:-z-10 before:rounded data-[touch-holding=true]:before:bg-surface-raised data-[touch-dragging=true]:before:bg-accent/15 data-[touch-dragging=true]:before:ring-1 data-[touch-dragging=true]:before:ring-accent hover:before:bg-surface-raised focus-visible:outline-none focus-visible:before:outline-2 focus-visible:before:outline-accent ${isDropTarget ? 'before:bg-accent/15 before:ring-1 before:ring-accent' : isMenuTarget ? 'before:bg-surface-raised' : ''}`}
+            className={`flex min-w-0 ${projectLink || node.path === ctx.documentsFolder?.path ? 'max-w-[calc(100%-28px)]' : 'flex-1'} items-center gap-1.5 rounded px-2 py-1 text-left text-sm font-medium text-ink-secondary select-none [-webkit-touch-callout:none] ${projectLink || node.path === ctx.documentsFolder?.path ? 'after:absolute after:inset-0 after:rounded' : ''} before:absolute before:inset-0 before:-z-10 before:rounded data-[touch-holding=true]:before:bg-surface-raised data-[touch-dragging=true]:before:bg-accent/15 data-[touch-dragging=true]:before:ring-1 data-[touch-dragging=true]:before:ring-accent ${selected ? 'hover:before:bg-accent/25' : 'hover:before:bg-surface-raised'} focus-visible:outline-none focus-visible:before:outline-2 focus-visible:before:outline-accent ${isDropTarget ? 'before:bg-accent/15 before:ring-1 before:ring-accent' : selected ? 'before:bg-accent/20' : isMenuTarget ? 'before:bg-surface-raised' : ''}`}
             style={{ paddingLeft: `${depth * 14 + 8}px`, scrollMarginTop: `${depth * 1.75}rem` }}
           >
             {node.project && node.icon ? <ProjectIcon icon={node.icon} size={14} /> : <FolderTypeIcon open={isOpen} />}
@@ -529,9 +542,11 @@ function Node({ node, depth, ctx }: { node: TreeNode; depth: number; ctx: NodeCt
               opened={ctx.openPaths?.has(moc.path)}
               presenceColors={ctx.presence[moc.path] ?? []}
               onSelect={ctx.onSelect}
+              selected={ctx.selection.has(moc.path)}
+              onPick={event => ctx.selectNode(moc.path, 'file', event)}
               search={ctx.search}
               publicShare={ctx.publicShares ? ctx.publicShares.get(moc.path) : moc.publicShare}
-              onMenu={ctx.readOnly ? undefined : (x, y) => ctx.openPopover(moc.path, 'file', x, y)}
+              onMenu={ctx.readOnly ? undefined : (x, y, selectFirst) => ctx.openPopover(moc.path, 'file', x, y, selectFirst)}
             />
           )}
           {createEditing && (
@@ -565,7 +580,7 @@ function NodeList({ nodes, depth, ctx }: { nodes: TreeNode[]; depth: number; ctx
     }
     return result
   }, [nodes, ctx.openDirs])
-  return <>{groups.map(group => group.length >= 200 && !group.some(node => ctx.editing?.mode === 'rename' ? ctx.editing.path === node.path : ctx.editing?.parentPath === node.path)
+  return <>{groups.flatMap(group => group.length >= 200 && !group.some(node => ctx.editing?.mode === 'rename' ? ctx.editing.path === node.path : ctx.editing?.parentPath === node.path)
     ? <VirtualTreeRows key={group[0].path} nodes={group} pinned={[ctx.focused?.path, ctx.menuPath]}
         render={node => <Node node={node} depth={depth} ctx={ctx} />} />
     : group.map(node => <Node key={node.path} node={node} depth={depth} ctx={ctx} />))}</>
@@ -687,6 +702,7 @@ export function FileTree({
   const titleRoot = workspacePath ? documentAbsolutePath(workspacePath, documentsPath, project, '') : ''
   const documentTitles = useMemo(() => Object.fromEntries(Object.entries(titleDrafts).filter(([path]) => titleRoot && path.startsWith(titleRoot)).map(([path, preview]) => [path.slice(titleRoot.length), preview.title])), [titleDrafts, titleRoot])
   const [focused, setFocused] = useState<Focused>(null)
+  const [selection, setSelection] = useState<TreeSelection>(() => ({ paths: new Set(), anchor: null }))
   const [openDirs, setOpenDirs] = useState<Set<string>>(() => new Set(accountState?.openDirs ?? loadOpenDirs(persistedProject) ?? []))
   // 로그인 계정은 서버 상태를 우선하고, 서버 상태가 아직 없을 때만 이 브라우저의 기존 캐시를 이관한다.
   // 게스트는 예전에 더 넓은 권한으로 본 파일명이 남지 않도록 자식 목록을 디스크에 저장하지 않는다.
@@ -740,9 +756,10 @@ export function FileTree({
     }).catch(() => {})
     return () => controller.abort()
   }, [project, canManagePublicShares, refreshSignal, treeInvalidation, shareRefresh])
-  const [deleteTarget, setDeleteTarget] = useState<{ path: string; type: 'file' | 'dir' } | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<TreeSelectionItem[] | null>(null)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [clipboard, setClipboardState] = useState<FileClipboard>(() => readFileClipboard())
+  const pasteInFlight = useRef(false)
   const [dropDir, setDropDir] = useState<string | null>(null)
   const setClipboard = useCallback((value: FileClipboard) => {
     writeFileClipboard(value)
@@ -817,7 +834,7 @@ export function FileTree({
     }
   }
   // 드래그 중인 항목 — dragover가 초당 여러 번 발화하므로 상태 대신 ref로 들고 다닌다
-  const draggingRef = useRef<{ path: string; type: 'file' | 'dir' } | null>(null)
+  const draggingRef = useRef<TreeSelectionItem[] | null>(null)
   const previousRootRef = useRef<TreeNode[] | null>(null)
   const pendingDirsRef = useRef(new Map<string, { promise: Promise<TreeNode[] | undefined>; dirty: boolean }>())
   const mountedTreeRef = useRef(true)
@@ -1103,6 +1120,29 @@ export function FileTree({
     onDirectoryFocus?.(type === 'dir' ? path : parentOf(path))
   }
 
+  function selectNode(path: string, type: 'file' | 'dir', modifiers = {}) {
+    pageOpenSequence.current++
+    const next = selectTreeItem(selection, visibleItems, path, modifiers)
+    setSelection(next)
+    setPopover(null)
+    if (next.paths.size) focusNode(path, type)
+    else { setFocused(null); onDirectoryFocus?.(rootPath) }
+  }
+
+  function clearSelection() {
+    pageOpenSequence.current++
+    setSelection({ paths: new Set(), anchor: null })
+    setFocused(null)
+    setPopover(null)
+    onDirectoryFocus?.(rootPath)
+  }
+
+  function copySelection(mode: 'copy' | 'cut') {
+    if (!selectedItems.length || (mode === 'cut' && !selectionWritable)) return
+    const items = topLevelTreeItems(selectedItems)
+    setClipboard({ ...items[0], items, mode, workspacePath })
+  }
+
   function startRename(path: string, type: 'file' | 'dir') {
     if (readOnly) return
     const name = path.split('/').pop() ?? path
@@ -1125,6 +1165,7 @@ export function FileTree({
       const remap = (path: string) => remapPagePath(path, result.moves)
       setOpenDirs(current => new Set([...current].map(remap)))
       setFocused(current => current ? { ...current, path: remap(current.path) } : null)
+      setSelection(current => ({ paths: new Set([...current.paths].map(remap)), anchor: current.anchor === null ? null : remap(current.anchor) }))
       const remapNode = (node: TreeNode): TreeNode => ({ ...node, path: remap(node.path), name: basenameOf(remap(node.path)), ...(node.children ? { children: node.children.map(remapNode) } : {}) })
       directoryChildrenRef.current = Object.fromEntries(Object.entries(directoryChildrenRef.current).map(([parent, nodes]) => [remap(parent), nodes.map(remapNode)]))
       setDirectoryChildren(directoryChildrenRef.current)
@@ -1136,7 +1177,7 @@ export function FileTree({
   async function requestCopy(path: string) {
     if (readOnly) return
     try {
-      if (documentPages && (path.endsWith('.md') || focused?.type === 'dir' && focused.path === path || popover?.type === 'dir' && popover.path === path)) {
+      if (documentPages && (path.endsWith('.md') || visibleNodes.get(path)?.type === 'dir')) {
         const result = await changePage('copy', path, '', parentOf(path))
         onFileCreated(result.path); return
       }
@@ -1150,8 +1191,8 @@ export function FileTree({
   }
 
   function requestDelete(path: string, type: 'file' | 'dir') {
-    if (readOnly) return
-    setDeleteTarget({ path, type })
+    if (readOnly || selection.paths.has(path) && !selectionWritable) return
+    setDeleteTarget(topLevelTreeItems(selection.paths.has(path) ? selectedItems : [{ path, type }]))
   }
 
   async function deleteConfirmed() {
@@ -1159,17 +1200,27 @@ export function FileTree({
     setDeleteTarget(null)
     if (!target) return
     try {
-      if (documentPages && (target.type === 'dir' || target.path.endsWith('.md'))) await changePage('delete', target.path)
-      else await deleteFile(target.path, project)
-      setFocused((f) => (f?.path === target.path ? null : f))
-      onDeleted(target.path, target.type)
+      for (const item of target) {
+        if (documentPages && (item.type === 'dir' || item.path.endsWith('.md'))) await changePage('delete', item.path)
+        else await deleteFile(item.path, project)
+        setSelection(current => ({ ...current, paths: new Set([...current.paths].filter(path => path !== item.path && !(item.type === 'dir' && path.startsWith(item.path + '/')))) }))
+        setFocused(f => f?.path === item.path ? null : f)
+        onDeleted(item.path, item.type)
+      }
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : String(err))
     }
   }
 
-  function openPopover(path: string, type: 'file' | 'dir', x: number, y: number) {
+  function openPopover(path: string, type: 'file' | 'dir', x: number, y: number, selectFirst = false) {
     if (readOnly) return
+    if (selectFirst && !selection.paths.has(path)) selectNode(path, type)
+    else if (path === rootPath || !selection.paths.has(path)) {
+      clearSelection()
+      setPopover({ path: rootPath, type: 'dir', x, y })
+      return
+    }
+    focusNode(path, type)
     setPopover({ path, type, x, y })
   }
 
@@ -1274,29 +1325,32 @@ export function FileTree({
 
   // 드래그 이동·잘라내기 붙여넣기 — 내부적으로 terminal mv(=fs.renameSync)인 /rename을 재사용한다
   async function moveInto(srcPath: string, srcType: 'file' | 'dir', destDir: string) {
-    if (readOnly) return
+    if (readOnly) return false
     const newPath = destDir ? `${destDir}/${basenameOf(srcPath)}` : basenameOf(srcPath)
-    if (newPath === srcPath) return // 같은 위치로의 이동 — 무동작
+    if (newPath === srcPath) return true
     if (isSelfOrDescendant(srcPath, srcType, destDir)) {
       setErrorMsg(uiText("폴더를 자기 자신 안으로는 옮길 수 없습니다"))
-      return
+      return false
     }
     try {
       if (documentPages && (srcType === 'dir' || srcPath.endsWith('.md'))) {
         const result = await changePage('move', srcPath, '', destDir)
-        ensureOpenChain(parentOf(result.path)); onFolderCreated(); return
+        ensureOpenChain(parentOf(result.path)); onFolderCreated(); return true
       }
       const { hidden } = await renamePath(srcPath, newPath, project)
       if (hidden) onNotice(notAllowed())
       captureMove(srcPath, newPath)
       onRenamed(srcPath, newPath, srcType)
+      setSelection(current => ({ ...current, paths: new Set([...current.paths].map(path => path === srcPath || path.startsWith(srcPath + '/') ? newPath + path.slice(srcPath.length) : path)), anchor: current.anchor === srcPath ? newPath : current.anchor }))
+      return true
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : String(err))
+      return false
     }
   }
 
   // 복사 붙여넣기 — 내부적으로 terminal cp(=fs.cpSync, 폴더 재귀)인 /copy-into를 호출한다
-  async function copyIntoDir(srcPath: string, srcType: 'file' | 'dir', destDir: string, sourceWorkspacePath: string | null) {
+  async function copyIntoDir(srcPath: string, srcType: 'file' | 'dir', destDir: string, sourceWorkspacePath: string | null, openCreated = true) {
     if (readOnly) return
     if (sourceWorkspacePath === workspacePath && isSelfOrDescendant(srcPath, srcType, destDir)) {
       setErrorMsg(uiText("폴더를 자기 자신 안으로는 복사할 수 없습니다"))
@@ -1305,11 +1359,11 @@ export function FileTree({
     try {
       if (documentPages && sourceWorkspacePath === workspacePath && (srcType === 'dir' || srcPath.endsWith('.md'))) {
         const result = await changePage('copy', srcPath, '', destDir)
-        ensureOpenChain(parentOf(result.path)); onFileCreated(result.path); return
+        ensureOpenChain(parentOf(result.path)); if (openCreated) onFileCreated(result.path); else onFolderCreated(); return
       }
       const { relPath, hidden } = await copyInto(srcPath, destDir, project, sourceWorkspacePath === workspacePath ? null : sourceWorkspacePath)
       if (hidden) onNotice(notAllowed())
-      if (srcType === 'file') onFileCreated(relPath)
+      if (srcType === 'file' && openCreated) onFileCreated(relPath)
       else onFolderCreated()
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : String(err))
@@ -1319,23 +1373,30 @@ export function FileTree({
   // Ctrl+V / 우클릭 붙여넣기 — cut은 이동(클립보드 비움), copy는 복사(여러 번 붙일 수 있게 유지)
   async function pasteInto(destDir: string) {
     const clip = clipboard
-    if (!clip || readOnly) return
-    if (clip.mode === 'cut') {
-      if (clip.workspacePath !== workspacePath) {
-        setErrorMsg(uiText("다른 프로젝트로는 잘라내기 대신 복사해 붙여넣으세요"))
-        return
+    if (!clip || readOnly || pasteInFlight.current) return
+    pasteInFlight.current = true
+    try {
+      const items = clip.items ?? [clip]
+      if (clip.mode === 'cut') {
+        if (clip.workspacePath !== workspacePath) {
+          setErrorMsg(uiText("다른 프로젝트로는 잘라내기 대신 복사해 붙여넣으세요"))
+          return
+        }
+        const remaining = []
+        for (const item of items) if (!await moveInto(item.path, item.type, destDir)) remaining.push(item)
+        if (readFileClipboard() === clip) setClipboard(remaining.length ? { ...clip, ...remaining[0], items: remaining } : null)
+      } else {
+        for (const item of items) await copyIntoDir(item.path, item.type, destDir, clip.workspacePath, items.length === 1)
       }
-      await moveInto(clip.path, clip.type, destDir)
-      setClipboard(null)
-    } else {
-      await copyIntoDir(clip.path, clip.type, destDir, clip.workspacePath)
-    }
-    ensureOpenChain(destDir)
+      ensureOpenChain(destDir)
+    } finally { pasteInFlight.current = false }
   }
 
   function beginDrag(path: string, type: 'file' | 'dir') {
+    const items = selection.paths.has(path) ? topLevelTreeItems(selectedItems) : [{ path, type }]
+    if (!selection.paths.has(path)) selectNode(path, type)
     focusNode(path, type)
-    draggingRef.current = { path, type }
+    draggingRef.current = items
     // 드래그 동안 스크롤 저장 잠금 — 브라우저 자동 스크롤이 저장값을 오염시킨다 (scrollMemory 주석 참고)
     setScrollSaveSuppressed(true)
   }
@@ -1347,20 +1408,24 @@ export function FileTree({
   }
 
   function canDropInto(dir: string): boolean {
-    const item = draggingRef.current
-    if (!item || readOnly) return false
-    return !isSelfOrDescendant(item.path, item.type, dir)
+    const items = draggingRef.current
+    if (!items || readOnly || visibleNodes.get(dir)?.editable === false) return false
+    return items.every(item => !isSelfOrDescendant(item.path, item.type, dir))
   }
 
-  function onDragOverDir(dir: string) {
+  function onDragOverDir(dir: string | null) {
     setDropDir((cur) => (cur === dir ? cur : dir))
   }
 
   function onDropDir(dir: string) {
-    const item = draggingRef.current
+    const items = draggingRef.current
     draggingRef.current = null
     setDropDir(null)
-    if (item) void moveInto(item.path, item.type, dir)
+    if (items) void moveItems(items, dir)
+  }
+
+  async function moveItems(items: TreeSelectionItem[], dir: string) {
+    for (const item of items) if (!await moveInto(item.path, item.type, dir)) break
   }
 
   // 바깥(파일 탐색기)에서 끌어온 파일을 놓은 폴더에 그대로 업로드한다. 여러 개면 순서대로 —
@@ -1385,53 +1450,95 @@ export function FileTree({
   }
 
   function handleTreeKeyDown(e: React.KeyboardEvent) {
-    if (readOnly || !focused || editing) return
-    const targetParent = documentPages || focused.type === 'dir' ? focused.path : parentOf(focused.path)
+    if (editing || (e.target as HTMLElement).closest('input,textarea,[contenteditable="true"]')) return
+    const row = (e.target as HTMLElement).closest<HTMLElement>('[data-path]')
+    const item = visibleItems.find(item => item.path === row?.dataset.path)
+    const handled = () => { e.preventDefault(); e.stopPropagation() }
+    if (e.key === 'Escape') { handled(); clearSelection(); return }
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
+      handled()
+      pageOpenSequence.current++
+      setSelection({ paths: new Set(visibleItems.map(item => item.path)), anchor: item?.path ?? visibleItems[0]?.path ?? null })
+      if (item) focusNode(item.path, item.type)
+      return
+    }
+    if (item && e.key === ' ') { handled(); selectNode(item.path, item.type, e); return }
+    if (item && e.key === 'Enter') {
+      handled()
+      if (!selection.paths.has(item.path)) selectNode(item.path, item.type)
+      const node = visibleNodes.get(item.path)!
+      if (documentPages && !node.project && (item.type === 'dir' || /\.md$/i.test(item.path))) ctx.openPage(node, { preview: false, ...(e.ctrlKey || e.metaKey ? { forceNewTab: true } : { replaceActive: true }) })
+      else if (item.type === 'file') ctx.onSelect(item.path, { preview: false, ...(e.ctrlKey || e.metaKey ? { forceNewTab: true } : {}) })
+      else ctx.toggleDir(item.path)
+      return
+    }
+    if (item && (e.key === 'ContextMenu' || e.key === 'F10' && e.shiftKey)) {
+      handled()
+      const rect = row!.getBoundingClientRect()
+      openPopover(item.path, item.type, rect.left + 16, rect.bottom)
+      return
+    }
+    if (item && ['ArrowUp', 'ArrowDown', 'Home', 'End'].includes(e.key)) {
+      handled()
+      const index = visibleItems.indexOf(item)
+      const next = visibleItems[e.key === 'Home' ? 0 : e.key === 'End' ? visibleItems.length - 1 : index + (e.key === 'ArrowUp' ? -1 : 1)]
+      if (next) {
+        if (!e.ctrlKey && !e.metaKey || e.shiftKey) selectNode(next.path, next.type, e)
+        else focusNode(next.path, next.type)
+        materializeTreePath(listRef.current!, { tree: persistedProject, path: next.path })
+        requestAnimationFrame(() => listRef.current?.querySelector<HTMLElement>(`[data-path="${CSS.escape(next.path)}"]`)?.focus())
+      }
+      return
+    }
+    if (readOnly) return
+    const targetParent = focused ? documentPages || focused.type === 'dir' ? focused.path : parentOf(focused.path) : rootPath
+    const destinationWritable = !focused || visibleNodes.get(focused.path)?.editable !== false
 
     // Ctrl/⌘ + C(복사)·X(잘라내기)·V(붙여넣기)·D(복제). 트리 노드는 select-none이라
     // 가로챌 텍스트 선택이 없어 네이티브 클립보드를 덮어써도 안전하다.
     if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey) {
       const k = e.key.toLowerCase()
       if (k === 'c') {
-        e.preventDefault()
-        setClipboard({ path: focused.path, type: focused.type, mode: 'copy', workspacePath })
+        handled()
+        copySelection('copy')
         return
       }
       if (k === 'x') {
-        e.preventDefault()
-        setClipboard({ path: focused.path, type: focused.type, mode: 'cut', workspacePath })
+        handled()
+        copySelection('cut')
         return
       }
       if (k === 'v') {
-        e.preventDefault()
-        void pasteInto(targetParent)
+        handled()
+        if (destinationWritable) void pasteInto(targetParent)
         return
       }
       if (k === 'd') {
-        e.preventDefault()
-        if (focused.type === 'file' || documentPages) void requestCopy(focused.path)
+        handled()
+        const selected = selectedItems[0]
+        if (selectedItems.length === 1 && selectionWritable && (selected.type === 'file' || documentPages)) void requestCopy(selected.path)
         return
       }
     }
 
     if (matchesShortcut(e, getBinding('treeRename'))) {
-      e.preventDefault()
-      startRename(focused.path, focused.type)
+      handled()
+      if (selectedItems.length === 1 && selectionWritable) startRename(selectedItems[0].path, selectedItems[0].type)
     } else if (matchesShortcut(e, getBinding('treeDelete'))) {
-      e.preventDefault()
-      requestDelete(focused.path, focused.type)
+      handled()
+      if (selectionWritable) requestDelete(selectedItems[0].path, selectedItems[0].type)
     } else if (matchesShortcut(e, getBinding('treeNewFile'))) {
-      e.preventDefault()
-      startCreate(targetParent, 'file')
+      handled()
+      if (destinationWritable) startCreate(targetParent, 'file')
     } else if (matchesShortcut(e, getBinding('treeNewFolder'))) {
-      e.preventDefault()
-      startCreate(targetParent, 'folder')
+      handled()
+      if (destinationWritable) startCreate(targetParent, 'folder')
     } else if (matchesShortcut(e, getBinding('treeNewFileAlt'))) {
-      e.preventDefault()
-      startCreate(targetParent, 'file')
+      handled()
+      if (destinationWritable) startCreate(targetParent, 'file')
     } else if (matchesShortcut(e, getBinding('treeNewFolderAlt'))) {
-      e.preventDefault()
-      startCreate(targetParent, 'folder')
+      handled()
+      if (destinationWritable) startCreate(targetParent, 'folder')
     }
   }
 
@@ -1450,6 +1557,38 @@ export function FileTree({
   const displayedTree = searchTree?.tree ?? tree
   const rootMoc = useMemo(() => displayedTree.find(isMocNode) ?? null, [displayedTree])
   const rootNodes = useMemo(() => displayedTree.filter(node => !rootMoc || !isMocNode(node)), [displayedTree, rootMoc])
+  const visibleNodes = useMemo(() => {
+    const result = new Map<string, TreeNode>()
+    const visit = (nodes: TreeNode[]) => nodes.forEach(node => {
+      result.set(node.path, node)
+      if (node.type !== 'dir' || !displayedOpenDirs.has(node.path)) return
+      const children = node.children ?? directoryChildren[node.path] ?? []
+      if (documentPages && !node.project) {
+        const representative = pageRepresentative(node.path, children)
+        visit(children.filter(child => child !== representative && !isMocNode(child)))
+      } else {
+        const rawDocuments = documentsFolder && (node.path === documentsFolder.path || node.path.startsWith(documentsFolder.path + '/'))
+        const moc = rawDocuments ? undefined : children.find(isMocNode)
+        if (moc) result.set(moc.path, moc)
+        visit(children.filter(child => !moc || !isMocNode(child)))
+      }
+    })
+    if (rootMoc) result.set(rootMoc.path, rootMoc)
+    visit(rootNodes)
+    return result
+  }, [rootMoc, rootNodes, displayedOpenDirs, directoryChildren, documentPages, documentsFolder])
+  const visibleItems = useMemo(() => [...visibleNodes.values()].map(({ path, type, editable }) => ({ path, type, editable })), [visibleNodes])
+  const selectedItems = visibleItems.filter(item => selection.paths.has(item.path))
+  const selectionWritable = !readOnly && selectedItems.length > 0 && selectedItems.every(item => item.editable !== false)
+  const multipleSelected = selectedItems.length > 1
+  const rootMenu = popover?.path === rootPath
+
+  useEffect(() => {
+    setSelection(current => {
+      const paths = new Set([...current.paths].filter(path => visibleNodes.has(path)))
+      return paths.size === current.paths.size ? current : { paths, anchor: current.anchor !== null && paths.has(current.anchor) ? current.anchor : null }
+    })
+  }, [visibleNodes])
 
   const rootCreateEditing =
     (editing?.mode === 'create-file' || editing?.mode === 'create-folder') && editing.parentPath === rootPath ? editing : null
@@ -1488,6 +1627,9 @@ export function FileTree({
     selectedPath,
     openPaths,
     focused,
+    selection: selection.paths,
+    selectionWritable,
+    selectNode,
     menuPath: popover?.path,
     openDirs: displayedOpenDirs,
     editing,
@@ -1531,18 +1673,20 @@ export function FileTree({
           if (e.target === e.currentTarget) recordScrollRef.current()
         }}
         onKeyDown={handleTreeKeyDown}
+        onClick={e => {
+          if (!(e.target as HTMLElement).closest('button,input,a,[role="button"]')) clearSelection()
+        }}
         onContextMenu={(e) => {
-          // 노드 위 우클릭은 Node.handleContextMenu가 먼저 처리하고 버블링되어 여기 닿는다 —
-          // e.target이 컨테이너 자신일 때만(=빈 영역) 루트 메뉴를 연다.
-          if (readOnly || e.target !== e.currentTarget) return
+          // Item handlers stop propagation; padding and virtual row spacers use the root menu.
+          if (readOnly || e.defaultPrevented) return
           e.preventDefault()
-          openPopover('', 'dir', e.clientX, e.clientY)
+          openPopover(rootPath, 'dir', e.clientX, e.clientY)
         }}
         onTouchStart={(e) => {
           if (readOnly || e.target !== e.currentTarget) return
           const touch = e.touches[0]
           rootLongPressTimer.current = window.setTimeout(() => {
-            openPopover('', 'dir', touch.clientX, touch.clientY)
+            openPopover(rootPath, 'dir', touch.clientX, touch.clientY)
           }, 500)
         }}
         onTouchEnd={clearRootLongPress}
@@ -1561,13 +1705,13 @@ export function FileTree({
           e.preventDefault()
           if (hasExternalFiles(e.dataTransfer)) {
             setDropDir(null)
-            void uploadFilesInto('', e.dataTransfer.files)
+            void uploadFilesInto(rootPath, e.dataTransfer.files)
             return
           }
-          const item = draggingRef.current
+          const items = draggingRef.current
           draggingRef.current = null
           setDropDir(null)
-          if (item) void moveInto(item.path, item.type, '')
+          if (items && items.every(item => !isSelfOrDescendant(item.path, item.type, rootPath))) void moveItems(items, rootPath)
         }}
         className={`${compact ? 'py-1' : 'min-h-0 flex-1 overflow-y-auto pt-0.5 pb-[300px] [--tree-sticky-inset:2px]'} outline-none ${dropDir === '' ? 'ring-1 ring-inset ring-accent' : ''}`}
       >
@@ -1588,9 +1732,11 @@ export function FileTree({
                 opened={openPaths?.has(rootMoc.path)}
                 presenceColors={presence[rootMoc.path] ?? []}
                 onSelect={ctx.onSelect}
+                selected={selection.paths.has(rootMoc.path)}
+                onPick={event => selectNode(rootMoc.path, 'file', event)}
                 search={search}
                 publicShare={publicShares ? publicShares.get(rootMoc.path) : rootMoc.publicShare}
-                onMenu={readOnly ? undefined : (x, y) => openPopover(rootMoc.path, 'file', x, y)}
+                onMenu={readOnly ? undefined : (x, y, selectFirst) => openPopover(rootMoc.path, 'file', x, y, selectFirst)}
               />
             )}
             {rootCreateEditing && (
@@ -1611,9 +1757,9 @@ export function FileTree({
         <ActionPopover
           x={popover.x}
           y={popover.y}
-          onPublicShare={canManagePublicShares && popover.path !== '' ? () => { setShareTarget({ path: popover.path }); setPopover(null) } : undefined}
+          onPublicShare={canManagePublicShares && !rootMenu && !multipleSelected ? () => { setShareTarget({ path: popover.path }); setPopover(null) } : undefined}
           onRename={
-            popover.path === ''
+            rootMenu || multipleSelected || !selectionWritable
               ? undefined
               : () => {
                   startRename(popover.path, popover.type)
@@ -1621,7 +1767,7 @@ export function FileTree({
                 }
           }
           onDuplicate={
-            popover.type === 'file' || documentPages
+            !rootMenu && !multipleSelected && selectionWritable && (popover.type === 'file' || documentPages)
               ? () => {
                   void requestCopy(popover.path)
                   setPopover(null)
@@ -1629,23 +1775,23 @@ export function FileTree({
               : undefined
           }
           onCopyClip={
-            popover.path === ''
+            rootMenu
               ? undefined
               : () => {
-                  setClipboard({ path: popover.path, type: popover.type, mode: 'copy', workspacePath })
+                  copySelection('copy')
                   setPopover(null)
                 }
           }
           onCutClip={
-            popover.path === ''
+            rootMenu || !selectionWritable
               ? undefined
               : () => {
-                  setClipboard({ path: popover.path, type: popover.type, mode: 'cut', workspacePath })
+                  copySelection('cut')
                   setPopover(null)
                 }
           }
           onPasteClip={
-            clipboard
+            clipboard && !multipleSelected && (rootMenu || selectionWritable)
               ? () => {
                   void pasteInto(documentPages ? popover.path : popover.type === 'dir' ? popover.path : parentOf(popover.path))
                   setPopover(null)
@@ -1653,38 +1799,38 @@ export function FileTree({
               : undefined
           }
           onDownload={
-            popover.type === 'file'
+            !rootMenu && !multipleSelected && popover.type === 'file'
               ? <DownloadLink href={downloadUrl(popover.path, project)} name={popover.path.split('/').pop() ?? popover.path} onStarted={() => setPopover(null)} menuIcon={<Download />}>{t('fileExplorer.download')}</DownloadLink>
               : undefined
           }
           onDelete={
-            popover.path === ''
+            rootMenu || !selectionWritable
               ? undefined
               : () => {
                   requestDelete(popover.path, popover.type)
                   setPopover(null)
                 }
           }
-          onNewFile={() => {
+          onNewFile={multipleSelected || !rootMenu && !selectionWritable ? undefined : () => {
             startCreate(documentPages ? popover.path : popover.type === 'dir' ? popover.path : parentOf(popover.path), 'file')
             setPopover(null)
           }}
-          onNewFolder={documentPages ? undefined : () => {
+          onNewFolder={documentPages || multipleSelected || !rootMenu && !selectionWritable ? undefined : () => {
             startCreate(popover.type === 'dir' ? popover.path : parentOf(popover.path), 'folder')
             setPopover(null)
           }}
-          onUpload={() => {
+          onUpload={multipleSelected || !rootMenu && !selectionWritable ? undefined : () => {
             triggerUpload(popover.type === 'dir' ? popover.path : parentOf(popover.path))
             setPopover(null)
           }}
           onCreateSubproject={
-            !creatingProject && popover.type === 'dir' && popover.path !== '' && popover.path !== rootPath
+            !multipleSelected && selectionWritable && !creatingProject && popover.type === 'dir' && popover.path !== '' && popover.path !== rootPath
               && !popover.path.split('/').includes('.mew') && !projectPaths.has(popover.path)
               ? () => { void makeSubproject(popover.path); setPopover(null) }
               : undefined
           }
           onInitGit={
-            canUseGit && popover.type === 'dir' && popover.path !== '' && !gitPaths.has(popover.path)
+            !multipleSelected && selectionWritable && canUseGit && popover.type === 'dir' && popover.path !== '' && !gitPaths.has(popover.path)
               ? () => {
                   initGit(popover.path)
                   setPopover(null)
@@ -1725,7 +1871,7 @@ export function FileTree({
 
       {deleteTarget && (
         <ConfirmDialog
-          message={uiText("{p0} \"{p1}\"을(를) 삭제할까요?", { p0: deleteTarget.type === 'dir' ? uiText("폴더") : uiText("파일"), p1: deleteTarget.path })}
+          message={uiText("{p0} \"{p1}\"을(를) 삭제할까요?", { p0: deleteTarget.every(item => item.type === 'dir') ? uiText("폴더") : uiText("파일"), p1: deleteTarget.map(item => item.path).join(', ') })}
           detail={uiText("이 작업은 되돌릴 수 없습니다.")}
           confirmLabel={uiText("삭제")}
           danger

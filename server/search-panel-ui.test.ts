@@ -202,9 +202,9 @@ test('explorer search filters file and document trees with contextual content pr
           assert.equal(requests.at(-1)!.searchParams.get('scopes'), docs ? 'docs' : 'root')
           if (docs && width === 1100) {
             await page.evaluate('window.deferPageLoad=true')
-            await row('a1').click()
+            await row('a1').dblclick()
             await page.waitForFunction('window.pageLoadPending===true')
-            await row(paths[0]).click()
+            await row(paths[0]).dblclick()
             await page.evaluate('window.resolvePageLoad([{type:"file",name:"_a1.md",path:"a1/_a1.md"}]);window.deferPageLoad=false')
             await browsingList.evaluate(el => new Promise<void>(resolve => {
               const view = el.ownerDocument.defaultView!
@@ -212,7 +212,7 @@ test('explorer search filters file and document trees with contextual content pr
             }))
             assert.equal(await page.evaluate('window.openedFile'), paths[0], 'a delayed ancestor representative cannot replace a subsequently opened search match')
           }
-          await row(paths[0]).click()
+          await row(paths[0]).dblclick()
           assert.equal(await page.evaluate('window.openedFile'), paths[0])
 
           for (const [label, option] of [['대소문자 구분', 'case'], ['정규식 사용', 'regex']]) {
@@ -288,7 +288,7 @@ test('explorer search filters file and document trees with contextual content pr
             assert.equal(secondOpened[1].line, secondMatch.line)
             assert.equal(secondOpened[1].column, secondMatch.column, 'tooltip navigation opens the selected match at its original position')
           }
-          await row(paths[0]).click()
+          await row(paths[0]).dblclick()
           const opened = await page.evaluate('window.openedResult') as [string, typeof firstMatch, string, unknown, string]
           assert.equal(opened[0], paths[0])
           assert.equal(opened[1].line, firstMatch.line)
@@ -364,7 +364,7 @@ test('explorer search filters file and document trees with contextual content pr
             assert.deepEqual(await matchedPaths(), paths, 'a previous root response cannot overwrite Documents results after a scope switch')
             assert.equal(await page.locator('[data-document-page="' + paths[0] + '"]').count(), 1)
             assert.equal(await row('a1/b3.md').count(), 0)
-            await row(paths[0]).click()
+            await row(paths[0]).dblclick()
             assert.equal((await page.evaluate('window.openedResult') as [string, unknown, string, unknown, string])[4], 'docs')
             await page.getByRole('button', { name: '검색 지우기', exact: true }).click()
             await page.evaluate('window.setDocs(false)')

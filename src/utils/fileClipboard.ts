@@ -3,6 +3,7 @@
 export type FileClipboard = {
   path: string
   type: 'file' | 'dir'
+  items?: { path: string; type: 'file' | 'dir' }[]
   mode: 'copy' | 'cut'
   /** 복사할 때 보고 있던 루트 프로젝트. 다른 루트로 붙여넣을 때만 서버에 함께 보낸다. */
   workspacePath: string | null
