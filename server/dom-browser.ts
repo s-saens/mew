@@ -21,14 +21,13 @@ type AssetCache = { entries: Map<string, Promise<string>>; bytes: number; baseUr
 const assetCache = (baseUrl = 'about:blank'): AssetCache => ({ entries: new Map(), bytes: 0, baseUrl, abort: new AbortController() })
 const recordBundle = () => fs.readFileSync(path.join(path.dirname(createRequire(import.meta.url).resolve('@rrweb/record')), 'record.umd.min.cjs'), 'utf8')
 
-/** Restrict browser documents and relayed assets to explicit loopback HTTP services. */
+/** Allow HTTP documents while keeping credentials and Mew's ports out of the host browser. */
 export function domBrowserTarget(raw: string, blockedPorts: ReadonlySet<number>): URL {
   const url = new URL(raw)
   const port = Number(url.port || (url.protocol === 'https:' ? 443 : 80))
   const authority = raw.trim().replace(/[\t\r\n]/g, '').match(/^[a-z][a-z\d+.-]*:\/\/([^/?#]*)/i)?.[1]
-  const loopback = ['localhost', '[::1]'].includes(url.hostname) || /^127(?:\.\d{1,3}){3}$/.test(url.hostname)
-  if (!['http:', 'https:'].includes(url.protocol) || !loopback || authority?.includes('@') || url.username || url.password || !Number.isInteger(port) || port < 1 || port > 65535 || blockedPorts.has(port)) {
-    throw new Error('호스트 localhost의 HTTP 앱만 열 수 있습니다. Mew 자체 포트는 열 수 없습니다.')
+  if (!['http:', 'https:'].includes(url.protocol) || authority?.includes('@') || url.username || url.password || !Number.isInteger(port) || port < 1 || port > 65535 || blockedPorts.has(port)) {
+    throw new Error('HTTP(S) 주소만 열 수 있습니다. 로그인 정보가 포함된 주소와 Mew 자체 포트는 열 수 없습니다.')
   }
   return url
 }
@@ -184,7 +183,7 @@ class DomBrowserSession {
       }).catch(() => {}).finally(() => { this.pendingEvents -= bytes })
     })
     await page.addInitScript({ content: `${recordBundle()}; if (window === window.top) {
-      const documentToken = crypto.randomUUID();
+      const documentToken = Array.from(crypto.getRandomValues(new Uint32Array(4)), value => value.toString(16).padStart(8, '0')).join('');
       window.__mewDomScrollRevisions = new Map();
       window.open = url => { if (url) window.location.assign(String(url)); return null; };
       document.addEventListener('click', event => { const anchor = event.target?.closest?.('a[target]'); if (anchor) anchor.target = '_self'; }, true);
@@ -195,7 +194,7 @@ class DomBrowserSession {
     page.on('framenavigated', frame => {
       if (frame !== page.mainFrame()) return
       try { domBrowserTarget(frame.url(), this.blockedPorts) }
-      catch { this.send({ type: 'error', message: 'localhost 앱 밖으로 이동할 수 없습니다.' }); void this.close(); return }
+      catch { this.send({ type: 'error', message: '이 주소로 이동할 수 없습니다. HTTP(S) 주소와 Mew 자체 포트인지 확인해 주세요.' }); void this.close(); return }
       void this.sendState()
     })
     page.on('close', () => { void this.close() })
@@ -308,6 +307,7 @@ class DomBrowserSession {
     if (command.type === 'resize') { await page.setViewportSize({ width: command.width, height: command.height }); return }
     if (['navigate', 'back', 'forward', 'reload'].includes(command.type)) {
       this.generation++
+      const commandGeneration = this.generation
       this.loading = true; await this.sendState()
       try {
         await page.evaluate('window.__mewDomScrollRevisions?.clear()').catch(() => {})
@@ -317,7 +317,8 @@ class DomBrowserSession {
         else await page.reload({ waitUntil: 'domcontentloaded' })
       } finally {
         this.loading = false
-        await page.evaluate('window.__mewDomRecord?.takeFullSnapshot?.()').catch(() => {})
+        // New documents record their own snapshot; SPA history needs a fresh generation snapshot.
+        if (this.generation === commandGeneration) await page.evaluate('window.__mewDomRecord?.takeFullSnapshot?.()').catch(() => {})
         await this.sendState()
       }
       return

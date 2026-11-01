@@ -60,6 +60,7 @@ export function DomBrowserPanel({ url, navigationRequest = 0, onClose }: { url: 
 
   useEffect(() => {
     let disposed = false, replay: Replayer | undefined, replayGeneration = -1, snapshotGeneration = -1, unbind = () => {}
+    let replayBaseline = 0, replayStartedAt = 0
     let resizeTimer: ReturnType<typeof setTimeout> | undefined
     let applyHostScroll = (_data: DomBrowserScroll) => {}
     const reportedInputs = new Map<number, string>()
@@ -208,14 +209,17 @@ export function DomBrowserPanel({ url, navigationRequest = 0, onClose }: { url: 
               const custom = event as Extract<eventWithTime, { type: EventType.Custom }>
               if (custom.data.tag === 'mew-dom-scroll') applyHostScroll(custom.data.payload as DomBrowserScroll)
             })
-            replay.startLive()
+            replayBaseline = Date.now(); replayStartedAt = performance.now()
+            replay.startLive(replayBaseline)
           }
+          // This is a live surface: apply received events now, independently of the host's clock.
+          const timestamp = replayBaseline + Math.floor(performance.now() - replayStartedAt)
           for (const event of message.events) {
             const recorded = event as eventWithTime
             // Keep scroll ordering with DOM mutations while bypassing rrweb's smooth scroll.
             replay.addEvent(recorded.type === EventType.IncrementalSnapshot && recorded.data.source === IncrementalSource.Scroll
-              ? { type: EventType.Custom, timestamp: recorded.timestamp, data: { tag: 'mew-dom-scroll', payload: recorded.data } }
-              : recorded)
+              ? { type: EventType.Custom, timestamp, data: { tag: 'mew-dom-scroll', payload: recorded.data } }
+              : { ...recorded, timestamp })
           }
         }
       } catch { setError(uiText('브라우저 화면을 복원하지 못했습니다. 다시 연결해 주세요.')) }

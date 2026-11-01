@@ -26,7 +26,7 @@ test('DOM browser replays inert pages and relays editing, navigation, scrolling 
         window.packets=[];window.sockets=[];window.closedCount=0;window.generation=1;window.editorCloseCount=0;
         window.BrowserSocket=class {readyState=0;send(value){window.packets.push(JSON.parse(value))}close(){this.readyState=3}constructor(url){this.url=url;window.socket=this;window.sockets.push(this);queueMicrotask(()=>{this.readyState=1;this.onopen?.(new Event('open'))})}};
         window.deliver=message=>window.socket.onmessage({data:JSON.stringify(message)});
-        window.snapshotPage=(generation=window.generation,initialOffset={left:0,top:0})=>{window.generation=generation;const doc=document.getElementById('source').contentDocument;const mirror=createMirror();const freshNode=snapshot(doc,{mirror});const node=window.initialNode||freshNode;window.initialNode=node;window.ids=window.initialIds||Object.fromEntries([...doc.querySelectorAll('[id]')].map(el=>[el.id,mirror.getId(el)]));window.ids.document=mirror.getId(doc);if(!window.initialIds){window.ids.resultText=mirror.getId(doc.querySelector('#result').firstChild);window.initialIds=window.ids;}const timestamp=Date.now()-40;window.deliver({type:'events',generation:window.generation,events:[{type:4,timestamp,data:{href:'http://localhost:3333/',width:760,height:480}},{type:2,timestamp:timestamp+1,data:{node,initialOffset}}]});window.deliver({type:'state',generation:window.generation,url:'http://localhost:3333/form',title:'Fixture',loading:false,canGoBack:true,canGoForward:true})};
+        window.snapshotPage=(generation=window.generation,initialOffset={left:0,top:0})=>{window.generation=generation;const doc=document.getElementById('source').contentDocument;const mirror=createMirror();const freshNode=snapshot(doc,{mirror});const node=window.initialNode||freshNode;window.initialNode=node;window.ids=window.initialIds||Object.fromEntries([...doc.querySelectorAll('[id]')].map(el=>[el.id,mirror.getId(el)]));window.ids.document=mirror.getId(doc);if(!window.initialIds){window.ids.resultText=mirror.getId(doc.querySelector('#result').firstChild);window.initialIds=window.ids;}const timestamp=Date.now()+60_000;window.deliver({type:'events',generation:window.generation,events:[{type:4,timestamp,data:{href:'http://localhost:3333/',width:760,height:480}},{type:2,timestamp:timestamp+1,data:{node,initialOffset}}]});window.deliver({type:'state',generation:window.generation,url:'http://localhost:3333/form',title:'Fixture',loading:false,canGoBack:true,canGoForward:true})};
         function Fixture(){const [open,setOpen]=React.useState(true);const [request,setRequest]=React.useState(0);React.useEffect(()=>captureAppTabShortcuts({closeEditorTab:()=>window.editorCloseCount++,create:()=>{}}),[]);return <><button onClick={()=>{setOpen(true);setRequest(value=>value+1)}}>Reopen same link</button>{open&&<div style={{height:'480px',width:'100%'}}><DomBrowserPanel url="http://localhost:3333/" navigationRequest={request} onClose={()=>{window.closedCount++;setOpen(false)}}/></div>}</>}
         createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18nProvider>);`
     },
@@ -53,7 +53,14 @@ test('DOM browser replays inert pages and relays editing, navigation, scrolling 
   assert.ok(await page.evaluate<boolean>('window.packets.some(packet=>packet.type==="resize"&&packet.width>0&&packet.height>0)'))
   await page.evaluate('window.snapshotPage()')
   const frame = page.frameLocator('[data-dom-browser-surface] iframe')
-  await frame.getByRole('textbox', { name: 'Name', exact: true }).waitFor()
+  await frame.getByRole('textbox', { name: 'Name', exact: true }).waitFor({ timeout: 1000 })
+  for (const hostOffset of [60_000, -60_000, 120_000]) {
+    const marker = `Live update ${hostOffset}`
+    const receivedAt = performance.now()
+    await page.evaluate(`window.deliver({type:'events',generation:window.generation,events:[{type:3,timestamp:Date.now()+${hostOffset},data:{source:0,texts:[{id:window.ids.resultText,value:${JSON.stringify(marker)}}],attributes:[],removes:[],adds:[]}}]})`)
+    await frame.getByText(marker, { exact: true }).waitFor({ timeout: 500 })
+    t.diagnostic(`Host clock offset ${hostOffset} ms: received-to-visible ${Math.round(performance.now() - receivedAt)} ms`)
+  }
   assert.equal(await page.locator('[data-dom-browser-surface] iframe').getAttribute('sandbox'), 'allow-same-origin')
   assert.equal(await page.evaluate('Boolean(window.replayScriptRan)'), false)
   await frame.getByRole('textbox', { name: 'Name', exact: true }).click()
@@ -154,6 +161,9 @@ test('DOM browser replays inert pages and relays editing, navigation, scrolling 
   await page.getByRole('textbox', { name: '브라우저 주소', exact: true }).fill('localhost:4321/sub?x=1#section')
   await page.getByRole('textbox', { name: '브라우저 주소', exact: true }).press('Enter')
   assert.ok(await page.evaluate<boolean>('window.packets.some(packet=>packet.type==="navigate"&&packet.url==="http://localhost:4321/sub?x=1#section")'))
+  await page.getByRole('textbox', { name: '브라우저 주소', exact: true }).fill('https://example.org/articles?q=mew#read')
+  await page.getByRole('textbox', { name: '브라우저 주소', exact: true }).press('Enter')
+  assert.ok(await page.evaluate<boolean>('window.packets.some(packet=>packet.type==="navigate"&&packet.url==="https://example.org/articles?q=mew#read")'))
   await page.getByRole('button', { name: 'Reopen same link', exact: true }).click()
   assert.equal(await page.evaluate('window.packets.findLast(packet=>packet.type==="navigate").url'), 'http://localhost:3333/')
   assert.equal(await page.evaluate('window.sockets.length'), 1)

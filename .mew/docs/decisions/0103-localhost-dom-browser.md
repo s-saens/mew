@@ -1,13 +1,13 @@
 ---
 title: "Restore DOM relay for localhost apps"
-description: "Restores an authenticated internal DOM browser for localhost links and command ports, partially superseding decision 0023 while preserving independent login video and legacy proxy URLs. Records host execution, isolated replay, transport, limits, and alternatives."
+description: "Restores an authenticated internal DOM browser for localhost links and command ports, partially superseding decision 0023 while preserving independent login video and legacy proxy URLs. Decision 0106 extends navigation to external HTTP(S) sites and changes live replay timing. Records host execution, isolated replay, transport, limits, and alternatives."
 created: "2026-10-31"
-updated: "2026-10-31"
+updated: "2026-11-01"
 ---
 
 ## Status
 
-Accepted. Host build and application remain the user's responsibility. Partially supersedes [0023](0023-login-desktop-and-port-preview.md) for local-app entry and the removal of all DOM relay. The dedicated login video desktop and existing proxy routes remain.
+Accepted. [Decision 0106](0106-dom-browser-external-sites.md) supersedes the loopback-only document restriction and extends the replay contract. The remaining architecture and separate agent login display remain in effect. Host application remains the user's responsibility. Partially supersedes [0023](0023-login-desktop-and-port-preview.md) for local-app entry and the removal of all DOM relay. The dedicated login video desktop and existing proxy routes remain.
 
 ## Context
 

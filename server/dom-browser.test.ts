@@ -4,6 +4,7 @@ import assert from 'node:assert/strict'
 import http from 'node:http'
 import { once } from 'node:events'
 import { WebSocket, WebSocketServer } from 'ws'
+import { chromium } from 'playwright-core'
 import { attachDomBrowserWebSocket, closeDomBrowsers, DOM_BROWSER_WS, domBrowserTarget, parseDomBrowserCommand } from './dom-browser.ts'
 import type { DomBrowserCommand, DomBrowserMessage } from '../shared/dom-browser.ts'
 import type { RequestAuth } from './reqAuth.ts'
@@ -48,12 +49,17 @@ function findNode(value: unknown, predicate: (node: Record<string, unknown>) => 
   }
 }
 
-test('DOM browser rejects external addresses, credentials, Mew ports, and malformed input', () => {
-  for (const raw of ['https://example.com', 'file:///etc/passwd', 'http://localhost:5000', 'http://user:password@localhost:3000', 'http://@localhost:3000', 'http://192.168.0.1:3000', 'http://localhost.example.com:3000']) assert.throws(() => domBrowserTarget(raw, new Set([5000])))
+test('DOM browser accepts HTTP(S) sites and rejects credentials, Mew ports, and malformed addresses', () => {
+  const blocked = new Set([5000, 4999])
+  for (const raw of ['https://example.com/path?q=1#test', 'http://external.example.test:3000', 'http://192.168.0.1:3000', 'http://localhost.example.com:3000']) assert.equal(domBrowserTarget(raw, blocked).href, new URL(raw).href)
+  for (const raw of ['', '/relative', 'file:///etc/passwd', 'ftp://example.com', 'javascript:alert(1)', 'data:text/html,hello', 'http://localhost:5000', 'http://[::1]:4999', 'https://external.example.test:5000', 'http://user:password@localhost:3000', 'https://user:password@example.com', 'http://@localhost:3000', 'https://@example.com', 'http://example.com:0', 'http://example.com:65536']) assert.throws(() => domBrowserTarget(raw, blocked), raw)
   assert.equal(domBrowserTarget('http://localhost:3000/path?q=1#test', new Set([5000])).pathname, '/path')
   assert.equal(domBrowserTarget('http://[::1]:3000', new Set([5000])).hostname, '[::1]')
   assert.equal(domBrowserTarget('http://127.0.0.2:3000', new Set([5000])).hostname, '127.0.0.2')
   assert.equal(domBrowserTarget('http://127.1:3000', new Set([5000])).hostname, '127.0.0.1')
+})
+
+test('DOM browser validates command input and remote transport capability', () => {
   for (const command of [{ type: 'input', id: -1, value: '' }, { type: 'resize', width: 1, height: 1 }, { type: 'key', key: 'Control+Escape' }, { type: 'scroll', id: 1, x: null, y: 0 }, { type: 'key', key: 'Enter', ctrlKey: 'true' }]) assert.throws(() => parseDomBrowserCommand(JSON.stringify(command)))
   for (const scrollRevision of [0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1, '1', null]) assert.throws(() => parseDomBrowserCommand(JSON.stringify({ type: 'scroll', generation: 1, id: 1, x: 0, y: 100, scrollRevision })))
   for (const scrollRevision of [1, Number.MAX_SAFE_INTEGER]) assert.equal((parseDomBrowserCommand(JSON.stringify({ type: 'scroll', generation: 1, id: 1, x: 0, y: 100, scrollRevision })) as { scrollRevision: number }).scrollRevision, scrollRevision)
@@ -61,6 +67,58 @@ test('DOM browser rejects external addresses, credentials, Mew ports, and malfor
   assert.deepEqual(parseDomBrowserCommand('{"type":"key","generation":1,"key":"Enter","ctrlKey":true}'), { type: 'key', generation: 1, key: 'Enter', ctrlKey: true })
   assert.equal(remotePath(DOM_BROWSER_WS, true), true)
   assert.equal(remotePath(DOM_BROWSER_WS, true, 'port-preview'), false)
+})
+
+test('host DOM relay opens an external HTTP hostname and follows links, redirects, and history without internet access', { timeout: 60_000, skip: !domBrowserExecutable() }, async t => {
+  const launch = chromium.launch.bind(chromium)
+  t.mock.method(chromium, 'launch', (options: Parameters<typeof chromium.launch>[0]) => launch({
+    ...options,
+    args: [...(options?.args ?? []), '--host-resolver-rules=MAP external.example.test 127.0.0.1', '--no-proxy-server'],
+  }))
+  let origin = '', protectedRequests = 0
+  const fixture = http.createServer((req, res) => {
+    if (req.url === '/redirect') { res.writeHead(302, { location: '/redirected?external=1#last' }); res.end(); return }
+    if (req.url === '/mew-redirect') { res.writeHead(302, { location: origin + '/secret' }); res.end(); return }
+    res.setHeader('content-type', 'text/html')
+    res.end(`<!doctype html><html><head><title>External site</title></head><body><output id="path">${req.url}</output><a id="next" href="/next?link=1#next">Next</a><a id="redirect" href="/redirect">Redirect</a><a id="mew" href="/mew-redirect">Mew</a></body></html>`)
+  })
+  const local = await start(fixture); t.after(() => stop(fixture))
+  const external = local.replace('127.0.0.1', 'external.example.test')
+  const host = http.createServer((_req, res) => { protectedRequests++; res.end('Mew secret') })
+  attachDomBrowserWebSocket(host, () => owner)
+  origin = await start(host); t.after(async () => { await closeDomBrowsers(); await stop(host) })
+  const client = connection(origin); await once(client.ws, 'open'); t.after(() => client.ws.terminate())
+  const loaded = async (from: number, path: string) => {
+    await client.wait(() => client.messages.slice(from).findLast(message => message.type === 'state' && !message.loading && message.url === external + path), `external page ${path}`)
+    return client.wait(() => findNode(client.messages.slice(from), entry => (entry.attributes as Record<string, unknown> | undefined)?.id === 'next'), `external snapshot ${path}`)
+  }
+  const singleSnapshot = async (from: number, label: string) => {
+    await new Promise(resolve => setTimeout(resolve, 150))
+    const snapshots = client.messages.slice(from).flatMap(message => message.type === 'events' ? message.events : []).filter(event => event && typeof event === 'object' && 'type' in event && event.type === 2)
+    assert.equal(snapshots.length, 1, `${label} relays its automatic full snapshot once`)
+  }
+  client.send({ type: 'navigate', url: external + '/start?entry=1#first' })
+  await loaded(0, '/start?entry=1#first')
+  await singleSnapshot(0, 'initial document navigation')
+  const beforeReload = client.messages.length
+  client.send({ type: 'reload' })
+  const reloadedNext = await loaded(beforeReload, '/start?entry=1#first')
+  await singleSnapshot(beforeReload, 'document reload')
+  const beforeLink = client.messages.length
+  client.send({ type: 'click', id: Number(reloadedNext.id) })
+  await loaded(beforeLink, '/next?link=1#next')
+  const beforeBack = client.messages.length
+  client.send({ type: 'back' }); await loaded(beforeBack, '/start?entry=1#first')
+  const beforeForward = client.messages.length
+  client.send({ type: 'forward' }); await loaded(beforeForward, '/next?link=1#next')
+  const redirect = await client.wait(() => findNode(client.messages.slice(beforeForward), entry => (entry.attributes as Record<string, unknown> | undefined)?.id === 'redirect'), 'external redirect link')
+  const beforeRedirect = client.messages.length
+  client.send({ type: 'click', id: Number(redirect.id) }); await loaded(beforeRedirect, '/redirected?external=1#last')
+  const mew = await client.wait(() => findNode(client.messages.slice(beforeRedirect), entry => (entry.attributes as Record<string, unknown> | undefined)?.id === 'mew'), 'Mew redirect link')
+  const beforeMew = client.messages.length
+  client.send({ type: 'click', id: Number(mew.id) })
+  await client.wait(() => client.messages.slice(beforeMew).find(message => message.type === 'error'), 'external redirect to Mew rejection')
+  assert.equal(protectedRequests, 0, 'external documents cannot redirect into Mew')
 })
 
 test('host scrolls apply instantly, echo viewer revisions per node, and reset revisions after document or SPA history navigation', { timeout: 45_000, skip: !domBrowserExecutable() }, async t => {
@@ -193,11 +251,13 @@ test('host DOM relay runs native SPA paths and JS, relays input/scroll/history/H
   assert.equal(client.messages.findLast(message => message.type === 'state')?.type === 'state' && (client.messages.findLast(message => message.type === 'state') as { canGoBack?: boolean }).canGoBack, true)
   client.send({ type: 'click', id: Number((await node('popup')).id) }); await text('/popup?native=1#popup')
   client.send({ type: 'navigate', url: target + '/local-redirect' }); await text('/redirected?local=1#last')
+  const beforeOwnPort = client.messages.length
   client.send({ type: 'navigate', url: hostOrigin + '/secret' })
-  await client.wait(() => client.messages.find(message => message.type === 'error'), 'Mew own-port rejection')
+  await client.wait(() => client.messages.slice(beforeOwnPort).find(message => message.type === 'error'), 'Mew own-port rejection')
   assert.equal(mewRequests, 0)
+  const beforeRedirect = client.messages.length
   client.send({ type: 'navigate', url: target + '/redirect' })
-  await client.wait(() => client.messages.findLast(message => message.type === 'error' && !message.message.includes('Mew 자체')), 'redirect rejection')
+  await client.wait(() => client.messages.slice(beforeRedirect).find(message => message.type === 'error'), 'redirect rejection')
   assert.equal(mewRequests, 0)
 })
 

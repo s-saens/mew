@@ -1,8 +1,8 @@
 ---
-title: "Login Screen, localhost Apps, and Android"
-description: "Explains the restored internal DOM browser for localhost links and command ports, host Chromium prerequisites and limits, separate login video, retained proxy URLs, and Android environment checks and gateways."
+title: "Login Screen, Browser, and Android"
+description: "Explains the internal DOM browser for localhost apps and external HTTP(S) websites, address entry, host Chromium prerequisites and limits, separate login video, retained proxy URLs, and Android environment checks and gateways."
 created: "2026-09-04"
-updated: "2026-10-31"
+updated: "2026-11-01"
 ---
 
 ## Login screen
@@ -15,11 +15,11 @@ This video screen is for login and account management. The localhost DOM browser
 
 ## Open host localhost apps
 
-Click a `http://localhost:3333` link in a document, agent response, or terminal output, or click a command's port number in the command menu. Mew opens the host app in its internal **Browser** panel. The command keeps running; clicking the port does not execute it again. You can also select **Browser** in the dock and enter a localhost address. Paths, queries, and fragments are preserved.
+Click a `http://localhost:3333` link in a document, agent response, or terminal output, or click a command's port number in the command menu. Mew opens the host app in its internal **Browser** panel. The command keeps running; clicking the port does not execute it again. You can also select **Browser** in the dock and enter a localhost address or an external website such as `https://example.com`. Paths, queries, and fragments are preserved.
 
 The Browser toolbar provides Back, Forward, refresh, an address field, and close. Type and click in the app as usual; its JavaScript and network requests run in headless Chromium on the host. Only the resulting DOM and your input travel through Mew. The same flow works through direct access and Mewlink without a separate preview domain or wildcard DNS setup. Mewlink also needs its central launcher updated to admit the new DOM browser connection; updating only the host is insufficient with an older launcher.
 
-The app must already be running, and Chrome/Chromium must be installed on the Mew host. Set `MEW_BROWSER_EXECUTABLE` to its absolute executable path if automatic detection fails. Mew login and **Access localhost Apps** permission are required; owner and manager have it by default. The browser accepts loopback HTTP(S) addresses and blocks Mew's own listening ports. This browser does not open general external sites or replace agent login screens.
+The app must already be running, and Chrome/Chromium must be installed on the Mew host. Set `MEW_BROWSER_EXECUTABLE` to its absolute executable path if automatic detection fails. Mew login and **Access localhost Apps** permission are required; owner and manager have it by default. The browser accepts local and external HTTP(S) addresses. It blocks addresses containing login credentials and Mew's own port numbers, even on external hosts. Agent login screens continue to use the separate video display.
 
 Closing the panel disposes of its isolated browser context. If the connection closes or the session expires, use **Reconnect** or reopen the link. Reconnection starts a fresh context; app cookies and local storage are not kept across it. Logging out or losing permission closes the browser too.
 
