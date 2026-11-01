@@ -1,6 +1,6 @@
 ---
 title: "mewlink Cloudflare Deployment"
-description: "Maintainer runbook covering Mewlink's independent local Git repository and parent-checkout dependencies, central configuration, deployment and Wrangler JSON-output recovery, key preservation, access revocation, verification, rollback, and localhost preview DNS and HTTPS preparation. Links to dated implementation and deployment records."
+description: "Maintainer runbook covering Mewlink's independent local Git repository and parent-checkout dependencies, central configuration, deployment, local secrets preflight and recovery, Wrangler JSON-output recovery, key preservation, access revocation, verification, rollback, and localhost preview DNS and HTTPS preparation. Links to dated implementation and deployment records."
 created: "2026-10-07"
 updated: "2026-11-01"
 ---
@@ -105,11 +105,23 @@ This command automatically prepares the database and server keys.
 
 ### When deployment fails while parsing Wrangler JSON
 
-If `scripts/deploy.mjs` reports `Unexpected non-whitespace character after JSON` after `No migrations to apply!`, the next step is the reserved `demo` username query. The old script parsed all captured stdout as one JSON document, so additional text or structured logs could stop deployment even when the query succeeded. [D1 command reference](https://developers.cloudflare.com/d1/wrangler-commands/#d1-execute).
+Check the exact source expression in the stack trace before attributing `Unexpected non-whitespace character after JSON` to Wrangler output. A failure after `No migrations to apply!` can also come from reading the local `.secrets.json`; that was confirmed in the follow-up on 2026-11-01. The previous raw stdout parser and an invalid local file can produce the same JavaScript error.
+
+`./scripts/secrets.mjs` now validates local secrets immediately after setup, before copying demo artifacts or making any Cloudflare call. The file must contain exactly one JSON object with string values, including the existing signing key as a JSON-encoded string. Add provider fields inside that object; do not append another complete object. Validation names the file and required format without printing its contents or rewriting credentials.
+
+To validate only the local file from `mewlink/`, without deployment:
+
+```bash
+node --input-type=module -e "import { readDeploymentSecrets } from './scripts/secrets.mjs'; await readDeploymentSecrets('.secrets.json'); console.log('Secrets JSON is valid')"
+```
+
+Before repairing an invalid file, preserve a mode-0600 backup in an ignored, protected directory such as `.tmp/`. Identical repeated objects can be reduced to one only after checking that all values agree; conflicting objects need explicit reconciliation. Preserve the existing provider credentials and signing key. Never print secret values in diagnostics or add either file to Git.
+
+For an error originating in captured command output, the old script parsed all stdout as one JSON document, so additional text or structured logs could stop deployment even when the query succeeded. [D1 command reference](https://developers.cloudflare.com/d1/wrangler-commands/#d1-execute).
 
 The deployment runner now sets `WRANGLER_LOG=log` for captured commands, waits for stdout and stderr to close, and extracts exactly one JSON result array while skipping surrounding text and complete structured log objects. Database listing, the username query, and secret listing use this parser. Missing or ambiguous result arrays and failed commands stop deployment; the existing username and signing-key protections remain in force. Errors identify the command without echoing captured output.
 
-Run `npm run test:deploy` inside `mewlink/` to check this behavior without Cloudflare access, migration, or deployment. After updating the script, the operator can rerun `npm run deploy` from that folder. Applied migrations remain applied; this error occurs before the Worker upload. Do not reset the database or regenerate signing keys to recover from an output parsing error. See the [local verification record](../work/mewlink-deploy-json.md) for the scope checked.
+Run `npm run test:deploy` inside `mewlink/` to check this behavior without Cloudflare access, migration, or deployment. After updating the script, the operator can rerun `npm run deploy` from that folder. Applied migrations remain applied; both parsing checks occur before the Worker upload. Do not reset the database or regenerate signing keys to recover from an output parsing error. See the [local verification record](../work/mewlink-deploy-json.md) for the scope checked.
 
 ### When ERR_TOO_MANY_REDIRECTS Appears
 
