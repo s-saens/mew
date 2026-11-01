@@ -4,11 +4,11 @@ parent: "mew-settings"
 title: "Panel Layout, Mobile, and State Restoration"
 status: "implemented"
 created: "2026-09-18"
-updated: "2026-11-01"
+updated: "2026-11-02"
 status_hash: "018bca32e486b43c386b29de3e2087d6d1447fae6a33abc99d745367947a9382"
 files: ["src/components/tool-presentation-toggle.tsx", "src/components/SettingsModal.tsx", "src/hooks/use-refresh-tasks.ts", "src/hooks/usePresence.ts", "src/components/project-loading-overlay.tsx", "src/App.tsx", "src/components/DockWorkspace.tsx", "src/components/EditorPane.tsx", "src/components/TabBar.tsx", "src/components/AgentPanel.tsx", "src/components/mobile-dock.tsx", "src/components/layout-presets.tsx", "src/utils/layout-presets.ts", "server/layout-icon-cli.ts", "src/utils/mobile-dock.ts", "src/hooks/use-mobile-keyboard.ts", "src/hooks/use-mobile-panel-swipe.ts", "src/hooks/useTabs.ts", "server/userUiState.ts"]
 commits: []
-description: "Feature contract covering installed-app safe areas for the header, panels, Dock and dialogs, automatic scrolling to active and focused tabs in all horizontal tab bars, chevron buttons with theme-background-colored shadows in directions with remaining scroll space, constant-speed movement while held, normal wheel scrolling, returning to the most recently active tab when closing an editor tab, per-tab document navigation, maximizing panels by double-clicking their handles, renaming agent and terminal tabs by double-clicking, hiding and restoring surrounding panels and the side dock while maximized, and docking and splitting work panels. Explains panel switching through the independently positioned desktop and mobile docks, 20px dock swipes and 30px content-area tab switching that preserves internal horizontal scrolling, the Plain modifier key bar with arrow gestures reserved for cursor movement, panel visit history, layout presets shared by the header and account settings, per-device layout storage, loading and focus on session return, the restored task panel, and migration of removed browser storage nodes."
+description: "Feature contract covering native page-pinch suppression with editor-local font zoom, installed-app safe areas for the header, panels, Dock and dialogs, automatic scrolling to active and focused tabs in all horizontal tab bars, chevron buttons with theme-background-colored shadows in directions with remaining scroll space, constant-speed movement while held, normal wheel scrolling, returning to the most recently active tab when closing an editor tab, per-tab document navigation, maximizing panels by double-clicking their handles, renaming agent and terminal tabs by double-clicking, hiding and restoring surrounding panels and the side dock while maximized, and docking and splitting work panels. Explains panel switching through the independently positioned desktop and mobile docks, 20px dock swipes and 30px content-area tab switching that preserves internal horizontal scrolling, the Plain modifier key bar with arrow gestures reserved for cursor movement, panel visit history, layout presets shared by the header and account settings, per-device layout storage, loading and focus on session return, the restored task panel, and migration of removed browser storage nodes."
 상위파일:
   - "MOC.md"
   - "_appearance-accounts-operations.md"
@@ -46,6 +46,13 @@ description: "Feature contract covering installed-app safe areas for the header,
 - Use the dock and top menu to operate panels on desktop and mobile. The general browser menu item and dock icon have been removed. Use the relevant task's screen to log in, and open localhost apps through `/포트번호` in the address. Keep the desktop file explorer fixed on the left, with a button centered on its right boundary to collapse and expand it. Provide move and resize handles for note and task popups.
 - On desktop, double-clicking a shared panel move handle maximizes its content; double-clicking again restores the original layout.
 - Do not cover project or panel tab bars or the dock; Esc also restores the layout.
+
+### Touch zoom
+
+- Keep the workspace at its initial page scale during native two-finger touch gestures. Add `maximum-scale=1` to the existing viewport declaration while retaining its safe-area and keyboard settings; cancel native multi-touch page gestures where browsers ignore the viewport limit.
+- Cancel the browser default without stopping event propagation, so code/text and Markdown Hotview/Plain editors can still handle their own font-size pinch gestures. One-finger scrolling and selection remain available.
+- This policy does not intercept Ctrl/Cmd+wheel or browser keyboard zoom. It does not promise control over OS accessibility magnification or touch events inside separately embedded documents.
+- Current editor behavior belongs to [code/text touch zoom](../document-code-media-editing/code-text-editing-and-document-search.md#touch-zoom) and [Markdown touch zoom](../document-code-media-editing/markdown-hotview-source-and-properties.md#touch-zoom). Physical-device browser behavior requires separate verification.
 
 ### Boundaries and limitations
 

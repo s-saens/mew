@@ -60,6 +60,7 @@ class PinchZoom {
       offsetY: coords ? pair.y - coords.top : 0,
     }
     this.active = true
+    view.scrollDOM.dataset.codePinching = 'true'
     this.consume(event)
   }
 
@@ -78,15 +79,18 @@ class PinchZoom {
     view.requestMeasure()
     const win = scroller.ownerDocument.defaultView!
     win.cancelAnimationFrame(this.frame)
-    // CodeMirror adjusts its own scroll anchor during measurement. Apply ours after that pass.
+    // CodeMirror can schedule a second measurement while materializing the anchor.
+    // Apply our position after both passes have restored its internal scroll anchor.
     this.frame = win.requestAnimationFrame(() => {
-      this.frame = 0
-      if (gesture.position === null) return
-      const coords = view.coordsAtPos(Math.min(gesture.position, view.state.doc.length))
-      if (!coords) return
-      const scale = fontSize / gesture.fontSize
-      scroller.scrollTop += coords.top + gesture.offsetY * scale - pair.y
-      scroller.scrollLeft += coords.left + gesture.offsetX * scale - pair.x
+      this.frame = win.requestAnimationFrame(() => {
+        this.frame = 0
+        if (gesture.position === null) return
+        const coords = view.coordsAtPos(Math.min(gesture.position, view.state.doc.length))
+        if (!coords) return
+        const scale = fontSize / gesture.fontSize
+        scroller.scrollTop += coords.top + gesture.offsetY * scale - pair.y
+        scroller.scrollLeft += coords.left + gesture.offsetX * scale - pair.x
+      })
     })
   }
 
@@ -95,13 +99,17 @@ class PinchZoom {
     this.consume(event)
     this.gesture = null
     // Consume the remaining finger as well, so ending a pinch cannot place the caret.
-    if (event.touches.length === 0) this.active = false
+    if (event.touches.length === 0) {
+      this.active = false
+      delete this.view.scrollDOM.dataset.codePinching
+    }
   }
 
   private cancel = (event: TouchEvent) => {
     if (this.active) this.consume(event)
     this.gesture = null
     this.active = false
+    delete this.view.scrollDOM.dataset.codePinching
   }
 
   destroy() {
@@ -111,6 +119,7 @@ class PinchZoom {
     scroller.removeEventListener('touchmove', this.move)
     scroller.removeEventListener('touchend', this.end)
     scroller.removeEventListener('touchcancel', this.cancel)
+    delete scroller.dataset.codePinching
     scroller.style.fontSize = this.previousFontSize
   }
 }

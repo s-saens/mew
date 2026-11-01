@@ -4,11 +4,11 @@ parent: "mew-editor"
 title: "Code and text editing and in-document search"
 status: "implemented"
 created: "2026-09-18"
-updated: "2026-10-31"
+updated: "2026-11-02"
 status_hash: "4d8fe6026b3341576de674bb4b2ae85cd1124f3eb3638b2e33e15d8697ed1fc1"
 files: ["src/components/EditorPane.tsx", "src/hooks/useTabs.ts", "src/components/CodePane.tsx", "src/utils/codeSearch.ts", "src/utils/code-search-panel.ts", "src/utils/code-pinch-zoom.ts", "packages/editor/src/editor/EditorSearchBar.tsx"]
 commits: []
-description: "A feature contract covering line numbers, syntax highlighting, supported diagnostics for code and plain text, compact Find and collapsible Replace controls, result counts, search options, and keyboard behavior. Explains touch pinch zoom, immediate native mobile keyboard activation through body taps, always-visible mobile auxiliary keys floating over the document above the status bar with a rightmost inverted-T arrow cluster, and tab switching that preserves body horizontal scrolling."
+description: "A feature contract covering line numbers, syntax highlighting, supported diagnostics for code and plain text, compact Find and collapsible Replace controls, result counts, search options, and keyboard behavior. Explains editor-local touch pinch zoom independent of workspace page zoom, immediate native mobile keyboard activation through body taps, always-visible mobile auxiliary keys floating over the document above the status bar with a rightmost inverted-T arrow cluster, and tab switching that preserves body horizontal scrolling."
 상위파일:
   - "MOC.md"
   - "_document-code-media-editing.md"
@@ -48,9 +48,10 @@ description: "A feature contract covering line numbers, syntax highlighting, sup
 
 ### Touch zoom
 
-- In the CodeMirror file body and line number area, excluding `.md`·`.mdx`, the font size adjusts from 8 to 40px based on the ratio of the distance between two fingers. The toolbar and overall browser zoom remain unchanged.
+- In the CodeMirror file body and line number area, including Markdown Plain, the font size adjusts from 8 to 40px based on the ratio of the distance between two fingers. The toolbar and overall browser zoom remain unchanged.
 - Scrolling is adjusted to preserve the reading position between the fingers. One-finger scrolling, text selection, and keyboard editing retain their existing behavior.
 - Pinching does not change the body, selection, or undo history, or trigger autosave. Lifting the remaining finger after a pinch does not move the cursor either.
+- The workspace suppresses native page pinch zoom while preserving this editor-local font resizing. Ctrl/Cmd+wheel and browser keyboard zoom are outside that touch policy; see [workspace touch zoom](../appearance-accounts-operations/panel-layout-mobile-and-state-restoration.md#touch-zoom).
 - The size persists only in the open editor. If the editor is recreated, such as when switching files or toggling read-only mode, it returns to the default 14px.
 
 <!-- mew:implementation:start -->
@@ -76,7 +77,7 @@ description: "A feature contract covering line numbers, syntax highlighting, sup
 
 - `server/code-search-ui.test.ts` passed at 680px with Midnight and Korean, 390px with Rose and English, and 320px with Ocean and Japanese. Checks covered expanding find and replace, result counts, search options, recovery from regular expression errors, Previous, Next, Select All, IME input, keyboard navigation and closing, single and all replacements and undo, read-only mode, and preservation of input and expanded state after language changes. Horizontal overflow, button heights of at least 24px, shared tooltips, blocking Esc propagation, the `10000+` display for 10,001 results, the Select All limit, and continued navigation were also verified.
 
-- `server/code-pinch-zoom-ui.test.ts` verifies mobile touch zoom, size limits, preservation of reading position, browser zoom, body, selection, and undo history, read-only and plain-text support, and Markdown exclusion. It also checks one-finger input, cancellation, event cleanup after editor removal, and desktop scrolling. Safari and Chrome behavior on actual phones requires real-device checks.
+- `server/code-pinch-zoom-ui.test.ts` verifies mobile touch zoom, size limits, preservation of reading position, browser zoom, body, selection, and undo history, read-only and plain-text support, and Markdown Plain support. It also checks one-finger input, cancellation, event cleanup after editor removal, and desktop scrolling. Safari and Chrome behavior on actual phones requires real-device checks.
 
 - Use `server/editor-keyboard-ui.test.ts` to check that line 28 remains visible in the keyboard-reduced viewport, repeated resizing works, the status bar and auxiliary keys do not overlap, input works, height is restored, and desktop and reading scroll positions are preserved. The OS keyboard itself requires checking on a physical device.
 

@@ -60,6 +60,7 @@ import { DeleteLine } from './editor/deleteLine'
 import { LineFocus, lineFocusPositionAtLine, lineFocusSourceKey, listLevel } from './editor/lineFocus'
 import { getIncrementalMarkdown, IncrementalMarkdown } from './editor/incrementalMarkdown'
 import { VirtualBlocks, materializeVirtualPosition } from './editor/virtualBlocks'
+import { attachMarkdownPinchZoom } from './editor/pinchZoom'
 import { changedCaretPos } from './editor/undoCaret'
 import { SearchAndReplace } from './editor/searchExtension'
 import { CommentHighlight, commentRefreshKey, docTextWithMap, indexOfPos, type CommentThreadInput } from './editor/commentHighlight'
@@ -420,7 +421,7 @@ export const Editor = forwardRef<
     caretScrollFrameRef.current = requestAnimationFrame(() => {
       caretScrollFrameRef.current = null
       const scroller = containerRef.current
-      if (!scroller || !ed.isFocused) return
+      if (!scroller || !ed.isFocused || scroller.dataset.markdownPinching) return
       try {
         const caret = ed.view.coordsAtPos(ed.state.selection.head)
         const { top, bottom } = visibleEditorBounds(scroller)
@@ -1755,6 +1756,11 @@ export const Editor = forwardRef<
     // 원문 echo 뒤에도 native caret DOM을 맞춘다. 줄 번호는 plugin state 캐시를 재사용한다.
     editor.view.dispatch(editor.state.tr.setMeta(lineFocusSourceKey, { offset: lineNumberOffset }))
   }, [editor, body, lineNumberOffset])
+
+  useEffect(() => {
+    if (!editor || editor.isDestroyed || !containerRef.current) return
+    return attachMarkdownPinchZoom(editor.view, containerRef.current)
+  }, [editor])
 
   // 방을 처음 만든 클라이언트가 이미 로드해 둔 탭 내용(body)으로 Y.XmlFragment를 시딩한다
   // (디스크 재조회 아님) — 이미 누군가 협업 중이던 방이면 fragment가 비어 있지 않으므로

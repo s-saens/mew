@@ -9,6 +9,7 @@ import { applyThemePalette, loadThemeSettings } from './utils/theme-color.ts'
 import { startNetworkTracking } from './utils/network-tracking.ts'
 import { startScrollbarGradientTracking } from './utils/scrollbar-gradient.ts'
 import { startScrollbarTouchDragging } from './utils/scrollbar-touch.ts'
+import { startWorkspacePinchZoom } from './utils/workspace-pinch-zoom.ts'
 import { StartupScreen } from './components/startup-screen.tsx'
 import { getAppRuntime } from './runtime/app-runtime.ts'
 import { startAppInstallTracking } from './utils/app-install.ts'
@@ -17,6 +18,9 @@ import { parsePublicSharePath } from './utils/public-share-route.ts'
 import { appRoute } from '../shared/app-route.ts'
 
 startAppInstallTracking()
+
+const stopWorkspacePinchZoom = startWorkspacePinchZoom()
+if (import.meta.hot) import.meta.hot.dispose(stopWorkspacePinchZoom)
 
 const stopScrollbarGradientTracking = startScrollbarGradientTracking()
 if (import.meta.hot) import.meta.hot.dispose(stopScrollbarGradientTracking)

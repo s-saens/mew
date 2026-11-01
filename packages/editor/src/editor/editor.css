@@ -4,12 +4,12 @@
   font-family: var(--mew-font-markdown, 'Noto Serif KR', ui-serif, Georgia, serif);
   /* 좌우 여백은 표의 줄 번호가 거터 위치를 되짚는 데 쓴다(아래 .tableWrapper::before) */
   --mew-pad-x: 2rem;
-  --mew-body-line-height: calc(15px * 1.7);
+  --mew-body-line-height: var(--mew-markdown-zoom-line-height, calc(15px * 1.7));
   padding: var(--mew-pad-x);
   padding-bottom: calc(var(--mew-pad-x) + var(--editor-key-bar-height, 0px));
   min-height: 100%;
   color: var(--color-ink);
-  font-size: 15px;
+  font-size: var(--mew-markdown-zoom-size, 15px);
   line-height: var(--mew-body-line-height);
 }
 .tiptap::selection,

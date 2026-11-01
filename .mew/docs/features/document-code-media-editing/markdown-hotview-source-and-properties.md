@@ -4,11 +4,11 @@ parent: "mew-editor"
 title: "Markdown Hotview, source, and document properties"
 status: "implemented"
 created: "2026-09-18"
-updated: "2026-11-01"
+updated: "2026-11-02"
 status_hash: "2741d359b18c61eecb53b8ce0ba2862f0f42c088d7d02cf55c88a23d1d44a98e"
 files: ["packages/editor/src/editor/FrontmatterSelect.tsx", "server/frontmatter-options.ts", "src/hooks/useTabs.ts", "src/components/EditorPane.tsx", "src/components/markdown-error-boundary.tsx", "packages/editor/src/Editor.tsx", "packages/editor/src/editor/FrontmatterPanel.tsx", "src/components/TableOfContents.tsx"]
 commits: []
-description: "A feature contract covering Markdown Hotview and Plain editing, per-block computation caching and Pretext-based DOM virtualization, preservation of code-block line breaks and internal horizontal scrolling, retaining the line being read when switching views and cursor restoration boundaries in the properties area, checkboxes, document tables of contents, frontmatter properties, and navigation through backlinks and parent-file arrows beside the title. Includes parent-file exclusion, cross-project references, YAML preservation, native mobile keyboard activation through body taps, always-visible mobile auxiliary keys floating over the document above the status row, project-owned options shared by Documents and Files with legacy migration, and source-saving boundaries."
+description: "A feature contract covering Markdown Hotview and Plain editing, editor-local touch pinch font zoom, per-block computation caching and Pretext-based DOM virtualization, preservation of code-block line breaks and internal horizontal scrolling, retaining the line being read when switching views and cursor restoration boundaries in the properties area, checkboxes, document tables of contents, frontmatter properties, and navigation through backlinks and parent-file arrows beside the title. Includes parent-file exclusion, cross-project references, YAML preservation, native mobile keyboard activation through body taps, always-visible mobile auxiliary keys floating over the document above the status row, project-owned options shared by Documents and Files with legacy migration, and source-saving boundaries."
 상위파일:
   - "MOC.md"
   - "_document-code-media-editing.md"
@@ -40,6 +40,12 @@ description: "A feature contract covering Markdown Hotview and Plain editing, pe
 - On mobile, tapping an editable Hotview, Plain, or code body focuses it immediately and lets the browser open the keyboard. There is no floating keyboard button or separate activation step. Moving the cursor or using auxiliary keys does not force keyboard dismissal; native selection and the existing selection menu remain available. See [Mobile Editor and Keyboard](../../development/ui-contracts.md#mobile-editor-and-keyboard).
 
 - When the mobile keyboard opens, reduce the editor height to keep the tapped cursor line and the status bar showing the selected character count and file size above the keyboard.
+
+### Touch zoom
+
+- Two-finger pinching in the Hotview body adjusts document text from 8 to 40px and scales line height without resizing the workspace toolbar or page. Gutter numbers retain their existing 11px size. Markdown Plain uses the [CodeMirror touch zoom contract](code-text-editing-and-document-search.md#touch-zoom). Read-only documents support the same reading gesture.
+- Keep the reading position near the pinch midpoint. A pinch must not edit content, change selection or undo history, or trigger autosave. Ordinary one-finger scrolling, selection, and input retain their existing behavior.
+- Zoom lasts until the editor is recreated and remains temporary display state; it is not saved to the Markdown source or account font preferences. The [workspace touch policy](../appearance-accounts-operations/panel-layout-mobile-and-state-restoration.md#touch-zoom) suppresses native page pinch zoom while leaving editor handlers available.
 
 ### Boundaries and limitations
 

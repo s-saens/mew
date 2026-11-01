@@ -411,7 +411,7 @@ export const CodePane = forwardRef<
         EditorState.allowMultipleSelections.of(true),
         syntaxHighlighting(highlight),
         theme,
-        ...(['md', 'mdx'].includes(extOf(path)) ? [] : [codePinchZoom()]),
+        codePinchZoom(),
         ...languageFor(path),
         ...(['md', 'mdx'].includes(extOf(path)) && databaseLinksEnabled ? databaseLinks(reference => onOpenDatabaseRef.current?.(reference)) : []),
         ...(isProse(path) ? [EditorView.lineWrapping] : []),
@@ -468,7 +468,7 @@ export const CodePane = forwardRef<
     const stopViewport = observeEditorViewport(container, () => view.requestMeasure({
       key: container,
       read: () => {
-        if (!view.hasFocus) return 0
+        if (!view.hasFocus || view.scrollDOM.dataset.codePinching) return 0
         const caret = view.coordsAtPos(view.state.selection.main.head)
         if (!caret) return 0
         const { top, bottom } = visibleEditorBounds(view.scrollDOM)

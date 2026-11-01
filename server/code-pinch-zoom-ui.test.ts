@@ -7,13 +7,15 @@ import { compile } from '@tailwindcss/node'
 import { chromium } from 'playwright-core'
 import { domBrowserExecutable } from './browser-dom-executable.ts'
 
-test('code files pinch independently while preserving editing, scrolling and Markdown gestures', { skip: !domBrowserExecutable(), timeout: 60_000 }, async () => {
+test('code, text and Markdown Plain pinch independently while preserving editing and scrolling', { skip: !domBrowserExecutable(), timeout: 60_000 }, async () => {
   const root = path.resolve(import.meta.dirname, '..')
   const content = Array.from({ length: 120 }, (_, i) => `const line${i + 1} = "${'Long code line for horizontal scrolling. '.repeat(5)}";`).join('\n')
   const source = `
 import React from ${JSON.stringify(import.meta.resolve('react'))};
 import {createRoot} from ${JSON.stringify(import.meta.resolve('react-dom/client'))};
 import {EditorView} from '@codemirror/view';
+import {startWorkspacePinchZoom} from ${JSON.stringify(path.join(root, 'src/utils/workspace-pinch-zoom.ts'))};
+startWorkspacePinchZoom();
 import {CodePane} from ${JSON.stringify(path.join(root, 'src/components/CodePane.tsx'))};
 function Fixture(){
  const [value,setValue]=React.useState(${JSON.stringify(content)}),[file,setFile]=React.useState('fixture.ts'),[readOnly,setReadOnly]=React.useState(false);
@@ -22,6 +24,7 @@ function Fixture(){
  <main style={{height:window.innerHeight-40}}><CodePane path={file} value={value} onChange={setValue} readOnly={readOnly}/></main></>;
 }
 createRoot(document.getElementById('root')).render(<Fixture/>);`
+  const viewport = (await fs.readFile(path.join(root, 'index.html'), 'utf8')).match(/<meta name="viewport"[^>]+>/)![0]
   const styles: string[] = [], candidates = [source]
   const bundle = await build({ input: 'virtual:code-pinch.tsx', write: false, platform: 'browser', output: { format: 'esm', codeSplitting: false },
     onwarn(warning, defaultHandler) { if (warning.code !== 'MODULE_LEVEL_DIRECTIVE') defaultHandler(warning) },
@@ -48,7 +51,7 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
       await page.route('http://mew-code-pinch.test/**', route => route.fulfill(route.request().url().includes('/api/')
         ? { contentType: 'application/json', body: '[]' }
         : route.request().url().endsWith('/app.js') ? { contentType: 'text/javascript', body: chunk.code }
-        : { contentType: 'text/html', body: `<!doctype html><html class="dark"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}</style><div id="root"></div><script type="module" src="/app.js"></script></html>` }))
+        : { contentType: 'text/html', body: `<!doctype html><html class="dark"><meta charset="utf-8">${viewport}<style>${css}</style><div id="root"></div><script type="module" src="/app.js"></script></html>` }))
       await page.goto('http://mew-code-pinch.test/')
       const editor = page.locator('.cm-content'), scroller = page.locator('.cm-scroller')
       await editor.waitFor()
@@ -88,8 +91,13 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
         continue
       }
 
+      // Finish focus/keyboard viewport updates before positioning the reading anchor.
+      await settle()
+      await settle()
       await scroller.evaluate(el => { el.scrollTop = 500; el.scrollLeft = 150 })
       await settle()
+      assert.equal(await page.evaluate('window.fixtureView().hasFocus'), true, 'trusted pinch preserves a focused editor')
+      const beforePinchScroll = await scroller.evaluate(el => el.scrollTop)
       const anchor = await scroller.evaluate((el, point) => {
         const view = (el.ownerDocument.defaultView as any).fixtureView()
         const pos = view.posAtCoords(point)
@@ -108,7 +116,7 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
       assert.equal(await scroller.evaluate(el => el.ownerDocument.defaultView!.visualViewport!.scale), scale, 'pinch changes the editor rather than the browser viewport')
       const afterAnchor = await scroller.evaluate((el, pos) => (el.ownerDocument.defaultView as any).fixtureView().coordsAtPos(pos), anchor.pos)
       assert.ok(anchor.coords && afterAnchor && Math.abs(afterAnchor.top - anchor.coords.top) < 35, `pinch keeps the same source near the gesture midpoint: ${JSON.stringify({ anchor, afterAnchor })}`)
-      assert.ok(await scroller.evaluate(el => el.scrollTop) > 500, 'zoom preserves a scrolled reading position')
+      assert.ok(await scroller.evaluate(el => el.scrollTop) > beforePinchScroll, 'zoom preserves a scrolled reading position')
 
       const beforePan = await scroller.evaluate(el => el.scrollTop), zoomedSize = await fontSize()
       const panPoint = (dy: number) => [{ x: center.x, y: box.y + 550 + dy, id: 1 }]
@@ -136,8 +144,11 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
       assert.equal(await emit('touchmove', [points(120)[0]]), true, 'the remaining finger cannot accidentally move the caret')
       await emit('touchend', [])
 
-      await emit('touchstart', points(100)); await emit('touchcancel', [])
-      assert.equal(await emit('touchmove', points(160)), false, 'cancelled gestures stop intercepting touches')
+      await emit('touchstart', points(100))
+      assert.equal(await scroller.getAttribute('data-code-pinching'), 'true')
+      await emit('touchcancel', [])
+      assert.equal(await scroller.getAttribute('data-code-pinching'), null, 'cancel releases the viewport caret guard')
+      assert.equal(await emit('touchmove', points(160)), true, 'cancelled editor gestures still suppress native page pinch')
       assert.equal(await fontSize(), 8)
       await editor.press('Control+z')
       assert.equal(await page.evaluate('window.fixtureValue'), content, 'pinch preserves undo history')
@@ -153,9 +164,10 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
       for (const name of ['Markdown', 'MDX']) {
         await page.getByRole('button', { name, exact: true }).click()
         assert.equal(await fontSize(), 14)
-        assert.equal(await emit('touchstart', points(100)), false, `${name} Plain retains its existing gestures`)
+        assert.equal(await emit('touchstart', points(100)), true, `${name} Plain handles editor pinch`)
         await emit('touchmove', points(160)); await emit('touchend', [])
-        assert.equal(await fontSize(), 14, `${name} is excluded from code pinch zoom`)
+        assert.ok(await fontSize() > 20, `${name} Plain supports editor-local zoom`)
+        assert.equal(await page.evaluate('window.fixtureValue'), content, `${name} zoom leaves source unchanged`)
       }
       await page.getByRole('button', { name: 'Text', exact: true }).click()
       await scroller.evaluate(el => { el.scrollTop = 2000 })
