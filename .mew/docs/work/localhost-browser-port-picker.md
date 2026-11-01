@@ -1,6 +1,6 @@
 ---
 title: "Localhost browser entry and host port selection"
-description: "Records the 2026-11-01 hamburger entry, host-wide TCP port list, disabled Mew ports and live navigation guard, browser start-page lifecycle, regression checks, screenshots, and the boundary before user application."
+description: "Records the 2026-11-01 hamburger entry, host-wide TCP port list, disabled Mew ports and live navigation guard, browser start-page lifecycle, regression checks, screenshots, the follow-up diagnosis of a stale running port API, restart guidance, and the boundary before user application."
 created: "2026-11-01"
 updated: "2026-11-01"
 ---
@@ -41,3 +41,20 @@ The first integrated panel run exposed a missing test-transport export after add
 The build updated local UI assets. No deployment, launcher execution, or Mew server start, stop, or restart was performed; the user applies the new API and listener registry to the running host. Current contracts document the endpoint and its existing Mewlink transport path; actual external-network Mewlink access and physical devices were not verified.
 
 Discovery is a snapshot of OS-visible TCP listeners, not an HTTP health check. Some selectable ports may serve other protocols, and ports can close after listing. LAN-only bindings, separate network namespaces, actual macOS/Windows execution, and OS permission-dependent visibility remain unverified or excluded as documented. Returning to the list discards the previous page's temporary login/storage. Existing unrelated worktree changes were excluded from this task.
+
+
+## 2026-11-01 — Missing API in the running server
+
+The reported screen displayed **Could not load ports**. Direct read-only checks found that the running production server returned 404 HTML for `/api/dom-browser/ports`, while the development listener returned its SPA HTML with status 200. Running the current discovery helper separately returned live host listeners successfully. This identifies a missing API in the running server, rather than a successful empty scan: the UI build was current while the server's in-memory routes were still from an earlier version. No authentication bypass or server lifecycle operation was used to diagnose it.
+
+The list now distinguishes 404 and successful HTML responses from ordinary scan/request errors and asks the user to restart Mew with the latest code. A retry clears the message once the endpoint returns the expected JSON. Updated `src/components/DomBrowserPorts.tsx`, its browser regression, the shared translation key, the current implementation contract, and the public guide. Unrelated concurrent translation and task-agent edits were preserved.
+
+The new regression failed before the fix. The final combined run passed 19 tests, including mobile 404 JSON, 404 HTML, 200 HTML, recovery to a valid list, existing 503/invalid-response errors, cancellation, browser interaction, translation coverage, and backend discovery checks:
+
+```bash
+node --test src/components/dom-browser-ports.browser.test.ts src/components/dom-browser-panel.browser.test.ts packages/ui/src/i18n.test.ts server/dom-browser-ports.test.ts
+```
+
+Scoped oxlint and the UI detector passed with no findings. `npm run build` passed with the large-chunk warning after a first attempt encountered a temporary type mismatch in a concurrently edited AgentPanel; no unrelated source was changed for this task. Documentation and diff checks passed.
+
+The diagnostic and error-message fix does not apply server-side code to an already running process. Actual port-list access remains pending the user's server restart under the repository execution rules; no deployment, launcher run, or server start/stop/restart was performed.

@@ -1,6 +1,6 @@
 ---
 title: "Login Screen, Browser, and Android"
-description: "Explains the internal DOM browser for localhost apps and external HTTP(S) websites, host-wide port selection from the hamburger menu with Mew ports disabled, address entry, host Chromium prerequisites and limits, separate login video, retained proxy URLs, and Android environment checks and gateways."
+description: "Explains the internal DOM browser for localhost apps and external HTTP(S) websites, host-wide port selection from the hamburger menu with Mew ports disabled, recovery when the running server lacks the port API, address entry, host Chromium prerequisites and limits, separate login video, retained proxy URLs, and Android environment checks and gateways."
 created: "2026-09-04"
 updated: "2026-11-01"
 ---
@@ -16,6 +16,8 @@ This video screen is for login and account management. The localhost DOM browser
 ## Find running localhost apps
 
 Choose **Menu → Localhost browser** to list ports currently listening on the Mew host. Click a port to open it in the internal browser. The list includes services started outside Mew's command buttons; use refresh to update it. A port labelled **Mew** is disabled, as are reserved ports marked unavailable. The list shows TCP listeners, so a non-web service may not open as a webpage.
+
+If the list asks you to restart Mew with the latest code, the UI has loaded but the running server does not provide the port-list API. Apply the current server code with your normal server restart procedure, then retry the list. A UI build alone does not reload server routes.
 
 The list itself starts no host browser or app. In an open page, choose **Open ports** in the toolbar to return to the list. This closes that page's temporary browser session and its stored login state. You can still enter a full URL in the address field. The same localhost-app permission controls this menu and the Browser dock.
 

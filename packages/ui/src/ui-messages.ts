@@ -5,6 +5,7 @@ export const uiMessages = {
   "열려 있는 포트": ["Open ports", "开放端口", "開いているポート"],
   "열려 있는 포트가 없습니다.": ["No open ports.", "没有开放的端口。", "開いているポートはありません。"],
   "포트 목록을 불러오지 못했습니다.": ["Could not load ports.", "无法加载端口列表。", "ポート一覧を読み込めませんでした。"],
+  "포트 목록을 사용하려면 Mew 서버를 최신 코드로 다시 시작해 주세요.": ["Restart the Mew server with the latest code to load ports.", "请使用最新代码重启 Mew 服务器以加载端口列表。", "ポート一覧を読み込むには、最新のコードで Mew サーバーを再起動してください。"],
   "Mew": ["Mew", "Mew", "Mew"],
   "사용 불가": ["Unavailable", "不可用", "利用不可"],
   "이 페이지는 잠시 길을 잃었어요.": ["This page has wandered off.", "这个页面迷路了。", "このページは迷子になったようです。"],

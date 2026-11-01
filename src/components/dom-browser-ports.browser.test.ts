@@ -101,6 +101,27 @@ test('localhost browser start page lists safe ports, blocks Mew and recovers wit
     } finally { await page.close() }
   })
 
+  await t.test('missing port APIs explain the required server restart and recover after it is available', async () => {
+    for (const missing of [
+      { status: 404, json: { error: 'Not found' } },
+      { status: 404, contentType: 'text/html', body: '<!doctype html><html><body>Mew</body></html>' },
+      { status: 200, contentType: 'text/html', body: '<!doctype html><html><body>Mew</body></html>' },
+    ]) {
+      const { page, errors, request } = await fixture(390)
+      try {
+        await (await request(0)).fulfill(missing)
+        await page.getByRole('alert').getByText('Restart the Mew server with the latest code to load ports.', { exact: true }).waitFor({ timeout: 700 })
+        assert.equal(await page.getByText('No open ports.', { exact: true }).count(), 0)
+        assert.deepEqual(await page.evaluate('window.opened'), [])
+        await page.getByRole('button', { name: 'Retry', exact: true }).click()
+        await (await request(1)).fulfill({ json: { ports: [{ port: 5173, kind: 'app' }] } })
+        await page.getByRole('button', { name: 'localhost:5173', exact: true }).waitFor()
+        assert.equal(await page.getByRole('alert').count(), 0)
+        assert.deepEqual(errors, [])
+      } finally { await page.close() }
+    }
+  })
+
   await t.test('refresh aborts the prior request and rejects stale results', async () => {
     const { page, errors, request } = await fixture(1100, true)
     try {
