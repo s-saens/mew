@@ -91,7 +91,7 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><I18nProvid
 
     await tab.click()
     await visible()
-    await deepFolder.click()
+    await deepFolder.dblclick()
     await row.waitFor({ state: 'detached' })
     await refresh.click()
     await page.waitForTimeout(100)
@@ -117,7 +117,7 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><I18nProvid
     await refresh.click()
     await page.waitForTimeout(100)
     assert.equal(await scroller.evaluate(el => el.scrollTop), 0, 'nested Documents also preserves manual scrolling across refreshes')
-    await deepFolder.click()
+    await deepFolder.dblclick()
     await row.waitFor({ state: 'detached' })
     await refresh.click()
     await page.waitForTimeout(100)

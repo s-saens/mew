@@ -1,13 +1,13 @@
 ---
 title: "Explorer selection and explicit opening"
-description: "Separates project explorer selection from opening with single-click selection, double-click or Enter opening, modifier multiselection, and menus bound to explicit selection. Supersedes the single-click Documents navigation in migrated decision 0191 while preserving its storage model."
+description: "Separates project explorer selection from opening with single-click selection, double-click or Enter opening, modifier multiselection, and menus bound to explicit selection. Supersedes the single-click Documents navigation in migrated decision 0191 while preserving its storage model. ADR 0113 supersedes plain-click Files folder expansion."
 created: "2026-11-01"
-updated: "2026-11-01"
+updated: "2026-11-02"
 ---
 
 ## Status
 
-Accepted. Supersedes the click and Ctrl/Cmd+click opening behavior in [0191](../history/decisions/0191-mew-documents-parent-and-child-pages.md). Its representative-file structure, link preservation, and editor data protection remain.
+Accepted. [ADR 0113](0113-explicit-folder-expansion.md) supersedes plain-click Files folder expansion; the other selection and opening rules remain. Supersedes the click and Ctrl/Cmd+click opening behavior in [0191](../history/decisions/0191-mew-documents-parent-and-child-pages.md). Its representative-file structure, link preservation, and editor data protection remain.
 
 ## Context
 

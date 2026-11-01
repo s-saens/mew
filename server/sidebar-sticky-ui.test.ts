@@ -112,7 +112,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
         assert.ok(revealed.y>=stackTop+84-1,JSON.stringify({mobile,docs,revealed,stackTop}));
         assert.ok(revealed.y+revealed.height<=listBox.y+listBox.height);
         if(docs) await page.locator('[data-document-page="parent/child"] > [data-tree-sticky-depth] button[aria-expanded]').click();
-        else await page.locator('[data-path="parent/child"]').click();
+        else await page.locator('[data-path="parent/child"]').dblclick();
         assert.equal(await page.locator('[data-tree-sticky-depth]').count(),1,'closing a pinned ancestor removes descendant headers');
       }
     }

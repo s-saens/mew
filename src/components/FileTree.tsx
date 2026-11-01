@@ -326,7 +326,7 @@ function Node({ node, depth, ctx }: { node: TreeNode; depth: number; ctx: NodeCt
   function handleClick(event: React.MouseEvent) {
     if (touch.consumeClick() || event.detail > 1 && !event.shiftKey && !event.ctrlKey && !event.metaKey) return
     ctx.selectNode(node.path, node.type, event)
-    if (node.type === 'dir' && !ctx.documentPages && !event.shiftKey && !event.ctrlKey && !event.metaKey) {
+    if (node.type === 'dir' && !ctx.documentPages && (event.target as Element).closest('[data-folder-toggle]') && !event.shiftKey && !event.ctrlKey && !event.metaKey) {
       ctx.toggleDir(node.path)
     }
   }
@@ -335,6 +335,7 @@ function Node({ node, depth, ctx }: { node: TreeNode; depth: number; ctx: NodeCt
     if (event.shiftKey || event.ctrlKey || event.metaKey || touch.consumeClick()) return
     if (ctx.documentPages && !node.project && (node.type === 'dir' || /\.md$/i.test(node.name))) ctx.openPage(node, { replaceActive: true, preview: false })
     else if (node.type === 'file') ctx.onSelect(node.path, { preview: false })
+    else if (!(event.target as Element).closest('[data-folder-toggle]')) ctx.toggleDir(node.path)
   }
 
   function handleContextMenu(e: React.MouseEvent) {
@@ -507,11 +508,14 @@ function Node({ node, depth, ctx }: { node: TreeNode; depth: number; ctx: NodeCt
             onDragStart={handleDragStart}
             onDragEnd={ctx.endDrag}
             onClick={handleClick}
+            onDoubleClick={handleDoubleClick}
             {...touchProps}
             className={`flex min-w-0 ${projectLink || node.path === ctx.documentsFolder?.path ? 'max-w-[calc(100%-28px)]' : 'flex-1'} items-center gap-1.5 rounded px-2 py-1 text-left text-sm font-medium text-ink-secondary select-none [-webkit-touch-callout:none] ${projectLink || node.path === ctx.documentsFolder?.path ? 'after:absolute after:inset-0 after:rounded' : ''} before:absolute before:inset-0 before:-z-10 before:rounded data-[touch-holding=true]:before:bg-surface-raised data-[touch-dragging=true]:before:bg-accent/15 data-[touch-dragging=true]:before:ring-1 data-[touch-dragging=true]:before:ring-accent ${selected ? 'hover:before:bg-accent/25' : 'hover:before:bg-surface-raised'} focus-visible:outline-none focus-visible:before:outline-2 focus-visible:before:outline-accent ${isDropTarget ? 'before:bg-accent/15 before:ring-1 before:ring-accent' : selected ? 'before:bg-accent/20' : isMenuTarget ? 'before:bg-surface-raised' : ''}`}
             style={{ paddingLeft: `${depth * 14 + 8}px`, scrollMarginTop: `${depth * 1.75}rem` }}
           >
-            {node.project && node.icon ? <ProjectIcon icon={node.icon} size={14} /> : <FolderTypeIcon open={isOpen} />}
+            <span data-folder-toggle aria-hidden="true" className="relative z-10 flex shrink-0 items-center justify-center">
+              {node.project && node.icon ? <ProjectIcon icon={node.icon} size={14} /> : <FolderTypeIcon open={isOpen} />}
+            </span>
             <span className="min-w-0 truncate">{node.name}</span>
             {node.project && (
               <span className="ml-1 rounded bg-accent/15 px-1 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-accent">

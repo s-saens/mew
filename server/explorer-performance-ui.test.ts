@@ -54,7 +54,7 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><I18nProvid
       await page.waitForFunction('!!window.waiting.folder')
       assert.deepEqual(await page.evaluate('window.loads'), ['folder'], 'page name and expand arrow share the pending request')
       await page.evaluate("window.waiting.folder(window.items('folder'));delete window.waiting.folder;window.block=false")
-    } else await folder.click()
+    } else await folder.dblclick()
     await page.locator('[data-path="folder/item-0000.md"]').waitFor()
     await page.waitForTimeout(80)
     assert.deepEqual(await page.evaluate('window.loads'), ['folder'], 'cold expansion makes one request')

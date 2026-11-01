@@ -1,8 +1,8 @@
 ---
 title: "Explorer selection and double-click opening"
-description: "Records the 2026-11-01 change to explorer selection, double-click opening, modifier multiselection, selection-bound menus, and bulk operations. Covers passing feature regressions, build, lint and isolated visual checks, a reproduced failure in an unchanged tree-persistence test fixture, and the boundary excluding deployment and physical-device verification."
+description: "Records the 2026-11-01 change to explorer selection, double-click opening, modifier multiselection, selection-bound menus, and bulk operations. Covers passing feature regressions, build, lint and isolated visual checks, a reproduced failure in an unchanged tree-persistence test fixture, and the boundary excluding deployment and physical-device verification. Includes the 2026-11-02 change to explicit Files folder expansion by double-click or icon click."
 created: "2026-11-01"
-updated: "2026-11-01"
+updated: "2026-11-02"
 ---
 
 ## Purpose and resulting behavior
@@ -23,6 +23,16 @@ The current contracts are [explorer selection and operations](../features/projec
 - `npm run lint` exited successfully with existing warnings outside the changed source. Targeted oxlint checks were clean. The manual Impeccable detector returned no findings (`[]`) for `FileTree.tsx`.
 - The final `npm run check:docs` passed description and local-link validation.
 - Desktop screenshots in dark and light themes and Chromium touch screenshots were inspected in two bounded rounds. These checks cover isolated browser behavior and appearance; they do not establish physical-device behavior.
+
+## Explicit Files folder expansion (2026-11-02)
+
+Folder names and row space now select without changing expansion. Double-clicking the row, clicking its folder or custom project icon, or pressing Enter toggles children. Icon double-clicks toggle once, and selection modifiers suppress toggling. This applies to ordinary Files folders, subprojects, and the linked Documents folder. Documents page navigation, independent root/scope arrows, and shared server browsing retain their existing behavior. See [ADR 0113](../decisions/0113-explicit-folder-expansion.md) and the [current feature contract](../features/projects-files-search/file-folder-exploration-and-operations.md#selection-opening-and-context-menus).
+
+- Selection, subproject, and touch browser regressions passed (3/3), including single-click selection, icon activation, double-click expansion/collapse, modified clicks, double-tap expansion, custom project icons, linked Documents folders, and independent navigation arrows.
+- Documents page, virtualized explorer, sticky ancestor, tab-reveal browser regressions and selection unit tests passed (16/16). Existing expansion actions in fixtures now use double-clicks.
+- `npm run lint` passed with existing warnings outside the changed files. The manual Impeccable detector returned no findings (`[]`).
+- Desktop light and mobile dark fixture screenshots were inspected; existing row spacing and icons remain intact. These are isolated Chromium checks, not physical-device verification.
+- `npm run build` passed, including TypeScript and Vite, with the existing chunk-size warning. `npm run check:docs` passed (633 descriptions, no metadata or local-link errors); `git diff --check` passed.
 
 ## Application boundary
 
