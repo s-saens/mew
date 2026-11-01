@@ -61,6 +61,48 @@ test('Rust install retains locked dependency sources, compiles offline and verif
   }
 })
 
+test('Rust install reports missing Windows commands with the original launch error and host-specific prerequisites', () => {
+  const failure = Object.assign(new Error('spawnSync cargo ENOENT'), { code: 'ENOENT' })
+  let published = false
+  assert.throws(() => installRustEngine({
+    target: '/fixture/engine', platform: 'win32', log() {}, mkdir() {}, remove() {},
+    rename() { published = true }, run: () => ({ status: null, error: failure }),
+  }), (error: unknown) => {
+    assert.ok(error instanceof Error)
+    assert.match(error.message, /cargo vendor: ENOENT: spawnSync cargo ENOENT/)
+    assert.match(error.message, /Windows.*Rust stable\(MSVC\).*libclang.*Perl.*Windows SDK/)
+    assert.match(error.message, /Windows PATH/)
+    assert.match(error.message, /WSL.*Windows/)
+    assert.equal(error.cause, failure)
+    return true
+  })
+  assert.equal(published, false)
+})
+
+test('Rust install distinguishes build exit codes, signals and timeouts without publishing a failed module', () => {
+  for (const result of [
+    { status: 101 },
+    { status: null, signal: 'SIGTERM' },
+    { status: null, signal: 'SIGTERM', error: Object.assign(new Error('spawnSync cargo ETIMEDOUT'), { code: 'ETIMEDOUT' }) },
+  ]) {
+    let calls = 0, published = false
+    assert.throws(() => installRustEngine({
+      target: '/fixture/engine', platform: 'linux', log() {}, mkdir() {}, remove() {}, prepareVendor() {},
+      rename() { published = true }, run: () => ++calls === 1 ? { status: 0 } : result,
+    }), (error: unknown) => {
+      assert.ok(error instanceof Error)
+      assert.match(error.message, /cargo build/)
+      assert.match(error.message, result.error ? /ETIMEDOUT: spawnSync cargo ETIMEDOUT/ : result.signal ? /signal SIGTERM/ : /exit code 101/)
+      assert.match(error.message, /Rust stable.*PATH/)
+      assert.doesNotMatch(error.message, /MSVC|Windows PATH/)
+      if (result.error) assert.equal(error.cause, result.error)
+      return true
+    })
+    assert.equal(calls, 2)
+    assert.equal(published, false)
+  }
+})
+
 test('Rust signaling scopes native events, preserves NAT cleanup and never transfers video to JavaScript', async () => {
   const engine = new EventEmitter() as EventEmitter & { postMessage(value: unknown): void }, commands: Record<string, unknown>[] = []
   engine.postMessage = value => commands.push(value as Record<string, unknown>)

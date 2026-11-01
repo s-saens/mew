@@ -1,8 +1,8 @@
 ---
 title: "Remote Desktop Setup and Controls"
 created: 2026-09-12
-updated: "2026-10-24"
-description: "Explains how to open the server's logged-in desktop from a PC or mobile device, the Rust helper app's build tools, OS permissions, and direct connection requirements, plus the on-screen keyboard, clipboard, and touch controls. Covers the comparison criteria for native FHD resolution and high image quality, quality/speed priority options, and actual performance limitations."
+updated: "2026-11-01"
+description: "Explains how to open the server's logged-in desktop from a PC or mobile device, the Rust helper's host build tools and installation failure recovery, OS permissions, and direct connection requirements, plus keyboard, clipboard, and touch controls. Covers native FHD and image quality comparison, quality/speed priority, and actual performance limitations."
 상위파일: "MOC.md"
 ---
 
@@ -36,6 +36,8 @@ Video and input are transmitted over a direct WebRTC connection between the brow
 Once the initial screen and input are ready, the remotely accessed PC displays a **mew Remote Desktop Connected** system notification once per connection. Reconnecting triggers another notification. It may not appear if OS notifications are disabled or Do Not Disturb is enabled.
 
 All server environments require Rust stable, CMake, libclang, a C++ compiler, and Perl. On WSL, install these tools on the **Windows side**. The initial Rust engine compilation takes additional time; if tools are missing, the preparation log shows the reason for failure. Preparing components does not start screen capture. See [engine installation and verification scope](../../.mew/docs/development/remote-desktop-rust.md).
+
+If preparation fails at **Preparing the Rust desktop engine**, open **View Setup Details**. An error such as `cargo vendor: ENOENT` means the installer could not launch Cargo. On Windows/WSL, install Rust stable with the MSVC toolchain on Windows and check the Windows PATH used by Mew's installer. Check CMake, libclang, Perl, C++ Build Tools, and the Windows SDK as well; WSL-only installations do not satisfy these requirements. After correcting the environment, click **Reconnect** to retry preparation. Compiling the GPU DLL alone does not complete setup.
 
 | Server environment | Required OS setup |
 | --- | --- |

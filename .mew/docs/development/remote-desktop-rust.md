@@ -1,8 +1,8 @@
 ---
 title: "Remote Desktop Rust Video Engine"
-description: "Defines capture output, RTP pacing, and direct WebRTC on a dedicated Rust thread that reuses the existing OS GPU ABI, along with Node control boundaries and approval revocation/shutdown contracts. Describes locked dependency source preservation, installation tools, the legacy comparison path, synthetic browser verification, and the scope of actual GPU behavior that remains unverified."
+description: "Defines capture output, RTP pacing, and direct WebRTC on a dedicated Rust thread that reuses the existing OS GPU ABI, along with Node control boundaries and approval revocation/shutdown contracts. Covers locked dependency sources, host build tools and actionable installation errors, the legacy comparison path, synthetic verification, and unverified actual GPU behavior."
 created: 2026-10-24
-updated: 2026-10-24
+updated: "2026-11-01"
 ---
 
 ## Execution Path
@@ -42,6 +42,8 @@ Frame order, IDR recovery, burst and lifetime limits, and quality recovery follo
 ## Installation and comparison
 
 All OSes require Rust stable, CMake, libclang, a C++ compiler, and Perl; Windows uses the MSVC Rust toolchain, Visual Studio C++ Build Tools, and Windows SDK. WSL remote desktop requires Windows tools. Existing OS-specific GPU, login, and permission requirements also apply unchanged. Tools must be discoverable in the installer's PATH.
+
+If an installation command fails, the setup terminal identifies the command and phase, such as `cargo vendor` or `cargo build`, and retains the OS launch error, exit code, or termination signal. A missing Cargo executable reports `ENOENT`; installing Rust only inside WSL does not satisfy the Windows helper's requirements. Launch errors remain available as the error cause. The installer keeps compiler output in the terminal, removes temporary output on failure, and leaves the helper unready until installation succeeds. It does not install missing build tools or fall back to the legacy engine automatically.
 
 `install-rust-engine.mjs` preserves the sources pinned in `Cargo.lock` in `rust/vendor/` and compiles them with `--release --locked --offline`. Notices and corresponding sources for MPL libraries, OpenSSL, and other components are not removed. The [distribution contract](remote-desktop-distribution.md) owns the scope of licensing and Windows OpenSSL path corrections. The installer and preparation hashes include nested Rust sources, lockfiles, and build scripts.
 

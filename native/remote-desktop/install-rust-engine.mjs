@@ -11,7 +11,14 @@ export function installRustEngine({ target, platform = process.platform, run = s
   const manifest = path.join(target, 'rust', 'Cargo.toml'), output = path.join(target, rustLibrary(platform)), temporary = `${output}.tmp`
   const execute = (command, args) => {
     const result = run(command, args, { cwd: target, stdio: 'inherit', timeout: 20 * 60 * 1000 })
-    if (result.error || result.status !== 0) throw new Error('Rust 영상 모듈 준비에 실패했습니다. Rust stable·CMake·libclang·C++ 컴파일러·Perl과 플랫폼 SDK를 확인해 주세요.')
+    if (result.error || result.status !== 0) {
+      const phase = command === 'cargo' ? `${command} ${args[0]}` : command
+      const detail = result.error ? `${result.error.code ? `${result.error.code}: ` : ''}${result.error.message}` : result.signal ? `signal ${result.signal}` : `exit code ${result.status ?? 'unknown'}`
+      const guidance = platform === 'win32'
+        ? 'Windows에 Rust stable(MSVC)·CMake·libclang·Perl·Visual Studio C++ Build Tools와 Windows SDK를 설치하고 Windows PATH를 확인한 뒤 다시 준비해 주세요. WSL에만 설치한 도구는 Windows 빌드에 사용할 수 없습니다.'
+        : 'Rust stable·CMake·libclang·C++ 컴파일러·Perl과 플랫폼 SDK 및 PATH를 확인한 뒤 다시 준비해 주세요.'
+      throw new Error(`Rust 영상 모듈 준비에 실패했습니다 (${phase}: ${detail}). ${guidance}`, { cause: result.error })
+    }
   }
   log('Preparing the Rust desktop engine (first compilation can take several minutes)...')
   remove(temporary)
