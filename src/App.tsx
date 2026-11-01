@@ -9,7 +9,7 @@ import { factoryLayout, editorIds, layoutPresetsKey, legacyLayoutPresetsKey, nor
 import { loadFloatingRect, restoreFloatingRect } from './hooks/use-floating-panel'
 import { restoreDeviceLayout, saveDeviceLayout } from './utils/device-layout'
 import { useToolPresentation, setToolPresentation } from './hooks/use-tool-presentation'
-import { Computer, Link } from 'iconoir-react'
+import { Computer, Globe, Link } from 'iconoir-react'
 import { fetchUpdatesStatus } from './api/client'
 import { uuid } from './utils/uuid'
 import type { MewcatAction } from '../shared/mewcat-assistant'
@@ -1952,6 +1952,19 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
   }, [isGuest])
   // 독에 있는 작업 패널은 제외하고 나머지 동작만 권한에 따라 햄버거 메뉴에 표시한다.
   const headerMenuItems: HeaderMenuItem[] = [
+    ...(caps.portPreview && auth.email ? [{
+      id: 'localhost-browser',
+      label: uiText('로컬호스트 브라우저'),
+      icon: <Globe width={14} height={14} />,
+      onSelect: () => {
+        setBrowserUrl('')
+        setBrowserNavigationRequest(request => request + 1)
+        setRemoteDesktopOpen(false)
+        dockRef.current?.restore()
+        openWorkspacePanel('browser')
+        setFocusedWorkspacePanel('browser')
+      },
+    }] : []),
     ...(caps.desktop ? [{
       id: 'desktop',
       label: t('access.desktop'),

@@ -1,5 +1,7 @@
 export const DOM_BROWSER_WS = '/api/dom-browser/ws'
 
+export type DomBrowserPort = { port: number; kind: 'app' | 'mew' | 'blocked' }
+
 export type DomBrowserCommand =
   | { type: 'navigate'; url: string }
   | { type: 'resize'; width: number; height: number }

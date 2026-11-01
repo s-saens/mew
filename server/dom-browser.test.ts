@@ -5,7 +5,7 @@ import http from 'node:http'
 import { once } from 'node:events'
 import { WebSocket, WebSocketServer } from 'ws'
 import { chromium } from 'playwright-core'
-import { attachDomBrowserWebSocket, closeDomBrowsers, DOM_BROWSER_WS, domBrowserTarget, parseDomBrowserCommand } from './dom-browser.ts'
+import { attachDomBrowserWebSocket, closeDomBrowsers, DOM_BROWSER_WS, domBrowserTarget, parseDomBrowserCommand, domBrowserMewPorts, domBrowserBlockedPorts } from './dom-browser.ts'
 import type { DomBrowserCommand, DomBrowserMessage } from '../shared/dom-browser.ts'
 import type { RequestAuth } from './reqAuth.ts'
 import { accessChanges } from './access-policy.ts'
@@ -18,6 +18,42 @@ async function start(server: http.Server) {
 }
 const stop = (server: http.Server) => new Promise<void>(resolve => { server.closeAllConnections(); server.close(() => resolve()) })
 const owner: RequestAuth = { role: 'owner', email: 'dom-browser@example.test', mustChangePassword: false }
+
+test('DOM browser registry marks actual Mew listeners and removes closed servers', async () => {
+  const host = http.createServer()
+  attachDomBrowserWebSocket(host, () => owner)
+  const origin = await start(host)
+  const port = Number(new URL(origin).port)
+  try {
+    assert.ok(domBrowserMewPorts().has(port))
+    assert.ok(domBrowserBlockedPorts().has(port))
+    assert.ok(domBrowserBlockedPorts().has(4999))
+    assert.throws(() => domBrowserTarget(origin, domBrowserBlockedPorts()))
+  } finally { await stop(host) }
+  assert.equal(domBrowserMewPorts().has(port), false)
+  assert.equal(domBrowserBlockedPorts().has(port), false)
+})
+
+test('existing browser connections block a Mew server that starts listening later', async () => {
+  const first = http.createServer()
+  attachDomBrowserWebSocket(first, () => owner)
+  const firstOrigin = await start(first)
+  const client = connection(firstOrigin)
+  await once(client.ws, 'open')
+  let protectedRequests = 0
+  const later = http.createServer((_req, res) => { protectedRequests++; res.end('Mew') })
+  attachDomBrowserWebSocket(later, () => owner)
+  const laterOrigin = await start(later)
+  try {
+    client.send({ type: 'navigate', url: laterOrigin })
+    await client.wait(() => client.messages.find(message => message.type === 'error'), 'new Mew listener is blocked')
+    assert.equal(protectedRequests, 0)
+  } finally {
+    client.ws.terminate()
+    await closeDomBrowsers()
+    await Promise.all([stop(first), stop(later)])
+  }
+})
 
 function connection(origin: string, requestOrigin = origin) {
   const ws = new WebSocket(origin.replace('http:', 'ws:') + DOM_BROWSER_WS, { origin: requestOrigin })

@@ -43,10 +43,15 @@ test('real DOM browser viewer and host relay interactive app mutations, focus, a
   }] })
   const chunks = bundle.output.filter(chunk => chunk.type === 'chunk'), entry = chunks.find(chunk => chunk.isEntry)!
   const scripts = new Map(chunks.map(chunk => [`/${chunk.fileName}`, chunk.code]))
-  const styles = await Promise.all([component, path.join(root, 'src/components/DockWorkspace.tsx'), path.join(root, 'src/components/panel-close-button.tsx'), path.join(root, 'packages/ui/src/HoverTipLayer.tsx')].map(file => fs.readFile(file, 'utf8')))
+  const styles = await Promise.all([component, path.join(root, 'src/components/DomBrowserPorts.tsx'), path.join(root, 'src/components/DockWorkspace.tsx'), path.join(root, 'src/components/panel-close-button.tsx'), path.join(root, 'packages/ui/src/HoverTipLayer.tsx')].map(file => fs.readFile(file, 'utf8')))
   const compiler = await compile(await fs.readFile(path.join(root, 'src/index.css'), 'utf8'), { base: path.join(root, 'src'), onDependency() {} })
   const css = compiler.build([...new Set(styles.join('\n').match(/[A-Za-z0-9_@:/.[\]()%,-]+/g))])
   const host = http.createServer((req, res) => {
+    if (req.url === '/api/dom-browser/ports') {
+      res.setHeader('content-type', 'application/json')
+      res.end(JSON.stringify({ ports: [{ port: Number(new URL(target).port), kind: 'app' }, { port: (host.address() as { port: number }).port, kind: 'mew' }] }))
+      return
+    }
     const script = scripts.get(req.url ?? '')
     if (script !== undefined) { res.setHeader('content-type', 'text/javascript'); res.end(script); return }
     res.setHeader('content-type', 'text/html')
@@ -94,6 +99,17 @@ test('real DOM browser viewer and host relay interactive app mutations, focus, a
   const toolbar = await page.getByRole('textbox', { name: 'Browser address', exact: true }).boundingBox()
   assert.ok(toolbar && toolbar.width > 100 && toolbar.x + toolbar.width <= 390)
   if (screenshotDirectory) await page.screenshot({ path: path.join(screenshotDirectory, 'mew-dom-browser-mobile.png') })
+  await page.getByRole('button', { name: 'Open ports', exact: true }).click()
+  const ports = page.locator('[data-dom-browser-ports]')
+  const openApp = ports.getByRole('button', { name: `localhost:${new URL(target).port}`, exact: true })
+  await openApp.waitFor()
+  assert.equal(await ports.getByRole('button', { name: `localhost:${new URL(origin).port} Mew`, exact: true }).isDisabled(), true)
+  assert.equal(await page.locator('[data-dom-browser-surface] iframe').count(), 0)
+  if (screenshotDirectory) await page.screenshot({ path: path.join(screenshotDirectory, 'mew-dom-browser-ports-mobile.png') })
+  await openApp.click()
+  await frame.getByText('Count: 0', { exact: true }).waitFor()
+  await frame.getByRole('button', { name: 'Increment', exact: true }).click()
+  await frame.getByText('Count: 1', { exact: true }).waitFor()
   await page.getByRole('button', { name: 'Close browser', exact: true }).click()
   assert.equal(await page.locator('[data-dom-browser]').count(), 0)
   assert.deepEqual(errors, [])

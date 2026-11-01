@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Replayer } from '@rrweb/replay'
 import { EventType, IncrementalSource, type eventWithTime } from '@rrweb/types'
-import { ArrowLeft, ArrowRight, Refresh } from 'iconoir-react'
+import { ArrowLeft, ArrowRight, HomeSimple, Refresh } from 'iconoir-react'
 import { HoverTipLayer, LoadingIndicator } from '@mew/ui'
 import { uiText } from '@mew/ui/i18n-core'
 import { useUiLocale } from '@mew/ui/i18n'
@@ -12,10 +12,48 @@ import { appTabShortcut } from '../utils/app-tab-shortcuts'
 import { bindDomBrowserScroll, type DomBrowserScroll } from '../utils/dom-browser-scroll'
 import { PanelCloseButton } from './panel-close-button'
 import { DockGrip } from './DockWorkspace'
+import { DomBrowserPorts } from './DomBrowserPorts'
 
 type Connection = 'connecting' | 'open' | 'closed'
 
 export function DomBrowserPanel({ url, navigationRequest = 0, onClose }: { url: string; navigationRequest?: number; onClose: () => void }) {
+  const [entry, setEntry] = useState({ url, navigationRequest })
+  useEffect(() => { setEntry({ url, navigationRequest }) }, [url, navigationRequest])
+  const open = (target: string) => setEntry(current => ({ ...current, url: target }))
+  return entry.url
+    ? <DomBrowserPage url={entry.url} navigationRequest={entry.navigationRequest} onClose={onClose} onHome={() => open('')} />
+    : <DomBrowserStart onOpen={open} onClose={onClose} />
+}
+
+function browserAddress(value: string): URL {
+  const url = new URL(/^[a-z][a-z\d+.-]*:\/\//i.test(value) ? value : `http://${value}`)
+  if (!['http:', 'https:'].includes(url.protocol)) throw new Error('invalid-address')
+  return url
+}
+
+function DomBrowserStart({ onOpen, onClose }: { onOpen: (url: string) => void; onClose: () => void }) {
+  useUiLocale()
+  const scope = useRef<HTMLDivElement>(null)
+  useFocusedShortcutScope(scope, { closeTab: () => { onClose(); return true } })
+  const [address, setAddress] = useState('')
+  const [error, setError] = useState('')
+  return <div ref={scope} data-dom-browser className="flex h-full min-h-0 min-w-0 flex-col bg-surface-deep text-ink">
+    <form className="flex h-9 shrink-0 items-center gap-0.5 border-b border-edge bg-surface px-1" onSubmit={event => {
+      event.preventDefault()
+      if (!address.trim()) return
+      try { onOpen(browserAddress(address.trim()).href) }
+      catch { setError(uiText('브라우저 주소가 올바르지 않습니다')) }
+    }}>
+      <DockGrip group="browser" />
+      <input aria-label={uiText('브라우저 주소')} className="h-7 min-w-0 flex-1 rounded bg-surface-deep px-2 text-xs text-ink outline-none focus-visible:ring-1 focus-visible:ring-accent" value={address} onChange={event => setAddress(event.target.value)} autoCapitalize="off" autoCorrect="off" spellCheck={false} type="text" inputMode="url" />
+      <PanelCloseButton aria-label={uiText('브라우저 닫기')} onClick={onClose} />
+    </form>
+    {error && <div role="alert" className="border-b border-edge px-2 py-1 text-xs text-danger">{error}</div>}
+    <DomBrowserPorts onOpen={onOpen} />
+  </div>
+}
+
+function DomBrowserPage({ url, navigationRequest, onClose, onHome }: { url: string; navigationRequest: number; onClose: () => void; onHome: () => void }) {
   useUiLocale()
   const scope = useRef<HTMLDivElement>(null)
   const close = useRef(onClose)
@@ -239,8 +277,7 @@ export function DomBrowserPanel({ url, navigationRequest = 0, onClose }: { url: 
     if (!value) return
     let target: URL
     try {
-      target = new URL(/^[a-z][a-z\d+.-]*:\/\//i.test(value) ? value : `http://${value}`)
-      if (!['http:', 'https:'].includes(target.protocol)) throw new Error()
+      target = browserAddress(value)
     } catch { setError(uiText('브라우저 주소가 올바르지 않습니다')); return }
     currentUrl.current = target.href; setAddress(target.href); setError('')
     if (connection !== 'open') { setAttempt(current => current + 1); return }
@@ -251,6 +288,7 @@ export function DomBrowserPanel({ url, navigationRequest = 0, onClose }: { url: 
   return <div ref={scope} data-dom-browser className="h-full min-h-0 min-w-0"><HoverTipLayer className="flex h-full min-h-0 min-w-0 flex-1 flex-col bg-surface-deep text-ink">
     <form className="flex h-9 shrink-0 items-center gap-0.5 border-b border-edge bg-surface px-1" onSubmit={event => { event.preventDefault(); navigate() }}>
       <DockGrip group="browser" />
+      <button type="button" className={buttonClass} aria-label={uiText('열려 있는 포트')} data-tip={uiText('열려 있는 포트')} onClick={onHome}><HomeSimple width={16} height={16} aria-hidden="true" /></button>
       <button type="button" className={buttonClass} disabled={connection !== 'open' || !page.canGoBack} aria-label={uiText('뒤로가기')} data-tip={uiText('뒤로가기')} onClick={() => send({ type: 'back' })}><ArrowLeft width={16} height={16} aria-hidden="true" /></button>
       <button type="button" className={buttonClass} disabled={connection !== 'open' || !page.canGoForward} aria-label={uiText('앞으로가기')} data-tip={uiText('앞으로가기')} onClick={() => send({ type: 'forward' })}><ArrowRight width={16} height={16} aria-hidden="true" /></button>
       <button type="button" className={buttonClass} aria-label={uiText(connection === 'closed' ? '다시 연결' : '새로고침')} data-tip={uiText(connection === 'closed' ? '다시 연결' : '새로고침')} disabled={connection === 'connecting'} onClick={() => { setError(''); if (connection === 'closed') setAttempt(current => current + 1); else send({ type: 'reload' }) }}><Refresh width={16} height={16} aria-hidden="true" /></button>

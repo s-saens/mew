@@ -1,6 +1,12 @@
 // Source-message keys keep shared UI packages independent of the host app.
 // Every entry supplies English, Simplified Chinese and Japanese; the key is Korean.
 export const uiMessages = {
+  "로컬호스트 브라우저": ["Localhost browser", "本地主机浏览器", "ローカルホストブラウザー"],
+  "열려 있는 포트": ["Open ports", "开放端口", "開いているポート"],
+  "열려 있는 포트가 없습니다.": ["No open ports.", "没有开放的端口。", "開いているポートはありません。"],
+  "포트 목록을 불러오지 못했습니다.": ["Could not load ports.", "无法加载端口列表。", "ポート一覧を読み込めませんでした。"],
+  "Mew": ["Mew", "Mew", "Mew"],
+  "사용 불가": ["Unavailable", "不可用", "利用不可"],
   "이 페이지는 잠시 길을 잃었어요.": ["This page has wandered off.", "这个页面迷路了。", "このページは迷子になったようです。"],
   "주소가 바뀌었거나, 더 이상 존재하지 않는 페이지입니다.": ["The address may have changed, or the page no longer exists.", "地址可能已更改，或页面已不存在。", "アドレスが変更されたか、ページが削除された可能性があります。"],
   "작업 공간으로 돌아가기": ["Back to workspace", "返回工作区", "ワークスペースに戻る"],

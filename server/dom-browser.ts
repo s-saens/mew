@@ -14,6 +14,18 @@ import { domBrowserExecutable } from './browser-dom-executable.ts'
 
 export { DOM_BROWSER_WS }
 const sessions = new Set<DomBrowserSession>()
+const servers = new Set<Server | Http2SecureServer>()
+export function domBrowserMewPorts(): ReadonlySet<number> {
+  const ports = new Set<number>()
+  for (const server of servers) {
+    const address = server.address()
+    if (address && typeof address !== 'string') ports.add(address.port)
+  }
+  return ports
+}
+export function domBrowserBlockedPorts(): ReadonlySet<number> {
+  return new Set([Number(process.env.MEW_TEAM_PORT ?? 5000), 4999, ...domBrowserMewPorts()])
+}
 const MAX_ASSET = 4 * 1024 * 1024
 const MAX_QUEUE = 16 * 1024 * 1024
 const EMPTY_IMAGE = 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs='
@@ -51,7 +63,7 @@ class DomBrowserSession {
   readonly account: string
   private socket: WebSocket
   private allowed: () => boolean
-  private blockedPorts: ReadonlySet<number>
+  private get blockedPorts(): ReadonlySet<number> { return domBrowserBlockedPorts() }
   private browser?: Browser
   private context?: BrowserContext
   private page?: Page
@@ -75,8 +87,8 @@ class DomBrowserSession {
   private lifetime: NodeJS.Timeout
   private starting?: Promise<Page>
 
-  constructor(account: string, socket: WebSocket, allowed: () => boolean, blockedPorts: ReadonlySet<number>) {
-    this.account = account; this.socket = socket; this.allowed = allowed; this.blockedPorts = blockedPorts
+  constructor(account: string, socket: WebSocket, allowed: () => boolean) {
+    this.account = account; this.socket = socket; this.allowed = allowed
     sessions.add(this)
     this.lifetime = setTimeout(() => { this.send({ type: 'error', message: '브라우저 세션이 만료됐습니다. 다시 열어 주세요.' }); void this.close() }, 30 * 60_000)
     this.lifetime.unref()
@@ -360,9 +372,7 @@ class DomBrowserSession {
 export async function closeDomBrowsers() { await Promise.all([...sessions].map(session => session.close())) }
 
 export function attachDomBrowserWebSocket(server: Server | Http2SecureServer, getAuth: (req: IncomingMessage) => RequestAuth = resolveAuth) {
-  const blockedPorts = new Set([Number(process.env.MEW_TEAM_PORT ?? 5000), 4999])
-  const registerPort = () => { const address = server.address(); if (address && typeof address !== 'string') blockedPorts.add(address.port) }
-  registerPort(); server.on('listening', registerPort)
+  servers.add(server)
   const wss = new WebSocketServer({ noServer: true, maxPayload: 96 * 1024, perMessageDeflate: false })
   server.on('upgrade', (req, socket, head) => {
     if (new URL(req.url ?? '', 'http://localhost').pathname !== DOM_BROWSER_WS) return
@@ -372,8 +382,8 @@ export function attachDomBrowserWebSocket(server: Server | Http2SecureServer, ge
     if (sessions.size >= 8 || [...sessions].filter(session => session.account === original.email).length >= 3) { socket.end('HTTP/1.1 429 Too Many Requests\r\nConnection: close\r\n\r\n'); return }
     wss.handleUpgrade(req, socket, head, ws => {
       watchSocketAccess(ws, req, allowed)
-      new DomBrowserSession(original.email!, ws, allowed, blockedPorts)
+      new DomBrowserSession(original.email!, ws, allowed)
     })
   })
-  server.once('close', () => { wss.close(); void closeDomBrowsers() })
+  server.once('close', () => { servers.delete(server); wss.close(); void closeDomBrowsers() })
 }

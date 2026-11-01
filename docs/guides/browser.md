@@ -1,6 +1,6 @@
 ---
 title: "Login Screen, Browser, and Android"
-description: "Explains the internal DOM browser for localhost apps and external HTTP(S) websites, address entry, host Chromium prerequisites and limits, separate login video, retained proxy URLs, and Android environment checks and gateways."
+description: "Explains the internal DOM browser for localhost apps and external HTTP(S) websites, host-wide port selection from the hamburger menu with Mew ports disabled, address entry, host Chromium prerequisites and limits, separate login video, retained proxy URLs, and Android environment checks and gateways."
 created: "2026-09-04"
 updated: "2026-11-01"
 ---
@@ -12,6 +12,12 @@ Clicking **Open Login Page** for an agent displays the host Chrome login screen 
 Currently supported hosts are Linux/WSL. Chrome/Chromium, Xvfb, FFmpeg, Python 3, and libX11/libXtst are required. The Debian/Ubuntu packages are `xvfb ffmpeg python3 libx11-6 libxtst6`; install Chrome separately. Use `MEW_BROWSER_EXECUTABLE` to specify the executable's absolute path. Regular Chrome is preferred, and an existing Playwright Chromium installation is also checked as an alternative executable. In an unprepared environment, it does not control the actual host desktop as a substitute.
 
 This video screen is for login and account management. The localhost DOM browser described below is a separate workspace panel. Do not attach CDP or a DOM recorder to login pages. Detailed behavior and lifecycle follow [Login Virtual Screen](../../.mew/docs/development/login-desktop.md). Successful authentication with actual Google and Antigravity accounts must be verified in the user's environment.
+
+## Find running localhost apps
+
+Choose **Menu → Localhost browser** to list ports currently listening on the Mew host. Click a port to open it in the internal browser. The list includes services started outside Mew's command buttons; use refresh to update it. A port labelled **Mew** is disabled, as are reserved ports marked unavailable. The list shows TCP listeners, so a non-web service may not open as a webpage.
+
+The list itself starts no host browser or app. In an open page, choose **Open ports** in the toolbar to return to the list. This closes that page's temporary browser session and its stored login state. You can still enter a full URL in the address field. The same localhost-app permission controls this menu and the Browser dock.
 
 ## Open host localhost apps
 

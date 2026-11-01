@@ -15,7 +15,7 @@ test('DOM browser replays inert pages and relays editing, navigation, scrolling 
     resolveId(id) { if (id.startsWith('virtual:')) return id; if (id.endsWith('/remote-transport')) return 'virtual:transport'; if (id.endsWith('.css')) return 'virtual:style' },
     load(id) {
       if (id === 'virtual:style') return ''
-      if (id === 'virtual:transport') return 'export function openMewSocket(url){return new window.BrowserSocket(url)}'
+      if (id === 'virtual:transport') return 'export function openMewSocket(url){return new window.BrowserSocket(url)}; export const mewFetch=(...args)=>fetch(...args);'
       if (id === 'virtual:dom-browser.tsx') return `
         import React from ${JSON.stringify(react)};
         import {createRoot} from ${JSON.stringify(reactDom)};
@@ -27,7 +27,7 @@ test('DOM browser replays inert pages and relays editing, navigation, scrolling 
         window.BrowserSocket=class {readyState=0;send(value){window.packets.push(JSON.parse(value))}close(){this.readyState=3}constructor(url){this.url=url;window.socket=this;window.sockets.push(this);queueMicrotask(()=>{this.readyState=1;this.onopen?.(new Event('open'))})}};
         window.deliver=message=>window.socket.onmessage({data:JSON.stringify(message)});
         window.snapshotPage=(generation=window.generation,initialOffset={left:0,top:0})=>{window.generation=generation;const doc=document.getElementById('source').contentDocument;const mirror=createMirror();const freshNode=snapshot(doc,{mirror});const node=window.initialNode||freshNode;window.initialNode=node;window.ids=window.initialIds||Object.fromEntries([...doc.querySelectorAll('[id]')].map(el=>[el.id,mirror.getId(el)]));window.ids.document=mirror.getId(doc);if(!window.initialIds){window.ids.resultText=mirror.getId(doc.querySelector('#result').firstChild);window.initialIds=window.ids;}const timestamp=Date.now()+60_000;window.deliver({type:'events',generation:window.generation,events:[{type:4,timestamp,data:{href:'http://localhost:3333/',width:760,height:480}},{type:2,timestamp:timestamp+1,data:{node,initialOffset}}]});window.deliver({type:'state',generation:window.generation,url:'http://localhost:3333/form',title:'Fixture',loading:false,canGoBack:true,canGoForward:true})};
-        function Fixture(){const [open,setOpen]=React.useState(true);const [request,setRequest]=React.useState(0);React.useEffect(()=>captureAppTabShortcuts({closeEditorTab:()=>window.editorCloseCount++,create:()=>{}}),[]);return <><button onClick={()=>{setOpen(true);setRequest(value=>value+1)}}>Reopen same link</button>{open&&<div style={{height:'480px',width:'100%'}}><DomBrowserPanel url="http://localhost:3333/" navigationRequest={request} onClose={()=>{window.closedCount++;setOpen(false)}}/></div>}</>}
+        function Fixture(){const [open,setOpen]=React.useState(true);const [request,setRequest]=React.useState(0);const [url,setUrl]=React.useState('http://localhost:3333/');React.useEffect(()=>captureAppTabShortcuts({closeEditorTab:()=>window.editorCloseCount++,create:()=>{}}),[]);return <><button onClick={()=>{setOpen(true);setUrl('http://localhost:3333/');setRequest(value=>value+1)}}>Reopen same link</button><button onClick={()=>{setOpen(true);setUrl('');setRequest(value=>value+1)}}>Show port list</button>{open&&<div style={{height:'480px',width:'100%'}}><DomBrowserPanel url={url} navigationRequest={request} onClose={()=>{window.closedCount++;setOpen(false)}}/></div>}</>}
         createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18nProvider>);`
     },
   }] })
@@ -42,6 +42,7 @@ test('DOM browser replays inert pages and relays editing, navigation, scrolling 
   await page.route('https://dom-browser.test/**', async route => {
     const pathname = new URL(route.request().url()).pathname, script = scripts.get(pathname)
     if (script !== undefined) { await route.fulfill({ contentType: 'text/javascript', body: script }); return }
+    if (pathname === '/api/dom-browser/ports') return route.fulfill({ json: { ports: [{ port: 3333, kind: 'app' }, { port: 5000, kind: 'mew' }] } })
     if (pathname === '/source') {
       await route.fulfill({ contentType: 'text/html', body: '<html><head><style>html,#scroller{scroll-behavior:smooth}body{margin:8px;font:16px sans-serif;min-height:1800px}#scroller{height:100px;overflow:auto}#scroller>div{height:900px}</style></head><body><form><input id="name" aria-label="Name"><textarea id="notes" aria-label="Notes"></textarea><input id="check" type="checkbox" aria-label="Checked"><select id="choice" aria-label="Choice"><option value="a">A</option><option value="b">B</option></select><button id="submit" type="submit">Save</button></form><a id="link" href="http://localhost:3333/other">Other page</a><p id="result">Initial result</p><div id="scroller"><div>Long content</div></div><script>window.top.replayScriptRan=true</script></body></html>' }); return
     }
@@ -165,6 +166,7 @@ test('DOM browser replays inert pages and relays editing, navigation, scrolling 
   await page.getByRole('textbox', { name: '브라우저 주소', exact: true }).press('Enter')
   assert.ok(await page.evaluate<boolean>('window.packets.some(packet=>packet.type==="navigate"&&packet.url==="https://example.org/articles?q=mew#read")'))
   await page.getByRole('button', { name: 'Reopen same link', exact: true }).click()
+  await page.waitForFunction('window.packets.findLast(packet=>packet.type==="navigate").url==="http://localhost:3333/"')
   assert.equal(await page.evaluate('window.packets.findLast(packet=>packet.type==="navigate").url'), 'http://localhost:3333/')
   assert.equal(await page.evaluate('window.sockets.length'), 1)
   await page.setViewportSize({ width: 390, height: 800 })
@@ -187,5 +189,21 @@ test('DOM browser replays inert pages and relays editing, navigation, scrolling 
   assert.equal(await page.evaluate('window.closedCount'), 2)
   assert.equal(await page.evaluate('window.editorCloseCount'), 0)
   assert.equal(await page.evaluate('window.socket.readyState'), 3)
+  const socketsBeforeHome = await page.evaluate<number>('window.sockets.length')
+  await page.getByRole('button', { name: 'Show port list', exact: true }).click()
+  const ports = page.locator('[data-dom-browser-ports]')
+  await ports.getByRole('button', { name: 'localhost:3333', exact: true }).waitFor()
+  assert.equal(await page.evaluate('window.sockets.length'), socketsBeforeHome, 'listing ports opens no browser socket or Chromium session')
+  assert.equal(await ports.getByRole('button', { name: 'localhost:5000 Mew', exact: true }).isDisabled(), true)
+  await ports.getByRole('button', { name: 'localhost:3333', exact: true }).click()
+  await page.waitForFunction(`window.sockets.length===${socketsBeforeHome + 1}&&window.socket.readyState===1`)
+  assert.equal(await page.evaluate('window.packets.findLast(packet=>packet.type==="navigate").url'), 'http://localhost:3333/')
+  await page.evaluate('window.snapshotPage()')
+  await frame.getByRole('textbox', { name: 'Name', exact: true }).waitFor()
+  await page.getByRole('button', { name: '열려 있는 포트', exact: true }).click()
+  await ports.getByRole('button', { name: 'localhost:3333', exact: true }).waitFor()
+  assert.equal(await page.evaluate('window.socket.readyState'), 3, 'returning to the list disposes of the host browser session')
+  await page.getByRole('textbox', { name: '브라우저 주소', exact: true }).press('Control+w')
+  assert.equal(await page.evaluate('window.closedCount'), 3)
   assert.deepEqual(errors, [])
 })

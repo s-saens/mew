@@ -4,6 +4,8 @@ import { createPublicSharesRouter } from './public-share-routes.ts'
 import { decoratePublicShares } from './public-shares.ts'
 import { createDocumentBacklinksRouter } from './document-backlinks-routes.ts'
 import { createDebuggerRouter } from './debugger-routes.ts'
+import { createDomBrowserPortsRouter } from './dom-browser-ports.ts'
+import { domBrowserMewPorts, domBrowserBlockedPorts } from './dom-browser.ts'
 import { mergeTaskFrontmatter, TaskFrontmatterConflict } from '../packages/editor/src/utils/task-frontmatter-merge.ts'
 import { isTaskDocumentPath } from '../shared/task-document-paths.ts'
 import { runAccountWorkspace } from './account-workspace.ts'
@@ -434,6 +436,7 @@ export function createApiApp() {
   app.use(filePermissionMiddleware)
   app.use('/task-list', createTaskListRouter())
   app.use('/debugger', createDebuggerRouter())
+  app.use('/dom-browser', createDomBrowserPortsRouter({ mewPorts: domBrowserMewPorts, blockedPorts: domBrowserBlockedPorts }))
   const documentLinks = new DocumentLinkIndex()
   app.use(createDocumentBacklinksRouter(documentLinks))
   app.use((req, res, next) => {
