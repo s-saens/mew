@@ -7,6 +7,7 @@ import { activeRemoteTransport, DataChannelTransport, setRemoteTransport } from 
 import { initializeRemoteApp } from './remote-app.ts'
 import { portPreviewUrl } from './port-preview-url.ts'
 import { REMOTE_LIMITS, type RemoteFrame } from '../../shared/remote-access.ts'
+import { AgentConnectionWatch } from './agent-connection-watch.ts'
 
 class Wire extends EventTarget {
   readyState = 'open'
@@ -46,6 +47,73 @@ function transportFixture(t: TestContext) {
   t.after(() => { transport.close(); restore() })
   return { wire, transport }
 }
+
+test('remote socket connection timing starts at transmission after admission and preserves monotonic zero', async t => {
+  const { wire, transport } = transportFixture(t)
+  for (let index = 0; index < REMOTE_LIMITS.streams; index++) await transport.forward({ type: 'request', id: `busy-${index}`, method: 'GET', path: '/api/files', headers: {} })
+  const socket = transport.socket('/api/agent/ws') as WebSocket & { readonly connectionStartedAt?: number }
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal('connectionStartedAt' in socket, true)
+  assert.equal(socket.connectionStartedAt, undefined)
+  assert.equal(wire.frames.some(frame => frame.type === 'socket'), false)
+  t.mock.method(performance, 'now', () => 0)
+  wire.message({ type: 'end', id: 'busy-0' })
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(wire.frames.some(frame => frame.type === 'socket'), true)
+  assert.equal(socket.connectionStartedAt, 0)
+  assert.equal(Object.getOwnPropertyDescriptor(Object.getPrototypeOf(socket), 'connectionStartedAt')?.set, undefined)
+})
+
+test('a locally queued remote agent handshake is not replaced before transmission and cancellation removes its wait', async t => {
+  const { wire, transport } = transportFixture(t)
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 1_900_000_000_000 })
+  let now = 1000
+  t.mock.method(performance, 'now', () => now)
+  for (let index = 0; index < REMOTE_LIMITS.streams; index++) await transport.forward({ type: 'request', id: `busy-${index}`, method: 'GET', path: '/api/files', headers: {} })
+  const socket = transport.socket('/api/agent/ws') as WebSocket & { readonly connectionStartedAt?: number }
+  let reconnects = 0
+  const watch = new AgentConnectionWatch(socket, { available: () => true, reconnect: () => { reconnects++ } })
+  t.after(() => watch.dispose())
+  await new Promise(resolve => setImmediate(resolve))
+  for (let interval = 0; interval < 9; interval++) { now += 3000; t.mock.timers.tick(3000) }
+  assert.equal(reconnects, 0)
+  assert.equal(socket.connectionStartedAt, undefined)
+  watch.dispose()
+  socket.close()
+  assert.equal(socket.readyState, SocketConstants.CLOSED)
+  wire.message({ type: 'end', id: 'busy-0' })
+  await new Promise(resolve => setImmediate(resolve))
+  now += 60_000; t.mock.timers.tick(60_000)
+  assert.equal(wire.frames.some(frame => frame.type === 'socket'), false, 'a canceled admission cannot transmit a late socket open')
+  assert.equal(transport.sockets.size, 0)
+  assert.equal(reconnects, 0)
+})
+
+test('remote socket handshake timing excludes local DataChannel backpressure', async t => {
+  const { wire, transport } = transportFixture(t)
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 1_900_000_000_000 })
+  let now = 1000
+  t.mock.method(performance, 'now', () => now)
+  wire.bufferedAmount = REMOTE_LIMITS.queue + 1
+  const socket = transport.socket('/api/agent/ws') as WebSocket & { readonly connectionStartedAt?: number }
+  await new Promise(resolve => setImmediate(resolve))
+  let reconnects = 0
+  const watch = new AgentConnectionWatch(socket, { available: () => true, reconnect: () => { reconnects++ } })
+  t.after(() => watch.dispose())
+  now += 3000; t.mock.timers.tick(3000)
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(socket.connectionStartedAt, undefined)
+  assert.equal(reconnects, 0)
+  wire.bufferedAmount = 0
+  now += 10; t.mock.timers.tick(10)
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(socket.connectionStartedAt, now)
+  assert.equal(wire.frames.filter(frame => frame.type === 'socket').length, 1)
+  now += 2999; t.mock.timers.tick(2999)
+  assert.equal(reconnects, 0)
+  now += 1; t.mock.timers.tick(1)
+  assert.equal(reconnects, 1, 'the three-second response deadline starts only after the socket frame was sent')
+})
 
 test('reconnect interrupts active response bodies and writes while keeping the wire open for fresh reads and subscriptions', async t => {
   const { wire, transport } = transportFixture(t)

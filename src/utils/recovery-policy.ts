@@ -1,7 +1,7 @@
 /** Automatic retries after the initial failure, before offering explicit recovery. */
 export const AUTOMATIC_RETRY_LIMIT = 11
 
-/** Keep safe agent reads and subscriptions retrying, with slower attempts after the fast recovery window. */
+/** Recover safe agent reads and subscriptions promptly without busy-looping during an outage. */
 export function agentRecoveryDelay(failures: number, interval: number) {
-  return Math.min(30_000, interval * 2 ** Math.min(Math.max(0, failures - AUTOMATIC_RETRY_LIMIT), 5))
+  return failures <= 0 ? interval : [0, 250, 500, 1000, 2000, 3000][Math.min(failures - 1, 5)]!
 }

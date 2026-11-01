@@ -32,7 +32,7 @@ localStorage.setItem('mew:agent-active-tab:'+JSON.stringify('/workspace'),tabs[0
 if(!fresh)writeAgentEventCache('codex','first','/workspace',{sessionId:'first',events:[{type:'update',update:{sessionUpdate:'user_message_chunk',content:{type:'text',text:'Cached text must not flash'}}}]});
 onMewcatNotice(notice=>window.notices.push(notice));
 class Socket {
- static OPEN=1;static CLOSED=3;readyState=0;
+ static OPEN=1;static CLOSED=3;readyState=0;bufferedAmount=0;
  constructor(url){this.tab=new URL(url).searchParams.get('tab');window.socketAttempts[this.tab]=(window.socketAttempts[this.tab]||0)+1;if(window.throwSocket)throw new Error('Socket construction unavailable');window.sockets[this.tab]=this;if(window.fail)setTimeout(()=>this.close(),20)}
  emit(value){this.onmessage?.({data:JSON.stringify(value)})}
  open(restore=true){this.readyState=1;this.onopen?.();if(!restore)return;this.emit({type:'replay',restored:true,events:[{type:'update',update:{sessionUpdate:'user_message_chunk',content:{type:'text',text:'Saved conversation'}}}]});this.emit({type:'meta',meta:{sessionId:this.tab,startedAt:new Date().toISOString(),turns:1,busy:false,queued:[],usage:null,canLoad:true,canList:true}})}
@@ -277,7 +277,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
       await page.evaluate('window.sockets.first.close()')
       assert.equal(await page.evaluate('window.socketAttempts.first'), beforeRemoteRecovery, 'a disconnected socket waits for its scheduled retry')
       await page.evaluate(`window.dispatchEvent(new Event('mew:remote-reconnected'));window.dispatchEvent(new Event('mew:remote-reconnected'));window.dispatchEvent(new Event('online'));document.dispatchEvent(new Event('visibilitychange'))`)
-      assert.equal(await page.evaluate('window.socketAttempts.first'), beforeRemoteRecovery + 1, 'verified remote recovery opens immediately without advancing the one-second retry clock')
+      assert.equal(await page.evaluate('window.socketAttempts.first'), beforeRemoteRecovery + 1, 'verified remote recovery opens immediately without advancing the retry clock')
       assert.equal(await page.evaluate('window.sockets.first.readyState'), 0, 'a recovery burst leaves one connecting socket')
       assert.equal(await page.evaluate('window.messages.length'), messagesBeforeRemoteRecovery, 'recovery never resends a pending clear or prompt')
       await page.evaluate('window.sockets.first.open()')
@@ -346,22 +346,28 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
       await page.evaluate('window.fail=false;window.sockets.first.close()')
       await overlay.waitFor()
       assert.equal(await session.getByRole('alert').count(), 0, 'recoverable connection loss only shows loading')
-      for (let attempt = 1; attempt <= 11; attempt++) {
-        await page.clock.runFor(1000)
+      const recoveryDelays = [0, 250, 500, 1000, 2000, 3000, 3000, 3000, 3000, 3000, 3000]
+      for (let attempt = 1; attempt <= recoveryDelays.length; attempt++) {
+        const delay = recoveryDelays[attempt - 1]!
+        if (delay) {
+          await page.clock.runFor(delay - 1)
+          assert.equal(await page.evaluate('window.socketAttempts.first'), previousAttempts + attempt - 1)
+          await page.clock.runFor(1)
+        } else await page.clock.runFor(0)
         assert.equal(await page.evaluate('window.socketAttempts.first'), previousAttempts + attempt)
         await page.evaluate('window.sockets.first.close()')
       }
-      await page.clock.runFor(1999)
-      assert.equal(await page.evaluate('window.socketAttempts.first'), previousAttempts + 11, 'a prolonged outage slows retries without stopping them')
+      await page.clock.runFor(2999)
+      assert.equal(await page.evaluate('window.socketAttempts.first'), previousAttempts + 11, 'a prolonged outage keeps a three-second retry cap')
       await page.clock.runFor(1)
       assert.equal(await page.evaluate('window.socketAttempts.first'), previousAttempts + 12, 'the twelfth retry remains automatic')
-      for (const delay of [4000, 8000, 16_000, 30_000, 30_000]) {
+      for (const delay of [3000, 3000, 3000, 3000, 3000]) {
         const attempts = await page.evaluate<number>('window.socketAttempts.first')
         await page.evaluate('window.sockets.first.close()')
         await page.clock.runFor(delay - 1)
         assert.equal(await page.evaluate('window.socketAttempts.first'), attempts)
         await page.clock.runFor(1)
-        assert.equal(await page.evaluate('window.socketAttempts.first'), attempts + 1, 'retry backoff remains capped at thirty seconds')
+        assert.equal(await page.evaluate('window.socketAttempts.first'), attempts + 1, 'retry backoff stays capped at three seconds')
       }
       await page.evaluate('window.sockets.first.close();document.dispatchEvent(new Event("visibilitychange"));window.dispatchEvent(new Event("online"));window.dispatchEvent(new Event("mew:remote-reconnected"))')
       assert.equal(await page.evaluate('window.socketAttempts.first'), previousAttempts + 18, 'foreground return wakes the pending retry and event bursts keep one socket')
@@ -376,17 +382,16 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
       await overlay.waitFor()
       assert.equal(await session.getByRole('alert').count(), 0, 'a thrown socket constructor is recovered without a false failure alert')
       await page.evaluate('window.throwSocket=false')
-      await page.clock.runFor(30_000)
+      await page.clock.runFor(3000)
       await page.waitForFunction('window.sockets.first!==window.previousSocket')
       await page.evaluate('window.sockets.first.open()')
       await overlay.waitFor({ state: 'hidden' })
       assert.equal(await composerValue(draft), 'Edited while connecting', 'automatic recovery preserves the unsent draft')
       const resetAttempts = await page.evaluate<number>('window.socketAttempts.first')
       await page.evaluate('window.sockets.first.close()')
-      await page.clock.runFor(999)
       assert.equal(await page.evaluate('window.socketAttempts.first'), resetAttempts)
-      await page.clock.runFor(1)
-      assert.equal(await page.evaluate('window.socketAttempts.first'), resetAttempts + 1, 'successful synchronization resets the fast retry interval')
+      await page.clock.runFor(0)
+      assert.equal(await page.evaluate('window.socketAttempts.first'), resetAttempts + 1, 'successful synchronization resets recovery to an immediate retry')
       await page.evaluate('window.sockets.first.open()')
       await overlay.waitFor({ state: 'hidden' })
       await send.click()

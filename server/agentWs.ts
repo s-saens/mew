@@ -4,6 +4,7 @@ import { resolveAuth } from './reqAuth.ts'
 import type { MewcatClientMessage, MewcatActionRequest } from '../shared/mewcat-assistant.ts'
 import { validHistoryRequest, validHistoryDetailsRequest, type HistoryRequest, type HistoryPage, type HistoryPosition, type HistoryPreview, type HistoryDetailsRequest } from '../shared/agent-history.ts'
 import { agentDisplayMessage } from '../shared/agent-display.ts'
+import { validAgentConnectionProbeId, type AgentConnectionPing, type AgentConnectionPong, type AgentConnectionReady } from '../shared/agent-connection.ts'
 import { attachmentPrompt, type AgentAttachmentInput } from '../shared/agent-attachment.ts'
 import { watchSocketAccess } from './access-socket.ts'
 import { webSocketOriginAllowed } from './websocket-origin.ts'
@@ -35,6 +36,7 @@ const TAB_ID = /^[A-Za-z0-9_-]{1,64}$/
 const SESSION_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$/
 
 type ClientMessage = MewcatClientMessage
+  | AgentConnectionPing
   | { type: 'history'; range: HistoryRequest }
   | ({ type: 'history_details'; requestId: string } & HistoryDetailsRequest)
   | { type: 'prompt'; text: string; displayText?: string; images?: AgentImage[]; imageRefs?: AgentImageRef[]; skills?: string[]; settings?: AgentMessageSettings; attachments?: AgentAttachmentInput[] }
@@ -126,7 +128,8 @@ type ServerMessage =
   | { type: 'history_details'; requestId: string; error: string; generation?: string; start?: number; end?: number }
   | AgentEvent
   | MewcatActionRequest
-  | { type: 'ready'; cwd: string }
+  | AgentConnectionReady
+  | AgentConnectionPong
   | { type: 'fatal'; message?: string }
   // 목록은 물어본 창에만 답한다 — 상태가 아니라 조회 결과라 이벤트 버퍼에 넣지 않는다
   | { type: 'sessions'; sessions: SessionSearchResult[]; query?: string; requestId?: string; error?: string }
@@ -178,7 +181,7 @@ async function handleConnection(
 
   // 에이전트가 뜨는 데는 1초가 넘게 걸린다(spawn + initialize + newSession). 그동안 창을 세워 두지 않는다:
   // ready를 먼저 보낸다. 지난 세션 목록은 **창이 물어볼 때만** 간다 — 붙을 때마다 훑으면 탭 수만큼 곱해진다.
-  send(ws, { type: 'ready', cwd })
+  send(ws, { type: 'ready', cwd, connectionProbe: true })
 
   // 대화가 오래 조용하면(에이전트가 긴 작업 중이거나 사용자가 읽고만 있을 때) 중간 장비가 유휴 소켓을
   // 끊는다 — 창은 되감기로 복구하지만 그때마다 화면이 한 번 출렁인다. 30초 핑으로 살아 있다고 알린다
@@ -206,6 +209,10 @@ async function handleConnection(
 
   const handle = (msg: ClientMessage) => {
     if (accessChecks.get(ws)?.() === false) { ws.terminate(); return }
+    if (msg.type === 'ping') {
+      if (validAgentConnectionProbeId(msg.id)) send(ws, { type: 'pong', id: msg.id })
+      return
+    }
     if (msg.type === 'mewcat_context' || msg.type === 'mewcat_action_result') {
       try { assistant?.handle(msg) } catch { ws.close() }
       return

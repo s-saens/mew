@@ -116,8 +116,10 @@ function createRemoteConnection(instance: string, onState: ConnectionObserver, o
     foregroundCheck = undefined; clearTimeout(check.timer); channel.removeEventListener('message', check.received)
     void transport?.forward({ type: 'cancel', id: check.id }).catch(() => {})
   }
-  const checkForeground = () => {
-    if (!transport || foregroundCheck || performance.now() - lastForegroundCheck < FOREGROUND_CHECK_TIMEOUT || channel.bufferedAmount > REMOTE_LIMITS.queue) return
+  const checkForeground = (interrupted = false) => {
+    if (!authenticated || stopped || document.visibilityState !== 'visible' || channel.readyState !== 'open' || !transport) return
+    if (signalResume && remainingLease() <= 0) { fail('인증 연결이 만료되어 다시 연결합니다.'); return }
+    if (foregroundCheck || !interrupted && performance.now() - lastForegroundCheck < FOREGROUND_CHECK_TIMEOUT || channel.bufferedAmount > REMOTE_LIMITS.queue) return
     lastForegroundCheck = performance.now()
     const check: ForegroundCheck = {
       id: `remote-check-${crypto.randomUUID()}`,
@@ -325,6 +327,7 @@ function createRemoteConnection(instance: string, onState: ConnectionObserver, o
         if (stopped || peer.connectionState !== 'disconnected') return
         recoveryNotified = true; onState('reconnecting')
       }, RTC_RECOVERY_NOTICE_DELAY)
+      checkForeground(true)
       return
     }
     if (peer.connectionState === 'connected') {

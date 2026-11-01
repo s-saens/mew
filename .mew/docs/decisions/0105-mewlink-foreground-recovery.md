@@ -1,13 +1,13 @@
 ---
 title: "Fast verified Mewlink recovery on foreground return"
-description: "Accepts a fresh bounded P2P read probe on foreground return, immediate replacement of unresponsive or expired connections, RTT-aware deadlines, verified subscription retry acceleration and renewed pending collaboration sync deadlines, and focus preservation without relaxing identity or lease checks."
+description: "Records fresh bounded P2P read probes on foreground return, immediate replacement of unresponsive or expired connections, RTT-aware deadlines, verified subscription retry acceleration, renewed collaboration sync deadlines, and focus preservation. ADR 0111 extends the same check to visible RTC disconnection without relaxing identity or lease checks."
 created: "2026-10-31"
-updated: "2026-10-31"
+updated: "2026-11-02"
 ---
 
 ## Status
 
-Accepted. Extends [ADR 0099](0099-quiet-automatic-recovery.md) and supersedes [ADR 0081](0081-mewlink-transient-recovery.md) only where a foreground check confirms that the retained data path is unresponsive. Ordinary brief RTC interruptions retain their five-second recovery grace. Current behavior belongs to [remote access](../development/remote-access.md#reattaching-the-same-rtc-after-a-brief-signaling-interruption); measurements and application status belong to the [work record](../work/mewlink-foreground-recovery.md).
+Accepted, extended by [ADR 0111](0111-fast-agent-recovery.md) to probe immediately on visible RTC disconnection. Hidden and congestion fallback paths retain the five-second recovery grace. The original decision below remains as the rationale for foreground verification. Extends [ADR 0099](0099-quiet-automatic-recovery.md) and supersedes [ADR 0081](0081-mewlink-transient-recovery.md) where a fresh check confirms that the retained data path is unresponsive. Current behavior belongs to [remote access](../development/remote-access.md#reattaching-the-same-rtc-after-a-brief-signaling-interruption); earlier measurements and application status belong to the [work record](../work/mewlink-foreground-recovery.md), with the subsequent extension recorded in the [fast recovery work record](../work/fast-agent-recovery.md).
 
 ## Context
 

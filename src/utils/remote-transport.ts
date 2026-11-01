@@ -9,6 +9,10 @@ let remote: AppTransport | null = null
 let remoteMode = false
 export const activeRemoteTransport = () => remote
 export const isRemoteMode = () => remoteMode
+export function isMewTransportSuspended() {
+  const transport = getAppRuntime().transport ?? remote
+  return !!transport && 'suspended' in transport && transport.suspended === true
+}
 export function setRemoteTransport(transport: AppTransport | null) { remoteMode = true; const old = remote; remote = transport; if (old && old !== transport) old.close() }
 export function mewFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
   const transport = getAppRuntime().transport ?? remote
@@ -181,7 +185,7 @@ export class DataChannelTransport implements AppTransport {
       if (socket.readyState !== WebSocket.CONNECTING) { release(); return }
       socket.release = release
       socket.sentAt = performance.now()
-      return this.send({ type: 'socket', ...(capability ? { capability } : {}), id, path: parsed.pathname + parsed.search, ...(requested.length ? { protocols: requested } : {}), flowControl: REMOTE_FLOW_CONTROL })
+      return this.send({ type: 'socket', ...(capability ? { capability } : {}), id, path: parsed.pathname + parsed.search, ...(requested.length ? { protocols: requested } : {}), flowControl: REMOTE_FLOW_CONTROL }).then(() => socket.markConnectionStarted())
     }).catch(() => socket.finish(1006))
     return socket as unknown as WebSocket
   }
@@ -303,6 +307,9 @@ class RemoteSocket extends EventTarget {
   admission = new AbortController()
   release?: () => void
   sentAt = 0
+  private startedAt?: number
+  get connectionStartedAt(): number | undefined { return this.startedAt }
+  markConnectionStarted() { this.startedAt = performance.now() }
   flow?: RemoteReceiveWindow
   parts: Uint8Array[] = []; receivedBytes = 0; sequence = 0
   constructor(transport: DataChannelTransport, id: string, url: string) {

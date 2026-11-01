@@ -9,8 +9,9 @@ import { attachmentKind, conversationAttachments, documentReferenceTokens, uploa
 import { AgentMediaPreviewDialog } from './agent-media-preview-dialog'
 import { scopedBrowserStorage } from '@mew/ui/browser-storage-scope'
 import { workspaceViewportBottom } from '../utils/workspace-viewport'
-import { openMewSocket } from '../utils/remote-transport.ts'
+import { isMewTransportSuspended, openMewSocket } from '../utils/remote-transport.ts'
 import { agentRecoveryDelay } from '../utils/recovery-policy'
+import { AgentConnectionWatch } from '../utils/agent-connection-watch.ts'
 import { PanelCloseButton } from './panel-close-button'
 import { TabActionMenu } from './tab-action-menu'
 import { ConfirmDialog, HoverTipLayer, PanelNotice, canAutoFocusInput } from '@mew/ui'
@@ -2695,6 +2696,10 @@ function AgentSessionView({
     let failures = 0
     let retry: number | undefined
     let ws: WebSocket | undefined
+    let connectionWatch: AgentConnectionWatch | undefined
+    let synchronized = false
+    let cacheReady = false
+    const connectionAvailable = () => document.visibilityState !== 'hidden' && navigator.onLine !== false && !isMewTransportSuspended()
     const target = { tabId, cwd, workspacePath: notificationWorkspace }
     const source = `${runtimeOf(runtime).label} · ${cwd.split('/').filter(Boolean).at(-1) ?? cwd}`
     const trackNotice = createAgentNoticeTracker(source, target)
@@ -2740,8 +2745,39 @@ function AgentSessionView({
       if (closed || terminal || retry !== undefined) return
       retry = window.setTimeout(() => { retry = undefined; connect() }, agentRecoveryDelay(++failures, 1000))
     }
+    const disconnected = () => {
+      resetSelection()
+      setStartupReady(false)
+      resetWorkDetails()
+      cancelClear()
+      historyPendingRef.current = false
+      previewTargetRef.current = resumeSessionIdRef.current
+      setHistoryPreview(null)
+      setConnected(false)
+      disconnectPromptFeedback()
+      setMeta(null)
+    }
+    const replaceConnection = () => {
+      if (closed || terminal) return
+      connectionWatch?.dispose()
+      const previous = ws
+      ws = undefined
+      wsRef.current = null
+      if (previous) {
+        previous.onopen = null
+        previous.onmessage = null
+        previous.onclose = null
+        previous.close()
+      }
+      clearTimeout(retry)
+      retry = undefined
+      disconnected()
+      connect()
+    }
     const connect = () => {
       if (closed || terminal) return
+      if (ws && ws.readyState !== WebSocket.CLOSED) return
+      if (!connectionAvailable()) return
       const proto = location.protocol === 'https:' ? 'wss:' : 'ws:'
       const query = new URLSearchParams({
         runtime,
@@ -2758,14 +2794,24 @@ function AgentSessionView({
       }).toString()
       try { ws = openMewSocket(`${proto}//${location.host}/api/agent/ws?${query}`) }
       catch { scheduleReconnect(); return }
-      wsRef.current = ws
-      ws.onopen = () => {
+      const current = ws
+      wsRef.current = current
+      connectionWatch?.dispose()
+      const watch = connectionWatch = new AgentConnectionWatch(current, {
+        available: connectionAvailable,
+        reconnect: replaceConnection,
+      })
+      current.onopen = () => {
+        if (closed || ws !== current) return
         // 다시 붙었다 — 다음에 오는 대화는 이어 붙이는 것이 아니라 지금 화면을 대신할 것이다
         swapRef.current = true
         setConnected(true)
       }
-      ws.onmessage = (raw) => {
+      current.onmessage = (raw) => {
+        if (closed || terminal || ws !== current) return
         let event = JSON.parse(String(raw.data)) as AgentEvent
+        watch.receive(event)
+        if (event.type === 'pong') return
         if (event.type === 'history_details') {
           acceptWorkDetails(event)
           return
@@ -2837,6 +2883,7 @@ function AgentSessionView({
         if (event.type === 'modes') return adoptModes(event.modes)
         if (event.type === 'thinking') return adoptThinking(event.thinking)
         if (event.type === 'meta') {
+          synchronized = true
           clearTimeout(retry)
           retry = undefined
           failures = 0
@@ -2959,7 +3006,7 @@ function AgentSessionView({
         }
         // session/load가 reset 전에 실패하면 오류만 온다. 선택기를 계속 "불러오는 중"에 가두지 않는다.
         if (event.type === 'error' || event.type === 'fatal') {
-          if (event.type === 'fatal') { terminal = true; setConnectionFailed(true) }
+          if (event.type === 'fatal') { terminal = true; watch.dispose(); setConnectionFailed(true) }
           resetSelection()
           setStartupReady(false)
           cancelClear()
@@ -2969,40 +3016,37 @@ function AgentSessionView({
         }
         if (!sequenced) queueEvent(event)
       }
-      ws.onclose = () => {
-        if (closed) return
-        resetSelection()
-        setStartupReady(false)
-        resetWorkDetails()
-        cancelClear()
-        historyPendingRef.current = false
-        previewTargetRef.current = resumeSessionIdRef.current
-        setHistoryPreview(null)
-        setConnected(false)
-        disconnectPromptFeedback()
-        // 대화는 지우지 않는다 — 잠깐 끊긴 사이 화면이 빈 탭(히스토리 드롭다운)으로 보이던 원인이다.
-        // 다시 붙으면 서버가 보내는 replay가 통째로 갈아끼운다
-        setMeta(null)
+      current.onclose = () => {
+        if (closed || ws !== current) return
+        watch.dispose()
+        disconnected()
         scheduleReconnect()
       }
     }
     const reconnectAfterRemoteRecovery = () => {
-      if (closed || terminal || document.visibilityState === 'hidden' || retry === undefined || (ws && ws.readyState !== WebSocket.CLOSED)) return
+      if (closed || terminal) return
+      connectionWatch?.resume()
+      if (!cacheReady || !connectionAvailable() || (ws && ws.readyState !== WebSocket.CLOSED)) return
       clearTimeout(retry)
       retry = undefined
       connect()
     }
     window.addEventListener('mew:remote-reconnected', reconnectAfterRemoteRecovery)
     window.addEventListener('online', reconnectAfterRemoteRecovery)
+    window.addEventListener('offline', reconnectAfterRemoteRecovery)
+    window.addEventListener('pageshow', reconnectAfterRemoteRecovery)
     document.addEventListener('visibilitychange', reconnectAfterRemoteRecovery)
     let cacheDeadline: ReturnType<typeof setTimeout> | undefined
+    if (resumeSessionIdRef.current) void readQueueCache(cacheKey).then(queue => {
+      if (!closed && !synchronized && queue?.sessionId === resumeSessionIdRef.current) setCachedQueue(queue)
+    })
     const cachedRestoration = resumeSessionIdRef.current
-      ? Promise.race([Promise.all([readHistoryCache(cacheKey), readQueueCache(cacheKey)]), new Promise<null>(resolve => { cacheDeadline = setTimeout(() => resolve(null), 200) })])
+      ? Promise.race([readHistoryCache(cacheKey), new Promise<null>(resolve => { cacheDeadline = setTimeout(() => resolve(null), 25) })])
       : Promise.resolve(null)
-    void cachedRestoration.then(snapshot => {
-      const [cached, queue] = snapshot ?? [null, null]
+    void cachedRestoration.then(cached => {
       clearTimeout(cacheDeadline)
       if (closed) return
+      cacheReady = true
       if (cached && cached.sessionId === resumeSessionIdRef.current && !historyRef.current) {
         historyRef.current = cached
         cacheSessionIdRef.current = cached.sessionId
@@ -3010,7 +3054,6 @@ function AgentSessionView({
         setUsersBefore(cached.usersBefore)
         setEvents(cached.events.slice())
       }
-      if (queue?.sessionId === resumeSessionIdRef.current) setCachedQueue(queue)
       connect()
     })
 
@@ -3018,8 +3061,11 @@ function AgentSessionView({
       closed = true
       cancelClear()
       if (retry) clearTimeout(retry)
+      connectionWatch?.dispose()
       window.removeEventListener('mew:remote-reconnected', reconnectAfterRemoteRecovery)
       window.removeEventListener('online', reconnectAfterRemoteRecovery)
+      window.removeEventListener('offline', reconnectAfterRemoteRecovery)
+      window.removeEventListener('pageshow', reconnectAfterRemoteRecovery)
       document.removeEventListener('visibilitychange', reconnectAfterRemoteRecovery)
       ws?.close()
       wsRef.current = null

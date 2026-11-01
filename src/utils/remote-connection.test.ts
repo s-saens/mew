@@ -996,3 +996,164 @@ test('foreground probing bypasses the ordinary five-second RTC disconnected grac
   assert.equal(f.codes.at(-1), 'connection-unresponsive')
   assert.equal(f.states.includes('reconnecting'), false)
 })
+
+test('a visible RTC disconnection checks its data path immediately and replaces a stalled peer after 250ms', async t => {
+  const f = fixture(t)
+  let now = 0
+  t.mock.method(performance, 'now', () => now)
+  f.peer.state('disconnected')
+  const probe = await foregroundProbe(f.peer)
+  assert.equal(probe.method, 'HEAD')
+  assert.equal(probe.path, '/api/remote-ui/file?path=/favicon.ico')
+  now = 249; t.mock.timers.tick(249)
+  assert.equal(f.peer.channel.readyState, 'open')
+  now = 250; t.mock.timers.tick(1)
+  assert.equal(f.peer.channel.readyState, 'closed')
+  assert.equal(f.codes.at(-1), 'connection-unresponsive')
+  assert.deepEqual(f.states, ['connected', 'error'])
+  t.mock.timers.tick(5000)
+  assert.equal(f.errors.length, 1, 'replacement cancels the superseded grace and delayed notice')
+})
+
+test('a healthy visible RTC interruption keeps the same peer and pending write without replay', async t => {
+  const f = fixture(t), transport = activeRemoteTransport()!
+  let now = 0
+  t.mock.method(performance, 'now', () => now)
+  const pending = transport.fetch('/api/files', { method: 'POST', body: 'preserve this draft' })
+  await until(() => foregroundFrames(f.peer).some(frame => frame.type === 'end'))
+  const write = foregroundFrames(f.peer).find(frame => frame.type === 'request' && frame.path === '/api/files')!
+  f.peer.state('disconnected')
+  const probe = await foregroundProbe(f.peer)
+  now = 200; t.mock.timers.tick(200)
+  f.peer.channel.message({ type: 'response', id: probe.id, status: 200, headers: {} })
+  f.peer.state('connected')
+  f.peer.channel.message({ type: 'response', id: write.id, status: 204, headers: {} })
+  f.peer.channel.message({ type: 'end', id: write.id })
+  assert.equal((await pending).status, 204)
+  now += 5000; t.mock.timers.tick(5000)
+  assert.equal(activeRemoteTransport(), transport)
+  assert.equal(foregroundFrames(f.peer).filter(frame => frame.type === 'request' && frame.path === '/api/files').length, 1)
+  assert.deepEqual(f.states, ['connected'])
+})
+
+test('a new RTC disconnection probes even immediately after a healthy foreground check', async t => {
+  const f = fixture(t)
+  let now = 0
+  t.mock.method(performance, 'now', () => now)
+  f.browser.dispatchEvent(new Event('online'))
+  const previous = await foregroundProbe(f.peer)
+  f.peer.channel.message({ type: 'response', id: previous.id, status: 200, headers: {} })
+  now = 50; t.mock.timers.tick(50)
+  f.peer.state('disconnected')
+  await until(() => foregroundFrames(f.peer).filter(frame => frame.type === 'request').length === 2)
+  const probes = foregroundFrames(f.peer).filter(frame => frame.type === 'request')
+  assert.notEqual(probes[0].id, probes[1].id)
+  f.peer.channel.message({ type: 'response', id: previous.id, status: 200, headers: {} })
+  now = 300; t.mock.timers.tick(250)
+  assert.equal(f.codes.at(-1), 'connection-unresponsive', 'the prior live response cannot satisfy the new interruption')
+})
+
+test('RTC disconnection and foreground event bursts share one probe and one failure deadline', async t => {
+  const f = fixture(t)
+  let now = 0
+  t.mock.method(performance, 'now', () => now)
+  f.peer.state('disconnected')
+  await foregroundProbe(f.peer)
+  now = 100; t.mock.timers.tick(100)
+  f.peer.state('disconnected')
+  f.browser.dispatchEvent(new Event('online'))
+  f.browser.dispatchEvent(new Event('pageshow'))
+  f.document.dispatchEvent(new Event('visibilitychange'))
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(foregroundFrames(f.peer).filter(frame => frame.type === 'request').length, 1)
+  now = 250; t.mock.timers.tick(150)
+  assert.equal(f.codes.at(-1), 'connection-unresponsive')
+  assert.equal(f.errors.length, 1)
+})
+
+test('a hidden RTC interruption retains its five-second grace without probing', async t => {
+  const f = fixture(t)
+  f.document.visibilityState = 'hidden'
+  f.peer.state('disconnected')
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(foregroundFrames(f.peer).some(frame => frame.type === 'request'), false)
+  t.mock.timers.tick(4999)
+  assert.equal(f.peer.channel.readyState, 'open')
+  t.mock.timers.tick(1)
+  assert.equal(f.peer.channel.readyState, 'closed')
+  assert.equal(f.errors.length, 1)
+  assert.notEqual(f.codes.at(-1), 'connection-unresponsive')
+})
+
+test('returning during a hidden RTC interruption starts its fast data-path check immediately', async t => {
+  const f = fixture(t)
+  let now = 0
+  t.mock.method(performance, 'now', () => now)
+  f.document.visibilityState = 'hidden'
+  f.peer.state('disconnected')
+  now = 500; t.mock.timers.tick(500)
+  f.document.visibilityState = 'visible'; f.document.dispatchEvent(new Event('visibilitychange'))
+  await foregroundProbe(f.peer)
+  now = 750; t.mock.timers.tick(250)
+  assert.equal(f.codes.at(-1), 'connection-unresponsive')
+})
+
+test('an immediate RTC interruption check retains the existing RTT allowance', async t => {
+  const f = fixture(t)
+  let now = 0
+  t.mock.method(performance, 'now', () => now)
+  t.mock.method(f.peer, 'getStats', async () => candidateStats(0.2))
+  f.peer.state('disconnected')
+  await foregroundProbe(f.peer)
+  now = 649; t.mock.timers.tick(649)
+  assert.equal(f.peer.channel.readyState, 'open')
+  now = 650; t.mock.timers.tick(1)
+  assert.equal(f.codes.at(-1), 'connection-unresponsive')
+})
+
+test('a visible RTC interruption cannot probe or extend an authorization that expired while timers were frozen', async t => {
+  const f = await resumableFixture(t)
+  const before = f.signal.sent.filter(value => value.type === 'renew').length
+  t.mock.timers.setTime(Date.now() + 60 * 60 * 1000)
+  f.peer.state('disconnected')
+  assert.equal(f.peer.channel.readyState, 'closed')
+  assert.equal(f.signal.sent.filter(value => value.type === 'renew').length, before)
+  assert.equal(foregroundFrames(f.peer).some(frame => frame.id?.startsWith('remote-check-')), false)
+  assert.match(f.errors.at(-1)!, /인증 연결/)
+})
+
+for (const congestion of ['slots', 'backpressure']) test(`a visible RTC interruption with local ${congestion} retains its grace without a false fast failure`, async t => {
+  const f = fixture(t), transport = activeRemoteTransport()!
+  if (congestion === 'slots') await Promise.all(Array.from({ length: 16 }, (_, index) => transport.forward({ type: 'request', id: `busy-${index}`, method: 'GET', path: '/api/files', headers: {} })))
+  else f.peer.channel.bufferedAmount = 1024 * 1024
+  f.peer.state('disconnected')
+  await new Promise(resolve => setImmediate(resolve))
+  t.mock.timers.tick(250)
+  assert.equal(f.peer.channel.readyState, 'open')
+  assert.equal(activeRemoteTransport(), transport)
+  if (congestion === 'slots') f.peer.channel.message({ type: 'end', id: 'busy-0' })
+  else f.peer.channel.bufferedAmount = 0
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(foregroundFrames(f.peer).some(frame => frame.id.startsWith('remote-check-')), false)
+  f.peer.state('connected')
+  t.mock.timers.tick(5000)
+  assert.equal(activeRemoteTransport(), transport)
+  assert.deepEqual(f.errors, [])
+})
+
+for (const action of ['hide', 'dispose', 'access-revoked', 'session-expired']) test(`${action} cancels a fast RTC interruption check without a late replacement`, async t => {
+  const f = fixture(t)
+  f.peer.state('disconnected')
+  const probe = await foregroundProbe(f.peer)
+  if (action === 'hide') { f.document.visibilityState = 'hidden'; f.document.dispatchEvent(new Event('visibilitychange')) }
+  else if (action === 'dispose') f.close()
+  else {
+    f.signal.onmessage?.({ data: JSON.stringify({ type: 'error', code: action }) })
+    await until(() => f.peer.channel.readyState === 'closed')
+  }
+  f.peer.channel.message({ type: 'response', id: probe.id, status: 200, headers: {} })
+  t.mock.timers.tick(500)
+  assert.equal(f.errors.length, 0)
+  assert.equal(f.peer.channel.readyState, action === 'hide' ? 'open' : 'closed')
+  assert.equal(f.states.filter(state => state === 'connected').length, 1)
+})

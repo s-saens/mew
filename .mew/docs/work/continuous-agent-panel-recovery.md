@@ -1,11 +1,13 @@
 ---
 title: "Continuous automatic agent-panel recovery"
-description: "Records the 2026-11-01 replacement of exhausted agent-panel connection and command-status notices with continuous quiet retries, capped backoff, draft preservation, and scoped permanent failures. Covers passing local build and recovery checks, an existing broader CLI fixture failure, and unverified physical-device and external-network behavior."
+description: "Records the initial 2026-11-01 removal of exhausted agent-panel connection and command-status notices, with preserved drafts, scoped permanent failures, passing local checks, and an existing broader CLI fixture failure. The subsequent fast-recovery work supersedes its 30-second backoff; physical-device and external-network behavior remain unverified."
 created: "2026-11-01"
-updated: "2026-11-01"
+updated: "2026-11-02"
 ---
 
 ## Purpose and result
+
+This record describes the initial continuous-recovery change. [ADR 0111](../decisions/0111-fast-agent-recovery.md) and the [fast recovery work record](fast-agent-recovery.md) supersede its 30-second backoff and add bounded liveness checks and reads. Preserve the results below as verification of the earlier revision.
 
 The eleven-retry limit could leave agent conversations showing `Could not reconnect.` or `Failed to fetch` until a manual retry. Agent-panel connections and safe command-status reads now continue automatic recovery with loading dots and a retry interval capped at 30 seconds. Returning online or to a visible document and verified transport recovery advance a pending retry. Conversation and composer DOM, drafts, and known CLI records stay in place; recovery does not replay prompts or commands.
 

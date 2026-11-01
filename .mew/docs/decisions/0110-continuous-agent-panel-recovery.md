@@ -1,13 +1,13 @@
 ---
 title: "Continuous quiet recovery for agent panels"
-description: "Replaces the eleven-retry limit for agent-panel connections and safe command-status reads with continuous quiet recovery, capped backoff, and immediate retry on foreground or verified transport return. Preserves drafts, fatal and permanent errors, and the retry limits of other components."
+description: "Records replacement of the eleven-retry limit for agent-panel connections and safe command-status reads with continuous quiet recovery, preserved drafts, and scoped permanent errors. ADR 0111 supersedes its original retry delays and adds relay liveness probes, bounded reads, and faster cache startup."
 created: "2026-11-01"
-updated: "2026-11-01"
+updated: "2026-11-02"
 ---
 
 ## Status
 
-Accepted. Supersedes [ADR 0099](0099-quiet-automatic-recovery.md) only for agent-panel connection and command-status read retry exhaustion. Current behavior belongs to the [agent feature](../features/terminals-agents-automation/agent-conversations-queue-and-restoration.md#waiting-for-connection-and-reconnecting), [session contract](../development/agent-sessions.md#messages-reconnection-and-queues), and [UI contract](../development/ui-contracts.md#automatic-recovery-within-panels-and-menus). Verification and application status belong to the [work record](../work/continuous-agent-panel-recovery.md).
+Accepted, with the original retry-delay policy superseded by [ADR 0111](0111-fast-agent-recovery.md). Continuous quiet recovery, retained drafts, permanent error boundaries, and the other components' retry limits remain in force. The original decision below preserves the initial rationale. Supersedes [ADR 0099](0099-quiet-automatic-recovery.md) only for agent-panel connection and command-status read retry exhaustion. Current behavior belongs to the [agent feature](../features/terminals-agents-automation/agent-conversations-queue-and-restoration.md#waiting-for-connection-and-reconnecting), [session contract](../development/agent-sessions.md#messages-reconnection-and-queues), and [UI contract](../development/ui-contracts.md#automatic-recovery-within-panels-and-menus). Earlier verification and application status belong to the [work record](../work/continuous-agent-panel-recovery.md); subsequent measurements belong to the [fast recovery work record](../work/fast-agent-recovery.md).
 
 ## Context
 

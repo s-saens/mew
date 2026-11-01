@@ -2,8 +2,10 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { AgentCommandRecord, AgentCommandScope } from '../../shared/agent-command'
 import { listAgentCommands, startAgentCommand } from '../api/agent-commands'
 import { agentRecoveryDelay } from '../utils/recovery-policy'
+import { isMewTransportSuspended } from '../utils/remote-transport'
 
 const EMPTY_RECORDS: AgentCommandRecord[] = []
+type CommandRead = { key: string; startedAt: number; controller: AbortController; promise: Promise<void> }
 
 function commandId() {
   if (crypto.randomUUID) return crypto.randomUUID()
@@ -27,22 +29,37 @@ export function useAgentCommands(scope: AgentCommandScope, enabled: boolean) {
   const [readError, setReadError] = useState<string | null>(null)
   const [recovering, setRecovering] = useState(false)
   const [readRetry, setReadRetry] = useState(0)
-  const refresh = useCallback(async () => {
-    if (!enabled || !scope.sessionId) return
-    const result = await listAgentCommands(scope)
-    if (currentKey.current !== key) return
-    setSnapshot(previous => {
-      // An overlapping list request must not hide a just-accepted command.
-      const incoming = new Map(result.commands.map(record => [record.id, record]))
-      for (const record of previous.key === key ? previous.records : []) if (!incoming.has(record.id)) incoming.set(record.id, record)
-      const records = [...incoming.values()].sort((a, b) => a.startedAt - b.startedAt)
-      return previous.key === key && JSON.stringify(previous.records) === JSON.stringify(records) ? previous : { key, records }
-    })
-    setReadError(null)
-    setRecovering(false)
+  const activeRead = useRef<CommandRead | null>(null)
+  const lastReadStarted = useRef(-Infinity)
+  const cancelRead = useCallback(() => {
+    const reading = activeRead.current
+    activeRead.current = null
+    reading?.controller.abort()
+  }, [])
+  const refresh = useCallback(() => {
+    if (!enabled || !scope.sessionId) return Promise.resolve()
+    if (activeRead.current?.key === key) return activeRead.current.promise
+    cancelRead()
+    const reading: CommandRead = { key, startedAt: performance.now(), controller: new AbortController(), promise: Promise.resolve() }
+    lastReadStarted.current = reading.startedAt
+    activeRead.current = reading
+    reading.promise = Promise.resolve().then(async () => {
+      const result = await listAgentCommands(scope, reading.controller.signal)
+      if (currentKey.current !== key || activeRead.current !== reading || reading.controller.signal.aborted) return
+      setSnapshot(previous => {
+        // An overlapping list request must not hide a just-accepted command.
+        const incoming = new Map(result.commands.map(record => [record.id, record]))
+        for (const record of previous.key === key ? previous.records : []) if (!incoming.has(record.id)) incoming.set(record.id, record)
+        const records = [...incoming.values()].sort((a, b) => a.startedAt - b.startedAt)
+        return previous.key === key && JSON.stringify(previous.records) === JSON.stringify(records) ? previous : { key, records }
+      })
+      setReadError(null)
+      setRecovering(false)
+    }).finally(() => { if (activeRead.current === reading) activeRead.current = null })
+    return reading.promise
   // The serialized scope is the dependency; object identity changes each render.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, enabled])
+  }, [key, enabled, cancelRead])
 
   useEffect(() => {
     let disposed = false
@@ -50,16 +67,23 @@ export function useAgentCommands(scope: AgentCommandScope, enabled: boolean) {
     let failures = 0
     let polling = false
     let stopped = false
+    let version = 0
     setError(null)
     setReadError(null)
     setRecovering(false)
     if (!enabled || !scope.sessionId) return
     const poll = async () => {
       if (disposed || polling || stopped) return
-      polling = true
       timer = undefined
-      try { await refresh(); failures = 0 } catch (error) {
-        if (disposed) return
+      if (document.visibilityState === 'hidden' || navigator.onLine === false || isMewTransportSuspended()) return
+      const attempt = ++version
+      polling = true
+      try {
+        await refresh()
+        if (disposed || attempt !== version) return
+        failures = 0
+      } catch (error) {
+        if (disposed || attempt !== version) return
         const status = (error as { status?: number } | null)?.status
         if (error instanceof SyntaxError || (status !== undefined && status >= 400 && status < 500 && status !== 408 && status !== 429)) {
           stopped = true
@@ -69,26 +93,33 @@ export function useAgentCommands(scope: AgentCommandScope, enabled: boolean) {
         }
         failures++
         setRecovering(true)
-      } finally { polling = false }
-      if (!disposed) timer = window.setTimeout(poll, agentRecoveryDelay(failures, 1500))
+      } finally { if (attempt === version) polling = false }
+      if (!disposed && attempt === version) timer = window.setTimeout(poll, agentRecoveryDelay(failures, 1500))
     }
     const resume = () => {
-      if (disposed || stopped || polling || failures === 0 || document.visibilityState === 'hidden') return
+      if (disposed || stopped || isMewTransportSuspended() || document.visibilityState === 'hidden' || navigator.onLine === false || performance.now() - lastReadStarted.current < 250) return
       clearTimeout(timer)
+      version++
+      polling = false
+      cancelRead()
       void poll()
     }
     window.addEventListener('mew:remote-reconnected', resume)
     window.addEventListener('online', resume)
+    window.addEventListener('pageshow', resume)
     document.addEventListener('visibilitychange', resume)
     void poll()
     return () => {
       disposed = true
+      version++
       clearTimeout(timer)
+      cancelRead()
       window.removeEventListener('mew:remote-reconnected', resume)
       window.removeEventListener('online', resume)
+      window.removeEventListener('pageshow', resume)
       document.removeEventListener('visibilitychange', resume)
     }
-  }, [refresh, enabled, scope.sessionId, readRetry])
+  }, [refresh, enabled, scope.sessionId, readRetry, cancelRead])
 
   const submit = useCallback(async (tab: string, command: string, afterUserCount: number) => {
     if (!enabled || !scope.sessionId || pending.current) return false
