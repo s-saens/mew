@@ -4,11 +4,11 @@ parent: "mew-agents"
 title: "Agent Sets and Tab Creation"
 status: "implemented"
 created: "2026-09-18"
-updated: "2026-11-01"
+updated: "2026-11-02"
 status_hash: "3e9a3293848b77d07af2e0bbeb65a930bb54c18ce2da6a1b7543c145fb06a0b9"
 files: ["src/components/AgentPanel.tsx", "src/components/AgentSetPicker.tsx", "server/agentSets.ts", "server/agentCwd.ts"]
 commits: []
-description: "A feature contract covering new-tab runtime selection with number keys 1–9, automatic focus on new conversation input, unchanged default tab names and live position numbers before each close button, number display between the install button and settings icon, handle-based drag reordering, per-browser order storage, creation/editing/selection of agent sets containing runtime/model/effort/role presets, and per-project tab creation. Provides tab renaming by double-click, a context menu, and panel maximization/restoration by double-clicking the panel handle. Describes creating new tabs and restoring closed tabs based on panel focus, bidirectional swipe cycling through conversation tabs and the final + picker, retaining the Ctrl/Cmd+W close target immediately after keyboard tab switching, saving exact models, direct entry, restoring existing tabs, dedicated AI Commit execution, and transient task-editor launch messages that wait for startup and are never replayed from saved tabs."
+description: "A feature contract covering new-tab runtime selection with number keys 1–9, automatic focus on new conversation input, unchanged default tab names and live position numbers before each close button, number display between the install button and settings icon, handle-based drag reordering, per-browser order storage, creation/editing/selection of agent sets containing runtime/model/effort/role presets, and per-project tab creation. Provides tab renaming by double-click, a context menu, and panel maximization/restoration by double-clicking the panel handle. Describes creating new tabs and restoring closed tabs based on panel focus, bidirectional swipe cycling through conversation tabs and the final + picker, retaining the Ctrl/Cmd+W close target immediately after keyboard tab switching, saving exact models, direct entry, restoring existing tabs, dedicated AI Commit execution, and task-editor requests that open runtime selection and prepare editable input drafts without automatic submission."
 상위파일:
   - "MOC.md"
   - "_terminals-agents-automation.md"
@@ -22,7 +22,7 @@ description: "A feature contract covering new-tab runtime selection with number 
 
 ### Scope
 
-- The [task editor action](../projects-files-search/task-panel-list-calendar-and-gantt.md#requirements) can request a new tab with a fixed task title and a one-shot initial prompt. Consume the prompt into the existing startup queue, wait for a ready session, and preserve initialized runtime settings. Keep the initial prompt outside persisted `AgentTab` state: tab restoration and ordinary external requests without a prompt do not send messages automatically.
+- The [task editor action](../projects-files-search/task-panel-list-calendar-and-gantt.md#requirements) requests the runtime/agent set picker with a fixed task title and an input draft. Keep the request pending without creating a tab or runtime connection until selection. Then create the named conversation in the task's root project, retain any selected preset, and seed the existing input-draft storage before mounting the composer. The user edits and sends the draft explicitly. Consume each request once and keep `initialDraft` outside persisted `AgentTab` state; connection readiness, rerenders, and restoration never send it. Project/account switching and activating an existing conversation discard a pending task request. External requests that already specify a runtime, including Mewcat work drafts, retain their direct-tab behavior.
 
 - Provide agent set creation, editing, and selection, along with per-project tab and tab name management.
 - Switching with `Ctrl/Cmd+1…9` or the previous/next tab shortcuts also moves keyboard focus to the selected tab. Pressing `Ctrl/Cmd+W` afterward closes the active tab in the same agent group. Closing uses the same last pointerdown/focusin target as new-tab creation and restoration, so selecting an empty agent area does not close an editor tab even if actual focus remains in the editor or moves to body. Do not close tabs for hidden, inert, or removed targets, or during a modal, IME composition, or repeated input.

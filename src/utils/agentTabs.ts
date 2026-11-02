@@ -18,7 +18,7 @@ export type AgentTab = {
 }
 
 /** One-shot input for opening a conversation; never part of persisted tab state. */
-export type RequestedAgentTab = AgentTab & { initialPrompt?: string }
+export type RequestedAgentTab = AgentTab & { initialDraft?: string }
 
 function sessionSlot(runtime: string, cwd: string): string {
   return JSON.stringify([runtime, cwd])

@@ -1562,8 +1562,10 @@ export function AgentPanel({ requestedPicker = false, onPickerRuntimeChosen, onR
   const tabsKey = agentTabStorageKey(TABS_KEY, workspacePath)
   const activeTabKey = agentTabStorageKey(ACTIVE_TAB_KEY, workspacePath)
   const [tabs, setTabs] = useState<AgentTab[]>(() => loadTabs(workspacePath))
-  const [initialPrompts, setInitialPrompts] = useState<Record<string, string>>({})
-  const clearInitialPrompt = useCallback((id: string) => setInitialPrompts(previous => { const next = { ...previous }; delete next[id]; return next }), [])
+  const pendingRequestedTab = useRef<RequestedAgentTab | null>(null)
+  const handledRequestedTab = useRef<string | null>(null)
+  const currentWorkspace = useRef(workspacePath)
+  currentWorkspace.current = workspacePath
   const closedTabs = useRef<{ tab: AgentTab; group: string; index: number }[]>([])
   const [autoFocusTabId, setAutoFocusTabId] = useState<string | null>(null)
   useEffect(() => { closedTabs.current = [] }, [workspacePath, cacheAccount])
@@ -1697,12 +1699,28 @@ export function AgentPanel({ requestedPicker = false, onPickerRuntimeChosen, onR
     return () => { alive = false }
   }, [workspacePath, docked, preparedTabs, trackRestore])
 
-  // External requests can attach a conversation and supply a one-shot startup message.
+  useEffect(() => {
+    pendingRequestedTab.current = null
+  }, [workspacePath, cacheAccount])
+
+  // Requests without a runtime wait for the picker; drafts never enter the send queue.
   useEffect(() => {
     if (!requestedTab || !tabsSynced || !allowAgent || requestedTab.cwd !== workspacePath) return
-    const { initialPrompt, ...tab } = requestedTab
+    if (handledRequestedTab.current === requestedTab.id) { onRequestedTabHandled?.(); return }
+    handledRequestedTab.current = requestedTab.id
+    if (!requestedTab.runtime) {
+      pendingRequestedTab.current = requestedTab
+      setPickerGroup('agent')
+      setFocusedGroup('agent')
+      setOpenRuntimeError(null)
+      setPickerOpen(true)
+      onRequestedTabHandled?.()
+      return
+    }
+    pendingRequestedTab.current = null
+    const { initialDraft, ...tab } = requestedTab
+    if (initialDraft) writeAgentInputDraft(tab.id, initialDraft)
     setTabs(previous => previous.some(existing => existing.id === tab.id) ? previous : [...previous, tab])
-    if (initialPrompt) setInitialPrompts(previous => ({ ...previous, [tab.id]: initialPrompt }))
     setActiveId(requestedTab.id)
     setOpened(previous => new Set(previous).add(requestedTab.id))
     setPickerOpen(false)
@@ -1730,6 +1748,7 @@ export function AgentPanel({ requestedPicker = false, onPickerRuntimeChosen, onR
   }, [workspacePath])
 
   const activate = (id: string) => {
+    pendingRequestedTab.current = null
     setPickerOpen(false)
     setActiveId(id)
     const tab = tabs.find((tab) => tab.id === id)
@@ -1756,11 +1775,18 @@ export function AgentPanel({ requestedPicker = false, onPickerRuntimeChosen, onR
     if (openingRuntime) return
     setOpeningRuntime(runtime)
     setOpenRuntimeError(null)
+    const request = runtimeOf(runtime).surface === 'acp' && destination === 'agent' && pendingRequestedTab.current?.cwd === workspacePath
+      ? pendingRequestedTab.current : null
+    const requestedWorkspace = workspacePath
     // 선택한 worktree 경로는 즉시 쓸 수 있지만 서버에서 실제 디렉터리인지 다시 확인한다. 최초 확인이
     // 일시적으로 실패했어도 "사용"을 다시 누르면 복구되며, null cwd 탭은 절대 만들지 않는다.
-    void resolveAgentCwd(workingPath ?? defaultCwd ?? '')
+    void resolveAgentCwd(request?.cwd ?? workingPath ?? defaultCwd ?? '')
       .then(({ cwd }) => {
-        const tab = newTab(runtime, preset?.name ?? runtimeOf(runtime).label, cwd, preset)
+        if (currentWorkspace.current !== requestedWorkspace || request && pendingRequestedTab.current !== request) return
+        const { initialDraft, ...requested } = request ?? {}
+        const tab = { ...newTab(runtime, preset?.name ?? runtimeOf(runtime).label, cwd, preset), ...requested, runtime, cwd, preset }
+        if (initialDraft) writeAgentInputDraft(tab.id, initialDraft)
+        if (request) pendingRequestedTab.current = null
         setDefaultCwd(cwd)
         setTabs((prev) => [...prev, tab])
         setAutoFocusTabId(tab.id)
@@ -2045,8 +2071,6 @@ export function AgentPanel({ requestedPicker = false, onPickerRuntimeChosen, onR
               notificationFocused={notificationFocused && agentOpen && isActive}
               allowTerminal={allowTerminal}
               tabId={tab.id}
-              initialPrompt={initialPrompts[tab.id]}
-              onInitialPromptHandled={clearInitialPrompt}
               active={isActive}
               autoFocus={isActive && tab.id === autoFocusTabId}
               visible={visible}
@@ -2082,7 +2106,7 @@ export function AgentPanel({ requestedPicker = false, onPickerRuntimeChosen, onR
     {panelGroups.filter(group => group.startsWith('terminal') ? allowTerminal : allowAgent).map((group) => {
       const terminal = group.startsWith('terminal'), list = groupTabs(group), selected = groupActive(group)
       const picking = !terminal && ((pickerOpen && pickerGroup === group) || (tabsSynced && !tabs.some((tab) => tab.runtime !== 'tmux')))
-      return <DockPanel key={group} id={group} tabs={list.map((tab) => tab.id)} kind={terminal ? 'terminal' : 'agent'} visible={(terminal ? terminalOpen : agentOpen) && (list.length > 0 || !tabs.some((tab) => (tab.runtime === 'tmux') === terminal))} onFocus={() => focusGroup(group)}>
+      return <DockPanel key={group} id={group} tabs={list.map((tab) => tab.id)} kind={terminal ? 'terminal' : 'agent'} visible={(terminal ? terminalOpen : agentOpen) && (picking || list.length > 0 || !tabs.some((tab) => (tab.runtime === 'tmux') === terminal))} onFocus={() => focusGroup(group)}>
         <AgentTabBar group={group} tabs={list} activeId={selected} pickerOpen={picking} infos={infos} onActivate={activate}
           onAdd={() => { focusGroup(group); if (terminal) addRuntimeTab('tmux', undefined, group); else { setPickerGroup(group); setPickerOpen(true) } }}
           onRename={renameTab} onReorder={(from, to) => { const a = tabs.findIndex((tab) => tab.id === list[from]?.id), b = tabs.findIndex((tab) => tab.id === list[to]?.id); if (a >= 0 && b >= 0) reorderTabs(a, b) }}
@@ -2238,8 +2262,6 @@ function AgentSessionView({
   tabId,
   active,
   autoFocus,
-  initialPrompt,
-  onInitialPromptHandled,
   runtime,
   cwd,
   preset,
@@ -2269,8 +2291,6 @@ function AgentSessionView({
   /** 입력·단축키 포커스 대상 */
   active: boolean
   autoFocus: boolean
-  initialPrompt?: string
-  onInitialPromptHandled: (id: string) => void
   /** 다른 패널에 포커스가 있어도 현재 표시 중인 탭은 로딩을 재생한다. */
   visible: boolean
   runtime: string
@@ -3681,20 +3701,6 @@ function AgentSessionView({
     thinking: thinking?.options.find((option) => option.id === thinking.currentValue)?.name ?? thinking?.currentValue ?? '—',
     permission: modes ? (MODE_LABEL[modes.currentModeId] ?? modes.currentModeId) : '—',
   }), [uiLocale, currentModel, models?.currentModelId, modes, thinking])
-  const initialPromptQueued = useRef(false)
-  useEffect(() => {
-    if (!initialPrompt || initialPromptQueued.current) return
-    initialPromptQueued.current = true
-    const prompt: StartupPrompt = {
-      type: 'prompt', text: initialPrompt, displayText: initialPrompt,
-      images: [], imageRefs: [], attachments: [], skills: [],
-      settings: { model: '—', thinking: '—', permission: '—' },
-    }
-    const id = startupQueue.enqueue(prompt)
-    beginPrompt(prompt, items.at(-1)?.key ?? null, queueMeta?.queued ?? [], id)
-    setStartupPrompts(startupQueue.snapshot())
-    onInitialPromptHandled(tabId)
-  }, [initialPrompt, tabId, onInitialPromptHandled, startupQueue, beginPrompt, items, queueMeta?.queued])
   useEffect(() => {
     if (!startupReady || !connected || !meta?.sessionId || auth || loadingSession || historyPreview || restoreFailureRef.current) return
     startupQueue.flush(prompt => {

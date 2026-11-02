@@ -70,7 +70,6 @@ import { resolveTaskAgentLaunch } from './utils/task-agent-launch'
 import { fetchTaskList } from './api/task-list'
 import { syncTaskDocuments, withTaskDocumentSync } from './utils/task-document-sync'
 import { documentAbsolutePath } from './utils/document-title-preview'
-import { DEFAULT_RUNTIME_ID, runtimeOf } from './components/agentRuntimes'
 import { DockWorkspace, DockPanel, type DockHandle } from './components/DockWorkspace'
 import type { DockState } from './utils/dock-layout'
 import { getBinding, matchesShortcut } from '@mew/shortcuts'
@@ -1889,11 +1888,9 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
         sync: (previous, next) => syncTaskDocuments(root, previous, next),
       })
       if (!task?.path || !isCurrent()) return
-      const selected = runtimeOf(scopedBrowserStorage().getItem('mew:agent-runtime') ?? DEFAULT_RUNTIME_ID)
-      const runtime = selected.surface === 'acp' ? selected.id : DEFAULT_RUNTIME_ID
       setRequestedAgentTab({
         id: `task-${uuid()}`, label: task.text || taskAgentTitle(content, task.path), renamed: true,
-        runtime, cwd: root, initialPrompt: taskAgentPrompt({ project: WORKSPACE_PROJECT, path: task.path }, getUiLocale()),
+        cwd: root, initialDraft: taskAgentPrompt({ project: WORKSPACE_PROJECT, path: task.path }, getUiLocale()),
       })
       openWorkspacePanel('agent')
     } catch (error) {
