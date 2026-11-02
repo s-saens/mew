@@ -1,8 +1,8 @@
 ---
 title: "Conversation Storage and Range Synchronization"
 created: 2026-09-30
-updated: "2026-11-02"
-description: "Defines SQLite originals and attachments, recent-turn and lazy work-detail synchronization, early restoration display, per-frame assembly, immediate local prompt feedback outside sequenced history, a 25ms transcript-cache startup gate with parallel queue restoration, and IndexedDB cache and startup-queue lifetimes and limits."
+updated: "2026-11-03"
+description: "Conversation persistence and recovery contracts: SQLite originals and attachments, range and work-detail synchronization, temporary restoration display, per-frame updates, and local prompt feedback. Defines IndexedDB cache and queue scope, limits, and authority, including the 25ms transcript-cache startup gate and parallel queue restoration."
 상위파일: "MOC.md"
 ---
 
@@ -10,94 +10,178 @@ description: "Defines SQLite originals and attachments, recent-turn and lazy wor
 
 ## Server Storage
 
-`server/agentTranscript.ts` stores `sessions` and `events` in `<DATA_DIR>/agent-transcripts/transcripts.sqlite`. The key remains SHA-256(runtime, cwd, sessionId), and the event primary key is `(session_key, seq)`. There is no separate DB server or new dependency; it uses the existing Node built-in `node:sqlite`. Directory permissions are 0700, DB file permissions are 0600, and the schema is `user_version=1`; higher versions are not written to.
+`server/agentTranscript.ts` stores `sessions` and `events` in `<DATA_DIR>/agent-transcripts/transcripts.sqlite`, using the existing Node built-in `node:sqlite` without a separate DB server or new dependency.
 
-Uses WAL, `synchronous=FULL`, and a 1-second busy timeout. The DB resides on a local disk on the same host. Normal streaming batches saves 250ms after the first unsaved event and saves immediately at turn completion and shutdown. Already recorded prefixes of the same append-only event array are not serialized or INSERTed again. When ACP restoration or another operation replaces the array, the session records are replaced in a single transaction. Saving identical content skips the DB update.
+| Storage property | Contract |
+| --- | --- |
+| Session key | SHA-256(runtime, cwd, sessionId) |
+| Event primary key | `(session_key, seq)` |
+| Directory / DB file permissions | 0700 / 0600 |
+| Schema | `user_version=1`; higher versions are not written to |
 
-New messages and queued executions store `project`, `path`, and `mimeType` for all attachments in a `user_attachments` event immediately after the user body. Image bytes are excluded, and originals are retrieved using the stored attachment scope regardless of the current document scope. `user_images` events from older clients without attachment metadata are also read. Range retrieval, device caching, and early transcript display retain this event with the body.
+The DB resides on local disk on the same host and uses WAL, `synchronous=FULL`, and a 1-second busy timeout.
 
-WS input validation accepts both the current upload path `.mew/assets/` and the legacy `.mew/files/` for attachments and image references. The same rules apply to new messages, attachment-only messages, and queue edits so that uploaded file metadata reaches the supervisor.
+| Save condition | Behavior |
+| --- | --- |
+| Normal streaming | Batch saves 250ms after the first unsaved event |
+| Turn completion or shutdown | Save immediately |
+| Same append-only event array | Do not serialize or INSERT already recorded prefixes again |
+| Array replaced by ACP restoration or another operation | Replace session records in a single transaction |
+| Identical content | Skip the DB update |
 
-Prepared statements for retrieval, insertion, and replacement SQL are reused for the lifetime of the DB connection and released when it closes. The schema, save interval, durability, revision checks for other writers, and restoration semantics remain unchanged.
+**Attachments.** New messages and queued executions record every attachment's `project`, `path`, and `mimeType` in a `user_attachments` event immediately after the user body. Exclude image bytes; retrieve originals using the stored attachment scope regardless of current document scope. Also read legacy `user_images` events without attachment metadata. Range retrieval, device caching, and early transcript display retain the attachment event with the body.
 
-If no session row exists on the first retrieval, migration checks the version 2, session key, and event array in the existing `<hash>.json`. The JSON is neither deleted nor overwritten. Incomplete v1 transcripts are not migrated. Corruption, locking, and capacity errors are logged, and failed transactions preserve previous records. Revision and count checks prevent stale append buffers from overwriting transcripts updated by another writer. Save failures do not stop ongoing conversations. Subsequent save opportunities retry the unsaved tail. The existing JSON preserves the original at migration time; it is not a rollback copy that receives reverse synchronization of new DB changes.
+WS validation accepts current `.mew/assets/` and legacy `.mew/files/` upload paths for attachments and image references. Apply the same rules to new messages, attachment-only messages, and queue edits so uploaded metadata reaches the supervisor.
 
-The provider's ACP history is authoritative for agent context. Merging external CLI changes, settings, and completion times follows the existing [Session Restoration Contract](agent-sessions.md#messages-reconnection-and-queues). SQLite holds the Mew display transcript and does not modify provider storage. The supervisor still holds the current full event array in memory and reconciles the entire history during ACP restoration, so this change guarantees neither provider restoration time nor an overall supervisor memory limit.
+Reuse prepared retrieval, insertion, and replacement SQL statements until the DB connection closes, then release them. The schema, save interval, durability, revision checks for other writers, and restoration semantics remain unchanged.
+
+**Migration and failures.** If the first retrieval finds no session row, check the version 2, session key, and event array in the existing `<hash>.json`. Do not migrate incomplete v1 transcripts or delete/overwrite the JSON. It preserves the original at migration time; new DB changes are not reverse-synchronized into a rollback copy.
+
+Log corruption, locking, and capacity errors; failed transactions preserve prior records. Revision and count checks prevent stale append buffers from overwriting another writer's updates. Save failures do not stop conversations: retry the unsaved tail at subsequent save opportunities.
+
+**Authority and limits.** Provider ACP history is authoritative for agent context. External CLI changes, settings, and completion times follow the [Session Restoration Contract](agent-sessions.md#messages-reconnection-and-queues). SQLite holds Mew's display transcript without modifying provider storage. The supervisor still retains the full current event array and reconciles the entire history during ACP restoration; neither provider restoration time nor an overall supervisor memory limit is guaranteed.
 
 ## Ranges and Connections
 
-The scope of `shared/agent-history.ts` is `[start, end)`. Each supervisor creation or transcript replacement creates a new generation and incrementally indexes current question boundaries. New screens first receive the latest **3 questions and their associated answers** through `history=1&deferWork=1&turns=3`. Earlier ranges are also read in batches of 3 turns. `turns` ranges from 1 to 20; existing clients that omit it receive the latest 20 turns. Consecutive chunks and answers for a single question are not split, so the turn count alone does not limit the byte size of large questions or answers.
+`shared/agent-history.ts` uses `[start, end)` ranges. Supervisor creation or transcript replacement starts a new generation and incrementally indexes current question boundaries.
 
-- The WS `history=1&generation=...&after=...` passes the last sequence number actually held. If it belongs to the same generation and is valid within the recent range, only the new tail is sent as `append`; otherwise, the recent range is sent as `replace`.
-- The `history` response contains the session ID, generation, start/end/total, preceding question count (`usersBefore`), events, and current model/permission/thinking controls.
-- `{type:'history', range:{generation,before:start}}` reads the immediately preceding range through `prepend`. The supervisor slices the range from memory it already holds and converts it for display. It does not repeatedly retrieve and parse the stored original JSON from SQLite.
-- Real-time `history_event` sends the event together with `{generation,seq}`. The browser ignores duplicates and requests the recent range again if it detects gaps or a generation change. Sequence numbers are recorded in memory before being applied to screen state, preventing incorrect cursors even on rapid reconnections.
-- The supervisor negotiates through hello capabilities and subscribe. Older clients receive a full replay, and older supervisors use the existing replay path. A running older supervisor may continue sending the full history until replaced.
-- Retrieval is available only through the existing tab WS/supervisor IPC, which rechecks authentication and feature permissions. No public retrieval API accepting arbitrary session keys is added. If automatic restoration fails, the original tab pointer and device transcript are preserved.
+| Request | Turn range |
+| --- | --- |
+| New screen: `history=1&deferWork=1&turns=3` | Latest **3 questions and their associated answers** |
+| Earlier ranges | Batches of 3 turns |
+| `turns` | 1 to 20; clients omitting it receive the latest 20 turns |
 
-Binary search finds the preceding range and `usersBefore` in the question boundary array. This avoids scanning the prefix on every request in proportion to the turn count, while preserving the same range and question boundaries.
+Do not split consecutive chunks and answers for one question. Turn count alone therefore does not bound the bytes in large questions or answers.
+
+- WS `history=1&generation=...&after=...` sends the last sequence number actually held. Send only the new tail as `append` if the generation matches and the number is valid within the recent range; otherwise send that range as `replace`.
+- The `history` response contains session ID, generation, start/end/total, preceding question count (`usersBefore`), events, and current model/permission/thinking controls.
+- `{type:'history', range:{generation,before:start}}` requests the immediately preceding range as `prepend`. The supervisor slices its existing in-memory range and converts it for display, without repeatedly retrieving/parsing original JSON from SQLite.
+- Real-time `history_event` includes `{generation,seq}`. The browser ignores duplicates and rerequests the recent range on gaps or generation changes. Record sequence numbers in memory before screen state, preserving cursors during rapid reconnections.
+- Negotiate through supervisor hello capabilities and subscribe. Older clients receive full replay; older supervisors keep the existing replay path. A running older supervisor may send full history until replaced.
+- Retrieve only through existing tab WS/supervisor IPC, rechecking authentication and feature permissions. There is no public retrieval API accepting arbitrary session keys. Failed automatic restoration preserves the original tab pointer and device transcript.
+
+Binary search of the question boundary array finds the preceding range and `usersBefore`. It preserves range/question boundaries while avoiding a prefix scan proportional to turn count on every request.
 
 ### Display Tool Events
 
-In the copy sent to the browser, `shared/agent-display.ts` reduces `update` in `tool_call` and `tool_call_update` to the `sessionUpdate`, `toolCallId`, `title`, `status`, and `kind` fields used by the screen. Raw tool inputs and outputs, result bodies, and location information unused by the screen are not sent. Settings and other data outside events are preserved, and user messages, answers, approval requests, errors, and controls pass through unchanged. Lazy loading of work details also provides only display fields, without raw tool results.
+For browser copies, `shared/agent-display.ts` reduces `update` in `tool_call` and `tool_call_update` to the screen's `sessionUpdate`, `toolCallId`, `title`, `status`, and `kind` fields. Omit raw tool inputs/outputs, result bodies, and unused locations. Preserve settings and other data outside events; pass user messages, answers, approval requests, errors, and controls unchanged. Lazy work-detail loading likewise sends display fields without raw tool results.
 
-The data is first reduced for display at the IPC send boundary of `server/agentHost.ts` so that large originals are not serialized between the supervisor and server. The same transformation remains in the shared send function of `server/agentWs.ts` after authentication and permission checks, protecting `history`, full `replay`, and individual events from older supervisors. Original order, generation, sequence numbers, range boundaries, and restoration failure information are preserved.
+Reduce data first at the `server/agentHost.ts` IPC send boundary, avoiding serialization of large originals between supervisor and server. Keep the same transformation in the shared send function of `server/agentWs.ts`, after authentication/permission checks, for `history`, full `replay`, and individual events from older supervisors. Preserve order, generation, sequence numbers, range boundaries, and restoration failure information.
 
-SQLite transcripts, supervisor memory, and provider ACP history retain the originals. Display conversion does not modify original objects or participate in provider restoration, context, or tool execution. This change reduces transfer volume for conversations with large tool results, but does not guarantee total transfer volume or initial display time when questions or answers themselves are large.
+SQLite transcripts, supervisor memory, and provider ACP history retain originals. Display conversion neither mutates original objects nor participates in provider restoration, context, or tool execution. It reduces transfer volume for large tool results, without guaranteeing total transfer volume or initial display time for large questions/answers.
 
 ### Lazy Loading of Collapsed Work Details
 
-`deferWork` and `turns` are negotiated only when the supervisor's `hello.workDetails` is true. Recent and earlier ranges and early restoration display send consecutive `agent_thought_chunk` and `tool_call` as `{type:'work_pending',count:N}`. Small `tool_call_update` is reduced to display fields and sent immediately so that status updates arriving after completion do not create spurious turns. Real-time thinking and tool events are not delayed. Older supervisors receive no new options and retain the existing transmission behavior.
+Negotiate `deferWork` and `turns` only if supervisor `hello.workDetails` is true. In recent/earlier ranges and early restoration display, send consecutive `agent_thought_chunk` and `tool_call` events as `{type:'work_pending',count:N}`. Reduce small `tool_call_update` events to display fields and send immediately, so post-completion status updates do not create spurious turns. Do not delay real-time thinking/tool events. Older supervisors receive no new options and keep existing behavior.
 
-The browser expands each received run into lightweight markers matching the original sequence count. This preserves the one-sequence-number-per-row semantics of `start/end/total`, reconnection cursors, and device caches, as well as bubble keys. The assembler groups markers into a single contiguous range that only establishes the location of work details.
+The browser expands each run into lightweight markers matching its original sequence count. Preserve one sequence number per row for `start/end/total`, reconnection cursors, device caches, and bubble keys. The assembler groups markers into one contiguous range that establishes only the work-detail location.
 
-200ms after the first screen is displayed, up to 2,048 events for the latest 3 answers in the visible tab are prefetched into the memory cache. At most 2 requests run concurrently, with pending requests for expanded details taking priority. New detail requests stop in inactive tabs or hidden browsers and resume when visible again. Responses already in flight are received and cached. Background responses alone do not assemble or render collapsed details; once all details for an expanded turn arrive, only its markers are filled, followed by one reassembly.
+**Prefetch and visibility.** 200ms after first display, prefetch up to 2,048 events for the latest 3 answers in the visible tab into memory. Run at most 2 requests concurrently; pending requests for expanded details take priority. Stop new requests in inactive tabs or hidden browsers and resume when visible. Receive/cache in-flight responses.
 
-Retrieval uses `{type:'history_details',requestId,generation,start,end}` on the existing authenticated tab WS. It checks the current generation and valid range, targeting at most 256 events per request and 1MiB of display JSON per response. The first event alone may be up to 8MiB; exceeding the limit returns an error. If the response's actual `end` is smaller than requested, reading continues from that sequence number. Requests and responses for the same range are shared, and a slot is released if no response arrives within 10 seconds. Failed expanded details can be retried, and questions and answers are preserved.
+Background responses alone do not assemble or render collapsed details. Once all details for an expanded turn arrive, fill only its markers and reassemble once.
 
-Detail responses do not advance the conversation cursor or replace live events. Reconnection and generation replacement clear requests and the memory cache and ignore late responses. Real-time events and unsequenced errors received in the same frame as hydrate are also preserved. Temporary early display during ACP restoration does not retrieve details until the final generation arrives.
+**Retrieval.** Use `{type:'history_details',requestId,generation,start,end}` on the existing authenticated tab WS, checking the current generation and valid range.
+
+| Limit or result | Behavior |
+| --- | --- |
+| Request target | At most 256 events |
+| Response display JSON | 1MiB; the first event alone may be up to 8MiB; exceeding the limit returns an error |
+| Actual response `end` below requested end | Continue from that sequence number |
+| Same range | Share requests and responses |
+| No response within 10 seconds | Release the slot |
+| Failed expanded details | Allow retry; preserve questions and answers |
+
+Details neither advance the conversation cursor nor replace live events. Reconnection/generation replacement clears requests and memory cache and ignores late responses. Preserve real-time events and unsequenced errors received in the hydrate frame. Temporary early ACP-restoration display waits for the final generation before retrieving details.
 
 ## Browser and Screen
 
-`src/utils/agent-history-cache.ts` uses the sessions/events stores in the `mew-agent-history` IndexedDB database. Keys consist of the logged-in account, runtime, tab, and cwd, with one event row per sequence number. Only the latest 20 questions are stored, and when new records are appended to the same range, only new rows are saved. Even when a new question shifts the range start, overlapping rows for the same session and generation are preserved; deletion of the dropped prefix, insertion of the new tail, and metadata updates occur in one transaction. The optional `bytes` on event rows is calculated from serialized length when absent from existing rows, and DB version 1 is retained. Updates during slow saves are coalesced into one latest snapshot so the queue does not keep growing.
+### Device transcript cache
 
-A WeakMap holds a question index for each socket-owned append-only event array, so only new events are indexed when calculating the recent range. Inserting earlier ranges or replacing the transcript creates a new array and rebuilds the index. Snapshots awaiting storage use separate arrays so subsequent streaming is not mixed in.
+`src/utils/agent-history-cache.ts` uses sessions/events stores in IndexedDB `mew-agent-history`, keyed by logged-in account, runtime, tab, and cwd, with one event row per sequence number.
 
-Limits are 4MiB per entry, 32MiB total, at most 128 entries, and 7 days after the last write. Sizes are estimates based on serialized length and differ from actual browser quotas. Expired entries are cleaned up on initial opening; expired entries and entries exceeding capacity or count limits are cleaned up on save. If a range exceeds the per-entry limit, device caching is skipped and server records are retained. Quota errors, storage restrictions, and delayed upgrades fall back to a connection without caching. Existing-session startup waits at most 25ms for the transcript cache before connecting; saved queue restoration runs in parallel and does not hold the socket. A transcript available within that gate supplies its generation and sequence cursor for incremental synchronization. New sessions skip both reads. Saves run asynchronously during normal operation, and completion of saves on shutdown events is not assumed. [ADR 0111](../decisions/0111-fast-agent-recovery.md) records this startup-latency tradeoff.
+Store only the latest 20 questions. Append only new rows to the same range. When a new question shifts the start, preserve overlapping rows for the same session/generation; delete the dropped prefix, insert the tail, and update metadata in one transaction. Calculate missing optional event-row `bytes` from serialized length; retain DB version 1. Coalesce updates during slow saves into one latest snapshot, bounding the save queue.
 
-After checking the server tab ledger, valid device records for the same account and session are displayed first as actual bubbles. Legacy localStorage plain-text previews are not used, and the legacy transcript key is removed when a new range arrives. The device cache is not authoritative for session pointers. Input drafts, settings, and control caches retain the existing [Browser Storage Contract](browser-storage.md). Explicitly closing a tab also removes all runtime/cwd IndexedDB records for that account and tab.
+A WeakMap indexes questions for each socket-owned append-only event array, indexing only new events when computing recent ranges. Earlier-range insertion or transcript replacement creates a new array and rebuilds the index. Use separate arrays for pending storage snapshots so later streaming does not mix in.
 
-Scrolling upward to within 80px of the top requests the preceding range. The height difference before and after prepending preserves the reading position, and global event sequence numbers serve as bubble keys to preserve expanded states. Question counts for CLI batches and new CLIs include `usersBefore`. Previously read ranges remain on the open screen, while the default range for reconnection/device storage is the latest 20 questions.
+| Cache budget | Limit |
+| --- | --- |
+| Per entry | 4MiB |
+| Total | 32MiB |
+| Entry count | At most 128 |
+| Lifetime | 7 days after the last write |
+
+Sizes estimate serialized length, not actual browser quotas. Clean expired entries on initial opening; also remove expired entries and capacity/count excess on save. Skip device caching for ranges above the entry limit, retaining server records. Quota errors, storage restrictions, and delayed upgrades fall back to a connection without caching.
+
+**Startup.** Existing sessions wait at most 25ms for transcript cache before connecting. A transcript returned within the gate supplies generation/sequence cursor for incremental synchronization. Restore the saved queue in parallel without holding the socket. New sessions skip both reads. Save asynchronously during normal operation; do not assume saves finish on shutdown events. [ADR 0111](../decisions/0111-fast-agent-recovery.md) records the tradeoff.
+
+After checking the server tab ledger, display valid device records for the same account/session as actual bubbles first. Do not use legacy localStorage text previews; remove the legacy transcript key on a new range. Device cache is not authoritative for session pointers. Drafts, settings, and control caches follow the [Browser Storage Contract](browser-storage.md). Explicit tab closure removes all runtime/cwd IndexedDB records for that account/tab.
+
+Scrolling within 80px of the top requests the preceding range. Preserve position using the height difference after prepend and expanded states using global sequence-number bubble keys. CLI batch/new-CLI question counts include `usersBefore`. Keep previously read ranges on the open screen; reconnect/device storage defaults to the latest 20 questions.
 
 ### Early Display of Server Transcripts During ACP Restoration
 
-During automatic restoration, history selection, or refresh of the current conversation, the supervisor reads the already stored SQLite transcript independently of ACP readiness and `session/load`. A temporary Worker in `server/agent-history-preview.ts` uses a read-only DB connection and read transaction to extract event types and user message IDs through SQLite, starting from the latest sequence number, to find a complete range of recent questions; only originals in the selected range are read into JavaScript and parsed. The presence, absence, and changes of question chunk IDs and neutral events use the same boundaries as the existing forward index. This reduces cases where unnecessary older originals in the existing 256-row batch caused early display of the recent range to be skipped. New screens receive thinking and tool calls from 3 turns as markers, while existing requests retain 20 turns. I/O and JSON parsing do not run on the supervisor's event loop, and concurrent queries with the same transcript and display options share one in-flight Worker. No schema changes, JSON migration, or saves are performed.
+During automatic restoration, history selection, or current-conversation refresh, the supervisor reads the stored SQLite transcript independently of ACP readiness and `session/load`.
 
-`{type:'history_preview', preview:{sessionId,start,events}}` is sent only to range synchronization clients on existing authenticated tab connections. It excludes generation, reconnection cursors, and controls. Late results are discarded if supervisor restoration has already finished or the conversation has changed. If no transcript exists or reading/parsing fails, early display is skipped and existing restoration continues.
+A temporary `server/agent-history-preview.ts` Worker uses a read-only DB connection and read transaction. Starting at the latest sequence number, SQLite extracts event types/user message IDs to find a complete recent-question range. Read and parse only that range's originals into JavaScript. Question chunk IDs (present, absent, or changed) and neutral events use the existing forward index's boundaries. This reduces skipped early display caused by unnecessary older originals in the existing 256-row batch.
 
-Original sizes are checked in SQL first, and each selected row is read separately and converted to a display event, so large batches of originals do not accumulate in memory. Display output, including the envelope, is limited to 4MiB; boundary searches are limited to a total original size of 64MiB and 50,000 rows, and individual events in the selected range are limited to 8MiB. SQLite boundary extraction reads the original JSON but does not create JavaScript objects for large tool bodies. The Worker's 64MiB V8 memory limit and 500ms timeout also remain. If a limit is exceeded, existing ACP restoration continues, and the Worker terminates after a result, error, or timeout. Even original tool results larger than 4MiB can be displayed early if they fit within the display output and retrieval limits. The full replay path for older clients remains.
+New screens receive thinking/tool calls from 3 turns as markers; existing requests retain 20 turns. I/O and JSON parsing stay off the supervisor event loop. Concurrent queries sharing transcript and display options share one in-flight Worker. No schema changes, JSON migration, or saves occur.
 
-The browser displays only records matching the current restoration target ID in separate temporary state. The existing conversation, device cache, tab pointer, and reconnection cursor are preserved, and the early display is not saved. Expanding questions and answers, copying, and scrolling are allowed; sending, approvals, and requests for earlier ranges are blocked. CLI history from the previous conversation is not mixed in. The conversation's `aria-busy` is retained until restoration finishes. Temporary display is cleared on final `history`, `replay`/`meta`, `reset`, errors, authentication transitions, or connection closure. Failure preserves the existing conversation; success replaces it with the latest ACP transcript. Provider restoration time and writer replacement rules remain unchanged.
+Send `{type:'history_preview', preview:{sessionId,start,events}}` only to range synchronization clients on existing authenticated tab connections, excluding generation, reconnection cursors, and controls. Discard late results after restoration finishes or the conversation changes. Missing transcripts and read/parse failures skip early display while existing restoration continues.
+
+Check original sizes in SQL, then read/convert each selected row separately so batches of originals do not accumulate in memory. SQLite boundary extraction reads original JSON without creating JavaScript objects for large tool bodies.
+
+| Early-display budget | Limit |
+| --- | --- |
+| Display output, including envelope | 4MiB |
+| Boundary search | 64MiB total originals and 50,000 rows |
+| Individual selected event | 8MiB |
+| Worker V8 memory | 64MiB |
+| Worker timeout | 500ms |
+
+Exceeding a limit leaves existing ACP restoration running. Terminate the Worker after a result, error, or timeout. Original tool results larger than 4MiB can display early if display output and retrieval limits permit. Preserve full replay for older clients.
+
+Display only records matching the current restoration target ID in separate temporary browser state. Preserve the existing conversation, device cache, tab pointer, and reconnection cursor; do not save early display or mix in the previous conversation's CLI history.
+
+| During temporary display | Behavior |
+| --- | --- |
+| Expand questions/answers, copy, scroll | Allowed |
+| Send, approve, request earlier ranges | Blocked |
+| Conversation `aria-busy` | Retained until restoration finishes |
+| Final `history`, `replay`/`meta`, `reset`, errors, authentication transitions, or connection closure | Clear temporary display |
+| Restoration failure | Preserve existing conversation |
+| Restoration success | Replace with latest ACP transcript |
+
+Provider restoration time and writer replacement rules remain unchanged.
 
 ### Incremental Screen Updates
 
-`src/hooks/use-agent-prompt-feedback.ts` overlays one locally submitted idle question and a waiting reply on the folded display items. It does not append synthetic events to `events` or `historyRef`, allocate server sequence numbers, or persist optimistic content in transcript caches. Observe new live event batches alongside the frame's actual event append: a matching question echo removes the local question, and its `turn_start` removes the waiting reply. Only new events acknowledge a send, so identical text in older turns cannot consume it. Buffered echoes take priority over a later queue acknowledgment containing identical text.
+#### Local prompt feedback
 
-Server queue acknowledgments, errors, disconnects, conversation changes, and authoritative history replacement reconcile this overlay. Startup feedback remains attached to its cancellable in-memory queue entry until sending. Local feedback is not proof of server acceptance, is not automatically resent after disconnection, and does not survive refresh. The [feature contract](../features/terminals-agents-automation/agent-conversations-queue-and-restoration.md#immediate-message-and-reply-feedback) owns the visible behavior.
+`src/hooks/use-agent-prompt-feedback.ts` overlays one locally submitted idle question and waiting reply on folded display items. It never appends synthetic events to `events` or `historyRef`, allocates server sequence numbers, or persists optimistic content in transcript caches.
 
-Real-time events are appended to a socket-specific buffer, and sequence numbers are updated immediately. The full history array is not copied for every event, and a separate array is passed to React screen state. Copying the screen state's event array and assembling the conversation occur once per animation frame.
+Observe new live batches alongside the frame's actual event append: a matching question echo removes the local question; its `turn_start` removes the waiting reply. Only new events acknowledge sends, so identical older text cannot consume feedback. Buffered echoes take priority over a later queue acknowledgment with identical text.
 
-`src/hooks/use-agent-event-state.ts` and `src/utils/agentFold.ts` apply only events from the new frame to question, answer, tool, and approval items. Only changed items and their children are copied, preserving snapshots from previous renders. Completed bubbles and unchanged answers retain the same objects, allowing memoized components to skip rendering and Markdown conversion. Late tool updates and approval responses for earlier turns modify only their corresponding locations. Per-question setting change indicators are calculated in a single pass.
+Reconcile the overlay on server queue acknowledgments, errors, disconnects, conversation changes, and authoritative history replacement. Startup feedback stays attached to its cancellable in-memory queue entry until sending. Local feedback does not prove server acceptance, is not automatically resent after disconnect, and does not survive refresh. The [feature contract](../features/terminals-agents-automation/agent-conversations-queue-and-restoration.md#immediate-message-and-reply-feedback) owns visible behavior.
 
-Transcript replacement, insertion of earlier ranges, and changes to the language or starting sequence number trigger full reassembly. If a frame contains a reset, only events after the last reset are applied to the new conversation. Legacy full replay and range restoration use the same assembly rules.
+#### Event assembly and Markdown
 
-The Markdown HTML cache uses language and body as keys and is managed as an LRU with at most 128 entries and an estimated 4MiB. If one entry exceeds an estimated 512KiB, it bypasses the global cache and reuses only the last conversion result for the mounted answer. New streaming bodies do not clear the entire cache. Raw HTML blocking, code/table copying, and translated controls remain.
+Append real-time events to a socket-specific buffer and update sequence numbers immediately. Do not copy full history per event; pass a separate event array to React state. Copy screen-state events and assemble the conversation once per animation frame.
 
-Screen update optimizations do not change the conversation context sent to providers or prompt caching. Open screens and supervisors may still hold the full history, and Markdown for a single large answer in progress is reparsed when its body changes. This change does not introduce DOM virtualization or a supervisor memory limit.
+`src/hooks/use-agent-event-state.ts` and `src/utils/agentFold.ts` apply only the new frame's events to question, answer, tool, and approval items. Copy changed items/children only, preserving prior render snapshots. Completed bubbles and unchanged answers retain object identity, letting memoized components skip rendering/Markdown conversion. Late tool updates and approvals modify only their earlier-turn locations. Compute per-question setting indicators in one pass.
 
-The queue is also saved asynchronously as a separate snapshot in the same IndexedDB database. After checking the account, runtime, tab, cwd, and session, it displays bodies, types, attachment references, and settings when the parallel read finishes before session synchronization; receipt of the server's `meta` replaces it exactly, including an empty queue. Late cache results cannot replace synchronized server state. The last queue display remains during temporary disconnections. Editing, deletion, and reordering are blocked until server state arrives, and cached work is neither resent to the server nor executed. The server supervisor is authoritative for queue execution. The queue shares the conversation's per-entry/total budgets, 7-day lifetime, save-failure fallback, and cleanup on explicit tab closure. Queue reads do not delay connection. Queue snapshots count as separate entries toward the overall 128-entry limit.
+Reassemble fully on transcript replacement, earlier-range insertion, or language/starting-sequence-number changes. A frame containing reset applies only events after its last reset. Legacy full replay and range restoration use the same rules.
 
-Messages accepted in a new tab before session readiness reside in a separate in-memory list in `AgentStartupQueue`. Without a session ID, they are not written to IndexedDB server queue snapshots or represented as an existing queue. While that tab remains mounted, unsent items persist through reconnections and login waits and are handed off once each after initialization completes. Recovery after tab closure, refresh, or app exit is not guaranteed. The [Session Contract](agent-sessions.md#messages-reconnection-and-queues) owns sending conditions, cancellation, and scope switching.
+The language/body-keyed Markdown HTML LRU holds at most 128 entries and an estimated 4MiB. An entry above an estimated 512KiB bypasses it and reuses only the mounted answer's last conversion. New streaming bodies do not clear the global cache. Preserve raw HTML blocking, code/table copying, and translated controls.
+
+These optimizations change neither provider conversation context nor prompt caching. Open screens/supervisors may still retain full history; a large streaming answer's Markdown is reparsed when its body changes. There is no DOM virtualization or supervisor memory limit.
+
+### Saved queue and startup messages
+
+Save the server queue asynchronously as a separate snapshot in the same IndexedDB database. After checking account, runtime, tab, cwd, and session, display cached bodies, types, attachment references, and settings if the parallel read finishes before session synchronization. Server `meta` replaces the cache display exactly, including an empty queue; late cache results cannot replace synchronized state. Queue reads do not delay connection.
+
+Keep the last queue display during temporary disconnections. Block editing, deletion, and reordering until server state arrives. Never resend cached work to the server or execute it; the server supervisor controls execution. Queue snapshots share conversation per-entry/total budgets, the 7-day lifetime, save-failure fallback, and explicit-tab-close cleanup. Each snapshot counts separately toward the overall 128-entry limit.
+
+Before a new tab has session readiness, accepted messages live in a separate `AgentStartupQueue` in-memory list. Without a session ID, never write them to IndexedDB server queue snapshots or represent them as an existing queue. While mounted, the tab retains unsent items across reconnections/login waits and hands off each once after initialization. Recovery after tab closure, refresh, or app exit is not guaranteed. The [Session Contract](agent-sessions.md#messages-reconnection-and-queues) owns sending conditions, cancellation, and scope switching.
 
 ## Validation and Measurement
 
