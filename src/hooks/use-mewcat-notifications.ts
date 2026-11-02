@@ -55,7 +55,7 @@ export function useMewcatNotifications(canMonitorResources: boolean, identity: s
     const sample = createResourceNoticeTracker()
     const poll = async () => {
       try {
-        const stats = await fetchSystemStats(AbortSignal.any([controller.signal, AbortSignal.timeout(10_000)]))
+        const stats = await fetchSystemStats(AbortSignal.any([controller.signal, AbortSignal.timeout(10_000)]), { processes: false })
         if (!disposed) sample(stats).forEach(publishMewcatNotice)
       } catch { sample(null) }
       if (!disposed) timer = window.setTimeout(poll, 15_000)

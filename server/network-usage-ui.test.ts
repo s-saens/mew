@@ -34,7 +34,7 @@ window.cloneRoundTrip=async()=>{const response=await fetch('/api/stream-finite')
   const css = compiler.build([...new Set((source + content).match(/[A-Za-z0-9_@:/.[\]()%,-]+/g))])
   const server = http.createServer((request, response) => {
     response.setHeader('Cache-Control', 'no-store')
-    if (request.url === '/api/system-stats') { response.setHeader('Content-Type', 'application/json'); response.end(JSON.stringify({ cpu: { usage: 12, cores: 4, model: 'Fixture CPU', temperature: null, loadavg: [0, 0, 0] }, memory: { used: 1000, total: 2000, available: 1000 }, gpus: [], processes: [], hostname: 'network-fixture', uptime: 60 })); return }
+    if (request.url?.split('?')[0] === '/api/system-stats') { response.setHeader('Content-Type', 'application/json'); response.end(JSON.stringify({ cpu: { usage: 12, cores: 4, model: 'Fixture CPU', temperature: null, loadavg: [0, 0, 0] }, memory: { used: 1000, total: 2000, available: 1000 }, gpus: [], processes: [], hostname: 'network-fixture', uptime: 60 })); return }
     if (request.url === '/app.js') { response.setHeader('Content-Type', 'text/javascript'); response.end(chunk.code); return }
     if (request.url === '/api/stream') {
       response.setHeader('Content-Type', 'text/event-stream'); response.flushHeaders(); response.write('data: one\n\n')

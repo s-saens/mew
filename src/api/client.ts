@@ -1655,8 +1655,9 @@ export interface SystemStats {
   hostname: string
 }
 
-export function fetchSystemStats(signal?: AbortSignal): Promise<SystemStats> {
-  return mewFetch('/api/system-stats', { signal }).then(json<SystemStats>)
+export function fetchSystemStats(signal?: AbortSignal, options?: { processes?: boolean }): Promise<SystemStats> {
+  const query = options?.processes === false ? '?processes=0' : ''
+  return mewFetch(`/api/system-stats${query}`, { signal }).then(json<SystemStats>)
 }
 
 // ---- 예약 에이전트 작업 (crontab 생성원) ----

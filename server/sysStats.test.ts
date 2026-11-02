@@ -2,7 +2,67 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import os from 'node:os'
-import { collectSystemStats, parsePsProcesses } from './sysStats.ts'
+import { collectSystemStats, createSystemStatsCollector, parsePsProcesses, type SystemStats } from './sysStats.ts'
+
+const summary: Omit<SystemStats, 'gpus' | 'processes'> = {
+  cpu: { model: 'Fixture CPU', cores: 4, usage: 12, loadavg: [0, 0, 0], temperature: null },
+  memory: { total: 1000, used: 400, available: 600 }, uptime: 120, hostname: 'fixture',
+}
+
+test('summary requests never collect processes, including when detailed samples are cached', async () => {
+  let scans = 0
+  const collect = createSystemStatsCollector({
+    summary: async () => summary, gpus: async () => [],
+    processStats: async () => { scans++; return [{ pid: 123, name: 'fixture', cmd: 'fixture', cpu: 2, memMb: 4, gpuMemMb: 0 }] },
+  })
+  const lightweight = await Promise.all(Array.from({ length: 20 }, () => collect({ processes: false })))
+  assert.equal(scans, 0)
+  assert.ok(lightweight.every(sample => sample.processes.length === 0))
+  assert.equal((await collect()).processes[0]?.pid, 123)
+  assert.equal(scans, 1)
+  assert.deepEqual((await collect({ processes: false })).processes, [])
+  assert.equal(scans, 1)
+})
+
+test('clients share summary samples for 500ms and process scans for two seconds', async () => {
+  let clock = 0, summaries = 0, scans = 0
+  const collect = createSystemStatsCollector({
+    summary: async () => { summaries++; return summary }, gpus: async () => [],
+    processStats: async () => { scans++; return [] }, now: () => clock,
+  })
+  await Promise.all(Array.from({ length: 20 }, () => collect()))
+  assert.equal(summaries, 1)
+  assert.equal(scans, 1)
+  clock = 499
+  await collect()
+  assert.equal(summaries, 1)
+  clock = 500
+  await collect()
+  assert.equal(summaries, 2)
+  assert.equal(scans, 1)
+  clock = 2000
+  await collect()
+  assert.equal(summaries, 3)
+  assert.equal(scans, 2)
+})
+
+test('slow process scans stay shared while lightweight requests can finish independently', async () => {
+  let scans = 0, clock = 0
+  let finishScan!: (value: []) => void
+  const scan = new Promise<[]>(resolve => { finishScan = resolve })
+  const collect = createSystemStatsCollector({
+    summary: async () => summary, gpus: async () => [],
+    processStats: async () => { scans++; return scan }, now: () => clock,
+  })
+  const first = collect()
+  clock = 5000
+  const second = collect()
+  assert.deepEqual((await collect({ processes: false })).processes, [])
+  assert.equal(scans, 1)
+  finishScan([])
+  await Promise.all([first, second])
+  assert.equal(scans, 1)
+})
 
 test('parsePsProcesses: macOS ps 출력을 프로세스 목록으로 바꾼다', () => {
   const stats = parsePsProcesses(

@@ -2430,9 +2430,9 @@ export function createApiApp() {
   app.use('/agent/mcp', createSharedMcpRouter())
 
   // 호스트 자원 현황(프로파일링 팝업) — 서버가 도는 기계의 정보라 셸과 같은 역할로 묶는다
-  app.get('/system-stats', requireFeature('system'), async (_req, res) => {
+  app.get('/system-stats', requireFeature('system'), async (req, res) => {
     try {
-      res.json(await collectSystemStats())
+      res.json(await collectSystemStats({ processes: req.query.processes !== '0' }))
     } catch (err) {
       handleError(res, err)
     }

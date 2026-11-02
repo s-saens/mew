@@ -1,25 +1,12 @@
-// 프로파일링 팝업이 읽는 호스트 자원 스냅샷. CPU·메모리는 stdlib, 리눅스 프로세스별 사용량은 /proc,
-// macOS 프로세스별 사용량은 ps에서 온다. GPU는 nvidia-smi, 온도는 /sys/class/thermal에서 온다 —
-// 없는 환경(WSL·컨테이너·비NVIDIA·macOS)에서는 해당 값만 null/빈 배열이고 나머지는 그대로 나간다.
-import { execFile } from 'node:child_process'
+// Host resource samples shared by the header, alerts and process dialog.
 import fs from 'node:fs'
 import os from 'node:os'
-import { promisify } from 'node:util'
 import { processes as windowsProcesses } from './platform/windows/metrics.ts'
 import { macProcesses } from './platform/macos/metrics.ts'
+import { createGpuCollector, type GpuStat } from './gpu-stats.ts'
+import { resourceSampleCache } from './resource-sample-cache.ts'
 export { parsePsProcesses } from './platform/macos/metrics.ts'
-
-const run = promisify(execFile)
-
-export interface GpuStat {
-  name: string
-  /** % */
-  utilization: number | null
-  memoryUsedMb: number | null
-  memoryTotalMb: number | null
-  /** ℃ */
-  temperature: number | null
-}
+export type { GpuStat } from './gpu-stats.ts'
 
 export interface ProcStat {
   pid: number
@@ -69,8 +56,7 @@ function cpuTimes(): CpuTimes {
   return { idle, total }
 }
 
-// ponytail: 표본 하나를 모든 클라이언트가 공유한다 — 여러 창이 동시에 폴링하면 각자의 구간이 짧아질 뿐
-// 값은 유효하다. 창별 정확도가 필요해지면 세션 키별 표본으로 나눈다.
+// The summary cache keeps concurrent clients on the same CPU sampling interval.
 let prevTimes = cpuTimes()
 
 function cpuUsage(): number | null {
@@ -106,64 +92,6 @@ function memory(): SystemStats['memory'] {
     // /proc 없음(비리눅스) — freemem으로 간다
   }
   return { total, available, used: Math.max(0, total - available) }
-}
-
-const numOrNull = (s: string): number | null => {
-  const n = Number(s)
-  return Number.isFinite(n) ? n : null
-}
-
-async function gpus(): Promise<GpuStat[]> {
-  try {
-    const { stdout } = await run(
-      'nvidia-smi',
-      [
-        '--query-gpu=name,utilization.gpu,memory.used,memory.total,temperature.gpu',
-        '--format=csv,noheader,nounits',
-      ],
-      { timeout: 3000 },
-    )
-    return stdout
-      .trim()
-      .split('\n')
-      .filter(Boolean)
-      .map((line) => {
-        const [name, util, used, total, temp] = line.split(',').map((s) => s.trim())
-        return {
-          name: name ?? 'GPU',
-          utilization: numOrNull(util ?? ''),
-          memoryUsedMb: numOrNull(used ?? ''),
-          memoryTotalMb: numOrNull(total ?? ''),
-          temperature: numOrNull(temp ?? ''),
-        }
-      })
-  } catch {
-    // nvidia-smi가 없거나 실패 — GPU 정보 없이 나머지를 보여준다
-    return []
-  }
-}
-
-/** pid → 이 프로세스가 잡고 있는 GPU 메모리(MB). nvidia-smi가 없으면 빈 맵 */
-async function gpuProcesses(): Promise<Map<number, number>> {
-  const map = new Map<number, number>()
-  try {
-    const { stdout } = await run(
-      'nvidia-smi',
-      ['--query-compute-apps=pid,used_gpu_memory', '--format=csv,noheader,nounits'],
-      { timeout: 3000 },
-    )
-    for (const line of stdout.trim().split('\n')) {
-      if (!line) continue
-      const [pid, mb] = line.split(',').map((s) => s.trim())
-      const p = Number(pid)
-      const m = Number(mb)
-      // 같은 pid가 GPU 여러 장에 걸쳐 있으면 줄이 여러 개 나온다 — 합친다
-      if (Number.isInteger(p) && Number.isFinite(m)) map.set(p, (map.get(p) ?? 0) + m)
-    }
-  } catch {
-    // nvidia-smi 없거나 실패 — 프로세스별 GPU 열은 0으로 남는다
-  }
-  return map
 }
 
 // 리눅스 기본값. sysconf(_SC_CLK_TCK)·getpagesize()를 노드에서 읽을 방법이 없다.
@@ -254,9 +182,10 @@ async function processes(gpuMem: Map<number, number>, cores: number): Promise<Pr
   return linuxProcesses(gpuMem, cores)
 }
 
-export async function collectSystemStats(): Promise<SystemStats> {
+type ResourceSummary = Omit<SystemStats, 'gpus' | 'processes'>
+
+async function resourceSummary(): Promise<ResourceSummary> {
   const cpus = os.cpus()
-  const [gpuList, gpuMem] = await Promise.all([gpus(), gpuProcesses()])
   return {
     cpu: {
       model: cpus[0]?.model ?? 'unknown',
@@ -266,9 +195,32 @@ export async function collectSystemStats(): Promise<SystemStats> {
       temperature: cpuTemperature(),
     },
     memory: memory(),
-    gpus: gpuList,
-    processes: await processes(gpuMem, cpus.length),
     uptime: os.uptime(),
     hostname: os.hostname(),
   }
 }
+
+const gpu = createGpuCollector()
+
+export function createSystemStatsCollector({
+  summary = resourceSummary,
+  gpus = gpu.gpus,
+  processStats = async () => processes(await gpu.processMemory(), os.cpus().length),
+  now = () => performance.now(),
+}: {
+  summary?: () => Promise<ResourceSummary>
+  gpus?: () => Promise<GpuStat[]>
+  processStats?: () => Promise<ProcStat[]>
+  now?: () => number
+} = {}) {
+  const readSummary = resourceSampleCache(summary, 500, now)
+  const readProcesses = resourceSampleCache(processStats, 2000, now)
+  return async (options: { processes?: boolean } = {}): Promise<SystemStats> => {
+    const [sample, gpuList, processList] = await Promise.all([
+      readSummary(), gpus(), options.processes === false ? [] : readProcesses(),
+    ])
+    return { ...sample, gpus: gpuList, processes: processList }
+  }
+}
+
+export const collectSystemStats = createSystemStatsCollector()

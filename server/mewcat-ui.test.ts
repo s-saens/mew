@@ -155,8 +155,8 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
       assert.equal(await summary.getByText('Older agent', { exact: true }).count(), 1)
       cpu = 37
       const refreshStarted = Date.now()
-      await page.locator('header button[data-tip*="CPU 37%"]').waitFor({ timeout: 1500 })
-      assert.ok(Date.now() - refreshStarted < 1500, 'header refreshes on a half-second cadence')
+      await page.locator('header button[data-tip*="CPU 37%"]').waitFor({ timeout: 3000 })
+      assert.ok(Date.now() - refreshStarted < 3000, 'header refreshes within its two-second cadence')
       await page.waitForTimeout(650)
       await page.screenshot({ path: `/tmp/mewcat-resources-${mobile ? 'mobile' : 'desktop'}-${light ? 'light' : 'dark'}.png` })
       const tappedCatX = await page.evaluate('window.tappedCatX') as number
@@ -164,43 +164,43 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
       const summaryBox = await summary.boundingBox()
       assert.ok(summaryBox && summaryBox.x >= 0 && summaryBox.x + summaryBox.width <= width)
       const resourceBox = (await resources.boundingBox())!
-      assert.equal(resourceBox.width, 36, 'resource button stays compact on desktop and mobile')
-      assert.equal(resourceBox.height, 36)
+      assert.equal(resourceBox.width, mobile ? 28 : 32, 'resource button follows the shared compact header dimensions')
+      assert.equal(resourceBox.height, mobile ? 28 : 32)
       assert.ok(resourceBox.y < 48)
-      assert.match(await resources.evaluate(el => el.ownerDocument.defaultView!.getComputedStyle(el).fontFamily), /Mono|monospace/)
+      assert.equal(await resources.evaluate(el => el.ownerDocument.defaultView!.getComputedStyle(el).fontFamily), await page.locator('body').evaluate(el => el.ownerDocument.defaultView!.getComputedStyle(el).fontFamily))
       const gauges = await resources.evaluate(el => {
         const win = el.ownerDocument.defaultView!
-        const columns = Array.from(el.children) as (typeof el)[]
+        const columns = Array.from(el.firstElementChild!.children) as (typeof el)[]
         return columns.map(column => {
           const bounds = column.getBoundingClientRect()
           const fill = column.lastElementChild!
           const label = column.firstElementChild!
           const labelBounds = label.getBoundingClientRect()
           const fillStyle = win.getComputedStyle(fill)
-          return { label: label.textContent, x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height, bottom: bounds.bottom, labelX: labelBounds.x + labelBounds.width / 2, labelY: labelBounds.y + labelBounds.height / 2, radius: parseFloat(win.getComputedStyle(column).borderTopLeftRadius), clip: fillStyle.clipPath, fillColor: fillStyle.backgroundColor, textColor: fillStyle.color, hidden: column.getAttribute('aria-hidden') }
+          return { label: label.textContent, x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height, bottom: bounds.bottom, labelX: labelBounds.x + labelBounds.width / 2, labelY: labelBounds.y + labelBounds.height / 2, radius: parseFloat(win.getComputedStyle(column).borderTopLeftRadius), clip: fillStyle.clipPath, fillColor: fillStyle.backgroundColor, textColor: fillStyle.color, hidden: column.parentElement!.getAttribute('aria-hidden') }
         })
       })
       assert.deepEqual(gauges.map(gauge => gauge.label), ['C', 'R', 'G'])
-      assert.ok(gauges.every((gauge, index) => gauge.height === 24 && Math.abs(gauge.width - gauges[0].width) < 1 && gauge.bottom === gauges[0].bottom && gauge.radius === 4 && Math.abs(gauge.labelX - gauge.x - gauge.width / 2) < 1 && Math.abs(gauge.labelY - gauge.y - gauge.height / 2) < 1 && gauge.hidden === 'true' && (index === 0 || gauge.x > gauges[index - 1].x + gauges[index - 1].width)), 'compact rounded gauges share a baseline and center their letters in both directions')
+      assert.ok(gauges.every((gauge, index) => gauge.height === 20 && Math.abs(gauge.width - gauges[0].width) < 1 && gauge.bottom === gauges[0].bottom && gauge.radius === 4 && Math.abs(gauge.labelX - gauge.x - gauge.width / 2) < 1 && Math.abs(gauge.labelY - gauge.y - gauge.height / 2) < 1 && gauge.hidden === 'true' && (index === 0 || gauge.x > gauges[index - 1].x + gauges[index - 1].width)), 'compact rounded gauges share a baseline and center their letters in both directions')
       gauges.forEach((gauge, index) => {
         assert.match(gauge.clip, new RegExp(`^inset\\(${[63, 50, 38][index]}% `), 'usage fills each gauge from the bottom')
-        assert.equal(gauge.fillColor, light ? 'rgb(86, 66, 199)' : 'rgb(144, 130, 218)')
-        assert.equal(gauge.textColor, light ? 'rgb(255, 255, 255)' : 'rgb(23, 23, 23)')
+        assert.equal(gauge.fillColor, light ? 'rgb(82, 82, 82)' : 'rgb(163, 163, 163)')
+        assert.equal(gauge.textColor, light ? 'rgb(248, 248, 248)' : 'rgb(23, 23, 23)')
       })
       await resources.screenshot({ path: `/tmp/mew-header-resources-${mobile ? 'mobile' : 'desktop'}-${light ? 'light' : 'dark'}.png` })
       const recolored = await resources.evaluate(el => {
         const root = el.ownerDocument.documentElement
-        root.style.setProperty('--color-accent', '#0f766e')
-        root.style.setProperty('--color-ink-on-accent', '#ffffff')
-        const colors = (Array.from(el.children) as (typeof el)[]).map(column => {
+        root.style.setProperty('--color-ink-secondary', '#0f766e')
+        root.style.setProperty('--color-surface', '#ffffff')
+        const colors = (Array.from(el.firstElementChild!.children) as (typeof el)[]).map(column => {
           const style = el.ownerDocument.defaultView!.getComputedStyle(column.lastElementChild!)
           return { fill: style.backgroundColor, text: style.color }
         })
-        root.style.removeProperty('--color-accent')
-        root.style.removeProperty('--color-ink-on-accent')
+        root.style.removeProperty('--color-ink-secondary')
+        root.style.removeProperty('--color-surface')
         return colors
       })
-      assert.ok(recolored.every(color => color.fill === 'rgb(15, 118, 110)' && color.text === 'rgb(255, 255, 255)'), 'all gauges follow a changed theme accent and its text color immediately')
+      assert.ok(recolored.every(color => color.fill === 'rgb(15, 118, 110)' && color.text === 'rgb(255, 255, 255)'), 'all gauges follow changed theme secondary text and surface colors immediately')
       if (!mobile) {
         await resources.hover()
         await page.getByRole('tooltip').getByText('CPU 37% · RAM 50% · GPU 62%', { exact: false }).waitFor()
@@ -220,11 +220,11 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
       await page.locator('header button[data-tip*="CPU 37%"]').waitFor()
       unavailable = true
       await page.locator('header button[data-tip*="GPU —"]').waitFor()
-      assert.match(await resources.locator(':scope > span').nth(2).locator('span').last().getAttribute('style') ?? '', /inset\(100% /)
+      assert.match(await resources.locator(':scope > span > span').nth(2).locator('span').last().getAttribute('style') ?? '', /inset\(100% /)
       fail = true
       await page.waitForFunction("document.querySelector('header button')?.getAttribute('data-tip') === '자원 현황을 불러오지 못했습니다'")
       assert.equal(await page.locator(`[id="${resourceDescription}"]`).textContent(), 'CPU — · RAM — · GPU —')
-      assert.ok((await resources.locator(':scope > span > span:last-child').evaluateAll(fills => fills.map(fill => fill.getAttribute('style')))).every(style => style?.includes('inset(100% ')), 'failed samples clear every gauge')
+      assert.ok((await resources.locator(':scope > span > span > span:last-child').evaluateAll(fills => fills.map(fill => fill.getAttribute('style')))).every(style => style?.includes('inset(100% ')), 'failed samples clear every gauge')
       await page.keyboard.press('Escape')
       await summary.waitFor({ state: 'detached' })
       // Freeze roaming so edge positions and the tail can be checked exactly.

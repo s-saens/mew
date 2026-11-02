@@ -16,10 +16,10 @@ export function HeaderResources({ onOpen }: { onOpen: () => void }) {
     const controller = new AbortController()
     let pending = false
     const poll = async () => {
-      if (pending || controller.signal.aborted) return
+      if (pending || controller.signal.aborted || document.visibilityState === 'hidden') return
       pending = true
       try {
-        const next = await fetchSystemStats(AbortSignal.any([controller.signal, AbortSignal.timeout(10_000)]))
+        const next = await fetchSystemStats(AbortSignal.any([controller.signal, AbortSignal.timeout(10_000)]), { processes: false })
         if (controller.signal.aborted) return
         setStats(next)
         setFailed(false)
@@ -30,8 +30,14 @@ export function HeaderResources({ onOpen }: { onOpen: () => void }) {
       } finally { pending = false }
     }
     void poll()
-    const timer = window.setInterval(() => { void poll() }, 500)
-    return () => { controller.abort(); clearInterval(timer) }
+    const timer = window.setInterval(() => { void poll() }, 2_000)
+    const onVisibilityChange = () => { if (document.visibilityState !== 'hidden') void poll() }
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    return () => {
+      controller.abort()
+      clearInterval(timer)
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+    }
   }, [])
 
   const gpuUsage = stats?.gpus.map(gpu => gpu.utilization).filter((value): value is number => value !== null && Number.isFinite(value)) ?? []
