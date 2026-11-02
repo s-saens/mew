@@ -1,31 +1,51 @@
 ---
 title: "Task panel and Markdown storage contract"
 created: 2026-10-03
-updated: "2026-10-29"
-description: "Defines the contracts for task lists, calendars, Gantt charts, Markdown properties, concurrent editing, and save serialization, as well as the boundaries between .mew/tasks source files, moves to Done, migration of existing docs/tasks·tasks, and installation-specific metadata."
+updated: "2026-11-03"
+description: "Task panel contracts for input, tags, assignees, dates, list/calendar/Gantt views, and sorting. Defines Markdown source and installation metadata, Done-folder and legacy migration, API permissions, concurrent saves, client recovery, and recorded verification."
 상위파일: "MOC.md"
 ---
 
 [Features](../features/projects-files-search/task-panel-list-calendar-and-gantt.md) · [Usage](../../../docs/guides/projects.md#tasks)
 
-The standalone task panel provides list, calendar, and Gantt views that read existing Markdown. Open and close it from the dock or with the default `Alt+T` shortcut. The [editor DB Gantt view](../../../docs/guides/database.md#switching-views) is also retained; the two datasets are not automatically migrated or synchronized. The panel restoration decision follows [0052](../decisions/0052-restore-task-panel.md).
+The standalone task panel reads Markdown through list, calendar, and Gantt views. Toggle it from the dock or with the default `Alt+T` shortcut. The [editor DB Gantt view](../../../docs/guides/database.md#switching-views) remains a separate dataset, without automatic migration or synchronization. See the restoration decision [0052](../decisions/0052-restore-task-panel.md).
 
 ## Input and panel
 
-- List and calendar item text is truncated to one line with `…` when space is insufficient. Focusing the input displays the full content across multiple lines; leaving focus collapses it back to one line. Original text and Shift+Enter line breaks are preserved.
+The `tasks` docking panel manages the current root project's flat list independently of memos. Items are `{id, text, done, tags?, assignees?, startDate?, date?, path?}`; tags, assignees, and dates are optional. There is no priority property.
 
-- With the task panel selected, Ctrl/Cmd+N, Ctrl/Cmd+T, and Alt+N (including a customized `newTab`) invoke the new-item action. List and calendar views move focus to the end of the final draft input, preserving any draft in progress. Items committed in the calendar receive the selected date and active tag filter. Gantt adds an item with the default title, like the existing New Task button, and applies the active tag filter. The action does not run in read-only mode, while loading, or at the 2,000-item limit, and does not fall through to new file creation. The same registration is maintained across the header, body, empty areas, popup/docked modes, and project switches. Modals, IME, and repeated input follow the shared creation-key blocking contract. `server/task-shortcuts-ui.test.ts` checks the actual TaskPanel and capture handling on PC/mobile across all three views, draft preservation, project switching, permissions, loading, and the item limit.
+| Input or action | Behavior |
+| --- | --- |
+| List/calendar text | Collapses to one line with `…` when space is insufficient; focus expands the full text. Blur collapses it without changing text or Shift+Enter line breaks |
+| Final draft input | Empty and unfocused: only a horizontally centered +, without text or checkbox. Click the row or Tab into the existing input to type |
+| Enter or focus leaving the draft | Creates an object; after Enter, the same input accepts the next item |
+| Enter in an existing item | Splits at the cursor/selection, retaining the original ID on the left and assigning a new ID on the right |
+| Shift+Enter | Inserts a line break within the item |
+| Multiline paste | Creates one object per line; the first line in an existing item keeps its ID |
+| Backspace in an empty item | Deletes it. The delete button can also remove the first item |
+| Up/Down at the beginning/end | Moves to adjacent items |
+| Enter during IME composition | Neither creates nor splits tasks |
+| Checkbox click/tap | Changes completion only, preserving saved order. The default filter hides completed items immediately; shown completed items have strikethrough and remain editable |
 
-- The popup/panel toggle icon in the PC title bar changes only the display mode while retaining the same task panel. The display choice was removed from display settings, and mobile uses the panel without a toggle button. Popup/position restoration and the topmost settings window follow the [shared UI contract](ui-overlays.md#settings-window-layer).
+After button or empty-item Backspace deletion, focus stays off other inputs so the mobile keyboard does not reopen.
 
-- This is a `tasks` docking panel independent of memos that manages tasks for the current root project. Items are `{id, text, done, tags?, assignees?, startDate?, date?, path?}` objects. All items are at the same level, and tags, assignees, and dates are optional properties. Priority is not provided.
-- The final input is a draft for a new item. When empty and unfocused, it shows only a horizontally centered + icon instead of text or a checkbox; clicking the row or tabbing into it allows typing in the existing input. Enter or moving focus creates an object, and after Enter, the same input accepts the next item. Enter in an existing item splits the content at the cursor/selection position, retaining the original item ID. The content on the right receives a new ID. Shift+Enter inserts a line break within the same item.
-- Multiline paste creates one object per line. When pasted into an existing item, the first line retains the original ID. Backspace on an empty item deletes that object. After deletion through the delete button or Backspace on an empty item, focus does not automatically move to another item or the new input, so the mobile keyboard does not reopen. The first item can be removed with the delete button. When the cursor is at the beginning/end, the up/down arrows move to adjacent items. Enter during IME composition does not create or split tasks.
-- The checkbox changes only the object's completion state and preserves saved order. The default filter hides an item immediately upon completion; when completed items are shown, they appear with strikethrough and remain directly editable. Delete icons for list/calendar items are hidden both by default and on hover. Swiping an item left reveals a delete icon on the right, and the object is deleted only when the icon is pressed. Swiping right, clicking outside, Esc, or switching views closes it, and only one item can be open at a time. Vertical movement and pointer cancellation do not reveal deletion; checkbox reordering and horizontal tag scrolling retain their existing behavior. With the keyboard, Alt+Delete within an item reveals and focuses the icon, then Enter/Space deletes it. Swipe deletion is unavailable in read-only mode.
-- Dragging the checkbox area at least 6px switches to reordering, while a short click/tap still toggles completion. A copy of the item follows the pointer, an insertion line appears, and the body automatically scrolls at the edges. The displayed order changes immediately whenever the pointer crosses another item's midpoint, and surrounding rows move with the same reorder animation as tabs and the dock. The preview order remains internal to the panel; on drop, the final position is applied to the latest objects and saved automatically. Cancellation restores the original order, and external structural changes cancel the move. Checked state, body text, and IDs are preserved, and synthetic clicks after dragging are blocked. Esc, pointercancel, capture release, window resizing, blur, and screen hiding cancel the move; Esc does not propagate to close the panel. Existing scrolling and text selection remain available in inputs and regular body content.
-- Items can also be moved with Alt+Up/Down while the checkbox has focus. During dragging, cancellation, and keyboard moves, surrounding rows use the shared `useReorderAnimation` curve of 180ms, with animation omitted under `prefers-reduced-motion`.
-- Save-in-progress status appears immediately to the right of the task title in the title bar. The status remains visible even when the title collapses to an icon on narrow screens and is truncated to fit the remaining width before the view tabs.
-- Shares the 36px common header, DockGrip, maximize/restore, split boundaries, dock, mobile foreground stack, and Esc/Back behavior. The open state is restored per account from `chrome.tasksOpen`, and the position from the `tasks` dock kind. On mobile, the input is not automatically focused.
+**New-item shortcuts.** With this panel selected, Ctrl/Cmd+N, Ctrl/Cmd+T, Alt+N, or a customized `newTab` invoke its action:
+
+- List/calendar focus the end of the final draft without losing input. Calendar commits receive the selected date and active tag filter.
+- Gantt creates the default title, as New Task does, with the active tag filter.
+- Read-only mode, loading, and the 2,000-item limit block creation without falling through to new-file creation. Registration covers header, body, empty areas, popup/docked modes, and project switches. Modals, IME, and repeats follow shared creation-key blocking.
+
+`server/task-shortcuts-ui.test.ts` checks actual TaskPanel/capture handling on PC/mobile across all three views, draft preservation, project switches, permissions, loading, and the limit.
+
+**Swipe deletion.** List/calendar delete icons are hidden even on hover. Swipe left to reveal one icon; only pressing it deletes. Swipe right, outside click, Esc, or a view change closes it; only one item may be open. Vertical motion and pointer cancellation do not reveal it. Checkbox reordering and horizontal tag scrolling are unchanged. Alt+Delete within an item reveals and focuses the icon; Enter/Space deletes. Read-only mode disables swipe deletion.
+
+**Reordering.** Drag the checkbox area at least 6px; shorter clicks/taps still toggle completion. An item copy follows the pointer with an insertion line and edge autoscroll. Crossing another row's midpoint immediately updates the preview and animates surrounding rows like tabs/dock. The preview stays local until drop applies its final position to the latest objects and autosaves. Completion, body, and IDs survive; synthetic post-drag clicks are blocked.
+
+Cancellation restores order. External structural changes, Esc, pointercancel, capture release, resize, blur, or screen hiding cancel; Esc does not close the panel. Inputs/body retain scrolling and text selection. Alt+Up/Down moves a checkbox-focused item. Dragging, cancellation, and keyboard moves use `useReorderAnimation` at 180ms, omitted under `prefers-reduced-motion`.
+
+**Panel chrome.** The PC title-bar popup/panel toggle changes display mode without replacing the panel; this choice was removed from display settings. Mobile has no toggle and does not autofocus input. Popup/position restoration and topmost settings follow the [shared UI contract](ui-overlays.md#settings-window-layer).
+
+The panel shares the 36px header, DockGrip, maximize/restore, split boundaries, dock, mobile foreground stack, and Esc/Back. Account restoration uses `chrome.tasksOpen` and the `tasks` dock position. Save status sits immediately right of the title, remains visible when narrow layouts collapse the title to an icon, and truncates before the view tabs.
 
 ## Assignees
 
@@ -104,48 +124,125 @@ The standalone task panel provides list, calendar, and Gantt views that read exi
 
 ## Saving and concurrent edits
 
-- Ordinary Markdown that is not registered by path or filesystem identifier and has no YAML frontmatter is excluded from task queries and saves, preserving its original content. A single body-only file does not block retrieval of all valid tasks. Missing frontmatter in a registered task, an unclosed YAML block, invalid YAML, or invalid task properties continue to be treated as errors that block saving.
-- The `_tasks.md` parent document and existing `MOC.md`, `_MOC.md`, and `README.md` guide documents are excluded from task queries, migration, modification, and deletion regardless of case, preserving their original content. Tasks with titles matching these reserved names are numbered starting at `(2)` to avoid guide paths. Required task property and corruption validation remain in place for other Markdown files. Ordinary tasks such as `_CON.md`, whose names were adjusted for Windows reserved names, are read as usual.
-- The canonical source for tasks is the `.md` files in the root project's `.mew/tasks/` and its immediate `Done/` subfolder. Incomplete tasks are stored at the root, completed tasks in `Done/`, and uncompleting a task returns it to the root. Existing completed documents are also migrated under the same rule during queries with write permission and saves. Other subfolders are not read as tasks. YAML frontmatter `title` and `done` are required; `tags` (array), `assignees` (email array), `startDate`, and `date` (ISO dates) are optional. `title` serves as both task text and document title. Panel edits preserve the Markdown body, other frontmatter properties, and comments, and do not automatically generate a separate H1.
-- Editing the body or other properties in Hotview preserves existing YAML block and inline arrays for `tags` and `assignees`. Multiline properties are not interpreted as empty values, and fields whose value, name, or type was not directly changed retain their original YAML and comments. Tags are removed only through explicit tag value edits or field deletion. `task-markdown.test.ts` checks that tags, assignees, and IDs survive repeated body saves and subsequent panel edits.
-- Open task documents send the last saved source text as `expectedContent` with autosaves, explicit saves, saves before tab replacement, and saves before document moves. `PUT /api/file` applies 3-way comparison of title, description, completion, start date, due date, tags, and assignees only to individual documents in that root's `.mew/tasks`, `.mew/tasks/Done`, and legacy `tasks`. Properties unchanged in the editor retain current on-disk additions, modifications, and deletions; directly changed properties are saved. If both sides change the same property differently, the operation stops with 409 before writing. YAML arrays, existing array strings, and empty values for tags and assignees are compared semantically, as are completion booleans and `"true"`/`"false"`. This merge is not applied to guide documents or ordinary files.
-- When the server returns merged source text, it is reflected in the editor buffer, save baseline, and cache. Body input entered while awaiting the response is preserved while the latest properties are merged, preventing the next autosave from reviving stale titles or tags. Server task-save regressions are checked with `task-document-save.test.ts`; actual tab, autosave, and response-during-input regressions are checked with `task-document-save-ui.test.ts`.
-- `done: "true"`/`"false"` stored as strings by the document property editor are also read as completion values. A string `tags` is read as no tags if empty, one tag if it is a single name, or a tag list if it is a YAML/JSON inline array string, with existing name, duplicate, and count validation applied. Queries or saves without changes do not rewrite a document solely because of this representation. Other completion strings and malformed tag arrays continue to be rejected.
-- Creation makes `<태스크 제목>.md`, and deletion removes the entire linked file. External changes to titles, tags, ranges, and completion, as well as file creation, renaming, and deletion, are reflected as-is on the next query. `id` is not written to frontmatter. Internal IDs, file paths, and filesystem identifiers (device/inode) are stored in per-root version 5 metadata, preserving items through panel title changes and external renames within the same filesystem. Legacy document `id` is moved to metadata and removed during queries with write permission or saves, preserving the body and user properties. Documents without metadata are also read using filesystem identifiers, and replacing a file externally preserves the ID at the same path. Moves that change both metadata and filesystem identifiers may be recognized as new items. Corrupt YAML, duplicate IDs, invalid properties, and symbolic links are treated as errors rather than overwritten with an empty list.
-- Version 5 of `DATA_DIR/task-list-<루트 절대경로 SHA-256>.json` stores order (`order`), the list of used tags (`tags`), selected colors by tag name (`tagColors`: name → palette hue), and internal IDs with file association information (`documents`: id/path/device/inode). Task content and properties are not duplicated in JSON. It is shared per root, and switching subproject tabs uses the same list.
-- Existing version 1 and 2 JSON and version 3 `tasks/<ID>.md` are migrated to `.mew/tasks/<제목>.md` or, depending on completion state, `.mew/tasks/Done/<제목>.md` when an account with write permission queries or changes the panel. IDs, titles, completion, tags, displayed ranges, order, bodies, and user properties are preserved, and migrated originals are removed. Read-only queries alone do not trigger migration. If existing version 1 or 2 JSON coexists with Markdown, or duplicate IDs exist in both locations, this is treated as an error rather than arbitrarily overwriting or deleting anything. Version 4 title-based documents likewise have `id` removed and their association information registered. Legacy `project-tasks-*.json`, personal home todos, and shared memo files are neither read nor changed. The [record before removal](../history/project-tasks.md) is retained as history.
-- Ordinary titles are used directly as filenames, including spaces and Korean characters. Duplicate titles receive `(2)`, `(3)` suffixes, and differences in case or Unicode normalization are also treated as collisions. Existing duplicate numbers are retained after deletion or reordering. Characters that cannot be used in filenames and control characters are replaced with `-`, and leading/trailing whitespace and trailing periods are removed. Empty titles use `제목 없음`, Windows reserved names receive the `_` prefix, and long names are limited to 200 bytes while preserving Unicode characters. These filename adjustments do not change the original `title`.
-- `GET /api/task-list?workspace=<현재 루트>` → `{tasks, canEdit, tags, tagColors}`. `PATCH /api/task-list` accepts `{workspace, changes, tagColorChanges?, deletedTags?}` and returns the same board format. The request's `X-Mew-Task-Owner` must be the URL-encoded login email and must match the session.
-- `deletedTags` is an array of unique, valid tag names (up to 2,000). Deletions are applied to the server's latest full list, and deleted tags are also excluded when checking ordinary field changes. Tasks added in other windows are included in the deletion scope, and retries of the same deletion are treated as successful. Deletions are saved to Markdown and metadata together with other task/color changes in the same PATCH. Deletion requests are retained in browser drafts and in the queue after any save in progress, and follow the existing automatic/explicit retry behavior and full-file editing permissions.
-- Color changes use `{tag, before, after}`; `before=null` means no custom color, and `after` is a hue from the 16-color palette. Color metadata stores up to 2,000 tags and validates tag names, palette values, and duplicate changes. Conflicting edits to the same tag return 409; edits to different tags and retries with the same value are merged. Colors are saved through the same PATCH and metadata write as task changes and are preserved during regular task saves and migration. Changing only colors does not duplicate color attributes in Markdown. It shares the existing automatic retries, browser drafts, explicit resaving, and root/account/file permission boundaries; other windows receive changes on their next periodic fetch.
-- A change is `{id, before, after, afterId, move?}`. `before=null` means creation, `after=null` means deletion, and if both are objects, it is a field change. New objects are inserted after `afterId`, or at the beginning if it is null. For an existing object, `move=true` moves it after `afterId` independently of field changes. The object is not recreated. Creation, deletion, movement, and content changes are handled together in the same PATCH.
-- Moves preserve the object's current server content and are applied relative to an anchor. They merge with content/completion edits from other windows and do not remove new objects. If order is changed concurrently, the anchor of the move saved later takes effect. Missing objects or anchors follow the existing conflict path. Retrying after a lost response does not create duplicate moves.
-- The server compares the current object with `before`. Edits to different IDs or fields are merged, and a field already equal to `after` is treated as successful. Conflicting edits to the same field, deletion of a modified object, and a missing insertion position return 409. After validating the entire change batch, each Markdown file is saved using a temporary file plus rename, and order metadata is saved last. Write failures restore changed files. External processes may see intermediate states while multiple files are being saved; multi-file transactions that cover forced process termination are not provided. Save failures and corrupted files are not overwritten with an empty list.
-- Login and permission to view all files in the root are required; writes also require permission to edit all files. Read-only accounts can only view the list. Account or current-root mismatches return 409, insufficient permissions return 403, invalid input returns 400, and save/read failures return 500. Guest and temporary-password accounts are blocked at the existing HTTP authentication boundary.
-- The limit is 2,000 items, with 8,000 characters of content per item; IDs contain 1–100 letters, digits, underscores, or hyphens. Empty content is allowed as a standalone item during line splitting and is not generated automatically. Duplicate IDs and format errors are rejected. The panel manages title/done/tags/assignees/startDate/date, and other document properties are preserved. The change API rejects new parentId values.
+**Source and exclusions.** Canonical tasks are `.md` files in the root project's `.mew/tasks/` and its immediate `Done/` subfolder; other subfolders are excluded. Incomplete tasks stay at the root; completion moves them to `Done/`, and uncompleting returns them. Writable queries/saves also move existing completed documents.
 
-Moves based on completion status also preserve item IDs, order, body content, and user properties. Relative body links in moved documents are adjusted for the new location. Name collisions are avoided with numbering in each folder, and reserved guide-document names and symlink blocking apply equally to both locations. The `Done` folder is created on the first completion save, and documents are restored if writing or saving metadata fails. `server/task-done-folder.test.ts` checks completion, restoration, same-name items, migration of existing documents, failure recovery, link adjustment, and symlink rejection.
+| Document | Treatment |
+| --- | --- |
+| Ordinary body-only Markdown, unregistered by path or filesystem identifier | Excluded from task queries/saves without changing content; one such file does not block valid tasks |
+| Registered task missing frontmatter, unclosed/invalid YAML, or invalid properties | Error; blocks saving |
+| `_tasks.md`, `MOC.md`, `_MOC.md`, `README.md`, regardless of case | Excluded from queries, migration, modification, and deletion. Matching task titles receive numbering from `(2)` |
+| Other Markdown, including Windows-adjusted `_CON.md` | Normal task property/corruption validation |
+
+YAML `title` and `done` are required; `tags` (array), `assignees` (email array), `startDate`, and `date` (ISO dates) are optional. `title` supplies both task text and document title. Panel edits preserve body, other properties, and comments without generating an H1.
+
+**Editor property preservation.** Hotview body/other-property edits retain YAML block/inline arrays for `tags` and `assignees`. Multiline values are not empty values. Unchanged field values, names, and types keep their YAML/comments; only explicit tag edits or field deletion remove tags. `task-markdown.test.ts` checks repeated body saves and later panel edits preserve tags, assignees, and IDs.
+
+Open task documents send the last saved source as `expectedContent` with autosaves, explicit saves, saves before tab replacement, and saves before moves. `PUT /api/file` performs a 3-way property comparison only for individual task documents in that root's `.mew/tasks`, `.mew/tasks/Done`, and legacy `tasks`; guides and ordinary files are excluded.
+
+- Compared fields: title, description, completion, start/due dates, tags, and assignees. Unchanged editor fields retain current disk additions, modifications, and deletions; directly changed fields save.
+- Different changes to the same property return 409 before writing. Tag/assignee YAML arrays, array strings, and empty values compare semantically, as do completion booleans and `"true"`/`"false"`.
+- Returned merged source updates the editor buffer, save baseline, and cache while preserving body input received during the request. This prevents later autosaves reviving stale titles/tags. `task-document-save.test.ts` covers server merges; `task-document-save-ui.test.ts` covers tabs, autosave, and response-during-input.
+
+Document-property strings remain compatible: `done: "true"`/`"false"` are completion values. String `tags` means no tags when empty, one tag for a single name, or multiple tags for a YAML/JSON inline array string, with normal name/duplicate/count validation. Unchanged queries/saves do not rewrite this representation. Other completion strings and malformed tag arrays are rejected.
+
+**Identity and metadata.** Creation makes `<태스크 제목>.md`; deletion removes the entire linked file. Queries reflect external property edits, creation, renaming, and deletion. `id` is not written to frontmatter.
+
+Version 5 of `DATA_DIR/task-list-<루트 절대경로 SHA-256>.json` stores:
+
+| Key | Content |
+| --- | --- |
+| `order` | Saved order |
+| `tags` | Used tag names |
+| `tagColors` | Name → palette hue |
+| `documents` | Internal id/path/device/inode associations |
+
+Content/properties are not duplicated in JSON. Metadata is shared per root, including subproject tabs. Associations preserve IDs through panel title changes and same-filesystem external renames. Documents without metadata use filesystem identifiers; external replacement at the same path keeps the ID. Moves changing both metadata and filesystem identifiers may appear as new items. Corrupt YAML, duplicate IDs, invalid properties, and symlinks are errors, never replacements with an empty list.
+
+**Legacy migration.** Accounts with write permission trigger migration by querying or changing the panel; read-only queries do not.
+
+- Version 1/2 JSON and version 3 `tasks/<ID>.md` become `.mew/tasks/<제목>.md` or `.mew/tasks/Done/<제목>.md` according to completion. Preserve IDs, titles, completion, tags, displayed ranges, order, bodies, and user properties; remove migrated originals.
+- Legacy document `id` moves into metadata and is removed on writable queries/saves, preserving body/user properties. Version 4 title-based documents likewise register associations and remove `id`.
+- Coexisting version 1/2 JSON and Markdown, or duplicate IDs across locations, cause errors rather than arbitrary overwrite/deletion.
+- Legacy `project-tasks-*.json`, personal home todos, and shared memo files are neither read nor changed. Preserve the [record before removal](../history/project-tasks.md).
+
+**Filenames.** Use ordinary titles directly as filenames, retaining spaces/Korean characters. Duplicate, case-equivalent, or Unicode-normalization-equivalent names receive `(2)`, `(3)` suffixes; existing numbers survive deletion/reordering. Invalid filename/control characters become `-`; leading/trailing whitespace and trailing periods are removed. Empty names use `제목 없음`, Windows reserved names get `_`, and names are capped at 200 bytes without splitting Unicode characters. These adjustments never change `title`.
+
+**API and access.**
+
+| Contract | Rule |
+| --- | --- |
+| `GET /api/task-list?workspace=<현재 루트>` | Returns `{tasks, canEdit, tags, tagColors}` |
+| `PATCH /api/task-list` | Accepts `{workspace, changes, tagColorChanges?, deletedTags?}`; returns the same board format |
+| `X-Mew-Task-Owner` | URL-encoded login email matching the session |
+| Read | Login and permission to view every file in the root; read-only accounts cannot write |
+| Write | Permission to edit every file |
+| Errors | Account/current-root mismatch: 409; insufficient permission: 403; invalid input: 400; read/save failure: 500 |
+| HTTP boundary | Blocks guests and temporary-password accounts |
+| Limits | 2,000 items; 8,000 content characters each; IDs: 1–100 letters, digits, underscores, or hyphens |
+
+Empty standalone content is allowed during line splitting but never generated automatically. Duplicate IDs and format errors are rejected. The panel manages title/done/tags/assignees/startDate/date and preserves other properties; the change API rejects new parentId values.
+
+**Change batches.** A change is `{id, before, after, afterId, move?}`:
+
+| Shape | Effect |
+| --- | --- |
+| `before=null` | Create after `afterId`, or first if the anchor is null |
+| `after=null` | Delete |
+| Both objects | Change fields |
+| Existing object with `move=true` | Move after `afterId` independently of field changes; never recreate it |
+
+Creation, deletion, movement, and content edits share one PATCH. Anchored moves preserve current server content and merge with other-window content/completion edits without removing new objects. For concurrent order changes, the later saved anchor wins. Missing objects/anchors conflict; lost-response retries do not duplicate moves.
+
+The server compares current values with `before`. Different IDs/fields merge; values already equal to `after` succeed. Same-field conflicts, deleting modified objects, and missing insertion positions return 409. Validate the entire batch before writing each Markdown file by temporary-file rename, then save order metadata last. Write failure restores changed files. External processes may see intermediate multi-file states; forced-termination-safe multi-file transactions are not provided. Save failure/corruption never causes an empty-list overwrite.
+
+**Global tag deletion.** `deletedTags` is an array of up to 2,000 unique valid names. Apply deletions to the latest full list, including other-window additions; exclude deleted tags from ordinary field-change checks. Retries of the same deletion succeed. Markdown, metadata, task edits, and color edits save in the same PATCH. Browser drafts retain deletion requests queued after an active save, with existing automatic/explicit retries and full-file edit permissions.
+
+**Tag colors.** Changes use `{tag, before, after}`: `before=null` means no custom color; `after` is a 16-color palette hue. Metadata holds up to 2,000 tags and validates names, palette values, and duplicate changes. Same-tag conflicts return 409; different-tag edits and same-value retries merge. Colors share task PATCH/metadata writes and survive ordinary saves/migration without duplicating Markdown attributes. Existing retries, browser drafts, explicit resaving, and root/account/file permissions apply; other windows receive colors on their next periodic fetch.
+
+**Completion moves.** Preserve IDs, order, body, and user properties; adjust relative body links to the new location. Both folders use collision numbering, reserved-guide protection, and symlink blocking. Create `Done` on first completion save; restore documents if file/metadata saving fails. `server/task-done-folder.test.ts` checks completion, restoration, same-name items, existing-document migration, failure recovery, links, and symlink rejection.
 
 ## Client Lifecycle and Errors
 
-- `tags` and `assignees` in documents without type annotations are also displayed as individual tags and selected/deselected according to the [editor's default multiselect rules](packages.md). Neither existing nor newly created documents require a separate type migration or per-field registration. Types and display are calculated from the current document's fields even when the panel saves values again or fields disappear.
+**Document types.** `tags` and `assignees` without type annotations use the [editor's default multiselect rules](packages.md) for display/selection. Existing/new documents need no type migration or field registration. Types/display derive from current fields, including after panel saves or field removal.
+
+**Read/save coordination.**
+
 - List reads and saves are serialized and wait for document saves in progress to finish. Reads do not force unsaved body content to be saved, preventing files from being recreated before external deletion is detected. Before panel changes, unsaved documents are saved first as before. Deleted items are also compared by ID and passed to open tabs, while renaming an item with the same ID preserves its tab.
-- Tabs with saved content for deleted documents are closed, and caches, navigation history, title previews, and scheduled or pending autosaves are cleared. If new input arrives during deletion detection or unsaved content remains, the body and save baseline are preserved in a read-only error tab. If the target path for saving an existing task with `expectedContent` has disappeared due to deletion or movement, the server returns 409 before writing to prevent file recreation. Explicit new-file creation requests without a save baseline remain supported.
-
-- Titles entered in the editor title field or tasks appear immediately in the explorer, tasks, open editor titles, and tabs without waiting for the save response. Previews are cleared when switching working folders or accounts, and acknowledgments for earlier saves do not erase newer input. Actual file moves follow the existing autosave and task synchronization sequence; file opening and saving use the existing path until confirmation. Renaming in Documents also updates `title`.
-- Renaming the same document's file preserves its document identifier in the editor. The title input is not recreated while the collaborative document is connected to the new path, and body selection and scroll position are restored. Moving to another document assigns a new identifier. Immediate title updates from task input do not add a separate editor autosave.
-- Even if additional input arrives during document autosave, the source text from the successful response is recorded as the new `savedContent` baseline. The same rule applies to normal responses where the server has not supplemented the content, and new input is preserved. The next autosave for the same document runs with the latest source text and save baseline after the preceding request and React state updates finish. Different documents can be saved in parallel, and pending autosaves are not run consecutively after a failed request. This prevents an earlier title save by the same client from being mistaken for an external edit while preserving 409 conflict protection for actual changes to the same property elsewhere.
-- `task-document-sync` compares confirmed items in task read/save responses by ID and passes changed paths and properties to `useTabs`. It adjusts paths and per-tab navigation history in all open split panes and inactive tabs, and also updates the same file opened from both Documents and Files. Paths are converted based on the configured Documents root and current working folder, and late responses from other working folders are not applied.
-- If a task save succeeds but the subsequent read of an open document fails, the task changes are not resent. The previous document comparison baseline is retained so the body update can be retried on the next task read. `server/document-title-sync-ui.test.ts` checks the three change paths, split panes and inactive tabs, body input, direct saves, and tab closing during delayed reads/saves, title swaps between two items, title display before save responses, and preservation of title input focus and cursor before and after collaborative connection changes.
 - Before task reads or saves, editor saves in progress are awaited and open drafts are saved. Reads can also move files to match titles, so they receive the same protection as saves. They run serially with document structure changes, deferring autosaves, direct saves, and closing tabs being edited until file moves and body rereads finish, then resuming at the new path. Additional input during requests is preserved, and unchanged titles, descriptions, completion states, dates, tags, and assignees are merged with the latest file. Conflicting server changes to the same property are treated as save conflicts.
-- `useTaskList` maintains a per-root, per-account `TaskListSession` in App. Input is reflected immediately and saved 350 ms after the last input or when an existing item blurs. Closing the panel or remounting it for docking preserves the session and pending saves. When the project changes, previous requests are blocked by the server's workspace check, and previous drafts remain in their session.
-- Additional input during write responses or reads is merged back as local changes and preserved. Authenticated SSE from `GET /api/task-list/events` batches creation/deletion and file changes in the root, docs, task, and Done folders at 75 ms intervals and immediately triggers a reread. Subscriptions are released according to the panel, account, and root lifecycle and terminated when the root or permissions change. If the stream is unavailable or disconnected, polling every 3 seconds and reads when returning to the browser provide fallback coverage. When there are local changes, saves in progress, or save errors, polling does not replace input. Read errors do not block subsequent reads, and recovery responses also merge and preserve pending local changes and drafts. This object API is separate from Yjs collaborative editing for notes.
-- Unsaved changes and the content and tags of the latest input draft are stored in the browser under `mew:task-draft:<이메일>:<루트>:<창 ID>`. The window ID is retained in sessionStorage so other windows using the same account do not clear the stored draft. Changes are cleared after server saves, and any draft remaining after a refresh is merged back into the server read results. Drafts on the current page are retained even if storage is full.
-- Network failures, timeouts, and HTTP 5xx errors during reads/saves are automatically retried up to twice, after 1 and 3 seconds, without showing an initial warning. Initial reads follow the same path, and read errors shown after repeated failures are automatically cleared by the next successful response. HTTP 4xx errors (concurrent edits, account/project changes, permissions, or input errors) and invalid JSON or board formats are displayed immediately. Actual conflicts on the same field are not automatically overwritten.
-- Save retries resend the exact same change batch to handle lost responses. If retries also fail, the latest list is read to check whether all task changes, colors, and complete tag deletions have been applied before displaying a save error. Batches already applied are treated as successful, and additional input received in the meantime is saved separately. If verification is impossible or changes remain unapplied, the input, error, and Save Again button are retained. When the user saves again, only locally changed fields are applied to the latest server list; for same-field conflicts, this is an explicit action that applies the confirmed local content. When accounts change, all read/save retry timers for the previous account's session are stopped.
-- `src/api/task-list.ts` applies a 30-second limit to read/save requests, including receipt of the response body, and preserves the HTTP status of both responses. Successful responses are also validated for item types, duplicate IDs, tags, assignees, date ranges, colors, and board structure; format errors are not treated as valid lists or transient network failures.
 
-- The date-range picker uses `DateCalendar` from `@mew/ui`. Markdown Hotview date properties also use the same component in single-date mode.
+**Deletion and renaming.**
+
+- Deleted documents with saved content close their tabs; clear caches, navigation history, title previews, and pending/scheduled autosaves. New input during detection or remaining unsaved content keeps the body/baseline in a read-only error tab.
+- If an existing task's save path disappeared through deletion/movement, a request with `expectedContent` returns 409 before writing, preventing recreation. Explicit new-file creation without a baseline remains supported.
+- Editor/task title input immediately updates explorer, task, editor, and tab titles. Folder/account switches clear previews; older acknowledgments cannot erase newer input. Until confirmation, opening/saving uses the old path under existing autosave/task-sync sequencing. Documents rename also updates `title`.
+- Renaming the same file preserves its editor document identifier, title input instance during collaboration reconnection, body selection, and scroll. Another document gets a new identifier. Task title previews do not add an editor autosave.
+
+**Document save baseline.** Every successful response supplies the new `savedContent`, even without a server merge or when more input has arrived. Preserve that input. The next autosave for this document waits for the preceding response and React state updates, then uses the latest source/baseline. Other documents may save in parallel; failed requests do not trigger consecutive pending autosaves. This avoids mistaking the client's previous title save for an external edit while retaining real same-property 409 conflicts.
+
+**Task-to-tab synchronization.** `task-document-sync` compares confirmed read/save items by ID and passes path/property changes to `useTabs`. Update all split panes, inactive tabs, per-tab history, and the same file opened through Documents and Files. Convert paths using the configured Documents root/current working folder; ignore late responses from other folders.
+
+A successful task save followed by a failed open-document read must not resend task changes. Retain the previous comparison baseline and retry the body update on the next task read. `server/document-title-sync-ui.test.ts` covers all three change paths, split/inactive tabs, body input, direct saves, closing tabs during delayed reads/saves, title swaps, pre-response titles, and title input focus/cursor across collaboration changes.
+
+**Session and browser drafts.** `useTaskList` keeps a per-root, per-account `TaskListSession` in App. Input updates immediately and saves 350 ms after the last input or on an existing item's blur. Panel close/docking remount preserves session and pending saves. Project changes leave prior drafts in their session and block prior requests through the server workspace check. Input received during writes/reads merges back as local changes.
+
+Unsaved changes and latest draft content/tags persist at `mew:task-draft:<이메일>:<루트>:<창 ID>`. sessionStorage retains the window ID so another window for the same account cannot clear the draft. Server saves clear changes; refresh merges remaining drafts into read results. Current-page drafts survive even when storage is full.
+
+**Live updates.** Authenticated `GET /api/task-list/events` SSE batches creation/deletion and file changes in root/docs/task/Done folders every 75 ms and triggers an immediate reread. Panel/account/root lifecycle releases subscriptions; root/permission changes terminate them. If unavailable/disconnected, poll every 3 seconds and read on browser return. Local changes, active saves, or save errors prevent polling from replacing input. Read errors do not block later reads; recovery responses preserve local changes/drafts. This object API is separate from notes' Yjs editing.
+
+**Errors and retries.**
+
+| Result | Behavior |
+| --- | --- |
+| Network failure, timeout, HTTP 5xx | Retry reads/saves up to twice, after 1 and 3 seconds, without an initial warning; initial reads follow the same path |
+| Read error after exhausted retries | Display it; clear it on the next successful response |
+| HTTP 4xx: concurrent edits, account/project change, permissions, invalid input | Display immediately; never automatically overwrite real same-field conflicts |
+| Invalid JSON/board format | Display immediately, never accept as a list or treat as a transient network failure |
+
+Save retries resend the exact change batch. If exhausted, read the latest list and verify every task change, color, and complete tag deletion before showing failure. Already-applied batches succeed; later input saves separately. If verification fails or changes remain unapplied, retain input, error, and Save Again. Explicit resaving applies only locally changed fields to the latest list; same-field conflicts use the user's confirmed local content. Account changes stop every old-session read/save retry timer.
+
+`src/api/task-list.ts` limits reads/saves to 30 seconds including response-body receipt and preserves HTTP status. Validate even successful responses for item types, duplicate IDs, tags, assignees, ranges, colors, and board structure.
+
+The range picker uses `DateCalendar` from `@mew/ui`; Hotview date properties use its single-date mode.
 
 ## Verification
 
@@ -174,33 +271,70 @@ Moves based on completion status also preserve item IDs, order, body content, an
 
 ### Task Row Date Display
 
-Task rows in the list and calendar display date status to the left of the delete button. If `startDate` is later than the browser's local date, the time remaining until the start date takes priority and is shown in gray. 1–6 days uses `n일 후 시작`, 7–29 days uses `w주 후 시작`, and 30 days or more uses `m달 후 시작`. Weeks are calculated using 7 days and months using 30 days, discarding fractional parts. English uses the short forms `In nd`, `In nw`, and `In nmo`. The display follows the Korean, English, Chinese, or Japanese UI language. If the start date is today, in the past, or absent, the days remaining until `date` are shown as `D-n`, today as `D-Day`, and days overdue as red `D+n`. Completion check status does not change this date calculation. If there is no completion date, gray `날짜 설정` is shown. Day counts use timezone-free calendar date arithmetic, and open screens update today every 30 seconds and when window focus or visibility changes.
+List/calendar rows show date status left of Delete. A `startDate` after the browser's local date takes priority over `date`, in gray:
 
-The date status button opens the schedule editing popover on click, Enter, or Space. The list and Gantt display the 6-week calendar from `TaskRangeCalendar` directly inside the popover. The separate calendar button and nested popup are removed so date-range selection is handled in one place. The first click sets `startDate` and clears `date`. If the next click is on or after the start date, it is saved as the end date. Selecting the same date twice creates a one-day schedule with identical start and end dates. Clicking before the start date replaces the start date and waits for an end-date selection. Clicking after an end date has been selected starts a new range. Each selection updates both fields at once while preserving content, completion, and tags. The month heading uses language-specific year/month formatting, and each can be entered directly. Start and end dates are aligned as two columns of date summaries, and the next selection target is underlined in the theme color. The selected endpoints are highlighted with circles, and the intervening range is connected by a pale theme-colored band that continues across each week. Popovers share the theme's `surface-deep` background, 12 px corners, and 10 px padding. Today is marked with a theme-colored circular border around the date number; when it overlaps a selected date, a contrasting border is used over the selection background. Clear Dates clears both fields together.
+| Time until start | Korean | English |
+| --- | --- | --- |
+| 1–6 days | `n일 후 시작` | `In nd` |
+| 7–29 days | `w주 후 시작` | `In nw` |
+| 30 days or more | `m달 후 시작` | `In nmo` |
 
-Year and month use numeric inputs that select all text on click and commit on Enter or blur. Values outside the year range 0001–9999 or month range 1–12 revert to the previous display; Esc restores the input. Changing the month alone does not change the saved date. Arrow keys, Home/End, PageUp/Down, and Shift+PageUp/Down navigate dates, months, and years; Enter/Space selects a period. Read-only mode allows only calendar navigation. The popover renders through a body portal and repositions on scroll, resize, and visual viewport changes. Inputs are not automatically focused. Outside clicks, Esc, and Back close it, and focus inside it is restored to the status button.
+Weeks use 7 days and months 30 days, rounding down. Labels follow the Korean, English, Chinese, or Japanese UI language. If start is today, past, or absent, use `date`: future `D-n`, today `D-Day`, overdue red `D+n`, or gray `날짜 설정` when absent. Completion does not affect calculation. Day arithmetic is timezone-free; open screens update today every 30 seconds and on focus/visibility changes.
+
+Click, Enter, or Space on status opens schedule editing. List/Gantt embed the 6-week `TaskRangeCalendar` directly, without a separate calendar button/nested popup.
+
+| Range selection | Result |
+| --- | --- |
+| First click | Sets `startDate`, clears `date` |
+| Next click on/after start | Saves end; selecting the same date twice creates a one-day range |
+| Click before start | Replaces start and waits for end |
+| Click after an end was selected | Starts a new range |
+| Clear Dates | Clears both fields |
+
+Each selection updates both fields together, preserving content, completion, and tags. Month/year headings follow locale formatting and accept direct entry. Two date-summary columns underline the next target in theme color. Endpoints are circles connected by a pale theme band across weeks. Today has a theme circular border, contrasting against selection when they overlap. Popovers use `surface-deep`, 12 px corners, and 10 px padding.
+
+Year/month numeric inputs select all on click and commit on Enter/blur. Values outside years 0001–9999 or months 1–12 revert to the previous display; Esc restores input. Changing only the month does not save a date. Arrow keys, Home/End, PageUp/Down, and Shift+PageUp/Down navigate dates/months/years; Enter/Space selects a period. Read-only mode allows calendar navigation only. The body portal repositions on scroll, resize, and visual viewport changes without autofocus. Outside click, Esc, or Back closes it, restoring focus from inside to the status button.
 
 - `src/utils/task-date-label.test.ts`: future-start priority, day/week/month unit transitions and rounding down, translations, and D-day calculations for today, overdue dates, unspecified dates, completion status, leap years, and year boundaries.
 
 ### Default List Sort
 
-When the list is first opened or the project changes, priority 1 is **Tags · Alphabetical**, and priority 2 is **Schedule Priority · Default Order**. Within the same tag, items appear in `D-Day → 마감 임박(D-n) → 기한 초과(D+n) → 시작 전 → 날짜 미정` order. Approaching deadlines are ordered by fewest days remaining, overdue items by fewest days overdue, and not-yet-started items by nearest start date. A future start date gives the not-yet-started status priority over the due date; items that have already started but have no due date belong to the unspecified-date group. Completion checks do not change priority. Items are resorted when dates, tags, or the local date change, and exact ties retain saved order. Calendar and Gantt order remain unchanged.
+First opening the list or changing projects restores **1: Tags · Alphabetical; 2: Schedule Priority · Default Order**. Within a tag: `D-Day → 마감 임박(D-n) → 기한 초과(D+n) → 시작 전 → 날짜 미정`.
 
-Removing all criteria uses the previous date-status sort (`D-Day → D-n → D+n → 시작 대기 → 날짜 설정`) and manual reordering within the same status group. In this mode, numeric date values are not compared within groups. The popover's **Restore Defaults** icon restores the two criteria, Tags → Schedule Priority.
+- Approaching: fewest days remaining; overdue: fewest days overdue; not started: nearest start.
+- Future start takes priority over due date. Started items without a due date are unspecified. Completion does not change priority.
+- Date, tag, or local-day changes resort items; exact ties keep saved order. Calendar/Gantt order is unchanged.
+
+With all criteria removed, use the previous status order `D-Day → D-n → D+n → 시작 대기 → 날짜 설정` and allow manual reordering within each group, without numeric date comparisons. **Restore Defaults** restores Tags → Schedule Priority.
 
 ### Multi-Criteria List Sorting
 
-- Open the popover using the **Sort List** icon and criterion count in the list's filter row. It immediately shows the two default criteria, and **Add Sort Criterion** adds an unused field from tags, schedule priority, start status, due date, start date, or title. The same field cannot be specified twice, and the maximum is 6 criteria. Row numbers indicate priority, and × removes that criterion.
-- Criteria added earlier take priority, and only items tied on an earlier criterion are compared using the next one. If all criteria tie, saved order is retained. Removing a criterion does not change the relative priority of the others.
-- Titles and tags use `Intl.Collator` for the UI language to compare numbers naturally (`작업 2 → 작업 10`). Tags are compared lexicographically as complete arrays of sorted names, so the order in which tags were attached has no effect. The directions are **Alphabetical/Reverse**.
-- **Schedule Priority** compares the status and date proximity from the default sort above as a single criterion. The directions are **Default Order/Reverse**, and unspecified dates come last in both directions. The criterion name's tooltip shows the status order.
-- **Start Status** classifies items with future start dates as not started, and items whose start dates are today or earlier, or that have a due date without a start date, as in progress. Choose **In Progress First/Not Started First**; items with neither date come last. This criterion does not compare dates within groups, so it can be combined with due-date and start-date criteria.
-- **Due Date** and **Start Date** independently compare only their respective dates. The directions are **Earliest First/Latest First**, and neither substitutes the other date. For example, Start Status · In Progress First → Due Date · Earliest First places not-yet-started items below while showing past deadlines first. Unspecified tags or dates are placed last for that criterion regardless of direction, and items with the same unspecified value are compared using the next criterion.
-- Criteria are held in the panel's memory state. They persist across view changes and do not change calendar or Gantt order. Project changes or remounts restore the two default criteria. They can also be configured in read-only mode and with tag/completion filters. Display sorting does not save the order to session objects, Markdown, or the server, or delete items.
-- While any criterion is active, dragging and manual movement with Alt+Up/Down are disabled, while checkboxes retain the pointer for toggling completion and touch scrolling. Completion, body/tag/date edits, additions, and deletions retain the existing ID-based paths, and moving up/down between input fields follows display order.
-- The popover is at most 304 px wide with 6 px padding; criterion rows are 28 px on desktop/32 px on touch devices, with 2 px between rows. Criterion names receive more width, while direction is displayed with an arrow and a short label specific to the criterion. The header contains Restore Defaults and Close icons. Outer list spacing is 8 px horizontally and 4 px vertically, preserving readability and existing touch targets.
-- Fields and directions are selected using the shared `SelectField`. It stays within screen boundaries on desktop and touch devices, and nested lists close first on Esc or Back. Closing the popover restores focus to the trigger; adding or removing criteria restores focus to a remaining field or the add button. Four languages and light/dark themes are supported.
-- Validation: `src/utils/task-sort.test.ts` checks defaults, criterion priority, directions, tag arrays, independent dates, schedule proximity, start-status combinations, changes to today, unspecified values, ties, and preservation of the original data. `server/task-sort-ui.test.ts` checks defaults/restoration, adding/changing/removing criteria, duplicate prevention, keyboard, touch, read-only mode, filters, view switching, 320 px boundaries, and preservation of saved order.
+**Sort List** and its criterion count open the filter-row popover with both defaults. **Add Sort Criterion** adds an unused field; no duplicates, at most 6. Numbered rows show priority; × removes one without reprioritizing others. Compare earlier criteria first, then ties using the next; final ties retain saved order.
+
+| Criterion | Comparison and directions |
+| --- | --- |
+| Title/tags | UI-language `Intl.Collator`, including natural numbers (`작업 2 → 작업 10`); **Alphabetical/Reverse**. Tags compare complete arrays of sorted names lexicographically, independent of attachment order |
+| **Schedule Priority** | Default status/date proximity above; **Default Order/Reverse**. Unspecified dates always last. Tooltip states the status order |
+| **Start Status** | Future start: not started; start today/past, or due date without start: in progress; neither date: last. **In Progress First/Not Started First**; no within-group date comparison |
+| **Due Date** / **Start Date** | Compare only the named field; **Earliest First/Latest First**, without substituting the other date |
+
+Unspecified tags/dates sort last for their criterion in either direction; equal unspecified values use the next criterion. For example, Start Status · In Progress First → Due Date · Earliest First keeps future-start items below and past deadlines first.
+
+Criteria stay in panel memory across view changes; project changes/remounts restore defaults. Read-only mode and tag/completion filters still allow sorting. Display sort never saves order to session objects, Markdown, or the server, deletes items, or changes calendar/Gantt order.
+
+With any criterion active, disable dragging and Alt+Up/Down manual moves. Checkboxes still handle completion and touch scrolling. Completion, body/tag/date edits, additions, and deletion retain ID-based paths; input Up/Down follows display order.
+
+| Popover layout | Value |
+| --- | --- |
+| Width / padding | At most 304 px / 6 px |
+| Criterion row | 28 px desktop, 32 px touch; 2 px gap |
+| Labels | More width for field names; arrow and criterion-specific short direction label |
+| Header | Restore Defaults and Close icons |
+| Outer list spacing | 8 px horizontal, 4 px vertical; preserve readability/touch targets |
+
+Fields/directions use shared `SelectField` within desktop/touch screen bounds. Esc/Back closes nested lists first. Closing restores trigger focus; add/remove restores a remaining field or Add button. Support four languages and light/dark themes.
+
+Validation: `src/utils/task-sort.test.ts` covers defaults, priorities, directions, tag arrays, independent dates, proximity, start-status combinations, today changes, unspecified values, ties, and original-data preservation. `server/task-sort-ui.test.ts` covers defaults/restoration, criterion changes, duplicate prevention, keyboard/touch, read-only mode, filters, view changes, 320 px bounds, and saved-order preservation.
 
 ## Document Navigation Summary
 

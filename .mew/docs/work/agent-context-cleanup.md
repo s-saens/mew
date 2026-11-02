@@ -46,6 +46,12 @@ Restructure the [package APIs](../development/packages.md) into focused sections
 
 Split the former shared UI contract into six topics and separate browser startup, connection recovery, and agent guidance. Each topic has a scoped description; original UI headings and explicit aliases remain in the compatibility entry. Shorten descriptions and authoring instructions without adding MOC requirements. Historical decisions and unrelated pending edits remain outside this cleanup.
 
-An independent audit checked 137 rewritten links across 74 current documents: each relative target/fragment resolves, every replacement matches its mapping, and the original 58 UI headings plus two explicit aliases remain. Topic descriptions were independently reviewed for distinguishable ownership. Shared UI corrections retain the existing source contract; legacy `browser` permission overrides remain a read-time compatibility rule.
+An independent audit checked 138 rewritten links across 75 current documents: each relative target/fragment resolves, every replacement matches its mapping, and the original 58 UI headings plus two explicit aliases remain. Topic descriptions were independently reviewed for distinguishable ownership. Shared UI corrections retain the existing source contract; legacy `browser` permission overrides remain a read-time compatibility rule.
 
 `npm run check:docs` reports 665 valid descriptions and one pre-existing error in the unrelated task `Image preview and attachment editing.md`: its `/api/asset` URL needs a repository-relative link. No changed contract has a new link error. Discovery/search tests passed all 5 tests. The final required build passed; actual deployment, server application, and production latency remain unverified.
+
+## Task and Git lookup
+
+Shorten the [task contract](../development/task-list.md) from 9,750 to 8,363 words and the two [Git panel](../features/git-history/project-git-work-panel.md)/[connection](../development/git-connections.md) documents from 9,145 to 8,559 words, including metadata. Use focused subsections and tables while retaining existing anchors and verbatim historical verification sections. Independent reviews checked input focus, saving/lifetimes, date/sort precedence, commit selection, retry limits, account races, and credential scope. These are prose changes; they introduce no new task or Git behavior.
+
+Related existing theme, project access, icons, worktree, snapshot, and account-state suites passed 14 tests. Together with the new helper/router, connection, browser, and discovery checks above, the scoped runs passed 169 tests. This is not a full-suite result. The final documentation check still has only the unrelated task asset-link error noted above.
