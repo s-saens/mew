@@ -321,7 +321,7 @@ export const Editor = forwardRef<
     onAnnotationOpen?: (num: number, x: number, y: number) => void
     /** 주면 모바일 보조키에 댓글 아이콘이 뜬다 — 폰에는 Alt+Shift+C가 없다. 호스트가 앵커를 만든다 */
     onStartComment?: () => void
-    /** 호스트가 보조키 표시를 제한할 수 있다. 기본값은 모바일 폭·편집기 포커스를 따른다. */
+    /** Hosts may restrict the key bar; by default it remains visible at mobile widths regardless of focus. */
     showMobileKeyBar?: boolean
   }
 >(function Editor(

@@ -35,3 +35,9 @@ Extract pending-probe state, response listeners, admission cancellation, and tra
 `node --test src/utils/remote-foreground-probe.test.ts src/utils/remote-connection.test.ts` passed 131 tests, including late statistics and responses, canceled queued probes, replacement, and reset. The required build and scoped lint passed. Independent source review found no intended behavior change.
 
 The [remote access](../development/remote-access.md), [recovery](../development/remote-access-recovery.md), [remote desktop](../development/remote-desktop.md), [collaboration](../development/collaboration.md), and [port preview](../development/port-preview.md) contracts now use shorter paragraphs and lookup tables. Recovery has its own canonical topic; the original entry anchor remains. Existing headings, code, limits, links, and historical verification evidence were checked for preservation. Authentication and transport clauses received an independent semantic review; this review did not revalidate production operation.
+
+## Shared package reference corrections
+
+Restructure the [package APIs](../development/packages.md) into focused sections and option tables. Match existing source behavior for the mobile editor key bar and shared header/action menus; these are documentation corrections, not UI changes. Shared [overlay](../development/ui-overlays.md#shared-action-menus) and [editor context-menu](../development/ui-editor-input.md#editor-body-context-menu) sections retain their anchors at the correct heading level. The editor prop comment now describes its existing mobile-width default without a focus gate.
+
+`node --test server/action-menu-ui.test.ts` passed its actual-component check across eight desktop/mobile/theme/gradient combinations. The fixture now uses the existing translated mobile dialog name, **내 프로젝트**; it suppresses only irrelevant module-directive warnings. Source geometry and current key-bar conditions were inspected directly.

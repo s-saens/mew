@@ -147,7 +147,7 @@ For logged-in users, Documents and regular-file tabs are saved in one `.workspac
 
 Verification: `editor-files.test.ts` checks tab identifiers, same-name files, merging old saved states, and preventing repeated restoration; `unified-editor-ui.test.ts` checks switching between same-name files, saving in each scope, preserving moved dock layouts, and restoration after refresh in the actual editor. `workspace-switch-ui.test.ts` checks shared-tab integration in the actual App and state isolation across roots.
 
-### Editor body context menu
+## Editor body context menu
 
 Hotview, Plain, and code bodies display **Add Annotation · Add Comment · Copy · Cut · Paste · Delete · Select All** using the shared `ActionMenu`. The editor opts into the shared horizontal presentation: only icons are visible, and mouse hover shows each translated action name in a tooltip. The same labels remain available to assistive technologies. The 7 default items are always displayed, with unavailable actions disabled. These include annotations in non-Markdown files, body changes in read-only mode, and copy/cut/delete without a selection. Comments require separate feature and file modification permissions, as well as target text.
 

@@ -54,7 +54,7 @@ function Fixture(){
  </>;
 }
 createRoot(document.getElementById('root')).render(<React.StrictMode><I18nProvider><Fixture/></I18nProvider></React.StrictMode>);`
-  const bundle = await build({ input: 'virtual:action-menu.tsx', write: false, platform: 'browser', output: { format: 'iife' }, transform: { jsx: 'react-jsx', define: { 'process.env.NODE_ENV': JSON.stringify('test') } }, plugins: [{
+  const bundle = await build({ onwarn(warning, warn) { if (warning.code !== 'MODULE_LEVEL_DIRECTIVE') warn(warning) }, input: 'virtual:action-menu.tsx', write: false, platform: 'browser', output: { format: 'iife' }, transform: { jsx: 'react-jsx', define: { 'process.env.NODE_ENV': JSON.stringify('test') } }, plugins: [{
     name: 'fixture',
     resolveId(id) { if (id === 'virtual:action-menu.tsx') return id; if (id.endsWith('.css')) return 'virtual:style' },
     load(id) { if (id === 'virtual:action-menu.tsx') return source; if (id === 'virtual:style') return '' },
@@ -148,7 +148,7 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><I18nProvid
       await page.locator('[data-project-switcher]').click(); await menu.waitFor()
       if (width >= 768) assert.deepEqual(await metrics('[data-action-menu]'), reference, 'desktop project dropdown matches hamburger dimensions and typography')
       else {
-        const panel = page.getByRole('dialog', { name: '프로젝트', exact: true })
+        const panel = page.getByRole('dialog', { name: '내 프로젝트', exact: true })
         assert.deepEqual(await panel.boundingBox(), { x: 0, y: 0, width, height: 800 }, 'mobile projects cover the header, workspace, and dock')
         assert.equal(await panel.locator('[data-action-menu]').count(), 0, 'the mobile project list is an inline panel')
       }
