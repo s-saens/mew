@@ -1,5 +1,6 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
 import fs from 'node:fs'
+import os from 'node:os'
 import { withinPath, validWindowsRelativePath } from './platform/common/paths.ts'
 import { projectDocsDir } from './project-agent-settings.ts'
 import { DATA_DIR } from './dataDir.ts'
@@ -109,9 +110,16 @@ function canonicalPath(file: string): string {
   }
 }
 
+/** Managed project content remains editable when an installation stores metadata in ~/.mew. */
+function isManagedProjectContent(serverData: string, file: string): boolean {
+  const managedRoot = canonicalPath(path.join(os.homedir(), '.mew', 'projects'))
+  return serverData !== managedRoot && withinPath(serverData, managedRoot) && withinPath(managedRoot, file)
+}
+
 /** Server state stays private even when its configured location is inside a workspace. */
 export function assertNotServerDataPath(file: string): void {
-  if (withinPath(canonicalPath(path.resolve(DATA_DIR)), canonicalPath(path.resolve(file)))) {
+  const serverData = canonicalPath(path.resolve(DATA_DIR)), target = canonicalPath(path.resolve(file))
+  if (withinPath(serverData, target) && !isManagedProjectContent(serverData, target)) {
     throw new UnsafePathError('서버 데이터 경로에 접근할 수 없습니다.')
   }
 }
@@ -192,7 +200,8 @@ export function createProjectPathResolver(project: string): (relativePath: strin
   const root = projectRoot(project)
   const serverData = canonicalPath(path.resolve(DATA_DIR))
   const assertSafe = (file: string) => {
-    if (withinPath(serverData, canonicalPath(file))) {
+    const target = canonicalPath(file)
+    if (withinPath(serverData, target) && !isManagedProjectContent(serverData, target)) {
       throw new UnsafePathError('서버 데이터 경로에 접근할 수 없습니다.')
     }
   }

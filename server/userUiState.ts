@@ -1,5 +1,6 @@
 import { normalizeProjectTabLayout, type ProjectTabGroup } from '../shared/project-tab-groups.ts'
 import path from 'node:path'
+import { projectRegistry } from './project-registry.ts'
 import { DATA_DIR, readJsonRecord, writeFileAtomic } from './dataDir.ts'
 import { normalizeEmail } from './auth.ts'
 import { normalizeIconValue } from './svgIcon.ts'
@@ -162,16 +163,12 @@ export function normalizeAgentTabs(input: unknown): StoredAgentTabs {
 }
 
 export function readRootProjects(email: string): StoredRootProjects | null {
-  return userState(readAll(), email).rootProjects ?? null
+  return projectRegistry.readMine(email)
 }
 
 export function writeRootProjects(email: string, input: unknown): StoredRootProjects {
   const value = normalizeRootProjects(input)
-  const all = readAll()
-  const key = normalizeEmail(email)
-  all[key] = { ...userState(all, key), rootProjects: value }
-  writeAll(all)
-  return value
+  return projectRegistry.writeMine(email, value)
 }
 
 export function readAgentTabs(email: string, workspacePath: string): StoredAgentTabs | null {

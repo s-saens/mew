@@ -42,6 +42,7 @@ import {
   saveWorkspaceUi,
   switchWorkspace,
   openSubproject,
+  type RegisteredProject,
   type AuthStatus,
   type MewUpdateStatus,
   type TreeNode,
@@ -126,6 +127,7 @@ function toggleFullscreen() {
 const UpdatesModal = deferredComponent(async () => ({ default: (await import('./components/updates-modal')).UpdatesModal }), null)
 const TaskPanel = deferredComponent(async () => ({ default: (await import('./components/task-panel')).TaskPanel }))
 const SharedMemo = deferredComponent(async () => ({ default: (await import('./components/shared-memo')).SharedMemo }))
+const ProjectCreationAgentDialog = deferredComponent(async () => ({ default: (await import('./components/ProjectCreationAgentDialog')).ProjectCreationAgentDialog }), null)
 const OpenProjectDialog = deferredComponent(async () => ({ default: (await import('./components/OpenProjectDialog')).OpenProjectDialog }), null)
 const DocumentGraph = deferredComponent(async () => ({ default: (await import('./components/DocumentGraph')).DocumentGraph }), null)
 const DocsSettingsModal = deferredComponent(async () => ({ default: (await import('./components/DocsSettingsModal')).DocsSettingsModal }), null)
@@ -248,7 +250,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
   const { role, email: authEmail } = auth
   const isGuest = role === 'guest'
   const isOwner = role === 'owner'
-  const canOpenProjects = isOwner || role === 'manager'
+  const canOpenProjects = !isGuest
   const caps = useMemo(() => auth.capabilities ?? defaultCapabilities(role), [auth.capabilities, role])
   const canUseTerminal = caps.terminal
   const canDebug = caps.terminal && (auth.role === 'owner' || auth.role === 'manager')
@@ -300,13 +302,15 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     workspaceUiSaveQueue.current = workspaceUiSaveQueue.current.catch(() => {})
       .then(() => workspaceUiOwnerAlive.current ? saveWorkspaceUi(path, state) : undefined).catch(console.error)
   }, [authEmail])
-  // 프로젝트 목록은 owner·manager가 사용하며 계정별로 저장한다.
+  // My Projects is an account-specific shortcut list in the shared registry.
   const [openProjectPaths, setOpenProjectPaths] = useState<string[]>(() => (canOpenProjects ? loadOpenProjectPaths() : []))
-  const projectPaths = useMemo(() => [...new Set([...openProjectPaths, ...(projectUiPath ? [projectUiPath] : [])])], [openProjectPaths, projectUiPath])
+  const projectPaths = useMemo(() => [...new Set(openProjectPaths)], [openProjectPaths])
   const [rootProjectIcons, setRootProjectIcons] = useState<Record<string, string>>({})
   const rootProjectSaveQueue = useRef<Promise<unknown>>(Promise.resolve())
   const [rootProjectTabsSynced, setRootProjectTabsSynced] = useState(!canOpenProjects)
   const [openProjectDialog, setOpenProjectDialog] = useState(false)
+  const [hasProject, setHasProject] = useState<boolean | null>(isGuest ? true : null)
+  const [creationAgentProject, setCreationAgentProject] = useState<RegisteredProject | null>(null)
   const [switchingRootProject, setSwitchingRootProject] = useState(false)
   const [pendingRootProjectPath, setPendingRootProjectPath] = useState<string | null>(null)
   const rootProjectSwitchRef = useRef<{ path: string; controller: AbortController } | null>(null)
@@ -732,6 +736,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
   }, [docsExpanded, isGuest, projectUiPath, workspaceUiLoaded])
 
   const refreshTree = useCallback((signal?: { project?: string; version?: number; parents?: string[] }) => {
+    if (!rootProjectPathRef.current && !isGuest) return Promise.resolve()
     const epoch = workspaceEpochRef.current
     const root = rootProjectPathRef.current
     const read = async (scope: string) => {
@@ -750,7 +755,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     return Promise.all([...scopes].map(read)).then(() => {
       if (epoch === workspaceEpochRef.current) setTreeRefreshSignal(value => value + 1)
     }).catch(console.error)
-  }, [project])
+  }, [project, isGuest])
 
   useEffect(() => {
     const invalidate = () => {
@@ -808,10 +813,6 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     return () => { current = false }
   }, [canOpenProjects, openProjectPaths, rootProjectTabsSynced])
 
-  const rememberProjectPath = useCallback((projectPath: string) => {
-    setOpenProjectPaths(previous => previous.includes(projectPath) ? previous : [...previous, projectPath])
-  }, [])
-
   const changeRootProjectIcon = useCallback(async (projectPath: string, icon: string) => {
     try {
       const saved = await saveRootProjectIcon(projectPath, icon)
@@ -828,7 +829,15 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     } catch (err) { showToast(err instanceof Error ? err.message : String(err)) }
   }, [showToast])
 
-  const applyWorkspace = useCallback((info: { path: string; projectPath?: string; docsPath?: string }) => {
+  const applyWorkspace = useCallback((info: { path: string; projectPath?: string; docsPath?: string; hasProject?: boolean }) => {
+    if (info.hasProject === false) {
+      setHasProject(false)
+      setRootProjectPath(null)
+      setProjectUiPath(null)
+      setOpenProjectDialog(true)
+      return
+    }
+    setHasProject(true)
     const previous = workspaceInfoRef.current
     // The POST response and its presence broadcast describe the same handoff.
     // Update refs synchronously so either arrival order applies it exactly once.
@@ -864,7 +873,6 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
       setMobilePanelStack(foreground && foreground !== 'editor' ? [foreground] : [])
       if (foreground && foreground !== 'editor') workspacePanelSetters[foreground](true)
     }
-    rememberProjectPath(uiPath)
     const cachedRoot = rootTreeCache.current.get(`${info.path}\0${WORKSPACE_PROJECT}`) ?? []
     const cachedDocs = previous?.path === info.path ? [] : rootTreeCache.current.get(`${info.path}\0${DEFAULT_PROJECT}`) ?? []
     setTree(cachedRoot)
@@ -872,7 +880,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     setDocsTree(cachedDocs)
     setPendingOpen(null)
     if (!sameProject) setRequestedAgentTab(null)
-  }, [rememberProjectPath, workspacePanelSetters])
+  }, [workspacePanelSetters])
 
   const handleWorkspaceBroadcast = useCallback(() => {
     // Resolve notifications after our POST so an older GET cannot undo its result.
@@ -963,6 +971,8 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     try {
       const info = await openSubproject(path, scope, rootProjectPath)
       applyWorkspace(info)
+      const { state } = await fetchRootProjectTabs()
+      if (state) setOpenProjectPaths(state.paths)
     } catch (err) {
       showToast(err instanceof Error ? err.message : String(err))
     } finally {
@@ -2175,11 +2185,11 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
           <ProjectSwitcher
             sidebarHost={projectSidebarHost} sidebarEnabled={desktopMode} sidebarOpen={showProjectSidebar} onSidebarOpenChange={changeProjectSidebarOpen}
             sidebarWidth={projectSidebarWidth} onSidebarResize={startProjectSidebarResize} onSidebarWidthChange={restoreProjectSidebarWidth}
-            canUseCommands={canUseTerminal && !isGuest} activeWorkingPath={rootProjectPath}
+            canUseCommands={canUseTerminal && !isGuest && hasProject === true} activeWorkingPath={rootProjectPath}
             paths={projectPaths}
             activePath={projectUiPath}
             pendingPath={pendingRootProjectPath}
-            fallbackLabel={projectLabel(projectUiPath)}
+            fallbackLabel={hasProject === false ? t('project.noActive') : projectLabel(projectUiPath)}
             canOpen={canOpenProjects}
             canChangeIcon={canOpenProjects}
             icons={rootProjectIcons}
@@ -2197,7 +2207,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
             }}
             onOpen={() => setOpenProjectDialog(true)}
           />
-          {canUseTerminal && !isGuest && !showProjectSidebar && <div className="flex shrink-0 items-center">
+          {canUseTerminal && !isGuest && hasProject && !showProjectSidebar && <div className="flex shrink-0 items-center">
             <CommandButtonMenu
               key={rootProjectPath}
               project={WORKSPACE_PROJECT}
@@ -2233,7 +2243,12 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
         </header>
       </div>
 
-      <div className="workspace-dock-layout" data-dock-position={dockPosition}>
+      {hasProject === false && <main className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 p-4 text-center">
+        <h1 className="text-lg font-semibold text-ink">{t('project.welcome')}</h1>
+        <p className="text-sm text-ink-secondary">{t('project.welcomeHint')}</p>
+        <button type="button" onClick={() => setOpenProjectDialog(true)} className="rounded-md bg-accent px-3 py-2 text-sm font-medium text-ink-on-accent hover:bg-accent-strong">{t('project.start')}</button>
+      </main>}
+      <div className="workspace-dock-layout" data-dock-position={dockPosition} style={hasProject === true ? undefined : { display: 'none' }}>
         <div ref={setProjectSidebarHost} className="mew-project-sidebar-host" data-project-sidebar-host />
         <div ref={setSidebarDockHost} className="desktop-dock-rail" data-sidebar-dock />
       <div
@@ -2247,6 +2262,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
           if (!e.currentTarget.contains(e.relatedTarget as Node)) setDropTarget(null)
         }}
       >
+        {hasProject === true && <>
         <button type="button" data-sidebar-toggle aria-expanded={sidebarOpen} aria-label={uiText(sidebarOpen ? '파일 탐색기 닫기' : '파일 탐색기 열기')} data-tip={uiText(sidebarOpen ? '파일 탐색기 닫기' : '파일 탐색기 열기')} onClick={() => toggleWorkspacePanel('sidebar')}
           className="absolute top-1/2 z-50 hidden h-9 w-5 -translate-y-1/2 items-center justify-center rounded-r border border-edge-strong bg-surface-deep text-ink-secondary hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-accent md:flex"
           style={{ left: sidebarOpen ? sidebarWidth - 1 : 0 }}>
@@ -2304,7 +2320,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
               >
                 {search => <>
                     {(isGuest || (workspaceUiLoaded && sidebarStateLoadedRootRef.current === projectUiPath)) && <FileTree
-                      canManagePublicShares={canOpenProjects}
+                      canManagePublicShares={isOwner || role === 'manager'}
                       search={search}
                       key={`${isGuest || docsExpanded ? DEFAULT_PROJECT : WORKSPACE_PROJECT}:${rootProjectPath ?? ''}:${workspaceUiRevision}`}
                       {...sidebarCreate.treeProps(isGuest || docsExpanded ? 'docs' : 'root')}
@@ -2322,7 +2338,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
                       readOnly={isGuest || !caps.filesRead || !caps.filesWrite}
                       canUseCommands={canUseTerminal && !isGuest}
                       onOpenProject={(path) => void openSidebarProject(isGuest || docsExpanded ? DEFAULT_PROJECT : WORKSPACE_PROJECT, path)}
-                      canOpenProjects={canOpenProjects}
+                      canOpenProjects={isOwner || role === 'manager'}
                       canUseGit={caps.git}
                       loadChildren={isGuest || docsExpanded ? loadDocsTreeChildren : loadWorkspaceTreeChildren}
                       treeInvalidation={treeInvalidation}
@@ -2363,7 +2379,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
         <DockWorkspace key={projectUiPath ?? 'pending-workspace'} apiRef={dockRef} initialLayout={layout} value={workspaceUi.dock} onChange={saveDockLayout} onEditorDrop={handleDockEditorDrop} foreground={mobileForegroundPanel}>
         {panes.map(renderEditorPane)}
 
-        {(caps.agent || caps.terminal) && <AgentPanel
+        {!creationAgentProject && (caps.agent || caps.terminal) && <AgentPanel
           preparedTabs={preparedAgentTabs} requestedTab={requestedAgentTab} onRequestedTabHandled={() => { mewcatHandledTab.current = requestedAgentTab?.id ?? null; setRequestedAgentTab(null) }}
           requestedPicker={mewcatPicker}
           onPickerRuntimeChosen={runtime => { if (mewcatPicker) { selectMewcatRuntime(runtime); setMewcatPicker(false) } }}
@@ -2470,12 +2486,13 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
             </div>
           </div>
         )}
+        </>}
       </div>
       </div>
 
       <Mewcat onOpenSettings={() => { setMewcatSettingsRequest(request => request + 1); setSettingsOpen(true) }} portalTarget={settingsOpen && !desktopMode ? settingsMewcatHost : remoteDesktopOpen ? remoteMewcatHost : null} hidden={remoteDesktopOpen && mewcatHideDesktop} skin={mewcatSkin} assistant={{ account: auth.email ?? 'guest', enabled: caps.agent, runtime: mewcatRuntime, projectRoot: rootProjectPath, onAction: handleMewcatAction, onRuntimeChange: selectMewcatRuntime, onConnect: () => { setMewcatPicker(true); openWorkspacePanel('agent'); showToast(t('mewcat.assistant.guide')) } }} />
 
-      <MobileDock active={remoteDesktopOpen ? 'desktop' : desktopMode ? focusedDockPanel ?? '' : mobileForegroundPanel ?? 'editor'} openPanels={desktopMode ? mobileDockPanels.filter(panel => panel === 'editor' ? editorOpen : panel === 'desktop' ? remoteDesktopOpen : panel === 'memo' ? memoOpen : workspacePanelOpen[panel]) : undefined} available={mobileDockPanels} hidden={mobileKeyboardOpen} portalTarget={remoteDockHost ?? sidebarDockHost}
+      <MobileDock active={remoteDesktopOpen ? 'desktop' : desktopMode ? focusedDockPanel ?? '' : mobileForegroundPanel ?? 'editor'} openPanels={desktopMode ? mobileDockPanels.filter(panel => panel === 'editor' ? editorOpen : panel === 'desktop' ? remoteDesktopOpen : panel === 'memo' ? memoOpen : workspacePanelOpen[panel]) : undefined} available={mobileDockPanels} hidden={mobileKeyboardOpen || hasProject !== true} portalTarget={remoteDockHost ?? sidebarDockHost}
         position={remoteDockHost ? undefined : dockPosition} onSelect={selectDockPanel} onNavigate={navigateMobileDock} />
 
       {settingsOpen && (
@@ -2536,10 +2553,21 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
       {openProjectDialog && canOpenProjects && (
         <OpenProjectDialog
           basePath={rootProjectPath ?? ''}
-          onOpen={async path => { await openRootProject(path) }}
+          canUseAgent={caps.agent}
+          canManageFolders={isOwner || role === 'manager'}
+          beforeMutation={() => rootProjectSaveQueue.current}
+          onProjectsChanged={async () => { const { state } = await fetchRootProjectTabs(); if (state) setOpenProjectPaths(state.paths) }}
+          onCreateWithAgent={async project => {
+            setPreparedAgentTabs(undefined)
+            setCreationAgentProject(project)
+            if (!(await openRootProject(project.path))) setCreationAgentProject(null)
+          }}
+          onOpen={openRootProject}
           onClose={() => setOpenProjectDialog(false)}
         />
       )}
+
+      {creationAgentProject && creationAgentProject.path === projectUiPath && caps.agent && <ProjectCreationAgentDialog projectPath={creationAgentProject.path} projectName={creationAgentProject.name} cacheAccount={auth.email ?? undefined} onOpenFile={openMentionedFile} onClose={() => { setPreparedAgentTabs(undefined); setCreationAgentProject(null) }} />}
 
       {serverFileExplorerOpen && caps.serverFiles && (
         <ServerFileExplorer

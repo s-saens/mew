@@ -10,13 +10,14 @@ import { applyTaskChanges, type TaskItem } from '../shared/task-list.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 
-for (const mode of ['keyboard', 'workspace', 'documents', 'permissions', 'panels', 'worktree', 'swipes', 'rapid'] as const) test(mode === 'rapid' ? 'App rapid project selections cancel superseded handoffs and restore the latest root' : mode === 'swipes' ? 'App mobile dock swipes select panels and explorer swipes preserve search mode' : mode === 'worktree' ? 'linked worktree swaps retain project layout and sessions and settle outgoing file saves' : mode === 'panels' ? 'App restores Tasks with Alt+T and task sessions survive close and reload' : mode === 'permissions' ? 'permission invalidation replaces pending workspace metadata and ignores the old response' : mode === 'documents' ? 'Files opens Documents as a filesystem folder with a separate navigation arrow' : mode === 'keyboard' ? 'App keyboard aliases open files and projects and create files and folders in the current explorer scope' : 'App overlaps workspace metadata, restores warm roots and ignores duplicate handoffs', { skip: !domBrowserExecutable(), timeout: 60_000 }, async () => {
+for (const mode of ['onboarding', 'keyboard', 'workspace', 'documents', 'permissions', 'panels', 'worktree', 'swipes', 'rapid'] as const) test(mode === 'onboarding' ? 'App first-use onboarding creates a named project without exposing the startup workspace' : mode === 'rapid' ? 'App rapid project selections cancel superseded handoffs and restore the latest root' : mode === 'swipes' ? 'App mobile dock swipes select panels and explorer swipes preserve search mode' : mode === 'worktree' ? 'linked worktree swaps retain project layout and sessions and settle outgoing file saves' : mode === 'panels' ? 'App restores Tasks with Alt+T and task sessions survive close and reload' : mode === 'permissions' ? 'permission invalidation replaces pending workspace metadata and ignores the old response' : mode === 'documents' ? 'Files opens Documents as a filesystem folder with a separate navigation arrow' : mode === 'keyboard' ? 'App keyboard aliases open files and projects and create files and folders in the current explorer scope' : 'App overlaps workspace metadata, restores warm roots and ignores duplicate handoffs', { skip: !domBrowserExecutable(), timeout: 60_000 }, async () => {
   const keyboardOnly = mode === 'keyboard'
+  const onboarding = mode === 'onboarding'
   const appSource = await fs.readFile(`${root}/src/App.tsx`, 'utf8')
   // Keep App, useTabs, FileTree, project switching and docking real. Unrelated panels and the
   // editor renderer are inert so this measures handoff work rather than editor startup.
   const keep = new Set(['deferredComponent', 'ProjectSwitcher', 'ProjectLoadingOverlay', 'FileTree', 'SearchPanel', 'DockWorkspace', 'ProjectIcon', 'SubprojectLink', 'SidebarCreateButtons', 'MobileDock', 'HeaderMenu', 'TaskPanel', 'IconPackProvider'])
-  if (keyboardOnly) { keep.add('OpenProjectDialog'); keep.add('ServerFileExplorer') }
+  if (keyboardOnly || onboarding) { keep.add('OpenProjectDialog'); keep.add('ServerFileExplorer') }
   const stubs = new Map<string, string>()
   const componentImports = appSource.replace(/const \w+ = deferredComponent\(async \(\) => \(\{ default: \(await import\('([^']+)'\)\)\.(\w+) \}\)(?:, null)?\)/g, (_match, module, name) => `import { ${name} } from '${module}'`)
   for (const match of componentImports.matchAll(/import \{ ([^\n]+) \} from '(\.\/components\/[^']+)'/g)) {
@@ -36,7 +37,7 @@ for (const mode of ['keyboard', 'workspace', 'documents', 'permissions', 'panels
     }).join('\n'))
   }
   const source = `import React from '${root}/node_modules/react/index.js';import {createRoot} from '${root}/node_modules/react-dom/client.js';import App from '${root}/src/AppBootstrap.tsx';import {I18nProvider} from '${root}/src/i18n.tsx';import {setDockPosition} from '${root}/src/hooks/use-dock-preferences.ts';window.fixtureDockPosition=setDockPosition;createRoot(document.getElementById('root')).render(<I18nProvider><App/></I18nProvider>);`
-  const bundle = await build({ input: 'virtual:switch.tsx', write: false, platform: 'browser', output: { format: 'iife', codeSplitting: false }, transform: { jsx: 'react-jsx', define: { 'process.env.NODE_ENV': JSON.stringify('test') } }, plugins: [{ name: 'fixture', resolveId(id, importer) {
+  const bundle = await build({ input: 'virtual:switch.tsx', onLog(level, log, handler) { if (log.code !== 'MODULE_LEVEL_DIRECTIVE') handler(level, log) }, write: false, platform: 'browser', output: { format: 'iife', codeSplitting: false }, transform: { jsx: 'react-jsx', define: { 'process.env.NODE_ENV': JSON.stringify('test') } }, plugins: [{ name: 'fixture', resolveId(id, importer) {
     if (id === 'virtual:switch.tsx') return id
     if (importer === `${root}/src/App.tsx` && stubs.has(id)) return `virtual:stub:${id}`
     if (/\/file-type-icon(?:\.tsx)?$/.test(id)) return 'virtual:file-icons'
@@ -49,7 +50,7 @@ for (const mode of ['keyboard', 'workspace', 'documents', 'permissions', 'panels
     if (id.endsWith('?raw')) return 'export default ' + JSON.stringify(await fs.readFile(id.slice(0, -4), 'utf8'))
   } }] })
   const chunk = bundle.output.find(item => item.type === 'chunk')!
-  const content = (await Promise.all(['src/components/ProjectSwitcher.tsx', 'src/components/project-loading-overlay.tsx', 'src/components/FileTree.tsx', 'src/components/SearchPanel.tsx', 'src/components/DockWorkspace.tsx', 'src/components/mobile-dock.tsx', 'src/components/HeaderMenu.tsx', 'src/components/OpenProjectDialog.tsx', 'src/components/ServerFileExplorer.tsx', 'src/components/file-browser.tsx', 'src/components/file-browser-favorites.tsx', 'packages/ui/src/HoverTipLayer.tsx', 'packages/ui/src/dialog-frame.tsx', 'packages/ui/src/ConfirmDialog.tsx', 'packages/ui/src/select-field.tsx'].map(file => fs.readFile(path.join(root, file), 'utf8')))).join('\n')
+  const content = (await Promise.all(['src/components/ProjectSwitcher.tsx', 'src/components/project-loading-overlay.tsx', 'src/components/FileTree.tsx', 'src/components/SearchPanel.tsx', 'src/components/DockWorkspace.tsx', 'src/components/mobile-dock.tsx', 'src/components/HeaderMenu.tsx', 'src/components/OpenProjectDialog.tsx', 'src/components/LinkProjectDialog.tsx', 'src/components/ServerFileExplorer.tsx', 'src/components/file-browser.tsx', 'src/components/file-browser-favorites.tsx', 'packages/ui/src/HoverTipLayer.tsx', 'packages/ui/src/dialog-frame.tsx', 'packages/ui/src/ConfirmDialog.tsx', 'packages/ui/src/select-field.tsx'].map(file => fs.readFile(path.join(root, file), 'utf8')))).join('\n')
   const compiler = await compile(await fs.readFile(`${root}/src/index.css`, 'utf8'), { base: `${root}/src`, onDependency() {} })
   const taskContent = await fs.readFile(`${root}/src/components/task-panel.tsx`, 'utf8')
   const dateCss = await fs.readFile(`${root}/packages/ui/src/date-field.css`, 'utf8')
@@ -61,6 +62,7 @@ for (const mode of ['keyboard', 'workspace', 'documents', 'permissions', 'panels
     const errors: string[] = []
     page.on('pageerror', error => errors.push(error.message))
     let active = '/alpha', projectPath = '/alpha'
+    let onboardingComplete = false
     let role = 'owner', serverFiles = keyboardOnly
     let failSwitch = false
     const requests: { path: string; method: string; root: string; time: number }[] = []
@@ -120,6 +122,7 @@ for (const mode of ['keyboard', 'workspace', 'documents', 'permissions', 'panels
       if (url.pathname === '/api/workspace') {
         if (method === 'POST') {
           const body = route.request().postDataJSON()
+          onboardingComplete = true
           workspacePosts.push(body)
           if (mode === 'rapid') {
             if (failSwitch) return route.fulfill({ status: 400, json: { error: 'missing folder' } })
@@ -141,10 +144,11 @@ for (const mode of ['keyboard', 'workspace', 'documents', 'permissions', 'panels
           await page.evaluate(() => (globalThis as unknown as { presence: { onmessage: (e: { data: string }) => void } }).presence.onmessage({ data: JSON.stringify({ type: 'workspace' }) }))
           await new Promise(resolve => setTimeout(resolve, 40))
         }
-        return json({ path: active, projectPath: mode === 'worktree' ? projectPath : active, docs: 'docs', docsPath: active + '/docs', projects: [] })
+        return json({ hasProject: !onboarding || onboardingComplete, path: active, projectPath: mode === 'worktree' ? projectPath : active, docs: 'docs', docsPath: active + '/docs', projects: [] })
       }
+      if (url.pathname === '/api/project-registry' && method === 'POST') return json({ project: { name: route.request().postDataJSON().name, path: '/new-project', managed: true, mine: true, icon: null } })
       if (url.pathname === '/api/project-icons/read') return json({ icons: {} })
-      if (url.pathname === '/api/user-ui/root-projects') return json({ state: { paths: ['/alpha', '/beta', ...(mode === 'worktree' ? ['/alpha-worktree'] : mode === 'rapid' ? ['/gamma'] : [])], icons: {}, groups: [] } })
+      if (url.pathname === '/api/user-ui/root-projects') return json({ state: { paths: onboarding ? onboardingComplete ? ['/new-project'] : [] : ['/alpha', '/beta', ...(mode === 'worktree' ? ['/alpha-worktree'] : mode === 'rapid' ? ['/gamma'] : [])], icons: {}, groups: [] } })
       if (url.pathname === '/api/user-ui/agent-tabs') return json({ state: null, claims: [], workspace: url.searchParams.get('workspace') })
       if (url.pathname === '/api/user-ui/workspace') {
         if (method === 'PUT') { const body = route.request().postDataJSON(); persisted.set(body.workspacePath, body.state); return json({ state: body.state }) }
@@ -200,6 +204,25 @@ for (const mode of ['keyboard', 'workspace', 'documents', 'permissions', 'panels
       return route.fulfill(url.pathname === '/app.js' ? { contentType: 'text/javascript', body: chunk.code } : { contentType: 'text/html', body: `<!doctype html><html><meta charset="utf-8"><style>${css}</style><div id="root"></div><script src="/app.js"></script></html>` })
     })
     await page.goto('http://mew-switch.test/')
+    if (onboarding) {
+      const dialog = page.getByRole('dialog', { name: '프로젝트 추가', exact: true })
+      await dialog.getByRole('textbox', { name: '프로젝트 이름', exact: true }).waitFor()
+      assert.equal(await page.locator('[data-test-editor]').count(), 0, 'onboarding never mounts the internal fallback workspace')
+      assert.equal(requests.filter(request => ['/api/tree', '/api/file', '/api/user-ui/workspace', '/api/user-ui/agent-tabs'].includes(request.path)).length, 0, 'onboarding does not request fallback files, layouts or agent tabs')
+      assert.equal(await dialog.getByRole('checkbox', { name: 'Git 레포로 만들기' }).isChecked(), true)
+      await page.keyboard.press('Escape')
+      await page.getByRole('heading', { name: '첫 프로젝트를 만들어 보세요' }).waitFor()
+      await page.getByRole('button', { name: '프로젝트 만들기', exact: true }).click()
+      await dialog.getByRole('textbox', { name: '프로젝트 이름', exact: true }).fill('First project')
+      await dialog.getByRole('button', { name: '빈 프로젝트 만들기', exact: true }).click()
+      while (!releaseUi) await page.waitForTimeout(10)
+      releaseUi(); blockUi = false
+      await page.locator('[data-test-content]').getByText('Content of /new-project', { exact: true }).waitFor()
+      assert.equal(await page.locator('[data-current-project="/new-project"]').count(), 1)
+      assert.deepEqual(workspacePosts.map(post => post.path), ['/new-project'])
+      assert.deepEqual(errors, [])
+      return
+    }
     const loading = page.locator('[role="status"].pointer-events-none').filter({ has: page.getByText('불러오는 중…', { exact: true }) })
     await loading.waitFor()
     while (!releaseUi) await page.waitForTimeout(10)
@@ -587,23 +610,23 @@ for (const mode of ['keyboard', 'workspace', 'documents', 'permissions', 'panels
     const docsFolder = page.locator('[data-tree-key="sidebar-tree:root:/alpha"] [data-path="docs"]')
     assert.ok((await page.locator('[data-path="assets"]').boundingBox())!.y < (await docsFolder.boundingBox())!.y, 'docs follows the normal folder order')
     assert.ok((await docsFolder.boundingBox())!.y < (await page.locator('[data-path="src"]').boundingBox())!.y)
-    await page.locator('[data-path="src"]').click()
-    await page.locator('[data-path="src/child.ts"]').click()
+    await page.locator('[data-path="src"]').dblclick()
+    await page.locator('[data-path="src/child.ts"]').dblclick()
     await page.getByRole('button', { name: 'Close src/child.ts', exact: true }).waitFor()
     assert.equal(active, '/alpha', 'subproject files open without switching the current project')
     await page.getByRole('button', { name: 'Close src/child.ts', exact: true }).click()
     assert.equal(await page.locator('[data-subproject-link="src"]').count(), 1, 'App keeps subprojects in the normal folder tree')
     assert.equal(await page.locator('[data-path="@subproject:src"]').count(), 0)
-    await page.locator('[data-path="src"]').click()
-    await docsFolder.click()
+    await page.locator('[data-path="src"]').dblclick()
+    await docsFolder.dblclick()
     assert.equal((await explorerScope.innerText()).trim(), '파일', 'folder expansion stays in Files')
     await page.locator('[data-path="docs/MOC.md"]').waitFor()
     assert.equal(await page.locator('[data-path="docs/MOC.md"]').innerText(), 'MOC.md')
-    await page.locator('[data-path="docs/example.ts"]').click()
+    await page.locator('[data-path="docs/example.ts"]').dblclick()
     await page.getByRole('button', { name: 'Close docs/example.ts', exact: true }).waitFor()
     assert.equal((await explorerScope.innerText()).trim(), '파일', 'raw document files open in Files')
     await page.getByRole('button', { name: 'Close docs/example.ts', exact: true }).click()
-    await docsFolder.click()
+    await docsFolder.dblclick()
     assert.equal(await page.locator('[data-path="docs/MOC.md"]').count(), 0, 'folder can collapse')
     await page.locator('[data-documents-link]').click()
     assert.equal((await explorerScope.innerText()).trim(), '문서')
@@ -638,14 +661,14 @@ for (const mode of ['keyboard', 'workspace', 'documents', 'permissions', 'panels
         await page.setViewportSize({ width, height: 700 })
         await page.evaluate(`document.documentElement.classList.toggle('dark', ${width === 390})`)
         await selectExplorerScope('파일')
-        await docsFolder.click()
+        await docsFolder.dblclick()
         await page.locator('[data-path="docs/example.ts"]').waitFor()
         await page.screenshot({ path: `/tmp/mew-docs-folder-${width}.png` })
         await page.locator('[data-documents-link]').click()
         assert.equal((await explorerScope.innerText()).trim(), '문서')
         await selectExplorerScope('파일')
         await page.locator('[data-path="docs/example.ts"]').waitFor()
-        await docsFolder.click()
+        await docsFolder.dblclick()
       }
       assert.deepEqual(errors, [])
       return
@@ -667,12 +690,17 @@ for (const mode of ['keyboard', 'workspace', 'documents', 'permissions', 'panels
         assert.equal(requests.filter(r => r.path === '/api/workspace' && r.method === 'POST').length, 0)
         assert.equal(await page.locator('[data-test-editor]').isVisible(), true, 'external file opening brings the mobile editor forward')
         await page.keyboard.press(`${modifier}+Shift+o`)
-        const projectDialog = page.getByRole('dialog', { name: '새 프로젝트 열기', exact: true })
+        const createDialog = page.getByRole('dialog', { name: '프로젝트 추가', exact: true })
+        await createDialog.getByRole('textbox', { name: '프로젝트 이름', exact: true }).waitFor()
+        assert.equal(await createDialog.getByRole('combobox').count(), 0)
+        await createDialog.getByRole('button', { name: '기존 프로젝트 연결', exact: true }).click()
+        const projectDialog = page.getByRole('dialog', { name: '기존 프로젝트 연결', exact: true })
         await projectDialog.getByRole('button', { name: 'config', exact: true }).waitFor()
         assert.equal(await projectDialog.getByRole('button', { name: '.zshrc', exact: true }).count(), 0, 'project opening lists folders only')
         await page.screenshot({ path: `/tmp/mew-open-project-${width}.png` })
         await page.keyboard.press('Escape')
         await projectDialog.waitFor({ state: 'detached' })
+        await page.keyboard.press('Escape')
         await page.getByRole('button', { name: 'Select README.md', exact: true }).click()
       }
       await page.setViewportSize({ width: 1100, height: 700 })
@@ -707,7 +735,7 @@ for (const mode of ['keyboard', 'workspace', 'documents', 'permissions', 'panels
       await page.keyboard.press('Escape')
       await page.getByRole('dialog').waitFor({ state: 'detached' })
       await page.keyboard.press('Control+Shift+o')
-      await page.getByRole('dialog', { name: '새 프로젝트 열기', exact: true }).waitFor()
+      await page.getByRole('dialog', { name: '프로젝트 추가', exact: true }).waitFor()
       await page.keyboard.press('Escape')
       await page.getByRole('dialog').waitFor({ state: 'detached' })
       await page.keyboard.press('Alt+p')
@@ -718,9 +746,11 @@ for (const mode of ['keyboard', 'workspace', 'documents', 'permissions', 'panels
       role = 'member'
       await page.reload()
       await page.locator('[data-test-content]').getByText('Content of /alpha', { exact: true }).waitFor()
-      assert.equal(await page.locator('button[data-project-switcher]').count(), 0, 'member cannot switch projects')
+      assert.equal(await page.locator('button[data-project-switcher]').count(), 1, 'members can select shared projects')
       await page.keyboard.press('Control+Shift+o')
-      assert.equal(await page.getByRole('dialog').count(), 0, 'member cannot open the project picker')
+      await page.getByRole('dialog', { name: '프로젝트 추가', exact: true }).waitFor()
+      await page.keyboard.press('Escape')
+      await page.getByRole('dialog').waitFor({ state: 'detached' })
       role = 'manager'
       serverFiles = false
       await page.reload()
@@ -739,7 +769,9 @@ for (const mode of ['keyboard', 'workspace', 'documents', 'permissions', 'panels
       await page.locator('[data-sidebar]').screenshot({ path: path.join(process.env.MEW_EXPLORER_SCREENSHOTS, 'desktop-files.png') })
       await selectExplorerScope('문서')
     }
-    await page.locator('[data-tree-key="sidebar-tree:docs:/alpha"] [data-path="alpha.md"]').click({ modifiers: ['Control'] })
+    const documentRow = page.locator('[data-tree-key="sidebar-tree:docs:/alpha"] [data-path="alpha.md"]')
+    await documentRow.click()
+    await documentRow.press('Control+Enter')
     await page.getByRole('button', { name: 'Close mew:file:docs/alpha.md' }).waitFor()
     await page.getByRole('button', { name: 'Close README.md' }).waitFor()
     await page.getByRole('button', { name: 'Select extra.md', exact: true }).click()
@@ -1155,7 +1187,7 @@ for (const mode of ['keyboard', 'workspace', 'documents', 'permissions', 'panels
     await page.reload()
     await projectsPanel.waitFor()
     assert.equal(Number(await projectResize.getAttribute('aria-valuenow')), savedProjectWidth, 'App restores project panel width and open state across reload')
-    await projectsPanel.getByRole('button', { name: '프로젝트 · 닫기', exact: true }).click()
+    await projectsPanel.getByRole('button', { name: '내 프로젝트 · 닫기', exact: true }).click()
     assert.equal(await page.locator('button[data-project-switcher]').getAttribute('aria-expanded'), 'false')
     await page.reload()
     await page.locator('button[data-project-switcher]').waitFor()

@@ -12,7 +12,7 @@ const root = path.resolve(import.meta.dirname, '..')
 for (const compact of [false, true]) test(compact ? 'file browsers keep compact rows and parent navigation in empty and filtered lists' : 'project browser and app dialogs preserve input, focus and operation boundaries', { skip: !domBrowserExecutable(), timeout: 45_000 }, async () => {
   const source = `import React,{useState} from '${root}/node_modules/react/index.js';
 import {createRoot} from '${root}/node_modules/react-dom/client.js';
-import {OpenProjectDialog} from '${root}/src/components/OpenProjectDialog.tsx';
+import {LinkProjectDialog as OpenProjectDialog} from '${root}/src/components/LinkProjectDialog.tsx';
 import {ServerFileExplorer} from '${root}/src/components/ServerFileExplorer.tsx';
 import {I18nProvider} from '${root}/src/i18n.tsx';
 import {useDialog} from '${root}/packages/ui/src/use-dialog.tsx';
@@ -21,7 +21,7 @@ function Fixture(){const [open,setOpen]=useState(false);const [explorer,setExplo
 createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18nProvider>);`
   const bundle = await build({ input: 'virtual:project.tsx', onLog(level, log, handler) { if (log.code !== 'MODULE_LEVEL_DIRECTIVE') handler(level, log) }, write: false, platform: 'browser', output: { format: 'iife' }, transform: { jsx: 'react-jsx', define: { 'process.env.NODE_ENV': JSON.stringify('test') } }, plugins: [{ name: 'fixture', resolveId(id) { if (id === 'virtual:project.tsx') return id; if (id.endsWith('.css')) return 'virtual:style' }, load(id) { if (id === 'virtual:project.tsx') return source; if (id === 'virtual:style') return '' } }] })
   const chunk = bundle.output.find(item => item.type === 'chunk')!
-  const files = ['src/components/file-action-menu.tsx', 'src/hooks/use-external-file-actions.tsx', 'src/components/file-browser.tsx', 'src/components/file-browser-path.tsx', 'src/components/ServerFileExplorer.tsx', 'src/components/OpenProjectDialog.tsx', 'src/components/file-browser-favorites.tsx', 'packages/ui/src/dialog-frame.tsx', 'packages/ui/src/ConfirmDialog.tsx', 'packages/ui/src/prompt-dialog.tsx']
+  const files = ['src/components/file-action-menu.tsx', 'src/hooks/use-external-file-actions.tsx', 'src/components/file-browser.tsx', 'src/components/file-browser-path.tsx', 'src/components/ServerFileExplorer.tsx', 'src/components/LinkProjectDialog.tsx', 'src/components/file-browser-favorites.tsx', 'packages/ui/src/dialog-frame.tsx', 'packages/ui/src/ConfirmDialog.tsx', 'packages/ui/src/prompt-dialog.tsx']
   const content = (await Promise.all(files.map(file => fs.readFile(path.join(root, file), 'utf8')))).join('\n')
   const compiler = await compile(await fs.readFile(`${root}/src/index.css`, 'utf8'), { base: `${root}/src`, onDependency() {} })
   const css = compiler.build([...new Set((source + content).match(/[A-Za-z0-9_@!:/.[\]()%,-]+/g))])
@@ -109,7 +109,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     page.on('dialog', async dialog => { errors.push(`Native dialog: ${dialog.type()}`); await dialog.dismiss() })
     await page.goto('http://mew-project.test/')
     const trigger = page.getByRole('button', { name: '프로젝트 추가', exact: true })
-    const dialog = page.getByRole('dialog', { name: '새 프로젝트 열기' })
+    const dialog = page.getByRole('dialog', { name: '기존 프로젝트 연결' })
     const openFavorites = async (owner: typeof dialog) => {
       const button = owner.getByRole('button', { name: '즐겨찾기', exact: true })
       if (await button.getAttribute('aria-expanded') !== 'true') await button.click()
@@ -170,7 +170,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
       await trigger.click()
       await dialog.getByRole('button', { name: 'mew Git' }).waitFor()
       assert.equal(await dialog.getByRole('combobox', { name: '프로젝트 경로' }).evaluate(el => el === el.ownerDocument.activeElement), false)
-      assert.equal(await dialog.getByRole('heading', { name: '새 프로젝트 열기' }).evaluate(el => el === el.ownerDocument.activeElement), true)
+      assert.equal(await dialog.getByRole('heading', { name: '기존 프로젝트 연결' }).evaluate(el => el === el.ownerDocument.activeElement), true)
       assert.equal(await dialog.getByRole('button', { name: 'OneDrive - Work 폴더로 이동' }).count(), 0)
       await openFavorites(dialog)
       await dialog.getByRole('button', { name: 'OneDrive - Work 폴더로 이동' }).waitFor()
@@ -261,7 +261,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     await address.fill('/missing')
     await address.press('Enter')
     await dialog.getByRole('alert').waitFor()
-    assert.equal(await dialog.getByRole('button', { name: '이 프로젝트 열기' }).isDisabled(), true)
+    assert.equal(await dialog.getByRole('button', { name: '이 폴더 연결' }).isDisabled(), true)
     await address.fill('/home/test/new-parent/new-project')
     await address.press('Enter')
     const createPath = page.getByRole('dialog', { name: '/home/test에 new-parent가 없습니다. 경로를 생성할까요?', exact: true })
@@ -283,7 +283,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     assert.equal(await page.evaluate('window.opened'), undefined, 'creation only navigates; project opening is explicit')
     await address.fill('/home/test/mew')
     await address.press('Enter')
-    await dialog.getByRole('button', { name: '이 프로젝트 열기' }).click()
+    await dialog.getByRole('button', { name: '이 폴더 연결' }).click()
     await dialog.waitFor({ state: 'detached' })
     assert.equal(await page.evaluate('window.opened'), '/home/test/mew')
     // A shortcut navigates only; opening a chosen subfolder remains explicit.
@@ -295,7 +295,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     assert.equal(await address.inputValue(), '/cloud/OneDrive')
     assert.equal(await page.evaluate('window.opened'), null)
     await dialog.getByRole('button', { name: 'work', exact: true }).click()
-    await dialog.getByRole('button', { name: '이 프로젝트 열기' }).click()
+    await dialog.getByRole('button', { name: '이 폴더 연결' }).click()
     await dialog.waitFor({ state: 'detached' })
     assert.equal(await page.evaluate('window.opened'), '/cloud/OneDrive/work')
     cloudFolders.push({ provider: 'onedrive', name: 'OneDrive - Work', path: '/cloud/OtherDrive' })

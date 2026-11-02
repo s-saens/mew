@@ -8,7 +8,7 @@ import http from 'node:http'
 import express from 'express'
 import { createApiApp } from './api.ts'
 import { WORKSPACE_ROOT, setWorkspaceRoot } from './paths.ts'
-import { readRootProjects, writeRootProjects } from './userUiState.ts'
+import { readRootProjects, writeRootProjects, writeActiveWorkspace } from './userUiState.ts'
 
 test('shared icon API allows owner and manager access, persists project data and excludes icons from account saves', async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mew-icon-api-'))
@@ -17,6 +17,7 @@ test('shared icon API allows owner and manager access, persists project data and
   const original = WORKSPACE_ROOT
   setWorkspaceRoot(root)
   const email = 'icons@example.com'
+  writeActiveWorkspace(email, root)
   writeRootProjects(email, { paths: [child], icons: { [child]: 'i:book' } })
   let role = 'owner'
   const app = express()
@@ -34,11 +35,16 @@ test('shared icon API allows owner and manager access, persists project data and
   try {
     const restored = await (await fetch(base + '/user-ui/root-projects')).json() as { state: { icons: Record<string, string> } }
     assert.equal(restored.state.icons[child], 'i:book')
-    for (const denied of ['member', 'guest']) {
+    for (const denied of ['guest']) {
       role = denied
       assert.equal((await request('/project-icons', { path: child, icon: '🌱' })).status, 403)
       assert.equal((await request('/project-icons/read', { paths: [child] }, 'POST')).status, 403)
     }
+    role = 'member'
+    assert.equal((await request('/project-icons', { path: child, icon: '🌱' })).status, 200)
+    assert.equal((await request('/project-icons/read', { paths: [child] }, 'POST')).status, 200)
+    assert.equal((await request('/project-icons', { path: path.dirname(root), icon: '🌱' })).status, 403)
+    assert.equal((await request('/project-icons/read', { paths: [path.dirname(root)] }, 'POST')).status, 403)
     role = 'manager'
     assert.equal((await request('/project-icons', { path: child, icon: '🌱' })).status, 200)
     const icons = await (await request('/project-icons/read', { paths: [child] }, 'POST')).json() as { icons: Record<string, string> }

@@ -1,6 +1,6 @@
 ---
 title: "App Startup, Server Architecture, and State Files"
-description: "Defines workspace, public-share, and unknown application routes, the themed 404 recovery screen, and production fallback status. Describes per-account project switching for owner·manager, the startup screen before authentication waits, parallel downloads, initial/authentication/workspace screen chunk grouping, reuse of current P2P authentication, startup and runtime failure recovery, and rendering the workspace screen and editor with regular state. Distinguishes asynchronous loading by identity and permissions, server·CLI·OS execution layers, state files, project-owned document metadata and legacy migration, and the boundaries between isolated startup verification and production application."
+description: "Defines workspace, public-share, and unknown application routes, the themed 404 recovery screen, and production fallback status. Describes the shared YAML project catalog, per-account My Projects, name-only managed creation, first-use onboarding, per-account project switching for all signed-in users, the startup screen before authentication waits, parallel downloads, initial/authentication/workspace screen chunk grouping, reuse of current P2P authentication, startup and runtime failure recovery, and rendering the workspace screen and editor with regular state. Distinguishes asynchronous loading by identity and permissions, server·CLI·OS execution layers, state files, project-owned document metadata and legacy migration, and the boundaries between isolated startup verification and production application."
 updated: "2026-11-02"
 상위파일:
   - "../MOC.md"
@@ -23,6 +23,7 @@ updated: "2026-11-02"
 - `server/access-policy.ts`·`access-routes.ts`·`access-socket.ts` — [Per-Account Feature and File Permissions](access-control.md), management APIs, and connection revalidation. `guestAccess.ts` is compatibility code for the existing storage format.
 - `server/usersCli.ts` — approval list CLI
 - `server/docsRepo.ts` — docs folder import/export; `server/fsBrowse.ts` — folder listing outside the workspace
+- `server/project-registry.ts` — instance-wide project catalog, per-account shortcuts, legacy list migration, and managed project creation
 - Mew's own documentation follows this repository's [Documentation Rules](../README.md). Documentation policies for other projects linked to Documents are owned by those projects and do not automatically require MOC registration.
 
 `vite.config.ts` loads `server/plugin.ts` only from the development server's `configureServer` hook. It passes a module URL to dynamic import so the Vite configuration bundler does not preload server dependencies, keeping native `node-pty` unnecessary for loading configuration during browser builds. Running the development or production server still requires a native PTY installed for the platform. `server/vite-config.test.ts` loads the configuration without building the app or running the server to check this dependency boundary.
@@ -98,7 +99,7 @@ flowchart LR
   Account --> State["개인 설정·프로젝트·대화"]
 ```
 
-Users, sessions, per-account feature/file permissions, project layouts, terminal buttons, hidden lists, and scheduled tasks are stored here. JSON state is read and written through `server/dataDir.ts`. Conversation transcripts use the SQLite store in `server/agentTranscript.ts` and follow the [Conversation Storage Contract](conversation-storage.md). Connection history is persisted in `presence/history.sqlite` in `server/presence-history.ts` and follows the [Collaboration Storage Contract](collaboration.md#connection-history-daily-queries-and-excel):
+Users, sessions, per-account feature/file permissions, project layouts, terminal buttons, hidden lists, and scheduled tasks are stored here. The project catalog and My Projects use `projects.yaml`; other structured settings use JSON. Atomic state I/O is shared through `server/dataDir.ts`. Conversation transcripts use the SQLite store in `server/agentTranscript.ts` and follow the [Conversation Storage Contract](conversation-storage.md). Connection history is persisted in `presence/history.sqlite` in `server/presence-history.ts` and follows the [Collaboration Storage Contract](collaboration.md#connection-history-daily-queries-and-excel):
 
 - **Writes use only a temporary file + rename**. Writing directly with `writeFileSync` briefly makes the file 0 bytes, and another process reading it at that moment mistakes it for an empty value.
 - **Do not return an empty value on read failure.** If the file is missing, return `null`; if it is corrupted, leave a copy (`*.corrupt-*`) and throw. Treating an unreadable file as `{}` and overwriting it would erase all remaining settings — project icons were actually reset through this path.
@@ -118,12 +119,49 @@ Each root's `.mew/project-icon.json` stores one icon value in the form `{ "icon"
 
 Existing values in `DATA_DIR/project-icons.json` for projects directly under the current root are migrated to project files on first lookup, then the old keys are removed. Existing account tab icons are migrated as initial values only when neither project file nor file explorer values exist. Old file explorer values are not applied to projects with the same name under other roots. Projects that cannot be queried display the default folder icon. Reads and migration occur at display time, so closed projects are not traversed recursively.
 
-The owner-only `POST /api/project-icons/read` reads current icons for a list of absolute paths, and `PUT /api/project-icons` saves `{ path, icon }` to the project. The existing `/api/project-icon` also updates the same file. Account root tab storage no longer includes icon contents. Follow [ADR 0177](../history/decisions/0177-mew-project-owned-icons.md).
+The signed-in-only `POST /api/project-icons/read` reads current icons for a list of absolute paths, and `PUT /api/project-icons` saves `{ path, icon }` to the project. Members are restricted to registered project roots; guests cannot use these APIs. The existing `/api/project-icon` also updates the same file. Account root tab storage no longer includes icon contents. Follow [ADR 0177](../history/decisions/0177-mew-project-owned-icons.md).
+
+## Shared project registry and My Projects
+
+`server/project-registry.ts` owns `DATA_DIR/projects.yaml`. The instance catalog contains all registered folders; My Projects contains each account's ordered shortcuts. Registration grants discoverability to every signed-in non-guest account, while normal file and feature rules still govern project contents and tools. Managed project files live separately at `~/.mew/projects/<name>`, independent of `MEW_DATA_DIR`.
+
+```yaml
+version: 1
+projects:
+  - path: /home/example/.mew/projects/Notebook
+    name: Notebook
+    managed: true
+  - path: /work/existing-app
+    name: existing-app
+    managed: false
+myProjects:
+  example-account:
+    paths:
+      - /home/example/.mew/projects/Notebook
+    icons: {}
+```
+
+`projects` is global; `myProjects` keys are normalized local account IDs, and each value retains the compatible `StoredRootProjects` shape (`paths`, legacy `icons`, and optional `groups`). Icons displayed in the UI are still read from each project's `.mew/project-icon.json`; no group UI is restored. Removing a shortcut never removes the global entry, another account's shortcuts, or files. Missing directories remain listed so an unavailable mount or migrated entry is not silently discarded.
+
+When YAML is missing, its first read migrates all accounts' `rootProjects` from `user-ui-state.json`. Only when an account has no `rootProjects` value does migration use its saved `activeProjectPath` or `activeWorkspace`. Existing ordering and compatibility metadata are preserved, duplicates share one catalog entry, and the old JSON stays intact as historical migration data. A fresh installation does not register the server startup directory. YAML writes use atomic replacement; malformed existing YAML raises a data error and is not replaced by an empty catalog.
+
+| API | Contract |
+| --- | --- |
+| `GET /api/project-registry` | Returns `{ projects: [{ path, name, managed, mine, icon }] }` for a signed-in account. |
+| `POST /api/project-registry` with `{ name, git? }` | Creates a managed directory, registers it, and adds it to the caller's My Projects; Git defaults to enabled. Returns `{ project, state }`. |
+| `POST /api/project-registry` with `{ path }` | Validates and canonicalizes an existing directory, registers it without moving it, and adds it to the caller's My Projects. Returns `{ project, state }`. |
+| `PUT /api/project-registry/mine` with `{ path, added }` | Adds or removes only the caller's shortcut and returns `{ state }`. |
+| `GET/PUT /api/user-ui/root-projects` | Compatible personal-list API backed by YAML instead of the old JSON field. |
+
+Managed names are validated as one safe directory component: no traversal, separators, leading dot, control characters, reserved filename characters/names, or trailing dot/space. Existing directories are rejected with 409 instead of reused or overwritten. Every managed project gets an empty `.mew/docs/` directory, which existing Documents detection selects by default. Keeping that location inside `.mew/` avoids creating a separate root `docs/` on first access. Git-enabled projects additionally get `.git/` and `.gitignore` excluding `.mew/temp/`. Linking requires an existing canonical directory and deduplicates symbolic-link aliases. Both flows preserve server-data path restrictions. If an explicitly configured data root is an ancestor of `~/.mew/projects`, general file operations allow the managed-project subtree while continuing to block instance metadata and symbolic-link escapes. Arbitrary server folder creation and Git operations retain their existing role and feature checks.
+
+The name-first dialog is `OpenProjectDialog`; its explicit existing-folder branch is `LinkProjectDialog`. `ProjectCreationAgentDialog` hosts the normal `AgentPanel` for discovery and documentation after managed creation. [The project feature](../features/projects-files-search/opening-projects-tabs-and-groups.md), [agent sessions](agent-sessions.md#agent-assisted-project-creation), and [ADR 0118](../decisions/0118-shared-project-registry.md) own their behavior and rationale.
+
 ## Per-Account Active Project
 
-Under [ADR 0200](../history/decisions/0200-mew-account-active-workspace.md), the last active project is owned by the per-account `activeWorkspace` in `user-ui-state.json`. `server/account-workspace.ts` reads the authenticated account's root and fixes it in the `AsyncLocalStorage` context of `paths.ts` for the request's lifetime. Path functions such as `workspacePaths` and `projectRoot` read this context, while CLI and server initialization without an account use the existing server default root. If there is no saved value or the path has been deleted, it falls back to the default root.
+Under [ADR 0200](../history/decisions/0200-mew-account-active-workspace.md), the last active project is owned by the per-account `activeWorkspace` in `user-ui-state.json`. `server/account-workspace.ts` reads the authenticated account's root and fixes it in the `AsyncLocalStorage` context of `paths.ts` for the request's lifetime. Path functions such as `workspacePaths` and `projectRoot` read this context, while CLI and server initialization without an account use the existing server default root. A saved active root is used only while its directory exists. If it is absent or deleted, the request layer chooses the first existing My Projects directory and persists it as active. If none exists, it uses the server startup root only as an internal request fallback. Workspace metadata reports `hasProject: true` for a signed-in account only when its saved active root matches the request root; otherwise it reports `false`, and the UI shows project onboarding instead of files and tools. Missing catalog entries and shortcuts remain stored. A fresh account is not enrolled in the startup project.
 
-`POST /api/workspace`, `/api/fs/open-project`, and `/api/subprojects/open` are allowed for owner·manager and save only the requesting account's root. `workspace` presence notifications are sent only to the same authenticated account. They do not change the server default root, `MEW_WORKSPACE` settings, other accounts' watchers, or collaborative editing rooms. Existing agent working paths remain fixed, while the default path for new terminals follows the requesting account's root. Documents folder settings remain owned by the project configuration file.
+`POST /api/workspace` accepts registered project roots for all signed-in accounts. `/api/fs/open-project` links, pins, and opens an existing folder for the caller. Members cannot use an unregistered arbitrary path through `/api/workspace`; owners and managers retain their broader existing switching behavior. `/api/subprojects/open` and worktree operations keep their existing manager/owner checks. Opening an existing subproject also registers and pins it for the caller. Opening an existing All Projects catalog row changes the active root without implicitly pinning it; the explicit Add to My Projects action controls that shortcut. All root changes save only the requesting account's root. `workspace` presence notifications are sent only to the same authenticated account. They do not change the server default root, `MEW_WORKSPACE` settings, other accounts' watchers, or collaborative editing rooms. Existing agent working paths remain fixed, while the default path for new terminals follows the requesting account's root. Documents folder settings remain owned by the project configuration file.
 
 File catalogs, search state, and tree watchers are separated by actual project path, and search SQLite handles by per-root DB path. Project WebSocket connections use the account root at connection time, and collaborative editing rooms include the root in their internal server keys. The wire-level `프로젝트:상대경로` and server-wide shared memo room are retained. Accounts viewing the same actual root share collaborative editing, while files with the same name under different roots remain separate.
 

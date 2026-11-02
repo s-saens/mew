@@ -1,11 +1,11 @@
 ---
 title: "0070 — Manager Project Access"
-description: "Decision to allow owner and manager roles to select, add, and switch projects and perform folder and Git operations in the selection dialog, while retaining per-account root isolation and owner-only account and Documents management."
+description: "Decision to allow owner and manager roles to select, add, and switch projects and perform folder and Git operations in the selection dialog, while retaining per-account root isolation and owner-only account and Documents management. ADR 0118 supersedes its account-isolated catalog and member restrictions for registered projects, managed creation, linking, and personal shortcuts."
 created: 2026-10-26
-updated: 2026-10-26
+updated: 2026-11-02
 ---
 
-- Status: Adopted
+- Status: Partially superseded by [0118](0118-shared-project-registry.md) for shared project registration and non-guest project discovery, managed creation, linking, and switching. Registered-root icon access also extends to members. Existing arbitrary server operation, subproject/worktree, and administrative boundaries remain.
 - Partially supersedes: the owner-only restriction on adding and switching projects in [0019](0019-project-selector.md).
 
 ## Background

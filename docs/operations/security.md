@@ -1,8 +1,8 @@
 ---
 title: "Security operations guidelines"
-description: "Guidelines for operators sharing a Mew instance to assess roles, file permissions, owner password resets, browser-token and external-login revocation, project access, server control features, and data retention risks. Links authentication and storage details to development contracts and explains private vulnerability reporting."
+description: "Guidelines for operators sharing a Mew instance to assess roles, file permissions, owner password resets, browser-token and external-login revocation, shared registered-project access and personal shortcuts, retained server-operation boundaries, server control features, and data retention risks. Links authentication and storage details to development contracts and explains private vulnerability reporting."
 created: 2026-10-22
-updated: 2026-10-31
+updated: 2026-11-02
 상위파일: "MOC.md"
 ---
 
@@ -27,7 +27,8 @@ Roles are guest &lt; member &lt; manager &lt; owner and define **feature default
 | DB, collaborative editing, comments, and chat | Blocked | Allowed | Allowed | Allowed |
 | Agents, terminals, localhost app access, remote desktop, and Android | Blocked | Blocked | Allowed | Allowed |
 | Server file explorer, Git workbench, system, and scheduled tasks | Blocked | Blocked | Allowed | Allowed |
-| Project listing, addition, switching, icon changes, folder creation, and Git clone/initialization | Blocked | Blocked | Allowed | Allowed |
+| Registered projects, My Projects, managed creation, existing-folder linking, and shared icons | Blocked | Allowed | Allowed | Allowed |
+| Arbitrary server folder/Git operations and subproject/worktree switching | Blocked | Blocked | Allowed | Allowed |
 | Account management and docs settings/import/export | Blocked | Blocked | Blocked | Allowed |
 
 The last row contains administrative features determined by role and cannot be delegated through the feature table. The last owner cannot be demoted or deleted, and users cannot delete their own currently logged-in account. Server control features cannot be enabled for guests. Terminal-based agents require both agent and terminal permissions.
@@ -36,9 +37,9 @@ The last row contains administrative features determined by role and cannot be d
 
 Within the file features allowed for an account, apply the most specific rule for each path: inherit, block, read, or edit. Logged-in accounts are allowed access when no rule exists, so they can also read `.env*` unless explicitly restricted. Guests are blocked from all paths until explicitly allowed, and `.env*` is denied even when an allow rule exists. Permissions belong to the local user ID and actual workspace root and cannot be bypassed through aliases or symbolic links.
 
-The server also checks file permissions for searches, downloads, attachments, and collaboration. Features that handle project-wide data, such as Git and DB administration, are denied if any files within the project have partial restrictions. The general file API blocks access to the server data folder, protected paths, and locations outside the workspace. This block remains in effect even if the actual data folder's name or location changes. Even the owner cannot rename or delete protected projects such as the app itself.
+The server also checks file permissions for searches, downloads, attachments, and collaboration. Features that handle project-wide data, such as Git and DB administration, are denied if any files within the project have partial restrictions. The general file API blocks access to the server data folder, protected paths, and locations outside the workspace. This block follows the configured data root. If that root contains the fixed managed-project directory, project files beneath `~/.mew/projects` remain available while instance metadata and symlink escapes stay blocked. Even the owner cannot rename or delete protected projects such as the app itself.
 
-The server file explorer is a separate feature intended to provide access across the OS and does not apply workspace file boundaries or blocklists. Administrative operations such as docs import/export and workspace changes are owner-only. Specific decisions and exceptions follow the [access control contract](../../.mew/docs/development/access-control.md).
+The server file explorer is a separate feature intended to provide access across the OS and does not apply workspace file boundaries or blocklists. Documents administration remains owner-only. Registered-project selection and creation/linking are available to signed-in accounts, and change only that account's active project. Adding a folder to Mew makes it discoverable by all signed-in users; My Projects is a personal shortcut list and does not make files private. File rules still determine access to project contents. Specific decisions and exceptions follow the [access control contract](../../.mew/docs/development/access-control.md).
 
 ### Git operations and external account connections
 

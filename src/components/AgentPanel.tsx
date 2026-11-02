@@ -1542,10 +1542,11 @@ function RuntimePicker({ onSelect, onSelectSet }: { onSelect: (runtime: string) 
   )
 }
 
-export function AgentPanel({ requestedPicker = false, onPickerRuntimeChosen, onRuntimeReady, cacheAccount = 'local', notificationFocused = false, trackRestore, onRunningAgentsChange, requestedNoticeTab, onNoticeHandled, preparedTabs, requestedTab, onRequestedTabHandled, allowAgent = true, allowTerminal = true, project, workspacePath, workingPath = workspacePath, tree, focusedFilePath, getSelectedText, renderCommandButtons, onOpenFile, onOpenGuidanceFile, onClose, nextTabSignal = 0, previousTabSignal = 0, closeTabSignal = 0, agentOpen = true, terminalOpen = false, onCloseTerminal, onPanelFocus, foregroundKind }: { requestedPicker?: boolean; onPickerRuntimeChosen?: (runtime: string) => void; onRuntimeReady?: (runtime: string) => void; cacheAccount?: string; notificationFocused?: boolean; trackRestore?: <T>(request: Promise<T>) => Promise<T>; onRunningAgentsChange?: (count: number) => void; requestedNoticeTab?: string; onNoticeHandled?: () => void; preparedTabs?: ReturnType<typeof fetchAgentTabs>; requestedTab?: RequestedAgentTab | null; onRequestedTabHandled?: () => void; allowAgent?: boolean; allowTerminal?: boolean; foregroundKind?: string | null; agentOpen?: boolean; terminalOpen?: boolean; onCloseTerminal?: () => void; onPanelFocus?: (kind: 'agent' | 'terminal') => void; project: string; workspacePath: string | null; workingPath?: string | null; tree: TreeNode[]; focusedFilePath: string | null; getSelectedText?: () => string | null; renderCommandButtons?: (run: (command: string) => void) => ReactNode; onOpenFile: OpenWorkspaceFile; onOpenGuidanceFile?: (path: string) => void; onClose: () => void; nextTabSignal?: number; previousTabSignal?: number; closeTabSignal?: number }) {
+export function AgentPanel({ embedded = false, startupPrompt, requestedPicker = false, onPickerRuntimeChosen, onRuntimeReady, cacheAccount = 'local', notificationFocused = false, trackRestore, onRunningAgentsChange, requestedNoticeTab, onNoticeHandled, preparedTabs, requestedTab, onRequestedTabHandled, allowAgent = true, allowTerminal = true, project, workspacePath, workingPath = workspacePath, tree, focusedFilePath, getSelectedText, renderCommandButtons, onOpenFile, onOpenGuidanceFile, onClose, nextTabSignal = 0, previousTabSignal = 0, closeTabSignal = 0, agentOpen = true, terminalOpen = false, onCloseTerminal, onPanelFocus, foregroundKind }: { embedded?: boolean; startupPrompt?: { tabId: string; text: string; displayText?: string }; requestedPicker?: boolean; onPickerRuntimeChosen?: (runtime: string) => void; onRuntimeReady?: (runtime: string) => void; cacheAccount?: string; notificationFocused?: boolean; trackRestore?: <T>(request: Promise<T>) => Promise<T>; onRunningAgentsChange?: (count: number) => void; requestedNoticeTab?: string; onNoticeHandled?: () => void; preparedTabs?: ReturnType<typeof fetchAgentTabs>; requestedTab?: RequestedAgentTab | null; onRequestedTabHandled?: () => void; allowAgent?: boolean; allowTerminal?: boolean; foregroundKind?: string | null; agentOpen?: boolean; terminalOpen?: boolean; onCloseTerminal?: () => void; onPanelFocus?: (kind: 'agent' | 'terminal') => void; project: string; workspacePath: string | null; workingPath?: string | null; tree: TreeNode[]; focusedFilePath: string | null; getSelectedText?: () => string | null; renderCommandButtons?: (run: (command: string) => void) => ReactNode; onOpenFile: OpenWorkspaceFile; onOpenGuidanceFile?: (path: string) => void; onClose: () => void; nextTabSignal?: number; previousTabSignal?: number; closeTabSignal?: number }) {
   useUiLocale()
   const { t } = useI18n()
-  const dock = useDock()
+  const inheritedDock = useDock()
+  const dock = embedded ? null : inheritedDock
   const latestDock = useRef(dock)
   latestDock.current = dock
   const docked = !!dock
@@ -2071,6 +2072,7 @@ export function AgentPanel({ requestedPicker = false, onPickerRuntimeChosen, onR
               tabId={tab.id}
               active={isActive}
               autoFocus={isActive && tab.id === autoFocusTabId}
+              initialPrompt={startupPrompt?.tabId === tab.id ? startupPrompt : undefined}
               visible={visible}
               runtime={tab.runtime!}
               cwd={tab.cwd!}
@@ -2260,6 +2262,7 @@ function AgentSessionView({
   tabId,
   active,
   autoFocus,
+  initialPrompt,
   runtime,
   cwd,
   preset,
@@ -2289,6 +2292,7 @@ function AgentSessionView({
   /** 입력·단축키 포커스 대상 */
   active: boolean
   autoFocus: boolean
+  initialPrompt?: { text: string; displayText?: string }
   /** 다른 패널에 포커스가 있어도 현재 표시 중인 탭은 로딩을 재생한다. */
   visible: boolean
   runtime: string
@@ -2338,6 +2342,7 @@ function AgentSessionView({
   const [startupQueue] = useState(() => new AgentStartupQueue<StartupPrompt>())
   const [startupPrompts, setStartupPrompts] = useState(startupQueue.snapshot())
   const [startupReady, setStartupReady] = useState(false)
+  const initialPromptSent = useRef(false)
   const startupClosingSocketRef = useRef<WebSocket | null>(null)
   const clearStartupPrompts = useCallback(() => {
     startupQueue.clear()
@@ -3717,6 +3722,20 @@ function AgentSessionView({
     })
     setStartupPrompts(startupQueue.snapshot())
   }, [startupQueue, startupPrompts, startupReady, connected, meta, auth, loadingSession, historyPreview, messageSettings, skills, beginPrompt, markPromptSent, items])
+  useEffect(() => {
+    if (!initialPrompt || initialPromptSent.current || !startupReady || !connected || !meta?.sessionId
+      || auth || loadingSession || historyPreview || restoreFailureRef.current) return
+    // This one-shot belongs to the newly requested tab, never to restored tab state.
+    initialPromptSent.current = true
+    if (items.some(item => item.kind === 'user') || meta.busy || meta.queued.length > 0) return
+    const displayText = initialPrompt.displayText ?? initialPrompt.text
+    const prompt: StartupPrompt = { type: 'prompt', text: initialPrompt.text, displayText,
+      images: [], imageRefs: [], attachments: [], skills: selectedSkillNames(initialPrompt.text, skills), settings: messageSettings }
+    if (!send(prompt)) { initialPromptSent.current = false; return }
+    beginPrompt({ ...prompt, text: displayText }, items.at(-1)?.key ?? null, meta.queued)
+    markPromptSent(displayText)
+    stickRef.current = true
+  }, [initialPrompt, startupReady, connected, meta, auth, loadingSession, historyPreview, items, skills, messageSettings, send, beginPrompt, markPromptSent])
   const editingSettings = editingQueued?.settings
   const composerModelId = editingSettings?.modelId
     ? hasModelEffort(runtime) ? splitModelVariant(runtime, editingSettings.modelId, models?.availableModels).model : editingSettings.modelId

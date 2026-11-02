@@ -19,6 +19,7 @@ export class WorkspaceError extends Error {
 }
 
 export interface WorkspaceInfo {
+  hasProject: boolean
   path: string
   /** 화면 배치와 실행 중 세션을 유지하는 프로젝트 경로. 파일 작업은 path를 사용한다. */
   projectPath?: string
@@ -33,7 +34,8 @@ export interface WorkspaceInfo {
 export function currentWorkspace(): WorkspaceInfo {
   const account = workspaceContext.getStore()?.account
   const projectPath = account ? readActiveProjectPath(account, workspacePaths.root) : workspacePaths.root
-  return { path: workspacePaths.root, projectPath, projects: listProjects(), docs: workspacePaths.docsDir, docsPath: workspacePaths.docsRoot }
+  const hasProject = !account || readActiveWorkspace(account) === workspacePaths.root
+  return { hasProject, path: workspacePaths.root, projectPath, projects: listProjects(), docs: workspacePaths.docsDir, docsPath: workspacePaths.docsRoot }
 }
 
 /** 설정 파일에 그대로 쓸 수 있는 경로인지 — 셸(`. config.env`)과 Node(loadEnvFile) 둘 다 읽는 파일이다 */

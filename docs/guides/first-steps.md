@@ -1,19 +1,23 @@
 ---
 title: "Open your first project and document"
-description: "Walks through first use after installation and login: add a server working folder with the current project selector in the header, create and edit notes.md with autosave, then check the tools and Git changes."
+description: "Walks through first use after installation and login: create a project by name or link an existing folder, understand shared Projects and personal My Projects, create and edit notes.md with autosave, then review tools and Git changes."
 created: "2026-10-14"
-updated: "2026-10-19"
+updated: "2026-11-02"
 상위파일: "MOC.md"
 ---
 # Open your first project and document
 
-Start with installation complete and logged in to mew. By the end of this guide, you will have created `notes.md` in your working folder and reviewed your changes. If you have not installed it yet, follow the [Korean getting started guide](getting-started-ko.md).
+Start with installation complete and logged in to mew. By the end of this guide, you will have created `notes.md` in your working folder and reviewed your changes. If you have not installed it yet, follow the [installation guide](getting-started-en.md).
 
-## 1. Open a working folder
+## 1. Create or link a project
 
-Click the **current project icon and name** on the left side of the header, then select **Add Project** at the bottom of the list. Navigate to a working folder on the server computer and click **Open Current Folder** (owner). These are **files on the mew server**. To get started, you can create an example folder such as `hello-mew` in the folder picker. Once you switch to the selected folder, the header displays that project's icon and name.
+With no project selected, Mew shows a project welcome screen. Choose **Create project**, enter a name such as `hello-mew`, and choose **Create empty project**. Leave **Create Git repository** checked to track changes, or clear it for a regular folder. Mew creates and opens the project without asking you to choose a path.
 
-To switch projects, click the current project in the header and select one from the list. Permissions to open folders and access features vary by account role. [Project management](projects.md#프로젝트-탭).
+Choose **Create with agent** instead if you want help defining and building the project. The popup uses the normal agent conversation controls: select a configured runtime if needed, answer the agent's first questions, and let it document and implement the project. This option requires agent access. [Runtime setup](../configuration/agent-runtimes.md).
+
+To use a folder that already exists on the server, choose **Link existing project**, find the folder, and open it. Linking preserves its files and location. When you create or link a project, it appears in the instance's shared **Projects** catalog and your own **My projects** list. Other signed-in users can add the same project to their lists, subject to file permissions.
+
+To return to a project, click its name in the header and choose from My projects. Use **Add project → All projects** to find projects other users have added. Removing a shortcut from My projects leaves its folder and shared catalog entry intact. [Project management](projects.md#프로젝트-탭).
 
 ## 2. Distinguish files from Documents
 

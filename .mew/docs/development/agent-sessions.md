@@ -1,6 +1,6 @@
 ---
 title: "Agent session and communication contract"
-description: "Defines account and project instruction APIs, focused documentation and modular code guidance, configurable default-on build verification, model capacity retries, continuous panel recovery and relay liveness, runtimes, tabs, worktrees, attachments, Git AI Commit, CLI, memory, and MCP. Also covers history searches, local incremental indexing, and restoration boundaries for external CLI records."
+description: "Defines account and project instruction APIs, focused documentation and modular code guidance, configurable default-on build verification, model capacity retries, continuous panel recovery and relay liveness, runtimes, tabs, one-time discovery prompts in agent-assisted project creation, worktrees, attachments, Git AI Commit, CLI, memory, and MCP. Also covers history searches, local incremental indexing, and restoration boundaries for external CLI records."
 updated: "2026-11-02"
 상위파일:
   - "../MOC.md"
@@ -41,6 +41,14 @@ Per-project queues, independent tabs, the shared CLI, and completion criteria fo
 - `GET` on the same owner API returns `{ projectRoot, settings, revision }`. `PATCH` accepts `{ projectRoot, revision, instructions, enabled? }` and changes only additional instructions and whether automatic guidance is enabled, preserving the Documents path, entry document, and other settings. Instructions are a string of up to 8,000 characters. A current project or settings revision mismatch returns 409, and invalid input returns 400; existing files are not overwritten. The **Current Project** tab in the Default Instructions dialog uses this API and does not create a separate settings copy.
 - Mew global instructions apply to all projects in the current account and explicitly state that additional project instructions take precedence over conflicting Mew global preferences in that project. Explicit user requests and existing project instructions remain in effect. Both scopes are reread on the next actual request, and neither is passed when automatic guidance is disabled. The default template includes configurable build verification. Concrete project commands and execution, deployment, and server lifecycle restrictions remain project-owned. Follows [Decision 0061](../decisions/0061-agent-guidance-scopes.md).
 - If automatic guidance fails, report the error without falling back to another project to perform the work. Fix the settings JSON or document connection, then submit the request again.
+
+## Agent-assisted project creation
+
+After managed creation and a successful project switch, `ProjectCreationAgentDialog` embeds the normal `AgentPanel` with the new project root. It requests a named conversation through `RequestedAgentTab`, initially leaving runtime selection to the existing picker. It uses normal account/project context, authentication, permissions, execution settings, transcript storage, queues, and error handling; it does not introduce a separate chat or an agent permission bypass.
+
+The popup supplies a startup prompt only for its newly requested tab. The prompt asks the agent to begin with a focused question about the intended project and wait for the user's answer before generating it. Follow-up questions clarify purpose, users, scope, and technology choices. Once agreed, the agent works in the created directory and documents requirements and implementation in the configured Documents location under the applicable Mew and project instructions, including metadata, decisions, work records, language, and verification where required. Existing `.mew` settings and files must be preserved.
+
+Bootstrap delivery waits until the user has chosen a runtime and the normal conversation is ready. It is delivered once for that requested tab; reconnecting or restoring an existing conversation does not send it again. Closing the popup leaves the normal project conversation available from the regular agent panel. Discovery is agent behavior guided by a prompt, not a guarantee that the selected provider will follow every question or complete implementation. [Project creation](../features/projects-files-search/opening-projects-tabs-and-groups.md) owns registration and UI entry, and [ADR 0118](../decisions/0118-shared-project-registry.md) records why the existing panel is reused.
 
 ## Git AI Commit Jobs
 

@@ -12,7 +12,7 @@ const root = path.resolve(import.meta.dirname, '..')
 test('project picker preserves path drafts, validates the selected folder and selects created projects', { skip: !domBrowserExecutable(), timeout: 45_000 }, async () => {
   const source = `import React,{useState} from '${root}/node_modules/react/index.js';
 import {createRoot} from '${root}/node_modules/react-dom/client.js';
-import {OpenProjectDialog} from '${root}/src/components/OpenProjectDialog.tsx';
+import {LinkProjectDialog as OpenProjectDialog} from '${root}/src/components/LinkProjectDialog.tsx';
 import {I18nProvider} from '${root}/src/i18n.tsx';
 localStorage.setItem('mew:locale','ko');
 function Fixture(){const [open,setOpen]=useState(false);const [opened,setOpened]=useState('');return <><button onClick={()=>{setOpened('');setOpen(true)}}>프로젝트 추가</button><output aria-label='열린 프로젝트'>{opened}</output>{open&&<OpenProjectDialog basePath='/home/test' onClose={()=>setOpen(false)} onOpen={p=>{setOpened(p);setOpen(false)}}/>}</>}
@@ -23,7 +23,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     load(id) { if (id === 'virtual:project-picker.tsx') return source; if (id === 'virtual:style') return '' },
   }] })
   const chunk = bundle.output.find(item => item.type === 'chunk')!
-  const files = ['src/components/OpenProjectDialog.tsx', 'src/components/file-browser.tsx', 'src/components/file-browser-path.tsx', 'src/components/file-browser-favorites.tsx', 'src/components/file-action-menu.tsx', 'src/hooks/use-external-file-actions.tsx', 'packages/ui/src/dialog-frame.tsx', 'packages/ui/src/ConfirmDialog.tsx', 'packages/ui/src/prompt-dialog.tsx']
+  const files = ['src/components/LinkProjectDialog.tsx', 'src/components/file-browser.tsx', 'src/components/file-browser-path.tsx', 'src/components/file-browser-favorites.tsx', 'src/components/file-action-menu.tsx', 'src/hooks/use-external-file-actions.tsx', 'packages/ui/src/dialog-frame.tsx', 'packages/ui/src/ConfirmDialog.tsx', 'packages/ui/src/prompt-dialog.tsx']
   const content = (await Promise.all(files.map(file => fs.readFile(path.join(root, file), 'utf8')))).join('\n')
   const compiler = await compile(await fs.readFile(`${root}/src/index.css`, 'utf8'), { base: `${root}/src`, onDependency() {} })
   const css = compiler.build([...new Set((source + content).match(/[A-Za-z0-9_@!:/.[\]()%,-]+/g))])
@@ -68,10 +68,10 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     page.on('pageerror', error => errors.push(error.message))
     await page.goto('http://mew-project-picker.test/')
     const trigger = page.getByRole('button', { name: '프로젝트 추가', exact: true })
-    const dialog = page.getByRole('dialog', { name: '새 프로젝트 열기' })
+    const dialog = page.getByRole('dialog', { name: '기존 프로젝트 연결' })
     const address = dialog.getByRole('combobox', { name: '프로젝트 경로', exact: true })
-    const primary = dialog.getByRole('button', { name: '이 프로젝트 열기', exact: true })
-    const heading = dialog.getByRole('heading', { name: '새 프로젝트 열기', exact: true })
+    const primary = dialog.getByRole('button', { name: '이 폴더 연결', exact: true })
+    const heading = dialog.getByRole('heading', { name: '기존 프로젝트 연결', exact: true })
     const opened = page.getByLabel('열린 프로젝트', { exact: true })
 
     const initialRequest = page.waitForRequest(request => new URL(request.url()).pathname === '/api/fs/entries')

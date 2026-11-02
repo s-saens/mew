@@ -65,10 +65,11 @@ export function FileBrowserEntry({ entry, busy, depth = 0, expanded, onClick, on
 }
 
 /** Shared browsing surface; callers own permissions, loading and file operations. */
-export function FileBrowser({ result, error, draft, onDraftChange, onNavigate, busy = false, foldersOnly = false, autocomplete = false, autoFocusPath = true, toolbar, notice, footerActions, selectedPath, renderEntry, onFilesChanged, onRenamed, onDeleted, onOpenProject }: {
+export function FileBrowser({ result, error, draft, onDraftChange, onNavigate, busy = false, foldersOnly = false, autocomplete = false, autoFocusPath = true, allowFileActions = true, showFavorites = true, toolbar, notice, footerActions, selectedPath, renderEntry, onFilesChanged, onRenamed, onDeleted, onOpenProject }: {
   result: ExternalEntriesResult | null; error: string | null; draft: string
   onDraftChange: (value: string) => void; onNavigate: (path: string) => void
   busy?: boolean; foldersOnly?: boolean; autocomplete?: boolean; autoFocusPath?: boolean
+  allowFileActions?: boolean; showFavorites?: boolean
   toolbar?: ReactNode; notice?: ReactNode; footerActions?: ReactNode
   selectedPath?: string
   renderEntry?: (entry: ExternalEntry, onMenu: EntryMenu) => ReactNode
@@ -96,7 +97,7 @@ export function FileBrowser({ result, error, draft, onDraftChange, onNavigate, b
       <button type="submit" disabled={locked} className={fileBrowserButton}>{t('folder.go')}</button>
     </form>}
     <div className="flex shrink-0 flex-wrap items-center gap-x-2 gap-y-1 border-y border-edge px-2 py-1 sm:px-3">
-      <FileBrowserFavorites compact currentPath={result?.canonicalPath ?? result?.path} disabled={locked} onSelect={navigate} />
+      {showFavorites && <FileBrowserFavorites compact currentPath={result?.canonicalPath ?? result?.path} disabled={locked} onSelect={navigate} />}
       {toolbar}
     </div>
     {notice}
@@ -113,7 +114,7 @@ export function FileBrowser({ result, error, draft, onDraftChange, onNavigate, b
       {error && <div role="alert" className="mx-2 rounded-lg bg-danger-surface p-4 text-sm text-danger-ink"><p className="whitespace-pre-wrap break-words">{error}</p><button type="button" disabled={locked} onClick={() => navigate(draft)} className={`${fileBrowserButton} mt-2 !text-danger-ink`}><RefreshDouble width={16} height={16} />{t('project.retry')}</button></div>}
       {!result ? !error && <div role="status" className="px-3 py-6 text-center text-sm text-ink-secondary">{t('common.loading')}</div>
         : visible.length === 0 ? <div className="flex flex-col items-center px-3 py-6 text-center"><Folder width={28} height={28} className="mb-3 text-ink-secondary" /><p className="text-sm font-medium text-ink">{t(filter ? (foldersOnly ? 'project.noMatches' : 'fileExplorer.noMatches') : (foldersOnly ? 'folder.empty' : 'fileExplorer.empty'))}</p>{foldersOnly && <p className="mt-2 text-xs text-ink-secondary">{t(filter ? 'project.filterHint' : 'project.emptyHint')}</p>}</div>
-        : visible.map((entry) => renderEntry ? renderEntry(entry, actions.openMenu) : <FileBrowserEntry key={entry.path} entry={entry} busy={locked} onMenu={actions.openMenu} onClick={() => navigate(entry.path)} />)}
+        : visible.map((entry) => renderEntry ? renderEntry(entry, actions.openMenu) : <FileBrowserEntry key={entry.path} entry={entry} busy={locked} onMenu={allowFileActions ? actions.openMenu : () => {}} onClick={() => navigate(entry.path)} />)}
     </div>
     <footer className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-edge bg-surface-deep px-3 py-2 sm:px-4">
       <div className="min-w-0 flex-1" aria-live={foldersOnly ? 'polite' : undefined}>

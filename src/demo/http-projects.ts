@@ -1,4 +1,4 @@
-import type { ProjectInfo } from '../api/client.ts'
+import type { ProjectInfo, RegisteredProject, RootProjectTabState } from '../api/client.ts'
 import { demoJson, requireMethod, stringField, type DemoHttpHandler } from './http.ts'
 import { DemoError, type DemoWorkspaceStore } from './workspace-store.ts'
 
@@ -17,9 +17,65 @@ function absolutePath(store: DemoWorkspaceStore, path: string, project = '.works
   return join(store.workspacePath, relative).replace(/\/$/, '')
 }
 
+function registry(store: DemoWorkspaceStore): RegisteredProject[] {
+  const saved = store.getState<RegisteredProject[]>('project-registry', [])
+  const mine = store.getState<RootProjectTabState>('root-projects', { paths: [store.workspacePath], icons: {} })
+  const icons = store.getState<Record<string, string>>('project-icons', {})
+  for (const path of mine.paths) if (!saved.some(project => project.path === path)) saved.push({ path, name: basename(path), managed: false, mine: true, icon: null })
+  const projects = saved.map(project => ({ ...project, mine: mine.paths.includes(project.path), icon: icons[project.path] ?? null }))
+  store.setState('project-registry', projects)
+  return projects
+}
+
+function pin(store: DemoWorkspaceStore, path: string, added: boolean): RootProjectTabState {
+  const previous = store.getState<RootProjectTabState>('root-projects', { paths: [store.workspacePath], icons: {} })
+  const paths = previous.paths.filter(project => project !== path)
+  if (added) paths.push(path)
+  const state = { ...previous, paths }
+  store.setState('root-projects', state)
+  return state
+}
+
 export const handleDemoProjects: DemoHttpHandler = ({ store, request, url, body, project }) => {
   const route = url.pathname, method = request.method
   const root = store.workspaceInfo().path
+  if (route === '/api/project-registry') {
+    requireMethod(request, 'GET', 'POST')
+    if (method === 'GET') return demoJson({ projects: registry(store) })
+    const projects = registry(store)
+    let target: string
+    const managed = body.path === undefined
+    if (managed) {
+      const name = stringField(body, 'name')
+      if (!name || name !== name.trim() || name.length > 120 || name.startsWith('.') || /[\\/\p{Cc}<>:"|?*]/u.test(name) || /[. ]$/.test(name) || /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(name)) throw new DemoError('프로젝트 이름을 확인해 주세요.')
+      if (body.git !== undefined && typeof body.git !== 'boolean') throw new DemoError('Git 설정을 확인해 주세요.')
+      target = join(store.workspacePath, `.mew/projects/${name}`)
+      store.createDirectory(target)
+      store.createDirectory(join(target, '.mew'))
+      if (body.git !== false) {
+        store.writeFile(join(target, '.gitignore'), '.mew/temp/\n')
+        store.setState('git-roots', [...new Set([...store.getState<string[]>('git-roots', [store.workspacePath]), target])])
+      }
+    } else {
+      target = absolutePath(store, stringField(body, 'path'))
+      store.tree('.workspace', target)
+    }
+    let project = projects.find(project => project.path === target)
+    if (!project) {
+      project = { path: target, name: basename(target), managed, mine: true, icon: null }
+      projects.push(project)
+    }
+    store.setState('project-registry', projects)
+    const state = pin(store, target, true)
+    return demoJson({ project: { ...project, mine: true }, state })
+  }
+  if (route === '/api/project-registry/mine') {
+    requireMethod(request, 'PUT')
+    const target = stringField(body, 'path')
+    if (typeof body.added !== 'boolean') throw new DemoError('프로젝트 선택을 확인해 주세요.')
+    if (!registry(store).some(project => project.path === target)) throw new DemoError('등록되지 않은 프로젝트입니다.', 404)
+    return demoJson({ ok: true, state: pin(store, target, body.added) })
+  }
   if (route === '/api/workspace' || route === '/api/fs/open-project' || route === '/api/subprojects/open') {
     requireMethod(request, ...(route === '/api/workspace' ? ['GET', 'POST'] : ['POST']))
     if (method === 'GET') return demoJson(store.workspaceInfo())

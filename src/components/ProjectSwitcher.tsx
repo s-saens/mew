@@ -219,13 +219,13 @@ export function ProjectSwitcher({ paths, activePath, pendingPath, fallbackLabel,
         {content}
       </button> : <div data-project-switcher data-current-project={activePath ?? ''} title={activePath ?? label} className="flex h-full min-w-0 items-center gap-1.5 px-2.5 text-xs text-ink">{content}</div>}
     </div>
-    {showingSidebar && sidebarHost && createPortal(<aside id={panelId} data-project-sidebar data-workspace-panel="projects" aria-label={t('project.sidebar')}
+    {showingSidebar && sidebarHost && createPortal(<aside id={panelId} data-project-sidebar data-workspace-panel="projects" aria-label={t('project.mine')}
       className="mew-project-sidebar mew-panel-surface bg-surface-deep" style={{ width: sidebarWidth }}>
       <div className="mew-project-sidebar-body">
         <div className="mew-project-sidebar-heading">
           <Folder width={14} height={14} aria-hidden="true" />
-          <span className="min-w-0 flex-1 truncate">{t('project.sidebar')}</span>
-          <PanelCloseButton aria-label={`${t('project.sidebar')} · ${t('common.close')}`} onClick={() => { onSidebarOpenChange?.(false); trigger.current?.focus({ preventScroll: true }) }} />
+          <span className="min-w-0 flex-1 truncate">{t('project.mine')}</span>
+          <PanelCloseButton aria-label={`${t('project.mine')} · ${t('common.close')}`} onClick={() => { onSidebarOpenChange?.(false); trigger.current?.focus({ preventScroll: true }) }} />
         </div>
         <div ref={sidebarList} role="menu" data-inline-menu aria-label={t('project.choose')} className="mew-project-sidebar-list"
           onKeyDown={event => {
@@ -261,8 +261,8 @@ export function ProjectSwitcher({ paths, activePath, pendingPath, fallbackLabel,
       <div id={panelId} data-mobile-project-panel className="mew-project-sidebar-body min-h-0">
         <div className="mew-project-sidebar-heading">
           <Folder width={14} height={14} aria-hidden="true" />
-          <h2 id={mobileTitleId} className="min-w-0 flex-1 truncate">{t('project.sidebar')}</h2>
-          <PanelCloseButton aria-label={`${t('project.sidebar')} · ${t('common.close')}`} onClick={closeMenu} />
+          <h2 id={mobileTitleId} className="min-w-0 flex-1 truncate">{t('project.mine')}</h2>
+          <PanelCloseButton aria-label={`${t('project.mine')} · ${t('common.close')}`} onClick={closeMenu} />
         </div>
         <div ref={menuElement} role="menu" data-inline-menu aria-label={t('project.choose')} className="mew-project-sidebar-list"
           onKeyDown={event => {
@@ -286,7 +286,7 @@ export function ProjectSwitcher({ paths, activePath, pendingPath, fallbackLabel,
     {contextMenu && canChangeIcon && <ActionMenu key="project-actions" x={contextMenu.x} y={contextMenu.y} label={labelOf(contextMenu.path)} ref={contextMenuElement} trigger={contextMenu.trigger}
       portalContainer={contextMenu.container} onClose={() => setContextMenu(null)}>
       <ActionMenuItem icon={<EditPencil />} onClick={() => editIcon(contextMenu.path)}>{t('project.edit')}</ActionMenuItem>
-      {canOpen && onRemove && <ActionMenuItem icon={<Trash />} danger disabled={contextMenu.path === activePath && !paths.some(path => path !== activePath)} onClick={() => onRemove(contextMenu.path)}>{t('common.delete')}</ActionMenuItem>}
+      {canOpen && onRemove && <ActionMenuItem icon={<Trash />} danger disabled={contextMenu.path === activePath && !paths.some(path => path !== activePath)} onClick={() => onRemove(contextMenu.path)}>{t('project.removeFromMine')}</ActionMenuItem>}
     </ActionMenu>}
     {editingPath && canChangeIcon && <DialogFrame labelledBy={iconTitleId} onClose={() => setEditingPath(null)}>
       <div className="p-3">

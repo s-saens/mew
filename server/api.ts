@@ -37,6 +37,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { assertNotServerDataPath, DEFAULT_PROJECT, isDeniedSegment, isProtectedProject, listProjects, pathsForWorkspace, projectRoot, resolveProjectPath, UnknownProjectError, UnsafePathError, WORKSPACE_PROJECT, workspacePaths, workspaceContext } from './paths.ts'
 import { createProject, deleteProject, ProjectNameError, renameProject } from './projects.ts'
+import { projectRegistry, ProjectRegistryError } from './project-registry.ts'
 import { buildTree, buildTreeAsync, isPathVisible } from './tree.ts'
 import { flattenTextFiles, replaceInFile, searchInProject, searchInProjectProgressively } from './search.ts'
 import { requiredSearchLiteral } from './search-pattern.ts'
@@ -501,6 +502,32 @@ export function createApiApp() {
     )
   })
 
+  app.get('/project-registry', requireAuthenticated, (req, res) => {
+    try { res.json({ projects: projectRegistry.list(authOf(req).email!) }) }
+    catch (err) { handleError(res, err) }
+  })
+
+  app.post('/project-registry', requireAuthenticated, async (req, res) => {
+    try {
+      const email = authOf(req).email!
+      if (typeof req.body?.path === 'string' && !req.body.path.trim()) throw new ProjectRegistryError('프로젝트 경로가 필요합니다')
+      const project = typeof req.body?.path === 'string'
+        ? projectRegistry.link(email, resolveBrowsePath(req.body.path))
+        : await projectRegistry.create(email, req.body?.name, req.body?.git ?? true)
+      broadcast({ type: 'projects' })
+      res.json({ project, state: projectRegistry.readMine(email) })
+    } catch (err) { handleError(res, err) }
+  })
+
+  app.put('/project-registry/mine', requireAuthenticated, (req, res) => {
+    try {
+      const email = authOf(req).email!
+      const state = projectRegistry.setMine(email, req.body?.path, req.body?.added)
+      broadcastAccount(email, { type: 'projects' })
+      res.json({ ok: true, state })
+    } catch (err) { handleError(res, err) }
+  })
+
   // 로그인 계정의 작업 맥락 — 브라우저 localStorage가 아니라 서버가 기준이라 다른 기기·시크릿 창도
   // 같은 프로젝트·에이전트 탭을 복원한다(ADR 0093).
   app.get('/user-ui/theme', requireAuthenticated, (req, res) => {
@@ -517,12 +544,12 @@ export function createApiApp() {
     } catch (err) { handleError(res, err) }
   })
 
-  app.get('/user-ui/root-projects', requireRole('owner', 'manager'), (req, res) => {
+  app.get('/user-ui/root-projects', requireAuthenticated, (req, res) => {
     const state = readRootProjects(authOf(req).email!)
     res.json({ state: state ? { ...state, icons: readRootProjectIcons(state.paths, state.icons) } : null })
   })
 
-  app.put('/user-ui/root-projects', requireRole('owner', 'manager'), (req, res) => {
+  app.put('/user-ui/root-projects', requireAuthenticated, (req, res) => {
     try {
       res.json({ state: writeRootProjects(authOf(req).email!, { ...req.body, icons: {} }) })
     } catch (err) {
@@ -723,18 +750,28 @@ export function createApiApp() {
     } finally { if (reserved) mewActionStarting = false }
   })
 
-  app.post('/project-icons/read', requireRole('owner', 'manager'), (req, res) => {
-    try { res.json({ icons: readRootProjectIcons(req.body.paths) }) }
+  app.post('/project-icons/read', requireAuthenticated, (req, res) => {
+    try {
+      if (!Array.isArray(req.body?.paths) || req.body.paths.some((root: unknown) => typeof root !== 'string' || (authOf(req).role === 'member' && !projectRegistry.has(root)))) {
+        res.status(403).json({ error: '등록된 프로젝트만 조회할 수 있습니다' }); return
+      }
+      for (const root of req.body.paths) assertNotServerDataPath(root)
+      res.json({ icons: readRootProjectIcons(req.body.paths) })
+    }
     catch (err) { res.status(400).json({ error: String(err) }) }
   })
 
-  app.put('/project-icons', requireRole('owner', 'manager'), (req, res) => {
+  app.put('/project-icons', requireAuthenticated, (req, res) => {
     try {
       const { path: root, icon } = req.body
       if (typeof root !== 'string' || !path.isAbsolute(root) || (icon !== null && typeof icon !== 'string')) {
         res.status(400).json({ error: '프로젝트 경로와 아이콘이 필요합니다' })
         return
       }
+      if (authOf(req).role === 'member' && !projectRegistry.has(root)) {
+        res.status(403).json({ error: '등록된 프로젝트만 수정할 수 있습니다' }); return
+      }
+      assertNotServerDataPath(root)
       res.json({ icon: writeProjectIcon(root, icon) })
     } catch (err) { res.status(400).json({ error: String(err) }) }
   })
@@ -792,8 +829,7 @@ export function createApiApp() {
     }
   })
 
-  // ── 워크스페이스 자체 갈아끼우기 (owner·manager) ──────────────────────────────
-  // 프로젝트 전환은 셸과 같은 OS 사용자 범위를 사용하는 owner·manager에게 허용한다.
+  // Account-local project switching; members select registered roots.
   app.get('/workspace', requireAuthenticated, (_req, res) => {
     try {
       res.json(currentWorkspace())
@@ -802,16 +838,24 @@ export function createApiApp() {
     }
   })
 
-  app.post('/workspace', requireRole('owner', 'manager'), async (req, res) => {
+  app.post('/workspace', requireAuthenticated, async (req, res) => {
     const { path: target } = req.body as { path?: unknown }
     try {
       if (typeof target !== 'string' || !target.trim()) {
         res.status(400).json({ error: '열 폴더 경로가 없습니다' })
         return
       }
+      const resolved = resolveBrowsePath(target)
+      if (req.body?.worktree === true && authOf(req).role === 'member') {
+        res.status(403).json({ error: '권한이 없습니다' }); return
+      }
+      if (authOf(req).role === 'member' && !projectRegistry.has(resolved)) {
+        res.status(403).json({ error: '등록된 프로젝트만 열 수 있습니다' })
+        return
+      }
       const info = req.body?.worktree === true
         ? await switchWorktree(resolveBrowsePath(target), req.body?.workspace)
-        : switchWorkspace(resolveBrowsePath(target))
+        : switchWorkspace(resolved)
       res.json(info)
     } catch (err) {
       handleError(res, err)
@@ -847,11 +891,14 @@ export function createApiApp() {
     }
   })
 
-  // ── docs 특별 레포와 워크스페이스 밖 폴더 고르기 (owner·manager) ────────────────
-  // /fs/dirs는 셸과 같은 OS 사용자 범위를 노출하므로 owner·manager만 쓴다.
-  app.get('/fs/dirs', requireRole('owner', 'manager'), (req, res) => {
+  // Folder-only browsing supports linking for all authenticated accounts.
+  app.get('/fs/dirs', requireAuthenticated, (req, res) => {
     try {
-      res.json(listDirs(resolveBrowsePath(String(req.query.path ?? ''))))
+      const directory = resolveBrowsePath(String(req.query.path ?? ''))
+      assertNotServerDataPath(directory)
+      const listing = listDirs(directory)
+      listing.dirs = listing.dirs.filter(entry => { try { assertNotServerDataPath(entry.path); return true } catch { return false } })
+      res.json(listing)
     } catch (err) {
       handleError(res, err)
     }
@@ -1005,11 +1052,12 @@ export function createApiApp() {
     }
   })
 
-  app.post('/fs/open-project', requireRole('owner', 'manager'), (req, res) => {
+  app.post('/fs/open-project', requireAuthenticated, (req, res) => {
     try {
       const abs = resolveExistingPath((req.body as { path?: unknown }).path)
       if (!fs.statSync(abs).isDirectory()) throw new BrowseError(`폴더가 아닙니다: ${abs}`)
-      const info = switchWorkspace(abs, WORKSPACE_PROJECT)
+      const registered = projectRegistry.link(authOf(req).email!, abs)
+      const info = switchWorkspace(registered.path, WORKSPACE_PROJECT)
       res.json({ ...info, project: WORKSPACE_PROJECT })
     } catch (err) {
       handleError(res, err)
@@ -1031,7 +1079,8 @@ export function createApiApp() {
       }
       const directory = subprojectToOpen(projectOf(req), req.body?.path)
       if (!requireFileView(req, res, req.body.path)) return
-      const info = switchWorkspace(directory, WORKSPACE_PROJECT)
+      const registered = projectRegistry.link(authOf(req).email!, directory)
+      const info = switchWorkspace(registered.path, WORKSPACE_PROJECT)
       res.json(info)
     } catch (err) { handleError(res, err) }
   })
@@ -2885,6 +2934,7 @@ export function createApiApp() {
 }
 
 function handleError(res: express.Response, err: unknown) {
+  if (err instanceof ProjectRegistryError) { res.status(err.status).json({ error: err.message }); return }
   if (err instanceof ThemeSettingsError) { res.status(400).json({ error: err.message }); return }
   if (err instanceof RowPageError) { res.status(err.status).json({ error: err.message }); return }
   if (err instanceof DbValidationError) { res.status(400).json({ error: err.message }); return }

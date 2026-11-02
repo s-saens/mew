@@ -619,7 +619,32 @@ export function openExternalProject(path: string): Promise<WorkspaceInfo & { pro
   }).then(json<WorkspaceInfo & { project: string }>)
 }
 
+export interface RegisteredProject {
+  path: string
+  name: string
+  managed: boolean
+  mine: boolean
+  icon: string | null
+}
+
+export function fetchProjectRegistry(signal?: AbortSignal): Promise<{ projects: RegisteredProject[] }> {
+  return mewFetch('/api/project-registry', { signal }).then(json<{ projects: RegisteredProject[] }>)
+}
+
+export function registerProject(input: { name: string; git: boolean } | { path: string }): Promise<{ project: RegisteredProject }> {
+  return mewFetch('/api/project-registry', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
+  }).then(json<{ project: RegisteredProject }>)
+}
+
+export function addMyProject(path: string): Promise<{ ok: true }> {
+  return mewFetch('/api/project-registry/mine', {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path, added: true }),
+  }).then(json<{ ok: true }>)
+}
+
 export interface WorkspaceInfo {
+  hasProject?: boolean
   path: string
   projectPath?: string
   /** 그 폴더 안에서 프로젝트로 잡히는 것들 — 폴더 하나가 프로젝트 하나 */

@@ -1,8 +1,8 @@
 ---
 title: "Browser demo using the shared UI"
-description: "Defines the full public file list, initial copy, on-demand body loading, and size budgets for the browser demo using the actual Mew UI, along with the task, virtual host, account theme, and in-memory storage contracts after removal of the feature panel. Explains static files, origins, CSP, test boundaries for using verified public materials when pinned Git objects are unavailable, and user deployment procedures; includes required agent build verification and user-owned server lifecycle operations."
+description: "Defines the full public file list, initial copy, on-demand body loading, and size budgets for the browser demo using the actual Mew UI, along with name-only virtual project creation, the catalog and My Projects, task, virtual host, account theme, and in-memory storage contracts after removal of the feature panel. Explains static files, origins, CSP, test boundaries for using verified public materials when pinned Git objects are unavailable, and user deployment procedures; includes required agent build verification and user-owned server lifecycle operations."
 created: "2026-10-19"
-updated: "2026-10-31"
+updated: "2026-11-02"
 ---
 
 # Browser demo using the shared UI
@@ -29,7 +29,7 @@ The demo is a separate entry point for trying Mew without logging in or running 
 | --- | --- |
 | Documents and code | Actual editing, autosave, tabs, and view switching; creating new files and folders in Files; creating, moving, copying, renaming, deleting, and searching documents and subdocuments in Documents |
 | Tasks | Adding, editing, completing, and deleting example tasks; tags, colors, assignees, dates, calendar, Gantt, and opening Markdown documents |
-| Projects | Creating, opening, and switching folders; adding, renaming, deleting, and arranging projects; initializing and cloning virtual Git repositories |
+| Projects | Name-only managed creation, shared catalog and My Projects controls, existing-folder linking and switching; virtual folder/Git operations using the same UI |
 | Agent | Uses the existing send, wait, and cancel UI and event display, and generates responses that modify example documents |
 | Terminal | Creating, renaming, deleting, and reconnecting sessions; preserving working directories and history; interpreting file and Git commands locally. Package installation, development, and test commands provide example output |
 | Git | Computes changes, diffs, selective commits, history, and reverts from the same files. Does not modify actual Git repositories |
@@ -43,6 +43,12 @@ The demo is a separate entry point for trying Mew without logging in or running 
 | Debugger | Virtual stacks, variables, watch expressions, breakpoints, stepping, continue, and pause; in-memory settings storage |
 
 The file list and original content are generated from a pinned Mew commit and contain no actual user accounts or credentials. Agent responses and terminal commands do not connect to external models or CLIs. APIs and sockets that are not implemented fail explicitly and do not fall back to the actual server.
+
+### Project catalog and managed creation
+
+`src/demo/http-projects.ts` implements `/api/project-registry` and `/api/project-registry/mine` against the visitor's in-memory `DemoWorkspaceStore`. Creating by name registers and pins a virtual project; linking registers an existing virtual directory; personal shortcut removal preserves the catalog and virtual files. Managed names and Git choices use the same API shapes as the host. The demo starts with its example workspace rather than simulating an empty installation.
+
+Managed folders are virtual paths beneath `/demo/mew-playground/.mew/projects/<name>`, because the browser has no OS home directory. `.mew/`, `.gitignore`, and virtual Git state are prepared according to the selected options; no real `projects.yaml`, Git repository, or host folder is created. The host's `~/.mew/projects` and persistent YAML contract remain owned by [architecture](architecture.md#shared-project-registry-and-my-projects). `src/demo/projects.test.ts` covers creation, linking, Git choice, and shortcut/catalog separation.
 
 ### Scope of host feature demos
 

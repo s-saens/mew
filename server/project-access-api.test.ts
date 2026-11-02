@@ -48,7 +48,7 @@ test('manager can restore, browse, create and switch projects without account ad
     assert.equal(readActiveWorkspace(owner), root, 'switching preserves another account workspace')
     assert.equal((await request('/admin/users')).status, 403)
     assert.equal((await request('/project', { name: 'owner-only' })).status, 403)
-    for (const denied of ['member', 'guest'] as const) {
+    for (const denied of ['guest'] as const) {
       role = denied
       for (const [route, body, method] of [
         ['/user-ui/root-projects', undefined, 'GET'],
@@ -64,6 +64,28 @@ test('manager can restore, browse, create and switch projects without account ad
         ['/fs/git/clone', { parent: root, url: 'invalid' }, 'POST'],
       ] as const) assert.equal((await request(route, body, method)).status, 403, `${denied} ${route}`)
     }
+    role = 'member'
+    assert.equal((await request('/project-registry')).status, 200)
+    assert.equal((await request('/user-ui/root-projects')).status, 200)
+    assert.equal((await request(`/fs/dirs?path=${encodeURIComponent(root)}`)).status, 200)
+    const linked = await (await request('/project-registry', { path: root })).json() as { project: { path: string; mine: boolean } }
+    assert.equal(linked.project.path, root)
+    assert.equal(linked.project.mine, true)
+    assert.equal((await request('/workspace', { path: root })).status, 200)
+    assert.equal((await request('/workspace', { path: root, worktree: true, workspace: root })).status, 403)
+    assert.equal((await request('/workspace', { path: path.dirname(root) })).status, 403)
+    const removed = await (await request('/project-registry/mine', { path: root, added: false }, 'PUT')).json() as { state: { paths: string[] } }
+    assert.equal(removed.state.paths.includes(root), false)
+    const catalog = await (await request('/project-registry')).json() as { projects: { path: string; mine: boolean }[] }
+    assert.equal(catalog.projects.find(project => project.path === root)?.mine, false)
+    assert.equal((await request('/project-registry/mine', { path: root, added: true }, 'PUT')).status, 200)
+    assert.equal((await request('/fs/open-project', { path: root })).status, 200)
+    assert.equal((await request('/fs/folder', { parent: root, name: 'denied' })).status, 403)
+    assert.equal((await request('/fs/git/init', { path: root })).status, 403)
+    role = 'guest'
+    assert.equal((await request('/project-registry')).status, 403)
+    assert.equal((await request('/project-registry', { path: root })).status, 403)
+    assert.equal((await request('/project-registry/mine', { path: root, added: true }, 'PUT')).status, 403)
     assert.equal(fs.existsSync(path.join(root, 'denied')), false)
   } finally {
     await new Promise<void>(resolve => server.close(() => resolve()))

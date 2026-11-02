@@ -18,7 +18,7 @@ import { attachCollabWebSocket, closeAllRooms } from './collab.ts'
 import { runAccountWorkspace } from './account-workspace.ts'
 import { currentWorkspace } from './workspace.ts'
 import { WORKSPACE_ROOT, setWorkspaceRoot, resolveProjectPath } from './paths.ts'
-import { readActiveWorkspace, writeActiveWorkspace } from './userUiState.ts'
+import { readActiveWorkspace, writeActiveWorkspace, writeRootProjects } from './userUiState.ts'
 import { waitForSearchIndex } from './searchCatalog.ts'
 import { resetTreeWatchers } from './watcher.ts'
 
@@ -151,4 +151,22 @@ test('project selection, requests, broadcasts and collaboration stay within each
     setWorkspaceRoot(original)
     fs.rmSync(root, { recursive: true, force: true })
   }
+})
+
+
+test('fresh accounts stay projectless and saved shortcuts restore a real root before workspace metadata is read', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mew-account-first-project-'))
+  const account = 'first-project@example.test', other = 'still-empty@example.test'
+  try {
+    assert.equal(runAccountWorkspace(account, () => currentWorkspace()).hasProject, false)
+    writeRootProjects(account, { paths: [path.join(root, 'missing')], icons: {} })
+    assert.equal(runAccountWorkspace(account, () => currentWorkspace()).hasProject, false, 'unavailable shortcuts do not expose the startup root')
+    writeRootProjects(account, { paths: [path.join(root, 'missing'), root], icons: {} })
+    const restored = runAccountWorkspace(account, () => currentWorkspace())
+    assert.equal(restored.hasProject, true)
+    assert.equal(restored.path, root)
+    assert.equal(restored.projectPath, root)
+    assert.equal(readActiveWorkspace(account), root)
+    assert.equal(runAccountWorkspace(other, () => currentWorkspace()).hasProject, false)
+  } finally { fs.rmSync(root, { recursive: true, force: true }) }
 })
