@@ -9,6 +9,7 @@ import { branchGuidanceText, branchGuidanceValidationError, defaultBranchGuidanc
 import { legacyBranchGuidanceKeys, legacyBranchGuidanceText, type LegacyBranchGuidanceSettings } from '../shared/branch-guidance-v1.ts'
 import { previousBranchGuidanceText } from '../shared/branch-guidance-v2.ts'
 import { agentCapacityRetryMetadata, agentCapacityRetryValidationError, defaultAgentCapacityRetrySettings, type AgentCapacityRetrySettings } from '../shared/agent-capacity-retry.ts'
+import { agentBuildVerificationText, agentBuildVerificationValidationError, defaultAgentBuildVerificationSettings, type AgentBuildVerificationSettings, type AgentBuildVerificationSnapshot } from '../shared/agent-build-verification.ts'
 
 export const AGENT_GUIDANCE_PATH = path.join(DATA_DIR, 'agent-guidance.md')
 export const agentGuidancePath = () => agentSettingsPath('agent-guidance.md')
@@ -66,7 +67,7 @@ function effectiveGuidance(content: string, locale?: string): string {
     if (retry) content = content.slice(0, retry.from) + content.slice(retry.to)
   } catch { /* Preserve handwritten text surrounding damaged markers. */ }
   let defaults = withDocumentationDefaults(currentDocumentationGuidance(content))
-  defaults = withBranchDefault(withTestingDefault(withDebuggerDefault(withCommitLanguageDefault(defaults))))
+  defaults = withBuildVerificationDefault(withBranchDefault(withTestingDefault(withDebuggerDefault(withCommitLanguageDefault(defaults)))))
   const branch = branchSnapshot(defaults)
   if (!branch.custom) {
     const block = region(defaults, 'branch')
@@ -188,8 +189,8 @@ export class GuidanceError extends Error {
 }
 
 const revisionOf = (content: string) => createHash('sha256').update(content).digest('hex')
-type GuidanceRegionKey = GuidanceKey | 'branch' | 'instructions' | 'capacityRetry'
-const regionKeys: GuidanceRegionKey[] = [...Object.keys(guidanceOptions) as GuidanceKey[], 'branch', 'instructions', 'capacityRetry']
+type GuidanceRegionKey = GuidanceKey | 'branch' | 'instructions' | 'capacityRetry' | 'buildVerification'
+const regionKeys: GuidanceRegionKey[] = [...Object.keys(guidanceOptions) as GuidanceKey[], 'branch', 'instructions', 'capacityRetry', 'buildVerification']
 const markers = (key: GuidanceRegionKey) => [`<!-- mew:agent-setting:${key} -->`, `<!-- /mew:agent-setting:${key} -->`]
 
 function withDocumentationDefaults(content: string): string {
@@ -250,6 +251,12 @@ function withBranchDefault(content: string): string {
   return `${content}${content ? '\n\n' : ''}${start}\n${branchGuidanceText(defaultBranchGuidance)}\n${end}`
 }
 
+function withBuildVerificationDefault(content: string): string {
+  const [start, end] = markers('buildVerification')
+  if (content.includes(start) || content.includes(end)) return content
+  return `${content}${content ? '\n\n' : ''}${start}\n${agentBuildVerificationText(defaultAgentBuildVerificationSettings)}\n${end}`
+}
+
 function region(content: string, key: GuidanceRegionKey) {
   const [start, end] = markers(key)
   const from = content.indexOf(start), closing = content.indexOf(end)
@@ -308,6 +315,23 @@ function capacityRetrySettings(content: string): AgentCapacityRetrySettings {
   return { ...defaultAgentCapacityRetrySettings }
 }
 
+function buildVerificationSnapshot(content: string): AgentBuildVerificationSnapshot {
+  const fallback = () => ({ value: { ...defaultAgentBuildVerificationSettings }, custom: true })
+  try {
+    const block = isolatedRegion(content, 'buildVerification')
+    if (!block) {
+      const damaged = markers('buildVerification').some(marker => content.includes(marker))
+      return { value: { ...defaultAgentBuildVerificationSettings }, custom: damaged }
+    }
+    const metadata = block.text.split('\n', 1)[0].match(/^<!-- mew:agent-build-verification:v1 (.+) -->$/)
+    if (!metadata) return fallback()
+    const value: unknown = JSON.parse(metadata[1])
+    if (agentBuildVerificationValidationError(value)) return fallback()
+    const settings = value as AgentBuildVerificationSettings
+    return { value: settings, custom: block.text !== agentBuildVerificationText(settings) }
+  } catch { return fallback() }
+}
+
 function snapshot(content: string): GuidanceSnapshot {
   const settings = {} as GuidanceSnapshot['settings']
   for (const key of Object.keys(guidanceOptions) as GuidanceKey[]) {
@@ -318,7 +342,7 @@ function snapshot(content: string): GuidanceSnapshot {
   }
   let instructions = ''
   try { instructions = region(content, 'instructions')?.text ?? '' } catch { /* Keep file editing available for damaged markers. */ }
-  return { path: agentGuidancePath(), content, revision: revisionOf(content), instructions, settings, branch: branchSnapshot(content), capacityRetry: capacityRetrySettings(content) }
+  return { path: agentGuidancePath(), content, revision: revisionOf(content), instructions, settings, branch: branchSnapshot(content), capacityRetry: capacityRetrySettings(content), buildVerification: buildVerificationSnapshot(content) }
 }
 
 export function agentGuidanceSettings(): GuidanceSnapshot {
@@ -327,7 +351,7 @@ export function agentGuidanceSettings(): GuidanceSnapshot {
 
 export function updateAgentGuidance(input: unknown): GuidanceSnapshot {
   const value = input as { key?: unknown; value?: unknown; revision?: unknown } | null
-  if (!value || typeof value.key !== 'string' || (!['branch', 'instructions', 'capacityRetry'].includes(value.key) && !Object.hasOwn(guidanceOptions, value.key))) throw new GuidanceError('올바른 설정 항목을 선택하세요.')
+  if (!value || typeof value.key !== 'string' || (!['branch', 'instructions', 'capacityRetry', 'buildVerification'].includes(value.key) && !Object.hasOwn(guidanceOptions, value.key))) throw new GuidanceError('올바른 설정 항목을 선택하세요.')
   const key = value.key as GuidanceRegionKey
   if (typeof value.revision !== 'string') throw new GuidanceError('올바른 설정값을 선택하세요.')
   let text: string
@@ -342,6 +366,10 @@ export function updateAgentGuidance(input: unknown): GuidanceSnapshot {
     const validationError = branchGuidanceValidationError(value.value)
     if (validationError) throw new GuidanceError(validationError)
     text = branchGuidanceText(value.value as BranchGuidanceSettings)
+  } else if (key === 'buildVerification') {
+    const validationError = agentBuildVerificationValidationError(value.value)
+    if (validationError) throw new GuidanceError(validationError)
+    text = agentBuildVerificationText(value.value as AgentBuildVerificationSettings)
   } else {
     const options = guidanceOptions[key] as Record<string, string>
     if (typeof value.value !== 'string' || !Object.hasOwn(options, value.value)) throw new GuidanceError('올바른 설정값을 선택하세요.')

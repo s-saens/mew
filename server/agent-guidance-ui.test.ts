@@ -7,6 +7,7 @@ import { compile } from '@tailwindcss/node'
 import { chromium } from 'playwright-core'
 import { domBrowserExecutable } from './browser-dom-executable.ts'
 import { defaultBranchGuidance } from '../shared/branch-guidance.ts'
+import { defaultAgentBuildVerificationSettings } from '../shared/agent-build-verification.ts'
 import { documentationGuidanceKeys, type DocumentationGuidanceKey } from '../shared/agent-guidance.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
@@ -26,7 +27,7 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
     name: 'fixture', resolveId(id) { if (id === 'virtual:guidance.tsx') return id; if (id.endsWith('.css')) return 'virtual:style' }, load(id) { if (id === 'virtual:guidance.tsx') return source; if (id === 'virtual:style') return '' },
   }] })
   const chunk = bundle.output.find(item => item.type === 'chunk')!
-  const content = (await Promise.all(['src/components/agent-guidance-settings.tsx', 'src/components/agent-capacity-retry-fields.tsx', 'src/components/agent-branch-guidance.tsx', 'src/components/agent-guidance-row.tsx', 'packages/ui/src/dialog-frame.tsx', 'packages/ui/src/select-field.tsx', 'packages/ui/src/HoverTipLayer.tsx', 'packages/ui/src/ConfirmDialog.tsx'].map(file => fs.readFile(`${root}/${file}`, 'utf8')))).join('\n')
+  const content = (await Promise.all(['src/components/agent-guidance-settings.tsx', 'src/components/agent-capacity-retry-fields.tsx', 'src/components/agent-build-verification-fields.tsx', 'src/components/agent-branch-guidance.tsx', 'src/components/agent-guidance-row.tsx', 'packages/ui/src/dialog-frame.tsx', 'packages/ui/src/select-field.tsx', 'packages/ui/src/HoverTipLayer.tsx', 'packages/ui/src/ConfirmDialog.tsx'].map(file => fs.readFile(`${root}/${file}`, 'utf8')))).join('\n')
   const compiler = await compile(await fs.readFile(`${root}/src/index.css`, 'utf8'), { base: `${root}/src`, onDependency() {} })
   const css = compiler.build([...new Set((source + content).match(/[A-Za-z0-9_@:/.[\]()%,-]+/g))]) + await fs.readFile(`${root}/src/components/agent-guidance-settings.css`, 'utf8')
   const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
@@ -39,7 +40,7 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
       let releaseSave: (() => void) | undefined, releaseLoad: (() => void) | undefined
       let heldLoad = false
       const documentationSettings = Object.fromEntries(documentationGuidanceKeys.map(key => [key, 'required'])) as Record<DocumentationGuidanceKey, string>
-      let state = { path: '/data/agent-guidance.md', content: '# Guidance', instructions: '', revision: 'first', capacityRetry: { delaySeconds: 30, maxRetries: 20 }, settings: { commit: 'inherit', commitLanguage: 'en', language: 'inherit', detail: 'custom', subagents: 'inherit', debugger: 'enabled', testing: 'required', ...documentationSettings }, branch: { value: { ...defaultBranchGuidance }, custom: false } }
+      let state = { path: '/data/agent-guidance.md', content: '# Guidance', instructions: '', revision: 'first', buildVerification: { value: { ...defaultAgentBuildVerificationSettings }, custom: false }, capacityRetry: { delaySeconds: 30, maxRetries: 20 }, settings: { commit: 'inherit', commitLanguage: 'en', language: 'inherit', detail: 'custom', subagents: 'inherit', debugger: 'enabled', testing: 'required', ...documentationSettings }, branch: { value: { ...defaultBranchGuidance }, custom: false } }
       let projectState = { projectRoot: '/project', revision: 'project1', settings: { version: 1, enabled: true, docsDir: 'notes', entrypoints: ['AGENTS.md'], instructions: 'Existing project rule' } }
       const errors: string[] = []
       page.on('pageerror', error => errors.push(error.message))
@@ -67,6 +68,9 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
             if (input.key === 'branch') {
               assert.deepEqual(Object.keys(input.value).sort(), Object.keys(defaultBranchGuidance).sort(), 'branch writes include the entire preference object')
               state = { ...state, revision: `updated-${updates}`, branch: { value: input.value, custom: false } }
+            } else if (input.key === 'buildVerification') {
+              assert.deepEqual(Object.keys(input.value).sort(), Object.keys(defaultAgentBuildVerificationSettings).sort())
+              state = { ...state, revision: `updated-${updates}`, buildVerification: { value: input.value, custom: false } }
             } else if (input.key === 'capacityRetry') {
               assert.deepEqual(Object.keys(input.value).sort(), ['delaySeconds', 'maxRetries'])
               state = { ...state, revision: `updated-${updates}`, capacityRetry: input.value }
@@ -133,7 +137,7 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
           assert.ok(control.x >= 0 && control.x + control.width <= width, `${name} stays inside a ${width}px viewport`)
         }
       }
-      await assertInlineFields(['응답 언어', '답변 길이', '서브에이전트 위임', '디버거 활용', '테스트 작성', '브랜치 전략', 'Git 자동 처리', '커밋 방식', '커밋 언어'])
+      await assertInlineFields(['응답 언어', '답변 길이', '서브에이전트 위임', '디버거 활용', '테스트 작성', '빌드 검증', '브랜치 전략', 'Git 자동 처리', '커밋 방식', '커밋 언어'])
       await assertInlineFields(['재시도 간격 (초)', '최대 재시도 횟수'], 'spinbutton')
       const languageBounds = (await field('응답 언어').boundingBox())!, debuggerBounds = (await field('디버거 활용').boundingBox())!
       assert.ok(debuggerBounds.y - languageBounds.y <= (width >= 768 ? 120 : 168), 'ordinary settings use a compact, consistently spaced list')

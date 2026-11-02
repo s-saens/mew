@@ -1,8 +1,8 @@
 ---
 title: "Development setup and rules"
 created: 2026-09-29
-updated: "2026-10-31"
-description: "Defines development commands; repository-internal document checks, CLI and isolated Postgres tests, type checks, tests, and lint validation; mandatory agent build verification after implementation changes and restrictions on deployments and server execution limited to this Mew source repository; document ownership and updates; required UI implementation rules; and ownership of feature documentation after removal of the feature panel."
+updated: "2026-11-02"
+description: "Defines development commands and verification, including npm run build as this repository's concrete command under Mew's configurable default build guidance. Covers repository-only deployment and server execution restrictions, documentation ownership, UI implementation rules, and isolated database and CLI checks."
 상위파일:
   - "../MOC.md"
   - "MOC.md"
@@ -24,7 +24,9 @@ This checks descriptions, including history, and local links within the reposito
 
 **After changing code, features, dependencies, or build configuration in this Mew source repository, coding agents must run `npm run build` before reporting completion.** Fix build failures and rerun the build. If a missing prerequisite or another blocker prevents success, report the actual failure and keep the work explicitly incomplete. Type checks, relevant tests, lint, and documentation checks remain required as applicable; passing them does not replace the build. Documentation-only changes do not require an app build.
 
-**Agents must not deploy, run the `mew` launcher, or start, stop, or restart servers.** Prohibited commands include `npm start`, `npm run serve`, `npm run dev`, `./mew start|stop|restart|update`, killing server processes, and starting them in the background. The user performs deployment and server lifecycle operations. Use `npm run build` for build verification without chaining a restart. These requirements belong to this project's instructions; do not add them to Mew-wide agent guidance or apply them to other projects opened in Mew.
+The general build-verification policy is now part of [Mew's configurable default instructions](../../../docs/guides/project-setup.md#build-verification). That shared setting selects each project's build process; this repository specifies `npm run build` and retains its stricter local requirements. The redundant build paragraph has been removed from this project's additional guidance in `.mew/agent-context.json`.
+
+**Agents must not deploy, run the `mew` launcher, or start, stop, or restart servers.** Prohibited commands include `npm start`, `npm run serve`, `npm run dev`, `./mew start|stop|restart|update`, killing server processes, and starting them in the background. The user performs deployment and server lifecycle operations. Use `npm run build` for build verification without chaining a restart. These execution restrictions belong to this source repository; do not add them to Mew-wide agent guidance or apply them to other projects opened in Mew.
 
 Browser tests under `server/` use the Node.js TypeScript configuration, which excludes DOM globals. For DOM operations in Playwright callbacks, use `locator.evaluate` and its element argument (or `el.ownerDocument`) instead of directly referencing `document`.
 

@@ -3,5 +3,5 @@
   "enabled": true,
   "docsDir": ".mew/docs",
   "entrypoints": [],
-  "instructions": "- After code, feature, dependency, or build configuration changes, agents must run npm run build before reporting completion. Fix build failures and rerun the build; if blocked, report the actual failure and do not claim completion.\n- Agents must not deploy, run the mew launcher, or start, stop, or restart servers. The user performs those operations.\n- Type checks, tests, lint, and documentation checks are also required as applicable. Documentation-only changes do not require an app build.\n- These instructions apply only to the Mew source repository. Follow .mew/docs/development/getting-started.md for details."
+  "instructions": "- Agents must not deploy, run the mew launcher, or start, stop, or restart servers. The user performs those operations.\n- Type checks, tests, lint, and documentation checks are also required as applicable.\n- These instructions apply only to the Mew source repository. Follow .mew/docs/development/getting-started.md for details."
 }

@@ -11,6 +11,7 @@ import { defaultAgentSettings, writeProjectAgentSettings } from './project-agent
 import { readExternalFile, writeExternalFile } from './fsBrowse.ts'
 import { documentationGuidanceKeys, guidanceOptions } from '../shared/agent-guidance.ts'
 import { runWithAgentAccount } from './agent-account-settings.ts'
+import { agentBuildVerificationText, defaultAgentBuildVerificationSettings } from '../shared/agent-build-verification.ts'
 
 test('shared guidance survives initialization and editor changes reach every project on the next request', () => {
   const a = path.join(DATA_DIR, 'a'), b = path.join(DATA_DIR, 'b')
@@ -601,4 +602,101 @@ test('the default Mew-wide guidance does not prohibit building or restarting oth
     const guidance = readAgentGuidance()
     assert.doesNotMatch(guidance, /Coding agents must not|must not (?:run.*build|build|restart)|user (?:runs|performs) builds/i)
   })
+})
+
+test('build verification defaults reach existing guidance without changing stored files or revisions', async () => {
+  const { agentGuidanceSettings, agentGuidancePath } = await import('./agent-guidance.ts')
+  const expected = agentBuildVerificationText(defaultAgentBuildVerificationSettings)
+  runWithAgentAccount('build-verification-default@example.test', () => {
+    assert.equal(readAgentGuidance().split(expected).length - 1, 1, 'fresh template and runtime default agree')
+    const state = agentGuidanceSettings()
+    assert.deepEqual(state.buildVerification, { value: defaultAgentBuildVerificationSettings, custom: false })
+    assert.equal(state.content.split(expected).length - 1, 1)
+  })
+  for (const content of ['# Existing instructions\n\nKeep the project deployment policy.\n', '']) {
+    fs.writeFileSync(AGENT_GUIDANCE_PATH, content)
+    const state = agentGuidanceSettings()
+    assert.deepEqual(state.buildVerification, { value: defaultAgentBuildVerificationSettings, custom: false })
+    assert.equal(readAgentGuidance().split(expected).length - 1, 1)
+    assert.equal(agentGuidanceSettings().revision, state.revision)
+    assert.equal(fs.readFileSync(agentGuidancePath(), 'utf8'), content)
+  }
+})
+
+test('build verification settings persist per account and apply to every project on the next request', async () => {
+  const { agentGuidanceSettings, updateAgentGuidance, GuidanceError } = await import('./agent-guidance.ts')
+  const roots = ['build-verification-a', 'build-verification-b'].map(name => path.join(DATA_DIR, name))
+  for (const root of roots) fs.mkdirSync(root, { recursive: true })
+  const context = (root: string) => agentContextText({ projectRoot: root, docsRoot: path.join(root, 'docs') }, root)
+  runWithAgentAccount('build-verification-account@example.test', () => {
+    let state = agentGuidanceSettings()
+    const before = state
+    const settings = { mode: 'required' as const, command: 'pnpm build', scope: 'all' as const, fixFailures: false }
+    state = updateAgentGuidance({ key: 'buildVerification', value: settings, revision: state.revision })
+    assert.deepEqual(state.buildVerification, { value: settings, custom: false })
+    assert.deepEqual(state.settings, before.settings)
+    assert.deepEqual(state.branch, before.branch)
+    assert.deepEqual(state.capacityRetry, before.capacityRetry)
+    assert.notEqual(state.revision, before.revision)
+    assert.throws(() => updateAgentGuidance({ key: 'buildVerification', value: defaultAgentBuildVerificationSettings, revision: before.revision }), (error: unknown) => error instanceof GuidanceError && error.status === 409)
+    for (const root of roots) {
+      assert.ok(context(root).includes(agentBuildVerificationText(settings)))
+      assert.ok(!context(root).includes(agentBuildVerificationText(defaultAgentBuildVerificationSettings)))
+    }
+    const delegated = { ...settings, mode: 'project' as const }
+    state = updateAgentGuidance({ key: 'buildVerification', value: delegated, revision: state.revision })
+    state = updateAgentGuidance({ key: 'language', value: 'ko', revision: state.revision })
+    assert.deepEqual(state.buildVerification, { value: delegated, custom: false }, 'unrelated settings do not restore the default requirement')
+    for (const root of roots) {
+      assert.ok(context(root).includes(agentBuildVerificationText(delegated)))
+      assert.doesNotMatch(context(root), /After any project changes|Use the configured build command/)
+    }
+    for (const invalid of [null, { ...settings, extra: true }, { ...settings, command: 'npm run build\nother' }, { ...settings, command: '<!-- mew:agent-setting:language -->' }, { ...settings, command: '<!-- mew:agent-build-verification:v1 {} -->' }]) {
+      assert.throws(() => updateAgentGuidance({ key: 'buildVerification', value: invalid, revision: state.revision }), (error: unknown) => error instanceof GuidanceError && error.status === 400)
+      assert.equal(agentGuidanceSettings().content, state.content)
+    }
+  })
+  runWithAgentAccount('other-build-verification-account@example.test', () => {
+    assert.deepEqual(agentGuidanceSettings().buildVerification, { value: defaultAgentBuildVerificationSettings, custom: false })
+    for (const root of roots) assert.ok(context(root).includes(agentBuildVerificationText(defaultAgentBuildVerificationSettings)))
+  })
+})
+
+test('handwritten and damaged build verification blocks stay custom and are never replaced by effective defaults', async () => {
+  const { agentGuidanceSettings, updateAgentGuidance, GuidanceError } = await import('./agent-guidance.ts')
+  const start = '<!-- mew:agent-setting:buildVerification -->', end = '<!-- /mew:agent-setting:buildVerification -->'
+  const expected = agentBuildVerificationText(defaultAgentBuildVerificationSettings)
+  const custom = `${start}\nBuild storage changes only.\n${end}`
+  fs.writeFileSync(AGENT_GUIDANCE_PATH, custom)
+  let state = agentGuidanceSettings()
+  assert.equal(state.buildVerification?.custom, true)
+  assert.ok(readAgentGuidance().startsWith(custom))
+  assert.ok(!readAgentGuidance().includes(expected))
+  state = updateAgentGuidance({ key: 'language', value: 'en', revision: state.revision })
+  assert.equal(state.buildVerification?.custom, true)
+  assert.ok(state.content.startsWith(custom))
+  const edited = agentBuildVerificationText({ ...defaultAgentBuildVerificationSettings, command: 'make build' }).replace('Fix build failures', 'Repair only application build failures')
+  for (const content of [
+    `${start}\n${edited}\n${end}`,
+    `${start}\n<!-- mew:agent-build-verification:v1 {"mode":"unknown"} -->\n${end}`,
+    `${start}\n<!-- mew:agent-build-verification:v1 invalid-json -->\n${end}`,
+  ]) {
+    fs.writeFileSync(AGENT_GUIDANCE_PATH, content)
+    assert.equal(agentGuidanceSettings().buildVerification?.custom, true)
+    assert.ok(readAgentGuidance().startsWith(content))
+    assert.ok(!readAgentGuidance().includes(expected))
+    assert.equal(fs.readFileSync(AGENT_GUIDANCE_PATH, 'utf8'), content)
+  }
+  for (const broken of [
+    `${start}Missing end`, end, `${start}x${end}${start}y${end}`,
+    `${start}<!-- mew:agent-setting:language -->x${end}<!-- /mew:agent-setting:language -->`,
+  ]) {
+    fs.writeFileSync(AGENT_GUIDANCE_PATH, broken)
+    state = agentGuidanceSettings()
+    assert.equal(state.buildVerification?.custom, true)
+    assert.ok(readAgentGuidance().startsWith(broken))
+    assert.ok(!readAgentGuidance().includes(expected))
+    assert.throws(() => updateAgentGuidance({ key: 'buildVerification', value: defaultAgentBuildVerificationSettings, revision: state.revision }), (error: unknown) => error instanceof GuidanceError && error.status === 409)
+    assert.equal(fs.readFileSync(AGENT_GUIDANCE_PATH, 'utf8'), broken)
+  }
 })

@@ -40,6 +40,14 @@ After documentation changes, run the project’s existing documentation checks f
 When adding or changing behavior or fixing a bug, you must write or update automated tests that verify the affected behavior. For bug fixes, include a regression test. Run the relevant tests before completing the task, following project execution restrictions. If tests cannot run, report the blocker and do not claim they passed. Documentation-only changes do not require new tests.
 <!-- /mew:agent-setting:testing -->
 
+<!-- mew:agent-setting:buildVerification -->
+<!-- mew:agent-build-verification:v1 {"mode":"required","command":"","scope":"implementation","fixFailures":true} -->
+After code, feature, dependency, or build configuration changes, run the project build before reporting completion. Documentation-only changes do not require a build.
+Choose the build command from the project's documented build process, package manager, and existing build script; for an npm project with a build script, use npm run build. If the project has no build system, report build verification as not applicable. Do not invent a build command or install a toolchain just to satisfy this instruction.
+Fix build failures and rerun the build before reporting completion. If a failure or missing prerequisite blocks success, report the actual failure and keep the work explicitly incomplete.
+Respect explicit user instructions and project execution restrictions. Applicable tests, type checks, lint, and documentation checks remain required; they do not replace build verification.
+<!-- /mew:agent-setting:buildVerification -->
+
 <!-- mew:agent-setting:debugger -->
 Use an available debugger when logs and tests do not adequately explain a bug or runtime behavior. Inspect variables and call stacks at relevant breakpoints. Follow existing execution and permission restrictions, and clean up debug connections and temporary processes afterward.
 <!-- /mew:agent-setting:debugger -->

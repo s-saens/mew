@@ -1,5 +1,6 @@
 import type { BranchGuidanceSnapshot } from './branch-guidance.ts'
 import type { AgentCapacityRetrySettings } from './agent-capacity-retry.ts'
+import type { AgentBuildVerificationSnapshot } from './agent-build-verification.ts'
 
 export const guidanceOptions = {
   commit: {
@@ -83,4 +84,5 @@ export type GuidanceSnapshot = {
   settings: Record<GuidanceKey, string>
   branch: BranchGuidanceSnapshot
   capacityRetry?: AgentCapacityRetrySettings
+  buildVerification?: AgentBuildVerificationSnapshot
 }

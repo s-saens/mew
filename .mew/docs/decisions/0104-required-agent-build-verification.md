@@ -1,13 +1,15 @@
 ---
 title: "Require agent build verification without server restarts"
-description: "Replaces Mew's source-repository agent build prohibition with mandatory builds after implementation changes, while retaining deployment and server lifecycle restrictions and keeping the policy out of global Mew guidance."
+description: "Records mandatory agent builds in Mew's source repository and retained deployment and server lifecycle restrictions. ADR 0116 supersedes only its exclusion of configurable build verification from Mew-wide defaults."
 created: "2026-10-31"
-updated: "2026-10-31"
+updated: "2026-11-02"
 ---
 
 ## Status
 
 Accepted at the user's explicit request. Supersedes the previous build prohibition in the repository execution rules; historical verification records remain unchanged.
+
+Partially superseded by [ADR 0116](0116-configurable-agent-build-verification.md): configurable build verification is now a Mew-wide default. The concrete `npm run build` command and restrictions on deployments, launcher execution, and server lifecycle operations remain Mew source-repository rules. The original decision below preserves the scope at the time it was accepted.
 
 ## Context
 
