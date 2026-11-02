@@ -14,7 +14,9 @@ function parsePorts(value: unknown): DomBrowserPort[] {
   const priority = { app: 0, blocked: 1, mew: 2 }
   for (const entry of value.ports) {
     if (!entry || typeof entry !== 'object' || !Number.isInteger(entry.port) || entry.port < 1 || entry.port > 65535 || !['app', 'mew', 'blocked'].includes(entry.kind)) continue
-    const port = entry as DomBrowserPort, previous = ports.get(port.port)
+    const port: DomBrowserPort = { port: entry.port, kind: entry.kind }
+    if (port.kind === 'app' && typeof entry.title === 'string' && entry.title.trim()) port.title = Array.from(entry.title.trim()).slice(0, 200).join('')
+    const previous = ports.get(port.port)
     if (!previous || priority[port.kind] > priority[previous.kind]) ports.set(port.port, port)
   }
   return [...ports.values()].sort((a, b) => a.port - b.port)
@@ -64,9 +66,10 @@ export function DomBrowserPorts({ onOpen }: { onOpen: (url: string) => void }) {
       </div>}
       {!loading && !failed && ports.length === 0 && <p className="px-2 py-1 text-xs text-ink-muted">{uiText('열려 있는 포트가 없습니다.')}</p>}
       <ul className="min-h-0 flex-1 overflow-auto px-1 pb-1">
-        {ports.map(({ port, kind }) => <li key={port}>
+        {ports.map(({ port, kind, title }) => <li key={port}>
           <button type="button" disabled={kind !== 'app' || loading || !!failed} onClick={() => onOpen(`http://localhost:${port}/`)} className="flex min-h-9 w-full items-center gap-2 rounded px-2 py-1 text-left text-xs text-ink-secondary hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-default disabled:text-ink-muted disabled:hover:bg-transparent">
-            <span className="min-w-0 flex-1 truncate font-mono tabular-nums">localhost:{port}</span>
+            <span className="shrink-0 font-mono tabular-nums">localhost:{port}</span>
+            <span className="min-w-0 flex-1 truncate text-ink" data-tip={title}>{title}</span>
             {kind === 'mew' ? <span className="shrink-0 text-xs">{uiText('Mew')}</span> : kind === 'blocked' ? <span className="shrink-0 text-xs">{uiText('사용 불가')}</span> : <ArrowRight width={15} height={15} aria-hidden="true" className="shrink-0" />}
           </button>
         </li>)}

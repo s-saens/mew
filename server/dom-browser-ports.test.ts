@@ -100,6 +100,7 @@ test('port API requires current authenticated preview access and marks only actu
     mewPorts: () => new Set([5000, 7000]),
     blockedPorts: () => new Set([4999, 5000, 8000]),
     scan: signal => { calls++; return scan(signal) },
+    titles: async ports => ports,
     timeoutMs: 15,
   }))
   const server = http.createServer(app)
@@ -144,6 +145,44 @@ test('port API requires current authenticated preview access and marks only actu
   response = await get()
   assert.equal(response.status, 200)
   assert.deepEqual(await response.json(), { ports: [] }, 'only a successful scan can report no listeners')
+})
+
+test('port API enriches app titles, rechecks live port policy and denies access revoked during title lookup', async t => {
+  const owner: RequestAuth = { role: 'owner', email: 'port-titles-api@example.test', mustChangePassword: false }
+  const auth = owner
+  let mode: 'normal' | 'mew' | 'revoked' = 'normal'
+  const mew = new Set([5000])
+  const app = express()
+  app.use((req, _res, next) => { req.auth = auth; next() })
+  app.use('/api/dom-browser', createDomBrowserPortsRouter({
+    mewPorts: () => mew,
+    blockedPorts: () => new Set([4999]),
+    scan: async () => [3000, 4999, 5000],
+    titles: async (ports, options) => {
+      assert.equal(options.signal?.aborted, false)
+      assert.equal(options.allowedPort(3000), true)
+      assert.equal(options.allowedPort(4999), false)
+      assert.equal(options.allowedPort(5000), false)
+      if (mode === 'mew') mew.add(3000)
+      if (mode === 'revoked') auth.mustChangePassword = true
+      if (mode !== 'normal') assert.equal(options.allowedPort(3000), false)
+      return ports.map(entry => entry.kind === 'app' ? { ...entry, title: 'Along & Workspace' } : entry)
+    },
+  }))
+  const server = http.createServer(app)
+  server.listen(0, '127.0.0.1'); await once(server, 'listening')
+  t.after(() => new Promise<void>(resolve => { server.closeAllConnections(); server.close(() => resolve()) }))
+  const address = server.address(); assert.ok(address && typeof address !== 'string')
+  const get = () => fetch(`http://127.0.0.1:${address.port}/api/dom-browser/ports`)
+  assert.deepEqual(await (await get()).json(), { ports: [
+    { port: 3000, kind: 'app', title: 'Along & Workspace' }, { port: 4999, kind: 'blocked' }, { port: 5000, kind: 'mew' },
+  ] })
+  mode = 'mew'
+  assert.deepEqual(await (await get()).json(), { ports: [
+    { port: 3000, kind: 'mew' }, { port: 4999, kind: 'blocked' }, { port: 5000, kind: 'mew' },
+  ] })
+  mew.delete(3000); mode = 'revoked'
+  assert.equal((await get()).status, 403)
 })
 
 test('host discovery detects an unrelated live fixture and removes its closed listener', { skip: process.platform !== 'linux', timeout: 15_000 }, async t => {

@@ -1,6 +1,6 @@
 export const DOM_BROWSER_WS = '/api/dom-browser/ws'
 
-export type DomBrowserPort = { port: number; kind: 'app' | 'mew' | 'blocked' }
+export type DomBrowserPort = { port: number; kind: 'app' | 'mew' | 'blocked'; title?: string }
 
 export type DomBrowserCommand =
   | { type: 'navigate'; url: string }

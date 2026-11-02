@@ -5,9 +5,9 @@ title: "Virtual login display and DOM browser"
 status: "implemented"
 created: "2026-09-18"
 updated: "2026-11-03"
-files: ["server/dom-browser.ts", "server/dom-browser-ports.ts", "src/components/DomBrowserPanel.tsx", "src/components/DomBrowserPorts.tsx", "server/login-desktop.ts", "server/port-preview.ts", "server/port-preview-location.ts", "src/components/LoginDesktopViewer.tsx", "src/components/PortPreviewPage.tsx"]
+files: ["server/dom-browser.ts", "server/dom-browser-ports.ts", "server/dom-browser-port-titles.ts", "src/components/DomBrowserPanel.tsx", "src/components/DomBrowserPorts.tsx", "server/login-desktop.ts", "server/port-preview.ts", "server/port-preview-location.ts", "src/components/LoginDesktopViewer.tsx", "src/components/PortPreviewPage.tsx"]
 commits: []
-description: "Host DOM browsing for localhost apps and external HTTP(S) sites, listening-port discovery, Mew theme synchronization, replay, and connection failures. Distinguishes login video, direct port previews, DNS readiness, and production verification limits."
+description: "Host DOM browsing for localhost apps and external HTTP(S) sites, listening-port discovery with app page titles, Mew theme synchronization, replay, and connection failures. Distinguishes login video, direct port previews, DNS readiness, and production verification limits."
 상위파일: "_browser-android-remote-desktop.md"
 ---
 
@@ -15,7 +15,7 @@ description: "Host DOM browsing for localhost apps and external HTTP(S) sites, l
 
 During login, other users must not steal focus from the host's games or work. OAuth runs in regular Chrome on an independent virtual display sized to the panel, with its video and input connected to the panel. Closing it cleans up the virtual session while preserving completed official CLI authentication.
 
-Click a localhost link or a command menu port button to open the internal Browser panel. A headless host Chromium runs the app at its native address and relays its DOM to an inert viewer on the connecting device. The address bar, Back, Forward, refresh, input, scrolling, and close operate on that host page. The dock opens the same panel on desktop and mobile. Enter an external HTTP(S) address in the panel to browse a website on the host. Live replay uses the viewer's local timeline, and new documents avoid duplicate full-snapshot rebuilds. **Menu → Localhost browser** opens a host-wide listening-port list with refresh and address entry. Allowed ports open the same DOM browser; actual Mew ports are labelled and disabled, and reserved ports remain unavailable. Returning through **Open ports** closes the current ephemeral page context. Existing `/port-number` URLs retain their proxy implementation for compatibility.
+Click a localhost link or a command menu port button to open the internal Browser panel. A headless host Chromium runs the app at its native address and relays its DOM to an inert viewer on the connecting device. The address bar, Back, Forward, refresh, input, scrolling, and close operate on that host page. The dock opens the same panel on desktop and mobile. Enter an external HTTP(S) address in the panel to browse a website on the host. Live replay uses the viewer's local timeline, and new documents avoid duplicate full-snapshot rebuilds. **Menu → Localhost browser** opens a host-wide listening-port list with refresh and address entry. App rows show their HTML page title when available; missing titles retain the port-only row. Allowed ports open the same DOM browser; actual Mew ports are labelled and disabled, and reserved ports remain unavailable. Returning through **Open ports** closes the current ephemeral page context. Existing `/port-number` URLs retain their proxy implementation for compatibility.
 
 ## Detailed contracts
 
@@ -29,6 +29,7 @@ Click a localhost link or a command menu port button to open the internal Browse
 - Localhost document, agent, and terminal links and command port buttons select the Browser panel without opening an external tab or rerunning commands.
 - The hamburger entry always shows the port list on desktop and mobile, even from an existing page. Opening the list launches no host browser; selecting an allowed port opens its app. Mew and reserved ports remain disabled, including manual address and redirect guards. Failed scans support retry without claiming no listeners.
 - Pages that support automatic dark/light mode follow Mew on initial open, live theme changes, navigation, and reconnect. Host JavaScript and replayed CSS agree, and theme changes preserve the running app state.
+- App titles appear as plain text beside ports, truncate within narrow panels, and refresh with the list. Missing or slow titles do not remove or disable an app. Lookup preserves authentication, live Mew-port guards, and cancellation without launching Chromium.
 - Host scripts update the relayed DOM; viewer scripts from the app remain disabled. Native app URLs and host-side API/HMR avoid proxy rewriting.
 - Each viewer has an isolated context; check login, Origin, permissions, local and external HTTP(S) navigation, blocked credentials and Mew ports, and cleanup on close/revocation.
 - Host clock skew and timestamp gaps do not delay received snapshots or mutations; document navigation emits one full snapshot, and SPA history still refreshes its generation.

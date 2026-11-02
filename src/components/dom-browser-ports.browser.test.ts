@@ -80,6 +80,47 @@ test('localhost browser start page lists safe ports, blocks Mew and recovers wit
     } finally { await page.close() }
   })
 
+  for (const width of [1100, 390]) await t.test(`page titles stay readable and safe at ${width}px`, async () => {
+    const { page, errors, request } = await fixture(width)
+    const longTitle = 'My development app · ' + 'Long page title '.repeat(25)
+    try {
+      await (await request(0)).fulfill({ json: { ports: [
+        { port: 3000, kind: 'app', title: '  Along · Team workspace  ' },
+        { port: 5173, kind: 'app', title: longTitle },
+        { port: 8080, kind: 'app', title: '<img src=x onerror="window.titleScriptRan=true">' },
+        { port: 8081, kind: 'app', title: { invalid: true } },
+        { port: 8082, kind: 'app', title: '   ' },
+        { port: 8083, kind: 'app', title: 'X' + '🐈'.repeat(200) },
+        { port: 5000, kind: 'mew', title: 'Wrong title' },
+        { port: 9222, kind: 'blocked', title: 'Hidden title' },
+      ] } })
+      const app = page.getByRole('button', { name: 'localhost:3000 Along · Team workspace', exact: true })
+      await app.waitFor()
+      assert.equal(await page.getByRole('button', { name: 'localhost:5000 Mew', exact: true }).isDisabled(), true)
+      assert.equal(await page.getByRole('button', { name: 'localhost:9222 Unavailable', exact: true }).isDisabled(), true)
+      await page.getByRole('button', { name: 'localhost:8081', exact: true }).waitFor()
+      await page.getByRole('button', { name: 'localhost:8082', exact: true }).waitFor()
+      const title = page.locator('li button [data-tip]').filter({ hasText: 'My development app' })
+      assert.equal((await title.textContent())?.length, 200)
+      const unicodeTitle = page.locator('li').filter({ hasText: 'localhost:8083' }).locator('[data-tip]')
+      assert.equal(await unicodeTitle.textContent(), 'X' + '🐈'.repeat(199), 'title limits preserve complete Unicode characters')
+      assert.equal(await title.evaluate(element => element.scrollWidth > element.clientWidth), true)
+      assert.equal(await page.locator('[data-dom-browser-ports]').evaluate(element => element.scrollWidth <= element.clientWidth), true)
+      assert.equal(await page.locator('li img').count(), 0)
+      assert.equal(await page.evaluate('Boolean(window.titleScriptRan)'), false)
+      if (process.env.MEW_BROWSER_CAPTURE_DIR) {
+        await fs.mkdir(process.env.MEW_BROWSER_CAPTURE_DIR, { recursive: true })
+        await page.screenshot({ path: path.join(process.env.MEW_BROWSER_CAPTURE_DIR, `port-titles-${width}.png`), fullPage: true })
+      }
+      await app.click()
+      assert.deepEqual(await page.evaluate('window.opened'), ['http://localhost:3000/'])
+      await page.getByRole('button', { name: 'Refresh', exact: true }).click()
+      await (await request(1)).fulfill({ json: { ports: [{ port: 3000, kind: 'app', title: 'Renamed app' }] } })
+      await page.getByRole('button', { name: 'localhost:3000 Renamed app', exact: true }).waitFor()
+      assert.deepEqual(errors, [])
+    } finally { await page.close() }
+  })
+
   await t.test('empty results, request errors and invalid responses recover with retry', async () => {
     const { page, errors, request } = await fixture()
     try {

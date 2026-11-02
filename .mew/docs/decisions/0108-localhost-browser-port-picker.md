@@ -1,13 +1,15 @@
 ---
 title: "Host-wide localhost browser port selection"
-description: "Adds a hamburger entry and browser start page for host-wide TCP listeners, with authenticated read-only OS discovery, explicit disabled Mew ports, and a live shared self-port navigation boundary."
+description: "Adds a hamburger entry and browser start page for host-wide TCP listeners, with authenticated read-only OS discovery, disabled Mew ports, and a live self-port boundary. Decision 0123 later permits bounded HTTP title enrichment after discovery."
 created: "2026-11-01"
-updated: "2026-11-01"
+updated: "2026-11-03"
 ---
 
 ## Status
 
 Accepted. Extends the Browser entry and host-port contract from [0103](0103-localhost-dom-browser.md) and [0106](0106-dom-browser-external-sites.md). The existing DOM relay remains the page renderer.
+
+[Decision 0123](0123-localhost-port-page-titles.md) partially supersedes the no-HTTP-probe choice by adding optional bounded title lookup after OS discovery. The discovery and port-selection decisions remain in effect.
 
 ## Context
 

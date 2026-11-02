@@ -6,6 +6,7 @@ import type { DomBrowserPort } from '../shared/dom-browser.ts'
 import { canUse } from './access-policy.ts'
 import { commandPortParsers } from './command-ports.ts'
 import { authOf } from './reqAuth.ts'
+import { enrichDomBrowserPortTitles } from './dom-browser-port-titles.ts'
 import { encodedPowerShell, powershell } from './platform/windows/storage.ts'
 
 const execute = promisify(execFile)
@@ -29,6 +30,7 @@ export interface DomBrowserPortsOptions {
   mewPorts: () => ReadonlySet<number>
   blockedPorts?: () => ReadonlySet<number>
   scan?: (signal: AbortSignal) => Promise<number[]>
+  titles?: typeof enrichDomBrowserPortTitles
   timeoutMs?: number
 }
 
@@ -138,9 +140,15 @@ export function createDomBrowserPortsRouter(options: DomBrowserPortsOptions) {
     try {
       const discovered = await timedScan(options.scan ?? (signal => discoverDomBrowserPorts({ signal })), options.timeoutMs ?? scanTimeout, cancellation.signal)
       if (!allowed()) { res.status(403).json({ error: '이 기능을 사용할 권한이 없습니다' }); return }
-      const mew = options.mewPorts(), blocked = options.blockedPorts?.() ?? new Set<number>()
-      const ports = sortedPorts(discovered).map<DomBrowserPort>(port => ({ port, kind: mew.has(port) ? 'mew' : blocked.has(port) ? 'blocked' : 'app' }))
-      res.json({ ports })
+      const kindOf = (port: number): DomBrowserPort['kind'] => options.mewPorts().has(port) ? 'mew' : options.blockedPorts?.().has(port) ? 'blocked' : 'app'
+      const ports = sortedPorts(discovered).map<DomBrowserPort>(port => ({ port, kind: kindOf(port) }))
+      const titled = await (options.titles ?? enrichDomBrowserPortTitles)(ports, {
+        signal: cancellation.signal,
+        allowedPort: port => allowed() && kindOf(port) === 'app',
+      })
+      if (!allowed()) { res.status(403).json({ error: '이 기능을 사용할 권한이 없습니다' }); return }
+      if (res.destroyed) return
+      res.json({ ports: titled.map(entry => kindOf(entry.port) === 'app' ? entry : { port: entry.port, kind: kindOf(entry.port) }) })
     } catch {
       if (!res.destroyed) res.status(503).json({ error: '열린 포트를 불러오지 못했습니다. 다시 시도해 주세요.', code: 'dom-browser-ports-unavailable' })
     } finally {
