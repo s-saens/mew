@@ -50,51 +50,99 @@ description: "Defines Postgres document DB editing, Markdown table conversion, c
 
 ### Markdown Tables and Conversion
 
-- Right-clicking a DB in an editable Hotview document offers `표로 전환`. The same item is also added to the column type menu for editable column headers. Conversion applies to the entire DB from its title, card, board, or calendar view as well; the option is not shown in standalone DB popups. Read-only DB references and external tables can also be converted to snapshot tables if the document is editable. Neither conversion direction is offered if the document itself is read-only.
-- DB→table uses `getView(id, {allRows: true})` to read all rows and columns regardless of search, sorting, or view settings and creates a regular table in the document body. The default query limit of 1,000 rows does not apply. Column names become headers; numbers, checkboxes, dates, and page titles become text; multi-select values become comma-separated text; and empty values become empty cells. Line breaks are preserved. DB types, selection colors, and row-page bodies are not copied to the regular table.
-- Table→DB saves the table's cell text to a new DB using `데이터베이스로 전환` in `TableCopyMenu`. It validates the optional `table: {columns: string[], rows: string[][]}` in `POST /api/db`, creates all columns as text, and saves column definitions and rows in one transaction. Default `/db` insertion retains the existing 2 example rows, while imports that send `table` do not create example rows. Imports are limited to 200 columns and 10,000 rows. The browser demo uses the same normalization.
-- If the first column contains nonempty, unique values, it is used as the primary column. If it contains empty or duplicate values, a separate text primary column populated starting with `항목 1` is prepended, preserving the original cells. Empty, duplicate, or reserved column names are replaced with distinct names. Tables without headers and merged cells follow the [Markdown Table Contract](../document-code-media-editing/markdown-table-editing-and-copying.md#detailed-contracts).
-- Replacement in either direction is a single step in both the regular ProseMirror history and the collaborative Yjs history. Undo and redo restore the original node's DB UUID, read-only status, and view settings, or its table formatting, without recreating or deleting the DB. After DB→table, the original DB and linked row pages remain. A DB undone after table→DB also remains in the list for use by redo. Converting the table back to a DB later creates a new DB and does not restore the original types.
-- While a request is pending, the source node's position is tracked through subsequent transactions. Edits elsewhere are preserved, and no overwrite occurs after the source is modified or deleted or the document becomes read-only. Duplicate requests for the same node are blocked, and deletion is requested for any new DB that could not be inserted into the document. If the API fails, the existing document block is preserved and an error is shown. Follows the [Conversion Decision](../../decisions/0035-table-database-conversion.md).
+- In editable Hotview documents, right-click a DB or open an editable column header's type menu for `표로 전환`. It converts the entire DB, including from its title, card, board, or calendar view. Standalone DB popups omit this option. Read-only references and external tables can become snapshot tables when the containing document is editable. A read-only document offers neither conversion direction.
+- DB→table calls `getView(id, {allRows: true})` for all rows and columns, ignoring search, sorting, view settings, and the default 1,000-row query limit. It creates a regular table in the document body: column names become headers; numbers, checkboxes, dates, and page titles become text; multi-select values become comma-separated text; empty values become empty cells. Line breaks remain. DB types, selection colors, and row-page bodies are not copied.
+- `데이터베이스로 전환` in `TableCopyMenu` saves cell text to a new DB. `POST /api/db` validates optional `table: {columns: string[], rows: string[][]}`, creates text columns, and saves definitions and rows in one transaction. Default `/db` insertion retains 2 example rows; imports with `table` create none. Imports allow up to 200 columns and 10,000 rows. The browser demo uses the same normalization.
+- Nonempty, unique first-column values make that column primary. Otherwise, a separate text primary column starting with `항목 1` is prepended without changing the original cells. Empty, duplicate, or reserved column names receive distinct replacements. Headerless tables and merged cells follow the [Markdown Table Contract](../document-code-media-editing/markdown-table-editing-and-copying.md#detailed-contracts).
+- Either conversion is one step in regular ProseMirror and collaborative Yjs history. Undo/redo restores the original node's DB UUID, read-only status, and view settings, or its table formatting, without recreating or deleting the DB. DB→table leaves the original DB and linked row pages intact. Undoing table→DB leaves the new DB listed for redo. A later table→DB conversion creates another DB without restoring the original types.
+- Pending conversions track the source node through subsequent transactions and preserve edits elsewhere. Source modification/deletion or a switch to read-only prevents overwrite. Duplicate requests for the same node are blocked; deletion is requested for a new DB that cannot be inserted. API failure preserves the document block and shows an error. See the [Conversion Decision](../../decisions/0035-table-database-conversion.md).
 
 ### Multiple views and item details
 
-- All five views use the UI font with a 12px base size and 16px line height, independent of the surrounding document's font, weight, and line height. DB titles use 13px text. Document heading styles exclude DB controls, so board and calendar headings retain their own 12px type and compact margins in both embedded and standalone views. Sizes here assume the default browser root font size.
-- Table text, number, date, and page-title cells use 12px text and 4px vertical padding (6px for coarse pointers); headers use 2px vertical padding around their existing 24px desktop or 32px touch controls. Standard text rows are about 25px desktop and 29px touch including dividers; selection tags can increase row height. View tabs are at least 28px high on desktop and retain 40px touch targets. Date-column selectors retain 32px desktop and 40px touch minimum heights, and addition bars retain their existing dimensions.
-- Cards use 8px padding and section gaps, with 4px between property rows. The card grid uses 8px outer padding and gaps with a 240px preferred minimum card width; boards use the same outer spacing and 240px lanes with 6px inner padding. Calendar day cells have minimum heights of 64px below the small-screen breakpoint and 88px above it, growing with visible events. Gantt rows are 28px desktop or 32px touch, with 20px or 24px bars; the 24px-per-day default zoom, sticky title rail, date calculations, and drag distances stay unchanged.
+- All five views use the UI font with 12px text and 16px line height, independent of the surrounding document's font, weight, and line height. DB titles use 13px. Document heading styles exclude DB controls: board/calendar headings retain 12px type and compact margins in embedded and standalone views. These sizes assume the default browser root font size.
 
-- `DatabaseCollection` provides a shared title, view switching, and search, connecting the existing `DatabaseTable` with cards, boards, and calendars. Editor nodes and the full DB popup use the same component, and the browser demo uses the same UI. The default view is the existing table. On narrow screens, icons, accessible names, and shared tooltips replace view names, and even single-column tables retain enough minimum width to display all view switching buttons. View tabs support arrow keys, Home, End, Enter, Space, and touch.
-- Cards display the primary column title, a preview of the first text property, and selected properties. Choose columns to display in `표시 속성`; option colors, dates, numbers, and checkbox states follow the existing field types. If a linked row page exists, a separate button opens it. Cards stack in one column on mobile, while wider screens determine the number of cards based on available width.
-- Boards group rows by the selected single-select or checkbox column. They retain empty groups for configured options and an ungrouped group, displaying each row exactly once. On desktop, dragging a card to another group changes that row's grouping column value. Drags from other DBs are ignored. With touch or keyboard, move cards by editing the same property in card details. Each group's add button creates a row with that value filled in. Horizontal scrolling is confined to the board.
-- The calendar specifies an end-date column and an optional start-date column and displays a 6-week grid starting on Sunday. `열 추가` in the start-date selector creates and immediately connects a new date column. The same column cannot be connected to both endpoints; without a start date, existing single-date events are retained. Ranges appear on every date including both endpoints, and the range is also shown in the selected date's list. If only one date is valid, the item appears on that date. Existing reversed values appear between the two dates without changing the original values. Items with both dates missing or invalid remain in a separate `날짜 없음` list. Even for long ranges, only the currently visible 42 days are calculated.
-- The calendar supports month navigation, returning to today, date selection, and adding rows by date, using date values as their original calendar dates without time zone conversion. New rows added by date fill both connected start and end dates with the selected date. By default, it displays today's complete event list; after month navigation, it selects the first day of that month (today for the current month). Each date shows up to 3 items followed by a Show more button, and the selected date's list allows reading full titles and opening every item.
-- Calendar and Gantt item details use the shared `DateCalendar` to edit connected dates. If a start-date column exists, they provide start and end date inputs, selection of both dates, range highlighting, and Clear event; otherwise, they provide single-date editing. Values are saved to the corresponding columns through the existing cell API. Read-only mode allows only date column selection and range viewing, with no date changes or column creation.
+Table dimensions preserve compact rows and touch targets:
+
+| Element | Size |
+| --- | --- |
+| Text, number, date, and page-title cells | 12px text; 4px vertical padding, or 6px for coarse pointers |
+| Headers | 2px vertical padding around existing 24px desktop or 32px touch controls |
+| Standard text rows, including dividers | About 25px desktop or 29px touch; selection tags can increase height |
+| View tabs | At least 28px desktop; 40px touch targets |
+| Date-column selectors | Minimum 32px desktop or 40px touch |
+| Addition bars | Existing dimensions retained |
+
+Other view dimensions:
+
+| View | Spacing and size |
+| --- | --- |
+| Cards | 8px padding and section gaps; 4px between property rows. Grid: 8px outer padding/gaps and 240px preferred minimum card width |
+| Boards | Same outer spacing; 240px lanes with 6px inner padding |
+| Calendar | Day cells grow with events; minimum 64px below the small-screen breakpoint, 88px above it |
+| Gantt | 28px desktop or 32px touch rows; 20px or 24px bars. The 24px-per-day default zoom, sticky title rail, date calculations, and drag distances remain unchanged |
+
+- `DatabaseCollection` shares the title, view switching, and search across the existing `DatabaseTable`, cards, boards, and calendars. Editor nodes, the full DB popup, and the browser demo use this UI; table remains the default. Narrow screens replace view names with icons, accessible names, and shared tooltips. Even single-column tables retain room for all view buttons. Tabs support arrow keys, Home, End, Enter, Space, and touch.
+- Cards show the primary-column title, the first text property's preview, and properties chosen in `표시 속성`. Option colors, dates, numbers, and checkboxes follow existing field types. A separate button opens a linked row page when present. Mobile uses one column; wider screens fit columns to the available width.
+- Boards group rows by a selected single-select or checkbox column, retaining empty configured groups and an ungrouped group. Each row appears exactly once. Desktop dragging between groups changes the grouping value; drags from other DBs are ignored. Touch/keyboard users edit that property in card details. Each group's add button prefills its value in a new row. Horizontal scrolling stays within the board.
+
+The calendar uses an end-date column, an optional start-date column, and a Sunday-first 6-week grid. `열 추가` in the start-date selector creates and immediately connects a date column. The endpoints cannot share a column; omitting the start date retains single-date events.
+
+| Dates | Display |
+| --- | --- |
+| Both valid | Every date between and including the endpoints; the selected date's list also shows the range |
+| Only one valid | That date |
+| Reversed | Between the two dates, without changing stored values |
+| Both missing or invalid | Separate `날짜 없음` list |
+
+Only the visible 42 days are calculated, even for long ranges.
+
+- Calendar controls navigate months, return to today, select dates, and add rows by date. Dates retain their original calendar values without time zone conversion. Date-specific rows fill both connected endpoints with the selected date. The default list shows all today's events. Month navigation selects that month's first day, or today for the current month. Each date shows up to 3 items followed by a Show more button; the selected-date list lets users read full titles and open any item.
+- Calendar/Gantt details use shared `DateCalendar`. With a start-date column, they offer start/end inputs, both-date selection, range highlighting, and Clear event; otherwise, single-date editing. The existing cell API saves each connected column. Read-only mode permits date-column selection and range viewing, but no date changes or column creation.
 - Search matches cell values in the current DB and displays rows matching all search terms. Results apply across all views without changing the server's row order or other display positions. Per-column table sorting remains in the existing table state.
-- Clicking a card or event opens item details in the shared `DialogFrame`. Primary column, text, number, date, checkbox, and select properties are edited with existing cell components. Save failures appear in both the details and DB block, and server values are reloaded. Row deletion runs after confirmation in the details dialog. New board or date-specific rows save their initial properties after creation and then open details. If saving initial properties fails, the already-created row is preserved and an error is displayed.
+- Cards/events open shared `DialogFrame` details. Existing cell components edit primary, text, number, date, checkbox, and select properties. Save failures appear in both details and the DB block, followed by reloading server values. Deletion requires confirmation in details. New board/date-specific rows save initial properties before opening details; if that save fails, the created row remains and an error appears.
 - Read-only references and external DBs also support view switching, search, and viewing details, but do not allow property changes, group moves, or adding or deleting rows or columns. Data access and modification retain the existing DB API's project, feature, and file permissions.
 
 ### Gantt
 
 - Gantt shares the same DB rows and the calendar's `dateColumn` and `startDateColumn`. Without a start date, it displays a one-day bar. Reversed dates, single-sided dates, and invalid dates follow the calendar's range normalization. Rows without dates retain their titles and the ability to open details.
 - Gantt provides a date axis for the current month, previous month, next month, today, zoom in, zoom out, and a full-range view. Horizontal scrolling is confined to the DB, and titles on the left remain fixed. Only search results are displayed, and queries and row, column, and cell saves use the existing controller.
-- In month view, moving bars, resizing either end when a start-date column exists, and drawing on the timeline of empty rows update the existing date cells. Pointer cancellation does not save. Left and right arrow keys on a bar move it by one day; Shift changes the end date, and Alt changes the start date. In full-range view, use the details dialog or keyboard instead of pointer editing. Read-only mode blocks moving, range changes, and drawing.
+
+Gantt editing depends on view and access:
+
+| Context | Behavior |
+| --- | --- |
+| Month view, pointer | Move bars, resize either end when a start-date column exists, or draw on empty rows' timelines to update existing date cells. Pointer cancellation does not save |
+| Bar keyboard focus | Left/Right moves one day; Shift changes the end date, Alt the start date |
+| Full-range view | Edit through details or keyboard, not pointers |
+| Read-only | No moving, range changes, or drawing |
+
 - Open shared item details from a title or bar to edit dates and other properties. Completion colors, tags, assignees, and automatic creation features specific to the task panel are not included. Existing task Markdown is not automatically migrated to the DB or deleted. Follow the [integration decision](../../decisions/0051-database-gantt.md).
 
 ### Saving view settings
 
 - The document node's `layout` is `{mode, groupColumn?, dateColumn?, startDateColumn?, visibleFields?}`, with modes `table`, `cards`, `board`, and `calendar`. `dateColumn` is the end-date or single-date column, and `startDateColumn` is the optional start-date column. Normalized JSON is URL-encoded and stored in `data-mew-db-layout`. Default table settings omit the attribute to preserve the existing Markdown representation. The server collaboration schema and client use the same parser and serializer.
 - If the document is editable, the reference's view, grouping/date columns, and visible properties are saved in Markdown. Display settings remain independent even when other documents reference the same DB. If the document is read-only, changes apply only to the current screen. DB row and column definitions remain in Postgres; saving display settings does not replicate DB data into Markdown.
-- The standalone DB popup stores display settings in scoped localStorage `mew:db-layout:<DB UUID>` and restores them when the same DB is reopened. If storage is unavailable, the current screen's selections are retained. Search terms, selected rows, and the calendar month are not persisted. Deleted grouping or end-date columns, or those whose types have changed, are replaced with the first available column of the same type; if none exists, an add-column or empty state is displayed. If the selected start-date column disappears or is no longer a date type, the view displays without a start date. Follow the [display settings decision](../../decisions/0028-database-multiple-views.md).
+
+The standalone popup restores display settings from scoped localStorage `mew:db-layout:<DB UUID>` when reopening the same DB. Unavailable storage retains selections for the current screen. Search terms, selected rows, and calendar month are not persisted.
+
+| Invalid saved selection | Fallback |
+| --- | --- |
+| Grouping/end-date column deleted or its type changed | First available column of the same type; otherwise add-column or empty state |
+| Start-date column deleted or no longer a date type | Display without a start date |
+
+See the [display settings decision](../../decisions/0028-database-multiple-views.md).
 
 ### Keyboard navigation in table views
 
-- The DB title acts as one merged cell above the column headers. Down moves from the title to a header, then to each data row in the same column; Up reverses this path. Left and Right move between columns. Returning through the title remembers the previous column, clamped to the remaining columns after deletion. Edges stop movement without wrapping or leaving the current DB. Empty tables still support title/header navigation.
-- Headers and data cells have focusable containers with a theme-colored focus outline. Arrow navigation focuses these containers without changing values or opening pages. Enter or F2 enters the existing editor, opens a selection list, or activates a checkbox. In read-only page cells, it opens the linked page. Header activation edits the column name, including with a physical keyboard in touch layouts.
-- Up and Down from a single-line text, number, or date input move to the adjacent row without incrementing numeric or date values. While editing text, Left and Right move the caret until its beginning or end; at that boundary they move to the adjacent cell. Text selections, Shift/Alt/Ctrl/Meta combinations, and IME composition retain their existing behavior. Enter saves and returns focus to the cell. Esc returns to cell navigation; Esc while renaming a column cancels the rename.
+- The title is one merged cell above the headers. Down moves title → header → data rows in the same column; Up reverses. Left/Right changes columns. Returning through the title remembers the previous column, clamped to remaining columns after deletion. Edges stop without wrapping or leaving the DB. Empty tables still support title/header navigation.
+- Focusable header/data-cell containers have theme-colored outlines. Arrow navigation focuses them without changing values or opening pages. Enter/F2 enters the existing editor, opens a selection list, or activates a checkbox; a read-only page cell opens its linked page. Activating a header edits its name, including physical-keyboard use in touch layouts.
+- Up/Down in single-line text, number, or date inputs moves between rows without incrementing numeric/date values. Left/Right moves the text caret, then enters the adjacent cell at the boundary. Text selections, Shift/Alt/Ctrl/Meta combinations, and IME composition keep their behavior. Enter saves and returns cell focus. Esc returns to navigation; during column renaming, it cancels the rename.
 - Selection controls retain their existing arrow behavior while directly focused or open. Their popups, the header type menu, view tabs, search fields, and other view controls handle their own keys. Navigation in the table does not intercept their events or change card, board, calendar, or Gantt interactions.
 - `databaseNavigation.ts` reads the current table row and cell positions, so sorting and filtering determine movement order without a separate row model or a scan of every data cell per key. Focus reveals the destination inside the table's scroll container. Editor nodes and standalone DB popups share this implementation; other tables and surrounding document content are excluded.
 
 ### Existing tables and data synchronization
+
+#### Plain references and popups
 
 - In Plain Markdown HTML blocks, a `div` with a valid `data-mew-db` UUID is displayed as a link. Ctrl+click or Cmd+click opens the full list popup with that DB selected. A normal click retains source editing; code blocks, inline code, HTML comments, and invalid UUIDs are not treated as links. Opening a link does not change the Markdown body.
 
@@ -102,17 +150,33 @@ description: "Defines Postgres document DB editing, Markdown table conversion, c
 
 - The full list and DB popups opened from Plain use the shared `DialogFrame`. They follow the shared theme's background, blur, and border, ensuring the inner panel background does not obscure the outer blur. The close button, clicking outside, or Esc closes the popup and restores the previous focus; Tab focus remains inside the popup.
 
+#### Table geometry and creation
+
 - Tables in the editor and full DB popup start with the first data column, without a dedicated row-delete button column on the left. The empty-table message spans only the data columns.
-- Editable tables place a vertical add-column bar to the right of the field grid and a horizontal add-row bar below it. Both bars are borderless and show only a centered plus icon. Their cross-axis thickness matches: 20px on desktop and 32px for coarse pointers. Accessible names and shared tooltips identify each action without visible text. The bars sit outside the rounded data border; adding a column does not create an empty header or body column. The right bar spans the grid height, and the bottom bar spans its visible width. Other views use the same icon-only row bar. Read-only views hide these controls, and schema changes disable them.
+
+Editable tables put a vertical add-column bar right of the field grid and a horizontal add-row bar below it.
+
+| Property | Contract |
+| --- | --- |
+| Appearance | Borderless, centered plus icon only; accessible names and shared tooltips, no visible text |
+| Cross-axis thickness | Both 20px desktop or 32px for coarse pointers |
+| Placement | Outside the rounded data border; adding a column creates no empty header/body column |
+| Extent | Right bar spans grid height; bottom bar spans visible grid width |
+| Other views | Same icon-only row bar |
+| Access/busy state | Hidden in read-only views; disabled during schema changes |
 
 - The overall DB block, title, view switcher, display settings, and Add row have no borders and use the document background directly. Only the table's field grid is enclosed by a border with 6px corners; cell dividers use `edge-strong`, as in regular Markdown tables. The table body uses `surface-deep` and column headers use `surface-raised` backgrounds at 20% opacity. Cards, empty boards, calendar date cells, and events also have no borders, using backgrounds and spacing for separation. The full DB popup reuses the same styles. Regular Markdown table cell padding does not apply to DB tables, preserving their existing density.
 
 - The DB creation transaction saves the `제목` and `텍스트` columns together with 2 rows containing `항목 1` / `첫 번째 내용` and `항목 2` / `두 번째 내용`, and returns them in the creation response. The browser demo uses the same initial values. Example rows and columns are not added to existing DBs or external read-only references.
 
-- An always-visible sort icon button appears to the right of each column title. Clicking, Enter, Space, or touch cycles through ascending → descending → off; selecting another column switches to ascending order for that column. The active column displays a directional arrow, an accent color, and `aria-sort`, while the button name and tooltip describe the next action.
-- Sorting applies only to the displayed table. It is available in the editor, popups, and read-only references without changing the DB's stored order or other tables' sorting. Turning sorting off displays the original row order received from the server. Numbers sort numerically, dates by time, checkboxes unchecked → checked, and text, pages, and options use natural sorting for the UI language. Multi-select values are compared by joining option names. Empty values appear last in both directions, and equal values retain their original order. Current sorting is reapplied when cells or rows update, and sorting for a removed column is not applied.
+#### Sorting and width
 
-- The overall DB block and each column hug the table content horizontally. Title-area content does not increase the block width, and long titles display within the available width. Cell input values, options, and page titles also affect column width during editing; narrow DB blocks are not forced to fill the screen width. For tables wider than the screen, the block is constrained to its parent's width and scrolls horizontally within the DB without widening the entire document. Read-only tables and the full DB popup follow the same rules.
+- An always-visible sort icon button appears to the right of each column title. Clicking, Enter, Space, or touch cycles through ascending → descending → off; selecting another column switches to ascending order for that column. The active column displays a directional arrow, an accent color, and `aria-sort`, while the button name and tooltip describe the next action.
+- Sorting affects only the displayed table in the editor, popups, or read-only references. Stored DB order and other tables' sorting remain unchanged; off restores server row order. Numbers sort numerically, dates by time, checkboxes unchecked → checked, and text/pages/options naturally for the UI language. Multi-select compares joined option names. Empty values stay last in both directions; equal values retain original order. Cell/row updates reapply sorting; removed columns' sorting is ignored.
+
+- The DB block and columns hug content. Title-area content cannot widen the block; long titles fit the available width. Editing inputs, options, and page titles affect column width, without forcing narrow blocks to fill the screen. Wider tables stay within the parent's width and scroll internally without widening the document. Read-only tables and the full popup follow the same rules.
+
+#### Selection options
 
 - Single-select values are stored as one string, and multi-select values as an array of strings. Options are managed per column, and new options can be added while editing a cell.
 
@@ -120,17 +184,34 @@ description: "Defines Postgres document DB editing, Markdown table conversion, c
 
 - Renaming updates single-select and multi-select values and subpage properties for every row using that option. Deletion removes the option, its color, and corresponding selected values together. Single-select values become empty, while multi-select values retain other selections. Duplicate names, empty names, and unsupported colors are not saved.
 
-- The column header context menu changes the type of the entire column, including when the DB has no rows. Right-click anywhere in the header, click its type icon, or press ContextMenu/Shift+F10 with a header control focused to open the same menu. Esc closes it and restores focus to the invoking control, including clicks on its SVG icon. Read-only and busy headers do not open type menus. Data-cell right-clicks and keyboard context menus do not offer type changes; document-level conversion remains available there. The primary column allows only text↔page conversion, and regular columns cannot use the page type. The primary column's internal value remains a title string even in page mode, and the row UUID is the primary key.
+#### Column types and primary values
+
+The column-header menu changes an entire column's type, even with no rows.
+
+| Action or condition | Behavior |
+| --- | --- |
+| Open | Right-click anywhere in the header, click its type icon, or press ContextMenu/Shift+F10 with a header control focused |
+| Esc | Close and restore invoking-control focus, including invocation through its SVG icon |
+| Read-only or busy header | No type menu |
+| Data-cell context menu, mouse or keyboard | No type changes; document-level conversion remains available |
+| Primary column | Only text↔page; internal value remains a title string, with row UUID as primary key |
+| Regular column | Page type prohibited |
 
 - A new row's primary value starts with a unique `제목 없음`. When primary-column constraints are first applied to an existing DB, empty values are filled with a default title and duplicate values are distinguished by appended numbers. Subsequent saves of empty or duplicate values and deletion of the primary column are rejected.
 
 - Type changes validate all values in the column before applying the change. If any value cannot be converted, no change is made. Rows with more than one multi-select value cannot be converted to a single-value type. Deleting an option in use with X also cleans up row values in the same transaction; simply replacing the option list does not discard values in use.
 
-- Changing the primary column to page creates `<대표열 값>.md` for each row directly beneath the source document. If the source is a single file, it is converted to a primary file under the normal child-document rules. No separate DB document or UUID folder is created. Existing UUID files are also migrated while preserving their bodies and row links. Later primary title edits immediately preview the document name in the explorer and open tabs; confirmed saves rename its file within the current directory. Parent pages retain children and attachments while their folder and representative are renamed together. Supported links, open tabs, drafts, and nested DB bindings follow the [document page contract](../../development/document-pages.md#database-row-subpages) and [0093](../../decisions/0093-database-row-title-renames.md). Collisions use safe numbered names; unrelated synchronization preserves manually selected paths. Primary-column values are shared through frontmatter `title`, and other column values use column display names as field names. Numbers, checkboxes, and multi-select values retain YAML number, boolean, and array types, respectively. `title`, `_mew_database`, `_mew_row`, and `상위파일` are not used as regular column names.
+#### Linked row pages
 
-- Editing a subpage or changing a table cell updates the linked fields on the other side. The body and frontmatter fields not linked to the DB are preserved. `created` and `updated` are not generated automatically; their values are shared only if DB columns with those names are explicitly defined. Editing a bound page's body does not automatically update `updated` to today's date.
+Changing the primary column to page creates `<대표열 값>.md` for each row directly under the source document.
 
-- Changing page to text or deleting a row or DB stops sharing. Existing page bodies are not automatically deleted, and converting the same row back to page preserves the existing body. Page paths, linking metadata, and document lifetime follow the [document page contract](../../development/document-pages.md).
+- A single-file source becomes a primary file under normal child-document rules; no separate DB document or UUID folder is created. Existing UUID files migrate with bodies and row links intact.
+- Primary-title edits immediately preview names in the explorer/open tabs; confirmed saves rename files in their current directory. Parent folder and representative rename together, retaining children and attachments. Supported links, tabs, drafts, and nested DB bindings follow the [database row-page contract](../../development/database-row-pages.md#database-row-subpages) and [0093](../../decisions/0093-database-row-title-renames.md). Collisions use safe numbered names; unrelated synchronization preserves manually selected paths.
+- The primary value shares frontmatter `title`; other columns use display names as field names. Numbers, checkboxes, and multi-select retain YAML number, boolean, and array types. Regular column names exclude `title`, `_mew_database`, `_mew_row`, and `상위파일`.
+
+- Subpage edits and table-cell changes update linked fields bidirectionally, preserving the body and unlinked frontmatter. `created` and `updated` are shared only when explicitly defined as DB columns, never generated automatically. Editing a bound page's body does not set `updated` to today.
+
+- Changing page to text or deleting a row or DB stops sharing. Existing page bodies are not automatically deleted, and converting the same row back to page preserves the existing body. Page paths, linking metadata, and document lifetime follow the [database row-page contract](../../development/database-row-pages.md).
 
 <!-- mew:implementation:end -->
 

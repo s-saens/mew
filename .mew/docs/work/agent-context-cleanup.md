@@ -55,3 +55,13 @@ An independent audit checked 138 rewritten links across 75 current documents: ea
 Shorten the [task contract](../development/task-list.md) from 9,750 to 8,363 words and the two [Git panel](../features/git-history/project-git-work-panel.md)/[connection](../development/git-connections.md) documents from 9,145 to 8,559 words, including metadata. Use focused subsections and tables while retaining existing anchors and verbatim historical verification sections. Independent reviews checked input focus, saving/lifetimes, date/sort precedence, commit selection, retry limits, account races, and credential scope. These are prose changes; they introduce no new task or Git behavior.
 
 Related existing theme, project access, icons, worktree, snapshot, and account-state suites passed 14 tests. Together with the new helper/router, connection, browser, and discovery checks above, the scoped runs passed 169 tests. This is not a full-suite result. The final documentation check still has only the unrelated task asset-link error noted above.
+
+## Additional focused contracts
+
+Shorten the task feature, database feature, and conversation-storage contracts with lookup headings, tables, and direct conditions. Independent reviews preserved feature metadata, existing anchors, permission/lifetime rules, and verbatim dated validation records. Restore precise Gantt buffer/direction and numeric-aware title comparison wording against current source.
+
+Move all ten database row-page paragraphs verbatim into [database row pages](../development/database-row-pages.md), with scoped headings. The [parent/child page contract](../development/document-pages.md) retains its old anchor, shared structural engine, and original verification records. Seven prose edits shorten its current storage, inline creation, and draft-mutation rules; protected code examples and links remain. Update the database feature and title-rename record to the new owner.
+
+Correct the [shared navigation contract](../development/ui-project-navigation.md#file-explorer-top-create-buttons) to match ADR 0107 and `FileTree`: click selects, double-click/Enter opens, Ctrl/Cmd+click toggles selection, and Ctrl/Cmd+Enter opens a separate tab. This fixes stale documentation without changing UI behavior. The source and decision were independently checked.
+
+The final description check reports 666 valid descriptions. Local links and old/new row-page anchors resolve; the full documentation check retains the same unrelated task asset-link error. These additional changes are documentation only, so no new implementation tests or build were required.
