@@ -1,6 +1,6 @@
 ---
 title: "Mewlink device registration and locally authenticated P2P access contract"
-description: "Defines production-only Mewlink integration, public device addresses, local and anonymous authentication, browser trust, revocation, resource and transport boundaries, central repository dependencies, and signaling reattachment. Covers quiet bounded recovery with a minimal exhausted-connection message, suspended reads and sockets, transmission-based virtual-socket timing, fresh foreground and visible-disconnection probes with RTT-aware deadlines, transmission-bound lease expiry, immediate verified panel and collaboration recovery, retained input focus, and separate host versus central application."
+description: "Defines production-only Mewlink integration, public device addresses, local and anonymous authentication, browser trust, revocation, resource and transport boundaries, central repository dependencies, launcher touch-zoom policy, and signaling reattachment. Covers quiet bounded recovery with a minimal exhausted-connection message, suspended reads and sockets, transmission-based virtual-socket timing, fresh foreground and visible-disconnection probes with RTT-aware deadlines, transmission-bound lease expiry, immediate verified panel and collaboration recovery, retained input focus, and separate host versus central application."
 created: 2026-10-07
 updated: "2026-11-02"
 ---
@@ -20,6 +20,16 @@ Command port buttons and localhost links open the [internal DOM Browser](port-pr
 The internal execution origin is `https://app.mew.run`. It is separated from the management screen on a different origin within the same site to reduce mobile browser cross-site storage restrictions while preserving central cookie and API isolation. Screen addresses on the former `mew.saens.kr` redirect to the new domain, but registration, persistent WSS, signing keys, and device IDs are retained. The central service allows only configured previous origins, and validates the host proof audience and ticket issuer against the origin of the host actually connected to. New browsers validate ticket issuers only against the current and previous origin list allowed by central configuration, while retaining validation of the same signing key and instance audience. Launch does not require new RPC methods on existing Durable Objects. The issuer of approved local Mewlink identities remains the corresponding host's origin, and the identity namespace for direct email accounts is also fixed to its previous value to prevent creation of a different account with the same email.
 
 When retaining previous provider callbacks, OAuth is handled at `OAUTH_ORIGIN`, and a new management session is issued after consuming a single-use proof valid for 60 seconds and bound to a browser verification cookie on the new management origin. Requests that fail origin, cookie, or expiration validation do not create a session. This route is not provided on the app origin. [Domain migration decision](../decisions/0005-mewlink-domain-and-private-dashboard.md).
+
+## Launcher touch zoom
+
+The device connection document on `mew.run` and its app launcher on `app.mew.run` apply the [workspace touch policy](../features/appearance-accounts-operations/panel-layout-mobile-and-state-restoration.md#touch-zoom) before loading the installed UI. Apply it separately in both documents because touch events do not propagate across iframe boundaries. The account dashboard keeps its existing browser zoom behavior.
+
+The launcher helper `mewlink/src/workspace-touch-zoom.ts` reuses the host's `startWorkspacePinchZoom` event policy. It appends `maximum-scale=1` to the existing viewport content while preserving other directives, sets `data-workspace-touch-zoom` on the document root, and activates `touch-action: pan-x pan-y` through scoped launcher CSS. Disposal restores the prior viewport content and root attribute and removes event listeners.
+
+Cancel only native multi-touch and gesture defaults; keep event propagation available for editor-local font resizing in the installed app. One-finger input, Ctrl/Cmd+wheel, and browser keyboard zoom retain their input paths. Embedded third-party content retains its own policy. Whole-page touch enlargement is restricted in the launcher documents, with the accessibility and physical-device limits recorded in [ADR 0112](../decisions/0112-workspace-touch-zoom.md).
+
+This is a central **source contract**, not evidence of a live change at `mew.run`. A host build cannot publish launcher assets; central application is separate and user-owned. The [launcher touch-zoom work record](../work/mewlink-touch-zoom.md) records actual local checks and remaining application limits.
 
 ## Public file and folder links
 

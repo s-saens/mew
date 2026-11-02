@@ -1,6 +1,6 @@
 ---
 title: "Workspace touch zoom and editor font resizing"
-description: "Accepts suppression of native page pinch zoom in the Mew document while retaining editor-local touch font resizing, desktop browser zoom, and separate embedded-document input. Records alternatives and accessibility and device-verification limits."
+description: "Accepts suppression of native page pinch zoom in the Mew document and Mewlink connection/app launchers while retaining editor-local touch font resizing, desktop browser zoom, and separate embedded-document input. Records alternatives and accessibility and device-verification limits."
 created: "2026-11-02"
 updated: "2026-11-02"
 status: "accepted"
@@ -16,7 +16,9 @@ Add `maximum-scale=1` to the existing viewport settings and use `touch-action: p
 
 Enable CodeMirror font resizing for Markdown Plain as well as code and text, and provide local font resizing in Hotview. Preserve Ctrl/Cmd+wheel and browser keyboard zoom. The document policy also covers public shares rendered in the same Mew application; separately embedded documents retain their own input policy.
 
-The current contracts are [workspace touch zoom](../features/appearance-accounts-operations/panel-layout-mobile-and-state-restoration.md#touch-zoom), [code/text touch zoom](../features/document-code-media-editing/code-text-editing-and-document-search.md#touch-zoom), and [Markdown touch zoom](../features/document-code-media-editing/markdown-hotview-source-and-properties.md#touch-zoom).
+Extend the same policy to the Mewlink connection parent and app launcher, each in its own document before the installed UI loads. Reuse the host event helper and scope launcher CSS through a root attribute. Preserve and restore existing viewport directives and root state on disposal. The central account dashboard is excluded. This extension changes source only; it does not establish deployment at `mew.run`.
+
+The [remote-access contract](../development/remote-access.md#launcher-touch-zoom) owns the launcher integration. The current contracts are [workspace touch zoom](../features/appearance-accounts-operations/panel-layout-mobile-and-state-restoration.md#touch-zoom), [code/text touch zoom](../features/document-code-media-editing/code-text-editing-and-document-search.md#touch-zoom), and [Markdown touch zoom](../features/document-code-media-editing/markdown-hotview-source-and-properties.md#touch-zoom).
 
 ## Alternatives and rationale
 
@@ -30,4 +32,4 @@ Canceling only native touch defaults keeps the workspace stable while letting ed
 
 Whole-page touch enlargement is intentionally restricted, including controls outside editors. Editor font resizing and desktop browser zoom remain available, but they do not replace whole-page touch magnification for every accessibility need. OS magnification remains outside application control. Actual Safari and Android gesture behavior requires physical-device checks; synthetic event tests do not establish that result.
 
-Implementation evidence and application limits belong to the [work record](../work/editor-touch-zoom.md).
+Implementation evidence and application limits belong to the [workspace work record](../work/editor-touch-zoom.md) and [Mewlink launcher work record](../work/mewlink-touch-zoom.md).
