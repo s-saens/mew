@@ -26,17 +26,19 @@ export function AgentPromptDrafts({ workspace, text, cliMode, attachments, disab
   }
   const close = () => setMenu(null)
   return <>
-    <HoverTipLayer className="flex h-5 w-8 items-center justify-center bg-transparent">
+    <HoverTipLayer className="flex w-8 shrink-0 items-stretch bg-transparent">
+      <div data-tip={text.trim() ? uiText('프롬프트 임시저장') : uiText('저장한 프롬프트')}
+        className="flex min-h-8 w-full items-center justify-center">
       <button type="button" disabled={disabled} aria-label={uiText('프롬프트 임시저장')}
-        data-tip={text.trim() ? uiText('프롬프트 임시저장') : uiText('저장한 프롬프트')}
         aria-haspopup="menu" aria-expanded={menu !== null}
-        className="flex h-full w-full items-center justify-center rounded text-ink-secondary hover:bg-surface-raised hover:text-ink focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-40"
+        className="flex h-5 w-full items-center justify-center rounded text-ink-secondary hover:bg-surface-raised hover:text-ink focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-40"
         onClick={event => {
           const prompts = text.trim() ? saveAgentPrompt(workspace, { text, cliMode, attachments }) : readSavedAgentPrompts(workspace)
           if (!prompts) { onError(); return }
           const rect = event.currentTarget.getBoundingClientRect()
           setMenu({ x: rect.right, y: rect.top, trigger: event.currentTarget, prompts })
         }}><FloppyDisk width={16} height={16} aria-hidden="true" /></button>
+      </div>
     </HoverTipLayer>
     {menu && !disabled && <ActionMenu x={menu.x} y={menu.y} trigger={menu.trigger} label={uiText('저장한 프롬프트')} onClose={close}>
       {menu.prompts.length === 0 && <div className="px-2 py-1 text-xs text-ink-secondary" role="status">{uiText('저장한 프롬프트가 없습니다.')}</div>}

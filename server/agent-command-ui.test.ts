@@ -69,7 +69,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     },
   }] })
   const chunk = bundle.output.find(item => item.type === 'chunk')!
-  const files = ['src/components/AgentPanel.tsx', 'src/components/agent-command-bubble.tsx', 'src/components/SessionTerminalPopup.tsx', 'src/components/MentionTextarea.tsx']
+  const files = ['src/components/AgentPanel.tsx', 'src/components/agent-prompt-drafts.tsx', 'src/components/agent-command-bubble.tsx', 'src/components/SessionTerminalPopup.tsx', 'src/components/MentionTextarea.tsx', 'packages/ui/src/HoverTipLayer.tsx']
   const content = (await Promise.all(files.map(file => fs.readFile(path.join(root, file), 'utf8')))).join('\n')
   const compiler = await compile(await fs.readFile(`${root}/src/index.css`, 'utf8'), { base: `${root}/src`, onDependency() {} })
   const css = compiler.build([...new Set((source + content).match(/[A-Za-z0-9_@!:/.[\]()%,-]+/g))])
@@ -197,9 +197,39 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
           previousRight = box.x + box.width
         }
       }
+      const assertComposerTooltips = async (savedLabel = '저장한 프롬프트', submitLabel = '전송', hasSchedule = true) => {
+        const labels = [
+          ['그림판 열기', '그림판 열기'],
+          ['프롬프트 임시저장', savedLabel],
+          ['파일 첨부', '파일 첨부'],
+          ...(hasSchedule ? [['예약 메시지', '예약 메시지']] : []),
+          [submitLabel, submitLabel === '저장' ? '저장' : `${submitLabel} (Ctrl+Enter)`],
+        ]
+        let top: number | undefined
+        for (const [buttonLabel, tooltipLabel] of labels) {
+          const button = composer.getByRole('button', { name: buttonLabel, exact: true })
+          assert.equal(await button.getAttribute('title'), null, 'composer actions use only the shared tooltip')
+          await button.hover()
+          const tip = page.getByRole('tooltip', { name: tooltipLabel, exact: true })
+          await tip.waitFor()
+          assert.equal(await page.getByRole('tooltip').count(), 1, 'each hovered action shows exactly one tooltip')
+          const box = await tip.boundingBox()
+          assert.ok(box && box.x >= 0 && box.x + box.width <= width, 'tooltip remains within the viewport')
+          if (top !== undefined) assert.ok(Math.abs(box.y - top) < 0.5, 'all composer tooltips share the same height')
+          top = box.y
+          if (process.env.MEW_CLI_SCREENSHOTS && ['그림판 열기', '프롬프트 임시저장'].includes(buttonLabel)) {
+            await fs.mkdir(process.env.MEW_CLI_SCREENSHOTS, { recursive: true })
+            await page.screenshot({ path: path.join(process.env.MEW_CLI_SCREENSHOTS, `tooltip-${buttonLabel === '그림판 열기' ? 'drawing' : 'save'}-${width}.png`) })
+          }
+        }
+        await page.mouse.move(0, 0)
+        await page.getByRole('tooltip').waitFor({ state: 'detached' })
+      }
       await assertComposerActionsContained()
+      await assertComposerTooltips()
       assert.ok(await composer.getByRole('button', { name: '전송', exact: true }).evaluate(el => parseFloat(el.ownerDocument.defaultView!.getComputedStyle(el).borderRadius)) >= 12, 'send has rounder corners')
       await draft.fill('버튼 순서 확인')
+      await assertComposerTooltips('프롬프트 임시저장')
       await composer.getByRole('button', { name: '그림판 열기', exact: true }).focus()
       for (const label of ['프롬프트 임시저장', '파일 첨부', '예약 메시지', '전송']) {
         await page.keyboard.press('Tab')
@@ -493,6 +523,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
       const queuedInput = page.getByRole('textbox', { name: '대기 메시지 수정칸', exact: true })
       await queuedInput.waitFor()
       await assertComposerActionsContained('저장', false)
+      await assertComposerTooltips('프롬프트 임시저장', '저장', false)
       assert.equal(await composerValue(queuedInput), '첨부 확인', 'attachment paths stay out of editable text')
       assert.equal(await page.getByRole('button', { name: '파일 첨부', exact: true }).count(), 1, 'queue edit reuses the composer attachment picker')
       assert.equal(await page.locator('[data-agent-queue]').getByRole('textbox').count(), 0, 'queue rows do not contain inline editors')
@@ -597,6 +628,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
       assert.equal(await composerValue(draft), '보존할 새 메시지')
       assert.equal(await page.getByRole('button', { name: 'CLI 명령 모드', exact: true }).getAttribute('aria-pressed'), 'true', 'cancel restores CLI mode')
       await assertComposerActionsContained('명령 실행')
+      await assertComposerTooltips('프롬프트 임시저장', '명령 실행')
       await page.locator('[data-agent-queue]').getByRole('button', { name: '편집', exact: true }).click()
       await queuedInput.waitFor()
       await queuedInput.fill('뒤로가기로 취소할 수정')

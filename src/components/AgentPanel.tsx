@@ -4446,15 +4446,17 @@ function AgentSessionView({
             }}
           />
           </div>
-          <div ref={composerActionsRef} data-agent-composer-actions className="flex shrink-0 items-center justify-end gap-1 px-1 pb-1">
-          <HoverTipLayer>
-            <button type="button" aria-label={uiText('그림판 열기')} data-tip={uiText('그림판 열기')}
+          <div ref={composerActionsRef} data-agent-composer-actions className="flex shrink-0 items-stretch justify-end gap-1 px-1 pb-1">
+          <HoverTipLayer className="flex items-stretch">
+            <div data-tip={uiText('그림판 열기')} className="flex min-h-8 items-center">
+            <button type="button" aria-label={uiText('그림판 열기')}
               aria-keyshortcuts="Control+Alt+D Meta+Alt+D"
               disabled={composerCliMode || composerAttaching}
               onClick={openDrawing}
               className="flex h-7 w-7 items-center justify-center rounded bg-surface text-ink-muted hover:bg-surface-raised hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-40">
               <EditPencil width={17} height={17} aria-hidden="true" />
             </button>
+            </div>
           </HoverTipLayer>
           <input
             ref={attachmentInputRef}
@@ -4470,7 +4472,6 @@ function AgentSessionView({
               void attachFiles(files, context.target)
             }}
           />
-          <div className="flex h-7 shrink-0 items-center justify-center">
             <AgentPromptDrafts workspace={notificationWorkspace} text={draft} cliMode={cliMode}
               attachments={draftAttachments.map(queuedAttachmentInput)}
               disabled={!visible || !!editingQueued || composerAttaching || cli.submitting} allowTerminal={allowTerminal}
@@ -4490,33 +4491,42 @@ function AgentSessionView({
               }}
               onError={() => setErrorDetail({ title: uiText('프롬프트 임시저장 실패'), detail: uiText('브라우저 저장 공간을 확인하고 다시 시도하세요.') })}
             />
-          </div>
+          <HoverTipLayer className="flex items-stretch">
+            <div data-tip={uiText('파일 첨부')} className="flex min-h-8 items-center">
             <button type="button" onPointerDown={keepFocusOnPress} onClick={() => {
               attachmentPickerContext.current = { target: editingQueued ? 'queue' : 'composer', version: queuedEditVersionRef.current, projectRoot: notificationWorkspace }
               attachmentInputRef.current?.click()
-            }} disabled={composerCliMode || composerAttaching} className="flex h-6 w-8 items-center justify-center rounded text-ink-secondary hover:bg-surface-raised disabled:opacity-40" aria-label={uiText("파일 첨부")} title={uiText("파일 첨부")}><PaperclipGlyph /></button>
+            }} disabled={composerCliMode || composerAttaching} className="flex h-6 w-8 items-center justify-center rounded text-ink-secondary hover:bg-surface-raised disabled:opacity-40" aria-label={uiText("파일 첨부")}><PaperclipGlyph /></button>
+            </div>
+          </HoverTipLayer>
             {!editingQueued && (
+            <HoverTipLayer className="flex items-stretch">
+            <div data-tip={uiText('예약 메시지')} className="flex min-h-8 items-center">
             <button
               type="button"
               onClick={() => setScheduleOpen(true)}
               disabled={composerCliMode || composerAttaching || !meta?.sessionId}
               className="flex h-6 w-8 items-center justify-center rounded text-ink-secondary hover:bg-surface-raised disabled:opacity-40"
               aria-label={uiText("예약 메시지")}
-              title={uiText("예약 메시지")}
             >
               <ClockGlyph />
             </button>
+            </div>
+            </HoverTipLayer>
             )}
+            <HoverTipLayer className="flex items-stretch">
+            <div data-tip={editingQueued ? uiText("저장") : composerCliMode ? uiText("명령 실행 (Ctrl+Enter)") : uiText("전송 (Ctrl+Enter)")} className="flex min-h-8 items-center">
             <button
               type="button"
               onClick={submit}
               disabled={(!connected && !(canQueueStartup && !composerCliMode && !editingQueued)) || !!loadingSession || !!historyPreview || composerAttaching || (composerCliMode && (cli.submitting || !meta?.sessionId || !allowTerminal)) || (!composerDraft.trim() && composerAttachments.length === 0)}
               className="flex h-8 w-8 items-center justify-center rounded-xl bg-accent text-ink-on-accent disabled:opacity-40"
               aria-label={editingQueued ? uiText("저장") : composerCliMode ? uiText("명령 실행") : uiText("전송")}
-              title={editingQueued ? uiText("저장") : composerCliMode ? uiText("명령 실행 (Ctrl+Enter)") : uiText("전송 (Ctrl+Enter)")}
             >
               {editingQueued ? <SaveGlyph /> : <SendIcon width={17} height={17} aria-hidden="true" />}
             </button>
+            </div>
+            </HoverTipLayer>
         </div>
         </div>
         </div>
