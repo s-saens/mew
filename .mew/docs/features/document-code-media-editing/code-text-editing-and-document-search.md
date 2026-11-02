@@ -24,10 +24,10 @@ description: "Plain/code editing, syntax and diagnostics, Find/Replace, and docu
 - Provides in-document find and replace, undo, and redo.
 - On mobile, pinch out or in with two fingers to enlarge or shrink text and line numbers in code and plain text. This also applies to read-only files.
 
-- On mobile, tapping an editable Hotview, Plain, or code body focuses it immediately and lets the browser open the keyboard. There is no floating keyboard button or separate activation step. Moving the cursor or using auxiliary keys does not force keyboard dismissal; native selection and the existing selection menu remain available. See [Mobile Editor and Keyboard](../../development/ui-contracts.md#mobile-editor-and-keyboard).
+- On mobile, tapping an editable Hotview, Plain, or code body focuses it immediately and lets the browser open the keyboard. There is no floating keyboard button or separate activation step. Moving the cursor or using auxiliary keys does not force keyboard dismissal; native selection and the existing selection menu remain available. See [Mobile Editor and Keyboard](../../development/ui-editor-input.md#mobile-editor-and-keyboard).
 
 - When the mobile keyboard opens, reduce the editor height to keep the tapped cursor line and the status bar showing the selected character count and file size above the keyboard.
-- The mobile Plain editor displays the shared auxiliary keys before editor focus and after blur or keyboard dismissal. The file-size and selection status row sits below the auxiliary keys and above the Dock or keyboard. The body continues behind the floating keys, and gaps between buttons remain available for document interaction. Trailing scroll space keeps the final cursor line reachable above the keys. Esc, Tab, Ctrl, Shift, and undo and redo for editable files appear as individual rounded translucent floating buttons without an enclosing bar surface. The arrow keys sit at the far right in an inverted T, with Up above Left/Down/Right. Layout and focus follow [Mobile auxiliary key bar](../../development/ui-contracts.md#mobile-auxiliary-key-bar). Horizontal scrolling in the body does not switch tabs; only swiping left or right on the auxiliary-key area selects the previous or next tab. Markdown Plain follows the same rules.
+- The mobile Plain editor displays the shared auxiliary keys before editor focus and after blur or keyboard dismissal. The file-size and selection status row sits below the auxiliary keys and above the Dock or keyboard. The body continues behind the floating keys, and gaps between buttons remain available for document interaction. Trailing scroll space keeps the final cursor line reachable above the keys. Esc, Tab, Ctrl, Shift, and undo and redo for editable files appear as individual rounded translucent floating buttons without an enclosing bar surface. The arrow keys sit at the far right in an inverted T, with Up above Left/Down/Right. Layout and focus follow [Mobile auxiliary key bar](../../development/ui-editor-input.md#mobile-auxiliary-key-bar). Horizontal scrolling in the body does not switch tabs; only swiping left or right on the auxiliary-key area selects the previous or next tab. Markdown Plain follows the same rules.
 
 ### Boundaries and limitations
 
@@ -57,7 +57,7 @@ description: "Plain/code editing, syntax and diagnostics, Find/Replace, and docu
 <!-- mew:implementation:start -->
 ## Implementation details
 
-- Reposition the focused cursor after mobile viewport or editor height changes, and restore the height when the keyboard closes. The detailed contract follows [Mobile Editor and Keyboard](../../development/ui-contracts.md#mobile-editor-and-keyboard).
+- Reposition the focused cursor after mobile viewport or editor height changes, and restore the height when the keyboard closes. The detailed contract follows [Mobile Editor and Keyboard](../../development/ui-editor-input.md#mobile-editor-and-keyboard).
 - `EditorPane` enables the shared `MobileKeyBar` in `CodePane` and keeps the body visible behind the keys down to the status bar. Modifier keys use CodeMirror's existing keymaps and collaborative undo. Panel swipes are owned by [Panel layout and mobile](../appearance-accounts-operations/panel-layout-mobile-and-state-restoration.md).
 
 - Displays line numbers, syntax highlighting, and diagnostics for supported formats.
@@ -66,7 +66,7 @@ description: "Plain/code editing, syntax and diagnostics, Find/Replace, and docu
 
 - While the body loads, show a translucent black overlay and a centered indicator in the editor area and block editing.
 - Keep tab switching available and remove the overlay on success or failure.
-- The detailed contract follows [Editor Body Loading](../../development/ui-contracts.md#editor-body-loading).
+- The detailed contract follows [Editor Body Loading](../../development/ui-editor-input.md#editor-body-loading).
 
 <!-- mew:implementation:end -->
 

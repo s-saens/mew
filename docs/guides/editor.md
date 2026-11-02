@@ -151,7 +151,7 @@ Each editing pane has its own document tab bar and collaboration session. Docume
 - With the keyboard, focus a tab and use `Shift+Enter` to maximize or restore; while maximized, you can navigate only the selected panel's tabs. Selecting a panel from the dock exits maximization and switches to the selected view.
 - Drop a file from the file explorer onto an edge of the editor body to open it in a new pane. Dropping in the center of the body inserts path text as before.
 - On mobile, if there are multiple editing panes, switch between them using the selector above the tab bar. The desktop split layout is preserved.
-- `useTabs` manages the document tab list, and `DockWorkspace` manages the shared workspace layout. Follow the [UI contract](../../.mew/docs/development/ui-contracts.md#workspace-panel-layout) for detailed rules.
+- `useTabs` manages the document tab list, and `DockWorkspace` manages the shared workspace layout. Follow the [UI contract](../../.mew/docs/development/ui-workspace-layout.md#workspace-panel-layout) for detailed rules.
 - When a pane becomes empty (when its last tab is closed), it **collapses automatically** and the tree shrinks with it (`removeLeaf`·`prunePanes`). The last remaining pane stays open even when empty and displays guidance.
 - The \*\*focused pane\*\* is the target for keyboard shortcuts, search, history navigation, and pasting terminal selections. Clicking anywhere in a pane (`onPointerDownCapture`) moves focus to it, and tab bars in unfocused panes are dimmed. The `tabs`/`activePath`/`activeTab` provided by `useTabs` **belong to the focused pane**.
 - **Content caching and autosave are keyed by path, not pane**. Opening the same file in two panes shows the same content.

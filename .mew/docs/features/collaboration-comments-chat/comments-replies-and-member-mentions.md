@@ -41,7 +41,7 @@ Select text in Markdown Hotview or Plain, code, or text, then press the default 
 
 **Add comment** in the body's right-click menu uses the existing selection. If there is no selection, it automatically selects the right-clicked Hotview paragraph or Plain/code line to start a comment. Disable the item when there is no text or the user lacks permission to comment. After creation, anchors, storage, and author permissions are the same as for existing comments.
 
-When the comment shortcut reaches the app and an actual text editor has focus or a selection, prevent the browser's default action during the capture phase and route it to that editor field. In a valid editor, consume the key even when there is no selection or the input is repeated or part of IME composition, without creating a comment. Do not intercept keys from terminals, agents, remote screens, or modals as comment shortcuts. Follow the [Shared input contract](../../development/ui-contracts.md#focus-based-tab-shortcuts) for browser-reserved keys and remote input priority.
+When the comment shortcut reaches the app and an actual text editor has focus or a selection, prevent the browser's default action during the capture phase and route it to that editor field. In a valid editor, consume the key even when there is no selection or the input is repeated or part of IME composition, without creating a comment. Do not intercept keys from terminals, agents, remote screens, or modals as comment shortcuts. Follow the [Shared input contract](../../development/ui-editor-input.md#focus-based-tab-shortcuts) for browser-reserved keys and remote input priority.
 
 ### Composer, thread, and list views
 

@@ -51,7 +51,7 @@ description: "Feature contract covering Documents parent and child storage, expl
 <!-- mew:implementation:start -->
 ## Implementation details
 
-- Sticky parent items during scrolling are provided again in response to the user's renewed request on 2026-10-06. `TreeHeader` adjusts top spacing to stack rows without gaps, and per-node `isolate` keeps ancestor guide lines continuing above child sticky rows. Preserve unsticking on collapse and at the end of child lists, along with file location indicators. Follow the [sticky parent row contract](../../development/ui-contracts.md#sticky-ancestor-rows-in-the-file-explorer-tree).
+- Sticky parent items during scrolling are provided again in response to the user's renewed request on 2026-10-06. `TreeHeader` adjusts top spacing to stack rows without gaps, and per-node `isolate` keeps ancestor guide lines continuing above child sticky rows. Preserve unsticking on collapse and at the end of child lists, along with file location indicators. Follow the [sticky parent row contract](../../development/ui-project-navigation.md#sticky-ancestor-rows-in-the-file-explorer-tree).
 
 - The shared `TreeChildren` in `FileTree.tsx` overlays a 1px theme divider line on each child list. Position the line 2px left of the center of the folder icon or document expansion button. Preserve the existing 14px indentation and continue the line through creation inputs and loading rows without affecting clicks, dragging, or accessibility navigation.
 

@@ -37,7 +37,7 @@ Opening the list starts neither a browser socket nor Chromium. Selecting an allo
 
 `https://mew.example/3333`, `http://<tailscale-IP>:5000/3333`, and `https://mew.run/<user>/<device>/3333` open the host's running `localhost:3333` app. Include the Mew port when required. Mew neither builds the app nor starts its development server.
 
-Direct access uses `server/port-preview.ts` HTTP/WS proxies. Logged-out users visit `/?preview=3333&previewPath=...` and return after login. Owners/managers have `portPreview` by default; owners grant it to others. Legacy `browser` overrides migrate to `portPreview`. Guests and temporary-password accounts are rejected.
+Direct access uses `server/port-preview.ts` HTTP/WS proxies. Logged-out users visit `/?preview=3333&previewPath=...` and return after login. Owners/managers have `portPreview` by default; owners grant it to others. Legacy `browser` overrides are read as `portPreview` for migration. Guests and temporary-password accounts are rejected.
 
 App HTML, JavaScript, styles, and API responses execute on the viewing device. The direct proxy rewrites URLs/scripts, CookieJar, and storage inside a sandbox without `allow-same-origin`; it uses neither host Chrome nor DOM replay. The Android gateway shares this loopback boundary through `GET /api/android-url`.
 

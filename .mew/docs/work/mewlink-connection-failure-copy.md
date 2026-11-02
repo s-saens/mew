@@ -7,7 +7,7 @@ updated: "2026-11-02"
 
 ## Purpose and result
 
-Simplified the exhausted Mewlink recovery screen to “연결 실패했습니다” (“Connection failed”), keeping the reconnect button and device-list link. Retry counts and diagnostic messages such as `Failed to fetch` are omitted. Retry limits, identity checks, the retained iframe, and unsent drafts follow the existing [remote access contract](../development/remote-access.md#reattaching-the-same-rtc-after-a-brief-signaling-interruption) and [shared UI contract](../development/ui-contracts.md). Initial bootstrap and explicit authorization/configuration errors retain their existing details.
+Simplified the exhausted Mewlink recovery screen to “연결 실패했습니다” (“Connection failed”), keeping the reconnect button and device-list link. Retry counts and diagnostic messages such as `Failed to fetch` are omitted. Retry limits, identity checks, the retained iframe, and unsent drafts follow the existing [remote access contract](../development/remote-access-recovery.md#reattaching-the-same-rtc-after-a-brief-signaling-interruption) and [shared UI contract](../development/ui-contracts.md). Initial bootstrap and explicit authorization/configuration errors retain their existing details.
 
 The independent `mewlink/` repository owns `src/connection-parent.ts` and `test/startup.browser.test.ts`. The parent repository owns the contracts and this record.
 

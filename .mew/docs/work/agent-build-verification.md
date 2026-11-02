@@ -20,7 +20,7 @@ The [execution rules](../development/getting-started.md) and [ADR 0104](../decis
 
 ## 2026-11-02: Configurable default build verification
 
-Move the general completion rule from this repository's additional project instructions into Mew's account-wide defaults. The [user guide](../../../docs/guides/project-setup.md#build-verification), [session contract](../development/agent-sessions.md#passing-project-context), and [ADR 0116](../decisions/0116-configurable-agent-build-verification.md) own the current behavior and rationale. The earlier sections above record the original repository-only change.
+Move the general completion rule from this repository's additional project instructions into Mew's account-wide defaults. The [user guide](../../../docs/guides/project-setup.md#build-verification), [session contract](../development/agent-guidance.md#passing-project-context), and [ADR 0116](../decisions/0116-configurable-agent-build-verification.md) own the current behavior and rationale. The earlier sections above record the original repository-only change.
 
 Default instructions now expose required build verification, an optional command, implementation or all-change scope, and repair-and-rebuild or failure-report behavior. Empty commands follow each project's existing build process. Projects without a build system report verification as not applicable. Missing settings in existing accounts receive effective defaults without rewriting saved files or revisions; custom instructions and damaged sections are preserved. The settings form uses the existing revision API, autosave, conflict reporting, and draft-discard guards.
 

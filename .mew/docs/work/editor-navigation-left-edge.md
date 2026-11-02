@@ -9,7 +9,7 @@ updated: "2026-11-01"
 
 Back and Forward previously sat immediately before the upper-right file tools. They now stay at the upper-left edge of each editor body, with the existing 12px inset and button styling. When shown, Open File Explorer follows Forward without moving the navigation buttons. File tools keep their right inset.
 
-The current contracts are [editor document navigation](../development/ui-contracts.md#editor-tab-visits-and-document-navigation) and [links and references](../features/document-code-media-editing/links-file-references-and-attachments.md). The [editing guide](../../../docs/guides/editor.md#links-and-attachments) describes the new location.
+The current contracts are [editor document navigation](../development/ui-editor-input.md#editor-tab-visits-and-document-navigation) and [links and references](../features/document-code-media-editing/links-file-references-and-attachments.md). The [editing guide](../../../docs/guides/editor.md#links-and-attachments) describes the new location.
 
 ## Verification
 

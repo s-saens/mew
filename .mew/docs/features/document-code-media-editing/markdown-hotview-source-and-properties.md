@@ -22,7 +22,7 @@ description: "A feature contract covering Markdown Hotview and Plain editing, re
 
 - Repeated Hotview computations use per-block caches, and with 120 or more top-level blocks, Pretext height prediction avoids creating DOM for off-screen content. Cursor, selection, and IME positions and the full editing and collaboration model are preserved.
 - Provides Hotview/Plain switching, headings, lists, checkboxes, quotes, code blocks, and emphasis.
-- On mobile, Hotview and Plain auxiliary keys remain visible before focus and after blur or keyboard dismissal. The file-size/selection status row sits below the keys and above the Dock or keyboard. The body continues behind the floating keys down to status, and gaps pass touches through to the document. Trailing scroll padding keeps the final cursor line reachable above the keys. Embedded hosts retain their explicit visibility option. See [Mobile auxiliary key bar](../../development/ui-contracts.md#mobile-auxiliary-key-bar).
+- On mobile, Hotview and Plain auxiliary keys remain visible before focus and after blur or keyboard dismissal. The file-size/selection status row sits below the keys and above the Dock or keyboard. The body continues behind the floating keys down to status, and gaps pass touches through to the document. Trailing scroll padding keeps the final cursor line reachable above the keys. Embedded hosts retain their explicit visibility option. See [Mobile auxiliary key bar](../../development/ui-editor-input.md#mobile-auxiliary-key-bar).
 - Hotview code blocks preserve original line breaks, spaces, and tabs. Long lines do not wrap automatically and scroll horizontally within the block, with the same behavior on mobile and in read-only mode. The copy button remains fixed at the block's upper right.
 - Typing `[] ` or `[ ] ` at the beginning of a line creates a checkbox line. Click to toggle completion, press Enter to continue the list, or return to a normal paragraph from an empty item.
 - Provides frontmatter property editing, a document table of contents, and list indentation.
@@ -37,7 +37,7 @@ description: "A feature contract covering Markdown Hotview and Plain editing, re
 - Use the handle to the left of a property to reorder it, and the type menu to assign document link, single-select, multi-select, date, text, or number. Each type entry displays a type icon to the left of its name.
 - Preserve the visible cursor line or the body line being read when switching between Hotview and Plain.
 
-- On mobile, tapping an editable Hotview, Plain, or code body focuses it immediately and lets the browser open the keyboard. There is no floating keyboard button or separate activation step. Moving the cursor or using auxiliary keys does not force keyboard dismissal; native selection and the existing selection menu remain available. See [Mobile Editor and Keyboard](../../development/ui-contracts.md#mobile-editor-and-keyboard).
+- On mobile, tapping an editable Hotview, Plain, or code body focuses it immediately and lets the browser open the keyboard. There is no floating keyboard button or separate activation step. Moving the cursor or using auxiliary keys does not force keyboard dismissal; native selection and the existing selection menu remain available. See [Mobile Editor and Keyboard](../../development/ui-editor-input.md#mobile-editor-and-keyboard).
 
 - When the mobile keyboard opens, reduce the editor height to keep the tapped cursor line and the status bar showing the selected character count and file size above the keyboard.
 
@@ -87,7 +87,7 @@ Selecting the command removes its slash text and records an insertion position. 
 
 - Replaced the date property's native browser calendar with the shared `DateCalendar` in single-date mode. The task panel retains the same component's date-range selection mode. The detailed contract follows the [Editor Package](../../development/packages.md).
 
-- Reposition the focused cursor after mobile viewport or editor height changes, and restore the height when the keyboard closes. The detailed contract follows [Mobile Editor and Keyboard](../../development/ui-contracts.md#mobile-editor-and-keyboard).
+- Reposition the focused cursor after mobile viewport or editor height changes, and restore the height when the keyboard closes. The detailed contract follows [Mobile Editor and Keyboard](../../development/ui-editor-input.md#mobile-editor-and-keyboard).
 
 - Provides Hotview/Plain switching, headings, lists, checkboxes, quotes, code blocks, and emphasis.
 - Position the slash insertion menu above or below the input location based on the screen space available excluding the mobile keyboard. Detailed behavior follows [Basic Editing](../../../../docs/guides/editor.md#basic-editing).
@@ -107,7 +107,7 @@ Selecting the command removes its slash text and records an insertion position. 
 - Single-select and multi-select fields use custom lists that support searching and creating options. Shared storage, compatibility with existing documents, refetching, and failure handling follow the [Editor Package](../../development/packages.md).
 - While the body loads, show a translucent black overlay and a centered indicator in the editor area and block editing.
 - Keep tab switching available and remove the overlay on success or failure.
-- The detailed contract follows [Editor Body Loading](../../development/ui-contracts.md#editor-body-loading).
+- The detailed contract follows [Editor Body Loading](../../development/ui-editor-input.md#editor-body-loading).
 
 - Insert a Mermaid flowchart with `/diagram`. In Hotview, show the code by default and open a diagram popup with the image icon button. Retain the standard `mermaid` code fence.
 

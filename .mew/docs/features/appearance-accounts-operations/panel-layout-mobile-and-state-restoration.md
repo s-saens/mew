@@ -16,7 +16,7 @@ description: "Panel docking, maximization, tab navigation, mobile gestures, safe
 
 ## Requirements
 
-- Keep the installed app header, panels, Dock and full-screen dialogs inside device safe areas in portrait and landscape. Reserve each inset once without shrinking the existing header or touch controls; follow [Device safe areas](../../development/ui-contracts.md#device-safe-areas).
+- Keep the installed app header, panels, Dock and full-screen dialogs inside device safe areas in portrait and landscape. Reserve each inset once without shrinking the existing header or touch controls; follow [Device safe areas](../../development/ui-workspace-layout.md#device-safe-areas).
 
 - Restore the task panel to the dock, docking layouts, mobile foreground, per-account layouts, and layout presets. Restore saved task groups, tab assignments, and open states; for saved layouts without tasks, add the panel next to its default neighbor when opened. Retain the DB Gantt; their data storage is independent. Follow [0052](../../decisions/0052-restore-task-panel.md).
 - Switch notes and tasks between desktop popup and panel modes using the icon button in each tab header, and remove the selection from appearance settings. Preserve the mode, coordinates, and content, and switch each tool independently. On mobile, hide the button and display the panel.
@@ -68,9 +68,9 @@ description: "Panel docking, maximization, tab navigation, mobile gestures, safe
 <!-- mew:implementation:start -->
 ## Implementation details
 
-- `ToolPresentationToggle` toggles the existing saved presentation mode from note and task headers. `SettingsModal` uses the topmost layer of the body portal, and language and font selection lists also appear inside the settings portal. Follows the [UI Contract](../../development/ui-contracts.md#settings-window-layer).
+- `ToolPresentationToggle` toggles the existing saved presentation mode from note and task headers. `SettingsModal` uses the topmost layer of the body portal, and language and font selection lists also appear inside the settings portal. Follows the [UI Contract](../../development/ui-overlays.md#settings-window-layer).
 
-- The default docking tree is defined by `defaultDockTree` in `src/utils/dock-layout.ts`. Space for hidden panels collapses in the visible area, and panels mounted later are added next to their designated neighbors through `addDockGroup`. Existing saved layouts, splits within editor panes, and mobile foreground display are preserved. Ratios and restoration priorities follow the [Work Panel Layout Contract](../../development/ui-contracts.md#workspace-panel-layout).
+- The default docking tree is defined by `defaultDockTree` in `src/utils/dock-layout.ts`. Space for hidden panels collapses in the visible area, and panels mounted later are added next to their designated neighbors through `addDockGroup`. Existing saved layouts, splits within editor panes, and mobile foreground display are preserved. Ratios and restoration priorities follow the [Work Panel Layout Contract](../../development/ui-workspace-layout.md#workspace-panel-layout).
 - 2026-10-06 default layout validation: Passed 12 docking unit tests, actual Chromium checks in `dockWorkspaceUi.test.ts` for default positions, dragging, boundary resizing, closing, reopening, and restoration, plus type checking, targeted lint, and documentation allowlist checks. `dock-maximize-ui.test.ts` failed because it could not find the Git commit title input; the same failure was confirmed in `DockWorkspace` before the change. Workspace link checks failed because 3 task documents outside this work were not registered in a MOC. No build or server restart was run.
 
 - Adjust visibility and order in **Settings → Dock**. This shares state with existing dock reordering, and hidden items are also excluded from swipe navigation. Preserve order and visibility settings for items hidden by permissions, as well as open work panels. Details follow [Dock Settings](../../../../docs/configuration/appearance.md#dock-settings).
@@ -83,9 +83,9 @@ description: "Panel docking, maximization, tab navigation, mobile gestures, safe
 
 - Display Remote Desktop in the desktop and mobile hamburger menus and exclude it from the Dock. Do not display the removed browser or Remote Desktop in the dock even if they remain in the saved order.
 
-- During drag reordering, surrounding items move to their new positions using the shared 180ms movement animation. The grabbed item follows the pointer immediately; consecutive reordering and reduced motion settings follow the [shared motion contract](../../development/ui-contracts.md#drag-reordering-motion).
+- During drag reordering, surrounding items move to their new positions using the shared 180ms movement animation. The grabbed item follows the pointer immediately; consecutive reordering and reduced motion settings follow the [shared motion contract](../../development/ui-workspace-layout.md#drag-reordering-motion).
 
-- Input autofocus uses the shared `canAutoFocusInput()` condition. On mobile, shared dialogs focus the window itself instead of an input field. Detailed criteria follow [Mobile Input Focus](../../development/ui-contracts.md#mobile-input-focus).
+- Input autofocus uses the shared `canAutoFocusInput()` condition. On mobile, shared dialogs focus the window itself instead of an input field. Detailed criteria follow [Mobile Input Focus](../../development/ui-editor-input.md#mobile-input-focus).
 
 - Documents does not switch to a separate editing screen. It uses the current root's shared tab state so that `DockPanel` registration and panel positions do not reset based on file type.
 
@@ -95,9 +95,9 @@ description: "Panel docking, maximization, tab navigation, mobile gestures, safe
 
 - Provide document tabs, splitting, docking, resizing, per-account restoration, and a mobile dock with configurable edge placement, fullscreen, and Back navigation.
 
-- Closing the active editor tab prioritizes the most recently active tab in the same editor pane over the visually adjacent tab. For example, with tabs 1, 2, and 3 open, opening an internal document from 1 in a new tab 4 and then closing 4 returns to 1. Closing an inactive tab preserves the current active tab. Per-tab document Back and Forward navigation and detailed state contracts follow [Editor Tab Visits and Document Navigation](../../development/ui-contracts.md#editor-tab-visits-and-document-navigation).
+- Closing the active editor tab prioritizes the most recently active tab in the same editor pane over the visually adjacent tab. For example, with tabs 1, 2, and 3 open, opening an internal document from 1 in a new tab 4 and then closing 4 returns to 1. Closing an inactive tab preserves the current active tab. Per-tab document Back and Forward navigation and detailed state contracts follow [Editor Tab Visits and Document Navigation](../../development/ui-editor-input.md#editor-tab-visits-and-document-navigation).
 
-- Horizontal tab bars use the shared `TabScrollArea` and internal `useTabAutoScroll` to reveal active and focused tabs and display scroll arrows in directions with remaining scroll space. This applies to editor, agent, terminal, existing project, sheet, DB, task, account, and session tabs, and visibility is checked after restoration, resizing, and layout changes. Automatic revealing is suppressed during dragging. Arrow display and movement distance, selection indicators, and scroll and focus boundaries follow [Active Tab Auto-Scrolling](../../development/ui-contracts.md#active-tab-auto-scrolling).
+- Horizontal tab bars use the shared `TabScrollArea` and internal `useTabAutoScroll` to reveal active and focused tabs and display scroll arrows in directions with remaining scroll space. This applies to editor, agent, terminal, existing project, sheet, DB, task, account, and session tabs, and visibility is checked after restoration, resizing, and layout changes. Automatic revealing is suppressed during dragging. Arrow display and movement distance, selection indicators, and scroll and focus boundaries follow [Active Tab Auto-Scrolling](../../development/ui-workspace-layout.md#active-tab-auto-scrolling).
 
 - When dragging document, agent, terminal, or browser tabs, the grabbed tab follows the pointer and its original position appears as an empty space.
 - The preview remains visible outside the horizontal scroll area, while reordering, edge auto-scrolling, and splitting into or merging with other panes remain available.
@@ -115,7 +115,7 @@ description: "Panel docking, maximization, tab navigation, mobile gestures, safe
 - Expand the selected panel's tab bar and content together across the work area, including the file explorer area, and hide and disable interaction with other panels' tab bars and content and floating note and task popups.
 - The selected tab bar spans the full width at the top of the work area, while the project header remains. During maximization, hide the side dock, document/file explorer, file explorer toggle, chat, and Android panel, preventing visibility and pointer and keyboard interaction. On restoration, restore their previous open states, layouts, and input content unchanged.
 - Maximizing, restoring, and switching targets do not remount sessions.
-- Detailed exit conditions and mobile boundaries follow [Work Panel Layout](../../development/ui-contracts.md#workspace-panel-layout).
+- Detailed exit conditions and mobile boundaries follow [Work Panel Layout](../../development/ui-workspace-layout.md#workspace-panel-layout).
 
 - Place the workspace dock at the top, bottom, left, or right below the header, independently for desktop and mobile through Settings → Dock. Defaults remain left on desktop and bottom on mobile. Reserve space at the chosen edge, keep the dock available when the file explorer collapses, and retain the remote viewer toolbar layout. Left/right docks use vertical dragging and Alt+Up/Down; top/bottom docks use horizontal dragging and Alt+Left/Right.
 - Display dock icon hover tooltips toward the work area for top/bottom docks and ensure they are not obscured in the remote viewer.
@@ -137,14 +137,14 @@ description: "Panel docking, maximization, tab navigation, mobile gestures, safe
 - The default order is file explorer, editor, agent panel, terminal, Git, memo, and tasks, with visibility based on permissions.
 - Press and hold to reorder; the browser remembers the order.
 - Tasks displays List, Calendar, and Gantt as title bar tabs. Swiping the content on mobile cycles through them, wrapping at either end. Row deletion, horizontal Gantt scrolling, and schedule dragging retain their existing gestures.
-- Dock swipes require at least 20px of horizontal movement; mobile content and modifier-key-bar swipes require at least 30px. Direction filtering, cancellation, and horizontal scrolling priority follow the [mobile dock contract](../../development/ui-contracts.md#mobile-dock-and-panel-switching).
+- Dock swipes require at least 20px of horizontal movement; mobile content and modifier-key-bar swipes require at least 30px. Direction filtering, cancellation, and horizontal scrolling priority follow the [mobile dock contract](../../development/ui-workspace-layout.md#mobile-dock-and-panel-switching).
 - Dock swipes move to adjacent panels in the visible dock order, starting from the frontmost panel on mobile or the focused panel on desktop. Left-to-right moves to the previous panel; right-to-left moves to the next, stopping at either end. Each panel's selected tab is preserved.
 - On mobile, swiping the content of the file explorer, editor, agent, terminal, Git, or tasks moves to the current panel's previous or next tab, wrapping at either end. Panels with one or no tabs remain unchanged. Tab strips, popups, and separate drag areas retain their existing controls.
-- Touches starting in areas with actual horizontal scrolling, such as tables or code, prioritize internal scrolling and do not switch tabs even at either scroll boundary. Containers without overflow and vertical-only scroll areas retain content swipe tab switching. Detection boundaries and the Plain modifier key bar exception follow the [mobile dock contract](../../development/ui-contracts.md#mobile-dock-and-panel-switching).
-- Editor content swipes are allowed in Markdown Hotview. Regular files and Markdown Plain retain horizontal content scrolling and switch tabs only from the modifier key bar. Plain's modifier key bar is available on mobile regardless of keyboard visibility. Arrow presses, holds, and drags control the cursor instead of switching tabs. Entering an arrow cancels an in-progress content/key-bar tab swipe; ordinary keys retain swipe navigation. See [Mobile auxiliary key bar](../../development/ui-contracts.md#mobile-auxiliary-key-bar).
+- Touches starting in areas with actual horizontal scrolling, such as tables or code, prioritize internal scrolling and do not switch tabs even at either scroll boundary. Containers without overflow and vertical-only scroll areas retain content swipe tab switching. Detection boundaries and the Plain modifier key bar exception follow the [mobile dock contract](../../development/ui-workspace-layout.md#mobile-dock-and-panel-switching).
+- Editor content swipes are allowed in Markdown Hotview. Regular files and Markdown Plain retain horizontal content scrolling and switch tabs only from the modifier key bar. Plain's modifier key bar is available on mobile regardless of keyboard visibility. Arrow presses, holds, and drags control the cursor instead of switching tabs. Entering an arrow cancels an in-progress content/key-bar tab swipe; ordinary keys retain swipe navigation. See [Mobile auxiliary key bar](../../development/ui-editor-input.md#mobile-auxiliary-key-bar).
 - The dock also appears in the remote desktop viewer and is hidden in fullscreen mode.
 - Selecting another panel from the dock ends the remote connection and switches panels. Closing the viewer returns to the previous workspace screen.
-- The 2026-10-27 [decision to separate dock and content swipes](../../decisions/0079-mobile-panel-swipes.md) replaced the dock's tab-first behavior from 2026-10-03. Gesture thresholds, cancellation, and input preservation follow the [mobile dock contract](../../development/ui-contracts.md#mobile-dock-and-panel-switching).
+- The 2026-10-27 [decision to separate dock and content swipes](../../decisions/0079-mobile-panel-swipes.md) replaced the dock's tab-first behavior from 2026-10-03. Gesture thresholds, cancellation, and input preservation follow the [mobile dock contract](../../development/ui-workspace-layout.md#mobile-dock-and-panel-switching).
 - Mouse hover shows a tooltip with the icon name. A touch tap shows a name toast beside the selected dock edge, which disappears after 0.5 seconds.
 - When the mobile keyboard opens, hide both the dock and its reserved edge space. Maintain keyboard detection while zoomed in and account for fullscreen changes and viewport scrolling.
 - Desktop and mobile floating handles and the left-side file explorer button have been replaced by the dock and top menu. Do not reintroduce them until the user requests it.
@@ -154,7 +154,7 @@ description: "Panel docking, maximization, tab navigation, mobile gestures, safe
 - During initial app restoration, return from the background, and refresh after presence reconnection, show only a loading indicator centered over the existing screen.
 - Do not dim the screen or block clicks, touches, or keyboard input. The indicator disappears when all registered restoration queries have succeeded or failed.
 - Do not show it for ordinary file changes or autosaves.
-- Follow the [session restoration and return contract](../../development/ui-contracts.md#full-screen-loading-during-session-restoration-and-return).
+- Follow the [session restoration and return contract](../../development/ui-recovery-feedback.md#full-screen-loading-during-session-restoration-and-return).
 
 ### Desktop Layout Presets
 
@@ -214,7 +214,7 @@ Input includes `version`, `dock` (existing DockState), `open` (a boolean per pan
 - Verify that bidirectional dock swipes open adjacent panels while preserving selected tabs, and that bidirectional swipes on mobile content and the Plain modifier key bar select tabs in the current panel. Automated checks and the scope unverified on physical devices follow the [work record](../../work/mobile-panel-swipes.md).
 - Check bidirectional movement in nested horizontal scrolling areas in tables and code, and suppression of tab switching at both ends. Also check tab switching in areas without overflow and vertical scrolling areas, along with existing tab switching on the Plain modifier key bar.
 
-- 2026-09-30: Related drag UI regression checks verified reordering animations and existing input and cancel behavior. The scope and limitations follow [shared motion verification](../../development/ui-contracts.md#drag-reordering-motion).
+- 2026-09-30: Related drag UI regression checks verified reordering animations and existing input and cancel behavior. The scope and limitations follow [shared motion verification](../../development/ui-workspace-layout.md#drag-reordering-motion).
 
 - On mobile, verify that opening model selection, file/content search, or input dialogs does not automatically open the keyboard, and that tapping an input allows typing. Also check desktop autofocus and dialog Tab/Esc behavior.
 
@@ -258,7 +258,7 @@ On desktop, icons in the memo and tasks headers toggle each between tab and popu
 
 Docking positions, split ratios, document tabs, and panel open/closed states are saved per browser device under account/root-project keys. Account restoration values serve as initial values on devices with no local records. Popup sizes, positions, and display settings are also saved in the browser and do not overwrite those on other devices. Clearing browser storage also resets that device's remembered state.
 
-Initial restoration may receive the current account's small UI snapshot with the authenticated workspace response, under the [startup snapshot contract](../../development/architecture.md#workspace-initialization). Device-local values retain precedence. A snapshot from an obsolete root or permission generation cannot replace current state or newer local edits; missing or invalid snapshots use the existing account-state request. Worktrees use their logical project UI key while file reads remain bound to the actual worktree root.
+Initial restoration may receive the current account's small UI snapshot with the authenticated workspace response, under the [startup snapshot contract](../../development/browser-startup.md#workspace-initialization). Device-local values retain precedence. A snapshot from an obsolete root or permission generation cannot replace current state or newer local edits; missing or invalid snapshots use the existing account-state request. Worktrees use their logical project UI key while file reads remain bound to the actual worktree root.
 
 Validation (2026-10-06): Ran related server and isolated Chromium tests, TypeScript, and targeted lint. No actual update installation, build, or server restart was performed.
 

@@ -11,7 +11,7 @@ A reported drawing failure left only the workspace background visible after buil
 
 Both drawing entry points now use a shared deferred wrapper. Loading stays visible in a closable dialog, and rejected imports, invalid modules, or render failures show a local alert. Closing preserves the surrounding document and agent input. A root boundary provides recovery for failures outside a local boundary. Existing startup and workspace-import failures use the same workspace recovery screen. Recovery offers manual refresh and conditional server-restart guidance after an update; it never restarts the server or refreshes automatically.
 
-Current contracts: [drawing board](../features/terminals-agents-automation/agent-drawing-editor.md) and [workspace initialization](../development/architecture.md#workspace-initialization).
+Current contracts: [drawing board](../features/terminals-agents-automation/agent-drawing-editor.md) and [workspace initialization](../development/browser-startup.md#workspace-initialization).
 
 ## Local verification
 

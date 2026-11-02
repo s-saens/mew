@@ -15,7 +15,7 @@ A CDP function breakpoint in ProseMirror's widget mutation handler showed a `cha
 
 `EditorLink` now prepares explicit stored marks when composition starts at a collapsed, matching file-link caret. It preserves other formatting and removes the link mark so ProseMirror starts composition outside the ignored widget. Cursor alignment pauses during composition startup and ongoing composition. The native editor handles preedit, commit, and cancellation; the application does not reconstruct the composition string or insert placeholder text into Markdown.
 
-The [Hotview input contract](../development/hotview-rendering.md#input-and-serialization) owns the current behavior. The [mobile keyboard policy](../development/ui-contracts.md#mobile-editor-and-keyboard) and [selection-menu contract](../development/ui-contracts.md#editor-body-context-menu) retain their existing responsibilities.
+The [Hotview input contract](../development/hotview-rendering.md#input-and-serialization) owns the current behavior. The [mobile keyboard policy](../development/ui-editor-input.md#mobile-editor-and-keyboard) and [selection-menu contract](../development/ui-editor-input.md#editor-body-context-menu) retain their existing responsibilities.
 
 ## Verification and limits
 

@@ -11,7 +11,7 @@ Changed the editor body context menu to one horizontal row of icons while retain
 
 Icon items keep hidden text and hint content, accessible names, and mouse-hover labels through the existing `HoverTipLayer`. Explicit tooltip descriptions and complex labels with `aria-label` remain supported. The row uses 32px mouse targets and 36px coarse-pointer targets and scrolls horizontally when it exceeds its host. Keyboard navigation reveals focused items. Row/column deletion, database conversion, and Markdown copy now have distinguishable table icons. Tooltip placement uses the menu's portal host, the shared tooltip layer token, and direction flipping and clamping at screen or modal bounds.
 
-Current behavior is owned by the [shared action-menu contract](../development/ui-contracts.md#shared-action-menus), [editor body menu contract](../development/ui-contracts.md#editor-body-context-menu), and [package responsibilities](../development/packages.md). [0096](../decisions/0096-shared-horizontal-action-menus.md) records the reuse decision, and the [editing guide](../../../docs/guides/editor.md#body-context-menu) describes the control for users.
+Current behavior is owned by the [shared action-menu contract](../development/ui-overlays.md#shared-action-menus), [editor body menu contract](../development/ui-editor-input.md#editor-body-context-menu), and [package responsibilities](../development/packages.md). [0096](../decisions/0096-shared-horizontal-action-menus.md) records the reuse decision, and the [editing guide](../../../docs/guides/editor.md#body-context-menu) describes the control for users.
 
 ## Verification
 

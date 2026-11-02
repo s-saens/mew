@@ -5,7 +5,7 @@ created: "2026-10-30"
 updated: "2026-10-31"
 ---
 
-The current contract is [Mobile auxiliary key bar](../development/ui-contracts.md#mobile-auxiliary-key-bar). The initial polish below was followed by the floating editor controls described in the next section.
+The current contract is [Mobile auxiliary key bar](../development/ui-editor-input.md#mobile-auxiliary-key-bar). The initial polish below was followed by the floating editor controls described in the next section.
 
 ## Initial polish
 
@@ -44,7 +44,7 @@ All checks were isolated from the running instance. No app build, deployment, la
 
 On 2026-10-31, changed shared arrow buttons to move on primary pointer contact, repeat after 350ms and every 60ms while held, and immediately change direction when a held pointer enters a different arrow. The same behavior applies to fixed editor keys and terminal flow keys. Empty space pauses repetition; entering an arrow with an already pressed pointer also works. Coordinate hit testing supports touch implicit capture.
 
-The arrow interaction preserves text selection and editor focus. It consumes pointer-generated release clicks, preserves keyboard and assistive activation, and clears repetition on release, cancellation, capture loss, multiple pointers, blur, visibility change, placement change, or unmount. Arrow gestures cannot switch tabs, and swipes entering an arrow cancel tab navigation. Existing ordinary-key swipes remain available. The current contract is [Mobile auxiliary key bar](../development/ui-contracts.md#mobile-auxiliary-key-bar).
+The arrow interaction preserves text selection and editor focus. It consumes pointer-generated release clicks, preserves keyboard and assistive activation, and clears repetition on release, cancellation, capture loss, multiple pointers, blur, visibility change, placement change, or unmount. Arrow gestures cannot switch tabs, and swipes entering an arrow cancel tab navigation. Existing ordinary-key swipes remain available. The current contract is [Mobile auxiliary key bar](../development/ui-editor-input.md#mobile-auxiliary-key-bar).
 
 Local verification:
 
@@ -56,7 +56,7 @@ Checks use isolated browser fixtures. No app build, deployment, launcher, or run
 
 ## Auxiliary actions without keyboard activation
 
-On 2026-10-31, removed editing-focus requests from Plain/code auxiliary dispatch and Hotview Tab, list indentation, undo/redo caret restoration, code-block toggling, and table insertion. A keyboard can be closed while its editor retains focus; another `focus()` call can reopen it. Actions now use the existing editor state and preserve whether the body was focused. Direct body taps retain native keyboard activation under [0098](../decisions/0098-native-mobile-editor-keyboard.md). The current contract is [Mobile auxiliary key bar](../development/ui-contracts.md#mobile-auxiliary-key-bar).
+On 2026-10-31, removed editing-focus requests from Plain/code auxiliary dispatch and Hotview Tab, list indentation, undo/redo caret restoration, code-block toggling, and table insertion. A keyboard can be closed while its editor retains focus; another `focus()` call can reopen it. Actions now use the existing editor state and preserve whether the body was focused. Direct body taps retain native keyboard activation under [0098](../decisions/0098-native-mobile-editor-keyboard.md). The current contract is [Mobile auxiliary key bar](../development/ui-editor-input.md#mobile-auxiliary-key-bar).
 
 Extended `server/mobile-editor-keyboard-ui.test.ts` to track editing-focus requests, including redundant requests that produce no `focusin` event. It exercises actual Hotview, Markdown Plain, and code auxiliary actions with the body focused and blurred, continued indentation and table insertion, subsequent body-tap typing, and browsers with and without the keyboard API. The regression first failed on Hotview Tab before the fix.
 

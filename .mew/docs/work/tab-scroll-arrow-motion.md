@@ -7,7 +7,7 @@ updated: "2026-10-30"
 
 Tab scroll arrows now gently indicate the direction of hidden tabs through a repeating wall-bounce motion. The right icon accelerates toward a right-hand wall, rebounds immediately, and slows as it moves inward. The left icon mirrors that path. Both move four pixels in total over a 1.2-second cycle using CSS transform keyframes with quadratic acceleration and deceleration. Button geometry, tab layout, scrolling speed, focus, and theme shadows retain their existing behavior. Reduced motion leaves icons centered and static; hidden buttons do not animate.
 
-The [shared tab scrolling contract](../development/ui-contracts.md#active-tab-auto-scrolling) owns the current behavior.
+The [shared tab scrolling contract](../development/ui-workspace-layout.md#active-tab-auto-scrolling) owns the current behavior.
 
 Verification:
 

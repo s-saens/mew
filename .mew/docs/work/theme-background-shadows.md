@@ -5,7 +5,7 @@ created: "2026-10-30"
 updated: "2026-10-30"
 ---
 
-Tab chevrons, full-entry/project-loading logos, and Mewpet notification bubbles now use the selected theme's base background color for their outline shadows. This removes the fixed black tint from light and colored themes. Existing opacity, offsets, blur radii, masks, and animation remain unchanged. Gradient themes use their base background color. The [shared UI contract](../development/ui-contracts.md#shared-loading-indicators) and [panel layout contract](../features/appearance-accounts-operations/panel-layout-mobile-and-state-restoration.md) own current behavior.
+Tab chevrons, full-entry/project-loading logos, and Mewpet notification bubbles now use the selected theme's base background color for their outline shadows. This removes the fixed black tint from light and colored themes. Existing opacity, offsets, blur radii, masks, and animation remain unchanged. Gradient themes use their base background color. The [shared UI contract](../development/ui-recovery-feedback.md#shared-loading-indicators) and [panel layout contract](../features/appearance-accounts-operations/panel-layout-mobile-and-state-restoration.md) own current behavior.
 
 Verification:
 

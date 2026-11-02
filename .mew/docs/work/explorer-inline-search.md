@@ -49,7 +49,7 @@ No app build, deployment, launcher execution, or runtime server changes were per
 
 ## Compact search header
 
-On 2026-10-30, removed the search field's rounded border, inset background, and stacked outer padding. The search row now matches the panel tab bars at 36px including its bottom divider. The input retains a visible keyboard-focus outline, and option and close buttons retain their 24px interaction areas. Scope tags and expanded replacement controls keep their own spacing below the fixed-height row. The [feature contract](../features/projects-files-search/filename-content-search-and-replacement.md) and [shared UI contract](../development/ui-contracts.md#search-within-the-file-explorer) own the current behavior.
+On 2026-10-30, removed the search field's rounded border, inset background, and stacked outer padding. The search row now matches the panel tab bars at 36px including its bottom divider. The input retains a visible keyboard-focus outline, and option and close buttons retain their 24px interaction areas. Scope tags and expanded replacement controls keep their own spacing below the fixed-height row. The [feature contract](../features/projects-files-search/filename-content-search-and-replacement.md) and [shared UI contract](../development/ui-project-navigation.md#search-within-the-file-explorer) own the current behavior.
 
 Verification:
 

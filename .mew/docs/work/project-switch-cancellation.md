@@ -11,7 +11,7 @@ The root-switch lock discarded project selections made while an earlier switch w
 
 The displayed root retains its pending restoration until a replacement is confirmed, including when the replacement fails. Duplicate selections of the pending target remain no-ops. Mouse, touch, and Alt+number use the same path. Subproject and worktree mutation locks remain unchanged.
 
-The current contracts are [project selection](../features/projects-files-search/opening-projects-tabs-and-groups.md) and [fast root project switching](../development/ui-contracts.md#fast-root-project-switching).
+The current contracts are [project selection](../features/projects-files-search/opening-projects-tabs-and-groups.md) and [fast root project switching](../development/ui-project-navigation.md#fast-root-project-switching).
 
 ## Verification and application
 

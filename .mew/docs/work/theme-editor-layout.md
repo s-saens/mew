@@ -5,7 +5,7 @@ created: "2026-10-27"
 updated: "2026-10-27"
 ---
 
-Improved the layout where color choices were scattered across multiple rows and the color picker pushed settings below it down. Current controls are owned by [Appearance settings](../../../docs/configuration/appearance.md#appearance-settings), detailed behavior by the [Appearance settings feature contract](../features/appearance-accounts-operations/appearance-language-fonts-and-shortcuts.md), and coordinate calculations by the [Shared popup contract](../development/ui-contracts.md#popup-coordinates-inside-modals).
+Improved the layout where color choices were scattered across multiple rows and the color picker pushed settings below it down. Current controls are owned by [Appearance settings](../../../docs/configuration/appearance.md#appearance-settings), detailed behavior by the [Appearance settings feature contract](../features/appearance-accounts-operations/appearance-language-fonts-and-shortcuts.md), and coordinate calculations by the [Shared popup contract](../development/ui-overlays.md#popup-coordinates-inside-modals).
 
 ## Implementation results
 

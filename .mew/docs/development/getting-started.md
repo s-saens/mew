@@ -50,7 +50,7 @@ If a terminal edit unexpectedly reverts, an open Mew editor may have saved stale
 | Purposeful UI copy | Use the field/button label when sufficient; show extra text for a decision or recovery, rather than repeating controls or implementation details |
 | App-owned choices | Native `<select>` and `<datalist>` popups are prohibited, even when restyled; reuse an existing custom control or create a shared one. Prefer `SelectField` from `@mew/ui` for single selection |
 
-Follow the [density and button contract](ui-contracts.md#design-guidelines-spacing-and-information-density), [UI copy contract](ui-contracts.md#ui-copy), and [selection contract](ui-contracts.md#dropdowns-and-selection-components). Selection must preserve theme, keyboard/touch behavior, focus, Esc/Back dismissal, and viewport bounds.
+Follow the [density and button contract](ui-foundations.md#design-guidelines-spacing-and-information-density), [UI copy contract](ui-foundations.md#ui-copy), and [selection contract](ui-overlays.md#dropdowns-and-selection-components). Selection must preserve theme, keyboard/touch behavior, focus, Esc/Back dismissal, and viewport bounds.
 
 ### Postgres database verification
 

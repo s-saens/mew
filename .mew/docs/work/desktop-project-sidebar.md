@@ -13,7 +13,7 @@ Retains the existing handles, icons, right-side numbers, full highlighting of th
 
 Alt+P opens the panel and focuses the first item, and exits maximization if the work panel is maximized. Alt+R and Ctrl+E open the command menu on the current project row when the panel is open, or in the header when it is closed or on mobile. Commands with the same name in different root projects are isolated using session identifiers that include the actual folder path.
 
-Current usage follows the [project guide](../../../docs/guides/projects.md#프로젝트-탭) and [command guide](../../../docs/guides/commands.md); feature contracts follow [Opening, selecting, and switching projects](../features/projects-files-search/opening-projects-tabs-and-groups.md) and [Project command buttons](../features/terminals-agents-automation/project-command-buttons.md); shared implementation follows [UI contracts](../development/ui-contracts.md#header-project-switcher); changes to existing decisions follow [ADR 0082](../decisions/0082-desktop-project-sidebar.md).
+Current usage follows the [project guide](../../../docs/guides/projects.md#프로젝트-탭) and [command guide](../../../docs/guides/commands.md); feature contracts follow [Opening, selecting, and switching projects](../features/projects-files-search/opening-projects-tabs-and-groups.md) and [Project command buttons](../features/terminals-agents-automation/project-command-buttons.md); shared implementation follows [UI contracts](../development/ui-project-navigation.md#header-project-switcher); changes to existing decisions follow [ADR 0082](../decisions/0082-desktop-project-sidebar.md).
 
 ## Verification and application
 
@@ -29,7 +29,7 @@ The app was not built or deployed, and the server was not started or restarted. 
 
 ## Shared panel background fix (2026-10-29)
 
-Fixed an issue where only the project sidebar retained a solid background while popup backgrounds and blur were layered over its internal list. Applied the shared surface class used by other panels to its base, and classified the persistent list as an inline menu to exclude popup effects. Also aligned the header's left padding with the file explorer at 8px. The current standard follows the [header project selector](../development/ui-contracts.md#header-project-switcher).
+Fixed an issue where only the project sidebar retained a solid background while popup backgrounds and blur were layered over its internal list. Applied the shared surface class used by other panels to its base, and classified the persistent list as an inline menu to exclude popup effects. Also aligned the header's left padding with the file explorer at 8px. The current standard follows the [header project selector](../development/ui-project-navigation.md#header-project-switcher).
 
 - Project sidebar regression checks: verified background matching with the file explorer across 7 actual themes, a transparent inline list background with no blur and inherited theme colors, and retention of the existing blur in command popups and the mobile dropdown. Before the fix, the same regression check failed because a 75% background remained on the list in light themes.
 - Browser checks for shared menus and theme settings also passed. Reviewed midnight, dark, and light desktop captures and a midnight mobile capture.
@@ -41,7 +41,7 @@ No build, deployment, or server restart was performed. The user applies the chan
 
 ## Leftmost project panel fix (2026-10-31)
 
-The Dock edge layout had wrapped the project sidebar, placing a left Dock before project selection. Moved the project sidebar host into its own leftmost workspace grid column. The left-edge order is now project sidebar → Dock → file explorer → work panels; top and bottom Docks span only the area to the right of project selection. Updated the explorer toggle offset and maximization hiding rule for the new host location. Current behavior is defined by the [project feature](../features/projects-files-search/opening-projects-tabs-and-groups.md) and [shared UI contract](../development/ui-contracts.md#header-project-switcher).
+The Dock edge layout had wrapped the project sidebar, placing a left Dock before project selection. Moved the project sidebar host into its own leftmost workspace grid column. The left-edge order is now project sidebar → Dock → file explorer → work panels; top and bottom Docks span only the area to the right of project selection. Updated the explorer toggle offset and maximization hiding rule for the new host location. Current behavior is defined by the [project feature](../features/projects-files-search/opening-projects-tabs-and-groups.md) and [shared UI contract](../development/ui-project-navigation.md#header-project-switcher).
 
 - Added regression assertions to the actual App fixture for leftmost project selection across all four Dock edges, the explorer toggle boundary, and the mobile sidebar exclusion. The pre-fix run failed because the top Dock extended left of the project panel.
 - `node --test server/workspace-switch-ui.test.ts server/project-sidebar-ui.test.ts server/mobile-dock-ui.test.ts`: 11 passed. Coverage includes project switching, panel opening and closing, resizing and restoration, maximization, desktop/mobile Dock boundaries, and existing swipe behavior. Reviewed the actual App desktop capture with project selection before the left Dock.

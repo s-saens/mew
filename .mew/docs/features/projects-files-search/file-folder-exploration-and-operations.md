@@ -31,7 +31,7 @@ File Explorer is the panel name encompassing hierarchical navigation in Document
 - File/folder rows in both popups and nested rows in the server explorer use a minimum height of 28px on desktop and 36px in touch environments. Text and icon sizes remain unchanged.
 - The first item in file/folder lists is `상위경로`; clicking it or pressing Enter or Space navigates to the parent of the current path. It is displayed even with search filters and in empty folders, and disabled at the root. Remove the up arrow to the left of the address bar, and exclude the parent-path row from item counts.
 - Separate navigation lists with a full-width Documents/Files toggle at the top. Preserve the selected view and each tree's expansion and scroll state per project.
-- Below 768px, a leftward swipe in the file explorer selects Files and a rightward swipe selects Documents. Stop at either end rather than wrapping. Use the same scope selection as the toggle and reset the creation destination to the selected scope's root; preserve the search query, filename/content search mode, editor tabs, and foreground panel. Guests remain in Documents. Retain the shared [mobile gesture thresholds and exclusions](../../development/ui-contracts.md#mobile-dock-and-panel-switching), including native horizontal scrolling, input fields, menus, cancellation, and multitouch.
+- Below 768px, a leftward swipe in the file explorer selects Files and a rightward swipe selects Documents. Stop at either end rather than wrapping. Use the same scope selection as the toggle and reset the creation destination to the selected scope's root; preserve the search query, filename/content search mode, editor tabs, and foreground panel. Guests remain in Documents. Retain the shared [mobile gesture thresholds and exclusions](../../development/ui-workspace-layout.md#mobile-dock-and-panel-switching), including native horizontal scrolling, input fields, menus, cancellation, and multitouch.
 - Give explicitly selected rows the selection background. Keep the active editor file, files open in other tabs or split panes, hover, and keyboard focus distinguishable from explorer selection; an open tab alone does not select its row. Remove the open-file background when a tab is closed, and do not display a theme-colored border.
 - Provide creation, renaming, duplication, copying, cutting, pasting, deletion, and drag-to-move in the file explorer.
 - When file/document moves are applied, animate the moved item and surrounding rows with the same 180ms motion as tabs and Dock; place them immediately when reduced motion is enabled.
@@ -68,7 +68,7 @@ The interaction choice follows [ADR 0107](../../decisions/0107-explorer-selectio
 
 <!-- mew:implementation:start -->
 
-- `use-tree-move-animation.ts` records existing row positions after a successful move and maps paths after the asynchronous tree update. Detailed behavior follows the [shared motion contract](../../development/ui-contracts.md#drag-reordering-motion).
+- `use-tree-move-animation.ts` records existing row positions after a successful move and maps paths after the asynchronous tree update. Detailed behavior follows the [shared motion contract](../../development/ui-workspace-layout.md#drag-reordering-motion).
 ## Implementation details
 
 ### File-type icons
@@ -109,7 +109,7 @@ After regenerating either pack, run `node tools/generate-file-icon-chunks.mjs` t
 
 - Each item in the shared file context menu displays a 16px Iconoir icon alongside text. Corners are square and shadows are removed; item padding is reduced to 8px horizontally and 4px vertically, with a 6px icon gap. Download aligns with the same icon column, and icons are excluded from accessible names. This applies equally to the file explorer, Add Project, and server file explorer.
 
-- Sticky parent items during scrolling are provided again in response to the user's renewed request on 2026-10-06. `TreeHeader` adjusts top spacing to stack rows without gaps, and per-node `isolate` keeps ancestor guide lines continuing above child sticky rows. Preserve unsticking on collapse and at the end of child lists, along with file location indicators. Follow the [sticky parent row contract](../../development/ui-contracts.md#sticky-ancestor-rows-in-the-file-explorer-tree).
+- Sticky parent items during scrolling are provided again in response to the user's renewed request on 2026-10-06. `TreeHeader` adjusts top spacing to stack rows without gaps, and per-node `isolate` keeps ancestor guide lines continuing above child sticky rows. Preserve unsticking on collapse and at the end of child lists, along with file location indicators. Follow the [sticky parent row contract](../../development/ui-project-navigation.md#sticky-ancestor-rows-in-the-file-explorer-tree).
 
 - The shared `TreeChildren` in `FileTree.tsx` overlays a 1px theme divider line on each child list. Position the line 2px left of the center of the folder icon or document expansion button. Preserve the existing 14px indentation and continue the line through creation inputs and loading rows without affecting clicks, dragging, or accessibility navigation.
 

@@ -11,7 +11,7 @@ Temporary reconnections and metadata reads previously displayed connection warni
 
 Mewlink, agent sessions, the Mewpet assistant, project command metadata, and agent command polling allow eleven automatic retries after the initial failure. Exhausted component recovery has a scoped retry control. Exhausted Mewlink recovery stops automatic requests and covers the page with a themed error containing the cause and reconnect action. The app iframe remains inert behind it; explicit retry reconnects the same frame, preserves unsent input, verifies identity, and restores the title and keyboard focus. Hidden/offline waits and canceled Mewlink preparation or authentication do not consume the retry allowance. Memo and terminal retry lifetimes are unchanged.
 
-Current behavior belongs to [UI contracts](../development/ui-contracts.md#automatic-recovery-within-panels-and-menus), [remote access](../development/remote-access.md#reattaching-the-same-rtc-after-a-brief-signaling-interruption), the linked feature documents, and [ADR 0099](../decisions/0099-quiet-automatic-recovery.md).
+Current behavior belongs to [UI contracts](../development/ui-recovery-feedback.md#automatic-recovery-within-panels-and-menus), [remote access](../development/remote-access-recovery.md#reattaching-the-same-rtc-after-a-brief-signaling-interruption), the linked feature documents, and [ADR 0099](../decisions/0099-quiet-automatic-recovery.md).
 
 ## Verification
 

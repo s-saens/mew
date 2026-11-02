@@ -74,7 +74,7 @@ After replacement identity verification, resumed transport emits one `mew:remote
 
 ### Recovery screen and retry allowance
 
-Recovery follows the [shared UI contract](ui-contracts.md#mewlink-stay-signed-in-prompt) and [ADR 0099](../decisions/0099-quiet-automatic-recovery.md):
+Recovery follows the [shared UI contract](ui-recovery-feedback.md#mewlink-stay-signed-in-prompt) and [ADR 0099](../decisions/0099-quiet-automatic-recovery.md):
 
 - Show loading dots only, including offline, auth timeout, and rate limits.
 - After initial failure, allow 11 actual auto-retries/presence probes. Canceled preparation, hidden/offline-interrupted RTC/auth recovery, and passive waits do not count. Reset only after replacement authentication succeeds.

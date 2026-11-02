@@ -15,7 +15,7 @@ The host sent a heartbeat every 20 seconds but did not check whether a central r
 
 ## Changes
 
-The [remote access contract](../development/remote-access.md#reattaching-the-same-rtc-after-a-brief-signaling-interruption) owns current behavior. Existing JSON heartbeat responses are checked outside the asynchronous processing queue; after at least 60 seconds without a response, measured using monotonic time, the periodic check forcibly closes the socket and uses the existing reconnection procedure. Send errors are cleaned up through the same path, and the initial WSS handshake is limited to 30 seconds. The central protocol, registration keys, leases, and RTC reattachment policy remain in place.
+The [remote access contract](../development/remote-access-recovery.md#reattaching-the-same-rtc-after-a-brief-signaling-interruption) owns current behavior. Existing JSON heartbeat responses are checked outside the asynchronous processing queue; after at least 60 seconds without a response, measured using monotonic time, the periodic check forcibly closes the socket and uses the existing reconnection procedure. Send errors are cleaned up through the same path, and the initial WSS handshake is limited to 30 seconds. The central protocol, registration keys, leases, and RTC reattachment policy remain in place.
 
 ## Verification and application
 

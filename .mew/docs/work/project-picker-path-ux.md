@@ -13,7 +13,7 @@ Enabled project path suggestions, which were previously disabled. Known child fo
 
 Opening after editing a path validates and opens that folder. Relative targets are resolved consistently in the footer and Open action; empty paths disable Open. A pending listing cannot overwrite subsequent typing. Creating a folder or cloning a repository selects the API's returned folder without opening the project automatically. The suggestions endpoint now accepts server file access as well as its existing agent or terminal permissions; it does not grant agent-session cwd validation.
 
-Current behavior belongs to the [project feature](../features/projects-files-search/opening-projects-tabs-and-groups.md), [shared UI contract](../development/ui-contracts.md#shared-ui-for-adding-projects-and-browsing-server-files), and [public project guide](../../../docs/guides/projects.md#프로젝트-탭).
+Current behavior belongs to the [project feature](../features/projects-files-search/opening-projects-tabs-and-groups.md), [shared UI contract](../development/ui-project-navigation.md#shared-ui-for-adding-projects-and-browsing-server-files), and [public project guide](../../../docs/guides/projects.md#프로젝트-탭).
 
 ## Verification and application
 

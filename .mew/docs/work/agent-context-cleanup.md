@@ -41,3 +41,11 @@ The [remote access](../development/remote-access.md), [recovery](../development/
 Restructure the [package APIs](../development/packages.md) into focused sections and option tables. Match existing source behavior for the mobile editor key bar and shared header/action menus; these are documentation corrections, not UI changes. Shared [overlay](../development/ui-overlays.md#shared-action-menus) and [editor context-menu](../development/ui-editor-input.md#editor-body-context-menu) sections retain their anchors at the correct heading level. The editor prop comment now describes its existing mobile-width default without a focus gate.
 
 `node --test server/action-menu-ui.test.ts` passed its actual-component check across eight desktop/mobile/theme/gradient combinations. The fixture now uses the existing translated mobile dialog name, **내 프로젝트**; it suppresses only irrelevant module-directive warnings. Source geometry and current key-bar conditions were inspected directly.
+
+## Document selection and current links
+
+Split the former shared UI contract into six topics and separate browser startup, connection recovery, and agent guidance. Each topic has a scoped description; original UI headings and explicit aliases remain in the compatibility entry. Shorten descriptions and authoring instructions without adding MOC requirements. Historical decisions and unrelated pending edits remain outside this cleanup.
+
+An independent audit checked 137 rewritten links across 74 current documents: each relative target/fragment resolves, every replacement matches its mapping, and the original 58 UI headings plus two explicit aliases remain. Topic descriptions were independently reviewed for distinguishable ownership. Shared UI corrections retain the existing source contract; legacy `browser` permission overrides remain a read-time compatibility rule.
+
+`npm run check:docs` reports 665 valid descriptions and one pre-existing error in the unrelated task `Image preview and attachment editing.md`: its `/api/asset` URL needs a repository-relative link. No changed contract has a new link error. Discovery/search tests passed all 5 tests. The final required build passed; actual deployment, server application, and production latency remain unverified.

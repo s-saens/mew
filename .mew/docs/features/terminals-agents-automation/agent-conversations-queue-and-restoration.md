@@ -69,7 +69,7 @@ All three entry points display the `대화 비우는 중…` status and a blinki
 
 2026-10-20 validation: In isolated Chromium on desktop and mobile in both themes, verified shared feedback for the shortcut, button, and `/clear`, status updates before requests, completion and queued indicators based on server confirmation and their automatic dismissal, duplicate request blocking, draft preservation, dismissal on errors and disconnection, and reduced motion. Passed 12 server clear and queue checks, type checks, targeted lint, and documentation checks. No build or server restart was performed.
 
-Does not apply to other panels, terminals, inactive conversations, hidden panels, runtime selectors, or modals. Does not intercept keystrokes with `Shift` or `Alt` held, or during IME composition. Fullscreen entered through the app button also includes R in keyboard locking. Support, permissions, and remote input priority follow the [fullscreen keyboard lock contract](../../development/ui-contracts.md#focus-based-tab-shortcuts).
+Does not apply to other panels, terminals, inactive conversations, hidden panels, runtime selectors, or modals. Does not intercept keystrokes with `Shift` or `Alt` held, or during IME composition. Fullscreen entered through the app button also includes R in keyboard locking. Support, permissions, and remote input priority follow the [fullscreen keyboard lock contract](../../development/ui-editor-input.md#focus-based-tab-shortcuts).
 
 2026-10-14 validation: In isolated Chromium for `server/agent-connection-ui.test.ts` on desktop and mobile in both themes, verified Ctrl and Cmd request sending, draft preservation, request blocking for repeated keys and disconnection, and preservation of default behavior outside the panel and for Shift, Alt, and IME input. Full type checks, targeted lint, and documentation description/placement checks passed. No build or server restart was performed.
 
@@ -159,7 +159,7 @@ Place a book-shaped **Manage Skills** button and a plug-shaped **Manage MCP** bu
 
 **Agent** and **Terminal** are separate panels. The agent panel contains ACP chats and official agent TUIs, while the terminal panel contains regular shell tabs. The agent panel's `+` opens the runtime selector, and the terminal panel's `+` adds a shell. Existing `tmux` tabs appear in the terminal panel with their IDs and cwd preserved.
 
-Panel movement and tab detachment follow [ADR 0134](../../history/decisions/0134-mew-dockable-workspace-panels.md) and the [UI contract](../../development/ui-contracts.md#workspace-panel-layout). Collapsing or moving a panel does not end its sessions. A panel's close button closes only that pane and gathers its tabs into a remaining panel of the same type. Preserve the last panel's tabs for reopening. Remaining panels fill the vacant space, and closed splits are not restored. Only a tab's `×` ends its session.
+Panel movement and tab detachment follow [ADR 0134](../../history/decisions/0134-mew-dockable-workspace-panels.md) and the [UI contract](../../development/ui-workspace-layout.md#workspace-panel-layout). Collapsing or moving a panel does not end its sessions. A panel's close button closes only that pane and gathers its tabs into a remaining panel of the same type. Preserve the last panel's tabs for reopening. Remaining panels fill the vacant space, and closed splits are not restored. Only a tab's `×` ends its session.
 
 ### Select a new agent
 
@@ -319,7 +319,7 @@ Completed tasks preserve the full transcript at termination. Thus, even after th
 
 - Show explicit command execution and runtime open errors as small translucent floating notices over the content area. Scroll long errors inside the notice, and retain existing task error records and detail windows. Recoverable command-status polling and connection failures use the loading behavior below while automatic recovery remains active.
 
-- During Mewlink suspension, command-status reads and new agent sockets wait for verified reconnection without advancing backoff. A long background interval must not leave a stale reconnect warning requiring manual retry. Preserve rows, conversations, and drafts; resume reads and subscriptions automatically under the [remote transport contract](../../development/remote-access.md#reattaching-the-same-rtc-after-a-brief-signaling-interruption).
+- During Mewlink suspension, command-status reads and new agent sockets wait for verified reconnection without advancing backoff. A long background interval must not leave a stale reconnect warning requiring manual retry. Preserve rows, conversations, and drafts; resume reads and subscriptions automatically under the [remote transport contract](../../development/remote-access-recovery.md#reattaching-the-same-rtc-after-a-brief-signaling-interruption).
 
 - Foreground, network `online`, `pageshow`, and verified Mewlink transport recovery cancel a pending retry delay and retry once immediately. `online` alone does not bypass Mewlink transport readiness. Duplicate recovery events cannot create a second connecting socket or overlapping status read, replay prompts or `/clear`, or revive a fatal connection or permanent read failure. Focus restoration across the retained inert app follows the remote contract.
 
@@ -335,7 +335,7 @@ Completed tasks preserve the full transcript at termination. Thus, even after th
 
 - Stopping AI or CLI cancels only the active work and approval requests. After termination completes, execution resumes from the shared FIFO queue, while edit locks and protective holds remain in place. Closing a tab or switching conversations also clears pending work.
 
-- During drag reordering, surrounding items move to their new positions using the shared 180ms movement animation. The grabbed item follows the pointer immediately; consecutive reordering and reduced motion settings follow the [shared motion contract](../../development/ui-contracts.md#drag-reordering-motion).
+- During drag reordering, surrounding items move to their new positions using the shared 180ms movement animation. The grabbed item follows the pointer immediately; consecutive reordering and reduced motion settings follow the [shared motion contract](../../development/ui-workspace-layout.md#drag-reordering-motion).
 
 - When New Conversation in history is clicked while idle, the UI clears first, while server termination, reconnection, and preparation proceed in the background. Connection loading does not cover the empty screen; the input draft is preserved, and new messages are accepted into the initialization waiting queue ([session contract](../../development/agent-sessions.md#messages-reconnection-and-queues)).
 
@@ -411,7 +411,7 @@ Completed tasks preserve the full transcript at termination. Thus, even after th
 
 - 2026-10-01: Passed 47 ACP, shared queue, and memory protection checks (skipped 2 optional OS checks). Verified execution of the reordered top message after stopping AI, execution of the next message after canceling approval, continued waiting until CLI termination is confirmed, and AI→CLI ordering. Type, targeted lint, document boundary, and link checks also passed. No build or server restart was performed.
 
-- 2026-09-30: Related drag UI regression checks verified reordering animations and existing input and cancel behavior. The scope and limitations follow [shared motion verification](../../development/ui-contracts.md#drag-reordering-motion).
+- 2026-09-30: Related drag UI regression checks verified reordering animations and existing input and cancel behavior. The scope and limitations follow [shared motion verification](../../development/ui-workspace-layout.md#drag-reordering-motion).
 
 - 2026-09-30: Desktop mouse and mobile touch UI regression checks verified surrounding row movement and dashed insertion slots before drop, unchanged server order before drop, reordering of rows with different heights, and restoration of the original order on pointer cancellation or Esc. Reviewed drag captures from both screens, and frontend type, targeted lint, and document boundary checks passed. The full type check was blocked by an out-of-scope syntax error in `server/agentWs.ts`, and the document link check by existing missing links.
 

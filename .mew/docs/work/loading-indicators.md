@@ -9,7 +9,7 @@ updated: "2026-10-30"
 
 Restore the three dots used in attachment upload tags to the previous circular indicator and document the three shared indicator types and their selection criteria. Upload-pending tags in new input and pending queue editing use a 12px circular indicator, which changes to a file type icon on completion. User bubble tags retain the completed icons.
 
-The current contracts are owned by [Shared Loading Indicators](../development/ui-contracts.md#shared-loading-indicators) and the [Input and Attachment Feature Contract](../features/terminals-agents-automation/agent-input-mentions-skills-and-attachments.md), and the decision is owned by [ADR 0075](../decisions/0075-attachment-spinner-indicator.md).
+The current contracts are owned by [Shared Loading Indicators](../development/ui-recovery-feedback.md#shared-loading-indicators) and the [Input and Attachment Feature Contract](../features/terminals-agents-automation/agent-input-mentions-skills-and-attachments.md), and the decision is owned by [ADR 0075](../decisions/0075-attachment-spinner-indicator.md).
 
 ## Verification and application
 

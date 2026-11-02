@@ -11,7 +11,7 @@ Consolidated project and command list handles and row highlighting into shared c
 
 Command handles support mouse and touch dragging and keyboard reordering. Changed orders are saved serially to the existing command file, preventing status polling and late responses from overwriting the order during saving. On failure, the order reverts to the last saved order. Handles are excluded from initial focus and normal arrow-key navigation to preserve existing numeric execution and row navigation behavior.
 
-The current contracts follow [Shared dropdowns](../development/ui-contracts.md#dropdowns-and-selection-components) and [Project command buttons](../features/terminals-agents-automation/project-command-buttons.md), and usage follows the [Command button guide](../../../docs/guides/commands.md). Earlier shortcut additions and menu switching fixes remain in the [existing record](command-menu-shortcuts.md).
+The current contracts follow [Shared dropdowns](../development/ui-overlays.md#dropdowns-and-selection-components) and [Project command buttons](../features/terminals-agents-automation/project-command-buttons.md), and usage follows the [Command button guide](../../../docs/guides/commands.md). Earlier shortcut additions and menu switching fixes remain in the [existing record](command-menu-shortcuts.md).
 
 ## Verification and application
 

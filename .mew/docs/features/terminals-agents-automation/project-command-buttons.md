@@ -31,7 +31,7 @@ description: "Contract for registering, running, and stopping per-project comman
 - Highlight running commands using the background of the entire item, including its handle and buttons, instead of a separate checkmark or dot. Show hover and focus across the entire item as well, and place port buttons on a lower line within the same item.
 - Up and Down cycle through command rows and Add Command; Left and Right cycle through the name, Run/Stop, and Terminal buttons in the same row. Skip disabled buttons, and use Home/End to move to the first/last row. Enter/Space activates the focused button, and closing with Esc returns focus to ▶.
 - Do not display internal project identifiers such as `.workspace` at the top of the list.
-- The list uses the same shared `ActionMenuSurface` header style as the hamburger and project menus. Width, font, row height, spacing, and focus indicators follow the [shared UI contract](../../development/ui-contracts.md#dropdowns-and-selection-components).
+- The list uses the same shared `ActionMenuSurface` header style as the hamburger and project menus. Width, font, row height, spacing, and focus indicators follow the [shared UI contract](../../development/ui-overlays.md#dropdowns-and-selection-components).
 - Restore previously saved file explorer command tabs as the file explorer.
 
 ### Boundaries and limitations

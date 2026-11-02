@@ -9,7 +9,7 @@ updated: "2026-10-28"
 
 Added support for opening the project list with Alt+P even from an input field and focusing the first item. If the list is already open, it only moves focus to the first item. Existing arrow-key and Enter/Space selection, Esc return, and Alt+number switching are preserved. The list does not open when a modal is active, during IME input or key repeat, with additional modifier keys, or without permission. Remote keyboard capture takes precedence over Alt+P.
 
-Current usage follows the [Project guide](../../../docs/guides/projects.md#프로젝트-탭), the feature contract follows [Opening, selecting, and switching projects](../features/projects-files-search/opening-projects-tabs-and-groups.md), and the shared implementation follows the [Header project selector](../development/ui-contracts.md#header-project-switcher).
+Current usage follows the [Project guide](../../../docs/guides/projects.md#프로젝트-탭), the feature contract follows [Opening, selecting, and switching projects](../features/projects-files-search/opening-projects-tabs-and-groups.md), and the shared implementation follows the [Header project selector](../development/ui-project-navigation.md#header-project-switcher).
 
 ## Verification and application
 

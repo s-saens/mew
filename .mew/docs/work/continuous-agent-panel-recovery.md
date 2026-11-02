@@ -13,7 +13,7 @@ The eleven-retry limit could leave agent conversations showing `Could not reconn
 
 Fatal agent events retain their original error and stop reconnecting. Invalid JSON and permanent command-status HTTP 4xx errors other than 408/429 keep a scoped recovery action. Top-level Mewlink, Mewpet assistant, and project command metadata retain their existing retry limits.
 
-Current behavior belongs to the [agent feature](../features/terminals-agents-automation/agent-conversations-queue-and-restoration.md#waiting-for-connection-and-reconnecting), [session contract](../development/agent-sessions.md#messages-reconnection-and-queues), and [UI contract](../development/ui-contracts.md#automatic-recovery-within-panels-and-menus). [ADR 0110](../decisions/0110-continuous-agent-panel-recovery.md) records the limited reversal of [ADR 0099](../decisions/0099-quiet-automatic-recovery.md).
+Current behavior belongs to the [agent feature](../features/terminals-agents-automation/agent-conversations-queue-and-restoration.md#waiting-for-connection-and-reconnecting), [session contract](../development/agent-sessions.md#messages-reconnection-and-queues), and [UI contract](../development/ui-recovery-feedback.md#automatic-recovery-within-panels-and-menus). [ADR 0110](../decisions/0110-continuous-agent-panel-recovery.md) records the limited reversal of [ADR 0099](../decisions/0099-quiet-automatic-recovery.md).
 
 ## Verification
 

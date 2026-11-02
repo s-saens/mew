@@ -11,7 +11,7 @@ Settings → Dock now offers top, bottom, left, and right positions independentl
 
 The workspace reserves space at the selected edge without remounting panels. Left/right docks support vertical scrolling when screen height is insufficient and use vertical reordering; top/bottom docks use horizontal reordering. A position change cancels a pending drag. Keyboard-hidden and empty docks release their reserved space. Position values are validated independently and stored in scoped browser preferences. The remote viewer retains its existing toolbar layout.
 
-Current contracts: [Dock settings](../../../docs/configuration/appearance.md#dock-settings), [appearance settings feature](../features/appearance-accounts-operations/appearance-language-fonts-and-shortcuts.md), [panel layout feature](../features/appearance-accounts-operations/panel-layout-mobile-and-state-restoration.md), and [shared Dock contract](../development/ui-contracts.md#dock-and-top-menu).
+Current contracts: [Dock settings](../../../docs/configuration/appearance.md#dock-settings), [appearance settings feature](../features/appearance-accounts-operations/appearance-language-fonts-and-shortcuts.md), [panel layout feature](../features/appearance-accounts-operations/panel-layout-mobile-and-state-restoration.md), and [shared Dock contract](../development/ui-workspace-layout.md#dock-and-top-menu).
 
 ## Local verification
 

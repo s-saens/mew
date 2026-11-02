@@ -5,7 +5,7 @@ created: "2026-10-30"
 updated: "2026-10-30"
 ---
 
-Expanded the invisible area above and below vertical scrollbar thumbs to make them easier to grab on touch devices. The [shared scrollbar contract](../development/ui-contracts.md#shared-scrollbars) owns the current behavior.
+Expanded the invisible area above and below vertical scrollbar thumbs to make them easier to grab on touch devices. The [shared scrollbar contract](../development/ui-foundations.md#shared-scrollbars) owns the current behavior.
 
 `src/utils/scrollbar-touch.ts` multiplies the previous vertical touch length by three, capped at the track length. The 24px touch width, native 6px scrollbar appearance, horizontal touch length, initial scroll position, and drag ratio remain unchanged.
 

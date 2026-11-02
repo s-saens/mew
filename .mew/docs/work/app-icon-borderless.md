@@ -7,7 +7,7 @@ updated: "2026-10-28"
 
 ## Purpose and results
 
-Removed the outer square border from the app icon installed on the home screen. Preserved the existing background and the internal mark's color, size, position, and stroke width in the 180, 192, and 512px PNGs. The favicon and full loading logo were not changed. The current requirements are owned by the [Installable web app UI contract](../development/ui-contracts.md#installable-web-app-and-startup-guidance).
+Removed the outer square border from the app icon installed on the home screen. Preserved the existing background and the internal mark's color, size, position, and stroke width in the 180, 192, and 512px PNGs. The favicon and full loading logo were not changed. The current requirements are owned by the [Installable web app UI contract](../development/ui-recovery-feedback.md#installable-web-app-and-startup-guidance).
 
 Applied a transform to the existing paths in `public/favicon.svg` that translates them by 20% of the canvas size and scales them by `크기 × 0.6 / 64`. First reproduced the PNGs with their existing borders using CairoSVG and confirmed pixel matches with the originals at all three sizes, then generated PNGs from the same SVG with only the border excluded.
 

@@ -5,7 +5,7 @@ created: "2026-10-27"
 updated: "2026-10-30"
 ---
 
-Changed dock swipes from switching tabs first to switching panels. Tab switching is handled in the mobile panel body; for regular files and Markdown Plain, it is handled only in the auxiliary key bar to preserve horizontal scrolling. The current contract is owned by [Panel layout and mobile](../features/appearance-accounts-operations/panel-layout-mobile-and-state-restoration.md) and [Shared UI contracts](../development/ui-contracts.md#mobile-dock-and-panel-switching), and the rationale is owned by [ADR 0079](../decisions/0079-mobile-panel-swipes.md).
+Changed dock swipes from switching tabs first to switching panels. Tab switching is handled in the mobile panel body; for regular files and Markdown Plain, it is handled only in the auxiliary key bar to preserve horizontal scrolling. The current contract is owned by [Panel layout and mobile](../features/appearance-accounts-operations/panel-layout-mobile-and-state-restoration.md) and [Shared UI contracts](../development/ui-workspace-layout.md#mobile-dock-and-panel-switching), and the rationale is owned by [ADR 0079](../decisions/0079-mobile-panel-swipes.md).
 
 Removed the tab-first branch from the dock wiring in `App` and used `useMobilePanelSwipe` to establish the starting panel and element. `EditorPane` distinguishes the Hotview body from the Plain auxiliary key bar, while tab rows, popups, task deletion, and Gantt interactions retain their existing handling. Cancellation, multitouch, and foreground panel changes do not switch tabs, and key clicks after swipes are suppressed.
 
@@ -27,7 +27,7 @@ The app was not built or deployed, and the server was not started or restarted. 
 
 ## 2026-10-28 Prioritize internal horizontal scrolling
 
-Fixed an issue where touches intended to scroll horizontally in tables, code, and similar content in non-editor panels were handled as tab switches. `useMobilePanelSwipe` checks for an actual horizontal scroll area between the initial touch element and the starting panel, and leaves the entire touch gesture to native browser scrolling. It does not hand off to tab switching at either end. Existing tab switching is retained for containers without overflow, vertical-only scrolling, and the Plain auxiliary key bar. The current detection conditions are owned by [Shared UI contracts](../development/ui-contracts.md#mobile-dock-and-panel-switching).
+Fixed an issue where touches intended to scroll horizontally in tables, code, and similar content in non-editor panels were handled as tab switches. `useMobilePanelSwipe` checks for an actual horizontal scroll area between the initial touch element and the starting panel, and leaves the entire touch gesture to native browser scrolling. It does not hand off to tab switching at either end. Existing tab switching is retained for containers without overflow, vertical-only scrolling, and the Plain auxiliary key bar. The current detection conditions are owned by [Shared UI contracts](../development/ui-workspace-layout.md#mobile-dock-and-panel-switching).
 
 Verification results:
 
@@ -66,7 +66,7 @@ No build, deployment, or server restart was performed; physical phones and produ
 
 ## 2026-10-30 Switch Documents and Files with explorer swipes
 
-File explorer body swipes previously reached a tab-switching handler that returned without changing the scope. `App` now selects Files on a leftward swipe and Documents on a rightward swipe, stopping at either end. Swipes and the existing toggle share scope selection and creation-destination handling. The query, filename/content search mode, editor tabs, and foreground panel are preserved; guests retain Documents. The current behavior is owned by [File and Folder Navigation](../features/projects-files-search/file-folder-exploration-and-operations.md#scope) and the [shared gesture contract](../development/ui-contracts.md#mobile-dock-and-panel-switching); usage is documented in [Projects and file navigation](../../../docs/guides/projects.md#projects-subprojects-and-documents-in-the-file-explorer).
+File explorer body swipes previously reached a tab-switching handler that returned without changing the scope. `App` now selects Files on a leftward swipe and Documents on a rightward swipe, stopping at either end. Swipes and the existing toggle share scope selection and creation-destination handling. The query, filename/content search mode, editor tabs, and foreground panel are preserved; guests retain Documents. The current behavior is owned by [File and Folder Navigation](../features/projects-files-search/file-folder-exploration-and-operations.md#scope) and the [shared gesture contract](../development/ui-workspace-layout.md#mobile-dock-and-panel-switching); usage is documented in [Projects and file navigation](../../../docs/guides/projects.md#projects-subprojects-and-documents-in-the-file-explorer).
 
 Verification results:
 
@@ -81,7 +81,7 @@ Only local isolated checks were performed. No app build, deployment, or server s
 
 ## 2026-10-30 Halve swipe recognition distances
 
-Reduced the required horizontal movement from 60px to 30px in mobile panel content and the Plain modifier key bar, and from 40px to 20px on the dock, so shorter left/right gestures trigger navigation. Direction filtering, native horizontal scrolling, cancellation, click suppression, and long-press reordering retain their existing behavior. Current thresholds are owned by [Shared UI contracts](../development/ui-contracts.md#mobile-dock-and-panel-switching) and linked from [Panel layout and mobile](../features/appearance-accounts-operations/panel-layout-mobile-and-state-restoration.md).
+Reduced the required horizontal movement from 60px to 30px in mobile panel content and the Plain modifier key bar, and from 40px to 20px on the dock, so shorter left/right gestures trigger navigation. Direction filtering, native horizontal scrolling, cancellation, click suppression, and long-press reordering retain their existing behavior. Current thresholds are owned by [Shared UI contracts](../development/ui-workspace-layout.md#mobile-dock-and-panel-switching) and linked from [Panel layout and mobile](../features/appearance-accounts-operations/panel-layout-mobile-and-state-restoration.md).
 
 Extended `server/mobile-panel-swipe-ui.test.ts` to exercise actual touch gestures at 30px in both directions in the key bar and each tabbed panel body, 20px dock navigation, and rejection of 29px body/key-bar and 19px dock movements. Hotview checks use 30px at multiple screen heights, and vertical gestures remain rejected at the shorter distance.
 

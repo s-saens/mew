@@ -9,7 +9,7 @@ updated: "2026-10-30"
 
 Added a recognizable recovery screen for unknown URLs instead of opening the workspace and replacing the address. The large 404 graphic includes a tilted M, follows the existing palette and local fonts, and settles once unless reduced motion is enabled. The screen provides workspace recovery and browser back navigation, with translated copy in all four UI languages.
 
-The browser and production fallback use the same route classifier. Unknown direct paths skip authentication and workspace imports, and the production fallback sets HTTP 404 while serving the application shell. Workspace, valid public-share, remote-frame, demo-base, and port-preview entry behavior follows the [current architecture contract](../development/architecture.md#application-routes-and-missing-pages). Existing share availability errors retain their own screen.
+The browser and production fallback use the same route classifier. Unknown direct paths skip authentication and workspace imports, and the production fallback sets HTTP 404 while serving the application shell. Workspace, valid public-share, remote-frame, demo-base, and port-preview entry behavior follows the [current architecture contract](../development/browser-startup.md#application-routes-and-missing-pages). Existing share availability errors retain their own screen.
 
 ## Verification
 

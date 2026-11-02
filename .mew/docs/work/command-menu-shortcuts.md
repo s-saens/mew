@@ -9,7 +9,7 @@ updated: "2026-10-28"
 
 Added Alt+R to open the top bar command menu and numeric execution for the first 9 commands in the menu. Preserves existing Ctrl+E, arrow-key navigation, and Esc return behavior. Numeric selection executes the same action as clicking a command name; port, stop, terminal, and add buttons are excluded from numbering. Numbers are placed within the existing name area to preserve row width even in narrow menus.
 
-Current usage follows the [Command button guide](../../../docs/guides/commands.md), and implementation requirements follow the [Dropdown and selection component contract](../development/ui-contracts.md#dropdowns-and-selection-components).
+Current usage follows the [Command button guide](../../../docs/guides/commands.md), and implementation requirements follow the [Dropdown and selection component contract](../development/ui-overlays.md#dropdowns-and-selection-components).
 
 ## Verification and application
 
@@ -22,7 +22,7 @@ App builds, deployment, and server runs and restarts were not performed. The use
 
 ## Dropdown switching fix (2026-10-28)
 
-Fixed an issue where pressing the command button while the project list was open did not open the command list. The existing menu's outside-press handler swallowed the new button's click, and even when clicks were allowed, closing the existing menu first caused back-navigation guard cleanup to cancel opening the new menu. Clicks on other top menu buttons are now passed through, and the existing menu closes in a subsequent task after the new button's click handler finishes. Focus does not return to the previous button, while closing via the same button or a normal outside press is preserved. The current contract is reflected in the [Shared dropdown contract](../development/ui-contracts.md#dropdowns-and-selection-components) and [Project command buttons](../features/terminals-agents-automation/project-command-buttons.md).
+Fixed an issue where pressing the command button while the project list was open did not open the command list. The existing menu's outside-press handler swallowed the new button's click, and even when clicks were allowed, closing the existing menu first caused back-navigation guard cleanup to cancel opening the new menu. Clicks on other top menu buttons are now passed through, and the existing menu closes in a subsequent task after the new button's click handler finishes. Focus does not return to the previous button, while closing via the same button or a normal outside press is preserved. The current contract is reflected in the [Shared dropdown contract](../development/ui-overlays.md#dropdowns-and-selection-components) and [Project command buttons](../features/terminals-agents-automation/project-command-buttons.md).
 
 - Used the Chromium debugger to inspect outside-press targets and call stacks and `popstate` during switching. Removed temporary debugging files and connections.
 - `node --test server/header-menu-switch-ui.test.ts packages/ui/src/useOverlayDismiss.test.ts src/utils/command-menu-keyboard.test.ts`: 16 tests passed. Switching regression checks covered bidirectional switching by click and touch, a single popup, focus, closing with the same button, Esc and back navigation, and blocking normal outside clicks at 1100/390px with light/dark solid colors and gradients.

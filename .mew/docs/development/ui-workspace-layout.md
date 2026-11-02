@@ -1,6 +1,6 @@
 ---
 title: "UI workspace panels, Dock, and gestures"
-description: "Shared workspace geometry, safe areas, panel and Dock layout, tab scrolling, drag motion, and mobile gestures. Covers Git panel presentation, popup bounds, layout presets, and debugger entry points."
+description: "Shared workspace geometry, safe areas, panel and Dock layout, tab scrolling, drag motion, and mobile gestures. Covers Git panel presentation, floating-window movement and resize bounds, layout presets, and debugger entry points."
 created: "2026-11-03"
 updated: "2026-11-03"
 상위파일: "ui-contracts.md"

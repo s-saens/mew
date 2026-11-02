@@ -9,7 +9,7 @@ updated: "2026-10-30"
 
 Added a translucent circular keyboard button at the bottom center of editable mobile Hotview, Markdown Plain, and code bodies. It opens input at the current selection, hides when the keyboard is detected, and returns after dismissal. Activation releases the touch-selection suppression hint and uses the keyboard API when available, restoring its policy afterward. Unsupported or rejected API calls use native focus. Desktop, read-only, loading, revalidating, partial-preview, and media views exclude the button.
 
-Current behavior is owned by [Mobile editor and keyboard](../development/ui-contracts.md#mobile-editor-and-keyboard), the [Markdown feature](../features/document-code-media-editing/markdown-hotview-source-and-properties.md), and the [code editing feature](../features/document-code-media-editing/code-text-editing-and-document-search.md). The [editing guide](../../../docs/guides/editor.md#basic-editing) describes current input behavior for users.
+Current behavior is owned by [Mobile editor and keyboard](../development/ui-editor-input.md#mobile-editor-and-keyboard), the [Markdown feature](../features/document-code-media-editing/markdown-hotview-source-and-properties.md), and the [code editing feature](../features/document-code-media-editing/code-text-editing-and-document-search.md). The [editing guide](../../../docs/guides/editor.md#basic-editing) describes current input behavior for users.
 
 ## Initial addition: verification
 

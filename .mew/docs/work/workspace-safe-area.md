@@ -7,7 +7,7 @@ updated: "2026-11-01"
 
 The reported iPhone Safari home-screen app placed the top menu beneath the status bar, making it unreachable. The direct entry used a translucent Apple status bar without `viewport-fit=cover`, and the workspace had no top safe-area padding. Insets were previously reserved only by particular Dock edges.
 
-The workspace now reserves all four safe-area insets within its existing viewport height. Positioned docks use their regular dimensions within that area, avoiding duplicate insets and protecting panel footers with any Dock placement. Shared dialogs and the separate settings portal reserve safe areas independently of the workspace. Current behavior belongs to [Device safe areas](../development/ui-contracts.md#device-safe-areas) and the [panel layout feature](../features/appearance-accounts-operations/panel-layout-mobile-and-state-restoration.md).
+The workspace now reserves all four safe-area insets within its existing viewport height. Positioned docks use their regular dimensions within that area, avoiding duplicate insets and protecting panel footers with any Dock placement. Shared dialogs and the separate settings portal reserve safe areas independently of the workspace. Current behavior belongs to [Device safe areas](../development/ui-workspace-layout.md#device-safe-areas) and the [panel layout feature](../features/appearance-accounts-operations/panel-layout-mobile-and-state-restoration.md).
 
 Local verification:
 

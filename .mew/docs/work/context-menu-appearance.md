@@ -5,7 +5,7 @@ created: "2026-10-30"
 updated: "2026-10-30"
 ---
 
-Adjusted shared right-click menus to blend with the workspace background and reduce row spacing. The [shared action-menu contract](../development/ui-contracts.md#shared-action-menus) owns the current appearance and interaction requirements.
+Adjusted shared right-click menus to blend with the workspace background and reduce row spacing. The [shared action-menu contract](../development/ui-overlays.md#shared-action-menus) owns the current appearance and interaction requirements.
 
 The default menu uses the solid workspace surface token for both opaque and translucent backgrounds. Its container has a 6px corner radius and 3px internal padding. Desktop rows shrink from 28px to 26px, with padding reduced from 4px/8px to 3px/6px and a 3px corner radius. Text, icons, coarse-pointer target heights, and header dropdown styling retain their existing sizes.
 

@@ -55,7 +55,7 @@ description: "Defines name-first managed project creation, empty and agent-assis
 <!-- mew:implementation:start -->
 ## Implementation details
 
-The [architecture contract](../../development/architecture.md#shared-project-registry-and-my-projects) owns catalog persistence, migration, and API payloads. The [shared UI contract](../../development/ui-contracts.md#shared-ui-for-adding-projects-and-browsing-server-files) owns the creation/catalog dialog and the explicit linked-folder browser. [Project usage](../../../../docs/guides/projects.md#프로젝트-탭) explains the flow to users.
+The [architecture contract](../../development/architecture.md#shared-project-registry-and-my-projects) owns catalog persistence, migration, and API payloads. The [shared UI contract](../../development/ui-project-navigation.md#shared-ui-for-adding-projects-and-browsing-server-files) owns the creation/catalog dialog and the explicit linked-folder browser. [Project usage](../../../../docs/guides/projects.md#프로젝트-탭) explains the flow to users.
 
 `activeWorkspace` in the account UI ledger is the actual file root, and `activeProjectPath` is the logical root used for screen restoration. Ordinary project selection sets both values; an existing-worktree switch preserves the logical root. `hasProject` distinguishes first-use onboarding from the server's internal fallback root. HTTP and project WebSocket requests pin the authenticated account's actual root; switching never changes the startup root or other accounts' contexts.
 
@@ -96,7 +96,7 @@ The [2026-11-02 work record](../../work/shared-project-registry.md) owns verific
 
 - `server/account-workspace.test.ts`: Checks active roots, same-named files, trees, async paths, and default terminal paths for multi-account HTTP; switch notifications delivered only to the same account; collaborative editing isolation across different roots; and default root restoration for deleted paths.
 
-- 2026-09-30: Related drag UI regression checks verified reordering animations and existing input and cancel behavior. The scope and limitations follow [shared motion verification](../../development/ui-contracts.md#drag-reordering-motion).
+- 2026-09-30: Related drag UI regression checks verified reordering animations and existing input and cancel behavior. The scope and limitations follow [shared motion verification](../../development/ui-workspace-layout.md#drag-reordering-motion).
 
 - `projectIcons.test.ts` and `project-icons-api.test.ts`: Verify shared SVGs, nested icons, migration priority, initialization, renaming, corruption/link protection, owner permissions, and exclusion of account copies.
 

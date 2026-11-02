@@ -11,7 +11,7 @@ Changed mobile project selection below 768px from an anchored dropdown to a pane
 
 Project selection and Add Project close the panel. Existing icons, active highlighting, saved order, handles, and keyboard shortcuts remain available. Nested Edit/Delete menus stay inside the dialog's focus boundary and close before the parent panel. The desktop project sidebar and its saved width and open state remain unchanged.
 
-The current contract belongs to the [project feature](../features/projects-files-search/opening-projects-tabs-and-groups.md), [shared UI contract](../development/ui-contracts.md#header-project-switcher), and [public project guide](../../../docs/guides/projects.md#프로젝트-탭). [ADR 0102](../decisions/0102-mobile-project-panel.md) records the replacement of the previous mobile dropdown.
+The current contract belongs to the [project feature](../features/projects-files-search/opening-projects-tabs-and-groups.md), [shared UI contract](../development/ui-project-navigation.md#header-project-switcher), and [public project guide](../../../docs/guides/projects.md#프로젝트-탭). [ADR 0102](../decisions/0102-mobile-project-panel.md) records the replacement of the previous mobile dropdown.
 
 ## Verification and application
 

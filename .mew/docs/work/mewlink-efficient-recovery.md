@@ -7,7 +7,7 @@ updated: "2026-10-29"
 
 ## Purpose and results
 
-Reduced the long unresponsive wait remaining after the [initial host monitoring fix](mewlink-host-heartbeat.md) and the repeated cost of full RTC preparation while waiting for an offline host. [ADR 0086](../decisions/0086-mewlink-recovery-efficiency.md) owns the policy choice, and the [remote access contract](../development/remote-access.md#reattaching-the-same-rtc-after-a-brief-signaling-interruption) owns current behavior.
+Reduced the long unresponsive wait remaining after the [initial host monitoring fix](mewlink-host-heartbeat.md) and the repeated cost of full RTC preparation while waiting for an offline host. [ADR 0086](../decisions/0086-mewlink-recovery-efficiency.md) owns the policy choice, and the [remote access contract](../development/remote-access-recovery.md#reattaching-the-same-rtc-after-a-brief-signaling-interruption) owns current behavior.
 
 The host retains the existing heartbeat interval while cleaning up dead WSS connections using a short response deadline and one recheck. The browser preserves the original error code and queries only presence when explicitly offline. It performs a new bootstrap after the host comes online and preserves the existing app and drafts. It pauses or resumes full recovery based on screen and network state and reads the recovery authentication response body within the time limit as well. Natural recovery from ordinary brief RTC interruptions and existing permission and lease validation remain in place.
 

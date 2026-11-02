@@ -9,7 +9,7 @@ On mobile, pressing the browser or device Back button while viewing a detail scr
 
 Added checks for the current screen width and `mobileSection` to the existing `closeOnBack` in `useOverlayDismiss`. On detail screens below 768px, back navigation returns to the settings list while retaining the shared History guard. The next back action from the list closes only the settings window. An open selection list closes first, and direct entry to Mewpet or the debugger uses the same detail state. Esc, the close button, and desktop back navigation retain their existing behavior.
 
-[Settings features](../features/appearance-accounts-operations/appearance-language-fonts-and-shortcuts.md) and the [Settings window UI contract](../development/ui-contracts.md#settings-window-layer) own the current contract, and the [Appearance settings guide](../../../docs/configuration/appearance.md) owns user operations.
+[Settings features](../features/appearance-accounts-operations/appearance-language-fonts-and-shortcuts.md) and the [Settings window UI contract](../development/ui-overlays.md#settings-window-layer) own the current contract, and the [Appearance settings guide](../../../docs/configuration/appearance.md) owns user operations.
 
 Verification results:
 

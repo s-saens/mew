@@ -39,7 +39,7 @@ description: "Feature contract covering Markdown footnotes and References, and i
 
 In Markdown Hotview and Plain, pressing `Ctrl+'` inserts an annotation marker at the current cursor position. If text is selected, the selected text is preserved and the marker is inserted after it. Hotview displays markers as small superscripts `1)` and `2)`.
 
-**Add Annotation** in the body context menu uses the same insertion and editing flow. Right-clicking within an existing selection inserts the marker after the selection; right-clicking outside it inserts the marker at the relocated cursor position. The item is disabled for non-Markdown files and positions that cannot be edited. Shared menu behavior follows the [editor context menu contract](../../development/ui-contracts.md#editor-body-context-menu).
+**Add Annotation** in the body context menu uses the same insertion and editing flow. Right-clicking within an existing selection inserts the marker after the selection; right-clicking outside it inserts the marker at the relocated cursor position. The item is disabled for non-Markdown files and positions that cannot be edited. Shared menu behavior follows the [editor context menu contract](../../development/ui-editor-input.md#editor-body-context-menu).
 
 Adding a marker opens a small popup with one text input. The entered content is included in document autosave. Clicking a superscript marker in Hotview reopens the same popup to edit the content or delete the annotation.
 
