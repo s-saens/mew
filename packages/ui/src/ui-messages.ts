@@ -587,6 +587,8 @@ export const uiMessages = {
   "연결 중…": ["Connecting…","正在连接…","接続中…"],
   "접속 중…": ["Connecting…","正在连接…","接続中…"],
   "작업 화면을 불러오지 못했습니다. 페이지를 다시 열어 주세요.": ["Could not load the workspace. Reopen the page.","无法加载工作区，请重新打开页面。","ワークスペースを読み込めませんでした。ページを開き直してください。"],
+  "그림판을 불러오지 못했습니다.": ["Could not load the drawing editor.", "无法加载绘图板。", "描画エディターを読み込めませんでした。"],
+  "업데이트 후 발생했다면 서버를 재시작한 뒤 새로고침해 주세요.": ["If this happened after an update, restart the server, then refresh.", "如果在更新后发生此问题，请重启服务器，然后刷新。", "更新後に発生した場合は、サーバーを再起動してから再読み込みしてください。"],
   "처리 중…": ["Working…","处理中…","処理中…"],
   "여는 중…": ["Opening…","正在打开…","開いています…"],
   "로그인 계속하기": ["Continue sign-in","继续登录","ログインを続ける"],

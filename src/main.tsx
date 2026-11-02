@@ -13,9 +13,9 @@ import { startWorkspacePinchZoom } from './utils/workspace-pinch-zoom.ts'
 import { StartupScreen } from './components/startup-screen.tsx'
 import { getAppRuntime } from './runtime/app-runtime.ts'
 import { startAppInstallTracking } from './utils/app-install.ts'
-import { uiText } from '@mew/ui/i18n-core'
 import { parsePublicSharePath } from './utils/public-share-route.ts'
 import { appRoute } from '../shared/app-route.ts'
+import { AppErrorBoundary, WorkspaceErrorScreen } from './components/app-error-boundary.tsx'
 
 startAppInstallTracking()
 
@@ -73,14 +73,16 @@ async function startApp() {
 
     root.render(
       <StrictMode>
-        <I18nProvider>
-          {page}
-        </I18nProvider>
+        <AppErrorBoundary>
+          <I18nProvider>
+            {page}
+          </I18nProvider>
+        </AppErrorBoundary>
       </StrictMode>,
     )
   } catch (error) {
     console.error(error)
-    root.render(<main role="alert" className="mew-workspace flex h-dvh items-center justify-center px-4 text-center text-sm text-ink">{uiText('작업 화면을 불러오지 못했습니다. 페이지를 다시 열어 주세요.')}</main>)
+    root.render(<WorkspaceErrorScreen />)
   }
 }
 

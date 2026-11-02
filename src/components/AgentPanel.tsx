@@ -43,8 +43,6 @@ import { LoginDesktopViewer } from './LoginDesktopViewer'
 // 정보줄(세션·토큰·턴 수)은 이벤트가 아니라 서버가 보내는 meta 스냅샷을 그대로 그린다.
 import {
   memo,
-  lazy,
-  Suspense,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -161,7 +159,7 @@ import {
   type SessionMeta,
 } from '../utils/agentFold'
 
-const LazyDrawingEditor = lazy(() => import('./drawing/DrawingEditor').then(module => ({ default: module.DrawingEditor })))
+import { DeferredDrawingEditor } from './drawing/deferred-drawing-editor'
 
 /** ACP가 주는 이름은 영어다 — 아는 모드만 우리 말로 바꾸고 나머지는 그대로 쓴다 */
 const MODE_LABEL: Record<string, string> = {
@@ -4545,9 +4543,7 @@ function AgentSessionView({
           onClose={() => setPreviewAttachment(null)}
         />
       )}
-      {drawingContext && <Suspense fallback={null}>
-        <LazyDrawingEditor onClose={() => { setDrawingContext(null); requestAnimationFrame(() => agentInputRef.current?.focus()) }} onSave={saveDrawingAttachment} />
-      </Suspense>}
+      {drawingContext && <DeferredDrawingEditor onClose={() => { setDrawingContext(null); requestAnimationFrame(() => agentInputRef.current?.focus()) }} onSave={saveDrawingAttachment} />}
         </>
       )}
 

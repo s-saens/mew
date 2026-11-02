@@ -12,6 +12,7 @@ import { StartupScreen } from './components/startup-screen'
 import { getAppRuntime } from './runtime/app-runtime'
 import { portPreviewEntry } from './utils/port-preview-entry'
 import { defaultCapabilities } from '../shared/access-policy'
+import { WorkspaceErrorScreen } from './components/app-error-boundary'
 
 type WorkspaceComponent = typeof import('./App.tsx')['default']
 const PortPreviewPage = lazy(() => import('./components/PortPreviewPage.tsx'))
@@ -85,7 +86,7 @@ export default function AppBootstrap({ initialAuth }: { initialAuth?: AuthStatus
   }
 
   if (!Workspace) return workspaceFailure === workspaceIdentity
-    ? <main role="alert" className="mew-workspace flex h-dvh items-center justify-center px-4 text-center text-sm text-ink">{uiText('작업 화면을 불러오지 못했습니다. 페이지를 다시 열어 주세요.')}</main>
+    ? <WorkspaceErrorScreen />
     : startupScreen
 
   return <>

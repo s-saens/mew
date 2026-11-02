@@ -5,7 +5,7 @@ title: "Agent Drawing Board"
 status: "implemented"
 created: "2026-10-16"
 updated: "2026-11-02"
-description: "Defines the shared drawing board in agent input and Hotview, transparent previews and PNG exports, freehand and Bézier pens, grid and object snapping, transformations, fonts, and shortcuts. Covers agent SVG history, document image insertion without agent permissions, storage and access boundaries, geometry caching, and verification criteria."
+description: "Defines the shared drawing board in agent input and Hotview, transparent previews and PNG exports, freehand and Bézier pens, grid and object snapping, transformations, fonts, and shortcuts. Covers agent SVG history, document image insertion without agent permissions, storage and access boundaries, isolated loading and render-error recovery, geometry caching, and verification criteria."
 files: ["src/components/drawing/DrawingEditor.tsx", "src/components/drawing/model.ts", "src/components/drawing/geometry.ts", "src/components/drawing/svg.ts", "server/agent-drawings.ts", "src/components/AgentPanel.tsx"]
 상위파일: "_terminals-agents-automation.md"
 ---
@@ -19,6 +19,8 @@ Editable project Markdown also opens the shared board through Hotview's `/paint`
 The drawing board supports individual editing inside a popup. It does not provide real-time collaborative editing or editing-state synchronization across devices. The same drawing board is used for new messages and editing queued messages, and the saved PNG is attached to the input from which the drawing board was opened. The drawing board cannot be opened in CLI command mode or while attachments are uploading.
 
 If there are unsaved changes, choose **Continue Editing / Close** before closing. Duplicate saves and closing are blocked while saving. Switching root projects or hiding the panel closes the drawing board, and saves or uploads that finish late are not attached to another project or another queued message. Previewing, deleting, and sending regular attachments follow the [Input and Attachment Contract](agent-input-mentions-skills-and-attachments.md).
+
+Both entry points use `DeferredDrawingEditor` with a local error boundary around the lazy drawing module. Loading shows a closable dialog. A failed chunk download, module evaluation, or React render shows a drawing-specific alert with **Close**, **Refresh**, and conditional server-restart guidance after an update. Closing preserves the surrounding document and agent input; the app does not refresh automatically. A failed drawing render can discard its in-memory drawing. Reopening does not guarantee recovery because the browser and React can retain a rejected import; refresh after correcting the underlying problem. Shared application fallback behavior follows [runtime error recovery](../../development/architecture.md#workspace-initialization).
 
 ## Workspace and Grid
 
@@ -135,6 +137,7 @@ The server allows only editor-generated SVG tags and attributes, raster image da
 | `geometry.ts` | Coordinate conversion, selection bounds, actual shape hit testing, movement, resizing, rotation, and curve calculations |
 | `freehand.ts` / `snapping.ts` | Bounded stroke sampling and cubic smoothing / static sorted edge and center targets, screen-space tolerance, and alignment guides |
 | `DrawingObjectView.tsx` | Per-object SVG rendering and memoization |
+| `deferred-drawing-editor.tsx` | Shared lazy entry point, closable loading dialog, and local error recovery |
 | `DrawingEditor.tsx` | Tools, selection, pointer gestures, panning, keyboard handling, and popup lifecycle |
 | `DrawingInspector.tsx` | Property editing using shared menus, select fields, and color pickers |
 | `svg.ts` | SVG serialization, editing metadata restoration, and PNG conversion |

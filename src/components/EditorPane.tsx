@@ -8,7 +8,7 @@ import { useShortcutBindings } from '@mew/shortcuts'
 import { ArrowLeft, ArrowRight, Brain, OpenNewWindow, Quote } from 'iconoir-react'
 import { taskAgentFile } from '../utils/task-agent'
 import { useDock, DockGrip, DockInlineBody } from './DockWorkspace'
-import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
 import {
   deleteComment,
   createEditorApi,
@@ -51,7 +51,7 @@ import { afterFirstPaint, markFileOpen } from '../utils/fileOpenPerformance'
 import { MarkdownErrorBoundary } from './markdown-error-boundary'
 import { useI18n } from '../i18n'
 
-const LazyDrawingEditor = lazy(() => import('./drawing/DrawingEditor').then(module => ({ default: module.DrawingEditor })))
+import { DeferredDrawingEditor } from './drawing/deferred-drawing-editor'
 
 /** 상태줄용 바이트 표기 — 1KB 미만은 바이트 그대로, 그 위는 소수 한 자리 */
 function formatBytes(bytes: number): string {
@@ -1074,9 +1074,7 @@ export function EditorPane({
                       tree={tree}
                       onOpenLink={onOpenLink}
                       renderDrawingEditor={!isExternalTabPath(activeTab.path) ? options => (
-                        <Suspense fallback={<LoadingIndicator />}>
-                          <LazyDrawingEditor {...options} context="document" projectRoot={workspace?.path} />
-                        </Suspense>
+                        <DeferredDrawingEditor {...options} context="document" projectRoot={workspace?.path} />
                       ) : undefined}
                       onCreateChildPage={!isGuest && !isExternalTabPath(activeTab.path) && onCreateChildPage ? async (name, insert) => {
                         const sourcePath = pane.activePath
