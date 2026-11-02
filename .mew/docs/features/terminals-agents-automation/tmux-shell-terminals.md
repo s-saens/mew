@@ -4,11 +4,11 @@ parent: "mew-agents"
 title: "tmux shell terminal"
 status: "implemented"
 created: "2026-09-18"
-updated: "2026-11-01"
+updated: "2026-11-03"
 status_hash: "b19a2771f0bfb2f727bc14539350c69b524d222b67a2322b322f359fefd6a804"
 files: ["src/components/AgentPanel.tsx", "src/components/TermButtonBar.tsx", "src/components/CommandButtonMenu.tsx", "server/termButtons.ts", "server/command-ports.ts", "packages/tmux-term/src/TmuxTerminal.tsx", "packages/tmux-term/src/server/tmuxWs.ts"]
 commits: []
-description: "Covers creation, input, reconnection, and termination of per-project shell tabs; quiet connection recovery indicators; command buttons and automatic detection of listening ports opened by executed commands, opening ports and terminal localhost links in the internal DOM browser; wide, compact preview menus with ports beside command names; focus-dependent new tabs, closed-tab restoration, live tab position numbers, renaming, context menus, and panel maximization/restoration. Defines Linux/macOS tmux and Windows psmux/PowerShell behavior, transparent backgrounds, shared input areas, accessible names, and actual verification boundaries."
+description: "Covers creation, input, reconnection, and termination of per-project shell tabs; deferred terminal renderer loading; quiet connection recovery indicators; command buttons and automatic detection of listening ports opened by executed commands, opening ports and terminal localhost links in the internal DOM browser; wide, compact preview menus with ports beside command names; focus-dependent new tabs, closed-tab restoration, live tab position numbers, renaming, context menus, and panel maximization/restoration. Defines Linux/macOS tmux and Windows psmux/PowerShell behavior, transparent backgrounds, shared input areas, accessible names, and actual verification boundaries."
 상위파일:
   - "MOC.md"
   - "_terminals-agents-automation.md"
@@ -38,6 +38,8 @@ description: "Covers creation, input, reconnection, and termination of per-proje
 
 <!-- mew:implementation:start -->
 ## Implementation details
+
+- The agent panel prepares `TmuxTerminal` through `DeferredAgentTerminal` only when a terminal session surface renders. Restoring background agent metadata does not download xterm. While code loads, display the shared busy indicator and retain current session props. Canceling the surface cannot attach its old session after loading completes; reopening reuses the downloaded module. Backend session creation, restoration, authorization, and termination retain their existing owners. The [startup contract](../../development/architecture.md#workspace-initialization) defines the module boundary.
 
 - Linux/macOS uses the existing tmux, while native Windows uses psmux and PowerShell. The backend owns the executables and argv for creation, commands, attach, input, capture, and clipboard control, while retaining the existing tmux API and session IDs. Namespaces per Windows state path separate them from user sessions. Implementation, Windows CI, and public support gates follow the [OS execution contract](../../development/windows-native.md).
 
@@ -71,6 +73,8 @@ description: "Covers creation, input, reconnection, and termination of per-proje
 
 <!-- mew:validation:start -->
 ## Verification
+
+- `src/components/deferred-agent-terminal.browser.test.ts` holds the real terminal module, verifies cancellation without an old socket, and checks current-session attachment, command input, and cleanup after reopening. The editor startup graph also rejects xterm in the background agent panel's static closure.
 
 - `server/terminal-keybar-ui.test.ts` checks indicator-only initial connection and automatic recovery, removal after the socket opens, preserved input drafts, and the existing auxiliary-key input, focus, responsive layout, and transparent-background behavior.
 

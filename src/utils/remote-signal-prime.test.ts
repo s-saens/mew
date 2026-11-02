@@ -1,6 +1,6 @@
 import test, { type TestContext } from 'node:test'
 import assert from 'node:assert/strict'
-import { primeRemoteSignal, takePrimedRemoteSignal } from './remote-signal-prime.ts'
+import { discardPrimedRemoteSignal, hasPrimedRemoteSignal, primeRemoteSignal, takePrimedRemoteSignal } from './remote-signal-prime.ts'
 
 class Signal extends EventTarget {
   static CLOSING = 2
@@ -56,9 +56,9 @@ for (const data of [42, 'A'.repeat(65_537), '가'.repeat(22_000)]) test(`the ear
   assert.equal(Signal.instances[0]!.closes, 1)
 })
 
-test('more than eight buffered messages close the early socket', t => {
+test('more than 128 buffered negotiation messages close the early socket', t => {
   fixture(t); primeRemoteSignal(url, protocols)
-  for (let index = 0; index < 9; index++) Signal.instances[0]!.message('{}')
+  for (let index = 0; index < 129; index++) Signal.instances[0]!.message('{}')
   assert.equal(takePrimedRemoteSignal(url, protocols)!.failed, true)
   assert.equal(Signal.instances[0]!.closes, 1)
 })
@@ -81,12 +81,70 @@ test('a foreign shared-slot version closes only its socket and falls back withou
   fixture(t)
   const socket = new Signal(url)
   let called = false
-  Object.defineProperty(window, Symbol.for('mewlink.remote-signal-prime'), { configurable: true, value: { version: 2, socket, dispose() { called = true } } })
+  Object.defineProperty(window, Symbol.for('mewlink.remote-signal-prime'), { configurable: true, value: { version: 3, socket, dispose() { called = true } } })
   primeRemoteSignal(url, protocols)
   assert.equal(socket.closes, 1)
   assert.equal(called, false)
   assert.equal(Signal.instances.length, 2)
   assert.equal(takePrimedRemoteSignal(url, protocols)!.socket, Signal.instances[1])
+})
+
+test('signed Upgrade preparation buffers a bounded challenge, ticket, answer and ICE burst before controller download', t => {
+  fixture(t)
+  const flight = [...protocols, 'mew-connect.' + 'a'.repeat(6000)]
+  primeRemoteSignal(url, flight)
+  const socket = Signal.instances[0]!
+  for (const type of ['challenge', 'ticket', 'answer', ...Array(20).fill('candidate')]) socket.message(JSON.stringify({ type }))
+  const adopted = takePrimedRemoteSignal(url, flight)!
+  assert.equal(adopted.failed, false)
+  assert.equal(adopted.messages.length, 23)
+  assert.equal(Signal.instances.length, 1)
+  assert.deepEqual(adopted.messages.slice(0, 3).map(event => JSON.parse(event.data).type), ['challenge', 'ticket', 'answer'])
+})
+
+test('adoption retains the original Upgrade transmission clocks for conservative lease accounting', t => {
+  fixture(t)
+  primeRemoteSignal(url, protocols)
+  const slot = Object.getOwnPropertyDescriptor(window, Symbol.for('mewlink.remote-signal-prime'))!.value
+  slot.startedAt = Math.max(0, performance.now() - 100)
+  slot.startedWall = Date.now() - 100
+  const { startedAt, startedWall } = slot
+  const adopted = takePrimedRemoteSignal(url, protocols)!
+  assert.equal(adopted.startedAt, startedAt)
+  assert.equal(adopted.startedWall, startedWall)
+})
+
+test('only a live exact signed flight can reconstruct protocols after admission freshness elapses', t => {
+  fixture(t)
+  const admission = 'fixture.signed.capability'
+  primeRemoteSignal(url, protocols)
+  assert.equal(hasPrimedRemoteSignal(url, admission), false, 'ordinary challenge preparation cannot bypass freshness')
+  const flight = [...protocols, 'mew-connect.signed.offer.proof']
+  primeRemoteSignal(url, flight)
+  assert.equal(hasPrimedRemoteSignal(url, admission), true)
+  assert.equal(hasPrimedRemoteSignal(url + '&hint=other', admission), false)
+  assert.equal(hasPrimedRemoteSignal(url, 'other.signed.capability'), false)
+  Signal.instances.at(-1)!.close()
+  assert.equal(hasPrimedRemoteSignal(url, admission), false)
+})
+
+test('cancellation closes only the exact URL and admission before socket adoption', t => {
+  fixture(t)
+  const admission = 'fixture.signed.capability'
+  primeRemoteSignal(url, [...protocols, 'mew-connect.signed.offer.proof'])
+  const socket = Signal.instances[0]!
+  discardPrimedRemoteSignal(url + '&hint=other', admission)
+  discardPrimedRemoteSignal(url, 'other.signed.capability')
+  assert.equal(socket.closes, 0)
+  discardPrimedRemoteSignal(url, admission)
+  assert.equal(socket.closes, 1)
+  assert.equal(takePrimedRemoteSignal(url, protocols), undefined)
+})
+
+test('oversized protocol headers are rejected before allocating a signaling socket', t => {
+  fixture(t)
+  assert.throws(() => primeRemoteSignal(url, [...protocols, 'a'.repeat(12288)]), /너무 큽니다/)
+  assert.equal(Signal.instances.length, 0)
 })
 
 test('a malformed shared slot cannot inject queued payloads or accessors into its controller', t => {

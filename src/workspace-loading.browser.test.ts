@@ -65,11 +65,12 @@ test('authenticated workspace mounts without waiting for the lazy retry deadline
     page.on('pageerror', error => errors.push(error.message))
     await page.addInitScript(() => {
       const nativeSet = window.setTimeout, nativeClear = window.clearTimeout
-      let next = 1_000_000
+      let next = 1_000_000, holdRetries = true
       const held = new Map<number, { callback: TimerHandler; args: unknown[]; delay: number }>()
       Object.assign(window, {
         fixtureHeldDelays: [] as number[],
         fixtureReleaseTimers() {
+          holdRetries = false
           for (const [id, value] of held) {
             held.delete(id)
             if (typeof value.callback === 'function') Reflect.apply(value.callback, window, value.args)
@@ -77,7 +78,7 @@ test('authenticated workspace mounts without waiting for the lazy retry deadline
         },
       })
       window.setTimeout = function (callback: TimerHandler, delay = 0, ...args: unknown[]) {
-        if (typeof callback === 'function' && callback.name.startsWith('bound ') && delay > 10 && delay <= 300) {
+        if (holdRetries && typeof callback === 'function' && callback.name.startsWith('bound ') && delay > 10 && delay <= 300) {
           const id = next++; held.set(id, { callback, args, delay })
           ;(window as unknown as { fixtureHeldDelays: number[] }).fixtureHeldDelays.push(delay)
           return id

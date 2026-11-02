@@ -8,7 +8,11 @@
     "./server": "./src/serverExtensions.ts",
     "./context-target": "./src/editor/contextTarget.ts",
     "./fuzzy": "./src/utils/fuzzy.ts",
-    "./frontmatter": "./src/utils/frontmatter.ts"
+    "./frontmatter": "./src/utils/frontmatter.ts",
+    "./annotation-source": "./src/editor/annotationSource.ts",
+    "./annotation-popover": "./src/editor/AnnotationPopover.tsx",
+    "./comment-anchor": "./src/utils/commentAnchor.ts",
+    "./database": "./src/database.ts"
   },
   "dependencies": {
     "@chenglou/pretext": "1.0.0",

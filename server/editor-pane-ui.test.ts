@@ -42,6 +42,7 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><I18nProvid
   })
   const chunks = bundle.output.filter(item => item.type === 'chunk')
   const chunk = chunks.find(item => item.isEntry)!
+  const plainChunk = chunks.find(item => new URL('../src/components/CodePane.tsx', import.meta.url).pathname in item.modules)!
   const scripts = new Map(chunks.map(item => [`/${item.fileName}`, item.code]))
   const cssFiles = ['../src/components/EditorPane.tsx', '../src/components/TabBar.tsx']
   const cssSource = (await Promise.all(cssFiles.map(file => fs.readFile(new URL(file, import.meta.url), 'utf8')))).join('\n') + ' flex h-dvh flex-col'
@@ -56,6 +57,7 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><I18nProvid
   }
   const server = http.createServer(async (req, res) => {
     if (req.url === '/app.js' || scripts.has(req.url ?? '')) {
+      await gates.get(req.url!)
       res.setHeader('Content-Type', 'text/javascript')
       res.end(req.url === '/app.js' ? chunk.code : scripts.get(req.url!))
     } else if (req.url?.startsWith('/api/')) {
@@ -76,7 +78,7 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><I18nProvid
       res.end(req.url.startsWith('/api/file?') ? JSON.stringify({path:file, content:file === 'loading-empty.txt' ? '' : '# File content\n\nSelected file body', editable:true}) : '[]')
     } else {
       res.setHeader('Content-Type', 'text/html')
-      res.end(`<!doctype html><html><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}</style><body><div id="root"></div><script type="module" src="/app.js"></script></body></html>`)
+      res.end(`<!doctype html><html><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}</style><body><div id="root"></div><script type="module" src="/${chunk.fileName}"></script></body></html>`)
     }
   })
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
@@ -107,8 +109,18 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><I18nProvid
     await page.getByRole('button', { name: button, exact: true }).click()
     assert.equal(await page.evaluate('window.savedTabs.panes[0].activePath'), 'old.exe', 'unsupported new selection keeps the current tab')
   }
+  const releasePlain = hold('/' + plainChunk.fileName)
+  const plainRequested = page.waitForRequest(request => new URL(request.url()).pathname === '/' + plainChunk.fileName)
   await page.getByRole('button', { name: 'Open text', exact: true }).click()
+  await plainRequested
+  await page.evaluate('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))')
+  assert.equal(await page.locator('.cm-content').count(), 0, 'the actual editor engine is still downloading')
+  assert.equal(await page.evaluate("performance.getEntriesByType('measure').filter(entry => /:(?:editor-ready|first-paint)$/.test(entry.name)).length"), 0, 'loading placeholders never count as editor readiness or paint')
+  releasePlain()
   await page.locator('.cm-content').filter({ hasText: 'Selected file body' }).waitFor()
+  await page.waitForFunction("performance.getEntriesByType('measure').some(entry => /:first-paint$/.test(entry.name))")
+  assert.equal(await page.evaluate("performance.getEntriesByType('measure').filter(entry => /:editor-ready$/.test(entry.name)).length > 0"), true)
+
   const browserLink = page.getByRole('link', { name: /브라우저 새 탭에서 열기|Open in a new browser tab/ })
   assert.equal(await browserLink.count(), 0, 'other text files have no HTML browser action')
   for (const [path, width] of [['nested/cat preview.html', 1100], ['alternate.HTM', 390]] as const) {

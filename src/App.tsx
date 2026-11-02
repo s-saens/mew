@@ -22,7 +22,10 @@ import { useFocusedWorkspacePanel } from './hooks/use-focused-workspace-panel'
 import { defaultCapabilities, type Feature } from '../shared/access-policy'
 import { writeBrowserStorage } from '@mew/ui/browser-storage'
 import { WorkspaceSnapshotCache } from './utils/workspace-snapshot-cache'
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { seedWorkspaceUiSnapshot } from './utils/workspace-ui-startup'
+import { workspaceEditorPreparations } from './utils/workspace-editor-preparation'
+import { prepareEditorView } from './components/deferred-editor-views'
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import {
   createEditorApi,
   fetchAgentTabs,
@@ -81,7 +84,7 @@ import { captureCommentShortcut } from './utils/comment-shortcut'
 import { captureAppKeyboardLock } from './utils/keyboard-lock'
 import { HoverTipLayer, SelectField, hasDirPathDrag, hasPathDrag, pathFromDrag, useToast } from '@mew/ui'
 import type { PaneHandle } from './components/EditorPane'
-import { DeferredEditorPane as EditorPane } from './components/deferred-editor-pane'
+import { DeferredEditorPane as EditorPane, prepareEditorPane } from './components/deferred-editor-pane'
 import { mediaKind } from './utils/media'
 import { setContentWorkspace } from './utils/contentCache'
 import { useTabs, type StoredTabs } from './hooks/useTabs'
@@ -139,8 +142,27 @@ const RemoteAccessModal = deferredComponent(async () => ({ default: (await impor
 const DatabaseListModal = deferredComponent(async () => ({ default: (await import('./components/DatabaseListModal')).DatabaseListModal }), null)
 const SystemStatsModal = deferredComponent(async () => ({ default: (await import('./components/SystemStatsModal')).SystemStatsModal }), null)
 const ScheduleModal = deferredComponent(async () => ({ default: (await import('./components/ScheduleModal')).ScheduleModal }), null)
-const SearchPanel = deferredComponent(async () => ({ default: (await import('./components/SearchPanel')).SearchPanel }))
-const AgentPanel = deferredComponent(async () => ({ default: (await import('./components/AgentPanel')).AgentPanel }), null)
+const SearchPanel = deferredComponent(async () => ({ default: (await import('./components/SearchPanel')).SearchPanel }), undefined, { suspend: false })
+type AgentPanelModule = typeof import('./components/AgentPanel.tsx')
+let agentPanelCode: Promise<AgentPanelModule> | undefined
+let startPendingAgentPanel: (() => void) | undefined
+let urgentAgentPanel = false
+function prepareAgentPanelModule(load: () => Promise<AgentPanelModule>): Promise<AgentPanelModule> {
+  return agentPanelCode ??= new Promise((resolve, reject) => {
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const start = () => {
+      if (startPendingAgentPanel !== start) return
+      startPendingAgentPanel = undefined
+      clearTimeout(timer)
+      void load().then(resolve, reject)
+    }
+    startPendingAgentPanel = start
+    if (urgentAgentPanel) start()
+    else timer = setTimeout(start, 250)
+  })
+}
+function promoteAgentPanelModule() { urgentAgentPanel = true; startPendingAgentPanel?.() }
+const AgentPanel = deferredComponent(async () => ({ default: (await prepareAgentPanelModule(() => import('./components/AgentPanel'))).AgentPanel }), null, { suspend: false })
 const AndroidPanel = deferredComponent(async () => ({ default: (await import('./components/AndroidPanel')).AndroidPanel }))
 const ChatPanel = deferredComponent(async () => ({ default: (await import('./components/ChatPanel')).ChatPanel }))
 const FileHistoryModal = deferredComponent(async () => ({ default: (await import('./components/FileHistoryModal')).FileHistoryModal }), null)
@@ -276,6 +298,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
   const workspaceUiCache = useRef(new WorkspaceSnapshotCache<WorkspaceUiState>())
   const workspaceUiSaveQueue = useRef<Promise<unknown>>(Promise.resolve())
   const workspaceUiOwnerAlive = useRef(true)
+  const initialEditorPreparationAllowed = useRef(false)
   const agentTabsPrefetch = useRef<{ path: string; promise: ReturnType<typeof fetchAgentTabs> } | null>(null)
   const [preparedAgentTabs, setPreparedAgentTabs] = useState<ReturnType<typeof fetchAgentTabs>>()
   const rootTreeCache = useRef(new WorkspaceSnapshotCache<TreeNode[]>(24))
@@ -346,6 +369,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
   const dockPreferences = useDockPreferences()
   const dockPosition = dockPreferences.positions[desktopMode ? 'desktop' : 'mobile']
   const [editorOpen, setEditorOpen] = useState(true)
+  initialEditorPreparationAllowed.current = caps.filesRead && (!desktopMode || editorOpen)
   useEffect(() => {
     const query = window.matchMedia('(min-width: 768px)')
     const update = () => setDesktopMode(query.matches)
@@ -887,10 +911,22 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     // Read once afterward to retain a concurrent switch from another client.
     if (projectOpeningRef.current) { workspaceBroadcastPending.current = true; return }
     const sequence = ++workspaceReadSequence.current
-    void trackRefresh(fetchWorkspace().then(info => {
-      if (sequence === workspaceReadSequence.current) applyWorkspace(info)
+    const epoch = workspaceEpochRef.current
+    const initial = workspaceInfoRef.current === null
+    void trackRefresh(fetchWorkspace({ includeUi: initial }).then(info => {
+      if (sequence !== workspaceReadSequence.current || !workspaceUiOwnerAlive.current) return
+      if (initial && workspaceInfoRef.current === null) {
+        seedWorkspaceUiSnapshot(info, workspaceUiCache.current, { sequence, epoch },
+          { sequence: workspaceReadSequence.current, epoch: workspaceEpochRef.current },
+          (path, state) => restoreDeviceLayout(authEmail ?? 'guest', path, state))
+        if (info.hasProject !== false && epoch === workspaceEpochRef.current && initialEditorPreparationAllowed.current) {
+          const state = workspaceUiCache.current.get(info.projectPath ?? info.path)
+          for (const view of workspaceEditorPreparations(state)) void prepareEditorView(view.mode, view.path).catch(() => {})
+        }
+      }
+      applyWorkspace(info)
     }).catch(console.error))
-  }, [applyWorkspace, trackRefresh])
+  }, [applyWorkspace, authEmail, trackRefresh])
 
   const openRootProject = useCallback(async (projectPath: string) => {
     if (!canOpenProjects || (projectOpeningRef.current && !rootProjectSwitchRef.current)) return
@@ -1032,6 +1068,15 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     authEmail ?? undefined,
     projectUiPath ?? undefined,
   )
+
+  useLayoutEffect(() => {
+    if (projectUiPath && caps.filesRead && (!desktopMode || editorOpen)) void prepareEditorPane().catch(() => {})
+  }, [projectUiPath, caps.filesRead, desktopMode, editorOpen])
+
+  useLayoutEffect(() => {
+    const notice = noticeTarget === readyNoticeTarget && !!readyNoticeTarget && [projectUiPath, rootProjectPath].includes(readyNoticeTarget.workspacePath ?? readyNoticeTarget.cwd ?? null)
+    if (projectUiPath && (!workspaceUiLoaded || caps.agent && agentOpen || caps.terminal && terminalOpen || requestedAgentTab || mewcatPicker || notice)) promoteAgentPanelModule()
+  }, [projectUiPath, rootProjectPath, workspaceUiLoaded, caps.agent, caps.terminal, agentOpen, terminalOpen, requestedAgentTab, mewcatPicker, noticeTarget, readyNoticeTarget])
 
   const sidebarOpenPaths = useMemo(() => {
     const result: Record<string, Set<string>> = {}
@@ -1919,6 +1964,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
 
         <EditorPane
           key={pane.id}
+          visible={!desktopMode || editorOpen}
           accessVersion={JSON.stringify([auth.email, auth.role, auth.accessRevision, auth.capabilities])}
           pane={workspaceChanging ? { ...pane, tabs: pane.tabs.map(tab => ({ ...tab, editable: false })) } : pane}
           role={role}
@@ -2379,7 +2425,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
         <DockWorkspace key={projectUiPath ?? 'pending-workspace'} apiRef={dockRef} initialLayout={layout} value={workspaceUi.dock} onChange={saveDockLayout} onEditorDrop={handleDockEditorDrop} foreground={mobileForegroundPanel}>
         {panes.map(renderEditorPane)}
 
-        {!creationAgentProject && (caps.agent || caps.terminal) && <AgentPanel
+        {!creationAgentProject && projectUiPath && (caps.agent || caps.terminal) && <AgentPanel
           preparedTabs={preparedAgentTabs} requestedTab={requestedAgentTab} onRequestedTabHandled={() => { mewcatHandledTab.current = requestedAgentTab?.id ?? null; setRequestedAgentTab(null) }}
           requestedPicker={mewcatPicker}
           onPickerRuntimeChosen={runtime => { if (mewcatPicker) { selectMewcatRuntime(runtime); setMewcatPicker(false) } }}

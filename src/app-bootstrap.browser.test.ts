@@ -91,12 +91,15 @@ test('workspace grouping preserves every deferred module gate in the actual sour
     const bootstrap = new URL('./AppBootstrap.tsx', import.meta.url).pathname
     const editor = new URL('./components/EditorPane.tsx', import.meta.url).pathname
     const codePane = new URL('./components/CodePane.tsx', import.meta.url).pathname
+    const explorer = new URL('./components/SearchPanel.tsx', import.meta.url).pathname
     assert.ok(owner.has(editor) && owner.has(codePane), 'the real EditorPane and CodePane must be bundled')
     const initial = modules(staticChunks(chunks, entry)), authentication = modules(closure(bootstrap))
     const critical = new Set([...closure(appPath), ...closure(editor)])
+    assert.equal(modules(closure(appPath)).has(explorer), false, 'file explorer controls keep their independent download boundary')
     assert.notEqual(owner.get(appPath)!.fileName, owner.get(editor)!.fileName, 'EditorPane retains its own dynamic boundary')
     for (const eager of [initial, authentication]) {
       assert.equal(eager.has(appPath) || eager.has(editor) || eager.has(codePane), false, 'workspace and editor remain behind authentication')
+      assert.equal(eager.has(explorer), false, 'file explorer controls remain behind authentication')
       assert.deepEqual([...eager].filter(id => /\/(?:@codemirror|@lezer|@tiptap|@xterm)\//.test(id) || id.includes('/packages/tmux-term/')), [], 'editor and terminal dependencies remain deferred')
     }
     return { chunks, owner, closure, modules, initial, authentication, critical, criticalModules: modules(critical) }
@@ -143,11 +146,12 @@ test('workspace grouping preserves every deferred module gate in the actual sour
 test('cold startup preserves deferred workspace loading, remote authentication and local guest entry', { skip: !domBrowserExecutable(), timeout: 25_000 }, async t => {
   const bundle = await startupBundle(startupCodeSplitting)
   const chunks = bundle.output.filter(item => item.type === 'chunk')
-  const eagerWorkspaceModules = chunks.flatMap(item => Object.keys(item.modules)).filter(id => /\/src\/api\/client\.ts$|\/packages\/tmux-term\/|\/node_modules\/(?:@xterm|@codemirror|@tiptap)\//.test(id))
-  assert.deepEqual(eagerWorkspaceModules, [], 'authentication code has no editor or terminal module side effects')
   const entry = chunks.find(item => item.isEntry)!
   const workspaceChunk = chunks.find(item => appPath in item.modules)!
   const bootstrapChunk = chunks.find(item => new URL('./AppBootstrap.tsx', import.meta.url).pathname in item.modules)!
+  const authenticationChunks = new Set([...staticChunks(chunks, entry), ...staticChunks(chunks, bootstrapChunk)])
+  const eagerWorkspaceModules = chunks.filter(item => authenticationChunks.has(item.fileName)).flatMap(item => Object.keys(item.modules)).filter(id => /\/src\/api\/client\.ts$|\/packages\/tmux-term\/|\/node_modules\/(?:@xterm|@codemirror|@tiptap)\//.test(id))
+  assert.deepEqual(eagerWorkspaceModules, [], 'authentication code has no editor or terminal module side effects')
   assert.ok(staticChunks(chunks, bootstrapChunk).has(entry.fileName), 'fixture exercises authentication importing shared startup exports without blocking entry evaluation')
   const scripts = new Map(chunks.map(item => [`/${item.fileName}`, item.code]))
   let auth = guest, failAuth = false, authRequests = 0, holdAuth = false, supplyAuth = false

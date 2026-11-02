@@ -2,7 +2,11 @@ import type { JWK } from 'jose'
 import { REMOTE_LIMITS, REMOTE_PROTOCOL, REMOTE_TOKEN_CLOCK_TOLERANCE, parseRemoteFrame, sdpFingerprint } from '../../shared/remote-access.ts'
 import { DataChannelTransport, setRemoteTransport } from './remote-transport.ts'
 import { parseRemoteBootstrap, remoteBootstrapUrl, REMOTE_ADMISSION_PROTOCOL, REMOTE_ADMISSION_PREFIX, type RemoteBootstrapContext, type RemoteConnectionTarget } from '../../shared/remote-bootstrap.ts'
-import { takePrimedRemoteSignal } from './remote-signal-prime.ts'
+import { discardPrimedRemoteSignal, hasPrimedRemoteSignal, takePrimedRemoteSignal } from './remote-signal-prime.ts'
+import { remoteConnectFlightProtocols } from './remote-connect-flight.ts'
+import { remoteRecoveryFlightProtocols } from './remote-recovery-flight.ts'
+import type { RemoteRecoveryFlightClock } from '../../shared/remote-recovery-flight.ts'
+import { takePrimedRemotePeer } from './remote-peer-prime.ts'
 
 type ConnectionObserver = (state: string, error?: string, code?: string) => void
 type ConnectionCredentials = { session?: string; keyPair: CryptoKeyPair }
@@ -14,6 +18,9 @@ type Bootstrap = {
   target: RemoteConnectionTarget
   identity?: boolean
   admission?: string
+  initialCredentials?: Promise<ConnectionCredentials>
+  recoveryFlight?: RemoteRecoveryFlightClock
+  recoverySent(): void
   credentials: Promise<ConnectionCredentials | null>
   received(): void
   accept(context: RemoteBootstrapContext): void
@@ -24,20 +31,22 @@ export function connectRemote(instance: string, onState: ConnectionObserver, opt
   return createRemoteConnection(instance, onState, options)
 }
 
-export function bootstrapRemoteConnection(target: RemoteConnectionTarget, options: { identity?: boolean; admission?: string } = {}) {
+export function bootstrapRemoteConnection(target: RemoteConnectionTarget, options: { identity?: boolean; admission?: string; initialCredentials?: Promise<ConnectionCredentials>; recoveryFlight?: RemoteRecoveryFlightClock } = {}) {
   let accept!: (context: RemoteBootstrapContext) => void, reject!: (error: Error) => void
   let resume!: (credentials: ConnectionCredentials | null) => void
-  let observer: ConnectionObserver | undefined, started = false, closed = false, received = false
+  let observer: ConnectionObserver | undefined, started = false, closed = false, received = false, recoverySent = false
   const context = new Promise<RemoteBootstrapContext>((resolve, fail) => { accept = resolve; reject = fail })
   const credentials = new Promise<ConnectionCredentials | null>(resolve => { resume = resolve })
   const close = createRemoteConnection('', (state, message, code) => {
     if (observer) observer(state, message, code)
     else if (['error', 'denied', 'revoked'].includes(state)) {
       closed = true
-      reject(Object.assign(new Error(message ?? '중앙 서비스에 연결하지 못했습니다.'), { state, code, legacyFallback: !received && state === 'error' && !options.admission }))
+      reject(Object.assign(new Error(message ?? '중앙 서비스에 연결하지 못했습니다.'), { state, code,
+        recoveryFallback: recoverySent && state === 'error' && (!received || code === 'recovery-flight-unsupported'),
+        legacyFallback: !received && state === 'error' && !options.admission && !recoverySent }))
     }
   }, {}, {
-    target, identity: options.identity, admission: options.admission, credentials, received() { received = true },
+    target, identity: options.identity, admission: options.admission, initialCredentials: options.initialCredentials, recoveryFlight: options.recoveryFlight, recoverySent() { recoverySent = true }, credentials, received() { received = true },
     accept(value) { received = true; accept(value) },
     cancel() { closed = true; resume(null); queueMicrotask(() => reject(new Error('연결 준비가 취소됐습니다.'))) },
   })
@@ -75,8 +84,9 @@ function createRemoteConnection(instance: string, onState: ConnectionObserver, o
   const signalUrl = bootstrap ? remoteBootstrapUrl(location.origin, bootstrap.target, bootstrap.identity) : `${location.origin.replace('https:', 'wss:')}/central/signal?instance=${encodeURIComponent(instance)}&role=browser`
   const protocols = bootstrap?.admission ? [REMOTE_ADMISSION_PROTOCOL, `${REMOTE_ADMISSION_PREFIX}${bootstrap.admission}`] : undefined
   let primed: ReturnType<typeof takePrimedRemoteSignal>
-  try { primed = bootstrap ? takePrimedRemoteSignal(signalUrl, protocols) : undefined; signal = primed?.socket ?? new WebSocket(signalUrl, protocols) }
-  catch (error) { keyRequest.abort(); throw error }
+  const flightInstance = bootstrap?.initialCredentials && (bootstrap.admission || bootstrap.recoveryFlight && 'instance' in bootstrap.target) ? ('instance' in bootstrap.target ? bootstrap.target.instance : bootstrap.target.hint) : undefined
+  let flightOffered = false, recoveryOffered = false
+  const primedPeer = flightInstance && bootstrap?.admission ? takePrimedRemotePeer(signalUrl, bootstrap.admission) : undefined
   const verification = import('./remote-verification.ts').then(value => ({ value }), (error: unknown) => ({ error }))
   const verifier = async () => { const result = await verification; if ('error' in result) throw result.error; return result.value }
   const initializePeer = () => {
@@ -85,13 +95,13 @@ function createRemoteConnection(instance: string, onState: ConnectionObserver, o
     catch (error) { peer.close(); throw error }
   }
   let endpoint: ReturnType<typeof initializePeer>
-  try { endpoint = initializePeer() }
-  catch (error) { signal.close(); keyRequest.abort(); throw error }
+  try { endpoint = primedPeer ?? initializePeer() }
+  catch (error) { keyRequest.abort(); throw error }
   const { peer, channel } = endpoint
-  const candidates: RTCIceCandidateInit[] = [], localCandidates: RTCIceCandidateInit[] = []
+  const candidates: RTCIceCandidateInit[] = [], localCandidates: RTCIceCandidateInit[] = (primedPeer?.candidates ?? []).filter(candidate => !/ typ relay(?:\s|$)/.test(candidate.candidate ?? ''))
   let connectSocket: WebSocket | undefined, earlyCandidates = 0
   const emit = (value: Record<string, unknown>) => {
-    if (stopped || signal.readyState !== WebSocket.OPEN) return false
+    if (stopped || signal?.readyState !== WebSocket.OPEN) return false
     if (value.type === 'renew' && signalInterrupted) return false
     if (value.type === 'renew' && signalResume) {
       const request = crypto.randomUUID()
@@ -169,7 +179,7 @@ function createRemoteConnection(instance: string, onState: ConnectionObserver, o
     if (event) checkForeground()
   }
   const close = () => { if (stopped) return; if (authenticated && signalResume) emit({ type: 'end' }); stopped = true; cancelForegroundCheck(); keyRequest.abort(); bootstrap?.cancel(); clearTimeout(timeout); clearTimeout(disconnected); clearTimeout(disconnectNotice); clearTimeout(signalRetry); clearTimeout(signalTimeout); clearTimeout(leaseTimeout); clearInterval(renew); renewals.clear(); document.removeEventListener('visibilitychange', resume); window.removeEventListener('pageshow', resume); window.removeEventListener('online', resume); setRemoteTransport(null)
-    channel.close(); peer.close(); signal.close() }
+    channel.close(); peer.close(); signal?.close(); if (bootstrap?.admission) discardPrimedRemoteSignal(signalUrl, bootstrap.admission) }
   const fail = (error = '기기와 직접 연결하지 못했습니다. 기기의 실행 상태와 네트워크를 확인해 주세요.', state = 'error', code?: string) => { if (stopped) return; close(); onState(state, error, code) }
   const authorizeLease = (remaining: unknown, sentAt: number, sentWall: number) => {
     if (typeof remaining !== 'number' || !Number.isFinite(remaining) || remaining < 0 || remaining > REMOTE_LIMITS.lease) throw new Error('연결 유효 시간을 확인하지 못했습니다.')
@@ -199,14 +209,15 @@ function createRemoteConnection(instance: string, onState: ConnectionObserver, o
   }
   timeout = setTimeout(() => fail('직접 연결 시간이 초과됐습니다. 현재 네트워크에서 연결이 차단됐을 수 있습니다.'), 25_000)
   let queue = Promise.resolve(), offer = '', challenged = false
-  // Local preparation can overlap the signaling handshake; send only after its challenge.
-  const preparation = Promise.all([Promise.resolve(bootstrap ? bootstrap.credentials.then(value => value?.keyPair) : options.keyPair ?? crypto.subtle.generateKey({ name: 'Ed25519' }, false, ['sign', 'verify']) as Promise<CryptoKeyPair>).then(async pair => {
+  // Ordinary preparation overlaps the handshake; verified flights carry the same offer in Upgrade.
+  const preparation = Promise.all([Promise.resolve(bootstrap ? (bootstrap.initialCredentials ?? bootstrap.credentials).then(value => value?.keyPair) : options.keyPair ?? crypto.subtle.generateKey({ name: 'Ed25519' }, false, ['sign', 'verify']) as Promise<CryptoKeyPair>).then(async pair => {
     if (stopped || !pair) return null
     const publicKey = await crypto.subtle.exportKey('jwk', pair.publicKey)
     if (stopped) return null
     if (pair.publicKey.type !== 'public' || publicKey.kty !== 'OKP' || publicKey.crv !== 'Ed25519' || typeof publicKey.x !== 'string' || publicKey.d !== undefined) throw new Error('브라우저 연결 키를 확인하지 못했습니다.')
-    return { privateKey: pair.privateKey, publicKey: { kty: publicKey.kty, crv: publicKey.crv, x: publicKey.x } }
+    return { privateKey: pair.privateKey, publicKey: { kty: publicKey.kty, crv: publicKey.crv, x: publicKey.x }, pair }
   }), (async () => {
+    if (primedPeer) return primedPeer.descriptionPromise
     const description = await peer.createOffer()
     if (stopped) return null
     await peer.setLocalDescription(description)
@@ -215,7 +226,7 @@ function createRemoteConnection(instance: string, onState: ConnectionObserver, o
     if (stopped || !description || !key) return null
     privateKey = key.privateKey
     offer = description.sdp!
-    return { publicKey: key.publicKey }
+    return { publicKey: key.publicKey, pair: key.pair }
   }).then(value => ({ value }), (error: unknown) => ({ error }))
   const prove = async () => {
     if (!ticket || channel.readyState !== 'open' || stopped) return
@@ -248,7 +259,12 @@ function createRemoteConnection(instance: string, onState: ConnectionObserver, o
           if (value.context !== undefined) bootstrap.received()
           if (typeof value.nonce !== 'string' || !/^[A-Za-z0-9_-]{20,64}$/.test(value.nonce)) throw new Error('연결 증명을 확인하지 못했습니다.')
           const context = parseRemoteBootstrap(value.context, location.origin)
+          if (value.earlyConnect === true && (!flightOffered || context.instance !== flightInstance)) throw new Error('연결 기기가 일치하지 않습니다.')
           if ('instance' in bootstrap.target && context.instance !== bootstrap.target.instance) throw new Error('연결 기기가 일치하지 않습니다.')
+          if (value.recoveryConnect === true && !recoveryOffered) throw new Error('연결 복구 증명을 확인하지 못했습니다.')
+          if (recoveryOffered && (value.earlyConnect !== true || value.recoveryConnect !== true)) {
+            fail('중앙 서비스의 연결 복구 방식을 다시 확인합니다.', 'error', 'recovery-flight-unsupported'); return
+          }
           instance = context.instance; ticketIssuers = context.ticketIssuers
           centralKey = Promise.resolve({ key: context.publicKey })
           bootstrap.accept(context)
@@ -260,6 +276,16 @@ function createRemoteConnection(instance: string, onState: ConnectionObserver, o
         if (stopped || socket !== signal || signalInterrupted) return
         if ('error' in prepared) throw prepared.error
         if (!prepared.value) return
+        if (bootstrap?.initialCredentials) {
+          const credentials = await bootstrap.credentials
+          if (stopped || !credentials) return
+          const key = await crypto.subtle.exportKey('jwk', credentials.keyPair.publicKey)
+          if (key.x !== prepared.value.publicKey.x) throw new Error('브라우저 연결 키가 변경됐습니다. 다시 연결해 주세요.')
+        }
+        if (value.earlyConnect === true) {
+          if (!flightOffered) throw new Error('연결 증명을 확인하지 못했습니다.')
+          connectSocket = socket; flushCandidates(); return
+        }
         connectSentAt = performance.now(); connectWallSentAt = Date.now()
         if (emit({ type: 'connect', instance, sdp: offer, publicKey: prepared.value.publicKey, serverRenewal: true, signalResume: value.signalResume === true, ...(bootstrap ? { nonce: value.nonce } : options.launch ? { launch: options.launch } : {}) })) { connectSocket = socket; flushCandidates() }
         return
@@ -344,9 +370,48 @@ function createRemoteConnection(instance: string, onState: ConnectionObserver, o
     socket.onerror = () => interruptSignal(socket)
     socket.onclose = event => interruptSignal(socket, event?.code === 1000)
   }
-  bindSignal(signal)
-  for (const event of primed?.messages ?? []) receiveSignal(signal, event)
-  if (primed?.failed) queueMicrotask(() => fail('중앙 서비스에 연결하지 못했습니다.'))
+  const openSignal = (selectedProtocols = protocols, requirePrimed = false) => {
+    if (stopped) return false
+    try {
+      primed = bootstrap ? takePrimedRemoteSignal(signalUrl, selectedProtocols) : undefined
+      if (requirePrimed && !primed) return false
+      connectSentAt = primed?.startedAt ?? performance.now(); connectWallSentAt = primed?.startedWall ?? Date.now()
+      signal = primed?.socket ?? new WebSocket(signalUrl, selectedProtocols)
+      bindSignal(signal)
+      for (const event of primed?.messages ?? []) receiveSignal(signal, event)
+      if (primed?.failed) queueMicrotask(() => fail('중앙 서비스에 연결하지 못했습니다.'))
+      return true
+    } catch (error) { fail(error instanceof Error ? error.message : undefined) }
+    return false
+  }
+  if (flightInstance && bootstrap?.admission) {
+    void preparation.then(async prepared => {
+      if (stopped) return
+      if ('error' in prepared) throw prepared.error
+      if (!prepared.value) return
+      const reconstructPrimed = hasPrimedRemoteSignal(signalUrl, bootstrap.admission!)
+      const flight = await remoteConnectFlightProtocols(location.origin, flightInstance, bootstrap.admission!, offer, prepared.value.pair, { allowElapsedAdmission: reconstructPrimed })
+      if (stopped) return
+      flightOffered = !!flight
+      if (!openSignal(flight ?? protocols, reconstructPrimed) && !stopped) {
+        const freshFlight = await remoteConnectFlightProtocols(location.origin, flightInstance, bootstrap.admission!, offer, prepared.value.pair)
+        if (stopped) return
+        flightOffered = !!freshFlight
+        openSignal(freshFlight ?? protocols)
+      }
+    }).catch(error => fail(error instanceof Error ? error.message : undefined))
+  } else if (flightInstance && bootstrap?.recoveryFlight) {
+    void preparation.then(async prepared => {
+      if (stopped) return
+      if ('error' in prepared) throw prepared.error
+      if (!prepared.value) return
+      const flight = await remoteRecoveryFlightProtocols(location.origin, flightInstance, offer, prepared.value.pair, bootstrap.recoveryFlight)
+      if (stopped) return
+      flightOffered = recoveryOffered = !!flight
+      if (flight) bootstrap.recoverySent()
+      openSignal(flight ?? protocols)
+    }).catch(error => fail(error instanceof Error ? error.message : undefined))
+  } else openSignal()
   channel.onopen = () => { void prove().catch(() => fail()) }
   channel.addEventListener('message', event => {
     if (stopped || authenticated) return

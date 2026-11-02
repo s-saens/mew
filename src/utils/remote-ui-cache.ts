@@ -13,6 +13,7 @@ const STORED_BYTES = 'x-mew-ui-cache-bytes'
 let writes = Promise.resolve()
 const confirmed = new WeakMap<AppTransport, { instance: string; generation: number; expires: number; digests: Map<string, string> }>()
 const indexVersions = new WeakMap<AppTransport, number>()
+const emptyIndexes = new WeakMap<AppTransport, { instance: string; generation: number; expires: number }>()
 const contentDigest = (etag: string) => /^"sha256-[A-Za-z0-9_-]{43}(?:-gzip)?"$/.test(etag) ? etag.replace(/-gzip"$/, '"') : null
 const cachePrefix = (instance: string) => `${location.origin}/__mew_ui_cache/${encodeURIComponent(instance)}/`
 
@@ -21,12 +22,18 @@ async function fetchIndex(transport: AppTransport, path: string, init: RequestIn
   const version = (indexVersions.get(transport) ?? 0) + 1
   indexVersions.set(transport, version)
   confirmed.delete(transport)
+  emptyIndexes.delete(transport)
   if (generation === undefined || !globalThis.caches || !crypto.subtle) return transport.fetch(path, init)
   const url = new URL(path, location.origin)
   const discover = async () => {
     const paths: string[] = []
     const cache = await caches.open(CACHE), prefix = cachePrefix(instance)
-    for (const key of [...await cache.keys()].reverse()) {
+    const keys = await cache.keys()
+    if (!keys.some(key => key.url.startsWith(prefix) && remoteUiCachePath(decodeURIComponent(key.url.slice(prefix.length)))) &&
+      generation === transport.resourceGeneration && version === indexVersions.get(transport) && !init.signal?.aborted) {
+      emptyIndexes.set(transport, { instance, generation, expires: performance.now() + REMOTE_UI_REVALIDATION_AGE })
+    }
+    for (const key of [...keys].reverse()) {
       if (!key.url.startsWith(prefix)) continue
       const asset = decodeURIComponent(key.url.slice(prefix.length))
       if (!remoteUiCachePath(asset) || paths.includes(asset)) continue
@@ -41,7 +48,12 @@ async function fetchIndex(transport: AppTransport, path: string, init: RequestIn
   clearTimeout(timer)
   if (!paths.length) return transport.fetch(path, init)
   url.searchParams.set('revalidate', JSON.stringify(paths))
-  const response = await transport.fetch(url.pathname + url.search, init)
+  let response = await transport.fetch(url.pathname + url.search, init)
+  if (response.status === 400) {
+    await response.body?.cancel().catch(() => {})
+    url.searchParams.delete('revalidate')
+    response = await transport.fetch(url.pathname + url.search, init)
+  }
   if (response.status === 200 && generation === transport.resourceGeneration && version === indexVersions.get(transport) && !init.signal?.aborted) {
     try {
       const values: unknown = JSON.parse(response.headers.get(REMOTE_UI_REVALIDATION_HEADER) ?? 'null')
@@ -103,12 +115,33 @@ async function store(cache: Cache, key: string, response: Response, bytes: Uint8
   }
 }
 
+function cacheFreshResponse(cache: Cache | undefined, key: string, response: Response) {
+  const etag = response.headers.get('etag')
+  if (response.status !== 200 || !etag || !contentDigest(etag)) return
+  const snapshot = response.clone()
+  // Cache preparation and writes cannot delay the live streamed response.
+  void (async () => {
+    const fresh = await readAsset(snapshot)
+    if (!fresh || await digest(fresh) !== contentDigest(etag)) return
+    const target = cache ?? await caches.open(CACHE)
+    writes = writes.then(() => store(target, key, snapshot, fresh)).catch(() => {})
+  })().catch(() => {})
+}
+
 /** Cached code is usable only after this host confirms its digest over the live P2P link. */
 export async function fetchRemoteUiResource(transport: AppTransport, path: string, init: RequestInit, instance?: string): Promise<Response> {
   const url = new URL(path, location.origin), asset = url.searchParams.get('path') ?? ''
   if (instance && init.method === 'GET' && url.pathname === '/api/remote-ui/file' && asset === '/index.html' && !new Headers(init.headers).has('range')) return fetchIndex(transport, path, init, instance)
   if (!instance || init.method !== 'GET' || url.pathname !== '/api/remote-ui/file' || !remoteUiCachePath(asset) || new Headers(init.headers).has('range') || !globalThis.caches || !crypto.subtle) return transport.fetch(path, init)
   const key = cachePrefix(instance) + encodeURIComponent(asset)
+  const empty = emptyIndexes.get(transport)
+  if (empty?.instance === instance && empty.generation === transport.resourceGeneration && performance.now() < empty.expires) {
+    const headers = new Headers(init.headers)
+    headers.delete('if-none-match')
+    const response = await transport.fetch(path, { ...init, headers })
+    cacheFreshResponse(undefined, key, response)
+    return response
+  }
   let cache: Cache, cached: Response | undefined, bytes: Uint8Array | null = null
   try {
     cache = await caches.open(CACHE)
@@ -144,15 +177,6 @@ export async function fetchRemoteUiResource(transport: AppTransport, path: strin
     headers.delete('if-none-match')
     response = await transport.fetch(path, { ...init, headers })
   }
-  const etag = response.headers.get('etag')
-  if (response.status === 200 && etag && contentDigest(etag)) {
-    const snapshot = response.clone()
-    // Read alongside the consumer; cache writes never hold up the first streamed response.
-    void (async () => {
-      const fresh = await readAsset(snapshot)
-      if (!fresh || await digest(fresh) !== contentDigest(etag)) return
-      writes = writes.then(() => store(cache, key, snapshot, fresh)).catch(() => {})
-    })().catch(() => {})
-  }
+  cacheFreshResponse(cache, key, response)
   return response
 }

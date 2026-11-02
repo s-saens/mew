@@ -10,6 +10,19 @@ const origin = 'https://mew.test'
 const settle = async () => { for (let index = 0; index < 8; index++) await Promise.resolve() }
 type WorkerMessage = { type: string; [key: string]: unknown }
 
+test('resource readiness returns only the public protocol to an exact-origin window through its own port', () => {
+  const listeners = new Map<string, (event: unknown) => void>()
+  vm.runInNewContext(source, { self: { location: { origin }, addEventListener(type: string, callback: (event: unknown) => void) { listeners.set(type, callback) } } })
+  const message = listeners.get('message')!
+  const probe = (changes: Record<string, unknown> = {}) => {
+    const messages: unknown[] = [], port = { postMessage(value: unknown) { messages.push(value) }, close() {} }
+    message({ origin, source: { type: 'window' }, data: { type: 'mew-resource-ready', protocol: 1 }, ports: [port], ...changes })
+    return messages
+  }
+  assert.deepEqual(JSON.parse(JSON.stringify(probe())), [{ type: 'mew-resource-ready', protocol: 1 }])
+  for (const changes of [{ origin: 'https://foreign.test' }, { source: { type: 'worker' } }, { data: { type: 'mew-resource-ready', protocol: 2 } }, { data: { type: 'mew-resource' } }, { ports: [] }]) assert.deepEqual(probe(changes), [])
+})
+
 class Port {
   peer!: Port
   closed = false

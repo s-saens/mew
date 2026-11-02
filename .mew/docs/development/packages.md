@@ -1,7 +1,7 @@
 ---
 title: "Shared Packages"
-description: "Defines responsibilities of source packages such as shared ActionMenu, header menus, editor, and ui; pure search and tmux session entry points; and editor context menu and readable-text/rich-HTML clipboard boundaries, including shared vertical and horizontal icon presentations and scroll-preserving click dismissal. Describes host-injected drawing dialogs and mapped image insertion, Hotview computation and display ranges, YAML preservation, default multi-select types for tags and assignees, host API injection for full-file mention candidates and image URLs, translation, Mermaid, mobile comment integration, and project-owned option storage shared by Documents and Files."
-updated: "2026-11-02"
+description: "Defines shared package responsibilities and engine-independent editor utility, annotation, database, search, and tmux entry points. Covers editor context menus and clipboard boundaries, host-injected drawings, image URLs, mentions, translations, Hotview rendering, YAML, mobile comments, and project-owned property options."
+updated: "2026-11-03"
 상위파일:
   - "../MOC.md"
   - "MOC.md"
@@ -13,6 +13,8 @@ Reusable parts are separated into source packages under `packages/*` (no build�
 Hotview uses per-block Markdown and line number caches inside the editor package and DOM virtualization based on Pretext 1.0.0. The full ProseMirror and Yjs models are retained, and selection, table of contents, search, and source line navigation restore the required blocks. Storage formats, display ranges, font changes, and limitations of large single blocks follow the [Hotview rendering contract](hotview-rendering.md).
 
 Explorer and mention search functions are imported from `@mew/editor/fuzzy`, and the general API's session classification function is imported from `@mew/tmux-term/command-session`. Neither entry point imports editor or terminal UI. Existing package-root exports remain for compatibility, but pure utilities needed for the start screen use these entry points to keep Tiptap, CodeMirror, and xterm out of initial dependencies. The in-memory bundle regression test `src/api/client-bundle.test.ts` verifies this boundary.
+
+The document pane also imports frontmatter, source annotations, comment anchors, and annotation UI through `@mew/editor/frontmatter`, `annotation-source`, `comment-anchor`, and `annotation-popover`. The `@mew/editor/database` entry exports the database panel and glyph without importing the Hotview editor. These entries preserve independent Plain and Hotview downloads: Plain must not load Tiptap or ProseMirror, and Hotview must not load CodeMirror or Lezer. Use `import type { TreeNode } from '@mew/editor'` for types from the package root. With verbatim module syntax, an inline `import { type TreeNode }` can retain an empty runtime import and download the editor engine, as the background agent panel previously did. The [startup contract](architecture.md#workspace-initialization) owns view and popup preparation; `src/components/editor-view-startup.test.ts` checks the actual pane, engine, and agent-panel static dependency closures.
 
 Shared UI text is translated with `uiText` from `@mew/ui/i18n-core` and `useUiLocale` from `@mew/ui/i18n`. Hosts pass the language through `setUiLocale`, and Mew connects it to the existing `I18nProvider`. The editor, mobile modifier keys, terminal, shortcut errors, and confirmation dialogs use the same language. Utilities used in Node use the `i18n-core` entry point, which does not load React. Dictionaries, subscriptions, and verification criteria follow the [UI translation contract](ui-contracts.md#ui-translation).
 

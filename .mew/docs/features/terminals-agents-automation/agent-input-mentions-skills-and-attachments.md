@@ -4,11 +4,11 @@ parent: "mew-agents"
 title: "Agent Input, Mentions, Skills, and Attachments"
 status: "implemented"
 created: "2026-09-18"
-updated: "2026-11-02"
+updated: "2026-11-03"
 status_hash: "a10e27bcc06cebe98975858548ff907b5953bfbcf197fe2ef971d9294144858f"
 files: ["src/components/AgentPanel.tsx", "src/components/agent-document-tag.tsx", "src/utils/agent-attachments.ts", "src/components/agent-prompt-drafts.tsx", "src/utils/agent-saved-prompts.ts", "src/components/MentionTextarea.tsx", "src/components/agent-composer-input.tsx", "src/components/agent-composer-attachments.tsx", "src/components/agent-media-preview-dialog.tsx", "src/utils/agent-composer-document.ts", "src/components/drawing/DrawingEditor.tsx", "src/utils/clipboard-images.ts", "src/utils/agentInputMentions.ts", "server/skills.ts"]
 commits: []
-description: "Feature contract covering project, file, and folder @mentions and autocomplete lists in agent input, /skill selection, circular upload indicators for movable inline attachment tags, and sent document reference icons with filename popups that open the editor only after filename activation. Explains inline user message attachments, Enter focus return and Ctrl/Cmd+Enter submission from settings selectors, mobile keyboard image pasting, media previews, input history, saved prompt drafts, floating Drawing/Save/Attach/Schedule/Send controls with aligned hover tooltips, resizing, CLI switching, queue editing, drawing attachments, candidate scope, `.mew/temp/assets` storage, and reference compatibility."
+description: "Feature contract covering project, file, and folder @mentions and autocomplete lists in agent input, /skill selection, circular upload indicators for movable inline attachment tags, and sent document reference icons with filename popups that open the editor only after filename activation. Explains deferred rich composer preparation, inline user message attachments, Enter focus return and Ctrl/Cmd+Enter submission from settings selectors, mobile keyboard image pasting, media previews, input history, saved prompt drafts, floating Drawing/Save/Attach/Schedule/Send controls with aligned hover tooltips, resizing, CLI switching, queue editing, drawing attachments, candidate scope, `.mew/temp/assets` storage, and reference compatibility."
 상위파일:
   - "MOC.md"
   - "_terminals-agents-automation.md"
@@ -47,6 +47,8 @@ Saved prompts are scoped to the current account, instance, browser, and logical 
 Disable this control while attachments are uploading, a CLI submission is pending, or a queued message is being edited. CLI drafts cannot be loaded without terminal permission. The shared action menu supplies keyboard navigation, Escape/Back and outside dismissal, viewport bounds, and trigger focus restoration; loading a prompt returns focus to the composer. Local verification and application limits are in the [work record](../../work/agent-prompt-drafts.md).
 
 ### Composer input
+
+Prepare the rich `AgentComposerInput` only when an image-capable input renders. Ordinary textarea inputs retain their native editing surface without downloading CodeMirror. During rich composer preparation, display the shared busy indicator, then mount with the current draft, callbacks, ref, and autofocus state. A canceled load cannot replace a subsequently selected native input; reopening reuses prepared code. Background agent session restoration and notifications remain unchanged. The [startup contract](../../development/architecture.md#workspace-initialization) owns the module boundary, verified by `src/components/mention-composer-loading.browser.test.ts` alongside the existing mention, attachment, and clipboard checks.
 
 Local implementation and verification of the in-field action row are recorded in the [composer action work record](../../work/agent-composer-actions.md).
 

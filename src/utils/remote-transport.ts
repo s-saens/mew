@@ -26,6 +26,7 @@ export function openMewSocket(url: string | URL, protocols?: string | string[]):
   if (remoteMode) throw new Error('기기 연결이 종료됐습니다.')
   return new WebSocket(url, protocols)
 }
+const isUiResourceRequest = (method: string, path: string) => ['GET', 'HEAD'].includes(method) && path.split('?', 1)[0] === '/api/remote-ui/file'
 type PendingRequest = { resolve(response: Response): void; reject(error: Error): void; controller?: ReadableStreamDefaultController<Uint8Array>; cleanup(): void; responseStarted(): void; responded: boolean; sentAt: number; window?: number; outstanding?: number; flow?: RemoteReceiveWindow; queuedBytes?: number }
 export class DataChannelTransport implements AppTransport {
   channel: RTCDataChannel
@@ -67,7 +68,7 @@ export class DataChannelTransport implements AppTransport {
       if (this.forwarded.has(frame.id) || this.requests.has(frame.id) || this.sockets.has(frame.id)) throw new Error('중복된 원격 요청입니다.')
       const entry = { ready: Promise.resolve(), outgoing: Promise.resolve(), admission: new AbortController(), release: undefined as (() => void) | undefined, socket: frame.type === 'socket' }
       this.forwarded.set(frame.id, entry)
-      entry.ready = this.slots.acquire(entry.admission.signal, frame.type).then(async release => {
+      entry.ready = this.slots.acquire(entry.admission.signal, frame.type, frame.type === 'request' && isUiResourceRequest(frame.method, frame.path)).then(async release => {
         if (this.forwarded.get(frame.id) !== entry || this.closed) { release(); return }
         entry.release = release
         await this.send(frame)
@@ -139,7 +140,7 @@ export class DataChannelTransport implements AppTransport {
     }
   }
   private async fetchRequest(request: Request, url: URL, capability: 'port-preview' | undefined, generation: number): Promise<Response> {
-    const signal = request.signal, release = await this.slots.acquire(signal)
+    const signal = request.signal, release = await this.slots.acquire(signal, 'request', isUiResourceRequest(request.method, url.pathname))
     if (this.closed || this.suspended || generation !== this.generation) { release(); throw new Error('원격 요청이 중단됐습니다. 결과를 확인한 뒤 다시 시도해 주세요.') }
     const id = crypto.randomUUID()
     return new Promise<Response>((resolve, reject) => {

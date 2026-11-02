@@ -120,15 +120,21 @@ test('static UI cache revalidates across launch tokens, isolates hosts and rejec
   const original = `export const value="host A";\n/*${'cached static module '.repeat(12_000)}*/`
   const changed = original.replace('host A', 'host A updated'), other = 'export const value="host B";'
   const hosts = new Map<string, { server: http.Server; dist: string }>()
+  let rejectedBatchStatus = 0
   for (const [instance, script] of [['fixture-instance', original], ['other-instance', other]]) {
     const dist = path.join(temporary, instance)
     await fs.mkdir(path.join(dist, 'assets'), { recursive: true })
     await fs.mkdir(path.join(dist, 'fonts'), { recursive: true })
     await fs.writeFile(path.join(dist, 'assets/app.js'), script)
+    await fs.writeFile(path.join(dist, 'assets/workspace~App~public-share-a1b2c3.js'), script)
     await fs.writeFile(path.join(dist, 'fonts/fixture.css'), '@font-face{font-family:Fixture;src:url(./fixture.woff2)}')
     await fs.writeFile(path.join(dist, 'fonts/fixture.woff2'), 'installed font payload')
     await fs.writeFile(path.join(dist, 'index.html'), '<html><head><meta name="mew-p2p-bootstrap" content="1"></head><body>Installed UI</body></html>')
     const app = express(), server = http.createServer(app)
+    app.get('/api/remote-ui/file', (req, res, next) => {
+      if (rejectedBatchStatus && req.query.revalidate !== undefined) { res.status(rejectedBatchStatus).end('Batch revalidation unavailable'); return }
+      next()
+    })
     app.get('/api/cache-probe', (_req, res) => { res.json({ instance }) })
     app.use('/api/remote-ui', createRemoteUiRouter(dist))
     hosts.set(instance, { server, dist })
@@ -204,6 +210,11 @@ test('static UI cache revalidates across launch tokens, isolates hosts and rejec
   assert.equal((await fetchFile('/fonts/fixture.css')).text, '@font-face{font-family:Fixture;src:url(./fixture.woff2)}')
   assert.equal((await fetchFile('/fonts/fixture.woff2')).text, 'installed font payload')
   await page.waitForFunction("caches.open('mew-remote-ui-v1').then(cache=>cache.keys()).then(keys=>keys.filter(key=>key.url.includes('/__mew_ui_cache/fixture-instance/')).length>=3)")
+  const sharedAsset = '/assets/workspace~App~public-share-a1b2c3.js'
+  const sharedCold = await fetchFile(sharedAsset)
+  assert.equal(sharedCold.text, original)
+  assert.equal(sharedCold.etag, cold.etag, 'entry-aware chunk names receive the same content validator')
+  await page.waitForFunction(`caches.open('mew-remote-ui-v1').then(cache=>cache.keys()).then(keys=>keys.some(key=>key.url.endsWith(${JSON.stringify(encodeURIComponent(sharedAsset))})))`)
   await page.addInitScript("window.cacheWrites=0;window.cachePut=Cache.prototype.put;Cache.prototype.put=function(...args){window.cacheWrites++;return window.cachePut.apply(this,args)}")
 
   await launch()
@@ -223,11 +234,31 @@ test('static UI cache revalidates across launch tokens, isolates hosts and rejec
   assert.equal(transfers.length, bundledStart + 1, 'the current index validates the cached module without another P2P request')
   assert.equal((await fetchFile('/fonts/fixture.css')).text, '@font-face{font-family:Fixture;src:url(./fixture.woff2)}')
   assert.equal((await fetchFile('/fonts/fixture.woff2')).text, 'installed font payload')
+  assert.equal((await fetchFile(sharedAsset)).text, original)
   assert.equal(transfers.length, bundledStart + 1, 'font CSS and fonts use the same live host validation without being transferred again')
   assert.equal((await fetchFile()).text, original)
   assert.equal(transfers.length, bundledStart + 2, 'each digest can be consumed only once during startup')
   assert.equal(transfers.at(-1)!.status, 304)
   assert.equal(await page.evaluate('window.cacheWrites'), 0, 'fresh validated bodies do not get rewritten on every cache hit')
+
+  await launch()
+  rejectedBatchStatus = 400
+  const rejectedBatchStart = transfers.length
+  assert.equal((await fetchFile('/index.html')).status, 200)
+  assert.deepEqual(transfers.slice(rejectedBatchStart).map(value => value.status), [400, 200], 'an older host can reject new cache paths without blocking its fresh index')
+  assert.equal(new URL(transfers.at(-1)!.path, origin).searchParams.has('revalidate'), false)
+  const fallbackFileStart = transfers.length
+  assert.equal((await fetchFile()).text, original)
+  assert.equal(transfers.length, fallbackFileStart + 1, 'a rejected batch cannot authorize cached modules')
+  assert.equal(transfers.at(-1)!.status, 304, 'cached modules still require an individual validator from the current host')
+  rejectedBatchStatus = 0
+
+  await launch()
+  rejectedBatchStatus = 403
+  const forbiddenBatchStart = transfers.length
+  assert.equal((await fetchFile('/index.html')).status, 403)
+  assert.equal(transfers.length, forbiddenBatchStart + 1, 'permission denials must not retry a different index request')
+  rejectedBatchStatus = 0
 
   await launch()
   await page.evaluate('window.cacheKeys=Cache.prototype.keys;Cache.prototype.keys=()=>new Promise(()=>{})')

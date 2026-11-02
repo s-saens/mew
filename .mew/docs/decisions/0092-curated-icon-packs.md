@@ -1,10 +1,12 @@
 ---
 title: "Curated local file icon packs in account themes"
-description: "Chooses a built-in Material/Catppuccin/basic icon selector with account theme synchronization, pinned upstream assets, local license notices, and no runtime extension catalog or execution. Extends ADRs 0030, 0089, and 0091 while retaining their palette and generic-artwork behavior."
+description: "Chooses a built-in Material/Catppuccin/basic icon selector with account theme synchronization, pinned assets, local notices, and no runtime extension catalog or execution. Extends ADRs 0030, 0089, and 0091; ADR 0122 changes whole-pack artwork delivery to bounded generated groups without changing matching or appearance."
 created: "2026-10-30"
-updated: "2026-10-30"
+updated: "2026-11-03"
 status: accepted
 ---
+
+[ADR 0122](0122-mewlink-initial-offer.md) replaces the whole-pack runtime artwork download below with generated bounded groups. Pack selection, source pins, matching, palettes, generic artwork, licenses, and account isolation remain in effect.
 
 ## Context
 

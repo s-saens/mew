@@ -68,9 +68,9 @@ import { stopAgentTabCommands } from '../api/agent-commands'
 import { commandTimeline } from '../utils/agent-command-timeline'
 import { copyText, keepFocusOnPress, TabScrollArea, useDragReorder, useOverlayDismiss } from '@mew/ui'
 import { useFocusedShortcutScope } from '@mew/shortcuts'
-import { TmuxTerminal } from '@mew/tmux-term'
+import { DeferredAgentTerminal as TmuxTerminal } from './deferred-agent-terminal'
 import { useI18n } from '../i18n'
-import { type TreeNode } from '@mew/editor'
+import type { TreeNode } from '@mew/editor'
 import {
   agentMarkdownHrefFromClick,
   commandFromAgentMarkdownClick,

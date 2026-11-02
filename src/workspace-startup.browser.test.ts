@@ -20,7 +20,12 @@ test('workspace chrome remains usable while editor and unopened tools download o
   const bundle = await build({
     input: 'virtual:workspace-startup.tsx', write: false, platform: 'browser', output: { format: 'esm', codeSplitting: startupCodeSplitting },
     transform: { jsx: 'react-jsx', define: { 'process.env.NODE_ENV': JSON.stringify('production'), 'import.meta.hot': 'false' } },
-    plugins: [{ name: 'workspace-startup-fixture', resolveId(id) {
+    plugins: [{ name: 'workspace-startup-fixture', transform(code, id) {
+      if (id === path.join(root, 'src/App.tsx')) return code.replace("import('./components/AgentPanel')", "(window.startupAgentImportAt=performance.now(),window.startupPreparationOrder.push('agent'),import('./components/AgentPanel'))")
+        .replace('return agentPanelCode ??=', 'window.startupAgentScheduledAt ??= performance.now(); return agentPanelCode ??=')
+      if (id === componentPath('deferred-editor-pane')) return code.replace("import('./EditorPane').then", "(window.startupPreparationOrder.push('editor'),import('./EditorPane')).then")
+      if (id === componentPath('deferred-editor-views')) return code.replace("return mode === 'plain' ?", "window.startupPreparationOrder.push('engine:' + mode); return mode === 'plain' ?")
+    }, resolveId(id) {
       if (id === 'virtual:workspace-startup.tsx') return id
       if (id.endsWith('.css')) return 'virtual:style'
       if (/\.(?:png|webp|jpe?g|gif|woff2?)(?:\?url)?$/.test(id)) return 'virtual:image'
@@ -28,6 +33,7 @@ test('workspace chrome remains usable while editor and unopened tools download o
       if (id === 'virtual:workspace-startup.tsx') return source
       if (id === 'virtual:style') return ''
       if (id === 'virtual:image') return 'export default "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"'
+      if (id === componentPath('AgentPanel')) return `import {useEffect} from ${JSON.stringify(import.meta.resolve('react'))}; export function AgentPanel(props){useEffect(()=>{window.restoredAgentWorkspace=props.workspacePath},[props.workspacePath]);return null}`
       if (id.endsWith('?raw')) return 'export default ' + JSON.stringify(await fs.readFile(id.slice(0, -4), 'utf8'))
     } }],
   })
@@ -39,7 +45,7 @@ test('workspace chrome remains usable while editor and unopened tools download o
     assert.ok(chunk, `${name} has its own deferred module`)
     return `/${chunk.fileName}`
   }
-  const editorScript = scriptFor('EditorPane'), settingsScript = scriptFor('SettingsModal')
+  const editorScript = scriptFor('EditorPane'), settingsScript = scriptFor('SettingsModal'), agentScript = scriptFor('AgentPanel')
   const closedTools = ['AdminSettingsModal', 'remote-desktop', 'FileHistoryModal', 'OpenProjectDialog'].map(scriptFor)
   assert.notEqual(editorScript, `/${entry.fileName}`)
   assert.notEqual(editorScript, settingsScript)
@@ -47,6 +53,7 @@ test('workspace chrome remains usable while editor and unopened tools download o
   const content = (await Promise.all(styleSources.map(file => fs.readFile(path.join(root, file), 'utf8')))).join('\n')
   const compiler = await compile(await fs.readFile(path.join(root, 'src/index.css'), 'utf8'), { base: path.join(root, 'src'), onDependency() {} })
   const css = compiler.build([...new Set(content.match(/[A-Za-z0-9_@:/.[\]()%,-]+/g))])
+  const initialUi = { sidebar: { docsExpanded: false }, chrome: { sidebarOpen: true, sidebarView: 'files' }, tabs: { '.workspace': { panes: [{ id: 'main', tabs: [{ path: 'README.md', preview: false, viewMode: 'plain' }], activePath: 'README.md' }], layout: { kind: 'leaf', pane: 'main' }, focusedPaneId: 'main' } } }
   const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
   t.after(() => browser.close())
 
@@ -59,19 +66,21 @@ test('workspace chrome remains usable while editor and unopened tools download o
     const editorPending = new Promise<void>(resolve => { releaseEditor = resolve })
     const settingsPending = new Promise<void>(resolve => { releaseSettings = resolve })
     const gates = new Map([[editorScript, editorPending], [settingsScript, settingsPending]])
-    await page.addInitScript(() => {
+    await page.addInitScript(urgent => {
       localStorage.setItem('mew:locale', 'ko')
       localStorage.setItem('mew:mewcat-skin', 'none')
+      if (urgent) localStorage.setItem('mew:agent-open', '1')
+      Object.assign(window, { startupPreparationOrder: [], startupSockets: [] })
       class Socket extends EventTarget {
         static OPEN = 1
-        readyState = 1
+        readyState = 0
         onopen: (() => void) | null = null
-        constructor() { super(); setTimeout(() => this.onopen?.(), 0) }
+        constructor() { super(); (window as any).startupSockets.push(this) }
         send() {}
         close() { this.readyState = 3 }
       }
       Object.defineProperty(globalThis, 'WebSocket', { value: Socket })
-    })
+    }, width === 390)
     await page.route('http://mew-startup.test/**', async route => {
       const url = new URL(route.request().url()), method = route.request().method()
       requested.add(url.pathname)
@@ -80,10 +89,10 @@ test('workspace chrome remains usable while editor and unopened tools download o
         return route.fulfill({ contentType: 'text/javascript', body: scripts.get(url.pathname)! })
       }
       const json = (value: unknown) => route.fulfill({ json: value })
-      if (url.pathname === '/api/auth/me') return json({ authenticated: true, email: 'startup@example.test', role: 'owner', mustChangePassword: false, displayName: 'Startup', avatarDataUrl: null, capabilities: { filesRead: true, filesWrite: true, agent: false, terminal: false, serverFiles: false, collaboration: false, git: true, portPreview: true, desktop: true } })
-      if (url.pathname === '/api/workspace') return json({ path: '/alpha', projects: [], docs: 'docs', docsPath: '/alpha/docs' })
+      if (url.pathname === '/api/auth/me') return json({ authenticated: true, email: 'startup@example.test', role: 'owner', mustChangePassword: false, displayName: 'Startup', avatarDataUrl: null, capabilities: { filesRead: true, filesWrite: true, agent: true, terminal: false, serverFiles: false, collaboration: false, git: true, portPreview: true, desktop: true } })
+      if (url.pathname === '/api/workspace') return json({ path: '/alpha', projects: [], docs: 'docs', docsPath: '/alpha/docs', workspaceUi: { workspacePath: '/alpha', state: initialUi } })
       if (url.pathname === '/api/user-ui/root-projects') return json({ state: { paths: ['/alpha'], icons: {}, groups: [] } })
-      if (url.pathname === '/api/user-ui/workspace') return json({ state: method === 'PUT' ? route.request().postDataJSON().state : { sidebar: { docsExpanded: false }, chrome: { sidebarOpen: true, sidebarView: 'files' }, tabs: { '.workspace': { panes: [{ id: 'main', tabs: [{ path: 'README.md', preview: false, viewMode: 'plain' }], activePath: 'README.md' }], layout: { kind: 'leaf', pane: 'main' }, focusedPaneId: 'main' } } } })
+      if (url.pathname === '/api/user-ui/workspace') return json({ state: method === 'PUT' ? route.request().postDataJSON().state : initialUi })
       if (url.pathname === '/api/tree') return json({ version: 1, state: 'ready', entries: [{ name: 'README.md', path: 'README.md', type: 'file' }] })
       if (url.pathname === '/api/file-access') return json({ view: true, edit: true })
       if (url.pathname === '/api/file') return json({ path: url.searchParams.get('path'), content: 'Startup document', editable: true })
@@ -98,6 +107,16 @@ test('workspace chrome remains usable while editor and unopened tools download o
       await page.goto('http://mew-startup.test/', { waitUntil: 'domcontentloaded' })
       const menu = page.getByRole('button', { name: '메뉴', exact: true })
       await menu.waitFor()
+      await page.waitForFunction('window.restoredAgentWorkspace === "/alpha"')
+      const preparation = await page.evaluate(() => (window as any).startupPreparationOrder as string[])
+      const agentDelay = await page.evaluate('window.startupAgentImportAt-window.startupAgentScheduledAt') as number
+      assert.ok(width === 390 ? agentDelay < 80 : agentDelay >= 200, `visible agents start immediately; closed background code waits250ms: ${agentDelay}`)
+      assert.equal(preparation.filter(value => value === 'agent').length, 1, 'urgent and background preparation share one import')
+      assert.ok(preparation.indexOf('engine:plain') >= 0 && preparation.indexOf('engine:plain') < preparation.indexOf('editor'), 'the accepted initial UI prepares the selected engine before pane registration: ' + JSON.stringify(preparation))
+      assert.ok(preparation.indexOf('editor') >= 0 && preparation.indexOf('editor') < preparation.indexOf('agent'), 'editor preparation starts before background agent module fanout: ' + JSON.stringify(preparation))
+      assert.equal(requested.has(agentScript), true, 'background agent preparation continues while the editor is held')
+      // Establish presence after the initial HTTP snapshot, then exercise its permission refresh.
+      await page.evaluate(() => { for (const socket of (window as any).startupSockets) { socket.readyState = 1; socket.onopen?.() } })
       if (width === 390) await page.locator('.mobile-dock').getByRole('button', { name: '파일 탐색기', exact: true }).click()
       const sidebar = page.locator('[data-sidebar]')
       await sidebar.waitFor()

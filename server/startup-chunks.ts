@@ -5,6 +5,6 @@ export const startupCodeSplitting: CodeSplittingOptions = {
     // main starts asynchronously without blocking evaluation of shared startup exports.
     { name: 'startup', tags: ['$initial'], priority: 10 },
     { name: 'authentication', test: /[/\\]src[/\\]AppBootstrap\.tsx$/, priority: 5 },
-    { name: 'workspace', test: /[/\\]src[/\\]App\.tsx$/, priority: 4, includeDependenciesRecursively: true },
+    { name: 'workspace', test: /[/\\]src[/\\]App\.tsx$/, priority: 4, includeDependenciesRecursively: true, entriesAware: true, entriesAwareMergeThreshold: 14 * 1024 },
   ],
 }

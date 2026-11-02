@@ -465,19 +465,21 @@ export function useTabs(
       const requestEpoch = workspaceRequestRef.current.epoch
       const requestKey = `${requestEpoch}\0${p}\0${path}`
       const requestToken = Symbol()
-      let readBaseline = existing?.savedContent ?? shared?.savedContent ?? cached?.content ?? ''
+      const readBaseline = existing?.savedContent ?? shared?.savedContent ?? cached?.content ?? ''
+      let previewBaseline: string | undefined
+      const matchesReadBaseline = (content: string) => content === readBaseline || content === previewBaseline
       fileReadSequenceRef.current.set(requestKey, requestToken)
       const isCurrentWorkspace = () => requestEpoch === workspaceRequestRef.current.epoch && fileReadSequenceRef.current.get(requestKey) === requestToken
       const applyFullFile = ({ content, editable, version }: { content: string; editable: boolean; version?: FileVersion }) => {
           if (!isCurrentWorkspace()) return
           markFileOpen(trace, 'file-response')
           const confirmed = findTab(p, path)
-          const superseded = confirmed && confirmed.savedContent !== readBaseline && confirmed.savedContent !== content
+          const superseded = confirmed && !matchesReadBaseline(confirmed.savedContent) && confirmed.savedContent !== content
           if (!external && !superseded) putCachedFile(p, path, { content, editable, version })
           mapTabsAtPath(p, path, (t) => {
             // A different pane may have saved this path while its read was pending.
             // Do not replace that newer confirmed buffer or its save baseline.
-            if (t.savedContent !== readBaseline && t.savedContent !== content) {
+            if (!matchesReadBaseline(t.savedContent) && t.savedContent !== content) {
               return { ...t, loading: false, revalidating: false, editable }
             }
             const edited = t.content !== t.savedContent
@@ -510,7 +512,12 @@ export function useTabs(
       // 목표 줄이 알려진 큰 plain 파일은 조각을 먼저 보여 준다. 조각 상태는 readOnly이고 cache에도
       // 저장하지 않는다. 뒤의 전체 요청이 완료되면 기존 편집·협업 경로로 원자적으로 바뀐다.
       const load = async () => {
-        if (!external && !cached) {
+        const showCachedFile = (snapshot: CachedFile) => {
+          previewBaseline = snapshot.content
+          markFileOpen(trace, 'cache-ready')
+          mapTabsAtPath(p, path, tab => tab.content !== tab.savedContent || !matchesReadBaseline(tab.savedContent) ? tab : ({ ...tab, content: snapshot.content, savedContent: snapshot.content, committedContent: snapshot.content, loading: false, revalidating: true, editable: false }))
+        }
+        if (!external && !cached && opts?.anchorLine !== undefined && opts.viewMode === 'plain') {
           // A blocked/queued browser database must not hold up the first server read.
           let cacheDeadline: ReturnType<typeof setTimeout> | undefined
           try {
@@ -520,12 +527,7 @@ export function useTabs(
             ])
           } finally { clearTimeout(cacheDeadline) }
           if (!isCurrentWorkspace()) return
-          if (cached) {
-            const snapshot = cached
-            readBaseline = snapshot.content
-            markFileOpen(trace, 'cache-ready')
-            mapTabsAtPath(p, path, tab => tab.content !== tab.savedContent ? tab : ({ ...tab, content: snapshot.content, savedContent: snapshot.content, committedContent: snapshot.content, loading: false, revalidating: true, editable: false }))
-          }
+          if (cached) showCachedFile(cached)
         }
         if (!isCurrentWorkspace()) return
         const canPreviewAnchor = !external && cached === undefined && opts?.anchorLine !== undefined && opts.viewMode === 'plain'
@@ -537,6 +539,7 @@ export function useTabs(
             return
           }
           markFileOpen(trace, 'anchor-preview')
+          previewBaseline = first.content
           mapTabsAtPath(p, path, (t) => ({
             ...t,
             content: first.content,
@@ -557,7 +560,14 @@ export function useTabs(
           }))
           applyFullFile(await fetchFile(file.path, file.project))
         } else {
-          applyFullFile(await (external ? fetchExternalFile(externalAbsolutePath(path)) : fetchFile(file.path, file.project, cached)))
+          // Start the authoritative read before opening persistent storage. A late
+          // disk snapshot can preview text, but cannot delay or replace validation.
+          const reading = external ? fetchExternalFile(externalAbsolutePath(path)) : fetchFile(file.path, file.project, cached)
+          let pending = true
+          if (!external && !cached) void loadCachedFile(p, path).then(snapshot => {
+            if (pending && isCurrentWorkspace() && snapshot) showCachedFile(snapshot)
+          }).catch(() => {})
+          try { applyFullFile(await reading) } finally { pending = false }
         }
       }
       const loading = load().catch(handleOpenError)

@@ -543,3 +543,36 @@ for (const [code, expected] of [['access-revoked', 'revoked'], ['permission-deni
     assert.equal(peer.channel.readyState, 'closed')
   })
 }
+
+
+test('a cold UI resource burst leaves room for current file and document rule requests on both transport routes', async t => {
+  const { wire, transport } = transportFixture(t)
+  for (let index = 0; index < REMOTE_LIMITS.streams - 2; index++) await transport.forward({ type: 'request', id: `asset-${index}`, method: 'GET', path: `/api/remote-ui/file?path=${encodeURIComponent(`/assets/${index}.js`)}`, headers: {} })
+  const queued = transport.forward({ type: 'request', id: 'queued-asset', method: 'GET', path: '/api/remote-ui/file?path=%2Fassets%2Flater.js', headers: {} })
+  const rules = transport.fetch('/api/rules?path=README.md')
+  await transport.forward({ type: 'request', id: 'current-file', method: 'GET', path: '/api/file?path=README.md', headers: {} })
+  await until(() => wire.frames.some(frame => frame.type === 'request' && frame.path.startsWith('/api/rules')))
+  assert.equal(wire.frames.some(frame => frame.id === 'queued-asset'), false)
+  assert.equal(wire.frames.filter(frame => frame.type === 'request').length, REMOTE_LIMITS.streams)
+  const current = wire.frames.find(frame => frame.type === 'request' && frame.path.startsWith('/api/rules'))!
+  wire.message({ type: 'response', id: current.id, status: 204, headers: {} })
+  wire.message({ type: 'end', id: current.id })
+  assert.equal((await rules).status, 204)
+  wire.message({ type: 'end', id: 'current-file' })
+  wire.message({ type: 'end', id: 'asset-0' })
+  await queued
+  assert.equal(wire.frames.filter(frame => frame.id === 'queued-asset').length, 1)
+})
+
+test('a queued direct resource fetch can be canceled while ordinary writes retain reserved admission', async t => {
+  const { wire, transport } = transportFixture(t)
+  for (let index = 0; index < REMOTE_LIMITS.streams - 2; index++) await transport.forward({ type: 'request', id: `asset-${index}`, method: 'HEAD', path: '/api/remote-ui/file?path=%2Fassets%2Fbusy.js', headers: {} })
+  const controller = new AbortController()
+  const queued = assert.rejects(transport.fetch('/api/remote-ui/file?path=%2Fassets%2Fcanceled.js', { signal: controller.signal }), { name: 'AbortError' })
+  await transport.forward({ type: 'request', id: 'write', method: 'POST', path: '/api/files', headers: {} })
+  controller.abort(); await queued
+  wire.message({ type: 'end', id: 'asset-0' })
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(wire.frames.some(frame => frame.type === 'request' && frame.path.includes('canceled.js')), false)
+  assert.equal(wire.frames.filter(frame => frame.id === 'write' && frame.type === 'request').length, 1)
+})

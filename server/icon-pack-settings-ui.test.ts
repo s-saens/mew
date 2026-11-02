@@ -84,13 +84,14 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
       }
       for (const selector of ['#files [data-path="src"]', '#server [title="/fixture/src"]']) {
         const folder = page.locator(selector)
-        await folder.click()
+        const toggle = selector.startsWith('#files') ? folder.locator('[data-folder-toggle]') : folder
+        await toggle.click()
         assert.equal(await folder.getAttribute('aria-expanded'), 'true')
         if (pack !== 'none') {
           const opened = pack === 'material' ? 'folder-open' : `${theme === 'dark' ? 'mocha' : 'latte'}-_folder_open`
           await folder.locator(`img[data-file-icon="${opened}"]`).waitFor()
         }
-        await folder.click()
+        await toggle.click()
         assert.equal(await folder.getAttribute('aria-expanded'), 'false')
       }
       for (const image of await page.locator('img[data-file-icon]:visible').all()) {

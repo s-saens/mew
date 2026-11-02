@@ -1,11 +1,15 @@
 import test, { type TestContext } from 'node:test'
 import assert from 'node:assert/strict'
-import { importJWK, SignJWT, type JWK } from 'jose'
+import { importJWK, jwtVerify, SignJWT, type JWK } from 'jose'
 import { remoteKeyPair } from '../../shared/remote-access-crypto.ts'
 import { REMOTE_TOKEN_CLOCK_TOLERANCE } from '../../shared/remote-access.ts'
 import { bootstrapRemoteConnection, connectRemote } from './remote-connection.ts'
-import type { RemoteBootstrapContext, RemoteConnectionTarget } from '../../shared/remote-bootstrap.ts'
+import { remoteBootstrapUrl, type RemoteBootstrapContext, type RemoteConnectionTarget } from '../../shared/remote-bootstrap.ts'
 import { activeRemoteTransport } from './remote-transport.ts'
+import { primeRemotePeer, takePrimedRemotePeer } from './remote-peer-prime.ts'
+import { primeRemoteSignal, takePrimedRemoteSignal } from './remote-signal-prime.ts'
+import { remoteConnectFlightProtocols } from './remote-connect-flight.ts'
+import type { RemoteRecoveryFlightClock } from '../../shared/remote-recovery-flight.ts'
 
 class FakeChannel extends EventTarget {
   readyState = 'open'
@@ -19,7 +23,7 @@ class FakeChannel extends EventTarget {
 }
 const fingerprint = Array(32).fill('AB').join(':')
 const sdp = `v=0\r\na=fingerprint:sha-256 ${fingerprint}\r\n`
-class FakePeer {
+class FakePeer extends EventTarget {
   static latest: FakePeer
   connectionState = 'new'
   remoteDescription?: { type: string; sdp: string }
@@ -27,17 +31,18 @@ class FakePeer {
   channel = new FakeChannel()
   onconnectionstatechange?: () => void
   onicecandidate?: (event: { candidate: { candidate: string; toJSON(): RTCIceCandidateInit } }) => void
-  constructor() { FakePeer.latest = this }
+  constructor() { super(); FakePeer.latest = this }
   createDataChannel() { return this.channel }
   async createOffer() { return { type: 'offer', sdp } }
   async setLocalDescription() {}
   async getStats(): Promise<Map<string, Record<string, unknown>>> { return new Map() }
-  state(value: string) { this.connectionState = value; this.onconnectionstatechange?.() }
+  state(value: string) { this.connectionState = value; this.dispatchEvent(new Event('connectionstatechange')); this.onconnectionstatechange?.() }
   close() { this.state('closed') }
-  candidate(index: number) { const candidate = { candidate: `candidate:fixture-${index} 1 udp 1 192.0.2.1 5000 typ host`, sdpMid: '0' }; this.onicecandidate?.({ candidate: { ...candidate, toJSON: () => candidate } }) }
+  candidate(index: number) { const candidate = { candidate: `candidate:fixture-${index} 1 udp 1 192.0.2.1 5000 typ host`, sdpMid: '0' }, event = { candidate: { ...candidate, toJSON: () => candidate } }; this.dispatchEvent(Object.assign(new Event('icecandidate'),event)); this.onicecandidate?.(event) }
 }
-class FakeSignal {
+class FakeSignal extends EventTarget {
   static OPEN = 1
+  static CLOSING = 2
   static latest: FakeSignal
   readyState = 1
   sent: { type: string }[] = []
@@ -46,13 +51,13 @@ class FakeSignal {
   onclose?: (event?: { code: number }) => void
   url: string
   protocols?: string | string[]
-  constructor(url: string, protocols?: string | string[]) { this.url = url; this.protocols = protocols; FakeSignal.latest = this }
+  constructor(url: string, protocols?: string | string[]) { super(); this.url = url; this.protocols = protocols; FakeSignal.latest = this }
   send(value: string) { this.sent.push(JSON.parse(value)) }
   close(code = 1006) { if (this.readyState === 3) return; this.readyState = 3; this.onclose?.({ code }) }
 }
-function fixture(t: TestContext, authenticated = true, options: Parameters<typeof connectRemote>[2] = {}, centralKey: JWK | ((signal: AbortSignal) => Promise<Response>) = {}, bootstrap?: { target: RemoteConnectionTarget; identity?: boolean; admission?: string }) {
+function fixture(t: TestContext, authenticated = true, options: Parameters<typeof connectRemote>[2] = {}, centralKey: JWK | ((signal: AbortSignal) => Promise<Response>) = {}, bootstrap?: { target: RemoteConnectionTarget; identity?: boolean; admission?: string; initialCredentials?: Promise<{ keyPair: CryptoKeyPair; session?: string }>; recoveryFlight?: RemoteRecoveryFlightClock }, beforeConnect?: () => void) {
   const browser = new EventTarget(), document = Object.assign(new EventTarget(), { visibilityState: 'visible' })
-  const values = { RTCPeerConnection: FakePeer, WebSocket: FakeSignal, location: { origin: 'https://app.example.test' }, window: browser, document }
+  const values = { RTCPeerConnection: FakePeer, RTCDataChannel: FakeChannel, WebSocket: FakeSignal, location: { origin: 'https://app.example.test' }, window: browser, document }
   const previous = new Map<string, PropertyDescriptor | undefined>()
   for (const [key, value] of Object.entries(values)) { previous.set(key, Object.getOwnPropertyDescriptor(globalThis, key)); Object.defineProperty(globalThis, key, { configurable: true, value }) }
   t.mock.timers.enable({ apis: ['setTimeout', 'setInterval', 'Date'], now: 1_900_000_000_000 })
@@ -65,7 +70,8 @@ function fixture(t: TestContext, authenticated = true, options: Parameters<typeo
     return typeof centralKey === 'function' ? centralKey(keySignal!) : Response.json(centralKey)
   })
   const observe = (state: string, error?: string, code?: string) => { states.push(state); codes.push(code); if (state === 'error') errors.push(error) }
-  const pending = bootstrap && bootstrapRemoteConnection(bootstrap.target, { identity: bootstrap.identity, admission: bootstrap.admission })
+  beforeConnect?.()
+  const pending = bootstrap && bootstrapRemoteConnection(bootstrap.target, { identity: bootstrap.identity, admission: bootstrap.admission, initialCredentials: bootstrap.initialCredentials, recoveryFlight: bootstrap.recoveryFlight })
   const close = pending?.close ?? connectRemote('instance', observe, options)
   t.after(() => { close(); for (const [key, descriptor] of previous) { if (descriptor) Object.defineProperty(globalThis, key, descriptor); else Reflect.deleteProperty(globalThis, key) } })
   const peer = FakePeer.latest, signal = FakeSignal.latest
@@ -500,6 +506,319 @@ test('WebSocket bootstrap prepares ICE immediately and authenticates with its bo
   assert.equal(peer.remoteDescription?.sdp, sdp)
   assert.equal(keyRequests(), 0, 'bootstrap keys arrive on the authenticated same-origin WebSocket')
   assert.throws(() => pending!.start(observe, { keyPair: pair }), /이미 사용/)
+})
+
+function fixtureAdmission() {
+  return `${Buffer.from('{"alg":"EdDSA"}').toString('base64url')}.${Buffer.from(JSON.stringify({ sub: bootstrapInstance, instance: bootstrapInstance, jti: 'bootstrap-fixture-admission', iat: 1_900_000_000, expires: 1_900_000_010_000 })).toString('base64url')}.signature`
+}
+
+test('the admitted controller consumes its primed peer once and retains early ICE order, cached offer fingerprint and browser proof key', async t => {
+  let offers = 0, localDescriptions = 0
+  const originalFingerprint = Array(32).fill('CD').join(':'), originalSdp = `v=0\r\na=fingerprint:sha-256 ${originalFingerprint}\r\n`
+  t.mock.method(FakePeer.prototype,'createOffer',async () => { offers++; return {type:'offer',sdp:originalSdp} })
+  t.mock.method(FakePeer.prototype,'setLocalDescription',async () => { localDescriptions++ })
+  const pair = await crypto.subtle.generateKey({name:'Ed25519'},false,['sign','verify']), exportedKey = await crypto.subtle.exportKey('jwk',pair.publicKey)
+  const publicKey = {kty:exportedKey.kty,crv:exportedKey.crv,x:exportedKey.x}
+  const central = await remoteKeyPair(), host = await remoteKeyPair(), context = {...await bootstrapContext(),publicKey:central.publicKey}
+  const target = {owner:'user',name:'home',hint:bootstrapInstance}, admission = fixtureAdmission(), signalUrl = remoteBootstrapUrl(context.centralOrigin,target,false)
+  let earlyPeer!: FakePeer
+  const previous = FakeSignal.latest
+  const f = fixture(t,false,{},{},{target,identity:false,admission,initialCredentials:Promise.resolve({keyPair:pair})},() => {
+    primeRemotePeer(signalUrl,admission); primeRemotePeer(signalUrl,admission)
+    earlyPeer = FakePeer.latest; earlyPeer.candidate(1); earlyPeer.candidate(2)
+  })
+  assert.equal(f.peer,earlyPeer)
+  assert.equal(takePrimedRemotePeer(signalUrl,admission),undefined,'the actual controller owns the one-use endpoint')
+  await until(() => FakeSignal.latest !== previous)
+  const signal = FakeSignal.latest, protocol = (signal.protocols as string[]).find(value=>value.startsWith('mew-connect.'))!
+  const flight = await jwtVerify(protocol.slice('mew-connect.'.length),pair.publicKey,{issuer:'mew-browser',audience:`${context.centralOrigin}/connect-flight`,algorithms:['EdDSA']})
+  assert.equal(flight.payload.sdp,originalSdp)
+  assert.equal(flight.payload.fingerprint,originalFingerprint)
+  assert.deepEqual(flight.payload.publicKey,publicKey)
+  assert.equal(offers,1)
+  assert.equal(localDescriptions,1)
+  f.peer.candidate(3)
+  signal.onmessage?.({data:JSON.stringify({type:'challenge',protocol:1,nonce:bootstrapNonce,context,earlyConnect:true})})
+  await f.pending!.context
+  const session = 's'.repeat(43)
+  f.pending!.start(f.observe,{keyPair:pair,session})
+  await until(() => signal.sent.length >= 3 || f.errors.length > 0)
+  assert.deepEqual(signal.sent.map(value=>value.type),['candidate','candidate','candidate'])
+  assert.deepEqual(signal.sent.map(value=>(value as unknown as {candidate:RTCIceCandidateInit}).candidate.candidate),[1,2,3].map(index=>`candidate:fixture-${index} 1 udp 1 192.0.2.1 5000 typ host`))
+  f.browser.dispatchEvent(new Event('pagehide')); t.mock.timers.tick(10_000)
+  assert.equal(f.peer.channel.readyState,'open','the retired prime cannot close its adopted endpoint')
+  assert.equal(activeRemoteTransport(),null)
+  const bound = {connection:'primed-connection',challenge:'host-challenge',generation:'host-generation',fingerprint:originalFingerprint}
+  const ticket = await new SignJWT({...bound,authMode:'local',instanceKey:host.publicKey,browserKey:publicKey}).setProtectedHeader({alg:'EdDSA'}).setIssuer(context.centralOrigin).setAudience(bootstrapInstance).setSubject(context.account).setJti('primed-ticket').setIssuedAt().setExpirationTime('60s').sign(await importJWK(central.privateKey,'EdDSA'))
+  signal.onmessage?.({data:JSON.stringify({type:'ticket',connection:bound.connection,ticket})})
+  await until(() => f.peer.channel.sent.length > 0 || f.errors.length > 0)
+  const authentication = JSON.parse(f.peer.channel.sent[0]), proof = await jwtVerify(authentication.proof,pair.publicKey,{issuer:'mew-browser',audience:bootstrapInstance,algorithms:['EdDSA']})
+  assert.equal(authentication.session,session)
+  assert.equal(proof.payload.fingerprint,originalFingerprint)
+  assert.equal(proof.payload.sub,context.account)
+  assert.equal(proof.payload.connection,bound.connection)
+  assert.equal(JSON.stringify(signal.sent).includes(session),false)
+  const answerProof = await new SignJWT({...bound,fingerprint}).setProtectedHeader({alg:'EdDSA'}).setIssuer('mew-instance').setAudience(bound.connection).setSubject(bootstrapInstance).setJti('primed-answer').setIssuedAt().setExpirationTime('60s').sign(await importJWK(host.privateKey,'EdDSA'))
+  signal.onmessage?.({data:JSON.stringify({type:'answer',connection:bound.connection,sdp,proof:answerProof})})
+  await until(() => f.peer.remoteDescription !== undefined || f.errors.length > 0)
+  assert.equal(f.peer.remoteDescription?.sdp,sdp)
+  assert.equal(activeRemoteTransport(),null,'neither priming nor valid peer proofs bypass the host authentication ACK')
+  f.peer.channel.message({type:'authenticated',protocol:1})
+  assert.equal(f.states.at(-1),'connected')
+  assert.deepEqual(f.errors,[])
+  f.close()
+  assert.equal(f.peer.connectionState,'closed')
+  assert.equal(f.peer.channel.readyState,'closed')
+  assert.equal(signal.readyState,3)
+  assert.equal(activeRemoteTransport(),null)
+})
+
+test('an admitted first Upgrade carries the offer and never sends a duplicate connect after its context', async t => {
+  const pair = await crypto.subtle.generateKey({ name: 'Ed25519' }, false, ['sign', 'verify'])
+  const context = await bootstrapContext(), previous = FakeSignal.latest
+  const f = fixture(t, false, {}, {}, { target: { owner: 'user', name: 'home', hint: bootstrapInstance }, admission: fixtureAdmission(), initialCredentials: Promise.resolve({ keyPair: pair }) })
+  await until(() => FakeSignal.latest !== previous)
+  const signal = FakeSignal.latest
+  assert.equal((signal.protocols as string[]).length, 3)
+  assert.equal((signal.protocols as string[])[2].startsWith('mew-connect.'), true)
+  assert.equal(signal.url.includes('mew-connect'), false)
+  signal.onmessage?.({ data: JSON.stringify({ type: 'challenge', protocol: 1, nonce: bootstrapNonce, context, earlyConnect: true }) })
+  assert.deepEqual(await f.pending!.context, context)
+  f.pending!.start(f.observe, { keyPair: pair })
+  await new Promise(resolve => setImmediate(resolve))
+  await new Promise(resolve => setImmediate(resolve))
+  assert.deepEqual(signal.sent, [])
+  f.peer.candidate(1)
+  await until(() => signal.sent.some(value => value.type === 'candidate'))
+  assert.equal(signal.sent.some(value => value.type === 'connect'), false)
+  assert.deepEqual(f.errors, [])
+})
+
+test('an admitted Upgrade retains normal challenge negotiation when the server does not accept its early offer', async t => {
+  const pair = await crypto.subtle.generateKey({ name: 'Ed25519' }, false, ['sign', 'verify'])
+  const context = await bootstrapContext(), previous = FakeSignal.latest
+  const f = fixture(t, false, {}, {}, { target: { owner: 'user', name: 'home', hint: bootstrapInstance }, admission: fixtureAdmission(), initialCredentials: Promise.resolve({ keyPair: pair }) })
+  await until(() => FakeSignal.latest !== previous)
+  const signal = FakeSignal.latest
+  challenge(signal, context)
+  await f.pending!.context
+  f.pending!.start(f.observe, { keyPair: pair })
+  await until(() => signal.sent.length > 0)
+  assert.equal(signal.sent.filter(value => value.type === 'connect').length, 1)
+  assert.deepEqual(f.errors, [])
+})
+
+test('the initial offer cannot switch browser keys after context admission', async t => {
+  const pair = await crypto.subtle.generateKey({ name: 'Ed25519' }, false, ['sign', 'verify'])
+  const replacement = await crypto.subtle.generateKey({ name: 'Ed25519' }, false, ['sign', 'verify'])
+  const context = await bootstrapContext(), previous = FakeSignal.latest
+  const f = fixture(t, false, {}, {}, { target: { owner: 'user', name: 'home', hint: bootstrapInstance }, admission: fixtureAdmission(), initialCredentials: Promise.resolve({ keyPair: pair }) })
+  await until(() => FakeSignal.latest !== previous)
+  const signal = FakeSignal.latest
+  signal.onmessage?.({ data: JSON.stringify({ type: 'challenge', protocol: 1, nonce: bootstrapNonce, context, earlyConnect: true }) })
+  await f.pending!.context
+  f.pending!.start(f.observe, { keyPair: replacement })
+  await until(() => f.peer.channel.readyState === 'closed')
+  assert.match(f.errors[0]!, /연결 키가 변경/)
+  assert.deepEqual(signal.sent, [])
+})
+
+test('cancellation during initial credential preparation closes the peer without creating a late signaling socket', async t => {
+  let resolve!: (value: { keyPair: CryptoKeyPair }) => void
+  const credentials = new Promise<{ keyPair: CryptoKeyPair }>(ready => { resolve = ready })
+  const previous = FakeSignal.latest
+  const f = fixture(t, false, {}, {}, { target: { owner: 'user', name: 'home', hint: bootstrapInstance }, admission: fixtureAdmission(), initialCredentials: credentials })
+  const rejection = assert.rejects(f.pending!.context, /취소/)
+  f.close()
+  const pair = await crypto.subtle.generateKey({ name: 'Ed25519' }, false, ['sign', 'verify'])
+  resolve({ keyPair: pair })
+  await rejection
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(FakeSignal.latest, previous)
+  assert.equal(f.peer.channel.readyState, 'closed')
+})
+
+const recoveryClock = (): RemoteRecoveryFlightClock => ({ serverTime: 1_900_000_000_000, receivedAt: performance.now(), wallTime: 1_900_000_000_000 })
+
+test('a replacement RTC Upgrade signs its fresh offer with the existing key and never sends a duplicate connect', async t => {
+  const pair = await crypto.subtle.generateKey({ name: 'Ed25519' }, false, ['sign', 'verify'])
+  const context = await bootstrapContext(), previous = FakeSignal.latest
+  const f = fixture(t, false, {}, {}, { target: { instance: bootstrapInstance }, identity: false, recoveryFlight: recoveryClock(), initialCredentials: Promise.resolve({ keyPair: pair }) })
+  await until(() => FakeSignal.latest !== previous)
+  const signal = FakeSignal.latest, protocols = signal.protocols as string[]
+  assert.equal(protocols[0], 'mew-recovery-v1')
+  assert.equal(protocols.length, 2)
+  const { payload } = await jwtVerify(protocols[1].slice('mew-recovery.'.length), pair.publicKey, { issuer: 'mew-browser', audience: `${context.centralOrigin}/recovery-connect` })
+  assert.equal(payload.sdp, sdp)
+  assert.equal(payload.fingerprint, fingerprint)
+  assert.equal(payload.instance, bootstrapInstance)
+  assert.equal(payload.kind, 'rtc-recovery-connect-v1')
+  assert.equal(signal.url.includes('mew-recovery'), false)
+  signal.onmessage?.({ data: JSON.stringify({ type: 'challenge', protocol: 1, nonce: bootstrapNonce, context, earlyConnect: true, recoveryConnect: true }) })
+  assert.deepEqual(await f.pending!.context, context)
+  f.pending!.start(f.observe, { keyPair: pair })
+  f.peer.candidate(1)
+  await until(() => signal.sent.some(value => value.type === 'candidate'))
+  assert.equal(signal.sent.some(value => value.type === 'connect'), false)
+  assert.deepEqual(f.errors, [])
+  f.close()
+  assert.equal(f.peer.channel.readyState, 'closed')
+  assert.equal(signal.readyState, 3)
+})
+
+for (const ack of [{}, { earlyConnect: true }, { recoveryConnect: true }]) test(`a recovery flight missing its exact acknowledgment closes before any ordinary connect: ${JSON.stringify(ack)}`, async t => {
+  const pair = await crypto.subtle.generateKey({ name: 'Ed25519' }, false, ['sign', 'verify'])
+  const context = await bootstrapContext(), previous = FakeSignal.latest
+  const f = fixture(t, false, {}, {}, { target: { instance: bootstrapInstance }, recoveryFlight: recoveryClock(), initialCredentials: Promise.resolve({ keyPair: pair }) })
+  const rejection = assert.rejects(f.pending!.context, error => {
+    assert.equal((error as { code: string }).code, 'recovery-flight-unsupported')
+    assert.equal((error as { recoveryFallback: boolean }).recoveryFallback, true)
+    assert.equal((error as { legacyFallback: boolean }).legacyFallback, false)
+    return true
+  })
+  await until(() => FakeSignal.latest !== previous)
+  const signal = FakeSignal.latest
+  signal.onmessage?.({ data: JSON.stringify({ type: 'challenge', protocol: 1, nonce: bootstrapNonce, context, ...ack }) })
+  await rejection
+  assert.deepEqual(signal.sent, [], 'a compatibility retry needs a fresh socket and server nonce')
+  assert.equal(f.peer.channel.readyState, 'closed')
+  assert.equal(signal.readyState, 3)
+})
+
+test('a failed recovery Upgrade requests one fresh nonce attempt without legacy launch or proof reuse', async t => {
+  const pair = await crypto.subtle.generateKey({ name: 'Ed25519' }, false, ['sign', 'verify']), previous = FakeSignal.latest
+  const f = fixture(t, false, {}, {}, { target: { instance: bootstrapInstance }, recoveryFlight: recoveryClock(), initialCredentials: Promise.resolve({ keyPair: pair }) })
+  const rejection = assert.rejects(f.pending!.context, error => {
+    assert.equal((error as { recoveryFallback: boolean }).recoveryFallback, true)
+    assert.equal((error as { legacyFallback: boolean }).legacyFallback, false)
+    return true
+  })
+  await until(() => FakeSignal.latest !== previous)
+  FakeSignal.latest.onerror?.()
+  await rejection
+  assert.equal(f.peer.channel.readyState, 'closed')
+  assert.deepEqual(FakeSignal.latest.sent, [])
+})
+
+for (const code of ['access-revoked', 'session-expired']) test(`a recovery ${code} rejection never enables a compatibility retry`, async t => {
+  const pair = await crypto.subtle.generateKey({ name: 'Ed25519' }, false, ['sign', 'verify']), previous = FakeSignal.latest
+  const f = fixture(t, false, {}, {}, { target: { instance: bootstrapInstance }, recoveryFlight: recoveryClock(), initialCredentials: Promise.resolve({ keyPair: pair }) })
+  const rejection = assert.rejects(f.pending!.context, error => {
+    assert.equal((error as { code: string }).code, code)
+    assert.equal((error as { recoveryFallback: boolean }).recoveryFallback, false)
+    return true
+  })
+  await until(() => FakeSignal.latest !== previous)
+  FakeSignal.latest.onmessage?.({ data: JSON.stringify({ type: 'error', code }) })
+  await rejection
+})
+
+test('a changed target cannot enable the compatibility retry of a signed recovery offer', async t => {
+  const pair = await crypto.subtle.generateKey({ name: 'Ed25519' }, false, ['sign', 'verify']), previous = FakeSignal.latest
+  const context = { ...await bootstrapContext(), instance: 'different-fixture-instance' }
+  const f = fixture(t, false, {}, {}, { target: { instance: bootstrapInstance }, recoveryFlight: recoveryClock(), initialCredentials: Promise.resolve({ keyPair: pair }) })
+  const rejection = assert.rejects(f.pending!.context, error => {
+    assert.match((error as Error).message, /기기가 일치/)
+    assert.equal((error as { recoveryFallback: boolean }).recoveryFallback, false)
+    return true
+  })
+  await until(() => FakeSignal.latest !== previous)
+  FakeSignal.latest.onmessage?.({ data: JSON.stringify({ type: 'challenge', protocol: 1, nonce: bootstrapNonce, context, earlyConnect: true, recoveryConnect: true }) })
+  await rejection
+})
+
+test('an unusable server clock retains the ordinary server-nonce handshake', async t => {
+  const pair = await crypto.subtle.generateKey({ name: 'Ed25519' }, false, ['sign', 'verify']), previous = FakeSignal.latest
+  const f = fixture(t, false, {}, {}, { target: { instance: bootstrapInstance }, recoveryFlight: { ...recoveryClock(), wallTime: 0 }, initialCredentials: Promise.resolve({ keyPair: pair }) })
+  await until(() => FakeSignal.latest !== previous)
+  const signal = FakeSignal.latest
+  assert.equal(signal.protocols, undefined)
+  challenge(signal, await bootstrapContext())
+  await f.pending!.context
+  f.pending!.start(f.observe, { keyPair: pair })
+  await until(() => signal.sent.some(value => value.type === 'connect'))
+  assert.equal(signal.sent.filter(value => value.type === 'connect').length, 1)
+  assert.equal(signal.sent.find(value => value.type === 'connect')!.nonce, bootstrapNonce)
+})
+
+for (const serverNow of [null, NaN, 0, -1, 1.5]) test(`an invalid optional server-time hint cannot enter the bootstrap context: ${serverNow}`, async t => {
+  const context = { ...await bootstrapContext(), serverNow }
+  const f = fixture(t, false, {}, {}, { target: { instance: bootstrapInstance } })
+  const rejection = assert.rejects(f.pending!.context, /중앙 연결 정보/)
+  challenge(f.signal, context as unknown as RemoteBootstrapContext)
+  await rejection
+  assert.equal(f.peer.channel.readyState, 'closed')
+  assert.deepEqual(f.signal.sent, [])
+})
+
+test('cancellation during recovery credential preparation cannot create a late Upgrade', async t => {
+  let resolve!: (value: { keyPair: CryptoKeyPair }) => void
+  const credentials = new Promise<{ keyPair: CryptoKeyPair }>(ready => { resolve = ready }), previous = FakeSignal.latest
+  const f = fixture(t, false, {}, {}, { target: { instance: bootstrapInstance }, recoveryFlight: recoveryClock(), initialCredentials: credentials })
+  const rejection = assert.rejects(f.pending!.context, /취소/)
+  f.close()
+  const pair = await crypto.subtle.generateKey({ name: 'Ed25519' }, false, ['sign', 'verify'])
+  resolve({ keyPair: pair })
+  await rejection
+  await new Promise(ready => setImmediate(ready))
+  assert.equal(FakeSignal.latest, previous)
+  assert.equal(f.peer.channel.readyState, 'closed')
+})
+
+test('cancellation during recovery signing cannot open a late socket or retain the peer', async t => {
+  const pair = await crypto.subtle.generateKey({ name: 'Ed25519' }, false, ['sign', 'verify'])
+  const sign = crypto.subtle.sign.bind(crypto.subtle), previous = FakeSignal.latest
+  let signed = false, release!: () => void
+  const pending = new Promise<void>(ready => { release = ready })
+  t.mock.method(crypto.subtle, 'sign', async (...args: Parameters<typeof sign>) => {
+    const value = await Reflect.apply(sign, crypto.subtle, args)
+    signed = true
+    await pending
+    return value
+  })
+  const f = fixture(t, false, {}, {}, { target: { instance: bootstrapInstance }, recoveryFlight: recoveryClock(), initialCredentials: Promise.resolve({ keyPair: pair }) })
+  const rejection = assert.rejects(f.pending!.context, /취소/)
+  await until(() => signed)
+  f.close()
+  release()
+  await rejection
+  await new Promise(ready => setImmediate(ready))
+  assert.equal(FakeSignal.latest, previous)
+  assert.equal(f.peer.channel.readyState, 'closed')
+})
+
+test('late controller download adopts the exact admitted flight instead of replacing it after the freshness margin', async t => {
+  const pair = await crypto.subtle.generateKey({ name: 'Ed25519' }, false, ['sign', 'verify'])
+  const target = { owner: 'user', name: 'home', hint: bootstrapInstance }, admission = fixtureAdmission(), context = await bootstrapContext()
+  const url = remoteBootstrapUrl(context.centralOrigin, target), protocols = await remoteConnectFlightProtocols(context.centralOrigin, bootstrapInstance, admission, sdp, pair)
+  let early!: FakeSignal
+  const f = fixture(t, false, {}, {}, { target, admission, initialCredentials: Promise.resolve({ keyPair: pair }) }, () => {
+    primeRemoteSignal(url, protocols); early = FakeSignal.latest
+    t.mock.timers.tick(8500)
+  })
+  await until(() => early.onmessage !== undefined || f.errors.length > 0)
+  assert.equal(FakeSignal.latest, early)
+  early.onmessage?.({ data: JSON.stringify({ type: 'challenge', protocol: 1, nonce: bootstrapNonce, context, earlyConnect: true }) })
+  await f.pending!.context
+  f.pending!.start(f.observe, { keyPair: pair })
+  await new Promise(resolve => setImmediate(resolve))
+  assert.deepEqual(f.errors, [])
+  assert.equal(early.sent.some(value => value.type === 'connect'), false)
+  assert.equal(takePrimedRemoteSignal(url, protocols), undefined)
+})
+
+test('controller cancellation closes its unadopted early socket while initial credentials remain pending', async t => {
+  const target = { owner: 'user', name: 'home', hint: bootstrapInstance }, admission = fixtureAdmission()
+  const context = await bootstrapContext(), url = remoteBootstrapUrl(context.centralOrigin, target)
+  let early!: FakeSignal
+  const f = fixture(t, false, {}, {}, { target, admission, initialCredentials: new Promise(() => {}) }, () => {
+    primeRemoteSignal(url, ['mew-admission-v1', `mew-admission.${admission}`, 'mew-connect.signed.offer.proof']); early = FakeSignal.latest
+  })
+  const rejected = assert.rejects(f.pending!.context, /취소/)
+  f.close()
+  await rejected
+  assert.equal(early.readyState, 3)
+  assert.equal(takePrimedRemoteSignal(url), undefined)
 })
 
 for (const invalid of ['origin', 'private-key', 'issuer', 'instance']) {

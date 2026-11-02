@@ -1,11 +1,14 @@
 import { canAutoFocusInput, getFixedPopupLayout } from '@mew/ui'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type CSSProperties, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
-import { AgentComposerInput, type MentionInputHandle } from './agent-composer-input'
+import type { MentionInputHandle } from './agent-composer-input'
+import { deferredComponent } from './deferred-component'
 import type { ComposerAttachment } from './agent-composer-attachments'
 import { clipboardImages } from '../utils/clipboard-images'
 import { prefixMatch } from '@mew/editor/fuzzy'
 import { useOverlayDismiss } from '@mew/ui'
+
+const AgentComposerInput = deferredComponent(async () => ({ default: (await import('./agent-composer-input')).AgentComposerInput }), undefined, { suspend: false })
 
 // '@' 멘션이 되는 textarea — 채팅 입력(파일 멘션)과 댓글 작성(사용자 멘션)이 같이 쓴다.
 // '@' 뒤에 이어 친 글자를 검색어로 목록을 띄우고, 고르면 '@검색어'가 insert 문자열로 바뀐다.

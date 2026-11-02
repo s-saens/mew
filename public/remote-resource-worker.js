@@ -1,6 +1,11 @@
 /* Work and installed UI resources stay on the exact tab's authenticated P2P link. */
 self.addEventListener('install', event => event.waitUntil(self.skipWaiting()))
 self.addEventListener('activate', event => event.waitUntil(self.clients.claim()))
+self.addEventListener('message', event => {
+  if (event.origin !== self.location.origin || event.source?.type !== 'window' || event.data?.type !== 'mew-resource-ready' || event.data.protocol !== 1 || event.ports.length !== 1) return
+  event.ports[0].postMessage({ type: 'mew-resource-ready', protocol: 1 })
+  event.ports[0].close()
+})
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url)
   if (url.origin !== self.location.origin || (!url.pathname.startsWith('/api/') && !url.pathname.startsWith('/__mew_ui/') && !event.clientId)) return

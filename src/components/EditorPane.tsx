@@ -25,11 +25,16 @@ import {
   type Role,
   type TreeNode,
 } from '../api/client'
-import { AnnotationPopover, readSourceAnnotations, Editor, relativeLinkPath, splitFrontmatter, type CommentAnchor, type EditorContextTarget, type EditorDbApi, type EditorHandle, type EditorOpenLink, type EditorOpenLinkOptions, type EditorViewAnchor } from '@mew/editor'
-import { DatabaseListModal } from './DatabaseListModal'
+import type { CommentAnchor, EditorContextTarget, EditorDbApi, EditorHandle, EditorOpenLink, EditorOpenLinkOptions, EditorViewAnchor } from '@mew/editor'
+import { AnnotationPopover } from '@mew/editor/annotation-popover'
+import { readSourceAnnotations } from '@mew/editor/annotation-source'
+import { relativeLinkPath } from '@mew/editor/fuzzy'
+import { splitFrontmatter } from '@mew/editor/frontmatter'
+import { deferredComponent } from './deferred-component'
 import type { DatabaseLink } from '../utils/database-links'
-import { CodePane, type CodePaneHandle } from './CodePane'
-import { CommentComposer, CommentListPopover, CommentPopover, CommentThreadView } from './Comments'
+import type { CodePaneHandle } from './CodePane'
+import { DeferredCodePane, DeferredHotviewEditor } from './deferred-editor-views'
+import { CommentComposer, CommentListPopover, CommentPopover, CommentThreadView } from './deferred-editor-comments'
 import { EditorContextMenu, type EditorContextAction } from './EditorContextMenu'
 import { MediaViewer } from './MediaViewer'
 import { SvgPreview } from './SvgPreview'
@@ -42,6 +47,7 @@ import { canOpenEditorFile } from '../utils/editor-open-policy.ts'
 import { editorFile, editorTabPath, editorLinkTabPath } from '../utils/editor-files'
 import { saveScroll, getScroll } from '../utils/scrollMemory'
 import { useCollab } from '../hooks/useCollab'
+import { primaryCollabPath, type PreparedEditorCollaboration } from '../utils/editor-collaboration'
 import { useEditorTouchSelection } from '../hooks/useEditorTouchSelection'
 import type { Pane, Tab } from '../hooks/useTabs'
 import type { DropZone } from '../utils/paneTree'
@@ -52,6 +58,8 @@ import { MarkdownErrorBoundary } from './markdown-error-boundary'
 import { useI18n } from '../i18n'
 
 import { DeferredDrawingEditor } from './drawing/deferred-drawing-editor'
+
+const DatabaseListModal = deferredComponent(async () => ({ default: (await import('./DatabaseListModal')).DatabaseListModal }), null, { suspend: false })
 
 /** 상태줄용 바이트 표기 — 1KB 미만은 바이트 그대로, 그 위는 소수 한 자리 */
 function formatBytes(bytes: number): string {
@@ -98,15 +106,6 @@ type EditorMenuSession = {
   busy: boolean
   closed: boolean
   touchSelection?: boolean
-}
-
-// 실시간 협업은 파일별 "주 편집화면"에서만 지원한다 — .md는 Hotview, 그 외는 Plain.
-// 게스트는 파일별 편집 허용이 있어도 collab 소켓 자체가 서버에서 막혀 있어 항상 로컬 편집으로 처리한다.
-function primaryCollabPath(tab: Tab | null, role: Role, project: string, prepare = false): string | null {
-  if (role === 'guest' || !tab || tab.deferredLoad || tab.anchorPreview || isExternalTabPath(tab.path) || !canOpenEditorFile(tab.path) || isArchivedPath(tab.path, project) || mediaKind(tab.path)) return null
-  if (!(prepare && tab.revalidating) && (tab.revalidating || !tab.editable)) return null
-  const eligible = tab.path.endsWith('.md') ? tab.viewMode === 'hotview' : tab.viewMode === 'plain'
-  return eligible ? tab.path : null
 }
 
 /** 사이드바가 닫혀 있을 때 맨 왼쪽 칸 좌상단에 뜨는 여는 버튼 — 우상단 도구 줄과 같은 생김새 */
@@ -156,6 +155,7 @@ export interface EditorPaneProps {
   /** 지금 포커스된 칸인지 — 커밋·단축키·터미널이 가리키는 칸이다 */
   focused: boolean
   canCollaborate?: boolean
+  preparedCollaboration?: PreparedEditorCollaboration
   isGuest: boolean
   diffVisible?: boolean
   onOpenDiffFile?: (project: string, path: string) => void
@@ -201,6 +201,7 @@ export function EditorPane({
   focused,
   isGuest,
   canCollaborate = true,
+  preparedCollaboration,
   showSidebarButton,
   tocOpen,
   dropZone,
@@ -317,7 +318,10 @@ export function EditorPane({
   // The socket authorizes independently. Prepare it alongside the file read, but
   // attach only after that read confirms access and the document has synchronized.
   const preparedCollabPath = canCollaborate ? primaryCollabPath(activeTab, role, project, true) : null
-  const collabSession = useCollab(project, preparedCollabPath, authEmail)
+  const ownCollabSession = useCollab(project, preparedCollaboration === undefined ? preparedCollabPath : null, authEmail)
+  const collabSession = preparedCollaboration === undefined ? ownCollabSession
+    : preparedCollaboration.project === project && preparedCollaboration.path === preparedCollabPath && preparedCollaboration.authEmail === authEmail
+      ? preparedCollaboration.session : null
   const collab = collabPath && collabSession?.synced ? collabSession : null
   const collaborationPending = !!collabPath && !collab
 
@@ -770,15 +774,28 @@ export function EditorPane({
     ? isExternalTabPath(activeTab.path) ? externalRawUrl(htmlPath) : rawUrl(htmlPath, project)
     : null
 
-  // 자식 편집기가 마운트된 뒤 첫 paint까지를 파일 열기 trace에 남긴다. 캐시 본문도 이 지점을
-  // 지나므로 캐시·콜드·복원 오픈을 같은 기준으로 비교할 수 있다.
+  // Deferred downloads and Tiptap's asynchronous mount must finish before a real
+  // editor can count as ready. A verified or read-only cached body uses the same point.
   useEffect(() => {
-    const trace = activeTab?.openTrace
-    if (!trace || mediaKind(activeTab.path)) return
-    markFileOpen(trace, 'editor-ready')
-    const raf = requestAnimationFrame(() => markFileOpen(trace, 'first-paint'))
-    return () => cancelAnimationFrame(raf)
-  }, [activeTab?.openTrace, activeTab?.path])
+    const trace = activeTab?.openTrace, host = editorMenuRoot.current
+    if (!trace || !host || loading || fileLoadFailed || unsupportedFile || mediaKind(activeTab.path)) return
+    const selector = activeTab.viewMode === 'plain' ? '.cm-content' : '.ProseMirror'
+    let frame: number | null = null, ready = false
+    const markReady = () => {
+      if (ready || !host.querySelector(selector)) return
+      ready = true
+      observer.disconnect()
+      markFileOpen(trace, 'editor-ready')
+      frame = requestAnimationFrame(() => markFileOpen(trace, 'first-paint'))
+    }
+    const observer = new MutationObserver(markReady)
+    observer.observe(host, { childList: true, subtree: true })
+    markReady()
+    return () => {
+      observer.disconnect()
+      if (frame !== null) cancelAnimationFrame(frame)
+    }
+  }, [activeTab?.openTrace, activeTab?.path, activeTab?.viewMode, loading, fileLoadFailed, unsupportedFile])
 
   return (
     <div onPointerDownCapture={onFocus} data-mobile-tab-swipe={isMd && activeTab?.viewMode === 'hotview' ? 'content' : 'key-bar'} className="relative flex min-h-0 min-w-0 flex-1 flex-col">
@@ -1037,7 +1054,7 @@ export function EditorPane({
                 ) : isSvg && activeTab.viewMode === 'hotview' ? (
                   <SvgPreview content={activeTab.content} />
                 ) : activeTab.viewMode === 'plain' ? (
-                  <CodePane
+                  <DeferredCodePane
                     ref={codePaneRef}
                     showMobileKeyBar
                     path={activeTab.path}
@@ -1058,7 +1075,7 @@ export function EditorPane({
                     resetKey={JSON.stringify([project, activeTab.path])}
                     onOpenPlain={() => changeViewMode('plain')}
                   >
-                    <Editor
+                    <DeferredHotviewEditor
                       key={activeTab.documentId ?? pane.activePath}
                       ref={editorRef}
                       value={activeTab.content}

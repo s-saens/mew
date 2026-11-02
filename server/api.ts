@@ -145,6 +145,7 @@ import { createPresenceHistoryRouter } from './presence-history-routes.ts'
 import { resetTreeWatchers, watchProjectTree } from './watcher.ts'
 import { measure, measureSync } from './perfMarks.ts'
 import { authOf, requireAuthenticated, requireRole, requireFeature, requireAnyFeature, seesEveryFile } from './reqAuth.ts'
+import { withWorkspaceUiSnapshot } from './workspace-ui-snapshot.ts'
 import { canUse, fileAccess, filterTreeForAccess, subtreeAccess, unrestrictedFiles, accessChanges, removeAccountAccess } from './access-policy.ts'
 import { createAccessRouter } from './access-routes.ts'
 import { updateAccountAccess } from './remote-access-context.ts'
@@ -831,9 +832,9 @@ export function createApiApp() {
   })
 
   // Account-local project switching; members select registered roots.
-  app.get('/workspace', requireAuthenticated, (_req, res) => {
+  app.get('/workspace', requireAuthenticated, (req, res) => {
     try {
-      res.json(currentWorkspace())
+      res.json(withWorkspaceUiSnapshot(currentWorkspace(), authOf(req).email!, req.query.include))
     } catch (err) {
       handleError(res, err)
     }

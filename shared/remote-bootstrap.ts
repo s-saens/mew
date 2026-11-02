@@ -15,6 +15,7 @@ export type RemoteBootstrapContext = {
   previewDomain?: string | null
   identity: boolean
   publicKey: JWK
+  serverNow?: number
 }
 
 export function remoteBootstrapUrl(origin: string, target: RemoteConnectionTarget, identity = true) {
@@ -41,6 +42,7 @@ export function parseRemoteBootstrap(value: unknown, origin: string): RemoteBoot
     !Array.isArray(context.ticketIssuers) || !context.ticketIssuers.length || context.ticketIssuers.some(issuer => !isOrigin(issuer)) ||
     typeof context.identity !== 'boolean' || context.publicKey?.kty !== 'OKP' || context.publicKey.crv !== 'Ed25519' ||
     typeof context.publicKey.x !== 'string' || context.publicKey.d !== undefined ||
+    context.serverNow !== undefined && (typeof context.serverNow !== 'number' || !Number.isSafeInteger(context.serverNow) || context.serverNow <= 0) ||
     context.previewDomain !== undefined && context.previewDomain !== null && typeof context.previewDomain !== 'string') {
     throw new Error('중앙 연결 정보를 확인하지 못했습니다.')
   }

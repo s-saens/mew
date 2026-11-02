@@ -1,12 +1,12 @@
 ---
 title: "File-type icons from Material Icon Theme"
-description: "Chooses Material Icon Theme 5.40.0 for generated file mappings, variants, and local SVGs. ADR 0091 replaces the old folder icons; ADR 0092 extends the fixed pack choice with account-selected packs and supplemental source notices. ADR 0114 restores outline icons for Documents pages only."
+description: "Chooses Material Icon Theme 5.40.0 for generated mappings, variants, and local SVGs. ADR 0091 replaces old folder icons; ADR 0092 adds account-selected packs and notices; ADR 0114 restores outline Documents page icons; ADR 0122 replaces whole-pack runtime downloads with bounded generated groups."
 created: "2026-10-30"
-updated: "2026-11-02"
+updated: "2026-11-03"
 status: accepted
 ---
 
-The ordinary-folder preservation clause below is superseded by [ADR 0091](0091-unified-explorer-icons.md). [ADR 0092](0092-curated-icon-packs.md) extends the fixed pack choice with account-selected Material/Catppuccin/basic icons and supplemental Material source notices. The original file association rules remain in effect for file rows; [ADR 0114](0114-documents-page-icons.md) restores the previous outline icon for Documents page rows.
+The ordinary-folder preservation clause below is superseded by [ADR 0091](0091-unified-explorer-icons.md). [ADR 0092](0092-curated-icon-packs.md) extends the fixed pack choice with account-selected Material/Catppuccin/basic icons and supplemental Material source notices. The original file association rules remain in effect for file rows; [ADR 0114](0114-documents-page-icons.md) restores the previous outline icon for Documents page rows. [ADR 0122](0122-mewlink-initial-offer.md) replaces downloading the full artwork module with generated bounded groups, while retaining the complete original artwork JSON and matching rules.
 
 ## Context
 

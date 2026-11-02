@@ -81,9 +81,10 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
       await link.waitFor()
       assert.equal(await page.locator('.cm-line').filter({ hasText: 'invalid' }).locator('[data-database-link]').count(), 0)
       assert.equal(await page.locator(`[data-database-link="${first}"]`).count(), 1, 'fenced, inline-code and commented examples are not links')
-      await link.click()
+      // The floating history buttons cover the first syntax fragment; click the exposed link text.
+      await link.click({ position: { x: 120, y: 8 } })
       assert.equal(await page.getByRole('dialog').count(), 0, 'ordinary clicks keep editing the source')
-      await link.click({ modifiers: ['Control'] })
+      await link.click({ modifiers: ['Control'], position: { x: 120, y: 8 } })
       const dialog = page.getByRole('dialog', { name: '데이터베이스', exact: true })
       await dialog.locator('input[value="Clicked DB"]').waitFor()
       assert.equal(await page.evaluate('window.saved'), content, 'Ctrl+click does not alter the Markdown')

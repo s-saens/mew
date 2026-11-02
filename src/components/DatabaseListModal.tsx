@@ -1,7 +1,8 @@
 // 이 프로젝트의 모든 데이터베이스를 한 팝업에서 열람/편집한다 — 헤더의 원통 아이콘으로 연다.
 // 왼쪽 목록에서 고르면 오른쪽에 DatabasePanel(노드뷰와 같은 표)을 편집 가능 상태로 띄운다.
 import { useEffect, useId, useState } from 'react'
-import { DatabasePanel, DbGlyph, type DbSummary, type EditorDbApi, type EditorOpenLink } from '@mew/editor'
+import { DatabasePanel, DbGlyph } from '@mew/editor/database'
+import type { DbSummary, EditorDbApi, EditorOpenLink } from '@mew/editor'
 import { DialogFrame } from '@mew/ui'
 import { PanelCloseButton } from './panel-close-button'
 import { dbApi, getProject } from '../api/client'

@@ -1,4 +1,4 @@
-import { insertSourceAnnotation, updateSourceAnnotation, deleteSourceAnnotation, findSourceAnnotation, sourceAnnotationIdentity } from '@mew/editor'
+import { insertSourceAnnotation, updateSourceAnnotation, deleteSourceAnnotation, findSourceAnnotation, sourceAnnotationIdentity } from '@mew/editor/annotation-source'
 import { subscribeUiLocale } from '@mew/ui/i18n-core'
 import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from 'react'
 import { MobileKeyBar, useMobileLayout } from '@mew/mobile-keys'
@@ -16,35 +16,23 @@ import {
 } from '@codemirror/view'
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands'
 import { SearchQuery, openSearchPanel, setSearchQuery } from '@codemirror/search'
-import { HighlightStyle, StreamLanguage, bracketMatching, syntaxHighlighting } from '@codemirror/language'
+import { HighlightStyle, bracketMatching, syntaxHighlighting } from '@codemirror/language'
 import { linter, lintGutter } from '@codemirror/lint'
 import { yCollab, yUndoManagerKeymap } from 'y-codemirror.next'
 import { HoverTipLayer, pathFromDrag, observeEditorViewport, visibleEditorBounds } from '@mew/ui'
 import { tags } from '@lezer/highlight'
 import type { Collab } from '../hooks/useCollab'
-import { markdown } from '@codemirror/lang-markdown'
-import { javascript } from '@codemirror/lang-javascript'
-import { json, jsonParseLinter } from '@codemirror/lang-json'
-import { yaml } from '@codemirror/lang-yaml'
-import { css } from '@codemirror/lang-css'
-import { html } from '@codemirror/lang-html'
-import { python } from '@codemirror/lang-python'
-import { sql } from '@codemirror/lang-sql'
-import { rust } from '@codemirror/lang-rust'
-import { go } from '@codemirror/lang-go'
-import { xml } from '@codemirror/lang-xml'
-import { shell } from '@codemirror/legacy-modes/mode/shell'
-import { toml } from '@codemirror/legacy-modes/mode/toml'
-import { properties } from '@codemirror/legacy-modes/mode/properties'
-import { sCSS } from '@codemirror/legacy-modes/mode/css'
+import { codeLanguageKey, loadCodeLanguage, preparedCodeLanguage, type CodeLanguage } from '../utils/code-language'
 import { lintFile } from '../api/client'
 import { codeSearchExtensions, refreshCodeSearchLanguage } from '../utils/codeSearch'
 import { codePinchZoom } from '../utils/code-pinch-zoom'
 import { debuggerEditorExtension } from '../utils/debugger-editor'
-import { databaseLinks, type DatabaseLink } from '../utils/database-links'
+import type { DatabaseLink } from '../utils/database-links'
 import { prepareCodeContext, type CodeContextSession } from '../utils/code-context-target'
 import type { EditorContextTarget } from '@mew/editor/context-target'
-import { makeCommentAnchor, resolveCommentAnchor, type CommentAnchor, type CommentThreadInput, type EditorViewAnchor } from '@mew/editor'
+import { makeCommentAnchor, resolveCommentAnchor, type CommentAnchor } from '@mew/editor/comment-anchor'
+import type { CommentThreadInput, EditorViewAnchor } from '@mew/editor'
+import { PanelLoading } from './startup-screen'
 
 // value prop 동기화로 들어온 트랜잭션 표시 — 이걸 다시 onChange로 올리면 열기만 한
 // 미리보기 탭이 "편집됨"으로 승격되고 무의미한 자동저장이 잡힌다
@@ -97,65 +85,13 @@ function extOf(filePath: string): string {
   return dot > 0 ? name.slice(dot + 1).toLowerCase() : ''
 }
 
-function languageFor(filePath: string): Extension[] {
-  const name = filePath.split('/').pop() ?? filePath
-  switch (extOf(filePath)) {
-    case 'md':
-    case 'mdx':
-      return [markdown()]
-    case 'ts':
-      return [javascript({ typescript: true })]
-    case 'tsx':
-      return [javascript({ typescript: true, jsx: true })]
-    case 'js':
-    case 'mjs':
-    case 'cjs':
-      return [javascript()]
-    case 'jsx':
-      return [javascript({ jsx: true })]
-    case 'json':
-    case 'jsonc':
-      return [json()]
-    case 'yml':
-    case 'yaml':
-      return [yaml()]
-    case 'css':
-      return [css()]
-    case 'scss':
-      return [StreamLanguage.define(sCSS)]
-    case 'html':
-      return [html()]
-    case 'svg':
-      return [xml()]
-    case 'py':
-      return [python()]
-    case 'sql':
-      return [sql()]
-    case 'rs':
-      return [rust()]
-    case 'go':
-      return [go()]
-    case 'sh':
-    case 'zsh':
-    case 'bash':
-      return [StreamLanguage.define(shell)]
-    case 'toml':
-    case 'ini':
-      return [StreamLanguage.define(toml)]
-    default:
-      if (name === 'Dockerfile' || name === 'Makefile') return [StreamLanguage.define(shell)]
-      if (name === '.gitignore' || name === '.env' || name.startsWith('.env.')) return [StreamLanguage.define(properties)]
-      return []
-  }
-}
-
 /** 산문 파일은 가로 스크롤 대신 줄바꿈 — 코드는 VSCode처럼 줄을 유지한다 */
 function isProse(filePath: string): boolean {
   const ext = extOf(filePath)
   return ext === 'md' || ext === 'mdx' || ext === 'txt'
 }
 
-function lintExtensions(filePath: string, project?: string): Extension[] {
+function lintExtensions(filePath: string, project: string | undefined, language: CodeLanguage): Extension[] {
   const ext = extOf(filePath)
   if (OXLINT_EXTS.has(ext)) {
     return [
@@ -181,7 +117,7 @@ function lintExtensions(filePath: string, project?: string): Extension[] {
       ),
     ]
   }
-  if (ext === 'json') return [lintGutter(), linter(jsonParseLinter())]
+  if (ext === 'json' && language.jsonLinter) return [lintGutter(), linter(language.jsonLinter)]
   return []
 }
 
@@ -306,29 +242,28 @@ export interface CodePaneHandle {
  * Plain 모드(md)와 코드 파일 공용 CodeMirror 에디터 — 줄번호·구문강조·lint.
  * tiptap이 훼손하는 비마크다운 파일의 기본 편집기이기도 하다 (useTabs의 viewMode 기본값 참고).
  */
-export const CodePane = forwardRef<
-  CodePaneHandle,
-  {
-    path: string
-    project?: string
-    value: string
-    onChange: (content: string) => void
-    readOnly: boolean
-    serverLint?: boolean
-    /** The file editor enables its mobile tab-swipe surface; embedded editors can omit it. */
-    showMobileKeyBar?: boolean
-    /** 있으면 이 방의 Y.Text가 문서 내용의 진실 원천이 된다 — value/onChange는 그 결과를 반영만 한다 */
-    collab?: Collab | null
-    /** 파일 댓글 스레드 — 본문 위 장식(하이라이트)으로만 그린다. 저장·해석은 호스트 몫 */
-    commentThreads?: CommentThreadInput[]
-    onCommentClick?: (id: string, x: number, y: number) => void
-    onAnnotationOpen?: (num: number, x: number, y: number) => void
-    onOpenDatabase?: (reference: DatabaseLink) => void
-    /** 부분 preview는 문서 전체 줄 번호를 유지한다. 일반 문서는 0이다. */
-    lineOffset?: number
-    debuggerContext?: { root: string; account: string }
-  }
->(function CodePane({ path, project, value, onChange, readOnly, serverLint = true, showMobileKeyBar = false, collab, commentThreads, onCommentClick, onAnnotationOpen, onOpenDatabase, lineOffset = 0, debuggerContext }, ref) {
+type CodePaneProps = {
+  path: string
+  project?: string
+  value: string
+  onChange: (content: string) => void
+  readOnly: boolean
+  serverLint?: boolean
+  /** The file editor enables its mobile tab-swipe surface; embedded editors can omit it. */
+  showMobileKeyBar?: boolean
+  /** 있으면 이 방의 Y.Text가 문서 내용의 진실 원천이 된다 — value/onChange는 그 결과를 반영만 한다 */
+  collab?: Collab | null
+  /** 파일 댓글 스레드 — 본문 위 장식(하이라이트)으로만 그린다. 저장·해석은 호스트 몫 */
+  commentThreads?: CommentThreadInput[]
+  onCommentClick?: (id: string, x: number, y: number) => void
+  onAnnotationOpen?: (num: number, x: number, y: number) => void
+  onOpenDatabase?: (reference: DatabaseLink) => void
+  /** 부분 preview는 문서 전체 줄 번호를 유지한다. 일반 문서는 0이다. */
+  lineOffset?: number
+  debuggerContext?: { root: string; account: string }
+}
+
+const PreparedCodePane = forwardRef<CodePaneHandle, CodePaneProps & { language: CodeLanguage }>(function PreparedCodePane({ language, path, project, value, onChange, readOnly, serverLint = true, showMobileKeyBar = false, collab, commentThreads, onCommentClick, onAnnotationOpen, onOpenDatabase, lineOffset = 0, debuggerContext }, ref) {
   const containerRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
   const mobileLayout = useMobileLayout()
@@ -412,10 +347,10 @@ export const CodePane = forwardRef<
         syntaxHighlighting(highlight),
         theme,
         codePinchZoom(),
-        ...languageFor(path),
-        ...(['md', 'mdx'].includes(extOf(path)) && databaseLinksEnabled ? databaseLinks(reference => onOpenDatabaseRef.current?.(reference)) : []),
+        ...language.extensions,
+        ...(['md', 'mdx'].includes(extOf(path)) && databaseLinksEnabled && language.databaseLinks ? language.databaseLinks(reference => onOpenDatabaseRef.current?.(reference)) : []),
         ...(isProse(path) ? [EditorView.lineWrapping] : []),
-        ...(readOnly || !serverLint ? [] : lintExtensions(path, project)),
+        ...(readOnly || !serverLint ? [] : lintExtensions(path, project, language)),
         EditorState.readOnly.of(readOnly),
         EditorView.editable.of(!readOnly),
         commentField,
@@ -490,7 +425,7 @@ export const CodePane = forwardRef<
       viewRef.current = null
     }
     // 파일이 바뀌면 언어·lint 구성이 달라지므로 뷰를 새로 만든다 (문서 내용은 valueRef로 최신값 사용)
-  }, [project, path, readOnly, serverLint, collab?.ydoc, lineOffset, debugRoot, debugAccount, databaseLinksEnabled])
+  }, [project, path, readOnly, serverLint, collab?.ydoc, lineOffset, debugRoot, debugAccount, databaseLinksEnabled, language])
 
   // 방을 처음 만든 클라이언트가 이미 로드해 둔 탭 내용으로 Y.Text를 시딩한다 (디스크 재조회 아님) —
   // 이미 누군가 협업 중이던 방이면 ytext가 비어 있지 않으므로 아무 일도 하지 않는다
@@ -663,4 +598,17 @@ export const CodePane = forwardRef<
         onRedo={readOnly ? undefined : () => runKey('z', true, true)} />}
     </div>
   )
+})
+
+export const CodePane = forwardRef<CodePaneHandle, CodePaneProps>(function CodePane(props, ref) {
+  const key = codeLanguageKey(props.path)
+  const [result, setResult] = useState<{ key: string; language: CodeLanguage } | { key: string; error: unknown }>()
+  useEffect(() => {
+    let active = true
+    void loadCodeLanguage(props.path).then(language => { if (active) setResult({ key, language }) }, error => { if (active) setResult({ key, error }) })
+    return () => { active = false }
+  }, [key, props.path])
+  const language = preparedCodeLanguage(props.path) ?? (result?.key === key && 'language' in result ? result.language : undefined)
+  if (!language && result?.key === key && 'error' in result) throw result.error
+  return language ? <PreparedCodePane {...props} language={language} ref={ref} /> : <div data-editor-body className="h-full w-full bg-surface-deep"><PanelLoading /></div>
 })

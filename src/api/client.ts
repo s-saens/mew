@@ -26,6 +26,7 @@ import { isHiddenTmuxSession } from '@mew/tmux-term/command-session'
 import { subscribeDb } from './dbSocket'
 import { compressImage } from '../utils/compressImage'
 import { detectInitialProject } from '../utils/active-project'
+import type { WorkspaceUiSnapshot } from '../../shared/workspace-ui-snapshot.ts'
 
 export type { TreeNode } from '@mew/editor'
 export type { TmuxSession } from '@mew/tmux-term'
@@ -653,11 +654,12 @@ export interface WorkspaceInfo {
   docs: string
   /** 같은 폴더의 절대 경로 */
   docsPath: string
+  workspaceUi?: WorkspaceUiSnapshot
 }
 
 /** 지금 열려 있는 워크스페이스 — owner 전용(서버 기계의 경로다) */
-export function fetchWorkspace(): Promise<WorkspaceInfo> {
-  return mewFetch('/api/workspace').then(json<WorkspaceInfo>)
+export function fetchWorkspace(options?: { includeUi?: boolean }): Promise<WorkspaceInfo> {
+  return mewFetch(`/api/workspace${options?.includeUi ? '?include=workspace-ui' : ''}`).then(json<WorkspaceInfo>)
 }
 
 /** 워크스페이스를 통째로 바꾼다 — owner 전용. 성공하면 클라이언트가 새 루트 상태로 교체한다. */
