@@ -12,9 +12,15 @@ The shared `DialogFrame`, scheduled task, agent instruction, and extension manag
 
 ## Popup coordinates inside modals
 
-`getFixedPopupLayout` (`packages/ui/src/fixed-popup-layout.ts`) in `@mew/ui` maps screen coordinates to CSS coordinates for fixed elements. It finds the actual containing element established by `backdrop-filter`, `filter`, transforms, contain, and similar properties, accounting for borders, scrolling, and axis-specific scaling. It calculates placement and dimensions within the intersection of the visual viewport and overflow/paint clipping regions extending from the containing element, preventing menu items from becoming invisible outside the modal. When space is insufficient, the menu scrolls internally.
+`getFixedPopupLayout` (`packages/ui/src/fixed-popup-layout.ts`) in `@mew/ui` converts screen coordinates to fixed-element CSS coordinates. It identifies the containing element created by `backdrop-filter`, `filter`, transforms, contain, or similar properties, accounting for borders, scrolling, and axis-specific scaling. Placement and dimensions fit the intersection of the visual viewport and the overflow/paint clipping regions of that element and its ancestors. Scroll the menu internally when space is insufficient.
 
-`SelectField`, `ActionMenu`, file explorer favorites, account popups, mention lists, `FrontmatterPopover`, tag color selectors, compact `ColorPicker`, and `HoverTipLayer` share this calculation. Preserve existing portal targets, focus scopes, and Esc/back dismissal. The compact color picker is displayed with fixed positioning in the same DOM as its trigger to preserve form height and Tab order. Open selection lists and color pickers are repositioned by monitoring the viewport/scroll and observing theme and host changes. Rotated selectors on remote screens retain their existing inverse-matrix local placement, while simple translation and scaling use the shared calculation. Follow [Decision 0069](../decisions/0069-shared-fixed-popup-coordinates.md).
+`SelectField`, `ActionMenu`, file explorer favorites, account popups, mention lists, `FrontmatterPopover`, tag color selectors, compact `ColorPicker`, and `HoverTipLayer` share this calculation. Preserve portal targets, focus scopes, and Esc/back dismissal.
+
+- Keep the compact picker fixed in its trigger's DOM to preserve form height and Tab order.
+- Reposition open lists and pickers on viewport/scroll, theme, and host changes.
+- Rotated remote-screen selectors retain inverse-matrix local placement; simple translation and scaling use the shared calculation.
+
+See [Decision 0069](../decisions/0069-shared-fixed-popup-coordinates.md).
 
 Validation includes blur, filters, transforms, borders, scrolling, nested portals, above/below placement, and hit tests on actual items in `server/fixed-popup-ui.test.ts`. `server/project-dialog-ui.test.ts` checks favorites and file operations in both file explorers on PC/mobile and in both themes, while `server/mention-textarea-ui.test.ts` checks modal blur changes and mention selection.
 
@@ -66,7 +72,23 @@ Document DBs store item colors as column metadata and update all rows and linked
 
 ## Shared layer order
 
-`src/components/overlay-layers.css` owns the global overlay tokens and rules for shared popup backgrounds, blur, and the outer backdrop of light modals. Above the local ordering of workspace panels and tabs, layers stack in this order: Dock (40), floating windows (starting at 60, one level per open window), menus (1050), notifications and regular Mewpet (1100), modals (1200), selection lists and secondary menus (1300), remote desktop (1600) and installation windows (1700), image viewer (1750), settings (1800), and tooltips and break screens (1900). Focusing floating windows only reorders the current windows; layers do not keep increasing with the number of clicks. Dock, Mewpet, and selection lists moved to dedicated hosts inside settings or remote screens follow the ordering within those hosts.
+`src/components/overlay-layers.css` owns global overlay tokens, popup backgrounds and blur, and light-modal outer backdrops. Above local workspace panel/tab order, use these layers:
+
+| Layer | Level |
+| --- | --- |
+| Dock | 40 |
+| Floating windows | Start at 60; one level per open window |
+| Menus | 1050 |
+| Notifications and regular Mewpet | 1100 |
+| Modals | 1200 |
+| Selection lists and secondary menus | 1300 |
+| Remote desktop | 1600 |
+| Installation windows | 1700 |
+| Image viewer | 1750 |
+| Settings | 1800 |
+| Tooltips and break screens | 1900 |
+
+Focus reorders existing floating windows without increasing levels on every click. Dock, Mewpet, and selection lists placed in dedicated settings or remote-screen hosts follow that host's internal order.
 
 The agent attachment image viewer is displayed through a `document.body` portal to escape panel transforms, local z-index values, and clipping areas. Its backdrop covers Dock and notifications, and Esc and mobile Back close only the topmost viewer through the shared `useOverlayDismiss`. Command editing modals also appear above Dock and regular notifications.
 

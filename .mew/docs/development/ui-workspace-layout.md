@@ -8,11 +8,11 @@ updated: "2026-11-03"
 
 ## Device safe areas
 
-The direct app viewport includes `viewport-fit=cover` alongside the existing `interactive-widget=resizes-content` setting. The `.mew-workspace` border box reserves all four `env(safe-area-inset-*, 0px)` values within `--app-height`, keeping the project header, panel tabs and Dock clear of the status bar, display cutouts and home indicator. Insets follow the browser across orientation and viewport changes, including landscape widths above the desktop breakpoint. Zero insets preserve existing desktop geometry.
+The direct viewport combines `viewport-fit=cover` with `interactive-widget=resizes-content`. Within `--app-height`, the `.mew-workspace` border box reserves all four `env(safe-area-inset-*, 0px)` values once, protecting the header, panel tabs, and Dock from status bars, cutouts, and the home indicator. Follow orientation and viewport changes, including landscape above the desktop breakpoint. Zero insets preserve desktop geometry.
 
-For the positioned Dock (`data-position`), the workspace owns the insets once: mobile horizontal docks remain 48px high and vertical docks remain 48px wide, without adding safe-area padding again. This also protects the panel footer when the Dock is at the top or side, hidden, or unavailable. The older unpositioned Dock fallback retains its own fixed-edge spacing.
+For a positioned Dock (`data-position`), reserve insets only in the workspace. Mobile horizontal docks stay 48px high and vertical docks 48px wide. Protect the panel footer when the Dock is top/side, hidden, or unavailable. The older unpositioned Dock fallback retains its fixed-edge spacing.
 
-Body portals do not inherit workspace padding. `DialogFrame` and `SettingsModal` use `.mew-dialog-overlay`, taking the greater of each existing dialog gutter and the corresponding device inset. The backdrop still covers the viewport; the dialog and its internal scrolling content fit within the remaining area. Settings and mobile project selection fill the safe area rather than the status bar. Dialog focus, dismissal, layers and desktop size limits remain unchanged.
+Body portals do not inherit workspace padding. `DialogFrame` and `SettingsModal` use `.mew-dialog-overlay` with the greater of each dialog gutter and device inset. Keep the backdrop viewport-sized and the dialog/internal scrolling inside the safe area. Settings and mobile project selection fill that area. Preserve focus, dismissal, layers, and desktop size limits.
 
 `server/workspace-safe-area-ui.test.ts` checks the viewport setting, exact header offsets and compact heights, all four Dock positions without duplicate insets, full-height and ordinary dialogs, the actual settings panel, click dismissal, and overflow across portrait, landscape, narrow landscape, a keyboard-sized viewport and desktop. The isolated Chromium fixture substitutes safe-area CSS environment values; it does not verify Safari's device-provided values or an installed iPhone session. See the [implementation record](../work/workspace-safe-area.md).
 
@@ -46,7 +46,7 @@ The agent `+` runtime list uses the vertical axis (`axis: 'y'`) and dedicated ha
 
 File and document moves in the file explorer use the same duration and curve. Record positions immediately after a successful move and retain them until the actual tree update, mapping the moved path and descendant paths to new rows so they remain linked even if React recreates the rows. Surrounding rows move together, and scroll changes are excluded from movement distances. Expanding, searching, failing, or canceling alone does not start movement animations. `sidebar-move-ui.test.ts` validates asynchronous updates, intermediate positions, and reduced-motion transitions; `sidebar-touch-ui.test.ts` validates existing touch input and cancellation.
 
-File, project, agent, and terminal tabs, task items, and docks transition between drag-induced layouts over 180ms using `cubic-bezier(0.22, 1, 0.36, 1)`. The shared `useReorderAnimation` records visible positions immediately before reordering and animates only transforms after React changes the layout. Consecutive moves continue from the current animated position to the new destination, and tab/dock target detection uses actual layout coordinates excluding animation to prevent jitter and back-and-forth reordering. A copy of the grabbed item follows the pointer immediately.
+File, project, agent, and terminal tabs, task items, and docks animate reordered layouts for 180ms with `cubic-bezier(0.22, 1, 0.36, 1)`. `useReorderAnimation` records visible positions before reordering and animates only transforms after React updates. Consecutive moves continue from the current animated position. Tab/dock hit testing uses actual layout coordinates without animation to prevent jitter and reversal. A grabbed-item copy follows the pointer immediately.
 
 Surrounding queue rows and the dashed insertion placeholder move with the same duration and curve. Order persistence, drop, cancellation, and edit-lock contracts follow each feature's existing behavior. Apply keyboard reordering immediately, and omit position animations with `prefers-reduced-motion: reduce`. If the setting changes during dragging, also remove movement animations already in progress.
 
@@ -135,7 +135,27 @@ Free movement, the move handle, and position storage for the desktop dock were r
 
 Below 768px, horizontal docks span the safe workspace width and are 48px high. Vertical docks span the safe workspace height and are 48px wide, with 44px-high buttons and internal scrolling when needed. A vertical pointer swipe before the long-press delay scrolls an overflowing side dock without selecting, reordering, or navigating panels. Only the divider facing the content is shown. Selected icons use a bright foreground and bold strokes without rounded outlines or background highlights. Regular Mewpets use the visible bottom edge of the visual viewport or explicit keyboard area as their floor and appear over the dock; giant resting cats retain the existing screen bounds.
 
-At 768px or wider, the default left dock sits beside the file explorer below the project header. Vertical docks reserve 44px of width (48px for touch pointers); horizontal docks reserve 40px of height (48px for touch pointers), independently of the file explorer. It is hidden while a panel is maximized and reappears on restoration. Icons are 32×36px (44×44px for touch pointers), with a separator facing the content. If height is insufficient, the dock scrolls vertically internally. The file explorer collapse button sits at the file explorer's right boundary, relative to the content grid cell. Crossing the responsive breakpoint applies the other position preference. In the remote viewer, the dock is portaled into a host in the viewer toolbar and hidden in browser fullscreen. Desktop dock buttons open closed panels, focus open but unfocused panels without closing them, and close a panel only when it is already focused and pressed again. Other panels remain unchanged. Open state is exposed through `aria-pressed`, and all open panels receive a subtle `surface-raised` background. The single panel with current workspace focus is distinguished by `aria-current`, a stronger `surface-hover` background, and a bright, bold icon. Clicking a subtle highlight restores focus to the panel's last input element and strengthens the highlight. If the previous element is absent or hidden, focus moves to a visible input element, button, or the panel, in that order. Clicking the strong highlight again closes that panel and removes its background. Closed icons respond to hover through foreground color without a background highlight. `useFocusedWorkspacePanel` tracks pointerdown and focusin at the panel's `data-workspace-panel` boundary, and the active element after window blur when entering an iframe. Tabs, bodies, and keyboard navigation all update it; dock and shared-tool interactions retain the last workspace focus. Closed panels are excluded from highlights, and focus is not inferred simply from opening order. The editor hides or redisplays all editing panes while preserving tabs, bodies, split layout, and mounts. The close (X) button on the right of the desktop editor tab bar uses the same hiding behavior and appears even without tabs. Editor hiding is retained only in current app memory and does not apply on mobile. Requests to bring the editor forward, such as opening a file, unhide it.
+At 768px or wider, the default left dock sits beside the file explorer below the project header. Reserve dock space independently of the explorer:
+
+| Geometry | Standard pointer | Touch pointer |
+| --- | --- | --- |
+| Vertical width | 44px | 48px |
+| Horizontal height | 40px | 48px |
+| Icon area | 32×36px | 44×44px |
+
+The separator faces content; insufficient height scrolls internally. Hide the dock during panel maximization and restore it afterward. Place the explorer collapse button at its right boundary relative to the content grid cell. Crossing the breakpoint selects the other position preference. Remote viewers portal the dock into their toolbar host and hide it in browser fullscreen.
+
+| Desktop dock target | Result |
+| --- | --- |
+| Closed panel | Open it |
+| Open, unfocused panel | Focus it without closing |
+| Focused panel | Close it |
+
+Other panels remain unchanged. Expose open state through `aria-pressed`; open panels receive a subtle `surface-raised` background. The one focused workspace panel uses `aria-current`, a stronger `surface-hover` background, and a bright bold icon. Clicking a subtle highlight restores its last input focus; if that element is absent/hidden, choose a visible input, then a button, then the panel. Clicking the strong highlight closes the panel and removes its background. Closed icons change foreground on hover without a highlight.
+
+`useFocusedWorkspacePanel` observes pointerdown/focusin at `data-workspace-panel` and the active element after window blur into an iframe. Tabs, bodies, and keyboard navigation update focus; dock/shared-tool actions retain the last workspace focus. Exclude closed panels and do not infer focus from opening order.
+
+Editor toggling preserves all panes, tabs, bodies, splits, and mounts. Its desktop tab-bar X performs the same hide action, even without tabs. Hide state lasts only in app memory, never on mobile; bringing the editor forward, including opening a file, unhides it.
 
 ### Mobile Dock and Panel Switching
 

@@ -53,7 +53,7 @@ The bar owns an upward-facing shared `HoverTipLayer`, using accessible labels an
 
 ## Editor Body Loading
 
-The transient `Tab.loading` in `useTabs` indicates a file body request independently of save status. It is set for new files, restored tabs, and cache revalidation, and cleared when the full body succeeds (including an empty string) or fails. It remains set while only an anchor preview of a large file has been received. It is not recorded in the tab persistence ledger and is not set for binary media streamed by its own viewer.
+`Tab.loading` in `useTabs` tracks body requests independently of saves. Set it for new/restored files and cache revalidation; clear it on full-body success, including an empty string, or failure. An anchor-only preview of a large file remains loading. Do not persist the flag or set it for binary media streamed by its own viewer.
 
 When the active tab is loading, `EditorPane` sets `aria-busy` on `DockInlineBody` and covers the body, toolbar, and status bar with a black 50% overlay and a centered spinner. The underlying area is `inert`, and the editor is read-only. The tab bar and other panels remain usable. The loading indicator's `role="status"` uses the existing `common.loading` translation and does not rotate under reduced motion.
 
@@ -63,25 +63,33 @@ Validation: `server/editor-pane-ui.test.ts` uses the actual editor and delayed f
 
 The editor separately manages **tab selection order within an editor pane** and **document visit history within a tab**. It follows the [Per-Tab Document Navigation Decision](../decisions/0044-editor-tab-navigation.md).
 
-- Closing the active tab opens the most recently active remaining tab in the same editor pane. Closing an inactive tab preserves the current tab. For example, if tabs 1, 2, and 3 exist and a new tab 4 is opened from 1 and then closed, focus returns to 1. If no tabs remain, the existing empty-pane cleanup rules apply.
-- A normal click on an internal document link, including a subdocument link, changes the document in the current tab of the clicked editor pane and appends it after the current history position. Opening another document after going back removes the existing forward history. Document navigation does not change the active tab or history in another editor pane.
-- Ctrl/Cmd+click opens a new tab. The new tab's visit history starts with only the target document and does not duplicate the original tab's history.
-- Document navigation and Back/Forward within a tab retain the originating tab even if the target document is open in another tab. `Tab.id` and `Pane.activeTabId` distinguish tabs displaying the same path, and each tab's document visit history remains independent. Sharing file bodies does not merge tab visit histories.
-- Back and Forward move only the current tab's history position and do not add the destination document as a new visit. Selecting a tab alone does not change its document visit history. Document bodies, drafts, and save status follow existing per-file-path management and permission checks.
-- `Tab.navigation` is an in-memory record for the tab session. Refreshing or restoring saved tabs merges duplicate tabs for the same document according to the existing restoration policy and restarts history with only the restored current document. Splitting a tab or moving it to another editor pane preserves its document visit history. The order for returning to recently active tabs is managed separately for each editor pane.
-- Pin **Back → Forward** to the upper-left edge of each editor body, 12px from its left and top edges, independently of the upper-right file tools. When the Open File Explorer button is visible, place it after Forward in the same left group without moving or overlapping navigation. Keep the file history, view, comment, annotation, and contents tools at their existing upper-right inset. They reuse the existing floating buttons' size, surface, spacing, and shared tooltips and provide translated accessible names. Back is disabled when no previous entry exists, and Forward is disabled when no next entry exists. Both buttons are disabled in a new tab.
+**Tab selection.** Closing the active tab selects the most recently active remaining tab in that pane; closing an inactive tab leaves selection unchanged. With tabs 1, 2, 3, opening 4 from 1 and closing it returns to 1. Empty panes follow existing cleanup rules. Each pane tracks recency separately.
+
+| Document action | Visit-history behavior |
+| --- | --- |
+| Normal internal/subdocument link click | Navigate in the clicked pane's current tab; append after the current position and discard forward history |
+| Ctrl/Cmd+click | Open a new tab containing only the target visit, without copying the source history |
+| Back/Forward | Move the current history position without recording a new visit |
+| Select a tab | Leave its document history unchanged |
+| Split or move a tab to another pane | Preserve that tab's document history |
+
+Navigation and Back/Forward retain the originating tab even when another tab already shows the target. `Tab.id` and `Pane.activeTabId` distinguish same-path tabs; shared bodies never merge histories. Other panes' active tabs/histories remain unchanged. Bodies, drafts, saves, and permissions retain per-file-path management.
+
+`Tab.navigation` lasts for the in-memory tab session. Refresh/restoration merges same-document duplicates under existing policy and starts history from the restored current document only.
+
+**Controls.** Pin **Back → Forward** 12px from the editor body's upper-left edges, independently of upper-right file tools. Put Open File Explorer after Forward when visible, without shifting/overlapping navigation. Preserve file-history, view, comment, annotation, and contents tools at their upper-right inset. Reuse floating-button size, surface, spacing, tooltips, and translated accessible names. Disable Back without a previous visit and Forward without a next visit; both start disabled in a new tab.
 
 Document navigation within a tab is separate from viewing historical file contents in Git and does not add document visits to mobile panel visit history or the browser's Back stack. [Links](../features/document-code-media-editing/links-file-references-and-attachments.md) owns link display, path resolution, and click contracts.
 
 ## Editor status bar
 
-- The selected character count and file size status bar maintains a minimum height of 16px even when its values are empty. On mobile, it sits below the auxiliary keys, above the Dock or keyboard; see [Mobile auxiliary key bar](#mobile-auxiliary-key-bar).
-- The text's UTF-8 size is calculated after the initial render. While typing in the same project and file, the last calculated value is retained and updated when the new calculation finishes. When the project or file changes, the previous file's size is not displayed.
-- `server/editor-status-bar-ui.test.ts` verifies that the size display and height are maintained while typing in Hotview and Plain on desktop and mobile, and that the actual UTF-8 size is updated after calculation.
+- Keep the selected-character count and file-size status bar at least 16px high, even when empty. On mobile, place it below [auxiliary keys](#mobile-auxiliary-key-bar), above the Dock or keyboard.
+- Calculate UTF-8 text size after initial render. While typing in the same project/file, retain the last value until recalculation finishes. Never show the previous file's size after a project/file change.
+- `server/editor-status-bar-ui.test.ts` checks retained size/height during Hotview and Plain typing on desktop/mobile, and the updated UTF-8 size after calculation.
 
 ## Text selection
 
-In the base layer of `src/index.css`, app UI blocks text selection and the iOS long-press callout by default. Titles, guidance, tabs, menus, tool buttons, and descriptions in portals follow the same default. This is managed through the `body` default and per-content exceptions, without forcing `user-select: none` on all descendants.
+`src/index.css` blocks app-UI text selection and iOS long-press callouts by default, including titles, guidance, tabs, menus, tool buttons, and portal descriptions. Apply this through the `body` default and per-content exceptions, without forcing `user-select: none` on every descendant.
 
 Selection backgrounds in Hotview, Plain, and code editors use the current theme's primary color (`--color-accent`) at 30% opacity, while text and syntax highlighting colors remain `currentColor` ([standard selection highlight color rules](https://www.w3.org/TR/css-pseudo/#highlight-cascade)). The same color applies to Hotview's `.tiptap ::selection` and CodePane's native browser selection and `.cm-selectionBackground`. When CodeMirror draws selections itself, native browser selection remains transparent to prevent overlapping colors; theme colors are also specified for paths that use native browser selection, such as iOS. Changes to the theme's primary color take effect immediately regardless of focus or read-only status. `server/editor-context-menu-ui.test.ts` handles verification, and iOS branch checks use a platform-detection test double in Chromium. Selection handles and toolbars drawn directly by the OS are outside the scope of CSS color settings.
 
@@ -143,7 +151,13 @@ Verification: `editor-files.test.ts` checks tab identifiers, same-name files, me
 
 Hotview, Plain, and code bodies display **Add Annotation · Add Comment · Copy · Cut · Paste · Delete · Select All** using the shared `ActionMenu`. The editor opts into the shared horizontal presentation: only icons are visible, and mouse hover shows each translated action name in a tooltip. The same labels remain available to assistive technologies. The 7 default items are always displayed, with unavailable actions disabled. These include annotations in non-Markdown files, body changes in read-only mode, and copy/cut/delete without a selection. Comments require separate feature and file modification permissions, as well as target text.
 
-Long presses and double taps in touch editor bodies allow the browser's native text selection. A touch-generated `contextmenu` stops propagation to internal table menus. When a nonempty native selection is already contained within the body, it also cancels the default menu so only Mew's actions appear. Without a body selection, it preserves the default behavior needed to initiate native word selection. The handler neither moves focus nor prepares a new editor selection; touch start and movement remain uncanceled. This also applies to mouse-compatible context events generated after touch input. `useEditorTouchSelection` observes nonempty DOM selections within the same body and opens the existing menu below the selection when the range remains stable for 250ms after the finger is lifted. Mouse or keyboard selection alone does not automatically show the menu. Input that changes the selection range closes the previous menu and prepares it again for the new range. Clearing the selection through a new editing gesture, key input, loss of window focus, or changes to the file, workspace, mode, account, or permissions cancel pending display. Scrolling and pointer movement alone retain an existing menu and its action target; scrolling also leaves a pending stable-selection timer intact so its final position uses the current range geometry. A temporarily collapsed native range during a scroll gesture does not dispose the existing target. Actual range changes still hide and rebuild the menu for the new selection.
+Long presses and double taps retain native text selection in touch editor bodies. Touch-generated `contextmenu` events, including mouse-compatible events after touch, stop propagation to internal table menus. Cancel the default menu only when a nonempty native selection is already inside the body; otherwise preserve native word-selection initiation. Do not move focus, prepare an editor selection, or cancel touch start/movement.
+
+`useEditorTouchSelection` observes nonempty DOM selections in that body:
+
+- After finger release, open the existing menu below a range stable for 250ms. Mouse or keyboard selection alone does not open it.
+- Range-changing input closes the old menu and prepares the new range. Clearing selection through an editing gesture, key input, window-focus loss, or file/workspace/mode/account/permission changes cancels pending display.
+- Scrolling and pointer movement retain an open menu and its target. Scrolling also preserves a pending stable-selection timer, whose final placement uses current range geometry. A temporarily collapsed native range during scrolling retains the target; actual range changes hide and rebuild the menu.
 
 A browser can cancel pointer delivery when it takes over native text selection. `pointercancel` and `touchcancel` therefore recheck the current range rather than discard pending menu display. If a native touch is still active, the menu waits for `touchend` or `touchcancel`; once the gesture ends, a valid range opens the menu after the same 250ms stability delay. Cancellation without a selection leaves the menu closed. File and other scope changes still cancel pending display.
 
