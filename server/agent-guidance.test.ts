@@ -272,7 +272,7 @@ test('test-writing guidance defaults to required without rewriting existing inst
   }
 })
 
-for (const key of documentationGuidanceKeys) test(`${key} defaults on and preserves independent choices, custom text and damaged blocks`, async () => {
+for (const key of [...documentationGuidanceKeys, 'codeQuality'] as const) test(`${key} defaults on and preserves independent choices, custom text and damaged blocks`, async () => {
   const { agentGuidanceSettings, updateAgentGuidance, GuidanceError } = await import('./agent-guidance.ts')
   fs.rmSync(AGENT_GUIDANCE_PATH, { force: true })
   assert.equal(readAgentGuidance().split(guidanceOptions[key].required).length - 1, 1, 'fresh template and runtime default agree')
@@ -381,6 +381,67 @@ test('documentation preferences are account-wide and never change another accoun
   })
   runWithAgentAccount('documentation-a@example.test', () => {
     for (const key of documentationGuidanceKeys) assert.equal(agentGuidanceSettings().settings[key], 'project')
+  })
+})
+
+test('document structure and code quality defaults supplement empty Markdown and legacy TXT without changing files, revisions, or prior writing guidance', async () => {
+  const { agentGuidanceSettings, agentGuidancePath } = await import('./agent-guidance.ts')
+  const keys = ['documentStructure', 'codeQuality'] as const
+  const oldWriting = `<!-- mew:agent-setting:documentWriting -->\n${guidanceOptions.documentWriting.required}\n<!-- /mew:agent-setting:documentWriting -->`
+  for (const [kind, original] of [['empty', ''], ['existing', `# Keep my instructions\n\n${oldWriting}\n`], ['legacy', `# Keep legacy spacing\n\n${oldWriting}\n`]] as const) {
+    runWithAgentAccount(`structure-code-${kind}@example.test`, () => {
+      const guidancePath = agentGuidancePath()
+      const source = kind === 'legacy' ? path.join(path.dirname(guidancePath), 'agent-guidance.txt') : guidancePath
+      fs.writeFileSync(source, original)
+      const effective = readAgentGuidance()
+      for (const key of keys) assert.equal(effective.split(guidanceOptions[key].required).length - 1, 1)
+      assert.ok(effective.startsWith(original.trim()))
+      assert.equal(fs.readFileSync(source, 'utf8'), original)
+      if (kind === 'legacy') assert.equal(fs.existsSync(guidancePath), false, 'legacy previews do not initialize Markdown')
+      let state = agentGuidanceSettings()
+      const revision = state.revision
+      assert.equal(state.content, original, 'initialization preserves the complete source')
+      for (const key of keys) assert.equal(state.settings[key], 'required')
+      readAgentGuidance()
+      state = agentGuidanceSettings()
+      assert.equal(state.revision, revision)
+      assert.equal(state.content, original)
+      if (kind !== 'empty') {
+        assert.equal(state.settings.documentWriting, 'required')
+        assert.ok(effective.includes(oldWriting), 'the old exact writing preset remains intact')
+      }
+    })
+  }
+})
+
+test('document structure and code quality choices are independent and account-scoped on the next request', async () => {
+  const { agentGuidanceSettings, updateAgentGuidance } = await import('./agent-guidance.ts')
+  const keys = ['documentStructure', 'codeQuality'] as const
+  runWithAgentAccount('structure-code-choices@example.test', () => {
+    let state = agentGuidanceSettings()
+    state = updateAgentGuidance({ key: 'documentStructure', value: 'project', revision: state.revision })
+    assert.equal(state.settings.codeQuality, 'required')
+    assert.equal(state.settings.documentWriting, 'required')
+    state = updateAgentGuidance({ key: 'codeQuality', value: 'project', revision: state.revision })
+    const revision = state.revision
+    const content = readAgentGuidance()
+    for (const key of keys) {
+      assert.equal(state.settings[key], 'project')
+      assert.ok(content.includes(guidanceOptions[key].project))
+      assert.ok(!content.includes(guidanceOptions[key].required))
+    }
+    assert.equal(agentGuidanceSettings().revision, revision)
+  })
+  runWithAgentAccount('structure-code-other@example.test', () => {
+    const state = agentGuidanceSettings(), content = readAgentGuidance()
+    for (const key of keys) {
+      assert.equal(state.settings[key], 'required')
+      assert.ok(content.includes(guidanceOptions[key].required))
+      assert.ok(!content.includes(guidanceOptions[key].project))
+    }
+  })
+  runWithAgentAccount('structure-code-choices@example.test', () => {
+    for (const key of keys) assert.equal(agentGuidanceSettings().settings[key], 'project')
   })
 })
 

@@ -36,7 +36,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><AgentGuidanceB
       let updates = 0, failure: 503 | 409 | undefined
       let state = {
         path: '/data/agent-guidance.md', content: '# Guidance', instructions: '', revision: 'initial',
-        settings: { commit: 'inherit', commitLanguage: 'en', language: 'inherit', detail: 'inherit', subagents: 'inherit', debugger: 'enabled', testing: 'required', ...Object.fromEntries(documentationGuidanceKeys.map(key => [key, 'required'])) },
+        settings: { commit: 'inherit', commitLanguage: 'en', language: 'inherit', detail: 'inherit', subagents: 'inherit', debugger: 'enabled', testing: 'required', codeQuality: 'required', ...Object.fromEntries(documentationGuidanceKeys.map(key => [key, 'required'])) },
         capacityRetry: { delaySeconds: 30, maxRetries: 20 },
         branch: { value: { ...defaultBranchGuidance }, custom: false },
         buildVerification: { value: { ...defaultAgentBuildVerificationSettings }, custom: false },

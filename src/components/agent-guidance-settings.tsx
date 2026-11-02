@@ -25,6 +25,7 @@ const copy = {
 }
 const button = 'inline-flex min-h-7 shrink-0 items-center justify-center gap-1.5 rounded px-2 text-xs text-ink-secondary hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-40 pointer-coarse:min-h-9'
 const generalCopy = { ko: '일반', en: 'General', ja: '一般', 'zh-CN': '常规' }
+const codeQualityCopy = { ko: '코드 품질', en: 'Code quality', ja: 'コード品質', 'zh-CN': '代码质量' }
 const capacityRetryDraft = (value: AgentCapacityRetrySettings): CapacityRetryDraft => ({ delaySeconds: String(value.delaySeconds), maxRetries: String(value.maxRetries) })
 const documentationKeys = new Set<GuidanceKey>(documentationGuidanceKeys)
 const managedCommitCopy = {
@@ -160,12 +161,12 @@ export function AgentGuidanceSettings({ onClose, onOpenFile, workspacePath }: { 
   }, [busy, error, globalDirty, globalDraft, projectDirty, projectDraft, projectEnabled, data, projectData])
   const labels: Record<string, string> = { ...text, ko: '한국어', en: 'English', ja: '日本語', zh: '简体中文' }
   const managedCommit = data && data.settings.commit !== 'custom' && !data.branch.custom && data.branch.value.strategy !== 'inherit' && data.branch.value.workflow !== 'manual'
-  const settingLabels: Record<GuidanceKey, string> = { ...text, ...docText }
+  const settingLabels: Record<GuidanceKey, string> = { ...text, ...docText, codeQuality: codeQualityCopy[locale] }
   const guidanceField = (key: GuidanceKey) => data && <GuidanceRow key={key} label={settingLabels[key]} hint={key === 'commit' && (managedCommit ? managedCommitCopy[locale] : data.settings.commit === 'custom' ? text.customHint : undefined)}>
     <SelectField compact portalContainer={panel} popupWidth={key === 'commitLanguage' ? 280 : undefined} label={settingLabels[key]} value={data.settings[key]} disabled={busy || !!error || (key === 'commit' && !!managedCommit)} onChange={value => void update(key, value)}
       options={[
         ...(data.settings[key] === 'custom' ? [{ value: 'custom', label: text.custom, disabled: true }] : []),
-        ...Object.keys(guidanceOptions[key]).map(value => ({ value, label: value === 'required' && documentationKeys.has(key) ? docText.required : labels[value] })),
+        ...Object.keys(guidanceOptions[key]).map(value => ({ value, label: value === 'required' && (documentationKeys.has(key) || key === 'codeQuality') ? docText.required : labels[value] })),
       ]} />
   </GuidanceRow>
   return <DialogFrame labelledBy={titleId} onClose={close} busy={saving} size="settings" className="agent-guidance-dialog flex flex-col text-ink">

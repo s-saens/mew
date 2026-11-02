@@ -43,6 +43,10 @@ export const guidanceOptions = {
     required: 'When adding or changing behavior or fixing a bug, you must write or update automated tests that verify the affected behavior. For bug fixes, include a regression test. Run the relevant tests before completing the task, following project execution restrictions. If tests cannot run, report the blocker and do not claim they passed. Documentation-only changes do not require new tests.',
     project: 'Follow the project’s requirements for writing and running tests. Mew adds no separate test-writing requirement in this mode.',
   },
+  codeQuality: {
+    required: 'Keep modules, components, and functions focused on a single responsibility. Prefer small, cohesive files, explicit interfaces, and clear dependency direction. Separate domain logic from UI and I/O where it improves understanding or testing. Use clear names, straightforward control flow, and explicit error handling; reuse existing abstractions and avoid duplication, dead code, and speculative abstractions. Split code when it improves understanding, testing, or maintenance, without arbitrary size limits or excessive tiny wrappers. Keep changes within the task and avoid unrelated rewrites.',
+    project: 'Follow the project’s code design and maintainability requirements. Mew adds no separate code quality requirement in this mode.',
+  },
   documentation: {
     required: 'When code, features, configuration, or operating procedures change, update the owning canonical documentation in the same task. Update the existing source of truth instead of duplicating it, and link related usage, implementation, and operational documents when their contracts change.',
     project: 'Follow the project’s documentation update requirements. Mew adds no separate documentation update requirement in this mode.',
@@ -59,6 +63,10 @@ export const guidanceOptions = {
     required: 'Write documentation for its intended reader and task, using clear, concise language and the project’s terminology and format. Separate current contracts, instructions, decisions, and historical work. Preserve facts, conditions, code, links, and uncertainty; do not invent verification results or rewrite unrelated documents.',
     project: 'Follow the project’s documentation writing conventions. Mew adds no separate writing convention in this mode.',
   },
+  documentStructure: {
+    required: 'Organize documentation into small, focused files for a specific topic and intended reader. Separate independently maintained contracts, usage guides, decisions, and historical records when useful, while keeping closely related content together. Keep one canonical source for each fact or contract and link to it instead of duplicating it. Use clear filenames and accurate descriptions so agents can retrieve only the relevant documents. Preserve the project’s established documentation structure and description-first discovery; do not require MOC navigation or registration. Split documents when it improves retrieval or maintenance, without arbitrary line limits or excessive fragmentation.',
+    project: 'Follow the project’s documentation structure and decomposition conventions. Mew adds no separate document structure requirement in this mode.',
+  },
   documentDescriptions: {
     required: 'Give every new or changed documentation file an accurate, non-empty frontmatter description, and update it when the document’s scope or status changes. Describe the subject and coverage so agents can select relevant current documents without reading every body. Preserve the project’s established metadata format.',
     project: 'Follow the project’s documentation metadata requirements. Mew adds no separate frontmatter description requirement in this mode.',
@@ -74,7 +82,7 @@ export const guidanceOptions = {
 } as const
 
 export type GuidanceKey = keyof typeof guidanceOptions
-export const documentationGuidanceKeys = ['documentation', 'decisionRecords', 'workRecords', 'documentWriting', 'documentDescriptions', 'documentLinks', 'documentChecks'] as const satisfies readonly GuidanceKey[]
+export const documentationGuidanceKeys = ['documentation', 'decisionRecords', 'workRecords', 'documentWriting', 'documentStructure', 'documentDescriptions', 'documentLinks', 'documentChecks'] as const satisfies readonly GuidanceKey[]
 export type DocumentationGuidanceKey = typeof documentationGuidanceKeys[number]
 export type GuidanceSnapshot = {
   path: string

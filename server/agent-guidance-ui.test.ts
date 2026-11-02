@@ -40,7 +40,7 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
       let releaseSave: (() => void) | undefined, releaseLoad: (() => void) | undefined
       let heldLoad = false
       const documentationSettings = Object.fromEntries(documentationGuidanceKeys.map(key => [key, 'required'])) as Record<DocumentationGuidanceKey, string>
-      let state = { path: '/data/agent-guidance.md', content: '# Guidance', instructions: '', revision: 'first', buildVerification: { value: { ...defaultAgentBuildVerificationSettings }, custom: false }, capacityRetry: { delaySeconds: 30, maxRetries: 20 }, settings: { commit: 'inherit', commitLanguage: 'en', language: 'inherit', detail: 'custom', subagents: 'inherit', debugger: 'enabled', testing: 'required', ...documentationSettings }, branch: { value: { ...defaultBranchGuidance }, custom: false } }
+      let state = { path: '/data/agent-guidance.md', content: '# Guidance', instructions: '', revision: 'first', buildVerification: { value: { ...defaultAgentBuildVerificationSettings }, custom: false }, capacityRetry: { delaySeconds: 30, maxRetries: 20 }, settings: { commit: 'inherit', commitLanguage: 'en', language: 'inherit', detail: 'custom', subagents: 'inherit', debugger: 'enabled', testing: 'required', codeQuality: 'required', ...documentationSettings }, branch: { value: { ...defaultBranchGuidance }, custom: false } }
       let projectState = { projectRoot: '/project', revision: 'project1', settings: { version: 1, enabled: true, docsDir: 'notes', entrypoints: ['AGENTS.md'], instructions: 'Existing project rule' } }
       const errors: string[] = []
       page.on('pageerror', error => errors.push(error.message))
@@ -137,7 +137,7 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
           assert.ok(control.x >= 0 && control.x + control.width <= width, `${name} stays inside a ${width}px viewport`)
         }
       }
-      await assertInlineFields(['응답 언어', '답변 길이', '서브에이전트 위임', '디버거 활용', '테스트 작성', '빌드 검증', '브랜치 전략', 'Git 자동 처리', '커밋 방식', '커밋 언어'])
+      await assertInlineFields(['응답 언어', '답변 길이', '서브에이전트 위임', '디버거 활용', '테스트 작성', '코드 품질', '빌드 검증', '브랜치 전략', 'Git 자동 처리', '커밋 방식', '커밋 언어'])
       await assertInlineFields(['재시도 간격 (초)', '최대 재시도 횟수'], 'spinbutton')
       const languageBounds = (await field('응답 언어').boundingBox())!, debuggerBounds = (await field('디버거 활용').boundingBox())!
       assert.ok(debuggerBounds.y - languageBounds.y <= (width >= 768 ? 120 : 168), 'ordinary settings use a compact, consistently spaced list')
@@ -220,25 +220,48 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
       await discard.getByRole('button', { name: '변경 버리기', exact: true }).click()
       await page.waitForFunction("!document.querySelector('textarea[aria-label=\"현재 프로젝트 추가 지침\"]')?.disabled")
       await globalScope.click()
+      assert.equal(await field('코드 품질').textContent(), '기본 지침 적용')
+      await choose('코드 품질', '프로젝트 지침에 따름'); await saved()
+      assert.equal(state.settings.codeQuality, 'project')
+      await dialog.getByRole('button', { name: '닫기', exact: true }).click()
+      await button.click()
+      await field('코드 품질').filter({ hasText: '프로젝트 지침에 따름' }).waitFor()
+      await field('코드 품질').scrollIntoViewIfNeeded()
+      for (const dark of [false, true]) {
+        await page.evaluate(`window.fixtureTheme(${dark})`)
+        await page.screenshot({ path: `/tmp/mew-code-quality-${width}-${dark ? 'dark' : 'light'}.png` })
+      }
+      await page.evaluate('window.fixtureTheme(false)')
       const documentation = dialog.locator('details').filter({ has: page.locator('summary', { hasText: /^문서$/ }) })
       await documentation.locator('summary').click()
-      const documentationFields = ['기준 문서 갱신', '결정 기록 (ADR)', '작업·검증 기록', '문서 작성 방식', '문서 description', '문서 링크 관리', '문서 검사']
+      const documentationFields = ['기준 문서 갱신', '결정 기록 (ADR)', '작업·검증 기록', '문서 작성 방식', '문서 구조', '문서 description', '문서 링크 관리', '문서 검사']
       await assertInlineFields(documentationFields)
+      await field('문서 구조').scrollIntoViewIfNeeded()
+      for (const dark of [false, true]) {
+        await page.evaluate(`window.fixtureTheme(${dark})`)
+        await page.screenshot({ path: `/tmp/mew-document-structure-${width}-${dark ? 'dark' : 'light'}.png` })
+      }
+      await page.evaluate('window.fixtureTheme(false)')
       for (const [index, key] of documentationGuidanceKeys.entries()) {
         assert.equal(await field(documentationFields[index]).textContent(), '기본 지침 적용')
         await choose(documentationFields[index], '프로젝트 지침에 따름')
         await page.getByRole('status').filter({ hasText: '저장했습니다.' }).waitFor()
         assert.equal(state.settings[key], 'project')
         assert.equal(state.settings.testing, 'required')
+        assert.equal(state.settings.codeQuality, 'project', 'documentation changes preserve the code quality choice')
       }
       await page.getByRole('button', { name: '다시 불러오기' }).click()
       await field('문서 검사').filter({ hasText: '프로젝트 지침에 따름' }).waitFor()
+      assert.equal(await field('코드 품질').textContent(), '프로젝트 지침에 따름')
       for (const [index, key] of documentationGuidanceKeys.entries()) {
         assert.equal(await field(documentationFields[index]).textContent(), '프로젝트 지침에 따름')
         await choose(documentationFields[index], '기본 지침 적용')
         await page.getByRole('status').filter({ hasText: '저장했습니다.' }).waitFor()
         assert.equal(state.settings[key], 'required')
+        assert.equal(state.settings.codeQuality, 'project')
       }
+      await choose('코드 품질', '기본 지침 적용'); await saved()
+      assert.equal(state.settings.codeQuality, 'required')
       state = { ...state, revision: 'custom-docs', settings: { ...state.settings, decisionRecords: 'custom' } }
       await page.getByRole('button', { name: '다시 불러오기' }).click()
       await field('결정 기록 (ADR)').filter({ hasText: '직접 편집한 지침' }).waitFor()
@@ -470,6 +493,7 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
       assert.equal(await field('서브에이전트 위임').textContent(), '필요할 때 자동 위임')
       assert.equal(await field('테스트 작성').textContent(), '필수 작성')
       assert.equal(await field('디버거 활용').textContent(), '활성화')
+      assert.equal(await field('코드 품질').textContent(), '기본 지침 적용')
       await page.keyboard.press('Escape')
       assert.equal(await dialog.count(), 0)
       assert.equal(await button.evaluate(el => el === el.ownerDocument.activeElement), true)
