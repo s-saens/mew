@@ -40,8 +40,7 @@ import { DbReferencePicker } from './database/DbReferencePicker'
 import { flattenFiles, prefixMatch, isExternalHref, relativeLinkPath, resolveRelativePath } from './utils/fuzzy'
 import { splitFrontmatter, joinFrontmatter, todayDate, type FrontmatterData } from './utils/frontmatter'
 import { sourceLineOfPos } from './utils/sourceLine'
-import { unwrapOpenListWrappers } from './utils/clipboardList'
-import { selectedTableCellText } from './utils/clipboardTable'
+import { clipboardTextSerializer } from './utils/clipboardText'
 import { isSvgMarkup, svgFileName } from './utils/svgPaste'
 import { MobileKeyBar, useMobileLayout } from '@mew/mobile-keys'
 import { pathFromDrag } from '@mew/ui'
@@ -788,7 +787,7 @@ export const Editor = forwardRef<
       Database.configure({ api, onOpenPage: (target, options) => openLinkRef.current?.(target, options) }),
       Placeholder.configure({ placeholder: () => uiText("내용 입력 · / 명령어") }),
       Markdown.configure({
-        transformCopiedText: true,
+        transformCopiedText: false,
         transformPastedText: true,
       }),
       IncrementalMarkdown,
@@ -838,25 +837,14 @@ export const Editor = forwardRef<
       scheduleCaretVisibility(editor)
     },
     editorProps: {
-      // 복사 text/plain의 md 직렬화 — tiptap-markdown의 것(플러그인 레벨)을 view 레벨에서 덮는다.
-      // 중첩 리스트 중간을 잘라 복사하면 slice에 열린 조상 리스트 래퍼가 남아 마커가 겹친
-      // "- - - 항목"이 나온다 — 래퍼를 벗기고 직렬화해 선택한 항목들 층의 마커만 남긴다
-      clipboardTextSerializer: (slice, view) => {
-        const cellText = selectedTableCellText(view.state.selection)
-        if (cellText !== null) return cellText
-        const content = unwrapOpenListWrappers(slice.content, slice.openStart, slice.openEnd)
-        const serializer = (editorRef.current?.storage as unknown as {
-          markdown?: { serializer?: { serialize: (c: Fragment) => string } }
-        })?.markdown?.serializer
-        return serializer ? serializer.serialize(content) : content.textBetween(0, content.size, '\n\n')
-      },
+      clipboardTextSerializer,
       handleClick: (view, _pos, event) => {
         if (readOnlyRef.current) return false
         const target = event.target as HTMLElement
         if (!(target instanceof HTMLElement)) return false
 
         // 코드블럭 왼쪽 여백(거터)을 클릭하면 블럭 전체를 NodeSelection으로 선택한다.
-        // 이 상태로 복사해야 ``` 펜스까지 포함된다 — 코드 텍스트(<code>) 안 클릭은 커서만 이동.
+        // 코드 텍스트(<code>) 안 클릭은 커서만 이동한다.
         const codeWrap = target.closest('.code-block-wrap') as HTMLElement | null
         if (codeWrap && !target.closest('code') && !target.closest('.code-block-copy')) {
           const rect = codeWrap.getBoundingClientRect()

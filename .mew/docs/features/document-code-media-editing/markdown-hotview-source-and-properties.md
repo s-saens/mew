@@ -8,7 +8,7 @@ updated: "2026-11-02"
 status_hash: "2741d359b18c61eecb53b8ce0ba2862f0f42c088d7d02cf55c88a23d1d44a98e"
 files: ["packages/editor/src/editor/FrontmatterSelect.tsx", "server/frontmatter-options.ts", "src/hooks/useTabs.ts", "src/components/EditorPane.tsx", "src/components/markdown-error-boundary.tsx", "packages/editor/src/Editor.tsx", "packages/editor/src/editor/FrontmatterPanel.tsx", "src/components/TableOfContents.tsx"]
 commits: []
-description: "A feature contract covering Markdown Hotview and Plain editing, /paint and /그림 drawing insertion with mapped upload positions and document access boundaries, editor-local touch pinch font zoom, per-block caching and virtualization, code-block scrolling, view and cursor restoration, checkboxes, document properties, backlinks, mobile auxiliary keys, and source-saving boundaries."
+description: "A feature contract covering Markdown Hotview and Plain editing, readable text and rich HTML copying, /paint and /그림 drawing insertion with mapped upload positions and document access boundaries, editor-local touch pinch font zoom, per-block caching and virtualization, code-block scrolling, view and cursor restoration, checkboxes, document properties, backlinks, mobile auxiliary keys, and source-saving boundaries."
 상위파일:
   - "MOC.md"
   - "_document-code-media-editing.md"
@@ -52,6 +52,13 @@ Selecting the command removes its slash text and records an insertion position. 
 - Two-finger pinching in the Hotview body adjusts document text from 8 to 40px and scales line height without resizing the workspace toolbar or page. Gutter numbers retain their existing 11px size. Markdown Plain uses the [CodeMirror touch zoom contract](code-text-editing-and-document-search.md#touch-zoom). Read-only documents support the same reading gesture.
 - Keep the reading position near the pinch midpoint. A pinch must not edit content, change selection or undo history, or trigger autosave. Ordinary one-finger scrolling, selection, and input retain their existing behavior.
 - Zoom lasts until the editor is recreated and remains temporary display state; it is not saved to the Markdown source or account font preferences. The [workspace touch policy](../appearance-accounts-operations/panel-layout-mobile-and-state-restoration.md#touch-zoom) suppresses native page pinch zoom while leaving editor handlers available.
+
+### Copying and cutting
+
+- Hotview keyboard, native selection, and context-menu copy/cut provide readable `text/plain` without heading, emphasis, link, quote, or code-fence syntax. Supported destinations also receive the existing rich HTML, retaining headings, emphasis, links, lists, and tables. Read-only documents allow copying.
+- Plain text retains paragraph boundaries, hard breaks, literal punctuation, code whitespace, list indentation, ordered numbers, and checkbox state (`☐` / `☑`). Bullets use `•`; whole tables and cell ranges use tabs between columns and newlines between rows, with empty placeholders for merged-cell spans to keep values in their logical columns. Within one cell, copy only the selected text.
+- Plain mode and code files continue to copy source verbatim. Explicit table export actions retain their formats. Copying does not change the saved Markdown; cut still deletes only after a successful clipboard write.
+- Clipboard serialization and fallback ownership follow the [editor package contract](../../development/packages.md). The choice and alternatives are recorded in [ADR 0119](../../decisions/0119-readable-hotview-clipboard.md).
 
 ### Boundaries and limitations
 
@@ -108,6 +115,8 @@ Selecting the command removes its slash text and records an insertion position. 
 
 <!-- mew:validation:start -->
 ## Verification
+
+- `packages/editor/src/utils/clipboardText.test.ts` and `prosemirrorContext.test.ts` cover readable text, rich HTML, Markdown save preservation, merged-table alignment, selection mapping, and safe cut behavior. `server/editor-context-menu-ui.test.ts` checks native copy events and context-menu copies in editable/read-only Hotview and Plain at desktop/mobile widths. See the [implementation record](../../work/editor-readable-copy.md) for results and limitations.
 
 - `server/mobile-editor-keyboard-ui.test.ts` covers immediate native body focus, typing at the selection, repeated cursor taps without blur, absence of a floating button or keyboard suppression, viewport changes, and excluded views in Hotview, Markdown Plain, and code at mobile and desktop widths, with and without the keyboard API. `server/editor-context-menu-ui.test.ts` covers selection menus without changing native keyboard policy. Physical OS keyboard behavior still requires device verification.
 

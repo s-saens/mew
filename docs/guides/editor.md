@@ -1,6 +1,6 @@
 ---
 title: "Document Editing and Storage Formats"
-description: "Explains editing Markdown, code, document properties, tables, links, attachments, and PDFs; /paint and /그림 image insertion with freehand pens, transparent exports, and snap settings; adding and deleting table rows and columns; and the body context menu and native mobile keyboard. Covers Hotview @ file autocomplete, annotations, internal document navigation, table/DB conversion, inline subpage naming, autosave, split views, mobile panels, and installation controls."
+description: "Explains editing Markdown, code, document properties, tables, links, attachments, and PDFs; readable Hotview copying and source copying in Plain; /paint and /그림 image insertion with freehand pens, transparent exports, and snap settings; adding and deleting table rows and columns; and the body context menu and native mobile keyboard. Covers Hotview @ file autocomplete, annotations, internal document navigation, table/DB conversion, inline subpage naming, autosave, split views, mobile panels, and installation controls."
 updated: "2026-11-02"
 상위파일:
   - "../../.mew/docs/MOC.md"
@@ -38,6 +38,8 @@ On mobile, long-press or double-tap the body to select text. For selected body t
 Copy, Cut, and Delete are disabled when no text is selected. Actions that modify the body are unavailable in read-only mode, and Add Annotation is unavailable for files other than Markdown. Add Comment targets the selected text; without a selection, it automatically selects the relevant paragraph in Hotview or line in Plain or code. You cannot comment where there is no text.
 
 If copying, cutting, or pasting fails, follow the guidance to use `Ctrl/Cmd+C`·`Ctrl/Cmd+X`·`Ctrl/Cmd+V`. Cut deletes the selected content only after it has been successfully copied to the clipboard.
+
+Copy from **Hotview** to paste readable text without Markdown syntax. Apps that accept rich text can retain headings, emphasis, links, lists, and tables. Text-only destinations receive readable lists and checkboxes, code with its original whitespace, and tables with tab-separated columns. To copy the Markdown source, switch to **Plain** first. Code files and explicit table export actions keep their existing copy formats.
 
 ## Links and Attachments
 

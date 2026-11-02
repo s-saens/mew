@@ -10,11 +10,12 @@ const { Editor } = await import('@tiptap/core')
 const { UndoRedo } = await import('@tiptap/extensions')
 const { serverEditorExtensions } = await import('../serverExtensions.ts')
 const { prepareProseMirrorContext } = await import('./prosemirrorContext.ts')
+const { clipboardTextSerializer } = await import('../utils/clipboardText.ts')
 
 function makeEditor(content = 'alpha bravo\n\nsecond paragraph') {
   const element = document.createElement('div')
   document.body.append(element)
-  const editor = new Editor({ element, extensions: [...serverEditorExtensions(), UndoRedo], content })
+  const editor = new Editor({ element, extensions: [...serverEditorExtensions(), UndoRedo], content, editorProps: { clipboardTextSerializer } })
   editor.view.dom.getBoundingClientRect = () => ({ left: 0, top: 0, right: 100, bottom: 100, width: 100, height: 100, x: 0, y: 0, toJSON() {} })
   let position = 3
   editor.view.posAtCoords = () => ({ pos: position, inside: 0 })
@@ -22,7 +23,7 @@ function makeEditor(content = 'alpha bravo\n\nsecond paragraph') {
 }
 function clipboard(value: object) { Object.defineProperty(navigator, 'clipboard', { value, configurable: true }) }
 
-test('right-clicking in the selection preserves it, maps it across edits, and copies through the Markdown clipboard serializer', async () => {
+test('right-clicking in the selection preserves it, maps it across edits, and copies readable text', async () => {
   const fixture = makeEditor('**alpha** bravo')
   const { editor } = fixture
   let copied = ''
@@ -37,7 +38,7 @@ test('right-clicking in the selection preserves it, maps it across edits, and co
     assert.equal(target.restoreSelection(), true)
     assert.equal(editor.state.doc.textBetween(editor.state.selection.from, editor.state.selection.to), 'alpha')
     assert.equal(await target.copy(), true)
-    assert.equal(copied, '**alpha**')
+    assert.equal(copied, 'alpha')
     target.dispose()
     assert.equal(target.restoreSelection(), false)
     assert.equal(target.deleteSelection(), false)
@@ -82,6 +83,28 @@ test('cut removes only after clipboard success and participates in undo', async 
     assert.equal(editor.state.doc.textContent, 'alpha bravo')
     target.dispose()
   } finally { fixture.destroy() }
+})
+
+test('context-menu copy writes both readable text and rich HTML when the clipboard supports them', async () => {
+  const fixture = makeEditor('**alpha** bravo')
+  let copied: Record<string, Blob> | undefined
+  class ClipboardItem {
+    data: Record<string, Blob>
+    constructor(data: Record<string, Blob>) { this.data = data }
+  }
+  Object.defineProperty(globalThis, 'ClipboardItem', { value: ClipboardItem, configurable: true })
+  clipboard({ write: async (items: ClipboardItem[]) => { copied = items[0].data } })
+  try {
+    fixture.editor.commands.setTextSelection({ from: 1, to: 6 })
+    const target = prepareProseMirrorContext(fixture.editor, 10, 10)!
+    assert.equal(await target.copy(), true)
+    assert.equal(await copied!['text/plain'].text(), 'alpha')
+    assert.match(await copied!['text/html'].text(), /<strong>alpha<\/strong>/)
+    target.dispose()
+  } finally {
+    Reflect.deleteProperty(globalThis, 'ClipboardItem')
+    fixture.destroy()
+  }
 })
 
 test('Hotview document margins target the first or last visible text position', () => {

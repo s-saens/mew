@@ -229,6 +229,38 @@ function Fixture(){const [state,setState]=React.useState({...defaults,generation
     return page
   }
 
+  await t.test('Hotview copy supplies readable text and rich HTML while Plain retains Markdown source', async () => {
+    const source = '# Heading\n\n**Bold** [Website](https://example.com)\n'
+    for (const width of [1280, 390]) for (const editable of [true, false]) {
+      const page = await createPage(width, 'dark')
+      try {
+        for (const viewMode of ['hotview', 'plain']) {
+          await reset(page, { value: source, viewMode, editable })
+          await surface(page).click()
+          await page.keyboard.press('Control+a')
+          const copied = await surface(page).evaluate(el => {
+            const win = el.ownerDocument.defaultView!
+            const data = new win.DataTransfer()
+            el.dispatchEvent(new win.ClipboardEvent('copy', { clipboardData: data, bubbles: true, cancelable: true }))
+            return { text: data.getData('text/plain'), html: data.getData('text/html') }
+          })
+          if (viewMode === 'hotview') {
+            assert.equal(copied.text, 'Heading\n\nBold Website')
+            assert.match(copied.html, /<strong>Bold<\/strong>/)
+            assert.match(copied.html, /href="https:\/\/example.com"/)
+            await select(page, 'Bold')
+            await open(page, 'Bold', 1)
+            await item(page, '복사').click()
+            assert.equal(await page.locator('[data-context-fixture]').evaluate(el =>
+              (el.ownerDocument.defaultView as unknown as { contextClipboard: { text: string } }).contextClipboard.text), 'Bold')
+          } else {
+            assert.equal(copied.text, source)
+          }
+        }
+      } finally { await page.close() }
+    }
+  })
+
   await t.test('editor selections follow the current accent in Hotview, drawn code ranges and native code ranges', async () => {
     for (const width of [1280, 390]) for (const theme of ['light', 'dark']) {
       for (const nativeCodeSelection of width === 390 ? [false, true] : [false]) {

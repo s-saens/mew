@@ -1,7 +1,6 @@
 import { uiText, subscribeUiLocale } from '@mew/ui/i18n-core'
 import CodeBlock from '@tiptap/extension-code-block'
 import { createDiagramPreview } from './diagram-preview'
-import { Plugin, PluginKey } from '@tiptap/pm/state'
 
 // 복사 버튼 아이콘 — 라벨 텍스트 대신 순수 아이콘만 노출한다. currentColor라 버튼 color를 따라간다.
 const COPY_ICON =
@@ -38,30 +37,6 @@ async function copyText(text: string): Promise<boolean> {
 // 편집 내용(code)은 ProseMirror가 contentDOM으로 관리하고, 버튼은 그 밖의 비편집 영역에 둔다.
 // 복사 대상은 클릭 시점의 code.textContent이므로 편집 중에도 항상 최신 내용을 복사한다.
 export const CodeBlockWithCopy = CodeBlock.extend({
-  addProseMirrorPlugins() {
-    return [
-      ...(this.parent?.() ?? []),
-      new Plugin({
-        key: new PluginKey('codeBlockPlainCopy'),
-        props: {
-          // 코드블럭 "안의 텍스트 일부"(혹은 전체)를 선택해 복사하면 tiptap-markdown이
-          // ``` 펜스를 붙여 버린다. 그런 텍스트 선택은 열린 슬라이스(openStart/openEnd > 0)라
-          // 여기서 가로채 순수 텍스트만 돌려준다. 코드블럭 노드 자체를 선택(NodeSelection)해
-          // 복사할 때만 닫힌 슬라이스(경계 0)라 빈 문자열을 반환한다 → ProseMirror의 someProp이
-          // falsy로 보고 다음 직렬화기(tiptap-markdown)로 넘겨 펜스를 붙인다.
-          // CodeBlock 우선순위(100)가 markdown 확장(50)보다 높아 이 직렬화기가 먼저 평가된다.
-          clipboardTextSerializer: (slice) => {
-            const { content, openStart, openEnd } = slice
-            if (content.childCount === 1 && openStart > 0 && openEnd > 0) {
-              const only = content.firstChild
-              if (only && only.type.name === this.name) return only.textContent
-            }
-            return ''
-          },
-        },
-      }),
-    ]
-  },
   addNodeView() {
     return ({ node, HTMLAttributes }) => {
       const dom = document.createElement('div')
