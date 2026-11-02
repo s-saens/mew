@@ -30,6 +30,7 @@ import express from 'express'
 import { createRemoteUiRouter } from './remote-ui.ts'
 import { createMewpetSkinsRouter } from './mewpet-skin-routes.ts'
 import { createTaskListRouter } from './task-list-routes.ts'
+import { createUserUiRouter } from './user-ui-routes.ts'
 import { createRemoteDesktopRoutes } from './remote-desktop.ts'
 import multer from 'multer'
 import { GitError } from 'simple-git'
@@ -113,7 +114,6 @@ import { createGitAiCommitRouter } from './git-ai-commit-routes.ts'
 import { acpRuntimeList, agentSetRuntimeList, isRuntime, probeModels, thinkingByRuntime } from './agentAcp.ts'
 import { isRuntimeLoginMethod, runtimeLoginSpec } from './agentRuntimes.ts'
 import { terminalAuthFromHost } from './agentHost.ts'
-import { saveAgentTabs } from './agent-tab-state.ts'
 import { authFailureMessageFromOutput, browserLoginDetailsFromOutput, prepareAgentAuthTerminal, readAgentAuthTerminalStatus } from './agentAuthTerminal.ts'
 import { resolveWorkspaceLink } from './workspaceLinks.ts'
 import { installRuntime, logoutRuntime, runtimeStatuses, RuntimeInstallError, uninstallRuntime } from './agentRuntimeInstall.ts'
@@ -124,7 +124,6 @@ import { AgentScheduledPromptError, cancelAgentScheduledPrompt, listAgentSchedul
 import { AgentTerminalError, startAgentTerminal, stopAgentTerminal } from './agentTerminal.ts'
 import { AgentCommandStore } from './agent-commands.ts'
 import { createAgentCommandRouter } from './agent-command-routes.ts'
-import { readAccountTheme, writeAccountTheme, readAgentSessionClaims, readAgentTabs, readRootProjects, readWorkspaceUi, writeRootProjects, writeWorkspaceUi } from './userUiState.ts'
 import {
   AgentSettingError,
   deleteAgentSetting,
@@ -530,71 +529,7 @@ export function createApiApp() {
     } catch (err) { handleError(res, err) }
   })
 
-  // 로그인 계정의 작업 맥락 — 브라우저 localStorage가 아니라 서버가 기준이라 다른 기기·시크릿 창도
-  // 같은 프로젝트·에이전트 탭을 복원한다(ADR 0093).
-  app.get('/user-ui/theme', requireAuthenticated, (req, res) => {
-    try { res.json({ state: readAccountTheme(authOf(req).email!) }) }
-    catch (err) { handleError(res, err) }
-  })
-
-  app.put('/user-ui/theme', requireAuthenticated, (req, res) => {
-    try {
-      const email = authOf(req).email!
-      const state = writeAccountTheme(email, req.body?.state, req.body?.initialize === true)
-      broadcastAccount(email, { type: 'theme' })
-      res.json({ state })
-    } catch (err) { handleError(res, err) }
-  })
-
-  app.get('/user-ui/root-projects', requireAuthenticated, (req, res) => {
-    const state = readRootProjects(authOf(req).email!)
-    res.json({ state: state ? { ...state, icons: readRootProjectIcons(state.paths, state.icons) } : null })
-  })
-
-  app.put('/user-ui/root-projects', requireAuthenticated, (req, res) => {
-    try {
-      res.json({ state: writeRootProjects(authOf(req).email!, { ...req.body, icons: {} }) })
-    } catch (err) {
-      handleError(res, err)
-    }
-  })
-
-  app.get('/user-ui/agent-tabs', requireAnyFeature('agent', 'terminal'), (req, res) => {
-    try {
-      const workspacePath = String(req.query.workspace ?? '')
-      const email = authOf(req).email!
-      res.json({ state: readAgentTabs(email, workspacePath), claims: readAgentSessionClaims(email) })
-    } catch (err) {
-      handleError(res, err)
-    }
-  })
-
-  app.put('/user-ui/agent-tabs', requireAnyFeature('agent', 'terminal'), async (req, res) => {
-    try {
-      const workspacePath = typeof req.body?.workspacePath === 'string' ? req.body.workspacePath : ''
-      res.json({ state: await saveAgentTabs(authOf(req).email!, workspacePath, req.body) })
-    } catch (err) {
-      handleError(res, err)
-    }
-  })
-
-  // 로그인한 계정의 작업 화면 — 탭·사이드바·스크롤·패널 상태를 루트 경로별로 한 원장에 둔다.
-  app.get('/user-ui/workspace', requireAuthenticated, (req, res) => {
-    try {
-      res.json({ state: readWorkspaceUi(authOf(req).email!, String(req.query.workspace ?? '')) })
-    } catch (err) {
-      handleError(res, err)
-    }
-  })
-
-  app.put('/user-ui/workspace', requireAuthenticated, (req, res) => {
-    try {
-      const workspacePath = typeof req.body?.workspacePath === 'string' ? req.body.workspacePath : ''
-      res.json({ state: writeWorkspaceUi(authOf(req).email!, workspacePath, req.body?.state) })
-    } catch (err) {
-      handleError(res, err)
-    }
-  })
+  app.use('/user-ui', createUserUiRouter(handleError))
 
   // ── 프로젝트 폴더 생성·개명·삭제 (owner 전용) ──────────────────────────────
   // 삭제는 폴더를 통째로 지우는 되돌릴 수 없는 작업 — 클라이언트가 이름 타이핑 확인을 받고 호출한다.

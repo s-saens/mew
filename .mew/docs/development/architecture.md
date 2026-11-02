@@ -20,6 +20,7 @@ updated: "2026-11-03"
 - `shared/mewlink-identity.ts` — central issuer, immutable identity verification, and shared types. `server/mewlink-identities.ts`·`mewlink-auth-routes.ts` — local approval, account linking, external login, and owner management.
 - `server/remote-authentication.ts` — password session or approved identity selected for a P2P connection. Transport leases and permissions are checked by `remote-access-agent.ts` and the dispatcher.
 - `server/reqAuth.ts` — per-request authentication resolution (`req.auth`) and role/feature gating middleware
+- `server/user-ui-routes.ts` — account UI routes for themes, My Projects, agent tabs/session claims, and workspace layout. `server/api.ts` mounts them after its existing account-workspace, body, cache, file-permission, and Git-context middleware and supplies the shared error handler.
 - `server/access-policy.ts`·`access-routes.ts`·`access-socket.ts` — [Per-Account Feature and File Permissions](access-control.md), management APIs, and connection revalidation. `guestAccess.ts` is compatibility code for the existing storage format.
 - `server/usersCli.ts` — approval list CLI
 - `server/docsRepo.ts` — docs folder import/export; `server/fsBrowse.ts` — folder listing outside the workspace

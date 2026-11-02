@@ -21,3 +21,9 @@ Extract the public-module delay, shared promise, and urgent promotion from `App.
 | Scoped source/test lint | Passed with existing App React warnings |
 
 The graph retains 170 deferred edges and 19 critical chunks. These checks establish scheduling and boundary preservation, not production connection latency.
+
+## Account UI route ownership
+
+Move the eight theme, root-project, agent-tab, and workspace GET/PUT handlers into `server/user-ui-routes.ts`. `createApiApp()` mounts the router at the original middleware position and supplies its existing error handler. Request identity, per-route authentication/feature checks, response shapes, and root/session-claim behavior remain unchanged. See [server structure](../development/architecture.md#structure).
+
+`node --test server/user-ui-routes.test.ts` passed all 5 tests against the actual API fixture: guest rejection, agent/terminal feature gates, account/root isolation, cache middleware, and existing error responses. The required build and scoped lint also passed; this does not apply new server code to a running instance.
