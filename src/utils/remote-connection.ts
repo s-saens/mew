@@ -1,5 +1,5 @@
 import type { JWK } from 'jose'
-import { REMOTE_LIMITS, REMOTE_PROTOCOL, REMOTE_TOKEN_CLOCK_TOLERANCE, parseRemoteFrame, sdpFingerprint } from '../../shared/remote-access.ts'
+import { REMOTE_LIMITS, REMOTE_PROTOCOL, REMOTE_TOKEN_CLOCK_TOLERANCE, sdpFingerprint } from '../../shared/remote-access.ts'
 import { DataChannelTransport, setRemoteTransport } from './remote-transport.ts'
 import { parseRemoteBootstrap, remoteBootstrapUrl, REMOTE_ADMISSION_PROTOCOL, REMOTE_ADMISSION_PREFIX, type RemoteBootstrapContext, type RemoteConnectionTarget } from '../../shared/remote-bootstrap.ts'
 import { discardPrimedRemoteSignal, hasPrimedRemoteSignal, takePrimedRemoteSignal } from './remote-signal-prime.ts'
@@ -7,13 +7,12 @@ import { remoteConnectFlightProtocols } from './remote-connect-flight.ts'
 import { remoteRecoveryFlightProtocols } from './remote-recovery-flight.ts'
 import type { RemoteRecoveryFlightClock } from '../../shared/remote-recovery-flight.ts'
 import { takePrimedRemotePeer } from './remote-peer-prime.ts'
+import { createRemoteForegroundProbe } from './remote-foreground-probe.ts'
 
 type ConnectionObserver = (state: string, error?: string, code?: string) => void
 type ConnectionCredentials = { session?: string; keyPair: CryptoKeyPair }
 type ConnectionOptions = { centralOrigin?: string; ticketIssuers?: string[]; launch?: string; session?: string; keyPair?: CryptoKeyPair }
 const RTC_RECOVERY_GRACE = 5000, RTC_RECOVERY_NOTICE_DELAY = 1000
-const FOREGROUND_CHECK_TIMEOUT = 250
-type ForegroundCheck = { id: string; timer: ReturnType<typeof setTimeout>; sentAt?: number; timeout: number; received(event: MessageEvent): void }
 type Bootstrap = {
   target: RemoteConnectionTarget
   identity?: boolean
@@ -69,7 +68,7 @@ function createRemoteConnection(instance: string, onState: ConnectionObserver, o
   let stopped = false, authenticated = false, connection = '', ticket = '', privateKey: CryptoKey, claims: Record<string, any>, renew: ReturnType<typeof setInterval> | undefined, disconnected: ReturnType<typeof setTimeout> | undefined, timeout: ReturnType<typeof setTimeout> | undefined
   let disconnectNotice: ReturnType<typeof setTimeout> | undefined, recoveryNotified = false
   let signalResume = false, signalInterrupted = false, signalAttempt = 0, connectSentAt = 0, connectWallSentAt = 0, leaseDeadline = 0, leaseWallDeadline = 0, resumeNonce = '', resumeSentAt = 0, resumeWallSentAt = 0
-  let transport: DataChannelTransport | undefined, foregroundCheck: ForegroundCheck | undefined, lastForegroundCheck = -Infinity
+  let transport: DataChannelTransport | undefined
   let recoveringSignal: WebSocket | undefined
   let signalRetry: ReturnType<typeof setTimeout> | undefined, signalTimeout: ReturnType<typeof setTimeout> | undefined, leaseTimeout: ReturnType<typeof setTimeout> | undefined
   const renewals = new Map<string, { monotonic: number; wall: number }>()
@@ -120,66 +119,46 @@ function createRemoteConnection(instance: string, onState: ConnectionObserver, o
     return true
   }
   const flushCandidates = () => { while (localCandidates.length && sendCandidate(localCandidates[0])) localCandidates.shift() }
-  const cancelForegroundCheck = () => {
-    const check = foregroundCheck
-    if (!check) return
-    foregroundCheck = undefined; clearTimeout(check.timer); channel.removeEventListener('message', check.received)
-    void transport?.forward({ type: 'cancel', id: check.id }).catch(() => {})
-  }
+  const foregroundProbe = createRemoteForegroundProbe(peer, channel, () => {
+    fail('기기가 응답하지 않아 다시 연결합니다.', 'error', 'connection-unresponsive')
+  })
   const checkForeground = (interrupted = false) => {
     if (!authenticated || stopped || document.visibilityState !== 'visible' || channel.readyState !== 'open' || !transport) return
     if (signalResume && remainingLease() <= 0) { fail('인증 연결이 만료되어 다시 연결합니다.'); return }
-    if (foregroundCheck || !interrupted && performance.now() - lastForegroundCheck < FOREGROUND_CHECK_TIMEOUT || channel.bufferedAmount > REMOTE_LIMITS.queue) return
-    lastForegroundCheck = performance.now()
-    const check: ForegroundCheck = {
-      id: `remote-check-${crypto.randomUUID()}`,
-      timer: setTimeout(() => { if (foregroundCheck === check) cancelForegroundCheck() }, FOREGROUND_CHECK_TIMEOUT),
-      timeout: FOREGROUND_CHECK_TIMEOUT,
-      received(event: MessageEvent) {
-        if (foregroundCheck !== check) return
-        try {
-          const frame = parseRemoteFrame(event.data)
-          if (frame.id === check.id && ['response', 'end', 'error'].includes(frame.type)) cancelForegroundCheck()
-        } catch { /* Unrelated or invalid frames cannot prove a fresh round trip. */ }
-      },
-    }
-    foregroundCheck = check
-    channel.addEventListener('message', check.received)
-    const arm = () => {
-      if (stopped || foregroundCheck !== check || check.sentAt === undefined) return
-      clearTimeout(check.timer)
-      check.timer = setTimeout(() => {
-        if (foregroundCheck !== check) return
-        cancelForegroundCheck()
-        fail('기기가 응답하지 않아 다시 연결합니다.', 'error', 'connection-unresponsive')
-      }, Math.max(0, check.sentAt + check.timeout - performance.now()))
-    }
-    if (typeof peer.getStats === 'function') void Promise.resolve().then(() => peer.getStats()).then(report => {
-      if (stopped || foregroundCheck !== check) return
-      report.forEach(stat => {
-        if (stat.type !== 'transport' || typeof stat.selectedCandidatePairId !== 'string') return
-        const pair = report.get(stat.selectedCandidatePairId), rtt = pair?.currentRoundTripTime
-        if (pair?.type !== 'candidate-pair' || typeof rtt !== 'number' || !Number.isFinite(rtt) || rtt < 0) return
-        check.timeout = Math.max(check.timeout, Math.min(1000, rtt * 3000 + 50))
-      })
-      arm()
-    }).catch(() => {})
-    // A queued probe cannot distinguish a stalled peer from local stream congestion.
-    void transport.forward({ type: 'request', id: check.id, method: 'HEAD', path: '/api/remote-ui/file?path=/favicon.ico', headers: {} }).then(() => {
-      if (stopped || foregroundCheck !== check) return
-      check.sentAt = performance.now(); arm()
-    }).catch(() => { if (foregroundCheck === check) cancelForegroundCheck() })
+    foregroundProbe.check(transport, interrupted)
   }
   const resume = (event?: Event) => {
-    if (document.visibilityState !== 'visible') { cancelForegroundCheck(); lastForegroundCheck = -Infinity; return }
+    if (document.visibilityState !== 'visible') { foregroundProbe.reset(); return }
     if (!authenticated || stopped) return
     if (signalResume && remainingLease() <= 0) { fail('인증 연결이 만료되어 다시 연결합니다.'); return }
     if (signalInterrupted) { if (signalRetry !== undefined) { clearTimeout(signalRetry); clearTimeout(signalTimeout); signalRetry = undefined; reconnectSignal() } }
     else emit({ type: 'renew' })
     if (event) checkForeground()
   }
-  const close = () => { if (stopped) return; if (authenticated && signalResume) emit({ type: 'end' }); stopped = true; cancelForegroundCheck(); keyRequest.abort(); bootstrap?.cancel(); clearTimeout(timeout); clearTimeout(disconnected); clearTimeout(disconnectNotice); clearTimeout(signalRetry); clearTimeout(signalTimeout); clearTimeout(leaseTimeout); clearInterval(renew); renewals.clear(); document.removeEventListener('visibilitychange', resume); window.removeEventListener('pageshow', resume); window.removeEventListener('online', resume); setRemoteTransport(null)
-    channel.close(); peer.close(); signal?.close(); if (bootstrap?.admission) discardPrimedRemoteSignal(signalUrl, bootstrap.admission) }
+  const close = () => {
+    if (stopped) return
+    if (authenticated && signalResume) emit({ type: 'end' })
+    stopped = true
+    foregroundProbe.cancel()
+    keyRequest.abort()
+    bootstrap?.cancel()
+    clearTimeout(timeout)
+    clearTimeout(disconnected)
+    clearTimeout(disconnectNotice)
+    clearTimeout(signalRetry)
+    clearTimeout(signalTimeout)
+    clearTimeout(leaseTimeout)
+    clearInterval(renew)
+    renewals.clear()
+    document.removeEventListener('visibilitychange', resume)
+    window.removeEventListener('pageshow', resume)
+    window.removeEventListener('online', resume)
+    setRemoteTransport(null)
+    channel.close()
+    peer.close()
+    signal?.close()
+    if (bootstrap?.admission) discardPrimedRemoteSignal(signalUrl, bootstrap.admission)
+  }
   const fail = (error = '기기와 직접 연결하지 못했습니다. 기기의 실행 상태와 네트워크를 확인해 주세요.', state = 'error', code?: string) => { if (stopped) return; close(); onState(state, error, code) }
   const authorizeLease = (remaining: unknown, sentAt: number, sentWall: number) => {
     if (typeof remaining !== 'number' || !Number.isFinite(remaining) || remaining < 0 || remaining > REMOTE_LIMITS.lease) throw new Error('연결 유효 시간을 확인하지 못했습니다.')

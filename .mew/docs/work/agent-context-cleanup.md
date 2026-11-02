@@ -27,3 +27,11 @@ The graph retains 170 deferred edges and 19 critical chunks. These checks establ
 Move the eight theme, root-project, agent-tab, and workspace GET/PUT handlers into `server/user-ui-routes.ts`. `createApiApp()` mounts the router at the original middleware position and supplies its existing error handler. Request identity, per-route authentication/feature checks, response shapes, and root/session-claim behavior remain unchanged. See [server structure](../development/architecture.md#structure).
 
 `node --test server/user-ui-routes.test.ts` passed all 5 tests against the actual API fixture: guest rejection, agent/terminal feature gates, account/root isolation, cache middleware, and existing error responses. The required build and scoped lint also passed; this does not apply new server code to a running instance.
+
+## Foreground probe and network contracts
+
+Extract pending-probe state, response listeners, admission cancellation, and transmit-relative RTT timers into `createRemoteForegroundProbe`. The connection controller retains authenticated/visible/open-channel/transport/lease eligibility and cancels the probe synchronously on close. See [foreground recovery](../development/remote-access-recovery.md#foreground-liveness-and-lease-expiry).
+
+`node --test src/utils/remote-foreground-probe.test.ts src/utils/remote-connection.test.ts` passed 131 tests, including late statistics and responses, canceled queued probes, replacement, and reset. The required build and scoped lint passed. Independent source review found no intended behavior change.
+
+The [remote access](../development/remote-access.md), [recovery](../development/remote-access-recovery.md), [remote desktop](../development/remote-desktop.md), [collaboration](../development/collaboration.md), and [port preview](../development/port-preview.md) contracts now use shorter paragraphs and lookup tables. Recovery has its own canonical topic; the original entry anchor remains. Existing headings, code, limits, links, and historical verification evidence were checked for preservation. Authentication and transport clauses received an independent semantic review; this review did not revalidate production operation.
