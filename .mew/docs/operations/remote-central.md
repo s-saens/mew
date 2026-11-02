@@ -1,8 +1,8 @@
 ---
 title: "mewlink Cloudflare Deployment"
-description: "Maintainer runbook covering Mewlink's independent local Git repository and parent-checkout dependencies, central configuration, deployment, local secrets preflight and recovery, Wrangler JSON-output recovery, key preservation, access revocation, verification, rollback, and localhost preview DNS and HTTPS preparation. Links to dated implementation and deployment records."
+description: "Maintainer runbook covering Mewlink's independent Git repository, parent-checkout dependencies, configuration, deployment, secrets recovery, key preservation, access revocation, verification, rollback, and port-preview wildcard DNS with Custom Domain-managed TLS and read-only readiness checks. Links to dated operating records."
 created: "2026-10-07"
-updated: "2026-11-01"
+updated: "2026-11-02"
 ---
 
 Recurring deployment, configuration, and recovery procedures for central service maintainers. Results of changes by date are preserved in the [deployment history](../work/mewlink-deployment-history.md).
@@ -356,14 +356,26 @@ When retaining the current `PREVIEW_DOMAIN=preview.mew.run`, prepare the followi
 
 This DNS record routes `*.preview.mew.run` to the same Worker. A record for `preview.mew.run` itself does not handle random hostname lookups. [Deep wildcard DNS](https://developers.cloudflare.com/dns/manage-dns-records/reference/wildcard-dns-records/) is supported, but HTTPS requires an active Edge Certificate that explicitly includes `*.preview.mew.run`. The default Universal SSL `*.mew.run` does not secure this address, so check existing certificates before deciding how to provision the required certificate. Follow [Universal SSL coverage](https://developers.cloudflare.com/ssl/edge-certificates/universal-ssl/limitations/).
 
-The user deploys after applying the central `src/port-preview.ts`, `public/port-preview-launch.js`, `public/port-preview-worker.js`, and `public/port-preview-runtime.js` together with the Worker entry point, client, and configuration. Follow [port preview](../development/port-preview.md) for detailed permission/security boundaries and unsupported items. This work did not include central deployment, actual domain checks, or external network checks.
+The deployment configuration also retains `preview.mew.run` as a production [Worker Custom Domain](https://developers.cloudflare.com/workers/configuration/routing/custom-domains/) on `mewlink`. Cloudflare manages its DNS and certificate. The certificate ordered for this domain on 2026-11-02 includes `*.preview.mew.run`; wait for active issuance and verify that coverage before declaring readiness. No Advanced Certificate Manager subscription was enabled for this repair. Preserve this entry alongside the wildcard route in `mewlink/wrangler.jsonc` so later deployments retain the Custom Domain:
+
+```json
+{
+  "pattern": "preview.mew.run",
+  "custom_domain": true,
+  "previews_enabled": false
+}
+```
+
+`previews_enabled: false` keeps Cloudflare Worker version previews disabled. Mew's random port-preview hosts continue to use the proxied wildcard CNAME and Worker route. The exact Custom Domain does not replace that wildcard DNS record. The [DNS and TLS repair record](../work/port-preview-domain-readiness.md) distinguishes applied infrastructure from local configuration and runtime verification.
+
+The user deploys after applying the central `src/port-preview.ts`, `public/port-preview-launch.js`, `public/port-preview-worker.js`, and `public/port-preview-runtime.js` together with the Worker entry point, client, and configuration. Follow [port preview](../development/port-preview.md) for detailed permission/security boundaries and unsupported items. The original implementation did not include central deployment, actual domain checks, or external network checks; subsequent DNS and TLS verification is recorded in the repair record linked above.
 
 In the read-only check on 2026-10-27, the public device preview entry point returned HTTP 200, but DNS lookups for `preview.mew.run` and different random subhosts returned `ENOTFOUND`. Even with Worker configuration in place, previews cannot connect unless external DNS is ready. This check did not change DNS, certificates, or the Worker deployment.
 
 Operators check readiness in the following order.
 
 1. Point the `*` DNS record under the domain matching `PREVIEW_DOMAIN` to the same Worker, and verify its proxied status and the `*.preview.mew.run/*` route.
-2. Verify an active HTTPS certificate that explicitly includes `*.preview.mew.run`. Do not substitute a certificate that includes only `*.mew.run`.
+2. Verify the `preview.mew.run` Custom Domain on `mewlink` and an active HTTPS certificate that explicitly includes `*.preview.mew.run`. Do not substitute a certificate that includes only `*.mew.run`.
 3. Verify DNS and the HTTPS response from `https://<난수>.preview.mew.run/__mew_preview_launch` on a newly created subhost with a 32-digit base-16 name. Do not stop after checking only the public device page's 200 response.
 4. Apply the host and public preview launcher fixes respectively, then check modules, APIs, and WebSockets at `/<port>` on the actual device address. Follow the [preview contract](../development/port-preview.md#mewlink) for remote initialization failures and the 15-second limit.
 
