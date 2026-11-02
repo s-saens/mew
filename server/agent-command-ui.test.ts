@@ -26,6 +26,7 @@ window.composerSelection=()=>{
   return {from:selection.from,to:selection.to};
 };
 window.composerSelect=(from,to=from)=>EditorView.findFromDOM(document.querySelector('.cm-editor')).dispatch({selection:{anchor:from,head:to}});
+window.composerCaret=()=>{const view=EditorView.findFromDOM(document.querySelector('.cm-editor'));return view.coordsAtPos(view.state.selection.main.head)};
 window.repeatPrefixUpdate=()=>{
   const view=EditorView.findFromDOM(document.querySelector('.cm-editor'));
   view.dispatch({changes:{from:0,to:view.state.doc.length,insert:'! '},selection:{anchor:2}});
@@ -184,7 +185,19 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
         const composerBox = await composer.boundingBox()
         assert.ok(inputBox && actionBox && editorBox && composerBox)
         assert.equal(inputBox.width, composerBox.width - 16, 'the input uses the full width without a right action column')
-        assert.ok(editorBox.y + editorBox.height <= actionBox.y + 0.5, 'scrolling input never overlaps the action row')
+        const actionStyle = await actions.evaluate(el => {
+          const style = el.ownerDocument.defaultView!.getComputedStyle(el)
+          return { position: style.position, background: style.backgroundColor }
+        })
+        assert.equal(actionStyle.position, 'absolute', 'actions float over the input instead of reserving a bottom bar')
+        assert.equal(actionStyle.background, 'rgba(0, 0, 0, 0)', 'the floating group has no bar background')
+        assert.ok(Math.abs(editorBox.height - (inputBox.height - 12)) < 0.5, 'the scrollable editor keeps the full input height')
+        assert.ok(Math.abs(actionBox.x + actionBox.width - (inputBox.x + inputBox.width - 4)) < 0.5
+          && Math.abs(actionBox.y + actionBox.height - (inputBox.y + inputBox.height - 4)) < 0.5, 'the group floats at the bottom-right inset')
+        assert.equal(await input.evaluate((el, y) => {
+          const target = el.ownerDocument.elementFromPoint(el.getBoundingClientRect().left + 10, y)
+          return !!target?.closest('.cm-editor')
+        }, actionBox.y + actionBox.height / 2), true, 'the bottom-left area remains part of the editor')
         let previousRight = inputBox.x
         let centerY: number | undefined
         for (const label of expectedOrder) {
@@ -281,6 +294,9 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
         const bounds = await composer.boundingBox()
         const scroller = await page.locator('[data-keep-keyboard] .cm-scroller').boundingBox()
         assert.ok(bounds && scroller && scroller.y + scroller.height <= bounds.y + bounds.height, 'long input scrolls inside the composer')
+        const caret = await page.evaluate<{ bottom: number }>('window.composerCaret()')
+        const controls = await composer.locator('[data-agent-composer-actions]').boundingBox()
+        assert.ok(controls && caret.bottom <= controls.y, 'the active line scrolls clear of the floating buttons')
         await assertComposerActionsContained()
       }
       await assertInputContained()

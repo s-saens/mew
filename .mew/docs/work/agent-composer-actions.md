@@ -2,12 +2,12 @@
 title: "Agent composer action row"
 created: "2026-11-02"
 updated: "2026-11-02"
-description: "Records moving the agent composer actions into the input surface, the rounder right-pointing Send button, aligned hover tooltips, responsive and keyboard regression checks, and local build verification. Distinguishes isolated browser checks from physical-device and server lifecycle verification."
+description: "Records moving the agent composer actions into the input surface, the rounder right-pointing Send button, aligned hover tooltips, the correction from a reserved footer row to floating controls, responsive and keyboard regression checks, and local build verification. Distinguishes isolated browser checks from physical-device and server lifecycle verification."
 ---
 
 The agent composer now groups Drawing, Save prompt, Attach, Schedule, and Send inside the input surface, in that order. This removes the separate right action column and gives the settings and editor the full available width. Button sizes and colors remain; Send uses 12px corners and Iconoir's right-pointing Send icon. The [agent input contract](../features/terminals-agents-automation/agent-input-mentions-skills-and-attachments.md#composer-input) owns the current behavior.
 
-The editor scrolls above a fixed action row within the same surface. The minimum composer height follows the measured settings and action rows, their spacing, the editor's CSS minimum, and outer padding and borders. Queue editing and CLI mode retain their existing actions and restrictions.
+The first implementation kept the editor above a fixed action row within the same surface; the floating-controls follow-up below replaces that layout. The minimum composer height follows the measured settings and action rows, their spacing, the editor's CSS minimum, and outer padding and borders. Queue editing and CLI mode retain their existing actions and restrictions.
 
 Local verification:
 
@@ -35,3 +35,21 @@ Follow-up verification:
 - The Impeccable detector, `npm run check:docs`, and `git diff --check` passed.
 
 Providers and APIs were mocked in the browser checks. Physical devices and server lifecycle operations were not tested; only the required build refreshed `dist/`.
+
+## Follow-up: floating controls
+
+The requested layout was floating buttons inside the input. The earlier implementation incorrectly reserved a full-width footer row. The controls now form a transparent, absolutely positioned group at the bottom right, and the editor viewport fills the entire input surface. The area left of the buttons remains editable. Existing button order, appearance, aligned tooltips, keyboard behavior, and mode restrictions remain.
+
+The group measurement supplies trailing content padding and CodeMirror scroll margins through `--agent-composer-bottom-inset`, so long or wrapped input can scroll the active line clear of the controls. This padding belongs to the scrollable document; it does not reserve an editor layout row. The measured minimum still leaves enough room for one input line and the floating controls.
+
+Before the fix, the new regression test failed because the controls used normal flow instead of absolute positioning. The test now checks a transparent floating group, full editor height, bottom/right insets, editing at the bottom left, and caret clearance during long-input scrolling and keyboard viewport changes.
+
+Floating-controls verification:
+
+- `node --test server/agent-command-ui.test.ts server/agent-model-controls-ui.test.ts server/fullscreen-keyboard-ui.test.ts`: All four tests passed. Covers desktop/mobile layout, the 280px panel, minimum and expanded heights, long and wrapped input, mobile keyboard and fullscreen geometry, saved prompts, CLI and queue actions, and aligned tooltips. The mobile composer and keyboard-overflow screenshots were inspected.
+- `npm run build`: Passed, including TypeScript checks; the existing large-chunk warning remains.
+- Targeted Oxlint: No errors; existing React warnings remain. The Impeccable detector reported no findings.
+- `npm run check:docs`: All 646 description checks passed. The full link check failed on an unrelated absolute `/api/asset` link in `.mew/tasks/사진 첨부 편집 기능.md`; that task was left unchanged. Running the existing link checker's `documentLinkErrors` for the two changed documents found no errors.
+- `git diff --check`: Passed.
+
+Browser responses were mocked, and physical mobile devices remain unverified. No deployment or server lifecycle command was run; the required build refreshed `dist/`.

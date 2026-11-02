@@ -69,6 +69,9 @@ export function AgentComposerInput(props: {
         doc: latest.current.value,
         extensions: [
           EditorView.lineWrapping,
+          EditorView.scrollMargins.of(view => ({
+            bottom: parseFloat(view.dom.ownerDocument.defaultView!.getComputedStyle(view.dom).getPropertyValue('--agent-composer-bottom-inset')) || 0,
+          })),
           history(),
           composerAttachments(token => {
             const result = latest.current.resolvePendingToken?.(token)
@@ -106,7 +109,7 @@ export function AgentComposerInput(props: {
             '&': { height: '100%', backgroundColor: 'transparent' },
             '&.cm-focused': { outline: 'none' },
             '.cm-scroller': { overflow: 'auto', fontFamily: 'inherit', lineHeight: 'inherit' },
-            '.cm-content': { padding: '0', minHeight: '100%', caretColor: 'var(--color-ink)' },
+            '.cm-content': { padding: '0', paddingBottom: 'var(--agent-composer-bottom-inset, 0px)', boxSizing: 'border-box', minHeight: '100%', caretColor: 'var(--color-ink)' },
             // CodeMirror's plaintext-only default prevents Android keyboards from offering images.
             '.cm-content[contenteditable=true]': { WebkitUserModify: 'read-write' },
             '.cm-line': { padding: '0' },

@@ -2504,10 +2504,12 @@ function AgentSessionView({
     const measure = () => {
       const style = getComputedStyle(composer)
       const contentStyle = getComputedStyle(settings.parentElement!)
+      const actionInset = Math.ceil(actions.getBoundingClientRect().height) + 4
+      editor.style.setProperty('--agent-composer-bottom-inset', `${actionInset}px`)
       const contentHeight = settings.getBoundingClientRect().height
         + (parseFloat(contentStyle.rowGap) || 0)
         + (parseFloat(getComputedStyle(editor).minHeight) || 0)
-        + actions.getBoundingClientRect().height
+        + actionInset
       const height = Math.ceil(contentHeight + parseFloat(style.paddingTop) + parseFloat(style.paddingBottom)
         + parseFloat(style.borderTopWidth) + parseFloat(style.borderBottomWidth))
       setMinInputHeight(height)
@@ -4413,7 +4415,7 @@ function AgentSessionView({
             }} title={uiText("권한")} disabled={!modes || modes.availableModes.length < 2} />
           </div>
         </div>
-          <div data-agent-input className={`relative flex min-h-0 flex-1 flex-col rounded bg-surface ${composerCliMode ? 'ring-1 ring-inset ring-accent/40' : ''}`}>
+          <div data-agent-input className={`relative flex min-h-0 flex-1 rounded bg-surface ${composerCliMode ? 'ring-1 ring-inset ring-accent/40' : ''}`}>
           <div ref={composerEditorRef} className="flex min-h-8 flex-1">
           <MentionTextarea
             key={editingQueued ? `queue:${editingQueued.index}` : 'draft'}
@@ -4469,7 +4471,7 @@ function AgentSessionView({
             }}
           />
           </div>
-          <div ref={composerActionsRef} data-agent-composer-actions className="flex shrink-0 items-stretch justify-end gap-1 px-1 pb-1">
+          <div ref={composerActionsRef} data-agent-composer-actions className="absolute right-1 bottom-1 z-10 flex items-stretch gap-1">
           <HoverTipLayer className="flex items-stretch">
             <div data-tip={uiText('그림판 열기')} className="flex min-h-8 items-center">
             <button type="button" aria-label={uiText('그림판 열기')}
