@@ -13,7 +13,7 @@ Mew owns this repository's instructions and documentation under [ADR 0001](decis
 
 Write project-owned documentation in **English**, regardless of the response language. This includes knowledge, tasks, notes, public guides, and first-party instructions in `resources/`.
 
-Preserve code, commands, identifiers, metadata keys, IDs, dates, status tags, and pinned third-party material. Translate human-readable titles and descriptions, repairing incoming links. Keep existing locale-specific guide paths for compatibility; maintain another language edition only when requested. New installation links use the [English guide](../../docs/guides/getting-started-en.md).
+Preserve code, commands, identifiers, machine-owned metadata, and third-party source and license texts. Keep metadata keys, IDs, dates, and status tags intact. Translate human-readable titles and descriptions, repairing incoming links. Keep existing locale-specific guide paths for compatibility; maintain another language edition only when requested. New installation links use the [English guide](../../docs/guides/getting-started-en.md).
 
 This policy does not change UI languages, language skills, or another project's default language. See [ADR 0088](decisions/0088-english-project-documentation.md).
 
@@ -54,7 +54,7 @@ Descriptions guide selection; the body establishes facts and status. Do not recu
 
 Identify the owner before moving content. A feature contract, operating guide, decision, and work record may concern one topic while serving different readers. Keep each fact in one current owner and link to it. Moving files into a common folder alone does not establish ownership.
 
-Keep task metadata in tasks and substantial design or verification evidence in linked work records. Distinguish local checks from production application and implemented behavior from plans. Preserve original research and historical rationale. After checking the current owner, move superseded records to history with their original text and uncertainties intact. Age alone does not justify deletion. Follow [ADR 0087](decisions/0087-documentation-role-boundaries.md).
+Keep task metadata in tasks and substantial design or verification evidence in linked work records. Distinguish local checks from production application and implemented behavior from plans. Preserve original research and historical rationale. After checking the current owner, move superseded records to history with their original text and uncertainties intact. Record the observation date and current canonical source in work and research records. Consolidation must retain unique facts, figures, code, checkboxes, and uncertainties. Age alone does not justify deletion. Follow [ADR 0087](decisions/0087-documentation-role-boundaries.md).
 
 ## Parent files
 

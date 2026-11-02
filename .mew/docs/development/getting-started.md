@@ -48,7 +48,7 @@ If a terminal edit unexpectedly reverts, an open Mew editor may have saved stale
 | Compact working UI | Remove outer/decorative spacing before shrinking text or usable touch targets; avoid stacked padding and unnecessary minimum heights |
 | Familiar actions use icon buttons | Use the established icon set, translated accessible name, shared tooltip, and small padding/gaps; retain text when it clarifies the action or consequence |
 | Purposeful UI copy | Use the field/button label when sufficient; show extra text for a decision or recovery, rather than repeating controls or implementation details |
-| App-owned single selection | Use shared `SelectField` from `@mew/ui`; native `<select>` and `<datalist>` popups are prohibited, even when restyled |
+| App-owned choices | Native `<select>` and `<datalist>` popups are prohibited, even when restyled; reuse an existing custom control or create a shared one. Prefer `SelectField` from `@mew/ui` for single selection |
 
 Follow the [density and button contract](ui-contracts.md#design-guidelines-spacing-and-information-density), [UI copy contract](ui-contracts.md#ui-copy), and [selection contract](ui-contracts.md#dropdowns-and-selection-components). Selection must preserve theme, keyboard/touch behavior, focus, Esc/Back dismissal, and viewport bounds.
 

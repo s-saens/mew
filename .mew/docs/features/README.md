@@ -11,7 +11,7 @@ The dedicated feature panel, API, CLI, and execution queue were removed under [A
 
 ## Files and hierarchy
 
-- Each feature is one Markdown file. Its filename is the title; a representative file's `_` prefix is hidden. Frontmatter `title` and `parent` do not define the current title or hierarchy.
+- Each feature is one Markdown file. Its filename without `.md` is the title; a representative file's `_` prefix is hidden. Frontmatter `title` and `parent` do not define the current title or hierarchy.
 - A leaf is `Name.md`. When it gains its first child, move it to `Name/_Name.md` beside its children. When the last child leaves, restore `Name.md` and remove the empty folder. Keep folders containing attachments or hidden files.
 - Documents operations update content and links. Renaming a parent renames its folder and representative file. Direct filesystem moves require manual link checks.
 - Keep `MOC.md` and `_MOC.md` for compatibility. If `_Folder.md` exists, it is the representative; a separate MOC remains navigation.
@@ -41,7 +41,7 @@ The initial 2026-09-18 catalog had 8 areas and 44 subfeatures. Its `created` dat
 | --- | --- |
 | `implemented` | The documented scope was confirmed in code; verification may remain incomplete |
 | `verified`, `needs-fix` | User determinations; do not infer or automatically change them |
-| `status_hash` | Former API hash of title, body requirements, and parent relationship; the removed panel no longer recalculates it or determines `changed` |
+| `status_hash` | Former API hash of title, body requirements, and parent relationship; the app no longer recalculates it or makes determinations from it |
 | `files` | Representative implementation entry points, not an exhaustive changed-file list |
 
 Editing a document does not trigger agent execution or Git commits. [Feature-based development](terminals-agents-automation/feature-driven-development-and-markdown-documents.md) preserves the removed workflow's records.
