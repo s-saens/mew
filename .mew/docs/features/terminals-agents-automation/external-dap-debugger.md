@@ -4,10 +4,10 @@ parent: "mew-agents"
 title: "External DAP Debugger"
 status: "implemented"
 created: "2026-10-07"
-updated: "2026-10-31"
+updated: "2026-11-03"
 files: ["src/components/debugger-panel.tsx", "src/components/debugger-source-field.tsx", "src/components/debugger-settings.tsx", "src/components/debugger-controls.tsx", "src/components/debugger-helpers.ts", "server/debugger.ts", "server/debugger-dap.ts", "server/debugger-routes.ts", "server/debugger-commands.ts", "server/debugger-profiles.ts", "server/debugger-browser.ts", "server/debugger-mcp.ts", "server/debugger-mcp-stdio.ts", "server/agentWs.ts", "src/utils/debugger-editor.ts", "src/components/debugger-variable.tsx", "src/components/debugger-inspector.tsx", "src/components/debugger-artifacts.tsx"]
 commits: []
-description: "Defines usage, support conditions, and verification scope for external DAP debugger settings with aligned connection and port fields, profiles, compound sessions, execution state, a collapsible tools area, breakpoint/watch input forms opened as needed, a compact source file picker, editor breakpoints integrated with a transparent line-number gutter without a background, stepping, variables, memory, stop history, importing external analysis files, and optional agent MCP connections. Distinguishes plans from the Zed/DAP investigation from the current implementation and remaining scope such as external engines, collaboration, and Wasm. Following removal of the general DOM browser, the panel does not provide tab CDP connections."
+description: "External DAP debugger setup, sessions, stepping, breakpoints, watches, variables, memory, stop history, analysis imports, and optional agent MCP access. Distinguishes implemented support from research plans and remaining external-engine, collaboration, and Wasm gates; tab CDP connections are absent."
 ---
 
 ## Requirements

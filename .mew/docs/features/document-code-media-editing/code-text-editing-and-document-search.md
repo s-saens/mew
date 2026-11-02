@@ -4,11 +4,11 @@ parent: "mew-editor"
 title: "Code and text editing and in-document search"
 status: "implemented"
 created: "2026-09-18"
-updated: "2026-11-02"
+updated: "2026-11-03"
 status_hash: "4d8fe6026b3341576de674bb4b2ae85cd1124f3eb3638b2e33e15d8697ed1fc1"
 files: ["src/components/EditorPane.tsx", "src/hooks/useTabs.ts", "src/components/CodePane.tsx", "src/utils/codeSearch.ts", "src/utils/code-search-panel.ts", "src/utils/code-pinch-zoom.ts", "packages/editor/src/editor/EditorSearchBar.tsx"]
 commits: []
-description: "A feature contract covering line numbers, syntax highlighting, supported diagnostics for code and plain text, compact Find and collapsible Replace controls, result counts, search options, and keyboard behavior. Explains editor-local touch pinch zoom independent of workspace page zoom, immediate native mobile keyboard activation through body taps, always-visible mobile auxiliary keys floating over the document above the status bar with a rightmost inverted-T arrow cluster, and tab switching that preserves body horizontal scrolling."
+description: "Plain/code editing, syntax and diagnostics, Find/Replace, and document search controls. Covers mobile keyboard activation, editor-local font zoom, floating auxiliary keys, and tab gestures that preserve horizontal scrolling."
 상위파일:
   - "MOC.md"
   - "_document-code-media-editing.md"

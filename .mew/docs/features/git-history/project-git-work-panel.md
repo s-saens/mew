@@ -4,11 +4,11 @@ parent: "mew-git"
 title: "Current project Git operations panel"
 status: "implemented"
 created: "2026-09-18"
-updated: "2026-10-26"
+updated: "2026-11-03"
 status_hash: "ad2d450aae96362a9d082f3989ccd04643632b17559700c16044ef32ca54d690"
 files: ["src/components/GitWorkbench.tsx", "src/utils/git-graph.ts", "src/utils/git-graph-branches.ts", "src/components/git-diff-editor.tsx", "src/components/git-changes-menu.tsx", "src/utils/git-diff-tabs.ts", "src/components/git-branch-picker.tsx", "src/components/git-panel.tsx", "src/components/github-account.tsx", "server/github-auth.ts", "server/github-auth-routes.ts", "src/components/git-ai-commit-dialog.tsx", "server/gitWorkbench.ts", "server/git-ai-commit.ts", "server/git-commit-analysis.ts", "server/git-commit-packets.ts", "server/git-diff-codec.ts", "server/git-change-intent.ts", "server/git-change-intent-cli.ts", "server/git-ai-commit-runner.ts", "server/git-ai-commit-routes.ts"]
 commits: []
-description: "Feature contract covering the current project's changed files and current-branch commit history opened with Ctrl/Cmd+G: the default 50:50 layout; wildcard search; general selection and commit selection; editor diff; a commit graph with branch and merge connectors, columns, colors, branch-name tooltips, and click-to-switch behavior; committing/discarding selected changes; compact branch search, selection, creation, and safe local deletion in a title bar whose surface matches the hamburger menu; switching to existing worktrees while preserving project layout and tabs; and Pull/Push. Includes account connections and approval, scope, and automatic JSON response recovery rules for AI commits by work unit."
+description: "Project changes, commit history and graph, diffs, branch operations, worktree switching, and Pull/Push. Defines selected-change commits and discard, plus account approval, scope, and JSON recovery for AI commits by work unit."
 상위파일:
   - "MOC.md"
   - "_git-history.md"

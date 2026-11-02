@@ -8,7 +8,7 @@ updated: "2026-11-03"
 status_hash: "a10e27bcc06cebe98975858548ff907b5953bfbcf197fe2ef971d9294144858f"
 files: ["src/components/AgentPanel.tsx", "src/components/agent-document-tag.tsx", "src/utils/agent-attachments.ts", "src/components/agent-prompt-drafts.tsx", "src/utils/agent-saved-prompts.ts", "src/components/MentionTextarea.tsx", "src/components/agent-composer-input.tsx", "src/components/agent-composer-attachments.tsx", "src/components/agent-media-preview-dialog.tsx", "src/utils/agent-composer-document.ts", "src/components/drawing/DrawingEditor.tsx", "src/utils/clipboard-images.ts", "src/utils/agentInputMentions.ts", "server/skills.ts"]
 commits: []
-description: "Feature contract covering project, file, and folder @mentions and autocomplete lists in agent input, /skill selection, circular upload indicators for movable inline attachment tags, and sent document reference icons with filename popups that open the editor only after filename activation. Explains deferred rich composer preparation, inline user message attachments, Enter focus return and Ctrl/Cmd+Enter submission from settings selectors, mobile keyboard image pasting, media previews, input history, saved prompt drafts, floating Drawing/Save/Attach/Schedule/Send controls with aligned hover tooltips, resizing, CLI switching, queue editing, drawing attachments, candidate scope, `.mew/temp/assets` storage, and reference compatibility."
+description: "Agent input mentions, skill selection, attachments, media previews, and drawing integration. Covers deferred rich input, drafts and history, reference storage and compatibility, queue editing, CLI mode, keyboard submission, and composer controls."
 상위파일:
   - "MOC.md"
   - "_terminals-agents-automation.md"

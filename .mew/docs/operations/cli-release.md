@@ -1,7 +1,7 @@
 ---
 title: "CLI Releases and npm Publishing"
-description: "Covers s-saens/mew Linux, macOS, and Windows x64/arm64 executables; pinned tmux, psmux, and Job Object helpers; checksums, third-party notices, and Windows CI verification; and npm publishing, OIDC configuration after repository transfer, and updates for @liiiiv/mew-cli. Also includes checks for Mew's own license copies, metadata, and inclusion in the npm package. The first public publication and hands-on checks across all platforms have not yet been performed; includes required agent build verification and user-owned server lifecycle operations."
-updated: "2026-10-31"
+description: "Release procedure for @liiiiv/mew-cli and Linux, macOS, and Windows x64/arm64 runtimes. Covers native helpers, checksums, licensing, CI and npm/OIDC gates; first public publication and hands-on platform checks remain incomplete."
+updated: "2026-11-03"
 상위파일:
   - "../../../docs/deployment/native.md"
   - "../development/cli-distribution.md"

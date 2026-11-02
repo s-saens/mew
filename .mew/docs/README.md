@@ -1,97 +1,105 @@
 ---
-title: "mew documentation authoring and navigation rules"
-description: "Defines ownership and English-language maintenance of project knowledge, tasks, public guides, and first-party resources; description-based discovery, checks, and current versus historical sources; includes required agent build verification and user-owned server lifecycle operations."
+title: "Mew documentation rules"
+description: "Ownership, English-language policy, description-based discovery, and concise authoring rules for Mew documentation. Defines current versus historical records, same-task write-back, metadata, links, and validation."
 created: "2026-10-06"
-updated: "2026-10-31"
+updated: "2026-11-03"
 ---
 
 # Documentation authoring and navigation rules
 
-For usage instructions, start with the [public documentation](../../docs/README.md). This document defines rules for people and agents who write or maintain documentation.
-
-Keep the canonical source of Mew project knowledge in this `.mew/docs/`. Keep public guides in `docs/` at the repository root, tasks in `.mew/tasks/`, and built-in product skills and tool instructions in `resources/`. Under the [independent project decision](decisions/0001-independent-project.md), this repository owns its instructions, documentation, decisions, and verification. Navigating, updating, or registering in parent Liiiiv instructions or central documentation is not required. Documentation navigation retains the description-based approach from [previous ADR 0199](history/decisions/0199-mew-description-discovery.md).
+Mew owns this repository's instructions and documentation under [ADR 0001](decisions/0001-independent-project.md). Parent Liiiiv policies and documentation do not govern it. For product usage, start at the [public documentation](../../docs/README.md).
 
 ## Documentation language
 
-Write and maintain this repository's project-owned documentation in English, regardless of the agent's response language. This covers project knowledge, task and note prose, public guides, and first-party instructions in `resources/`.
+Write project-owned documentation in **English**, regardless of the response language. This includes knowledge, tasks, notes, public guides, and first-party instructions in `resources/`.
 
-Preserve code, commands, identifiers, machine-owned metadata, and third-party source material. Keep pinned vendor skills and license texts in their original form. Translate human-readable titles and descriptions; retain metadata keys, IDs, dates, status values, and task tag identifiers. Repair incoming links when translating headings or file and folder names.
+Preserve code, commands, identifiers, metadata keys, IDs, dates, status tags, and pinned third-party material. Translate human-readable titles and descriptions, repairing incoming links. Keep existing locale-specific guide paths for compatibility; maintain another language edition only when requested. New installation links use the [English guide](../../docs/guides/getting-started-en.md).
 
-Use [the English installation guide](../../docs/guides/getting-started-en.md) for new installation links. The other existing locale-specific guide paths retain their full content in English for link compatibility. Create another maintained language edition only when explicitly requested.
-
-This repository policy does not change Mew's UI languages, language skills, or the default document language in other projects. See [ADR 0088](decisions/0088-english-project-documentation.md).
+This policy does not change UI languages, language skills, or another project's default language. See [ADR 0088](decisions/0088-english-project-documentation.md).
 
 ## Finding the documents you need
 
-Read the project README, instructions, and [execution and verification rules](development/getting-started.md) first. Then scan only document paths and YAML frontmatter `description` to select the current document bodies you need. Descriptions are navigation hints; verify exact facts, statuses, and contracts in the selected bodies. Do not load document bodies, history, or original research in full.
-
-From the repository root, the command below dynamically lists paths and descriptions without printing document bodies. No separate list file or index needs to be maintained.
+1. Read the project README, agent instructions, and [execution rules](development/getting-started.md).
+2. Select a topic from document paths and frontmatter `description` values.
+3. Read only the selected current bodies and relevant decisions. Load history or research only when provenance is needed.
 
 ```bash
-node server/document-descriptions.ts
+node server/document-descriptions.ts                         # Project knowledge
+node server/document-descriptions.ts .mew/docs/development  # One scope
+node server/document-descriptions.ts --repository           # All maintained roles
 npm run check:docs
 ```
 
-The default list excludes `history/`, `archives/`, hidden paths, and symbolic links from the configured Documents location, `.mew/docs/`. `--repository` includes public guides, tasks, free-form documents, and directly maintained product resources, and excludes pinned external skills `.vendor`. Include history descriptions with `--all` only when historical evidence is needed. archives are always read-only and excluded from the list. Documents without descriptions, empty strings, invalid YAML, and the old `desc` key are check errors.
+The catalog reads YAML headers, not bodies. It defaults to `.mew/docs` and excludes hidden entries, symlinks, `history/`, and `archives/`. `--all` includes history; archives remain excluded and read-only. `--repository` also covers public guides, tasks, notes, and first-party skills/help, excluding pinned `.vendor` sources. No catalog file or MOC registration is required. This preserves the [description-discovery decision](history/decisions/0199-mew-description-discovery.md).
+
+Descriptions guide selection; the body establishes facts and status. Do not recursively load the document tree or infer implementation from a title or modification date.
 
 ## Document placement
 
-| Content | Canonical location |
+| Content | Canonical home |
 | --- | --- |
-| User installation, operation, configuration, self-hosting, and contribution guides | Repository root `docs/` |
-| Current requirements, behavior, and verification criteria by feature | `.mew/docs/features/` |
-| Shared implementation, storage, communication, UI, and verification contracts | `.mew/docs/development/` |
-| Procedures for project publishing, central services, and repository maintenance | `.mew/docs/operations/` |
-| Technical choices and changes to existing decisions | `.mew/docs/decisions/` |
-| Task titles, completion, assignees, tags, and dates | `.mew/tasks/` |
-| Records of design, implementation, execution, and rollout verification | `.mew/docs/work/` |
-| Original comparisons, measurements, and investigations | `.mew/docs/research/` |
-| Superseded implementations and previous contracts | `.mew/docs/history/` |
-| Business and promotional materials | `.mew/docs/business/` |
-| Free-form work and practice documents | `.mew/notes/` |
-| Built-in skills and tool usage instructions | `resources/skills/` · `resources/help/` |
-| Production originals and review outputs / final app assets / public documentation images | `assets/` / `public/` / `docs/assets/` |
+| Installation, usage, configuration, self-hosting, contribution | Repository `docs/` |
+| Feature requirements, behavior, implementation entry points, acceptance criteria | `.mew/docs/features/` |
+| Shared implementation, storage, communication, and UI contracts | `.mew/docs/development/` |
+| Repeatable publishing, service, and maintenance procedures | `.mew/docs/operations/` |
+| Technical choices and reversals | `.mew/docs/decisions/` |
+| Design, implementation, execution, and rollout records | `.mew/docs/work/` |
+| Original investigations and comparisons | `.mew/docs/research/` |
+| Superseded implementations and evidence | `.mew/docs/history/` |
+| Business materials | `.mew/docs/business/` |
+| Task status, dates, assignees, and tags | `.mew/tasks/` |
+| Free-form work and practice | `.mew/notes/` |
+| Built-in skills and tool instructions | `resources/skills/`, `resources/help/` |
+| Production originals, app assets, public documentation images | `assets/`, `public/`, `docs/assets/` respectively |
 
-Distinguish successful verification in work records from actual application to production. Do not infer completion or current contracts from titles or modification dates alone. After checking the current canonical source, move records of superseded implementations to `history/`, preserving the original text and unverified conditions. Fix incoming links and, when needed, retain paths used by existing decisions or external links as short relocation notices. Preserve original research in `research/`, but categorize research on previous implementations under History / raw in the documentation home.
+Identify the owner before moving content. A feature contract, operating guide, decision, and work record may concern one topic while serving different readers. Keep each fact in one current owner and link to it. Moving files into a common folder alone does not establish ownership.
 
-When organizing documents, first identify who owns the content. Even when they cover the same topic, usage, configuration, implementation contracts, and work records provide different information for readers. Consolidate overlapping authoritative content in the existing owning document and link to it from other documents. Moving files directly under `docs/` alone does not complete classification.
-
-Keep task status, dates, tags, and assignees in the task, and separate lengthy design, implementation, and verification records into `work/`. State the observation date and current canonical source in records and research so that past conditions of not implemented, not deployed, or other limitations are not read as current status. When consolidating duplicate paragraphs, preserve unique content, figures, code, checkboxes, and unverified conditions. Do not discard records based only on age or filename.
+Keep task metadata in tasks and substantial design or verification evidence in linked work records. Distinguish local checks from production application and implemented behavior from plans. Preserve original research and historical rationale. After checking the current owner, move superseded records to history with their original text and uncertainties intact. Age alone does not justify deletion. Follow [ADR 0087](decisions/0087-documentation-role-boundaries.md).
 
 ## Parent files
 
-Record parent document references in frontmatter `상위파일` using paths relative to the current document, rather than in the body. Use a string for one document or a string array for links to multiple documents. Put child file lists and contextually necessary reference links in the body. Existing `parent` IDs in feature documents are a separate field and must not be changed.
+Use relative paths in frontmatter `상위파일`, as one string or a string array. Put child lists and contextual links in the body. Preserve existing feature `parent` IDs; they serve a different purpose.
 
 ## Writing descriptions
 
-Write a nonempty string `description` in the first YAML block of directly maintained Markdown for project documents, tasks, public guides, and product resources. Describe the target feature, contract, or problem and the document's scope in 1\~2 sentences. Do not merely repeat the title or copy the entire body. Explicitly identify plans that are not implemented, previous contracts, relocation notices, and research findings to distinguish them from the current implementation. Standardize the field name as `description`.
+Every directly maintained Markdown document needs a nonempty `description` in its first YAML block. Use **one or two sentences** that identify the owning topic, coverage, and relevant status. Include distinguishing terms an agent would search for; leave exhaustive behavior lists in the body.
 
-Write a description when creating a new document or detailed body. Documents created by adding only a title in the task panel start with `태스크: 제목`, and the automatic default description follows title changes. The panel does not overwrite manually refined descriptions. When the body's scope or status changes, the author also updates the description.
+Missing descriptions, empty values, invalid YAML, and the legacy `desc` key fail validation. Update the description when the body's scope or status changes. Task-panel placeholders use `태스크: 제목` until edited; automatic title updates preserve manually refined descriptions.
 
 ## Ownership and updates
 
-Each feature file owns its feature-specific requirements and detailed specifications; keep development contracts, usage instructions, and operations shared by multiple features in the existing owning documents. Update owning documents in the same task as changes to code, features, or operations. Record technical choices, shared contracts, and changes to existing decisions in [Mew decision records](decisions/README.md). Preserve migrated central ADRs as history in `history/decisions/`; Mew documentation defines current rules. Do not put secrets or temporary debugging logs in documentation.
+Keep current requirements and detailed acceptance criteria in the owning feature document. Shared contracts, usage, configuration, and operations stay in their respective owners. Link to them instead of maintaining another copy. Follow the [feature rules](features/README.md).
 
-New or moved documents do not need to be registered in a MOC. Fix existing incoming links when moving or renaming documents. Preserve existing MOCs and representative documents for compatibility with Documents, feature screens, and old links. A MOC's link list is not a mandatory index covering every file. Preserve original history bodies and research findings, and do not modify archives.
+| Change | Write-back |
+| --- | --- |
+| Code, feature, configuration, or operating behavior | Update the owning current documents and descriptions in the same task |
+| Architecture, technology choice, shared contract, or established decision reversal | Record the decision in `decisions/`; link superseded decisions and retain history |
+| Implementation or verification work | Record purpose, resulting behavior, actual checks, outcomes, and remaining limits in the existing work/change record |
+| Routine prose edit | Update the current owner; no duplicate permanent log is needed |
+| File or heading move | Repair incoming links and relevant anchors in the same task |
 
-`npm run check:docs` checks descriptions and links within the repository. Relative link paths must remain within the repository; do not make files in other local projects required references. For source and configuration files excluded from the public repository, format their paths as code and explain the separate prerequisites. Preserve old path references in historical documents as history, but point clickable evidence links to the migrated copies. Keep detailed Markdown in the role-specific owning paths above, and keep `README.md`, `AGENTS.md`, and `CLAUDE.md` at the repository root. Dedicated skill and package documentation retains its existing format.
+Preserve original decisions and migrated sources in history. Keep secrets and temporary debugging logs out of documentation. Retain root `README.md`, `AGENTS.md`, and `CLAUDE.md`; preserve dedicated skill/package formats.
 
-The current link check verifies that target files exist and remain within the repository boundary; it does not check section locations after `#`. When changing headings or explicit anchors, also check the same document's table of contents and incoming links from other documents. Preserve fixed anchors shared by existing language editions, or update their references together.
+New or moved files need no MOC update. Preserve existing MOCs and representative pages for link and Documents compatibility; they are optional navigation, not complete registries.
+
+Run `npm run check:docs` from this repository. Links must resolve inside it. For private or excluded source paths, use inline code and explain prerequisites; do not make another local checkout a documentation dependency. Historical references remain evidence, while current links point to canonical owners.
+
+The link checker verifies target files and repository boundaries, **not heading anchors**. Inspect changed anchors and incoming links directly. Preserve shared anchors or update their callers together. Documentation changes also follow the [execution and build rules](development/getting-started.md).
 
 ## Writing readable guides
 
-- Introductions show the purpose, representative screens, and getting-started links first. Do not repeat the full feature specifications in installation guides.
-- Write getting-started guides in this order: prerequisites → installation → first login → first task. Distinguish currently available installation options from unpublished releases.
-- Usage instructions explain the intended task, starting location, and result, and link to owning documents for implementation contracts and verification evidence.
-- Group and link topics in subject-area homes. Put current usage and contracts first, followed by work, research, and history with their nature clearly identified.
-- Keep public screenshots in `docs/assets/screenshots/` in the repository, and use relative links and specific alt text. The default capture conditions are **the default Midnight theme with Mewpet visible**. Change these conditions only when explaining another theme or a hidden state.
-- Capture the actual running UI. Use example data in a new browser context, and record the capture date, screen size, whether mock responses were used, and whether a physical device was used in the document introducing the image. Do not include accounts, personal files, conversations, or secrets. Follow the [required build verification rules](development/getting-started.md) after implementation changes. Screenshot capture does not authorize starting or restarting the server.
-- Keep the core sequence and scope aligned across language editions of the same content. When changing existing heading anchors or reference paths, also check incoming links.
+- Give each file one reader and task. Split independently maintained subjects when this improves retrieval; avoid arbitrary size limits or tiny fragments.
+- Lead with the purpose or contract. Use short, concrete sentences and one topic per paragraph. Use tables for comparisons and bullets for independent rules. Keep conditions, exceptions, actor responsibilities, uncertainty, code, and links intact.
+- Introduce features and representative screens without repeating their full specifications. Order getting-started guides as prerequisites → installation → login → first task. State unpublished release limits.
+- Usage guides name the task, starting point, and result, then link implementation and verification details to their owners. Put current instructions before historical evidence.
+- For language editions, preserve sequence, scope, and shared anchors; repair incoming links when paths or headings change.
 
-The separation of introduction, installation, and detailed guides drew on the [code-server README](https://github.com/coder/code-server) and [HedgeDoc documentation home](https://docs.hedgedoc.org/); the feature-focused introduction drew on the [AFFiNE README](https://github.com/toeverything/AFFiNE). Follow mew's folder ownership and description-based navigation rules as defined.
+Public screenshots belong in `docs/assets/screenshots/` with relative links and specific alt text. Capture the actual UI using example data in a new browser context. Default to **Midnight with Mewpet visible** unless illustrating another setting. Record capture date, viewport, mocked responses, and physical-device use in the introducing document. Exclude private accounts, files, conversations, and secrets. Screenshot work does not authorize server lifecycle operations.
+
+Guide organization drew on [code-server](https://github.com/coder/code-server), [HedgeDoc](https://docs.hedgedoc.org/), and [AFFiNE](https://docs.affine.pro/); Mew's ownership and discovery rules remain authoritative.
 
 ## Project materials and runtime state
 
-`.mew/docs`, `.mew/tasks`, and project settings are project materials tracked in Git. Exclude `.mew/notes` from the default navigation scope for current contracts. Define retention and sharing scopes separately for collaboration data such as comments; do not treat it as temporary files based only on location. Per-installation accounts, sessions, and user-edited skills are persistent data in `MEW_DATA_DIR`. When adopting a temporary upload in `.mew/temp` as a permanent documentation image, copy it to the asset path appropriate to its role and update the link. Do not delete referenced files based only on the name of a temporary path.
+`.mew/docs`, `.mew/tasks`, and project settings are Git-tracked project materials. Exclude `.mew/notes` from default current-contract navigation. Define retention and sharing for collaboration data such as comments; location alone does not make it temporary.
 
-Follow [0087](decisions/0087-documentation-role-boundaries.md) for document classification and relocation decisions.
+Installation accounts, sessions, and edited skills persist in `MEW_DATA_DIR`. To adopt an upload from `.mew/temp` into documentation, copy it to the proper permanent asset location and update its links. Never delete a referenced file merely because its path looks temporary.

@@ -8,7 +8,7 @@ updated: "2026-11-03"
 status_hash: "b19a2771f0bfb2f727bc14539350c69b524d222b67a2322b322f359fefd6a804"
 files: ["src/components/AgentPanel.tsx", "src/components/TermButtonBar.tsx", "src/components/CommandButtonMenu.tsx", "server/termButtons.ts", "server/command-ports.ts", "packages/tmux-term/src/TmuxTerminal.tsx", "packages/tmux-term/src/server/tmuxWs.ts"]
 commits: []
-description: "Covers creation, input, reconnection, and termination of per-project shell tabs; deferred terminal renderer loading; quiet connection recovery indicators; command buttons and automatic detection of listening ports opened by executed commands, opening ports and terminal localhost links in the internal DOM browser; wide, compact preview menus with ports beside command names; focus-dependent new tabs, closed-tab restoration, live tab position numbers, renaming, context menus, and panel maximization/restoration. Defines Linux/macOS tmux and Windows psmux/PowerShell behavior, transparent backgrounds, shared input areas, accessible names, and actual verification boundaries."
+description: "Per-project shell tabs, input, commands and port links, restoration, and connection recovery. Defines deferred rendering, tmux versus Windows psmux/PowerShell, mobile controls and focus, tab operations, and verification limits."
 상위파일:
   - "MOC.md"
   - "_terminals-agents-automation.md"

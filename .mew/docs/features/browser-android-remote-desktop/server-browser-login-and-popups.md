@@ -4,10 +4,10 @@ parent: "mew-remote"
 title: "Virtual login display and DOM browser"
 status: "implemented"
 created: "2026-09-18"
-updated: "2026-11-01"
+updated: "2026-11-03"
 files: ["server/dom-browser.ts", "server/dom-browser-ports.ts", "src/components/DomBrowserPanel.tsx", "src/components/DomBrowserPorts.tsx", "server/login-desktop.ts", "server/port-preview.ts", "server/port-preview-location.ts", "src/components/LoginDesktopViewer.tsx", "src/components/PortPreviewPage.tsx"]
 commits: []
-description: "Defines the DOM browser for localhost apps and external HTTP(S) sites, hamburger entry with host-wide listening-port selection and disabled Mew ports, local live replay timing, single document snapshots, link and command-port entry, isolated host execution and replay, alongside independent login video and retained /port-number previews. Includes forwarding inline and multiline modules in direct previews, virtual paths for standard SPAs, remote initialization failures, DNS readiness, and production verification boundaries."
+description: "Host DOM browsing for localhost apps and external HTTP(S) sites, listening-port discovery, replay, and connection failures. Distinguishes login video, direct port previews, DNS readiness, and production verification limits."
 상위파일: "_browser-android-remote-desktop.md"
 ---
 

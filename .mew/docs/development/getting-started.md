@@ -1,54 +1,60 @@
 ---
 title: "Development setup and rules"
 created: 2026-09-29
-updated: "2026-11-02"
-description: "Defines development commands and verification, including npm run build as this repository's concrete command under Mew's configurable default build guidance. Covers repository-only deployment and server execution restrictions, documentation ownership, UI implementation rules, and isolated database and CLI checks."
+updated: "2026-11-03"
+description: "Repository execution restrictions, required build and verification commands, and UI implementation rules. Links isolated Postgres and CLI checks and Mew's documentation ownership."
 상위파일:
   - "../MOC.md"
   - "MOC.md"
 ---
 
-[Installation and usage](../../../docs/guides/getting-started-en.md)
+[Installation and usage](../../../docs/guides/getting-started-en.md) · [Contributor setup](../../../docs/development/getting-started.md)
 
-Development environment setup and standard commands are in the [public contributor guide](../../../docs/development/getting-started.md).
+These rules govern **this Mew source repository**, not other projects opened in Mew.
 
-The server serves `dist/` directly. The required build updates the UI assets served by a running instance; it does not restart the server or reload server-side code. Keep the development server private.
+## Execution and verification
 
-Mew owns its development rules, documentation, and decision records. Run documentation checks from the repository root without another workspace's scripts or hooks:
+**Agents must not deploy, run the `mew` launcher, or start, stop, or restart servers.** The user performs those operations. Prohibited examples include `npm start`, `npm run serve`, `npm run dev`, `./mew start|stop|restart|update`, background server starts, and killing server processes.
+
+| Change | Required verification |
+| --- | --- |
+| Code, features, dependencies, or build configuration | `npm run build`, plus applicable tests, type checks, lint, and documentation checks |
+| Documentation only | `npm run check:docs`; no application build required |
+
+Fix build failures and rerun the build. If a failure or missing prerequisite blocks verification, report the actual blocker and leave the work explicitly incomplete. Other checks do not replace the build.
+
+The running server serves `dist/` directly: a build updates UI assets without restarting the server or reloading server-side code. Do not chain a server operation to the build. Keep any development server private.
+
+Mew's [configurable default build guidance](../../../docs/guides/project-setup.md#build-verification) serves other projects; this repository owns the concrete command and stricter execution restrictions. The former duplicate rule in `.mew/agent-context.json` was removed.
+
+Run repository-owned checks from the root:
 
 ```bash
 npm run check:docs
 ```
 
-This checks descriptions, including history, and local links within the repository. MOC registration is optional. Repair existing links when files move. New decisions belong in [Mew's decision records](../decisions/README.md); imported decisions remain in history. If this clone still has a Liiiiv shared hook configured, remove that local setting with `git config --local --unset core.hooksPath`.
+This checks descriptions, including history, and local links. MOC registration is optional. Follow the [documentation rules](../README.md) and [feature ownership rules](../features/README.md); use `node server/document-descriptions.ts` to choose current owners before reading bodies. Update affected contracts, descriptions, and links with implementation changes. New decisions belong in [Mew's decision records](../decisions/README.md); imported records remain in history.
 
-**After changing code, features, dependencies, or build configuration in this Mew source repository, coding agents must run `npm run build` before reporting completion.** Fix build failures and rerun the build. If a missing prerequisite or another blocker prevents success, report the actual failure and keep the work explicitly incomplete. Type checks, relevant tests, lint, and documentation checks remain required as applicable; passing them does not replace the build. Documentation-only changes do not require an app build.
+If this clone still uses a Liiiiv shared hook, remove that local setting with `git config --local --unset core.hooksPath`. Mew owns its rules and checks.
 
-The general build-verification policy is now part of [Mew's configurable default instructions](../../../docs/guides/project-setup.md#build-verification). That shared setting selects each project's build process; this repository specifies `npm run build` and retains its stricter local requirements. The redundant build paragraph has been removed from this project's additional guidance in `.mew/agent-context.json`.
+Browser tests under `server/` use the Node TypeScript configuration without DOM globals. In Playwright callbacks, use `locator.evaluate` and the element's `ownerDocument` rather than a direct `document` reference.
 
-**Agents must not deploy, run the `mew` launcher, or start, stop, or restart servers.** Prohibited commands include `npm start`, `npm run serve`, `npm run dev`, `./mew start|stop|restart|update`, killing server processes, and starting them in the background. The user performs deployment and server lifecycle operations. Use `npm run build` for build verification without chaining a restart. These execution restrictions belong to this source repository; do not add them to Mew-wide agent guidance or apply them to other projects opened in Mew.
-
-Browser tests under `server/` use the Node.js TypeScript configuration, which excludes DOM globals. For DOM operations in Playwright callbacks, use `locator.evaluate` and its element argument (or `el.ownerDocument`) instead of directly referencing `document`.
-
-If a file edited from the terminal reverts unexpectedly, an open mew editor may have saved an older copy over it. Check the file again, then ask the user to close that editor or use **Revert File**.
-
-For feature work, select the owning current document from its frontmatter `description` using `node server/document-descriptions.ts`. Follow the [documentation rules](../README.md); MOC registration is optional. Keep the feature's scope, detailed behavior, implementation notes, and acceptance criteria in the owning feature document; update linked shared contracts when they change. Follow the [feature documentation rules](../features/README.md).
+If a terminal edit unexpectedly reverts, an open Mew editor may have saved stale content. Recheck the file, then ask the user to close that editor or choose **Revert File**.
 
 ### Required UI rules
 
-**Keep working UI compact.** Avoid decorative whitespace, stacked container padding, and unnecessary minimum heights. Reduce outer spacing before shrinking readable text or usable click/touch targets. Follow the [spacing and information density rules](ui-contracts.md#design-guidelines-spacing-and-information-density).
+| Rule | Implementation |
+| --- | --- |
+| Compact working UI | Remove outer/decorative spacing before shrinking text or usable touch targets; avoid stacked padding and unnecessary minimum heights |
+| Familiar actions use icon buttons | Use the established icon set, translated accessible name, shared tooltip, and small padding/gaps; retain text when it clarifies the action or consequence |
+| Purposeful UI copy | Use the field/button label when sufficient; show extra text for a decision or recovery, rather than repeating controls or implementation details |
+| App-owned single selection | Use shared `SelectField` from `@mew/ui`; native `<select>` and `<datalist>` popups are prohibited, even when restyled |
 
-**Prefer icon buttons for familiar actions.** Close, refresh, copy, cancel, and disconnect controls should normally use the established icon set with a translated accessible name and a shared tooltip. Keep short text where an icon alone makes the primary action or its consequences unclear. Use small padding and gaps by default; see the [UI button and spacing contract](ui-contracts.md#design-guidelines-spacing-and-information-density).
-
-**Do not add permanent instructions, shortcut hints, or explanatory copy that repeats what the interface already makes clear.** Use the button or field label when it is enough. Show additional information where it helps someone decide or recover from an error. See [UI copy](ui-contracts.md#ui-copy).
-
-**Do not use native** `<select>` **or** `<datalist>` **popups for app-owned choices.** Reuse an existing custom component, or create a shared one if none fits. Changing a native control's border or `appearance` does not satisfy this rule. It applies on desktop and mobile, including when modifying an existing native dropdown.
-
-Prefer `SelectField` from `@mew/ui` for single-choice fields. Follow the [selection component contract](ui-contracts.md#dropdowns-and-selection-components) for themes, keyboard and touch input, focus, Esc/Back dismissal, and viewport boundaries.
+Follow the [density and button contract](ui-contracts.md#design-guidelines-spacing-and-information-density), [UI copy contract](ui-contracts.md#ui-copy), and [selection contract](ui-contracts.md#dropdowns-and-selection-components). Selection must preserve theme, keyboard/touch behavior, focus, Esc/Back dismissal, and viewport bounds.
 
 ### Postgres database verification
 
-DB service, route, and row page integration tests use only the isolated test DB explicitly specified by `MEW_DB_TEST_DATABASE_URL`. They do not automatically use `.env` or `DATABASE_URL` from the normal runtime environment and are skipped if no dedicated URL is provided. Tests create temporary projects and schemas and clean them up on completion. Do not specify a production DB URL.
+DB service, route, and row-page integration tests use only the isolated database explicitly named by `MEW_DB_TEST_DATABASE_URL`. They do not load `.env` or normal `DATABASE_URL`; without a dedicated URL, they are skipped. Tests create and clean up temporary projects and schemas. **Never supply a production database URL.**
 
 ```bash
 MEW_DB_TEST_DATABASE_URL='<격리 테스트 DB URL>' node --test server/db/databaseService.test.ts server/db/routes.test.ts server/db/rowPages.test.ts
@@ -56,4 +62,14 @@ MEW_DB_TEST_DATABASE_URL='<격리 테스트 DB URL>' node --test server/db/datab
 
 ### CLI release verification
 
-The canonical sources for the prebuilt launcher are the [CLI distribution contract](cli-distribution.md) and [release procedure](../operations/cli-release.md). `npm ci --prefix apps/cli --ignore-scripts`, `npm run test:cli`, and `node --test server/cli-host.test.ts server/instance-lock.test.ts server/release-runtime.test.ts server/mew-release-actions.test.ts` are isolated checks that do not modify the actual server or dist. `npm run release:runtime -- --output <폴더>` is a command for release maintainers/CI that packages an already-built dist and platform-specific native dependencies; it does not replace the required implementation build or authorize agents to deploy or restart the app.
+The [CLI distribution contract](cli-distribution.md) and [release procedure](../operations/cli-release.md) own release behavior.
+
+These isolated checks do not alter the running server or `dist/`:
+
+```bash
+npm ci --prefix apps/cli --ignore-scripts
+npm run test:cli
+node --test server/cli-host.test.ts server/instance-lock.test.ts server/release-runtime.test.ts server/mew-release-actions.test.ts
+```
+
+`npm run release:runtime -- --output <폴더>` packages an already-built `dist/` and platform-native dependencies for release maintainers or CI. It neither replaces `npm run build` nor authorizes deployment or server lifecycle operations.

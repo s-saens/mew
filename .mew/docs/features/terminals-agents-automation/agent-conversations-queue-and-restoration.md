@@ -4,11 +4,11 @@ parent: "mew-agents"
 title: "Agent Conversations, Queues, and Restoration"
 status: "implemented"
 created: "2026-09-18"
-updated: "2026-11-02"
+updated: "2026-11-03"
 status_hash: "b325d279cf16e291b2bcddda7cc0d70268647e336403acba780cb1081da44668"
 files: ["src/components/AgentPanel.tsx", "src/components/agent-startup-queue.tsx", "src/utils/agent-startup-queue.ts", "src/hooks/use-agent-event-state.ts", "src/hooks/use-agent-work-history.ts", "src/utils/agent-work-loader.ts", "src/utils/agentFold.ts", "src/hooks/useGridDrag.ts", "server/agentHost.ts", "server/agentWs.ts", "server/agentTranscript.ts", "server/agent-history-preview.ts", "server/agent-session-search-service.ts", "server/agent-transcript-search.ts", "server/agent-runtime-history-search.ts"]
 commits: []
-description: "Feature contract for immediate local question bubbles and reply waiting dots, agent conversations, stopping, queues, restoration, history search, request ordering, and session conflicts. Covers fast continuous quiet recovery, foreground/pageshow and idle relay liveness checks with paused monotonic budgets, bounded command-status reads preserving permanent HTTP status, parallel cache startup, preserved drafts and records, scoped permanent failures, bounded Mewpet assistant recovery, new tabs, the latest 3 turns, work details, attachments, question navigation, memory protection, and model capacity retries."
+description: "Agent conversation feedback, history, stopping, queues, drafts, session conflicts, and restoration. Defines quiet continuous recovery, relay liveness and bounded status reads, permanent-failure handling, Mewpet recovery, and model-capacity retries."
 상위파일:
   - "MOC.md"
   - "_terminals-agents-automation.md"

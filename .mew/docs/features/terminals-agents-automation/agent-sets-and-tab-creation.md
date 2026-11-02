@@ -4,11 +4,11 @@ parent: "mew-agents"
 title: "Agent Sets and Tab Creation"
 status: "implemented"
 created: "2026-09-18"
-updated: "2026-11-02"
+updated: "2026-11-03"
 status_hash: "3e9a3293848b77d07af2e0bbeb65a930bb54c18ce2da6a1b7543c145fb06a0b9"
 files: ["src/components/AgentPanel.tsx", "src/components/AgentSetPicker.tsx", "server/agentSets.ts", "server/agentCwd.ts"]
 commits: []
-description: "A feature contract covering new-tab runtime selection with number keys 1–9, automatic focus on new conversation input, unchanged default tab names and live position numbers before each close button, number display between the install button and settings icon, handle-based drag reordering, per-browser order storage, creation/editing/selection of agent sets containing runtime/model/effort/role presets, and per-project tab creation. Provides tab renaming by double-click, a context menu, and panel maximization/restoration by double-clicking the panel handle. Describes creating new tabs and restoring closed tabs based on panel focus, bidirectional swipe cycling through conversation tabs and the final + picker, retaining the Ctrl/Cmd+W close target immediately after keyboard tab switching, saving exact models, direct entry, restoring existing tabs, dedicated AI Commit execution, and task-editor requests that open runtime selection and prepare editable input drafts without automatic submission."
+description: "Runtime/model/effort/role presets, agent sets, and project tabs. Covers exact-model restoration, tab creation and ordering, focus-aware shortcuts and swipes, AI Commit, and task requests that prepare drafts without submitting them."
 상위파일:
   - "MOC.md"
   - "_terminals-agents-automation.md"
