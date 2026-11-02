@@ -31,7 +31,7 @@ export interface HarnessDetail { item: HarnessItem; content: string; revision: s
 export interface HarnessMutation {
   cwd: string
   kind: HarnessKind
-  action: 'save' | 'move' | 'delete' | 'create'
+  action: 'save' | 'move' | 'delete' | 'create' | 'import'
   id?: string
   revision?: string
   target?: string

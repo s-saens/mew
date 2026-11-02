@@ -103,6 +103,7 @@ import { MEW_APP_ROOT, MEW_UPDATE_SESSION, mewUpdateStatus, mewUpdateRunning, re
 import { androidCommandById, collectAndroidEnvStatus } from './androidEnv.ts'
 import { listSkills } from './skills.ts'
 import { createAgentHarnessRouter } from './agent-harness-routes.ts'
+import { createSharedMcpRouter } from './shared-mcp-routes.ts'
 import { createAgentDrawingsRouter } from './agent-drawings.ts'
 import { readCrontab } from './crontab.ts'
 import { agentCommand, jobCwd, jobSessionName, jobViews, otherLines, readJobs, saveSchedules, ScheduleError } from './schedules.ts'
@@ -2426,6 +2427,7 @@ export function createApiApp() {
   app.use('/tmux', requireFeature('terminal'), createTmuxRouter(tmuxManager))
   app.use('/agent/commands', createAgentCommandRouter(new AgentCommandStore(tmuxManager)))
   app.use('/agent/harness', createAgentHarnessRouter())
+  app.use('/agent/mcp', createSharedMcpRouter())
 
   // 호스트 자원 현황(프로파일링 팝업) — 서버가 도는 기계의 정보라 셸과 같은 역할로 묶는다
   app.get('/system-stats', requireFeature('system'), async (_req, res) => {

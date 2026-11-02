@@ -59,6 +59,7 @@
     "@mew/shortcuts": "*",
     "@mew/tmux-term": "*",
     "@mew/ui": "*",
+    "@modelcontextprotocol/sdk": "1.32.1",
     "@rrweb/record": "2.2.0",
     "@rrweb/replay": "2.2.0",
     "@tailwindcss/typography": "^0.5.20",

@@ -1,6 +1,7 @@
 import express from 'express'
 import { AgentHarnessStore, HarnessError } from './agent-harness.ts'
-import { requireFeature } from './reqAuth.ts'
+import { authOf, requireFeature } from './reqAuth.ts'
+import { runWithAgentAccount } from './agent-account-settings.ts'
 import type { HarnessKind } from '../shared/agent-harness.ts'
 
 function scope(value: unknown, kind: unknown): { cwd: string; kind: HarnessKind } {
@@ -10,6 +11,7 @@ function scope(value: unknown, kind: unknown): { cwd: string; kind: HarnessKind 
 export function createAgentHarnessRouter(store = new AgentHarnessStore()) {
   const router = express.Router()
   router.use(requireFeature('agent'))
+  router.use((req, _res, next) => runWithAgentAccount(authOf(req).email, next))
   router.use((_req, res, next) => { res.setHeader('Cache-Control', 'no-store'); next() })
   router.get('/', async (req, res, next) => {
     try { const input = scope(req.query.cwd, req.query.kind); res.json(await store.list(input.cwd, input.kind)) } catch (error) { next(error) }

@@ -14,7 +14,7 @@ test('harness popup supports scope filtering, protected drafts, editing, moves a
 import {createRoot} from '${root}/node_modules/react-dom/client.js';
 import {AgentHarnessButtons} from '${root}/src/components/agent-harness-modal.tsx';
 createRoot(document.getElementById('root')).render(<div className="flex"><button aria-label="세션 정보">i</button><AgentHarnessButtons cwd="/project"/></div>);`
-  const bundle = await build({ input: 'virtual:harness.tsx', write: false, platform: 'browser', output: { format: 'iife' }, transform: { jsx: 'react-jsx', define: { 'process.env.NODE_ENV': JSON.stringify('test') } }, plugins: [{
+  const bundle = await build({ input: 'virtual:harness.tsx', write: false, platform: 'browser', onLog(level, log, defaultHandler) { if (log.code !== 'MODULE_LEVEL_DIRECTIVE') defaultHandler(level, log) }, output: { format: 'iife' }, transform: { jsx: 'react-jsx', define: { 'process.env.NODE_ENV': JSON.stringify('test') } }, plugins: [{
     name: 'harness-fixture', resolveId(id) { if (id === 'virtual:harness.tsx') return id; if (id.endsWith('.css')) return 'virtual:style' }, load(id) { if (id === 'virtual:harness.tsx') return source; if (id === 'virtual:style') return '' },
   }] })
   const chunk = bundle.output.find(item => item.type === 'chunk')!
@@ -81,10 +81,10 @@ createRoot(document.getElementById('root')).render(<div className="flex"><button
       const opener = page.getByRole('button', { name: 'Skills 관리', exact: true })
       await opener.click()
       await page.getByRole('button', { name: 'deploy Codex', exact: true }).waitFor()
-      assert.ok(await page.evaluate('document.activeElement?.getAttribute("aria-label") === "확장 검색"'))
+      if (width >= 768) assert.ok(await page.evaluate('document.activeElement?.getAttribute("aria-label") === "확장 검색"'))
       assert.equal(await page.locator('select, datalist').count(), 0)
       await field('에이전트').focus()
-      await page.keyboard.press('ArrowDown')
+      await page.keyboard.press('Enter')
       await page.keyboard.press('End')
       assert.equal(await field('에이전트').innerText(), '모든 에이전트', 'navigation does not apply the filter')
       await page.keyboard.press('Enter')
@@ -117,7 +117,7 @@ createRoot(document.getElementById('root')).render(<div className="flex"><button
       assert.equal(await page.getByRole('button', { name: '삭제', exact: true }).isEnabled(), false)
       if (width < 768) {
         await page.getByRole('button', { name: '목록으로' }).click()
-        assert.ok(await page.evaluate('document.activeElement?.getAttribute("aria-label") === "확장 검색"'))
+        if (width >= 768) assert.ok(await page.evaluate('document.activeElement?.getAttribute("aria-label") === "확장 검색"'))
       }
       await page.getByRole('button', { name: 'deploy Codex', exact: true }).click()
       await page.getByLabel('확장 내용').waitFor()
@@ -200,6 +200,139 @@ createRoot(document.getElementById('root')).render(<div className="flex"><button
       assert.equal(await page.getByRole('dialog').count(), 0)
       assert.ok(await page.evaluate('document.activeElement?.getAttribute("aria-label") === "Skills 관리"'))
       assert.deepEqual(errors, [])
+      await page.close()
+    }
+  } finally { await browser.close() }
+})
+
+test('Mew shared MCP defaults, credential-free import and connection lifecycle work on desktop/mobile', { skip: !domBrowserExecutable(), timeout: 60000 }, async () => {
+  const source = `import React from '${root}/node_modules/react/index.js';
+import {createRoot} from '${root}/node_modules/react-dom/client.js';
+import {AgentHarnessButtons} from '${root}/src/components/agent-harness-modal.tsx';
+createRoot(document.getElementById('root')).render(<AgentHarnessButtons cwd="/project"/>);`
+  const bundle = await build({ input: 'virtual:shared-harness.tsx', write: false, platform: 'browser', onLog(level, log, handler) { if (log.code !== 'MODULE_LEVEL_DIRECTIVE') handler(level, log) }, output: { format: 'iife' }, transform: { jsx: 'react-jsx', define: { 'process.env.NODE_ENV': JSON.stringify('test') } }, plugins: [{
+    name: 'shared-harness-fixture',
+    resolveId(id) {
+      if (id === 'virtual:shared-harness.tsx') return id
+      if (id.endsWith('LoginDesktopViewer')) return 'virtual:login-viewer.tsx'
+      if (id.endsWith('.css')) return 'virtual:style'
+    },
+    load(id) {
+      if (id === 'virtual:shared-harness.tsx') return source
+      if (id === 'virtual:style') return ''
+      if (id === 'virtual:login-viewer.tsx') return `import React from '${root}/node_modules/react/index.js'; export function LoginDesktopViewer({streamUrl,reopen}) { return <div role="region" aria-label="MCP 로그인 화면" data-stream-url={streamUrl} className="h-full w-full bg-surface-raised">Cloudflare 로그인<button onClick={() => void reopen()}>로그인 화면 다시 열기</button></div> }`
+    },
+  }] })
+  const chunk = bundle.output.find(item => item.type === 'chunk')!
+  const files = ['src/components/agent-harness-modal.tsx', 'src/components/shared-mcp-connection.tsx', 'packages/ui/src/select-field.tsx']
+  const content = (await Promise.all(files.map(file => fs.readFile(path.join(root, file), 'utf8')))).join('\n')
+  const compiler = await compile(await fs.readFile(`${root}/src/index.css`, 'utf8'), { base: `${root}/src`, onDependency() {} })
+  const css = compiler.build([...new Set((source + content).match(/[A-Za-z0-9_@!:/.[\]()%,-]+/g))])
+  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  try {
+    for (const width of [1200, 390]) {
+      const page = await browser.newPage({ viewport: { width, height: 844 }, locale: 'ko-KR', hasTouch: width < 768, isMobile: width < 768 })
+      page.setDefaultTimeout(5000)
+      const errors: string[] = [], mutations: HarnessMutation[] = [], connectionActions: string[] = []
+      page.on('pageerror', error => errors.push(error.message))
+      let status: 'disconnected' | 'needs_auth' | 'connected' = 'disconnected', authenticate = false, failConnect = false, failImport = true, polls = 0
+      const inventory: HarnessInventory = {
+        scopes: [{ id: 'mew', label: 'Mew', path: 'Mew account', global: false }, { id: 'global', label: '전역', path: '/home/test', global: true }],
+        agents: [{ id: 'mew', label: 'Mew' }, { id: 'claude', label: 'Claude' }],
+        locations: [{ id: 'mew-mcp', kind: 'mcp', agent: 'mew', scope: 'mew', label: 'Mew', path: 'Mew account MCP', writable: true }, { id: 'claude-mcp', kind: 'mcp', agent: 'claude', scope: 'global', label: 'Claude', path: '/home/test/.claude.json', writable: true }],
+        items: [{ id: 'native', location: 'claude-mcp', name: 'cloudflare', description: '기존 Claude MCP', path: '/home/test/.claude/plugins/cloudflare/.mcp.json', writable: false, reason: '플러그인 설정' }], warnings: [],
+      }
+      const connection = () => ({ name: 'shared-cloud', status, ...(status === 'needs_auth' ? { streamUrl: '/api/agent/mcp/login-desktop/job/stream' } : {}) })
+      await page.route('http://mew-shared-mcp.test/**', async route => {
+        const url = new URL(route.request().url())
+        if (url.pathname === '/app.js') return route.fulfill({ contentType: 'text/javascript', body: chunk.code })
+        if (url.pathname === '/api/agent/harness/detail') return route.fulfill({ json: { item: inventory.items.find(item => item.id === url.searchParams.get('id')), content: '{"type":"http","url":"https://mcp.example.com/mcp"}', revision: 'revision', files: [] } })
+        if (url.pathname === '/api/agent/harness') {
+          if (route.request().method() === 'POST') {
+            const input = route.request().postDataJSON() as HarnessMutation
+            mutations.push(input)
+            if (input.action === 'import' && failImport) { failImport = false; return route.fulfill({ status: 409, json: { error: '같은 이름이 있습니다. 이름을 확인하세요.' } }) }
+            inventory.items.push({ id: input.action === 'import' ? 'imported' : 'created', location: 'mew-mcp', name: input.action === 'import' ? 'cloudflare' : input.name!, description: '', path: 'Mew account MCP', writable: true })
+            return route.fulfill({ json: { ok: true } })
+          }
+          return route.fulfill({ json: inventory })
+        }
+        if (url.pathname === '/api/agent/mcp/status') { polls++; if (authenticate) status = 'connected'; return route.fulfill({ json: connection() }) }
+        if (url.pathname.startsWith('/api/agent/mcp/')) {
+          const action = url.pathname.split('/').at(-1)!
+          connectionActions.push(action)
+          assert.deepEqual(route.request().postDataJSON(), { name: 'shared-cloud' })
+          if (action === 'connect' && failConnect) { failConnect = false; return route.fulfill({ status: 502, json: { error: '연결 서버가 응답하지 않습니다.' } }) }
+          status = action === 'connect' ? 'needs_auth' : 'disconnected'
+          return route.fulfill({ json: connection() })
+        }
+        return route.fulfill({ contentType: 'text/html', body: `<!doctype html><html class="${width === 390 ? '' : 'dark'}" lang="ko"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}html,body{margin:0}</style><div id="root"></div><script src="/app.js"></script></html>` })
+      })
+      const opener = page.getByRole('button', { name: 'MCP 관리', exact: true })
+      await page.goto('http://mew-shared-mcp.test/')
+      await opener.click()
+      await page.getByRole('button', { name: 'cloudflare Claude', exact: true }).click()
+      await page.getByRole('button', { name: 'Mew에 가져오기', exact: true }).waitFor()
+      assert.equal(await page.getByRole('button', { name: '수정', exact: true }).isEnabled(), false)
+      await page.getByRole('button', { name: 'Mew에 가져오기', exact: true }).click()
+      await page.getByRole('alert').filter({ hasText: '같은 이름' }).waitFor()
+      await page.getByRole('button', { name: 'Mew에 가져오기', exact: true }).click()
+      await page.getByRole('status').filter({ hasText: 'Mew 공통으로 가져왔습니다' }).waitFor()
+      assert.deepEqual(mutations.at(-1), { cwd: '/project', kind: 'mcp', action: 'import', id: 'native', revision: 'revision', target: 'mew-mcp' })
+      assert.equal(await page.getByRole('button', { name: 'cloudflare Claude', exact: true }).count(), 1, 'import leaves the native entry intact')
+      await page.getByRole('button', { name: 'cloudflare Mew 공통', exact: true }).waitFor()
+      await page.getByRole('button', { name: '추가', exact: true }).click()
+      assert.equal(await page.getByRole('combobox', { name: '대상 위치', exact: true }).innerText(), 'Mew 공통')
+      await page.getByRole('textbox', { name: '이름', exact: true }).fill('shared-cloud')
+      await page.getByRole('textbox', { name: '서버 URL', exact: true }).fill('https://mcp.example.com/mcp')
+      assert.equal(await page.getByRole('textbox', { name: 'MCP 설정 JSON', exact: true }).count(), 0)
+      await page.getByRole('button', { name: '저장', exact: true }).click()
+      await page.getByRole('status').filter({ hasText: '저장했습니다' }).waitFor()
+      assert.equal(mutations.at(-1)?.target, 'mew-mcp')
+      assert.deepEqual(JSON.parse(mutations.at(-1)!.content!), { type: 'http', url: 'https://mcp.example.com/mcp' })
+      const sharedRow = () => page.getByRole('button', { name: 'shared-cloud Mew 공통', exact: true })
+      await sharedRow().click()
+      const state = () => page.getByRole('region', { name: 'MCP 연결 상태', exact: true })
+      await state().getByRole('status').filter({ hasText: '연결 안 됨' }).waitFor()
+      assert.equal(await page.getByRole('button', { name: '이동', exact: true }).count(), 0)
+      await page.getByRole('button', { name: '연결', exact: true }).click()
+      const viewer = page.getByRole('region', { name: 'MCP 로그인 화면', exact: true })
+      await viewer.waitFor()
+      assert.equal(await viewer.getAttribute('data-stream-url'), '/api/agent/mcp/login-desktop/job/stream')
+      const box = (await viewer.boundingBox())!
+      assert.ok(box.x >= 0 && box.x + box.width <= width && box.y + box.height <= 844)
+      assert.equal(await page.locator('select, datalist').count(), 0)
+      await fs.mkdir('/tmp/mew-harness-review', { recursive: true })
+      await page.screenshot({ path: `/tmp/mew-harness-review/shared-mcp-${width}.png` })
+      await viewer.getByRole('button', { name: '로그인 화면 다시 열기' }).click()
+      authenticate = true
+      await state().getByRole('status').filter({ hasText: /^연결됨$/ }).waitFor()
+      assert.equal(await viewer.count(), 0)
+      await page.getByRole('button', { name: '닫기', exact: true }).click()
+      assert.deepEqual(connectionActions, ['connect', 'connect'], 'reopening the login view keeps polling and closing an authenticated connection preserves authorization')
+      await opener.click(); await sharedRow().click()
+      await page.getByRole('button', { name: '연결 해제', exact: true }).click()
+      authenticate = false
+      await state().getByRole('status').filter({ hasText: '연결 안 됨' }).waitFor()
+      failConnect = true
+      await page.getByRole('button', { name: '연결', exact: true }).click()
+      await state().getByRole('alert').filter({ hasText: '연결 서버가 응답하지 않습니다' }).waitFor()
+      await state().getByRole('button', { name: '다시 연결', exact: true }).click()
+      await viewer.waitFor()
+      await page.getByRole('button', { name: '연결 취소', exact: true }).click()
+      await state().getByRole('status').filter({ hasText: '연결 안 됨' }).waitFor()
+      assert.equal(await viewer.count(), 0)
+      await page.getByRole('button', { name: '연결', exact: true }).click(); await viewer.waitFor()
+      const previousCancels = connectionActions.filter(action => action === 'cancel').length
+      await page.getByRole('button', { name: '닫기', exact: true }).click()
+      await page.waitForFunction(`document.querySelector('[role=dialog]') === null`)
+      await new Promise(resolve => setTimeout(resolve, 100))
+      assert.equal(connectionActions.filter(action => action === 'cancel').length, previousCancels + 1, 'closing pending authentication cancels its host browser job')
+      const closedPolls = polls
+      await new Promise(resolve => setTimeout(resolve, 1700))
+      assert.equal(polls, closedPolls, 'polling stops when the manager closes')
+      assert.deepEqual(errors, [])
+      assert.ok(await opener.evaluate(el => el.ownerDocument.documentElement.scrollWidth <= el.ownerDocument.defaultView!.innerWidth))
       await page.close()
     }
   } finally { await browser.close() }

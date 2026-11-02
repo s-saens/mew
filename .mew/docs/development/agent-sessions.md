@@ -1,6 +1,6 @@
 ---
 title: "Agent session and communication contract"
-description: "Defines account and project instruction APIs, focused documentation and modular code guidance, configurable default-on build verification, model capacity retries, continuous panel recovery and relay liveness, runtimes, tabs, one-time discovery prompts in agent-assisted project creation, worktrees, attachments, Git AI Commit, CLI, memory, and MCP. Also covers history searches, local incremental indexing, and restoration boundaries for external CLI records."
+description: "Defines account/project instructions, runtime sessions and recovery, agent-assisted project creation, worktrees, attachments, Git AI Commit, CLI, memory, and history restoration. Includes account-owned common MCP injection alongside debugger and Mewpet bindings."
 updated: "2026-11-02"
 상위파일:
   - "../MOC.md"
@@ -212,6 +212,10 @@ Antigravity directly spawns Google's official ACP server. It retains `initialize
 URL events are resent only to a reconnected authentication screen. On success, failure, or cancellation, `auth_url_done` closes the browser and discards the URL. Since ACP has no authenticate cancellation method, cancellation or a 330-second timeout terminates that connection's process and restarts from initialize. Late responses from a previous connection do not create a new session. Provider CLI credentials are neither read nor copied. Installation, environment variables, and support scope follow [Runtime Settings](../../../docs/configuration/agent-runtimes.md#antigravity-official-acp); decisions follow [ADR 0143](../history/decisions/0143-mew-antigravity-official-acp.md).
 
 
+## Mew Common MCP
+
+Account-owned [Mew common MCP](shared-mcp.md) definitions are read under the captured session account and combined with the caller's built-in MCP list for every session/new and session/load. Common definitions apply to regular, scheduled, and helper ACP sessions. Starting or clearing a conversation or loading a saved one refreshes the common list; reconnecting the active conversation keeps its existing bindings. Native CLI configurations remain independent.
+
 ## Agent Debugger MCP
 
 When debugger sharing is enabled for the current account and project, the regular agent WS passes the `mew-debugger` list created by `debuggerMcpServers` to `AgentSession.start`. The default is an empty list. It checks owner·manager, `agent`·`terminal`, and permission to modify all project files; enabling the option alone does not launch an adapter or change provider MCP settings. Mewpet continues to use its existing helper MCP list.
@@ -222,4 +226,4 @@ The MCP list is fixed when the independent supervisor starts. After enabling sha
 
 ## Mewpet Helper Sessions and MCP
 
-Mewpet uses a separate supervisor for each account, browser tab, and runtime. The `mcpServers` option from `AgentSession.start` is passed to the independent supervisor and reused for every session/new and session/load. Regular sessions use an empty list when the optional debugger MCP described above is disabled. Permissions, current screen context, task ID round trips, and persistence boundaries for each session's built-in MCP follow the [Helper Contract](../features/appearance-accounts-operations/mewpet-assistant-conversations-and-controls.md).
+Mewpet uses a separate supervisor for each account, browser tab, and runtime. The `mcpServers` option from `AgentSession.start` is passed to the independent supervisor and combined with the account's current common MCP definitions for every session/new and session/load. Regular sessions add no built-in bindings when the optional debugger MCP described above is disabled. Permissions, current screen context, task ID round trips, and persistence boundaries for each session's built-in MCP follow the [Helper Contract](../features/appearance-accounts-operations/mewpet-assistant-conversations-and-controls.md).

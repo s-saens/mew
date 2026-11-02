@@ -8,6 +8,8 @@ import { readAgentSettings } from './agentSettings.ts'
 import { ensureCommitSkill, MEW_SKILLS_DIR } from './mew-skills.ts'
 import { DOCUMENTATION_SKILLS_DIR, listDocumentationSkills, listDocumentationDependencies } from './documentation-skills.ts'
 import { parseConfig, patchConfig, atKeys, object, type ConfigFormat } from './harness-config.ts'
+import { normalizeSharedMcpConfig, sharedMcpDirectory, SHARED_MCP_FILE } from './shared-mcp.ts'
+import { protectDirectory } from './platform/storage.ts'
 import type { HarnessDetail, HarnessInventory, HarnessItem, HarnessKind, HarnessLocation, HarnessMutation, HarnessScope } from '../shared/agent-harness.ts'
 
 const MAX_TEXT = 2 * 1024 * 1024
@@ -21,7 +23,7 @@ export class HarnessError extends Error {
 interface Location extends HarnessLocation { format?: ConfigFormat; keys?: string[] }
 interface Entry extends HarnessItem { directory?: string }
 interface Index extends HarnessInventory { locations: Location[]; items: Entry[] }
-export interface HarnessEnvironment { home: string; env: NodeJS.ProcessEnv; runtimeEnvs?: Record<string, NodeJS.ProcessEnv>; mewSkillsDir?: string }
+export interface HarnessEnvironment { home: string; env: NodeJS.ProcessEnv; runtimeEnvs?: Record<string, NodeJS.ProcessEnv>; mewSkillsDir?: string; mewMcpDir?: string }
 
 function exists(file: string) { try { fs.lstatSync(file); return true } catch { return false } }
 function linked(file: string): boolean {
@@ -40,11 +42,12 @@ function readText(file: string): string {
 function assertWritable(file: string) {
   if (linked(file)) throw new HarnessError('심볼릭 링크는 원본 위치에서 관리하세요')
 }
-function atomicWrite(file: string, content: string) {
+function atomicWrite(file: string, content: string, privateFile = false) {
   assertWritable(file)
-  fs.mkdirSync(path.dirname(file), { recursive: true })
+  if (privateFile) protectDirectory(path.dirname(file))
+  else fs.mkdirSync(path.dirname(file), { recursive: true })
   const temp = path.join(path.dirname(file), `.mew-harness-${randomUUID()}`)
-  const mode = exists(file) ? fs.statSync(file).mode & 0o777 : 0o600
+  const mode = privateFile ? 0o600 : exists(file) ? fs.statSync(file).mode & 0o777 : 0o600
   try { fs.writeFileSync(temp, content, { flag: 'wx', mode }); fs.renameSync(temp, file) }
   finally { if (exists(temp)) fs.unlinkSync(temp) }
 }
@@ -77,7 +80,7 @@ function skillSnapshot(directory: string) {
   return { revision: hash.digest('hex'), files }
 }
 
-/** Native source files remain the source of truth. This service never launches an agent or MCP process. */
+/** Source management never launches processes; Mew common definitions are private to the account. */
 export class AgentHarnessStore {
   environment?: HarnessEnvironment
   constructor(environment?: HarnessEnvironment) { this.environment = environment }
@@ -181,8 +184,14 @@ export class AgentHarnessStore {
         items.push({ id: identity(documentationLocation.id, skill.name), location: documentationLocation.id, name: skill.name, description: skill.description, path: skill.path, directory: path.dirname(skill.path), writable: false, reason: documentationLocation.reason })
       }
     }
+    if (kind === 'mcp') {
+      const directory = this.environment?.mewMcpDir ?? (this.environment ? path.join(home, '.mew-mcp') : sharedMcpDirectory())
+      const scope = { id: 'mew', label: 'Mew 공통', path: directory, global: false }
+      scopes.unshift(scope)
+      add(scope, 'mew', path.join(directory, SHARED_MCP_FILE), 'Mew 공통', 'json', ['mcpServers'])
+    }
     for (const location of locations) {
-      if (location.agent === 'mew') continue
+      if (kind === 'skills' && location.agent === 'mew') continue
       if (kind === 'skills') await this.scanSkills(location, items, warnings)
       else if (exists(location.path)) {
         try {
@@ -195,7 +204,7 @@ export class AgentHarnessStore {
         } catch { warnings.push(`설정 문법 또는 읽기 권한을 확인하세요: ${location.path}`) }
       }
     }
-    return { scopes, agents: [...(kind === 'skills' ? [{ id: 'mew', label: 'Mew' }] : []), { id: 'shared', label: '공통' }, ...Object.values(RUNTIMES).filter(runtime => runtime.id !== 'tmux').map(({ id, label }) => ({ id, label }))], locations, items: items.sort((a, b) => a.name.localeCompare(b.name)), warnings: [...new Set(warnings)] }
+    return { scopes, agents: [{ id: 'mew', label: kind === 'mcp' ? 'Mew 공통' : 'Mew' }, { id: 'shared', label: '공통' }, ...Object.values(RUNTIMES).filter(runtime => runtime.id !== 'tmux').map(({ id, label }) => ({ id, label }))], locations, items: items.sort((a, b) => a.name.localeCompare(b.name)), warnings: [...new Set(warnings)] }
   }
 
   private async scanSkills(location: Location, items: Entry[], warnings: string[]) {
@@ -254,12 +263,44 @@ export class AgentHarnessStore {
 
   async mutate(input: HarnessMutation) {
     const index = await this.index(input.cwd, input.kind)
-    if (!['create', 'save', 'move', 'delete'].includes(input.action)) throw new HarnessError('알 수 없는 작업입니다')
+    if (!['create', 'save', 'move', 'delete', 'import'].includes(input.action)) throw new HarnessError('알 수 없는 작업입니다')
     const target = index.locations.find(location => location.id === input.target)
-    if (input.action === 'create' || input.action === 'move') {
-      if (target?.agent === 'mew') throw new HarnessError('Mew 기본 스킬은 기존 파일의 내용만 편집할 수 있습니다')
+    if (input.action === 'create' || input.action === 'move' || input.action === 'import') {
+      if (input.kind === 'skills' && target?.agent === 'mew') throw new HarnessError('Mew 기본 스킬은 기존 파일의 내용만 편집할 수 있습니다')
       if (!target?.writable) throw new HarnessError('쓸 수 있는 대상 위치를 선택하세요')
       assertWritable(target.path)
+    }
+    if (input.action === 'import') {
+      if (input.kind !== 'mcp' || target?.agent !== 'mew') throw new HarnessError('Mew 공통 MCP 위치를 선택하세요')
+      const { item, location } = this.find(index, input.id)
+      if (location.agent === 'mew') throw new HarnessError('이미 Mew 공통에 등록된 MCP입니다')
+      const detail = this.read(item, location)
+      if (typeof input.revision !== 'string' || detail.revision !== input.revision) throw new HarnessError('다른 곳에서 변경되었습니다. 새로고침 후 다시 시도하세요', 409)
+      if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$/.test(item.name)) throw new HarnessError('Mew 공통에서 사용할 수 없는 MCP 이름입니다. 새 이름으로 추가하세요')
+      const text = configText(target)
+      if (Object.hasOwn(atKeys(parseConfig(text, target.format!), target.keys!), item.name)) throw new HarnessError('같은 이름의 MCP가 이미 있습니다', 409)
+      let config
+      try { config = normalizeSharedMcpConfig(JSON.parse(detail.content), location.agent) }
+      catch (error) { throw new HarnessError(error instanceof Error ? error.message : 'MCP 설정을 가져오지 못했습니다') }
+      if (config.command && !config.cwd) config.cwd = location.scope === 'global' ? path.resolve(input.cwd) : location.scope
+      const runtimeEnvs = this.environment?.runtimeEnvs ?? (this.environment ? {} : Object.fromEntries(Object.entries(readAgentSettings()).map(([id, setting]) => [id, setting.env ?? {}])))
+      const sourceEnv = { ...(this.environment?.env ?? process.env), ...runtimeEnvs[location.agent] }
+      for (const [key, value] of Object.entries(config.env ?? {})) {
+        config.env![key] = value.replace(/\$\{([A-Za-z_][A-Za-z0-9_]*)\}/g, (match, reference: string) => {
+          if (reference !== key) return match
+          if (sourceEnv[key] === undefined || sourceEnv[key]!.includes(match)) throw new HarnessError(`MCP 환경 변수 ${key}을(를) 원래 런타임에서 찾을 수 없습니다`)
+          return sourceEnv[key]!
+        })
+      }
+      const referenced = new Set([...JSON.stringify(config).matchAll(/\$\{([A-Za-z_][A-Za-z0-9_]*)\}/g)].map(match => match[1]))
+      for (const key of referenced) {
+        if (Object.hasOwn(config.env ?? {}, key)) continue
+        if (sourceEnv[key] === undefined) throw new HarnessError(`MCP 환경 변수 ${key}을(를) 찾을 수 없습니다. 공통 설정의 env에 값을 지정하세요`)
+        config.env = { ...config.env, [key]: sourceEnv[key]! }
+        for (const match of sourceEnv[key]!.matchAll(/\$\{([A-Za-z_][A-Za-z0-9_]*)\}/g)) referenced.add(match[1])
+      }
+      atomicWrite(target.path, patchConfig(text, target.format!, target.keys!, item.name, config), true)
+      return
     }
     if (input.action === 'create') {
       const name = input.name?.trim() ?? ''
@@ -274,11 +315,12 @@ export class AgentHarnessStore {
       } else {
         const text = configText(target!)
         if (Object.hasOwn(atKeys(parseConfig(text, target!.format!), target!.keys!), name)) throw new HarnessError('같은 이름의 MCP가 이미 있습니다', 409)
-        atomicWrite(target!.path, patchConfig(text, target!.format!, target!.keys!, name, JSON.parse(content)))
+        atomicWrite(target!.path, patchConfig(text, target!.format!, target!.keys!, name, JSON.parse(content)), target!.agent === 'mew')
       }
       return
     }
     const { item, location } = this.find(index, input.id)
+    if (input.kind === 'mcp' && location.agent === 'mew' && input.action === 'move') throw new HarnessError('Mew 공통 MCP는 계정 공통 위치에서 관리합니다')
     if (item.managed && input.action !== 'save') throw new HarnessError('Mew 기본 스킬은 이동·삭제할 수 없습니다. 내용을 편집하세요.')
     if (!item.writable) throw new HarnessError(item.reason || '읽기 전용 항목입니다')
     assertWritable(item.path)
@@ -286,7 +328,7 @@ export class AgentHarnessStore {
     if (typeof input.revision !== 'string' || detail.revision !== input.revision) throw new HarnessError('다른 곳에서 변경되었습니다. 새로고침 후 다시 시도하세요', 409)
     if (input.action === 'save') {
       const content = this.content(input.content, input.kind, location.agent)
-      atomicWrite(item.path, input.kind === 'skills' ? content : patchConfig(configText(location), location.format!, location.keys!, item.name, JSON.parse(content)))
+      atomicWrite(item.path, input.kind === 'skills' ? content : patchConfig(configText(location), location.format!, location.keys!, item.name, JSON.parse(content)), input.kind === 'mcp' && location.agent === 'mew')
     } else if (input.kind === 'skills') {
       if (!item.directory) {
         if (input.action === 'delete') fs.unlinkSync(item.path)
@@ -336,6 +378,10 @@ export class AgentHarnessStore {
     if (kind === 'mcp') {
       let config: Record<string, unknown>
       try { config = object(JSON.parse(value)) } catch { throw new HarnessError('MCP 설정은 올바른 JSON 객체여야 합니다') }
+      if (agent === 'mew') {
+        try { return JSON.stringify(normalizeSharedMcpConfig(config), null, 2) }
+        catch (error) { throw new HarnessError(error instanceof Error ? error.message : 'MCP 설정을 확인하세요') }
+      }
       const command = typeof config.command === 'string' && config.command.trim()
       const commandArray = Array.isArray(config.command) && config.command.length > 0 && config.command.every(value => typeof value === 'string' && value.trim())
       const remote = ['url', 'serverUrl', 'httpUrl'].some(key => typeof config[key] === 'string' && config[key].trim())

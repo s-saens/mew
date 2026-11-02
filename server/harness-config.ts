@@ -11,7 +11,7 @@ export function object(value: unknown): Record<string, unknown> {
 }
 export function parseConfig(text: string, format: ConfigFormat): Record<string, unknown> {
   if (!text.trim()) return {}
-  if (format === 'toml') return object(parseToml(text))
+  if (format === 'toml') return object(structuredClone(parseToml(text)))
   if (format === 'json5') return object(JSON5.parse(text))
   if (format === 'yaml') {
     const doc = parseDocument(text, { uniqueKeys: true })

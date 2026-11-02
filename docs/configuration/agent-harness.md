@@ -1,18 +1,30 @@
 ---
 title: "Skills and MCP Management"
 created: 2026-09-17
-updated: "2026-10-29"
-description: "Explains how to use the Skills and MCP management window, sources, supported locations, original protection, application scope, built-in commit and language-specific documentation skills, and external sprite MCP connections."
+updated: "2026-11-02"
+description: "Explains account-owned Mew common MCP registration, imports, shared login and connection controls, alongside native skill/MCP source management, supported locations, original protection, and built-in skills."
 상위파일: "MOC.md"
 ---
 
 Decision: [ADR 0157](../../.mew/docs/history/decisions/0157-mew-native-agent-harness-management.md).
 
+## Mew common MCP
+
+Use **Agent panel → Manage MCP → Add → Mew shared** to register a server for your Mew account. Enter its name and HTTPS server URL, then save. Use **Configure with JSON** for local commands, environment variables, headers, SSE, or OAuth options. Select the saved server and choose **Connect**. If approval is required, complete it in the host login screen displayed inside Mew.
+
+The same common connection and saved authentication are available to this account's new Mew ACP conversations across runtimes and projects. Start a new conversation after adding or changing the common list; an already-running conversation keeps the list it started with. CLIs launched outside Mew retain their own configuration.
+
+To reuse a server already registered in Claude, Codex, or another supported source, select it and choose **Import to Mew**. Mew converts the supported configuration and preserves the source. A name collision or unsupported setting produces an error without overwriting the original. Native OAuth tokens are not copied, so the first common connection may require a fresh approval. Imported native definitions can still load independently until you disable them in their owning runtime.
+
+The connection controls show the last checked state, allow retry, and cancel pending login. Closing a pending login cancels its job while preserving saved credentials. **Disconnect** clears the common connection's saved authentication; it does not remove the definition or revoke the provider's grant. The host login screen requires Linux/WSL with the existing Chrome and login-desktop dependencies. Local and unauthenticated remote servers can connect without that screen.
+
+Mew common definitions and credentials are private instance data belonging to the signed-in Mew account. They are not saved in the project or copied to every runtime's native settings. See the [common MCP contract](../../.mew/docs/development/shared-mcp.md) and [ADR 0120](../../.mew/docs/decisions/0120-shared-mcp.md).
+
 ## Usage
 
 At the top of the agent panel, the book icon to the right of `i` opens **Manage Skills**, and the plug icon opens **Manage MCP**. Both are available before connecting a session. The two buttons open the corresponding tabs in the same management window. The gear button on the right opens the separate [agent default instructions settings](../guides/project-setup.md#edit-the-shared-guidance-file).
 
-- The default list order is **Mew (skills only) → Global → Current Working Project → Subprojects**, with each item's name and agent label on the right shown on one line. Shared skills show `Global`, while dedicated items show agent names such as `Codex` or `Claude`. These labels identify the owning agent; group headings distinguish global and project application scopes. Click the arrow in each group heading to collapse or expand that group; item counts remain visible when collapsed. Collapse states are retained separately for Skills and MCP while the window is open, leaving detail selections and editing drafts intact. Items with the same name are listed separately if their sources differ; hover over them to see the owning agent and path.
+- The default list order is **Mew → Global → Current Working Project → Subprojects**. Mew contains built-in skills in Skills and account-owned common connections in MCP. Each item's name and agent label appear on one line. Shared skills show `Global`, while dedicated items show agent names such as `Codex` or `Claude`. These labels identify the owning agent; group headings distinguish global and project application scopes. Click the arrow in each group heading to collapse or expand that group; item counts remain visible when collapsed. Collapse states are retained separately for Skills and MCP while the window is open, leaving detail selections and editing drafts intact. Items with the same name are listed separately if their sources differ; hover over them to see the owning agent and path.
 - Scope and agent selection can be combined with search. `공통` means skills stored in `.agents/skills`. It does not mean every runtime automatically discovers this path.
 - Scope and agent filters and destination selection for adding or moving items use the shared custom `SelectField` dropdown. Destinations display both the global/project scope and the agent. Navigate with the arrow keys and confirm with Enter/Space; Esc and Back close the list first. Confirming a selection goes through the existing draft protection, and selectors are disabled while saving. On mobile, select from the same list by touch.
 - Selecting an item displays its description, owning agent, read-only status, original text, original path, and ownership scope in the details area. For skills, you can also expand the list of included files. MCP details contain JSON for only the selected server and do not return other account or settings fields.
@@ -22,7 +34,7 @@ At the top of the agent panel, the book icon to the right of `i` opens **Manage 
 - Saving, moving, and deleting are rejected if external edits have changed the original. Your edits remain on screen so you can copy them or reload. Unsaved drafts are checked when closing, switching type or scope, or refreshing.
 - On mobile, switch between the list and details. Esc and Back use the shared overlay stack; keyboard focus stays within the popup and returns to the original button when it closes.
 
-Global settings are based on the **OS user running the Mew server**. Multiple Mew accounts share the same global settings. The API requires the `agent` feature permission and follows the same permission boundary as existing server control features ([access contract](../../.mew/docs/development/access-control.md)).
+Native global settings are based on the **OS user running the Mew server**. Multiple Mew accounts share those native global settings. Mew common MCP has a separate private registry for each Mew account. The APIs require the `agent` feature permission and follow the existing server control boundary ([access contract](../../.mew/docs/development/access-control.md)).
 
 To generate sprites with a local model in agent chat, optionally [connect the separate project's `local-sprites` as an external MCP server](local-sprites.md). Generation code, models, and Python dependencies are not included in the Mew distribution. Mew uses the existing runtime MCP settings, and the generation tools can be reused in other clients.
 
@@ -107,11 +119,11 @@ Directories containing `SKILL.md` are searched recursively. Kimi and Prime's sin
 | Hermes | `~/.hermes/config.yaml` | None | `mcp_servers` |
 | OpenClaw | `~/.openclaw/openclaw.json` | None | `mcp.servers` |
 
-Existing `.kimi/mcp.json` and `~/.gemini/antigravity/mcp_config.json` are also displayed when present. Claude's custom `CLAUDE_CONFIG_DIR` contains `.claude.json`. `.mcp.json`, `mcp.json`, and `mcp_config.json` in Codex and Claude plugin caches are read-only. Shared MCP files are not arbitrarily created, and settings are not duplicated into other runtimes.
+Existing `.kimi/mcp.json` and `~/.gemini/antigravity/mcp_config.json` are also displayed when present. Claude's custom `CLAUDE_CONFIG_DIR` contains `.claude.json`. `.mcp.json`, `mcp.json`, and `mcp_config.json` in Codex and Claude plugin caches are read-only. Mew common MCP uses its private account registry; native settings are not automatically duplicated into other runtimes.
 
 ## Saving and Applying
 
-The management window checks the existing original's syntax, external changes, and move conflicts, preserving the original text on failure. It does not run or connect MCP servers or restart sessions, so check the relevant runtime's application and trust settings. Detailed saving, API, and validation contracts follow the [development documentation](../../.mew/docs/development/agent-harness.md).
+The management window checks the existing original's syntax, external changes, and move conflicts, preserving the original text on failure. Native source editing does not connect MCP servers or restart sessions, so check the relevant runtime's application and trust settings. Mew common MCP has explicit connection and authentication controls described above. Detailed saving, API, and validation contracts follow the [development documentation](../../.mew/docs/development/agent-harness.md).
 
 ## Sources
 

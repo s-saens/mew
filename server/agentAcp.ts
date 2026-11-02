@@ -1,4 +1,5 @@
 import { AGENT_ACCOUNT_ENV, agentSettingsAccount, runWithAgentAccount } from './agent-account-settings.ts'
+import { sharedMcpServers } from './shared-mcp.ts'
 import { HistoryIndex, validHistoryDetailsRequest, type HistoryRequest, type HistoryPage, type HistoryPosition, type HistoryDetailsRequest, type HistoryDetails, type HistoryWorkPending } from '../shared/agent-history.ts'
 import { agentDisplayEvent, compactHistoryWork } from '../shared/agent-display.ts'
 import { randomUUID } from 'node:crypto'
@@ -533,6 +534,10 @@ export class AgentSession {
     }
   }
 
+  #sessionMcpServers(): McpServer[] {
+    return runWithAgentAccount(this.#account, () => [...sharedMcpServers(), ...this.#mcpServers])
+  }
+
   async #initializeWithTimeout(createSession: boolean | 'unless-load-supported' = true) {
     let handshakeTimer: NodeJS.Timeout | null = null
     try {
@@ -616,7 +621,7 @@ export class AgentSession {
   }
 
   async #createSession() {
-    const created = await measureAgentPhase(this.runtime, 'session/new', () => this.#conn.newSession({ cwd: this.cwd, mcpServers: this.#mcpServers }))
+    const created = await measureAgentPhase(this.runtime, 'session/new', () => this.#conn.newSession({ cwd: this.cwd, mcpServers: this.#sessionMcpServers() }))
     this.#adopt(created.sessionId, created.models ?? null, created.modes ?? null, created.configOptions)
     this.#authRequired = false
     this.#authenticating = false
@@ -1361,7 +1366,7 @@ export class AgentSession {
         await this.#initializeWithTimeout(false)
       }
       if (this.#disposed) return
-      const created = await this.#conn.newSession({ cwd: this.cwd, mcpServers: this.#mcpServers })
+      const created = await this.#conn.newSession({ cwd: this.cwd, mcpServers: this.#sessionMcpServers() })
       if (this.#disposed) return
       this.#loadingEvents = null
       this.#clearFailed = false
@@ -1401,7 +1406,7 @@ export class AgentSession {
     let loaded: Awaited<ReturnType<ClientSideConnection['loadSession']>>
     let replay: AgentEvent[]
     try {
-      loaded = await measureAgentPhase(this.runtime, 'session/load', () => this.#conn.loadSession({ sessionId, cwd: this.cwd, mcpServers: this.#mcpServers }))
+      loaded = await measureAgentPhase(this.runtime, 'session/load', () => this.#conn.loadSession({ sessionId, cwd: this.cwd, mcpServers: this.#sessionMcpServers() }))
       replay = reconcileAgentTranscript(readAgentTranscript(this.runtime, this.cwd, sessionId), this.#loadingEvents)
     } catch (err) {
       // 일부 어댑터는 실패하기 전 update를 몇 개 흘리거나 모드를 바꾼다. 어느 쪽도 현재 세션에 남기지 않는다.

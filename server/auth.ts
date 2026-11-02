@@ -372,6 +372,7 @@ export function removeUser(accountId: string): boolean {
   const key = normalizeEmail(accountId)
   if (!Object.hasOwn(loadUsers().accounts, key)) return false
   revokeAccountCredentials(key)
+  fs.rmSync(path.join(DATA_DIR, 'agent-accounts', crypto.createHash('sha256').update(key).digest('hex'), 'mcp'), { recursive: true, force: true })
   return mutateAccountDirectory(data => {
     delete data.accounts[key]
     delete data.passwordCredentials[key]

@@ -2,7 +2,7 @@
 title: "Per-account feature and file permissions"
 created: "2026-09-16"
 updated: "2026-11-02"
-description: "Defines shared project discovery, per-account My Projects and managed creation for non-guests, retained server-operation role boundaries, project and per-account feature/file access, successful Mewlink responses to account access changes with live revocation, atomic feature-default reset per account, owner-issued password reset and browser-token revocation, server data path blocking, WebSocket Origin validation, raw-content isolation, guest editing, and public capabilities. Also covers Git cleanup and Mewlink, debugger, MCP, and global skin boundaries."
+description: "Defines project and account permissions, live Mewlink revocation, server-data boundaries, public capabilities, and browser/WebSocket checks. Covers account-private common MCP credentials, authorization-job cancellation, account-deletion cleanup, and existing debugger/native MCP boundaries."
 상위파일: "MOC.md"
 ---
 
@@ -85,6 +85,8 @@ File rules apply to the **mew file API**. Server control features such as agents
 The [external DAP debugger](../features/terminals-agents-automation/external-dap-debugger.md) requires terminal feature permission for owner or manager and project-wide file read and edit permissions for the current project. Adapter installation and execution and debug targets operate with server OS permissions and are not sandboxed by file ACLs. Permissions are checked on every debugger HTTP request, and running sessions are revalidated on policy changes and every 5 seconds. Requests with mismatched accounts, projects, or sessions are not executed. Independent sessions, child connections, threads, and references for each pause revision are checked, and the same permissions apply to memory and value writes. Since the internal DOM browser was removed, analysis connections that select a general Mew browser tab are not provided. The external DAP debugger and analysis file import are retained.
 
 The optional `mew-debugger` agent MCP requires the `agent` feature and per-account, per-project `agentBridge` activation in addition to debugger permissions. It rechecks every call, on policy changes, and every 5 seconds through a private Unix socket bound to the account and project, and closes connections when sharing is disabled, permissions are revoked, or the project changes. Commands require the exact session, connection, and pause revision and use the same allowlist as HTTP. Tool installation, arbitrary DAP/CDP, and other accounts' targets are not exposed.
+
+[Mew common MCP](shared-mcp.md) requires the authenticated account's `agent` permission. Definitions and OAuth credentials belong to that account's private server-data directory; APIs cannot select another account or an arbitrary credential path. Connection jobs and login desktops revalidate the initiating account, live session/access, and configuration while approval is pending. Cancellation and disconnect close temporary callbacks and transports. Account deletion removes the common MCP directory, and credential epochs block delayed writes from restoring cleared tokens. Native global source files continue to belong to the server OS user. MCP commands execute with server OS permissions and do not add process isolation.
 
 ## Permission changes during active connections
 
