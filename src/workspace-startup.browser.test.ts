@@ -22,7 +22,7 @@ test('workspace chrome remains usable while editor and unopened tools download o
     transform: { jsx: 'react-jsx', define: { 'process.env.NODE_ENV': JSON.stringify('production'), 'import.meta.hot': 'false' } },
     plugins: [{ name: 'workspace-startup-fixture', transform(code, id) {
       if (id === path.join(root, 'src/App.tsx')) return code.replace("import('./components/AgentPanel')", "(window.startupAgentImportAt=performance.now(),window.startupPreparationOrder.push('agent'),import('./components/AgentPanel'))")
-        .replace('return agentPanelCode ??=', 'window.startupAgentScheduledAt ??= performance.now(); return agentPanelCode ??=')
+        .replace('await agentPanelPreparation.prepare(', 'await (window.startupAgentScheduledAt ??= performance.now(), agentPanelPreparation.prepare)(')
       if (id === componentPath('deferred-editor-pane')) return code.replace("import('./EditorPane').then", "(window.startupPreparationOrder.push('editor'),import('./EditorPane')).then")
       if (id === componentPath('deferred-editor-views')) return code.replace("return mode === 'plain' ?", "window.startupPreparationOrder.push('engine:' + mode); return mode === 'plain' ?")
     }, resolveId(id) {

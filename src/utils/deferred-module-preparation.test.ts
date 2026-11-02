@@ -1,0 +1,97 @@
+import assert from 'node:assert/strict'
+import test from 'node:test'
+import { createDeferredModulePreparation } from './deferred-module-preparation.ts'
+
+test('background module preparation starts only after its delay', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] })
+  const preparation = createDeferredModulePreparation<string>(250)
+  const load = t.mock.fn(async () => 'module')
+  t.mock.timers.tick(1000)
+  assert.equal(load.mock.callCount(), 0)
+  const pending = preparation.prepare(load)
+  t.mock.timers.tick(249)
+  assert.equal(load.mock.callCount(), 0)
+  t.mock.timers.tick(1)
+  assert.equal(await pending, 'module')
+  assert.equal(load.mock.callCount(), 1)
+})
+
+test('urgent preparation before the first request starts immediately', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] })
+  const preparation = createDeferredModulePreparation<string>(250)
+  const load = t.mock.fn(async () => 'module')
+  preparation.promote()
+  const pending = preparation.prepare(load)
+  assert.equal(load.mock.callCount(), 1)
+  assert.equal(await pending, 'module')
+  t.mock.timers.tick(1000)
+  assert.equal(load.mock.callCount(), 1)
+})
+
+test('promotion clears the pending timer and cannot start a second download', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] })
+  const clear = t.mock.method(globalThis, 'clearTimeout')
+  const preparation = createDeferredModulePreparation<string>(250)
+  const load = t.mock.fn(async () => 'module')
+  const pending = preparation.prepare(load)
+  t.mock.timers.tick(100)
+  assert.equal(clear.mock.callCount(), 0)
+  preparation.promote()
+  assert.equal(clear.mock.callCount(), 1)
+  assert.equal(load.mock.callCount(), 1)
+  preparation.promote()
+  t.mock.timers.tick(1000)
+  assert.equal(await pending, 'module')
+  assert.equal(load.mock.callCount(), 1)
+  assert.equal(clear.mock.callCount(), 1)
+})
+
+test('requests before and after resolution share one promise and module', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] })
+  const preparation = createDeferredModulePreparation<object>(250)
+  const module = {}
+  let resolve!: (value: object) => void
+  const load = t.mock.fn(() => new Promise<object>(done => { resolve = done }))
+  const otherLoad = t.mock.fn(async () => ({}))
+  const pending = preparation.prepare(load)
+  assert.equal(preparation.prepare(otherLoad), pending)
+  t.mock.timers.tick(250)
+  assert.equal(preparation.prepare(otherLoad), pending)
+  resolve(module)
+  assert.equal(await pending, module)
+  assert.equal(preparation.prepare(otherLoad), pending)
+  assert.equal(load.mock.callCount(), 1)
+  assert.equal(otherLoad.mock.callCount(), 0)
+})
+
+test('download failure remains shared instead of silently retrying', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] })
+  const preparation = createDeferredModulePreparation<object>(250)
+  const error = new Error('download failed')
+  const load = t.mock.fn(async () => { throw error })
+  const pending = preparation.prepare(load)
+  const rejected = assert.rejects(pending, candidate => candidate === error)
+  preparation.promote()
+  await rejected
+  const otherLoad = t.mock.fn(async () => ({}))
+  assert.equal(preparation.prepare(otherLoad), pending)
+  preparation.promote()
+  t.mock.timers.tick(1000)
+  assert.equal(load.mock.callCount(), 1)
+  assert.equal(otherLoad.mock.callCount(), 0)
+})
+
+test('promoting one module does not change another module lifetime', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] })
+  const urgent = createDeferredModulePreparation<string>(250)
+  const background = createDeferredModulePreparation<string>(250)
+  const urgentLoad = t.mock.fn(async () => 'urgent')
+  const backgroundLoad = t.mock.fn(async () => 'background')
+  const urgentPending = urgent.prepare(urgentLoad)
+  const backgroundPending = background.prepare(backgroundLoad)
+  urgent.promote()
+  assert.equal(await urgentPending, 'urgent')
+  assert.equal(backgroundLoad.mock.callCount(), 0)
+  t.mock.timers.tick(250)
+  assert.equal(await backgroundPending, 'background')
+})

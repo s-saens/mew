@@ -24,6 +24,7 @@ import { writeBrowserStorage } from '@mew/ui/browser-storage'
 import { WorkspaceSnapshotCache } from './utils/workspace-snapshot-cache'
 import { seedWorkspaceUiSnapshot } from './utils/workspace-ui-startup'
 import { workspaceEditorPreparations } from './utils/workspace-editor-preparation'
+import { createDeferredModulePreparation } from './utils/deferred-module-preparation'
 import { prepareEditorView } from './components/deferred-editor-views'
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import {
@@ -144,25 +145,8 @@ const SystemStatsModal = deferredComponent(async () => ({ default: (await import
 const ScheduleModal = deferredComponent(async () => ({ default: (await import('./components/ScheduleModal')).ScheduleModal }), null)
 const SearchPanel = deferredComponent(async () => ({ default: (await import('./components/SearchPanel')).SearchPanel }), undefined, { suspend: false })
 type AgentPanelModule = typeof import('./components/AgentPanel.tsx')
-let agentPanelCode: Promise<AgentPanelModule> | undefined
-let startPendingAgentPanel: (() => void) | undefined
-let urgentAgentPanel = false
-function prepareAgentPanelModule(load: () => Promise<AgentPanelModule>): Promise<AgentPanelModule> {
-  return agentPanelCode ??= new Promise((resolve, reject) => {
-    let timer: ReturnType<typeof setTimeout> | undefined
-    const start = () => {
-      if (startPendingAgentPanel !== start) return
-      startPendingAgentPanel = undefined
-      clearTimeout(timer)
-      void load().then(resolve, reject)
-    }
-    startPendingAgentPanel = start
-    if (urgentAgentPanel) start()
-    else timer = setTimeout(start, 250)
-  })
-}
-function promoteAgentPanelModule() { urgentAgentPanel = true; startPendingAgentPanel?.() }
-const AgentPanel = deferredComponent(async () => ({ default: (await prepareAgentPanelModule(() => import('./components/AgentPanel'))).AgentPanel }), null, { suspend: false })
+const agentPanelPreparation = createDeferredModulePreparation<AgentPanelModule>(250)
+const AgentPanel = deferredComponent(async () => ({ default: (await agentPanelPreparation.prepare(() => import('./components/AgentPanel'))).AgentPanel }), null, { suspend: false })
 const AndroidPanel = deferredComponent(async () => ({ default: (await import('./components/AndroidPanel')).AndroidPanel }))
 const ChatPanel = deferredComponent(async () => ({ default: (await import('./components/ChatPanel')).ChatPanel }))
 const FileHistoryModal = deferredComponent(async () => ({ default: (await import('./components/FileHistoryModal')).FileHistoryModal }), null)
@@ -1075,7 +1059,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
 
   useLayoutEffect(() => {
     const notice = noticeTarget === readyNoticeTarget && !!readyNoticeTarget && [projectUiPath, rootProjectPath].includes(readyNoticeTarget.workspacePath ?? readyNoticeTarget.cwd ?? null)
-    if (projectUiPath && (!workspaceUiLoaded || caps.agent && agentOpen || caps.terminal && terminalOpen || requestedAgentTab || mewcatPicker || notice)) promoteAgentPanelModule()
+    if (projectUiPath && (!workspaceUiLoaded || caps.agent && agentOpen || caps.terminal && terminalOpen || requestedAgentTab || mewcatPicker || notice)) agentPanelPreparation.promote()
   }, [projectUiPath, rootProjectPath, workspaceUiLoaded, caps.agent, caps.terminal, agentOpen, terminalOpen, requestedAgentTab, mewcatPicker, noticeTarget, readyNoticeTarget])
 
   const sidebarOpenPaths = useMemo(() => {
