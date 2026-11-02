@@ -96,6 +96,8 @@ test('DOM browser accepts HTTP(S) sites and rejects credentials, Mew ports, and 
 })
 
 test('DOM browser validates command input and remote transport capability', () => {
+  for (const colorScheme of ['dark', 'light']) assert.deepEqual(parseDomBrowserCommand(JSON.stringify({ type: 'color-scheme', colorScheme })), { type: 'color-scheme', colorScheme })
+  for (const colorScheme of ['system', 'no-preference', '', null, true, 1, {}, undefined]) assert.throws(() => parseDomBrowserCommand(JSON.stringify({ type: 'color-scheme', colorScheme })))
   for (const command of [{ type: 'input', id: -1, value: '' }, { type: 'resize', width: 1, height: 1 }, { type: 'key', key: 'Control+Escape' }, { type: 'scroll', id: 1, x: null, y: 0 }, { type: 'key', key: 'Enter', ctrlKey: 'true' }]) assert.throws(() => parseDomBrowserCommand(JSON.stringify(command)))
   for (const scrollRevision of [0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1, '1', null]) assert.throws(() => parseDomBrowserCommand(JSON.stringify({ type: 'scroll', generation: 1, id: 1, x: 0, y: 100, scrollRevision })))
   for (const scrollRevision of [1, Number.MAX_SAFE_INTEGER]) assert.equal((parseDomBrowserCommand(JSON.stringify({ type: 'scroll', generation: 1, id: 1, x: 0, y: 100, scrollRevision })) as { scrollRevision: number }).scrollRevision, scrollRevision)

@@ -4,6 +4,7 @@ export type DomBrowserPort = { port: number; kind: 'app' | 'mew' | 'blocked' }
 
 export type DomBrowserCommand =
   | { type: 'navigate'; url: string }
+  | { type: 'color-scheme'; colorScheme: 'dark' | 'light' }
   | { type: 'resize'; width: number; height: number }
   | { type: 'click'; generation: number; id: number }
   | { type: 'focus'; generation: number; id: number }

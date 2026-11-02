@@ -50,6 +50,7 @@ export function parseDomBrowserCommand(raw: string): DomBrowserCommand {
   const generation = () => 'generation' in value && Number.isSafeInteger(value.generation) && value.generation >= 0
   const id = () => 'id' in value && Number.isInteger(value.id) && value.id >= 0 && generation()
   if (value.type === 'navigate' && typeof value.url === 'string' && value.url.length <= 8192) return value
+  if (value.type === 'color-scheme' && ['dark', 'light'].includes(value.colorScheme)) return value
   if (value.type === 'resize' && Number.isInteger(value.width) && Number.isInteger(value.height) && value.width >= 240 && value.width <= 3840 && value.height >= 160 && value.height <= 2160) return value
   if ((value.type === 'click' || value.type === 'focus') && id()) return value
   if (value.type === 'input' && id() && typeof value.value === 'string' && value.value.length <= 65536 && (value.checked === undefined || typeof value.checked === 'boolean')) return value
@@ -83,6 +84,7 @@ class DomBrowserSession {
   private abort = new AbortController()
   private state = ''
   private loading = false
+  private colorScheme: 'dark' | 'light' = 'light'
   private poll?: NodeJS.Timeout
   private lifetime: NodeJS.Timeout
   private starting?: Promise<Page>
@@ -132,7 +134,7 @@ class DomBrowserSession {
     const browser = await chromium.launch({ executablePath, chromiumSandbox: true, headless: true, args: ['--disable-dev-shm-usage'] })
     this.browser = browser
     if (!this.active()) { await browser.close(); throw new Error('브라우저 세션이 닫혔습니다.') }
-    this.context = await browser.newContext({ viewport: { width: 1100, height: 700 }, serviceWorkers: 'block', acceptDownloads: false })
+    this.context = await browser.newContext({ viewport: { width: 1100, height: 700 }, colorScheme: this.colorScheme, serviceWorkers: 'block', acceptDownloads: false })
     const context = this.context
     await context.route('**/*', async route => {
       const request = route.request()
@@ -312,6 +314,11 @@ class DomBrowserSession {
   }
 
   private async command(command: DomBrowserCommand) {
+    if (command.type === 'color-scheme') {
+      this.colorScheme = command.colorScheme
+      await this.page?.emulateMedia({ colorScheme: command.colorScheme })
+      return
+    }
     if (['click', 'focus', 'input', 'scroll', 'key'].includes(command.type) && 'generation' in command && command.generation !== this.generation) return
     if (command.type === 'navigate') domBrowserTarget(command.url, this.blockedPorts)
     const page = await this.start()

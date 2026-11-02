@@ -25,7 +25,7 @@ test('real DOM browser viewer and host relay interactive app mutations, focus, a
       res.end('<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28"><rect width="28" height="28" rx="5" fill="#67e8a5"/></svg>'); return
     }
     res.setHeader('content-type', 'text/html')
-    res.end(`<!doctype html><html><head><title>Local application</title><style>body{margin:20px;background:#fcfcfd;color:#232326;font:15px system-ui}main{max-width:560px}h1{font-size:21px;margin:0 0 18px}label{display:block;margin-bottom:6px}input{box-sizing:border-box;width:100%;padding:8px;font:inherit;border:1px solid #bbb;border-radius:5px}button,a{display:inline-block;margin:12px 8px 0 0;padding:8px 12px;font:inherit}output{display:block;margin-top:12px}img{vertical-align:middle}#scroll{height:80px;overflow:auto;margin-top:15px;border:1px solid #ccc}#scroll>div{height:500px;padding:8px;background-image:url('/mark.svg');background-repeat:no-repeat;background-position:right bottom}</style></head><body><main><h1><img alt="Local mark" src="/mark.svg"> Development app</h1><form><label for="name">Name</label><input id="name"><button id="save" type="submit">Save</button><button id="count" type="button">Increment</button><a href="/second?from=link#view">Next page</a></form><output id="value">Waiting for input</output><output id="saved">Not saved</output><output id="counter">Count: 0</output><output id="path"></output><div id="scroll"><div>Scrollable content</div></div></main><script>window.__localAppExecuted=true;let count=0;document.querySelector('#name').oninput=e=>document.querySelector('#value').textContent='Value: '+e.target.value;document.querySelector('form').onsubmit=e=>{e.preventDefault();document.querySelector('#saved').textContent='Saved: '+document.querySelector('#name').value};document.querySelector('#count').onclick=()=>document.querySelector('#counter').textContent='Count: '+(++count);document.querySelector('#path').textContent=location.pathname+location.search+location.hash;</script></body></html>`)
+    res.end(`<!doctype html><html><head><title>Local application</title><style>body{margin:20px;background:#fcfcfd;color:#232326;font:15px system-ui}main{max-width:560px}h1{font-size:21px;margin:0 0 18px}label{display:block;margin-bottom:6px}input{box-sizing:border-box;width:100%;padding:8px;font:inherit;border:1px solid #bbb;border-radius:5px}button,a{display:inline-block;margin:12px 8px 0 0;padding:8px 12px;font:inherit}output{display:block;margin-top:12px}img{vertical-align:middle}#scroll{height:80px;overflow:auto;margin-top:15px;border:1px solid #ccc}#scroll>div{height:500px;padding:8px;background-image:url('/mark.svg');background-repeat:no-repeat;background-position:right bottom}@media(prefers-color-scheme:dark){body{background:#18181b;color:#fafafa}}</style></head><body><main><h1><img alt="Local mark" src="/mark.svg"> Development app</h1><form><label for="name">Name</label><input id="name"><button id="save" type="submit">Save</button><button id="count" type="button">Increment</button><a href="/second?from=link#view">Next page</a></form><output id="value">Waiting for input</output><output id="saved">Not saved</output><output id="counter">Count: 0</output><output id="path"></output><output id="scheme"></output><div id="scroll"><div>Scrollable content</div></div></main><script>window.__localAppExecuted=true;const media=matchMedia('(prefers-color-scheme:dark)');const renderScheme=()=>document.querySelector('#scheme').textContent='Host theme: '+(media.matches?'dark':'light');media.addEventListener('change',renderScheme);renderScheme();let count=0;document.querySelector('#name').oninput=e=>document.querySelector('#value').textContent='Value: '+e.target.value;document.querySelector('form').onsubmit=e=>{e.preventDefault();document.querySelector('#saved').textContent='Saved: '+document.querySelector('#name').value};document.querySelector('#count').onclick=()=>document.querySelector('#counter').textContent='Count: '+(++count);document.querySelector('#path').textContent=location.pathname+location.search+location.hash;</script></body></html>`)
   })
   const target = await listen(app); t.after(() => stop(app))
   const screenshotDirectory = process.env.MEW_DOM_BROWSER_SCREENSHOTS
@@ -62,17 +62,35 @@ test('real DOM browser viewer and host relay interactive app mutations, focus, a
   t.after(async () => { await closeDomBrowsers(); await stop(host) })
   const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
   t.after(() => browser.close())
-  const page = await browser.newPage({ viewport: { width: 1040, height: 700 }, locale: 'en-US' })
+  const page = await browser.newPage({ viewport: { width: 1040, height: 700 }, locale: 'en-US', colorScheme: null })
   page.setDefaultTimeout(7000)
   const errors: string[] = []
   page.on('pageerror', error => errors.push(error.message))
   await page.goto(origin)
   const frame = page.frameLocator('[data-dom-browser-surface] iframe'), name = frame.getByRole('textbox', { name: 'Name', exact: true })
   await name.waitFor()
+  const background = () => frame.locator('body').evaluate(element => element.ownerDocument.defaultView!.getComputedStyle(element).backgroundColor)
+  const waitForBackground = async (color: string) => {
+    const until = Date.now() + 5000
+    while (Date.now() < until) {
+      if (await background() === color) return
+      await new Promise(resolve => setTimeout(resolve, 25))
+    }
+    assert.equal(await background(), color)
+  }
+  await frame.getByText('Host theme: dark', { exact: true }).waitFor()
+  await waitForBackground('rgb(24, 24, 27)')
   assert.equal(await page.evaluate('Boolean(window.__localAppExecuted)'), false)
   await frame.getByText('/first?start=1#top', { exact: true }).waitFor()
   await frame.getByRole('button', { name: 'Increment', exact: true }).click()
   await frame.getByText('Count: 1', { exact: true }).waitFor()
+  await page.locator('html').evaluate(element => element.classList.remove('dark'))
+  await frame.getByText('Host theme: light', { exact: true }).waitFor()
+  await waitForBackground('rgb(252, 252, 253)')
+  await page.locator('html').evaluate(element => element.classList.add('dark'))
+  await frame.getByText('Host theme: dark', { exact: true }).waitFor()
+  await waitForBackground('rgb(24, 24, 27)')
+  assert.equal(await frame.locator('#counter').textContent(), 'Count: 1', 'theme changes preserve app state')
   await name.focus()
   await name.fill('Mew DOM 한글')
   await frame.getByText('Value: Mew DOM 한글', { exact: true }).waitFor()
@@ -87,11 +105,16 @@ test('real DOM browser viewer and host relay interactive app mutations, focus, a
   if (screenshotDirectory) await page.screenshot({ path: path.join(screenshotDirectory, 'mew-dom-browser-desktop.png') })
   await frame.getByRole('link', { name: 'Next page', exact: true }).click()
   await frame.getByText('/second?from=link#view', { exact: true }).waitFor()
+  await frame.getByText('Host theme: dark', { exact: true }).waitFor()
+  await waitForBackground('rgb(24, 24, 27)')
   await page.getByRole('button', { name: 'Back', exact: true }).click()
   await frame.getByText('/first?start=1#top', { exact: true }).waitFor()
   await page.getByRole('button', { name: 'Forward', exact: true }).click()
   await frame.getByText('/second?from=link#view', { exact: true }).waitFor()
   await page.setViewportSize({ width: 390, height: 700 })
+  await page.locator('html').evaluate(element => element.classList.remove('dark'))
+  await frame.getByText('Host theme: light', { exact: true }).waitFor()
+  await waitForBackground('rgb(252, 252, 253)')
   await name.fill('Mobile input')
   await frame.getByText('Value: Mobile input', { exact: true }).waitFor()
   await name.press('Enter')
@@ -108,6 +131,8 @@ test('real DOM browser viewer and host relay interactive app mutations, focus, a
   if (screenshotDirectory) await page.screenshot({ path: path.join(screenshotDirectory, 'mew-dom-browser-ports-mobile.png') })
   await openApp.click()
   await frame.getByText('Count: 0', { exact: true }).waitFor()
+  await frame.getByText('Host theme: light', { exact: true }).waitFor()
+  await waitForBackground('rgb(252, 252, 253)')
   await frame.getByRole('button', { name: 'Increment', exact: true }).click()
   await frame.getByText('Count: 1', { exact: true }).waitFor()
   await page.getByRole('button', { name: 'Close browser', exact: true }).click()

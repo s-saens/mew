@@ -52,9 +52,15 @@ test('DOM browser replays inert pages and relays editing, navigation, scrolling 
   await page.waitForFunction('window.packets.some(packet=>packet.type==="navigate")')
   assert.match(await page.evaluate<string>('window.socket.url'), /^wss:\/\/dom-browser\.test\/api\/dom-browser\/ws$/)
   assert.ok(await page.evaluate<boolean>('window.packets.some(packet=>packet.type==="resize"&&packet.width>0&&packet.height>0)'))
+  assert.deepEqual(await page.evaluate('window.packets[0]'), { type: 'color-scheme', colorScheme: 'light' })
   await page.evaluate('window.snapshotPage()')
   const frame = page.frameLocator('[data-dom-browser-surface] iframe')
   await frame.getByRole('textbox', { name: 'Name', exact: true }).waitFor({ timeout: 1000 })
+  await page.locator('html').evaluate(element => element.classList.add('dark'))
+  await page.waitForFunction('window.packets.findLast(packet=>packet.type==="color-scheme")?.colorScheme==="dark"')
+  assert.equal(await page.locator('[data-dom-browser-surface] iframe').evaluate(element => (element as unknown as { style: { colorScheme: string } }).style.colorScheme), 'dark')
+  assert.equal(await page.evaluate('window.packets.filter(packet=>packet.type==="navigate").length'), 1, 'theme changes do not navigate or reconnect')
+  assert.equal(await page.evaluate('window.sockets.length'), 1)
   for (const hostOffset of [60_000, -60_000, 120_000]) {
     const marker = `Live update ${hostOffset}`
     const receivedAt = performance.now()
@@ -175,6 +181,7 @@ test('DOM browser replays inert pages and relays editing, navigation, scrolling 
   await page.getByRole('alert').getByText('연결이 끊겼습니다. 다시 연결해 주세요.', { exact: true }).waitFor()
   await page.getByRole('button', { name: '다시 연결', exact: true }).first().click()
   await page.waitForFunction('window.sockets.length===2&&window.socket.readyState===1')
+  assert.equal(await page.evaluate('window.packets.findLast(packet=>packet.type==="color-scheme").colorScheme'), 'dark')
   assert.equal(await page.locator('[data-dom-browser-surface] iframe').count(), 0)
   await page.evaluate('window.snapshotPage()')
   await frame.getByRole('textbox', { name: 'Name', exact: true }).waitFor()

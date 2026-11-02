@@ -118,6 +118,16 @@ function DomBrowserPage({ url, navigationRequest, onClose, onHome }: { url: stri
       if (['navigate', 'back', 'forward', 'reload'].includes(command.type)) blockInteraction()
       if (!disposed && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(command))
     }
+    const readColorScheme = (): 'dark' | 'light' => document.documentElement.classList.contains('dark') ? 'dark' : 'light'
+    let colorScheme = readColorScheme()
+    const themeObserver = new MutationObserver(() => {
+      const next = readColorScheme()
+      if (next === colorScheme) return
+      colorScheme = next
+      if (replay) replay.iframe.style.colorScheme = colorScheme
+      relay({ type: 'color-scheme', colorScheme })
+    })
+    themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
     const updateReady = () => {
       const fresh = snapshotGeneration === currentGeneration.current && snapshotGeneration >= requiredGeneration.current
       interactionReady.current = !documentLoading.current && fresh
@@ -206,6 +216,8 @@ function DomBrowserPage({ url, navigationRequest, onClose, onHome }: { url: stri
     }
     ws.onopen = () => {
       if (disposed) return
+      colorScheme = readColorScheme()
+      relay({ type: 'color-scheme', colorScheme })
       setConnection('open'); resize()
       const target = currentUrl.current || requestedUrl.current
       if (target) relay({ type: 'navigate', url: target })
@@ -233,6 +245,7 @@ function DomBrowserPage({ url, navigationRequest, onClose, onHome }: { url: stri
           if (!replay) {
             replay = new Replayer([], { root: surface.current, liveMode: true, mouseTail: false, triggerFocus: false, showWarning: false, useVirtualDom: false })
             replay.iframe.title = uiText('서버 웹페이지')
+            replay.iframe.style.colorScheme = colorScheme
             Object.assign(replay.wrapper.style, { width: '100%', height: '100%' })
             Object.assign(replay.iframe.style, { width: '100%', height: '100%', border: '0' })
             replay.wrapper.querySelector<HTMLElement>('.replayer-mouse')?.style.setProperty('display', 'none')
@@ -265,7 +278,7 @@ function DomBrowserPage({ url, navigationRequest, onClose, onHome }: { url: stri
     ws.onerror = () => { if (!disposed) { interactionReady.current = false; setError(uiText('브라우저에 연결하지 못했습니다. 다시 연결해 주세요.')); setConnection('closed') } }
     ws.onclose = () => { if (!disposed) { interactionReady.current = false; setConnection('closed'); setError(current => current || uiText('연결이 끊겼습니다. 다시 연결해 주세요.')) } }
     return () => {
-      disposed = true; interactionReady.current = false; unbind(); observer.disconnect(); clearTimeout(resizeTimer)
+      disposed = true; interactionReady.current = false; unbind(); observer.disconnect(); themeObserver.disconnect(); clearTimeout(resizeTimer)
       ws.onopen = null; ws.onmessage = null; ws.onerror = null; ws.onclose = null
       if (socket.current === ws) socket.current = null
       ws.close(); replay?.destroy()

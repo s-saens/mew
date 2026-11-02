@@ -7,7 +7,7 @@ created: "2026-09-18"
 updated: "2026-11-03"
 files: ["server/dom-browser.ts", "server/dom-browser-ports.ts", "src/components/DomBrowserPanel.tsx", "src/components/DomBrowserPorts.tsx", "server/login-desktop.ts", "server/port-preview.ts", "server/port-preview-location.ts", "src/components/LoginDesktopViewer.tsx", "src/components/PortPreviewPage.tsx"]
 commits: []
-description: "Host DOM browsing for localhost apps and external HTTP(S) sites, listening-port discovery, replay, and connection failures. Distinguishes login video, direct port previews, DNS readiness, and production verification limits."
+description: "Host DOM browsing for localhost apps and external HTTP(S) sites, listening-port discovery, Mew theme synchronization, replay, and connection failures. Distinguishes login video, direct port previews, DNS readiness, and production verification limits."
 상위파일: "_browser-android-remote-desktop.md"
 ---
 
@@ -28,6 +28,7 @@ Click a localhost link or a command menu port button to open the internal Browse
 
 - Localhost document, agent, and terminal links and command port buttons select the Browser panel without opening an external tab or rerunning commands.
 - The hamburger entry always shows the port list on desktop and mobile, even from an existing page. Opening the list launches no host browser; selecting an allowed port opens its app. Mew and reserved ports remain disabled, including manual address and redirect guards. Failed scans support retry without claiming no listeners.
+- Pages that support automatic dark/light mode follow Mew on initial open, live theme changes, navigation, and reconnect. Host JavaScript and replayed CSS agree, and theme changes preserve the running app state.
 - Host scripts update the relayed DOM; viewer scripts from the app remain disabled. Native app URLs and host-side API/HMR avoid proxy rewriting.
 - Each viewer has an isolated context; check login, Origin, permissions, local and external HTTP(S) navigation, blocked credentials and Mew ports, and cleanup on close/revocation.
 - Host clock skew and timestamp gaps do not delay received snapshots or mutations; document navigation emits one full snapshot, and SPA history still refreshes its generation.

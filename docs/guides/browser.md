@@ -1,8 +1,8 @@
 ---
 title: "Login Screen, Browser, and Android"
-description: "Explains the internal DOM browser for localhost apps and external HTTP(S) websites, host-wide port selection from the hamburger menu with Mew ports disabled, recovery when the running server lacks the port API, address entry, host Chromium prerequisites and limits, separate login video, retained proxy URLs, and Android environment checks and gateways."
+description: "Explains the internal DOM browser for localhost apps and external HTTP(S) websites, host-wide port selection from the hamburger menu with Mew ports disabled, recovery when the running server lacks the port API, address entry, automatic dark/light mode matching Mew, host Chromium prerequisites and limits, separate login video, retained proxy URLs, and Android environment checks and gateways."
 created: "2026-09-04"
-updated: "2026-11-01"
+updated: "2026-11-03"
 ---
 
 ## Login screen
@@ -28,6 +28,8 @@ Click a `http://localhost:3333` link in a document, agent response, or terminal 
 The Browser toolbar provides Back, Forward, refresh, an address field, and close. Type and click in the app as usual; its JavaScript and network requests run in headless Chromium on the host. Only the resulting DOM and your input travel through Mew. The same flow works through direct access and Mewlink without a separate preview domain or wildcard DNS setup. Mewlink also needs its central launcher updated to admit the new DOM browser connection; updating only the host is insufficient with an older launcher.
 
 The app must already be running, and Chrome/Chromium must be installed on the Mew host. Set `MEW_BROWSER_EXECUTABLE` to its absolute executable path if automatic detection fails. Mew login and **Access localhost Apps** permission are required; owner and manager have it by default. The browser accepts local and external HTTP(S) addresses. It blocks addresses containing login credentials and Mew's own port numbers, even on external hosts. Agent login screens continue to use the separate video display.
+
+Pages that support automatic dark/light mode follow Mew's theme. Changing Mew's theme updates the open page without reloading it. A site's own explicit theme setting may override its automatic appearance.
 
 Closing the panel disposes of its isolated browser context. If the connection closes or the session expires, use **Reconnect** or reopen the link. Reconnection starts a fresh context; app cookies and local storage are not kept across it. Logging out or losing permission closes the browser too.
 
