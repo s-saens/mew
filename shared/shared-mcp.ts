@@ -4,4 +4,5 @@ export interface SharedMcpConnectionStatus {
   status: 'disconnected' | 'connecting' | 'needs_auth' | 'connected' | 'error'
   error?: string
   streamUrl?: string
+  ownsJob?: boolean
 }

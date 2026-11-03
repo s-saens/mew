@@ -1,15 +1,15 @@
 ---
 title: "Mew common MCP implementation"
-description: "Records the 2026-11-02 implementation of account-owned common MCP registration, native imports, shared OAuth, runtime injection, connection controls, and local verification. Separates fixture checks and builds from pending server application and real-provider approval."
+description: "Records the initial common MCP implementation and the 2026-11-03 change to installation-wide registration and authentication with owner-only management. Separates fixture checks and builds from pending server application and real-provider approval."
 created: "2026-11-02"
-updated: "2026-11-02"
+updated: "2026-11-03"
 ---
 
-## Purpose and resulting behavior
+## Initial implementation: 2026-11-02
 
 The user requested one MCP connection in Mew instead of repeating registration and authorization after switching between Claude Code and Codex. The implementation adds an account-private **Mew common** registry, URL entry and advanced JSON, native definition import, connection checks, inline OAuth approval through the host login desktop, and saved authentication shared across ACP runtimes.
 
-Imports preserve native source files, capture a local source's working folder, and copy only referenced source-runtime environment values into private common configuration. Common bindings are reread for each new/cleared/loaded ACP conversation. Local, HTTP, and SSE transports pass through a stdio bridge. Authentication uses the MCP SDK, process-shared refresh coordination, credential epochs, effective-secret identity, and account/access/configuration guards. Account deletion clears common MCP data. The [common MCP contract](../development/shared-mcp.md), [source manager contract](../development/agent-harness.md), [user guide](../../../docs/configuration/agent-harness.md), and [ADR 0120](../decisions/0120-shared-mcp.md) own the current behavior and rationale.
+Imports preserve native source files, capture a local source's working folder, and copy only referenced source-runtime environment values into private common configuration. Common bindings are reread for each new/cleared/loaded ACP conversation. Local, HTTP, and SSE transports pass through a stdio bridge. Authentication uses the MCP SDK, process-shared refresh coordination, credential epochs, effective-secret identity, and account/access/configuration guards. Account deletion clears common MCP data. The [common MCP contract](../development/shared-mcp.md), [source manager contract](../development/agent-harness.md), [user guide](../../../docs/configuration/agent-harness.md), and [ADR 0120](../decisions/0120-shared-mcp.md) own the behavior and rationale; the installation-wide follow-up below changes the original ownership and deletion rules.
 
 Relevant native TOML regression checks exposed a preservation failure caused by parser tables with null prototypes. Parsing now clones TOML tables before semantic comparison, retaining source values and allowing existing safe edits.
 
@@ -30,3 +30,20 @@ The full `npm run check:docs` metadata stage passed. Its link stage reported one
 No deployment, launcher execution, or app-server lifecycle operation was performed. The build updates `dist/` in this checkout; the user must apply server-side changes through the repository's normal lifecycle procedure. Start or clear a conversation after common registrations change. Existing external CLI registration and authentication remain independent.
 
 Real Cloudflare approval, DNS/certificate mutation, and real-provider permissions were not tested. The first common authorization can require user approval even when that provider was previously connected in another native CLI. The OAuth host login desktop retains its Linux/WSL and Chrome/X11 prerequisites. Connection status reports the last check rather than continuous availability.
+
+## Installation-wide follow-up: 2026-11-03
+
+The user requested sharing common MCP across all Mew login accounts. Definitions and credentials now use the installation registry, with agent permission required for inventory, status, and ACP use and owner permission additionally required for raw details, mutations, imports, and authentication changes. Connection jobs remain initiator-owned and are deduplicated by shared registry/server name. Account deletion cancels the initiating account's jobs and retains legacy private-directory cleanup while preserving shared definitions and credentials.
+
+Existing private registries remain untouched and are not automatically promoted. Native import preserves originals and rejects unsupported settings; preparing an explicit supported common definition is a separate action. [ADR 0127](../decisions/0127-installation-wide-mcp.md) records the ownership change, and the [current contract](../development/shared-mcp.md) owns its details.
+
+Local follow-up verification:
+
+- The combined shared MCP, OAuth, bridge, harness, route, and desktop/mobile UI run passed 54 tests. Regression coverage includes cross-account new/load/clear injection, shared credential retention after account deletion, single-job authorization, initiator-only login streams, observer panels preserving pending approval, owner-only management, and rejection of items or destinations absent from the authorization snapshot.
+- `npm run build` passed, including TypeScript project checks. Vite retained its large-chunk warning.
+- The shared UI translation suite passed four tests. A separate repository-wide literal scan passed one test and failed its untranslated-literal check on files outside the changed MCP UI modules; it reported no findings in those modules.
+- `npm run lint` passed with existing React warnings. Focused changed-file lint also passed with existing effect warnings in the harness modal.
+- The full documentation metadata check passed with 676 descriptions and zero errors. The full link check still reports the unrelated task image URL described above; this change's eight documents pass metadata and link checks.
+- A local registration operation validated every source before publishing the complete common registry, deduplicated equivalent entries, preserved native source bytes, and verified eight distinct runtime bindings and POSIX file mode 0600. Unsupported native timeout options were omitted only from explicitly prepared common definitions; their original settings remain unchanged. This checked registration and configuration, not live provider access.
+
+No deployment, launcher execution, or app-server lifecycle operation was performed. The user must apply the server-side change before the running installation uses the shared registry, then start or reload a conversation. Real-provider approval remains unverified and can require a fresh owner connection in the common MCP panel.

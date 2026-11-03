@@ -983,7 +983,7 @@ export const uiMessages = {
   "Mew 공통": ["Mew shared","Mew 共用","Mew 共通"],
   "Mew에 가져오기": ["Import into Mew","导入 Mew","Mew に取り込む"],
   "Mew 공통으로 가져왔습니다. 연결 후 새 세션에서 사용할 수 있습니다.": ["Imported into Mew shared. Connect to use it in new sessions.","已导入 Mew 共用。连接后可在新会话中使用。","Mew 共通に取り込みました。接続後、新しいセッションで使えます。"],
-  "Mew 공통 연결은 이 계정의 모든 Mew 에이전트가 함께 사용합니다.": ["All Mew agents in this account share these connections.","此账号的所有 Mew 代理共用这些连接。","このアカウントのすべての Mew エージェントで接続を共有します。"],
+  "Mew 공통 연결은 이 설치의 모든 계정이 함께 사용합니다.": ["All accounts on this Mew installation share these connections.","此 Mew 实例的所有账号共用这些连接。","この Mew インストールのすべてのアカウントで接続を共有します。"],
   "서버 URL": ["Server URL","服务器 URL","サーバー URL"],
   "JSON으로 직접 설정": ["Configure with JSON","使用 JSON 配置","JSON で設定"],
   "저장 후 연결하여 인증을 완료하세요.": ["Save, then connect to finish authentication.","保存后连接以完成认证。","保存してから接続し、認証を完了してください。"],

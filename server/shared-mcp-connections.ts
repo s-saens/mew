@@ -39,7 +39,7 @@ interface Dependencies {
 }
 
 const defaults: Dependencies = {
-  directory: sharedMcpDirectory,
+  directory: () => sharedMcpDirectory(),
   config: readSharedMcpConfig,
   identity: sharedMcpConfigIdentity,
   accountVersion: owner => getUser(owner)?.createdAt ?? null,
@@ -100,12 +100,17 @@ function sameState(received: string | null, expected: string | undefined): boole
   return a.length === b.length && timingSafeEqual(a, b)
 }
 
-/** Bounded account-owned connection checks; browser access never transports OAuth secrets. */
+/** Shared connection checks retain initiator-owned browser access and authorization. */
 export class SharedMcpConnections {
   private readonly deps: Dependencies
   private readonly jobs = new Map<string, Job>()
   constructor(dependencies: Partial<Dependencies> = {}) { this.deps = { ...defaults, ...dependencies } }
-  private key(owner: string, name: string) { return JSON.stringify([owner, name]) }
+  private key(owner: string, name: string) { return JSON.stringify([this.deps.directory(owner), name]) }
+  private state(job: Job, owner: string): SharedMcpConnectionStatus {
+    const state = { ...job.state, ownsJob: job.owner === owner }
+    if (job.owner !== owner) delete state.streamUrl
+    return state
+  }
   private name(value: unknown): string {
     if (typeof value !== 'string' || !value.trim() || value.length > 256 || /[\0\r\n]/.test(value)) throw new SharedMcpConnectionError('MCP 이름을 확인하세요.')
     return value
@@ -118,17 +123,18 @@ export class SharedMcpConnections {
   async status(owner: string, value: unknown): Promise<SharedMcpConnectionStatus> {
     const name = this.name(value), { directory, config } = this.config(owner, name)
     let job = this.jobs.get(this.key(owner, name))
-    if (job && this.deps.accountVersion(owner) !== job.accountVersion) {
+    if (job && this.deps.accountVersion(job.owner) !== job.accountVersion) {
       await this.finish(job, { name, status: 'disconnected' })
-      this.jobs.delete(this.key(owner, name)); job = undefined
+      if (this.jobs.get(this.key(owner, name)) === job) this.jobs.delete(this.key(owner, name))
+      job = undefined
     }
     if (job) {
       if (job.active) this.valid(job)
-      if (job.active) return { ...job.state }
+      if (job.active) return this.state(job, owner)
     }
     if (config.enabled === false) return { name, status: 'disconnected' }
     const status = await this.deps.authStatus(directory, name)
-    if (job?.state.status === 'error' && status.status !== 'connected' && this.deps.identity(config) === job.identity) return { ...job.state }
+    if (job?.state.status === 'error' && status.status !== 'connected' && this.deps.identity(config) === job.identity) return this.state(job, owner)
     return { name, ...status }
   }
   start(owner: string, value: unknown, authorized: () => boolean): SharedMcpConnectionStatus {
@@ -136,7 +142,7 @@ export class SharedMcpConnections {
     if (config.enabled === false) throw new SharedMcpConnectionError('이 MCP를 활성화한 뒤 연결하세요.', 409)
     if (!authorized()) throw new SharedMcpConnectionError('에이전트 접근 권한이 없습니다.', 403)
     const existing = this.jobs.get(this.key(owner, name))
-    if (existing?.active && this.valid(existing)) return { ...existing.state }
+    if (existing?.active && this.valid(existing)) return this.state(existing, owner)
     const job: Job = { id: `mcp-${randomUUID()}`, owner, name, directory, identity: this.deps.identity(config), accountVersion: this.deps.accountVersion(owner), authorized, state: { name, status: 'connecting' }, controller: new AbortController(), active: true }
     this.jobs.set(this.key(owner, name), job)
     job.deadline = setTimeout(() => { void this.finish(job, { name, status: 'error', error: '연결 시간이 만료되었습니다. 다시 연결하세요.' }) }, this.deps.timeout)
@@ -145,7 +151,7 @@ export class SharedMcpConnections {
     accessChanges.on('change', job.accessCheck)
     job.watcher = setInterval(job.accessCheck, this.deps.checkInterval); job.watcher.unref()
     void this.begin(job, config)
-    return { ...job.state }
+    return this.state(job, owner)
   }
   async cancel(owner: string, value: unknown): Promise<SharedMcpConnectionStatus> {
     const name = this.name(value)

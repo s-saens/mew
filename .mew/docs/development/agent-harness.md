@@ -1,7 +1,7 @@
 ---
 title: "Skills and MCP management implementation contract"
-description: "Contracts for native skill/MCP source editing, account-owned Mew common MCP imports, save atomicity, conflicts, scope discovery, APIs, and verification. Shared authentication and runtime injection follow the linked common MCP contract."
-updated: "2026-11-02"
+description: "Contracts for native skill/MCP source editing, installation-wide Mew common MCP imports, save atomicity, conflicts, scope discovery, APIs, and verification. Shared authentication and runtime injection follow the linked common MCP contract."
+updated: "2026-11-03"
 ---
 
 ## Storage and application scope
@@ -13,7 +13,7 @@ updated: "2026-11-02"
 - MCP moves spanning two files save the destination first. If subsequent source deletion fails, both copies are preserved and a partial-completion error is displayed. Claude personal-to-global moves within the same file are saved in a single operation.
 - Skill details and changes check for conflicts using a hash of the entire folder's contents. MCP uses a hash of the entire source configuration file. Limits are 2 MiB per file and 32 MiB per skill folder.
 - Project discovery searches actual directories below the current cwd for folders containing `.mew`, `.git`, or supported configuration locations. It does not traverse hidden folders, dependencies, build outputs, archives, or docs-editor. When the depth limit of 16 or folder limit of 12,000 is reached, it warns and instructs the user to reopen that folder as cwd.
-- Native source editing does not run MCP or restart sessions. Mew common MCP adds explicit connection checks and account-owned authentication; its [shared connection contract](shared-mcp.md) defines storage, imports, permissions, and session injection. Native CLI restart, trust, and configuration precedence rules continue to apply to native definitions. Antigravity entries are official CLI/IDE settings; automatic loading by Mew's pinned ACP 1.1.1 has not been verified. Prime may require a Python integration skill in addition to MCP definitions.
+- Native source editing does not run MCP or restart sessions. Mew common MCP adds explicit connection checks and installation-wide authentication; its [shared connection contract](shared-mcp.md) defines storage, imports, permissions, and session injection. Native CLI restart, trust, and configuration precedence rules continue to apply to native definitions. Antigravity entries are official CLI/IDE settings; automatic loading by Mew's pinned ACP 1.1.1 has not been verified. Prime may require a Python integration skill in addition to MCP definitions.
 
 ## Input fields and APIs
 
@@ -27,7 +27,7 @@ updated: "2026-11-02"
 
 The server does not accept source paths directly in requests; it matches them to rediscovered IDs. All responses use no-store, and raw content and authentication values are not saved to logs or localStorage. Detailed raw content is edited in browser memory while the user has the item selected.
 
-Mew common definitions appear first under the account-owned `mew` scope. Their file is private server data, and they have no project/native move destination. They can be created, edited, or deleted. Native read-only entries may be imported because importing reads the source and writes a new account-owned definition; it does not grant permission to edit the source. Name collisions and stale source revisions fail without overwriting either side. Normalized TOML parsing uses ordinary cloned objects so null-prototype parser tables do not falsely fail semantic preservation checks.
+Mew common definitions appear first under the installation-wide `mew` scope. Their file is private server data, and they have no project/native move destination. Every account with agent access can list them and use their ACP bindings. Only owners with agent access can read raw common details, create, edit, delete, import, or change authentication. Native source permissions remain unchanged. Native read-only entries may be imported because importing reads the source and writes a new installation-wide definition; it does not grant permission to edit the source. Name collisions and stale source revisions fail without overwriting either side. Normalized TOML parsing uses ordinary cloned objects so null-prototype parser tables do not falsely fail semantic preservation checks.
 
 ## Verification and sources
 

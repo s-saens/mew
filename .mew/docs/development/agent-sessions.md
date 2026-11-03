@@ -1,6 +1,6 @@
 ---
 title: "Agent session and communication contract"
-description: "Runtime sessions, recovery, agent-assisted projects, Git AI Commit, CLI, memory, history, and account-owned MCP bindings. Guidance storage, presets, and project-context delivery are maintained in the linked agent guidance contract."
+description: "Runtime sessions, recovery, agent-assisted projects, Git AI Commit, CLI, memory, history, and installation-wide MCP bindings. Guidance storage, presets, and project-context delivery are maintained in the linked agent guidance contract."
 updated: "2026-11-03"
 상위파일:
   - "../MOC.md"
@@ -186,7 +186,7 @@ URL events are resent only to a reconnected authentication screen. On success, f
 
 ## Mew Common MCP
 
-Account-owned [Mew common MCP](shared-mcp.md) definitions are read under the captured session account and combined with the caller's built-in MCP list for every session/new and session/load. Common definitions apply to regular, scheduled, and helper ACP sessions. Starting or clearing a conversation or loading a saved one refreshes the common list; reconnecting the active conversation keeps its existing bindings. Native CLI configurations remain independent.
+Installation-wide [Mew common MCP](shared-mcp.md) definitions are read from the shared registry and combined with the caller's built-in MCP list for every session/new and session/load. Common definitions apply to regular, scheduled, and helper ACP sessions. Starting or clearing a conversation or loading a saved one refreshes the common list; reconnecting the active conversation keeps its existing bindings. Native CLI configurations remain independent.
 
 ## Agent Debugger MCP
 
@@ -198,4 +198,4 @@ The MCP list is fixed when the independent supervisor starts. After enabling sha
 
 ## Mewpet Helper Sessions and MCP
 
-Mewpet uses a separate supervisor for each account, browser tab, and runtime. The `mcpServers` option from `AgentSession.start` is passed to the independent supervisor and combined with the account's current common MCP definitions for every session/new and session/load. Regular sessions add no built-in bindings when the optional debugger MCP described above is disabled. Permissions, current screen context, task ID round trips, and persistence boundaries for each session's built-in MCP follow the [Helper Contract](../features/appearance-accounts-operations/mewpet-assistant-conversations-and-controls.md).
+Mewpet uses a separate supervisor for each account, browser tab, and runtime. The `mcpServers` option from `AgentSession.start` is passed to the independent supervisor and combined with the installation's current common MCP definitions for every session/new and session/load. Regular sessions add no built-in bindings when the optional debugger MCP described above is disabled. Permissions, current screen context, task ID round trips, and persistence boundaries for each session's built-in MCP follow the [Helper Contract](../features/appearance-accounts-operations/mewpet-assistant-conversations-and-controls.md).

@@ -5,6 +5,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import http from 'node:http'
 import path from 'node:path'
+import { createHash } from 'node:crypto'
 import { pathToFileURL } from 'node:url'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
@@ -12,6 +13,7 @@ import { AgentHarnessStore } from './agent-harness.ts'
 import { AgentSession } from './agentAcp.ts'
 import { runWithAgentAccount } from './agent-account-settings.ts'
 import { upsertUser, removeUser } from './auth.ts'
+import { DATA_DIR } from './dataDir.ts'
 import { normalizeSharedMcpConfig, readSharedMcpConfig, sharedMcpConfigIdentity, sharedMcpDirectory, sharedMcpRuntimeName, sharedMcpServers } from './shared-mcp.ts'
 
 function fixture(t: test.TestContext) {
@@ -83,17 +85,23 @@ test('import carries only referenced runtime environment values into the private
   assert.doesNotMatch(fs.readFileSync(target.path, 'utf8'), /UNRELATED_SECRET|never-copy/)
 })
 
-test('removing an account clears its shared MCP definitions and credentials before the email can be reused', () => {
+test('removing an account preserves installation MCP definitions and credentials while clearing legacy private data', t => {
   const email = 'shared-mcp-deleted@example.test'
   upsertUser(email, { role: 'owner', hash: 'fixture', mustChangePassword: false, createdAt: 1, passwordChangedAt: 0 })
-  const directory = sharedMcpDirectory(email)
+  const directory = sharedMcpDirectory()
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }))
+  const legacy = path.join(DATA_DIR, 'agent-accounts', createHash('sha256').update(email).digest('hex'), 'mcp')
+  fs.mkdirSync(legacy, { recursive: true })
+  fs.writeFileSync(path.join(legacy, 'servers.json'), '{"mcpServers":{"private":{"command":"node"}}}')
+  assert.deepEqual(sharedMcpServers(), [])
   fs.mkdirSync(path.join(directory, 'auth'), { recursive: true })
   fs.writeFileSync(path.join(directory, 'servers.json'), '{"mcpServers":{"demo":{"command":"node"}}}')
   fs.writeFileSync(path.join(directory, 'auth/fixture.json'), '{"token":"fixture-private"}')
   assert.equal(removeUser(email), true)
-  assert.equal(fs.existsSync(directory), false)
+  assert.equal(fs.existsSync(legacy), false)
+  assert.equal(fs.readFileSync(path.join(directory, 'auth/fixture.json'), 'utf8'), '{"token":"fixture-private"}')
   upsertUser(email, { role: 'owner', hash: 'new-fixture', mustChangePassword: false, createdAt: 2, passwordChangedAt: 0 })
-  assert.deepEqual(sharedMcpServers(sharedMcpDirectory(email)), [])
+  assert.equal(runWithAgentAccount(email, () => sharedMcpServers()).length, 1)
 })
 
 test('shared identities are stable, isolate changed credentials and skip disabled definitions', t => {
@@ -148,13 +156,14 @@ test('independent runtime bridge processes use the same private HTTP definition 
   assert.equal(methods.filter(method => method === 'initialize').length, 2)
 })
 
-test('shared MCPs stay account-specific and are injected into every ACP new/load/clear request', async t => {
+test('all accounts share MCP bindings injected into every ACP new/load/clear request', async t => {
   const f = fixture(t), account = 'shared-mcp-owner@example.test'
   const ownDirectory = runWithAgentAccount(account, () => sharedMcpDirectory())
   const otherDirectory = runWithAgentAccount('shared-mcp-other@example.test', () => sharedMcpDirectory())
-  assert.notEqual(ownDirectory, otherDirectory)
+  assert.equal(ownDirectory, otherDirectory)
+  t.after(() => fs.rmSync(ownDirectory, { recursive: true, force: true }))
   f.write(path.join(ownDirectory, 'servers.json'), { mcpServers: { common: { command: process.execPath, args: ['fixture.js'] } } })
-  assert.equal(sharedMcpServers(otherDirectory).length, 0)
+  assert.equal(sharedMcpServers(otherDirectory).length, 1)
   const received = path.join(f.directory, 'requests.jsonl'), adapter = path.join(f.directory, 'adapter.mjs')
   const sdkUrl = pathToFileURL(path.resolve('node_modules/@agentclientprotocol/sdk/dist/acp.js')).href
   fs.writeFileSync(adapter, `import fs from 'node:fs';
@@ -164,7 +173,7 @@ const record=(method,params)=>fs.appendFileSync(${JSON.stringify(received)},JSON
 new AgentSideConnection(()=>({initialize:async()=>({protocolVersion:PROTOCOL_VERSION,agentCapabilities:{loadSession:true}}),newSession:async p=>{record('new',p);return {sessionId:'shared-fixture'}},loadSession:async p=>{record('load',p);return {}},cancel:async()=>{}}),ndJsonStream(Writable.toWeb(process.stdout),Readable.toWeb(process.stdin)));`)
   for (const runtime of ['codex', 'claude']) {
     f.write(path.join(ownDirectory, 'servers.json'), { mcpServers: { common: { command: process.execPath, args: ['fixture.js'] } } })
-    const session = await runWithAgentAccount(account, () => AgentSession.start(runtime, { cmd: process.execPath, args: [adapter] }, f.cwd))
+    const session = await runWithAgentAccount(runtime === 'codex' ? account : 'shared-mcp-other@example.test', () => AgentSession.start(runtime, { cmd: process.execPath, args: [adapter] }, f.cwd))
     try {
       f.write(path.join(ownDirectory, 'servers.json'), { mcpServers: { replacement: { command: process.execPath, args: ['new.js'] } } })
       await session.loadSession('restored-fixture')

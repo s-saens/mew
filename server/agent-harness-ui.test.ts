@@ -237,16 +237,18 @@ createRoot(document.getElementById('root')).render(<AgentHarnessButtons cwd="/pr
       page.on('pageerror', error => errors.push(error.message))
       let status: 'disconnected' | 'needs_auth' | 'connected' = 'disconnected', authenticate = false, failConnect = false, failImport = true, polls = 0
       const inventory: HarnessInventory = {
-        scopes: [{ id: 'mew', label: 'Mew', path: 'Mew account', global: false }, { id: 'global', label: '전역', path: '/home/test', global: true }],
+        canManageSharedMcp: true,
+        scopes: [{ id: 'mew', label: 'Mew', path: 'Mew installation', global: true }, { id: 'global', label: '전역', path: '/home/test', global: true }],
         agents: [{ id: 'mew', label: 'Mew' }, { id: 'claude', label: 'Claude' }],
         locations: [{ id: 'mew-mcp', kind: 'mcp', agent: 'mew', scope: 'mew', label: 'Mew', path: 'Mew account MCP', writable: true }, { id: 'claude-mcp', kind: 'mcp', agent: 'claude', scope: 'global', label: 'Claude', path: '/home/test/.claude.json', writable: true }],
         items: [{ id: 'native', location: 'claude-mcp', name: 'cloudflare', description: '기존 Claude MCP', path: '/home/test/.claude/plugins/cloudflare/.mcp.json', writable: false, reason: '플러그인 설정' }], warnings: [],
       }
-      const connection = () => ({ name: 'shared-cloud', status, ...(status === 'needs_auth' ? { streamUrl: '/api/agent/mcp/login-desktop/job/stream' } : {}) })
+      let detailRequests = 0, ownsJob = true
+      const connection = () => ({ name: 'shared-cloud', status, ...(status === 'needs_auth' ? { streamUrl: '/api/agent/mcp/login-desktop/job/stream', ownsJob } : {}) })
       await page.route('http://mew-shared-mcp.test/**', async route => {
         const url = new URL(route.request().url())
         if (url.pathname === '/app.js') return route.fulfill({ contentType: 'text/javascript', body: chunk.code })
-        if (url.pathname === '/api/agent/harness/detail') return route.fulfill({ json: { item: inventory.items.find(item => item.id === url.searchParams.get('id')), content: '{"type":"http","url":"https://mcp.example.com/mcp"}', revision: 'revision', files: [] } })
+        if (url.pathname === '/api/agent/harness/detail') { detailRequests++; return route.fulfill({ json: { item: inventory.items.find(item => item.id === url.searchParams.get('id')), content: '{"type":"http","url":"https://mcp.example.com/mcp"}', revision: 'revision', files: [] } }) }
         if (url.pathname === '/api/agent/harness') {
           if (route.request().method() === 'POST') {
             const input = route.request().postDataJSON() as HarnessMutation
@@ -331,6 +333,40 @@ createRoot(document.getElementById('root')).render(<AgentHarnessButtons cwd="/pr
       const closedPolls = polls
       await new Promise(resolve => setTimeout(resolve, 1700))
       assert.equal(polls, closedPolls, 'polling stops when the manager closes')
+      status = 'needs_auth'; ownsJob = false
+      const observerActions = connectionActions.length
+      await opener.click(); await sharedRow().click()
+      await state().getByRole('status').filter({ hasText: '로그인 필요' }).waitFor()
+      assert.equal(await state().getByRole('button', { name: '연결 취소', exact: true }).count(), 1, 'another owner may explicitly cancel a shared connection')
+      await page.getByRole('button', { name: '닫기', exact: true }).click()
+      await new Promise(resolve => setTimeout(resolve, 100))
+      assert.equal(connectionActions.length, observerActions, 'closing an owner observer preserves the initiating owner authentication job')
+      inventory.canManageSharedMcp = false
+      inventory.locations.find(location => location.id === 'mew-mcp')!.writable = false
+      inventory.items = inventory.items.map(item => item.location === 'mew-mcp' ? { ...item, writable: false, reason: '소유자만 관리할 수 있습니다.' } : item)
+      status = 'needs_auth'
+      const readonlyDetails = detailRequests, readonlyActions = connectionActions.length, readonlyMutations = mutations.length
+      await opener.click(); await sharedRow().click()
+      await state().getByRole('status').filter({ hasText: '로그인 필요' }).waitFor()
+      assert.equal(await page.getByRole('region', { name: 'MCP 로그인 화면', exact: true }).count(), 0, 'members never open the shared owner authorization screen')
+      assert.equal(await page.getByLabel('확장 내용').count(), 0)
+      for (const action of ['수정', '삭제', '연결', '연결 해제', '연결 취소']) assert.equal(await page.getByRole('button', { name: action, exact: true }).count(), 0)
+      assert.match(await page.getByRole('dialog').innerText(), /소유자만 관리할 수 있습니다/)
+      if (width < 768) await page.getByRole('button', { name: '목록으로', exact: true }).click()
+      await page.getByRole('button', { name: 'cloudflare Claude', exact: true }).click()
+      await page.getByLabel('확장 내용').waitFor()
+      assert.equal(await page.getByRole('button', { name: 'Mew에 가져오기', exact: true }).count(), 0)
+      if (width < 768) await page.getByRole('button', { name: '목록으로', exact: true }).click()
+      await page.getByRole('button', { name: '추가', exact: true }).click()
+      await page.getByRole('combobox', { name: '대상 위치', exact: true }).click()
+      assert.equal(await page.getByRole('option', { name: 'Mew 공통', exact: true }).count(), 0, 'members cannot create in the shared installation location')
+      await page.keyboard.press('Escape')
+      await page.getByRole('button', { name: '취소', exact: true }).click()
+      await page.getByRole('alertdialog').getByRole('button', { name: '변경 버리기', exact: true }).click()
+      await page.getByRole('button', { name: '닫기', exact: true }).click()
+      assert.equal(detailRequests, readonlyDetails + 1, 'only native MCP details are fetched for members')
+      assert.equal(connectionActions.length, readonlyActions, 'viewing and leaving shared pending authentication never cancels the owner job')
+      assert.equal(mutations.length, readonlyMutations)
       assert.deepEqual(errors, [])
       assert.ok(await opener.evaluate(el => el.ownerDocument.documentElement.scrollWidth <= el.ownerDocument.defaultView!.innerWidth))
       await page.close()

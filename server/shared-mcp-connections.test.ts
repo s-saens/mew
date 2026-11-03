@@ -16,7 +16,7 @@ async function until(check: () => boolean | Promise<boolean>) {
   assert.fail('connection job did not settle')
 }
 
-function fixture(t: { after(fn: () => Promise<void>): void }, timeout = 5000) {
+function fixture(t: { after(fn: () => Promise<void>): void }, timeout = 5000, shared = false) {
   const configs = new Map<string, SharedMcpConfig>([['alice', { url: 'https://mcp.example.test/mcp', type: 'http' }], ['bob', { url: 'https://mcp.example.test/mcp', type: 'http' }]])
   const versions = new Map([['alice', 1], ['bob', 1]])
   const authorized = new Map([['alice', true], ['bob', true]])
@@ -31,7 +31,7 @@ function fixture(t: { after(fn: () => Promise<void>): void }, timeout = 5000) {
     }
   }
   const store = new SharedMcpConnections({
-    directory: owner => owner,
+    directory: owner => shared ? 'alice' : owner,
     config: (owner, name) => { if (name !== 'cloudflare' || !configs.has(owner)) throw new Error('missing'); return { ...configs.get(owner)! } },
     identity: sharedMcpConfigIdentity,
     accountVersion: owner => versions.get(owner) ?? null,
@@ -65,7 +65,37 @@ function fixture(t: { after(fn: () => Promise<void>): void }, timeout = 5000) {
   }
 }
 
-test('shared stdio checks close the child transport and keep status account-scoped', async t => {
+test('accounts share a single connection job and credentials without sharing the initiating login screen', async t => {
+  const f = fixture(t, 5000, true)
+  f.start(); await f.waiting()
+  assert.equal(f.start('bob').status, 'needs_auth')
+  assert.equal(f.start('bob').streamUrl, undefined)
+  assert.equal(f.start('bob').ownsJob, false)
+  assert.equal((await f.status()).ownsJob, true)
+  assert.equal((await f.status('bob')).streamUrl, undefined)
+  assert.ok((await f.status()).streamUrl)
+  assert.equal(f.openedBrowser.length, 1)
+  const callback = new URL(f.options().redirectUrl)
+  callback.search = '?state=private-state&code=private-authorization-code'
+  assert.equal((await fetch(callback)).status, 200)
+  await until(async () => (await f.status('bob')).status === 'connected')
+  assert.equal((await f.status()).status, 'connected')
+  await f.store.disconnect('bob', 'cloudflare')
+  assert.equal((await f.status()).status, 'disconnected')
+  assert.deepEqual(f.cleared, ['alice'])
+})
+
+test('shared pending authorization is invalidated by its initiating account, not the observing account', async t => {
+  const f = fixture(t, 5000, true)
+  f.versions.set('bob', 2)
+  f.start(); await f.waiting()
+  assert.equal((await f.status('bob')).status, 'needs_auth')
+  f.versions.set('alice', 3)
+  assert.equal((await f.status('bob')).status, 'disconnected')
+  assert.equal(f.saved.size, 0)
+})
+
+test('stdio checks close the child transport and keep fixture registries separate', async t => {
   const f = fixture(t); f.publicServer(); f.configs.set('alice', { command: 'fixture-private-command', args: ['fixture-private-arg'] })
   assert.equal((await f.status()).status, 'disconnected')
   assert.equal(f.start().status, 'connecting')
@@ -100,7 +130,7 @@ test('OAuth callback is loopback-only, validates state and returns a safe stream
   assert.equal(f.closedBrowser[0][0], 'alice')
 })
 
-test('another account cannot cancel, disconnect or view a pending connection', async t => {
+test("separate registry fixtures cannot cancel, disconnect or view each other's pending connection", async t => {
   const f = fixture(t)
   f.start(); await f.waiting()
   assert.equal((await f.status('bob')).status, 'disconnected')
@@ -128,7 +158,7 @@ test('cancelling closes callback and browser without revoking previously stored 
   assert.deepEqual([...f.saved], ['alice'])
 })
 
-test('disconnect revokes only the owning account and prevents a late callback', async t => {
+test('disconnect clears only the selected fixture registry and prevents a late callback', async t => {
   const f = fixture(t)
   f.saved.add('alice'); f.saved.add('bob')
   f.start(); await f.waiting()

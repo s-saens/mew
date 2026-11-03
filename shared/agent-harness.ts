@@ -21,6 +21,7 @@ export interface HarnessItem {
   reason?: string
 }
 export interface HarnessInventory {
+  canManageSharedMcp?: boolean
   scopes: HarnessScope[]
   agents: { id: string; label: string }[]
   locations: HarnessLocation[]

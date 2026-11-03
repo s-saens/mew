@@ -1,8 +1,8 @@
 ---
 title: "Per-account feature and file permissions"
 created: "2026-09-16"
-updated: "2026-11-02"
-description: "Defines project and account permissions, live Mewlink revocation, server-data boundaries, public capabilities, and browser/WebSocket checks. Covers account-private common MCP credentials, authorization-job cancellation, account-deletion cleanup, and existing debugger/native MCP boundaries."
+updated: "2026-11-03"
+description: "Defines project and account permissions, live Mewlink revocation, server-data boundaries, public capabilities, and browser/WebSocket checks. Covers installation-wide common MCP credentials, owner-only management, authorization-job cancellation, account-deletion preservation, and existing debugger/native MCP boundaries."
 상위파일: "MOC.md"
 ---
 
@@ -86,7 +86,9 @@ The [external DAP debugger](../features/terminals-agents-automation/external-dap
 
 The optional `mew-debugger` agent MCP requires the `agent` feature and per-account, per-project `agentBridge` activation in addition to debugger permissions. It rechecks every call, on policy changes, and every 5 seconds through a private Unix socket bound to the account and project, and closes connections when sharing is disabled, permissions are revoked, or the project changes. Commands require the exact session, connection, and pause revision and use the same allowlist as HTTP. Tool installation, arbitrary DAP/CDP, and other accounts' targets are not exposed.
 
-[Mew common MCP](shared-mcp.md) requires the authenticated account's `agent` permission. Definitions and OAuth credentials belong to that account's private server-data directory; APIs cannot select another account or an arbitrary credential path. Connection jobs and login desktops revalidate the initiating account, live session/access, and configuration while approval is pending. Cancellation and disconnect close temporary callbacks and transports. Account deletion removes the common MCP directory, and credential epochs block delayed writes from restoring cleared tokens. Native global source files continue to belong to the server OS user. MCP commands execute with server OS permissions and do not add process isolation.
+[Mew common MCP](shared-mcp.md) requires the authenticated account's `agent` permission for inventory, status, and ACP runtime use. Its definitions and OAuth credentials are shared installation data under `DATA_DIR/mcp`. Raw definition details, definition mutations, imports, and authentication changes additionally require the owner role. APIs cannot select an arbitrary registry or credential path. Existing private registries are preserved without automatic promotion or fallback.
+
+Connection jobs and login desktops remain bound to the initiating account and revalidate its live session/access and the shared configuration while approval is pending. One pending job per shared registry/server name prevents competing approvals across accounts; only the initiator receives its login stream. Cancellation and disconnect close temporary callbacks and transports. Account deletion cancels that account's jobs and retains the existing cleanup of its legacy private MCP directory, while preserving shared definitions and credentials. Credential epochs block delayed writes from restoring explicitly cleared tokens. Native global source files continue to belong to the server OS user. MCP commands execute with server OS permissions and do not add process isolation.
 
 ## Permission changes during active connections
 

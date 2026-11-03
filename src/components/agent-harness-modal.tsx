@@ -29,6 +29,7 @@ export function AgentHarnessModal({ cwd, initialKind, onClose }: { cwd: string; 
   useUiLocale()
   const [kind, setKind] = useState(initialKind)
   const [inventory, setInventory] = useState<HarnessInventory | null>(null)
+  const canManageSharedMcp = inventory?.canManageSharedMcp === true
   const [scope, setScope] = useState('all'), [agent, setAgent] = useState('all'), [search, setSearch] = useState('')
   const [collapsedScopes, setCollapsedScopes] = useState<Set<string>>(() => new Set())
   const scopeListId = useId()
@@ -76,11 +77,12 @@ export function AgentHarnessModal({ cwd, initialKind, onClose }: { cwd: string; 
   }, [cwd, kind, reload])
   useEffect(() => {
     if (!selected) return
+    if (kind === 'mcp' && inventory?.locations.find(location => location.id === selected.location)?.agent === 'mew' && !canManageSharedMcp) return
     const controller = new AbortController()
     setDetail(null); setError('')
     fetchHarnessDetail(cwd, kind, selected.id, controller.signal).then(value => { setDetail(value); setContent(value.content) }).catch(error => { if (!controller.signal.aborted) setError(error.message) })
     return () => controller.abort()
-  }, [cwd, kind, selected])
+  }, [cwd, kind, selected, inventory, canManageSharedMcp])
 
   const locationOf = useCallback((item: HarnessItem) => inventory?.locations.find(location => location.id === item.location), [inventory])
   const filtered = inventory?.items.filter(item => {
@@ -89,9 +91,11 @@ export function AgentHarnessModal({ cwd, initialKind, onClose }: { cwd: string; 
       && `${item.name} ${item.description} ${item.path}`.toLocaleLowerCase().includes(search.toLocaleLowerCase())
   }) ?? []
   const selectedLocation = selected && locationOf(selected)
-  const mewLocation = kind === 'mcp' ? inventory?.locations.find(location => location.agent === 'mew' && location.writable) : undefined
+  const mewLocation = kind === 'mcp' && canManageSharedMcp ? inventory?.locations.find(location => location.agent === 'mew' && location.writable) : undefined
   const sharedSelection = kind === 'mcp' && selectedLocation?.agent === 'mew'
-  const destinations = inventory?.locations.filter(location => (kind === 'mcp' || location.agent !== 'mew') && location.writable && (!moving || location.agent !== 'mew' && location.id !== selected?.location && (kind === 'skills' || location.agent === selectedLocation?.agent))) ?? []
+  const readonlySharedSelection = sharedSelection && !canManageSharedMcp
+  const writableLocation = (location: HarnessLocation) => location.writable && (kind !== 'mcp' || location.agent !== 'mew' || canManageSharedMcp)
+  const destinations = inventory?.locations.filter(location => (kind === 'mcp' || location.agent !== 'mew') && writableLocation(location) && (!moving || location.agent !== 'mew' && location.id !== selected?.location && (kind === 'skills' || location.agent === selectedLocation?.agent))) ?? []
   const availableLocations = inventory?.locations.filter(location => (kind === 'mcp' || location.agent !== 'mew') && (scope === 'all' || location.scope === scope) && (agent === 'all' || location.agent === agent)) ?? []
   const scopeLabel = (id?: string) => id === 'mew' ? uiText('Mew 공통') : inventory?.scopes.find(scope => scope.id === id)?.label ?? ''
   const simpleMcp = creating && kind === 'mcp' && destinations.find(location => location.id === target)?.agent === 'mew' && !advancedMcp
@@ -116,7 +120,7 @@ export function AgentHarnessModal({ cwd, initialKind, onClose }: { cwd: string; 
   }
   function create() {
     reset(); setCreating(true)
-    const location = availableLocations.find(location => location.agent === 'mew' && location.writable) ?? availableLocations.find(location => location.writable)
+    const location = availableLocations.find(location => location.agent === 'mew' && writableLocation(location)) ?? availableLocations.find(writableLocation)
     setTarget(location?.id ?? destinations[0]?.id ?? '')
     setName('')
     setContent(kind === 'skills' ? uiText("---\nname: my-skill\ndescription: 스킬의 용도를 적어주세요\n---\n\n# 지침\n") : mcpDraft(location?.agent ?? destinations[0]?.agent))
@@ -166,7 +170,7 @@ export function AgentHarnessModal({ cwd, initialKind, onClose }: { cwd: string; 
                 options={[{ value: 'all', label: uiText("모든 에이전트") }, ...(inventory?.agents.filter(agent => kind === 'skills' || agent.id !== 'shared').map(agent => ({ value: agent.id, label: agent.id === 'mew' && kind === 'mcp' ? uiText('Mew 공통') : agent.label })) ?? [])]} />
             </div>
           </div>
-          <div className="flex items-center justify-between px-3 py-1 text-xs text-ink-secondary"><span>{loading ? uiText("불러오는 중…") : uiText("{p0}개", { p0: filtered.length })}</span><button type="button" className={button} disabled={busy || loading || !availableLocations.some(location => location.writable)} onClick={() => guarded(create)}><Plus width={14} height={14} aria-hidden />{uiText("추가")}</button></div>
+          <div className="flex items-center justify-between px-3 py-1 text-xs text-ink-secondary"><span>{loading ? uiText("불러오는 중…") : uiText("{p0}개", { p0: filtered.length })}</span><button type="button" className={button} disabled={busy || loading || !availableLocations.some(writableLocation)} onClick={() => guarded(create)}><Plus width={14} height={14} aria-hidden />{uiText("추가")}</button></div>
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-3" aria-label={uiText("확장 목록")} aria-busy={loading}>
             {!loading && !filtered.length && <div className="px-4 py-8 text-sm text-ink-secondary">{search ? uiText("검색 결과가 없습니다.") : !availableLocations.length ? uiText("이 에이전트의 설정 위치는 아직 지원하지 않습니다.") : uiText("이 범위에 등록된 항목이 없습니다.")}</div>}
             {inventory?.scopes.map((scope, scopeIndex) => {
@@ -203,11 +207,11 @@ export function AgentHarnessModal({ cwd, initialKind, onClose }: { cwd: string; 
           {!!inventory?.warnings.length && <details className="max-h-36 shrink-0 overflow-auto border-t border-edge p-3 text-xs text-ink-secondary"><summary className="cursor-pointer">{uiText("확인이 필요한 위치")}{inventory.warnings.length}{uiText("개")}</summary>{inventory.warnings.map(warning => <p key={warning} className="mt-2 break-all select-text">{warning}</p>)}</details>}
         </aside>
         <main className={`${showingDetail ? 'flex' : 'hidden md:flex'} min-h-0 min-w-0 flex-1 flex-col overflow-y-auto`}>
-          {!showingDetail ? <div className="m-auto max-w-sm space-y-2 p-6 text-center"><h3 className="text-base font-medium">{kind === 'skills' ? uiText("스킬을 한곳에서") : uiText("MCP 연결을 한곳에서")}</h3><p className="text-sm leading-relaxed text-ink-secondary">{uiText("목록에서 항목을 선택하면 내용과 적용 범위를 확인하고 관리할 수 있습니다.")}</p><p className="text-xs text-ink-secondary">{kind === 'mcp' ? uiText('Mew 공통 연결은 이 계정의 모든 Mew 에이전트가 함께 사용합니다.') : uiText("전역 설정은 이 서버를 사용하는 에이전트에 적용됩니다.")}</p></div> : <>
+          {!showingDetail ? <div className="m-auto max-w-sm space-y-2 p-6 text-center"><h3 className="text-base font-medium">{kind === 'skills' ? uiText("스킬을 한곳에서") : uiText("MCP 연결을 한곳에서")}</h3><p className="text-sm leading-relaxed text-ink-secondary">{uiText("목록에서 항목을 선택하면 내용과 적용 범위를 확인하고 관리할 수 있습니다.")}</p><p className="text-xs text-ink-secondary">{kind === 'mcp' ? uiText('Mew 공통 연결은 이 설치의 모든 계정이 함께 사용합니다.') : uiText("전역 설정은 이 서버를 사용하는 에이전트에 적용됩니다.")}</p></div> : <>
             <div className="shrink-0 space-y-2 border-b border-edge p-4">
               <button type="button" className={`${button} -ml-3 md:hidden`} disabled={busy} onClick={() => guarded(reset)}>{uiText("목록으로")}</button>
               <div className="flex flex-wrap items-start justify-between gap-2"><div className="min-w-0"><h3 ref={headingRef} tabIndex={-1} className="break-words text-base font-semibold outline-none">{creating ? kind === 'skills' ? uiText("스킬 추가") : uiText("MCP 추가") : selected?.name}</h3>{selectedLocation && <p className="mt-1 text-xs text-ink-secondary">{scopeLabel(selectedLocation.scope)}{!sharedSelection && ` · ${selectedLocation.label}`}</p>}</div>
-                {!creating && detail && <div className="flex flex-wrap gap-1">
+                {!creating && detail && !readonlySharedSelection && <div className="flex flex-wrap gap-1">
                   <button type="button" className={button} disabled={!detail.item.writable || busy || editing} onClick={() => { setEditing(true); setMoving(false) }}>{uiText("수정")}</button>
                   {!sharedSelection && <button type="button" className={button} disabled={!detail.item.writable || detail.item.managed || busy} onClick={() => guarded(() => { setEditing(false); setContent(detail.content); setMoving(!moving); setTarget(destinations[0]?.id ?? '') })}>{uiText("이동")}</button>}
                   {kind === 'mcp' && !sharedSelection && mewLocation && <button type="button" className={`${button} text-accent`} disabled={busy || editing} onClick={() => void mutate('import')}>{uiText('Mew에 가져오기')}</button>}
@@ -215,9 +219,10 @@ export function AgentHarnessModal({ cwd, initialKind, onClose }: { cwd: string; 
                 </div>}
               </div>
               {(detail?.item.description || selected?.description) && <p aria-label={uiText("확장 설명")} className="max-h-24 overflow-y-auto whitespace-pre-wrap break-words select-text text-xs leading-relaxed text-ink-secondary">{detail?.item.description || selected?.description}</p>}
-              {sharedSelection && <p className="text-xs text-ink-secondary">{uiText('Mew 공통 연결은 이 계정의 모든 Mew 에이전트가 함께 사용합니다.')}</p>}
+              {sharedSelection && <p className="text-xs text-ink-secondary">{uiText('Mew 공통 연결은 이 설치의 모든 계정이 함께 사용합니다.')}</p>}
               {selected && <p className="select-text break-all font-mono text-[11px] text-ink-secondary">{selected.path}</p>}
               {detail && !detail.item.writable && <p className="text-xs text-ink-secondary">{uiText("읽기 전용 ·")}{detail.item.reason}</p>}
+              {readonlySharedSelection && <p className="text-xs text-ink-secondary">{uiText("읽기 전용 ·")}{selected?.reason ?? selectedLocation?.reason}</p>}
               {kind === 'mcp' && (selectedLocation?.agent === 'openclaw' || destinations.find(location => location.id === target)?.agent === 'openclaw') && <p className="text-xs text-ink-secondary">{uiText("저장하면 OpenClaw 설정의 주석을 제거하고 JSON 형식으로 정리합니다.")}</p>}
               {kind === 'mcp' && selectedLocation?.agent === 'codex' && (editing || moving) && <p className="text-xs text-ink-secondary">{uiText("저장하면 MCP 구역의 주석과 서식을 정리합니다. 다른 설정값은 유지합니다.")}</p>}
               {(creating || moving) && <div className="space-y-2 pt-2">
@@ -234,8 +239,8 @@ export function AgentHarnessModal({ cwd, initialKind, onClose }: { cwd: string; 
                 {moving && <div className="flex flex-wrap items-center gap-2"><p className="min-w-0 flex-1 text-xs text-ink-secondary">{kind === 'skills' ? uiText("부속 파일도 함께 이동합니다. 상대 경로 참조를 확인하세요.") : uiText("동일 에이전트의 적용 범위가 바뀝니다.")}</p><button type="button" className={button} disabled={busy} onClick={() => setMoving(false)}>{uiText("취소")}</button><button type="button" className={`${button} bg-accent text-ink-on-accent`} disabled={busy || !target} onClick={() => setConfirmation({ text: uiText("{p0}을(를) {p1} · {p2}(으)로 이동할까요?", { p0: selected?.name, p1: scopeLabel(destinations.find(location => location.id === target)?.scope), p2: destinations.find(location => location.id === target)?.label }), label: uiText("이동"), action: () => { void mutate('move') } })}>{uiText("이동 확인")}</button></div>}
               </div>}
             </div>
-            {!creating && !detail ? <p role="status" className="p-5 text-sm text-ink-secondary">{error ? uiText("내용을 불러오지 못했습니다.") : uiText("내용을 불러오는 중…")}</p> : <>
-              {sharedSelection && !editing && selected && <SharedMcpConnection key={selected.id} name={selected.name} />}
+            {readonlySharedSelection && selected ? <SharedMcpConnection key={selected.id} name={selected.name} canManage={false} /> : !creating && !detail ? <p role="status" className="p-5 text-sm text-ink-secondary">{error ? uiText("내용을 불러오지 못했습니다.") : uiText("내용을 불러오는 중…")}</p> : <>
+              {sharedSelection && !editing && selected && <SharedMcpConnection key={selected.id} name={selected.name} canManage={canManageSharedMcp} />}
               {simpleMcp ? <div className="min-h-0 flex-1 overflow-auto bg-surface-deep p-4"><label className="block space-y-1 text-xs text-ink-secondary"><span>{uiText('서버 URL')}</span><input type="url" aria-label={uiText('서버 URL')} autoComplete="off" placeholder="https://mcp.example.com/mcp" className={`${input} w-full`} value={serverUrl} disabled={busy} onChange={event => setContent(JSON.stringify({ type: 'http', url: event.target.value }, null, 2))} /></label><button type="button" className={`${button} mt-2 -ml-2`} disabled={busy} onClick={() => setAdvancedMcp(true)}>{uiText('JSON으로 직접 설정')}</button></div> : (editing || creating) ? <textarea aria-label={kind === 'skills' ? uiText("스킬 내용") : uiText("MCP 설정 JSON")} spellCheck={false} value={content} onChange={event => setContent(event.target.value)} disabled={busy} className="min-h-32 min-w-0 flex-1 resize-none bg-surface-deep p-4 font-mono text-xs leading-relaxed text-ink outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent" /> : <pre tabIndex={0} aria-label={uiText("확장 내용")} className="min-h-0 flex-1 overflow-auto whitespace-pre-wrap break-words bg-surface-deep p-4 font-mono text-xs leading-relaxed text-ink focus-visible:outline-2 focus-visible:outline-accent">{detail?.content}</pre>}
               {!!detail?.files.length && !editing && <details className="max-h-32 shrink-0 overflow-auto border-t border-edge px-4 py-2 text-xs text-ink-secondary"><summary className="cursor-pointer">{uiText("포함된 파일")}{detail.files.length}{uiText("개")}</summary>{detail.files.map(file => <p key={file} className="mt-1 select-text break-all font-mono">{file}</p>)}</details>}
               {(editing || creating) && <footer className="flex shrink-0 items-center gap-2 border-t border-edge p-3"><span className="min-w-0 flex-1 text-xs text-ink-secondary">{simpleMcp ? uiText('저장 후 연결하여 인증을 완료하세요.') : kind === 'mcp' ? uiText("선택한 서버의 설정을 JSON으로 편집합니다.") : uiText("SKILL.md 원문")}</span><button type="button" className={button} disabled={busy} onClick={() => guarded(() => { if (creating) reset(); else { setEditing(false); setContent(detail?.content ?? '') } })}>{uiText("취소")}</button><button type="button" className={`${button} bg-accent text-ink-on-accent hover:bg-accent/90`} disabled={busy || creating && (!target || !name.trim() || simpleMcp && !serverUrl.trim()) || !creating && !dirty} onClick={() => void mutate(creating ? 'create' : 'save')}>{busy ? uiText("저장 중…") : uiText("저장")}</button></footer>}

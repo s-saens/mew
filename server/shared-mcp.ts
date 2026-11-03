@@ -3,7 +3,7 @@ import path from 'node:path'
 import { createHash } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import type { McpServer } from '@agentclientprotocol/sdk'
-import { agentSettingsAccount, agentSettingsPath } from './agent-account-settings.ts'
+import { DATA_DIR } from './dataDir.ts'
 import { object, parseConfig, atKeys } from './harness-config.ts'
 
 export interface SharedMcpConfig {
@@ -21,9 +21,9 @@ export interface SharedMcpConfig {
 export const SHARED_MCP_FILE = 'servers.json'
 const MAX_CONFIG_BYTES = 2 * 1024 * 1024
 
-/** Shared means the current Mew account, across its projects and agent runtimes. */
-export function sharedMcpDirectory(account = agentSettingsAccount()): string {
-  return path.join(path.dirname(agentSettingsPath('agent-settings.json', account)), 'mcp')
+/** One registry and credential cache serve this installation's agent-enabled accounts. */
+export function sharedMcpDirectory(): string {
+  return path.join(DATA_DIR, 'mcp')
 }
 
 function strings(value: unknown, field: string): Record<string, string> | undefined {

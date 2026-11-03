@@ -9,9 +9,10 @@ import { attachAuthContext } from './reqAuth.ts'
 import { SharedMcpConnectionError, type SharedMcpConnections } from './shared-mcp-connections.ts'
 import { createSharedMcpRouter } from './shared-mcp-routes.ts'
 
-test('MCP routes enforce account and agent access, ignore caller paths and recheck live authority', async t => {
+test('MCP routes require an owner for shared connection control and recheck live authority', async t => {
   const owner = 'mcp-routes@example.test'
-  upsertUser(owner, { role: 'member', hash: '', createdAt: Date.now(), passwordChangedAt: 0, mustChangePassword: false })
+  const record = { role: 'owner' as const, hash: '', createdAt: Date.now(), passwordChangedAt: 0, mustChangePassword: false }
+  upsertUser(owner, record)
   let token = createSession(owner)
   let authorize: (() => boolean) | undefined
   let error: Error | undefined
@@ -49,6 +50,10 @@ test('MCP routes enforce account and agent access, ignore caller paths and reche
   assert.deepEqual(await connected.json(), { name: 'cloudflare', status: 'connecting' })
   assert.deepEqual(calls.at(-1), ['start', owner, 'cloudflare'])
   assert.equal(authorize!(), true)
+  upsertUser(owner, { ...record, role: 'manager' })
+  assert.equal(authorize!(), false, 'losing the owner role revokes pending authorization')
+  upsertUser(owner, record)
+  assert.equal(authorize!(), true)
   setFeature(owner, 'agent', false)
   assert.equal(authorize!(), false)
   setFeature(owner, 'agent', true)
@@ -72,4 +77,43 @@ test('MCP routes enforce account and agent access, ignore caller paths and reche
   const invalid = await request('/status')
   assert.equal(invalid.status, 400)
   assert.deepEqual(await invalid.json(), { error: 'MCP 이름을 확인하세요.' })
+})
+
+test('agent-enabled nonowners can read status without login streams and cannot control shared connections', async t => {
+  const email = 'mcp-status@example.test'
+  const record = { role: 'member' as const, hash: '', createdAt: Date.now(), passwordChangedAt: 0, mustChangePassword: false }
+  upsertUser(email, record)
+  setFeature(email, 'agent', true)
+  const token = createSession(email)
+  const calls: unknown[][] = []
+  const store = {
+    status: async (...args: unknown[]) => { calls.push(['status', ...args]); return { name: 'remote', status: 'needs_auth', streamUrl: '/private-owner-login' } },
+    start: () => { throw new Error('denied start reached store') },
+    cancel: () => { throw new Error('denied cancel reached store') },
+    disconnect: () => { throw new Error('denied disconnect reached store') },
+  } as unknown as SharedMcpConnections
+  const app = express()
+  app.use(express.json(), attachAuthContext)
+  app.use('/mcp', createSharedMcpRouter(store))
+  const server = http.createServer(app)
+  await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
+  t.after(async () => { server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve())); removeUser(email) })
+  const address = server.address()
+  assert.ok(address && typeof address !== 'string')
+  const base = `http://127.0.0.1:${address.port}/mcp`
+  const headers = { Cookie: `mew_session=${token}`, 'Content-Type': 'application/json' }
+  for (const role of ['member', 'manager'] as const) {
+    upsertUser(email, { ...record, role })
+    const status = await fetch(`${base}/status?name=remote&owner=another-owner`, { headers })
+    assert.equal(status.status, 200)
+    assert.deepEqual(await status.json(), { name: 'remote', status: 'needs_auth' })
+    assert.deepEqual(calls.at(-1), ['status', email, 'remote'])
+    for (const action of ['connect', 'cancel', 'disconnect']) {
+      const denied = await fetch(`${base}/${action}`, { method: 'POST', headers, body: JSON.stringify({ name: 'remote' }) })
+      assert.equal(denied.status, 403)
+    }
+  }
+  setFeature(email, 'agent', false)
+  assert.equal((await fetch(`${base}/status?name=remote`, { headers })).status, 403)
+  assert.equal(calls.length, 2)
 })

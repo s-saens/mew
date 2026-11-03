@@ -80,7 +80,7 @@ function skillSnapshot(directory: string) {
   return { revision: hash.digest('hex'), files }
 }
 
-/** Source management never launches processes; Mew common definitions are private to the account. */
+/** Source management never launches processes; routes guard installation-wide common definitions. */
 export class AgentHarnessStore {
   environment?: HarnessEnvironment
   constructor(environment?: HarnessEnvironment) { this.environment = environment }

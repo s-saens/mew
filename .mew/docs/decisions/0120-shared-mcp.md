@@ -1,10 +1,12 @@
 ---
 title: "0120 — Account-owned common MCP connections"
-description: "Adopts a Mew-owned account-private MCP registry and shared OAuth bridge across ACP runtimes, while retaining native settings and importing definitions without copying native authentication tokens."
+description: "Records the original account-private MCP registry and shared OAuth bridge across ACP runtimes. ADR 0127 supersedes account-private ownership with installation-wide sharing while retaining native imports and bridge behavior."
 created: "2026-11-02"
-updated: "2026-11-02"
-status: "accepted"
+updated: "2026-11-03"
+status: "superseded in part by 0127"
 ---
+
+[ADR 0127](0127-installation-wide-mcp.md) supersedes the account-private registry, credential ownership, and deletion policy. The stdio bridge, explicit native imports, and native-token preservation remain in effect.
 
 ## Context
 
