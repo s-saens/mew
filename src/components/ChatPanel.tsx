@@ -60,7 +60,7 @@ function fileTitle(path: string): string {
 function MessageBody({ text, onOpenFile }: { text: string; onOpenFile: (project: string, path: string) => void }) {
   const parts = text.split(/(\[\[[^\]\n]+\]\])/)
   return (
-    <div className="select-text whitespace-pre-wrap break-words text-sm text-ink">
+    <div className="select-text whitespace-pre-wrap break-words text-sm leading-relaxed text-ink [overflow-wrap:anywhere]">
       {parts.map((part, i) => {
         const inner = part.startsWith('[[') && part.endsWith(']]') ? part.slice(2, -2) : null
         const token = inner ? parseFileToken(inner) : null
@@ -317,7 +317,7 @@ export function ChatPanel({
   }
 
   return (
-    <div className="flex h-full w-full bg-surface-deep">
+    <div className="flex h-full min-h-0 w-full min-w-0 bg-surface-deep">
       {confirmDelete !== null && view.canDeleteHistory && (
         <ConfirmDialog
           message={t('chat.deleteConfirm', { name: confirmDelete === GROUP_CHAT ? t('chat.groupConversation') : nameOf(confirmDelete) })}
@@ -329,7 +329,7 @@ export function ChatPanel({
         />
       )}
       {rail}
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
       <div className="flex h-9 shrink-0 items-center gap-2 border-b border-edge pl-2">
         <span className="min-w-0 flex-1 truncate text-xs font-medium text-ink">{title}</span>
         {view.canDeleteHistory && (
@@ -365,27 +365,38 @@ export function ChatPanel({
         )}
         {messages.map((message, i) => {
           const prev = messages[i - 1]
+          const outgoing = message.author === authEmail
           // 같은 사람이 5분 안에 이어 보내면 머리(이름·시간)를 생략한다
           const compact = prev && prev.author === message.author && message.time - prev.time < 5 * 60 * 1000
           return (
-            <div key={message.id} className={compact ? 'mt-0.5 pl-4' : 'mt-3 first:mt-0'}>
+            <div
+              key={message.id}
+              data-chat-message={outgoing ? 'outgoing' : 'incoming'}
+              className={`flex flex-col ${outgoing ? 'items-end' : 'items-start'} ${compact ? 'mt-1' : 'mt-3 first:mt-0'}`}
+            >
               {!compact && (
-                <div className="mb-0.5 flex items-baseline gap-1.5">
+                <div
+                  data-chat-message-header
+                  className={`mb-1 flex max-w-full items-baseline gap-1.5 ${outgoing ? 'flex-row-reverse' : ''}`}
+                >
                   <span className="h-2 w-2 shrink-0 self-center rounded-full" style={{ backgroundColor: identityColor(message.author) }} />
-                  <span className={`truncate text-xs font-medium ${message.author === authEmail ? 'text-ink' : 'text-ink-secondary'}`}>
+                  <span className={`min-w-0 truncate text-xs font-medium ${outgoing ? 'text-ink' : 'text-ink-secondary'}`}>
                     {nameOf(message.author)}
                   </span>
                   <span className="shrink-0 text-[10px] text-ink-faint">{formatTime(message.time)}</span>
                 </div>
               )}
               {/* 안 읽은 수신자 수 — 카톡처럼 버블 옆에 붙고, 모두 읽으면 사라진다 */}
-              <div className={`flex items-start gap-1.5 ${compact ? '' : 'pl-3.5'}`}>
-                <div className="min-w-0 flex-1">
+              <div className={`flex w-full items-end gap-1.5 ${outgoing ? 'flex-row-reverse' : ''}`}>
+                <div
+                  data-chat-bubble
+                  className={`min-w-0 max-w-[85%] rounded-xl px-3 py-2 ${outgoing ? 'rounded-tr-sm bg-surface-hover' : 'rounded-tl-sm bg-surface-raised'}`}
+                >
                   <MessageBody text={message.text} onOpenFile={onOpenFile} />
                 </div>
                 {message.unread > 0 && (
                   <span
-                    className="shrink-0 pt-0.5 text-[10px] font-medium text-accent"
+                    className="shrink-0 pb-0.5 text-[10px] font-medium tabular-nums text-accent"
                     title={t('chat.unreadCount', { count: message.unread })}
                   >
                     {message.unread}
