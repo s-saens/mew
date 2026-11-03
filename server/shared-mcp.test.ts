@@ -14,6 +14,7 @@ import { AgentSession } from './agentAcp.ts'
 import { runWithAgentAccount } from './agent-account-settings.ts'
 import { upsertUser, removeUser } from './auth.ts'
 import { DATA_DIR } from './dataDir.ts'
+import { clearSharedMcpAuth, createSharedMcpConnection, markSharedMcpConnected, SharedMcpLoginRequiredError } from './shared-mcp-oauth.ts'
 import { normalizeSharedMcpConfig, readSharedMcpConfig, sharedMcpConfigIdentity, sharedMcpDirectory, sharedMcpRuntimeName, sharedMcpServers } from './shared-mcp.ts'
 
 function fixture(t: test.TestContext) {
@@ -156,7 +157,7 @@ test('independent runtime bridge processes use the same private HTTP definition 
   assert.equal(methods.filter(method => method === 'initialize').length, 2)
 })
 
-test('all accounts share MCP bindings injected into every ACP new/load/clear request', async t => {
+test('ACP new/load/clear only inject connected common MCPs across accounts, including Antigravity', async t => {
   const f = fixture(t), account = 'shared-mcp-owner@example.test'
   const ownDirectory = runWithAgentAccount(account, () => sharedMcpDirectory())
   const otherDirectory = runWithAgentAccount('shared-mcp-other@example.test', () => sharedMcpDirectory())
@@ -171,23 +172,37 @@ import {AgentSideConnection,ndJsonStream,PROTOCOL_VERSION} from ${JSON.stringify
 import {Readable,Writable} from 'node:stream';
 const record=(method,params)=>fs.appendFileSync(${JSON.stringify(received)},JSON.stringify({method,...params})+'\\n');
 new AgentSideConnection(()=>({initialize:async()=>({protocolVersion:PROTOCOL_VERSION,agentCapabilities:{loadSession:true}}),newSession:async p=>{record('new',p);return {sessionId:'shared-fixture'}},loadSession:async p=>{record('load',p);return {}},cancel:async()=>{}}),ndJsonStream(Writable.toWeb(process.stdout),Readable.toWeb(process.stdin)));`)
-  for (const runtime of ['codex', 'claude']) {
-    f.write(path.join(ownDirectory, 'servers.json'), { mcpServers: { common: { command: process.execPath, args: ['fixture.js'] } } })
-    const session = await runWithAgentAccount(runtime === 'codex' ? account : 'shared-mcp-other@example.test', () => AgentSession.start(runtime, { cmd: process.execPath, args: [adapter] }, f.cwd))
+  const runtimes = ['codex', 'claude', 'antigravity']
+  for (const [runtimeIndex, runtime] of runtimes.entries()) {
+    f.write(path.join(ownDirectory, 'servers.json'), { mcpServers: {
+      common: { command: process.execPath, args: ['fixture.js'] },
+      disconnected: { command: process.execPath, args: ['unconnected.js'] },
+      public: { url: 'https://public.example.test/mcp' },
+      pending: { url: 'https://oauth.example.test/mcp' },
+      error: { url: 'https://error.example.test/mcp', headers: { Authorization: '${MEW_MCP_ABSENT_FIXTURE_TOKEN}' } },
+      disabled: { command: process.execPath, enabled: false },
+    } })
+    markSharedMcpConnected(ownDirectory, 'common')
+    const pending = createSharedMcpConnection(ownDirectory, 'pending')
+    try { await assert.rejects(async () => pending.provider.redirectToAuthorization(new URL('https://auth.example.test/authorize')), SharedMcpLoginRequiredError) }
+    finally { await pending.close() }
+    const internal = { name: 'internal-fixture', command: process.execPath, args: [], env: [] }
+    const session = await runWithAgentAccount(runtime === 'codex' ? account : 'shared-mcp-other@example.test', () => AgentSession.start(runtime, { cmd: process.execPath, args: [adapter] }, f.cwd, undefined, undefined, undefined, { mcpServers: [internal] }))
     try {
       f.write(path.join(ownDirectory, 'servers.json'), { mcpServers: { replacement: { command: process.execPath, args: ['new.js'] } } })
+      markSharedMcpConnected(ownDirectory, 'replacement')
       await session.loadSession('restored-fixture')
-      f.write(path.join(ownDirectory, 'servers.json'), { mcpServers: {} })
+      clearSharedMcpAuth(ownDirectory, 'replacement')
       session.clearAfterQueue()
       const deadline = Date.now() + 5000
-      const expected = runtime === 'codex' ? 3 : 6
+      const expected = (runtimeIndex + 1) * 3
       while (fs.readFileSync(received, 'utf8').trim().split('\n').length < expected && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 10))
     } finally { await session.disposeAndWait() }
   }
   const requests = fs.readFileSync(received, 'utf8').trim().split('\n').map(line => JSON.parse(line))
-  assert.deepEqual(requests.map(request => request.method), ['new', 'load', 'new', 'new', 'load', 'new'])
+  assert.deepEqual(requests.map(request => request.method), runtimes.flatMap(() => ['new', 'load', 'new']))
   for (const [index, request] of requests.entries()) {
     const names = request.mcpServers.map((server: { name: string }) => server.name)
-    assert.deepEqual(names, index % 3 === 0 ? [sharedMcpRuntimeName('common')] : index % 3 === 1 ? [sharedMcpRuntimeName('replacement')] : [])
+    assert.deepEqual(names, [...(index % 3 === 0 ? [sharedMcpRuntimeName('common')] : index % 3 === 1 ? [sharedMcpRuntimeName('replacement')] : []), 'internal-fixture'])
   }
 })

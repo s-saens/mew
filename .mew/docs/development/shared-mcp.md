@@ -1,6 +1,6 @@
 ---
 title: "Mew common MCP connections"
-description: "Defines installation-wide common MCP registration and imports, stdio forwarding into ACP runtimes, shared OAuth storage and refresh coordination, connection jobs, host-browser approval, conversation-free startup diagnostics, permissions, and verification boundaries."
+description: "Defines installation-wide common MCP registration, connection-ready ACP injection, stdio forwarding, shared OAuth storage and refresh coordination, connection jobs, startup diagnostics, permissions, and verification boundaries."
 created: "2026-11-02"
 updated: "2026-11-04"
 ---
@@ -19,7 +19,9 @@ The source manager converts supported Claude, Codex, OpenCode, and other discove
 
 ## Runtime application
 
-`AgentSession` reads the installation's enabled definitions for each session/new and session/load request and combines them with existing debugger or Mewpet MCP bindings. Each definition becomes a local stdio binding to `shared-mcp-stdio.ts`, with only its private registry directory and name in the arguments. A stable `mew_<name>_<hash>` namespace avoids collisions with native server names and sanitized names. Existing native definitions can still load independently; importing does not disable them.
+`AgentSession` reads the installation's enabled definitions for each session/new and session/load request and includes only those whose saved connection status is `connected`. Definitions awaiting login, disconnected definitions, and definitions with a saved connection error remain registered in management but are excluded from ACP startup. Owners must first complete **Connect**, including for local and unauthenticated remote servers. This prevents an unapproved common MCP from blocking a runtime that requires every injected server to initialize. [ADR 0128](../decisions/0128-shared-mcp-readiness.md) records the readiness policy.
+
+The selected common definitions are combined with existing debugger or Mewpet MCP bindings, which retain their own selection rules. Each definition becomes a local stdio binding to `shared-mcp-stdio.ts`, with only its private registry directory and name in the arguments. A stable `mew_<name>_<hash>` namespace avoids collisions with native server names and sanitized names. Existing native definitions can still load independently; importing does not disable them.
 
 The bridge forwards the complete JSON-RPC stream, including notifications, server requests, tools, resources, and prompts. Local servers use SDK stdio transport; HTTP and SSE use SDK remote transports. Runtime differences in native remote transport and token stores are hidden behind this stdio connection. The bridge does not print authorization URLs or tokens.
 
@@ -34,6 +36,8 @@ Each bridge reads the same installation credential cache. A bounded process-shar
 Codex ACP MCP startup diagnostics do not create assistant reply bubbles. The [conversation display contract](conversation-storage.md#display-tool-events) preserves their original records while excluding them from rendered turns. This does not suppress real MCP tool activity or change connection management.
 
 Connection status records the latest successful check or authentication requirement; it is not continuous server health monitoring. **Connect** checks the MCP initialization handshake. **Disconnect** cancels a pending job and clears saved credentials. It does not disable the definition, remove native CLI registrations, or revoke a provider grant remotely. An existing request may finish before credential invalidation is observed.
+
+Readiness selection uses this saved status without opening a network connection during session creation. A previously connected server can still fail if its upstream becomes unavailable; real initialization errors remain visible. Connection changes apply on a new conversation, clear, or saved conversation load, rather than rewriting an active conversation's tools. Local regression evidence is recorded in the [readiness work record](../work/shared-mcp-readiness.md).
 
 ## Connection jobs and API
 

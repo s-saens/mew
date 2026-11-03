@@ -1,8 +1,8 @@
 ---
 title: "Skills and MCP Management"
 created: 2026-09-17
-updated: "2026-11-03"
-description: "Explains installation-wide Mew common MCP registration and owner-only management, imports, shared login and connection controls, alongside native skill/MCP source management, supported locations, original protection, and built-in skills."
+updated: "2026-11-04"
+description: "Explains installation-wide Mew common MCP registration and owner-only management, imports, connection readiness before ACP use, shared login and connection controls, alongside native skill/MCP source management, supported locations, original protection, and built-in skills."
 상위파일: "MOC.md"
 ---
 
@@ -12,13 +12,17 @@ Decision: [ADR 0157](../../.mew/docs/history/decisions/0157-mew-native-agent-har
 
 Use **Agent panel → Manage MCP → Add → Mew shared** as an owner to register a server for this Mew installation. Enter its name and HTTPS server URL, then save. Use **Configure with JSON** for local commands, environment variables, headers, SSE, or OAuth options. Select the saved server and choose **Connect**. If approval is required, complete it in the host login screen displayed inside Mew.
 
-The same common connection and saved authentication are available to every account with agent access in new Mew ACP conversations across runtimes and projects. Start a new conversation after adding or changing the common list; an already-running conversation keeps the list it started with. CLIs launched outside Mew retain their own configuration.
+Enabled common servers enter Mew ACP conversations only when their saved connection state is **Connected**. An owner must select **Connect** and complete any required login before first use, including for local commands and remote servers that need no login. Registration alone leaves the server in the management list without adding it to a conversation.
+
+After connection succeeds, start or clear a conversation, or load a saved one, to use the current connected common list. The same common connection and saved authentication are available to every account with agent access across runtimes and projects. An active conversation retains its existing bindings; reconnecting it does not refresh the list. CLIs launched outside Mew retain their own configuration.
 
 To reuse a server already registered in Claude, Codex, or another supported source, select it and choose **Import to Mew**. Mew converts the supported configuration and preserves the source. A name collision or unsupported setting produces an error without overwriting the original. For unsupported native options, explicitly prepare a common definition with the intended supported behavior instead of silently dropping settings. Native OAuth tokens are not copied, so the first common connection may require a fresh approval. Imported native definitions can still load independently until you disable them in their owning runtime.
 
 The connection controls show the last checked state, allow retry, and cancel pending login. Closing a pending login cancels its job while preserving saved credentials. **Disconnect** clears the common connection's saved authentication; it does not remove the definition or revoke the provider's grant. The host login screen requires Linux/WSL with the existing Chrome and login-desktop dependencies. Local and unauthenticated remote servers can connect without that screen.
 
-Mew common definitions and credentials are private server data shared by all accounts on this installation. Accounts with agent access can list and use them; owners with agent access manage definitions, imports, raw configuration, and authentication. Disconnecting clears authentication for every account using that connection. Deleting an account preserves shared connections. Previous account-private registries are retained without automatic promotion; an owner must explicitly register or import a shared definition. See the [common MCP contract](../../.mew/docs/development/shared-mcp.md) and [ADR 0127](../../.mew/docs/decisions/0127-installation-wide-mcp.md).
+**Connected** records saved readiness, not continuous server health; a later outage or expired authorization can still fail a runtime connection. If a server needs login, an owner must reconnect it before starting, clearing, or loading a conversation to add it again.
+
+Mew common definitions and credentials are private server data shared by all accounts on this installation. Accounts with agent access can list and use them; owners with agent access manage definitions, imports, raw configuration, and authentication. Disconnecting clears authentication for every account using that connection. Deleting an account preserves shared connections. Previous account-private registries are retained without automatic promotion; an owner must explicitly register or import a shared definition. See the [common MCP contract](../../.mew/docs/development/shared-mcp.md), [ADR 0127](../../.mew/docs/decisions/0127-installation-wide-mcp.md), and the [connection-readiness decision](../../.mew/docs/decisions/0128-shared-mcp-readiness.md).
 
 ## Usage
 

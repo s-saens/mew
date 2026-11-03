@@ -2,7 +2,7 @@
 title: "0127 — Installation-wide common MCP connections"
 description: "Shares one Mew MCP registry and credential cache across installation accounts, with owner-only management and initiator-owned authorization jobs. Supersedes ADR 0120's private ownership without automatically publishing existing private data."
 created: "2026-11-03"
-updated: "2026-11-03"
+updated: "2026-11-04"
 status: "accepted"
 ---
 
@@ -25,6 +25,8 @@ Duplicating definitions and credentials into every account would retain drift an
 One canonical registry matches the requested sharing boundary. Owner-only management limits who can change shared tools and authentication, while agent permission controls who can use them. Keeping each approval with its initiating account preserves the existing host-browser and live-access boundaries.
 
 ## Consequences
+
+[ADR 0128](0128-shared-mcp-readiness.md) later narrows ACP injection to enabled definitions whose saved connection status is `connected`. Registration and credential ownership remain installation-wide.
 
 A definition, authentication change, or disconnect affects all accounts using that connection. Account removal preserves shared authentication; existing cleanup of the deleted account's legacy private MCP data remains. Existing private registrations require an explicit owner action before they become shared. Native registrations remain available independently and may produce duplicate bindings after import. This remains an OS-user execution boundary, not process isolation between Mew accounts.
 
