@@ -1,7 +1,7 @@
 ---
 title: "Collaborative Editing, Comments, Chat, and Guest Sharing"
-description: "Covers preparing accounts and file permissions for collaboration; adding comments with Ctrl+Shift+C or the body context menu; threads, lists, and retaining drafts on failure; collaborative editing; shared notes; active sessions and history; chat; and DMs. Includes revocable public file/folder links and distinguishes them from guest path permissions."
-updated: "2026-10-30"
+description: "Covers collaborative editing, shared notes, sessions, comments and mentions, group chat and DMs with incoming-message notifications. Includes account permissions, draft recovery, revocable public links, and guest sharing boundaries."
+updated: "2026-11-03"
 상위파일:
   - "../../.mew/docs/MOC.md"
   - "MOC.md"
@@ -68,6 +68,8 @@ Comments are managed separately rather than inserted as text in the body. They a
 ## Group Chat and DMs
 
 Open chat through Header Menu → **Chat** or `Alt+C`. In the conversation list, select the group room to talk with all members, or select a person for a 1:1 conversation. The unread conversation count and the number of recipients who have not read each message are displayed.
+
+While mew is open, new messages from other people appear in the header notification bell even when chat is closed. Select a notification to open its group room or DM. **Settings → Notifications** controls in-app display, Mewpet/toasts, sound, and desktop notifications; desktop delivery requires browser permission and an inactive window. Reloading does not turn old chat history into new notifications, and closing the browser stops delivery.
 
 If you insert a file reference in the input and send it, recipients can click the reference to open it in the mew editor. After opening chat, press `Ctrl+L` in the editor to insert a file mention into the input according to the [reference forwarding rules](editor.md#ctrll-references-경로줄). If you opened another auxiliary panel most recently, that panel may receive the reference.
 

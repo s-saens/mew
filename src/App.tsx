@@ -63,6 +63,7 @@ import { useDockPreferences } from './hooks/use-dock-preferences'
 import { useMobileKeyboard } from './hooks/use-mobile-keyboard'
 import { adjacentDockPanel, type MobileDockPanel } from './utils/mobile-dock'
 import { useMewcatNotifications } from './hooks/use-mewcat-notifications'
+import { useChatNotifications } from './hooks/use-chat-notifications'
 import { OPEN_NOTICE_EVENT, publishMewcatNotice, type MewcatNotice } from './utils/mewcat-notifications'
 import { SidebarCreateButtons } from './components/sidebar-create-buttons'
 import { useSidebarCreate } from './hooks/use-sidebar-create'
@@ -401,6 +402,8 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
   const [androidOpen, setAndroidOpen] = useState(() => caps.android && scopedBrowserStorage().getItem(ANDROID_OPEN_KEY) === '1')
   // 멤버 채팅 창(Alt+C)은 채팅 기능 권한을 따른다.
   const [chatOpen, setChatOpen] = useState(false)
+  const [chatConversationRequest, setChatConversationRequest] = useState<{ conversation: string }>()
+  useEffect(() => { setChatOpen(false); setChatConversationRequest(undefined) }, [authEmail, caps.chat])
   // 모바일 보조창은 종류별 예외 없이 이 스택 하나로 전면 순서와 뒤로가기 순서를 공유한다.
   // 새 패널을 WORKSPACE_PANEL_IDS에 넣으면 아래 registry가 빠진 연결을 타입 오류로 알려 준다.
   const [mobilePanelStack, setMobilePanelStack] = useState<WorkspacePanelId[]>(() =>
@@ -553,6 +556,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
   const [fontPreferences, setFontPreferences] = useState(loadFontPreferences)
   const [themeSettings, setThemeSettings] = useAccountTheme(isGuest ? null : authEmail, error => showToast(error instanceof Error ? error.message : String(error)))
   useMewcatNotifications(caps.system, authEmail)
+  useChatNotifications(caps.chat, authEmail)
   const [noticeTarget, setNoticeTarget] = useState<Extract<MewcatNotice['target'], object>>()
   const [readyNoticeTarget, setReadyNoticeTarget] = useState<typeof noticeTarget>()
   const [mewcatHideDesktop, setMewcatHideDesktop] = useState(loadMewcatHideDesktop)
@@ -971,6 +975,10 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
       const notice = (event as CustomEvent<MewcatNotice>).detail
       if (notice.target === 'updates' && caps.system) setUpdatesOpen(true)
       else if (notice.target === 'system' && caps.system) setSysStatsOpen(true)
+      else if (notice.target === 'chat' && caps.chat) {
+        setChatConversationRequest({ conversation: notice.chatConversation ?? 'group' })
+        openWorkspacePanel('chat')
+      }
       else if (notice.target && typeof notice.target === 'object' && caps.agent) {
         const target = notice.target
         const workspace = target.workspacePath ?? target.cwd
@@ -981,7 +989,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     }
     window.addEventListener(OPEN_NOTICE_EVENT, open)
     return () => window.removeEventListener(OPEN_NOTICE_EVENT, open)
-  }, [caps.system, caps.agent, projectUiPath, rootProjectPath, canOpenProjects, openRootProject])
+  }, [caps.system, caps.agent, caps.chat, projectUiPath, rootProjectPath, canOpenProjects, openRootProject, openWorkspacePanel])
 
   const openSidebarProject = useCallback(async (scope: string, path: string) => {
     if (!canOpenProjects || !rootProjectPath || projectOpeningRef.current) return
@@ -2490,6 +2498,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
                 <ChatPanel
                   authEmail={authEmail}
                   authDisplayName={auth.displayName}
+                  conversationRequest={chatConversationRequest}
                 project={project}
                 tree={tree}
                 onOpenFile={openMentionedFile}

@@ -1,6 +1,6 @@
 ---
-title: "Member chat bubble alignment"
-description: "Records the 2026-11-03 member chat presentation change: own messages on the right, other participants on the left, grouped headers, bounded wrapping, and local verification."
+title: "Member chat presentation and recipient notifications"
+description: "Records the 2026-11-03 member chat bubble alignment and recipient notification work. Covers grouped headers, wrapping, closed-panel collection, conversation navigation, and local verification limits."
 created: "2026-11-03"
 updated: "2026-11-03"
 ---
@@ -18,3 +18,16 @@ The member chat previously rendered every message as left-aligned text. The chan
 - `npm run build` passed, including TypeScript checks and the Vite production build, with chunk-size warnings. The first two attempts stopped at an implicit `any` callback parameter in the unrelated pending `server/input-focus-ui.test.ts`. An explicit `Event` annotation unblocked that check; the file contains another task's changes and is excluded from the chat commit.
 
 No deployment or application server lifecycle operations were performed. Real multi-account delivery was not exercised through a running application.
+
+## Recipient notifications
+
+The follow-up adds incoming member-chat messages to the existing notification center even when chat is closed. Initial history is silent; a monotonic cursor excludes old and duplicate messages, the current sender, and other people's DMs. Notification actions open the corresponding group room or DM. Desktop titles omit the sender and message body, and channel settings remain shared with existing notifications. The [recipient notification contract](../features/collaboration-comments-chat/group-chat-direct-messages-and-read-status.md#recipient-notifications) owns current behavior.
+
+Follow-up verification:
+
+- `node --test src/utils/chat-notification-rules.test.ts src/hooks/use-chat-notifications.test.ts src/utils/mewcat-notifications.test.ts src/components/mewcat-notifications.test.ts server/chat-bubbles-ui.test.ts server/chat.test.ts server/chat-history.test.ts`: 44 passed, none skipped. Coverage includes group/DM eligibility, silent history, bounded ID retention, duplicates, deletion, absent-panel collection, header notification clicks, serialized overlapping requests, failure recovery, account/permission cleanup, foreground/reconnection catchup, initial DM read isolation, and repeated navigation to the same DM.
+- The existing desktop delivery test now verifies a generic localized chat title without the sender and opens the corresponding DM when clicked. Delivery is simulated with a fake browser notification API; actual OS permission prompts, audio playback, physical devices, and real multi-account delivery were not exercised.
+- `npm run build` passed with chunk-size warnings. `npm run lint` passed with existing warnings; targeted lint for the new notification modules and tests passed without warnings. `git diff --check` passed.
+- The full documentation check still reports the unrelated pending task asset URL listed above. Changed document descriptions and local links passed scoped inspection.
+
+Only chat-related hunks in the already modified `src/App.tsx` belong to this change. Other project-navigation edits remain outside its commit. No deployment or application server lifecycle operation was performed.

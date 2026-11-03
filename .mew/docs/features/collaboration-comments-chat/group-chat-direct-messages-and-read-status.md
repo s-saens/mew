@@ -10,7 +10,7 @@ files:
   - src/components/ChatPanel.tsx
   - server/chat.ts
 commits: []
-description: "Group rooms and DMs with right-aligned own-message bubbles, left-aligned participant bubbles, read receipts, and file references. Covers owner-only history deletion, permissions, DM delivery boundaries, and the preserved needs-fix user assessment."
+description: "Group rooms and DMs with aligned message bubbles, recipient notifications, read receipts, and file references. Covers notification navigation, owner-only history deletion, permissions, DM delivery boundaries, and the preserved needs-fix user assessment."
 상위파일:
   - "MOC.md"
   - "_collaboration-comments-chat.md"
@@ -36,6 +36,14 @@ description: "Group rooms and DMs with right-aligned own-message bubbles, left-a
 - Use the existing theme surfaces and rounded bubble styling from agent conversations. Keep text left-aligned inside both bubble directions. Limit bubble width to 85% of the message area, and wrap long text and file references without horizontal overflow.
 - Align the author and timestamp with the bubble's side. Consecutive messages by the same author within five minutes retain separate bubbles with a smaller gap and omit the repeated header.
 - Place a nonzero unread-recipient count outside each bubble, toward the center of the conversation; hide it when everyone has read the message. Preserve clickable file references, sending, and conversation filtering.
+
+### Recipient notifications
+
+- While the app is open, collect new incoming group messages and DMs even when the chat panel is closed. Notify only signed-in accounts with chat permission. Exclude the sender's own messages and DMs addressed to other accounts.
+- Use the existing notification center: the header bell and recent list, plus Mewpet/toasts, desktop delivery, and sounds according to the user's notification settings. See [notification channels](../appearance-accounts-operations/mewpet-mascot-notifications-and-breaks.md#notification-settings-and-pc-desktop-notifications). Desktop notifications require permission and an inactive window; they contain only a generic localized chat title, without sender or message text.
+- An in-app notice identifies the sender without copying the message body. Clicking the notice opens the group room or the sender's DM, including when the panel is closed or another conversation is selected. Opening the notification acknowledges it through the existing notification center; conversation read receipts retain their separate behavior.
+- Establish the initial chat history silently. After that, each new message produces at most one notice per page, including after a read-status signal, repeated delivery, history deletion, reconnect, or foreground reconciliation. Notifications are neither persisted across reloads nor delivered after the browser is closed.
+- Account or permission changes stop collection and discard pending responses from the previous subscription. Reuse authenticated REST reads and content-free presence signals; notification support does not change DM delivery permissions.
 
 ### Delete history
 

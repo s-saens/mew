@@ -143,6 +143,7 @@ function GroupGlyph() {
 export function ChatPanel({
   authEmail,
   authDisplayName,
+  conversationRequest,
   project,
   tree,
   onOpenFile,
@@ -150,6 +151,7 @@ export function ChatPanel({
 }: {
   authEmail: string | null
   authDisplayName: string | null
+  conversationRequest?: { conversation: string }
   project: string
   tree: TreeNode[]
   onOpenFile: (project: string, path: string) => void
@@ -159,7 +161,7 @@ export function ChatPanel({
   const [view, setView] = useState<ChatView>({ messages: [], unread: {}, dmSupported: true })
   const [members, setMembers] = useState<MemberProfile[]>([])
   /** 지금 보고 있는 대화 — GROUP_CHAT이거나 상대 이메일 */
-  const [active, setActive] = useState<string>(GROUP_CHAT)
+  const [active, setActive] = useState<string>(() => conversationRequest?.conversation ?? GROUP_CHAT)
   const [draft, setDraft] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
@@ -167,6 +169,12 @@ export function ChatPanel({
   const deleteInFlight = useRef(false)
   const scrollRef = useRef<HTMLDivElement>(null)
   const stickToBottomRef = useRef(true)
+
+  useEffect(() => {
+    if (!conversationRequest) return
+    stickToBottomRef.current = true
+    setActive(conversationRequest.conversation)
+  }, [conversationRequest])
 
   const refresh = useCallback(() => {
     fetchChat()

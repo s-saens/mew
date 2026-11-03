@@ -1,6 +1,6 @@
 ---
 title: "Collaboration rooms and member chat"
-description: "Defines per-root Yjs rooms, wire and backend contracts, permission-checked file preparation and recovery, and headless DOM restrictions. Covers theme signals, shared memo persistence and focus, tab presence and connection history, member chat, and panel subscriptions."
+description: "Defines per-root Yjs rooms, permission-checked preparation and recovery, and headless DOM restrictions. Covers theme signals, shared memo, presence and history, member chat with recipient notification collection, and panel subscriptions."
 updated: "2026-11-03"
 상위파일:
   - "../MOC.md"
@@ -101,6 +101,10 @@ Each person has one group chat and 1:1 DMs. Delivery uses **presence signals + R
 - Deletion preserves read pointers. New timestamps exceed both the ledger's last message and every stored read pointer, including when deletion/resending happen within one millisecond.
 - Broadcast read state **only when it changes**; repeatedly writing it while the window is open causes an infinite broadcast loop.
 - The 500-line limit is shared by the group chat and DMs
+
+`useChatNotifications` collects incoming notices outside the chat panel while a signed-in account has chat permission. It establishes a silent REST baseline, serializes subsequent reads on chat signals, and reconciles on permission/reconnection and foreground events. Pending signals cause one follow-up read rather than concurrent requests. Cleanup prevents a response from an old identity or permission subscription from publishing notices.
+
+`createChatNoticeTracker` uses the server's strictly increasing message timestamps as a high-water mark that never decreases after deletion or truncation. It excludes the current author and nonrecipient DMs, deduplicates message IDs, and publishes the shared `chat` notice with `target: 'chat'` and a viewer-relative `chatConversation`. The notification stores the sender, never the body. `App` opens that conversation through the existing workspace panel controls, and `ChatPanel.conversationRequest` handles initial and repeated navigation requests. Requirements and limits follow [recipient notifications](../features/collaboration-comments-chat/group-chat-direct-messages-and-read-status.md#recipient-notifications).
 
 ## Panel state subscriptions
 

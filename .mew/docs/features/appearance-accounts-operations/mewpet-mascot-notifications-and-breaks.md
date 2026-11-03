@@ -8,7 +8,7 @@ updated: "2026-11-03"
 status_hash: "8b1758c7281118da18b267a2c001213bb7c463d4dbd018bb221e192d83f43ec3"
 files: ["server/mewpet-skins.ts", "server/mewpet-skin-routes.ts", "shared/mewpet-skins.ts", "src/components/header-notifications.tsx", "src/components/header-resources.tsx", "src/utils/mewcat-notifications.ts", "src/components/Mewcat.tsx", "src/components/mewcat-skin-settings.tsx", "src/components/mewcat-size-settings.tsx", "src/utils/mewcat-size-preferences.ts", "src/utils/mewcat-sprites.ts", "src/utils/mewcat-sprite-storage.ts", "src/components/mewcat-fullscreen-guide.tsx", "src/hooks/use-startup-guide.ts", "src/utils/app-install.ts", "src/components/mewcat-resources.tsx", "src/components/SettingsModal.tsx", "src/components/mewcat-notifications.tsx", "src/hooks/use-mewcat-notifications.ts", "src/utils/mewcat-notification-rules.ts", "src/components/mewcat-break.tsx", "src/hooks/use-mewcat-break.ts", "src/utils/mewcat-break-rules.ts"]
 commits: []
-description: "Mewpet motion, skin selection and file registration, notifications, resource gauges, optional breaks, and startup guidance. Covers storage and migration, accessibility, owner controls, and actual verification limits."
+description: "Mewpet motion, skins, agent and incoming member-chat notifications, resource gauges, optional breaks, and startup guidance. Covers notification channels, storage and migration, accessibility, owner controls, and verification limits."
 상위파일:
   - "MOC.md"
   - "_appearance-accounts-operations.md"
@@ -38,7 +38,7 @@ description: "Mewpet motion, skin selection and file registration, notifications
 
 ### Boundaries and limitations
 
-- Monitor only connected ACP chat tabs in the current project.
+- Agent alerts monitor only connected ACP chat tabs in the current project. Incoming member-chat notifications follow the [recipient notification contract](../collaboration-comments-chat/group-chat-direct-messages-and-read-status.md#recipient-notifications).
 - Exclude terminal-only agents and push notifications when the browser is closed.
 - OS notifications require browser permission and a supported environment.
 - In normal display mode, movement is restricted to the floor.
@@ -289,6 +289,7 @@ The manually opened recent list, helper, and fullscreen startup guide retain the
 - **Errors and approvals**: Reports agent errors, authentication failures, failed exits, approval requests, and abnormal interruptions such as token limits. The error/turn_end
   events for the same failure trigger only one notification, and the corresponding notification is removed once approval processing is complete.
 - **Disconnection**: Does not send Mewpet speech bubble, list, sound, or desktop notifications. Repetitive disconnection notifications were removed at the user's request and must not be reintroduced unless requested. Disconnection is indicated only by a translucent dark overlay and loading indicator within the affected agent panel ([Panel Connection Indicator](../terminals-agents-automation/agent-conversations-queue-and-restoration.md#waiting-for-connection-and-reconnecting)).
+- **Member chat**: New incoming group messages and DMs use the same channels while the app is open, including when the chat panel is closed. Opening a chat notice navigates to its group room or sender's DM. Initial history, own messages, nonrecipient DMs, and duplicate signals do not create notices. The [chat feature](../collaboration-comments-chat/group-chat-direct-messages-and-read-status.md#recipient-notifications) owns delivery scope and navigation; desktop titles omit the sender and body.
 - **Updates**: When an account with system permission accesses the app, relevant installed items are checked, and available updates are reported with a count and representative items. **View Updates** opens the unified update screen. A failed check is not reported as up to date. Detailed targets and execution restrictions follow [Unified Updates](../../../../docs/deployment/native.md#unified-updates-for-installed-dependencies-and-agents).
 - **Overload**: Only accounts with system resource permissions monitor the **server machine** through the [lightweight resource summary](system-resources-and-processes.md#collection-and-api), `/api/system-stats?processes=0`. This does not monitor the
   memory or JS heap of the PC running the browser. Queries run without overlap at 15-second intervals after each request completes, with

@@ -159,13 +159,27 @@ test('OS delivery requires permission, preference and an inactive window; payloa
   assert.equal(FakeNotification.sent.length, 1)
   assert.ok(!JSON.stringify(FakeNotification.sent[0]).includes('SECRET'))
   assert.equal(FakeNotification.sent[0].options.silent, true)
+  await act(async () => store.publishMewcatNotice({ key: 'desktop-chat', kind: 'chat', level: 'success', source: 'PRIVATE sender@example.test', target: 'chat', chatConversation: 'sender@example.test' }))
+  assert.equal(FakeNotification.sent.length, 2)
+  assert.equal(FakeNotification.sent[1].title, 'mew · New chat message')
+  assert.ok(!JSON.stringify(FakeNotification.sent[1]).includes('sender@example.test'))
+  const opened: unknown[] = []
+  const onOpen = (event: Event) => opened.push((event as CustomEvent).detail.chatConversation)
+  window.addEventListener(store.OPEN_NOTICE_EVENT, onOpen)
+  const previousFocus = window.focus
+  window.focus = () => {}
+  await act(async () => FakeNotification.sent[1].onclick?.())
+  assert.deepEqual(opened, ['sender@example.test'])
+  assert.equal(FakeNotification.sent[1].closed, true)
+  window.focus = previousFocus
+  window.removeEventListener(store.OPEN_NOTICE_EVENT, onOpen)
   FakeNotification.permission = 'denied'
   await act(async () => send('denied'))
-  assert.equal(FakeNotification.sent.length, 1)
+  assert.equal(FakeNotification.sent.length, 2)
   FakeNotification.permission = 'granted'
   await act(async () => store.setNotificationPreferences({ desktop: false }))
   await act(async () => send('disabled'))
-  assert.equal(FakeNotification.sent.length, 1)
+  assert.equal(FakeNotification.sent.length, 2)
   await view.close()
   assert.equal(FakeNotification.sent[0].closed, true)
   Reflect.deleteProperty(globalThis, 'Notification')
