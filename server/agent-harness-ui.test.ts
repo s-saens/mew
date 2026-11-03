@@ -243,8 +243,8 @@ createRoot(document.getElementById('root')).render(<AgentHarnessButtons cwd="/pr
         locations: [{ id: 'mew-mcp', kind: 'mcp', agent: 'mew', scope: 'mew', label: 'Mew', path: 'Mew account MCP', writable: true }, { id: 'claude-mcp', kind: 'mcp', agent: 'claude', scope: 'global', label: 'Claude', path: '/home/test/.claude.json', writable: true }],
         items: [{ id: 'native', location: 'claude-mcp', name: 'cloudflare', description: '기존 Claude MCP', path: '/home/test/.claude/plugins/cloudflare/.mcp.json', writable: false, reason: '플러그인 설정' }], warnings: [],
       }
-      let detailRequests = 0, ownsJob = true
-      const connection = () => ({ name: 'shared-cloud', status, ...(status === 'needs_auth' ? { streamUrl: '/api/agent/mcp/login-desktop/job/stream', ownsJob } : {}) })
+      let detailRequests = 0, ownsJob: boolean | undefined
+      const connection = () => ({ name: 'shared-cloud', status, ...(status === 'needs_auth' && ownsJob !== undefined ? { ownsJob, ...(ownsJob ? { streamUrl: '/api/agent/mcp/login-desktop/job/stream' } : {}) } : {}) })
       await page.route('http://mew-shared-mcp.test/**', async route => {
         const url = new URL(route.request().url())
         if (url.pathname === '/app.js') return route.fulfill({ contentType: 'text/javascript', body: chunk.code })
@@ -266,6 +266,7 @@ createRoot(document.getElementById('root')).render(<AgentHarnessButtons cwd="/pr
           assert.deepEqual(route.request().postDataJSON(), { name: 'shared-cloud' })
           if (action === 'connect' && failConnect) { failConnect = false; return route.fulfill({ status: 502, json: { error: '연결 서버가 응답하지 않습니다.' } }) }
           status = action === 'connect' ? 'needs_auth' : 'disconnected'
+          ownsJob = action === 'connect' ? true : undefined
           return route.fulfill({ json: connection() })
         }
         return route.fulfill({ contentType: 'text/html', body: `<!doctype html><html class="${width === 390 ? '' : 'dark'}" lang="ko"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}html,body{margin:0}</style><div id="root"></div><script src="/app.js"></script></html>` })
@@ -293,11 +294,21 @@ createRoot(document.getElementById('root')).render(<AgentHarnessButtons cwd="/pr
       assert.equal(mutations.at(-1)?.target, 'mew-mcp')
       assert.deepEqual(JSON.parse(mutations.at(-1)!.content!), { type: 'http', url: 'https://mcp.example.com/mcp' })
       const sharedRow = () => page.getByRole('button', { name: 'shared-cloud Mew 공통', exact: true })
+      status = 'needs_auth'
       await sharedRow().click()
       const state = () => page.getByRole('region', { name: 'MCP 연결 상태', exact: true })
-      await state().getByRole('status').filter({ hasText: '연결 안 됨' }).waitFor()
+      await state().getByRole('status').filter({ hasText: '로그인 필요' }).waitFor()
+      assert.equal(await state().getByRole('button', { name: '로그인', exact: true }).isEnabled(), true, 'saved authentication requirements offer a way to start login')
+      assert.equal(await state().getByRole('button', { name: '연결 취소', exact: true }).count(), 0, 'saved authentication requirements are not active authorization jobs')
+      const savedAuthPolls = polls
+      await new Promise(resolve => setTimeout(resolve, 1700))
+      assert.equal(polls, savedAuthPolls, 'saved authentication requirements are not polled')
+      await page.getByRole('button', { name: '닫기', exact: true }).click()
+      assert.deepEqual(connectionActions, [], 'closing saved authentication requirements does not cancel a job')
+      await opener.click(); await sharedRow().click()
+      await state().getByRole('status').filter({ hasText: '로그인 필요' }).waitFor()
       assert.equal(await page.getByRole('button', { name: '이동', exact: true }).count(), 0)
-      await page.getByRole('button', { name: '연결', exact: true }).click()
+      await state().getByRole('button', { name: '로그인', exact: true }).click()
       const viewer = page.getByRole('region', { name: 'MCP 로그인 화면', exact: true })
       await viewer.waitFor()
       assert.equal(await viewer.getAttribute('data-stream-url'), '/api/agent/mcp/login-desktop/job/stream')

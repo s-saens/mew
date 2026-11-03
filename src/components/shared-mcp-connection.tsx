@@ -7,7 +7,7 @@ import { changeSharedMcpConnection, fetchSharedMcpStatus } from '../api/shared-m
 import { LoginDesktopViewer } from './LoginDesktopViewer'
 
 const button = 'inline-flex min-h-9 items-center justify-center gap-1.5 rounded px-2 text-xs text-ink-secondary hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-40'
-const pending = (value: SharedMcpConnectionStatus | null) => value?.status === 'connecting' || value?.status === 'needs_auth'
+const pending = (value: SharedMcpConnectionStatus | null) => value?.status === 'connecting' || value?.status === 'needs_auth' && typeof value.ownsJob === 'boolean'
 const ownsPendingJob = (value: SharedMcpConnectionStatus | null) => pending(value) && value?.ownsJob === true
 
 export function SharedMcpConnection({ name, canManage }: { name: string; canManage: boolean }) {
@@ -75,7 +75,7 @@ export function SharedMcpConnection({ name, canManage }: { name: string; canMana
       <span role="status" className={`min-w-0 flex-1 text-xs ${connection?.status === 'connected' ? 'text-success' : 'text-ink-secondary'}`}>{label}</span>
       {canManage && (pending(connection) ? <button type="button" className={button} aria-label={uiText('연결 취소')} data-tip={uiText('연결 취소')} disabled={busy} onClick={() => void change('cancel')}><Xmark width={16} height={16} aria-hidden /></button>
         : connection?.status === 'connected' ? <button type="button" className={button} aria-label={uiText('연결 해제')} data-tip={uiText('연결 해제')} disabled={busy} onClick={() => void change('disconnect')}><PlugTypeA width={16} height={16} aria-hidden /></button>
-          : <button type="button" className={button} disabled={busy || !connection && !error} onClick={() => void change('connect')}>{error || connection?.status === 'error' ? <RefreshDouble width={14} height={14} aria-hidden /> : <PlugTypeA width={14} height={14} aria-hidden />}{connection?.status === 'error' || error ? uiText('다시 연결') : uiText('연결')}</button>)}
+          : <button type="button" className={button} disabled={busy || !connection && !error} onClick={() => void change('connect')}>{error || connection?.status === 'error' ? <RefreshDouble width={14} height={14} aria-hidden /> : <PlugTypeA width={14} height={14} aria-hidden />}{connection?.status === 'needs_auth' ? uiText('로그인') : connection?.status === 'error' || error ? uiText('다시 연결') : uiText('연결')}</button>)}
     </div>
     {(error || connection?.error) && <p role="alert" className="mt-1 break-words text-xs text-danger-strong">{error || connection?.error}</p>}
     {canManage && connection?.status === 'needs_auth' && connection.streamUrl && <div className="mt-2 h-64 min-h-0 overflow-hidden rounded sm:h-80"><LoginDesktopViewer key={connection.streamUrl} streamUrl={connection.streamUrl} reopen={async () => {

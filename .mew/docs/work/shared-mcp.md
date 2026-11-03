@@ -1,6 +1,6 @@
 ---
 title: "Mew common MCP implementation"
-description: "Records the common MCP implementation, the November 3 installation-wide ownership change, and the November 4 correction for startup diagnostics creating empty Done reply bubbles. Separates fixture checks and builds from pending server application and real-provider approval."
+description: "Records the common MCP implementation, the November 3 installation-wide ownership change, and the November 4 corrections for startup diagnostic reply bubbles and an unavailable sign-in action. Separates fixture checks and builds from pending server application and real-provider approval."
 created: "2026-11-02"
 updated: "2026-11-04"
 ---
@@ -62,3 +62,14 @@ Local verification:
 - `npm run check:docs` found 676 valid descriptions and the existing unrelated absolute image link in the Image preview and attachment editing task. The three changed documents passed scoped metadata and link checks. `git diff --check` passed.
 
 No production transcript was modified, and no deployment, launcher invocation, or server lifecycle operation was performed. Real-provider reconnection and runtime application remain outside local fixture verification.
+
+
+## Saved sign-in state recovery: 2026-11-04
+
+A saved `needs_auth` status was treated as an active login job. The management panel displayed only cancellation, even though no authorization job or login desktop existed; cancelling returned the same saved state.
+
+The panel now distinguishes saved authentication requirements from live jobs using the existing `ownsJob` field. A saved requirement shows **Log in** and starts no polling or cancellation merely from opening or closing the panel. Selecting **Log in** starts the existing owner-authorized connection flow. Active approval polling, login desktop display, explicit owner cancellation, and initiator-only automatic cleanup retain their behavior. No backend authorization or credential storage contract changed. The [current connection contract](../development/shared-mcp.md#connection-jobs-and-api) and [user guide](../../../docs/configuration/agent-harness.md#mew-common-mcp) own the controls.
+
+The regression failed before the fix because no login button existed. After the fix, both desktop/mobile harness browser tests passed, covering 1200px and 390px viewports, idle saved sign-in state, absence of polling/cancellation, starting an owned login job, the login viewer, and existing owner-observer/member restrictions. Four shared translation tests also passed. `npm run build` and `npm run lint` passed with existing warnings. The three changed documents passed description and link checks; the full documentation check found 678 valid descriptions and the existing unrelated task image link. `git diff --check` passed.
+
+The build updates the served UI assets; refreshing the browser applies this frontend correction without a backend change. No real-provider approval or server lifecycle operation was performed.

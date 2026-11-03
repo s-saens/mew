@@ -1,6 +1,6 @@
 ---
 title: "Mew common MCP connections"
-description: "Defines installation-wide common MCP registration, connection-ready ACP injection, stdio forwarding, shared OAuth storage and refresh coordination, connection jobs, startup diagnostics, permissions, and verification boundaries."
+description: "Defines installation-wide common MCP registration, connection-ready ACP injection, stdio forwarding, shared OAuth storage and refresh coordination, connection jobs, actionable sign-in recovery, startup diagnostics, permissions, and verification boundaries."
 created: "2026-11-02"
 updated: "2026-11-04"
 ---
@@ -49,6 +49,8 @@ All endpoints require an authenticated account with the `agent` feature and retu
 | `POST /api/agent/mcp/connect` | `{name}` starts or returns the installation's bounded connection job for that server |
 | `POST /api/agent/mcp/cancel` | Cancels a pending job while preserving credentials |
 | `POST /api/agent/mcp/disconnect` | Cancels work and clears the common connection's saved credentials |
+
+A saved `needs_auth` status without `ownsJob` reports that authorization is required; it is not an active login job. The owner sees **Log in**, which starts the existing connection flow. The UI polls and offers cancellation only for an active connection job: `connecting`, or `needs_auth` with an explicit `ownsJob` boolean. Opening or closing a saved sign-in-required status alone neither starts polling nor cancels work.
 
 Only one connection job may run for a registry/server name across all accounts. Status can report that shared work, but the login stream remains visible only to the initiating account. `ownsJob` identifies that account so closing an observer's management panel does not automatically cancel another account's approval. A second account cannot take over or open its login desktop. Another owner may explicitly cancel or disconnect the shared connection.
 

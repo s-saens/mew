@@ -2,7 +2,7 @@
 title: "Skills and MCP Management"
 created: 2026-09-17
 updated: "2026-11-04"
-description: "Explains installation-wide Mew common MCP registration and owner-only management, imports, connection readiness before ACP use, shared login and connection controls, alongside native skill/MCP source management, supported locations, original protection, and built-in skills."
+description: "Explains installation-wide Mew common MCP registration and owner-only management, imports, connection readiness before ACP use, actionable shared login and connection controls, alongside native skill/MCP source management, supported locations, original protection, and built-in skills."
 상위파일: "MOC.md"
 ---
 
@@ -10,7 +10,7 @@ Decision: [ADR 0157](../../.mew/docs/history/decisions/0157-mew-native-agent-har
 
 ## Mew common MCP
 
-Use **Agent panel → Manage MCP → Add → Mew shared** as an owner to register a server for this Mew installation. Enter its name and HTTPS server URL, then save. Use **Configure with JSON** for local commands, environment variables, headers, SSE, or OAuth options. Select the saved server and choose **Connect**. If approval is required, complete it in the host login screen displayed inside Mew.
+Use **Agent panel → Manage MCP → Add → Mew shared** as an owner to register a server for this Mew installation. Enter its name and HTTPS server URL, then save. Use **Configure with JSON** for local commands, environment variables, headers, SSE, or OAuth options. Select the saved server and choose **Connect**, or **Log in** when its saved state says that sign-in is required. If approval is required, complete it in the host login screen displayed inside Mew.
 
 Enabled common servers enter Mew ACP conversations only when their saved connection state is **Connected**. An owner must select **Connect** and complete any required login before first use, including for local commands and remote servers that need no login. Registration alone leaves the server in the management list without adding it to a conversation.
 
