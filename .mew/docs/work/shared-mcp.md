@@ -1,8 +1,8 @@
 ---
 title: "Mew common MCP implementation"
-description: "Records the initial common MCP implementation and the 2026-11-03 change to installation-wide registration and authentication with owner-only management. Separates fixture checks and builds from pending server application and real-provider approval."
+description: "Records the common MCP implementation, the November 3 installation-wide ownership change, and the November 4 correction for startup diagnostics creating empty Done reply bubbles. Separates fixture checks and builds from pending server application and real-provider approval."
 created: "2026-11-02"
-updated: "2026-11-03"
+updated: "2026-11-04"
 ---
 
 ## Initial implementation: 2026-11-02
@@ -47,3 +47,18 @@ Local follow-up verification:
 - A local registration operation validated every source before publishing the complete common registry, deduplicated equivalent entries, preserved native source bytes, and verified eight distinct runtime bindings and POSIX file mode 0600. Unsupported native timeout options were omitted only from explicitly prepared common definitions; their original settings remain unchanged. This checked registration and configuration, not live provider access.
 
 No deployment, launcher execution, or app-server lifecycle operation was performed. The user must apply the server-side change before the running installation uses the shared registry, then start or reload a conversation. Real-provider approval remains unverified and can require a fresh owner connection in the common MCP panel.
+
+
+## MCP startup reply-bubble correction: 2026-11-04
+
+Read-only transcript inspection and an isolated event-fold reproduction confirmed that Codex ACP can emit reserved `mcp_startup.*` tool-call diagnostics after a completed user turn. The conversation fold created a new tool-only turn; the idle UI then labelled that empty reply “Done”. No synthetic user prompt or actual assistant “Done” text was responsible.
+
+The display fold now ignores these startup diagnostics before creating a turn. Deferred history preserves their identity instead of converting them into anonymous work markers, while retaining every sequence position. Original transcript records, real MCP tool calls, and genuine assistant replies remain intact. The [conversation display contract](../development/conversation-storage.md#display-tool-events) owns this behavior; MCP connection management and authorization are unchanged.
+
+Local verification:
+
+- All 29 focused tests passed: 28 event-fold, display projection, and history-state tests plus one real AgentPanel browser regression covering both 1100px desktop and 390px mobile. Checks include late startup call/update events, restored history, startup-only history, ordinary MCP tool details, genuine assistant “Done” text, and preserved sequence positions and source objects.
+- `npm run build` passed, including TypeScript and Vite, with the existing large-chunk warning. Separate TypeScript and new browser-test lint checks passed. Global `npm run lint` passed with existing warnings.
+- `npm run check:docs` found 676 valid descriptions and the existing unrelated absolute image link in the Image preview and attachment editing task. The three changed documents passed scoped metadata and link checks. `git diff --check` passed.
+
+No production transcript was modified, and no deployment, launcher invocation, or server lifecycle operation was performed. Real-provider reconnection and runtime application remain outside local fixture verification.

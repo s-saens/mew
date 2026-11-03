@@ -1,8 +1,8 @@
 ---
 title: "Conversation Storage and Range Synchronization"
 created: 2026-09-30
-updated: "2026-11-03"
-description: "Conversation persistence and recovery contracts: SQLite originals and attachments, range and work-detail synchronization, temporary restoration display, per-frame updates, and local prompt feedback. Defines IndexedDB cache and queue scope, limits, and authority, including the 25ms transcript-cache startup gate and parallel queue restoration."
+updated: "2026-11-04"
+description: "Conversation persistence and recovery contracts: SQLite originals and attachments, range/work-detail synchronization, MCP startup diagnostic exclusion, temporary restoration display, per-frame updates, and local prompt feedback. Defines IndexedDB cache and queue scope, limits, and authority, including the 25ms transcript-cache startup gate and parallel queue restoration."
 상위파일: "MOC.md"
 ---
 
@@ -69,6 +69,8 @@ For browser copies, `shared/agent-display.ts` reduces `update` in `tool_call` an
 Reduce data first at the `server/agentHost.ts` IPC send boundary, avoiding serialization of large originals between supervisor and server. Keep the same transformation in the shared send function of `server/agentWs.ts`, after authentication/permission checks, for `history`, full `replay`, and individual events from older supervisors. Preserve order, generation, sequence numbers, range boundaries, and restoration failure information.
 
 SQLite transcripts, supervisor memory, and provider ACP history retain originals. Display conversion neither mutates original objects nor participates in provider restoration, context, or tool execution. It reduces transfer volume for large tool results, without guaranteeing total transfer volume or initial display time for large questions/answers.
+
+**MCP startup diagnostics.** Codex ACP reports asynchronous server startup failures/cancellations as `tool_call` or `tool_call_update` with reserved `mcp_startup.*` IDs. These are connection diagnostics, not assistant work for a user request. The display fold ignores them before allocating a conversation turn, both live and during replay. Do not defer them into anonymous `work_pending` markers: retain their identity and one sequence position so the browser can apply the same rule. Preserve original supervisor/SQLite/provider records and ordinary MCP tool calls; genuine assistant text such as “Done” remains visible. Common connection state and recovery stay in the [MCP management contract](shared-mcp.md#shared-authentication).
 
 ### Lazy Loading of Collapsed Work Details
 

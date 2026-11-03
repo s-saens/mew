@@ -18,6 +18,31 @@ test('한 턴은 질문 하나와 답변 묶음 하나로 접힌다', () => {
   assert.equal(turn.kind === 'turn' && turn.done, true)
 })
 
+test('late MCP startup diagnostics do not create a completed answer bubble', () => {
+  const completed = [user('Question'), { type: 'turn_start' } as AgentEvent, agent('Answer'), { type: 'turn_end', stopReason: 'end_turn' } as AgentEvent]
+  const startup: AgentEvent[] = [
+    { type: 'update', update: { sessionUpdate: 'tool_call', toolCallId: 'mcp_startup.fixture', title: 'mcp__fixture__startup', status: 'failed' } },
+    { type: 'update', update: { sessionUpdate: 'tool_call_update', toolCallId: 'mcp_startup.fixture', status: 'failed' } },
+  ]
+  const original = createEventFold('en')
+  const answered = appendEventFold(original, completed)
+  const late = appendEventFold(answered, startup)
+  assert.equal(late.items, answered.items, 'out-of-turn diagnostics leave rendered items intact')
+  assert.equal(late.length, completed.length + startup.length, 'ignored diagnostics retain sequence positions')
+  assert.deepEqual(foldEvents([...completed, ...startup], 'en'), answered.items, 'history restoration matches live rendering')
+  assert.deepEqual(foldEvents(startup, 'en'), [], 'session startup alone is not an assistant reply')
+
+  const running = foldEvents([
+    user('Next question'), { type: 'turn_start' }, ...startup,
+    { type: 'update', update: { sessionUpdate: 'tool_call', toolCallId: 'actual-call', title: 'mcp__fixture__read', status: 'completed' } },
+    agent('Done'), { type: 'turn_end', stopReason: 'end_turn' },
+  ], 'en')
+  const turn = running[1]
+  assert.ok(turn.kind === 'turn')
+  assert.deepEqual(turn.children.map(child => child.kind), ['tool_group', 'agent'], 'real MCP tool calls remain in work details')
+  assert.equal(turn.children[1].kind === 'agent' && turn.children[1].text, 'Done', 'genuine assistant replies are preserved')
+})
+
 test('사용자 메시지는 전송 때의 모델·추론·권한 설정을 함께 보존한다', () => {
   const settings = { model: 'gpt-5.6-sol', thinking: 'high', permission: '전체 허용' }
   const event: AgentEvent = {

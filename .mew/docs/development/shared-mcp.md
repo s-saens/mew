@@ -1,8 +1,8 @@
 ---
 title: "Mew common MCP connections"
-description: "Defines installation-wide common MCP registration and imports, stdio forwarding into ACP runtimes, shared OAuth storage and refresh coordination, connection jobs, host-browser approval, permissions, and verification boundaries."
+description: "Defines installation-wide common MCP registration and imports, stdio forwarding into ACP runtimes, shared OAuth storage and refresh coordination, connection jobs, host-browser approval, conversation-free startup diagnostics, permissions, and verification boundaries."
 created: "2026-11-02"
-updated: "2026-11-03"
+updated: "2026-11-04"
 ---
 
 Mew common MCP lets an owner register and authorize a server once for all accounts with agent access on the same Mew installation. [The user guide](../../../docs/configuration/agent-harness.md#mew-common-mcp) owns everyday controls. [ADR 0127](../decisions/0127-installation-wide-mcp.md) records installation-wide sharing and supersedes the account-private ownership in [ADR 0120](../decisions/0120-shared-mcp.md).
@@ -30,6 +30,8 @@ An active conversation retains its existing MCP bindings. Starting a new convers
 Mew uses the pinned MCP SDK's OAuth discovery, dynamic client registration, PKCE, and token exchange. Credentials live under the installation's private MCP directory, separated by configuration identity and effective expanded header/OAuth values. Changing the endpoint, credentials, or other connection settings selects a different credential identity. PKCE verifiers remain in the interactive job's memory; background bridges cannot replace them. Each approval retains its own registered client and saves the matching client/token pair together. Native Claude/Codex OAuth credentials remain owned by those clients; the first common connection may require a new approval. Removing a Mew account cancels its pending authorization jobs and removes its legacy private MCP directory, but preserves the installation registry and credentials for other accounts.
 
 Each bridge reads the same installation credential cache. A bounded process-shared refresh lock checks the latest saved token before exchanging a refresh token. If another process already rotated it, the waiting process uses the new tokens. Token/client-pair saves and invalidation use the same lock; status and discovery live in separate files so metadata publication cannot restore an older token pair. An epoch invalidates late saves after **Disconnect**, so an older connection cannot restore cleared credentials. Background bridges report that login is needed instead of opening an unattended authorization browser.
+
+Codex ACP MCP startup diagnostics do not create assistant reply bubbles. The [conversation display contract](conversation-storage.md#display-tool-events) preserves their original records while excluding them from rendered turns. This does not suppress real MCP tool activity or change connection management.
 
 Connection status records the latest successful check or authentication requirement; it is not continuous server health monitoring. **Connect** checks the MCP initialization handshake. **Disconnect** cancels a pending job and clears saved credentials. It does not disable the definition, remove native CLI registrations, or revoke a provider grant remotely. An existing request may finish before credential invalidation is observed.
 

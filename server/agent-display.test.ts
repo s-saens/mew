@@ -32,6 +32,22 @@ test('display projection preserves the rendered conversation and approvals witho
   assert.equal(agentDisplayEvent(projected[2]), projected[2], 'already projected events are reused')
 })
 
+test('MCP startup diagnostics keep their identity through deferred history without becoming answer turns', () => {
+  const startup = [
+    { type: 'update', update: { sessionUpdate: 'tool_call', toolCallId: 'mcp_startup.fixture', kind: 'other', title: 'mcp__fixture__startup', status: 'failed', content: [{ type: 'content', content: { type: 'text', text: 'Startup failed' } }] } },
+    { type: 'update', update: { sessionUpdate: 'tool_call_update', toolCallId: 'mcp_startup.fixture', status: 'failed' } },
+  ]
+  const source = [...records(), ...startup] as AgentEvent[]
+  const original = structuredClone(source)
+  const deferred = compactHistoryWork(source)
+  const expanded = expandHistoryWork(deferred) as AgentEvent[]
+  assert.deepEqual(expanded.slice(-2), startup.map(agentDisplayEvent), 'startup diagnostics are not anonymized as deferred work markers')
+  assert.equal(expanded.length, source.length)
+  assert.deepEqual(foldEvents(expanded, 'en').map(item => item.kind), ['user', 'turn'])
+  assert.deepEqual(foldEvents(source.map(agentDisplayEvent), 'en'), foldEvents(records() as AgentEvent[], 'en'), 'ordinary tool activity remains visible')
+  assert.deepEqual(source, original, 'raw diagnostic records are preserved')
+})
+
 test('paged, preview, replay, sequenced and legacy messages share the display contract and preserve all envelope fields', () => {
   const events = records() as AgentEvent[], index = new HistoryIndex<AgentEvent>('generation')
   events.forEach(event => index.push(event))

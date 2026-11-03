@@ -1,6 +1,7 @@
 import type { HistoryPage, HistoryPosition, HistoryPreview } from '../../shared/agent-history.ts'
 import type { AgentAttachmentRef } from '../../shared/agent-attachment.ts'
 import type { AgentConnectionReady, AgentConnectionPong } from '../../shared/agent-connection.ts'
+import { isMcpStartupEvent } from '../../shared/agent-display.ts'
 import { uiText, getUiLocale } from '@mew/ui/i18n-core'
 // 에이전트 창이 받은 이벤트 흐름을 화면 항목으로 접는다. 그리는 쪽은 components/AgentPanel.tsx.
 // 서버는 상태를 보내지 않고 이벤트만 보낸다 — 재접속하면 지나간 이벤트를 그대로 되받으므로
@@ -242,6 +243,7 @@ export function appendEventFold(previous: EventFold, events: AgentEvent[]): Even
 
   for (const [offset, event] of events.entries()) {
     const i = baseIndex + previous.length + offset
+    if (isMcpStartupEvent(event)) continue
     if (event.type === 'work_pending') {
       const turn = ensureTurn(i)
       const last = turn.children.at(-1)

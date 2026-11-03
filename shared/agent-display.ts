@@ -10,9 +10,18 @@ type DisplayMessage = DisplayEvent & {
 }
 const TOOL_FIELDS = new Set(['sessionUpdate', 'toolCallId', 'title', 'status', 'kind'])
 
+/** Codex ACP uses this reserved ID for asynchronous MCP startup diagnostics. */
+export function isMcpStartupEvent(event: DisplayEvent): boolean {
+  if (event.type !== 'update' || !event.update
+    || !['tool_call', 'tool_call_update'].includes(event.update.sessionUpdate)) return false
+  const id = (event.update as Record<string, unknown>).toolCallId
+  return typeof id === 'string' && id.startsWith('mcp_startup.')
+}
+
 export function isHistoryWorkEvent(event: DisplayEvent): boolean {
   return event.type === 'update' && !!event.update
     && ['agent_thought_chunk', 'tool_call'].includes(event.update.sessionUpdate)
+    && !isMcpStartupEvent(event)
 }
 
 /** Defer historical work only; visible replies, approvals and sequence positions remain intact. */
