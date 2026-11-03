@@ -1,8 +1,8 @@
 ---
-title: "Shared projects and name-first creation"
-description: "Records the 2026-11-02 implementation of the shared YAML project catalog, per-account My Projects, name-only managed creation, existing-folder linking, first-use onboarding, and agent-assisted discovery. Records 44 passing focused checks, successful type/build/lint/documentation verification, and a separate existing demo transport failure; distinguishes local checks from user-owned runtime application and provider behavior."
+title: "Shared projects and inline project setup"
+description: "Records shared project registry creation on November 2 and the November 3 inline panel follow-up: managed clones, GitHub repositories, nested discovery, shortcut removal, and focus/touch fixes. Separates passing local tests, build and lint from unrelated documentation and branch-test failures and pending user-owned runtime application."
 created: "2026-11-02"
-updated: "2026-11-02"
+updated: "2026-11-03"
 ---
 
 ## Purpose and resulting behavior
@@ -41,3 +41,46 @@ A separate broader demo transport run reproduced the existing Mewpet manifest wi
 No deployment, launcher invocation, or server start, stop, or restart was performed. The required build changes local `dist/` assets but does not reload server-side code. The user must apply server changes through their normal operation workflow.
 
 Actual provider authentication and project-generation quality, physical-device interaction, and total production switching latency require separate validation. Discovery and documentation are requested through normal prompts; they are not enforced provider outcomes. Project registration is shared, while personal shortcuts provide convenience rather than private file ownership.
+
+
+## Inline project setup follow-up — November 3, 2026
+
+### Purpose and resulting behavior
+
+Implement the latest requirements in [the organized task](../../tasks/Done/Improve%20project%20selection%20and%20creation%20UX.md). The open task editor automatically moved its original Korean filename to the English title and then to Done when completion was recorded. The November 2 dialog described above is superseded by the inline panel; its original checks remain historical evidence.
+
+- **Add** reveals Git clone, New project, and Existing project inside the desktop/mobile panel. Name-only creation keeps a default-on Git icon inside the field and a check action. Agent-assisted setup remains a secondary action using the existing conversation panel.
+- **All Projects** starts collapsed at the bottom. Opening a shared row and adding its shortcut remain separate actions. The last personal shortcut can be removed while keeping its active project open; shared entries and files are preserved.
+- Managed cloning derives its name and uses the existing account credential boundary. GitHub organization/private repositories are listed across pages; public GitHub/GitLab HTTPS URLs need no account connection. First-use onboarding exposes GitHub connection before a project is open.
+- Catalog discovery imports managed folders and bounded nested Git/Mew projects. My Projects groups pinned descendants beneath their nearest pinned ancestor; catalog discoveries are not automatically pinned.
+- Mobile inline controls have 44px targets. Catalog shortcut refreshes preserve rows and return keyboard focus to the completed project's open action.
+
+The [project feature](../features/projects-files-search/opening-projects-tabs-and-groups.md), [UI navigation contract](../development/ui-project-navigation.md#shared-ui-for-adding-projects-and-browsing-server-files), [architecture](../development/architecture.md#shared-project-registry-and-my-projects), and [ADR 0124](../decisions/0124-managed-clone-and-project-discovery.md) own current behavior and boundaries. The browser demo implements managed cloning as an in-memory example without network/provider access.
+
+### Local verification
+
+The final focused runs passed **43 distinct tests**:
+
+| Scope | Tests |
+| --- | --- |
+| Managed clone, GitHub repository listing, registry service and authenticated APIs | 19 |
+| Inline addition, catalog, project switcher/sidebar, and assisted conversation | 5 |
+| Hierarchy utility and virtual demo projects | 7 |
+| Actual App switching/onboarding/keyboard and startup download boundaries | 12 |
+
+After the review fixes, the two inline browser tests and actual App keyboard integration passed again. Captures covered 200px/240px sidebars, 390px mobile, both light and dark themes, and the integrated App panel. A fresh review scored the mobile-target and pin-focus fixes resolved. The one mechanical UI detector run reported no findings.
+
+- `npm run build` passed after TypeScript and Vite compilation. A prior attempt was blocked by a concurrently added, unrelated input-focus test's implicit event type; that file was corrected before the successful reruns. The existing large-chunk warning remains.
+- `npm run lint` passed with warnings and zero errors. TypeScript also passed through the required build.
+- `npm run check:docs` found 673 valid descriptions, but the whole-repository link check reports an existing absolute `/api/asset` reference in the unrelated Image preview and attachment editing task. This task does not change that document. A scoped check using the existing description and link validators passed for all 11 changed documents.
+- A broader Git connection run passed 26 of 27 tests. The unchanged branch API test expects a ref without the `hash` returned by the existing implementation; no full-suite success is claimed.
+- `git diff --check` passed. No server lifecycle operation, launcher invocation, deployment, or push was performed.
+
+### Application and remaining limits
+
+The build updates local served assets; server-side APIs still require user-owned runtime application. Actual GitHub authorization/private cloning, organization SSO approval, physical-device touch, and external network behavior remain unverified. GitLab account authorization and other Git hosts are outside the current provider support. Browser tests use synthetic projects and mocked provider responses; the Git clone regression preserves actual local Git history and files.
+
+
+### Commit boundary
+
+The source, tests, task, and canonical documentation were included in concurrent commit `4c31568` alongside member-chat notification work while both tasks used the shared Git index. The implementation was not lost. No existing commit was amended or rewritten; this verification note records the mixed commit boundary explicitly.
