@@ -8,7 +8,7 @@ updated: "2026-11-03"
 status_hash: "8b1758c7281118da18b267a2c001213bb7c463d4dbd018bb221e192d83f43ec3"
 files: ["server/mewpet-skins.ts", "server/mewpet-skin-routes.ts", "shared/mewpet-skins.ts", "src/components/header-notifications.tsx", "src/components/header-resources.tsx", "src/utils/mewcat-notifications.ts", "src/components/Mewcat.tsx", "src/components/mewcat-skin-settings.tsx", "src/components/mewcat-size-settings.tsx", "src/utils/mewcat-size-preferences.ts", "src/utils/mewcat-sprites.ts", "src/utils/mewcat-sprite-storage.ts", "src/components/mewcat-fullscreen-guide.tsx", "src/hooks/use-startup-guide.ts", "src/utils/app-install.ts", "src/components/mewcat-resources.tsx", "src/components/SettingsModal.tsx", "src/components/mewcat-notifications.tsx", "src/hooks/use-mewcat-notifications.ts", "src/utils/mewcat-notification-rules.ts", "src/components/mewcat-break.tsx", "src/hooks/use-mewcat-break.ts", "src/utils/mewcat-break-rules.ts"]
 commits: []
-description: "Mewpet motion, skins, agent and incoming member-chat notifications, resource gauges, optional breaks, and startup guidance. Covers notification channels, storage and migration, accessibility, owner controls, and verification limits."
+description: "Mewpet motion, skins, agent and member-chat notifications, resource gauges, breaks, and startup guidance. Covers mobile service-worker browser notifications, Mewlink permission bridging, notification channels, storage, accessibility, and verification limits."
 상위파일:
   - "MOC.md"
   - "_appearance-accounts-operations.md"
@@ -317,9 +317,9 @@ independently. In-app notifications and resource monitoring are on by default; d
 by default. Settings are stored in this browser's `mew:notification-preferences`; if storage is unavailable, they apply only to the current page. The **None** skin hides the
 cat and toasts while retaining collection and delivery for header notifications, OS notifications, and sound. The header bell appears only when in-app notifications (`visual`) are enabled and the queue contains items. Existing stored values are inherited unchanged; if the additional `mewcat` field is absent, it is read as enabled by default. Turning off in-app notifications does not delete the queue, so it can be viewed when they are turned back on.
 
-1. Click **Allow desktop notifications** to grant browser permission. This also enables the desktop option.
+1. Click **Allow browser notifications** to grant browser permission. This also enables the browser notification option; existing `desktop` preferences are preserved.
 2. Enable **Notification sound** if needed. Enabling it plays a preview and activates browser audio.
-3. Click **Send test notification**, then switch to another PC window within 3 seconds to verify it.
+3. Click **Send test notification**, then switch to another app, tab, or window within 3 seconds to verify it.
 
 OS notifications are delivered through the Web Notifications API when the page is hidden or the window lacks focus. On Windows, they appear
 as Windows notifications from supported browsers; clicking one focuses mew and opens the corresponding screen. Notification permission
@@ -328,6 +328,14 @@ Settings. OS notifications show only the task type and do not include project na
 default sound is disabled in favor of mew's sound setting; mew sound applies in both the foreground and background, and consecutive
 notifications within 3 seconds sound only once. After a refresh, sound may require a click or keypress on the page before it can
 resume. OS Do Not Disturb, browser muting, and power-saving policies may prevent delivery or sound playback.
+
+Mobile browser delivery uses `ServiceWorkerRegistration.showNotification()` rather than relying on the `Notification` constructor, which most mobile browsers reject. Register `public/notification-worker.js` at the narrow `/__mew_notifications__/` scope; do not replace Mewlink's root resource worker or add a fetch handler/offline cache. `shared/browser-notifications.ts` bounds worker activation and client-ID discovery to five seconds, retains at most 30 active notices, and uses the constructor only as a desktop fallback.
+
+- Android needs a supported browser over HTTPS or localhost and granted notification permission. On iPhone/iPad, show an installation-specific state in ordinary Safari tabs; users must add mew to the Home Screen, launch the installed app, and grant permission there. Installation does not grant notification permission automatically.
+- Under Mewlink, the top-level public device page owns permission requests and notification delivery. The installed UI forwards only a generic localized title and an opaque action ID over the existing trusted MessagePort. Request permission immediately from the user's button action, before awaiting worker preparation. Focus/permission state changes update the settings panel through the bridge; older launchers remain unsupported rather than reporting a false success.
+- Notification data contains only a protocol marker, opaque ID, and the exact owning WindowClient ID. A click validates that client's origin, focuses it, and returns the ID to its active in-memory handler. Never choose another connected tab, open an arbitrary URL, or serialize project paths, sender identities, transcripts, or navigation targets into notification data.
+- Dismissal, account changes, connection replacement, and unmount remove pending actions and close owned notifications, including a display that finishes after cleanup. A missing owning window does not recreate a conversation or account session.
+- This is delivery for events received by a running connected app, not server Web Push. Closing or suspending the browser can prevent new events from arriving. Application and physical-device verification limits are recorded in the [mobile notification work record](../../work/mobile-browser-notifications.md); the ownership decision is [ADR 0126](../../decisions/0126-mobile-browser-notifications.md).
 
 #### Supported Features
 

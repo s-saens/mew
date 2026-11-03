@@ -2,6 +2,7 @@ import { uiText } from '@mew/ui/i18n-core'
 import { useEffect, useRef, useState } from 'react'
 import { Toast } from '@mew/ui'
 import { useI18n } from '../i18n'
+import { onBrowserNotificationPermissionChange, requestBrowserNotificationPermissionForApp } from '../utils/browser-notifications'
 import { desktopNotificationPermission, playNotificationSound, publishMewcatNotice, setNotificationPreferences, unlockNotificationAudio, useMewcatNotices, useNotificationPreferences } from '../utils/mewcat-notifications'
 
 export function MewcatNotifications({ hasCat }: { hasCat: boolean }) {
@@ -34,13 +35,14 @@ export function MewcatNotificationSettings({ hasCat = false }: { hasCat?: boolea
   const timer = useRef<number | undefined>(undefined)
   useEffect(() => {
     const refresh = () => setPermission(desktopNotificationPermission())
+    const unsubscribe = onBrowserNotificationPermissionChange(refresh)
     window.addEventListener('focus', refresh)
-    return () => { window.removeEventListener('focus', refresh); clearTimeout(timer.current) }
+    return () => { unsubscribe(); window.removeEventListener('focus', refresh); clearTimeout(timer.current) }
   }, [])
   const allow = async () => {
     setError('')
     try {
-      const result = await Notification.requestPermission()
+      const result = await requestBrowserNotificationPermissionForApp()
       setPermission(result)
       if (result === 'granted') setNotificationPreferences({ desktop: true })
     } catch { setError(t('mewcat.permissionError')) }

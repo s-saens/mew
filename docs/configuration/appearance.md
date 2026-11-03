@@ -1,8 +1,8 @@
 ---
 title: "Appearance, notifications, Dock, and keyboard shortcut settings"
-description: "Explains per-account themes and curated file icon packs, previews and source/license links, per-browser language and fonts, notifications, independent desktop/mobile Dock positions, and keyboard shortcuts. Covers mobile settings navigation and links to implementation contracts."
+description: "Explains themes, file icon packs, language and fonts, desktop/mobile browser notifications, Dock positions, and keyboard shortcuts. Covers Android permission setup, iPhone/iPad Home Screen requirements, mobile navigation, and implementation links."
 created: 2026-10-22
-updated: "2026-10-30"
+updated: "2026-11-03"
 상위파일: "MOC.md"
 ---
 
@@ -49,6 +49,10 @@ Noto Serif KR is loaded once from Google Fonts only when included in saved font 
 ## Notification settings
 
 Configure in-app notifications, desktop notifications, sounds, server resource monitoring, and test notifications in **Settings → Notifications**. These settings were moved from the Mewpet tab, and their values are preserved. If there are unread notifications, open the list using the bell icon to the left of the active sessions at the top to review them and go to the corresponding task screen. Even when Mewpet is off, header notifications, OS notifications, and sounds follow their respective settings.
+
+For mobile OS notifications, open mew over HTTPS, choose **Allow browser notifications**, and allow the browser prompt. On Android, use a supported browser such as Chrome. On iPhone/iPad, first add mew to the Home Screen and launch that installed app; an ordinary Safari tab cannot request these notifications. Installation and notification permission are separate steps. If notifications were previously blocked, change the site's permission in browser or OS settings.
+
+Keep **Browser notifications when away** enabled. To test it, choose **Send test notification** and switch to another app or tab within three seconds. Notifications are sent when mew is hidden or unfocused and still receiving events. Browser suspension, closing the app, Do Not Disturb, and OS power policies can prevent delivery; this feature does not provide server push while the app is stopped. Mewlink also requires the updated central frontend for its top-level permission prompt; a host-only update does not apply that change.
 
 **Open agent tab on approval request** is enabled by default. A new approval request switches to that agent's tab even while you are working on something else. Turn this option off to keep working on the current screen. Disabling automatic switching preserves the orange pending indicator and notifications, and you can navigate directly using Mewpet's **View approval request**. The setting is saved in the browser; if it is missing from existing saved settings, it is treated as enabled.
 

@@ -5,6 +5,7 @@ import { installHostedKeyboard } from '@mew/ui/virtual-keyboard'
 import { DataChannelTransport, setRemoteTransport } from './remote-transport.ts'
 import type { AuthStatus } from '../api/auth.ts'
 import { installHostedAppInstall } from './app-install.ts'
+import { installHostedBrowserNotifications } from './browser-notifications.ts'
 
 let appPort: MessagePort | undefined
 let localEmail: string | null = null
@@ -61,6 +62,7 @@ export async function initializeRemoteApp() {
   appPort = channel.port1
   const keyboard = installHostedKeyboard()
   const install = installHostedAppInstall(channel.port1)
+  const notifications = installHostedBrowserNotifications(channel.port1)
   let generation = 0
   const waiting = new Set<{ resolve(): void; reject(error: Error): void }>()
   const finishWaiting = (error?: Error) => { for (const waiter of waiting) { if (error) waiter.reject(error); else waiter.resolve() }; waiting.clear() }
@@ -71,11 +73,12 @@ export async function initializeRemoteApp() {
   const wire = new EventTarget() as EventTarget & { readyState: string; bufferedAmount: number; send(data: string): void; close(): void }
   wire.readyState = 'open'; wire.bufferedAmount = 0
   wire.send = data => channel.port1.postMessage(data)
-  wire.close = () => { if (wire.readyState === 'closed') return; wire.readyState = 'closed'; keyboard.dispose(); install.dispose(); const error = new Error('기기 연결이 종료됐습니다. 다시 연결해 주세요.'); finishWaiting(error); finishAuthentication(undefined, error); channel.port1.postMessage({ type: 'mew-app-close' }); channel.port1.close(); wire.dispatchEvent(new Event('close')) }
+  wire.close = () => { if (wire.readyState === 'closed') return; wire.readyState = 'closed'; keyboard.dispose(); install.dispose(); notifications.dispose(); const error = new Error('기기 연결이 종료됐습니다. 다시 연결해 주세요.'); finishWaiting(error); finishAuthentication(undefined, error); channel.port1.postMessage({ type: 'mew-app-close' }); channel.port1.close(); wire.dispatchEvent(new Event('close')) }
   channel.port1.onmessage = ({ data }) => {
     if (typeof data === 'string') wire.dispatchEvent(new MessageEvent('message', { data }))
     else if (data?.type === 'mew-keyboard-geometry') keyboard.update(data)
     else if (data?.type === 'mew-app-install-state' || data?.type === 'mew-app-install-result') install.update(data)
+    else if (typeof data?.type === 'string' && data.type.startsWith('mew-notification-')) notifications.update(data)
     else if (data?.type === 'mew-app-reconnecting' && !transport.suspended) { generation++; initialAuth = undefined; transport.suspendForReconnect() }
     else if (data?.type === 'mew-app-auth-status') { if (validStatus(data.status)) { initialAuth = data.status; finishAuthentication(initialAuth) } else wire.close() }
     else if (data?.type === 'mew-app-reconnected' && transport.suspended) { transport.resumeAfterReconnect(); finishWaiting(); window.dispatchEvent(new Event('mew:remote-reconnected')); window.dispatchEvent(new Event('online')) }

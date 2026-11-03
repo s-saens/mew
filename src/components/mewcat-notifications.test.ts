@@ -98,7 +98,7 @@ test('unsupported desktop API leaves in-app settings usable', async () => {
 test('notification settings omit the monitoring scope footer and retain test guidance', async () => {
   const view = await mount(h(ui.MewcatNotificationSettings))
   assert.doesNotMatch(view.element.textContent!, /Agent alerts cover connected chat tabs|Keep the mew browser tab open|Terminal-only agents/)
-  assert.match(view.element.textContent!, /For a desktop test, switch to another window within 3 seconds/)
+  assert.match(view.element.textContent!, /For a browser notification test, switch to another app or tab within 3 seconds/)
   assert.ok([...view.element.querySelectorAll('button')].some(button => button.textContent === 'Send test notification'))
   await view.close()
 })
@@ -145,6 +145,7 @@ test('OS delivery requires permission, preference and an inactive window; payloa
     close() { this.closed = true; this.onclose?.() }
   }
   Object.defineProperty(globalThis, 'Notification', { value: FakeNotification, configurable: true })
+  Object.defineProperty(win, 'Notification', { value: FakeNotification, configurable: true })
   let focused = true
   Object.defineProperty(document, 'hasFocus', { value: () => focused, configurable: true })
   Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true })
@@ -183,4 +184,5 @@ test('OS delivery requires permission, preference and an inactive window; payloa
   await view.close()
   assert.equal(FakeNotification.sent[0].closed, true)
   Reflect.deleteProperty(globalThis, 'Notification')
+  Reflect.deleteProperty(win, 'Notification')
 })

@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { fetchSystemStats } from '../api/client'
 import { useI18n } from '../i18n'
 import { createResourceNoticeTracker } from '../utils/mewcat-notification-rules'
+import { createNotificationDelivery } from '../utils/browser-notifications'
 import { clearMewcatNotices, desktopNotificationPermission, focusMewcatNotice, getNotificationPreferences, onMewcatNotice, openMewcatNotice, playNotificationSound, publishMewcatNotice, unlockNotificationAudio, useNotificationPreferences } from '../utils/mewcat-notifications'
 
 /** Mounted independently of the cat skin and settings dialog. */
@@ -13,7 +14,16 @@ export function useMewcatNotifications(canMonitorResources: boolean, identity: s
 
   useEffect(() => {
     clearMewcatNotices()
-    const desktop = new Set<Notification>()
+    const desktop = new Map<string, Parameters<typeof openMewcatNotice>[0]>()
+    const deliveryId = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`
+    const delivery = createNotificationDelivery(id => {
+      const notice = desktop.get(id)
+      if (!notice) return
+      window.focus()
+      openMewcatNotice(notice)
+      delivery.close(id)
+      desktop.delete(id)
+    })
     const unsubscribe = onMewcatNotice(notice => {
       const t = current.current
       const preferences = getNotificationPreferences()
@@ -21,22 +31,15 @@ export function useMewcatNotifications(canMonitorResources: boolean, identity: s
       if (notice.kind === 'permission' && preferences.autoOpenApproval) focusMewcatNotice(notice)
       if (preferences.sound) playNotificationSound(notice.level)
       if (!preferences.desktop || !away || desktopNotificationPermission() !== 'granted') return
-      try {
-        // Never expose transcripts, tool arguments or raw errors on the lock screen.
-        const notification = new Notification(`mew · ${notice.kind === 'test' ? t('mewcat.testBody') : t(`mewcat.${notice.kind}`)}`, {
-          tag: notice.key, silent: true,
-        })
-        if (desktop.size >= 30) {
-          const oldest = desktop.values().next().value!
-          oldest.close()
-          desktop.delete(oldest)
-        }
-        desktop.add(notification)
-        notification.onclose = () => desktop.delete(notification)
-        notification.onclick = () => { window.focus(); openMewcatNotice(notice); notification.close(); desktop.delete(notification) }
-      } catch { /* In-app notices remain available on unsupported platforms. */ }
+      const id = `${deliveryId}:${notice.id}`
+      if (desktop.size >= 30) desktop.delete(desktop.keys().next().value!)
+      desktop.set(id, notice)
+      // Only a generic localized title and opaque click ID leave this app context.
+      void delivery.show(`mew · ${notice.kind === 'test' ? t('mewcat.testBody') : t(`mewcat.${notice.kind}`)}`, id)
+        .then(shown => { if (!shown) desktop.delete(id) })
+        .catch(() => { desktop.delete(id) })
     })
-    return () => { unsubscribe(); desktop.forEach(notification => notification.close()) }
+    return () => { unsubscribe(); desktop.clear(); delivery.dispose() }
   }, [identity])
 
   useEffect(() => {

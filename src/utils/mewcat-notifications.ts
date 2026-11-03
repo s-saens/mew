@@ -1,6 +1,7 @@
 import { scopedBrowserStorage, remoteStorageName } from '@mew/ui/browser-storage-scope'
 import { useSyncExternalStore } from 'react'
 import type { NoticeInput } from './mewcat-notification-rules.ts'
+import { getBrowserNotificationPermission } from './browser-notifications.ts'
 
 export type NotificationPreferences = { visual: boolean; mewcat: boolean; desktop: boolean; sound: boolean; resources: boolean; autoOpenApproval: boolean }
 export type MewcatNotice = NoticeInput & { id: number; createdAt: number }
@@ -113,6 +114,4 @@ export function playNotificationSound(level: NoticeInput['level'], force = false
     return true
   } catch { return false }
 }
-export function desktopNotificationPermission(): NotificationPermission | 'unsupported' {
-  return typeof Notification !== 'undefined' && window.isSecureContext ? Notification.permission : 'unsupported'
-}
+export const desktopNotificationPermission = getBrowserNotificationPermission
