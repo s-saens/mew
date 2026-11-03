@@ -19,6 +19,8 @@ import {setBinding} from '${root}/packages/shortcuts/src/index.ts';
 import {captureAppTabShortcuts} from '${root}/src/utils/app-tab-shortcuts.ts';
 import {useFocusedWorkspacePanel} from '${root}/src/hooks/use-focused-workspace-panel.ts';
 import {useMobilePanelSwipe} from '${root}/src/hooks/use-mobile-panel-swipe.ts';
+import {startInputFocusTracking} from '${root}/packages/ui/src/input-focus.ts';
+startInputFocusTracking();
 localStorage.setItem('mew:locale','ko');window.messages=[];window.sockets={};
 const tabs=['first','second'].map(id=>({id,label:id,renamed:true,runtime:'codex',cwd:'/workspace'}));
 localStorage.setItem('mew:agent-tabs:'+JSON.stringify('/workspace'),JSON.stringify(tabs));
@@ -70,7 +72,7 @@ window.showTerminal=()=>{rootView.unmount();rootView=createRoot(document.getElem
   const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
   try {
     for (const width of [1100, 390]) for (const dark of [true, false]) {
-      const page = await browser.newPage({ viewport: { width, height: 844 } })
+      const page = await browser.newPage({ viewport: { width, height: 844 }, hasTouch: width < 768, isMobile: width < 768 })
       page.setDefaultTimeout(5000)
       const errors: string[] = []
       let terminalMode = false
@@ -250,20 +252,20 @@ window.showTerminal=()=>{rootView.unmount();rootView=createRoot(document.getElem
       assert.deepEqual(await page.getByRole('tab').locator('span.truncate').allTextContents(), ['first', 'second', 'Codex'])
       const composer = page.locator('[data-agent-composer] [contenteditable="true"]:visible')
       await composer.waitFor()
-      assert.equal(await composer.evaluate(el => el === el.ownerDocument.activeElement), width === 1100, 'runtime number selection focuses the new desktop composer only')
-      if (width === 1100) {
-        await page.keyboard.type('New conversation draft')
-        assert.equal(await composer.textContent(), 'New conversation draft', 'typing works before the runtime connects')
-      }
+      assert.equal(await composer.evaluate(el => el === el.ownerDocument.activeElement), true, 'runtime number selection focuses the new composer on desktop and mobile with a keyboard')
+      await page.keyboard.type('New conversation draft')
+      assert.equal(await composer.textContent(), 'New conversation draft', 'typing works before the runtime connects')
       await first.click()
       assert.equal(await page.locator('[data-agent-composer] [contenteditable="true"]:focus').count(), 0, 'switching back preserves tab focus')
       await add.click()
-      await page.locator('[data-runtime-id="codex"]').getByRole('button', { name: 'Codex', exact: true }).click()
+      const runtimeButton = page.locator('[data-runtime-id="codex"]').getByRole('button', { name: 'Codex', exact: true })
+      if (width < 768) await runtimeButton.tap()
+      else await runtimeButton.click()
       await page.waitForFunction("document.querySelectorAll('[role=tab]').length===4")
       assert.deepEqual(await page.getByRole('tab').locator('span.truncate').allTextContents(), ['first', 'second', 'Codex', 'Codex'])
       await expectPositions(4)
       await composer.waitFor()
-      assert.equal(await composer.evaluate(el => el === el.ownerDocument.activeElement), width === 1100, 'runtime click also focuses the new desktop composer only')
+      assert.equal(await composer.evaluate(el => el === el.ownerDocument.activeElement), true, 'runtime click or touch retains autofocus after keyboard use')
       await add.click()
       await page.locator('[data-runtime-id="codex"]').getByRole('button', { name: 'Codex', exact: true }).click()
       await page.waitForFunction("document.querySelectorAll('[role=tab]').length===5")

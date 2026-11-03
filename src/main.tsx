@@ -1,5 +1,6 @@
 import { initializeRemoteApp } from './utils/remote-app'
 import { startBrowserStorageMaintenance } from '@mew/ui/browser-storage'
+import { startInputFocusTracking } from '@mew/ui/input-focus'
 import { StrictMode, type ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
@@ -18,6 +19,9 @@ import { appRoute } from '../shared/app-route.ts'
 import { AppErrorBoundary, WorkspaceErrorScreen } from './components/app-error-boundary.tsx'
 
 startAppInstallTracking()
+
+const stopInputFocusTracking = startInputFocusTracking()
+if (import.meta.hot) import.meta.hot.dispose(stopInputFocusTracking)
 
 const stopWorkspacePinchZoom = startWorkspacePinchZoom()
 if (import.meta.hot) import.meta.hot.dispose(stopWorkspacePinchZoom)

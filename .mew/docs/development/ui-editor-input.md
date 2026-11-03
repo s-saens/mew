@@ -1,6 +1,6 @@
 ---
 title: "UI editor input, navigation, and shortcuts"
-description: "Shared editor focus, mobile keyboard and auxiliary keys, text selection, loading, tab navigation, and shortcuts. Covers context menus and common editing-state boundaries across document and file editors."
+description: "Shared editor focus, observed external-keyboard autofocus on touch devices, mobile keyboard and auxiliary keys, text selection, loading, tab navigation, and shortcuts. Covers context menus and common editing-state boundaries across document and file editors."
 created: "2026-11-03"
 updated: "2026-11-03"
 상위파일: "ui-contracts.md"
@@ -8,9 +8,13 @@ updated: "2026-11-03"
 
 ## Mobile input focus
 
-Input autofocus when opening dropdowns, windows, or search panels follows the `canAutoFocusInput()` conditions in `@mew/ui`. Allow autofocus only when the width is at least 768px and the primary input device is a hover-capable fine pointer. In mobile/touch environments, the keyboard opens when the user directly taps the input. Apply the same conditions to model search, file/content search, editor find, and name, path, comment, and form inputs.
+Input autofocus when opening dropdowns, windows, or search panels follows `canAutoFocusInput()` in `@mew/ui`. Allow autofocus when the width is at least 768px and the primary input device is a hover-capable fine pointer, or after keyboard use is observed in the current window. Touch-only opening still leaves inputs unfocused until the user taps them. Apply the same conditions to model search, file/content search, editor find, and name, path, comment, and form inputs.
 
-The shared `DialogFrame` focuses the dialog itself on mobile when the initial focus target is an input element. Preserve button/title focus, Tab navigation, Esc, and back behavior. Distinguish cursor movement during direct input and explicit keyboard navigation from autofocus restrictions.
+`src/main.tsx` starts `startInputFocusTracking()` from `@mew/ui/input-focus` before rendering and disposes it during hot replacement. The capture-phase listener observes trusted keydowns with a known physical code or Ctrl/Meta/Alt. Ignore composing input, key code 229, empty/Process/Unidentified/Dead keys, synthetic events, and unmodified Enter/Backspace, which software keyboards can also emit. This allows the first Ctrl/Cmd+P to focus and select the explorer query, and runtime selection by a number key to focus the new composer. Keep the observed capability across touch presses so a keyboard user can also tap a runtime and type immediately.
+
+This is an inference from keyboard use, not a keyboard connection API. It lasts until the document reloads or tracking stops; there is no reliable attachment or disconnection signal, and virtual keyboards that emulate physical codes can be indistinguishable. See [ADR 0125](../decisions/0125-touch-keyboard-autofocus.md) and the [verification record](../work/agent-new-conversation-focus.md).
+
+The shared `DialogFrame` focuses the dialog itself when input autofocus is disallowed and the initial focus target is an input element. Preserve button/title focus, Tab navigation, Esc, and back behavior. Distinguish cursor movement during direct input and explicit keyboard navigation from autofocus restrictions.
 
 ### Mobile editor and keyboard
 

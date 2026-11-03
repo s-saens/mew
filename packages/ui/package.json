@@ -12,6 +12,7 @@
     "./browser-storage": "./src/browser-storage.ts",
     "./browser-storage-scope": "./src/browser-storage-scope.ts",
     "./virtual-keyboard": "./src/virtual-keyboard.ts",
+    "./input-focus": "./src/input-focus.ts",
     "./loading-indicator": "./src/loading-indicator.tsx",
     "./loading-indicator.css": "./src/loading-indicator.css",
     "./tab-scroll-area.css": "./src/tab-scroll-area.css",

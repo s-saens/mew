@@ -4,11 +4,11 @@ parent: "mew-projects"
 title: "Filename and Content Search and Replacement"
 status: "implemented"
 created: "2026-09-18"
-updated: "2026-10-30"
+updated: "2026-11-03"
 status_hash: "79a1e8766564a2bf356422b60d751638dcc7b3a1ae78f96ce4deb3c240d57085"
 files: ["src/components/FileTree.tsx", "src/components/explorer-search-preview.tsx", "src/utils/explorer-search.ts", "src/components/SearchPanel.tsx", "server/fileNameSearch.ts", "server/search.ts", "server/search-pattern.ts", "server/searchCatalog.ts"]
 commits: []
-description: "Feature contract covering the explorer's borderless search field with a magnifying-glass icon instead of placeholder text in a 36px header aligned with panel tab bars, literal filename and path matching, explicit wildcards and RE2 regular expressions, Documents/Files scope, hierarchical results, context tooltips, replacement, and limits. Explains FTS v2 project-scoped queries, candidate extraction, Unicode supplementation, source verification, instrumentation, and removed RAG functionality."
+description: "Explorer search with a borderless 36px header, keyboard-aware focus on desktop and touch devices, literal filename and path matching, wildcards and RE2 regular expressions, Documents/Files scopes, hierarchical results, previews, and replacement limits. Covers FTS v2 project-scoped queries, candidate extraction, Unicode supplementation, source verification, instrumentation, and removed RAG functionality."
 상위파일:
   - "MOC.md"
   - "_projects-files-search.md"
@@ -36,7 +36,7 @@ description: "Feature contract covering the explorer's borderless search field w
 
 ## Detailed behavior
 
-The file explorer has no Browse, Filename, or Content Search tabs. In the top search field, turning off the content-search icon beside `Aa` and `.*` searches filenames; turning it on searches content. Ctrl+P and Ctrl+Shift+F select the respective modes and focus the same input. Input is retained when changing modes or Documents/Files scope. Automatic input focus follows the shared desktop conditions. A shared X button outside the right side of the search field closes the file explorer regardless of whether a query is present. The Documents/Files scope row does not duplicate the close button.
+The file explorer has no Browse, Filename, or Content Search tabs. In the top search field, turning off the content-search icon beside `Aa` and `.*` searches filenames; turning it on searches content. Ctrl/Cmd+P and Ctrl/Cmd+Shift+F select the respective modes and focus the same input, selecting its existing query for replacement. This also works on touch/mobile devices from the first keyboard shortcut under the [shared input-focus policy](../../development/ui-editor-input.md#mobile-input-focus). Touch-only opening still suppresses autofocus. Input is retained when changing modes or Documents/Files scope. A shared X button outside the right side of the search field closes the file explorer regardless of whether a query is present. The Documents/Files scope row does not duplicate the close button.
 
 A decorative magnifying-glass icon identifies the search input instead of filename or content placeholder text. The input retains its translated, mode-specific accessible name; the icon is hidden from assistive technology and is not a separate button.
 
