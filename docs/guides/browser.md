@@ -1,6 +1,6 @@
 ---
 title: "Login Screen, Browser, and Android"
-description: "Explains the internal DOM browser for localhost apps and external HTTP(S) websites, host-wide port selection with optional app page titles and Mew ports disabled, recovery when the running server lacks the port API, address entry, automatic dark/light mode matching Mew, host Chromium prerequisites and limits, separate login video, retained proxy URLs, and Android environment checks and gateways."
+description: "Explains the internal DOM browser for localhost apps and external HTTP(S) websites, host-wide port selection with app/process names followed by port tags and Mew ports disabled, recovery when the running server lacks the port API, address entry, automatic dark/light mode matching Mew, host Chromium prerequisites and limits, separate login video, retained proxy URLs, and Android environment checks and gateways."
 created: "2026-09-04"
 updated: "2026-11-03"
 ---
@@ -15,7 +15,7 @@ This video screen is for login and account management. The localhost DOM browser
 
 ## Find running localhost apps
 
-Choose **Menu → Localhost browser** to list ports currently listening on the Mew host. Click a port to open it in the internal browser. The list includes services started outside Mew's command buttons; use refresh to update it. A port labelled **Mew** is disabled, as are reserved ports marked unavailable. App page titles appear beside the port when available. Long titles are shortened to fit; hover over a title to read it. Refresh updates both ports and titles. Pages that set their title only after JavaScript runs, require app login, or do not serve HTTP may show only the port. The list shows TCP listeners, so a non-web service may not open as a webpage.
+Choose **Menu → Localhost browser** to list ports currently listening on the Mew host. Click a port to open it in the internal browser. The list includes services started outside Mew's command buttons; use refresh to update it. A port labelled **Mew** is disabled, as are reserved ports marked unavailable. Each row shows the app name followed by its port number as a tag, such as **Along** `5173`. When there is no HTML page title, Mew uses the actual process name when available, for example **postgres** `5432` or **sshd** `22`. If neither can be read, the name is **(Unnamed)**. A process name identifies the listener owner; it does not prove what the service does. Long names are shortened to fit; hover over a name to read it. Refresh updates the list and its names. Pages whose title requires JavaScript or app login, HTTPS-only services, and processes hidden by OS permissions may lack a descriptive name. The list shows TCP listeners, so a non-web service may not open as a webpage.
 
 If the list asks you to restart Mew with the latest code, the UI has loaded but the running server does not provide the port-list API. Apply the current server code with your normal server restart procedure, then retry the list. A UI build alone does not reload server routes.
 

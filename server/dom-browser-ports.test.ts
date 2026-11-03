@@ -93,6 +93,7 @@ test('port API requires current authenticated preview access and marks only actu
   const email = 'dom-browser-ports-api@example.test'
   let auth: RequestAuth = { role: 'owner', email, mustChangePassword: false }
   let calls = 0
+  let failProcesses = false
   let scan: (signal: AbortSignal) => Promise<number[]> = async () => [5000, 3333, 3000, 3333, 4999, 0, 65536, NaN]
   const app = express()
   app.use((req, _res, next) => { req.auth = auth; next() })
@@ -101,6 +102,7 @@ test('port API requires current authenticated preview access and marks only actu
     blockedPorts: () => new Set([4999, 5000, 8000]),
     scan: signal => { calls++; return scan(signal) },
     titles: async ports => ports,
+    processes: async () => { if (failProcesses) throw new Error('Process metadata unavailable'); return new Map() },
     timeoutMs: 15,
   }))
   const server = http.createServer(app)
@@ -114,6 +116,11 @@ test('port API requires current authenticated preview access and marks only actu
   assert.deepEqual(await response.json(), { ports: [
     { port: 3000, kind: 'app' }, { port: 3333, kind: 'app' }, { port: 4999, kind: 'blocked' }, { port: 5000, kind: 'mew' },
   ] })
+  failProcesses = true
+  response = await get()
+  assert.equal(response.status, 200, 'optional process lookup failures do not hide listeners')
+  assert.equal(((await response.json()) as { ports: unknown[] }).ports.length, 4)
+  failProcesses = false
   for (const denied of [
     { role: 'guest', email: null, mustChangePassword: false },
     { role: 'owner', email: null, mustChangePassword: false },
@@ -158,6 +165,11 @@ test('port API enriches app titles, rechecks live port policy and denies access 
     mewPorts: () => mew,
     blockedPorts: () => new Set([4999]),
     scan: async () => [3000, 4999, 5000],
+    processes: async (ports, options) => {
+      assert.equal(options?.signal?.aborted, false)
+      assert.equal(ports.includes(5000), false)
+      return new Map([[3000, 'node'], [4999, 'vite']])
+    },
     titles: async (ports, options) => {
       assert.equal(options.signal?.aborted, false)
       assert.equal(options.allowedPort(3000), true)
@@ -175,11 +187,11 @@ test('port API enriches app titles, rechecks live port policy and denies access 
   const address = server.address(); assert.ok(address && typeof address !== 'string')
   const get = () => fetch(`http://127.0.0.1:${address.port}/api/dom-browser/ports`)
   assert.deepEqual(await (await get()).json(), { ports: [
-    { port: 3000, kind: 'app', title: 'Along & Workspace' }, { port: 4999, kind: 'blocked' }, { port: 5000, kind: 'mew' },
+    { port: 3000, kind: 'app', title: 'Along & Workspace', processName: 'node' }, { port: 4999, kind: 'blocked', processName: 'vite' }, { port: 5000, kind: 'mew' },
   ] })
   mode = 'mew'
   assert.deepEqual(await (await get()).json(), { ports: [
-    { port: 3000, kind: 'mew' }, { port: 4999, kind: 'blocked' }, { port: 5000, kind: 'mew' },
+    { port: 3000, kind: 'mew' }, { port: 4999, kind: 'blocked', processName: 'vite' }, { port: 5000, kind: 'mew' },
   ] })
   mew.delete(3000); mode = 'revoked'
   assert.equal((await get()).status, 403)

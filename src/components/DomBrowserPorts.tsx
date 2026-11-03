@@ -16,6 +16,7 @@ function parsePorts(value: unknown): DomBrowserPort[] {
     if (!entry || typeof entry !== 'object' || !Number.isInteger(entry.port) || entry.port < 1 || entry.port > 65535 || !['app', 'mew', 'blocked'].includes(entry.kind)) continue
     const port: DomBrowserPort = { port: entry.port, kind: entry.kind }
     if (port.kind === 'app' && typeof entry.title === 'string' && entry.title.trim()) port.title = Array.from(entry.title.trim()).slice(0, 200).join('')
+    if (port.kind !== 'mew' && typeof entry.processName === 'string' && entry.processName.trim()) port.processName = Array.from(entry.processName.replace(/[\s\p{Cc}\p{Cf}]+/gu, ' ').trim()).slice(0, 80).join('')
     const previous = ports.get(port.port)
     if (!previous || priority[port.kind] > priority[previous.kind]) ports.set(port.port, port)
   }
@@ -66,13 +67,18 @@ export function DomBrowserPorts({ onOpen }: { onOpen: (url: string) => void }) {
       </div>}
       {!loading && !failed && ports.length === 0 && <p className="px-2 py-1 text-xs text-ink-muted">{uiText('열려 있는 포트가 없습니다.')}</p>}
       <ul className="min-h-0 flex-1 overflow-auto px-1 pb-1">
-        {ports.map(({ port, kind, title }) => <li key={port}>
-          <button type="button" disabled={kind !== 'app' || loading || !!failed} onClick={() => onOpen(`http://localhost:${port}/`)} className="flex min-h-9 w-full items-center gap-2 rounded px-2 py-1 text-left text-xs text-ink-secondary hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-default disabled:text-ink-muted disabled:hover:bg-transparent">
-            <span className="shrink-0 font-mono tabular-nums">localhost:{port}</span>
-            <span className="min-w-0 flex-1 truncate text-ink" data-tip={title}>{title}</span>
-            {kind === 'mew' ? <span className="shrink-0 text-xs">{uiText('Mew')}</span> : kind === 'blocked' ? <span className="shrink-0 text-xs">{uiText('사용 불가')}</span> : <ArrowRight width={15} height={15} aria-hidden="true" className="shrink-0" />}
+        {ports.map(({ port, kind, title, processName }) => {
+          const name = kind === 'mew' ? uiText('Mew') : title || processName || uiText('(이름 없음)')
+          return <li key={port}>
+          <button type="button" disabled={kind !== 'app' || loading || !!failed} onClick={() => onOpen(`http://localhost:${port}/`)} className="flex min-h-9 w-full items-center gap-2 rounded px-2 py-1 text-left text-xs text-ink hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-default disabled:text-ink-muted disabled:hover:bg-transparent">
+            <span className="flex min-w-0 items-center gap-2">
+              <span data-port-name className="min-w-0 truncate" data-tip={name}>{name}</span>
+              <span data-port-badge className="shrink-0 rounded bg-surface-raised px-1.5 py-0.5 font-mono text-xs tabular-nums text-ink-secondary">{port}</span>
+            </span>
+            <span className="flex-1" />
+            {kind === 'blocked' ? <span className="shrink-0 text-xs">{uiText('사용 불가')}</span> : kind === 'app' ? <ArrowRight width={15} height={15} aria-hidden="true" className="shrink-0" /> : null}
           </button>
-        </li>)}
+        </li>})}
       </ul>
     </section>
   </HoverTipLayer>

@@ -60,21 +60,21 @@ test('localhost browser start page lists safe ports, blocks Mew and recovers wit
         { port: 0, kind: 'app' }, { port: 65536, kind: 'app' }, { port: '8000', kind: 'app' }, { port: 8001, kind: 'unknown' },
         { port: 5000, kind: 'app' }, { port: 3000, kind: 'app' },
       ] } })
-      await page.getByRole('button', { name: 'localhost:5000 Mew', exact: true }).waitFor()
-      assert.equal(await page.getByRole('button', { name: 'localhost:5000 Mew', exact: true }).isDisabled(), true)
-      assert.equal(await page.getByRole('button', { name: 'localhost:9222 Unavailable', exact: true }).isDisabled(), true)
-      assert.deepEqual(await page.locator('li button').allTextContents(), ['localhost:3000', 'localhost:5000Mew', 'localhost:5173', 'localhost:9222Unavailable'])
+      await page.getByRole('button', { name: 'Mew 5000', exact: true }).waitFor()
+      assert.equal(await page.getByRole('button', { name: 'Mew 5000', exact: true }).isDisabled(), true)
+      assert.equal(await page.getByRole('button', { name: '(Unnamed) 9222 Unavailable', exact: true }).isDisabled(), true)
+      assert.deepEqual(await page.locator('li button').allTextContents(), ['(Unnamed)3000', 'Mew5000', '(Unnamed)5173', '(Unnamed)9222Unavailable'])
       assert.deepEqual(await page.evaluate('window.opened'), [])
       assert.equal(await page.locator('[data-dom-browser-ports]').evaluate(element => element.scrollWidth <= element.clientWidth), true)
       if (process.env.MEW_BROWSER_CAPTURE_DIR) {
         await fs.mkdir(process.env.MEW_BROWSER_CAPTURE_DIR, { recursive: true })
         await page.screenshot({ path: path.join(process.env.MEW_BROWSER_CAPTURE_DIR, `ports-${width === 1100 ? 'desktop' : 'mobile'}.png`), fullPage: true })
       }
-      await page.getByRole('button', { name: 'localhost:5173', exact: true }).click()
+      await page.getByRole('button', { name: '(Unnamed) 5173', exact: true }).click()
       assert.deepEqual(await page.evaluate('window.opened'), ['http://localhost:5173/'])
       await page.getByRole('button', { name: 'Refresh', exact: true }).click()
       await (await request(1)).fulfill({ json: { ports: [{ port: 8080, kind: 'app' }] } })
-      await page.getByRole('button', { name: 'localhost:8080', exact: true }).waitFor()
+      await page.getByRole('button', { name: '(Unnamed) 8080', exact: true }).waitFor()
       assert.equal(await page.locator('li').count(), 1)
       assert.deepEqual(errors, [])
     } finally { await page.close() }
@@ -94,20 +94,26 @@ test('localhost browser start page lists safe ports, blocks Mew and recovers wit
         { port: 5000, kind: 'mew', title: 'Wrong title' },
         { port: 9222, kind: 'blocked', title: 'Hidden title' },
       ] } })
-      const app = page.getByRole('button', { name: 'localhost:3000 Along · Team workspace', exact: true })
+      const app = page.getByRole('button', { name: 'Along · Team workspace 3000', exact: true })
       await app.waitFor()
-      assert.equal(await page.getByRole('button', { name: 'localhost:5000 Mew', exact: true }).isDisabled(), true)
-      assert.equal(await page.getByRole('button', { name: 'localhost:9222 Unavailable', exact: true }).isDisabled(), true)
-      await page.getByRole('button', { name: 'localhost:8081', exact: true }).waitFor()
-      await page.getByRole('button', { name: 'localhost:8082', exact: true }).waitFor()
+      assert.equal(await page.getByRole('button', { name: 'Mew 5000', exact: true }).isDisabled(), true)
+      assert.equal(await page.getByRole('button', { name: '(Unnamed) 9222 Unavailable', exact: true }).isDisabled(), true)
+      await page.getByRole('button', { name: '(Unnamed) 8081', exact: true }).waitFor()
+      await page.getByRole('button', { name: '(Unnamed) 8082', exact: true }).waitFor()
       const title = page.locator('li button [data-tip]').filter({ hasText: 'My development app' })
       assert.equal((await title.textContent())?.length, 200)
-      const unicodeTitle = page.locator('li').filter({ hasText: 'localhost:8083' }).locator('[data-tip]')
+      const unicodeTitle = page.locator('li').filter({ has: page.locator('[data-port-badge]', { hasText: /^8083$/ }) }).locator('[data-tip]')
       assert.equal(await unicodeTitle.textContent(), 'X' + '🐈'.repeat(199), 'title limits preserve complete Unicode characters')
       assert.equal(await title.evaluate(element => element.scrollWidth > element.clientWidth), true)
       assert.equal(await page.locator('[data-dom-browser-ports]').evaluate(element => element.scrollWidth <= element.clientWidth), true)
       assert.equal(await page.locator('li img').count(), 0)
       assert.equal(await page.evaluate('Boolean(window.titleScriptRan)'), false)
+      assert.equal(await app.locator('[data-port-name]').textContent(), 'Along · Team workspace')
+      assert.equal(await app.locator('[data-port-badge]').textContent(), '3000')
+      const labelBounds = await app.locator('[data-port-name]').boundingBox()
+      const tagBounds = await app.locator('[data-port-badge]').boundingBox()
+      assert.ok(labelBounds && tagBounds && labelBounds.x + labelBounds.width <= tagBounds.x, 'title precedes the port tag')
+      assert.notEqual(await app.locator('[data-port-badge]').evaluate(element => element.ownerDocument.defaultView!.getComputedStyle(element).backgroundColor), 'rgba(0, 0, 0, 0)')
       if (process.env.MEW_BROWSER_CAPTURE_DIR) {
         await fs.mkdir(process.env.MEW_BROWSER_CAPTURE_DIR, { recursive: true })
         await page.screenshot({ path: path.join(process.env.MEW_BROWSER_CAPTURE_DIR, `port-titles-${width}.png`), fullPage: true })
@@ -116,7 +122,34 @@ test('localhost browser start page lists safe ports, blocks Mew and recovers wit
       assert.deepEqual(await page.evaluate('window.opened'), ['http://localhost:3000/'])
       await page.getByRole('button', { name: 'Refresh', exact: true }).click()
       await (await request(1)).fulfill({ json: { ports: [{ port: 3000, kind: 'app', title: 'Renamed app' }] } })
-      await page.getByRole('button', { name: 'localhost:3000 Renamed app', exact: true }).waitFor()
+      await page.getByRole('button', { name: 'Renamed app 3000', exact: true }).waitFor()
+      assert.deepEqual(errors, [])
+    } finally { await page.close() }
+  })
+
+  for (const width of [1100, 390]) await t.test(`page titles take priority over actual listener names at ${width}px`, async () => {
+    const { page, errors, request } = await fixture(width)
+    try {
+      await (await request(0)).fulfill({ json: { ports: [
+        { port: 5432, kind: 'app', processName: 'postgres' },
+        { port: 22, kind: 'app', processName: '  sshd  ' },
+        { port: 5173, kind: 'app', title: 'Along', processName: 'node' },
+        { port: 5000, kind: 'mew', processName: 'Ignore me', title: 'Wrong title' },
+        { port: 6379, kind: 'app', processName: { invalid: true } },
+        { port: 9222, kind: 'blocked', processName: 'node' },
+      ] } })
+      await page.getByRole('button', { name: 'postgres 5432', exact: true }).waitFor()
+      assert.deepEqual(await page.locator('[data-port-name]').allTextContents(), ['sshd', 'Mew', 'Along', 'postgres', '(Unnamed)', 'node'])
+      assert.deepEqual(await page.locator('[data-port-badge]').allTextContents(), ['22', '5000', '5173', '5432', '6379', '9222'])
+      assert.equal(await page.getByRole('button', { name: 'Mew 5000', exact: true }).isDisabled(), true)
+      assert.equal(await page.getByRole('button', { name: 'node 9222 Unavailable', exact: true }).isDisabled(), true)
+      assert.equal(await page.locator('[data-dom-browser-ports]').evaluate(element => element.scrollWidth <= element.clientWidth), true)
+      if (process.env.MEW_BROWSER_CAPTURE_DIR) {
+        await fs.mkdir(process.env.MEW_BROWSER_CAPTURE_DIR, { recursive: true })
+        await page.screenshot({ path: path.join(process.env.MEW_BROWSER_CAPTURE_DIR, `port-services-${width}.png`), fullPage: true })
+      }
+      await page.getByRole('button', { name: 'Along 5173', exact: true }).click()
+      assert.deepEqual(await page.evaluate('window.opened'), ['http://localhost:5173/'])
       assert.deepEqual(errors, [])
     } finally { await page.close() }
   })
@@ -135,7 +168,7 @@ test('localhost browser start page lists safe ports, blocks Mew and recovers wit
       await page.getByRole('alert').waitFor()
       await page.getByRole('button', { name: 'Retry', exact: true }).click()
       await (await request(3)).fulfill({ json: { ports: [{ port: 8080, kind: 'app' }] } })
-      await page.getByRole('button', { name: 'localhost:8080', exact: true }).waitFor()
+      await page.getByRole('button', { name: '(Unnamed) 8080', exact: true }).waitFor()
       assert.equal(await page.getByRole('alert').count(), 0)
       assert.equal(await page.getByText('No open ports.', { exact: true }).count(), 0)
       assert.deepEqual(errors, [])
@@ -156,7 +189,7 @@ test('localhost browser start page lists safe ports, blocks Mew and recovers wit
         assert.deepEqual(await page.evaluate('window.opened'), [])
         await page.getByRole('button', { name: 'Retry', exact: true }).click()
         await (await request(1)).fulfill({ json: { ports: [{ port: 5173, kind: 'app' }] } })
-        await page.getByRole('button', { name: 'localhost:5173', exact: true }).waitFor()
+        await page.getByRole('button', { name: '(Unnamed) 5173', exact: true }).waitFor()
         assert.equal(await page.getByRole('alert').count(), 0)
         assert.deepEqual(errors, [])
       } finally { await page.close() }
@@ -169,11 +202,11 @@ test('localhost browser start page lists safe ports, blocks Mew and recovers wit
       const stale = await request(0)
       await page.getByRole('button', { name: 'Refresh', exact: true }).click()
       await (await request(1)).fulfill({ json: { ports: [{ port: 8080, kind: 'app' }] } })
-      await page.getByRole('button', { name: 'localhost:8080', exact: true }).waitFor()
+      await page.getByRole('button', { name: '(Unnamed) 8080', exact: true }).waitFor()
       assert.equal(await page.evaluate('window.portRequests[0].aborted'), true)
       await stale.fulfill({ json: { ports: [{ port: 3000, kind: 'app' }] } })
       await page.evaluate('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))')
-      assert.deepEqual(await page.locator('li button').allTextContents(), ['localhost:8080'])
+      assert.deepEqual(await page.locator('li button').allTextContents(), ['(Unnamed)8080'])
       assert.deepEqual(await page.evaluate('window.opened'), [])
       assert.deepEqual(errors, [])
     } finally { await page.close() }

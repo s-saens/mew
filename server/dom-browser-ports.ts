@@ -7,6 +7,7 @@ import { canUse } from './access-policy.ts'
 import { commandPortParsers } from './command-ports.ts'
 import { authOf } from './reqAuth.ts'
 import { enrichDomBrowserPortTitles } from './dom-browser-port-titles.ts'
+import { discoverDomBrowserPortProcesses } from './dom-browser-port-processes.ts'
 import { encodedPowerShell, powershell } from './platform/windows/storage.ts'
 
 const execute = promisify(execFile)
@@ -31,6 +32,7 @@ export interface DomBrowserPortsOptions {
   blockedPorts?: () => ReadonlySet<number>
   scan?: (signal: AbortSignal) => Promise<number[]>
   titles?: typeof enrichDomBrowserPortTitles
+  processes?: typeof discoverDomBrowserPortProcesses
   timeoutMs?: number
 }
 
@@ -142,13 +144,22 @@ export function createDomBrowserPortsRouter(options: DomBrowserPortsOptions) {
       if (!allowed()) { res.status(403).json({ error: '이 기능을 사용할 권한이 없습니다' }); return }
       const kindOf = (port: number): DomBrowserPort['kind'] => options.mewPorts().has(port) ? 'mew' : options.blockedPorts?.().has(port) ? 'blocked' : 'app'
       const ports = sortedPorts(discovered).map<DomBrowserPort>(port => ({ port, kind: kindOf(port) }))
-      const titled = await (options.titles ?? enrichDomBrowserPortTitles)(ports, {
-        signal: cancellation.signal,
-        allowedPort: port => allowed() && kindOf(port) === 'app',
-      })
+      const [titled, processes] = await Promise.all([
+        (options.titles ?? enrichDomBrowserPortTitles)(ports, {
+          signal: cancellation.signal,
+          allowedPort: port => allowed() && kindOf(port) === 'app',
+        }),
+        (options.processes ?? discoverDomBrowserPortProcesses)(ports.filter(entry => entry.kind !== 'mew').map(entry => entry.port), { signal: cancellation.signal }).catch(() => new Map<number, string>()),
+      ])
       if (!allowed()) { res.status(403).json({ error: '이 기능을 사용할 권한이 없습니다' }); return }
       if (res.destroyed) return
-      res.json({ ports: titled.map(entry => kindOf(entry.port) === 'app' ? entry : { port: entry.port, kind: kindOf(entry.port) }) })
+      res.json({ ports: titled.map(entry => {
+        const kind = kindOf(entry.port)
+        if (kind === 'mew') return { port: entry.port, kind }
+        const result: DomBrowserPort = kind === 'app' ? entry : { port: entry.port, kind }
+        const processName = processes.get(entry.port)
+        return processName ? { ...result, processName } : result
+      }) })
     } catch {
       if (!res.destroyed) res.status(503).json({ error: '열린 포트를 불러오지 못했습니다. 다시 시도해 주세요.', code: 'dom-browser-ports-unavailable' })
     } finally {

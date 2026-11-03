@@ -1,13 +1,13 @@
 ---
 title: "Page titles in the localhost port list"
-description: "Adds bounded HTTP title lookup for discovered app ports, partially superseding decision 0108's no-probe policy while preserving OS discovery, port guards, and the existing DOM browser."
+description: "Adds bounded HTTP title lookup for discovered app ports, partially superseding decision 0108's no-probe policy while preserving OS discovery, port guards, and the existing DOM browser. Decision 0124 extends labels with owning process names and port tags."
 created: "2026-11-03"
 updated: "2026-11-03"
 ---
 
 ## Status
 
-Accepted. Partially supersedes [0108](0108-localhost-browser-port-picker.md) only for optional page-title lookup after OS discovery.
+Accepted. Partially supersedes [0108](0108-localhost-browser-port-picker.md) only for optional page-title lookup after OS discovery. [Decision 0124](0124-localhost-port-service-labels.md) adds actual process names as fallback labels and places the name before a port tag.
 
 ## Context
 
