@@ -39,6 +39,10 @@ function pin(store: DemoWorkspaceStore, path: string, added: boolean): RootProje
 export const handleDemoProjects: DemoHttpHandler = ({ store, request, url, body, project }) => {
   const route = url.pathname, method = request.method
   const root = store.workspaceInfo().path
+  if (route === '/api/project-registry/repositories') {
+    requireMethod(request, 'GET')
+    return demoJson({ connected: false, repositories: [] })
+  }
   if (route === '/api/project-registry') {
     requireMethod(request, 'GET', 'POST')
     if (method === 'GET') return demoJson({ projects: registry(store) })
@@ -46,13 +50,27 @@ export const handleDemoProjects: DemoHttpHandler = ({ store, request, url, body,
     let target: string
     const managed = body.path === undefined
     if (managed) {
-      const name = stringField(body, 'name')
+      const cloning = body.mode === 'clone'
+      let cloneUrl: URL | undefined
+      if (cloning) {
+        try {
+          const raw = stringField(body, 'url')
+          if (/[\s\\\p{Cc}]/u.test(raw) || /(?:^|\/)\.{1,2}(?:\/|$)/.test(raw)) throw new Error()
+          cloneUrl = new URL(raw)
+          if (cloneUrl.protocol !== 'https:' || !['github.com', 'gitlab.com'].includes(cloneUrl.hostname) || cloneUrl.username || cloneUrl.password || cloneUrl.port || cloneUrl.search || cloneUrl.hash || !/^\/[\w.-]+(?:\/[\w.-]+)+\/?$/.test(cloneUrl.pathname) || cloneUrl.hostname === 'github.com' && cloneUrl.pathname.split('/').filter(Boolean).length !== 2) throw new Error()
+        } catch { throw new DemoError('GitHub 또는 GitLab의 HTTPS 저장소 주소를 입력하세요.') }
+      }
+      const name = cloneUrl ? basename(cloneUrl.pathname.replace(/\/+$/, '')).replace(/\.git$/, '') : stringField(body, 'name')
       if (!name || name !== name.trim() || name.length > 120 || name.startsWith('.') || /[\\/\p{Cc}<>:"|?*]/u.test(name) || /[. ]$/.test(name) || /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(name)) throw new DemoError('프로젝트 이름을 확인해 주세요.')
       if (body.git !== undefined && typeof body.git !== 'boolean') throw new DemoError('Git 설정을 확인해 주세요.')
       target = join(store.workspacePath, `.mew/projects/${name}`)
       store.createDirectory(target)
       store.createDirectory(join(target, '.mew'))
-      if (body.git !== false) {
+      if (cloning) {
+        store.seedProject(target)
+        store.setState(`git-origin:${target}`, cloneUrl!.toString())
+      }
+      if (cloning || body.git !== false) {
         store.writeFile(join(target, '.gitignore'), '.mew/temp/\n')
         store.setState('git-roots', [...new Set([...store.getState<string[]>('git-roots', [store.workspacePath]), target])])
       }

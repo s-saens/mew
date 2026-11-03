@@ -1,23 +1,28 @@
 ---
 title: "Open your first project and document"
-description: "Walks through first use after installation and login: create a project by name or link an existing folder, understand shared Projects and personal My Projects, create and edit notes.md with autosave, then review tools and Git changes."
+description: "Walks through inline first-use project creation, optional managed cloning or existing-folder linking, personal My Projects and collapsed All Projects, then editing notes.md with autosave and reviewing Git changes."
 created: "2026-10-14"
-updated: "2026-11-02"
+updated: "2026-11-03"
 상위파일: "MOC.md"
 ---
 # Open your first project and document
 
 Start with installation complete and logged in to mew. By the end of this guide, you will have created `notes.md` in your working folder and reviewed your changes. If you have not installed it yet, follow the [installation guide](getting-started-en.md).
 
-## 1. Create or link a project
+## 1. Add your first project
 
-With no project selected, Mew shows a project welcome screen. Choose **Create project**, enter a name such as `hello-mew`, and choose **Create empty project**. Leave **Create Git repository** checked to track changes, or clear it for a regular folder. Mew creates and opens the project without asking you to choose a path.
+With no project selected, Mew shows the project setup panel. Choose **Add project → New project**, enter a name such as `hello-mew`, and press the check icon. The Git icon inside the name field starts enabled; leave it on to track changes, or turn it off for a regular folder. Mew creates and opens the project without asking for a storage path.
 
-Choose **Create with agent** instead if you want help defining and building the project. The popup uses the normal agent conversation controls: select a configured runtime if needed, answer the agent's first questions, and let it document and implement the project. This option requires agent access. [Runtime setup](../configuration/agent-runtimes.md).
+You can also use either of the other inline choices:
 
-To use a folder that already exists on the server, choose **Link existing project**, find the folder, and open it. Linking preserves its files and location. When you create or link a project, it appears in the instance's shared **Projects** catalog and your own **My projects** list. Other signed-in users can add the same project to their lists, subject to file permissions.
+- **Git clone** accepts a public GitHub or GitLab HTTPS repository URL without an account connection. Connect GitHub here to select a repository your account can access, including authorized private and organization repositories. This is available before you open a project.
+- **Existing project** opens the server folder browser. Find a folder and open it to link it without moving or copying its files.
 
-To return to a project, click its name in the header and choose from My projects. Use **Add project → All projects** to find projects other users have added. Removing a shortcut from My projects leaves its folder and shared catalog entry intact. [Project management](projects.md#프로젝트-탭).
+The secondary **Create with agent** action is available when you want help defining and building a new project. It uses the normal agent conversation controls: select a configured runtime if needed, answer the agent's first questions, and let it document and implement the project. This option requires agent access. [Runtime setup](../configuration/agent-runtimes.md).
+
+Creating, cloning, or linking adds the project to the shared **All projects** catalog and your **My projects** shortcuts. Other signed-in users can add the same project to their lists, subject to file permissions. All projects starts collapsed at the bottom of the panel; expand it to find projects added by other users.
+
+To return to a project, click its name in the header and choose it from My projects. Removing a shortcut leaves the folder and shared catalog entry intact. Nested Git/Mew projects appear beneath their actual parent. [Project management](projects.md#프로젝트-탭).
 
 ## 2. Distinguish files from Documents
 

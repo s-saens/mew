@@ -13,16 +13,21 @@ export class ProjectRegistryError extends Error {
   constructor(message: string, status = 400) { super(message); this.status = status }
 }
 
-type RegisteredProject = { path: string; name: string; managed: boolean }
+type RegisteredProject = { path: string; name: string; managed: boolean; discovered?: boolean }
 type Registry = { version: 1; projects: RegisteredProject[]; myProjects: Record<string, StoredRootProjects> }
-export type RegistryProject = RegisteredProject & { mine: boolean; icon: string | null }
+export type RegistryProject = RegisteredProject & { mine: boolean; icon: string | null; parentPath?: string }
 const accountKey = (account: string) => account.trim().toLowerCase()
 const validPath = (value: unknown): value is string => typeof value === 'string' && value.length > 0 && value.length <= 4096 && !value.includes('\0') && path.isAbsolute(value)
+
+function assertManagedName(name: unknown): asserts name is string {
+  if (typeof name !== 'string' || !name.trim() || name !== name.trim() || name.length > 120 || name === '.' || name === '..' || /^[.]/.test(name) || /[\\/\p{Cc}<>:"|?*]/u.test(name) || /[. ]$/.test(name) || /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(name)) throw new ProjectRegistryError('프로젝트 이름이 올바르지 않습니다')
+}
 
 /** Shared installation catalog and account shortcuts live in one atomic YAML ledger. */
 export class ProjectRegistry {
   readonly file: string
   readonly managedRoot: string
+  private pendingDirectories = new Set<string>()
   constructor(directory = DATA_DIR, managedRoot = path.join(os.homedir(), '.mew', 'projects')) {
     this.file = path.join(directory, 'projects.yaml')
     this.managedRoot = managedRoot
@@ -52,11 +57,13 @@ export class ProjectRegistry {
       const state = parse(raw) as Registry
       if (!state || state.version !== 1 || !Array.isArray(state.projects) || !state.myProjects || typeof state.myProjects !== 'object' || Array.isArray(state.myProjects)) throw new Error('Invalid registry')
       for (const project of state.projects) {
-        if (!project || !validPath(project.path) || typeof project.name !== 'string' || typeof project.managed !== 'boolean') throw new Error('Invalid project')
+        if (!project || !validPath(project.path) || typeof project.name !== 'string' || typeof project.managed !== 'boolean' || (project.discovered !== undefined && typeof project.discovered !== 'boolean')) throw new Error('Invalid project')
       }
       for (const value of Object.values(state.myProjects)) {
         if (!value || !Array.isArray(value.paths) || !value.paths.every(validPath) || !value.icons || typeof value.icons !== 'object' || Array.isArray(value.icons)) throw new Error('Invalid shortcuts')
       }
+      const registered = new Set(state.projects.map(project => project.path))
+      for (const value of Object.values(state.myProjects)) value.paths = value.paths.filter(directory => registered.has(directory))
       return state
     } catch {
       throw new DataFileError('프로젝트 목록이 손상되었습니다: projects.yaml')
@@ -90,8 +97,34 @@ export class ProjectRegistry {
   }
 
   list(account: string): RegistryProject[] {
-    const state = this.read(), mine = new Set(state.myProjects[accountKey(account)]?.paths ?? [])
-    return state.projects.map(project => ({ ...project, mine: mine.has(project.path), icon: fs.existsSync(project.path) ? readProjectIcon(project.path) : null }))
+    const state = this.read()
+    let changed = false
+    let managed: fs.Dirent[] = []
+    try { managed = fs.readdirSync(this.managedRoot, { withFileTypes: true }) } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+    }
+    for (const entry of managed) {
+      if (!entry.isDirectory() || entry.name.startsWith('.')) continue
+      const directory = path.join(this.managedRoot, entry.name)
+      if (this.pendingDirectories.has(directory)) continue
+      try { assertNotServerDataPath(directory) } catch { continue }
+      const canonical = fs.realpathSync(directory)
+      if (!state.projects.some(project => project.path === canonical)) { this.include(state, canonical, true); changed = true }
+    }
+    for (const root of [...state.projects].filter(project => !project.discovered)) {
+      for (const directory of discoverNestedProjects(root.path, this.pendingDirectories)) {
+        if (!state.projects.some(project => project.path === directory)) {
+          this.include(state, directory).discovered = true
+          changed = true
+        }
+      }
+    }
+    if (changed) this.write(state)
+    const mine = new Set(state.myProjects[accountKey(account)]?.paths ?? [])
+    return state.projects.map(project => {
+      const parent = state.projects.filter(candidate => candidate.path !== project.path && project.path.startsWith(candidate.path.endsWith(path.sep) ? candidate.path : candidate.path + path.sep)).sort((a, b) => b.path.length - a.path.length)[0]
+      return { ...project, mine: mine.has(project.path), icon: fs.existsSync(project.path) ? readProjectIcon(project.path) : null, ...(parent ? { parentPath: parent.path } : {}) }
+    })
   }
 
   has(directory: string): boolean {
@@ -128,8 +161,23 @@ export class ProjectRegistry {
   }
 
   async create(account: string, name: unknown, git: unknown = true): Promise<RegistryProject> {
-    if (typeof name !== 'string' || !name.trim() || name !== name.trim() || name.length > 120 || name === '.' || name === '..' || /^[.]/.test(name) || /[\\/\p{Cc}<>:"|?*]/u.test(name) || /[. ]$/.test(name) || /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(name)) throw new ProjectRegistryError('프로젝트 이름이 올바르지 않습니다')
+    assertManagedName(name)
     if (typeof git !== 'boolean') throw new ProjectRegistryError('Git 설정이 올바르지 않습니다')
+    return this.createManaged(account, name, async directory => {
+      fs.mkdirSync(path.join(directory, '.mew', 'docs'), { recursive: true })
+      if (git) {
+        await simpleGit(directory).init()
+        fs.writeFileSync(path.join(directory, '.gitignore'), '.mew/temp/\n')
+      }
+    })
+  }
+
+  async clone(account: string, name: string, populate: (directory: string) => Promise<void>): Promise<RegistryProject> {
+    assertManagedName(name)
+    return this.createManaged(account, name, populate)
+  }
+
+  private async createManaged(account: string, name: string, populate: (directory: string) => Promise<void>): Promise<RegistryProject> {
     this.read() // Validate the ledger before creating any files.
     fs.mkdirSync(this.managedRoot, { recursive: true })
     const directory = path.join(this.managedRoot, name)
@@ -138,12 +186,9 @@ export class ProjectRegistry {
       if ((error as NodeJS.ErrnoException).code === 'EEXIST') throw new ProjectRegistryError('같은 이름의 프로젝트가 이미 있습니다', 409)
       throw error
     }
+    this.pendingDirectories.add(directory)
     try {
-      fs.mkdirSync(path.join(directory, '.mew', 'docs'), { recursive: true })
-      if (git) {
-        await simpleGit(directory).init()
-        fs.writeFileSync(path.join(directory, '.gitignore'), '.mew/temp/\n')
-      }
+      await populate(directory)
       const state = this.read(), project = this.include(state, fs.realpathSync(directory), true)
       const key = accountKey(account), mine = state.myProjects[key] ?? { paths: [], icons: {} }
       if (!mine.paths.includes(project.path)) mine.paths.push(project.path)
@@ -153,8 +198,35 @@ export class ProjectRegistry {
     } catch (error) {
       fs.rmSync(directory, { recursive: true, force: true })
       throw error
+    } finally { this.pendingDirectories.delete(directory) }
+  }
+}
+
+const ignoredDirectories = new Set(['.git', '.mew', '.worktrees', 'node_modules', 'vendor', 'dist', 'build', '.cache'])
+
+/** Bounded, link-free discovery keeps dependency trees and server metadata outside the catalog. */
+export function discoverNestedProjects(root: string, excluded: ReadonlySet<string> = new Set()): string[] {
+  const result: string[] = [], pending = [{ directory: root, depth: 0 }]
+  let visited = 0
+  while (pending.length && visited < 10_000) {
+    const current = pending.pop()!
+    if (current.depth >= 20) continue
+    let entries: fs.Dirent[]
+    try { entries = fs.readdirSync(current.directory, { withFileTypes: true }) } catch { continue }
+    for (const entry of entries) {
+      if (!entry.isDirectory() || ignoredDirectories.has(entry.name) || entry.name.startsWith('.')) continue
+      if (++visited > 10_000) break
+      const directory = path.join(current.directory, entry.name)
+      if (excluded.has(directory)) continue
+      try { assertNotServerDataPath(directory) } catch { continue }
+      const marker = ['.mew', '.git'].some(name => {
+        try { const stat = fs.lstatSync(path.join(directory, name)); return stat.isDirectory() || (name === '.git' && stat.isFile()) } catch { return false }
+      })
+      if (marker) result.push(directory)
+      pending.push({ directory, depth: current.depth + 1 })
     }
   }
+  return result.sort()
 }
 
 export const projectRegistry = new ProjectRegistry()

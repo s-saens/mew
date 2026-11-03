@@ -186,8 +186,10 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
       if (['dark', 'light', 'midnight'].includes(theme)) await page.screenshot({ path: `/tmp/mew-project-sidebar-desktop-${theme}.png` })
     }
     await page.evaluate('window.setMaximized(true)')
+    await sidebar.waitFor({ state: 'hidden' })
     assert.equal(await sidebar.isVisible(), false, 'workspace maximize hides the project panel')
     await page.evaluate('window.setMaximized(false)')
+    await sidebar.waitFor({ state: 'visible' })
     assert.equal(await sidebar.isVisible(), true)
     await close().click()
     assert.equal(await sidebar.count(), 0)

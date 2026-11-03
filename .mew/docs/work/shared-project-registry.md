@@ -79,8 +79,3 @@ After the review fixes, the two inline browser tests and actual App keyboard int
 ### Application and remaining limits
 
 The build updates local served assets; server-side APIs still require user-owned runtime application. Actual GitHub authorization/private cloning, organization SSO approval, physical-device touch, and external network behavior remain unverified. GitLab account authorization and other Git hosts are outside the current provider support. Browser tests use synthetic projects and mocked provider responses; the Git clone regression preserves actual local Git history and files.
-
-
-### Commit boundary
-
-The source, tests, task, and canonical documentation were included in concurrent commit `4c31568` alongside member-chat notification work while both tasks used the shared Git index. The implementation was not lost. No existing commit was amended or rewritten; this verification note records the mixed commit boundary explicitly.

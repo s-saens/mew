@@ -129,3 +129,76 @@ test('managed content remains accessible when server metadata uses ~/.mew, while
   `
   execFileSync(process.execPath, ['--input-type=module', '--eval', script], { env: { ...process.env, HOME: home, MEW_DATA_DIR: serverData }, encoding: 'utf8' })
 })
+
+test('catalog discovers nested Git and Mew roots, registers them and returns nearest-parent hierarchy', () => {
+  const store = fixture(), root = path.join(temporary, `hierarchy-${sequence}`)
+  const child = path.join(root, 'apps', 'child'), grandchild = path.join(child, 'nested')
+  fs.mkdirSync(path.join(child, '.mew'), { recursive: true })
+  fs.mkdirSync(grandchild)
+  fs.writeFileSync(path.join(grandchild, '.git'), 'gitdir: /fixture/worktree')
+  for (const ignored of ['node_modules/dependency', '.worktrees/branch', '.hidden/secret']) fs.mkdirSync(path.join(root, ignored, '.mew'), { recursive: true })
+  const outside = path.join(temporary, `outside-${sequence}`)
+  fs.mkdirSync(path.join(outside, '.mew'), { recursive: true })
+  fs.symlinkSync(outside, path.join(root, 'linked'), 'dir')
+  store.link('a@example.test', root)
+  const catalog = store.list('a@example.test')
+  assert.deepEqual(catalog.map(project => project.path), [root, child, grandchild])
+  assert.equal(catalog[1].parentPath, root)
+  assert.equal(catalog[2].parentPath, child)
+  assert.equal(catalog[1].discovered, true)
+  assert.equal(catalog[1].mine, false)
+  assert.equal(store.has(child), true)
+  store.setMine('a@example.test', grandchild, true)
+  assert.deepEqual(store.readMine('a@example.test')?.paths, [root, grandchild])
+  assert.deepEqual(parse(fs.readFileSync(store.file, 'utf8')).projects.map((project: { path: string }) => project.path), [root, child, grandchild])
+})
+
+test('My Projects drops orphan shortcuts after global catalog removal without re-registering them', async () => {
+  const store = fixture(), first = await store.create('a@example.test', 'first'), second = await store.create('a@example.test', 'second')
+  const ledger = parse(fs.readFileSync(store.file, 'utf8'))
+  ledger.projects = ledger.projects.filter((project: { path: string }) => project.path !== first.path)
+  fs.rmSync(first.path, { recursive: true })
+  fs.writeFileSync(store.file, JSON.stringify(ledger))
+  assert.deepEqual(store.readMine('a@example.test')?.paths, [second.path])
+  assert.deepEqual(store.list('a@example.test').map(project => project.path), [second.path])
+  assert.equal(store.has(first.path), false)
+})
+
+test('managed clone population accepts a real Git clone and preserves repository files', async () => {
+  const store = fixture(), source = path.join(temporary, `clone-source-${sequence}`)
+  fs.mkdirSync(source)
+  execFileSync('git', ['init', '--quiet', source])
+  fs.writeFileSync(path.join(source, 'README.md'), '# Original repository\n')
+  execFileSync('git', ['-C', source, 'add', 'README.md'])
+  execFileSync('git', ['-C', source, '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.test', 'commit', '--quiet', '-m', 'Initial fixture'])
+  const project = await store.clone('a@example.test', 'cloned', async directory => {
+    execFileSync('git', ['clone', '--quiet', '--', source, directory])
+  })
+  assert.equal(fs.readFileSync(path.join(project.path, 'README.md'), 'utf8'), '# Original repository\n')
+  assert.equal(execFileSync('git', ['-C', project.path, 'log', '-1', '--format=%s'], { encoding: 'utf8' }).trim(), 'Initial fixture')
+  assert.equal(project.managed, true)
+  assert.deepEqual(store.readMine('a@example.test')?.paths, [project.path])
+})
+
+test('catalog imports existing managed folders without adding personal shortcuts or following aliases', () => {
+  const store = fixture(), existing = path.join(store.managedRoot, 'existing')
+  fs.mkdirSync(existing, { recursive: true })
+  fs.mkdirSync(path.join(store.managedRoot, '.hidden'))
+  fs.symlinkSync(existing, path.join(store.managedRoot, 'alias'), 'dir')
+  const projects = store.list('a@example.test')
+  assert.deepEqual(projects.map(project => [project.path, project.managed, project.mine]), [[existing, true, false]])
+  assert.equal(store.readMine('a@example.test'), null)
+})
+
+test('concurrent catalog listing never registers an unfinished or failing managed clone', async () => {
+  const store = fixture()
+  let failClone: (() => void) | undefined
+  const clone = store.clone('a@example.test', 'in-progress', () => new Promise<void>((_resolve, reject) => {
+    failClone = () => reject(new Error('fixture clone failure'))
+  }))
+  assert.deepEqual(store.list('b@example.test'), [])
+  assert.equal(store.has(path.join(store.managedRoot, 'in-progress')), false)
+  failClone!()
+  await assert.rejects(clone, /fixture clone failure/)
+  assert.deepEqual(store.list('b@example.test'), [])
+})

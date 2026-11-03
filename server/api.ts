@@ -39,6 +39,7 @@ import path from 'node:path'
 import { assertNotServerDataPath, DEFAULT_PROJECT, isDeniedSegment, isProtectedProject, listProjects, pathsForWorkspace, projectRoot, resolveProjectPath, UnknownProjectError, UnsafePathError, WORKSPACE_PROJECT, workspacePaths, workspaceContext } from './paths.ts'
 import { createProject, deleteProject, ProjectNameError, renameProject } from './projects.ts'
 import { projectRegistry, ProjectRegistryError } from './project-registry.ts'
+import { projectGit } from './project-git.ts'
 import { buildTree, buildTreeAsync, isPathVisible } from './tree.ts'
 import { flattenTextFiles, replaceInFile, searchInProject, searchInProjectProgressively } from './search.ts'
 import { requiredSearchLiteral } from './search-pattern.ts'
@@ -508,11 +509,17 @@ export function createApiApp() {
     catch (err) { handleError(res, err) }
   })
 
+  app.get('/project-registry/repositories', requireAuthenticated, async (req, res) => {
+    res.setHeader('Cache-Control', 'no-store')
+    try { res.json(await projectGit.repositories(authOf(req).email!)) }
+    catch (err) { handleError(res, err) }
+  })
+
   app.post('/project-registry', requireAuthenticated, async (req, res) => {
     try {
       const email = authOf(req).email!
       if (typeof req.body?.path === 'string' && !req.body.path.trim()) throw new ProjectRegistryError('프로젝트 경로가 필요합니다')
-      const project = typeof req.body?.path === 'string'
+      const project = req.body?.mode === 'clone' ? await projectGit.clone(email, req.body?.url) : typeof req.body?.path === 'string'
         ? projectRegistry.link(email, resolveBrowsePath(req.body.path))
         : await projectRegistry.create(email, req.body?.name, req.body?.git ?? true)
       broadcast({ type: 'projects' })

@@ -90,3 +90,18 @@ test('project catalog supports name-only creation, Git choice, linking, and inde
   assert.equal((await demoFetch(store, '/api/project-registry', post({ name: '../escape' }))).status, 400)
   assert.equal((await demoFetch(store, '/api/project-registry/mine', post({ path: `${store.workspacePath}/unregistered`, added: true }, 'PUT'))).status, 404)
 })
+
+test('managed demo cloning uses the shared catalog and personal shortcuts without a provider connection', async () => {
+  const store = new DemoWorkspaceStore()
+  assert.deepEqual(await data(store, '/api/project-registry/repositories'), { connected: false, repositories: [] })
+  const { project } = await data(store, '/api/project-registry', post({ mode: 'clone', url: 'https://gitlab.com/team/group/planner.git' }))
+  assert.equal(project.path, `${store.workspacePath}/.mew/projects/planner`)
+  assert.equal(project.managed, true)
+  assert.equal(project.mine, true)
+  assert.equal(store.getState(`git-origin:${project.path}`, ''), 'https://gitlab.com/team/group/planner.git')
+  assert.equal((await demoFetch(store, '/api/project-registry', post({ mode: 'clone', url: 'https://gitlab.com/team/group/planner.git' }))).status, 409)
+  assert.equal((await data(store, '/api/user-ui/root-projects')).state.paths.includes(project.path), true)
+  for (const url of ['file:///private/repo', 'https://user:token@github.com/team/repo', 'https://github.com/team/../repo']) {
+    assert.equal((await demoFetch(store, '/api/project-registry', post({ mode: 'clone', url }))).status, 400)
+  }
+})

@@ -197,8 +197,10 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     await page.keyboard.press('Escape')
     await page.evaluate('window.setPaths(["/alpha"])')
     await trigger.click({ button: 'right' })
-    assert.equal(await page.getByRole('menuitem', { name: '내 프로젝트에서 제거', exact: true }).isDisabled(), true)
-    await page.keyboard.press('Escape')
+    assert.equal(await page.getByRole('menuitem', { name: '내 프로젝트에서 제거', exact: true }).isEnabled(), true)
+    await page.getByRole('menuitem', { name: '내 프로젝트에서 제거', exact: true }).click()
+    assert.deepEqual(await page.evaluate('window.removals'), ['/delta', '/alpha'], 'the last shortcut can be removed without removing its shared project')
+    assert.equal(await active(), '/alpha', 'removing the last shortcut retains the open project')
     await page.evaluate('window.setPaths(["/alpha","/beta","/gamma"])')
 
     for (const width of [1100, 320]) {

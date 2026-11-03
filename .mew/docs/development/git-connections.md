@@ -2,7 +2,7 @@
 title: "Per-account Git connections and execution"
 created: 2026-09-29
 updated: "2026-11-03"
-description: "Per-account GitHub authorization, encrypted storage, and Git command boundaries. Covers author identity, OAuth cleanup and refresh races, scoped credentials, and general-agent commit attribution."
+description: "Per-account GitHub authorization, encrypted storage, and Git command boundaries. Covers author identity, OAuth cleanup and refresh races, scoped credentials, managed GitHub/GitLab cloning, connected repository pagination, and general-agent commit attribution."
 상위파일: "MOC.md"
 ---
 
@@ -46,6 +46,16 @@ description: "Per-account GitHub authorization, encrypted storage, and Git comma
 - `POST /api/git/remote` with `Accept: application/x-ndjson` streams `progress`, `complete`, and `error` only once Git runs. Authentication/workspace/remote validation retains HTTP errors before streaming, including 428 for login.
 - Run Git with `--progress` and `LC_ALL=C`; extract only phase, percentage, and object counters from stderr, never raw logs, URLs, or credentials. Send `complete` only on successful exit: 100% transfer is not remote success. Client disconnects neither rerun nor forcibly stop Git. Preserve regular JSON responses.
 - Pass credentials only through a temporary Unix socket/helper accepting the exact HTTPS host/repository path. Exclude OS helpers, global/system configuration, extra authentication headers, cookies, interactive prompts, and HTTP redirects. Remove the socket on exit. This route supports Linux, macOS, and WSL.
+### Managed project cloning and repository listing
+
+`server/project-git.ts` supports project creation before a workspace is open. Its authenticated catalog APIs are available to signed-in members as well as managers and owners; guests are denied. They use the caller’s Mew identity, not an OS Git account. [The architecture contract](architecture.md#shared-project-registry-and-my-projects) owns API payloads and registry effects.
+
+- Public clones accept HTTPS addresses on `github.com` and `gitlab.com`, including GitLab subgroup paths. Embedded credentials, custom ports, queries, fragments, path traversal, local transports, and other hosts are rejected. No account connection is required.
+- A connected GitHub account supplies the existing refresh and repository-scoped credential helper for private or public GitHub cloning. Tokens stay out of the URL, argv, API responses, and browser state. GitLab account authentication and private GitLab cloning remain unsupported.
+- Managed clones disable inherited Git authentication, global/system Git configuration, prompts, redirects, hooks, and templates. They allow only HTTPS transport and do not initialize submodules. The earlier external-folder clone API retains its existing OS-environment behavior and role restrictions.
+- Connected repository listing calls GitHub’s authenticated [`GET /user/repos`](https://docs.github.com/en/rest/repos/repos#list-repositories-for-the-authenticated-user) with all visibility and owner, collaborator, and organization-member affiliation. It requests every page using the fixed GitHub API origin, without forwarding a token to a provider-supplied pagination URL. Access remains limited by the token’s repository permissions and organization SSO authorization.
+- Disconnected accounts receive an empty list and can still clone a public URL. Provider revocation requires reauthorization; temporary failures and SSO/access errors are reported without substituting an empty connected list. A late result is rejected if the account connection has been removed or replaced.
+
 ### Agent execution and OS boundaries
 
 - AI task files receive only the Mew owner and connection ID, provider, and host. The current connection ID is checked at execution start and immediately before each commit, and work does not continue with a disconnected or replaced connection. Tokens are not placed in AI prompts or input.json.

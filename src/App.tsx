@@ -133,7 +133,8 @@ const UpdatesModal = deferredComponent(async () => ({ default: (await import('./
 const TaskPanel = deferredComponent(async () => ({ default: (await import('./components/task-panel')).TaskPanel }))
 const SharedMemo = deferredComponent(async () => ({ default: (await import('./components/shared-memo')).SharedMemo }))
 const ProjectCreationAgentDialog = deferredComponent(async () => ({ default: (await import('./components/ProjectCreationAgentDialog')).ProjectCreationAgentDialog }), null)
-const OpenProjectDialog = deferredComponent(async () => ({ default: (await import('./components/OpenProjectDialog')).OpenProjectDialog }), null)
+const ProjectAddInline = deferredComponent(async () => ({ default: (await import('./components/project-add-inline')).ProjectAddInline }), null)
+const ProjectCatalogPanel = deferredComponent(async () => ({ default: (await import('./components/project-catalog-panel')).ProjectCatalogPanel }), null)
 const DocumentGraph = deferredComponent(async () => ({ default: (await import('./components/DocumentGraph')).DocumentGraph }), null)
 const DocsSettingsModal = deferredComponent(async () => ({ default: (await import('./components/DocsSettingsModal')).DocsSettingsModal }), null)
 const Mewcat = deferredComponent(async () => ({ default: (await import('./components/Mewcat')).Mewcat }), null)
@@ -2227,6 +2228,23 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
             paths={projectPaths}
             activePath={projectUiPath}
             pendingPath={pendingRootProjectPath}
+            openRequested={openProjectDialog}
+            projectTools={canOpenProjects && <div className="mew-project-tools">
+              <div className="mew-project-sidebar-footer">
+                <ProjectAddInline basePath={rootProjectPath ?? ''} canUseAgent={caps.agent} canManageFolders={isOwner || role === 'manager'}
+                  openRequested={openProjectDialog} onOpenRequestHandled={() => setOpenProjectDialog(false)} onboarding={hasProject === false}
+                  beforeMutation={() => rootProjectSaveQueue.current}
+                  onProjectsChanged={async () => { const { state } = await fetchRootProjectTabs(); if (state) setOpenProjectPaths(state.paths) }}
+                  onCreateWithAgent={async project => {
+                    setPreparedAgentTabs(undefined)
+                    setCreationAgentProject(project)
+                    if (!(await openRootProject(project.path))) { setCreationAgentProject(null); throw new Error(t('project.retry')) }
+                  }}
+                  onOpen={openRootProject} />
+              </div>
+              <ProjectCatalogPanel paths={projectPaths} onOpen={openRootProject} beforeMutation={() => rootProjectSaveQueue.current}
+                onProjectsChanged={async () => { const { state } = await fetchRootProjectTabs(); if (state) setOpenProjectPaths(state.paths) }} />
+            </div>}
             fallbackLabel={hasProject === false ? t('project.noActive') : projectLabel(projectUiPath)}
             canOpen={canOpenProjects}
             canChangeIcon={canOpenProjects}
@@ -2239,7 +2257,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
               if (!canOpenProjects || projectOpeningRef.current) return
               if (path === projectUiPath) {
                 const next = projectPaths.find(candidate => candidate !== path)
-                if (!next || !(await openRootProject(next))) return
+                if (next && !(await openRootProject(next))) return
               }
               setOpenProjectPaths(previous => previous.filter(candidate => candidate !== path))
             }}
@@ -2281,12 +2299,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
         </header>
       </div>
 
-      {hasProject === false && <main className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 p-4 text-center">
-        <h1 className="text-lg font-semibold text-ink">{t('project.welcome')}</h1>
-        <p className="text-sm text-ink-secondary">{t('project.welcomeHint')}</p>
-        <button type="button" onClick={() => setOpenProjectDialog(true)} className="rounded-md bg-accent px-3 py-2 text-sm font-medium text-ink-on-accent hover:bg-accent-strong">{t('project.start')}</button>
-      </main>}
-      <div className="workspace-dock-layout" data-dock-position={dockPosition} style={hasProject === true ? undefined : { display: 'none' }}>
+      <div className="workspace-dock-layout" data-dock-position={dockPosition} style={hasProject !== null ? undefined : { display: 'none' }}>
         <div ref={setProjectSidebarHost} className="mew-project-sidebar-host" data-project-sidebar-host />
         <div ref={setSidebarDockHost} className="desktop-dock-rail" data-sidebar-dock />
       <div
@@ -2300,6 +2313,11 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
           if (!e.currentTarget.contains(e.relatedTarget as Node)) setDropTarget(null)
         }}
       >
+        {hasProject === false && <main className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 p-4 text-center">
+          <h1 className="text-lg font-semibold text-ink">{t('project.welcome')}</h1>
+          <p className="text-sm text-ink-secondary">{t('project.welcomeHint')}</p>
+          <button type="button" onClick={() => { changeProjectSidebarOpen(true); setOpenProjectDialog(false); requestAnimationFrame(() => setOpenProjectDialog(true)) }} className="rounded-md bg-accent px-3 py-2 text-sm font-medium text-ink-on-accent hover:bg-accent-strong">{t('project.start')}</button>
+        </main>}
         {hasProject === true && <>
         <button type="button" data-sidebar-toggle aria-expanded={sidebarOpen} aria-label={uiText(sidebarOpen ? '파일 탐색기 닫기' : '파일 탐색기 열기')} data-tip={uiText(sidebarOpen ? '파일 탐색기 닫기' : '파일 탐색기 열기')} onClick={() => toggleWorkspacePanel('sidebar')}
           className="absolute top-1/2 z-50 hidden h-9 w-5 -translate-y-1/2 items-center justify-center rounded-r border border-edge-strong bg-surface-deep text-ink-secondary hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-accent md:flex"
@@ -2586,23 +2604,6 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
             void refreshTree()
           }}
           onClose={() => setDocsSettingsOpen(false)}
-        />
-      )}
-
-      {openProjectDialog && canOpenProjects && (
-        <OpenProjectDialog
-          basePath={rootProjectPath ?? ''}
-          canUseAgent={caps.agent}
-          canManageFolders={isOwner || role === 'manager'}
-          beforeMutation={() => rootProjectSaveQueue.current}
-          onProjectsChanged={async () => { const { state } = await fetchRootProjectTabs(); if (state) setOpenProjectPaths(state.paths) }}
-          onCreateWithAgent={async project => {
-            setPreparedAgentTabs(undefined)
-            setCreationAgentProject(project)
-            if (!(await openRootProject(project.path))) setCreationAgentProject(null)
-          }}
-          onOpen={openRootProject}
-          onClose={() => setOpenProjectDialog(false)}
         />
       )}
 

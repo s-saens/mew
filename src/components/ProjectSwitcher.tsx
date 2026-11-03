@@ -8,6 +8,7 @@ import { ProjectIcon } from './ProjectIcon'
 import { CommandButtonMenu } from './CommandButtonMenu'
 import { PanelCloseButton } from './panel-close-button'
 import { WORKSPACE_PROJECT } from '../utils/active-project'
+import { projectHierarchy } from '../utils/project-hierarchy'
 
 const IconPicker = lazy(() => import('./IconPicker').then(module => ({ default: module.IconPicker })))
 
@@ -17,7 +18,7 @@ function labelOf(projectPath: string): string {
 }
 
 export function ProjectSwitcher({ paths, activePath, pendingPath, fallbackLabel, canOpen, canChangeIcon, icons, onActivate, onIconChange, onOpen, onPreview, onRemove, onReorder,
-  sidebarHost, sidebarEnabled = false, sidebarOpen = false, onSidebarOpenChange, sidebarWidth = 240, onSidebarResize, onSidebarWidthChange, canUseCommands = false, activeWorkingPath }: {
+  sidebarHost, sidebarEnabled = false, sidebarOpen = false, onSidebarOpenChange, sidebarWidth = 240, onSidebarResize, onSidebarWidthChange, canUseCommands = false, activeWorkingPath, projectTools, openRequested = false }: {
   paths: string[]
   activePath: string | null
   pendingPath?: string | null
@@ -40,6 +41,8 @@ export function ProjectSwitcher({ paths, activePath, pendingPath, fallbackLabel,
   onSidebarWidthChange?: (width: number) => void
   canUseCommands?: boolean
   activeWorkingPath?: string | null
+  projectTools?: React.ReactNode
+  openRequested?: boolean
 }) {
   const { t } = useI18n()
   const trigger = useRef<HTMLButtonElement>(null)
@@ -147,6 +150,15 @@ export function ProjectSwitcher({ paths, activePath, pendingPath, fallbackLabel,
   useEffect(() => { setMenu(null); setContextMenu(null) }, [sidebarEnabled])
 
   useEffect(() => {
+    if (!openRequested || !canOpen) return
+    if (sidebarEnabled) onSidebarOpenChange?.(true)
+    else {
+      const box = trigger.current?.getBoundingClientRect()
+      if (box) setMenu({ x: box.left, y: box.bottom + 4 })
+    }
+  }, [openRequested, canOpen, sidebarEnabled, onSidebarOpenChange])
+
+  useEffect(() => {
     setMenu(null)
     setContextMenu(null)
     cancelHold()
@@ -246,7 +258,7 @@ export function ProjectSwitcher({ paths, activePath, pendingPath, fallbackLabel,
           }}>
           {projectItems(true)}
         </div>
-        <div className="mew-project-sidebar-footer"><ActionMenuItem icon={<Plus />} onClick={onOpen}>{t('project.add')}</ActionMenuItem></div>
+        {projectTools ?? <div className="mew-project-sidebar-footer"><ActionMenuItem icon={<Plus />} onClick={onOpen}>{t('project.add')}</ActionMenuItem></div>}
       </div>
       <div role="separator" tabIndex={0} aria-label={t('project.resizeSidebar')} aria-orientation="vertical" aria-valuenow={sidebarWidth} aria-valuemin={200} aria-valuemax={360}
         className="mew-project-sidebar-resize" onPointerDown={onSidebarResize}
@@ -275,18 +287,19 @@ export function ProjectSwitcher({ paths, activePath, pendingPath, fallbackLabel,
             if (next !== null) { event.preventDefault(); items[next]?.focus({ preventScroll: true }) }
           }}>
           {projectItems(false)}
-          <div className="mew-project-sidebar-footer"><ActionMenuItem icon={<Plus />} onClick={() => { closeMenu(); onOpen() }}>{t('project.add')}</ActionMenuItem></div>
+          {!projectTools && <div className="mew-project-sidebar-footer"><ActionMenuItem icon={<Plus />} onClick={() => { closeMenu(); onOpen() }}>{t('project.add')}</ActionMenuItem></div>}
         </div>
+        {projectTools}
       </div>
     </DialogFrame> : <ActionMenu ref={menuElement} variant="header" x={menu.x} y={menu.y} label={t('project.choose')} trigger={trigger.current} outsideIgnore={() => contextMenuElement.current} onClose={() => { setContextMenu(null); setMenu(null) }}>
       {projectItems(false)}
       {paths.length > 0 && <ActionMenuSeparator />}
-      <ActionMenuItem icon={<Plus />} onClick={onOpen}>{t('project.add')}</ActionMenuItem>
+      {projectTools ?? <ActionMenuItem icon={<Plus />} onClick={onOpen}>{t('project.add')}</ActionMenuItem>}
     </ActionMenu>)}
     {contextMenu && canChangeIcon && <ActionMenu key="project-actions" x={contextMenu.x} y={contextMenu.y} label={labelOf(contextMenu.path)} ref={contextMenuElement} trigger={contextMenu.trigger}
       portalContainer={contextMenu.container} onClose={() => setContextMenu(null)}>
       <ActionMenuItem icon={<EditPencil />} onClick={() => editIcon(contextMenu.path)}>{t('project.edit')}</ActionMenuItem>
-      {canOpen && onRemove && <ActionMenuItem icon={<Trash />} danger disabled={contextMenu.path === activePath && !paths.some(path => path !== activePath)} onClick={() => onRemove(contextMenu.path)}>{t('project.removeFromMine')}</ActionMenuItem>}
+      {canOpen && onRemove && <ActionMenuItem icon={<Trash />} danger onClick={() => onRemove(contextMenu.path)}>{t('project.removeFromMine')}</ActionMenuItem>}
     </ActionMenu>}
     {editingPath && canChangeIcon && <DialogFrame labelledBy={iconTitleId} onClose={() => setEditingPath(null)}>
       <div className="p-3">
@@ -313,10 +326,11 @@ function ProjectOrder({ paths, activePath, onReorder, renderItem }: {
     next.splice(to, 0, next.splice(from, 1)[0])
     onReorder(next)
   }
-  const drag = useDragReorder({ axis: 'y', handleOnly: true, onReorder: reorder })
-  return paths.map((path, index) => {
-    const { ref, ...handleProps } = drag.getItemProps(index)
-    return <div key={path} ref={ref} role="none" data-project-row={path} data-active={path === activePath || undefined} className={`mew-sortable-menu-row ${drag.dragIndex === index ? 'opacity-60' : ''}`}>
+  const rows = projectHierarchy(paths)
+  const drag = useDragReorder({ axis: 'y', handleOnly: true, onReorder: (from, to) => reorder(rows[from].index, rows[to].index) })
+  return rows.map(({ path, depth, index }, visualIndex) => {
+    const { ref, ...handleProps } = drag.getItemProps(visualIndex)
+    return <div key={path} ref={ref} role="none" data-project-row={path} data-project-depth={depth} data-active={path === activePath || undefined} style={{ paddingLeft: Math.min(depth, 5) * 12 }} className={`mew-sortable-menu-row ${drag.dragIndex === visualIndex ? 'opacity-60' : ''}`}>
       {onReorder && paths.length > 1 && <MenuReorderHandle {...handleProps}
         data-project-drag-handle={path} aria-label={`${labelOf(path)} · ${t('project.reorder')}`} data-tip={t('project.reorder')}
         onClick={event => { event.stopPropagation(); drag.consumeClick() }}

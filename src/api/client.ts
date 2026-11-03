@@ -621,6 +621,8 @@ export function openExternalProject(path: string): Promise<WorkspaceInfo & { pro
 }
 
 export interface RegisteredProject {
+  parentPath?: string
+  discovered?: boolean
   path: string
   name: string
   managed: boolean
@@ -635,6 +637,18 @@ export function fetchProjectRegistry(signal?: AbortSignal): Promise<{ projects: 
 export function registerProject(input: { name: string; git: boolean } | { path: string }): Promise<{ project: RegisteredProject }> {
   return mewFetch('/api/project-registry', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
+  }).then(json<{ project: RegisteredProject }>)
+}
+
+export interface ConnectedGitRepository { name: string; fullName: string; url: string; private: boolean }
+
+export function fetchConnectedGitRepositories(signal?: AbortSignal): Promise<{ connected: boolean; repositories: ConnectedGitRepository[] }> {
+  return mewFetch('/api/project-registry/repositories', { signal, cache: 'no-store' }).then(json<{ connected: boolean; repositories: ConnectedGitRepository[] }>)
+}
+
+export function cloneManagedProject(url: string): Promise<{ project: RegisteredProject }> {
+  return mewFetch('/api/project-registry', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode: 'clone', url }),
   }).then(json<{ project: RegisteredProject }>)
 }
 

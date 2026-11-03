@@ -1,8 +1,8 @@
 ---
 title: "Browser demo using the shared UI"
-description: "Defines the full public file list, initial copy, on-demand body loading, and size budgets for the browser demo using the actual Mew UI, along with name-only virtual project creation, the catalog and My Projects, task, virtual host, account theme, and in-memory storage contracts after removal of the feature panel. Explains static files, origins, CSP, test boundaries for using verified public materials when pinned Git objects are unavailable, and user deployment procedures; includes required agent build verification and user-owned server lifecycle operations."
+description: "Defines the full public file list, initial copy, on-demand body loading, and size budgets for the browser demo using the actual Mew UI, along with name-only virtual project creation and managed cloning, the inline catalog and My Projects, task, virtual host, account theme, and in-memory storage contracts after removal of the feature panel. Explains static files, origins, CSP, test boundaries for using verified public materials when pinned Git objects are unavailable, and user deployment procedures; includes required agent build verification and user-owned server lifecycle operations."
 created: "2026-10-19"
-updated: "2026-11-02"
+updated: "2026-11-03"
 ---
 
 # Browser demo using the shared UI
@@ -29,7 +29,7 @@ The demo is a separate entry point for trying Mew without logging in or running 
 | --- | --- |
 | Documents and code | Actual editing, autosave, tabs, and view switching; creating new files and folders in Files; creating, moving, copying, renaming, deleting, and searching documents and subdocuments in Documents |
 | Tasks | Adding, editing, completing, and deleting example tasks; tags, colors, assignees, dates, calendar, Gantt, and opening Markdown documents |
-| Projects | Name-only managed creation, shared catalog and My Projects controls, existing-folder linking and switching; virtual folder/Git operations using the same UI |
+| Projects | Inline name-only managed creation and virtual Git clone, shared catalog and My Projects controls, existing-folder linking and switching; virtual folder/Git operations using the same UI |
 | Agent | Uses the existing send, wait, and cancel UI and event display, and generates responses that modify example documents |
 | Terminal | Creating, renaming, deleting, and reconnecting sessions; preserving working directories and history; interpreting file and Git commands locally. Package installation, development, and test commands provide example output |
 | Git | Computes changes, diffs, selective commits, history, and reverts from the same files. Does not modify actual Git repositories |
@@ -46,9 +46,11 @@ The file list and original content are generated from a pinned Mew commit and co
 
 ### Project catalog and managed creation
 
-`src/demo/http-projects.ts` implements `/api/project-registry` and `/api/project-registry/mine` against the visitor's in-memory `DemoWorkspaceStore`. Creating by name registers and pins a virtual project; linking registers an existing virtual directory; personal shortcut removal preserves the catalog and virtual files. Managed names and Git choices use the same API shapes as the host. The demo starts with its example workspace rather than simulating an empty installation.
+`src/demo/http-projects.ts` implements `/api/project-registry` and `/api/project-registry/mine` against the visitor's in-memory `DemoWorkspaceStore`. Creating by name registers and pins a virtual project; linking registers an existing virtual directory; personal shortcut removal preserves the catalog and virtual files. Managed names and Git choices use the same API shapes as the host. The shared inline project panel and collapsed All Projects list use these same endpoints. The demo starts with its example workspace rather than simulating an empty installation.
 
-Managed folders are virtual paths beneath `/demo/mew-playground/.mew/projects/<name>`, because the browser has no OS home directory. `.mew/`, `.gitignore`, and virtual Git state are prepared according to the selected options; no real `projects.yaml`, Git repository, or host folder is created. The host's `~/.mew/projects` and persistent YAML contract remain owned by [architecture](architecture.md#shared-project-registry-and-my-projects). `src/demo/projects.test.ts` covers creation, linking, Git choice, and shortcut/catalog separation.
+Managed folders are virtual paths beneath `/demo/mew-playground/.mew/projects/<name>`, because the browser has no OS home directory. `.mew/`, `.gitignore`, and virtual Git state are prepared according to the selected options; no real `projects.yaml`, Git repository, or host folder is created. The host's `~/.mew/projects` and persistent YAML contract remain owned by [architecture](architecture.md#shared-project-registry-and-my-projects). `src/demo/projects.test.ts` covers creation, virtual managed cloning, linking, Git choice, and shortcut/catalog separation.
+
+`POST /api/project-registry` with `{ mode: "clone", url }` accepts public GitHub/GitLab HTTPS repository addresses and derives the virtual managed name from the repository basename. It seeds an example workspace and records the URL as metadata without contacting the provider or copying actual repository content. It registers and pins the virtual result, rejects duplicate destinations, and preserves catalog/files after personal removal. `/api/project-registry/repositories` returns `{ connected: false, repositories: [] }`; the demo does not expose a real Git account or private repository list.
 
 ### Scope of host feature demos
 

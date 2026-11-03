@@ -1,38 +1,45 @@
 ---
 title: "Projects and file navigation"
-description: "Explains name-only empty or agent-assisted project creation, linking existing folders, the shared project catalog and personal My Projects, project switching and commands, explorer search and scope controls, single-click selection, double-click or icon-click folder expansion, double-click file opening, modifier multiselection, and selection-bound item menus and bulk operations. Covers Git changes, commit history and branches, list, calendar, and Gantt operations in the task panel, and preparing an editable agent prompt from a task document after runtime selection."
-updated: "2026-11-02"
+description: "Explains inline project creation, managed Git cloning with optional GitHub repository selection, existing-folder linking, personal My Projects, and the collapsed shared catalog and nested project hierarchy. Covers project switching, file navigation, Git review, and task controls."
+updated: "2026-11-03"
 상위파일:
   - "../../.mew/docs/MOC.md"
   - "MOC.md"
 ---
-A guide to creating or linking projects, finding files, and reviewing Git changes.
+A guide to creating, cloning, or linking projects, finding files, and reviewing Git changes.
 
 [Open folders and switch projects](#프로젝트-탭) · [View documents and subprojects](#projects-subprojects-and-documents-in-the-file-explorer) · [Create and move files](#file-and-folder-management) · [Connect a Documents folder](#documents-folder-contract) · [Git changes and commits](#git-operations-panel) · [Work branches and previews](#기능-패널에서-작업-브랜치-확인) · [Tasks](#tasks)
 
 <a id="프로젝트-탭"></a>
 ## Select a project
 
-A new account starts with a project welcome screen. Choose **Create project** to begin, or link a folder you already use. You only need a name to create a project; you do not need to choose or know a storage path. [Create your first project](first-steps.md).
+A new account starts with a project welcome screen. Use **Add project** to create a project, clone a repository, or link a folder you already use. You only need a name to create a project; you do not need to choose or know a storage path. [Create your first project](first-steps.md).
 
-**Projects** lists every project added to this Mew instance. **My projects** is your own list of shortcuts. Every signed-in user can open a registered project and add it to My projects. Creating or linking a project adds it to both the shared catalog and your personal list. For example, if another user creates a project, you can add it to My projects without copying its folder or changing their list. Guests do not have these controls. Existing file and feature permissions still apply.
+**All projects** lists every project added to this Mew instance. **My projects** is your own list of shortcuts. Every signed-in user can open a registered project and add it to My projects. Creating, cloning, or linking a project adds it to both the shared catalog and your personal list. For example, if another user creates a project, you can add it to My projects without copying its folder or changing their list. Guests do not have these controls. Existing file and feature permissions still apply.
 
 ### Create a project
 
-Open **Add project → New project**, enter a project name, and choose one of the following:
+In the project panel, choose **Add project → New project**. Enter a name in the inline field and press the check icon to create and open it. The Git icon inside the field starts enabled; turn it off if you want a regular folder.
 
-- **Create empty project** opens a new folder ready for your files.
-- **Create with agent** opens the new project and a conversation popup using the regular agent panel. Choose a runtime if needed. The agent asks about your project first, then uses your answers to build and document it under the applicable default instructions. Closing the popup keeps the conversation available in the normal agent tabs. This option requires agent access and a configured runtime.
+Mew stores managed projects in `~/.mew/projects/<name>` on the server. It creates `.mew/` for settings and an empty `.mew/docs/` as the initial Documents folder. Git-enabled projects also get `.git/` and `.gitignore`. An existing folder with the same name is never overwritten.
 
-**Create Git repository** is checked by default. Leave it checked to start a Git repository, or clear it to use a regular folder. Mew stores managed projects in `~/.mew/projects/<name>` on the server. It creates `.mew/` for project settings and an empty `.mew/docs/` as the initial Documents folder. Git-enabled projects also get `.git/` and `.gitignore`. An existing folder with the same name is never overwritten.
+The secondary **Create with agent** action opens the new project and a conversation popup using the regular agent panel. Choose a runtime if needed. The agent asks about your project first, then uses your answers to build and document it under the applicable default instructions. Closing the popup keeps the conversation available in the normal agent tabs. This option requires agent access and a configured runtime.
+
+### Clone a repository
+
+Choose **Add project → Git clone**. Paste a public GitHub or GitLab HTTPS repository URL to clone without connecting a provider account. The clone is stored as a managed project and opens when ready.
+
+To select an accessible repository, connect GitHub from this inline flow; no project needs to be open first. The repository list includes private and organization repositories that your connected account is authorized to access. Organization SSO or repository permissions can require additional authorization on GitHub. Private cloning uses your connected GitHub account. GitLab supports public URL cloning; GitLab and other provider account connections are not yet supported. [GitHub connection](#github-login).
 
 ### Use an existing project
 
-**Add project → All projects** shows registered projects by name. Use the add button to keep one in **My projects**, or click its name to open it without adding a shortcut. If two projects have the same name, a path detail distinguishes them. **Link existing project** opens the server folder picker: navigate to an existing folder and open it. Linking keeps its location and contents, makes it available in the shared catalog, and adds it to your My projects.
+Expand **All projects** at the bottom of the project panel to browse the shared catalog. It starts collapsed so My projects remains the main list. Use the add button to keep a project in **My projects**, or select its name to open it without adding a shortcut. Duplicate names show a path detail to distinguish them.
+
+**Add project → Existing project** opens the server folder picker. Find an existing folder and open it. Linking preserves its location and contents, makes it available in the shared catalog, and adds it to My projects. It does not copy the folder into managed storage.
 
 The linked-folder picker retains its path field, home/parent navigation, and keyboard navigation. Folder suggestions and favorites appear when your account has the required server-file access. Up/Down and Enter choose a suggestion; Enter without a selected suggestion navigates to the typed path. Relative paths start from the displayed folder, and `~` opens the server user's home. Esc or Back closes suggestions first. Owner and manager folder/Git tools remain available under their existing permissions. Creating a folder or cloning selects the result inside the picker; linking it is a separate action.
 
-`Ctrl/Cmd+Shift+O` opens Add project. The separate `Ctrl/Cmd+O` server file explorer requires server-file access and opens a file without switching projects. To upload files from your device, open a project and drag them into the file explorer.
+`Ctrl/Cmd+Shift+O` opens the project panel and its inline Add project choices. The separate `Ctrl/Cmd+O` server file explorer requires server-file access and opens a file without switching projects. To upload files from your device, open a project and drag them into the file explorer.
 
 ### Switch and organize My projects
 
@@ -41,7 +48,8 @@ If your previous project folder is unavailable, Mew restores the first available
 The header shows the current project's icon and name. Clicking it opens **My projects** in a sidebar to the left of the file explorer on desktop, or in a full-screen panel on mobile. The current row is highlighted. Each project shares its icon with the file explorer.
 
 - Select a row to switch projects without refreshing. Document tabs, layout, and scroll positions are restored per project. Your other connected screens follow the switch; other users' active projects stay as they are. Running agents keep their original working directories.
-- Use **Add project** to return to creation or the shared catalog. **Remove from My projects** removes only your shortcut, preserving the project, other users' shortcuts, and all files. Removing the current project requires another project to open first.
+- Use **Add project** for the three inline setup choices, or expand **All projects** to browse the shared catalog. **Remove from My projects** removes only your shortcut, preserving the project, other users' shortcuts, and all files. If other shortcuts remain, removing the current one first opens another project. Removing your last shortcut leaves the active project open. My projects only contains registered catalog entries.
+- Nested Git/Mew projects are discovered in the shared catalog. Pinned descendants appear beneath their nearest pinned parent in My projects. Select a project when you want to change the active root.
 - Drag the left handle to reorder shortcuts. **↑/↓** on the handle or **Shift+↑/↓** on the row also reorders them. The **Alt+1…9** numbers on the right follow your order.
 - `Alt+P` opens My projects and focuses its first item; `Alt+1…9` switches in personal list order. Up/Down and Home/End navigate, and Enter/Space selects. Existing modal, IME, repeated-key, and remote-screen input boundaries apply. `Ctrl/Cmd+number` selects tabs in the current panel.
 - The desktop sidebar stays open after selection and can be resized from its right border. Its width and open state are remembered in this browser. The mobile panel closes on selection, Close, Esc, or Back and restores focus to the project button.

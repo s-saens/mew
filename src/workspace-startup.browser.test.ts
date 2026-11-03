@@ -46,10 +46,10 @@ test('workspace chrome remains usable while editor and unopened tools download o
     return `/${chunk.fileName}`
   }
   const editorScript = scriptFor('EditorPane'), settingsScript = scriptFor('SettingsModal'), agentScript = scriptFor('AgentPanel')
-  const closedTools = ['AdminSettingsModal', 'remote-desktop', 'FileHistoryModal', 'OpenProjectDialog'].map(scriptFor)
+  const closedTools = ['AdminSettingsModal', 'remote-desktop', 'FileHistoryModal', 'project-add-inline', 'project-catalog-panel'].map(scriptFor)
   assert.notEqual(editorScript, `/${entry.fileName}`)
   assert.notEqual(editorScript, settingsScript)
-  const styleSources = ['src/App.tsx', 'src/components/ProjectSwitcher.tsx', 'src/components/HeaderMenu.tsx', 'src/components/header-menu-popup.tsx', 'src/components/FileTree.tsx', 'src/components/SearchPanel.tsx', 'src/components/DockWorkspace.tsx', 'src/components/mobile-dock.tsx', 'src/components/SettingsModal.tsx', 'src/components/EditorPane.tsx', 'src/components/startup-screen.tsx', 'packages/ui/src/HoverTipLayer.tsx', 'packages/ui/src/select-field.tsx']
+  const styleSources = ['src/App.tsx', 'src/components/ProjectSwitcher.tsx', 'src/components/project-add-inline.tsx', 'src/components/project-catalog-panel.tsx', 'src/components/HeaderMenu.tsx', 'src/components/header-menu-popup.tsx', 'src/components/FileTree.tsx', 'src/components/SearchPanel.tsx', 'src/components/DockWorkspace.tsx', 'src/components/mobile-dock.tsx', 'src/components/SettingsModal.tsx', 'src/components/EditorPane.tsx', 'src/components/startup-screen.tsx', 'packages/ui/src/HoverTipLayer.tsx', 'packages/ui/src/select-field.tsx']
   const content = (await Promise.all(styleSources.map(file => fs.readFile(path.join(root, file), 'utf8')))).join('\n')
   const compiler = await compile(await fs.readFile(path.join(root, 'src/index.css'), 'utf8'), { base: path.join(root, 'src'), onDependency() {} })
   const css = compiler.build([...new Set(content.match(/[A-Za-z0-9_@:/.[\]()%,-]+/g))])
