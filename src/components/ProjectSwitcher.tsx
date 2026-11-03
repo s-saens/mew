@@ -18,7 +18,7 @@ function labelOf(projectPath: string): string {
 }
 
 export function ProjectSwitcher({ paths, activePath, pendingPath, fallbackLabel, canOpen, canChangeIcon, icons, onActivate, onIconChange, onOpen, onPreview, onRemove, onReorder,
-  sidebarHost, sidebarEnabled = false, sidebarOpen = false, onSidebarOpenChange, sidebarWidth = 240, onSidebarResize, onSidebarWidthChange, canUseCommands = false, activeWorkingPath, projectTools, openRequested = false }: {
+  sidebarHost, sidebarEnabled = false, sidebarOpen = false, onSidebarOpenChange, sidebarWidth = 240, onSidebarResize, onSidebarWidthChange, canUseCommands = false, activeWorkingPath, projectAdd, projectCatalog, openRequested = false }: {
   paths: string[]
   activePath: string | null
   pendingPath?: string | null
@@ -41,7 +41,8 @@ export function ProjectSwitcher({ paths, activePath, pendingPath, fallbackLabel,
   onSidebarWidthChange?: (width: number) => void
   canUseCommands?: boolean
   activeWorkingPath?: string | null
-  projectTools?: React.ReactNode
+  projectAdd?: React.ReactNode
+  projectCatalog?: React.ReactNode
   openRequested?: boolean
 }) {
   const { t } = useI18n()
@@ -239,6 +240,7 @@ export function ProjectSwitcher({ paths, activePath, pendingPath, fallbackLabel,
           <span className="min-w-0 flex-1 truncate">{t('project.mine')}</span>
           <PanelCloseButton aria-label={`${t('project.mine')} · ${t('common.close')}`} onClick={() => { onSidebarOpenChange?.(false); trigger.current?.focus({ preventScroll: true }) }} />
         </div>
+        <div className={projectAdd ? 'mew-project-sidebar-content' : 'contents'}>
         <div ref={sidebarList} role="menu" data-inline-menu aria-label={t('project.choose')} className="mew-project-sidebar-list"
           onKeyDown={event => {
             if (event.defaultPrevented || event.nativeEvent.isComposing || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey
@@ -258,7 +260,9 @@ export function ProjectSwitcher({ paths, activePath, pendingPath, fallbackLabel,
           }}>
           {projectItems(true)}
         </div>
-        {projectTools ?? <div className="mew-project-sidebar-footer"><ActionMenuItem icon={<Plus />} onClick={onOpen}>{t('project.add')}</ActionMenuItem></div>}
+        {projectAdd && <div className="mew-project-inline-add">{projectAdd}</div>}
+        </div>
+        {projectCatalog ?? (!projectAdd && <div className="mew-project-sidebar-footer"><ActionMenuItem icon={<Plus />} onClick={onOpen}>{t('project.add')}</ActionMenuItem></div>)}
       </div>
       <div role="separator" tabIndex={0} aria-label={t('project.resizeSidebar')} aria-orientation="vertical" aria-valuenow={sidebarWidth} aria-valuemin={200} aria-valuemax={360}
         className="mew-project-sidebar-resize" onPointerDown={onSidebarResize}
@@ -276,6 +280,7 @@ export function ProjectSwitcher({ paths, activePath, pendingPath, fallbackLabel,
           <h2 id={mobileTitleId} className="min-w-0 flex-1 truncate">{t('project.mine')}</h2>
           <PanelCloseButton aria-label={`${t('project.mine')} · ${t('common.close')}`} onClick={closeMenu} />
         </div>
+        <div className={projectAdd ? 'mew-project-sidebar-content' : 'contents'}>
         <div ref={menuElement} role="menu" data-inline-menu aria-label={t('project.choose')} className="mew-project-sidebar-list"
           onKeyDown={event => {
             if (event.defaultPrevented || event.nativeEvent.isComposing || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return
@@ -287,14 +292,17 @@ export function ProjectSwitcher({ paths, activePath, pendingPath, fallbackLabel,
             if (next !== null) { event.preventDefault(); items[next]?.focus({ preventScroll: true }) }
           }}>
           {projectItems(false)}
-          {!projectTools && <div className="mew-project-sidebar-footer"><ActionMenuItem icon={<Plus />} onClick={() => { closeMenu(); onOpen() }}>{t('project.add')}</ActionMenuItem></div>}
+          {!projectAdd && !projectCatalog && <div className="mew-project-sidebar-footer"><ActionMenuItem icon={<Plus />} onClick={() => { closeMenu(); onOpen() }}>{t('project.add')}</ActionMenuItem></div>}
         </div>
-        {projectTools}
+        {projectAdd && <div className="mew-project-inline-add">{projectAdd}</div>}
+        </div>
+        {projectCatalog}
       </div>
     </DialogFrame> : <ActionMenu ref={menuElement} variant="header" x={menu.x} y={menu.y} label={t('project.choose')} trigger={trigger.current} outsideIgnore={() => contextMenuElement.current} onClose={() => { setContextMenu(null); setMenu(null) }}>
       {projectItems(false)}
       {paths.length > 0 && <ActionMenuSeparator />}
-      {projectTools ?? <ActionMenuItem icon={<Plus />} onClick={onOpen}>{t('project.add')}</ActionMenuItem>}
+      {projectAdd ?? (!projectCatalog && <ActionMenuItem icon={<Plus />} onClick={onOpen}>{t('project.add')}</ActionMenuItem>)}
+      {projectCatalog}
     </ActionMenu>)}
     {contextMenu && canChangeIcon && <ActionMenu key="project-actions" x={contextMenu.x} y={contextMenu.y} label={labelOf(contextMenu.path)} ref={contextMenuElement} trigger={contextMenu.trigger}
       portalContainer={contextMenu.container} onClose={() => setContextMenu(null)}>

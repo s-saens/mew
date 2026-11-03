@@ -96,6 +96,8 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     assert.equal(await choices.count(), 3)
     const boxes = await choices.evaluateAll(elements => elements.map(element => { const box = element.getBoundingClientRect(); return { x: box.x, y: box.y, width: box.width } }))
     assert.ok(boxes.every(box => box.y === boxes[0].y) && boxes[0].x < boxes[1].x && boxes[1].x < boxes[2].x, 'the three choices share one horizontal row')
+    const addBox = await add.boundingBox()
+    assert.ok(addBox && Math.abs(addBox.y - boxes[0].y) <= 1 && addBox.x + addBox.width <= boxes[0].x, 'choices sit beside Add on the same row')
     await createMode.click()
     assert.equal(await git.getAttribute('aria-pressed'), 'true')
     assert.equal(await create.isDisabled(), true)

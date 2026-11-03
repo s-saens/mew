@@ -1,6 +1,6 @@
 ---
 title: "Shared projects and inline project setup"
-description: "Records shared project registry creation on November 2 and the November 3 inline panel follow-up: managed clones, GitHub repositories, nested discovery, shortcut removal, and focus/touch fixes. Separates passing local tests, build and lint from unrelated documentation and branch-test failures and pending user-owned runtime application."
+description: "Records shared project registry creation on November 2 and the November 3 inline panel follow-up: managed clones, GitHub repositories, nested discovery, shortcut removal, focus/touch fixes, and Add placement immediately after personal projects. Separates passing local tests, build and lint from unrelated documentation and branch-test failures and pending user-owned runtime application."
 created: "2026-11-02"
 updated: "2026-11-03"
 ---
@@ -79,3 +79,15 @@ After the review fixes, the two inline browser tests and actual App keyboard int
 ### Application and remaining limits
 
 The build updates local served assets; server-side APIs still require user-owned runtime application. Actual GitHub authorization/private cloning, organization SSO approval, physical-device touch, and external network behavior remain unverified. GitLab account authorization and other Git hosts are outside the current provider support. Browser tests use synthetic projects and mocked provider responses; the Git clone regression preserves actual local Git history and files.
+
+
+## Add placement correction — November 3, 2026
+
+Move Add immediately below the final My Projects row, and reveal its three options beside the Add trigger on the same row. The personal list and setup share a scrolling region; All Projects remains an independent bottom section. Narrow panels use accessible icon choices with shared tooltips, and wider panels show their labels. Current behavior belongs to the [UI contract](../development/ui-project-navigation.md#shared-ui-for-adding-projects-and-browsing-server-files) and [project guide](../../../docs/guides/projects.md).
+
+- Six focused browser checks passed: inline addition, project sidebar, switcher, catalog, and actual App onboarding/keyboard flows. Regression assertions check same-row Add/options, Add directly after the last project, and separation from the bottom catalog.
+- Desktop and mobile captures were inspected, including the 200px sidebar. A scoped fresh review found no material issue. The mechanical detector reported no findings.
+- Global lint passed with warnings. The full documentation check found valid metadata and the same unrelated image-task asset-link error described above.
+- `npm run build` passed after TypeScript and Vite compilation, with the existing large-chunk warning. The initial attempt was blocked by two argument-count errors in concurrently modified `server/shared-mcp.test.ts`; those errors were corrected before the successful rerun. All four changed documentation files passed metadata and local-link checks.
+
+No deployment, launcher, or server lifecycle operation was performed.

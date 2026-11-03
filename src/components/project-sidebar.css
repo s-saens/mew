@@ -66,9 +66,13 @@
 .mew-project-catalog button:disabled { opacity: .5; }
 .mew-project-catalog button:focus-visible, .mew-project-catalog input:focus-visible { outline: 2px solid var(--color-accent); outline-offset: -2px; }
 .mew-mobile-project-panel .mew-project-catalog-open, .mew-mobile-project-panel .mew-project-catalog-toggle, .mew-mobile-project-panel .mew-project-catalog-pin { min-height: 44px; }
-.mew-project-tools { display: flex; min-height: 0; max-height: 70%; flex-shrink: 0; flex-direction: column; }
-.mew-project-tools > .mew-project-catalog { max-height: none; flex-shrink: 1; }
-.mew-project-tools > .mew-project-sidebar-footer { min-height: 0; flex-shrink: 1; overflow-y: auto; }
+.mew-project-sidebar-content { min-height: 0; flex: 1; overflow-y: auto; }
+.mew-project-sidebar-content > .mew-project-sidebar-list { flex: none; overflow: visible; padding-bottom: 0; }
+.mew-project-inline-add { padding: 0 6px 6px; }
+.mew-project-add { container-type: inline-size; min-width: 0; }
+@container (width < 340px) {
+  .mew-project-add-choice-label { display: none; }
+}
 .mew-mobile-project-panel [data-project-add-inline] button,
 .mew-mobile-project-panel [data-project-add-inline] input { min-height: 44px; }
 .mew-mobile-project-panel [data-project-add-inline] button.w-8 { min-width: 44px; }

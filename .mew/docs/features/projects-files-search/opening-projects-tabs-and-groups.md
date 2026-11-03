@@ -8,7 +8,7 @@ updated: "2026-11-03"
 status_hash: "03b352e53f93242f9efdfd05c5bd632f9bf92dd1a456279d6b0eb0efd066cd3f"
 files: ["src/components/file-action-menu.tsx", "src/hooks/use-external-file-actions.tsx", "src/components/file-browser-favorites.tsx", "server/file-favorites.ts", "src/components/file-browser.tsx", "src/components/file-browser-path.tsx", "src/components/file-browser-path-suggestions.ts", "src/components/project-add-inline.tsx", "src/components/project-catalog-panel.tsx", "src/components/LinkProjectDialog.tsx", "src/components/ProjectCreationAgentDialog.tsx", "server/project-registry.ts", "src/components/ProjectSwitcher.tsx", "server/projects.ts", "server/cloud-storage.ts"]
 commits: []
-description: "Defines panel-inline project creation and Git cloning, external-folder linking, the shared projects.yaml catalog, and personal My Projects shortcuts. Covers collapsed All Projects, nested project hierarchy, GitHub repository selection before opening a project, and retained switching, icon, worktree, and session boundaries."
+description: "Defines project creation and Git cloning through same-row Add choices immediately after My Projects, external-folder linking, and the shared projects.yaml catalog. Covers collapsed All Projects, nested project hierarchy, GitHub repository selection before opening a project, and retained switching, icon, worktree, and session boundaries."
 상위파일:
   - "MOC.md"
   - "_projects-files-search.md"
@@ -36,6 +36,8 @@ description: "Defines panel-inline project creation and Git cloning, external-fo
 - `Ctrl/Cmd+O` opens the server file explorer for accounts with the required server file permission. Opening a file keeps the current project. `Ctrl/Cmd+Shift+O` opens the project panel and its inline Add Project choices for a signed-in user. Alt combinations and IME composition do not trigger these actions.
 
 ### Select and organize projects
+
+- Add follows the last My Projects row and expands its three choices beside its trigger. The personal list and setup share one scrolling region; All Projects stays independently at the bottom. Narrow panels use labelled icon actions with shared tooltips.
 
 - The header and project lists show project names and their shared icons; managed creation and catalog browsing do not depend on knowing storage paths. Icons remain owned by each project's `.mew/project-icon.json`, shared by the explorer and selector. Signed-in users can edit shared icons, with members restricted to registered project roots.
 - The header project button opens the leftmost project sidebar on desktop (768px or wider) or the full-screen project panel on mobile. The sidebar is outside the Dock and file explorer, opens independently, and remembers its width and open state per browser and account. Desktop selection does not close it. Mobile selection and Close dismiss the panel and restore focus to the invoking control. Esc and Back collapse expanded Add Project setup first and focus its trigger; busy setup stays open. Without an inner setup or menu, Esc and Back dismiss the panel. Safe-area padding, focus containment, internal scrolling, and touch-sized rows are retained.

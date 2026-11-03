@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react'
-import { Check, GitBranch, Lock, Plus, RefreshDouble, Spark, Xmark } from 'iconoir-react'
+import { Check, FolderPlus, GitBranch, Link, Lock, Plus, RefreshDouble, Spark, Xmark } from 'iconoir-react'
 import { canAutoFocusInput, HoverTipLayer, LoadingIndicator, useOverlayDismiss } from '@mew/ui'
 import { cloneManagedProject, fetchConnectedGitRepositories, registerProject, type RegisteredProject } from '../api/client'
 import { GIT_CONNECTION_CHANGED } from '../api/git-auth-request'
@@ -137,22 +137,24 @@ export function ProjectAddInline({ basePath, onOpen, onProjectsChanged, onCreate
     if (next === 'existing') setLinkOpen(true)
   }
 
-  return <HoverTipLayer className="max-h-[min(420px,55dvh)] min-w-0 overflow-y-auto"><div className="min-w-0" data-project-add-inline>
+  return <HoverTipLayer className="mew-project-add"><div className="min-w-0" data-project-add-inline>
     <div className="flex min-w-0 items-center gap-1">
-      <button ref={trigger} type="button" aria-expanded={expanded} aria-controls={`${id}-setup`} disabled={busy}
+      <button ref={trigger} type="button" aria-label={copy.add} aria-expanded={expanded} aria-controls={`${id}-setup`} disabled={busy}
         onClick={() => expanded ? close() : setExpanded(true)}
-        className="flex min-h-8 min-w-0 flex-1 items-center gap-1.5 rounded px-1.5 text-left text-xs text-ink-secondary hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-40">
-        <Plus width={16} height={16} aria-hidden="true" />{copy.add}
+        className={`flex min-h-8 min-w-0 items-center gap-1.5 rounded px-1.5 text-left text-xs text-ink-secondary hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-40 ${expanded ? 'shrink-0' : 'flex-1'}`}>
+        {expanded ? <Xmark width={16} height={16} aria-hidden="true" /> : <Plus width={16} height={16} aria-hidden="true" />}{copy.add}
       </button>
-      {expanded && <button type="button" onClick={close} disabled={busy} className={iconButton} aria-label={t('common.close')} data-tip={t('common.close')}><Xmark width={16} height={16} aria-hidden="true" /></button>}
+      {expanded && <nav id={`${id}-setup`} aria-label={t('project.add')} className="flex min-w-0 flex-1 items-stretch gap-0.5">
+        {(['clone', 'create', 'existing'] as const).map(next => <button key={next} ref={element => { modeTriggers.current[next] = element }} type="button"
+          aria-label={next === 'existing' ? copy.existingLabel : copy[next]} data-tip={next === 'existing' ? copy.existingLabel : copy[next]} aria-pressed={mode === next} disabled={busy || !!created && next !== mode} onClick={() => choose(next)}
+          className={`flex min-h-8 min-w-0 flex-1 items-center justify-center gap-1 whitespace-nowrap rounded px-1 text-xs leading-4 text-ink-secondary hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-40 ${mode === next ? 'bg-surface-raised !text-ink' : ''}`}>
+          {next === 'clone' ? <GitBranch width={16} height={16} aria-hidden="true" /> : next === 'create' ? <FolderPlus width={16} height={16} aria-hidden="true" /> : <Link width={16} height={16} aria-hidden="true" />}
+          <span className="mew-project-add-choice-label">{copy[next]}</span>
+        </button>)}
+      </nav>}
     </div>
     {onboarding && (!expanded || mode !== 'clone') && <GitHubAccount project="" />}
-    {expanded && <div id={`${id}-setup`} className="min-w-0 pb-1">
-      <nav aria-label={t('project.add')} className="flex min-w-0 items-stretch gap-0.5 py-1">
-        {(['clone', 'create', 'existing'] as const).map(next => <button key={next} ref={element => { modeTriggers.current[next] = element }} type="button"
-          aria-label={next === 'existing' ? copy.existingLabel : copy[next]} aria-pressed={mode === next} disabled={busy || !!created && next !== mode} onClick={() => choose(next)}
-          className={`min-h-8 min-w-0 whitespace-nowrap rounded px-0.5 text-xs leading-4 text-ink-secondary hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-40 ${next === 'create' ? 'flex-[1.25]' : 'flex-1'} ${mode === next ? 'bg-surface-raised !text-ink' : ''}`}>{copy[next]}</button>)}
-      </nav>
+    {expanded && <div className="min-w-0 pb-1">
       {mode === 'create' && <form className="min-w-0" noValidate onSubmit={event => { event.preventDefault(); submit() }}>
         <div className="flex min-w-0 items-center gap-1">
           <div className="relative min-w-0 flex-1">

@@ -1,6 +1,6 @@
 ---
 title: "Projects and file navigation"
-description: "Explains inline project creation, managed Git cloning with optional GitHub repository selection, existing-folder linking, personal My Projects, and the collapsed shared catalog and nested project hierarchy. Covers project switching, file navigation, Git review, and task controls."
+description: "Explains Add directly after My Projects with choices on the same row, managed Git cloning with optional GitHub repository selection, existing-folder linking, and the bottom shared catalog and nested project hierarchy. Covers project switching, file navigation, Git review, and task controls."
 updated: "2026-11-03"
 상위파일:
   - "../../.mew/docs/MOC.md"
@@ -19,7 +19,7 @@ A new account starts with a project welcome screen. Use **Add project** to creat
 
 ### Create a project
 
-In the project panel, choose **Add project → New project**. Enter a name in the inline field and press the check icon to create and open it. The Git icon inside the field starts enabled; turn it off if you want a regular folder.
+In the project panel, **Add project** follows your last personal project. Its choices appear beside it; narrow panels show icons with tooltips. Choose **New project**. Enter a name in the inline field and press the check icon to create and open it. The Git icon inside the field starts enabled; turn it off if you want a regular folder.
 
 Mew stores managed projects in `~/.mew/projects/<name>` on the server. It creates `.mew/` for settings and an empty `.mew/docs/` as the initial Documents folder. Git-enabled projects also get `.git/` and `.gitignore`. An existing folder with the same name is never overwritten.
 

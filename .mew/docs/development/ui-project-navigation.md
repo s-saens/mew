@@ -1,6 +1,6 @@
 ---
 title: "UI project navigation and file browsing"
-description: "Shared inline project panel, managed creation and clone entry points, collapsed catalog, hierarchy, root and worktree switching, and server-file browsing. Defines cancellation, restoration, validation, and favorites while linked feature documents retain user-facing scope."
+description: "Shared project panel with Add beside its choices immediately after personal projects, an independent bottom catalog, hierarchy, root/worktree switching, and server-file browsing. Defines cancellation, restoration, validation, and favorites while linked feature documents retain user-facing scope."
 created: "2026-11-03"
 updated: "2026-11-03"
 상위파일: "ui-contracts.md"
@@ -121,7 +121,7 @@ This switch uses an existing worktree without copying files, checking out, or sw
 
 ## Shared UI for adding projects and browsing server files
 
-`project-add-inline.tsx` owns the shared inline Add Project controls, used inside desktop, mobile, and first-use project panels. `project-catalog-panel.tsx` owns the collapsed All Projects footer. **Add Project** reveals three horizontal choices: **Git clone**, **New project**, and **Existing project**. Preserve labelled controls, keyboard focus, touch targets, mobile focus containment, and viewport-bound internal scrolling. Mobile inline actions and fields keep a minimum height of 44px. Project creation and catalog discovery stay in the panel; only existing-folder browsing opens its dedicated dialog.
+`project-add-inline.tsx` owns the shared inline Add Project controls, used inside desktop, mobile, and first-use project panels. `project-catalog-panel.tsx` owns the collapsed All Projects footer. **Add Project** sits immediately after the last My Projects row and reveals **Git clone**, **New project**, and **Existing project** beside it on the same row. Add and its setup scroll with the personal list; All Projects remains independently at the bottom. Narrow panels show option icons with translated accessible names and shared tooltips; wider panels also show their labels. Preserve labelled controls, keyboard focus, touch targets, mobile focus containment, and viewport-bound internal scrolling. Mobile inline actions and fields keep a minimum height of 44px. Project creation and catalog discovery stay in the panel; only existing-folder browsing opens its dedicated dialog.
 
 **New project** provides a labelled inline name field, a default-on Git icon toggle inside its right edge, and a check-icon confirmation button. Require ordinary agent permission for the secondary **Create with agent** action. Do not require or display managed storage paths as inputs. Busy state blocks duplicate creation. Errors retain the name and Git choice; if opening fails after creation, retry the created project without recreating it.
 

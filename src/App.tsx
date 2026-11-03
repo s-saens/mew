@@ -2229,8 +2229,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
             activePath={projectUiPath}
             pendingPath={pendingRootProjectPath}
             openRequested={openProjectDialog}
-            projectTools={canOpenProjects && <div className="mew-project-tools">
-              <div className="mew-project-sidebar-footer">
+            projectAdd={canOpenProjects &&
                 <ProjectAddInline basePath={rootProjectPath ?? ''} canUseAgent={caps.agent} canManageFolders={isOwner || role === 'manager'}
                   openRequested={openProjectDialog} onOpenRequestHandled={() => setOpenProjectDialog(false)} onboarding={hasProject === false}
                   beforeMutation={() => rootProjectSaveQueue.current}
@@ -2240,11 +2239,10 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
                     setCreationAgentProject(project)
                     if (!(await openRootProject(project.path))) { setCreationAgentProject(null); throw new Error(t('project.retry')) }
                   }}
-                  onOpen={openRootProject} />
-              </div>
+                  onOpen={openRootProject} />}
+            projectCatalog={canOpenProjects &&
               <ProjectCatalogPanel paths={projectPaths} onOpen={openRootProject} beforeMutation={() => rootProjectSaveQueue.current}
-                onProjectsChanged={async () => { const { state } = await fetchRootProjectTabs(); if (state) setOpenProjectPaths(state.paths) }} />
-            </div>}
+                onProjectsChanged={async () => { const { state } = await fetchRootProjectTabs(); if (state) setOpenProjectPaths(state.paths) }} />}
             fallbackLabel={hasProject === false ? t('project.noActive') : projectLabel(projectUiPath)}
             canOpen={canOpenProjects}
             canChangeIcon={canOpenProjects}
