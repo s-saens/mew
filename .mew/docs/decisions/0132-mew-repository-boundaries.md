@@ -26,7 +26,7 @@ The private parent owns compatible child-commit pins and integration tooling. Ea
 
 Public IDE installation must work without access to the private parent or Run. Shared protocol, browser transport, and asset dependencies must have explicit package or artifact interfaces. Keep Mewlink networking available when desktop components are absent. IDE authorization and session revocation continue to control desktop access.
 
-Implement through the [migration plan](../work/mew-repository-split-plan.md), tracked by the [task](../../tasks/Split%20Mew%20into%20IDE,%20Run,%20and%20remote%20desktop%20repositories.md). This decision accepts the target direction; it does not claim a completed move or supersede current runtime and operational contracts. Update those owners when their implementation changes.
+Implement through the [migration plan](../work/mew-repository-split-plan.md), tracked by the [task](../../tasks/Mew를%20IDE·Run·원격%20데스크톱%20저장소로%20분리.md). This decision accepts the target direction; it does not claim a completed move or supersede current runtime and operational contracts. Update those owners when their implementation changes.
 
 ## Alternatives and rationale
 

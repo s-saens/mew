@@ -7,7 +7,7 @@ updated: "2026-11-04"
 
 ## Purpose and scope
 
-Implement the repository boundaries accepted in [ADR 0132](../decisions/0132-mew-repository-boundaries.md). The [task](../../tasks/Split%20Mew%20into%20IDE,%20Run,%20and%20remote%20desktop%20repositories.md) owns implementation status. This document is a plan; no repositories, runtime paths, installations, or services have been changed by this planning work.
+Implement the repository boundaries accepted in [ADR 0132](../decisions/0132-mew-repository-boundaries.md). The [task](../../tasks/Mew를%20IDE·Run·원격%20데스크톱%20저장소로%20분리.md) owns implementation status. This document is a plan; no repositories, runtime paths, installations, or services have been changed by this planning work.
 
 ```text
 mew/                       private integration repository
