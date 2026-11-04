@@ -1,6 +1,6 @@
 ---
-title: "Responsive task calendar layout"
-description: "Records the 2026-11-04 task calendar change to a right-hand agenda in wide panels, local build and lint results, and the Obscura connection blocker for browser regression verification."
+title: "Task calendar and row layout"
+description: "Records the 2026-11-04 right-hand calendar agenda and document-before-date row controls, local checks, and Obscura connection blockers for browser regression verification."
 created: "2026-11-04"
 updated: "2026-11-04"
 ---
@@ -24,3 +24,11 @@ The [task-panel feature](../features/projects-files-search/task-panel-list-calen
 - The Impeccable detector reported only the pre-existing task swipe `padding-right` transition; this change adds no animation.
 
 The required build updates local `dist/` assets. No deployment, launcher execution, or server lifecycle operation was performed.
+
+## Document and date order follow-up
+
+The follow-up places the document icon immediately before the date in list and calendar rows, making dates the rightmost ordinary control. `TaskDateStatus` changes DOM order so keyboard traversal matches the visual order. File opening, date editing, and the separately revealed swipe-delete action retain their behavior. The [internal document link contract](../development/task-list.md#internal-document-links) owns this order; earlier dated feature records describe the previous arrangement.
+
+The existing isolated calendar layout test now renders `TaskDateStatus` with linked documents. It checks document → date DOM and visual order at every panel size, file opening, and Tab focus from document to date, in addition to the calendar layout checks.
+
+Follow-up verification: `npm run build` passed, including TypeScript checks. `npm run lint` completed with existing repository warnings, and focused lint passed without diagnostics. The design detector reported no findings for the changed component. Changed-document descriptions and links passed; the full documentation check still reported 42 unrelated missing links. The updated browser regression could not connect to Obscura before rendering, so visual placement, file-opening interaction, and keyboard focus remain unverified in the browser. No services were started or restarted.

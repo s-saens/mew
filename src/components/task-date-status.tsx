@@ -40,8 +40,8 @@ export function TaskDateStatus({ task, today, readOnly, onChange, isOpen, onOpen
   }, [open])
   const status = taskDateLabel(task, today)
   return <>
-    <button ref={trigger} type="button" className="task-date-status" data-tone={status.tone} aria-haspopup="dialog" aria-expanded={open} aria-controls={open ? id : undefined} onClick={() => setOpen(!open)}>{status.label}</button>
     {task.path && documents.open && <button type="button" className="task-tool task-open-document" aria-label={uiText('파일 열기')} data-tip={uiText('파일 열기')} onClick={() => documents.open?.(task.path!)}><Page width={14} height={14} aria-hidden="true" /></button>}
+    <button ref={trigger} type="button" className="task-date-status" data-tone={status.tone} aria-haspopup="dialog" aria-expanded={open} aria-controls={open ? id : undefined} onClick={() => setOpen(!open)}>{status.label}</button>
     {open && createPortal(<div ref={popup} id={id} role="dialog" aria-label={uiText('일정 편집')} tabIndex={-1} className="task-date-popover mew-overlay-surface bg-surface-deep" style={position}>
       <TaskRangeCalendar start={task.startDate} end={task.date} readOnly={readOnly} onChange={onChange} />
     </div>, document.body)}
