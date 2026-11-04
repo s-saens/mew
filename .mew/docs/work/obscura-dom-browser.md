@@ -1,6 +1,6 @@
 ---
 title: "Obscura host DOM browser migration"
-description: "Records the 2026-11-04 switch of the workspace DOM browser from headless Chrome/Chromium to per-session Obscura CDP instances, including executable discovery, CDP/WebSocket/history compatibility bridges, passed integration tests, and measured startup/RSS benchmarks."
+description: "Records the 2026-11-04 switch of the workspace DOM browser from headless Chrome/Chromium to per-session Obscura CDP instances, executable discovery, CDP/WebSocket/history bridges, integration tests, startup/RSS benchmarks, and the follow-up stylesheet URL correction with separate local and viewer verification limits."
 created: "2026-11-04"
 updated: "2026-11-04"
 ---
@@ -45,3 +45,16 @@ Measured on the Linux x64 host (`1280×800` viewport, identical HTML/CSS/JS + We
   - Per-session cookie and `localStorage` isolation across concurrent sessions and removal of `mew-dom-obscura-*` temporary directories on close.
 - Migrated `server/dom-browser-flow.browser.test.ts`, `src/components/dom-browser-entry.browser.test.ts`, `src/components/dom-browser-panel.browser.test.ts`, and `src/components/dom-browser-ports.browser.test.ts` to use `connectTestBrowser()` for their outer UI viewer browser and fixed the missing `prepareEditorPane` mock export in `src/components/dom-browser-entry.browser.test.ts`. Running those 4 UI viewer tests requires the user-managed external Obscura UI test service on `ws://127.0.0.1:9222` ([browser-testing.md](../development/browser-testing.md)).
 - `npm run build`, `npx tsc -b`, `npm run lint`, and `npm run check:docs` passed.
+
+## Follow-up: missing stylesheet after DOM replay
+
+The localhost sign-in page appeared with browser-default typography and controls after the Obscura migration. A one-shot Obscura v0.2.6 CLI inspection of the already-running app found that `HTMLLinkElement.href` returned a relative path while the corresponding `CSSStyleSheet.href` was absolute. rrweb compares those values directly, so it left the external stylesheet uninlined. The viewer cannot use the host's localhost URL; its resource policy also blocks HTTP stylesheets.
+
+`server/dom-browser-compat.ts` corrects the reflected link getter before rrweb and app scripts run. It resolves URLs against the owning document's base URI, preserves the native setter and property flags, and retains the original value when URL resolution fails. The correction applies to each new document through the existing initialization script. The [DOM browser contract](../development/port-preview.md#internal-dom-browser) owns this behavior.
+
+Local verification against the existing app used the installed Obscura CLI and the actual rrweb-snapshot bundle without starting a server. Before the correction, the stylesheet snapshot contained zero CSS bytes. Afterward, it contained approximately 126 KB of serialized CSS. This demonstrates restored stylesheet capture; it does not establish physical-device appearance or complete Obscura browser compatibility. Server-side code must be applied through the user's normal restart procedure before the internal Browser uses this correction.
+
+- `node --test server/dom-browser-compat.test.ts server/browser-dom-executable.test.ts` passed (6/6). The new regression tests use the actual rrweb snapshot bundle with an Obscura-like relative getter and cover restored CSS capture, native setters, base changes, descriptor flags, repeated application, and missing or malformed URLs without a network fixture.
+- `npm run build` and `npx tsc -b` passed. Repository lint completed with existing warnings; focused lint for the compatibility module, tests, and session file passed without diagnostics.
+- `npm run check:docs` validated 700 descriptions but failed on 42 existing missing links outside the two changed documents, including the missing decision README referenced by repository entrypoints. The changed documents' descriptions and local links passed a scoped check.
+- No deployment, launcher execution, or server start, stop, or restart was performed. End-to-end replay and physical-device appearance remain unverified.

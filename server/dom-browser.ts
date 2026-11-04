@@ -13,6 +13,7 @@ import { canUse } from './access-policy.ts'
 import { watchSocketAccess } from './access-socket.ts'
 import { webSocketOriginAllowed } from './websocket-origin.ts'
 import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { DOM_BROWSER_COMPAT_SCRIPT } from './dom-browser-compat.ts'
 
 export { DOM_BROWSER_WS }
 const sessions = new Set<DomBrowserSession>()
@@ -382,7 +383,7 @@ class DomBrowserSession {
         if (generation === this.generation) this.send({ type: 'events', generation, events: [event] })
       }).catch(() => {}).finally(() => { this.pendingEvents -= bytes })
     })
-    await page.addInitScript({ content: `${recordBundle()}; if (window === window.top) {
+    await page.addInitScript({ content: `${DOM_BROWSER_COMPAT_SCRIPT}; ${recordBundle()}; if (window === window.top) {
       const documentToken = Array.from(crypto.getRandomValues(new Uint32Array(4)), value => value.toString(16).padStart(8, '0')).join('');
       window.__mewDomScrollRevisions = new Map();
       const notifyHistory = mode => { try { void window.__mewDomHistory(mode, window.location.href).catch(() => {}); } catch {} };
