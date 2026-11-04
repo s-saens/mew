@@ -8,7 +8,7 @@ import { ProjectIcon } from './ProjectIcon'
 import { CommandButtonMenu } from './CommandButtonMenu'
 import { PanelCloseButton } from './panel-close-button'
 import { WORKSPACE_PROJECT } from '../utils/active-project'
-import { projectHierarchy } from '../utils/project-hierarchy'
+import { projectHierarchy, type ProjectHierarchyRow } from '../utils/project-hierarchy'
 
 const IconPicker = lazy(() => import('./IconPicker').then(module => ({ default: module.IconPicker })))
 
@@ -62,6 +62,7 @@ export function ProjectSwitcher({ paths, activePath, pendingPath, fallbackLabel,
   const showingSidebar = sidebarEnabled && sidebarOpen && canOpen
   const panelId = useId()
   const mobileTitleId = useId()
+  const rows = useMemo(() => projectHierarchy(paths), [paths])
   const labels = useMemo(() => {
     const counts = new Map<string, number>()
     for (const path of paths) counts.set(labelOf(path), (counts.get(labelOf(path)) ?? 0) + 1)
@@ -137,12 +138,12 @@ export function ProjectSwitcher({ paths, activePath, pendingPath, fallbackLabel,
         return
       }
       if (index === null) return
-      const path = paths[index]
+      const path = rows[index]?.path
       if (path && path !== selectionPath) { if (mobile && menuElement.current) closeMenu(); else setMenu(null); onActivate(path) }
     }
     window.addEventListener('keydown', select, true)
     return () => window.removeEventListener('keydown', select, true)
-  }, [paths, selectionPath, canOpen, onActivate, sidebarEnabled, sidebarOpen, onSidebarOpenChange, mobile])
+  }, [rows, selectionPath, canOpen, onActivate, sidebarEnabled, sidebarOpen, onSidebarOpenChange, mobile])
 
   useLayoutEffect(() => {
     if (showingSidebar) sidebarList.current?.querySelector<HTMLButtonElement>('[data-project-option]')?.focus({ preventScroll: true })
@@ -182,7 +183,7 @@ export function ProjectSwitcher({ paths, activePath, pendingPath, fallbackLabel,
   </>
 
   function projectItems(inSidebar: boolean) {
-    return <ProjectOrder paths={paths} activePath={activePath} onReorder={onReorder} renderItem={(path, move, index) => <>
+    return <ProjectOrder rows={rows} activePath={activePath} onReorder={onReorder} renderItem={(path, move, index) => <>
       <ActionMenuItem style={{ flex: 1, minWidth: 0, width: 'auto' }} data-project-option={path} title={path} aria-keyshortcuts={index < 9 ? `Alt+${index + 1}` : undefined} role="menuitemradio" checked={path === activePath} closeOnSelect={!inSidebar}
         data-dialog-autofocus={!inSidebar && index === 0 || undefined}
         icon={<span className="flex h-4 w-4 shrink-0 items-center justify-center" aria-hidden="true"><ProjectIcon icon={icons[path] ?? 'i:folder'} size={16} /></span>}
@@ -321,25 +322,24 @@ export function ProjectSwitcher({ paths, activePath, pendingPath, fallbackLabel,
   </>
 }
 
-function ProjectOrder({ paths, activePath, onReorder, renderItem }: {
-  paths: string[]
+function ProjectOrder({ rows, activePath, onReorder, renderItem }: {
+  rows: ProjectHierarchyRow[]
   activePath: string | null
   onReorder?: (paths: string[]) => void
   renderItem: (path: string, move: (direction: number) => void, index: number) => React.ReactNode
 }) {
   const { t } = useI18n()
   function reorder(from: number, to: number) {
-    if (!onReorder || from === to || to < 0 || to >= paths.length) return
-    const next = [...paths]
+    if (!onReorder || from === to || to < 0 || to >= rows.length) return
+    const next = rows.map(row => row.path)
     next.splice(to, 0, next.splice(from, 1)[0])
     onReorder(next)
   }
-  const rows = projectHierarchy(paths)
-  const drag = useDragReorder({ axis: 'y', handleOnly: true, onReorder: (from, to) => reorder(rows[from].index, rows[to].index) })
+  const drag = useDragReorder({ axis: 'y', handleOnly: true, onReorder: reorder })
   return rows.map(({ path, depth, index }, visualIndex) => {
     const { ref, ...handleProps } = drag.getItemProps(visualIndex)
     return <div key={path} ref={ref} role="none" data-project-row={path} data-project-depth={depth} data-active={path === activePath || undefined} style={{ paddingLeft: Math.min(depth, 5) * 12 }} className={`mew-sortable-menu-row ${drag.dragIndex === visualIndex ? 'opacity-60' : ''}`}>
-      {onReorder && paths.length > 1 && <MenuReorderHandle {...handleProps}
+      {onReorder && rows.length > 1 && <MenuReorderHandle {...handleProps}
         data-project-drag-handle={path} aria-label={`${labelOf(path)} · ${t('project.reorder')}`} data-tip={t('project.reorder')}
         onClick={event => { event.stopPropagation(); drag.consumeClick() }}
         onMove={direction => reorder(index, index + direction)} />}

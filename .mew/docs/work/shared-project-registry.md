@@ -1,8 +1,8 @@
 ---
 title: "Shared projects and inline project setup"
-description: "Records shared project registry creation on November 2 and the November 3 inline panel follow-up: managed clones, GitHub repositories, nested discovery, shortcut removal, focus/touch fixes, and Add placement immediately after personal projects. Separates passing local tests, build and lint from unrelated documentation and branch-test failures and pending user-owned runtime application."
+description: "Records shared project registry creation on November 2 and the November 3 inline panel follow-up: managed clones, GitHub repositories, nested discovery, shortcut removal, focus/touch fixes, and Add placement immediately after personal projects. Includes the November 4 correction for hierarchy shortcut numbering and reordering. Separates passing local tests, build and lint from unrelated documentation and branch-test failures and pending browser/runtime verification."
 created: "2026-11-02"
-updated: "2026-11-03"
+updated: "2026-11-04"
 ---
 
 ## Purpose and resulting behavior
@@ -91,3 +91,15 @@ Move Add immediately below the final My Projects row, and reveal its three optio
 - `npm run build` passed after TypeScript and Vite compilation, with the existing large-chunk warning. The initial attempt was blocked by two argument-count errors in concurrently modified `server/shared-mcp.test.ts`; those errors were corrected before the successful rerun. All four changed documentation files passed metadata and local-link checks.
 
 No deployment, launcher, or server lifecycle operation was performed.
+
+
+## Hierarchy shortcut correction — November 4, 2026
+
+Nested projects were displayed beneath their ancestors while shortcut labels, Alt-number targets, and reorder operations still used positions in the ungrouped saved list. Derive a single displayed hierarchy for all three operations. My Projects now numbers its first nine rows from top to bottom, and sibling reordering starts from that displayed order. The [feature contract](../features/projects-files-search/opening-projects-tabs-and-groups.md#select-and-organize-projects) and [UI contract](../development/ui-project-navigation.md#header-project-switcher) own current behavior. Filesystem ancestry still determines nesting.
+
+- `node --test src/components/project-shortcut-order.test.ts src/utils/project-hierarchy.test.ts`: all five tests passed. Actual component regressions cover shortcut text and accessibility metadata, Alt-number activation, keyboard and pointer-handle reordering, selection while the sidebar is closed, and the nine-row limit. Happy DOM supplies row geometry for drag hit testing; it does not verify browser layout or physical touch.
+- `npm run build` passed, including TypeScript; Vite retained its large-chunk warning. `npm run lint` passed with warnings and no errors. The scoped mechanical UI detector reported no findings, and the changed diff passed whitespace checks.
+- `npm run check:docs` validated 694 descriptions, then failed on 42 existing missing-target links outside this change. Scoped metadata and link checks for the three changed documents passed.
+- `server/project-switcher-ui.test.ts` and `server/project-sidebar-ui.test.ts` could not connect to the user-managed Obscura endpoint. Browser and physical-device verification remain incomplete.
+
+The build updates local `dist/` assets. No deployment, launcher invocation, server lifecycle operation, or push was performed.

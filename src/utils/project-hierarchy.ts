@@ -12,9 +12,9 @@ export function projectHierarchy(paths: readonly string[]): ProjectHierarchyRow[
   }
   const rows: ProjectHierarchyRow[] = []
   function append(parent: string | null, depth: number) {
-    unique.forEach((path, index) => {
+    unique.forEach(path => {
       if (parents.get(path) !== parent) return
-      rows.push({ path, parentPath: parent, depth, index })
+      rows.push({ path, parentPath: parent, depth, index: rows.length })
       append(path, depth + 1)
     })
   }
