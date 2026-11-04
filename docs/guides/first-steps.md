@@ -1,8 +1,8 @@
 ---
 title: "Open your first project and document"
-description: "Walks through inline first-use project creation, optional managed cloning or existing-folder linking, personal My Projects and collapsed All Projects, then editing notes.md with autosave and reviewing Git changes."
+description: "Walks through the panel for an empty My Projects list, inline project creation, optional Git cloning or workspace/path import, then editing notes.md with autosave and reviewing Git changes."
 created: "2026-10-14"
-updated: "2026-11-03"
+updated: "2026-11-04"
 상위파일: "MOC.md"
 ---
 # Open your first project and document
@@ -11,18 +11,18 @@ Start with installation complete and logged in to mew. By the end of this guide,
 
 ## 1. Add your first project
 
-With no project selected, Mew shows the project setup panel. Choose **Add project → New project**, enter a name such as `hello-mew`, and press the check icon. The Git icon inside the name field starts enabled; leave it on to track changes, or turn it off for a regular folder. Mew creates and opens the project without asking for a storage path.
+With My projects empty, Mew shows only the top bar and the project panel. The centered **Add a project** prompt offers **New project**, **Git clone**, and **Import project**. Choose **New project**, enter a name such as `hello-mew`, and press the check icon. The Git icon inside the name field starts enabled; leave it on to track changes, or turn it off for a regular folder. Mew creates and opens the project without asking for a storage path.
 
 You can also use either of the other inline choices:
 
 - **Git clone** accepts a public GitHub or GitLab HTTPS repository URL without an account connection. Connect GitHub here to select a repository your account can access, including authorized private and organization repositories. This is available before you open a project.
-- **Existing project** opens the server folder browser. Find a folder and open it to link it without moving or copying its files.
+- **Import project** reveals **From this workspace** and **Browse path** inline. The first lists registered projects; selecting one adds it to My projects and opens it. The second opens the server folder browser to link a folder without moving or copying its files.
 
 The secondary **Create with agent** action is available when you want help defining and building a new project. It uses the normal agent conversation controls: select a configured runtime if needed, answer the agent's first questions, and let it document and implement the project. This option requires agent access. [Runtime setup](../configuration/agent-runtimes.md).
 
-Creating, cloning, or linking adds the project to the shared **All projects** catalog and your **My projects** shortcuts. Other signed-in users can add the same project to their lists, subject to file permissions. All projects starts collapsed at the bottom of the panel; expand it to find projects added by other users.
+Creating, cloning, or linking registers the project with the **workspace** and adds it to your **My projects** shortcuts. Importing a workspace project adds your shortcut and opens it. The Dock and header project controls appear once you have a personal project. Other signed-in users can import the same project, subject to file permissions.
 
-To return to a project, click its name in the header and choose it from My projects. Removing a shortcut leaves the folder and shared catalog entry intact. Nested Git/Mew projects appear beneath their actual parent. [Project management](projects.md#프로젝트-탭).
+To return to a project, click its name in the header and choose it from My projects. Use **Add project → Import project → From this workspace** to find projects added by other users. X returns through the inline choices one level at a time. Removing a shortcut leaves the folder and workspace registration intact; removing the last one returns to the centered project panel. Nested Git/Mew projects appear beneath their actual parent. [Project management](projects.md#프로젝트-탭).
 
 ## 2. Distinguish files from Documents
 

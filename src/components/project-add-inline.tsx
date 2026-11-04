@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react'
-import { Check, FolderPlus, GitBranch, Link, Lock, Plus, RefreshDouble, Spark, Xmark } from 'iconoir-react'
+import { Check, Folder, FolderPlus, GitBranch, Link, Lock, Plus, RefreshDouble, Spark, Xmark } from 'iconoir-react'
 import { canAutoFocusInput, HoverTipLayer, LoadingIndicator, useOverlayDismiss } from '@mew/ui'
 import { cloneManagedProject, fetchConnectedGitRepositories, registerProject, type RegisteredProject } from '../api/client'
 import { GIT_CONNECTION_CHANGED } from '../api/git-auth-request'
@@ -7,8 +7,10 @@ import { useI18n } from '../i18n'
 import { GitHubAccount } from './github-account'
 import { LinkProjectDialog } from './LinkProjectDialog'
 import { projectAddCopy } from './project-add-copy'
+import { ProjectCatalogPanel } from './project-catalog-panel'
 
-type Mode = 'clone' | 'create' | 'existing'
+type Mode = 'clone' | 'create' | 'import' | 'workspace'
+const emptyPaths: string[] = []
 type Repository = Awaited<ReturnType<typeof fetchConnectedGitRepositories>>['repositories'][number]
 
 const iconButton = 'inline-flex h-8 w-8 shrink-0 items-center justify-center rounded text-ink-secondary hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-40'
@@ -16,6 +18,7 @@ const field = 'h-8 w-full min-w-0 rounded border border-edge-strong bg-surface-d
 
 export interface ProjectAddInlineProps {
   basePath: string
+  paths?: string[]
   onOpen: (path: string) => Promise<boolean | void> | boolean | void
   onProjectsChanged?: () => Promise<void> | void
   onCreateWithAgent?: (project: RegisteredProject) => Promise<void> | void
@@ -27,11 +30,11 @@ export interface ProjectAddInlineProps {
   onboarding?: boolean
 }
 
-export function ProjectAddInline({ basePath, onOpen, onProjectsChanged, onCreateWithAgent, canUseAgent = true, canManageFolders = true, beforeMutation, openRequested = false, onOpenRequestHandled, onboarding = false }: ProjectAddInlineProps) {
+export function ProjectAddInline({ basePath, paths = emptyPaths, onOpen, onProjectsChanged, onCreateWithAgent, canUseAgent = true, canManageFolders = true, beforeMutation, openRequested = false, onOpenRequestHandled, onboarding = false }: ProjectAddInlineProps) {
   const { t, locale } = useI18n()
   const copy = projectAddCopy(locale)
   const id = useId()
-  const [expanded, setExpanded] = useState(false)
+  const [expanded, setExpanded] = useState(onboarding)
   const [mode, setMode] = useState<Mode | null>(null)
   const [linkOpen, setLinkOpen] = useState(false)
   const [name, setName] = useState('')
@@ -46,8 +49,15 @@ export function ProjectAddInline({ basePath, onOpen, onProjectsChanged, onCreate
   const trigger = useRef<HTMLButtonElement>(null)
   const input = useRef<HTMLInputElement>(null)
   const modeTriggers = useRef<Partial<Record<Mode, HTMLButtonElement | null>>>({})
+  const browseTrigger = useRef<HTMLButtonElement>(null)
+  const restoreFocus = useRef<Mode | 'browse' | null>(null)
+  const backTrigger = useRef<HTMLButtonElement>(null)
+  const focusCollapsed = useRef(false)
+  const [createdMode, setCreatedMode] = useState<Mode | null>(null)
   const busyRef = useRef(false)
   const alive = useRef(true)
+  const workspace = useRef<HTMLDivElement>(null)
+  const linked = useRef(new Map<string, RegisteredProject>())
   const [created, setCreated] = useState<RegisteredProject | null>(null)
 
   useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
@@ -57,9 +67,22 @@ export function ProjectAddInline({ basePath, onOpen, onProjectsChanged, onCreate
     onOpenRequestHandled?.()
   }, [openRequested, onOpenRequestHandled])
   useEffect(() => {
-    if (!expanded || !mode || linkOpen) return
-    if (canAutoFocusInput()) input.current?.focus()
-    else modeTriggers.current[mode]?.focus()
+    if (!expanded) {
+      if (focusCollapsed.current) trigger.current?.focus()
+      focusCollapsed.current = false
+      return
+    }
+    if (linkOpen) return
+    const restore = restoreFocus.current
+    if (restore) {
+      (restore === 'browse' ? browseTrigger.current : modeTriggers.current[restore])?.focus()
+      restoreFocus.current = null
+    } else if (mode === 'create' || mode === 'clone') {
+      if (canAutoFocusInput()) input.current?.focus()
+      else backTrigger.current?.focus()
+    } else if (mode) {
+      (mode === 'workspace' && canAutoFocusInput() ? workspace.current?.querySelector<HTMLInputElement>('input') : backTrigger.current)?.focus()
+    }
   }, [expanded, mode, linkOpen])
   useEffect(() => {
     if (!expanded || mode !== 'clone') return
@@ -81,12 +104,18 @@ export function ProjectAddInline({ basePath, onOpen, onProjectsChanged, onCreate
     return () => window.removeEventListener(GIT_CONNECTION_CHANGED, changed)
   }, [])
 
-  function close() {
+  function back() {
     if (busyRef.current) return
-    setExpanded(false)
-    trigger.current?.focus()
+    setError(null)
+    if (mode) {
+      restoreFocus.current = mode
+      setMode(mode === 'workspace' ? 'import' : null)
+    } else {
+      focusCollapsed.current = true
+      setExpanded(false)
+    }
   }
-  useOverlayDismiss(expanded && !linkOpen && close, { closeOnEscape: () => !busyRef.current, closeOnBack: () => !busyRef.current })
+  useOverlayDismiss(expanded && !linkOpen && back, { closeOnEscape: () => !busyRef.current, closeOnBack: () => !busyRef.current })
 
   const validName = !!name.trim() && name.trim() !== '.' && name.trim() !== '..' && !/[\\/\p{Cc}]/u.test(name.trim()) && !name.trim().startsWith('.')
   const invalidName = !!name.trim() && !validName
@@ -112,6 +141,8 @@ export function ProjectAddInline({ basePath, onOpen, onProjectsChanged, onCreate
     else if (await onOpen(project.path) === false) throw new Error(copy.openFailed)
     if (!alive.current) return
     setCreated(null)
+    linked.current.clear()
+    setCreatedMode(null)
     setExpanded(false)
     setMode(null)
     setName('')
@@ -126,35 +157,53 @@ export function ProjectAddInline({ basePath, onOpen, onProjectsChanged, onCreate
       const project = created ?? (mode === 'create'
         ? (await registerProject({ name: name.trim(), git })).project
         : (await cloneManagedProject(repositoryUrl)).project)
+      setCreatedMode(mode)
       setCreated(project)
       await finish(project, withAgent)
     }).catch(() => {})
   }
   function choose(next: Mode) {
-    if (busyRef.current || created && next !== mode) return
+    if (busyRef.current || created && next !== createdMode) return
     setMode(next)
     setError(null)
-    if (next === 'existing') setLinkOpen(true)
   }
 
-  return <HoverTipLayer className="mew-project-add"><div className="min-w-0" data-project-add-inline>
-    <div className="flex min-w-0 items-center gap-1">
-      <button ref={trigger} type="button" aria-label={copy.add} aria-expanded={expanded} aria-controls={`${id}-setup`} disabled={busy}
-        onClick={() => expanded ? close() : setExpanded(true)}
-        className={`flex min-h-8 min-w-0 items-center gap-1.5 rounded px-1.5 text-left text-xs text-ink-secondary hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-40 ${expanded ? 'shrink-0' : 'flex-1'}`}>
-        {expanded ? <Xmark width={16} height={16} aria-hidden="true" /> : <Plus width={16} height={16} aria-hidden="true" />}{copy.add}
-      </button>
-      {expanded && <nav id={`${id}-setup`} aria-label={t('project.add')} className="flex min-w-0 flex-1 items-stretch gap-0.5">
-        {(['clone', 'create', 'existing'] as const).map(next => <button key={next} ref={element => { modeTriggers.current[next] = element }} type="button"
-          aria-label={next === 'existing' ? copy.existingLabel : copy[next]} data-tip={next === 'existing' ? copy.existingLabel : copy[next]} aria-pressed={mode === next} disabled={busy || !!created && next !== mode} onClick={() => choose(next)}
-          className={`flex min-h-8 min-w-0 flex-1 items-center justify-center gap-1 whitespace-nowrap rounded px-1 text-xs leading-4 text-ink-secondary hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-40 ${mode === next ? 'bg-surface-raised !text-ink' : ''}`}>
-          {next === 'clone' ? <GitBranch width={16} height={16} aria-hidden="true" /> : next === 'create' ? <FolderPlus width={16} height={16} aria-hidden="true" /> : <Link width={16} height={16} aria-hidden="true" />}
-          <span className="mew-project-add-choice-label">{copy[next]}</span>
+  const choices = mode === 'import' ? (['workspace', 'browse'] as const) : (['create', 'clone', 'import'] as const)
+  const title = mode === 'workspace' ? copy.workspace : mode ? copy[mode] : copy.add
+
+  return <HoverTipLayer className={`mew-project-add${onboarding ? ' mew-project-add-onboarding' : ''}`}><div className="min-w-0" data-project-add-inline data-project-add-step={!expanded ? 'closed' : mode ?? 'choices'}>
+    {onboarding && <h2 className="mew-project-add-heading text-center text-base font-medium text-ink">{copy.heading}</h2>}
+    {!expanded ? <button ref={trigger} type="button" aria-label={copy.add} aria-expanded={false} aria-controls={`${id}-setup`}
+      onClick={() => { setMode(null); setExpanded(true) }}
+      className="flex min-h-8 w-full min-w-0 items-center gap-1.5 rounded px-1.5 text-left text-xs text-ink-secondary hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-accent">
+      <Plus width={16} height={16} aria-hidden="true" />{copy.add}
+    </button> : <>
+      <div className="mew-project-add-header flex min-w-0 items-center justify-between gap-1">
+        <span className="mew-project-add-title min-w-0 truncate px-1.5 text-xs text-ink-secondary">{title}</span>
+        <button ref={backTrigger} type="button" data-project-add-back aria-label={copy.back} data-tip={copy.back} disabled={busy} onClick={back} className={`${iconButton} mew-project-add-back`}><Xmark width={16} height={16} aria-hidden="true" /></button>
+      </div>
+      {(mode === null || mode === 'import') && <nav id={`${id}-setup`} aria-label={title} className="mew-project-add-choices flex min-w-0 flex-col gap-0.5">
+        {choices.map(next => <button key={next} ref={element => { if (next === 'browse') browseTrigger.current = element; else modeTriggers.current[next] = element }} type="button"
+          data-project-add-choice={next} aria-label={copy[next]} data-tip={copy[next]} disabled={busy || !!created && next !== createdMode}
+          onClick={() => next === 'browse' ? setLinkOpen(true) : choose(next)}
+          className="mew-project-add-choice flex min-h-8 min-w-0 items-center gap-1.5 rounded px-1.5 py-1 text-left text-xs leading-4 text-ink-secondary hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-40">
+          {next === 'clone' ? <GitBranch width={16} height={16} className="shrink-0" aria-hidden="true" /> : next === 'create' ? <FolderPlus width={16} height={16} className="shrink-0" aria-hidden="true" /> : next === 'browse' ? <Folder width={16} height={16} className="shrink-0" aria-hidden="true" /> : <Link width={16} height={16} className="shrink-0" aria-hidden="true" />}
+          <span>{copy[next]}</span>
         </button>)}
       </nav>}
-    </div>
-    {onboarding && (!expanded || mode !== 'clone') && <GitHubAccount project="" />}
+    </>}
     {expanded && <div className="min-w-0 pb-1">
+      {mode === 'workspace' && <div ref={workspace}><ProjectCatalogPanel paths={paths} beforeMutation={beforeMutation} onProjectsChanged={onProjectsChanged}
+        onBusyChange={value => { busyRef.current = value; setBusy(value) }} onOpen={async path => {
+          try {
+            const result = await onOpen(path)
+            if (result !== false && alive.current) { setExpanded(false); setMode(null) }
+            return result
+          } finally {
+            busyRef.current = false
+            if (alive.current) setBusy(false)
+          }
+        }} /></div>}
       {mode === 'create' && <form className="min-w-0" noValidate onSubmit={event => { event.preventDefault(); submit() }}>
         <div className="flex min-w-0 items-center gap-1">
           <div className="relative min-w-0 flex-1">
@@ -195,10 +244,14 @@ export function ProjectAddInline({ basePath, onOpen, onProjectsChanged, onCreate
       {error && <p role="alert" className="mt-1 whitespace-pre-wrap break-words text-xs text-danger-ink">{error}</p>}
       {busy && <span role="status" className="mt-1 flex items-center gap-1.5 text-xs text-ink-secondary"><LoadingIndicator />{t(mode === 'clone' ? 'project.cloning' : 'project.working')}</span>}
     </div>}
-    {linkOpen && <LinkProjectDialog basePath={basePath} canManageFolders={canManageFolders} onClose={() => setLinkOpen(false)} onOpen={async path => {
+    {linkOpen && <LinkProjectDialog basePath={basePath} canManageFolders={canManageFolders} onClose={() => { restoreFocus.current = 'browse'; setLinkOpen(false) }} onOpen={async path => {
       await run(async () => {
-        await beforeMutation?.()
-        const { project } = await registerProject({ path })
+        let project = linked.current.get(path)
+        if (!project) {
+          await beforeMutation?.()
+          project = (await registerProject({ path })).project
+          linked.current.set(path, project)
+        }
         await finish(project)
       })
     }} />}

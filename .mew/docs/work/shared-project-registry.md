@@ -1,6 +1,6 @@
 ---
 title: "Shared projects and inline project setup"
-description: "Records shared project registry creation, inline setup, cloning, discovery, and Add placement. Includes November 4 fixes for hierarchy shortcut ordering and empty My Projects on new accounts, with local test/build/lint results, existing document-link failures, and browser verification limits."
+description: "Records shared project registry creation, inline setup, cloning, discovery, and personal project corrections. Includes November 4 layout for an empty personal list and nested workspace/path import changes, with their verification status and earlier local test, build, lint, document-link, and browser limits."
 created: "2026-11-02"
 updated: "2026-11-04"
 ---
@@ -115,3 +115,25 @@ Prevent browser-cached project paths from becoming a new account's personal shor
 - `node --test --test-name-pattern='App first-use onboarding' server/workspace-switch-ui.test.ts` could not connect to the user-managed Obscura endpoint. The passing hook tests use Happy DOM and mocked API responses; browser layout and physical-device verification remain incomplete.
 
 The required build updated local `dist/` assets. No deployment, launcher invocation, or application server lifecycle operation was performed. Previously saved account shortcuts are preserved; this correction does not remove entries already stored by the old behavior.
+
+
+## Empty personal project panel and unified import — November 4, 2026
+
+### Purpose and resulting behavior
+
+Make an empty My Projects list a clear starting point for adding a project, including when an accessible shared project remains active. Consolidate shared project discovery and server-folder linking under one inline import flow. The [project feature](../features/projects-files-search/opening-projects-tabs-and-groups.md#projects-and-my-projects), [UI navigation contract](../development/ui-project-navigation.md#shared-ui-for-adding-projects-and-browsing-server-files), and [project guide](../../../docs/guides/projects.md#프로젝트-탭) own the current behavior. Earlier bottom-catalog descriptions and checks above remain historical.
+
+- Empty My Projects shows the top bar and a project panel filling the remaining area. It hides the Dock, project work panels, header project selector, and header command button. Centered Add a project offers New project, Git clone, and Import project.
+- For accounts with personal projects, Add follows the list and reveals those same three choices. Import project reveals From this workspace and Browse path inline. The former bottom All Projects section is removed; workspace is the UI term for the registered shared catalog.
+- Workspace import adds the caller's personal shortcut and opens that project. Path import preserves the existing directory and registration behavior. Creation and cloning also pin and open their result. An empty personal list initially shows the centered three choices. X returns one inline level at a time and can collapse those choices to Add.
+- Storage, catalog APIs, account roots, permissions, project files, and other accounts' shortcuts retain their existing owners and boundaries. This flow refines ADRs [0118](../decisions/0118-shared-project-registry.md) and [0124](../decisions/0124-managed-clone-and-project-discovery.md) without changing their registry or provider decisions.
+
+### Verification and application
+
+- The focused registry/access, demo, personal-list, hierarchy/shortcut, project-view, and actual-component runs passed 40 tests. `node --test src/hooks/use-mobile-panel-swipe.test.ts` passed one additional regression, for 41 distinct passing tests. The component checks cover all three choices, workspace/path imports, X/Esc/Back and focus restoration, busy-operation guards, provider/catalog errors, validation, and retries without duplicate creation or import. The swipe check covers delayed workspace mounting, listener cleanup, and adding a project after returning to setup.
+- Review identified a first-open failure that could unmount setup after registration. App now applies refreshed personal shortcuts only after the chosen project opens successfully, retaining the form and error on failure. The first-open browser fixture includes a failed attempt and retry; its runtime assertion remains blocked below.
+- `npm run build` passed, including TypeScript; Vite retained its large-chunk warning. `npm run lint` passed with warnings and no errors. `git diff --check` passed. The scoped Impeccable detector reported no findings.
+- `npm run check:docs` validated 698 descriptions and reported the same 42 existing missing-target links. Changed descriptions and new links were also inspected separately; the architecture and public project guide retain their existing missing parent references.
+- `node --test --test-name-pattern='App hides project work surfaces' server/workspace-switch-ui.test.ts` compiled its fixture but could not connect to the user-managed Obscura endpoint. Desktop/mobile geometry, browser rendering, and physical-device behavior remain unverified. Happy DOM component/hook tests and policy tests do not establish those visual results.
+
+The build updates local `dist/` assets. No deployment, launcher invocation, application server lifecycle operation, or push was performed.

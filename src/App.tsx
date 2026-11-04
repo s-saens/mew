@@ -19,6 +19,7 @@ import { getUiLocale, uiText } from '@mew/ui/i18n-core'
 import { useUiLocale } from '@mew/ui/i18n'
 import { useRefreshTasks } from './hooks/use-refresh-tasks'
 import { useRootProjectTabs } from './hooks/use-root-project-tabs'
+import { projectWorkspaceView } from './utils/project-workspace-view'
 import { useFocusedWorkspacePanel } from './hooks/use-focused-workspace-panel'
 import { defaultCapabilities, type Feature } from '../shared/access-policy'
 import { writeBrowserStorage } from '@mew/ui/browser-storage'
@@ -135,7 +136,6 @@ const TaskPanel = deferredComponent(async () => ({ default: (await import('./com
 const SharedMemo = deferredComponent(async () => ({ default: (await import('./components/shared-memo')).SharedMemo }))
 const ProjectCreationAgentDialog = deferredComponent(async () => ({ default: (await import('./components/ProjectCreationAgentDialog')).ProjectCreationAgentDialog }), null)
 const ProjectAddInline = deferredComponent(async () => ({ default: (await import('./components/project-add-inline')).ProjectAddInline }), null)
-const ProjectCatalogPanel = deferredComponent(async () => ({ default: (await import('./components/project-catalog-panel')).ProjectCatalogPanel }), null)
 const DocumentGraph = deferredComponent(async () => ({ default: (await import('./components/DocumentGraph')).DocumentGraph }), null)
 const DocsSettingsModal = deferredComponent(async () => ({ default: (await import('./components/DocsSettingsModal')).DocsSettingsModal }), null)
 const Mewcat = deferredComponent(async () => ({ default: (await import('./components/Mewcat')).Mewcat }), null)
@@ -303,6 +303,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
   const projectPaths = useMemo(() => [...new Set(openProjectPaths)], [openProjectPaths])
   const [openProjectDialog, setOpenProjectDialog] = useState(false)
   const [hasProject, setHasProject] = useState<boolean | null>(isGuest ? true : null)
+  const projectView = projectWorkspaceView({ canOpenProjects, shortcutsLoaded: rootProjectTabsSynced, paths: projectPaths, hasProject })
   const [creationAgentProject, setCreationAgentProject] = useState<RegisteredProject | null>(null)
   const [switchingRootProject, setSwitchingRootProject] = useState(false)
   const [pendingRootProjectPath, setPendingRootProjectPath] = useState<string | null>(null)
@@ -352,7 +353,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
   const desktopDockReadyRef = useRef(false)
   const [projectSidebarHost, setProjectSidebarHost] = useState<HTMLDivElement | null>(null)
   const [projectSidebarOpen, setProjectSidebarOpen] = useState(() => scopedBrowserStorage().getItem('mew:project-sidebar-open') === '1')
-  const showProjectSidebar = desktopMode && canOpenProjects && projectSidebarOpen
+  const showProjectSidebar = projectView === 'workspace' && desktopMode && canOpenProjects && projectSidebarOpen
   const changeProjectSidebarOpen = useCallback((open: boolean) => {
     if (open) dockRef.current?.restore()
     setProjectSidebarOpen(open)
@@ -933,6 +934,13 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     }
   }, [applyWorkspace, caps.agent, caps.terminal, handleWorkspaceBroadcast, canOpenProjects, showToast, prepareWorkspaceUi])
 
+  const openAddedProject = useCallback(async (path: string) => {
+    if (!(await openRootProject(path))) return false
+    const { state } = await fetchRootProjectTabs()
+    setOpenProjectPaths(state?.paths ?? [])
+    return true
+  }, [openRootProject, setOpenProjectPaths])
+
   useEffect(() => {
     const open = (event: Event) => {
       const notice = (event as CustomEvent<MewcatNotice>).detail
@@ -1398,7 +1406,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     }
     if (direction < 0) switchCurrentWindowTabLeft()
     else switchCurrentWindowTabRight()
-  })
+  }, projectView === 'workspace')
 
   // 터미널의 Ctrl+L이 우선 사용할 값 — 포커스된 칸의 활성 뷰(hotview/plain)에서 선택된 텍스트를
   // 읽는다. 선택이 없으면 각 패널이 activeFilePath(상대경로)로 폴백한다.
@@ -2180,13 +2188,24 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     return !required || caps[required]
   })
 
+  const projectAdd = canOpenProjects && <ProjectAddInline paths={projectPaths} basePath={rootProjectPath ?? ''}
+    canUseAgent={caps.agent} canManageFolders={isOwner || role === 'manager'}
+    openRequested={openProjectDialog} onOpenRequestHandled={() => setOpenProjectDialog(false)} onboarding={projectView === 'setup'}
+    beforeMutation={() => rootProjectSaveQueue.current}
+    onCreateWithAgent={async project => {
+      setPreparedAgentTabs(undefined)
+      if (!(await openAddedProject(project.path))) throw new Error(t('project.retry'))
+      setCreationAgentProject(project)
+    }}
+    onOpen={openAddedProject} />
+
   return (
     <IconPackProvider value={themeSettings.iconPack}>
     <div className="mew-workspace flex flex-col overflow-hidden bg-surface text-ink" data-mobile-keyboard={mobileKeyboardOpen || undefined} style={{ height: 'var(--app-height, 100dvh)' }}>
       {/* 프로젝트 선택기와 도구 버튼은 전체 너비 헤더에, 문서 탭은 각 편집 칸에 둔다. */}
       <div className="flex flex-col">
         <header className="flex h-9 items-stretch border-b border-edge pr-2 md:h-11">
-          <ProjectSwitcher
+          {projectView === 'workspace' && <ProjectSwitcher
             sidebarHost={projectSidebarHost} sidebarEnabled={desktopMode} sidebarOpen={showProjectSidebar} onSidebarOpenChange={changeProjectSidebarOpen}
             sidebarWidth={projectSidebarWidth} onSidebarResize={startProjectSidebarResize} onSidebarWidthChange={restoreProjectSidebarWidth}
             canUseCommands={canUseTerminal && !isGuest && hasProject === true} activeWorkingPath={rootProjectPath}
@@ -2194,20 +2213,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
             activePath={projectUiPath}
             pendingPath={pendingRootProjectPath}
             openRequested={openProjectDialog}
-            projectAdd={canOpenProjects &&
-                <ProjectAddInline basePath={rootProjectPath ?? ''} canUseAgent={caps.agent} canManageFolders={isOwner || role === 'manager'}
-                  openRequested={openProjectDialog} onOpenRequestHandled={() => setOpenProjectDialog(false)} onboarding={hasProject === false}
-                  beforeMutation={() => rootProjectSaveQueue.current}
-                  onProjectsChanged={async () => { const { state } = await fetchRootProjectTabs(); if (state) setOpenProjectPaths(state.paths) }}
-                  onCreateWithAgent={async project => {
-                    setPreparedAgentTabs(undefined)
-                    setCreationAgentProject(project)
-                    if (!(await openRootProject(project.path))) { setCreationAgentProject(null); throw new Error(t('project.retry')) }
-                  }}
-                  onOpen={openRootProject} />}
-            projectCatalog={canOpenProjects &&
-              <ProjectCatalogPanel paths={projectPaths} onOpen={openRootProject} beforeMutation={() => rootProjectSaveQueue.current}
-                onProjectsChanged={async () => { const { state } = await fetchRootProjectTabs(); if (state) setOpenProjectPaths(state.paths) }} />}
+            projectAdd={projectAdd}
             fallbackLabel={hasProject === false ? t('project.noActive') : projectLabel(projectUiPath)}
             canOpen={canOpenProjects}
             canChangeIcon={canOpenProjects}
@@ -2225,8 +2231,8 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
               setOpenProjectPaths(previous => previous.filter(candidate => candidate !== path))
             }}
             onOpen={() => setOpenProjectDialog(true)}
-          />
-          {canUseTerminal && !isGuest && hasProject && !showProjectSidebar && <div className="flex shrink-0 items-center">
+          />}
+          {projectView === 'workspace' && canUseTerminal && !isGuest && !showProjectSidebar && <div className="flex shrink-0 items-center">
             <CommandButtonMenu
               key={rootProjectPath}
               project={WORKSPACE_PROJECT}
@@ -2247,7 +2253,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
             {caps.system && <HeaderResources key={`header-resources:${authEmail ?? 'guest'}`} onOpen={() => setSysStatsOpen(true)} />}
             <RuntimeControls />
             {!isGuest && <ActiveSessionsButton presence={activeSessions} profile={{ email: authEmail, displayName: auth.displayName, avatarDataUrl: auth.avatarDataUrl }} />}
-            {desktopMode && projectUiPath && workspaceUiLoaded && tabsHydrated && <LayoutPresets key={`layout-presets:${authEmail ?? 'guest'}`} storageKey={layoutPresetsKey(authEmail ?? 'guest')} legacyStorageKey={legacyLayoutPresetsKey(authEmail ?? 'guest', projectUiPath)} factory={layoutFactory} capture={captureLayout} onApply={applyLayoutPreset} />}
+            {projectView === 'workspace' && desktopMode && projectUiPath && workspaceUiLoaded && tabsHydrated && <LayoutPresets key={`layout-presets:${authEmail ?? 'guest'}`} storageKey={layoutPresetsKey(authEmail ?? 'guest')} legacyStorageKey={legacyLayoutPresetsKey(authEmail ?? 'guest', projectUiPath)} factory={layoutFactory} capture={captureLayout} onApply={applyLayoutPreset} />}
             {(!isGuest || canEditActiveTab) && <HoverTipLayer className="contents" placement="bottom">
               <button type="button" aria-label={uiText("전체화면")} data-tip={uiText("전체화면")} onClick={toggleFullscreen}
                 className={headerIconControlClassName}>
@@ -2262,7 +2268,8 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
         </header>
       </div>
 
-      <div className="workspace-dock-layout" data-dock-position={dockPosition} style={hasProject !== null ? undefined : { display: 'none' }}>
+      {projectView === 'setup' && <main data-project-empty data-workspace-panel="projects" className="mew-project-empty mew-panel-surface bg-surface-deep">{projectAdd}</main>}
+      {projectView === 'workspace' && <div className="workspace-dock-layout" data-dock-position={dockPosition}>
         <div ref={setProjectSidebarHost} className="mew-project-sidebar-host" data-project-sidebar-host />
         <div ref={setSidebarDockHost} className="desktop-dock-rail" data-sidebar-dock />
       <div
@@ -2276,11 +2283,6 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
           if (!e.currentTarget.contains(e.relatedTarget as Node)) setDropTarget(null)
         }}
       >
-        {hasProject === false && <main className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 p-4 text-center">
-          <h1 className="text-lg font-semibold text-ink">{t('project.welcome')}</h1>
-          <p className="text-sm text-ink-secondary">{t('project.welcomeHint')}</p>
-          <button type="button" onClick={() => { changeProjectSidebarOpen(true); setOpenProjectDialog(false); requestAnimationFrame(() => setOpenProjectDialog(true)) }} className="rounded-md bg-accent px-3 py-2 text-sm font-medium text-ink-on-accent hover:bg-accent-strong">{t('project.start')}</button>
-        </main>}
         {hasProject === true && <>
         <button type="button" data-sidebar-toggle aria-expanded={sidebarOpen} aria-label={uiText(sidebarOpen ? '파일 탐색기 닫기' : '파일 탐색기 열기')} data-tip={uiText(sidebarOpen ? '파일 탐색기 닫기' : '파일 탐색기 열기')} onClick={() => toggleWorkspacePanel('sidebar')}
           className="absolute top-1/2 z-50 hidden h-9 w-5 -translate-y-1/2 items-center justify-center rounded-r border border-edge-strong bg-surface-deep text-ink-secondary hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-accent md:flex"
@@ -2508,12 +2510,12 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
         )}
         </>}
       </div>
-      </div>
+      </div>}
 
-      <Mewcat onOpenSettings={() => { setMewcatSettingsRequest(request => request + 1); setSettingsOpen(true) }} portalTarget={settingsOpen && !desktopMode ? settingsMewcatHost : remoteDesktopOpen ? remoteMewcatHost : null} hidden={remoteDesktopOpen && mewcatHideDesktop} skin={mewcatSkin} assistant={{ account: auth.email ?? 'guest', enabled: caps.agent, runtime: mewcatRuntime, projectRoot: rootProjectPath, onAction: handleMewcatAction, onRuntimeChange: selectMewcatRuntime, onConnect: () => { setMewcatPicker(true); openWorkspacePanel('agent'); showToast(t('mewcat.assistant.guide')) } }} />
+      <Mewcat onOpenSettings={() => { setMewcatSettingsRequest(request => request + 1); setSettingsOpen(true) }} portalTarget={settingsOpen && !desktopMode ? settingsMewcatHost : remoteDesktopOpen ? remoteMewcatHost : null} hidden={projectView !== 'workspace' || remoteDesktopOpen && mewcatHideDesktop} skin={mewcatSkin} assistant={{ account: auth.email ?? 'guest', enabled: caps.agent, runtime: mewcatRuntime, projectRoot: rootProjectPath, onAction: handleMewcatAction, onRuntimeChange: selectMewcatRuntime, onConnect: () => { setMewcatPicker(true); openWorkspacePanel('agent'); showToast(t('mewcat.assistant.guide')) } }} />
 
-      <MobileDock active={remoteDesktopOpen ? 'desktop' : desktopMode ? focusedDockPanel ?? '' : mobileForegroundPanel ?? 'editor'} openPanels={desktopMode ? mobileDockPanels.filter(panel => panel === 'editor' ? editorOpen : panel === 'desktop' ? remoteDesktopOpen : panel === 'memo' ? memoOpen : workspacePanelOpen[panel]) : undefined} available={mobileDockPanels} hidden={mobileKeyboardOpen || hasProject !== true} portalTarget={remoteDockHost ?? sidebarDockHost}
-        position={remoteDockHost ? undefined : dockPosition} onSelect={selectDockPanel} onNavigate={navigateMobileDock} />
+      {projectView === 'workspace' && <MobileDock active={remoteDesktopOpen ? 'desktop' : desktopMode ? focusedDockPanel ?? '' : mobileForegroundPanel ?? 'editor'} openPanels={desktopMode ? mobileDockPanels.filter(panel => panel === 'editor' ? editorOpen : panel === 'desktop' ? remoteDesktopOpen : panel === 'memo' ? memoOpen : workspacePanelOpen[panel]) : undefined} available={mobileDockPanels} hidden={mobileKeyboardOpen} portalTarget={remoteDockHost ?? sidebarDockHost}
+        position={remoteDockHost ? undefined : dockPosition} onSelect={selectDockPanel} onNavigate={navigateMobileDock} />}
 
       {settingsOpen && (
         <SettingsModal

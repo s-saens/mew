@@ -24,11 +24,12 @@ function swipePanel(target: Element): TabbedPanel | null {
 }
 
 /** Panel bodies own tab swipes; editor source text keeps native horizontal scrolling. */
-export function useMobilePanelSwipe(onSwipe: (panel: TabbedPanel, direction: DockDirection) => void) {
+export function useMobilePanelSwipe(onSwipe: (panel: TabbedPanel, direction: DockDirection) => void, enabled = true) {
   const root = useRef<HTMLDivElement>(null)
   const callback = useRef(onSwipe)
   useLayoutEffect(() => { callback.current = onSwipe }, [onSwipe])
   useEffect(() => {
+    if (!enabled) return
     const element = root.current
     if (!element) return
     let gesture: { panel: TabbedPanel; target: Element; id: number; x: number; y: number; lastX: number; lastY: number } | null = null
@@ -95,6 +96,6 @@ export function useMobilePanelSwipe(onSwipe: (panel: TabbedPanel, direction: Doc
       window.removeEventListener('blur', cancel)
       document.removeEventListener('visibilitychange', cancel)
     }
-  }, [])
+  }, [enabled])
   return root
 }

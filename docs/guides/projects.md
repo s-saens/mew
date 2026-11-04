@@ -1,7 +1,7 @@
 ---
 title: "Projects and file navigation"
-description: "Explains Add directly after My Projects with choices on the same row, managed Git cloning with optional GitHub repository selection, existing-folder linking, and the bottom shared catalog and nested project hierarchy. Covers project switching, file navigation, Git review, and task controls."
-updated: "2026-11-03"
+description: "Explains onboarding when My Projects is empty, inline creation and Git cloning, and project import from the workspace catalog or a server path. Covers personal project hierarchy, switching, file navigation, Git review, and task controls."
+updated: "2026-11-04"
 상위파일:
   - "../../.mew/docs/MOC.md"
   - "MOC.md"
@@ -13,13 +13,13 @@ A guide to creating, cloning, or linking projects, finding files, and reviewing 
 <a id="프로젝트-탭"></a>
 ## Select a project
 
-A new account starts with a project welcome screen. Use **Add project** to create a project, clone a repository, or link a folder you already use. You only need a name to create a project; you do not need to choose or know a storage path. [Create your first project](first-steps.md).
+When **My projects** is empty, Mew shows the top bar and a project panel with **Add a project** centered above **New project**, **Git clone**, and **Import project**. The Dock, header project selector, and command button appear after you add a project. You only need a name to create a project. [Create your first project](first-steps.md).
 
-**All projects** lists every project added to this Mew instance. **My projects** is your own list of shortcuts. Every signed-in user can open a registered project and add it to My projects. Creating, cloning, or linking a project adds it to both the shared catalog and your personal list. For example, if another user creates a project, you can add it to My projects without copying its folder or changing their list. Guests do not have these controls. Existing file and feature permissions still apply.
+The **workspace** contains every project registered with this Mew instance. **My projects** is your own list of shortcuts and starts empty for a new account, even when you can access workspace projects. Every signed-in user can import a registered project into My projects without copying its folder or changing another account's list. Creating, cloning, or linking a project registers it with the workspace and adds it to your list. Guests do not have these controls. Existing file and feature permissions still apply.
 
 ### Create a project
 
-In the project panel, **Add project** follows your last personal project. Its choices appear beside it; narrow panels show icons with tooltips. Choose **New project**. Enter a name in the inline field and press the check icon to create and open it. The Git icon inside the field starts enabled; turn it off if you want a regular folder.
+In the project panel, **Add project** follows your last personal project. It reveals **New project**, **Git clone**, and **Import project** inline. With an empty list, these choices are already visible. Choose **New project**. Enter a name in the inline field and press the check icon to create and open it. The Git icon inside the field starts enabled; turn it off if you want a regular folder.
 
 Mew stores managed projects in `~/.mew/projects/<name>` on the server. It creates `.mew/` for settings and an empty `.mew/docs/` as the initial Documents folder. Git-enabled projects also get `.git/` and `.gitignore`. An existing folder with the same name is never overwritten.
 
@@ -27,15 +27,18 @@ The secondary **Create with agent** action opens the new project and a conversat
 
 ### Clone a repository
 
-Choose **Add project → Git clone**. Paste a public GitHub or GitLab HTTPS repository URL to clone without connecting a provider account. The clone is stored as a managed project and opens when ready.
+Choose **Git clone** from the Add project choices. Paste a public GitHub or GitLab HTTPS repository URL to clone without connecting a provider account. The clone is stored as a managed project and opens when ready.
 
 To select an accessible repository, connect GitHub from this inline flow; no project needs to be open first. The repository list includes private and organization repositories that your connected account is authorized to access. Organization SSO or repository permissions can require additional authorization on GitHub. Private cloning uses your connected GitHub account. GitLab supports public URL cloning; GitLab and other provider account connections are not yet supported. [GitHub connection](#github-login).
 
 ### Use an existing project
 
-Expand **All projects** at the bottom of the project panel to browse the shared catalog. It starts collapsed so My projects remains the main list. Use the add button to keep a project in **My projects**, or select its name to open it without adding a shortcut. Duplicate names show a path detail to distinguish them.
+Choose **Import project** to reveal two inline sources:
 
-**Add project → Existing project** opens the server folder picker. Find an existing folder and open it. Linking preserves its location and contents, makes it available in the shared catalog, and adds it to My projects. It does not copy the folder into managed storage.
+- **From this workspace** lists registered projects. Choose a project to add it to My projects and open it. Duplicate names show a path detail to distinguish them.
+- **Browse path** opens the server folder picker. Find an existing folder and open it. Linking preserves its location and contents, registers it with the workspace, adds it to My projects, and opens it. It does not copy the folder into managed storage.
+
+X returns from the source choices to the three Add project choices. Press X again to return to the Add project button. An empty personal list initially shows the three centered choices; X can return them to the Add project button.
 
 The linked-folder picker retains its path field, home/parent navigation, and keyboard navigation. Folder suggestions and favorites appear when your account has the required server-file access. Up/Down and Enter choose a suggestion; Enter without a selected suggestion navigates to the typed path. Relative paths start from the displayed folder, and `~` opens the server user's home. Esc or Back closes suggestions first. Owner and manager folder/Git tools remain available under their existing permissions. Creating a folder or cloning selects the result inside the picker; linking it is a separate action.
 
@@ -48,7 +51,7 @@ If your previous project folder is unavailable, Mew restores the first available
 The header shows the current project's icon and name. Clicking it opens **My projects** in a sidebar to the left of the file explorer on desktop, or in a full-screen panel on mobile. The current row is highlighted. Each project shares its icon with the file explorer.
 
 - Select a row to switch projects without refreshing. Document tabs, layout, and scroll positions are restored per project. Your other connected screens follow the switch; other users' active projects stay as they are. Running agents keep their original working directories.
-- Use **Add project** for the three inline setup choices, or expand **All projects** to browse the shared catalog. **Remove from My projects** removes only your shortcut, preserving the project, other users' shortcuts, and all files. If other shortcuts remain, removing the current one first opens another project. Removing your last shortcut leaves the active project open. My projects only contains registered catalog entries.
+- Use **Add project** for the three inline choices. The workspace catalog is under **Import project → From this workspace**. **Remove from My projects** removes only your shortcut, preserving the project, other users' shortcuts, and all files. If other shortcuts remain, removing the current one first opens another project. Removing your last shortcut returns to the centered project panel. My projects only contains registered catalog entries.
 - Nested Git/Mew projects are discovered in the shared catalog. Pinned descendants appear beneath their nearest pinned parent in My projects. Select a project when you want to change the active root.
 - Drag the left handle to reorder shortcuts. **↑/↓** on the handle or **Shift+↑/↓** on the row also reorders them. The **Alt+1…9** numbers on the right follow your order.
 - `Alt+P` opens My projects and focuses its first item; `Alt+1…9` switches in personal list order. Up/Down and Home/End navigate, and Enter/Space selects. Existing modal, IME, repeated-key, and remote-screen input boundaries apply. `Ctrl/Cmd+number` selects tabs in the current panel.

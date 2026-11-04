@@ -9,16 +9,17 @@ import { applyTaskChanges, type TaskItem } from '../shared/task-list.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 
-for (const mode of ['onboarding', 'keyboard', 'workspace', 'documents', 'permissions', 'panels', 'worktree', 'swipes', 'rapid', 'desktop-layout'] as const) test(mode === 'desktop-layout' ? 'App desktop account layout survives project switches with independent document contents' : mode === 'onboarding' ? 'App first-use onboarding creates a named project without exposing the startup workspace' : mode === 'rapid' ? 'App rapid project selections cancel superseded handoffs and restore the latest root' : mode === 'swipes' ? 'App mobile dock swipes select panels and explorer swipes preserve search mode' : mode === 'worktree' ? 'linked worktree swaps retain project layout and sessions and settle outgoing file saves' : mode === 'panels' ? 'App restores Tasks with Alt+T and task sessions survive close and reload' : mode === 'permissions' ? 'permission invalidation replaces pending workspace metadata and ignores the old response' : mode === 'documents' ? 'Files opens Documents as a filesystem folder with a separate navigation arrow' : mode === 'keyboard' ? 'App keyboard aliases open files and projects and create files and folders in the current explorer scope' : 'App overlaps workspace metadata, restores warm roots and ignores duplicate handoffs', { timeout: 60_000 }, async () => {
+for (const mode of ['onboarding', 'empty-projects', 'missing-active', 'remove-last', 'keyboard', 'workspace', 'documents', 'permissions', 'panels', 'worktree', 'swipes', 'rapid', 'desktop-layout'] as const) test(mode === 'empty-projects' ? 'App hides project work surfaces for an empty personal list despite a saved active root' : mode === 'missing-active' ? 'App offers project recovery when shortcuts remain without an active root' : mode === 'remove-last' ? 'App returns to project setup after its last personal shortcut is removed' : mode === 'desktop-layout' ? 'App desktop account layout survives project switches with independent document contents' : mode === 'onboarding' ? 'App first-use onboarding creates a named project without exposing the startup workspace' : mode === 'rapid' ? 'App rapid project selections cancel superseded handoffs and restore the latest root' : mode === 'swipes' ? 'App mobile dock swipes select panels and explorer swipes preserve search mode' : mode === 'worktree' ? 'linked worktree swaps retain project layout and sessions and settle outgoing file saves' : mode === 'panels' ? 'App restores Tasks with Alt+T and task sessions survive close and reload' : mode === 'permissions' ? 'permission invalidation replaces pending workspace metadata and ignores the old response' : mode === 'documents' ? 'Files opens Documents as a filesystem folder with a separate navigation arrow' : mode === 'keyboard' ? 'App keyboard aliases open files and projects and create files and folders in the current explorer scope' : 'App overlaps workspace metadata, restores warm roots and ignores duplicate handoffs', { timeout: 60_000 }, async () => {
   const keyboardOnly = mode === 'keyboard'
   const onboarding = mode === 'onboarding'
+  const projectSetup = onboarding || mode === 'empty-projects' || mode === 'missing-active'
   const desktopLayout = mode === 'desktop-layout'
   const dockedToolFixture = mode === 'worktree' || desktopLayout
   const appSource = await fs.readFile(`${root}/src/App.tsx`, 'utf8')
   // Keep App, useTabs, FileTree, project switching and docking real. Unrelated panels and the
   // editor renderer are inert so this measures handoff work rather than editor startup.
   const keep = new Set(['deferredComponent', 'ProjectSwitcher', 'ProjectLoadingOverlay', 'FileTree', 'SearchPanel', 'DockWorkspace', 'ProjectIcon', 'SubprojectLink', 'SidebarCreateButtons', 'MobileDock', 'HeaderMenu', 'TaskPanel', 'IconPackProvider'])
-  if (keyboardOnly || onboarding) { keep.add('ProjectAddInline'); keep.add('ProjectCatalogPanel'); keep.add('ServerFileExplorer') }
+  if (keyboardOnly || projectSetup || mode === 'remove-last') { keep.add('ProjectAddInline'); keep.add('ProjectCatalogPanel'); keep.add('ServerFileExplorer') }
   const stubs = new Map<string, string>()
   const componentImports = appSource.replace(/const \w+ = deferredComponent\(async \(\) => \(\{ default: \(await import\('([^']+)'\)\)\.(\w+) \}\)(?:, null)?\)/g, (_match, module, name) => `import { ${name} } from '${module}'`)
     // AgentPanel wraps its import in module preparation; keep that deferred path inert too.
@@ -34,6 +35,7 @@ for (const mode of ['onboarding', 'keyboard', 'workspace', 'documents', 'permiss
         ? `import {DockGrip} from '${root}/src/components/DockWorkspace.tsx';function EditorPane({pane,onCloseTab,onActivate,onChangeContent,workspace}) { const active=pane.tabs.find(t=>t.path===pane.activePath);React.useEffect(()=>{window.fixtureEditors??={};window.fixtureEditors[pane.id]={pane,workspace,onChangeContent};window.fixtureEditorCallbacks??={};window.fixtureEditorCallbacks[(workspace?.path||'')+':'+pane.id]=onChangeContent},[pane,workspace,onChangeContent]);return React.createElement('div',{'data-test-editor':pane.id,'data-test-active':pane.activePath,'data-test-root':workspace?.path,'data-test-revalidating':!!active?.revalidating},React.createElement(DockGrip,{group:'editor:'+pane.id}),React.createElement('span',{'data-test-content':true},active?.content||''),...pane.tabs.flatMap(t=>[React.createElement('button',{key:'select:'+t.path,onClick:()=>onActivate(t.path)},'Select '+t.path),React.createElement('button',{key:t.path,onClick:()=>onCloseTab(t.path)},'Close '+t.path)])); }`
         : local === 'AgentPanel' ? `${dockedToolFixture ? `import {DockPanel} from '${root}/src/components/DockWorkspace.tsx';` : ''}function AgentPanel({preparedTabs,workspacePath,agentOpen,terminalOpen}) { React.useEffect(()=>{window.fixtureAgentMounts=(window.fixtureAgentMounts||0)+1},[]);React.useEffect(()=>{window.fixtureAgentRoot=workspacePath},[workspacePath]);React.useEffect(()=>{const prepared=preparedTabs${dockedToolFixture ? `??(workspacePath?fetch('/api/user-ui/agent-tabs?workspace='+encodeURIComponent(workspacePath)).then(response=>response.json()):undefined)` : ''};prepared?.then(value=>{window.preparedAgentRoot=value.workspace})},[preparedTabs,workspacePath]);return ${dockedToolFixture ? `React.createElement(React.Fragment,null,React.createElement(DockPanel,{id:'agent',kind:'agent',visible:agentOpen,tabs:['fixture-agent']},React.createElement('div',{'data-test-agent-root':workspacePath,tabIndex:0},'Existing agent')),React.createElement(DockPanel,{id:'terminal',kind:'terminal',visible:terminalOpen,tabs:['fixture-terminal']},React.createElement('div',{'data-test-terminal-root':workspacePath},'Existing terminal')))` : 'null'} }`
         : local === 'GitPanel' && mode === 'worktree' ? `import {DockPanel} from '${root}/src/components/DockWorkspace.tsx';function GitPanel({onPrepareBranchChange,onOpenWorktree,visible}) {React.useEffect(()=>{window.openFixtureWorktree=async path=>{window.worktreeError=null;try {const release=await onPrepareBranchChange();try {await onOpenWorktree(path);return true}finally{release()}}catch(error){window.worktreeError=error.message;return false}}},[onPrepareBranchChange,onOpenWorktree]);return React.createElement(DockPanel,{id:'git',kind:'git',visible,tabs:[]},React.createElement('button',{'data-test-worktree-trigger':true,onClick:()=>{window.openFixtureWorktree('/alpha-worktree')}},'Open linked worktree'))}`
+        : local === 'CommandButtonMenu' ? `function CommandButtonMenu({title,className}) {return React.createElement('button',{'data-test-command':true,'aria-label':title,className},title)}`
         : local === 'RemoteDesktop' ? `function RemoteDesktop({onClose,dockHostRef}) { return React.createElement('div',{'role':'dialog','aria-label':'Remote desktop fixture',style:{position:'fixed',inset:0,zIndex:100,background:'var(--color-surface)'}},React.createElement('button',{onClick:onClose},'Close remote desktop'),React.createElement('div',{ref:dockHostRef})); }`
         : local.startsWith('prepare') ? `async function ${local}(){}` : `function ${local}(){return null}`
       return `${stub}\nexport { ${local} as ${exported} }`
@@ -66,6 +68,7 @@ for (const mode of ['onboarding', 'keyboard', 'workspace', 'documents', 'permiss
     page.on('pageerror', error => errors.push(error.message))
     let active = '/alpha', projectPath = '/alpha'
     let onboardingComplete = false
+    let personalPaths = projectSetup ? mode === 'missing-active' ? ['/alpha'] : [] : mode === 'remove-last' ? ['/alpha'] : ['/alpha', '/beta', ...(mode === 'worktree' ? ['/alpha-worktree'] : mode === 'rapid' || desktopLayout ? ['/gamma'] : [])]
     let role = 'owner', serverFiles = keyboardOnly
     let failSwitch = false
     const requests: { path: string; method: string; root: string; time: number }[] = []
@@ -163,7 +166,7 @@ for (const mode of ['onboarding', 'keyboard', 'workspace', 'documents', 'permiss
           await page.evaluate(() => (globalThis as unknown as { presence: { onmessage: (e: { data: string }) => void } }).presence.onmessage({ data: JSON.stringify({ type: 'workspace' }) }))
           await new Promise(resolve => setTimeout(resolve, 40))
         }
-        return json({ hasProject: !onboarding || onboardingComplete, path: active, projectPath: mode === 'worktree' ? projectPath : active, docs: 'docs', docsPath: active + '/docs', projects: [] })
+        return json({ hasProject: !(onboarding || mode === 'missing-active') || onboardingComplete, path: active, projectPath: mode === 'worktree' ? projectPath : active, docs: 'docs', docsPath: active + '/docs', projects: [] })
       }
       if (url.pathname === '/api/project-registry' && method === 'GET') return json({ projects: [
         { path: '/alpha', name: 'alpha', managed: true, mine: true, icon: null },
@@ -173,9 +176,20 @@ for (const mode of ['onboarding', 'keyboard', 'workspace', 'documents', 'permiss
         ...(desktopLayout ? [{ path: '/gamma', name: 'gamma', managed: false, mine: true, icon: null }] : []),
       ] })
       if (url.pathname === '/api/project-registry/repositories') return json({ connected: false, repositories: [] })
-      if (url.pathname === '/api/project-registry' && method === 'POST') return json({ project: { name: route.request().postDataJSON().name, path: '/new-project', managed: true, mine: true, icon: null } })
+      if (url.pathname === '/api/project-registry' && method === 'POST') {
+        personalPaths = [...personalPaths, '/new-project']
+        return json({ project: { name: route.request().postDataJSON().name, path: '/new-project', managed: true, mine: true, icon: null } })
+      }
+      if (url.pathname === '/api/project-registry/mine' && method === 'PUT') {
+        const { path: project, added } = route.request().postDataJSON()
+        personalPaths = added ? [...new Set([...personalPaths, project])] : personalPaths.filter(path => path !== project)
+        return json({ ok: true })
+      }
       if (url.pathname === '/api/project-icons/read') return json({ icons: {} })
-      if (url.pathname === '/api/user-ui/root-projects') return json({ state: { paths: onboarding ? onboardingComplete ? ['/new-project'] : [] : ['/alpha', '/beta', ...(mode === 'worktree' ? ['/alpha-worktree'] : mode === 'rapid' || desktopLayout ? ['/gamma'] : [])], icons: {}, groups: [] } })
+      if (url.pathname === '/api/user-ui/root-projects') {
+        if (method === 'PUT') personalPaths = route.request().postDataJSON().paths
+        return json({ state: { paths: personalPaths, icons: {}, groups: [] } })
+      }
       if (url.pathname === '/api/user-ui/agent-tabs') return json({ state: null, claims: [], workspace: url.searchParams.get('workspace') })
       if (desktopLayout && url.pathname === '/api/user-ui/editor-tabs') {
         const body = method === 'PUT' ? route.request().postDataJSON() : undefined
@@ -241,24 +255,64 @@ for (const mode of ['onboarding', 'keyboard', 'workspace', 'documents', 'permiss
       return route.fulfill(url.pathname === '/app.js' ? { contentType: 'text/javascript', body: chunk.code } : { contentType: 'text/html', body: `<!doctype html><html><meta charset="utf-8"><style>${css}</style><div id="root"></div><script src="/app.js"></script></html>` })
     })
     await page.goto('http://mew-switch.test/')
-    if (onboarding) {
+    const assertProjectSetup = async () => {
+      const panel = page.locator('[data-project-empty]')
+      await panel.waitFor()
+      await panel.getByRole('heading', { name: '프로젝트를 추가하세요', exact: true }).waitFor()
+      for (const width of [1100, 390]) {
+        await page.setViewportSize({ width, height: 700 })
+        assert.equal(await page.locator('header').getByRole('button', { name: '메뉴', exact: true }).isVisible(), true, 'general header controls remain available')
+        assert.equal(await page.locator('header').getByRole('button', { name: '전체화면', exact: true }).isVisible(), true)
+        assert.equal(await page.locator('[data-project-switcher], .mew-project-command, [data-test-command]').count(), 0, 'setup omits the current-project selector and project commands')
+        assert.equal(await page.locator('.workspace-dock-layout, .mobile-dock, [data-sidebar-dock]').count(), 0, 'desktop and mobile work docks are absent')
+        assert.equal(await page.locator('[data-test-editor], [data-sidebar], [data-project-sidebar], [data-mobile-project-panel]').count(), 0, 'setup uses a single project surface')
+        assert.equal(await page.getByRole('dialog').count(), 0, 'the project setup surface remains inline on phones')
+        const bounds = (await panel.boundingBox())!
+        const header = (await page.locator('header').boundingBox())!
+        assert.ok(bounds.x <= 1 && bounds.width >= width - 1, 'the project surface fills the available width')
+        assert.ok(Math.abs(bounds.y - header.y - header.height) <= 1 && bounds.y + bounds.height >= 699, 'the project surface fills the area below the header')
+      }
+    }
+    if (projectSetup) {
+      await assertProjectSetup()
       const dialog = page.locator('[data-project-add-inline]')
-      await dialog.getByRole('button', { name: '새 프로젝트', exact: true }).click()
+      for (const name of ['새 프로젝트 만들기', 'Git repo 클론하기', '프로젝트 가져오기']) {
+        assert.equal(await dialog.getByRole('button', { name, exact: true }).isVisible(), true)
+      }
+      await dialog.getByRole('button', { name: '프로젝트 가져오기', exact: true }).click()
+      await dialog.getByRole('button', { name: '이 워크스페이스에서 가져오기', exact: true }).waitFor()
+      assert.equal(await dialog.getByRole('button', { name: '경로 탐색하기', exact: true }).isVisible(), true)
+      await dialog.getByRole('button', { name: '이 워크스페이스에서 가져오기', exact: true }).click()
+      await page.locator('[data-catalog-project="/shared"]').waitFor()
+      assert.equal(await page.getByRole('button', { name: '모든 프로젝트', exact: true }).count(), 0, 'the catalog belongs to the import flow')
+      await dialog.getByRole('button', { name: '이전 선택지로', exact: true }).click()
+      await dialog.getByRole('button', { name: '이 워크스페이스에서 가져오기', exact: true }).waitFor()
+      await dialog.getByRole('button', { name: '이전 선택지로', exact: true }).click()
+      await dialog.getByRole('button', { name: '새 프로젝트 만들기', exact: true }).click()
       await dialog.getByRole('textbox', { name: '프로젝트 이름', exact: true }).waitFor()
-      assert.equal(await page.locator('[data-test-editor]').count(), 0, 'onboarding never mounts the internal fallback workspace')
-      assert.equal(requests.filter(request => ['/api/tree', '/api/file', '/api/user-ui/workspace', '/api/user-ui/agent-tabs'].includes(request.path)).length, 0, 'onboarding does not request fallback files, layouts or agent tabs')
+      if (mode !== 'empty-projects') {
+        assert.equal(requests.filter(request => ['/api/tree', '/api/file', '/api/user-ui/workspace', '/api/user-ui/agent-tabs'].includes(request.path)).length, 0, 'an absent active root does not request fallback files, layouts or agent tabs')
+      }
       assert.equal(await dialog.getByRole('button', { name: 'Git 레포로 만들기' }).getAttribute('aria-pressed'), 'true')
-      assert.equal(await page.getByRole('dialog').count(), 0, 'desktop onboarding is inline in the project panel')
-      await page.keyboard.press('Escape')
-      await page.getByRole('heading', { name: '첫 프로젝트를 만들어 보세요' }).waitFor()
-      await page.getByRole('main').getByRole('button', { name: '프로젝트 만들기', exact: true }).click()
       await dialog.getByRole('textbox', { name: '프로젝트 이름', exact: true }).fill('First project')
+      if (mode === 'empty-projects') failSwitch = true
       await dialog.getByRole('button', { name: '프로젝트 만들기', exact: true }).click()
+      if (mode === 'empty-projects') {
+        await dialog.getByRole('alert').getByText('프로젝트를 열지 못했습니다. 다시 시도하세요.', { exact: true }).waitFor()
+        assert.equal(await page.locator('[data-project-empty]').count(), 1, 'a failed first open retains project setup and its retry form')
+        assert.equal(await page.locator('.workspace-dock-layout, .mobile-dock, [data-test-editor]').count(), 0)
+        assert.equal(await dialog.getByRole('textbox', { name: '프로젝트 이름', exact: true }).inputValue(), 'First project')
+        failSwitch = false
+        await dialog.getByRole('button', { name: '프로젝트 만들기', exact: true }).click()
+        assert.equal(requests.filter(request => request.path === '/api/project-registry' && request.method === 'POST').length, 1, 'retry opens the created project without creating a second folder')
+      }
       while (!releaseUi) await page.waitForTimeout(10)
-      releaseUi(); blockUi = false
+      uiWaiters.forEach(release => release()); blockUi = false
       await page.locator('[data-test-content]').getByText('Content of /new-project', { exact: true }).waitFor()
+      assert.equal(await page.locator('[data-project-empty]').count(), 0, 'adding and opening a personal project restores the workspace')
       assert.equal(await page.locator('[data-current-project="/new-project"]').count(), 1)
-      assert.deepEqual(workspacePosts.map(post => post.path), ['/new-project'])
+      assert.equal(await page.locator('.mobile-dock').count(), 1)
+      assert.deepEqual(workspacePosts.map(post => post.path), mode === 'empty-projects' ? ['/new-project', '/new-project'] : ['/new-project'])
       assert.deepEqual(errors, [])
       return
     }
@@ -282,6 +336,20 @@ for (const mode of ['onboarding', 'keyboard', 'workspace', 'documents', 'permiss
     }
     releaseUi(); blockUi = false
     await page.locator('[data-test-content]').getByText('Content of /alpha', { exact: true }).waitFor()
+    if (mode === 'remove-last') {
+      await page.keyboard.press('Alt+p')
+      const lastProject = page.locator('[data-project-option="/alpha"]')
+      await lastProject.click({ button: 'right' })
+      await page.getByRole('menuitem', { name: '내 프로젝트에서 제거', exact: true }).click()
+      await assertProjectSetup()
+      assert.equal(await page.locator('[data-project-add-inline]').getByRole('button', { name: '프로젝트 가져오기', exact: true }).isVisible(), true)
+      assert.deepEqual(workspacePosts, [], 'removing the last shortcut does not change or delete the saved active project')
+      const deadline = Date.now() + 3000
+      while (personalPaths.length > 0 && Date.now() < deadline) await page.waitForTimeout(10)
+      assert.deepEqual(personalPaths, [], 'the account shortcut list persists the removal')
+      assert.deepEqual(errors, [])
+      return
+    }
     if (desktopLayout) {
       await page.locator('[data-test-content]').getByText('Content of /alpha / alpha-side.md', { exact: true }).waitFor()
       const dock = page.getByRole('navigation', { name: '작업 독', exact: true })
@@ -792,28 +860,30 @@ for (const mode of ['onboarding', 'keyboard', 'workspace', 'documents', 'permiss
         assert.equal(await page.locator('[data-test-editor]').isVisible(), true, 'external file opening brings the mobile editor forward')
         await page.keyboard.press(`${modifier}+Shift+o`)
         const createDialog = page.locator('[data-project-add-inline]')
-        await createDialog.getByRole('button', { name: '새 프로젝트', exact: true }).waitFor()
+        await createDialog.getByRole('button', { name: '새 프로젝트 만들기', exact: true }).waitFor()
         assert.equal(await createDialog.getByRole('combobox').count(), 0)
-        const catalogToggle = page.getByRole('button', { name: '모든 프로젝트', exact: true })
+        assert.equal(await page.getByRole('button', { name: '모든 프로젝트', exact: true }).count(), 0, 'the project panel has no independent workspace catalog')
         const projectPanel = page.locator(width >= 768 ? '[data-project-sidebar]' : '[data-mobile-project-panel]')
         const lastProjectBox = await projectPanel.locator('[data-project-option]').last().boundingBox()
-        const addBox = await createDialog.getByRole('button', { name: '추가', exact: true }).boundingBox()
-        const catalogBox = await catalogToggle.boundingBox()
-        assert.ok(lastProjectBox && addBox && catalogBox)
-        assert.ok(addBox.y >= lastProjectBox.y + lastProjectBox.height && addBox.y - lastProjectBox.y - lastProjectBox.height <= 8, 'Add follows the last personal project without a flexible gap')
-        assert.ok(catalogBox.y > addBox.y + addBox.height + 40, 'All Projects stays independently at the bottom')
-        await catalogToggle.click()
+        const choicesBox = await createDialog.boundingBox()
+        assert.ok(lastProjectBox && choicesBox)
+        assert.ok(choicesBox.y >= lastProjectBox.y + lastProjectBox.height && choicesBox.y - lastProjectBox.y - lastProjectBox.height <= 8, 'project addition follows the last personal project without a flexible gap')
+        await createDialog.getByRole('button', { name: '프로젝트 가져오기', exact: true }).click()
+        await createDialog.getByRole('button', { name: '이 워크스페이스에서 가져오기', exact: true }).click()
         await page.locator('[data-catalog-project="/alpha/packages/docs"]').waitFor()
         await page.screenshot({ path: `/tmp/mew-inline-project-panel-${width >= 768 ? 'desktop' : 'mobile'}.png` })
-        await catalogToggle.click()
-        await createDialog.getByRole('button', { name: '기존 프로젝트', exact: true }).click()
+        await createDialog.getByRole('button', { name: '이전 선택지로', exact: true }).click()
+        await createDialog.getByRole('button', { name: '경로 탐색하기', exact: true }).click()
         const projectDialog = page.getByRole('dialog', { name: '기존 프로젝트 연결', exact: true })
         await projectDialog.getByRole('button', { name: 'config', exact: true }).waitFor()
         assert.equal(await projectDialog.getByRole('button', { name: '.zshrc', exact: true }).count(), 0, 'project opening lists folders only')
         await page.screenshot({ path: `/tmp/mew-open-project-${width}.png` })
         await page.keyboard.press('Escape')
         await projectDialog.waitFor({ state: 'detached' })
-        await page.keyboard.press('Escape')
+        await createDialog.getByRole('button', { name: '이전 선택지로', exact: true }).click()
+        await createDialog.getByRole('button', { name: '새 프로젝트 만들기', exact: true }).waitFor()
+        await createDialog.getByRole('button', { name: '이전 선택지로', exact: true }).click()
+        await createDialog.getByRole('button', { name: '프로젝트 추가', exact: true }).waitFor()
         if (width < 768) {
           await page.keyboard.press('Escape')
           await page.locator('[data-mobile-project-panel]').waitFor({ state: 'detached' })
@@ -852,7 +922,7 @@ for (const mode of ['onboarding', 'keyboard', 'workspace', 'documents', 'permiss
       await page.keyboard.press('Escape')
       await page.getByRole('dialog').waitFor({ state: 'detached' })
       await page.keyboard.press('Control+Shift+o')
-      await page.locator('[data-project-add-inline]').getByRole('button', { name: '새 프로젝트', exact: true }).waitFor()
+      await page.locator('[data-project-add-inline]').getByRole('button', { name: '새 프로젝트 만들기', exact: true }).waitFor()
       await page.keyboard.press('Escape')
       await page.getByRole('dialog').waitFor({ state: 'detached' })
       await page.keyboard.press('Alt+p')
@@ -865,7 +935,7 @@ for (const mode of ['onboarding', 'keyboard', 'workspace', 'documents', 'permiss
       await page.locator('[data-test-content]').getByText('Content of /alpha', { exact: true }).waitFor()
       assert.equal(await page.locator('button[data-project-switcher]').count(), 1, 'members can select shared projects')
       await page.keyboard.press('Control+Shift+o')
-      await page.locator('[data-project-add-inline]').getByRole('button', { name: '새 프로젝트', exact: true }).waitFor()
+      await page.locator('[data-project-add-inline]').getByRole('button', { name: '새 프로젝트 만들기', exact: true }).waitFor()
       await page.keyboard.press('Escape')
       await page.getByRole('dialog').waitFor({ state: 'detached' })
       role = 'manager'

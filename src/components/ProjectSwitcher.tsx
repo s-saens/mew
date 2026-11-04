@@ -18,7 +18,7 @@ function labelOf(projectPath: string): string {
 }
 
 export function ProjectSwitcher({ paths, activePath, pendingPath, fallbackLabel, canOpen, canChangeIcon, icons, onActivate, onIconChange, onOpen, onPreview, onRemove, onReorder,
-  sidebarHost, sidebarEnabled = false, sidebarOpen = false, onSidebarOpenChange, sidebarWidth = 240, onSidebarResize, onSidebarWidthChange, canUseCommands = false, activeWorkingPath, projectAdd, projectCatalog, openRequested = false }: {
+  sidebarHost, sidebarEnabled = false, sidebarOpen = false, onSidebarOpenChange, sidebarWidth = 240, onSidebarResize, onSidebarWidthChange, canUseCommands = false, activeWorkingPath, projectAdd, openRequested = false }: {
   paths: string[]
   activePath: string | null
   pendingPath?: string | null
@@ -42,7 +42,6 @@ export function ProjectSwitcher({ paths, activePath, pendingPath, fallbackLabel,
   canUseCommands?: boolean
   activeWorkingPath?: string | null
   projectAdd?: React.ReactNode
-  projectCatalog?: React.ReactNode
   openRequested?: boolean
 }) {
   const { t } = useI18n()
@@ -263,7 +262,7 @@ export function ProjectSwitcher({ paths, activePath, pendingPath, fallbackLabel,
         </div>
         {projectAdd && <div className="mew-project-inline-add">{projectAdd}</div>}
         </div>
-        {projectCatalog ?? (!projectAdd && <div className="mew-project-sidebar-footer"><ActionMenuItem icon={<Plus />} onClick={onOpen}>{t('project.add')}</ActionMenuItem></div>)}
+        {!projectAdd && <div className="mew-project-sidebar-footer"><ActionMenuItem icon={<Plus />} onClick={onOpen}>{t('project.add')}</ActionMenuItem></div>}
       </div>
       <div role="separator" tabIndex={0} aria-label={t('project.resizeSidebar')} aria-orientation="vertical" aria-valuenow={sidebarWidth} aria-valuemin={200} aria-valuemax={360}
         className="mew-project-sidebar-resize" onPointerDown={onSidebarResize}
@@ -293,17 +292,15 @@ export function ProjectSwitcher({ paths, activePath, pendingPath, fallbackLabel,
             if (next !== null) { event.preventDefault(); items[next]?.focus({ preventScroll: true }) }
           }}>
           {projectItems(false)}
-          {!projectAdd && !projectCatalog && <div className="mew-project-sidebar-footer"><ActionMenuItem icon={<Plus />} onClick={() => { closeMenu(); onOpen() }}>{t('project.add')}</ActionMenuItem></div>}
+          {!projectAdd && <div className="mew-project-sidebar-footer"><ActionMenuItem icon={<Plus />} onClick={() => { closeMenu(); onOpen() }}>{t('project.add')}</ActionMenuItem></div>}
         </div>
         {projectAdd && <div className="mew-project-inline-add">{projectAdd}</div>}
         </div>
-        {projectCatalog}
       </div>
     </DialogFrame> : <ActionMenu ref={menuElement} variant="header" x={menu.x} y={menu.y} label={t('project.choose')} trigger={trigger.current} outsideIgnore={() => contextMenuElement.current} onClose={() => { setContextMenu(null); setMenu(null) }}>
       {projectItems(false)}
       {paths.length > 0 && <ActionMenuSeparator />}
-      {projectAdd ?? (!projectCatalog && <ActionMenuItem icon={<Plus />} onClick={onOpen}>{t('project.add')}</ActionMenuItem>)}
-      {projectCatalog}
+      {projectAdd ?? <ActionMenuItem icon={<Plus />} onClick={onOpen}>{t('project.add')}</ActionMenuItem>}
     </ActionMenu>)}
     {contextMenu && canChangeIcon && <ActionMenu key="project-actions" x={contextMenu.x} y={contextMenu.y} label={labelOf(contextMenu.path)} ref={contextMenuElement} trigger={contextMenu.trigger}
       portalContainer={contextMenu.container} onClose={() => setContextMenu(null)}>

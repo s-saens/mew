@@ -43,7 +43,8 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     const page = await browser.newPage({ viewport, hasTouch: mobile })
     page.setDefaultTimeout(7000)
     const errors: string[] = [], mutations: Record<string, unknown>[] = [], authProjects: string[] = []
-    let failMutation = false, connected = false, failRepositories = false, repositoryReads = 0
+    let failMutation = false, connected = false, failRepositories = false, repositoryReads = 0, catalogReads = 0
+    const imports: unknown[] = []
     const repositories = [{ name: 'secret', fullName: 'example-org/secret', url: 'https://github.com/example-org/secret.git', private: true }]
     page.on('pageerror', error => errors.push(error.message))
     await page.addInitScript(({ panelWidth, mobile }) => { localStorage.setItem('mew:locale', 'ko'); localStorage.setItem('mew:ui-locale', 'ko'); Object.assign(globalThis, { panelWidth, mobile }) }, { panelWidth, mobile })
@@ -54,6 +55,14 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
         repositoryReads++
         if (failRepositories) { failRepositories = false; return route.fulfill({ status: 503, json: { error: 'Repository list unavailable. Retry.' } }) }
         return route.fulfill({ json: { connected, repositories: connected ? repositories : [] } })
+      }
+      if (endpoint === '/api/project-registry' && request.method() === 'GET') {
+        catalogReads++
+        return route.fulfill({ json: { projects: [{ name: 'Shared orchard', path: '/shared/Orchard', managed: false, mine: false, icon: null }] } })
+      }
+      if (endpoint === '/api/project-registry/mine') {
+        imports.push(request.postDataJSON())
+        return route.fulfill({ json: { ok: true } })
       }
       if (endpoint === '/api/project-registry' && request.method() === 'POST') {
         const body = request.postDataJSON()
@@ -79,10 +88,13 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     })
     await page.goto('http://mew-inline-add.test/')
     const inline = page.locator('[data-project-add-inline]')
-    const add = inline.getByRole('button', { name: '추가', exact: true })
-    const createMode = inline.getByRole('button', { name: '새 프로젝트', exact: true })
-    const cloneMode = inline.getByRole('button', { name: 'Git 복제', exact: true })
-    const existingMode = inline.getByRole('button', { name: '기존 프로젝트', exact: true })
+    const add = inline.getByRole('button', { name: '프로젝트 추가', exact: true })
+    const createMode = inline.getByRole('button', { name: '새 프로젝트 만들기', exact: true })
+    const cloneMode = inline.getByRole('button', { name: 'Git repo 클론하기', exact: true })
+    const importMode = inline.getByRole('button', { name: '프로젝트 가져오기', exact: true })
+    const workspaceMode = inline.getByRole('button', { name: '이 워크스페이스에서 가져오기', exact: true })
+    const browseMode = inline.getByRole('button', { name: '경로 탐색하기', exact: true })
+    const back = inline.getByRole('button', { name: '이전 선택지로', exact: true })
     const create = inline.getByRole('button', { name: '프로젝트 만들기', exact: true })
     const clone = inline.getByRole('button', { name: '저장소 복제', exact: true })
     const name = inline.getByRole('textbox', { name: '프로젝트 이름', exact: true })
@@ -94,9 +106,14 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     const choices = inline.getByRole('navigation').getByRole('button')
     assert.equal(await choices.count(), 3)
     const boxes = await choices.evaluateAll(elements => elements.map(element => { const box = element.getBoundingClientRect(); return { x: box.x, y: box.y, width: box.width } }))
-    assert.ok(boxes.every(box => box.y === boxes[0].y) && boxes[0].x < boxes[1].x && boxes[1].x < boxes[2].x, 'the three choices share one horizontal row')
-    const addBox = await add.boundingBox()
-    assert.ok(addBox && Math.abs(addBox.y - boxes[0].y) <= 1 && addBox.x + addBox.width <= boxes[0].x, 'choices sit beside Add on the same row')
+    assert.ok(boxes.every(box => box.x === boxes[0].x) && boxes[0].y < boxes[1].y && boxes[1].y < boxes[2].y, 'the three choices replace Add in one inline column')
+    assert.equal(await add.count(), 0, 'expanded choices replace the Add trigger')
+    if (mobile) {
+      for (const target of [createMode, cloneMode, importMode, back]) {
+        const box = await target.boundingBox()
+        assert.ok(box && box.height >= 44, 'mobile project choices keep 44px touch targets')
+      }
+    }
     await createMode.click()
     assert.equal(await git.getAttribute('aria-pressed'), 'true')
     assert.equal(await create.isDisabled(), true)
@@ -111,7 +128,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     const inlineBox = await inline.boundingBox()
     assert.ok(inlineBox && inlineBox.x >= 0 && inlineBox.x + inlineBox.width <= viewport.width + 1)
     if (viewport.width < 768) {
-      for (const target of [add, createMode, cloneMode, existingMode, create, git]) {
+      for (const target of [back, create, git]) {
         const box = await target.boundingBox()
         assert.ok(box && box.height >= 44, 'mobile inline project actions keep 44px touch targets')
       }
@@ -177,15 +194,19 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     assert.deepEqual(mutations.splice(0), [{ mode: 'clone', url: 'https://github.com/example/public.git' }, { mode: 'clone', url: 'https://github.com/example/public.git' }], 'public clone needs no account; failed opening retries the same clone')
 
     await page.evaluate('window.reset({onboarding:true})')
+    await inline.getByRole('heading', { name: '프로젝트를 추가하세요', exact: true }).waitFor()
+    assert.equal(await inline.getByRole('navigation').getByRole('button').count(), 3, 'first use starts with the three labelled choices')
+    assert.equal(await add.count(), 0)
+    assert.equal(await inline.getByRole('button', { name: 'GitHub 로그인', exact: true }).count(), 0, 'GitHub connection appears within the clone choice')
+    await cloneMode.click()
     await inline.getByRole('button', { name: 'GitHub 로그인', exact: true }).waitFor()
-    assert.equal(await inline.getByRole('navigation').count(), 0, 'first-use connection is available before choosing an add mode')
     await inline.getByRole('button', { name: 'GitHub 로그인', exact: true }).click()
     const connectionDialog = page.getByRole('dialog', { name: 'GitHub 로그인', exact: true })
     await connectionDialog.getByRole('button', { name: 'GitHub 로그인', exact: true }).waitFor()
     await connectionDialog.getByRole('button', { name: '닫기', exact: true }).click()
     await connectionDialog.waitFor({ state: 'hidden' })
     await page.evaluate('window.requestAdd()')
-    await cloneMode.click()
+    assert.equal(await inline.getByRole('textbox', { name: 'Git 저장소 주소', exact: true }).count(), 1, 'requesting Add preserves the selected clone setup')
     await inline.getByRole('status', { name: '불러오는 중…', exact: true }).waitFor({ state: 'hidden' })
     failRepositories = true
     await inline.getByRole('button', { name: '다시 시도', exact: true }).click()
@@ -203,9 +224,29 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     assert.deepEqual(mutations.splice(0), [{ mode: 'clone', url: 'https://github.com/example-org/secret.git' }])
     connected = false
 
+    await page.evaluate('window.reset()')
+    await add.click(); await importMode.click()
+    assert.equal(await inline.getByRole('navigation').getByRole('button').count(), 2)
+    assert.equal(catalogReads, 0, 'import sources do not fetch the workspace catalog until selected')
+    await workspaceMode.click()
+    await inline.getByRole('button', { name: 'Shared orchard · 내 프로젝트에 추가', exact: true }).waitFor()
+    assert.equal(catalogReads, 1)
+    await back.click()
+    assert.equal(await browseMode.isVisible(), true)
+    await back.click()
+    assert.equal(await createMode.isVisible(), true)
+    await back.click()
+    assert.equal(await add.isVisible(), true, 'X returns catalog, import sources, choices, then Add one level at a time')
+    await add.click(); await importMode.click(); await workspaceMode.click()
+    await inline.getByRole('button', { name: 'Shared orchard · 내 프로젝트에 추가', exact: true }).click()
+    await page.getByText('Opened', { exact: true }).waitFor()
+    assert.deepEqual(imports, [{ path: '/shared/Orchard', added: true }])
+    assert.deepEqual(await page.evaluate('window.opened'), ['/shared/Orchard'])
+
     await page.evaluate('window.reset({canManageFolders:false})')
     await add.click()
-    await inline.getByRole('button', { name: '기존 프로젝트', exact: true }).click()
+    await importMode.click()
+    await browseMode.click()
     const browserDialog = page.getByRole('dialog', { name: '기존 프로젝트 연결', exact: true })
     await browserDialog.waitFor()
     assert.equal(await browserDialog.getByRole('button', { name: 'Git 복제', exact: true }).count(), 0)
@@ -219,12 +260,16 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     await page.evaluate('window.reset()')
     await add.click(); await createMode.click(); await name.fill('Draft')
     await name.press('Escape')
+    assert.equal(await inline.getByRole('navigation').getByRole('button').count(), 3)
+    assert.equal(await createMode.evaluate(element => element.ownerDocument.activeElement === element), true, 'Esc returns from a form to its invoking choice')
+    await page.keyboard.press('Escape')
     assert.equal(await inline.getByRole('navigation').count(), 0)
     assert.equal(await add.evaluate(element => element.ownerDocument.activeElement === element), true)
     if (mobile) assert.equal(await page.getByRole('dialog', { name: 'Projects', exact: true }).count(), 1, 'Esc collapses setup without dismissing the mobile project panel')
     await add.click(); await createMode.click()
     assert.equal(await name.inputValue(), 'Draft')
-    for (const [locale, labels] of [['en', ['Git clone', 'New project', 'Existing project']], ['zh-CN', ['Git 克隆', '新建项目', '已有项目']], ['ja', ['Git 複製', '新規', '既存のプロジェクト']]] as const) {
+    await back.click()
+    for (const [locale, labels] of [['en', ['Create new project', 'Clone Git repo', 'Import project']], ['zh-CN', ['新建项目', '克隆 Git 仓库', '导入项目']], ['ja', ['新規プロジェクトを作成', 'Git リポジトリをクローン', 'プロジェクトを取り込む']]] as const) {
       await page.evaluate(locale => (globalThis as unknown as { locale: (locale: string) => void }).locale(locale), locale)
       for (const label of labels) await inline.getByRole('navigation').getByRole('button', { name: label, exact: true }).waitFor()
       assert.equal(await inline.evaluate(element => element.scrollWidth <= element.clientWidth), true)
