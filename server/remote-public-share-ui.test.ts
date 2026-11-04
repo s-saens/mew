@@ -1,13 +1,12 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { build } from 'rolldown'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
-test('remote public shares hand off the validated public path and device base into the installed app', { skip: !domBrowserExecutable(), timeout: 20_000 }, async t => {
+test('remote public shares hand off the validated public path and device base into the installed app', { timeout: 20_000 }, async t => {
   const bundle = await build({ input: 'virtual:share.ts', write: false, platform: 'browser', output: { format: 'iife' }, plugins: [{ name: 'fixture', resolveId(id) { if (id === 'virtual:share.ts') return id }, load(id) { if (id === 'virtual:share.ts') return `import {initializeRemoteApp} from '${new URL('../src/utils/remote-app.ts', import.meta.url).pathname}';import {publicShareUrl} from '${new URL('../src/utils/public-share-url.ts', import.meta.url).pathname}';initializeRemoteApp().then(auth=>parent.postMessage({type:'fixture-result',auth,search:location.search,url:publicShareUrl('f','a'.repeat(43))},location.origin)).catch(error=>parent.postMessage({type:'fixture-error',message:error.message},location.origin));` } }] })
   const code = bundle.output.find(item => item.type === 'chunk')!.code
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   t.after(() => browser.close())
   const page = await browser.newPage()
   const errors: string[] = []

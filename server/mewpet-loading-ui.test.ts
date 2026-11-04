@@ -4,14 +4,13 @@ import path from 'node:path'
 import fs from 'node:fs/promises'
 import { compile } from '@tailwindcss/node'
 import { build } from 'rolldown'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 import { mewpetUiFixture } from './mewpet-ui-fixture.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 type Snapshot = { loading: boolean; failed: boolean; ids: string[] }
 
-test('selected pet renders while other skins are pending; downloads are bounded and failed refresh preserves it', { skip: !domBrowserExecutable(), timeout: 30_000 }, async () => {
+test('selected pet renders while other skins are pending; downloads are bounded and failed refresh preserves it', { timeout: 30_000 }, async () => {
   const source = `
 import React from '${root}/node_modules/react/index.js';
 import {createRoot} from '${root}/node_modules/react-dom/client.js';
@@ -41,7 +40,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Mewcat skin="c
   }))
   for (let index = 0; index < 4; index++) files.store.save(`loading-pet-${index}`, `Loading pet ${index}`, sprites)
   const catalog = files.store.list()
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     for (const mobile of [false, true]) {
       const page = await browser.newPage({ viewport: { width: mobile ? 390 : 1000, height: 700 }, hasTouch: mobile, isMobile: mobile })

@@ -4,15 +4,14 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 const email = 'profile.long-email+abcdefghijklmnop@example.test'
 const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=', 'base64')
 const avatarDataUrl = `data:image/png;base64,${png.toString('base64')}`
 
-test('profile avatar menu supports compact layouts, file and clipboard changes, validation and saving', { skip: !domBrowserExecutable(), timeout: 45_000 }, async () => {
+test('profile avatar menu supports compact layouts, file and clipboard changes, validation and saving', { timeout: 45_000 }, async () => {
   const source = `
 import React from '${root}/node_modules/react/index.js';
 import {createRoot} from '${root}/node_modules/react-dom/client.js';
@@ -38,7 +37,7 @@ createRoot(document.getElementById('fixture')).render(<I18nProvider><AccountProf
   const content = (await Promise.all(['src/components/account-profile-form.tsx', 'packages/ui/src/action-menu.tsx'].map(file => fs.readFile(path.join(root, file), 'utf8')))).join('\n')
   const compiler = await compile(await fs.readFile(`${root}/src/index.css`, 'utf8'), { base: `${root}/src`, onDependency() {} })
   const css = compiler.build([...new Set((source + content).match(/[A-Za-z0-9_@:/.[\]()%,-]+/g))])
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   const screenshots = process.env.MEW_ACCOUNT_PROFILE_SCREENSHOTS
   if (screenshots) await fs.mkdir(screenshots, { recursive: true })
   const payloads: { displayName: string; avatarDataUrl: string | null }[] = []

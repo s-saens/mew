@@ -4,11 +4,10 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
-test('image previews escape panel stacking; command dialogs remain legible above the dock', { skip: !domBrowserExecutable(), timeout: 60_000 }, async () => {
+test('image previews escape panel stacking; command dialogs remain legible above the dock', { timeout: 60_000 }, async () => {
   const source = `import React,{useState} from 'react';
 import {createRoot} from 'react-dom/client';
 import {AgentMediaPreviewDialog} from '${root}/src/components/agent-media-preview-dialog.tsx';
@@ -35,7 +34,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
   const files = ['src/components/agent-media-preview-dialog.tsx', 'src/components/CommandButtonMenu.tsx']
   const content = source + (await Promise.all(files.map(file => fs.readFile(`${root}/${file}`, 'utf8')))).join('\n')
   const css = compiler.build([...new Set(content.match(/[A-Za-z0-9_@!&:/.[\]()%,-]+/g))])
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     for (const width of [390, 1100]) {
       const page = await browser.newPage({ viewport: { width, height: 844 }, hasTouch: width === 390 })

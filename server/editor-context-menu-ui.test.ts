@@ -4,8 +4,8 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium, type Locator, type Page } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import type { Locator, Page } from 'playwright-core'
+import { connectTestBrowser } from './test-browser.ts'
 
 const markdown = '# Context fixture\n\nAlpha selected text omega.\n\nSecond paragraph target.\n\n<br/>\n'
 const code = 'const selected = "value";\nconst next = "target";\n'
@@ -163,7 +163,7 @@ async function assertMenu(menu: Locator, width: number, height: number) {
 }
 
 test('editor context menus preserve native selections and apply scoped actions in Hotview, Plain, and code', {
-  skip: !domBrowserExecutable(), timeout: 120_000,
+  timeout: 120_000,
 }, async t => {
   const repo = path.resolve(import.meta.dirname, '..')
   const source = `
@@ -203,7 +203,7 @@ function Fixture(){const [state,setState]=React.useState({...defaults,generation
   const entry = bundle.output.find(item => item.type === 'chunk' && item.isEntry)!
   assert.ok(entry.type === 'chunk')
   const javascript = entry.code
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   t.after(() => browser.close())
   const captures = process.env.MEW_CONTEXT_MENU_SCREENSHOT_DIR
   if (captures) await fs.mkdir(captures, { recursive: true })

@@ -4,13 +4,12 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 import { applyTaskChanges, type TaskItem } from '../shared/task-list.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 
-for (const mode of ['onboarding', 'keyboard', 'workspace', 'documents', 'permissions', 'panels', 'worktree', 'swipes', 'rapid'] as const) test(mode === 'onboarding' ? 'App first-use onboarding creates a named project without exposing the startup workspace' : mode === 'rapid' ? 'App rapid project selections cancel superseded handoffs and restore the latest root' : mode === 'swipes' ? 'App mobile dock swipes select panels and explorer swipes preserve search mode' : mode === 'worktree' ? 'linked worktree swaps retain project layout and sessions and settle outgoing file saves' : mode === 'panels' ? 'App restores Tasks with Alt+T and task sessions survive close and reload' : mode === 'permissions' ? 'permission invalidation replaces pending workspace metadata and ignores the old response' : mode === 'documents' ? 'Files opens Documents as a filesystem folder with a separate navigation arrow' : mode === 'keyboard' ? 'App keyboard aliases open files and projects and create files and folders in the current explorer scope' : 'App overlaps workspace metadata, restores warm roots and ignores duplicate handoffs', { skip: !domBrowserExecutable(), timeout: 60_000 }, async () => {
+for (const mode of ['onboarding', 'keyboard', 'workspace', 'documents', 'permissions', 'panels', 'worktree', 'swipes', 'rapid'] as const) test(mode === 'onboarding' ? 'App first-use onboarding creates a named project without exposing the startup workspace' : mode === 'rapid' ? 'App rapid project selections cancel superseded handoffs and restore the latest root' : mode === 'swipes' ? 'App mobile dock swipes select panels and explorer swipes preserve search mode' : mode === 'worktree' ? 'linked worktree swaps retain project layout and sessions and settle outgoing file saves' : mode === 'panels' ? 'App restores Tasks with Alt+T and task sessions survive close and reload' : mode === 'permissions' ? 'permission invalidation replaces pending workspace metadata and ignores the old response' : mode === 'documents' ? 'Files opens Documents as a filesystem folder with a separate navigation arrow' : mode === 'keyboard' ? 'App keyboard aliases open files and projects and create files and folders in the current explorer scope' : 'App overlaps workspace metadata, restores warm roots and ignores duplicate handoffs', { timeout: 60_000 }, async () => {
   const keyboardOnly = mode === 'keyboard'
   const onboarding = mode === 'onboarding'
   const appSource = await fs.readFile(`${root}/src/App.tsx`, 'utf8')
@@ -57,7 +56,7 @@ for (const mode of ['onboarding', 'keyboard', 'workspace', 'documents', 'permiss
   const taskContent = await fs.readFile(`${root}/src/components/task-panel.tsx`, 'utf8')
   const dateCss = await fs.readFile(`${root}/packages/ui/src/date-field.css`, 'utf8')
   const css = compiler.build([...new Set((source + content + appSource + taskContent).match(/[A-Za-z0-9_@:/.[\]()%,-]+/g)), ...Array.from(dateCss.matchAll(/--color-([a-z-]+)/g), match => `bg-${match[1]}`)]) + await fs.readFile(`${root}/src/components/task-panel.css`, 'utf8') + dateCss
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     const page = await browser.newPage({ viewport: { width: 1100, height: 700 }, hasTouch: true })
     page.setDefaultTimeout(3000)

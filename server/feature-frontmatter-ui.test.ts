@@ -5,10 +5,9 @@ import path from 'node:path'
 import { parse } from 'yaml'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
-test('feature frontmatter displays compact file links and commit tags without changing YAML on desktop and mobile', { skip: !domBrowserExecutable(), timeout: 45_000 }, async () => {
+test('feature frontmatter displays compact file links and commit tags without changing YAML on desktop and mobile', { timeout: 45_000 }, async () => {
   const root = path.resolve(import.meta.dirname, '..')
   const initial = '---\ntitle: 기능 문서\nfiles:\n  - "src/아주 긴 파일 경로/공백 #100%?.tsx" # keep file comment\n  - docs/guide.md\ncommits:\n  - repository: ""\n    hash: abc1234567890abcdef1234567890abcdef1234567\n    subject: 첫 구현\n  - repository: packages/app\n    hash: def5678901234abcdef1234567890abcdef1234567\n    subject: 하위 저장소\n---\n\n본문 [가이드](../guide.md)'
   const source = `
@@ -39,7 +38,7 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
   const compiler = await compile(await fs.readFile(path.join(root, 'src/index.css'), 'utf8'), { base: path.join(root, 'src'), onDependency() {} })
   const css = compiler.build([...new Set(candidates.join('\n').match(/[A-Za-z0-9_@!:/.[\]()%,-]+/g))]) + styles.join('\n')
   const chunk = bundle.output.find(item => item.type === 'chunk')!
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     for (const width of [1280, 390]) {
       const page = await browser.newPage({ viewport: { width, height: 844 }, hasTouch: width < 500, isMobile: width < 500 })

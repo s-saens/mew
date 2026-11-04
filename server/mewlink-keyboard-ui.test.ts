@@ -1,15 +1,14 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { build } from 'rolldown'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
-test('top-level keyboard geometry reaches a fullscreen app through two launcher frames', { skip: !domBrowserExecutable(), timeout: 30_000 }, async () => {
+test('top-level keyboard geometry reaches a fullscreen app through two launcher frames', { timeout: 30_000 }, async () => {
   const bundle = await build({ input: {
     keyboard: new URL('../packages/ui/src/virtual-keyboard.ts', import.meta.url).pathname,
     workspace: new URL('../src/utils/workspace-viewport.ts', import.meta.url).pathname,
   }, write: false, platform: 'browser', output: { format: 'esm', entryFileNames: '[name].js' } })
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     for (const [width, touch] of [[390, true], [980, true], [1280, false]] as const) {
       const page = await browser.newPage({ viewport: { width, height: 844 }, hasTouch: touch })

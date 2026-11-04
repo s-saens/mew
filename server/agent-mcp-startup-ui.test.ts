@@ -4,12 +4,11 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 
-test('MCP startup diagnostics stay out of live and restored assistant turns on desktop/mobile', { skip: !domBrowserExecutable(), timeout: 40_000 }, async () => {
+test('MCP startup diagnostics stay out of live and restored assistant turns on desktop/mobile', { timeout: 40_000 }, async () => {
   const source = `import React from '${root}/node_modules/react/index.js';
 import {createRoot} from '${root}/node_modules/react-dom/client.js';
 import {AgentPanel} from '${root}/src/components/AgentPanel.tsx';
@@ -68,7 +67,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><div style={{he
   const compiler = await compile(await fs.readFile(`${root}/src/index.css`, 'utf8'), { base: `${root}/src`, onDependency() {} })
   const content = await fs.readFile(`${root}/src/components/AgentPanel.tsx`, 'utf8')
   const css = compiler.build([...new Set((source + content).match(/[A-Za-z0-9_@!:/.[\]()%,-]+/g))])
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     for (const width of [1100, 390]) {
       const page = await browser.newPage({ viewport: { width, height: 844 }, hasTouch: width === 390 })

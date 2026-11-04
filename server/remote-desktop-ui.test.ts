@@ -5,12 +5,11 @@ import path from 'node:path'
 import { createRequire } from 'node:module'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
 const root = path.resolve(import.meta.dirname, '..'), require = createRequire(`${root}/package.json`)
 
-for (const scenario of ['direct', 'native-direct'] as readonly string[]) test(`fullscreen desktop decodes real ${scenario} video and controls a synthetic host on mobile`, { skip: !domBrowserExecutable(), timeout: 90_000 }, async () => {
+for (const scenario of ['direct', 'native-direct'] as readonly string[]) test(`fullscreen desktop decodes real ${scenario} video and controls a synthetic host on mobile`, { timeout: 90_000 }, async () => {
   const transport = scenario === 'native' || scenario === 'server' ? 'server' : 'direct', nativeCapture = scenario.startsWith('native')
   const source = `
 import React,{useState} from '${require.resolve('react')}';
@@ -65,7 +64,7 @@ import('/sender.mjs').then(()=>createRoot(document.getElementById('root')).rende
   const tipSource = await fs.readFile(`${root}/packages/ui/src/HoverTipLayer.tsx`, 'utf8')
   const css = compiler.build((popupSource + dockSource + selectSource + tipSource).match(/[A-Za-z0-9_:[\]/.%!#()-]+/g) ?? []) + await fs.readFile(`${root}/src/components/remote-desktop.css`, 'utf8') + await fs.readFile(`${root}/src/components/desktop-screen-keyboard.css`, 'utf8')
   const sender = await fs.readFile(`${root}/native/remote-desktop/sender.mjs`, 'utf8')
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     const page = await browser.newPage({ viewport: { width: 390, height: 844 }, hasTouch: true, locale: 'ko-KR' })
     await page.addInitScript(`

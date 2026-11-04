@@ -5,10 +5,9 @@ import path from 'node:path'
 import { createRequire } from 'node:module'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 const root = path.resolve(import.meta.dirname, '..'), require = createRequire(`${root}/package.json`)
-test('popup modes preserve content, resize, move, restore and return to mobile panels', { skip: !domBrowserExecutable(), timeout: 45_000 }, async () => {
+test('popup modes preserve content, resize, move, restore and return to mobile panels', { timeout: 45_000 }, async () => {
   const source = `import React,{useState,useRef} from '${require.resolve('react')}';
 import {createRoot} from '${require.resolve('react-dom/client')}';
 import {I18nProvider} from '${root}/src/i18n.tsx';
@@ -21,7 +20,7 @@ function Fixture(){ const [state,setState]=useState(null),[settings,setSettings]
   const content = source + (await Promise.all(['src/components/DockWorkspace.tsx', 'src/components/tool-presentation-toggle.tsx', 'src/components/SettingsModal.tsx', 'packages/ui/src/select-field.tsx'].map(file => fs.readFile(`${root}/${file}`, 'utf8')))).join('\n')
   const compiler = await compile(await fs.readFile(`${root}/src/index.css`, 'utf8'), { base: `${root}/src`, onDependency() {} })
   const css = compiler.build([...new Set(content.match(/[A-Za-z0-9_@:/.[\]()%,-]+/g))]) + '\n' + await fs.readFile(`${root}/src/components/shared-memo.css`, 'utf8')
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     const page = await browser.newPage({ viewport: { width: 1100, height: 800 } })
     await page.route('http://fixture/**', route => route.fulfill(route.request().url().endsWith('/app.js') ? { contentType: 'text/javascript', body: bundle.output[0].code } : { contentType: 'text/html', body: `<html class="dark"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}</style><div id="root"></div><script src="/app.js"></script></html>` }))

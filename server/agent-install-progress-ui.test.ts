@@ -4,11 +4,10 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
-test('install logs update before completion, retain errors and fit desktop/mobile', { skip: !domBrowserExecutable(), timeout: 30_000 }, async () => {
+test('install logs update before completion, retain errors and fit desktop/mobile', { timeout: 30_000 }, async () => {
   const source = `import React from '${root}/node_modules/react/index.js';
 import {createRoot} from '${root}/node_modules/react-dom/client.js';
 import {RuntimeInstallProgress} from '${root}/src/components/RuntimeInstallProgress.tsx';
@@ -22,7 +21,7 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
   const compiler = await compile(await fs.readFile(`${root}/src/index.css`, 'utf8'), { base: `${root}/src`, onDependency() {} })
   const content = await fs.readFile(`${root}/src/components/RuntimeInstallProgress.tsx`, 'utf8')
   const css = compiler.build(content.match(/[A-Za-z0-9_:[\]./!%#()-]+/g) ?? [])
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), headless: true, args: ['--no-sandbox'] })
+  const browser = await connectTestBrowser()
   try {
     for (const [width, dark] of [[1100, true], [390, false]] as const) {
       const page = await browser.newPage({ viewport: { width, height: 700 } })

@@ -4,11 +4,10 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
-test('paged conversations keep scroll position and restore account-scoped IndexedDB on desktop/mobile', { skip: !domBrowserExecutable(), timeout: 60_000 }, async () => {
+test('paged conversations keep scroll position and restore account-scoped IndexedDB on desktop/mobile', { timeout: 60_000 }, async () => {
   const source = `import React from '${root}/node_modules/react/index.js';
 import {createRoot} from '${root}/node_modules/react-dom/client.js';
 import {AgentPanel} from '${root}/src/components/AgentPanel.tsx';
@@ -53,7 +52,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><div style={{he
   const compiler = await compile(await fs.readFile(`${root}/src/index.css`, 'utf8'), { base: `${root}/src`, onDependency() {} })
   const content = (await Promise.all(['src/components/AgentPanel.tsx', 'src/components/agent-attachment-icon.tsx', 'src/components/agent-document-tag.tsx', 'src/components/MentionTextarea.tsx', 'packages/ui/src/action-menu.tsx'].map(file => fs.readFile(`${root}/${file}`, 'utf8')))).join('\n')
   const css = compiler.build([...new Set((source + content).match(/[A-Za-z0-9_@!:/.[\]()%,-]+/g))])
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     for (const width of [1100, 390]) for (const dark of [false, true]) {
       const page = await browser.newPage({ viewport: { width, height: 844 }, hasTouch: width === 390 })

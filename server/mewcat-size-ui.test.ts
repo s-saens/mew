@@ -5,8 +5,8 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium, type Page } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import type { Page } from 'playwright-core'
+import { connectTestBrowser } from './test-browser.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 
@@ -62,7 +62,7 @@ async function expectSettingsLayer(page: Page, mobile: boolean) {
   assert.equal(layer.settings, true, 'settings stay above the underlying workspace')
 }
 
-test('Mewcat size settings apply live, preserve dragging and floor bounds, and persist per browser scope', { skip: !domBrowserExecutable(), timeout: 90_000 }, async () => {
+test('Mewcat size settings apply live, preserve dragging and floor bounds, and persist per browser scope', { timeout: 90_000 }, async () => {
   const source = `
 import React,{useEffect,useState} from '${root}/node_modules/react/index.js';
 import {createRoot} from '${root}/node_modules/react-dom/client.js';
@@ -105,7 +105,7 @@ if(new URLSearchParams(location.search).has('portal'))document.getElementById('r
     const image = petFiles.store.image('capybara', action as Parameters<typeof petFiles.store.image>[1])
     return [action, { bytes: image.bytes, frames: image.frames }]
   })))
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     for (const mobile of [false, true]) {
       const context = await browser.newContext({ viewport: { width: mobile ? 390 : 1280, height: mobile ? 844 : 800 }, hasTouch: mobile })

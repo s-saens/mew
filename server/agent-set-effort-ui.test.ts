@@ -4,11 +4,10 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
-for (const targetRuntime of ['codex', 'antigravity']) test(`Agent sets separate ${targetRuntime} model/effort and save ACP effort on desktop/mobile`, { skip: !domBrowserExecutable(), timeout: 60_000 }, async () => {
+for (const targetRuntime of ['codex', 'antigravity']) test(`Agent sets separate ${targetRuntime} model/effort and save ACP effort on desktop/mobile`, { timeout: 60_000 }, async () => {
   const exactId = (model: string, effort: string) => targetRuntime === 'codex' ? `${model}[${effort}]` : `${model}-opaque-${effort}`
   const baseId = (model: string) => targetRuntime === 'codex' ? model : model[0].toUpperCase() + model.slice(1)
   const optionName = (model: string) => targetRuntime === 'codex' ? `${baseId(model)[0].toUpperCase() + baseId(model).slice(1)} · ${model}` : baseId(model)
@@ -29,7 +28,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><div style={{he
   const content = (await Promise.all(files.map(file => fs.readFile(path.join(root, file), 'utf8')))).join('\n')
   const compiler = await compile(await fs.readFile(`${root}/src/index.css`, 'utf8'), { base: `${root}/src`, onDependency() {} })
   const css = compiler.build([...new Set((source + content).match(/[A-Za-z0-9_@!:/.[\]()%,-]+/g))])
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     for (const width of [1100, 390]) {
       const page = await browser.newPage({ viewport: { width, height: 844 } })

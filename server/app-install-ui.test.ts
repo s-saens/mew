@@ -5,8 +5,8 @@ import path from 'node:path'
 import { createRequire } from 'node:module'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium, type Browser, type Page } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import type { Browser, Page } from 'playwright-core'
+import { connectTestBrowser } from './test-browser.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 const require = createRequire(`${root}/package.json`)
@@ -97,9 +97,9 @@ async function settle(page: Page) {
   }))
 }
 
-test('app installation and fullscreen startup guidance follows platform, installation, and saved choices', { skip: !domBrowserExecutable(), timeout: 90_000 }, async t => {
+test('app installation and fullscreen startup guidance follows platform, installation, and saved choices', { timeout: 90_000 }, async t => {
   const html = await installGuideBundle()
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     await t.test('mobile installation comes first without a pet and both opt-outs persist independently', async () => {
       const { page, close } = await fixturePage(browser, html)

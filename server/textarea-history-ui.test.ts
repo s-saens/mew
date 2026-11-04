@@ -1,10 +1,9 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { build } from 'rolldown'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
-test('textarea history preserves blank lines and wrapped-line arrow navigation', { skip: !domBrowserExecutable(), timeout: 30_000 }, async () => {
+test('textarea history preserves blank lines and wrapped-line arrow navigation', { timeout: 30_000 }, async () => {
   const bundle = await build({
     input: new URL('../packages/ui/src/textareaVisualLine.ts', import.meta.url).pathname,
     write: false,
@@ -12,7 +11,7 @@ test('textarea history preserves blank lines and wrapped-line arrow navigation',
     output: { format: 'iife', name: 'textareaBoundary' },
   })
   const chunk = bundle.output.find(item => item.type === 'chunk')!
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     const page = await browser.newPage()
     await page.setContent('<textarea style="width:120px;height:180px;font:16px/24px monospace;padding:8px;white-space:pre-wrap;overflow-wrap:break-word"></textarea>')

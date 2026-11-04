@@ -4,12 +4,12 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium, type Route } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import type { Route } from 'playwright-core'
+import { connectTestBrowser } from './test-browser.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 
-test('file browser paths show known suggestions immediately and preserve keyboard, composition and latest-response boundaries', { skip: !domBrowserExecutable(), timeout: 45_000 }, async () => {
+test('file browser paths show known suggestions immediately and preserve keyboard, composition and latest-response boundaries', { timeout: 45_000 }, async () => {
   const source = `import React,{useState} from '${root}/node_modules/react/index.js';
 import {createRoot} from '${root}/node_modules/react-dom/client.js';
 import {FileBrowserPath} from '${root}/src/components/file-browser-path.tsx';
@@ -25,7 +25,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
   const content = (await Promise.all(files.map(file => fs.readFile(path.join(root, file), 'utf8')))).join('\n')
   const compiler = await compile(await fs.readFile(`${root}/src/index.css`, 'utf8'), { base: `${root}/src`, onDependency() {} })
   const css = compiler.build([...new Set((source + content).match(/[A-Za-z0-9_@!:/.[\]()%,-]+/g))])
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     const context = await browser.newContext({ viewport: { width: 1100, height: 800 }, hasTouch: true })
     const pending = new Map<string, (route: Route) => void>()

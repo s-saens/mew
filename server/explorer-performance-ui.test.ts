@@ -4,12 +4,11 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 
-test('explorer coalesces loads, keeps refreshed rows and windows large Files/Documents lists', { skip: !domBrowserExecutable(), timeout: 40_000 }, async t => {
+test('explorer coalesces loads, keeps refreshed rows and windows large Files/Documents lists', { timeout: 40_000 }, async t => {
   const source = `import React from '${root}/node_modules/react/index.js';
 import {createRoot} from '${root}/node_modules/react-dom/client.js';
 import {FileTree} from '${root}/src/components/FileTree.tsx';
@@ -34,7 +33,7 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><I18nProvid
   const content = await fs.readFile(`${root}/src/components/FileTree.tsx`, 'utf8')
   const compiler = await compile(await fs.readFile(`${root}/src/index.css`, 'utf8'), { base: `${root}/src`, onDependency() {} })
   const css = compiler.build([...new Set((source + content).match(/[A-Za-z0-9_@:/.[\]()%,-]+/g))])
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   t.after(() => browser.close())
   for (const docs of [false, true]) {
     const page = await browser.newPage({ viewport: { width: 1100, height: 750 } })

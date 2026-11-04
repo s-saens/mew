@@ -3,10 +3,9 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
-test('file explorer dock, controls and shortcut labels update together across languages', { skip: !domBrowserExecutable(), timeout: 30_000 }, async () => {
+test('file explorer dock, controls and shortcut labels update together across languages', { timeout: 30_000 }, async () => {
   const root = path.resolve(import.meta.dirname, '..')
   const shortcuts = JSON.parse(await fs.readFile(`${root}/packages/shortcuts/src/shortcuts.json`, 'utf8')) as { id: string; label: string; keys: string }[]
   const shortcut = shortcuts.find(item => item.id === 'toggleSidebar')!
@@ -33,7 +32,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     }],
   })
   const chunk = bundle.output.find(item => item.type === 'chunk')!
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     for (const width of [1100, 390]) {
       const page = await browser.newPage({ viewport: { width, height: 640 }, hasTouch: width < 768 })

@@ -4,8 +4,8 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium, type Locator, type Page } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import type { Locator, Page } from 'playwright-core'
+import { connectTestBrowser } from './test-browser.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 
@@ -50,7 +50,7 @@ async function assertSelectPosition(page: Page, direction: 'above' | 'below', cl
   await assertVisibleItems(menu, '[role="option"]')
 }
 
-test('modal selects and action menus keep viewport anchors through blur, borders, scrolling and nested portals', { skip: !domBrowserExecutable(), timeout: 30_000 }, async () => {
+test('modal selects and action menus keep viewport anchors through blur, borders, scrolling and nested portals', { timeout: 30_000 }, async () => {
   const source = `import React,{useLayoutEffect,useState} from 'react';
 import {createRoot} from 'react-dom/client';
 import {SelectField} from '${root}/packages/ui/src/select-field.tsx';
@@ -85,7 +85,7 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
   const components = (await Promise.all(['select-field.tsx', 'HoverTipLayer.tsx'].map(file => fs.readFile(path.join(root, 'packages/ui/src', file), 'utf8')))).join('\n')
   const compiler = await compile(await fs.readFile(path.join(root, 'src/index.css'), 'utf8'), { base: path.join(root, 'src'), onDependency() {} })
   const css = compiler.build([...new Set((source + components).match(/[A-Za-z0-9_@:/.[\]()%,-]+/g))])
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     const page = await browser.newPage({ viewport: { width: 1100, height: 800 } })
     page.setDefaultTimeout(3000)

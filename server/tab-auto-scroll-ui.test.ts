@@ -3,12 +3,11 @@ import assert from 'node:assert/strict'
 import path from 'node:path'
 import fs from 'node:fs/promises'
 import { build } from 'rolldown'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 
-test('tab strips smoothly reveal new, selected and focused tabs without moving their surroundings', { skip: !domBrowserExecutable(), timeout: 30_000 }, async t => {
+test('tab strips smoothly reveal new, selected and focused tabs without moving their surroundings', { timeout: 30_000 }, async t => {
   const source = `
 import React from '${root}/node_modules/react/index.js';
 import {createRoot} from '${root}/node_modules/react-dom/client.js';
@@ -37,7 +36,7 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><Fixture/><
   })
   const code = bundle.output.filter(item => item.type === 'chunk').map(item => item.code).join('\n')
   const css = (await Promise.all(['tab-auto-scroll.css', 'tab-scroll-area.css'].map(file => fs.readFile(`${root}/packages/ui/src/${file}`, 'utf8')))).join('\n')
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   t.after(() => browser.close())
   for (const width of [960, 390]) {
     await t.test(`${width}px viewport`, async () => {

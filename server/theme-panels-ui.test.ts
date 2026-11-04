@@ -4,8 +4,8 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium, type Locator, type Page } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import type { Locator, Page } from 'playwright-core'
+import { connectTestBrowser } from './test-browser.ts'
 import { installLiveFixture } from './live-ui-fixture.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
@@ -50,7 +50,7 @@ async function frame(page: Page, time: number) {
   }))
 }
 
-test('Git and tasks reveal the shared gradient through real dock bodies and tabs on desktop/mobile', { skip: !domBrowserExecutable(), timeout: 90_000 }, async () => {
+test('Git and tasks reveal the shared gradient through real dock bodies and tabs on desktop/mobile', { timeout: 90_000 }, async () => {
   const source = `import React,{useState} from '${root}/node_modules/react/index.js';
 import {createRoot} from '${root}/node_modules/react-dom/client.js';
 import {DockWorkspace,DockPanel} from '${root}/src/components/DockWorkspace.tsx';
@@ -91,7 +91,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
   const repository = { repository: true, workspace: '/workspace', remotes: [], branch: 'main', ahead: 0, behind: 0 }
   const commits = [{ hash: 'abcdef123456', parents: [], subject: 'Theme commit', author: 'Theme fixture', date: '2026-10-01T00:00:00Z', refs: ['main'] }]
   const workingTree = { files: [{ path: 'theme.ts', status: 'M' }] }
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   const failures: string[] = []
   const check = (condition: boolean, message: string) => { if (!condition) failures.push(message) }
   try {

@@ -1,10 +1,10 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { build } from 'rolldown'
-import { chromium, type Page } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import type { Page } from 'playwright-core'
+import { connectTestBrowser } from './test-browser.ts'
 
-test('input autofocus follows observed keyboard use on touch devices', { skip: !domBrowserExecutable(), timeout: 60_000 }, async t => {
+test('input autofocus follows observed keyboard use on touch devices', { timeout: 60_000 }, async t => {
   const source = `
 import React,{useEffect,useState} from 'react';
 import {createRoot} from 'react-dom/client';
@@ -52,7 +52,7 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
     } }],
   })
   const code = bundle.output.filter(item => item.type === 'chunk').map(item => item.code).join('\n')
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   t.after(() => browser.close())
   const errors: string[] = []
   const openPage = async (width: number, touch = true) => {

@@ -4,8 +4,8 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium, type Locator } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import type { Locator } from 'playwright-core'
+import { connectTestBrowser } from './test-browser.ts'
 import type { AgentAttachmentInput } from '../shared/agent-attachment.ts'
 import type { AgentCommandRecord } from '../shared/agent-command.ts'
 
@@ -16,7 +16,7 @@ async function composerValue(input: Locator): Promise<string> {
   return (await input.locator('.cm-line').allTextContents()).join('\n')
 }
 
-test('CLI composer, code block execution, live-to-saved popup, keyboard focus and reload on desktop/mobile', { skip: !domBrowserExecutable(), timeout: 45_000 }, async () => {
+test('CLI composer, code block execution, live-to-saved popup, keyboard focus and reload on desktop/mobile', { timeout: 45_000 }, async () => {
   const source = `
 import React from '${root}/node_modules/react/index.js';
 import {createRoot} from '${root}/node_modules/react-dom/client.js';
@@ -75,7 +75,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
   const compiler = await compile(await fs.readFile(`${root}/src/index.css`, 'utf8'), { base: `${root}/src`, onDependency() {} })
   const css = compiler.build([...new Set((source + content).match(/[A-Za-z0-9_@!:/.[\]()%,-]+/g))])
     + await fs.readFile(`${root}/packages/ui/src/loading-indicator.css`, 'utf8')
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     for (const width of [1100, 390]) {
       const page = await browser.newPage({ viewport: { width, height: 844 }, locale: 'ko-KR' })

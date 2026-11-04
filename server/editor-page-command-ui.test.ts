@@ -6,13 +6,12 @@ import os from 'node:os'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 import { DocumentPages } from './document-pages.ts'
 
 const repo = path.resolve(import.meta.dirname, '..')
 
-test('/page names children inline and preserves editing across path changes on desktop and mobile', { skip: !domBrowserExecutable(), timeout: 90_000 }, async t => {
+test('/page names children inline and preserves editing across path changes on desktop and mobile', { timeout: 90_000 }, async t => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mew-page-command-'))
   t.after(() => fs.rmSync(root, { recursive: true, force: true }))
   const source = `
@@ -64,7 +63,7 @@ test('/page names children inline and preserves editing across path changes on d
   const scripts = new Map(chunks.map(item => [`/${item.fileName}`, item.code]))
   const compiler = await compile(fs.readFileSync(`${repo}/src/index.css`, 'utf8'), { base: `${repo}/src`, onDependency() {} })
   const css = compiler.build([...new Set(candidates.join('\n').match(/[A-Za-z0-9_@!:/.[\]()%,-]+/g))]) + styles.join('\n')
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   t.after(() => browser.close())
   for (const collaborative of [false, true]) for (const width of [1100, 390]) {
     const workspace = path.join(root, `${width}-${collaborative}`), docs = path.join(workspace, 'docs')

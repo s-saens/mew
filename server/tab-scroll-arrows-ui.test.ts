@@ -4,12 +4,11 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 
-test('tab chevrons overlay overflowing edges and scroll while held without changing focus or selection', { skip: !domBrowserExecutable(), timeout: 30_000 }, async t => {
+test('tab chevrons overlay overflowing edges and scroll while held without changing focus or selection', { timeout: 30_000 }, async t => {
   const source = `import React from '${root}/node_modules/react/index.js';
 import {createRoot} from '${root}/node_modules/react-dom/client.js';
 import {TabBar} from '${root}/src/components/TabBar.tsx';
@@ -32,7 +31,7 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><Fixture/><
   const compiler = await compile(await fs.readFile(`${root}/src/index.css`, 'utf8'), { base: `${root}/src`, onDependency() {} })
   const css = compiler.build([...new Set((source + sources.join('\n')).match(/[A-Za-z0-9_@:/.[\]()%,-]+/g))])
   const autoCss = await fs.readFile(`${root}/packages/ui/src/tab-auto-scroll.css`, 'utf8')
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   t.after(() => browser.close())
   for (const width of [1100, 390]) {
     await t.test(`${width}px ${width > 500 ? 'dark' : 'light'} tabs`, async () => {

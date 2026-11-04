@@ -4,12 +4,11 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 
-test('public share controls publish, edit, revoke, handle errors and restrict management on desktop and mobile', { skip: !domBrowserExecutable(), timeout: 40_000 }, async () => {
+test('public share controls publish, edit, revoke, handle errors and restrict management on desktop and mobile', { timeout: 40_000 }, async () => {
   const source = `import React,{useState} from '${root}/node_modules/react/index.js';
 import {createRoot} from '${root}/node_modules/react-dom/client.js';
 import {I18nProvider,useI18n} from '${root}/src/i18n.tsx';
@@ -25,7 +24,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
   const content = (await Promise.all(files.map(file => fs.readFile(path.join(root, file), 'utf8')))).join('\n')
   const compiler = await compile(await fs.readFile(`${root}/src/index.css`, 'utf8'), { base: `${root}/src`, onDependency() {} })
   const css = compiler.build([...new Set((source + content).match(/[A-Za-z0-9_@:/.[\]()%,-]+/g))])
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     const context = await browser.newContext({ viewport: { width: 1100, height: 800 }, hasTouch: true })
     const page = await context.newPage()

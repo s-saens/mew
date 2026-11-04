@@ -6,11 +6,10 @@ import path from 'node:path'
 import fs from 'node:fs/promises'
 import { compile } from '@tailwindcss/node'
 import { build } from 'rolldown'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
-const root = path.resolve(import.meta.dirname, '..'), chrome = domBrowserExecutable()
-test('remote login cannot be dismissed and handles incorrect and temporary local passwords on desktop/mobile', { skip: !chrome, timeout: 30_000 }, async t => {
+const root = path.resolve(import.meta.dirname, '..')
+test('remote login cannot be dismissed and handles incorrect and temporary local passwords on desktop/mobile', { timeout: 30_000 }, async t => {
   const source = `import React from '${root}/node_modules/react/index.js';import{createRoot}from '${root}/node_modules/react-dom/client.js';import{LoginPage}from '${root}/src/components/LoginPage.tsx';import{I18nProvider}from '${root}/src/i18n.tsx';localStorage.setItem('mew:locale','ko');createRoot(document.getElementById('root')).render(<I18nProvider><LoginPage dismissible={false} initialMustChangePassword={location.pathname==='/resume'} onClose={()=>{window.fixtureClosed=true}} onSuccess={status=>{window.fixtureStatus=status}}/></I18nProvider>);`
   const bundle = await build({ input: 'virtual:login.tsx', write: false, platform: 'browser', output: { format: 'iife' }, transform: { jsx: 'react-jsx', define: { 'process.env.NODE_ENV': JSON.stringify('test') } }, plugins: [{ name: 'fixture', resolveId(id) { if (id === 'virtual:login.tsx') return id; if (id.endsWith('.css')) return 'virtual:style' }, load(id) { if (id === 'virtual:login.tsx') return source; if (id === 'virtual:style') return '' } }] })
   const code = bundle.output.filter(item => item.type === 'chunk').map(item => item.code).join('\n')
@@ -27,7 +26,7 @@ test('remote login cannot be dismissed and handles incorrect and temporary local
   })
   server.listen(0, '127.0.0.1'); await once(server, 'listening')
   t.after(() => new Promise<void>(resolve => { server.closeAllConnections(); server.close(() => resolve()) }))
-  const browser = await chromium.launch({ executablePath: chrome, chromiumSandbox: true }); t.after(() => browser.close())
+  const browser = await connectTestBrowser(); t.after(() => browser.close())
   const page = await browser.newPage({ viewport: { width: 1000, height: 800 } }); page.setDefaultTimeout(5000)
   await page.goto(`http://127.0.0.1:${(server.address() as { port: number }).port}`)
   await page.getByPlaceholder('이메일', { exact: true }).waitFor()

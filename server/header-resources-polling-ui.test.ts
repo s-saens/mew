@@ -2,14 +2,14 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import path from 'node:path'
 import { build } from 'rolldown'
-import { chromium, type Page } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import type { Page } from 'playwright-core'
+import { connectTestBrowser } from './test-browser.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 
 type SampleRequest = { url: string; completed: boolean; aborted: boolean }
 
-test('resource summaries limit header polling while retaining away notifications and request cancellation', { skip: !domBrowserExecutable(), timeout: 60_000 }, async t => {
+test('resource summaries limit header polling while retaining away notifications and request cancellation', { timeout: 60_000 }, async t => {
   // In-memory browser fixture only: no application server or dist changes.
   const source = `
 import React from '${root}/node_modules/react/index.js';
@@ -61,7 +61,7 @@ window.fixture={requests,timeouts,
   })
   const chunk = bundle.output.find(item => item.type === 'chunk')
   assert.ok(chunk && chunk.type === 'chunk')
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   const errors: string[] = []
   const pages: Page[] = []
   const open = async () => {

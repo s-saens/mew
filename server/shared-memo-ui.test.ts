@@ -6,10 +6,9 @@ import path from 'node:path'
 import http from 'node:http'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
-test('shared memo panel docking, focus, presence, shared editing and persisted reopen', { skip: !domBrowserExecutable(), timeout: 60_000 }, async () => {
+test('shared memo panel docking, focus, presence, shared editing and persisted reopen', { timeout: 60_000 }, async () => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'mew-memo-ui-'))
   process.env.MEW_DATA_DIR = directory
   const { attachCollabWebSocket, closeAllRooms } = await import('./collab.ts')
@@ -55,7 +54,7 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><I18nProvid
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
   const address = server.address(); assert.ok(address && typeof address !== 'string')
   const base = `http://127.0.0.1:${address.port}`
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     const one = await browser.newPage({ viewport: { width: 1100, height: 800 } })
     const two = await browser.newPage({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true })

@@ -4,12 +4,11 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 
-test('mention candidates stay visible above clipped panels and scroll independently on desktop/mobile', { skip: !domBrowserExecutable(), timeout: 45_000 }, async () => {
+test('mention candidates stay visible above clipped panels and scroll independently on desktop/mobile', { timeout: 45_000 }, async () => {
   const source = `import React,{useState} from 'react';import {createRoot} from 'react-dom/client';
 import {MentionTextarea} from '${root}/src/components/MentionTextarea.tsx';
 const options=Array.from({length:30},(_,i)=>({id:'document-'+i,label:'문서 '+String(i+1).padStart(2,'0'),hint:'Documents/reference-'+String(i+1).padStart(2,'0')+'.md',insert:'[[docs:reference-'+String(i+1).padStart(2,'0')+'.md]]'}));
@@ -33,7 +32,7 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
   const chunk = bundle.output.find(item => item.type === 'chunk'); assert.ok(chunk)
   const compiler = await compile(await fs.readFile(path.join(root, 'src/index.css'), 'utf8'), { base: path.join(root, 'src'), onDependency() {} })
   const css = compiler.build([...new Set(candidates.join('\n').match(/[A-Za-z0-9_@!&:/.[\]()%,-]+/g))])
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     for (const width of [1100, 390]) for (const dark of [false, true]) {
       const page = await browser.newPage({ viewport: { width, height: 844 }, reducedMotion: 'reduce' })

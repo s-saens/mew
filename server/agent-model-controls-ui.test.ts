@@ -4,12 +4,11 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 
-for (const runtime of ['codex', 'antigravity']) test(`${runtime} panel restores controls before a prompt, including failed history restoration, on desktop and mobile`, { skip: !domBrowserExecutable(), timeout: 40_000 }, async () => {
+for (const runtime of ['codex', 'antigravity']) test(`${runtime} panel restores controls before a prompt, including failed history restoration, on desktop and mobile`, { timeout: 40_000 }, async () => {
   const effortConfig = runtime === 'codex' ? 'reasoning_effort' : 'mew:model-effort'
   const source = `import React from '${root}/node_modules/react/index.js';
 import {createRoot} from '${root}/node_modules/react-dom/client.js';
@@ -58,7 +57,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><AgentPanel pro
   const compiler = await compile(await fs.readFile(`${root}/src/index.css`, 'utf8'), { base: `${root}/src`, onDependency() {} })
   const content = (await Promise.all(['src/components/AgentPanel.tsx', 'src/components/agent-header-select.tsx', 'src/components/agent-prompt-drafts.tsx', 'src/components/MentionTextarea.tsx', 'src/components/DockWorkspace.tsx'].map(file => fs.readFile(`${root}/${file}`, 'utf8')))).join('\n')
   const css = compiler.build([...new Set((source + content).match(/[A-Za-z0-9_@!:/.[\]()%,-]+/g))])
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     for (const width of [1100, 390]) for (const initial of ['live', 'paged', 'replay', 'failed-restore']) {
       const page = await browser.newPage({ viewport: { width, height: 844 } })

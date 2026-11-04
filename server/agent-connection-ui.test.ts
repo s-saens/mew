@@ -4,8 +4,8 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium, type Locator } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import type { Locator } from 'playwright-core'
+import { connectTestBrowser } from './test-browser.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 
@@ -14,7 +14,7 @@ async function composerValue(input: Locator): Promise<string> {
   return (await input.locator('.cm-line').allTextContents()).join('\n')
 }
 
-test('agent loading and clear feedback cover connection, history and startup queues, preserve drafts and respect reduced motion', { skip: !domBrowserExecutable(), timeout: 60_000 }, async () => {
+test('agent loading and clear feedback cover connection, history and startup queues, preserve drafts and respect reduced motion', { timeout: 60_000 }, async () => {
   const source = `import React from '${root}/node_modules/react/index.js';
 import {createRoot} from '${root}/node_modules/react-dom/client.js';
 import {AgentPanel} from '${root}/src/components/AgentPanel.tsx';
@@ -69,7 +69,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
   const content = (await Promise.all(['src/components/AgentPanel.tsx', 'src/components/MentionTextarea.tsx', 'src/components/DockWorkspace.tsx', 'packages/ui/src/panel-notice.tsx'].map(file => fs.readFile(`${root}/${file}`, 'utf8')))).join('\n')
   const css = compiler.build([...new Set((source + content).match(/[A-Za-z0-9_@!:/.[\]()%,-]+/g))])
     + await fs.readFile(`${root}/packages/ui/src/loading-indicator.css`, 'utf8')
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     for (const width of [1100, 390]) for (const dark of [true, false]) {
       const page = await browser.newPage({ viewport: { width, height: 844 } })

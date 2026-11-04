@@ -5,12 +5,11 @@ import path from 'node:path'
 import os from 'node:os'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 
-test('capacity retry notice shows the next retry, stops with keyboard input and fits narrow translated layouts', { skip: !domBrowserExecutable(), timeout: 30_000 }, async () => {
+test('capacity retry notice shows the next retry, stops with keyboard input and fits narrow translated layouts', { timeout: 30_000 }, async () => {
   const source = `import React from '${root}/node_modules/react/index.js';
 import {createRoot} from '${root}/node_modules/react-dom/client.js';
 import {I18nProvider} from '${root}/src/i18n.tsx';
@@ -30,7 +29,7 @@ window.renderNotice(30);`
   const content = source + await fs.readFile(`${root}/src/components/agent-capacity-retry-notice.tsx`, 'utf8')
   const compiler = await compile(await fs.readFile(`${root}/src/index.css`, 'utf8'), { base: `${root}/src`, onDependency() {} })
   const css = compiler.build([...new Set(content.match(/[A-Za-z0-9_@!:/.[\]()%,-]+/g))])
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     for (const [locale, waiting, countdown, stop] of [
       ['ko', '모델 혼잡', '30초 뒤 재시도', '재시도 중단'],

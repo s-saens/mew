@@ -4,10 +4,9 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
-test('mobile editors shrink after keyboard resize and keep the tapped line above the keyboard', { skip: !domBrowserExecutable(), timeout: 45_000 }, async () => {
+test('mobile editors shrink after keyboard resize and keep the tapped line above the keyboard', { timeout: 45_000 }, async () => {
   const root = path.resolve(import.meta.dirname, '..')
   const content = '---\ntitle: Mobile\nproperty: value\n---\n\n' + Array.from({ length: 80 }, (_, i) => `Line ${i + 1}`).join('\n\n')
   const source = `
@@ -41,7 +40,7 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
   const css = compiler.build([...new Set(candidates.join('\n').match(/[A-Za-z0-9_@!:/.[\]()%,-]+/g))]) + styles.join('\n')
   const chunk = bundle.output.find(item => item.type === 'chunk' && item.isEntry)!
   assert.ok(chunk.type === 'chunk')
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     for (const width of [390, 1280]) {
       const page = await browser.newPage({ viewport: { width, height: 844 }, hasTouch: width < 768 })

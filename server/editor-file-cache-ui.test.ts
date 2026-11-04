@@ -1,10 +1,9 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { build } from 'rolldown'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
-test('cached project files render before validation without editing or seeding collaboration', { skip: !domBrowserExecutable(), timeout: 45_000 }, async (t) => {
+test('cached project files render before validation without editing or seeding collaboration', { timeout: 45_000 }, async (t) => {
   const cachedAlpha = '# Alpha cached\n\nOriginal alpha body'
   const cachedBeta = '# Beta cached\n\nOld beta body'
   const latestBeta = '# Beta latest\n\nNew beta body'
@@ -44,7 +43,7 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><I18nProvid
     } }],
   })
   const chunk = bundle.output.find(item => item.type === 'chunk')!
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     const page = await browser.newPage({ viewport: { width: 1100, height: 800 } })
     page.setDefaultTimeout(5000)

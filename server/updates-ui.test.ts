@@ -4,11 +4,10 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 import type { UpdatesStatus } from '../shared/updates.ts'
 const root = path.resolve(import.meta.dirname, '..')
-test('updates dialog displays versions, individual/batch progress, persistent terminals, failure recovery and mobile layout', { skip: !domBrowserExecutable(), timeout: 60_000 }, async () => {
+test('updates dialog displays versions, individual/batch progress, persistent terminals, failure recovery and mobile layout', { timeout: 60_000 }, async () => {
   const source = `import React from '${root}/node_modules/react/index.js';
 import {createRoot} from '${root}/node_modules/react-dom/client.js';
 import {UpdatesModal} from '${root}/src/components/updates-modal.tsx';
@@ -21,7 +20,7 @@ function Fixture(){const [open,setOpen]=React.useState(true);const [mew,setMew]=
   const content = (await Promise.all(['src/components/updates-modal.tsx', 'src/components/SessionTerminalPopup.tsx', 'packages/ui/src/HoverTipLayer.tsx'].map(file => fs.readFile(`${root}/${file}`, 'utf8')))).join('\n')
   const compiler = await compile(await fs.readFile(`${root}/src/index.css`, 'utf8'), { base: `${root}/src`, onDependency() {} })
   const css = compiler.build([...new Set((content + 'fixed inset-0 z-[1200] flex items-center justify-center bg-black/50 p-3 sm:p-6 w-full overflow-hidden rounded-xl bg-surface shadow-2xl outline-none').match(/[A-Za-z0-9_@!:/.[\]()%,-]+/g))])
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     for (const width of [1100, 390]) {
       const page = await browser.newPage({ viewport: { width, height: 844 }, locale: 'ko-KR' })

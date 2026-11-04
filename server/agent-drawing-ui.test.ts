@@ -4,8 +4,8 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium, type Locator, type Page } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import type { Locator, Page } from 'playwright-core'
+import { connectTestBrowser } from './test-browser.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 async function drag(page: Page, locator: Locator, start: { x: number; y: number }, end: { x: number; y: number }): Promise<void> {
@@ -17,7 +17,7 @@ async function drag(page: Page, locator: Locator, start: { x: number; y: number 
   await page.mouse.up()
 }
 
-test('drawing popup supports vector edits, clipboard, history, PNG attachments and workspace isolation on desktop/mobile', { skip: !domBrowserExecutable(), timeout: 90_000 }, async () => {
+test('drawing popup supports vector edits, clipboard, history, PNG attachments and workspace isolation on desktop/mobile', { timeout: 90_000 }, async () => {
   const source = `
 import React from '${root}/node_modules/react/index.js';
 import {createRoot} from '${root}/node_modules/react-dom/client.js';
@@ -56,7 +56,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
   const utilityCss = compiler.build([...new Set((source + content).match(/[A-Za-z0-9_@!:/.[\]()%,-]+/g))])
   const drawingCss = (await Promise.all(drawingFiles.filter(name => name.endsWith('.css')).map(name => fs.readFile(`${root}/src/components/drawing/${name}`, 'utf8')))).join('\n')
   const fontData = await fs.readFile(`${root}/public/fonts/ibm-plex/plex-mono-2.5.0-regular.woff2`)
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     for (const width of [1100, 390]) {
       const page = await browser.newPage({ viewport: { width, height: 844 }, locale: 'ko-KR', permissions: ['clipboard-read', 'clipboard-write'] })

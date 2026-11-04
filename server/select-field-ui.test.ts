@@ -2,12 +2,11 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import path from 'node:path'
 import { build } from 'rolldown'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 
-test('focused selects change closed values with arrows and preserve popup, editable and multiple navigation', { skip: !domBrowserExecutable(), timeout: 30_000 }, async () => {
+test('focused selects change closed values with arrows and preserve popup, editable and multiple navigation', { timeout: 30_000 }, async () => {
   const source = `import React,{useState} from '${root}/node_modules/react/index.js';
 import {createRoot} from '${root}/node_modules/react-dom/client.js';
 import {SelectField} from '${root}/packages/ui/src/select-field.tsx';
@@ -42,7 +41,7 @@ createRoot(document.getElementById('root')).render(<><Property/><Trigger/><Heade
     name: 'fixture', resolveId(id) { if (id === 'virtual:select.tsx') return id; if (id.endsWith('.css')) return 'virtual:style' }, load(id) { if (id === 'virtual:select.tsx') return source; if (id === 'virtual:style') return '' },
   }] })
   const chunk = bundle.output.find(item => item.type === 'chunk'); assert.ok(chunk)
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     const page = await browser.newPage()
     page.setDefaultTimeout(4000)

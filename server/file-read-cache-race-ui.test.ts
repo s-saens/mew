@@ -1,8 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { build } from 'rolldown'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
 async function fixtureCode() {
   const source = `
@@ -42,9 +41,9 @@ export const dropCachedFile=()=>{};`
   return bundle.output.find(item => item.type === 'chunk')!.code
 }
 
-test('persistent file caches cannot delay validation or replace a later response or denial', { skip: !domBrowserExecutable(), timeout: 30_000 }, async () => {
+test('persistent file caches cannot delay validation or replace a later response or denial', { timeout: 30_000 }, async () => {
   const code = await fixtureCode()
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     const page = await browser.newPage()
     page.setDefaultTimeout(5000)
@@ -105,9 +104,9 @@ test('persistent file caches cannot delay validation or replace a later response
 })
 
 
-test('a disk snapshot skipped for a dirty verified peer preserves the original conflict baseline', { skip: !domBrowserExecutable(), timeout: 20_000 }, async () => {
+test('a disk snapshot skipped for a dirty verified peer preserves the original conflict baseline', { timeout: 20_000 }, async () => {
   const code = await fixtureCode()
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     const page = await browser.newPage()
     page.setDefaultTimeout(5000)
@@ -153,9 +152,9 @@ test('a disk snapshot skipped for a dirty verified peer preserves the original c
   } finally { await browser.close() }
 })
 
-test('a bounded disk lookup hands an anchor preview over to the full editable body', { skip: !domBrowserExecutable(), timeout: 20_000 }, async () => {
+test('a bounded disk lookup hands an anchor preview over to the full editable body', { timeout: 20_000 }, async () => {
   const code = await fixtureCode()
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     const page = await browser.newPage()
     page.setDefaultTimeout(5000)

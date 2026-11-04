@@ -2,9 +2,8 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import http from 'node:http'
 import { build } from 'rolldown'
-import { chromium } from 'playwright-core'
 import { WebSocketServer } from 'ws'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 import { remoteDispatcher } from './remote-access-dispatch.ts'
 import { REMOTE_LIMITS } from '../shared/remote-access.ts'
 import type { AuthenticatedSession } from './auth.ts'
@@ -12,10 +11,10 @@ import type { AuthenticatedSession } from './auth.ts'
 const owner: AuthenticatedSession = { email: 'owner@example.test', user: { hash: '', role: 'owner', mustChangePassword: false, createdAt: 1, passwordChangedAt: 0 } }
 const bridge = `window.bridge=()=>{const previous=window.transport,c=new MessageChannel(),wire=new EventTarget();wire.readyState='open';wire.bufferedAmount=0;wire.send=raw=>c.port1.postMessage(raw);wire.close=()=>{wire.readyState='closed';c.port1.close();c.port2.close()};c.port1.onmessage=e=>wire.dispatchEvent(new MessageEvent('message',{data:e.data}));c.port2.onmessage=e=>previous.forward(JSON.parse(e.data)).catch(e=>window.failure=e.message);previous.channel.addEventListener('message',e=>c.port2.postMessage(e.data));c.port1.start();c.port2.start();window.transport=new Remote.DataChannelTransport(wire)};`
 
-test('two-port consumers negotiate adaptive HTTP/WS credit at RTT 100ms while unread and cancelled bodies remain bounded', { skip: !domBrowserExecutable(), timeout: 30_000 }, async t => {
+test('two-port consumers negotiate adaptive HTTP/WS credit at RTT 100ms while unread and cancelled bodies remain bounded', { timeout: 30_000 }, async t => {
   const bundle = await build({ input: new URL('../src/utils/remote-transport.ts', import.meta.url).pathname, write: false, platform: 'browser', output: { format: 'iife', name: 'Remote' } })
   const code = bundle.output.find(item => item.type === 'chunk')!.code
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true }); t.after(() => browser.close())
+  const browser = await connectTestBrowser(); t.after(() => browser.close())
   const page = await browser.newPage(), errors: string[] = []; page.on('pageerror', e => errors.push(e.message))
   const app = http.createServer((req, res) => res.end(Buffer.alloc(req.url === '/api/large' ? 4 * 1024 * 1024 : 17, 23)))
   const sockets = new WebSocketServer({ noServer: true })

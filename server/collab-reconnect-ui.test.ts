@@ -1,10 +1,9 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { build } from 'rolldown'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
-test('collab recovers stalled handshakes and sync without losing local edits', { skip: !domBrowserExecutable(), timeout: 30_000 }, async () => {
+test('collab recovers stalled handshakes and sync without losing local edits', { timeout: 30_000 }, async () => {
   const source = `
 import React from ${JSON.stringify(import.meta.resolve('react'))};
 import {createRoot} from ${JSON.stringify(import.meta.resolve('react-dom/client'))};
@@ -28,7 +27,7 @@ root.render(<Fixture/>);`
     plugins: [{ name: 'collab-fixture', resolveId(id) { if (id === 'virtual:collab.tsx') return id }, load(id) { if (id === 'virtual:collab.tsx') return source } }],
   })
   const chunk = bundle.output.find(item => item.type === 'chunk')!
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     const page = await browser.newPage()
     const errors: string[] = []

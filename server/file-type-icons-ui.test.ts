@@ -4,10 +4,9 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
-test('file icons render in Files, Documents, search and server browsing across themes and sizes', { skip: !domBrowserExecutable(), timeout: 40_000 }, async t => {
+test('file icons render in Files, Documents, search and server browsing across themes and sizes', { timeout: 40_000 }, async t => {
   const root = path.resolve(import.meta.dirname, '..')
   const source = `import React from '${root}/node_modules/react/index.js';
 import {createRoot} from '${root}/node_modules/react-dom/client.js';
@@ -35,7 +34,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
   const content = (await Promise.all(['src/components/FileTree.tsx', 'src/components/file-type-icon.tsx', 'src/components/file-icon-artwork.tsx', 'src/components/file-type-icon-image.tsx', 'src/components/file-browser.tsx'].map(file => fs.readFile(path.join(root, file), 'utf8')))).join('\n')
   const compiler = await compile(await fs.readFile(`${root}/src/index.css`, 'utf8'), { base: `${root}/src`, onDependency() {} })
   const css = compiler.build([...new Set((source + content).match(/[A-Za-z0-9_@:/.[\]()%,-]+/g))])
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   t.after(() => browser.close())
   for (const width of [1100, 390]) {
     const page = await browser.newPage({ viewport: { width, height: 844 }, hasTouch: width < 768 })

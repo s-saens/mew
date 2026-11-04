@@ -4,12 +4,11 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 import type { HarnessInventory, HarnessMutation } from '../shared/agent-harness.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
-test('harness popup supports scope filtering, protected drafts, editing, moves and deletion on desktop/mobile', { skip: !domBrowserExecutable(), timeout: 45000 }, async () => {
+test('harness popup supports scope filtering, protected drafts, editing, moves and deletion on desktop/mobile', { timeout: 45000 }, async () => {
   const source = `import React from '${root}/node_modules/react/index.js';
 import {createRoot} from '${root}/node_modules/react-dom/client.js';
 import {AgentHarnessButtons} from '${root}/src/components/agent-harness-modal.tsx';
@@ -21,7 +20,7 @@ createRoot(document.getElementById('root')).render(<div className="flex"><button
   const content = (await Promise.all(['src/components/agent-harness-modal.tsx', 'packages/ui/src/select-field.tsx'].map(file => fs.readFile(path.join(root, file), 'utf8')))).join('\n')
   const compiler = await compile(await fs.readFile(`${root}/src/index.css`, 'utf8'), { base: `${root}/src`, onDependency() {} })
   const css = compiler.build([...new Set((source + content).match(/[A-Za-z0-9_@!:/.[\]()%,-]+/g))])
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     for (const width of [1200, 390]) {
       const page = await browser.newPage({ viewport: { width, height: 844 }, locale: 'ko-KR', hasTouch: width < 768, isMobile: width < 768 })
@@ -205,7 +204,7 @@ createRoot(document.getElementById('root')).render(<div className="flex"><button
   } finally { await browser.close() }
 })
 
-test('Mew shared MCP defaults, credential-free import and connection lifecycle work on desktop/mobile', { skip: !domBrowserExecutable(), timeout: 60000 }, async () => {
+test('Mew shared MCP defaults, credential-free import and connection lifecycle work on desktop/mobile', { timeout: 60000 }, async () => {
   const source = `import React from '${root}/node_modules/react/index.js';
 import {createRoot} from '${root}/node_modules/react-dom/client.js';
 import {AgentHarnessButtons} from '${root}/src/components/agent-harness-modal.tsx';
@@ -228,7 +227,7 @@ createRoot(document.getElementById('root')).render(<AgentHarnessButtons cwd="/pr
   const content = (await Promise.all(files.map(file => fs.readFile(path.join(root, file), 'utf8')))).join('\n')
   const compiler = await compile(await fs.readFile(`${root}/src/index.css`, 'utf8'), { base: `${root}/src`, onDependency() {} })
   const css = compiler.build([...new Set((source + content).match(/[A-Za-z0-9_@!:/.[\]()%,-]+/g))])
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     for (const width of [1200, 390]) {
       const page = await browser.newPage({ viewport: { width, height: 844 }, locale: 'ko-KR', hasTouch: width < 768, isMobile: width < 768 })

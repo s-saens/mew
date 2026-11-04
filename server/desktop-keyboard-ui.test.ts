@@ -1,8 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { build } from 'rolldown'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
 const source = `
   import React from '${process.cwd()}/node_modules/react/index.js';
@@ -32,8 +31,8 @@ function keyboardBundle() {
   }).then(result => result.output.find(item => item.type === 'chunk')!.code)
 }
 
-test('app fullscreen locks Escape and restores it after a remote all-key lock', { skip: !domBrowserExecutable() }, async () => {
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+test('app fullscreen locks Escape and restores it after a remote all-key lock', { }, async () => {
+  const browser = await connectTestBrowser()
   try {
     const page = await browser.newPage()
     await page.route('http://localhost/keyboard', route => route.fulfill({ contentType: 'text/html', body: '<div id="stage" tabindex="0">Remote</div>' }))
@@ -59,8 +58,8 @@ test('app fullscreen locks Escape and restores it after a remote all-key lock', 
   } finally { await browser.close() }
 })
 
-test('remote viewport captures shortcuts, locks fullscreen keys and releases on focus/close', { skip: !domBrowserExecutable() }, async () => {
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+test('remote viewport captures shortcuts, locks fullscreen keys and releases on focus/close', { }, async () => {
+  const browser = await connectTestBrowser()
   try {
     const page = await browser.newPage()
     await page.route('http://localhost/keyboard', route => route.fulfill({ contentType: 'text/html', body: '<button id="tool">Tool</button><div id="stage" tabindex="0">Remote</div>' }))
@@ -117,8 +116,8 @@ test('remote viewport captures shortcuts, locks fullscreen keys and releases on 
   } finally { await browser.close() }
 })
 
-test('remote keyboard precedes mounted app shortcuts, restores app lock and forwards repeats and paste fallback', { skip: !domBrowserExecutable(), timeout: 25_000 }, async () => {
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+test('remote keyboard precedes mounted app shortcuts, restores app lock and forwards repeats and paste fallback', { timeout: 25_000 }, async () => {
+  const browser = await connectTestBrowser()
   try {
     const page = await browser.newPage()
     page.setDefaultTimeout(5000)

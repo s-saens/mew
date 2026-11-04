@@ -6,13 +6,12 @@ import path from 'node:path'
 import { createRequire } from 'node:module'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 const require = createRequire(`${root}/package.json`)
 
-test('giant cat roams and can be grabbed or thrown, shows only a timer, and preserves the break lifecycle', { skip: !domBrowserExecutable(), timeout: 60_000 }, async () => {
+test('giant cat roams and can be grabbed or thrown, shows only a timer, and preserves the break lifecycle', { timeout: 60_000 }, async () => {
   // Route an isolated fixture; never build dist or start/restart the user's app.
   const source = `
 import React from '${require.resolve('react')}';
@@ -36,7 +35,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><main style={{p
   const ui = await fs.readFile(`${root}/src/components/mewcat-break.tsx`, 'utf8')
   const css = compiler.build(ui.match(/[A-Za-z0-9_:[\]/.%!#()-]+/g) ?? [])
   const petFiles = await mewpetUiFixture()
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     for (const mobile of [false, true]) for (const light of [false, true]) {
       const page = await browser.newPage({ viewport: { width: mobile ? 390 : 1280, height: mobile ? 844 : 800 }, hasTouch: mobile })

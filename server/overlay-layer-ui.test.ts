@@ -4,12 +4,11 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 
-test('foreground menus and dialogs cover dock resize hit targets', { skip: !domBrowserExecutable(), timeout: 30_000 }, async () => {
+test('foreground menus and dialogs cover dock resize hit targets', { timeout: 30_000 }, async () => {
   const source = `import React,{useState,useRef} from '${root}/node_modules/react/index.js';
 import {createRoot} from '${root}/node_modules/react-dom/client.js';
 import {I18nProvider} from '${root}/src/i18n.tsx';
@@ -26,7 +25,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
   const content = (await Promise.all(['src/components/DockWorkspace.tsx', 'src/components/HeaderMenu.tsx', 'src/components/TermButtonBar.tsx', 'src/components/IconPicker.tsx'].map(file => fs.readFile(path.join(root, file), 'utf8')))).join('\n')
   const compiler = await compile(await fs.readFile(`${root}/src/index.css`, 'utf8'), { base: `${root}/src`, onDependency() {} })
   const css = compiler.build([...new Set((source + content).match(/[A-Za-z0-9_@:/.[\]()%,-]+/g))])
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     const page = await browser.newPage({ viewport: { width: 1280, height: 800 } })
     page.setDefaultTimeout(3000)

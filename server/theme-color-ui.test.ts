@@ -4,13 +4,12 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 type Palette = { background: string; text: string; primary: string; gradient?: { colors: [string, string]; angle: number; animated: boolean } }
 
-test('theme palettes migrate, preview, persist and customize in desktop/mobile settings', { skip: !domBrowserExecutable(), timeout: 90_000 }, async () => {
+test('theme palettes migrate, preview, persist and customize in desktop/mobile settings', { timeout: 90_000 }, async () => {
   const source = `import React,{useState,useEffect} from '${root}/node_modules/react/index.js';
 import {createRoot} from '${root}/node_modules/react-dom/client.js';
 import {SettingsModal} from '${root}/src/components/SettingsModal.tsx';
@@ -43,7 +42,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
   const content = (await Promise.all(['src/components/SettingsModal.tsx', 'src/components/theme-settings.tsx', 'src/components/theme-gradient-angle.tsx', 'packages/ui/src/select-field.tsx', 'packages/ui/src/color-picker.tsx', 'packages/ui/src/ConfirmDialog.tsx', 'packages/ui/src/dialog-frame.tsx'].map(file => fs.readFile(path.join(root, file), 'utf8')))).join('\n')
   const compiler = await compile(await fs.readFile(`${root}/src/index.css`, 'utf8'), { base: `${root}/src`, onDependency() {} })
   const css = compiler.build([...new Set((source + content).match(/[A-Za-z0-9_@!&:/.[\]()%,-]+/g))])
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     const page = await browser.newPage({ viewport: { width: 1100, height: 850 } })
     page.setDefaultTimeout(5000)

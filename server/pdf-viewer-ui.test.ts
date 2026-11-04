@@ -6,14 +6,13 @@ import os from 'node:os'
 import express from 'express'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
 import { PDFDocument, PDFDict, PDFName, degrees } from 'pdf-lib'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 import { registerPdfRoutes } from './pdf.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 
-test('PDF viewer renders under production CSP, virtualizes pages, retains ink and writes portable PDF annotations', { skip: !domBrowserExecutable(), timeout: 60_000 }, async t => {
+test('PDF viewer renders under production CSP, virtualizes pages, retains ink and writes portable PDF annotations', { timeout: 60_000 }, async t => {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'mew-pdf-ui-'))
   const file = path.join(dir, 'fixture.pdf')
   const document = await PDFDocument.create()
@@ -57,7 +56,7 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><Fixture/><
   })
   const server = app.listen(0, '127.0.0.1')
   await new Promise<void>(resolve => server.once('listening', resolve))
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   t.after(async () => { await browser.close(); server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve())); await fs.rm(dir, { recursive: true, force: true }) })
   const origin = `http://127.0.0.1:${(server.address() as { port: number }).port}`
   const page = await browser.newPage({ viewport: { width: 1100, height: 900 } })

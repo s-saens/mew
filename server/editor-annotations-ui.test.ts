@@ -4,8 +4,8 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium, type Locator, type Page } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import type { Locator, Page } from 'playwright-core'
+import { connectTestBrowser } from './test-browser.ts'
 
 const initialContent = '# Annotation fixture\n\n선택할 본문과 커서 위치를 확인합니다.\n\n다음 문단을 유지합니다.\n'
 
@@ -47,7 +47,7 @@ async function assertWithinViewport(dialog: Locator, viewport: { width: number; 
 }
 
 test('Markdown annotations preserve selections, edit in popovers, round-trip through Plain, and respect readonly on desktop and mobile', {
-  skip: !domBrowserExecutable(), timeout: 90_000,
+  timeout: 90_000,
 }, async t => {
   const repo = path.resolve(import.meta.dirname, '..')
   const source = `
@@ -90,7 +90,7 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><I18nProvid
   const css = compiler.build([...new Set(candidates.join('\n').match(/[A-Za-z0-9_@!:/.[\]()%,-]+/g))]) + styles.join('\n')
   const entry = bundle.output.find(item => item.type === 'chunk' && item.isEntry)!
   assert.ok(entry.type === 'chunk')
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   t.after(() => browser.close())
   const screenshotDir = process.env.MEW_EDITOR_SCREENSHOT_DIR
   if (screenshotDir) await fs.mkdir(screenshotDir, { recursive: true })

@@ -4,12 +4,12 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium, type Locator } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import type { Locator } from 'playwright-core'
+import { connectTestBrowser } from './test-browser.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 
-test('sidebar touch separates selection, double-tap opening, stationary menus and immediate drag after arming', { skip: !domBrowserExecutable(), timeout: 30_000 }, async () => {
+test('sidebar touch separates selection, double-tap opening, stationary menus and immediate drag after arming', { timeout: 30_000 }, async () => {
   const source = `import React from '${root}/node_modules/react/index.js';
 import {createRoot} from '${root}/node_modules/react-dom/client.js';
 import {FileTree} from '${root}/src/components/FileTree.tsx';
@@ -26,7 +26,7 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><I18nProvid
   const content = (await Promise.all(['src/components/file-action-menu.tsx', 'src/components/FileTree.tsx', 'src/hooks/use-tree-touch-gesture.ts'].map(file => fs.readFile(path.join(root, file), 'utf8')))).join('\n')
   const compiler = await compile(await fs.readFile(`${root}/src/index.css`, 'utf8'), { base: `${root}/src`, onDependency() {} })
   const css = compiler.build([...new Set((source + content).match(/[A-Za-z0-9_@:/.[\]()%,-]+/g))])
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     const context = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true })
     const page = await context.newPage()

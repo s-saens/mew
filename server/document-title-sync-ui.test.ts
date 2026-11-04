@@ -6,14 +6,13 @@ import os from 'node:os'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 import { DocumentPages } from './document-pages.ts'
 import { changeTaskList, readTaskList } from './task-list.ts'
 import { taskDocumentsNeedMigration } from './task-markdown.ts'
 import { mergeTaskFrontmatter } from '../packages/editor/src/utils/task-frontmatter-merge.ts'
 
-test('document titles stay synchronized after explorer, editor, and task edits across open panes', { skip: !domBrowserExecutable(), timeout: 60_000 }, async t => {
+test('document titles stay synchronized after explorer, editor, and task edits across open panes', { timeout: 60_000 }, async t => {
   const repo = path.resolve(import.meta.dirname, '..')
   const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'mew-title-sync-ui-'))
   const docs = path.join(workspace, '.mew')
@@ -74,7 +73,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
   const cssSources = ['src/components/FileTree.tsx', 'src/components/EditorPane.tsx', 'src/components/TabBar.tsx', 'packages/editor/src/Editor.tsx', 'packages/editor/src/editor/FrontmatterPanel.tsx'].map(file => fs.readFileSync(path.join(repo, file), 'utf8')).join('\n')
   const css = compiler.build([...new Set((source + cssSources).match(/[A-Za-z0-9_@!:/.[\]()%,-]+/g))]) + styles.join('\n')
   const script = bundle.output.find(item => item.type === 'chunk')!.code
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   const page = await browser.newPage({ viewport: { width: 1500, height: 900 } })
   page.setDefaultTimeout(6000)
   const errors: string[] = [], saves: string[] = []

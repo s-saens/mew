@@ -5,13 +5,13 @@ import path from 'node:path'
 import { createRequire } from 'node:module'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium, type Locator } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import type { Locator } from 'playwright-core'
+import { connectTestBrowser } from './test-browser.ts'
 import { installLiveFixture } from './live-ui-fixture.ts'
 
 const root = path.resolve(import.meta.dirname, '..'), require = createRequire(`${root}/package.json`)
 
-test('Git opens only the current project, migrates saved tabs, docks and preserves drafts', { skip: !domBrowserExecutable(), timeout: 90_000 }, async () => {
+test('Git opens only the current project, migrates saved tabs, docks and preserves drafts', { timeout: 90_000 }, async () => {
   const files = ['src/components/git-diff-editor.tsx', 'src/components/git-diff-view.tsx', 'src/components/git-changes-menu.tsx', 'src/components/EditorPane.tsx', 'src/components/TabBar.tsx', 'src/components/git-panel.tsx', 'src/components/GitWorkbench.tsx', 'src/components/git-branch-picker.tsx', 'packages/ui/src/select-field.tsx', 'packages/ui/src/ConfirmDialog.tsx', 'packages/ui/src/dialog-frame.tsx', 'src/components/github-account.tsx', 'src/components/DockWorkspace.tsx']
   const content = (await Promise.all(files.map((file) => fs.readFile(`${root}/${file}`, 'utf8')))).join('\n')
   const source = `
@@ -75,7 +75,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
   assert.ok(chunk && chunk.type === 'chunk')
   const compiler = await compile(await fs.readFile(`${root}/src/index.css`, 'utf8'), { base: `${root}/src`, onDependency() {} })
   const css = compiler.build([...new Set((source + content).match(/[A-Za-z0-9_@:/.[\]()%,-]+/g))])
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
     page.setDefaultTimeout(6000)

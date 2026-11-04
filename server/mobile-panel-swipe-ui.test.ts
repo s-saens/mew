@@ -4,12 +4,11 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 
-test('mobile swipes separate dock panels, body tabs and source-editor key bars', { skip: !domBrowserExecutable(), timeout: 45_000 }, async () => {
+test('mobile swipes separate dock panels, body tabs and source-editor key bars', { timeout: 45_000 }, async () => {
   const source = `import React from 'react';
 import {createRoot} from 'react-dom/client';
 import {EditorView} from '@codemirror/view';
@@ -63,7 +62,7 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><I18nProvid
   const content = (await Promise.all(files.map(file => fs.readFile(path.join(root, file), 'utf8')))).join('\n')
   const compiler = await compile(await fs.readFile(`${root}/src/index.css`, 'utf8'), { base: `${root}/src`, onDependency() {} })
   const css = compiler.build([...new Set((source + content).match(/[A-Za-z0-9_@!:/.[\]()%,-]+/g))])
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     const page = await browser.newPage({ viewport: { width: 390, height: 844 }, hasTouch: true })
     page.setDefaultTimeout(3000)

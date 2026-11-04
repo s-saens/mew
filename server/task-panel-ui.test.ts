@@ -6,8 +6,8 @@ import path from 'node:path'
 import express from 'express'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium, type Locator } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import type { Locator } from 'playwright-core'
+import { connectTestBrowser } from './test-browser.ts'
 
 function tagContrast(color: string, background: string): number {
   const luminance = (value: string) => value.match(/[\d.]+/g)!.slice(0, 3).map(Number).map(number => {
@@ -30,7 +30,7 @@ async function assertInlineTagAlignment(row: Locator): Promise<void> {
   assert.ok(metrics.every(tag => tag.height <= tag.lineHeight), 'tag backgrounds stay within the text line height')
 }
 
-test('task panel supports continuous typing, independent objects, autosave, retry, docking and mobile', { skip: !domBrowserExecutable(), timeout: 60_000 }, async () => {
+test('task panel supports continuous typing, independent objects, autosave, retry, docking and mobile', { timeout: 60_000 }, async () => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'mew-task-ui-'))
   process.env.MEW_DATA_DIR = path.join(directory, 'data')
   process.env.MEW_WORKSPACE = path.join(directory, 'workspace')
@@ -78,7 +78,7 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><I18nProvid
   await new Promise<void>(resolve => server.once('listening', resolve))
   const address = server.address(); assert.ok(address && typeof address !== 'string')
   const base = `http://127.0.0.1:${address.port}`
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     const one = await browser.newPage({ viewport: { width: 1100, height: 800 } })
     const two = await browser.newPage({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true })

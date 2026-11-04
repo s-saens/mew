@@ -1,8 +1,8 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { build } from 'rolldown'
-import { chromium, type Page } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import type { Page } from 'playwright-core'
+import { connectTestBrowser } from './test-browser.ts'
 
 async function hookFixture() {
   const source = `
@@ -75,9 +75,9 @@ async function installRoutes(page: Page, code: string, hold: (url: URL) => Promi
   return writes
 }
 
-test('verified split-pane edits are accepted while callbacks from its unverified peer are ignored', { skip: !domBrowserExecutable(), timeout: 30_000 }, async () => {
+test('verified split-pane edits are accepted while callbacks from its unverified peer are ignored', { timeout: 30_000 }, async () => {
   const code = await hookFixture()
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   let release = () => {}
   const gate = new Promise<void>(resolve => { release = resolve })
   try {
@@ -119,9 +119,9 @@ test('verified split-pane edits are accepted while callbacks from its unverified
   } finally { release(); await browser.close() }
 })
 
-test('failed local tab metadata persistence retries on a body update without repeating account notifications', { skip: !domBrowserExecutable(), timeout: 30_000 }, async () => {
+test('failed local tab metadata persistence retries on a body update without repeating account notifications', { timeout: 30_000 }, async () => {
   const code = await hookFixture()
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   let release = () => {}
   const gate = new Promise<void>(resolve => { release = resolve })
   try {

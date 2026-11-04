@@ -5,10 +5,9 @@ import path from 'node:path'
 import express from 'express'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
-test('task sorting supports ordered rules, directions, removal, keyboard, touch and read-only without saving task order', { skip: !domBrowserExecutable(), timeout: 45_000 }, async () => {
+test('task sorting supports ordered rules, directions, removal, keyboard, touch and read-only without saving task order', { timeout: 45_000 }, async () => {
   const root = path.resolve(import.meta.dirname, '..')
   const source = `import React,{useState} from 'react';import {createRoot} from 'react-dom/client';
 import {TaskPanel} from '${root}/src/components/task-panel.tsx';import {I18nProvider} from '${root}/src/i18n.tsx';
@@ -29,7 +28,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
   app.get('/', (_req, res) => res.type('html').send(`<!doctype html><html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}</style><div id="root"></div><script src="/app.js"></script></html>`))
   const server = app.listen(0, '127.0.0.1'); await new Promise<void>(resolve => server.once('listening', resolve))
   const address = server.address(); assert.ok(address && typeof address !== 'string')
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     const errors: string[] = []
     for (const mobile of [false, true]) {

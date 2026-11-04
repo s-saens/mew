@@ -4,12 +4,11 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 
-test('file tab reveals preserve manual navigation across tree refreshes and lazy mounting', { skip: !domBrowserExecutable(), timeout: 30_000 }, async () => {
+test('file tab reveals preserve manual navigation across tree refreshes and lazy mounting', { timeout: 30_000 }, async () => {
   const source = `import React from '${root}/node_modules/react/index.js';
 import {createRoot} from '${root}/node_modules/react-dom/client.js';
 import {FileTree} from '${root}/src/components/FileTree.tsx';
@@ -47,7 +46,7 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><I18nProvid
   const content = (await Promise.all(['src/components/FileTree.tsx', 'src/components/TabBar.tsx'].map(file => fs.readFile(path.join(root, file), 'utf8')))).join('\n')
   const compiler = await compile(await fs.readFile(`${root}/src/index.css`, 'utf8'), { base: `${root}/src`, onDependency() {} })
   const css = compiler.build([...new Set((source + content).match(/[A-Za-z0-9_@:/.[\]()%,-]+/g))])
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     const page = await browser.newPage({ viewport: { width: 1100, height: 700 } })
     page.setDefaultTimeout(3000)

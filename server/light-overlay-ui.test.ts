@@ -4,8 +4,8 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium, type Page } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import type { Page } from 'playwright-core'
+import { connectTestBrowser } from './test-browser.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 type Point = { x: number; y: number }
@@ -26,7 +26,7 @@ async function pixels(page: Page, points: Point[]) {
 
 const distance = (a: number[], b: number[]) => a.reduce((sum, value, index) => sum + Math.abs(value - b[index]), 0)
 
-test('light modal scrims darken only outside translucent panels on desktop/mobile', { skip: !domBrowserExecutable(), timeout: 60_000 }, async () => {
+test('light modal scrims darken only outside translucent panels on desktop/mobile', { timeout: 60_000 }, async () => {
   const source = `import React,{useState} from '${root}/node_modules/react/index.js';
 import {createRoot} from '${root}/node_modules/react-dom/client.js';
 import {DialogFrame} from '${root}/packages/ui/src/dialog-frame.tsx';
@@ -55,7 +55,7 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
   const content = (await Promise.all(['packages/ui/src/dialog-frame.tsx', 'packages/ui/src/select-field.tsx'].map(file => fs.readFile(path.join(root, file), 'utf8')))).join('\n')
   const compiler = await compile(await fs.readFile(`${root}/src/index.css`, 'utf8'), { base: `${root}/src`, onDependency() {} })
   const css = compiler.build([...new Set((source + content).match(/[A-Za-z0-9_@!&:/.[\]()%,-]+/g))])
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     for (const width of [1100, 390]) for (const theme of ['light', 'paper', 'rose', 'ocean']) for (const modal of ['frame', 'legacy', 'nested']) {
       const page = await browser.newPage({ viewport: { width, height: 844 }, reducedMotion: 'reduce' })

@@ -4,14 +4,13 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 import { mewpetUiFixture } from './mewpet-ui-fixture.ts'
 import { MEWCAT_SPRITE_ACTIONS, MEWCAT_CYCLE_MS } from '../src/utils/mewcat-sprites.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 
-test('Mewpet previews and walking artwork animate; falling poses loop within a narrow tilt in both motion preferences', { skip: !domBrowserExecutable(), timeout: 90_000 }, async () => {
+test('Mewpet previews and walking artwork animate; falling poses loop within a narrow tilt in both motion preferences', { timeout: 90_000 }, async () => {
   const source = `
 import React,{useState} from '${root}/node_modules/react/index.js';
 import {createRoot} from '${root}/node_modules/react-dom/client.js';
@@ -40,7 +39,7 @@ start();`
   const chunk = bundle.output.find(item => item.type === 'chunk')!
   const compiler = await compile(await fs.readFile(`${root}/src/index.css`, 'utf8'), { base: `${root}/src`, onDependency() {} })
   const petFiles = await mewpetUiFixture()
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     for (const mobile of [false, true]) for (const reducedMotion of ['no-preference', 'reduce'] as const) {
       const page = await browser.newPage({ viewport: { width: mobile ? 390 : 1000, height: 1400 }, hasTouch: mobile, reducedMotion })

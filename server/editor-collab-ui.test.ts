@@ -4,12 +4,11 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
 const content = '---\ntitle: "문서 테스트"\n---\n\n# File content\n\nSelected file body\n\n[문서](guides/editor.md)\n\n| A | B |\n| --- | --- |\n| 1 | 2 |'
 
-test('Markdown failures stay inside the document and recover through Plain or another file', { skip: !domBrowserExecutable(), timeout: 45_000 }, async () => {
+test('Markdown failures stay inside the document and recover through Plain or another file', { timeout: 45_000 }, async () => {
   const source = `
 import React from ${JSON.stringify(import.meta.resolve('react'))};
 import {createRoot} from ${JSON.stringify(import.meta.resolve('react-dom/client'))};
@@ -64,7 +63,7 @@ ${anchor}`)
   const ui = (await Promise.all(['src/components/EditorPane.tsx', 'src/components/markdown-error-boundary.tsx', 'src/components/DockWorkspace.tsx', 'src/components/TabBar.tsx'].map(file => fs.readFile(path.join(root, file), 'utf8')))).join('\n')
   const compiler = await compile(await fs.readFile(path.join(root, 'src/index.css'), 'utf8'), { base: path.join(root, 'src'), onDependency() {} })
   const css = compiler.build([...new Set((source + ui).match(/[A-Za-z0-9_@!:/.[\]()%,-]+/g))])
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) {
       const page = await browser.newPage({ viewport })

@@ -4,12 +4,11 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 
-test('task editor action stays last, uses the current document, and handles pending requests and failures', { skip: !domBrowserExecutable(), timeout: 90_000 }, async t => {
+test('task editor action stays last, uses the current document, and handles pending requests and failures', { timeout: 90_000 }, async t => {
   const source = `
     import React from 'react';
     import {createRoot} from 'react-dom/client';
@@ -58,7 +57,7 @@ test('task editor action stays last, uses the current document, and handles pend
   const scripts = new Map(chunks.map(item => [`/${item.fileName}`, item.code]))
   const compiler = await compile(fs.readFileSync(`${root}/src/index.css`, 'utf8'), { base: `${root}/src`, onDependency() {} })
   const css = compiler.build([...new Set(candidates.join('\n').match(/[A-Za-z0-9_@!:/.[\]()%,-]+/g))]) + styles.join('\n')
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   t.after(() => browser.close())
   for (const [locale, label, width] of [['ko', '태스크 실행', 1100], ['ko', '태스크 실행', 390], ['en', 'Run task', 1100], ['ja', 'タスクを実行', 1100], ['zh-CN', '执行任务', 1100]] as const) {
     const page = await browser.newPage({ viewport: { width, height: 800 }, hasTouch: width < 768 })

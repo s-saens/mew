@@ -4,12 +4,12 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium, type Route } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import type { Route } from 'playwright-core'
+import { connectTestBrowser } from './test-browser.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 
-test('subprojects can be created and opened in the project switcher on desktop and mobile', { skip: !domBrowserExecutable(), timeout: 30_000 }, async () => {
+test('subprojects can be created and opened in the project switcher on desktop and mobile', { timeout: 30_000 }, async () => {
   const source = `import React,{useState} from '${root}/node_modules/react/index.js';
 import {createRoot} from '${root}/node_modules/react-dom/client.js';
 import {FileTree} from '${root}/src/components/FileTree.tsx';
@@ -34,7 +34,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
   const content = (await Promise.all(['src/components/ProjectIcon.tsx', 'src/components/file-action-menu.tsx', 'src/hooks/use-external-file-actions.tsx', 'src/components/FileTree.tsx', 'src/components/subproject-link.tsx', 'src/components/ProjectSwitcher.tsx', 'src/hooks/use-tree-touch-gesture.ts'].map(file => fs.readFile(path.join(root, file), 'utf8')))).join('\n')
   const compiler = await compile(await fs.readFile(`${root}/src/index.css`, 'utf8'), { base: `${root}/src`, onDependency() {} })
   const css = compiler.build([...new Set((source + content).match(/[A-Za-z0-9_@:/.[\]()%,-]+/g))])
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     const context = await browser.newContext({ viewport: { width: 1100, height: 800 }, hasTouch: true })
     const page = await context.newPage()

@@ -6,11 +6,10 @@ import path from 'node:path'
 import express from 'express'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
 // Isolated browser fixture; never starts or builds the running application.
-test('task assignees support avatars, keyboard, drafts, persistence, mobile and read-only', { skip: !domBrowserExecutable(), timeout: 45_000 }, async () => {
+test('task assignees support avatars, keyboard, drafts, persistence, mobile and read-only', { timeout: 45_000 }, async () => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'mew-assignee-ui-'))
   process.env.MEW_DATA_DIR = directory
   process.env.MEW_WORKSPACE = path.join(directory, 'workspace')
@@ -41,7 +40,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
   app.get('/', (_req, res) => res.type('html').send(`<!doctype html><html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}</style><div id="root"></div><script src="/app.js"></script></html>`))
   const server = app.listen(0, '127.0.0.1'); await new Promise<void>(resolve => server.once('listening', resolve))
   const address = server.address(); assert.ok(address && typeof address !== 'string')
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     const page = await browser.newPage({ viewport: { width: 900, height: 640 } }); page.setDefaultTimeout(5000)
     const errors: string[] = []; page.on('pageerror', error => errors.push(error.message))

@@ -1,10 +1,9 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { build } from 'rolldown'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
-test('Undo preserves loaded files and external refreshes while reverting local edits', { skip: !domBrowserExecutable(), timeout: 60_000 }, async t => {
+test('Undo preserves loaded files and external refreshes while reverting local edits', { timeout: 60_000 }, async t => {
   const content = '# Saved document\n\nKeep this body.'
   const refreshed = '# Refreshed document\n\nKeep the external changes.'
   const source = `
@@ -42,7 +41,7 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
   })
   const chunk = bundle.output.find(item => item.type === 'chunk' && item.isEntry)!
   assert.ok(chunk.type === 'chunk')
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     for (const mode of ['Plain', 'Code', 'Hotview']) for (const collaborative of [false, true]) {
       const hotview = mode === 'Hotview'

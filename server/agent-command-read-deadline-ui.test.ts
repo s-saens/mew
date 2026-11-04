@@ -2,10 +2,9 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import path from 'node:path'
 import { build } from 'rolldown'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
-test('command status reads bound fetch and JSON time, cancel obsolete requests and pause during transport suspension', { skip: !domBrowserExecutable(), timeout: 15_000 }, async t => {
+test('command status reads bound fetch and JSON time, cancel obsolete requests and pause during transport suspension', { timeout: 15_000 }, async t => {
   const root = path.resolve(import.meta.dirname, '..')
   const source = `
 import {listAgentCommands} from '${root}/src/api/agent-commands.ts';
@@ -23,7 +22,7 @@ window.read=()=>{window.controller=new AbortController();window.result=null;wind
     },
   }] })
   const code = bundle.output.find(item => item.type === 'chunk')!.code
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   t.after(() => browser.close())
   const page = await browser.newPage(), errors: string[] = []
   page.on('pageerror', error => errors.push(error.message))

@@ -1,14 +1,13 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { build } from 'rolldown'
-import { chromium } from 'playwright-core'
 import * as Y from 'yjs'
 import * as encoding from 'lib0/encoding'
 import * as decoding from 'lib0/decoding'
 import { readSyncMessage } from 'y-protocols/sync'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
-test('Markdown stays visible while collaboration catches up with file loading', { skip: !domBrowserExecutable(), timeout: 60_000 }, async t => {
+test('Markdown stays visible while collaboration catches up with file loading', { timeout: 60_000 }, async t => {
   const bodies: Record<string, string> = {
     'slow.md': 'Slow file body remains visible\n',
     'fast.md': 'Fast file body remains visible\n',
@@ -47,7 +46,7 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><I18nProvid
     } }],
   })
   const chunk = bundle.output.find(item => item.type === 'chunk')!
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) {
       await t.test(`${viewport.width}px viewport`, async () => {

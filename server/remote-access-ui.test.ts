@@ -6,11 +6,10 @@ import path from 'node:path'
 import fs from 'node:fs/promises'
 import { compile } from '@tailwindcss/node'
 import { build } from 'rolldown'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 import type { RemoteNetworkStatus } from '../shared/remote-access.ts'
-const root = path.resolve(import.meta.dirname, '..'), chrome = domBrowserExecutable()
-test('remote registration settings support desktop/mobile and local account access without central member mapping', { skip: !chrome, timeout: 30_000 }, async t => {
+const root = path.resolve(import.meta.dirname, '..')
+test('remote registration settings support desktop/mobile and local account access without central member mapping', { timeout: 30_000 }, async t => {
   const source = `import React from '${root}/node_modules/react/index.js';import{createRoot}from '${root}/node_modules/react-dom/client.js';import{setUiLocale}from '${root}/packages/ui/src/i18n-core.ts';setUiLocale('ko');import{RemoteAccessSettings}from '${root}/src/components/remote-access-settings.tsx';import{DialogFrame}from '${root}/packages/ui/src/dialog-frame.tsx';const app=createRoot(document.getElementById('root'));app.render(<DialogFrame labelledBy="fixture-title" onClose={()=>app.unmount()}><header className="border-b border-edge px-3 py-2"><h2 id="fixture-title" className="text-sm font-semibold">Mewlink</h2></header><div className="p-3"><RemoteAccessSettings/></div></DialogFrame>);`
   const bundle = await build({ input: 'virtual:remote-ui.tsx', write: false, platform: 'browser', output: { format: 'iife' }, transform: { jsx: 'react-jsx', define: { 'process.env.NODE_ENV': JSON.stringify('test') } }, plugins: [{ name: 'fixture', resolveId(id) { if (id === 'virtual:remote-ui.tsx') return id; if (id.endsWith('.css')) return 'virtual:style' }, load(id) { if (id === 'virtual:remote-ui.tsx') return source; if (id === 'virtual:style') return '' } }] })
   const code = bundle.output.filter(item => item.type === 'chunk').map(item => item.code).join('\n')
@@ -32,7 +31,7 @@ test('remote registration settings support desktop/mobile and local account acce
     res.setHeader('Content-Type', 'text/html'); res.end(`<meta charset="utf-8"><meta name="viewport" content="width=device-width"><style>${css}body{margin:0}#root{padding:12px;max-width:650px}</style><div id="root"></div><script>localStorage.setItem("mew:locale","ko")</script><script>${code}</script>`)
   })
   server.listen(0, '127.0.0.1'); await once(server, 'listening')
-  const browser = await chromium.launch({ executablePath: chrome, chromiumSandbox: true }); t.after(async () => { await browser.close(); await new Promise<void>(resolve => server.close(() => resolve())) })
+  const browser = await connectTestBrowser(); t.after(async () => { await browser.close(); await new Promise<void>(resolve => server.close(() => resolve())) })
   const page = await browser.newPage({ viewport: { width: 900, height: 700 }, permissions: ['clipboard-read', 'clipboard-write'] }); page.setDefaultTimeout(5000); await page.goto(`http://127.0.0.1:${(server.address() as { port: number }).port}`)
   await page.getByRole('dialog', { name: 'Mewlink', exact: true }).waitFor()
   await page.getByRole('button', { name: '기기 등록', exact: true }).click(); await page.getByRole('link', { name: '로그인하고 등록 완료' }).waitFor(); assert.equal(registered, true)

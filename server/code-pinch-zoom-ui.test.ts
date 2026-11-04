@@ -4,10 +4,9 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
-test('code, text and Markdown Plain pinch independently while preserving editing and scrolling', { skip: !domBrowserExecutable(), timeout: 60_000 }, async () => {
+test('code, text and Markdown Plain pinch independently while preserving editing and scrolling', { timeout: 60_000 }, async () => {
   const root = path.resolve(import.meta.dirname, '..')
   const content = Array.from({ length: 120 }, (_, i) => `const line${i + 1} = "${'Long code line for horizontal scrolling. '.repeat(5)}";`).join('\n')
   const source = `
@@ -41,7 +40,7 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
   assert.ok(chunk.type === 'chunk')
   const compiler = await compile(await fs.readFile(path.join(root, 'src/index.css'), 'utf8'), { base: path.join(root, 'src'), onDependency() {} })
   const css = compiler.build([...new Set(candidates.join('\n').match(/[A-Za-z0-9_@!:/.[\]()%,-]+/g))]) + styles.join('\n')
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     for (const mobile of [true, false]) {
       const page = await browser.newPage({ viewport: { width: mobile ? 390 : 1100, height: 800 }, hasTouch: mobile, isMobile: mobile })

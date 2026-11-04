@@ -6,10 +6,9 @@ import path from 'node:path'
 import { createRequire } from 'node:module'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
 import { mewcatNotificationCopy } from '../src/components/mewcat-notification-copy.ts'
 import { LOCALES } from '../src/i18n-locales.ts'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 const require = createRequire(`${root}/package.json`)
@@ -19,7 +18,7 @@ type MewcatFixture = {
   clearNotices: () => void
 }
 
-test('Mewcat notices and header resources fit themes, open targets and stop polling when permission is revoked', { skip: !domBrowserExecutable(), timeout: 60_000 }, async () => {
+test('Mewcat notices and header resources fit themes, open targets and stop polling when permission is revoked', { timeout: 60_000 }, async () => {
   // In-memory fixture only: no app build, server, authenticated workspace or dist changes.
   const source = `
 // This fixture covers cat behavior in a fullscreen-unavailable client.
@@ -53,7 +52,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
   const toastSource = await fs.readFile(`${root}/packages/ui/src/Toast.tsx`, 'utf8')
   const css = compiler.build((uiSource + toastSource).match(/[A-Za-z0-9_:[\]/.%!#()-]+/g) ?? [])
   const petFiles = await mewpetUiFixture()
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     for (const mobile of [false, true]) for (const light of [false, true]) {
       const width = mobile ? 390 : 1280

@@ -5,12 +5,11 @@ import path from 'node:path'
 import http from 'node:http'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 
-test('chat history UI supports owner confirmation, cancellation, errors and mobile; other roles have no delete button', { skip: !domBrowserExecutable(), timeout: 45_000 }, async () => {
+test('chat history UI supports owner confirmation, cancellation, errors and mobile; other roles have no delete button', { timeout: 45_000 }, async () => {
   const source = `import React from '${root}/node_modules/react/index.js';
 import {createRoot} from '${root}/node_modules/react-dom/client.js';
 import {ChatPanel} from '${root}/src/components/ChatPanel.tsx';
@@ -28,7 +27,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><div style={{he
     response.end(`<!doctype html><html lang="ko"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}</style><div id="root"></div><script src="/app.js"></script></html>`)
   })
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     const page = await browser.newPage()
     page.setDefaultTimeout(5000)

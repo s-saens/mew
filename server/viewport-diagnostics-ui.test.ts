@@ -2,16 +2,15 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'node:fs/promises'
 import { build } from 'rolldown'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
-test('opt-in viewport diagnostics preserve keyboard focus and export geometry without workspace contents', { skip: !domBrowserExecutable(), timeout: 20_000 }, async () => {
+test('opt-in viewport diagnostics preserve keyboard focus and export geometry without workspace contents', { timeout: 20_000 }, async () => {
   const entry = `import {installViewportDiagnostics} from '${new URL('../src/utils/viewport-diagnostics.ts', import.meta.url).pathname}';window.stopDiagnostics=installViewportDiagnostics();`
   const bundle = await build({ input: 'virtual:viewport-diagnostics', write: false, platform: 'browser', output: { format: 'iife' },
     plugins: [{ name: 'viewport-diagnostics', resolveId(id) { if (id === 'virtual:viewport-diagnostics') return id }, load(id) { if (id === 'virtual:viewport-diagnostics') return entry } }],
   })
   const chunk = bundle.output.find(item => item.type === 'chunk')!
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     for (const width of [390, 1100]) {
       const page = await browser.newPage({ viewport: { width, height: 844 }, hasTouch: width === 390 })

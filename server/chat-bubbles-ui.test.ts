@@ -4,14 +4,13 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 const owner = 'owner@example.com'
 const peer = 'peer@example.com'
 
-test('member chat bubbles follow authorship, fit mobile themes, and retain conversation actions', { skip: !domBrowserExecutable(), timeout: 60_000 }, async () => {
+test('member chat bubbles follow authorship, fit mobile themes, and retain conversation actions', { timeout: 60_000 }, async () => {
   const source = `import React from '${root}/node_modules/react/index.js';
 import {createRoot} from '${root}/node_modules/react-dom/client.js';
 import {ChatPanel} from '${root}/src/components/ChatPanel.tsx';
@@ -36,7 +35,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><div style={{he
   ]
   const messages = [...initial]
   const sent: Array<{ text: string; to?: string[] }> = []
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     const page = await browser.newPage()
     page.setDefaultTimeout(5_000)

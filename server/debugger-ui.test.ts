@@ -4,12 +4,11 @@ import http from 'node:http'
 import fs from 'node:fs/promises'
 import { compile } from '@tailwindcss/node'
 import { build } from 'rolldown'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 import { defaultDebugConfig, type DebugSnapshot } from '../shared/debugger.ts'
 import { attachLiveWebSocket } from './live-socket.ts'
 
-test('debugger settings and panel work on desktop and narrow mobile with changed variables and pins', { skip: !domBrowserExecutable(), timeout: 60000 }, async t => {
+test('debugger settings and panel work on desktop and narrow mobile with changed variables and pins', { timeout: 60000 }, async t => {
   const bundle = await build({ input: 'virtual:debugger.tsx', output: { format: 'esm', codeSplitting: false }, platform: 'browser', write: false, transform: { define: { 'process.env.NODE_ENV': JSON.stringify('test') }, jsx: 'react-jsx' }, plugins: [{ name: 'debugger-fixture', resolveId(id) { if (id === 'virtual:debugger.tsx') return id; if (id.endsWith('.css')) return 'virtual:style' }, load(id) {
     if (id === 'virtual:style') return ''
     if (id !== 'virtual:debugger.tsx') return
@@ -63,7 +62,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     return resource.kind === 'debugger-browser' ? { tabs: [], session: null } : { config, session: snapshot, adapter: { installed: false, version: '1.140.0' } }
   } }))
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   t.after(async () => { await browser.close(); server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve())) })
   const address = server.address(); assert.ok(address && typeof address !== 'string')
   for (const viewport of [{ width: 1366, height: 768 }, { width: 768, height: 900 }, { width: 320, height: 640 }]) {

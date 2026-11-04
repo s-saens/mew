@@ -4,8 +4,8 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium, type Locator, type Page } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import type { Locator, Page } from 'playwright-core'
+import { connectTestBrowser } from './test-browser.ts'
 import { MEWCAT_ALL_SPRITE_ACTIONS, MEWCAT_TRANSITION_ACTIONS, MEWCAT_CYCLE_MS } from '../src/utils/mewcat-sprites.ts'
 import { parseMewpetMotion, type MewpetMotion } from '../shared/mewpet-motion.ts'
 
@@ -49,7 +49,7 @@ async function grabPoint(cat: Locator) {
   })
 }
 
-test('optional skin transitions play once; the bundled capybara and reduced motion remain usable without transitions', { skip: !domBrowserExecutable(), timeout: 120_000 }, async () => {
+test('optional skin transitions play once; the bundled capybara and reduced motion remain usable without transitions', { timeout: 120_000 }, async () => {
   const source = `
 import React from '${root}/node_modules/react/index.js';
 import {createRoot} from '${root}/node_modules/react-dom/client.js';
@@ -97,7 +97,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Mewcat skin={n
     assert.equal(skin.sprites[action]?.height, 128)
     assert.equal(skin.sprites[action]?.frames, 2)
   }
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     for (const mobile of [false, true]) for (const skin of catalog.skins) {
       const page = await browser.newPage({ viewport: { width: mobile ? 390 : 1000, height: 700 }, hasTouch: mobile, isMobile: mobile })

@@ -4,10 +4,9 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
-test('code search supports compact responsive controls, keyboard navigation and safe replacement', { skip: !domBrowserExecutable(), timeout: 60_000 }, async () => {
+test('code search supports compact responsive controls, keyboard navigation and safe replacement', { timeout: 60_000 }, async () => {
   const root = path.resolve(import.meta.dirname, '..')
   const workspaceExports = new Map<string, string>()
   for (const name of ['editor', 'ui', 'mobile-keys', 'shortcuts', 'tmux-term']) {
@@ -50,7 +49,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
   assert.ok(chunk.type === 'chunk')
   const compiler = await compile(await fs.readFile(path.join(root, 'src/index.css'), 'utf8'), { base: path.join(root, 'src'), onDependency() {} })
   const css = compiler.build([...new Set(candidates.join('\n').match(/[A-Za-z0-9_@!&:/.[\]()%,-]+/g))]) + styles.join('\n')
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     if (process.env.MEW_UI_SCREENSHOTS) await fs.mkdir(process.env.MEW_UI_SCREENSHOTS, { recursive: true })
     for (const { width, theme, locale, find } of [

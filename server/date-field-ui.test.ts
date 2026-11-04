@@ -5,10 +5,9 @@ import path from 'node:path'
 import express from 'express'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
-test('custom calendar supports text, keyboard, themes, touch, viewport bounds and layered dismissal', { skip: !domBrowserExecutable(), timeout: 60_000 }, async () => {
+test('custom calendar supports text, keyboard, themes, touch, viewport bounds and layered dismissal', { timeout: 60_000 }, async () => {
   const root = path.resolve(import.meta.dirname, '..')
   const source = `import React,{useState} from 'react';import {createRoot} from 'react-dom/client';
 import {DateField,useOverlayDismiss} from '@mew/ui';import {setUiLocale,uiText} from '@mew/ui/i18n-core';setUiLocale('ko');
@@ -32,7 +31,7 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><Fixture/><
   await new Promise<void>(resolve => server.once('listening', resolve))
   const address = server.address(); assert.ok(address && typeof address !== 'string')
   const base = `http://127.0.0.1:${address.port}`
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   await fs.mkdir('/tmp/mew-date-field', { recursive: true })
   try {
     const desktop = await browser.newPage({ viewport: { width: 1100, height: 800 } })

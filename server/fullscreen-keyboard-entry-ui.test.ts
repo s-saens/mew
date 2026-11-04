@@ -1,8 +1,8 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { build } from 'rolldown'
-import { chromium, type Page } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import type { Page } from 'playwright-core'
+import { connectTestBrowser } from './test-browser.ts'
 
 // Headless has no Android keyboard compositor. This fixture verifies native API
 // ordering and viewport recovery; it does not reproduce the OS's black stripe.
@@ -45,7 +45,7 @@ button.addEventListener('click',()=>{
 window.fixtureReady=true;
 `
 
-test('fullscreen keyboard policy is prepared before native entry and survives pending viewport changes', { skip: !domBrowserExecutable(), timeout: 40_000 }, async t => {
+test('fullscreen keyboard policy is prepared before native entry and survives pending viewport changes', { timeout: 40_000 }, async t => {
   const bundle = await build({
     input: 'virtual:fullscreen-keyboard-entry', write: false, platform: 'browser', output: { format: 'iife' },
     plugins: [{ name: 'fullscreen-keyboard-entry-fixture',
@@ -54,7 +54,7 @@ test('fullscreen keyboard policy is prepared before native entry and survives pe
     }],
   })
   const chunk = bundle.output.find(item => item.type === 'chunk')!
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   const createPage = async ({ width = 390, touch = true, query = '', frame = false } = {}) => {
     const page = await browser.newPage({ viewport: { width, height: 844 }, hasTouch: touch })
     page.setDefaultTimeout(3000)

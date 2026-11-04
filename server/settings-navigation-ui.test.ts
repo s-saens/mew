@@ -4,12 +4,11 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 
-test('settings Back returns mobile details to categories before dismissing the modal', { skip: !domBrowserExecutable(), timeout: 60_000 }, async () => {
+test('settings Back returns mobile details to categories before dismissing the modal', { timeout: 60_000 }, async () => {
   const source = `import React,{useState} from '${root}/node_modules/react/index.js';
 import {createRoot} from '${root}/node_modules/react-dom/client.js';
 import {I18nProvider} from '${root}/src/i18n.tsx';
@@ -62,7 +61,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     'src/components/dock-settings-panel.tsx', 'packages/ui/src/select-field.tsx',
   ].map(file => fs.readFile(`${root}/${file}`, 'utf8')))).join('\n')
   const css = compiler.build([...new Set((source + content).match(/[A-Za-z0-9_@!&:/.[\]()%,-]+/g))])
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     for (const theme of ['dark', 'light']) {
       const page = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true })

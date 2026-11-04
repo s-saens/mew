@@ -6,13 +6,12 @@ import os from 'node:os'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 import { DocumentPages } from './document-pages.ts'
 
 const repo = path.resolve(import.meta.dirname, '..')
 
-test('Documents pages select before opening, support explicit modifier tabs, and preserve edits across promotion', { skip: !domBrowserExecutable(), timeout: 40_000 }, async t => {
+test('Documents pages select before opening, support explicit modifier tabs, and preserve edits across promotion', { timeout: 40_000 }, async t => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mew-pages-ui-'))
   t.after(() => fs.rmSync(root, { recursive: true, force: true }))
   const write = (rel: string, body: string) => { fs.mkdirSync(path.dirname(path.join(root, rel)), { recursive: true }); fs.writeFileSync(path.join(root, rel), body) }
@@ -58,7 +57,7 @@ test('Documents pages select before opening, support explicit modifier tabs, and
   const compiler = await compile(fs.readFileSync(`${repo}/src/index.css`, 'utf8'), { base: `${repo}/src`, onDependency() {} })
   const content = ['src/components/FileTree.tsx', 'src/components/tree-scroll-center.ts', 'packages/ui/src/HoverTipLayer.tsx', 'packages/ui/src/dialog-frame.tsx', 'packages/ui/src/ConfirmDialog.tsx'].filter(file => fs.existsSync(`${repo}/${file}`)).map(file => fs.readFileSync(`${repo}/${file}`, 'utf8')).join('\n')
   const css = compiler.build([...new Set((source + content).match(/[A-Za-z0-9_@:/.[\]()%,-]+/g))])
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   t.after(() => browser.close())
   const page = await browser.newPage({ viewport: { width: 1100, height: 700 } })
   page.setDefaultTimeout(3000)

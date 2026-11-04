@@ -4,13 +4,12 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 const label = '그라데이션 방향'
 
-test('gradient angle dial supports cardinal dragging, numeric drafts and keyboard adjustment on desktop and touch', { skip: !domBrowserExecutable(), timeout: 60_000 }, async t => {
+test('gradient angle dial supports cardinal dragging, numeric drafts and keyboard adjustment on desktop and touch', { timeout: 60_000 }, async t => {
   const source = `import React,{useState} from '${root}/node_modules/react/index.js';
 import {createRoot} from '${root}/node_modules/react-dom/client.js';
 import {ThemeGradientAngle} from '${root}/src/components/theme-gradient-angle.tsx';
@@ -35,7 +34,7 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><Fixture/><
   const sources = await Promise.all(['src/components/theme-gradient-angle.tsx', 'packages/ui/src/color-picker.tsx'].map(file => fs.readFile(path.join(root, file), 'utf8')))
   const compiler = await compile(await fs.readFile(path.join(root, 'src/index.css'), 'utf8'), { base: path.join(root, 'src'), onDependency() {} })
   const css = compiler.build([...new Set((source + sources.join('\n')).match(/[A-Za-z0-9_@!&:/.[\]()%,-]+/g))])
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   t.after(() => browser.close())
 
   for (const touch of [false, true]) await t.test(touch ? '390px touch' : '1100px desktop', async () => {

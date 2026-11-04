@@ -3,12 +3,11 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
 const repo = new URL('..', import.meta.url).pathname
 
-test('Hotview code blocks preserve lines and scroll internally on desktop/mobile', { skip: !domBrowserExecutable(), timeout: 60_000 }, async t => {
+test('Hotview code blocks preserve lines and scroll internally on desktop/mobile', { timeout: 60_000 }, async t => {
   const code = `npm run dev     # ${'Private development UI, port 4999; '.repeat(8)}\n\t${'unbroken_identifier_'.repeat(30)}`
   const prose = 'Ordinary document text should still wrap at the editor width. '.repeat(8)
   const markdown = `${prose}\n\n\`\`\`bash\n${code}\n\`\`\`\n\nInline \`npm ci\` remains inline.\n`
@@ -35,7 +34,7 @@ test('Hotview code blocks preserve lines and scroll internally on desktop/mobile
   const chunk = bundle.output.find(item => item.type === 'chunk')!
   const compiler = await compile(fs.readFileSync(`${repo}src/index.css`, 'utf8'), { base: `${repo}src`, onDependency() {} })
   const css = compiler.build([...new Set(candidates.join('\n').match(/[A-Za-z0-9_@!:/.[\]()%,-]+/g))]) + styles.join('\n')
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   t.after(() => browser.close())
   for (const width of [1100, 390]) {
     for (const theme of ['dark', 'light']) {

@@ -4,12 +4,11 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
 const repo = path.resolve(import.meta.dirname, '..')
 
-test('Hotview loads README and Documents images without rewriting Markdown, updates identical images on document switch, and resizes images with their gutter', { skip: !domBrowserExecutable(), timeout: 40_000 }, async () => {
+test('Hotview loads README and Documents images without rewriting Markdown, updates identical images on document switch, and resizes images with their gutter', { timeout: 40_000 }, async () => {
   const readme = fs.readFileSync(path.join(repo, 'README.md'), 'utf8')
   const overview = fs.readFileSync(path.join(repo, 'docs/guides/overview.md'), 'utf8')
   const source = `import React,{useState,useMemo} from ${JSON.stringify(import.meta.resolve('react'))};
@@ -28,7 +27,7 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
   const candidates = ['packages/editor/src/Editor.tsx', 'packages/editor/src/ResizableImage.tsx'].map(file => fs.readFileSync(path.join(repo, file), 'utf8')).join('\n')
   const css = compiler.build([...new Set(candidates.match(/[A-Za-z0-9_@!:/.[\]()%,-]+/g))]) + fs.readFileSync(path.join(repo, 'packages/editor/src/editor/editor.css'), 'utf8')
   const code = bundle.output.find(item => item.type === 'chunk')!.code
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     const page = await browser.newPage()
     page.setDefaultTimeout(5000)

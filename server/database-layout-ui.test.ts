@@ -4,11 +4,10 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
-test('database cards, board and calendar share editing, search, persistence and read-only behavior', { skip: !domBrowserExecutable(), timeout: 90_000 }, async t => {
+test('database cards, board and calendar share editing, search, persistence and read-only behavior', { timeout: 90_000 }, async t => {
   const source = `import React from 'react';import {createRoot} from 'react-dom/client';
 import {DatabaseCollection} from '${root}/packages/editor/src/database/DatabaseCollection.tsx';
 import {useDatabaseView} from '${root}/packages/editor/src/database/useDatabaseView.ts';
@@ -43,7 +42,7 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
   const compiler = await compile(await fs.readFile(`${root}/src/index.css`, 'utf8'), { base: `${root}/src`, onDependency() {} })
   const dateCss = (await Promise.all(['date-field.css', 'date-calendar.css'].map(name => fs.readFile(`${root}/packages/ui/src/${name}`, 'utf8')))).join('\n')
   const css = compiler.build([...new Set(candidates.join('\n').match(/[A-Za-z0-9_@!:/.[\]()%,-]+/g)), ...Array.from(dateCss.matchAll(/--color-([a-z-]+)/g), match => `bg-${match[1]}`)]) + await fs.readFile(`${root}/packages/editor/src/editor/editor.css`, 'utf8') + dateCss
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   t.after(() => browser.close())
   for (const width of [1100, 390]) for (const theme of ['dark', 'light']) {
     const page = await browser.newPage({ viewport: { width, height: 900 }, hasTouch: width < 500, isMobile: width < 500 })

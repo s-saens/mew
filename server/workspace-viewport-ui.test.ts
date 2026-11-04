@@ -1,16 +1,15 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { build } from 'rolldown'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
-test('workspace keeps bottom controls within fullscreen and keyboard viewport boundaries', { skip: !domBrowserExecutable(), timeout: 15_000 }, async () => {
+test('workspace keeps bottom controls within fullscreen and keyboard viewport boundaries', { timeout: 15_000 }, async () => {
   const bundle = await build({
     input: new URL('../src/utils/workspace-viewport.ts', import.meta.url).pathname,
     write: false, platform: 'browser', output: { format: 'esm' },
   })
   const chunk = bundle.output.find(item => item.type === 'chunk')!
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     const page = await browser.newPage({ viewport: { width: 390, height: 844 }, hasTouch: true })
     await page.route('http://mew-viewport.test/**', route => route.fulfill({

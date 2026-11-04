@@ -2,10 +2,9 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import path from 'node:path'
 import { build } from 'rolldown'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
-test('Mewlink command UI survives a ten-minute suspension and resumes without notices or remounts', { skip: !domBrowserExecutable(), timeout: 40_000 }, async t => {
+test('Mewlink command UI survives a ten-minute suspension and resumes without notices or remounts', { timeout: 40_000 }, async t => {
   const root = path.resolve(import.meta.dirname, '..')
   const source = `
 import React,{useEffect,useState} from '${root}/node_modules/react/index.js';
@@ -61,7 +60,7 @@ const app=createRoot(document.getElementById('root'));app.render(React.createEle
     plugins: [{ name: 'fixture', resolveId(id) { if (id === 'virtual:mewlink-background-recovery.tsx') return id }, load(id) { if (id === 'virtual:mewlink-background-recovery.tsx') return source } }],
   })
   const code = bundle.output.find(item => item.type === 'chunk')!.code
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   t.after(() => browser.close())
   for (const width of [390, 1100]) {
     await t.test(`${width}px`, async () => {

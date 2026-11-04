@@ -3,12 +3,11 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 
-test('agent connections replace stalled handshakes and relay paths promptly while preserving the conversation and focused draft', { skip: !domBrowserExecutable(), timeout: 30_000 }, async () => {
+test('agent connections replace stalled handshakes and relay paths promptly while preserving the conversation and focused draft', { timeout: 30_000 }, async () => {
   const source = `import React from '${root}/node_modules/react/index.js';
 import {createRoot} from '${root}/node_modules/react-dom/client.js';
 import {AgentPanel} from '${root}/src/components/AgentPanel.tsx';
@@ -44,7 +43,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><AgentPanel pro
     },
   }] })
   const chunk = bundle.output.find(item => item.type === 'chunk')!
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     const page = await browser.newPage({ viewport: { width: 1100, height: 844 } })
     page.setDefaultTimeout(4000)

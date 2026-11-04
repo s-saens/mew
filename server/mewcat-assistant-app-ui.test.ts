@@ -5,14 +5,13 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 import type { MewcatAction } from '../shared/mewcat-assistant.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 type Fixture = { assistant: { projectRoot: string | null; onAction: (action: MewcatAction) => Promise<void> }; workTab: { id: string; runtime: string; cwd: string }; noticeTab?: string }
 
-test('Mewcat tools use real App project switching, Documents tabs and reviewed work-session drafts', { skip: !domBrowserExecutable(), timeout: 30_000 }, async () => {
+test('Mewcat tools use real App project switching, Documents tabs and reviewed work-session drafts', { timeout: 30_000 }, async () => {
   const app = await fs.readFile(`${root}/src/App.tsx`, 'utf8')
   const keep = new Set(['deferredComponent', 'ProjectSwitcher', 'ProjectLoadingOverlay', 'FileTree', 'DockWorkspace', 'ProjectIcon', 'SubprojectLink', 'SidebarCreateButtons', 'MobileDock', 'HeaderMenu'])
   const stubs = new Map<string, string>()
@@ -44,7 +43,7 @@ test('Mewcat tools use real App project switching, Documents tabs and reviewed w
   const compiler = await compile(await fs.readFile(`${root}/src/index.css`, 'utf8'), { base: `${root}/src`, onDependency() {} })
   const css = compiler.build([...new Set(app.match(/[A-Za-z0-9_@:/.[\]()%,-]+/g))])
   const petFiles = await mewpetUiFixture()
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), headless: true, args: ['--no-sandbox'] })
+  const browser = await connectTestBrowser()
   try {
     const page = await browser.newPage({ viewport: { width: 1100, height: 700 } })
     page.setDefaultTimeout(5000)

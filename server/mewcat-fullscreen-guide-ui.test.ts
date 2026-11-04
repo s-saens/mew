@@ -6,13 +6,12 @@ import path from 'node:path'
 import { createRequire } from 'node:module'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 const require = createRequire(`${root}/package.json`)
 
-test('startup fullscreen guide fits desktop/mobile and Mewcat stays on the viewport floor over the dock', { skip: !domBrowserExecutable(), timeout: 60_000 }, async () => {
+test('startup fullscreen guide fits desktop/mobile and Mewcat stays on the viewport floor over the dock', { timeout: 60_000 }, async () => {
   const source = `
 Math.random=()=>0.45;
 import React from '${require.resolve('react')}';
@@ -43,7 +42,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
   const ui = await fs.readFile(`${root}/src/components/mewcat-fullscreen-guide.tsx`, 'utf8')
   const css = compiler.build(ui.match(/[A-Za-z0-9_:[\]/.%!#()-]+/g) ?? [])
   const petFiles = await mewpetUiFixture()
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     for (const mobile of [false, true]) {
       const page = await browser.newPage({ viewport: { width: mobile ? 390 : 1100, height: 780 }, hasTouch: mobile })

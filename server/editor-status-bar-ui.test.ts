@@ -4,10 +4,9 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
-test('editor status retains size and height during typing and deferred measurement', { skip: !domBrowserExecutable(), timeout: 45_000 }, async () => {
+test('editor status retains size and height during typing and deferred measurement', { timeout: 45_000 }, async () => {
   const content = 'hello'
   const panePath = new URL('../src/components/EditorPane.tsx', import.meta.url).pathname
   const source = `
@@ -48,7 +47,7 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><I18nProvid
   const sources = await Promise.all(['src/components/EditorPane.tsx', 'src/components/CodePane.tsx', 'src/components/TabBar.tsx', 'packages/editor/src/Editor.tsx', 'packages/mobile-keys/src/MobileKeyBar.tsx'].map(file => fs.readFile(path.join(root, file), 'utf8')))
   const css = compiler.build([...new Set((source + sources.join('\n')).match(/[A-Za-z0-9_@!:/.[\]()%,-]+/g))]) + styles.join('\n')
   const chunk = bundle.output.find(item => item.type === 'chunk')!
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     for (const width of [1280, 390]) {
       const page = await browser.newPage({ viewport: { width, height: 800 }, hasTouch: width < 768 })

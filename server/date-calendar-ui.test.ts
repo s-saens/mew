@@ -4,10 +4,9 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
-test('shared calendar edits date segments and keeps valid ranges on desktop and touch', { skip: !domBrowserExecutable(), timeout: 30_000 }, async () => {
+test('shared calendar edits date segments and keeps valid ranges on desktop and touch', { timeout: 30_000 }, async () => {
   const root = path.resolve(import.meta.dirname, '..')
   const source = `import React from 'react';import {createRoot} from 'react-dom/client';import {DateCalendar} from '@mew/ui';
 function Fixture(){const [range,setRange]=React.useState(['2026-10-02','2026-10-10']),[readOnly,setReadOnly]=React.useState(false);
@@ -21,7 +20,7 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
   const dateCss = (await Promise.all(['date-field.css','date-calendar.css'].map(name=>fs.readFile(path.join(root,'packages/ui/src',name),'utf8')))).join('\n')
   const compiler = await compile(await fs.readFile(path.join(root,'src/index.css'),'utf8'), { base: path.join(root,'src'), onDependency() {} })
   const css = compiler.build(['font-sans', ...Array.from(dateCss.matchAll(/--color-([a-z-]+)/g), match=>`bg-${match[1]}`)]) + dateCss
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     for (const width of [1100,390]) {
       const page = await browser.newPage({ viewport: { width,height:844 }, hasTouch: width<500, isMobile: width<500 })

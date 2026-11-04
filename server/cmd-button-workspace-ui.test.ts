@@ -4,10 +4,9 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
-test('root command menus pin reads, execution, editing and ordering while only the active row owns shortcuts', { skip: !domBrowserExecutable(), timeout: 30_000 }, async t => {
+test('root command menus pin reads, execution, editing and ordering while only the active row owns shortcuts', { timeout: 30_000 }, async t => {
   const root = path.resolve(import.meta.dirname, '..')
   const source = `
 import React from 'react';import {createRoot} from 'react-dom/client';
@@ -39,7 +38,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider>
   const content = (await Promise.all(['src/components/CommandButtonMenu.tsx', 'src/components/SessionTerminalPopup.tsx'].map(file => fs.readFile(path.join(root, file), 'utf8')))).join('\n')
   const compiler = await compile(await fs.readFile(path.join(root, 'src/index.css'), 'utf8'), { base: path.join(root, 'src'), onDependency() {} })
   const css = compiler.build([...new Set((source + content).match(/[A-Za-z0-9_@:/.[\]()%,-]+/g))])
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   t.after(() => browser.close())
   const page = await browser.newPage({ viewport: { width: 1000, height: 800 } })
   page.setDefaultTimeout(5_000)

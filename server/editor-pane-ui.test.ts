@@ -4,11 +4,10 @@ import http from 'node:http'
 import fs from 'node:fs/promises'
 import { compile } from '@tailwindcss/node'
 import { build } from 'rolldown'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 import { protectFileResponse } from './file-response.ts'
 
-test('opening and switching files survives full or blocked tab storage', { skip: !domBrowserExecutable(), timeout: 45_000 }, async (t) => {
+test('opening and switching files survives full or blocked tab storage', { timeout: 45_000 }, async (t) => {
   const bundle = await build({
     input: 'virtual:editor-pane.tsx', output: { format: 'esm' }, platform: 'browser', write: false,
     transform: { define: { 'process.env.NODE_ENV': JSON.stringify('test') }, jsx: 'react-jsx' },
@@ -82,13 +81,13 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><I18nProvid
     }
   })
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
-  let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined
+  let browser: Awaited<ReturnType<typeof connectTestBrowser>> | undefined
   t.after(async () => {
     await browser?.close()
     server.closeAllConnections()
     await new Promise<void>((resolve) => server.close(() => resolve()))
   })
-  browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  browser = await connectTestBrowser()
   const page = await browser.newPage()
   page.setDefaultTimeout(5000)
   const errors: string[] = []

@@ -5,8 +5,8 @@ import path from 'node:path'
 import type { Editor as TiptapEditor } from '@tiptap/core'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium, type CDPSession, type Page } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import type { CDPSession, Page } from 'playwright-core'
+import { connectTestBrowser } from './test-browser.ts'
 
 const markdown = 'Alpha selected text omega.\n\n[문서홈](./home.md)\n\nBefore [다른 문서](./other.md) after.\n\n[첫 문서](./first.md)[둘째 문서](./second.md)\n\n**Bold [굵은 링크](./bold.md) rest**\n\n```ts\nconst value = 1\n```\n'
 const code = 'const selected = "value";\nconst next = "target";\n'
@@ -44,7 +44,7 @@ async function compose(client: CDPSession) {
 }
 
 test('trusted Korean IME commits in mobile editors after menu actions and at file-link caret boundaries', {
-  skip: !domBrowserExecutable(), timeout: 120_000,
+  timeout: 120_000,
 }, async t => {
   const repo = path.resolve(import.meta.dirname, '..')
   const source = `
@@ -77,7 +77,7 @@ function Fixture(){const [state,setState]=React.useState({...defaults,generation
   const css = compiler.build([...new Set(candidates.join('\n').match(/[A-Za-z0-9_@!:/.[\]()%,-]+/g))]) + styles.join('\n')
   const entry = bundle.output.find(item => item.type === 'chunk' && item.isEntry)!
   assert.ok(entry.type === 'chunk')
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   const page = await browser.newPage({ viewport: { width: 390, height: 844 }, hasTouch: true })
   page.setDefaultTimeout(5000)
   const errors: string[] = []

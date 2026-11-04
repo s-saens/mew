@@ -4,12 +4,11 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 
-test('project creation reuses live agent chat, pins its cwd, sends its interview once, and preserves the conversation on close', { skip: !domBrowserExecutable(), timeout: 60_000 }, async t => {
+test('project creation reuses live agent chat, pins its cwd, sends its interview once, and preserves the conversation on close', { timeout: 60_000 }, async t => {
   const app = await fs.readFile(`${root}/src/App.tsx`, 'utf8')
   const createWithAgent = app.match(/onCreateWithAgent=\{(async project => \{[\s\S]*?\n\s*\})\}/)?.[1]
   const closeCreation = app.match(/<ProjectCreationAgentDialog[^\n]*onClose=\{(\(\) => \{[^}]*\})\}/)?.[1]
@@ -61,7 +60,7 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
   const chunk = bundle.output.find(item => item.type === 'chunk')!
   const compiler = await compile(await fs.readFile(`${root}/src/index.css`, 'utf8'), { base: `${root}/src`, onDependency() {} })
   const css = compiler.build([...new Set(candidates.join('\n').match(/[A-Za-z0-9_@!:/.[\]()%,-]+/g))])
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   t.after(() => browser.close())
   for (const width of [1100, 390]) {
     const page = await browser.newPage({ viewport: { width, height: 844 } })

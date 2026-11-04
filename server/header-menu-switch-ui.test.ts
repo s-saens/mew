@@ -4,10 +4,9 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
-test('header dropdowns switch with one click or tap without losing the new menu to history cleanup', { skip: !domBrowserExecutable(), timeout: 30_000 }, async () => {
+test('header dropdowns switch with one click or tap without losing the new menu to history cleanup', { timeout: 30_000 }, async () => {
   const root = path.resolve(import.meta.dirname, '..')
   const source = `
 import React,{useState} from 'react';import {createRoot} from 'react-dom/client';
@@ -31,7 +30,7 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><I18nProvid
   const content = (await Promise.all(['src/components/ProjectSwitcher.tsx', 'src/components/CommandButtonMenu.tsx', 'packages/ui/src/dialog-frame.tsx'].map(file => fs.readFile(path.join(root, file), 'utf8')))).join('\n')
   const compiler = await compile(await fs.readFile(`${root}/src/index.css`, 'utf8'), { base: `${root}/src`, onDependency() {} })
   const css = compiler.build([...new Set((source + content).match(/[A-Za-z0-9_@:/.[\]()%,-]+/g))])
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     for (const width of [1100, 390]) for (const dark of [false, true]) for (const gradient of [false, true]) {
       const page = await browser.newPage({ viewport: { width, height: 800 }, hasTouch: width === 390 })

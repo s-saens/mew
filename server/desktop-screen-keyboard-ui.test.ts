@@ -4,10 +4,9 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
-test('screen keyboards support multitouch, sticky modifiers, customization, persistence and release on lifecycle changes', { skip: !domBrowserExecutable(), timeout: 45_000 }, async () => {
+test('screen keyboards support multitouch, sticky modifiers, customization, persistence and release on lifecycle changes', { timeout: 45_000 }, async () => {
   const root = path.resolve(import.meta.dirname, '..')
   const source = `import React from '${root}/node_modules/react/index.js';import {createRoot} from '${root}/node_modules/react-dom/client.js';
 import {DesktopScreenKeyboard} from '${root}/src/components/desktop-screen-keyboard.tsx';import {desktopInput} from '${root}/src/utils/desktop-input.ts';import {readScreenKeyboard} from '${root}/src/utils/desktop-screen-keyboard.ts';
@@ -26,7 +25,7 @@ return <div className="remote-desktop"><div ref={panel} className="desktop-panel
   const css = compiler.build([...new Set(candidates.join('\n').match(/[A-Za-z0-9_@!:/.[\]()%,-]+/g))]) + await fs.readFile(`${root}/src/components/remote-desktop.css`, 'utf8') + styles.join('\n')
   const chunk = bundle.output.find(item => item.type === 'chunk' && item.isEntry)!
   const code = chunk.type === 'chunk' ? chunk.code : ''
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     for (const width of [1100, 390]) {
       const page = await browser.newPage({ viewport: { width, height: 844 }, hasTouch: true })

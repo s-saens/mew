@@ -5,10 +5,9 @@ import path from 'node:path'
 import { parse } from 'yaml'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
-test('untyped task selections render as tags and survive edits, clearing and document replacement', { skip: !domBrowserExecutable(), timeout: 45_000 }, async () => {
+test('untyped task selections render as tags and survive edits, clearing and document replacement', { timeout: 45_000 }, async () => {
   const root = path.resolve(import.meta.dirname, '..')
   const initial = '---\ntitle: 기존 태스크\ntags:\n  - 기능 # preserve\n  - 검증\nassignees: "[\\"alice@example.test\\",\\"bob@example.test\\"]"\ndone: false\n---\n\nBody'
   const created = '---\ntitle: 새 태스크\ndone: false\ntags: [새태그]\nassignees:\n  - carol@example.test\n---\n\nNew body'
@@ -40,7 +39,7 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
   const compiler = await compile(await fs.readFile(path.join(root, 'src/index.css'), 'utf8'), { base: path.join(root, 'src'), onDependency() {} })
   const css = compiler.build([...new Set(candidates.join('\n').match(/[A-Za-z0-9_@!:/.[\]()%,-]+/g))])
   const chunk = bundle.output.find(item => item.type === 'chunk')!
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     for (const width of [1280, 390]) {
       const page = await browser.newPage({ viewport: { width, height: 844 }, hasTouch: width < 500, isMobile: width < 500 })

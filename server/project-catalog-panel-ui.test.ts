@@ -4,12 +4,11 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 
-test('inline project catalog loads on expansion, preserves hierarchy and separates opening from personal shortcuts', { skip: !domBrowserExecutable(), timeout: 60_000 }, async () => {
+test('inline project catalog loads on expansion, preserves hierarchy and separates opening from personal shortcuts', { timeout: 60_000 }, async () => {
   const source = `import React,{useState} from '${root}/node_modules/react/index.js';
 import {createRoot} from '${root}/node_modules/react-dom/client.js';
 import {ProjectCatalogPanel} from '${root}/src/components/project-catalog-panel.tsx';
@@ -31,7 +30,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
   const content = (await Promise.all(['src/components/project-catalog-panel.tsx', 'src/components/ProjectSwitcher.tsx', 'packages/ui/src/dialog-frame.tsx'].map(file => fs.readFile(path.join(root, file), 'utf8')))).join('\n')
   const compiler = await compile(await fs.readFile(`${root}/src/index.css`, 'utf8'), { base: `${root}/src`, onDependency() {} })
   const css = compiler.build([...new Set((source + content).match(/[A-Za-z0-9_@!:/.[\]()%,-]+/g))])
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     const context = await browser.newContext({ viewport: { width: 1100, height: 700 }, hasTouch: true })
     const page = await context.newPage()

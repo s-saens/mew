@@ -5,11 +5,10 @@ import path from 'node:path'
 import os from 'node:os'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
-test('quota battery displays shortest headroom in desktop/mobile themes, coalesces reads, and keeps unknown distinct', { skip: !domBrowserExecutable(), timeout: 30_000 }, async () => {
+test('quota battery displays shortest headroom in desktop/mobile themes, coalesces reads, and keeps unknown distinct', { timeout: 30_000 }, async () => {
   const source = `import React from '${root}/node_modules/react/index.js';
 import {createRoot} from '${root}/node_modules/react-dom/client.js';
 import {I18nProvider} from '${root}/src/i18n.tsx';
@@ -21,7 +20,7 @@ const root=createRoot(document.getElementById('root')); window.renderBattery('co
   const compiler = await compile(await fs.readFile(`${root}/src/index.css`, 'utf8'), { base: `${root}/src`, onDependency() {} })
   const content = source + await fs.readFile(`${root}/src/components/AgentQuotaBattery.tsx`, 'utf8')
   const css = compiler.build([...new Set(content.match(/[A-Za-z0-9_@!:/.[\]()%,-]+/g))])
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     for (const width of [1100, 390]) {
       const page = await browser.newPage({ viewport: { width, height: 600 } })

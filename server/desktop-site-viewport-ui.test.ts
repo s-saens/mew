@@ -1,10 +1,9 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { build } from 'rolldown'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
-test('desktop-site initial shrink-to-fit fills the phone viewport through focus, pinch zoom and rotation', { skip: !domBrowserExecutable(), timeout: 20_000 }, async () => {
+test('desktop-site initial shrink-to-fit fills the phone viewport through focus, pinch zoom and rotation', { timeout: 20_000 }, async () => {
   const root = new URL('..', import.meta.url).pathname
   const source = `import React from 'react';import {createRoot} from 'react-dom/client';
 import {observeWorkspaceViewport} from '${root}/src/utils/workspace-viewport.ts';
@@ -16,7 +15,7 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
     plugins: [{ name: 'desktop-site-fixture', resolveId(id) { if (id === 'virtual:desktop-site.tsx') return id }, load(id) { if (id === 'virtual:desktop-site.tsx') return source } }],
   })
   const chunk = bundle.output.find(item => item.type === 'chunk')!
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     // A fixed 980px mobile viewport reproduces a phone's desktop-site fit scale.
     // Use the real VisualViewport and page scale; no height/scale property mocks.

@@ -4,12 +4,11 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 
-test('conversation answers appear before deferred work, hydrate once with two background requests, and reject stale generations', { skip: !domBrowserExecutable(), timeout: 60_000 }, async t => {
+test('conversation answers appear before deferred work, hydrate once with two background requests, and reject stale generations', { timeout: 60_000 }, async t => {
   const source = `import React from '${root}/node_modules/react/index.js';
 import {createRoot} from '${root}/node_modules/react-dom/client.js';
 import {AgentPanel} from '${root}/src/components/AgentPanel.tsx';
@@ -59,7 +58,7 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><I18nProvid
   const compiler = await compile(await fs.readFile(`${root}/src/index.css`, 'utf8'), { base: `${root}/src`, onDependency() {} })
   const content = await fs.readFile(`${root}/src/components/AgentPanel.tsx`, 'utf8')
   const css = compiler.build([...new Set((source + content).match(/[A-Za-z0-9_@!:/.[\]()%,-]+/g))])
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     for (const width of [1100, 390]) for (const dark of [false, true]) {
       const page = await browser.newPage({ viewport: { width, height: 844 } })

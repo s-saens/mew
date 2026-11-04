@@ -6,8 +6,7 @@ import path from 'node:path'
 import { createRequire } from 'node:module'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 import { mewcatAssistantMessages } from '../src/components/mewcat-assistant-copy.ts'
 import { LOCALES } from '../src/i18n-locales.ts'
 
@@ -15,7 +14,7 @@ const root = path.resolve(import.meta.dirname, '..')
 const require = createRequire(`${root}/package.json`)
 type Fixture = { setLocale: (locale: string) => void; setFixtureTheme: (id: string) => void; current: { receive: (message: object) => void }; prompts: string[]; actions: object[]; connections: number; runtime: string }
 
-test('Mewcat assistant supports translated connection, chat, IME, actions, replay and agent switching on desktop and mobile', { skip: !domBrowserExecutable(), timeout: 60_000 }, async () => {
+test('Mewcat assistant supports translated connection, chat, IME, actions, replay and agent switching on desktop and mobile', { timeout: 60_000 }, async () => {
   const source = `
 // This fixture covers cat behavior in a fullscreen-unavailable client.
 Object.defineProperty(document,'fullscreenEnabled',{value:false});
@@ -48,7 +47,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
   const selectionSource = await fs.readFile(`${root}/packages/ui/src/select-field.tsx`, 'utf8')
   const css = compiler.build([...new Set((uiSource + selectionSource).match(/[\w:/.[\]()%,-]+/g) ?? [])])
   const petFiles = await mewpetUiFixture()
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), headless: true, args: ['--no-sandbox'] })
+  const browser = await connectTestBrowser()
   try {
     for (const mobile of [false, true]) {
       const width = mobile ? 390 : 1100

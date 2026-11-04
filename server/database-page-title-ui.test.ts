@@ -2,11 +2,10 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import path from 'node:path'
 import { build } from 'rolldown'
-import { chromium } from 'playwright-core'
 import { parse, stringify } from 'yaml'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
-test('database page titles preview in the explorer and open tabs, then follow confirmed paths without losing newer edits', { skip: !domBrowserExecutable(), timeout: 45_000 }, async t => {
+test('database page titles preview in the explorer and open tabs, then follow confirmed paths without losing newer edits', { timeout: 45_000 }, async t => {
   const root = path.resolve(import.meta.dirname, '..')
   const source = `
 import React from 'react';import {createRoot} from 'react-dom/client';
@@ -51,7 +50,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     }, load(id) { if (id === 'virtual:database-title.tsx') return source; if (id === 'virtual:style') return '' } }],
   })
   const script = bundle.output.find(item => item.type === 'chunk')!.code
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   const page = await browser.newPage({ viewport: { width: 1300, height: 850 } })
   page.setDefaultTimeout(6000)
   let currentPath = 'Old.md', currentTitle = 'Old', holdSave = true, holdRead = true, holdFailure = true
@@ -154,7 +153,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
   assert.deepEqual(errors, [])
 })
 
-test('late database page-path refreshes cannot replace a newer confirmed path', { skip: !domBrowserExecutable(), timeout: 20_000 }, async t => {
+test('late database page-path refreshes cannot replace a newer confirmed path', { timeout: 20_000 }, async t => {
   const root = path.resolve(import.meta.dirname, '..')
   const source = `
 import React from 'react';import {createRoot} from 'react-dom/client';
@@ -169,7 +168,7 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
     plugins: [{ name: 'database-path-order', resolveId: id => id === 'virtual:database-path-order.tsx' ? id : undefined, load: id => id === 'virtual:database-path-order.tsx' ? source : undefined }],
   })
   const script = bundle.output.find(item => item.type === 'chunk')!.code
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   t.after(() => browser.close())
   const page = await browser.newPage()
   await page.route('http://mew-database-path-order.test/**', route => route.fulfill(new URL(route.request().url()).pathname === '/app.js'

@@ -4,10 +4,10 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium, type Locator } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import type { Locator } from 'playwright-core'
+import { connectTestBrowser } from './test-browser.ts'
 
-test('real editor and calendar popups share hamburger opacity and backdrop blur', { skip: !domBrowserExecutable(), timeout: 90_000 }, async t => {
+test('real editor and calendar popups share hamburger opacity and backdrop blur', { timeout: 90_000 }, async t => {
   const root = path.resolve(import.meta.dirname, '..')
   const source = `import React,{useState} from 'react';import {createRoot} from 'react-dom/client';
 import {HeaderMenuPopup} from '${root}/src/components/header-menu-popup.tsx';
@@ -47,7 +47,7 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
   const chunk = bundle.output.find(item => item.type === 'chunk'); assert.ok(chunk)
   const compiler = await compile(await fs.readFile(path.join(root, 'src/index.css'), 'utf8'), { base: path.join(root, 'src'), onDependency() {} })
   const css = compiler.build([...new Set(candidates.join('\n').match(/[A-Za-z0-9_@!&:/.[\]()%,-]+/g))]) + styles.join('\n')
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   t.after(() => browser.close())
   const screenshots = '/tmp/mew-overlay-consistency'
   await fs.mkdir(screenshots, { recursive: true })

@@ -5,10 +5,9 @@ import path from 'node:path'
 import type { Editor as TiptapEditor } from '@tiptap/core'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
-test('Hotview gutter follows typing, trailing paragraphs and frontmatter on desktop and mobile', { skip: !domBrowserExecutable(), timeout: 45_000 }, async () => {
+test('Hotview gutter follows typing, trailing paragraphs and frontmatter on desktop and mobile', { timeout: 45_000 }, async () => {
   const initial = '---\ntitle: test\nupdated: 2026-09-27\n---\n\n첫 문단\n\n마지막 문단'
   const codeContent = '---\ntitle: test\n---\n\n# 제목\n\n```txt\n코드\n```'
   const ruleContent = '앞 문단\n\n---\n\n뒤 문단';
@@ -59,7 +58,7 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
   const compiler = await compile(await fs.readFile(path.join(root, 'src/index.css'), 'utf8'), { base: path.join(root, 'src'), onDependency() {} })
   const css = compiler.build([...new Set((source + await fs.readFile(editorPath, 'utf8') + await fs.readFile(path.join(root, 'packages/editor/src/editor/FrontmatterPanel.tsx'), 'utf8')).match(/[A-Za-z0-9_@!:/.[\]()%,-]+/g))]) + styles.join('\n')
   const chunk = bundle.output.find(item => item.type === 'chunk')!
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) {
       const page = await browser.newPage({ viewport })

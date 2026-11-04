@@ -2,9 +2,8 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import path from 'node:path'
 import { build } from 'rolldown'
-import { chromium } from 'playwright-core'
 import { parse } from 'yaml'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 import { mergeTaskFrontmatter } from '../packages/editor/src/utils/task-frontmatter-merge.ts'
 
 async function taskSaveScript(): Promise<string> {
@@ -27,9 +26,9 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
   return bundle.output.find(item => item.type === 'chunk')!.code
 }
 
-test('task deletion closes saved tabs, preserves unsaved drafts and never recreates deleted files', { skip: !domBrowserExecutable(), timeout: 30_000 }, async t => {
+test('task deletion closes saved tabs, preserves unsaved drafts and never recreates deleted files', { timeout: 30_000 }, async t => {
   const script = await taskSaveScript()
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable()!, args: ['--no-sandbox'], headless: true })
+  const browser = await connectTestBrowser()
   const original = '---\ntitle: Task\ndone: false\n---\nBody'
   const task = { id: 'task', text: 'Task', done: false, path: 'docs/tasks/Task.md' }
   try {
@@ -141,9 +140,9 @@ test('task deletion closes saved tabs, preserves unsaved drafts and never recrea
   } finally { await browser.close() }
 })
 
-test('open tabs rebase server-preserved tags while retaining typing during autosave', { skip: !domBrowserExecutable(), timeout: 30_000 }, async () => {
+test('open tabs rebase server-preserved tags while retaining typing during autosave', { timeout: 30_000 }, async () => {
   const script = await taskSaveScript()
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable()!, args: ['--no-sandbox'], headless: true })
+  const browser = await connectTestBrowser()
   const original = '---\ntitle: Task\ndone: false\n---\nBody'
   let disk = original, release!: () => void, markReceived!: () => void
   const delayed = new Promise<void>(resolve => { release = resolve })
@@ -187,9 +186,9 @@ test('open tabs rebase server-preserved tags while retaining typing during autos
 })
 
 for (const waitPastDebounce of [false, true]) {
-  test(`consecutive title edits use the acknowledged autosave baseline (${waitPastDebounce ? 'response after debounce' : 'response before debounce'})`, { skip: !domBrowserExecutable(), timeout: 30_000 }, async () => {
+  test(`consecutive title edits use the acknowledged autosave baseline (${waitPastDebounce ? 'response after debounce' : 'response before debounce'})`, { timeout: 30_000 }, async () => {
     const script = await taskSaveScript()
-    const browser = await chromium.launch({ executablePath: domBrowserExecutable()!, args: ['--no-sandbox'], headless: true })
+    const browser = await connectTestBrowser()
     const original = '---\ntitle: Task\ndescription: "태스크: Task"\ndone: false\n---\nBody'
     const first = original.replaceAll('Task', 'First') + ' first'
     const pending = first.replaceAll('First', 'Pending') + ' pending'

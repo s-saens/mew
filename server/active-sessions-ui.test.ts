@@ -4,15 +4,14 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 import { sessionHistoryXlsx } from './session-history-xlsx.ts'
 import { parseXlsx } from '../src/utils/xlsx.ts'
 import type { MewSessionRecord } from '../shared/active-sessions.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 
-test('verified Mewlink recovery immediately reconnects presence once and cancels pending retries', { skip: !domBrowserExecutable(), timeout: 30_000 }, async t => {
+test('verified Mewlink recovery immediately reconnects presence once and cancels pending retries', { timeout: 30_000 }, async t => {
   const source = `import React from '${root}/node_modules/react/index.js';
 import {createRoot} from '${root}/node_modules/react-dom/client.js';
 import {usePresence} from '${root}/src/hooks/usePresence.ts';
@@ -24,7 +23,7 @@ function Fixture(){usePresence('work','readme.md','owner@example.test',()=>{});r
 const app=createRoot(document.getElementById('root'));app.render(React.createElement(Fixture));window.unmount=()=>app.unmount();`
   const bundle = await build({ input: 'virtual:presence-recovery.tsx', write: false, platform: 'browser', output: { format: 'iife' }, transform: { jsx: 'react-jsx', define: { 'process.env.NODE_ENV': JSON.stringify('test') } }, plugins: [{ name: 'fixture', resolveId(id) { if (id === 'virtual:presence-recovery.tsx') return id }, load(id) { if (id === 'virtual:presence-recovery.tsx') return source } }] })
   const code = bundle.output.find(item => item.type === 'chunk')!.code
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   t.after(() => browser.close())
   for (const width of [390, 1100]) {
     const page = await browser.newPage({ viewport: { width, height: 844 } })
@@ -62,7 +61,7 @@ const app=createRoot(document.getElementById('root'));app.render(React.createEle
   }
 })
 
-test('total session count and session popup stay live across mobile layout and reconnects', { skip: !domBrowserExecutable(), timeout: 45_000 }, async () => {
+test('total session count and session popup stay live across mobile layout and reconnects', { timeout: 45_000 }, async () => {
   const source = `import React,{useState} from '${root}/node_modules/react/index.js';
 import {createRoot} from '${root}/node_modules/react-dom/client.js';
 import {ActiveSessionsButton} from '${root}/src/components/active-sessions-button.tsx';
@@ -81,7 +80,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
   const content = (await Promise.all(['src/components/active-sessions-button.tsx', 'src/components/header-control.ts', 'src/components/session-history.tsx', 'packages/ui/src/dialog-frame.tsx', 'packages/ui/src/select-field.tsx', 'packages/ui/src/HoverTipLayer.tsx'].map(file => fs.readFile(`${root}/${file}`, 'utf8')))).join('\n')
   const compiler = await compile(await fs.readFile(`${root}/src/index.css`, 'utf8'), { base: `${root}/src`, onDependency() {} })
   const css = compiler.build([...new Set((source + content).match(/[A-Za-z0-9_@:/.[\]()%,-]+/g))])
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     const context = await browser.newContext({ viewport: { width: 1200, height: 800 }, hasTouch: true })
     const historyRequests: URL[] = []

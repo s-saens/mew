@@ -4,10 +4,9 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
-test('title backlinks popup supports desktop/touch, themes, failures, cancellation and external document opening', { skip: !domBrowserExecutable(), timeout: 45_000 }, async () => {
+test('title backlinks popup supports desktop/touch, themes, failures, cancellation and external document opening', { timeout: 45_000 }, async () => {
   const root = path.resolve(import.meta.dirname, '..')
   const source = `
 import React from ${JSON.stringify(import.meta.resolve('react'))};
@@ -27,7 +26,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
   const candidates = await Promise.all(['packages/editor/src/editor/FrontmatterPanel.tsx', 'packages/editor/src/editor/FrontmatterPopover.tsx', 'packages/editor/src/editor/DocumentBacklinks.tsx'].map(file => fs.readFile(path.join(root, file), 'utf8')))
   const css = compiler.build([...new Set(candidates.join('\n').match(/[A-Za-z0-9_@!:/.[\]()%,-]+/g))]) + await fs.readFile(path.join(root, 'packages/editor/src/editor/editor.css'), 'utf8')
   const chunk = bundle.output.find(item => item.type === 'chunk')!
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     for (const width of [1280, 390]) {
       const page = await browser.newPage({ viewport: { width, height: 844 }, hasTouch: width < 500, isMobile: width < 500 })

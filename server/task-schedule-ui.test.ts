@@ -6,8 +6,8 @@ import path from 'node:path'
 import express from 'express'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium, type Page, type Locator } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import type { Page, Locator } from 'playwright-core'
+import { connectTestBrowser } from './test-browser.ts'
 import { taskChanges } from '../shared/task-list.ts'
 
 async function expectDateValue(input: Locator, expected: string) {
@@ -22,7 +22,7 @@ async function expectDateValue(input: Locator, expected: string) {
   }), expected)
 }
 
-test('calendar agenda and Gantt share persisted periods, edit by mouse/touch/keyboard and preserve read-only views', { skip: !domBrowserExecutable(), timeout: 60_000 }, async () => {
+test('calendar agenda and Gantt share persisted periods, edit by mouse/touch/keyboard and preserve read-only views', { timeout: 60_000 }, async () => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'mew-task-schedule-ui-'))
   process.env.MEW_DATA_DIR = path.join(directory, 'data')
   process.env.MEW_WORKSPACE = path.join(directory, 'workspace')
@@ -68,7 +68,7 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><I18nProvid
   app.get('/', (_req, res) => res.type('html').send(`<!doctype html><html class="dark"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}</style><div id="root"></div><script src="/app.js"></script></html>`))
   const server = app.listen(0, '127.0.0.1'); await new Promise<void>(resolve => server.once('listening', resolve))
   const address = server.address(); assert.ok(address && typeof address !== 'string')
-  const base = `http://127.0.0.1:${address.port}`, browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const base = `http://127.0.0.1:${address.port}`, browser = await connectTestBrowser()
   const screenshots = '/tmp/mew-task-schedule'
   await fs.mkdir(screenshots, { recursive: true })
   try {

@@ -5,12 +5,11 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
 const repo = path.resolve(import.meta.dirname, '..')
 
-test('Hotview opens the shared drawing editor and uploads a PNG without agent history access', { skip: !domBrowserExecutable(), timeout: 60_000 }, async t => {
+test('Hotview opens the shared drawing editor and uploads a PNG without agent history access', { timeout: 60_000 }, async t => {
   const source = `
     import React from 'react';import {createRoot} from 'react-dom/client';
     import {EditorPane} from '${repo}/src/components/EditorPane.tsx';
@@ -48,7 +47,7 @@ test('Hotview opens the shared drawing editor and uploads a PNG without agent hi
   const scripts = new Map(chunks.map(item => [`/${item.fileName}`, item.code]))
   const compiler = await compile(fs.readFileSync(path.join(repo, 'src/index.css'), 'utf8'), { base: path.join(repo, 'src'), onDependency() {} })
   const css = compiler.build([...new Set(candidates.join('\n').match(/[A-Za-z0-9_@!:/.[\]()%,-]+/g))]) + styles.join('\n')
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   t.after(() => browser.close())
   for (const width of [1100, 390]) {
     const page = await browser.newPage({ viewport: { width, height: 844 }, hasTouch: width < 768 })

@@ -4,12 +4,11 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 
-test('real graph worker/canvas: desktop/mobile rendering, search, opening, zoom, errors and dismissal', { skip: !domBrowserExecutable(), timeout: 45_000 }, async t => {
+test('real graph worker/canvas: desktop/mobile rendering, search, opening, zoom, errors and dismissal', { timeout: 45_000 }, async t => {
   const component = await fs.readFile(`${root}/src/components/DocumentGraph.tsx`, 'utf8')
   const source = `import React from '${root}/node_modules/react/index.js';import {createRoot} from '${root}/node_modules/react-dom/client.js';import {DocumentGraph} from '${root}/src/components/DocumentGraph.tsx';function App(){const [open,setOpen]=React.useState(false);const [path,setPath]=React.useState('');return React.createElement(React.Fragment,null,React.createElement('button',{onClick:()=>setOpen(true)},'Graph'),React.createElement('span',{'data-opened':true},path),open&&React.createElement(DocumentGraph,{revision:0,onClose:()=>setOpen(false),onOpen:path=>{setPath(path);setOpen(false)}}))}createRoot(document.getElementById('root')).render(React.createElement(App));`
   const plugin = { name: 'graph-fixture', resolveId(id: string) { if (id === 'virtual:graph') return id; if (id.endsWith('.css')) return 'virtual:style' }, async load(id: string) {
@@ -24,7 +23,7 @@ test('real graph worker/canvas: desktop/mobile rendering, search, opening, zoom,
   const compiler = await compile(await fs.readFile(`${root}/src/index.css`, 'utf8'), { base: `${root}/src`, onDependency() {} })
   const content = component + await fs.readFile(`${root}/packages/ui/src/dialog-frame.tsx`, 'utf8')
   const css = compiler.build([...new Set(content.match(/[A-Za-z0-9_@:/.[\]()%,-]+/g))])
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   t.after(() => browser.close())
   for (const width of [1100, 390]) {
     const page = await browser.newPage({ viewport: { width, height: 760 }, hasTouch: true })

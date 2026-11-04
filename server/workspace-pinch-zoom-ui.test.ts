@@ -3,10 +3,9 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
-test('workspace blocks page pinch while preserving native pan and removable gesture handling', { skip: !domBrowserExecutable(), timeout: 30_000 }, async () => {
+test('workspace blocks page pinch while preserving native pan and removable gesture handling', { timeout: 30_000 }, async () => {
   const root = path.resolve(import.meta.dirname, '..')
   const html = await fs.readFile(path.join(root, 'index.html'), 'utf8')
   const viewport = html.match(/<meta\s+name="viewport"\s+content="([^"]+)"/)?.[1]
@@ -19,7 +18,7 @@ test('workspace blocks page pinch while preserving native pan and removable gest
   const bundle = await build({ input: 'virtual:workspace-pinch', write: false, platform: 'browser', output: { format: 'esm', codeSplitting: false }, plugins: [{ name: 'workspace-pinch-fixture', resolveId(id) { if (id === 'virtual:workspace-pinch') return id }, load(id) { if (id === 'virtual:workspace-pinch') return source } }] })
   const chunk = bundle.output.find(item => item.type === 'chunk' && item.isEntry)!
   assert.ok(chunk.type === 'chunk')
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     const page = await browser.newPage({ viewport: { width: 390, height: 800 }, hasTouch: true, isMobile: true })
     const errors: string[] = []

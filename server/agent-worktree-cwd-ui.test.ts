@@ -3,12 +3,12 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
-import { chromium, type Route } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import type { Route } from 'playwright-core'
+import { connectTestBrowser } from './test-browser.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 
-test('worktree changes preserve existing agent sessions and create new agent and terminal tabs in the selected folder', { skip: !domBrowserExecutable(), timeout: 40_000 }, async () => {
+test('worktree changes preserve existing agent sessions and create new agent and terminal tabs in the selected folder', { timeout: 40_000 }, async () => {
   const source = `import React from '${root}/node_modules/react/index.js';
 import {createRoot} from '${root}/node_modules/react-dom/client.js';
 import {AgentPanel} from '${root}/src/components/AgentPanel.tsx';
@@ -44,7 +44,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     },
   }] })
   const chunk = bundle.output.find(item => item.type === 'chunk')!
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   const page = await browser.newPage()
   page.setDefaultTimeout(5_000)
   const errors: string[] = []

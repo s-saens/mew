@@ -4,12 +4,12 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium, type Page } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import type { Page } from 'playwright-core'
+import { connectTestBrowser } from './test-browser.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 
-test('explorer separates selection, opening, selected-item menus and bulk actions across input modes', { skip: !domBrowserExecutable(), timeout: 60_000 }, async () => {
+test('explorer separates selection, opening, selected-item menus and bulk actions across input modes', { timeout: 60_000 }, async () => {
   const source = `import React from '${root}/node_modules/react/index.js';
 import {createRoot} from '${root}/node_modules/react-dom/client.js';
 import {I18nProvider} from '${root}/src/i18n.tsx';
@@ -25,7 +25,7 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><I18nProvid
   const content = (await Promise.all(['src/components/FileTree.tsx', 'src/components/file-action-menu.tsx', 'packages/ui/src/action-menu.tsx', 'packages/ui/src/ConfirmDialog.tsx', 'packages/ui/src/dialog-frame.tsx'].map(file => fs.readFile(path.join(root, file), 'utf8')))).join('\n')
   const compiler = await compile(await fs.readFile(`${root}/src/index.css`, 'utf8'), { base: `${root}/src`, onDependency() {} })
   const css = compiler.build([...new Set((source + content).match(/[A-Za-z0-9_@:/.[\]()%,-]+/g))])
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     const errors: string[] = []
     const writes: Array<{ endpoint: string; payload: Record<string, unknown> }> = []

@@ -1,10 +1,9 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { build } from 'rolldown'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
-test('dock returns after fullscreen keyboard use without blurring the input', { skip: !domBrowserExecutable(), timeout: 15_000 }, async () => {
+test('dock returns after fullscreen keyboard use without blurring the input', { timeout: 15_000 }, async () => {
   const hook = new URL('../src/hooks/use-mobile-keyboard.ts', import.meta.url).pathname
   const source = `import React from 'react';import {createRoot} from 'react-dom/client';
   import {useMobileKeyboard} from ${JSON.stringify(hook)};
@@ -15,7 +14,7 @@ test('dock returns after fullscreen keyboard use without blurring the input', { 
     plugins: [{ name: 'fixture', resolveId(id) { if (id === 'virtual:keyboard.tsx') return id }, load(id) { if (id === 'virtual:keyboard.tsx') return source } }],
   })
   const chunk = bundle.output.find(item => item.type === 'chunk')!
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     const page = await browser.newPage({ viewport: { width: 390, height: 760 } })
     page.setDefaultTimeout(3000)

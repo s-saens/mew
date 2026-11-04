@@ -7,8 +7,7 @@ import path from 'node:path'
 import http from 'node:http'
 import { duplexPair } from 'node:stream'
 import express from 'express'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 import { directUiHtml, sendDirectUiHtml } from './direct-ui.ts'
 
 test('direct HTML rewrites startup resources while preserving document links and inline code', () => {
@@ -47,7 +46,7 @@ function request(server: http.Server, target: string, method = 'GET'): Promise<{
   })
 }
 
-test('public deep links load relative production assets from the direct app root', { skip: !domBrowserExecutable(), timeout: 15_000 }, async t => {
+test('public deep links load relative production assets from the direct app root', { timeout: 15_000 }, async t => {
   const source = await readFile(new URL('../index.html', import.meta.url), 'utf8')
   const html = source.replace('src="/src/main.tsx"', 'src="./assets/app.js"')
     .replace('</head>', '<link rel="stylesheet" href="./assets/app.css"></head>')
@@ -61,7 +60,7 @@ test('public deep links load relative production assets from the direct app root
   const app = express(), server = http.createServer(app)
   app.use('/assets', express.static(path.join(directory, 'assets'), { immutable: true, maxAge: '30d' }))
   app.use(async (_req, res) => { res.setHeader('Cache-Control', 'no-cache'); await sendDirectUiHtml(res, path.join(directory, 'index.html')) })
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   t.after(() => browser.close())
   const page = await browser.newPage()
   page.setDefaultTimeout(2000)

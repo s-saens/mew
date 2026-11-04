@@ -1,10 +1,9 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { build } from 'rolldown'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
-test('Markdown links render external files and follow links from external Markdown', { skip: !domBrowserExecutable(), timeout: 30_000 }, async () => {
+test('Markdown links render external files and follow links from external Markdown', { timeout: 30_000 }, async () => {
   const source = `import React from ${JSON.stringify(import.meta.resolve('react'))};
 import {createRoot} from ${JSON.stringify(import.meta.resolve('react-dom/client'))};
 import {Editor} from ${JSON.stringify(new URL('../packages/editor/src/Editor.tsx', import.meta.url).pathname)};
@@ -20,7 +19,7 @@ return <div style={{height:600}}>{tab && !tab.loading ? tab.viewMode==='hotview'
 createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18nProvider>);`
   const bundle = await build({ input: 'virtual:links.tsx', write: false, platform: 'browser', output: { format: 'iife' }, transform: { jsx: 'react-jsx', define: { 'process.env.NODE_ENV': JSON.stringify('test') } }, plugins: [{ name: 'fixture', resolveId(id) { if (id === 'virtual:links.tsx') return id; if (id.endsWith('.css')) return 'virtual:style' }, load(id) { if (id === 'virtual:links.tsx') return source; if (id === 'virtual:style') return '' } }] })
   const chunk = bundle.output.find(item => item.type === 'chunk')!
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     const page = await browser.newPage()
     page.setDefaultTimeout(4000)

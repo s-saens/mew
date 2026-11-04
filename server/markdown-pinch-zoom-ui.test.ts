@@ -4,11 +4,10 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
-test('Hotview pinch preserves source, selection, undo and the reading anchor', { skip: !domBrowserExecutable(), timeout: 60_000 }, async () => {
+test('Hotview pinch preserves source, selection, undo and the reading anchor', { timeout: 60_000 }, async () => {
   const content = Array.from({ length: 600 }, (_, i) => `Paragraph ${i}: ${'Reading wrapped markdown content. '.repeat(5)}`).join('\n\n')
   const source = `
 import React from 'react';
@@ -36,7 +35,7 @@ const root=createRoot(document.getElementById('root'));window.unmount=()=>root.u
   const cssSources = await Promise.all(['packages/editor/src/Editor.tsx', 'packages/editor/src/editor/FrontmatterPanel.tsx'].map(file => fs.readFile(path.join(root, file), 'utf8')))
   const compiler = await compile(await fs.readFile(path.join(root, 'src/index.css'), 'utf8'), { base: path.join(root, 'src'), onDependency() {} })
   const css = compiler.build([...new Set((source + cssSources.join('\n')).match(/[A-Za-z0-9_@!:/.[\]()%,-]+/g))]) + styles.join('\n')
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     const page = await browser.newPage({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true })
     await page.route('http://mew-pinch.test/**', route => route.fulfill(route.request().url().endsWith('/app.js')

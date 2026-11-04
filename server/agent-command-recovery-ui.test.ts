@@ -2,10 +2,9 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import path from 'node:path'
 import { build } from 'rolldown'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
-test('agent command polling keeps recovering quietly with bounded backoff and preserves operation failures', { skip: !domBrowserExecutable(), timeout: 20_000 }, async t => {
+test('agent command polling keeps recovering quietly with bounded backoff and preserves operation failures', { timeout: 20_000 }, async t => {
   const root = path.resolve(import.meta.dirname, '..')
   const source = `
 import React from '${root}/node_modules/react/index.js';
@@ -28,7 +27,7 @@ const app=createRoot(document.getElementById('root'));app.render(React.createEle
     },
   }] })
   const code = bundle.output.find(item => item.type === 'chunk')!.code
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   t.after(() => browser.close())
   const page = await browser.newPage(), errors: string[] = []
   page.on('pageerror', error => errors.push(error.message))

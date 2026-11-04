@@ -4,8 +4,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 const paragraphs = Array.from({ length: 600 }, (_, i) => `문단 ${i + 1}: 한글과 English **강조** 및 [내부 문서](./other.md)를 함께 편집합니다.`)
@@ -15,7 +14,7 @@ const content = ['---', 'title: 큰 문서', '---', '', '# 첫 제목', '', ...p
     ? ['> 가상 블록 인용문', '', '```ts', 'const windowed = true', '```', '', '| A | B |', '| --- | --- |', '| 하나 | 둘 |', '', '- [ ] 창 밖 할 일', '- [x] 끝난 할 일', '', '![도형](/fixture.svg)', '', '<div data-mew-db="windowed-db"></div>', '', text, '']
     : [text, ''])].join('\n')
 
-test('Hotview windows block descendants and preserves edits, navigation, selection and shared documents', { skip: !domBrowserExecutable(), timeout: 90_000 }, async () => {
+test('Hotview windows block descendants and preserves edits, navigation, selection and shared documents', { timeout: 90_000 }, async () => {
   const source = `
 import React from 'react';
 import {createRoot} from 'react-dom/client';
@@ -55,7 +54,7 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
   const cssSources = await Promise.all(['packages/editor/src/Editor.tsx', 'packages/editor/src/editor/FrontmatterPanel.tsx'].map(file => fs.readFile(path.join(root, file), 'utf8')))
   const compiler = await compile(await fs.readFile(path.join(root, 'src/index.css'), 'utf8'), { base: path.join(root, 'src'), onDependency() {} })
   const css = compiler.build([...new Set((source + cssSources.join('\n')).match(/[A-Za-z0-9_@!:/.[\]()%,-]+/g))]) + styles.join('\n')
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) for (const collab of [false, true]) {
       const page = await browser.newPage({ viewport })

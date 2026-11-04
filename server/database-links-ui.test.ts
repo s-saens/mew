@@ -4,15 +4,14 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 const first = '123e4567-e89b-12d3-a456-426614174000'
 const second = '123e4567-e89b-12d3-a456-426614174001'
 const missing = '123e4567-e89b-12d3-a456-426614174002'
 
-test('Plain DB links open scoped dialogs with shared blur, preserve source and respect references', { skip: !domBrowserExecutable(), timeout: 45_000 }, async () => {
+test('Plain DB links open scoped dialogs with shared blur, preserve source and respect references', { timeout: 45_000 }, async () => {
   const content = [
     `<div data-mew-db="${first}"></div>`, '',
     `<div\n data-mew-db-readonly='true' data-mew-db='${second}'>\n</div>`, '',
@@ -50,7 +49,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
   const compiler = await compile(await fs.readFile(path.join(root, 'src/index.css'), 'utf8'), { base: path.join(root, 'src'), onDependency() {} })
   const css = compiler.build([...new Set(candidates.join('\n').match(/[A-Za-z0-9_@!:/.[\]()%,-]+/g))]) + styles.join('\n')
   const code = bundle.output.find(item => item.type === 'chunk')!.code
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     for (const width of [1100, 390]) for (const theme of ['midnight', 'light']) {
       const page = await browser.newPage({ viewport: { width, height: 844 }, isMobile: width < 500, hasTouch: width < 500 })

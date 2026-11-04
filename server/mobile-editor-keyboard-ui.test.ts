@@ -4,11 +4,10 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
 test('editor body taps allow native keyboard focus and typing without a floating button', {
-  skip: !domBrowserExecutable(), timeout: 60_000,
+  timeout: 60_000,
 }, async t => {
   const repo = path.resolve(import.meta.dirname, '..')
   const source = `
@@ -39,7 +38,7 @@ function Fixture(){const [state,setState]=React.useState(defaults);const handle=
   const css = compiler.build([...new Set(candidates.join('\n').match(/[A-Za-z0-9_@!:/.[\]()%,-]+/g))]) + styles.join('\n')
   const entry = bundle.output.find(item => item.type === 'chunk' && item.isEntry)!
   assert.ok(entry.type === 'chunk')
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   t.after(() => browser.close())
 
   for (const [width, theme, nativeApi] of [[390, 'dark', true], [320, 'light', false], [1280, 'dark', true]] as const) {

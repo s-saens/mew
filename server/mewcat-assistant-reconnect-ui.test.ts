@@ -2,10 +2,9 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import path from 'node:path'
 import { build } from 'rolldown'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
-test('assistant reconnect shows neutral loading, bounds retries, preserves conversation and never resends prompts', { skip: !domBrowserExecutable(), timeout: 20_000 }, async t => {
+test('assistant reconnect shows neutral loading, bounds retries, preserves conversation and never resends prompts', { timeout: 20_000 }, async t => {
   const root = path.resolve(import.meta.dirname, '..')
   const source = `
 import React from '${root}/node_modules/react/index.js';
@@ -31,7 +30,7 @@ window.mount=()=>app.render(React.createElement(Harness,{key:++key}));window.unm
     if (id.endsWith('.css')) return 'virtual:style'
   }, load(id) { if (id === 'virtual:assistant-reconnect.ts') return source; if (id === 'virtual:i18n') return `export function useI18n(){return {locale:'ko',t:key=>key}}`; if (id === 'virtual:style') return '' } }] })
   const code = bundle.output.find(item => item.type === 'chunk')!.code
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   t.after(() => browser.close())
   const page = await browser.newPage(), errors: string[] = []
   page.on('pageerror', error => errors.push(error.message))

@@ -4,10 +4,9 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import express from 'express'
 import { build } from 'rolldown'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
-test('task context menus provide icon actions, keyboard navigation, viewport placement and read-only protection in all views', { skip: !domBrowserExecutable(), timeout: 30_000 }, async () => {
+test('task context menus provide icon actions, keyboard navigation, viewport placement and read-only protection in all views', { timeout: 30_000 }, async () => {
   const root = path.resolve(import.meta.dirname, '..')
   const source = `import React,{useState} from 'react';import {createRoot} from 'react-dom/client';
 import {TaskPanel} from '${root}/src/components/task-panel.tsx';import {I18nProvider} from '${root}/src/i18n.tsx';
@@ -24,7 +23,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
   const server = app.listen(0, '127.0.0.1')
   await new Promise<void>(resolve => server.once('listening', resolve))
   const address = server.address(); assert.ok(address && typeof address !== 'string')
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     const errors: string[] = []
     for (const mobile of [false, true]) {

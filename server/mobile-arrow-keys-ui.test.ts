@@ -4,11 +4,10 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
 test('mobile arrows press on contact, repeat while held, and track mouse and captured touch drags', {
-  skip: !domBrowserExecutable(), timeout: 45_000,
+  timeout: 45_000,
 }, async t => {
   const root = path.resolve(import.meta.dirname, '..')
   const source = `import React from 'react';import {createRoot} from 'react-dom/client';
@@ -38,7 +37,7 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><Fixture/><
   const css = compiler.build([...new Set(candidates.join('\n').match(/[A-Za-z0-9_@!:/.[\]()%,-]+/g))])
   const entry = bundle.output.find(item => item.type === 'chunk' && item.isEntry)!
   assert.ok(entry.type === 'chunk')
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   t.after(() => browser.close())
 
   for (const placement of ['fixed', 'flow']) await t.test(placement, async () => {

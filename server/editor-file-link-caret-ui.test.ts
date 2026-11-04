@@ -3,10 +3,9 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs/promises'
 import type { Editor as TiptapEditor } from '@tiptap/core'
 import { build } from 'rolldown'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
-test('file link arrow navigation keeps a visible caret after selectionchange on desktop and mobile', { skip: !domBrowserExecutable(), timeout: 30_000 }, async () => {
+test('file link arrow navigation keeps a visible caret after selectionchange on desktop and mobile', { timeout: 30_000 }, async () => {
   const content = '[문서홈](./home.md)\n\n앞 [문서홈](./home.md) 뒤\n\n[첫 문서](./one.md)[둘째 문서](./two.md)'
   const source = `
 import React from ${JSON.stringify(import.meta.resolve('react'))};
@@ -34,7 +33,7 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
     }],
   })
   const chunk = bundle.output.find(item => item.type === 'chunk')!
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) {
       const page = await browser.newPage({ viewport })

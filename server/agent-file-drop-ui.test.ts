@@ -2,12 +2,11 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import path from 'node:path'
 import { build } from 'rolldown'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 
-test('external files become attachments without entering the composer document', { skip: !domBrowserExecutable() }, async () => {
+test('external files become attachments without entering the composer document', { }, async () => {
   const bundle = await build({
     input: 'virtual:drop.tsx', write: false, platform: 'browser',
     output: { format: 'iife', codeSplitting: false },
@@ -33,7 +32,7 @@ test('external files become attachments without entering the composer document',
     }],
   })
   const code = bundle.output.find(item => item.type === 'chunk')!.code
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     const page = await browser.newPage()
     await page.route('http://mew-drop.test/**', route => route.fulfill({ contentType: 'text/html', body: '<div id="root"></div>' }))

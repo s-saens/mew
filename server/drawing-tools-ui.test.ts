@@ -4,8 +4,8 @@ import path from 'node:path'
 import test from 'node:test'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium, type Locator, type Page } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import type { Locator, Page } from 'playwright-core'
+import { connectTestBrowser } from './test-browser.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 const near = (actual: number, expected: number) => assert.ok(Math.abs(actual - expected) < .02, `${actual} should be near ${expected}`)
@@ -35,7 +35,7 @@ async function origin(object: Locator): Promise<{ x: number; y: number }> {
   return { x: Number(transform[1]), y: Number(transform[2]) }
 }
 
-test('drawing pen, theme transparency, PNG alpha and configurable snapping work on desktop and narrow mobile', { skip: !domBrowserExecutable(), timeout: 90_000 }, async t => {
+test('drawing pen, theme transparency, PNG alpha and configurable snapping work on desktop and narrow mobile', { timeout: 90_000 }, async t => {
   const source = `
 import React from '${root}/node_modules/react/index.js';
 import {createRoot} from '${root}/node_modules/react-dom/client.js';
@@ -71,7 +71,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
   const chunk = bundle.output.find(item => item.type === 'chunk')!
   const compiler = await compile(await fs.readFile(`${root}/src/index.css`, 'utf8'), { base: `${root}/src`, onDependency() {} })
   const css = compiler.build([...new Set(['bg-surface-inverse', 'text-surface-deep', ...(candidates.join('\n').match(/[A-Za-z0-9_@!:/.[\]()%,-]+/g) ?? [])])]) + styles.join('\n')
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   t.after(() => browser.close())
   for (const width of [1100, 390, 320]) {
     const page = await browser.newPage({ viewport: { width, height: 844 }, hasTouch: width < 768, locale: 'ko-KR' })

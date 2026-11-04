@@ -1,13 +1,12 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { build } from 'rolldown'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
-test('socket callback errors are reported without closing sibling sockets or HTTP requests', { skip: !domBrowserExecutable(), timeout: 15_000 }, async t => {
+test('socket callback errors are reported without closing sibling sockets or HTTP requests', { timeout: 15_000 }, async t => {
   const bundle = await build({ input: new URL('../src/utils/remote-transport.ts', import.meta.url).pathname, write: false, platform: 'browser', output: { format: 'iife', name: 'Remote' } })
   const code = bundle.output.find(item => item.type === 'chunk')!.code
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   t.after(() => browser.close())
   const page = await browser.newPage(), errors: string[] = []
   page.on('pageerror', error => errors.push(error.message))
@@ -52,9 +51,9 @@ window.deliver=frame=>window.channel.dispatchEvent(new MessageEvent('message',{d
   assert.deepEqual(errors, ['app-open-callback', 'app-message-callback', 'app-close-callback', 'app-shutdown-callback'])
 })
 
-test('closing a socket while its Blob is read does not send messages after the close frame', { skip: !domBrowserExecutable(), timeout: 15_000 }, async t => {
+test('closing a socket while its Blob is read does not send messages after the close frame', { timeout: 15_000 }, async t => {
   const bundle = await build({ input: new URL('../src/utils/remote-transport.ts', import.meta.url).pathname, write: false, platform: 'browser', output: { format: 'iife', name: 'Remote' } })
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   t.after(() => browser.close())
   const page = await browser.newPage()
   await page.route('https://mew-resilience.test/**', route => route.fulfill({ contentType: 'text/html', body: `<script>${bundle.output.find(item => item.type === 'chunk')!.code}</script>` }))

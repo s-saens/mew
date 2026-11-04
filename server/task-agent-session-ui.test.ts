@@ -3,13 +3,12 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 const prompt = '[[.workspace:.mew/tasks/Task.md]]\nFirst organize this task document, then implement its contents.'
 
-test('task requests choose a runtime and prepare an editable draft without sending it', { skip: !domBrowserExecutable(), timeout: 60_000 }, async t => {
+test('task requests choose a runtime and prepare an editable draft without sending it', { timeout: 60_000 }, async t => {
   const source = `
     import React from '${root}/node_modules/react/index.js';
     import {createRoot} from '${root}/node_modules/react-dom/client.js';
@@ -61,7 +60,7 @@ test('task requests choose a runtime and prepare an editable draft without sendi
     } }],
   })
   const chunk = bundle.output.find(item => item.type === 'chunk')!
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   t.after(() => browser.close())
   for (const { width, docked } of [{ width: 1100, docked: false }, { width: 390, docked: false }, { width: 1100, docked: true }]) await t.test(`${width}px ${docked ? 'split dock' : width === 390 ? 'agent preset' : 'runtime'}`, async matrix => {
     const page = await browser.newPage({ viewport: { width, height: 844 }, hasTouch: width === 390 })

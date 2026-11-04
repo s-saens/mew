@@ -4,10 +4,9 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
-test('explorer search filters file and document trees with contextual content previews', { skip: !domBrowserExecutable(), timeout: 90_000 }, async () => {
+test('explorer search filters file and document trees with contextual content previews', { timeout: 90_000 }, async () => {
   const root = path.resolve(import.meta.dirname, '..')
   const workspaceExports = new Map<string, string>()
   for (const name of ['editor', 'ui', 'mobile-keys', 'shortcuts', 'tmux-term']) {
@@ -72,7 +71,7 @@ test('explorer search filters file and document trees with contextual content pr
   assert.ok(chunk.type === 'chunk')
   const compiler = await compile(await fs.readFile(path.join(root, 'src/index.css'), 'utf8'), { base: path.join(root, 'src'), onDependency() {} })
   const css = compiler.build([...new Set(candidates.join('\n').match(/[A-Za-z0-9_@!&:/.[\]()%,-]+/g))]) + styles.join('\n')
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     for (const docs of [false, true]) {
       for (const { width, theme } of [{ width: 1100, theme: 'midnight' }, { width: 390, theme: 'rose' }]) {

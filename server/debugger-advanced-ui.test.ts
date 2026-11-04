@@ -6,10 +6,9 @@ import path from 'node:path'
 import express from 'express'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
-test('advanced debugger UI pages arrays, edits values/memory and shares editor breakpoints on desktop/mobile', { skip: !domBrowserExecutable(), timeout: 60000 }, async t => {
+test('advanced debugger UI pages arrays, edits values/memory and shares editor breakpoints on desktop/mobile', { timeout: 60000 }, async t => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'mew-debugger-advanced-ui-')); process.env.MEW_DATA_DIR = root; process.env.MEW_WORKSPACE = root
   const { attachLiveWebSocket } = await import('./live-socket.ts')
   const { createDebuggerRouter, readDebuggerStatus, readDebuggerBrowserStatus } = await import('./debugger-routes.ts'), { saveDebugConfig, debugConfig, debugSessions } = await import('./debugger.ts'), { defaultDebugConfig, breakpointKey } = await import('../shared/debugger.ts'), { upsertUser } = await import('./auth.ts')
@@ -33,7 +32,7 @@ const debug = debuggerEditorExtension(${JSON.stringify(root)}, ${JSON.stringify(
   attachLiveWebSocket(server, (_req, resource) => ({ key: resource.kind, interval: 100, allowed: () => true, async read() {
     return resource.kind === 'debugger-browser' ? readDebuggerBrowserStatus(account) : readDebuggerStatus(account)
   } }))
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   t.after(async () => { await Promise.allSettled(debugSessions(account, root).map(s => s.stop())); await browser.close(); server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve())); await fs.rm(root, { recursive: true, force: true }) })
   const wait = async (check: () => boolean) => { const deadline = Date.now() + 4000; while (!check()) { assert.ok(Date.now() < deadline, 'state did not settle'); await new Promise(r => setTimeout(r, 10)) } }
   for (const viewport of [{ width: 1366, height: 768 }, { width: 320, height: 640 }]) {

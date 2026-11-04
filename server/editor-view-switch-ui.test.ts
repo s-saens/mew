@@ -4,10 +4,9 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
-test('Hotview and Plain keep the visible source line across repeated switches', { skip: !domBrowserExecutable(), timeout: 45_000 }, async () => {
+test('Hotview and Plain keep the visible source line across repeated switches', { timeout: 45_000 }, async () => {
   const content = ['---', 'title: switch', '---', '', '', ...Array.from({ length: 200 }, (_, i) => `문단 ${i + 1}: 본문 **강조**와 내용\n`)].join('\n')
   const panePath = new URL('../src/components/EditorPane.tsx', import.meta.url).pathname
   const source = `
@@ -49,7 +48,7 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><I18nProvid
   const sources = await Promise.all(['src/components/EditorPane.tsx', 'src/components/TabBar.tsx', 'packages/editor/src/Editor.tsx'].map(file => fs.readFile(path.join(root, file), 'utf8')))
   const css = compiler.build([...new Set((source + sources.join('\n')).match(/[A-Za-z0-9_@!:/.[\]()%,-]+/g))]) + styles.join('\n')
   const chunk = bundle.output.find(item => item.type === 'chunk')!
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     const scenarios = [false, true].flatMap(collab => [{ width: 1280, height: 800 }, { width: 390, height: 844 }].map(viewport => ({ viewport, collab })))
     for (const { viewport, collab } of scenarios) {

@@ -4,11 +4,11 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium, type Locator } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import type { Locator } from 'playwright-core'
+import { connectTestBrowser } from './test-browser.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
-test('tab double-click renames and desktop grip double-click expands panels without losing sessions', { skip: !domBrowserExecutable(), timeout: 60_000 }, async () => {
+test('tab double-click renames and desktop grip double-click expands panels without losing sessions', { timeout: 60_000 }, async () => {
   const layout = { version: 1, groups: [{ id: 'editor:main', kind: 'editor' }, ...['agent', 'terminal', 'git'].map(id => ({ id, kind: id }))], tabs: {}, active: {}, tree: {
     axis: 'row', ratio: .5, first: { axis: 'col', ratio: .5, first: { id: 'editor:main' }, second: { id: 'git' } }, second: { axis: 'col', ratio: .5, first: { id: 'agent' }, second: { id: 'terminal' } },
   } }
@@ -71,7 +71,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
   const chunk = bundle.output.find(item => item.type === 'chunk')!
   const compiler = await compile(await fs.readFile(path.join(root, 'src/index.css'), 'utf8'), { base: path.join(root, 'src'), onDependency() {} })
   const css = compiler.build([...new Set((content + source).match(/[A-Za-z0-9_@!:/.[\]()%,-]+/g))])
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
     page.setDefaultTimeout(7000)

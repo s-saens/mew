@@ -4,8 +4,8 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium, type Locator, type Page } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import type { Locator, Page } from 'playwright-core'
+import { connectTestBrowser } from './test-browser.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 type Point = { x: number; y: number }
@@ -44,7 +44,7 @@ async function backgroundAlpha(surface: Locator): Promise<number> {
   })
 }
 
-test('real docked agent conversations and saved history show animated theme gradients on desktop/mobile', { skip: !domBrowserExecutable(), timeout: 60_000 }, async () => {
+test('real docked agent conversations and saved history show animated theme gradients on desktop/mobile', { timeout: 60_000 }, async () => {
   const source = `import React,{useState} from '${root}/node_modules/react/index.js';
 import {createRoot} from '${root}/node_modules/react-dom/client.js';
 import {AgentPanel} from '${root}/src/components/AgentPanel.tsx';
@@ -91,7 +91,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
   const compiler = await compile(await fs.readFile(`${root}/src/index.css`, 'utf8'), { base: `${root}/src`, onDependency() {} })
   const content = (await Promise.all(['src/components/AgentPanel.tsx', 'src/components/MentionTextarea.tsx', 'src/components/DockWorkspace.tsx'].map(file => fs.readFile(`${root}/${file}`, 'utf8')))).join('\n')
   const css = compiler.build([...new Set((source + content).match(/[A-Za-z0-9_@!&:/.[\]()%,-]+/g))])
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     for (const width of [1100, 390]) for (const theme of ['midnight', 'rose', 'ocean']) {
       const page = await browser.newPage({ viewport: { width, height: 844 }, reducedMotion: 'no-preference' })

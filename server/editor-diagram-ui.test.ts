@@ -2,10 +2,9 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'node:fs/promises'
 import { build } from 'rolldown'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
-test('Mermaid renders the remote desktop diagram, opens on demand and recovers on desktop/mobile', { skip: !domBrowserExecutable(), timeout: 60000 }, async () => {
+test('Mermaid renders the remote desktop diagram, opens on demand and recovers on desktop/mobile', { timeout: 60000 }, async () => {
   const doc = await fs.readFile(new URL('../.mew/docs/development/remote-desktop.md', import.meta.url), 'utf8')
   const diagram = doc.match(/```mermaid\n([\s\S]*?)\n```/)![1]
   const modulePath = new URL('../packages/editor/src/editor/diagram-preview.ts', import.meta.url).pathname
@@ -18,7 +17,7 @@ document.querySelector('#recover').onclick=()=>view.update('mermaid','flowchart 
     plugins: [{ name: 'fixture', resolveId(id) { if (id === 'virtual:diagram') return id }, load(id) { if (id === 'virtual:diagram') return source } }] })
   const script = bundle.output.find(item => item.type === 'chunk')!
   const css = await fs.readFile(new URL('../packages/editor/src/editor/editor.css', import.meta.url), 'utf8')
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) {
       const page = await browser.newPage({ viewport })

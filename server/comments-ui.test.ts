@@ -4,8 +4,8 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium, type Locator, type Page } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import type { Locator, Page } from 'playwright-core'
+import { connectTestBrowser } from './test-browser.ts'
 
 interface CommentThread {
   id: string
@@ -84,7 +84,7 @@ async function assertOverlayTheme(dialog: Locator, theme: string) {
 }
 
 test('comments open with Ctrl+Shift+C, preserve failed drafts, and support post, reply, edit, and delete across themes and mobile', {
-  skip: !domBrowserExecutable(), timeout: 120_000,
+  timeout: 120_000,
 }, async t => {
   const repo = path.resolve(import.meta.dirname, '..')
   const baselineSource = process.env.MEW_COMMENTS_BASELINE_SOURCE
@@ -141,7 +141,7 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><I18nProvid
   const css = compiler.build([...new Set(candidates.join('\n').match(/[A-Za-z0-9_@!:/.[\]()%,-]+/g))]) + styles.join('\n')
   const entry = bundle.output.find(item => item.type === 'chunk' && item.isEntry)!
   assert.ok(entry.type === 'chunk')
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   t.after(() => browser.close())
   const screenshotDir = process.env.MEW_COMMENTS_SCREENSHOT_DIR
   if (screenshotDir) await fs.mkdir(screenshotDir, { recursive: true })

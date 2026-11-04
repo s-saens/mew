@@ -6,12 +6,11 @@ import http from 'node:http'
 import { WebSocketServer } from 'ws'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 
-test('system resources integrates live network totals and rates without header network controls', { skip: !domBrowserExecutable(), timeout: 45_000 }, async () => {
+test('system resources integrates live network totals and rates without header network controls', { timeout: 45_000 }, async () => {
   const source = `import React from '${root}/node_modules/react/index.js';
 import {createRoot} from '${root}/node_modules/react-dom/client.js';
 import {HeaderResources} from '${root}/src/components/header-resources.tsx';
@@ -49,7 +48,7 @@ window.cloneRoundTrip=async()=>{const response=await fetch('/api/stream-finite')
   sockets.on('connection', socket => socket.on('message', (data, binary) => socket.send(data, { binary })))
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
   const base = `http://127.0.0.1:${(server.address() as { port: number }).port}`
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     const page = await browser.newPage({ viewport: { width: 1100, height: 800 } })
     page.setDefaultTimeout(5000)

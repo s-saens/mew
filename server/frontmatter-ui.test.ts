@@ -4,10 +4,9 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
-test('frontmatter handles reorder and edit persistent field types on desktop and touch', { skip: !domBrowserExecutable(), timeout: 45_000 }, async () => {
+test('frontmatter handles reorder and edit persistent field types on desktop and touch', { timeout: 45_000 }, async () => {
   const root = path.resolve(import.meta.dirname, '..')
   const initial = '---\ntitle: Document\nstatus: Draft\nreference: "[Guide](../guide.md)"\ncount: "123"\ndue: "2026-10-02"\n---\n\nBody'
   const source = `
@@ -45,7 +44,7 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
   const calendarCss = (await Promise.all(['date-field.css', 'date-calendar.css'].map(name => fs.readFile(path.join(root, 'packages/ui/src', name), 'utf8')))).join('\n')
   const css = calendarCss + compiler.build([...new Set(candidates.join('\n').match(/[A-Za-z0-9_@!:/.[\]()%,-]+/g))]) + await fs.readFile(path.join(root, 'packages/editor/src/editor/editor.css'), 'utf8')
   const chunk = bundle.output.find(item => item.type === 'chunk')!
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     for (const width of [1280, 390]) {
       const page = await browser.newPage({ viewport: { width, height: 844 }, hasTouch: width < 500, isMobile: width < 500 })

@@ -4,12 +4,11 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 
-test('tab arrows, loading logos and notification shadows follow the theme background', { skip: !domBrowserExecutable(), timeout: 30_000 }, async t => {
+test('tab arrows, loading logos and notification shadows follow the theme background', { timeout: 30_000 }, async t => {
   const source = `import React from '${root}/node_modules/react/index.js';
 import {createRoot} from '${root}/node_modules/react-dom/client.js';
 import {TabScrollArea} from '${root}/packages/ui/src/tab-scroll-area.tsx';
@@ -41,7 +40,7 @@ createRoot(document.getElementById('root')).render(<main className="mew-workspac
   const code = bundle.output.filter(item => item.type === 'chunk').map(item => item.code).join('\n')
   const compiler = await compile(await fs.readFile(`${root}/src/index.css`, 'utf8'), { base: `${root}/src`, onDependency() {} })
   const css = compiler.build([]) + await fs.readFile(`${root}/packages/ui/src/loading-indicator.css`, 'utf8')
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   t.after(() => browser.close())
   for (const width of [1100, 390]) {
     const page = await browser.newPage({ viewport: { width, height: 480 }, hasTouch: width < 500, reducedMotion: 'reduce' })

@@ -4,8 +4,8 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium, type Page } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import type { Page } from 'playwright-core'
+import { connectTestBrowser } from './test-browser.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 const photoToken = '[[.workspace:.mew/assets/photo copy.png]]'
@@ -52,7 +52,7 @@ async function moveToPosition(page: Page, position: number, steps = 8): Promise<
   await settlePointer(page)
 }
 
-test('inline attachment editing and long-press moves preserve the controlled document on desktop/mobile', { skip: !domBrowserExecutable(), timeout: 60_000 }, async t => {
+test('inline attachment editing and long-press moves preserve the controlled document on desktop/mobile', { timeout: 60_000 }, async t => {
   const source = `
 import React from '${root}/node_modules/react/index.js';
 import {createRoot} from '${root}/node_modules/react-dom/client.js';
@@ -119,7 +119,7 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
   const compiler = await compile(await fs.readFile(path.join(root, 'src/index.css'), 'utf8'), { base: path.join(root, 'src'), onDependency() {} })
   const css = compiler.build([...new Set(candidates.join('\n').match(/[A-Za-z0-9_@!&:/.[\]()%,-]+/g))])
     + await fs.readFile(path.join(root, 'packages/ui/src/loading-indicator.css'), 'utf8')
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   t.after(() => browser.close())
   for (const width of [1100, 390]) for (const dark of [true, false]) {
     await t.test(`${width}px ${dark ? 'dark' : 'light'}`, async matrix => {

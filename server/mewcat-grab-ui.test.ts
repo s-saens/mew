@@ -5,12 +5,11 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 
-test('a thrown Mewcat keeps background input accessible and can be caught without jumping', { skip: !domBrowserExecutable(), timeout: 120_000 }, async () => {
+test('a thrown Mewcat keeps background input accessible and can be caught without jumping', { timeout: 120_000 }, async () => {
   const source = `
 // This fixture covers cat behavior in a fullscreen-unavailable client.
 Object.defineProperty(document,'fullscreenEnabled',{value:false});
@@ -31,7 +30,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider>{host?createPor
   const chunk = bundle.output.find(item => item.type === 'chunk')!
   const compiler = await compile(await fs.readFile(`${root}/src/index.css`, 'utf8'), { base: `${root}/src`, onDependency() {} })
   const petFiles = await mewpetUiFixture()
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     for (const skin of ['capybara']) for (const remote of [false, true]) for (const touch of [false, true]) {
       const page = await browser.newPage({ viewport: { width: touch ? 390 : 800, height: 700 }, hasTouch: touch, isMobile: touch })

@@ -2,12 +2,11 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import path from 'node:path'
 import { build } from 'rolldown'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 
-test('mobile Back exhausts popup, screen visits and remaining panels before leaving the app', { skip: !domBrowserExecutable(), timeout: 30_000 }, async () => {
+test('mobile Back exhausts popup, screen visits and remaining panels before leaving the app', { timeout: 30_000 }, async () => {
   const source = `
 import React,{useState} from '${root}/node_modules/react/index.js';
 import {createRoot} from '${root}/node_modules/react-dom/client.js';
@@ -38,7 +37,7 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
   const bundle = await build({ input: 'virtual:overlay-history.tsx', write: false, platform: 'browser', output: { format: 'iife' }, transform: { jsx: 'react-jsx', define: { 'process.env.NODE_ENV': JSON.stringify('production') } }, plugins: [{ name: 'fixture', resolveId(id) { if (id === 'virtual:overlay-history.tsx') return id; if (id.endsWith('.css')) return 'virtual:empty-css'; return null }, load(id) { if (id === 'virtual:overlay-history.tsx') return source; if (id === 'virtual:empty-css') return ''; return null } }] })
   const chunk = bundle.output.find(item => item.type === 'chunk')
   assert.ok(chunk && chunk.type === 'chunk')
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     const page = await browser.newPage({ viewport: { width: 390, height: 800 }, isMobile: true, hasTouch: true })
     const errors: string[] = []

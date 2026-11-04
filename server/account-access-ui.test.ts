@@ -4,8 +4,8 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium, type Locator } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import type { Locator } from 'playwright-core'
+import { connectTestBrowser } from './test-browser.ts'
 import { defaultCapabilities, type AccessRow } from '../shared/access-policy.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
@@ -22,13 +22,13 @@ async function assertAnchoredMenu(trigger: Locator, menu: Locator, width: number
   }), true, 'the dropdown options must not be clipped or covered')
 }
 
-test('account controls save roles, features and file rules and confirm deletion on desktop and mobile', { skip: !domBrowserExecutable(), timeout: 45_000 }, async () => {
+test('account controls save roles, features and file rules and confirm deletion on desktop and mobile', { timeout: 45_000 }, async () => {
   const source = `import React from '${root}/node_modules/react/index.js';import{createRoot}from '${root}/node_modules/react-dom/client.js';import{AdminSettingsModal}from '${root}/src/components/AdminSettingsModal.tsx';import{I18nProvider}from '${root}/src/i18n.tsx';import{applyThemePalette,THEME_PRESETS}from '${root}/src/utils/theme-color.ts';window.fixtureTheme=id=>applyThemePalette(THEME_PRESETS.find(theme=>theme.id===id).palette);window.fixtureTheme('light');localStorage.setItem('mew:locale','ko');Object.defineProperty(navigator,'clipboard',{value:{writeText:async text=>{window.copiedPassword=text}}});createRoot(document.getElementById('root')).render(<I18nProvider><AdminSettingsModal currentEmail="owner@example.test" onClose={()=>{window.fixtureClosed=true}}/></I18nProvider>);`
   const bundle = await build({ input: 'virtual:access.tsx', write: false, platform: 'browser', output: { format: 'iife' }, transform: { jsx: 'react-jsx', define: { 'process.env.NODE_ENV': JSON.stringify('test') } }, plugins: [{ name: 'fixture', resolveId(id) { if (id === 'virtual:access.tsx') return id; if (id.endsWith('.css')) return 'virtual:style' }, async load(id) { if (id === 'virtual:access.tsx') return source; if (id === 'virtual:style') return ''; if (id.endsWith('?raw')) return 'export default ' + JSON.stringify(await fs.readFile(id.slice(0, -4), 'utf8')) } }] })
   const content = (await Promise.all(['src/components/AdminSettingsModal.tsx', 'src/components/account-access-matrix.tsx', 'src/components/account-column-headers.tsx', 'src/components/account-role-select.tsx', 'src/components/mewlink-access-settings.tsx', 'packages/ui/src/dialog-frame.tsx', 'packages/ui/src/select-field.tsx', 'packages/ui/src/HoverTipLayer.tsx'].map(file => fs.readFile(path.join(root, file), 'utf8')))).join('\n')
   const compiler = await compile(await fs.readFile(`${root}/src/index.css`, 'utf8'), { base: `${root}/src`, onDependency() {} })
   const css = compiler.build([...new Set(content.match(/[A-Za-z0-9_@:/.[\]()%,-]+/g))])
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   const avatar = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII='
   const rows: AccessRow[] = (['owner', 'manager', 'member', 'guest'] as const).map(role => ({ subject: role === 'guest' ? 'guest' : `${role}@example.test`, displayName: role === 'member' ? 'Member with a long name' : role, role, avatarDataUrl: role === 'member' ? avatar : role === 'manager' ? 'data:image/png;base64,broken' : null, capabilities: defaultCapabilities(role), overrides: {} }))
   const rules = new Map<string, string>()

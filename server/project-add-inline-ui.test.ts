@@ -4,12 +4,11 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 
-test('inline project addition creates, clones, connects GitHub before a project, links, and retries without duplicate mutations', { skip: !domBrowserExecutable(), timeout: 120_000 }, async t => {
+test('inline project addition creates, clones, connects GitHub before a project, links, and retries without duplicate mutations', { timeout: 120_000 }, async t => {
   const source = `import React from 'react';
 import {createRoot} from 'react-dom/client';
 import {DialogFrame} from '@mew/ui';
@@ -37,7 +36,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
   const chunk = bundle.output.find(item => item.type === 'chunk')!
   const compiler = await compile(await fs.readFile(`${root}/src/index.css`, 'utf8'), { base: `${root}/src`, onDependency() {} })
   const css = compiler.build([...new Set(candidates.join('\n').match(/[A-Za-z0-9_@!:/.[\]()%,-]+/g))])
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   t.after(() => browser.close())
   for (const panelWidth of [200, 240, 390]) for (const theme of ['dark', 'light']) {
     const mobile = panelWidth === 390, viewport = { width: mobile ? 390 : 1100, height: 844 }

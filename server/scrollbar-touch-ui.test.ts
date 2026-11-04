@@ -4,12 +4,11 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 
-test('native scrollbars retain their size while touch thumbs drag without blocking content gestures', { skip: !domBrowserExecutable(), timeout: 45_000 }, async () => {
+test('native scrollbars retain their size while touch thumbs drag without blocking content gestures', { timeout: 45_000 }, async () => {
   const source = `import {startScrollbarTouchDragging} from '${root}/src/utils/scrollbar-touch.ts';
 window.stopScrollbarTouchDragging=startScrollbarTouchDragging();
 window.pointerStarts=0;window.ancestorPointerStarts=0;window.dragStarts=0;window.buttonClicks=0;
@@ -22,7 +21,7 @@ window.setCase=name=>{document.querySelectorAll('.case').forEach(element=>elemen
   const chunk = bundle.output.find(item => item.type === 'chunk')!
   const compiler = await compile(await fs.readFile(path.join(root, 'src/index.css'), 'utf8'), { base: path.join(root, 'src'), onDependency() {} })
   const css = compiler.build(['no-scrollbar'])
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     const page = await browser.newPage({ viewport: { width: 390, height: 700 }, hasTouch: true, isMobile: true })
     page.setDefaultTimeout(3000)

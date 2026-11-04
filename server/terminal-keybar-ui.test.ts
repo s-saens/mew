@@ -4,12 +4,11 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 
-test('terminal recovery stays neutral and extra keys preserve the composer draft and focus', { skip: !domBrowserExecutable(), timeout: 30_000 }, async () => {
+test('terminal recovery stays neutral and extra keys preserve the composer draft and focus', { timeout: 30_000 }, async () => {
   const source = `import React from '${root}/node_modules/react/index.js';
 import {createRoot} from '${root}/node_modules/react-dom/client.js';
 import {TmuxTerminal} from '${root}/packages/tmux-term/src/TmuxTerminal.tsx';
@@ -24,7 +23,7 @@ createRoot(document.getElementById('root')).render(<TmuxTerminal sessionName="ke
   const content = (await Promise.all(['packages/tmux-term/src/TmuxTerminal.tsx', 'packages/mobile-keys/src/MobileKeyBar.tsx', 'packages/ui/src/HoverTipLayer.tsx'].map(file => fs.readFile(`${root}/${file}`, 'utf8')))).join('\n')
   const css = compiler.build([...new Set((source + content).match(/[A-Za-z0-9_@:/.[\]()%,-]+/g))])
   const xterm = (await Promise.all(['node_modules/@xterm/xterm/css/xterm.css', 'packages/tmux-term/src/terminal.css', 'packages/ui/src/loading-indicator.css'].map(file => fs.readFile(`${root}/${file}`, 'utf8')))).join('\n')
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     const page = await browser.newPage({ viewport: { width: 390, height: 700 }, hasTouch: true })
     page.setDefaultTimeout(3000)

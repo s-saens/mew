@@ -4,8 +4,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 
@@ -15,7 +14,7 @@ test('direct app opts into the device safe-area viewport', async () => {
   assert.match(html, /name="viewport"[^>]*interactive-widget=resizes-content/)
 })
 
-test('workspace header, all dock edges and portaled dialogs stay inside safe areas', { skip: !domBrowserExecutable(), timeout: 30_000 }, async () => {
+test('workspace header, all dock edges and portaled dialogs stay inside safe areas', { timeout: 30_000 }, async () => {
   const source = `import React from '${root}/node_modules/react/index.js';
 import {createRoot} from '${root}/node_modules/react-dom/client.js';
 import {I18nProvider} from '${root}/src/i18n.tsx';
@@ -42,7 +41,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
   // Chromium has no device cutout here; substitute only env() values, preserving all production layout rules.
   const css = compiler.build([...new Set(content.match(/[A-Za-z0-9_@:/.[\]()%,-]+/g))])
     .replace(/env\(safe-area-inset-(top|right|bottom|left)(?:,\s*0px)?\)/g, 'var(--test-safe-$1, 0px)')
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     const page = await browser.newPage({ viewport: { width: 390, height: 844 }, hasTouch: true })
     page.setDefaultTimeout(3000)

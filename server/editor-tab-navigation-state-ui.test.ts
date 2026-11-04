@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { build } from 'rolldown'
-import { chromium, type Route } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import type { Route } from 'playwright-core'
+import { connectTestBrowser } from './test-browser.ts'
 
-test('editor tabs maintain MRU selection and independent document navigation', { skip: !domBrowserExecutable(), timeout: 45_000 }, async t => {
+test('editor tabs maintain MRU selection and independent document navigation', { timeout: 45_000 }, async t => {
   const source = `import React from ${JSON.stringify(import.meta.resolve('react'))};
 import {createRoot} from ${JSON.stringify(import.meta.resolve('react-dom/client'))};
 import {useTabs} from ${JSON.stringify(new URL('../src/hooks/useTabs.ts', import.meta.url).pathname)};
@@ -14,7 +14,7 @@ function Fixture(){const tabs=useTabs('docs',noop,message=>{window.lastNotice=me
 createRoot(document.getElementById('root')).render(<React.StrictMode><I18nProvider><Fixture/></I18nProvider></React.StrictMode>);`
   const bundle = await build({ input: 'virtual:tab-navigation.tsx', write: false, platform: 'browser', output: { format: 'iife' }, transform: { jsx: 'react-jsx', define: { 'process.env.NODE_ENV': JSON.stringify('test') } }, plugins: [{ name: 'fixture', resolveId(id) { if (id === 'virtual:tab-navigation.tsx') return id; if (id.endsWith('.css')) return 'virtual:style' }, load(id) { if (id === 'virtual:tab-navigation.tsx') return source; if (id === 'virtual:style') return '' } }] })
   const chunk = bundle.output.find(item => item.type === 'chunk')!
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   const fixture = async (intercept?: (route: Route) => Promise<boolean>) => {
     const page = await browser.newPage()
     page.setDefaultTimeout(5000)

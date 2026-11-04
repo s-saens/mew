@@ -4,8 +4,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 
@@ -29,7 +28,7 @@ async function databaseFixture(source: string) {
   }
 }
 
-test('document property option colors, rename and deletion persist in standalone and DB-bound fields', { skip: !domBrowserExecutable(), timeout: 30_000 }, async () => {
+test('document property option colors, rename and deletion persist in standalone and DB-bound fields', { timeout: 30_000 }, async () => {
   const source = `import React from ${JSON.stringify(import.meta.resolve('react'))};
 import {createRoot} from ${JSON.stringify(import.meta.resolve('react-dom/client'))};
 import {FrontmatterPanel} from ${JSON.stringify(path.join(root, 'packages/editor/src/editor/FrontmatterPanel.tsx'))};
@@ -43,7 +42,7 @@ const initial={title:'Example',fields:[{key:'status',type:'select',value:'Draft'
 function Fixture(){const [value,setValue]=React.useState(joinFrontmatter(initial,'Body'));const [key,setKey]=React.useState(0);window.saved=value;return <><button onClick={()=>setKey(k=>k+1)}>Reload</button><FrontmatterPanel key={key} data={splitFrontmatter(value).frontmatter} optionsApi={bound?undefined:api} databaseApi={db} onChange={next=>setValue(joinFrontmatter(next,'Body'))}/></>}
 createRoot(document.getElementById('root')).render(<Fixture/>);`
   const { code, css } = await databaseFixture(source)
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     for (const width of [1100, 390]) for (const bound of [false, true]) {
       const page = await browser.newPage({ viewport: { width, height: 900 }, isMobile: width < 500, hasTouch: width < 500 })
@@ -84,7 +83,7 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
   } finally { await browser.close() }
 })
 
-test('database table retains compact styling inside the editor and standalone panel', { skip: !domBrowserExecutable(), timeout: 30_000 }, async () => {
+test('database table retains compact styling inside the editor and standalone panel', { timeout: 30_000 }, async () => {
   const source = `import React from ${JSON.stringify(import.meta.resolve('react'))};
 import {createRoot} from ${JSON.stringify(import.meta.resolve('react-dom/client'))};
 import {DatabaseTable} from ${JSON.stringify(path.join(root, 'packages/editor/src/database/DatabaseTable.tsx'))};
@@ -94,7 +93,7 @@ const ctrl={view:{title,kind:'managed',columns:[{id:'name',name:'Name',type:'tex
 return <><button onClick={()=>setEditable(false)}>Read only</button><div className="tiptap"><DatabaseTable ctrl={ctrl}/><div className="tableWrapper"><table><thead><tr><th>Markdown</th></tr></thead><tbody><tr><td>Body</td></tr></tbody></table></div></div><div id="panel"><DatabaseTable ctrl={ctrl}/></div></>}
 createRoot(document.getElementById('root')).render(<Fixture/>);`
   const { code, css } = await databaseFixture(source)
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     for (const width of [390, 1100]) for (const theme of ['dark', 'light']) {
       const page = await browser.newPage({ viewport: { width, height: 800 }, isMobile: width < 500, hasTouch: width < 500 })
@@ -227,7 +226,7 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
   } finally { await browser.close() }
 })
 
-test('database column types, creatable choices, page links and failed edits work on desktop and touch layouts', { skip: !domBrowserExecutable(), timeout: 30_000 }, async () => {
+test('database column types, creatable choices, page links and failed edits work on desktop and touch layouts', { timeout: 30_000 }, async () => {
   const source = `import React from ${JSON.stringify(import.meta.resolve('react'))};
 import {createRoot} from ${JSON.stringify(import.meta.resolve('react-dom/client'))};
 import {DatabaseTable} from ${JSON.stringify(path.join(root, 'packages/editor/src/database/DatabaseTable.tsx'))};
@@ -244,7 +243,7 @@ async addColumn(id,name,type){if(view.columns.some(c=>c.name===name))throw Error
 function Fixture(){const ctrl=useDatabaseView(api,'db');return <DatabaseTable ctrl={ctrl} onOpenPage={path=>window.openedPage=path}/>}
 createRoot(document.getElementById('root')).render(<Fixture/>);`
   const { code, css } = await databaseFixture(source)
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     for (const width of [1100, 390]) {
       const page = await browser.newPage({ viewport: { width, height: 800 }, isMobile: width < 500, hasTouch: width < 500 })
@@ -360,7 +359,7 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
   } finally { await browser.close() }
 })
 
-test('empty database headers allow type changes while read-only and busy headers block them', { skip: !domBrowserExecutable(), timeout: 30_000 }, async () => {
+test('empty database headers allow type changes while read-only and busy headers block them', { timeout: 30_000 }, async () => {
   const source = `import React from ${JSON.stringify(import.meta.resolve('react'))};
 import {createRoot} from ${JSON.stringify(import.meta.resolve('react-dom/client'))};
 import {DatabaseTable} from ${JSON.stringify(path.join(root, 'packages/editor/src/database/DatabaseTable.tsx'))};
@@ -369,7 +368,7 @@ const ctrl={view:{id:'empty',title:'Empty',kind:'managed',columns:[{id:'name',na
 return <>{['editable','readonly','busy'].map(value=><button key={value} onClick={()=>setMode(value)}>{value}</button>)}<DatabaseTable ctrl={ctrl}/></>}
 createRoot(document.getElementById('root')).render(<Fixture/>);`
   const { code, css } = await databaseFixture(source)
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     for (const width of [1100, 390]) {
       const page = await browser.newPage({ viewport: { width, height: 800 }, isMobile: width < 500, hasTouch: width < 500 })
@@ -412,7 +411,7 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
   } finally { await browser.close() }
 })
 
-test('database arrows navigate title, headers and visible cells without changing values or escaping the table', { skip: !domBrowserExecutable(), timeout: 45_000 }, async () => {
+test('database arrows navigate title, headers and visible cells without changing values or escaping the table', { timeout: 45_000 }, async () => {
   const source = `import React from ${JSON.stringify(import.meta.resolve('react'))};
 import {createRoot} from ${JSON.stringify(import.meta.resolve('react-dom/client'))};
 import {DatabaseCollection} from ${JSON.stringify(path.join(root, 'packages/editor/src/database/DatabaseCollection.tsx'))};
@@ -424,7 +423,7 @@ const ctrl={view:{id:'navigation',title,kind:'managed',columns:cols,rows:empty?[
 return <><button onClick={()=>setReadonly(value=>!value)}>Read only</button><button onClick={()=>setEmpty(value=>!value)}>Empty</button><button onClick={()=>setColumns(cols=>cols.slice(0,-1))}>Remove last column</button><div id="first"><DatabaseCollection ctrl={ctrl} onOpenPage={path=>window.opened.push(path)} onConvertToTable={()=>window.converted=true}/></div><div id="second"><DatabaseCollection ctrl={ctrl}/></div></>}
 createRoot(document.getElementById('root')).render(<Fixture/>);`
   const { code, css } = await databaseFixture(source)
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     for (const width of [1100, 390]) for (const theme of ['dark', 'light']) {
       const page = await browser.newPage({ viewport: { width, height: 900 }, isMobile: width < 500, hasTouch: width < 500 })

@@ -4,11 +4,10 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
-test('header notifications work without Mewcat and settings separate the optional cat channel', { skip: !domBrowserExecutable(), timeout: 30_000 }, async () => {
+test('header notifications work without Mewcat and settings separate the optional cat channel', { timeout: 30_000 }, async () => {
   const source = `import React,{useState,useRef} from 'react';import {createRoot} from 'react-dom/client';
 import {I18nProvider} from '${root}/src/i18n.tsx';import {HeaderNotifications} from '${root}/src/components/header-notifications.tsx';
 import {SettingsModal} from '${root}/src/components/SettingsModal.tsx';import {Mewcat} from '${root}/src/components/Mewcat.tsx';import {publishMewcatNotice} from '${root}/src/utils/mewcat-notifications.ts';
@@ -20,7 +19,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
   const content = source + (await Promise.all(files.map(file => fs.readFile(`${root}/${file}`, 'utf8')))).join('\n')
   const compiler = await compile(await fs.readFile(`${root}/src/index.css`, 'utf8'), { base: `${root}/src`, onDependency() {} })
   const css = compiler.build([...new Set(content.match(/[A-Za-z0-9_@:/.[\]()%,-]+/g))])
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     const page = await browser.newPage({ viewport: { width: 1100, height: 800 } }); page.setDefaultTimeout(4000)
     const errors: string[] = []; page.on('pageerror', error => errors.push(error.message))

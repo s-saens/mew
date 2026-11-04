@@ -4,12 +4,11 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 import type { GitHubAuthStatus } from '../shared/github-auth.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
-test('GitHub login resumes, retries polling, preserves errors and supports keyboard approval on desktop/mobile', { skip: !domBrowserExecutable(), timeout: 60_000 }, async () => {
+test('GitHub login resumes, retries polling, preserves errors and supports keyboard approval on desktop/mobile', { timeout: 60_000 }, async () => {
   const source = `
 import React from '${root}/node_modules/react/index.js';
 import {createRoot} from '${root}/node_modules/react-dom/client.js';
@@ -32,7 +31,7 @@ createRoot(document.getElementById('root')).render(<><GitHubAccount project='.wo
   const content = (await Promise.all(['src/components/github-account.tsx', 'packages/ui/src/dialog-frame.tsx', 'packages/ui/src/HoverTipLayer.tsx'].map(file => fs.readFile(path.join(root, file), 'utf8')))).join('\n')
   const compiler = await compile(await fs.readFile(`${root}/src/index.css`, 'utf8'), { base: `${root}/src`, onDependency() {} })
   const css = compiler.build([...new Set((source + content).match(/[A-Za-z0-9_@!:/.[\]()%,-]+/g))])
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     for (const width of [1100, 390, 320]) {
       const page = await browser.newPage({ viewport: { width, height: 844 } })

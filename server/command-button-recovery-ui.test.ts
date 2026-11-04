@@ -3,11 +3,10 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 import { AUTOMATIC_RETRY_LIMIT } from '../src/utils/recovery-policy.ts'
 
-test('command metadata retries quietly, retains cached rows, and offers recovery only after the retry budget or a permanent error', { skip: !domBrowserExecutable(), timeout: 60_000 }, async t => {
+test('command metadata retries quietly, retains cached rows, and offers recovery only after the retry budget or a permanent error', { timeout: 60_000 }, async t => {
   const root = path.resolve(import.meta.dirname, '..')
   const source = `
 import React from 'react';import {createRoot} from 'react-dom/client';
@@ -22,7 +21,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><CommandButtonM
       load(id) { if (id === 'virtual:command-recovery.tsx') return source; if (id === 'virtual:style') return '' },
     }] })
   const indicatorCss = await fs.readFile(path.join(root, 'packages/ui/src/loading-indicator.css'), 'utf8')
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   t.after(() => browser.close())
   for (const width of [1100, 390]) {
     const page = await browser.newPage({ viewport: { width, height: 700 }, hasTouch: width === 390 })

@@ -3,12 +3,11 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
 const repo = new URL('..', import.meta.url).pathname
 
-test('table context menu edits the clicked row or column and preserves readonly copying', { skip: !domBrowserExecutable(), timeout: 60_000 }, async t => {
+test('table context menu edits the clicked row or column and preserves readonly copying', { timeout: 60_000 }, async t => {
   const markdown = 'Outside\n\n| H1 | H2 | H3 |\n| --- | --- | --- |\n| A1 | A2 | A3 |\n| B1 | B2 | B3 |\n\nBetween\n\n| X | Y |\n| --- | --- |\n| C | D |\n'
   const source = `import React from 'react';
     import {createRoot} from 'react-dom/client';
@@ -32,7 +31,7 @@ test('table context menu edits the clicked row or column and preserves readonly 
   const chunk = bundle.output.find(item => item.type === 'chunk')!
   const compiler = await compile(fs.readFileSync(`${repo}src/index.css`, 'utf8'), { base: `${repo}src`, onDependency() {} })
   const css = compiler.build([...new Set(candidates.join('\n').match(/[A-Za-z0-9_@!:/.[\]()%,-]+/g))]) + styles.join('\n')
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   t.after(() => browser.close())
   for (const width of [1100, 390]) {
     const page = await browser.newPage({ viewport: { width, height: 800 } })

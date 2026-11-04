@@ -4,10 +4,9 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
-test('editor floating navigation follows tab-local links and modified clicks open fresh tabs', { skip: !domBrowserExecutable(), timeout: 60_000 }, async () => {
+test('editor floating navigation follows tab-local links and modified clicks open fresh tabs', { timeout: 60_000 }, async () => {
   const root = path.resolve(import.meta.dirname, '..')
   const files: Record<string, string> = {
     'one.md': '# One\n\n[Four](./nested/four.md)\n\n[Child](./children/Child/_Child.md)',
@@ -51,7 +50,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
   const sources = await Promise.all(['src/components/EditorPane.tsx', 'src/components/TabBar.tsx', 'packages/editor/src/Editor.tsx'].map(file => fs.readFile(path.join(root, file), 'utf8')))
   const css = compiler.build([...new Set((source + sources.join('\n')).match(/[A-Za-z0-9_@!:/.[\]()%,-]+/g))]) + styles.join('\n')
   const code = bundle.output.find(item => item.type === 'chunk')!.code
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     for (const { width, dark } of [{ width: 1280, dark: true }, { width: 390, dark: false }]) {
       const page = await browser.newPage({ viewport: { width, height: 844 } })

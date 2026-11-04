@@ -4,12 +4,11 @@ import http from 'node:http'
 import fs from 'node:fs/promises'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 import { attachLiveWebSocket } from './live-socket.ts'
 import { defaultDebugConfig } from '../shared/debugger.ts'
 
-test('real code editor shares transparent line numbers with breakpoint controls on desktop/mobile', { skip: !domBrowserExecutable(), timeout: 60_000 }, async t => {
+test('real code editor shares transparent line numbers with breakpoint controls on desktop/mobile', { timeout: 60_000 }, async t => {
   const code = ['message = "' + 'A long line to scroll horizontally. '.repeat(12) + '"', 'counter = 1', 'counter += 1', 'print(counter)', ...Array.from({ length: 24 }, (_, i) => `value_${i} = counter + ${i}`)].join('\n')
   const source = `import React from ${JSON.stringify(import.meta.resolve('react'))};
 import {createRoot} from ${JSON.stringify(import.meta.resolve('react-dom/client'))};
@@ -49,7 +48,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><main className
   })
   attachLiveWebSocket(server, () => ({ key: 'gutter', interval: 100, allowed: () => true, async read() { return status() } }))
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   t.after(async () => { await browser.close(); server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve())) })
   const address = server.address(); assert.ok(address && typeof address !== 'string')
   const wait = async (check: () => boolean) => { const deadline = Date.now() + 4000; while (!check()) { assert.ok(Date.now() < deadline, 'breakpoint state did not settle'); await new Promise(resolve => setTimeout(resolve, 10)) } }

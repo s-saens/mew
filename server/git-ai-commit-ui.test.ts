@@ -4,12 +4,11 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 import type { GitAiCommitJob } from '../shared/git-ai-commit.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
-test('AI Commit chooses/creates presets, restores jobs, creates multiple commits and preserves the manual composer on desktop/mobile', { skip: !domBrowserExecutable(), timeout: 60_000 }, async () => {
+test('AI Commit chooses/creates presets, restores jobs, creates multiple commits and preserves the manual composer on desktop/mobile', { timeout: 60_000 }, async () => {
   const source = `
 import React from '${root}/node_modules/react/index.js';
 import {createRoot} from '${root}/node_modules/react-dom/client.js';
@@ -27,7 +26,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><div style={{he
   const content = (await Promise.all(files.map(file => fs.readFile(path.join(root, file), 'utf8')))).join('\n')
   const compiler = await compile(await fs.readFile(`${root}/src/index.css`, 'utf8'), { base: `${root}/src`, onDependency() {} })
   const css = compiler.build([...new Set((source + content).match(/[A-Za-z0-9_@!:/.[\]()%,-]+/g))])
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     for (const width of [1100, 390]) {
       const page = await browser.newPage({ viewport: { width, height: 844 }, locale: 'ko-KR' })

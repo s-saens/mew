@@ -2,8 +2,8 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import path from 'node:path'
 import { build } from 'rolldown'
-import { chromium, type Page } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import type { Page } from 'playwright-core'
+import { connectTestBrowser } from './test-browser.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 async function rawDocument(page: Page): Promise<string> {
@@ -18,7 +18,7 @@ async function select(page: Page, from: number): Promise<void> {
   await page.evaluate(`window.composerFixture.select(${from})`)
 }
 
-test('agent composer accepts keyboard clipboard images and plain text', { skip: !domBrowserExecutable(), timeout: 30_000 }, async t => {
+test('agent composer accepts keyboard clipboard images and plain text', { timeout: 30_000 }, async t => {
   const source = `
 import React from '${root}/node_modules/react/index.js';
 import {createRoot} from '${root}/node_modules/react-dom/client.js';
@@ -50,7 +50,7 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
   })
   const chunk = bundle.output.find(item => item.type === 'chunk')
   assert.ok(chunk)
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   t.after(() => browser.close())
   for (const width of [1100, 390]) for (const dark of [true, false]) {
     await t.test(`${width}px ${dark ? 'dark' : 'light'}`, async matrix => {

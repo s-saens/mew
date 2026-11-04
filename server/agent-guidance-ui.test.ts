@@ -4,15 +4,14 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 import { defaultBranchGuidance } from '../shared/branch-guidance.ts'
 import { defaultAgentBuildVerificationSettings } from '../shared/agent-build-verification.ts'
 import { documentationGuidanceKeys, type DocumentationGuidanceKey } from '../shared/agent-guidance.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 
-test('compact guidance settings match the shared settings dialog, autosave all fields, preserve invalid drafts and trap focus on desktop and mobile', { skip: !domBrowserExecutable(), timeout: 120_000 }, async () => {
+test('compact guidance settings match the shared settings dialog, autosave all fields, preserve invalid drafts and trap focus on desktop and mobile', { timeout: 120_000 }, async () => {
   const source = `import React, {useState} from '${root}/node_modules/react/index.js';
 import {createRoot} from '${root}/node_modules/react-dom/client.js';
 import {AgentGuidanceButton} from '${root}/src/components/agent-guidance-settings.tsx';
@@ -30,7 +29,7 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
   const content = (await Promise.all(['src/components/agent-guidance-settings.tsx', 'src/components/agent-capacity-retry-fields.tsx', 'src/components/agent-build-verification-fields.tsx', 'src/components/agent-branch-guidance.tsx', 'src/components/agent-guidance-row.tsx', 'packages/ui/src/dialog-frame.tsx', 'packages/ui/src/select-field.tsx', 'packages/ui/src/HoverTipLayer.tsx', 'packages/ui/src/ConfirmDialog.tsx'].map(file => fs.readFile(`${root}/${file}`, 'utf8')))).join('\n')
   const compiler = await compile(await fs.readFile(`${root}/src/index.css`, 'utf8'), { base: `${root}/src`, onDependency() {} })
   const css = compiler.build([...new Set((source + content).match(/[A-Za-z0-9_@:/.[\]()%,-]+/g))]) + await fs.readFile(`${root}/src/components/agent-guidance-settings.css`, 'utf8')
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   try {
     for (const width of [1100, 390, 320]) {
       const page = await browser.newPage({ viewport: { width, height: 844 }, locale: 'ko-KR', reducedMotion: 'reduce', hasTouch: width < 768, isMobile: width < 768 })

@@ -4,10 +4,9 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
-test('command ports open the internal DOM browser without executing commands at compact widths', { skip: !domBrowserExecutable(), timeout: 60_000 }, async t => {
+test('command ports open the internal DOM browser without executing commands at compact widths', { timeout: 60_000 }, async t => {
   const root = path.resolve(import.meta.dirname, '..')
   const source = `
 import React from 'react';import {createRoot} from 'react-dom/client';
@@ -26,7 +25,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><CommandButtonM
   const content = await fs.readFile(path.join(root, 'src/components/CommandButtonMenu.tsx'), 'utf8')
   const compiler = await compile(await fs.readFile(path.join(root, 'src/index.css'), 'utf8'), { base: path.join(root, 'src'), onDependency() {} })
   const css = compiler.build([...new Set((source + content).match(/[A-Za-z0-9_@:/.[\]()%,-]+/g))])
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   t.after(() => browser.close())
   for (const width of [1100, 390, 320]) for (const dark of [false, true]) {
     const page = await browser.newPage({ viewport: { width, height: 700 }, hasTouch: width <= 390 })

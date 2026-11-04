@@ -4,12 +4,11 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium, type Page } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import type { Page } from 'playwright-core'
+import { connectTestBrowser } from './test-browser.ts'
 import type { MewlinkAccessOverview, MewlinkAccessStatus, MewlinkIdentity } from '../shared/mewlink-identity.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
-const chrome = domBrowserExecutable()
 const identity: MewlinkIdentity = { issuer: 'https://mewlink.test', subject: 'central-person-1', provider: 'github', displayName: '뮤링크 사용자', username: 'mewlink-person' }
 
 async function fixture() {
@@ -40,9 +39,9 @@ async function noHorizontalOverflow(page: Page) {
   assert.equal(await page.getByRole('dialog').evaluate(el => el.scrollWidth <= el.clientWidth), true)
 }
 
-test('Mewlink login requests approval without credentials and enters after approval on desktop/mobile', { skip: !chrome, timeout: 30_000 }, async t => {
+test('Mewlink login requests approval without credentials and enters after approval on desktop/mobile', { timeout: 30_000 }, async t => {
   const { js, css } = await fixture()
-  const browser = await chromium.launch({ executablePath: chrome, chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   t.after(() => browser.close())
   const page = await browser.newPage({ viewport: { width: 1000, height: 800 } })
   page.setDefaultTimeout(5000)
@@ -102,9 +101,9 @@ test('Mewlink login requests approval without credentials and enters after appro
   assert.deepEqual(errors, [])
 })
 
-test('users link Mewlink to their own email account after a password login', { skip: !chrome, timeout: 30_000 }, async t => {
+test('users link Mewlink to their own email account after a password login', { timeout: 30_000 }, async t => {
   const { js, css } = await fixture()
-  const browser = await chromium.launch({ executablePath: chrome, chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   t.after(() => browser.close())
   const page = await browser.newPage({ viewport: { width: 1000, height: 800 } })
   page.setDefaultTimeout(5000)
@@ -176,9 +175,9 @@ test('users link Mewlink to their own email account after a password login', { s
   assert.deepEqual(errors, [])
 })
 
-test('owner approves Mewlink accounts directly, retries failures, denies and revokes access', { skip: !chrome, timeout: 30_000 }, async t => {
+test('owner approves Mewlink accounts directly, retries failures, denies and revokes access', { timeout: 30_000 }, async t => {
   const { js, css } = await fixture()
-  const browser = await chromium.launch({ executablePath: chrome, chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   t.after(() => browser.close())
   const page = await browser.newPage({ viewport: { width: 1000, height: 800 }, hasTouch: true })
   page.setDefaultTimeout(5000)

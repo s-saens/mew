@@ -2,16 +2,15 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import http from 'node:http'
 import { build } from 'rolldown'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 import { remoteDispatcher } from './remote-access-dispatch.ts'
 import type { AuthenticatedSession } from './auth.ts'
 import { REMOTE_LIMITS } from '../shared/remote-access.ts'
 
-test('browser response window removes chunk RTT waterfall and bounds unread responses, with legacy fallback', { skip: !domBrowserExecutable(), timeout: 20_000 }, async t => {
+test('browser response window removes chunk RTT waterfall and bounds unread responses, with legacy fallback', { timeout: 20_000 }, async t => {
   const bundle = await build({ input: new URL('../src/utils/remote-transport.ts', import.meta.url).pathname, write: false, platform: 'browser', output: { format: 'iife', name: 'Remote' } })
   const code = bundle.output.find(item => item.type === 'chunk')!.code
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   t.after(() => browser.close())
   const page = await browser.newPage()
   const errors: string[] = []

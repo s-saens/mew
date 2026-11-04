@@ -4,11 +4,10 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
-import { chromium } from 'playwright-core'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
-test('table and database context menus convert whole blocks with native and collaborative undo/redo', { skip: !domBrowserExecutable(), timeout: 120_000 }, async t => {
+test('table and database context menus convert whole blocks with native and collaborative undo/redo', { timeout: 120_000 }, async t => {
   const originalId = '123e4567-e89b-12d3-a456-426614174000'
   const markdown = `Before\n\n| Name | Note |\n| --- | --- |\n| **Same** | first<br>second |\n| Same | [link](./note.md) |\n\nAfter\n\n<div data-mew-db="${originalId}" data-mew-db-readonly="true"></div>`
   const source = `import React from 'react';import {createRoot} from 'react-dom/client';import * as Y from 'yjs';import {Awareness} from 'y-protocols/awareness';
@@ -31,7 +30,7 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
   const compiler = await compile(await fs.readFile(`${root}/src/index.css`, 'utf8'), { base: `${root}/src`, onDependency() {} })
   const css = compiler.build([...new Set(candidates.join('\n').match(/[A-Za-z0-9_@!:/.[\]()%,-]+/g))]) + styles.join('\n')
   const code = bundle.output.find(item => item.type === 'chunk')!.code
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   t.after(() => browser.close())
   for (const collaborative of [false, true]) for (const width of [1100, 390]) for (const theme of ['dark', 'light']) {
     const page = await browser.newPage({ viewport: { width, height: 844 }, hasTouch: width < 500, isMobile: width < 500 })
