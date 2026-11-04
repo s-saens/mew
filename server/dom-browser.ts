@@ -10,9 +10,13 @@ import { resolveAuth, type RequestAuth } from './reqAuth.ts'
 import { canUse } from './access-policy.ts'
 import { watchSocketAccess } from './access-socket.ts'
 import { webSocketOriginAllowed } from './websocket-origin.ts'
-import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { domBrowserExecutable, externalBrowserExecutable, domBrowserEngine } from './browser-dom-executable.ts'
+import { DomBrowserHistory } from './browser-dom-history.ts'
 
 export { DOM_BROWSER_WS }
+type BrowserEngine = ReturnType<typeof domBrowserEngine>
+type NavigationRequest = { method: string; postData?: string; headers: Record<string, string> }
+type QueuedNavigation = { url: string; historyIndex?: number; request?: NavigationRequest }
 const sessions = new Set<DomBrowserSession>()
 const servers = new Set<Server | Http2SecureServer>()
 export function domBrowserMewPorts(): ReadonlySet<number> {
@@ -88,6 +92,17 @@ export class DomBrowserSession {
   private poll?: NodeJS.Timeout
   private lifetime: NodeJS.Timeout
   private starting?: Promise<Page>
+  private engine?: BrowserEngine
+  private runtimeId = 0
+  private history = new DomBrowserHistory()
+  private historyIndex?: number
+  private nativeHistoryIndices = new Map<number, number>()
+  private historyRecording: Promise<void> = Promise.resolve()
+  private queuedNavigation?: QueuedNavigation
+  private engineRedirects = 0
+  private navigationRequest?: QueuedNavigation
+  private viewport = { width: 1100, height: 700 }
+  private storageStates = new Map<BrowserEngine, Awaited<ReturnType<BrowserContext['storageState']>>>()
 
   constructor(account: string, socket: WebSocket, allowed: () => boolean) {
     this.account = account; this.socket = socket; this.allowed = allowed
@@ -121,20 +136,58 @@ export class DomBrowserSession {
     this.socket.send(json)
   }
 
-  private async start(): Promise<Page> {
-    if (this.page) return this.page
+  private async start(url?: string): Promise<Page> {
+    const engine = url ? domBrowserEngine(url) : this.engine ?? 'chromium'
+    if (this.page && engine === this.engine) return this.page
     if (this.starting) return this.starting
-    this.starting = this.launch()
-    return this.starting
+    const executablePath = engine === 'chrome' ? externalBrowserExecutable() : domBrowserExecutable()
+    if (!executablePath) throw new Error(engine === 'chrome'
+      ? '외부 사이트에는 일반 Google Chrome이 필요합니다. Chrome을 설치하거나 MEW_CHROME_EXECUTABLE을 확인해 주세요.'
+      : 'localhost에는 Chromium이 필요합니다. Playwright Chromium을 설치하거나 MEW_CHROMIUM_EXECUTABLE을 확인해 주세요.')
+    this.starting = (async () => {
+      if (this.page) {
+        await this.releaseBrowser(true)
+        this.beginDocument(url!)
+      }
+      this.engine = engine
+      this.runtimeId++
+      try { return await this.launch(executablePath) }
+      catch (error) { await this.releaseBrowser(); throw error }
+    })()
+    try { return await this.starting }
+    finally { this.starting = undefined }
   }
 
-  private async launch(): Promise<Page> {
-    const executablePath = domBrowserExecutable()
-    if (!executablePath) throw new Error('호스트에 Chromium 또는 Chrome이 필요합니다. MEW_BROWSER_EXECUTABLE 설정을 확인해 주세요.')
-    const browser = await chromium.launch({ executablePath, chromiumSandbox: true, headless: true, args: ['--disable-dev-shm-usage'] })
+  private async releaseBrowser(saveState = false) {
+    const context = this.context, browser = this.browser
+    if (saveState && context && this.engine) this.storageStates.set(this.engine, await context.storageState())
+    this.page = undefined; this.context = undefined; this.browser = undefined; this.cdp = undefined
+    clearInterval(this.poll)
+    this.nativeHistoryIndices.clear()
+    await context?.close().catch(() => {})
+    await browser?.close().catch(() => {})
+  }
+
+  private queueNavigation(url: string, request: NavigationRequest) {
+    if (++this.engineRedirects > 10) throw new Error('브라우저 전환 리다이렉트가 너무 많습니다. 주소를 확인해 주세요.')
+    const pending: QueuedNavigation = { url, historyIndex: this.historyIndex, request }
+    this.queuedNavigation = pending
+    this.commands = this.commands.then(async () => {
+      if (!this.active() || this.queuedNavigation !== pending) return
+      this.queuedNavigation = undefined
+      await this.navigateTo(pending.url, pending.historyIndex, undefined, pending.request)
+    }).catch(error => {
+      if (this.active()) this.send({ type: 'error', message: error instanceof Error ? error.message : '브라우저를 전환하지 못했습니다.' })
+    })
+  }
+
+  private async launch(executablePath: string): Promise<Page> {
+    const launchOptions = { executablePath, chromiumSandbox: true, headless: true, args: ['--disable-dev-shm-usage'] }
+    const contextOptions = { viewport: this.viewport, colorScheme: this.colorScheme, serviceWorkers: 'block' as const, acceptDownloads: false }
+    const browser = await chromium.launch(launchOptions)
     this.browser = browser
     if (!this.active()) { await browser.close(); throw new Error('브라우저 세션이 닫혔습니다.') }
-    this.context = await browser.newContext({ viewport: { width: 1100, height: 700 }, colorScheme: this.colorScheme, serviceWorkers: 'block', acceptDownloads: false })
+    this.context = await browser.newContext({ ...contextOptions, storageState: this.storageStates.get(this.engine!) })
     const context = this.context
     await context.route('**/*', async route => {
       const request = route.request()
@@ -159,21 +212,46 @@ export class DomBrowserSession {
     await cdp.send('Page.enable')
     const mainFrame = (await cdp.send('Page.getFrameTree')).frameTree.frame.id
     cdp.on('Page.frameNavigated', ({ frame }) => {
-      if (frame.parentId) return
+      if (frame.parentId || this.cdp !== cdp) return
       if (!this.navigatingDocument) this.beginDocument(frame.url)
       this.cache.baseUrl = frame.url
       this.navigatingDocument = false
     })
     // Fetch interception sees every redirect hop; Playwright routing only sees the first.
     cdp.on('Fetch.requestPaused', request => {
+      if (this.cdp !== cdp) return
       let allowed = this.active()
+      let override: NavigationRequest | undefined
+      const mainDocument = request.resourceType === 'Document' && request.frameId === mainFrame
       try {
         const url = new URL(request.request.url)
+        if (request.request.urlFragment) url.hash = request.request.urlFragment
         if (request.resourceType === 'Document') domBrowserTarget(url.href, this.blockedPorts)
         else this.assertSubresource(url)
-        if (allowed && request.resourceType === 'Document' && request.frameId === mainFrame) this.beginDocument(url.href)
-      } catch { allowed = false }
-      void cdp.send(allowed ? 'Fetch.continueRequest' : 'Fetch.failRequest', allowed ? { requestId: request.requestId } : { requestId: request.requestId, errorReason: 'BlockedByClient' }).catch(() => {})
+        if (allowed && mainDocument && domBrowserEngine(url.href) !== this.engine) {
+          if (request.request.hasPostData && request.request.postData === undefined) throw new Error('브라우저를 전환하는 파일 전송은 지원하지 않습니다. 대상 사이트를 먼저 열어 주세요.')
+          const headers = Object.fromEntries(Object.entries(request.request.headers).filter(([name]) => ['content-type', 'origin', 'referer'].includes(name.toLowerCase())))
+          this.queueNavigation(url.href, { method: request.request.method, postData: request.request.postData, headers })
+          void cdp.send('Fetch.failRequest', { requestId: request.requestId, errorReason: 'Aborted' }).catch(() => {})
+          return
+        }
+        if (allowed && mainDocument) {
+          if (this.navigationRequest?.url === url.href) {
+            override = this.navigationRequest.request
+            this.navigationRequest = undefined
+          }
+          this.beginDocument(url.href)
+        }
+      } catch (error) {
+        allowed = false
+        if (mainDocument && error instanceof Error && /파일 전송|전환 리다이렉트/.test(error.message)) this.send({ type: 'error', message: error.message })
+      }
+      const overrides = override ? {
+        method: override.method,
+        ...(override.postData === undefined ? {} : { postData: Buffer.from(override.postData).toString('base64') }),
+        headers: [...Object.entries(request.request.headers).filter(([name]) => !Object.keys(override.headers).some(key => key.toLowerCase() === name.toLowerCase())), ...Object.entries(override.headers)].map(([name, value]) => ({ name, value })),
+      } : {}
+      void cdp.send(allowed ? 'Fetch.continueRequest' : 'Fetch.failRequest', allowed ? { requestId: request.requestId, ...overrides } : { requestId: request.requestId, errorReason: 'BlockedByClient' }).catch(() => {})
     })
     await cdp.send('Fetch.enable', { patterns: [{ urlPattern: '*', requestStage: 'Request' }] })
     context.on('page', popup => { if (popup !== page) void popup.close() })
@@ -182,7 +260,7 @@ export class DomBrowserSession {
     page.setDefaultTimeout(5000)
     page.setDefaultNavigationTimeout(20_000)
     await page.exposeBinding('__mewDomEmit', ({ frame }, token: string, event: unknown) => {
-      if (frame !== page.mainFrame() || !this.active()) return
+      if (frame !== page.mainFrame() || this.page !== page || !this.active()) return
       if (typeof token !== 'string' || this.retiredTokens.has(token)) return
       if (!this.documentToken) this.documentToken = token
       if (this.documentToken !== token) return
@@ -206,22 +284,42 @@ export class DomBrowserSession {
     }` })
     page.on('domcontentloaded', () => { this.loading = false; void this.sendState() })
     page.on('framenavigated', frame => {
-      if (frame !== page.mainFrame()) return
+      if (frame !== page.mainFrame() || this.page !== page) return
       try { domBrowserTarget(frame.url(), this.blockedPorts) }
       catch { this.send({ type: 'error', message: '이 주소로 이동할 수 없습니다. HTTP(S) 주소와 Mew 자체 포트인지 확인해 주세요.' }); void this.close(); return }
-      void this.sendState()
+      this.historyRecording = this.recordNavigation(page, cdp, this.runtimeId, this.historyIndex)
+      void this.historyRecording.then(() => this.sendState()).catch(() => {
+        this.send({ type: 'error', message: '브라우저 탐색 기록을 갱신하지 못했습니다. 다시 연결해 주세요.' })
+      })
     })
-    page.on('close', () => { void this.close() })
+    page.on('close', () => { if (this.page === page) void this.close() })
     this.poll = setInterval(() => { void this.sendState() }, 300)
     this.poll.unref()
     return page
   }
 
+  private async recordNavigation(page: Page, cdp: CDPSession, runtimeId: number, historyIndex?: number) {
+    const url = page.url()
+    const native = await cdp.send('Page.getNavigationHistory').catch(() => undefined)
+    if (this.page !== page || this.runtimeId !== runtimeId || page.url() !== url) return
+    if (!native) { this.history.record(url, runtimeId, historyIndex); return }
+    let replaceIndex = historyIndex
+    for (const entry of native.entries.slice(0, native.currentIndex + 1)) {
+      if (entry.url === 'about:blank' || this.nativeHistoryIndices.has(entry.id)) continue
+      this.history.record(entry.url, runtimeId, replaceIndex, true)
+      this.nativeHistoryIndices.set(entry.id, this.history.currentIndex)
+      replaceIndex = undefined
+    }
+    const current = native.entries[native.currentIndex]
+    if (current) this.history.record(url, runtimeId, this.nativeHistoryIndices.get(current.id) ?? historyIndex)
+    const validIds = new Set(native.entries.map(entry => entry.id))
+    for (const id of this.nativeHistoryIndices.keys()) if (!validIds.has(id)) this.nativeHistoryIndices.delete(id)
+  }
+
   private async sendState() {
     const page = this.page
     if (!page || !this.active()) return
-    const history = await this.cdp?.send('Page.getNavigationHistory').catch(() => undefined)
-    const message = { type: 'state' as const, generation: this.generation, url: page.url() === 'about:blank' ? '' : page.url(), title: await page.title().catch(() => ''), loading: this.loading, canGoBack: !!history && history.currentIndex > 0 && history.entries[history.currentIndex - 1]?.url !== 'about:blank', canGoForward: !!history && history.currentIndex < history.entries.length - 1 }
+    const message = { type: 'state' as const, generation: this.generation, url: page.url() === 'about:blank' ? '' : page.url(), title: await page.title().catch(() => ''), loading: this.loading, canGoBack: this.history.canGoBack, canGoForward: this.history.canGoForward }
     const serialized = JSON.stringify(message)
     if (serialized !== this.state) { this.state = serialized; this.send(message) }
   }
@@ -313,36 +411,72 @@ export class DomBrowserSession {
     }
   }
 
+  private async navigateTo(url: string, historyIndex?: number, action?: 'back' | 'forward' | 'reload', request?: NavigationRequest) {
+    domBrowserTarget(url, this.blockedPorts)
+    this.loading = true
+    try {
+      const page = await this.start(url)
+      if (!this.active()) return
+      this.generation++
+      this.historyIndex = historyIndex
+      const commandGeneration = this.generation
+      this.navigationRequest = request ? { url, request } : undefined
+      await this.sendState()
+      try {
+        await page.evaluate('window.__mewDomScrollRevisions?.clear()').catch(() => {})
+        if (action === 'back') await page.goBack({ waitUntil: 'domcontentloaded' })
+        else if (action === 'forward') await page.goForward({ waitUntil: 'domcontentloaded' })
+        else if (action === 'reload') await page.reload({ waitUntil: 'domcontentloaded' })
+        else await page.goto(url, { waitUntil: 'domcontentloaded' })
+        if (!this.queuedNavigation) this.engineRedirects = 0
+      } catch (error) {
+        if (!this.queuedNavigation) throw error
+      } finally {
+        await this.historyRecording
+        if (!this.queuedNavigation && this.generation === commandGeneration) await page.evaluate('window.__mewDomRecord?.takeFullSnapshot?.()').catch(() => {})
+      }
+    } finally {
+      this.navigationRequest = undefined
+      this.historyIndex = undefined
+      this.loading = !!this.queuedNavigation
+      await this.sendState()
+    }
+  }
+
   private async command(command: DomBrowserCommand) {
     if (command.type === 'color-scheme') {
       this.colorScheme = command.colorScheme
-      await this.page?.emulateMedia({ colorScheme: command.colorScheme })
+      await this.page?.emulateMedia({ colorScheme: this.colorScheme })
+      return
+    }
+    if (command.type === 'resize') {
+      this.viewport = { width: command.width, height: command.height }
+      await this.page?.setViewportSize(this.viewport)
       return
     }
     if (['click', 'focus', 'input', 'scroll', 'key'].includes(command.type) && 'generation' in command && command.generation !== this.generation) return
-    if (command.type === 'navigate') domBrowserTarget(command.url, this.blockedPorts)
-    const page = await this.start()
-    if (!this.active()) return
-    if (command.type === 'resize') { await page.setViewportSize({ width: command.width, height: command.height }); return }
-    if (['navigate', 'back', 'forward', 'reload'].includes(command.type)) {
-      this.generation++
-      const commandGeneration = this.generation
-      this.loading = true; await this.sendState()
-      try {
-        await page.evaluate('window.__mewDomScrollRevisions?.clear()').catch(() => {})
-        if (command.type === 'navigate') await page.goto(command.url, { waitUntil: 'domcontentloaded' })
-        else if (command.type === 'back') await page.goBack({ waitUntil: 'domcontentloaded' })
-        else if (command.type === 'forward') await page.goForward({ waitUntil: 'domcontentloaded' })
-        else await page.reload({ waitUntil: 'domcontentloaded' })
-      } finally {
-        this.loading = false
-        // New documents record their own snapshot; SPA history needs a fresh generation snapshot.
-        if (this.generation === commandGeneration) await page.evaluate('window.__mewDomRecord?.takeFullSnapshot?.()').catch(() => {})
-        await this.sendState()
+    if (command.type === 'navigate') { this.engineRedirects = 0; this.queuedNavigation = undefined; await this.navigateTo(command.url); return }
+    if (command.type === 'back' || command.type === 'forward') {
+      this.engineRedirects = 0
+      const target = this.history.target(command.type)
+      if (target) {
+        const native = await this.cdp?.send('Page.getNavigationHistory').catch(() => undefined)
+        const adjacent = native?.entries[native.currentIndex + (command.type === 'back' ? -1 : 1)]
+        const nativeAction = target.entry.runtimeId === this.runtimeId && adjacent?.url === target.entry.url ? command.type : undefined
+        await this.navigateTo(target.entry.url, target.index, nativeAction)
       }
       return
     }
+    if (command.type === 'reload') {
+      this.engineRedirects = 0
+      const current = this.history.current
+      if (current) await this.navigateTo(current.url, this.history.currentIndex, 'reload')
+      return
+    }
+    const page = await this.start()
+    if (!this.active()) return
     if (command.type === 'key') {
+      this.engineRedirects = 0
       const key = [command.ctrlKey && 'Control', command.metaKey && 'Meta', command.altKey && 'Alt', command.shiftKey && 'Shift', command.key === ' ' ? 'Space' : command.key].filter(Boolean).join('+')
       await page.keyboard.press(key); return
     }
@@ -351,6 +485,7 @@ export class DomBrowserSession {
       return
     }
     if (command.type === 'click') {
+      this.engineRedirects = 0
       const point = await page.evaluate(`(() => { const n = window.__mewDomRecord?.mirror.getNode(${command.id}); const e = n?.nodeType === 1 ? n : n?.parentElement; if (!e) return null; e.scrollIntoView({block:'nearest', inline:'nearest'}); const r = e.getBoundingClientRect(); return {x: r.x + r.width / 2, y: r.y + r.height / 2}; })()`) as { x: number; y: number } | null
       if (point) await page.mouse.click(point.x, point.y)
       return
@@ -371,8 +506,8 @@ export class DomBrowserSession {
     this.assetWaiters.splice(0).forEach(resolve => resolve())
     this.cache.abort.abort(); this.cache.entries.clear()
     this.socket.close(1000)
-    await this.context?.close().catch(() => {})
-    await this.browser?.close().catch(() => {})
+    await this.releaseBrowser()
+    this.storageStates.clear()
   }
 }
 

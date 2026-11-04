@@ -1,17 +1,17 @@
 ---
 title: "UI browser testing with Chromium"
-description: "Defines local Chrome/Chromium discovery, MEW_BROWSER_EXECUTABLE, and the shared Playwright helper that launches and closes test-owned headless browsers. Covers execution restrictions, cleanup, and the boundary between UI fixtures and native browser checks."
+description: "Defines Chromium discovery with MEW_CHROMIUM_EXECUTABLE and the shared Playwright helper for test-owned headless browsers. Separates UI automation from ordinary Google Chrome for external browsing and login, and covers cleanup and execution limits."
 created: "2026-11-04"
-updated: "2026-11-04"
+updated: "2026-11-05"
 ---
 
-Mew's normal UI tests under `server/*-ui.test.ts` use a local Chrome/Chromium executable through Playwright. `server/test-browser.ts` owns the shared `connectTestBrowser()` helper. Each call launches an isolated headless browser with Chromium sandboxing enabled and a 15-second startup timeout. The caller owns the returned browser and must close it during test cleanup.
+Mew's normal UI tests under `server/*-ui.test.ts` use Playwright's Chromium or an installed Chromium executable through Playwright. `server/test-browser.ts` owns the shared `connectTestBrowser()` helper. Each call launches an isolated headless browser with Chromium sandboxing enabled and a 15-second startup timeout. The caller owns the returned browser and must close it during test cleanup.
 
 ## Prerequisites and executable discovery
 
-The helper uses `domBrowserExecutable()` from `server/browser-dom-executable.ts`. Set `MEW_BROWSER_EXECUTABLE` to an absolute executable path when needed. Otherwise, discovery checks Playwright's bundled Chromium first, then standard system Chrome/Chromium locations. macOS discovery includes apps installed in the current user's `Applications` directory.
+The helper uses `domBrowserExecutable()` from `server/browser-dom-executable.ts`. Discovery checks `MEW_CHROMIUM_EXECUTABLE`, the legacy `MEW_BROWSER_EXECUTABLE` override, Playwright's bundled Chromium, then installed Chromium locations. Overrides must be absolute executable paths. Ordinary Google Chrome is reserved for external browsing and login and is not an automatic fallback for UI tests. Test selection follows this automation policy even when a fixture uses an external URL.
 
-An Obscura installation or running CDP service is not required. `MEW_TEST_BROWSER_CDP_URL` and `MEW_DOM_BROWSER_EXECUTABLE` are no longer used. If `MEW_BROWSER_EXECUTABLE` previously pointed to Obscura, remove the override or change it to Chrome/Chromium. Missing executables, invalid overrides, and launch failures leave browser verification incomplete; report the actual error.
+An Obscura installation or running CDP service is not required. `MEW_TEST_BROWSER_CDP_URL` and `MEW_DOM_BROWSER_EXECUTABLE` are no longer used. If the legacy override previously pointed to Obscura, remove it or set `MEW_CHROMIUM_EXECUTABLE` to Chromium. Prefer the purpose-specific override; the legacy variable also affects external browsing and login. Missing executables, invalid overrides, and launch failures leave browser verification incomplete; report the actual error.
 
 ## Writing and running tests
 
@@ -31,6 +31,6 @@ Tests under `server/` use the Node TypeScript configuration without DOM globals.
 
 ## Scope and limitations
 
-This helper covers normal UI tests. Mew's application DOM browser also launches isolated Chrome/Chromium sessions (`server/dom-browser.ts`); the login desktop retains its separate video and input lifecycle (`server/login-desktop.ts`). Native RTC, browser-conformance, and platform-specific checks retain the actual engines and devices their assertions require.
+This helper covers normal UI tests. Mew's application DOM browser uses this Chromium resolver for loopback URLs and ordinary Google Chrome for other URLs (`server/dom-browser.ts`). External DOM browsing still uses Playwright and rrweb; the login desktop retains its separate native video and input lifecycle (`server/login-desktop.ts`). Native RTC, browser-conformance, and platform-specific checks retain the actual engines and devices their assertions require.
 
-Helper unit tests verify browser selection and launch behavior without launching a browser. They do not establish that every UI assertion or screenshot passes. Record actual browser results and remaining blockers separately from build success. [ADR 0136](../decisions/0136-chromium-browser-restoration.md) records the current browser runtime and test policy.
+Helper unit tests verify browser selection and launch behavior without launching a browser. They do not establish that every UI assertion or screenshot passes. Record actual browser results and remaining blockers separately from build success. [ADR 0137](../decisions/0137-browser-purpose-routing.md) records browser selection by purpose, building on the [Chromium restoration](../decisions/0136-chromium-browser-restoration.md).

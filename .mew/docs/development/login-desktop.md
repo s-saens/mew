@@ -1,19 +1,21 @@
 ---
 title: "Virtual Login Desktop"
-description: "Defines the X server, standard Chrome, video WebSocket, XTest input, account profiles, permissions, process lifetimes, and readiness requirements for the Linux/WSL-only OAuth and account management screen. Distinguishes the boundaries of a regular DOM browser and verification of actual account authentication."
+description: "Defines ordinary Google Chrome selection, the X server, video WebSocket, XTest input, account profiles, permissions, and process lifetimes for the Linux/WSL-only login screen. Separates native login video from external DOM browsing and actual-account verification."
 created: "2026-10-20"
-updated: "2026-10-20"
+updated: "2026-11-05"
 ---
 
 ## Execution and Support Scope
 
-`server/login-desktop.ts` owns a virtual desktop for each login job. After receiving the panel's initial size, it starts dedicated Xvfb, a Python X11 window manager and input handling, Chrome, and FFmpeg. Sites run in host Chrome, and only JPEG video frames and OS input connect to the panel. CDP, Playwright execution, DOM recorders, and players are not used. Playwright is used only to find an alternate location for the browser executable.
+`server/login-desktop.ts` owns a virtual desktop for each login job. After receiving the panel's initial size, it starts dedicated Xvfb, a Python X11 window manager and input handling, Chrome, and FFmpeg. Sites run in host Chrome, and only JPEG video frames and OS input connect to the panel. CDP, Playwright execution, DOM recorders, and players are not used. Browser discovery uses the ordinary Google Chrome resolver; Playwright testing binaries are not a fallback.
 
 The virtual framebuffer is at most 3840×2160, and the Chrome window and video crop match the panel's display area. Resizing reconfigures the window and capture while preserving the same browser, page, and input values. The page viewport and video dimensions fit the panel, but the `screen.width/height` read by sites reflects the virtual framebuffer dimensions. The minimum is 320×240 and the maximum is 3840×2160, with video dimensions adjusted to even numbers.
 
-Linux/WSL requires Chrome or Chromium, Xvfb, FFmpeg with X11 capture and an MJPEG encoder, Python 3, and libX11 and libXtst. An installed regular Chrome takes priority; otherwise, it looks for Playwright's installed Chromium. `MEW_BROWSER_EXECUTABLE` can specify the executable's absolute path. Display preparation failures do not fall back to the actual desktop or headless mode. macOS and native Windows return a preparation error.
+Linux/WSL requires ordinary Google Chrome, Xvfb, FFmpeg with X11 capture and an MJPEG encoder, Python 3, and libX11 and libXtst. `loginDesktopExecutable()` uses `MEW_CHROME_EXECUTABLE`, then the legacy `MEW_BROWSER_EXECUTABLE` override, then installed Google Chrome locations such as `/usr/bin/google-chrome-stable`. Overrides must be absolute executable paths. Chrome for Testing and bundled Chromium are not automatic fallbacks. Install Chrome inside the Linux/WSL host; a Windows Chrome installation does not satisfy this prerequisite. Display preparation failures do not fall back to the actual desktop or headless mode. macOS and native Windows return a preparation error.
 
 `server/login-desktop-x11.py` handles focus, popups, clipboard, keys, and buttons on a separate X server. It does not connect to input, clipboard, or portals on the actual host desktop. Browser CPU/GPU usage is not isolated. It does not attach personal Chrome profiles and maintains `DATA_DIR/browser/profiles/<account-hash>` per account. Currently, each account uses one login screen at a time.
+
+External websites in the internal DOM browser also use ordinary Chrome, but retain Playwright control and rrweb replay. Only this login screen uses native video and OS input without CDP or Playwright. See the [browser selection decision](../decisions/0137-browser-purpose-routing.md).
 
 ## APIs and Permissions
 

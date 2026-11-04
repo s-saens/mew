@@ -8,7 +8,7 @@ import type { IncomingMessage, Server } from 'node:http'
 import type { Http2SecureServer } from 'node:http2'
 import express from 'express'
 import { WebSocket, WebSocketServer } from 'ws'
-import { chromium } from 'playwright-core'
+import { externalBrowserExecutable } from './browser-dom-executable.ts'
 import { canUse } from './access-policy.ts'
 import { watchSocketAccess } from './access-socket.ts'
 import { authOf, requireFeature, resolveAuth, type RequestAuth } from './reqAuth.ts'
@@ -54,18 +54,10 @@ async function stopChild(child: ChildProcess | undefined) {
   child.stdin?.destroy(); child.stdout?.destroy()
 }
 
-function executable(file: string): boolean {
-  try { fs.accessSync(file, fs.constants.X_OK); return fs.statSync(file).isFile() } catch { return false }
-}
-
-/** Use a regular installed Chrome first; Playwright supplies only the fallback executable path. */
+/** Login uses ordinary installed Chrome, independently of automation Chromium. */
 export function loginDesktopExecutable(env: NodeJS.ProcessEnv = process.env): string {
-  if (env.MEW_BROWSER_EXECUTABLE) {
-    if (!path.isAbsolute(env.MEW_BROWSER_EXECUTABLE) || !executable(env.MEW_BROWSER_EXECUTABLE)) throw new Error('MEW_BROWSER_EXECUTABLE에 실행 가능한 Chrome 파일의 절대 경로를 지정해 주세요.')
-    return env.MEW_BROWSER_EXECUTABLE
-  }
-  const found = ['/usr/bin/google-chrome-stable', '/usr/bin/google-chrome', '/opt/google/chrome/chrome', '/usr/bin/chromium', '/usr/bin/chromium-browser', chromium.executablePath()].find(executable)
-  if (!found) throw new Error('호스트 Chrome이 없습니다. Chrome 또는 Chromium을 설치해 주세요.')
+  const found = externalBrowserExecutable({ env })
+  if (!found) throw new Error('호스트 Google Chrome이 없습니다. 일반 Google Chrome을 설치하거나 MEW_CHROME_EXECUTABLE에 실행 파일의 절대 경로를 지정해 주세요.')
   return found
 }
 

@@ -1,10 +1,12 @@
 ---
 title: "0136 — Restore Chromium for browsing and UI verification"
-description: "Supersedes Obscura decisions 0129 and 0135 with local Chrome/Chromium for the internal DOM browser and UI tests after slow real-app startup and interaction. Preserves DOM relay and isolation while restoring native browser networking, navigation, and input."
+description: "Browser selection is extended by ADR 0137. Supersedes Obscura decisions 0129 and 0135 with local Chrome/Chromium for the internal DOM browser and UI tests after slow real-app startup and interaction. Preserves DOM relay and isolation while restoring native browser networking, navigation, and input."
 created: "2026-11-04"
-updated: "2026-11-04"
+updated: "2026-11-05"
 status: "accepted"
 ---
+
+[ADR 0137](0137-browser-purpose-routing.md) extends this restoration by selecting ordinary Google Chrome for login/external pages and Chromium for localhost/UI automation. It replaces the shared executable-discovery policy below while retaining the restored native browser paths.
 
 ## Context
 
