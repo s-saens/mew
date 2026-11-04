@@ -89,7 +89,7 @@ import type { PaneHandle } from './components/EditorPane'
 import { DeferredEditorPane as EditorPane, prepareEditorPane } from './components/deferred-editor-pane'
 import { mediaKind } from './utils/media'
 import { setContentWorkspace } from './utils/contentCache'
-import { useTabs, type StoredTabs } from './hooks/useTabs'
+import { useTabs } from './hooks/useTabs'
 import { useMobilePanelSwipe } from './hooks/use-mobile-panel-swipe'
 import { dropZoneAt, paneIds, type DropSide, type DropZone } from './utils/paneTree'
 import { usePresence } from './hooks/usePresence'
@@ -110,6 +110,7 @@ import { useWorkspacePanelDismissals } from './hooks/use-panel-dismissals'
 import { useI18n } from './i18n'
 import { applyFontPreferences, loadFontPreferences, normalizeFontPreferences, saveFontPreferences } from './utils/fontPreferences'
 import { useAccountTheme } from './hooks/use-account-theme'
+import { useAccountEditorTabs } from './hooks/use-account-editor-tabs'
 import { IconPackProvider } from './components/icon-pack-context'
 import { loadMewcatSkin, saveMewcatSkin, loadMewcatHideDesktop, MEWCAT_HIDE_DESKTOP_KEY, type MewcatSkinSelection } from './utils/mewcatSkin'
 import { externalTabPath, isExternalTabPath } from './utils/externalFiles'
@@ -219,11 +220,6 @@ function accountTrees(value: unknown): AccountTreeStates {
     }
   }
   return result
-}
-
-function accountTabs(value: unknown): Record<string, StoredTabs> {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
-  return Object.fromEntries(Object.entries(value).filter(([, state]) => state && typeof state === 'object' && !Array.isArray(state))) as Record<string, StoredTabs>
 }
 
 function loadOpenProjectPaths(): string[] {
@@ -1014,11 +1010,8 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     }
   }, [applyWorkspace, handleWorkspaceBroadcast, canOpenProjects, rootProjectPath, showToast])
 
-  const syncedAccountTabs = useMemo(() => accountTabs(workspaceUi.tabs), [workspaceUi.tabs])
-  const saveAccountTabs = useCallback((tabProject: string, state: StoredTabs) => {
-    if (isGuest) return
-    setWorkspaceUi((previous) => ({ ...previous, tabs: { ...accountTabs(previous.tabs), [tabProject]: state } }))
-  }, [isGuest])
+  const accountEditorTabs = useAccountEditorTabs(isGuest ? null : authEmail, projectUiPath,
+    error => showToast(error instanceof Error ? error.message : String(error)))
 
   const {
     hydrated: tabsHydrated,
@@ -1054,9 +1047,9 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     refreshTree,
     showToast,
     rootProjectPath ?? undefined,
-    syncedAccountTabs,
-    saveAccountTabs,
-    workspaceUiLoaded,
+    accountEditorTabs.tabs,
+    accountEditorTabs.change,
+    workspaceUiLoaded && (isGuest || accountEditorTabs.hydrated),
     workspaceInfoRef.current?.docsPath,
     authEmail ?? undefined,
     projectUiPath ?? undefined,

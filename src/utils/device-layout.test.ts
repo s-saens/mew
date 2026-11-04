@@ -8,7 +8,10 @@ test('devices restore independent geometry without copying unrelated account set
   const fallback = { dock: { ratio: .5 }, tabs: { main: 1 }, features: { expanded: true } }
   attach(desktop)
   saveDeviceLayout('a', '/project', { dock: { ratio: .3 }, tabs: { main: 2 }, features: { expanded: false } })
-  assert.deepEqual(restoreDeviceLayout('a', '/project', fallback), { ...fallback, dock: { ratio: .3 }, tabs: { main: 2 } })
+  assert.deepEqual(restoreDeviceLayout('a', '/project', fallback), { ...fallback, dock: { ratio: .3 } })
+  assert.equal(JSON.parse([...desktop.values()][0]).tabs, undefined, 'tab metadata is no longer saved as device geometry')
+  desktop.set([...desktop.keys()][0], JSON.stringify({ dock: { ratio: .3 }, tabs: { stale: true } }))
+  assert.deepEqual(restoreDeviceLayout('a', '/project', fallback).tabs, fallback.tabs, 'old device tabs cannot override the account')
   assert.deepEqual(restoreDeviceLayout('b', '/project', fallback), fallback)
   attach(mobile)
   assert.deepEqual(restoreDeviceLayout('a', '/project', fallback), fallback)

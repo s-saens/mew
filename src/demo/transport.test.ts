@@ -99,6 +99,23 @@ test('SSE content search returns matches followed by an explicit completion even
   assert.match(text, /event: done\ndata: .*"state":"ready"/)
 })
 
+test('editor tabs stay independent of device layout writes in the demo memory store', async () => {
+  const store = new DemoWorkspaceStore(), other = new DemoWorkspaceStore()
+  try {
+    const url = `/api/user-ui/editor-tabs?workspace=${encodeURIComponent(store.workspacePath)}`
+    const original = await data(store, url)
+    const state = { panes: [{ id: 'main', tabs: [], activePath: null }], layout: { kind: 'leaf', pane: 'main' }, focusedPaneId: 'main' }
+    const saved = await data(store, '/api/user-ui/editor-tabs', write('PUT', { workspacePath: store.workspacePath, project: '.workspace', state }))
+    assert.deepEqual(saved, { state: { '.workspace': state }, revision: 1 })
+    await data(store, '/api/user-ui/workspace', write('PUT', { workspacePath: store.workspacePath, state: { tabs: original.state } }))
+    assert.deepEqual(await data(store, url), saved)
+    assert.deepEqual(await data(store, '/api/user-ui/editor-tabs', write('PUT', { workspacePath: store.workspacePath, project: '.workspace', state: original.state['.workspace'], initialize: true })), saved)
+    assert.deepEqual(await data(other, url), original, 'separate visitors do not share tabs')
+    store.reset()
+    assert.deepEqual(await data(store, url), original)
+  } finally { store.close(); other.close() }
+})
+
 test('workspace UI, runtime defaults and icons round trip independently', async () => {
   const store = new DemoWorkspaceStore()
   const state = { chrome: { sidebarOpen: false }, tabs: {} }

@@ -7,7 +7,7 @@ import path from 'node:path'
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mew-user-ui-state-'))
 process.env.MEW_DATA_DIR = dir
 
-const { readAgentSessionClaims, readAgentTabs, readRootProjects, readWorkspaceUi, writeAgentTabs, writeRootProjects, writeWorkspaceUi } = await import('./userUiState.ts')
+const { readAgentSessionClaims, readAgentTabs, readEditorTabs, readRootProjects, readWorkspaceUi, writeAgentTabs, writeEditorTabs, writeRootProjects, writeWorkspaceUi } = await import('./userUiState.ts')
 
 test('계정마다 루트 프로젝트 탭과 아이콘을 분리해 영속화한다', () => {
   const saved = writeRootProjects('You@Example.com', {
@@ -80,4 +80,51 @@ test('project tab groups persist per account and prune closed or duplicate membe
   assert.equal(readRootProjects('no-groups@example.com'), null)
   const closed = writeRootProjects('groups@example.com', { ...saved, paths: ['/a', '/b'] })
   assert.deepEqual(closed.groups, [])
+})
+
+test('editor tabs are shared per account and workspace while project writes preserve sibling projects', () => {
+  const email = 'Editor-Tabs@example.com', root = '/work/editor-tabs'
+  assert.deepEqual(readEditorTabs(email, root), { state: null, revision: 0 })
+  const docs = { panes: [{ id: 'main', tabs: [{ path: 'README.md' }], activePath: 'README.md' }] }
+  const files = { panes: [{ id: 'main', tabs: [{ path: 'src/index.ts' }], activePath: 'src/index.ts' }] }
+  assert.deepEqual(writeEditorTabs(email, root, 'docs', docs), { state: { docs }, revision: 1 })
+  assert.deepEqual(writeEditorTabs(email, root, '.workspace', files), { state: { docs, '.workspace': files }, revision: 2 })
+  assert.deepEqual(readEditorTabs(email.toLowerCase(), root), { state: { docs, '.workspace': files }, revision: 2 })
+  assert.deepEqual(readEditorTabs('other-editor@example.com', root), { state: null, revision: 0 })
+  assert.deepEqual(readEditorTabs(email, '/work/other-editor-tabs'), { state: null, revision: 0 })
+
+  const empty = { panes: [{ id: 'main', tabs: [], activePath: null }] }
+  assert.deepEqual(writeEditorTabs(email, root, 'docs', empty), { state: { docs: empty, '.workspace': files }, revision: 3 })
+  writeWorkspaceUi(email, root, { tabs: { docs }, marker: 'stale device layout' })
+  assert.deepEqual(readEditorTabs(email, root), { state: { docs: empty, '.workspace': files }, revision: 3 }, 'whole-workspace saves cannot reopen closed editor tabs')
+})
+
+test('editor tabs freeze legacy migration and initialize each project only once', () => {
+  const email = 'editor-migration@example.com', root = '/work/editor-migration'
+  const oldTabs = { tabs: [{ path: 'legacy.md' }], activePath: 'legacy.md' }
+  const staleTabs = { tabs: [{ path: 'stale.md' }], activePath: 'stale.md' }
+  writeWorkspaceUi(email, root, { tabs: { docs: oldTabs } })
+  assert.deepEqual(readEditorTabs(email, root), { state: { docs: oldTabs }, revision: 0 })
+  writeWorkspaceUi(email, root, { tabs: { docs: staleTabs } })
+  assert.deepEqual(readEditorTabs(email, root), { state: { docs: oldTabs }, revision: 0 })
+  assert.deepEqual(writeEditorTabs(email, root, 'docs', staleTabs, true), { state: { docs: oldTabs }, revision: 0 })
+  assert.deepEqual(writeEditorTabs(email, root, '.workspace', staleTabs, true), { state: { docs: oldTabs, '.workspace': staleTabs }, revision: 1 })
+  assert.deepEqual(writeEditorTabs(email, root, '.workspace', oldTabs, true), { state: { docs: oldTabs, '.workspace': staleTabs }, revision: 1 })
+
+  const directRoot = '/work/editor-direct-migration'
+  writeWorkspaceUi(email, directRoot, { tabs: { docs: oldTabs } })
+  assert.deepEqual(writeEditorTabs(email, directRoot, 'docs', staleTabs, true), { state: { docs: oldTabs }, revision: 0 })
+  writeWorkspaceUi(email, directRoot, { tabs: { docs: staleTabs } })
+  assert.deepEqual(readEditorTabs(email, directRoot), { state: { docs: oldTabs }, revision: 0 }, 'initialize also freezes a legacy project when GET was skipped')
+})
+
+test('invalid editor tab updates do not alter canonical tabs or revision', () => {
+  const email = 'editor-validation@example.com', root = '/work/editor-validation'
+  const saved = writeEditorTabs(email, root, 'docs', { panes: [] })
+  for (const [workspacePath, project, state] of [
+    ['relative', 'docs', {}], [root, '', {}], [root, 'docs', []],
+    [root, 'docs', { large: 'x'.repeat(512 * 1024) }],
+  ] as const) assert.throws(() => writeEditorTabs(email, workspacePath, project, state))
+  assert.throws(() => readEditorTabs(email, 'relative'))
+  assert.deepEqual(readEditorTabs(email, root), saved)
 })

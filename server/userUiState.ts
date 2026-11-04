@@ -6,6 +6,7 @@ import { normalizeEmail } from './auth.ts'
 import { normalizeIconValue } from './svgIcon.ts'
 import type { FileFavoritePreferences } from '../shared/file-favorites.ts'
 import { parseThemeSettings, ThemeSettingsError, type ThemeSettings } from '../shared/theme.ts'
+import type { AgentTabState, AgentTabsState } from '../shared/agent-tabs.ts'
 
 // 계정별 작업 맥락과 공유 테마를 저장한다. 화면 크기·초안처럼
 // 기기 성격인 값까지 넣지 않는다(ADR 0093).
@@ -15,20 +16,12 @@ const MAX_TABS = 100
 const MAX_PATH = 4_096
 const TAB_ID = /^[A-Za-z0-9_-]{1,64}$/
 
-export type StoredAgentTab = {
-  id: string
-  label: string
-  runtime?: string | null
-  cwd?: string | null
-  renamed?: boolean
-  sessionIds?: Record<string, string>
-  preset?: { id: string; name: string; thinkingId?: string; thinkingConfigId?: string; modelId: string; role: string }
-}
-
-export type StoredAgentTabs = { tabs: StoredAgentTab[]; activeId: string | null }
+export type StoredAgentTab = AgentTabState
+export type StoredAgentTabs = AgentTabsState
 export type StoredRootProjects = { paths: string[]; icons: Record<string, string>; groups?: ProjectTabGroup[] }
 /** 계정에 귀속하는 작업 화면 상태. 브라우저별 폭·글꼴·작성 중 초안은 넣지 않는다. */
 export type StoredWorkspaceUi = Record<string, unknown>
+export type StoredEditorTabsSnapshot = { state: Record<string, StoredWorkspaceUi> | null; revision: number }
 
 type UserUiState = {
   theme?: ThemeSettings
@@ -38,6 +31,7 @@ type UserUiState = {
   rootProjects?: StoredRootProjects
   agentTabs?: Record<string, StoredAgentTabs>
   workspaceUi?: Record<string, StoredWorkspaceUi>
+  editorTabs?: Record<string, StoredEditorTabsSnapshot>
 }
 
 export function readAccountTheme(email: string): ThemeSettings | null {
@@ -221,6 +215,52 @@ export function writeWorkspaceUi(email: string, workspacePath: string, input: un
   all[key] = { ...previous, workspaceUi: { ...previous.workspaceUi, [workspacePath]: value } }
   writeAll(all)
   return value
+}
+
+function legacyEditorTabs(state: UserUiState, workspacePath: string): StoredEditorTabsSnapshot {
+  const legacy = state.workspaceUi?.[workspacePath]?.tabs
+  if (!legacy || typeof legacy !== 'object' || Array.isArray(legacy)) return { state: null, revision: 0 }
+  const tabs = Object.fromEntries(Object.entries(legacy).filter(([project, value]) =>
+    project.length > 0 && project.length <= MAX_PATH && value && typeof value === 'object' && !Array.isArray(value),
+  )) as Record<string, StoredWorkspaceUi>
+  return { state: tabs, revision: 0 }
+}
+
+/** Freeze the legacy snapshot once so device layout saves cannot replace account tabs. */
+export function readEditorTabs(email: string, workspacePath: string): StoredEditorTabsSnapshot {
+  if (!validPath(workspacePath)) throw new Error('작업 폴더 경로가 올바르지 않습니다')
+  const all = readAll(), key = normalizeEmail(email), previous = userState(all, key)
+  const saved = previous.editorTabs?.[workspacePath]
+  if (saved) return saved
+  const snapshot = legacyEditorTabs(previous, workspacePath)
+  if (snapshot.state !== null) {
+    all[key] = { ...previous, editorTabs: { ...previous.editorTabs, [workspacePath]: snapshot } }
+    writeAll(all)
+  }
+  return snapshot
+}
+
+/** Only the changed project is written; initial migration never replaces an existing project. */
+export function writeEditorTabs(email: string, workspacePath: string, project: string, input: unknown, initialize = false): StoredEditorTabsSnapshot {
+  if (!validPath(workspacePath)) throw new Error('작업 폴더 경로가 올바르지 않습니다')
+  if (typeof project !== 'string' || project.length === 0 || project.length > MAX_PATH) throw new Error('프로젝트 식별자가 올바르지 않습니다')
+  const value = normalizeWorkspaceUi(input)
+  const all = readAll(), key = normalizeEmail(email), previous = userState(all, key)
+  const saved = previous.editorTabs?.[workspacePath] ?? legacyEditorTabs(previous, workspacePath)
+  if (initialize && saved.state && Object.hasOwn(saved.state, project)) {
+    if (!previous.editorTabs?.[workspacePath]) {
+      all[key] = { ...previous, editorTabs: { ...previous.editorTabs, [workspacePath]: saved } }
+      writeAll(all)
+    }
+    return saved
+  }
+  const state = { ...saved.state, [project]: value }
+  if (Object.keys(state).length > MAX_PROJECTS) throw new Error(`프로젝트 탭은 최대 ${MAX_PROJECTS}개입니다`)
+  normalizeWorkspaceUi(state)
+  const snapshot = { state, revision: saved.revision + 1 }
+  all[key] = { ...previous, editorTabs: { ...previous.editorTabs, [workspacePath]: snapshot } }
+  writeAll(all)
+  return snapshot
 }
 
 export function readActiveWorkspace(email: string): string | null {

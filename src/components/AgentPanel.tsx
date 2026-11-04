@@ -12,6 +12,7 @@ import { workspaceViewportBottom } from '../utils/workspace-viewport'
 import { isMewTransportSuspended, openMewSocket } from '../utils/remote-transport.ts'
 import { agentRecoveryDelay } from '../utils/recovery-policy'
 import { AgentConnectionWatch } from '../utils/agent-connection-watch.ts'
+import { createAgentTabsSync } from '../utils/agent-tabs-sync.ts'
 import { PanelCloseButton } from './panel-close-button'
 import { TabActionMenu } from './tab-action-menu'
 import { ConfirmDialog, HoverTipLayer, PanelNotice, canAutoFocusInput } from '@mew/ui'
@@ -1620,10 +1621,10 @@ export function AgentPanel({ embedded = false, startupPrompt, requestedPicker = 
   }, [allowAgent, tabsSynced, tabs, opened, infos, onRunningAgentsChange])
   useEffect(() => () => onRunningAgentsChange?.(0), [onRunningAgentsChange])
   const [infoTabs, setInfoTabs] = useState<Set<string>>(() => new Set())
-  // 탭 상태 저장은 한 번에 하나만 보낸다. 빠른 이름·세션 갱신의 오래된 PUT이 늦게 도착해
-  // 최신 thread 포인터를 되돌리는 경합을 막고, 대기 중에는 마지막 스냅샷만 남긴다.
-  const pendingSaveRef = useRef<{ workspacePath: string; tabs: AgentTab[]; activeId: string | null } | null>(null)
-  const saveRunningRef = useRef(false)
+  const tabsSyncRef = useRef<ReturnType<typeof createAgentTabsSync> | null>(null)
+  const tabStateRef = useRef({ tabs, activeId })
+  tabStateRef.current = { tabs, activeId }
+  const tabOwnerRef = useRef({ workspacePath, cacheAccount })
   // 탭을 닫을 때 그 탭의 WS로 close_session을 보내야 한다 — 창을 닫는 것과 달리 세션을 끝내는 뜻이다
   const sendersRef = useRef(new Map<string, (payload: Record<string, unknown>) => void>())
 
@@ -1634,23 +1635,7 @@ export function AgentPanel({ embedded = false, startupPrompt, requestedPicker = 
     // 계정 원장이 SSoT이고 localStorage는 첫 화면용 fallback뿐이다. 전사·본문 캐시가 브라우저
     // quota를 채워도 이 보조 저장 실패가 서버 저장까지 막거나 React 루트를 내리면 안 된다.
     try { writeBrowserStorage(tabsKey, JSON.stringify(tabs)) } catch { /* 서버 원장 저장은 아래에서 계속한다 */ }
-    if (!tabsSynced || !workspacePath) return
-    pendingSaveRef.current = { workspacePath, tabs, activeId }
-    if (saveRunningRef.current) return
-    saveRunningRef.current = true
-    const drain = async () => {
-      while (pendingSaveRef.current) {
-        const next = pendingSaveRef.current
-        pendingSaveRef.current = null
-        try {
-          await saveAgentTabs(next.workspacePath, next)
-        } catch (err) {
-          console.error(err)
-        }
-      }
-      saveRunningRef.current = false
-    }
-    void drain()
+    if (tabsSynced && workspacePath) tabsSyncRef.current?.change({ tabs, activeId })
   }, [activeId, tabs, tabsKey, tabsSynced, workspacePath])
 
   useEffect(() => {
@@ -1675,8 +1660,7 @@ export function AgentPanel({ embedded = false, startupPrompt, requestedPicker = 
     } catch { /* 마지막 활성 탭도 계정 탭 상태에서 복원할 수 있다 */ }
   }, [activeId, activeTabKey])
 
-  // 서버 저장값이 있으면 먼저 그것을 복원한다. 없을 때만 기존 localStorage 값이 위 effect를 통해
-  // 계정 저장소의 첫 값이 된다. 따라서 빈 시크릿 창이 다른 기기의 탭을 지우지 않는다.
+  // Account changes update tab metadata without replacing mounted session surfaces or local geometry.
   useEffect(() => {
     sessionClaimsRefreshRef.current = null
     if (!workspacePath) {
@@ -1684,14 +1668,22 @@ export function AgentPanel({ embedded = false, startupPrompt, requestedPicker = 
       setTabsSynced(true)
       return
     }
-    let alive = true
+    let alive = true, prefetched = preparedTabs
+    let latestClaims: AgentSessionClaim[] = []
     setTabsSynced(false)
-    const restoration = (preparedTabs ?? fetchAgentTabs(workspacePath))
-      .then(({ state, claims }) => {
-        if (alive) {
-          setSessionClaims(claims)
-        }
-        if (!alive || !state) return
+    const ownerChanged = tabOwnerRef.current.workspacePath !== workspacePath || tabOwnerRef.current.cacheAccount !== cacheAccount
+    tabOwnerRef.current = { workspacePath, cacheAccount }
+    const initialTabs = ownerChanged ? loadTabs(workspacePath) : tabStateRef.current.tabs
+    const initialState = ownerChanged ? { tabs: initialTabs, activeId: loadActiveTabId(initialTabs, workspacePath) } : tabStateRef.current
+    const controller = createAgentTabsSync(initialState, {
+      read: async () => {
+        const request = prefetched ?? fetchAgentTabs(workspacePath)
+        prefetched = undefined
+        const { state, claims } = await request
+        if (!alive) return null
+        latestClaims = claims
+        setSessionClaims(claims)
+        if (!state) return null
         const restoredTabs = state.tabs
           .filter((tab) => !(tab.runtime === null && tab.label === LEGACY_PENDING_TAB_LABEL))
           .filter((tab) => tab.runtime === null || tab.runtime === undefined || RUNTIMES.some((runtime) => runtime.id === tab.runtime))
@@ -1701,16 +1693,61 @@ export function AgentPanel({ embedded = false, startupPrompt, requestedPicker = 
         const restoredActiveId = state.activeId && restoredTabs.some((tab) => tab.id === state.activeId)
           ? state.activeId
           : (restoredTabs[0]?.id ?? null)
-        pruneAgentLocalCaches(new Set([...claims.map((claim) => claim.tabId), ...restoredTabs.map((tab) => tab.id)]))
-        setTabs(restoredTabs)
-        setActiveId(restoredActiveId)
-        setOpened(new Set(!docked && restoredActiveId ? [restoredActiveId] : []))
-      })
-      .catch(console.error)
-      .finally(() => { if (alive) setTabsSynced(true) })
+        return { tabs: restoredTabs, activeId: restoredActiveId }
+      },
+      write: async (state) => (await saveAgentTabs(workspacePath, state)).state,
+      apply: (state, initial) => {
+        const previous = tabStateRef.current
+        const remaining = new Set(state.tabs.map(tab => tab.id))
+        pruneAgentLocalCaches(new Set([...latestClaims.map(claim => claim.tabId), ...remaining]))
+        const activeChanged = previous.activeId !== state.activeId
+        setTabs(current => state.tabs.map(tab => {
+          const existing = current.find(candidate => candidate.id === tab.id)
+          return existing && JSON.stringify(existing) === JSON.stringify(tab) ? existing : tab
+        }))
+        setActiveId(state.activeId)
+        setOpened(current => {
+          const next = new Set(initial ? [] : [...current].filter(id => remaining.has(id)))
+          if (!docked && state.activeId) next.add(state.activeId)
+          return next
+        })
+        if (initial || activeChanged) {
+          setPickerOpen(false)
+          const tab = state.tabs.find(candidate => candidate.id === state.activeId)
+          const currentDock = latestDock.current
+          if (tab && currentDock) currentDock.select(currentDock.groupFor(tab.runtime === 'tmux' ? 'terminal' : 'agent', tab.id), tab.id)
+        }
+      },
+      ready: () => { if (alive) setTabsSynced(true) },
+      onError: console.error,
+    })
+    tabsSyncRef.current = controller
+    const refresh = () => { void controller.refresh() }
+    const onSignal = (event: Event) => {
+      if ((event as CustomEvent<{ workspacePath?: string }>).detail?.workspacePath === workspacePath) refresh()
+    }
+    const onVisibility = () => { if (document.visibilityState !== 'hidden') refresh() }
+    const onPageShow = (event: PageTransitionEvent) => { if (event.persisted) refresh() }
+    window.addEventListener('mew:agent-tabs-changed', onSignal)
+    window.addEventListener('mew:permissions-changed', refresh)
+    window.addEventListener('focus', refresh)
+    window.addEventListener('online', refresh)
+    window.addEventListener('pageshow', onPageShow)
+    document.addEventListener('visibilitychange', onVisibility)
+    const restoration = controller.refresh()
     if (trackRestore) void trackRestore(restoration)
-    return () => { alive = false }
-  }, [workspacePath, docked, preparedTabs, trackRestore])
+    return () => {
+      alive = false
+      controller.dispose()
+      if (tabsSyncRef.current === controller) tabsSyncRef.current = null
+      window.removeEventListener('mew:agent-tabs-changed', onSignal)
+      window.removeEventListener('mew:permissions-changed', refresh)
+      window.removeEventListener('focus', refresh)
+      window.removeEventListener('online', refresh)
+      window.removeEventListener('pageshow', onPageShow)
+      document.removeEventListener('visibilitychange', onVisibility)
+    }
+  }, [workspacePath, docked, preparedTabs, trackRestore, cacheAccount])
 
   useEffect(() => {
     pendingRequestedTab.current = null

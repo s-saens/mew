@@ -78,7 +78,7 @@ export function usePresence(
       ws.onmessage = (event) => {
         if (cancelled || typeof event.data !== 'string') return
         try {
-          const msg = JSON.parse(event.data) as { type?: string; participants?: Record<string, string[]>; activeSessions?: ActiveMewSessions; project?: string; version?: number; parents?: string[] }
+          const msg = JSON.parse(event.data) as { type?: string; participants?: Record<string, string[]>; activeSessions?: ActiveMewSessions; project?: string; version?: number; parents?: string[]; workspacePath?: string }
           if (msg.type === 'participants' && msg.participants) {
             setActiveSessions(msg.activeSessions ?? null)
             // 내 프로젝트 것만 남기고 접두어를 벗겨 UI가 기존처럼 rel 경로로 쓰게 한다
@@ -90,6 +90,8 @@ export function usePresence(
             setParticipants(mine)
           } else if (msg.type === 'theme') {
             window.dispatchEvent(new Event('mew:theme-changed'))
+          } else if (msg.type === 'editor-tabs' || msg.type === 'agent-tabs') {
+            if (typeof msg.workspacePath === 'string') window.dispatchEvent(new CustomEvent(`mew:${msg.type}-changed`, { detail: { workspacePath: msg.workspacePath } }))
           } else if (msg.type === 'permissions') {
             window.dispatchEvent(new Event('mew:permissions-changed'))
             onTreeChangeRef.current()

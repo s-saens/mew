@@ -46,6 +46,22 @@ export const handleDemoSettings: DemoHttpHandler = ({ store, request, url, body,
     if (method === 'PUT') store.setState('root-projects', body)
     return demoJson({ state: store.getState<RootProjectTabState>('root-projects', { paths: [store.workspacePath], icons: {} }) })
   }
+  if (route === '/api/user-ui/editor-tabs') {
+    requireMethod(request, 'GET', 'PUT')
+    const workspace = method === 'GET' ? url.searchParams.get('workspace') ?? store.workspacePath : stringField(body, 'workspacePath', store.workspacePath)
+    const key = `${route}:${workspace}`
+    let snapshot = store.getState<{ state: Record<string, StoredTabs>; revision: number }>(key,
+      { state: store.getState<WorkspaceUiState>(`/api/user-ui/workspace:${workspace}`, defaultDemoWorkspaceUi).tabs as Record<string, StoredTabs> ?? {}, revision: 0 })
+    if (method === 'PUT') {
+      const scope = stringField(body, 'project')
+      if (!scope || !body.state || typeof body.state !== 'object' || Array.isArray(body.state)) throw new DemoError('탭 상태를 확인해 주세요.')
+      if (!body.initialize || !Object.hasOwn(snapshot.state, scope)) snapshot = {
+        state: { ...snapshot.state, [scope]: body.state as StoredTabs }, revision: snapshot.revision + 1,
+      }
+    }
+    store.setState(key, snapshot)
+    return demoJson(snapshot)
+  }
   if (route === '/api/user-ui/workspace' || route === '/api/user-ui/agent-tabs') {
     requireMethod(request, 'GET', 'PUT')
     const workspace = method === 'GET' ? url.searchParams.get('workspace') ?? store.workspacePath : stringField(body, 'workspacePath', store.workspacePath)

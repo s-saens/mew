@@ -1,6 +1,6 @@
 import { scopedBrowserStorage } from '@mew/ui/browser-storage-scope'
 const keyFor = (account: string, workspace: string) => `mew:device-layout:${encodeURIComponent(account)}:${encodeURIComponent(workspace)}`
-const fields = ['dock', 'tabs', 'chrome'] as const
+const fields = ['dock', 'chrome'] as const
 export function restoreDeviceLayout(account: string, workspace: string, fallback: Record<string, unknown>): Record<string, unknown> {
   try {
     const saved = JSON.parse(scopedBrowserStorage().getItem(keyFor(account, workspace)) ?? 'null')

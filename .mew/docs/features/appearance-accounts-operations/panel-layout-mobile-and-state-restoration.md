@@ -4,11 +4,11 @@ parent: "mew-settings"
 title: "Panel Layout, Mobile, and State Restoration"
 status: "implemented"
 created: "2026-09-18"
-updated: "2026-11-03"
+updated: "2026-11-04"
 status_hash: "018bca32e486b43c386b29de3e2087d6d1447fae6a33abc99d745367947a9382"
 files: ["src/components/tool-presentation-toggle.tsx", "src/components/SettingsModal.tsx", "src/hooks/use-refresh-tasks.ts", "src/hooks/usePresence.ts", "src/components/project-loading-overlay.tsx", "src/App.tsx", "src/components/DockWorkspace.tsx", "src/components/EditorPane.tsx", "src/components/TabBar.tsx", "src/components/AgentPanel.tsx", "src/components/mobile-dock.tsx", "src/components/layout-presets.tsx", "src/utils/layout-presets.ts", "server/layout-icon-cli.ts", "src/utils/mobile-dock.ts", "src/hooks/use-mobile-keyboard.ts", "src/hooks/use-mobile-panel-swipe.ts", "src/hooks/useTabs.ts", "server/userUiState.ts"]
 commits: []
-description: "Panel docking, maximization, tab navigation, mobile gestures, safe areas, and editor zoom. Defines desktop/mobile presets, per-device layout and session restoration, focus, and initial account UI snapshots with device-local precedence."
+description: "Panel docking, maximization, tab navigation, mobile gestures, safe areas, and editor zoom. Defines desktop/mobile presets, device-local panel geometry, real-time account tab synchronization, focus, and initial account UI snapshots."
 상위파일:
   - "MOC.md"
   - "_appearance-accounts-operations.md"
@@ -252,13 +252,13 @@ Input includes `version`, `dock` (existing DockState), `open` (a boolean per pan
 
 ### Device-specific layouts and memo/tasks popups (2026-10-06)
 
-Storage ownership follows [ADR 0197](../../history/decisions/0197-mew-device-local-workspace-layout.md).
+Panel geometry follows [ADR 0197](../../history/decisions/0197-mew-device-local-workspace-layout.md). [ADR 0133](../../decisions/0133-realtime-account-tabs.md) replaces its device-local document-tab ownership with account synchronization.
 
 On desktop, icons in the memo and tasks headers toggle each between tab and popup display. Popups can be moved and resized over documents, and switching modes preserves the same component and input state. Mobile uses the existing frontmost panel regardless of the selection.
 
-Docking positions, split ratios, document tabs, and panel open/closed states are saved per browser device under account/root-project keys. Account restoration values serve as initial values on devices with no local records. Popup sizes, positions, and display settings are also saved in the browser and do not overwrite those on other devices. Clearing browser storage also resets that device's remembered state.
+Docking positions, split ratios, and panel open/closed states are saved per browser device under account/root-project keys. Account restoration values serve as initial geometry on devices with no local records. Open editor, agent, and terminal tabs and their selected tab synchronize in real time between devices signed into the same account on the same instance and logical project. Editor pane membership is part of that shared tab state. Follow the [account tab contract](../../development/account-tabs.md) for migration, simultaneous changes, draft protection, and recovery. Popup sizes, positions, and display settings are also saved in the browser and do not overwrite those on other devices. Clearing browser storage also resets that device's remembered state.
 
-Initial restoration may receive the current account's small UI snapshot with the authenticated workspace response, under the [startup snapshot contract](../../development/browser-startup.md#workspace-initialization). Device-local values retain precedence. A snapshot from an obsolete root or permission generation cannot replace current state or newer local edits; missing or invalid snapshots use the existing account-state request. Worktrees use their logical project UI key while file reads remain bound to the actual worktree root.
+Initial restoration may receive the current account's small UI snapshot with the authenticated workspace response, under the [startup snapshot contract](../../development/browser-startup.md#workspace-initialization). Device-local geometry retains precedence; document tabs wait for the dedicated authoritative account response. A snapshot from an obsolete root or permission generation cannot replace current state or newer local edits; missing or invalid snapshots use the existing account-state request. Worktrees use their logical project UI key while file reads remain bound to the actual worktree root.
 
 Validation (2026-10-06): Ran related server and isolated Chromium tests, TypeScript, and targeted lint. No actual update installation, build, or server restart was performed.
 

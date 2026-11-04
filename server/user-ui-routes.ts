@@ -1,6 +1,6 @@
 import express from 'express'
 import { authOf, requireAuthenticated, requireAnyFeature } from './reqAuth.ts'
-import { readAccountTheme, writeAccountTheme, readAgentSessionClaims, readAgentTabs, readRootProjects, readWorkspaceUi, writeRootProjects, writeWorkspaceUi } from './userUiState.ts'
+import { readAccountTheme, writeAccountTheme, readAgentSessionClaims, readAgentTabs, readEditorTabs, readRootProjects, readWorkspaceUi, writeEditorTabs, writeRootProjects, writeWorkspaceUi } from './userUiState.ts'
 import { readRootProjectIcons } from './projectIcons.ts'
 import { broadcastAccount } from './presence.ts'
 import { saveAgentTabs } from './agent-tab-state.ts'
@@ -48,8 +48,32 @@ export function createUserUiRouter(handleError: (res: express.Response, error: u
 
   router.put('/agent-tabs', requireAnyFeature('agent', 'terminal'), async (req, res) => {
     try {
+      const email = authOf(req).email!
       const workspacePath = typeof req.body?.workspacePath === 'string' ? req.body.workspacePath : ''
-      res.json({ state: await saveAgentTabs(authOf(req).email!, workspacePath, req.body) })
+      const state = await saveAgentTabs(email, workspacePath, req.body)
+      broadcastAccount(email, { type: 'agent-tabs', workspacePath })
+      res.json({ state })
+    } catch (err) {
+      handleError(res, err)
+    }
+  })
+
+  router.get('/editor-tabs', requireAuthenticated, (req, res) => {
+    try {
+      res.json(readEditorTabs(authOf(req).email!, String(req.query.workspace ?? '')))
+    } catch (err) {
+      handleError(res, err)
+    }
+  })
+
+  router.put('/editor-tabs', requireAuthenticated, (req, res) => {
+    try {
+      const email = authOf(req).email!
+      const workspacePath = typeof req.body?.workspacePath === 'string' ? req.body.workspacePath : ''
+      const project = typeof req.body?.project === 'string' ? req.body.project : ''
+      const snapshot = writeEditorTabs(email, workspacePath, project, req.body?.state, req.body?.initialize === true)
+      broadcastAccount(email, { type: 'editor-tabs', workspacePath })
+      res.json(snapshot)
     } catch (err) {
       handleError(res, err)
     }

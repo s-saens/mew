@@ -1,6 +1,6 @@
 ---
 provenance: "Migrated copy of a Liiiiv central ADR, 2026-10-14"
-description: "Migrated decision record: Remember workspace layouts per device. Preserves the choices, rationale, and subsequent changes at the time; consult Mew's owning documents for current contracts."
+description: "Migrated decision record: Remember workspace layouts per device. Preserves the choices and rationale; ADR 0133 supersedes device-local document tabs. Consult Mew's owning documents for current contracts."
 title: "0197 — Remember workspace layouts per device"
 created: 2026-10-06
 updated: 2026-10-06
@@ -36,3 +36,7 @@ Adopt option 2.
 Layouts depend on the screen and input method. Applying local priority while retaining initial restoration from the existing account ledger provides the requested independent layout memory without introducing device registration or additional personal information on the server.
 
 Current implementation and validation follow the [Mew UI contracts](../../development/ui-contracts.md#workspace-panel-layout).
+
+## Subsequent decision
+
+[ADR 0133](../../decisions/0133-realtime-account-tabs.md) supersedes device-local ownership of open document tabs, editor pane membership, and active document selection. Panel positions, sizes, and popup geometry remain device-local.

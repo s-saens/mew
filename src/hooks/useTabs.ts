@@ -10,7 +10,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { fetchExternalFile, fetchFile, fetchFileAnchorPreview, fetchRules, isArchivedPath, mutateDocumentPage, saveExternalFile, saveFile, type DocRules, type FileVersion } from '../api/client'
 import { mediaKind } from '../utils/media'
 import { dropCachedFile, getCachedFile, loadCachedFile, putCachedFile, type CachedFile } from '../utils/contentCache'
-import { leaf, normalizeLayout, removeLeaf, splitLeaf, type DropSide, type PaneNode } from '../utils/paneTree'
+import { leaf, normalizeLayout, removeLeaf, splitLeaf, type DropSide } from '../utils/paneTree'
 import { externalAbsolutePath, externalTabPath, isExternalTabPath } from '../utils/externalFiles'
 import { afterFirstPaint, markFileOpen, startFileOpen, type FileOpenTrace } from '../utils/fileOpenPerformance'
 import { gitDiffTarget } from '../utils/git-diff-tabs'
@@ -22,6 +22,8 @@ import { uiText } from '@mew/ui/i18n-core'
 import { activePaneTab, mostRecentTab, nextTabNavigation, recordPaneActivation, remapTabNavigation, type TabNavigation } from '../utils/editor-tab-navigation'
 import { registerTaskDocumentSync, type TaskDocumentChange } from '../utils/task-document-sync'
 import { splitFrontmatter } from '@mew/editor/frontmatter'
+import { normalizeStoredTabs, reconcileEditorTabs, storedEditorTabs, type EditorTabState, type StoredTabs } from '../utils/editor-tab-state.ts'
+export type { StoredTabs } from '../utils/editor-tab-state.ts'
 import { clearTitlePreviews, documentAbsolutePath, previewDatabaseDocumentTitle, previewDocumentTitle, remapTitlePreviews, subscribeTitlePreviews, titlePreviews, withDocumentTitle } from '../utils/document-title-preview'
 
 function savedBuffer(current: string, submitted: string, saved: string): string {
@@ -71,7 +73,7 @@ function matchingPaneTab(pane: Pane, path: string, id?: string): Tab | undefined
 }
 
 /** 한 프로젝트의 편집 화면 — 칸들 + 그 칸들의 배치 + 지금 포커스된 칸 */
-type ProjectTabs = { panes: Pane[]; layout: PaneNode; focusedPaneId: string }
+type ProjectTabs = EditorTabState
 
 /** 분할하지 않은 상태의 칸 id — 저장분과 옛 형식 이관이 이 이름 하나만 알면 되게 고정값이다 */
 const MAIN_PANE = 'main'
@@ -94,47 +96,12 @@ export function openTabsKey(project: string, workspaceScope?: string): string {
   return project === 'docs' ? 'mew:open-tabs' : `mew:open-tabs:${project}`
 }
 
-type StoredTab = { path: string; preview: boolean; viewMode: 'hotview' | 'plain' }
-export type StoredTabs = {
-  unifiedScopes?: boolean
-  panes: { id: string; tabs: StoredTab[]; activePath: string | null }[]
-  layout: PaneNode
-  focusedPaneId: string
-}
-
-/** 저장분 읽기 — 분할 이전 형식(`{tabs, activePath}`)은 칸 하나짜리로 읽는다 */
+/** Browser metadata is a migration fallback; account snapshots use the same validation. */
 function loadStoredTabs(project: string, workspaceScope?: string): StoredTabs | null {
   try {
     const raw = scopedBrowserStorage().getItem(openTabsKey(project, workspaceScope))
-    if (!raw) return null
-    const parsed = JSON.parse(raw) as Partial<StoredTabs> & { tabs?: StoredTab[]; activePath?: string | null }
-    const panes = Array.isArray(parsed?.panes)
-      ? parsed.panes.filter((p) => p && typeof p.id === 'string' && Array.isArray(p.tabs))
-      : Array.isArray(parsed?.tabs)
-        ? [{ id: MAIN_PANE, tabs: parsed.tabs, activePath: parsed.activePath ?? null }]
-        : []
-    if (panes.length === 0) return null
-    return {
-      unifiedScopes: parsed.unifiedScopes === true,
-      panes: panes.map((p) => {
-        // 중간 저장·옛 버전의 복원 경쟁으로 같은 경로가 여러 번 남아도, 한 칸에는 파일 하나만 둔다.
-        // React key 충돌과 "파일 탭이 세 개"로 보이는 복원을 여기서 같이 치운다.
-        const seen = new Set<string>()
-        const tabs = p.tabs.filter((tab): tab is StoredTab => {
-          // Git 워크벤치가 팝업으로 바뀌면서 옛 가상 탭은 복원하지 않는다.
-          if (!tab || typeof tab.path !== 'string' || !tab.path || isGitTabPath(tab.path) || seen.has(tab.path)) return false
-          seen.add(tab.path)
-          return tab.preview === true || tab.preview === false
-        })
-        const activePath = typeof p.activePath === 'string' && seen.has(p.activePath) ? p.activePath : tabs[0]?.path ?? null
-        return { id: p.id, tabs, activePath }
-      }),
-      layout: normalizeLayout(parsed.layout, panes.map((p) => p.id)),
-      focusedPaneId: panes.some((p) => p.id === parsed.focusedPaneId) ? parsed.focusedPaneId! : panes[0].id,
-    }
-  } catch {
-    return null
-  }
+    return raw ? normalizeStoredTabs(JSON.parse(raw)) : null
+  } catch { return null }
 }
 
 function blankTab(): Tab {
@@ -197,9 +164,9 @@ export function useTabs(
   unsupportedNoticeRef.current = t('editor.unsupportedFile')
   const { pending: refreshing, track: trackRefresh } = useRefreshTasks()
   const [states, setStates] = useState<Record<string, ProjectTabs>>({})
-  const workspaceRequestRef = useRef({ scope: workspaceScope, epoch: 0 })
-  if (workspaceRequestRef.current.scope !== workspaceScope) {
-    workspaceRequestRef.current = { scope: workspaceScope, epoch: workspaceRequestRef.current.epoch + 1 }
+  const workspaceRequestRef = useRef({ scope: workspaceScope, account: accountScope, epoch: 0 })
+  if (workspaceRequestRef.current.scope !== workspaceScope || workspaceRequestRef.current.account !== accountScope) {
+    workspaceRequestRef.current = { scope: workspaceScope, account: accountScope, epoch: workspaceRequestRef.current.epoch + 1 }
   }
   // 콜백 identity가 바뀌어도 openFileIn 등의 useCallback을 다시 만들지 않도록 ref로 든다
   const onNoticeRef = useRef(onNotice)
@@ -221,6 +188,7 @@ export function useTabs(
   projectRef.current = project
   const hydratedRef = useRef<string | null>(null)
   const hydratedWorkspaceRef = useRef(workspaceScope)
+  const hydratedAccountRef = useRef(accountScope)
   const hydratedPresentationRef = useRef(presentationScope)
   const [hydratedSession, setHydratedSession] = useState<string | null>(null)
   // 탭 껍데기를 setState로 세운 직후에는 statesRef가 아직 옛 상태다. 활성 탭의 실제 로드는
@@ -228,9 +196,12 @@ export function useTabs(
   const pendingRestoreLoadsRef = useRef(new Map<string, { paneId: string; path: string; preview: boolean; viewMode: Tab['viewMode'] }[]>())
   const persistedTabsRef = useRef(new Map<string, string>())
   const notifiedTabsRef = useRef(new Map<string, string>())
+  const receivedTabsRef = useRef(new Map<string, string>())
+  const remoteTabsPendingRef = useRef(new Map<string, string>())
+  const tabsCacheKey = useCallback((p: string) => `${accountScope ?? ''}\0${presentationScope ?? ''}\0${p}`, [accountScope, presentationScope])
 
-  const sessionKey = `${project}\u0000${workspaceScope ?? ''}\u0000${presentationScope ?? ''}`
-  const carryLayout = hydratedPresentationRef.current === presentationScope && hydratedWorkspaceRef.current !== workspaceScope ? states[project] : undefined
+  const sessionKey = `${accountScope ?? ''}\u0000${project}\u0000${workspaceScope ?? ''}\u0000${presentationScope ?? ''}`
+  const carryLayout = hydratedAccountRef.current === accountScope && hydratedPresentationRef.current === presentationScope && hydratedWorkspaceRef.current !== workspaceScope ? states[project] : undefined
   const state = hydratedSession === sessionKey ? states[project] ?? EMPTY : carryLayout ? { ...carryLayout, panes: carryLayout.panes.map(pane => ({ ...pane, tabs: pane.tabs.map(tab => ({ ...tab, content: '', savedContent: '', committedContent: '', editable: false, revalidating: true })) })) } : EMPTY
   const { panes, layout, focusedPaneId } = state
   const focusedPane = panes.find((p) => p.id === focusedPaneId) ?? panes[0]
@@ -658,8 +629,9 @@ export function useTabs(
     // 계정 원장이 기준이다. 새 기기에서 로컬 빈 상태가 서버 복원값을 덮기 전에 응답을 기다린다.
     if (workspaceScope && !accountHydrated) return
     hydratedRef.current = sessionKey
-    const carry = hydratedPresentationRef.current === presentationScope && hydratedWorkspaceRef.current !== workspaceScope ? statesRef.current[project] : undefined
-    if (hydratedWorkspaceRef.current !== workspaceScope || hydratedPresentationRef.current !== presentationScope) {
+    const carry = hydratedAccountRef.current === accountScope && hydratedPresentationRef.current === presentationScope && hydratedWorkspaceRef.current !== workspaceScope ? statesRef.current[project] : undefined
+    if (hydratedAccountRef.current !== accountScope || hydratedWorkspaceRef.current !== workspaceScope || hydratedPresentationRef.current !== presentationScope) {
+      hydratedAccountRef.current = accountScope
       hydratedWorkspaceRef.current = workspaceScope
       hydratedPresentationRef.current = presentationScope
       setStates({})
@@ -670,8 +642,11 @@ export function useTabs(
     // 메모리에서도 즉시 버린다. 저장분은 workspaceScope별 키에 남아 다시 돌아올 때 복원된다.
     setHydratedSession(null)
     // 첫 도입 때만 기존 공용 키를 읽는다. 다음 저장부터는 루트별 키로 옮겨져 서로 덮지 않는다.
-    const legacy = (scope: string) => accountTabs?.[scope] ?? loadStoredTabs(scope, presentationScope) ?? (presentationScope ? loadStoredTabs(scope) : null)
-    const stored = carry ? { ...carry, panes: carry.panes.map(pane => ({ ...pane, tabs: pane.tabs.map(tab => ({ path: tab.path, preview: tab.preview, viewMode: tab.viewMode })) })) } : project === '.workspace' ? mergeEditorTabs(legacy(project), legacy('docs')) : legacy(project)
+    const legacy = (scope: string) => normalizeStoredTabs(accountTabs?.[scope]) ?? loadStoredTabs(scope, presentationScope) ?? (presentationScope ? loadStoredTabs(scope) : null)
+    const accountStored = normalizeStoredTabs(accountTabs?.[project])
+    const stored = carry ? { ...carry, panes: carry.panes.map(pane => ({ ...pane, tabs: pane.tabs.map(tab => ({ path: tab.path, preview: tab.preview, viewMode: tab.viewMode })) })) }
+      : project === '.workspace' ? mergeEditorTabs(legacy(project), accountStored ? normalizeStoredTabs(accountTabs?.docs) : legacy('docs')) : legacy(project)
+    if (accountStored) receivedTabsRef.current.set(tabsCacheKey(project), JSON.stringify(accountStored))
     if (!stored) {
       patch(project, () => EMPTY) // 빈 상태라도 만들어 둬야 이후 저장이 이 프로젝트를 기록한다
       setHydratedSession(sessionKey)
@@ -702,7 +677,7 @@ export function useTabs(
     })
     pendingRestoreLoadsRef.current.set(sessionKey, activeLoads)
     setHydratedSession(sessionKey)
-  }, [accountHydrated, accountTabs, project, sessionKey, workspaceScope, presentationScope, patch])
+  }, [accountHydrated, accountTabs, project, sessionKey, accountScope, workspaceScope, presentationScope, tabsCacheKey, patch])
 
   // 위 hydration effect가 만든 모든 탭이 상태에 붙은 뒤 활성 탭만 읽는다. statesRef 동기화 effect가
   // 선언 순서상 먼저 돌기 때문에 openFileIn은 deferred tab을 찾아 본문 요청만 시작한다.
@@ -719,39 +694,6 @@ export function useTabs(
       openFileIn(project, load.paneId, load.path, { restoring: !!activeLoads, preview: load.preview, viewMode: load.viewMode })
     }
   }, [project, sessionKey, hydratedSession, states, openFileIn])
-
-  // 복원이 끝난(=상태가 만들어진) 프로젝트만 저장한다 — 아직 열어보지 않은 프로젝트의 저장분을
-  // 빈 목록으로 덮어쓰지 않는다.
-  useEffect(() => {
-    // scope를 갈아끼운 첫 렌더에는 아직 옛 루트 상태가 남아 있다. 그 상태를 새 루트의
-    // 저장 키에 쓰지 않고 hydration 업데이트가 반영된 다음 렌더까지 기다린다.
-    if (hydratedSession !== sessionKey) return
-    for (const [p, s] of Object.entries(states)) {
-      const payload: StoredTabs = {
-        ...(p === '.workspace' ? { unifiedScopes: true } : {}),
-        panes: s.panes.map((pane) => ({
-          id: pane.id,
-          tabs: [...new Map(pane.tabs.filter((t) => !isExternalTabPath(t.path) && !isGitTabPath(t.path)).map((t) => [t.path, { path: t.path, preview: t.preview, viewMode: t.viewMode }])).values()],
-          activePath: pane.activePath && !isExternalTabPath(pane.activePath) && !isGitTabPath(pane.activePath) ? pane.activePath : null,
-        })),
-        layout: s.layout,
-        focusedPaneId: s.focusedPaneId,
-      }
-      const serialized = JSON.stringify(payload)
-      const cacheKey = `${presentationScope ?? ''}\0${p}`
-      if (persistedTabsRef.current.get(cacheKey) !== serialized) {
-        try {
-          if (writeBrowserStorage(openTabsKey(p, presentationScope), serialized)) persistedTabsRef.current.set(cacheKey, serialized)
-        } catch {
-          // 로컬 복원은 fallback이다. 저장 실패는 이후 갱신 때 재시도한다.
-        }
-      }
-      if (notifiedTabsRef.current.get(cacheKey) !== serialized) {
-        onAccountTabsChange?.(p, payload)
-        notifiedTabsRef.current.set(cacheKey, serialized)
-      }
-    }
-  }, [states, sessionKey, hydratedSession, presentationScope, onAccountTabsChange])
 
   const pinTab = useCallback(
     (path: string, paneId?: string, tabId?: string) => {
@@ -794,7 +736,7 @@ export function useTabs(
   // 실행하지 않는다 — StrictMode가 업데이터 함수를 두 번 호출해 fetch가 중복 발생하는 것을 방지
   const autosave = useCallback(
     (p: string, path: string) => {
-      if (workspaceRequestRef.current.scope !== workspaceScope) return
+      if (workspaceRequestRef.current.scope !== workspaceScope || workspaceRequestRef.current.account !== accountScope) return
       const epoch = workspaceRequestRef.current.epoch
       const saveKey = JSON.stringify([workspaceRequestRef.current.epoch, p, path])
       const pending = fileSaveRequests.current.get(saveKey)
@@ -835,7 +777,7 @@ export function useTabs(
       fileSaveRequests.current.set(saveKey, request)
       inFlightSaves.current.add(request)
     },
-    [mapTabsAtPath, workspaceScope],
+    [mapTabsAtPath, accountScope, workspaceScope],
   )
 
   useEffect(() => {
@@ -877,6 +819,74 @@ export function useTabs(
     },
     [autosave, settlePendingSave],
   )
+
+  // Account updates change tab metadata while retaining this device's live buffers.
+  useEffect(() => {
+    if (hydratedSession !== sessionKey || !accountHydrated) return
+    for (const [p, current] of Object.entries(states)) {
+      const incoming = normalizeStoredTabs(accountTabs?.[p])
+      if (!incoming) continue
+      const key = tabsCacheKey(p), serialized = JSON.stringify(incoming)
+      if (receivedTabsRef.current.get(key) === serialized) {
+        remoteTabsPendingRef.current.delete(key)
+        continue
+      }
+      if (notifiedTabsRef.current.get(key) === serialized) {
+        receivedTabsRef.current.set(key, serialized)
+        remoteTabsPendingRef.current.delete(key)
+        continue
+      }
+      remoteTabsPendingRef.current.set(key, serialized)
+      const paths = new Set(incoming.panes.flatMap(pane => pane.tabs.map(tab => tab.path)))
+      const closing = current.panes.flatMap(pane => pane.tabs).filter(tab => !paths.has(tab.path)
+        && !isExternalTabPath(tab.path) && !isGitTabPath(tab.path)
+        && (tab.content !== tab.savedContent || tab.status === 'saving'))
+      if (closing.length) {
+        // A remote close waits for this device's autosave; errors retain the draft.
+        for (const tab of closing) if (tab.status !== 'saving' && tab.status !== 'error') {
+          settlePendingSave(p, tab.path)
+          autosave(p, tab.path)
+        }
+        continue
+      }
+      receivedTabsRef.current.set(key, serialized)
+      notifiedTabsRef.current.set(key, serialized)
+      patch(p, previous => reconcileEditorTabs(previous, incoming, tab => {
+        const supported = canOpenEditorFile(tab.path)
+        const cached = supported ? getCachedFile(p, tab.path) : undefined
+        return {
+          ...blankTab(), ...tab, editable: supported && !!mediaKind(tab.path), deferredLoad: supported,
+          loading: !cached && supported && !mediaKind(tab.path), revalidating: supported && !mediaKind(tab.path),
+          ...(cached ? { content: cached.content, savedContent: cached.content, committedContent: cached.content } : {}),
+        }
+      }))
+    }
+  }, [accountTabs, accountHydrated, states, hydratedSession, sessionKey, tabsCacheKey, patch, autosave, settlePendingSave])
+
+  // 복원이 끝난(=상태가 만들어진) 프로젝트만 저장한다 — 아직 열어보지 않은 프로젝트의 저장분을
+  // 빈 목록으로 덮어쓰지 않는다.
+  useEffect(() => {
+    // scope를 갈아끼운 첫 렌더에는 아직 옛 루트 상태가 남아 있다. 그 상태를 새 루트의
+    // 저장 키에 쓰지 않고 hydration 업데이트가 반영된 다음 렌더까지 기다린다.
+    if (hydratedSession !== sessionKey) return
+    for (const [p, s] of Object.entries(states)) {
+      const payload = storedEditorTabs(s, p)
+      const serialized = JSON.stringify(payload)
+      const cacheKey = tabsCacheKey(p)
+      if (remoteTabsPendingRef.current.has(cacheKey)) continue
+      if (persistedTabsRef.current.get(cacheKey) !== serialized) {
+        try {
+          if (writeBrowserStorage(openTabsKey(p, presentationScope), serialized)) persistedTabsRef.current.set(cacheKey, serialized)
+        } catch {
+          // 로컬 복원은 fallback이다. 저장 실패는 이후 갱신 때 재시도한다.
+        }
+      }
+      if (notifiedTabsRef.current.get(cacheKey) !== serialized) {
+        onAccountTabsChange?.(p, payload)
+        notifiedTabsRef.current.set(cacheKey, serialized)
+      }
+    }
+  }, [states, sessionKey, hydratedSession, presentationScope, tabsCacheKey, onAccountTabsChange])
 
   const closeTab = useCallback(
     function close(path: string, paneId?: string, tabId?: string) {
@@ -920,7 +930,7 @@ export function useTabs(
     (path: string, content: string, paneId?: string) => {
       const p = projectRef.current
       const tab = matchingPaneTab(paneOf(p, paneId), path)
-      if (!tab || tab.revalidating || workspaceRequestRef.current.scope !== workspaceScope) return
+      if (!tab || tab.revalidating || workspaceRequestRef.current.scope !== workspaceScope || workspaceRequestRef.current.account !== accountScope) return
       // 편집이 시작되면 미리보기 탭을 고정 탭으로 승격 (VSCode와 동일)
       mapTabsAtPath(p, path, (t) => ({ ...t, content, preview: false }))
       if (workspaceScope && !isExternalTabPath(path) && !isGitTabPath(path)) {
@@ -933,7 +943,7 @@ export function useTabs(
       }
       scheduleAutosave(p, path)
     },
-    [mapTabsAtPath, scheduleAutosave, workspaceScope, workspaceDocsPath],
+    [mapTabsAtPath, scheduleAutosave, accountScope, workspaceScope, workspaceDocsPath],
   )
 
   useEffect(() => {
@@ -1239,7 +1249,7 @@ export function useTabs(
     previewTitle: (fileProject, path, title) => workspaceScope
       ? previewDatabaseDocumentTitle(documentAbsolutePath(workspaceScope, workspaceDocsPath, fileProject, path), title)
       : () => {},
-  }), [prepareDocumentPageMutation, applyDocumentPageMutation, workspaceScope, workspaceDocsPath])
+  }), [prepareDocumentPageMutation, applyDocumentPageMutation, accountScope, workspaceScope, workspaceDocsPath])
 
   const refreshTaskDocuments = useCallback(async (changes: TaskDocumentChange[]) => {
     const p = projectRef.current, epoch = workspaceRequestRef.current.epoch
@@ -1330,7 +1340,7 @@ export function useTabs(
 
   useEffect(() => registerTaskDocumentSync({
     workspace: workspaceScope ?? '', prepare: mode => prepareDocumentPageMutation('*', false, true, mode !== 'read'), apply: refreshTaskDocuments,
-  }), [workspaceScope, prepareDocumentPageMutation, refreshTaskDocuments])
+  }), [accountScope, workspaceScope, prepareDocumentPageMutation, refreshTaskDocuments])
 
   const createChildPage = useCallback(async (path: string, name: string, onCreated?: (result: DocumentPageMutation) => void) => {
     const p = projectRef.current, epoch = workspaceRequestRef.current.epoch
@@ -1374,7 +1384,7 @@ export function useTabs(
    * 목록은 그대로 두므로 다시 열면 열려 있던 문서들이 복원된다.
    */
   const forgetProject = useCallback((p: string) => {
-    if (hydratedRef.current?.startsWith(`${p}\u0000`)) hydratedRef.current = null
+    if (hydratedRef.current?.split('\u0000')[1] === p) hydratedRef.current = null
     setStates((all) => {
       if (!(p in all)) return all
       const next = { ...all }

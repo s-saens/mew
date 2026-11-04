@@ -1,5 +1,6 @@
 import { closeExistingAgentHost } from './agentHost.ts'
-import { readAgentTabs, writeAgentTabs, type StoredAgentTab } from './userUiState.ts'
+import { normalizeAgentTabs, readAgentTabs, writeAgentTabs, type StoredAgentTab } from './userUiState.ts'
+import { mergeAgentTabs } from '../shared/agent-tabs.ts'
 
 function connectionsFor(tab: StoredAgentTab, workspacePath: string): Array<[string, string]> {
   const connections = new Map<string, [string, string]>()
@@ -16,7 +17,12 @@ function connectionsFor(tab: StoredAgentTab, workspacePath: string): Array<[stri
 
 export async function saveAgentTabs(email: string, workspacePath: string, input: unknown) {
   const previous = readAgentTabs(email, workspacePath)
-  const state = writeAgentTabs(email, workspacePath, input)
+  const next = normalizeAgentTabs(input)
+  const options = input as { base?: unknown; initialize?: unknown }
+  if (options.initialize === true && previous) return previous
+  const base = options.base === undefined ? null : normalizeAgentTabs(options.base)
+  const value = base ? mergeAgentTabs(previous ?? { tabs: [], activeId: null }, base, next) : next
+  const state = writeAgentTabs(email, workspacePath, value)
   const remaining = new Set(state.tabs.map(tab => tab.id))
   const removed = previous?.tabs.filter(tab => !remaining.has(tab.id)) ?? []
   await Promise.all(removed.flatMap(tab => connectionsFor(tab, workspacePath).map(async ([runtime, cwd]) => {
