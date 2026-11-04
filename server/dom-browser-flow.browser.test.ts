@@ -7,9 +7,9 @@ import { once } from 'node:events'
 import test from 'node:test'
 import { compile } from '@tailwindcss/node'
 import { build } from 'rolldown'
-import { chromium } from 'playwright-core'
 import { attachDomBrowserWebSocket, closeDomBrowsers } from './dom-browser.ts'
 import { domBrowserExecutable } from './browser-dom-executable.ts'
+import { connectTestBrowser } from './test-browser.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 const stop = (server: http.Server) => new Promise<void>(resolve => { server.closeAllConnections(); server.close(() => resolve()) })
@@ -60,7 +60,7 @@ test('real DOM browser viewer and host relay interactive app mutations, focus, a
   attachDomBrowserWebSocket(host, () => ({ role: 'owner', email: 'dom-flow@example.test', mustChangePassword: false }))
   const origin = await listen(host)
   t.after(async () => { await closeDomBrowsers(); await stop(host) })
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   t.after(() => browser.close())
   const page = await browser.newPage({ viewport: { width: 1040, height: 700 }, locale: 'en-US', colorScheme: null })
   page.setDefaultTimeout(7000)

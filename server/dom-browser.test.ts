@@ -1,10 +1,12 @@
 import './test-isolated-data.ts'
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import dns from 'node:dns'
+import fs from 'node:fs'
 import http from 'node:http'
+import os from 'node:os'
 import { once } from 'node:events'
 import { WebSocket, WebSocketServer } from 'ws'
-import { chromium } from 'playwright-core'
 import { attachDomBrowserWebSocket, closeDomBrowsers, DOM_BROWSER_WS, domBrowserTarget, parseDomBrowserCommand, domBrowserMewPorts, domBrowserBlockedPorts } from './dom-browser.ts'
 import type { DomBrowserCommand, DomBrowserMessage } from '../shared/dom-browser.ts'
 import type { RequestAuth } from './reqAuth.ts'
@@ -108,11 +110,18 @@ test('DOM browser validates command input and remote transport capability', () =
 })
 
 test('host DOM relay opens an external HTTP hostname and follows links, redirects, and history without internet access', { timeout: 60_000, skip: !domBrowserExecutable() }, async t => {
-  const launch = chromium.launch.bind(chromium)
-  t.mock.method(chromium, 'launch', (options: Parameters<typeof chromium.launch>[0]) => launch({
-    ...options,
-    args: [...(options?.args ?? []), '--host-resolver-rules=MAP external.example.test 127.0.0.1', '--no-proxy-server'],
-  }))
+  const origLookup = dns.lookup.bind(dns)
+  t.mock.method(dns, 'lookup', ((hostname: string, options: unknown, callback?: unknown) => {
+    const cb = (typeof options === 'function' ? options : callback) as (err: NodeJS.ErrnoException | null, address: string | dns.LookupAddress[], family?: number) => void
+    const opts = typeof options === 'object' && options !== null ? options as dns.LookupOptions : {}
+    if (hostname === 'external.example.test') {
+      if (opts.all) cb(null, [{ address: '127.0.0.1', family: 4 }])
+      else cb(null, '127.0.0.1', 4)
+      return
+    }
+    return (origLookup as (...args: unknown[]) => unknown)(hostname, options, callback)
+  }) as typeof dns.lookup)
+
   let origin = '', protectedRequests = 0
   const fixture = http.createServer((req, res) => {
     if (req.url === '/redirect') { res.writeHead(302, { location: '/redirected?external=1#last' }); res.end(); return }
@@ -339,4 +348,51 @@ test('new host documents refresh inlined assets and reject reused DOM IDs from t
   const beforeNavigate = client.messages.length
   client.send({ type: 'navigate', url: target + '/another-document' })
   await snapshot(beforeNavigate, 'green')
+})
+
+test('host DOM browser isolates cookies and web storage per session and cleans up temporary storage on close', { skip: !domBrowserExecutable(), timeout: 30_000 }, async t => {
+  let requests = 0
+  const fixture = http.createServer((req, res) => {
+    const cookie = req.headers.cookie ?? 'none'
+    const n = ++requests
+    if (req.url === '/set') {
+      res.setHeader('set-cookie', `sid=session-${n}; Path=/`)
+    }
+    res.setHeader('content-type', 'text/html')
+    res.end(`<!doctype html><html><body><p id="cookie">${cookie}</p><p id="storage"></p><script>if(location.pathname==='/set')localStorage.setItem('token','local-${n}');document.getElementById('storage').textContent=localStorage.getItem('token')||'empty';</script></body></html>`)
+  })
+  const target = await start(fixture); t.after(() => stop(fixture))
+  const host = http.createServer(); attachDomBrowserWebSocket(host, () => owner)
+  const origin = await start(host); t.after(async () => { await closeDomBrowsers(); await stop(host) })
+
+  const listTempDirs = () => fs.readdirSync(os.tmpdir()).filter(name => name.startsWith('mew-dom-obscura-'))
+  const beforeDirs = new Set(listTempDirs())
+
+  const hasText = (events: unknown, text: string) => Boolean(findNode(events, node => node.textContent === text || node.value === text))
+  const clientA = connection(origin); await once(clientA.ws, 'open'); t.after(() => clientA.ws.terminate())
+  clientA.send({ type: 'navigate', url: `${target}/set` })
+  await clientA.wait(() => clientA.messages.some(m => m.type === 'events' && hasText(m.events, 'local-1')) ? true : undefined, 'session A initial storage')
+
+  const activeDirs = listTempDirs().filter(name => !beforeDirs.has(name))
+  assert.equal(activeDirs.length, 1, 'session A created an isolated temporary storage directory')
+
+  const beforeCheckA = clientA.messages.length
+  clientA.send({ type: 'navigate', url: `${target}/check` })
+  await clientA.wait(() => {
+    const slice = clientA.messages.slice(beforeCheckA).filter(m => m.type === 'events').map(m => m.events)
+    return hasText(slice, 'sid=session-1') && hasText(slice, 'local-1') ? true : undefined
+  }, 'session A retains its cookie and localStorage')
+
+  const clientB = connection(origin); await once(clientB.ws, 'open'); t.after(() => clientB.ws.terminate())
+  clientB.send({ type: 'navigate', url: `${target}/check` })
+  await clientB.wait(() => {
+    const slice = clientB.messages.filter(m => m.type === 'events').map(m => m.events)
+    return hasText(slice, 'none') && hasText(slice, 'empty') ? true : undefined
+  }, 'session B has isolated cookies and localStorage')
+
+  clientA.ws.close()
+  clientB.ws.close()
+  await closeDomBrowsers()
+  const remainingDirs = listTempDirs().filter(name => !beforeDirs.has(name))
+  assert.deepEqual(remainingDirs, [], 'closing sessions removes temporary Obscura storage directories')
 })

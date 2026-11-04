@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { build } from 'rolldown'
-import { chromium } from 'playwright-core'
 import { domBrowserExecutable } from '../../server/browser-dom-executable.ts'
+import { connectTestBrowser } from '../../server/test-browser.ts'
 
 test('DOM browser replays inert pages and relays editing, navigation, scrolling and reconnection', { skip: !domBrowserExecutable(), timeout: 30_000 }, async t => {
   const component = new URL('./DomBrowserPanel.tsx', import.meta.url).pathname
@@ -33,7 +33,7 @@ test('DOM browser replays inert pages and relays editing, navigation, scrolling 
   }] })
   const scripts = new Map(result.output.filter(chunk => chunk.type === 'chunk').map(chunk => [`/${chunk.fileName}`, chunk.code]))
   const entry = result.output.find(chunk => chunk.type === 'chunk' && chunk.isEntry)!
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   t.after(() => browser.close())
   const page = await browser.newPage({ viewport: { width: 1000, height: 800 }, locale: 'ko-KR' })
   page.setDefaultTimeout(5000)

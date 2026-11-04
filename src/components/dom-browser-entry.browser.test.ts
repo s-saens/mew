@@ -4,8 +4,8 @@ import path from 'node:path'
 import test from 'node:test'
 import { compile } from '@tailwindcss/node'
 import { build } from 'rolldown'
-import { chromium } from 'playwright-core'
 import { domBrowserExecutable } from '../../server/browser-dom-executable.ts'
+import { connectTestBrowser } from '../../server/test-browser.ts'
 
 const root = path.resolve(import.meta.dirname, '../..')
 
@@ -25,7 +25,8 @@ test('localhost links open the real workspace browser dock on desktop and mobile
     createRoot(document.getElementById('root')).render(<Fixture/>);`
   // Keep App, permissions, capture listeners, dock layout and mobile foreground real;
   // isolate the two renderers so this test needs neither a local app nor a browser server.
-  const editor = `export function DeferredEditorPane(){return <article data-entry-editor>
+  const editor = `export function prepareEditorPane(){}
+    export function DeferredEditorPane(){return <article data-entry-editor>
     <a data-local-link href="http://localhost:5173/nested?mode=preview#section" target="_blank" onClick={()=>{window.nativeEditorClicks=(window.nativeEditorClicks||0)+1}}>Local app</a>
     <a data-second-link href="http://127.0.0.1:8080/other?x=1#next" target="_blank">Second local app</a>
     </article>}`
@@ -56,7 +57,7 @@ test('localhost links open the real workspace browser dock on desktop and mobile
   const content = (await Promise.all(styleSources.map(file => fs.readFile(path.join(root, file), 'utf8')))).join('\n')
   const compiler = await compile(await fs.readFile(path.join(root, 'src/index.css'), 'utf8'), { base: path.join(root, 'src'), onDependency() {} })
   const css = compiler.build([...new Set(content.match(/[A-Za-z0-9_@:/.[\]()%,-]+/g))])
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   t.after(() => browser.close())
 
   for (const mobile of [false, true]) await t.test(mobile ? 'mobile foreground and access changes' : 'desktop dock and access changes', async () => {

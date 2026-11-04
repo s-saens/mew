@@ -1,7 +1,6 @@
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { chromium } from 'playwright-core'
 
 function isExecutable(file: string): boolean {
   try {
@@ -11,24 +10,50 @@ function isExecutable(file: string): boolean {
   } catch { return false }
 }
 
-/** Resolve for the server OS/user, including macOS apps installed only for that user. */
-export function domBrowserExecutable({
-  env = process.env, platform = process.platform, home = os.homedir(), bundledExecutable = chromium.executablePath(),
-}: { env?: NodeJS.ProcessEnv; platform?: NodeJS.Platform; home?: string; bundledExecutable?: string } = {}): string | undefined {
-  const explicit = env.MEW_BROWSER_EXECUTABLE
-  if (explicit) {
-    if (!path.isAbsolute(explicit) || !isExecutable(explicit)) {
-      throw new Error('서버 Chromium 실행 설정 MEW_BROWSER_EXECUTABLE에는 실행 가능한 파일의 절대 경로가 필요합니다. macOS에서는 .app 폴더 안의 Contents/MacOS 실행 파일을 지정해 주세요.')
-    }
-    return explicit
+function isValidObscuraExecutable(file: string): boolean {
+  if (!isExecutable(file)) return false
+  try {
+    const resolved = fs.realpathSync(file)
+    return isExecutable(path.join(path.dirname(resolved), 'obscura-worker'))
+  } catch {
+    return isExecutable(path.join(path.dirname(file), 'obscura-worker'))
   }
-  const system = platform === 'darwin'
-    ? ['Google Chrome', 'Chromium'].flatMap((name) => [
-      path.join(home, 'Applications', `${name}.app`, 'Contents', 'MacOS', name),
-      path.join('/Applications', `${name}.app`, 'Contents', 'MacOS', name),
-    ])
-    : ['/usr/bin/chromium', '/usr/bin/chromium-browser', '/usr/bin/google-chrome']
-  // Playwright chooses the bundled executable for the host OS and architecture.
-  // Keep that tested binary first; launching app bundle internals needs no shell/open -a.
-  return [bundledExecutable, ...system].find(isExecutable)
 }
+
+function installedObscuraCandidates(home: string, pathEnv: string): string[] {
+  const candidates: string[] = []
+  for (const dir of pathEnv.split(path.delimiter).map(item => item.trim()).filter(Boolean)) {
+    candidates.push(path.join(dir, 'obscura'))
+  }
+  if (home) {
+    candidates.push(path.join(home, '.local', 'bin', 'obscura'))
+    const shareRoot = path.join(home, '.local', 'share', 'obscura')
+    try {
+      const versions = fs.readdirSync(shareRoot, { withFileTypes: true })
+        .filter(entry => entry.isDirectory())
+        .map(entry => entry.name)
+        .sort((a, b) => b.localeCompare(a, undefined, { numeric: true }))
+      for (const version of versions) {
+        candidates.push(path.join(shareRoot, version, 'obscura'))
+      }
+    } catch {}
+  }
+  return candidates
+}
+
+/** Resolve Obscura for the internal DOM browser on the server OS/user. */
+export function domBrowserExecutable({
+  env = process.env, home = os.homedir(),
+}: { env?: NodeJS.ProcessEnv; platform?: NodeJS.Platform; home?: string; bundledExecutable?: string } = {}): string | undefined {
+  for (const key of ['MEW_DOM_BROWSER_EXECUTABLE', 'MEW_BROWSER_EXECUTABLE'] as const) {
+    const explicit = env[key]
+    if (explicit) {
+      if (!path.isAbsolute(explicit) || !isExecutable(explicit)) {
+        throw new Error(`서버 Obscura 실행 설정 ${key}에는 실행 가능한 파일의 절대 경로가 필요합니다.`)
+      }
+      return explicit
+    }
+  }
+  return installedObscuraCandidates(home, env.PATH ?? '').find(isValidObscuraExecutable)
+}
+

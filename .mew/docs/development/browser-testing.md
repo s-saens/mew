@@ -35,8 +35,8 @@ Tests under `server/` use the Node TypeScript configuration without DOM globals.
 
 ## Scope and limitations
 
-This connection policy covers normal UI tests. Mew's application DOM browser and login desktop retain their own browser dependencies and lifecycles. Native RTC, browser-conformance, and platform-specific checks retain the actual engines and devices their assertions require.
+This connection policy covers normal UI tests. Mew's application DOM browser spawns its own isolated per-session Obscura processes (`server/dom-browser.ts`), while the login desktop retains its Chrome/Chromium dependency and lifecycle (`server/login-desktop.ts`). Native RTC, browser-conformance, and platform-specific checks retain the actual engines and devices their assertions require.
 
 Obscura's CDP support does not establish Chromium equivalence. Upstream documents gaps in service workers, native media, Web APIs, CSS, compositor behavior, and editor interaction. Source migration and passing helper unit tests do not prove that every migrated UI assertion or screenshot works. Record actual browser results and remaining blockers separately from build success.
 
-[ADR 0129](../decisions/0129-obscura-ui-testing.md) records the choice. The [work record](../work/obscura-ui-testing.md) owns installation and verification evidence.
+[ADR 0129](../decisions/0129-obscura-ui-testing.md) records the UI test choice and [ADR 0135](../decisions/0135-obscura-dom-browser.md) records the application DOM browser runtime. The [work record](../work/obscura-ui-testing.md) owns installation and verification evidence.

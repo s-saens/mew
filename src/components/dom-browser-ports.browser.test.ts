@@ -4,8 +4,9 @@ import path from 'node:path'
 import test from 'node:test'
 import { compile } from '@tailwindcss/node'
 import { build } from 'rolldown'
-import { chromium, type Route } from 'playwright-core'
+import type { Route } from 'playwright-core'
 import { domBrowserExecutable } from '../../server/browser-dom-executable.ts'
+import { connectTestBrowser } from '../../server/test-browser.ts'
 
 const root = path.resolve(import.meta.dirname, '../..')
 
@@ -33,7 +34,7 @@ test('localhost browser start page lists safe ports, blocks Mew and recovers wit
   const content = (await Promise.all([component, path.join(root, 'packages/ui/src/HoverTipLayer.tsx')].map(file => fs.readFile(file, 'utf8')))).join('\n')
   const compiler = await compile(await fs.readFile(path.join(root, 'src/index.css'), 'utf8'), { base: path.join(root, 'src'), onDependency() {} })
   const css = compiler.build([...new Set(content.match(/[A-Za-z0-9_@:/.[\]()%,-]+/g))]) + await fs.readFile(path.join(root, 'packages/ui/src/loading-indicator.css'), 'utf8')
-  const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
+  const browser = await connectTestBrowser()
   t.after(() => browser.close())
 
   const fixture = async (width = 1100, ignoreAbort = false) => {
