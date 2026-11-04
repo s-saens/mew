@@ -4,11 +4,11 @@ parent: "mew-editor"
 title: "Markdown Hotview, source, and document properties"
 status: "implemented"
 created: "2026-09-18"
-updated: "2026-11-02"
+updated: "2026-11-04"
 status_hash: "2741d359b18c61eecb53b8ce0ba2862f0f42c088d7d02cf55c88a23d1d44a98e"
 files: ["packages/editor/src/editor/FrontmatterSelect.tsx", "server/frontmatter-options.ts", "src/hooks/useTabs.ts", "src/components/EditorPane.tsx", "src/components/markdown-error-boundary.tsx", "packages/editor/src/Editor.tsx", "packages/editor/src/editor/FrontmatterPanel.tsx", "src/components/TableOfContents.tsx"]
 commits: []
-description: "A feature contract covering Markdown Hotview and Plain editing, readable text and rich HTML copying, /paint and /그림 drawing insertion with mapped upload positions and document access boundaries, editor-local touch pinch font zoom, per-block caching and virtualization, code-block scrolling, view and cursor restoration, checkboxes, document properties, backlinks, mobile auxiliary keys, and source-saving boundaries."
+description: "A feature contract covering Markdown Hotview and Plain editing, readable text and rich HTML copying, /voice inline recording with persistent playback and retry, /paint and /그림 drawing insertion with mapped upload positions and document access boundaries, editor-local touch pinch font zoom, per-block caching and virtualization, code-block scrolling, view and cursor restoration, checkboxes, document properties, backlinks, mobile auxiliary keys, and source-saving boundaries."
 상위파일:
   - "MOC.md"
   - "_document-code-media-editing.md"
@@ -46,6 +46,16 @@ description: "A feature contract covering Markdown Hotview and Plain editing, re
 In editable project Markdown, type `/paint` or `/그림` and choose **Drawing Editor** to open the shared [drawing board](../terminals-agents-automation/agent-drawing-editor.md). Saving inserts a transparent PNG through the current document's `EditorApi.uploadAsset`; it needs document upload permission and does not call agent drawing APIs. Document context has no SVG history picker or persisted editable original. Read-only documents, hosts without the renderer, and external server-file tabs do not offer this command.
 
 Selecting the command removes its slash text and records an insertion position. Map that position through subsequent transactions while the board or upload is open, so moving the caret does not redirect the image. Closing without saving restores focus at that position and leaves the rest of the document intact. Upload failures keep the board and drawing available for retry. A path, API, editor, or editability change invalidates the session; a late upload cannot insert into a different document. The host owns the popup and the editor package owns insertion, as recorded in [ADR 0115](../../decisions/0115-hotview-drawing.md).
+
+### Voice recording
+
+In editable project Markdown, type `/voice` (or `/녹음`) and choose **Voice recording**. The local block offers Start, elapsed time while recording, Stop, and Cancel. Start requests the editing browser's microphone; inserting a block alone never requests access. Recording requires supported `getUserMedia`/`MediaRecorder` APIs, browser consent, and HTTPS or a browser-trusted loopback origin. Denied permission, missing devices, unsupported APIs, empty recordings, recorder errors, and recordings exceeding 25 MiB show recoverable errors. External server-file tabs disable the command through the host's `allowVoiceRecording` option.
+
+Stop waits for the final audio chunk, releases microphone tracks, and offers local playback while uploading through the current document's `EditorApi.uploadAsset`. Successful uploads replace that location with the existing audio node, saved as `<audio src="…" controls></audio>`. Reopening, source mode, read-only playback, collaboration, and attachment authorization use the existing media contract. Use the browser-supported container (WebM/Opus, MP4, Ogg/Opus, or its default) and a matching filename extension; playback compatibility depends on the receiving browser.
+
+The unfinished block is a local ProseMirror decoration, excluded from Markdown and collaboration state. It maps through document edits rather than following the caret. Only one recording session is active per editor. Cancel, removal of its anchor, path/API/editor changes, loss of editability, and unmount invalidate the session and release tracks, timers, and local playback URLs. Late permission results release their tracks; late uploads cannot insert into a different context. Upload failure retains local playback and the recording for Retry without recording again. Reloading or leaving the editor discards an unfinished recording; canceled uploads may leave an unreferenced asset under the existing upload lifecycle.
+
+The [editor package contract](../../development/packages.md#editor-package) owns host integration. [ADR 0131](../../decisions/0131-hotview-voice-recording.md) records the API and browser policy choice; the [remote access contract](../../development/remote-access.md#microphone-permission) owns host headers, nested Mewlink delegation, and separate user-managed application. Actual checks and device limits belong to the [work record](../../work/hotview-voice-recording.md).
 
 ### Touch zoom
 

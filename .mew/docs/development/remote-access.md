@@ -1,8 +1,8 @@
 ---
 title: "Mewlink device registration and locally authenticated P2P access contract"
-description: "Defines Mewlink registration, launcher behavior, authentication, browser trust, UI resources, notification permission bridging, signaling proofs, and transport limits. Links recovery and distinguishes host updates, central rollout, and isolated verification."
+description: "Defines Mewlink registration, launcher behavior, authentication, browser trust, UI resources, notification permission bridging, microphone delegation, signaling proofs, and transport limits. Links recovery and distinguishes host updates, central rollout, and isolated verification."
 created: 2026-10-07
-updated: "2026-11-03"
+updated: "2026-11-04"
 ---
 
 [Work and release criteria](<../work/remote-access.md>) · [Central service installation](../operations/remote-central.md) · [ADR 0195](../history/decisions/0195-mew-account-based-p2p-remote-access.md) · [Follow-up ADR 0203](../history/decisions/0203-mewlink-workers-p2p-ui.md) · [Local authentication ADR 0207](../history/decisions/0207-mewlink-device-access-local-auth.md) · [Permissions](access-control.md)
@@ -30,6 +30,14 @@ Legacy provider callbacks use `OAUTH_ORIGIN`. A single-use proof, valid 60 secon
 Cancel native multi-touch/gesture defaults only; preserve propagation for editor-local font resizing. One-finger input, Ctrl/Cmd+wheel, keyboard zoom, and third-party policies remain. Launcher whole-page enlargement is restricted, with accessibility/device limits in [ADR 0112](../decisions/0112-workspace-touch-zoom.md).
 
 This central **source contract** does not establish a live `mew.run` change. Host builds cannot publish launcher assets; central application is user-owned and separate. The [work record](../work/mewlink-touch-zoom.md) records local checks and remaining rollout limits.
+
+## Microphone permission
+
+Hotview voice recording uses the connecting browser's microphone. The direct host's `server/security-headers.ts` permits `microphone=(self)` while retaining camera, geolocation, and payment denial. Browser permission and a secure context (HTTPS or a browser-trusted loopback origin) remain required.
+
+The Mewlink connection page delegates `microphone 'src'` to its configured app-origin iframe. Both the prepared frame (`mewlink/src/connection-frame.ts`) and fallback frame (`connection-parent.ts`) set this policy. The app launcher (`app-launcher.ts`) delegates the same permission to the installed UI frame. This permits the configured frame origins without granting unrelated origins or camera access. See [ADR 0131](../decisions/0131-hotview-voice-recording.md).
+
+Host builds update browser assets only. Applying the changed direct HTTP header requires a user-managed host restart; applying Mewlink delegation requires a separate user-managed central frontend rollout. Older central launchers continue to block recording in their cross-origin app frame. Local checks establish source behavior, not live Mewlink or physical-microphone operation.
 
 ## Public file and folder links
 

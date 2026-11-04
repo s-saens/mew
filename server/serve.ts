@@ -36,6 +36,7 @@ import { DATA_DIR } from './dataDir.ts'
 import { workspaceSearchPolicy } from './search-indexing.ts'
 import { sendDirectUiHtml } from './direct-ui.ts'
 import { appRoute } from '../shared/app-route.ts'
+import { securityHeaders } from './security-headers.ts'
 
 // 프로덕션 서버 — `npm run build` 후 `npm run serve`.
 // 단일 서버(5000) — 로그인 없이 접속하면 게스트(뷰어), 로그인하면 owner/manager/member.
@@ -75,19 +76,6 @@ if (!fs.existsSync(INDEX_HTML)) {
 }
 
 const PORT = Number(process.env.MEW_TEAM_PORT ?? 5000)
-
-function securityHeaders(req: express.Request, res: express.Response, next: express.NextFunction) {
-  res.setHeader('X-Content-Type-Options', 'nosniff')
-  res.setHeader('X-Frame-Options', 'DENY')
-  res.setHeader('Referrer-Policy', 'same-origin')
-  res.setHeader('Permissions-Policy', 'camera=(), geolocation=(), microphone=(), payment=()')
-  // Google Fonts CSS·폰트와 그림판의 독립 SVG용 폰트 임베딩 요청을 허용한다.
-  res.setHeader('Content-Security-Policy', "default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; connect-src 'self' ws: wss: https://fonts.googleapis.com https://fonts.gstatic.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; media-src 'self' data: blob: https:; object-src 'none'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; worker-src 'self' blob:")
-  if (req.secure || req.headers['x-forwarded-proto'] === 'https') {
-    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains')
-  }
-  next()
-}
 
 function addStaticAndSpaFallback(app: express.Express) {
   // vite가 해시를 붙이는 /assets는 영구 캐시, 그 외(index.html 등)는 항상 재검증

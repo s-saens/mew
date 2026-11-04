@@ -1,7 +1,7 @@
 ---
 title: "Shared Packages"
-description: "Shared package responsibilities, engine-independent imports, and host integration APIs. Covers editor metadata and source mapping, terminals, mobile keys, shared UI, diagrams, and verification boundaries."
-updated: "2026-11-03"
+description: "Shared package responsibilities, engine-independent imports, and host integration APIs, including Hotview voice session cleanup and recording controls. Covers editor metadata and source mapping, terminals, mobile keys, shared UI, diagrams, and verification boundaries."
+updated: "2026-11-04"
 상위파일:
   - "../MOC.md"
   - "MOC.md"
@@ -31,6 +31,8 @@ Shared UI text is translated with `uiText` from `@mew/ui/i18n-core` and `useUiLo
 Optional `EditorApi.fetchFileCandidates(signal)` returns all viewable file paths in the current project. The editor queries it when opening the `@` menu and filters by filename prefix while typing. Requests are canceled on closure or API changes; if the method is absent or the query fails, candidates from the `tree` prop are used. The Mew host connects `fetchFullTree(project)` with `flattenFiles` from the pure `@mew/editor/fuzzy` entry point to separate candidate queries from the explorer's lazy-loading state.
 
 Optional `renderDrawingEditor(EditorDrawingOptions)` supplies a host-owned drawing popup with `onClose` and async `onSave(File)` callbacks. It enables Hotview's `/paint` and `/그림` commands in editable documents. The editor maps the insertion position through transactions and uploads through `EditorApi.uploadAsset`; changes to the editor, path, API, or editability invalidate pending callbacks. Mew's `EditorPane` lazy-loads `DrawingEditor` in document context, which exports a PNG without calling agent history APIs. The reusable package does not import app drawing code or storage endpoints. See [ADR 0115](../decisions/0115-hotview-drawing.md) and the [Hotview feature contract](../features/document-code-media-editing/markdown-hotview-source-and-properties.md#drawing-insertion).
+
+Optional `allowVoiceRecording` defaults to `true` and enables `/voice` in editable Markdown. Hosts without a document-scoped upload destination must set it to `false`; Mew disables it for external server-file tabs. `InlineVoice` is a client-only decoration extension: pending microphone and upload state never change the shared document schema. `useInlineVoice` owns context invalidation and mapped insertion, `VoiceRecordingBlock` owns controls and retry/preview state, and `voiceCapture` owns native recording and track cleanup. Successful uploads insert the existing shared `audio` node; no new server extension or capture endpoint is needed. See the [voice feature contract](../features/document-code-media-editing/markdown-hotview-source-and-properties.md#voice-recording).
 
 The `EditorContextTarget` returned by `prepareContextMenu(x, y)` maps the selection as the document changes, and the host releases it with `dispose()` when menu and asynchronous clipboard operations finish. The host owns the menu UI, permissions, and lifetime boundaries, and imports target types and clipboard read/write utilities from `@mew/editor/context-target`, which does not initialize the editor UI ([body context menu contract](ui-editor-input.md#editor-body-context-menu)).
 

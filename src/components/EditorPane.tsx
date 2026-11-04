@@ -1080,6 +1080,7 @@ export function EditorPane({
                       ref={editorRef}
                       value={activeTab.content}
                       api={editorApi}
+                      allowVoiceRecording={!isExternalTabPath(activeTab.path)}
                       onChange={(content) => onChangeContent(activeTab.path, content)}
                       readOnly={loading || revalidating || collaborationPending || !activeTab.editable || isArchivedPath(activeTab.path, project)}
                       path={externalAbsolutePath(activeTab.path)}

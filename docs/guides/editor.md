@@ -1,7 +1,7 @@
 ---
 title: "Document Editing and Storage Formats"
-description: "Explains editing Markdown, code, document properties, tables, links, attachments, and PDFs; readable Hotview copying and source copying in Plain; /paint and /그림 image insertion with freehand pens, transparent exports, and snap settings; adding and deleting table rows and columns; and the body context menu and native mobile keyboard. Covers Hotview @ file autocomplete, annotations, internal document navigation, table/DB conversion, inline subpage naming, autosave, split views, mobile panels, and installation controls."
-updated: "2026-11-02"
+description: "Explains editing Markdown, code, document properties, tables, links, attachments, and PDFs; /voice microphone recording, playback, and upload retry; readable Hotview copying and source copying in Plain; /paint and /그림 image insertion with freehand pens, transparent exports, and snap settings; adding and deleting table rows and columns; and the body context menu and native mobile keyboard. Covers Hotview @ file autocomplete, annotations, internal document navigation, table/DB conversion, inline subpage naming, autosave, split views, mobile panels, and installation controls."
+updated: "2026-11-04"
 상위파일:
   - "../../.mew/docs/MOC.md"
   - "MOC.md"
@@ -40,6 +40,14 @@ Copy, Cut, and Delete are disabled when no text is selected. Actions that modify
 If copying, cutting, or pasting fails, follow the guidance to use `Ctrl/Cmd+C`·`Ctrl/Cmd+X`·`Ctrl/Cmd+V`. Cut deletes the selected content only after it has been successfully copied to the clipboard.
 
 Copy from **Hotview** to paste readable text without Markdown syntax. Apps that accept rich text can retain headings, emphasis, links, lists, and tables. Text-only destinations receive readable lists and checkboxes, code with its original whitespace, and tables with tab-separated columns. To copy the Markdown source, switch to **Plain** first. Code files and explicit table export actions keep their existing copy formats.
+
+### Record voice
+
+In an editable project Markdown document, type `/voice` (or `/녹음`) in Hotview and choose **Voice recording**. Click **Start recording**, allow microphone access, then click **Stop recording**. The block becomes an audio player when the upload finishes. If upload fails, listen locally and choose **Retry**. **Cancel** discards the unfinished recording.
+
+Use HTTPS or localhost with a browser that supports microphone recording. Check browser microphone permissions if access is blocked. Recordings are limited to 25 MiB, and playback support depends on the browser's audio formats. Keep the editor open until upload completes; changing documents or leaving Hotview discards an unfinished recording. Recording is unavailable in read-only documents and external server-file tabs. Existing saved audio remains playable with attachment read permission.
+
+For Mewlink, the installed launcher must delegate microphone access. The host header and central launcher changes require separate user-managed application; see the [microphone access contract](../../.mew/docs/development/remote-access.md#microphone-permission).
 
 ## Links and Attachments
 

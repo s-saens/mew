@@ -1,6 +1,21 @@
 // Source-message keys keep shared UI packages independent of the host app.
 // Every entry supplies English, Simplified Chinese and Japanese; the key is Korean.
 export const uiMessages = {
+  "음성 녹음": ["Voice recording", "语音录制", "音声録音"],
+  "마이크로 녹음하여 오디오로 삽입": ["Record and insert audio", "录制并插入音频", "録音して音声を挿入"],
+  "녹음 시작": ["Start recording", "开始录音", "録音を開始"],
+  "녹음 중지": ["Stop recording", "停止录音", "録音を停止"],
+  "녹음 재생": ["Play recording", "播放录音", "録音を再生"],
+  "녹음 시간": ["Recording time", "录音时长", "録音時間"],
+  "녹음 중": ["Recording", "录音中", "録音中"],
+  "마이크 권한 대기 중…": ["Waiting for microphone access…", "正在等待麦克风权限…", "マイクの許可を待っています…"],
+  "녹음 마무리 중…": ["Finishing recording…", "正在完成录音…", "録音を処理中…"],
+  "이 브라우저에서는 녹음할 수 없습니다. HTTPS 또는 localhost에서 지원 브라우저를 사용하세요.": ["Recording is unavailable. Use a supported browser on HTTPS or localhost.", "无法录音。请在 HTTPS 或 localhost 上使用支持的浏览器。", "録音できません。HTTPS または localhost で対応ブラウザーを使用してください。"],
+  "녹음이 25 MiB를 초과했습니다. 더 짧게 다시 녹음하세요.": ["Recording exceeded 25 MiB. Record a shorter clip.", "录音超过 25 MiB。请录制更短的音频。", "録音が 25 MiB を超えました。短く録り直してください。"],
+  "녹음된 소리가 없습니다. 다시 녹음하세요.": ["The recording is empty. Record again.", "录音为空。请重新录制。", "録音データがありません。録り直してください。"],
+  "마이크 접근이 차단되었습니다. 브라우저 권한과 연결 보안을 확인하세요.": ["Microphone access is blocked. Check browser permissions and connection security.", "麦克风访问被阻止。请检查浏览器权限和连接安全性。", "マイクへのアクセスがブロックされています。ブラウザーの権限と接続の安全性を確認してください。"],
+  "녹음하지 못했습니다. 마이크를 확인하고 다시 시도하세요.": ["Could not record. Check your microphone and try again.", "无法录音。请检查麦克风后重试。", "録音できませんでした。マイクを確認して再試行してください。"],
+  "녹음을 업로드하지 못했습니다. 다시 시도하세요.": ["Could not upload the recording. Try again.", "无法上传录音。请重试。", "録音をアップロードできませんでした。再試行してください。"],
   "로컬호스트 브라우저": ["Localhost browser", "本地主机浏览器", "ローカルホストブラウザー"],
   "열려 있는 포트": ["Open ports", "开放端口", "開いているポート"],
   "열려 있는 포트가 없습니다.": ["No open ports.", "没有开放的端口。", "開いているポートはありません。"],

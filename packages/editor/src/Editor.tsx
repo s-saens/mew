@@ -69,6 +69,8 @@ import { EditorSearchBar } from './editor/EditorSearchBar'
 import { EmptyParagraph } from './editor/emptyParagraph'
 import { InlinePageName, inlinePageNameKey } from './editor/inlinePageName'
 import { InlinePageNameInput } from './editor/InlinePageNameInput'
+import { InlineVoice } from './editor/inlineVoice'
+import { useInlineVoice } from './editor/useInlineVoice'
 import { AnnotationMarker, Annotations, insertAnnotation, updateAnnotation, deleteAnnotation, scanAnnotations } from './editor/annotations'
 import { prepareProseMirrorContext } from './editor/prosemirrorContext'
 import type { EditorContextTarget } from './editor/contextTarget'
@@ -304,6 +306,7 @@ export const Editor = forwardRef<
     /** 호스트 앱의 서버 연동 — 렌더 간 identity가 안정적인 객체를 넘길 것 */
     api: EditorApi
     readOnly?: boolean
+    allowVoiceRecording?: boolean
     path?: string
     fileLinkContext?: FileLinkContext
     tree?: TreeNode[]
@@ -325,7 +328,7 @@ export const Editor = forwardRef<
     showMobileKeyBar?: boolean
   }
 >(function Editor(
-  { value, onChange, api, readOnly, path = '', fileLinkContext, tree = [], onOpenLink, onCreateChildPage, renderDrawingEditor, onSelectionChars, collab, collaborationPending, commentThreads, onCommentClick, onAnnotationOpen, onStartComment, showMobileKeyBar = true },
+  { value, onChange, api, readOnly, allowVoiceRecording = true, path = '', fileLinkContext, tree = [], onOpenLink, onCreateChildPage, renderDrawingEditor, onSelectionChars, collab, collaborationPending, commentThreads, onCommentClick, onAnnotationOpen, onStartComment, showMobileKeyBar = true },
   ref,
 ) {
   useUiLocale()
@@ -558,6 +561,7 @@ export const Editor = forwardRef<
       Text,
       EmptyParagraph,
       InlinePageName,
+      InlineVoice,
       // StarterKit이 기본 제공하는 확장 중 아래에서 개별 등록·설정하는 것들은 전부 꺼야 한다.
       // 켠 채로 같은 이름을 또 등록하면 tiptap이 "Duplicate extension names found"를 경고하고,
       // 플러그인이 두 벌 돌아간다 — 특히 Link는 StarterKit 기본값(openOnClick: true)이 함께
@@ -1318,6 +1322,7 @@ export const Editor = forwardRef<
     // collab이 없을 때는 undefined 하나뿐인 안정된 배열이라 기존처럼 인스턴스가 유지된다.
   }, [collab?.ydoc])
 
+  const voice = useInlineVoice(editor, path, api, !!readOnly || !allowVoiceRecording)
   const continuity = useRef<{ from: number; to: number; focused: boolean; scrollTop: number } | null>(null)
   // Capture before useEditor destroys the old view in its passive effect.
   useLayoutEffect(() => () => {
@@ -1726,6 +1731,10 @@ export const Editor = forwardRef<
   // 슬래시 커맨드는 데이터·삽입 관련 명령만 노출한다 (제목·목록·인용 등 글 형식은 마크다운
   // 단축어 `#`·`-`·`1.`·```` ``` ````로 그대로 쓸 수 있으므로 메뉴에서 뺐다).
   const slashCommands: SlashCommand[] = [
+    ...(!readOnly && allowVoiceRecording ? [{
+      id: 'voice', title: uiText('음성 녹음'), description: uiText('마이크로 녹음하여 오디오로 삽입'), keywords: ['voice', 'record', '녹음', '음성'],
+      run: voice.open,
+    }] : []),
     ...(canDraw ? [{
       id: 'paint', title: uiText('그림판'), description: uiText('그림을 그려 이미지로 삽입'), keywords: ['paint', 'drawing', '그림', '그림판'],
       run: openDrawing,
@@ -2269,6 +2278,7 @@ export const Editor = forwardRef<
         <EditorContent editor={editor} />
       </ImageSourceContext.Provider>
       {pageName && createPortal(<InlinePageNameInput onSubmit={submitPageName} onCancel={() => closePageName()} />, pageName.mount)}
+      {voice.portal}
       {drawing && canDraw && renderDrawingEditor?.({ onClose: () => closeDrawing(drawing), onSave: file => saveDrawingImage(drawing, file) })}
       {uploading && (
         <div className="absolute bottom-2 right-2 rounded bg-surface-inverse px-2 py-1 text-xs text-ink-inverse">
