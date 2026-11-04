@@ -1,7 +1,7 @@
 ---
 title: "App Startup, Server Architecture, and State Files"
-description: "Server and CLI entry points, state-file ownership, project metadata, shared project catalogs, managed cloning, nested-project discovery, and per-account active roots. Routes browser initialization and deferred loading to the focused startup contract."
-updated: "2026-11-03"
+description: "Server and CLI entry points, state-file ownership, project metadata, shared project catalogs, managed cloning, nested-project discovery, and per-account active roots. Defines server-authoritative personal shortcuts with empty lists for new accounts and links browser startup."
+updated: "2026-11-04"
 상위파일:
   - "../MOC.md"
   - "MOC.md"
@@ -101,6 +101,8 @@ myProjects:
 `projects` is global; optional `discovered: true` identifies a nested project first found by catalog discovery. API rows add `parentPath` for the nearest registered ancestor; this relationship is computed from paths rather than stored as another ledger. `myProjects` keys are normalized local account IDs, and each value retains the compatible `StoredRootProjects` shape (`paths`, legacy `icons`, and optional `groups`). Icons displayed in the UI are still read from each project's `.mew/project-icon.json`; no group UI is restored. Removing a shortcut never removes the global entry, another account's shortcuts, or files. Missing directories remain listed so an unavailable mount or migrated entry is not silently discarded.
 
 My Projects is a subset of the catalog. Reading a personal list removes paths absent from `projects`, while retaining registered folders that are temporarily unavailable. The compatible personal-list write still registers supplied paths for legacy browser recovery.
+
+`src/hooks/use-root-project-tabs.ts` restores My Projects from the signed-in account's server response. Its initial list is empty, and a `null` response means no personal shortcuts, regardless of role, file permissions, the active project, or cached browser paths. Browser paths are never imported into an account's list. Saves and browser-cache updates wait for a successful read; a failed read leaves saved shortcuts untouched. Existing server lists retain their ordering. Opening an All Projects entry changes only the active project; adding its personal shortcut remains explicit.
 
 Catalog listing imports existing real, non-hidden direct folders from the managed root without pinning them, then discovers nested projects beneath registered roots. A real `.mew` directory or a `.git` directory/file marks a nested project. Discovery registers it with `discovered: true`, without adding personal shortcuts. It skips symlinks, hidden directories, `node_modules`, `vendor`, `dist`, `build`, and server metadata; each root scan stops at depth 20 or 10,000 directories. In-progress managed creation is excluded from catalog import and discovery. Unavailable entries remain registered.
 

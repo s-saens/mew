@@ -10,6 +10,7 @@ import { createApiApp } from './api.ts'
 import { WORKSPACE_ROOT, WORKSPACE_PROJECT, setWorkspaceRoot } from './paths.ts'
 import { readActiveWorkspace, writeActiveWorkspace } from './userUiState.ts'
 import { resetTreeWatchers } from './watcher.ts'
+import { projectRegistry } from './project-registry.ts'
 import type { Role } from './reqAuth.ts'
 
 test('manager can restore, browse, create and switch projects without account administration access', async () => {
@@ -22,8 +23,9 @@ test('manager can restore, browse, create and switch projects without account ad
   writeActiveWorkspace(owner, root)
   setWorkspaceRoot(root)
   let role: Role = 'manager'
+  let account = manager
   const app = express()
-  app.use((req, _res, next) => { req.auth = { role, email: role === 'guest' ? null : manager, mustChangePassword: false }; next() })
+  app.use((req, _res, next) => { req.auth = { role, email: role === 'guest' ? null : account, mustChangePassword: false }; next() })
   app.use('/api', createApiApp())
   const server = http.createServer(app)
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
@@ -33,6 +35,21 @@ test('manager can restore, browse, create and switch projects without account ad
     ...(body === undefined ? {} : { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
   })
   try {
+    projectRegistry.link(owner, root)
+    for (const freshRole of ['owner', 'manager', 'member'] as const) {
+      role = freshRole
+      account = `fresh-projects-${freshRole}@example.test`
+      const mine = async () => (await (await request('/user-ui/root-projects')).json() as { state: unknown }).state
+      assert.equal(await mine(), null, `${role} starts without personal shortcuts`)
+      const catalogResponse = await request('/project-registry')
+      assert.equal(catalogResponse.status, 200)
+      const catalog = await catalogResponse.json() as { projects: { path: string; mine: boolean }[] }
+      assert.equal(catalog.projects.find(project => project.path === root)?.mine, false)
+      assert.equal((await request('/workspace', { path: root })).status, 200)
+      assert.equal(await mine(), null, `${role} can open a shared project without pinning it`)
+    }
+    role = 'manager'
+    account = manager
     assert.equal((await request('/user-ui/root-projects', { paths: [root] }, 'PUT')).status, 200)
     const saved = await (await request('/user-ui/root-projects')).json() as { state: { paths: string[] } }
     assert.deepEqual(saved.state.paths, [root])

@@ -18,6 +18,7 @@ import { GitLoginDialog } from './components/github-account'
 import { getUiLocale, uiText } from '@mew/ui/i18n-core'
 import { useUiLocale } from '@mew/ui/i18n'
 import { useRefreshTasks } from './hooks/use-refresh-tasks'
+import { useRootProjectTabs } from './hooks/use-root-project-tabs'
 import { useFocusedWorkspacePanel } from './hooks/use-focused-workspace-panel'
 import { defaultCapabilities, type Feature } from '../shared/access-policy'
 import { writeBrowserStorage } from '@mew/ui/browser-storage'
@@ -42,7 +43,6 @@ import {
   revertFileToCommit,
   runMewAction,
   setProject,
-  saveRootProjectTabs,
   saveWorkspaceUi,
   switchWorkspace,
   openSubproject,
@@ -192,7 +192,6 @@ const TERMINAL_OPEN_KEY = 'mew:terminal-open'
 const AGENT_OPEN_KEY = 'mew:agent-open'
 const GIT_OPEN_KEY = 'mew:git-open'
 const ANDROID_OPEN_KEY = 'mew:android-open'
-const OPEN_PROJECTS_KEY = 'mew:open-project-paths'
 /** 지울 수 없는 기본 프로젝트 — 보고 있던 프로젝트가 사라지면 여기로 빠진다 */
 const DEFAULT_PROJECT = 'docs'
 type AccountSidebarState = { explorerScope?: 'docs' | 'files'; docsExpanded: boolean; expandedSubprojects: string[] }
@@ -220,15 +219,6 @@ function accountTrees(value: unknown): AccountTreeStates {
     }
   }
   return result
-}
-
-function loadOpenProjectPaths(): string[] {
-  try {
-    const parsed: unknown = JSON.parse(scopedBrowserStorage().getItem(OPEN_PROJECTS_KEY) ?? '[]')
-    return Array.isArray(parsed) ? parsed.filter((value): value is string => typeof value === 'string' && value !== '') : []
-  } catch {
-    return []
-  }
 }
 
 function projectLabel(projectPath: string | null): string {
@@ -308,11 +298,9 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
       .then(() => workspaceUiOwnerAlive.current ? saveWorkspaceUi(path, state) : undefined).catch(console.error)
   }, [])
   // My Projects is an account-specific shortcut list in the shared registry.
-  const [openProjectPaths, setOpenProjectPaths] = useState<string[]>(() => (canOpenProjects ? loadOpenProjectPaths() : []))
+  const { paths: openProjectPaths, setPaths: setOpenProjectPaths, icons: rootProjectIcons, setIcons: setRootProjectIcons,
+    synced: rootProjectTabsSynced, saveQueue: rootProjectSaveQueue } = useRootProjectTabs(canOpenProjects, trackRefresh)
   const projectPaths = useMemo(() => [...new Set(openProjectPaths)], [openProjectPaths])
-  const [rootProjectIcons, setRootProjectIcons] = useState<Record<string, string>>({})
-  const rootProjectSaveQueue = useRef<Promise<unknown>>(Promise.resolve())
-  const [rootProjectTabsSynced, setRootProjectTabsSynced] = useState(!canOpenProjects)
   const [openProjectDialog, setOpenProjectDialog] = useState(false)
   const [hasProject, setHasProject] = useState<boolean | null>(isGuest ? true : null)
   const [creationAgentProject, setCreationAgentProject] = useState<RegisteredProject | null>(null)
@@ -796,38 +784,6 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     }).catch(console.error)
     return () => { alive = false }
   }, [canOpenProjects, rootProjectTabsSynced, openProjectPaths, projectUiPath, workspaceEpoch])
-
-  // 서버 상태가 비어 있을 때만 이 브라우저의 기존 localStorage를 최초 값으로 올린다. 시크릿 창의
-  // 빈 저장소가 이미 쓰고 있던 계정 상태를 덮어쓰지 않도록, 내려받기 전에는 저장하지 않는다.
-  useEffect(() => {
-    if (!canOpenProjects) return
-    let alive = true
-    void trackRefresh(fetchRootProjectTabs())
-      .then(({ state }) => {
-        if (!alive) return
-        if (state) {
-          setOpenProjectPaths(state.paths)
-          setRootProjectIcons(state.icons)
-        }
-        setRootProjectTabsSynced(true)
-      })
-      .catch(console.error)
-    return () => { alive = false }
-  }, [canOpenProjects, trackRefresh])
-
-  useEffect(() => {
-    if (!canOpenProjects) return
-    const paths = [...new Set(openProjectPaths)]
-    writeBrowserStorage(OPEN_PROJECTS_KEY, JSON.stringify(paths))
-    if (!rootProjectTabsSynced) return
-    // Keep list updates in order; discard superseded or unmounted pending writes.
-    let current = true
-    rootProjectSaveQueue.current = rootProjectSaveQueue.current
-      .catch(() => {})
-      .then(() => current ? saveRootProjectTabs({ paths, icons: {}, groups: [] }) : undefined)
-      .catch(console.error)
-    return () => { current = false }
-  }, [canOpenProjects, openProjectPaths, rootProjectTabsSynced])
 
   const changeRootProjectIcon = useCallback(async (projectPath: string, icon: string) => {
     try {

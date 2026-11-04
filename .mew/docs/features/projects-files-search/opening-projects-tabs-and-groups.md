@@ -8,7 +8,7 @@ updated: "2026-11-04"
 status_hash: "03b352e53f93242f9efdfd05c5bd632f9bf92dd1a456279d6b0eb0efd066cd3f"
 files: ["src/components/file-action-menu.tsx", "src/hooks/use-external-file-actions.tsx", "src/components/file-browser-favorites.tsx", "server/file-favorites.ts", "src/components/file-browser.tsx", "src/components/file-browser-path.tsx", "src/components/file-browser-path-suggestions.ts", "src/components/project-add-inline.tsx", "src/components/project-catalog-panel.tsx", "src/components/LinkProjectDialog.tsx", "src/components/ProjectCreationAgentDialog.tsx", "server/project-registry.ts", "src/components/ProjectSwitcher.tsx", "server/projects.ts", "server/cloud-storage.ts"]
 commits: []
-description: "Defines project creation and Git cloning through same-row Add choices immediately after My Projects, external-folder linking, and the shared projects.yaml catalog. Covers collapsed All Projects, nested hierarchy with shortcuts numbered in displayed order, GitHub repository selection before opening a project, and retained switching, icon, worktree, and session boundaries."
+description: "Defines project creation, cloning, linking, and the shared catalog alongside account-specific My Projects, empty for new accounts regardless of permissions or browser cache. Covers inline Add choices, collapsed All Projects, hierarchy shortcuts, and switching, icon, worktree, and session boundaries."
 상위파일:
   - "MOC.md"
   - "_projects-files-search.md"
@@ -19,6 +19,7 @@ description: "Defines project creation and Git cloning through same-row Add choi
 ### Projects and My Projects
 
 - **All Projects** is the instance-wide catalog of folders added to Mew. **My Projects** is an ordered set of shortcuts for one signed-in account; it is not a folder or a private copy of a project.
+- A new account starts with an empty My Projects list even when its role or file permissions allow access to existing projects. Browser-cached paths and opening a shared project do not populate the list. Existing projects remain available through All Projects; adding a shortcut is an explicit account action.
 - All signed-in users, including members, can browse registered projects, add them to My Projects, and switch to them. Guests cannot use the catalog, create or link projects, or maintain My Projects. Existing feature and file permissions continue to apply after selection.
 - Creating, cloning, or linking a project registers it for the instance and adds it to the initiating account's My Projects. Other accounts can add that same project to their own lists without copying files or affecting the creator's list.
 - `DATA_DIR/projects.yaml` owns both the shared catalog and personal shortcuts. Every personal shortcut must reference a registered catalog entry; entries absent from the catalog are excluded from My Projects. Existing per-account lists migrate without moving project folders. The [registry and storage contract](../../development/architecture.md#shared-project-registry-and-my-projects) owns the schema and APIs; [ADR 0118](../../decisions/0118-shared-project-registry.md) supersedes the account-isolated catalog and member restrictions in [ADR 0070](../../decisions/0070-manager-project-access.md).

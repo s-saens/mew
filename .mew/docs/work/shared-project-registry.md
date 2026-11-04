@@ -1,6 +1,6 @@
 ---
 title: "Shared projects and inline project setup"
-description: "Records shared project registry creation on November 2 and the November 3 inline panel follow-up: managed clones, GitHub repositories, nested discovery, shortcut removal, focus/touch fixes, and Add placement immediately after personal projects. Includes the November 4 correction for hierarchy shortcut numbering and reordering. Separates passing local tests, build and lint from unrelated documentation and branch-test failures and pending browser/runtime verification."
+description: "Records shared project registry creation, inline setup, cloning, discovery, and Add placement. Includes November 4 fixes for hierarchy shortcut ordering and empty My Projects on new accounts, with local test/build/lint results, existing document-link failures, and browser verification limits."
 created: "2026-11-02"
 updated: "2026-11-04"
 ---
@@ -103,3 +103,15 @@ Nested projects were displayed beneath their ancestors while shortcut labels, Al
 - `server/project-switcher-ui.test.ts` and `server/project-sidebar-ui.test.ts` could not connect to the user-managed Obscura endpoint. Browser and physical-device verification remain incomplete.
 
 The build updates local `dist/` assets. No deployment, launcher invocation, server lifecycle operation, or push was performed.
+
+
+## New-account personal shortcuts correction — November 4, 2026
+
+Prevent browser-cached project paths from becoming a new account's personal shortcuts. The former startup flow retained cached paths when the server returned `null`, then saved them into that account. The focused `useRootProjectTabs` hook now starts empty, restores only the account's server list, and waits for a successful read before saving or updating the browser cache. Existing server lists retain their ordering; read failures leave saved lists untouched. The [feature contract](../features/projects-files-search/opening-projects-tabs-and-groups.md#projects-and-my-projects) and [storage contract](../development/architecture.md#shared-project-registry-and-my-projects) own current behavior.
+
+- `node --test src/hooks/use-root-project-tabs.test.ts server/project-registry.test.ts server/project-access-api.test.ts`: all 17 tests passed. React hook regressions cover stale cache isolation before and after a null response, explicit additions, existing and empty lists, failed reads, and disabled project access. API assertions cover fresh owner, manager, and member accounts browsing and opening a shared project without adding it to My Projects.
+- `npm run build` passed, including TypeScript; Vite retained its large-chunk warning. `npm run lint` passed with warnings and no errors. `git diff --check` passed.
+- `npm run check:docs` validated 697 descriptions and reported 42 existing missing-target links. No new link target is introduced by this correction; the architecture document retains its existing missing parent reference.
+- `node --test --test-name-pattern='App first-use onboarding' server/workspace-switch-ui.test.ts` could not connect to the user-managed Obscura endpoint. The passing hook tests use Happy DOM and mocked API responses; browser layout and physical-device verification remain incomplete.
+
+The required build updated local `dist/` assets. No deployment, launcher invocation, or application server lifecycle operation was performed. Previously saved account shortcuts are preserved; this correction does not remove entries already stored by the old behavior.
