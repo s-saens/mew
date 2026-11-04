@@ -4,10 +4,10 @@ parent: "mew-projects"
 title: "Task Panel, List, Calendar, and Gantt"
 status: "changed"
 created: "2026-10-03"
-updated: "2026-11-03"
+updated: "2026-11-04"
 files: ["src/components/task-assignees.ts", "src/components/task-assignee-picker.tsx", "src/components/task-assignee-context.tsx", "shared/task-assignees.ts", "src/components/task-panel.tsx", "src/components/task-sort-picker.tsx", "src/utils/task-sort.ts", "src/components/task-swipe-row.tsx", "src/components/task-action-menu.tsx", "src/components/task-date-status.tsx", "src/components/task-panel.css", "src/components/task-text.tsx", "src/components/task-tag-picker.tsx", "server/task-markdown.ts", "src/components/task-tag-filter.tsx", "src/utils/task-tag-color.ts", "shared/task-tags.ts", "src/components/task-range-calendar.tsx", "src/components/task-calendar.tsx", "src/components/task-gantt.tsx", "src/utils/task-schedule.ts", "src/utils/task-timeline.ts", "src/hooks/use-task-list.ts", "src/hooks/use-task-drag.ts", "src/utils/task-list-session.ts", "shared/task-list.ts", "packages/ui/src/select-field.tsx", "packages/ui/src/date-field.tsx", "packages/ui/src/date-field.css", "server/task-list.ts", "server/task-list-routes.ts", "src/App.tsx"]
 commits: []
-description: "Feature requirements for the Markdown task panel, list/calendar/Gantt views, sorting, tags, assignees, document links, and Run task agent drafts. Links shared storage and lifecycle contracts and preserves dated implementation and verification records."
+description: "Feature requirements for the Markdown task panel, responsive calendar agenda, list/Gantt views, sorting, tags, assignees, document links, and Run task agent drafts. Links shared storage and lifecycle contracts and dated verification records."
 상위파일:
   - "MOC.md"
   - "_projects-files-search.md"
@@ -62,7 +62,7 @@ Provides both a standalone task panel and [editor DB Gantt](../../../../docs/gui
 
 - Save each task's start/completion date range. Status left of Delete shows future starts in gray `n일 후 시작`, `w주 후 시작`, or `m달 후 시작`; started schedules use completion-date `D-n`, `D-Day`, or red `D+n`. Clicking opens the integrated range-calendar popover: first click sets start; next on/after start sets end; the same date twice gives one day. An earlier date replaces start and waits for end.
 - Cycle through views using the List, Calendar, and Gantt tabs in the title bar or left/right swipes on the bottom dock, editing the same task data.
-- The upper calendar area provides monthly date selection; the lower area shows schedules whose date ranges include the selected date and an input for new schedules.
+- The calendar shows monthly date selection and an agenda containing schedules whose date ranges include the selected date, plus an input for new schedules. When the task panel is wider than it is tall and at least 640px wide, place the agenda to the right of the month, with independent vertical scrolling for each column. Otherwise, keep the agenda below the month. Reflow on panel resizing without resetting date selection or task edits; use panel dimensions rather than viewport orientation. See the [layout implementation and verification record](../../work/task-calendar-layout.md).
 - Gantt has a scrollbar, without edge handles. Default range: 5 days before today through 5 days after the later of today and the last schedule's end date. Continued horizontal input at an edge extends 14 days in that direction after gentle resistance. Keep extensions unsaved and reset on view reopening.
 - Holding Ctrl/Cmd temporarily enables Gantt pencil/drawing mode; release restores the previous selection mode while retaining button-selected pencil mode. Clear temporary mode on blur/hiding; preserve read-only behavior and Ctrl/Cmd+wheel zoom. Verify individual/both modifiers, release, temporary drawing saves, manual-pencil restoration, blur, and read-only mode.
 - Gantt reuses the scales, bars, colors, date-range moving/resizing, drawing, and zoom controls from `liiiiv/gantt-maker`.

@@ -26,7 +26,7 @@
 @media (pointer: coarse) { .task-delete { height: 32px; } }
 @media (prefers-reduced-motion: reduce) { .task-swipe > .task-row-content { transition: none; } }
 
-.task-panel { container-type: inline-size; }
+.task-panel { container: task-panel / size; }
 .task-content { display: flex; gap: 6px; flex: 1; min-width: 0; align-items: flex-start; }
 
 .task-view-switch { display: flex; min-width: 0; gap: 2px; overflow-x: auto; padding: 0 2px; }
@@ -40,6 +40,8 @@
 .task-tool-group { display: flex; gap: 2px; }
 .task-today { padding-inline: 8px; }
 .task-empty { padding: 8px 12px 0; font-size: 12px; color: var(--color-ink-secondary); }
+.task-calendar { flex-shrink: 0; min-width: 0; }
+.task-calendar-month { min-width: 0; }
 .task-calendar-nav { display: flex; align-items: center; gap: 2px; padding: 6px 8px; }
 .task-calendar-nav > strong { flex: 1; font-size: 13px; padding-left: 4px; }
 .task-calendar-grid { padding: 0 8px 6px; font-variant-numeric: tabular-nums; }
@@ -55,7 +57,12 @@
 .task-calendar-dots { display: flex; align-items: center; justify-content: center; gap: 2px; height: 9px; }
 .task-calendar-dots small { font-size: 9px; line-height: 9px; }
 .task-calendar-dots i, .task-gantt-legend i { display: inline-block; width: 5px; height: 5px; border-radius: 50%; }
-.task-calendar-agenda { border-top: 1px solid var(--color-edge); }
+.task-calendar-agenda { min-width: 0; border-top: 1px solid var(--color-edge); }
+@container task-panel (min-width: 640px) and (aspect-ratio > 1) {
+  .task-calendar { display: grid; grid-template-columns: minmax(260px, 2fr) minmax(0, 3fr); flex: 1; min-height: 0; }
+  .task-calendar-month, .task-calendar-agenda { min-height: 0; overflow: auto; overscroll-behavior: contain; }
+  .task-calendar-agenda { border-top: 0; border-left: 1px solid var(--color-edge); }
+}
 .task-agenda-heading { display: flex; align-items: baseline; gap: 6px; padding: 10px 12px 2px; }
 .task-agenda-heading strong { font-size: 12px; }
 .task-agenda-heading > span { margin-left: auto; font-size: 11px; color: var(--color-ink-secondary); }
