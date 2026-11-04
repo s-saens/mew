@@ -6,9 +6,9 @@ status: "implemented"
 created: "2026-09-18"
 updated: "2026-11-04"
 status_hash: "333669f522d259fe25acbfd4326c1e55deca98f9f89df6cb5443d61057d19e0a"
-files: ["src/components/AgentPanel.tsx", "src/hooks/use-scheduled-prompts.ts", "src/utils/agent-scheduled-cache.ts", "server/agentScheduledPrompts.ts"]
+files: ["src/components/AgentPanel.tsx", "src/components/agent-schedule-input.tsx", "src/hooks/use-scheduled-prompts.ts", "src/utils/agent-scheduled-cache.ts", "server/agentScheduledPrompts.ts"]
 commits: []
-description: "Feature contract covering creation, editing, deletion, and execution of the scheduled time and content of a message to be sent once to the current agent session. Describes document tags in previews and editors, early display of device-stored lists, server synchronization, session restoration, and queue handling rules for busy sessions."
+description: "One-time agent messages scheduled through floating inline hours/minutes controls, with confirmation, cancellation, and time editing. Covers document tags, device-stored list restoration, server synchronization, and queued execution in the original session."
 상위파일:
   - "MOC.md"
   - "_terminals-agents-automation.md"
@@ -35,9 +35,11 @@ description: "Feature contract covering creation, editing, deletion, and executi
 
 ## Detailed behavior
 
-The clock button in the agent window's input bar opens the **Scheduled Message** popup. The popup allows only future dates and times; scheduling sends the content already in the input bar, including attachment references, at that time. Once scheduling is complete, clear that input draft and the attachment display.
+The clock button inside the input field is replaced in place by a compact floating hours/minutes form with Check and X buttons on the right. It starts at 1 hour and 0 minutes. Hours accept whole numbers from 0 to 999; minutes accept 0 to 59, with a positive total required. Check or Enter schedules the current input, including attachment references, relative to the confirmation time. X or Escape returns to the clock without changing the draft. There is no separate popup or date/time picker.
 
-View unexecuted scheduled messages in the **pending queue list** directly above the input bar. They appear only after regular pending messages, ordered by send time ascending. Click a message body once to edit it in place. Like the input, pending and scheduled message editors can be resized by dragging the top border up or down, or with the up and down arrow keys when the border has keyboard focus. Click the date/time text to reopen the same time picker and change the time. Scheduled messages cannot be reordered relative to one another and can also be deleted. Regular pending messages lock queue execution until editing is completed or canceled ([ADR 0118](../../history/decisions/0118-mew-agent-queue-edit-lock.md)).
+While registration is pending, lock the fields and both actions to prevent duplicate requests. On failure, retain the entered duration and draft and show the error beside the form for retry. Only successful creation clears the input draft and attachment display. Existing session, CLI, upload, and queue-edit restrictions remain. Floating controls wrap within narrow panels; their measured height updates editor clearance without adding a separate footer.
+
+View unexecuted scheduled messages in the **pending queue list** directly above the input bar. They appear only after regular pending messages, ordered by send time ascending. Click a message body once to edit it in place. Like the input, pending and scheduled message editors can be resized by dragging the top border up or down, or with the up and down arrow keys when the border has keyboard focus. Click the date/time text to replace the composer clock with the same relative-time fields and update that message's send time. Initialize them from the remaining time, rounding partial minutes up and using at least one minute for elapsed times. A time edit preserves the message body and current composer draft. Scheduled messages cannot be reordered relative to one another and can also be deleted. Regular pending messages lock queue execution until editing is completed or canceled ([ADR 0118](../../history/decisions/0118-mew-agent-queue-edit-lock.md)).
 
 Display ordinary document references as compact document tags in the scheduled list and its inline editor. Preview tags are passive parts of the message edit button, so clicking the body still starts editing. The editor supports `@` candidates, filename actions, and atomic reference removal and undo through the shared [agent input contract](agent-input-mentions-skills-and-attachments.md). Saving preserves exact scoped reference strings, including repeated references; changing the presentation does not alter scheduled payloads.
 
@@ -54,7 +56,7 @@ Scheduled messages remain in the server data folder. At the scheduled time, the 
 <!-- mew:implementation:start -->
 ## Implementation details
 
-- Provide scheduled time and message creation, content/time editing and deletion, and queued execution in the original session.
+- `AgentScheduleInput` owns the floating relative-time form; `AgentPanel` replaces the clock, submits absolute ISO timestamps through the existing schedule API, and measures wrapped controls for editor clearance.
 - Display lists are stored in IndexedDB by account, runtime, tab, and working path. Successful creation, modification, and cancellation operations and server query results are reflected immediately, and the server list is rechecked on reconnection, return to the window, or return online.
 - Query failures do not clear the cache, and late cache results or earlier query responses do not overwrite the latest server results or changes. The server owns actual scheduled execution and restoration ([display cache contract](#browser-list-restoration)).
 
@@ -62,6 +64,8 @@ Scheduled messages remain in the server data folder. At the scheduled time, the 
 
 <!-- mew:validation:start -->
 ## Verification
+
+- The [composer work record](../../work/agent-composer-actions.md#follow-up-inline-relative-scheduling) records the inline scheduling checks and remaining browser-verification limits.
 
 - 2026-09-30: Isolated Chromium tests in `agent-scheduled-cache-ui.test.ts` (1100/390px, both themes) verified cache-first display during delayed server queries; persistence after refresh following creation, modification, and cancellation during query failures; protection against overwrites by late cache and server responses; account, runtime, tab, and cwd isolation; and unavailable storage and quota failures. The existing `agent-history-ui.test.ts` also passed.
 - User verification criteria: Reopen the browser and confirm that the last schedule list appears while waiting for the server query, then updates to reflect executed, modified, and canceled states after the query completes.

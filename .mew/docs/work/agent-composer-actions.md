@@ -1,8 +1,8 @@
 ---
 title: "Agent composer action row"
 created: "2026-11-02"
-updated: "2026-11-02"
-description: "Records moving the agent composer actions into the input surface, the rounder right-pointing Send button, aligned hover tooltips, the correction from a reserved footer row to floating controls, responsive and keyboard regression checks, and local build verification. Distinguishes isolated browser checks from physical-device and server lifecycle verification."
+updated: "2026-11-04"
+description: "Records moving the agent composer actions into the input surface, the rounder right-pointing Send button, aligned hover tooltips, the correction from a reserved footer row to floating controls, responsive and keyboard regression checks, and local build verification. Also records replacement of the schedule picker with inline relative-time fields, component checks, and blocked browser verification. Distinguishes local checks from physical-device and server lifecycle verification."
 ---
 
 The agent composer now groups Drawing, Save prompt, Attach, Schedule, and Send inside the input surface, in that order. This removes the separate right action column and gives the settings and editor the full available width. Button sizes and colors remain; Send uses 12px corners and Iconoir's right-pointing Send icon. The [agent input contract](../features/terminals-agents-automation/agent-input-mentions-skills-and-attachments.md#composer-input) owns the current behavior.
@@ -53,3 +53,20 @@ Floating-controls verification:
 - `git diff --check`: Passed.
 
 Browser responses were mocked, and physical mobile devices remain unverified. No deployment or server lifecycle command was run; the required build refreshed `dist/`.
+
+## Follow-up: inline relative scheduling
+
+The clock previously opened a separate date/time picker above the composer. It now becomes a floating hours/minutes form in the same action group, with Check and X buttons on the right. Existing scheduled messages use the same form when their time is edited. Controls wrap inside narrow inputs, and the existing measurement updates editor clearance. The [scheduled-message contract](../features/terminals-agents-automation/agent-scheduled-messages.md#detailed-behavior) owns duration bounds, confirmation timing, cancellation, errors, and draft preservation.
+
+Verification on 2026-11-04:
+
+- `node --test server/agent-schedule-input.test.ts src/utils/scheduleTime.test.ts src/utils/agent-scheduled-cache.test.ts src/utils/agentInputLayout.test.ts`: All 8 tests passed. The new React/happy-dom component test covers defaults, duration validation, confirmation-time calculation, existing-time rounding, cancellation, pending locks, duplicate prevention, and retry after failure.
+- `node --test server/agent-scheduled-cache-ui.test.ts server/agent-command-ui.test.ts`: Both fixtures bundled, but neither browser test could connect to the user-managed Obscura endpoint. Browser interaction, screenshots, and desktop/mobile/narrow geometry remain unverified. Updated assertions cover inline containment, cancellation preserving the draft, relative scheduling, and narrow-panel bounds.
+- `npm run build`: Passed, including TypeScript and the production bundle; the existing large-chunk warning remains. Initial attempts were blocked by a type error in another task's `server/editor-tabs-sync-ui.test.ts`; verification passed after that file was corrected by its owner.
+- Targeted Oxlint passed with existing `AgentPanel.tsx` warnings. The Impeccable detector returned no findings.
+- The broader `src/ui-localization.test.ts` run failed its source scan on pre-existing untranslated literals in other files, including `src/api/client.ts`, `src/api/task-list.ts`, and `src/components/debugger-helpers.ts`; it reported none in the new component. Its locale-formatting test passed.
+
+- `npm run check:docs`: All 694 description checks passed. The repository-wide link check found 42 unrelated missing-target errors, including `.mew/docs/MOC.md` and `.mew/docs/decisions/README.md`. Filtering the existing checker to the three changed documents found no errors; their changed anchors were inspected.
+- `git diff --check` passed for the task files.
+
+No deployment, launcher, or server lifecycle operation was performed. The required build refreshed local `dist/` assets. Physical-device and browser layout verification remain pending.

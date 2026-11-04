@@ -51,7 +51,6 @@ import {
   useRef,
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
-  type FormEvent,
   type MouseEvent,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
@@ -130,7 +129,7 @@ import { AgentHarnessButtons } from './agent-harness-modal'
 import { AgentGuidanceButton } from './agent-guidance-settings'
 import { SUBSCRIPTION_URLS } from '../../shared/agent-access'
 import { AgentSetPicker } from './AgentSetPicker'
-import { ScrollDateTimePicker } from './ScrollDateTimePicker'
+import { AgentScheduleInput } from './agent-schedule-input'
 import { cachedAgentRuntimes, refreshAgentRuntimes, subscribeAgentRuntimes, updateAgentRuntimesCache } from '../utils/agentPickerCache'
 import { useGridDrag } from '../hooks/useGridDrag'
 import { sessionIdOf, sessionIdsExcept, withAutoLabel, withProjectLabel, withRename, withSessionId, type AgentTab, type RequestedAgentTab } from '../utils/agentTabs'
@@ -142,7 +141,6 @@ import {
   agentQueueEditMaxHeight,
   resizedHeightFromTop,
 } from '../utils/agentInputLayout'
-import { nextLocalMinuteValue } from '../utils/scheduleTime'
 import {
   foldEvents,
   formatDuration,
@@ -3394,6 +3392,7 @@ function AgentSessionView({
     if (cliModeDisabled) return
     setCliMode(value => !value)
     setScheduleOpen(false)
+    setRescheduling(null)
   }
   const codeRunDisabled = cliModeDisabled || !connected || !meta?.sessionId || !!loadingSession || !!historyPreview
   const codeAfterUserCount = usersBefore + items.filter(item => item.kind === 'user').length
@@ -3404,6 +3403,7 @@ function AgentSessionView({
       if (!accepted) return
       setCliMode(true)
       setScheduleOpen(false)
+      setRescheduling(null)
       recordAgentInputHistory(tabId, command)
       stickRef.current = true
     })
@@ -3413,6 +3413,7 @@ function AgentSessionView({
     send({ type: 'begin_edit_queued', index, expect: text })
     queuedEditVersionRef.current++
     setScheduleOpen(false)
+    setRescheduling(null)
     setPreviewAttachment(null)
     requestAnimationFrame(() => agentInputRef.current?.focus())
     const legacyRefs = (queueMeta?.queuedAttachments?.[index] ?? []).map(file => `[[${file.project}:${file.path}]]`).filter(token => !text.includes(token))
@@ -4355,18 +4356,6 @@ function AgentSessionView({
       </div>
 
       {!auth && (<>
-      {scheduleOpen && (rescheduling || meta?.sessionId) && (
-        <SchedulePromptInline
-          onClose={() => { setScheduleOpen(false); setRescheduling(null) }}
-          initialAt={rescheduling?.at}
-          onConfirm={async (at) => {
-            if (rescheduling) await updateScheduled(rescheduling, rescheduling.text, new Date(at).toISOString())
-            else await schedule(at)
-          }}
-          disabled={rescheduling ? false : attaching || !draft.trim() || /\[\[mew-upload:/.test(draft)}
-        />
-      )}
-
       {/* 키보드를 쥐어도 되는 유일한 자리 — 전송 버튼을 눌러도 이어 쓰도록 포커스를 뺏지 않는다 */}
       <div
         ref={composerRef}
@@ -4466,6 +4455,7 @@ function AgentSessionView({
                 // Set the target mode so duplicate notifications cannot toggle it back.
                 setCliMode(!cliMode)
                 setScheduleOpen(false)
+                setRescheduling(null)
                 setDraft(next.slice(2))
                 requestAnimationFrame(() => agentInputRef.current?.setSelectionRange(Math.max(0, caret - 2), Math.max(0, caret - 2)))
                 return
@@ -4492,7 +4482,7 @@ function AgentSessionView({
             }}
           />
           </div>
-          <div ref={composerActionsRef} data-agent-composer-actions className="absolute right-1 bottom-1 z-10 flex items-stretch gap-1">
+          <div ref={composerActionsRef} data-agent-composer-actions className="absolute right-1 bottom-1 z-10 flex w-max max-w-[calc(100%-0.5rem)] flex-wrap items-stretch justify-end gap-1">
           <HoverTipLayer className="flex items-stretch">
             <div data-tip={uiText('그림판 열기')} className="flex min-h-8 items-center">
             <button type="button" aria-label={uiText('그림판 열기')}
@@ -4545,12 +4535,23 @@ function AgentSessionView({
             }} disabled={composerCliMode || composerAttaching} className="flex h-6 w-8 items-center justify-center rounded text-ink-secondary hover:bg-surface-raised disabled:opacity-40" aria-label={uiText("파일 첨부")}><PaperclipGlyph /></button>
             </div>
           </HoverTipLayer>
-            {!editingQueued && (
+            {(rescheduling || !editingQueued) && (scheduleOpen && (rescheduling || meta?.sessionId) ? (
+              <AgentScheduleInput
+                key={rescheduling?.id ?? 'new'}
+                onClose={() => { setScheduleOpen(false); setRescheduling(null); focusComposerInput() }}
+                initialAt={rescheduling?.at}
+                onConfirm={async (at) => {
+                  if (rescheduling) await updateScheduled(rescheduling, rescheduling.text, at)
+                  else await schedule(at)
+                }}
+                disabled={rescheduling ? false : composerCliMode || composerAttaching || !draft.trim()}
+              />
+            ) : (
             <HoverTipLayer className="flex items-stretch">
             <div data-tip={uiText('예약 메시지')} className="flex min-h-8 items-center">
             <button
               type="button"
-              onClick={() => setScheduleOpen(true)}
+              onClick={() => { setRescheduling(null); setScheduleOpen(true) }}
               disabled={composerCliMode || composerAttaching || !meta?.sessionId}
               className="flex h-6 w-8 items-center justify-center rounded text-ink-secondary hover:bg-surface-raised disabled:opacity-40"
               aria-label={uiText("예약 메시지")}
@@ -4559,7 +4560,7 @@ function AgentSessionView({
             </button>
             </div>
             </HoverTipLayer>
-            )}
+            ))}
             <HoverTipLayer className="flex items-stretch">
             <div data-tip={editingQueued ? uiText("저장") : composerCliMode ? uiText("명령 실행 (Ctrl+Enter)") : uiText("전송 (Ctrl+Enter)")} className="flex min-h-8 items-center">
             <button
@@ -5201,88 +5202,6 @@ function AgentErrorDialog({ title, detail, onClose }: { title: string; detail: s
       </div>
     </div>
   )
-}
-
-function localDateTimeValue(date: Date) {
-  const offset = date.getTimezoneOffset() * 60_000
-  return new Date(date.getTime() - offset).toISOString().slice(0, 16)
-}
-
-function SchedulePromptInline({
-  onClose,
-  onConfirm,
-  disabled,
-  initialAt,
-}: {
-  onClose: () => void
-  onConfirm: (at: string) => Promise<void>
-  disabled: boolean
-  initialAt?: string
-}) {
-  useUiLocale()
-  const [now, setNow] = useState(Date.now())
-  const [at, setAt] = useState(() => {
-    const minimum = nextLocalMinuteValue(Date.now())
-    const initial = initialAt ? localDateTimeValue(new Date(initialAt)) : localDateTimeValue(new Date(Date.now() + 60 * 60_000))
-    return initial < minimum ? minimum : initial
-  })
-  const [error, setError] = useState<string | null>(null)
-  const [saving, setSaving] = useState(false)
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(Date.now()), 1_000)
-    return () => clearInterval(timer)
-  }, [])
-  const minimumAt = nextLocalMinuteValue(now)
-  useEffect(() => {
-    setAt((current) => current < minimumAt ? minimumAt : current)
-  }, [minimumAt])
-  const remaining = formatScheduleRemaining(new Date(at).getTime() - now)
-  const submit = async (event: FormEvent) => {
-    event.preventDefault()
-    if (new Date(at).getTime() <= Date.now()) return setError(uiText("미래의 날짜와 시간을 고르세요"))
-    setSaving(true); setError(null)
-    try {
-      await onConfirm(at)
-      onClose()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  return (
-    <form aria-label={uiText("예약 전송")} onSubmit={submit} className="relative flex shrink-0 flex-col items-center border-t border-edge bg-surface px-3 py-1.5">
-      <button
-        type="button"
-        onClick={onClose}
-        className="absolute right-2 top-1.5 flex h-6 w-6 items-center justify-center rounded text-ink-muted hover:bg-surface-raised hover:text-ink"
-        aria-label={uiText("예약 전송 닫기")}
-        title={uiText("닫기")}
-      >
-        <XGlyph small />
-      </button>
-      <div className="w-full max-w-72">
-        <ScrollDateTimePicker value={at} onChange={setAt} min={minimumAt} />
-      </div>
-      <div className="mt-1 flex items-center justify-center gap-2">
-        {error
-          ? <p className="select-text text-[11px] text-danger">{error}</p>
-          : <p className="text-xs text-ink-muted" aria-live="polite">{remaining}</p>}
-        <button type="submit" disabled={saving || disabled} className="shrink-0 rounded bg-accent px-2 py-1 text-xs font-medium text-ink-on-accent disabled:opacity-50">{saving ? uiText("등록 중…") : uiText("예약")}</button>
-      </div>
-    </form>
-  )
-}
-
-function formatScheduleRemaining(milliseconds: number) {
-  if (milliseconds <= 0) return uiText("이미 지난 시간입니다")
-  const minutes = Math.floor(milliseconds / 60_000)
-  const days = Math.floor(minutes / (24 * 60))
-  const hours = Math.floor((minutes % (24 * 60)) / 60)
-  const restMinutes = minutes % 60
-  const parts = [days && uiText("{p0}일", { p0: days }), hours && uiText("{p0}시간", { p0: hours }), restMinutes && uiText("{p0}분", { p0: restMinutes })].filter(Boolean)
-  return uiText("{p0} 후", { p0: parts.length ? parts.join(' ') : uiText("1분") })
 }
 
 /** 버블 텍스트를 통째로 클립보드에 넣는다 — 끌어 고르지 않고 한 번에 가져가는 길 */

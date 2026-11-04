@@ -70,7 +70,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     },
   }] })
   const chunk = bundle.output.find(item => item.type === 'chunk')!
-  const files = ['src/components/AgentPanel.tsx', 'src/components/agent-prompt-drafts.tsx', 'src/components/agent-command-bubble.tsx', 'src/components/SessionTerminalPopup.tsx', 'src/components/MentionTextarea.tsx', 'packages/ui/src/HoverTipLayer.tsx']
+  const files = ['src/components/AgentPanel.tsx', 'src/components/agent-schedule-input.tsx', 'src/components/agent-prompt-drafts.tsx', 'src/components/agent-command-bubble.tsx', 'src/components/SessionTerminalPopup.tsx', 'src/components/MentionTextarea.tsx', 'packages/ui/src/HoverTipLayer.tsx']
   const content = (await Promise.all(files.map(file => fs.readFile(path.join(root, file), 'utf8')))).join('\n')
   const compiler = await compile(await fs.readFile(`${root}/src/index.css`, 'utf8'), { base: `${root}/src`, onDependency() {} })
   const css = compiler.build([...new Set((source + content).match(/[A-Za-z0-9_@!:/.[\]()%,-]+/g))])
@@ -240,6 +240,25 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
       }
       await assertComposerActionsContained()
       await assertComposerTooltips()
+      // Expanding Schedule stays inside the editor, including in narrow panels.
+      for (const panelWidth of [null, '280px']) {
+        if (panelWidth) await composer.evaluate((el, width) => { el.style.width = width! }, panelWidth)
+        await composer.getByRole('button', { name: '예약 메시지', exact: true }).click()
+        const schedule = composer.getByRole('form', { name: '예약 전송', exact: true })
+        await schedule.getByRole('spinbutton', { name: '시간', exact: true }).waitFor()
+        await page.evaluate('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))')
+        const inputBounds = await composer.locator('[data-agent-input]').boundingBox()
+        assert.ok(inputBounds)
+        for (const control of await schedule.locator('input, button').all()) {
+          const bounds = await control.boundingBox()
+          assert.ok(bounds && bounds.x >= inputBounds.x && bounds.x + bounds.width <= inputBounds.x + inputBounds.width
+            && bounds.y >= inputBounds.y && bounds.y + bounds.height <= inputBounds.y + inputBounds.height, 'expanded fields and actions remain inside the input')
+        }
+        assert.equal(await composer.locator('[data-agent-composer-actions]').getByRole('button', { name: '예약 메시지', exact: true }).count(), 0)
+        await schedule.getByRole('spinbutton', { name: '분', exact: true }).press('Escape')
+        await composer.getByRole('button', { name: '예약 메시지', exact: true }).waitFor()
+      }
+      await composer.evaluate(el => { el.style.removeProperty('width') })
       assert.ok(await composer.getByRole('button', { name: '전송', exact: true }).evaluate(el => parseFloat(el.ownerDocument.defaultView!.getComputedStyle(el).borderRadius)) >= 12, 'send has rounder corners')
       await draft.fill('버튼 순서 확인')
       await assertComposerTooltips('프롬프트 임시저장')
