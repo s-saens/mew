@@ -2244,10 +2244,10 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
                 {t('common.login')}
               </button>
             )}
-            {caps.system && <HeaderResources key={authEmail} onOpen={() => setSysStatsOpen(true)} />}
+            {caps.system && <HeaderResources key={`header-resources:${authEmail ?? 'guest'}`} onOpen={() => setSysStatsOpen(true)} />}
             <RuntimeControls />
             {!isGuest && <ActiveSessionsButton presence={activeSessions} profile={{ email: authEmail, displayName: auth.displayName, avatarDataUrl: auth.avatarDataUrl }} />}
-            {desktopMode && projectUiPath && workspaceUiLoaded && tabsHydrated && <LayoutPresets key={authEmail ?? 'guest'} storageKey={layoutPresetsKey(authEmail ?? 'guest')} legacyStorageKey={legacyLayoutPresetsKey(authEmail ?? 'guest', projectUiPath)} factory={layoutFactory} capture={captureLayout} onApply={applyLayoutPreset} />}
+            {desktopMode && projectUiPath && workspaceUiLoaded && tabsHydrated && <LayoutPresets key={`layout-presets:${authEmail ?? 'guest'}`} storageKey={layoutPresetsKey(authEmail ?? 'guest')} legacyStorageKey={legacyLayoutPresetsKey(authEmail ?? 'guest', projectUiPath)} factory={layoutFactory} capture={captureLayout} onApply={applyLayoutPreset} />}
             {(!isGuest || canEditActiveTab) && <HoverTipLayer className="contents" placement="bottom">
               <button type="button" aria-label={uiText("전체화면")} data-tip={uiText("전체화면")} onClick={toggleFullscreen}
                 className={headerIconControlClassName}>

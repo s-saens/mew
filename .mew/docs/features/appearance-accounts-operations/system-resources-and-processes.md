@@ -4,11 +4,11 @@ parent: "mew-settings"
 title: "System resources and process view"
 status: "implemented"
 created: "2026-09-18"
-updated: "2026-11-02"
+updated: "2026-11-04"
 status_hash: "20544b07271a698d27b55dfdbbdbc97abb3472a36115cbbbcdffed7759ae2d9f"
-files: ["src/components/SystemStatsModal.tsx", "server/sysStats.ts", "server/gpu-stats.ts", "server/resource-sample-cache.ts", "src/components/network-usage-panel.tsx"]
+files: ["src/App.tsx", "src/components/header-resources.tsx", "src/components/SystemStatsModal.tsx", "server/sysStats.ts", "server/gpu-stats.ts", "server/resource-sample-cache.ts", "src/components/network-usage-panel.tsx"]
 commits: []
-description: "Defines server resource snapshots, lightweight summary requests, shared collection intervals, and Windows-only NVIDIA queries under WSL without crossing process PID namespaces. Covers the resource popup, unsupported measurements, recent trends, and the current tab's network totals and speeds."
+description: "Defines server resource snapshots, lightweight summary requests, shared collection intervals, and Windows-only NVIDIA queries under WSL without crossing process PID namespaces. Covers singleton header gauges with distinct account-scoped identities, the resource popup, unsupported measurements, recent trends, and the current tab's network totals and speeds."
 상위파일:
   - "MOC.md"
   - "_appearance-accounts-operations.md"
@@ -43,6 +43,12 @@ description: "Defines server resource snapshots, lightweight summary requests, s
 - Integrate the totals and speed tables from [Network usage](network-usage.md) below CPU, memory, and GPU and above the process list. Display network totals for the current tab even while server resources are loading or their retrieval has failed.
 - Close the popup with the X button on the right side of the title row. Display it even in loading and error states, and provide a translated accessible name and a keyboard focus indicator.
 
+### Header identity
+
+Render one resource control when system resources are permitted. Its React key must identify both the control and the account, independently of sibling controls such as layout presets. Account changes still remount the resource control to clear its previous sample and cancel polling. Repeated header updates and layout-control visibility changes must not leave duplicate resource buttons in the DOM.
+
+The [header resource identity work record](../../work/header-resource-identity.md) records the duplicate-key repair and its verification limits.
+
 ### Collection and API
 
 `GET /api/system-stats` includes the process list by default. `GET /api/system-stats?processes=0` retains the response shape with an empty `processes` array and skips both process enumeration and per-process GPU queries. The header and overload monitor use this summary request; the resource popup uses the full request.
@@ -72,6 +78,7 @@ Skip the compute-process GPU query under WSL. Windows compute PIDs belong to a d
   - Verify measurements and unsupported indicators for each supported environment, and that trends reset after the popup is closed.
   - Verify that the upper-right X button is visible on desktop and mobile and can close the popup by click, touch, and keyboard.
 - Regression checks must cover WSL detection, executable discovery with custom mounts and spaces, absence of Linux fallback, PID namespace separation, summary requests skipping process work, concurrent collection sharing, cache expiry, and failure retry delays.
+- Header reconciliation regression checks must cover distinct sibling keys, repeated account changes, layout visibility changes, resource permission removal, and cleanup without orphan resource buttons.
 - Local measurements, completed checks, and runtime application status belong to the [WSL GPU monitoring work record](../../work/wsl-gpu-monitoring.md).
 
 <!-- mew:validation:end -->
