@@ -2,7 +2,7 @@
 title: "Task panel and Markdown storage contract"
 created: 2026-10-03
 updated: "2026-11-04"
-description: "Task panel contracts for input, tags, assignees, document/date control order, list/calendar/Gantt views, and sorting. Defines Markdown storage, migration, API permissions, concurrent saves, client recovery, and recorded verification."
+description: "Task panel contracts for input, tags, assignees, inline document controls before task text, list/calendar/Gantt views, and sorting. Defines Markdown storage, migration, API permissions, concurrent saves, client recovery, and recorded verification."
 상위파일: "MOC.md"
 ---
 
@@ -62,7 +62,7 @@ The panel shares the 36px header, DockGrip, maximize/restore, split boundaries, 
 
 ## Internal document links
 
-- Each task is linked to a `.mew/tasks/<태스크 제목>.md` file in the root project, and completed items are placed in `.mew/tasks/Done/<태스크 제목>.md`. Clicking the document icon immediately left of the rightmost date button in the list or calendar opens the actual Markdown document through App's file-open function. DOM and keyboard focus order follow document → date; swipe deletion remains a separate revealed action. The same file can be opened from the Gantt edit card, and Open document is also available to read-only accounts.
+- Each task is linked to a `.mew/tasks/<태스크 제목>.md` file in the root project, and completed items are placed in `.mew/tasks/Done/<태스크 제목>.md`. In list and calendar rows, the document icon sits immediately before task text and after the assignee control when present; dates remain rightmost. DOM and keyboard focus order follow assignee → document → text → date, omitting noninteractive or absent controls. Opening the document invokes the task flush callback before App's file-open function. Swipe deletion remains a separate revealed action. The same file can be opened from the Gantt edit card, and Open document is also available to read-only accounts.
 - If the linked file is inside the configured Documents folder, it opens with the Documents scope and a folder-relative path. It reuses the same tab as opening it directly from Docs; files outside the Documents folder open in the root project scope.
 - Document icons in the list and calendar align with the vertical center of the first body line and date button. For touch input, they retain a 32px button area while using 2px negative margins above and below to align with the 28px row baseline.
 - `path` is the root-relative path calculated by the server from the actual filename. Paths in API input are not trusted as save or deletion targets. Editing the title changes both frontmatter `title` and the filename. If `title` is edited externally, a query with write permission also aligns the filename while preserving the ID, body, and user properties. If only the filename is changed externally, read queries return that path, and queries with write permission or saves realign the name with `title`.

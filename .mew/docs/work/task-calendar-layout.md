@@ -1,6 +1,6 @@
 ---
 title: "Task calendar and row layout"
-description: "Records the 2026-11-04 right-hand calendar agenda and document-before-date row controls, local checks, and Obscura connection blockers for browser regression verification."
+description: "Records the 2026-11-04 right-hand calendar agenda, intermediate document/date arrangement, and final document icon between assignees and task text. Includes local checks, unrelated build errors, and Obscura browser verification blockers."
 created: "2026-11-04"
 updated: "2026-11-04"
 ---
@@ -27,8 +27,26 @@ The required build updates local `dist/` assets. No deployment, launcher executi
 
 ## Document and date order follow-up
 
+This intermediate placement is superseded by the inline placement below.
+
 The follow-up places the document icon immediately before the date in list and calendar rows, making dates the rightmost ordinary control. `TaskDateStatus` changes DOM order so keyboard traversal matches the visual order. File opening, date editing, and the separately revealed swipe-delete action retain their behavior. The [internal document link contract](../development/task-list.md#internal-document-links) owns this order; earlier dated feature records describe the previous arrangement.
 
 The existing isolated calendar layout test now renders `TaskDateStatus` with linked documents. It checks document → date DOM and visual order at every panel size, file opening, and Tab focus from document to date, in addition to the calendar layout checks.
 
 Follow-up verification: `npm run build` passed, including TypeScript checks. `npm run lint` completed with existing repository warnings, and focused lint passed without diagnostics. The design detector reported no findings for the changed component. Changed-document descriptions and links passed; the full documentation check still reported 42 unrelated missing links. The updated browser regression could not connect to Obscura before rendering, so visual placement, file-opening interaction, and keyboard focus remain unverified in the browser. No services were started or restarted.
+
+## Document icon beside task text
+
+The next refinement places the document icon after the assignee control and before task text, while keeping dates rightmost. `TaskText` accepts an optional linked document path; only persisted list/calendar items supply it. `TaskDateStatus` now renders date controls only. Gantt retains its existing document-opening action, and the draft row has no document icon. Opening the inline document still invokes the task's flush callback. The touch alignment rule follows the button into `TaskText` and retains its existing 32px target.
+
+The isolated regression fixture now uses the actual `TaskText` with assignees and linked paths. It checks assignee → document → text → date geometry, a single document icon per row, file opening and the flush callback, and keyboard focus through document → text → date across the existing panel sizes.
+
+Local verification for this refinement:
+
+- `node --test src/utils/task-date-label.test.ts src/utils/task-document-links.test.ts` passed all 6 checks.
+- `npm run lint` completed with existing warnings. Focused lint reported only existing `TaskPanel` ref/effect warnings; the design detector retained the existing swipe animation warning.
+- `npm run build` failed in concurrently edited code outside this task. A retry reported `src/App.tsx` calling `seedWorkspaceUiSnapshot` with four arguments instead of five, and `src/utils/editor-tab-state.ts` importing the missing `activatePaneTab` export. No task-component type errors were reported. Build verification and updated application assets remain incomplete; those unrelated edits were preserved.
+- The updated browser regression again could not connect to Obscura before rendering. Browser geometry, focus, and file-opening assertions remain unverified.
+- Changed-document descriptions and links passed. The full documentation check passed 695 descriptions and reported 47 missing links outside the changed documents at the time of the check.
+
+No deployment or server lifecycle operation was performed for this refinement.
