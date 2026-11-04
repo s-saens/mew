@@ -1,11 +1,9 @@
-import { spawn, type ChildProcess } from 'node:child_process'
 import fs from 'node:fs'
-import os from 'node:os'
 import path from 'node:path'
 import { createRequire } from 'node:module'
 import type { IncomingMessage, Server } from 'node:http'
 import type { Http2SecureServer } from 'node:http2'
-import { chromium, type Browser, type BrowserContext, type Page } from 'playwright-core'
+import { chromium, type Browser, type BrowserContext, type Page, type CDPSession } from 'playwright-core'
 import { WebSocket, WebSocketServer } from 'ws'
 import { DOM_BROWSER_WS, type DomBrowserCommand, type DomBrowserMessage } from '../shared/dom-browser.ts'
 import { resolveAuth, type RequestAuth } from './reqAuth.ts'
@@ -13,7 +11,6 @@ import { canUse } from './access-policy.ts'
 import { watchSocketAccess } from './access-socket.ts'
 import { webSocketOriginAllowed } from './websocket-origin.ts'
 import { domBrowserExecutable } from './browser-dom-executable.ts'
-import { DOM_BROWSER_COMPAT_SCRIPT } from './dom-browser-compat.ts'
 
 export { DOM_BROWSER_WS }
 const sessions = new Set<DomBrowserSession>()
@@ -63,17 +60,15 @@ export function parseDomBrowserCommand(raw: string): DomBrowserCommand {
   throw new Error('잘못된 브라우저 요청입니다.')
 }
 
-class DomBrowserSession {
+export class DomBrowserSession {
   readonly account: string
   private socket: WebSocket
   private allowed: () => boolean
   private get blockedPorts(): ReadonlySet<number> { return domBrowserBlockedPorts() }
-  private obscuraProcess?: ChildProcess
-  private sessionDir?: string
   private browser?: Browser
   private context?: BrowserContext
   private page?: Page
-  private upstreamSockets = new Set<WebSocket>()
+  private cdp?: CDPSession
   private closed = false
   private commands: Promise<void> = Promise.resolve()
   private events: Promise<void> = Promise.resolve()
@@ -83,17 +78,13 @@ class DomBrowserSession {
   private generation = 0
   private documentToken?: string
   private retiredTokens = new Set<string>()
+  private navigatingDocument = false
   private assetLoads = 0
   private assetWaiters: (() => void)[] = []
   private abort = new AbortController()
   private state = ''
   private loading = false
   private colorScheme: 'dark' | 'light' = 'light'
-  private historyEntries: { url: string; docId: number }[] = []
-  private historyIndex = -1
-  private currentDocId = 0
-  private historyTraversal: 'none' | 'back' | 'forward' | 'reload' = 'none'
-  private cookieJar = new Map<string, Map<string, string>>()
   private poll?: NodeJS.Timeout
   private lifetime: NodeJS.Timeout
   private starting?: Promise<Page>
@@ -137,237 +128,59 @@ class DomBrowserSession {
     return this.starting
   }
 
-  private async launchObscura(executablePath: string): Promise<string> {
-    const sessionDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mew-dom-obscura-'))
-    this.sessionDir = sessionDir
-    const readyFile = path.join(sessionDir, 'ready.json')
-    const storageDir = path.join(sessionDir, 'storage')
-    fs.mkdirSync(storageDir, { recursive: true })
-    const child = spawn(executablePath, [
-      'serve',
-      '--host', '127.0.0.1',
-      '--port', '0',
-      '--allow-private-network',
-      '--storage-dir', storageDir,
-      '--ready-file', readyFile,
-      '--quiet',
-    ], { stdio: 'ignore' })
-    this.obscuraProcess = child
-    const deadline = Date.now() + 10_000
-    while (Date.now() < deadline) {
-      if (this.closed) throw new Error('브라우저 세션이 닫혔습니다.')
-      if (child.exitCode !== null || child.signalCode !== null) {
-        throw new Error('호스트 Obscura 브라우저 프로세스가 시작 중 종료됐습니다.')
-      }
-      if (fs.existsSync(readyFile)) {
-        try {
-          const ready = JSON.parse(fs.readFileSync(readyFile, 'utf8')) as { host: string; port: number; websocket_path: string }
-          if (ready.host && ready.port && ready.websocket_path) {
-            return `ws://${ready.host}:${ready.port}${ready.websocket_path}`
-          }
-        } catch {}
-      }
-      await new Promise(resolve => setTimeout(resolve, 20))
-    }
-    throw new Error('호스트 Obscura 브라우저 시작 시간이 초과됐습니다.')
-  }
-
-  private storeCookies(url: URL, headers: Headers) {
-    const setCookies = typeof headers.getSetCookie === 'function' ? headers.getSetCookie() : []
-    if (!setCookies.length) return
-    let hostJar = this.cookieJar.get(url.hostname)
-    if (!hostJar) { hostJar = new Map(); this.cookieJar.set(url.hostname, hostJar) }
-    for (const raw of setCookies) {
-      const pair = raw.split(';')[0]?.trim()
-      const eq = pair ? pair.indexOf('=') : -1
-      if (pair && eq > 0) hostJar.set(pair.slice(0, eq).trim(), pair.slice(eq + 1).trim())
-    }
-  }
-
-  private cookieHeader(url: URL): string {
-    const hostJar = this.cookieJar.get(url.hostname)
-    if (!hostJar || !hostJar.size) return ''
-    return [...hostJar.entries()].map(([name, value]) => `${name}=${value}`).join('; ')
-  }
-
-  private recordHistoryUrl(url: string, replace = false) {
-    if (!url || url === 'about:blank') return
-    if (this.historyTraversal === 'back' || this.historyTraversal === 'forward') {
-      if (this.historyIndex >= 0 && this.historyEntries[this.historyIndex]) {
-        this.historyEntries[this.historyIndex]!.url = url
-        this.historyEntries[this.historyIndex]!.docId = this.currentDocId
-      }
-      return
-    }
-    if (this.historyTraversal === 'reload' || replace) {
-      if (this.historyIndex >= 0 && this.historyEntries[this.historyIndex]) {
-        this.historyEntries[this.historyIndex] = { url, docId: this.currentDocId }
-      } else {
-        this.historyEntries.push({ url, docId: this.currentDocId })
-        this.historyIndex = 0
-      }
-      return
-    }
-    if (this.historyIndex >= 0 && this.historyEntries[this.historyIndex]?.url === url) {
-      this.historyEntries[this.historyIndex]!.docId = this.currentDocId
-      return
-    }
-    this.historyEntries.splice(this.historyIndex + 1)
-    this.historyEntries.push({ url, docId: this.currentDocId })
-    this.historyIndex = this.historyEntries.length - 1
-  }
-
   private async launch(): Promise<Page> {
     const executablePath = domBrowserExecutable()
-    if (!executablePath) throw new Error('호스트에 Obscura가 필요합니다. MEW_BROWSER_EXECUTABLE 설정을 확인해 주세요.')
-    const wsUrl = await this.launchObscura(executablePath)
-    const browser = await chromium.connectOverCDP(wsUrl)
+    if (!executablePath) throw new Error('호스트에 Chromium 또는 Chrome이 필요합니다. MEW_BROWSER_EXECUTABLE 설정을 확인해 주세요.')
+    const browser = await chromium.launch({ executablePath, chromiumSandbox: true, headless: true, args: ['--disable-dev-shm-usage'] })
     this.browser = browser
-    if (!this.active()) { await browser.close().catch(() => {}); throw new Error('브라우저 세션이 닫혔습니다.') }
+    if (!this.active()) { await browser.close(); throw new Error('브라우저 세션이 닫혔습니다.') }
     this.context = await browser.newContext({ viewport: { width: 1100, height: 700 }, colorScheme: this.colorScheme, serviceWorkers: 'block', acceptDownloads: false })
     const context = this.context
     await context.route('**/*', async route => {
-      if (!this.active()) { await route.abort('blockedbyclient').catch(() => {}); return }
       const request = route.request()
-      const isDoc = request.isNavigationRequest() || request.resourceType() === 'document'
       let mainDocument = false
-      if (isDoc) {
+      if (request.isNavigationRequest()) {
         try { const frame = request.frame(); mainDocument = frame.page() === this.page && !frame.parentFrame() } catch { /* A popup's first request can precede its frame. */ }
       }
-      if (isDoc && !mainDocument) {
+      if (request.isNavigationRequest() && !mainDocument) {
         await route.abort('blockedbyclient').catch(() => {})
         return
       }
-      try {
-        let current = new URL(request.url())
-        if (isDoc) domBrowserTarget(current.href, this.blockedPorts)
-        else this.assertSubresource(current)
-        const method = request.method()
-        const body = request.postDataBuffer() ?? undefined
-        let redirected = false
-        for (let hops = 0; hops < 10; hops++) {
-          const reqHeaders: Record<string, string> = { ...request.headers() }
-          if (isDoc && !reqHeaders['sec-fetch-dest'] && !reqHeaders['Sec-Fetch-Dest']) {
-            reqHeaders['sec-fetch-dest'] = 'document'
-          }
-          const cookieStr = this.cookieHeader(current)
-          if (cookieStr && !reqHeaders.cookie && !reqHeaders.Cookie) {
-            reqHeaders.cookie = cookieStr
-          }
-          const response = await fetch(current, {
-            method,
-            headers: reqHeaders,
-            body: method === 'GET' || method === 'HEAD' ? undefined : body,
-            redirect: 'manual',
-            signal: AbortSignal.any([this.abort.signal, AbortSignal.timeout(15_000)]),
-          })
-          this.storeCookies(current, response.headers)
-          const location = response.headers.get('location')
-          if (response.status >= 300 && response.status < 400 && location) {
-            await response.body?.cancel().catch(() => {})
-            current = new URL(location, current)
-            if (isDoc) domBrowserTarget(current.href, this.blockedPorts)
-            else this.assertSubresource(current)
-            redirected = true
-            continue
-          }
-          if (isDoc && mainDocument) this.beginDocument(current.href)
-          const headers: Record<string, string> = {}
-          response.headers.forEach((value, key) => { headers[key] = value })
-          let payload = Buffer.from(await response.arrayBuffer())
-          if (redirected && isDoc && mainDocument && (headers['content-type'] ?? '').toLowerCase().includes('text/html')) {
-            const inject = `<script>try{if(location.href!==${JSON.stringify(current.href)}){window.__mewDomInternalReplace=true;history.replaceState(history.state,"",${JSON.stringify(current.href)});window.__mewDomInternalReplace=false}}catch{}</script>`
-            payload = Buffer.concat([Buffer.from(inject), payload])
-            delete headers['content-length']
-          }
-          await route.fulfill({ status: response.status, headers, body: payload }).catch(() => {})
-          return
-        }
-        await route.abort('blockedbyclient').catch(() => {})
-      } catch (error) {
-        if (isDoc && mainDocument) {
-          this.send({ type: 'error', message: error instanceof Error ? error.message : '이 주소로 이동할 수 없습니다. HTTP(S) 주소와 Mew 자체 포트인지 확인해 주세요.' })
-        }
-        await route.abort('blockedbyclient').catch(() => {})
-      }
+      await route.continue().catch(() => {})
     })
     await context.routeWebSocket('**/*', ws => {
-      try {
-        const wsUrl = new URL(ws.url())
-        const httpUrl = new URL(ws.url())
-        httpUrl.protocol = wsUrl.protocol === 'wss:' ? 'https:' : 'http:'
-        this.assertSubresource(httpUrl)
-        const upstream = new WebSocket(ws.url())
-        this.upstreamSockets.add(upstream)
-        const pending: (string | Buffer)[] = []
-        ws.onMessage(message => {
-          if (upstream.readyState === WebSocket.OPEN) upstream.send(message)
-          else if (upstream.readyState === WebSocket.CONNECTING) pending.push(message)
-        })
-        ws.onClose((code, reason) => {
-          this.upstreamSockets.delete(upstream)
-          try { upstream.close(code ?? 1000, reason ?? '') } catch { upstream.terminate() }
-        })
-        upstream.on('open', () => {
-          for (const item of pending.splice(0)) upstream.send(item)
-        })
-        upstream.on('message', (data, isBinary) => {
-          if (!this.active()) return
-          const buffer = Buffer.isBuffer(data) ? data : Array.isArray(data) ? Buffer.concat(data) : Buffer.from(data as ArrayBuffer)
-          ws.send(isBinary ? buffer : buffer.toString('utf8'))
-        })
-        upstream.on('close', (code, reason) => {
-          this.upstreamSockets.delete(upstream)
-          void ws.close({ code: code || 1000, reason: reason?.toString() || '' })
-        })
-        upstream.on('error', () => {
-          this.upstreamSockets.delete(upstream)
-          void ws.close({ code: 1006, reason: 'WebSocket connection failed' })
-        })
-      } catch {
-        void ws.close()
-      }
+      try { const url = new URL(ws.url()); url.protocol = url.protocol === 'wss:' ? 'https:' : 'http:'; this.assertSubresource(url); ws.connectToServer() }
+      catch { ws.close() }
     })
     const page = await context.newPage()
     this.page = page
-    context.on('page', popup => { if (popup !== page) void popup.close().catch(() => {}) })
+    this.cdp = await context.newCDPSession(page)
+    const cdp = this.cdp
+    await cdp.send('Page.enable')
+    const mainFrame = (await cdp.send('Page.getFrameTree')).frameTree.frame.id
+    cdp.on('Page.frameNavigated', ({ frame }) => {
+      if (frame.parentId) return
+      if (!this.navigatingDocument) this.beginDocument(frame.url)
+      this.cache.baseUrl = frame.url
+      this.navigatingDocument = false
+    })
+    // Fetch interception sees every redirect hop; Playwright routing only sees the first.
+    cdp.on('Fetch.requestPaused', request => {
+      let allowed = this.active()
+      try {
+        const url = new URL(request.request.url)
+        if (request.resourceType === 'Document') domBrowserTarget(url.href, this.blockedPorts)
+        else this.assertSubresource(url)
+        if (allowed && request.resourceType === 'Document' && request.frameId === mainFrame) this.beginDocument(url.href)
+      } catch { allowed = false }
+      void cdp.send(allowed ? 'Fetch.continueRequest' : 'Fetch.failRequest', allowed ? { requestId: request.requestId } : { requestId: request.requestId, errorReason: 'BlockedByClient' }).catch(() => {})
+    })
+    await cdp.send('Fetch.enable', { patterns: [{ urlPattern: '*', requestStage: 'Request' }] })
+    context.on('page', popup => { if (popup !== page) void popup.close() })
     page.on('dialog', dialog => { void dialog.dismiss() })
     page.on('download', download => { void download.cancel() })
     page.setDefaultTimeout(5000)
     page.setDefaultNavigationTimeout(20_000)
-    await page.exposeBinding('__mewDomOpen', ({ frame }, rawUrl: unknown, mode: unknown) => {
-      if (frame !== page.mainFrame() || !this.active() || typeof rawUrl !== 'string' || !rawUrl) return
-      let target: URL
-      try { target = domBrowserTarget(new URL(rawUrl, this.cache.baseUrl || page.url()).href, this.blockedPorts) }
-      catch (error) {
-        if (mode === 'navigate') {
-          this.send({ type: 'error', message: error instanceof Error ? error.message : '이 주소로 이동할 수 없습니다.' })
-        }
-        return
-      }
-      this.commands = this.commands.then(async () => {
-        if (!this.active()) return
-        this.generation++
-        const commandGeneration = this.generation
-        this.loading = true; await this.sendState()
-        try {
-          await page.evaluate('window.__mewDomScrollRevisions?.clear()').catch(() => {})
-          await page.goto(target.href, { waitUntil: 'domcontentloaded' })
-        } catch (error) {
-          this.send({ type: 'error', message: error instanceof Error ? error.message : '이 주소로 이동할 수 없습니다.' })
-        } finally {
-          this.loading = false
-          if (this.generation === commandGeneration) await page.evaluate('window.__mewDomRecord?.takeFullSnapshot?.()').catch(() => {})
-          await this.sendState()
-        }
-      }).catch(() => {})
-    })
-    await page.exposeBinding('__mewDomHistory', ({ frame }, mode: unknown, rawUrl: unknown) => {
-      if (frame !== page.mainFrame() || !this.active() || typeof rawUrl !== 'string' || !rawUrl) return
-      this.recordHistoryUrl(rawUrl, mode === 'replace')
-      this.cache.baseUrl = rawUrl
-      void this.sendState()
-    })
     await page.exposeBinding('__mewDomEmit', ({ frame }, token: string, event: unknown) => {
       if (frame !== page.mainFrame() || !this.active()) return
       if (typeof token !== 'string' || this.retiredTokens.has(token)) return
@@ -383,66 +196,19 @@ class DomBrowserSession {
         if (generation === this.generation) this.send({ type: 'events', generation, events: [event] })
       }).catch(() => {}).finally(() => { this.pendingEvents -= bytes })
     })
-    await page.addInitScript({ content: `${DOM_BROWSER_COMPAT_SCRIPT}; ${recordBundle()}; if (window === window.top) {
+    await page.addInitScript({ content: `${recordBundle()}; if (window === window.top) {
       const documentToken = Array.from(crypto.getRandomValues(new Uint32Array(4)), value => value.toString(16).padStart(8, '0')).join('');
       window.__mewDomScrollRevisions = new Map();
-      const notifyHistory = mode => { try { void window.__mewDomHistory(mode, window.location.href).catch(() => {}); } catch {} };
-      const origPushState = history.pushState;
-      history.pushState = function(...args) {
-        const prev = window.location.href;
-        const res = origPushState.apply(this, args);
-        if (!window.__mewDomInternalReplace && window.location.href !== prev) notifyHistory('push');
-        return res;
-      };
-      const origReplaceState = history.replaceState;
-      history.replaceState = function(...args) {
-        const res = origReplaceState.apply(this, args);
-        if (!window.__mewDomInternalReplace) notifyHistory('replace');
-        return res;
-      };
-      window.addEventListener('popstate', () => { if (!window.__mewDomInternalReplace) notifyHistory('pop'); });
-      window.addEventListener('hashchange', () => { if (!window.__mewDomInternalReplace) notifyHistory('push'); });
-      window.open = url => { if (url) { try { void window.__mewDomOpen(new URL(String(url), document.baseURI).href, 'popup').catch(() => {}); } catch {} } return null; };
-      const origFormSubmit = HTMLFormElement.prototype.submit;
-      HTMLFormElement.prototype.submit = function() {
-        const t = (this.getAttribute('target') || '').trim().toLowerCase();
-        if (t && t !== '_self' && t !== '_top' && t !== '_parent') {
-          try { if (this.action) void window.__mewDomOpen(new URL(String(this.action), document.baseURI).href, 'popup').catch(() => {}); } catch {}
-          return;
-        }
-        return origFormSubmit.call(this);
-      };
+      window.open = url => { if (url) window.location.assign(String(url)); return null; };
       document.addEventListener('click', event => { const anchor = event.target?.closest?.('a[target]'); if (anchor) anchor.target = '_self'; }, true);
-      document.addEventListener('submit', event => {
-        const form = event.target;
-        const t = (form?.getAttribute?.('target') || '').trim().toLowerCase();
-        if (t && t !== '_self' && t !== '_top' && t !== '_parent') {
-          event.preventDefault();
-          try { if (form.action) void window.__mewDomOpen(new URL(String(form.action), document.baseURI).href, 'popup').catch(() => {}); } catch {}
-        }
-      }, true);
+      document.addEventListener('submit', event => { if (event.target?.target) event.target.target = '_self'; }, true);
       window.__mewDomRecord = rrwebRecord.record; rrwebRecord.record({ emit: event => { if (event.type === 3 && event.data.source === 3) { const revision = window.__mewDomScrollRevisions.get(event.data.id); if (revision !== undefined) event.data.scrollRevision = revision; } void window.__mewDomEmit(documentToken, event).catch(() => {}); }, inlineStylesheet: true, inlineImages: true, collectFonts: true, recordCanvas: false, maskAllInputs: false, maskInputOptions: { password: false }, sampling: { mousemove: false }, recordCrossOriginIframes: false });
     }` })
     page.on('domcontentloaded', () => { this.loading = false; void this.sendState() })
     page.on('framenavigated', frame => {
       if (frame !== page.mainFrame()) return
-      const frameUrl = frame.url()
-      if (frameUrl !== 'about:blank') {
-        try { domBrowserTarget(frameUrl, this.blockedPorts) }
-        catch { this.send({ type: 'error', message: '이 주소로 이동할 수 없습니다. HTTP(S) 주소와 Mew 자체 포트인지 확인해 주세요.' }); void this.close(); return }
-      }
-      if (frameUrl !== 'about:blank') {
-        const currentEntry = this.historyEntries[this.historyIndex]?.url
-        let keepReplacedRedirect = false
-        if (currentEntry) {
-          try {
-            const cur = new URL(currentEntry), nav = new URL(frameUrl)
-            if (cur.origin === nav.origin && cur.pathname !== nav.pathname) keepReplacedRedirect = true
-          } catch {}
-        }
-        if (!keepReplacedRedirect) this.recordHistoryUrl(frameUrl, true)
-        this.cache.baseUrl = this.historyEntries[this.historyIndex]?.url ?? frameUrl
-      }
+      try { domBrowserTarget(frame.url(), this.blockedPorts) }
+      catch { this.send({ type: 'error', message: '이 주소로 이동할 수 없습니다. HTTP(S) 주소와 Mew 자체 포트인지 확인해 주세요.' }); void this.close(); return }
       void this.sendState()
     })
     page.on('close', () => { void this.close() })
@@ -454,31 +220,21 @@ class DomBrowserSession {
   private async sendState() {
     const page = this.page
     if (!page || !this.active()) return
-    const pageUrl = page.url()
-    const currentUrl = this.historyIndex >= 0 ? this.historyEntries[this.historyIndex]!.url : (pageUrl === 'about:blank' ? '' : pageUrl)
-    const message = {
-      type: 'state' as const,
-      generation: this.generation,
-      url: currentUrl,
-      title: await page.title().catch(() => ''),
-      loading: this.loading,
-      canGoBack: this.historyIndex > 0,
-      canGoForward: this.historyIndex >= 0 && this.historyIndex < this.historyEntries.length - 1,
-    }
+    const history = await this.cdp?.send('Page.getNavigationHistory').catch(() => undefined)
+    const message = { type: 'state' as const, generation: this.generation, url: page.url() === 'about:blank' ? '' : page.url(), title: await page.title().catch(() => ''), loading: this.loading, canGoBack: !!history && history.currentIndex > 0 && history.entries[history.currentIndex - 1]?.url !== 'about:blank', canGoForward: !!history && history.currentIndex < history.entries.length - 1 }
     const serialized = JSON.stringify(message)
     if (serialized !== this.state) { this.state = serialized; this.send(message) }
   }
 
   private beginDocument(url: string) {
     this.generation++
-    this.currentDocId++
     this.loading = true
+    this.navigatingDocument = true
     if (this.documentToken) this.retiredTokens.add(this.documentToken)
     this.documentToken = undefined
     this.cache.abort.abort()
     this.cache.entries.clear()
     this.cache = assetCache(url)
-    this.recordHistoryUrl(url)
     this.assetWaiters.splice(0).forEach(resolve => resolve())
     void this.sendState()
   }
@@ -495,8 +251,8 @@ class DomBrowserSession {
       if (!this.active() || cache !== this.cache) return EMPTY_IMAGE
       this.assetLoads++
       try {
-        const cookieStr = this.cookieHeader(url)
-        const response = await fetch(url, { redirect: 'manual', signal: AbortSignal.any([this.abort.signal, cache.abort.signal, AbortSignal.timeout(5000)]), headers: cookieStr ? { Cookie: cookieStr } : undefined })
+        const cookies = await this.context!.cookies(url.href)
+        const response = await fetch(url, { redirect: 'manual', signal: AbortSignal.any([this.abort.signal, cache.abort.signal, AbortSignal.timeout(5000)]), headers: { Cookie: cookies.map(cookie => `${cookie.name}=${cookie.value}`).join('; ') } })
         try {
           const mime = response.headers.get('content-type')?.split(';')[0] ?? ''
           if (!response.ok || !response.body || !/^(image\/|font\/|application\/(?:font|x-font|vnd\.ms-fontobject)|text\/css)/i.test(mime) || Number(response.headers.get('content-length') ?? 0) > MAX_ASSET) return EMPTY_IMAGE
@@ -567,41 +323,18 @@ class DomBrowserSession {
     if (command.type === 'navigate') domBrowserTarget(command.url, this.blockedPorts)
     const page = await this.start()
     if (!this.active()) return
-    if (command.type === 'resize') {
-      await page.setViewportSize({ width: command.width, height: command.height })
-      await page.evaluate('window.dispatchEvent(new Event("resize"))').catch(() => {})
-      return
-    }
-    if (command.type === 'navigate' || command.type === 'back' || command.type === 'forward' || command.type === 'reload') {
-      if (command.type === 'back' && this.historyIndex <= 0) return
-      if (command.type === 'forward' && (this.historyIndex < 0 || this.historyIndex >= this.historyEntries.length - 1)) return
+    if (command.type === 'resize') { await page.setViewportSize({ width: command.width, height: command.height }); return }
+    if (['navigate', 'back', 'forward', 'reload'].includes(command.type)) {
       this.generation++
       const commandGeneration = this.generation
-      this.loading = true
-      this.historyTraversal = command.type === 'navigate' ? 'none' : command.type
-      await this.sendState()
+      this.loading = true; await this.sendState()
       try {
         await page.evaluate('window.__mewDomScrollRevisions?.clear()').catch(() => {})
-        if (command.type === 'navigate') {
-          await page.goto(command.url, { waitUntil: 'domcontentloaded' })
-        } else if (command.type === 'reload') {
-          const current = this.historyEntries[this.historyIndex]?.url ?? page.url()
-          await page.goto(current, { waitUntil: 'domcontentloaded' })
-        } else {
-          const currentEntry = this.historyEntries[this.historyIndex]
-          const targetIndex = command.type === 'back' ? this.historyIndex - 1 : this.historyIndex + 1
-          const targetEntry = this.historyEntries[targetIndex]!
-          this.historyIndex = targetIndex
-          if (currentEntry && currentEntry.docId === targetEntry.docId) {
-            this.cache.baseUrl = targetEntry.url
-            const targetUrlJson = JSON.stringify(targetEntry.url)
-            await page.evaluate(`(() => { window.__mewDomInternalReplace = true; history.replaceState(history.state, '', ${targetUrlJson}); window.__mewDomInternalReplace = false; window.dispatchEvent(new PopStateEvent('popstate', { state: history.state })); })()`).catch(() => {})
-          } else {
-            await page.goto(targetEntry.url, { waitUntil: 'domcontentloaded' })
-          }
-        }
+        if (command.type === 'navigate') await page.goto(command.url, { waitUntil: 'domcontentloaded' })
+        else if (command.type === 'back') await page.goBack({ waitUntil: 'domcontentloaded' })
+        else if (command.type === 'forward') await page.goForward({ waitUntil: 'domcontentloaded' })
+        else await page.reload({ waitUntil: 'domcontentloaded' })
       } finally {
-        this.historyTraversal = 'none'
         this.loading = false
         // New documents record their own snapshot; SPA history needs a fresh generation snapshot.
         if (this.generation === commandGeneration) await page.evaluate('window.__mewDomRecord?.takeFullSnapshot?.()').catch(() => {})
@@ -618,16 +351,8 @@ class DomBrowserSession {
       return
     }
     if (command.type === 'click') {
-      await page.evaluate(`(() => {
-        const n = window.__mewDomRecord?.mirror.getNode(${command.id});
-        const e = n?.nodeType === 1 ? n : n?.parentElement;
-        if (!e) return;
-        e.scrollIntoView?.({block:'nearest', inline:'nearest'});
-        const target = e.closest?.('a,button,input,select,textarea,summary,label,[role="button"],[role="link"]') ?? e;
-        target.focus?.();
-        if (typeof target.click === 'function') target.click();
-        else target.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
-      })()`)
+      const point = await page.evaluate(`(() => { const n = window.__mewDomRecord?.mirror.getNode(${command.id}); const e = n?.nodeType === 1 ? n : n?.parentElement; if (!e) return null; e.scrollIntoView({block:'nearest', inline:'nearest'}); const r = e.getBoundingClientRect(); return {x: r.x + r.width / 2, y: r.y + r.height / 2}; })()`) as { x: number; y: number } | null
+      if (point) await page.mouse.click(point.x, point.y)
       return
     }
     if (command.type === 'input') {
@@ -643,26 +368,11 @@ class DomBrowserSession {
     sessions.delete(this)
     clearTimeout(this.lifetime); clearInterval(this.poll)
     this.abort.abort()
-    for (const upstream of this.upstreamSockets) {
-      try { upstream.terminate() } catch {}
-    }
-    this.upstreamSockets.clear()
     this.assetWaiters.splice(0).forEach(resolve => resolve())
     this.cache.abort.abort(); this.cache.entries.clear()
     this.socket.close(1000)
     await this.context?.close().catch(() => {})
     await this.browser?.close().catch(() => {})
-    const child = this.obscuraProcess
-    if (child && child.exitCode === null && child.signalCode === null) {
-      child.kill('SIGTERM')
-      await Promise.race([
-        new Promise<void>(resolve => child.once('exit', () => resolve())),
-        new Promise<void>(resolve => setTimeout(() => { try { child.kill('SIGKILL') } catch {} resolve() }, 1000)),
-      ])
-    }
-    if (this.sessionDir) {
-      try { fs.rmSync(this.sessionDir, { recursive: true, force: true }) } catch {}
-    }
   }
 }
 
@@ -684,4 +394,3 @@ export function attachDomBrowserWebSocket(server: Server | Http2SecureServer, ge
   })
   server.once('close', () => { servers.delete(server); wss.close(); void closeDomBrowsers() })
 }
-

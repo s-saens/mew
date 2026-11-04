@@ -1,9 +1,11 @@
 ---
 title: "Obscura host DOM browser migration"
-description: "Records the 2026-11-04 switch of the workspace DOM browser from headless Chrome/Chromium to per-session Obscura CDP instances, executable discovery, CDP/WebSocket/history bridges, integration tests, startup/RSS benchmarks, and the follow-up stylesheet URL correction with separate local and viewer verification limits."
+description: "Historical Obscura work, superseded by the Chromium restoration under ADR 0136. Records the 2026-11-04 switch of the workspace DOM browser from headless Chrome/Chromium to per-session Obscura CDP instances, executable discovery, CDP/WebSocket/history bridges, integration tests, startup/RSS benchmarks, and the follow-up stylesheet URL correction with separate local and viewer verification limits."
 created: "2026-11-04"
 updated: "2026-11-04"
 ---
+
+Current behavior follows [ADR 0136](../decisions/0136-chromium-browser-restoration.md) and the [Chromium restoration work record](chromium-browser-restoration.md). The original migration and stylesheet investigation below are retained as historical evidence.
 
 ## Purpose and resulting behavior
 

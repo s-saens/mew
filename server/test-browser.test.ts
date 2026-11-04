@@ -1,60 +1,51 @@
 import assert from 'node:assert/strict'
-import { EventEmitter } from 'node:events'
+import fs from 'node:fs'
 import test from 'node:test'
-import { chromium, type Browser, type BrowserContext, type Page } from 'playwright-core'
-import { connectTestBrowser, testBrowserEndpoint } from './test-browser.ts'
+import { chromium, type Browser } from 'playwright-core'
+import { connectTestBrowser } from './test-browser.ts'
 
-test('UI tests select Obscura CDP independently of the product browser executable', () => {
-  assert.equal(testBrowserEndpoint({ MEW_BROWSER_EXECUTABLE: '/unrelated/chrome' }), 'ws://127.0.0.1:9222')
-  for (const endpoint of ['ws://127.0.0.1:9333', 'http://localhost:9333', 'wss://browser.example.test/cdp']) {
-    assert.equal(testBrowserEndpoint({ MEW_TEST_BROWSER_CDP_URL: endpoint }), endpoint)
-  }
-  for (const endpoint of ['', './obscura', 'file:///tmp/browser', 'ws://user:password@localhost:9222', 'ws://localhost:9222/#fragment']) {
-    assert.throws(() => testBrowserEndpoint({ MEW_TEST_BROWSER_CDP_URL: endpoint }), /MEW_TEST_BROWSER_CDP_URL/)
-  }
-})
-
-test('CDP attachment isolates and closes only test-owned contexts, then disconnects once', async t => {
-  const calls: string[] = [], options: unknown[] = []
-  const context = (name: string) => {
-    const events = new EventEmitter()
-    return Object.assign(events, { close: async () => { calls.push(name); events.emit('close') } }) as unknown as BrowserContext
-  }
-  const existing = context('existing'), explicit = context('explicit'), pageContext = context('page')
-  const page = { context: () => pageContext } as Page
-  const connected = {
-    contexts: () => [existing, explicit, pageContext],
-    newContext: async (value: unknown) => { options.push(value); return explicit },
-    newPage: async (value: unknown) => { options.push(value); return page },
-    close: async () => { calls.push('disconnect') },
-    isConnected() { return this === connected },
-  } as unknown as Browser
-  t.mock.method(chromium, 'launch', async () => { assert.fail('UI tests must never fall back to Chromium') })
-  t.mock.method(chromium, 'connectOverCDP', async (...args: unknown[]) => {
-    assert.deepEqual(args, ['ws://127.0.0.1:9222', { timeout: 15_000 }])
-    return connected
+test('UI tests launch an owned headless Chromium browser and ignore the retired CDP endpoint', async t => {
+  const launched = {} as Browser
+  const launch = t.mock.method(chromium, 'launch', async (...args: unknown[]) => {
+    assert.deepEqual(args, [{ executablePath: process.execPath, chromiumSandbox: true, headless: true, timeout: 15_000 }])
+    return launched
   })
-  const browser = await connectTestBrowser({ env: {} })
-  assert.equal(browser.isConnected(), true)
-  assert.deepEqual(browser.contexts(), [], 'the service default context is not exposed')
-  assert.equal(await browser.newContext({ viewport: { width: 390, height: 844 } }), explicit)
-  assert.equal(await browser.newPage({ locale: 'ko-KR' }), page)
-  assert.deepEqual(options, [{ viewport: { width: 390, height: 844 } }, { locale: 'ko-KR' }])
-  assert.deepEqual(browser.contexts(), [explicit, pageContext])
-  await explicit.close()
-  assert.deepEqual(browser.contexts(), [pageContext])
-  await Promise.all([browser.close(), browser.close()])
-  assert.deepEqual(calls, ['explicit', 'page', 'disconnect'])
-  assert.deepEqual(browser.contexts(), [])
+  t.mock.method(chromium, 'connectOverCDP', async () => { assert.fail('UI tests must launch their own Chromium browser') })
+  const browser = await connectTestBrowser({ env: {
+    MEW_BROWSER_EXECUTABLE: process.execPath,
+    MEW_TEST_BROWSER_CDP_URL: 'not-a-cdp-url',
+  } })
+  assert.equal(browser, launched, 'the caller owns and closes the actual launched browser')
+  assert.equal(launch.mock.callCount(), 1)
 })
 
-test('an unavailable Obscura endpoint fails with an actionable message and no browser fallback', async t => {
-  t.mock.method(chromium, 'launch', async () => { assert.fail('must not launch Chromium') })
-  t.mock.method(chromium, 'connectOverCDP', async () => { throw new Error('upstream-private-detail') })
-  await assert.rejects(connectTestBrowser({ env: {}, timeout: 1 }), error => {
+test('UI browser launch forwards an explicit startup timeout', async t => {
+  const launched = {} as Browser
+  t.mock.method(chromium, 'launch', async (...args: unknown[]) => {
+    assert.deepEqual(args, [{ executablePath: process.execPath, chromiumSandbox: true, headless: true, timeout: 2000 }])
+    return launched
+  })
+  assert.equal(await connectTestBrowser({ env: { MEW_BROWSER_EXECUTABLE: process.execPath }, timeout: 2000 }), launched)
+})
+
+test('Chromium launch failures retain their cause and actionable browser configuration guidance', async t => {
+  const failure = new Error('Chromium sandbox initialization failed')
+  t.mock.method(chromium, 'launch', async () => { throw failure })
+  await assert.rejects(connectTestBrowser({ env: { MEW_BROWSER_EXECUTABLE: process.execPath } }), error => {
     assert.ok(error instanceof Error)
-    assert.match(error.message, /Obscura.*MEW_TEST_BROWSER_CDP_URL/)
-    assert.doesNotMatch(error.message, /upstream-private-detail/)
+    assert.match(error.message, /Chromium.*MEW_BROWSER_EXECUTABLE/)
+    assert.equal(error.cause, failure)
     return true
   })
+})
+
+test('invalid explicit browser configuration fails before launching a browser', async t => {
+  t.mock.method(chromium, 'launch', async () => { assert.fail('invalid executable must not launch') })
+  await assert.rejects(connectTestBrowser({ env: { MEW_BROWSER_EXECUTABLE: './relative-chromium' } }), /MEW_BROWSER_EXECUTABLE/)
+})
+
+test('missing Chromium executables produce installation guidance without launching a browser', async t => {
+  t.mock.method(fs, 'statSync', () => { throw new Error('fixture executable is unavailable') })
+  t.mock.method(chromium, 'launch', async () => { assert.fail('missing executable must not launch') })
+  await assert.rejects(connectTestBrowser({ env: {} }), /Install Chrome\/Chromium.*MEW_BROWSER_EXECUTABLE/)
 })

@@ -1,10 +1,12 @@
 ---
 title: "0129 — Obscura CDP for normal UI tests"
-description: "Selects an externally managed local Obscura CDP endpoint for normal Playwright UI tests, with a shared connection helper and no Chromium launch fallback. Retains application-browser and native-conformance requirements and records compatibility limits."
+description: "Superseded by ADR 0136. Selects an externally managed local Obscura CDP endpoint for normal Playwright UI tests, with a shared connection helper and no Chromium launch fallback. Retains application-browser and native-conformance requirements and records compatibility limits."
 created: "2026-11-04"
 updated: "2026-11-04"
-status: "accepted"
+status: "superseded"
 ---
+
+Superseded by [ADR 0136](0136-chromium-browser-restoration.md), which restores Chrome/Chromium for the internal browser and normal UI tests. The original decision below is retained as historical context.
 
 ## Context
 

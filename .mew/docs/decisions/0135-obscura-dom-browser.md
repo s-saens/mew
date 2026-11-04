@@ -1,10 +1,12 @@
 ---
 title: "0135 — Obscura runtime for the host DOM browser"
-description: "Replaces per-session headless Chrome/Chromium launches in the workspace DOM browser with isolated Obscura CDP instances (`obscura serve` + `obscura-worker`), Node-side redirect/cookie/WebSocket bridges, and per-session temporary storage cleanup."
+description: "Superseded by ADR 0136. Replaces per-session headless Chrome/Chromium launches in the workspace DOM browser with isolated Obscura CDP instances (`obscura serve` + `obscura-worker`), Node-side redirect/cookie/WebSocket bridges, and per-session temporary storage cleanup."
 created: "2026-11-04"
 updated: "2026-11-04"
-status: "accepted"
+status: "superseded"
 ---
+
+Superseded by [ADR 0136](0136-chromium-browser-restoration.md), which restores Chrome/Chromium for the internal browser and normal UI tests. The original decision below is retained as historical context.
 
 ## Context
 

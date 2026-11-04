@@ -1,42 +1,36 @@
 ---
-title: "UI browser testing with Obscura"
-description: "Defines Obscura CDP prerequisites, user-owned service startup, MEW_TEST_BROWSER_CDP_URL, shared Playwright test connections, and current compatibility limits for Mew UI tests. Distinguishes UI fixtures from application browsers and native browser-conformance checks."
+title: "UI browser testing with Chromium"
+description: "Defines local Chrome/Chromium discovery, MEW_BROWSER_EXECUTABLE, and the shared Playwright helper that launches and closes test-owned headless browsers. Covers execution restrictions, cleanup, and the boundary between UI fixtures and native browser checks."
 created: "2026-11-04"
 updated: "2026-11-04"
 ---
 
-Mew's normal UI tests under `server/*-ui.test.ts` use Playwright through a running Obscura CDP endpoint. `server/test-browser.ts` owns the shared `connectTestBrowser()` connection. The helper connects to an existing service and does not launch or stop Obscura. Follow the repository's [execution rules](getting-started.md#execution-and-verification); agents must leave service lifecycle operations to the user.
+Mew's normal UI tests under `server/*-ui.test.ts` use a local Chrome/Chromium executable through Playwright. `server/test-browser.ts` owns the shared `connectTestBrowser()` helper. Each call launches an isolated headless browser with Chromium sandboxing enabled and a 15-second startup timeout. The caller owns the returned browser and must close it during test cleanup.
 
-## Prerequisites and endpoint
+## Prerequisites and executable discovery
 
-Install a rendering-enabled Obscura release for the host platform and verify its archive checksum. Keep `obscura` and `obscura-worker` together in their extracted directory and expose the CLI through `PATH`. Binaries remain outside Git. The locally prepared baseline is the official Linux x64 v0.2.6 release. Official unsuffixed archives include rendering; a source build needs the `render` feature. Follow the upstream [installation guide](https://github.com/h4ckf0r0day/obscura/blob/main/docs/Installation.md).
+The helper uses `domBrowserExecutable()` from `server/browser-dom-executable.ts`. Set `MEW_BROWSER_EXECUTABLE` to an absolute executable path when needed. Otherwise, discovery checks Playwright's bundled Chromium first, then standard system Chrome/Chromium locations. macOS discovery includes apps installed in the current user's `Applications` directory.
 
-Before running UI tests, the user starts the local service:
-
-```bash
-obscura serve --host 127.0.0.1 --port 9222 --allow-private-network
-```
-
-Private-network access allows the test browser to reach local fixture URLs. Keep this test endpoint on loopback. Tests connect to `ws://127.0.0.1:9222` by default. Override it for an already-running test endpoint with:
-
-```bash
-MEW_TEST_BROWSER_CDP_URL=ws://127.0.0.1:9333 node --test server/agent-harness-ui.test.ts
-```
-
-The override changes only the test connection address. It does not configure or start the service. If the endpoint is absent or incompatible, report the connection failure and leave browser verification incomplete. The helper provides no Chromium launch fallback.
+An Obscura installation or running CDP service is not required. `MEW_TEST_BROWSER_CDP_URL` and `MEW_DOM_BROWSER_EXECUTABLE` are no longer used. If `MEW_BROWSER_EXECUTABLE` previously pointed to Obscura, remove the override or change it to Chrome/Chromium. Missing executables, invalid overrides, and launch failures leave browser verification incomplete; report the actual error.
 
 ## Writing and running tests
 
-Import `connectTestBrowser` from `./test-browser.ts` in normal UI test files and await it in place of launching a browser. Create new test-owned contexts and pages rather than reusing the service default context. The helper exposes only contexts it created and closes those contexts before disconnecting; tests should still close pages or contexts in their own cleanup where needed. The upstream [Playwright guide](https://github.com/h4ckf0r0day/obscura/blob/main/docs/Use-with-Playwright.md) specifies `connectOverCDP`; closing that connection leaves the Obscura service running.
+Import `connectTestBrowser` from `./test-browser.ts` in normal UI test files. Create the test's contexts and pages from the returned browser and register cleanup immediately:
 
-Run the focused Node test files relevant to the change after the endpoint is ready. Tests continue to use their existing fixture setup and assertions. Browser access does not authorize starting the Mew launcher or application servers. Implementation work still requires `npm run build` and applicable tests, lint, and [document checks](../README.md).
+```ts
+const browser = await connectTestBrowser()
+t.after(() => browser.close())
+const page = await browser.newPage()
+```
+
+Closing this browser closes its contexts and terminates the test-owned browser process. Tests can also close individual contexts or pages earlier. The helper does not attach to an existing browser or manage an external browser service.
+
+Run the focused Node test files relevant to the change. Browser tests may launch their isolated test browsers; follow the repository's [execution rules](getting-started.md#execution-and-verification). Agents must not deploy, run the Mew launcher, or start, stop, or restart application servers. Implementation work still requires `npm run build` and applicable tests, lint, and [document checks](../README.md).
 
 Tests under `server/` use the Node TypeScript configuration without DOM globals. In Playwright callbacks, obtain the document through the evaluated element's `ownerDocument`, as required by the [development rules](getting-started.md#execution-and-verification).
 
 ## Scope and limitations
 
-This connection policy covers normal UI tests. Mew's application DOM browser spawns its own isolated per-session Obscura processes (`server/dom-browser.ts`), while the login desktop retains its Chrome/Chromium dependency and lifecycle (`server/login-desktop.ts`). Native RTC, browser-conformance, and platform-specific checks retain the actual engines and devices their assertions require.
+This helper covers normal UI tests. Mew's application DOM browser also launches isolated Chrome/Chromium sessions (`server/dom-browser.ts`); the login desktop retains its separate video and input lifecycle (`server/login-desktop.ts`). Native RTC, browser-conformance, and platform-specific checks retain the actual engines and devices their assertions require.
 
-Obscura's CDP support does not establish Chromium equivalence. Upstream documents gaps in service workers, native media, Web APIs, CSS, compositor behavior, and editor interaction. Source migration and passing helper unit tests do not prove that every migrated UI assertion or screenshot works. Record actual browser results and remaining blockers separately from build success.
-
-[ADR 0129](../decisions/0129-obscura-ui-testing.md) records the UI test choice and [ADR 0135](../decisions/0135-obscura-dom-browser.md) records the application DOM browser runtime. The [work record](../work/obscura-ui-testing.md) owns installation and verification evidence.
+Helper unit tests verify browser selection and launch behavior without launching a browser. They do not establish that every UI assertion or screenshot passes. Record actual browser results and remaining blockers separately from build success. [ADR 0136](../decisions/0136-chromium-browser-restoration.md) records the current browser runtime and test policy.

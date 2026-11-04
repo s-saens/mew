@@ -2,7 +2,7 @@
 title: "Development setup and rules"
 created: 2026-09-29
 updated: "2026-11-04"
-description: "Repository execution restrictions, required build and verification commands, and UI implementation rules. Links Obscura UI testing, isolated Postgres and CLI checks, and Mew's documentation ownership."
+description: "Repository execution restrictions, required build and verification commands, and UI implementation rules. Links Chromium UI testing, isolated Postgres and CLI checks, and Mew's documentation ownership."
 상위파일:
   - "../MOC.md"
   - "MOC.md"
@@ -37,7 +37,7 @@ This checks descriptions, including history, and local links. MOC registration i
 
 If this clone still uses a Liiiiv shared hook, remove that local setting with `git config --local --unset core.hooksPath`. Mew owns its rules and checks.
 
-Normal UI tests connect to a user-managed Obscura CDP service through the shared test helper; follow the [browser-testing prerequisites and limits](browser-testing.md). Browser tests under `server/` use the Node TypeScript configuration without DOM globals. In Playwright callbacks, use `locator.evaluate` and the element's `ownerDocument` rather than a direct `document` reference.
+Normal UI tests launch test-owned headless Chrome/Chromium through the shared test helper; follow the [browser-testing prerequisites and limits](browser-testing.md). Browser tests under `server/` use the Node TypeScript configuration without DOM globals. In Playwright callbacks, use `locator.evaluate` and the element's `ownerDocument` rather than a direct `document` reference.
 
 If a terminal edit unexpectedly reverts, an open Mew editor may have saved stale content. Recheck the file, then ask the user to close that editor or choose **Revert File**.
 

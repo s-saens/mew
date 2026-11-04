@@ -1,9 +1,11 @@
 ---
 title: "Obscura UI test browser migration"
-description: "Records the 2026-11-04 local Obscura installation and normal UI-test migration to a shared external CDP connection. Separates passed helper/build checks and native CLI smoke results from browser verification blocked by the absent service and retained native-browser requirements."
+description: "Historical Obscura work, superseded by the Chromium restoration under ADR 0136. Records the 2026-11-04 local Obscura installation and normal UI-test migration to a shared external CDP connection. Separates passed helper/build checks and native CLI smoke results from browser verification blocked by the absent service and retained native-browser requirements."
 created: "2026-11-04"
 updated: "2026-11-04"
 ---
+
+Current behavior follows [ADR 0136](../decisions/0136-chromium-browser-restoration.md) and the [Chromium restoration work record](chromium-browser-restoration.md). The original migration and stylesheet investigation below are retained as historical evidence.
 
 ## Purpose and resulting behavior
 
