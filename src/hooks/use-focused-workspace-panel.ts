@@ -1,12 +1,37 @@
 import { numberedTabIndex, adjacentPanelTabDirection } from '@mew/shortcuts'
+import { scopedBrowserStorage } from '@mew/ui/browser-storage-scope'
 import { activateNumberedPanelTab, activateAdjacentPanelTab, numberedTabPanel } from '../utils/numbered-panel-tabs'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type SetStateAction } from 'react'
+
+const focusKey = (account: string) => `mew:desktop-panel-focus:${encodeURIComponent(account)}`
+const desktop = () => window.matchMedia('(min-width: 768px)').matches
+function restorePanel(account?: string): string | null {
+  if (!account || !desktop()) return null
+  try { return scopedBrowserStorage().getItem(focusKey(account)) || null } catch { return null }
+}
 
 /** Track the working surface across portals, keyboard navigation and iframe focus. */
-export function useFocusedWorkspacePanel() {
-  const [focusedPanel, setFocusedPanel] = useState<string | null>(null)
+export function useFocusedWorkspacePanel(account?: string) {
+  const [selection, setSelection] = useState(() => ({ account, panel: restorePanel(account) }))
+  const focusedPanel = selection.account === account ? selection.panel : restorePanel(account)
   const lastFocus = useRef(new Map<string, HTMLElement>())
+  const focusOwner = useRef(account)
+  const setFocusedPanel = useCallback((next: SetStateAction<string | null>) => {
+    setSelection(previous => {
+      const panel = typeof next === 'function' ? next(previous.account === account ? previous.panel : restorePanel(account)) : next
+      if (account && desktop()) {
+        try {
+          if (panel) scopedBrowserStorage().setItem(focusKey(account), panel)
+          else scopedBrowserStorage().removeItem(focusKey(account))
+        } catch { /* Focus remains available when browser storage is restricted. */ }
+      }
+      return previous.account === account && previous.panel === panel ? previous : { account, panel }
+    })
+  }, [account])
   useEffect(() => {
+    const ownerChanged = focusOwner.current !== account
+    if (ownerChanged) lastFocus.current.clear()
+    focusOwner.current = account
     let lastSurface: HTMLElement | null = null
     const record = (target: EventTarget | null) => {
       if (!(target instanceof Element) || target.closest('.mobile-dock')) return
@@ -47,7 +72,7 @@ export function useFocusedWorkspacePanel() {
     document.addEventListener('pointerdown', focus, true)
     document.addEventListener('focusin', focus, true)
     window.addEventListener('blur', blur)
-    record(document.activeElement)
+    if (!account && !ownerChanged) record(document.activeElement)
     return () => {
       clearTimeout(frameFocus)
       window.removeEventListener('keydown', selectTab, true)
@@ -55,7 +80,7 @@ export function useFocusedWorkspacePanel() {
       document.removeEventListener('focusin', focus, true)
       window.removeEventListener('blur', blur)
     }
-  }, [])
+  }, [account, setFocusedPanel])
   const focusPanel = useCallback((panel: string) => {
     setFocusedPanel(panel)
     const visible = (element: HTMLElement) => element.isConnected && !element.closest('[inert]') && !element.matches(':disabled') && element.checkVisibility({ visibilityProperty: true })
@@ -71,6 +96,6 @@ export function useFocusedWorkspacePanel() {
     }
     const surface = surfaces[0]
     if (surface) { surface.tabIndex = -1; surface.focus({ preventScroll: true }) }
-  }, [])
+  }, [setFocusedPanel])
   return [focusedPanel, setFocusedPanel, focusPanel] as const
 }

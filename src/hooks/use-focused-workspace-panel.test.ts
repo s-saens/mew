@@ -4,7 +4,7 @@ import test from 'node:test'
 import { Window } from 'happy-dom'
 
 const win = new Window({ url: 'http://localhost' })
-for (const key of ['window', 'document', 'Node', 'Element', 'HTMLElement', 'HTMLIFrameElement', 'KeyboardEvent']) {
+for (const key of ['window', 'document', 'localStorage', 'Node', 'Element', 'HTMLElement', 'HTMLIFrameElement', 'KeyboardEvent']) {
   Object.defineProperty(globalThis, key, { value: (win as unknown as Record<string, unknown>)[key], configurable: true })
 }
 // happy-dom does not lay out elements; visibility is supplied for this keyboard fixture.
@@ -12,13 +12,97 @@ win.HTMLElement.prototype.checkVisibility = function () { return !this.closest('
 Object.defineProperty(globalThis, 'IS_REACT_ACT_ENVIRONMENT', { value: true, configurable: true })
 registerHooks({ resolve(specifier, context, nextResolve) {
   if (specifier === '@mew/shortcuts') return { url: new URL('../../packages/shortcuts/src/numberedTab.ts', import.meta.url).href, shortCircuit: true }
+  if (specifier === '@mew/ui/browser-storage-scope') return { url: new URL('../../packages/ui/src/browser-storage-scope.ts', import.meta.url).href, shortCircuit: true }
   if (specifier === '../utils/numbered-panel-tabs') return { url: new URL('../utils/numbered-panel-tabs.ts', import.meta.url).href, shortCircuit: true }
   return nextResolve(specifier, context)
 } })
-const [{ act }, { createRoot }, { useFocusedWorkspacePanel }] = await Promise.all([
+const [{ act, createElement, useEffect }, { createRoot }, { useFocusedWorkspacePanel }] = await Promise.all([
   import('react'), import('react-dom/client'), import('./use-focused-workspace-panel.ts'),
 ])
 function Harness() { useFocusedWorkspacePanel(); return null }
+
+test('desktop last panel belongs to the account across projects and remounts without moving DOM focus', async () => {
+  win.happyDOM.setWindowSize({ width: 1200, height: 800 })
+  localStorage.clear()
+  const host = document.createElement('div'); document.body.append(host)
+  host.innerHTML = '<section data-workspace-panel="agent"><textarea></textarea><textarea></textarea></section><section data-workspace-panel="sidebar"><input></section><button>Outside</button>'
+  const mount = document.createElement('div'); host.append(mount)
+  let root = createRoot(mount)
+  let current!: ReturnType<typeof useFocusedWorkspacePanel>
+  function FocusHarness({ account }: { account: string; project?: string }) {
+    const value = useFocusedWorkspacePanel(account)
+    useEffect(() => { current = value }, [value])
+    return null
+  }
+  const render = async (account: string, project = '/first') => { await act(async () => root.render(createElement(FocusHarness, { account, project }))) }
+  const inputs = host.querySelectorAll('textarea'), sidebar = host.querySelector('input')!, outside = host.querySelector('button')!
+  try {
+    await render('first@example.test')
+    assert.equal(current[0], null)
+    await act(async () => inputs[1].focus())
+    assert.equal(current[0], 'agent')
+    outside.focus()
+    await render('first@example.test', '/second')
+    assert.equal(current[0], 'agent', 'switching projects preserves the last panel')
+    assert.equal(document.activeElement, outside, 'restoring the indicator does not steal focus')
+    await act(async () => current[2]('agent'))
+    assert.equal(document.activeElement, inputs[1], 'the same account retains its remembered input across project changes')
+
+    await render('second@example.test')
+    assert.equal(current[0], null, 'a new account cannot inherit the previous panel')
+    await act(async () => current[2]('agent'))
+    assert.equal(document.activeElement, inputs[0], 'switching accounts clears the previous input reference')
+    await act(async () => sidebar.focus())
+    assert.equal(current[0], 'sidebar')
+    await render('first@example.test')
+    assert.equal(current[0], 'agent', 'the original account restores its own panel')
+    assert.equal(document.activeElement, sidebar, 'account restoration changes only the indicator')
+    await act(async () => root.unmount())
+    root = createRoot(mount)
+    await render('first@example.test', '/third')
+    assert.equal(current[0], 'agent', 'a reload in another project restores account focus')
+    assert.equal(document.activeElement, sidebar)
+    await act(async () => current[1](null))
+    await act(async () => root.unmount())
+    root = createRoot(mount)
+    await render('first@example.test')
+    assert.equal(current[0], null, 'closing the remembered panel clears persisted focus')
+    await render('second@example.test')
+    assert.equal(current[0], 'sidebar', 'clearing one account preserves another account')
+  } finally {
+    await act(async () => root.unmount()); host.remove(); localStorage.clear()
+  }
+})
+
+test('mobile focus does not restore or overwrite the account desktop panel', async () => {
+  localStorage.clear()
+  const host = document.createElement('div'); document.body.append(host)
+  const root = createRoot(host)
+  let current!: ReturnType<typeof useFocusedWorkspacePanel>
+  function FocusHarness() {
+    const value = useFocusedWorkspacePanel('account')
+    useEffect(() => { current = value }, [value])
+    return null
+  }
+  try {
+    win.happyDOM.setWindowSize({ width: 1200, height: 800 })
+    await act(async () => root.render(createElement(FocusHarness)))
+    await act(async () => current[1]('terminal'))
+    win.happyDOM.setWindowSize({ width: 390, height: 800 })
+    await act(async () => root.render(null))
+    await act(async () => root.render(createElement(FocusHarness)))
+    assert.equal(current[0], null, 'mobile starts without a restored desktop indicator')
+    await act(async () => current[1]('agent'))
+    assert.equal(current[0], 'agent', 'mobile still tracks current focus in memory')
+    await act(async () => root.render(null))
+    win.happyDOM.setWindowSize({ width: 1200, height: 800 })
+    await act(async () => root.render(createElement(FocusHarness)))
+    assert.equal(current[0], 'terminal', 'mobile activity preserves the saved desktop selection')
+  } finally {
+    await act(async () => root.unmount()); host.remove(); localStorage.clear()
+    win.happyDOM.setWindowSize({ width: 1200, height: 800 })
+  }
+})
 
 test('Ctrl/Cmd+숫자는 포커스된 분할 패널의 표시 순서로 전환하고 PTY 입력을 차단한다', async () => {
   const host = document.createElement('div')

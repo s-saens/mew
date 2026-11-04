@@ -22,7 +22,7 @@ import { uiText } from '@mew/ui/i18n-core'
 import { activePaneTab, mostRecentTab, nextTabNavigation, recordPaneActivation, remapTabNavigation, type TabNavigation } from '../utils/editor-tab-navigation'
 import { registerTaskDocumentSync, type TaskDocumentChange } from '../utils/task-document-sync'
 import { splitFrontmatter } from '@mew/editor/frontmatter'
-import { normalizeStoredTabs, reconcileEditorTabs, storedEditorTabs, type EditorTabState, type StoredTabs } from '../utils/editor-tab-state.ts'
+import { alignEditorPaneSlots, normalizeStoredTabs, reconcileEditorTabs, storedEditorTabs, type EditorTabState, type StoredTabs } from '../utils/editor-tab-state.ts'
 export type { StoredTabs } from '../utils/editor-tab-state.ts'
 import { clearTitlePreviews, documentAbsolutePath, previewDatabaseDocumentTitle, previewDocumentTitle, remapTitlePreviews, subscribeTitlePreviews, titlePreviews, withDocumentTitle } from '../utils/document-title-preview'
 
@@ -158,8 +158,14 @@ export function useTabs(
   workspaceDocsPath?: string,
   accountScope?: string,
   presentationScope = workspaceScope,
+  desktopPaneIds?: string[],
+  desktopFocusedPaneId?: string,
 ) {
   const { t } = useI18n()
+  const desktopPaneIdsRef = useRef(desktopPaneIds)
+  desktopPaneIdsRef.current = desktopPaneIds
+  const desktopFocusedPaneIdRef = useRef(desktopFocusedPaneId)
+  desktopFocusedPaneIdRef.current = desktopFocusedPaneId
   const unsupportedNoticeRef = useRef('')
   unsupportedNoticeRef.current = t('editor.unsupportedFile')
   const { pending: refreshing, track: trackRefresh } = useRefreshTasks()
@@ -648,13 +654,13 @@ export function useTabs(
       : project === '.workspace' ? mergeEditorTabs(legacy(project), accountStored ? normalizeStoredTabs(accountTabs?.docs) : legacy('docs')) : legacy(project)
     if (accountStored) receivedTabsRef.current.set(tabsCacheKey(project), JSON.stringify(accountStored))
     if (!stored) {
-      patch(project, () => EMPTY) // 빈 상태라도 만들어 둬야 이후 저장이 이 프로젝트를 기록한다
+      patch(project, () => alignEditorPaneSlots(EMPTY, desktopPaneIdsRef.current ?? [], desktopFocusedPaneIdRef.current)) // 빈 상태라도 만들어 둬야 이후 저장이 이 프로젝트를 기록한다
       setHydratedSession(sessionKey)
       return
     }
     // Restore all shells in one update. Looking up existing tabs while queuing a
     // reset still sees the previous root's same-named files and can skip members.
-    const restored: ProjectTabs = {
+    const restored: ProjectTabs = alignEditorPaneSlots({
       panes: stored.panes.map(pane => ({
         id: pane.id,
         activePath: pane.activePath,
@@ -669,9 +675,9 @@ export function useTabs(
       })),
       layout: stored.layout,
       focusedPaneId: stored.focusedPaneId,
-    }
+    }, desktopPaneIdsRef.current ?? [], desktopFocusedPaneIdRef.current)
     patch(project, () => restored)
-    const activeLoads = stored.panes.flatMap(pane => {
+    const activeLoads = restored.panes.flatMap(pane => {
       const active = pane.tabs.find(tab => tab.path === pane.activePath && canOpenEditorFile(tab.path))
       return active ? [{ paneId: pane.id, path: active.path, preview: active.preview, viewMode: active.viewMode }] : []
     })

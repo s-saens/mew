@@ -259,10 +259,10 @@ const popupResizeHandles: Array<{ edge: ResizeEdge; className: string }> = [
   { edge: 'sw', className: 'bottom-0 left-0 h-3 w-3 cursor-sw-resize' },
 ]
 /** All surfaces portal into the same host. Moving a split changes geometry, not component ownership. */
-export function DockPanel({ id, floating = false, storageKey = `mew:popup:${id}`, kind, visible = true, children, onFocus, mobileSelected, tabs = [] }: { floating?: boolean; storageKey?: string; tabs?: string[]; mobileSelected?: boolean; id: string; kind: DockKind; visible?: boolean; children: ReactNode; onFocus?: () => void }) {
+export function DockPanel({ id, floating = false, storageKey = `mew:popup:${id}`, legacyStorageKey, kind, visible = true, children, onFocus, mobileSelected, tabs = [] }: { floating?: boolean; storageKey?: string; legacyStorageKey?: string; tabs?: string[]; mobileSelected?: boolean; id: string; kind: DockKind; visible?: boolean; children: ReactNode; onFocus?: () => void }) {
   const dock = useDock(), register = dock?.register
   const floats = floating && !!dock?.desktop
-  const popup = useFloatingPanel(storageKey, dock?.host ?? null, floats, true)
+  const popup = useFloatingPanel(storageKey, dock?.host ?? null, floats, true, legacyStorageKey)
   const movePopup = popup.controls('move')
   const tabKey = JSON.stringify(tabs)
   useLayoutEffect(() => { register?.(id, { kind, visible: visible && !floats, tabs: JSON.parse(tabKey) as string[] }); return () => register?.(id, null) }, [register, id, kind, visible, tabKey, floats])

@@ -55,3 +55,40 @@ test('normalization accepts legacy metadata and rejects duplicate or malformed r
   input.panes.push(input.panes[0])
   assert.deepEqual(normalizeStoredTabs(input), stored(['one.md', 'two.md']))
 })
+
+test('account desktop editor slots retain project buffers and pane selection when saved pane IDs differ', async () => {
+  const { alignEditorPaneSlots } = await import('./editor-tab-state.ts')
+  const one = tab('project-b-one.md'), two = tab('project-b-two.md')
+  const previous: EditorTabState = { panes: [
+    { id: 'b-one', tabs: [one], activePath: one.path },
+    { id: 'b-two', tabs: [two], activePath: two.path },
+  ], layout: leaf('b-one'), focusedPaneId: 'b-two' }
+  const next = alignEditorPaneSlots(previous, ['main', 'side', 'extra'])
+  assert.deepEqual(next.panes.map(pane => pane.id), ['main', 'side', 'extra'])
+  assert.equal(next.panes[0].tabs[0], one)
+  assert.equal(next.panes[1].tabs[0], two)
+  assert.equal(next.focusedPaneId, 'side')
+  assert.deepEqual(next.panes[2].tabs, [])
+  const merged = alignEditorPaneSlots(previous, ['main'])
+  assert.deepEqual(merged.panes[0].tabs, [one, two], 'fewer account slots retain every project buffer')
+  assert.equal(alignEditorPaneSlots(next, ['main', 'side', 'extra']), next, 'matching slots do not trigger another state update')
+  const matched = alignEditorPaneSlots(previous, ['new', 'b-one'])
+  assert.equal(matched.panes[1].tabs[0], one, 'matching IDs keep their original buffers')
+  assert.equal(matched.panes[0].tabs[0], two)
+})
+
+
+test('the account last editor slot takes precedence over destination project focus without changing its selected documents', async () => {
+  const { alignEditorPaneSlots } = await import('./editor-tab-state.ts')
+  const one = tab('beta-one.md'), two = tab('beta-two.md')
+  const previous: EditorTabState = { panes: [
+    { id: 'beta-one', tabs: [one], activePath: one.path },
+    { id: 'beta-two', tabs: [two], activePath: two.path },
+  ], layout: leaf('beta-one'), focusedPaneId: 'beta-one' }
+  const next = alignEditorPaneSlots(previous, ['main', 'side'], 'side')
+  assert.equal(next.focusedPaneId, 'side')
+  assert.equal(next.panes[0].activePath, one.path)
+  assert.equal(next.panes[1].activePath, two.path)
+  assert.equal(alignEditorPaneSlots(next, ['main', 'side'], 'main').focusedPaneId, 'main')
+  assert.equal(alignEditorPaneSlots(previous, ['main', 'side'], 'removed').focusedPaneId, 'main')
+})

@@ -4,12 +4,24 @@ export type ResizeEdge = 'n' | 'e' | 's' | 'w' | 'ne' | 'nw' | 'se' | 'sw'
 type GestureMode = 'move' | ResizeEdge
 type Geometry = { x: number; y: number; width: number; height: number }
 const initial: Geometry = { x: 24, y: 24, width: 420, height: 480 }
-export function loadFloatingRect(key: string): Geometry {
+function parseFloatingRect(raw: string | null): Geometry | null {
   try {
-    const saved = JSON.parse(scopedBrowserStorage().getItem(key) ?? 'null')
-    if (saved && Object.values(saved).every(value => typeof value === 'number' && Number.isFinite(value)) && saved.width >= 240 && saved.height >= 160 && typeof saved.x === 'number' && typeof saved.y === 'number') return saved
-  } catch { /* defaults */ }
-  return initial
+    const saved = JSON.parse(raw ?? 'null')
+    return saved && Object.values(saved).every(value => typeof value === 'number' && Number.isFinite(value)) && saved.width >= 240 && saved.height >= 160 && typeof saved.x === 'number' && typeof saved.y === 'number' ? saved : null
+  } catch { return null }
+}
+export function loadFloatingRect(key: string, legacyKey?: string): Geometry {
+  try {
+    const storage = scopedBrowserStorage()
+    const current = storage.getItem(key)
+    const raw = current ?? (legacyKey ? storage.getItem(legacyKey) : null)
+    const saved = parseFloatingRect(raw)
+    if (!saved) return initial
+    if (current === null && raw && legacyKey) {
+      try { storage.setItem(key, raw) } catch { /* use migrated geometry in memory */ }
+    }
+    return saved
+  } catch { return initial }
 }
 export function restoreFloatingRect(key: string, rect: Geometry) {
   try { scopedBrowserStorage().setItem(key, JSON.stringify(rect)) } catch { /* session geometry */ }
@@ -22,19 +34,24 @@ function focusFloatingPanel(update: (layer: number) => void) {
   floatingLayers.push(update)
   floatingLayers.forEach((setLayer, index) => setLayer(60 + index))
 }
-export function useFloatingPanel(key: string, host: HTMLElement | null, enabled = true, workspaceBounds = false) {
-  const [geometry, setGeometry] = useState(() => ({ key, rect: loadFloatingRect(key) }))
-  const rect = geometry.key === key ? geometry.rect : loadFloatingRect(key)
+export function useFloatingPanel(key: string, host: HTMLElement | null, enabled = true, workspaceBounds = false, legacyKey?: string) {
+  const [geometry, setGeometry] = useState(() => ({ key, legacyKey, rect: loadFloatingRect(key, legacyKey) }))
+  const rect = geometry.key === key ? geometry.rect : loadFloatingRect(key, legacyKey)
+  useEffect(() => {
+    if (geometry.key !== key || geometry.legacyKey === undefined && legacyKey !== undefined) {
+      setGeometry({ key, legacyKey, rect: loadFloatingRect(key, legacyKey) })
+    }
+  }, [geometry.key, geometry.legacyKey, key, legacyKey])
   const rectRef = useRef(rect)
   rectRef.current = rect
   useEffect(() => {
     const restore = (event: Event) => {
       const detail = (event as CustomEvent<{ key: string; rect: Geometry }>).detail
-      if (detail.key === key) setGeometry({ key, rect: detail.rect })
+      if (detail.key === key) setGeometry({ key, legacyKey, rect: detail.rect })
     }
     window.addEventListener('mew:popup-layout', restore)
     return () => window.removeEventListener('mew:popup-layout', restore)
-  }, [key])
+  }, [key, legacyKey])
   const [size, setSize] = useState({ x: 0, y: 0, width: 0, height: 0 })
   const [layer, setLayer] = useState(60)
   useEffect(() => {
@@ -76,7 +93,7 @@ export function useFloatingPanel(key: string, host: HTMLElement | null, enabled 
   }
   const update = (value: Geometry) => {
     const next = clamp(value)
-    setGeometry({ key, rect: next })
+    setGeometry({ key, legacyKey, rect: next })
     try { scopedBrowserStorage().setItem(key, JSON.stringify(next)) } catch { /* session-only geometry */ }
   }
   const start = (event: PointerEvent<HTMLElement>, mode: GestureMode) => {

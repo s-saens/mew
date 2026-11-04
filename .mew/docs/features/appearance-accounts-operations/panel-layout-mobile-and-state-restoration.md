@@ -8,7 +8,7 @@ updated: "2026-11-04"
 status_hash: "018bca32e486b43c386b29de3e2087d6d1447fae6a33abc99d745367947a9382"
 files: ["src/components/tool-presentation-toggle.tsx", "src/components/SettingsModal.tsx", "src/hooks/use-refresh-tasks.ts", "src/hooks/usePresence.ts", "src/components/project-loading-overlay.tsx", "src/App.tsx", "src/components/DockWorkspace.tsx", "src/components/EditorPane.tsx", "src/components/TabBar.tsx", "src/components/AgentPanel.tsx", "src/components/mobile-dock.tsx", "src/components/layout-presets.tsx", "src/utils/layout-presets.ts", "server/layout-icon-cli.ts", "src/utils/mobile-dock.ts", "src/hooks/use-mobile-keyboard.ts", "src/hooks/use-mobile-panel-swipe.ts", "src/hooks/useTabs.ts", "server/userUiState.ts"]
 commits: []
-description: "Panel docking, maximization, tab navigation, mobile gestures, safe areas, and editor zoom. Defines desktop/mobile presets, device-local panel geometry, real-time account tab synchronization, focus, and initial account UI snapshots."
+description: "Panel docking, maximization, tab navigation, mobile gestures, safe areas, and editor zoom. Defines account-wide desktop layout, popup geometry, last-panel and editor-slot focus per browser device, project-specific mobile restoration, presets, and account-and-project tab synchronization."
 상위파일:
   - "MOC.md"
   - "_appearance-accounts-operations.md"
@@ -28,6 +28,7 @@ description: "Panel docking, maximization, tab navigation, mobile gestures, safe
 - When switching mobile panels, retain up to 20 previous panels, including the editor, and restore them in reverse order with Back.
 
 - Arrange document and tool panels to suit the screen size and workflow.
+- On each desktop browser device, keep one layout, last focused panel, and last focused editor slot per account across project changes. Preserve panel positions, sizes, open states, and popup coordinates while loading the selected project's own documents and execution tabs. Mobile keeps its existing project-specific layout and foreground memory.
 - On desktops without a saved layout, start with the editor above the terminal and Git above agents on the right. Place task tabs in the rightmost column.
 - Swiping left or right on the dock moves to the previous or next panel in display order. In mobile panel content, it moves to the previous or next tab; for regular files and Markdown Plain, only swipes starting on the modifier key bar switch tabs.
 
@@ -252,13 +253,19 @@ Input includes `version`, `dock` (existing DockState), `open` (a boolean per pan
 
 ### Device-specific layouts and memo/tasks popups (2026-10-06)
 
-Panel geometry follows [ADR 0197](../../history/decisions/0197-mew-device-local-workspace-layout.md). [ADR 0133](../../decisions/0133-realtime-account-tabs.md) replaces its device-local document-tab ownership with account synchronization.
+Panel geometry retains the browser-device boundary established by [ADR 0197](../../history/decisions/0197-mew-device-local-workspace-layout.md). [ADR 0134](../../decisions/0134-account-desktop-layout.md) replaces its desktop account/root geometry scope with one layout per account on that device. [ADR 0133](../../decisions/0133-realtime-account-tabs.md) retains account-and-logical-project ownership of shared document and execution tabs.
 
 On desktop, icons in the memo and tasks headers toggle each between tab and popup display. Popups can be moved and resized over documents, and switching modes preserves the same component and input state. Mobile uses the existing frontmost panel regardless of the selection.
 
-Docking positions, split ratios, and panel open/closed states are saved per browser device under account/root-project keys. Account restoration values serve as initial geometry on devices with no local records. Open editor, agent, and terminal tabs and their selected tab synchronize in real time between devices signed into the same account on the same instance and logical project. Editor pane membership is part of that shared tab state. Follow the [account tab contract](../../development/account-tabs.md) for migration, simultaneous changes, draft protection, and recovery. Popup sizes, positions, and display settings are also saved in the browser and do not overwrite those on other devices. Clearing browser storage also resets that device's remembered state.
+Desktop docking positions, split ratios, panel open/closed states, and popup coordinates are saved per account on each browser device. Switching projects keeps that arrangement and last focused work panel. Restoring the focused-panel highlight does not move keyboard focus. Initial migration uses the first accepted active project's old browser layout or account fallback; later project snapshots and previews preserve the established desktop layout. Mobile geometry and foreground memory remain project-specific. Clearing browser storage resets the device's remembered state.
+
+Open editor, agent, and terminal tabs and their selected tab synchronize in real time between devices signed into the same account on the same instance and logical project. Editor pane membership remains project tab metadata; incoming panes align with the desktop's existing editor slots without copying another project's documents. Follow the [account tab contract](../../development/account-tabs.md) for migration, simultaneous changes, draft protection, and recovery, and the [layout contract](../../development/ui-workspace-layout.md#workspace-panel-layout) for storage, popup migration, and restoration precedence.
+
+When switching projects on desktop, keep the last focused editor slot if that slot still exists. Restore the selected project's own active document in each slot. Project tab metadata retains its focused-pane value for compatibility and mobile; desktop restoration prefers the account's device-local slot preference. Neither restoring the work-panel highlight nor the editor-slot preference takes keyboard focus.
 
 Initial restoration may receive the current account's small UI snapshot with the authenticated workspace response, under the [startup snapshot contract](../../development/browser-startup.md#workspace-initialization). Device-local geometry retains precedence; document tabs wait for the dedicated authoritative account response. A snapshot from an obsolete root or permission generation cannot replace current state or newer local edits; missing or invalid snapshots use the existing account-state request. Worktrees use their logical project UI key while file reads remain bound to the actual worktree root.
+
+Current desktop account-layout implementation, verification, and remaining limits are recorded in the [work record](../../work/account-desktop-layout.md).
 
 Validation (2026-10-06): Ran related server and isolated Chromium tests, TypeScript, and targeted lint. No actual update installation, build, or server restart was performed.
 

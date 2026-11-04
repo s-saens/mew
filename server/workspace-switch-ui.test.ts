@@ -9,9 +9,11 @@ import { applyTaskChanges, type TaskItem } from '../shared/task-list.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 
-for (const mode of ['onboarding', 'keyboard', 'workspace', 'documents', 'permissions', 'panels', 'worktree', 'swipes', 'rapid'] as const) test(mode === 'onboarding' ? 'App first-use onboarding creates a named project without exposing the startup workspace' : mode === 'rapid' ? 'App rapid project selections cancel superseded handoffs and restore the latest root' : mode === 'swipes' ? 'App mobile dock swipes select panels and explorer swipes preserve search mode' : mode === 'worktree' ? 'linked worktree swaps retain project layout and sessions and settle outgoing file saves' : mode === 'panels' ? 'App restores Tasks with Alt+T and task sessions survive close and reload' : mode === 'permissions' ? 'permission invalidation replaces pending workspace metadata and ignores the old response' : mode === 'documents' ? 'Files opens Documents as a filesystem folder with a separate navigation arrow' : mode === 'keyboard' ? 'App keyboard aliases open files and projects and create files and folders in the current explorer scope' : 'App overlaps workspace metadata, restores warm roots and ignores duplicate handoffs', { timeout: 60_000 }, async () => {
+for (const mode of ['onboarding', 'keyboard', 'workspace', 'documents', 'permissions', 'panels', 'worktree', 'swipes', 'rapid', 'desktop-layout'] as const) test(mode === 'desktop-layout' ? 'App desktop account layout survives project switches with independent document contents' : mode === 'onboarding' ? 'App first-use onboarding creates a named project without exposing the startup workspace' : mode === 'rapid' ? 'App rapid project selections cancel superseded handoffs and restore the latest root' : mode === 'swipes' ? 'App mobile dock swipes select panels and explorer swipes preserve search mode' : mode === 'worktree' ? 'linked worktree swaps retain project layout and sessions and settle outgoing file saves' : mode === 'panels' ? 'App restores Tasks with Alt+T and task sessions survive close and reload' : mode === 'permissions' ? 'permission invalidation replaces pending workspace metadata and ignores the old response' : mode === 'documents' ? 'Files opens Documents as a filesystem folder with a separate navigation arrow' : mode === 'keyboard' ? 'App keyboard aliases open files and projects and create files and folders in the current explorer scope' : 'App overlaps workspace metadata, restores warm roots and ignores duplicate handoffs', { timeout: 60_000 }, async () => {
   const keyboardOnly = mode === 'keyboard'
   const onboarding = mode === 'onboarding'
+  const desktopLayout = mode === 'desktop-layout'
+  const dockedToolFixture = mode === 'worktree' || desktopLayout
   const appSource = await fs.readFile(`${root}/src/App.tsx`, 'utf8')
   // Keep App, useTabs, FileTree, project switching and docking real. Unrelated panels and the
   // editor renderer are inert so this measures handoff work rather than editor startup.
@@ -30,7 +32,7 @@ for (const mode of ['onboarding', 'keyboard', 'workspace', 'documents', 'permiss
     stubs.set(match[2], names.map(({ exported, local }) => {
       const stub = local === 'EditorPane'
         ? `import {DockGrip} from '${root}/src/components/DockWorkspace.tsx';function EditorPane({pane,onCloseTab,onActivate,onChangeContent,workspace}) { const active=pane.tabs.find(t=>t.path===pane.activePath);React.useEffect(()=>{window.fixtureEditors??={};window.fixtureEditors[pane.id]={pane,workspace,onChangeContent};window.fixtureEditorCallbacks??={};window.fixtureEditorCallbacks[(workspace?.path||'')+':'+pane.id]=onChangeContent},[pane,workspace,onChangeContent]);return React.createElement('div',{'data-test-editor':pane.id,'data-test-active':pane.activePath,'data-test-root':workspace?.path,'data-test-revalidating':!!active?.revalidating},React.createElement(DockGrip,{group:'editor:'+pane.id}),React.createElement('span',{'data-test-content':true},active?.content||''),...pane.tabs.flatMap(t=>[React.createElement('button',{key:'select:'+t.path,onClick:()=>onActivate(t.path)},'Select '+t.path),React.createElement('button',{key:t.path,onClick:()=>onCloseTab(t.path)},'Close '+t.path)])); }`
-        : local === 'AgentPanel' ? `${mode === 'worktree' ? `import {DockPanel} from '${root}/src/components/DockWorkspace.tsx';` : ''}function AgentPanel({preparedTabs,workspacePath,agentOpen,terminalOpen}) { React.useEffect(()=>{window.fixtureAgentMounts=(window.fixtureAgentMounts||0)+1},[]);React.useEffect(()=>{window.fixtureAgentRoot=workspacePath},[workspacePath]);React.useEffect(()=>{const prepared=preparedTabs${mode === 'worktree' ? `??(workspacePath?fetch('/api/user-ui/agent-tabs?workspace='+encodeURIComponent(workspacePath)).then(response=>response.json()):undefined)` : ''};prepared?.then(value=>{window.preparedAgentRoot=value.workspace})},[preparedTabs,workspacePath]);return ${mode === 'worktree' ? `React.createElement(React.Fragment,null,React.createElement(DockPanel,{id:'agent',kind:'agent',visible:agentOpen,tabs:['fixture-agent']},React.createElement('div',{'data-test-agent-root':workspacePath},'Existing agent')),React.createElement(DockPanel,{id:'terminal',kind:'terminal',visible:terminalOpen,tabs:['fixture-terminal']},React.createElement('div',{'data-test-terminal-root':workspacePath},'Existing terminal')))` : 'null'} }`
+        : local === 'AgentPanel' ? `${dockedToolFixture ? `import {DockPanel} from '${root}/src/components/DockWorkspace.tsx';` : ''}function AgentPanel({preparedTabs,workspacePath,agentOpen,terminalOpen}) { React.useEffect(()=>{window.fixtureAgentMounts=(window.fixtureAgentMounts||0)+1},[]);React.useEffect(()=>{window.fixtureAgentRoot=workspacePath},[workspacePath]);React.useEffect(()=>{const prepared=preparedTabs${dockedToolFixture ? `??(workspacePath?fetch('/api/user-ui/agent-tabs?workspace='+encodeURIComponent(workspacePath)).then(response=>response.json()):undefined)` : ''};prepared?.then(value=>{window.preparedAgentRoot=value.workspace})},[preparedTabs,workspacePath]);return ${dockedToolFixture ? `React.createElement(React.Fragment,null,React.createElement(DockPanel,{id:'agent',kind:'agent',visible:agentOpen,tabs:['fixture-agent']},React.createElement('div',{'data-test-agent-root':workspacePath,tabIndex:0},'Existing agent')),React.createElement(DockPanel,{id:'terminal',kind:'terminal',visible:terminalOpen,tabs:['fixture-terminal']},React.createElement('div',{'data-test-terminal-root':workspacePath},'Existing terminal')))` : 'null'} }`
         : local === 'GitPanel' && mode === 'worktree' ? `import {DockPanel} from '${root}/src/components/DockWorkspace.tsx';function GitPanel({onPrepareBranchChange,onOpenWorktree,visible}) {React.useEffect(()=>{window.openFixtureWorktree=async path=>{window.worktreeError=null;try {const release=await onPrepareBranchChange();try {await onOpenWorktree(path);return true}finally{release()}}catch(error){window.worktreeError=error.message;return false}}},[onPrepareBranchChange,onOpenWorktree]);return React.createElement(DockPanel,{id:'git',kind:'git',visible,tabs:[]},React.createElement('button',{'data-test-worktree-trigger':true,onClick:()=>{window.openFixtureWorktree('/alpha-worktree')}},'Open linked worktree'))}`
         : local === 'RemoteDesktop' ? `function RemoteDesktop({onClose,dockHostRef}) { return React.createElement('div',{'role':'dialog','aria-label':'Remote desktop fixture',style:{position:'fixed',inset:0,zIndex:100,background:'var(--color-surface)'}},React.createElement('button',{onClick:onClose},'Close remote desktop'),React.createElement('div',{ref:dockHostRef})); }`
         : local.startsWith('prepare') ? `async function ${local}(){}` : `function ${local}(){return null}`
@@ -89,6 +91,22 @@ for (const mode of ['onboarding', 'keyboard', 'workspace', 'documents', 'permiss
     const heldUiPaths = new Set<string>()
     const heldUiResponses: { path: string; release(): void }[] = []
     const stateFor = (name: string) => ({ sidebar: { docsExpanded: false, expandedSubprojects: [] }, chrome: { sidebarOpen: true, sidebarView: 'tree', ragOpen: true, ...(mode === 'worktree' ? { agentOpen: true, terminalOpen: true, gitOpen: true } : {}) }, tabs: { '.workspace': { panes: [{ id: 'main', tabs: [{ path: 'README.md', preview: false, viewMode: 'plain' }, { path: 'extra.md', preview: false, viewMode: 'plain' }], activePath: 'README.md' }, ...(mode === 'worktree' && name === '/alpha' ? [{ id: 'side', tabs: [{ path: 'side.md', preview: false, viewMode: 'plain' }], activePath: 'side.md' }] : [])], layout: mode === 'worktree' && name === '/alpha' ? { kind: 'split', dir: 'row', kids: [{ kind: 'leaf', pane: 'main' }, { kind: 'leaf', pane: 'side' }] } : { kind: 'leaf', pane: 'main' }, focusedPaneId: 'main' } }, label: name })
+    const stateForProject = (name: string) => {
+      if (!desktopLayout) return stateFor(name)
+      const initial = name === '/alpha', empty = name === '/gamma'
+      const pane = initial ? 'main' : empty ? 'empty-project-pane' : 'beta-project-pane'
+      const panes = [{ id: pane, tabs: empty ? [] : [{ path: initial ? 'README.md' : 'beta-only.md', preview: false, viewMode: 'plain' }], activePath: empty ? null : initial ? 'README.md' : 'beta-only.md' },
+        ...(initial ? [{ id: 'side', tabs: [{ path: 'alpha-side.md', preview: false, viewMode: 'plain' }], activePath: 'alpha-side.md' }] : [])]
+      return {
+        chrome: { sidebarOpen: !initial, sidebarView: 'files', agentOpen: initial, terminalOpen: initial, gitOpen: !initial },
+        dock: { version: 1, groups: [...panes.map(({ id }) => ({ id: `editor:${id}`, kind: 'editor' })), { id: 'agent', kind: 'agent' }, { id: 'terminal', kind: 'terminal' }], tabs: {}, active: {}, tree: initial
+          ? { axis: 'row', ratio: .62, first: { axis: 'col', ratio: .68, first: { id: 'editor:main' }, second: { id: 'terminal' } }, second: { axis: 'col', ratio: .57, first: { id: 'editor:side' }, second: { id: 'agent' } } }
+          : { axis: 'col', ratio: .2, first: { id: 'agent' }, second: { id: `editor:${pane}` } } },
+        tabs: { '.workspace': { panes, layout: initial ? { kind: 'split', dir: 'row', kids: [{ kind: 'leaf', pane: 'main' }, { kind: 'leaf', pane: 'side' }] } : { kind: 'leaf', pane }, focusedPaneId: pane } },
+      }
+    }
+    const editorLedgers = new Map<string, Record<string, unknown>>()
+    let editorRevision = 1
     await page.addInitScript(() => {
       localStorage.setItem('mew:locale', 'ko')
       localStorage.setItem('mew:mobile-dock-hidden', '["browser"]')
@@ -152,18 +170,28 @@ for (const mode of ['onboarding', 'keyboard', 'workspace', 'documents', 'permiss
         { path: '/alpha/packages/docs', name: 'docs', managed: false, mine: false, parentPath: '/alpha', discovered: true, icon: null },
         { path: '/beta', name: 'beta', managed: false, mine: true, icon: null },
         { path: '/shared', name: 'shared', managed: false, mine: false, icon: null },
+        ...(desktopLayout ? [{ path: '/gamma', name: 'gamma', managed: false, mine: true, icon: null }] : []),
       ] })
       if (url.pathname === '/api/project-registry/repositories') return json({ connected: false, repositories: [] })
       if (url.pathname === '/api/project-registry' && method === 'POST') return json({ project: { name: route.request().postDataJSON().name, path: '/new-project', managed: true, mine: true, icon: null } })
       if (url.pathname === '/api/project-icons/read') return json({ icons: {} })
-      if (url.pathname === '/api/user-ui/root-projects') return json({ state: { paths: onboarding ? onboardingComplete ? ['/new-project'] : [] : ['/alpha', '/beta', ...(mode === 'worktree' ? ['/alpha-worktree'] : mode === 'rapid' ? ['/gamma'] : [])], icons: {}, groups: [] } })
+      if (url.pathname === '/api/user-ui/root-projects') return json({ state: { paths: onboarding ? onboardingComplete ? ['/new-project'] : [] : ['/alpha', '/beta', ...(mode === 'worktree' ? ['/alpha-worktree'] : mode === 'rapid' || desktopLayout ? ['/gamma'] : [])], icons: {}, groups: [] } })
       if (url.pathname === '/api/user-ui/agent-tabs') return json({ state: null, claims: [], workspace: url.searchParams.get('workspace') })
+      if (desktopLayout && url.pathname === '/api/user-ui/editor-tabs') {
+        const body = method === 'PUT' ? route.request().postDataJSON() : undefined
+        const workspace = body?.workspacePath ?? url.searchParams.get('workspace')!
+        const state = editorLedgers.get(workspace) ?? stateForProject(workspace).tabs
+        const next = method === 'PUT' ? { ...state, [body.project]: body.state } : state
+        editorLedgers.set(workspace, next)
+        if (method === 'PUT') editorRevision++
+        return json({ state: next, revision: editorRevision })
+      }
       if (url.pathname === '/api/user-ui/workspace') {
         if (method === 'PUT') { const body = route.request().postDataJSON(); persisted.set(body.workspacePath, body.state); return json({ state: body.state }) }
         if (blockUi) await new Promise<void>(resolve => { releaseUi = resolve; uiWaiters.push(resolve) })
         const name = url.searchParams.get('workspace')!
         if (mode === 'rapid' && heldUiPaths.has(name)) await new Promise<void>(resolve => heldUiResponses.push({ path: name, release: resolve }))
-        return json({ state: persisted.get(name) ?? stateFor(name) })
+        return json({ state: persisted.get(name) ?? stateForProject(name) })
       }
       if (url.pathname === '/api/tree') {
         if (blockTree) await new Promise<void>(resolve => treeWaiters.push(resolve))
@@ -191,7 +219,7 @@ for (const mode of ['onboarding', 'keyboard', 'workspace', 'documents', 'permiss
         const delayed = captured === blockFileRoot
         if (delayed) await new Promise<void>(resolve => fileWaiters.push(resolve))
         const filePath = url.searchParams.get('path')!
-        return json({ path: filePath, content: delayed ? 'Late response from ' + captured : fileContents.get(`${captured}:${filePath}`) ?? 'Content of ' + captured + (mode === 'worktree' && filePath !== 'README.md' ? ` / ${filePath}` : ''), editable: true })
+        return json({ path: filePath, content: delayed ? 'Late response from ' + captured : fileContents.get(`${captured}:${filePath}`) ?? 'Content of ' + captured + (dockedToolFixture && filePath !== 'README.md' ? ` / ${filePath}` : ''), editable: true })
       }
       if (url.pathname === '/api/fs/favorites') return json({ folders: [] })
       if (url.pathname === '/api/fs/entries') {
@@ -254,6 +282,67 @@ for (const mode of ['onboarding', 'keyboard', 'workspace', 'documents', 'permiss
     }
     releaseUi(); blockUi = false
     await page.locator('[data-test-content]').getByText('Content of /alpha', { exact: true }).waitFor()
+    if (desktopLayout) {
+      await page.locator('[data-test-content]').getByText('Content of /alpha / alpha-side.md', { exact: true }).waitFor()
+      const dock = page.getByRole('navigation', { name: '작업 독', exact: true })
+      const workspace = await page.locator('[data-dock-workspace]').elementHandle()
+      assert.ok(workspace)
+      const snapshot = async () => ({
+        panels: await page.locator('[data-dock-panel]').evaluateAll(elements => elements.map(element => {
+          const bounds = element.getBoundingClientRect()
+          return { id: element.getAttribute('data-dock-panel'), rect: [bounds.x, bounds.y, bounds.width, bounds.height].map(value => Math.round(value * 100) / 100) }
+        }).sort((a, b) => a.id!.localeCompare(b.id!))),
+        open: await dock.locator('[data-dock-item]').evaluateAll(elements => Object.fromEntries(elements.map(element => [element.getAttribute('data-dock-item'), element.getAttribute('aria-pressed')]))),
+        sidebar: await page.locator('[data-sidebar]').isVisible(),
+      })
+      const initial = await snapshot()
+      assert.equal(initial.sidebar, false, 'the accepted account layout starts with the explorer closed')
+      assert.equal(initial.panels.length, 4, 'the fixture has two editor slots and two open tool panels')
+      const resize = page.locator('[data-dock-workspace] [role="separator"]').first()
+      await resize.focus(); await resize.press('ArrowRight')
+      await page.locator('[data-test-agent-root]').focus()
+      assert.equal(await dock.locator('[data-dock-item=agent]').getAttribute('aria-current'), 'page')
+      const adjusted = await snapshot()
+      assert.notDeepEqual(adjusted.panels, initial.panels, 'the scenario uses a locally adjusted layout rather than just a restored default')
+      const assertAccountLayout = async (expected: Awaited<ReturnType<typeof snapshot>>) => {
+        assert.equal(await workspace.evaluate(element => element === element.ownerDocument.querySelector('[data-dock-workspace]')), true, 'project switching preserves the actual desktop Dock host')
+        assert.deepEqual(await snapshot(), expected, 'destination project geometry and chrome cannot replace the current account arrangement')
+        assert.equal(await dock.locator('[data-dock-item=agent]').getAttribute('aria-current'), 'page', 'the remembered focused panel survives project content replacement')
+      }
+
+      await page.keyboard.press('Alt+2')
+      await page.locator('[data-current-project="/beta"]').waitFor()
+      await page.locator('[data-test-content]').getByText('Content of /beta / beta-only.md', { exact: true }).waitFor()
+      await page.locator('[data-test-agent-root="/beta"]').waitFor()
+      assert.equal(await page.locator('[data-test-editor="main"]').count(), 1)
+      assert.equal(await page.locator('[data-test-editor="side"]').count(), 1, 'different destination pane IDs align to the account editor slots')
+      assert.equal(await page.getByRole('button', { name: 'Select README.md', exact: true }).count(), 0, 'the destination does not inherit the outgoing project files')
+      assert.equal(await page.getByRole('button', { name: 'Select alpha-side.md', exact: true }).count(), 0)
+      await assertAccountLayout(adjusted)
+
+      await resize.focus(); await resize.press('ArrowLeft')
+      await resize.press('ArrowLeft')
+      await page.locator('[data-test-agent-root]').focus()
+      const latest = await snapshot()
+      assert.notDeepEqual(latest.panels, adjusted.panels)
+      await page.keyboard.press('Alt+1')
+      await page.locator('[data-test-content]').getByText('Content of /alpha', { exact: true }).waitFor()
+      await page.locator('[data-test-content]').getByText('Content of /alpha / alpha-side.md', { exact: true }).waitFor()
+      assert.equal(await page.getByRole('button', { name: 'Select beta-only.md', exact: true }).count(), 0)
+      await assertAccountLayout(latest)
+
+      await page.keyboard.press('Alt+3')
+      await page.locator('[data-current-project="/gamma"]').waitFor()
+      await page.locator('[data-test-agent-root="/gamma"]').waitFor()
+      await page.waitForFunction(() => {
+        const fixture = globalThis as unknown as { fixtureEditors: Record<string, { pane: { tabs: unknown[] }; workspace?: { path: string } }> }
+        return ['main', 'side'].every(id => fixture.fixtureEditors[id]?.workspace?.path === '/gamma' && fixture.fixtureEditors[id].pane.tabs.length === 0)
+      })
+      assert.equal(await page.locator('[data-test-editor] button').count(), 0, 'an empty project remains empty without carrying earlier tabs')
+      await assertAccountLayout(latest)
+      assert.deepEqual(errors, [])
+      return
+    }
     if (mode === 'swipes') {
       const dock = page.getByRole('navigation', { name: '작업 독', exact: true })
       for (const width of [390, 1100]) {
@@ -462,10 +551,11 @@ for (const mode of ['onboarding', 'keyboard', 'workspace', 'documents', 'permiss
       await assertKeptWorkspace()
       await page.keyboard.press('Alt+p')
       await page.locator('[data-project-option="/alpha-worktree"]').click()
-      await page.locator('[data-test-editor="target"]').getByText('Content of /alpha-worktree / target-only.md', { exact: true }).waitFor()
+      await page.locator('[data-test-editor="main"]').getByText('Content of /alpha-worktree / target-only.md', { exact: true }).waitFor()
       assert.equal(active, '/alpha-worktree')
       assert.equal(projectPath, '/alpha-worktree')
-      assert.equal(await side.count(), 0, 'a separate project restores its own pane layout')
+      assert.equal(await side.count(), 1, 'a separate project keeps the account desktop editor slots')
+      assert.equal(await side.getByRole('button').count(), 0, 'the retained extra slot does not inherit the previous project files')
       assert.equal(await page.getByRole('button', { name: 'Select README.md', exact: true }).count(), 0)
       assert.deepEqual(errors, [])
       return

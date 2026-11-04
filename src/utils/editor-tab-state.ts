@@ -1,8 +1,8 @@
 import type { Pane, Tab } from '../hooks/useTabs.ts'
 import { isExternalTabPath } from './externalFiles.ts'
 import { isGitTabPath } from './gitTabs.ts'
-import { normalizeLayout, type PaneNode } from './paneTree.ts'
-import { activePaneTab } from './editor-tab-navigation.ts'
+import { leaf, normalizeLayout, type PaneNode } from './paneTree.ts'
+import { activePaneTab, recordPaneActivation } from './editor-tab-navigation.ts'
 
 export type StoredTab = { path: string; preview: boolean; viewMode: 'hotview' | 'plain' }
 export type StoredTabs = {
@@ -12,6 +12,31 @@ export type StoredTabs = {
   focusedPaneId: string
 }
 export type EditorTabState = { panes: Pane[]; layout: PaneNode; focusedPaneId: string }
+
+/** Fit this project's existing buffers into account layout slots without importing another project's tabs. */
+export function alignEditorPaneSlots(state: EditorTabState, ids: string[], preferredFocus?: string): EditorTabState {
+  const slots = [...new Set(ids)].slice(0, 64)
+  if (!slots.length || slots.length === state.panes.length && slots.every((id, index) => id === state.panes[index].id)) {
+    return preferredFocus && preferredFocus !== state.focusedPaneId && state.panes.some(pane => pane.id === preferredFocus) ? { ...state, focusedPaneId: preferredFocus } : state
+  }
+  const used = new Set<Pane>()
+  const matched = new Map(slots.map(id => [id, state.panes.find(pane => pane.id === id)]))
+  const reserved = new Set([...matched.values()].filter((pane): pane is Pane => !!pane))
+  let focusedPaneId = slots[0]
+  const panes = slots.map(id => {
+    const source = matched.get(id) ?? state.panes.find(pane => !used.has(pane) && !reserved.has(pane))
+    if (!source) return { id, tabs: [], activePath: null } as Pane
+    used.add(source)
+    if (source.id === state.focusedPaneId) focusedPaneId = id
+    return { ...source, id }
+  })
+  const remaining = state.panes.filter(pane => !used.has(pane)).flatMap(pane => pane.tabs)
+  if (remaining.length) {
+    const active = activePaneTab(panes[0]) ?? remaining[0]
+    panes[0] = recordPaneActivation(panes[0], { ...panes[0], tabs: [...panes[0].tabs, ...remaining], activePath: active.path, activeTabId: active.id })
+  }
+  return { panes, layout: slots.length === 1 ? leaf(slots[0]) : { kind: 'split', dir: 'row', kids: slots.map(leaf) }, focusedPaneId: preferredFocus && slots.includes(preferredFocus) ? preferredFocus : focusedPaneId }
+}
 
 export function normalizeStoredTabs(input: unknown): StoredTabs | null {
   if (!input || typeof input !== 'object' || Array.isArray(input)) return null

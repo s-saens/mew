@@ -1,15 +1,21 @@
 ---
 title: "Real-time account tabs"
-description: "Defines authoritative account editor, agent, and terminal tabs across devices, live presence signals, migration, concurrent saves, draft protection, and recovery. Separates shared tab selection from device-local panel geometry."
+description: "Defines authoritative account-and-project editor, agent, and terminal tabs across devices, live presence signals, migration, concurrent saves, draft protection, and recovery. Separates shared tab metadata from account-wide desktop editor slots, preferred slot focus, and panel geometry on each browser device."
 created: "2026-11-04"
 updated: "2026-11-04"
 ---
 
 Open editor, agent, and terminal tabs and active selection belong to the authenticated account and logical project on one Mew instance. Changes propagate through the existing presence connection. Different accounts and projects keep independent lists. Dock positions, panel sizes, visibility, mobile foreground, and popup geometry retain their [device-local ownership](ui-workspace-layout.md#workspace-panel-layout). See [ADR 0133](../decisions/0133-realtime-account-tabs.md).
 
+On desktop, that device's layout and last focused panel belong to the account across projects under [ADR 0134](../decisions/0134-account-desktop-layout.md). Selecting another project replaces its content inside the existing desktop arrangement. It does not reuse the outgoing project's open files, active document, agent tabs, or terminal tabs. Mobile retains project-specific layout and foreground restoration.
+
 ## Editor tabs
 
 `GET /api/user-ui/editor-tabs?workspace=<logical project path>` returns `{state, revision}`. `state` is a map from editor API scope to its `StoredTabs`, or `null` before initialization. Stored metadata contains paths, preview and view modes, pane membership, pane layout, active paths, and focused pane. It contains no document bodies, drafts, or permission grants. External filesystem and transient Git tabs remain local.
+
+Saved pane metadata describes the project's tabs; it does not replace the current desktop slot geometry on a project switch. Align incoming panes with the account's device-local editor slots while preserving that project's tabs and active selections, including when saved pane IDs differ. Preserve the tab/content scope and file-read boundaries during alignment. Device-local panel focus names a work surface, such as editor or terminal; it is separate from the shared active document or execution tab.
+
+The account's desktop chrome also remembers its last focused editor slot as `focusedEditorPaneId`. Desktop hydration prefers that valid slot over the incoming project's mapped focus while retaining the destination panes' active paths. `focusedPaneId` remains in project tab metadata for compatibility and mobile restoration. If the preferred desktop slot no longer exists, use the incoming mapped focus or the first slot. This restores selection without taking DOM focus.
 
 `PUT /api/user-ui/editor-tabs` accepts `{workspacePath, project, state, initialize?}` and returns the full map and revision. The server derives the account from authentication, validates path/object/size limits, and updates only the requested scope. Revisions increase per workspace. Concurrent saves to the same editor scope use the last accepted snapshot; saves to sibling scopes preserve one another.
 
