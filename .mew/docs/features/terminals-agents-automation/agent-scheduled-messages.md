@@ -8,7 +8,7 @@ updated: "2026-11-04"
 status_hash: "333669f522d259fe25acbfd4326c1e55deca98f9f89df6cb5443d61057d19e0a"
 files: ["src/components/AgentPanel.tsx", "src/components/agent-schedule-input.tsx", "src/hooks/use-scheduled-prompts.ts", "src/utils/agent-scheduled-cache.ts", "server/agentScheduledPrompts.ts"]
 commits: []
-description: "One-time agent messages scheduled through floating inline hours/minutes controls, with confirmation, cancellation, and time editing. Covers document tags, device-stored list restoration, server synchronization, and queued execution in the original session."
+description: "One-time agent messages scheduled through floating inline hours/minutes controls, with a smooth entrance, reduced-motion support, confirmation, cancellation, and time editing. Covers document tags, device-stored list restoration, server synchronization, and queued execution in the original session."
 상위파일:
   - "MOC.md"
   - "_terminals-agents-automation.md"
@@ -35,7 +35,7 @@ description: "One-time agent messages scheduled through floating inline hours/mi
 
 ## Detailed behavior
 
-The clock button inside the input field is replaced in place by a compact floating hours/minutes form with Check and X buttons on the right. It starts at 1 hour and 0 minutes. Hours accept whole numbers from 0 to 999; minutes accept 0 to 59, with a positive total required. Check or Enter schedules the current input, including attachment references, relative to the confirmation time. X or Escape returns to the clock without changing the draft. There is no separate popup or date/time picker.
+The clock button inside the input field is replaced in place by a compact floating hours/minutes form with Check and X buttons on the right. It starts at 1 hour and 0 minutes. Hours accept whole numbers from 0 to 999; minutes accept 0 to 59, with a positive total required. Check or Enter schedules the current input, including attachment references, relative to the confirmation time. X or Escape returns to the clock without changing the draft. There is no separate popup or date/time picker. Opening the form reveals it from the clock side over 240ms with a short leftward movement and fade. With reduced motion enabled, use a 100ms fade without movement or clipping. Fields are immediately interactive; closing cancels any remaining animation, and reopening plays a fresh entrance. Browsers without the Web Animations API show the form immediately.
 
 While registration is pending, lock the fields and both actions to prevent duplicate requests. On failure, retain the entered duration and draft and show the error beside the form for retry. Only successful creation clears the input draft and attachment display. Existing session, CLI, upload, and queue-edit restrictions remain. Floating controls wrap within narrow panels; their measured height updates editor clearance without adding a separate footer.
 

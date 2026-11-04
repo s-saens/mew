@@ -2,7 +2,7 @@
 title: "Agent composer action row"
 created: "2026-11-02"
 updated: "2026-11-04"
-description: "Records moving the agent composer actions into the input surface, the rounder right-pointing Send button, aligned hover tooltips, the correction from a reserved footer row to floating controls, responsive and keyboard regression checks, and local build verification. Also records replacement of the schedule picker with inline relative-time fields, component checks, and blocked browser verification. Distinguishes local checks from physical-device and server lifecycle verification."
+description: "Records moving the agent composer actions into the input surface, the rounder right-pointing Send button, aligned hover tooltips, the correction from a reserved footer row to floating controls, responsive and keyboard regression checks, and local build verification. Also records replacement of the schedule picker with inline relative-time fields, component checks, the schedule entrance animation and reduced-motion behavior, and blocked browser verification. Distinguishes local checks from physical-device and server lifecycle verification."
 ---
 
 The agent composer now groups Drawing, Save prompt, Attach, Schedule, and Send inside the input surface, in that order. This removes the separate right action column and gives the settings and editor the full available width. Button sizes and colors remain; Send uses 12px corners and Iconoir's right-pointing Send icon. The [agent input contract](../features/terminals-agents-automation/agent-input-mentions-skills-and-attachments.md#composer-input) owns the current behavior.
@@ -70,3 +70,18 @@ Verification on 2026-11-04:
 - `git diff --check` passed for the task files.
 
 No deployment, launcher, or server lifecycle operation was performed. The required build refreshed local `dist/` assets. Physical-device and browser layout verification remain pending.
+
+
+## Follow-up: schedule entrance motion
+
+The inline schedule form now reveals from the clock side with a short slide and fade. A one-shot Web Animations API effect keeps the controls immediately usable and cancels on unmount; reopening starts a fresh entrance. Reduced motion uses only a short fade. The [scheduled-message contract](../features/terminals-agents-automation/agent-scheduled-messages.md#detailed-behavior) owns timing and fallback behavior.
+
+Verification on 2026-11-04:
+
+- `node --test server/agent-schedule-input.test.ts`: Passed. Checks normal and reduced-motion keyframes, immediate focus and submission, cancellation on unmount, replay on reopening, no replay while typing, and usability without animation support, alongside the scheduling regressions. The animation API is mocked; this does not verify rendered smoothness.
+- `npm run build`: Passed, including TypeScript and the production bundle, with the existing large-chunk warning.
+- Targeted Oxlint and `git diff --check`: Passed.
+- The Obscura connection probe failed; rendered desktop/mobile motion remains unverified. No browser service was started.
+- `npm run check:docs`: Metadata passed; the link check reported 42 existing missing-target errors outside the changed documents, including `.mew/docs/MOC.md` and `.mew/docs/decisions/README.md`. The two changed documents have no link errors in the existing checker.
+
+The required build refreshed local `dist/` assets. No deployment, launcher, or server lifecycle operation was performed.

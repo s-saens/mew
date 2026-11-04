@@ -13,12 +13,21 @@ import {AgentScheduleInput} from '${root}/src/components/agent-schedule-input.ts
 import {I18nProvider} from '${root}/src/i18n.tsx';
 window.IS_REACT_ACT_ENVIRONMENT = true;
 localStorage.setItem('mew:locale', 'ko');
+window.reducedMotion = false;
+const matchMedia = window.matchMedia.bind(window);
+window.matchMedia = query => query === '(prefers-reduced-motion: reduce)' ? {matches: window.reducedMotion} : matchMedia(query);
+window.motionCalls = [];
+Element.prototype.animate = function(frames, options) {
+  const record = {target: this.getAttribute('aria-label'), frames, options, canceled: false};
+  window.motionCalls.push(record);
+  return {cancel: () => {record.canceled = true;}};
+};
 const host = document.getElementById('root'), root = createRoot(host);
 let generation = 0, mode = 'success', resolveSave, rejectSave;
 window.calls = []; window.closed = 0; window.outerKeys = [];
 window.fixture = {
   mount: props => act(async () => {
-    generation++; window.calls = []; window.closed = 0; window.outerKeys = [];
+    generation++; window.calls = []; window.closed = 0; window.outerKeys = []; window.motionCalls = [];
     root.render(<I18nProvider><div onKeyDown={event => window.outerKeys.push(event.key)}>
       <AgentScheduleInput key={generation} {...props}
         onClose={() => window.closed++}
@@ -65,7 +74,8 @@ window.fixture = {
   win.Date.now = () => now
   win.eval(chunk.code)
   const state = win as unknown as {
-    calls: string[]; closed: number; outerKeys: string[]
+    calls: string[]; closed: number; outerKeys: string[]; reducedMotion: boolean
+    motionCalls: { target: string; frames: { opacity: number; transform?: string; clipPath?: string }[]; options: { duration: number; easing: string }; canceled: boolean }[]
     fixture: {
       mount(props?: { disabled?: boolean; initialAt?: string }): Promise<void>
       set(label: string, value: string): Promise<void>; click(label: string): Promise<void>
@@ -79,7 +89,17 @@ window.fixture = {
   const confirm = () => win.document.querySelector<HTMLButtonElement>('button[aria-label="확인"]')!
   try {
     await fixture.mount({ disabled: false })
-    assert.ok(win.document.querySelector('form[aria-label="예약 전송"]'))
+    const form = win.document.querySelector('form[aria-label="예약 전송"]')
+    assert.ok(form)
+    const entrance = state.motionCalls[0]
+    assert.equal(state.motionCalls.length, 1)
+    assert.equal(entrance.target, '예약 전송')
+    assert.equal(entrance.options.duration, 240)
+    assert.equal(entrance.options.easing, 'cubic-bezier(0.16, 1, 0.3, 1)')
+    assert.equal(entrance.frames[0].transform, 'translateX(6px)')
+    assert.match(entrance.frames[0].clipPath!, /100% - 2rem/, 'reveal grows from the clock side')
+    assert.equal(entrance.frames[1].opacity, 1)
+    assert.equal(win.document.activeElement?.getAttribute('aria-label'), '시간', 'the fields work immediately during the entrance')
     assert.equal(hours().getAttribute('type'), 'number')
     assert.equal(minutes().getAttribute('type'), 'number')
     assert.equal(hours().value, '1')
@@ -91,9 +111,22 @@ window.fixture = {
     await fixture.set('시간', '2')
     await fixture.set('분', '15')
     now += 90_000
+    assert.equal(state.motionCalls.length, 1, 'typing does not restart the entrance')
     await fixture.click('확인')
     assert.deepEqual(Array.from(state.calls), [new Date(now + 135 * 60_000).toISOString()], 'the delay starts when confirmed')
     assert.equal(state.closed, 1)
+
+    state.reducedMotion = true
+    await fixture.mount({ disabled: false })
+    assert.equal(entrance.canceled, true, 'unmounting cancels the previous entrance')
+    assert.equal(state.motionCalls[0].options.duration, 100)
+    assert.ok(state.motionCalls[0].frames.every(frame => frame.transform === undefined && frame.clipPath === undefined), 'reduced motion uses only a short fade')
+    const reducedEntrance = state.motionCalls[0]
+    state.reducedMotion = false
+    await fixture.mount({ disabled: false })
+    assert.equal(reducedEntrance.canceled, true)
+    assert.equal(state.motionCalls.length, 1, 'reopening starts one fresh entrance')
+    assert.equal(state.motionCalls[0].options.duration, 240)
 
     for (const [hour, minute] of [['0', '1'], ['999', '59']]) {
       await fixture.mount({ disabled: false })
@@ -158,6 +191,13 @@ window.fixture = {
     assert.equal(state.calls.length, 2)
     assert.equal(state.calls[1], new Date(now + 5 * 60_000).toISOString())
     assert.equal(state.closed, 1, 'a successful retry closes the control')
+
+    win.eval('Element.prototype.animate = undefined')
+    await fixture.mount({ disabled: false })
+    assert.equal(state.motionCalls.length, 0)
+    assert.equal(win.document.activeElement?.getAttribute('aria-label'), '시간')
+    await fixture.click('확인')
+    assert.equal(state.calls.length, 1, 'scheduling still works without the animation API')
   } finally {
     await fixture.destroy()
     await win.happyDOM.close()

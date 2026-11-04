@@ -20,7 +20,22 @@ export function AgentScheduleInput({ onClose, onConfirm, disabled, initialAt }: 
   const [error, setError] = useState<string | null>(null)
   const submitting = useRef(false)
   const hoursInput = useRef<HTMLInputElement>(null)
-  useEffect(() => { hoursInput.current?.focus(); hoursInput.current?.select() }, [])
+  const form = useRef<HTMLFormElement>(null)
+  useEffect(() => {
+    hoursInput.current?.focus()
+    hoursInput.current?.select()
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    const animation = form.current?.animate?.(
+      reducedMotion
+        ? [{ opacity: 0.6 }, { opacity: 1 }]
+        : [
+            { opacity: 0, clipPath: 'inset(0 0 0 calc(100% - 2rem) round 8px)', transform: 'translateX(6px)' },
+            { opacity: 1, clipPath: 'inset(0 0 0 0 round 8px)', transform: 'translateX(0)' },
+          ],
+      { duration: reducedMotion ? 100 : 240, easing: 'cubic-bezier(0.16, 1, 0.3, 1)' },
+    )
+    return () => animation?.cancel()
+  }, [])
   const hours = Number(delay.hours)
   const minutes = Number(delay.minutes)
   const valid = /^\d+$/.test(delay.hours) && /^\d+$/.test(delay.minutes)
@@ -47,7 +62,7 @@ export function AgentScheduleInput({ onClose, onConfirm, disabled, initialAt }: 
   const inputClass = 'h-6 w-8 rounded border border-edge bg-surface px-0.5 text-center text-xs tabular-nums text-ink outline-none focus-visible:border-accent disabled:opacity-50 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none'
   const buttonClass = 'flex h-7 w-7 shrink-0 items-center justify-center rounded text-ink-secondary hover:bg-surface-hover hover:text-ink focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-40'
   return (
-    <form aria-label={uiText('예약 전송')} onSubmit={submit}
+    <form ref={form} aria-label={uiText('예약 전송')} onSubmit={submit}
       onKeyDown={event => {
         if (event.nativeEvent.isComposing) return
         if (event.key === 'Escape') {
