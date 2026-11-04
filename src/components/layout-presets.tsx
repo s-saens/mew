@@ -126,7 +126,7 @@ export function LayoutPresets({ storageKey, legacyStorageKey, factory, capture, 
           <input ref={nameInput} aria-label={t('layout.name')} value={renaming.name} maxLength={60}
             onChange={event => setRenaming({ ...renaming, name: event.target.value })}
             className="min-w-0 flex-1 rounded border border-edge bg-surface px-2 py-1 text-sm text-ink focus:border-accent focus:outline-none" />
-          <button type="submit" className="rounded bg-accent px-2 py-1 text-xs text-white">{t('common.save')}</button>
+          <button type="submit" className="rounded bg-accent px-2 py-1 text-xs text-ink-on-accent hover:bg-accent-strong">{t('common.save')}</button>
           <button type="button" onClick={cancelRename} className="rounded px-2 py-1 text-xs text-ink-secondary hover:bg-surface-hover">{t('common.cancel')}</button>
         </form>}
         {notice && <p role="status" className="mt-2 max-w-72 text-xs text-ink-secondary">{notice}</p>}

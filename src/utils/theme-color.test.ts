@@ -306,3 +306,19 @@ test('arbitrary black, white and saturated primary colors keep their source and 
     }
   }
 })
+
+test('solid accent button classes use ink-on-accent instead of body or hardcoded white text', () => {
+  const dir = new URL('../components/', import.meta.url)
+  for (const file of fs.readdirSync(dir).filter(name => name.endsWith('.tsx'))) {
+    const source = fs.readFileSync(new URL(file, dir), 'utf8')
+    const tokens = [...source.matchAll(/['"]([^'"]*\bbg-accent\b(?![/-])[^'"]*)['"]/g)].map(match => match[1])
+    for (const value of tokens) {
+      if (!/\btext-/.test(value)) continue
+      assert.match(value, /\btext-ink-on-accent\b/, `${file}: ${value}`)
+      assert.doesNotMatch(value, /\btext-(?:ink|accent-ink|white)(?![/-])/, `${file}: ${value}`)
+      assert.doesNotMatch(value, /\bhover:bg-surface-hover\b/, `${file}: ${value}`)
+    }
+  }
+})
+
+

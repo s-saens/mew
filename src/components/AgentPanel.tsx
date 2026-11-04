@@ -4351,7 +4351,7 @@ function AgentSessionView({
                         }}
                       />
                       <div className="flex shrink-0 flex-col gap-1">
-                        <button type="button" onPointerDown={keepFocusOnPress} onClick={() => commitScheduledEdit(editing)} disabled={!editing.text.trim()} className="rounded bg-accent px-2 py-1 text-xs font-medium text-accent-ink hover:bg-accent-strong disabled:opacity-40">{uiText("완료")}</button>
+                        <button type="button" onPointerDown={keepFocusOnPress} onClick={() => commitScheduledEdit(editing)} disabled={!editing.text.trim()} className="rounded bg-accent px-2 py-1 text-xs font-medium text-ink-on-accent hover:bg-accent-strong disabled:opacity-40">{uiText("완료")}</button>
                         <button type="button" onPointerDown={keepFocusOnPress} onClick={() => setEditingScheduled(null)} className="rounded border border-edge-strong px-2 py-1 text-xs text-ink-secondary hover:bg-surface-hover hover:text-ink">{uiText("취소")}</button>
                       </div>
                     </>
@@ -5146,7 +5146,7 @@ const AgentConversationItem = memo(function AgentConversationItem({ item, expand
                             type="button"
                             disabled={readOnly}
                             onClick={() => send({ type: 'permission', id: child.id, optionId: option.optionId })}
-                            className={`rounded px-2 py-1 text-xs ${option.kind.startsWith('allow') ? 'bg-accent text-ink' : 'bg-surface-raised text-ink-secondary'} hover:bg-surface-hover disabled:opacity-40`}
+                            className={`rounded px-2 py-1 text-xs ${option.kind.startsWith('allow') ? 'bg-accent text-ink-on-accent hover:bg-accent-strong' : 'bg-surface-raised text-ink-secondary hover:bg-surface-hover'} disabled:opacity-40`}
                           >
                             {option.name}
                           </button>

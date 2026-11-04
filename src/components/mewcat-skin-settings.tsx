@@ -121,7 +121,7 @@ export function MewcatSkinSettings({ skin, onChange }: { skin: MewcatSkinSelecti
       </details>
       <div className="mt-2 flex items-center justify-between gap-2">
         <span className="text-xs text-ink-muted">{uiText('모든 프로젝트에서 사용')}</span>
-        <button type="button" disabled={busy} onClick={() => void save()} className="min-h-9 rounded bg-accent px-3 text-sm font-medium text-white disabled:opacity-40">{busy ? uiText('저장 중…') : uiText('저장')}</button>
+        <button type="button" disabled={busy} onClick={() => void save()} className="min-h-9 rounded bg-accent px-3 text-sm font-medium text-ink-on-accent hover:bg-accent-strong disabled:opacity-40">{busy ? uiText('저장 중…') : uiText('저장')}</button>
       </div>
     </div>}
     {error && <p className="mt-2 text-sm text-danger" role="alert">{error}</p>}
