@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom'
 import type { MentionInputHandle } from './agent-composer-input'
 import { deferredComponent } from './deferred-component'
 import type { ComposerAttachment } from './agent-composer-attachments'
+import type { OpenAgentDocument } from './agent-document-tag'
 import { clipboardImages } from '../utils/clipboard-images'
 import { prefixMatch } from '@mew/editor/fuzzy'
 import { useOverlayDismiss } from '@mew/ui'
@@ -75,6 +76,7 @@ export function MentionTextarea({
   imageCapable = false,
   attachmentForToken,
   resolvePendingToken,
+  onOpenFile,
 }: {
   value: string
   onChange: (value: string) => void
@@ -107,6 +109,7 @@ export function MentionTextarea({
   imageCapable?: boolean
   attachmentForToken?: (token: string) => ComposerAttachment
   resolvePendingToken?: (token: string) => string | undefined
+  onOpenFile?: OpenAgentDocument
   /** 호스트가 첫·마지막 시각적 줄인지 확인해 입력 히스토리를 탐색한다. 처리했으면 true를 돌린다. */
   onHistoryNavigate?: (direction: 'up' | 'down') => boolean
 }) {
@@ -326,6 +329,7 @@ export function MentionTextarea({
         onImagesPasted={onImagesPasted}
         attachmentForToken={attachmentForToken}
         resolvePendingToken={resolvePendingToken}
+        onOpenFile={onOpenFile}
         inputRef={textareaRef}
         placeholder={placeholder}
         label={submitHint}

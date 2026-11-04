@@ -1,8 +1,8 @@
 ---
-title: "Document reference tags in agent questions"
-description: "Records the 2026-11-01 replacement of raw document references in sent agent questions with document icon tags, filename popup actions, local verification, and runtime and physical-device limits."
+title: "Document reference tags in agent messages and input"
+description: "Records document icon tags in sent agent questions and the November 4 extension to the composer and scheduled message previews and editors. Covers filename actions, atomic editing, exact reference preservation, local checks, and browser and runtime limits."
 created: "2026-11-01"
-updated: "2026-11-01"
+updated: "2026-11-04"
 ---
 
 Sent user messages now display ordinary document references as compact icon tags. Activating an icon reveals the filename; activating the filename opens the original project/path in Mew's editor. This also covers reference-only messages and repeated references mixed with attachments. The [input feature contract](../features/terminals-agents-automation/agent-input-mentions-skills-and-attachments.md) owns current behavior, and [ADR 0039](../decisions/0039-agent-inline-attachments.md#2026-11-01-follow-up-changes) records the presentation change.
@@ -19,3 +19,17 @@ Local verification:
 - Final `npm run build`: Passed, including TypeScript and production assets. Existing large-chunk warnings remain. An intermediate run encountered `TS2339` in a concurrent `src/App.tsx` task-session edit; the final rerun passed after that source was corrected, without additional changes from this task.
 
 The required build refreshed local `dist/` assets. No deployment, launcher execution, or server lifecycle operation was performed. Physical mobile devices remain unverified.
+
+## November 4: composer and scheduled messages
+
+Extended document tags to the main composer, pending queue editing, scheduled previews, and scheduled editing because these surfaces still exposed raw reference strings. The composer uses a separate CodeMirror replacement/atomic-range extension and reuses `AgentDocumentTag` for filename actions and removal. Scheduled previews use passive tags within the existing edit button. The resizable scheduled editor now uses the same rich mention input. CLI command text stays literal, and upload identity and serialization remain unchanged. Current behavior belongs to the [input contract](../features/terminals-agents-automation/agent-input-mentions-skills-and-attachments.md) and [scheduled message contract](../features/terminals-agents-automation/agent-scheduled-messages.md).
+
+Local checks and limits:
+
+- `node --test server/agent-document-tags.test.ts src/utils/agent-attachments.test.ts src/utils/agent-composer-document.test.ts src/utils/agentInputMentions.test.ts`: 19 tests passed. The new DOM regression exercises actual `@` selection, hidden tokens, repeated/scoped references, passive scheduled tags, arrow movement, atomic deletion, remove actions, undo/redo, filename opening, reference serialization, CLI switching, external edits, and malformed/upload exclusions. It uses Happy DOM and does not establish browser layout or physical-device behavior.
+- Targeted lint passed with existing component warnings. The Impeccable detector reported no findings.
+- `server/agent-composer-attachments-ui.test.ts` and `server/mention-textarea-ui.test.ts` could not connect to the user-managed Obscura service. Browser layout and touch verification remain incomplete; no alternative browser or service was started.
+- Final `npm run build` passed, including TypeScript and production assets, with the existing chunk-size warning. Earlier checks encountered concurrent editor-tab type errors in `useTabs.ts`, `user-ui-routes.test.ts`, and `editor-tabs-sync-ui.test.ts`; the final rerun passed after those sources changed, without this task editing them.
+- `npm run check:docs`: the initial run passed all 690 descriptions and found two existing links to the missing `.mew/docs/decisions/README.md`. The final run passed 694 descriptions and found 42 broken links during concurrent documentation navigation renames. These paths are outside this task. Filtering the repository link checker to the three documents changed here found zero errors. `git diff --check` passed.
+
+The required build refreshed local `dist/` assets. No deployment, launcher execution, or server lifecycle operation was performed. Physical-device and real-browser checks remain incomplete.

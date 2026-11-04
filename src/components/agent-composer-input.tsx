@@ -6,6 +6,9 @@ import { EditorView, keymap, placeholder as inputPlaceholder } from '@codemirror
 import { defaultKeymap, history, historyKeymap, isolateHistory } from '@codemirror/commands'
 import { composerAttachmentPattern, composerAttachments, refreshComposerAttachments, type ComposerAttachment } from './agent-composer-attachments'
 import { ComposerDocument } from '../utils/agent-composer-document'
+import { documentReferenceTokens } from '../utils/agent-attachments'
+import { composerDocuments, refreshComposerDocuments } from './agent-composer-documents'
+import type { OpenAgentDocument } from './agent-document-tag'
 
 /** Shared cursor operations for the plain textarea and the image-capable composer. */
 export interface MentionInputHandle {
@@ -26,6 +29,7 @@ export function AgentComposerInput(props: {
   onImagesPasted?: (files: File[]) => void
   attachmentForToken?: (token: string) => ComposerAttachment
   resolvePendingToken?: (token: string) => string | undefined
+  onOpenFile?: OpenAgentDocument
   inputRef: RefObject<MentionInputHandle | null>
   placeholder?: string
   label?: string
@@ -77,6 +81,7 @@ export function AgentComposerInput(props: {
             const result = latest.current.resolvePendingToken?.(token)
             return latest.current.attachmentForToken?.(result || token)
           }),
+          composerDocuments(() => latest.current.onOpenFile),
           EditorView.clipboardOutputFilter.of(text => document.canonical(text)),
           EditorView.clipboardInputFilter.of(text => document.editor(text)),
           EditorView.domEventHandlers({
@@ -166,19 +171,20 @@ export function AgentComposerInput(props: {
       while (end > from && nextEnd > from && previous[end - 1] === editorValue[nextEnd - 1]) { end--; nextEnd-- }
       let suffix = previous.length - end
       for (const [text, boundary] of [[previous, end], [editorValue, nextEnd]] as const) {
-        for (const match of text.matchAll(composerAttachmentPattern)) {
-          const to = match.index + match[0].length
-          if (match.index < from && from < to) from = match.index
-          if (match.index < boundary && boundary < to) suffix = Math.min(suffix, text.length - to)
+        const ranges = [...text.matchAll(composerAttachmentPattern)].map(match => ({ from: match.index, to: match.index + match[0].length }))
+        if (props.onOpenFile) ranges.push(...documentReferenceTokens(text))
+        for (const range of ranges) {
+          if (range.from < from && from < range.to) from = range.from
+          if (range.from < boundary && boundary < range.to) suffix = Math.min(suffix, text.length - range.to)
         }
       }
       end = previous.length - suffix
       nextEnd = editorValue.length - suffix
       view.dispatch({ changes: { from, to: end, insert: editorValue.slice(from, nextEnd) }, annotations: Transaction.addToHistory.of(false) })
     }
-    view.dispatch({ effects: refreshComposerAttachments.of(null) })
+    view.dispatch({ effects: [refreshComposerAttachments.of(null), refreshComposerDocuments.of(null)] })
     view.contentDOM.setAttribute('aria-label', props.label ?? props.placeholder ?? '')
-  }, [props.value, props.label, props.placeholder, props.attachmentForToken])
+  }, [props.value, props.label, props.placeholder, props.attachmentForToken, props.onOpenFile])
 
   return <div ref={hostRef} className={props.className} style={props.style} />
 }

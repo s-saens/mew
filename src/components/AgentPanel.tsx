@@ -4,7 +4,7 @@ import { HeaderSelect } from './agent-header-select'
 import { AgentPromptDrafts } from './agent-prompt-drafts'
 import { RuntimeInstallProgress } from './RuntimeInstallProgress'
 import { AgentAttachmentIcon } from './agent-attachment-icon'
-import { AgentDocumentTag } from './agent-document-tag'
+import { AgentDocumentReferences, AgentDocumentTag } from './agent-document-tag'
 import { attachmentKind, conversationAttachments, documentReferenceTokens, uploadedAttachmentTokens, withoutAttachmentTokens } from '../utils/agent-attachments'
 import { AgentMediaPreviewDialog } from './agent-media-preview-dialog'
 import { scopedBrowserStorage } from '@mew/ui/browser-storage-scope'
@@ -227,11 +227,19 @@ function ResizableQueueTextarea({
   onChange,
   onKeyDown,
   label,
+  onOpenFile,
+  options,
+  triggers,
+  onTriggerChange,
 }: {
   value: string
   onChange: (value: string) => void
-  onKeyDown: (event: ReactKeyboardEvent<HTMLTextAreaElement>) => void
+  onKeyDown: (event: ReactKeyboardEvent<HTMLDivElement>) => void
   label: string
+  onOpenFile: OpenWorkspaceFile
+  options: MentionOption[]
+  triggers: TriggerOptionSet[]
+  onTriggerChange: (trigger: string | null) => void
 }) {
   useUiLocale()
   const containerRef = useRef<HTMLDivElement>(null)
@@ -308,14 +316,22 @@ function ResizableQueueTextarea({
       >
         <span className="pointer-events-none absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-transparent group-hover:bg-accent group-focus-visible:bg-accent" />
       </div>
-      <textarea
+      <div className="h-full" onKeyDownCapture={onKeyDown}>
+      <MentionTextarea
+        imageCapable
         autoFocus={canAutoFocusInput()}
-        aria-label={label}
+        submitHint={label}
         value={value}
-        onChange={(event) => onChange(event.target.value)}
-        onKeyDown={onKeyDown}
+        onChange={onChange}
+        onOpenFile={onOpenFile}
+        options={options}
+        triggers={triggers}
+        onTriggerChange={onTriggerChange}
+        maxResults={Infinity}
+        style={{ height: '100%' }}
         className="h-full w-full resize-none rounded bg-surface-raised px-2 py-1 text-xs text-ink outline-none"
       />
+      </div>
     </div>
   )
 }
@@ -4278,6 +4294,10 @@ function AgentSessionView({
                     <>
                       <ResizableQueueTextarea
                         label={uiText("예약 메시지 수정칸")}
+                        onOpenFile={onOpenFile}
+                        options={fileMentionOptions}
+                        triggers={mentionTriggers}
+                        onTriggerChange={setMentionTrigger}
                         value={editing.text}
                         onChange={(text) => setEditingScheduled({ ...editing, text })}
                         onKeyDown={(event) => {
@@ -4304,7 +4324,7 @@ function AgentSessionView({
                       disabled={editingScheduled !== null}
                       title={uiText("눌러서 수정")}
                       className="min-w-0 flex-1 truncate text-left text-ink-secondary disabled:cursor-default"
-                    >{job.text}</button>
+                    ><AgentDocumentReferences text={job.text} /></button>
                     <button
                       type="button"
                       onClick={() => { setRescheduling(job); setScheduleOpen(true) }}
@@ -4421,6 +4441,7 @@ function AgentSessionView({
             key={editingQueued ? `queue:${editingQueued.index}` : 'draft'}
             autoFocus={autoFocus && !editingQueued}
             imageCapable
+            onOpenFile={composerCliMode ? undefined : onOpenFile}
             value={composerDraft}
             resolvePendingToken={token => pendingAttachmentResults.current.get(token)}
             attachmentForToken={composerCliMode ? undefined : token => {
