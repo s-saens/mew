@@ -29,7 +29,7 @@ Check feature specifications and the development contract for current behavior. 
 - [Implementation plans, investigations, and verification records](work/_work.md)
 - [Research and performance measurements](research/_research.md)
 - [Comparison of description and MOC navigation costs](research/desc-moc-benchmark.md)
-- [Mew decision records](decisions/README.md)
+- [Mew decision records](decisions/MOC.md)
 
 ## Documentation authoring and agent navigation
 
