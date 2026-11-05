@@ -15,7 +15,6 @@ import {HoverTipLayer} from '@mew/ui';
 import {I18nProvider} from '${root}/src/i18n.tsx';
 import {ProjectSwitcher} from '${root}/src/components/ProjectSwitcher.tsx';
 import {HeaderMenu} from '${root}/src/components/HeaderMenu.tsx';
-import {HeaderNotifications} from '${root}/src/components/header-notifications.tsx';
 import {HeaderResources} from '${root}/src/components/header-resources.tsx';
 import {ActiveSessionsButton} from '${root}/src/components/active-sessions-button.tsx';
 import {LayoutPresets} from '${root}/src/components/layout-presets.tsx';
@@ -36,8 +35,7 @@ function Fixture(){React.useEffect(()=>{publishMewcatNotice({key:'header-fixture
 <ActiveSessionsButton presence={presence} profile={{email:'alex@example.test',displayName:'Alex Park',avatarDataUrl:avatar}}/>
 <div className="hidden md:contents"><LayoutPresets storageKey="header-layout-fixture" factory={layout} capture={()=>layout} onApply={()=>{window.headerActions.layout++}}/></div>
 <HoverTipLayer className="contents" placement="bottom"><button type="button" aria-label="전체화면" data-tip="전체화면" className={headerIconControlClassName} onClick={()=>{window.headerActions.fullscreen++}}><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/></svg></button></HoverTipLayer>
-<HeaderNotifications/>
-<HeaderMenu items={[{id:'settings',label:'설정',icon:<svg width="16" height="16"><circle cx="8" cy="8" r="5" stroke="currentColor" fill="none"/></svg>,onSelect:()=>{window.headerActions.menu++}},{id:'help',label:'도움말',icon:<svg width="16" height="16"><path d="M8 3v6m0 3v1" stroke="currentColor"/></svg>,onSelect:()=>{window.headerActions.menu++}}]}/>
+<HeaderMenu notifications items={[{id:'settings',label:'설정',icon:<svg width="16" height="16"><circle cx="8" cy="8" r="5" stroke="currentColor" fill="none"/></svg>,onSelect:()=>{window.headerActions.menu++}},{id:'help',label:'도움말',icon:<svg width="16" height="16"><path d="M8 3v6m0 3v1" stroke="currentColor"/></svg>,onSelect:()=>{window.headerActions.menu++}}]}/>
 </div></header>
 <main tabIndex={-1} className="min-h-40 bg-surface-deep p-3 text-sm text-ink-secondary">README.md</main>
 <span data-reference-secondary className="hidden text-ink-secondary"/><span data-reference-ink className="hidden text-ink"/><span data-reference-accent className="hidden text-accent"/><span data-reference-hover className="hidden bg-surface-hover"/>
@@ -45,6 +43,7 @@ function Fixture(){React.useEffect(()=>{publishMewcatNotice({key:'header-fixture
 createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18nProvider>);`
   const bundle = await build({
     input: 'virtual:header-controls.tsx', write: false, platform: 'browser',
+    onLog(level, log, handler) { if (log.code !== 'MODULE_LEVEL_DIRECTIVE') handler(level, log) },
     output: { format: 'iife', codeSplitting: false },
     transform: { jsx: 'react-jsx', define: { 'process.env.NODE_ENV': JSON.stringify('test') } },
     plugins: [{ name: 'header-fixture', async resolveId(id, importer) {
@@ -64,7 +63,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
   const files = ['src/components/header-control.ts', 'src/components/ProjectSwitcher.tsx', 'src/components/ProjectIcon.tsx', 'src/components/HeaderMenu.tsx', 'src/components/header-menu-popup.tsx', 'src/components/header-notifications.tsx', 'src/components/header-resources.tsx', 'src/components/active-sessions-button.tsx', 'src/components/layout-presets.tsx', 'packages/ui/src/dialog-frame.tsx', 'packages/ui/src/HoverTipLayer.tsx', 'packages/ui/src/action-menu.tsx']
   const content = source + (await Promise.all(files.map(file => fs.readFile(path.join(root, file), 'utf8')))).join('\n')
   const compiler = await compile(await fs.readFile(path.join(root, 'src/index.css'), 'utf8'), { base: path.join(root, 'src'), onDependency() {} })
-  const css = compiler.build([...new Set(content.match(/[A-Za-z0-9_@:/.[\]()%,-]+/g))])
+  const css = compiler.build([...new Set(content.match(/[A-Za-z0-9_@:/.[\]()%,-]+/g))]) + await fs.readFile(path.join(root, 'src/components/workspace-menu.css'), 'utf8')
   const browser = await connectTestBrowser()
   try {
     const page = await browser.newPage({ viewport: { width: 1100, height: 700 }, hasTouch: true })
@@ -82,12 +81,14 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     await page.goto('http://mew-header-controls.test/')
     const header = page.locator('[data-app-header]')
     const menu = header.getByRole('button', { name: '메뉴', exact: true })
-    const bell = header.getByRole('button', { name: '알림: 1', exact: true })
+    const badge = menu.locator('[data-menu-notification-count]')
     const fullscreen = header.getByRole('button', { name: '전체화면', exact: true })
     const layouts = header.getByRole('button', { name: '레이아웃', exact: true })
     const resources = header.getByRole('button', { name: '시스템 자원 보기', exact: true })
     const sessions = header.locator('[data-active-sessions]')
-    await bell.waitFor()
+    await badge.waitFor()
+    assert.equal(await badge.innerText(), '1')
+    assert.equal(await header.getByRole('button', { name: /^알림:/ }).count(), 0, 'notifications share the menu trigger')
     await sessions.locator('[data-active-sessions-count]').waitFor()
     await page.getByText('CPU 37% · RAM 40% · GPU 24%', { exact: true }).waitFor({ state: 'attached' })
     assert.equal(await sessions.locator('[data-active-sessions-count]').innerText(), '4')
@@ -104,7 +105,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
       const ink = await page.locator('[data-reference-ink]').evaluate(element => element.ownerDocument.defaultView!.getComputedStyle(element).color)
       const accent = await page.locator('[data-reference-accent]').evaluate(element => element.ownerDocument.defaultView!.getComputedStyle(element).color)
       const hover = await page.locator('[data-reference-hover]').evaluate(element => element.ownerDocument.defaultView!.getComputedStyle(element).backgroundColor)
-      const controls = [resources, sessions, fullscreen, bell, menu, ...(width >= 768 ? [layouts] : [])]
+      const controls = [resources, sessions, fullscreen, menu, ...(width >= 768 ? [layouts] : [])]
       const measurements = []
       for (const control of controls) {
         measurements.push(await control.evaluate(element => {
@@ -125,13 +126,16 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
       assert.equal(await page.locator('html').evaluate(element => element.scrollWidth <= element.clientWidth), true)
       const project = await header.locator('[data-project-switcher]').boundingBox()
       assert.ok(project && project.width > 0, 'the project selector retains visible space')
-      assert.equal(await menu.innerText(), '', 'the menu trigger has an icon and an accessible name')
+      assert.equal(await badge.innerText(), '1', 'the menu trigger shows its unread badge beside the icon')
+      const descriptionId = await menu.getAttribute('aria-describedby')
+      assert.ok(descriptionId)
+      assert.equal(await page.locator(`[id="${descriptionId}"]`).innerText(), '읽지 않은 알림: 1', 'screen readers receive the unread count with its meaning')
       assert.equal(await menu.getAttribute('title'), null, 'the menu uses the immediate shared tooltip')
       assert.equal(await layouts.isVisible(), width >= 768)
       const sessionIcon = (await sessions.locator('[data-active-sessions-icon]').boundingBox())!
       assert.equal(sessionIcon.width, 16)
       assert.equal(sessionIcon.height, 16)
-      for (const icon of [fullscreen, bell, menu]) {
+      for (const icon of [fullscreen, menu]) {
         const box = (await icon.locator('svg').boundingBox())!
         assert.equal(box.width, 16)
         assert.equal(box.height, 16)
@@ -164,6 +168,9 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
       await menu.focus(); await menu.press('Enter')
       const popup = page.getByRole('menu', { name: '메뉴', exact: true })
       await popup.waitFor()
+      assert.equal(await popup.getByRole('menuitem', { name: '전체 보기', exact: true }).evaluate(element => element === element.ownerDocument.activeElement), true)
+      await page.keyboard.press('End')
+      await page.keyboard.press('ArrowUp')
       assert.equal(await popup.getByRole('menuitem', { name: '설정', exact: true }).evaluate(element => element === element.ownerDocument.activeElement), true)
       await page.keyboard.press('ArrowDown')
       assert.equal(await popup.getByRole('menuitem', { name: '도움말', exact: true }).evaluate(element => element === element.ownerDocument.activeElement), true)
@@ -174,13 +181,14 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
       await popup.waitFor({ state: 'detached' })
       assert.equal(await menu.evaluate(element => element === element.ownerDocument.activeElement), true)
 
-      await bell.click()
+      await menu.click()
+      await popup.getByRole('menuitem', { name: '전체 보기', exact: true }).click()
       const notices = page.getByRole('dialog', { name: '알림', exact: true })
       await notices.waitFor()
       const noticeBounds = (await notices.boundingBox())!
       assert.ok(noticeBounds.x >= 0 && noticeBounds.x + noticeBounds.width <= width)
       await page.keyboard.press('Escape'); await notices.waitFor({ state: 'detached' })
-      assert.equal(await bell.evaluate(element => element === element.ownerDocument.activeElement), true)
+      assert.equal(await menu.evaluate(element => element === element.ownerDocument.activeElement), true)
       if (width >= 768) {
         await layouts.click()
         const dialog = page.getByRole('dialog', { name: '레이아웃', exact: true })

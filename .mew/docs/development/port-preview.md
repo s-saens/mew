@@ -1,6 +1,6 @@
 ---
 title: "Localhost app tabs and port previews"
-description: "Defines new-tab localhost app routing through the existing authenticated direct/Mewlink port proxy, host port discovery, command detection, URL rewriting, sandbox boundaries, and compatibility limits. Links the default native Chrome video browser and retained DOM implementation history."
+description: "Defines localhost app routing through authenticated direct/Mewlink port proxies, host port discovery, command detection, URL rewriting, and sandbox boundaries. Only the portPreview feature authorizes proxy sessions; the former Android gateway entry is removed."
 created: "2026-10-20"
 updated: "2026-11-05"
 ---
@@ -43,7 +43,7 @@ Opening the list starts neither a browser socket nor Chromium. Selecting an allo
 
 Direct access uses `server/port-preview.ts` HTTP/WS proxies. Logged-out users visit `/?preview=3333&previewPath=...` and return after login. Owners/managers have `portPreview` by default; owners grant it to others. Legacy `browser` overrides are read as `portPreview` for migration. Guests and temporary-password accounts are rejected.
 
-App HTML, JavaScript, styles, and API responses execute on the viewing device. The direct proxy rewrites URLs/scripts, CookieJar, and storage inside a sandbox without `allow-same-origin`; it uses neither host Chrome nor DOM replay. The Android gateway shares this loopback boundary through `GET /api/android-url`.
+App HTML, JavaScript, styles, and API responses execute on the viewing device. The direct proxy rewrites URLs/scripts, CookieJar, and storage inside a sandbox without `allow-same-origin`; it uses neither host Chrome nor DOM replay.
 
 ## Command button port detection
 

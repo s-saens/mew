@@ -4,19 +4,21 @@ parent: "mew-collaboration"
 title: "Group chat, DMs, and read receipts"
 status: "needs-fix"
 created: "2026-09-18"
-updated: "2026-11-03"
+updated: "2026-11-05"
 status_hash: "3044869fecf2142055b3c8efdd3a51053186e282981a1bed5e342a14f6bbb8ae"
 files:
   - src/components/ChatPanel.tsx
   - server/chat.ts
 commits: []
-description: "Group rooms and DMs with aligned message bubbles, recipient notifications, read receipts, and file references. Covers notification navigation, owner-only history deletion, permissions, DM delivery boundaries, and the preserved needs-fix user assessment."
+description: "Dock access to group rooms and DMs with aligned message bubbles, recipient notifications, read receipts, and file references. Covers notification navigation, owner-only history deletion, permissions, DM delivery boundaries, and the preserved needs-fix user assessment."
 상위파일:
   - "MOC.md"
   - "_collaboration-comments-chat.md"
 ---
 
 ## Requirements
+
+- Open Chat from its permission-gated Dock button or `Alt+C`. The button uses the existing Dock order and visibility settings, desktop panel toggling, and mobile foreground navigation; the header menu does not duplicate this entry.
 
 - Exchange messages and file references with members while working on a project.
 

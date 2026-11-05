@@ -1,6 +1,6 @@
 ---
-title: "Login Screen, Browser, and Android"
-description: "Explains localhost apps in new proxy tabs, the native Chrome video Browser panel and mobile input, managed browser preparation, separate provider login screens, session lifetimes, and Android prerequisites."
+title: "Login screens and the host browser"
+description: "Explains localhost apps in new proxy tabs, the native Chrome video Browser panel and mobile input, managed browser preparation, separate provider login screens, and session lifetimes."
 created: "2026-09-04"
 updated: "2026-11-05"
 ---
@@ -38,18 +38,3 @@ The native Browser currently supports Linux/WSL and requires ordinary Google Chr
 Direct WebRTC uses the existing remote desktop ICE/NAT settings. The video path works without WebCodecs or a secure-context requirement, including HTTP Tailscale addresses. A working Mew page alone does not prove that the peer-to-peer video route is reachable on another network. Mewlink must also admit `/api/browser-desktop/ws`; host and central updates are separate. A UI build does not reload a running server, so apply server changes with your normal restart procedure.
 
 The [native browser contract](../../.mew/docs/development/browser-desktop.md) owns input, profile, authorization, and verification limits. The older DOM endpoint remains for compatibility; [its archived contract](../../.mew/docs/history/dom-browser-purpose-routing.md) is no longer the default Browser behavior. No implementation establishes that a particular provider login or CAPTCHA will succeed.
-
-## Android Panel
-
-An auxiliary panel opened at the far right with the Android button in the header menu (`components/AndroidPanel.tsx`). Android Emulator and system images are not included in the mew distribution ([ADR 0058](../../.mew/docs/history/decisions/0058-mew-android-panel-optional-gateway.md)). The panel does only two things.
-
-- It checks `/dev/kvm` on Linux and WSL and the Emulator's Hypervisor.Framework acceleration status on macOS, and shows whether the Android SDK tools (`sdkmanager`, `adb`, `emulator`, `avdmanager`), an API 36 system image, and an AVD exist. It selects an `arm64-v8a` image for Apple Silicon and an `x86_64` image for Intel/AMD. If the image is missing, it provides only the installation command, then provides the AVD creation command after a refresh.
-- The \*\*▶\*\* next to the copy icon for a suggested command runs a server-defined command ID in a dedicated hidden tmux session (`mewcmd-*`). The adjacent terminal icon opens progress output and interactive input through `SessionTerminalPopup`. When the command finishes, it automatically terminates its own session through the same path as project one-shot command buttons. Arbitrary command strings sent by the browser are not executed.
-- Enter the URL of an already running Android WebRTC/gateway to open it in an iframe through the existing loopback-compatible proxy.
-
-Logged-in accounts with the Android feature permission can use it. The roles allowed by default are **manager and owner**. The status check API does not run the emulator, start processes, install anything, or download system images. Therefore, unless the Android panel is opened, the only overhead added to mew's default execution path is the panel code and API routes.
-
-| Route | Role | Function |
-| --- | --- | --- |
-| `GET /api/android/status` | **manager·owner** | Checks Linux/WSL KVM or macOS acceleration, Android SDK, and AVD status for the host architecture. Does not run the emulator |
-| `POST /api/android/commands/:id/run` | **manager·owner** | Runs an Android setup command from the server registry in a one-shot tmux session |

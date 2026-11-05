@@ -37,7 +37,6 @@ function Fixture(){
  <button data-sidebar-toggle className="absolute left-0 top-1/2 z-50 hidden md:block">Toggle files</button>
  <aside className="hidden w-40 shrink-0 md:block" data-sidebar><input data-sidebar-input defaultValue="KEEP SEARCH"/></aside>
  <aside data-workspace-panel="chat" className="hidden w-10 md:block"><button>Chat</button></aside>
- <aside data-workspace-panel="android" className="hidden w-10 md:block"><button>Android</button></aside>
  <DockWorkspace apiRef={ref} value={state} onChange={value=>{window.layoutWrites++;setState(value)}} foreground={foreground} onEditorDrop={()=>'main'}>
  <DockPanel id="memo" kind="memo" floating tabs={["memo"]}><Probe id="memo"/></DockPanel>
  <DockPanel id="editor:main" kind="editor" tabs={docs.map(d=>d.path)}>
@@ -211,7 +210,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
       for (const locator of [page.getByRole('button', { name: 'Project', exact: true })]) {
         assert.equal(await locator.evaluate(el => { const r = el.getBoundingClientRect(); return el.contains(el.ownerDocument.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2)) }), true, 'project header remains clickable')
       }
-      for (const selector of ['[data-sidebar-dock]', '[data-sidebar-toggle]', '[data-sidebar]', '[data-workspace-panel="chat"]', '[data-workspace-panel="android"]', '[data-dock-panel="memo"]']) {
+      for (const selector of ['[data-sidebar-dock]', '[data-sidebar-toggle]', '[data-sidebar]', '[data-workspace-panel="chat"]', '[data-dock-panel="memo"]']) {
         assert.equal(await page.locator(selector).isVisible(), false, `${selector} is temporarily hidden`)
       }
       for (const selector of ['[data-side-dock-button]', '[data-sidebar-input]', '[data-session="memo"]']) {
@@ -224,7 +223,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
       }
       await grip(group).dblclick()
       assert.equal(await host.getAttribute('data-dock-maximized'), null)
-      for (const selector of ['[data-sidebar-dock]', '[data-sidebar-toggle]', '[data-sidebar]', '[data-workspace-panel="chat"]', '[data-workspace-panel="android"]', '[data-dock-panel="memo"]']) {
+      for (const selector of ['[data-sidebar-dock]', '[data-sidebar-toggle]', '[data-sidebar]', '[data-workspace-panel="chat"]', '[data-dock-panel="memo"]']) {
         assert.equal(await page.locator(selector).isVisible(), true, `${selector} returns after restoration`)
       }
       assert.equal(await page.locator('[data-sidebar-input]').inputValue(), 'KEEP SEARCH')

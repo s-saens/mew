@@ -170,7 +170,7 @@ test('Ctrl/Cmd+숫자는 포커스된 분할 패널의 표시 순서로 전환�
   }
 })
 
-test('Alt+Q/E는 포커스된 패널의 이전·다음 탭으로 순환하며 수정키·IME·모달은 제외한다', async () => {
+test('Alt+Q and Alt+Shift+E cycle tabs in the focused panel and exclude other modifiers, IME, and modals', async () => {
   const host = document.createElement('div'); document.body.append(host)
   host.innerHTML = `<section data-workspace-panel="editor" data-dock-panel="editor:a"><div data-dock-tab-bar><button role="tab" aria-selected="true">A1</button><button role="tab">A2</button><button role="tab">A3</button></div><textarea></textarea></section>
     <section data-workspace-panel="terminal" data-dock-panel="terminal:a"><div data-dock-tab-bar><button role="tab" aria-selected="true">T1</button><button role="tab">T2</button></div></section>
@@ -191,7 +191,7 @@ test('Alt+Q/E는 포커스된 패널의 이전·다음 탭으로 순환하며 �
   const inputs = host.querySelectorAll('textarea')
   const press = (input: HTMLElement, code: string, extra: KeyboardEventInit = {}) => {
     input.focus()
-    const event = new window.KeyboardEvent('keydown', { key: code === 'KeyQ' ? 'q' : 'e', code, altKey: true, bubbles: true, cancelable: true, ...extra })
+    const event = new window.KeyboardEvent('keydown', { key: code === 'KeyQ' ? 'q' : 'e', code, altKey: true, shiftKey: code === 'KeyE', bubbles: true, cancelable: true, ...extra })
     input.dispatchEvent(event)
     return event
   }
@@ -207,9 +207,10 @@ test('Alt+Q/E는 포커스된 패널의 이전·다음 탭으로 순환하며 �
     assert.deepEqual(selected, ['A3', 'A1', 'A2', 'T2', 'T1', 'T2', 'Search', 'Files'])
     assert.equal(received, 0)
     await act(async () => {
-      for (const extra of [{ ctrlKey: true }, { metaKey: true }, { shiftKey: true }, { isComposing: true }]) {
+      for (const extra of [{ ctrlKey: true }, { metaKey: true }, { shiftKey: false }, { isComposing: true }]) {
         assert.equal(press(inputs[0], 'KeyE', extra).defaultPrevented, false)
       }
+      assert.equal(press(inputs[0], 'KeyQ', { shiftKey: true }).defaultPrevented, false)
       assert.equal(press(inputs[4], 'KeyQ').defaultPrevented, false)
     })
     assert.equal(selected.length, 8)

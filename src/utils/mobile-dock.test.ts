@@ -20,9 +20,9 @@ test('dock order preserves customization and inserts new entries before desktop'
   assert.deepEqual(normalizeMobileDockOrder(null), MOBILE_DOCK_ORDER)
   assert.deepEqual(normalizeMobileDockOrder(MOBILE_DOCK_ORDER.filter(id => id !== 'tasks')), MOBILE_DOCK_ORDER)
   assert.deepEqual(normalizeMobileDockOrder(['sidebar', 'editor', 'agent', 'terminal', 'git', 'browser', 'desktop']), MOBILE_DOCK_ORDER)
-  assert.deepEqual(normalizeMobileDockOrder(['git', 'git', 'unknown', 'editor']), ['git', 'editor', 'sidebar', 'agent', 'terminal', 'debugger', 'browser', 'desktop', 'memo', 'tasks'])
-  assert.deepEqual(normalizeMobileDockOrder(['browser', 'sidebar', 'editor', 'agent', 'terminal', 'git']), ['browser', 'sidebar', 'editor', 'agent', 'terminal', 'git', 'debugger', 'desktop', 'memo', 'tasks'])
-  assert.deepEqual(moveDockPanel([...MOBILE_DOCK_ORDER], 'desktop', 'sidebar'), ['desktop', 'sidebar', 'editor', 'agent', 'terminal', 'git', 'debugger', 'browser', 'memo', 'tasks'])
+  assert.deepEqual(normalizeMobileDockOrder(['git', 'git', 'unknown', 'editor']), ['git', 'editor', 'sidebar', 'agent', 'terminal', 'debugger', 'browser', 'desktop', 'memo', 'tasks', 'database', 'chat'])
+  assert.deepEqual(normalizeMobileDockOrder(['browser', 'sidebar', 'editor', 'agent', 'terminal', 'git']), ['browser', 'sidebar', 'editor', 'agent', 'terminal', 'git', 'debugger', 'desktop', 'memo', 'tasks', 'database', 'chat'])
+  assert.deepEqual(moveDockPanel([...MOBILE_DOCK_ORDER], 'desktop', 'sidebar'), ['desktop', 'sidebar', 'editor', 'agent', 'terminal', 'git', 'debugger', 'browser', 'memo', 'tasks', 'database', 'chat'])
 })
 test('swipes use adjacent allowed panels, preserve custom order and stop at either end', () => {
   assert.equal(adjacentDockPanel(MOBILE_DOCK_ORDER, 'editor', -1), 'sidebar')
@@ -40,7 +40,7 @@ test('swipes use adjacent allowed panels, preserve custom order and stop at eith
 
 test('task entries persist and retired RAG entries disappear without changing the customized dock order', () => {
   const saved = ['browser', 'memo', 'tasks', 'rag', 'git', 'editor', 'sidebar', 'agent', 'terminal', 'debugger', 'desktop', 'rag']
-  assert.deepEqual(normalizeMobileDockOrder(saved), ['browser', 'memo', 'tasks', 'git', 'editor', 'sidebar', 'agent', 'terminal', 'debugger', 'desktop'])
+  assert.deepEqual(normalizeMobileDockOrder(saved), ['browser', 'memo', 'tasks', 'git', 'editor', 'sidebar', 'agent', 'terminal', 'debugger', 'desktop', 'database', 'chat'])
 })
 
 test('visibility filters preferences and permissions without losing stored order', () => {
@@ -50,4 +50,26 @@ test('visibility filters preferences and permissions without losing stored order
   assert.deepEqual(visibleDockPanels(order, ['editor', 'agent', 'git'], ['agent']), ['git', 'editor'])
   assert.deepEqual(visibleDockPanels(order, ['editor', 'agent', 'git'], ['git', 'editor', 'agent']), [])
   assert.deepEqual(visibleDockPanels(order, ['editor', 'agent', 'git'], []), ['git', 'agent', 'editor'])
+})
+
+test('database action migrates into saved preferences and swipes skip it', () => {
+  const saved = MOBILE_DOCK_ORDER.filter(id => id !== 'database')
+  assert.deepEqual(normalizeMobileDockOrder(saved), MOBILE_DOCK_ORDER)
+  assert.deepEqual(normalizeHiddenDockPanels(['database', 'database']), ['database'])
+  assert.deepEqual(visibleDockPanels(MOBILE_DOCK_ORDER, ['editor', 'database'], []), ['editor', 'database'])
+  assert.equal(adjacentDockPanel(['editor', 'database', 'agent'], 'editor', 1), 'agent')
+  assert.equal(adjacentDockPanel(['editor', 'database', 'agent'], 'agent', -1), 'editor')
+  assert.equal(adjacentDockPanel(['editor', 'database'], 'editor', 1), undefined)
+})
+
+test('chat joins saved Dock preferences and follows panel navigation and permission visibility', () => {
+  const previous = MOBILE_DOCK_ORDER.filter(id => id !== 'chat')
+  assert.deepEqual(normalizeMobileDockOrder(previous), MOBILE_DOCK_ORDER)
+  assert.deepEqual(normalizeMobileDockOrder(['chat', ...previous]), ['chat', ...previous])
+  assert.deepEqual(normalizeHiddenDockPanels(['chat', 'chat']), ['chat'])
+  assert.deepEqual(visibleDockPanels(MOBILE_DOCK_ORDER, ['editor', 'chat'], []), ['editor', 'chat'])
+  assert.deepEqual(visibleDockPanels(MOBILE_DOCK_ORDER, ['editor'], []), ['editor'])
+  assert.deepEqual(visibleDockPanels(MOBILE_DOCK_ORDER, ['editor', 'chat'], ['chat']), ['editor'])
+  assert.equal(adjacentDockPanel(['editor', 'database', 'chat'], 'editor', 1), 'chat')
+  assert.equal(adjacentDockPanel(['editor', 'database', 'chat'], 'chat', -1), 'editor')
 })

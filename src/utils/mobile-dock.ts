@@ -1,4 +1,4 @@
-export const MOBILE_DOCK_ORDER = ['sidebar', 'editor', 'agent', 'terminal', 'git', 'debugger', 'browser', 'desktop', 'memo', 'tasks'] as const
+export const MOBILE_DOCK_ORDER = ['sidebar', 'editor', 'agent', 'terminal', 'git', 'debugger', 'browser', 'desktop', 'memo', 'tasks', 'database', 'chat'] as const
 export type MobileDockPanel = typeof MOBILE_DOCK_ORDER[number]
 export type DockDirection = -1 | 1
 export const MOBILE_DOCK_ORDER_KEY = 'mew:mobile-dock-order'
@@ -21,7 +21,9 @@ export function normalizeMobileDockOrder(value: unknown): MobileDockPanel[] {
     if (order.includes(panel)) continue
     const desktop = order.indexOf('desktop')
     const browser = order.indexOf('browser')
-    if (panel === 'debugger' && browser >= 0 && browser === desktop - 1) order.splice(browser, 0, panel)
+    if (panel === 'tasks' && order.includes('database')) order.splice(order.indexOf('database'), 0, panel)
+    else if (panel === 'database' && order.includes('chat')) order.splice(order.indexOf('chat'), 0, panel)
+    else if (panel === 'debugger' && browser >= 0 && browser === desktop - 1) order.splice(browser, 0, panel)
     else if ((panel === 'debugger' || panel === 'browser') && desktop >= 0) order.splice(desktop, 0, panel)
     else order.push(panel)
   }
@@ -29,8 +31,9 @@ export function normalizeMobileDockOrder(value: unknown): MobileDockPanel[] {
 }
 
 export function adjacentDockPanel(order: readonly MobileDockPanel[], active: string, direction: DockDirection): MobileDockPanel | undefined {
-  const index = order.indexOf(active as MobileDockPanel)
-  return index < 0 ? undefined : order[index + direction]
+  const panels: MobileDockPanel[] = order.filter(id => id !== 'database')
+  const index = panels.indexOf(active as MobileDockPanel)
+  return index < 0 ? undefined : panels[index + direction]
 }
 
 export function moveDockPanel(order: MobileDockPanel[], from: MobileDockPanel, to: MobileDockPanel): MobileDockPanel[] {

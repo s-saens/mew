@@ -42,7 +42,7 @@ Edit documents together, leave comments, chat, and share documents with guests. 
 
 [Collaboration and sharing](docs/guides/collaboration.md) · [Mobile controls](docs/guides/editor.md#mobile-and-fullscreen)
 
-Also available: [PDF annotation](docs/guides/editor.md#reading-and-annotating-pdfs), a [sign-in screens, localhost apps, and Android](docs/guides/browser.md), [remote desktop](docs/guides/remote-desktop.md), [Postgres tables](docs/guides/database.md), and [command buttons and schedules](docs/guides/commands.md). Remote desktop and Android need their own environment setup; database tables need a Postgres connection.
+Also available: [PDF annotation](docs/guides/editor.md#reading-and-annotating-pdfs), [remote browser and localhost apps](docs/guides/browser.md), [remote desktop](docs/guides/remote-desktop.md), [Postgres tables](docs/guides/database.md), and [command buttons and schedules](docs/guides/commands.md). Remote desktop needs its own environment setup; database tables need a Postgres connection.
 
 ## Get started
 

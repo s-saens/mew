@@ -887,8 +887,6 @@ export const uiMessages = {
   "터미널 세션 보기": ["View terminal session","查看终端会话","ターミナルセッションを表示"],
   "{p0} 명령 복사": ["Copy {p0} command","复制 {p0} 命令","{p0} のコマンドをコピー"],
   "상태 새로고침": ["Refresh status","刷新状态","状態を更新"],
-  "Android 닫기": ["Close Android","关闭 Android","Android を閉じる"],
-  "Android gateway 주소": ["Android gateway address","Android 网关地址","Android ゲートウェイのアドレス"],
   "SDK 경로 복사": ["Copy SDK path","复制 SDK 路径","SDK パスをコピー"],
   "실행 예시": ["Example command","运行示例","実行例"],
   "확인 중": ["Checking","检查中","確認中"],

@@ -91,7 +91,7 @@ export function AccountProfileForm({ email, displayName, avatarDataUrl, hasPassw
     }
   }
 
-  return <form onSubmit={saveProfile} className="mb-4 flex flex-col gap-2">
+  return <form onSubmit={saveProfile} className="mb-3 flex flex-col gap-2">
     <div className="flex items-center gap-3">
       <button type="button" aria-label={uiText('프로필 사진 변경')} data-tip={uiText('프로필 사진 변경')}
         aria-haspopup="menu" aria-expanded={!!menu} disabled={disabled}
@@ -105,7 +105,7 @@ export function AccountProfileForm({ email, displayName, avatarDataUrl, hasPassw
           const rect = event.currentTarget.getBoundingClientRect()
           setMenu({ x: rect.left, y: rect.bottom + 4, trigger: event.currentTarget })
         }}
-        className="group relative flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-full border border-edge-strong bg-surface-raised text-xl font-semibold text-ink-secondary outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-40">
+        className="group relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full border border-edge-strong bg-surface-raised text-xl font-semibold text-ink-secondary outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-40">
         {avatar
           ? <img src={avatar} alt={uiText('프로필 사진 미리보기')} className="h-full w-full object-cover" />
           : <span aria-hidden="true">{(name.trim()[0] ?? email[0] ?? '?').toUpperCase()}</span>}

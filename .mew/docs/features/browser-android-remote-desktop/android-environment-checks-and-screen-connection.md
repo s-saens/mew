@@ -1,48 +1,27 @@
 ---
 id: "mew-remote-android"
 parent: "mew-remote"
-title: "Android environment checks and display connection"
-status: "implemented"
+title: "Removed Android environment and gateway feature"
+status: "removed"
 created: "2026-09-18"
-updated: "2026-10-20"
+updated: "2026-11-05"
 status_hash: "bed0a9e331155081546a5580d1b26a16663266c47fe7472e00f82e8352aff86c"
-files: ["src/components/AndroidPanel.tsx", "server/androidEnv.ts", "server/port-preview.ts"]
+files: []
 commits: []
-description: "Feature contract covering Android SDK, acceleration, system image, and AVD status checks, execution of preparation commands, and connection to an existing WebRTC gateway display. Describes the boundary that status queries alone do not install, download, or start processes, and the localhost gateway proxy restricted to Android permissions."
+description: "Records removal of the Android SDK readiness panel, setup commands, gateway proxy, capability, and demo. Retains the former feature scope for existing links; Android viewing-device support remains available."
 상위파일:
   - "MOC.md"
   - "_browser-android-remote-desktop.md"
 ---
 
-## Requirements
+## Removal
 
-- Check the Android development environment and access preparation commands and an existing gateway display.
+Under [ADR 0147](../../decisions/0147-compact-workspace-menu.md), Mew no longer includes the Android environment panel, SDK readiness checks, registered setup commands, gateway iframe, or Android feature permission. The former Android APIs are absent, and saved panel visibility and width values are ignored. The browser demo also omits this feature.
 
-### Scope
+This removal does not affect use of Mew from Android browsers, installation guidance, notifications, keyboard handling, or Android project file icons. It does not uninstall SDKs, emulators, system images, or gateways that users installed separately.
 
-- Provide SDK, acceleration, system image, and AVD status, execution of server-defined preparation commands, and terminal access.
-- Connect to an already running WebRTC/gateway display.
+## Former scope
 
-### Boundaries and limitations
+The removed feature checked SDK tools, acceleration, system images, and AVD readiness; offered server-defined preparation commands and terminal access; and connected to an already running WebRTC gateway display. Status queries alone did not install, start processes, or download anything. Emulator binaries and system images were never bundled with Mew.
 
-- Do not include Android Emulator or system images in the Mew distribution.
-- Status queries alone do not install, start processes, or download anything.
-
-### Detailed contracts
-
-- [Android support scope](../../../../docs/guides/browser.md)
-
-<!-- mew:implementation:start -->
-## Implementation details
-
-- Provide SDK, acceleration, system image, and AVD status, execution of server-defined preparation commands, and terminal access.
-
-<!-- mew:implementation:end -->
-
-<!-- mew:validation:start -->
-## Verification
-
-- The following items are user verification criteria, not results of tests run during this documentation cleanup:
-  - Verify that the host architecture and readiness status are accurate and that installation does not begin before explicit execution.
-
-<!-- mew:validation:end -->
+The original optional-gateway rationale remains in [historical ADR 0058](../../history/decisions/0058-mew-android-panel-optional-gateway.md). The [browser guide](../../../../docs/guides/browser.md) describes the available login and host-browser features.

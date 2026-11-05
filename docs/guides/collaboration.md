@@ -1,7 +1,7 @@
 ---
 title: "Collaborative Editing, Comments, Chat, and Guest Sharing"
-description: "Covers collaborative editing, notes, sessions, comments, mentions, group chat and DMs with incoming notifications. Links desktop/mobile browser notification setup and covers permissions, drafts, public links, and guest sharing boundaries."
-updated: "2026-11-03"
+description: "Covers collaborative editing, notes, sessions, comments, mentions, group chat and DMs opened from the Dock, with incoming notifications. Links desktop/mobile browser notification setup and covers permissions, drafts, public links, and guest sharing boundaries."
+updated: "2026-11-05"
 상위파일:
   - "../../.mew/docs/MOC.md"
   - "MOC.md"
@@ -67,9 +67,9 @@ Comments are managed separately rather than inserted as text in the body. They a
 
 ## Group Chat and DMs
 
-Open chat through Header Menu → **Chat** or `Alt+C`. In the conversation list, select the group room to talk with all members, or select a person for a 1:1 conversation. The unread conversation count and the number of recipients who have not read each message are displayed.
+Open **Chat** from the Dock or press `Alt+C`. The Dock button appears when you are logged in and have chat permission; its order and visibility are configurable under **Settings → Dock**. On desktop, selecting Chat brings the panel forward, and selecting it again while focused closes it. On mobile, it brings chat to the front while preserving your other open panels. In the conversation list, select the group room to talk with all members, or select a person for a 1:1 conversation. The unread conversation count and the number of recipients who have not read each message are displayed.
 
-While mew is open, new messages from other people appear in the header notification bell even when chat is closed. Select a notification to open its group room or DM. **Settings → Notifications** controls in-app display, Mewpet/toasts, sound, and browser notifications; follow [desktop and mobile notification setup](../configuration/appearance.md#notification-settings) for permission and iPhone/iPad installation requirements. Reloading does not turn old chat history into new notifications, and closing or suspending the browser can stop delivery.
+While mew is open, new messages from other people appear in the header menu’s notification section even when chat is closed. An unread count appears on the menu button. Select a notification to open its group room or DM. **Settings → Notifications** controls in-app display, Mewpet/toasts, sound, and browser notifications; follow [desktop and mobile notification setup](../configuration/appearance.md#notification-settings) for permission and iPhone/iPad installation requirements. Reloading does not turn old chat history into new notifications, and closing or suspending the browser can stop delivery.
 
 If you insert a file reference in the input and send it, recipients can click the reference to open it in the mew editor. After opening chat, press `Ctrl+L` in the editor to insert a file mention into the input according to the [reference forwarding rules](editor.md#ctrll-references-경로줄). If you opened another auxiliary panel most recently, that panel may receive the reference.
 

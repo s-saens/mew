@@ -1,7 +1,7 @@
 ---
 title: "Getting started with mew"
 updated: "2026-11-05"
-description: "Installation and everyday use of Mew on Windows/WSL, macOS, and Linux. Covers source setup, first-administrator browser creation, Windows wizard and prebuilt release limits, remote access, and links to feature guides."
+description: "Installation, first sign-in, remote access, host browser and remote desktop setup, updates, and data retention for Mew. Covers source setup, first-administrator creation, and Windows wizard/prebuilt release limits."
 ---
 
 # Getting started with mew
@@ -151,7 +151,7 @@ Use Mewlink to connect from another browser, or choose Tailscale or Cloudflare T
 
 Mewlink sign-in is used for registration, your device list and device removal. To give someone access, create their local mew account and configure its role, features and file permissions; a Mewlink account is not needed for local password sign-in. Application data remains blocked until local sign-in succeeds.
 
-The host must stay running and online. Networks that block direct connections show an error. Android iframe access is unavailable in this mode. Run `./mew remote-access account` to see the registration instructions again. Operators should follow [Central service setup](../../.mew/docs/operations/remote-central.md). Applying this authentication change requires updating local mew and redeploying Mewlink; real external-network validation is separate.
+The host must stay running and online. Networks that block direct connections show an error. Run `./mew remote-access account` to see the registration instructions again. Operators should follow [Central service setup](../../.mew/docs/operations/remote-central.md). Applying this authentication change requires updating local mew and redeploying Mewlink; real external-network validation is separate.
 
 For passwordless access, the visitor can choose **Sign in with Mewlink → Request access** on the device login screen. The owner approves the identity under **Account management → Mewlink account access**, linking it to an existing local user or creating one (member by default). Permissions remain local; remove the identity link to revoke access. The registration account and matching email do not grant access automatically. Local mew and Mewlink must both be updated for this flow; provider sign-in and external-network validation remain separate. See the [remote-access contract](../../.mew/docs/development/remote-access.md#verification-and-remaining-gates).
 
@@ -244,11 +244,11 @@ Open a terminal or agent from the dock. Install and authenticate your AI runtime
 
 <a id="browser-android-and-remote-desktop"></a>
 
-### Browser, Android, and remote desktop
+### Browser and remote desktop
 
-Use the server browser for webpages. Android and remote desktop need separate environment preparation, installation, and OS permissions; check their support limits first.
+Use the server browser for webpages. Remote desktop needs separate environment preparation, installation, and OS permissions; check its support limits first.
 
-[Browser and Android](browser.md) · [Remote desktop](remote-desktop.md).
+[Login screens and browser](browser.md) · [Remote desktop](remote-desktop.md).
 
 <a id="databases"></a>
 

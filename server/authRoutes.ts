@@ -234,7 +234,6 @@ export function createAuthRouter({ prepareFirstOwnerWorkspace = async (email: st
     const profile = session ? userProfile(session.email, session.user) : null
     const capabilities = capabilitiesFor({ role: session?.user.role ?? 'guest', email: session?.email ?? null, mustChangePassword: session?.user.mustChangePassword ?? false })
     if (remoteSession(req) !== undefined) {
-      capabilities.android = false
       if (!session) for (const feature of Object.keys(capabilities) as (keyof typeof capabilities)[]) capabilities[feature] = false
     }
     return {

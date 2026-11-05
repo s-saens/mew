@@ -1,7 +1,6 @@
 import type { DemoWorkspaceStore } from './workspace-store.ts'
 import { DemoError } from './workspace-store.ts'
 import { demoMewpetAsset } from './http-mewpet.ts'
-import { DEMO_ANDROID_HTML } from './host-fixtures.ts'
 
 const mimeTypes: Record<string, string> = { md: 'text/markdown', txt: 'text/plain', ts: 'text/plain', tsx: 'text/plain', js: 'text/javascript', jsx: 'text/plain', json: 'application/json', css: 'text/css', html: 'text/html', svg: 'image/svg+xml', csv: 'text/csv', yaml: 'text/yaml', yml: 'text/yaml' }
 const textEncoder = new TextEncoder()
@@ -55,12 +54,6 @@ export function createDemoResources(store: DemoWorkspaceStore, base = '/demo') {
     const publicAsset = parsed.origin === origin ? demoMewpetAsset(parsed.pathname) : null
     if (publicAsset) return publicAsset
     const key = parsed.pathname + parsed.search
-    if (parsed.origin === origin && parsed.pathname === '/api/demo/android') {
-      const cached = cache.get(key)
-      if (cached) return cached.url
-      const next = URL.createObjectURL(new Blob([DEMO_ANDROID_HTML], { type: 'text/html;charset=utf-8' }))
-      cache.set(key, { revision: 'android', url: next }); return next
-    }
     let blob: Blob, revision: string
     try {
       if (parsed.origin !== origin || !supported.has(parsed.pathname)) throw new DemoError('이 파일은 데모에서 제공하지 않습니다.')

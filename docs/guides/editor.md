@@ -1,6 +1,6 @@
 ---
 title: "Document Editing and Storage Formats"
-description: "Explains editing Markdown, code, document properties, tables, links, attachments, and PDFs; /voice microphone recording, playback, and upload retry; readable Hotview copying and source copying in Plain; /paint and /그림 image insertion with freehand pens, transparent exports, and snap settings; adding and deleting table rows and columns; and the body context menu and native mobile keyboard. Covers the AI button for every file view, titled reference-only agent drafts, Hotview @ file autocomplete, annotations, internal document navigation, table/DB conversion, inline subpage naming, autosave, split views, real-time account tab sharing, mobile panels, and installation controls."
+description: "Explains document and file editing, previews, mobile navigation, grouped workspace menu, notification history, database actions, and fullscreen controls."
 updated: "2026-11-05"
 상위파일:
   - "../../.mew/docs/MOC.md"
@@ -141,9 +141,9 @@ Swipe left or right on a mobile panel's body to move to the current panel's prev
 
 Open **Remote Desktop** from the header menu. Use the viewer's Close or Back action to return to the previous workspace; on mobile, you can also select another panel from the bottom dock. This ends the remote connection. For connection and control details, see [Remote Desktop](remote-desktop.md).
 
-Open Chat, Android, Remote Desktop, and Settings from the header menu. When the mobile software keyboard opens, the dock and reserved bottom space are hidden; they return when the keyboard closes. Control panels using the dock and top menu, and switch tabs using the tab bar, keyboard shortcuts, or swipes on the mobile body or Plain auxiliary key bar.
+Open Remote Desktop, Remote Browser, Server File Explorer, Scheduled Tasks, and Settings from the grouped header menu. Open databases from the Dock, the Documents file area, or the floating editor button beside the agent action. Click your profile card in the menu for account settings. When the mobile software keyboard opens, the dock and reserved bottom space are hidden; they return when the keyboard closes. Control panels using the dock and top menu, and switch tabs using the tab bar, keyboard shortcuts, or swipes on the mobile body or Plain auxiliary key bar.
 
-At screen widths of 768px or greater, the top **Menu** button shows both an icon and text, and the header height and spacing increase. Narrow screens use an icon button.
+The top **Menu** icon carries the unread notification count. Its Notifications section previews up to four compact items; **View all** opens the complete list. The same icon control is used on desktop and mobile.
 
 Toggle fullscreen using the header's **fullscreen button** or `Alt+Enter`. On mobile, one foreground work panel is shown; if there are multiple document editing panes, switch panes using the selector above the tab bar. The desktop split layout is preserved.
 

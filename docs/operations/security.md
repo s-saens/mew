@@ -1,6 +1,6 @@
 ---
 title: "Security operations guidelines"
-description: "Guidelines for operators sharing a Mew instance to assess first-administrator bootstrap, roles, file permissions, owner password resets, browser-token and external-login revocation, shared registered-project access and personal shortcuts, retained server-operation boundaries, server control features, and data retention risks. Links authentication and storage details to development contracts and explains private vulnerability reporting."
+description: "Guidelines for sharing Mew: first-administrator bootstrap, roles, current feature permissions, file boundaries, password resets, browser/session revocation, registered projects, server controls, and retention risks. Links server authorization contracts and private vulnerability reporting."
 created: 2026-10-22
 updated: 2026-11-05
 상위파일: "MOC.md"
@@ -25,7 +25,7 @@ Roles are guest &lt; member &lt; manager &lt; owner and define **feature default
 | View files and edit contents | Allowed paths only | Allowed | Allowed | Allowed |
 | File creation, deletion, renaming, uploads, and history | Blocked | Allowed | Allowed | Allowed |
 | DB, collaborative editing, comments, and chat | Blocked | Allowed | Allowed | Allowed |
-| Agents, terminals, localhost app access, remote desktop, and Android | Blocked | Blocked | Allowed | Allowed |
+| Agents, terminals, localhost app access, and remote desktop | Blocked | Blocked | Allowed | Allowed |
 | Server file explorer, Git workbench, system, and scheduled tasks | Blocked | Blocked | Allowed | Allowed |
 | Registered projects, My Projects, managed creation, existing-folder linking, and shared icons | Blocked | Allowed | Allowed | Allowed |
 | Arbitrary server folder/Git operations and subproject/worktree switching | Blocked | Blocked | Allowed | Allowed |
@@ -98,10 +98,6 @@ The general internal DOM browser has been removed. OAuth and account management 
 A login screen belongs to the account that created it and the feature permissions for its authentication task. Agent authentication checks agent permission, while GitHub connections check Git or file editing permission; no separate general browser permission is required. Users can view, provide input to, and close only their own screens. Support conditions, shutdown lifetimes, and the scope of verification of actual authentication follow the [virtual login screen contract](../../.mew/docs/development/login-desktop.md).
 
 `/<port>` app access requires login and permission for the localhost app access feature. Targets are allowed loopback HTTP(S) ports; Mew's own port and bypasses to other targets are denied. Development app JavaScript runs on the connecting device. Apps do not share an origin with the Mew session or full API permissions, and the host's provider credentials, Mew cookies, and visitor IP are not forwarded to the app upstream. Isolation, proxying, and storage standards follow the [localhost app preview contract](../../.mew/docs/development/port-preview.md).
-
-## Android Panel
-
-Android screen viewing and input are protected at the same level as a local development server. Gateway addresses are restricted to loopback, and SDK paths and acceleration status are treated as server operational information. Status queries alone do not start or install the Emulator or create AVDs. Explicit preparation operations and gateway permissions follow the [Android feature contract](../../.mew/docs/features/browser-android-remote-desktop/android-environment-checks-and-screen-connection.md).
 
 ## Settings for external access
 

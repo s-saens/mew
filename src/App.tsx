@@ -2,14 +2,13 @@ import { scopedBrowserStorage } from '@mew/ui/browser-storage-scope'
 import { HeaderResources } from './components/header-resources'
 import { RuntimeControls } from './runtime/runtime-controls'
 import { normalizeWorkspaceLocation } from './runtime/app-runtime'
-import { HeaderNotifications } from './components/header-notifications'
 import { headerIconControlClassName } from './components/header-control'
 import { LayoutPresets } from './components/layout-presets'
 import { factoryLayout, editorIds, layoutPresetsKey, legacyLayoutPresetsKey, normalizeLayoutSnapshot, type LayoutSnapshot } from './utils/layout-presets'
 import { loadFloatingRect, restoreFloatingRect } from './hooks/use-floating-panel'
 import { createDeviceLayoutSession } from './utils/device-layout'
 import { useToolPresentation, setToolPresentation } from './hooks/use-tool-presentation'
-import { Computer, Globe, Link } from 'iconoir-react'
+import { Clock, Computer, Download, Folder, Globe, Link, Settings, User } from 'iconoir-react'
 import { fetchUpdatesStatus } from './api/client'
 import { uuid } from './utils/uuid'
 import type { MewcatAction } from '../shared/mewcat-assistant'
@@ -21,7 +20,7 @@ import { useRefreshTasks } from './hooks/use-refresh-tasks'
 import { useRootProjectTabs } from './hooks/use-root-project-tabs'
 import { projectWorkspaceView } from './utils/project-workspace-view'
 import { useFocusedWorkspacePanel } from './hooks/use-focused-workspace-panel'
-import { defaultCapabilities, type Feature } from '../shared/access-policy'
+import { defaultCapabilities } from '../shared/access-policy'
 import { writeBrowserStorage } from '@mew/ui/browser-storage'
 import { WorkspaceSnapshotCache } from './utils/workspace-snapshot-cache'
 import { seedWorkspaceUiSnapshot } from './utils/workspace-ui-startup'
@@ -83,6 +82,7 @@ import type { DockState } from './utils/dock-layout'
 import { getBinding, matchesShortcut } from '@mew/shortcuts'
 import { captureAppTabShortcuts } from './utils/app-tab-shortcuts'
 import { captureSettingsShortcut } from './utils/settings-shortcut'
+import { captureWorkspaceToolShortcuts } from './utils/workspace-tool-shortcuts'
 import { captureUpdatesShortcut } from './utils/updates-shortcut'
 import { captureCommentShortcut } from './utils/comment-shortcut'
 import { captureAppKeyboardLock } from './utils/keyboard-lock'
@@ -141,6 +141,7 @@ const DocumentGraph = deferredComponent(async () => ({ default: (await import('.
 const DocsSettingsModal = deferredComponent(async () => ({ default: (await import('./components/DocsSettingsModal')).DocsSettingsModal }), null)
 const Mewcat = deferredComponent(async () => ({ default: (await import('./components/Mewcat')).Mewcat }), null)
 const ServerFileExplorer = deferredComponent(async () => ({ default: (await import('./components/ServerFileExplorer')).ServerFileExplorer }), null)
+const AccountSettingsModal = deferredComponent(async () => ({ default: (await import('./components/AccountSettingsModal')).AccountSettingsModal }), null)
 const SettingsModal = deferredComponent(async () => ({ default: (await import('./components/SettingsModal')).SettingsModal }), null)
 const AdminSettingsModal = deferredComponent(async () => ({ default: (await import('./components/AdminSettingsModal')).AdminSettingsModal }), null)
 const RemoteAccessModal = deferredComponent(async () => ({ default: (await import('./components/remote-access-settings')).RemoteAccessModal }), null)
@@ -151,7 +152,6 @@ const SearchPanel = deferredComponent(async () => ({ default: (await import('./c
 type AgentPanelModule = typeof import('./components/AgentPanel.tsx')
 const agentPanelPreparation = createDeferredModulePreparation<AgentPanelModule>(250)
 const AgentPanel = deferredComponent(async () => ({ default: (await agentPanelPreparation.prepare(() => import('./components/AgentPanel'))).AgentPanel }), null, { suspend: false })
-const AndroidPanel = deferredComponent(async () => ({ default: (await import('./components/AndroidPanel')).AndroidPanel }))
 const ChatPanel = deferredComponent(async () => ({ default: (await import('./components/ChatPanel')).ChatPanel }))
 const FileHistoryModal = deferredComponent(async () => ({ default: (await import('./components/FileHistoryModal')).FileHistoryModal }), null)
 const GitPanel = deferredComponent(async () => ({ default: (await import('./components/git-panel')).GitPanel }), null)
@@ -192,7 +192,6 @@ const TERMINAL_OPEN_KEY = 'mew:terminal-open'
 /** 에이전트 창이 열려 있었는지 — 터미널과 같이 프로젝트와 무관한 화면 상태다(세션 스코프가 워크스페이스다) */
 const AGENT_OPEN_KEY = 'mew:agent-open'
 const GIT_OPEN_KEY = 'mew:git-open'
-const ANDROID_OPEN_KEY = 'mew:android-open'
 /** 지울 수 없는 기본 프로젝트 — 보고 있던 프로젝트가 사라지면 여기로 빠진다 */
 const DEFAULT_PROJECT = 'docs'
 type AccountSidebarState = { explorerScope?: 'docs' | 'files'; docsExpanded: boolean; expandedSubprojects: string[] }
@@ -386,8 +385,6 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
   const [remoteDockHost, setRemoteDockHost] = useState<HTMLDivElement | null>(null)
   const [sidebarDockHost, setSidebarDockHost] = useState<HTMLDivElement | null>(null)
   if (gitOpen) gitMounted.current = true
-  // Android 패널 — emulator는 외부 도구라 여기서는 상태 점검과 loopback gateway 표시만 한다
-  const [androidOpen, setAndroidOpen] = useState(() => caps.android && scopedBrowserStorage().getItem(ANDROID_OPEN_KEY) === '1')
   // 멤버 채팅 창(Alt+C)은 채팅 기능 권한을 따른다.
   const [chatOpen, setChatOpen] = useState(false)
   const [chatConversationRequest, setChatConversationRequest] = useState<{ conversation: string }>()
@@ -405,7 +402,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
       if (panel === 'memo') return memoOpen
       if (panel === 'debugger') return debuggerOpen
       if (panel === 'browser') return browserOpen
-      return androidOpen
+      return false
     }),
   )
   useEffect(() => {
@@ -427,6 +424,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     if (!mewcatRuntimeRef.current) selectMewcatRuntime(runtime)
     window.dispatchEvent(new CustomEvent('mew:mewcat-agent-ready', { detail: runtime }))
   }, [selectMewcatRuntime])
+  const [accountSettingsOpen, setAccountSettingsOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [mewcatSettingsRequest, setMewcatSettingsRequest] = useState(0)
   const [debuggerSettingsRequested, setDebuggerSettingsRequested] = useState(false)
@@ -445,13 +443,12 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     agent: agentOpen,
     terminal: terminalOpen,
     git: gitOpen,
-    android: androidOpen,
     tasks: tasksOpen,
     memo: memoOpen,
     debugger: debuggerOpen,
     browser: browserOpen,
   } satisfies Record<WorkspacePanelId, boolean>), [
-    sidebarOpen, chatOpen, agentOpen, terminalOpen, gitOpen, androidOpen, debuggerOpen, browserOpen, memoOpen, tasksOpen,
+    sidebarOpen, chatOpen, agentOpen, terminalOpen, gitOpen, debuggerOpen, browserOpen, memoOpen, tasksOpen,
   ])
   const workspacePanelSetters = useMemo(() => ({
     sidebar: setSidebarOpen,
@@ -459,7 +456,6 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     agent: setAgentOpen,
     terminal: setTerminalOpen,
     git: setGitOpen,
-    android: setAndroidOpen,
     tasks: setTasksOpen,
     memo: setMemoOpen,
     debugger: setDebuggerOpen,
@@ -1188,20 +1184,14 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
   const { width: projectSidebarWidth, restoreWidth: restoreProjectSidebarWidth, startResize: startProjectSidebarResize } = usePanelWidth('mew:project-sidebar-width', {
     min: 200, max: 360, initial: 240,
   })
-  const { width: androidWidth, restoreWidth: restoreAndroidWidth, startResize: startAndroidResize } = usePanelWidth('mew:android-panel-width', {
-    min: 380,
-    max: 1200,
-    initial: 760,
-    invert: true,
-  })
 
   const popupKey = (tool: 'memo' | 'tasks') => `mew:popup:${authEmail}:${tool}`
   const captureLayout = (): LayoutSnapshot => normalizeLayoutSnapshot({
     version: 1, dock: dockRef.current?.snapshot() ?? workspaceUi.dock,
-    open: { ...workspacePanelOpen, editor: editorOpen }, sidebarWidth, androidWidth,
+    open: { ...workspacePanelOpen, editor: editorOpen }, sidebarWidth,
     tools: toolPresentation, popups: { memo: loadFloatingRect(popupKey('memo')), tasks: loadFloatingRect(popupKey('tasks')) },
   })
-  const permitted: Record<WorkspacePanelId, boolean> = { sidebar: caps.filesRead, chat: caps.chat, android: caps.android, agent: caps.agent, terminal: canUseTerminal, git: caps.git, debugger: canDebug && !!auth.email && !!rootProjectPath, browser: caps.portPreview && !!auth.email, tasks: caps.filesRead && !!auth.email, memo: caps.collaboration && !!auth.email }
+  const permitted: Record<WorkspacePanelId, boolean> = { sidebar: caps.filesRead, chat: caps.chat, agent: caps.agent, terminal: canUseTerminal, git: caps.git, debugger: canDebug && !!auth.email && !!rootProjectPath, browser: caps.portPreview && !!auth.email, tasks: caps.filesRead && !!auth.email, memo: caps.collaboration && !!auth.email }
   const layoutFactory = factoryLayout(captureLayout())
   for (const panel of WORKSPACE_PANEL_IDS) layoutFactory.open[panel] &&= permitted[panel]
   const applyLayoutPreset = (next: LayoutSnapshot) => {
@@ -1217,7 +1207,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
         return groups.some(group => group.id === id) ? id : groups.find(group => group.kind === kind)?.id ?? id
       }
       saveDockLayout({ ...next.dock, tabs: Object.fromEntries(Object.entries(current?.tabs ?? {}).map(([tab, group]) => [tab, destination(group)])), active: Object.fromEntries(Object.entries(current?.active ?? {}).map(([group, tab]) => [destination(group), tab])) })
-      restoreSidebarWidth(next.sidebarWidth); restoreAndroidWidth(next.androidWidth)
+      restoreSidebarWidth(next.sidebarWidth)
       for (const panel of WORKSPACE_PANEL_IDS) workspacePanelSetters[panel](next.open[panel] && permitted[panel])
       setEditorOpen(next.open.editor)
       for (const tool of ['memo', 'tasks'] as const) {
@@ -1240,7 +1230,6 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     terminal: { open: terminalOpen, close: () => closeWorkspacePanel('terminal') },
     agent: { open: agentOpen, close: () => closeWorkspacePanel('agent') },
     git: { open: gitOpen, close: () => closeWorkspacePanel('git') },
-    android: { open: androidOpen, close: () => closeWorkspacePanel('android') },
     tasks: { open: tasksOpen, close: () => closeWorkspacePanel('tasks') },
     memo: { open: memoOpen, close: memoSession.close },
     debugger: { open: debuggerOpen, close: () => closeWorkspacePanel('debugger') },
@@ -1303,20 +1292,23 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
   const mobileKeyboardOpen = useMobileKeyboard()
   const mobileDockPanels: MobileDockPanel[] = ['sidebar', 'editor']
   if (caps.agent) mobileDockPanels.push('agent')
+  if (caps.chat && !isGuest) mobileDockPanels.push('chat')
   if (caps.terminal) mobileDockPanels.push('terminal')
   if (caps.git) mobileDockPanels.push('git')
+  if (caps.database && !isGuest) mobileDockPanels.push('database')
   if (caps.portPreview && auth.email) mobileDockPanels.push('browser')
   if (canDebug && auth.email && rootProjectPath) mobileDockPanels.push('debugger')
   if (caps.filesRead && auth.email && rootProjectPath) mobileDockPanels.push('tasks')
   if (caps.collaboration && auth.email) mobileDockPanels.push('memo')
   const selectDockPanel = (panel: MobileDockPanel, toggle = true) => {
     if (!mobileDockPanels.includes(panel) && !(panel === 'desktop' && caps.desktop)) return
+    if (panel === 'database') { setRemoteDesktopOpen(false); dockRef.current?.restore(); setDbListOpen(true); return }
     const closeFocused = isDesktop() && toggle && (remoteDesktopOpen ? panel === 'desktop' : focusedDockPanel === panel)
     dockRef.current?.restore()
     if (panel === 'desktop') { setRemoteDesktopOpen(open => closeFocused ? !open : true); return }
     setRemoteDesktopOpen(false)
     if (panel === 'memo') setMemoFocusSignal(value => value + 1)
-    if (panel !== 'memo' && panel !== 'debugger' && panel !== 'browser') activeTabbedSurfaceRef.current = panel
+    if (panel !== 'memo' && panel !== 'debugger' && panel !== 'browser' && panel !== 'chat') activeTabbedSurfaceRef.current = panel
     if (panel === 'editor') {
       if (closeFocused && editorOpen) {
         setEditorOpen(false)
@@ -1455,8 +1447,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
       agent: agentOpen,
       terminal: terminalOpen,
         git: gitOpen,
-      android: androidOpen,
-      tasks: tasksOpen,
+        tasks: tasksOpen,
       memo: memoOpen,
       debugger: debuggerOpen,
       browser: browserOpen,
@@ -1490,16 +1481,12 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
         restoredOpen.terminal = restoredTerminal
         setGitOpen(caps.git && chrome.gitOpen === true)
         restoredOpen.git = caps.git && chrome.gitOpen === true
-        if (caps.android && typeof chrome.androidOpen === 'boolean') {
-          setAndroidOpen(chrome.androidOpen)
-          restoredOpen.android = chrome.androidOpen
-        }
       }
     } else if (projectUiPath && !isGuest) {
       // 계정 원장이 처음 비어 있을 때만 이 기기의 기존 화면 상태를 이관한다.
       setWorkspaceUi((previous) => ({
         ...previous,
-        chrome: { tocOpen, sidebarOpen, sidebarView, agentOpen, terminalOpen, gitOpen, androidOpen, debuggerOpen, memoOpen, tasksOpen,
+        chrome: { tocOpen, sidebarOpen, sidebarView, agentOpen, terminalOpen, gitOpen, debuggerOpen, memoOpen, tasksOpen,
           ...(isDesktop() && tabsHydrated ? { focusedEditorPaneId: focusedPaneId } : {}) },
       }))
     }
@@ -1514,7 +1501,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     }
     chromeStateLoadedRootRef.current = projectUiPath
     chromeStateRestorePendingRef.current = projectUiPath
-  }, [agentOpen, terminalOpen, androidOpen, gitOpen, debuggerOpen, browserOpen, memoOpen, tasksOpen, canDebug, caps, auth.email, chatOpen, isGuest, projectUiPath, sidebarOpen, sidebarView, tocOpen, workspaceUi.chrome, workspaceUiLoaded, workspacePanelSetters, focusedPaneId, tabsHydrated])
+  }, [agentOpen, terminalOpen, gitOpen, debuggerOpen, browserOpen, memoOpen, tasksOpen, canDebug, caps, auth.email, chatOpen, isGuest, projectUiPath, sidebarOpen, sidebarView, tocOpen, workspaceUi.chrome, workspaceUiLoaded, workspacePanelSetters, focusedPaneId, tabsHydrated])
 
   useEffect(() => {
     if (!noticeTarget || !workspaceUiLoaded || chromeStateLoadedRootRef.current !== projectUiPath
@@ -1600,9 +1587,6 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     writeBrowserStorage(AGENT_OPEN_KEY, agentOpen ? '1' : '0')
   }, [agentOpen])
 
-  useEffect(() => {
-    writeBrowserStorage(ANDROID_OPEN_KEY, androidOpen ? '1' : '0')
-  }, [androidOpen])
 
   useEffect(() => {
     if (!projectUiPath || isGuest || !workspaceUiLoaded) return
@@ -1612,10 +1596,10 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     }
     setWorkspaceUi((previous) => ({
       ...previous,
-      chrome: { ...(previous.chrome as Record<string, unknown> | undefined), tocOpen, sidebarOpen, sidebarView, agentOpen, terminalOpen, gitOpen, androidOpen, debuggerOpen, memoOpen, tasksOpen,
+      chrome: { ...(previous.chrome as Record<string, unknown> | undefined), tocOpen, sidebarOpen, sidebarView, agentOpen, terminalOpen, gitOpen, debuggerOpen, memoOpen, tasksOpen,
         ...(isDesktop() && tabsHydrated ? { focusedEditorPaneId: focusedPaneId } : {}) },
     }))
-  }, [agentOpen, terminalOpen, androidOpen, gitOpen, debuggerOpen, memoOpen, tasksOpen, isGuest, projectUiPath, sidebarOpen, sidebarView, tocOpen, workspaceUiLoaded, focusedPaneId, tabsHydrated])
+  }, [agentOpen, terminalOpen, gitOpen, debuggerOpen, memoOpen, tasksOpen, isGuest, projectUiPath, sidebarOpen, sidebarView, tocOpen, workspaceUiLoaded, focusedPaneId, tabsHydrated])
 
   const handleRenamed = useCallback(
     (oldPath: string, newPath: string, type: 'file' | 'dir') => {
@@ -1646,6 +1630,10 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
           parentPath: activeTab?.path ? activeFile.path.split('/').slice(0, -1).join('/') : '',
         })
       },
+    })
+    const stopToolShortcuts = captureWorkspaceToolShortcuts({
+      openExplorer: caps.serverFiles ? () => setServerFileExplorerOpen(true) : undefined,
+      openSchedules: caps.schedules ? () => setScheduleOpen(true) : undefined,
     })
     const stopSettingsShortcut = captureSettingsShortcut(() => setSettingsOpen(true))
     const stopUpdatesShortcut = caps.system ? captureUpdatesShortcut(() => setUpdatesOpen(true)) : undefined
@@ -1750,6 +1738,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     return () => {
       stopTabShortcuts()
       stopSettingsShortcut()
+      stopToolShortcuts()
       stopUpdatesShortcut?.()
       stopCommentShortcut()
       window.removeEventListener('keydown', handleKeyDown)
@@ -1758,7 +1747,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
   }, [
     saveCurrentTab, closeTab, activePath, activeTab, activeRelativePath, activeFile.path, activeFile.project, tabs, setActivePath,
     caps, canUseTerminal, rootProjectPath, auth.email, focusedEditor, isGuest, canOpenProjects, project, sidebarOpen, chatOpen, agentOpen, terminalOpen,
-    androidOpen, mobilePanelStack, openWorkspacePanel, docsExpanded, sidebarCreate,
+    mobilePanelStack, openWorkspacePanel, docsExpanded, sidebarCreate,
     toggleWorkspacePanel, switchCurrentWindowTabRight, switchCurrentWindowTabLeft,
   ])
 
@@ -1981,6 +1970,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
           onSetViewMode={(path, viewMode) => setTabViewMode(path, viewMode, pane.id)}
           onChangeContent={(...args) => { if (rootProjectPathRef.current === rootProjectPath) updateTabContent(...args) }}
           onAskAgent={caps.agent ? askFileAgent : undefined}
+          onOpenDatabase={caps.database && !isGuest ? () => setDbListOpen(true) : undefined}
           diffVisible={!desktopMode || editorOpen}
           onOpenDiffFile={(fileProject, path) => {
             openFile(editorTabPath(fileProject, path, project), { preview: false, forceNewTab: true, paneId: pane.id })
@@ -2021,12 +2011,11 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
       return { ...previous, trees: { ...trees, [key]: value } }
     })
   }, [isGuest])
-  // 독에 있는 작업 패널은 제외하고 나머지 동작만 권한에 따라 햄버거 메뉴에 표시한다.
   const headerMenuItems: HeaderMenuItem[] = [
+    ...(isOwner ? [{ id: 'admin', group: 'account' as const, label: t('header.accountManagement'), icon: <User width={16} height={16} />, onSelect: () => setAdminOpen(true) }] : []),
+    ...(caps.desktop ? [{ id: 'desktop', group: 'tools' as const, label: t('access.desktop'), icon: <Computer width={16} height={16} />, active: remoteDesktopOpen, onSelect: () => selectDockPanel('desktop') }] : []),
     ...(caps.portPreview && auth.email ? [{
-      id: 'localhost-browser',
-      label: uiText('로컬호스트 브라우저'),
-      icon: <Globe width={14} height={14} />,
+      id: 'localhost-browser', group: 'tools' as const, label: t('menu.remoteBrowser'), icon: <Globe width={16} height={16} />,
       onSelect: () => {
         setBrowserUrl('')
         setBrowserNavigationRequest(request => request + 1)
@@ -2036,167 +2025,12 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
         setFocusedWorkspacePanel('browser')
       },
     }] : []),
-    ...(caps.desktop ? [{
-      id: 'desktop',
-      label: t('access.desktop'),
-      icon: <Computer width={14} height={14} />,
-      active: remoteDesktopOpen,
-      onSelect: () => selectDockPanel('desktop'),
-    }] : []),
-    ...(!isGuest || canEditActiveTab
-      ? [
-          {
-            id: 'commit',
-            label: 'Commit',
-            hint: 'Ctrl+S',
-            onSelect: () => saveCurrentTab(true),
-            disabled: !activeTab || !canEditActiveTab || activeTab.content === activeTab.committedContent,
-            // git commit — 커밋 하나가 이력선 위에 찍힌 모양
-            icon: (
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="4" />
-                <line x1="1.5" y1="12" x2="8" y2="12" />
-                <line x1="16" y1="12" x2="22.5" y2="12" />
-              </svg>
-            ),
-          },
-        ]
-      : []),
-    ...[
-          {
-            id: 'file-explorer',
-            label: t('header.fileExplorer'),
-            onSelect: () => setServerFileExplorerOpen(true),
-            icon: (
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M3 6h6l2 2h10v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" />
-                <path d="M3 10h18" />
-              </svg>
-            ),
-          },
-          {
-            id: 'schedule',
-            label: t('header.scheduledTasks'),
-            onSelect: () => setScheduleOpen(true),
-            icon: (
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="9" />
-                <path d="M12 7v5l3 2" />
-              </svg>
-            ),
-          },
-          {
-            id: 'sysstats',
-            label: t('header.systemResources'),
-            onSelect: () => setSysStatsOpen(true),
-            icon: (
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 14a8 8 0 0 1 8-8" />
-                <path d="M4 14a8 8 0 0 1 3.5-6.6" />
-                <path d="M12 14 8.5 9.5" />
-                <path d="M4 14h16" />
-                <path d="M3 18h18" />
-              </svg>
-            ),
-          },
-          {
-            id: 'mew-update',
-            label: uiText("업데이트"),
-            onSelect: () => setUpdatesOpen(true),
-            icon: (
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 3v12" />
-                <path d="m7 10 5 5 5-5" />
-                <path d="M5 21h14" />
-              </svg>
-            ),
-          },
-          {
-            id: 'android',
-            label: 'Android',
-            onSelect: () => toggleWorkspacePanel('android'),
-            active: androidOpen,
-            icon: (
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="6" y="4" width="12" height="16" rx="2" />
-                <path d="M9 8h6" />
-                <path d="M9 17h6" />
-                <path d="M8 2 6.5 4.5" />
-                <path d="m16 2 1.5 2.5" />
-              </svg>
-            ),
-          },
-        ],
-    ...(isGuest
-      ? []
-      : [
-          {
-            id: 'chat',
-            label: t('header.chat'),
-            hint: 'Alt+C',
-            onSelect: () => toggleWorkspacePanel('chat'),
-            active: chatOpen,
-            // 겹친 말풍선 둘 — 에이전트(말풍선 하나)·계정 관리(사람)와 구분된다
-            icon: (
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M14 9a2 2 0 0 1-2 2H6l-4 3V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2z" />
-                <path d="M18 8h2a2 2 0 0 1 2 2v11l-4-3h-6a2 2 0 0 1-2-2v-1" />
-              </svg>
-            ),
-          },
-          {
-            id: 'database',
-            label: t('header.database'),
-            onSelect: () => setDbListOpen(true),
-            icon: (
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <ellipse cx="12" cy="5" rx="8" ry="3" />
-                <path d="M20 5v6c0 1.66-3.58 3-8 3s-8-1.34-8-3V5" />
-                <path d="M20 11v6c0 1.66-3.58 3-8 3s-8-1.34-8-3v-6" />
-              </svg>
-            ),
-          },
-        ]),
-    ...(isOwner
-      ? [
-          {
-            id: 'mewlink',
-            label: 'Mewlink',
-            onSelect: () => setRemoteAccessOpen(true),
-            icon: <Link width={14} height={14} aria-hidden="true" />,
-          },
-          {
-            id: 'admin',
-            label: t('header.accountManagement'),
-            onSelect: () => setAdminOpen(true),
-            icon: (
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-                <circle cx="9" cy="7" r="4" />
-                <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
-                <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-              </svg>
-            ),
-          },
-        ]
-      : []),
-    {
-      id: 'settings',
-      // 로그인해 있으면 이 항목이 곧 계정 자리다 — 누구 계정인지 이름을 붙여 준다
-      label: t('settings.title'),
-      onSelect: () => setSettingsOpen(true),
-      icon: (
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="12" cy="12" r="3" />
-          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-        </svg>
-      ),
-    },
-  ].filter(item => {
-    const feature: Partial<Record<string, Feature>> = { 'file-explorer': 'serverFiles', schedule: 'schedules', sysstats: 'system', 'mew-update': 'system', android: 'android', chat: 'chat', database: 'database' }
-    const required = feature[item.id]
-    return !required || caps[required]
-  })
+    ...(caps.serverFiles ? [{ id: 'file-explorer', group: 'tools' as const, label: t('header.fileExplorer'), hint: 'Alt+E', icon: <Folder width={16} height={16} />, onSelect: () => setServerFileExplorerOpen(true) }] : []),
+    ...(caps.schedules ? [{ id: 'schedule', group: 'tools' as const, label: t('header.scheduledTasks'), hint: 'Alt+S', icon: <Clock width={16} height={16} />, onSelect: () => setScheduleOpen(true) }] : []),
+    ...(caps.system ? [{ id: 'mew-update', group: 'mew' as const, label: uiText('업데이트'), hint: 'Ctrl+U', icon: <Download width={16} height={16} />, onSelect: () => setUpdatesOpen(true) }] : []),
+    ...(isOwner ? [{ id: 'mewlink', group: 'mew' as const, label: 'Mewlink', icon: <Link width={16} height={16} />, onSelect: () => setRemoteAccessOpen(true) }] : []),
+    { id: 'settings', group: 'mew', label: t('settings.title'), hint: 'Ctrl+,', icon: <Settings width={16} height={16} />, onSelect: () => setSettingsOpen(true) },
+  ]
 
   const projectAdd = canOpenProjects && <ProjectAddInline paths={projectPaths} basePath={rootProjectPath ?? ''}
     canUseAgent={caps.agent} canManageFolders={isOwner || role === 'manager'}
@@ -2272,8 +2106,8 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
                 </svg>
               </button>
             </HoverTipLayer>}
-            <HeaderNotifications />
-            <HeaderMenu items={headerMenuItems} />
+            <HeaderMenu items={headerMenuItems} notifications={!isGuest}
+              account={!isGuest && authEmail ? { email: authEmail, displayName: auth.displayName, avatarDataUrl: auth.avatarDataUrl, onSelect: () => setAccountSettingsOpen(true) } : undefined} />
           </div>
         </header>
       </div>
@@ -2381,6 +2215,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
                         path: docsFolderPath,
                         onOpen: () => { setDocsExpanded(true); sidebarCreate.selectDirectory('docs', '') },
                       } : undefined}
+                      onOpenDatabase={caps.database && !isGuest ? () => setDbListOpen(true) : undefined}
                       documentPages={isGuest || docsExpanded}
                       onBeforePageMutation={prepareDocumentPageMutation}
                       onPageMutation={async result => { await applyDocumentPageMutation(result); void refreshTree() }}
@@ -2501,31 +2336,19 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
           </div>
         )}
 
-        {androidOpen && caps.android && (
-          <div
-            data-workspace-panel="android"
-          onPointerDownCapture={() => bringWorkspacePanelToFront('android')}
-            className={`fixed inset-x-0 top-10 bottom-0 flex md:static md:z-auto md:shrink-0 ${mobilePanelLayer('android')}`}
-            style={{ width: isDesktop() ? androidWidth : undefined }}
-          >
-            <div
-              onPointerDown={startAndroidResize}
-              className="hidden w-1.5 shrink-0 cursor-col-resize touch-none border-l border-edge bg-transparent hover:bg-accent md:block"
-              aria-hidden="true"
-            />
-            <div className="min-h-0 min-w-0 flex-1 overflow-hidden">
-              <AndroidPanel onClose={() => closeWorkspacePanel('android')} />
-            </div>
-          </div>
-        )}
         </>}
       </div>
       </div>}
 
       <Mewcat onOpenSettings={() => { setMewcatSettingsRequest(request => request + 1); setSettingsOpen(true) }} portalTarget={settingsOpen && !desktopMode ? settingsMewcatHost : remoteDesktopOpen ? remoteMewcatHost : null} hidden={projectView !== 'workspace' || remoteDesktopOpen && mewcatHideDesktop} skin={mewcatSkin} assistant={{ account: auth.email ?? 'guest', enabled: caps.agent, runtime: mewcatRuntime, projectRoot: rootProjectPath, onAction: handleMewcatAction, onRuntimeChange: selectMewcatRuntime, onConnect: () => { setMewcatPicker(true); openWorkspacePanel('agent'); showToast(t('mewcat.assistant.guide')) } }} />
 
-      {projectView === 'workspace' && <MobileDock active={remoteDesktopOpen ? 'desktop' : desktopMode ? focusedDockPanel ?? '' : mobileForegroundPanel ?? 'editor'} openPanels={desktopMode ? mobileDockPanels.filter(panel => panel === 'editor' ? editorOpen : panel === 'desktop' ? remoteDesktopOpen : panel === 'memo' ? memoOpen : workspacePanelOpen[panel]) : undefined} available={mobileDockPanels} hidden={mobileKeyboardOpen} portalTarget={remoteDockHost ?? sidebarDockHost}
+      {projectView === 'workspace' && <MobileDock active={remoteDesktopOpen ? 'desktop' : desktopMode ? focusedDockPanel ?? '' : mobileForegroundPanel ?? 'editor'} openPanels={desktopMode ? mobileDockPanels.filter(panel => panel === 'editor' ? editorOpen : panel === 'desktop' ? remoteDesktopOpen : panel === 'memo' ? memoOpen : panel === 'database' ? dbListOpen : workspacePanelOpen[panel]) : undefined} available={mobileDockPanels} hidden={mobileKeyboardOpen} portalTarget={remoteDockHost ?? sidebarDockHost}
         position={remoteDockHost ? undefined : dockPosition} onSelect={selectDockPanel} onNavigate={navigateMobileDock} />}
+
+      {accountSettingsOpen && authEmail && !isGuest && <AccountSettingsModal
+        email={authEmail} displayName={auth.displayName} avatarDataUrl={auth.avatarDataUrl}
+        hasPassword={auth.hasPassword} authenticationMethod={auth.authenticationMethod}
+        onClose={() => setAccountSettingsOpen(false)} onLoggedOut={onLoggedOut} onProfileChanged={onProfileChanged} />}
 
       {settingsOpen && (
         <SettingsModal
@@ -2535,11 +2358,6 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
           initialDebugger={debuggerSettingsRequested}
           debuggerRoot={canDebug && auth.email ? rootProjectPath ?? undefined : undefined}
           onOpenDebugger={() => { setSettingsOpen(false); setMewcatSettingsRequest(0); setDebuggerSettingsRequested(false); openWorkspacePanel('debugger') }}
-          email={authEmail}
-          displayName={auth.displayName}
-          avatarDataUrl={auth.avatarDataUrl}
-          hasPassword={auth.hasPassword}
-          authenticationMethod={auth.authenticationMethod}
           canEditIgnore={caps.system}
           fontPreferences={fontPreferences}
           themeSettings={themeSettings}
@@ -2558,8 +2376,6 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
             setMewcatSettingsRequest(0)
             setDebuggerSettingsRequested(false)
           }}
-          onLoggedOut={onLoggedOut}
-          onProfileChanged={onProfileChanged}
         />
       )}
 

@@ -8,7 +8,7 @@ updated: "2026-11-05"
 status_hash: "ea759314baf1dca2105e78500c7277302e925451b58b01f45479cf00db9e02ad"
 files: ["src/components/DatabaseListModal.tsx", "packages/editor/src/database/DatabaseTable.tsx", "packages/editor/src/database/databaseNavigation.ts", "packages/editor/src/database/DatabaseCollection.tsx", "packages/editor/src/database/DatabaseBoard.tsx", "packages/editor/src/database/DatabaseCalendar.tsx", "packages/editor/src/database/DatabaseGantt.tsx", "packages/editor/src/database/DatabaseRowDialog.tsx", "packages/editor/src/database/databaseLayout.ts", "packages/editor/src/database/databaseSchema.ts", "server/db/databaseService.ts", "server/db/rowPages.ts", "server/db/routes.ts"]
 commits: []
-description: "Defines Postgres document DB editing, Markdown table conversion, larger table cells and titles, compact calendar days, rounded field grids with icon-only addition bars, and calendar and Gantt date ranges. Also covers keyboard navigation with immediate input focus, header type menus, queries, search, grouping, linked-page title previews and filename renames, synchronization, access boundaries, and separation from tasks."
+description: "Defines Dock and floating explorer/editor entry points, Postgres document DB editing, Markdown table conversion, larger table cells and titles, compact calendar days, rounded field grids with icon-only addition bars, and calendar and Gantt date ranges. Also covers keyboard navigation with immediate input focus, header type menus, queries, search, grouping, linked-page title previews and filename renames, synchronization, access boundaries, and separation from tasks."
 상위파일:
   - "MOC.md"
   - "_document-databases.md"
@@ -24,7 +24,7 @@ description: "Defines Postgres document DB editing, Markdown table conversion, l
 - Provided alongside the independent [Task Panel](../projects-files-search/task-panel-list-calendar-and-gantt.md). Task Markdown and DB rows are not automatically migrated or synchronized.
 - Switching views of the same DB does not duplicate row or column data. Open item details from cards or events to use the existing property editor and navigate to the linked row page.
 - Boards group items by single-select or checkbox columns. Calendars use an end-date column and an optional start-date column to display single-date events and date-range events by month. If required columns are missing, editable DBs offer an option to add them.
-- View and edit DBs in the current project from the database list in the menu.
+- View and edit DBs in the current project from **Database** in the Dock, the floating button at the upper right inside the explorer file area, or the editor button immediately left of the AI action. These buttons open the same database-list popup and require database feature access. The Dock action supports the existing order and visibility preferences; swiping between panels skips this popup action.
 - Ctrl/Cmd+click a DB reference in Plain to open a popup with that DB selected.
 - Use the sort button to the right of each column title to cycle through ascending → descending → off. Read-only tables can also be sorted.
 - Right-click a column header to change its type. The type change applies to every row in that column; data cells do not offer type changes.

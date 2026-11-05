@@ -1,9 +1,8 @@
-import { appResourceUrl } from '../runtime/app-runtime.ts'
 import type { AgentJob, AgentJobView, AgentScheduledPrompt, AgentSet, MewUpdateStatus } from '../api/client.ts'
 import type { TmuxSession } from '../../packages/tmux-term/src/types.ts'
 import type { RemoteStatus } from '../../shared/remote-access.ts'
 import type { UpdatesStatus } from '../../shared/updates.ts'
-import { demoAndroidStatus, demoMewUpdate, demoScheduleJobs, demoSystemStats, demoUpdates } from './host-fixtures.ts'
+import { demoMewUpdate, demoScheduleJobs, demoSystemStats, demoUpdates } from './host-fixtures.ts'
 import { demoJson, requireMethod, stringArray, stringField, type DemoHttpHandler } from './http.ts'
 import { DemoError, type DemoWorkspaceStore } from './workspace-store.ts'
 
@@ -17,14 +16,6 @@ export function demoHostSession(store: DemoWorkspaceStore, session: string, labe
 export const handleDemoHost: DemoHttpHandler = ({ store, request, url, body }) => {
   const route = url.pathname, method = request.method
   if (route === '/api/system-stats') { requireMethod(request, 'GET'); return demoJson(demoSystemStats()) }
-  if (route === '/api/android/status') { requireMethod(request, 'GET'); return demoJson(demoAndroidStatus(store.getState<TmuxSession[]>('tmux-sessions', []).map(item => item.name))) }
-  if (route === '/api/android-url') { requireMethod(request, 'GET'); return demoJson({ url: appResourceUrl('/api/demo/android') }) }
-  const android = route.match(/^\/api\/android\/commands\/(emulator|gateway)\/run$/)
-  if (android) {
-    requireMethod(request, 'POST')
-    const session = `mewcmd-demo-android-${android[1]}`; demoHostSession(store, session, `Android ${android[1]} · Demo`)
-    return demoJson({ ok: true, session })
-  }
   if (route === '/api/schedules' || route === '/api/schedules/run') {
     let jobs = store.getState<AgentJobView[]>('host-schedules', demoScheduleJobs(store.workspaceInfo().path))
     if (route.endsWith('/run')) {

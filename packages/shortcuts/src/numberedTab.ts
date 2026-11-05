@@ -24,7 +24,8 @@ export function adjacentPanelTabDirection(event: Pick<KeyboardEvent, 'altKey' | 
     if (!event.shiftKey && (event.code === 'PageUp' || event.key === 'PageUp')) return -1
     if (!event.shiftKey && (event.code === 'PageDown' || event.key === 'PageDown')) return 1
   }
-  if (!event.altKey || event.ctrlKey || event.metaKey || event.shiftKey || event.isComposing) return null
+  if (!event.altKey || event.ctrlKey || event.metaKey || event.isComposing) return null
   const key = event.code || `Key${event.key.toUpperCase()}`
-  return key === 'KeyQ' ? -1 : key === 'KeyE' ? 1 : null
+  if (key === 'KeyQ' && !event.shiftKey) return -1
+  return key === 'KeyE' && event.shiftKey ? 1 : null
 }

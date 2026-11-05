@@ -1,8 +1,8 @@
 ---
 title: "UI overlays, selection controls, and menus"
-description: "Shared popup positioning, selection controls, layering, settings dialogs, dismissal, and action menus. Covers keyboard and touch behavior, focus boundaries, and reusable menu surfaces."
+description: "Shared popup positioning, custom selection, layering, dismissal, and action-menu contracts. Defines the compact grouped workspace menu, independent account settings, keyboard/touch behavior, and focus boundaries."
 created: "2026-11-03"
-updated: "2026-11-03"
+updated: "2026-11-05"
 상위파일: "ui-contracts.md"
 ---
 
@@ -28,7 +28,7 @@ Validation includes blur, filters, transforms, borders, scrolling, nested portal
 
 ## Dropdowns and selection components
 
-The top bar hamburger and ▶ command menus share `ActionMenuSurface` from `@mew/ui` and the header menu styling. The hamburger uses a width of 220px, 14px text with 20px line height, 4px outer padding and 8px corner radius, and 6px 10px item padding with 8px gaps and 4px corner radius. Minimum item height is 32px for standard pointers and 40px for touch, and menu width is constrained on narrow screens. The hamburger uses `ActionMenu` to handle focus, screen boundaries, and dismissal. The desktop project sidebar and mobile full-screen project panel follow the [project selector contract](ui-project-navigation.md#header-project-switcher).
+The top bar hamburger and ▶ command menus share `ActionMenuSurface` from `@mew/ui`, themed backgrounds, and overlay opacity/blur. The command menu keeps the default header variant. The workspace hamburger adds scoped styles from `src/components/workspace-menu.css`: 292px width constrained to the viewport, 13px text, 4px outer padding, 12px corners, 32px action rows (36px for touch), and 4px 8px row padding. Account identity uses one 52px row; notification previews use 38px rows. `ActionMenu` owns focus, viewport bounds, scrolling, and dismissal. The desktop project sidebar and mobile full-screen project panel follow the [project selector contract](ui-project-navigation.md#header-project-switcher).
 
 When a top bar dropdown is open, clicking or touching another menu button once closes it and immediately opens the new menu or mobile project panel. The full-screen mobile project panel covers these buttons and must be closed before opening another header control. Buttons are identified by `data-header-menu-trigger`, and the header variant of `ActionMenu` does not restore focus to the previous button or block the subsequent click when another enabled button is pressed with the left mouse button or touch. Close the previous menu in a task after the new button's click handler finishes to preserve the overlay stack's back-navigation guard. Pressing the same button or an ordinary outside area and the default right-click menu retain their existing dismissal behavior. The desktop project sidebar does not close on menu switching or outside presses. `server/header-menu-switch-ui.test.ts` checks switching in both directions between menus, a single popup, focus in the new menu, Esc/back, and blocking of ordinary outside clicks.
 
@@ -142,9 +142,11 @@ Validation: `server/action-menu-horizontal-ui.test.ts` checks rendering the same
 
 ### Header hamburger menu
 
-`HeaderMenuPopup` in `HeaderMenu` uses the shared `ActionMenu` and `ActionMenuItem`. Its appearance is owned by the `header` variant in `packages/ui/src/action-menu.css`, sharing background opacity and blur with the project and command dropdowns. It uses the same themed background as shared dropdowns, a gray 1px border, and rounded corners (8px for the popup and 4px for rows). Popup padding is 4px, row padding is 6px vertically and 10px horizontally, icon spacing is 8px, and minimum width is 220px. In touch environments, row height remains at least 40px.
+`HeaderMenuPopup` uses shared `ActionMenu` and `ActionMenuItem` primitives with the compact workspace styling described above. Its sections are User & Account, Notifications, Tools, and Mew. The profile card combines the avatar (initials on missing/failed photos), name, and email, and opens the independent account settings dialog. Owner-only account management follows it. General Settings opens Appearance and has no account section.
 
-Existing items, permissions, toggle states, and shortcut hints are preserved. It supports portals, visual viewport and mobile dock boundaries, internal scrolling, and arrow-key and Home/End navigation that skips disabled items. Selection, Esc, Tab, back, and outside presses close it and restore focus to the invoking button. Pressing another top menu button closes the current menu and opens the new one immediately. Other outside presses do not click underlying elements. `server/action-menu-ui.test.ts` checks independent styling, selection, keyboard navigation, focus restoration, modal preservation, and outside clicks in both themes on desktop/mobile.
+Tools contains Remote Desktop, Remote Browser, Server File Explorer (`Alt+E`), and Scheduled Tasks (`Alt+S`), filtered by capabilities. Mew contains Updates (`Ctrl+U`), owner-only Mewlink, and Settings (`Ctrl+,`). The redundant Commit, system resources, chat, database, and retired Android entries are absent. System resources remain in the top bar; database actions follow the [database feature contract](../features/document-databases/document-databases-and-catalog.md). Notification content follows the [header notification contract](ui-recovery-feedback.md#header-notifications).
+
+Preserve portals, visual viewport/mobile Dock boundaries, internal scrolling, arrow-key and Home/End navigation that skips disabled items, and focus restoration. Selection, Esc, Tab, Back, and outside presses dismiss the menu. Individual notification acknowledgment keeps it open. Pressing another top menu button immediately switches menus; other outside presses do not activate underlying controls. `server/workspace-menu-ui.test.ts` checks groups, density, previews, acknowledgment, history, avatar fallback, themes, four locales, and 320/390/1100px bounds. `server/action-menu-ui.test.ts` retains shared primitive coverage.
 
 ### Agent and terminal tab context menu
 

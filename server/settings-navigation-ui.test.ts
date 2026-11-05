@@ -29,10 +29,10 @@ function Fixture(){
   const [open,setOpen]=useState(true);
   return <><Background/>
     <button onClick={()=>setOpen(true)}>Open settings</button>
-    {open&&<SettingsModal email={null} displayName={null} avatarDataUrl={null} canEditIgnore={false}
+    {open&&<SettingsModal canEditIgnore={false}
       themeSettings={{palette,custom:[]}} fontPreferences={{ui:'Arial',markdown:'Arial',mono:'monospace'}}
       mewcatRequest={params.has('mewcat')?1:undefined} mewcatSkin={null} mewcatHideDesktop={false}
-      onClose={()=>setOpen(false)} onLoggedOut={noop} onProfileChanged={noop}
+      onClose={()=>setOpen(false)}
       onFontPreferencesChange={noop} onThemeSettingsChange={noop} onMewcatSkinChange={noop} onMewcatHideDesktopChange={noop}/>}</>;
 }
 createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18nProvider>);`
@@ -84,6 +84,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
         await background.evaluate(el => el.ownerDocument.defaultView!.history.back())
       }
       await categories.waitFor()
+      assert.equal(await categories.getByRole('button', { name: 'Account', exact: true }).count(), 0, 'account settings has its own popup')
       await categories.getByRole('button', { name: 'Appearance', exact: true }).tap()
       await backButton.waitFor()
       await back()

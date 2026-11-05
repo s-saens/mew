@@ -11,6 +11,12 @@ const LOCALE_KEY = 'mew:locale'
 
 const messages = {
   ko: {
+    'menu.userAccount': '사용자 및 계정',
+    'menu.notifications': '알림',
+    'menu.tools': '도구',
+    'menu.viewAll': '전체 보기',
+    'menu.noNotifications': '새 알림이 없습니다',
+    'menu.remoteBrowser': '원격 브라우저',
     'editor.unsupportedFile': '에디터에서 볼 수 없는 파일입니다. 파일 메뉴에서 다운로드할 수 있습니다.',
     ...mewcatNotificationMessages('ko'),
     ...mewcatAssistantMessages('ko'),
@@ -125,7 +131,6 @@ const messages = {
     'access.terminal': '터미널',
     'access.desktop': '원격 데스크톱',
     'access.portPreview': 'localhost 앱 접속',
-    'access.android': 'Android',
     'access.serverFiles': '서버 파일 탐색기',
     'access.git': 'Git 작업',
     'access.database': '데이터베이스',
@@ -655,6 +660,12 @@ const messages = {
     'dateTime.minute': '분',
   },
   en: {
+    'menu.userAccount': 'User & Account',
+    'menu.notifications': 'Notifications',
+    'menu.tools': 'Tools',
+    'menu.viewAll': 'View all',
+    'menu.noNotifications': 'No new notifications',
+    'menu.remoteBrowser': 'Remote browser',
     'editor.unsupportedFile': 'This file cannot be previewed in the editor. Download it from the file menu.',
     ...mewcatNotificationMessages('en'),
     ...mewcatAssistantMessages('en'),
@@ -769,7 +780,6 @@ const messages = {
     'access.terminal': 'Terminal',
     'access.desktop': 'Remote desktop',
     'access.portPreview': 'Localhost apps',
-    'access.android': 'Android',
     'access.serverFiles': 'Server files',
     'access.git': 'Git operations',
     'access.database': 'Database',
@@ -1299,6 +1309,12 @@ const messages = {
     'dateTime.minute': 'Minute',
   },
   'zh-CN': {
+    'menu.userAccount': '用户与账户',
+    'menu.notifications': '通知',
+    'menu.tools': '工具',
+    'menu.viewAll': '查看全部',
+    'menu.noNotifications': '暂无新通知',
+    'menu.remoteBrowser': '远程浏览器',
     'editor.unsupportedFile': '此文件无法在编辑器中预览。可从文件菜单下载。',
     ...mewcatNotificationMessages('zh-CN'),
     ...mewcatAssistantMessages('zh-CN'),
@@ -1413,7 +1429,6 @@ const messages = {
     'access.terminal': '终端',
     'access.desktop': '远程桌面',
     'access.portPreview': 'localhost 应用',
-    'access.android': 'Android',
     'access.serverFiles': '服务器文件',
     'access.git': 'Git 操作',
     'access.database': '数据库',
@@ -1943,6 +1958,12 @@ const messages = {
     'dateTime.minute': '分',
   },
   ja: {
+    'menu.userAccount': 'ユーザーとアカウント',
+    'menu.notifications': '通知',
+    'menu.tools': 'ツール',
+    'menu.viewAll': 'すべて表示',
+    'menu.noNotifications': '新しい通知はありません',
+    'menu.remoteBrowser': 'リモートブラウザー',
     'editor.unsupportedFile': 'このファイルはエディターでプレビューできません。ファイルメニューからダウンロードできます。',
     ...mewcatNotificationMessages('ja'),
     ...mewcatAssistantMessages('ja'),
@@ -2057,7 +2078,6 @@ const messages = {
     'access.terminal': 'ターミナル',
     'access.desktop': 'リモートデスクトップ',
     'access.portPreview': 'localhost アプリ',
-    'access.android': 'Android',
     'access.serverFiles': 'サーバーファイル',
     'access.git': 'Git 操作',
     'access.database': 'データベース',
@@ -2593,6 +2613,7 @@ export type TranslationKey = keyof (typeof messages)['ko']
 const shortcutTranslations: Record<Locale, Record<string, string>> = {
   ko: {},
   en: {
+    openServerFileExplorer: 'Server file explorer', openScheduledTasks: 'Scheduled tasks',
     '전역': 'Global', '협업': 'Collaboration', '파일 트리': 'File tree', '터미널·에이전트': 'Terminal & agent', '에디터': 'Editor',
     save: 'Save (commit)', quickOpen: 'Quick open file', projectSearch: 'Search project', toggleTerminal: 'Open/close terminal • agent panel',
     toggleTasks: 'Open/close tasks panel', toggleSidebar: 'Open/close file explorer', closeTab: 'Close tab', closeTabAlt: 'Close tab (alternative)', newTab: 'New file',
@@ -2603,6 +2624,7 @@ const shortcutTranslations: Record<Locale, Record<string, string>> = {
     insertLink: 'Insert/edit link', editorFind: 'Find and replace in document',
   },
   'zh-CN': {
+    openServerFileExplorer: '服务器文件资源管理器', openScheduledTasks: '计划任务',
     '전역': '全局', '협업': '协作', '파일 트리': '文件树', '터미널·에이전트': '终端和代理', '에디터': '编辑器',
     save: '保存（提交）', quickOpen: '快速打开文件', projectSearch: '搜索项目', toggleTerminal: '打开/关闭代理',
     toggleTasks: '打开/关闭任务面板', toggleSidebar: '打开/关闭文件资源管理器', closeTab: '关闭标签页', closeTabAlt: '关闭标签页（备用）', newTab: '新建文件',
@@ -2613,6 +2635,7 @@ const shortcutTranslations: Record<Locale, Record<string, string>> = {
     insertLink: '插入/编辑链接', editorFind: '在文档中查找和替换',
   },
   ja: {
+    openServerFileExplorer: 'サーバーファイルエクスプローラー', openScheduledTasks: 'スケジュールタスク',
     '전역': '全体', '협업': '共同作業', '파일 트리': 'ファイルツリー', '터미널·에이전트': 'ターミナルとエージェント', '에디터': 'エディター',
     save: '保存（コミット）', quickOpen: 'ファイルをクイックオープン', projectSearch: 'プロジェクトを検索', toggleTerminal: 'エージェントを開く/閉じる',
     toggleTasks: 'タスクパネルを開く/閉じる', toggleSidebar: 'ファイルエクスプローラーを開く/閉じる', closeTab: 'タブを閉じる', closeTabAlt: 'タブを閉じる（代替）', newTab: '新規ファイル',

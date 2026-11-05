@@ -1,5 +1,5 @@
 import { scopedBrowserStorage } from '@mew/ui/browser-storage-scope'
-import { ArrowUpRight, Download } from 'iconoir-react'
+import { ArrowUpRight, Database, Download } from 'iconoir-react'
 import { useI18n } from '../i18n'
 import { pageRepresentative, documentPageLabel, documentPageTarget, remapPagePath, type DocumentPageMutation } from '../../shared/document-pages'
 import { documentAbsolutePath, useTitlePreviews } from '../utils/document-title-preview'
@@ -614,6 +614,7 @@ export function FileTree({
   compact = false,
   roots,
   onOpenGraph,
+  onOpenDatabase,
   documentPages = false,
   documentsFolder,
   onPageMutation,
@@ -667,6 +668,7 @@ export function FileTree({
   roots?: React.ReactNode
   /** Docs root only: graph entry above its MOC. */
   onOpenGraph?: () => void
+  onOpenDatabase?: () => void
   documentPages?: boolean
   /** Pinned filesystem folder with a separate Documents navigation action. */
   documentsFolder?: { path: string; onOpen: () => void }
@@ -1667,8 +1669,13 @@ export function FileTree({
   }
 
   return (
-    <div data-tree-key={persistedProject} className={compact ? 'bg-surface-deep' : 'flex h-full flex-col border-r border-edge bg-surface-deep'}>
+    <div data-tree-key={persistedProject} className={compact ? 'relative bg-surface-deep' : 'relative flex h-full flex-col border-r border-edge bg-surface-deep'}>
       {dialogs.dialog}
+      {onOpenDatabase && <button type="button" data-explorer-database
+        onClick={onOpenDatabase} aria-label={t('header.database')} data-tip={t('header.database')} aria-haspopup="dialog"
+        className="absolute right-2 top-1.5 z-20 rounded-md border border-edge-strong bg-surface-raised p-1.5 text-ink-muted shadow-sm hover:bg-surface-hover hover:text-ink focus-visible:outline-2 focus-visible:outline-accent">
+        <Database width={14} height={14} aria-hidden="true" />
+      </button>}
       <div
         ref={listRef}
         tabIndex={-1}

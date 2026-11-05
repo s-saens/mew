@@ -1,7 +1,7 @@
 ---
-updated: "2026-10-28"
+updated: "2026-11-05"
 title: "Getting started with mew"
-description: "Installation, first sign-in, remote access, updates, and data retention for Mew. The legacy locale filename is retained for existing links."
+description: "Installation, first sign-in, remote access, host browser and remote desktop setup, updates, and data retention for Mew. The legacy locale filename is retained for existing links."
 ---
 
 [Current installation guide](getting-started-en.md) · [Documentation](../README.md)
@@ -159,7 +159,7 @@ Exit with Ctrl+C and run the same command again to use the latest version. If yo
 4. In local mew, confirm the **Online** status and fixed access address. The address has the format `https://mew.saens.kr/<유저이름>/<기기이름>`.
 5. Opening this address on your phone or another computer displays that computer's mew login screen without requiring a Mewlink login. Log in with your **local mew email and password**. The connecting browser does not need separate registration, and if its saved local login session is valid, you can continue using it on your next visit. Registration, deletion, and list management in [My devices](https://mew.saens.kr/dashboard) require logging in to Mewlink.
 
-Your computer must stay on, with mew running and an active internet connection. You cannot connect while the computer is off or asleep. Networks that block direct connections display a connection failure. Android iframes are not supported with this access method. See the [remote access contract](../../.mew/docs/development/remote-access.md#verification-and-remaining-gates) for the scope of verification covering provider-specific logins, external mobile networks, sleep, and network switching.
+Your computer must stay on, with mew running and an active internet connection. You cannot connect while the computer is off or asleep. Networks that block direct connections display a connection failure. See the [remote access contract](../../.mew/docs/development/remote-access.md#verification-and-remaining-gates) for the scope of verification covering provider-specific logins, external mobile networks, sleep, and network switching.
 
 To allow someone else access, configure an email account and its role, feature permissions, and file permissions in local mew's **Account management**, then share the device address. They can log in with the local account without a Mewlink account.
 
@@ -258,11 +258,11 @@ Open a terminal or agent from the dock. Install and authenticate AI tools first.
 
 <a id="browser-android-and-remote-desktop"></a>
 
-### Browser, Android, and remote desktop
+### Browser and remote desktop
 
-Log in to agents in a standalone Chrome window on the host, and open development apps by appending `/포트번호` to the Mew address. Login screens, Android, and remote desktop require separate environment setup, installation, and OS permissions; check the supported scope first.
+Log in to agents in a standalone Chrome window on the host, and open development apps by appending `/포트번호` to the Mew address. Login screens and remote desktop require separate environment setup, installation, and OS permissions; check the supported scope first.
 
-[Browser and Android](browser.md) · [Remote desktop](remote-desktop.md).
+[Login screens and browser](browser.md) · [Remote desktop](remote-desktop.md).
 
 <a id="databases"></a>
 

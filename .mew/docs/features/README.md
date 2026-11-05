@@ -1,8 +1,8 @@
 ---
 title: "Mew feature document management"
 created: "2026-09-18"
-updated: "2026-11-03"
-description: "Ownership, hierarchy, and write-back rules for current feature contracts. Explains preserved legacy status fields and historical records after removal of the feature panel, API, and execution queue."
+updated: "2026-11-05"
+description: "Ownership, hierarchy, and write-back rules for feature contracts, preserved legacy status fields, and historical records. Covers removed feature-panel workflows and the Android feature removal notice."
 ---
 
 Choose relevant feature bodies by `description`, following the [documentation rules](../README.md). Documents uses `.mew/docs`; the [feature home](_features.md) remains for navigation and old links.
@@ -48,7 +48,7 @@ Editing a document does not trigger agent execution or Git commits. [Feature-bas
 
 ## Items not included in the catalog
 
-The initial catalog excluded the old home to-do/calendar, unimplemented AI commit generation, and unrealized plans. Android covers environment preparation and existing gateways. RAG was removed on 2026-09-28; its evidence is in [history](../history/rag-feature.md). Installation, HTTPS, backups, licensing, research, and past plans retain their existing owners.
+The initial catalog excluded the old home to-do/calendar, unimplemented AI commit generation, and unrealized plans. The Android environment and gateway feature was removed on 2026-11-05; its former scope remains in the [removal notice](browser-android-remote-desktop/android-environment-checks-and-screen-connection.md). RAG was removed on 2026-09-28; its evidence is in [history](../history/rag-feature.md). Installation, HTTPS, backups, licensing, research, and past plans retain their existing owners.
 
 ## Specs consolidation — 2026-10-06
 

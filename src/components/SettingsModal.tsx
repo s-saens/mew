@@ -5,8 +5,7 @@ import { uiText } from '@mew/ui/i18n-core'
 import { useUiLocale } from '@mew/ui/i18n'
 import { lazy, Suspense, useEffect, useId, useState, type Ref } from 'react'
 import { SelectField, useOverlayDismiss } from '@mew/ui'
-import { changePassword, fetchIgnoreList, logout, saveIgnoreList } from '../api/client'
-import { AccountProfileForm } from './account-profile-form'
+import { fetchIgnoreList, saveIgnoreList } from '../api/client'
 import { DEFAULT_SHORTCUTS, formatKeyCombo, resetAllBindings, resetBinding, setBinding, useShortcutBindings } from '@mew/shortcuts'
 import { LOCALES, LOCALE_NAMES, localizeShortcut, useI18n, type Locale, type TranslationKey } from '../i18n'
 import { DEFAULT_FONT_PREFERENCES, type FontPreferences } from '../utils/fontPreferences'
@@ -17,14 +16,10 @@ import { MewcatSkinSettings } from './mewcat-skin-settings'
 import { MewcatSizeSettings } from './mewcat-size-settings'
 import { MewcatNotificationSettings } from './mewcat-notifications'
 import { MewcatBreakSettings } from './mewcat-break'
-import { requestMewlinkLogout } from '../utils/remote-app.ts'
-import { MewlinkAccountConnection } from './mewlink-account-connection.tsx'
 
 const DebuggerSettings = lazy(() => import('./debugger-settings'))
 
-const PASSWORD_MIN_LENGTH = 10
-
-type Section = 'debugger' | 'account' | 'appearance' | 'notifications' | 'dock' | 'mewcat' | 'shortcuts' | 'ignore'
+type Section = 'debugger' | 'appearance' | 'notifications' | 'dock' | 'mewcat' | 'shortcuts' | 'ignore'
 
 interface SettingsModalProps {
   mewcatHostRef?: Ref<HTMLDivElement>
@@ -33,12 +28,6 @@ interface SettingsModalProps {
   debuggerRoot?: string
   onOpenDebugger?: () => void
   dockAvailable?: readonly MobileDockPanel[]
-  /** 로그인한 사용자의 이메일 — 게스트면 null이라 계정 탭을 숨긴다 */
-  email: string | null
-  displayName: string | null
-  avatarDataUrl: string | null
-  hasPassword?: boolean
-  authenticationMethod?: 'password' | 'mewlink' | null
   /** owner·manager만 숨김 목록 탭을 본다 — 모두의 트리를 바꾸는 전역 설정이라 */
   canEditIgnore: boolean
   fontPreferences: FontPreferences
@@ -50,13 +39,10 @@ interface SettingsModalProps {
   onThemeSettingsChange: (settings: ThemeSettings) => void
   onMewcatSkinChange: (skin: MewcatSkinSelection) => void
   onClose: () => void
-  onLoggedOut: () => void
-  onProfileChanged: (profile: { displayName: string; avatarDataUrl: string | null }) => void
 }
 
 const SECTION_LABEL: Record<Section, TranslationKey> = {
   debugger: 'settings.debugger',
-  account: 'settings.account',
   appearance: 'settings.appearance',
   dock: 'settings.dock',
   notifications: 'settings.notifications',
@@ -65,11 +51,11 @@ const SECTION_LABEL: Record<Section, TranslationKey> = {
   ignore: 'settings.ignoreList',
 }
 
-/** 헤더의 계정 버튼(게스트는 톱니 버튼)으로 여는 설정 창 — 계정·화면(테마)·단축키·숨김 목록을 한곳에서 관리한다 */
-export function SettingsModal({ mewcatHostRef, mewcatRequest, initialDebugger, debuggerRoot, onOpenDebugger, dockAvailable, email, displayName, avatarDataUrl, hasPassword = true, authenticationMethod, canEditIgnore, themeSettings = { palette: DEFAULT_THEME_PALETTE, custom: [] }, fontPreferences, mewcatSkin, mewcatHideDesktop, onMewcatHideDesktopChange, onFontPreferencesChange, onThemeSettingsChange = () => {}, onMewcatSkinChange, onClose, onLoggedOut, onProfileChanged }: SettingsModalProps) {
+/** Workspace appearance, notifications, tools, shortcuts, and shared ignore rules. */
+export function SettingsModal({ mewcatHostRef, mewcatRequest, initialDebugger, debuggerRoot, onOpenDebugger, dockAvailable, canEditIgnore, themeSettings = { palette: DEFAULT_THEME_PALETTE, custom: [] }, fontPreferences, mewcatSkin, mewcatHideDesktop, onMewcatHideDesktopChange, onFontPreferencesChange, onThemeSettingsChange = () => {}, onMewcatSkinChange, onClose }: SettingsModalProps) {
   useUiLocale()
   const [portalContainer, setPortalContainer] = useState<HTMLDivElement | null>(null)
-  const [section, setSection] = useState<Section>(mewcatRequest ? 'mewcat' : debuggerRoot && initialDebugger ? 'debugger' : email ? 'account' : 'appearance')
+  const [section, setSection] = useState<Section>(mewcatRequest ? 'mewcat' : debuggerRoot && initialDebugger ? 'debugger' : 'appearance')
   // Mobile begins with the category list; the selected panel is a second screen.
   const [mobileSection, setMobileSection] = useState<Section | null>(section === 'debugger' || mewcatRequest ? section : null)
   const { t } = useI18n()
@@ -93,7 +79,6 @@ export function SettingsModal({ mewcatHostRef, mewcatRequest, initialDebugger, d
   })
 
   const sections: Section[] = [
-    ...(email ? (['account'] as Section[]) : []),
     'appearance',
     'notifications',
     'dock',
@@ -161,7 +146,6 @@ export function SettingsModal({ mewcatHostRef, mewcatRequest, initialDebugger, d
             </button>
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto p-4">
-            {section === 'account' && email && <AccountPanel email={email} displayName={displayName} avatarDataUrl={avatarDataUrl} hasPassword={hasPassword} authenticationMethod={authenticationMethod} onLoggedOut={onLoggedOut} onProfileChanged={onProfileChanged} />}
             {section === 'appearance' && (
               <AppearancePanel
                 portalContainer={portalContainer}
@@ -182,133 +166,6 @@ export function SettingsModal({ mewcatHostRef, mewcatRequest, initialDebugger, d
       </div>
       <div ref={mewcatHostRef} data-settings-mewcat-host className="contents" onClick={event => event.stopPropagation()} onKeyDown={event => event.stopPropagation()} onKeyUp={event => event.stopPropagation()} />
     </div>, document.body
-  )
-}
-
-// ── 계정: 비밀번호 변경 + 로그아웃 ───────────────────────────────────────────
-function AccountPanel({
-  email,
-  displayName,
-  avatarDataUrl,
-  hasPassword,
-  authenticationMethod,
-  onLoggedOut,
-  onProfileChanged,
-}: {
-  email: string
-  displayName: string | null
-  avatarDataUrl: string | null
-  hasPassword: boolean
-  authenticationMethod?: 'password' | 'mewlink' | null
-  onLoggedOut: () => void
-  onProfileChanged: (profile: { displayName: string; avatarDataUrl: string | null }) => void
-}) {
-  useUiLocale()
-  const { t } = useI18n()
-  const [currentPassword, setCurrentPassword] = useState('')
-  const [newPassword, setNewPassword] = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
-  const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState(false)
-  const [busy, setBusy] = useState(false)
-
-  async function handleChangePassword(e: React.FormEvent) {
-    e.preventDefault()
-    setError(null)
-    setSuccess(false)
-    if (newPassword.length < PASSWORD_MIN_LENGTH) {
-      setError(uiText("비밀번호는 {p0}자 이상이어야 합니다", { p0: PASSWORD_MIN_LENGTH }))
-      return
-    }
-    if (newPassword !== confirmPassword) {
-      setError(uiText("새 비밀번호가 서로 다릅니다"))
-      return
-    }
-    setBusy(true)
-    try {
-      await changePassword(currentPassword, newPassword)
-      setSuccess(true)
-      setCurrentPassword('')
-      setNewPassword('')
-      setConfirmPassword('')
-    } catch (err) {
-      setError(err instanceof Error ? err.message : uiText("비밀번호 변경에 실패했습니다"))
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  async function handleLogout() {
-    try {
-      await logout()
-    } catch {
-      // 서버에 못 알려도 클라이언트 상태는 로그아웃으로 전환한다
-    }
-    if (authenticationMethod === 'mewlink' && requestMewlinkLogout()) return
-    onLoggedOut()
-  }
-
-  const inputClass =
-    'w-full rounded border border-edge-strong bg-surface px-3 py-2 text-sm text-ink outline-none placeholder:text-ink-faint focus:border-edge-bright'
-
-  return (
-    <div>
-      <AccountProfileForm email={email} displayName={displayName} avatarDataUrl={avatarDataUrl} hasPassword={hasPassword} onProfileChanged={onProfileChanged} />
-
-      <MewlinkAccountConnection email={email} authenticationMethod={authenticationMethod} />
-
-      {hasPassword && <form onSubmit={handleChangePassword} className="flex flex-col gap-3 border-t border-edge pt-4">
-        <div className="text-sm font-medium">{t('settings.changePassword')}</div>
-        <input
-          type="password"
-          value={currentPassword}
-          onChange={(e) => setCurrentPassword(e.target.value)}
-          placeholder={t('settings.currentPassword')}
-          autoComplete="current-password"
-          required
-          className={inputClass}
-        />
-        <input
-          type="password"
-          value={newPassword}
-          onChange={(e) => setNewPassword(e.target.value)}
-          placeholder={`${t('settings.newPassword')} (${PASSWORD_MIN_LENGTH}+)`}
-          autoComplete="new-password"
-          required
-          className={inputClass}
-        />
-        <input
-          type="password"
-          value={confirmPassword}
-          onChange={(e) => setConfirmPassword(e.target.value)}
-          placeholder={t('settings.confirmPassword')}
-          autoComplete="new-password"
-          required
-          className={inputClass}
-        />
-        {error && <div className="select-text text-sm text-danger">{error}</div>}
-        {success && (
-          <div className="text-sm text-success">{uiText("비밀번호 변경 완료 · 다른 기기에서 다시 로그인 필요")}</div>
-        )}
-        <button
-          type="submit"
-          disabled={busy || !currentPassword || !newPassword || !confirmPassword}
-          className="rounded bg-accent py-2 text-sm font-medium text-ink-on-accent hover:bg-accent-strong disabled:opacity-40"
-        >
-          {busy ? t('settings.changing') : t('settings.change')}
-        </button>
-      </form>}
-
-      <div className="mt-4 border-t border-edge pt-4">
-        <button
-          type="button"
-          onClick={handleLogout}
-          className="w-full rounded border border-edge-strong py-2 text-sm text-danger hover:bg-surface-raised"
-        >
-          {t('settings.logout')}
-        </button>
-      </div>
-    </div>
   )
 }
 

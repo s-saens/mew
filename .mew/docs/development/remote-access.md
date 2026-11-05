@@ -1,6 +1,6 @@
 ---
 title: "Mewlink device registration and locally authenticated P2P access contract"
-description: "Defines Mewlink registration, launcher behavior, authentication, browser trust, UI resources, notification permission bridging, microphone delegation, signaling proofs, and transport limits. Links recovery and distinguishes host updates, central rollout, and isolated verification."
+description: "Defines Mewlink registration, launcher behavior, authentication, browser trust, UI resources, notification permission bridging, microphone delegation, signaling proofs, and transport limits. Links recovery and distinguishes host updates, central rollout, and isolated verification; the removed Android gateway has no transport capability."
 created: 2026-10-07
 updated: "2026-11-04"
 ---
@@ -401,7 +401,6 @@ The [remote connection recovery contract](remote-access-recovery.md#reattaching-
 | Remote desktop | Negotiation uses app transport; video/input uses the existing separate peer. OS approval, single-controller, input lease, and NAT contracts remain in place. Actual video/input verification was not performed in this work |
 | Internal localhost DOM browser | Authenticated `/api/dom-browser/ws` through the ordinary Mew P2P socket bridge, with host `portPreview` authorization. Requires an updated host and central shared socket allowlist, but no preview domain. Execution and assets follow the [DOM browser contract](port-preview.md#internal-dom-browser). |
 | Legacy localhost app preview | Entry through `/user/device/<port>`. Passes only a port-specific capability issued through Mew login and `portPreview` permission. Assets, APIs, and WS on the separate preview origin connect to host loopback over P2P. Requires the wildcard HTTPS configuration in [Port preview](port-preview.md). |
-| Android iframe | Unsupported over P2P. Hides the Android capability and does not allow arbitrary URL proxying. |
 | Agent and GitHub login screens | Transmits JPEG video and input from `/api/login-desktop/ws` through existing app transport. The host's independent X server owns the virtual display and input. |
 | Local login, password changes, and logout | Uses A's existing authentication API over P2P. Separate from central device registration and management login |
 

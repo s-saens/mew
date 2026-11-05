@@ -1,8 +1,8 @@
 ---
 title: "UI installation, loading, and recovery feedback"
-description: "Shared installation guidance, loading indicators, notifications, session restoration, and quiet recovery presentation. Defines retained content, UI feedback for retry and error boundaries, and the Mewlink stay-signed-in prompt."
+description: "Shared installation guidance, loading, session restoration, quiet recovery, and hamburger notification previews with full history. Defines retained content, acknowledgment, and retry/error feedback boundaries."
 created: "2026-11-03"
-updated: "2026-11-03"
+updated: "2026-11-05"
 상위파일: "ui-contracts.md"
 ---
 
@@ -82,7 +82,9 @@ On 2026-10-21, the 3 simulated-connection Chromium checks `connection-screen.bro
 
 ## Header notifications
 
-When unacknowledged notifications exist, show a bell icon and count immediately to the left of the active sessions button. Subscribe to the same notification queue independently of the Mewpet skin and remote viewer hiding setting, and provide navigation to the relevant screen, individual acknowledgment, and acknowledgment of all notifications in the list. Keep notification channels and tests in the Notifications tab in settings, and show additional toast options only when Mewpet is enabled. Hide Mewpet, fallback images, and loading text while the selected skin loads. Show new notifications through the shared `Toast` for 2.6 seconds, with the latest notification replacing the previous toast. Unacknowledged items remain in the list after the toast ends. Detailed storage, delivery, and defaults follow the [notification contract](../features/appearance-accounts-operations/mewpet-mascot-notifications-and-breaks.md#notification-settings-and-pc-desktop-notifications).
+When in-app notifications are enabled, the hamburger trigger shows the unacknowledged count and its Notifications section displays up to four compact previews, ordered by danger, warning, then completion and newest first within each level. There is no separate header bell. **View all** opens the full queue in a dialog, including an empty state after the final item is acknowledged. Individual acknowledgment in the menu keeps it open and reveals the next queued item. Target navigation closes the menu and preserves approval notices until resolved; other target notices are acknowledged. The same queue and channel preferences remain independent of the Mewpet skin and remote viewer setting.
+
+Keep notification channels and tests in Settings → Notifications, with additional toast options only when Mewpet is enabled. Hide Mewpet, fallback images, and loading text while the selected skin loads. New notices use the shared `Toast` for 2.6 seconds; the latest notice replaces the previous toast without acknowledging it. Detailed storage, delivery, and defaults follow the [notification feature contract](../features/appearance-accounts-operations/mewpet-mascot-notifications-and-breaks.md#notification-settings-and-pc-desktop-notifications).
 
 ## Full-screen loading during session restoration and return
 

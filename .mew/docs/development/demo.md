@@ -1,8 +1,8 @@
 ---
 title: "Browser demo using the shared UI"
-description: "Defines the full public file list, initial copy, on-demand body loading, and size budgets for the browser demo using the actual Mew UI, along with name-only virtual project creation and managed cloning, the inline catalog and My Projects, task, virtual host, account theme, and in-memory storage contracts after removal of the feature panel. Explains static files, origins, CSP, test boundaries for using verified public materials when pinned Git objects are unavailable, and user deployment procedures; includes required agent build verification and user-owned server lifecycle operations."
+description: "Defines the browser demo using Mew's shared UI, pinned public file catalog, lazy body loading, size budgets, virtual projects, host fixtures, and in-memory state. Covers transport/CSP boundaries, removed Android fixtures, automated checks, and user-owned application procedures."
 created: "2026-10-19"
-updated: "2026-11-03"
+updated: "2026-11-05"
 ---
 
 # Browser demo using the shared UI
@@ -36,7 +36,6 @@ The demo is a separate entry point for trying Mew without logging in or running 
 | Document DB, comments, and chat | Uses example data in per-visitor memory and the existing UI |
 | Remote desktop | Two 960×600 virtual screens; keyboard, paste, virtual clipboard, and pointer input; screen selection, rotation, and settings UI |
 | System resources | Dummy CPU, memory, GPU, temperature, and process values, with graphs that change over time |
-| Android | SDK and virtual device status; Home, Notes, and Settings on a local HTML phone; virtual command execution and terminal output |
 | Scheduled tasks | Editing, adding, and deleting example schedules and prompts, execution history, and in-memory state changes from the virtual terminal and scheduled prompts |
 | Updates and commands | Dummy versions, completion status, and execution logs; simulates command buttons and agent runtime installation, removal, and logout |
 | Account management and Mewlink | Changing example account, feature, and file permissions; approving, rejecting, and disconnecting example access requests; changing device registration status |
@@ -54,11 +53,11 @@ Managed folders are virtual paths beneath `/demo/mew-playground/.mew/projects/<n
 
 ### Scope of host feature demos
 
-`http-host.ts` and `host-fixtures.ts` own dummy responses for system resources, Android, scheduling, updates, and device registration. `http-admin.ts` and `http-debugger.ts` own virtual admin and debugger state. Execution results use Demo and simulation labels. They do not run actual processes at scheduled times or change the OS, crontab, accounts, firewall, or installation state. Permission edits in the admin screen apply only to example account state, while demo visitors retain access to try all features.
+`http-host.ts` and `host-fixtures.ts` own dummy responses for system resources, scheduling, updates, and device registration. `http-admin.ts` and `http-debugger.ts` own virtual admin and debugger state. Execution results use Demo and simulation labels. They do not run actual processes at scheduled times or change the OS, crontab, accounts, firewall, or installation state. Permission edits in the admin screen apply only to example account state, while demo visitors retain access to try all features.
 
 `desktop.ts` draws screens with Canvas and applies input from the shared `desktopInput` to local notes and pointers. It does not use actual screen capture, external media, installed assets, remote sockets, or WebRTC. Browsers that do not support `VideoFrame` display a local stream from the same Canvas. Frames are released immediately after drawing, and timers, stream tracks, and connections are cleaned up on close, reset, or page exit. Video resolution and FPS settings let visitors try the existing UI without changing virtual screen dimensions or actual transmission quality.
 
-The Android screen is Blob HTML without external resources or scripts. The app CSP permits only `frame-src blob:` and continues to block external frames. Changing SDK or gateway addresses does not connect to actual addresses. Remote device registration shows only example addresses and does not issue actual connection addresses. Actual server-browser login, running local port services, and advanced debug adapter requests cannot be executed. Related features are exposed in existing settings, permissions, and tools, and requests that are not implemented return errors explaining the demo's scope.
+Remote device registration shows only example addresses and does not issue actual connection addresses. Actual server-browser login, running local port services, and advanced debug adapter requests cannot be executed. Related features are exposed in existing settings, permissions, and tools, and requests that are not implemented return errors explaining the demo's scope.
 
 ### Full file list and on-demand body loading
 
@@ -137,7 +136,7 @@ For this browser check, `server/demo-repository-fixture.mjs` first uses the orig
 
 The demo host flow checks the example visitor's approve and reject buttons in account management's Mewlink access requests, and checks the device name in the separate Mewlink settings in the owner menu. Do not look for example values from different APIs in the same dialog. The original snapshot tools and separate regression tests continue to own generation and size checks for pinned materials.
 
-`host.test.ts` checks all capabilities, state changes for dummy resources, schedules, updates, admin, and debugger, visitor isolation, reset, Android Blob revocation, and virtual execution logs. `server/demo-host-browser-flow.ts` integrates full hamburger-menu visibility, resource popups, virtual desktop input, settings, scheduled execution, admin, and Android note operations on desktop and mobile into the shared browser check.
+`host.test.ts` checks all capabilities, state changes for dummy resources, schedules, updates, admin, and debugger, visitor isolation, reset, retired Android route rejection, and virtual execution logs. `server/demo-host-browser-flow.ts` integrates full hamburger-menu visibility, resource popups, virtual desktop input, settings, scheduled execution, and admin operations on desktop and mobile into the shared browser check.
 
 `server/mewlink-demo.test.ts` checks routing, static paths, CSP, and reserved-name conflicts across both origins. `tools/demo-distribution.test.mjs` uses temporary artifacts and an injected build function without running actual app builds or deployments. The private central `test/demo.test.ts` and `username.test.ts` are also checked when integrations change.
 

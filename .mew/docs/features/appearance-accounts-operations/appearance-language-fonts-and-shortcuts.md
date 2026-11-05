@@ -4,11 +4,11 @@ parent: "mew-settings"
 title: "Appearance, language, font, and shortcut settings"
 status: "implemented"
 created: "2026-09-18"
-updated: "2026-10-30"
+updated: "2026-11-05"
 status_hash: "4f239b57ff4cc09aac87a665e96e137692355fb592ecb3c0965c8ea2b7ff2181"
 files: ["src/components/SettingsModal.tsx", "src/components/theme-settings.tsx", "src/components/theme-gradient-angle.tsx", "src/components/overlay-layers.css", "packages/ui/src/color-picker.tsx", "src/i18n.tsx", "packages/ui/src/ui-messages.ts", "packages/ui/src/i18n-core.ts", "src/index.css", "src/utils/theme-color.ts", "shared/theme.ts", "src/hooks/use-account-theme.ts", "src/utils/account-theme.ts", "src/api/theme.ts", "server/userUiState.ts", "server/api.ts", "src/hooks/usePresence.ts", "src/App.tsx", "src/main.tsx", "index.html", "server/serve.ts", "public/fonts/ibm-plex/fonts.css", "shared/icon-packs.ts", "src/components/icon-pack-settings.tsx", "src/components/icon-pack-context.tsx"]
 commits: []
-description: "Defines per-account palettes, gradients, custom theme editing, curated Material/Catppuccin/basic file icon choices with previews and license links, and cross-device synchronization. Covers language, local fonts, shortcuts, Dock placement, mobile settings navigation, shared backgrounds, contrast, popups, reduced motion, and remote-input priority."
+description: "Defines per-account palettes, gradients, custom theme editing, curated Material/Catppuccin/basic file icon choices with previews and license links, and cross-device synchronization. Covers language, local fonts, server explorer/schedule shortcuts, compact grouped menu, Dock placement, mobile settings navigation, shared backgrounds, contrast, popups, reduced motion, and remote-input priority."
 상위파일:
   - "MOC.md"
   - "_appearance-accounts-operations.md"
@@ -54,7 +54,7 @@ description: "Defines per-account palettes, gradients, custom theme editing, cur
 - `DockSettingsPanel` and `useDockPreferences` share dock visibility, order, and per-device-class edge preferences. Position fields use the shared custom `SelectField` inside the settings portal and apply immediately. Only available items are shown, and hiding an item keeps its open panel intact. Mobile and PC, light and dark themes, and four languages are supported. Storage, permissions, and reset scope follow [Dock settings](../../../../docs/configuration/appearance.md#dock-settings).
 
 - `Ctrl/Cmd+N/T` opens a new tab in the focused agent or terminal, or opens the new file name input in the editor or file explorer. `Ctrl/Cmd+Shift+N` uses the existing new folder flow (new document in the document tree). Existing Alt combinations and user remappings are also retained.
-- `Ctrl/Cmd+Tab/Shift+Tab/PageUp/PageDown` and the existing `Alt+Q/E` cycle through the focused panel's previous and next tabs. `Ctrl/Cmd+1…9` selects internal tabs in display order and ignores numbers with no matching tab. The same boundaries apply to split editors, portal terminals, browser iframes, the file explorer, and tasks.
+- `Ctrl/Cmd+Tab/Shift+Tab/PageUp/PageDown` and the existing `Alt+Q` / `Alt+Shift+E` cycle through the focused panel's previous and next tabs. `Ctrl/Cmd+1…9` selects internal tabs in display order and ignores numbers with no matching tab. The same boundaries apply to split editors, portal terminals, browser iframes, the file explorer, and tasks.
 - `Alt+1…9` selects project tabs in their display order in the header. It follows grouping and rearranged order, independently of the focused panel. It does not switch for the current project, an unmatched number, a modal, key repeats, or lack of owner permission. When the remote screen has focus, it is forwarded to the remote.
 - `Ctrl/Cmd+W/Shift+W` closes one focused internal tab. The standard Ctrl/Cmd combinations are fixed aliases and remain available even if custom shortcuts change. Repeated, IME, and modal input for creation and closing is consumed without manipulating background tabs.
 - In JavaScript fullscreen activated by the mew button, creation, closing, number, navigation, and R keys are locked, while the remote screen receives all keys at a higher priority. `Ctrl/Cmd+R` in the agent panel is used to [Clear conversation](../terminals-agents-automation/agent-conversations-queue-and-restoration.md#clear-conversation-shortcut). The app's lock is restored when returning from the remote. Reserved-key restrictions in regular Chrome windows, the path for choosing a Chrome app window, and verification follow the [focus contract](../../development/ui-editor-input.md#focus-based-tab-shortcuts).
@@ -153,3 +153,5 @@ description: "Defines per-account palettes, gradients, custom theme editing, cur
 - 2026-10-19 layer and popup backgrounds: Checked the command editing dialog and image viewer in isolated Chromium across combinations of 390/1100px and dark/light gradients. Verified 6px blur and mode-specific background alpha for command editing, image portal coverage over the Dock and notifications, closing with Esc, and layers remaining at 60 and 61 even after switching floating window focus 3,000 times. Existing settings theme, floating window, and dock expansion checks also passed.
 
 <!-- mew:validation:end -->
+
+The workspace menu groups account, notifications, tools, and Mew actions under the [shared menu contract](../../development/ui-overlays.md#header-hamburger-menu). `Alt+E` opens Server File Explorer and `Alt+S` opens Scheduled Tasks when permitted. The previous `Alt+E` next-tab alias moves to `Alt+Shift+E`; standard next-tab keys remain available.

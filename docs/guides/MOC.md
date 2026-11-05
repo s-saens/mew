@@ -1,8 +1,8 @@
 ---
 title: "Usage"
 created: "2026-09-11"
-updated: "2026-10-29"
-description: "Links to guides for documents, files, Git, agents, collaboration, and remote work after installation and first use, and explains features that require additional preparation and settings for the interface, language, and skills."
+updated: "2026-11-05"
+description: "Links guides for documents, files, Git, agents, collaboration, host browser, and remote desktop after installation. Explains additional setup and settings for the interface, language, and skills."
 상위파일: "../README.md"
 ---
 # Usage
@@ -38,10 +38,10 @@ The current public installation uses Linux, macOS, or WSL 2 on Windows. See [CLI
 | Task | Guide |
 | --- | --- |
 | Open your mew in a browser on a phone or another computer | [Mewlink, Tailscale, and Cloudflare Tunnel](getting-started-ko.md#connect-remotely) |
-| Open web pages on the server and check the Android environment | [Browser and Android](browser.md) |
+| Use login screens, host Chrome, and localhost apps | [Login screens and browser](browser.md) |
 | Access a computer's screen and use keyboard and touch input | [Remote Desktop](remote-desktop.md) |
 
-External access lets you open a running mew instance in another browser. Remote desktop transmits the computer's screen and input and requires separate components and OS permissions. Android requires a separate device and gateway, and Postgres tables require a DB connection.
+External access lets you open a running mew instance in another browser. Remote desktop transmits the computer's screen and input and requires separate components and OS permissions. Postgres tables require a DB connection.
 
 ## Settings and troubleshooting
 

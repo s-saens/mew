@@ -730,51 +730,12 @@ export function exportDocs(path: string): Promise<{ ok: true; path: string }> {
   }).then(json<{ ok: true; path: string }>)
 }
 
-export function fetchAndroidFrameUrl(url: string): Promise<{ url: string }> {
-  return mewFetch(`/api/android-url?url=${encodeURIComponent(url)}`).then(json<{ url: string }>)
-}
-
 export type LoginDesktopSession = { id: string; job: string; url: string; streamUrl: string }
 export function openLoginDesktop(url: string): Promise<LoginDesktopSession> {
   return mewFetch('/api/login-desktop', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }) }).then(json<LoginDesktopSession>)
 }
 export function closeLoginDesktop(id: string): Promise<{ ok: true }> {
   return mewFetch(`/api/login-desktop/${encodeURIComponent(id)}`, { method: 'DELETE' }).then(json<{ ok: true }>)
-}
-
-export interface AndroidEnvCheck {
-  id: string
-  label: string
-  ok: boolean
-  detail: string
-  fixes?: AndroidCommandItem[]
-}
-
-export interface AndroidCommandItem {
-  id?: string
-  context: string
-  command?: string
-  session?: string
-  running?: boolean
-}
-
-export interface AndroidEnvStatus {
-  platform: string
-  architecture: string
-  isWsl: boolean
-  sdkRoot: string
-  checks: AndroidEnvCheck[]
-  suggestedCommands: Array<AndroidCommandItem & { id: string; command: string; session: string; running: boolean }>
-}
-
-export function fetchAndroidEnvStatus(): Promise<AndroidEnvStatus> {
-  return mewFetch('/api/android/status').then(json<AndroidEnvStatus>)
-}
-
-export function runAndroidCommand(id: string): Promise<{ ok: true; session: string }> {
-  return mewFetch(`/api/android/commands/${encodeURIComponent(id)}/run`, { method: 'POST' }).then(
-    json<{ ok: true; session: string }>,
-  )
 }
 
 /** 햄버거 메뉴의 서버 등록 mew 작업 — id 외의 셸 문자열은 절대 보내지 않는다. */

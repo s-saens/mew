@@ -117,7 +117,6 @@ type StorageArea = Record<string, string>
 type PreviewSession = {
   accountHash: string
   expiresAt: number
-  feature: 'portPreview' | 'android'
   pageOrigin: string
   active: () => boolean
   jar: CookieJar
@@ -153,12 +152,11 @@ function signTokenPayload(encoded: string): string {
   return crypto.createHmac('sha256', TOKEN_SECRET).update(encoded).digest('base64url')
 }
 
-function createSession(account: string, pageOrigin: string, active: () => boolean, feature: 'portPreview' | 'android' = 'portPreview'): { id: string; session: PreviewSession } {
+function createSession(account: string, pageOrigin: string, active: () => boolean): { id: string; session: PreviewSession } {
   const id = crypto.randomBytes(24).toString('base64url')
   const session: PreviewSession = {
     accountHash: accountHash(account),
     expiresAt: Date.now() + TOKEN_TTL_MS,
-    feature,
     pageOrigin, active,
     jar: new CookieJar(),
     localStorage: new Map(),
@@ -655,7 +653,7 @@ function tokenMatchesAuthenticatedAccount(req: express.Request, verified: Verifi
   // 쓰되, 다른 Mew 계정의 cookie가 제시되면 명시적으로 거부한다.
   if (!auth.email) return true
   return (
-    canUse(auth, verified.session.feature) &&
+    canUse(auth, 'portPreview') &&
     accountHash(auth.email) === verified.session.accountHash
   )
 }
@@ -732,28 +730,28 @@ async function browserControl(req: express.Request, res: express.Response): Prom
 export function portPreviewFrameUrl(
   rawUrl: string,
   account: string,
-  options: { active: () => boolean; feature?: 'portPreview' | 'android' },
+  options: { active: () => boolean },
 ): string {
   const url = new URL(rawUrl)
   if (!account.trim() || !options.active()) throw new PortPreviewError('로그인이 필요합니다', 401)
   assertLoopbackTarget(url)
   if (!validPreviewPort(Number(url.port)) || protectedPorts.has(Number(url.port))) throw new PortPreviewError('이 포트는 미리볼 수 없습니다', 403)
-  const created = createSession(account, url.origin, options.active, options.feature)
+  const created = createSession(account, url.origin, options.active)
   const token = createPreviewToken(created.id, url.origin, created.session.expiresAt)
   return proxyPath(url, token)
 }
 
-function activeRequest(req: IncomingMessage, feature: 'portPreview' | 'android' = 'portPreview'): () => boolean {
+function activeRequest(req: IncomingMessage): () => boolean {
   const original = sessionFromRequest(req)
   return () => {
     const session = sessionFromRequest(req)
-    return !!original && !!session && session.email === original.email && !session.user.mustChangePassword && canUse({ role: session.user.role, email: session.email, mustChangePassword: session.user.mustChangePassword }, feature)
+    return !!original && !!session && session.email === original.email && !session.user.mustChangePassword && canUse({ role: session.user.role, email: session.email, mustChangePassword: session.user.mustChangePassword }, 'portPreview')
   }
 }
 
-export function previewForRequest(req: IncomingMessage, rawUrl: string, feature: 'portPreview' | 'android' = 'portPreview'): string {
+export function previewForRequest(req: IncomingMessage, rawUrl: string): string {
   const auth = resolveAuth(req)
-  return portPreviewFrameUrl(rawUrl, auth.email ?? '', { active: activeRequest(req, feature), feature })
+  return portPreviewFrameUrl(rawUrl, auth.email ?? '', { active: activeRequest(req) })
 }
 
 export function createPortPreviewMiddleware(): express.RequestHandler {

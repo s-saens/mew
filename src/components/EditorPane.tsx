@@ -5,7 +5,7 @@ import { LoadingIndicator, observeEditorViewport, useToast } from '@mew/ui'
 import { uiText } from '@mew/ui/i18n-core'
 import { useUiLocale } from '@mew/ui/i18n'
 import { useShortcutBindings } from '@mew/shortcuts'
-import { ArrowLeft, ArrowRight, Brain, OpenNewWindow, Quote } from 'iconoir-react'
+import { ArrowLeft, ArrowRight, Brain, Database, OpenNewWindow, Quote } from 'iconoir-react'
 import { useDock, DockGrip, DockInlineBody } from './DockWorkspace'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
 import {
@@ -179,6 +179,7 @@ export interface EditorPaneProps {
   onCreateChildPage?: (path: string, name: string, onCreated: (result: DocumentPageMutation) => void) => Promise<void>
   onOpenHistory: () => void
   onAskAgent?: (path: string, content: string) => Promise<void>
+  onOpenDatabase?: () => void
   onSetTocOpen: (open: boolean) => void
   onOpenSidebar: () => void
   onTabDragMove: (paneId: string, path: string, x: number, y: number, tabId?: string) => void
@@ -224,6 +225,7 @@ export function EditorPane({
   diffVisible = true,
   onOpenDiffFile,
   onAskAgent,
+  onOpenDatabase,
   onTabDragMove,
   onTabDrop,
 }: EditorPaneProps) {
@@ -1014,6 +1016,13 @@ export function EditorPane({
                       <circle cx="4" cy="12" r="1" fill="currentColor" />
                       <circle cx="4" cy="18" r="1" fill="currentColor" />
                     </svg>
+                  </button>
+                )}
+                {!isGuest && onOpenDatabase && (
+                  <button type="button" data-editor-database onClick={onOpenDatabase}
+                    aria-label={t('header.database')} data-tip={t('header.database')} aria-haspopup="dialog"
+                    className="rounded border border-edge-strong bg-surface-raised p-1.5 text-ink-muted shadow-sm hover:bg-surface-hover hover:text-ink focus-visible:outline-2 focus-visible:outline-accent">
+                    <Database width={14} height={14} aria-hidden="true" />
                   </button>
                 )}
                 {!isGuest && onAskAgent && (

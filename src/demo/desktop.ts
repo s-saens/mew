@@ -58,7 +58,7 @@ export function createDemoDesktop(store: DemoWorkspaceStore) {
       ;['README.md', 'docs/', '  welcome.md', '  guides/', '  features/', '  tasks/', 'src/', '  main.tsx', 'shared/', '  task-list.ts'].forEach((item, index) => label(item, 42, 124 + index * 31, 14, index === 2 ? '#a1dcb5' : '#b7c6d7', true))
       panel(250, 60, 686, 484, selected === 'terminal' ? 'Terminal · 로컬 시뮬레이션' : 'docs/welcome.md · Mew 데모')
       if (selected === 'terminal') {
-        ;['visitor@mew-demo:~/mew $ npm run check', 'Mew demo: checks are simulated.', 'No real commands are executed.', '', '✓ 문서·코드 편집', '✓ 기능·태스크·Git', '✓ 원격 화면·시스템·Android 체험'].forEach((line, index) => label(line, 274, 130 + index * 34, 16, index === 0 ? '#a1dcb5' : '#dbe2ec', true))
+        ;['visitor@mew-demo:~/mew $ npm run check', 'Mew demo: checks are simulated.', 'No real commands are executed.', '', '✓ 문서·코드 편집', '✓ 기능·태스크·Git', '✓ 원격 화면·시스템 체험'].forEach((line, index) => label(line, 274, 130 + index * 34, 16, index === 0 ? '#a1dcb5' : '#dbe2ec', true))
       } else {
         label('Mew를 Mew 안에서 둘러보세요', 278, 148, 27, '#f0f4fa')
         label('이 화면도 데모입니다. 키보드나 입력 도구로 메모를 바꿔 보세요.', 278, 190)

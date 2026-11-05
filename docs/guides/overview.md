@@ -1,8 +1,8 @@
 ---
 title: "Introduction to mew and a tour of the interface"
-description: "Introduces mew through example screens showing document editing, split code views, Git, and mobile use with the dark theme and Mewpet, and links to installation, first use, agents, and settings guides. Also covers the login screen, localhost apps, and Android use."
+description: "Introduces Mew through example screens for document editing, split code views, Git, and mobile use with the dark theme and Mewpet. Links installation, first use, agents, settings, login screens, and localhost apps."
 created: "2026-10-14"
-updated: "2026-10-20"
+updated: "2026-11-05"
 상위파일: "MOC.md"
 ---
 # Introduction to mew and a tour of the interface
@@ -58,7 +58,7 @@ The default theme in a new browser is Midnight. Change the theme, fonts, and doc
 | Switch between folders and projects and find files | [Projects, files, and search](projects.md) |
 | Connect AI runtimes and use conversations and terminals | [Terminals and agents](terminal-agents.md) · [Runtime settings](../configuration/agent-runtimes.md) |
 | Coedit documents, comment, chat, and share with guests | [Collaboration and sharing](collaboration.md) |
-| Use the login screen, localhost apps, or Android | [Login, localhost apps, and Android](browser.md) |
+| Use login screens and localhost apps | [Login screens and localhost apps](browser.md) |
 | Connect directly to your computer's screen | [Remote desktop](remote-desktop.md) — Requires component installation and OS permissions |
 | Add database tables to documents | [Postgres tables](database.md) — Requires a separate database connection |
 | Set up recurring commands and scheduled tasks | [Command buttons and scheduling](commands.md) |

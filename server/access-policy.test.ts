@@ -7,8 +7,15 @@ import { createHash } from 'node:crypto'
 import express from 'express'
 import { once } from 'node:events'
 import { WebSocket } from 'ws'
-import type { AccessSettings } from '../shared/access-policy.ts'
+import { FEATURES, defaultCapabilities, normalizeFeatureOverrides, type AccessSettings } from '../shared/access-policy.ts'
 import type { RequestAuth } from './reqAuth.ts'
+
+test('retired Android grants are discarded without changing localhost preview access', () => {
+  assert.equal(FEATURES.some(feature => String(feature) === 'android'), false)
+  assert.equal(Object.hasOwn(defaultCapabilities('owner'), 'android'), false)
+  assert.deepEqual(normalizeFeatureOverrides({ android: true, portPreview: false }), { portPreview: false })
+  assert.deepEqual(normalizeFeatureOverrides({ android: true, browser: true }), { portPreview: true })
+})
 
 test('account capabilities and canonical file rules are enforced across HTTP and live collaboration', { timeout: 30_000 }, async () => {
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'mew-access-'))
@@ -47,6 +54,9 @@ test('account capabilities and canonical file rules are enforced across HTTP and
   try {
     assert.equal(policy.canUse(member, 'agent'), false)
     assert.equal(policy.canUse(owner, 'terminal'), true)
+    for (const [route, method] of [['/android/status', 'GET'], ['/android-url?url=http://localhost:8080', 'GET'], ['/android/commands/emulator/run', 'POST']]) {
+      assert.equal((await request(route, method, undefined, 'owner')).status, 404, route)
+    }
     for (const account of ['member', 'guest']) {
       assert.equal((await request('/agent-runtimes/codex/models', 'GET', undefined, account)).status, 403)
       assert.equal((await request('/git/github-auth', 'GET', undefined, account)).status, 403)

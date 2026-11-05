@@ -150,7 +150,8 @@ export function MobileDock({ active, openPanels, available, hidden, portalTarget
       const label = labelFor(id)
       return <button key={id} type="button" data-dock-item={id} data-dragging={dragging === id || undefined}
         aria-label={label} data-tip={dragging ? undefined : label} aria-current={active === id ? (openPanels ? 'true' : 'page') : undefined}
-        aria-pressed={openPanels ? openPanels.includes(id) : undefined}
+        aria-pressed={id !== 'database' && openPanels ? openPanels.includes(id) : undefined}
+        aria-haspopup={id === 'database' ? 'dialog' : undefined}
         aria-describedby="mobile-dock-hint"
         onClick={event => { if (event.detail === 0 || !suppressClick.current) onSelect(id) }}
         onKeyDown={event => {

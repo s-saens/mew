@@ -28,7 +28,7 @@ const [{ createElement, useState, act }, { createRoot }, { useWorkspacePanelDism
   import('./use-panel-dismissals.ts'),
 ])
 
-const ids = ['sidebar', 'chat', 'agent', 'terminal', 'browser', 'git', 'android', 'memo', 'tasks', 'debugger'] as const
+const ids = ['sidebar', 'chat', 'agent', 'terminal', 'browser', 'git', 'memo', 'tasks', 'debugger'] as const
 type PanelId = (typeof ids)[number]
 
 function Harness({ closed }: { closed: PanelId[] }) {
@@ -50,7 +50,6 @@ function Harness({ closed }: { closed: PanelId[] }) {
     agent: panel('agent'),
     terminal: panel('terminal'),
     browser: panel('browser'),
-    android: panel('android'),
     git: panel('git'),
     memo: panel('memo'), tasks: panel('tasks'), debugger: panel('debugger'),
   }, stack.at(-1) ?? null)
@@ -75,7 +74,6 @@ function SidebarSearchHarness({ closed }: { closed: string[] }) {
     agent: closedPanel,
     terminal: closedPanel,
     browser: closedPanel,
-    android: closedPanel,
     git: closedPanel,
     memo: closedPanel, tasks: closedPanel, debugger: closedPanel,
   }, 'sidebar')
@@ -91,7 +89,7 @@ test('only the foreground browser delegates Back; Escape keeps panels open', asy
     const panel = (id: string) => ({ open: true, close: () => { closed.push(id) } })
     useWorkspacePanelDismissals({
       sidebar: panel('sidebar'), chat: panel('chat'), terminal: panel('terminal'),
-      agent: panel('agent'), git: panel('git'), android: panel('android'), features: panel('features'),
+      agent: panel('agent'), git: panel('git'), features: panel('features'),
       memo: panel('memo'), tasks: panel('tasks'), debugger: panel('debugger'),
       browser: { ...panel('browser'), closeOnBack: () => {
         if (!canGoBack) return true

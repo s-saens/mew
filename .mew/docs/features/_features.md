@@ -1,8 +1,8 @@
 ---
 title: "Feature home"
 created: 2026-09-18
-updated: "2026-10-26"
-description: "A document home linking Mew feature areas to documents covering individual requirements, detailed behavior, implementation, and acceptance criteria. Explains the feature document management criteria used in Documents after removal of the feature panel."
+updated: "2026-11-05"
+description: "A document home linking Mew feature areas to documents covering individual requirements, detailed behavior, implementation, and acceptance criteria. Explains the feature document management criteria used in Documents after removal of the feature panel and Android emulator gateway."
 상위파일: "../MOC.md"
 ---
 
@@ -17,7 +17,7 @@ An entry point for reading each feature's requirements, detailed behavior, imple
 - [Git and change history](git-history/MOC.md) · [Overview](git-history/_git-history.md)
 - [Collaboration·Comments·Chat](collaboration-comments-chat/MOC.md) · [Overview](collaboration-comments-chat/_collaboration-comments-chat.md)
 - [Terminals·Agents·Automation](terminals-agents-automation/MOC.md) · [Overview](terminals-agents-automation/_terminals-agents-automation.md)
-- [Browser·Android·Remote Desktop](browser-android-remote-desktop/MOC.md) · [Overview](browser-android-remote-desktop/_browser-android-remote-desktop.md)
+- [Browser·Remote Desktop](browser-android-remote-desktop/MOC.md) · [Overview](browser-android-remote-desktop/_browser-android-remote-desktop.md)
 - [Document Databases](document-databases/MOC.md) · [Overview](document-databases/_document-databases.md)
 - [Interface·Accounts·Operations](appearance-accounts-operations/MOC.md) · [Overview](appearance-accounts-operations/_appearance-accounts-operations.md)
 
@@ -28,7 +28,6 @@ An entry point for reading each feature's requirements, detailed behavior, imple
 - [Shared Notes](collaboration-comments-chat/shared-notes.md)
 - [Task Panel·List·Calendar·Gantt](projects-files-search/task-panel-list-calendar-and-gantt.md)
 - [AI Runtime Installation·Authentication·Execution Settings](terminals-agents-automation/ai-runtime-installation-authentication-and-settings.md)
-- [Android Environment Checks·Display Connection](browser-android-remote-desktop/android-environment-checks-and-screen-connection.md)
 - [Documents·Document Map Management](projects-files-search/documents-and-document-map-management.md)
 - [Git·Change History](git-history/_git-history.md)
 - [Markdown Hotview·Source·Document Properties](document-code-media-editing/markdown-hotview-source-and-properties.md)
@@ -49,7 +48,7 @@ An entry point for reading each feature's requirements, detailed behavior, imple
 - [Document·Code·Media Editing](document-code-media-editing/_document-code-media-editing.md)
 - [Media·Spreadsheet Previews](document-code-media-editing/media-and-spreadsheet-previews.md)
 - [Recurring Scheduled Tasks](terminals-agents-automation/recurring-scheduled-tasks.md)
-- [Browser·Android·Remote Desktop](browser-android-remote-desktop/_browser-android-remote-desktop.md)
+- [Browser·Remote Desktop](browser-android-remote-desktop/_browser-android-remote-desktop.md)
 - [Server Browser·Login·Popups](browser-android-remote-desktop/server-browser-login-and-popups.md)
 - [Skill·MCP Source Management](terminals-agents-automation/skill-and-mcp-source-management.md)
 - [View System Resources·Processes](appearance-accounts-operations/system-resources-and-processes.md)

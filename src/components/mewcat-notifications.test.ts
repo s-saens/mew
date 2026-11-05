@@ -7,11 +7,12 @@ import ts from 'typescript'
 import { Window } from 'happy-dom'
 
 const win = new Window({ url: 'https://localhost' })
-for (const key of ['window', 'document', 'navigator', 'localStorage', 'HTMLElement', 'Event', 'CustomEvent']) {
+for (const key of ['window', 'document', 'navigator', 'localStorage', 'HTMLElement', 'Element', 'SVGElement', 'Event', 'CustomEvent', 'ResizeObserver', 'MutationObserver']) {
   Object.defineProperty(globalThis, key, { value: (win as unknown as Record<string, unknown>)[key], configurable: true })
 }
 Object.defineProperty(globalThis, 'requestAnimationFrame', { value: win.requestAnimationFrame.bind(win), configurable: true })
 Object.defineProperty(globalThis, 'cancelAnimationFrame', { value: win.cancelAnimationFrame.bind(win), configurable: true })
+Object.defineProperty(globalThis, 'getComputedStyle', { value: win.getComputedStyle.bind(win), configurable: true })
 Object.defineProperty(globalThis, 'IS_REACT_ACT_ENVIRONMENT', { value: true, configurable: true })
 Object.defineProperty(win, 'isSecureContext', { value: true, configurable: true })
 localStorage.setItem('mew:locale', 'en')
@@ -41,7 +42,7 @@ const [{ createElement: h, act }, { createRoot }, { I18nProvider }, ui, store, {
   import('../utils/mewcat-notifications.ts'), import('../hooks/use-mewcat-notifications.ts'),
 ])
 
-const { HeaderNotifications } = await import('./header-notifications.tsx')
+const { HeaderMenu } = await import('./HeaderMenu.tsx')
 
 async function mount(child: ReturnType<typeof h>) {
   const element = document.createElement('div')
@@ -54,33 +55,48 @@ async function mount(child: ReturnType<typeof h>) {
 test('header receives actionable notices without a cat; cat channel and visual preference stay independent', async () => {
   store.clearMewcatNotices()
   store.setNotificationPreferences({ visual: true, mewcat: true })
-  const header = await mount(h(HeaderNotifications))
+  const header = await mount(h(HeaderMenu, { notifications: true, items: [{ id: 'settings', group: 'mew', label: 'Settings', icon: null, onSelect: () => {} }] }))
   const cat = await mount(h(ui.MewcatNotifications, { hasCat: false }))
   const opened: unknown[] = []
   const listen = (event: Event) => opened.push((event as CustomEvent).detail.target)
   window.addEventListener(store.OPEN_NOTICE_EVENT, listen)
-  assert.equal(header.element.querySelector('button'), null)
+  const trigger = header.element.querySelector('button')!
+  const badge = () => header.element.querySelector('[data-menu-notification-count]')
+  const openHistory = async () => {
+    await act(async () => trigger.click())
+    const menu = document.querySelector('[role="menu"]')!
+    await act(async () => [...menu.querySelectorAll('button')].find(button => button.textContent === 'View all')!.click())
+    return document.querySelector('[role="dialog"]')!
+  }
+  assert.ok(trigger)
+  assert.equal(badge(), null)
   await act(async () => store.publishMewcatNotice({ key: 'ui-error', kind: 'error', level: 'danger', source: 'Codex', target: { tabId: 'tab', cwd: '/work' } }))
-  assert.equal(cat.element.querySelector('aside'), null)
-  assert.match(header.element.querySelector('button')!.getAttribute('aria-label')!, /Notifications: 1/)
-  await act(async () => header.element.querySelector('button')!.click())
-  const dialog = document.querySelector('[role="dialog"]')!
+  assert.equal(cat.element.querySelector('[role="status"]'), null)
+  assert.equal(badge()!.textContent, '1')
+  assert.equal(trigger.getAttribute('aria-label'), 'Menu')
+  const dialog = await openHistory()
   assert.match(dialog.textContent!, /encountered an error/)
   await act(async () => [...dialog.querySelectorAll('button')].find(button => button.textContent!.includes('encountered an error'))!.click())
   assert.deepEqual(opened, [{ tabId: 'tab', cwd: '/work' }])
-  assert.equal(header.element.querySelector('button'), null)
+  assert.equal(badge(), null)
   await act(async () => store.publishMewcatNotice({ key: 'ui-memory', kind: 'memory', level: 'warning', source: '95%', target: 'system' }))
   const activeCat = await mount(h(ui.MewcatNotifications, { hasCat: true }))
   assert.ok(activeCat.element.querySelector('[role="status"]'))
   await act(async () => store.setNotificationPreferences({ mewcat: false }))
   assert.equal(activeCat.element.querySelector('[role="status"]'), null)
-  assert.ok(header.element.querySelector('button'))
+  assert.equal(badge()!.textContent, '1', 'the menu retains the same queue when the cat channel is disabled')
   await act(async () => store.setNotificationPreferences({ visual: false }))
-  assert.equal(header.element.querySelector('button'), null)
+  assert.equal(badge(), null)
+  assert.ok(trigger.isConnected, 'disabling visual notices keeps the workspace menu available')
+  await act(async () => trigger.click())
+  assert.equal(document.querySelector('[role="group"][aria-label="Notifications"]'), null)
+  await act(async () => [...document.querySelectorAll('[role="menu"] button')].find(button => button.textContent === 'Settings')!.click())
   await act(async () => store.setNotificationPreferences({ visual: true, mewcat: true }))
-  await act(async () => header.element.querySelector('button')!.click())
+  await openHistory()
   await act(async () => (document.querySelector('[aria-label="Dismiss notification: 95%"]') as HTMLElement).click())
-  assert.equal(header.element.querySelector('button'), null)
+  assert.equal(badge(), null)
+  assert.match(document.querySelector('[role="dialog"]')!.textContent!, /No new notifications/)
+  await act(async () => (document.querySelector('[role="dialog"] [aria-label="Close"]') as HTMLElement).click())
   window.removeEventListener(store.OPEN_NOTICE_EVENT, listen)
   await header.close(); await cat.close(); await activeCat.close()
 })

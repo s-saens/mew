@@ -1,11 +1,8 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { FEATURES } from '../../shared/access-policy.ts'
-import { configureAppRuntime } from '../runtime/app-runtime.ts'
 import { DemoWorkspaceStore } from './workspace-store.ts'
 import { demoFetch } from './transport.ts'
-import { createDemoResources } from './resources.ts'
-import { createDemoSocketFactory } from './socket.ts'
 
 const write = (method: string, body: unknown): RequestInit => ({ method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
 async function data(store: DemoWorkspaceStore, route: string, init?: RequestInit) {
@@ -22,7 +19,6 @@ test('every capability is visible and host fixtures have useful data', async t =
   assert.match(stats.cpu.model, /Demo/); assert.ok(stats.cpu.usage > 0 && stats.cpu.usage < 100)
   assert.equal(stats.memory.used + stats.memory.available, stats.memory.total)
   assert.ok(stats.gpus.length && stats.processes.length)
-  assert.ok((await data(store, '/api/android/status')).checks.every((item: { ok: boolean }) => item.ok))
   assert.equal((await data(store, '/api/mew-update/status')).available, true)
   assert.equal((await data(store, '/api/updates/status')).items.length, 3)
 })
@@ -53,24 +49,19 @@ test('schedule edits, run logs and updates are tab-local and resettable', async 
   assert.equal(store.gitWorkingTree().files.length, 0)
 })
 
-test('Android is a local script-free blob and its commands produce virtual terminal output', async t => {
-  const store = new DemoWorkspaceStore(), resources = createDemoResources(store), sockets = createDemoSocketFactory(store)
-  configureAppRuntime({ kind: 'demo', resourceUrl: resources.url })
-  t.after(() => { configureAppRuntime({}); resources.close(); sockets.close(); store.close() })
-  const { url } = await data(store, '/api/android-url?url=https://untrusted.example/')
-  assert.match(url, /^blob:/)
-  const html = await (await fetch(url)).text()
-  assert.match(html, /Mew Demo Phone/); assert.doesNotMatch(html, /<script|https?:\/\/|src=/i)
-  const { session } = await data(store, '/api/android/commands/emulator/run', { method: 'POST' })
-  const output: string[] = [], socket = sockets(`wss://unused.test/api/tmux/ws?session=${session}`)
-  socket.onmessage = event => output.push(String(event.data))
-  await new Promise(resolve => setTimeout(resolve, 30))
-  assert.match(output.join(''), /Android emulator · Demo/)
-  assert.match(output.join(''), /실제 명령·설치·예약·외부 연결은 실행하지 않았습니다/)
-  const previousLength = output.join('').length
-  await data(store, '/api/android/commands/emulator/run', { method: 'POST' })
-  assert.ok(output.join('').length > previousLength, 'rerunning a host action appends its virtual log')
-  resources.close(); await assert.rejects(fetch(url))
+test('retired Android routes and capability are absent from the demo', async t => {
+  const store = new DemoWorkspaceStore(); t.after(() => store.close())
+  const auth = await data(store, '/api/auth/me')
+  assert.equal(Object.hasOwn(auth.capabilities, 'android'), false)
+  for (const [route, method] of [
+    ['/api/android/status', 'GET'],
+    ['/api/android-url?url=http://localhost:8080', 'GET'],
+    ['/api/android/commands/emulator/run', 'POST'],
+  ]) {
+    const response = await demoFetch(store, route, { method })
+    assert.equal(response.status, 501, route)
+  }
+  assert.deepEqual(store.getState('tmux-sessions', []), [])
 })
 
 test('administrator actions and debugger stepping change only mock state', async t => {

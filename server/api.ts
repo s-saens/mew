@@ -96,13 +96,12 @@ import {
   resolveExistingPath,
   writeExternalFile,
 } from './fsBrowse.ts'
-import { previewForRequest, createPortPreviewRoutes } from './port-preview.ts'
+import { createPortPreviewRoutes } from './port-preview.ts'
 import { createLoginDesktopAuthSession, createLoginDesktopRoutes, closeLoginDesktopJob } from './login-desktop.ts'
 import { createTodo, deleteTodo, listTodos, TodoError, updateTodo, type TodoChange } from './todos.ts'
 import { currentWorkspace, switchDocsRoot, switchWorkspace, switchWorktree, WorkspaceError } from './workspace.ts'
 import { collectSystemStats } from './sysStats.ts'
 import { MEW_APP_ROOT, MEW_UPDATE_SESSION, mewUpdateStatus, mewUpdateRunning, readMewUpdateJob, needsMewUpdate, writeMewUpdateJob, isReleaseDistribution, RELEASE_UPDATE_MESSAGE } from './mewUpdate.ts'
-import { androidCommandById, collectAndroidEnvStatus } from './androidEnv.ts'
 import { listSkills } from './skills.ts'
 import { createAgentHarnessRouter } from './agent-harness-routes.ts'
 import { createSkillLibraryRouter } from './skill-library-routes.ts'
@@ -581,46 +580,6 @@ export function createApiApp() {
   app.use('/login-desktop', createLoginDesktopRoutes())
   app.use('/port-preview', createPortPreviewRoutes())
   app.use('/remote-desktop', createRemoteDesktopRoutes(tmuxManager))
-
-  app.get('/android-url', requireFeature('android'), (req, res) => {
-    try {
-      const target = String(req.query.url ?? '')
-      if (!target.trim()) {
-        res.status(400).json({ error: '주소가 없습니다' })
-        return
-      }
-      res.json({ url: previewForRequest(req, target, 'android') })
-    } catch (err) {
-      handleError(res, err)
-    }
-  })
-
-  // ── Android 패널: 상태 확인 + 사용자가 누른 서버 등록표 명령만 one-shot tmux로 실행 ─────
-  app.get('/android/status', requireFeature('android'), async (_req, res) => {
-    try {
-      const running = new Set((await tmuxManager.list()).map((session) => session.name))
-      res.json(await collectAndroidEnvStatus(running))
-    } catch (err) {
-      handleError(res, err)
-    }
-  })
-
-  app.post('/android/commands/:id/run', requireFeature('android'), async (req, res) => {
-    try {
-      const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id
-      const runnable = androidCommandById(id)
-      if (!runnable) {
-        res.status(404).json({ error: '해당 Android 안내 명령을 찾을 수 없습니다' })
-        return
-      }
-      // Android 안내 명령은 모두 one-shot이다. 대화형 명령은 사용자가 팝업 터미널에서 응답할 수 있고,
-      // 명령이 끝나면 프로젝트 명령어 버튼과 똑같이 자기 숨김 세션을 정리한다.
-      await tmuxManager.runCommand(runnable.session, oneShotCommand(runnable.command, runnable.session), workspacePaths.root)
-      res.json({ ok: true, session: runnable.session })
-    } catch (err) {
-      handleError(res, err)
-    }
-  })
 
   app.get('/updates/status', requireFeature('system'), async (req, res) => {
     try { res.json(await updatesStatus(req.query.refresh === '1')) }

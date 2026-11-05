@@ -4,11 +4,11 @@ parent: "mew-settings"
 title: "Mewpet mascot, notifications, and breaks"
 status: "implemented"
 created: "2026-09-18"
-updated: "2026-11-03"
+updated: "2026-11-05"
 status_hash: "8b1758c7281118da18b267a2c001213bb7c463d4dbd018bb221e192d83f43ec3"
 files: ["server/mewpet-skins.ts", "server/mewpet-skin-routes.ts", "shared/mewpet-skins.ts", "src/components/header-notifications.tsx", "src/components/header-resources.tsx", "src/utils/mewcat-notifications.ts", "src/components/Mewcat.tsx", "src/components/mewcat-skin-settings.tsx", "src/components/mewcat-size-settings.tsx", "src/utils/mewcat-size-preferences.ts", "src/utils/mewcat-sprites.ts", "src/utils/mewcat-sprite-storage.ts", "src/components/mewcat-fullscreen-guide.tsx", "src/hooks/use-startup-guide.ts", "src/utils/app-install.ts", "src/components/mewcat-resources.tsx", "src/components/SettingsModal.tsx", "src/components/mewcat-notifications.tsx", "src/hooks/use-mewcat-notifications.ts", "src/utils/mewcat-notification-rules.ts", "src/components/mewcat-break.tsx", "src/hooks/use-mewcat-break.ts", "src/utils/mewcat-break-rules.ts"]
 commits: []
-description: "Mewpet motion, skins, agent and member-chat notifications, resource gauges, breaks, and startup guidance. Covers mobile service-worker browser notifications, Mewlink permission bridging, notification channels, storage, accessibility, and verification limits."
+description: "Mewpet motion, skins, agent and member-chat notifications, resource gauges, breaks, and startup guidance. Covers compact hamburger previews and full notification history, mobile service-worker browser notifications, Mewlink permission bridging, notification channels, storage, accessibility, and verification limits."
 상위파일:
   - "MOC.md"
   - "_appearance-accounts-operations.md"
@@ -16,7 +16,7 @@ description: "Mewpet motion, skins, agent and member-chat notifications, resourc
 
 ## Requirements
 
-- Collect notifications even when no Mewpet skin is available or the cat is hidden. When in-app notifications are enabled and there are unacknowledged notifications, show a bell icon and count to the right of the top fullscreen button and to the left of the hamburger button. Clicking it opens the same notification list with actions to navigate to the relevant screen, dismiss individual notifications, and mark all as read.
+- Collect notifications even when no Mewpet skin is available or the cat is hidden. When in-app notifications are enabled, show the unread count on the hamburger button and preview up to four compact entries in its Notifications section. View all opens the full queue with target navigation and individual or bulk acknowledgment.
 - Move notification channels, resource monitoring, and tests to a separate **Notifications** tab in settings. When a Mewpet skin is enabled, add an **Also show notifications through Mewpet** option; turning it off preserves header notifications, OS notifications, and sounds. The Mewpet tab owns skin, default size, hiding in the remote viewer, and break settings.
 
 - Interact with the cat at the bottom of the screen, and receive visual notifications and optional PC desktop notifications and sounds for agent tasks, errors, and server overload.
@@ -278,9 +278,9 @@ Custom skins remaining in the legacy scoped IndexedDB `mewcat-sprite-skins` are 
 
 Task completion, error, approval, server resource, and update notifications appear at the bottom of the screen through the shared `Toast`. The title and source appear on one line, with long content truncated with an ellipsis. Toasts disappear after 2.6 seconds; if a new notification arrives during that time, it replaces the current one and restarts the timer. They do not move focus or intercept pointer input or back navigation, and provide polite status announcements to screen readers. They appear the same way while skins are loading.
 
-Toast dismissal does not mark a notification as read. Unread items remain in the header's bell button and the Mewpet click list, where users can navigate to the corresponding conversation, system resources, or update screen, or mark individual items as read. If the target agent tab is already closed, it is not recreated. Approval requests remain in the list even after navigation until they are processed or the user marks them as read. A new approval request closes the open Mewpet helper or recent list and appears as a toast before the fullscreen startup guide. The startup guide is restored after the request is processed.
+Toast dismissal does not mark a notification as read. Unread items remain in the hamburger menu's Notifications section and the Mewpet click list, where users can navigate to the corresponding conversation, system resources, or update screen, or mark individual items as read. If the target agent tab is already closed, it is not recreated. Approval requests remain in the list even after navigation until they are processed or the user marks them as read. A new approval request closes the open Mewpet helper or recent list and appears as a toast before the fullscreen startup guide. The startup guide is restored after the request is processed.
 
-Mewpet stops at its current position when there are unread notifications with additional notification display enabled or when the click list is open. It resumes roaming once all notifications are marked as read. For a new notification, the artwork plays a single 420ms animation that tilts 3 degrees and returns; this is skipped with reduced motion. Dragging and throwing remain available. With the None skin, toasts are not displayed; notifications can be checked using the top bell button.
+Mewpet stops at its current position when there are unread notifications with additional notification display enabled or when the click list is open. It resumes roaming once all notifications are marked as read. For a new notification, the artwork plays a single 420ms animation that tilts 3 degrees and returns; this is skipped with reduced motion. Dragging and throwing remain available. With the None skin, toasts are not displayed; notifications can be checked using the hamburger menu.
 
 The manually opened recent list, helper, and fullscreen startup guide retain their existing speech bubble positions and themes. The body and tail use the `drop-shadow(0 4px 10px rgb(0 0 0 / 24%))` shadow. The cat artwork retains its colors, and styles that fixed the speech bubble to cream and brown must not be reintroduced.
 
@@ -315,7 +315,7 @@ or deduplicated across multiple mew browser tabs.
 In-app notifications, desktop notifications, sound, and server resource monitoring can each be toggled
 independently. In-app notifications and resource monitoring are on by default; desktop notifications and sound are off by default. When a Mewpet skin is active, **Toast notifications** is an additional setting and is on
 by default. Settings are stored in this browser's `mew:notification-preferences`; if storage is unavailable, they apply only to the current page. The **None** skin hides the
-cat and toasts while retaining collection and delivery for header notifications, OS notifications, and sound. The header bell appears only when in-app notifications (`visual`) are enabled and the queue contains items. Existing stored values are inherited unchanged; if the additional `mewcat` field is absent, it is read as enabled by default. Turning off in-app notifications does not delete the queue, so it can be viewed when they are turned back on.
+cat and toasts while retaining collection and delivery for header notifications, OS notifications, and sound. The hamburger notification badge appears only when in-app notifications (`visual`) are enabled and the queue contains items. Existing stored values are inherited unchanged; if the additional `mewcat` field is absent, it is read as enabled by default. Turning off in-app notifications does not delete the queue, so it can be viewed when they are turned back on.
 
 1. Click **Allow browser notifications** to grant browser permission. This also enables the browser notification option; existing `desktop` preferences are preserved.
 2. Enable **Notification sound** if needed. Enabling it plays a preview and activates browser audio.
@@ -351,8 +351,8 @@ When a task completes, no completion notification is created if the browser docu
 
 `src/utils/mewcat-notification-rules.ts` handles agent and resource decisions, `src/utils/mewcat-notifications.ts` handles a single page's queue, settings, and sound, and `src/hooks/use-mewcat-notifications.ts` handles
 resource queries and OS delivery. `AgentPanel.tsx` connects only live events, while `src/components/mewcat-notifications.tsx` handles the UI and
-settings. `src/components/header-notifications.tsx` displays the same queue independently of Mewpet and shares its danger-warning-completion
-priority and newest-first sorting. The list closes with Esc, Back, or Close, and the bell is cleared when navigating to the corresponding screen or acknowledging the last item. Register the four-language copy from `mewcat-notification-copy.ts` in `i18n.tsx` under `mewcat.*` keys; clicks, automatic speech bubbles, settings, and OS notifications all use the shared `t()`.
+settings. `src/components/HeaderMenu.tsx` previews up to four entries and `src/components/header-notifications.tsx` displays the full queue independently of Mewpet and shares its danger-warning-completion
+priority and newest-first sorting. The list closes with Esc, Back, or Close, and the badge is cleared when navigating to the corresponding screen or acknowledging the last item. Register the four-language copy from `mewcat-notification-copy.ts` in `i18n.tsx` under `mewcat.*` keys; clicks, automatic speech bubbles, settings, and OS notifications all use the shared `t()`.
 
 ```bash
 node --test src/utils/mewcat-notifications.test.ts src/components/mewcat-notifications.test.ts server/header-notifications-ui.test.ts server/mewcat-ui.test.ts
@@ -523,3 +523,5 @@ Questions and answers below recent notifications, agent connections, and automat
 Built-in skin verification criteria: On PC/mobile, check that only capybara appears as a built-in skin and that defaults, previews, selection restoration, fallback to capybara for eight removed built-in selections, removal of previous default and fur-color settings, and example downloads for seven actions work. Frame count, storage, and interaction checks follow the skin selection contract above.
 
 - 2026-10-14: Displayed approval requests with an orange circle and a dedicated navigation button, and added automatic tab switching enabled by default with a setting to disable it. On PC/mobile in both themes, confirmed that approval notifications take priority over open resource popups and fullscreen guidance, persist after navigation, disappear after a response, and that settings are saved. 35 related tests passed, along with frontend type checking, targeted lint, and document checks. Full type checking failed due to server platform and memory module errors outside this work's scope; no app build or server restart was performed.
+
+The current grouped menu and notification preview density follow the [workspace menu contract](../../development/ui-overlays.md#header-hamburger-menu) and [header notification behavior](../../development/ui-recovery-feedback.md#header-notifications). [ADR 0147](../../decisions/0147-compact-workspace-menu.md) records the header entry-point change.

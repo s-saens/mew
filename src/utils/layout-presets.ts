@@ -1,7 +1,7 @@
 import { scopedBrowserStorage } from '@mew/ui/browser-storage-scope'
 import { defaultDockTree, dockIds, normalizeDock, pruneDock, type DockKind, type DockNode, type DockState } from './dock-layout.ts'
 
-export const layoutPanels = ['sidebar', 'editor', 'agent', 'terminal', 'git', 'memo', 'tasks', 'debugger', 'browser', 'chat', 'android'] as const
+export const layoutPanels = ['sidebar', 'editor', 'agent', 'terminal', 'git', 'memo', 'tasks', 'debugger', 'browser', 'chat'] as const
 export type LayoutPanel = typeof layoutPanels[number]
 export type PopupRect = { x: number; y: number; width: number; height: number }
 export type LayoutSnapshot = {
@@ -9,7 +9,6 @@ export type LayoutSnapshot = {
   dock: DockState
   open: Record<LayoutPanel, boolean>
   sidebarWidth: number
-  androidWidth: number
   tools: { memo: 'tab' | 'popup'; tasks: 'tab' | 'popup' }
   popups: Partial<Record<'memo' | 'tasks', PopupRect>>
 }
@@ -27,7 +26,7 @@ export function normalizeLayoutSnapshot(value: unknown): LayoutSnapshot {
   return {
     version: 1, dock: { ...normalizeDock(raw.dock), tabs: {}, active: {} },
     open: Object.fromEntries(layoutPanels.map(id => [id, raw.open?.[id] === true])) as LayoutSnapshot['open'],
-    sidebarWidth: number(raw.sidebarWidth, 256, 180, 480), androidWidth: number(raw.androidWidth, 760, 380, 1200),
+    sidebarWidth: number(raw.sidebarWidth, 256, 180, 480),
     tools: { memo: raw.tools?.memo === 'popup' ? 'popup' : 'tab', tasks: raw.tools?.tasks === 'popup' ? 'popup' : 'tab' }, popups,
   }
 }
@@ -56,7 +55,6 @@ export function layoutFingerprint(value: LayoutSnapshot): string {
   return JSON.stringify({
     geometry, open: layout.open,
     sidebar: layout.open.sidebar ? Math.round(layout.sidebarWidth) : null,
-    android: layout.open.android ? Math.round(layout.androidWidth) : null,
     popups: (['memo', 'tasks'] as const).filter(tool => layout.open[tool] && layout.tools[tool] === 'popup').map(tool => [tool, layout.popups[tool] ?? { x: 24, y: 24, width: 420, height: 480 }]),
   })
 }
@@ -137,8 +135,8 @@ export function layoutIconRects(value: LayoutSnapshot): (PopupRect & { role: 'ch
   const rects: ReturnType<typeof layoutIconRects> = [{ x: 1, y: 1, width: 62, height: 4, role: 'chrome' }, { x: 1, y: 7, width: 3, height: 40, role: 'chrome' }]
   let x = 6, width = 57
   if (layout.open.sidebar) { const w = Math.min(18, layout.sidebarWidth / 1200 * 57); rects.push({ x, y: 7, width: w, height: 40, role: 'panel' }); x += w + 2; width -= w + 2 }
-  for (const id of ['android', 'chat'] as const) if (layout.open[id]) {
-    const w = Math.min(width * .4, id === 'android' ? layout.androidWidth / 1200 * 57 : 12)
+  if (layout.open.chat) {
+    const w = Math.min(width * .4, 12)
     rects.push({ x: x + width - w, y: 7, width: w, height: 40, role: 'panel' }); width -= w + 2
   }
   const visible = new Set(layout.dock.groups.filter(group => layout.open[group.kind] && !(group.kind in layout.tools && layout.tools[group.kind as 'memo' | 'tasks'] === 'popup')).map(group => group.id))
