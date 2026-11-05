@@ -1,0 +1,127 @@
+name: mew Windows installation wizard
+
+on:
+  push:
+    tags: ['mew-windows-v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mew-windows-installer-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: windows-2025
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+    steps:
+      - run: git config --global core.autocrlf false
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - id: version
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $version = (Get-Content apps/cli/package.json -Raw | ConvertFrom-Json).version
+          $tag = "mew-windows-v$version"
+          if ($env:GITHUB_REF_TYPE -eq 'tag' -and $env:GITHUB_REF_NAME -ne $tag) { throw "Tag must be $tag" }
+          git fetch --no-tags --depth=1 origin "refs/tags/mew-cli-v${version}:refs/tags/mew-cli-v${version}"
+          if ($LASTEXITCODE -ne 0) { throw 'The matching CLI runtime source tag must already exist' }
+          $runtimeCommit = git rev-parse "mew-cli-v${version}^{commit}"
+          $sourceCommit = git rev-parse HEAD
+          if ($runtimeCommit -ne $sourceCommit) { throw 'Build the Windows installer from the exact CLI runtime source commit' }
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "tag=$tag" >> $env:GITHUB_OUTPUT
+      - run: node --test apps/windows-installer/installer.test.mjs
+      - name: Prepare the pinned installer compiler on CI only
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $compiler = (Get-Content apps/windows-installer/downloads.json -Raw | ConvertFrom-Json).compiler
+          $download = Join-Path $env:RUNNER_TEMP 'innosetup.exe'
+          Invoke-WebRequest -Uri $compiler.url -OutFile $download
+          if ((Get-FileHash $download -Algorithm SHA256).Hash.ToLowerInvariant() -ne $compiler.sha256) { throw 'Inno Setup checksum mismatch' }
+          $signature = Get-AuthenticodeSignature $download
+          if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notmatch 'Pyrsys B\.V\.') { throw 'Inno Setup publisher verification failed' }
+          $compilerRoot = Join-Path $env:RUNNER_TEMP 'mew-inno'
+          $process = Start-Process $download -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/CURRENTUSER',"/DIR=`"$compilerRoot`"") -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw 'CI compiler preparation failed' }
+          "MEW_INNO_COMPILER=$compilerRoot\ISCC.exe" >> $env:GITHUB_ENV
+      - name: Build an unsigned source artifact
+        run: node apps/windows-installer/build.mjs --output artifacts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mew-windows-setup-unsigned
+          path: artifacts/*
+          if-no-files-found: error
+
+  release:
+    if: github.ref_type == 'tag'
+    needs: build
+    runs-on: windows-2025
+    environment: windows-installer-release
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: mew-windows-setup-unsigned
+          path: artifacts
+      - name: Require trusted signing before publication
+        shell: pwsh
+        env:
+          SIGNING_PFX: ${{ secrets.WINDOWS_INSTALLER_SIGNING_PFX }}
+          SIGNING_PASSWORD: ${{ secrets.WINDOWS_INSTALLER_SIGNING_PASSWORD }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if (-not $env:SIGNING_PFX -or -not $env:SIGNING_PASSWORD) { throw 'Configure trusted Windows installer signing. Unsigned source artifacts must not be published as public installers.' }
+          $pfx = Join-Path $env:RUNNER_TEMP 'mew-installer-signing.pfx'
+          $certificate = $null
+          try {
+            [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:SIGNING_PFX))
+            $password = ConvertTo-SecureString $env:SIGNING_PASSWORD -AsPlainText -Force
+            $certificate = Import-PfxCertificate -FilePath $pfx -CertStoreLocation Cert:\CurrentUser\My -Password $password | Where-Object HasPrivateKey | Select-Object -First 1
+            if (-not $certificate) { throw 'No signing private key was imported' }
+            $signTool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin" -Filter signtool.exe -Recurse | Where-Object FullName -Match '\\x64\\signtool.exe$' | Sort-Object FullName -Descending | Select-Object -First 1
+            if (-not $signTool) { throw 'Windows SDK signing tool is unavailable on the release runner' }
+            & $signTool.FullName sign /sha1 $certificate.Thumbprint /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 artifacts/mew-windows-setup-x64.exe
+            if ($LASTEXITCODE -ne 0) { throw 'Installer signing failed' }
+            $signature = Get-AuthenticodeSignature artifacts/mew-windows-setup-x64.exe
+            if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Thumbprint -ne $certificate.Thumbprint) { throw 'The installer does not have the expected trusted signature' }
+            # Authenticode changes the executable bytes: publish only its new digest.
+            $hash = (Get-FileHash artifacts/mew-windows-setup-x64.exe -Algorithm SHA256).Hash.ToLowerInvariant()
+            [IO.File]::WriteAllText((Join-Path $pwd 'artifacts/mew-windows-setup-x64.exe.sha256'), "$hash  mew-windows-setup-x64.exe`n", (New-Object Text.UTF8Encoding($false)))
+          } finally {
+            Remove-Item -LiteralPath $pfx -Force -ErrorAction SilentlyContinue
+            if ($certificate) { Remove-Item "Cert:\CurrentUser\My\$($certificate.Thumbprint)" -Force }
+          }
+      - name: Publish immutable signed installer
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ needs.build.outputs.tag }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          gh release view $env:RELEASE_TAG --repo $env:REPOSITORY *> $null
+          if ($LASTEXITCODE -eq 0) {
+            New-Item -ItemType Directory published | Out-Null
+            gh release download $env:RELEASE_TAG --repo $env:REPOSITORY --pattern 'mew-windows-setup-x64.exe*' --dir published
+            if ($LASTEXITCODE -ne 0) { throw 'Could not verify the existing installer release' }
+            $folder = 'published'
+          } else { $folder = 'artifacts' }
+          $exe = Join-Path $folder 'mew-windows-setup-x64.exe'
+          $expected = (Get-Content "$exe.sha256" -Raw).Trim()
+          $hash = (Get-FileHash $exe -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($expected -ne "$hash  mew-windows-setup-x64.exe" -or (Get-AuthenticodeSignature $exe).Status -ne 'Valid') { throw 'Installer signature or checksum validation failed' }
+          if ($folder -eq 'artifacts') {
+            gh release create $env:RELEASE_TAG --repo $env:REPOSITORY --verify-tag --title "Mew Windows installer $env:RELEASE_TAG" --generate-notes $exe "$exe.sha256"
+            if ($LASTEXITCODE -ne 0) { throw 'Installer publication failed' }
+          }

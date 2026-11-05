@@ -14,6 +14,7 @@ const help = `mew ${version}
   --cache-dir <폴더>    실행 패키지 캐시 위치
   --port <번호>        로컬 포트 (기본: 설정값 또는 5000, 0: 자동 선택)
   --owner-email <메일>  첫 owner 계정 이메일
+  --installer          Windows 설치 프로그램용 비공개 준비 알림 (브라우저 열기 생략)
   --no-open            브라우저 자동 열기 생략
   -h, --help           사용법
   -v, --version        버전

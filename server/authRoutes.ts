@@ -1,6 +1,8 @@
 import { remoteContext, remoteSession } from './remote-access-context.ts'
 import { capabilitiesFor, accessRevision } from './access-policy.ts'
 import { createMewlinkAuthRouter } from './mewlink-auth-routes.ts'
+import { createFirstOwner, firstOwnerSetupRequired, FirstOwnerSetupError } from './first-owner-setup.ts'
+import { AccountStorageBusyError } from './account-storage.ts'
 import express from 'express'
 import type { IncomingMessage } from 'node:http'
 import {
@@ -134,11 +136,39 @@ export function checkOrigin(req: express.Request, res: express.Response, next: e
 
 // ---------- 라우터 ----------
 
-export function createAuthRouter() {
+export function createAuthRouter({ prepareFirstOwnerWorkspace = async (email: string, workspace: string) => {
+  const { writeActiveWorkspace } = await import('./userUiState.ts')
+  writeActiveWorkspace(email, workspace)
+} }: { prepareFirstOwnerWorkspace?: (email: string, workspace: string) => void | Promise<void> } = {}) {
   const router = express.Router()
   // 프로필 사진은 data URL로 계정 레코드에 저장한다. 512KiB 원본 + base64 여유만 허용한다.
   router.use(express.json({ limit: '750kb' }))
   router.use('/mewlink', createMewlinkAuthRouter())
+
+  router.post('/setup', async (req, res) => {
+    res.setHeader('Cache-Control', 'no-store')
+    if (remoteContext(req)) { res.status(403).json({ error: 'Open the local installer setup link to create the administrator.' }); return }
+    const ip = clientIp(req), key = `first-owner:${normalizeEmail(req.body?.email)}`
+    if (isLoginBlocked(ip, key)) { res.status(429).json({ error: 'Too many setup attempts. Try again in 15 minutes.' }); return }
+    try {
+      const { email, workspace } = createFirstOwner(req.body ?? {})
+      clearLoginFailures(ip, key)
+      const token = createSession(email)
+      setSessionCookie(req, res, token)
+      if (workspace) {
+        try { await prepareFirstOwnerWorkspace(email, workspace) }
+        catch { console.warn('[mew] First administrator created; initial workspace settings could not be saved.') }
+      }
+      res.status(201).json(authStatus(req, getSession(token)))
+    } catch (error) {
+      if (error instanceof FirstOwnerSetupError) {
+        if (error.status === 403) registerLoginFailure(ip, key)
+        res.status(error.status).json({ error: error.message }); return
+      }
+      if (error instanceof AccountStorageBusyError) { res.status(409).json({ error: error.message }); return }
+      throw error
+    }
+  })
 
   router.post('/login', (req, res) => {
     const { email: rawEmail, password } = (req.body ?? {}) as { email?: unknown; password?: unknown }
@@ -196,14 +226,20 @@ export function createAuthRouter() {
   router.get('/me', (req, res) => {
     const session = sessionFromRequest(req)
     if (!session && remoteContext(req)?.setSessionToken) res.setHeader('x-mew-session', '')
+    res.setHeader('Cache-Control', 'no-store')
+    res.json(authStatus(req, session))
+  })
+
+  function authStatus(req: express.Request, session: AuthenticatedSession | null) {
     const profile = session ? userProfile(session.email, session.user) : null
     const capabilities = capabilitiesFor({ role: session?.user.role ?? 'guest', email: session?.email ?? null, mustChangePassword: session?.user.mustChangePassword ?? false })
     if (remoteSession(req) !== undefined) {
       capabilities.android = false
       if (!session) for (const feature of Object.keys(capabilities) as (keyof typeof capabilities)[]) capabilities[feature] = false
     }
-    res.json({
+    return {
       authenticated: session !== null,
+      setupRequired: !session && !remoteContext(req) && firstOwnerSetupRequired(),
       accountId: session?.email ?? null,
       email: session?.email ?? null,
       role: session ? session.user.role : 'guest',
@@ -216,8 +252,8 @@ export function createAuthRouter() {
       ...(session?.trustedDevice ? { deviceId: session.trustedDevice.id } : {}),
       accessRevision: accessRevision(),
       capabilities,
-    })
-  })
+    }
+  }
 
   router.put('/profile', (req, res) => {
     const session = sessionFromRequest(req)

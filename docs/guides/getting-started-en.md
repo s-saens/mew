@@ -1,7 +1,7 @@
 ---
 title: "Getting started with mew"
 updated: "2026-11-05"
-description: "Provides English instructions for installation, first login, the file explorer, and task-specific usage of the s-saens/mew source, along with Mewlink and alternative external access, permissions, updates, data retention, and the unpublished CLI path. Includes managed Chrome/Chromium preparation, dependency repair, and Mewlink registration from the hamburger menu."
+description: "Installation and everyday use of Mew on Windows/WSL, macOS, and Linux. Covers source setup, first-administrator browser creation, Windows wizard and prebuilt release limits, remote access, and links to feature guides."
 ---
 
 # Getting started with mew
@@ -17,6 +17,8 @@ mew opens folders on your computer or server in a browser. Edit Markdown and cod
 [Windows (WSL 2)](#windows-wsl-2) · [macOS](#macos) · [Linux](#linux) · [Remote access](#remote-access)
 
 ### Windows (WSL 2)
+
+A single-file Windows x64 installation wizard is implemented in source. Its first signed EXE, runtime publication, and clean-Windows checks are still pending, so there is no approved installer download yet. Once released, it will prepare its own environment, continue after any required Windows restart, and open administrator account creation in your browser. It preserves existing WSL environments and does not install Rust or compiler tools on Windows. [Installer release status](../../.mew/docs/operations/cli-release.md#windows-installation-wizard). For now, use the manual steps below.
 
 Run mew inside Ubuntu on WSL 2, then open it in your Windows browser.
 
@@ -105,11 +107,12 @@ During setup, enter:
 - **Workspace folder:** the parent folder of your projects. The default is `~/mew-workspace`; each folder inside it becomes a project.
 - **Port:** `5000` by default. If it is busy, setup chooses an available port nearby.
 - **Postgres connection:** optional, for database tables. You can skip it and add it later.
-- **Owner email:** your first mew account. Setup prints a temporary password.
+
+The first administrator is created in the browser after setup, rather than through a terminal email prompt.
 
 Setup installs npm dependencies, prepares ordinary Google Chrome and Playwright Chromium, prepares remote desktop components, builds the app, and starts the server. Browser preparation may need network access and sudo on Linux/WSL; run setup from an interactive terminal with permission to install system packages. The first download can take a few minutes. A remote desktop preparation failure is reported as a warning and does not stop the rest of the installation.
 
-Open the URL printed by setup, sign in, and change the temporary password. Use **+** in the header to open a project folder, then select a file in the File explorer.
+On a fresh installation, open the **private setup link** printed by setup, enter your email, choose a password, and confirm it. Mew creates the administrator and signs you in. Existing installations keep their accounts and show ordinary login. Use **+** in the header to open a project folder, then select a file in the File explorer. [Account setup and recovery](../configuration/accounts.md#first-administrator).
 
 After a reboot, open Ubuntu or Terminal and start mew from its installation folder:
 
@@ -129,7 +132,7 @@ npx @liiiiv/mew-cli@latest
 
 The launcher prepares missing browsers before starting the server; Linux preparation may need sudo and network access. Ordinary Chrome automatic installation on Linux/WSL supports x64; arm64 requires a compatible explicit `MEW_CHROME_EXECUTABLE`.
 
-Supports Linux glibc 2.35+ and macOS 15+, on x64/arm64. On Windows, use Ubuntu 22.04+ inside WSL 2. On first use, enter the owner email, sign in with the printed temporary password, and change it. Existing accounts, conversations, and device registration are reused. Follow [remote access](#remote-access) to register with Mewlink; the terminal also prints registration and online address QR codes.
+Supports Linux glibc 2.35+ and macOS 15+, on x64/arm64. On Windows, use Ubuntu 22.04+ inside WSL 2. On a fresh installation, the launcher opens a browser form where you choose the administrator email and password. No temporary-password step is required. Existing accounts, conversations, and device registration are reused. Follow [remote access](#remote-access) to register with Mewlink; the terminal also prints registration and online address QR codes.
 
 Press Ctrl+C to stop. Run the same command again to use the latest release. If your old clone uses `.data/`, pass `--data-dir /path/to/old/mew/.data` and stop the old server first. Remote desktop requires its optional components and OS permissions. [Runtime and data contract](../../.mew/docs/development/cli-distribution.md) · [Release procedure](../../.mew/docs/operations/cli-release.md)
 
@@ -141,7 +144,7 @@ Use Mewlink to connect from another browser, or choose Tailscale or Cloudflare T
 
 #### 1. Mewlink
 
-1. Sign in as owner on your local mew and change the temporary password.
+1. Sign in as owner on your local mew. Change any administrator-issued temporary password if required.
 2. Open **Menu → Mewlink → Register device**. Follow the one-time URL, sign in to Mewlink, and choose your username and device name.
 3. Wait for Online and copy the fixed URL, `https://mew.saens.kr/<username>/<device-name>`.
 4. Open that URL from another PC or phone. It connects without a Mewlink sign-in and shows the host's mew login screen. Sign in with **that computer's local mew email and password**. Connecting browsers need no registration. A valid saved local session can resume on later visits.
@@ -191,7 +194,7 @@ Share your mew instance only with people you trust. By default, `manager` and `o
 
 ## Using mew
 
-Open the printed address, sign in as owner, and change the temporary password.
+Create the first administrator through the private setup link, or sign in with your existing account. Change an administrator-issued temporary password if required.
 
 1. Open a working folder with the header **+**.
 2. Select a Markdown or code file from the file list.

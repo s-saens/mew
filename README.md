@@ -60,13 +60,15 @@ cd mew
 ./mew setup
 ```
 
-Setup installs dependencies, asks for your workspace folder and owner email, then builds and starts mew.
+Setup installs dependencies, asks for your workspace folder, then builds and starts mew. On a fresh installation, create the administrator account in your browser.
 
-1. Open the printed address, usually `http://localhost:5000`.
-2. Sign in with the owner email and temporary password, then change the password.
+1. Open the private setup link printed by setup. Existing installations use the ordinary address, usually `http://localhost:5000`.
+2. Choose the administrator email and password, or sign in with your existing account.
 3. Click the current project in the header, choose **Add project**, open a working folder, and select a file.
 
 [Follow the first-use walkthrough](docs/guides/first-steps.md).
+
+> **Windows installer:** A single-file x64 wizard is implemented in source, including Windows preparation and browser account creation. Its first signed EXE and clean-Windows acceptance are pending. Use the manual Windows guide for now. [Release status](.mew/docs/operations/cli-release.md#windows-installation-wizard).
 
 > **Prebuilt CLI:** `npx @liiiiv/mew-cli@latest` is implemented, but the first npm package and GitHub runtime release have not been published. Use source installation for now. [Release status](.mew/docs/operations/cli-release.md).
 

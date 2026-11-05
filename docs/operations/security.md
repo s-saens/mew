@@ -1,8 +1,8 @@
 ---
 title: "Security operations guidelines"
-description: "Guidelines for operators sharing a Mew instance to assess roles, file permissions, owner password resets, browser-token and external-login revocation, shared registered-project access and personal shortcuts, retained server-operation boundaries, server control features, and data retention risks. Links authentication and storage details to development contracts and explains private vulnerability reporting."
+description: "Guidelines for operators sharing a Mew instance to assess first-administrator bootstrap, roles, file permissions, owner password resets, browser-token and external-login revocation, shared registered-project access and personal shortcuts, retained server-operation boundaries, server control features, and data retention risks. Links authentication and storage details to development contracts and explains private vulnerability reporting."
 created: 2026-10-22
-updated: 2026-11-02
+updated: 2026-11-05
 상위파일: "MOC.md"
 ---
 
@@ -72,6 +72,8 @@ A lost device with a persistent login can continue using server control permissi
 Reauthentication is required after expiration or security revocation. Connections are not guaranteed to remain active during sleep or recover from every network transition. Key and token storage and lifetimes follow the [browser storage contract](../../.mew/docs/development/browser-storage.md#storage-scope-for-remote-local-account-connections), and the design rationale follows the [browser trust decision](../../.mew/docs/decisions/0015-trusted-browser-access.md).
 
 ## Authentication
+
+A fresh installation creates its first administrator through a local one-time setup link. The chosen password is permanent. Keep that link private and complete setup before exposing the instance. Initialized installations cannot reopen signup when accounts disappear; use local account recovery and preserve the closure marker. [First-administrator setup](../../.mew/docs/development/first-owner-setup.md) owns capability, expiry, and recovery rules.
 
 Only local email accounts or explicitly linked external identities can log in; there is no public signup. Temporary passwords must be changed at the first password login before work features can be used. Approved external login is a separate authentication method, and editing an external profile does not remove the temporary password change requirement. Changing a password disconnects password sessions on other devices. Authentication state and revocation during active connections follow the [access control contract](../../.mew/docs/development/access-control.md), and Mewlink authentication lifetimes follow the [remote access contract](../../.mew/docs/development/remote-access.md).
 

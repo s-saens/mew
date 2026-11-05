@@ -4,11 +4,11 @@ parent: "mew-settings"
 title: "Accounts, roles, feature permissions, and guest sharing"
 status: "implemented"
 created: "2026-09-18"
-updated: "2026-10-31"
+updated: "2026-11-05"
 status_hash: "65b2a28fe6a84c2ae5140eff868f32aefcd8cd25f5aabc3ea17d470b8cd0ec3d"
-files: ["src/components/account-access-matrix.tsx", "src/components/account-role-select.tsx", "src/components/account-column-headers.tsx", "src/components/account-profile-form.tsx", "src/components/AdminSettingsModal.tsx", "src/components/mewlink-access-settings.tsx", "src/components/mewlink-account-connection.tsx", "src/components/SettingsModal.tsx", "src/components/LoginPage.tsx", "server/access-policy.ts", "server/access-routes.ts", "server/api.ts", "server/remote-access-context.ts", "server/auth.ts", "server/authRoutes.ts", "server/mewlink-identities.ts", "server/mewlink-auth-routes.ts"]
+files: ["src/components/FirstOwnerSetup.tsx", "server/first-owner-setup.ts", "server/account-storage.ts", "src/components/account-access-matrix.tsx", "src/components/account-role-select.tsx", "src/components/account-column-headers.tsx", "src/components/account-profile-form.tsx", "src/components/AdminSettingsModal.tsx", "src/components/mewlink-access-settings.tsx", "src/components/mewlink-account-connection.tsx", "src/components/SettingsModal.tsx", "src/components/LoginPage.tsx", "server/access-policy.ts", "server/access-routes.ts", "server/api.ts", "server/remote-access-context.ts", "server/auth.ts", "server/authRoutes.ts", "server/mewlink-identities.ts", "server/mewlink-auth-routes.ts"]
 commits: []
-description: "Defines My Account, compact account management, photo/initial account popups, one feature-default reset per account column, and owner-issued temporary password resets. Covers successful Mewlink permission-save responses with live revocation, logout, roles, feature/file permissions and deletion, Mewlink approval and identity linking, guest permissions, and constrained public file/folder links; excludes device registration and public sign-up."
+description: "Defines locally armed first-administrator setup, My Account, compact account management, photo/initial account popups, one feature-default reset per account column, and owner-issued temporary password resets. Covers successful Mewlink permission-save responses with live revocation, logout, roles, feature/file permissions and deletion, Mewlink approval and identity linking, guest permissions, and constrained public file/folder links; excludes device registration and public sign-up."
 상위파일:
   - "MOC.md"
   - "_appearance-accounts-operations.md"
@@ -17,6 +17,8 @@ description: "Defines My Account, compact account management, photo/initial acco
 ## Requirements
 
 - Manage accounts and the scope of file and feature access.
+
+- A fresh installation opens a first-administrator form before entering the workspace. The user chooses an email and permanent password and signs in immediately. Only a trusted local installer/CLI capability can create this first owner; initialized or damaged account stores do not reopen enrollment. Missing or expired links offer local reopen guidance. The [first-administrator contract](../../development/first-owner-setup.md) owns freshness, API/storage boundaries, and recovery; later account creation remains owner-only.
 
 - Account role, feature, feature-default reset, and file-rule changes and account deletion return their completed result over Mewlink. The access change must not cancel its own response or display an interrupted-request error after a successful save. Other work using previous permissions is invalidated immediately, and later requests enforce the new permissions. See the [access-change response contract](../../development/access-control.md#mewlink-local-login).
 

@@ -4,13 +4,14 @@ import { fileURLToPath } from 'node:url'
 import type { Server } from 'node:http'
 import type { UserRecord } from './auth.ts'
 import type { RemoteStatus } from '../shared/remote-access.ts'
+import { prepareFirstOwnerSetup } from './first-owner-setup.ts'
 
 export type CliHostMessage =
   | { type: 'setup-needed' }
   | { type: 'owner-created'; email: string; password: string }
-  | { type: 'ready'; url: string }
+  | { type: 'ready'; url: string; setupUrl?: string }
   | { type: 'remote-status'; status: RemoteStatus }
-  | { type: 'error'; message: string }
+  | { type: 'error'; message: string; code?: 'setup-reopen-failed' }
 
 export interface CliHostChannel {
   send(message: CliHostMessage): void
@@ -38,6 +39,8 @@ export interface CliHostOptions {
   loadRuntime(): Promise<CliHostRuntime>
   prepareWorkspace?(owner: string): void | Promise<void>
   ownerEmail?: string
+  workspace?: string
+  prepareOwnerSetup?(): { setupRequired: boolean; token?: string }
   signal?: AbortSignal
   pollIntervalMs?: number
 }
@@ -141,12 +144,31 @@ async function listeningUrl(server: CliHostRuntime['server'], signal?: AbortSign
 /** Dependencies are injectable so onboarding and readiness can be checked without starting mew. */
 export async function startCliHost(options: CliHostOptions): Promise<{ close(): void }> {
   const { auth, channel, signal } = options
-  const owner = await ensureCliOwner(auth, channel, options.ownerEmail, signal)
+  let owner: string | undefined, setupToken: string | undefined
+  if (options.ownerEmail) owner = await ensureCliOwner(auth, channel, options.ownerEmail, signal)
+  else {
+    owner = auth.listUsers().find(({ record }) => record.role === 'owner')?.email
+    if (!owner) {
+      const setup = options.prepareOwnerSetup?.() ?? prepareFirstOwnerSetup(options.workspace ?? process.env.MEW_WORKSPACE)
+      if (!setup.setupRequired || !setup.token) throw new Error('This installation has no administrator and is not a fresh setup. Recover the existing account store or use the local users CLI to assign an owner; browser enrollment was not reopened.')
+      setupToken = setup.token
+    }
+  }
   if (signal?.aborted) throw cancelled()
-  await options.prepareWorkspace?.(owner)
+  if (owner) await options.prepareWorkspace?.(owner)
   if (signal?.aborted) throw cancelled()
   const runtime = await options.loadRuntime()
-  channel.send({ type: 'ready', url: await listeningUrl(runtime.server, signal) })
+  const url = await listeningUrl(runtime.server, signal)
+  channel.send({ type: 'ready', url, ...(setupToken ? { setupUrl: `${url}#setup=${setupToken}` } : {}) })
+  const removeSetupRequests = channel.onMessage(message => {
+    if (!message || typeof message !== 'object' || (message as { type?: unknown }).type !== 'setup-url-request') return
+    try {
+      const setup = options.prepareOwnerSetup?.() ?? prepareFirstOwnerSetup(options.workspace ?? process.env.MEW_WORKSPACE)
+      if (!setup.setupRequired && !auth.listUsers().some(({ record }) => record.role === 'owner')) throw new Error('The administrator account store requires local recovery. Browser enrollment was not reopened.')
+      if (setup.setupRequired && !setup.token) throw new Error('The local setup link could not be prepared.')
+      channel.send({ type: 'ready', url, ...(setup.token ? { setupUrl: `${url}#setup=${setup.token}` } : {}) })
+    } catch (error) { channel.send({ type: 'error', code: 'setup-reopen-failed', message: error instanceof Error ? error.message : 'The local setup page could not be reopened.' }) }
+  })
   let previous = ''
   const reportStatus = () => {
     const status = cliRemoteStatus(runtime.remoteAgent.status()), current = JSON.stringify(status)
@@ -157,6 +179,7 @@ export async function startCliHost(options: CliHostOptions): Promise<{ close(): 
   interval.unref()
   const close = () => {
     clearInterval(interval)
+    removeSetupRequests()
     runtime.server.off('close', close)
     signal?.removeEventListener('abort', close)
   }

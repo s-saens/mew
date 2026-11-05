@@ -6,6 +6,7 @@ import path from 'node:path'
 import { EventEmitter } from 'node:events'
 import { createHash } from 'node:crypto'
 import { gzipSync } from 'node:zlib'
+import { PassThrough } from 'node:stream'
 import * as tar from 'tar'
 import { runtimeTarget, checksumFor, safeArchiveEntry, prepareRuntime, validateRuntime } from '../src/runtime.mjs'
 import { parseOptions } from '../src/options.mjs'
@@ -190,4 +191,79 @@ test('launcher passes current workspace and persistent data separately from cach
   assert.deepEqual(opened, ['http://127.0.0.1:7000'])
   assert.ok(logs.some(value => value.includes('fixture-only')))
   assert.equal(runtimeEnvironment('/cached/app', options, { PATH: '/usr/bin', MEW_WORKSPACE: '/old' }).MEW_WORKSPACE, options.workspace)
+})
+
+for (const installer of [false, true]) {
+  test(`browser bootstrap stays out of ordinary output: installer=${installer}`, async () => {
+    const child = new EventEmitter(), logs = [], opened = [], output = []
+    child.connected = true
+    child.kill = () => queueMicrotask(() => child.emit('exit', 1, null))
+    const token = 'a'.repeat(43), setupUrl = `http://127.0.0.1:7000#setup=${token}`
+    const options = { workspace: '/workspace', dataDir: '/persistent', port: 7000, ownerEmail: '', open: !installer, installer }
+    const result = await runHost('/cached/app', options, { log: value => logs.push(value), output: { write: value => output.push(value) }, browser: value => opened.push(value), forkImpl: (_file, _args, configuration) => {
+      if (installer) assert.equal(configuration.stdio[1], process.stderr)
+      queueMicrotask(() => {
+        child.emit('message', { type: 'ready', url: 'http://127.0.0.1:7000', setupUrl })
+        child.emit('message', { type: 'ready', url: 'http://127.0.0.1:7000', setupUrl })
+        child.emit('exit', 0, null)
+      })
+      return child
+    } })
+    assert.equal(result, 0)
+    assert.equal(logs.some(value => value.includes(token)), false)
+    assert.deepEqual(opened, installer ? [] : [setupUrl])
+    assert.deepEqual(output, installer ? [`MEW_INSTALLER_READY ${JSON.stringify({ url: setupUrl })}\n`] : [])
+  })
+}
+
+test('installer flag uses an ephemeral port and disables browser opening without owner prompts', async t => {
+  const dir = await directory(t)
+  const options = parseOptions(['--installer', '--port', '0'], { cwd: dir, env: {} })
+  assert.equal(options.installer, true)
+  assert.equal(options.open, false)
+  assert.equal(options.port, 0)
+  assert.equal(options.ownerEmail, '')
+})
+
+test('installer reopen commands use trusted IPC and EOF shuts down only its owned child', async () => {
+  const child = new EventEmitter(), input = new PassThrough(), output = [], messages = [], signals = []
+  child.connected = true
+  child.kill = signal => { signals.push(signal); queueMicrotask(() => child.emit('exit', null, signal)) }
+  child.send = message => {
+    messages.push(message)
+    if (message.type === 'setup-url-request') queueMicrotask(() => {
+      child.emit('message', { type: 'ready', url: 'http://127.0.0.1:7000' })
+      input.end()
+    })
+    if (message.type === 'shutdown') queueMicrotask(() => child.emit('exit', 0, null))
+  }
+  const result = await runHost('/cached/app', { workspace: '/workspace', dataDir: '/persistent', port: 0, installer: true, open: false }, {
+    input, output: { write: line => { output.push(line); if (output.length === 1) input.write('MEW_INSTALLER_OPEN\n') } }, log: () => {},
+    forkImpl: () => { queueMicrotask(() => child.emit('message', { type: 'ready', url: 'http://127.0.0.1:7000', setupUrl: `http://127.0.0.1:7000#setup=${'r'.repeat(43)}` })); return child },
+  })
+  assert.equal(result, 143)
+  assert.equal(output.length, 2)
+  assert.equal(JSON.parse(output[1].slice('MEW_INSTALLER_READY '.length)).url, 'http://127.0.0.1:7000')
+  assert.equal(messages[0].type, 'setup-url-request')
+  assert.ok(process.platform === 'win32' ? messages.some(message => message.type === 'shutdown') : signals.includes('SIGTERM'))
+})
+
+test('failed installer reopen reports a fixed private error without terminating the live host', async () => {
+  const child = new EventEmitter(), input = new PassThrough(), output = [], signals = []
+  child.connected = true
+  child.kill = signal => { signals.push(signal); queueMicrotask(() => child.emit('exit', null, signal)) }
+  child.send = message => {
+    if (message.type === 'setup-url-request') queueMicrotask(() => child.emit('message', { type: 'error', code: 'setup-reopen-failed', message: 'fixture private local recovery detail' }))
+    if (message.type === 'shutdown') queueMicrotask(() => child.emit('exit', 0, null))
+  }
+  const result = await runHost('/cached/app', { workspace: '/workspace', dataDir: '/persistent', installer: true, open: false }, {
+    input, output: { write: line => {
+      output.push(line)
+      if (output.length === 1) input.write('MEW_INSTALLER_OPEN\n')
+      else { assert.deepEqual(signals, []); input.end() }
+    } }, log: () => {}, error: () => {},
+    forkImpl: () => { queueMicrotask(() => child.emit('message', { type: 'ready', url: 'http://127.0.0.1:7000' })); return child },
+  })
+  assert.equal(result, 143)
+  assert.deepEqual(output, ['MEW_INSTALLER_READY {"url":"http://127.0.0.1:7000"}\n', 'MEW_INSTALLER_ERROR {"code":"reopen-failed"}\n'])
 })

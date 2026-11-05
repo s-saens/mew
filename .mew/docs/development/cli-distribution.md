@@ -1,6 +1,6 @@
 ---
 title: "Single-Command Execution and Prebuilt Distribution"
-description: "Defines prebuilt CLI execution, browser dependency preparation before host startup, runtime manifests, configuration, updates, persistent data, and package boundaries for resources and required native source."
+description: "Defines prebuilt CLI execution, first-owner browser setup and private installer IPC, browser preparation, runtime manifests, persistent data, updates, and package boundaries."
 updated: "2026-11-05"
 상위파일:
   - "architecture.md"
@@ -11,7 +11,7 @@ updated: "2026-11-05"
 
 After the first release and npm package are published, run `npx @liiiiv/mew-cli@latest` from a working folder on a computer with Node.js 24 installed. The launcher downloads the server, UI, and dependencies for that version, OS, and architecture and runs the local server in the foreground. Cloning the app repository, building TypeScript/Vite on the user's computer, compiling C/C++, and installing tmux are not required. Git operations require Git on the host; installation and authentication for external AI tools and remote desktop OS permissions follow existing procedures.
 
-If no owner exists, it asks for an email address and displays a temporary password in the terminal. Existing accounts are reused without resetting their passwords. After logging in, change the password and proceed with existing Mewlink registration through **Mewlink → Remote Access → Register Device**. The launcher prints a QR code when the registration completion link or online access address changes. It does not add new central authentication or anonymous work permissions. Initial registration requires Mewlink login in the browser and selection of a device name.
+On a fresh installation, it opens the first-administrator form in the browser. Choose an email and permanent password to enter the workspace signed in. Existing accounts are reused without resetting their passwords; missing owners on a previously initialized installation require local recovery. The [first-administrator contract](first-owner-setup.md) owns freshness, one-time capabilities, and recovery. After signing in, proceed with existing Mewlink registration through **Mewlink → Remote Access → Register Device**. The launcher prints a QR code when the registration completion link or online access address changes. It does not add new central authentication or anonymous work permissions. Initial registration requires Mewlink login in the browser and selection of a device name.
 
 Existing registration is reused on the next run. Ctrl+C stops the local server and preserves persistent state. Sleep, central disconnection, WebRTC direct connection limitations, and the scope of actual external network verification follow the [Remote Access Contract](remote-access.md).
 
@@ -22,18 +22,19 @@ The `mew-ide` metadata in the root `package.json` and the executable package `ap
 | Item | Boundary |
 | --- | --- |
 | npm package | `apps/cli/`, `@liiiiv/mew-cli`, executable `mew`, initial version `0.1.0` |
-| Supported runtime | Pinned to Node.js major 24. Linux glibc 2.35 or later and macOS 15 or later, each on x64/arm64. Windows uses the Linux environment in WSL 2 |
+| Supported runtime | Pinned to Node.js major 24. Linux glibc 2.35 or later and macOS 15 or later, each on x64/arm64. Native Windows x64/arm64 follows its [platform contract](windows-native.md); the [guided Windows installer](windows-installer.md) uses managed WSL 2 for feature compatibility |
 | Executable distribution | `mew-cli-v<버전>` releases in GitHub `s-saens/mew`, `mew-runtime-<platform>-<arch>.tar.gz` |
 | Default working folder | The current folder where the command is run. Change with `--workspace` |
 | Configuration | Reads existing XDG `mew/config.env`, with CLI options and explicit environment variables taking precedence. Uses the folder for this run as the working folder instead of the previous `MEW_WORKSPACE` |
 | Persistent data | Precedence: `--data-dir` → explicit `MEW_DATA_DIR` → existing config.env → XDG data `mew/`. Not stored in the app cache |
 | Executable cache | `${XDG_CACHE_HOME:-~/.cache}/mew/runtimes/<버전>-<OS>-<arch>-node24`, change with `--cache-dir` |
 | Local access | loopback `127.0.0.1`, configured port or 5000. `--port 0` selects an available port |
-| First owner | `--owner-email` or interactive email entry. In noninteractive mode, exits without creating an account if no email is provided |
+| First owner | Browser creation through a locally armed one-time link. Explicit `--owner-email` retains temporary-password automation; ordinary HTTP cannot enable enrollment |
 | Multiple existing owners | Select an existing owner with `--owner-email`. If unspecified, uses the first owner in the existing account list |
-| Browser | Opens the local address after the server is actually listening. Skip with `--no-open`; the address is displayed in the terminal even if automatic opening is unavailable |
+| Browser | Opens the local address after the server is listening, including a private setup fragment when needed. `--no-open` skips opening; terminal output contains only the base address |
+| Installer bridge | `--installer` disables browser opening and reserves stdout for readiness records. A private stdin request reopens or refreshes setup; other output goes to stderr |
 
-Before starting the server, it saves the selected owner's `user-ui-state.json` working folder as the folder for this run. Other accounts' folders, accounts, conversations, and permissions are preserved. If an existing clone used `.data/` inside the repository, specify `--data-dir /절대/기존/mew/.data` explicitly. Arbitrary `.data/` found in the working folder is not automatically treated as account storage.
+For an existing owner, before starting the server it saves that owner's `user-ui-state.json` working folder as the folder for this run. A newly created browser owner receives the initial folder after the account claim. Other accounts' folders, accounts, conversations, and permissions are preserved. If an existing clone used `.data/` inside the repository, specify `--data-dir /절대/기존/mew/.data` explicitly. Arbitrary `.data/` found in the working folder is not automatically treated as account storage.
 
 `apps/cli/src/lock.mjs` prevents duplicate launcher runs against the same data, and `server/instance-lock.ts` ensures the source server and CLI host own a shared `DATA_DIR/server.lock`. Locks held by live PIDs are not taken over, and locks for dead PIDs are recovered under a separate recovery lock. On exit, only the lock matching its own token is deleted. The CLI does not start if the XDG `mew.pid` from the previous version `./mew` is still running. Older manually started versions without pidfiles are outside automatic detection, so users must stop them before switching. The launcher does not forcibly stop existing servers.
 
@@ -45,7 +46,7 @@ The archive cache for an already verified version is reused without another arch
 
 The runtime manifest must declare `browserDependencies: "server/browser-dependencies.js"` and include that required file. The CLI rejects obsolete or incomplete runtimes that omit the declaration or installer. Before starting the server host, it runs this installer in a child process with `--install`, forwarding preparation output and stopping launch on failure. Browser downloads and system package prompts complete before the application host is forked and its 60-second readiness timer starts. Cancellation is forwarded to the installer child and prevents host launch. The [browser dependency contract](browser-dependencies.md) owns pinned Chromium, ordinary Chrome reuse, explicit overrides, privilege requirements, and platform limits. Browser binaries are host downloads rather than npm or runtime-archive contents.
 
-The runtime then starts `server/cli-host.js` as a separate process. IPC in `cli-host.ts` carries only account setup requests, temporary passwords, actual listener addresses, and public remote status; it does not send registration keys or session tokens. Parent termination, IPC disconnection, and SIGINT/SIGTERM cause the host to shut down.
+The runtime then starts `server/cli-host.js` as a separate process. IPC in `cli-host.ts` carries listener addresses, the private first-owner setup URL and refresh requests, public remote status, and explicit legacy owner-creation responses. It does not send registration keys or login-session tokens. The raw setup capability travels only to the trusted launcher and browser, not ordinary logs. The [first-administrator contract](first-owner-setup.md) defines the installer stdin/stdout protocol. Parent termination, IPC disconnection, and SIGINT/SIGTERM cause the host to shut down.
 
 The launcher sets `MEW_DISTRIBUTION=release`. App update status checks in this distribution do not call Git. It rejects source builds, restarts, pull operations, and individual updates to bundled tmux, and directs users to rerun `npx @liiiiv/mew-cli@latest`. Existing update boundaries for external agents remain in place. Automatic replacement of the running app is not provided, and npx also handles checking the latest npm version.
 

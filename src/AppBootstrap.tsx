@@ -13,11 +13,24 @@ import { getAppRuntime } from './runtime/app-runtime'
 import { portPreviewEntry } from './utils/port-preview-entry'
 import { defaultCapabilities } from '../shared/access-policy'
 import { WorkspaceErrorScreen } from './components/app-error-boundary'
+import { FirstOwnerSetup } from './components/FirstOwnerSetup'
 
 type WorkspaceComponent = typeof import('./App.tsx')['default']
 const PortPreviewPage = lazy(() => import('./components/PortPreviewPage.tsx'))
 const GUEST_AUTH: AuthStatus = { authenticated: false, email: null, role: 'guest', mustChangePassword: false, displayName: null, avatarDataUrl: null }
 const startupScreen = <StartupScreen />
+/** Consume launcher credentials before any workspace or account UI can use the URL. */
+function consumeFirstOwnerSetupToken(): string | null {
+  const fragment = new URLSearchParams(window.location.hash.slice(1))
+  const token = fragment.get('setup')
+  if (token === null) return null
+  fragment.delete('setup')
+  const remaining = fragment.toString()
+  window.history.replaceState(window.history.state, '', `${window.location.pathname}${window.location.search}${remaining ? `#${remaining}` : ''}`)
+  return /^[A-Za-z0-9_-]{43}$/.test(token) ? token : null
+}
+
+let capturedSetupToken = consumeFirstOwnerSetupToken()
 
 /** Remote login does not need the editor, terminal, or workspace modules. */
 export default function AppBootstrap({ initialAuth }: { initialAuth?: AuthStatus }) {
@@ -25,14 +38,17 @@ export default function AppBootstrap({ initialAuth }: { initialAuth?: AuthStatus
   const { pending: refreshing, track: trackRefresh } = useRefreshTasks()
   const [auth, setAuth] = useState<AuthStatus | null>(null)
   const [loginOpen, setLoginOpen] = useState(false)
+  const [setupToken, setSetupToken] = useState(capturedSetupToken)
+  const [setupLoginRequired, setSetupLoginRequired] = useState(false)
   const [Workspace, setWorkspace] = useState<WorkspaceComponent | null>(null)
   const [workspaceFailure, setWorkspaceFailure] = useState<string | null>(null)
   const preview = portPreviewEntry(window.location.search)
-  const workspaceAllowed = !!auth && !preview && (!isRemoteMode() || auth.authenticated && !auth.mustChangePassword)
+  const workspaceAllowed = !!auth && !auth.setupRequired && !setupLoginRequired && !preview && (!isRemoteMode() || auth.authenticated && !auth.mustChangePassword)
   const workspaceIdentity = auth ? JSON.stringify([auth.email, auth.role, auth.accessRevision, auth.capabilities]) : ''
 
   // Prepare identity and permission-scoped caches before workspace effects restore tabs.
   const applyAuth = useCallback((status: AuthStatus) => {
+    if (!status.setupRequired) { capturedSetupToken = null; setSetupToken(null) }
     if (reloadRemoteAppForIdentity(status.authenticated ? status.email : null)) { clearFileContentCache(); setAuth(null); return }
     setContentIdentity(status.email)
     const permissionVersion = JSON.stringify([status.email, status.role, status.accessRevision, status.capabilities])
@@ -76,8 +92,9 @@ export default function AppBootstrap({ initialAuth }: { initialAuth?: AuthStatus
   }, [workspaceAllowed, workspaceIdentity, Workspace])
 
   if (!auth) return startupScreen
-  if ((isRemoteMode() || preview) && (!auth.authenticated || auth.mustChangePassword)) {
-    return <LoginPage dismissible={false} initialMustChangePassword={auth.mustChangePassword} onClose={() => {}} onSuccess={applyAuth} />
+  if (auth.setupRequired) return <FirstOwnerSetup token={setupToken} onSuccess={applyAuth} onInitialized={status => { applyAuth(status); setSetupLoginRequired(!status.authenticated) }} />
+  if ((isRemoteMode() || preview || setupLoginRequired) && (!auth.authenticated || auth.mustChangePassword)) {
+    return <LoginPage dismissible={false} initialMustChangePassword={auth.mustChangePassword} onClose={() => {}} onSuccess={status => { setSetupLoginRequired(false); applyAuth(status) }} />
   }
 
   if (preview) {

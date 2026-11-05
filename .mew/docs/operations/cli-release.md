@@ -1,6 +1,6 @@
 ---
 title: "CLI Releases and npm Publishing"
-description: "Release procedure for @liiiiv/mew-cli and Linux, macOS, and Windows x64/arm64 runtimes. Covers verified Windows desktop packages, native helpers, browser-installer manifest requirements, checksums, licensing, CI and npm/OIDC gates; first public publication and hands-on platform checks remain incomplete."
+description: "Release procedure for @liiiiv/mew-cli and Linux, macOS, and Windows x64/arm64 runtimes. Covers the signed Windows installation wizard, verified desktop packages, native helpers, browser manifests, checksums, licensing, CI and npm/OIDC gates; publication and hands-on platform checks remain incomplete."
 updated: "2026-11-05"
 상위파일:
   - "../../../docs/deployment/native.md"
@@ -37,6 +37,29 @@ Before publishing, verify both architectures on a clean Windows host without Rus
 
 Initial Windows helper builds, official package publication, clean-host installation, and real connection acceptance have not been performed. A missing exact-source release must remain a visible setup failure; it must never trigger host tool installation or compilation.
 
+## Windows Installation Wizard
+
+The [installer contract](../development/windows-installer.md) owns its managed WSL environment and user-data boundary; [ADR 0143](../decisions/0143-windows-installation-wizard.md) owns the delivery choice. The installer is separate from the native Windows runtime and from the retired Mewnager application.
+
+Build `mew-windows-setup-x64.exe` on a Windows worker with Node 24 and the checksum-pinned Inno Setup compiler. First publish the same-version `mew-cli-v<version>` runtime release. The installer source must be the exact commit referenced by that runtime tag. The builder retrieves its Linux x64 checksum, pins it inside `install-manifest.json`, bundles the locked CLI production dependencies, and refuses a missing or ambiguous runtime identity. The private Node and Ubuntu rootfs inputs follow `apps/windows-installer/downloads.json`; review their official origins and hashes when changing versions. Packaging never runs the installer or modifies a host distribution.
+
+```powershell
+node apps/windows-installer/build.mjs --output artifacts
+```
+
+`.github/workflows/windows-installer-release.yml` uses the matching `mew-windows-v<version>` tag and the protected `windows-installer-release` environment. Unsigned CI build artifacts are verification inputs, not approved public installers. Configure `WINDOWS_INSTALLER_SIGNING_PFX` (base64 PFX) and `WINDOWS_INSTALLER_SIGNING_PASSWORD` as protected environment secrets, require reviewers, and verify the publisher certificate before public use. The release path must reject missing signing configuration or an invalid Authenticode signature. Recompute the EXE checksum after signing and publish that signed file plus its `.sha256`; never replace an existing version's assets. Do not store PFX material or certificate passwords in the repository or logs.
+
+Before publication, run this acceptance matrix on clean Windows x64 machines without Node, Rust, or compiler tools:
+
+- WSL absent, already installed, WSL 1-only, and WSL 2 ready; existing unrelated distributions and user files must remain intact.
+- UAC acceptance and cancellation, disabled virtualization or restrictive Windows policy, restart deferred, logon resume, and manual rerun of the same installer.
+- Fresh administrator creation, browser closed before creation, expired setup link, repeated shortcut while Mew is already running, and reopen errors. URLs and setup tokens must not appear in installer logs or files.
+- Valid and corrupt cached downloads, offline interruption, incomplete import, failed ownership validation, and missing essential executable files followed by same-version repair.
+- Upgrade/reinstall with existing accounts and projects, controller exit/abnormal termination, Windows localhost forwarding, and concurrent shortcut/setup attempts. Verify application editing, terminal and login-browser behavior, rather than only file markers.
+- Valid Authenticode publisher/timestamp, matching post-sign checksum, Windows security prompts, and uninstall retaining the environment and data. Remote desktop and optional driver acceptance remain under their separate package gates.
+
+Initial signed installer build, publication, UAC/reboot acceptance, and clean-host application checks have not been performed. Do not advertise a working download until these gates pass. The [guided-installation work record](../work/guided-installation-and-first-owner.md) records the isolated checks actually run.
+
 ## Bundling Licenses
 
 New distributions of Mew itself follow the [Mew Source Available License 1.0](../../../LICENSE). Personal use, internal company use, and selling outputs are permitted, but selling Mew or modified versions and providing paid hosting or SaaS are prohibited without separate written permission. Detailed scope and existing MIT grants follow [Decision 0053](../decisions/0053-source-available-license.md); rights for external contributions follow the [Contribution Acceptance Criteria](../../../docs/development/contributing.md).
@@ -52,7 +75,7 @@ Before publishing, verify that the full texts of the root `LICENSE`, `apps/cli/L
 3. Only tag runs publish the 6 executables and `SHA256SUMS` to GitHub Release after passing the protected `cli-release` environment. Do not overwrite executables for existing versions.
 4. For npm publishing, select the matching tag in `workflow_dispatch` and set `publish_npm=true`. After verifying the 6 already-published runtimes and all checksums, publish to npm through the protected `npm-publish` environment. Do not change the release cache version.
 
-Assign reviewers for `cli-release`, `npm-publish`, and the separate `desktop-release` environment in the repository settings. The workflow uses the current repository through `${{ github.repository }}`. After a transfer, follow the [Repository Transfer Checks](repository-maintenance.md#transferring-github-ownership) to verify reviewers, allowed tags, protection rules, and settings previously supplied by the organization for every release environment. The [agent execution rules](../development/getting-started.md) require a build after implementation changes and prohibit deployment and server lifecycle operations; agents do not push tags, run workflows, or deploy on the user's behalf.
+Assign reviewers for `cli-release`, `npm-publish`, `desktop-release`, and the separate `windows-installer-release` environment in the repository settings. The workflow uses the current repository through `${{ github.repository }}`. After a transfer, follow the [Repository Transfer Checks](repository-maintenance.md#transferring-github-ownership) to verify reviewers, allowed tags, protection rules, and settings previously supplied by the organization for every release environment. The [agent execution rules](../development/getting-started.md) require a build after implementation changes and prohibit deployment and server lifecycle operations; agents do not push tags, run workflows, or deploy on the user's behalf.
 
 ## Initial Publication and Subsequent Versions
 
@@ -77,7 +100,7 @@ For the next version, update the CLI package version and the root version in its
 - Verify the required browser-installer manifest entry and file, preparation before host startup, cancellation, missing/invalid overrides, and a clean-host preparation on each supported platform. Browser download time must not consume the host readiness timeout.
 - Verify the explicit Windows desktop archive/checksum, source identity, manifest, complete file hashes, native binding/ABI probes, and clean-host setup without development tools on x64 and ARM64. Publish the matching desktop release before relying on unbundled WSL/source installation.
 - Verify that distribution files contain no personal data, secrets, or private central service sources and include native component redistribution notices and corresponding sources.
-- In an empty working directory on each supported OS, perform hands-on checks of new owner creation, password changes, editing, terminal use, relaunching, and preservation of account/device registrations. Fixture verification for the current implementation work does not replace these hands-on checks.
+- In an empty working directory on each supported OS, perform hands-on checks of browser first-owner creation, one-time setup closure, explicit temporary-password automation, editing, terminal use, relaunching, and preservation of account/device registrations. Fixture verification for the current implementation work does not replace these hands-on checks.
 - Check initial Mewlink registration, the online QR code, and local login, editing, and terminal use from an external browser. Other NATs, mobile networks, and remote desktop follow the [existing remote verification scope](../development/remote-access.md#verification-and-remaining-gates).
 
 The current code and isolated verification are ready; actual CI builds, GitHub Release publication, initial npm package publication, and the hands-on checks above have not been performed.

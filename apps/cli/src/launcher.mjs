@@ -1,7 +1,7 @@
 import { fork, spawn } from 'node:child_process'
 import path from 'node:path'
 import { createServer } from 'node:net'
-import { createInterface } from 'node:readline/promises'
+import { createInterface } from 'node:readline'
 import qrcode from 'qrcode-terminal'
 import { acquireDataLock, checkLegacyInstance } from './lock.mjs'
 import { windowsEnvironment, browserArgs } from './platform/index.mjs'
@@ -39,11 +39,12 @@ export function runtimeEnvironment(runtime, options, env = process.env) {
   return process.platform === 'win32' ? windowsEnvironment(environment) : environment
 }
 
-export async function runHost(runtime, options, { log = console.log, error = console.error, forkImpl = fork, input = process.stdin, output = process.stdout, browser = openBrowser } = {}) {
+export async function runHost(runtime, options, { log = options.installer ? console.error : console.log, error = console.error, forkImpl = fork, input = process.stdin, output = process.stdout, browser = openBrowser } = {}) {
   const child = forkImpl(path.join(runtime, 'server/cli-host.js'), [], {
-    cwd: options.workspace, env: runtimeEnvironment(runtime, options), execArgv: [], stdio: ['inherit', 'inherit', 'inherit', 'ipc'],
+    cwd: options.workspace, env: runtimeEnvironment(runtime, options), execArgv: [], stdio: options.installer ? ['inherit', process.stderr, process.stderr, 'ipc'] : ['inherit', 'inherit', 'inherit', 'ipc'],
   })
   let ready = false, prompting = false, printedRemote = '', exitSignal = null
+  let pendingSetupRequests = 0
   const abort = new AbortController()
   let shutdownTimer
   const stop = signal => {
@@ -63,32 +64,47 @@ export async function runHost(runtime, options, { log = console.log, error = con
   }
   startTimeout()
   const send = message => { if (child.connected) child.send(message) }
+  const installerInput = options.installer ? createInterface({ input, terminal: false, crlfDelay: Infinity }) : null
+  installerInput?.on('line', line => {
+    if (line !== 'MEW_INSTALLER_OPEN' || !ready || !child.connected) return
+    pendingSetupRequests++
+    send({ type: 'setup-url-request' })
+  })
+  installerInput?.on('close', () => { if (!abort.signal.aborted) stop('SIGTERM') })
   const onMessage = async message => {
     if (!message || typeof message !== 'object') return
     if (message.type === 'setup-needed') {
       prompting = true
       clearTimeout(timeout)
-      let email = options.ownerEmail
-      if (!email && !input.isTTY) { error('첫 실행에는 owner 이메일이 필요합니다. 터미널에서 실행하거나 --owner-email을 지정하세요.'); child.kill('SIGTERM'); return }
-      if (!email) {
-        const reader = createInterface({ input, output })
-        try { email = await reader.question('첫 mew 계정 이메일: ', { signal: abort.signal }) } catch { child.kill('SIGTERM'); return } finally { reader.close() }
-      }
-      if (!email.trim()) { error('owner 이메일을 입력하세요.'); child.kill('SIGTERM'); return }
+      const email = options.ownerEmail
+      if (!email?.trim()) { error('This runtime requires obsolete terminal account setup. Use the current Mew release for browser setup.'); child.kill('SIGTERM'); return }
       prompting = false
       startTimeout()
       send({ type: 'setup-owner', email: email.trim() })
       return
     }
     if (message.type === 'owner-created') {
-      log(`첫 계정: ${message.email}\n임시 비밀번호: ${message.password}\n브라우저에서 로그인한 뒤 비밀번호를 바꾸세요.`)
+      if (options.ownerEmail) log(`첫 계정: ${message.email}\n임시 비밀번호: ${message.password}\n브라우저에서 로그인한 뒤 비밀번호를 바꾸세요.`)
       return
     }
     if (message.type === 'ready') {
+      if (ready && (!options.installer || pendingSetupRequests === 0)) return
+      const reopening = ready
+      let browserUrl = message.url
+      if (message.setupUrl) {
+        const base = new URL(message.url), setup = new URL(message.setupUrl)
+        if (setup.username || setup.password || setup.origin !== base.origin || setup.pathname !== base.pathname || setup.search !== base.search || !/^#setup=[A-Za-z0-9_-]{43}$/.test(setup.hash)) throw new Error('Invalid local administrator setup address.')
+        browserUrl = message.setupUrl
+      }
       ready = true
+      if (reopening) pendingSetupRequests--
       clearTimeout(timeout)
-      log(`워크스페이스: ${options.workspace}\nmew: ${message.url}\n외부 접속: 계정 관리 → 원격 접속 → 기기 등록\n종료: Ctrl+C`)
-      if (options.open) browser(message.url)
+      if (!reopening) {
+        log(`워크스페이스: ${options.workspace}\nmew: ${message.url}\n외부 접속: 계정 관리 → 원격 접속 → 기기 등록\n종료: Ctrl+C`)
+        if (message.setupUrl) log('Create the administrator account in the browser opened by Mew. Relaunch Mew if the private setup page was closed.')
+      }
+      if (options.installer) output.write(`MEW_INSTALLER_READY ${JSON.stringify({ url: browserUrl })}\n`)
+      else if (options.open) browser(browserUrl)
       return
     }
     if (message.type === 'remote-status') {
@@ -101,7 +117,13 @@ export async function runHost(runtime, options, { log = console.log, error = con
       qrcode.generate(url, { small: true }, qr => log(qr))
       return
     }
-    if (message.type === 'error') error(message.message)
+    if (message.type === 'error') {
+      if (options.installer && message.code === 'setup-reopen-failed' && pendingSetupRequests > 0) {
+        pendingSetupRequests--
+        output.write('MEW_INSTALLER_ERROR {"code":"reopen-failed"}\n')
+      }
+      error(message.message)
+    }
   }
   child.on('message', message => { void onMessage(message).catch(failure => { error(failure.message); child.kill('SIGTERM') }) })
   try {
@@ -111,6 +133,7 @@ export async function runHost(runtime, options, { log = console.log, error = con
     })
   } finally {
     abort.abort()
+    installerInput?.close()
     clearTimeout(timeout)
     clearTimeout(shutdownTimer)
     process.off('SIGINT', interrupt)
@@ -123,8 +146,8 @@ export async function launch({ prepare, options, version, target, prepareBrowser
   await checkPort(options.port)
   const unlock = await acquireDataLock(options.dataDir)
   try {
-    const runtime = await prepare({ cacheDir: options.cacheDir, version, target, log: console.log })
-    await prepareBrowsers(runtime, { env: runtimeEnvironment(runtime, options) })
+    const runtime = await prepare({ cacheDir: options.cacheDir, version, target, log: options.installer ? console.error : console.log })
+    await prepareBrowsers(runtime, { env: runtimeEnvironment(runtime, options), installer: options.installer })
     return await host(runtime, options)
   } finally { await unlock() }
 }

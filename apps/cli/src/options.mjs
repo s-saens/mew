@@ -13,7 +13,7 @@ export function parseOptions(args, { env = process.env, cwd = process.cwd() } = 
     dataDir: path.resolve(cwd, values.MEW_DATA_DIR || locations.data),
     cacheDir: path.join(locations.cache, 'runtimes'),
     port: Number(values.MEW_TEAM_PORT || 5000),
-    ownerEmail: '', open: true, help: false, version: false,
+    ownerEmail: '', open: true, installer: false, help: false, version: false,
     legacyPidfile: path.join(locations.state, 'mew.pid'),
   }
   for (let i = 0; i < args.length; i++) {
@@ -21,6 +21,8 @@ export function parseOptions(args, { env = process.env, cwd = process.cwd() } = 
     if (arg === '--help' || arg === '-h') options.help = true
     else if (arg === '--version' || arg === '-v') options.version = true
     else if (arg === '--no-open') options.open = false
+    else if (arg === '--installer') { options.installer = true; options.open = false }
+    else if (arg === '--setup-in-browser') { /* Browser setup is the default. */ }
     else if (['--workspace', '--data-dir', '--cache-dir', '--port', '--owner-email'].includes(arg)) {
       const value = args[++i]
       if (!value || value.startsWith('--')) throw new Error(`${arg} 값을 입력하세요.`)

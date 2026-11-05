@@ -1,14 +1,20 @@
 ---
 title: "Accounts, permissions, and Mewlink identity linking"
-description: "Covers personal profiles, owner management of account roles and feature/file permissions, per-account restoration of all feature defaults, temporary password resets from account popups, Mewlink identity linking and merging, and the host user management CLI. Links to owning security and implementation contracts."
+description: "Covers first-administrator browser setup, personal profiles, owner management of account roles and feature/file permissions, per-account restoration of all feature defaults, temporary password resets from account popups, Mewlink identity linking and merging, and the host user management CLI. Links to owning security and implementation contracts."
 created: 2026-10-22
-updated: 2026-10-31
+updated: 2026-11-05
 상위파일: "MOC.md"
 ---
 
 # Accounts, permissions, and Mewlink identity linking
 
 Covers account actions in the app and user management commands on the host. Follow the [Security operations standards](../operations/security.md) for permissions by role and precautions before sharing, and [Appearance settings](appearance.md) for visual preferences.
+
+## First administrator
+
+On a fresh installation, open the browser page launched by Mew or the private link printed by source setup. Enter your email, choose a password of at least 10 characters, and confirm it. Mew creates the administrator account and signs you in. This password does not need an initial reset. Existing installations show their ordinary login flow and keep all accounts.
+
+If the page says to reopen Mew, use the Windows shortcut again. A source operator can rerun setup, or request a replacement token with `npm run users -- setup --json` while enrollment is still pending and open `<local-address>/#setup=<token>` locally. Treat the token as a password. Account loss after initialization requires local recovery rather than another signup. [Installation guide](../guides/getting-started-en.md#finish-setup) · [Bootstrap and recovery contract](../../.mew/docs/development/first-owner-setup.md).
 
 ## My account and account management
 
@@ -47,6 +53,6 @@ npm run users -- remove <account-id>  # 사용자 삭제 (비밀번호·외부 �
 npm run users -- list
 ```
 
-Send temporary passwords to the users themselves through a secure channel. For source installations, create the initial owner with this administration CLI or `./mew setup`. The prebuilt execution CLI creates the same temporary-password account when the first email is entered—afterward, an owner can change other accounts' roles in the in-app settings popup.
+Send temporary passwords to the users themselves through a secure channel. Source `./mew setup` and the prebuilt launcher use the browser flow above by default. Explicit local administration can still create an owner with `add <email> owner`, issuing a temporary password. The prebuilt CLI retains `--owner-email` for this automation. These commands are recovery or unattended-administration tools; later account management remains owner-only.
 
 For existing email accounts, `account-id` is the email address; for external-only users, find the immutable ID in `list`. `role` and `remove` accept both forms. `reset` is for email-and-password accounts and does not create passwords for external-only IDs.

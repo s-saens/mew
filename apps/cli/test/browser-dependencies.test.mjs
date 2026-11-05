@@ -73,3 +73,12 @@ test('cancellation reaches the installer child and blocks success even if it exi
   assert.deepEqual(signals, ['SIGTERM'])
   assert.deepEqual(['SIGINT', 'SIGTERM'].map(signal => process.listenerCount(signal)), before)
 })
+
+test('installer browser preparation routes ordinary subprocess output to stderr', async () => {
+  await prepareBrowserDependencies('/cached/app', { installer: true, spawnImpl: (_command, _args, options) => {
+    assert.deepEqual(options.stdio, ['inherit', process.stderr, process.stderr])
+    const child = new EventEmitter()
+    queueMicrotask(() => child.emit('exit', 0, null))
+    return child
+  } })
+})

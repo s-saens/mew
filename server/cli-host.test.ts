@@ -72,6 +72,63 @@ test('CLI 첫 설정은 owner를 만들고 임시 비밀번호 변경 요구를 
   assert.equal(JSON.stringify([...auth.users]).includes('temporary-password'), false)
 })
 
+test('fresh CLI opens browser enrollment after listening without creating or printing an account', async () => {
+  const auth = authFixture(), channel = channelFixture(), fixture = runtimeFixture(true)
+  const token = 'b'.repeat(43), calls: string[] = []
+  const host = await startCliHost({ auth: auth.auth, channel: channel.channel,
+    prepareOwnerSetup: () => { calls.push('arm'); return { setupRequired: true, token } },
+    prepareWorkspace: () => { assert.fail('the browser has not created an owner yet') },
+    loadRuntime: async () => { calls.push('runtime'); return fixture.runtime },
+  })
+  host.close()
+  assert.deepEqual(calls, ['arm', 'runtime'])
+  assert.equal(auth.users.size, 0)
+  assert.equal(auth.generated(), 0)
+  assert.deepEqual(channel.messages[0], { type: 'ready', url: 'http://127.0.0.1:54321', setupUrl: `http://127.0.0.1:54321#setup=${token}` })
+  assert.equal(channel.messages.some(message => ['setup-needed', 'owner-created'].includes(message.type)), false)
+})
+
+test('browser CLI refuses to reopen existing ownerless data', async () => {
+  const auth = authFixture({ 'member@example.test': { ...owner, role: 'member' } }), channel = channelFixture()
+  await assert.rejects(startCliHost({ auth: auth.auth, channel: channel.channel,
+    prepareOwnerSetup: () => ({ setupRequired: false }),
+    loadRuntime: async () => { assert.fail('recovery must happen before starting the app') },
+  }), /not a fresh setup/)
+  assert.equal(auth.users.size, 1)
+  assert.equal(auth.generated(), 0)
+  assert.deepEqual(channel.messages, [])
+})
+
+test('trusted launcher IPC refreshes only pending setup and returns a plain URL after initialization', async () => {
+  const auth = authFixture(), channel = channelFixture(), fixture = runtimeFixture(true)
+  let sequence = 0
+  const host = await startCliHost({ auth: auth.auth, channel: channel.channel,
+    prepareOwnerSetup: () => auth.users.size ? { setupRequired: false } : { setupRequired: true, token: String(++sequence).repeat(43) },
+    loadRuntime: async () => fixture.runtime,
+  })
+  channel.receive({ type: 'setup-url-request' })
+  assert.deepEqual(channel.messages.filter(message => message.type === 'ready').map(message => message.setupUrl), [
+    `http://127.0.0.1:54321#setup=${'1'.repeat(43)}`, `http://127.0.0.1:54321#setup=${'2'.repeat(43)}`,
+  ])
+  auth.users.set('owner@example.test', owner)
+  channel.receive({ type: 'setup-url-request' })
+  assert.deepEqual(channel.messages.at(-1), { type: 'ready', url: 'http://127.0.0.1:54321' })
+  host.close()
+  assert.equal(channel.emitter.listenerCount('message'), 0)
+})
+
+test('trusted reopen request cannot create a replacement owner after account loss', async () => {
+  const auth = authFixture({ 'owner@example.test': owner }), channel = channelFixture(), fixture = runtimeFixture(true)
+  const host = await startCliHost({ auth: auth.auth, channel: channel.channel,
+    prepareOwnerSetup: () => ({ setupRequired: false }), loadRuntime: async () => fixture.runtime,
+  })
+  auth.users.clear()
+  channel.receive({ type: 'setup-url-request' })
+  assert.equal(channel.messages.at(-1)?.type, 'error')
+  assert.equal(channel.messages.filter(message => message.type === 'ready').length, 1)
+  host.close()
+})
+
 test('기존 owner가 있으면 입력·계정·비밀번호를 바꾸지 않는다', async () => {
   const auth = authFixture({ 'existing@example.com': owner }), channel = channelFixture()
   await ensureCliOwner(auth.auth, channel.channel, 'invalid-email')

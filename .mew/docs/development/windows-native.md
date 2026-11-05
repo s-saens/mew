@@ -1,7 +1,7 @@
 ---
 title: "OS execution layer and Windows native support"
-description: "Owns the design that separates Windows, POSIX, and Linux implementations while retaining the shared mew server and UI, along with the contracts for psmux, Job Objects, private ACLs, mutually authenticated named pipes, and platform-specific releases. Distinguishes implementation and isolated checks from actual Windows and external-network release gates, required implementation builds, and server lifecycle restrictions."
-updated: "2026-10-31"
+description: "Owns the design that separates Windows, POSIX, and Linux implementations while retaining the shared mew server and UI, along with the contracts for psmux, Job Objects, private ACLs, mutually authenticated named pipes, and platform-specific releases. Distinguishes native execution from the managed WSL installation wizard and separates isolated checks from actual Windows and release gates."
+updated: "2026-11-05"
 상위파일:
   - "architecture.md"
   - "../operations/cli-release.md"
@@ -26,6 +26,8 @@ native/windows/process-host.cpp   Windows 작업 트리 소유자
 packages/tmux-term/src/server/backends/  tmux·psmux
 apps/cli/src/platform/            OS 경로·브라우저 열기
 ```
+
+The [Windows installation wizard](windows-installer.md) is a separate delivery path: a native setup UI prepares a dedicated WSL 2 environment and invokes the same prebuilt Linux CLI. Its first x64 release prioritizes compatibility with existing Linux-only login-desktop and provider installation features. It does not remove this native Windows implementation or restore the retired Mewnager management UI. [ADR 0143](../decisions/0143-windows-installation-wizard.md) owns that choice.
 
 ## OS-specific contracts
 

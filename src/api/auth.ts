@@ -16,10 +16,19 @@ export interface AuthStatus {
   authenticationMethod?: 'password' | 'mewlink' | null
   capabilities?: Capabilities
   accessRevision?: string
+  setupRequired?: boolean
 }
 
 export function fetchAuthStatus(): Promise<AuthStatus> {
   return mewFetch('/api/auth/me').then(json<AuthStatus>)
+}
+
+export function createFirstOwner(token: string, email: string, password: string): Promise<AuthStatus> {
+  return mewFetch('/api/auth/setup', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token, email, password }),
+  }).then(json<AuthStatus>)
 }
 
 export function login(

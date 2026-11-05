@@ -11,6 +11,7 @@ import {
   removeUser,
   upsertUser,
 } from './auth.ts'
+import { prepareFirstOwnerSetup } from './first-owner-setup.ts'
 
 // 팀 배포(5000) 승인 리스트 관리 — 내부 서버에서만 실행한다.
 //   npm run users -- add <email> [role]   임시 비밀번호를 만들어 등록 (첫 로그인 때 변경 강제, role 생략 시 member)
@@ -48,6 +49,14 @@ function requireRoleArg(): 'owner' | 'manager' | 'member' {
 }
 
 switch (command) {
+  case 'setup': {
+    if (rawAccountId !== '--json' || rawRole !== undefined) {
+      console.error('Usage: npm run users -- setup --json')
+      process.exit(1)
+    }
+    console.log(JSON.stringify(prepareFirstOwnerSetup(process.env.MEW_WORKSPACE)))
+    break
+  }
   case 'add': {
     const email = requireEmail()
     if (getUser(email)) {
@@ -121,6 +130,6 @@ switch (command) {
     break
   }
   default:
-    console.log('사용법: npm run users -- <add|role|reset|remove|list> [email|account-id] [role]')
+    console.log('사용법: npm run users -- <add|role|reset|remove|list> [email|account-id] [role]; setup --json')
     process.exit(command ? 1 : 0)
 }

@@ -5,6 +5,7 @@ import { DATA_DIR, DataFileError, readJsonFile, writeFileAtomic } from './dataDi
 import type { MewlinkAccessRequest, MewlinkIdentityLink } from '../shared/mewlink-identity.ts'
 import { gitConnections } from './git-connections.ts'
 import { gitProviders } from './git-providers.ts'
+import { sealOwnerSetup, withAccountStorageLock } from './account-storage.ts'
 
 // 팀 배포(5000) 인증의 SSoT.
 // - 계정·로그인 수단: .data/users.json — 로컬 owner 또는 CLI가 승인하는 계정 디렉터리
@@ -242,12 +243,15 @@ function loadUsers(): AccountDirectory {
     return emptyAccountDirectory()
   }
   if (usersCache && stamp === usersCacheStamp) return usersCache
-  usersCache = migrateUsers(readJsonFile<unknown>(USERS_FILE))
+  const loaded = migrateUsers(readJsonFile<unknown>(USERS_FILE))
+  if (Object.keys(loaded.accounts).length) sealOwnerSetup()
+  usersCache = loaded
   usersCacheStamp = stamp
   return usersCache
 }
 
 function saveUsers(data: AccountDirectory) {
+  if (Object.keys(data.accounts).length) sealOwnerSetup()
   writeFileAtomic(USERS_FILE, JSON.stringify(data, null, 2) + '\n')
   usersCache = null
 }
@@ -264,10 +268,13 @@ export function readMewlinkDirectory(): MewlinkDirectory {
 
 /** Mutations are synchronous and save once; failed approvals cannot leave orphan accounts. */
 export function mutateAccountDirectory<T>(update: (directory: AccountDirectory) => T): T {
-  const data = readAccountDirectory()
-  const result = update(data)
-  saveUsers(data)
-  return result
+  return withAccountStorageLock(() => {
+    usersCache = null
+    const data = readAccountDirectory()
+    const result = update(data)
+    saveUsers(data)
+    return result
+  })
 }
 
 function accountProfile(id: string, record: UserRecord): LocalAccountRecord {

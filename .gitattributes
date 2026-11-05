@@ -9,3 +9,6 @@ native/remote-desktop/*.html text eol=lf
 native/remote-desktop/*.json text eol=lf
 native/remote-desktop/LICENSE text eol=lf
 native/remote-desktop/rust/** text eol=lf
+
+# Installer shell payloads run inside Linux after a Windows release checkout.
+apps/windows-installer/*.sh text eol=lf

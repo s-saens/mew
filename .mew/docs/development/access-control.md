@@ -1,12 +1,16 @@
 ---
 title: "Per-account feature and file permissions"
 created: "2026-09-16"
-updated: "2026-11-03"
-description: "Defines project and account permissions, live Mewlink revocation, server-data boundaries, public capabilities, and browser/WebSocket checks. Covers installation-wide common MCP credentials, owner-only management, authorization-job cancellation, account-deletion preservation, and existing debugger/native MCP boundaries."
+updated: "2026-11-05"
+description: "Defines project and account permissions, locally armed first-owner enrollment, live Mewlink revocation, server-data boundaries, public capabilities, and browser/WebSocket checks. Covers installation-wide common MCP credentials, owner-only management, authorization-job cancellation, account-deletion preservation, and existing debugger/native MCP boundaries."
 상위파일: "MOC.md"
 ---
 
 Policy: [Security](../../../docs/operations/security.md), decision: [ADR 0150](../history/decisions/0150-mew-account-feature-and-file-permissions.md).
+
+## First administrator
+
+A fresh installation can create exactly one owner through a locally issued, expiring setup capability. The browser chooses the permanent password and receives the normal session. HTTP cannot arm setup; Mewlink/P2P enrollment is blocked. A durable closure marker and a cross-process account transaction prevent account loss or competing requests from reopening registration. Existing accounts and role protections remain unchanged. The [first-administrator contract](first-owner-setup.md) owns the API, fresh-state rules, token handling, and local recovery.
 
 ## Mewlink local login
 

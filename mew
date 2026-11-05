@@ -177,17 +177,22 @@ stop_server() {
 }
 
 create_first_owner() {
-  if node server/usersCli.ts list 2>/dev/null | grep -q '@'; then
-    say "accounts already exist — list them with: ./mew users list"
-    return 0
-  fi
-  if [ ! -t 0 ]; then
-    say "no account yet. Create one with: ./mew users add you@example.com owner"
-    return 0
-  fi
-  local email; email=$(ask "Email for the first account (the owner)" "")
-  [ -n "$email" ] || { say "skipped — create it later with: ./mew users add you@example.com owner"; return 0; }
-  node server/usersCli.ts add "$email" owner
+  FIRST_OWNER_SETUP_URL=''
+  local setup token
+  setup=$(node server/usersCli.ts setup --json) || die "could not prepare administrator setup; check the account data before retrying"
+  token=$(printf '%s' "$setup" | node -e '
+    let input = "";
+    process.stdin.on("data", value => input += value);
+    process.stdin.on("end", () => {
+      try {
+        const setup = JSON.parse(input);
+        if (setup.setupRequired === false) return;
+        if (setup.setupRequired !== true || typeof setup.token !== "string" || !/^[A-Za-z0-9_-]{43}$/.test(setup.token)) process.exit(1);
+        process.stdout.write(setup.token);
+      } catch { process.exit(1); }
+    });
+  ') || die "invalid administrator setup response"
+  if [ -n "$token" ]; then FIRST_OWNER_SETUP_URL="$(url)/#setup=$token"; fi
 }
 
 # ── commands ────────────────────────────────────────────────────────────────
@@ -255,13 +260,17 @@ cmd_setup() {
   fi
   say "building..."
   npm run build
+  create_first_owner
   start_server
   say ""
   say "mew is running: $(url)"
   say ""
-  create_first_owner
-  say ""
-  say "Next: open the URL above, log in, and change the temporary password."
+  if [ -n "${FIRST_OWNER_SETUP_URL:-}" ]; then
+    say "Create your administrator account in your browser using this private setup link:"
+    say "$FIRST_OWNER_SETUP_URL"
+  else
+    say "Next: open the URL above and sign in with your existing account."
+  fi
   if [ -t 0 ]; then remote_access_guide; fi
 }
 
@@ -307,7 +316,7 @@ mew — a browser workspace for a folder on your machine
   ./mew update          fast-forward origin/main, rebuild, restart
   ./mew status          what is running, and where things live
   ./mew logs            follow the log (ctrl-c to stop)
-  ./mew users <args>    accounts: add <email> [owner|manager|member] | list | role | reset | remove
+  ./mew users <args>    accounts: setup | add <email> [owner|manager|member] | list | role | reset | remove
 EOF
 }
 
