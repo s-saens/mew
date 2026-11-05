@@ -1,12 +1,12 @@
 ---
 title: "Skills and MCP Management"
 created: 2026-09-17
-updated: "2026-11-04"
-description: "Explains installation-wide Mew common MCP registration and owner-only management, imports, connection readiness before ACP use, actionable shared login and connection controls, alongside native skill/MCP source management, supported locations, original protection, and built-in skills."
+updated: "2026-11-05"
+description: "Manage one effective skill per name in common/project libraries, turn workflows on or off, import external originals safely, and remove or restore defaults. Also covers unchanged installation-wide common MCP connections and native MCP source editing."
 상위파일: "MOC.md"
 ---
 
-Decision: [ADR 0157](../../.mew/docs/history/decisions/0157-mew-native-agent-harness-management.md).
+Decisions: [Managed skill library](../../.mew/docs/decisions/0140-managed-skill-library.md) and [native MCP sources](../../.mew/docs/history/decisions/0157-mew-native-agent-harness-management.md).
 
 ## Mew common MCP
 
@@ -26,27 +26,41 @@ Mew common definitions and credentials are private server data shared by all acc
 
 ## Usage
 
-At the top of the agent panel, the book icon to the right of `i` opens **Manage Skills**, and the plug icon opens **Manage MCP**. Both are available before connecting a session. The two buttons open the corresponding tabs in the same management window. The gear button on the right opens the separate [agent default instructions settings](../guides/project-setup.md#edit-the-shared-guidance-file).
+At the top of the agent panel, the book icon opens **Manage Skills**, and the plug icon opens **Manage MCP**. Both work before a session connects. The gear opens the separate [default instructions settings](../guides/project-setup.md#edit-the-shared-guidance-file).
 
-- The default list order is **Mew → Global → Current Working Project → Subprojects**. Mew contains built-in skills in Skills and installation-wide common connections in MCP. Each item's name and agent label appear on one line. Shared skills show `Global`, while dedicated items show agent names such as `Codex` or `Claude`. These labels identify the owning agent; group headings distinguish global and project application scopes. Click the arrow in each group heading to collapse or expand that group; item counts remain visible when collapsed. Collapse states are retained separately for Skills and MCP while the window is open, leaving detail selections and editing drafts intact. Items with the same name are listed separately if their sources differ; hover over them to see the owning agent and path.
-- Scope and agent selection can be combined with search. `공통` means skills stored in `.agents/skills`. It does not mean every runtime automatically discovers this path.
-- Scope and agent filters and destination selection for adding or moving items use the shared custom `SelectField` dropdown. Destinations display both the global/project scope and the agent. Navigate with the arrow keys and confirm with Enter/Space; Esc and Back close the list first. Confirming a selection goes through the existing draft protection, and selectors are disabled while saving. On mobile, select from the same list by touch.
-- Selecting an item displays its description, owning agent, read-only status, original text, original path, and ownership scope in the details area. For skills, you can also expand the list of included files. MCP details contain JSON for only the selected server and do not return other account or settings fields.
-- Use **Add** to specify the location, name, and content. **Edit → Save** changes only the skill's original text or the selected MCP server. MCP input is JSON, and saving follows the provider's configuration format.
-- In **Move**, choose the destination scope and agent, then confirm. Skills move together with their scripts and reference files. MCP servers can only move between scopes within the same agent. If the destination already has an item with the same name, the operation fails and preserves the existing item.
-- **Delete** runs after confirmation. It deletes the entire folder for a skill or one server configuration for MCP. Package skills, system skills, and symbolic links are read-only.
-- Saving, moving, and deleting are rejected if external edits have changed the original. Your edits remain on screen so you can copy them or reload. Unsaved drafts are checked when closing, switching type or scope, or refreshing.
-- On mobile, switch between the list and details. Esc and Back use the shared overlay stack; keyboard focus stays within the popup and returns to the original button when it closes.
+### Skills
 
-Native global settings are based on the **OS user running the Mew server**. Multiple Mew accounts share those native global settings. Mew common MCP uses one installation-wide registry with owner-only management. The APIs require the `agent` feature permission and follow the existing server control boundary ([access contract](../../.mew/docs/development/access-control.md)).
+The main list contains one effective row per skill name. Each row shows its scope and an on/off control. Select a skill to read its description and instructions. Expand **Sources** to inspect the current path, duplicate external sources, and included files.
 
-To generate sprites with a local model in agent chat, optionally [connect the separate project's `local-sprites` as an external MCP server](local-sprites.md). Generation code, models, and Python dependencies are not included in the Mew distribution. Mew uses the existing runtime MCP settings, and the generation tools can be reused in other clients.
+- **Common** makes a skill available across projects and runtimes in this Mew installation. **This project** stores a project-specific skill or overrides a common skill's on/off setting. Use **Use common setting** to clear that override.
+- **Add** creates a skill in common or project scope. Edit and save managed skills without choosing a Codex- or Claude-specific folder.
+- **External skills** lists skills discovered in supported native folders. Select one and import it into common or project scope. Import copies supporting files, preserves the original, and rejects unsafe links or existing destinations. These sources are not active Mew registrations until imported.
+- **Off** keeps the skill and removes it from Mew suggestions and automatic workflow selection. **Delete** removes a managed copy or a default registration after confirmation. External originals remain untouched. Removing a project override does not silently activate its common fallback.
+- **Default skills** lets you explicitly restore a removed default. Normal reads, updates, and session startup do not register removed defaults again.
+
+Mew provides four documentation workflows and a commit workflow. The documentation workflows include their editing and translation helpers; those internal dependencies are not separate active rows. Package documentation files remain read-only, while their registration and enablement are controllable.
+
+Changes enter the catalog supplied with the next agent request, including queued requests when they execute. Mew's Codex and Claude sessions suppress their native automatic skill catalog; other runtimes receive the same selection policy without verified native suppression. Existing conversation text is retained. This setting does not restrict file tools or change CLIs launched outside Mew.
+
+### MCP
+
+MCP retains its source management interface: installation-wide **Mew common**, global native settings, the current project, and subprojects. Filter by scope and agent or search by name. Source details identify the runtime, path, and read-only reason. Common MCP connection behavior follows the section above.
+
+Use **Add**, **Edit**, **Move**, or **Delete** for a supported native server configuration. Moves remain within the same runtime. Delete removes one server entry after confirmation. Package and symbolic-link sources are read-only. Native source editing does not connect servers or restart sessions.
+
+### Preservation and access
+
+Scope controls use the shared keyboard/touch selection component. Unsaved edits require a discard decision before navigating or closing. Failed saves preserve the draft; stale revisions and destination collisions preserve existing files. On mobile, use **Back to list** to leave details. Esc and Back dismiss the current selection popup before the management dialog.
+
+Common skills and native global settings belong to the server OS user and are shared by Mew accounts. The APIs require the existing `agent` permission. Installation-wide common MCP additionally requires owner access for management. See the [access contract](../../.mew/docs/development/access-control.md).
+
+To generate sprites with a local model, optionally [connect the separate project's local-sprites MCP](local-sprites.md). Its generation code, models, and Python dependencies are not included in Mew.
 
 ## Mew-Specific Commit Skill
 
-`<DATA_DIR>/skills/commit/SKILL.md` is a commit instructions file owned by Mew. Read and edit it in **Manage Skills → Mew → commit → Edit**. Only the initial template is generated; updates and restarts do not overwrite user edits. Because this is a fixed path referenced by shared features, the management window does not allow moving or deleting it or adding skills from other locations to this scope.
+The commit workflow appears in **Manage Skills** alongside other common skills. Its editable common copy uses `<DATA_DIR>/skills/commit/SKILL.md`; until customized, the packaged template supplies the default. Project overrides can provide their own commit workflow. Saving preserves user edits, and disabling or removing the workflow prevents automatic references to it.
 
-`/commit` in all runtimes through Mew and **AI Auto Commit** in the Git panel use the same file. The Mew file takes precedence over runtime skills with the same name; regular conversations receive only an instruction to read this file when a commit is approved. It is not registered in the skill list of CLIs run outside Mew. It is not duplicated into global, project, or agent-specific commit skills. Other general skills retain the existing original management contract.
+`/commit` through Mew and **AI Auto Commit** use the enabled resolved workflow. If it is off, Git's built-in plan format and validation remain available without adding the disabled instructions. Commit authorization still comes from the user or shared commit setting; enabling a skill does not authorize a commit. No runtime-specific copies are installed.
 
 The default commit skill instructs the agent to read the actual source text of any available writing or proofreading skill matching the repository's message language and refine the title and description. It optionally uses skills such as Korean `korean-writing-reviewer`, English `writing-clearly-and-concisely`, Japanese `yomiyasu`, and Simplified Chinese `tech-doc-style-chinese`; if linked through a documentation entry point, only the sentence proofreading stage applies. Preserve the facts of the changes, terminology, uncertainty, and existing language and prefixes; do not add separate structural design, translation, or evaluation. If no skill is available, write under the existing rules without installation or additional confirmation.
 
@@ -58,7 +72,7 @@ AI Auto Commit validates the per-file plan before executing actual commits, and 
 
 ## Language-Specific Documentation Skills
 
-Mew provides documentation skills for Korean, English, Japanese, and Simplified Chinese. Read the source text and language-specific proofreading criteria in **Manage Skills → Mew**. These files are owned by the package and are read-only in the management window. If a project or global skill has the same name, the explicit skill candidate list follows the existing priority for closer project skills and dedicated skills.
+Mew provides documentation skills for Korean, English, Japanese, and Simplified Chinese. Read the source text in **Manage Skills**. Package originals are read-only; each workflow can be disabled, removed, or explicitly restored. A registered project skill takes precedence over a same-name common skill. Native copies require import and are shown as provenance rather than competing active rows.
 
 | Default Source Language | Skill |
 | --- | --- |
@@ -69,7 +83,7 @@ Mew provides documentation skills for Korean, English, Japanese, and Simplified 
 
 **Response Language** in the agent default instructions also applies to the default source language for new documents. **Follow mew Language Setting** uses the actual language of the screen where the request is made. User-specified document languages and existing project or file language requirements take precedence over the default, so changing the response language does not cause existing documents to be rewritten in another language. Without a separate specification or screen language, the source language is determined from the current response language instructions and user message. Manually edited language instructions are not reinterpreted and overwritten.
 
-`project-context-text.ts` passes the default skill path matching the response language instructions read in the same request. If the language cannot be determined, it passes all four paths and selection criteria so the agent reads only the relevant language. For documentation work, use the source-language skill to improve structure and wording and review accuracy. If translation is requested, translate directly from the finalized source into each target language, then review expression and meaning with the target-language skill. The source language is not fixed to Korean, and other language editions are not automatically generated or modified without a translation request. Disabling automatic project guidance also disables this linking guidance.
+`project-context-text.ts` passes only enabled resolved documentation paths matching the response language instructions read in the same request. If the language cannot be determined, it passes the enabled language entrypoints and selection criteria. Turning off the matching workflow removes that automatic reference on the next request. For documentation work, use the source-language skill to improve structure and wording and review accuracy. If translation is requested, translate directly from the finalized source into each target language, then review expression and meaning with the target-language skill. The source language is not fixed to Korean, and other language editions are not automatically generated or modified without a translation request. Disabling automatic project guidance also disables this documentation linking guidance. The independent active skill catalog still follows Skills settings.
 
 Language-specific entry points connect the documentation stages, and each stage reads and applies the original text of the existing specialized skills below. For Korean source text, proofread and finalize it in Korean, then translate directly into other languages. For English source text, proofread and finalize it in English, then translate directly into other languages. Perform the final translation review after completing translation proofreading and sentence proofreading in the target language.
 
@@ -90,9 +104,11 @@ Source installations and prebuilt executables use the same package without dupli
 
 ## Supported Locations
 
-The default paths are listed below. They account for `CODEX_HOME`, `CLAUDE_CONFIG_DIR`/`MEW_AGENT_CONFIG_DIR`, `XDG_CONFIG_HOME`, `KIMI_CODE_HOME`, `HERMES_HOME`, `OPENCLAW_STATE_DIR`/`OPENCLAW_CONFIG_PATH`, `GEMINI_HOME`, and the corresponding env values in Mew runtime settings. Arbitrary configuration paths, profiles, and additional skill paths in custom launch arguments are not automatically interpreted.
+External skill import candidates and native MCP locations are listed below. They account for `CODEX_HOME`, `CLAUDE_CONFIG_DIR`/`MEW_AGENT_CONFIG_DIR`, `XDG_CONFIG_HOME`, `KIMI_CODE_HOME`, `HERMES_HOME`, `OPENCLAW_STATE_DIR`/`OPENCLAW_CONFIG_PATH`, `GEMINI_HOME`, and the corresponding env values in Mew runtime settings. Arbitrary configuration paths, profiles, and additional skill paths in custom launch arguments are not automatically interpreted.
 
 ### Skills
+
+Managed common skills use `<DATA_DIR>/skills`; managed project skills and overrides use `.mew/skills` at the nearest project boundary. The following folders are read-only discovery sources for imports, not active Mew storage destinations.
 
 | Owner | Global | Project |
 | --- | --- | --- |
@@ -107,7 +123,7 @@ The default paths are listed below. They account for `CODEX_HOME`, `CLAUDE_CONFI
 | Hermes | `~/.hermes/skills` | Uses the shared skill location |
 | OpenClaw | `~/.openclaw/skills` | `skills` |
 
-Directories containing `SKILL.md` are searched recursively. Kimi and Prime's single root-level `.md` format is also supported and is converted to the `<이름>/SKILL.md` directory format when moved elsewhere. Existing `.kimi/skills` and `~/.gemini/antigravity-cli/skills` locations are listed separately. Codex and Claude's `plugins/cache` and Codex's `.system` support viewing original text only. Older versions remaining in plugin caches may also appear, so do not interpret this as a list of “currently active skills.”
+Discovery stops at each skill entrypoint rather than exposing its nested dependency skills. Kimi and Prime root-level `.md` sources can be imported into `<name>/SKILL.md` format. Existing `.kimi/skills` and `~/.gemini/antigravity-cli/skills` are also searched. Plugin caches and system folders are external sources; unsafe links cannot be imported. Older cache versions may appear in the external list without becoming active. Child and sibling projects are excluded; open the relevant project to manage its library.
 
 ### MCP
 
@@ -127,7 +143,7 @@ Existing `.kimi/mcp.json` and `~/.gemini/antigravity/mcp_config.json` are also d
 
 ## Saving and Applying
 
-The management window checks the existing original's syntax, external changes, and move conflicts, preserving the original text on failure. Native source editing does not connect MCP servers or restart sessions, so check the relevant runtime's application and trust settings. Mew common MCP has explicit connection and authentication controls described above. Detailed saving, API, and validation contracts follow the [development documentation](../../.mew/docs/development/agent-harness.md).
+The management window checks the existing original's syntax, external changes, and move conflicts, preserving the original text on failure. Native source editing does not connect MCP servers or restart sessions, so check the relevant runtime's application and trust settings. Mew common MCP has explicit connection and authentication controls described above. Skill resolution and management follow the [skill library contract](../../.mew/docs/development/skill-library.md); native MCP saving follows the [harness contract](../../.mew/docs/development/agent-harness.md).
 
 ## Sources
 

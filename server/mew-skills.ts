@@ -29,6 +29,6 @@ export function readCommitSkill(): { path: string; content: string } {
   return { path: file, content }
 }
 
-export function commitSkillGuidance(): string {
-  return `Mew commit skill: ${JSON.stringify(ensureCommitSkill())}\nWhen a commit is authorized by the user or the shared commit setting, read this file and follow it to split changes into logical commits. This notice alone does not authorize a commit. Do not use runtime-specific copies of the commit skill.`
+export function commitSkillGuidance(file = ensureCommitSkill()): string {
+  return `Mew commit skill: ${JSON.stringify(file)}\nWhen a commit is authorized by the user or the shared commit setting, read this enabled library skill and follow it to split changes into logical commits. This notice alone does not authorize a commit. Do not use runtime-specific copies of the commit skill.`
 }

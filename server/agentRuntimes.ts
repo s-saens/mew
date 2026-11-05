@@ -451,5 +451,28 @@ function defaultSkillPrompt(skills: RuntimeSkill[]): string {
 export function composeRuntimePrompt(runtime: string, text: string, skills: RuntimeSkill[] = []): string {
   if (skills.length === 0) return text
   const makeSkillPrompt = RUNTIMES[runtime]?.skillPrompt ?? defaultSkillPrompt
-  return `${makeSkillPrompt(skills)}\n\nUser request:\n${text}`
+  const names = encodeURIComponent(JSON.stringify([...new Set(skills.map(skill => skill.name))]))
+  const hint = makeSkillPrompt(skills)
+  return `<mew-selected-skills version="1" names="${names}" length="${hint.length}">\n${hint}\n</mew-selected-skills>\n\nUser request:\n${text}`
+}
+
+/** Only Mew's exact versioned prefix is interpreted; ordinary user prose stays intact. */
+export function selectedRuntimePrompt(prompt: string): { names: string[]; text: string } | null {
+  const opening = /^<mew-selected-skills version="1" names="([^"\r\n]+)" length="(\d+)">\n/.exec(prompt)
+  if (!opening) return null
+  const closing = '\n</mew-selected-skills>\n\nUser request:\n'
+  const length = Number(opening[2]), end = opening[0].length + length
+  if (!Number.isSafeInteger(length) || !prompt.startsWith(closing, end)) return null
+  try {
+    const names: unknown = JSON.parse(decodeURIComponent(opening[1]))
+    if (!Array.isArray(names) || !names.length || names.some(name => typeof name !== 'string' || !name.trim())) return null
+    return { names, text: prompt.slice(end + closing.length) }
+  } catch { return null }
+}
+
+export function refreshSelectedRuntimePrompt(runtime: string, prompt: string, currentSkills: RuntimeSkill[]): string {
+  const selected = selectedRuntimePrompt(prompt)
+  if (!selected) return prompt
+  const wanted = new Set(selected.names)
+  return composeRuntimePrompt(runtime, selected.text, currentSkills.filter(skill => wanted.has(skill.name)))
 }

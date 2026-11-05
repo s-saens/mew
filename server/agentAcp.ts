@@ -25,7 +25,8 @@ import { Readable, Writable } from 'node:stream'
 import fs from 'node:fs'
 import { killMemoryScope, memoryPressure, memoryScopeCommand, readAgentMemory, type MemoryReader } from './agent-memory.ts'
 import { agentContextText, captureAgentContext, refreshAgentContext, restoreAgentContext, saveAgentContext } from './agent-context.ts'
-import { stripMewContext } from './project-context-text.ts'
+import { contextBlock, stripMewContext } from './project-context-text.ts'
+import { currentSkillPolicy, skillLibraryPrompt, skillRuntimeEnvironment, skillRuntimeSessionOptions } from './skill-runtime-policy.ts'
 import type { AgentContextBinding } from '../shared/project-agent-context.ts'
 import { antigravityAuthUrl } from './antigravityAcp.ts'
 import { accessIssueFromError, type AccessIssue } from '../shared/agent-access.ts'
@@ -70,6 +71,7 @@ export {
 } from './agentRuntimes.ts'
 import {
   resolvedSpec,
+  refreshSelectedRuntimePrompt,
   RUNTIMES,
   isRuntimeLoginMethod,
   runtimeLoginSpec,
@@ -441,7 +443,7 @@ export class AgentSession {
     this.#startupFailure = new Promise<never>((_resolve, reject) => {
       this.#rejectStartup = reject
     })
-    const env = { ...this.#gitEnv }
+    const env = runWithAgentAccount(this.#account, () => skillRuntimeEnvironment(this.runtime, this.#gitEnv, currentSkillPolicy(this.cwd, this.runtime === 'codex')))
     // 주인 표식은 자손까지 그대로 상속된다 — 서버가 SIGKILL로 죽어도 다음 실행이 이걸 보고 걷어낸다
     env[OWNER_ENV] = String(process.pid)
     // CLAUDECODE가 켜져 있으면 Claude Code가 "중첩 세션"으로 보고 실행을 거부한다. mew 서버를 Claude Code
@@ -626,7 +628,7 @@ export class AgentSession {
   }
 
   async #createSession() {
-    const created = await measureAgentPhase(this.runtime, 'session/new', () => this.#conn.newSession({ cwd: this.cwd, mcpServers: this.#sessionMcpServers() }))
+    const created = await measureAgentPhase(this.runtime, 'session/new', () => this.#conn.newSession({ cwd: this.cwd, mcpServers: this.#sessionMcpServers(), ...skillRuntimeSessionOptions(this.runtime) }))
     this.#adopt(created.sessionId, created.models ?? null, created.modes ?? null, created.configOptions)
     this.#authRequired = false
     this.#authenticating = false
@@ -1179,7 +1181,14 @@ export class AgentSession {
     let context: string
     let retrySettings: ReturnType<typeof readAgentCapacityRetrySettings>
     try {
-      context = runWithAgentAccount(this.#account, () => agentContextText(this.#context, this.cwd, settings?.uiLocale))
+      context = runWithAgentAccount(this.#account, () => {
+        const policy = currentSkillPolicy(this.cwd)
+        promptText = refreshSelectedRuntimePrompt(this.runtime, promptText, policy.enabled)
+        return [
+          agentContextText(this.#context, this.cwd, settings?.uiLocale),
+          contextBlock(skillLibraryPrompt(this.cwd, policy)),
+        ].filter(Boolean).join('\n\n')
+      })
       retrySettings = runWithAgentAccount(this.#account, () => readAgentCapacityRetrySettings())
     }
     catch (error) {
@@ -1371,7 +1380,7 @@ export class AgentSession {
         await this.#initializeWithTimeout(false)
       }
       if (this.#disposed) return
-      const created = await this.#conn.newSession({ cwd: this.cwd, mcpServers: this.#sessionMcpServers() })
+      const created = await this.#conn.newSession({ cwd: this.cwd, mcpServers: this.#sessionMcpServers(), ...skillRuntimeSessionOptions(this.runtime) })
       if (this.#disposed) return
       this.#loadingEvents = null
       this.#clearFailed = false
@@ -1411,7 +1420,7 @@ export class AgentSession {
     let loaded: Awaited<ReturnType<ClientSideConnection['loadSession']>>
     let replay: AgentEvent[]
     try {
-      loaded = await measureAgentPhase(this.runtime, 'session/load', () => this.#conn.loadSession({ sessionId, cwd: this.cwd, mcpServers: this.#sessionMcpServers() }))
+      loaded = await measureAgentPhase(this.runtime, 'session/load', () => this.#conn.loadSession({ sessionId, cwd: this.cwd, mcpServers: this.#sessionMcpServers(), ...skillRuntimeSessionOptions(this.runtime) }))
       replay = reconcileAgentTranscript(readAgentTranscript(this.runtime, this.cwd, sessionId), this.#loadingEvents)
     } catch (err) {
       // 일부 어댑터는 실패하기 전 update를 몇 개 흘리거나 모드를 바꾼다. 어느 쪽도 현재 세션에 남기지 않는다.

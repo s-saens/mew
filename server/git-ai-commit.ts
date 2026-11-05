@@ -13,7 +13,8 @@ import { DATA_DIR, writeFileAtomic } from './dataDir.ts'
 import type { AgentSet } from './agentSets.ts'
 import { spawnSpecCommand } from './spawnSpecCommand.ts'
 import { gitAiCommitActive, type GitAiCommitJob, type GitCommitPlan } from '../shared/git-ai-commit.ts'
-import { readCommitSkill } from './mew-skills.ts'
+import { activeCommitSkill } from './active-commit-skill.ts'
+import { workspacePaths } from './paths.ts'
 import { parseCommitResponse } from './git-commit-response.ts'
 import { captureCommitLanguageSnapshot, readCommitLanguageGuidance, runWithCommitLanguageSnapshot, type CommitLanguageSnapshot } from './agent-guidance.ts'
 import { runWithAgentAccount } from './agent-account-settings.ts'
@@ -70,9 +71,9 @@ export async function captureCommitChanges(cwd: string, filesInput?: unknown, in
   } finally { fs.rmSync(temporary, { recursive: true, force: true }) }
 }
 
-export function commitPlanPrompt(set: AgentSet, changes: CommitSnapshot, skill = readCommitSkill(), locale?: string): string {
+export function commitPlanPrompt(set: AgentSet, changes: CommitSnapshot, skill = activeCommitSkill(workspacePaths.root), locale?: string): string {
   return `Mode: mew-commit-plan. The user authorized actual commits for the selected files in this repository.
-Read and follow this Mew-owned commit skill (snapshot from ${JSON.stringify(skill.path)}):
+${skill.path ? `Read and follow this enabled commit skill (snapshot from ${JSON.stringify(skill.path)}):` : 'Use this Git commit plan format:'}
 ${skill.content}
 
 Selected agent preset preferences (only where compatible with this task): ${JSON.stringify(set.role)}
@@ -164,7 +165,7 @@ export class GitAiCommitStore {
     fs.mkdirSync(directory, { recursive: true, mode: 0o700 })
     const session = `mewcmd-git-${id}`
     const job: GitAiCommitJob = { mode: 'commit', files: changes.files, id, agentSetName: set.name, state: 'starting', startedAt: Date.now(), output: '', truncated: changes.truncated }
-    const skill = readCommitSkill()
+    const skill = activeCommitSkill(cwd)
     const languageSnapshot = runWithAgentAccount(owner, () => captureCommitLanguageSnapshot(locale))
     const prompt = runWithAgentAccount(owner, () => runWithCommitLanguageSnapshot(languageSnapshot, () => commitPlanPrompt(set, changes, skill, locale)))
     const input: GitAiCommitInput = { owner, connection: { id: connection.id, provider: connection.provider, host: connection.host }, cwd, agentSet: { ...set }, skill, prompt, languageSnapshot, session, snapshot: changes }

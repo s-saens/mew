@@ -12,6 +12,7 @@ import { documentationLocale, documentationSkills, listDocumentationSkills, list
 import { guidanceOptions } from '../shared/agent-guidance.ts'
 import { listSkills } from './skills.ts'
 import { AgentHarnessStore } from './agent-harness.ts'
+import { SkillLibraryStore } from './skill-library.ts'
 
 const project = path.join(DATA_DIR, 'documentation-project')
 fs.mkdirSync(project)
@@ -62,18 +63,25 @@ test('language selection does not infer a setting from free text, duplicated mar
   }
 })
 
-test('all runtimes expose four documentation skills, preserving project overrides and read-only packaged resources', async () => {
+test('all runtimes expose documentation entrypoints while dependencies and native sources remain outside the active library', async () => {
   const home = path.join(DATA_DIR, 'documentation-home')
   fs.mkdirSync(home)
   const packaged = [...listDocumentationSkills(), ...listDocumentationDependencies()]
   for (const runtime of ['codex', 'claude', 'hermes', 'cursor', 'prime', 'opencode', 'openclaw', 'antigravity', 'kimi']) {
     const inventory = listSkills(project, runtime, home, {})
-    for (const skill of packaged) assert.equal(inventory.find(item => item.name === skill.name)?.path, skill.path)
+    for (const skill of listDocumentationSkills()) assert.equal(inventory.find(item => item.name === skill.name)?.path, skill.path)
+    for (const skill of listDocumentationDependencies()) assert.equal(inventory.some(item => item.name === skill.name), false)
   }
   const custom = path.join(project, '.codex/skills/english-technical-docs/SKILL.md')
   fs.mkdirSync(path.dirname(custom), { recursive: true })
   fs.writeFileSync(custom, '---\nname: english-technical-docs\ndescription: Project override\n---\nCustom editor')
-  assert.equal(listSkills(project, 'codex', home, {}).find(item => item.name === 'english-technical-docs')?.path, custom)
+  assert.notEqual(listSkills(project, 'codex', home, {}).find(item => item.name === 'english-technical-docs')?.path, custom)
+  const library = new SkillLibraryStore({ home, env: {} })
+  const candidate = library.list(project).candidates.find(item => item.path === custom)!
+  assert.ok(candidate)
+  library.mutate({ cwd: project, action: 'import', id: candidate.id, scope: 'project', revision: candidate.revision })
+  const imported = path.join(project, '.mew/skills/english-technical-docs/SKILL.md')
+  assert.equal(listSkills(project, 'codex', home, {}).find(item => item.name === 'english-technical-docs')?.path, imported)
   const store = new AgentHarnessStore({ home, env: {} })
   const inventory = await store.list(project, 'skills')
   const target = inventory.locations.find(location => location.agent === 'codex' && location.writable)!

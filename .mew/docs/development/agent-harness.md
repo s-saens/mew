@@ -1,10 +1,12 @@
 ---
 title: "Skills and MCP management implementation contract"
-description: "Contracts for native skill/MCP source editing, installation-wide Mew common MCP imports, save atomicity, conflicts, scope discovery, APIs, and verification. Shared authentication and runtime injection follow the linked common MCP contract."
-updated: "2026-11-03"
+description: "Contracts for native MCP source editing, installation-wide common imports, atomic saves, conflicts, scope discovery, APIs, and verification. Links the managed skill library that replaces native folders as Mew's active skills."
+updated: "2026-11-05"
 ---
 
 ## Storage and application scope
+
+The [managed skill library](skill-library.md) owns active skills, common/project settings, source-preserving imports, and prompt application under [ADR 0140](../decisions/0140-managed-skill-library.md). The native source store retains its internal skill file utilities for compatibility tests; the public native harness route accepts MCP management only. It returns HTTP 410 for `kind=skills` so the old mutation route cannot bypass library ownership or recreate removed defaults.
 
 - JSON/JSONC patches only the relevant paths, and YAML uses document node editing to preserve surrounding settings and comments. Codex TOML reserializes MCP tables and validates other setting values. Comments and formatting in the MCP section are normalized, and inline `mcp_servers = {...}` is rejected because it cannot be safely modified.
 - OpenClaw JSON5 is saved as JSON with all setting values preserved. The management dialog explains that comments and formatting are removed. JSON is valid JSON5.
@@ -17,11 +19,11 @@ updated: "2026-11-03"
 
 ## Input fields and APIs
 
-`GET /api/skills?cwd=...&runtime=...` searches for runtime-specific and shared skills from cwd up to the parent Git root and merges global skills. For identical names, the nearest project takes precedence, and runtime-specific skills precede shared skills within each scope. Child and sibling projects are excluded from prompt suggestions. Suggestions in open input fields are reloaded after management dialog changes, and immediate sending, queued message editing, and scheduled messages use the same cwd/runtime rules. These are Mew's explicit skill selection rules and do not replace the native runtime's automatic discovery precedence.
+`GET /api/skills?cwd=...&runtime=...` returns enabled effective library skills. Native folders supply external import candidates rather than automatically active skills. Project definitions and on/off overrides take precedence over common settings. Suggestions reload after management changes. Explicit selection, execution-time queue revalidation, documentation routing, and runtime policy follow the [skill library contract](skill-library.md).
 
 | API | Contract |
 | --- | --- |
-| `GET /api/agent/harness?cwd=...&kind=skills\|mcp` | Scope, runtime, storage location, item summaries, and read warnings. Excludes raw MCP content and authentication values |
+| `GET /api/agent/harness?cwd=...&kind=mcp` | Scope, runtime, storage location, item summaries, and read warnings. Excludes raw MCP content and authentication values |
 | `GET /api/agent/harness/detail?cwd=...&kind=...&id=...` | Selected item's raw content, revision, and included file list |
 | `POST /api/agent/harness` | `{cwd, kind, action, id?, revision?, target?, name?, content?}`. action is create/save/move/delete/import. Import accepts a rediscovered native MCP ID, revision, and the Mew target ID; conversion happens on the server and leaves the source unchanged |
 

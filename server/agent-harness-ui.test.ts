@@ -8,7 +8,7 @@ import { connectTestBrowser } from './test-browser.ts'
 import type { HarnessInventory, HarnessMutation } from '../shared/agent-harness.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
-test('harness popup supports scope filtering, protected drafts, editing, moves and deletion on desktop/mobile', { timeout: 45000 }, async () => {
+test('native MCP popup supports scope filtering, protected drafts, editing, moves and deletion on desktop/mobile', { timeout: 45000 }, async () => {
   const source = `import React from '${root}/node_modules/react/index.js';
 import {createRoot} from '${root}/node_modules/react-dom/client.js';
 import {AgentHarnessButtons} from '${root}/src/components/agent-harness-modal.tsx';
@@ -44,10 +44,10 @@ createRoot(document.getElementById('root')).render(<div className="flex"><button
         scopes: [{ id: 'global', label: '전역', path: '/home/test', global: true }, { id: '/project', label: 'project', path: '/project', global: false }, { id: '/project/apps/web', label: 'apps/web', path: '/project/apps/web', global: false }],
         agents: [{ id: 'shared', label: '공통' }, { id: 'codex', label: 'Codex' }, { id: 'claude', label: 'Claude' }],
         locations: [
-          { id: 'global', kind: 'skills', agent: 'shared', scope: 'global', label: '공통', path: '/home/test/.agents/skills', writable: true },
-          { id: 'global-codex', kind: 'skills', agent: 'codex', scope: 'global', label: 'Codex', path: '/home/test/.codex/skills', writable: true },
-          { id: 'local', kind: 'skills', agent: 'codex', scope: '/project', label: 'Codex', path: '/project/.codex/skills', writable: true },
-          { id: 'child', kind: 'skills', agent: 'claude', scope: '/project/apps/web', label: 'Claude', path: '/project/apps/web/.claude/skills', writable: true },
+          { id: 'global', kind: 'mcp', agent: 'shared', scope: 'global', label: '공통', path: '/home/test/.agents/skills', writable: true },
+          { id: 'global-codex', kind: 'mcp', agent: 'codex', scope: 'global', label: 'Codex', path: '/home/test/.codex/skills', writable: true },
+          { id: 'local', kind: 'mcp', agent: 'codex', scope: '/project', label: 'Codex', path: '/project/.codex/skills', writable: true },
+          { id: 'child', kind: 'mcp', agent: 'claude', scope: '/project/apps/web', label: 'Claude', path: '/project/apps/web/.claude/skills', writable: true },
         ],
         items: [
           { id: 'shared', location: 'global', name: 'writing', description: '공통 문서 작성 지침', path: '/home/test/.agents/skills/writing/SKILL.md', writable: true },
@@ -77,7 +77,7 @@ createRoot(document.getElementById('root')).render(<div className="flex"><button
         return route.fulfill({ contentType: 'text/html', body: `<!doctype html><html class="${width === 390 ? '' : 'dark'}" lang="ko"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}html,body{margin:0}</style><div id="root"></div><script src="/app.js"></script></html>` })
       })
       await page.goto('http://mew-harness.test/')
-      const opener = page.getByRole('button', { name: 'Skills 관리', exact: true })
+      const opener = page.getByRole('button', { name: 'MCP 관리', exact: true })
       await opener.click()
       await page.getByRole('button', { name: 'deploy Codex', exact: true }).waitFor()
       if (width >= 768) assert.ok(await page.evaluate('document.activeElement?.getAttribute("aria-label") === "확장 검색"'))
@@ -124,26 +124,26 @@ createRoot(document.getElementById('root')).render(<div className="flex"><button
       await fs.mkdir('/tmp/mew-harness-review', { recursive: true })
       await page.screenshot({ path: `/tmp/mew-harness-review/harness-${width}.png` })
       await page.getByRole('button', { name: '수정', exact: true }).click()
-      const editor = page.getByLabel('스킬 내용')
-      await editor.fill(detailText + '\n추가 지침')
+      const editor = page.getByLabel('MCP 설정 JSON')
+      await editor.fill('{"command":"node","args":["updated.js"]}')
       if (width >= 768) {
         await choose('스코프', '전역')
         await page.getByRole('alertdialog').getByRole('button', { name: '취소', exact: true }).click()
         assert.equal(await field('스코프').innerText(), '모든 스코프')
-        assert.match(await editor.inputValue(), /추가 지침/)
+        assert.match(await editor.inputValue(), /updated.js/)
         await page.getByRole('button', { name: '현재 프로젝트 · project 접기', exact: true }).click()
         assert.equal(await page.getByRole('alertdialog').count(), 0)
-        assert.match(await editor.inputValue(), /추가 지침/)
+        assert.match(await editor.inputValue(), /updated.js/)
         await page.getByRole('button', { name: '현재 프로젝트 · project 펼치기', exact: true }).click()
       }
       await page.keyboard.press('Escape')
       await page.getByRole('alertdialog').waitFor()
       await page.getByRole('alertdialog').getByRole('button', { name: '취소', exact: true }).click()
-      assert.match(await editor.inputValue(), /추가 지침/)
+      assert.match(await editor.inputValue(), /updated.js/)
       failSave = true
       await page.getByRole('button', { name: '저장', exact: true }).click()
       await page.getByRole('alert').waitFor()
-      assert.match(await editor.inputValue(), /추가 지침/)
+      assert.match(await editor.inputValue(), /updated.js/)
       failSave = false
       await page.getByRole('button', { name: '저장', exact: true }).click()
       await page.getByRole('status').filter({ hasText: '저장했습니다' }).waitFor()
@@ -197,7 +197,7 @@ createRoot(document.getElementById('root')).render(<div className="flex"><button
       assert.ok(await page.evaluate('document.documentElement.scrollWidth <= window.innerWidth'))
       await page.keyboard.press('Escape')
       assert.equal(await page.getByRole('dialog').count(), 0)
-      assert.ok(await page.evaluate('document.activeElement?.getAttribute("aria-label") === "Skills 관리"'))
+      assert.ok(await page.evaluate('document.activeElement?.getAttribute("aria-label") === "MCP 관리"'))
       assert.deepEqual(errors, [])
       await page.close()
     }

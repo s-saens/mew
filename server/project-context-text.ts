@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { readAgentGuidance } from './agent-guidance.ts'
 import { withDocumentationSkillGuidance } from './documentation-skills.ts'
 import { commitSkillGuidance } from './mew-skills.ts'
+import { listSkills } from './skills.ts'
 import type { AgentContextBinding, ProjectAgentSettings } from '../shared/project-agent-context.ts'
 
 export const CONTEXT_START = '<mew-context version="1">'
@@ -16,9 +17,11 @@ export function describeAgentContext(binding: AgentContextBinding, settings: Pro
     ...settings.entrypoints.map(p => path.join(binding.projectRoot, p))]
   if (cwd !== binding.projectRoot) candidates.push(path.join(cwd, 'AGENTS.md'), path.join(cwd, 'README.md'), path.join(cwd, 'docs/AGENT.md'), path.join(cwd, 'docs/README.md'))
   const entries = [...new Set(candidates)].filter(p => { try { return fs.statSync(p).isFile() } catch { return false } })
+  const skills = listSkills(cwd)
+  const commit = skills.find(skill => skill.name === 'commit')
   return [
-    withDocumentationSkillGuidance(readAgentGuidance(locale)),
-    commitSkillGuidance(),
+    withDocumentationSkillGuidance(readAgentGuidance(locale), skills),
+    commit ? commitSkillGuidance(commit.path) : '',
     `Change intent recorder: run ${shellQuote(process.execPath)} ${shellQuote(fileURLToPath(new URL('./git-change-intent-cli.ts', import.meta.url)))} --cwd ${shellQuote(binding.projectRoot)} with JSON on stdin: {"purpose":"brief reason for this task's changes","files":["repository-root-relative changed paths"],"verification":"checks actually performed (optional)"}. This writes disposable Git metadata only; it does not stage, commit or authorize a commit.`,
     `Project root: ${JSON.stringify(binding.projectRoot)}`,
     `Working directory: ${JSON.stringify(cwd)}`,

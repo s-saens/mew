@@ -63,15 +63,20 @@ export function documentationLocale(guidance: string): DocumentationLocale | und
 }
 
 /** Add paths only: agents load the source skill and requested target skills when documenting. */
-export function withDocumentationSkillGuidance(guidance: string): string {
+export function withDocumentationSkillGuidance(guidance: string, available: { name: string; path: string }[] = listDocumentationSkills()): string {
   const locale = documentationLocale(guidance)
-  const skills = locale ? [documentationSkills[locale]] : Object.values(documentationSkills)
+  const skills = (locale ? [documentationSkills[locale]] : Object.values(documentationSkills))
+    .flatMap(skill => {
+      const active = available.find(candidate => candidate.name === skill.name)
+      return active ? [{ ...skill, path: active.path }] : []
+    })
+  if (!skills.length) return guidance
   const selection = locale
     ? `Default documentation source language: ${documentationSkills[locale].language} (${locale}), following the resolved agent response-language setting.`
     : 'Default documentation source language: follow the active response-language instructions; if unspecified, use the user message language. Custom language instructions remain authoritative. Select the matching skill below.'
   return [guidance, [
     selection,
     'For technical documentation tasks, read the matching source-language skill before designing structure and editing prose. Explicit document-language requests and existing project/file language requirements take precedence; preserve existing file languages. For requested translations, finalize the source first, translate directly from that source, and read each target-language skill for local phrasing. Do not translate or rewrite unrelated documents without a request. Resolve shared references relative to the real skill file path.',
-    ...skills.map(skill => `${skill.language}: $${skill.name} — ${JSON.stringify(path.join(DOCUMENTATION_SKILLS_DIR, skill.name, 'SKILL.md'))}`),
+    ...skills.map(skill => `${skill.language}: $${skill.name} — ${JSON.stringify(skill.path)}`),
   ].join('\n')].filter(Boolean).join('\n\n')
 }

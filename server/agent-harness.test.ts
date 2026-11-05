@@ -163,7 +163,7 @@ test('native Prime/OpenClaw configs, runtime home overrides and flat skill moves
   } finally { f.cleanup() }
 })
 
-test('slash skill discovery selects nearest scope and current runtime, shares global common, excludes sibling projects', () => {
+test('native skills remain import candidates until explicitly registered in the shared library', () => {
   const f = fixture()
   try {
     f.write(path.join(f.cwd, '.git'), 'gitdir: /unused')
@@ -174,9 +174,9 @@ test('slash skill discovery selects nearest scope and current runtime, shares gl
     f.skill(path.join(f.cwd, 'apps/other/.agents/skills/sibling/SKILL.md'), 'sibling')
     f.skill(path.join(f.cwd, '.claude/skills/claude-only/SKILL.md'), 'claude-only')
     const skills = listSkills(path.join(f.cwd, 'apps/web'), 'codex', f.home, {})
-    assert.deepEqual(skills.filter(skill => !bundledDocumentationNames.has(skill.name)).map(skill => skill.name), ['commit', 'common', 'demo', 'local'])
-    assert.equal(skills.find(skill => skill.name === 'demo')!.path, path.join(f.cwd, '.codex/skills/demo/SKILL.md'))
-    assert.deepEqual(listSkills(f.cwd, 'claude', f.home, {}).filter(skill => !bundledDocumentationNames.has(skill.name)).map(skill => skill.name), ['claude-only', 'commit', 'common'])
+    assert.deepEqual(skills.filter(skill => !bundledDocumentationNames.has(skill.name)).map(skill => skill.name), ['commit'])
+    assert.equal(skills.some(skill => skill.name === 'demo' || skill.name === 'sibling'), false)
+    assert.deepEqual(listSkills(f.cwd, 'claude', f.home, {}).filter(skill => !bundledDocumentationNames.has(skill.name)).map(skill => skill.name), ['commit'])
   } finally { f.cleanup() }
 })
 

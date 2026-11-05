@@ -103,7 +103,9 @@ new AgentSideConnection(conn => new Agent(conn), ndJsonStream(Writable.toWeb(pro
   writeProjectAgentSettings(a, { ...defaultAgentSettings('new-notes'), enabled: false })
   await new Promise(resolve => setTimeout(resolve, 20))
   await resumed.runOnce('disabled')
-  assert.equal(calls().at(-1).prompt.length, 1)
+  assert.equal(calls().at(-1).prompt.length, 2, 'skill policy remains independent of project-document guidance')
+  assert.match(calls().at(-1).prompt[1].text, /skill/i)
+  assert.doesNotMatch(calls().at(-1).prompt[1].text, /A updated|Documents folder:/)
 })
 
 test('context display filtering preserves ordinary messages and removes separate or joined guidance', () => {

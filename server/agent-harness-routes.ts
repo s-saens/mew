@@ -6,6 +6,7 @@ import type { HarnessInventory, HarnessKind, HarnessMutation } from '../shared/a
 
 function scope(value: unknown, kind: unknown): { cwd: string; kind: HarnessKind } {
   if (typeof value !== 'string' || !value.trim() || !['skills', 'mcp'].includes(String(kind))) throw new HarnessError('작업 폴더와 종류를 확인하세요')
+  if (kind === 'skills') throw new HarnessError('스킬은 Skills 라이브러리에서 관리하세요', 410)
   return { cwd: value, kind: kind as HarnessKind }
 }
 function commonLocations(inventory: HarnessInventory) {
