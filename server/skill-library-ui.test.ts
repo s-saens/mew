@@ -17,7 +17,7 @@ createRoot(document.getElementById('root')).render(<AgentHarnessButtons cwd="/pr
     name: 'skill-library-fixture', resolveId(id) { if (id === 'virtual:skill-library.tsx') return id; if (id.endsWith('.css')) return 'virtual:style' }, load(id) { if (id === 'virtual:skill-library.tsx') return source; if (id === 'virtual:style') return '' },
   }] })
   const chunk = bundle.output.find(item => item.type === 'chunk')!
-  const content = (await Promise.all(['src/components/skill-library-manager.tsx', 'src/components/agent-harness-modal.tsx', 'packages/ui/src/select-field.tsx'].map(file => fs.readFile(path.join(root, file), 'utf8')))).join('\n')
+  const content = (await Promise.all(['src/components/skill-library-manager.tsx', 'src/components/mcp-manager.tsx', 'src/components/agent-harness-modal.tsx', 'packages/ui/src/select-field.tsx'].map(file => fs.readFile(path.join(root, file), 'utf8')))).join('\n')
   const compiler = await compile(await fs.readFile(`${root}/src/index.css`, 'utf8'), { base: `${root}/src`, onDependency() {} })
   const css = compiler.build([...new Set((source + content).match(/[A-Za-z0-9_@!:/.[\]()%,-]+/g))])
   const browser = await connectTestBrowser()
@@ -68,6 +68,7 @@ createRoot(document.getElementById('root')).render(<AgentHarnessButtons cwd="/pr
           return route.fulfill({ json: inventory })
         }
         if (url.pathname === '/api/agent/harness') return route.fulfill({ json: { scopes: [], agents: [], items: [], locations: [], warnings: [] } })
+        if (url.pathname === '/api/agent/mcp-management') return route.fulfill({ json: { canManage: true, revision: { registry: '', common: '', project: '' }, projectRoot: '/project', servers: [], groups: [], cloudflare: { url: 'https://mcp.cloudflare.com/mcp', existingUnified: null, suggestedName: 'cloudflare', candidates: [] } } })
         return route.fulfill({ contentType: 'text/html', body: `<!doctype html><html class="${width >= 768 ? 'dark' : ''}" lang="ko"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}html,body{margin:0}</style><div id="root"></div><script src="/app.js"></script></html>` })
       })
       const choose = async (label: string, option: string) => {
@@ -174,7 +175,7 @@ createRoot(document.getElementById('root')).render(<AgentHarnessButtons cwd="/pr
       await page.screenshot({ path: `/tmp/mew-skill-library-review/library-${width}.png` })
       assert.equal(await page.getByRole('dialog').evaluate(el => el.ownerDocument.documentElement.scrollWidth <= el.ownerDocument.defaultView!.innerWidth), true)
       await page.getByRole('button', { name: 'MCP', exact: true }).click()
-      await page.getByLabel('확장 검색').waitFor()
+      await page.getByLabel('연결 검색').waitFor()
       await page.getByRole('button', { name: 'Skills', exact: true }).click()
       await page.getByRole('button', { name: 'my-check', exact: true }).waitFor()
       await page.getByRole('button', { name: '닫기', exact: true }).focus()

@@ -5,6 +5,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import { DATA_DIR } from './dataDir.ts'
 import { parseConfig } from './harness-config.ts'
+import { projectSettingsRoot } from './project-settings-root.ts'
 import { readAgentSettings } from './agentSettings.ts'
 import type { SkillImportCandidate, SkillLibraryDetail, SkillLibraryInventory, SkillLibraryItem, SkillLibraryMutation, SkillScope } from '../shared/skill-library.ts'
 
@@ -110,14 +111,8 @@ function snapshot(entry: { path: string; directory?: string }): Snapshot {
 
 /** Resolve a project boundary without scanning child or sibling projects. */
 export function skillProjectRoot(cwd: string): string {
-  const root = path.resolve(cwd)
-  if (!fs.statSync(root).isDirectory()) throw new SkillLibraryError('프로젝트 폴더를 찾을 수 없습니다')
-  let current = root
-  while (true) {
-    if (exists(path.join(current, '.mew')) || exists(path.join(current, '.git'))) return current
-    if (path.dirname(current) === current) return root
-    current = path.dirname(current)
-  }
+  try { return projectSettingsRoot(cwd) }
+  catch { throw new SkillLibraryError('프로젝트 폴더를 찾을 수 없습니다') }
 }
 
 /** Mew owns these registrations and never edits a runtime's native skill tree. */

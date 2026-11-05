@@ -1,6 +1,7 @@
 import { AGENT_ACCOUNT_ENV, agentSettingsAccount, runWithAgentAccount } from './agent-account-settings.ts'
 import { sharedMcpDirectory, sharedMcpServers } from './shared-mcp.ts'
 import { sharedMcpAuthStatus } from './shared-mcp-oauth.ts'
+import { resolveMcpUsage } from './mcp-management.ts'
 import { HistoryIndex, validHistoryDetailsRequest, type HistoryRequest, type HistoryPage, type HistoryPosition, type HistoryDetailsRequest, type HistoryDetails, type HistoryWorkPending } from '../shared/agent-history.ts'
 import { agentDisplayEvent, compactHistoryWork } from '../shared/agent-display.ts'
 import { randomUUID } from 'node:crypto'
@@ -539,8 +540,9 @@ export class AgentSession {
 
   #sessionMcpServers(): McpServer[] {
     const directory = sharedMcpDirectory()
+    const usage = resolveMcpUsage(this.cwd, directory)
     return runWithAgentAccount(this.#account, () => [
-      ...sharedMcpServers(directory, name => sharedMcpAuthStatus(directory, name).status === 'connected'),
+      ...sharedMcpServers(directory, name => sharedMcpAuthStatus(directory, name).status === 'connected', usage.include),
       ...this.#mcpServers,
     ])
   }

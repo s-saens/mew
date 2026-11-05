@@ -132,14 +132,12 @@ export class SharedMcpConnections {
       if (job.active) this.valid(job)
       if (job.active) return this.state(job, owner)
     }
-    if (config.enabled === false) return { name, status: 'disconnected' }
     const status = await this.deps.authStatus(directory, name)
     if (job?.state.status === 'error' && status.status !== 'connected' && this.deps.identity(config) === job.identity) return this.state(job, owner)
     return { name, ...status }
   }
   start(owner: string, value: unknown, authorized: () => boolean): SharedMcpConnectionStatus {
     const name = this.name(value), { directory, config } = this.config(owner, name)
-    if (config.enabled === false) throw new SharedMcpConnectionError('이 MCP를 활성화한 뒤 연결하세요.', 409)
     if (!authorized()) throw new SharedMcpConnectionError('에이전트 접근 권한이 없습니다.', 403)
     const existing = this.jobs.get(this.key(owner, name))
     if (existing?.active && this.valid(existing)) return this.state(existing, owner)
@@ -174,7 +172,7 @@ export class SharedMcpConnections {
     let valid = false
     try {
       const config = this.deps.config(job.directory, job.name)
-      valid = job.authorized() && this.deps.accountVersion(job.owner) === job.accountVersion && config.enabled !== false && this.deps.identity(config) === job.identity
+      valid = job.authorized() && this.deps.accountVersion(job.owner) === job.accountVersion && this.deps.identity(config) === job.identity
     } catch { /* Removed configuration and revoked accounts invalidate pending authorization. */ }
     if (!valid) void this.finish(job, { name: job.name, status: 'disconnected' })
     return valid

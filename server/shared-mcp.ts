@@ -119,14 +119,18 @@ export function sharedMcpRuntimeName(name: string): string {
   return `mew_${name.replace(/[^A-Za-z0-9_]/g, '_').slice(0, 42)}_${createHash('sha256').update(name).digest('hex').slice(0, 8)}`
 }
 
-export function sharedMcpServers(directory = sharedMcpDirectory(), include: (name: string) => boolean = () => true): McpServer[] {
+export function sharedMcpServers(
+  directory = sharedMcpDirectory(),
+  include: (name: string) => boolean = () => true,
+  enabled: (name: string, config: SharedMcpConfig) => boolean = (_name, config) => config.enabled !== false,
+): McpServer[] {
   const file = path.join(directory, SHARED_MCP_FILE)
   if (!fs.existsSync(file)) return []
   if (fs.statSync(file).size > MAX_CONFIG_BYTES) throw new Error('Mew 공통 MCP 설정 파일이 너무 큽니다')
   const servers = atKeys(parseConfig(fs.readFileSync(file, 'utf8'), 'json'), ['mcpServers'])
   return Object.keys(servers).sort().flatMap(name => {
     const config = normalizeSharedMcpConfig(servers[name])
-    if (config.enabled === false || !include(name)) return []
+    if (!enabled(name, config) || !include(name)) return []
     return [{ name: sharedMcpRuntimeName(name), command: process.execPath,
       args: [fileURLToPath(new URL('./shared-mcp-stdio.ts', import.meta.url)), directory, name], env: [] }]
   })

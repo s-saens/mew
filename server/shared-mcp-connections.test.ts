@@ -169,16 +169,29 @@ test('disconnect clears only the selected fixture registry and prevents a late c
   assert.equal(f.closedBrowser.length, 1)
 })
 
-test('changed config and disabled definitions invalidate pending authorization', async t => {
-  for (const change of [{ url: 'https://different.example.test/mcp', type: 'http' as const }, { enabled: false }]) {
-    const f = fixture(t)
-    f.start(); await f.waiting()
-    f.configs.set('alice', { ...f.configs.get('alice')!, ...change })
-    await until(async () => (await f.status()).status === 'disconnected')
-    assert.equal(f.options().signal.aborted, true)
-    assert.equal(f.saved.size, 0)
-    assert.equal(f.closedBrowser.length, 1)
-  }
+test('changed connection identity invalidates pending authorization', async t => {
+  const f = fixture(t)
+  f.start(); await f.waiting()
+  f.configs.set('alice', { ...f.configs.get('alice')!, url: 'https://different.example.test/mcp' })
+  await until(async () => (await f.status()).status === 'disconnected')
+  assert.equal(f.options().signal.aborted, true)
+  assert.equal(f.saved.size, 0)
+  assert.equal(f.closedBrowser.length, 1)
+})
+
+test('usage changes preserve pending approval and saved authentication', async t => {
+  const f = fixture(t)
+  f.start(); await f.waiting()
+  f.configs.set('alice', { ...f.configs.get('alice')!, enabled: false })
+  await delay(20)
+  assert.equal((await f.status()).status, 'needs_auth')
+  assert.equal(f.options().signal.aborted, false)
+  const callback = new URL(f.options().redirectUrl)
+  callback.search = '?state=private-state&code=private-authorization-code'
+  assert.equal((await fetch(callback)).status, 200)
+  await until(async () => (await f.status()).status === 'connected')
+  assert.equal(f.saved.size, 1)
+  assert.deepEqual(f.cleared, [])
 })
 
 test('logout, access revocation and account replacement cancel pending authorization', async t => {
@@ -226,14 +239,22 @@ test('a connection factory completing after cancellation cannot leave a transpor
   assert.equal((await f.status()).status, 'disconnected')
 })
 
-test('invalid and disabled names fail before a process or browser is started', async t => {
+test('invalid names and missing access fail before a process or browser is started', async t => {
   const f = fixture(t)
   for (const name of [undefined, {}, [], '', '\u0000', 'x'.repeat(257)]) assert.throws(() => f.store.start('alice', name, () => true))
   assert.throws(() => f.store.start('', 'cloudflare', () => true))
   assert.throws(() => f.store.start('alice', 'cloudflare', () => false), /권한/)
-  f.configs.set('alice', { command: 'never-executed', enabled: false })
-  assert.throws(() => f.start(), /활성화/)
   assert.equal(f.checks(), 0)
+  assert.deepEqual(f.openedBrowser, [])
+})
+
+test('owners can prepare authentication while a server is off by default', async t => {
+  const f = fixture(t)
+  f.configs.set('alice', { command: 'fixture-only', enabled: false })
+  f.publicServer()
+  f.start()
+  await until(async () => (await f.status()).status === 'connected')
+  assert.equal(f.checks(), 1)
   assert.deepEqual(f.openedBrowser, [])
 })
 

@@ -1,9 +1,9 @@
 ---
 title: "Agent session and communication contract"
-description: "Runtime sessions, recovery, real-time account agent and terminal tabs, agent-assisted projects, Git AI Commit, CLI, memory, history, and installation-wide MCP bindings. Guidance storage, presets, and project-context delivery are maintained in the linked agent guidance contract."
-updated: "2026-11-04"
+description: "Runtime sessions, recovery, real-time account agent and terminal tabs, agent-assisted projects, Git AI Commit, CLI, memory, history, and MCP bindings selected by scoped usage and saved readiness. Guidance storage, presets, and project-context delivery belong to the linked agent guidance contract."
+updated: "2026-11-05"
 상위파일:
-  - "../MOC.md"
+  - "../_docs.md"
   - "MOC.md"
 ---
 [Installation and execution](../../../docs/guides/getting-started-ko.md)
@@ -186,7 +186,7 @@ URL events are resent only to a reconnected authentication screen. On success, f
 
 ## Mew Common MCP
 
-Installation-wide [Mew common MCP](shared-mcp.md) definitions are read from the shared registry and combined with the caller's built-in MCP list for every session/new and session/load. Common definitions apply to regular, scheduled, and helper ACP sessions. Starting or clearing a conversation or loading a saved one refreshes the common list; reconnecting the active conversation keeps its existing bindings. Native CLI configurations remain independent.
+Installation-wide [Mew common MCP](shared-mcp.md) definitions are read from the shared registry for every session/new and session/load. The [grouped management selector](mcp-management.md) resolves common/project server usage and group gates, then saved readiness selects connected definitions without a network check. Selected definitions combine with the caller's built-in MCP list for regular, scheduled, and helper ACP sessions. Starting or clearing a conversation or loading a saved one refreshes the common list; reconnecting the active conversation keeps its existing bindings. Native CLI configurations remain independent.
 
 ## Agent Debugger MCP
 

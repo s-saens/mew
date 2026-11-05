@@ -1,11 +1,13 @@
 ---
 title: "Mew common MCP connections"
-description: "Defines installation-wide common MCP registration, connection-ready ACP injection, stdio forwarding, shared OAuth storage and refresh coordination, connection jobs, actionable sign-in recovery, startup diagnostics, permissions, and verification boundaries."
+description: "Defines installation-wide MCP definitions, saved readiness, ACP injection, stdio forwarding, and shared OAuth storage and connection jobs. Links service groups and common/project usage, which remain separate from authentication."
 created: "2026-11-02"
-updated: "2026-11-04"
+updated: "2026-11-05"
 ---
 
 Mew common MCP lets an owner register and authorize a server once for all accounts with agent access on the same Mew installation. [The user guide](../../../docs/configuration/agent-harness.md#mew-common-mcp) owns everyday controls. [ADR 0127](../decisions/0127-installation-wide-mcp.md) records installation-wide sharing and supersedes the account-private ownership in [ADR 0120](../decisions/0120-shared-mcp.md).
+
+[Grouped management](mcp-management.md) owns service membership and common/project usage under [ADR 0141](../decisions/0141-grouped-mcp-management.md). These preferences govern session selection without rewriting connection settings or clearing authentication.
 
 ## Definitions and ownership
 
@@ -13,13 +15,13 @@ Mew common MCP lets an owner register and authorize a server once for all accoun
 
 Existing account-private registries and credentials remain at their original paths and are not automatically merged, exposed, or used as a fallback. An owner must explicitly register or import a definition into the installation registry. This preserves the previous private data without silently broadening its audience.
 
-Definitions support a local `command`, string-array `args`, optional absolute `cwd`, and string-map `env`, or a remote HTTPS URL with `type: "http"` or `"sse"`, optional string-map `headers` and `env`, and optional OAuth `scope`, `client_id`, and `client_secret`. HTTP is allowed only on loopback. `enabled: false` prevents injection and connection checks. URL credentials, fragments, malformed headers, and unsupported provider-specific execution or tool-filter settings are rejected. Environment references use `${NAME}` and fail explicitly when the required variable is missing. Raw definitions and credentials remain out of inventory summaries and browser persistence.
+Definitions support a local `command`, string-array `args`, optional absolute `cwd`, and string-map `env`, or a remote HTTPS URL with `type: "http"` or `"sse"`, optional string-map `headers` and `env`, and optional OAuth `scope`, `client_id`, and `client_secret`. HTTP is allowed only on loopback. The source `enabled` field supplies the common usage default; explicit management preferences can override it. Authentication can be prepared while usage is off. URL credentials, fragments, malformed headers, and unsupported provider-specific execution or tool-filter settings are rejected. Environment references use `${NAME}` and fail explicitly when the required variable is missing. Raw definitions and credentials remain out of inventory summaries and browser persistence.
 
 The source manager converts supported Claude, Codex, OpenCode, and other discovered definitions to this format when **Import to Mew** is selected. For local imports it captures the source project working folder. It copies only referenced source-runtime environment values into the installation common definition, so a token configured only for Claude or Codex remains available in the other runtimes. Unrelated runtime environment values are excluded, and unresolved references fail before writing. It preserves the original configuration and never imports another CLI's private OAuth tokens. Native source editing and import conflict rules follow [the harness contract](agent-harness.md). Unsupported fields require the user to create an explicit common definition rather than silently losing behavior.
 
 ## Runtime application
 
-`AgentSession` reads the installation's enabled definitions for each session/new and session/load request and includes only those whose saved connection status is `connected`. Definitions awaiting login, disconnected definitions, and definitions with a saved connection error remain registered in management but are excluded from ACP startup. Owners must first complete **Connect**, including for local and unauthenticated remote servers. This prevents an unapproved common MCP from blocking a runtime that requires every injected server to initialize. [ADR 0128](../decisions/0128-shared-mcp-readiness.md) records the readiness policy.
+`AgentSession` resolves common/project server usage and group gates for each session/new and session/load request, then includes only selected definitions whose saved connection status is `connected`. Definitions awaiting login, disconnected definitions, and definitions with a saved connection error remain registered in management but are excluded from ACP startup. Owners must first complete **Connect**, including for local and unauthenticated remote servers. This prevents an unapproved common MCP from blocking a runtime that requires every injected server to initialize. [ADR 0128](../decisions/0128-shared-mcp-readiness.md) records the readiness policy.
 
 The selected common definitions are combined with existing debugger or Mewpet MCP bindings, which retain their own selection rules. Each definition becomes a local stdio binding to `shared-mcp-stdio.ts`, with only its private registry directory and name in the arguments. A stable `mew_<name>_<hash>` namespace avoids collisions with native server names and sanitized names. Existing native definitions can still load independently; importing does not disable them.
 
@@ -35,7 +37,7 @@ Each bridge reads the same installation credential cache. A bounded process-shar
 
 Codex ACP MCP startup diagnostics do not create assistant reply bubbles. The [conversation display contract](conversation-storage.md#display-tool-events) preserves their original records while excluding them from rendered turns. This does not suppress real MCP tool activity or change connection management.
 
-Connection status records the latest successful check or authentication requirement; it is not continuous server health monitoring. **Connect** checks the MCP initialization handshake. **Disconnect** cancels a pending job and clears saved credentials. It does not disable the definition, remove native CLI registrations, or revoke a provider grant remotely. An existing request may finish before credential invalidation is observed.
+Connection status records the latest successful check or authentication requirement; it is not continuous server health monitoring. **Connect** checks the MCP initialization handshake. **Log out** in grouped management, or **Disconnect** in the external source editor, cancels a pending job and clears saved credentials. Turning usage off preserves credentials and pending approval. Logout does not disable the definition, remove native CLI registrations, or revoke a provider grant remotely. An existing request may finish before credential invalidation is observed.
 
 Readiness selection uses this saved status without opening a network connection during session creation. A previously connected server can still fail if its upstream becomes unavailable; real initialization errors remain visible. Connection changes apply on a new conversation, clear, or saved conversation load, rather than rewriting an active conversation's tools. Local regression evidence is recorded in the [readiness work record](../work/shared-mcp-readiness.md).
 

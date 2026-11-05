@@ -2,27 +2,27 @@
 title: "Skills and MCP Management"
 created: 2026-09-17
 updated: "2026-11-05"
-description: "Manage one effective skill per name in common/project libraries, turn workflows on or off, import external originals safely, and remove or restore defaults. Also covers unchanged installation-wide common MCP connections and native MCP source editing."
+description: "Manage common/project skills and grouped MCP connections with separate usage and authentication. Covers service groups, project overrides, safe Cloudflare consolidation, preserved external sources, imports, and removable skill defaults."
 상위파일: "MOC.md"
 ---
 
-Decisions: [Managed skill library](../../.mew/docs/decisions/0140-managed-skill-library.md) and [native MCP sources](../../.mew/docs/history/decisions/0157-mew-native-agent-harness-management.md).
+Decisions: [Managed skill library](../../.mew/docs/decisions/0140-managed-skill-library.md), [grouped MCP management](../../.mew/docs/decisions/0141-grouped-mcp-management.md), and [native MCP sources](../../.mew/docs/history/decisions/0157-mew-native-agent-harness-management.md).
 
 ## Mew common MCP
 
-Use **Agent panel → Manage MCP → Add → Mew shared** as an owner to register a server for this Mew installation. Enter its name and HTTPS server URL, then save. Use **Configure with JSON** for local commands, environment variables, headers, SSE, or OAuth options. Select the saved server and choose **Connect**, or **Log in** when its saved state says that sign-in is required. If approval is required, complete it in the host login screen displayed inside Mew.
+Use **Agent panel → Manage MCP → Add connection** as an owner. Choose **Common** or **This project**, enter a name and HTTPS server URL, then save. Use **Configure with JSON** for local commands, environment variables, headers, SSE, or OAuth options. A new project-only connection starts off in other projects. Select the saved server and choose **Connect**, or **Log in** when its saved state requires sign-in. Complete any approval in the host login screen displayed inside Mew.
 
-Enabled common servers enter Mew ACP conversations only when their saved connection state is **Connected**. An owner must select **Connect** and complete any required login before first use, including for local commands and remote servers that need no login. Registration alone leaves the server in the management list without adding it to a conversation.
+Servers enter Mew ACP conversations when their project-effective usage and group gate are on and their saved connection state is **Connected**. An owner must select **Connect** and complete any required login before first use, including for local commands and remote servers that need no login. Registration alone leaves the server in the management list without adding it to a conversation. You can prepare authentication while usage is off.
 
 After connection succeeds, start or clear a conversation, or load a saved one, to use the current connected common list. The same common connection and saved authentication are available to every account with agent access across runtimes and projects. An active conversation retains its existing bindings; reconnecting it does not refresh the list. CLIs launched outside Mew retain their own configuration.
 
-To reuse a server already registered in Claude, Codex, or another supported source, select it and choose **Import to Mew**. Mew converts the supported configuration and preserves the source. A name collision or unsupported setting produces an error without overwriting the original. For unsupported native options, explicitly prepare a common definition with the intended supported behavior instead of silently dropping settings. Native OAuth tokens are not copied, so the first common connection may require a fresh approval. Imported native definitions can still load independently until you disable them in their owning runtime.
+To reuse a server already registered in Claude, Codex, or another supported source, open **External connections**, select it, and choose **Import to Mew**. Mew converts the supported configuration and preserves the source. A name collision or unsupported setting produces an error without overwriting the original. For unsupported native options, explicitly prepare a common definition with the intended supported behavior instead of silently dropping settings. Native OAuth tokens are not copied, so the first common connection may require a fresh approval. Imported native definitions can still load independently until you disable them in their owning runtime.
 
-The connection controls show the last checked state, allow retry, and cancel pending login. Closing a pending login cancels its job while preserving saved credentials. **Disconnect** clears the common connection's saved authentication; it does not remove the definition or revoke the provider's grant. The host login screen requires Linux/WSL with the existing Chrome and login-desktop dependencies. Local and unauthenticated remote servers can connect without that screen.
+The connection controls show the last checked state, allow retry, and cancel pending login. Closing a pending login cancels its job while preserving saved credentials. Usage switches preserve authentication. **Log out** clears the common connection's saved authentication; the external editor calls this action **Disconnect**. It does not remove the definition or revoke the provider's grant. The host login screen requires Linux/WSL with the existing Chrome and login-desktop dependencies. Local and unauthenticated remote servers can connect without that screen.
 
 **Connected** records saved readiness, not continuous server health; a later outage or expired authorization can still fail a runtime connection. If a server needs login, an owner must reconnect it before starting, clearing, or loading a conversation to add it again.
 
-Mew common definitions and credentials are private server data shared by all accounts on this installation. Accounts with agent access can list and use them; owners with agent access manage definitions, imports, raw configuration, and authentication. Disconnecting clears authentication for every account using that connection. Deleting an account preserves shared connections. Previous account-private registries are retained without automatic promotion; an owner must explicitly register or import a shared definition. See the [common MCP contract](../../.mew/docs/development/shared-mcp.md), [ADR 0127](../../.mew/docs/decisions/0127-installation-wide-mcp.md), and the [connection-readiness decision](../../.mew/docs/decisions/0128-shared-mcp-readiness.md).
+Mew common definitions and credentials are private server data shared by all accounts on this installation. Accounts with agent access can list and use them and change project usage. Owners with agent access manage common usage, groups, definitions, imports, raw configuration, and authentication. Logging out clears authentication for every account using that connection. Deleting an account preserves shared connections. Previous account-private registries are retained without automatic promotion; an owner must explicitly register or import a shared definition. See the [grouped management contract](../../.mew/docs/development/mcp-management.md), [common MCP contract](../../.mew/docs/development/shared-mcp.md), and [connection-readiness decision](../../.mew/docs/decisions/0128-shared-mcp-readiness.md).
 
 ## Usage
 
@@ -44,7 +44,16 @@ Changes enter the catalog supplied with the next agent request, including queued
 
 ### MCP
 
-MCP retains its source management interface: installation-wide **Mew common**, global native settings, the current project, and subprojects. Filter by scope and agent or search by name. Source details identify the runtime, path, and read-only reason. Common MCP connection behavior follows the section above.
+The main list groups registered connections by service. Expand a group to see its servers, individual usage, and saved connection states. The group count shows how many members are in use; it is not a live health count. Search by connection or group name.
+
+- Choose **Common** to change the installation default, or **This project** to override usage for the current project. **Use common setting** clears a project override.
+- Turn a group off to stop selecting its members while retaining their individual choices. Turning it back on restores those choices. Authentication remains saved.
+- Owners can add a group, rename it, or assign connections to it. Removing a group preserves its connections and authentication and lets individual usage choices apply. Group membership is shared; the scope selector controls usage.
+- Official Cloudflare endpoints are suggested as one Cloudflare group. You can assign a connection to another group or leave it ungrouped.
+
+**Cloudflare API** offers an explicit transition to `https://mcp.cloudflare.com/mcp`. Add or select the unified connection first, connect it, and verify that it exposes the tools and account permissions you need. Return to the helper to select dedicated Mew connections to turn off in the chosen scope. Retirement controls require the unified connection's saved **Connected** state. Existing definitions, authentication, and external originals remain. Specialized servers may still be useful for workflows outside the unified API; Mew does not retire them automatically.
+
+Open **External connections** for installation-wide raw settings, global native settings, the current project, and subprojects. Filter by scope and agent or search by name. Source details identify the runtime, path, and read-only reason. These native definitions may load independently of Mew group switches.
 
 Use **Add**, **Edit**, **Move**, or **Delete** for a supported native server configuration. Moves remain within the same runtime. Delete removes one server entry after confirmation. Package and symbolic-link sources are read-only. Native source editing does not connect servers or restart sessions.
 
@@ -52,7 +61,7 @@ Use **Add**, **Edit**, **Move**, or **Delete** for a supported native server con
 
 Scope controls use the shared keyboard/touch selection component. Unsaved edits require a discard decision before navigating or closing. Failed saves preserve the draft; stale revisions and destination collisions preserve existing files. On mobile, use **Back to list** to leave details. Esc and Back dismiss the current selection popup before the management dialog.
 
-Common skills and native global settings belong to the server OS user and are shared by Mew accounts. The APIs require the existing `agent` permission. Installation-wide common MCP additionally requires owner access for management. See the [access contract](../../.mew/docs/development/access-control.md).
+Common skills and native global settings belong to the server OS user and are shared by Mew accounts. The APIs require the existing `agent` permission. Shared MCP management requires owner access; project MCP usage is available to agent-enabled accounts. See the [access contract](../../.mew/docs/development/access-control.md).
 
 To generate sprites with a local model, optionally [connect the separate project's local-sprites MCP](local-sprites.md). Its generation code, models, and Python dependencies are not included in Mew.
 
@@ -143,8 +152,10 @@ Existing `.kimi/mcp.json` and `~/.gemini/antigravity/mcp_config.json` are also d
 
 ## Saving and Applying
 
-The management window checks the existing original's syntax, external changes, and move conflicts, preserving the original text on failure. Native source editing does not connect MCP servers or restart sessions, so check the relevant runtime's application and trust settings. Mew common MCP has explicit connection and authentication controls described above. Skill resolution and management follow the [skill library contract](../../.mew/docs/development/skill-library.md); native MCP saving follows the [harness contract](../../.mew/docs/development/agent-harness.md).
+The management window checks existing revisions and conflicts, preserving drafts on failure. Native source editing also checks syntax and move conflicts. It does not connect MCP servers or restart sessions, so check the relevant runtime's application and trust settings. Mew common MCP has explicit connection and authentication controls described above. Skill resolution follows the [skill library contract](../../.mew/docs/development/skill-library.md); groups and usage follow the [MCP management contract](../../.mew/docs/development/mcp-management.md); native saving follows the [harness contract](../../.mew/docs/development/agent-harness.md).
 
 ## Sources
+
+The unified API endpoint and dedicated server roles follow [Cloudflare's official MCP server documentation](https://developers.cloudflare.com/agents/model-context-protocol/cloudflare/servers-for-cloudflare/).
 
 Configuration locations and formats were checked against official documentation and source code for [Codex MCP](https://developers.openai.com/codex/mcp/), [Claude MCP](https://code.claude.com/docs/en/mcp), [Claude skills](https://code.claude.com/docs/en/skills), [Cursor skills](https://cursor.com/docs/skills), [Cursor MCP](https://cursor.com/docs/mcp), [OpenCode skills](https://opencode.ai/docs/skills/), [OpenCode MCP](https://opencode.ai/docs/mcp-servers/), [Kimi configuration](https://www.kimi.com/code/docs/en/kimi-code-cli/configuration/config-files), [Prime skills](https://github.com/PrimeIntellect-ai/prime-agent/blob/main/packages/coding-agent/docs/skills.md), [Prime MCP](https://github.com/PrimeIntellect-ai/prime-agent/blob/main/packages/coding-agent/README.md#mcp-integrations), [Hermes MCP](https://hermes-agent.nousresearch.com/docs/user-guide/features/mcp/), [OpenClaw skills](https://docs.openclaw.ai/tools/skills), [OpenClaw MCP](https://docs.openclaw.ai/tools/mcp), and [Antigravity MCP](https://antigravity.google/docs/cli/mcp/).

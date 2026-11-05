@@ -45,7 +45,6 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   if (!directory || !name) process.exit(1)
   try {
     const config = readSharedMcpConfig(directory, name)
-    if (config.enabled === false) throw new Error('MCP is disabled.')
     const transport = config.command ? createSharedMcpLocalTransport(config) : undefined
     const connection = transport ? { transport, close: () => transport.close() } : createSharedMcpConnection(directory, name)
     const close = await relaySharedMcp(new StdioServerTransport(), connection.transport)

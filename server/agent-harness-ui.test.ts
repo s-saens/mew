@@ -11,8 +11,9 @@ const root = path.resolve(import.meta.dirname, '..')
 test('native MCP popup supports scope filtering, protected drafts, editing, moves and deletion on desktop/mobile', { timeout: 45000 }, async () => {
   const source = `import React from '${root}/node_modules/react/index.js';
 import {createRoot} from '${root}/node_modules/react-dom/client.js';
-import {AgentHarnessButtons} from '${root}/src/components/agent-harness-modal.tsx';
-createRoot(document.getElementById('root')).render(<div className="flex"><button aria-label="세션 정보">i</button><AgentHarnessButtons cwd="/project"/></div>);`
+import {NativeHarnessModal} from '${root}/src/components/agent-harness-modal.tsx';
+function Fixture(){const [open,setOpen]=React.useState(false);return <><button aria-label="MCP 관리" onClick={()=>setOpen(true)}>MCP</button>{open&&<NativeHarnessModal cwd="/project" onClose={()=>setOpen(false)} onSwitchSkills={()=>{}}/>}</>}
+createRoot(document.getElementById('root')).render(<div className="flex"><button aria-label="세션 정보">i</button><Fixture/></div>);`
   const bundle = await build({ input: 'virtual:harness.tsx', write: false, platform: 'browser', onLog(level, log, defaultHandler) { if (log.code !== 'MODULE_LEVEL_DIRECTIVE') defaultHandler(level, log) }, output: { format: 'iife' }, transform: { jsx: 'react-jsx', define: { 'process.env.NODE_ENV': JSON.stringify('test') } }, plugins: [{
     name: 'harness-fixture', resolveId(id) { if (id === 'virtual:harness.tsx') return id; if (id.endsWith('.css')) return 'virtual:style' }, load(id) { if (id === 'virtual:harness.tsx') return source; if (id === 'virtual:style') return '' },
   }] })
@@ -207,8 +208,9 @@ createRoot(document.getElementById('root')).render(<div className="flex"><button
 test('Mew shared MCP defaults, credential-free import and connection lifecycle work on desktop/mobile', { timeout: 60000 }, async () => {
   const source = `import React from '${root}/node_modules/react/index.js';
 import {createRoot} from '${root}/node_modules/react-dom/client.js';
-import {AgentHarnessButtons} from '${root}/src/components/agent-harness-modal.tsx';
-createRoot(document.getElementById('root')).render(<AgentHarnessButtons cwd="/project"/>);`
+import {NativeHarnessModal} from '${root}/src/components/agent-harness-modal.tsx';
+function Fixture(){const [open,setOpen]=React.useState(false);return <><button aria-label="MCP 관리" onClick={()=>setOpen(true)}>MCP</button>{open&&<NativeHarnessModal cwd="/project" onClose={()=>setOpen(false)} onSwitchSkills={()=>{}}/>}</>}
+createRoot(document.getElementById('root')).render(<Fixture/>);`
   const bundle = await build({ input: 'virtual:shared-harness.tsx', write: false, platform: 'browser', onLog(level, log, handler) { if (log.code !== 'MODULE_LEVEL_DIRECTIVE') handler(level, log) }, output: { format: 'iife' }, transform: { jsx: 'react-jsx', define: { 'process.env.NODE_ENV': JSON.stringify('test') } }, plugins: [{
     name: 'shared-harness-fixture',
     resolveId(id) {

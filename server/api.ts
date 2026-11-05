@@ -107,6 +107,7 @@ import { listSkills } from './skills.ts'
 import { createAgentHarnessRouter } from './agent-harness-routes.ts'
 import { createSkillLibraryRouter } from './skill-library-routes.ts'
 import { createSharedMcpRouter } from './shared-mcp-routes.ts'
+import { createMcpManagementRouter } from './mcp-management-routes.ts'
 import { createAgentDrawingsRouter } from './agent-drawings.ts'
 import { readCrontab } from './crontab.ts'
 import { agentCommand, jobCwd, jobSessionName, jobViews, otherLines, readJobs, saveSchedules, ScheduleError } from './schedules.ts'
@@ -2373,6 +2374,7 @@ export function createApiApp() {
   app.use('/agent/harness', createAgentHarnessRouter())
   app.use('/agent/skill-library', createSkillLibraryRouter())
   app.use('/agent/mcp', createSharedMcpRouter())
+  app.use('/agent/mcp-management', createMcpManagementRouter())
 
   // 호스트 자원 현황(프로파일링 팝업) — 서버가 도는 기계의 정보라 셸과 같은 역할로 묶는다
   app.get('/system-stats', requireFeature('system'), async (req, res) => {

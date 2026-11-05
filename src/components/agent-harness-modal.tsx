@@ -3,11 +3,13 @@ import { uiText } from '@mew/ui/i18n-core'
 import { useUiLocale } from '@mew/ui/i18n'
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { BookStack, PlugTypeA, Xmark, RefreshDouble, Plus, NavArrowRight } from 'iconoir-react'
+import { ArrowLeft, BookStack, PlugTypeA, Xmark, RefreshDouble, Plus, NavArrowRight } from 'iconoir-react'
 import { SelectField, useOverlayDismiss } from '@mew/ui'
 import { fetchHarness, fetchHarnessDetail, mutateHarness } from '../api/agent-harness'
 import { SharedMcpConnection } from './shared-mcp-connection'
 import { SkillLibraryManager } from './skill-library-manager'
+import { McpManager } from './mcp-manager'
+import { mcpManagerCopy } from './mcp-manager-copy'
 import type { HarnessDetail, HarnessInventory, HarnessItem, HarnessKind, HarnessLocation, HarnessMutation } from '../../shared/agent-harness'
 
 const button = 'inline-flex min-h-9 items-center justify-center gap-1.5 rounded px-3 text-xs text-ink-secondary hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-40'
@@ -28,13 +30,15 @@ export function AgentHarnessButtons({ cwd }: { cwd: string }) {
 
 export function AgentHarnessModal({ cwd, initialKind, onClose }: { cwd: string; initialKind: HarnessKind; onClose: () => void }) {
   const [kind, setKind] = useState(initialKind)
+  const [native, setNative] = useState(false)
   return kind === 'skills'
     ? <SkillLibraryManager cwd={cwd} onClose={onClose} onSwitchMcp={() => setKind('mcp')} />
-    : <NativeHarnessModal cwd={cwd} onClose={onClose} onSwitchSkills={() => setKind('skills')} />
+    : native ? <NativeHarnessModal cwd={cwd} onClose={onClose} onSwitchSkills={() => setKind('skills')} onBackToManaged={() => setNative(false)} />
+      : <McpManager cwd={cwd} onClose={onClose} onSwitchSkills={() => setKind('skills')} onOpenSources={() => setNative(true)} />
 }
 
-function NativeHarnessModal({ cwd, onClose, onSwitchSkills }: { cwd: string; onClose: () => void; onSwitchSkills: () => void }) {
-  useUiLocale()
+export function NativeHarnessModal({ cwd, onClose, onSwitchSkills, onBackToManaged }: { cwd: string; onClose: () => void; onSwitchSkills: () => void; onBackToManaged?: () => void }) {
+  const copy = mcpManagerCopy[useUiLocale()]
   const kind = 'mcp' as const
   const [inventory, setInventory] = useState<HarnessInventory | null>(null)
   const canManageSharedMcp = inventory?.canManageSharedMcp === true
@@ -149,7 +153,8 @@ function NativeHarnessModal({ cwd, onClose, onSwitchSkills }: { cwd: string; onC
       else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus() }
     }}>
       <header inert={confirmation ? true : undefined} className="flex shrink-0 items-center gap-3 border-b border-edge px-3 py-2 sm:px-5">
-        <h2 className="text-sm font-semibold">{uiText("에이전트 확장")}</h2>
+        {onBackToManaged && <button type="button" className={`${button} px-2`} aria-label={uiText("목록으로")} data-tip={uiText("목록으로")} onClick={() => guarded(onBackToManaged)}><ArrowLeft width={16} height={16} aria-hidden /></button>}
+        <h2 className={`${onBackToManaged ? 'sr-only sm:not-sr-only' : ''} text-sm font-semibold`}>{uiText("에이전트 확장")}</h2>
         <div className="flex gap-1" role="group" aria-label={uiText("확장 종류")}>
           {(['skills', 'mcp'] as const).map(value => <button key={value} type="button" aria-pressed={kind === value} onClick={() => { if (value === 'skills') guarded(onSwitchSkills) }} className={`${button} ${kind === value ? 'bg-surface-hover text-ink font-semibold' : ''}`}>{value === 'skills' ? 'Skills' : 'MCP'}</button>)}
         </div>
@@ -161,6 +166,7 @@ function NativeHarnessModal({ cwd, onClose, onSwitchSkills }: { cwd: string; onC
         <button ref={confirmRef} type="button" className={`${button} text-danger-strong`} onClick={() => { const action = confirmation.action; setConfirmation(null); action() }}>{confirmation.label}</button>
       </div>}
       {error && <div role="alert" className="shrink-0 border-b border-edge px-4 py-2 text-xs text-danger-strong">{error} <button type="button" className={button} disabled={busy} onClick={() => guarded(() => { reset(); setReload(value => value + 1) })}>{uiText("다시 불러오기")}</button></div>}
+      {onBackToManaged && <p className="shrink-0 border-b border-edge px-3 py-2 text-xs leading-relaxed text-ink-secondary">{copy.externalHint}</p>}
       {notice && <p role="status" className="shrink-0 border-b border-edge px-4 py-2 text-xs text-ink-secondary">{notice}</p>}
       <div className="flex min-h-0 flex-1" inert={confirmation ? true : undefined}>
         <aside className={`${showingDetail ? 'hidden md:flex' : 'flex'} min-h-0 w-full flex-col border-r border-edge md:w-80 md:shrink-0`}>

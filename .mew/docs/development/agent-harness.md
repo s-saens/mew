@@ -1,12 +1,14 @@
 ---
 title: "Skills and MCP management implementation contract"
-description: "Contracts for native MCP source editing, installation-wide common imports, atomic saves, conflicts, scope discovery, APIs, and verification. Links the managed skill library that replaces native folders as Mew's active skills."
+description: "Contracts for external/native MCP source editing, installation-wide imports, atomic saves, conflicts, discovery, APIs, and verification. Links the managed skill library and grouped MCP management that own the default management views."
 updated: "2026-11-05"
 ---
 
 ## Storage and application scope
 
 The [managed skill library](skill-library.md) owns active skills, common/project settings, source-preserving imports, and prompt application under [ADR 0140](../decisions/0140-managed-skill-library.md). The native source store retains its internal skill file utilities for compatibility tests; the public native harness route accepts MCP management only. It returns HTTP 410 for `kind=skills` so the old mutation route cannot bypass library ownership or recreate removed defaults.
+
+[Grouped MCP management](mcp-management.md) owns the default MCP list, service groups, usage preferences, scoped registration, and Cloudflare consolidation. **External connections** opens this source editor without stacking dialogs. Native scanning occurs only in that view; opening the managed list does not discover subprojects or native source trees. Editing a source remains distinct from choosing where to use a registered connection.
 
 - JSON/JSONC patches only the relevant paths, and YAML uses document node editing to preserve surrounding settings and comments. Codex TOML reserializes MCP tables and validates other setting values. Comments and formatting in the MCP section are normalized, and inline `mcp_servers = {...}` is rejected because it cannot be safely modified.
 - OpenClaw JSON5 is saved as JSON with all setting values preserved. The management dialog explains that comments and formatting are removed. JSON is valid JSON5.
