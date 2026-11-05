@@ -7,7 +7,7 @@ import { EventEmitter } from 'node:events'
 import { createHash } from 'node:crypto'
 import { gzipSync } from 'node:zlib'
 import * as tar from 'tar'
-import { runtimeTarget, checksumFor, safeArchiveEntry, prepareRuntime } from '../src/runtime.mjs'
+import { runtimeTarget, checksumFor, safeArchiveEntry, prepareRuntime, validateRuntime } from '../src/runtime.mjs'
 import { parseOptions } from '../src/options.mjs'
 import { acquireDataLock, checkLegacyInstance } from '../src/lock.mjs'
 import { runHost, runtimeEnvironment } from '../src/launcher.mjs'
@@ -56,8 +56,9 @@ async function runtimeFixture(t, platform = 'linux') {
   const dir = await directory(t), source = path.join(dir, 'source'), cacheDir = path.join(dir, 'cache')
   for (const sub of ['server', 'dist', 'bin']) await fs.mkdir(path.join(source, sub), { recursive: true })
   const target = { platform, arch: 'x64', nodeMajor: 24 }
-  await fs.writeFile(path.join(source, 'mew-runtime.json'), JSON.stringify({ version: '0.1.0', ...target, entrypoint: 'server/cli-host.js' }))
+  await fs.writeFile(path.join(source, 'mew-runtime.json'), JSON.stringify({ version: '0.1.0', ...target, entrypoint: 'server/cli-host.js', browserDependencies: 'server/browser-dependencies.js' }))
   await fs.writeFile(path.join(source, 'server/cli-host.js'), '// fixture\n')
+  await fs.writeFile(path.join(source, 'server/browser-dependencies.js'), '// fixture\n')
   await fs.writeFile(path.join(source, 'dist/index.html'), '<html></html>')
   await fs.writeFile(path.join(source, 'bin/tmux'), '#!/bin/sh\nexit 0\n', { mode: 0o755 })
   if (platform === 'win32') {
@@ -107,6 +108,20 @@ test('an incomplete cached release is reported without downloading or overwritin
   await fs.unlink(path.join(runtime, 'server/cli-host.js'))
   await assert.rejects(prepareRuntime({ ...fixture, fetchImpl: () => { throw new Error('should not download') } }), /캐시된 실행 패키지가 손상/)
   assert.ok(await fs.stat(path.join(runtime, 'dist/index.html')))
+})
+
+test('runtime validation requires the declared browser installer and its packaged file', async t => {
+  const fixture = await runtimeFixture(t)
+  const runtime = await prepareRuntime({ ...fixture, fetchImpl: async url => new Response(url.endsWith('SHA256SUMS') ? `${fixture.checksum}  ${fixture.filename}\n` : fixture.bytes) })
+  const file = path.join(runtime, 'mew-runtime.json')
+  const manifest = JSON.parse(await fs.readFile(file, 'utf8'))
+  delete manifest.browserDependencies
+  await fs.writeFile(file, JSON.stringify(manifest))
+  await assert.rejects(validateRuntime(runtime, fixture.version, fixture.target), /browserDependencies/)
+  manifest.browserDependencies = 'server/browser-dependencies.js'
+  await fs.writeFile(file, JSON.stringify(manifest))
+  await fs.unlink(path.join(runtime, manifest.browserDependencies))
+  await assert.rejects(validateRuntime(runtime, fixture.version, fixture.target), { code: 'ENOENT' })
 })
 
 test('an actual escaping tar link rejects cleanly and removes the temporary download', async t => {

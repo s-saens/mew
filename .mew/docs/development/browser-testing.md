@@ -1,6 +1,6 @@
 ---
 title: "UI browser testing with Chromium"
-description: "Defines Chromium discovery with MEW_CHROMIUM_EXECUTABLE and the shared Playwright helper for test-owned headless browsers. Separates UI automation from ordinary Google Chrome for external browsing and login, and covers cleanup and execution limits."
+description: "Defines managed Chromium prerequisites, MEW_CHROMIUM_EXECUTABLE, and the shared Playwright helper for test-owned headless browsers. Separates UI automation from ordinary Chrome, and covers cleanup and execution limits."
 created: "2026-11-04"
 updated: "2026-11-05"
 ---
@@ -8,6 +8,8 @@ updated: "2026-11-05"
 Mew's normal UI tests under `server/*-ui.test.ts` use Playwright's Chromium or an installed Chromium executable through Playwright. `server/test-browser.ts` owns the shared `connectTestBrowser()` helper. Each call launches an isolated headless browser with Chromium sandboxing enabled and a 15-second startup timeout. The caller owns the returned browser and must close it during test cleanup.
 
 ## Prerequisites and executable discovery
+
+Source setup/update prepare the required browser. After a manual `npm ci`, run `npm run browsers:install` before browser tests; `npm run browsers:check` checks readiness without installing. Default preparation requires Chromium and its headless shell pinned by the installed Playwright dependency even if system Chromium exists. Overrides and platform prerequisites follow the [browser dependency contract](browser-dependencies.md).
 
 The helper uses `domBrowserExecutable()` from `server/browser-dom-executable.ts`. Discovery checks `MEW_CHROMIUM_EXECUTABLE`, the legacy `MEW_BROWSER_EXECUTABLE` override, Playwright's bundled Chromium, then installed Chromium locations. Overrides must be absolute executable paths. Ordinary Google Chrome is reserved for external browsing and login and is not an automatic fallback for UI tests. Test selection follows this automation policy even when a fixture uses an external URL.
 

@@ -35,7 +35,7 @@ export function domBrowserExecutable({
 }: BrowserExecutableOptions = {}): string | undefined {
   const explicit = explicitExecutable(env, ['MEW_CHROMIUM_EXECUTABLE', 'MEW_BROWSER_EXECUTABLE'], 'Chromium')
   if (explicit) return explicit
-  const system = platform === 'darwin'
+  const system = platform === 'win32' ? [] : platform === 'darwin'
     ? [path.join(home, 'Applications/Chromium.app/Contents/MacOS/Chromium'), '/Applications/Chromium.app/Contents/MacOS/Chromium']
     : ['/usr/bin/chromium', '/usr/bin/chromium-browser']
   // Playwright chooses the bundled executable for the host OS and architecture.
@@ -49,7 +49,11 @@ export function externalBrowserExecutable({
 }: BrowserExecutableOptions = {}): string | undefined {
   const explicit = explicitExecutable(env, ['MEW_CHROME_EXECUTABLE', 'MEW_BROWSER_EXECUTABLE'], 'Chrome')
   if (explicit) return explicit
-  const system = platform === 'darwin'
+  const system = platform === 'win32'
+    ? [env.PROGRAMFILES, env['PROGRAMFILES(X86)'], env.LOCALAPPDATA]
+      .filter((directory): directory is string => !!directory)
+      .map(directory => path.win32.join(directory, 'Google', 'Chrome', 'Application', 'chrome.exe'))
+    : platform === 'darwin'
     ? [path.join(home, 'Applications/Google Chrome.app/Contents/MacOS/Google Chrome'), '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome']
     : ['/usr/bin/google-chrome-stable', '/usr/bin/google-chrome', '/opt/google/chrome/chrome']
   return system.find(isExecutable)

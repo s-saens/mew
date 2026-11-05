@@ -1,7 +1,7 @@
 ---
 title: "CLI Releases and npm Publishing"
-description: "Release procedure for @liiiiv/mew-cli and Linux, macOS, and Windows x64/arm64 runtimes. Covers native helpers, checksums, licensing, CI and npm/OIDC gates; first public publication and hands-on platform checks remain incomplete."
-updated: "2026-11-03"
+description: "Release procedure for @liiiiv/mew-cli and Linux, macOS, and Windows x64/arm64 runtimes. Covers native helpers, browser-installer manifest requirements, checksums, licensing, CI and npm/OIDC gates; first public publication and hands-on platform checks remain incomplete."
+updated: "2026-11-05"
 상위파일:
   - "../../../docs/deployment/native.md"
   - "../development/cli-distribution.md"
@@ -19,7 +19,9 @@ Windows executables verify the x64/arm64 zip files from [psmux v3.4.0](https://g
 
 Internal Windows workspace links are recorded in `runtime-links.json` instead of including symlinks in the archive. The CLI restores only verified `packages/` targets as junctions without administrator privileges. The overall design and current verification scope follow the [Windows Native Contract](../development/windows-native.md).
 
-Remote desktop installation scripts and protocol sources are included, but Electron, capture binaries, browser downloads, and OS permission setup are left to the optional feature's existing installation path. Do not include `.env`, `.data`, hidden state, test fixtures, or local native build outputs in releases. Private Mewlink central service sources are also excluded.
+The runtime manifest declares `browserDependencies: "server/browser-dependencies.js"`, and packaging includes that required installer with the pinned Playwright tooling. CLI launch prepares missing browsers before host startup; the [browser dependency contract](../development/browser-dependencies.md) owns platform and privilege requirements. Browser binaries are downloaded on the host and excluded from the archive.
+
+Remote desktop installation scripts and protocol sources are included, but Electron, capture binaries, and OS permission setup are left to the optional feature's existing installation path. Do not include `.env`, `.data`, hidden state, test fixtures, or local native build outputs in releases. Private Mewlink central service sources are also excluded.
 
 ## Bundling Licenses
 
@@ -58,6 +60,7 @@ For the next version, update the CLI package version and the root version in its
 ## Publishing Gates
 
 - Pass actual native module imports, `tmux -V` or `psmux -V`, and runtime relative import and link checks in all six environments. Job Object, CMD shim, psmux attach, output save/cancel, and compiled host fixtures must also pass on both Windows architectures.
+- Verify the required browser-installer manifest entry and file, preparation before host startup, cancellation, missing/invalid overrides, and a clean-host preparation on each supported platform. Browser download time must not consume the host readiness timeout.
 - Verify that distribution files contain no personal data, secrets, or private central service sources and include native component redistribution notices.
 - In an empty working directory on each supported OS, perform hands-on checks of new owner creation, password changes, editing, terminal use, relaunching, and preservation of account/device registrations. Fixture verification for the current implementation work does not replace these hands-on checks.
 - Check initial Mewlink registration, the online QR code, and local login, editing, and terminal use from an external browser. Other NATs, mobile networks, and remote desktop follow the [existing remote verification scope](../development/remote-access.md#verification-and-remaining-gates).

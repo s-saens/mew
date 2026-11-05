@@ -157,6 +157,7 @@ start_server() {
   local pid
   if pid=$(running_pid); then say "already running (pid $pid) — $(url)"; return 0; fi
   [ -f dist/index.html ] || die "not built yet — run: ./mew setup"
+  npm run browsers:check || die "browser dependencies are incomplete — run: npm run browsers:install"
   mkdir -p "$STATE_DIR"
   nohup "${MEW_NODE:-node}" server/serve.ts >>"$LOG" 2>&1 &
   echo $! >"$PIDFILE"
@@ -243,6 +244,7 @@ cmd_setup() {
 
   say "installing dependencies..."
   npm ci --no-audit --no-fund
+  npm run browsers:install
   if prepare_desktop; then
     say "Remote desktop preparation completed."
   else
@@ -268,6 +270,7 @@ cmd_update() {
   git pull --ff-only origin main || die "git pull failed — commit or stash your local changes first"
   say "installing dependencies..."
   npm ci --no-audit --no-fund || die "dependency installation failed — update failed"
+  npm run browsers:install || die "browser dependency installation failed — update failed; server was not restarted"
   say "building..."
   npm run build || die "build failed — update failed; server was not restarted"
   say "restarting..."
@@ -316,7 +319,7 @@ case "${1:-setup}" in
   status) cmd_status ;;
   start) load_config; start_server; say "$(url)" ;;
   stop) stop_server ;;
-  restart) load_config; stop_server; start_server; say "$(url)" ;;
+  restart) load_config; npm run browsers:check || die "browser dependencies are incomplete — run: npm run browsers:install"; stop_server; start_server; say "$(url)" ;;
   logs) mkdir -p "$STATE_DIR"; touch "$LOG"; tail -f -n 100 "$LOG" ;;
   users) shift; load_config; node server/usersCli.ts "$@" ;;
   help | -h | --help) usage ;;

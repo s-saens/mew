@@ -46,10 +46,10 @@ export function safeArchiveEntry(name, entry, platform = process.platform) {
 
 export async function validateRuntime(directory, version, target) {
   const manifest = JSON.parse(await fs.readFile(path.join(directory, 'mew-runtime.json'), 'utf8'))
-  for (const [key, value] of Object.entries({ version, ...target, entrypoint: 'server/cli-host.js' })) {
+  for (const [key, value] of Object.entries({ version, ...target, entrypoint: 'server/cli-host.js', browserDependencies: 'server/browser-dependencies.js' })) {
     if (manifest[key] !== value) throw new Error(`실행 패키지 정보가 맞지 않습니다: ${key}`)
   }
-  await Promise.all(['server/cli-host.js', 'dist/index.html'].map(file => fs.access(path.join(directory, file))))
+  await Promise.all(['server/cli-host.js', 'server/browser-dependencies.js', 'dist/index.html'].map(file => fs.access(path.join(directory, file))))
   await fs.access(path.join(directory, 'bin', target.platform === 'win32' ? 'psmux.exe' : 'tmux'), constants.X_OK)
   if (target.platform === 'win32') await fs.access(path.join(directory, 'native/windows/process-host.exe'))
   return directory

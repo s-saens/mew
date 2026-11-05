@@ -72,6 +72,19 @@ test('dedicated executable overrides win over legacy settings and stay independe
   assert.equal(externalBrowserExecutable({ ...options, env: { MEW_CHROMIUM_EXECUTABLE: env.MEW_CHROMIUM_EXECUTABLE } }), undefined)
 })
 
+test('Windows external browsing finds installed Chrome and automation uses bundled Chromium', t => {
+  const systemChrome = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
+  const userChrome = 'C:\\Users\\fixture\\AppData\\Local\\Google\\Chrome\\Application\\chrome.exe'
+  const { installed, options } = discovery(t, [userChrome, '/usr/bin/google-chrome', '/usr/bin/chromium'])
+  const windows = { ...options, platform: 'win32' as const, env: { PROGRAMFILES: 'C:\\Program Files', LOCALAPPDATA: 'C:\\Users\\fixture\\AppData\\Local' } }
+  assert.equal(externalBrowserExecutable(windows), userChrome)
+  installed.add(systemChrome)
+  assert.equal(externalBrowserExecutable(windows), systemChrome)
+  assert.equal(domBrowserExecutable(windows), undefined)
+  installed.add(options.bundledExecutable)
+  assert.equal(domBrowserExecutable(windows), options.bundledExecutable)
+})
+
 test('invalid overrides fail with the selected setting name rather than silently falling back', t => {
   const { options } = discovery(t, ['/fixture/legacy'])
   for (const [resolve, key] of [[domBrowserExecutable, 'MEW_CHROMIUM_EXECUTABLE'], [externalBrowserExecutable, 'MEW_CHROME_EXECUTABLE']] as const) {

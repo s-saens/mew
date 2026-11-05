@@ -1,7 +1,7 @@
 ---
 title: "Getting started with mew"
-updated: "2026-10-28"
-description: "Provides English instructions for installation, first login, the file explorer, and task-specific usage of the s-saens/mew source, along with Mewlink and alternative external access, permissions, updates, data retention, and the unpublished CLI path. Includes access to Mewlink connection from the hamburger menu."
+updated: "2026-11-05"
+description: "Provides English instructions for installation, first login, the file explorer, and task-specific usage of the s-saens/mew source, along with Mewlink and alternative external access, permissions, updates, data retention, and the unpublished CLI path. Includes managed Chrome/Chromium preparation, dependency repair, and Mewlink registration from the hamburger menu."
 ---
 
 # Getting started with mew
@@ -107,7 +107,7 @@ During setup, enter:
 - **Postgres connection:** optional, for database tables. You can skip it and add it later.
 - **Owner email:** your first mew account. Setup prints a temporary password.
 
-Setup installs dependencies, prepares remote desktop components, builds the app, and starts the server. The first download can take a few minutes. A remote desktop preparation failure is reported as a warning and does not stop the rest of the installation.
+Setup installs npm dependencies, prepares ordinary Google Chrome and Playwright Chromium, prepares remote desktop components, builds the app, and starts the server. Browser preparation may need network access and sudo on Linux/WSL; run setup from an interactive terminal with permission to install system packages. The first download can take a few minutes. A remote desktop preparation failure is reported as a warning and does not stop the rest of the installation.
 
 Open the URL printed by setup, sign in, and change the temporary password. Use **+** in the header to open a project folder, then select a file in the File explorer.
 
@@ -126,6 +126,8 @@ With Node.js 24 installed, run this from your workspace to download a prebuilt a
 cd /path/to/workspace
 npx @liiiiv/mew-cli@latest
 ```
+
+The launcher prepares missing browsers before starting the server; Linux preparation may need sudo and network access. Ordinary Chrome automatic installation on Linux/WSL supports x64; arm64 requires a compatible explicit `MEW_CHROME_EXECUTABLE`.
 
 Supports Linux glibc 2.35+ and macOS 15+, on x64/arm64. On Windows, use Ubuntu 22.04+ inside WSL 2. On first use, enter the owner email, sign in with the printed temporary password, and change it. Existing accounts, conversations, and device registration are reused. Follow [remote access](#remote-access) to register with Mewlink; the terminal also prints registration and online address QR codes.
 
@@ -265,7 +267,14 @@ Open panels from the dock and drag tabs to arrange them. On phones, switch panel
 
 ## Running and updating
 
-Run these from the mew repository. On Windows, use the Ubuntu terminal.
+Run these from the mew repository. On Windows, use the Ubuntu terminal. Setup and update install missing browser dependencies. Start and restart check them without installing; restart checks before stopping the running server. If this check fails, repair dependencies interactively, then retry your normal start or restart command:
+
+```bash
+npm run browsers:install
+npm run browsers:check
+```
+
+An existing ordinary Chrome is reused. Chromium follows Mew's pinned Playwright version. Override paths, Linux arm64 limits, and separate native-login prerequisites follow the [browser dependency contract](../../.mew/docs/development/browser-dependencies.md).
 
 ```bash
 ./mew start                    # Start the server

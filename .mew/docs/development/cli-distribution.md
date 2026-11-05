@@ -1,7 +1,7 @@
 ---
 title: "Single-Command Execution and Prebuilt Distribution"
-description: "The distribution contract for CLI execution, configuration, updates, and separation of persistent data; inclusion of bundled skills and tool help in resources; exclusion of project documentation and authoring sources; and preservation of required native source."
-updated: "2026-10-29"
+description: "Defines prebuilt CLI execution, browser dependency preparation before host startup, runtime manifests, configuration, updates, persistent data, and package boundaries for resources and required native source."
+updated: "2026-11-05"
 상위파일:
   - "architecture.md"
   - "../operations/cli-release.md"
@@ -41,9 +41,11 @@ Before starting the server, it saves the selected owner's `user-ui-state.json` w
 
 After comparing the target file checksum in `SHA256SUMS` against the actual bytes, the archive is extracted in a temporary folder in the user cache. Absolute paths, parent-directory escapes, links outside the package, device files, and excessive sizes are rejected, while internal npm executables and relative workspace links are preserved. After checking the manifest's version, platform, architecture, Node major, entry point, and required files, the directory is made available atomically. Concurrent downloads reuse a single completed cache. Failed downloads clean up their temporary folders.
 
-The cache for an already verified version is reused without network access. If the cache is corrupted, users are instructed to delete only that executable distribution's folder, without deleting account data or user projects. Checksums verify release transfer integrity; they are not signatures that independently establish whether the provider's account has been compromised.
+The archive cache for an already verified version is reused without another archive download. Browser dependency preparation may still need network access when a required browser is missing. If the cache is corrupted, users are instructed to delete only that executable distribution's folder, without deleting account data or user projects. Checksums verify release transfer integrity; they are not signatures that independently establish whether the provider's account has been compromised.
 
-The runtime starts `server/cli-host.js` as a separate process. IPC in `cli-host.ts` carries only account setup requests, temporary passwords, actual listener addresses, and public remote status; it does not send registration keys or session tokens. Parent termination, IPC disconnection, and SIGINT/SIGTERM cause the host to shut down.
+The runtime manifest must declare `browserDependencies: "server/browser-dependencies.js"` and include that required file. The CLI rejects obsolete or incomplete runtimes that omit the declaration or installer. Before starting the server host, it runs this installer in a child process with `--install`, forwarding preparation output and stopping launch on failure. Browser downloads and system package prompts complete before the application host is forked and its 60-second readiness timer starts. Cancellation is forwarded to the installer child and prevents host launch. The [browser dependency contract](browser-dependencies.md) owns pinned Chromium, ordinary Chrome reuse, explicit overrides, privilege requirements, and platform limits. Browser binaries are host downloads rather than npm or runtime-archive contents.
+
+The runtime then starts `server/cli-host.js` as a separate process. IPC in `cli-host.ts` carries only account setup requests, temporary passwords, actual listener addresses, and public remote status; it does not send registration keys or session tokens. Parent termination, IPC disconnection, and SIGINT/SIGTERM cause the host to shut down.
 
 The launcher sets `MEW_DISTRIBUTION=release`. App update status checks in this distribution do not call Git. It rejects source builds, restarts, pull operations, and individual updates to bundled tmux, and directs users to rerun `npx @liiiiv/mew-cli@latest`. Existing update boundaries for external agents remain in place. Automatic replacement of the running app is not provided, and npx also handles checking the latest npm version.
 

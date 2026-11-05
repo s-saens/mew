@@ -39,6 +39,7 @@ test('runtime fixture resolves compiled imports, native worker URLs, package exp
     'server/fixtures/private.json': '{"private":true}',
     'server/demo-repository-fixture.mjs': 'import "../tools/private-fixture.mjs"',
     'server/worker.ts': 'export const worker: string = "compiled"',
+    'server/browser-dependencies.ts': 'export const install: boolean = true',
     'server/login-desktop-x11.py': 'import ctypes\n',
     'server/worker.mjs': 'export { worker } from "./worker.ts"',
     'server/entry.ts': `import { value } from '../shared/value.ts';
@@ -72,7 +73,7 @@ console.log(JSON.stringify({value, number, data, worker: worker.pathname.endsWit
     'assets/mewpet/capybara/source/source.json': '{"generator":"fixture"}',
   }
   for (const [file, value] of Object.entries(files)) await write(root, file, value)
-  await stageRuntimeSources(root, output, { version: '0.1.0', platform: 'linux', arch: 'x64', nodeMajor: 24, entrypoint: 'server/cli-host.js', tmuxVersion: '3.7c' })
+  await stageRuntimeSources(root, output, { version: '0.1.0', platform: 'linux', arch: 'x64', nodeMajor: 24, entrypoint: 'server/cli-host.js', browserDependencies: 'server/browser-dependencies.js', tmuxVersion: '3.7c' })
   await fs.mkdir(path.join(output, 'node_modules', '@mew'), { recursive: true })
   await fs.symlink('../../packages/fixture', path.join(output, 'node_modules', '@mew', 'fixture'))
   await validateRuntimeLinks(output)
@@ -86,6 +87,8 @@ console.log(JSON.stringify({value, number, data, worker: worker.pathname.endsWit
     await assert.rejects(fs.stat(path.join(output, file)), { code: 'ENOENT' })
   }
   assert.equal((await fs.readFile(path.join(output, 'mew-runtime.json'), 'utf8')).includes('server/cli-host.js'), true)
+  assert.equal(JSON.parse(await fs.readFile(path.join(output, 'mew-runtime.json'), 'utf8')).browserDependencies, 'server/browser-dependencies.js')
+  assert.match(await fs.readFile(path.join(output, 'server/browser-dependencies.js'), 'utf8'), /export const install = true/)
   for (const file of Object.keys(files).filter(file => file.startsWith('resources/skills/'))) assert.equal(await fs.readFile(path.join(output, file), 'utf8'), files[file])
   for (const file of ['Cargo.toml', 'Cargo.lock', 'src/lib.rs']) {
     const source = `native/remote-desktop/rust/${file}`
@@ -127,7 +130,7 @@ test('repository source graph stages without missing imports or optional helper 
     await write(root, file, await fs.readFile(path.join(repository, file), 'utf8'))
   }
   await write(root, 'dist/index.html', '<main>isolated graph fixture</main>')
-  await stageRuntimeSources(root, output, { version: '0.1.0', platform: 'linux', arch: 'x64', nodeMajor: 24, entrypoint: 'server/cli-host.js', tmuxVersion: '3.7c' })
+  await stageRuntimeSources(root, output, { version: '0.1.0', platform: 'linux', arch: 'x64', nodeMajor: 24, entrypoint: 'server/cli-host.js', browserDependencies: 'server/browser-dependencies.js', tmuxVersion: '3.7c' })
   await validateCompiledImports(output)
   await validateRuntimeLinks(output)
   const helper = await import(pathToFileURL(path.join(output, 'native/remote-desktop/helper-version.mjs')).href)
@@ -166,6 +169,14 @@ test('repository source graph stages without missing imports or optional helper 
     const source = await fs.readFile(path.join(output, file), 'utf8')
     for (const reference of references) assert.ok(source.includes(reference), `${file} must reference ${reference}`)
   }
+  // Execute only the compiled read-only prerequisite checker, with a fixture
+  // executable for each role. This never starts the packaged host or a browser.
+  await fs.symlink(path.join(repository, 'node_modules'), path.join(output, 'node_modules'), process.platform === 'win32' ? 'junction' : 'dir')
+  const { stdout } = await exec(process.execPath, [path.join(output, 'server/browser-dependencies.js'), '--check'], {
+    env: { ...process.env, XDG_CONFIG_HOME: path.join(root, 'config'), LOCALAPPDATA: path.join(root, 'local'), MEW_CHROME_EXECUTABLE: process.execPath, MEW_CHROMIUM_EXECUTABLE: process.execPath },
+    timeout: 30_000,
+  })
+  assert.match(stdout, /Browser dependencies ready/)
 }))
 
 test('npm-only workflow skips runtime builds and verifies the complete existing release', async () => fixture(async (root, output) => {

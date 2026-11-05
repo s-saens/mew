@@ -5,6 +5,7 @@ import { createInterface } from 'node:readline/promises'
 import qrcode from 'qrcode-terminal'
 import { acquireDataLock, checkLegacyInstance } from './lock.mjs'
 import { windowsEnvironment, browserArgs } from './platform/index.mjs'
+import { prepareBrowserDependencies } from './browser-dependencies.mjs'
 
 export async function checkPort(port) {
   if (!port) return
@@ -117,12 +118,13 @@ export async function runHost(runtime, options, { log = console.log, error = con
   }
 }
 
-export async function launch({ prepare, options, version, target }) {
+export async function launch({ prepare, options, version, target, prepareBrowsers = prepareBrowserDependencies, host = runHost }) {
   await checkLegacyInstance(options.legacyPidfile)
   await checkPort(options.port)
   const unlock = await acquireDataLock(options.dataDir)
   try {
     const runtime = await prepare({ cacheDir: options.cacheDir, version, target, log: console.log })
-    return await runHost(runtime, options)
+    await prepareBrowsers(runtime, { env: runtimeEnvironment(runtime, options) })
+    return await host(runtime, options)
   } finally { await unlock() }
 }

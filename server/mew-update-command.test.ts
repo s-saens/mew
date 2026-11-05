@@ -8,7 +8,7 @@ import { promisify } from 'node:util'
 
 const exec = promisify(execFile)
 
-for (const failure of ['', 'git', 'ci', 'build', 'restart']) {
+for (const failure of ['', 'git', 'ci', 'browsers', 'build', 'restart']) {
   test(`update pipeline with stub commands: ${failure || 'success'}`, async () => {
     const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'mew-update-test-'))
     try {
@@ -22,7 +22,7 @@ stop_server() { printf 'stop\\n' >>"$TEST_TRACE"; }
       await fs.writeFile(path.join(directory, 'mew'), script)
       await fs.mkdir(path.join(directory, 'bin'))
       await fs.writeFile(path.join(directory, 'bin/git'), '#!/bin/sh\nprintf "git\\n" >>"$TEST_TRACE"\n[ "$TEST_FAILURE" != git ]\n', { mode: 0o700 })
-      await fs.writeFile(path.join(directory, 'bin/npm'), '#!/bin/sh\ncase "$1" in ci) stage=ci;; run) stage=build;; *) exit 99;; esac\nprintf "%s\\n" "$stage" >>"$TEST_TRACE"\n[ "$TEST_FAILURE" != "$stage" ]\n', { mode: 0o700 })
+      await fs.writeFile(path.join(directory, 'bin/npm'), '#!/bin/sh\ncase "$1:$2" in ci:*) stage=ci;; run:browsers:install) stage=browsers;; run:build) stage=build;; *) exit 99;; esac\nprintf "%s\\n" "$stage" >>"$TEST_TRACE"\n[ "$TEST_FAILURE" != "$stage" ]\n', { mode: 0o700 })
       const trace = path.join(directory, 'trace')
       let result: { stdout: string; stderr: string }
       try {
@@ -36,12 +36,12 @@ stop_server() { printf 'stop\\n' >>"$TEST_TRACE"; }
         assert.match(result.stderr, /failed/)
       }
       const stages = (await fs.readFile(trace, 'utf8')).trim().split('\n')
-      const expected = ['git', 'ci', 'build', 'stop', 'start']
+      const expected = ['git', 'ci', 'browsers', 'build', 'stop', 'start']
       const failedStage = failure === 'restart' ? 'start' : failure
       assert.deepEqual(stages, failure ? expected.slice(0, expected.indexOf(failedStage) + 1) : expected)
       if (failure) assert.doesNotMatch(result.stdout, /updated\./)
       else assert.match(result.stdout, /updated\./)
-      if (failure === 'build') assert.match(result.stderr, /server was not restarted/)
+      if (failure === 'build' || failure === 'browsers') assert.match(result.stderr, /server was not restarted/)
     } finally {
       await fs.rm(directory, { recursive: true, force: true })
     }

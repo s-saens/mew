@@ -1,7 +1,7 @@
 ---
-updated: "2026-10-31"
+updated: "2026-11-05"
 title: "Native server deployment"
-description: "Covers installing the s-saens/mew source server, changing the remote URL of older clones, the CLI path before publication, dedicated-user, HTTPS, and systemd operations, and Mewlink registration and locally authenticated P2P access through the hamburger menu. Explains preserved update terminals, backups, recovery from missing node-pty native modules, and support limitations for subpath and app container deployments; includes required agent build verification and user-owned server lifecycle operations."
+description: "Covers installing the s-saens/mew source server, changing the remote URL of older clones, the CLI path before publication, dedicated-user, HTTPS, and systemd operations, and Mewlink registration and locally authenticated P2P access through the hamburger menu. Explains preserved update terminals, backups, recovery from missing node-pty native modules, and support limitations for subpath and app container deployments; includes managed browser dependency preparation, required agent build verification, and user-owned server lifecycle operations."
 상위파일:
   - "../../.mew/docs/MOC.md"
   - "_deployment.md"
@@ -53,6 +53,8 @@ chmod 600 ~/.config/mew/config.env
 cd ~/apps/mew
 ./mew setup
 ```
+
+Browser preparation requires network access and may request sudo for Chrome or missing Linux libraries. Run it interactively as the service user with an authorized system-package installation path before unattended startup. Setup/update install missing dependencies; source start/restart only check readiness, with restart checking before it stops the server. To repair or inspect browser readiness after `npm ci`, run `npm run browsers:install` and `npm run browsers:check` in the checkout. A systemd unit that directly runs `server/serve.ts` bypasses launcher preflight, so complete this preparation before starting it. Browser binaries are installed on the host; Linux arm64 needs an explicit compatible external browser. See the [browser dependency contract](../../.mew/docs/development/browser-dependencies.md).
 
 If a configuration file already exists, `setup` does not ask for the workspace folder and port again. After installing app dependencies, it also prepares the Remote Desktop helper app; on Mac, it opens permission settings on the server Mac to check approvals. It then builds and starts the app and asks for the first owner account's email address. If helper app installation or permission preparation fails, it displays errors and warnings and continues installing Mew (Ctrl+C cancels). On an already running server, you can rerun preparation alone using `./mew desktop-setup` in the installation folder without building or restarting the server. Preparation does not enable screen capture, input control, or automatic startup at login. Installing components on a server without a desktop does not create a screen to share. For OS-specific library, login, and permission requirements, follow [Remote Desktop preparation](../guides/remote-desktop.md#first-connection). Change the password immediately after logging in with the printed temporary password.
 

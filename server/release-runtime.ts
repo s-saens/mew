@@ -26,6 +26,7 @@ export interface RuntimeManifest {
   arch: string
   nodeMajor: number
   entrypoint: string
+  browserDependencies: 'server/browser-dependencies.js'
   tmuxVersion?: string
   psmuxVersion?: string
 }
@@ -200,7 +201,7 @@ export async function packageRuntime(root: string, output: string) {
   const temporary = await fs.mkdtemp(path.join(os.tmpdir(), 'mew-release-'))
   const directory = path.join(temporary, 'runtime')
   try {
-    await stageRuntimeSources(root, directory, { version, platform: process.platform, arch: process.arch, nodeMajor: 24, entrypoint: 'server/cli-host.js', ...(process.platform === 'win32' ? { psmuxVersion: PSMUX_VERSION } : { tmuxVersion: TMUX_VERSION }) })
+    await stageRuntimeSources(root, directory, { version, platform: process.platform, arch: process.arch, nodeMajor: 24, entrypoint: 'server/cli-host.js', browserDependencies: 'server/browser-dependencies.js', ...(process.platform === 'win32' ? { psmuxVersion: PSMUX_VERSION } : { tmuxVersion: TMUX_VERSION }) })
     if (process.platform === 'win32') await compileWindowsProcessHost(root, directory)
     // The isolated installation preserves npm's workspace and executable links.
     const install = process.platform === 'win32' ? execHostFile : exec
