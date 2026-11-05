@@ -3,7 +3,7 @@ import type { HistoryPage, HistoryPosition, HistoryPreview, HistoryWorkPending }
 type DisplayEvent = { type: string; update?: { sessionUpdate: string } }
 type DisplayMessage = DisplayEvent & {
   page?: HistoryPage<DisplayEvent>
-  preview?: HistoryPreview<DisplayEvent>
+  preview?: HistoryPreview<DisplayEvent> | null
   events?: DisplayEvent[]
   event?: DisplayEvent
   position?: HistoryPosition
@@ -53,7 +53,7 @@ export function agentDisplayMessage<T extends DisplayMessage>(message: T): T {
   if (message.type === 'history' && message.page) return {
     ...message, page: { ...message.page, events: message.page.events.map(agentDisplayEvent), controls: message.page.controls.map(agentDisplayEvent) },
   }
-  if (message.type === 'history_preview' && message.preview) return {
+  if ((message.type === 'history_preview' || message.type === 'session_preview') && message.preview) return {
     ...message, preview: { ...message.preview, events: message.preview.events.map(agentDisplayEvent) },
   }
   if (message.type === 'replay' && message.events) return { ...message, events: message.events.map(agentDisplayEvent) }

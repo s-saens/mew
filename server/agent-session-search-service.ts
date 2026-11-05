@@ -29,12 +29,12 @@ function searchWorker(): Worker {
   return current
 }
 
-function searchIndex(runtime: string, cwd: string, query: string): Promise<SearchResult> {
+function searchIndex(runtime: string, cwd: string, query: string, localOnly = false): Promise<SearchResult> {
   const current = searchWorker(), id = ++sequence
   current.ref()
   return new Promise((resolve, reject) => {
     pending.set(id, { resolve, reject })
-    try { current.postMessage({ id, runtime, cwd, query, account: agentSettingsAccount() }) }
+    try { current.postMessage({ id, runtime, cwd, query, localOnly, account: agentSettingsAccount() }) }
     catch (error) {
       pending.delete(id)
       if (!pending.size) current.unref()
@@ -56,12 +56,26 @@ export async function searchSessionHistory(
   cwd: string,
   query: string,
   listSessions: () => Promise<SessionSearchResult[]>,
+  onPartial?: (result: SearchResult) => void,
 ): Promise<SearchResult> {
-  const sources = await Promise.allSettled([
+  const sources: PromiseSettledResult<SearchResult>[] = []
+  let completed = 0
+  const merged = (): SearchResult => ({
+    sessions: mergeSessionSearchResults(sources.flatMap(source => source.status === 'fulfilled' ? source.value.sessions : []), query),
+    ...(sources.some(source => source.status === 'rejected' || !!source.value.error) ? { error: '일부 대화를 검색하지 못했습니다' } : {}),
+  })
+  await Promise.all([
     searchIndex(runtime, cwd, query),
-    listSessions().then(sessions => ({ sessions } as SearchResult)),
-  ])
-  const sessions = mergeSessionSearchResults(sources.flatMap(source => source.status === 'fulfilled' ? source.value.sessions : []), query)
-  const failed = sources.some(source => source.status === 'rejected' || !!source.value.error)
-  return { sessions, ...(failed ? { error: '일부 대화를 검색하지 못했습니다' } : {}) }
+    Promise.resolve().then(listSessions).then(sessions => ({ sessions } as SearchResult)),
+  ].map(async (source, index) => {
+    try { sources[index] = { status: 'fulfilled', value: await source } }
+    catch (reason) { sources[index] = { status: 'rejected', reason } }
+    if (++completed === 1) onPartial?.(merged())
+  }))
+  return merged()
+}
+
+/** Warm the saved metadata list without provider listing or original-history indexing. */
+export function searchLocalSessionHistory(runtime: string, cwd: string, query = ''): Promise<SearchResult> {
+  return searchIndex(runtime, cwd, query, true)
 }

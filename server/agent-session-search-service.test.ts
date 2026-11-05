@@ -17,7 +17,7 @@ process.env.CODEX_HOME = codex
 process.env.CLAUDE_CONFIG_DIR = path.join(temporary, 'claude')
 process.env.MEW_AGENT_CONFIG_DIR = process.env.CLAUDE_CONFIG_DIR
 delete process.env.MEW_AGENT_ACCOUNT
-const { searchSessionHistory, closeSessionSearchWorker } = await import('./agent-session-search-service.ts')
+const { searchSessionHistory, searchLocalSessionHistory, closeSessionSearchWorker } = await import('./agent-session-search-service.ts')
 const { writeAgentTranscript, closeTranscriptDatabase } = await import('./agentTranscript.ts')
 const { runWithAgentAccount } = await import('./agent-account-settings.ts')
 const { writeAgentSetting } = await import('./agentSettings.ts')
@@ -104,6 +104,67 @@ test('빈 검색은 Mew 최근 기록과 어댑터 목록을 표시하고 원본
   assert.equal(result.error, undefined)
   assert.deepEqual(ids(result.sessions).sort(), ['recent-adapter', 'recent-mew'])
   assert.equal((await fsp.readdir(directory)).filter(file => file.endsWith('.sqlite')).length, before)
+})
+
+test('local results arrive while provider listing is pending, then final results merge both sources', async () => {
+  const cwd = project('partial-local')
+  transcript('codex', cwd, 'local-first', 'Saved conversation')
+  let release!: (sessions: SessionSearchResult[]) => void
+  const provider = new Promise<SessionSearchResult[]>(resolve => { release = resolve })
+  let publish!: (result: { sessions: SessionSearchResult[] }) => void
+  const partial = new Promise<{ sessions: SessionSearchResult[] }>(resolve => { publish = resolve })
+  let finished = false
+  const final = searchSessionHistory('codex', cwd, '', () => provider, publish).then(result => { finished = true; return result })
+  assert.deepEqual(ids((await partial).sessions), ['local-first'])
+  assert.equal(finished, false)
+  release([{ sessionId: 'provider-later', cwd }])
+  assert.deepEqual(ids((await final).sessions).sort(), ['local-first', 'provider-later'])
+})
+
+test('provider results can arrive first and synchronous provider failures preserve saved results', async () => {
+  const cwd = project('partial-provider')
+  transcript('codex', cwd, 'saved-later', 'Saved conversation')
+  await closeSessionSearchWorker()
+  const partials: { sessions: SessionSearchResult[] }[] = []
+  const result = await searchSessionHistory('codex', cwd, '', async () => [
+    { sessionId: 'provider-first', cwd },
+    { sessionId: 'saved-later', cwd, title: 'Provider title' },
+  ], value => partials.push(value))
+  assert.deepEqual(ids(partials[0].sessions).sort(), ['provider-first', 'saved-later'])
+  assert.deepEqual(ids(result.sessions).sort(), ['provider-first', 'saved-later'])
+  assert.equal(result.sessions.find(session => session.sessionId === 'saved-later')?.title, '질문 saved-later', 'final equal-score metadata retains deterministic local-first precedence')
+  const failure = await searchSessionHistory('codex', cwd, '', () => { throw new Error('Synthetic synchronous failure') })
+  assert.deepEqual(ids(failure.sessions), ['saved-later'])
+  assert.equal(failure.error, '일부 대화를 검색하지 못했습니다')
+})
+
+test('local warming lists unindexed and changed transcripts without reading or backfilling their bodies', async () => {
+  const cwd = project('warm-metadata')
+  transcript('codex', cwd, 'unindexed', 'Original title')
+  transcript('codex', cwd, 'old-writer', 'Indexed title')
+  transcript('codex', project('warm-other'), 'other-project', 'Foreign conversation')
+  transcript('claude', cwd, 'other-runtime', 'Foreign runtime')
+  await closeSessionSearchWorker()
+  const store = new DatabaseSync(path.join(data, 'agent-transcripts', 'transcripts.sqlite'))
+  try {
+    store.prepare('DELETE FROM history_search_sessions WHERE session_id=?').run('unindexed')
+    store.prepare('UPDATE sessions SET revision=? WHERE session_id=?').run('older-writer-revision', 'old-writer')
+    store.prepare('UPDATE events SET payload=? WHERE session_key IN (SELECT key FROM sessions WHERE cwd=?)').run('invalid-json-body', cwd)
+    const result = await searchLocalSessionHistory('codex', cwd)
+    assert.equal(result.error, undefined)
+    assert.deepEqual(ids(result.sessions).sort(), ['old-writer', 'unindexed'])
+    assert.equal(result.sessions.find(session => session.sessionId === 'unindexed')?.title, null)
+    assert.equal(result.sessions.find(session => session.sessionId === 'old-writer')?.title, '질문 old-writer')
+    assert.notEqual(store.prepare('SELECT revision FROM history_search_sessions WHERE session_id=?').get('old-writer')?.revision, 'older-writer-revision')
+    assert.equal(store.prepare('SELECT 1 FROM history_search_sessions WHERE session_id=?').get('unindexed'), undefined)
+  } finally { store.close() }
+})
+
+test('local-only searches never read provider originals', async () => {
+  const cwd = project('local-search-only')
+  transcript('codex', cwd, 'local-match', 'localonlyneedle')
+  await raw(codex, cwd, 'provider-excluded', 'localonlyneedle')
+  assert.deepEqual(ids((await searchLocalSessionHistory('codex', cwd, 'localonlyneedle')).sessions), ['local-match'])
 })
 
 test('어댑터 조회가 실패해도 worker 결과를 보존하고 부분 검색 오류를 알린다', async () => {

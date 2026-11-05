@@ -1,13 +1,13 @@
 ---
 title: "0141 — Prepare saved agent tab history before first visit"
-description: "Decouples saved transcript display from first-visit ACP startup through an authenticated account-tab preview API and bounded browser prefetch. Extends display projection, temporary restoration, and the 25ms device-cache gate without changing provider authority."
+description: "Decouples saved transcript display from first-visit ACP startup through an authenticated account-tab preview API and bounded browser prefetch. Extends display projection, temporary restoration, and the 25ms device-cache gate without changing provider authority; ADR 0144 extends preparation to history results."
 created: "2026-11-05"
 updated: "2026-11-05"
 ---
 
 ## Status
 
-Accepted. Extends [ADR 0031](0031-agent-display-events.md), [ADR 0043](0043-agent-work-details-loading.md), and [ADR 0111](0111-fast-agent-recovery.md). Replaces the WS-only saved-display retrieval restriction with an additional account-owned tab read path. Authoritative ranges, work details, and agent controls retain the existing authenticated WS/supervisor path.
+Accepted. Extends [ADR 0031](0031-agent-display-events.md), [ADR 0043](0043-agent-work-details-loading.md), and [ADR 0111](0111-fast-agent-recovery.md). Replaces the WS-only saved-display retrieval restriction with an additional account-owned tab read path. Authoritative ranges, work details, and agent controls retain the existing authenticated WS/supervisor path. [ADR 0144](0144-agent-history-previews.md) extends saved-display preparation to history lists and results on that connection.
 
 ## Context
 

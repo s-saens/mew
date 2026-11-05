@@ -63,6 +63,42 @@ test('unchanged targets are deduplicated during and after loading', async t => {
   assert.equal(f.changes, 1)
 })
 
+test('history query changes retain completed previews but cancel obsolete pending reads', async t => {
+  const f = fixture()
+  t.after(() => f.cleanup())
+  const saved = target('saved'), pending = target('pending'), match = target('match')
+  f.scheduler.update([saved, pending], null, { retainCached: true })
+  await flush()
+  f.calls[0].resolve(preview(saved))
+  await flush()
+  f.scheduler.update([match], null, { retainCached: true })
+  await flush()
+  assert.equal(f.calls[1].signal.aborted, true)
+  assert.deepEqual(f.scheduler.get(saved), preview(saved))
+  f.scheduler.update([saved], saved.id, { retainCached: true })
+  await flush()
+  assert.equal(f.calls.filter(call => call.target.id === saved.id).length, 1, 'returning to recent history reuses its completed preview')
+  assert.equal(f.calls[2].signal.aborted, true)
+  f.scheduler.update([], null)
+  assert.equal(f.scheduler.get(saved), null, 'connection or ownership invalidation still clears retained history')
+})
+
+test('retained history previews have a bounded entry count across many queries', async t => {
+  const f = fixture()
+  t.after(() => f.cleanup())
+  for (let i = 0; i < 130; i++) {
+    const value = target(String(i))
+    f.scheduler.update([value], value.id, { retainCached: true })
+    await flush()
+    f.calls.at(-1)!.resolve(preview(value))
+    await flush()
+  }
+  assert.equal(f.scheduler.get(target('0')), null)
+  assert.equal(f.scheduler.get(target('1')), null)
+  assert.deepEqual(f.scheduler.get(target('2')), preview(target('2')))
+  assert.deepEqual(f.scheduler.get(target('129')), preview(target('129')))
+})
+
 test('runtime, cwd and session changes reject late results from readers that ignore abort', async t => {
   for (const replacement of [{ runtime: 'claude' }, { cwd: '/other-workspace' }, { sessionId: 'new-session' }]) {
     const f = fixture()

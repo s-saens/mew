@@ -88,6 +88,7 @@ export type AgentEvent =
   | { type: 'history_details'; requestId: string; generation: string; start: number; end: number; events?: AgentEvent[]; error?: string }
   | { type: 'history'; page: HistoryPage<AgentEvent>; restoreFailure?: { sessionId: string; message: string } }
   | { type: 'history_preview'; preview: HistoryPreview<AgentEvent> }
+  | { type: 'session_preview'; requestId: string; preview: HistoryPreview<AgentEvent> | null }
   | { type: 'history_event'; event: AgentEvent; position: HistoryPosition }
   | { type: 'update'; update: SessionUpdate; settings?: AgentMessageSettings }
   | { type: 'user_images'; images: { path: string; mimeType: string }[] }
@@ -110,7 +111,7 @@ export type AgentEvent =
   | { type: 'auth_url_done'; id: string }
   | { type: 'auth_complete' }
   | { type: 'reset' }
-  | { type: 'sessions'; sessions: SessionInfo[]; query?: string; requestId?: string; error?: string }
+  | { type: 'sessions'; sessions: SessionInfo[]; query?: string; requestId?: string; error?: string; pending?: boolean }
   // 재접속했을 때 지나간 대화를 한 덩어리로 받는다 — 창은 그린 대화를 이걸로 통째로 갈아끼운다
   | { type: 'replay'; events: AgentEvent[]; restored?: boolean; restoreFailure?: { sessionId: string; message: string } }
 

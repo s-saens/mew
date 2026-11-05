@@ -98,14 +98,14 @@ test('에이전트가 뜨기 전에 보낸 질문도 잃지 않고, 목록은 �
   assert.equal(kinds[0], 'ready', 'ready는 에이전트를 기다리지 않는다')
   assert.equal(readyCwd, outside, '워크스페이스 밖에서 시작한 실제 cwd를 ready에 돌려준다')
   assert.ok(kinds.indexOf('sessions') < kinds.indexOf('meta'), '세션 목록은 디스크만 읽으므로 meta보다 먼저 온다')
-  assert.equal(kinds.filter((k) => k === 'sessions').length, 1, '목록은 물어본 만큼만 간다(붙을 때 미리 보내지 않는다)')
+  assert.equal(kinds.filter((k) => k === 'sessions').length, 2, 'one partial and one final result answer the requested listing')
   // 되감기는 붙을 때 한 프레임으로 딱 한 번 — 그 뒤 이벤트는 개별로 흐른다
   assert.equal(kinds.filter((k) => k === 'replay').length, 1, '지나간 대화는 한 덩어리로 한 번만 온다')
   assert.ok(kinds.indexOf('replay') < kinds.indexOf('update'), '되감기가 새 이벤트보다 먼저 온다')
   const searched = new Promise<{ requestId: string; query: string; sessions: { sessionId: string; snippet?: string }[] }>(resolve => {
     ws.on('message', raw => {
       const event = JSON.parse(raw.toString())
-      if (event.type === 'sessions' && event.requestId === 'topic-search') resolve(event)
+      if (event.type === 'sessions' && event.requestId === 'topic-search' && !event.pending) resolve(event)
     })
   })
   ws.send(JSON.stringify({ type: 'list_sessions', query: '에이전트패널', requestId: 'topic-search' }))

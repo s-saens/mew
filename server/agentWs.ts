@@ -20,7 +20,8 @@ import { DEFAULT_RUNTIME, isAcpRuntime, type AgentEvent, type AgentImageRef, typ
 import { connectAgentHost, type AgentHostClient } from './agentHost.ts'
 import { composeRuntimePrompt } from './agentRuntimes.ts'
 import { listSessionsFromDisk } from './agentSessionList.ts'
-import { searchSessionHistory } from './agent-session-search-service.ts'
+import { searchLocalSessionHistory, searchSessionHistory } from './agent-session-search-service.ts'
+import { readAgentHistoryPreview } from './agent-history-preview.ts'
 import { MAX_HISTORY_QUERY_LENGTH, type SessionSearchResult } from '../shared/agent-session-search.ts'
 import { agentSettingsAccount, runWithAgentAccount } from './agent-account-settings.ts'
 import { workspacePaths } from './paths.ts'
@@ -56,7 +57,8 @@ type ClientMessage = MewcatClientMessage
   | { type: 'edit_queued'; index: number; text: string; expect: string; skills?: string[]; attachments?: AgentAttachmentInput[]; settings?: AgentMessageSettings }
   /** `/clear`: 앞선 작업 뒤 새 ACP 세션을 여는 큐 경계 */
   | { type: 'clear_session' }
-  | { type: 'list_sessions'; query?: string; requestId?: string }
+  | { type: 'list_sessions'; query?: string; requestId?: string; localOnly?: boolean }
+  | { type: 'preview_session'; sessionId: string; requestId: string }
   | { type: 'load_session'; sessionId: string }
   /** 탭을 닫았다 — 창만 닫은 것과 달리 세션도 여기서 끝난다 */
   | { type: 'close_session' }
@@ -123,6 +125,7 @@ function validSettings(value: unknown): AgentMessageSettings | undefined {
 type ServerMessage =
   | { type: 'history'; page: HistoryPage<AgentEvent>; restoreFailure?: { sessionId: string; message: string } }
   | { type: 'history_preview'; preview: HistoryPreview<AgentEvent> }
+  | { type: 'session_preview'; requestId: string; preview: HistoryPreview<AgentEvent> | null }
   | { type: 'history_event'; event: AgentEvent; position: HistoryPosition }
   | ({ type: 'history_details'; requestId: string; events: AgentEvent[] } & HistoryDetailsRequest)
   | { type: 'history_details'; requestId: string; error: string; generation?: string; start?: number; end?: number }
@@ -132,7 +135,7 @@ type ServerMessage =
   | AgentConnectionPong
   | { type: 'fatal'; message?: string }
   // 목록은 물어본 창에만 답한다 — 상태가 아니라 조회 결과라 이벤트 버퍼에 넣지 않는다
-  | { type: 'sessions'; sessions: SessionSearchResult[]; query?: string; requestId?: string; error?: string }
+  | { type: 'sessions'; sessions: SessionSearchResult[]; query?: string; requestId?: string; error?: string; pending?: boolean }
   // 지나간 대화는 한 덩어리로 간다 — 창은 이걸 받아 지금 그린 대화를 통째로 갈아끼운다
   | { type: 'replay'; events: AgentEvent[]; restored?: boolean; restoreFailure?: { sessionId: string; message: string } }
 
@@ -181,7 +184,7 @@ async function handleConnection(
 
   // 에이전트가 뜨는 데는 1초가 넘게 걸린다(spawn + initialize + newSession). 그동안 창을 세워 두지 않는다:
   // ready를 먼저 보낸다. 지난 세션 목록은 **창이 물어볼 때만** 간다 — 붙을 때마다 훑으면 탭 수만큼 곱해진다.
-  send(ws, { type: 'ready', cwd, connectionProbe: true })
+  send(ws, { type: 'ready', cwd, connectionProbe: true, sessionHistoryPreviews: true })
 
   // 대화가 오래 조용하면(에이전트가 긴 작업 중이거나 사용자가 읽고만 있을 때) 중간 장비가 유휴 소켓을
   // 끊는다 — 창은 되감기로 복구하지만 그때마다 화면이 한 번 출렁인다. 30초 핑으로 살아 있다고 알린다
@@ -206,6 +209,7 @@ async function handleConnection(
   let rolePending = !resumeSessionId && preset.role.length > 0
   const early: ClientMessage[] = []
   let detach = () => {}
+  let previewReads = 0
 
   const handle = (msg: ClientMessage) => {
     if (accessChecks.get(ws)?.() === false) { ws.terminate(); return }
@@ -220,14 +224,31 @@ async function handleConnection(
     if (msg.type === 'list_sessions') {
       if (msg.query !== undefined && (typeof msg.query !== 'string' || msg.query.length > MAX_HISTORY_QUERY_LENGTH)) return
       if (msg.requestId !== undefined && (typeof msg.requestId !== 'string' || msg.requestId.length > 100)) return
+      if (msg.localOnly !== undefined && typeof msg.localOnly !== 'boolean') return
       const query = (msg.query ?? '').trim()
-      if (!session && runtime !== 'claude' && !query) { early.push(msg); return }
       const current = session
-      void runWithAgentAccount(account, () => searchSessionHistory(runtime, cwd, query, () => runtime === 'claude'
+      const reply = (result: { sessions: SessionSearchResult[]; error?: string }, pending?: boolean) =>
+        send(ws, { type: 'sessions', query, requestId: msg.requestId, ...result, ...(pending ? { pending: true } : {}) })
+      void runWithAgentAccount(account, () => msg.localOnly ? searchLocalSessionHistory(runtime, cwd, query)
+        : searchSessionHistory(runtime, cwd, query, () => runtime === 'claude'
         ? listSessionsFromDisk(cwd)
-        : current?.request<SessionSearchResult[]>({ type: 'list_sessions' }) ?? Promise.resolve([])))
-        .then((result) => send(ws, { type: 'sessions', query, requestId: msg.requestId, ...result }))
+        : current?.request<SessionSearchResult[]>({ type: 'list_sessions' }) ?? Promise.resolve([]), result => reply(result, true)))
+        .then(result => reply(result))
         .catch(() => send(ws, { type: 'sessions', query, requestId: msg.requestId, sessions: [], error: '대화 검색에 실패했습니다' }))
+      return
+    }
+    if (msg.type === 'preview_session') {
+      if (typeof msg.sessionId !== 'string' || !SESSION_ID.test(msg.sessionId)
+        || !validAgentConnectionProbeId(msg.requestId)) return
+      if (previewReads >= 2) {
+        send(ws, { type: 'session_preview', requestId: msg.requestId, preview: null })
+        return
+      }
+      previewReads++
+      void readAgentHistoryPreview(runtime, cwd, msg.sessionId, { deferWork: true, turns: 3 })
+        .then(preview => send(ws, { type: 'session_preview', requestId: msg.requestId, preview }))
+        .catch(() => send(ws, { type: 'session_preview', requestId: msg.requestId, preview: null }))
+        .finally(() => { previewReads-- })
       return
     }
     if (!session) {

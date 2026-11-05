@@ -62,6 +62,10 @@ test('paged, preview, replay, sequenced and legacy messages share the display co
   }
   const preview = { type: 'history_preview', preview: { sessionId: 'session', start: 100, events } }
   assert.deepEqual(agentDisplayMessage(preview), { ...preview, preview: { ...preview.preview, events: events.map(agentDisplayEvent) } })
+  const sessionPreview = { ...preview, type: 'session_preview', requestId: 'preview-request' }
+  assert.deepEqual(agentDisplayMessage(sessionPreview), { ...sessionPreview, preview: { ...sessionPreview.preview, events: events.map(agentDisplayEvent) } })
+  const missingPreview = { type: 'session_preview', requestId: 'missing', preview: null }
+  assert.equal(agentDisplayMessage(missingPreview), missingPreview)
   const replay = { type: 'replay', restored: true, events, restoreFailure: history.restoreFailure }
   assert.deepEqual(agentDisplayMessage(replay), { ...replay, events: events.map(agentDisplayEvent) })
   const live = { type: 'history_event', event: events[5], position: { generation: 'generation', seq: 105 } }

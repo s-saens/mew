@@ -56,10 +56,10 @@ export function createAgentTabPreviews(load: (target: AgentTabPreviewTarget, sig
   }
 
   return {
-    update(targets: AgentTabPreviewTarget[], selectedId: string | null) {
+    update(targets: AgentTabPreviewTarget[], selectedId: string | null, options: { retainCached?: boolean } = {}) {
       activeId = selectedId
       const keep = new Set(targets.map(keyOf))
-      for (const [key, entry] of entries) if (!keep.has(key)) {
+      for (const [key, entry] of entries) if (!keep.has(key) && !(options.retainCached && entry.preview)) {
         entry.controller.abort()
         running.delete(entry)
         bytes -= entry.bytes
@@ -67,6 +67,10 @@ export function createAgentTabPreviews(load: (target: AgentTabPreviewTarget, sig
       }
       for (const target of targets) if (!entries.has(keyOf(target))) {
         entries.set(keyOf(target), { target, controller: new AbortController(), started: false, preview: null, bytes: 0 })
+      }
+      if (options.retainCached) for (const [key, entry] of entries) {
+        if (entries.size <= 128) break
+        if (!keep.has(key) && entry.preview) { bytes -= entry.bytes; entries.delete(key) }
       }
       drain()
     },

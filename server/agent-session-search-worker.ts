@@ -6,11 +6,11 @@ import { mergeSessionSearchResults } from '../shared/agent-session-search.ts'
 
 const port = parentPort!
 let pending = Promise.resolve()
-port.on('message', (request: { id: number; runtime: string; cwd: string; query: string; account: string | null }) => {
+port.on('message', (request: { id: number; runtime: string; cwd: string; query: string; localOnly?: boolean; account: string | null }) => {
   pending = pending.then(async () => {
     const sources = await runWithAgentAccount(request.account, () => Promise.allSettled([
       Promise.resolve().then(() => searchAgentTranscripts(request.runtime, request.cwd, request.query)),
-      request.query ? searchRuntimeHistory(request.runtime, request.cwd, request.query) : Promise.resolve([]),
+      request.query && !request.localOnly ? searchRuntimeHistory(request.runtime, request.cwd, request.query) : Promise.resolve([]),
     ]))
     port.postMessage({ id: request.id, result: {
       sessions: mergeSessionSearchResults(sources.flatMap(source => source.status === 'fulfilled' ? source.value : []), request.query),

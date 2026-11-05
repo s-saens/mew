@@ -64,6 +64,8 @@ import { useAgentCommands } from '../hooks/use-agent-commands'
 import { useAgentClearFeedback } from '../hooks/use-agent-clear-feedback'
 import { useAgentEventState } from '../hooks/use-agent-event-state'
 import { useAgentTabPreviews } from '../hooks/use-agent-tab-previews'
+import { useAgentSessionPreviews } from '../hooks/use-agent-session-previews'
+import { mergeSessionSearchResults } from '../../shared/agent-session-search'
 import { useScheduledPrompts } from '../hooks/use-scheduled-prompts'
 import { stopAgentTabCommands } from '../api/agent-commands'
 import { commandTimeline } from '../utils/agent-command-timeline'
@@ -694,6 +696,7 @@ function SessionPicker({
   onOpen,
   onSearch,
   onPick,
+  onPrepare,
   onNewConversation,
   onRefresh,
   refreshDisabled = false,
@@ -713,6 +716,7 @@ function SessionPicker({
   onOpen: (query: string) => void | Promise<void>
   onSearch: (query: string) => void
   onPick: (session: SessionInfo) => void
+  onPrepare: (sessionId: string) => void
   onNewConversation: () => void
   onRefresh?: () => void
   refreshDisabled?: boolean
@@ -868,7 +872,9 @@ function SessionPicker({
                     onPick(session)
                     setOpen(false)
                   }}
-                  disabled={current || taken || loadDisabled || queryChanged || searching}
+                  disabled={current || taken || loadDisabled || queryChanged}
+                  onPointerEnter={() => onPrepare(session.sessionId)}
+                  onFocus={() => onPrepare(session.sessionId)}
                   className="flex w-full flex-col items-start gap-0.5 px-2.5 py-1.5 text-left hover:bg-surface-hover disabled:opacity-40"
                 >
                   <span className="w-full truncate text-ink">{session.title || session.sessionId.slice(0, 8)}</span>
@@ -2441,6 +2447,7 @@ function AgentSessionView({
   const [sessions, setSessions] = useState<SessionInfo[] | null>(null)
   const [searchingSessions, setSearchingSessions] = useState(false)
   const [sessionSearchError, setSessionSearchError] = useState<string | null>(null)
+  const [sessionPreviewsSupported, setSessionPreviewsSupported] = useState(false)
   const sessionSearchRequestRef = useRef<{ requestId: string; query: string } | null>(null)
   const [loadingSessionClaims, setLoadingSessionClaims] = useState(false)
   const sessionClaimsRequestRef = useRef(0)
@@ -2781,6 +2788,15 @@ function AgentSessionView({
     enabled: visible && connected && !historyPreview && !loadingSession,
     publish: publishWorkHistory,
   })
+  const { revision: sessionPreviewRevision, get: getSessionPreview, prepare: prepareSessionPreview,
+    accept: acceptSessionPreview, reset: resetSessionPreviews } = useAgentSessionPreviews(
+    cacheKey, runtime, cwd, wsRef, sessions, connected && sessionPreviewsSupported)
+  useEffect(() => {
+    if (!loadingSession || previewTargetRef.current !== loadingSession) return
+    const preview = getSessionPreview(loadingSession)
+    if (preview) setHistoryPreview(current => current?.sessionId === loadingSession ? current
+      : { ...preview, events: expandHistoryWork(preview.events) })
+  }, [sessionPreviewRevision, loadingSession, getSessionPreview])
 
   useEffect(() => () => {
     if (frameRef.current !== null) cancelAnimationFrame(frameRef.current)
@@ -2806,6 +2822,8 @@ function AgentSessionView({
     setHistoryPreview(saved?.sessionId === previewTargetRef.current && !historyRef.current
       ? { ...saved, events: expandHistoryWork(saved.events) } : null)
     setSessions(null)
+    setSessionPreviewsSupported(false)
+    resetSessionPreviews()
     setSearchingSessions(false)
     setSessionSearchError(null)
     sessionSearchRequestRef.current = null
@@ -2847,6 +2865,8 @@ function AgentSessionView({
       resetSelection()
       setStartupReady(false)
       resetWorkDetails()
+      resetSessionPreviews()
+      setSessionPreviewsSupported(false)
       cancelClear()
       historyPendingRef.current = false
       previewTargetRef.current = resumeSessionIdRef.current
@@ -2976,7 +2996,19 @@ function AgentSessionView({
         if (event.type === 'permission_done') resolveMewcatNotice(`${cwd}:${tabId}:permission:${event.id}`)
         const notice = trackNotice(event, notificationFocusedRef.current && document.visibilityState === 'visible' && document.hasFocus())
         if (notice) publishMewcatNotice(notice)
-        if (event.type === 'ready') return
+        if (event.type === 'session_preview') { acceptSessionPreview(event); return }
+        if (event.type === 'ready') {
+          if (event.sessionHistoryPreviews) {
+            setSessionPreviewsSupported(true)
+            if (!sessionSearchRequestRef.current) {
+              const request = { query: '', requestId: uuid() }
+              sessionSearchRequestRef.current = request
+              setSearchingSessions(true)
+              current.send(JSON.stringify({ type: 'list_sessions', localOnly: true, ...request }))
+            }
+          }
+          return
+        }
         if (event.type === 'models') return adoptModels(event.models)
         if (event.type === 'modes') return adoptModes(event.modes)
         if (event.type === 'thinking') return adoptThinking(event.thinking)
@@ -3043,8 +3075,8 @@ function AgentSessionView({
         if (event.type === 'sessions') {
           const requested = sessionSearchRequestRef.current
           if (!requested || (event.requestId ? event.requestId !== requested.requestId : requested.query !== '')) return
-          setSessions(event.sessions)
-          setSearchingSessions(false)
+          setSessions(previous => event.pending ? mergeSessionSearchResults([...(previous ?? []), ...event.sessions], requested.query) : event.sessions)
+          setSearchingSessions(event.pending === true)
           setSessionSearchError(event.error ?? null)
           return
         }
@@ -3179,7 +3211,7 @@ function AgentSessionView({
     }
     // 런타임을 바꾸면 저쪽 세션으로 갈아탄다 — 이쪽 세션은 서버에 그대로 남아 돌아오면 이어진다
     // (queueEvent는 값이 바뀌지 않는 useCallback이라 여기 있어도 재접속을 부르지 않는다)
-  }, [cacheKey, runtime, tabId, cwd, notificationWorkspace, preset?.modelId, preset?.thinkingId, preset?.thinkingConfigId, preset?.role, queueEvent, setEvents, adoptModels, adoptModes, adoptThinking, closeAuthBrowser, closeAcpLoginSessions, observeClearQueue, completeClear, cancelClear, acceptWorkDetails, resetWorkDetails, clearStartupPrompts, resetSelection, acknowledgePromptQueue, replacePromptFeedback, disconnectPromptFeedback])
+  }, [cacheKey, runtime, tabId, cwd, notificationWorkspace, preset?.modelId, preset?.thinkingId, preset?.thinkingConfigId, preset?.role, queueEvent, setEvents, adoptModels, adoptModes, adoptThinking, closeAuthBrowser, closeAcpLoginSessions, observeClearQueue, completeClear, cancelClear, acceptWorkDetails, resetWorkDetails, acceptSessionPreview, resetSessionPreviews, clearStartupPrompts, resetSelection, acknowledgePromptQueue, replacePromptFeedback, disconnectPromptFeedback])
 
   // 경과 시간만 흐르게 한다 — 나머지 값은 서버 meta가 밀어 준다
   useEffect(() => {
@@ -3969,6 +4001,7 @@ function AgentSessionView({
               ? t('agent.history.wait')
               : undefined}
           onSearch={searchSessions}
+          onPrepare={prepareSessionPreview}
           onOpen={async (query) => {
             const request = ++sessionClaimsRequestRef.current
             setLoadingSessionClaims(true)
@@ -3982,7 +4015,9 @@ function AgentSessionView({
           onPick={(session) => {
             clearStartupPrompts()
             previewTargetRef.current = session.sessionId
-            setHistoryPreview(null)
+            prepareSessionPreview(session.sessionId)
+            const preview = getSessionPreview(session.sessionId)
+            setHistoryPreview(preview ? { ...preview, events: expandHistoryWork(preview.events) } : null)
             setLoadingSession(session.sessionId)
             onLabel(tabId, session.title || session.sessionId.slice(0, 8))
             send({ type: 'load_session', sessionId: session.sessionId })

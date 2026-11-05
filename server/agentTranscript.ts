@@ -153,6 +153,20 @@ function backfillTranscriptSearch(store: DatabaseSync, runtime: string, cwd: str
 
 export function searchAgentTranscripts(runtime: string, cwd: string, query: string): SessionSearchResult[] {
   const store = db()
+  if (!query.trim()) {
+    const rows = prepare(store, `SELECT s.session_id,s.cwd,s.updated_at,h.title
+      FROM sessions s LEFT JOIN history_search_sessions h ON h.key=s.key
+      WHERE s.runtime=? ORDER BY s.updated_at DESC`).iterate(runtime)
+    const recent: SessionSearchResult[] = []
+    for (const row of rows) {
+      if (String(row.cwd).toLocaleLowerCase() !== cwd.toLocaleLowerCase()) continue
+      recent.push({ sessionId: String(row.session_id), cwd,
+        title: typeof row.title === 'string' ? row.title : null,
+        updatedAt: new Date(Number(row.updated_at)).toISOString() })
+      if (recent.length === 50) break
+    }
+    return recent
+  }
   backfillTranscriptSearch(store, runtime, cwd)
   return queryAgentSessionSearch(store, runtime, cwd, query)
 }
