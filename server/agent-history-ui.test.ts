@@ -310,7 +310,9 @@ createRoot(document.getElementById('root')).render(<I18nProvider><div style={{he
       assert.equal(await page.evaluate('window.socket.readyState'), 0, 'local history is visible before the connection opens')
       await page.waitForFunction('window.socket.readyState===1')
       await page.getByText('Saved queue task', { exact: true }).waitFor({ state: 'detached' })
-      assert.ok(await page.evaluate(`new URL(window.requests[0]).searchParams.get('after')===String(window.fixtureEvents.length)`), 'reload resumes from the cached cursor')
+      assert.ok(await page.evaluate(`(() => { const query = new URL(window.requests[0]).searchParams;
+        return query.has('generation') ? query.get('after')===String(window.fixtureEvents.length) : !query.has('after'); })()`),
+      'cache arriving within the startup gate supplies its cursor; late display does not adopt a cursor')
       assert.equal(await page.getByText('Question 44', { exact: true }).count(), 1)
       await page.screenshot({ path: `/tmp/mew-history-${width}-${dark ? 'dark' : 'light'}.png` })
       if (width === 1100 && !dark) {

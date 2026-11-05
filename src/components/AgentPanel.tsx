@@ -63,6 +63,7 @@ import { AgentLoadingBubbles, AgentReplyPending } from './agent-loading-bubbles'
 import { useAgentCommands } from '../hooks/use-agent-commands'
 import { useAgentClearFeedback } from '../hooks/use-agent-clear-feedback'
 import { useAgentEventState } from '../hooks/use-agent-event-state'
+import { useAgentTabPreviews } from '../hooks/use-agent-tab-previews'
 import { useScheduledPrompts } from '../hooks/use-scheduled-prompts'
 import { stopAgentTabCommands } from '../api/agent-commands'
 import { commandTimeline } from '../utils/agent-command-timeline'
@@ -1615,6 +1616,7 @@ export function AgentPanel({ embedded = false, startupPrompt, requestedPicker = 
   const [opened, setOpened] = useState<Set<string>>(() => new Set(!docked && activeId ? [activeId] : []))
   const [infos, setInfos] = useState<Record<string, TabInfo>>({})
   const [closeTarget, setCloseTarget] = useState<string | null>(null)
+  const savedPreviews = useAgentTabPreviews(cacheAccount, workspacePath, tabs, activeId, allowAgent && tabsSynced)
   useEffect(() => {
     const running = tabs.filter(tab => allowAgent && tabsSynced && tab.runtime && tab.runtime !== 'tmux' && opened.has(tab.id) && infos[tab.id]?.busy).length
     onRunningAgentsChange?.(running)
@@ -2129,6 +2131,7 @@ export function AgentPanel({ embedded = false, startupPrompt, requestedPicker = 
               cwd={tab.cwd!}
               preset={tab.preset}
               resumeSessionId={resumeSessionId}
+              savedHistoryPreview={resumeSessionId ? savedPreviews.get({ id: tab.id, runtime: tab.runtime!, cwd: tab.cwd!, sessionId: resumeSessionId }) : null}
               project={project}
               tree={tree}
               focusedFilePath={focusedFilePath}
@@ -2318,6 +2321,7 @@ function AgentSessionView({
   cwd,
   preset,
   resumeSessionId,
+  savedHistoryPreview,
   project,
   tree,
   focusedFilePath,
@@ -2350,6 +2354,7 @@ function AgentSessionView({
   cwd: string
   preset?: { id: string; name: string; thinkingId?: string; thinkingConfigId?: string; modelId: string; role: string }
   resumeSessionId: string | null
+  savedHistoryPreview: HistoryPreview<AgentEvent> | null
   project: string
   tree: TreeNode[]
   focusedFilePath: string | null
@@ -2376,8 +2381,16 @@ function AgentSessionView({
   const cacheKey = historyCacheKey(cacheAccount, runtime, tabId, cwd)
   const historyRef = useRef<CachedHistory | null>(null)
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set())
-  const [historyPreview, setHistoryPreview] = useState<HistoryPreview<AgentEvent> | null>(null)
+  const [historyPreview, setHistoryPreview] = useState<HistoryPreview<AgentEvent> | null>(() => savedHistoryPreview
+    ? { ...savedHistoryPreview, events: expandHistoryWork(savedHistoryPreview.events) } : null)
+  const savedPreviewRef = useRef(savedHistoryPreview)
+  savedPreviewRef.current = savedHistoryPreview
   const previewTargetRef = useRef<string | null>(resumeSessionId)
+  useEffect(() => {
+    if (savedHistoryPreview && previewTargetRef.current === savedHistoryPreview.sessionId && !historyRef.current) {
+      setHistoryPreview({ ...savedHistoryPreview, events: expandHistoryWork(savedHistoryPreview.events) })
+    }
+  }, [savedHistoryPreview])
   const historyPendingRef = useRef(false)
   const cacheWriteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [historyStart, setHistoryStart] = useState(0)
@@ -2789,7 +2802,9 @@ function AgentSessionView({
     pendingRef.current = []
     replayRef.current = null
     previewTargetRef.current = resumeSessionIdRef.current
-    setHistoryPreview(null)
+    const saved = savedPreviewRef.current
+    setHistoryPreview(saved?.sessionId === previewTargetRef.current && !historyRef.current
+      ? { ...saved, events: expandHistoryWork(saved.events) } : null)
     setSessions(null)
     setSearchingSessions(false)
     setSessionSearchError(null)
@@ -3123,8 +3138,15 @@ function AgentSessionView({
     if (resumeSessionIdRef.current) void readQueueCache(cacheKey).then(queue => {
       if (!closed && !synchronized && queue?.sessionId === resumeSessionIdRef.current) setCachedQueue(queue)
     })
+    const cachedHistory = resumeSessionIdRef.current ? readHistoryCache(cacheKey) : Promise.resolve(null)
+    // Slow device storage can still provide readable text after the socket has started.
+    void cachedHistory.then(cached => {
+      if (!closed && !synchronized && cached && cached.sessionId === previewTargetRef.current && !historyRef.current) {
+        setHistoryPreview(current => current ?? { sessionId: cached.sessionId, start: cached.start, events: cached.events })
+      }
+    })
     const cachedRestoration = resumeSessionIdRef.current
-      ? Promise.race([readHistoryCache(cacheKey), new Promise<null>(resolve => { cacheDeadline = setTimeout(() => resolve(null), 25) })])
+      ? Promise.race([cachedHistory, new Promise<null>(resolve => { cacheDeadline = setTimeout(() => resolve(null), 25) })])
       : Promise.resolve(null)
     void cachedRestoration.then(cached => {
       clearTimeout(cacheDeadline)
@@ -3136,6 +3158,7 @@ function AgentSessionView({
         setHistoryStart(cached.start)
         setUsersBefore(cached.usersBefore)
         setEvents(cached.events.slice())
+        setHistoryPreview(null)
       }
       connect()
     })

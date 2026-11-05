@@ -1,8 +1,8 @@
 ---
 title: "Conversation Storage and Range Synchronization"
 created: 2026-09-30
-updated: "2026-11-04"
-description: "Conversation persistence and recovery contracts: SQLite originals and attachments, range/work-detail synchronization, MCP startup diagnostic exclusion, temporary restoration display, per-frame updates, and local prompt feedback. Defines IndexedDB cache and queue scope, limits, and authority, including the 25ms transcript-cache startup gate and parallel queue restoration."
+updated: "2026-11-05"
+description: "Conversation persistence and recovery contracts: SQLite originals, attachments, range/work-detail synchronization, and temporary transcript display before ACP readiness. Defines account-tab preview prefetch, late IndexedDB display, cache and queue scope, limits, authority, and incremental rendering."
 상위파일: "MOC.md"
 ---
 
@@ -58,7 +58,7 @@ Do not split consecutive chunks and answers for one question. Turn count alone t
 - `{type:'history', range:{generation,before:start}}` requests the immediately preceding range as `prepend`. The supervisor slices its existing in-memory range and converts it for display, without repeatedly retrieving/parsing original JSON from SQLite.
 - Real-time `history_event` includes `{generation,seq}`. The browser ignores duplicates and rerequests the recent range on gaps or generation changes. Record sequence numbers in memory before screen state, preserving cursors during rapid reconnections.
 - Negotiate through supervisor hello capabilities and subscribe. Older clients receive full replay; older supervisors keep the existing replay path. A running older supervisor may send full history until replaced.
-- Retrieve only through existing tab WS/supervisor IPC, rechecking authentication and feature permissions. There is no public retrieval API accepting arbitrary session keys. Failed automatic restoration preserves the original tab pointer and device transcript.
+- Retrieve authoritative history and work details through existing tab WS/supervisor IPC, rechecking authentication and feature permissions. The read-only [saved tab preview API](#saved-previews-for-unopened-tabs) resolves an account-owned tab instead of accepting arbitrary session keys. Failed automatic restoration preserves the original tab pointer and device transcript.
 
 Binary search of the question boundary array finds the preceding range and `usersBefore`. It preserves range/question boundaries while avoiding a prefix scan proportional to turn count on every request.
 
@@ -114,11 +114,27 @@ A WeakMap indexes questions for each socket-owned append-only event array, index
 
 Sizes estimate serialized length, not actual browser quotas. Clean expired entries on initial opening; also remove expired entries and capacity/count excess on save. Skip device caching for ranges above the entry limit, retaining server records. Quota errors, storage restrictions, and delayed upgrades fall back to a connection without caching.
 
-**Startup.** Existing sessions wait at most 25ms for transcript cache before connecting. A transcript returned within the gate supplies generation/sequence cursor for incremental synchronization. Restore the saved queue in parallel without holding the socket. New sessions skip both reads. Save asynchronously during normal operation; do not assume saves finish on shutdown events. [ADR 0111](../decisions/0111-fast-agent-recovery.md) records the tradeoff.
+**Startup.** Existing sessions wait at most 25ms for transcript cache before connecting. A transcript returned within the gate supplies generation/sequence cursor for incremental synchronization. If the same-session read finishes after that gate but before authoritative synchronization, it can still supply temporary bubbles without changing the socket's generation or cursor. It cannot replace synchronized history or a different restoration target. Restore the saved queue in parallel without holding the socket. New sessions skip both reads. Save asynchronously during normal operation; do not assume saves finish on shutdown events. [ADR 0111](../decisions/0111-fast-agent-recovery.md) defines the connection gate; [ADR 0141](../decisions/0141-agent-tab-history-previews.md) extends temporary display beyond it.
 
 After checking the server tab ledger, display valid device records for the same account/session as actual bubbles first. Do not use legacy localStorage text previews; remove the legacy transcript key on a new range. Device cache is not authoritative for session pointers. Drafts, settings, and control caches follow the [Browser Storage Contract](browser-storage.md). Explicit tab closure removes all runtime/cwd IndexedDB records for that account/tab.
 
 Scrolling within 80px of the top requests the preceding range. Preserve position using the height difference after prepend and expanded states using global sequence-number bubble keys. CLI batch/new-CLI question counts include `usersBefore`. Keep previously read ranges on the open screen; reconnect/device storage defaults to the latest 20 questions.
+
+### Saved Previews for Unopened Tabs
+
+After the authoritative account tab ledger is synchronized, `use-agent-tab-previews.ts` prepares the latest 3 saved turns for ACP tabs with a saved session pointer, including tabs the browser has not mounted yet. These requests read Mew's unified SQLite display transcript. They neither open agent WebSockets nor start ACP processes for unopened tabs. No provider-specific history parser or additional transcript store is introduced.
+
+`GET /api/user-ui/agent-tabs/history?workspace=<root>&tab=<id>` returns `{preview}` using the same read-only Worker and display projection as early WS previews. The server requires agent permission, validates the workspace, and resolves runtime, cwd, and session ID from the authenticated account's saved tab ledger. Recheck permission, account, and the saved target after the read; a removed or changed target cannot receive the old result. The client supplies no runtime session key. Missing, unsupported, or unavailable saved history returns no preview and leaves ordinary session restoration available.
+
+| Browser prefetch property | Contract |
+| --- | --- |
+| Concurrent reads | At most 2; the selected tab takes priority among waiting requests |
+| Read deadline | 5 seconds through response completion; abort timed-out requests |
+| Memory budget | Estimated 32MiB total preview JSON, prioritizing retention of the selected tab |
+| Scope | Account, workspace root, tab, runtime, cwd, and session ID |
+| Target or scope changes | Cancel obsolete requests, discard their results, and release cached previews |
+
+On a tab's first visit, an available matching preview supplies temporary bubbles while its actual connection and ACP restoration proceed. A result that arrives after mounting can also supply temporary display before synchronization. Keep preview events separate from authoritative history: do not adopt their sequence positions as reconnection cursors, save them into the device transcript cache, change session pointers, or retrieve work details from them. The temporary-display interaction and replacement rules below also apply. Prefetch does not guarantee a ready preview before every click; missing records, budgets, failures, or an immediate visit use the existing fallback. Provider history remains authoritative for agent context.
 
 ### Early Display of Server Transcripts During ACP Restoration
 
@@ -128,7 +144,7 @@ A temporary `server/agent-history-preview.ts` Worker uses a read-only DB connect
 
 New screens receive thinking/tool calls from 3 turns as markers; existing requests retain 20 turns. I/O and JSON parsing stay off the supervisor event loop. Concurrent queries sharing transcript and display options share one in-flight Worker. No schema changes, JSON migration, or saves occur.
 
-Send `{type:'history_preview', preview:{sessionId,start,events}}` only to range synchronization clients on existing authenticated tab connections, excluding generation, reconnection cursors, and controls. Discard late results after restoration finishes or the conversation changes. Missing transcripts and read/parse failures skip early display while existing restoration continues.
+Send `{type:'history_preview', preview:{sessionId,start,events}}` to range synchronization clients on existing authenticated tab connections, excluding generation, reconnection cursors, and controls. The saved tab preview API uses the same preview shape for reads before a tab connection exists. Discard late results after restoration finishes or the conversation changes. Missing transcripts and read/parse failures skip early display while existing restoration continues.
 
 Check original sizes in SQL, then read/convert each selected row separately so batches of originals do not accumulate in memory. SQLite boundary extraction reads original JSON without creating JavaScript objects for large tool bodies.
 

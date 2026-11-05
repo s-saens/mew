@@ -1,9 +1,10 @@
 import express from 'express'
-import { authOf, requireAuthenticated, requireAnyFeature } from './reqAuth.ts'
+import { authOf, requireAuthenticated, requireAnyFeature, requireFeature, resolveAuth } from './reqAuth.ts'
 import { readAccountTheme, writeAccountTheme, readAgentSessionClaims, readAgentTabs, readEditorTabs, readRootProjects, readWorkspaceUi, writeEditorTabs, writeRootProjects, writeWorkspaceUi } from './userUiState.ts'
 import { readRootProjectIcons } from './projectIcons.ts'
 import { broadcastAccount } from './presence.ts'
 import { saveAgentTabs } from './agent-tab-state.ts'
+import { AgentTabPreviewError, readAgentTabPreview } from './agent-tab-preview.ts'
 
 /** Account UI persistence uses the request identity and the API's existing error policy. */
 export function createUserUiRouter(handleError: (res: express.Response, error: unknown) => void): express.Router {
@@ -42,6 +43,16 @@ export function createUserUiRouter(handleError: (res: express.Response, error: u
       const email = authOf(req).email!
       res.json({ state: readAgentTabs(email, workspacePath), claims: readAgentSessionClaims(email) })
     } catch (err) {
+      handleError(res, err)
+    }
+  })
+
+  router.get('/agent-tabs/history', requireFeature('agent'), async (req, res) => {
+    try {
+      const preview = await readAgentTabPreview(() => resolveAuth(req), req.query.workspace, req.query.tab)
+      res.json({ preview })
+    } catch (err) {
+      if (err instanceof AgentTabPreviewError) { res.status(err.status).json({ error: err.message }); return }
       handleError(res, err)
     }
   })
