@@ -62,10 +62,10 @@ export function DatabaseTable({ ctrl, onOpenPage, toolbar, content, wide = false
               if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
             }}
             placeholder={uiText("제목 없음")}
-            className="min-w-0 flex-1 rounded bg-transparent px-1 py-0.5 text-[13px] font-semibold leading-5 text-ink outline-none hover:bg-surface focus:bg-surface"
+            className="min-w-0 flex-1 rounded bg-transparent px-1 py-0.5 text-[17px] font-semibold leading-6 text-ink outline-none hover:bg-surface focus:bg-surface"
           />
         ) : (
-          <span className="min-w-0 flex-1 truncate text-[13px] font-semibold leading-5 text-ink">{view?.title ?? uiText("데이터베이스")}</span>
+          <span className="min-w-0 flex-1 truncate text-[17px] font-semibold leading-6 text-ink">{view?.title ?? uiText("데이터베이스")}</span>
         )}
         {view && !editable && (
           <span className="shrink-0 rounded bg-surface-hover px-1.5 py-0.5 text-[10px] font-medium text-ink-muted">
@@ -90,7 +90,7 @@ export function DatabaseTable({ ctrl, onOpenPage, toolbar, content, wide = false
       ) : content ? content : (
         <div className="grid w-fit max-w-full grid-cols-[minmax(0,1fr)_auto]">
         <div data-db-grid className="col-start-1 row-start-1 min-w-0 overflow-x-auto rounded-md border border-edge-strong bg-surface-deep">
-          <table className="mew-database-table w-max max-w-none border-collapse whitespace-nowrap text-xs">
+          <table className="mew-database-table w-max max-w-none border-collapse whitespace-nowrap text-sm leading-[18px]">
             <thead className="bg-surface-raised/20">
               <tr className="border-b border-edge-strong">
                 {view.columns.map((col) => (
@@ -117,7 +117,7 @@ export function DatabaseTable({ ctrl, onOpenPage, toolbar, content, wide = false
               {rows.map((row) => (
                 <tr key={row.id} className="border-b border-edge-strong last:border-b-0 hover:bg-surface">
                   {view.columns.map((col) => (
-                    <td key={col.id} data-db-cell tabIndex={-1} className="border-r border-edge-strong p-0 align-top last:border-r-0 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent">
+                    <td key={col.id} data-db-cell tabIndex={-1} className="border-r border-edge-strong p-0.5 align-top last:border-r-0 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent">
                       <DatabaseCell
                         col={col}
                         row={row}
@@ -243,7 +243,7 @@ function ColumnHeader({
   }
 
   return (
-    <th {...typeMenuHandlers} data-db-cell tabIndex={-1} aria-sort={sortDirection ?? 'none'} className="group/col border-r border-edge-strong px-2 py-0.5 text-left align-middle last:border-r-0 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent">
+    <th {...typeMenuHandlers} data-db-cell tabIndex={-1} aria-sort={sortDirection ?? 'none'} className="group/col border-r border-edge-strong px-2.5 py-1 text-left align-middle last:border-r-0 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent">
       <div className="flex items-center justify-between gap-1">
         <button type="button" disabled={!editable} aria-label={uiText('{p0} 열 타입 변경', { p0: col.name })}
           data-tip={TYPE_LABELS[col.type]} onClick={event => onTypeMenu(event.currentTarget)}

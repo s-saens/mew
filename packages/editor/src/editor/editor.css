@@ -288,6 +288,11 @@
   margin: 0.5em 0;
   border-radius: 6px;
 }
+.mew-database-table :is(input, button, span, div) {
+  font-size: inherit;
+  line-height: inherit;
+}
+
 /* 넓은 표(리사이즈로 min-width가 커진 표)는 문서가 아니라 표 안에서 좌우 스크롤한다 —
    문서 화면에 가로 스크롤이 생기면 안 된다.
    overflow-y는 명시적으로 hidden — 한 축만 auto면 다른 축의 visible이 auto로 강제 계산돼

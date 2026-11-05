@@ -35,8 +35,8 @@ export function DatabaseCalendar({ view, rows, column, startColumn, editable, bu
     <div className="grid grid-cols-7 bg-surface-raised/20">{uiWeekdays().map((name, index) => <span key={index} className="px-1 py-1 text-center text-[10px] font-medium text-ink-muted sm:text-xs">{name}</span>)}</div>
     <div className="grid grid-cols-7">{days.map(key => {
       const events = grouped.get(key) ?? [], isToday = key === today
-      return <section key={key} data-db-day={key} aria-label={dayLabel(key)} className={`group/day min-h-16 min-w-0 rounded p-1 sm:min-h-[88px] ${key.slice(0, 7) !== month ? 'bg-surface-raised/10 text-ink-muted' : 'text-ink-secondary'} ${selectedDay === key ? 'bg-accent/5' : ''}`}>
-        <div className="mb-1 flex items-center justify-between gap-0.5">
+      return <section key={key} data-db-day={key} aria-label={dayLabel(key)} className={`group/day min-h-12 min-w-0 rounded p-0.5 sm:min-h-16 ${key.slice(0, 7) !== month ? 'bg-surface-raised/10 text-ink-muted' : 'text-ink-secondary'} ${selectedDay === key ? 'bg-accent/5' : ''}`}>
+        <div className="mb-0.5 flex items-center justify-between gap-0.5">
           <button type="button" aria-label={dayLabel(key)} aria-pressed={selectedDay === key} onClick={() => setSelectedDay(selectedDay === key ? null : key)} className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] tabular-nums focus-visible:outline-2 focus-visible:outline-accent ${isToday ? 'bg-accent text-ink-on-accent font-semibold' : 'hover:bg-surface-hover'}`}>{Number(key.slice(-2))}</button>
           {editable && <button type="button" disabled={busy} aria-label={uiText('{p0}에 행 추가', { p0: key })} data-tip={uiText('행 추가')} onClick={() => createOnDay(key)} className="hidden h-6 w-6 items-center justify-center rounded text-ink-muted opacity-0 hover:bg-surface-hover hover:text-ink focus-visible:opacity-100 group-hover/day:opacity-100 sm:flex pointer-coarse:opacity-100"><DatabaseLayoutIcon kind="plus" size={12} /></button>}
         </div>

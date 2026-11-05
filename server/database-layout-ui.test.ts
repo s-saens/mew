@@ -69,11 +69,13 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
           const day = surface.querySelector('[data-db-day]')
           return {
             font: style(surface).fontSize, line: style(surface).lineHeight,
+            titleFont: style(surface.querySelector('[data-db-title-cell] input, [data-db-title-cell] > span')!).fontSize,
             tabHeight: surface.querySelector('[role="tab"]')!.getBoundingClientRect().height,
             headings: [...surface.querySelectorAll('h3,h4')].map(heading => ({ font: style(heading).fontSize, margin: style(heading).marginTop })),
             inputFonts: [...surface.querySelectorAll('tbody input')].map(input => style(input).fontSize),
             cardPadding: card ? style(card).padding : null, cardGap: card ? style(card).gap : null,
             dayHeight: day ? style(day).minHeight : null,
+            dayPadding: day ? style(day).padding : null,
             rowHeight: row?.getBoundingClientRect().height, barHeight: bar?.getBoundingClientRect().height,
           }
         }))
@@ -82,14 +84,18 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
       const measured = measurements[0]
       assert.equal(measured.font, '12px')
       assert.equal(measured.line, '16px')
+      assert.equal(measured.titleFont, '17px')
       assert.equal(measured.tabHeight, width < 500 ? 40 : 28)
       for (const heading of measured.headings) assert.deepEqual(heading, { font: '12px', margin: '0px' })
-      for (const font of measured.inputFonts) assert.equal(font, '12px', 'text, date and number inputs share compact type')
+      for (const font of measured.inputFonts) assert.equal(font, '14px', 'table text, date and number inputs use larger type')
       if (mode === 'cards' || mode === 'board') {
         assert.equal(measured.cardPadding, '8px')
         assert.equal(measured.cardGap, '8px')
       }
-      if (mode === 'calendar') assert.equal(measured.dayHeight, width < 500 ? '64px' : '88px')
+      if (mode === 'calendar') {
+        assert.equal(measured.dayHeight, width < 500 ? '48px' : '64px')
+        assert.equal(measured.dayPadding, '2px')
+      }
       if (mode === 'gantt') {
         assert.equal(measured.rowHeight, width < 500 ? 32 : 28)
         assert.equal(measured.barHeight, width < 500 ? 24 : 20)

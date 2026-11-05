@@ -4,11 +4,11 @@ parent: "mew-database"
 title: "Document Databases·Full List"
 status: "implemented"
 created: "2026-09-18"
-updated: "2026-10-31"
+updated: "2026-11-05"
 status_hash: "ea759314baf1dca2105e78500c7277302e925451b58b01f45479cf00db9e02ad"
 files: ["src/components/DatabaseListModal.tsx", "packages/editor/src/database/DatabaseTable.tsx", "packages/editor/src/database/databaseNavigation.ts", "packages/editor/src/database/DatabaseCollection.tsx", "packages/editor/src/database/DatabaseBoard.tsx", "packages/editor/src/database/DatabaseCalendar.tsx", "packages/editor/src/database/DatabaseGantt.tsx", "packages/editor/src/database/DatabaseRowDialog.tsx", "packages/editor/src/database/databaseLayout.ts", "packages/editor/src/database/databaseSchema.ts", "server/db/databaseService.ts", "server/db/rowPages.ts", "server/db/routes.ts"]
 commits: []
-description: "Defines Postgres document DB editing, Markdown table conversion, compact typography and spacing across five views, rounded field grids with icon-only addition bars, and calendar and Gantt date ranges. Also covers keyboard navigation, header type menus, queries, search, grouping, linked-page title previews and filename renames, synchronization, access boundaries, and separation from tasks."
+description: "Defines Postgres document DB editing, Markdown table conversion, larger table cells and titles, compact calendar days, rounded field grids with icon-only addition bars, and calendar and Gantt date ranges. Also covers keyboard navigation, header type menus, queries, search, grouping, linked-page title previews and filename renames, synchronization, access boundaries, and separation from tasks."
 상위파일:
   - "MOC.md"
   - "_document-databases.md"
@@ -59,15 +59,15 @@ description: "Defines Postgres document DB editing, Markdown table conversion, c
 
 ### Multiple views and item details
 
-- All five views use the UI font with 12px text and 16px line height, independent of the surrounding document's font, weight, and line height. DB titles use 13px. Document heading styles exclude DB controls: board/calendar headings retain 12px type and compact margins in embedded and standalone views. These sizes assume the default browser root font size.
+- All five views use the UI font, independent of the surrounding document's font, weight, and line height. The shared surface uses 12px text and 16px line height; table headers and values use 14px text and 18px line height. DB titles use 17px in editable and read-only views. Document heading styles exclude DB controls: board/calendar headings retain 12px type and compact margins in embedded and standalone views. These sizes assume the default browser root font size.
 
 Table dimensions preserve compact rows and touch targets:
 
 | Element | Size |
 | --- | --- |
-| Text, number, date, and page-title cells | 12px text; 4px vertical padding, or 6px for coarse pointers |
-| Headers | 2px vertical padding around existing 24px desktop or 32px touch controls |
-| Standard text rows, including dividers | About 25px desktop or 29px touch; selection tags can increase height |
+| Text, number, date, and page-title cells | 14px text; cell padding adds 2px on every side of the existing controls (text inputs retain 8px horizontal and 4px vertical padding, or 6px vertically for coarse pointers) |
+| Headers | 10px horizontal and 4px vertical padding around existing 24px desktop or 32px touch controls |
+| Standard text rows, including dividers | About 31px desktop or 35px touch; selection tags can increase height |
 | View tabs | At least 28px desktop; 40px touch targets |
 | Date-column selectors | Minimum 32px desktop or 40px touch |
 | Addition bars | Existing dimensions retained |
@@ -78,7 +78,7 @@ Other view dimensions:
 | --- | --- |
 | Cards | 8px padding and section gaps; 4px between property rows. Grid: 8px outer padding/gaps and 240px preferred minimum card width |
 | Boards | Same outer spacing; 240px lanes with 6px inner padding |
-| Calendar | Day cells grow with events; minimum 64px below the small-screen breakpoint, 88px above it |
+| Calendar | Day cells grow with events; minimum 48px below the small-screen breakpoint, 64px above it, with 2px inner padding and 2px below date controls |
 | Gantt | 28px desktop or 32px touch rows; 20px or 24px bars. The 24px-per-day default zoom, sticky title rail, date calculations, and drag distances remain unchanged |
 
 - `DatabaseCollection` shares the title, view switching, and search across the existing `DatabaseTable`, cards, boards, and calendars. Editor nodes, the full DB popup, and the browser demo use this UI; table remains the default. Narrow screens replace view names with icons, accessible names, and shared tooltips. Even single-column tables retain room for all view buttons. Tabs support arrow keys, Home, End, Enter, Space, and touch.

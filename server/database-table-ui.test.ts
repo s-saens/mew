@@ -83,7 +83,7 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
   } finally { await browser.close() }
 })
 
-test('database table retains compact styling inside the editor and standalone panel', { timeout: 30_000 }, async () => {
+test('database table enlarges cells and titles consistently inside the editor and standalone panel', { timeout: 30_000 }, async () => {
   const source = `import React from ${JSON.stringify(import.meta.resolve('react'))};
 import {createRoot} from ${JSON.stringify(import.meta.resolve('react-dom/client'))};
 import {DatabaseTable} from ${JSON.stringify(path.join(root, 'packages/editor/src/database/DatabaseTable.tsx'))};
@@ -113,6 +113,9 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
         const header = win.getComputedStyle(table.querySelector('thead')!)
         const input = table.querySelector('td input')
         return { padding: cell.padding, inputFont: input ? win.getComputedStyle(input).fontSize : null,
+          titleFont: surface.querySelector('[data-db-title-cell] input, [data-db-title-cell] > span') ? win.getComputedStyle(surface.querySelector('[data-db-title-cell] input, [data-db-title-cell] > span')!).fontSize : null,
+          headerFont: win.getComputedStyle(table.querySelector('th span') ?? table.querySelector('th')!).fontSize,
+          inputPadding: input ? win.getComputedStyle(input).padding : null,
           rowHeight: table.querySelector('tbody tr')!.getBoundingClientRect().height, headerHeight: table.querySelector('thead tr')!.getBoundingClientRect().height,
           background: head.backgroundColor, headerSurface: header.backgroundColor, titleSurface: title.backgroundColor,
           cellBorder: cell.borderRightColor, border: container.borderWidth, titleBorder: title.borderWidth, gridBorder: grid.borderColor,
@@ -124,10 +127,13 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
       assert.deepEqual(editor, panel, `${width}px ${theme}: editor and standalone table styles match`)
       assert.equal(editor.fillsContainer, true, 'the database container hugs the table without unused space')
       assert.equal(editor.fillsHost, false, 'short database blocks do not fill the editor width')
-      assert.equal(editor.padding, '0px')
-      assert.equal(editor.inputFont, '12px')
-      assert.ok(editor.rowHeight <= (width < 500 ? 29 : 25), 'compact text rows leave room for more data')
-      assert.ok(editor.headerHeight <= (width < 500 ? 37 : 29), 'headers trim padding around usable type and sort buttons')
+      assert.equal(editor.padding, '2px', 'cells gain 2px padding on each side')
+      assert.equal(editor.inputFont, '14px')
+      assert.equal(editor.headerFont, '14px')
+      assert.equal(editor.titleFont, '17px')
+      assert.equal(editor.inputPadding, width < 500 ? '6px 8px' : '4px 8px')
+      assert.equal(editor.rowHeight, width < 500 ? 35 : 31)
+      assert.ok(Math.abs(editor.headerHeight - (width < 500 ? 41 : 33)) <= 0.5, 'headers gain padding around usable controls, including collapsed border rounding')
       assert.equal(editor.background, 'rgba(0, 0, 0, 0)')
       assert.equal(editor.radius, '6px')
       const markdown = await measure('.tableWrapper table')
