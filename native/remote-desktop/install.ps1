@@ -28,10 +28,9 @@ try {
     & $node --input-type=module -e "import rtc from 'node-datachannel'; import koffi from 'koffi'; if (!rtc.getLibraryVersion() || !koffi.version) process.exit(1); rtc.cleanup();"
     $result = $LASTEXITCODE
     if ($result -eq 0) {
-      Write-Output '[3/3] Compiling Windows GPU capture and H.264 encoder...'
-      & (Join-Path $target 'install-windows-gpu.ps1') -Target $target
-      & $node (Join-Path $target 'install-rust-engine.mjs')
-      if ($LASTEXITCODE -ne 0) { throw 'Rust desktop engine compilation failed.' }
+      Write-Output '[3/3] Preparing Windows build tools, GPU capture and Rust video engine...'
+      & $node (Join-Path $target 'install-windows-native.mjs')
+      if ($LASTEXITCODE -ne 0) { throw 'Windows desktop native module preparation failed. Check the setup details above.' }
       Write-Output 'Preparing Windows UDP access for external desktop connections...'
       & (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path $target 'prepare-windows-network.ps1') -Target $target
       if ($LASTEXITCODE -ne 0) { Write-Warning 'Desktop files are ready, but Windows UDP access is not prepared. Run desktop-setup again to approve it.' }

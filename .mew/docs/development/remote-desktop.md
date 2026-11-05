@@ -1,8 +1,8 @@
 ---
 title: "Remote desktop architecture and validation"
 created: "2026-09-12"
-updated: "2026-11-03"
-description: "Defines resident Node control and Rust/GPU direct WebRTC, authorization lifetimes, two-frame limits, video negotiation, pacing, and RTT adaptation. Covers installation, viewer controls, input and OS permissions, diagnostics, synthetic results, and unverified hardware behavior."
+updated: "2026-11-05"
+description: "Defines resident Node control and Rust/GPU direct WebRTC, authorization lifetimes, two-frame limits, video negotiation, pacing, and RTT adaptation. Covers installation, viewer controls, input and OS permissions, diagnostics, synthetic results, and unverified hardware behavior. Links automatic Windows prerequisite installation before native compilation."
 상위파일: "MOC.md"
 ---
 
@@ -64,7 +64,7 @@ Installer and connection setup share `native/remote-desktop/wsl-powershell.mjs`.
 
 After PowerShell discovery, read-only checks inspect `/proc/sys/fs/binfmt_misc/status` and `WSLInterop`. Missing registration can make a POSIX shell parse an exe as `MZ`/syntax errors, so execution stops with interop guidance: run `wsl --shutdown` in Windows PowerShell, then restart WSL and Mew, noting that all running WSL distributions stop. Disabled registration gets enablement guidance instead. The app changes no registrations, sockets, or system settings. Valid registration alone does not ensure execution; the current session socket may also be required.
 
-Windows/WSL runs `[1/3] npm ci` → `[2/3] node-datachannel·Koffi binding import 검증` → `[3/3] C++ GPU DLL 컴파일`, then `install-rust-engine.mjs` preserves locked sources, builds release Rust, and checks ABI. Dedicated Windows Node, C++ Build Tools, Windows SDK, and Rust build tools are required. Missing DLL/ABI mismatch blocks connection. Browser setup first terminates the resident host and awaits login-supervisor cleanup. Direct `desktop-setup` can fail while that host holds the DLL: stop the server first or use viewer setup.
+Windows/WSL runs dependency installation and native binding checks, then prepares missing Windows build tools before compiling the GPU DLL and Rust engine. The [Windows setup contract](remote-desktop-windows-setup.md) owns WinGet package selection, compiler environment refresh, approval, and failure handling. `install-rust-engine.mjs` preserves locked sources, builds release Rust, and checks ABI. Missing DLL/ABI mismatch blocks connection. Browser setup first terminates the resident host and awaits login-supervisor cleanup. Direct `desktop-setup` can fail while that host holds the DLL: stop the server first or use viewer setup.
 
 Mac/Linux installs supported dedicated Node and its notices, checks bindings, and marks success only after GPU/Rust compilation and local Mac app signing. Download/build failures leave no success marker. Installation checks neither capture the screen nor launch a GUI.
 

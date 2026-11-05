@@ -14,6 +14,7 @@ HELPER_FILES.push('native-platform.mjs', 'gpu-posix.mjs', 'gpu-posix-worker.mjs'
 HELPER_FILES.push('native-connectivity.mjs', 'nat-port-map.mjs', 'nat-upnp.mjs', 'prepare-windows-network.ps1')
 HELPER_FILES.push('network-support.mjs', 'windows-network.mjs')
 HELPER_FILES.push('host-shutdown.mjs')
+HELPER_FILES.push('install-windows-native.mjs', 'windows-build-tools.mjs', 'windows-build-environment.ps1')
 HELPER_FILES.push('video-settings.mjs', 'video-pacer.mjs', 'video-adaptation.mjs', 'video-pump.mjs')
 HELPER_FILES.push('rust-engine.mjs', 'rust-direct.mjs', 'cursor-worker.mjs', 'install-rust-engine.mjs', 'rust-vendor.mjs', 'rust/Cargo.toml', 'rust/Cargo.lock', 'rust/build.rs', 'rust/src/lib.rs', 'rust/src/engine.rs', 'rust/src/gpu.rs', 'rust/src/rtp.rs', 'rust/src/rtc.rs')
 export function helperVersion(directory) {
