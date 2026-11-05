@@ -27,6 +27,7 @@ test('real viewer forwards screenshot input, preserves sessions, and rejects una
   const lab = await createLabServer({
     engine: { id: 'chrome', name: 'Chrome fixture', port: 5600 },
     initialUrl: 'https://fixture.test/', port: 0,
+    runtime: { viewerHosts: ['lab.example.ts.net', '100.64.0.7'] },
     factory: async () => {
       const context = await browser.newContext({ viewport: { width: 1280, height: 800 } })
       await context.route('https://fixture.test/**', route => route.fulfill({ contentType: 'text/html', body: fixture }))
@@ -127,6 +128,24 @@ test('real viewer forwards screenshot input, preserves sessions, and rejects una
     assert.equal(await textViewer.locator('#screen').isHidden(), true)
     assert.equal(await textViewer.locator('#screen').getAttribute('aria-disabled'), 'true')
     assert.equal(await textViewer.locator('#text-output').textContent(), 'Text-only page content remains visible.')
+  })
+
+  await t.test('configured tailnet hosts serve the viewer and authenticate its WebSocket', async () => {
+    for (const host of ['lab.example.ts.net', '100.64.0.7']) {
+      const html = await new Promise((resolve, reject) => {
+        http.get(`${origin}/`, { headers: { host: `${host}:${lab.port}` } }, response => {
+          assert.equal(response.statusCode, 200)
+          let body = ''
+          response.on('data', chunk => { body += chunk })
+          response.on('end', () => resolve(body))
+        }).on('error', reject)
+      })
+      const token = html.match(/"token":"([a-f0-9]+)"/)[1]
+      const ws = new WebSocket(`ws://127.0.0.1:${lab.port}/session?token=${token}`, { headers: { host: `${host}:${lab.port}` } })
+      const state = await new Promise((resolve, reject) => { ws.once('message', raw => resolve(JSON.parse(raw))); ws.once('error', reject) })
+      assert.equal(state.type, 'state')
+      await new Promise(resolve => { ws.once('close', resolve); ws.close() })
+    }
   })
 
   await t.test('foreign Host and invalid WebSocket token receive HTTP 403', async () => {

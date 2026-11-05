@@ -22,11 +22,12 @@ function deadline(operation, milliseconds, message) {
 }
 
 export class BrowserSession extends EventEmitter {
-  constructor({ id, runtime, initialUrl = INITIAL_URL, factory = launchEngine }) {
+  constructor({ id, runtime, initialUrl = INITIAL_URL, factory = launchEngine, viewerHosts = [] }) {
     super()
     this.id = id
     this.runtime = runtime
-    this.initialUrl = navigationTarget(initialUrl)
+    this.viewerHosts = viewerHosts
+    this.initialUrl = navigationTarget(initialUrl, viewerHosts)
     this.factory = factory
     this.width = 1280
     this.height = 800
@@ -85,7 +86,7 @@ export class BrowserSession extends EventEmitter {
   async navigate(url) {
     return this.pageOperation(async () => {
       this.generation++
-      this.lastUrl = navigationTarget(url)
+      this.lastUrl = navigationTarget(url, this.viewerHosts)
       this.captureBlocked = false
       this.lastFrame = null; this.lastHash = ''
       this.phase = 'starting'; this.error = ''; this.sendState()

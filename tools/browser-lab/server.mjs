@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises'
 import { randomBytes, timingSafeEqual } from 'node:crypto'
 import { WebSocket, WebSocketServer } from 'ws'
 import { BrowserSession } from './session.mjs'
-import { ENGINES, INITIAL_URL, parseCommand } from './protocol.mjs'
+import { ENGINES, INITIAL_URL, parseCommand, viewerHostnames } from './protocol.mjs'
 
 function matchesToken(candidate, token) {
   if (typeof candidate !== 'string') return false
@@ -15,13 +15,15 @@ function matchesToken(candidate, token) {
 export async function createLabServer({ engine, runtime, initialUrl = INITIAL_URL, factory, port = engine.port }) {
   const token = randomBytes(24).toString('hex')
   const nonce = randomBytes(18).toString('base64')
-  const session = new BrowserSession({ id: engine.id, runtime, initialUrl, factory })
+  const viewerHosts = viewerHostnames(runtime?.viewerHosts)
+  const allowedHosts = new Set(['localhost', '127.0.0.1', '[::1]', ...viewerHosts])
+  const session = new BrowserSession({ id: engine.id, runtime, initialUrl, factory, viewerHosts })
   const clients = new Set()
   const files = new Map(await Promise.all(['client.html', 'client.js', 'client.css'].map(async name => [name, await readFile(new URL(name, import.meta.url), 'utf8')])))
   const localHost = request => {
     try {
       const url = new URL(`http://${request.headers.host}`)
-      return ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname) && Number(url.port) === server.address()?.port
+      return allowedHosts.has(url.hostname) && Number(url.port) === server.address()?.port
     } catch { return false }
   }
   const server = http.createServer((request, response) => {

@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { ENGINES, navigationTarget, parseCommand } from './protocol.mjs'
+import { ENGINES, navigationTarget, parseCommand, viewerHostnames } from './protocol.mjs'
 
 const command = (value, viewport) => parseCommand(JSON.stringify(value), viewport)
 const pointer = { type: 'pointer', action: 'down', x: 100, y: 80, button: 'left', clickCount: 1 }
@@ -64,4 +64,19 @@ test('invalid wire data and unbounded wheel input are rejected', () => {
   assert.deepEqual(command(wheel), wheel)
   assert.throws(() => command({ ...wheel, deltaY: 10001 }))
   assert.throws(() => command({ ...wheel, deltaY: '120' }))
+})
+
+
+test('explicit viewer hosts accept tailnet names and reject URL components', () => {
+  assert.deepEqual(viewerHostnames(['100.64.0.7', 'LAB.example.ts.net']), ['100.64.0.7', 'lab.example.ts.net'])
+  assert.deepEqual(viewerHostnames(), [])
+  for (const hosts of ['lab.example.ts.net', [null], ['lab.example.ts.net:5600'], ['lab.example.ts.net/path'], ['user@lab.example.ts.net'], ['lab.example.ts.net?x=1'], ['lab.example.ts.net#x']]) assert.throws(() => viewerHostnames(hosts))
+})
+
+test('configured viewer addresses cannot be nested in any browser lab engine', () => {
+  const viewerHosts = ['100.64.0.7', 'lab.example.ts.net']
+  for (const host of viewerHosts) for (const engine of ENGINES) {
+    assert.throws(() => command({ type: 'navigate', url: `http://${host}:${engine.port}/` }, { viewerHosts }), /비교 화면/)
+  }
+  assert.equal(navigationTarget('http://100.64.0.7:5000/', viewerHosts), 'http://100.64.0.7:5000/')
 })

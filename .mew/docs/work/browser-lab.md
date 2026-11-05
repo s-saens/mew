@@ -1,6 +1,6 @@
 ---
 title: "Local manual browser comparison lab implementation"
-description: "Records the November 5 implementation of six isolated manual browser comparison endpoints, WPE TLS preparation, and adapter verification. Separates successful adapter, integrated viewer, and build checks from pending human challenge results."
+description: "Records the November 5 implementation of six isolated manual browser comparison endpoints, WPE TLS preparation, and adapter verification. Records adapter, viewer, build, and Tailscale access checks separately from pending human challenge results."
 created: "2026-11-05"
 updated: "2026-11-05"
 ---
@@ -46,3 +46,9 @@ Manual results for the full Cloudflare → Mew → Google flow are pending. The 
 The experiment depends on external native binaries, their licenses, compatible Playwright versions, and host runtime libraries. Those binaries are not part of the repository change. Temporary session profiles are removed on reset and graceful lab shutdown; abruptly killing the process can leave cleanup incomplete.
 
 The implementation does not select a replacement for Mew's current Chromium runtime. Any adoption requires a separate decision supported by the actual app and manual comparison results.
+
+## Tailscale access follow-up
+
+The user requested remote access to the six comparison viewers. The lab now accepts an explicit `viewerHosts` list while retaining loopback-only listeners, per-port WebSocket tokens, and rejection of unknown Host headers. The same host list prevents recursively opening a tailnet lab address inside an engine. The [lab contract](../development/browser-lab.md#connect-through-tailscale) owns configuration and proxy commands.
+
+The six lab ports were not listening when this follow-up began, so the authorized comparison process was started again. Tailscale Serve TCP forwarders were added for ports 5600–5605. Existing Mew routes on 443, 5000, and 8282 were preserved. No Funnel was enabled. All six endpoints passed HTTP page/health and authenticated WebSocket checks through both the Tailscale IPv4 address and MagicDNS name. The complete lab test suite passed 29 tests, scoped oxlint and the repository build passed, and documentation checks again reported 41 pre-existing link failures after description validation passed. A real browser also displayed all six viewers through the Tailscale IPv4 address: five image surfaces and Lightpanda text. Another physical tailnet device remains outside this host-side verification.

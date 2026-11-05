@@ -1,11 +1,11 @@
 ---
 title: "Local manual browser comparison lab"
-description: "Defines the six loopback browser lab endpoints, external runtime configuration, pixel and input relay, isolated session lifecycle, and manual challenge workflow. Covers Lightpanda's text-only boundary, WPE TLS prerequisites, and direct-tab use."
+description: "Defines the six loopback browser lab endpoints, external runtime configuration, optional Tailscale access, pixel and input relay, isolated session lifecycle, and manual challenge workflow. Covers Lightpanda's text-only boundary, WPE TLS prerequisites, and direct-tab use."
 created: "2026-11-05"
 updated: "2026-11-05"
 ---
 
-The standalone lab lets a person compare six browser engines through local browser tabs. Its source is in [tools/browser-lab](../../../tools/browser-lab/run.mjs). It runs separately from Mew and does not change Mew's [DOM browser](port-preview.md#internal-dom-browser), [browser dependencies](browser-dependencies.md), or [normal UI testing](browser-testing.md).
+The standalone lab lets a person compare six browser engines through local or explicitly configured tailnet browser tabs. Its source is in [tools/browser-lab](../../../tools/browser-lab/run.mjs). It runs separately from Mew and does not change Mew's [DOM browser](port-preview.md#internal-dom-browser), [browser dependencies](browser-dependencies.md), or [normal UI testing](browser-testing.md).
 
 ## Start and open the lab
 
@@ -33,6 +33,28 @@ Open these addresses directly in tabs on the host:
 Each page starts at `https://www.scrapingcourse.com/cloudflare-challenge`. Use `--initial-url <HTTP(S) URL>` to choose another initial page. Toolbar shortcuts open that initial page, `http://127.0.0.1:5000/` for Mew, or Google's sign-in page. The address field accepts a user-chosen HTTP(S) URL without embedded credentials. Lab addresses are rejected as navigation targets to avoid opening the comparison UI inside itself.
 
 The person using the lab solves any challenge manually. The harness does not select CAPTCHA answers or automatically interact with a challenge. A failed engine remains an error in its own tab; the lab never substitutes another browser.
+
+## Connect through Tailscale
+
+After an explicit request for remote access, add this host's Tailscale IPv4 address and MagicDNS names to the runtime JSON's `viewerHosts` array. Entries are exact hostnames without a scheme, path, or port. Other Host headers remain rejected, and the HTTP listeners still bind only to loopback. Restart only the authorized lab process to load the updated configuration.
+
+```json
+{
+  "viewerHosts": ["100.64.0.7", "lab.example.ts.net", "lab"]
+}
+```
+
+With the lab running, configure one tailnet-only TCP forwarder per HTTP port:
+
+```bash
+for port in 5600 5601 5602 5603 5604 5605; do
+  tailscale serve --bg --tcp="$port" "tcp://127.0.0.1:$port"
+done
+```
+
+Open `http://<host-tailscale-ip>:5600/` through `:5605/` from a device on the same tailnet with access permitted by its policy. MagicDNS names also work when included in `viewerHosts`. Engine links preserve the hostname; the WebSocket uses the same origin and token. Verify both `/health` and the viewer connection through the Tailscale address. A host-side check does not prove another device's ACL or DNS configuration.
+
+These are Tailscale Serve endpoints, not public Funnel endpoints. They expose the shared comparison sessions to permitted tailnet clients without adding a separate lab account system. Preserve existing Serve routes. To remove only these forwarders after authorization, run `tailscale serve --tcp=<port> off` for each lab port; do not reset the machine's entire Serve configuration.
 
 ## Runtime prerequisites
 
@@ -69,7 +91,7 @@ The toolbar provides Back, Forward, Reload, and Session reset. Click the capture
 
 Each engine has one session shared by its connected viewers. Its browser starts lazily on the first viewer connection. Profiles and native CDP listeners belong only to that engine; native adapters choose separate ephemeral loopback ports. Closing a viewer pauses capture when no viewers remain, while retaining the browser session until reset or lab shutdown.
 
-Lab HTTP listeners bind to `127.0.0.1`, validate the request Host against loopback names and the actual port, and require a random per-listener token for the session WebSocket. Runtime state and profiles stay local. The lab does not log input values or cookies, and native startup output is bounded and discarded after connection.
+Lab HTTP listeners bind to `127.0.0.1`, validate the request Host against loopback names, explicitly configured viewer hosts, and the actual port, and require a random per-listener token for the session WebSocket. Runtime state and profiles stay local. The lab does not log input values or cookies, and native startup output is bounded and discarded after connection.
 
 For an authorized shutdown, identify the owned lab PID from its runtime directory and confirm it against `/health`; send that process SIGTERM, or use Ctrl+C for a foreground run. Shutdown closes the six listeners, their browser processes, and temporary profiles. It does not stop Mew or any application being browsed. A forced process kill can bypass graceful profile cleanup.
 
