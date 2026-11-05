@@ -1,6 +1,6 @@
 ---
 title: "Local manual browser comparison lab"
-description: "Defines the six loopback browser lab endpoints, external runtime configuration, optional Tailscale access, pixel and input relay, isolated session lifecycle, and manual challenge workflow. Covers Lightpanda's text-only boundary, WPE TLS prerequisites, and direct-tab use."
+description: "Defines the six loopback browser lab endpoints, external runtime configuration, optional Tailscale access, supervised execution, pixel and input relay, isolated session lifecycle, and manual challenge workflow. Covers Lightpanda's text-only boundary, WPE TLS prerequisites, and direct-tab use."
 created: "2026-11-05"
 updated: "2026-11-05"
 ---
@@ -18,6 +18,20 @@ node tools/browser-lab/run.mjs --config /absolute/path/runtime.json --detach --r
 ```
 
 Without `--detach`, the process stays in the terminal. `--runtime-dir` defaults to `/tmp/mew-browser-manual-lab`; it holds the lab PID and detached `server.log`. The detached command checks all six health endpoints before reporting readiness. A busy port causes an error; the lab does not stop its existing owner.
+
+### Keep the lab outside the agent scope
+
+`--detach` creates a separate process session, but it does not escape an agent's systemd control group. If that scope is removed when the agent finishes, its lab process can also disappear while Tailscale forwarders remain configured. For an authorized lab that must remain available after the agent turn, use a separate user service on hosts with a running systemd user manager:
+
+```bash
+systemd-run --user --unit=mew-browser-lab --collect \
+  --property=WorkingDirectory=/absolute/path/mew \
+  --property=Restart=on-failure --property=RestartSec=2s \
+  -- /absolute/path/node /absolute/path/mew/tools/browser-lab/run.mjs \
+  --config /absolute/path/runtime.json --runtime-dir /tmp/mew-browser-manual-lab
+```
+
+Run the lab in the foreground inside this service: omit `--detach`. Its process and owned browser children belong to the service's control group rather than the agent scope. Check `systemctl --user status mew-browser-lab.service` and use `journalctl --user -u mew-browser-lab.service` for service output. After an authorized shutdown request, stop this unit with `systemctl --user stop mew-browser-lab.service`; leave other Mew services untouched. A transient unit is not a boot-time installation and still depends on its runtime files and user manager remaining available.
 
 Open these addresses directly in tabs on the host:
 

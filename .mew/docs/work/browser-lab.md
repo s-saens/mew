@@ -1,6 +1,6 @@
 ---
 title: "Local manual browser comparison lab implementation"
-description: "Records the November 5 implementation of six isolated manual browser comparison endpoints, WPE TLS preparation, and adapter verification. Records adapter, viewer, build, and Tailscale access checks separately from pending human challenge results."
+description: "Records the November 5 implementation of six isolated manual browser comparison endpoints, WPE TLS preparation, and adapter verification. Records adapter, viewer, build, Tailscale access, and supervised process recovery checks separately from pending human challenge results."
 created: "2026-11-05"
 updated: "2026-11-05"
 ---
@@ -52,3 +52,9 @@ The implementation does not select a replacement for Mew's current Chromium runt
 The user requested remote access to the six comparison viewers. The lab now accepts an explicit `viewerHosts` list while retaining loopback-only listeners, per-port WebSocket tokens, and rejection of unknown Host headers. The same host list prevents recursively opening a tailnet lab address inside an engine. The [lab contract](../development/browser-lab.md#connect-through-tailscale) owns configuration and proxy commands.
 
 The six lab ports were not listening when this follow-up began, so the authorized comparison process was started again. Tailscale Serve TCP forwarders were added for ports 5600–5605. Existing Mew routes on 443, 5000, and 8282 were preserved. No Funnel was enabled. All six endpoints passed HTTP page/health and authenticated WebSocket checks through both the Tailscale IPv4 address and MagicDNS name. The complete lab test suite passed 29 tests, scoped oxlint and the repository build passed, and documentation checks again reported 41 pre-existing link failures after description validation passed. A real browser also displayed all six viewers through the Tailscale IPv4 address: five image surfaces and Lightpanda text. Another physical tailnet device remains outside this host-side verification.
+
+## Process lifetime recovery
+
+After the user reported that the links did not work, all six loopback ports refused connections. Tailscale's six forwarders remained configured, but the recorded lab PID no longer existed. The active agent belonged to a `mew-agent-*.scope` systemd control group. POSIX detachment does not leave that group, so the earlier detached launch did not provide a sufficient process-lifetime boundary. The exact termination event was not recorded; scope cleanup is consistent with the observed disappearance.
+
+The authorized lab was started as a separate transient `mew-browser-lab.service` user service with `Restart=on-failure`. Its control group is under `app.slice`, outside the agent scope. Subsequent commands, after the launch command had exited, verified the same active service PID, zero restarts, and successful HTTP and authenticated WebSocket access through the Tailscale IPv4 address on all six ports. The canonical guide now describes this supervised launch and its shutdown boundary. No application code changed in this recovery; no new code tests or build were required. This does not claim verification from another physical tailnet device or persistence through a reboot.
