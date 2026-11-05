@@ -21,7 +21,7 @@ putCachedFile('beta','README.md',{content:${JSON.stringify(cachedBeta)},editable
 putCachedFile('beta','denied.md',{content:'# Previously allowed',editable:true,version:{size:20,mtimeMs:1,tag:'denied-v1'}});
 const noop=()=>{};
 const callbacks=Object.fromEntries(['registerHandle','registerElement','registerTabBar','onFocus','onActivate','onPin','onCloseTab','onReorder','onSetViewMode','onChangeContent','onOpenLink','onOpenHistory','onSetTocOpen','onOpenSidebar','onTabDragMove','onTabDrop'].map(key=>[key,noop]));
-const saved={panes:[{id:'main',tabs:[{path:'README.md',preview:false,viewMode:'hotview'}],activePath:'README.md'}],layout:{type:'leaf',id:'main'},focusedPaneId:'main'};
+const saved={panes:[{id:'main',tabs:[{path:'README.md',preview:false,viewMode:'hotview'}],activePath:'README.md'}],layout:{kind:'leaf',pane:'main'},focusedPaneId:'main'};
 const accountTabs={alpha:saved,beta:saved};
 function Fixture(){
   const [project,setProject]=React.useState('alpha');

@@ -580,6 +580,9 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
 
   // 흐름을 끊지 않는 짧은 안내 — 사이드바 작업 결과가 내 트리에 안 뜨거나, 파일을 못 열었을 때
   const { toast, showToast } = useToast()
+  const accountEditorTabs = useAccountEditorTabs(isGuest ? null : authEmail, projectUiPath,
+    error => showToast(error instanceof Error ? error.message : String(error)))
+  const prepareEditorTabs = accountEditorTabs.prepare
 
   useEffect(() => captureLocalBrowserLinks(url => {
     if (!auth.email || !caps.portPreview) { showToast(uiText('localhost 앱에 접근할 권한이 없습니다.')); return }
@@ -866,7 +869,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     const sequence = ++workspaceReadSequence.current
     const epoch = workspaceEpochRef.current
     const initial = workspaceInfoRef.current === null
-    void trackRefresh(fetchWorkspace({ includeUi: initial }).then(info => {
+    const reading = fetchWorkspace({ includeUi: initial }).then(info => {
       if (sequence !== workspaceReadSequence.current || !workspaceUiOwnerAlive.current) return
       if (initial && workspaceInfoRef.current === null) {
         seedWorkspaceUiSnapshot(info, workspaceUiCache.current, { sequence, epoch },
@@ -877,7 +880,8 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
         }
       }
       applyWorkspace(info)
-    }).catch(console.error))
+    })
+    void (initial ? trackRefresh(reading) : reading).catch(console.error)
   }, [applyWorkspace, authEmail, trackRefresh])
 
   const openRootProject = useCallback(async (projectPath: string) => {
@@ -899,6 +903,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     // Keep the displayed root usable if the replacement fails, but release all
     // other metadata reads so they cannot delay the latest selection.
     workspaceUiCache.current.cancelPending([projectPath, ...(projectUiPathRef.current ? [projectUiPathRef.current] : [])])
+    prepareEditorTabs(projectPath, request.controller.signal)
     // Account metadata is explicitly keyed by absolute root and can load in parallel.
     // Tree/file APIs still wait for the server to confirm its active root.
     void prepareWorkspaceUi(projectPath).catch(error => { if (error?.name !== 'AbortError') console.error(error) })
@@ -932,7 +937,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
         }
       }
     }
-  }, [applyWorkspace, caps.agent, caps.terminal, handleWorkspaceBroadcast, canOpenProjects, showToast, prepareWorkspaceUi])
+  }, [applyWorkspace, caps.agent, caps.terminal, handleWorkspaceBroadcast, canOpenProjects, showToast, prepareWorkspaceUi, prepareEditorTabs])
 
   const openAddedProject = useCallback(async (path: string) => {
     if (!(await openRootProject(path))) return false
@@ -983,9 +988,6 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
       }
     }
   }, [applyWorkspace, handleWorkspaceBroadcast, canOpenProjects, rootProjectPath, showToast])
-
-  const accountEditorTabs = useAccountEditorTabs(isGuest ? null : authEmail, projectUiPath,
-    error => showToast(error instanceof Error ? error.message : String(error)))
 
   const {
     hydrated: tabsHydrated,
@@ -1559,11 +1561,12 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
       const key = `${rootProjectPath ?? ''}\0${scope}`
       const cached = rootTreeCache.current.get(key)
       update(cached ?? [])
-      void trackRefresh(fetchTreeEntries(scope).then(next => {
+      const reading = fetchTreeEntries(scope).then(next => {
         if (!alive || epoch !== workspaceEpochRef.current) return
         rootTreeCache.current.set(key, next)
         update(next)
-      }).catch(console.error))
+      }).catch(console.error)
+      if (cached === undefined) void trackRefresh(reading)
     }
     read(WORKSPACE_PROJECT, next => { setRootTree(next); if (project === WORKSPACE_PROJECT) setTree(next) })
     read(DEFAULT_PROJECT, next => { setDocsTree(next); if (project === DEFAULT_PROJECT) setTree(next) })

@@ -548,7 +548,7 @@ export function useTabs(
         }
       }
       const loading = load().catch(handleOpenError)
-      if (opts?.restoring) void trackRefresh(loading)
+      if (opts?.restoring && cached === undefined) void trackRefresh(loading)
       if (!external) {
         // MOC·링크 검사는 본문 표시의 선행조건이 아니다. 로컬 서버에서 동기 검사하는 비용도 있으므로
         // 첫 편집기 paint 뒤에 시작한다. 실패해도 본문을 막지 않는 기존 계약은 그대로다.

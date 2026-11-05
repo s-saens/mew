@@ -9,7 +9,7 @@ import { applyTaskChanges, type TaskItem } from '../shared/task-list.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 
-for (const mode of ['onboarding', 'empty-projects', 'missing-active', 'remove-last', 'keyboard', 'workspace', 'documents', 'permissions', 'panels', 'worktree', 'swipes', 'rapid', 'desktop-layout'] as const) test(mode === 'empty-projects' ? 'App hides project work surfaces for an empty personal list despite a saved active root' : mode === 'missing-active' ? 'App offers project recovery when shortcuts remain without an active root' : mode === 'remove-last' ? 'App returns to project setup after its last personal shortcut is removed' : mode === 'desktop-layout' ? 'App desktop account layout survives project switches with independent document contents' : mode === 'onboarding' ? 'App first-use onboarding creates a named project without exposing the startup workspace' : mode === 'rapid' ? 'App rapid project selections cancel superseded handoffs and restore the latest root' : mode === 'swipes' ? 'App mobile dock swipes select panels and explorer swipes preserve search mode' : mode === 'worktree' ? 'linked worktree swaps retain project layout and sessions and settle outgoing file saves' : mode === 'panels' ? 'App restores Tasks with Alt+T and task sessions survive close and reload' : mode === 'permissions' ? 'permission invalidation replaces pending workspace metadata and ignores the old response' : mode === 'documents' ? 'Files opens Documents as a filesystem folder with a separate navigation arrow' : mode === 'keyboard' ? 'App keyboard aliases open files and projects and create files and folders in the current explorer scope' : 'App overlaps workspace metadata, restores warm roots and ignores duplicate handoffs', { timeout: 60_000 }, async () => {
+for (const mode of ['onboarding', 'empty-projects', 'missing-active', 'remove-last', 'keyboard', 'workspace', 'documents', 'permissions', 'panels', 'worktree', 'swipes', 'rapid', 'desktop-layout', 'latency'] as const) test(mode === 'latency' ? 'App prepares fresh editor tabs before handoff and restores warm roots without foreground loading' : mode === 'empty-projects' ? 'App hides project work surfaces for an empty personal list despite a saved active root' : mode === 'missing-active' ? 'App offers project recovery when shortcuts remain without an active root' : mode === 'remove-last' ? 'App returns to project setup after its last personal shortcut is removed' : mode === 'desktop-layout' ? 'App desktop account layout survives project switches with independent document contents' : mode === 'onboarding' ? 'App first-use onboarding creates a named project without exposing the startup workspace' : mode === 'rapid' ? 'App rapid project selections cancel superseded handoffs and restore the latest root' : mode === 'swipes' ? 'App mobile dock swipes select panels and explorer swipes preserve search mode' : mode === 'worktree' ? 'linked worktree swaps retain project layout and sessions and settle outgoing file saves' : mode === 'panels' ? 'App restores Tasks with Alt+T and task sessions survive close and reload' : mode === 'permissions' ? 'permission invalidation replaces pending workspace metadata and ignores the old response' : mode === 'documents' ? 'Files opens Documents as a filesystem folder with a separate navigation arrow' : mode === 'keyboard' ? 'App keyboard aliases open files and projects and create files and folders in the current explorer scope' : 'App overlaps workspace metadata, restores warm roots and ignores duplicate handoffs', { timeout: 60_000 }, async () => {
   const keyboardOnly = mode === 'keyboard'
   const onboarding = mode === 'onboarding'
   const projectSetup = onboarding || mode === 'empty-projects' || mode === 'missing-active'
@@ -191,10 +191,11 @@ for (const mode of ['onboarding', 'empty-projects', 'missing-active', 'remove-la
         return json({ state: { paths: personalPaths, icons: {}, groups: [] } })
       }
       if (url.pathname === '/api/user-ui/agent-tabs') return json({ state: null, claims: [], workspace: url.searchParams.get('workspace') })
-      if (desktopLayout && url.pathname === '/api/user-ui/editor-tabs') {
+      if (url.pathname === '/api/user-ui/editor-tabs') {
         const body = method === 'PUT' ? route.request().postDataJSON() : undefined
         const workspace = body?.workspacePath ?? url.searchParams.get('workspace')!
-        const state = editorLedgers.get(workspace) ?? stateForProject(workspace).tabs
+        const initial = (persisted.get(workspace) as ReturnType<typeof stateForProject> | undefined)?.tabs ?? stateForProject(workspace).tabs
+        const state = editorLedgers.get(workspace) ?? { '.workspace': { unifiedScopes: true, ...initial['.workspace'] } }
         const next = method === 'PUT' ? { ...state, [body.project]: body.state } : state
         editorLedgers.set(workspace, next)
         if (method === 'PUT') editorRevision++
@@ -308,7 +309,7 @@ for (const mode of ['onboarding', 'empty-projects', 'missing-active', 'remove-la
       }
       while (!releaseUi) await page.waitForTimeout(10)
       uiWaiters.forEach(release => release()); blockUi = false
-      await page.locator('[data-test-content]').getByText('Content of /new-project', { exact: true }).waitFor()
+      await page.locator('[data-test-content]').getByText('Content of /new-project', { exact: true }).waitFor({ state: 'attached' })
       assert.equal(await page.locator('[data-project-empty]').count(), 0, 'adding and opening a personal project restores the workspace')
       assert.equal(await page.locator('[data-current-project="/new-project"]').count(), 1)
       assert.equal(await page.locator('.mobile-dock').count(), 1)
@@ -356,7 +357,7 @@ for (const mode of ['onboarding', 'empty-projects', 'missing-active', 'remove-la
       const workspace = await page.locator('[data-dock-workspace]').elementHandle()
       assert.ok(workspace)
       const snapshot = async () => ({
-        panels: await page.locator('[data-dock-panel]').evaluateAll(elements => elements.map(element => {
+        panels: await page.locator('[data-dock-panel]:visible').evaluateAll(elements => elements.map(element => {
           const bounds = element.getBoundingClientRect()
           return { id: element.getAttribute('data-dock-panel'), rect: [bounds.x, bounds.y, bounds.width, bounds.height].map(value => Math.round(value * 100) / 100) }
         }).sort((a, b) => a.id!.localeCompare(b.id!))),
@@ -369,13 +370,13 @@ for (const mode of ['onboarding', 'empty-projects', 'missing-active', 'remove-la
       const resize = page.locator('[data-dock-workspace] [role="separator"]').first()
       await resize.focus(); await resize.press('ArrowRight')
       await page.locator('[data-test-agent-root]').focus()
-      assert.equal(await dock.locator('[data-dock-item=agent]').getAttribute('aria-current'), 'page')
+      assert.equal(await dock.locator('[data-dock-item=agent]').getAttribute('aria-current'), 'true')
       const adjusted = await snapshot()
       assert.notDeepEqual(adjusted.panels, initial.panels, 'the scenario uses a locally adjusted layout rather than just a restored default')
       const assertAccountLayout = async (expected: Awaited<ReturnType<typeof snapshot>>) => {
         assert.equal(await workspace.evaluate(element => element === element.ownerDocument.querySelector('[data-dock-workspace]')), true, 'project switching preserves the actual desktop Dock host')
         assert.deepEqual(await snapshot(), expected, 'destination project geometry and chrome cannot replace the current account arrangement')
-        assert.equal(await dock.locator('[data-dock-item=agent]').getAttribute('aria-current'), 'page', 'the remembered focused panel survives project content replacement')
+        assert.equal(await dock.locator('[data-dock-item=agent]').getAttribute('aria-current'), 'true', 'the remembered focused panel survives project content replacement')
       }
 
       await page.keyboard.press('Alt+2')
@@ -510,7 +511,7 @@ for (const mode of ['onboarding', 'empty-projects', 'missing-active', 'remove-la
       })
       const layoutSnapshot = async () => ({
         sidebar: await page.locator('[data-sidebar]').boundingBox(),
-        panels: await page.locator('[data-dock-panel]').evaluateAll(elements => elements.map(element => {
+        panels: await page.locator('[data-dock-panel]:visible').evaluateAll(elements => elements.map(element => {
           const bounds = element.getBoundingClientRect()
           return { id: element.getAttribute('data-dock-panel'), x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height }
         }).sort((a, b) => a.id!.localeCompare(b.id!))),
@@ -637,11 +638,11 @@ for (const mode of ['onboarding', 'empty-projects', 'missing-active', 'remove-la
         await page.keyboard.press('Alt+f')
         assert.equal(await dock.locator('[data-dock-item=features]').count(), 0)
         const terminal = page.locator('[data-dock-item=terminal]')
-        const previous = await terminal.getAttribute('aria-pressed')
+        const previous = await terminal.getAttribute('aria-pressed') === 'true'
         await page.keyboard.press('Alt+t')
         const panel = page.getByRole('region', { name: '태스크', exact: true })
         await panel.waitFor()
-        assert.equal(await terminal.getAttribute('aria-pressed'), previous, 'Alt+T does not toggle terminal')
+        assert.equal(await terminal.getAttribute('aria-pressed') === 'true', previous, 'Alt+T does not toggle terminal')
         const draft = panel.getByRole('textbox', { name: '새 태스크', exact: true })
         const text = `Restored task ${width}`
         await draft.fill(text)
@@ -685,6 +686,43 @@ for (const mode of ['onboarding', 'empty-projects', 'missing-active', 'remove-la
       }
     }
     const countUi = (root: string) => requests.filter(r => r.path === '/api/user-ui/workspace' && r.method === 'GET' && r.root === root).length
+    if (mode === 'latency') {
+      const countEditorReads = (root: string) => requests.filter(request => request.path === '/api/user-ui/editor-tabs' && request.method === 'GET' && request.root === root).length
+      const content = (root: string) => page.locator('[data-test-content]').getByText(`Content of ${root}`, { exact: true })
+      const selectWhileHeld = async (root: string) => {
+        blockSwitch = true
+        releaseSwitch = undefined
+        const prepared = page.waitForResponse(response => new URL(response.url()).pathname === '/api/user-ui/editor-tabs' && new URL(response.url()).searchParams.get('workspace') === root && response.request().method() === 'GET')
+        await selectProject(root)
+        await prepared
+        const deadline = Date.now() + 3000
+        while (!releaseSwitch && Date.now() < deadline) await page.waitForTimeout(10)
+        const release = releaseSwitch as (() => void) | undefined
+        assert.ok(release, 'editor metadata and the handoff both start before either is needed for hydration')
+        assert.notEqual(active, root, 'the preparation does not change the server root')
+        await loading.waitFor()
+        release(); blockSwitch = false
+      }
+      await selectWhileHeld('/beta')
+      await content('/beta').waitFor()
+      await loading.waitFor({ state: 'detached' })
+      assert.equal(countEditorReads('/beta'), 1, 'hydration consumes the fresh preparation without a serial metadata request')
+      blockTree = true; blockFileRoot = '/alpha'
+      const before = countEditorReads('/alpha')
+      await selectWhileHeld('/alpha')
+      await content('/alpha').waitFor()
+      await page.locator('[data-path="alpha.md"]').first().waitFor()
+      await loading.waitFor({ state: 'detached' })
+      assert.ok(treeWaiters.length && fileWaiters.length, 'both tree and body validation remain pending behind the visible cached screen')
+      assert.equal(countEditorReads('/alpha'), before + 1, 'a warm selection prepares one fresh authoritative tab snapshot')
+      assert.equal(await page.locator('[data-test-editor]').first().getAttribute('data-test-revalidating'), 'true', 'the cached body stays read-only until validation')
+      blockTree = false; blockFileRoot = null
+      for (const release of treeWaiters.splice(0)) release()
+      for (const release of fileWaiters.splice(0)) release()
+      await page.locator('[data-test-editor][data-test-revalidating="true"]').waitFor({ state: 'detached' })
+      assert.deepEqual(errors, [])
+      return
+    }
     if (mode === 'rapid') {
       const failedRequests: { path: string; method: string; root?: string }[] = []
       page.on('requestfailed', request => {
@@ -1058,8 +1096,7 @@ for (const mode of ['onboarding', 'empty-projects', 'missing-active', 'remove-la
     await page.waitForTimeout(100)
     assert.ok(persisted.has('/beta'), 'leaving before 500ms flushes the last outgoing layout')
     assert.equal((persisted.get('/beta') as { tabs: Record<string, unknown> }).tabs.docs, undefined, 'old-root Documents tabs must not be saved into the new root')
-    await loading.waitFor()
-    assert.equal(await loading.evaluate(el => el.ownerDocument.defaultView!.getComputedStyle(el).pointerEvents), 'none', 'warm body refresh leaves the workspace interactive')
+    assert.equal(await loading.count(), 0, 'warm body and tree validation do not show a workspace loading overlay')
     // Another client may change the server workspace during the pending refresh.
     active = '/beta'
     await signal()
@@ -1312,6 +1349,7 @@ for (const mode of ['onboarding', 'empty-projects', 'missing-active', 'remove-la
       layout: { kind: 'split', dir: 'row', kids: [{ kind: 'leaf', pane: 'main' }, { kind: 'leaf', pane: 'second' }] },
       focusedPaneId: 'main',
     } } })
+    editorLedgers.set(active, (persisted.get(active) as { tabs: Record<string, unknown> }).tabs)
     await page.locator('header').evaluate((element, workspace) => element.ownerDocument.defaultView!.localStorage.removeItem(`mew:device-layout:${encodeURIComponent('switch@example.test')}:${encodeURIComponent(workspace)}`), active)
     await page.reload()
     await dock.locator('[data-dock-item=editor]').tap()
