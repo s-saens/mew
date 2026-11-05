@@ -13,7 +13,11 @@ const root = path.resolve(import.meta.dirname, '..')
 
 async function composerValue(input: Locator): Promise<string> {
   if (await input.locator('.cm-placeholder').count()) return ''
-  return (await input.locator('.cm-line').allTextContents()).join('\n')
+  return input.locator('.cm-line').evaluateAll(lines => lines.map(line => {
+    const copy = line.cloneNode(true) as typeof line
+    for (const tag of copy.querySelectorAll('[data-document-token]')) tag.replaceWith(tag.getAttribute('data-document-token')!)
+    return copy.textContent
+  }).join('\n'))
 }
 
 test('CLI composer, code block execution, live-to-saved popup, keyboard focus and reload on desktop/mobile', { timeout: 45_000 }, async () => {
@@ -177,7 +181,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
       const assertComposerActionsContained = async (submitLabel = '전송', hasSchedule = true) => {
         const input = composer.locator('[data-agent-input]')
         const actions = input.locator('[data-agent-composer-actions]')
-        const expectedOrder = ['그림판 열기', '프롬프트 임시저장', '파일 첨부', ...(hasSchedule ? ['예약 메시지'] : []), submitLabel]
+        const expectedOrder = ['지우기', '그림판 열기', '프롬프트 임시저장', '파일 첨부', ...(hasSchedule ? ['예약 메시지'] : []), submitLabel]
         assert.deepEqual(await actions.getByRole('button').evaluateAll(buttons => buttons.map(button => button.getAttribute('aria-label'))), expectedOrder)
         const inputBox = await input.boundingBox()
         const actionBox = await actions.boundingBox()
@@ -212,6 +216,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
       }
       const assertComposerTooltips = async (savedLabel = '저장한 프롬프트', submitLabel = '전송', hasSchedule = true) => {
         const labels = [
+          ['지우기', '지우기'],
           ['그림판 열기', '그림판 열기'],
           ['프롬프트 임시저장', savedLabel],
           ['파일 첨부', '파일 첨부'],
@@ -238,6 +243,22 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
         await page.mouse.move(0, 0)
         await page.getByRole('tooltip').waitFor({ state: 'detached' })
       }
+      const clear = composer.getByRole('button', { name: '지우기', exact: true })
+      assert.equal(await clear.isDisabled(), true, 'clear is disabled for an empty input')
+      await draft.fill('Discard this draft [[test:README.md]]')
+      await draft.locator('[data-document-token]').waitFor()
+      await clear.click()
+      assert.equal(await composerValue(draft), '')
+      assert.equal(await draft.locator('[data-document-token]').count(), 0)
+      assert.equal(await draft.evaluate(el => el === el.ownerDocument.activeElement), true, 'clear returns focus to the input')
+      assert.equal(await clear.isDisabled(), true)
+      assert.equal(await page.evaluate("window.agentMessages.some(message => ['prompt', 'edit_queued', 'clear'].includes(message.type))"), false, 'clearing is local to the input')
+      await toggle.click()
+      await draft.fill('echo discard')
+      await clear.click()
+      assert.equal(await composerValue(draft), '')
+      assert.equal(await toggle.getAttribute('aria-pressed'), 'true', 'clear preserves CLI mode')
+      await toggle.click()
       await assertComposerActionsContained()
       await assertComposerTooltips()
       // Expanding Schedule stays inside the editor, including in narrow panels.
@@ -262,8 +283,8 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
       assert.ok(await composer.getByRole('button', { name: '전송', exact: true }).evaluate(el => parseFloat(el.ownerDocument.defaultView!.getComputedStyle(el).borderRadius)) >= 12, 'send has rounder corners')
       await draft.fill('버튼 순서 확인')
       await assertComposerTooltips('프롬프트 임시저장')
-      await composer.getByRole('button', { name: '그림판 열기', exact: true }).focus()
-      for (const label of ['프롬프트 임시저장', '파일 첨부', '예약 메시지', '전송']) {
+      await composer.getByRole('button', { name: '지우기', exact: true }).focus()
+      for (const label of ['그림판 열기', '프롬프트 임시저장', '파일 첨부', '예약 메시지', '전송']) {
         await page.keyboard.press('Tab')
         assert.equal(await composer.getByRole('button', { name: label, exact: true }).evaluate(el => el === el.ownerDocument.activeElement), true, 'keyboard focus follows the visual order')
       }
@@ -368,8 +389,10 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
       })
       assert.deepEqual(inlineOrder, ['파일 ', 'clipboard-1.png', 'clipboard-2.png', '드롭 초안'], 'files are inserted in order at the focused caret')
       assert.equal(uploads, 2, 'each dropped file uploads once')
-      await page.getByRole('button', { name: 'png 첨부 제거', exact: true }).first().click()
-      await page.getByRole('button', { name: 'png 첨부 제거', exact: true }).click()
+      await clear.click()
+      assert.equal(await composerValue(draft), '')
+      assert.equal(await page.getByRole('button', { name: 'png 첨부 제거', exact: true }).count(), 0, 'clear removes all attachment tags')
+      assert.equal(await toggle.isEnabled(), true, 'cleared attachments no longer prevent CLI mode')
       uploads = 0
       uploadBodies.length = 0
       await draft.fill('사진 두 장')
@@ -575,7 +598,11 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
       assert.match(await page.getByRole('dialog').locator('img').getAttribute('src') ?? '', /clipboard-1.png/)
       await page.keyboard.press('Escape')
       assert.equal(await queuedInput.count(), 1, 'closing preview does not cancel the edit')
-      await page.getByRole('button', { name: 'pdf 첨부 제거', exact: true }).click()
+      await clear.click()
+      assert.equal(await composerValue(queuedInput), '', 'clear empties the active queue edit')
+      assert.equal(await queuedInput.locator('[data-attachment-token]').count(), 0, 'queue attachment tags are cleared together')
+      assert.equal(await page.getByRole('button', { name: '저장', exact: true }).isDisabled(), true)
+      assert.equal(await page.evaluate("window.agentMessages.some(message => message.type === 'edit_queued' || message.type === 'remove_queued')"), false, 'clear does not submit or delete the queued message')
       await queuedInput.fill('취소할 수정')
       await page.getByRole('button', { name: '취소', exact: true }).click()
       assert.equal(await composerValue(draft), '보존할 새 메시지', 'cancel restores the unsent composer draft')
@@ -587,6 +614,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
       await page.getByRole('button', { name: '파일 첨부', exact: true }).first().click()
       await (await picker).setFiles({ name: 'added.png', mimeType: 'image/png', buffer: Buffer.from([137, 80, 78, 71]) })
       await page.getByRole('status', { name: '첨부 중…' }).waitFor()
+      assert.equal(await clear.isDisabled(), true, 'clear is disabled during an attachment upload')
       assert.equal(await page.getByRole('button', { name: '저장', exact: true }).isDisabled(), true)
       await queuedInput.press('Control+Enter')
       assert.equal(await page.evaluate("window.agentMessages.some(message => message.type === 'edit_queued')"), false)
@@ -682,6 +710,8 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
         for (const key of Object.keys(histories)) histories[key].unshift('이전 입력\n마지막 줄')
         localStorage.setItem('mew:agent-input-histories', JSON.stringify(histories))
       })
+      await clear.click()
+      assert.equal(await composerValue(draft), '')
       await draft.fill('첫 줄\n둘째 줄')
       await draft.press('Home')
       await draft.press('ArrowUp')

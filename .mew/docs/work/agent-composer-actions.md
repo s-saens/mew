@@ -1,8 +1,8 @@
 ---
 title: "Agent composer action row"
 created: "2026-11-02"
-updated: "2026-11-04"
-description: "Records moving the agent composer actions into the input surface, the rounder right-pointing Send button, aligned hover tooltips, the correction from a reserved footer row to floating controls, responsive and keyboard regression checks, and local build verification. Also records replacement of the schedule picker with inline relative-time fields, component checks, the schedule entrance animation and reduced-motion behavior, and blocked browser verification. Distinguishes local checks from physical-device and server lifecycle verification."
+updated: "2026-11-05"
+description: "Records moving the agent composer actions into the input surface, the rounder right-pointing Send button, aligned hover tooltips, the correction from a reserved footer row to floating controls, responsive and keyboard regression checks, and local build verification. Also records replacement of the schedule picker with inline relative-time fields, component checks, the schedule entrance animation and reduced-motion behavior, and blocked browser verification. Includes the input Clear button. Distinguishes local checks from physical-device and server lifecycle verification."
 ---
 
 The agent composer now groups Drawing, Save prompt, Attach, Schedule, and Send inside the input surface, in that order. This removes the separate right action column and gives the settings and editor the full available width. Button sizes and colors remain; Send uses 12px corners and Iconoir's right-pointing Send icon. The [agent input contract](../features/terminals-agents-automation/agent-input-mentions-skills-and-attachments.md#composer-input) owns the current behavior.
@@ -85,3 +85,18 @@ Verification on 2026-11-04:
 - `npm run check:docs`: Metadata passed; the link check reported 42 existing missing-target errors outside the changed documents, including `.mew/docs/MOC.md` and `.mew/docs/decisions/README.md`. The two changed documents have no link errors in the existing checker.
 
 The required build refreshed local `dist/` assets. No deployment, launcher, or server lifecycle operation was performed.
+
+## Follow-up: clear the active input
+
+On 2026-11-05, added an × button immediately to the left of Drawing so users can discard the active input with one action. It clears text and reference tags, returns focus to the editor, and preserves a separate new-message draft when editing the queue. The [agent input contract](../features/terminals-agents-automation/agent-input-mentions-skills-and-attachments.md#composer-input) owns the behavior and disabled states.
+
+Local verification:
+
+- `node --test server/agent-command-ui.test.ts`: Passed in isolated Chromium at 1100px and 390px, including 280px containment. Checks Clear placement and Tab order, shared tooltips, text/document/attachment clearing, editor focus, CLI mode retention, queue-edit isolation, empty-input state, and upload locking, alongside the existing composer regressions. Desktop, mobile, and narrow screenshots were inspected. Earlier runs hit stale document-tag expectations and multiline draft setup; the fixture now reads serialized document tags and explicitly clears the previous draft before its history scenario.
+- `server/agent-model-controls-ui.test.ts` and `src/utils/agentInputLayout.test.ts`: All seven tests passed in the combined run. That run's composer test failed on the multiline setup before the standalone correction above.
+- `npm run build`: Passed, including TypeScript and the production bundle; the large-chunk warning remains.
+- `npm run lint`: Passed with existing warnings.
+- `npm run check:docs`: All 729 descriptions passed. The full link check reported 42 missing-target errors outside the changed documents; the existing link checker found zero errors in the two changed documents. Their unchanged target anchors were inspected.
+- `git diff --check` passed for the task files.
+
+Browser checks use mocked runtime and API responses; physical devices remain unverified. The required build refreshed local `dist/` assets. No deployment, launcher, or server lifecycle operation was performed.

@@ -57,7 +57,7 @@ import {
   type ReactNode,
 } from 'react'
 import { flushSync } from 'react-dom'
-import { EditPencil, NavArrowRight, RefreshDouble, Send as SendIcon, Terminal as TerminalIcon } from 'iconoir-react'
+import { EditPencil, NavArrowRight, RefreshDouble, Send as SendIcon, Terminal as TerminalIcon, Xmark } from 'iconoir-react'
 import { AgentCommandBubble, AgentCommandPopup } from './agent-command-bubble'
 import { AgentLoadingBubbles, AgentReplyPending } from './agent-loading-bubbles'
 import { useAgentCommands } from '../hooks/use-agent-commands'
@@ -3479,6 +3479,21 @@ function AgentSessionView({
     if (composerCliMode || composerAttaching) return
     setDrawingContext({ projectRoot: notificationWorkspace, target: editingQueued ? 'queue' : 'composer', queueVersion: queuedEditVersionRef.current })
   }
+  const clearComposer = () => {
+    if (composerAttaching || cli.submitting) return
+    if (editingQueued) {
+      setEditingQueued(current => current ? { ...current, text: '', attachments: [] } : current)
+    } else {
+      historyIndexRef.current = null
+      historyDraftRef.current = ''
+      setDraft('')
+      setAttachments([])
+    }
+    setPreviewAttachment(null)
+    setScheduleOpen(false)
+    setRescheduling(null)
+    requestAnimationFrame(() => agentInputRef.current?.focus())
+  }
   const cliModeDisabled = !!editingQueued || !allowTerminal || attaching || draftAttachments.length > 0 || cli.submitting
   const toggleCliMode = () => {
     if (cliModeDisabled) return
@@ -4590,6 +4605,16 @@ function AgentSessionView({
           />
           </div>
           <div ref={composerActionsRef} data-agent-composer-actions className="absolute right-1 bottom-1 z-10 flex w-max max-w-[calc(100%-0.5rem)] flex-wrap items-stretch justify-end gap-1">
+          <HoverTipLayer className="flex items-stretch">
+            <div data-tip={uiText('지우기')} className="flex min-h-8 items-center">
+            <button type="button" aria-label={uiText('지우기')}
+              disabled={!composerDraft || composerAttaching || cli.submitting}
+              onClick={clearComposer}
+              className="flex h-7 w-7 items-center justify-center rounded bg-surface text-ink-muted hover:bg-surface-raised hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-40">
+              <Xmark width={17} height={17} aria-hidden="true" />
+            </button>
+            </div>
+          </HoverTipLayer>
           <HoverTipLayer className="flex items-stretch">
             <div data-tip={uiText('그림판 열기')} className="flex min-h-8 items-center">
             <button type="button" aria-label={uiText('그림판 열기')}
