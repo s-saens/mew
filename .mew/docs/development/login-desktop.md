@@ -1,6 +1,6 @@
 ---
 title: "Virtual Login Desktop"
-description: "Defines managed ordinary Chrome selection, the X server, video WebSocket, XTest input, account profiles, permissions, and process lifetimes for the Linux/WSL-only login screen. Separates browser dependency preparation from native display and actual-account verification."
+description: "Defines managed ordinary Chrome selection, the X server, video WebSocket, XTest input, account profiles, permissions, and process lifetimes for the Linux/WSL-only login screen. Separates the general native Chrome H.264 browser from this restricted JPEG login surface, dependency preparation, and actual-account verification."
 created: "2026-10-20"
 updated: "2026-11-05"
 ---
@@ -15,7 +15,7 @@ Linux/WSL requires ordinary Google Chrome, Xvfb, FFmpeg with X11 capture and an 
 
 `server/login-desktop-x11.py` handles focus, popups, clipboard, keys, and buttons on a separate X server. It does not connect to input, clipboard, or portals on the actual host desktop. Browser CPU/GPU usage is not isolated. It does not attach personal Chrome profiles and maintains `DATA_DIR/browser/profiles/<account-hash>` per account. Currently, each account uses one login screen at a time.
 
-External websites in the internal DOM browser also use ordinary Chrome, but retain Playwright control and rrweb replay. Only this login screen uses native video and OS input without CDP or Playwright. See the [browser selection decision](../decisions/0137-browser-purpose-routing.md).
+The [general Browser panel](browser-desktop.md) also uses ordinary headed Chrome and the same virtual-display/input lifecycle hooks, with its own profile namespace and H.264/WebRTC transport. It does not widen this login surface's registered-URL allowlist or change its JPEG protocol. [ADR 0146](../decisions/0146-native-browser-video-and-local-app-tabs.md) replaces the default DOM-browser UI policy while preserving this provider-login boundary.
 
 ## APIs and Permissions
 

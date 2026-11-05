@@ -1,4 +1,5 @@
 import { validPreviewPort } from '../../shared/port-preview.ts'
+import { localBrowserUrl } from '@mew/ui/local-browser'
 
 let previewBaseUrl: string | null | undefined
 
@@ -17,6 +18,14 @@ export function configurePortPreviewBaseUrl(value?: string | null) {
 export function portPreviewUrl(port: number): string {
   if (!validPreviewPort(port)) throw new Error('포트가 올바르지 않습니다.')
   return `${publicMewBaseUrl()}/${port}`
+}
+
+export function localAppPreviewUrl(raw: string): string {
+  const normalized = localBrowserUrl(raw)
+  if (!normalized) throw new Error('localhost 앱 주소가 올바르지 않습니다.')
+  const url = new URL(normalized)
+  const port = Number(url.port || (url.protocol === 'https:' ? 443 : 80))
+  return `${portPreviewUrl(port)}${url.pathname}${url.search}${url.hash}`
 }
 
 export function publicMewBaseUrl(): string {

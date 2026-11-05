@@ -1,11 +1,11 @@
 ---
 title: "Browser runtime dependencies"
-description: "Defines Mew-owned installation and readiness checks for ordinary Google Chrome and pinned Playwright Chromium. Covers source and prebuilt startup integration, overrides, host libraries, download boundaries, and platform limits."
+description: "Defines Mew-owned installation and readiness checks for ordinary Google Chrome and pinned Playwright Chromium. Covers source and prebuilt startup integration, overrides, host libraries, download boundaries, and platform limits, including the separate native video prerequisites."
 created: "2026-11-05"
 updated: "2026-11-05"
 ---
 
-Mew prepares both browser roles defined in [ADR 0137](../decisions/0137-browser-purpose-routing.md): ordinary Google Chrome for external browsing and login, and Playwright Chromium for loopback apps and UI automation. `server/browser-dependencies.ts` owns installation and readiness checks. Missing browsers are an installation problem rather than a prerequisite users must discover by opening a panel.
+Mew prepares ordinary Google Chrome for the native Browser and login screens, and Playwright Chromium for UI automation and the retained DOM compatibility endpoint. Localhost proxy tabs do not require a host browser. [ADR 0146](../decisions/0146-native-browser-video-and-local-app-tabs.md) updates ADR 0137's UI routing without changing the two executable preparation roles. `server/browser-dependencies.ts` owns installation and readiness checks. Missing browsers are an installation problem rather than a prerequisite users must discover by opening a panel.
 
 ## Commands and installation boundaries
 
@@ -44,6 +44,6 @@ On Linux/WSL, inspect executable shared-library dependencies with `ldd`. Run the
 
 Automatic ordinary Chrome installation on Linux/WSL is limited to x64. Linux arm64 requires an explicit compatible executable through `MEW_CHROME_EXECUTABLE`; otherwise preparation fails with an actionable message. Windows Chrome does not satisfy a WSL installation. On macOS and native Windows, browser shared-library dependencies are handled by the OS; this implementation does not establish successful installation or launch on those platforms.
 
-Login's Xvfb, FFmpeg, Python, libX11, and libXtst preparation remains separate. Browser readiness alone does not establish that the [native login screen](login-desktop.md) is ready, that a provider accepts a login, or that remote desktop permissions are granted.
+The native Browser and login screens' Xvfb, FFmpeg, Python, libX11, and libXtst preparation remains separate. The native Browser additionally needs FFmpeg libx264 and the existing node-datachannel runtime; the browser installer does not establish those video prerequisites. Browser readiness alone does not establish that the [native login screen](login-desktop.md) is ready, that a provider accepts a login, or that remote desktop permissions are granted.
 
-Current consumers: [DOM browser](port-preview.md#internal-dom-browser), [UI tests](browser-testing.md), [login screen](login-desktop.md), and [prebuilt CLI](cli-distribution.md). Rationale follows [ADR 0139](../decisions/0139-browser-runtime-dependencies.md); actual checks and limits belong in the [work record](../work/browser-runtime-dependencies.md).
+Current consumers: [native Browser](browser-desktop.md), [retained DOM browser](../history/dom-browser-purpose-routing.md), [UI tests](browser-testing.md), [login screen](login-desktop.md), and [prebuilt CLI](cli-distribution.md). Rationale follows [ADR 0139](../decisions/0139-browser-runtime-dependencies.md); actual checks and limits belong in the [work record](../work/browser-runtime-dependencies.md).

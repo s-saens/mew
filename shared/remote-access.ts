@@ -31,7 +31,7 @@ export function remotePath(path: unknown, socket = false, capability?: 'port-pre
   const url = new URL(path, 'https://mew.invalid')
   if (url.origin !== 'https://mew.invalid' || !path.startsWith('/api/') || url.pathname !== path.split('?')[0]) return false
   if (url.pathname.startsWith('/api/port-preview/') && !['/api/port-preview/session', '/api/port-preview/access-url'].includes(url.pathname)) return false
-  if (socket) return ['/api/tmux/ws', '/api/agent/ws', '/api/presence', '/api/live/ws', '/api/collab', '/api/db/ws', '/api/login-desktop/ws', '/api/dom-browser/ws', '/api/remote-desktop/ws'].includes(url.pathname)
+  if (socket) return ['/api/tmux/ws', '/api/agent/ws', '/api/presence', '/api/live/ws', '/api/collab', '/api/db/ws', '/api/login-desktop/ws', '/api/browser-desktop/ws', '/api/dom-browser/ws', '/api/remote-desktop/ws'].includes(url.pathname)
   return (!url.pathname.startsWith('/api/remote-access') || url.pathname === '/api/remote-access/members' || url.pathname === '/api/remote-access') && (!url.pathname.startsWith('/api/auth/') || ['/api/auth/me', '/api/auth/login', '/api/auth/logout', '/api/auth/change-password', '/api/auth/profile', '/api/auth/remote-device', '/api/auth/mewlink', '/api/auth/mewlink/request', '/api/auth/mewlink/login', '/api/auth/mewlink/link'].includes(url.pathname))
 }
 export function parseRemoteFrame(raw: string): RemoteFrame {

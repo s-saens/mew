@@ -25,6 +25,9 @@ async function until(fn: () => boolean) { const deadline = Date.now() + 4000; wh
 test('remote request paths cannot reach arbitrary origins, local ports or unsupported auth routes', () => {
   for (const path of ['//evil.test/api/file', 'https://evil.test/api/file', '/api/../auth/login', '/api/auth/signup', '/api/remote-access/register', '/api/%2fsecret', '/__mew_browser/x', '/api/file\nX: true']) assert.equal(remotePath(path), false, path)
   assert.equal(remotePath('/api/file?project=docs'), true)
+  assert.equal(remotePath('/api/browser-desktop/ws', true), true)
+  assert.equal(remotePath('/api/browser-desktop/ws?session=fixture', true), true)
+  assert.equal(remotePath('/api/browser-desktop/ws/other', true), false)
   for (const route of ['me', 'login', 'logout', 'change-password']) assert.equal(remotePath('/api/auth/' + route), true)
   assert.equal(remotePath('/api/auth/login/extra'), false)
   assert.equal(remotePath('/api/remote-ui/file?path=%2Fassets%2Fapp.js'), true)

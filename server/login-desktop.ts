@@ -23,12 +23,12 @@ const TTL = 20 * 60_000
 const DISCONNECT_GRACE = 60_000
 process.once('exit', () => { for (const child of owned) signalChild(child, 'SIGTERM') })
 
-function signalChild(child: ChildProcess, signal: NodeJS.Signals) {
+export function signalChild(child: ChildProcess, signal: NodeJS.Signals) {
   if (!child.pid || child.exitCode !== null || child.signalCode !== null) return
   try { process.kill(-child.pid, signal) } catch { try { child.kill(signal) } catch { /* Already exited. */ } }
 }
 
-function childProcess(command: string, args: string[], env: NodeJS.ProcessEnv): ChildProcess {
+export function childProcess(command: string, args: string[], env: NodeJS.ProcessEnv): ChildProcess {
   const child = spawn(command, args, { env, detached: true, stdio: ['pipe', 'pipe', 'pipe'] })
   owned.add(child)
   child.once('error', () => { owned.delete(child) })
@@ -37,7 +37,7 @@ function childProcess(command: string, args: string[], env: NodeJS.ProcessEnv): 
   return child
 }
 
-async function waitForExit(child: ChildProcess, timeout: number): Promise<boolean> {
+export async function waitForExit(child: ChildProcess, timeout: number): Promise<boolean> {
   if (child.exitCode !== null || child.signalCode !== null || !child.pid) return true
   return new Promise(resolve => {
     const finish = (exited: boolean) => { clearTimeout(timer); child.off('exit', exit); resolve(exited) }
@@ -47,7 +47,7 @@ async function waitForExit(child: ChildProcess, timeout: number): Promise<boolea
   })
 }
 
-async function stopChild(child: ChildProcess | undefined) {
+export async function stopChild(child: ChildProcess | undefined) {
   if (!child) return
   signalChild(child, 'SIGTERM')
   if (!await waitForExit(child, 1500)) { signalChild(child, 'SIGKILL'); await waitForExit(child, 1500) }
@@ -111,51 +111,84 @@ export class LoginJpegFrames {
 
 export class LoginDesktopSession {
   readonly id = crypto.randomBytes(24).toString('base64url')
-  readonly expiresAt = Date.now() + TTL
+  readonly expiresAt: number
   readonly account: string
   readonly job: string
   readonly url: string
   readonly features: readonly Feature[]
   private socket?: WebSocket
   private authorized?: () => boolean
-  private width = 0
-  private height = 0
+  protected width = 0
+  protected height = 0
   private timer: ReturnType<typeof setTimeout>
   private disconnected?: ReturnType<typeof setTimeout>
   private starting?: Promise<void>
   private resizing?: Promise<void>
   private requestedSize?: { width: number; height: number }
-  private environment?: NodeJS.ProcessEnv
+  protected environment?: NodeJS.ProcessEnv
   private closing?: Promise<void>
-  private closed = false
+  protected closed = false
   private directory?: string
   private display?: ChildProcess
   private browser?: ChildProcess
   private input?: ChildProcess
-  private capture?: ChildProcess
+  protected capture?: ChildProcess
   private frame?: Buffer
   private sentFrame?: Buffer
   private awaitingFrame = false
   private frameDeadline?: ReturnType<typeof setTimeout>
   private announcedWidth = 0
   private announcedHeight = 0
-  private ready = false
+  protected ready = false
   private inputCount = 0
   private inputAt = 0
 
-  constructor(account: string, job: string, url: string, features: readonly Feature[] = ['agent']) {
+  constructor(account: string, job: string, url: string, features: readonly Feature[] = ['agent'], lifetimeMs = TTL) {
+    if (!Number.isSafeInteger(lifetimeMs) || lifetimeMs < 1 || lifetimeMs > 0x7fffffff) throw new Error('가상 화면 유지 시간이 올바르지 않습니다.')
     this.account = account; this.job = job; this.url = url; this.features = features
-    this.timer = setTimeout(() => { void this.close() }, TTL); this.timer.unref()
+    this.expiresAt = Date.now() + lifetimeMs
+    this.timer = setTimeout(() => { void this.close() }, lifetimeMs); this.timer.unref()
   }
 
   get isClosed() { return this.closed }
   info(): LoginDesktopPage { return { id: this.id, job: this.job, url: this.url, streamUrl: `${LOGIN_DESKTOP_WS}?session=${this.id}` } }
-  private send(state: LoginDesktopState) { if (this.socket?.readyState === WebSocket.OPEN) this.socket.send(JSON.stringify(state)) }
-  private fail(message: string) { if (this.closed) return; this.send({ type: 'error', message }); void this.close() }
-  private command(value: LoginDesktopInput | { type: 'shutdown' }) {
+  protected send(state: LoginDesktopState) { if (this.socket?.readyState === WebSocket.OPEN) this.socket.send(JSON.stringify(state)) }
+  protected fail(message: string) { if (this.closed) return; this.send({ type: 'error', message }); void this.close() }
+  protected command(value: LoginDesktopInput | { type: 'shutdown' }) {
     const stream = this.input?.stdin
     if (!stream || stream.destroyed || stream.writableLength > 64 * 1024) return
     stream.write(JSON.stringify(value) + '\n')
+  }
+
+  /** Owns only this session's display; authentication and transport stay with its caller. */
+  startDesktop(width: number, height: number): Promise<void> {
+    if (this.closed) return Promise.reject(new Error('가상 화면이 종료됐습니다.'))
+    if (this.starting) return this.resizeDesktop(width, height)
+    const size = loginDesktopSize(width, height)
+    this.width = size.width; this.height = size.height
+    this.starting = this.launch()
+    return this.starting
+  }
+
+  resizeDesktop(width: number, height: number): Promise<void> {
+    if (this.closed) return Promise.resolve()
+    if (!this.starting) return this.startDesktop(width, height)
+    this.requestedSize = loginDesktopSize(width, height)
+    return this.resize()
+  }
+
+  /** The owning transport validates permission, rate limits, and input before calling. */
+  desktopInput(input: LoginDesktopInput) {
+    if (this.closed) return
+    if (input.type === 'release') this.command(input)
+    else if (input.type === 'close') void this.close()
+    else if (input.type === 'resize') void this.resizeDesktop(input.width, input.height).catch(() => this.fail('로그인 화면을 시작하지 못했습니다. Linux/WSL의 Chrome·Xvfb·ffmpeg·Python3·libXtst 설치를 확인해 주세요.'))
+    else if (input.type !== 'frame-ack' && this.ready) this.command(input)
+  }
+
+  protected profileKey() { return this.account }
+  protected browserArguments(profile: string): string[] {
+    return [`--user-data-dir=${profile}`, '--no-first-run', '--no-default-browser-check', '--ozone-platform=x11', '--new-window', '--start-fullscreen', `--window-size=${this.width},${this.height}`, '--window-position=0,0', this.url]
   }
 
   private sendFrame() {
@@ -193,14 +226,7 @@ export class LoginDesktopSession {
         if (now - this.inputAt >= 1000) { this.inputAt = now; this.inputCount = 0 }
         if (++this.inputCount > 500) throw new Error('input-limit')
         if (input.type === 'frame-ack') { clearTimeout(this.frameDeadline); this.awaitingFrame = false; this.sendFrame(); return }
-        if (input.type === 'close') { void this.close(); return }
-        if (input.type === 'resize') {
-          if (!this.starting) {
-            const size = loginDesktopSize(input.width, input.height)
-            this.width = size.width; this.height = size.height
-            this.starting = this.launch().then(() => { if (this.requestedSize) this.resize() }).catch(() => { this.fail('로그인 화면을 시작하지 못했습니다. Linux/WSL의 Chrome·Xvfb·ffmpeg·Python3·libXtst 설치를 확인해 주세요.') })
-          } else { this.requestedSize = loginDesktopSize(input.width, input.height); this.resize() }
-        } else if (this.ready) this.command(input)
+        this.desktopInput(input)
       } catch { socket.close(1008, 'Invalid login input'); void this.close() }
     })
     socket.once('close', () => {
@@ -212,8 +238,8 @@ export class LoginDesktopSession {
     socket.on('error', () => {})
   }
 
-  private resize() {
-    if (this.resizing || this.closed) return
+  private resize(): Promise<void> {
+    if (this.resizing || this.closed) return this.resizing ?? Promise.resolve()
     this.resizing = (async () => {
       await this.starting
       while (this.requestedSize && !this.closed) {
@@ -237,6 +263,7 @@ export class LoginDesktopSession {
         if (!this.closed) await this.startCapture()
       }
     })().catch(() => { this.fail('로그인 화면 크기를 변경하지 못했습니다. 화면을 닫고 다시 열어 주세요.') }).finally(() => { this.resizing = undefined; if (this.requestedSize && !this.closed) this.resize() })
+    return this.resizing
   }
 
   private async launch() {
@@ -276,9 +303,9 @@ export class LoginDesktopSession {
     })
     input.stdout!.resume()
     if (this.closed) return
-    const profile = path.join(DATA_DIR, 'browser', 'profiles', crypto.createHash('sha256').update(this.account).digest('hex'))
+    const profile = path.join(DATA_DIR, 'browser', 'profiles', crypto.createHash('sha256').update(this.profileKey()).digest('hex'))
     fs.mkdirSync(profile, { recursive: true, mode: 0o700 })
-    this.browser = childProcess(chrome, [`--user-data-dir=${profile}`, '--no-first-run', '--no-default-browser-check', '--ozone-platform=x11', '--new-window', '--start-fullscreen', `--window-size=${this.width},${this.height}`, '--window-position=0,0', this.url], env)
+    this.browser = childProcess(chrome, this.browserArguments(profile), env)
     this.browser.stdout!.resume()
     this.browser.once('error', () => { this.fail('호스트 Chrome을 실행하지 못했습니다.') })
     this.browser.once('exit', () => { if (!this.closed) void this.close() })
@@ -287,7 +314,7 @@ export class LoginDesktopSession {
     await this.startCapture()
   }
 
-  private async startCapture() {
+  protected async startCapture() {
     const env = this.environment!
     this.capture = childProcess('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-nostdin', '-f', 'x11grab', '-framerate', String(LOGIN_DESKTOP_LIMITS.fps), '-video_size', `${this.width}x${this.height}`, '-i', `${env.DISPLAY}+0,0`, '-an', '-c:v', 'mjpeg', '-threads:v', '1', '-q:v', '5', '-f', 'image2pipe', 'pipe:1'], env)
     const capture = this.capture, frames = new LoginJpegFrames()

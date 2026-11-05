@@ -1,4 +1,9 @@
 import { LOCAL_BROWSER_OPEN_EVENT, localBrowserUrl } from '@mew/ui/local-browser'
+import { localAppPreviewUrl } from './port-preview-url.ts'
+
+export function openLocalPortPreview(raw: string): void {
+  window.open(localAppPreviewUrl(raw), '_blank', 'noopener,noreferrer')
+}
 
 export function captureLocalBrowserLinks(onOpen: (url: string) => void): () => void {
   const onRequest = (event: Event) => {

@@ -1,6 +1,6 @@
 ---
 title: "0137 — Choose Chrome or Chromium by browser purpose"
-description: "Selects ordinary installed Google Chrome for login and external DOM pages, with Playwright Chromium for loopback apps and UI automation. Extends ADR 0136 with independent overrides, URL-based switching, per-role session state, and cross-runtime history; ADR 0139 adds managed runtime dependency preparation."
+description: "Selects ordinary installed Google Chrome for login and external DOM pages, with Playwright Chromium for loopback apps and UI automation. Extends ADR 0136 with independent overrides, URL-based switching, per-role session state, and cross-runtime history; ADR 0139 adds managed runtime dependency preparation; ADR 0146 supersedes the default UI routing while retaining the automation and installation roles."
 created: "2026-11-05"
 updated: "2026-11-05"
 status: "accepted"
@@ -42,3 +42,5 @@ Both browser installations are required for the complete feature set. Role chang
 Current contracts: [DOM browser](../development/port-preview.md#internal-dom-browser), [login desktop](../development/login-desktop.md), and [UI tests](../development/browser-testing.md). Installation and checks are recorded in the [work record](../work/browser-purpose-routing.md).
 
 [ADR 0139](0139-browser-runtime-dependencies.md) extends dependency ownership with source and prebuilt preparation. It preserves this purpose split while requiring the Playwright-pinned Chromium for default readiness.
+
+[ADR 0146](0146-native-browser-video-and-local-app-tabs.md) supersedes this decision's default DOM-browser UI and loopback runtime switching. Localhost apps now open proxy tabs and the Browser panel uses native headed Chrome video. The original rationale and compatibility implementation remain historical evidence; UI automation retains Playwright Chromium.

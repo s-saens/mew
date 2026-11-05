@@ -5,14 +5,15 @@ import os from 'node:os'
 import path from 'node:path'
 import { createServer } from 'node:http'
 import { EventEmitter, once } from 'node:events'
+import { createHash } from 'node:crypto'
 import { spawnSync, type ChildProcess } from 'node:child_process'
 import { setTimeout as delay } from 'node:timers/promises'
 import { WebSocket } from 'ws'
-import { loginDesktopSize, parseLoginDesktopInput } from '../shared/login-desktop.ts'
+import { loginDesktopSize, parseLoginDesktopInput, type LoginDesktopInput } from '../shared/login-desktop.ts'
 
 const root = await fs.mkdtemp(path.join(os.tmpdir(), 'mew-login-test-'))
 process.env.MEW_DATA_DIR = root
-const { LoginDesktopSession, LoginJpegFrames, attachLoginDesktopWebSocket, closeLoginDesktopJob, closeLoginDesktops, createLoginDesktopAuthSession, loginDesktopConnectionAllowed, loginDesktopExecutable, loginDesktopUrlAllowed } = await import('./login-desktop.ts')
+const { LoginDesktopSession, LoginJpegFrames, attachLoginDesktopWebSocket, childProcess, closeLoginDesktopJob, closeLoginDesktops, createLoginDesktopAuthSession, loginDesktopConnectionAllowed, loginDesktopExecutable, loginDesktopUrlAllowed, stopChild, waitForExit } = await import('./login-desktop.ts')
 test.after(async () => { await closeLoginDesktops(); await fs.rm(root, { recursive: true, force: true }) })
 
 test('login video URLs, dimensions and input preserve the restricted surface', () => {
@@ -41,6 +42,57 @@ test('JPEG parser accepts split boundaries and rejects oversized frames', () => 
   assert.throws(() => parser.push(Buffer.concat([Buffer.from([255, 216]), Buffer.alloc(2 * 1024 * 1024)]), () => {}), /한도/)
 })
 
+test('desktop hooks retain login defaults and gate native input without a video socket', async () => {
+  class Probe extends LoginDesktopSession {
+    commands: Array<LoginDesktopInput | { type: 'shutdown' }> = []
+    protected override command(input: LoginDesktopInput | { type: 'shutdown' }) { this.commands.push(input) }
+    markReady() { this.ready = true }
+    args(profile: string) { return this.browserArguments(profile) }
+    key() { return this.profileKey() }
+  }
+  const before = Date.now(), session = new Probe('hooks@test', 'hooks', 'https://accounts.google.com/')
+  try {
+    assert.ok(session.expiresAt >= before + 20 * 60_000 && session.expiresAt <= Date.now() + 20 * 60_000)
+    assert.equal(session.key(), 'hooks@test')
+    assert.ok(session.args('/fixture/profile').includes('--start-fullscreen'))
+    assert.ok(session.args('/fixture/profile').includes('--user-data-dir=/fixture/profile'))
+    session.desktopInput({ type: 'pointer', x: 12, y: 18 })
+    session.desktopInput({ type: 'release' })
+    assert.deepEqual(session.commands, [{ type: 'release' }], 'release works before video is ready; pointer input waits')
+    session.markReady()
+    session.desktopInput({ type: 'pointer', x: 12, y: 18 })
+    session.desktopInput({ type: 'frame-ack' })
+    assert.deepEqual(session.commands, [{ type: 'release' }, { type: 'pointer', x: 12, y: 18 }], 'video ACKs never enter native input')
+    await session.close()
+    const count = session.commands.length
+    session.desktopInput({ type: 'release' })
+    assert.equal(session.commands.length, count, 'closed sessions never inject input')
+    await assert.rejects(session.startDesktop(640, 480), /종료/)
+  } finally { await session.close() }
+})
+
+test('explicit browser lifetime is separate from the default login expiry and cleans up on expiry', async () => {
+  const before = Date.now(), browser = new LoginDesktopSession('lifetime@test', 'browser', 'https://example.test/', ['agent'], 8 * 60 * 60_000)
+  try { assert.ok(browser.expiresAt >= before + 8 * 60 * 60_000 && browser.expiresAt <= Date.now() + 8 * 60 * 60_000) }
+  finally { await browser.close() }
+  for (const duration of [0, -1, Infinity, 0x80000000, 2.5]) assert.throws(() => new LoginDesktopSession('bad@test', 'bad', 'https://example.test/', ['agent'], duration), /유지 시간/)
+  const expiring = new LoginDesktopSession('expiry@test', 'expiry', 'https://example.test/', ['agent'], 20)
+  await delay(50)
+  assert.equal(expiring.isClosed, true)
+  await expiring.close()
+})
+
+test('exported process cleanup waits for only the child it owns and remains idempotent', async () => {
+  const child = childProcess(process.execPath, ['-e', 'process.stdout.write("ready");setInterval(()=>{},1000)'], process.env)
+  try {
+    await once(child.stdout!, 'data')
+    assert.equal(await waitForExit(child, 10), false)
+    await stopChild(child)
+    assert.equal(await waitForExit(child, 10), true)
+    await stopChild(child)
+  } finally { await stopChild(child) }
+})
+
 const dependencies = process.platform === 'linux' && ['Xvfb', 'ffmpeg', 'python3'].every(command => spawnSync(command, [command === 'ffmpeg' ? '-version' : command === 'Xvfb' ? '-help' : '--version'], { stdio: 'ignore' }).status === 0)
 let chrome: string | undefined
 try { chrome = loginDesktopExecutable() } catch { /* No browser fixture available. */ }
@@ -50,6 +102,65 @@ async function until(predicate: () => boolean, label: string, timeout = 15_000) 
   while (Date.now() < deadline) { if (predicate()) return; await delay(30) }
   assert.fail(label)
 }
+
+test('a browser subclass starts and resizes its own ordinary Chrome without attaching the JPEG transport', { skip: !dependencies || !chrome, timeout: 30_000 }, async () => {
+  class BrowserDesktop extends LoginDesktopSession {
+    captures = 0
+    protected override profileKey() { return `browser-fixture:${this.account}` }
+    protected override browserArguments(profile: string) { return super.browserArguments(profile).filter(argument => argument !== '--start-fullscreen') }
+    protected override async startCapture() { this.captures++; await super.startCapture() }
+    runtime() { return { width: this.width, height: this.height, capture: this.capture, ready: this.ready, display: this.environment?.DISPLAY } }
+  }
+  const events: Array<{ kind: string; text: string; width: number; height: number; document: string }> = []
+  const server = createServer((req, res) => {
+    const url = new URL(req.url!, 'http://localhost')
+    if (url.pathname === '/event') { events.push({ kind: url.searchParams.get('kind')!, text: url.searchParams.get('text') ?? '', width: Number(url.searchParams.get('width')), height: Number(url.searchParams.get('height')), document: url.searchParams.get('document') ?? '' }); res.end('ok'); return }
+    res.setHeader('Content-Type', 'text/html')
+    res.end('<!doctype html><meta charset="utf-8"><style>body{margin:0}input{position:absolute;left:30px;top:30px;width:240px;height:50px}</style><input onclick="fetch(`/event?kind=clicked`)" oninput="fetch(`/event?kind=text&text=${encodeURIComponent(this.value)}`)"><script>const id=crypto.randomUUID();function report(){fetch(`/event?kind=loaded&width=${innerWidth}&height=${innerHeight}&document=${id}`)}addEventListener("resize",report);requestAnimationFrame(()=>requestAnimationFrame(report))</script>')
+  })
+  server.listen(0, '127.0.0.1'); await once(server, 'listening')
+  const origin = `http://127.0.0.1:${(server.address() as { port: number }).port}`
+  const session = new BrowserDesktop('native-subclass@test', 'browser', origin, ['agent'], 8 * 60 * 60_000)
+  try {
+    await session.startDesktop(641, 481)
+    const runtime = session.runtime()
+    assert.deepEqual({ width: runtime.width, height: runtime.height, ready: runtime.ready }, { width: 640, height: 480, ready: true })
+    assert.match(runtime.display!, /^:\d+$/)
+    assert.equal(session.captures, 1)
+    const profile = path.join(root, 'browser', 'profiles', createHash('sha256').update('browser-fixture:native-subclass@test').digest('hex'))
+    await fs.access(profile)
+    await assert.rejects(fs.access(path.join(root, 'browser', 'profiles', createHash('sha256').update('native-subclass@test').digest('hex'))), { code: 'ENOENT' })
+    await until(() => events.some(event => event.kind === 'loaded'), 'native browser fixture must load')
+    const document = events.find(event => event.kind === 'loaded')!.document
+    assert.ok(events.findLast(event => event.kind === 'loaded')!.height < 480, 'ordinary Chrome toolbar remains visible')
+    const clickInput = async () => {
+      const before = events.filter(event => event.kind === 'clicked').length
+      // The first encoded desktop frame may precede Chrome's first page paint.
+      // Wait for the fixture's actual native click before sending keyboard input.
+      for (let attempt = 0; attempt < 50; attempt++) {
+        const y = 55 + session.runtime().height - events.findLast(event => event.kind === 'loaded')!.height
+        session.desktopInput({ type: 'button', button: 0, down: true, x: 100, y })
+        session.desktopInput({ type: 'button', button: 0, down: false, x: 100, y })
+        await delay(80)
+        if (events.filter(event => event.kind === 'clicked').length > before) return
+      }
+      assert.fail(`native input target did not receive a click: ${JSON.stringify(events)}`)
+    }
+    await clickInput(); session.desktopInput({ type: 'paste', text: '직접 입력' })
+    await until(() => events.some(event => event.text === '직접 입력'), 'native input does not depend on JPEG socket attachment')
+    await session.resizeDesktop(901, 701)
+    assert.equal(session.captures, 2)
+    assert.ok(runtime.capture?.exitCode !== null || runtime.capture?.signalCode !== null, 'old capture is stopped before replacement')
+    await until(() => events.some(event => event.kind === 'loaded' && event.width >= 898), 'window follows explicit resize')
+    assert.equal(events.findLast(event => event.kind === 'loaded')!.document, document, 'resize preserves the same page')
+    await clickInput(); session.desktopInput({ type: 'key', key: 'End', code: 'End', down: true }); session.desktopInput({ type: 'key', key: 'End', code: 'End', down: false })
+    session.desktopInput({ type: 'paste', text: ' resized' })
+    await until(() => events.some(event => event.text === '직접 입력 resized'), 'input remains usable after native resize')
+  } finally {
+    await session.close()
+    server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve()))
+  }
+})
 
 test('private Xvfb sends real JPEG, accepts OS input and popup clipboard, and closes every owned process', { skip: !dependencies || !chrome, timeout: 45_000 }, async () => {
   const events: Array<{ kind: string; text?: string; width?: number; height?: number; webdriver?: boolean; document?: string }> = []

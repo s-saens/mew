@@ -4,6 +4,7 @@ import { createRemoteAgent } from './remote-access-agent.ts'
 import { watchSocketAccess } from './access-socket.ts' // 반드시 첫 줄 — 다른 모듈이 상수를 계산하기 전에 설정 파일을 읽어야 한다
 import { webSocketOriginAllowed } from './websocket-origin.ts'
 import { attachLoginDesktopWebSocket, closeLoginDesktops, LOGIN_DESKTOP_WS } from './login-desktop.ts'
+import { attachBrowserDesktopWebSocket, closeBrowserDesktops, BROWSER_DESKTOP_WS } from './browser-desktop.ts'
 import { attachDomBrowserWebSocket, closeDomBrowsers, DOM_BROWSER_WS } from './dom-browser.ts'
 import { attachRemoteDesktopWebSocket, DESKTOP_WS } from './remote-desktop.ts'
 import express from 'express'
@@ -60,7 +61,7 @@ process.on('uncaughtException', (err) => {
 // 소유하므로 mew 종료·재시작과 함께 접지 않는다. 신호 처리 뒤에는 직접 나가야 한다.
 export function shutdownServer() {
   disposeAllSessions()
-  void Promise.all([closeLoginDesktops(), closeDomBrowsers()]).finally(() => process.exit(0))
+  void Promise.all([closeLoginDesktops(), closeDomBrowsers(), closeBrowserDesktops()]).finally(() => process.exit(0))
   setTimeout(() => process.exit(0), 3000).unref()
 }
 for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) {
@@ -122,6 +123,7 @@ attachDbWebSocket(server, { authorize: authorizeFeature('database'), authorizePr
 attachAgentWebSocket(server, { authorize: authorizeFeature('agent') })
 attachLoginDesktopWebSocket(server)
 attachDomBrowserWebSocket(server)
+attachBrowserDesktopWebSocket(server)
 attachRemoteDesktopWebSocket(server)
 attachPortPreviewWebSocket(server)
 destroyUnknownUpgrades(server, [
@@ -133,6 +135,7 @@ destroyUnknownUpgrades(server, [
   AGENT_WS_PATH,
   LOGIN_DESKTOP_WS,
   DOM_BROWSER_WS,
+  BROWSER_DESKTOP_WS,
   DESKTOP_WS,
   '/__mew_port_preview_ws/',
   '/api/port-preview/ws',

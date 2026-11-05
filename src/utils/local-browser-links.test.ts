@@ -34,7 +34,7 @@ test('captures localhost anchors before editor handlers and opens shared request
     const modifiedClick = new browser.MouseEvent('click', { button: 0, ctrlKey: true, bubbles: true, cancelable: true })
     anchor.dispatchEvent(modifiedClick)
     assert.equal(modifiedClick.defaultPrevented, true)
-    assert.equal(opened.length, 3, 'modifier clicks also open the host app internally')
+    assert.equal(opened.length, 3, 'modifier clicks also use the host-app navigation handler')
     assert.equal(requestLocalBrowser('127.0.0.1:9000/route'), true)
     assert.equal(opened.at(-1), 'http://127.0.0.1:9000/route')
     assert.equal(requestLocalBrowser('https://example.com'), false)

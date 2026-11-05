@@ -125,7 +125,7 @@ import { observeWorkspaceViewport } from './utils/workspace-viewport'
 import { requestFullscreenWithKeyboard } from '@mew/ui/virtual-keyboard'
 import { deferredComponent } from './components/deferred-component'
 import { afterFirstPaint } from './utils/fileOpenPerformance'
-import { captureLocalBrowserLinks } from './utils/local-browser-links'
+import { captureLocalBrowserLinks, openLocalPortPreview } from './utils/local-browser-links'
 
 function toggleFullscreen() {
   if (document.fullscreenElement) document.exitFullscreen()
@@ -158,7 +158,7 @@ const GitPanel = deferredComponent(async () => ({ default: (await import('./comp
 const RemoteDesktop = deferredComponent(async () => ({ default: (await import('./components/remote-desktop')).RemoteDesktop }), null)
 const TermButtonBar = deferredComponent(async () => ({ default: (await import('./components/TermButtonBar')).TermButtonBar }), null)
 const DebuggerPanel = lazy(() => import('./components/debugger-panel'))
-const DomBrowserPanel = deferredComponent(async () => ({ default: (await import('./components/DomBrowserPanel')).DomBrowserPanel }))
+const BrowserDesktopPanel = deferredComponent(async () => ({ default: (await import('./components/BrowserDesktopPanel')).BrowserDesktopPanel }))
 
 const isDesktop = () => window.matchMedia('(min-width: 768px)').matches
 
@@ -364,7 +364,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
   const [terminalOpen, setTerminalOpen] = useState(() => canUseTerminal && (scopedBrowserStorage().getItem(TERMINAL_OPEN_KEY) !== null ? scopedBrowserStorage().getItem(TERMINAL_OPEN_KEY) === '1' : scopedBrowserStorage().getItem(LEGACY_TMUX_OPEN_KEY) === '1' || scopedBrowserStorage().getItem(AGENT_OPEN_KEY) === '1'))
   const [debuggerOpen, setDebuggerOpen] = useState(false)
   const [browserOpen, setBrowserOpen] = useState(false)
-  const [browserUrl, setBrowserUrl] = useState('')
+  const [browserUrl, setBrowserUrl] = useState(caps.desktop ? 'about:blank' : '')
   const [browserNavigationRequest, setBrowserNavigationRequest] = useState(0)
   const [agentOpen, setAgentOpen] = useState(() => caps.agent && scopedBrowserStorage().getItem(AGENT_OPEN_KEY) === '1')
   const gitMounted = useRef(false)
@@ -409,9 +409,9 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     }),
   )
   useEffect(() => {
-    setBrowserOpen(false); setBrowserUrl('')
+    setBrowserOpen(false); setBrowserUrl(caps.desktop ? 'about:blank' : '')
     setMobilePanelStack(stack => closeMobilePanel(stack, 'browser'))
-  }, [auth.email, caps.portPreview])
+  }, [auth.email, caps.portPreview, caps.desktop])
   const [mewcatRuntime, setMewcatRuntime] = useState<string | null>(null)
   const [mewcatPicker, setMewcatPicker] = useState(false)
   const mewcatRuntimeRef = useRef(mewcatRuntime)
@@ -587,13 +587,9 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
 
   useEffect(() => captureLocalBrowserLinks(url => {
     if (!auth.email || !caps.portPreview) { showToast(uiText('localhost 앱에 접근할 권한이 없습니다.')); return }
-    setBrowserUrl(url)
-    setBrowserNavigationRequest(request => request + 1)
-    setRemoteDesktopOpen(false)
-    dockRef.current?.restore()
-    openWorkspacePanel('browser')
-    setFocusedWorkspacePanel('browser')
-  }), [auth.email, caps.portPreview, openWorkspacePanel, setFocusedWorkspacePanel, showToast])
+    try { openLocalPortPreview(url) }
+    catch (error) { showToast(error instanceof Error ? error.message : uiText('미리보기를 열지 못했습니다.')) }
+  }), [auth.email, caps.portPreview, showToast])
 
   const refreshMewUpdate = useCallback(async (announce = false) => {
     try {
@@ -2470,7 +2466,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
           {debuggerOpen && <Suspense fallback={<div role="status" className="p-2 text-xs text-ink-secondary">…</div>}><DebuggerPanel key={`${auth.email}:${rootProjectPath}`} root={rootProjectPath} onClose={() => closeWorkspacePanel('debugger')} onSettings={() => { setDebuggerSettingsRequested(true); setSettingsOpen(true) }} onOpenFile={(file, line) => { const relative = file.startsWith(rootProjectPath + '/') ? file.slice(rootProjectPath.length + 1) : file; if (!relative.startsWith('/')) openMentionedFile(WORKSPACE_PROJECT, relative, line) }} /></Suspense>}
         </DockPanel>}
         {caps.portPreview && auth.email && <DockPanel id="browser" kind="browser" visible={browserOpen} tabs={['browser']} mobileSelected onFocus={() => bringWorkspacePanelToFront('browser')}>
-          {browserOpen && <div data-workspace-panel="browser" data-dom-browser className="h-full min-h-0 min-w-0"><DomBrowserPanel key={auth.email} url={browserUrl} navigationRequest={browserNavigationRequest} onClose={() => closeWorkspacePanel('browser')} /></div>}
+          {browserOpen && <div data-workspace-panel="browser" data-dom-browser className="h-full min-h-0 min-w-0"><BrowserDesktopPanel key={auth.email} url={browserUrl} navigationRequest={browserNavigationRequest} nativeAllowed={caps.desktop} onClose={() => closeWorkspacePanel('browser')} /></div>}
         </DockPanel>}
         {rootProjectPath && caps.filesRead && auth.email && <DockPanel floating={toolPresentation.tasks === 'popup'} storageKey={popupKey('tasks')} legacyStorageKey={`mew:popup:${authEmail}:${projectUiPath}:tasks`} id="tasks" kind="tasks" visible={tasksOpen} tabs={['tasks']} mobileSelected onFocus={() => { activeTabbedSurfaceRef.current = 'tasks'; bringWorkspacePanelToFront('tasks') }}>
           {tasksMounted.current && <TaskPanel workspace={rootProjectPath} onOpenFile={path => {
