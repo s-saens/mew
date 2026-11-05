@@ -1,13 +1,13 @@
 ---
 title: "Prepare missing Windows desktop build prerequisites automatically"
-description: "Accepts WinGet installation of missing Windows remote desktop build tools during helper preparation, with process-local discovery refresh, explicit Rust MSVC selection, host approval, and verified readiness."
+description: "Superseded by ADR 0140. Preserves the earlier WinGet installation choice for missing Windows remote desktop build tools, process-local discovery refresh, explicit Rust MSVC selection, host approval, and readiness."
 created: "2026-11-05"
 updated: "2026-11-05"
 ---
 
 ## Status
 
-Accepted. Extends [ADR 0059](0059-remote-desktop-rust-engine.md) installation behavior. Package installation and actual Windows video/input acceptance remain separate from local regression verification.
+Superseded by [ADR 0140](0140-windows-desktop-prebuilt-packages.md) on 2026-11-05. End-user Windows preparation now installs verified prebuilt packages without development tools. The following text preserves the original accepted decision, which extended [ADR 0059](0059-remote-desktop-rust-engine.md). Its package-installation and Windows video/input acceptance gates were not completed before supersession.
 
 ## Context
 

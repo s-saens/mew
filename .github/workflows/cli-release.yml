@@ -67,6 +67,9 @@ jobs:
             arch: arm64
     runs-on: ${{ matrix.runner }}
     steps:
+      - name: Preserve desktop source identity on Windows
+        if: matrix.platform == 'win32'
+        run: git config --global core.autocrlf false
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
@@ -76,6 +79,36 @@ jobs:
         if: matrix.platform == 'win32'
         with:
           arch: ${{ matrix.arch == 'arm64' && 'arm64' || 'x64' }}
+      - uses: dtolnay/rust-toolchain@stable
+        if: matrix.platform == 'win32'
+        with:
+          toolchain: ${{ matrix.arch == 'arm64' && 'stable-aarch64-pc-windows-msvc' || 'stable-x86_64-pc-windows-msvc' }}
+      - name: Prepare desktop build-only prerequisites
+        if: matrix.platform == 'win32'
+        shell: pwsh
+        env:
+          PACKAGE_ARCH: ${{ matrix.arch }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $state = & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File native/remote-desktop/windows-build-environment.ps1 | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0) { throw 'Build tool discovery failed' }
+          $packages = @(@{tool='cmake';id='Kitware.CMake'}, @{tool='clang';id='LLVM.LLVM'}, @{tool='perl';id='StrawberryPerl.StrawberryPerl'})
+          $missing = @($packages | Where-Object { -not $state.tools.($_.tool) })
+          if ($missing.Count) {
+            if (-not (Get-Command winget.exe -ErrorAction SilentlyContinue)) {
+              Install-Module Microsoft.WinGet.Client -Scope CurrentUser -Force -Repository PSGallery
+              Import-Module Microsoft.WinGet.Client
+              Repair-WinGetPackageManager -AllUsers -Latest
+            }
+            $winget = (Get-Command winget.exe -ErrorAction SilentlyContinue).Source
+            if (-not $winget) { $winget = Join-Path $env:LOCALAPPDATA 'Microsoft\WindowsApps\winget.exe' }
+            foreach ($package in $missing) {
+              $arguments = @('install','--exact','--id',$package.id,'--source','winget','--silent','--disable-interactivity','--accept-source-agreements','--accept-package-agreements')
+              if ($package.tool -eq 'clang') { $arguments += @('--architecture', $env:PACKAGE_ARCH) }
+              & $winget @arguments
+              if ($LASTEXITCODE -ne 0) { throw "CI prerequisite installation failed: $($package.id)" }
+            }
+          }
       - run: npm ci
       - run: npm ci --prefix apps/cli
       - run: node --test server/release-runtime.test.ts

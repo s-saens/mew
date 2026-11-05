@@ -1,44 +1,53 @@
 ---
-title: "Windows remote desktop build preparation"
-description: "Defines Windows/WSL discovery and WinGet installation of missing native build tools, same-process PATH and SDK refresh, explicit Rust stable MSVC selection, host approval, readiness, and failure boundaries."
+title: "Windows remote desktop prebuilt setup"
+description: "Defines Windows/WSL helper installation without host development tools, exact source-hash packages, bundled offline archives, verified manifests, staged replacement, readiness, and failure boundaries. Separates maintainer builds, package publication, and Windows acceptance gates."
 created: "2026-11-05"
 updated: "2026-11-05"
 ---
 
 ## Preparation boundary
 
-Windows/WSL helper preparation installs missing build prerequisites before compiling GPU capture and the Rust engine. The existing viewer preparation action and manual desktop setup use the same `install.ps1` → `install-windows-native.mjs` path. Status checks and ordinary connections to a ready helper do not install packages. Preparation and ABI checks do not capture the screen or inject input.
+Windows/WSL installs a prebuilt remote desktop helper. End users need no Rust, Cargo, CMake, LLVM, Perl, C++ Build Tools, or Windows SDK, and preparation never installs those tools. The helper still needs native Windows code to capture the desktop and inject authorized input. It runs with Mew's private Node runtime; no standalone GUI installer or permanent Windows service is required.
 
-`windows-build-tools.mjs` owns package selection and retry boundaries. `windows-build-environment.ps1` only discovers tools and prepares process-local compiler variables. It does not install packages, change registry environment values, or report unrelated host environment variables. The [Rust contract](remote-desktop-rust.md#installation-and-comparison) owns compilation and dependency source preservation; the [distribution contract](remote-desktop-distribution.md) owns notices and redistribution boundaries.
+The viewer preparation action and manual desktop setup share `install.ps1` → `install-windows-native.mjs`. PowerShell prepares private Node; the Node installer obtains and verifies the matching native package and stages the declared helper sources. It does not run npm dependency installation or lifecycle scripts, WinGet, Cargo, or a compiler. Status checks and connections to a ready helper remain read-only. Package verification and ABI probes do not capture the screen or inject input.
 
-## Discovery and installation
+[ADR 0140](../decisions/0140-windows-desktop-prebuilt-packages.md) supersedes the host build-tool approach in ADR 0138. The [Rust contract](remote-desktop-rust.md#installation-and-comparison) owns engine build behavior; the [distribution contract](remote-desktop-distribution.md) owns corresponding sources and notices.
 
-Read the current Windows Machine/User PATH on each discovery and preserve private Node and existing custom paths. Also search the Cargo home, standard CMake/LLVM paths, Strawberry Perl, and the WinGet app execution alias. Existing installations are reused. Tools installed only in WSL cannot build the Windows helper.
+## Source identity and package selection
 
-| Missing prerequisite | Exact WinGet package ID | Post-install requirement |
-| --- | --- | --- |
-| MSVC and Windows SDK | `Microsoft.VisualStudio.2022.BuildTools` | C++ workload, selected target architecture, usable `cl.exe`, `link.exe`, `rc.exe`, Windows headers and UCRT headers |
-| CMake | `Kitware.CMake` | Windows `cmake.exe` |
-| libclang | `LLVM.LLVM` | `libclang.dll`, exported as `LIBCLANG_PATH` |
-| Perl | `StrawberryPerl.StrawberryPerl` | Windows `perl.exe` |
-| Cargo/Rustup | `Rustlang.Rustup` | Windows `rustup.exe` and Cargo shim |
+`helper-version.mjs` computes a full 64-character SHA-256 identity from the names and contents of all `HELPER_FILES`, including nested Rust sources, lockfiles, installer code, and the maintainer build recipe. Package production and installation share this inventory. The identity is independent of an installed copy's readiness marker and of the CLI version. Repository attributes keep helper inputs at LF in Windows and POSIX checkouts; release staging preserves their bytes rather than transpiling native helper JavaScript.
 
-Use exact IDs from the `winget` source and keep WinGet's package hash checks enabled. Installation accepts package/source terms and suppresses terminal prompts; Windows elevation prompts still require host approval. Vendor installers can update the Windows installation and persistent tool paths. There is no automatic reboot. First-time preparation can download several gigabytes and take substantially longer than subsequent preparation.
+| Item | Contract |
+| --- | --- |
+| Platforms | Windows `x64` and `arm64`; the private Windows Node architecture selects the package |
+| Archive | `mew-desktop-win32-<arch>.zip` |
+| Checksums | Bundled `<archive>.sha256`; official release `SHA256SUMS` |
+| Release tag | `mew-desktop-<sourceHash>` |
+| Official source | `https://github.com/s-saens/mew/releases/download/<tag>/<archive>` |
+| Bundled copy | `native/remote-desktop/prebuilt/` in a Windows CLI runtime, with its checksum sidecar |
 
-The Visual Studio package requests `Microsoft.VisualStudio.Workload.VCTools` with recommended components and adds the ARM64 compiler component on ARM64 hosts. An existing Visual Studio 2022 Build Tools installation lacking required components is modified at its discovered installation path. Other complete Visual Studio editions can satisfy discovery without installing Build Tools. Force execution at the WinGet layer does not pass Visual Studio's process-closing `--force` option.
+Prefer a bundled archive when present so a Windows runtime can prepare the helper without another helper download. Otherwise fetch the exact content-hash release from the fixed official repository. A WSL source or Linux runtime installation can independently fetch the required Windows package. A bundled archive that fails verification is an error, rather than permission to fetch different bytes or compile locally. Private Node preparation can still require its separate download.
 
-Rediscover after every package installation and stop if its required tool is still unavailable. If WinGet is absent, explain how to install/update Microsoft App Installer or prepare the tools manually. Do not install a second package manager or silently choose the legacy engine. Installation cancellation, policy/download failures, and required restarts remain visible in **View Setup Details**; the user resolves them and retries **Reconnect**. See the [user guide](../../../docs/guides/remote-desktop.md#first-connection).
+Source changes require a new matching package. A missing release stops with publication guidance. There is no latest-version substitution, arbitrary package URL, host compilation fallback, or automatic legacy-engine selection.
 
-## Compiler environment and readiness
+## Verification and replacement
 
-Import `VsDevCmd.bat` compiler/SDK variables for the selected x64 or ARM64 target. Preserve the refreshed Windows paths and export `LIBCLANG_PATH` to both native builds. Normalize case-insensitive environment names so an inherited `PATH` cannot override the prepared `Path` when Node starts Windows children.
+The ZIP contains `gpu-windows.dll`, `mew-desktop-engine.dll`, prebuilt production `node_modules`, patched `rust/vendor` corresponding sources, and redistribution notices. `notices/mew-desktop-source/` preserves the shared helper sources, Rust lock/build metadata, and first-party license; `notices/README.txt` describes the source and license locations. The `mew-desktop-package.json` manifest declares `format: 1`, `platform: "win32"`, `arch`, `sourceHash`, and `files`, with a relative path, byte size, and SHA-256 for each payload file except the manifest itself; the archive checksum protects the manifest.
 
-Select `stable-x86_64-pc-windows-msvc` or `stable-aarch64-pc-windows-msvc`. Probe Rust and Cargo through the discovered Rustup executable; install that toolchain with the minimal profile only when unavailable. Do not change an existing Rustup default or add a repository override. Execute Cargo vendor/build through the verified `rustup run <toolchain> cargo` path, so another Cargo earlier in PATH cannot bypass the checked toolchain.
+Before replacing installed components, verify the archive checksum, manifest format/platform/architecture, exact source identity, allowed relative paths, complete file inventory, sizes, and every file hash. Reject path traversal, links, unsupported paths, duplicate names, missing files, and additional unlisted payloads. Load the staged native npm bindings and probe the GPU and Rust ABIs using private Node. Verification executes only native compatibility checks; it starts no capture, input, or GUI.
 
-GPU compilation runs first; a failure prevents the Rust build. `install.ps1` writes the existing readiness marker only after tool preparation, native binding checks, GPU compilation, Rust compilation, and the engine ABI probe succeed. Source hashes and installation copies include all three new preparation files. Missing tools or partial outputs never mark the helper ready.
+Keep downloads and extraction in temporary storage. Copy the declared helper sources into that staging directory and recheck their hash before publication, so concurrent source edits cannot pair new sources with older binaries. Serialize package installation per target with a process-owned lock; recover only a confirmed dead owner. Replace the declared helper files and package-owned paths only after verification succeeds. Back up the previous readiness marker first and restore it last on rollback. Replacement attempts to restore both the previous helper sources and native package on failure. If rollback also fails, preserve the backup and report its recovery path. Leave `.mew-ready` absent after successful replacement until the outer installer checks finish; marking a Windows helper ready also rechecks the installed package's source hash and CPU against the installed helper sources. Failed preparation preserves the prior matching installation when rollback succeeds. An interrupted lock write or recovery guard can require manual cleanup after checking that no installer is active. A failed download, incompatible native binding, damaged package, locked DLL, or interrupted replacement must not mark the new helper ready.
 
-## Verification
+Browser preparation first stops the resident helper and waits for login-supervisor cleanup so Windows can replace DLLs. Direct manual setup can fail if an active helper still holds a DLL. Keep the existing visible error and retry flow; agents do not stop or restart the server to work around it.
 
-Run `node --test native/remote-desktop/windows-build-tools.test.mjs` for reused/missing tools, stale inherited PATH, exact package selection, partial Visual Studio modification, explicit MSVC selection, cancellation/failure handling, and native build environment propagation. Its read-only PowerShell test runs when Windows PowerShell is available, including a conventional WSL mount, and otherwise skips. It checks script parsing and actual environment discovery without installing tools or starting capture.
+## Build and release boundary
 
-These checks do not verify live package installation, UAC approval, a complete Windows Rust build, or remote video/input. The [work record](../work/remote-desktop-windows-setup.md) records actual local verification; [ADR 0138](../decisions/0138-windows-desktop-build-prerequisites.md) records the decision.
+`node native/remote-desktop/build-windows-package.mjs --output <directory>` is a maintainer/CI command that runs only on native Windows. Its Windows worker already has Node, Rust stable MSVC, CMake, LLVM/libclang, Perl, Visual Studio C++ tools, and Windows SDK prepared. It runs native dependency preparation, GPU compilation, Rust vendoring/build, and ABI checks in an isolated staging directory. It does not install host tools. The builder preserves patched corresponding sources and notices, emits the manifest and archive checksum, and excludes development toolchains from the package.
+
+The dedicated `desktop-release.yml` workflow builds and verifies x64 and ARM64 packages, then publishes an immutable content-hash release through the protected `desktop-release` environment. The CLI runtime packager accepts an explicitly built, verified package for bundling rather than collecting arbitrary local DLL outputs. The [release runbook](../operations/cli-release.md#windows-remote-desktop-packages) owns publication order and gates.
+
+## Permissions and remaining gates
+
+Ordinary package preparation does not need elevation to install developer tools. Existing Windows login, WSL interop, Task Scheduler, GPU driver, and [firewall approval](remote-desktop-connectivity.md) requirements remain. The optional [virtual display driver](remote-desktop-virtual-display.md) still needs a separate signed package and explicit administrator approval; its signing and installation are outside this helper archive.
+
+Local manifest and installer regression checks do not establish Windows binary compatibility or a successful remote session. Both architecture builds, official package publication, clean-host setup with no development tools, and real video/input acceptance remain required release gates. The [work record](../work/remote-desktop-windows-setup.md) records checks actually performed.

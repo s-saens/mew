@@ -1,0 +1,11 @@
+# Keep helper package identities identical in Windows and POSIX checkouts.
+native/remote-desktop/*.mjs text eol=lf
+native/remote-desktop/*.cjs text eol=lf
+native/remote-desktop/*.ps1 text eol=lf
+native/remote-desktop/*.cpp text eol=lf
+native/remote-desktop/*.h text eol=lf
+native/remote-desktop/*.m text eol=lf
+native/remote-desktop/*.html text eol=lf
+native/remote-desktop/*.json text eol=lf
+native/remote-desktop/LICENSE text eol=lf
+native/remote-desktop/rust/** text eol=lf

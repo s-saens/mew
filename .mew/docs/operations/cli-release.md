@@ -1,6 +1,6 @@
 ---
 title: "CLI Releases and npm Publishing"
-description: "Release procedure for @liiiiv/mew-cli and Linux, macOS, and Windows x64/arm64 runtimes. Covers native helpers, browser-installer manifest requirements, checksums, licensing, CI and npm/OIDC gates; first public publication and hands-on platform checks remain incomplete."
+description: "Release procedure for @liiiiv/mew-cli and Linux, macOS, and Windows x64/arm64 runtimes. Covers verified Windows desktop packages, native helpers, browser-installer manifest requirements, checksums, licensing, CI and npm/OIDC gates; first public publication and hands-on platform checks remain incomplete."
 updated: "2026-11-05"
 상위파일:
   - "../../../docs/deployment/native.md"
@@ -21,7 +21,21 @@ Internal Windows workspace links are recorded in `runtime-links.json` instead of
 
 The runtime manifest declares `browserDependencies: "server/browser-dependencies.js"`, and packaging includes that required installer with the pinned Playwright tooling. CLI launch prepares missing browsers before host startup; the [browser dependency contract](../development/browser-dependencies.md) owns platform and privilege requirements. Browser binaries are downloaded on the host and excluded from the archive.
 
-Remote desktop installation scripts and protocol sources are included, but Electron, capture binaries, and OS permission setup are left to the optional feature's existing installation path. Do not include `.env`, `.data`, hidden state, test fixtures, or local native build outputs in releases. Private Mewlink central service sources are also excluded.
+Remote desktop installation scripts and required protocol sources are included. Windows runtimes additionally bundle an explicitly built and verified desktop ZIP with its checksum; arbitrary local capture DLLs are never collected as release inputs. Linux/macOS retain the optional feature's existing source-build setup; WSL can fetch its exact Windows helper package independently. OS permission setup remains separate. Do not include `.env`, `.data`, hidden state, test fixtures, or miscellaneous local native build outputs in releases. Private Mewlink central service sources are also excluded.
+
+## Windows Remote Desktop Packages
+
+The [Windows setup contract](../development/remote-desktop-windows-setup.md) owns package identity, contents, verification, replacement, and host permissions. [ADR 0140](../decisions/0140-windows-desktop-prebuilt-packages.md) moves Windows compilation out of end-user preparation. Development tools are required only on package build workers; package installation never installs them on the user's PC.
+
+Run `node native/remote-desktop/build-windows-package.mjs --output <directory>` on prepared native Windows x64 and ARM64 workers. Each worker supplies Node, Rust stable MSVC, CMake, LLVM/libclang, Perl, Visual Studio C++ tools, and Windows SDK. The builder stages locked production dependencies, GPU/Rust libraries, patched vendored sources, and notices; verifies native bindings and ABIs; and emits `mew-desktop-win32-<arch>.zip` with `.sha256`. It does not install build prerequisites. Never package developer toolchains or unrelated local DLLs.
+
+The dedicated `.github/workflows/desktop-release.yml` builds both architectures and publishes their ZIPs plus `SHA256SUMS` through the protected `desktop-release` environment. Use the full 64-character shared helper-source hash as `mew-desktop-<sourceHash>`; publish to the official `s-saens/mew` repository. Existing release assets are immutable. Configure required reviewers and protections before publication, and preserve corresponding sources and third-party notices inside every archive.
+
+Publish matching helper packages before releasing source revisions that need Windows setup. A CLI Windows runtime bundles the matching archive/checksum under `native/remote-desktop/prebuilt/`; its packager validates this explicit input before staging it. The ordinary helper installer uses the bundled copy first, then the exact official content-hash release when no bundle exists. A bundled package requiring no additional helper download still depends on private Node being available. Linux/WSL runtime archives do not need to carry every Windows architecture: WSL selects its Windows package independently.
+
+Before publishing, verify both architectures on a clean Windows host without Rust or other development tools: private Node preparation, package integrity and source rejection, native loading/ABI checks, first installation, repeat installation, and video/input connection. Exercise missing-release errors, corrupt archives, locked DLL replacement failure and rollback, and readiness-marker behavior. Check the archive's complete file list, patched corresponding sources, licenses, and notices. These are release gates; local fixture tests alone do not satisfy them. The optional signed virtual display driver remains a separate distribution and approval path.
+
+Initial Windows helper builds, official package publication, clean-host installation, and real connection acceptance have not been performed. A missing exact-source release must remain a visible setup failure; it must never trigger host tool installation or compilation.
 
 ## Bundling Licenses
 
@@ -34,11 +48,11 @@ Before publishing, verify that the full texts of the root `LICENSE`, `apps/cli/L
 `.github/workflows/cli-release.yml` runs in the following order.
 
 1. Compare the version in `apps/cli/package.json` with the `mew-cli-v<버전>` tag.
-2. Use Node.js 24 on Linux Ubuntu 22.04 x64/arm64, macOS 15 x64/arm64, Windows Server 2025 x64, and Windows 11 arm64. Install dependencies, run isolated tests, build the app, and package for each platform. On Windows, prepare the MSVC environment and, after packaging, use `release-windows-verify.ts` to check actual junction extraction; Job Object, psmux, and ConPTY fixtures; and startup in a separate workspace, authentication, HTML responses, and shutdown of the compiled host. Store the generated `mew-runtime-<OS>-<arch>.tar.gz` and individual `.sha256` files as Actions artifacts.
+2. Use Node.js 24 on Linux Ubuntu 22.04 x64/arm64, macOS 15 x64/arm64, Windows Server 2025 x64, and Windows 11 arm64. Install dependencies, run isolated tests, build the app, and package for each platform. Windows jobs first produce a verified desktop package as the runtime packager’s explicit input; the independent desktop workflow publishes packages needed by unbundled source/WSL installations. On Windows, prepare the MSVC environment and, after packaging, use `release-windows-verify.ts` to check actual junction extraction; Job Object, psmux, and ConPTY fixtures; and startup in a separate workspace, authentication, HTML responses, and shutdown of the compiled host. Store the generated `mew-runtime-<OS>-<arch>.tar.gz` and individual `.sha256` files as Actions artifacts.
 3. Only tag runs publish the 6 executables and `SHA256SUMS` to GitHub Release after passing the protected `cli-release` environment. Do not overwrite executables for existing versions.
 4. For npm publishing, select the matching tag in `workflow_dispatch` and set `publish_npm=true`. After verifying the 6 already-published runtimes and all checksums, publish to npm through the protected `npm-publish` environment. Do not change the release cache version.
 
-Assign reviewers for both environments in the repository settings. The workflow uses the current repository through `${{ github.repository }}`. After a transfer, follow the [Repository Transfer Checks](repository-maintenance.md#transferring-github-ownership) to verify reviewers, allowed tags, protection rules, and settings previously supplied by the organization for both environments. The [agent execution rules](../development/getting-started.md) require a build after implementation changes and prohibit deployment and server lifecycle operations; agents do not push tags, run workflows, or deploy on the user's behalf.
+Assign reviewers for `cli-release`, `npm-publish`, and the separate `desktop-release` environment in the repository settings. The workflow uses the current repository through `${{ github.repository }}`. After a transfer, follow the [Repository Transfer Checks](repository-maintenance.md#transferring-github-ownership) to verify reviewers, allowed tags, protection rules, and settings previously supplied by the organization for every release environment. The [agent execution rules](../development/getting-started.md) require a build after implementation changes and prohibit deployment and server lifecycle operations; agents do not push tags, run workflows, or deploy on the user's behalf.
 
 ## Initial Publication and Subsequent Versions
 
@@ -61,7 +75,8 @@ For the next version, update the CLI package version and the root version in its
 
 - Pass actual native module imports, `tmux -V` or `psmux -V`, and runtime relative import and link checks in all six environments. Job Object, CMD shim, psmux attach, output save/cancel, and compiled host fixtures must also pass on both Windows architectures.
 - Verify the required browser-installer manifest entry and file, preparation before host startup, cancellation, missing/invalid overrides, and a clean-host preparation on each supported platform. Browser download time must not consume the host readiness timeout.
-- Verify that distribution files contain no personal data, secrets, or private central service sources and include native component redistribution notices.
+- Verify the explicit Windows desktop archive/checksum, source identity, manifest, complete file hashes, native binding/ABI probes, and clean-host setup without development tools on x64 and ARM64. Publish the matching desktop release before relying on unbundled WSL/source installation.
+- Verify that distribution files contain no personal data, secrets, or private central service sources and include native component redistribution notices and corresponding sources.
 - In an empty working directory on each supported OS, perform hands-on checks of new owner creation, password changes, editing, terminal use, relaunching, and preservation of account/device registrations. Fixture verification for the current implementation work does not replace these hands-on checks.
 - Check initial Mewlink registration, the online QR code, and local login, editing, and terminal use from an external browser. Other NATs, mobile networks, and remote desktop follow the [existing remote verification scope](../development/remote-access.md#verification-and-remaining-gates).
 

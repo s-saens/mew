@@ -40,7 +40,7 @@ test('helper content updates invalidate readiness while unchanged dependencies c
       await fs.mkdir(path.join(root, 'node_modules', name), { recursive: true })
       await fs.writeFile(path.join(root, 'node_modules', name, 'package.json'), '{}')
     }
-    markHelperReady(root)
+    markHelperReady(root, { platform: 'linux' })
     const before = helperVersion(root)
     assert.equal(dependenciesCurrent(root), true)
     await fs.appendFile(path.join(root, 'main.mjs'), '\n// update fixture\n')
@@ -48,7 +48,7 @@ test('helper content updates invalidate readiness while unchanged dependencies c
     assert.equal(dependenciesCurrent(root), true)
     await fs.appendFile(path.join(root, 'package-lock.json'), '\n')
     assert.equal(dependenciesCurrent(root), false)
-    markHelperReady(root)
+    markHelperReady(root, { platform: 'linux' })
     await fs.rm(path.join(root, 'node_modules/koffi/package.json'))
     assert.equal(dependenciesCurrent(root), false)
   } finally { await fs.rm(root, { recursive: true, force: true }) }

@@ -10,6 +10,8 @@ import ts from 'typescript'
 import { installReleaseTmux, TMUX_VERSION } from './release-tmux.ts'
 import { installReleasePsmux, PSMUX_VERSION, compileWindowsProcessHost, encodeWindowsRuntimeLinks } from './release-psmux.ts'
 import { execHostFile } from './platform/process.ts'
+// @ts-expect-error The release-only native helper builder is JavaScript.
+import { buildWindowsPackage } from '../native/remote-desktop/build-windows-package.mjs'
 
 const exec = promisify(execFile)
 const CODE = /\.(?:ts|tsx|js|mjs|cjs)$/
@@ -17,7 +19,7 @@ const RESOURCE = /\.(?:ts|tsx|js|mjs|cjs|json|css|svg|txt|png|webp|woff2?|ttf|wa
 const NATIVE_RESOURCE = new RegExp(`${RESOURCE.source}|\\.(?:rs|toml|lock)$`)
 const SKILL_RESOURCE = /\.(?:md|ya?ml|py|txt|json|png|svg|tsv|csv|toml)$/
 const EXCLUDED = /(?:^|\/)(?:\.[^/]+|node_modules|dist|target|build|runtime|fixtures)(?:\/|$)|(?:\.test|\.browser\.test|-fixture)\.[^/]+$|\.d\.(?:ts|mts)$/
-const NATIVE_EXCLUDED = new RegExp(`${EXCLUDED.source}|(?:^|/)vendor(?:/|$)`)
+const NATIVE_EXCLUDED = new RegExp(`${EXCLUDED.source}|(?:^|/)(?:vendor|prebuilt)(?:/|$)|^notices(?:/|$)|^mew-desktop-package\\.json$`)
 const SOURCE_DIRS = ['server', 'shared', 'packages', 'resources/help', 'resources/skills', 'resources/skills/.vendor']
 
 export interface RuntimeManifest {
@@ -103,17 +105,18 @@ function compiledExports(value: unknown): unknown {
   return value
 }
 
-async function copySourceTree(source: string, target: string, relative = '', resources = RESOURCE, excluded = EXCLUDED) {
+async function copySourceTree(source: string, target: string, relative = '', resources = RESOURCE, excluded = EXCLUDED, preserveBytes = false) {
   await fs.mkdir(target, { recursive: true })
   for (const entry of await fs.readdir(source, { withFileTypes: true })) {
     const name = relative ? `${relative}/${entry.name}` : entry.name
     if (excluded.test(name) || /^release-/.test(entry.name) || /(?:benchmark|browser-test)/.test(entry.name)) continue
     const input = path.join(source, entry.name), output = path.join(target, outputPath(entry.name))
     if (entry.isSymbolicLink()) throw new Error(`Unexpected source symlink: ${input}`)
-    if (entry.isDirectory()) await copySourceTree(input, output, name, resources, excluded)
+    if (entry.isDirectory()) await copySourceTree(input, output, name, resources, excluded, preserveBytes)
     else if (entry.isFile()) {
       if (!resources.test(entry.name) && !/^(?:LICENSE|COPYING|COPYRIGHT)(?:\..*)?$/.test(entry.name)) continue
-      if (CODE.test(entry.name)) await fs.writeFile(output, compileRuntimeSource(await fs.readFile(input, 'utf8'), input), { mode: (await fs.stat(input)).mode & 0o777 })
+      if (preserveBytes) await fs.copyFile(input, output)
+      else if (CODE.test(entry.name)) await fs.writeFile(output, compileRuntimeSource(await fs.readFile(input, 'utf8'), input), { mode: (await fs.stat(input)).mode & 0o777 })
       else if (entry.name === 'package.json') {
         const manifest = JSON.parse(await fs.readFile(input, 'utf8'))
         if (manifest.exports) manifest.exports = compiledExports(manifest.exports)
@@ -140,9 +143,16 @@ export async function stageRuntimeSources(root: string, directory: string, manif
   }
   await fs.cp(path.join(root, 'dist'), path.join(directory, 'dist'), { recursive: true, filter: file => !EXCLUDED.test(path.relative(path.join(root, 'dist'), file)) })
   if (existsSync(path.join(root, 'public', 'mewcat'))) await copySourceTree(path.join(root, 'public', 'mewcat'), path.join(directory, 'public', 'mewcat'))
-  if (existsSync(path.join(root, 'native', 'remote-desktop'))) await copySourceTree(path.join(root, 'native', 'remote-desktop'), path.join(directory, 'native', 'remote-desktop'), '', NATIVE_RESOURCE, NATIVE_EXCLUDED)
+  // Native helper source identity must match standalone desktop releases.
+  if (existsSync(path.join(root, 'native', 'remote-desktop'))) await copySourceTree(path.join(root, 'native', 'remote-desktop'), path.join(directory, 'native', 'remote-desktop'), '', NATIVE_RESOURCE, NATIVE_EXCLUDED, true)
   for (const file of ['package.json', 'package-lock.json', 'LICENSE']) await fs.copyFile(path.join(root, file), path.join(directory, file))
   await fs.writeFile(path.join(directory, 'mew-runtime.json'), JSON.stringify(manifest, null, 2) + '\n')
+}
+
+export async function stageWindowsDesktopPackage(directory: string, { platform = process.platform, build = buildWindowsPackage } = {}) {
+  if (platform !== 'win32') return
+  const source = path.join(directory, 'native', 'remote-desktop')
+  await build({ source, output: path.join(source, 'prebuilt') })
 }
 
 export async function validateRuntimeLinks(directory: string) {
@@ -213,6 +223,7 @@ export async function packageRuntime(root: string, output: string) {
     runtimePackage.scripts = { serve: 'node server/cli-host.js' }
     await fs.writeFile(packageFile, JSON.stringify(runtimePackage, null, 2) + '\n')
     await verifyNativeDependencies(directory)
+    await stageWindowsDesktopPackage(directory)
     if (process.platform === 'win32') await installReleasePsmux(directory, temporary, process.arch)
     else await installReleaseTmux(directory, temporary, process.platform, process.arch)
     await validateCompiledImports(directory)

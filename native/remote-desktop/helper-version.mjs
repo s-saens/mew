@@ -14,7 +14,8 @@ HELPER_FILES.push('native-platform.mjs', 'gpu-posix.mjs', 'gpu-posix-worker.mjs'
 HELPER_FILES.push('native-connectivity.mjs', 'nat-port-map.mjs', 'nat-upnp.mjs', 'prepare-windows-network.ps1')
 HELPER_FILES.push('network-support.mjs', 'windows-network.mjs')
 HELPER_FILES.push('host-shutdown.mjs')
-HELPER_FILES.push('install-windows-native.mjs', 'windows-build-tools.mjs', 'windows-build-environment.ps1')
+HELPER_FILES.push('install-windows-native.mjs', 'windows-package.mjs', 'extract-windows-package.ps1')
+HELPER_FILES.push('build-windows-package.mjs', 'windows-build-environment.ps1')
 HELPER_FILES.push('video-settings.mjs', 'video-pacer.mjs', 'video-adaptation.mjs', 'video-pump.mjs')
 HELPER_FILES.push('rust-engine.mjs', 'rust-direct.mjs', 'cursor-worker.mjs', 'install-rust-engine.mjs', 'rust-vendor.mjs', 'rust/Cargo.toml', 'rust/Cargo.lock', 'rust/build.rs', 'rust/src/lib.rs', 'rust/src/engine.rs', 'rust/src/gpu.rs', 'rust/src/rtp.rs', 'rust/src/rtc.rs')
 export function helperVersion(directory) {
@@ -22,9 +23,14 @@ export function helperVersion(directory) {
   for (const file of HELPER_FILES) hash.update(file).update('\0').update(readFileSync(path.join(directory, file)))
   return hash.digest('hex')
 }
-export function markHelperReady(directory) {
+export function markHelperReady(directory, { platform = process.platform, arch = process.arch } = {}) {
   const marker = path.join(directory, '.mew-ready')
-  writeFileSync(`${marker}.tmp`, helperVersion(directory) + '\n', { mode: 0o600 })
+  const version = helperVersion(directory)
+  if (platform === 'win32') {
+    const packaged = JSON.parse(readFileSync(path.join(directory, 'mew-desktop-package.json'), 'utf8'))
+    if (packaged.format !== 1 || packaged.platform !== platform || packaged.arch !== arch || packaged.sourceHash !== version) throw new Error('Windows desktop sources no longer match the installed native package. Prepare a matching package before marking it ready.')
+  }
+  writeFileSync(`${marker}.tmp`, version + '\n', { mode: 0o600 })
   renameSync(`${marker}.tmp`, marker)
   writeFileSync(path.join(directory, '.mew-dependencies'), dependencyVersion(directory), { mode: 0o600 })
 }

@@ -45,7 +45,7 @@ export function installDesktopHelper({ platform = process.platform, release = os
   if (code === 0) {
     installCapture({ target, platform })
     installEngine({ target, platform })
-    markHelperReady(target)
+    markHelperReady(target, { platform })
     console.log('Mew remote desktop helper installed and verified. The viewer will connect automatically.')
   }
   return code

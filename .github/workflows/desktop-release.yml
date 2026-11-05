@@ -1,0 +1,148 @@
+name: mew Windows desktop packages
+
+on:
+  push:
+    tags: ['mew-desktop-*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mew-desktop-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  metadata:
+    runs-on: ubuntu-22.04
+    outputs:
+      source_hash: ${{ steps.source.outputs.source_hash }}
+      tag: ${{ steps.source.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - id: source
+        run: |
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          import {helperVersion} from './native/remote-desktop/helper-version.mjs';
+          const hash = helperVersion('native/remote-desktop');
+          const tag = `mew-desktop-${hash}`;
+          if (process.env.GITHUB_REF_TYPE === 'tag' && process.env.GITHUB_REF_NAME !== tag) throw new Error(`Tag must be ${tag}`);
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `source_hash=${hash}\ntag=${tag}\n`);
+          JS
+
+  build:
+    needs: metadata
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: windows-2025
+            arch: x64
+            toolchain: stable-x86_64-pc-windows-msvc
+          - runner: windows-11-arm
+            arch: arm64
+            toolchain: stable-aarch64-pc-windows-msvc
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Preserve source bytes across platforms
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: ${{ matrix.arch }}
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ matrix.toolchain }}
+      - name: Prepare build-only prerequisites
+        shell: pwsh
+        env:
+          PACKAGE_ARCH: ${{ matrix.arch }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $state = & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File native/remote-desktop/windows-build-environment.ps1 | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0) { throw 'Build tool discovery failed' }
+          $packages = @(@{tool='cmake';id='Kitware.CMake'}, @{tool='clang';id='LLVM.LLVM'}, @{tool='perl';id='StrawberryPerl.StrawberryPerl'})
+          $missing = @($packages | Where-Object { -not $state.tools.($_.tool) })
+          if ($missing.Count) {
+            if (-not (Get-Command winget.exe -ErrorAction SilentlyContinue)) {
+              Install-Module Microsoft.WinGet.Client -Scope CurrentUser -Force -Repository PSGallery
+              Import-Module Microsoft.WinGet.Client
+              Repair-WinGetPackageManager -AllUsers -Latest
+            }
+            $winget = (Get-Command winget.exe -ErrorAction SilentlyContinue).Source
+            if (-not $winget) { $winget = Join-Path $env:LOCALAPPDATA 'Microsoft\WindowsApps\winget.exe' }
+            foreach ($package in $missing) {
+              $arguments = @('install','--exact','--id',$package.id,'--source','winget','--silent','--disable-interactivity','--accept-source-agreements','--accept-package-agreements')
+              if ($package.tool -eq 'clang') { $arguments += @('--architecture', $env:PACKAGE_ARCH) }
+              & $winget @arguments
+              if ($LASTEXITCODE -ne 0) { throw "CI prerequisite installation failed: $($package.id)" }
+            }
+          }
+      - run: npm ci
+      - run: node --test native/remote-desktop/windows-package.test.mjs native/remote-desktop/build-windows-package.test.mjs
+      - name: Build isolated desktop package
+        shell: pwsh
+        env:
+          EXPECTED_SOURCE_HASH: ${{ needs.metadata.outputs.source_hash }}
+        run: |
+          $hash = node --input-type=module -e "import {helperVersion} from './native/remote-desktop/helper-version.mjs'; console.log(helperVersion('native/remote-desktop'));"
+          if ($LASTEXITCODE -ne 0 -or $hash.Trim() -ne $env:EXPECTED_SOURCE_HASH) { throw 'Windows checkout source identity differs from release metadata' }
+          node native/remote-desktop/build-windows-package.mjs --output artifacts
+          if ($LASTEXITCODE -ne 0) { throw 'Desktop package build failed' }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mew-desktop-win32-${{ matrix.arch }}
+          path: artifacts/*
+          if-no-files-found: error
+
+  release:
+    if: github.ref_type == 'tag'
+    needs: [metadata, build]
+    runs-on: ubuntu-22.04
+    environment: desktop-release
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+          path: artifacts
+      - name: Publish immutable desktop packages
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ needs.metadata.outputs.tag }}
+          SOURCE_HASH: ${{ needs.metadata.outputs.source_hash }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          cd artifacts
+          cat ./*.sha256 > SHA256SUMS
+          sha256sum --check --strict SHA256SUMS
+          if gh release view "$RELEASE_TAG" --repo "$REPOSITORY" > /dev/null 2>&1; then
+            mkdir published
+            gh release download "$RELEASE_TAG" --repo "$REPOSITORY" --pattern 'mew-desktop-win32-*.zip' --pattern SHA256SUMS --dir published
+            cd published
+          fi
+          python - <<'PY'
+          import hashlib, json, os, pathlib, zipfile
+          expected = {'mew-desktop-win32-x64.zip': 'x64', 'mew-desktop-win32-arm64.zip': 'arm64'}
+          sums = pathlib.Path('SHA256SUMS').read_text().splitlines()
+          parsed = [line.split() for line in sums]
+          if len(parsed) != 2 or {parts[1] for parts in parsed} != set(expected): raise SystemExit('Unexpected desktop release assets')
+          for digest, name in parsed:
+              data = pathlib.Path(name).read_bytes()
+              if hashlib.sha256(data).hexdigest() != digest: raise SystemExit('Desktop checksum mismatch')
+              with zipfile.ZipFile(name) as archive:
+                  manifest = json.loads(archive.read('mew-desktop-package.json'))
+              if manifest['format'] != 1 or manifest['platform'] != 'win32' or manifest['arch'] != expected[name] or manifest['sourceHash'] != os.environ['SOURCE_HASH']: raise SystemExit('Desktop source or architecture mismatch')
+          PY
+          if [ "$(basename "$PWD")" != 'published' ]; then
+            gh release create "$RELEASE_TAG" --repo "$REPOSITORY" --verify-tag --title "Mew Windows desktop ${SOURCE_HASH:0:12}" --generate-notes ./*.zip SHA256SUMS
+          fi

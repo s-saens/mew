@@ -10,6 +10,12 @@ lerna-debug.log*
 
 node_modules
 /.worktrees/
+/native/remote-desktop/prebuilt/
+/native/remote-desktop/.desktop-package-*/
+/native/remote-desktop/.mew-install.lock*
+/native/remote-desktop/mew-desktop-package.json
+/native/remote-desktop/gpu-windows.dll
+/native/remote-desktop/notices/
 native/remote-desktop/.mew-ready*
 native/remote-desktop/.mew-dependencies*
 native/remote-desktop/runtime/

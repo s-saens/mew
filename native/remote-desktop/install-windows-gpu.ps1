@@ -16,7 +16,7 @@ try {
     if (-not (Test-Path -LiteralPath $source) -or -not (Test-Path -LiteralPath $notification)) { throw 'Windows native desktop source is missing.' }
     $library = Join-Path $temporary 'gpu-windows.dll'
     $command = 'call "' + $vcvars + '" ' + $architecture + ' >nul' + "`r`n" +
-        'cl /nologo /std:c++17 /utf-8 /EHsc /O2 /LD /DUNICODE /D_UNICODE "' + $source + '" "' + $notification + '" /link /OUT:"' + $library + '" d3d11.lib dxgi.lib mfplat.lib mf.lib mfuuid.lib ole32.lib oleaut32.lib strmiids.lib user32.lib shell32.lib windowsapp.lib setupapi.lib'
+        'cl /nologo /std:c++17 /utf-8 /EHsc /O2 /MT /LD /DUNICODE /D_UNICODE "' + $source + '" "' + $notification + '" /link /OUT:"' + $library + '" d3d11.lib dxgi.lib mfplat.lib mf.lib mfuuid.lib ole32.lib oleaut32.lib strmiids.lib user32.lib shell32.lib windowsapp.lib setupapi.lib'
     $script = Join-Path $temporary 'compile.cmd'
     [IO.File]::WriteAllText($script, $command, [Text.Encoding]::Default)
     Push-Location -LiteralPath $temporary
