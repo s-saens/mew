@@ -1,0 +1,48 @@
+---
+title: "Local manual browser comparison lab implementation"
+description: "Records the November 5 implementation of six isolated manual browser comparison endpoints, WPE TLS preparation, and adapter verification. Separates successful adapter, integrated viewer, and build checks from pending human challenge results."
+created: "2026-11-05"
+updated: "2026-11-05"
+---
+
+## Purpose and resulting behavior
+
+The user requested six local comparison pages so they could inspect browser output and operate challenge pages themselves. The [lab contract](../development/browser-lab.md) owns the launch command, runtime keys, engine-to-port mapping, input path, and session lifecycle.
+
+The implementation adds a standalone harness under `tools/browser-lab/`. Each engine opens lazily in an isolated session. Five viewers display actual browser PNG captures and relay user input; Lightpanda displays DOM text and explicitly disables coordinate input. Startup, navigation, and capture failures remain visible without engine fallback. The initial page is the ScrapingCourse Cloudflare challenge, with shortcuts for Mew and Google sign-in.
+
+This experiment uses screenshot capture and browser input rather than Mew's rrweb DOM reconstruction. Direct localhost tabs are the intended comparison surface. The normal Mew DOM browser and production browser selection remain unchanged.
+
+The user explicitly authorized the six test listeners on ports 5600 through 5605 and their owned browser children for this session. That authorization does not extend to existing Mew, application, or display servers. There was no deployment or Mew launcher operation as part of this work.
+
+## WPE runtime preparation
+
+The available Playwright WebKit 2370 bundle contains a genuine WPE build for Linux headless execution. A matching Playwright 1.64.0 module was unpacked outside the repository. Missing Ubuntu shared libraries were downloaded and extracted into the experiment's temporary runtime without installing system packages.
+
+An initial HTTPS attempt failed with `TLS support is not available` before any HTTP response or challenge appeared. Inspection found that GnuTLS itself was installed, while GIO's `glib-networking` TLS module was absent. The isolated runtime was extended with `glib-networking`, its common and service packages, and `libproxy1v5`. Its wrapper supplies `GIO_EXTRA_MODULES` and `GIO_USE_TLS=gnutls`, alongside WPE's library and resource paths. Later ordinary HTTPS verification succeeded. The earlier setup error provides no evidence about Cloudflare compatibility.
+
+## Verification recorded so far
+
+| Check | Observed result | Scope |
+| --- | --- | --- |
+| Parent adapter test run | Seven passed; one WPE integration test skipped | Adapter checks; the skipped test was not counted as a browser success |
+| Explicit WPE adapter integration run | Two passed | Missing-runtime error, persistent profile launch, actual fill and click, nonzero element bounds, valid PNG bytes, HTTPS 200 and `Example Domain` title, repeated close, disconnected browser |
+| Native engine smoke checks | Three completed against `about:blank`; visual adapters produced PNG output | Moli, Obscura, and Lightpanda startup paths; Lightpanda retained its text-only capability declaration |
+| WPE adapter lint | Passed | The WPE adapter and its test file |
+| `npm run check:docs` | All 719 descriptions passed; link validation reported 42 errors in other documents | Neither new browser-lab document appeared in the error list; existing references to removed MOC and decision README paths remain outside this task |
+
+The explicit WPE run enabled `MEW_LAB_WPE_TEST_EXECUTABLE` and `MEW_LAB_WPE_TEST_PLAYWRIGHT` to use the isolated wrapper and matching module. Its ordinary HTTPS target was `https://example.com`; no CAPTCHA interaction occurred in that check. The current example page has an `Example Domain` title without the older heading, so the test asserts the title rather than assuming that heading exists.
+
+The final combined adapter, protocol, session, real Chrome viewer, and real WPE run passed all 26 tests with no skips. The WPE environment variables above enabled its integration check. Real viewer tests used intercepted synthetic HTTPS origins and a cross-origin checkbox, without CAPTCHA interaction. They verified screenshot coordinate input, ASCII and Korean committed text, Space activation, viewer reconnection with retained session state, desktop/mobile resizing, text-only output remaining visible after subsequent state updates, and rejection of foreign Host headers and invalid WebSocket tokens. Session regressions cover shared startup, transient capture recovery, failed resize state, and fresh-profile reset. Physical operating-system IME composition remains unverified.
+
+`npx oxlint tools/browser-lab` passed. `npm run build` passed with the existing large-chunk advisory. The final documentation check again passed description validation and reported the same 42 unrelated missing-link failures. The new documents' relative links were inspected directly. The UI detector reported the intentionally hidden screenshot image without an initial source and Mew's inherited Inter font; these are intentional in this utility. A desktop/mobile screenshot review found the controls and remote image usable.
+
+The six authorized listeners were started and their health responses checked. A passive viewer smoke run reached `Just a moment...` in all engines. Chrome, Headless Shell, Moli, Obscura, and WPE supplied real screenshots; Lightpanda supplied text only. In the sampled frames Chrome, Headless Shell, Moli, and WPE displayed a human checkbox; Obscura displayed the challenge shell without that checkbox. Those observations are not challenge-pass results, and the user has not yet completed the comparison. The owned lab process remains running for manual use; automated viewer clients and test-owned browser contexts were closed.
+
+## Remaining limits and application boundary
+
+Manual results for the full Cloudflare → Mew → Google flow are pending. The harness does not claim that any engine can solve or pass those sites, and test-owned input is not proof of a successful human challenge session. Screenshot polling also does not measure animation fidelity or interactive performance.
+
+The experiment depends on external native binaries, their licenses, compatible Playwright versions, and host runtime libraries. Those binaries are not part of the repository change. Temporary session profiles are removed on reset and graceful lab shutdown; abruptly killing the process can leave cleanup incomplete.
+
+The implementation does not select a replacement for Mew's current Chromium runtime. Any adoption requires a separate decision supported by the actual app and manual comparison results.

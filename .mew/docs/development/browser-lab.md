@@ -1,0 +1,80 @@
+---
+title: "Local manual browser comparison lab"
+description: "Defines the six loopback browser lab endpoints, external runtime configuration, pixel and input relay, isolated session lifecycle, and manual challenge workflow. Covers Lightpanda's text-only boundary, WPE TLS prerequisites, and direct-tab use."
+created: "2026-11-05"
+updated: "2026-11-05"
+---
+
+The standalone lab lets a person compare six browser engines through local browser tabs. Its source is in [tools/browser-lab](../../../tools/browser-lab/run.mjs). It runs separately from Mew and does not change Mew's [DOM browser](port-preview.md#internal-dom-browser), [browser dependencies](browser-dependencies.md), or [normal UI testing](browser-testing.md).
+
+## Start and open the lab
+
+Starting or stopping these test listeners requires an explicit user request under the repository's [execution rules](getting-started.md#execution-and-verification). The November 5 experiment authorized only the six lab listeners and their owned browser processes. Existing Mew, application, and display servers remain outside that authorization.
+
+Prepare a runtime JSON file containing absolute local paths, then run from the repository root:
+
+```bash
+node tools/browser-lab/run.mjs --config /absolute/path/runtime.json --detach --runtime-dir /tmp/mew-browser-manual-lab
+```
+
+Without `--detach`, the process stays in the terminal. `--runtime-dir` defaults to `/tmp/mew-browser-manual-lab`; it holds the lab PID and detached `server.log`. The detached command checks all six health endpoints before reporting readiness. A busy port causes an error; the lab does not stop its existing owner.
+
+Open these addresses directly in tabs on the host:
+
+| Address | Engine |
+| --- | --- |
+| `http://localhost:5600/` | Google Chrome |
+| `http://localhost:5601/` | Chrome Headless Shell |
+| `http://localhost:5602/` | Moli |
+| `http://localhost:5603/` | Obscura |
+| `http://localhost:5604/` | Lightpanda |
+| `http://localhost:5605/` | WPE WebKit |
+
+Each page starts at `https://www.scrapingcourse.com/cloudflare-challenge`. Use `--initial-url <HTTP(S) URL>` to choose another initial page. Toolbar shortcuts open that initial page, `http://127.0.0.1:5000/` for Mew, or Google's sign-in page. The address field accepts a user-chosen HTTP(S) URL without embedded credentials. Lab addresses are rejected as navigation targets to avoid opening the comparison UI inside itself.
+
+The person using the lab solves any challenge manually. The harness does not select CAPTCHA answers or automatically interact with a challenge. A failed engine remains an error in its own tab; the lab never substitutes another browser.
+
+## Runtime prerequisites
+
+The repository does not vendor the browser binaries or install system packages through this tool. Supply executable paths and a matching Playwright module where required:
+
+```json
+{
+  "chrome": "/absolute/path/google-chrome",
+  "shell": "/absolute/path/chrome-headless-shell",
+  "moli": "/absolute/path/moli",
+  "obscura": "/absolute/path/obscura",
+  "lightpanda": "/absolute/path/lightpanda",
+  "wpeExecutable": "/absolute/path/wpe-launch.sh",
+  "wpePlaywright": "/absolute/path/playwright-core/index.mjs",
+  "playwrightPath": "/absolute/path/playwright-core/index.mjs"
+}
+```
+
+`playwrightPath` is optional and selects the Playwright client for the native Moli, Obscura, and Lightpanda CDP adapters. They otherwise use the repository's `playwright-core`. `wpePlaywright` is required and must identify an importable module file compatible with the selected WPE build. `wpeExecutable` can be a runtime wrapper that configures libraries before executing the Playwright-patched WPE MiniBrowser. Stock WPE builds are not assumed to implement Playwright's inspector pipe.
+
+On Linux, WPE's shared libraries and GIO TLS backend must both be available. Resolving `ldd` dependencies alone does not establish HTTPS readiness: GIO loads its TLS backend dynamically. An isolated wrapper can add extracted libraries to `LD_LIBRARY_PATH`, point `GIO_EXTRA_MODULES` at its `gio/modules` directory, and select the installed `gnutls` backend with `GIO_USE_TLS=gnutls`. The runtime also needs the WPE executable, injected bundle, and inspector resource paths expected by its distribution. Keep downloaded packages and extracted runtime files outside the repository. A `TLS support is not available` error is a runtime prerequisite failure, not a website rejection.
+
+## Display and input
+
+Chrome, Headless Shell, Moli, Obscura, and WPE supply actual PNG screenshots. The viewer displays those pixels and forwards trusted local pointer, wheel, keyboard, pasted text, and IME composition events through the engine's input APIs. It scales coordinates to the captured viewport. This path does not reconstruct the target page with rrweb. Capture updates are periodic and are not a video or performance benchmark.
+
+Use direct localhost tabs for pointer checks. Opening the lab inside Mew's DOM replay adds another reconstruction and coordinate boundary; that nested arrangement is not a reliable input comparison.
+
+Lightpanda is deliberately text-only in this lab. It exposes page DOM text, navigation, and status, but supplies no actual GUI capture or coordinate input here. A text result does not establish visual layout or CAPTCHA usability. Moli and Obscura use independent rendering implementations; their displayed pixels and input behavior may differ from Chromium.
+
+The toolbar provides Back, Forward, Reload, and Session reset. Click the captured page to send input; Shift+Esc returns focus to the local address field. Session reset closes the engine, removes its temporary profile, and opens the current address in a fresh session, clearing login and page state.
+
+## Ownership and access
+
+Each engine has one session shared by its connected viewers. Its browser starts lazily on the first viewer connection. Profiles and native CDP listeners belong only to that engine; native adapters choose separate ephemeral loopback ports. Closing a viewer pauses capture when no viewers remain, while retaining the browser session until reset or lab shutdown.
+
+Lab HTTP listeners bind to `127.0.0.1`, validate the request Host against loopback names and the actual port, and require a random per-listener token for the session WebSocket. Runtime state and profiles stay local. The lab does not log input values or cookies, and native startup output is bounded and discarded after connection.
+
+For an authorized shutdown, identify the owned lab PID from its runtime directory and confirm it against `/health`; send that process SIGTERM, or use Ctrl+C for a foreground run. Shutdown closes the six listeners, their browser processes, and temporary profiles. It does not stop Mew or any application being browsed. A forced process kill can bypass graceful profile cleanup.
+
+The [work record](../work/browser-lab.md) separates adapter checks, live browser checks, and remaining integration verification.
+
+## Verify the harness
+
+Run `node --test tools/browser-lab/*.test.mjs` and `npx oxlint tools/browser-lab`. The real viewer integration requires Chrome at `/usr/bin/google-chrome`; the WPE integration is opt-in through `MEW_LAB_WPE_TEST_EXECUTABLE` and `MEW_LAB_WPE_TEST_PLAYWRIGHT`. Without these paths its test is skipped, which is not a successful WPE check. Tests use synthetic intercepted pages for input checks and do not operate a real CAPTCHA. Run the repository's required `npm run build` and documentation checks after changes.

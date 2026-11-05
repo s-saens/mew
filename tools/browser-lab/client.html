@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Browser Lab · mew</title>
+  <link rel="stylesheet" href="/client.css">
+</head>
+<body>
+  <header class="header">
+    <div class="identity"><strong>Browser Lab</strong><span class="divider">/</span><span id="engine-name"></span><span id="port" class="port"></span></div>
+    <nav id="engines" aria-label="브라우저 선택"></nav>
+  </header>
+  <form id="navigation" class="toolbar" aria-label="페이지 이동">
+    <div class="actions">
+      <button type="button" data-command="back" title="뒤로" aria-label="뒤로"><svg viewBox="0 0 24 24"><path d="m14 6-6 6 6 6"/></svg></button>
+      <button type="button" data-command="forward" title="앞으로" aria-label="앞으로"><svg viewBox="0 0 24 24"><path d="m10 6 6 6-6 6"/></svg></button>
+      <button type="button" data-command="reload" title="새로고침" aria-label="새로고침"><svg viewBox="0 0 24 24"><path d="M20 7v5h-5M20 12a8 8 0 1 0-2 5M20 7l-3-3"/></svg></button>
+    </div>
+    <label class="address"><span class="sr-only">웹 주소</span><input id="address" type="url" spellcheck="false" autocapitalize="off" autocomplete="off" required aria-label="웹 주소"><button type="submit" title="이동" aria-label="이동"><svg viewBox="0 0 24 24"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></button></label>
+    <button type="button" id="restart" title="브라우저 세션 초기화">세션 초기화</button>
+  </form>
+  <div class="quick-links" aria-label="검사 페이지"><span>검사 페이지</span><button type="button" data-target="cloudflare">Cloudflare</button><button type="button" data-target="mew">Mew</button><button type="button" data-target="google">Google 로그인</button></div>
+  <div class="statusbar"><span id="status" role="status" aria-live="polite">연결 중…</span><span id="dimensions"></span><button type="button" id="reconnect" hidden>다시 연결</button></div>
+  <p id="note" class="note" hidden></p>
+  <main id="viewport" aria-label="원격 브라우저">
+    <div id="placeholder" class="placeholder"><strong id="placeholder-title">브라우저에 연결하고 있습니다</strong><p id="placeholder-detail">연결되면 현재 페이지가 여기에 표시됩니다.</p></div>
+    <img id="screen" alt="원격 브라우저의 실제 화면. 클릭 후 키보드로 조작할 수 있습니다." tabindex="0" draggable="false" hidden>
+    <textarea id="ime" aria-label="원격 브라우저 문자 입력" autocomplete="off" autocapitalize="off" spellcheck="false" tabindex="-1"></textarea>
+    <pre id="text-output" aria-label="페이지 텍스트" hidden></pre>
+  </main>
+  <footer><span id="interaction-hint">화면을 클릭하면 마우스·키보드 입력이 전달됩니다. 캡챠는 직접 확인해 주세요.</span><span id="page-title"></span></footer>
+  <script nonce="__LAB_NONCE__">window.LAB_CONFIG=__LAB_CONFIG__;</script>
+  <script src="/client.js" defer></script>
+</body>
+</html>
