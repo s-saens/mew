@@ -4,11 +4,11 @@ parent: "mew-agents"
 title: "Agent Sets and Tab Creation"
 status: "implemented"
 created: "2026-09-18"
-updated: "2026-11-03"
+updated: "2026-11-05"
 status_hash: "3e9a3293848b77d07af2e0bbeb65a930bb54c18ce2da6a1b7543c145fb06a0b9"
 files: ["src/components/AgentPanel.tsx", "src/components/AgentSetPicker.tsx", "server/agentSets.ts", "server/agentCwd.ts"]
 commits: []
-description: "Runtime/model/effort/role presets, agent sets, and project tabs. Covers exact-model restoration, tab creation and ordering, keyboard-aware input focus on touch devices, shortcuts and swipes, AI Commit, and task requests that prepare drafts without submitting them."
+description: "Runtime/model/effort/role presets, agent sets, and project tabs. Covers exact-model restoration, tab creation and ordering, keyboard-aware input focus on touch devices, shortcuts and swipes, AI Commit, and file AI actions that prepare titled reference-only drafts without submitting them."
 상위파일:
   - "MOC.md"
   - "_terminals-agents-automation.md"
@@ -22,7 +22,9 @@ description: "Runtime/model/effort/role presets, agent sets, and project tabs. C
 
 ### Scope
 
-- The [task editor action](../projects-files-search/task-panel-list-calendar-and-gantt.md#requirements) requests the runtime/agent set picker with a fixed task title and an input draft. Keep the request pending without creating a tab or runtime connection until selection. Then create the named conversation in the task's root project, retain any selected preset, and seed the existing input-draft storage before mounting the composer. The user edits and sends the draft explicitly. Consume each request once and keep `initialDraft` outside persisted `AgentTab` state; connection readiness, rerenders, and restoration never send it. Project/account switching and activating an existing conversation discard a pending task request. External requests that already specify a runtime, including Mewcat work drafts, retain their direct-tab behavior.
+- The editor's rightmost **Agent** brain button is available for every open file, regardless of extension or view: Markdown Hotview/Plain, code, PDF, media, sheets, extensionless files, and download-only unsupported-file tabs. Include Documents, other project scopes, and external file tabs. Agent access is required; guests have no action. Read-only files can prepare references. Disable the action during loading, permission revalidation, failed file reads, or preparation. Duplicate clicks are blocked and failures allow retry.
+- Save pending editable content before opening the runtime/agent set picker. [Task documents](../projects-files-search/task-panel-list-calendar-and-gantt.md#requirements) retain stable-ID resolution across title renames and completion moves. Project changes cancel preparation. Keep the request pending without creating a tab or runtime connection until selection. Then create the conversation in the current root project, retain the selected preset, and seed the existing input-draft storage before mounting the composer.
+- The draft contains exactly one [titled file reference](agent-input-mentions-skills-and-attachments.md#titled-file-references), with no predefined instructions. Use the current Markdown frontmatter title, falling back to its filename without `.md`; other formats use the complete filename. Use the same title for the conversation and preserve it during automatic labeling. The user adds any instructions and sends explicitly. Consume each request once and keep `initialDraft` outside persisted `AgentTab` state; connection readiness, rerenders, and restoration never send it. Project/account switching and activating an existing conversation discard pending file requests. External requests that already specify a runtime, including Mewcat work drafts, retain their direct-tab behavior. See the [implementation record](../../work/task-agent-integration.md).
 
 - Provide agent set creation, editing, and selection, along with per-project tab and tab name management.
 - Switching with `Ctrl/Cmd+1…9` or the previous/next tab shortcuts also moves keyboard focus to the selected tab. Pressing `Ctrl/Cmd+W` afterward closes the active tab in the same agent group. Closing uses the same last pointerdown/focusin target as new-tab creation and restoration, so selecting an empty agent area does not close an editor tab even if actual focus remains in the editor or moves to body. Do not close tabs for hidden, inert, or removed targets, or during a modal, IME composition, or repeated input.

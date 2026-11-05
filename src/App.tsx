@@ -15,7 +15,7 @@ import { uuid } from './utils/uuid'
 import type { MewcatAction } from '../shared/mewcat-assistant'
 import { writeAgentInputDraft } from './utils/agentInputDrafts'
 import { GitLoginDialog } from './components/github-account'
-import { getUiLocale, uiText } from '@mew/ui/i18n-core'
+import { uiText } from '@mew/ui/i18n-core'
 import { useUiLocale } from '@mew/ui/i18n'
 import { useRefreshTasks } from './hooks/use-refresh-tasks'
 import { useRootProjectTabs } from './hooks/use-root-project-tabs'
@@ -72,7 +72,8 @@ import { FileTree, type TreePersistenceState } from './components/FileTree'
 import { CommandButtonMenu } from './components/CommandButtonMenu'
 import type { SearchMatch } from './api/client'
 import type { RequestedAgentTab } from './utils/agentTabs'
-import { taskAgentFile, taskAgentPrompt, taskAgentTitle } from './utils/task-agent'
+import { taskAgentFile } from './utils/task-agent'
+import { fileAgentDraft, fileAgentTitle } from './utils/file-agent'
 import { resolveTaskAgentLaunch } from './utils/task-agent-launch'
 import { fetchTaskList } from './api/task-list'
 import { syncTaskDocuments, withTaskDocumentSync } from './utils/task-document-sync'
@@ -1890,31 +1891,41 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
   // 사이드바 여는 버튼은 사이드바가 서는 자리와 붙은 맨 앞 칸(왼쪽·위)이 맡는다
   const sidebarPaneId = paneIds(layout)[0]
 
-  const runTask = async (path: string, content: string) => {
+  const askFileAgent = async (path: string, content: string) => {
     if (!caps.agent) return
     const root = rootProjectPath
     const workspace = workspaceInfoRef.current
-    const file = taskAgentFile(path, project, workspace)
-    if (!file || !root) return
-    const relative = documentAbsolutePath(root, workspace?.docsPath, file.project, file.path).slice(root.replace(/\/$/, '').length + 1)
+    const file = editorFile(path, project)
+    if (!root) return
     const isCurrent = () => rootProjectPathRef.current === root
     const before = taskSession.tasks
     try {
-      const task = await resolveTaskAgentLaunch({
-        path: relative, tasks: before, isCurrent,
-        readBefore: () => withTaskDocumentSync(root, async () => {
-          const board = await fetchTaskList(root, auth.email ?? '')
-          if (isCurrent()) await syncTaskDocuments(root, before, board.tasks)
-          return board.tasks
-        }, 'read'),
-        prepare: () => prepareDocumentPageMutation(file.project),
-        readAfter: async () => (await fetchTaskList(root, auth.email ?? '')).tasks,
-        sync: (previous, next) => syncTaskDocuments(root, previous, next),
-      })
-      if (!task?.path || !isCurrent()) return
+      let target = file
+      let title = fileAgentTitle(content, file.path)
+      if (taskAgentFile(path, project, workspace, content)) {
+        const relative = documentAbsolutePath(root, workspace?.docsPath, file.project, file.path).slice(root.replace(/\/$/, '').length + 1)
+        const task = await resolveTaskAgentLaunch({
+          path: relative, tasks: before, isCurrent,
+          readBefore: () => withTaskDocumentSync(root, async () => {
+            const board = await fetchTaskList(root, auth.email ?? '')
+            if (isCurrent()) await syncTaskDocuments(root, before, board.tasks)
+            return board.tasks
+          }, 'read'),
+          prepare: () => prepareDocumentPageMutation(file.project),
+          readAfter: async () => (await fetchTaskList(root, auth.email ?? '')).tasks,
+          sync: (previous, next) => syncTaskDocuments(root, previous, next),
+        })
+        if (!task?.path || !isCurrent()) return
+        target = { project: WORKSPACE_PROJECT, path: task.path }
+        title = task.text || fileAgentTitle(content, task.path)
+      } else {
+        const release = await prepareDocumentPageMutation(file.project, isExternalTabPath(file.path))
+        release()
+      }
+      if (!isCurrent()) return
       setRequestedAgentTab({
-        id: `task-${uuid()}`, label: task.text || taskAgentTitle(content, task.path), renamed: true,
-        cwd: root, initialDraft: taskAgentPrompt({ project: WORKSPACE_PROJECT, path: task.path }, getUiLocale()),
+        id: `file-${uuid()}`, label: title, renamed: true,
+        cwd: root, initialDraft: fileAgentDraft(target, title),
       })
       openWorkspacePanel('agent')
     } catch (error) {
@@ -1973,7 +1984,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
           onReorder={(from, to) => reorderTabs(from, to, pane.id)}
           onSetViewMode={(path, viewMode) => setTabViewMode(path, viewMode, pane.id)}
           onChangeContent={(...args) => { if (rootProjectPathRef.current === rootProjectPath) updateTabContent(...args) }}
-          onRunTask={caps.agent ? runTask : undefined}
+          onAskAgent={caps.agent ? askFileAgent : undefined}
           diffVisible={!desktopMode || editorOpen}
           onOpenDiffFile={(fileProject, path) => {
             openFile(editorTabPath(fileProject, path, project), { preview: false, forceNewTab: true, paneId: pane.id })

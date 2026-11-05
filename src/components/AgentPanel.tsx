@@ -432,10 +432,10 @@ function agentMessageContent(text: string, files: AgentAttachment[], onPreview: 
   for (const token of tokens) {
     content.push(withoutAttachmentTokens(text.slice(from, token.from)))
     const file = files.find(file => file.project === token.project && file.relPath === token.path)
-    if (file) {
+    if (file) referenced.add(file)
+    if (file && token.title === undefined) {
       content.push(<AgentAttachmentTag key={token.from} attachment={file} onPreview={onPreview} />)
-      referenced.add(file)
-    } else content.push(<AgentDocumentTag key={token.from} project={token.project} path={token.path} onOpenFile={onOpenFile} />)
+    } else content.push(<AgentDocumentTag key={token.from} project={token.project} path={token.path} title={token.title} onOpenFile={onOpenFile} />)
     from = token.to
   }
   content.push(withoutAttachmentTokens(text.slice(from)))

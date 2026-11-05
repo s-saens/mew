@@ -7,7 +7,7 @@ import { editorTabPath } from '../utils/editor-files'
 import { useRefreshTasks } from './use-refresh-tasks'
 import { writeBrowserStorage } from '@mew/ui/browser-storage'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { fetchExternalFile, fetchFile, fetchFileAnchorPreview, fetchRules, isArchivedPath, mutateDocumentPage, saveExternalFile, saveFile, type DocRules, type FileVersion } from '../api/client'
+import { externalRawUrl, fetchExternalFile, fetchFile, fetchFileAnchorPreview, fetchRules, isArchivedPath, mutateDocumentPage, rawUrl, saveExternalFile, saveFile, type DocRules, type FileVersion } from '../api/client'
 import { mediaKind } from '../utils/media'
 import { dropCachedFile, getCachedFile, loadCachedFile, putCachedFile, type CachedFile } from '../utils/contentCache'
 import { leaf, normalizeLayout, removeLeaf, splitLeaf, type DropSide } from '../utils/paneTree'
@@ -17,7 +17,6 @@ import { gitDiffTarget } from '../utils/git-diff-tabs'
 import { isGitTabPath } from '../utils/gitTabs'
 import { editorFile, mergeEditorTabs } from '../utils/editor-files'
 import { canOpenEditorFile } from '../utils/editor-open-policy.ts'
-import { useI18n } from '../i18n'
 import { uiText } from '@mew/ui/i18n-core'
 import { activePaneTab, mostRecentTab, nextTabNavigation, recordPaneActivation, remapTabNavigation, type TabNavigation } from '../utils/editor-tab-navigation'
 import { registerTaskDocumentSync, type TaskDocumentChange } from '../utils/task-document-sync'
@@ -161,13 +160,10 @@ export function useTabs(
   desktopPaneIds?: string[],
   desktopFocusedPaneId?: string,
 ) {
-  const { t } = useI18n()
   const desktopPaneIdsRef = useRef(desktopPaneIds)
   desktopPaneIdsRef.current = desktopPaneIds
   const desktopFocusedPaneIdRef = useRef(desktopFocusedPaneId)
   desktopFocusedPaneIdRef.current = desktopFocusedPaneId
-  const unsupportedNoticeRef = useRef('')
-  unsupportedNoticeRef.current = t('editor.unsupportedFile')
   const { pending: refreshing, track: trackRefresh } = useRefreshTasks()
   const [states, setStates] = useState<Record<string, ProjectTabs>>({})
   const workspaceRequestRef = useRef({ scope: workspaceScope, account: accountScope, epoch: 0 })
@@ -354,19 +350,12 @@ export function useTabs(
       // displays the destination. Ordinary open requests may select that tab.
       const existing = opts?.replaceActive ? source?.path === path ? source : undefined : matchingPaneTab(pane, path)
       const shared = !existing && opts?.replaceActive ? findTab(p, path) : undefined
-      if (!canOpenEditorFile(path)) {
-        if (existing) {
-          patchPane(p, paneId, pane => activatePaneTab(pane, existing))
-        } else {
-          onNoticeRef.current(unsupportedNoticeRef.current)
-        }
-        return
-      }
+      const supported = canOpenEditorFile(path)
       const diffTarget = gitDiffTarget(path)
       const file = editorFile(path, p)
       const preview = opts?.preview ?? true
       const external = isExternalTabPath(path)
-      let cached: CachedFile | undefined = external || diffTarget ? undefined : getCachedFile(p, path)
+      let cached: CachedFile | undefined = !supported || external || diffTarget ? undefined : getCachedFile(p, path)
       let trace: FileOpenTrace | undefined
       if (existing) {
         // 복원 때 뒤로 미뤘던 탭은 사용자가 고르는 바로 그때만 기존 전체 본문 요청을 시작한다.
@@ -382,9 +371,9 @@ export function useTabs(
                 ...t,
                 preview: !preview && t.preview ? false : t.preview,
                 deferredLoad: loadDeferred ? false : t.deferredLoad,
-                loading: loadDeferred ? cached === undefined && !diffTarget && !mediaKind(path) : t.loading,
-                revalidating: loadDeferred ? !diffTarget && !mediaKind(path) : t.revalidating,
-                editable: loadDeferred && !diffTarget && !mediaKind(path) ? false : t.editable,
+                loading: loadDeferred ? cached === undefined && !diffTarget && (!supported || !mediaKind(path)) : t.loading,
+                revalidating: loadDeferred ? !diffTarget && (!supported || !mediaKind(path)) : t.revalidating,
+                editable: !supported || loadDeferred && !diffTarget && !mediaKind(path) ? false : t.editable,
                 openTrace: trace ?? t.openTrace,
               },
           ),
@@ -403,12 +392,12 @@ export function useTabs(
       const newTab: Tab = {
         ...blankTab(),
         path,
-        editable: !diffTarget && !!mediaKind(path),
+        editable: supported && !diffTarget && !!mediaKind(path),
         preview,
         viewMode: opts?.viewMode ?? (previewFirst ? 'hotview' : 'plain'),
         deferredLoad: opts?.deferLoad === true,
-        loading: cached === undefined && !diffTarget && !mediaKind(path),
-        revalidating: !diffTarget && !mediaKind(path),
+        loading: cached === undefined && !diffTarget && (!supported || !mediaKind(path)),
+        revalidating: !diffTarget && (!supported || !mediaKind(path)),
         openTrace: trace,
         ...(cached
           ? { content: cached.content, savedContent: cached.content, committedContent: cached.content }
@@ -438,7 +427,7 @@ export function useTabs(
       // 위에서 이미 복원됐고, 비활성 탭을 고르면 existing 분기의 deferredLoad가 여기로 이어진다.
       if (opts?.deferLoad || diffTarget) return
       // 바이너리 미디어는 뷰어가 /api/raw로 직접 스트리밍한다 — utf-8 fetch도 규칙 검사도 없음
-      if (mediaKind(path)) return
+      if (supported && mediaKind(path)) return
       const requestEpoch = workspaceRequestRef.current.epoch
       const requestKey = `${requestEpoch}\0${p}\0${path}`
       const requestToken = Symbol()
@@ -485,6 +474,20 @@ export function useTabs(
         mapTabsAtPath(p, path, tab => ({ ...tab, content: '', savedContent: '', committedContent: '', editable: false, loading: false, revalidating: false, status: 'error', statusMessage: err instanceof Error ? err.message : String(err), anchorPreview: undefined }))
         console.error(err)
         onNoticeRef.current(err instanceof Error ? err.message : String(err))
+      }
+      if (!supported) {
+        // HEAD checks existence and the raw route's view/path permissions without reading binary bytes into the editor.
+        const validation = mewFetch(external ? externalRawUrl(externalAbsolutePath(path)) : rawUrl(file.path, file.project), { method: 'HEAD' })
+          .then(response => {
+            if (!response.ok) {
+              if (response.status === 401) window.dispatchEvent(new Event('mew:auth-expired'))
+              throw new Error(response.statusText || `HTTP ${response.status}`)
+            }
+            if (!isCurrentWorkspace()) return
+            mapTabsAtPath(p, path, tab => ({ ...tab, content: '', savedContent: '', committedContent: '', editable: false, loading: false, revalidating: false, status: 'idle', statusMessage: undefined }))
+          }).catch(handleOpenError)
+        if (opts?.restoring) void trackRefresh(validation)
+        return
       }
       // 목표 줄이 알려진 큰 plain 파일은 조각을 먼저 보여 준다. 조각 상태는 readOnly이고 cache에도
       // 저장하지 않는다. 뒤의 전체 요청이 완료되면 기존 편집·협업 경로로 원자적으로 바뀐다.
@@ -571,10 +574,6 @@ export function useTabs(
     (path: string, opts?: { preview?: boolean; forceNewTab?: boolean; replaceActive?: boolean; navigationIndex?: number; paneId?: string; viewMode?: Tab['viewMode']; anchorLine?: number }) => {
       const p = projectRef.current
       const paneId = opts?.paneId ?? stateOf(p).focusedPaneId
-      if (!canOpenEditorFile(path)) {
-        openFileIn(p, paneId, path, opts)
-        return
-      }
       const active = activePaneTab(paneOf(p, paneId))
       const navigationKey = `${p}\0${paneId}`
       const sequence = (fileNavigationRef.current.get(navigationKey) ?? 0) + 1
@@ -668,7 +667,7 @@ export function useTabs(
           const supported = canOpenEditorFile(tab.path)
           const cached = !supported || isExternalTabPath(tab.path) || gitDiffTarget(tab.path) ? undefined : getCachedFile(project, tab.path)
           return {
-            ...blankTab(), ...tab, editable: supported && !gitDiffTarget(tab.path) && !!mediaKind(tab.path), deferredLoad: supported, loading: !cached && supported && !gitDiffTarget(tab.path) && !mediaKind(tab.path), revalidating: supported && !gitDiffTarget(tab.path) && !mediaKind(tab.path),
+            ...blankTab(), ...tab, editable: supported && !gitDiffTarget(tab.path) && !!mediaKind(tab.path), deferredLoad: true, loading: !cached && !gitDiffTarget(tab.path) && (!supported || !mediaKind(tab.path)), revalidating: !gitDiffTarget(tab.path) && (!supported || !mediaKind(tab.path)),
             ...(cached ? { content: cached.content, savedContent: cached.content, committedContent: cached.content } : {}),
           }
         }),
@@ -678,7 +677,7 @@ export function useTabs(
     }, desktopPaneIdsRef.current ?? [], desktopFocusedPaneIdRef.current)
     patch(project, () => restored)
     const activeLoads = restored.panes.flatMap(pane => {
-      const active = pane.tabs.find(tab => tab.path === pane.activePath && canOpenEditorFile(tab.path))
+      const active = pane.tabs.find(tab => tab.path === pane.activePath)
       return active ? [{ paneId: pane.id, path: active.path, preview: active.preview, viewMode: active.viewMode }] : []
     })
     pendingRestoreLoadsRef.current.set(sessionKey, activeLoads)
@@ -861,8 +860,8 @@ export function useTabs(
         const supported = canOpenEditorFile(tab.path)
         const cached = supported ? getCachedFile(p, tab.path) : undefined
         return {
-          ...blankTab(), ...tab, editable: supported && !!mediaKind(tab.path), deferredLoad: supported,
-          loading: !cached && supported && !mediaKind(tab.path), revalidating: supported && !mediaKind(tab.path),
+          ...blankTab(), ...tab, editable: supported && !!mediaKind(tab.path), deferredLoad: true,
+          loading: !cached && (!supported || !mediaKind(tab.path)), revalidating: !supported || !mediaKind(tab.path),
           ...(cached ? { content: cached.content, savedContent: cached.content, committedContent: cached.content } : {}),
         }
       }))
@@ -936,7 +935,7 @@ export function useTabs(
     (path: string, content: string, paneId?: string) => {
       const p = projectRef.current
       const tab = matchingPaneTab(paneOf(p, paneId), path)
-      if (!tab || tab.revalidating || workspaceRequestRef.current.scope !== workspaceScope || workspaceRequestRef.current.account !== accountScope) return
+      if (!tab || !canOpenEditorFile(path) || tab.revalidating || workspaceRequestRef.current.scope !== workspaceScope || workspaceRequestRef.current.account !== accountScope) return
       // 편집이 시작되면 미리보기 탭을 고정 탭으로 승격 (VSCode와 동일)
       mapTabsAtPath(p, path, (t) => ({ ...t, content, preview: false }))
       if (workspaceScope && !isExternalTabPath(path) && !isGitTabPath(path)) {

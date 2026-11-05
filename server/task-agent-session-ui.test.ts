@@ -6,7 +6,7 @@ import { build } from 'rolldown'
 import { connectTestBrowser } from './test-browser.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
-const prompt = '[[.workspace:.mew/tasks/Task.md]]\nFirst organize this task document, then implement its contents.'
+const prompt = '[[mew-document:.workspace:.mew/tasks/Task.md|Task title]]'
 
 test('task requests choose a runtime and prepare an editable draft without sending it', { timeout: 60_000 }, async t => {
   const source = `
@@ -107,7 +107,7 @@ test('task requests choose a runtime and prepare an editable draft without sendi
       assert.equal(await page.evaluate('window.readDraft()'), prompt)
       const input = page.locator('[data-dock-body="agent"] [data-agent-composer] [contenteditable="true"]')
       await input.waitFor()
-      assert.ok((await input.innerText()).includes('First organize this task document'))
+      assert.ok((await input.innerText()).includes('Task title'))
       await page.evaluate(`const socket=window.sockets.find(socket=>new URL(socket.url).searchParams.get('tab')==='task-tab');socket.open();socket.emit({type:'models',models:{currentModelId:'task-model',availableModels:[{modelId:'task-model',name:'Task model'}]}});socket.emit({type:'meta',meta:{sessionId:'task-session',busy:false,queued:[],turns:0}});window.rerender()`)
       await page.waitForFunction('document.querySelector("[data-version]").dataset.version==="1"')
       assert.deepEqual(await page.evaluate('window.messages.filter(message=>message.type==="prompt")'), [], 'the docked task draft remains unsent after runtime initialization')
@@ -130,8 +130,8 @@ test('task requests choose a runtime and prepare an editable draft without sendi
     await page.waitForFunction('window.sockets.length===1')
     const input = page.locator('[data-agent-composer] [contenteditable="true"]:visible')
     await input.waitFor()
-    assert.equal(await page.evaluate('window.readDraft()'), prompt, 'the full document reference and task instruction become the composer draft')
-    assert.ok((await input.innerText()).includes('First organize this task document'), 'the prepared text is visible in the editable composer')
+    assert.equal(await page.evaluate('window.readDraft()'), prompt, 'only the titled document reference becomes the composer draft')
+    assert.ok((await input.innerText()).includes('Task title'), 'the document title is visible in the editable composer')
     await page.getByRole('tab', { name: /Task title/, selected: true }).waitFor()
     const sentPrompts = () => page.evaluate<Array<Record<string, unknown>>>('window.messages.filter(message=>message.type==="prompt")')
     assert.deepEqual(await sentPrompts(), [], 'creating the tab cannot submit its draft')
@@ -144,9 +144,10 @@ test('task requests choose a runtime and prepare an editable draft without sendi
     await page.evaluate('window.rerender()')
     await page.waitForFunction('document.querySelector("[data-version]").dataset.version==="3"')
     assert.deepEqual(await sentPrompts(), [], 'a ready session and rerenders leave the draft unsent')
-    const edited = 'Review my edited task before implementing it.'
-    await input.fill(edited)
-    assert.equal(await page.evaluate('window.readDraft()'), edited, 'the user can replace the suggested prompt')
+    const edited = `${prompt} Review my edited task before implementing it.`
+    await input.press('Control+End')
+    await page.keyboard.insertText(' Review my edited task before implementing it.')
+    assert.equal(await page.evaluate('window.readDraft()'), edited, 'the user can add instructions after the prepared tag')
     await page.evaluate('window.requestTask();window.rerender()')
     await page.waitForFunction('document.querySelector("[data-version]").dataset.version==="4"')
     assert.equal(await page.evaluate('window.readDraft()'), edited, 'repeated requests never overwrite an existing conversation draft')
@@ -158,6 +159,9 @@ test('task requests choose a runtime and prepare an editable draft without sendi
     assert.equal(prompts.length, 1)
     assert.equal(prompts[0].text, edited)
     assert.equal(prompts[0].displayText, edited)
+    const sentTag = page.locator('[data-agent-question-bubble] [data-agent-document]').filter({ hasText: 'Task title' })
+    await sentTag.waitFor()
+    assert.equal((await sentTag.innerText()).trim(), 'Task title', 'sent messages retain the document title')
     assert.equal((prompts[0].settings as { model?: string }).model, 'Task model')
     await page.evaluate(`window.rerender();window.sockets[0].emit({type:'meta',meta:{sessionId:'task-session',busy:false,queued:[],turns:1}})`)
     await page.waitForFunction('document.querySelector("[data-version]").dataset.version==="5"')

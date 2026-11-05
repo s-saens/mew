@@ -6,7 +6,6 @@ import { uiText } from '@mew/ui/i18n-core'
 import { useUiLocale } from '@mew/ui/i18n'
 import { useShortcutBindings } from '@mew/shortcuts'
 import { ArrowLeft, ArrowRight, Brain, OpenNewWindow, Quote } from 'iconoir-react'
-import { taskAgentFile } from '../utils/task-agent'
 import { useDock, DockGrip, DockInlineBody } from './DockWorkspace'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
 import {
@@ -179,7 +178,7 @@ export interface EditorPaneProps {
   onNavigateTab?: (direction: -1 | 1) => void
   onCreateChildPage?: (path: string, name: string, onCreated: (result: DocumentPageMutation) => void) => Promise<void>
   onOpenHistory: () => void
-  onRunTask?: (path: string, content: string) => Promise<void>
+  onAskAgent?: (path: string, content: string) => Promise<void>
   onSetTocOpen: (open: boolean) => void
   onOpenSidebar: () => void
   onTabDragMove: (paneId: string, path: string, x: number, y: number, tabId?: string) => void
@@ -224,7 +223,7 @@ export function EditorPane({
   onOpenSidebar,
   diffVisible = true,
   onOpenDiffFile,
-  onRunTask,
+  onAskAgent,
   onTabDragMove,
   onTabDrop,
 }: EditorPaneProps) {
@@ -232,8 +231,8 @@ export function EditorPane({
   const dock = useDock()
   const { t } = useI18n()
   const { toast: commentToast, showToast } = useToast()
-  const [runningTask, setRunningTask] = useState(false)
-  const taskRunPending = useRef(false)
+  const [preparingAgent, setPreparingAgent] = useState(false)
+  const agentRequestPending = useRef(false)
   const shortcutBindings = useShortcutBindings()
   const selectedTab = (pane.activeTabId ? pane.tabs.find((t) => t.id === pane.activeTabId) : undefined) ?? pane.tabs.find((t) => t.path === pane.activePath) ?? null
   const file = editorFile(pane.activePath ?? '', tabProject)
@@ -1017,19 +1016,19 @@ export function EditorPane({
                     </svg>
                   </button>
                 )}
-                {!isGuest && onRunTask && taskAgentFile(selectedTab!.path, tabProject, workspace) && (
+                {!isGuest && onAskAgent && (
                   <button
                     type="button"
-                    aria-label={uiText('태스크 실행')}
-                    data-tip={uiText('태스크 실행')}
-                    disabled={runningTask || loading || revalidating || !activeTab.editable}
+                    aria-label={t('header.agent')}
+                    data-tip={t('header.agent')}
+                    disabled={preparingAgent || loading || revalidating || fileLoadFailed}
                     onClick={() => {
-                      if (taskRunPending.current) return
-                      taskRunPending.current = true
-                      setRunningTask(true)
-                      void onRunTask(selectedTab!.path, activeTab.content)
+                      if (agentRequestPending.current) return
+                      agentRequestPending.current = true
+                      setPreparingAgent(true)
+                      void onAskAgent(selectedTab!.path, activeTab.content)
                         .catch(error => showToast(error instanceof Error ? error.message : String(error)))
-                        .finally(() => { taskRunPending.current = false; setRunningTask(false) })
+                        .finally(() => { agentRequestPending.current = false; setPreparingAgent(false) })
                     }}
                     className="rounded border border-edge-strong bg-surface-raised p-1.5 text-ink-muted shadow-sm enabled:hover:bg-surface-hover disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-accent"
                   >
@@ -1045,9 +1044,7 @@ export function EditorPane({
                     <p className="select-text whitespace-pre-wrap break-words">{fileError}</p>
                   </div>
                 ) : unsupportedFile ? (
-                  <div role="status" className="flex h-full items-center justify-center px-4 text-center text-sm text-ink-muted">
-                    {t('editor.unsupportedFile')}
-                  </div>
+                  <MediaViewer key={`${project}:${activeTab.path}`} path={activeTab.path} kind="download" project={project} />
                 ) : mediaKind(activeTab.path) ? (
                   // key로 파일 전환 시 리마운트 — 이전 파일의 재생 상태가 남지 않게
                   <MediaViewer key={`${project}:${activeTab.path}`} path={activeTab.path} kind={mediaKind(activeTab.path)!} project={project} identity={authEmail ?? 'guest'} onEdit={() => onPin(activeTab.path)} />

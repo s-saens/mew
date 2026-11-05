@@ -1,11 +1,11 @@
 ---
 title: "Task editor agent integration"
-description: "Records the task editor brain action and its 2026-11-02 change from automatic submission to runtime selection and editable prompt drafts, with isolated regression checks and runtime application limits."
+description: "Records the task editor brain action and its 2026-11-02 change from automatic submission to runtime selection and editable prompt drafts, and the November 5 extension to all file views with titled reference-only drafts. Includes regression checks and runtime application limits."
 created: "2026-11-01"
-updated: "2026-11-02"
+updated: "2026-11-05"
 ---
 
-Implemented the task editor's rightmost **Run task** brain icon so a task can move directly from its document to an agent conversation. Current behavior belongs to the [task feature contract](../features/projects-files-search/task-panel-list-calendar-and-gantt.md#requirements) and [agent tab contract](../features/terminals-agents-automation/agent-sets-and-tab-creation.md#requirements); everyday use is in the [project guide](../../../docs/guides/projects.md).
+Implemented the task editor's rightmost **Run task** brain icon so a task can move directly from its document to an agent conversation. Current behavior belongs to the [file AI action contract](../features/terminals-agents-automation/agent-sets-and-tab-creation.md#scope), [task feature contract](../features/projects-files-search/task-panel-list-calendar-and-gantt.md#requirements) and [agent tab contract](../features/terminals-agents-automation/agent-sets-and-tab-creation.md#requirements); everyday use is in the [project guide](../../../docs/guides/projects.md).
 
 ## Initial implementation (2026-11-01)
 
@@ -39,3 +39,17 @@ Local verification:
 - `npm run check:docs` passed description and local-link checks; `git diff --check` passed.
 
 No deployment, launcher, or server lifecycle operations are part of this change. Browser fixtures intercept HTTP and WebSocket traffic; actual provider execution and physical-device behavior require separate verification.
+
+## All files and titled reference-only drafts (2026-11-05)
+
+Extended the editor brain action to all file extensions and views, including read-only files, Documents and external scopes. Replaced the task-specific instructions with exactly one titled file reference, while retaining runtime selection, explicit user submission, draft persistence, retry behavior, and stable task identity across saves and moves. Markdown titles come from current frontmatter; other files use their filenames. The tag displays its title in the composer and passive previews, and in sent messages. [ADR 0145](../decisions/0145-titled-agent-file-references.md) records the compatible titled-reference format; the [agent tab contract](../features/terminals-agents-automation/agent-sets-and-tab-creation.md#scope) and [input contract](../features/terminals-agents-automation/agent-input-mentions-skills-and-attachments.md#titled-file-references) own current behavior.
+
+Local verification:
+
+- The focused Node suite passed all 69 tests across file titles and reference serialization, legacy upload compatibility, task identity/move resolution, draft storage, atomic tag editing, runtime selection, editor toolbar visibility, and account tab restoration/permission behavior. It includes `server/agent-document-tags.test.ts`, `server/task-agent-ui.test.ts`, `server/task-agent-session-ui.test.ts`, `server/editor-tabs-sync-ui.test.ts`, `server/editor-pane-ui.test.ts`, and the affected `src/utils` regression files.
+- `node --test server/agent-history-ui.test.ts` passed its desktop/mobile, light/dark matrix, including visible titles, exact navigation/copying, and titled references sharing a path with old upload metadata. The expanded matrix took about 65 seconds; its timeout now allows 120 seconds.
+- `npm run build` passed TypeScript and production asset generation with the existing chunk-size advisory. `npm run lint` passed with repository warnings. `git diff --check` passed.
+- `npm run check:docs` passed all 730 description checks, then reported 42 pre-existing local-link errors, including missing `.mew/docs/MOC.md` and `.mew/docs/decisions/README.md`. All 25 added documentation links and anchors were inspected and resolve. Unrelated navigation changes remain outside this task.
+- Inspected the 390px light-theme screenshot of the download fallback and shared Agent button. Toolbar browser checks also cover 1100px, all four translated labels, Hotview/Plain, code, media/PDF, Documents/external scopes, and read-only/loading/pending/error behavior. The toolbar fixture stubs PDF and sheet bodies; it does not verify their renderers. The opening fixture uses intercepted routes and checks existing HTML sandbox behavior without starting a listening server.
+
+The required build updated local `dist/` assets. No deployment, launcher, or server lifecycle operations were performed. Browser and file APIs use isolated fixtures; real agent providers and physical mobile devices remain unverified.

@@ -6,6 +6,7 @@ import { Window } from 'happy-dom'
 
 const root = path.resolve(import.meta.dirname, '..')
 const documentToken = '[[docs:guides/문서 #1%.md]]'
+const titledDocumentToken = '[[mew-document:docs:guides/문서 #1%.md|Document title]]'
 const projectToken = '[[.workspace:src/main.ts]]'
 
 test('composer and scheduled previews render atomic document tags and retain exact reference values', async () => {
@@ -123,6 +124,43 @@ window.fixture = {
     await fixture.reset('[[docs:guide-new.md]]')
     assert.equal(editor.querySelector('[data-document-token]')?.getAttribute('data-document-token'), '[[docs:guide-new.md]]', 'external edits refresh a whole tag')
     assert.equal(fixture.text(), '[[docs:guide-new.md]]')
+
+    const titled = `before ${titledDocumentToken} after ${documentToken}`
+    await fixture.reset(titled)
+    assert.equal(editor.textContent, 'before Document title after ', 'titled references show their title while legacy references remain icon-only')
+    assert.equal(preview.textContent, 'before Document title after ')
+    assert.equal(preview.querySelectorAll('button, a').length, 0, 'titled passive tags do not nest interactive controls')
+    const titleTag = editor.querySelector('[data-agent-document]')!
+    assert.equal(titleTag.getAttribute('data-tip'), 'Document title', 'the full title remains available as a shared tooltip')
+    assert.equal(titleTag.querySelector('button[aria-haspopup]')?.getAttribute('aria-label'), 'Document title')
+    assert.equal(fixture.copy(), titled, 'copy retains the exact title and scoped path')
+    await fixture.select('before '.length + titledDocumentToken.length)
+    await fixture.command('left')
+    assert.equal(fixture.selected(), 'before '.length, 'left arrow skips the whole titled reference')
+    await fixture.command('right')
+    assert.equal(fixture.selected(), 'before '.length + titledDocumentToken.length)
+    await fixture.command('backspace')
+    assert.equal(fixture.text(), titled.replace(titledDocumentToken, ''))
+    await fixture.command('undo')
+    assert.equal(fixture.text(), titled)
+    await fixture.command('redo')
+    assert.equal(fixture.text(), titled.replace(titledDocumentToken, ''))
+    await fixture.command('undo')
+    await fixture.click('[data-document-token] button[aria-haspopup] span')
+    assert.equal(win.document.querySelector('[role="menuitem"]')?.textContent, '문서 #1%.md', 'clicking the title opens the original filename action')
+    await fixture.click('[role="menuitem"]')
+    assert.deepEqual(JSON.parse(JSON.stringify((win as unknown as { opened: unknown[] }).opened)), [
+      ['docs', 'guides/문서 #1%.md', null], ['docs', 'guides/문서 #1%.md', null],
+    ], 'a title never changes the navigation path')
+    await fixture.click('[data-document-token] button:not([aria-haspopup])')
+    assert.equal(fixture.text(), titled.replace(titledDocumentToken, ''), 'remove deletes the entire titled reference')
+    await fixture.command('undo')
+    assert.equal(fixture.text(), titled)
+    await fixture.cli(true)
+    assert.equal(editor.querySelectorAll('[data-document-token]').length, 0)
+    assert.equal(editor.textContent, titled, 'CLI displays titled reference syntax literally')
+    await fixture.cli(false)
+    assert.equal(editor.querySelectorAll('[data-document-token]').length, 2)
     await fixture.reset('[[docs:incomplete [[docs:broken\nname.md]] [[mew-upload:pending]] [[docs:.mew/temp/assets/photo.png]]')
     assert.equal(editor.querySelectorAll('[data-document-token]').length, 0, 'incomplete references and uploads are not document tags')
   } finally {

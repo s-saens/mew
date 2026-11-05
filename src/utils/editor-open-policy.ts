@@ -22,7 +22,7 @@ const TEXT_NAMES = new Set([
   '.npmrc', '.nvmrc', '.bashrc', '.zshrc', '.profile', '.bash_profile',
 ])
 
-/** Decide before creating a tab or reading/caching its body. Unknown formats stay in the file explorer. */
+/** Whether a file has a supported editor/viewer. Other files use a read-only download tab without loading a body. */
 export function canOpenEditorFile(tabPath: string): boolean {
   if (gitDiffTarget(tabPath)) return true
   const path = externalAbsolutePath(editorFile(tabPath).path)

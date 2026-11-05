@@ -1,7 +1,7 @@
 ---
 title: "Document Editing and Storage Formats"
-description: "Explains editing Markdown, code, document properties, tables, links, attachments, and PDFs; /voice microphone recording, playback, and upload retry; readable Hotview copying and source copying in Plain; /paint and /그림 image insertion with freehand pens, transparent exports, and snap settings; adding and deleting table rows and columns; and the body context menu and native mobile keyboard. Covers Hotview @ file autocomplete, annotations, internal document navigation, table/DB conversion, inline subpage naming, autosave, split views, real-time account tab sharing, mobile panels, and installation controls."
-updated: "2026-11-04"
+description: "Explains editing Markdown, code, document properties, tables, links, attachments, and PDFs; /voice microphone recording, playback, and upload retry; readable Hotview copying and source copying in Plain; /paint and /그림 image insertion with freehand pens, transparent exports, and snap settings; adding and deleting table rows and columns; and the body context menu and native mobile keyboard. Covers the AI button for every file view, titled reference-only agent drafts, Hotview @ file autocomplete, annotations, internal document navigation, table/DB conversion, inline subpage naming, autosave, split views, real-time account tab sharing, mobile panels, and installation controls."
+updated: "2026-11-05"
 상위파일:
   - "../../.mew/docs/MOC.md"
   - "MOC.md"
@@ -49,6 +49,12 @@ Use HTTPS or localhost with a browser that supports microphone recording. Check 
 
 For Mewlink, the installed launcher must delegate microphone access. The host header and central launcher changes require separate user-managed application; see the [microphone access contract](../../.mew/docs/development/remote-access.md#microphone-permission).
 
+## Ask an agent about a file
+
+Click the rightmost **Agent** brain button above an open file, then choose a runtime or agent set. The new conversation contains only a file tag showing the document title; add your instructions and send when ready. Markdown uses its document title, or the filename when no title is set. Other formats use the filename, including its extension.
+
+The button works in Hotview and Plain, code, PDFs, images, media, sheets, and other file views. Read-only files are supported, and agent access is required. Mew saves pending editable content before opening the picker. Opening the picker or choosing a runtime does not send a message. [Runtime setup](terminal-agents.md) · [File AI behavior](../../.mew/docs/features/terminals-agents-automation/agent-sets-and-tab-creation.md#scope).
+
 ## Links and Attachments
 
 Internal document links, including subdocuments, **open in the same tab**. **Ctrl/Cmd+click** opens them in a new tab. Same-tab navigation uses the current tab even if another tab displays the same document, and each tab maintains its own document browsing history.
@@ -82,7 +88,7 @@ Click a file in the file tree to open it in the viewer for its format.
 | Audio and video | Play, pause, and seek using browser playback controls. Actual playback availability depends on device codec support |
 | PDF | Navigate pages, zoom, select text, annotate with a pen or highlighter, and save the PDF itself. [PDF Guide](#reading-and-annotating-pdfs) |
 | XLSX·CSV·TSV | View as read-only tables, switch XLSX sheet tabs, and download originals. Cell editing and formula calculation are not provided |
-| APK·AAB | Download without a preview |
+| Unsupported formats, including APK·AAB and archives | Open a read-only download tab with the shared Agent button; binary contents are not loaded into a text editor |
 
 ## Reading and Annotating PDFs
 

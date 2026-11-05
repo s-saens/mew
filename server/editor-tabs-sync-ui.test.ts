@@ -8,7 +8,7 @@ const stored = (paths: string[], activePath = paths.at(-1) ?? null) => ({
   layout: { kind: 'leaf', pane: 'main' }, focusedPaneId: 'main',
 })
 type StoredState = ReturnType<typeof stored>
-type FileTab = { path: string; content: string; savedContent: string; status: string; revalidating?: boolean }
+type FileTab = { path: string; content: string; savedContent: string; status: string; statusMessage?: string; editable: boolean; loading?: boolean; revalidating?: boolean }
 type Device = {
   account: { hydrated: boolean }
   editor: {
@@ -42,7 +42,7 @@ window.devices={};window.failures=[];
 function Device({id}){
   const account=useAccountEditorTabs('owner@example.test','/fixture',error=>window.failures.push(String(error)));
   const editor=useTabs(window.editorProject||'docs',noop,error=>window.failures.push(String(error)),'/fixture',account.tabs,account.change,account.hydrated,undefined,'owner@example.test','/fixture');
-  window.devices[id]={account,editor};return null;
+  React.useEffect(()=>{window.devices[id]={account,editor}});return null;
 }
 const root=createRoot(document.getElementById('root'));
 window.unmountFixture=()=>root.unmount();
@@ -59,7 +59,7 @@ root.render(<React.StrictMode><I18nProvider><Device id="a"/><Device id="b"/></I1
     } }],
   })
   const code = bundle.output.find(item => item.type === 'chunk')!.code
-  async function fixture(initial: Record<string, StoredState> | null, options: { holdHydration?: boolean; failHydration?: boolean; holdSave?: boolean; failSave?: boolean; project?: string } = {}) {
+  async function fixture(initial: Record<string, StoredState> | null, options: { holdHydration?: boolean; failHydration?: boolean; holdSave?: boolean; failSave?: boolean; holdValidation?: boolean; project?: string } = {}) {
     const win = new Window({ url: 'http://mew-editor-tabs.test/' }) as FixtureWindow
     win.console.timeStamp = () => {}
     win.editorProject = options.project
@@ -67,16 +67,25 @@ root.render(<React.StrictMode><I18nProvider><Device id="a"/><Device id="b"/></I1
     win.document.body.innerHTML = '<div id="root"></div>'
     win.localStorage.setItem('mew:open-tabs:docs@/fixture', JSON.stringify(stored(['stale-device.md'])))
     let remote = initial, revision = initial ? 1 : 0, failHydration = !!options.failHydration
-    const hydration = deferred(), save = deferred()
+    const hydration = deferred(), save = deferred(), validation = deferred()
     if (!options.holdHydration) hydration.resolve()
     if (!options.holdSave) save.resolve()
+    if (!options.holdValidation) validation.resolve()
     const writes: { project: string; state: StoredState; initialize: boolean }[] = []
     const fileWrites: { path: string; content: string }[] = [], disk = new Map<string, string>()
+    const fileReads: string[] = [], rawChecks: { route: string; path: string; method: string | undefined }[] = [], denied = new Set<string>(), missing = new Set<string>()
     let reads = 0
     const signal = () => win.dispatchEvent(new win.CustomEvent('mew:editor-tabs-changed', { detail: { workspacePath: '/fixture' } }))
     const response = (value: unknown, status = 200) => new win.Response(JSON.stringify(value), { status, headers: { 'Content-Type': 'application/json' } })
     win.fetch = async (input, init) => {
       const url = new URL(String(input), win.location.href)
+      if (url.pathname === '/api/raw' || url.pathname === '/api/fs/raw') {
+        const path = url.searchParams.get('path')!
+        rawChecks.push({ route: url.pathname, path, method: init?.method })
+        await validation.promise
+        return new win.Response(null, { status: denied.has(path) ? 403 : missing.has(path) ? 404 : 200 })
+      }
+      if (url.pathname === '/api/file-access') return response({ view: !denied.has(url.searchParams.get('path')!), edit: true })
       if (url.pathname === '/api/user-ui/editor-tabs') {
         if (init?.method !== 'PUT') {
           reads++
@@ -102,6 +111,7 @@ root.render(<React.StrictMode><I18nProvider><Device id="a"/><Device id="b"/></I1
           return response({ ok: true, content: body.content })
         }
         const path = url.searchParams.get('path')!
+        fileReads.push(path)
         return response({ path, content: disk.get(path) ?? `Body ${path}`, editable: true })
       }
       return response([])
@@ -109,15 +119,66 @@ root.render(<React.StrictMode><I18nProvider><Device id="a"/><Device id="b"/></I1
     win.eval(code)
     const a = () => win.devices.a.editor, b = () => win.devices.b.editor
     return {
-      win, a, b, writes, fileWrites, hydration, save, signal,
+      win, a, b, writes, fileWrites, fileReads, rawChecks, denied, missing, hydration, save, validation, signal,
       get reads() { return reads },
       get remote() { return remote },
       recover() { failHydration = false; win.dispatchEvent(new win.Event('online')) },
       update(next: Record<string, StoredState>) { remote = next; revision++; signal() },
       async ready() { await until(() => !!win.devices.a?.editor.hydrated && !!win.devices.b?.editor.hydrated, 'Both device hooks should hydrate') },
-      async close() { hydration.resolve(); save.resolve(); win.unmountFixture(); await win.happyDOM.abort(); win.close() },
+      async close() { hydration.resolve(); save.resolve(); validation.resolve(); win.unmountFixture(); await win.happyDOM.abort(); win.close() },
     }
   }
+
+  await t.test('unsupported and download-only files open read-only tabs without loading or saving binary bodies', async () => {
+    const f = await fixture({ docs: stored(['restored.exe']) }, { holdValidation: true })
+    try {
+      await f.ready()
+      await until(() => f.rawChecks.some(check => check.path === 'restored.exe'), 'Restored fallback should validate its file')
+      assert.equal(f.a().activeTab?.revalidating, true, 'the toolbar waits for file validation')
+      assert.equal(f.a().activeTab?.editable, false)
+      f.validation.resolve()
+      await until(() => f.a().activeTab?.revalidating === false, 'Restored file should validate')
+      for (const path of ['new.exe', 'archive.zip', 'unknown.bin', 'mystery', 'app.apk', '@fs:/outside/data.bin']) {
+        await f.a().openFile(path, { preview: false, forceNewTab: true })
+        await until(() => f.a().activePath === path && f.a().activeTab?.revalidating === false, `Fallback ${path} should validate`)
+        assert.equal(f.a().activeTab?.content, '')
+        assert.equal(f.a().activeTab?.savedContent, '')
+        assert.equal(f.a().activeTab?.editable, false)
+        assert.equal(f.a().activeTab?.status, 'idle')
+        f.a().updateTabContent(path, 'Must never become binary file contents')
+        await delay()
+        assert.equal(f.a().activeTab?.content, '', 'fallback tabs reject text updates')
+      }
+      assert.deepEqual(f.fileReads, [], 'neither device may decode unsupported file bodies')
+      assert.deepEqual(f.fileWrites, [])
+      assert.ok(f.rawChecks.every(check => check.method === 'HEAD'))
+      assert.ok(f.rawChecks.some(check => check.route === '/api/fs/raw' && check.path === '/outside/data.bin'))
+      assert.equal(f.win.failures.length, 0, f.win.failures.join('; '))
+    } finally { await f.close() }
+  })
+
+  await t.test('fallback validation preserves permission and missing-file failures and live revocation', async () => {
+    const f = await fixture({ docs: stored([]) })
+    try {
+      await f.ready()
+      f.denied.add('denied.bin'); f.missing.add('missing.zip')
+      for (const [path, status] of [['denied.bin', '403'], ['missing.zip', '404']]) {
+        await f.a().openFile(path, { preview: false, forceNewTab: true })
+        await until(() => f.a().activePath === path && f.a().activeTab?.status === 'error', `${path} should expose validation failure`)
+        assert.equal(f.a().activeTab?.editable, false)
+        assert.equal(f.a().activeTab?.loading, false)
+        assert.equal(f.a().activeTab?.revalidating, false)
+        assert.match(f.a().activeTab?.statusMessage ?? '', new RegExp(status))
+      }
+      await f.a().openFile('allowed.bin', { preview: false, forceNewTab: true })
+      await until(() => f.a().activeTab?.path === 'allowed.bin' && f.a().activeTab?.revalidating === false, 'Allowed fallback should validate')
+      f.denied.add('allowed.bin')
+      f.win.dispatchEvent(new f.win.Event('mew:permissions-changed'))
+      await until(() => !f.a().tabs.some(tab => tab.path === 'allowed.bin'), 'Permission revocation should remove the fallback')
+      assert.deepEqual(f.fileReads, [])
+      assert.deepEqual(f.fileWrites, [])
+    } finally { await f.close() }
+  })
 
   await t.test('authoritative hydration replaces stale browser tabs and live open, selection and close propagate once', async () => {
     const f = await fixture({ docs: stored(['server.md']) }, { holdHydration: true })
@@ -159,7 +220,7 @@ root.render(<React.StrictMode><I18nProvider><Device id="a"/><Device id="b"/></I1
       f.b().updateTabContent('draft.md', 'Unsaved local draft')
       await until(() => f.b().tabs.some(tab => tab.content === 'Unsaved local draft'), 'Local edit should render')
       f.a().closeTab('draft.md')
-      await until(() => f.fileWrites.length > 0, 'Remote close should flush local draft immediately')
+      await until(() => f.fileWrites.length > 0 && f.b().tabs.find(tab => tab.path === 'draft.md')?.status === 'saving', 'Remote close should flush the draft and render its saving state')
       assert.equal(f.b().tabs.find(tab => tab.path === 'draft.md')?.content, 'Unsaved local draft')
       assert.equal(f.b().tabs.find(tab => tab.path === 'draft.md')?.status, 'saving')
       f.save.resolve()

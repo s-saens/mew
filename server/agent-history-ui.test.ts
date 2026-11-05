@@ -5,9 +5,10 @@ import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
 import { connectTestBrowser } from './test-browser.ts'
+import { documentReference } from '../src/utils/agent-attachments.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
-test('paged conversations keep scroll position and restore account-scoped IndexedDB on desktop/mobile', { timeout: 60_000 }, async () => {
+test('paged conversations keep scroll position and restore account-scoped IndexedDB on desktop/mobile', { timeout: 120_000 }, async () => {
   const source = `import React from '${root}/node_modules/react/index.js';
 import {createRoot} from '${root}/node_modules/react-dom/client.js';
 import {AgentPanel} from '${root}/src/components/AgentPanel.tsx';
@@ -33,7 +34,8 @@ class Socket {
 }
 window.WebSocket=Socket;window.historyIndex=index;window.fixtureEvents=events;
 createRoot(document.getElementById('root')).render(<I18nProvider><div style={{height:'100vh',display:'flex'}}><AgentPanel cacheAccount="alice" project="test" workspacePath="/workspace" tree={[]} focusedFilePath={null} onOpenFile={(...args)=>window.openedFiles.push(args)} onClose={()=>{}} /></div></I18nProvider>);`
-  const bundle = await build({ input: 'virtual:history.tsx', write: false, platform: 'browser', output: { format: 'iife' }, transform: { jsx: 'react-jsx', define: { 'process.env.NODE_ENV': JSON.stringify('test') } }, plugins: [{
+  const bundle = await build({
+    onLog(level, log, handler) { if (log.code !== 'MODULE_LEVEL_DIRECTIVE') handler(level, log) }, input: 'virtual:history.tsx', write: false, platform: 'browser', output: { format: 'iife' }, transform: { jsx: 'react-jsx', define: { 'process.env.NODE_ENV': JSON.stringify('test') } }, plugins: [{
     name: 'history-fixture',
     async resolveId(id, importer) {
       if (id === 'virtual:history.tsx') return id
@@ -690,6 +692,26 @@ createRoot(document.getElementById('root')).render(<I18nProvider><div style={{he
       await scopedMenu.waitFor({ state: 'detached' })
       assert.deepEqual(await page.evaluate('window.openedFiles'), [['docs', scopedPath, null]], 'restored document tags retain the Documents editor scope')
       assert.equal(page.context().pages().length, 1, 'documents open in Mew without a new browser tab')
+
+      const titledText = documentReference(inlinePhoto.project, inlinePhoto.path, 'Screenshot title')
+      await page.evaluate(({ text, file }) => {
+        const socket = (globalThis as any).socket
+        socket.emit({ type: 'turn_start' })
+        socket.emit({ type: 'turn_end', stopReason: 'end_turn' })
+        socket.emit({ type: 'update', update: { sessionUpdate: 'user_message_chunk', content: { type: 'text', text } } })
+        socket.emit({ type: 'user_attachments', attachments: [file] })
+      }, { text: titledText, file: inlinePhoto })
+      const titledBubble = page.locator('[data-agent-question-bubble]').last()
+      const titledButton = titledBubble.locator('[data-agent-document]').getByRole('button', { name: 'Screenshot title', exact: true })
+      await titledButton.waitFor()
+      assert.equal(await titledBubble.locator('[data-agent-attachment]').count(), 0, 'legacy upload metadata cannot hide an explicit document title or append a duplicate tag')
+      if (width === 390) await titledButton.tap()
+      else await titledButton.click()
+      await page.getByRole('menuitem', { name: inlinePhoto.path.split('/').at(-1)!, exact: true }).click()
+      assert.deepEqual(await page.evaluate('window.openedFiles.at(-1)'), [inlinePhoto.project, inlinePhoto.path, null])
+      await titledBubble.locator('..').getByRole('button', { name: '이 질문 복사', exact: true }).click()
+      assert.equal(await page.evaluate('window.copied'), titledText, 'copy retains the titled reference even when the path is in an upload directory')
+
       assert.deepEqual(errors, [])
       await page.close()
     }

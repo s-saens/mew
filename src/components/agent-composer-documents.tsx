@@ -23,7 +23,7 @@ class DocumentWidget extends WidgetType {
     dom.dataset.documentToken = this.reference.token
     dom.contentEditable = 'false'
     this.root = createRoot(dom)
-    this.root.render(<AgentDocumentTag project={this.reference.project} path={this.reference.path}
+    this.root.render(<AgentDocumentTag project={this.reference.project} path={this.reference.path} title={this.reference.title}
       onOpenFile={(...args) => this.open()?.(...args)} onRemove={() => {
         const from = view.posAtDOM(dom)
         view.dispatch({ changes: { from, to: from + this.reference.token.length }, selection: { anchor: from },

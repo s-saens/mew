@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { attachmentKind, conversationAttachments, documentReferenceTokens, uploadedAttachmentTokens, withoutAttachmentTokens } from './agent-attachments.ts'
+import { attachmentKind, conversationAttachments, documentReference, documentReferenceTokens, uploadedAttachmentTokens, withoutAttachmentTokens } from './agent-attachments.ts'
 
 test('attachment icons use MIME and fall back to extensions for untyped uploads', () => {
   assert.equal(attachmentKind('image/jpeg', 'upload.bin'), 'image')
@@ -68,4 +68,21 @@ test('document tags exclude uploads, pending identifiers and incomplete or multi
   const text = '[[mew-upload:pending]] [[docs:.mew/assets/photo.png]] [[docs:.mew/files/old.pdf]] [[docs:.mew/temp/assets/new.pdf]] [[docs:]] [[docs:broken\nname.md]] [[docs:broken\rname.md]] [[docs:unfinished'
   assert.deepEqual(documentReferenceTokens(text), [])
   assert.deepEqual(documentReferenceTokens('[[docs:README]] [[docs:folder/name/]]').map(token => token.path), ['README', 'folder/name/'])
+})
+
+test('titled references preserve legacy paths containing pipes and do not reinterpret uploaded filenames', () => {
+  const old = '[[docs:notes/a|b\\name.md]]'
+  const upload = '[[.workspace:.mew/temp/assets/[a|b\\name.png]]'
+  const titled = documentReference('project:with spaces', 'folder/[a]|b\\name.md', 'Title [one] | two\nthree')
+  const text = `${old} ${upload} ${titled} ${titled}`
+  const references = documentReferenceTokens(text)
+  assert.deepEqual(references.map(({ project, path, title }) => ({ project, path, title })), [
+    { project: 'docs', path: 'notes/a|b\\name.md', title: undefined },
+    { project: 'project:with spaces', path: 'folder/[a]|b\\name.md', title: 'Title [one] | two\nthree' },
+    { project: 'project:with spaces', path: 'folder/[a]|b\\name.md', title: 'Title [one] | two\nthree' },
+  ])
+  for (const ref of references) assert.equal(text.slice(ref.from, ref.to), ref.token)
+  assert.deepEqual(uploadedAttachmentTokens(text).map(ref => ref.path), ['.mew/temp/assets/[a|b\\name.png'])
+  assert.equal(withoutAttachmentTokens(text), `${old}  ${titled} ${titled}`)
+  assert.deepEqual(documentReferenceTokens('[[mew-document:docs:path.md]] [[mew-document:docs:|Title]] [[mew-document:%GG:path.md|Title]]'), [])
 })

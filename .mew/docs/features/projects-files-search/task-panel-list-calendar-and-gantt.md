@@ -4,10 +4,10 @@ parent: "mew-projects"
 title: "Task Panel, List, Calendar, and Gantt"
 status: "changed"
 created: "2026-10-03"
-updated: "2026-11-04"
+updated: "2026-11-05"
 files: ["src/components/task-assignees.ts", "src/components/task-assignee-picker.tsx", "src/components/task-assignee-context.tsx", "shared/task-assignees.ts", "src/components/task-panel.tsx", "src/components/task-sort-picker.tsx", "src/utils/task-sort.ts", "src/components/task-swipe-row.tsx", "src/components/task-action-menu.tsx", "src/components/task-date-status.tsx", "src/components/task-panel.css", "src/components/task-text.tsx", "src/components/task-tag-picker.tsx", "server/task-markdown.ts", "src/components/task-tag-filter.tsx", "src/utils/task-tag-color.ts", "shared/task-tags.ts", "src/components/task-range-calendar.tsx", "src/components/task-calendar.tsx", "src/components/task-gantt.tsx", "src/utils/task-schedule.ts", "src/utils/task-timeline.ts", "src/hooks/use-task-list.ts", "src/hooks/use-task-drag.ts", "src/utils/task-list-session.ts", "shared/task-list.ts", "packages/ui/src/select-field.tsx", "packages/ui/src/date-field.tsx", "packages/ui/src/date-field.css", "server/task-list.ts", "server/task-list-routes.ts", "src/App.tsx"]
 commits: []
-description: "Feature requirements for the Markdown task panel, responsive calendar agenda, list/Gantt views, sorting, tags, assignees, inline document controls, and Run task agent drafts. Links shared storage and lifecycle contracts and dated verification records."
+description: "Feature requirements for the Markdown task panel, responsive calendar agenda, list/Gantt views, sorting, tags, assignees, inline document controls, and task documents using the shared file AI action with titled reference-only drafts. Links shared storage and lifecycle contracts and dated verification records."
 상위파일:
   - "MOC.md"
   - "_projects-files-search.md"
@@ -17,11 +17,9 @@ Provides both a standalone task panel and [editor DB Gantt](../../../../docs/gui
 
 ## Requirements
 
-### Run task from the editor
+### Agent action from the editor
 
-- Put the agent panel's brain icon at the editor floating toolbar's right edge as **Run task**, only for editable task documents with agent access. Disable it during loading, permission revalidation, read-only editing, or launch preparation. Exclude guides/ordinary Markdown; completed/legacy tasks follow the same path rules. Resolve the stable task ID before saving, then reread its canonical path afterward to follow title renames/completion moves.
-- **Run task** saves pending edits and opens the runtime/agent set picker. Only selection creates a conversation, named from frontmatter title or fallback filename. Preserve that name during automatic labeling and use the task root as cwd.
-- After selection, prefill the task reference and UI-language instruction to organize the task document first, then implement it. Support Korean, English, Simplified Chinese, and Japanese. Users edit/send explicitly; panel opening, runtime selection, initialization, and restoration never submit. Store the draft in existing input-draft storage, outside tab metadata. Preparation failure preserves the editor and allows retry; project changes cancel launch. Project/account changes or activating an existing conversation clear pending pickers. See [agent tab creation](../terminals-agents-automation/agent-sets-and-tab-creation.md) and the [implementation record](../../work/task-agent-integration.md).
+Task documents use the [shared file AI action](../terminals-agents-automation/agent-sets-and-tab-creation.md#scope), including its runtime picker and titled reference-only draft. Resolve the stable task ID before saving pending edits, then reread its canonical path to follow title renames and completion moves. Ordinary notes in task directories use the general file flow rather than requiring task identity. Use the resolved task title for the conversation and reference tag. Preparation failures preserve the editor and allow retry; project changes cancel launch. The action also supports ordinary files and read-only documents. See the [implementation record](../../work/task-agent-integration.md).
 
 ### Panel and item controls
 

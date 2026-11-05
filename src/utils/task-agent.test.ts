@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { taskAgentFile, taskAgentPrompt, taskAgentTitle } from './task-agent.ts'
+import { taskAgentFile } from './task-agent.ts'
 
 test('task agent resolves workspace and Documents scopes without treating guides or unrelated files as tasks', () => {
   const workspace = { path: '/work', docsPath: '/work/.mew/docs' }
@@ -15,19 +15,12 @@ test('task agent resolves workspace and Documents scopes without treating guides
   assert.deepEqual(taskAgentFile('mew:file:docs/tasks/Task.md', '.workspace', { path: '/work', docsPath: '/work/docs' }), { project: 'docs', path: 'tasks/Task.md' })
 })
 
-test('task agent uses the task title and localized document-first instructions with an exact file reference', () => {
-  assert.equal(taskAgentTitle('---\ntitle: "Task: latest title"\n---\n\nBody', 'Fallback.md'), 'Task: latest title')
-  assert.equal(taskAgentTitle('No metadata', '.mew/tasks/Fallback.md'), 'Fallback')
-  const file = { project: '.workspace', path: '.mew/tasks/Task with spaces (1).md' }
-  const expected = {
-    ko: '먼저 정리한 이후', en: 'First organize', 'zh-CN': '请先整理', ja: '先に整理してから',
-  } as const
-  const prompts = new Set<string>()
-  for (const locale of ['ko', 'en', 'zh-CN', 'ja'] as const) {
-    const prompt = taskAgentPrompt(file, locale)
-    assert.ok(prompt.startsWith('[[.workspace:.mew/tasks/Task with spaces (1).md]]\n\n'))
-    assert.ok(prompt.includes(expected[locale]))
-    prompts.add(prompt)
+test('ordinary files in task directories use the general file action instead of task identity lookup', () => {
+  const path = '.mew/tasks/Notes.md'
+  for (const content of ['Ordinary notes', '---\ntitle: Notes\n---\n\nBody']) {
+    assert.equal(taskAgentFile(path, '.workspace', null, content), null)
   }
-  assert.equal(prompts.size, 4)
+  for (const done of ['false', 'true', '"false"']) {
+    assert.deepEqual(taskAgentFile(path, '.workspace', null, `---\ntitle: A task\ndone: ${done}\n---\n\nBody`), { project: '.workspace', path })
+  }
 })

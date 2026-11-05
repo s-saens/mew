@@ -1,7 +1,7 @@
 ---
 title: "Projects and file navigation"
-description: "Explains onboarding when My Projects is empty, inline creation and Git cloning, and project import from the workspace catalog or a server path. Covers personal project hierarchy, switching, file navigation, Git review, and task controls."
-updated: "2026-11-04"
+description: "Explains onboarding when My Projects is empty, inline creation and Git cloning, and project import from the workspace catalog or a server path. Covers personal project hierarchy, switching, file navigation, Git review, task controls, and task reference drafts in agent conversations."
+updated: "2026-11-05"
 상위파일:
   - "../../.mew/docs/MOC.md"
   - "MOC.md"
@@ -327,7 +327,7 @@ Date fields use the `0000-00-00` format. Click the year, month, or day segment t
 
 Tasks are saved as `.mew/tasks/<태스크 제목>.md` files in the project, and completed documents are moved to `.mew/tasks/Done/`. Marking them incomplete returns them to the original folder. Existing completed documents are also organized when the panel is opened with write permission. The task title is the document's frontmatter `title`, and tags, assignees (an `assignees` email array), completion status, start date, and end date are also frontmatter properties. The `id` field is unnecessary, and existing instances are automatically removed. Use the document icon to the right of the dates to open the actual Markdown and write its body. Property edits in the file are reflected in the task. A new task creates a new file, and deleting a task deletes the entire document. To delete a list or calendar item, swipe left and click the delete icon that appears on the right. Swipe right, click outside, or press Esc to close the icon; with the keyboard, press Alt+Delete within an item to reveal it. Right-click an item to open a menu with icons for Open Document, Edit Schedule, Toggle Completion, and Delete. This is available in list, calendar, and Gantt views, and opens with Shift+F10 on the keyboard. Read-only mode shows only Open Document. Changing the title also renames the file while preserving its body and other properties. Files with the same title get `(2)`, `(3)` suffixes, and only characters invalid in filenames are adjusted. Existing lists and `tasks/` files are automatically migrated to the new location when the panel is opened with write permission.
 
-To implement a task with an agent, open its document and click the rightmost **Run task** brain icon above the editor. Mew saves pending edits and opens the agent panel's runtime/agent set picker. Choose a runtime or set to open a conversation named after the task. Its input contains the document reference and an instruction to organize the document first and then implement it, in the current UI language. Review or edit the prompt, then send it when ready. [Prepare the runtime](terminal-agents.md) before starting. The action requires agent access and an editable task document.
+To ask an agent about a task, open its document and use the [editor's Agent brain button](editor.md#ask-an-agent-about-a-file). Choose a runtime or set to open a conversation named after the task, with only its titled file tag in the input. Add your instructions and send when ready. The same action supports all file views and read-only files. [Prepare the runtime](terminal-agents.md) before starting.
 
 Tasks form a flat list with no parent/child hierarchy. Click + in the tag area to the left of the title to search names, select multiple tags, or create a new name. The popup stays open after selection, and × on a chip removes the tag. Colors are assigned automatically by name. `@` and `#` entered in the title remain in the title as written.
 

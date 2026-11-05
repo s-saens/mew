@@ -1,6 +1,5 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import http from 'node:http'
 import fs from 'node:fs/promises'
 import { compile } from '@tailwindcss/node'
 import { build } from 'rolldown'
@@ -9,6 +8,7 @@ import { protectFileResponse } from './file-response.ts'
 
 test('opening and switching files survives full or blocked tab storage', { timeout: 45_000 }, async (t) => {
   const bundle = await build({
+    onLog(level, log, handler) { if (log.code !== 'MODULE_LEVEL_DIRECTIVE') handler(level, log) },
     input: 'virtual:editor-pane.tsx', output: { format: 'esm' }, platform: 'browser', write: false,
     transform: { define: { 'process.env.NODE_ENV': JSON.stringify('test') }, jsx: 'react-jsx' },
     plugins: [{ name: 'editor-pane-fixture', resolveId(id) {
@@ -30,7 +30,7 @@ const noop = () => {};
 const saved = (project, state) => { window.savedTabs = state; };
 const callbacks = Object.fromEntries(['registerHandle', 'registerElement', 'registerTabBar', 'onFocus', 'onActivate', 'onPin', 'onCloseTab', 'onReorder', 'onSetViewMode', 'onChangeContent', 'onOpenLink', 'onOpenHistory', 'onSetTocOpen', 'onOpenSidebar', 'onTabDragMove', 'onTabDrop'].map(key => [key, noop]));
 function Fixture() {
-  const accountTabs = React.useMemo(() => ({docs: {panes: [{id:'main', tabs: [{path:'restored.txt', preview:false, viewMode:'plain'}, {path:'old.exe', preview:false, viewMode:'plain'}, {path:'archive.zip', preview:false, viewMode:'plain'}], activePath:'old.exe'}], layout:{type:'leaf', id:'main'}, focusedPaneId:'main'}}), []);
+  const accountTabs = React.useMemo(() => ({docs: {panes: [{id:'main', tabs: [{path:'restored.txt', preview:false, viewMode:'plain'}, {path:'old.exe', preview:false, viewMode:'plain'}, {path:'archive.zip', preview:false, viewMode:'plain'}], activePath:'old.exe'}], layout:{kind:'leaf', pane:'main'}, focusedPaneId:'main'}}), []);
   const tabs = useTabs('docs', noop, noop, '/fixture', accountTabs, saved);
   const open = (path, viewMode) => tabs.openFile(path, {viewMode});
   window.openFixtureHtml = path => open(path, 'plain');
@@ -43,56 +43,53 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><I18nProvid
   const chunk = chunks.find(item => item.isEntry)!
   const plainChunk = chunks.find(item => new URL('../src/components/CodePane.tsx', import.meta.url).pathname in item.modules)!
   const scripts = new Map(chunks.map(item => [`/${item.fileName}`, item.code]))
-  const cssFiles = ['../src/components/EditorPane.tsx', '../src/components/TabBar.tsx']
+  const cssFiles = ['../src/components/EditorPane.tsx', '../src/components/TabBar.tsx', '../src/components/MediaViewer.tsx']
   const cssSource = (await Promise.all(cssFiles.map(file => fs.readFile(new URL(file, import.meta.url), 'utf8')))).join('\n') + ' flex h-dvh flex-col'
   const compiler = await compile(await fs.readFile(new URL('../src/index.css', import.meta.url), 'utf8'), { base: new URL('../src', import.meta.url).pathname, onDependency() {} })
   const css = compiler.build([...new Set(cssSource.match(/[A-Za-z0-9_@!:/.[\]()%,-]+/g))])
   const fileRequests: string[] = []
+  const binaryChecks: string[] = []
   const gates = new Map<string, Promise<void>>()
   const hold = (file: string) => {
     let release: () => void = () => {}
     gates.set(file, new Promise<void>(resolve => { release = resolve }))
     return release
   }
-  const server = http.createServer(async (req, res) => {
-    if (req.url === '/app.js' || scripts.has(req.url ?? '')) {
-      await gates.get(req.url!)
-      res.setHeader('Content-Type', 'text/javascript')
-      res.end(req.url === '/app.js' ? chunk.code : scripts.get(req.url!))
-    } else if (req.url?.startsWith('/api/')) {
-      if (req.url.startsWith('/api/raw?')) {
-        protectFileResponse(res as never)
-        res.setHeader('Content-Type', 'text/html')
-        res.end('<h1>Saved HTML preview</h1><script>document.body.dataset.executed="yes"</script>')
-        return
+  const browser = await connectTestBrowser()
+  t.after(() => browser.close())
+  const context = await browser.newContext()
+  const origin = 'http://mew-editor-pane.test'
+  const fileHeaders: Record<string, string> = {}
+  protectFileResponse({ setHeader(name: string, value: string) { fileHeaders[name] = value } } as never)
+  await context.route(`${origin}/**`, async route => {
+    const url = new URL(route.request().url())
+    if (url.pathname === '/app.js' || scripts.has(url.pathname)) {
+      await gates.get(url.pathname)
+      return route.fulfill({ contentType: 'text/javascript', body: url.pathname === '/app.js' ? chunk.code : scripts.get(url.pathname)! })
+    }
+    if (url.pathname.startsWith('/api/')) {
+      if (url.pathname === '/api/raw') {
+        if (route.request().method() === 'HEAD') {
+          binaryChecks.push(url.searchParams.get('path')!)
+          return route.fulfill({ status: 200, body: '' })
+        }
+        return route.fulfill({ headers: fileHeaders, contentType: 'text/html', body: '<h1>Saved HTML preview</h1><script>document.body.dataset.executed="yes"</script>' })
       }
-      res.setHeader('Content-Type', 'application/json')
-      const file = new URL(req.url, 'http://fixture').searchParams.get('path') ?? ''
-      if (req.url.startsWith('/api/file?')) {
+      const file = url.searchParams.get('path') ?? ''
+      if (url.pathname === '/api/file') {
         fileRequests.push(file)
         await gates.get(file)
-        if (file === 'missing.md') { res.statusCode = 404; res.end(JSON.stringify({error:'Not found'})); return }
-        if (file === 'loading-error.txt') { res.statusCode = 500; res.end(JSON.stringify({error:'Load failed'})); return }
+        if (file === 'missing.md') return route.fulfill({ status: 404, json: { error: 'Not found' } })
+        if (file === 'loading-error.txt') return route.fulfill({ status: 500, json: { error: 'Load failed' } })
       }
-      res.end(req.url.startsWith('/api/file?') ? JSON.stringify({path:file, content:file === 'loading-empty.txt' ? '' : '# File content\n\nSelected file body', editable:true}) : '[]')
-    } else {
-      res.setHeader('Content-Type', 'text/html')
-      res.end(`<!doctype html><html><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}</style><body><div id="root"></div><script type="module" src="/${chunk.fileName}"></script></body></html>`)
+      return route.fulfill({ json: url.pathname === '/api/file' ? { path: file, content: file === 'loading-empty.txt' ? '' : '# File content\n\nSelected file body', editable: true } : [] })
     }
+    return route.fulfill({ contentType: 'text/html', body: `<!doctype html><html><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}</style><body><div id="root"></div><script type="module" src="/${chunk.fileName}"></script></body></html>` })
   })
-  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
-  let browser: Awaited<ReturnType<typeof connectTestBrowser>> | undefined
-  t.after(async () => {
-    await browser?.close()
-    server.closeAllConnections()
-    await new Promise<void>((resolve) => server.close(() => resolve()))
-  })
-  browser = await connectTestBrowser()
-  const page = await browser.newPage()
+  const page = await context.newPage()
   page.setDefaultTimeout(5000)
   const errors: string[] = []
   page.on('pageerror', (error) => errors.push(error.stack || error.message || error.name))
-  const origin = `http://127.0.0.1:${(server.address() as { port: number }).port}`
   await page.addInitScript(() => {
     localStorage.setItem('mew:content:legacy:large.md', 'x'.repeat(750_000))
     localStorage.setItem('mew:tree-children:legacy', 'x'.repeat(750_000))
@@ -100,13 +97,16 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><I18nProvid
   })
   await page.goto(origin)
   assert.deepEqual(errors, [], 'fixture scripts must load before storage checks')
-  await page.getByRole('status').filter({ hasText: /에디터에서 볼 수 없는 파일|cannot be previewed/ }).waitFor()
+  const download = page.getByRole('button', { name: /^(다운로드|Download)$/ })
+  await download.waitFor()
+  await page.getByText('old.exe', { exact: true }).last().waitFor()
   assert.equal(await page.evaluate('window.savedTabs.panes[0].activePath'), 'old.exe')
   assert.deepEqual(await page.evaluate('window.savedTabs.panes[0].tabs.map(tab => tab.path)'), ['restored.txt', 'old.exe', 'archive.zip'])
   assert.equal(await page.locator('[data-editor-loading], .cm-content, .ProseMirror').count(), 0)
-  for (const button of ['Open executable', 'Open binary']) {
+  for (const [button, path] of [['Open executable', 'new.exe'], ['Open binary', 'unknown.bin']]) {
     await page.getByRole('button', { name: button, exact: true }).click()
-    assert.equal(await page.evaluate('window.savedTabs.panes[0].activePath'), 'old.exe', 'unsupported new selection keeps the current tab')
+    await page.waitForFunction(`window.savedTabs.panes[0].activePath === ${JSON.stringify(path)}`)
+    assert.equal(await page.locator('[data-editor-loading], .cm-content, .ProseMirror').count(), 0, 'unsupported files open fallback tabs without text editors')
   }
   const releasePlain = hold('/' + plainChunk.fileName)
   const plainRequested = page.waitForRequest(request => new URL(request.url()).pathname === '/' + plainChunk.fileName)
@@ -147,7 +147,8 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><I18nProvid
   await page.locator('.cm-content').filter({ hasText: 'Selected file body' }).waitFor()
   assert.equal(await browserLink.count(), 0)
   await page.getByRole('button', { name: 'Open existing executable', exact: true }).click()
-  await page.getByRole('status').filter({ hasText: /에디터에서 볼 수 없는 파일|cannot be previewed/ }).waitFor()
+  await download.waitFor()
+  await page.getByText('old.exe', { exact: true }).last().waitFor()
   assert.equal(await page.evaluate('window.savedTabs.panes[0].activePath'), 'old.exe')
   for (const width of [1100, 390]) {
     await page.setViewportSize({ width, height: 800 })
@@ -156,6 +157,7 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><I18nProvid
   }
   assert.ok(fileRequests.length > 0)
   assert.ok(fileRequests.every(path => !/\.(exe|zip|bin)$/i.test(path)), 'unsupported tabs survive restore and selection without body requests')
+  assert.ok(['old.exe', 'new.exe', 'unknown.bin'].every(path => binaryChecks.includes(path)), 'restored and newly selected fallback files validate without requesting their bodies')
   assert.equal(await page.evaluate(() => localStorage.getItem('mew:content:legacy:large.md')), null)
   assert.equal(await page.evaluate(() => localStorage.getItem('mew:tree-children:legacy')), null)
   assert.equal(await page.evaluate(() => localStorage.getItem('mew:agent-input-drafts')), '{"tab":"unsent draft"}')
