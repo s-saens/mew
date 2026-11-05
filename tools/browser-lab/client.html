@@ -7,9 +7,10 @@
   <title>Browser Lab · mew</title>
   <link rel="stylesheet" href="/client.css">
 </head>
-<body>
+<body class="controls-collapsed">
   <header class="header">
-    <div class="identity"><strong>Browser Lab</strong><span class="divider">/</span><span id="engine-name"></span><span id="port" class="port"></span></div>
+    <div class="identity"><strong class="brand">Browser Lab</strong><span class="divider">/</span><span id="engine-name"></span><span id="port" class="port"></span></div>
+    <div class="mobile-controls"><button id="zoom" type="button" aria-label="화면 축소 배율 변경" title="화면 축소 배율 변경">100%</button><button id="keyboard" type="button" title="키보드 열기" aria-label="키보드 열기"><svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M6 9h1m4 0h1m4 0h1M6 12h1m4 0h1m4 0h1M7 16h10"/></svg></button><button id="toggle-controls" type="button" aria-expanded="false" aria-controls="engines navigation" title="브라우저 도구 보기">도구</button></div>
     <nav id="engines" aria-label="브라우저 선택"></nav>
   </header>
   <form id="navigation" class="toolbar" aria-label="페이지 이동">
@@ -27,7 +28,7 @@
   <main id="viewport" aria-label="원격 브라우저">
     <div id="placeholder" class="placeholder"><strong id="placeholder-title">브라우저에 연결하고 있습니다</strong><p id="placeholder-detail">연결되면 현재 페이지가 여기에 표시됩니다.</p></div>
     <img id="screen" alt="원격 브라우저의 실제 화면. 클릭 후 키보드로 조작할 수 있습니다." tabindex="0" draggable="false" hidden>
-    <textarea id="ime" aria-label="원격 브라우저 문자 입력" autocomplete="off" autocapitalize="off" spellcheck="false" tabindex="-1"></textarea>
+    <textarea id="ime" aria-label="원격 브라우저 문자 입력" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="none" tabindex="-1"></textarea>
     <pre id="text-output" aria-label="페이지 텍스트" hidden></pre>
   </main>
   <footer><span id="interaction-hint">화면을 클릭하면 마우스·키보드 입력이 전달됩니다. 캡챠는 직접 확인해 주세요.</span><span id="page-title"></span></footer>

@@ -1,6 +1,6 @@
 ---
 title: "Local manual browser comparison lab implementation"
-description: "Records the November 5 implementation of six isolated manual browser comparison endpoints, WPE TLS preparation, and adapter verification. Records adapter, viewer, build, Tailscale access, and supervised process recovery checks separately from pending human challenge results."
+description: "Records the November 5 implementation of six isolated manual browser comparison endpoints, WPE TLS preparation, and adapter verification. Separates adapter, viewer, build, Tailscale, process recovery, and mobile gesture checks from pending human challenge results."
 created: "2026-11-05"
 updated: "2026-11-05"
 ---
@@ -58,3 +58,11 @@ The six lab ports were not listening when this follow-up began, so the authorize
 After the user reported that the links did not work, all six loopback ports refused connections. Tailscale's six forwarders remained configured, but the recorded lab PID no longer existed. The active agent belonged to a `mew-agent-*.scope` systemd control group. POSIX detachment does not leave that group, so the earlier detached launch did not provide a sufficient process-lifetime boundary. The exact termination event was not recorded; scope cleanup is consistent with the observed disappearance.
 
 The authorized lab was started as a separate transient `mew-browser-lab.service` user service with `Restart=on-failure`. Its control group is under `app.slice`, outside the agent scope. Subsequent commands, after the launch command had exited, verified the same active service PID, zero restarts, and successful HTTP and authenticated WebSocket access through the Tailscale IPv4 address on all six ports. The canonical guide now describes this supervised launch and its shutdown boundary. No application code changed in this recovery; no new code tests or build were required. This does not claim verification from another physical tailnet device or persistence through a reboot.
+
+## Mobile visibility and touch input
+
+The user reported that the phone view devoted too much height to toolbars and engine notes, leaving the verification control below the visible image. The viewer had mouse-wheel input but no touch-scroll translation. Mobile controls now start collapsed, leaving a compact engine header and status row. The header provides a controls toggle, 100%/75%/50% view scale, and an explicit keyboard button. Touch swipes send remote wheel input, taps send clicks, and cancelled gestures send neither. Touch input does not automatically focus the hidden keyboard field.
+
+The mobile regression uses an emulated 384×720 touch viewport and separate real Chrome processes for the viewer and a synthetic target. It checks more than 600 CSS pixels of page space, controls expansion, swipe scrolling without clicks, scaled tap coordinates, cancelled gestures, and explicit keyboard input. CDP's synthesized swipe suppresses immediate compatibility clicks in Chrome; a separate static-page reproduction confirmed that behavior, and the test allows its gesture cooldown before tapping toolbar controls. A CDP debugger breakpoint also confirmed that the suppressed tap reached the intended toolbar button. No real CAPTCHA was operated.
+
+A separate real Moli synthetic-page check advanced `window.scrollY` from 0 to 400 using the adapter's wheel path. This verifies its input support without treating the challenge page as a test fixture. The full browser-lab suite passed all 34 tests with WPE integration enabled, and scoped oxlint and the required repository build passed. Tailscale live checks displayed Moli at phone size with controls collapsed and at 75% scale, and Chrome with the desktop toolbar. The authorized lab user service was restarted to load its cached viewer assets. Documentation description validation passed; global link validation still reported 42 unrelated failures. Physical phone keyboard and gesture behavior still require the user's check.

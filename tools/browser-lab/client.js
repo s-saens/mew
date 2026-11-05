@@ -20,6 +20,9 @@
   let pendingWheel;
   let wheelTimer;
   let lastResize = '';
+  let displayScale = 1;
+  let touchGesture;
+  let touchInput = false;
   let lastPointer;
   let heldButton = 'left';
   let lastPress = { time: 0, x: 0, y: 0, count: 0 };
@@ -70,11 +73,28 @@
     $('note').hidden = !state.note;
   }
   capabilities(config);
+  $('toggle-controls').addEventListener('click', () => {
+    const collapsed = document.body.classList.toggle('controls-collapsed');
+    $('toggle-controls').setAttribute('aria-expanded', String(!collapsed));
+    $('toggle-controls').textContent = collapsed ? '도구' : '닫기';
+    requestResize();
+  });
+  $('keyboard').addEventListener('click', () => {
+    if (!canPointer) return;
+    ime.inputMode = 'text';
+    ime.focus({ preventScroll: true });
+  });
+  $('zoom').addEventListener('click', () => {
+    const scales = [1, 0.75, 0.5];
+    displayScale = scales[(scales.indexOf(displayScale) + 1) % scales.length];
+    $('zoom').textContent = `${Math.round(displayScale * 100)}%`;
+    requestResize();
+  });
   function requestResize() {
     clearTimeout(resizeTimer);
     resizeTimer = setTimeout(() => {
-      const width = Math.min(3840, Math.max(320, Math.round(viewport.clientWidth)));
-      const height = Math.min(2160, Math.max(240, Math.round(viewport.clientHeight)));
+      const width = Math.min(3840, Math.max(320, Math.round(viewport.clientWidth / displayScale)));
+      const height = Math.min(2160, Math.max(240, Math.round(viewport.clientHeight / displayScale)));
       const next = `${width}x${height}`;
       if (next !== lastResize && send({ type: 'resize', width, height })) lastResize = next;
     }, 180);
@@ -177,9 +197,11 @@
     lastPointer = position;
     event.preventDefault();
     if (action === 'down') {
+      touchInput = false;
       heldButton = ['left', 'middle', 'right'][event.button] || 'left';
       const close = performance.now() - lastPress.time < 500 && Math.abs(lastPress.x - position.x) < 5 && Math.abs(lastPress.y - position.y) < 5;
       lastPress = { time: performance.now(), ...position, count: close && lastPress.count === 1 ? 2 : 1 };
+      ime.inputMode = 'text';
       ime.focus({ preventScroll: true });
       screen.setPointerCapture(event.pointerId);
     }
@@ -192,12 +214,50 @@
       send(message);
     }
   }
-  screen.addEventListener('pointerdown', (event) => pointer(event, 'down'));
-  screen.addEventListener('pointerup', (event) => pointer(event, 'up'));
-  screen.addEventListener('pointercancel', (event) => pointer(event, 'up'));
-  screen.addEventListener('pointermove', (event) => pointer(event, 'move'));
+  function touch(event, action) {
+    if (!event.isTrusted || !canPointer) return;
+    const position = point(event);
+    if (action === 'down') {
+      touchInput = true;
+      if (touchGesture) { touchGesture = undefined; return; }
+      if (!position) return;
+      touchGesture = { id: event.pointerId, startX: event.clientX, startY: event.clientY, lastX: event.clientX, lastY: event.clientY, start: position, moved: false };
+      screen.setPointerCapture(event.pointerId);
+      return;
+    }
+    if (!touchGesture || touchGesture.id !== event.pointerId) return;
+    const gesture = touchGesture;
+    if (action === 'cancel') { touchGesture = undefined; return; }
+    if (action === 'move') {
+      if (Math.hypot(event.clientX - gesture.startX, event.clientY - gesture.startY) > 8) gesture.moved = true;
+      if (gesture.moved) {
+        const rect = screen.getBoundingClientRect();
+        const scale = Math.min(rect.width / (screen.naturalWidth || remoteWidth), rect.height / (screen.naturalHeight || remoteHeight));
+        const deltaX = Math.max(-10000, Math.min(10000, (gesture.lastX - event.clientX) / scale));
+        const deltaY = Math.max(-10000, Math.min(10000, (gesture.lastY - event.clientY) / scale));
+        send({ type: 'wheel', ...gesture.start, deltaX, deltaY });
+      }
+      gesture.lastX = event.clientX; gesture.lastY = event.clientY;
+      return;
+    }
+    if (action === 'up') {
+      touchGesture = undefined;
+      if (!gesture.moved && position) {
+        // Taps remain clicks; swipes never focus the hidden keyboard input.
+        ime.inputMode = 'none';
+        send({ type: 'pointer', action: 'down', ...position, button: 'left', clickCount: 1 });
+        send({ type: 'pointer', action: 'up', ...position, button: 'left', clickCount: 1 });
+      }
+    }
+  }
+  for (const [name, action] of [['pointerdown', 'down'], ['pointermove', 'move'], ['pointerup', 'up'], ['pointercancel', 'cancel']]) {
+    screen.addEventListener(name, event => {
+      if (event.pointerType === 'touch') touch(event, action);
+      else pointer(event, action === 'cancel' ? 'up' : action);
+    });
+  }
   screen.addEventListener('contextmenu', (event) => event.preventDefault());
-  screen.addEventListener('focus', () => { if (canPointer) ime.focus({ preventScroll: true }); });
+  screen.addEventListener('focus', () => { if (canPointer && !touchInput) ime.focus({ preventScroll: true }); });
   screen.addEventListener('wheel', (event) => {
     if (!event.isTrusted || !canPointer) return;
     const position = point(event);

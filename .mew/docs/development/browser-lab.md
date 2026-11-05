@@ -1,6 +1,6 @@
 ---
 title: "Local manual browser comparison lab"
-description: "Defines the six loopback browser lab endpoints, external runtime configuration, optional Tailscale access, supervised execution, pixel and input relay, isolated session lifecycle, and manual challenge workflow. Covers Lightpanda's text-only boundary, WPE TLS prerequisites, and direct-tab use."
+description: "Defines the six loopback browser lab endpoints, external runtime configuration, optional Tailscale access, supervised execution, pixel and input relay, isolated session lifecycle, and manual challenge workflow. Covers mobile controls and touch scrolling, Lightpanda's text-only boundary, WPE TLS prerequisites, and direct-tab use."
 created: "2026-11-05"
 updated: "2026-11-05"
 ---
@@ -96,6 +96,10 @@ On Linux, WPE's shared libraries and GIO TLS backend must both be available. Res
 Chrome, Headless Shell, Moli, Obscura, and WPE supply actual PNG screenshots. The viewer displays those pixels and forwards trusted local pointer, wheel, keyboard, pasted text, and IME composition events through the engine's input APIs. It scales coordinates to the captured viewport. This path does not reconstruct the target page with rrweb. Capture updates are periodic and are not a video or performance benchmark.
 
 Use direct localhost tabs for pointer checks. Opening the lab inside Mew's DOM replay adds another reconstruction and coordinate boundary; that nested arrangement is not a reliable input comparison.
+
+At viewport widths of 760 CSS pixels or less, the viewer starts with the engine navigation, address toolbar, shortcuts, engine notes, and footer collapsed. Use **도구** to show them and **닫기** to restore page space. The header keeps the active engine visible. Its percentage button cycles 100%, 75%, and 50%: smaller percentages request a larger remote viewport and scale its image down, so more page content fits without changing the target site's CSS. Resizing retains the existing maximum remote dimensions.
+
+On touch devices, tap the image to click, or swipe it to scroll the remote page. Swipes and cancelled gestures do not dispatch clicks. Coordinate mapping applies the captured image scale, including zoomed-out views. A touch tap does not automatically open the local keyboard: tap the remote text field, then the header keyboard button to enter text. Mouse and hardware-keyboard input retain their existing path. Lightpanda remains text-only and does not accept these coordinate gestures.
 
 Lightpanda is deliberately text-only in this lab. It exposes page DOM text, navigation, and status, but supplies no actual GUI capture or coordinate input here. A text result does not establish visual layout or CAPTCHA usability. Moli and Obscura use independent rendering implementations; their displayed pixels and input behavior may differ from Chromium.
 
