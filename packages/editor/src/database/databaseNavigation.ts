@@ -51,7 +51,8 @@ export function navigateDatabaseTable(event: KeyboardEvent<HTMLDivElement>, pref
   const destination = nextRow === -1 ? title : table.rows[nextRow]?.cells[nextColumn]
   if (!destination?.hasAttribute('data-db-cell')) return consume()
   preferredColumn.current = nextColumn
-  destination.focus({ preventScroll: true })
+  const focusTarget = destination.querySelector<HTMLInputElement>('input:not(:disabled):not([readonly]):not([type="checkbox"])') ?? destination
+  focusTarget.focus({ preventScroll: true })
   destination.scrollIntoView({ block: 'nearest', inline: 'nearest' })
   return consume()
 }

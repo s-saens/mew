@@ -1,7 +1,7 @@
 ---
 title: "Table Databases (/db)"
-description: "Explains inserting Postgres document databases, matching plus-only row/column addition bars, table conversion and undo, calendar and Gantt ranges, keyboard cell navigation, header type menus, search, grouping, and sorting. Also covers primary columns, immediate linked-page title previews, filename changes after saving, row-page sharing, read-only references, and backups."
-updated: "2026-10-30"
+description: "Explains inserting Postgres document databases, matching plus-only row/column addition bars, table conversion and undo, calendar and Gantt ranges, keyboard cell navigation with immediate typing, header type menus, search, grouping, and sorting. Also covers primary columns, immediate linked-page title previews, filename changes after saving, row-page sharing, read-only references, and backups."
+updated: "2026-11-05"
 상위파일:
   - "../../.mew/docs/MOC.md"
   - "MOC.md"
@@ -63,7 +63,7 @@ Sorting is also available in read-only tables. It applies only to the table curr
 
 Use the arrow keys to move between cells. The DB title acts as a cell above the column headers: **Down** moves from the title to a header, then into the data rows; **Up** returns along the same path. **Left/Right** move between columns. Moving back down from the title returns to the previous column. Movement follows the currently sorted and filtered rows and stops at the table edges. This also works in read-only tables and between the title and headers of an empty table.
 
-Press **Enter** or **F2** on a focused cell to edit it, open its selection list, or toggle its checkbox. On a column header, this edits the column name. **Enter** finishes text editing and returns focus to the cell; **Esc** returns to navigation. Esc during a column rename cancels the change. Existing cell edits save when focus leaves the input.
+Moving to an editable title, text, page-title, number, or date cell focuses its input so you can type immediately. Press **Enter** or **F2** on a focused cell container to enter its editor, open its selection list, or toggle its checkbox. On a column header, this edits the column name. **Enter** finishes text editing and returns focus to the cell; **Esc** returns to navigation. Esc during a column rename cancels the change. Existing cell edits save when focus leaves the input.
 
 While editing text, Left/Right move the text cursor; at the beginning or end they move to the neighboring cell. Up/Down move to the adjacent row. Open selection menus keep their own arrow-key controls. To use cell navigation again after choosing an option, press Esc to return focus from the selection control to its cell.
 
