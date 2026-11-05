@@ -2578,7 +2578,7 @@ function AgentSessionView({
   const inputResizeCleanupRef = useRef<(() => void) | null>(null)
   // 지금 대화 바닥에 붙어 있는지 — 붙어 있을 때만 새 내용을 따라 내려간다
   const stickRef = useRef(true)
-  const [unread, setUnread] = useState(false)
+  const [showScrollToBottom, setShowScrollToBottom] = useState(false)
   const [viewportMetrics, setViewportMetrics] = useState(() => ({
     bottomInset: 0,
     maxInputHeight: agentInputMaxHeight(window.innerHeight),
@@ -3196,14 +3196,14 @@ function AgentSessionView({
   }, [anyTurnRunning])
 
   // 대화가 자라도 **바닥에 붙어 있을 때만** 따라 내려간다 — 위로 올려 읽는 중(펼친 작업 버블을 읽는
-  // 중이 대부분이다)이면 자리를 그대로 두고 "새 메시지"만 띄운다. 누르면 바닥으로 가고, 스스로
+  // 중이 대부분이다)이면 자리를 그대로 둔다. 누르면 바닥으로 가고, 스스로
   // 바닥까지 내려가도 사라진다
   const scrollToBottom = useCallback(() => {
     questionScrollRef.current = null
     const el = scrollRef.current
     if (el) el.scrollTop = el.scrollHeight
     stickRef.current = true
-    setUnread(false)
+    setShowScrollToBottom(false)
   }, [])
 
   useLayoutEffect(() => {
@@ -3216,7 +3216,6 @@ function AgentSessionView({
 
   useEffect(() => {
     if (stickRef.current) scrollToBottom()
-    else setUnread(true)
   }, [timeline, scrollToBottom])
 
   // 안 보이는 탭은 display:none이라 scrollHeight가 0이다 — 그동안 온 말은 못 따라 내려간 것이므로
@@ -3230,8 +3229,9 @@ function AgentSessionView({
     const el = scrollRef.current
     if (!el) return
     if (questionScrollRef.current && Math.abs(questionScrollRef.current.top - el.scrollTop) > 1) questionScrollRef.current = null
-    stickRef.current = el.scrollHeight - el.scrollTop - el.clientHeight <= 48
-    if (stickRef.current) setUnread(false)
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
+    stickRef.current = distanceFromBottom <= 48
+    setShowScrollToBottom(distanceFromBottom > 30)
     const history = historyRef.current
     if (!previewTargetRef.current && el.scrollTop < 80 && history && history.start > 0 && !historyPendingRef.current && wsRef.current?.readyState === WebSocket.OPEN) {
       historyPendingRef.current = true
@@ -3517,7 +3517,6 @@ function AgentSessionView({
       setCachedQueue(null)
       setSessions(null)
       stickRef.current = true
-      setUnread(false)
       onForgetSession(tabId, runtime, cwd)
     })
     send({ type: 'close_session' })
@@ -3837,6 +3836,16 @@ function AgentSessionView({
   const conversationLoading = !connectionFailed && !historyPreview && (loadingSession !== null || (!!resumeSessionIdRef.current
     && !newConversationPending && !historyRef.current && (!connected
     || (!meta && !auth && !hasError))))
+  useLayoutEffect(() => {
+    const el = scrollRef.current
+    if (!el || !active || conversationLoading) return
+    const measure = () => setShowScrollToBottom(el.scrollHeight - el.scrollTop - el.clientHeight > 30)
+    const observer = new ResizeObserver(measure)
+    observer.observe(el)
+    for (const child of el.children) observer.observe(child)
+    measure()
+    return () => observer.disconnect()
+  }, [active, conversationLoading, expanded, timeline])
   useEffect(() => {
     let alive = true
     const load = () => fetchSkills(cwd, runtime)
@@ -4174,21 +4183,24 @@ function AgentSessionView({
             project={project} readOnly={!!historyPreview} loadingActive={visible} busy={item.key === pendingReplyKey ? null : !historyPreview && item.kind === 'turn' && !item.done ? meta?.activeTask === 'cli' ? false : meta?.busy ?? null : false}
             now={item.kind === 'turn' && !item.done ? now : 0} toggle={toggle} send={send} onOpenFile={onOpenFile} onOpenError={setErrorDetail}
             onRunCommand={allowTerminal ? runCodeCommand : undefined} codeRunDisabled={codeRunDisabled || (item.kind === 'turn' && !item.done)} />)}
-        {/* 올려 읽는 동안 밑에서 대화가 자랐다는 표시 — 누르면 바닥으로 간다(바닥에 닿으면 스스로 사라진다).
-            찾기 바(에디터)와 같은 수법: 스크롤 컨테이너에 sticky로 붙는 높이 0짜리 앵커라 본문을 밀지 않는다.
-            marginTop은 인라인으로 지운다 — 부모의 space-y-3가 이 앵커에도 간격을 넣기 때문 */}
-        {unread && (
-          <div className="sticky bottom-0 z-10 h-0" style={{ marginTop: 0 }}>
-            <button
-              type="button"
-              onClick={scrollToBottom}
-              className="absolute bottom-2 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full bg-surface-inverse px-3 py-1 text-xs text-ink-inverse shadow-lg"
-            >
-              {uiText("새 메시지 ")}<CaretGlyph dir="down" />
-            </button>
-          </div>
-        )}
       </div>
+      {!conversationLoading && timeline.length > 0 && (
+        <HoverTipLayer className="pointer-events-none absolute bottom-2 right-2 z-30">
+          <button
+            type="button"
+            data-agent-scroll-to-bottom
+            onClick={scrollToBottom}
+            inert={!showScrollToBottom}
+            aria-hidden={!showScrollToBottom}
+            tabIndex={showScrollToBottom ? 0 : -1}
+            className={`mew-overlay-surface flex size-8 items-center justify-center rounded-full border border-edge-bright bg-surface-raised text-white shadow-lg transition-opacity duration-150 ease-out motion-reduce:transition-none hover:border-ink-secondary focus-visible:outline-2 focus-visible:outline-accent ${showScrollToBottom ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'}`}
+            aria-label={uiText("에이전트 맨 아래로")}
+            data-tip={uiText("에이전트 맨 아래로")}
+          >
+            <CaretGlyph dir="down" />
+          </button>
+        </HoverTipLayer>
+      )}
 
       {conversationLoading && <div data-agent-loading className="absolute inset-0 overflow-hidden">
         <AgentLoadingBubbles label={t('common.loading')} active={visible} />

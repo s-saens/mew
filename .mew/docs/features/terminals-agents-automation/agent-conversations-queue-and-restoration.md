@@ -4,11 +4,11 @@ parent: "mew-agents"
 title: "Agent Conversations, Queues, and Restoration"
 status: "implemented"
 created: "2026-09-18"
-updated: "2026-11-03"
+updated: "2026-11-05"
 status_hash: "b325d279cf16e291b2bcddda7cc0d70268647e336403acba780cb1081da44668"
 files: ["src/components/AgentPanel.tsx", "src/components/agent-startup-queue.tsx", "src/utils/agent-startup-queue.ts", "src/hooks/use-agent-event-state.ts", "src/hooks/use-agent-work-history.ts", "src/utils/agent-work-loader.ts", "src/utils/agentFold.ts", "src/hooks/useGridDrag.ts", "server/agentHost.ts", "server/agentWs.ts", "server/agentTranscript.ts", "server/agent-history-preview.ts", "server/agent-session-search-service.ts", "server/agent-transcript-search.ts", "server/agent-runtime-history-search.ts"]
 commits: []
-description: "Agent conversation feedback, history, stopping, queues, drafts, session conflicts, and restoration. Defines quiet continuous recovery, relay liveness and bounded status reads, permanent-failure handling, Mewpet recovery, and model-capacity retries."
+description: "Agent conversation feedback, history, bottom navigation, stopping, queues, drafts, session conflicts, and restoration. Defines the 30px bottom-button fade boundary, popup surface and layering, quiet recovery, relay liveness, permanent failures, Mewpet recovery, and model-capacity retries."
 상위파일:
   - "MOC.md"
   - "_terminals-agents-automation.md"
@@ -60,6 +60,12 @@ Sending a prompt from an idle conversation immediately displays the user's quest
 When the server echoes the question, replace its local display without duplication and retain the waiting response until the actual turn begins. Running response bubbles show the dots, both collapsed and expanded, until answer text arrives. Completed, interrupted, failed, and approval-waiting turns do not show reply waiting dots. Pause animation in hidden panels and honor the shared reduced-motion setting.
 
 Local feedback is temporary display state, separate from the authoritative transcript, history positions, and device caches; see [conversation storage](../../development/conversation-storage.md#incremental-screen-updates). Queue acknowledgments move a prompt to the normal server queue. Errors and disconnection stop local reply waiting; confirmed history replaces sent local feedback without resending it. Clearing or switching conversations and canceling the corresponding startup prompt remove that feedback. A closed socket or a synchronous send failure preserves the input and attachments. Verification and application limits are recorded in [the implementation record](../../work/agent-prompt-feedback.md).
+
+### Bottom navigation
+
+The conversation viewport has a circular bottom-right button that jumps to the latest message. Show it when the remaining scroll distance exceeds 30px; hide it at 30px or less, including conversations without overflow. Its visibility updates directly on scrolling and when conversation content or viewport dimensions change, independently of automatic following of incoming messages.
+
+Use the shared [popup background and blur](../../development/ui-overlays.md#dropdowns-and-selection-components) with a white downward arrow and a translated accessible name and hover tooltip. Keep the button outside the scrolling content and above expanded answer headers and collapse footers. Fade opacity in both directions over 150ms without removing the button during the transition. Hidden buttons receive no pointer or keyboard input and are absent from the accessibility tree. Disable the transition under reduced motion. See the [implementation and verification record](../../work/agent-scroll-to-bottom.md).
 
 ### Clear conversation shortcut
 
