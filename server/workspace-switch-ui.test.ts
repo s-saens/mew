@@ -298,10 +298,9 @@ for (const mode of ['assisted', 'onboarding', 'empty-projects', 'missing-active'
       assert.equal(await add.getAttribute('aria-haspopup'), 'dialog')
       await add.click()
       const dialog = page.locator('[role=dialog].mew-project-add-dialog')
-      for (const name of ['새 프로젝트 만들기', 'Git repo 클론하기', '프로젝트 가져오기']) {
+      for (const name of ['새 프로젝트 만들기', 'Git repo 클론하기', '이 워크스페이스에서 가져오기', '경로 탐색하기']) {
         assert.equal(await dialog.getByRole('button', { name, exact: true }).isVisible(), true)
       }
-      await dialog.getByRole('button', { name: '프로젝트 가져오기', exact: true }).click()
       await dialog.getByRole('button', { name: '이 워크스페이스에서 가져오기', exact: true }).waitFor()
       assert.equal(await dialog.getByRole('button', { name: '경로 탐색하기', exact: true }).isVisible(), true)
       await dialog.getByRole('button', { name: '이 워크스페이스에서 가져오기', exact: true }).click()
@@ -309,7 +308,6 @@ for (const mode of ['assisted', 'onboarding', 'empty-projects', 'missing-active'
       assert.equal(await page.getByRole('button', { name: '모든 프로젝트', exact: true }).count(), 0, 'the catalog belongs to the import flow')
       await dialog.getByRole('button', { name: '이전 선택지로', exact: true }).click()
       await dialog.getByRole('button', { name: '이 워크스페이스에서 가져오기', exact: true }).waitFor()
-      await dialog.getByRole('button', { name: '이전 선택지로', exact: true }).click()
       await dialog.getByRole('button', { name: '새 프로젝트 만들기', exact: true }).click()
       await dialog.getByRole('textbox', { name: '프로젝트 이름', exact: true }).waitFor()
       if (mode !== 'empty-projects') {
@@ -407,7 +405,7 @@ for (const mode of ['assisted', 'onboarding', 'empty-projects', 'missing-active'
       }
       await assertProjectSetup()
       await page.locator('[data-project-add-inline]').getByRole('button', { name: '프로젝트 추가', exact: true }).click()
-      assert.equal(await page.locator('[role=dialog].mew-project-add-dialog').getByRole('button', { name: '프로젝트 가져오기', exact: true }).isVisible(), true)
+      assert.equal(await page.locator('[role=dialog].mew-project-add-dialog').getByRole('button', { name: '이 워크스페이스에서 가져오기', exact: true }).isVisible(), true)
       assert.deepEqual(workspacePosts, [], 'removal does not issue an unrelated workspace switch')
       const permanentRequests = requests.filter(request => request.path === '/api/project-registry' && request.method === 'DELETE')
       assert.equal(permanentRequests.length, mode === 'delete-project' ? 2 : 0, 'shortcut removal and permanent deletion use separate mutation paths')
@@ -979,7 +977,6 @@ for (const mode of ['assisted', 'onboarding', 'empty-projects', 'missing-active'
         assert.ok(triggerBox.y >= lastProjectBox.y + lastProjectBox.height && triggerBox.y - lastProjectBox.y - lastProjectBox.height <= 8, 'the plus trigger follows the last personal project without a flexible gap')
         assert.ok(popupBox.x >= 0 && popupBox.x + popupBox.width <= width && popupBox.y >= 0 && popupBox.y + popupBox.height <= 700, 'the shortcut opens a popup inside the viewport')
         assert.equal(await projectPanel.locator('[data-project-add-choice]').count(), 0, 'setup choices live outside the project panel')
-        await createDialog.getByRole('button', { name: '프로젝트 가져오기', exact: true }).click()
         await createDialog.getByRole('button', { name: '이 워크스페이스에서 가져오기', exact: true }).click()
         await page.locator('[data-catalog-project="/alpha/packages/docs"]').waitFor()
         await page.screenshot({ path: `/tmp/mew-project-add-popup-panel-${width >= 768 ? 'desktop' : 'mobile'}.png` })
@@ -991,7 +988,7 @@ for (const mode of ['assisted', 'onboarding', 'empty-projects', 'missing-active'
         await page.screenshot({ path: `/tmp/mew-open-project-${width}.png` })
         await page.keyboard.press('Escape')
         await projectDialog.waitFor({ state: 'detached' })
-        await createDialog.getByRole('button', { name: '이전 선택지로', exact: true }).click()
+        assert.equal(await createDialog.getByRole('button', { name: '경로 탐색하기', exact: true }).evaluate(element => element === element.ownerDocument.activeElement), true, 'closing path browsing restores its top-level choice')
         await createDialog.getByRole('button', { name: '새 프로젝트 만들기', exact: true }).waitFor()
         await createDialog.locator('[data-project-add-close]').click()
         await createDialog.waitFor({ state: 'detached' })

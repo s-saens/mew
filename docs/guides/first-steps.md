@@ -1,8 +1,8 @@
 ---
 title: "Open your first project and document"
-description: "Walks through the plus-button popup for an empty My Projects list, project creation, optional Git cloning or workspace/path import, the Projects My/All selector, then editing notes.md with autosave and reviewing Git changes."
+description: "Walks through the four-choice plus-button popup for an empty My Projects list, project creation, optional Git cloning or workspace/path import, the Projects My/All selector, then editing notes.md with autosave and reviewing Git changes."
 created: "2026-10-14"
-updated: "2026-11-06"
+updated: "2026-11-07"
 상위파일: "MOC.md"
 ---
 # Open your first project and document
@@ -16,13 +16,14 @@ With My projects empty, Mew shows only the top bar and the project panel. Click 
 The popup also offers these choices:
 
 - **Git clone** accepts a public GitHub or GitLab HTTPS repository URL without an account connection. Connect GitHub here to select a repository your account can access, including authorized private and organization repositories. This is available before you open a project.
-- **Import project** shows **From this workspace** and **Browse path** in the popup. The first lists registered projects; selecting one adds it to My projects and opens it. The second opens the server folder browser to link a folder without moving or copying its files.
+- **From this workspace** lists registered projects; selecting one adds it to My projects and opens it.
+- **Browse path** opens the server folder browser to link a folder without moving or copying its files.
 
 The secondary **Create with agent** action is available when you want help defining and building a new project. It uses the normal agent conversation controls: select a configured runtime if needed, answer the agent's first questions, and let it document and implement the project. This option requires agent access. [Runtime setup](../configuration/agent-runtimes.md).
 
 Creating, cloning, or linking registers the project with the **workspace** and adds it to your **My projects** shortcuts. Importing a workspace project adds your shortcut and opens it. The Dock and header project controls appear once you have a personal project. Other signed-in users can import the same project, subject to file permissions.
 
-To return to a project, click its name in the header to open **Projects** and choose it in **My**. Select **All** to find registered projects added by other users. **+ → Import project → From this workspace** also opens this catalog. The back arrow returns one step within the popup. X, clicking outside, Esc, or browser Back closes it and returns focus to **+**; a nested folder browser closes first. A running project operation keeps the popup open. Removing a shortcut leaves the folder and workspace registration intact; removing the last one returns to the centered project panel. Nested Git/Mew projects appear beneath their actual parent. [Project management](projects.md#프로젝트-탭).
+To return to a project, click its name in the header to open **Projects** and choose it in **My**. Select **All** to find registered projects added by other users. **+ → From this workspace** also opens this catalog. The back arrow returns directly to the four setup choices. X, clicking outside, Esc, or browser Back closes it and returns focus to **+**; a nested folder browser closes first. A running project operation keeps the popup open. Removing a shortcut leaves the folder and workspace registration intact; removing the last one returns to the centered project panel. Nested Git/Mew projects appear beneath their actual parent. [Project management](projects.md#프로젝트-탭).
 
 ## 2. Distinguish files from Documents
 

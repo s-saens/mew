@@ -1,6 +1,6 @@
 ---
 title: "Shared projects and project setup"
-description: "Records shared registry creation, discovery, personal shortcuts, and the November 6 setup and deletion work. Includes the November 7 invisible deletion-error diagnosis and regression verification."
+description: "Records shared registry creation, discovery, personal shortcuts, and the November 6 setup and deletion work. Includes the November 7 invisible deletion-error diagnosis and direct four-choice project setup follow-up."
 created: "2026-11-02"
 updated: "2026-11-07"
 ---
@@ -234,3 +234,10 @@ Verification for deletion recovery passed 5 focused tests: the three API respons
 - `npm run lint` exited successfully with warnings.
 - `npm run check:docs` validated 750 descriptions without metadata errors and reported 39 existing missing-target links, including absent MOC and decisions entrypoints. No new missing target was introduced; changed links and anchors were inspected.
 - `git diff --check` passed. No live project deletion or physical-device validation was performed.
+
+
+## Direct project setup choices follow-up — November 7
+
+The project-add popup now offers **New project**, **Git clone**, **From this workspace**, and **Browse path** on its first screen. Workspace and path imports no longer require an intermediate Import selection. Back from creation, cloning, or the catalog returns directly to those choices with focus restored. Closing the nested folder picker focuses Browse path on the same first screen. Catalog queries remain lazy, and the existing creation, clone, permission, busy-state, and retry boundaries are preserved.
+
+The [project feature](../features/projects-files-search/opening-projects-tabs-and-groups.md#create-or-link-a-project) owns the current behavior; [navigation](../development/ui-project-navigation.md#shared-ui-for-adding-projects-and-browsing-server-files) owns popup and focus details. The public [first-use](../../../docs/guides/first-steps.md) and [project guide](../../../docs/guides/projects.md#use-an-existing-project) now show direct entry to both import sources. Verification passed 19 focused tests: 10 project-add component tests, two add/catalog browser fixtures, the Projects scope browser fixture, and six App modes covering creation, onboarding, missing or empty personal lists, last-shortcut removal, and keyboard navigation. Browser fixtures exercise desktop/mobile widths, both themes, four UI languages, direct workspace/path entry, lazy loading, focus restoration, busy operations, and retry without duplicate mutations. Reviewed 320px and 390px captures show all four choices within the viewport. The build, lint, and document-check results above apply to this same final working tree. Physical-device verification was not performed.

@@ -9,7 +9,7 @@ import { LinkProjectDialog } from './LinkProjectDialog'
 import { projectAddCopy } from './project-add-copy'
 import { ProjectCatalogPanel } from './project-catalog-panel'
 
-type Mode = 'clone' | 'create' | 'import' | 'workspace'
+type Mode = 'clone' | 'create' | 'workspace'
 const emptyPaths: string[] = []
 type Repository = Awaited<ReturnType<typeof fetchConnectedGitRepositories>>['repositories'][number]
 
@@ -111,7 +111,7 @@ export function ProjectAddInline({ basePath, paths = emptyPaths, onOpen, onProje
     setError(null)
     if (mode) {
       restoreFocus.current = mode
-      setMode(mode === 'workspace' ? 'import' : null)
+      setMode(null)
     }
   }
   function close() {
@@ -171,7 +171,7 @@ export function ProjectAddInline({ basePath, paths = emptyPaths, onOpen, onProje
     setError(null)
   }
 
-  const choices = mode === 'import' ? (['workspace', 'browse'] as const) : (['create', 'clone', 'import'] as const)
+  const choices = ['create', 'clone', 'workspace', 'browse'] as const
   const title = mode === 'workspace' ? copy.workspace : mode ? copy[mode] : copy.add
 
   return <HoverTipLayer className={`mew-project-add${onboarding ? ' mew-project-add-onboarding' : ''}`}><div className="min-w-0" data-project-add-inline data-project-add-step={!expanded ? 'closed' : mode ?? 'choices'}>
@@ -190,7 +190,7 @@ export function ProjectAddInline({ basePath, paths = emptyPaths, onOpen, onProje
         <button type="button" data-project-add-close aria-label={t('common.close')} data-tip={t('common.close')} disabled={busy} onClick={close} className={iconButton}><Xmark width={18} height={18} aria-hidden="true" /></button>
       </header>
       <div id={`${id}-setup`} className="mew-project-add-body min-h-0 overflow-y-auto p-3">
-      {(mode === null || mode === 'import') && <nav aria-label={title} className="mew-project-add-choices flex min-w-0 flex-col gap-1.5">
+      {mode === null && <nav aria-label={title} className="mew-project-add-choices flex min-w-0 flex-col gap-1.5">
         {choices.map((next, index) => <button key={next} ref={element => { if (next === 'browse') browseTrigger.current = element; else modeTriggers.current[next] = element }} type="button"
           data-project-add-choice={next} data-dialog-autofocus={index === 0 || undefined} aria-label={copy[next]} disabled={busy || !!created && next !== createdMode}
           onClick={() => next === 'browse' ? setLinkOpen(true) : choose(next)}
