@@ -113,7 +113,11 @@ export function SelectField({ id: fieldId, label, value, options, disabled = fal
   }
   const onKeyDown = (event: KeyboardEvent<HTMLInputElement | HTMLButtonElement>) => {
     if (disabled || event.nativeEvent.isComposing) return
-    if (event.key === 'Tab') { close(); return }
+    if (event.key === 'Tab') {
+      const action = expanded && !event.shiftKey ? menu.current?.querySelector<HTMLButtonElement>('[data-select-option-action]') : null
+      if (action) { event.preventDefault(); action.focus() } else close()
+      return
+    }
     if (!expanded && !editable && !multiple && !event.altKey && !event.ctrlKey && !event.metaKey &&
       (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
       event.preventDefault(); event.stopPropagation()
@@ -175,9 +179,9 @@ export function SelectField({ id: fieldId, label, value, options, disabled = fal
         {triggerContent ?? <><span className="min-w-0 flex-1 truncate">{multiple ? options.filter(isSelected).map(option => option.label).join(', ') || label : options.find(isSelected)?.label ?? value}</span>{chevron}</>}
       </button>}
     </div>
-    {expanded && position && createPortal(<div ref={menu} id={id} role="listbox" aria-label={label} aria-multiselectable={multiple || undefined} style={position}
+    {expanded && position && createPortal(<div ref={menu} id={id} role="listbox" aria-label={label} aria-multiselectable={multiple || undefined} onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget) && event.relatedTarget !== trigger.current && event.relatedTarget !== input.current) close() }} style={position}
       className={`fixed z-[1201] overflow-y-auto overscroll-contain rounded border border-edge-bright bg-surface-raised py-1 text-sm shadow-xl ${popupClassName ?? ''}`}>
-      {options.map((option, index) => <div key={option.value} id={`${id}-${index}`} role="option" aria-selected={isSelected(option)} aria-disabled={option.disabled || undefined}
+      {options.map((option, index) => <div key={option.value} id={`${id}-${index}`} role="option" aria-label={option.label} aria-selected={isSelected(option)} aria-disabled={option.disabled || undefined}
         data-active={active === index || undefined}
         onPointerDown={event => event.preventDefault()} onClick={() => { setActive(index); pick(index) }}
         className={`flex items-center gap-2 px-2.5 ${multiple && compact ? 'min-h-8 text-xs pointer-coarse:min-h-11' : 'min-h-11'} ${option.disabled ? 'cursor-default text-ink-muted' : 'cursor-pointer text-ink hover:bg-surface-hover'} ${active === index ? 'bg-surface-hover' : ''}`}>

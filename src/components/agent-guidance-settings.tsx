@@ -11,6 +11,7 @@ import { defaultAgentBuildVerificationSettings, type AgentBuildVerificationSetti
 import { AgentBuildVerificationFields } from './agent-build-verification-fields'
 import { BranchGuidanceFields } from './agent-branch-guidance'
 import { GuidanceRow } from './agent-guidance-row'
+import { DefaultGuidanceTip } from './agent-default-guidance-tip'
 import { guidanceScopeCopy } from './agent-guidance-scope-copy'
 import { documentationGuidanceCopy } from './agent-documentation-guidance-copy'
 import { fetchProjectSetup, saveProjectGuidance } from '../api/project-setup'
@@ -166,7 +167,8 @@ export function AgentGuidanceSettings({ onClose, onOpenFile, workspacePath }: { 
     <SelectField compact portalContainer={panel} popupWidth={key === 'commitLanguage' ? 280 : undefined} label={settingLabels[key]} value={data.settings[key]} disabled={busy || !!error || (key === 'commit' && !!managedCommit)} onChange={value => void update(key, value)}
       options={[
         ...(data.settings[key] === 'custom' ? [{ value: 'custom', label: text.custom, disabled: true }] : []),
-        ...Object.keys(guidanceOptions[key]).map(value => ({ value, label: value === 'required' && (documentationKeys.has(key) || key === 'codeQuality') ? docText.required : labels[value] })),
+        ...Object.keys(guidanceOptions[key]).map(value => ({ value, label: value === 'required' && (documentationKeys.has(key) || key === 'codeQuality') ? docText.required : labels[value],
+          leading: value === 'required' && (documentationKeys.has(key) || key === 'codeQuality') ? <DefaultGuidanceTip locale={locale} guidanceKey={key as typeof documentationGuidanceKeys[number] | 'codeQuality'} label={settingLabels[key]} portalContainer={panel} /> : undefined })),
       ]} />
   </GuidanceRow>
   return <DialogFrame labelledBy={titleId} onClose={close} busy={saving} size="settings" className="agent-guidance-dialog flex flex-col text-ink">

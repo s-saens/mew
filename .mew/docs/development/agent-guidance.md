@@ -1,13 +1,13 @@
 ---
 title: "Agent guidance and context delivery"
-description: "Per-account guidance storage, revision APIs, settings presets, and account/project context delivery. Defines defaults, preservation rules, runtime boundaries, and failure handling shared by interactive and scheduled sessions."
-updated: "2026-11-03"
+description: "Per-account guidance storage, revision APIs, settings presets and localized default instruction previews, and account/project context delivery. Defines defaults, preservation rules, runtime boundaries, and failure handling shared by interactive and scheduled sessions."
+updated: "2026-11-06"
 상위파일: "agent-sessions.md"
 ---
 
 ## Passing project context
 
-Retry, build verification, branch, additional instructions, and automatic project guidance settings in the default instructions dialog are saved automatically 400 ms after the last change, without a separate save button. Invalid numeric, branch, or build-command input is not sent to the API. Saves are serialized through the existing revision API, and drafts are preserved on failure or conflict. Other presets are saved immediately upon selection.
+Retry, build verification, branch, additional instructions, and automatic project guidance settings in the default instructions dialog are saved automatically 400 ms after the last change, without a separate save button. Invalid numeric, branch, or build-command input is not sent to the API. Saves are serialized through the existing revision API, and drafts are preserved on failure or conflict. Other presets are saved immediately upon selection. In the code quality and documentation selectors, the T button beside Apply default guidance displays a localized explanation without changing the selection or stored English instruction.
 
 Per-project queues, independent tabs, the shared CLI, and completion criteria for feature requests follow [feature-based development](../features/terminals-agents-automation/feature-driven-development-and-markdown-documents.md#실행과-복원). The project and Documents connection captured at submission are passed when the supervisor starts.
 
