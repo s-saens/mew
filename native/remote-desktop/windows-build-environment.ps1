@@ -10,8 +10,9 @@ $paths = @(
 )
 # Existing private Node and custom paths remain available. Registry paths pick
 # up tools installed after the Mew/WSL process started, without a global write.
-$env:PATH = (@($env:PATH) + $paths + @([Environment]::GetEnvironmentVariable('Path', 'Machine'), [Environment]::GetEnvironmentVariable('Path', 'User'))) -join ';'
-$env:PATH = [Environment]::ExpandEnvironmentVariables($env:PATH)
+$combinedPath = [Environment]::ExpandEnvironmentVariables((@($env:PATH) + $paths + @([Environment]::GetEnvironmentVariable('Path', 'Machine'), [Environment]::GetEnvironmentVariable('Path', 'User'))) -join ';')
+$seenPaths = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
+$env:PATH = (@($combinedPath -split ';' | ForEach-Object { $_.Trim() } | Where-Object { $_ -and $seenPaths.Add($_.TrimEnd('\')) })) -join ';'
 
 function Find-MewBuildCommand([string]$Name) {
   $command = Get-Command $Name -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1

@@ -1,6 +1,8 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { existsSync } from 'node:fs'
+import fs from 'node:fs/promises'
+import os from 'node:os'
 import { execFileSync, spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
@@ -44,6 +46,7 @@ foreach ($fixture in $fixtures) {
   $env:PROCESSOR_ARCHITEW6432 = ''
   $env:VSCMD_ARG_TGT_ARCH = $fixture.compilerArchitecture
   $env:MEW_TEST_PRIVATE_VALUE = 'must not be serialized'
+  $env:PATH = 'C:\\Tools;C:\\Tools\\;c:\\TOOLS;C:\\Other'
   $env:INCLUDE = if ($null -ne $fixture.include) { $fixture.include } else { 'C:\\SDK\\um;C:\\SDK\\ucrt' }
   . '${script.replaceAll("'", "''")}'
 }`
@@ -54,6 +57,46 @@ foreach ($fixture in $fixtures) {
   for (let index = 0; index < cases.length; index++) {
     assert.equal(states[index].tools.visualStudio, cases[index].ready, JSON.stringify(cases[index]))
     assert.equal(states[index].environment.MEW_TEST_PRIVATE_VALUE, undefined)
+    const entries = states[index].environment.Path.split(';').map(entry => entry.replace(/\\+$/, '').toLowerCase())
+    assert.equal(new Set(entries).size, entries.length)
+    assert.deepEqual(entries.slice(0, 2), ['c:\\tools', 'c:\\other'])
     if (cases[index].ready) assert.equal(states[index].environment.INCLUDE, cases[index].include ?? 'C:\\SDK\\um;C:\\SDK\\ucrt')
   }
+})
+
+test('GPU compilation invokes the resolved compiler directly with source paths containing spaces and quotes', {
+  skip: !existsSync(powershell), timeout: 30_000,
+}, async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'mew-gpu-build-test-'))
+  const windowsPath = file => process.platform === 'win32' ? file : execFileSync('wslpath', ['-w', file], { encoding: 'utf8' }).trim()
+  const literal = value => value.replaceAll("'", "''")
+  try {
+    const target = path.join(root, "package's sources"), compiler = path.join(root, 'fixture compiler.ps1')
+    await fs.mkdir(target)
+    for (const file of ['gpu-windows.cpp', 'notification-windows.cpp']) await fs.writeFile(path.join(target, file), 'fixture')
+    await fs.writeFile(path.join(target, 'windows-build-environment.ps1'), `$env:PATH = 'C:\\unavailable'\n'{"tools":{"visualStudio":true}}'\n`)
+    await fs.writeFile(compiler, `
+$args | ConvertTo-Json | Set-Content -LiteralPath '${literal(windowsPath(path.join(target, 'compiler-args.json')))}'
+$output = @($args | Where-Object { $_ -like '/OUT:*' })[0].Substring(5)
+[IO.File]::WriteAllText($output, 'fixture GPU library')
+$global:LASTEXITCODE = 0
+`)
+    const script = windowsPath(fileURLToPath(new URL('./install-windows-gpu.ps1', import.meta.url)))
+    const probe = `
+$ErrorActionPreference = 'Stop'
+function Get-Command {
+  [CmdletBinding()] param([string]$Name, [string]$CommandType)
+  if ($Name -ne 'cl.exe') { throw 'Unexpected build command' }
+  [pscustomobject]@{ Source = '${literal(windowsPath(compiler))}' }
+}
+& '${literal(script)}' -Target '${literal(windowsPath(target))}'
+`
+    const result = spawnSync(powershell, ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', Buffer.from(probe, 'utf16le').toString('base64')], { encoding: 'utf8', timeout: 25_000 })
+    assert.equal(result.status, 0, result.stderr)
+    assert.equal(await fs.readFile(path.join(target, 'gpu-windows.dll'), 'utf8'), 'fixture GPU library')
+    const args = JSON.parse((await fs.readFile(path.join(target, 'compiler-args.json'), 'utf8')).replace(/^\uFEFF/, ''))
+    assert.ok(args.includes('/MT'))
+    assert.ok(args.includes(windowsPath(path.join(target, 'gpu-windows.cpp'))))
+    assert.ok(args.includes(windowsPath(path.join(target, 'notification-windows.cpp'))))
+  } finally { await fs.rm(root, { recursive: true, force: true }) }
 })
