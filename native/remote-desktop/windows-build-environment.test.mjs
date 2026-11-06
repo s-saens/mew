@@ -98,9 +98,13 @@ function Get-Command {
     assert.equal(await fs.readFile(path.join(target, 'gpu-windows.dll'), 'utf8'), 'fixture GPU library')
     const args = JSON.parse((await fs.readFile(path.join(target, 'compiler-args.json'), 'utf8')).replace(/^\uFEFF/, ''))
     assert.ok(args.includes('/MT'))
-    const normalized = args.map(arg => path.win32.normalize(arg).toLowerCase())
+    const sourceArgs = args.filter(arg => /\.cpp$/i.test(arg))
+    assert.equal(sourceArgs.length, 2)
+    const canonical = async file => path.win32.normalize(process.platform === 'win32' ? await fs.realpath(file) : file).toLowerCase()
     for (const file of ['gpu-windows.cpp', 'notification-windows.cpp']) {
-      assert.ok(normalized.includes(path.win32.normalize(windowsPath(path.join(target, file))).toLowerCase()), JSON.stringify({ args, target }))
+      const actual = sourceArgs.find(arg => path.win32.basename(arg).toLowerCase() === file)
+      assert.ok(actual, JSON.stringify({ args, target }))
+      assert.equal(await canonical(actual), await canonical(windowsPath(path.join(target, file))))
     }
   } finally { await fs.rm(root, { recursive: true, force: true }) }
 })
