@@ -22,7 +22,12 @@ async function fixture(run) {
   const version = directory => createHash('sha256').update(files.map(file => readFileSync(path.join(directory, file))).join('')).digest('hex')
   const tools = { architecture: 'x64', tools: { visualStudio: true, cmake: 'cmake.exe', clang: 'C:\\LLVM\\bin', perl: 'perl.exe', rust: 'C:\\Cargo\\rustup.exe' }, environment: { Path: 'C:\\Native Tools', INCLUDE: 'sdk' } }
   const options = { source, output, platform: 'win32', arch: 'x64', files, version, env: { PATH: 'stale', SECRET: 'not serialized' }, log() {}, inspect: () => tools,
-    installEngine({ target, run }) {
+    async preserveSources({ destination }) {
+      await fs.mkdir(destination)
+      await fs.writeFile(path.join(destination, 'LICENSE'), 'fixture native source license')
+    },
+    installEngine({ target, run, buildTimeout }) {
+      assert.equal(buildTimeout, 60 * 60_000)
       run('cargo', ['vendor'], { cwd: target })
       writeFileSync(path.join(target, 'mew-desktop-engine.dll'), 'rust binary')
       mkdirSync(path.join(target, 'rust/vendor/crate'), { recursive: true })
@@ -41,11 +46,17 @@ async function fixture(run) {
       if (args.some(value => value.endsWith('install-windows-gpu.ps1'))) writeFileSync(path.join(settings.cwd, 'gpu-windows.dll'), 'gpu binary')
       if (args.includes('-Output')) {
         const payload = args[args.indexOf('-Source') + 1]
+        if (path.basename(payload) === 'npm-native-sources') {
+          assert.equal(readFileSync(path.join(payload, 'LICENSE'), 'utf8'), 'fixture native source license')
+          writeFileSync(args[args.indexOf('-Output') + 1], 'native source ZIP fixture')
+          return { status: 0 }
+        }
         assert.equal(readFileSync(path.join(payload, 'rust/vendor/crate/.cargo-checksum.json'), 'utf8'), '{}')
         const manifest = JSON.parse(readFileSync(path.join(payload, 'mew-desktop-package.json'), 'utf8'))
         assert.equal(manifest.sourceHash, version(source))
         assert.ok(manifest.files.some(file => file.path === 'rust/vendor/crate/.cargo-checksum.json'))
         assert.ok(manifest.files.some(file => file.path === 'notices/mew-desktop-source/source.mjs'))
+        assert.ok(manifest.files.some(file => file.path === 'notices/node-datachannel-native-sources.zip'))
         writeFileSync(args[args.indexOf('-Output') + 1], 'zip fixture')
       }
       return { status: 0, stdout: '    KERNEL32.dll\r\n    api-ms-win-crt-runtime-l1-1-0.dll\r\n' }
@@ -112,6 +123,19 @@ test('an npm native binding with an unbundled runtime dependency blocks package 
     return run(command, args, settings)
   } }), /unbundled build\/runtime libraries: VCRUNTIME140.dll/)
   await assert.rejects(fs.stat(output), { code: 'ENOENT' })
+}))
+
+test('locked build staging cannot hide the original command failure', () => fixture(async ({ options }) => {
+  let staging
+  const output = []
+  try {
+    await assert.rejects(buildWindowsPackage({ ...options,
+      run() { return { status: null, error: Object.assign(new Error('compiler timed out'), { code: 'ETIMEDOUT' }) } },
+      cleanup(directory) { staging = directory; throw Object.assign(new Error('staging is locked'), { code: 'EBUSY' }) },
+      log(line) { output.push(line) },
+    }), /compiler timed out/)
+    assert.ok(output.some(line => line.includes(staging) && line.includes('original build error is preserved')))
+  } finally { if (staging) await fs.rm(staging, { recursive: true, force: true }) }
 }))
 
 test('desktop build rejects dependencies on unbundled Visual C++ and OpenSSL runtimes', () => {

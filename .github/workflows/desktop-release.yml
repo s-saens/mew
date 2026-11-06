@@ -87,7 +87,7 @@ jobs:
             }
           }
       - run: node tools/desktop-test-dependencies.mjs
-      - run: node --test tools/desktop-test-dependencies.test.mjs native/remote-desktop/windows-build-environment.test.mjs native/remote-desktop/windows-package.test.mjs native/remote-desktop/build-windows-package.test.mjs
+      - run: node --test tools/desktop-test-dependencies.test.mjs native/remote-desktop/windows-build-environment.test.mjs native/remote-desktop/windows-native-sources.test.mjs native/remote-desktop/install-rust-engine.test.mjs native/remote-desktop/windows-package.test.mjs native/remote-desktop/build-windows-package.test.mjs
       - name: Build isolated desktop package
         shell: pwsh
         env:
