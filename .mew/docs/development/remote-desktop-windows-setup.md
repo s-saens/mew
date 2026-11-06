@@ -1,6 +1,6 @@
 ---
 title: "Windows remote desktop prebuilt setup"
-description: "Defines Windows/WSL helper installation without host development tools, exact source-hash packages, verified replacement, and readiness. Covers maintainer builds that reuse validated active compiler environments, package publication, and Windows acceptance gates."
+description: "Defines Windows/WSL helper installation without host development tools, exact source-hash packages, verified replacement, and readiness. Covers C++20 maintainer builds, validated active compiler environments, isolated test prerequisites, publication, and Windows acceptance gates."
 created: "2026-11-05"
 updated: "2026-11-07"
 ---
@@ -47,6 +47,8 @@ Browser preparation first stops the resident helper and waits for login-supervis
 The dedicated `desktop-release.yml` workflow builds and verifies x64 and ARM64 packages, then publishes an immutable content-hash release through the protected `desktop-release` environment. The CLI runtime packager accepts an explicitly built, verified package for bundling rather than collecting arbitrary local DLL outputs. The [release runbook](../operations/cli-release.md#windows-remote-desktop-packages) owns publication order and gates.
 
 Build-tool discovery first accepts an activated compiler environment only when `cl.exe`, `link.exe`, `rc.exe`, Windows SDK headers, and UCRT headers are available. An explicit target architecture must match the native package. Otherwise discovery imports a Visual Studio developer environment and repeats the same checks. GPU compilation shares this discovery instead of unconditionally rediscovering Visual Studio. Discovery deduplicates PATH entries while preserving search order and distinguishing drive-relative entries from drive roots; GPU compilation invokes the resolved compiler directly, preserving source paths without an intermediate command script. Return only the compiler/SDK environment allowlist, not arbitrary host variables.
+
+The GPU helper uses C++20 so C++/WinRT uses standard coroutines with current MSVC and Windows SDK headers. Keep the static `/MT` runtime and the existing C ABI; do not restore the deprecated experimental-coroutine path to accommodate a new compiler.
 
 The workflow prepares only the YAML parser needed by package tests, using its exact version, resolved URL, and integrity from the root lockfile. `tools/desktop-test-dependencies.mjs` installs it in temporary storage with npm lifecycle scripts disabled, then copies it into the fresh checkout. It rejects unexpected transitive dependencies and leaves application dependencies uninstalled. The isolated package builder separately prepares and verifies the native payload.
 

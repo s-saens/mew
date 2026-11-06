@@ -14,7 +14,7 @@ try {
     $library = Join-Path $temporary 'gpu-windows.dll'
     Push-Location -LiteralPath $temporary
     try {
-        & $compiler /nologo /std:c++17 /utf-8 /EHsc /O2 /MT /LD /DUNICODE /D_UNICODE $source $notification /link "/OUT:$library" d3d11.lib dxgi.lib mfplat.lib mf.lib mfuuid.lib ole32.lib oleaut32.lib strmiids.lib user32.lib shell32.lib windowsapp.lib setupapi.lib
+        & $compiler /nologo /std:c++20 /utf-8 /EHsc /O2 /MT /LD /DUNICODE /D_UNICODE $source $notification /link "/OUT:$library" d3d11.lib dxgi.lib mfplat.lib mf.lib mfuuid.lib ole32.lib oleaut32.lib strmiids.lib user32.lib shell32.lib windowsapp.lib setupapi.lib
         if ($LASTEXITCODE -ne 0) { throw 'Windows GPU module compilation failed.' }
     }
     finally { Pop-Location }

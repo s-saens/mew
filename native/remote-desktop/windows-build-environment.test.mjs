@@ -98,6 +98,7 @@ function Get-Command {
     assert.equal(await fs.readFile(path.join(target, 'gpu-windows.dll'), 'utf8'), 'fixture GPU library')
     const args = JSON.parse((await fs.readFile(path.join(target, 'compiler-args.json'), 'utf8')).replace(/^\uFEFF/, ''))
     assert.ok(args.includes('/MT'))
+    assert.ok(args.includes('/std:c++20'))
     const sourceArgs = args.filter(arg => /\.cpp$/i.test(arg))
     assert.equal(sourceArgs.length, 2)
     const canonical = async file => path.win32.normalize(process.platform === 'win32' ? await fs.realpath(file) : file).toLowerCase()
