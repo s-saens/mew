@@ -8,17 +8,19 @@ import { connectTestBrowser } from './test-browser.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 
-test('database actions stay compact inside explorer/editor content and respect availability', { timeout: 60_000 }, async t => {
+test('database actions align with explorer creation controls and respect availability', { timeout: 60_000 }, async t => {
   const source = `import React from 'react';import {createRoot} from 'react-dom/client';
 import {I18nProvider} from '${root}/src/i18n.tsx';
 import {FileTree} from '${root}/src/components/FileTree.tsx';
+import {ExplorerDatabaseButton} from '${root}/src/components/explorer-database-button.tsx';
+import {SidebarCreateButtons} from '${root}/src/components/sidebar-create-buttons.tsx';
+import {ScopeToggle} from '${root}/src/components/scope-toggle.tsx';
 import {EditorPane} from '${root}/src/components/EditorPane.tsx';
 import {MobileDock} from '${root}/src/components/mobile-dock.tsx';
-import {HoverTipLayer} from '@mew/ui';
 const noop=()=>{};window.actions=[];
 const callbacks=Object.fromEntries(['registerHandle','registerElement','registerTabBar','onFocus','onActivate','onPin','onCloseTab','onReorder','onSetViewMode','onChangeContent','onOpenLink','onOpenHistory','onSetTocOpen','onOpenSidebar','onTabDragMove','onTabDrop'].map(k=>[k,noop]));
-function Fixture(){const [access,setAccess]=React.useState(true);const [guest,setGuest]=React.useState(false);window.setDatabaseAccess=setAccess;window.setGuest=setGuest;const open=access?()=>window.actions.push('database'):undefined;const tree=Array.from({length:70},(_,i)=>({path:'document-'+i+'.txt',name:'Document '+i,type:'file'}));
-return <HoverTipLayer><div className="flex h-dvh flex-col bg-surface-deep text-ink"><header className="h-9 shrink-0">Documents</header><main className="flex min-h-0 flex-1 flex-col md:flex-row"><aside data-explorer-area className="relative h-64 shrink-0 md:h-full md:w-64"><FileTree tree={tree} project="docs" stateKey="database-entrypoints" selectedPath={null} readOnly newFileSignal={{n:0,parentPath:null}} revealSignal={0} presence={{}} onSelect={noop} onFileCreated={noop} onFolderCreated={noop} onRenamed={noop} onDeleted={noop} onNotice={noop} onOpenDatabase={open}/></aside><section data-editor-area className="flex min-h-0 min-w-0 flex-1 flex-col"><EditorPane {...callbacks} pane={{id:'main',activePath:'notes.txt',tabs:[{path:'notes.txt',content:'Example document',viewMode:'plain',preview:false,editable:true}]}} role={guest?'guest':'owner'} authEmail={guest?null:'owner@example.test'} project="docs" tree={[]} presence={{}} focused isGuest={guest} canCollaborate={false} showSidebarButton={false} tocOpen={false} dropZone={null} onAskAgent={async()=>window.actions.push('agent')} onOpenDatabase={open}/></section></main><MobileDock active="editor" openPanels={['editor']} available={['sidebar','editor']} hidden={false} position="bottom" onSelect={id=>window.actions.push(id)} onNavigate={noop}/></div></HoverTipLayer>}
+function Fixture(){const [access,setAccess]=React.useState(true);const [guest,setGuest]=React.useState(false);const [scope,setScope]=React.useState('docs');const [writable,setWritable]=React.useState(true);window.setWritable=setWritable;window.setDatabaseAccess=setAccess;window.setGuest=setGuest;const open=access?()=>window.actions.push('database'):undefined;const tree=Array.from({length:70},(_,i)=>({path:'document-'+i+'.txt',name:'Document '+i,type:'file'}));
+return <div className="flex h-dvh flex-col bg-surface-deep text-ink"><header className="h-9 shrink-0">Documents</header><main className="flex min-h-0 flex-1 flex-col md:flex-row"><aside data-explorer-area className="relative flex h-64 shrink-0 flex-col md:h-full md:w-64">{!guest&&<div data-explorer-toggle className="flex shrink-0 items-center gap-1 border-b border-edge p-1"><ScopeToggle label="Explorer scope" value={scope} options={[{value:"docs",label:"Documents"},{value:"files",label:"Files"}]} onChange={setScope}/>{writable&&<SidebarCreateButtons documents={scope==='docs'} onCreate={noop}/>} {open&&<ExplorerDatabaseButton onOpen={open}/>}</div>}<FileTree tree={tree} project="docs" stateKey="database-entrypoints" selectedPath={null} readOnly newFileSignal={{n:0,parentPath:null}} revealSignal={0} presence={{}} onSelect={noop} onFileCreated={noop} onFolderCreated={noop} onRenamed={noop} onDeleted={noop} onNotice={noop}/></aside><section data-editor-area className="flex min-h-0 min-w-0 flex-1 flex-col"><EditorPane {...callbacks} pane={{id:'main',activePath:'notes.txt',tabs:[{path:'notes.txt',content:'Example document',viewMode:'plain',preview:false,editable:true}]}} role={guest?'guest':'owner'} authEmail={guest?null:'owner@example.test'} project="docs" tree={[]} presence={{}} focused isGuest={guest} canCollaborate={false} showSidebarButton={false} tocOpen={false} dropZone={null} onAskAgent={async()=>window.actions.push('agent')} onOpenDatabase={open}/></section></main><MobileDock active="editor" openPanels={['editor']} available={['sidebar','editor']} hidden={false} position="bottom" onSelect={id=>window.actions.push(id)} onNavigate={noop}/></div>}
 createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18nProvider>);`
   const bundle = await build({
     input: 'virtual:database-entrypoints.tsx', write: false, platform: 'browser', output: { format: 'esm', codeSplitting: false },
@@ -34,13 +36,13 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     } }],
   })
   const code = bundle.output.find(item => item.type === 'chunk')!.code
-  const components = ['src/components/FileTree.tsx', 'src/components/EditorPane.tsx', 'src/components/mobile-dock.tsx', 'src/components/TabBar.tsx', 'packages/ui/src/HoverTipLayer.tsx']
+  const components = ['src/components/FileTree.tsx', 'src/components/explorer-database-button.tsx', 'src/components/sidebar-create-buttons.tsx', 'src/components/scope-toggle.tsx', 'src/components/EditorPane.tsx', 'src/components/mobile-dock.tsx', 'src/components/TabBar.tsx', 'packages/ui/src/HoverTipLayer.tsx']
   const content = (await Promise.all(components.map(file => fs.readFile(path.join(root, file), 'utf8')))).join('\n')
   const compiler = await compile(await fs.readFile(path.join(root, 'src/index.css'), 'utf8'), { base: path.join(root, 'src'), onDependency() {} })
   const css = compiler.build([...new Set((source + content).match(/[A-Za-z0-9_@!:/.[\]()%,-]+/g))])
   const browser = await connectTestBrowser()
   t.after(() => browser.close())
-  for (const width of [390, 1280]) {
+  for (const width of [320, 390, 1280]) {
     const page = await browser.newPage({ viewport: { width, height: 844 } })
     page.setDefaultTimeout(5000)
     const errors: string[] = []
@@ -69,18 +71,44 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     assert.ok(editorBox.height <= 30 && editorBox.height === agentBox.height, 'the database action shares the compact floating toolbar height')
     const area = (await page.locator('[data-explorer-area]').boundingBox())!, before = (await explorer.boundingBox())!
     assert.ok(before.x >= area.x && before.x + before.width <= area.x + area.width && before.y >= area.y && before.y + before.height <= area.y + area.height, 'explorer action remains inside its file area')
-    assert.ok(before.height <= 30 && before.x > area.x + area.width / 2, 'the explorer action is compact and aligned at the upper right')
+    const toolbar = page.locator('[data-explorer-toggle]')
+    const newDocument = toolbar.getByRole('button', { name: 'New document', exact: true })
+    const createBox = (await newDocument.boundingBox())!
+    assert.equal(await toolbar.locator('[data-explorer-database]').count(), 1)
+    assert.equal(await page.locator('[data-tree-key] [data-explorer-database]').count(), 0, 'the file list has no floating database action')
+    assert.ok(before.x >= createBox.x + createBox.width && before.x - createBox.x - createBox.width <= 8, 'the database button immediately follows New document')
+    assert.equal(before.y, createBox.y)
+    assert.equal(before.height, createBox.height)
+    assert.equal(before.width, createBox.width)
+    assert.equal(await explorer.evaluate(el => el.ownerDocument.defaultView!.getComputedStyle(el).position), 'static')
+    const listBox = (await page.locator('[data-tree-key]').boundingBox())!
+    assert.ok(before.y + before.height <= listBox.y, 'the toolbar sits above file content')
     await page.locator('[data-tree-key] > div').last().evaluate(el => { el.scrollTop = 500 })
-    assert.deepEqual(await explorer.boundingBox(), before, 'scrolling files does not move the floating action')
+    assert.deepEqual(await explorer.boundingBox(), before, 'scrolling files does not move the header action')
+    await toolbar.getByRole('button', { name: 'Files', exact: true }).click()
+    const folderBox = (await toolbar.getByRole('button', { name: 'New folder', exact: true }).boundingBox())!
+    const filesDatabaseBox = (await explorer.boundingBox())!
+    assert.ok(filesDatabaseBox.x >= folderBox.x + folderBox.width && filesDatabaseBox.x - folderBox.x - folderBox.width <= 8, 'Files keeps the database button after creation actions')
+    await toolbar.getByRole('button', { name: 'Documents', exact: true }).click()
+    await newDocument.focus()
+    await page.keyboard.press('Tab')
+    assert.equal(await explorer.evaluate(el => el === el.ownerDocument.activeElement), true, 'keyboard focus moves from creation to the database button')
+    await page.keyboard.press('Enter')
+    assert.deepEqual(await page.evaluate('window.actions'), ['database', 'database', 'database'])
     await page.mouse.move(0, 0)
     await explorer.hover()
     await page.getByRole('tooltip', { name: 'Database', exact: true }).waitFor()
     await page.evaluate('window.setGuest(true)')
-    await editor.waitFor({ state: 'hidden' })
+    for (const action of [explorer, editor]) await action.waitFor({ state: 'hidden' })
     await page.evaluate('window.setGuest(false);window.setDatabaseAccess(false)')
     for (const action of [explorer, editor, dock]) await action.waitFor({ state: 'hidden' })
-    await page.evaluate('window.setDatabaseAccess(true)')
+    await page.evaluate('window.setDatabaseAccess(true);window.setWritable(false)')
     await editor.waitFor()
+    await explorer.waitFor()
+    assert.equal(await newDocument.count(), 0)
+    assert.equal(await explorer.isVisible(), true, 'database access does not require file creation permission')
+    await page.evaluate('window.setWritable(true)')
+    await newDocument.waitFor()
     assert.deepEqual(errors, [])
     await page.screenshot({ path: `/tmp/mew-database-entrypoints-${width}.png` })
     await page.close()

@@ -1,8 +1,8 @@
 ---
 title: "Document database references and catalog access"
-description: "Records the November 6 database Dock removal, persisted source references, line maintenance, and last-reference cleanup. Separates local regression checks from unavailable Postgres integration and runtime application."
+description: "Records the November 6 database Dock removal, persisted source references, line maintenance, and last-reference cleanup, plus the November 7 explorer toolbar placement. Separates local regression checks from unavailable Postgres integration and runtime application."
 created: "2026-11-06"
-updated: "2026-11-06"
+updated: "2026-11-07"
 ---
 
 Implemented source-location visibility in the database catalog and removed its Dock action. The [database feature contract](../features/document-databases/document-databases-and-catalog.md#persisted-document-references-and-database-lifetime) owns current behavior, the [guide](../../../docs/guides/database.md#finding-where-a-database-is-used) covers use, and [ADR 0148](../decisions/0148-database-document-references.md) records the changed lifetime decision.
@@ -25,3 +25,18 @@ Saved Markdown blocks register project/file/line occurrences in Postgres. Edits 
 ## Limits
 
 No deployment, launcher execution, application server lifecycle operation, or production database test was performed. Server-side code requires the user's normal application procedure. Existing unrecorded documents are not backfilled by opening the catalog. Saved last-reference removal cannot be reversed by document undo; deleted Postgres data needs a database backup. Optional database failures can leave references stale until the affected file changes again.
+
+
+## November 7: Explorer toolbar placement
+
+Moved the explorer catalog action out of the file-list overlay to the fixed toolbar beside the Documents/Files toggle. In Documents it immediately follows New Document; in Files it follows the file/folder creation controls. It shares their 28px square size and remains available to accounts with database access when creation controls are hidden. The [feature contract](../features/document-databases/document-databases-and-catalog.md#scope) and [usage guide](../../../docs/guides/database.md#creating-and-editing-tables) own these current entry points.
+
+Local verification:
+
+- `node --test server/database-entrypoints-ui.test.ts` passed in the primary checkout and an isolated snapshot at 320px, 390px, and 1280px. It checks toolbar geometry, absence of the file-list overlay, scrolling, both scopes, keyboard activation, tooltips, and guest/permission visibility. Temporary browser captures were inspected; they use fixture data, not a physical device or production session.
+- `node --test server/sidebar-create-ui.test.ts` passed, including the isolated snapshot rerun.
+- `npm run build` passed in the primary checkout and in `.worktrees/explorer-database-toolbar-verification`, using HEAD plus this task's code and existing installed dependencies. The snapshot excludes concurrent workspace API refactoring. It emitted the existing chunk-size warning.
+- `npm run lint` passed with existing warnings; targeted lint for the new button and updated regression passed without diagnostics.
+- `npm run check:docs` validated all descriptions but retained 39 unrelated missing-target errors. Changed documents have no local-link errors. `git diff --check` passed for this task's changes.
+
+The primary-checkout build initially encountered incomplete exports in concurrent API edits and later an unused type import in that refactor. The unused import was removed as a local build prerequisite; those unrelated refactor changes are excluded from this task's commit. No deployment, launcher, or application server lifecycle operation was performed.

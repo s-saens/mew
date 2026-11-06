@@ -69,6 +69,7 @@ import { useChatNotifications } from './hooks/use-chat-notifications'
 import { OPEN_NOTICE_EVENT, publishMewcatNotice, type MewcatNotice } from './utils/mewcat-notifications'
 import { SidebarCreateButtons } from './components/sidebar-create-buttons'
 import { ScopeToggle } from './components/scope-toggle'
+import { ExplorerDatabaseButton } from './components/explorer-database-button'
 import { useSidebarCreate } from './hooks/use-sidebar-create'
 import { FileTree, type TreePersistenceState } from './components/FileTree'
 import { CommandButtonMenu } from './components/CommandButtonMenu'
@@ -2185,6 +2186,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
                       { value: 'files', label: t('explorer.files') },
                     ]} />
                   {!isGuest && caps.filesRead && caps.filesWrite && <SidebarCreateButtons documents={docsExpanded} onCreate={sidebarCreate.create} disabled={!workspaceUiLoaded || sidebarStateLoadedRootRef.current !== projectUiPath} />}
+                  {caps.database && <ExplorerDatabaseButton onOpen={() => setDbListOpen(true)} />}
                 </div>}
               >
                 {search => <>
@@ -2219,7 +2221,6 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
                         path: docsFolderPath,
                         onOpen: () => { setDocsExpanded(true); sidebarCreate.selectDirectory('docs', '') },
                       } : undefined}
-                      onOpenDatabase={caps.database && !isGuest ? () => setDbListOpen(true) : undefined}
                       documentPages={isGuest || docsExpanded}
                       onBeforePageMutation={prepareDocumentPageMutation}
                       onPageMutation={async result => { await applyDocumentPageMutation(result); void refreshTree() }}
