@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 
 export const TOAST_VISIBLE_MS = 2600
 
@@ -25,11 +26,12 @@ export function Toast({ message, onDone }: { message: string; onDone: () => void
     }
   }, [])
 
-  return (
+  return createPortal(
     <div
       role="status"
       aria-live="polite"
-      className="pointer-events-none fixed inset-x-0 bottom-8 z-[1100] flex justify-center px-4"
+      className="pointer-events-none fixed inset-x-0 bottom-8 flex justify-center px-4"
+      style={{ zIndex: 'var(--layer-notice, 1100)' }}
     >
       <div
         className={`max-w-[80vw] truncate rounded-full border border-edge-bright bg-surface-raised px-4 py-1.5 text-sm text-ink shadow-xl transition-opacity duration-150 ${
@@ -38,6 +40,7 @@ export function Toast({ message, onDone }: { message: string; onDone: () => void
       >
         {message}
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }

@@ -1,6 +1,6 @@
 ---
 title: "Agent composer Build and Deploy implementation"
-description: "Records the November 6 composer Build/Deploy toggles, per-message execution snapshots, guidance preservation, and removal of build settings controls. Covers 52 passing focused tests, successful build and lint, and existing documentation-link failures; deployment and server lifecycle operations are outside this work."
+description: "Records the November 6 composer Build/Deploy toggles, per-message execution snapshots, guidance preservation, removal of build settings controls, and the follow-up Dock toast visibility fix. Covers 52 passing focused tests, successful build and lint, and existing documentation-link failures; deployment and server lifecycle operations are outside this work."
 created: "2026-11-06"
 updated: "2026-11-06"
 ---
@@ -27,6 +27,14 @@ Current contracts are in [agent guidance](../development/agent-guidance.md#per-m
 - `npm run check:docs`: all 750 descriptions passed. The link phase reported 39 missing targets in unchanged documents, including `.mew/docs/MOC.md`, `.mew/docs/decisions/MOC.md`, and `.mew/docs/decisions/README.md`.
 - The repository link checker filtered to all seven changed Markdown files: zero errors. Changed heading targets were inspected directly.
 - `git diff --check`: passed.
+
+## Follow-up: toast visibility above Dock
+
+The Build/Deploy toast originally rendered inside the composer stacking context. Its local z-index could not rise above Dock, and transformed or clipped panel ancestors could constrain its position. Shared `Toast` now portals to `document.body` at the existing notice layer, following the [overlay contract](../development/ui-overlays.md#shared-layer-order). Pointer pass-through, live announcement, and dismissal timing remain unchanged.
+
+The regression fixture adds a transformed, clipped panel and an overlapping Dock surface. Before the fix, all six desktop/mobile and light/dark cases failed the paint-order assertion. After the fix, `node --test server/agent-build-verification-ui.test.ts` passed all seven reported tests across 1100/390/320px light/dark scenes, including the existing composer behavior checks. The fixture now includes shared dialog-frame styles so its synthetic stacking context does not invalidate unrelated dialog interaction checks.
+
+`npm run build` passed, including TypeScript checks; `npm run lint` completed with warnings. `npm run check:docs` again passed all 750 descriptions and failed on the same 39 existing missing links. The two changed documents had no local-link errors, and `git diff --check` passed. This was local browser and build verification without deployment or server lifecycle operations.
 
 ## Application and remaining limits
 

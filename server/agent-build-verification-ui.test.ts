@@ -45,7 +45,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><AgentPanel pro
   }] })
   const chunk = bundle.output.find(item => item.type === 'chunk')!
   const compiler = await compile(await fs.readFile(`${root}/src/index.css`, 'utf8'), { base: `${root}/src`, onDependency() {} })
-  const content = (await Promise.all(['src/components/AgentPanel.tsx', 'src/components/agent-execution-toggles.tsx', 'packages/ui/src/Toast.tsx', 'src/components/agent-guidance-settings.tsx', 'src/components/agent-header-select.tsx', 'src/components/MentionTextarea.tsx', 'src/components/DockWorkspace.tsx'].map(file => fs.readFile(`${root}/${file}`, 'utf8')))).join('\n')
+  const content = (await Promise.all(['src/components/AgentPanel.tsx', 'src/components/agent-execution-toggles.tsx', 'packages/ui/src/Toast.tsx', 'packages/ui/src/dialog-frame.tsx', 'src/components/agent-guidance-settings.tsx', 'src/components/agent-header-select.tsx', 'src/components/MentionTextarea.tsx', 'src/components/DockWorkspace.tsx'].map(file => fs.readFile(`${root}/${file}`, 'utf8')))).join('\n')
   const css = compiler.build([...new Set((source + content).match(/[A-Za-z0-9_@!:/.[\]()%,-]+/g))])
   const browser = await connectTestBrowser()
   t.after(() => browser.close())
@@ -73,7 +73,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><AgentPanel pro
           } })
         }
         if (pathname.startsWith('/api/')) return route.fulfill({ json: { settings: null, skills: [], jobs: [], commands: [], runtimes: [] } })
-        return route.fulfill({ contentType: 'text/html', body: `<!doctype html><html class="${dark ? 'dark' : ''}" lang="ko"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}html,body,#root{height:100%;margin:0}</style><div id="root"></div><script src="/app.js"></script></html>` })
+        return route.fulfill({ contentType: 'text/html', body: `<!doctype html><html class="${dark ? 'dark' : ''}" lang="ko"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}html,body,#root{height:100%;margin:0}#root{position:relative;z-index:10;transform:translateZ(0);overflow:hidden}[data-test-dock]{position:fixed;inset:auto 0 0;height:96px;z-index:40;background:#111;pointer-events:none}</style><div id="root"></div><div data-test-dock></div><script src="/app.js"></script></html>` })
       })
       await page.goto('http://mew-execution.test/')
       const buildButton = page.getByRole('button', { name: '빌드', exact: true })
@@ -85,7 +85,27 @@ createRoot(document.getElementById('root')).render(<I18nProvider><AgentPanel pro
       assert.equal(await buildButton.innerText(), '', 'controls contain icons only')
       await input.fill('capture execution choices')
       await buildButton.click()
-      await page.getByRole('status').filter({ hasText: '빌드 off' }).waitFor()
+      const toast = page.getByRole('status').filter({ hasText: '빌드 off' })
+      await toast.waitFor()
+      const paint = await toast.evaluate(element => {
+        const doc = element.ownerDocument
+        const surface = element.firstElementChild as typeof element
+        const dock = doc.querySelector('[data-test-dock]') as typeof element
+        const bounds = surface.getBoundingClientRect(), dockBounds = dock.getBoundingClientRect()
+        const previousSurface = surface.style.pointerEvents, previousDock = dock.style.pointerEvents
+        surface.style.pointerEvents = 'auto'
+        dock.style.pointerEvents = 'auto'
+        try {
+          const front = doc.elementFromPoint(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2)
+          return { overlapsDock: bounds.bottom > dockBounds.top, aboveDock: surface.contains(front), viewportRoot: element.parentElement === doc.body }
+        } finally {
+          surface.style.pointerEvents = previousSurface
+          dock.style.pointerEvents = previousDock
+        }
+      })
+      assert.equal(paint.overlapsDock, true, 'fixture must exercise overlapping Dock and toast surfaces')
+      assert.equal(paint.aboveDock, true, 'toast must paint above Dock outside the composer stacking context')
+      assert.equal(paint.viewportRoot, true, 'toast escapes transformed and clipped panel ancestors')
       await deployButton.focus()
       await deployButton.press('Space')
       await page.getByRole('status').filter({ hasText: '배포 on' }).waitFor()

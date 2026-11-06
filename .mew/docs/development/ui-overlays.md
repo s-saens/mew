@@ -1,6 +1,6 @@
 ---
 title: "UI overlays, selection controls, and menus"
-description: "Shared popup positioning, custom selection, layering, dismissal, and action-menu contracts. Defines the compact grouped workspace menu, independent account settings, immediate deferred-dialog shells, keyboard/touch behavior, and focus boundaries."
+description: "Shared popup positioning, custom selection, layering, viewport-level toast portals, dismissal, and action-menu contracts. Defines the compact grouped workspace menu, independent account settings, immediate deferred-dialog shells, keyboard/touch behavior, and focus boundaries."
 created: "2026-11-03"
 updated: "2026-11-06"
 상위파일: "ui-contracts.md"
@@ -89,6 +89,8 @@ Document DBs store item colors as column metadata and update all rows and linked
 | Tooltips and break screens | 1900 |
 
 Focus reorders existing floating windows without increasing levels on every click. Dock, Mewpet, and selection lists placed in dedicated settings or remote-screen hosts follow that host's internal order.
+
+Shared `Toast` messages portal to `document.body` at `var(--layer-notice, 1100)` so panel stacking contexts, transforms, and clipping cannot hide them behind Dock. Keep their fixed viewport position, pointer-event pass-through, polite live announcement, and automatic dismissal; they do not register with the dismissible overlay stack. `server/agent-build-verification-ui.test.ts` verifies overlapping Dock and toast paint order at desktop and mobile widths.
 
 The agent attachment image viewer is displayed through a `document.body` portal to escape panel transforms, local z-index values, and clipping areas. Its backdrop covers Dock and notifications, and Esc and mobile Back close only the topmost viewer through the shared `useOverlayDismiss`. Command editing modals also appear above Dock and regular notifications.
 
