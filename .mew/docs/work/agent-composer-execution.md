@@ -1,8 +1,8 @@
 ---
 title: "Agent composer Build and Deploy implementation"
-description: "Records the November 6 composer Build/Deploy toggles, per-message execution snapshots, guidance preservation, removal of build settings controls, and the follow-up Dock toast visibility fix. Covers 52 passing focused tests, successful build and lint, and existing documentation-link failures; deployment and server lifecycle operations are outside this work."
+description: "Records the November 6 composer Build/Deploy toggles, per-message execution snapshots, guidance preservation, removal of build settings controls, and follow-up fixes for Dock toast visibility and mobile keyboard reopening. Covers local regression tests, successful builds and lint, and existing documentation-link failures; deployment and server lifecycle operations are outside this work."
 created: "2026-11-06"
-updated: "2026-11-06"
+updated: "2026-11-07"
 ---
 
 ## Purpose
@@ -35,6 +35,16 @@ The Build/Deploy toast originally rendered inside the composer stacking context.
 The regression fixture adds a transformed, clipped panel and an overlapping Dock surface. Before the fix, all six desktop/mobile and light/dark cases failed the paint-order assertion. After the fix, `node --test server/agent-build-verification-ui.test.ts` passed all seven reported tests across 1100/390/320px light/dark scenes, including the existing composer behavior checks. The fixture now includes shared dialog-frame styles so its synthetic stacking context does not invalidate unrelated dialog interaction checks.
 
 `npm run build` passed, including TypeScript checks; `npm run lint` completed with warnings. `npm run check:docs` again passed all 750 descriptions and failed on the same 39 existing missing links. The two changed documents had no local-link errors, and `git diff --check` passed. This was local browser and build verification without deployment or server lifecycle operations.
+
+## Follow-up: preserve mobile keyboard visibility
+
+A dismissed mobile keyboard can leave the composer focused. Build/Deploy previously preserved that stale editing focus on touch, allowing the browser to reopen the keyboard. The toggles now use the existing mobile-keyboard visibility signal: a touch releases stale editing focus only while the keyboard is closed, and keeps existing editing focus while it is open. Toggling never requests editor focus. Mouse and keyboard activation keep their existing behavior.
+
+The regression covers both toggles with blurred input, retained focus after keyboard dismissal, and an open keyboard signaled through the visual viewport, along with desktop focus preservation and native-focus request recording. Before the fix, the four mobile light/dark cases failed the stale-focus assertion; desktop cases passed. `node --test server/agent-build-verification-ui.test.ts server/agent-execution-keyboard-ui.test.ts` passed all 14 reported tests after the fix. The focused fixture also covers textarea/contenteditable inputs, one change per activation, and Space-key accessibility.
+
+`npm run build` passed in the primary checkout, including TypeScript and Vite. An earlier isolated build in `.worktrees/verify-agent-toggle-keyboard` also passed while concurrent API/project-board changes temporarily blocked primary-checkout verification. The unrelated intermediate errors were resolved outside this task; those files are excluded from this change. `npm run lint` completed with warnings; targeted lint for the changed component and tests passed without warnings. `npm run check:docs` passed all 750 descriptions and reported the same 39 existing missing links; the two changed documents had no local-link errors. `git diff --check` passed.
+
+Headless Chromium cannot display an OS keyboard, so the tests verify real touch activation, focus requests, and viewport signals; physical-device keyboard animation remains unverified. No deployment or server lifecycle operation was performed.
 
 ## Application and remaining limits
 

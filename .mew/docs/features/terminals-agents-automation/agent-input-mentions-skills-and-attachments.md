@@ -4,11 +4,11 @@ parent: "mew-agents"
 title: "Agent Input, Mentions, Skills, and Attachments"
 status: "implemented"
 created: "2026-09-18"
-updated: "2026-11-06"
+updated: "2026-11-07"
 status_hash: "a10e27bcc06cebe98975858548ff907b5953bfbcf197fe2ef971d9294144858f"
 files: ["src/components/AgentPanel.tsx", "src/components/agent-execution-toggles.tsx", "src/hooks/use-agent-execution-options.ts", "shared/agent-execution-options.ts", "src/components/agent-document-tag.tsx", "src/utils/agent-attachments.ts", "src/components/agent-prompt-drafts.tsx", "src/utils/agent-saved-prompts.ts", "src/components/MentionTextarea.tsx", "src/components/agent-composer-input.tsx", "src/components/agent-composer-documents.tsx", "src/components/agent-composer-attachments.tsx", "src/components/agent-media-preview-dialog.tsx", "src/utils/agent-composer-document.ts", "src/components/drawing/DrawingEditor.tsx", "src/utils/clipboard-images.ts", "src/utils/agentInputMentions.ts", "server/skills.ts"]
 commits: []
-description: "Agent input mentions, document reference tags with optional visible titles, skill selection, attachments, media previews, and drawing integration. Covers atomic reference editing, deferred rich input, drafts and history, reference storage and compatibility, queue editing, CLI mode, keyboard submission, and floating composer controls with input clearing, inline relative scheduling, and per-message Build/Deploy toggles."
+description: "Agent input mentions, document reference tags with optional visible titles, skill selection, attachments, media previews, and drawing integration. Covers atomic reference editing, deferred rich input, drafts and history, reference storage and compatibility, queue editing, CLI mode, keyboard submission, and floating composer controls with input clearing, inline relative scheduling, and per-message Build/Deploy toggles that preserve mobile keyboard visibility."
 상위파일:
   - "MOC.md"
   - "_terminals-agents-automation.md"
@@ -48,7 +48,7 @@ Disable this control while attachments are uploading, a CLI submission is pendin
 
 ### Build and Deploy controls
 
-Place icon-only **Build** and **Deploy** toggles in the existing composer action row. Default to Build on and Deploy off. Use translated accessible names, the shared tooltip, `aria-pressed`, and a translated on/off toast for each change. The selected state must remain distinguishable in the supported themes.
+Place icon-only **Build** and **Deploy** toggles in the existing composer action row. Default to Build on and Deploy off. Use translated accessible names, the shared tooltip, `aria-pressed`, and a translated on/off toast for each change. The selected state must remain distinguishable in the supported themes. Touching either toggle must not open a closed mobile keyboard. If keyboard dismissal left editing focus behind, release that stale focus during pointer-down; preserve editing focus when the keyboard is already open. Desktop and keyboard activation retain their existing behavior.
 
 Persist preferences locally by account, project, and agent tab. Refresh restores the current tab's choices, while other tabs retain independent values. Capture `execution: { build, deploy }` with each immediate, startup-pending, queued, and scheduled message. Editing a queued message loads its saved options and restores the new-message options after save or cancellation. Later toggle changes must not alter earlier snapshots. Disable Build and Deploy in CLI mode.
 

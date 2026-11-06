@@ -17,6 +17,10 @@ import {createRoot} from '${root}/node_modules/react-dom/client.js';
 import {AgentPanel} from '${root}/src/components/AgentPanel.tsx';
 import {I18nProvider} from '${root}/src/i18n.tsx';
 localStorage.setItem('mew:locale','ko'); window.messages=[];
+window.inputFocusRequests=[];
+const nativeFocus=HTMLElement.prototype.focus;
+HTMLElement.prototype.focus=function(...args){if(this.matches('[contenteditable="true"]'))window.inputFocusRequests.push(new Error().stack);return nativeFocus.apply(this,args)};
+
 const meta={sessionId:'conversation',startedAt:new Date().toISOString(),turns:0,busy:false,queued:[],usage:null,canLoad:false,canList:false};
 class Socket {
  static OPEN=1;readyState=1;
@@ -79,11 +83,50 @@ createRoot(document.getElementById('root')).render(<I18nProvider><AgentPanel pro
       const buildButton = page.getByRole('button', { name: '빌드', exact: true })
       const deployButton = page.getByRole('button', { name: '배포', exact: true })
       const input = page.locator('[contenteditable="true"][aria-placeholder="텍스트 입력"]')
-      await buildButton.waitFor()
+      await buildButton.waitFor().catch(error => { throw new Error(errors.length ? errors.join("\n") : error.message) })
       assert.equal(await buildButton.getAttribute('aria-pressed'), 'true')
       assert.equal(await deployButton.getAttribute('aria-pressed'), 'false')
       assert.equal(await buildButton.innerText(), '', 'controls contain icons only')
+      for (const button of [buildButton, deployButton]) {
+        for (let repeat = 0; repeat < 2; repeat++) {
+          await input.evaluate(element => { element.blur(); (element.ownerDocument.defaultView as any).inputFocusRequests = [] })
+          if (width < 768) await button.tap()
+          else await button.click()
+          assert.equal(await input.evaluate(element => element === element.ownerDocument.activeElement), false, 'toggling without editing must not focus the composer')
+          assert.deepEqual(await page.evaluate('window.inputFocusRequests'), [], 'toggling must not request native editing focus')
+        }
+      }
+      if (width < 768) {
+        for (const button of [buildButton, deployButton]) {
+          await input.focus()
+          await page.evaluate('window.inputFocusRequests=[]')
+          await button.tap()
+          assert.equal(await input.evaluate(element => element === element.ownerDocument.activeElement), false, 'a closed keyboard must not reopen from retained editing focus')
+          assert.deepEqual(await page.evaluate('window.inputFocusRequests'), [], 'releasing stale focus must not request input focus again')
+          await button.tap()
+        }
+      }
       await input.fill('capture execution choices')
+      if (width < 768) await input.evaluate(element => {
+        const win = element.ownerDocument.defaultView!
+        Object.defineProperty(win.visualViewport!, 'height', { configurable: true, value: 440 })
+        win.visualViewport!.dispatchEvent(new win.Event('resize'))
+        return new Promise<void>(resolve => win.requestAnimationFrame(() => win.requestAnimationFrame(() => resolve())))
+      })
+      for (const button of [buildButton, deployButton]) {
+        for (let repeat = 0; repeat < 2; repeat++) {
+          await page.evaluate('window.inputFocusRequests=[]')
+          if (width < 768) await button.tap()
+          else await button.click()
+          assert.equal(await input.evaluate(element => element === element.ownerDocument.activeElement), true, 'toggling must preserve existing composer focus')
+          assert.deepEqual(await page.evaluate('window.inputFocusRequests'), [], 'retained focus after keyboard dismissal must not cause another focus request')
+        }
+      }
+      if (width < 768) await input.evaluate(element => {
+        const win = element.ownerDocument.defaultView!
+        Reflect.deleteProperty(win.visualViewport!, 'height')
+        win.visualViewport!.dispatchEvent(new win.Event('resize'))
+      })
       await buildButton.click()
       const toast = page.getByRole('status').filter({ hasText: '빌드 off' })
       await toast.waitFor()

@@ -1,6 +1,7 @@
 import { Hammer, Rocket } from 'iconoir-react'
 import { HoverTipLayer, keepFocusOnPress, useToast } from '@mew/ui'
 import { useI18n } from '../i18n'
+import { useMobileKeyboard } from '../hooks/use-mobile-keyboard'
 import type { AgentExecutionOptions } from '../../shared/agent-execution-options'
 
 const copy = {
@@ -16,6 +17,7 @@ export function AgentExecutionToggles({ value, onChange, disabled = false }: {
   disabled?: boolean
 }) {
   const { locale } = useI18n()
+  const keyboardOpen = useMobileKeyboard()
   const { toast, showToast } = useToast()
   return <>
     <HoverTipLayer className="flex items-stretch gap-1">
@@ -24,7 +26,13 @@ export function AgentExecutionToggles({ value, onChange, disabled = false }: {
         const label = copy[locale][key]
         return <div key={key} data-tip={`${label} ${value[key] ? 'on' : 'off'}`} className="flex min-h-8 items-center">
           <button type="button" aria-label={label} aria-pressed={value[key]} disabled={disabled}
-            onPointerDown={keepFocusOnPress}
+            onPointerDown={event => {
+              keepFocusOnPress(event)
+              if (event.pointerType !== 'touch' || keyboardOpen) return
+              const focused = event.currentTarget.ownerDocument.activeElement
+              // Dismissing the keyboard can leave editing focus behind; another touch can reopen it.
+              if (focused instanceof HTMLElement && (focused.isContentEditable || focused.matches('input, textarea'))) focused.blur()
+            }}
             onClick={() => {
               const next = !value[key]
               onChange({ ...value, [key]: next })
