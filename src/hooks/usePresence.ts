@@ -90,6 +90,8 @@ export function usePresence(
             setParticipants(mine)
           } else if (msg.type === 'theme') {
             window.dispatchEvent(new Event('mew:theme-changed'))
+          } else if (msg.type === 'projects-deleted') {
+            window.dispatchEvent(new Event('mew:projects-deleted'))
           } else if (msg.type === 'editor-tabs' || msg.type === 'agent-tabs') {
             if (typeof msg.workspacePath === 'string') window.dispatchEvent(new CustomEvent(`mew:${msg.type}-changed`, { detail: { workspacePath: msg.workspacePath } }))
           } else if (msg.type === 'permissions') {

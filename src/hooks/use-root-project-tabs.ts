@@ -11,13 +11,21 @@ export function useRootProjectTabs(enabled: boolean, trackRefresh: <T>(request: 
   useEffect(() => {
     if (!enabled) return
     let alive = true
-    void trackRefresh(fetchRootProjectTabs()).then(({ state }) => {
-      if (!alive) return
+    let sequence = 0
+    async function load(afterDeletion = false) {
+      const request = ++sequence
+      if (afterDeletion) await saveQueue.current
+      if (!alive || request !== sequence) return
+      const { state } = await trackRefresh(fetchRootProjectTabs())
+      if (!alive || request !== sequence) return
       setPaths(state?.paths ?? [])
       setIcons(state?.icons ?? {})
       setSynced(true)
-    }).catch(console.error)
-    return () => { alive = false }
+    }
+    const deleted = () => { void load(true).catch(console.error) }
+    void load().catch(console.error)
+    window.addEventListener('mew:projects-deleted', deleted)
+    return () => { alive = false; window.removeEventListener('mew:projects-deleted', deleted) }
   }, [enabled, trackRefresh])
 
   useEffect(() => {

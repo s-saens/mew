@@ -9,6 +9,8 @@ import { CommandButtonMenu } from './CommandButtonMenu'
 import { PanelCloseButton } from './panel-close-button'
 import { ProjectCatalogPanel } from './project-catalog-panel'
 import { projectPanelCopy } from './project-panel-copy'
+import { projectDeleteCopy } from './project-delete-copy'
+import { ProjectDeleteDialog } from './project-delete-dialog'
 import { ScopeToggle } from './scope-toggle'
 import { WORKSPACE_PROJECT } from '../utils/active-project'
 import { projectHierarchy, type ProjectHierarchyRow } from '../utils/project-hierarchy'
@@ -20,7 +22,7 @@ function labelOf(projectPath: string): string {
   return parts.at(-1) || projectPath
 }
 
-export function ProjectSwitcher({ paths, activePath, pendingPath, fallbackLabel, canOpen, canChangeIcon, icons, onActivate, onIconChange, onOpen, onPreview, onRemove, onReorder,
+export function ProjectSwitcher({ paths, activePath, pendingPath, fallbackLabel, canOpen, canChangeIcon, canDelete = false, icons, onActivate, onIconChange, onOpen, onPreview, onRemove, onDelete, onReorder,
   sidebarHost, sidebarEnabled = false, sidebarOpen = false, onSidebarOpenChange, sidebarWidth = 240, onSidebarResize, onSidebarWidthChange, canUseCommands = false, activeWorkingPath, projectAdd, openRequested = false, onOpenCatalogProject, beforeProjectMutation }: {
   paths: string[]
   activePath: string | null
@@ -28,12 +30,14 @@ export function ProjectSwitcher({ paths, activePath, pendingPath, fallbackLabel,
   fallbackLabel: string
   canOpen: boolean
   canChangeIcon: boolean
+  canDelete?: boolean
   icons: Record<string, string>
   onActivate: (path: string) => void
   onIconChange: (path: string, icon: string) => void
   onOpen: () => void
   onPreview?: (path: string) => void
   onRemove?: (path: string) => void
+  onDelete?: (path: string) => Promise<void>
   onReorder?: (paths: string[]) => void
   sidebarHost?: HTMLElement | null
   sidebarEnabled?: boolean
@@ -51,6 +55,7 @@ export function ProjectSwitcher({ paths, activePath, pendingPath, fallbackLabel,
 }) {
   const { t, locale } = useI18n()
   const copy = projectPanelCopy(locale)
+  const deleteCopy = projectDeleteCopy(locale)
   const [scope, setScope] = useState<'my' | 'all'>('my')
   const [catalogBusy, setCatalogBusy] = useState(false)
   const trigger = useRef<HTMLButtonElement>(null)
@@ -61,6 +66,8 @@ export function ProjectSwitcher({ paths, activePath, pendingPath, fallbackLabel,
   const [mobile, setMobile] = useState(() => window.matchMedia('(width < 768px)').matches)
   const [contextMenu, setContextMenu] = useState<{ path: string; x: number; y: number; trigger: HTMLElement | null; container: HTMLElement | null } | null>(null)
   const [editingPath, setEditingPath] = useState<string | null>(null)
+  const [deleteChoices, setDeleteChoices] = useState(false)
+  const [deletingPath, setDeletingPath] = useState<string | null>(null)
   const iconTitleId = useId()
   const hold = useRef<{ timer: ReturnType<typeof setTimeout>; x: number; y: number } | null>(null)
   const suppressClickUntil = useRef(0)
@@ -102,6 +109,7 @@ export function ProjectSwitcher({ paths, activePath, pendingPath, fallbackLabel,
   }
   function openContextMenu(path: string, x: number, y: number, origin: HTMLElement | null = trigger.current) {
     cancelHold()
+    setDeleteChoices(false)
     setContextMenu({ path, x, y, trigger: origin, container: origin?.closest<HTMLElement>('[role="dialog"]') ?? null })
   }
   function focusList(list: HTMLElement | null) {
@@ -341,7 +349,7 @@ export function ProjectSwitcher({ paths, activePath, pendingPath, fallbackLabel,
         </div>
       </div>
     </DialogFrame> : <ActionMenu ref={menuElement} variant="header" x={menu.x} y={menu.y} label={t('project.choose')} trigger={trigger.current}
-      outsideIgnore={() => contextMenuElement.current ?? (menuElement.current?.querySelector('[data-project-add-inline] [aria-expanded="true"]') ? document.body : null)}
+      outsideIgnore={() => deletingPath ? document.body : contextMenuElement.current ?? (menuElement.current?.querySelector('[data-project-add-inline] [aria-expanded="true"]') ? document.body : null)}
       onClose={() => { setContextMenu(null); setMenu(null) }}>
       {projectItems(false)}
       {paths.length > 0 && <ActionMenuSeparator />}
@@ -349,9 +357,18 @@ export function ProjectSwitcher({ paths, activePath, pendingPath, fallbackLabel,
     </ActionMenu>)}
     {contextMenu && canChangeIcon && <ActionMenu key="project-actions" x={contextMenu.x} y={contextMenu.y} label={labelOf(contextMenu.path)} ref={contextMenuElement} trigger={contextMenu.trigger}
       portalContainer={contextMenu.container} onClose={() => setContextMenu(null)}>
-      <ActionMenuItem icon={<EditPencil />} onClick={() => editIcon(contextMenu.path)}>{t('project.edit')}</ActionMenuItem>
-      {canOpen && onRemove && <ActionMenuItem icon={<Trash />} danger onClick={() => onRemove(contextMenu.path)}>{t('project.removeFromMine')}</ActionMenuItem>}
+      {deleteChoices ? <>
+        {canOpen && onRemove && <ActionMenuItem icon={<Xmark />} onClick={() => onRemove(contextMenu.path)}>{deleteCopy.removeFromMine}</ActionMenuItem>}
+        {canDelete && onDelete && <ActionMenuItem icon={<Trash />} danger onClick={() => setDeletingPath(contextMenu.path)}>{deleteCopy.permanently}</ActionMenuItem>}
+      </> : <>
+        <ActionMenuItem icon={<EditPencil />} onClick={() => editIcon(contextMenu.path)}>{t('project.edit')}</ActionMenuItem>
+        {canOpen && (onRemove || canDelete && onDelete) && <ActionMenuItem icon={<Trash />} closeOnSelect={false} onClick={() => {
+          setDeleteChoices(true)
+          requestAnimationFrame(() => contextMenuElement.current?.querySelector<HTMLButtonElement>('[data-action-menu-item]')?.focus({ preventScroll: true }))
+        }}>{deleteCopy.remove}</ActionMenuItem>}
+      </>}
     </ActionMenu>}
+    {deletingPath && canDelete && onDelete && <ProjectDeleteDialog path={deletingPath} onDelete={onDelete} onClose={() => setDeletingPath(null)} />}
     {editingPath && canChangeIcon && <DialogFrame labelledBy={iconTitleId} onClose={() => setEditingPath(null)}>
       <div className="p-3">
         <div className="mb-2 flex items-center justify-between gap-2"><h2 id={iconTitleId} className="text-sm font-semibold text-ink">{t('project.icon')}</h2>

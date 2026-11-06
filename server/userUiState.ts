@@ -1,5 +1,7 @@
 import { normalizeProjectTabLayout, type ProjectTabGroup } from '../shared/project-tab-groups.ts'
+import fs from 'node:fs'
 import path from 'node:path'
+import { withinPath } from './platform/common/paths.ts'
 import { projectRegistry } from './project-registry.ts'
 import { DATA_DIR, readJsonRecord, writeFileAtomic } from './dataDir.ts'
 import { normalizeEmail } from './auth.ts'
@@ -278,4 +280,26 @@ export function writeActiveWorkspace(email: string, root: string, projectPath = 
   const all = readAll(), key = normalizeEmail(email)
   all[key] = { ...userState(all, key), activeWorkspace: root, activeProjectPath: projectPath }
   writeAll(all)
+}
+
+/** Read and validate account state before deletion, then clear active roots only on success. */
+export function prepareDeletedProjectWorkspaces(directory: string): () => string[] {
+  const all = readAll(), affected: string[] = []
+  const canonical = (value: string) => {
+    try { return fs.realpathSync(value) } catch { return path.resolve(value) }
+  }
+  const root = canonical(directory)
+  const deleted = (value: string | undefined) => validPath(value) && withinPath(root, canonical(value))
+  for (const [account, saved] of Object.entries(all)) {
+    if (!deleted(saved.activeWorkspace) && !deleted(saved.activeProjectPath)) continue
+    const next = { ...saved }
+    delete next.activeWorkspace
+    delete next.activeProjectPath
+    all[account] = next
+    affected.push(account)
+  }
+  return () => {
+    if (affected.length) writeAll(all)
+    return affected
+  }
 }

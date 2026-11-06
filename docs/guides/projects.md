@@ -1,6 +1,6 @@
 ---
 title: "Projects and file navigation"
-description: "Explains the Projects panel with My personal shortcuts and All workspace projects, empty-list onboarding, and the plus popup for creation, Git cloning, and server-path import. Covers scope and popup navigation, personal project hierarchy, switching, file navigation, Git review, and task controls."
+description: "Explains Projects My/All scopes, the plus setup popup, and Delete choices for removing a personal shortcut or permanently deleting a project folder as owner. Covers confirmation, project hierarchy and switching, file navigation, Git review, and task controls."
 updated: "2026-11-06"
 상위파일:
   - "../../.mew/docs/MOC.md"
@@ -55,7 +55,7 @@ The header shows the current project's icon and name. Clicking it opens **Projec
 Use Left/Right on the scope buttons to switch and move focus, Home to select My, and End to select All. All loads its searchable catalog when selected. Choosing a catalog project adds it to My projects before opening it. Scope switching is disabled while that operation runs.
 
 - Select a row to switch projects without refreshing. Document tabs, layout, and scroll positions are restored per project. Your other connected screens follow the switch; other users' active projects stay as they are. Running agents keep their original working directories.
-- Use **+** below either list to open the project setup popup. The workspace catalog is available in **All** and under **Import project → From this workspace** in the popup. **Remove from My projects** removes only your shortcut, preserving the project, other users' shortcuts, and all files. If other shortcuts remain, removing the current one first opens another project. Removing your last shortcut returns to the centered project panel. My projects only contains registered catalog entries.
+- Use **+** below either list to open the project setup popup. The workspace catalog is available in **All** and under **Import project → From this workspace** in the popup. In a project's context menu, choose **Delete → Remove from My Projects** to remove only your shortcut, preserving the project, other users' shortcuts, and all files. If other shortcuts remain, removing the current one first opens another project. Removing your last shortcut returns to the centered project panel. My projects only contains registered catalog entries.
 - Nested Git/Mew projects are discovered in the shared catalog. Pinned descendants appear beneath their nearest pinned parent in My projects. Select a project when you want to change the active root.
 - In My, drag the left handle to reorder shortcuts. **↑/↓** on the handle or **Shift+↑/↓** on the row also reorders them. The **Alt+1…9** numbers on the right follow your order.
 - `Alt+P` opens Projects and focuses its first available item; `Alt+1…9` switches in personal list order. Within My, Up/Down and Home/End navigate, and Enter/Space selects. Existing modal, IME, repeated-key, and remote-screen input boundaries apply. `Ctrl/Cmd+number` selects tabs in the current panel.
@@ -75,6 +75,12 @@ Clicking a file tab once in the editor updates that file's location in the file 
 Expanding a folder or parent document in the file explorer extends a vertical line along the left side of its child list. One line appears for each expanded ancestor, so a file three levels deep shows three lines. Collapsing a folder or document also removes its line.
 
 As you scroll the list, expanded folders and parent documents stack at the top by level to show the current location. Each item is pushed out after the end of its child list passes. Pinned rows have no gaps between them, and the hierarchy lines on the left remain continuous. Existing open and collapse actions also work on pinned items.
+
+### Permanently delete a project
+
+Right-click a My project or the current project button, or use its keyboard context menu. Choose **Delete** to see the two deletion choices in the same menu. **Remove from My Projects** removes only your shortcut. Owners also see **Delete permanently**, which deletes the actual folder and all its contents and removes the project and nested projects from the workspace catalog and everyone's shortcuts. This applies to linked folders as well as managed projects.
+
+Choose **Delete permanently** and review the project and folder shown in the confirmation. Cancel is selected initially. Confirm only when you intend to delete those files, including any uncommitted work; Mew cannot undo this operation. Mew protects the filesystem root, the server user's home, instance-data and registry folders, Mew's source root, and parent folders containing them. While deletion runs, the confirmation stays open and cannot be submitted again. If it fails, the error and target remain available for retry. Cancel before submitting deletion to close the confirmation without deleting the folder.
 
 ### Create a missing project path
 

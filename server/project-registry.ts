@@ -4,7 +4,9 @@ import path from 'node:path'
 import { parse, stringify } from 'yaml'
 import { simpleGit } from 'simple-git'
 import { DATA_DIR, DataFileError, readJsonRecord, writeFileAtomic } from './dataDir.ts'
-import { assertNotServerDataPath } from './paths.ts'
+import { assertNotServerDataPath, containsServerDataPath } from './paths.ts'
+import { withinPath } from './platform/common/paths.ts'
+import { normalizeProjectTabLayout } from '../shared/project-tab-groups.ts'
 import { readProjectIcon } from './projectIcons.ts'
 import type { StoredRootProjects } from './userUiState.ts'
 
@@ -14,7 +16,7 @@ export class ProjectRegistryError extends Error {
 }
 
 type RegisteredProject = { path: string; name: string; managed: boolean; discovered?: boolean }
-type Registry = { version: 1; projects: RegisteredProject[]; myProjects: Record<string, StoredRootProjects> }
+type Registry = { version: 1; projects: RegisteredProject[]; myProjects: Record<string, StoredRootProjects>; deletedPaths?: string[] }
 export type RegistryProject = RegisteredProject & { mine: boolean; icon: string | null; parentPath?: string }
 const accountKey = (account: string) => account.trim().toLowerCase()
 const validPath = (value: unknown): value is string => typeof value === 'string' && value.length > 0 && value.length <= 4096 && !value.includes('\0') && path.isAbsolute(value)
@@ -56,6 +58,7 @@ export class ProjectRegistry {
     try {
       const state = parse(raw) as Registry
       if (!state || state.version !== 1 || !Array.isArray(state.projects) || !state.myProjects || typeof state.myProjects !== 'object' || Array.isArray(state.myProjects)) throw new Error('Invalid registry')
+      if (state.deletedPaths !== undefined && (!Array.isArray(state.deletedPaths) || !state.deletedPaths.every(validPath))) throw new Error('Invalid deleted paths')
       for (const project of state.projects) {
         if (!project || !validPath(project.path) || typeof project.name !== 'string' || typeof project.managed !== 'boolean' || (project.discovered !== undefined && typeof project.discovered !== 'boolean')) throw new Error('Invalid project')
       }
@@ -72,6 +75,7 @@ export class ProjectRegistry {
 
   private include(state: Registry, directory: string, managed = false): RegisteredProject {
     const normalized = path.resolve(directory)
+    if (state.deletedPaths?.includes(normalized)) state.deletedPaths = state.deletedPaths.filter(directory => directory !== normalized)
     const existing = state.projects.find(project => project.path === normalized)
     if (existing) return existing
     const project = { path: normalized, name: path.basename(normalized) || normalized, managed }
@@ -90,10 +94,13 @@ export class ProjectRegistry {
   /** Existing browser migrations may contain unavailable paths; preserve those shortcuts. */
   writeMine(account: string, value: StoredRootProjects): StoredRootProjects {
     const state = this.read()
-    for (const directory of value.paths) { assertNotServerDataPath(directory); this.include(state, directory) }
-    state.myProjects[accountKey(account)] = value
+    const deleted = new Set(state.deletedPaths ?? [])
+    const paths = value.paths.filter(directory => !deleted.has(path.resolve(directory)))
+    for (const directory of paths) { assertNotServerDataPath(directory); this.include(state, directory) }
+    const saved = { ...value, paths, icons: Object.fromEntries(Object.entries(value.icons).filter(([directory]) => !deleted.has(path.resolve(directory)))), ...(value.groups ? { groups: normalizeProjectTabLayout(paths, value.groups).groups } : {}) }
+    state.myProjects[accountKey(account)] = saved
     this.write(state)
-    return value
+    return saved
   }
 
   list(account: string): RegistryProject[] {
@@ -158,6 +165,43 @@ export class ProjectRegistry {
     state.myProjects[key] = { ...mine, paths }
     this.write(state)
     return state.myProjects[key]
+  }
+
+  /** Permanently remove one registered directory and every shortcut into its tree. */
+  delete(directory: unknown): { removedPaths: string[]; affectedAccounts: string[] } {
+    if (!validPath(directory)) throw new ProjectRegistryError('프로젝트 경로가 올바르지 않습니다')
+    const state = this.read(), normalized = path.resolve(directory)
+    if (!state.projects.some(project => project.path === normalized)) throw new ProjectRegistryError('등록되지 않은 프로젝트입니다', 404)
+    let canonical: string
+    try {
+      canonical = fs.realpathSync(normalized)
+      if (!fs.statSync(canonical).isDirectory()) throw new Error('Not a directory')
+    } catch { throw new ProjectRegistryError('프로젝트 폴더를 찾을 수 없습니다', 404) }
+    if (canonical !== normalized) throw new ProjectRegistryError('프로젝트 경로가 변경되었습니다. 다시 연결한 후 삭제하세요.', 409)
+    const home = fs.realpathSync(os.homedir()), source = fs.realpathSync(path.resolve(import.meta.dirname, '..'))
+    const metadata = fs.realpathSync(path.dirname(this.file))
+    const managed = path.resolve(this.managedRoot)
+    const managedContent = withinPath(metadata, managed) && metadata !== managed && withinPath(managed, canonical)
+    if (canonical === path.parse(canonical).root || withinPath(canonical, home) || withinPath(canonical, source)
+      || containsServerDataPath(canonical) || withinPath(canonical, metadata) || withinPath(metadata, canonical) && !managedContent) {
+      throw new ProjectRegistryError('보호된 폴더는 프로젝트에서 삭제할 수 없습니다.', 403)
+    }
+    assertNotServerDataPath(canonical)
+    if ([...this.pendingDirectories].some(pending => withinPath(canonical, pending))) throw new ProjectRegistryError('프로젝트 작업이 진행 중입니다. 완료 후 다시 시도하세요.', 409)
+    const affected = (candidate: string) => withinPath(canonical, path.resolve(candidate))
+    const removedPaths = state.projects.filter(project => affected(project.path)).map(project => project.path)
+    const affectedAccounts: string[] = []
+    state.projects = state.projects.filter(project => !affected(project.path))
+    state.deletedPaths = [...new Set([...(state.deletedPaths ?? []), ...removedPaths])]
+    for (const [account, mine] of Object.entries(state.myProjects)) {
+      if (mine.paths.some(affected)) affectedAccounts.push(account)
+      const paths = mine.paths.filter(directory => !affected(directory))
+      const icons = Object.fromEntries(Object.entries(mine.icons).filter(([directory]) => !affected(directory)))
+      state.myProjects[account] = { ...mine, paths, icons, ...(mine.groups ? { groups: normalizeProjectTabLayout(paths, mine.groups).groups } : {}) }
+    }
+    fs.rmSync(canonical, { recursive: true })
+    this.write(state)
+    return { removedPaths, affectedAccounts }
   }
 
   async create(account: string, name: unknown, git: unknown = true): Promise<RegistryProject> {

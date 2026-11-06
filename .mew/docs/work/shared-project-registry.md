@@ -1,6 +1,6 @@
 ---
 title: "Shared projects and project setup"
-description: "Records shared project registry creation, cloning, discovery, and personal project corrections. Includes the November 6 project-add popup, centered plus correction, agent-dialog loading recovery, and Projects My/All scope selector with browser and App verification alongside earlier inline setup history."
+description: "Records shared project registry creation, cloning, discovery, and personal project corrections. Includes the November 6 setup popup, My/All scope selector, and separate shortcut-removal/permanent-deletion work with local verification and runtime-application boundaries alongside earlier inline setup history."
 created: "2026-11-02"
 updated: "2026-11-06"
 ---
@@ -194,3 +194,26 @@ Local verification passed 26 focused tests:
 - `npm run build` passed, including TypeScript, with the existing large-chunk warning. `npm run lint` and `git diff --check` passed. `npm run check:docs` validated 742 descriptions and retained the same 39 existing missing-target links.
 
 Screenshots of desktop and mobile All were inspected. Browser APIs used isolated fixtures; physical devices and live account persistence were not exercised. The build updated local `dist/` assets without deployment or application server lifecycle operations.
+
+### Project deletion choices — November 6, 2026
+
+#### Purpose and resulting behavior
+
+Separate removing a personal shortcut from deleting the actual shared project. The current project button and My row context menus first show Edit and Delete. Delete reveals Remove from My Projects and the owner-only Delete permanently choice in the same popup. Shortcut removal preserves project files and other accounts' shortcuts. Permanent deletion uses a dedicated `DialogFrame` confirmation with Cancel initially focused, busy dismissal guards, explicit errors, and retry.
+
+The owner-only registry DELETE API deletes a registered real directory, removes its registered descendants and every account's matching shortcut/icon/group references, clears affected active roots, and publishes account-scoped deletion and workspace signals. Version-1 `deletedPaths` tombstones filter exact deleted registrations out of late shortcut saves while preserving unavailable-path recovery and allowing real folders to be registered again. It protects filesystem root, home, instance data/registry storage, the Mew source root, and protected ancestors. App waits for pending shortcut saves, applies the returned personal list, clears tree/icon caches, and restores another existing project or onboarding through the normal workspace flow. Other affected clients wait for their own save queue and reload authoritative personal paths/icons after the deletion signal.
+
+The [feature contract](../features/projects-files-search/opening-projects-tabs-and-groups.md#select-and-organize-projects), [UI navigation contract](../development/ui-project-navigation.md#header-project-switcher), and [registry contract](../development/architecture.md#permanent-project-deletion) own current behavior. [ADR 0151](../decisions/0151-permanent-project-deletion.md) extends the shared-registry decision with the separate destructive operation; earlier removal checks above remain evidence of shortcut-only behavior.
+
+#### Verification and application
+
+The affected checks passed 41 tests: 31 backend, 5 personal-list hook, and 5 isolated browser tests.
+
+- `node --test server/project-registry.test.ts server/project-registry-delete-api.test.ts server/userUiState.test.ts server/account-workspace.test.ts server/project-access-api.test.ts` passed all 31 tests. Coverage includes owner checks, protected roots and symlink changes, recursive folder and shared-ledger cleanup, exact-path tombstones, account-scoped WebSocket signals, corrupt-account-ledger preflight, filesystem failure preservation, and coexistence of managed projects with protected data under `.mew`. Backend scoped lint and diff checks also passed.
+- `node --test src/hooks/use-root-project-tabs.test.ts` passed all 5 tests, including deletion-signal reconciliation of paths and icons.
+- `server/project-delete-dialog-ui.test.ts` passed its isolated Chromium check at 1100/390/320px in dark and light themes. It covers the inline Delete choices, owner-only permanent action, Cancel focus, cancellation, busy dismissal, and failure/retry.
+- A serial browser run passed 4 tests across project switcher, project sidebar, and actual App cases for removing the last shortcut and permanently deleting a project. Screenshots were inspected at 390px dark and 1100px light.
+- `npm run build` passed TypeScript and Vite, retaining the existing large-chunk warning. `npm run lint` passed with existing warnings. Scoped `git diff --check` passed, and the changed descriptions were inspected through the repository's description catalog.
+- `npm run check:docs` validated 743 descriptions with no metadata errors and reported the same 39 existing missing-target links. This change adds no missing target.
+
+Backend filesystem checks use temporary projects, and browser APIs use isolated fixtures. These checks do not establish physical-device behavior or production application. The build updates local `dist/` assets; no deployment, launcher invocation, or application server lifecycle operation was performed.

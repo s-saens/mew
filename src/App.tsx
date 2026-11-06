@@ -33,6 +33,7 @@ import {
   fetchAgentTabs,
   fetchMewUpdateStatus,
   fetchRootProjectTabs,
+  deleteRegisteredProject,
   fetchWorkspaceUi,
   fetchRootProjectIcons,
   saveRootProjectIcon,
@@ -54,6 +55,7 @@ import {
 } from './api/client'
 import { ProjectSwitcher } from './components/ProjectSwitcher'
 import { ProjectLoadingOverlay } from './components/project-loading-overlay'
+import { projectDeleteCopy } from './components/project-delete-copy'
 import { useTaskList } from './hooks/use-task-list'
 import { useSharedMemo } from './hooks/use-shared-memo'
 import { HeaderMenu, type HeaderMenuItem } from './components/HeaderMenu'
@@ -244,7 +246,7 @@ export interface EditorAppProps {
 function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileChanged }: EditorAppProps) {
   useUiLocale()
   const { pending: refreshingWorkspace, track: trackRefresh } = useRefreshTasks()
-  const { t } = useI18n()
+  const { t, locale } = useI18n()
   const { role, email: authEmail } = auth
   const isGuest = role === 'guest'
   const isOwner = role === 'owner'
@@ -2063,6 +2065,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
             fallbackLabel={hasProject === false ? t('project.noActive') : projectLabel(projectUiPath)}
             canOpen={canOpenProjects}
             canChangeIcon={canOpenProjects}
+            canDelete={isOwner}
             icons={rootProjectIcons}
             onActivate={(projectPath) => void openRootProject(projectPath)}
             onOpenCatalogProject={openAddedProject}
@@ -2077,6 +2080,16 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
                 if (next && !(await openRootProject(next))) return
               }
               setOpenProjectPaths(previous => previous.filter(candidate => candidate !== path))
+            }}
+            onDelete={async path => {
+              if (!isOwner || projectOpeningRef.current) throw new Error(projectDeleteCopy(locale).unavailable)
+              await rootProjectSaveQueue.current
+              const result = await deleteRegisteredProject(path)
+              rootTreeCache.current.clear()
+              rootProjectIconsCache.current.clear()
+              setOpenProjectPaths(result.state?.paths ?? [])
+              try { applyWorkspace(await fetchWorkspace()) }
+              catch (err) { showToast(err instanceof Error ? err.message : String(err)) }
             }}
             onOpen={() => setOpenProjectDialog(true)}
           />}

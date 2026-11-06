@@ -35,6 +35,7 @@ const chunk = bundle.output.find(item => item.type === 'chunk')!
 type State = { paths: string[]; icons: Record<string, string> }
 interface Fixture {
   paths: string[]; icons: Record<string, string>; synced: boolean
+  read: Promise<{ state: State | null }>
   reads: number; writes: State[]; setPaths: (paths: string[]) => void
   flush: (callback: () => void) => void; close: () => void
 }
@@ -107,5 +108,20 @@ test('accounts without project access do not read or save personal shortcuts', a
     assert.equal(view.fixture.reads, 0)
     assert.deepEqual(view.paths(), [])
     assert.deepEqual(view.writes(), [])
+  } finally { await view.close() }
+})
+
+test('a deletion notification reconciles shortcuts and icons from the server', async () => {
+  const view = mount()
+  try {
+    view.resolve({ state: { paths: ['/deleted', '/kept'], icons: { '/deleted': '🌱' } } })
+    await view.waitFor(() => view.fixture.synced && view.fixture.writes.length > 0)
+    view.fixture.read = Promise.resolve({ state: { paths: ['/kept'], icons: {} } })
+    view.win.dispatchEvent(new view.win.Event('mew:projects-deleted'))
+    await view.waitFor(() => view.fixture.reads === 2 && view.fixture.paths.length === 1)
+    assert.deepEqual(view.paths(), ['/kept'])
+    assert.equal(view.fixture.icons['/deleted'], undefined)
+    await view.waitFor(() => view.fixture.writes.length === 2)
+    assert.deepEqual(view.writes().at(-1), ['/kept'])
   } finally { await view.close() }
 })

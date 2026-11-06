@@ -40,6 +40,7 @@ import path from 'node:path'
 import { assertNotServerDataPath, DEFAULT_PROJECT, isDeniedSegment, isProtectedProject, listProjects, pathsForWorkspace, projectRoot, resolveProjectPath, UnknownProjectError, UnsafePathError, WORKSPACE_PROJECT, workspacePaths, workspaceContext } from './paths.ts'
 import { createProject, deleteProject, ProjectNameError, renameProject } from './projects.ts'
 import { projectRegistry, ProjectRegistryError } from './project-registry.ts'
+import { prepareDeletedProjectWorkspaces } from './userUiState.ts'
 import { projectGit } from './project-git.ts'
 import { buildTree, buildTreeAsync, isPathVisible } from './tree.ts'
 import { flattenTextFiles, replaceInFile, searchInProject, searchInProjectProgressively } from './search.ts'
@@ -535,6 +536,20 @@ export function createApiApp() {
       const state = projectRegistry.setMine(email, req.body?.path, req.body?.added)
       broadcastAccount(email, { type: 'projects' })
       res.json({ ok: true, state })
+    } catch (err) { handleError(res, err) }
+  })
+
+  app.delete('/project-registry', requireRole('owner'), (req, res) => {
+    try {
+      const directory = req.body?.path
+      if (typeof directory !== 'string' || !path.isAbsolute(directory)) throw new ProjectRegistryError('프로젝트 경로가 올바르지 않습니다')
+      const clearWorkspaces = prepareDeletedProjectWorkspaces(directory)
+      const { removedPaths, affectedAccounts } = projectRegistry.delete(directory)
+      const activeAccounts = clearWorkspaces()
+      for (const account of activeAccounts) broadcastAccount(account, { type: 'workspace' })
+      for (const account of new Set([...affectedAccounts, ...activeAccounts])) broadcastAccount(account, { type: 'projects-deleted' })
+      broadcast({ type: 'projects' })
+      res.json({ ok: true, removedPaths, state: projectRegistry.readMine(authOf(req).email!) })
     } catch (err) { handleError(res, err) }
   })
 

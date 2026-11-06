@@ -126,6 +126,9 @@ test('managed content remains accessible when server metadata uses ~/.mew, while
       assert.equal(resolve('README.md'), path.join(project.path, 'README.md'));
       assert.throws(() => resolve('escape.json'));
     });
+    projectRegistry.delete(project.path);
+    assert.equal(fs.existsSync(project.path), false);
+    assert.equal(fs.readFileSync(secret, 'utf8'), '{}');
   `
   execFileSync(process.execPath, ['--input-type=module', '--eval', script], { env: { ...process.env, HOME: home, MEW_DATA_DIR: serverData }, encoding: 'utf8' })
 })
@@ -201,4 +204,97 @@ test('concurrent catalog listing never registers an unfinished or failing manage
   failClone!()
   await assert.rejects(clone, /fixture clone failure/)
   assert.deepEqual(store.list('b@example.test'), [])
+})
+
+test('permanent deletion removes managed descendants and every account shortcut while preserving siblings', async () => {
+  const store = fixture(), owner = 'delete-owner@example.test', other = 'delete-other@example.test'
+  const project = await store.create(owner, 'delete-tree', false), keep = await store.create(owner, 'keep-tree', false)
+  const child = path.join(project.path, 'apps', 'child')
+  fs.mkdirSync(path.join(child, '.mew'), { recursive: true })
+  fs.writeFileSync(path.join(child, 'draft.md'), 'Delete this project tree')
+  store.list(owner)
+  store.writeMine(other, { paths: [project.path, child, keep.path], icons: { [project.path]: '🌱', [child]: '🌿', [keep.path]: '📚' }, groups: [{ id: 'projects', paths: [project.path, child, keep.path], collapsed: true }] })
+  const deleted = store.delete(project.path)
+  assert.deepEqual(deleted.removedPaths, [project.path, child])
+  assert.deepEqual(deleted.affectedAccounts, [owner, other])
+  assert.equal(fs.existsSync(project.path), false)
+  assert.equal(fs.existsSync(keep.path), true)
+  assert.deepEqual(store.list(owner).map(project => project.path), [keep.path])
+  assert.deepEqual(store.readMine(owner)?.paths, [keep.path])
+  assert.deepEqual(store.readMine(other), { paths: [keep.path], icons: { [keep.path]: '📚' }, groups: [] })
+})
+
+test('permanent deletion removes a linked folder without following its directory links or similarly named siblings', () => {
+  const store = fixture(), parent = path.join(temporary, `linked-delete-${sequence}`)
+  const target = path.join(parent, 'project'), sibling = path.join(parent, 'project-keep'), outside = path.join(parent, 'outside')
+  for (const directory of [target, sibling, outside]) {
+    fs.mkdirSync(directory, { recursive: true })
+    fs.writeFileSync(path.join(directory, 'keep.md'), directory)
+  }
+  fs.symlinkSync(outside, path.join(target, 'linked-outside'), 'dir')
+  store.link('a@example.test', target)
+  store.link('a@example.test', sibling)
+  store.link('b@example.test', outside)
+  store.delete(target)
+  assert.equal(fs.existsSync(target), false)
+  assert.equal(fs.readFileSync(path.join(sibling, 'keep.md'), 'utf8'), sibling)
+  assert.equal(fs.readFileSync(path.join(outside, 'keep.md'), 'utf8'), outside)
+  assert.deepEqual(store.list('a@example.test').map(project => project.path), [sibling, outside])
+})
+
+test('deleted paths reject stale shortcut saves but allow explicit recreation and keep unavailable migrations', async () => {
+  const store = fixture(), account = 'stale-delete@example.test'
+  const first = await store.create(account, 'deleted', false), keep = await store.create(account, 'retained', false)
+  const stale = { paths: [first.path, keep.path], icons: { [first.path]: '🌱' }, groups: [{ id: 'stale', paths: [first.path, keep.path], collapsed: false }] }
+  store.delete(first.path)
+  assert.deepEqual(store.writeMine(account, stale), { paths: [keep.path], icons: {}, groups: [] })
+  assert.equal(store.has(first.path), false, 'a delayed save cannot restore the deleted catalog entry')
+  const unavailable = path.join(temporary, `unavailable-migration-${sequence}`)
+  assert.deepEqual(store.writeMine(account, { paths: [unavailable, first.path], icons: {} }).paths, [unavailable], 'unrelated legacy unavailable paths remain supported')
+  const recreated = await store.create(account, 'deleted', false)
+  assert.equal(recreated.path, first.path)
+  assert.deepEqual(store.writeMine(account, stale).paths, stale.paths, 'explicit project recreation clears its deletion marker')
+})
+
+test('permanent deletion rejects invalid, unregistered, missing and replaced roots without changing the registry', () => {
+  const store = fixture(), base = path.join(temporary, `delete-errors-${sequence}`), target = path.join(base, 'registered'), outside = path.join(base, 'outside')
+  fs.mkdirSync(target, { recursive: true })
+  fs.mkdirSync(outside)
+  fs.writeFileSync(path.join(outside, 'keep.md'), 'Untouched')
+  store.link('a@example.test', target)
+  const snapshot = fs.readFileSync(store.file, 'utf8')
+  for (const value of [undefined, null, '', 'relative/path', target + '\0']) assert.throws(() => store.delete(value), error => error instanceof ProjectRegistryError && error.status === 400)
+  assert.throws(() => store.delete(outside), error => error instanceof ProjectRegistryError && error.status === 404)
+  fs.rmSync(target, { recursive: true })
+  assert.throws(() => store.delete(target), error => error instanceof ProjectRegistryError && error.status === 404)
+  fs.writeFileSync(target, 'Replacement file')
+  assert.throws(() => store.delete(target), error => error instanceof ProjectRegistryError && error.status === 404)
+  fs.rmSync(target)
+  fs.symlinkSync(outside, target, 'dir')
+  assert.throws(() => store.delete(target), error => error instanceof ProjectRegistryError && error.status === 409)
+  assert.equal(fs.readFileSync(store.file, 'utf8'), snapshot)
+  assert.equal(fs.readFileSync(path.join(outside, 'keep.md'), 'utf8'), 'Untouched')
+})
+
+test('permanent deletion protects filesystem, home, metadata and installation roots and their ancestors', t => {
+  const store = fixture(), metadata = path.dirname(store.file), secret = path.join(metadata, 'secret')
+  fs.mkdirSync(secret)
+  fs.mkdirSync(process.env.MEW_DATA_DIR!, { recursive: true })
+  const source = fs.realpathSync(path.resolve(import.meta.dirname, '..'))
+  const protectedPaths = [...new Set([path.parse(source).root, os.homedir(), path.dirname(os.homedir()), source, path.dirname(source), metadata, path.dirname(metadata), secret, process.env.MEW_DATA_DIR!])]
+  fs.writeFileSync(store.file, JSON.stringify({ version: 1, projects: protectedPaths.map(directory => ({ path: directory, name: path.basename(directory), managed: false })), myProjects: {} }))
+  const snapshot = fs.readFileSync(store.file, 'utf8')
+  const removal = t.mock.method(fs, 'rmSync', () => { throw new Error('Protected deletion reached the filesystem') })
+  for (const directory of protectedPaths) assert.throws(() => store.delete(directory), error => error instanceof ProjectRegistryError && error.status === 403, directory)
+  assert.equal(removal.mock.callCount(), 0)
+  assert.equal(fs.readFileSync(store.file, 'utf8'), snapshot)
+})
+
+test('filesystem deletion failure preserves catalog and shortcuts for recovery', async t => {
+  const store = fixture(), created = await store.create('delete-failure@example.test', 'retained-on-error', false)
+  const snapshot = fs.readFileSync(store.file, 'utf8')
+  t.mock.method(fs, 'rmSync', () => { throw Object.assign(new Error('Fixture permission denied'), { code: 'EACCES' }) })
+  assert.throws(() => store.delete(created.path), /Fixture permission denied/)
+  assert.equal(fs.readFileSync(store.file, 'utf8'), snapshot)
+  assert.equal(fs.existsSync(created.path), true)
 })

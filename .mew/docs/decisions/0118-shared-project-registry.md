@@ -1,13 +1,13 @@
 ---
 title: "Shared project registry and personal project shortcuts"
-description: "Accepts a shared projects.yaml catalog with per-account My Projects, name-only managed creation in ~/.mew/projects, explicit existing-folder linking, and agent-assisted discovery using the existing conversation panel. Supersedes the account-isolated catalog and member restriction in ADR 0070 while retaining file, feature, server-operation, and account-root boundaries. ADR 0124 extends managed cloning and nested discovery."
+description: "Accepts a shared projects.yaml catalog with per-account My Projects, name-only managed creation in ~/.mew/projects, explicit existing-folder linking, and agent-assisted discovery using the existing conversation panel. Supersedes the account-isolated catalog and member restriction in ADR 0070 while retaining file, feature, server-operation, and account-root boundaries. ADR 0124 extends managed cloning and nested discovery; ADR 0151 adds a separate owner-only permanent deletion API."
 created: "2026-11-02"
-updated: "2026-11-03"
+updated: "2026-11-06"
 ---
 
 ## Status
 
-Accepted at the user's request. Extended by [ADR 0124](0124-managed-clone-and-project-discovery.md) for managed cloning and nested catalog discovery. Partially supersedes [ADR 0070](0070-manager-project-access.md): registered projects are shared across signed-in accounts, and members can discover, create, link, pin, and select them. Per-account active roots and workspace restoration remain. Existing arbitrary server folder/Git operations, subproject/worktree operations, and owner-only administration retain their previous boundaries. Shared icon APIs also allow members for registered roots.
+Accepted at the user's request. Extended by [ADR 0124](0124-managed-clone-and-project-discovery.md) for managed cloning and nested catalog discovery, and [ADR 0151](0151-permanent-project-deletion.md) for explicit owner-only permanent folder deletion. Shortcut removal retains its original preservation contract. Partially supersedes [ADR 0070](0070-manager-project-access.md): registered projects are shared across signed-in accounts, and members can discover, create, link, pin, and select them. Per-account active roots and workspace restoration remain. Existing arbitrary server folder/Git operations, subproject/worktree operations, and owner-only administration retain their previous boundaries. Shared icon APIs also allow members for registered roots.
 
 ## Context
 

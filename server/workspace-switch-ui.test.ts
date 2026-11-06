@@ -9,7 +9,7 @@ import { applyTaskChanges, type TaskItem } from '../shared/task-list.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 
-for (const mode of ['assisted', 'onboarding', 'empty-projects', 'missing-active', 'remove-last', 'keyboard', 'workspace', 'documents', 'permissions', 'panels', 'worktree', 'swipes', 'rapid', 'desktop-layout', 'latency'] as const) test(mode === 'assisted' ? 'App creates a project and opens its agent setup popup' : mode === 'latency' ? 'App prepares fresh editor tabs before handoff and restores warm roots without foreground loading' : mode === 'empty-projects' ? 'App hides project work surfaces for an empty personal list despite a saved active root' : mode === 'missing-active' ? 'App offers project recovery when shortcuts remain without an active root' : mode === 'remove-last' ? 'App returns to project setup after its last personal shortcut is removed' : mode === 'desktop-layout' ? 'App desktop account layout survives project switches with independent document contents' : mode === 'onboarding' ? 'App first-use onboarding creates a named project without exposing the startup workspace' : mode === 'rapid' ? 'App rapid project selections cancel superseded handoffs and restore the latest root' : mode === 'swipes' ? 'App mobile dock swipes select panels and explorer swipes preserve search mode' : mode === 'worktree' ? 'linked worktree swaps retain project layout and sessions and settle outgoing file saves' : mode === 'panels' ? 'App restores Tasks with Alt+T and task sessions survive close and reload' : mode === 'permissions' ? 'permission invalidation replaces pending workspace metadata and ignores the old response' : mode === 'documents' ? 'Files opens Documents as a filesystem folder with a separate navigation arrow' : mode === 'keyboard' ? 'App keyboard aliases open files and projects and create files and folders in the current explorer scope' : 'App overlaps workspace metadata, restores warm roots and ignores duplicate handoffs', { timeout: 60_000 }, async () => {
+for (const mode of ['assisted', 'onboarding', 'empty-projects', 'missing-active', 'remove-last', 'delete-project', 'keyboard', 'workspace', 'documents', 'permissions', 'panels', 'worktree', 'swipes', 'rapid', 'desktop-layout', 'latency'] as const) test(mode === 'assisted' ? 'App creates a project and opens its agent setup popup' : mode === 'latency' ? 'App prepares fresh editor tabs before handoff and restores warm roots without foreground loading' : mode === 'empty-projects' ? 'App hides project work surfaces for an empty personal list despite a saved active root' : mode === 'missing-active' ? 'App offers project recovery when shortcuts remain without an active root' : mode === 'delete-project' ? 'App permanently deletes a project only after confirmation and restores project setup' : mode === 'remove-last' ? 'App returns to project setup after its last personal shortcut is removed' : mode === 'desktop-layout' ? 'App desktop account layout survives project switches with independent document contents' : mode === 'onboarding' ? 'App first-use onboarding creates a named project without exposing the startup workspace' : mode === 'rapid' ? 'App rapid project selections cancel superseded handoffs and restore the latest root' : mode === 'swipes' ? 'App mobile dock swipes select panels and explorer swipes preserve search mode' : mode === 'worktree' ? 'linked worktree swaps retain project layout and sessions and settle outgoing file saves' : mode === 'panels' ? 'App restores Tasks with Alt+T and task sessions survive close and reload' : mode === 'permissions' ? 'permission invalidation replaces pending workspace metadata and ignores the old response' : mode === 'documents' ? 'Files opens Documents as a filesystem folder with a separate navigation arrow' : mode === 'keyboard' ? 'App keyboard aliases open files and projects and create files and folders in the current explorer scope' : 'App overlaps workspace metadata, restores warm roots and ignores duplicate handoffs', { timeout: 60_000 }, async () => {
   const keyboardOnly = mode === 'keyboard'
   const onboarding = mode === 'onboarding'
   const assisted = mode === 'assisted'
@@ -20,7 +20,7 @@ for (const mode of ['assisted', 'onboarding', 'empty-projects', 'missing-active'
   // Keep App, useTabs, FileTree, project switching and docking real. Unrelated panels and the
   // editor renderer are inert so this measures handoff work rather than editor startup.
   const keep = new Set(['deferredComponent', 'deferredDialog', 'ProjectSwitcher', 'ProjectLoadingOverlay', 'FileTree', 'SearchPanel', 'DockWorkspace', 'ProjectIcon', 'SubprojectLink', 'SidebarCreateButtons', 'ScopeToggle', 'MobileDock', 'HeaderMenu', 'TaskPanel', 'IconPackProvider'])
-  if (keyboardOnly || projectSetup || mode === 'remove-last') { keep.add('ProjectAddInline'); keep.add('ProjectCatalogPanel'); keep.add('ServerFileExplorer') }
+  if (keyboardOnly || projectSetup || mode === 'remove-last' || mode === 'delete-project') { keep.add('ProjectAddInline'); keep.add('ProjectCatalogPanel'); keep.add('ServerFileExplorer') }
   if (assisted) keep.add('ProjectCreationAgentDialog')
   const stubs = new Map<string, string>()
   const componentImports = appSource.replace(/const \w+ = deferredComponent\(async \(\) => \(\{ default: \(await import\('([^']+)'\)\)\.(\w+) \}\)(?:, null)?\)/g, (match, module, name) => assisted && name === 'ProjectCreationAgentDialog' ? match : `import { ${name} } from '${module}'`)
@@ -60,7 +60,7 @@ for (const mode of ['assisted', 'onboarding', 'empty-projects', 'missing-active'
     if (id.endsWith('?raw')) return 'export default ' + JSON.stringify(await fs.readFile(id.slice(0, -4), 'utf8'))
   } }] })
   const chunk = bundle.output.find(item => item.type === 'chunk')!
-  const content = (await Promise.all(['src/components/ProjectSwitcher.tsx', 'src/components/scope-toggle.tsx', 'src/components/project-loading-overlay.tsx', 'src/components/FileTree.tsx', 'src/components/SearchPanel.tsx', 'src/components/DockWorkspace.tsx', 'src/components/mobile-dock.tsx', 'src/components/HeaderMenu.tsx', 'src/components/project-add-inline.tsx', 'src/components/project-catalog-panel.tsx', 'src/components/LinkProjectDialog.tsx', 'src/components/ServerFileExplorer.tsx', 'src/components/file-browser.tsx', 'src/components/file-browser-favorites.tsx', 'packages/ui/src/HoverTipLayer.tsx', 'packages/ui/src/dialog-frame.tsx', 'packages/ui/src/ConfirmDialog.tsx', 'packages/ui/src/select-field.tsx'].map(file => fs.readFile(path.join(root, file), 'utf8')))).join('\n')
+  const content = (await Promise.all(['src/components/ProjectSwitcher.tsx', 'src/components/project-delete-dialog.tsx', 'src/components/scope-toggle.tsx', 'src/components/project-loading-overlay.tsx', 'src/components/FileTree.tsx', 'src/components/SearchPanel.tsx', 'src/components/DockWorkspace.tsx', 'src/components/mobile-dock.tsx', 'src/components/HeaderMenu.tsx', 'src/components/project-add-inline.tsx', 'src/components/project-catalog-panel.tsx', 'src/components/LinkProjectDialog.tsx', 'src/components/ServerFileExplorer.tsx', 'src/components/file-browser.tsx', 'src/components/file-browser-favorites.tsx', 'packages/ui/src/HoverTipLayer.tsx', 'packages/ui/src/dialog-frame.tsx', 'packages/ui/src/ConfirmDialog.tsx', 'packages/ui/src/select-field.tsx'].map(file => fs.readFile(path.join(root, file), 'utf8')))).join('\n')
   const compiler = await compile(await fs.readFile(`${root}/src/index.css`, 'utf8'), { base: `${root}/src`, onDependency() {} })
   const taskContent = await fs.readFile(`${root}/src/components/task-panel.tsx`, 'utf8')
   const dateCss = await fs.readFile(`${root}/packages/ui/src/date-field.css`, 'utf8')
@@ -72,8 +72,8 @@ for (const mode of ['assisted', 'onboarding', 'empty-projects', 'missing-active'
     const errors: string[] = []
     page.on('pageerror', error => errors.push(error.message))
     let active = '/alpha', projectPath = '/alpha'
-    let onboardingComplete = false
-    let personalPaths = projectSetup ? mode === 'missing-active' ? ['/alpha'] : [] : mode === 'remove-last' ? ['/alpha'] : ['/alpha', '/beta', ...(mode === 'worktree' ? ['/alpha-worktree'] : mode === 'rapid' || desktopLayout ? ['/gamma'] : [])]
+    let onboardingComplete = false, deletedProject = false
+    let personalPaths = projectSetup ? mode === 'missing-active' ? ['/alpha'] : [] : mode === 'remove-last' || mode === 'delete-project' ? ['/alpha'] : ['/alpha', '/beta', ...(mode === 'worktree' ? ['/alpha-worktree'] : mode === 'rapid' || desktopLayout ? ['/gamma'] : [])]
     let role = 'owner', serverFiles = keyboardOnly
     let failSwitch = false
     const requests: { path: string; method: string; root: string; time: number }[] = []
@@ -171,7 +171,7 @@ for (const mode of ['assisted', 'onboarding', 'empty-projects', 'missing-active'
           await page.evaluate(() => (globalThis as unknown as { presence: { onmessage: (e: { data: string }) => void } }).presence.onmessage({ data: JSON.stringify({ type: 'workspace' }) }))
           await new Promise(resolve => setTimeout(resolve, 40))
         }
-        return json({ hasProject: !(onboarding || assisted || mode === 'missing-active') || onboardingComplete, path: active, projectPath: mode === 'worktree' ? projectPath : active, docs: 'docs', docsPath: active + '/docs', projects: [] })
+        return json({ hasProject: !deletedProject && (!(onboarding || assisted || mode === 'missing-active') || onboardingComplete), path: active, projectPath: mode === 'worktree' ? projectPath : active, docs: 'docs', docsPath: active + '/docs', projects: [] })
       }
       if (url.pathname === '/api/project-registry' && method === 'GET') return json({ projects: [
         { path: '/alpha', name: 'alpha', managed: true, mine: true, icon: null },
@@ -184,6 +184,14 @@ for (const mode of ['assisted', 'onboarding', 'empty-projects', 'missing-active'
       if (url.pathname === '/api/project-registry' && method === 'POST') {
         personalPaths = [...personalPaths, '/new-project']
         return json({ project: { name: route.request().postDataJSON().name, path: '/new-project', managed: true, mine: true, icon: null } })
+      }
+      if (url.pathname === '/api/project-registry' && method === 'DELETE') {
+        assert.equal(route.request().postDataJSON().path, '/alpha', 'App deletes the project selected in its context menu')
+        deletedProject = true
+        personalPaths = []
+        active = ''
+        projectPath = ''
+        return json({ ok: true, removedPaths: ['/alpha', '/alpha/packages/docs'], state: { paths: [], icons: {}, groups: [] } })
       }
       if (url.pathname === '/api/project-registry/mine' && method === 'PUT') {
         const { path: project, added } = route.request().postDataJSON()
@@ -369,15 +377,36 @@ for (const mode of ['assisted', 'onboarding', 'empty-projects', 'missing-active'
     }
     releaseUi(); blockUi = false
     await page.locator('[data-test-content]').getByText('Content of /alpha', { exact: true }).waitFor()
-    if (mode === 'remove-last') {
+    if (mode === 'remove-last' || mode === 'delete-project') {
       await page.keyboard.press('Alt+p')
       const lastProject = page.locator('[data-project-option="/alpha"]')
       await lastProject.click({ button: 'right' })
-      await page.getByRole('menuitem', { name: '내 프로젝트에서 제거', exact: true }).click()
+      await page.getByRole('menuitem', { name: '삭제', exact: true }).click()
+      if (mode === 'delete-project') {
+        await page.getByRole('menuitem', { name: '완전히 삭제하기', exact: true }).click()
+        const confirmation = page.getByRole('dialog', { name: '프로젝트를 완전히 삭제할까요?', exact: true })
+        await confirmation.waitFor()
+        assert.equal(requests.filter(request => request.path === '/api/project-registry' && request.method === 'DELETE').length, 0, 'opening the confirmation does not delete the project')
+        await confirmation.locator('[data-project-delete-cancel]').click()
+        await confirmation.waitFor({ state: 'detached' })
+        assert.equal(requests.filter(request => request.path === '/api/project-registry' && request.method === 'DELETE').length, 0, 'cancellation leaves project files untouched')
+        await lastProject.click({ button: 'right' })
+        await page.getByRole('menuitem', { name: '삭제', exact: true }).click()
+        await page.getByRole('menuitem', { name: '완전히 삭제하기', exact: true }).click()
+        await confirmation.locator('[data-project-delete-confirm]').click()
+      } else {
+        await page.getByRole('menuitem', { name: '내 프로젝트에서 삭제하기', exact: true }).click()
+      }
       await assertProjectSetup()
       await page.locator('[data-project-add-inline]').getByRole('button', { name: '프로젝트 추가', exact: true }).click()
       assert.equal(await page.locator('[role=dialog].mew-project-add-dialog').getByRole('button', { name: '프로젝트 가져오기', exact: true }).isVisible(), true)
-      assert.deepEqual(workspacePosts, [], 'removing the last shortcut does not change or delete the saved active project')
+      assert.deepEqual(workspacePosts, [], 'removal does not issue an unrelated workspace switch')
+      const permanentRequests = requests.filter(request => request.path === '/api/project-registry' && request.method === 'DELETE')
+      assert.equal(permanentRequests.length, mode === 'delete-project' ? 1 : 0, 'shortcut removal and permanent deletion use separate mutation paths')
+      if (mode === 'delete-project') {
+        assert.equal(deletedProject, true)
+        assert.ok(requests.some(request => request.path === '/api/workspace' && request.method === 'GET' && request.time >= permanentRequests[0].time), 'App refreshes its active workspace after confirmed deletion')
+      }
       const deadline = Date.now() + 3000
       while (personalPaths.length > 0 && Date.now() < deadline) await page.waitForTimeout(10)
       assert.deepEqual(personalPaths, [], 'the account shortcut list persists the removal')
