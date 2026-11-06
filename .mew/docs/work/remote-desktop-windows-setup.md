@@ -1,8 +1,8 @@
 ---
 title: "Windows remote desktop setup architecture changes"
-description: "Records the November 5 Windows setup changes: the initial WinGet tool preparation and its replacement with verified prebuilt packages. Preserves earlier verification and records the November 6 exact-source package release attempt, with Windows builds and acceptance tracked separately."
+description: "Records the November 5 Windows setup changes: the initial WinGet tool preparation and its replacement with verified prebuilt packages. Preserves earlier verification and records the November 6 and 7 exact-source package release attempts, with Windows builds and acceptance tracked separately."
 created: "2026-11-05"
-updated: "2026-11-06"
+updated: "2026-11-07"
 ---
 
 The first phase below records the superseded implementation. Current installation follows the [Windows prebuilt setup contract](../development/remote-desktop-windows-setup.md) and [ADR 0140](../decisions/0140-windows-desktop-prebuilt-packages.md).
@@ -48,10 +48,14 @@ Fixture checks do not establish that either Windows architecture package builds 
 No Windows package build, official package publication, clean-Windows installation, real video/input connection, deployment, launcher execution, or server lifecycle operation has been performed for this phase. The initial packages must be built and published before an unbundled source revision can finish Windows preparation. Native x64/ARM64 loading, installation without development tools, repeat setup, damaged-package recovery, locked-DLL rollback, and an actual connection remain release acceptance gates. Optional virtual display signing/installation and firewall approval retain their separate operator boundaries.
 
 
-## November 6: first package release attempt
+## November 6 and 7: first package release attempts
 
 The reported source-install failure occurred while requesting the exact-source release's `SHA256SUMS`, before downloading the archive. A read-only request reproduced HTTP 404 for helper source hash `5a8f07b072c892cb12f3b5ca7edc8695a7c06965cb02b924cce94a81c65f5300`. The current helper sources include the [latency and virtual-mode changes](remote-desktop-latency-and-virtual-modes.md); the isolated release snapshot preserves those bytes and leaves unrelated working-tree edits untouched.
 
 The operator requested building and uploading matching Windows packages to `s-saens/mew`. The authenticated repository owner has write access. The remote repository currently has no desktop workflow, desktop-release environment, or published packages. Local checks passed `npm run build` and the integrated package/installer/builder/runtime test command from phase 2: 56 passed, 1 optional synthetic video test skipped. The package build, upload, clean-host installation, and real video/input acceptance remain pending at this point. No application server or launcher operation was performed.
 
 Additional pipeline/virtual-display checks passed 17 tests with 2 optional Windows/unsigned-driver checks skipped. Snapshot lint and `git diff --check` passed with existing UI warnings. Snapshot documentation metadata passed (745 descriptions); link checking reported 33 existing missing targets, including `.mew/docs/MOC.md`. A full build of the primary working tree passed. A second full build in the isolated committed-base snapshot exposed existing UI integration errors: the missing `에이전트 맨 아래로` translation key and the unsupported `DialogFrame.overlayClassName` prop. These files are outside the native package and were left out of the package-source snapshot; the native release workflow does not build the application UI.
+
+The first tag build reached both Windows runners. x64 passed its package tests (23 passed, 1 POSIX-only check skipped), then failed because tool discovery ignored an already activated VS18 compiler environment. The fix validates and reuses active compiler/SDK state, checks explicit target architecture, and shares that discovery with GPU compilation. A real PowerShell regression uses mocked discovery to cover valid active environments, missing commands/headers, trailing SDK separators, architecture mismatch, and environment-variable filtering. The workflow also disables unrelated root npm lifecycle scripts after ARM64 dependency installation spent several minutes there. A new helper hash is required because the fixed build scripts are shared source identity inputs.
+
+Both architecture jobs in [the first run](https://github.com/s-saens/mew/actions/runs/42239046783) ultimately failed the same compiler-discovery check; no archive was published. After the fix, all 25 package/build/discovery regression tests passed locally, including real PowerShell fixture execution. Targeted Oxlint and `git diff --check` passed. The primary-tree documentation check passed all 750 descriptions but reported 39 existing missing links. A later primary-tree full build was blocked by concurrent UI edits in `src/App.tsx` and `src/components/CodePane.tsx` (unused imports and `lintFile` scope); the earlier full build had passed. These UI changes are outside this native-package task and are not included in its source snapshot. The fixed helper hash is `e42129ac587b3e72d50b241d69a8931d5c0ad80a276481ede98e66ad245c5f4d`.
