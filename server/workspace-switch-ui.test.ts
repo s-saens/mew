@@ -18,7 +18,7 @@ for (const mode of ['onboarding', 'empty-projects', 'missing-active', 'remove-la
   const appSource = await fs.readFile(`${root}/src/App.tsx`, 'utf8')
   // Keep App, useTabs, FileTree, project switching and docking real. Unrelated panels and the
   // editor renderer are inert so this measures handoff work rather than editor startup.
-  const keep = new Set(['deferredComponent', 'ProjectSwitcher', 'ProjectLoadingOverlay', 'FileTree', 'SearchPanel', 'DockWorkspace', 'ProjectIcon', 'SubprojectLink', 'SidebarCreateButtons', 'MobileDock', 'HeaderMenu', 'TaskPanel', 'IconPackProvider'])
+  const keep = new Set(['deferredComponent', 'deferredDialog', 'ProjectSwitcher', 'ProjectLoadingOverlay', 'FileTree', 'SearchPanel', 'DockWorkspace', 'ProjectIcon', 'SubprojectLink', 'SidebarCreateButtons', 'MobileDock', 'HeaderMenu', 'TaskPanel', 'IconPackProvider'])
   if (keyboardOnly || projectSetup || mode === 'remove-last') { keep.add('ProjectAddInline'); keep.add('ProjectCatalogPanel'); keep.add('ServerFileExplorer') }
   const stubs = new Map<string, string>()
   const componentImports = appSource.replace(/const \w+ = deferredComponent\(async \(\) => \(\{ default: \(await import\('([^']+)'\)\)\.(\w+) \}\)(?:, null)?\)/g, (_match, module, name) => `import { ${name} } from '${module}'`)
@@ -267,7 +267,7 @@ for (const mode of ['onboarding', 'empty-projects', 'missing-active', 'remove-la
         assert.equal(await page.locator('[data-project-switcher], .mew-project-command, [data-test-command]').count(), 0, 'setup omits the current-project selector and project commands')
         assert.equal(await page.locator('.workspace-dock-layout, .mobile-dock, [data-sidebar-dock]').count(), 0, 'desktop and mobile work docks are absent')
         assert.equal(await page.locator('[data-test-editor], [data-sidebar], [data-project-sidebar], [data-mobile-project-panel]').count(), 0, 'setup uses a single project surface')
-        assert.equal(await page.getByRole('dialog').count(), 0, 'the project setup surface remains inline on phones')
+        assert.equal(await page.getByRole('dialog').count(), 0, 'project setup waits for the plus action on either viewport')
         const bounds = (await panel.boundingBox())!
         const header = (await page.locator('header').boundingBox())!
         assert.ok(bounds.x <= 1 && bounds.width >= width - 1, 'the project surface fills the available width')
@@ -276,7 +276,11 @@ for (const mode of ['onboarding', 'empty-projects', 'missing-active', 'remove-la
     }
     if (projectSetup) {
       await assertProjectSetup()
-      const dialog = page.locator('[data-project-add-inline]')
+      const add = page.locator('[data-project-add-inline]').getByRole('button', { name: '프로젝트 추가', exact: true })
+      assert.equal(await add.textContent(), '', 'first use opens project setup through an icon-only plus')
+      assert.equal(await add.getAttribute('aria-haspopup'), 'dialog')
+      await add.click()
+      const dialog = page.locator('[role=dialog].mew-project-add-dialog')
       for (const name of ['새 프로젝트 만들기', 'Git repo 클론하기', '프로젝트 가져오기']) {
         assert.equal(await dialog.getByRole('button', { name, exact: true }).isVisible(), true)
       }
@@ -343,7 +347,8 @@ for (const mode of ['onboarding', 'empty-projects', 'missing-active', 'remove-la
       await lastProject.click({ button: 'right' })
       await page.getByRole('menuitem', { name: '내 프로젝트에서 제거', exact: true }).click()
       await assertProjectSetup()
-      assert.equal(await page.locator('[data-project-add-inline]').getByRole('button', { name: '프로젝트 가져오기', exact: true }).isVisible(), true)
+      await page.locator('[data-project-add-inline]').getByRole('button', { name: '프로젝트 추가', exact: true }).click()
+      assert.equal(await page.locator('[role=dialog].mew-project-add-dialog').getByRole('button', { name: '프로젝트 가져오기', exact: true }).isVisible(), true)
       assert.deepEqual(workspacePosts, [], 'removing the last shortcut does not change or delete the saved active project')
       const deadline = Date.now() + 3000
       while (personalPaths.length > 0 && Date.now() < deadline) await page.waitForTimeout(10)
@@ -897,19 +902,22 @@ for (const mode of ['onboarding', 'empty-projects', 'missing-active', 'remove-la
         assert.equal(requests.filter(r => r.path === '/api/workspace' && r.method === 'POST').length, 0)
         assert.equal(await page.locator('[data-test-editor]').isVisible(), true, 'external file opening brings the mobile editor forward')
         await page.keyboard.press(`${modifier}+Shift+o`)
-        const createDialog = page.locator('[data-project-add-inline]')
+        const createDialog = page.locator('[role=dialog].mew-project-add-dialog')
         await createDialog.getByRole('button', { name: '새 프로젝트 만들기', exact: true }).waitFor()
         assert.equal(await createDialog.getByRole('combobox').count(), 0)
         assert.equal(await page.getByRole('button', { name: '모든 프로젝트', exact: true }).count(), 0, 'the project panel has no independent workspace catalog')
         const projectPanel = page.locator(width >= 768 ? '[data-project-sidebar]' : '[data-mobile-project-panel]')
         const lastProjectBox = await projectPanel.locator('[data-project-option]').last().boundingBox()
-        const choicesBox = await createDialog.boundingBox()
-        assert.ok(lastProjectBox && choicesBox)
-        assert.ok(choicesBox.y >= lastProjectBox.y + lastProjectBox.height && choicesBox.y - lastProjectBox.y - lastProjectBox.height <= 8, 'project addition follows the last personal project without a flexible gap')
+        const add = projectPanel.locator('[data-project-add-inline]').getByRole('button', { name: '프로젝트 추가', exact: true })
+        const triggerBox = await add.boundingBox(), popupBox = await createDialog.boundingBox()
+        assert.ok(lastProjectBox && triggerBox && popupBox)
+        assert.ok(triggerBox.y >= lastProjectBox.y + lastProjectBox.height && triggerBox.y - lastProjectBox.y - lastProjectBox.height <= 8, 'the plus trigger follows the last personal project without a flexible gap')
+        assert.ok(popupBox.x >= 0 && popupBox.x + popupBox.width <= width && popupBox.y >= 0 && popupBox.y + popupBox.height <= 700, 'the shortcut opens a popup inside the viewport')
+        assert.equal(await projectPanel.locator('[data-project-add-choice]').count(), 0, 'setup choices live outside the project panel')
         await createDialog.getByRole('button', { name: '프로젝트 가져오기', exact: true }).click()
         await createDialog.getByRole('button', { name: '이 워크스페이스에서 가져오기', exact: true }).click()
         await page.locator('[data-catalog-project="/alpha/packages/docs"]').waitFor()
-        await page.screenshot({ path: `/tmp/mew-inline-project-panel-${width >= 768 ? 'desktop' : 'mobile'}.png` })
+        await page.screenshot({ path: `/tmp/mew-project-add-popup-panel-${width >= 768 ? 'desktop' : 'mobile'}.png` })
         await createDialog.getByRole('button', { name: '이전 선택지로', exact: true }).click()
         await createDialog.getByRole('button', { name: '경로 탐색하기', exact: true }).click()
         const projectDialog = page.getByRole('dialog', { name: '기존 프로젝트 연결', exact: true })
@@ -920,8 +928,9 @@ for (const mode of ['onboarding', 'empty-projects', 'missing-active', 'remove-la
         await projectDialog.waitFor({ state: 'detached' })
         await createDialog.getByRole('button', { name: '이전 선택지로', exact: true }).click()
         await createDialog.getByRole('button', { name: '새 프로젝트 만들기', exact: true }).waitFor()
-        await createDialog.getByRole('button', { name: '이전 선택지로', exact: true }).click()
-        await createDialog.getByRole('button', { name: '프로젝트 추가', exact: true }).waitFor()
+        await createDialog.locator('[data-project-add-close]').click()
+        await createDialog.waitFor({ state: 'detached' })
+        assert.equal(await add.getAttribute('aria-expanded'), 'false')
         if (width < 768) {
           await page.keyboard.press('Escape')
           await page.locator('[data-mobile-project-panel]').waitFor({ state: 'detached' })
@@ -960,7 +969,7 @@ for (const mode of ['onboarding', 'empty-projects', 'missing-active', 'remove-la
       await page.keyboard.press('Escape')
       await page.getByRole('dialog').waitFor({ state: 'detached' })
       await page.keyboard.press('Control+Shift+o')
-      await page.locator('[data-project-add-inline]').getByRole('button', { name: '새 프로젝트 만들기', exact: true }).waitFor()
+      await page.locator('[role=dialog].mew-project-add-dialog').getByRole('button', { name: '새 프로젝트 만들기', exact: true }).waitFor()
       await page.keyboard.press('Escape')
       await page.getByRole('dialog').waitFor({ state: 'detached' })
       await page.keyboard.press('Alt+p')
@@ -973,7 +982,7 @@ for (const mode of ['onboarding', 'empty-projects', 'missing-active', 'remove-la
       await page.locator('[data-test-content]').getByText('Content of /alpha', { exact: true }).waitFor()
       assert.equal(await page.locator('button[data-project-switcher]').count(), 1, 'members can select shared projects')
       await page.keyboard.press('Control+Shift+o')
-      await page.locator('[data-project-add-inline]').getByRole('button', { name: '새 프로젝트 만들기', exact: true }).waitFor()
+      await page.locator('[role=dialog].mew-project-add-dialog').getByRole('button', { name: '새 프로젝트 만들기', exact: true }).waitFor()
       await page.keyboard.press('Escape')
       await page.getByRole('dialog').waitFor({ state: 'detached' })
       role = 'manager'

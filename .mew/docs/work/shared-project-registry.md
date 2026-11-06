@@ -1,8 +1,8 @@
 ---
-title: "Shared projects and inline project setup"
-description: "Records shared project registry creation, inline setup, cloning, discovery, and personal project corrections. Includes November 4 layout for an empty personal list and nested workspace/path import changes, with their verification status and earlier local test, build, lint, document-link, and browser limits."
+title: "Shared projects and project setup"
+description: "Records shared project registry creation, cloning, discovery, and personal project corrections. Includes the November 6 icon-only plus trigger and project-add popup, browser and App regressions, and local verification alongside earlier inline setup history."
 created: "2026-11-02"
-updated: "2026-11-04"
+updated: "2026-11-06"
 ---
 
 ## Purpose and resulting behavior
@@ -137,3 +137,24 @@ Make an empty My Projects list a clear starting point for adding a project, incl
 - `node --test --test-name-pattern='App hides project work surfaces' server/workspace-switch-ui.test.ts` compiled its fixture but could not connect to the user-managed Obscura endpoint. Desktop/mobile geometry, browser rendering, and physical-device behavior remain unverified. Happy DOM component/hook tests and policy tests do not establish those visual results.
 
 The build updates local `dist/` assets. No deployment, launcher invocation, application server lifecycle operation, or push was performed.
+
+## Project-add popup — November 6, 2026
+
+### Purpose and resulting behavior
+
+Replace the project panel's labelled Add project row and inline setup with an icon-only plus trigger and a separate themed popup. The [project feature](../features/projects-files-search/opening-projects-tabs-and-groups.md#create-or-link-a-project), [UI navigation contract](../development/ui-project-navigation.md#shared-ui-for-adding-projects-and-browsing-server-files), and [project guide](../../../docs/guides/projects.md#프로젝트-탭) own current behavior; earlier inline descriptions above remain historical.
+
+- The plus trigger follows My Projects. Empty-list onboarding shows its heading and plus without automatically opening setup. The trigger and existing project-add shortcut open the same popup, with creation, cloning, workspace import, and nested folder browsing.
+- The popup uses `DialogFrame`, visible name/URL labels, text-labelled primary actions, and compact choices with icons and short descriptions. It preserves Git initialization, agent-assisted creation, validation, drafts, and retries without duplicate creation or cloning.
+- The back arrow returns one setup step. X, outside press, Esc, and browser Back dismiss the popup; nested dialogs close first. Busy operations stay open. Focus remains inside the popup and returns to the plus after dismissal, including outside presses.
+- The desktop dropdown fallback retains its menu while portaled project and folder dialogs receive pointer input. Actual App regressions also cover first-project creation, a missing active project, removal of the last shortcut, and desktop/mobile keyboard entry.
+
+### Verification and application
+
+- `node --test src/components/project-add-inline.test.ts server/project-catalog-panel-ui.test.ts server/project-add-inline-ui.test.ts` passed 12 tests. Component and isolated Chromium checks cover creation, cloning, provider connection, import, errors, retries, dismissal, focus, busy guards, translated choices, and desktop menu/mobile panel nesting. Browser layouts cover 320/390/1100px viewports and 200/240px sidebars in dark and light themes.
+- `node --test --test-name-pattern='App (first-use|hides project|offers project|returns to project|keyboard aliases)' server/workspace-switch-ui.test.ts` passed 5 App regressions. The keyboard fixture keeps the actual deferred-dialog helper rather than replacing it with a null stub.
+- An additional isolated Chromium review checked creation and long repository lists inside a mobile parent dialog at 320×220, 390×220, 844×390, and 390×844. Popup bounds, fixed headers, body scrolling, 44px touch controls, nested Esc dismissal, and focus restoration passed. Desktop/mobile screenshots were inspected; physical devices were not tested.
+- `npm run build` passed, including TypeScript, with Vite's large-chunk warning. `npm run lint` passed with warnings and no errors. Focused lint and `git diff --check` passed.
+- `npm run check:docs` validated 742 descriptions and reported 39 existing missing-target links, including `.mew/docs/MOC.md`, `.mew/docs/decisions/MOC.md`, and `.mew/docs/decisions/README.md`. The project guide retains its existing missing parent reference; this task introduces no missing target.
+
+The required build updates local `dist/` assets. No deployment, launcher invocation, application server lifecycle operation, or push was performed. Browser APIs in these checks use isolated fixtures; real Git providers and physical-device interaction were not exercised.

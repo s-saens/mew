@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react'
-import { Check, Folder, FolderPlus, GitBranch, Link, Lock, Plus, RefreshDouble, Spark, Xmark } from 'iconoir-react'
-import { canAutoFocusInput, HoverTipLayer, LoadingIndicator, useOverlayDismiss } from '@mew/ui'
+import { ArrowLeft, Check, Folder, FolderPlus, GitBranch, Link, Lock, NavArrowRight, Plus, RefreshDouble, Spark, Xmark } from 'iconoir-react'
+import { canAutoFocusInput, DialogFrame, HoverTipLayer, LoadingIndicator } from '@mew/ui'
 import { cloneManagedProject, fetchConnectedGitRepositories, registerProject, type RegisteredProject } from '../api/client'
 import { GIT_CONNECTION_CHANGED } from '../api/git-auth-request'
 import { useI18n } from '../i18n'
@@ -14,7 +14,7 @@ const emptyPaths: string[] = []
 type Repository = Awaited<ReturnType<typeof fetchConnectedGitRepositories>>['repositories'][number]
 
 const iconButton = 'inline-flex h-8 w-8 shrink-0 items-center justify-center rounded text-ink-secondary hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-40'
-const field = 'h-8 w-full min-w-0 rounded border border-edge-strong bg-surface-deep px-2 text-sm text-ink placeholder:text-ink-secondary focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-60'
+const field = 'h-10 w-full min-w-0 rounded-lg border border-edge-strong bg-surface-deep px-2.5 text-sm text-ink placeholder:text-ink-secondary focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-60'
 
 export interface ProjectAddInlineProps {
   basePath: string
@@ -34,7 +34,7 @@ export function ProjectAddInline({ basePath, paths = emptyPaths, onOpen, onProje
   const { t, locale } = useI18n()
   const copy = projectAddCopy(locale)
   const id = useId()
-  const [expanded, setExpanded] = useState(onboarding)
+  const [expanded, setExpanded] = useState(false)
   const [mode, setMode] = useState<Mode | null>(null)
   const [linkOpen, setLinkOpen] = useState(false)
   const [name, setName] = useState('')
@@ -46,13 +46,13 @@ export function ProjectAddInline({ basePath, paths = emptyPaths, onOpen, onProje
   const [connected, setConnected] = useState(false)
   const [repositoryError, setRepositoryError] = useState<string | null>(null)
   const [reload, setReload] = useState(0)
+  const openRequestConsumed = useRef(false)
   const trigger = useRef<HTMLButtonElement>(null)
   const input = useRef<HTMLInputElement>(null)
   const modeTriggers = useRef<Partial<Record<Mode, HTMLButtonElement | null>>>({})
   const browseTrigger = useRef<HTMLButtonElement>(null)
   const restoreFocus = useRef<Mode | 'browse' | null>(null)
   const backTrigger = useRef<HTMLButtonElement>(null)
-  const focusCollapsed = useRef(false)
   const [createdMode, setCreatedMode] = useState<Mode | null>(null)
   const busyRef = useRef(false)
   const alive = useRef(true)
@@ -62,16 +62,18 @@ export function ProjectAddInline({ basePath, paths = emptyPaths, onOpen, onProje
 
   useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
   useEffect(() => {
-    if (!openRequested) return
-    setExpanded(true)
-    onOpenRequestHandled?.()
-  }, [openRequested, onOpenRequestHandled])
-  useEffect(() => {
+    if (!openRequested) { openRequestConsumed.current = false; return }
+    if (openRequestConsumed.current) return
+    openRequestConsumed.current = true
     if (!expanded) {
-      if (focusCollapsed.current) trigger.current?.focus()
-      focusCollapsed.current = false
-      return
+      trigger.current?.focus({ preventScroll: true })
+      setMode(createdMode)
+      setExpanded(true)
     }
+    onOpenRequestHandled?.()
+  }, [openRequested, onOpenRequestHandled, createdMode, expanded])
+  useEffect(() => {
+    if (!expanded) return
     if (linkOpen) return
     const restore = restoreFocus.current
     if (restore) {
@@ -110,12 +112,13 @@ export function ProjectAddInline({ basePath, paths = emptyPaths, onOpen, onProje
     if (mode) {
       restoreFocus.current = mode
       setMode(mode === 'workspace' ? 'import' : null)
-    } else {
-      focusCollapsed.current = true
-      setExpanded(false)
     }
   }
-  useOverlayDismiss(expanded && !linkOpen && back, { closeOnEscape: () => !busyRef.current, closeOnBack: () => !busyRef.current })
+  function close() {
+    if (busyRef.current) return
+    setExpanded(false)
+    requestAnimationFrame(() => trigger.current?.focus({ preventScroll: true }))
+  }
 
   const validName = !!name.trim() && name.trim() !== '.' && name.trim() !== '..' && !/[\\/\p{Cc}]/u.test(name.trim()) && !name.trim().startsWith('.')
   const invalidName = !!name.trim() && !validName
@@ -173,26 +176,32 @@ export function ProjectAddInline({ basePath, paths = emptyPaths, onOpen, onProje
 
   return <HoverTipLayer className={`mew-project-add${onboarding ? ' mew-project-add-onboarding' : ''}`}><div className="min-w-0" data-project-add-inline data-project-add-step={!expanded ? 'closed' : mode ?? 'choices'}>
     {onboarding && <h2 className="mew-project-add-heading text-center text-base font-medium text-ink">{copy.heading}</h2>}
-    {!expanded ? <button ref={trigger} type="button" aria-label={copy.add} aria-expanded={false} aria-controls={`${id}-setup`}
-      onClick={() => { setMode(null); setExpanded(true) }}
-      className="flex min-h-8 w-full min-w-0 items-center gap-1.5 rounded px-1.5 text-left text-xs text-ink-secondary hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-accent">
-      <Plus width={16} height={16} aria-hidden="true" />{copy.add}
-    </button> : <>
-      <div className="mew-project-add-header flex min-w-0 items-center justify-between gap-1">
-        <span className="mew-project-add-title min-w-0 truncate px-1.5 text-xs text-ink-secondary">{title}</span>
-        <button ref={backTrigger} type="button" data-project-add-back aria-label={copy.back} data-tip={copy.back} disabled={busy} onClick={back} className={`${iconButton} mew-project-add-back`}><Xmark width={16} height={16} aria-hidden="true" /></button>
-      </div>
-      {(mode === null || mode === 'import') && <nav id={`${id}-setup`} aria-label={title} className="mew-project-add-choices flex min-w-0 flex-col gap-0.5">
-        {choices.map(next => <button key={next} ref={element => { if (next === 'browse') browseTrigger.current = element; else modeTriggers.current[next] = element }} type="button"
-          data-project-add-choice={next} aria-label={copy[next]} data-tip={copy[next]} disabled={busy || !!created && next !== createdMode}
+    <button ref={trigger} type="button" aria-label={copy.add} data-tip={copy.add} aria-haspopup="dialog" aria-expanded={expanded} aria-controls={expanded ? `${id}-setup` : undefined}
+      onClick={() => { trigger.current?.focus({ preventScroll: true }); setMode(createdMode); setError(null); setExpanded(true) }}
+      className="mew-project-add-trigger inline-flex h-8 w-8 items-center justify-center rounded-lg text-ink-secondary hover:bg-surface-hover hover:text-ink focus-visible:outline-2 focus-visible:outline-accent">
+      <Plus width={18} height={18} aria-hidden="true" />
+    </button>
+    {expanded && <DialogFrame labelledBy={`${id}-title`} onClose={close} busy={busy} className="mew-project-add-dialog flex max-w-[26rem] flex-col">
+      <HoverTipLayer className="flex min-h-0 flex-col">
+      <header className="mew-project-add-header flex shrink-0 items-center gap-2 border-b border-edge px-3 py-2">
+        {mode ? <button ref={backTrigger} type="button" data-project-add-back aria-label={copy.back} data-tip={copy.back} disabled={busy} onClick={back} className={iconButton}><ArrowLeft width={18} height={18} aria-hidden="true" /></button>
+          : <span className="mew-project-add-title-icon flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-accent"><FolderPlus width={19} height={19} aria-hidden="true" /></span>}
+        <h2 id={`${id}-title`} className="min-w-0 flex-1 text-sm font-semibold text-ink">{title}</h2>
+        <button type="button" data-project-add-close aria-label={t('common.close')} data-tip={t('common.close')} disabled={busy} onClick={close} className={iconButton}><Xmark width={18} height={18} aria-hidden="true" /></button>
+      </header>
+      <div id={`${id}-setup`} className="mew-project-add-body min-h-0 overflow-y-auto p-3">
+      {(mode === null || mode === 'import') && <nav aria-label={title} className="mew-project-add-choices flex min-w-0 flex-col gap-1.5">
+        {choices.map((next, index) => <button key={next} ref={element => { if (next === 'browse') browseTrigger.current = element; else modeTriggers.current[next] = element }} type="button"
+          data-project-add-choice={next} data-dialog-autofocus={index === 0 || undefined} aria-label={copy[next]} disabled={busy || !!created && next !== createdMode}
           onClick={() => next === 'browse' ? setLinkOpen(true) : choose(next)}
-          className="mew-project-add-choice flex min-h-8 min-w-0 items-center gap-1.5 rounded px-1.5 py-1 text-left text-xs leading-4 text-ink-secondary hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-40">
-          {next === 'clone' ? <GitBranch width={16} height={16} className="shrink-0" aria-hidden="true" /> : next === 'create' ? <FolderPlus width={16} height={16} className="shrink-0" aria-hidden="true" /> : next === 'browse' ? <Folder width={16} height={16} className="shrink-0" aria-hidden="true" /> : <Link width={16} height={16} className="shrink-0" aria-hidden="true" />}
-          <span>{copy[next]}</span>
+          className="mew-project-add-choice flex min-w-0 items-center gap-3 rounded-lg border border-edge px-3 py-2.5 text-left text-ink hover:border-edge-strong hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-40">
+          <span className="mew-project-add-choice-icon flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-accent">
+            {next === 'clone' ? <GitBranch width={20} height={20} aria-hidden="true" /> : next === 'create' ? <FolderPlus width={20} height={20} aria-hidden="true" /> : next === 'browse' ? <Folder width={20} height={20} aria-hidden="true" /> : <Link width={20} height={20} aria-hidden="true" />}
+          </span>
+          <span className="min-w-0 flex-1"><span className="block text-sm font-medium">{copy[next]}</span><span className="mt-0.5 block text-xs leading-4 text-ink-secondary">{copy[`${next}Hint`]}</span></span>
+          <NavArrowRight width={16} height={16} className="shrink-0 text-ink-secondary" aria-hidden="true" />
         </button>)}
       </nav>}
-    </>}
-    {expanded && <div className="min-w-0 pb-1">
       {mode === 'workspace' && <div ref={workspace}><ProjectCatalogPanel paths={paths} beforeMutation={beforeMutation} onProjectsChanged={onProjectsChanged}
         onBusyChange={value => { busyRef.current = value; setBusy(value) }} onOpen={async path => {
           try {
@@ -205,29 +214,29 @@ export function ProjectAddInline({ basePath, paths = emptyPaths, onOpen, onProje
           }
         }} /></div>}
       {mode === 'create' && <form className="min-w-0" noValidate onSubmit={event => { event.preventDefault(); submit() }}>
-        <div className="flex min-w-0 items-center gap-1">
-          <div className="relative min-w-0 flex-1">
-            <label className="sr-only" htmlFor={`${id}-name`}>{t('project.name')}</label>
-            <input ref={input} id={`${id}-name`} value={name} disabled={locked} onChange={event => setName(event.target.value)}
-              placeholder={t('project.name')} autoComplete="off" spellCheck={false} className={`${field} pr-9`}
-              aria-invalid={invalidName || undefined} aria-describedby={invalidName ? `${id}-invalid` : undefined} />
-            <button type="button" aria-pressed={git} aria-label={t('project.createGit')} data-tip={t('project.createGit')} disabled={locked} onClick={() => setGit(value => !value)}
-              className={`${iconButton} absolute top-0 right-0 ${git ? '!text-accent' : ''}`}><GitBranch width={16} height={16} aria-hidden="true" /></button>
-          </div>
-          <button type="submit" disabled={busy || !validName && !created} aria-label={copy.confirmCreate} data-tip={copy.confirmCreate} className={`${iconButton} bg-accent !text-ink-on-accent hover:bg-accent-strong`}><Check width={17} height={17} aria-hidden="true" /></button>
+        <label className="mb-1.5 block text-xs font-medium text-ink-secondary" htmlFor={`${id}-name`}>{t('project.name')}</label>
+        <div className="relative min-w-0">
+          <input ref={input} id={`${id}-name`} value={name} disabled={locked} onChange={event => setName(event.target.value)}
+            placeholder={t('project.namePlaceholder')} autoComplete="off" spellCheck={false} className={`${field} pr-11`}
+            aria-invalid={invalidName || undefined} aria-describedby={invalidName ? `${id}-invalid` : undefined} />
+          <button type="button" aria-pressed={git} aria-label={t('project.createGit')} data-tip={t('project.createGit')} disabled={locked} onClick={() => setGit(value => !value)}
+            className={`${iconButton} mew-project-add-git absolute top-1 right-1 ${git ? '!text-accent' : ''}`}><GitBranch width={16} height={16} aria-hidden="true" /></button>
         </div>
         {invalidName && <p id={`${id}-invalid`} className="mt-1 break-words text-xs text-danger-ink">{t('project.invalidName')}</p>}
-        {canUseAgent && onCreateWithAgent && <button type="button" disabled={busy || !validName && !created} onClick={() => submit(true)}
-          className="mt-1 flex min-h-8 items-center gap-1.5 rounded px-1.5 text-xs text-ink-secondary hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-40"><Spark width={15} height={15} aria-hidden="true" />{t('project.createWithAgent')}</button>}
+        <div className="mew-project-add-actions mt-3 flex flex-wrap items-center justify-end gap-1.5">
+          {canUseAgent && onCreateWithAgent && <button type="button" disabled={busy || !validName && !created} onClick={() => submit(true)}
+            className="mew-project-add-secondary inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg px-2.5 text-xs text-ink-secondary hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-40"><Spark width={15} height={15} aria-hidden="true" />{t('project.createWithAgent')}</button>}
+          <button type="submit" disabled={busy || !validName && !created} className="mew-project-add-primary inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg bg-accent px-3 text-sm font-medium text-ink-on-accent hover:bg-accent-strong focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-40"><Check width={16} height={16} aria-hidden="true" />{copy.confirmCreate}</button>
+        </div>
       </form>}
       {mode === 'clone' && <div className="min-w-0">
-        <form className="flex min-w-0 items-center gap-1" onSubmit={event => { event.preventDefault(); submit() }}>
-          <label className="sr-only" htmlFor={`${id}-url`}>{t('project.repositoryUrl')}</label>
+        <form className="min-w-0" onSubmit={event => { event.preventDefault(); submit() }}>
+          <label className="mb-1.5 block text-xs font-medium text-ink-secondary" htmlFor={`${id}-url`}>{t('project.repositoryUrl')}</label>
           <input ref={input} id={`${id}-url`} type="text" value={url} disabled={locked} onChange={event => setUrl(event.target.value)}
-            placeholder={t('project.repositoryUrl')} autoComplete="off" spellCheck={false} className={`${field} flex-1`} />
-          <button type="submit" disabled={busy || !url.trim() && !created} aria-label={copy.confirmClone} data-tip={copy.confirmClone} className={`${iconButton} bg-accent !text-ink-on-accent hover:bg-accent-strong`}><Check width={17} height={17} aria-hidden="true" /></button>
+            placeholder="https://github.com/owner/repository" autoComplete="off" spellCheck={false} className={`${field} flex-1`} />
+          <div className="mt-3 flex justify-end"><button type="submit" disabled={busy || !url.trim() && !created} className="mew-project-add-primary inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg bg-accent px-3 text-sm font-medium text-ink-on-accent hover:bg-accent-strong focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-40"><GitBranch width={16} height={16} aria-hidden="true" />{copy.confirmClone}</button></div>
         </form>
-        <div className="mt-1 flex min-w-0 items-center justify-between gap-1"><GitHubAccount project="" />
+        <div className="mt-3 flex min-w-0 items-center justify-between gap-1 border-t border-edge pt-2"><GitHubAccount project="" />
           <button type="button" disabled={busy || repositories === null && !repositoryError} className={iconButton} onClick={() => setReload(value => value + 1)} aria-label={t('project.retry')} data-tip={t('project.retry')}><RefreshDouble width={15} height={15} aria-hidden="true" /></button>
         </div>
         {repositories === null && !repositoryError && <span role="status" aria-label={t('common.loading')} className="flex justify-center py-1"><LoadingIndicator /></span>}
@@ -243,7 +252,9 @@ export function ProjectAddInline({ basePath, paths = emptyPaths, onOpen, onProje
       </div>}
       {error && <p role="alert" className="mt-1 whitespace-pre-wrap break-words text-xs text-danger-ink">{error}</p>}
       {busy && <span role="status" className="mt-1 flex items-center gap-1.5 text-xs text-ink-secondary"><LoadingIndicator />{t(mode === 'clone' ? 'project.cloning' : 'project.working')}</span>}
-    </div>}
+      </div>
+      </HoverTipLayer>
+    </DialogFrame>}
     {linkOpen && <LinkProjectDialog basePath={basePath} canManageFolders={canManageFolders} onClose={() => { restoreFocus.current = 'browse'; setLinkOpen(false) }} onOpen={async path => {
       await run(async () => {
         let project = linked.current.get(path)

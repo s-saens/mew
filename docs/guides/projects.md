@@ -1,7 +1,7 @@
 ---
 title: "Projects and file navigation"
-description: "Explains onboarding when My Projects is empty, inline creation and Git cloning, and project import from the workspace catalog or a server path. Covers personal project hierarchy, switching, file navigation, Git review, task controls, and task reference drafts in agent conversations."
-updated: "2026-11-05"
+description: "Explains empty-list onboarding and the plus-button popup for project creation, Git cloning, and import from the workspace catalog or a server path. Covers popup navigation, personal project hierarchy, switching, file navigation, Git review, task controls, and task reference drafts in agent conversations."
+updated: "2026-11-06"
 상위파일:
   - "../../.mew/docs/MOC.md"
   - "MOC.md"
@@ -13,13 +13,13 @@ A guide to creating, cloning, or linking projects, finding files, and reviewing 
 <a id="프로젝트-탭"></a>
 ## Select a project
 
-When **My projects** is empty, Mew shows the top bar and a project panel with **Add a project** centered above **New project**, **Git clone**, and **Import project**. The Dock, header project selector, and command button appear after you add a project. You only need a name to create a project. [Create your first project](first-steps.md).
+When **My projects** is empty, Mew shows the top bar and a project panel with **Add a project** centered above a **+** button. Click **+** to open the project setup popup. The Dock, header project selector, and command button appear after you add a project. You only need a name to create a project. [Create your first project](first-steps.md).
 
 The **workspace** contains every project registered with this Mew instance. **My projects** is your own list of shortcuts and starts empty for a new account, even when you can access workspace projects. Every signed-in user can import a registered project into My projects without copying its folder or changing another account's list. Creating, cloning, or linking a project registers it with the workspace and adds it to your list. Guests do not have these controls. Existing file and feature permissions still apply.
 
 ### Create a project
 
-In the project panel, **Add project** follows your last personal project. It reveals **New project**, **Git clone**, and **Import project** inline. With an empty list, these choices are already visible. Choose **New project**. Enter a name in the inline field and press the check icon to create and open it. The Git icon inside the field starts enabled; turn it off if you want a regular folder.
+In the project panel, the **+** button follows your last personal project. It opens a popup with **New project**, **Git clone**, and **Import project**. The centered **+** button opens the same popup when your list is empty. Choose **New project**, enter a name, and click **Create project** to create and open it. The Git icon inside the field starts enabled; turn it off if you want a regular folder.
 
 Mew stores managed projects in `~/.mew/projects/<name>` on the server. It creates `.mew/` for settings and an empty `.mew/docs/` as the initial Documents folder. Git-enabled projects also get `.git/` and `.gitignore`. An existing folder with the same name is never overwritten.
 
@@ -27,22 +27,22 @@ The secondary **Create with agent** action opens the new project and a conversat
 
 ### Clone a repository
 
-Choose **Git clone** from the Add project choices. Paste a public GitHub or GitLab HTTPS repository URL to clone without connecting a provider account. The clone is stored as a managed project and opens when ready.
+Choose **Git clone** in the popup. Paste a public GitHub or GitLab HTTPS repository URL into the labelled field and click **Clone repository** to clone without connecting a provider account. The clone is stored as a managed project and opens when ready.
 
-To select an accessible repository, connect GitHub from this inline flow; no project needs to be open first. The repository list includes private and organization repositories that your connected account is authorized to access. Organization SSO or repository permissions can require additional authorization on GitHub. Private cloning uses your connected GitHub account. GitLab supports public URL cloning; GitLab and other provider account connections are not yet supported. [GitHub connection](#github-login).
+To select an accessible repository, connect GitHub from this popup; no project needs to be open first. The repository list includes private and organization repositories that your connected account is authorized to access. Organization SSO or repository permissions can require additional authorization on GitHub. Private cloning uses your connected GitHub account. GitLab supports public URL cloning; GitLab and other provider account connections are not yet supported. [GitHub connection](#github-login).
 
 ### Use an existing project
 
-Choose **Import project** to reveal two inline sources:
+Choose **Import project** in the popup to see two sources:
 
 - **From this workspace** lists registered projects. Choose a project to add it to My projects and open it. Duplicate names show a path detail to distinguish them.
 - **Browse path** opens the server folder picker. Find an existing folder and open it. Linking preserves its location and contents, registers it with the workspace, adds it to My projects, and opens it. It does not copy the folder into managed storage.
 
-X returns from the source choices to the three Add project choices. Press X again to return to the Add project button. An empty personal list initially shows the three centered choices; X can return them to the Add project button.
+Use the back arrow to return one step within the popup. X, clicking outside, Esc, or browser Back closes the popup from any step and returns focus to **+**. A nested folder browser or menu closes first. While a project operation is running, the popup stays open. Errors keep your input available for retry.
 
 The linked-folder picker retains its path field, home/parent navigation, and keyboard navigation. Folder suggestions and favorites appear when your account has the required server-file access. Up/Down and Enter choose a suggestion; Enter without a selected suggestion navigates to the typed path. Relative paths start from the displayed folder, and `~` opens the server user's home. Esc or Back closes suggestions first. Owner and manager folder/Git tools remain available under their existing permissions. Creating a folder or cloning selects the result inside the picker; linking it is a separate action.
 
-`Ctrl/Cmd+Shift+O` opens the project panel and its inline Add project choices. The separate `Ctrl/Cmd+O` server file explorer requires server-file access and opens a file without switching projects. To upload files from your device, open a project and drag them into the file explorer.
+`Ctrl/Cmd+Shift+O` opens the project panel and its project setup popup. The separate `Ctrl/Cmd+O` server file explorer requires server-file access and opens a file without switching projects. To upload files from your device, open a project and drag them into the file explorer.
 
 ### Switch and organize My projects
 
@@ -51,7 +51,7 @@ If your previous project folder is unavailable, Mew restores the first available
 The header shows the current project's icon and name. Clicking it opens **My projects** in a sidebar to the left of the file explorer on desktop, or in a full-screen panel on mobile. The current row is highlighted. Each project shares its icon with the file explorer.
 
 - Select a row to switch projects without refreshing. Document tabs, layout, and scroll positions are restored per project. Your other connected screens follow the switch; other users' active projects stay as they are. Running agents keep their original working directories.
-- Use **Add project** for the three inline choices. The workspace catalog is under **Import project → From this workspace**. **Remove from My projects** removes only your shortcut, preserving the project, other users' shortcuts, and all files. If other shortcuts remain, removing the current one first opens another project. Removing your last shortcut returns to the centered project panel. My projects only contains registered catalog entries.
+- Use **+** to open the project setup popup. The workspace catalog is under **Import project → From this workspace**. **Remove from My projects** removes only your shortcut, preserving the project, other users' shortcuts, and all files. If other shortcuts remain, removing the current one first opens another project. Removing your last shortcut returns to the centered project panel. My projects only contains registered catalog entries.
 - Nested Git/Mew projects are discovered in the shared catalog. Pinned descendants appear beneath their nearest pinned parent in My projects. Select a project when you want to change the active root.
 - Drag the left handle to reorder shortcuts. **↑/↓** on the handle or **Shift+↑/↓** on the row also reorders them. The **Alt+1…9** numbers on the right follow your order.
 - `Alt+P` opens My projects and focuses its first item; `Alt+1…9` switches in personal list order. Up/Down and Home/End navigate, and Enter/Space selects. Existing modal, IME, repeated-key, and remote-screen input boundaries apply. `Ctrl/Cmd+number` selects tabs in the current panel.
@@ -189,10 +189,10 @@ Documents is a virtual folder in the file explorer, rather than a tab. The owner
 
 ## Server File Explorer
 
-A project-independent popup opened from the header menu (`components/ServerFileExplorer.tsx`). The default path is the server user's home; use the address field or dropdown to open `~` or an absolute path. Folders are read one level at a time when expanded, so the entire home directory is not recursively scanned in advance. All files and folders readable by the mew server's OS user are included, including hidden items. It uses the same shared browsing UI as Add Project, and the name filter narrows the top-level list at the current path. Folder expansion and right-clicking child items remain available. Tab focus stays within the dialog and returns to the invoking button when closed. Both dialogs share favorites and cloud folders; the Add Project dialog provides New Folder, Git operations, and the Open Project confirmation button.
+A project-independent popup opened from the header menu (`components/ServerFileExplorer.tsx`). The default path is the server user's home; use the address field or dropdown to open `~` or an absolute path. Folders are read one level at a time when expanded, so the entire home directory is not recursively scanned in advance. All files and folders readable by the mew server's OS user are included, including hidden items. It uses the same shared browsing UI as the linked-folder picker, and the name filter narrows the top-level list at the current path. Folder expansion and right-clicking child items remain available. Tab focus stays within the dialog and returns to the invoking button when closed. Both dialogs share favorites and cloud folders; the linked-folder picker provides New Folder, Git operations, and the Open Project confirmation button.
 
 - Clicking a file opens it in a **preview tab** in the focused editor pane while keeping the current project unchanged. External tabs support autosave but do not use collaboration, comments, git history, or project rules, and are not retained in tab restoration after a refresh.
-- The right-click menus in the Add Project dialog and server file explorer use the same shared component as the file explorer. They provide Rename, Copy, Cut, Paste, and Delete; folders also show **Add to Favorites**. Paste targets the right-clicked folder, or the containing folder if a file was right-clicked. Paste is disabled when no item has been copied or cut. On mobile, press and hold to open the same menu. After a successful cut-and-paste operation, the source and destination lists and paths of open external files are updated. Files can be downloaded. **On mobile, if the browser detects a cellular connection and the file exceeds 100MiB**, a data charge notice and confirmation to continue downloading appear before the actual download. Wi-Fi, desktop, and browsers that cannot identify the connection type download immediately.
+- The right-click menus in the linked-folder picker and server file explorer use the same shared component as the file explorer. They provide Rename, Copy, Cut, Paste, and Delete; folders also show **Add to Favorites**. Paste targets the right-clicked folder, or the containing folder if a file was right-clicked. Paste is disabled when no item has been copied or cut. On mobile, press and hold to open the same menu. After a successful cut-and-paste operation, the source and destination lists and paths of open external files are updated. Files can be downloaded. **On mobile, if the browser detects a cellular connection and the file exceeds 100MiB**, a data charge notice and confirmation to continue downloading appear before the actual download. Wi-Fi, desktop, and browsers that cannot identify the connection type download immediately.
 - A folder's **Open as Project** adds that folder itself to the project list and opens it as the active project. This is owner-only and replaces the current screen with the new root under the active root switching contract.
 - The browsing, read, and write APIs are available to **logged-in accounts allowed to use the server file explorer** (manager and owner by default). Workspace boundaries and blocking rules for `.git` and `node_modules` do not apply; access uses the same OS permissions as the shell. For the meaning of these permissions on public servers, see [security.md](../operations/security.md).
 

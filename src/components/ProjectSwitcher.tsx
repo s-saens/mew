@@ -297,7 +297,9 @@ export function ProjectSwitcher({ paths, activePath, pendingPath, fallbackLabel,
         {projectAdd && <div className="mew-project-inline-add">{projectAdd}</div>}
         </div>
       </div>
-    </DialogFrame> : <ActionMenu ref={menuElement} variant="header" x={menu.x} y={menu.y} label={t('project.choose')} trigger={trigger.current} outsideIgnore={() => contextMenuElement.current} onClose={() => { setContextMenu(null); setMenu(null) }}>
+    </DialogFrame> : <ActionMenu ref={menuElement} variant="header" x={menu.x} y={menu.y} label={t('project.choose')} trigger={trigger.current}
+      outsideIgnore={() => contextMenuElement.current ?? (menuElement.current?.querySelector('[data-project-add-inline] [aria-expanded="true"]') ? document.body : null)}
+      onClose={() => { setContextMenu(null); setMenu(null) }}>
       {projectItems(false)}
       {paths.length > 0 && <ActionMenuSeparator />}
       {projectAdd ?? <ActionMenuItem icon={<Plus />} onClick={onOpen}>{t('project.add')}</ActionMenuItem>}

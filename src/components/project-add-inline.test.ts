@@ -21,6 +21,7 @@ window.fixture={calls:[], failOpen:false, registryError:false, pendingPin:false,
     onCreateWithAgent={project=>window.fixture.calls.push(['agent',project.path])}
     onOpen={path=>{window.fixture.calls.push(['open',path]);return !window.fixture.failOpen;}}/></I18nProvider>);}),
   click:selector=>act(async()=>{const button=document.querySelector(selector);if(!button)throw new Error('Missing '+selector);button.click();}),
+  outside:()=>act(async()=>document.querySelector('.mew-dialog-overlay').dispatchEvent(new PointerEvent('pointerdown',{bubbles:true}))),
   input:(selector,value)=>act(async()=>{const input=document.querySelector(selector);Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,value);input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new Event('change',{bubbles:true}));}),
   submit:()=>act(async()=>document.querySelector('form').dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}))),
   key:key=>act(async()=>window.dispatchEvent(new KeyboardEvent('keydown',{key,bubbles:true,cancelable:true}))),
@@ -74,8 +75,9 @@ interface Fixture {
   registryError: boolean
   pendingPin: boolean
   repositoriesError: boolean
-  mount(props?: { onboarding?: boolean; paths?: string[]; canUseAgent?: boolean }): Promise<void>
+  mount(props?: { onboarding?: boolean; paths?: string[]; canUseAgent?: boolean; openRequested?: boolean }): Promise<void>
   click(selector: string): Promise<void>
+  outside(): Promise<void>
   input(selector: string, value: string): Promise<void>
   submit(): Promise<void>
   key(key: string): Promise<void>
@@ -99,18 +101,31 @@ function mount() {
   const step = () => win.document.querySelector('[data-project-add-step]')?.getAttribute('data-project-add-step')
   const choices = () => [...win.document.querySelectorAll('[data-project-add-choice]')].map(element => element.getAttribute('data-project-add-choice'))
   const choose = (name: string) => fixture.click(`[data-project-add-choice="${name}"]`)
-  return { win, fixture, step, choices, choose, close: async () => { await fixture.destroy(); await win.happyDOM.close() } }
+  const open = () => fixture.click('button[aria-label="프로젝트 추가"]')
+  return { win, fixture, step, choices, choose, open, close: async () => { await fixture.destroy(); await win.happyDOM.close() } }
 }
 
-test('empty onboarding offers three actions, workspace import and path browsing back one level at a time', async () => {
+test('empty onboarding offers an icon trigger and opens project choices in a modal with one-level navigation', async () => {
   const view = mount()
   try {
     await view.fixture.mount({ onboarding: true })
-    assert.equal(view.step(), 'choices')
+    assert.equal(view.step(), 'closed')
     assert.equal(view.win.document.querySelector('h2')?.textContent, '프로젝트를 추가하세요')
-    assert.deepEqual(view.choices(), ['create', 'clone', 'import'])
-    assert.deepEqual([...view.win.document.querySelectorAll('[data-project-add-choice]')].map(element => element.textContent), ['새 프로젝트 만들기', 'Git repo 클론하기', '프로젝트 가져오기'])
+    assert.deepEqual(view.choices(), [])
+    const trigger = view.win.document.querySelector('button[aria-label="프로젝트 추가"]')
+    assert.equal(trigger?.textContent, '', 'the familiar Add action is an accessible icon-only button')
+    assert.equal(trigger?.getAttribute('aria-haspopup'), 'dialog')
+    assert.equal(view.win.document.querySelector('[role="dialog"]'), null)
     assert.equal(view.fixture.calls.length, 0, 'reading the empty onboarding does not query or import projects')
+    await view.open()
+    assert.equal(view.step(), 'choices')
+    const dialog = view.win.document.querySelector('[role="dialog"]')
+    assert.ok(dialog)
+    assert.equal(dialog.getAttribute('aria-modal'), 'true')
+    assert.equal(view.win.document.querySelector('#root')?.contains(dialog), false, 'setup is portaled outside the project panel')
+    assert.deepEqual(view.choices(), ['create', 'clone', 'import'])
+    assert.deepEqual([...view.win.document.querySelectorAll('[data-project-add-choice]')].map(element => element.getAttribute('aria-label')), ['새 프로젝트 만들기', 'Git repo 클론하기', '프로젝트 가져오기'])
+    assert.equal(view.fixture.calls.length, 0, 'opening project choices does not query or import projects')
     await view.choose('import')
     assert.deepEqual(view.choices(), ['workspace', 'browse'])
     await view.choose('workspace')
@@ -122,16 +137,17 @@ test('empty onboarding offers three actions, workspace import and path browsing 
     assert.equal(view.step(), 'import')
     assert.equal(view.win.document.activeElement?.getAttribute('data-project-add-choice'), 'workspace')
     await view.choose('browse')
-    assert.ok(view.win.document.querySelector('[role="dialog"]'), 'external browsing uses the established folder dialog')
+    assert.equal(view.win.document.querySelectorAll('[role="dialog"]').length, 2, 'external browsing uses the established folder dialog above project setup')
     await view.fixture.key('Escape')
-    assert.equal(view.win.document.querySelector('[role="dialog"]'), null)
+    assert.equal(view.win.document.querySelectorAll('[role="dialog"]').length, 1)
     assert.equal(view.step(), 'import')
     assert.equal(view.win.document.activeElement?.getAttribute('data-project-add-choice'), 'browse')
-    await view.fixture.key('Escape')
+    await view.fixture.click('[data-project-add-back]')
     assert.equal(view.step(), 'choices')
     assert.equal(view.win.document.activeElement?.getAttribute('data-project-add-choice'), 'import')
     await view.fixture.key('Escape')
     assert.equal(view.step(), 'closed')
+    assert.equal(view.win.document.querySelector('[role="dialog"]'), null)
     assert.equal(view.win.document.activeElement?.getAttribute('aria-label'), '프로젝트 추가')
     await view.fixture.click('button[aria-label="프로젝트 추가"]')
     assert.deepEqual(view.choices(), ['create', 'clone', 'import'])
@@ -142,6 +158,7 @@ test('workspace import disambiguates names, filters paths and pins before refres
   const view = mount()
   try {
     await view.fixture.mount({ onboarding: true, paths: ['/mine'] })
+    await view.open()
     await view.choose('import'); await view.choose('workspace')
     assert.ok(view.win.document.querySelector('[data-catalog-project="/workspace/shared"]')?.textContent.includes('/workspace/shared'))
     await view.fixture.input('.mew-project-catalog-search input', '/workspace/')
@@ -157,6 +174,7 @@ test('failed opening retries an imported project without pinning twice and exist
   try {
     view.fixture.failOpen = true
     await view.fixture.mount({ onboarding: true, paths: ['/mine'] })
+    await view.open()
     await view.choose('import'); await view.choose('workspace')
     await view.fixture.click('[data-catalog-project="/workspace/shared"] button')
     assert.match(view.win.document.querySelector('[role="alert"]')?.textContent ?? '', /프로젝트를 열지 못했습니다/)
@@ -166,6 +184,7 @@ test('failed opening retries an imported project without pinning twice and exist
     assert.equal(view.fixture.calls.filter(call => call[0] === 'pin').length, 1)
     assert.equal(view.fixture.calls.filter(call => call[0] === 'open').length, 2)
     await view.fixture.mount({ onboarding: true, paths: ['/mine'] })
+    await view.open()
     await view.choose('import'); await view.choose('workspace')
     await view.fixture.click('[data-catalog-project="/mine"] button')
     assert.equal(view.fixture.calls.filter(call => call[0] === 'pin').length, 1, 'an existing personal project is not pinned again')
@@ -173,16 +192,19 @@ test('failed opening retries an imported project without pinning twice and exist
   } finally { await view.close() }
 })
 
-test('busy workspace imports block duplicate actions, X, Escape and browser Back', async () => {
+test('busy workspace imports block duplicate actions, close/back buttons, outside, Escape and browser Back', async () => {
   const view = mount()
   try {
     view.fixture.pendingPin = true
     await view.fixture.mount({ onboarding: true })
+    await view.open()
     await view.choose('import'); await view.choose('workspace')
     await view.fixture.click('[data-catalog-project="/workspace/shared"] button')
     assert.equal(view.win.document.querySelector('[data-project-add-back]')?.getAttribute('disabled'), '')
     await view.fixture.click('[data-catalog-project="/workspace/shared"] button')
     await view.fixture.click('[data-project-add-back]')
+    await view.fixture.click('[data-project-add-close]')
+    await view.fixture.outside()
     await view.fixture.key('Escape')
     await view.fixture.back()
     assert.equal(view.step(), 'workspace')
@@ -192,11 +214,12 @@ test('busy workspace imports block duplicate actions, X, Escape and browser Back
   } finally { await view.close() }
 })
 
-test('catalog load errors recover inline and unmatched searches show the existing empty state', async () => {
+test('catalog load errors recover inside the modal and unmatched searches show the existing empty state', async () => {
   const view = mount()
   try {
     view.fixture.registryError = true
     await view.fixture.mount({ onboarding: true })
+    await view.open()
     await view.choose('import'); await view.choose('workspace')
     assert.match(view.win.document.querySelector('[role="alert"]')?.textContent ?? '', /Catalog unavailable/)
     view.fixture.registryError = false
@@ -206,7 +229,8 @@ test('catalog load errors recover inline and unmatched searches show the existin
     assert.equal(view.win.document.querySelectorAll('[data-catalog-project]').length, 0)
     assert.ok(view.win.document.querySelector('.mew-project-catalog-list p')?.textContent)
     await view.fixture.back()
-    assert.equal(view.step(), 'import', 'browser Back returns to import sources')
+    assert.equal(view.step(), 'closed', 'browser Back dismisses the Add popup at any step')
+    assert.equal(view.win.document.activeElement?.getAttribute('aria-label'), '프로젝트 추가')
   } finally { await view.close() }
 })
 
@@ -215,6 +239,7 @@ test('creation retains validation and retries the created project without a dupl
   try {
     view.fixture.failOpen = true
     await view.fixture.mount({ onboarding: true })
+    await view.open()
     await view.choose('create')
     await view.fixture.input('input', '../invalid')
     await view.fixture.submit()
@@ -223,6 +248,10 @@ test('creation retains validation and retries the created project without a dupl
     await view.fixture.submit()
     assert.equal(view.fixture.calls.filter(call => call[0] === 'register').length, 1)
     assert.match(view.win.document.querySelector('[role="alert"]')?.textContent ?? '', /프로젝트를 열지 못했습니다/)
+    await view.fixture.click('[data-project-add-close]')
+    assert.equal(view.step(), 'closed')
+    await view.open()
+    assert.equal(view.step(), 'create', 'reopening resumes a created project that still needs to be opened')
     await view.fixture.click('[data-project-add-back]')
     assert.equal(view.step(), 'choices')
     assert.equal(view.win.document.querySelector('[data-project-add-choice="clone"]')?.getAttribute('disabled'), '')
@@ -239,10 +268,11 @@ test('external folder import retains the registered project when opening fails a
   try {
     view.fixture.failOpen = true
     await view.fixture.mount({ onboarding: true })
+    await view.open()
     await view.choose('import'); await view.choose('browse')
     await view.fixture.click('[role="dialog"] footer button')
     assert.equal(view.fixture.calls.filter(call => call[0] === 'register').length, 1)
-    assert.match(view.win.document.querySelector('[role="dialog"] [role="alert"]')?.textContent ?? '', /프로젝트를 열지 못했습니다/)
+    assert.match(view.win.document.querySelector('[role="dialog"] footer')?.closest('[role="dialog"]')?.querySelector('[role="alert"]')?.textContent ?? '', /프로젝트를 열지 못했습니다/)
     view.fixture.failOpen = false
     await view.fixture.click('[role="dialog"] footer button')
     assert.equal(view.fixture.calls.filter(call => call[0] === 'register').length, 1)
@@ -257,6 +287,7 @@ test('clone keeps provider repositories, retry and private status and can open a
   try {
     view.fixture.repositoriesError = true
     await view.fixture.mount({ onboarding: true })
+    await view.open()
     await view.choose('clone')
     assert.match(view.win.document.querySelector('[role="alert"]')?.textContent ?? '', /Repositories unavailable/)
     view.fixture.repositoriesError = false
@@ -265,6 +296,44 @@ test('clone keeps provider repositories, retry and private status and can open a
     await view.fixture.click('[role="group"] button')
     const registered = view.fixture.calls.find(call => call[0] === 'register')
     assert.equal((registered?.[1] as { url: string })?.url, 'https://example.test/repo.git')
+    assert.equal(view.step(), 'closed')
+  } finally { await view.close() }
+})
+
+test('a failed URL clone resumes after dismissal and retries without cloning twice', async () => {
+  const view = mount()
+  try {
+    view.fixture.failOpen = true
+    await view.fixture.mount()
+    await view.open()
+    await view.choose('clone')
+    await view.fixture.submit()
+    assert.equal(view.fixture.calls.filter(call => call[0] === 'register').length, 0, 'an empty repository URL cannot submit')
+    await view.fixture.input('input', 'https://example.test/team/repository.git')
+    await view.fixture.submit()
+    assert.equal(view.fixture.calls.filter(call => call[0] === 'register').length, 1)
+    assert.match(view.win.document.querySelector('[role="alert"]')?.textContent ?? '', /프로젝트를 열지 못했습니다/)
+    await view.fixture.key('Escape')
+    assert.equal(view.step(), 'closed')
+    await view.open()
+    assert.equal(view.step(), 'clone')
+    view.fixture.failOpen = false
+    await view.fixture.submit()
+    assert.equal(view.fixture.calls.filter(call => call[0] === 'register').length, 1)
+    assert.equal(view.fixture.calls.filter(call => call[0] === 'open').length, 2)
+    assert.equal(view.step(), 'closed')
+  } finally { await view.close() }
+})
+
+test('an external Add request opens the same modal without fetching project data', async () => {
+  const view = mount()
+  try {
+    await view.fixture.mount({ openRequested: true })
+    assert.equal(view.step(), 'choices')
+    assert.equal(view.win.document.querySelectorAll('[role="dialog"]').length, 1)
+    assert.deepEqual(view.choices(), ['create', 'clone', 'import'])
+    assert.equal(view.fixture.calls.length, 0)
+    await view.fixture.click('[data-project-add-close]')
     assert.equal(view.step(), 'closed')
   } finally { await view.close() }
 })

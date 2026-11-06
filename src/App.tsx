@@ -805,7 +805,6 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
       setHasProject(false)
       setRootProjectPath(null)
       setProjectUiPath(null)
-      setOpenProjectDialog(true)
       return
     }
     setHasProject(true)
