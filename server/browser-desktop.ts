@@ -1,10 +1,10 @@
 import type { IncomingMessage, Server } from 'node:http'
 import type { Http2SecureServer } from 'node:http2'
-import crypto from 'node:crypto'
 import { WebSocket, WebSocketServer } from 'ws'
 import { BROWSER_DESKTOP_WS, browserDesktopCommand } from '../shared/browser-desktop.ts'
 import { parseLoginDesktopInput, type LoginDesktopInput, type LoginDesktopState } from '../shared/login-desktop.ts'
-import { LoginDesktopSession, childProcess, stopChild } from './login-desktop.ts'
+import { NativeBrowserSession, childProcess, stopChild } from './browser-native-runtime.ts'
+import { browserLoginJob, onBrowserLoginClosed } from './browser-login-jobs.ts'
 import { BrowserDesktopVideo, H264AccessUnits, browserVideoFFmpegArgs, type BrowserVideoMode } from './browser-desktop-video.ts'
 import { canUse } from './access-policy.ts'
 import { watchSocketAccess } from './access-socket.ts'
@@ -19,7 +19,7 @@ const servers = new Set<Server | Http2SecureServer>()
 const GRACE = 60000
 
 export function browserDesktopAllowed(req: IncomingMessage, auth: RequestAuth, account = auth.email) {
-  return !!account && auth.email === account && !auth.mustChangePassword && canUse(auth, 'portPreview') && canUse(auth, 'desktop') && (!!req.headers.origin || !!remoteContext(req)) && webSocketOriginAllowed(req)
+  return !!account && auth.email === account && !auth.mustChangePassword && canUse(auth, 'nativeBrowser') && (!!req.headers.origin || !!remoteContext(req)) && webSocketOriginAllowed(req)
 }
 
 export function browserDesktopTarget(raw: string): string {
@@ -34,7 +34,7 @@ export function browserDesktopTarget(raw: string): string {
 }
 
 /** A private X server and ordinary Chrome; media and input use desktop WebRTC. */
-export class BrowserDesktopSession extends LoginDesktopSession {
+export class BrowserDesktopSession extends NativeBrowserSession {
   private viewer?: WebSocket
   private allowed?: () => boolean
   private video?: BrowserDesktopVideo
@@ -46,20 +46,20 @@ export class BrowserDesktopSession extends LoginDesktopSession {
   private encoderTimer?: ReturnType<typeof setTimeout>
   private captureRevision = 0
   private navigationRevision = 0
+  private navigating: Promise<void> = Promise.resolve()
   private reconnect?: ReturnType<typeof setTimeout>
   private closeTask?: Promise<void>
   private requestedUrl: string
-  private pendingNavigation?: string
+  private pendingNavigation?: { url: string; viewer: WebSocket | undefined; revision: number }
   private reconnectCapture?: Promise<void>
   private receivedAt = 0
   private receivedInputs = 0
+  private loginId?: string
 
   constructor(account: string, url: string) {
-    super(account, `browser:${crypto.randomUUID()}`, browserDesktopTarget(url), ['portPreview'], 8 * 60 * 60_000)
+    super(account, browserDesktopTarget(url))
     this.requestedUrl = url
   }
-  protected override profileKey() { return `browser-desktop:${this.account}` }
-  protected override browserArguments(profile: string) { return super.browserArguments(profile).filter(argument => argument !== '--start-fullscreen') }
   protected override send(value: LoginDesktopState) { this.emitState(value) }
   private emitState(value: object) {
     if (this.viewer?.readyState !== WebSocket.OPEN) return
@@ -94,7 +94,7 @@ export class BrowserDesktopSession extends LoginDesktopSession {
           if (!this.active()) { if (this.viewer && !this.allowed?.()) void this.close(); return }
           const input = parseLoginDesktopInput(value)
           if (!reliable && input.type !== 'pointer') throw new Error('Invalid motion channel input')
-          if (['resize', 'close', 'frame-ack'].includes(input.type)) throw new Error('Invalid input channel command')
+          if (['resize', 'close'].includes(input.type)) throw new Error('Invalid input channel command')
           this.acceptInput(input)
         } catch { this.fail('브라우저 입력을 처리하지 못했습니다. 다시 연결해 주세요.') }
       },
@@ -109,8 +109,10 @@ export class BrowserDesktopSession extends LoginDesktopSession {
     this.desktopInput(input)
   }
 
-  attachViewer(viewer: WebSocket, allowed: () => boolean) {
-    if (this.closed) { viewer.close(1008); return }
+  attachViewer(viewer: WebSocket, allowed: () => boolean, loginId?: string) {
+    if (this.closed) { viewer.close(1008); return false }
+    const changedLogin = this.loginId !== loginId
+    this.loginId = loginId
     clearTimeout(this.reconnect); clearTimeout(this.encoderTimer); this.restarting = false
     const previous = this.viewer
     this.viewer = viewer; this.allowed = allowed
@@ -136,15 +138,18 @@ export class BrowserDesktopSession extends LoginDesktopSession {
       this.reconnect = setTimeout(() => { void this.close() }, GRACE); this.reconnect.unref()
     })
     viewer.on('error', () => {})
+    return changedLogin
   }
 
-  async openDesktop(width: number, height: number, url: string, viewer: WebSocket) {
+  async openDesktop(width: number, height: number, url: string, viewer: WebSocket, { navigate = true, force = false } = {}) {
     const revision = this.navigationRevision
     await this.startDesktop(width, height)
     await this.reconnectCapture
     this.reconnectCapture = undefined
-    if (this.ownsViewer(viewer) && revision === this.navigationRevision) await this.navigate(url, false, viewer)
+    if (navigate && this.ownsViewer(viewer) && revision === this.navigationRevision) await this.navigate(url, force, viewer)
   }
+
+  closeLoginView(id: string) { return this.loginId === id ? this.close() : Promise.resolve() }
 
   signal(value: Record<string, unknown>) { this.video?.signal(value) }
   receiveInput(value: LoginDesktopInput) { this.acceptInput(value) }
@@ -195,7 +200,10 @@ export class BrowserDesktopSession extends LoginDesktopSession {
         pending.push(frame); pendingBytes += frame.length
         if (!this.ready) {
           this.ready = true; this.emitState({ type: 'ready', width: this.width, height: this.height })
-          if (this.pendingNavigation) { const url = this.pendingNavigation; this.pendingNavigation = undefined; void this.navigate(url) }
+          if (this.pendingNavigation) {
+            const pending = this.pendingNavigation; this.pendingNavigation = undefined
+            if (pending.viewer === this.viewer && pending.revision === this.navigationRevision) void this.navigate(pending.url, true, pending.viewer).catch(() => this.fail('브라우저 주소를 열지 못했습니다.'))
+          }
         }
         if (this.launchingCapture) { clearTimeout(this.launchingCapture.timer); this.launchingCapture.resolve(); this.launchingCapture = undefined }
       })
@@ -231,16 +239,14 @@ export class BrowserDesktopSession extends LoginDesktopSession {
     if (force) this.navigationRevision++
     const url = browserDesktopTarget(raw)
     if (!force && url === this.requestedUrl) return
-    this.requestedUrl = url
-    if (!this.ready) { this.pendingNavigation = url; return }
-    this.command({ type: 'release' })
-    this.command({ type: 'key', key: 'Control', code: 'ControlLeft', down: true })
-    this.command({ type: 'key', key: 'l', code: 'KeyL', down: true })
-    this.command({ type: 'key', key: 'l', code: 'KeyL', down: false })
-    this.command({ type: 'key', key: 'Control', code: 'ControlLeft', down: false })
-    this.command({ type: 'paste', text: url })
-    this.command({ type: 'key', key: 'Enter', code: 'Enter', down: true })
-    this.command({ type: 'key', key: 'Enter', code: 'Enter', down: false })
+    const revision = this.navigationRevision
+    if (!this.ready) { this.pendingNavigation = { url, viewer, revision }; return }
+    this.navigating = this.navigating.catch(() => {}).then(async () => {
+      if (this.closed || viewer !== this.viewer || revision !== this.navigationRevision) return
+      await this.openNativeUrl(url)
+      if (!this.closed && viewer === this.viewer && revision === this.navigationRevision) this.requestedUrl = url
+    })
+    await this.navigating
   }
 
   override close(): Promise<void> {
@@ -250,12 +256,14 @@ export class BrowserDesktopSession extends LoginDesktopSession {
     if (this.launchingCapture) { clearTimeout(this.launchingCapture.timer); this.launchingCapture.reject(new Error('Browser closed')); this.launchingCapture = undefined }
     const video = this.video; this.video = undefined
     this.emitState({ type: 'closed' }); this.viewer?.close(1000); this.viewer = undefined
-    this.closeTask = (async () => { await Promise.all([super.close(), video?.close()]); await this.encoding.catch(() => {}); if (sessions.get(this.account) === this) sessions.delete(this.account) })()
+    this.closeTask = (async () => { await Promise.all([super.close(), video?.close()]); await Promise.all([this.encoding.catch(() => {}), this.navigating.catch(() => {})]); if (sessions.get(this.account) === this) sessions.delete(this.account) })()
     return this.closeTask
   }
 }
 
 export async function closeBrowserDesktops() { await Promise.all([...sessions.values()].map(session => session.close())) }
+export async function closeBrowserLoginView(account: string, id: string) { await sessions.get(account)?.closeLoginView(id) }
+onBrowserLoginClosed(record => { void closeBrowserLoginView(record.account, record.id) })
 
 export function attachBrowserDesktopWebSocket(server: Server | Http2SecureServer, getAuth = resolveAuth) {
   servers.add(server)
@@ -263,7 +271,8 @@ export function attachBrowserDesktopWebSocket(server: Server | Http2SecureServer
   server.on('upgrade', (req, socket, head) => {
     if (new URL(req.url ?? '', 'http://localhost').pathname !== BROWSER_DESKTOP_WS) return
     const auth = getAuth(req), account = auth.email ?? ''
-    const allowed = () => browserDesktopAllowed(req, getAuth(req), account)
+    const loginId = new URL(req.url ?? '', 'http://localhost').searchParams.get('login')
+    const allowed = () => browserDesktopAllowed(req, getAuth(req), account) && (!loginId || !!browserLoginJob(loginId, account))
     if (!allowed()) { socket.end('HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n'); return }
     wss.handleUpgrade(req, socket, head, ws => {
       watchSocketAccess(ws, req, allowed)
@@ -281,16 +290,22 @@ export function attachBrowserDesktopWebSocket(server: Server | Http2SecureServer
           const value = browserDesktopCommand(raw.toString())
           if (value.type === 'open') {
             if (initialized) throw new Error('Browser already initialized')
-            const url = browserDesktopTarget(value.url)
+            const login = loginId ? browserLoginJob(loginId, account) : undefined
+            if (loginId && !login) throw new Error('Browser login job expired')
+            const url = browserDesktopTarget(login?.url ?? value.url)
             initialized = true; clearTimeout(initialDeadline)
             void (async () => {
               let acquired = sessions.get(account)
               while (acquired?.isClosed) { await acquired.close(); acquired = sessions.get(account) }
               if (!allowed() || ws.readyState !== WebSocket.OPEN) return
+              const created = !acquired
               if (!acquired) { acquired = new BrowserDesktopSession(account, url); sessions.set(account, acquired) }
               session = acquired
-              session.attachViewer(ws, allowed)
-              await session.openDesktop(value.width, value.height, url, ws)
+              const changedLogin = session.attachViewer(ws, allowed, login?.id)
+              await session.openDesktop(value.width, value.height, url, ws, {
+                navigate: created || (login ? changedLogin : url !== 'about:blank'),
+                force: !created && !!login && changedLogin,
+              })
             })().catch(() => {
               if (!session?.ownsViewer(ws)) return
               if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'error', message: '가상 Chrome 화면을 시작하지 못했습니다. Chrome·Xvfb·FFmpeg·Python과 WebRTC 런타임을 확인해 주세요.' }))

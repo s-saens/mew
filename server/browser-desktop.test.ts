@@ -60,17 +60,26 @@ test('browser ownership, feature permission, password state and Origin are all r
   assert.equal(browserDesktopAllowed({ headers: { host: 'mew.test', origin: 'http://evil.test' } } as IncomingMessage, owner), false)
   assert.equal(browserDesktopAllowed({ headers: { host: 'mew.test' } } as IncomingMessage, owner), false)
   setFeature(owner.email, 'portPreview', false)
-  try { assert.equal(browserDesktopAllowed(req, owner), false) }
-  finally { setFeature(owner.email, 'portPreview', null) }
+  setFeature(owner.email, 'desktop', false)
+  try {
+    assert.equal(browserDesktopAllowed(req, owner), true, 'native browser access does not require localhost or remote desktop grants')
+    setFeature(owner.email, 'nativeBrowser', false)
+    assert.equal(browserDesktopAllowed(req, owner), false)
+  } finally { for (const feature of ['nativeBrowser', 'desktop', 'portPreview'] as const) setFeature(owner.email, feature, null) }
   const member = { ...owner, email: 'scoped-browser@test', role: 'member' } as const
   setFeature(member.email, 'portPreview', true)
   try {
     assert.equal(browserDesktopAllowed(req, member), false, 'a localhost-preview grant does not authorize a full native browser')
     setFeature(member.email, 'desktop', true)
+    assert.equal(browserDesktopAllowed(req, member), false, 'a remote desktop grant does not authorize the separately configured browser')
+    setFeature(member.email, 'nativeBrowser', true)
     assert.equal(browserDesktopAllowed(req, member), true)
     setFeature(member.email, 'desktop', false)
-    assert.equal(browserDesktopAllowed(req, member), false, 'revoking desktop authority revokes the native browser')
-  } finally { setFeature(member.email, 'desktop', null); setFeature(member.email, 'portPreview', null) }
+    setFeature(member.email, 'portPreview', false)
+    assert.equal(browserDesktopAllowed(req, member), true, 'the standalone browser grant remains sufficient')
+    setFeature(member.email, 'nativeBrowser', false)
+    assert.equal(browserDesktopAllowed(req, member), false, 'revoking browser authority closes browser access')
+  } finally { for (const feature of ['nativeBrowser', 'desktop', 'portPreview'] as const) setFeature(member.email, feature, null) }
 })
 
 test('closing an unauthorized OPEN viewer is idempotent and cannot recurse through state delivery', async () => {
@@ -90,6 +99,45 @@ test('closing an unauthorized OPEN viewer is idempotent and cannot recurse throu
     assert.equal(closed, 1)
     assert.deepEqual(sent, [], 'revoked viewers receive no state or video')
   } finally { await session.close() }
+})
+
+test('queued native navigation cannot outlive its viewer or session', async () => {
+  let release: (() => void) | undefined
+  const entered = new Promise<void>(resolve => {
+    release = resolve
+  })
+  let started!: () => void
+  const starting = new Promise<void>(resolve => { started = resolve })
+  class NavigationFixture extends BrowserDesktopSession {
+    readonly urls: string[] = []
+    activate() { this.ready = true }
+    deactivate() { this.ready = false }
+    protected override async openNativeUrl(url: string) {
+      this.urls.push(url)
+      if (this.urls.length === 1) { started(); await entered }
+    }
+  }
+  const viewer = () => Object.assign(new EventEmitter(), {
+    readyState: WebSocket.OPEN,
+    send() {},
+    close() {},
+  }) as unknown as WebSocket
+  const session = new NavigationFixture('queued-browser@test', 'about:blank')
+  const firstViewer = viewer(), nextViewer = viewer()
+  session.attachViewer(firstViewer, () => true); session.activate()
+  try {
+    const first = session.navigate('https://example.test/first', true, firstViewer)
+    await starting
+    const obsolete = session.navigate('https://example.test/obsolete', true, firstViewer)
+    session.deactivate(); session.attachViewer(nextViewer, () => true); session.activate()
+    const current = session.navigate('https://example.test/current', true, nextViewer)
+    release!()
+    await Promise.all([first, obsolete, current])
+    assert.deepEqual(session.urls, ['https://example.test/first', 'https://example.test/current'])
+    const afterClose = session.navigate('https://example.test/closed', true, nextViewer)
+    await session.close(); await afterClose
+    assert.equal(session.urls.length, 2)
+  } finally { release!(); await session.close() }
 })
 
 test('WebSocket rejects bad authority, commands before open, invalid framing and live feature revocation', { timeout: 10000 }, async () => {
@@ -120,11 +168,11 @@ test('WebSocket rejects bad authority, commands before open, invalid framing and
     oversized.send('a'.repeat(33 * 1024))
     assert.equal((await limitClosed)[0], 1009)
     const live = await connect(), revoked = once(live, 'close')
-    setFeature(account, 'portPreview', false)
+    setFeature(account, 'nativeBrowser', false)
     await revoked
-    setFeature(account, 'portPreview', null)
+    setFeature(account, 'nativeBrowser', null)
   } finally {
-    setFeature(account, 'portPreview', null)
+    setFeature(account, 'nativeBrowser', null)
     for (const ws of sockets) ws.terminate()
     await closeBrowserDesktops(); server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve()))
   }
@@ -224,7 +272,7 @@ try{
  await until(()=>ownedPids.every(pid=>!running(pid)),'explicit close releases all session-owned child processes');await assert.rejects(fs.access(path.dirname(authority)),{code:'ENOENT'});
  await fs.access(profile);
  const next=events.findLast(event=>event.kind==='loaded');assert.match(next.cookie,/browserFixture=retained/);
- allowed=false;setFeature(account,'portPreview',false);await page.waitForFunction('window.socket.readyState===WebSocket.CLOSED',null,{timeout:5000});
+ allowed=false;setFeature(account,'nativeBrowser',false);await page.waitForFunction('window.socket.readyState===WebSocket.CLOSED',null,{timeout:5000});
  await closeBrowserDesktops();await assert.rejects(fs.lstat(path.join(profile,'SingletonLock')),{code:'ENOENT'});assert.equal(binaryMessages,0,'video never enters the signaling WebSocket');assert.deepEqual(errors,[]);
  console.log(JSON.stringify({frames:beforeFrames,decodedFrames,measuredSeconds:Math.round(measuredSeconds*1000)/1000,receivedFps,localInputToVideoMs,nativeClicks:events.filter(event=>event.kind==='click').length,loadedDocuments:new Set(events.filter(event=>event.kind==='loaded').map(event=>event.document)).size,binaryMessages}));
 }finally{

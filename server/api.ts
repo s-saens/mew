@@ -2488,7 +2488,7 @@ export function createApiApp() {
     }
   })
 
-  app.post('/agent-runtimes/:id/auth/:method/browser', requireFeature('agent'), async (req, res) => {
+  app.post('/agent-runtimes/:id/auth/:method/browser', requireFeature('agent'), requireFeature('nativeBrowser'), async (req, res) => {
     try {
       const id = String(req.params.id)
       const methodId = String(req.params.method)

@@ -2485,7 +2485,8 @@ function AgentSessionView({
     authBrowserOpeningRef.current = false
     const current = authBrowserRef.current
     if (current) {
-      const id = current.loginSessionId ?? new URL(current.streamUrl, location.href).searchParams.get('session')
+      const query = new URL(current.streamUrl, location.href).searchParams
+      const id = current.loginSessionId ?? query.get('login') ?? query.get('session')
       if (id) { void closeLoginDesktop(id).catch(() => {}); acpLoginSessionsRef.current.delete(id) }
     }
     authBrowserRef.current = null
@@ -4136,7 +4137,8 @@ function AgentSessionView({
             const next = authBrowser.methodId
               ? await openAgentAuthServerBrowser(runtime, tabId, authBrowser.methodId)
               : await openLoginDesktop(authBrowser.url)
-            const id = new URL(next.streamUrl, location.href).searchParams.get('session')
+            const query = new URL(next.streamUrl, location.href).searchParams
+            const id = query.get('login') ?? query.get('session')
             if (!authBrowserRef.current) {
               if (id) void closeLoginDesktop(id).catch(() => {})
               return next.streamUrl

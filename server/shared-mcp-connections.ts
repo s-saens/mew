@@ -3,7 +3,7 @@ import http from 'node:http'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js'
 import type { SharedMcpConnectionStatus } from '../shared/shared-mcp.ts'
-import { accessChanges } from './access-policy.ts'
+import { accessChanges, canUse } from './access-policy.ts'
 import { getUser } from './auth.ts'
 import { closeLoginDesktopJob, createLoginDesktopAuthSession } from './login-desktop.ts'
 import { readSharedMcpConfig, sharedMcpConfigIdentity, sharedMcpDirectory, type SharedMcpConfig } from './shared-mcp.ts'
@@ -63,7 +63,11 @@ const defaults: Dependencies = {
   authStatus: sharedMcpAuthStatus,
   clearAuth: clearSharedMcpAuth,
   connected: markSharedMcpConnected,
-  openBrowser: createLoginDesktopAuthSession,
+  openBrowser: async (owner, job, url) => {
+    const user = getUser(owner)
+    if (!user || !canUse({ email: owner, role: user.role, mustChangePassword: user.mustChangePassword }, 'nativeBrowser')) throw new SharedMcpConnectionError('브라우저를 사용할 권한이 없습니다.', 403)
+    return createLoginDesktopAuthSession(owner, job, url)
+  },
   closeBrowser: closeLoginDesktopJob,
   timeout: 10 * 60_000,
   checkInterval: 1000,
@@ -197,8 +201,9 @@ export class SharedMcpConnections {
             const streamUrl = await this.deps.openBrowser(job.owner, job.id, url.href)
             this.assertActive(job)
             job.state = { name: job.name, status: 'needs_auth', streamUrl }
-          } catch {
-            if (job.active) throw new SharedMcpConnectionError('로그인 화면을 준비하지 못했습니다. Linux/WSL 호스트의 Chrome 및 로그인 화면 구성을 확인하세요.', 503)
+          } catch (error) {
+            job.expectedState = undefined
+            if (job.active) throw error instanceof SharedMcpConnectionError ? error : new SharedMcpConnectionError('로그인 화면을 준비하지 못했습니다. Linux/WSL 호스트의 Chrome 및 로그인 화면 구성을 확인하세요.', 503)
             throw new Error('cancelled')
           }
         } })

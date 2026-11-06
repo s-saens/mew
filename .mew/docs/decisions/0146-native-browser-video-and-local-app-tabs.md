@@ -1,8 +1,8 @@
 ---
 title: "0146 — Native Chrome video and separate localhost app tabs"
-description: "Chooses headed Chrome on a private Linux/WSL display with low-delay H.264 WebRTC for the Browser panel, and separate authenticated /port tabs for localhost apps. Partially supersedes ADR 0137's interactive DOM-browser purpose split while preserving Playwright automation and the independent login display."
+description: "Chooses headed Chrome on a private Linux/WSL display with low-delay H.264 WebRTC for the Browser panel, and separate authenticated /port tabs for localhost apps. Partially supersedes ADR 0137's interactive DOM-browser purpose split while preserving Playwright automation. ADR 0150 supersedes its separate login profile/transport and desktop-plus-preview browser permission."
 created: "2026-11-05"
-updated: "2026-11-05"
+updated: "2026-11-06"
 status: accepted
 ---
 
@@ -41,3 +41,5 @@ The Mew navigation guard rejects Mew-submitted targets on Mew ports. It does not
 Host server changes require a user-owned restart, and remote use requires the central Mewlink signaling allowlist update. Builds and isolated tests do not apply those operational changes or establish physical-phone, external-network, CAPTCHA, or provider-login acceptance.
 
 The current implementation contract is [Native Chrome browser desktop](../development/browser-desktop.md). Existing owners remain [port preview](../development/port-preview.md), [login desktop](../development/login-desktop.md), [browser dependencies](../development/browser-dependencies.md), and [UI automation](../development/browser-testing.md).
+
+[ADR 0150](0150-shared-browser-login.md) supersedes this decision's separate login display/profile and combined desktop-plus-localhost grant. Login and ordinary browsing now use one Chrome H.264/WebRTC component, one account browser profile, and the dedicated `nativeBrowser` permission. Its video transport and separate localhost app tabs remain.

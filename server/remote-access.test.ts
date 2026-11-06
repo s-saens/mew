@@ -28,6 +28,7 @@ test('remote request paths cannot reach arbitrary origins, local ports or unsupp
   assert.equal(remotePath('/api/browser-desktop/ws', true), true)
   assert.equal(remotePath('/api/browser-desktop/ws?session=fixture', true), true)
   assert.equal(remotePath('/api/browser-desktop/ws/other', true), false)
+  assert.equal(remotePath('/api/login-desktop/ws?session=old-jpeg-viewer', true), false)
   for (const route of ['me', 'login', 'logout', 'change-password']) assert.equal(remotePath('/api/auth/' + route), true)
   assert.equal(remotePath('/api/auth/login/extra'), false)
   assert.equal(remotePath('/api/remote-ui/file?path=%2Fassets%2Fapp.js'), true)

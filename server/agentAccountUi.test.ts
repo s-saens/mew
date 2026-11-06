@@ -10,11 +10,11 @@ import { chromium } from 'playwright-core'
 import { domBrowserExecutable } from './browser-dom-executable.ts'
 import { WebSocketServer } from 'ws'
 
-test('account UI shows quota/account, opens and closes the isolated sign-in video viewer, and refreshes without sending a prompt', { skip: !domBrowserExecutable(), timeout: 45_000 }, async (t) => {
+test('account UI opens the shared native browser panel and refreshes without sending a prompt', { skip: !domBrowserExecutable(), timeout: 45_000 }, async (t) => {
   const app = express()
   app.use(express.json())
   let closed = false
-  app.post('/api/login-desktop', (req, res) => res.json({ id: 'fixture', job: 'fixture', url: req.body.url, streamUrl: '/api/login-desktop/ws?session=fixture' }))
+  app.post('/api/login-desktop', (req, res) => res.json({ id: 'fixture', job: 'fixture', url: req.body.url, streamUrl: '/api/browser-desktop/ws?login=fixture' }))
   app.delete('/api/login-desktop/fixture', (_req, res) => { closed = true; res.json({ ok: true }) })
   const requests: string[] = []
   let origin = '', reads = 0
@@ -24,7 +24,7 @@ test('account UI shows quota/account, opens and closes the isolated sign-in vide
   })
   app.get('/billing', (_req, res) => res.type('html').send('<html><body><h1>Subscription fixture</h1><button onclick="document.querySelector(\'h1\').textContent=\'Plan selected\'">Choose plan</button></body></html>'))
   const bundle = await build({
-    input: 'virtual:account', output: { format: 'esm' }, platform: 'browser', write: false,
+    input: 'virtual:account', output: { format: 'esm' }, platform: 'browser', write: false, logLevel: 'silent',
     transform: { define: { 'process.env.NODE_ENV': JSON.stringify('test') }, jsx: 'react-jsx' },
     plugins: [{ name: 'account-fixture', resolveId(id) { if (id === 'virtual:account') return id; if (id.endsWith('.css')) return 'virtual:style' }, load(id) {
       if (id === 'virtual:style') return ''
@@ -44,8 +44,12 @@ createRoot(document.getElementById('root')).render(React.createElement(I18nProvi
   app.get('/style.css', (_req, res) => res.type('css').send(css))
   app.get('/', (_req, res) => res.type('html').send('<!doctype html><html lang="ko"><head><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="stylesheet" href="/style.css"></head><body><div id="root"></div><script type="module" src="/app.js"></script></body></html>'))
   const server = http.createServer(app)
-  const video = new WebSocketServer({ server, path: '/api/login-desktop/ws' })
-  video.on('connection', socket => socket.once('message', () => { socket.send(JSON.stringify({ type: 'ready', width: 640, height: 480 })); socket.send(Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=', 'base64'), { binary: true }) }))
+  const video = new WebSocketServer({ server, path: '/api/browser-desktop/ws' }), signals: Array<{ type: string }> = []
+  video.on('connection', socket => socket.on('message', raw => {
+    const value = JSON.parse(raw.toString()) as { type: string }
+    signals.push(value)
+    if (value.type === 'open') socket.send(JSON.stringify({ type: 'offer', negotiation: 0, sdp: 'v=0\r\nm=video 9 UDP/TLS/RTP/SAVPF 102\r\na=rtpmap:102 H264/90000\r\n' }))
+  }))
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
   origin = `http://127.0.0.1:${(server.address() as { port: number }).port}`
   const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
@@ -58,6 +62,11 @@ createRoot(document.getElementById('root')).render(React.createElement(I18nProvi
   page.on('pageerror', (error) => errors.push(error.message))
   page.on('request', (req) => { if (req.method() === 'POST') requests.push(req.url()) })
   await page.addInitScript(() => localStorage.setItem('mew:locale', 'ko'))
+  await page.addInitScript(`window.RTCPeerConnection=class {
+    connectionState='new';remoteDescription=null;localDescription=null;receivers=[];
+    async setRemoteDescription(value){this.remoteDescription=value;for(const label of ['control','motion'])this.ondatachannel?.({channel:{label,readyState:'open',bufferedAmount:0,send(){},close(){}}});const canvas=document.createElement('canvas');canvas.width=640;canvas.height=480;const context=canvas.getContext('2d');context.fillStyle='#123456';context.fillRect(0,0,640,480);const stream=canvas.captureStream(30);this.receivers=[{track:stream.getVideoTracks()[0]}];this.ontrack?.({streams:[stream],track:stream.getVideoTracks()[0],receiver:{jitterBufferTarget:50}});window.accountVideoTimer=setInterval(()=>context.fillRect(0,0,640,480),30)}
+    async addIceCandidate(){}async createAnswer(){return {type:'answer',sdp:'v=0\\r\\na=rtpmap:102 H264/90000\\r\\n'}}async setLocalDescription(value){this.localDescription=value}async getStats(){return new Map()}getReceivers(){return this.receivers}close(){this.connectionState='closed';clearInterval(window.accountVideoTimer)}
+  }`)
   await page.goto(origin)
   await page.getByText('long-account-name-for-mobile-layout@example.test', { exact: true }).waitFor()
   assert.equal(await page.getByText('사용량 한도를 모두 사용했습니다', { exact: true }).isVisible(), true)
@@ -69,8 +78,11 @@ createRoot(document.getElementById('root')).render(React.createElement(I18nProvi
     await page.setViewportSize({ width: 390, height: 844 })
   }
   await page.getByRole('button', { name: '구독하기', exact: true }).click()
-  await page.locator('[data-login-desktop] img').waitFor()
-  await page.locator('[data-login-desktop] img').evaluate(async el => { for (let i = 0; i < 100 && !el.getAttribute('src')?.startsWith('blob:'); ++i) await new Promise(resolve => setTimeout(resolve, 20)); if (!el.getAttribute('src')?.startsWith('blob:')) throw new Error('No sign-in video frame') })
+  await page.locator('[data-browser-desktop-panel][data-embedded] [data-login-desktop] video').waitFor()
+  await page.waitForFunction('document.querySelector("[data-login-desktop] video").videoWidth===640')
+  assert.equal(await page.locator('[data-login-desktop] img, [data-login-desktop] iframe').count(), 0, 'subscription login uses the same WebRTC video panel')
+  assert.equal(signals.some(value => value.type === 'answer'), true)
+  assert.equal(signals.some(value => value.type === 'frame-ack'), false)
   assert.equal(page.context().pages().length, 1, 'no external browser tab')
   await page.getByRole('button', { name: '채팅으로 돌아가기' }).click()
   await page.getByText('플랜: pro · 구독 중', { exact: true }).waitFor({ state: 'attached' })

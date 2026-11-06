@@ -1,15 +1,15 @@
 ---
 title: "Localhost app tabs and port previews"
-description: "Defines localhost app routing through authenticated direct/Mewlink port proxies, host port discovery, command detection, URL rewriting, and sandbox boundaries. Only the portPreview feature authorizes proxy sessions; the former Android gateway entry is removed."
+description: "Defines localhost app routing through authenticated direct/Mewlink port proxies, host port discovery, command detection, URL rewriting, and sandbox boundaries. Only portPreview authorizes proxy sessions and discovery; the common Browser/login uses the independent nativeBrowser feature. The former Android gateway entry is removed."
 created: "2026-10-20"
-updated: "2026-11-05"
+updated: "2026-11-06"
 ---
 
 <a id="internal-dom-browser"></a>
 
 ## Internal Chrome video and localhost apps
 
-The Browser dock starts ordinary headed Chrome at `about:blank` inside its own virtual X11 display. It sends low-delay H.264 over the existing native desktop WebRTC transport; native pointer, key, paste, and wheel input return through WebRTC data channels. Chrome's own address bar, tabs, menus, and page rendering remain visible. The [browser desktop contract](browser-desktop.md) owns capture, profiles, permissions, lifetimes, and verification. UI tests retain Playwright Chromium.
+The Browser dock starts ordinary headed Chrome at `about:blank` inside its own virtual X11 display. It sends low-delay H.264 over the existing native desktop WebRTC transport; native pointer, key, paste, and wheel input return through WebRTC data channels. Chrome's own address bar, tabs, menus, and page rendering remain visible. The [browser desktop contract](browser-desktop.md) owns the common Browser/login component, account profile, `nativeBrowser` permission, capture, lifetimes, and verification. Localhost app tabs and discovery remain separately controlled by `portPreview`. UI tests retain Playwright Chromium.
 
 Localhost HTTP(S) links in Mew, including terminal URLs and command-menu port numbers, open a new viewing-device tab at the existing `{mewAddress}/{port}` preview entry. Paths, queries, and fragments are preserved. `Menu → Localhost browser` opens the port picker; selecting a port opens the proxy tab without starting/stopping the app or creating a host browser context. The [local app proxy](#legacy-proxy-entry-and-execution) executes the app on the viewing device under its existing authenticated sandbox. Existing HTTP loopback proxy semantics and compatibility limits still apply to HTTPS-only local services.
 
@@ -19,7 +19,7 @@ This routing follows [ADR 0146](../decisions/0146-native-browser-video-and-local
 
 ### Host port discovery
 
-The Browser start page lists host localhost TCP listeners independently of command sessions/projects. `GET /api/dom-browser/ports` returns sorted, deduplicated `{ ports: [{ port, kind, title?, processName? }] }`. `kind` is `app`, `mew`, or `blocked`; only `app` opens `http://localhost:<port>/` in the existing DOM browser. Explicit paths and external HTTP(S) addresses remain available.
+The Browser start page lists host localhost TCP listeners independently of command sessions/projects. `GET /api/dom-browser/ports` returns sorted, deduplicated `{ ports: [{ port, kind, title?, processName? }] }`. `kind` is `app`, `mew`, or `blocked`; only `app` opens its authenticated `/<port>/` preview in a new tab. Explicit paths and external HTTP(S) addresses remain available.
 
 Discovery reads Linux `/proc/net/tcp` and `tcp6`, macOS `lsof`, or Windows `Get-NetTCPConnection`. It includes canonical IPv4/IPv6 loopback and wildcard TCP listeners without scanning ranges, probing HTTP, or starting apps. A listener may be non-HTTP; discovery does not prove it serves a website. LAN-only bindings and other network namespaces are excluded. macOS/Windows visibility depends on OS permissions.
 

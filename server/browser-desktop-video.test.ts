@@ -84,14 +84,19 @@ import {BrowserDesktopVideo,H264AccessUnits,browserVideoFFmpegArgs} from ${JSON.
 const requireNative=createRequire(${JSON.stringify(new URL('../native/remote-desktop/package.json', import.meta.url).href)});
 const rtc=requireNative('node-datachannel');
 const receiver=new rtc.PeerConnection('browser-video-synthetic',{iceServers:[],disableAutoNegotiation:true});
-const channels=[];let packets=0,marked=0,inputs=0,mode,remote=false,video,closed=false,offers=0;const pending=[],errors=[],sample=[];
-receiver.onTrack(track=>{channels.push(track);track.onMessage(packet=>{if(packet[1]>=192&&packet[1]<=223)return;packets++;if(packet[1]&128)marked++;if(sample.length<3)sample.push(Buffer.from(packet).subarray(0,16).toString('hex'))})});
-receiver.onDataChannel(channel=>{channels.push(channel);channel.onOpen(()=>channel.sendMessage(JSON.stringify({type:'synthetic-input'})))});
-receiver.onLocalDescription((sdp,type)=>{if(type==='answer')video.signal({type,sdp})});
-receiver.onLocalCandidate((candidate,sdpMid)=>video.signal({type:'candidate',candidate:{candidate,sdpMid}}));
+const channels=[];let packets=0,marked=0,inputs=0,mode,remote=false,video,closed=false,offers=0,queuedSignals=0;const pending=[],errors=[],sample=[];
+// Production signaling crosses a WebSocket. Do not reenter another native peer
+// from a native callback or add candidates before its local ICE transport exists.
+let signaling=Promise.resolve();
+const enqueue=action=>{if(closed)return;if(queuedSignals>=128){errors.push('Synthetic signaling queue overflow');return}queuedSignals++;
+ signaling=signaling.then(()=>new Promise(resolve=>setImmediate(resolve))).then(()=>{queuedSignals--;if(!closed)action()}).catch(error=>{if(!closed)errors.push(error.message)})};
+receiver.onTrack(track=>{if(closed)return;channels.push(track);track.onMessage(packet=>{if(closed||packet[1]>=192&&packet[1]<=223)return;packets++;if(packet[1]&128)marked++;if(sample.length<3)sample.push(Buffer.from(packet).subarray(0,16).toString('hex'))})});
+receiver.onDataChannel(channel=>{if(closed)return;channels.push(channel);channel.onOpen(()=>{if(!closed)channel.sendMessage(JSON.stringify({type:'synthetic-input'}))})});
+receiver.onLocalDescription((sdp,type)=>{if(type==='answer')enqueue(()=>{remote=true;video.signal({type,sdp});for(const c of pending)receiver.addRemoteCandidate(c.candidate,c.sdpMid);pending.length=0})});
+receiver.onLocalCandidate((candidate,sdpMid)=>enqueue(()=>video.signal({type:'candidate',candidate:{candidate,sdpMid}})));
 video=new BrowserDesktopVideo({
- emit(value){if(value.type==='offer'){offers++;receiver.setRemoteDescription(value.sdp,'offer');remote=true;for(const c of pending)receiver.addRemoteCandidate(c.candidate,c.sdpMid);pending.length=0;receiver.setLocalDescription('answer')}
-  else if(value.type==='candidate'){const c=value.candidate;if(remote)receiver.addRemoteCandidate(c.candidate,c.sdpMid);else pending.push(c)}},
+ emit(value){if(value.type==='offer')enqueue(()=>{offers++;receiver.setRemoteDescription(value.sdp,'offer');receiver.setLocalDescription('answer')});
+  else if(value.type==='candidate')enqueue(()=>{const c=value.candidate;if(remote)receiver.addRemoteCandidate(c.candidate,c.sdpMid);else pending.push(c)})},
  onVideo(value){mode=value},keyframe(){},onError(error){if(!closed)errors.push(error.message)},input(){inputs++}
 });
 try {
@@ -112,7 +117,7 @@ try {
  video.configure({width:1920,height:1080,fps:30});await delay(0);assert.equal(offers,1);assert.equal(mode.fps,30);
  assert.equal(errors.length,0,errors.join(';'));
  console.log(JSON.stringify({packets,marked,inputs,frames:frames.length}));
-}finally{closed=true;await video.close();receiver.close();rtc.cleanup()}
+}finally{closed=true;await signaling;await video.close();receiver.close();await delay(0);rtc.cleanup()}
 `
   const result = spawnSync(process.execPath, ['--input-type=module'], { input: script, encoding: 'utf8', timeout: 20000, maxBuffer: 262144 })
   assert.equal(result.status, 0, result.stderr || result.error?.message || result.stdout)

@@ -9,11 +9,11 @@ import { connectTestBrowser } from '../../server/test-browser.ts'
 
 const root = path.resolve(import.meta.dirname, '../..')
 
-test('localhost links open host preview tabs on desktop and mobile and obey permission revocation', { skip: !domBrowserExecutable(), timeout: 45_000 }, async t => {
+test('native browser and localhost tabs obey independent permissions on desktop and mobile', { skip: !domBrowserExecutable(), timeout: 45_000 }, async t => {
   const auth = {
     authenticated: true, email: 'browser-entry@example.test', role: 'owner', mustChangePassword: false,
     displayName: 'Browser entry', avatarDataUrl: null,
-    capabilities: { filesRead: true, filesWrite: true, agent: false, terminal: false, serverFiles: false, collaboration: false, git: false, portPreview: true, desktop: true },
+    capabilities: { filesRead: true, filesWrite: true, agent: false, terminal: false, serverFiles: false, collaboration: false, git: false, portPreview: true, nativeBrowser: true, desktop: false },
   }
   const source = `import React from ${JSON.stringify(import.meta.resolve('react'))};
     import {createRoot} from ${JSON.stringify(import.meta.resolve('react-dom/client'))};
@@ -22,6 +22,7 @@ test('localhost links open host preview tabs on desktop and mobile and obey perm
     function Fixture(){const [auth,setAuth]=React.useState(${JSON.stringify(auth)});
       window.setBrowserAllowed=allowed=>setAuth(current=>({...current,capabilities:{...current.capabilities,portPreview:allowed}}));
       window.setDesktopAllowed=allowed=>setAuth(current=>({...current,capabilities:{...current.capabilities,desktop:allowed}}));
+      window.setNativeBrowserAllowed=allowed=>setAuth(current=>({...current,capabilities:{...current.capabilities,nativeBrowser:allowed}}));
       return <I18nProvider><App auth={auth}/></I18nProvider>}
     createRoot(document.getElementById('root')).render(<Fixture/>);`
   // Keep App, permissions, capture listeners, dock layout and mobile foreground real;
@@ -31,7 +32,7 @@ test('localhost links open host preview tabs on desktop and mobile and obey perm
     <a data-local-link href="http://localhost:5173/nested?mode=preview#section" target="_blank" onClick={()=>{window.nativeEditorClicks=(window.nativeEditorClicks||0)+1}}>Local app</a>
     <a data-second-link href="http://127.0.0.1:8080/other?x=1#next" target="_blank">Second local app</a>
     </article>}`
-  const panel = `export function BrowserDesktopPanel({url,navigationRequest,nativeAllowed,onClose}){return <div data-entry-browser data-url={url} data-request={navigationRequest} data-native-allowed={String(nativeAllowed)}>
+  const panel = `export function BrowserDesktopPanel({url,navigationRequest,nativeAllowed,previewAllowed,onClose}){return <div data-entry-browser data-url={url} data-request={navigationRequest} data-native-allowed={String(nativeAllowed)} data-preview-allowed={String(previewAllowed)}>
     <output aria-label="Requested browser URL">{url}</output><button onClick={onClose}>Close test browser</button></div>}`
   const bundle = await build({
     input: 'virtual:browser-entry.tsx', logLevel: 'silent', write: false, platform: 'browser', output: { format: 'esm' },
@@ -116,17 +117,21 @@ test('localhost links open host preview tabs on desktop and mobile and obey perm
       await nativeBrowser.waitFor({ state: 'visible' })
       assert.equal(await nativeBrowser.getAttribute('data-url'), 'about:blank', 'the Browser dock starts an actual Chrome window with its own native toolbar')
       assert.equal(await nativeBrowser.getAttribute('data-native-allowed'), 'true')
+      await page.evaluate('window.setDesktopAllowed(true)')
+      assert.equal(await nativeBrowser.getAttribute('data-native-allowed'), 'true', 'the remote desktop grant does not own native browser access')
       await page.evaluate('window.setDesktopAllowed(false)')
+      assert.equal(await nativeBrowser.getAttribute('data-native-allowed'), 'true', 'remote desktop revocation keeps an independently granted browser open')
+      await page.evaluate('window.setNativeBrowserAllowed(false)')
       await nativeBrowser.waitFor({ state: 'detached' })
       await dockButton.click()
       await nativeBrowser.waitFor({ state: 'visible' })
-      assert.equal(await nativeBrowser.getAttribute('data-url'), '', 'desktop revocation changes the dock to the localhost port picker')
+      assert.equal(await nativeBrowser.getAttribute('data-url'), '', 'browser revocation changes the dock to the separately permitted localhost port picker')
       assert.equal(await nativeBrowser.getAttribute('data-native-allowed'), 'false', 'localhost preview permission alone does not grant a native browser')
       await nativeBrowser.getByRole('button', { name: 'Close test browser' }).click()
       await nativeBrowser.waitFor({ state: 'detached' })
       const headerMenu = page.getByRole('button', { name: 'Menu', exact: true })
       await headerMenu.click()
-      await page.getByRole('menuitem', { name: 'Localhost browser', exact: true }).click()
+      await page.getByRole('menuitem', { name: 'Remote browser', exact: true }).click()
       const home = page.locator('[data-entry-browser]')
       await home.waitFor({ state: 'visible' })
       assert.equal(await home.getAttribute('data-url'), '', 'hamburger entry opens the port list instead of a previous app')
@@ -146,7 +151,7 @@ test('localhost links open host preview tabs on desktop and mobile and obey perm
       assert.equal(secondPreview.url(), 'http://mew-browser-entry.test/8080/other?x=1#next')
       await secondPreview.close()
       await headerMenu.click()
-      await page.getByRole('menuitem', { name: 'Localhost browser', exact: true }).click()
+      await page.getByRole('menuitem', { name: 'Remote browser', exact: true }).click()
       const panel = page.locator('[data-entry-browser]')
       await panel.waitFor({ state: 'visible' })
       assert.equal(await panel.getAttribute('data-url'), '', 'hamburger still opens the internal browser start page')
@@ -155,7 +160,7 @@ test('localhost links open host preview tabs on desktop and mobile and obey perm
       await dockButton.waitFor({ state: 'detached' })
       await panel.waitFor({ state: 'detached' })
       await headerMenu.click()
-      assert.equal(await page.getByRole('menuitem', { name: 'Localhost browser', exact: true }).count(), 0, 'revoked access removes the menu entry')
+      assert.equal(await page.getByRole('menuitem', { name: 'Remote browser', exact: true }).count(), 0, 'revoked access removes the menu entry')
       await page.keyboard.press('Escape')
       if (mobile) await page.locator('[data-dock-item="editor"]').click()
       await link.waitFor({ state: 'visible' })
@@ -163,11 +168,21 @@ test('localhost links open host preview tabs on desktop and mobile and obey perm
       await page.getByText('You do not have permission to access localhost apps.', { exact: true }).waitFor()
       assert.equal(await panel.count(), 0, 'revoked access cannot reopen the browser')
       assert.equal(context.pages().length, 1, 'revoked localhost access cannot create another preview tab')
-      await page.evaluate('window.setDesktopAllowed(true);window.setBrowserAllowed(true)')
+      await page.evaluate('window.setNativeBrowserAllowed(true)')
+      await dockButton.waitFor()
+      await dockButton.click()
+      await panel.waitFor({ state: 'visible' })
+      assert.equal(await panel.getAttribute('data-url'), 'about:blank', 'browser permission alone opens native Chrome')
+      assert.equal(await panel.getAttribute('data-native-allowed'), 'true')
+      assert.equal(await panel.getAttribute('data-preview-allowed'), 'false', 'native browser permission does not expose the localhost port picker')
+      await page.evaluate('window.setBrowserAllowed(true)')
       await dockButton.waitFor()
       await dockButton.click()
       await panel.waitFor({ state: 'visible' })
       assert.equal(await panel.getAttribute('data-url'), 'about:blank', 'an account or permission reset restores the native Chrome start page')
+      await page.evaluate('window.setNativeBrowserAllowed(false);window.setBrowserAllowed(false);window.setDesktopAllowed(true)')
+      await dockButton.waitFor({ state: 'detached' })
+      await panel.waitFor({ state: 'detached' })
       assert.deepEqual(escapedRequests, [], 'the viewing device never requests its own localhost')
       assert.deepEqual(errors, [])
     } finally { await context.close() }

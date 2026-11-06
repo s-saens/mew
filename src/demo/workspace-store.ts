@@ -32,7 +32,7 @@ const copy = <T>(value: T): T => structuredClone(value)
 export class DemoWorkspaceStore {
   readonly workspacePath = DEMO_WORKSPACE_PATH
   readonly demoFilePath = DEMO_FILE_PATH
-  readonly capabilities: Capabilities = { filesRead: true, filesWrite: true, agent: true, terminal: true, desktop: true, portPreview: true, serverFiles: true, git: true, database: true, collaboration: true, chat: true, system: true, schedules: true }
+  readonly capabilities: Capabilities = { filesRead: true, filesWrite: true, agent: true, terminal: true, desktop: true, nativeBrowser: true, portPreview: true, serverFiles: true, git: true, database: true, collaboration: true, chat: true, system: true, schedules: true }
   private files = new Map<string, DemoFile>()
   private editedSources = new Map<string, string>()
   private editedSourceIds = new Set<string>()

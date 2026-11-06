@@ -1,4 +1,4 @@
-export const FEATURES = ['filesRead', 'filesWrite', 'agent', 'terminal', 'desktop', 'portPreview', 'serverFiles', 'git', 'database', 'collaboration', 'chat', 'system', 'schedules'] as const
+export const FEATURES = ['filesRead', 'filesWrite', 'agent', 'terminal', 'desktop', 'nativeBrowser', 'portPreview', 'serverFiles', 'git', 'database', 'collaboration', 'chat', 'system', 'schedules'] as const
 export type Feature = typeof FEATURES[number]
 export type Capabilities = Record<Feature, boolean>
 export type AccessRole = 'guest' | 'member' | 'manager' | 'owner'

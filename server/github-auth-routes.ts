@@ -1,5 +1,5 @@
 import express from 'express'
-import { authOf, requireAuthenticated, requireAnyFeature } from './reqAuth.ts'
+import { authOf, requireAuthenticated, requireAnyFeature, requireFeature } from './reqAuth.ts'
 import { closeLoginDesktopJob, createLoginDesktopAuthSession } from './login-desktop.ts'
 import { GitConnectionError } from './git-connections.ts'
 import { GITHUB_DEVICE_URL, GitHubAuth } from './github-auth.ts'
@@ -22,11 +22,11 @@ export function createGitHubAuthRouter(store = auth) {
   router.post('/:id/stop', (req, res, next) => {
     try { store.stop(authOf(req).email!, String(req.params.id)); res.json({ ok: true }) } catch (error) { next(error) }
   })
-  router.post('/:id/browser', async (req, res, next) => {
+  router.post('/:id/browser', requireFeature('nativeBrowser'), async (req, res, next) => {
     const owner = authOf(req).email!, id = String(req.params.id)
     try {
       const job = store.browserJob(owner, id)
-      const streamUrl = await createLoginDesktopAuthSession(owner, job, GITHUB_DEVICE_URL, ['git', 'filesWrite'])
+      const streamUrl = await createLoginDesktopAuthSession(owner, job, GITHUB_DEVICE_URL)
       // Approval or cancellation can finish while the browser is being prepared.
       try { store.browserJob(owner, id) } catch (error) { await closeLoginDesktopJob(owner, job); throw error }
       res.json({ streamUrl })

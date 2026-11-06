@@ -1,8 +1,8 @@
 ---
 title: "Login screens and the host browser"
-description: "Explains localhost apps in new proxy tabs, the native Chrome video Browser panel and mobile input, managed browser preparation, separate provider login screens, and session lifetimes."
+description: "Explains localhost apps in new proxy tabs, the native Chrome video Browser panel and mobile input, managed browser preparation, the same Browser/login video component and account cookie profile, one Browser permission, and session lifetimes."
 created: "2026-09-04"
-updated: "2026-11-05"
+updated: "2026-11-06"
 ---
 
 ## Login screen
@@ -11,7 +11,7 @@ Clicking **Open Login Page** for an agent displays the host Chrome login screen 
 
 Currently supported hosts are Linux/WSL. Ordinary Google Chrome, Xvfb, FFmpeg, Python 3, and libX11/libXtst are required. The Debian/Ubuntu packages are `xvfb ffmpeg python3 libx11-6 libxtst6`; Mew setup/update prepare Google Chrome inside Linux/WSL. If preparation is missing, run `npm run browsers:install` from the source checkout; use `npm run browsers:check` for a read-only check. The listed native-login packages remain separate prerequisites. Windows Chrome is not used. Set `MEW_CHROME_EXECUTABLE` to its absolute executable path if automatic discovery fails. Chrome for Testing and Playwright Chromium are not automatic substitutes. In an unprepared environment, Mew does not control the actual host desktop as a substitute.
 
-This video screen is for login and account management. The native Chrome Browser described below is a separate workspace panel with its own profile and video transport. Do not attach CDP or a DOM recorder to login pages. Detailed behavior and lifecycle follow [Login Virtual Screen](../../.mew/docs/development/login-desktop.md). Successful authentication with actual Google and Antigravity accounts must be verified in the user's environment.
+Login screens and the Browser panel below use the same Chrome window, H.264/WebRTC video component, input, and per-account browser profile. Cookies saved while signing in are available when you return to the Browser, and browsing cookies are available to login screens. This profile belongs to the Mew browser; it is separate from the host user's personal Chrome profile and other Mew accounts. Do not attach CDP or a DOM recorder to login pages. Detailed behavior and lifecycle follow [Login Virtual Screen](../../.mew/docs/development/login-desktop.md). Successful authentication with actual Google and Antigravity accounts must be verified in the user's environment.
 
 ## Find running localhost apps
 
@@ -19,7 +19,7 @@ Choose **Menu → Localhost browser** to list ports currently listening on the M
 
 If the list asks you to restart Mew with the latest code, the UI has loaded but the running server does not provide the port-list API. Apply the current server code with your normal server restart procedure, then retry the list. A UI build alone does not reload server routes.
 
-The list itself starts no host browser or app. The **Access localhost Apps** permission controls this menu and app tabs. The native Chrome view additionally requires **Remote desktop** permission. Owners and managers have it by default; guests and temporary-password accounts cannot use it.
+The list itself starts no host browser or app. The **Access localhost Apps** permission controls this menu and app tabs. **Account Management → Feature Permissions → Browser** controls both the native Chrome Browser and login screens. It is independent of **Remote desktop** and **Access localhost Apps**. Owners and managers have browser access by default; members can receive an explicit grant. Guests and temporary-password accounts cannot use it. Agent/Git workflows still require their own permissions.
 
 ## Open host localhost apps
 
@@ -29,9 +29,9 @@ The app runs in your viewing-device browser through the existing authenticated s
 
 ## Browse with host Chrome
 
-Choose **Browser** in the dock to open ordinary Google Chrome on a private virtual display. Use Chrome's own address bar, tabs, Back, Forward, and menus. Its real rendered screen reaches your device as encoded H.264 video over WebRTC, and input returns directly. This is not DOM reconstruction or periodic screenshots. It uses a separate per-account profile from provider login screens and never takes over the host's actual desktop.
+Choose **Browser** in the dock to open ordinary Google Chrome on a private virtual display. Use Chrome's own address bar, tabs, Back, Forward, and menus. Its real rendered screen reaches your device as encoded H.264 video over WebRTC, and input returns directly. This is not DOM reconstruction or periodic screenshots. It shares the account's browser-only profile with login screens and never takes over the host's actual desktop.
 
-On a phone, tap to click and swipe to scroll. Tap a remote input field and then the keyboard button to type. The panel's **Open ports** button returns to the localhost app picker. Use **Reconnect** after a connection error; it does not retry automatically. A brief disconnection retains the browser for up to 60 seconds. Explicit close cleans up the virtual screen and Chrome process while keeping the account's browser cookies and profile. Sessions expire after eight hours, and losing permission or logging out ends access.
+On a phone, tap to click and swipe to scroll. Tap a remote input field and then the keyboard button to type. When localhost app access is allowed, the panel's **Open ports** button returns to its picker. Use **Reconnect** after a connection error; it does not retry automatically. A brief disconnection retains the browser for up to 60 seconds. Explicit close cleans up the virtual screen and Chrome process while keeping the account's browser cookies and profile. Sessions expire after eight hours, and losing browser permission or logging out ends access. Opening another browser/login view takes over the same Chrome window; finishing an older login job cannot close a newer view.
 
 The native Browser currently supports Linux/WSL and requires ordinary Google Chrome, Xvfb, FFmpeg with X11 capture and libx264, Python 3, libX11/libXtst, and Mew's existing native WebRTC dependency. `npm run browsers:check` checks browser executables; it does not establish the separate virtual-display and encoder prerequisites. Configure `MEW_CHROME_EXECUTABLE` if ordinary Chrome discovery fails. UI automation continues to use Playwright Chromium.
 

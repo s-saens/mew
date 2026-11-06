@@ -248,6 +248,34 @@ test('invalid names and missing access fail before a process or browser is start
   assert.deepEqual(f.openedBrowser, [])
 })
 
+test('OAuth needing a browser reports the browser permission denial without waiting for a callback', async t => {
+  const { upsertUser, removeUser } = await import('./auth.ts')
+  const { setFeature } = await import('./access-policy.ts')
+  const { browserLoginJobs } = await import('./browser-login-jobs.ts')
+  const owner = 'mcp-browser-permission@test'
+  upsertUser(owner, { role: 'owner', hash: '', mustChangePassword: false, createdAt: 1, passwordChangedAt: 0 })
+  setFeature(owner, 'nativeBrowser', false)
+  let authorize!: (url: URL) => Promise<void>, closed = 0
+  const transport = { start: async () => {}, send: async () => {}, close: async () => { closed++ }, finishAuth: async () => { assert.fail('denied browsing cannot complete authorization') } }
+  const store = new SharedMcpConnections({
+    directory: () => 'browser-permission-fixture',
+    config: () => ({ type: 'http', url: 'https://mcp.example.test/mcp' }),
+    identity: sharedMcpConfigIdentity, accountVersion: () => 1,
+    authStatus: () => ({ status: 'disconnected' }),
+    remote: (_directory, _name, options) => { authorize = options.onAuthorization; return { transport, provider: { state: () => 'fixture-state' }, close: () => transport.close() } },
+    probe: async () => { await authorize(new URL('https://identity.example.test/authorize?state=fixture-state')); throw new Error('authorization required') },
+    closeBrowser: async () => {}, timeout: 5000,
+  })
+  t.after(async () => { await store.close(); setFeature(owner, 'nativeBrowser', null); removeUser(owner) })
+  store.start(owner, 'cloud', () => true)
+  await until(async () => (await store.status(owner, 'cloud')).status === 'error')
+  const state = await store.status(owner, 'cloud')
+  assert.match(state.error!, /브라우저.*권한/)
+  assert.equal(state.streamUrl, undefined)
+  assert.equal(browserLoginJobs(owner).length, 0, 'no browser login token is issued for denied access')
+  assert.ok(closed > 0, 'the temporary authorization transport is cleaned up instead of waiting for a callback')
+})
+
 test('owners can prepare authentication while a server is off by default', async t => {
   const f = fixture(t)
   f.configs.set('alice', { command: 'fixture-only', enabled: false })

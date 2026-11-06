@@ -21,7 +21,5 @@ export function browserDesktopCommand(raw: string): BrowserDesktopCommand {
   if (negotiation !== undefined && (!Number.isSafeInteger(negotiation) || negotiation < 0)) throw new Error('잘못된 영상 협상입니다.')
   if (value.type === 'answer' && typeof value.sdp === 'string' && value.sdp.length <= 30 * 1024) return { type: 'answer', sdp: value.sdp, negotiation }
   if (value.type === 'candidate' && value.candidate && typeof value.candidate.candidate === 'string' && value.candidate.candidate.length <= 4096 && (value.candidate.sdpMid === undefined || typeof value.candidate.sdpMid === 'string' && value.candidate.sdpMid.length <= 64)) return { type: 'candidate', candidate: value.candidate, negotiation }
-  const input = parseLoginDesktopInput(value)
-  if (input.type === 'frame-ack') throw new Error('이 브라우저는 이미지 ACK를 사용하지 않습니다.')
-  return input
+  return parseLoginDesktopInput(value)
 }

@@ -519,7 +519,7 @@ export function attachDomBrowserWebSocket(server: Server | Http2SecureServer, ge
   server.on('upgrade', (req, socket, head) => {
     if (new URL(req.url ?? '', 'http://localhost').pathname !== DOM_BROWSER_WS) return
     const original = getAuth(req)
-    const allowed = () => { const auth = getAuth(req); return !!original.email && auth.email === original.email && !auth.mustChangePassword && canUse(auth, 'portPreview') && webSocketOriginAllowed(req) }
+    const allowed = () => { const auth = getAuth(req); return !!original.email && auth.email === original.email && !auth.mustChangePassword && canUse(auth, 'nativeBrowser') && webSocketOriginAllowed(req) }
     if (!allowed()) { socket.end('HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n'); return }
     if (sessions.size >= 8 || [...sessions].filter(session => session.account === original.email).length >= 3) { socket.end('HTTP/1.1 429 Too Many Requests\r\nConnection: close\r\n\r\n'); return }
     wss.handleUpgrade(req, socket, head, ws => {

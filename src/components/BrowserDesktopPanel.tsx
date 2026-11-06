@@ -17,25 +17,38 @@ import { PanelCloseButton } from './panel-close-button'
 
 type Connection = 'connecting' | 'ready' | 'error' | 'closed'
 
-export function BrowserDesktopPanel({ url, navigationRequest = 0, nativeAllowed = true, onClose }: { url: string; navigationRequest?: number; nativeAllowed?: boolean; onClose: () => void }) {
+export function BrowserDesktopPanel({ url, navigationRequest = 0, nativeAllowed = true, previewAllowed = true, streamUrl, reopen, onReady, embedded = false, onClose }: {
+  url: string; navigationRequest?: number; nativeAllowed?: boolean; previewAllowed?: boolean
+  streamUrl?: string; reopen?: () => Promise<string>; onReady?: () => void; embedded?: boolean; onClose?: () => void
+}) {
   useUiLocale()
   const [entry, setEntry] = useState({ url, request: navigationRequest })
   const [address, setAddress] = useState(''), [addressError, setAddressError] = useState('')
-  const [attempt, setAttempt] = useState(0), [connection, setConnection] = useState<Connection>('connecting'), [error, setError] = useState('')
+  const source = streamUrl ?? BROWSER_DESKTOP_WS
+  const [transport, setTransport] = useState({ url: source, attempt: 0 }), [reopening, setReopening] = useState(false)
+  const [connection, setConnection] = useState<Connection>('connecting'), [error, setError] = useState('')
   const scope = useRef<HTMLDivElement>(null), stage = useRef<HTMLDivElement>(null), video = useRef<HTMLVideoElement>(null), keyboard = useRef<HTMLTextAreaElement>(null)
   const socket = useRef<WebSocket | null>(null), input = useRef<ReturnType<typeof bindBrowserDesktopInput> | null>(null)
   const latestUrl = useRef(entry.url), dimensions = useRef({ width: 960, height: 640 }), shown = useRef(false)
   const reconnecting = useRef(false)
+  const previousSource = useRef(source), reopeningGeneration = useRef(0), readyCallback = useRef(onReady)
   const active = !!entry.url && nativeAllowed
-  useFocusedShortcutScope(scope, { closeTab: () => { onClose(); return true } })
+  useFocusedShortcutScope(scope, { closeTab: () => { if (!onClose) return false; onClose(); return true } })
   useEffect(() => { latestUrl.current = entry.url }, [entry.url])
   useEffect(() => { setEntry({ url, request: navigationRequest }) }, [url, navigationRequest])
+  useEffect(() => { readyCallback.current = onReady }, [onReady])
+  useEffect(() => {
+    if (previousSource.current === source) return
+    previousSource.current = source; reopeningGeneration.current++; reconnecting.current = true
+    setReopening(false); setTransport(current => ({ url: source, attempt: current.attempt + 1 }))
+  }, [source])
+  useEffect(() => () => { reopeningGeneration.current++ }, [])
 
   useEffect(() => {
     if (!active) return
     const surface = stage.current!, element = video.current!, field = keyboard.current!
     let disposed = false, ended = false, resizeTimer: ReturnType<typeof setTimeout> | undefined, startupTimer: ReturnType<typeof setTimeout> | undefined, frameCallback: number | undefined
-    let lastSize = '', openSent = false
+    let lastSize = '', openSent = false, notified = false
     shown.current = false; setConnection('connecting'); setError('')
     const send = (value: unknown) => {
       const ws = socket.current
@@ -62,6 +75,7 @@ export function BrowserDesktopPanel({ url, navigationRequest = 0, nativeAllowed 
       if (element.videoWidth > 0 && element.videoHeight > 0) {
         dimensions.current = { width: element.videoWidth, height: element.videoHeight }
         shown.current = true; clearTimeout(startupTimer); setConnection('ready'); peer.ready()
+        if (!notified) { notified = true; readyCallback.current?.() }
       }
     }
     const watchFrame = () => {
@@ -75,8 +89,10 @@ export function BrowserDesktopPanel({ url, navigationRequest = 0, nativeAllowed 
     watchFrame()
     let ws: WebSocket
     try {
-      const target = new URL(BROWSER_DESKTOP_WS, location.href)
-      target.protocol = target.protocol === 'https:' ? 'wss:' : 'ws:'
+      const target = new URL(transport.url, location.href)
+      if (target.protocol === 'https:') target.protocol = 'wss:'
+      else if (target.protocol === 'http:') target.protocol = 'ws:'
+      else if (!['ws:', 'wss:'].includes(target.protocol)) throw new Error(uiText('브라우저 주소가 올바르지 않습니다'))
       ws = openMewSocket(target.href)
     } catch (cause) {
       fail(cause instanceof Error ? cause.message : undefined)
@@ -123,7 +139,7 @@ export function BrowserDesktopPanel({ url, navigationRequest = 0, nativeAllowed 
       element.removeEventListener('loadeddata', loaded); element.removeEventListener('playing', loaded)
       if (frameCallback !== undefined) element.cancelVideoFrameCallback(frameCallback)
     }
-  }, [active, attempt])
+  }, [active, transport])
 
   useEffect(() => {
     const ws = socket.current
@@ -132,7 +148,7 @@ export function BrowserDesktopPanel({ url, navigationRequest = 0, nativeAllowed 
 
   const open = (raw: string) => {
     setAddressError('')
-    if (requestLocalBrowser(raw)) return
+    if (previewAllowed && requestLocalBrowser(raw)) return
     if (!nativeAllowed) { setAddressError(uiText('권한이 없습니다')); return }
     try {
       const target = new URL(/^[a-z][a-z\d+.-]*:\/\//i.test(raw) ? raw : `https://${raw}`)
@@ -140,19 +156,32 @@ export function BrowserDesktopPanel({ url, navigationRequest = 0, nativeAllowed 
       setEntry(current => ({ url: target.href, request: current.request + 1 }))
     } catch { setAddressError(uiText('브라우저 주소가 올바르지 않습니다')) }
   }
-  const reconnect = () => { reconnecting.current = true; setAttempt(value => value + 1) }
+  const reconnect = async () => {
+    if (reopening) return
+    const generation = ++reopeningGeneration.current
+    setReopening(true)
+    try {
+      const next = reopen ? await reopen() : transport.url
+      if (generation !== reopeningGeneration.current) return
+      reconnecting.current = true; setTransport(current => ({ url: next, attempt: current.attempt + 1 }))
+    } catch (cause) {
+      if (generation !== reopeningGeneration.current) return
+      input.current?.release(); shown.current = false; setConnection('error')
+      setError(cause instanceof Error ? cause.message : uiText('다시 연결하지 못했습니다.'))
+    } finally { if (generation === reopeningGeneration.current) setReopening(false) }
+  }
   const iconButton = 'flex h-7 w-7 shrink-0 items-center justify-center rounded text-ink-secondary hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-40'
   return <HoverTipLayer className="flex h-full min-h-0 min-w-0 flex-col bg-surface-deep text-ink">
-    <div ref={scope} data-browser-desktop-panel className="flex h-full min-h-0 min-w-0 flex-col">
+    <div ref={scope} data-browser-desktop-panel data-embedded={embedded || undefined} className="flex h-full min-h-0 min-w-0 flex-col">
       <header className="flex h-8 shrink-0 items-center gap-0.5 border-b border-edge bg-surface px-1">
-        <DockGrip group="browser" />
-        {active && <button type="button" className={iconButton} aria-label={uiText('열려 있는 포트')} data-tip={uiText('열려 있는 포트')} onClick={() => setEntry(current => ({ url: '', request: current.request + 1 }))}><HomeSimple width={15} height={15} aria-hidden="true" /></button>}
-        <span className="min-w-0 flex-1 truncate text-xs">{uiText('브라우저')}</span>
+        {!embedded && <DockGrip group="browser" />}
+        {!embedded && active && previewAllowed && <button type="button" className={iconButton} aria-label={uiText('열려 있는 포트')} data-tip={uiText('열려 있는 포트')} onClick={() => setEntry(current => ({ url: '', request: current.request + 1 }))}><HomeSimple width={15} height={15} aria-hidden="true" /></button>}
+        <span className="min-w-0 flex-1 truncate text-xs">{!embedded && uiText('브라우저')}</span>
         {active && <>
           <button type="button" className={iconButton} aria-label={uiText('키보드 입력')} data-tip={uiText('키보드 입력')} disabled={connection !== 'ready'} onClick={() => keyboard.current?.focus({ preventScroll: true })}><DesktopIcon kind="keyboard" /></button>
-          <button type="button" className={iconButton} aria-label={uiText('다시 연결')} data-tip={uiText('다시 연결')} onClick={reconnect}><Refresh width={15} height={15} aria-hidden="true" /></button>
+          <button type="button" className={iconButton} aria-label={uiText('다시 연결')} data-tip={uiText('다시 연결')} disabled={reopening} onClick={() => void reconnect()}><Refresh width={15} height={15} aria-hidden="true" /></button>
         </>}
-        <PanelCloseButton aria-label={uiText('브라우저 닫기')} onClick={onClose} />
+        {!embedded && onClose && <PanelCloseButton aria-label={uiText('브라우저 닫기')} onClick={onClose} />}
       </header>
       {!active ? <>
         <form className="flex shrink-0 items-center gap-1 border-b border-edge px-1 py-1" onSubmit={event => { event.preventDefault(); if (address.trim()) open(address.trim()) }}>
@@ -160,12 +189,12 @@ export function BrowserDesktopPanel({ url, navigationRequest = 0, nativeAllowed 
           <button type="submit" className={iconButton} aria-label={uiText('이동')} data-tip={uiText('이동')}><ArrowRight width={16} height={16} aria-hidden="true" /></button>
         </form>
         {addressError && <p role="alert" className="px-2 py-1 text-xs text-danger">{addressError}</p>}
-        <DomBrowserPorts onOpen={raw => { requestLocalBrowser(raw) }} />
-      </> : <div ref={stage} data-browser-desktop tabIndex={0} role="application" aria-label={uiText('브라우저')} className="relative min-h-0 flex-1 touch-none overflow-hidden bg-black outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-accent">
+        {previewAllowed && <DomBrowserPorts onOpen={raw => { requestLocalBrowser(raw) }} />}
+      </> : <div ref={stage} data-browser-desktop data-login-desktop={embedded || undefined} tabIndex={0} role="application" aria-label={embedded ? uiText('로그인 화면') : uiText('브라우저')} className="relative min-h-0 flex-1 touch-none overflow-hidden bg-black outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-accent">
         <video ref={video} playsInline autoPlay muted disablePictureInPicture className="pointer-events-none absolute inset-0 h-full w-full select-none object-contain" />
-        <textarea ref={keyboard} aria-label={uiText('키보드 입력')} autoCapitalize="off" autoCorrect="off" spellCheck={false} className="absolute bottom-0 left-0 h-px w-px opacity-0" />
+        <textarea ref={keyboard} aria-label={embedded ? uiText('로그인 키보드 입력') : uiText('키보드 입력')} autoCapitalize="off" autoCorrect="off" spellCheck={false} className="absolute bottom-0 left-0 h-px w-px opacity-0" />
         {connection === 'connecting' && <div role="status" className="pointer-events-none absolute inset-0 flex items-center justify-center text-white"><LoadingIndicator size={20} /></div>}
-        {(connection === 'error' || connection === 'closed') && <div role="alert" className="absolute inset-x-1 bottom-1 flex items-center gap-1 rounded bg-surface-raised px-2 py-1 text-xs"><span className="min-w-0 flex-1 select-text break-words">{error || uiText('연결이 끊겼습니다. 다시 연결해 주세요.')}</span><button type="button" className={iconButton} aria-label={uiText('다시 연결')} data-tip={uiText('다시 연결')} onClick={reconnect}><Refresh width={15} height={15} aria-hidden="true" /></button></div>}
+        {(connection === 'error' || connection === 'closed') && <div role="alert" className="absolute inset-x-1 bottom-1 flex items-center gap-1 rounded bg-surface-raised px-2 py-1 text-xs"><span className="min-w-0 flex-1 select-text break-words">{error || uiText('연결이 끊겼습니다. 다시 연결해 주세요.')}</span><button type="button" className={iconButton} aria-label={uiText('다시 연결')} data-tip={uiText('다시 연결')} disabled={reopening} onClick={() => void reconnect()}><Refresh width={15} height={15} aria-hidden="true" /></button></div>}
       </div>}
     </div>
   </HoverTipLayer>

@@ -1,5 +1,4 @@
-export const LOGIN_DESKTOP_WS = '/api/login-desktop/ws'
-export const LOGIN_DESKTOP_LIMITS = Object.freeze({ minWidth: 320, maxWidth: 3840, minHeight: 240, maxHeight: 2160, frameBytes: 2 * 1024 * 1024, fps: 12, pasteChars: 4096 })
+export const LOGIN_DESKTOP_LIMITS = Object.freeze({ minWidth: 320, maxWidth: 3840, minHeight: 240, maxHeight: 2160, pasteChars: 4096 })
 
 export type LoginDesktopInput =
   | { type: 'resize'; width: number; height: number }
@@ -8,7 +7,7 @@ export type LoginDesktopInput =
   | { type: 'wheel'; deltaX: number; deltaY: number }
   | { type: 'key'; key: string; code: string; down: boolean }
   | { type: 'paste'; text: string }
-  | { type: 'release' | 'close' | 'frame-ack' }
+  | { type: 'release' | 'close' }
 
 export type LoginDesktopState = { type: 'ready' | 'size'; width: number; height: number } | { type: 'error'; message: string } | { type: 'closed' }
 export type LoginDesktopPage = { id: string; job: string; url: string; streamUrl: string }
@@ -22,7 +21,7 @@ export function parseLoginDesktopInput(value: unknown): LoginDesktopInput {
   if (!value || typeof value !== 'object') throw new Error('invalid-input')
   const input = value as Record<string, unknown>
   const finite = (key: string) => typeof input[key] === 'number' && Number.isFinite(input[key]) && Math.abs(input[key] as number) <= 100_000
-  if (input.type === 'close' || input.type === 'release' || input.type === 'frame-ack') return { type: input.type }
+  if (input.type === 'close' || input.type === 'release') return { type: input.type }
   if (input.type === 'resize' && finite('width') && finite('height')) return { type: 'resize', ...loginDesktopSize(input.width, input.height) }
   if (input.type === 'pointer' && finite('x') && finite('y')) return { type: 'pointer', x: input.x as number, y: input.y as number }
   if (input.type === 'button' && [0, 1, 2].includes(input.button as number) && typeof input.down === 'boolean' && (input.x === undefined || finite('x')) && (input.y === undefined || finite('y'))) return { type: 'button', button: input.button as number, down: input.down, ...(finite('x') && finite('y') ? { x: input.x as number, y: input.y as number } : {}) }

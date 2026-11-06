@@ -363,8 +363,9 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
   useEffect(() => { setProjectSidebarOpen(scopedBrowserStorage().getItem('mew:project-sidebar-open') === '1') }, [authEmail])
   const [terminalOpen, setTerminalOpen] = useState(() => canUseTerminal && (scopedBrowserStorage().getItem(TERMINAL_OPEN_KEY) !== null ? scopedBrowserStorage().getItem(TERMINAL_OPEN_KEY) === '1' : scopedBrowserStorage().getItem(LEGACY_TMUX_OPEN_KEY) === '1' || scopedBrowserStorage().getItem(AGENT_OPEN_KEY) === '1'))
   const [debuggerOpen, setDebuggerOpen] = useState(false)
+  const canOpenBrowser = !!auth.email && (caps.nativeBrowser || caps.portPreview)
   const [browserOpen, setBrowserOpen] = useState(false)
-  const [browserUrl, setBrowserUrl] = useState(caps.desktop ? 'about:blank' : '')
+  const [browserUrl, setBrowserUrl] = useState(caps.nativeBrowser ? 'about:blank' : '')
   const [browserNavigationRequest, setBrowserNavigationRequest] = useState(0)
   const [agentOpen, setAgentOpen] = useState(() => caps.agent && scopedBrowserStorage().getItem(AGENT_OPEN_KEY) === '1')
   const gitMounted = useRef(false)
@@ -407,9 +408,9 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     }),
   )
   useEffect(() => {
-    setBrowserOpen(false); setBrowserUrl(caps.desktop ? 'about:blank' : '')
+    setBrowserOpen(false); setBrowserUrl(caps.nativeBrowser ? 'about:blank' : '')
     setMobilePanelStack(stack => closeMobilePanel(stack, 'browser'))
-  }, [auth.email, caps.portPreview, caps.desktop])
+  }, [auth.email, caps.portPreview, caps.nativeBrowser])
   const [mewcatRuntime, setMewcatRuntime] = useState<string | null>(null)
   const [mewcatPicker, setMewcatPicker] = useState(false)
   const mewcatRuntimeRef = useRef(mewcatRuntime)
@@ -1192,7 +1193,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     open: { ...workspacePanelOpen, editor: editorOpen }, sidebarWidth,
     tools: toolPresentation, popups: { memo: loadFloatingRect(popupKey('memo')), tasks: loadFloatingRect(popupKey('tasks')) },
   })
-  const permitted: Record<WorkspacePanelId, boolean> = { sidebar: caps.filesRead, chat: caps.chat, agent: caps.agent, terminal: canUseTerminal, git: caps.git, debugger: canDebug && !!auth.email && !!rootProjectPath, browser: caps.portPreview && !!auth.email, tasks: caps.filesRead && !!auth.email, memo: caps.collaboration && !!auth.email }
+  const permitted: Record<WorkspacePanelId, boolean> = { sidebar: caps.filesRead, chat: caps.chat, agent: caps.agent, terminal: canUseTerminal, git: caps.git, debugger: canDebug && !!auth.email && !!rootProjectPath, browser: canOpenBrowser, tasks: caps.filesRead && !!auth.email, memo: caps.collaboration && !!auth.email }
   const layoutFactory = factoryLayout(captureLayout())
   for (const panel of WORKSPACE_PANEL_IDS) layoutFactory.open[panel] &&= permitted[panel]
   const applyLayoutPreset = (next: LayoutSnapshot) => {
@@ -1296,7 +1297,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
   if (caps.chat && !isGuest) mobileDockPanels.push('chat')
   if (caps.terminal) mobileDockPanels.push('terminal')
   if (caps.git) mobileDockPanels.push('git')
-  if (caps.portPreview && auth.email) mobileDockPanels.push('browser')
+  if (canOpenBrowser) mobileDockPanels.push('browser')
   if (canDebug && auth.email && rootProjectPath) mobileDockPanels.push('debugger')
   if (caps.filesRead && auth.email && rootProjectPath) mobileDockPanels.push('tasks')
   if (caps.collaboration && auth.email) mobileDockPanels.push('memo')
@@ -2299,8 +2300,8 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
         {rootProjectPath && canDebug && auth.email && <DockPanel id="debugger" kind="debugger" visible={debuggerOpen} mobileSelected onFocus={() => bringWorkspacePanelToFront('debugger')}>
           {debuggerOpen && <Suspense fallback={<div role="status" className="p-2 text-xs text-ink-secondary">…</div>}><DebuggerPanel key={`${auth.email}:${rootProjectPath}`} root={rootProjectPath} onClose={() => closeWorkspacePanel('debugger')} onSettings={() => { setDebuggerSettingsRequested(true); setSettingsOpen(true) }} onOpenFile={(file, line) => { const relative = file.startsWith(rootProjectPath + '/') ? file.slice(rootProjectPath.length + 1) : file; if (!relative.startsWith('/')) openMentionedFile(WORKSPACE_PROJECT, relative, line) }} /></Suspense>}
         </DockPanel>}
-        {caps.portPreview && auth.email && <DockPanel id="browser" kind="browser" visible={browserOpen} tabs={['browser']} mobileSelected onFocus={() => bringWorkspacePanelToFront('browser')}>
-          {browserOpen && <div data-workspace-panel="browser" data-dom-browser className="h-full min-h-0 min-w-0"><BrowserDesktopPanel key={auth.email} url={browserUrl} navigationRequest={browserNavigationRequest} nativeAllowed={caps.desktop} onClose={() => closeWorkspacePanel('browser')} /></div>}
+        {canOpenBrowser && <DockPanel id="browser" kind="browser" visible={browserOpen} tabs={['browser']} mobileSelected onFocus={() => bringWorkspacePanelToFront('browser')}>
+          {browserOpen && <div data-workspace-panel="browser" data-dom-browser className="h-full min-h-0 min-w-0"><BrowserDesktopPanel key={auth.email} url={browserUrl} navigationRequest={browserNavigationRequest} nativeAllowed={caps.nativeBrowser} previewAllowed={caps.portPreview} onClose={() => closeWorkspacePanel('browser')} /></div>}
         </DockPanel>}
         {rootProjectPath && caps.filesRead && auth.email && <DockPanel floating={toolPresentation.tasks === 'popup'} storageKey={popupKey('tasks')} legacyStorageKey={`mew:popup:${authEmail}:${projectUiPath}:tasks`} id="tasks" kind="tasks" visible={tasksOpen} tabs={['tasks']} mobileSelected onFocus={() => { activeTabbedSurfaceRef.current = 'tasks'; bringWorkspacePanelToFront('tasks') }}>
           {tasksMounted.current && <TaskPanel workspace={rootProjectPath} onOpenFile={path => {

@@ -3,7 +3,7 @@ import { acquireInstanceLock } from './instance-lock.ts'
 import { createRemoteAgent } from './remote-access-agent.ts'
 import { watchSocketAccess } from './access-socket.ts' // 반드시 첫 줄 — 다른 모듈이 상수를 계산하기 전에 설정 파일을 읽어야 한다
 import { webSocketOriginAllowed } from './websocket-origin.ts'
-import { attachLoginDesktopWebSocket, closeLoginDesktops, LOGIN_DESKTOP_WS } from './login-desktop.ts'
+import { closeLoginDesktops } from './login-desktop.ts'
 import { attachBrowserDesktopWebSocket, closeBrowserDesktops, BROWSER_DESKTOP_WS } from './browser-desktop.ts'
 import { attachDomBrowserWebSocket, closeDomBrowsers, DOM_BROWSER_WS } from './dom-browser.ts'
 import { attachRemoteDesktopWebSocket, DESKTOP_WS } from './remote-desktop.ts'
@@ -121,7 +121,6 @@ attachCollabWebSocket(server, { authorize: authorizeCollab })
 attachDbWebSocket(server, { authorize: authorizeFeature('database'), authorizeProject: authorizeDatabase })
 // 에이전트는 셸을 쓸 수 있다 — 게이트가 tmux와 같은 집합(owner/manager)이어야 한다
 attachAgentWebSocket(server, { authorize: authorizeFeature('agent') })
-attachLoginDesktopWebSocket(server)
 attachDomBrowserWebSocket(server)
 attachBrowserDesktopWebSocket(server)
 attachRemoteDesktopWebSocket(server)
@@ -133,7 +132,6 @@ destroyUnknownUpgrades(server, [
   '/api/collab',
   '/api/db/ws',
   AGENT_WS_PATH,
-  LOGIN_DESKTOP_WS,
   DOM_BROWSER_WS,
   BROWSER_DESKTOP_WS,
   DESKTOP_WS,
