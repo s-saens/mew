@@ -4,17 +4,19 @@ parent: "mew-settings"
 title: "Panel Layout, Mobile, and State Restoration"
 status: "implemented"
 created: "2026-09-18"
-updated: "2026-11-05"
+updated: "2026-11-06"
 status_hash: "018bca32e486b43c386b29de3e2087d6d1447fae6a33abc99d745367947a9382"
 files: ["src/components/tool-presentation-toggle.tsx", "src/components/SettingsModal.tsx", "src/hooks/use-refresh-tasks.ts", "src/hooks/usePresence.ts", "src/components/project-loading-overlay.tsx", "src/App.tsx", "src/components/DockWorkspace.tsx", "src/components/EditorPane.tsx", "src/components/TabBar.tsx", "src/components/AgentPanel.tsx", "src/components/mobile-dock.tsx", "src/components/layout-presets.tsx", "src/utils/layout-presets.ts", "server/layout-icon-cli.ts", "src/utils/mobile-dock.ts", "src/hooks/use-mobile-keyboard.ts", "src/hooks/use-mobile-panel-swipe.ts", "src/hooks/useTabs.ts", "server/userUiState.ts"]
 commits: []
-description: "Panel docking, maximization, tab navigation, mobile gestures, safe areas, and editor zoom. Defines account-wide desktop layout, popup geometry, last-panel and editor-slot focus per browser device, project-specific mobile restoration, presets, account-and-project tab synchronization, and ignored legacy Android panel geometry."
+description: "Current panel docking, mobile gestures, safe areas, presets, and account/device layout restoration. Separates account-and-project tab synchronization from geometry and links the planned optional multi-project mode."
 상위파일:
   - "MOC.md"
   - "_appearance-accounts-operations.md"
 ---
 
 ## Requirements
+
+The existing desktop behavior below is the baseline for the planned **single-project mode**. The optional **multi-project mode**, its project panels, and the **project selection panel** terminology are specified separately in [Multi-project mode](multi-project-mode.md). That extension is in design and has not changed the implemented layout described here.
 
 - Keep the installed app header, panels, Dock and full-screen dialogs inside device safe areas in portrait and landscape. Reserve each inset once without shrinking the existing header or touch controls; follow [Device safe areas](../../development/ui-workspace-layout.md#device-safe-areas).
 

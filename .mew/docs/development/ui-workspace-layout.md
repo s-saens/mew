@@ -1,8 +1,8 @@
 ---
 title: "UI workspace panels, Dock, and gestures"
-description: "Shared workspace geometry, safe areas, panel and Dock layout, tab scrolling, drag motion, and mobile gestures. Defines account-wide desktop layout, last-panel focus, and preferred editor slot per browser device, project-specific mobile restoration, popup bounds, presets, and account tab synchronization boundaries."
+description: "Current workspace geometry, safe areas, Dock layout, tab motion, and mobile gestures. Defines account/device desktop layout and project-specific mobile restoration, and links the planned independent multi-project session and board extension."
 created: "2026-11-03"
-updated: "2026-11-04"
+updated: "2026-11-06"
 상위파일: "ui-contracts.md"
 ---
 
@@ -57,6 +57,8 @@ Validation: `tab-reorder-ui.test.ts`·`mobile-dock-ui.test.ts`·`project-tab-gro
 In the Git changes list, distinguish ordinary selection through highlighting from commit-target selection through checkboxes. Display diffs in read-only editor tabs with `mew:diff:` virtual paths, excluding them from file APIs, autosave, comments, collaboration, and presence. Tab identifiers include the project, repository, file, and worktree or commit hash, and are saved with the existing per-account/per-root editor restoration state. Automatically retrieve active worktree diffs only while the editor is visible; stop for inactive tabs, hidden editors, and hidden browser pages. The [Git work panel](../features/git-history/project-git-work-panel.md) owns detailed operations and selection scope.
 
 ## Workspace Panel Layout
+
+The current desktop layout in this section remains the single-project baseline. [Multi-project mode](../features/appearance-accounts-operations/multi-project-mode.md) is a planned optional extension with separate board storage and reusable compact project workspaces. Its [proposed session architecture](../decisions/0152-multi-project-workspace-sessions.md) does not change this implemented contract until the staged work passes its verification gates.
 
 Panel tab bars use the shared `h-9` height (`calc(var(--spacing) * 9)`, 36px at the default font size). `DockBody` in Git, agent, terminal, and browser panels uses the same spacing basis to calculate the body start position and remaining height. Changing the browser's default font size or maximizing a panel does not cause the body to overlap the tab bar's bottom or leave a gap between them. Mobile uses the same basis. `dock-maximize-ui.test.ts` validates tab bar/body boundaries and bottom hit tests at font sizes of 14, 16, and 20px, plus maximized and mobile layouts.
 
