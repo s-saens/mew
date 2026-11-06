@@ -46,7 +46,7 @@ foreach ($fixture in $fixtures) {
   $env:PROCESSOR_ARCHITEW6432 = ''
   $env:VSCMD_ARG_TGT_ARCH = $fixture.compilerArchitecture
   $env:MEW_TEST_PRIVATE_VALUE = 'must not be serialized'
-  $env:PATH = 'C:\\Tools;C:\\Tools\\;c:\\TOOLS;C:\\Other'
+  $env:PATH = 'C:\\Tools;C:\\Tools\\;c:\\TOOLS;C:\\Other;C:\\;C:'
   $env:INCLUDE = if ($null -ne $fixture.include) { $fixture.include } else { 'C:\\SDK\\um;C:\\SDK\\ucrt' }
   . '${script.replaceAll("'", "''")}'
 }`
@@ -57,9 +57,11 @@ foreach ($fixture in $fixtures) {
   for (let index = 0; index < cases.length; index++) {
     assert.equal(states[index].tools.visualStudio, cases[index].ready, JSON.stringify(cases[index]))
     assert.equal(states[index].environment.MEW_TEST_PRIVATE_VALUE, undefined)
-    const entries = states[index].environment.Path.split(';').map(entry => entry.replace(/\\+$/, '').toLowerCase())
+    const entries = states[index].environment.Path.split(';').map(entry => (/^[a-z]:\\$/i.test(entry) ? entry : entry.replace(/\\+$/, '')).toLowerCase())
     assert.equal(new Set(entries).size, entries.length)
     assert.deepEqual(entries.slice(0, 2), ['c:\\tools', 'c:\\other'])
+    assert.ok(entries.includes('c:\\'))
+    assert.ok(entries.includes('c:'))
     if (cases[index].ready) assert.equal(states[index].environment.INCLUDE, cases[index].include ?? 'C:\\SDK\\um;C:\\SDK\\ucrt')
   }
 })
@@ -96,7 +98,9 @@ function Get-Command {
     assert.equal(await fs.readFile(path.join(target, 'gpu-windows.dll'), 'utf8'), 'fixture GPU library')
     const args = JSON.parse((await fs.readFile(path.join(target, 'compiler-args.json'), 'utf8')).replace(/^\uFEFF/, ''))
     assert.ok(args.includes('/MT'))
-    assert.ok(args.includes(windowsPath(path.join(target, 'gpu-windows.cpp'))))
-    assert.ok(args.includes(windowsPath(path.join(target, 'notification-windows.cpp'))))
+    const normalized = args.map(arg => path.win32.normalize(arg).toLowerCase())
+    for (const file of ['gpu-windows.cpp', 'notification-windows.cpp']) {
+      assert.ok(normalized.includes(path.win32.normalize(windowsPath(path.join(target, file))).toLowerCase()), JSON.stringify({ args, target }))
+    }
   } finally { await fs.rm(root, { recursive: true, force: true }) }
 })
