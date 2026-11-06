@@ -12,7 +12,11 @@ $paths = @(
 # up tools installed after the Mew/WSL process started, without a global write.
 $combinedPath = [Environment]::ExpandEnvironmentVariables((@($env:PATH) + $paths + @([Environment]::GetEnvironmentVariable('Path', 'Machine'), [Environment]::GetEnvironmentVariable('Path', 'User'))) -join ';')
 $seenPaths = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
-$env:PATH = (@($combinedPath -split ';' | ForEach-Object { $_.Trim() } | Where-Object { $_ -and $seenPaths.Add($_.TrimEnd('\')) })) -join ';'
+$env:PATH = (@($combinedPath -split ';' | ForEach-Object { $_.Trim() } | Where-Object {
+  if (-not $_) { return $false }
+  $key = if ($_ -match '^[A-Za-z]:\\$') { $_ } else { $_.TrimEnd('\') }
+  $seenPaths.Add($key)
+})) -join ';'
 
 function Find-MewBuildCommand([string]$Name) {
   $command = Get-Command $Name -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
