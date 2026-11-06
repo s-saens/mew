@@ -10,6 +10,7 @@ import { recordPageMutation } from './page-mutations.ts'
 import { editSelection, type OptionEdit } from '../../shared/selection-options.ts'
 import { DATABASE_INITIAL_ROWS, DATABASE_TEXT_COLUMN_NAME } from '../../shared/database-defaults.ts'
 import { prepareDatabaseTable, type DatabaseTableData } from '../../shared/database-table.ts'
+import { listDatabaseReferences, type DatabaseReference } from './documentReferences.ts'
 
 export class DbObjectNotFoundError extends Error {}
 export class DbReadOnlyError extends Error {}
@@ -46,6 +47,7 @@ export interface DatabaseSummary {
   title: string
   kind: 'managed' | 'external'
   editable: boolean
+  references?: DatabaseReference[]
 }
 
 const ROW_LIMIT = 1000
@@ -128,7 +130,8 @@ export async function attachExternal(
 
 export async function listDatabases(project: string): Promise<DatabaseSummary[]> {
   await ensureCatalog()
-  return (await catalog.listDatabaseRows(exec, project)).map(summary)
+  const [databases, references] = await Promise.all([catalog.listDatabaseRows(exec, project), listDatabaseReferences(project)])
+  return databases.map(db => ({ ...summary(db), references: references.get(db.id) ?? [] }))
 }
 
 export async function getView(project: string, id: string, allRows = false): Promise<DatabaseView> {

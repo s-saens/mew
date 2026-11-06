@@ -1,9 +1,8 @@
 ---
 title: "Document Editing and Storage Formats"
-description: "Explains document and file editing, previews, mobile navigation, grouped workspace menu, notification history, database actions, and fullscreen controls."
-updated: "2026-11-05"
+description: "Explains document and file editing, previews, mobile navigation, grouped workspace menu, notification history, floating database actions outside the Dock, and fullscreen controls."
+updated: "2026-11-06"
 상위파일:
-  - "../../.mew/docs/MOC.md"
   - "MOC.md"
 ---
 This guide explains how to open, edit, and save documents. If you are new, start with [First Steps](first-steps.md).
@@ -141,7 +140,7 @@ Swipe left or right on a mobile panel's body to move to the current panel's prev
 
 Open **Remote Desktop** from the header menu. Use the viewer's Close or Back action to return to the previous workspace; on mobile, you can also select another panel from the bottom dock. This ends the remote connection. For connection and control details, see [Remote Desktop](remote-desktop.md).
 
-Open Remote Desktop, Remote Browser, Server File Explorer, Scheduled Tasks, and Settings from the grouped header menu. Open databases from the Dock, the Documents file area, or the floating editor button beside the agent action. Click your profile card in the menu for account settings. When the mobile software keyboard opens, the dock and reserved bottom space are hidden; they return when the keyboard closes. Control panels using the dock and top menu, and switch tabs using the tab bar, keyboard shortcuts, or swipes on the mobile body or Plain auxiliary key bar.
+Open Remote Desktop, Remote Browser, Server File Explorer, Scheduled Tasks, and Settings from the grouped header menu. Open databases from the Documents file area or the floating editor button beside the agent action. Click your profile card in the menu for account settings. When the mobile software keyboard opens, the dock and reserved bottom space are hidden; they return when the keyboard closes. Control panels using the dock and top menu, and switch tabs using the tab bar, keyboard shortcuts, or swipes on the mobile body or Plain auxiliary key bar.
 
 The top **Menu** icon carries the unread notification count. Its Notifications section previews up to four compact items; **View all** opens the complete list. The same icon control is used on desktop and mobile.
 

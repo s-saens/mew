@@ -1,10 +1,12 @@
 ---
 title: "0147 — Group the workspace menu and retire the Android gateway"
-description: "Defines compact account/notification/tool/Mew menu groups, independent account settings, database workspace actions, and Alt+E/Alt+S shortcuts. Retires the optional Android emulator gateway while preserving Android browser support and historical records."
+description: "Defines compact account/notification/tool/Mew menu groups, independent account settings, database workspace actions, and Alt+E/Alt+S shortcuts. Retires the optional Android emulator gateway while preserving Android browser support and historical records; ADR 0148 removes the database Dock action."
 created: "2026-11-05"
-updated: "2026-11-05"
+updated: "2026-11-06"
 status: "accepted"
 ---
+
+The database Dock action is superseded by [ADR 0148](0148-database-document-references.md); floating explorer/editor actions remain.
 
 ## Context
 

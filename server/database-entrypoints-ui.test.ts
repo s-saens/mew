@@ -18,7 +18,7 @@ import {HoverTipLayer} from '@mew/ui';
 const noop=()=>{};window.actions=[];
 const callbacks=Object.fromEntries(['registerHandle','registerElement','registerTabBar','onFocus','onActivate','onPin','onCloseTab','onReorder','onSetViewMode','onChangeContent','onOpenLink','onOpenHistory','onSetTocOpen','onOpenSidebar','onTabDragMove','onTabDrop'].map(k=>[k,noop]));
 function Fixture(){const [access,setAccess]=React.useState(true);const [guest,setGuest]=React.useState(false);window.setDatabaseAccess=setAccess;window.setGuest=setGuest;const open=access?()=>window.actions.push('database'):undefined;const tree=Array.from({length:70},(_,i)=>({path:'document-'+i+'.txt',name:'Document '+i,type:'file'}));
-return <HoverTipLayer><div className="flex h-dvh flex-col bg-surface-deep text-ink"><header className="h-9 shrink-0">Documents</header><main className="flex min-h-0 flex-1 flex-col md:flex-row"><aside data-explorer-area className="relative h-64 shrink-0 md:h-full md:w-64"><FileTree tree={tree} project="docs" stateKey="database-entrypoints" selectedPath={null} readOnly newFileSignal={{n:0,parentPath:null}} revealSignal={0} presence={{}} onSelect={noop} onFileCreated={noop} onFolderCreated={noop} onRenamed={noop} onDeleted={noop} onNotice={noop} onOpenDatabase={open}/></aside><section data-editor-area className="flex min-h-0 min-w-0 flex-1 flex-col"><EditorPane {...callbacks} pane={{id:'main',activePath:'notes.txt',tabs:[{path:'notes.txt',content:'Example document',viewMode:'plain',preview:false,editable:true}]}} role={guest?'guest':'owner'} authEmail={guest?null:'owner@example.test'} project="docs" tree={[]} presence={{}} focused isGuest={guest} canCollaborate={false} showSidebarButton={false} tocOpen={false} dropZone={null} onAskAgent={async()=>window.actions.push('agent')} onOpenDatabase={open}/></section></main><MobileDock active="editor" openPanels={['editor']} available={access?['sidebar','editor','database']:['sidebar','editor']} hidden={false} position="bottom" onSelect={id=>window.actions.push(id)} onNavigate={noop}/></div></HoverTipLayer>}
+return <HoverTipLayer><div className="flex h-dvh flex-col bg-surface-deep text-ink"><header className="h-9 shrink-0">Documents</header><main className="flex min-h-0 flex-1 flex-col md:flex-row"><aside data-explorer-area className="relative h-64 shrink-0 md:h-full md:w-64"><FileTree tree={tree} project="docs" stateKey="database-entrypoints" selectedPath={null} readOnly newFileSignal={{n:0,parentPath:null}} revealSignal={0} presence={{}} onSelect={noop} onFileCreated={noop} onFolderCreated={noop} onRenamed={noop} onDeleted={noop} onNotice={noop} onOpenDatabase={open}/></aside><section data-editor-area className="flex min-h-0 min-w-0 flex-1 flex-col"><EditorPane {...callbacks} pane={{id:'main',activePath:'notes.txt',tabs:[{path:'notes.txt',content:'Example document',viewMode:'plain',preview:false,editable:true}]}} role={guest?'guest':'owner'} authEmail={guest?null:'owner@example.test'} project="docs" tree={[]} presence={{}} focused isGuest={guest} canCollaborate={false} showSidebarButton={false} tocOpen={false} dropZone={null} onAskAgent={async()=>window.actions.push('agent')} onOpenDatabase={open}/></section></main><MobileDock active="editor" openPanels={['editor']} available={['sidebar','editor']} hidden={false} position="bottom" onSelect={id=>window.actions.push(id)} onNavigate={noop}/></div></HoverTipLayer>}
 createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18nProvider>);`
   const bundle = await build({
     input: 'virtual:database-entrypoints.tsx', write: false, platform: 'browser', output: { format: 'esm', codeSplitting: false },
@@ -56,13 +56,13 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     const editor = page.locator('[data-editor-database]')
     const dock = page.locator('[data-dock-item="database"]')
     await editor.waitFor().catch(error => { assert.deepEqual(errors, []); throw error })
-    for (const action of [explorer, editor, dock]) {
+    for (const action of [explorer, editor]) {
       assert.equal(await action.getAttribute('aria-label'), 'Database')
       assert.equal(await action.getAttribute('aria-haspopup'), 'dialog')
       await action.click()
     }
-    assert.deepEqual(await page.evaluate('window.actions'), ['database', 'database', 'database'])
-    assert.equal(await dock.getAttribute('aria-pressed'), null, 'the database popup action is not presented as a panel toggle')
+    assert.deepEqual(await page.evaluate('window.actions'), ['database', 'database'])
+    assert.equal(await dock.count(), 0, 'the database catalog is absent from desktop and mobile Dock')
     const editorBox = (await editor.boundingBox())!, agentBox = (await page.locator('[data-editor-database] + button').boundingBox())!
     assert.ok(editorBox.x + editorBox.width <= agentBox.x && agentBox.x - editorBox.x - editorBox.width <= 8)
     assert.equal(editorBox.y, agentBox.y)
@@ -72,6 +72,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     assert.ok(before.height <= 30 && before.x > area.x + area.width / 2, 'the explorer action is compact and aligned at the upper right')
     await page.locator('[data-tree-key] > div').last().evaluate(el => { el.scrollTop = 500 })
     assert.deepEqual(await explorer.boundingBox(), before, 'scrolling files does not move the floating action')
+    await page.mouse.move(0, 0)
     await explorer.hover()
     await page.getByRole('tooltip', { name: 'Database', exact: true }).waitFor()
     await page.evaluate('window.setGuest(true)')

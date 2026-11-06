@@ -56,6 +56,15 @@ async function bootstrap(): Promise<void> {
   `)
   await exec(`ALTER TABLE mew.databases ADD COLUMN IF NOT EXISTS owner_path text`)
   await exec(`CREATE INDEX IF NOT EXISTS databases_project_idx ON mew.databases (project)`)
+  await exec(`CREATE TABLE IF NOT EXISTS mew.database_references (
+    database_id uuid NOT NULL REFERENCES mew.databases(id) ON DELETE CASCADE,
+    project text NOT NULL,
+    path text NOT NULL,
+    line integer NOT NULL CHECK (line > 0),
+    occurrence integer NOT NULL CHECK (occurrence >= 0),
+    PRIMARY KEY (database_id, project, path, occurrence)
+  )`)
+  await exec(`CREATE INDEX IF NOT EXISTS database_references_document_idx ON mew.database_references (project, path)`)
   await exec(`
     CREATE TABLE IF NOT EXISTS mew.columns (
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

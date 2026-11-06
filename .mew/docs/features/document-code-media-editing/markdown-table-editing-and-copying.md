@@ -4,11 +4,11 @@ parent: "mew-editor"
 title: "Markdown Table Editing and Copying"
 status: "implemented"
 created: "2026-09-18"
-updated: "2026-11-01"
+updated: "2026-11-06"
 status_hash: "a4d3adb2072291555b6bd681a8a5b7e3b9de108e056a15951673f169dd30caf7"
 files: ["packages/editor/src/editor/TableTooltip.tsx", "packages/editor/src/editor/TableCopyMenu.tsx", "server/tableLayout.ts"]
 commits: []
-description: "Feature contract covering right-click row/column addition and deletion and conversion to a DB with text fields, integrated with the common body menu for Markdown tables; single-step undo/redo; column resizing; and copying as text, Markdown, CSV, and images. Also explains deletion of the last row or column, DB value preservation, project-owned table widths shared by Documents and Files, and legacy migration."
+description: "Feature contract covering right-click row/column addition and deletion and conversion to a DB with text fields, integrated with the common body menu for Markdown tables; single-step document undo/redo with reference-based DB lifetime; column resizing; and copying as text, Markdown, CSV, and images. Also explains deletion of the last row or column, DB value preservation, project-owned table widths shared by Documents and Files, and legacy migration."
 상위파일:
   - "MOC.md"
   - "_document-code-media-editing.md"
@@ -24,7 +24,7 @@ description: "Feature contract covering right-click row/column addition and dele
 
 ### Boundaries and limitations
 
-- Store Markdown tables in the document body and document DB rows and columns in Postgres. Conversion replaces the document block and does not delete the DB.
+- Store Markdown tables in the document body and document DB rows and columns in Postgres. Conversion replaces the document block. Saving removal of its last recorded DB reference deletes the DB under the [reference lifecycle contract](../document-databases/document-databases-and-catalog.md#persisted-document-references-and-database-lifetime).
 - The supplementary column width storage format follows the editing guide.
 - Store supplementary widths in the actual project's `.mew/table-layout.json`, sharing file identity across Documents and Files. Legacy migration follows the [document metadata contract](../../development/architecture.md#project-owned-document-metadata).
 
@@ -35,7 +35,7 @@ description: "Feature contract covering right-click row/column addition and dele
 - `행 삭제` and `열 삭제` in the same menu delete the row or column containing the right-clicked cell. This also applies to headers; deleting the only remaining row or column removes the entire table. These actions are provided separately from `삭제` for selected text in the common body menu.
 - In editable documents, use `데이터베이스로 전환` in the right-click menu to convert the entire table to a DB. All columns are text, and strings that look like numbers, dates, or booleans are stored unchanged. If the first row is a header, use it for column names; otherwise, generate column names and store data starting from the first row. Normalize empty, duplicate, and reserved column names into distinct names. If values in the first column are empty or duplicated, preserve the original values and add a text primary column at the front.
 - Store cell paragraphs and hard line breaks as text line breaks, and exclude formatting such as bold and links from DB values. Place merged-cell text only in the starting cell and leave the remaining cells empty. A table containing only headers creates a DB with no rows and does not insert sample rows. Imports are limited to 200 columns and 10,000 rows. Preserve the original table on invalid input or save failure.
-- Conversion provides single-step undo and redo in both regular history and Yjs collaboration history. Undo restores the original table formatting, and redo reuses the same DB already created. Cancel replacement if the source is edited or deleted or the document becomes read-only while conversion is pending. Detailed storage boundaries follow the [DB Feature Contract](../document-databases/document-databases-and-catalog.md#markdown-tables-and-conversion) and [Conversion Decision](../../decisions/0035-table-database-conversion.md).
+- Conversion provides single-step undo and redo in both regular history and Yjs collaboration history. Undo restores the original table formatting, and redo restores the same DB UUID. If saving the last-reference removal has deleted the DB, document history cannot recover its Postgres data. Cancel replacement if the source is edited or deleted or the document becomes read-only while conversion is pending. Detailed storage boundaries follow the [DB Feature Contract](../document-databases/document-databases-and-catalog.md#markdown-tables-and-conversion) and [Conversion Decision](../../decisions/0035-table-database-conversion.md).
 - In read-only mode, hide row/column addition and deletion and DB conversion, and provide only Markdown, CSV, and image copying as table-specific items. In table areas outside cells, also provide DB conversion and copying when the user has edit permission.
 - When text is selected and copied within a single header or body cell, copy only the selected characters as plain text. Do not include table HTML tags or Markdown formatting, and preserve paragraphs and hard line breaks within the cell as line breaks.
 - Multiple-cell selections, whole-table selections, and the table copy menu retain the existing copy formats.

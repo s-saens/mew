@@ -1,13 +1,13 @@
 ---
 title: "0035 — Storage and history boundaries for conversion between regular tables and document DBs"
-description: "A decision to record bidirectional conversion between regular tables and document DBs as a single document transaction, preserving the source DB so undo and redo reuse the same reference. Defines text import and preservation of source values under primary column constraints."
+description: "A decision to record bidirectional conversion between regular tables and document DBs as a single document transaction, originally preserving the source DB so undo and redo reuse the same reference. ADR 0148 supersedes DB retention after saving removal of the last recorded reference; text import and primary-column preservation remain applicable."
 created: 2026-10-21
-updated: 2026-10-21
+updated: 2026-11-06
 ---
 
 # 0035 — Storage and history boundaries for conversion between regular tables and document DBs
 
-Status: Approved
+Status: Approved; DB retention after saved reference removal is superseded by [ADR 0148](0148-database-document-references.md).
 
 ## Background
 

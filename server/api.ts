@@ -12,6 +12,7 @@ import { runAccountWorkspace } from './account-workspace.ts'
 import { recordChangeIp, requestIp } from './change-ip.ts'
 import { DocumentPages, DocumentPageError } from './document-pages.ts'
 import { saveDatabaseRowPage, remapDatabaseRowPages } from './db/rowPageIntegration.ts'
+import { saveDocumentDatabaseReferences, refreshDocumentDatabaseReferences, mutateDocumentDatabaseReferences } from './db/documentReferenceIntegration.ts'
 import { RowPageError } from './db/rowPages.ts'
 import { DbValidationError } from './db/databaseService.ts'
 import { DocumentGraphIndex } from './document-graph.ts'
@@ -1280,12 +1281,15 @@ export function createApiApp() {
       const pages = new DocumentPages(root, (rel, recursive = false) => recursive ? subtreeAccess(auth, project, rel, true) : fileAccess(auth, project, rel).edit)
       const { path: target = '', name = '', destination = '', unique = false } = req.body ?? {}
       if (typeof target !== 'string' || typeof name !== 'string' || typeof destination !== 'string' || typeof unique !== 'boolean') { res.status(400).json({ error: '올바른 문서 경로와 이름을 입력하세요' }); return }
-      const result = req.params.action === 'create' ? pages.create(target, name, unique)
+      const result = await mutateDocumentDatabaseReferences(project, req.params.action === 'delete' ? [target] : [], () => {
+        const mutation = req.params.action === 'create' ? pages.create(target, name, unique)
         : req.params.action === 'rename' ? pages.rename(target, name)
         : req.params.action === 'delete' ? pages.delete(target)
         : req.params.action === 'move' ? pages.move(target, destination)
         : req.params.action === 'copy' ? pages.move(target, destination, true) : null
-      if (!result) { res.status(400).json({ error: '알 수 없는 문서 작업입니다' }); return }
+        if (!mutation) throw new DocumentPageError('알 수 없는 문서 작업입니다', 400)
+        return mutation
+      })
       await remapDatabaseRowPages(project, result.moves)
       for (const rel of result.changed) noteFileContentChanged(project, rel)
       await refreshCatalogPaths(project, result.changed)
@@ -1410,13 +1414,15 @@ export function createApiApp() {
 
   // 커밋 시점 내용을 디스크에 쓰고 커밋한다 — "내부 링크 라벨 = title" 동기화까지 PUT /file과
   // 동일하게 처리해야 하므로 그 로직을 공유한다.
-  async function writeAndCommit(project: string, relPath: string, content: string, action: 'add' | 'update', commitMessage?: string, mayEdit: (relPath: string) => boolean = () => true, mayEditDatabase = false) {
-    content = await saveDatabaseRowPage(project, relPath, content, undefined, mayEditDatabase) ?? content
+  async function writeAndCommit(project: string, relPath: string, content: string, action: 'add' | 'update', commitMessage?: string, mayEdit: (relPath: string) => boolean = () => true, mayEditDatabase = false, previousContent?: string) {
     const absPath = resolveProjectPath(project, relPath)
+    const previous = previousContent ?? (fs.existsSync(absPath) ? fs.readFileSync(absPath, 'utf8') : '')
+    content = await saveDatabaseRowPage(project, relPath, content, undefined, mayEditDatabase) ?? content
     fs.mkdirSync(path.dirname(absPath), { recursive: true })
     fs.writeFileSync(absPath, content, 'utf-8')
     // 협업 브리지가 이 쓰기를 "우리 메아리"로 걸러내게 기록 (외부 AI 변경만 방에 주입되도록)
     noteAppWrite(absPath, content)
+    await saveDocumentDatabaseReferences(project, relPath, content, previous)
     noteFileContentChanged(project, relPath)
     if (action === 'add') await refreshCatalogPaths(project, [relPath])
 
@@ -1471,12 +1477,13 @@ export function createApiApp() {
         }
         content = mergeTaskFrontmatter(expectedContent, content, fs.readFileSync(absPath, 'utf8'))
       }
+      const previous = isNew ? '' : fs.readFileSync(absPath, 'utf8')
       const sharedContent = await saveDatabaseRowPage(project, relPath, content, expectedContent, canUse(authOf(req), 'database') && unrestrictedFiles(authOf(req), project, true))
       if (sharedContent !== null) content = sharedContent
       const saved = content !== submittedContent ? { content } : {}
       const contentChanged = isNew || fs.readFileSync(absPath, 'utf8') !== content
       if (doCommit) {
-        const result = await writeAndCommit(project, relPath, content, isNew ? 'add' : 'update', undefined, target => fileAccess(authOf(req), project, target).edit, canUse(authOf(req), 'database') && unrestrictedFiles(authOf(req), project, true))
+        const result = await writeAndCommit(project, relPath, content, isNew ? 'add' : 'update', undefined, target => fileAccess(authOf(req), project, target).edit, canUse(authOf(req), 'database') && unrestrictedFiles(authOf(req), project, true), previous)
         res.json({ ok: true, commit: result, ...saved })
       } else {
         if (authOf(req).role === 'guest') {
@@ -1493,6 +1500,7 @@ export function createApiApp() {
         if (contentChanged) recordChangeIp(absPath, requestIp(req), content)
         // 자동저장(비커밋) 경로 — 협업 브리지가 메아리로 무시하도록 기록
         noteAppWrite(absPath, content)
+        await saveDocumentDatabaseReferences(project, relPath, content, previous)
         noteFileContentChanged(project, relPath)
         if (isNew) await refreshCatalogPaths(project, [relPath])
         res.json({ ok: true, commit: null, ...saved })
@@ -1538,7 +1546,10 @@ export function createApiApp() {
         res.status(403).json({ error: 'archives/ 문서는 삭제할 수 없습니다' })
         return
       }
-      deletePath(project, relPath)
+      await mutateDocumentDatabaseReferences(project, [relPath], () => {
+        deletePath(project, relPath)
+        return { path: relPath, moves: [], changed: [relPath] }
+      })
       noteFileContentChanged(project, relPath)
       await refreshCatalogPaths(project, [relPath])
       // 빈 디렉터리처럼 git이 전혀 알지 못하는 경로는 git add가 pathspec 오류를 던진다 —
@@ -1747,7 +1758,10 @@ export function createApiApp() {
         res.status(403).json({ error: 'archives/ 문서는 복제할 수 없습니다' })
         return
       }
-      const newRelPath = copyFile(project, relPath)
+      const { path: newRelPath } = await mutateDocumentDatabaseReferences(project, [], () => {
+        const copied = copyFile(project, relPath)
+        return { path: copied, moves: [], changed: [copied] }
+      })
       const commit = await commitFile(project, newRelPath, 'add', `${project}: copy ${relPath} → ${newRelPath}`)
       res.json({ ok: true, relPath: newRelPath, commit, hidden: hiddenFromTree(req, newRelPath) })
     } catch (err) {
@@ -1788,8 +1802,12 @@ export function createApiApp() {
           return
         }
         const destAbs = resolveProjectPath(project, destDir)
-        const copiedAbs = pasteExternalPath(sourceAbs, destAbs, 'copy')
-        const newRelPath = path.relative(projectRoot(project), copiedAbs).split(path.sep).join('/')
+        const { path: newRelPath } = await mutateDocumentDatabaseReferences(project, [], () => {
+          const copied = pasteExternalPath(sourceAbs, destAbs, 'copy')
+          const relative = path.relative(projectRoot(project), copied).split(path.sep).join('/')
+          return { path: relative, moves: [], changed: [relative] }
+        })
+        const copiedAbs = resolveProjectPath(project, newRelPath)
         await refreshCatalogPaths(project, [newRelPath])
         const commit = await commitFile(project, newRelPath, 'add', `${project}: copy ${srcPath} → ${newRelPath}`)
         const type = fs.statSync(copiedAbs).isDirectory() ? 'dir' : 'file'
@@ -1800,7 +1818,10 @@ export function createApiApp() {
         res.status(403).json({ error: 'archives/ 문서는 복사할 수 없습니다' })
         return
       }
-      const newRelPath = copyPathInto(project, srcPath, destDir)
+      const { path: newRelPath } = await mutateDocumentDatabaseReferences(project, [], () => {
+        const copied = copyPathInto(project, srcPath, destDir)
+        return { path: copied, moves: [], changed: [copied] }
+      })
       await refreshCatalogPaths(project, [newRelPath])
       const commit = await commitFile(project, newRelPath, 'add', `${project}: copy ${srcPath} → ${newRelPath}`)
       const type = fs.statSync(resolveProjectPath(project, newRelPath)).isDirectory() ? 'dir' : 'file'
@@ -1861,7 +1882,11 @@ export function createApiApp() {
           return
         }
       }
-      renamePath(project, oldPath, newPath)
+      await mutateDocumentDatabaseReferences(project, [oldPath], () => {
+        const directory = fs.statSync(resolveProjectPath(project, oldPath)).isDirectory()
+        renamePath(project, oldPath, newPath)
+        return { path: newPath, moves: [{ from: oldPath, to: newPath, directory }], changed: [oldPath, newPath] }
+      })
       noteFileContentChanged(project, oldPath)
       noteFileContentChanged(project, newPath)
       await refreshCatalogPaths(project, [oldPath, newPath])
@@ -2192,6 +2217,7 @@ export function createApiApp() {
       }
       if (!subtreeAccess(authOf(req), project, destDir, true, false)) { res.status(403).json({ error: '업로드 경로에 쓸 권한이 없습니다' }); return }
       const relPath = moveFileInto(project, destDir, file.originalname, file.path)
+      await refreshDocumentDatabaseReferences(project, [relPath])
       noteFileContentChanged(project, relPath)
       await refreshCatalogPaths(project, [relPath])
       const commit = await commitFile(project, relPath, 'add', `${project}: upload ${relPath}`)

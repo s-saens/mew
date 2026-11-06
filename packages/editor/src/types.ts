@@ -74,6 +74,7 @@ export interface DbSummary {
   title: string
   kind: 'managed' | 'external'
   editable: boolean
+  references?: { project: string; path: string; line: number }[]
 }
 
 /** 실시간 이벤트 — 서버 hub의 DbEvent와 동일 구조 */

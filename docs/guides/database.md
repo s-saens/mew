@@ -1,9 +1,8 @@
 ---
 title: "Table Databases (/db)"
-description: "Explains opening the database list from the Dock and floating explorer/editor buttons, inserting Postgres document databases, matching plus-only row/column addition bars, table conversion and undo, calendar and Gantt ranges, keyboard cell navigation with immediate typing, header type menus, search, grouping, and sorting. Also covers primary columns, immediate linked-page title previews, filename changes after saving, row-page sharing, read-only references, and backups."
-updated: "2026-11-05"
+description: "Explains opening the database list from floating explorer/editor buttons and viewing recorded document references, inserting Postgres document databases, matching plus-only row/column addition bars, table conversion and undo, calendar and Gantt ranges, keyboard cell navigation with immediate typing, header type menus, search, grouping, and sorting. Also covers primary columns, immediate linked-page title previews, filename changes after saving, row-page sharing, read-only references, and backups."
+updated: "2026-11-06"
 상위파일:
-  - "../../.mew/docs/MOC.md"
   - "MOC.md"
 ---
 Use this to embed editable data tables in documents or display existing Postgres tables read-only. If you only need a simple table in the document body, choose [Markdown tables](editor.md#editing-and-copying-tables), which work without Postgres.
@@ -15,7 +14,7 @@ An operator must first configure `DATABASE_URL` on the server. The logged-in acc
 1. Open a Markdown document in the project in **Hotview**.
 2. Type `/db` at the insertion point and select **Database**.
 3. Edit the table title and cells. Use the `+` bar to the right of the table to add text, number, checkbox, date, single-select, or multi-select columns. The `+` bar below the table adds a row. Click a column name to rename it. To use the page type, change the primary column's type.
-4. To find tables in other documents, choose **Database** in the Dock. The same list opens from the floating database button at the upper right of the explorer file area, or immediately left of the editor’s AI button. These controls appear when your account has database access.
+4. To find tables in other documents, use the floating database button at the upper right of the explorer file area, or immediately left of the editor’s AI button. These controls appear when your account has database access.
 
 A new table has a **Title** primary column and a **Text** column, with 2 example rows: `항목 1` / `첫 번째 내용` and `항목 2` / `두 번째 내용`. Replace the cells and column names with your own content.
 
@@ -25,11 +24,19 @@ In **Plain**, Ctrl+click the `<div data-mew-db="…"></div>` portion, or Cmd+cli
 
 ## Converting Between Databases and Regular Tables
 
-In an editable Hotview document, right-click a DB and select **Convert to Table** to transfer all columns and rows to a regular table. This includes rows hidden by search. The original DB and row pages remain, and edits to the regular table do not affect the original DB.
+In an editable Hotview document, right-click a DB and select **Convert to Table** to transfer all columns and rows to a regular table. This includes rows hidden by search. Edits to the regular table do not change a DB still used elsewhere. When the converted document is saved, removing the last recorded DB reference deletes the DB data; linked row-page bodies remain.
 
 Right-click a regular table and select **Convert to Database** to import all columns as text fields. If the first column has empty or duplicate values, the original cells are preserved and a separate primary column is added at the beginning. No example rows are added to a table that has only headers.
 
-Conversions in either direction can be undone in one step with **Ctrl/Cmd+Z** and redone with **Ctrl/Cmd+Shift+Z** or **Ctrl+Y**. Undo restores the original table formatting or DB reference settings. Undoing a table-to-DB conversion leaves the created DB in the list and reuses it on redo. Converting the table to a DB anew later creates a new DB and does not restore the previous field types.
+Conversions in either direction can be undone in one step with **Ctrl/Cmd+Z** and redone with **Ctrl/Cmd+Shift+Z** or **Ctrl+Y**. Undo restores the original table formatting or DB reference settings. The editor reuses the UUID on undo/redo, but saving removal of its last recorded reference deletes the DB. Undo cannot restore deleted Postgres data. Converting the table to a DB anew later creates a new DB and does not restore the previous field types.
+
+## Finding Where a Database Is Used
+
+Select a database in the full list to see its recorded reference count and **project / file : line** locations. Multiple blocks in the same document appear separately. Line numbers refer to the saved Markdown source and update when edits move a block. Copies add references; moves update their paths.
+
+Locations are recorded when documents are saved or changed; opening the list does not search files. Older documents may initially show no locations. Removing a block or deleting its document removes that reference. Missing old metadata is ignored. When a removal leaves no recorded references, Mew deletes the DB itself. For an external table, only Mew's attachment is removed; the source table remains untouched. Linked row-page bodies remain.
+
+Keep Postgres backups: document undo and Git history cannot restore deleted DB data. If Postgres is unavailable during a file edit, locations can remain stale until that file changes again. An unrecorded legacy reference cannot prevent cleanup of the last recorded reference.
 
 ## Switching Views
 

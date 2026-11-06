@@ -4,6 +4,7 @@ import { useEffect, useId, useState } from 'react'
 import { DatabasePanel, DbGlyph } from '@mew/editor/database'
 import type { DbSummary, EditorDbApi, EditorOpenLink } from '@mew/editor'
 import { DialogFrame } from '@mew/ui'
+import { uiText } from '@mew/ui/i18n-core'
 import { PanelCloseButton } from './panel-close-button'
 import { dbApi, getProject } from '../api/client'
 import { useI18n } from '../i18n'
@@ -38,6 +39,8 @@ export function DatabaseListModal({ onClose, onOpenPage, api = dbApi, project = 
       cancelled = true
     }
   }, [api, t])
+
+  const references = items?.find(item => item.id === selected)?.references ?? []
 
   return (
     <DialogFrame labelledBy={titleId} onClose={onClose} className="flex h-[80dvh] max-w-4xl flex-col">
@@ -81,7 +84,17 @@ export function DatabaseListModal({ onClose, onOpenPage, api = dbApi, project = 
         {/* 오른쪽: 선택한 DB */}
         <div className="min-w-0 flex-1 overflow-auto p-3">
           {selected ? (
-            <DatabasePanel key={selected} api={api} dbId={selected} readonly={readonly && selected === initialDbId} onOpenPage={(path, options) => { onClose(); onOpenPage?.(path, options) }} />
+            <>
+              <section aria-label={uiText('데이터베이스 참조')} className="mb-3 border-b border-edge pb-2 text-xs">
+                <h3 className="mb-1 font-medium text-ink-secondary">{uiText('데이터베이스 참조')} ({references.length})</h3>
+                {references.length ? <ul className="space-y-1 text-ink-secondary">
+                  {references.map((reference, index) => <li key={JSON.stringify([reference.project, reference.path, reference.line, index])} className="break-all select-text">
+                    <span>{reference.project}</span> / <span>{reference.path}</span> : <span>{uiText('줄')} {reference.line}</span>
+                  </li>)}
+                </ul> : <p className="text-ink-muted">{uiText('항목 없음')}</p>}
+              </section>
+              <DatabasePanel key={selected} api={api} dbId={selected} readonly={readonly && selected === initialDbId} onOpenPage={(path, options) => { onClose(); onOpenPage?.(path, options) }} />
+            </>
           ) : (
             <div className="flex h-full items-center justify-center text-xs text-ink-muted">
               {items && items.length === 0 ? t('database.createHint') : t('database.selectHint')}

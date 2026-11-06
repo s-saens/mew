@@ -16,6 +16,7 @@ import {
 import { resetSearchIndex } from './searchCatalog.ts'
 import { measure } from './perfMarks.ts'
 import { refreshDatabaseRowPages } from './db/rowPageIntegration.ts'
+import { refreshDocumentDatabaseReferences } from './db/documentReferenceIntegration.ts'
 
 // 감시할 때 내려가지 않는 디렉터리. 트리에 안 보이는 것(숨김 목록)과 접근 차단 세그먼트(node_modules·.git·.data)에
 // 더해 build까지 제외한다 — node_modules를 통째로 inotify로 걸면 감시 수천 개가 되어 한계(ENOSPC)에 걸리고,
@@ -204,6 +205,7 @@ class TreeWatcher {
         this.pendingWatchTargets.clear()
         this.needsFullSync = false
         if (this.closed) return
+        await refreshDocumentDatabaseReferences(this.project, content)
         await refreshDatabaseRowPages(this.project, content)
         for (const relPath of content) noteFileContentChanged(this.project, relPath)
         const changedParents: string[] = []
