@@ -14,6 +14,7 @@ import { videoPacer } from '../native/remote-desktop/video-pacer.mjs'
 import { videoAdaptation } from '../native/remote-desktop/video-adaptation.mjs'
 // @ts-expect-error Installed Windows helper is tested with an FFI double.
 import { windowsGpu } from '../native/remote-desktop/gpu-windows.mjs'
+import { videoModes, videoOffer } from '../native/remote-desktop/video-settings.mjs'
 
 function clock() {
   let time = 0, serial = 0
@@ -219,14 +220,20 @@ test('quality recovery is bounded, time-based and never accelerated by idle feed
 
 function windowsFixture(version = 5) {
   let status = 0, produced = false
-  const rates: number[] = []
+  const rates: number[] = [], starts: unknown[][] = []
+  const bounds = { x: 0, y: 0, width: 1920, height: 1080 }
   const ffi = { load: () => ({ func: (signature: string) => (...args: unknown[]) => {
     const name = signature.match(/(mew_gpu_\w+)\(/)![1]
     if (name === 'mew_gpu_abi') return version
     if (name === 'mew_gpu_create') return {}
     if (name === 'mew_gpu_error') return 0x80070005
+    if (name === 'mew_gpu_start') starts.push(args.slice(1))
     if (name === 'mew_gpu_bitrate') { rates.push(Number(args[1])); return status }
-    if (name === 'mew_gpu_current') { const out = args[1] as Buffer; out.writeInt32LE(1920, 12); out.writeInt32LE(1080, 16) }
+    if (name === 'mew_gpu_current') {
+      const out = args[1] as Buffer
+      out.writeInt32LE(bounds.x, 4); out.writeInt32LE(bounds.y, 8)
+      out.writeInt32LE(bounds.width, 12); out.writeInt32LE(bounds.height, 16)
+    }
     if (name === 'mew_gpu_poll') {
       if (produced) return 0
       produced = true
@@ -238,7 +245,7 @@ function windowsFixture(version = 5) {
     }
     return 0
   } }) }
-  return { gpu: () => windowsGpu(ffi, '/fixture'), rates, fail(value: number) { status = value } }
+  return { gpu: () => windowsGpu(ffi, '/fixture'), rates, starts, bounds, fail(value: number) { status = value } }
 }
 test('Windows rejects stale ABI, exposes stage timings and propagates encoder control failures', () => {
   assert.throws(() => windowsFixture(4).gpu(), /다시 준비/)
@@ -253,6 +260,31 @@ test('Windows rejects stale ABI, exposes stage timings and propagates encoder co
   f.fail(0); gpu.bitrate(6_000_000); gpu.bitrate(6_000_000)
   assert.equal(f.rates.length, 3)
   gpu.stop(); gpu.close()
+})
+
+test('virtual display acquisition receives negotiated size and refresh while input keeps native desktop bounds', () => {
+  const f = windowsFixture(), gpu = f.gpu()
+  try {
+    for (const resolution of ['1080p', '1440p', '2160p'] as const) {
+      const settings = { resolution, fps: 240, quality: 'high' } as const
+      const codec = videoOffer(settings)[0]
+      const answer = `v=0\r\nm=video 9 UDP/TLS/RTP/SAVPF ${codec.payload}\r\na=recvonly\r\na=rtpmap:${codec.payload} H264/90000\r\na=fmtp:${codec.payload} ${codec.fmtp}\r\n`
+      const mode = videoModes(answer, settings)[0]
+      assert.equal(mode.fps, 240)
+      f.bounds.x = -mode.width; f.bounds.y = 120; f.bounds.width = mode.width; f.bounds.height = mode.height
+      const screen = gpu.start('gpu:99', mode.bitrate, undefined, mode)
+      assert.deepEqual(f.starts.at(-1), [99, mode.width, mode.height, 240, mode.bitrate, 100, mode.level])
+      assert.deepEqual(screen, { id: 'gpu:99', label: 'Mew 가상 화면', ...f.bounds })
+      gpu.stop()
+    }
+    const codec = videoOffer({ resolution: '720p', fps: 30, quality: 'balanced' })[0]
+    const answer = `v=0\r\nm=video 9 UDP/TLS/RTP/SAVPF ${codec.payload}\r\na=recvonly\r\na=rtpmap:${codec.payload} H264/90000\r\na=fmtp:${codec.payload} ${codec.fmtp}\r\n`
+    const mode = videoModes(answer, { resolution: '720p', fps: 30, quality: 'balanced' })[0]
+    Object.assign(f.bounds, { x: 1920, y: 0, width: 1920, height: 1080 })
+    const screen = gpu.start('gpu:99', mode.bitrate, undefined, mode)
+    assert.deepEqual(f.starts.at(-1), [99, 1280, 720, 30, mode.bitrate, 100, mode.level])
+    assert.deepEqual([screen.x, screen.width, screen.height], [1920, 1920, 1080], 'a scaled stream must not replace desktop input bounds')
+  } finally { gpu.stop(); gpu.close() }
 })
 
 test('viewer diagnostics deliver FHD sender and receiver stages and stop with the connection', { skip: !domBrowserExecutable() }, async () => {

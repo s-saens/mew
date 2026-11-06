@@ -1,4 +1,4 @@
-use crate::Events;
+use crate::{input::Input, Events, Shared};
 use datachannel_sys as sys;
 use serde_json::{json, Value};
 use std::{
@@ -15,8 +15,19 @@ struct Callback {
     negotiation: u64,
     label: &'static str,
     key: Arc<AtomicBool>,
+    shared: Arc<Shared>,
+    direct_input: bool,
+    input: Arc<std::sync::Mutex<Option<Arc<Input>>>>,
 }
 impl Callback {
+    fn fail(&self) {
+        if let Ok(input) = self.input.lock() {
+            if let Some(input) = input.as_ref() {
+                input.revoke();
+            }
+        }
+        self.emit("rtc-error", Value::Null);
+    }
     fn emit(&self, kind: &str, value: Value) {
         self.events.send(json!({"type":kind,"session":self.session,"negotiation":self.negotiation,"label":self.label,"value":value}));
     }
@@ -37,7 +48,15 @@ unsafe extern "C" fn candidate(_: i32, value: *const c_char, mid: *const c_char,
     ctx(ptr).emit("rtc-candidate",json!({"candidate":CStr::from_ptr(value).to_string_lossy(),"sdpMid":CStr::from_ptr(mid).to_string_lossy()}));
 }
 unsafe extern "C" fn state(_: i32, value: sys::rtcState, ptr: *mut c_void) {
-    ctx(ptr).emit("rtc-state", json!(value));
+    let c = ctx(ptr);
+    if [3, 4, 5].contains(&value) {
+        if let Ok(input) = c.input.lock() {
+            if let Some(input) = input.as_ref() {
+                input.revoke();
+            }
+        }
+    }
+    c.emit("rtc-state", json!(value));
 }
 unsafe extern "C" fn gathering(_: i32, value: sys::rtcGatheringState, ptr: *mut c_void) {
     ctx(ptr).emit("rtc-gathering", json!(value));
@@ -50,10 +69,16 @@ unsafe extern "C" fn opened(_: i32, ptr: *mut c_void) {
     c.emit("rtc-open", Value::Null);
 }
 unsafe extern "C" fn closed(_: i32, ptr: *mut c_void) {
-    ctx(ptr).emit("rtc-closed", Value::Null);
+    let c = ctx(ptr);
+    if let Ok(input) = c.input.lock() {
+        if let Some(input) = input.as_ref() {
+            input.revoke();
+        }
+    }
+    c.emit("rtc-closed", Value::Null);
 }
 unsafe extern "C" fn error(_: i32, _: *const c_char, ptr: *mut c_void) {
-    ctx(ptr).emit("rtc-error", Value::Null);
+    ctx(ptr).fail();
 }
 unsafe extern "C" fn message(_: i32, data: *const c_char, size: i32, ptr: *mut c_void) {
     let c = ctx(ptr);
@@ -79,17 +104,41 @@ unsafe extern "C" fn message(_: i32, data: *const c_char, size: i32, ptr: *mut c
         return;
     }
     if size >= 0 {
-        c.emit("rtc-error", Value::Null);
+        c.fail();
         return;
     }
     let bytes = CStr::from_ptr(data).to_bytes();
     if bytes.len() > 16384 {
-        c.emit("rtc-error", Value::Null);
+        c.fail();
         return;
     }
     match std::str::from_utf8(bytes) {
-        Ok(text) => c.emit("rtc-message", json!(text)),
-        Err(_) => c.emit("rtc-error", Value::Null),
+        Ok(text) => {
+            if let Ok(input) = c.input.lock() {
+                if let Some(input) = input.as_ref() {
+                    let result = serde_json::from_str::<Value>(text)
+                        .map_err(|_| "Invalid desktop input".to_string())
+                        .and_then(|value| input.message(&value, c.label == "control", &c.shared));
+                    match result {
+                        Ok(true) => return,
+                        Err(_) => {
+                            input.revoke();
+                            c.emit("rtc-error", Value::Null);
+                            return;
+                        }
+                        Ok(false) => {}
+                    }
+                }
+            }
+            if c.direct_input
+                && serde_json::from_str::<Value>(text).is_ok_and(|v| v["type"] == "input")
+            {
+                // The channels may open before capture has configured display bounds.
+                return;
+            }
+            c.emit("rtc-message", json!(text));
+        }
+        Err(_) => c.fail(),
     }
 }
 fn check(code: i32) -> Result<i32, String> {
@@ -113,9 +162,11 @@ pub struct Peer {
     #[allow(clippy::vec_box)]
     callbacks: Vec<Box<Callback>>,
     pub key: Arc<AtomicBool>,
+    pub input: Arc<std::sync::Mutex<Option<Arc<Input>>>>,
+    pub playout_delay: Option<u8>,
 }
 impl Peer {
-    pub fn new(value: &Value, events: Events) -> Result<Self, String> {
+    pub fn new(value: &Value, events: Events, shared: Arc<Shared>) -> Result<Self, String> {
         static LOGGING: std::sync::Once = std::sync::Once::new();
         LOGGING.call_once(|| unsafe { sys::rtcInitLogger(sys::rtcLogLevel_RTC_LOG_NONE, None) });
         let session = value["session"]
@@ -162,6 +213,8 @@ impl Peer {
             control: -1,
             callbacks: Vec::new(),
             key: Arc::new(AtomicBool::new(true)),
+            input: Arc::new(std::sync::Mutex::new(None)),
+            playout_delay: None,
         };
         let context = |label| {
             Box::new(Callback {
@@ -170,6 +223,9 @@ impl Peer {
                 negotiation,
                 label,
                 key: peer.key.clone(),
+                input: peer.input.clone(),
+                shared: shared.clone(),
+                direct_input: cfg!(windows) && value["directInput"].as_bool().unwrap_or(false),
             })
         };
         let mut p = context("peer");
@@ -219,10 +275,11 @@ impl Peer {
         check(sys::rtcSetMessageCallback(id, Some(message)))?;
         Ok(())
     }
-    pub fn answer(&self, sdp: &str) -> Result<(), String> {
+    pub fn answer(&mut self, sdp: &str) -> Result<(), String> {
         check(unsafe {
             sys::rtcSetRemoteDescription(self.pc, cstr(sdp)?.as_ptr(), cstr("answer")?.as_ptr())
         })?;
+        self.playout_delay = playout_delay(sdp);
         Ok(())
     }
     pub fn candidate(&self, value: &Value) -> Result<(), String> {
@@ -259,6 +316,11 @@ impl Peer {
 }
 impl Drop for Peer {
     fn drop(&mut self) {
+        if let Ok(mut input) = self.input.lock() {
+            if let Some(input) = input.take() {
+                input.revoke();
+            }
+        }
         unsafe {
             if self.track >= 0 {
                 sys::rtcDeleteTrack(self.track);
@@ -271,5 +333,77 @@ impl Drop for Peer {
             }
             sys::rtcDeletePeerConnection(self.pc);
         }
+    }
+}
+
+// Only the offered one-byte extension ID in a receiving video section is usable.
+fn playout_delay(sdp: &str) -> Option<u8> {
+    let mut video = false;
+    let mut id = None;
+    for line in sdp.lines().map(str::trim) {
+        if line.starts_with("m=") {
+            video = line.starts_with("m=video ") && !line.starts_with("m=video 0 ");
+        }
+        if !video {
+            continue;
+        }
+        if matches!(line, "a=sendonly" | "a=inactive") {
+            return None;
+        }
+        if let Some(ext) = line.strip_prefix("a=extmap:") {
+            let mut words = ext.split_whitespace();
+            let spec = words.next().unwrap_or("");
+            if words.next() == Some("http://www.webrtc.org/experiments/rtp-hdrext/playout-delay")
+                && matches!(spec, "1" | "1/recvonly" | "1/sendrecv")
+            {
+                id = Some(1);
+            }
+        }
+    }
+    id
+}
+
+#[cfg(test)]
+mod tests {
+    use super::playout_delay;
+    #[test]
+    fn playout_delay_requires_matching_receiving_video_negotiation() {
+        let uri = "http://www.webrtc.org/experiments/rtp-hdrext/playout-delay";
+        for spec in ["1", "1/recvonly", "1/sendrecv"] {
+            assert_eq!(
+                playout_delay(&format!(
+                    "m=video 9 RTP/SAVPF 102\r\na=recvonly\r\na=extmap:{spec} {uri}\r\n"
+                )),
+                Some(1)
+            );
+        }
+        for spec in ["2", "15", "1/sendonly", "1/inactive"] {
+            assert_eq!(
+                playout_delay(&format!(
+                    "m=video 9 RTP/SAVPF 102\r\na=extmap:{spec} {uri}\r\n"
+                )),
+                None
+            );
+        }
+        assert_eq!(
+            playout_delay(&format!(
+                "m=audio 9 RTP/SAVPF 111\r\na=extmap:1 {uri}\r\nm=video 9 RTP/SAVPF 102\r\n"
+            )),
+            None
+        );
+        assert_eq!(
+            playout_delay(&format!("m=video 0 RTP/SAVPF 102\r\na=extmap:1 {uri}\r\n")),
+            None
+        );
+        assert_eq!(
+            playout_delay(&format!(
+                "m=video 9 RTP/SAVPF 102\r\na=extmap:1 {uri}\r\na=inactive\r\n"
+            )),
+            None
+        );
+        assert_eq!(
+            playout_delay("m=video 9 RTP/SAVPF 102\r\na=recvonly\r\n"),
+            None
+        );
     }
 }

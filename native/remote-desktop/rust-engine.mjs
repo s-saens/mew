@@ -16,6 +16,7 @@ export function rustEngine(koffi, directory = path.dirname(fileURLToPath(import.
   const command = library.func('int mew_engine_command(void *, const void *, int)')
   const event = library.func('int mew_engine_event(void *, void *, int)')
   const finished = library.func('int mew_engine_finished(void *)')
+  const sequence = process.platform === 'win32' ? library.func('int64 mew_engine_input_sequence(void *)') : undefined
   const destroy = library.func('int mew_engine_destroy(void *)')
   let handle = create(directory)
   if (!handle) throw new Error('Rust 영상 스레드를 준비하지 못했습니다.')
@@ -33,6 +34,12 @@ export function rustEngine(koffi, directory = path.dirname(fileURLToPath(import.
     const bytes = Buffer.from(JSON.stringify({ negotiation, ...value }))
     if (command(handle, bytes, bytes.length) !== 0) worker.emit('error', new Error('Rust 제어 대기열이 종료됐습니다.'))
   }
+  if (sequence) worker.inputReceiver = identity => ({
+    release() { worker.postMessage({ type: 'input-release', session: identity.session, negotiation: identity.negotiation }) },
+    keyChord(keys) { worker.postMessage({ type: 'input-chord', session: identity.session, negotiation: identity.negotiation, keys }) },
+    get sequence() { return handle && session === identity.session && negotiation === identity.negotiation ? Number(sequence(handle)) : -1 },
+    tick() { return false },
+  })
   const poll = () => {
     if (ended) return
     try {

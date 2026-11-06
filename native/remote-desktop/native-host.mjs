@@ -66,7 +66,7 @@ worker.on('message', value => {
   try {
     if (value.type === 'started') {
       session.screen = value.screen
-      session.adapter ??= platform.input(value.screen); session.receiver = createInputReceiver(session.adapter)
+      session.adapter ??= platform.input(value.screen); session.receiver = worker.inputReceiver?.(value) ?? createInputReceiver(session.adapter)
     }
     if (value.type === 'started') session.direct?.configure(value.video)
     if (value.type === 'frame') {

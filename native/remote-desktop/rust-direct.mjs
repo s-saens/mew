@@ -1,3 +1,4 @@
+import { KEY_CODES } from './keys.mjs'
 import { randomBytes } from 'node:crypto'
 import { directAttempts } from './native-direct.mjs'
 import { connectionNotice } from './connection-notice.mjs'
@@ -8,7 +9,7 @@ import { videoAdaptation } from './video-adaptation.mjs'
 
 export function rustMedia(settings, ssrc) {
   const codecs = videoOffer(settings)
-  return [`m=video 9 UDP/TLS/RTP/SAVPF ${codecs.map(c => c.payload).join(' ')}`, 'a=mid:video', 'a=sendonly', 'a=rtcp-mux',
+  return [`m=video 9 UDP/TLS/RTP/SAVPF ${codecs.map(c => c.payload).join(' ')}`, 'a=mid:video', 'a=sendonly', 'a=rtcp-mux', 'a=extmap:1 http://www.webrtc.org/experiments/rtp-hdrext/playout-delay',
     `b=AS:${Math.ceil(videoRate(settings) / 1000)}`, `a=ssrc:${ssrc} cname:mew`, `a=ssrc:${ssrc} msid:mew-desktop screen`, 'a=msid:mew-desktop screen',
     ...codecs.flatMap(c => [`a=rtpmap:${c.payload} H264/90000`, `a=fmtp:${c.payload} ${c.fmtp}`, `a=rtcp-fb:${c.payload} nack`, `a=rtcp-fb:${c.payload} nack pli`, `a=rtcp-fb:${c.payload} ccm fir`]), ''].join('\r\n')
 }
@@ -67,7 +68,7 @@ function rustAttempt(engine, { session, iceServers, udpPort, emit, input, keyfra
   engine.on('message', onEvent)
   try {
     const ssrc = randomBytes(4).readUInt32BE() || 1
-    post({ type: 'peer', iceServers: iceServers.flatMap(s => typeof s.urls === 'string' ? [s.urls] : s.urls), udpPort, media: rustMedia(settings, ssrc), ssrc, nackHistory: Math.min(4096, Math.max(512, Math.ceil(videoRate(settings) / 8 / 1180 * .4))) })
+    post({ type: 'peer', directInput: process.platform === 'win32', inputKeys: Object.fromEntries(Object.entries(KEY_CODES).map(([code, key]) => [code, key.windows])), iceServers: iceServers.flatMap(s => typeof s.urls === 'string' ? [s.urls] : s.urls), udpPort, media: rustMedia(settings, ssrc), ssrc, nackHistory: Math.min(4096, Math.max(512, Math.ceil(videoRate(settings) / 8 / 1180 * .4))) })
   } catch (error) { engine.removeListener('message', onEvent); void nat.close(); throw error }
   return {
     signal(value) {

@@ -1,8 +1,8 @@
 ---
 title: "Overlapped Remote Desktop Processing and Quality Recovery While Preserving Original FHD Dimensions"
-description: "Replaces waiting for high-quality FHD transmission to complete with overlapping encoding and transmission for up to two frames, and adopts relearning during RTT increases, time-based recovery, Windows setting application checks, and per-stage diagnostics. Distinguishes the scope of replacing existing single-frame serial processing, synthetic verification, and unverified physical hardware behavior. Subsequent decision 0059 moves video processing to Rust while retaining frame limits and quality policies."
+description: "Replaces waiting for high-quality FHD transmission to complete with overlapping encoding and transmission for up to two frames, and adopts relearning during RTT increases, time-based recovery, Windows setting application checks, and per-stage diagnostics. Distinguishes the scope of replacing existing single-frame serial processing, synthetic verification, and unverified physical hardware behavior. Subsequent decision 0059 moves video processing to Rust, and decision 0130 extends Windows input, bounded delta bursts, and virtual modes while retaining frame limits and quality policies."
 created: 2026-10-20
-updated: 2026-10-24
+updated: "2026-11-04"
 ---
 
 ## Status
@@ -10,6 +10,8 @@ updated: 2026-10-24
 Adopted. This decision covers code and isolated verification; it does not confirm production application, actual GPU behavior, or superiority over StarDesk.
 
 Subsequent [ADR 0059](0059-remote-desktop-rust-engine.md) replaces JS worker handoff, ACKs, and pacing in the default path with a Rust queue and direct transmission on the same thread. This decision's frame lifetime, reference recovery, and quality adaptation policies remain unchanged.
+
+[ADR 0130](0130-remote-desktop-latency-and-virtual-modes.md) subsequently moves Windows snapshot validation/injection to Rust callbacks and adds bounded delta-frame bursts, capture wakeups, and virtual display modes. Other OS input placement, frame lifetimes, reference recovery, and quality adaptation remain unchanged.
 
 ## Background
 

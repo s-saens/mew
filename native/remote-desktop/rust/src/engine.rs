@@ -1,5 +1,6 @@
 use crate::{
     gpu::{Gpu, Mode, MAX_FRAME},
+    input,
     rtc::Peer,
     rtp::Pacer,
     Command, Events, Shared,
@@ -31,6 +32,8 @@ pub fn run(directory: String, commands: Receiver<Command>, events: Events, share
     let mut next_poll = Instant::now();
     let mut poll_interval = Duration::from_millis(2);
     let mut ssrc = 0;
+    let mut direct_input = false;
+    let mut input_keys = Value::Null;
     let result = (|| -> Result<(), String> {
         loop {
             if shared.closed.load(Ordering::Acquire) {
@@ -56,7 +59,21 @@ pub fn run(directory: String, commands: Receiver<Command>, events: Events, share
             } else {
                 Duration::from_millis(100)
             };
-            let first = commands.recv_timeout(wait).ok();
+            // Output credits can keep the native event signaled while an IDR
+            // blocks reads. Use the bounded command wait until pacing drains it.
+            let can_wait_capture = gpu.has_wait()
+                && pacer
+                    .as_mut()
+                    .is_some_and(|pacer| pacer.can_read(shared.ms() as f64));
+            let first = if active.is_some() && can_wait_capture {
+                let queued = commands.try_recv().ok();
+                if queued.is_none() {
+                    gpu.wait(1)?;
+                }
+                queued.or_else(|| commands.try_recv().ok())
+            } else {
+                commands.recv_timeout(wait).ok()
+            };
             let mut command = first;
             for index in 0..32 {
                 let Some((epoch, value)) = command else { break };
@@ -87,7 +104,9 @@ pub fn run(directory: String, commands: Receiver<Command>, events: Events, share
                                 .filter(|n| *n > 0 && *n <= u32::MAX as u64)
                                 .ok_or("Invalid video SSRC")?
                                 as u32;
-                            peer = Some(Peer::new(&value, events.clone())?);
+                            direct_input = value["directInput"].as_bool().unwrap_or(false);
+                            input_keys = value["inputKeys"].clone();
+                            peer = Some(Peer::new(&value, events.clone(), shared.clone())?);
                         }
                         "close-peer" => {
                             gpu.stop()?;
@@ -115,7 +134,7 @@ pub fn run(directory: String, commands: Receiver<Command>, events: Events, share
                             }
                             match kind {
                                 "answer" => peer
-                                    .as_ref()
+                                    .as_mut()
                                     .ok_or("Missing peer")?
                                     .answer(value["sdp"].as_str().ok_or("Missing SDP")?)?,
                                 "candidate" => peer
@@ -177,8 +196,38 @@ pub fn run(directory: String, commands: Receiver<Command>, events: Events, share
                                     } else {
                                         2
                                     });
-                                    pacer =
-                                        Some(Pacer::new(parsed, ssrc, seed, shared.ms() as f64));
+                                    let mut sender =
+                                        Pacer::new(parsed, ssrc, seed, shared.ms() as f64);
+                                    sender.playout_delay =
+                                        peer.as_ref().and_then(|peer| peer.playout_delay);
+                                    pacer = Some(sender);
+                                    if direct_input {
+                                        if let Some(input) = input::windows(
+                                            screen,
+                                            &input_keys,
+                                            epoch,
+                                            session.clone(),
+                                            negotiation,
+                                        )? {
+                                            input.watch(
+                                                shared.clone(),
+                                                events.clone(),
+                                                session.clone(),
+                                                negotiation,
+                                            )?;
+                                            *shared
+                                                .input
+                                                .lock()
+                                                .map_err(|_| "Input state poisoned")? =
+                                                Some(input.clone());
+                                            *peer
+                                                .as_ref()
+                                                .ok_or("Missing peer")?
+                                                .input
+                                                .lock()
+                                                .map_err(|_| "Input state poisoned")? = Some(input);
+                                        }
+                                    }
                                     active = Some(epoch);
                                     mode = value;
                                     last_key = None;
@@ -199,6 +248,19 @@ pub fn run(directory: String, commands: Receiver<Command>, events: Events, share
                                             .ok_or("Invalid bitrate")?;
                                         gpu.bitrate(rate)?;
                                         pacer.bitrate(rate);
+                                    }
+                                }
+                                "input-chord" => {
+                                    let keys: Vec<String> =
+                                        serde_json::from_value(value["keys"].clone())
+                                            .map_err(|_| "Invalid key chord")?;
+                                    if let Some(input) = shared
+                                        .input
+                                        .lock()
+                                        .map_err(|_| "Input state poisoned")?
+                                        .as_ref()
+                                    {
+                                        input.chord(&keys, &shared)?;
                                     }
                                 }
                                 "control" => {
@@ -253,7 +315,7 @@ pub fn run(directory: String, commands: Receiver<Command>, events: Events, share
                 peer.key.store(false, Ordering::Release);
                 last_key = Some(Instant::now());
             }
-            if Instant::now() >= next_poll && pacer.can_read(now) {
+            if (gpu.has_wait() || Instant::now() >= next_poll) && pacer.can_read(now) {
                 let start = Instant::now();
                 if let Some((length, meta)) = gpu.read(&mut encoded)? {
                     if shared.authorized(epoch) {
@@ -265,6 +327,9 @@ pub fn run(directory: String, commands: Receiver<Command>, events: Events, share
                         )?;
                     }
                 }
+                pacer.tick(shared.ms() as f64, |packet| {
+                    shared.authorized(epoch) && peer.send(packet)
+                });
                 next_poll = Instant::now() + poll_interval;
             }
             if last_report.elapsed() >= Duration::from_secs(1)
@@ -284,6 +349,11 @@ pub fn run(directory: String, commands: Receiver<Command>, events: Events, share
         }
         Ok(())
     })();
+    if let Ok(mut input) = shared.input.lock() {
+        if let Some(input) = input.take() {
+            input.revoke();
+        }
+    }
     let stopped = gpu.stop();
     drop(peer);
     drop(gpu);

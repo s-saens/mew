@@ -69,6 +69,7 @@ pub struct Gpu {
     library: Library,
     handle: Handle,
     poll: Poll,
+    wait: Option<unsafe extern "C" fn(Handle, i32) -> i32>,
     destroy: Unary,
     pub active: bool,
     applied_rate: Option<i32>,
@@ -108,10 +109,15 @@ impl Gpu {
                     "GPU preparation failed; check login desktop and hardware H.264".into(),
                 );
             }
+            let wait = library
+                .get::<unsafe extern "C" fn(Handle, i32) -> i32>(b"mew_gpu_wait\0")
+                .ok()
+                .map(|f| *f);
             Ok(Self {
                 library,
                 handle,
                 poll,
+                wait,
                 destroy,
                 active: false,
                 applied_rate: None,
@@ -249,6 +255,17 @@ impl Gpu {
             }
             Ok(screen)
         }
+    }
+    pub fn has_wait(&self) -> bool {
+        self.active && self.wait.is_some()
+    }
+    pub fn wait(&self, timeout_ms: i32) -> Result<(), String> {
+        if let Some(wait) = self.wait.filter(|_| self.active) {
+            if unsafe { wait(self.handle, timeout_ms.clamp(0, 2)) } < 0 {
+                return Err("Native capture wait failed".into());
+            }
+        }
+        Ok(())
     }
     pub fn read(&self, buffer: &mut [u8]) -> Result<Option<(usize, Meta)>, String> {
         let mut meta = Meta::default();

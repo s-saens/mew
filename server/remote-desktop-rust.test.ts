@@ -125,6 +125,9 @@ test('Rust signaling scopes native events, preserves NAT cleanup and never trans
   assert.equal(commands.at(-1)!.type, 'close-peer')
   assert.equal(commands.some(value => value.type === 'frame'), false)
   assert.match(rustMedia(DEFAULT_VIDEO, 123), /a=ssrc:123 cname:mew/)
+  assert.match(String(commands[0].media), /a=extmap:1 http:\/\/www\.webrtc\.org\/experiments\/rtp-hdrext\/playout-delay\r\n/)
+  assert.equal(commands[0].directInput, process.platform === 'win32')
+  assert.equal((commands[0].inputKeys as Record<string, number>).KeyA, 65)
 })
 
 // A separately compiled test-only GPU ABI returns a synthetic H.264 image.

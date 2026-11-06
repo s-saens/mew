@@ -40,13 +40,14 @@ struct Frame {
     started: f64,
 }
 impl Frame {
-    fn packet_size(&self) -> usize {
+    fn packet_size(&self, header: usize) -> usize {
         let nal = &self.nals[self.nal];
-        12 + if nal.len() <= 1180 {
-            nal.len()
-        } else {
-            2 + (nal.len() - self.offset.max(1)).min(1178)
-        }
+        header
+            + if nal.len() <= 1192 - header {
+                nal.len()
+            } else {
+                2 + (nal.len() - self.offset.max(1)).min(1190 - header)
+            }
     }
     fn packet(
         &mut self,
@@ -54,23 +55,29 @@ impl Frame {
         sequence: &mut u16,
         ssrc: u32,
         payload: u8,
+        extension: Option<u8>,
     ) -> usize {
-        let size = self.packet_size();
+        let header = if extension.is_some() { 20 } else { 12 };
+        let size = self.packet_size(header);
         let nal = &self.nals[self.nal];
-        let end = if nal.len() <= 1180 {
-            buffer[12..size].copy_from_slice(nal);
+        let end = if nal.len() <= 1192 - header {
+            buffer[header..size].copy_from_slice(nal);
             true
         } else {
             let start = self.offset.max(1);
-            let end = start + size - 14 == nal.len();
-            buffer[12] = (nal[0] & 0xe0) | 28;
-            buffer[13] =
+            let end = start + size - header - 2 == nal.len();
+            buffer[header] = (nal[0] & 0xe0) | 28;
+            buffer[header + 1] =
                 (nal[0] & 31) | if start == 1 { 0x80 } else { 0 } | if end { 0x40 } else { 0 };
-            buffer[14..size].copy_from_slice(&nal[start..start + size - 14]);
-            self.offset = start + size - 14;
+            buffer[header + 2..size].copy_from_slice(&nal[start..start + size - header - 2]);
+            self.offset = start + size - header - 2;
             end
         };
-        buffer[0] = 0x80;
+        buffer[0] = if extension.is_some() { 0x90 } else { 0x80 };
+        if let Some(id) = extension {
+            // RFC 8285 one-byte extension, 24-bit min/max playout delay = 0.
+            buffer[12..20].copy_from_slice(&[0xbe, 0xde, 0, 1, (id << 4) | 2, 0, 0, 0]);
+        }
         buffer[1] = payload
             | if end && self.nal + 1 == self.nals.len() {
                 0x80
@@ -111,6 +118,8 @@ pub struct Pacer {
     sequence: u16,
     base: u32,
     rate: i32,
+    pub playout_delay: Option<u8>,
+    congestion_until: f64,
     credit: f64,
     last_tick: f64,
     waiting_key: bool,
@@ -131,6 +140,8 @@ impl Pacer {
     pub fn new(mode: Mode, ssrc: u32, seed: [u8; 6], now: f64) -> Self {
         Self {
             rate: mode.bitrate,
+            playout_delay: None,
+            congestion_until: 0.,
             mode,
             ssrc,
             sequence: u16::from_be_bytes([seed[0], seed[1]]),
@@ -156,7 +167,13 @@ impl Pacer {
     fn burst(&self) -> f64 {
         (self.rate as f64 * 1.15 / 8000. * 5.).max(2480.)
     }
+    fn delta_burst(&self) -> f64 {
+        (self.rate as f64 * 1.15 / 8. / self.mode.fps as f64 * 2.).clamp(2480., 128. * 1024.)
+    }
     pub fn bitrate(&mut self, rate: i32) {
+        if rate < self.rate {
+            self.congestion_until = self.last_tick + 1000.;
+        }
         self.rate = rate.clamp(350_000, 50_000_000);
         self.credit = self.credit.min(self.burst());
     }
@@ -175,6 +192,9 @@ impl Pacer {
         self.waiting_key = true;
         self.need_key = true;
         self.congested |= congested;
+        if congested {
+            self.congestion_until = self.last_tick + 1000.;
+        }
     }
     pub fn frame(&mut self, data: &[u8], meta: Meta, poll_ms: f64, now: f64) -> Result<(), String> {
         if data.is_empty() || data.len() > MAX_FRAME || meta.timestamp < 0 {
@@ -276,6 +296,9 @@ impl Pacer {
             .min(self.burst());
         self.last_tick = now;
         let mut packet = [0u8; 1192];
+        let header = if self.playout_delay.is_some() { 20 } else { 12 };
+        let delta_burst = self.delta_burst();
+        let mut immediate = false;
         while let Some(frame) = self.queue.front_mut() {
             let age = (now - frame.at).max(0.);
             self.metrics.queue_ms = self.metrics.queue_ms.max(age);
@@ -293,8 +316,27 @@ impl Pacer {
                 self.invalidate(true);
                 break;
             }
-            let cost = (frame.packet_size() + 48) as f64;
-            if self.credit < cost {
+            if frame.nal == 0
+                && frame.offset == 0
+                && !frame.key
+                && self.credit >= 0.
+                && now >= self.congestion_until
+            {
+                let wire_bytes: usize = frame
+                    .nals
+                    .iter()
+                    .map(|nal| {
+                        if nal.len() <= 1192 - header {
+                            nal.len() + header + 48
+                        } else {
+                            nal.len() - 1 + (nal.len() - 1).div_ceil(1190 - header) * (header + 50)
+                        }
+                    })
+                    .sum();
+                immediate = wire_bytes as f64 <= delta_burst;
+            }
+            let cost = (frame.packet_size(header) + 48) as f64;
+            if !immediate && self.credit < cost {
                 break;
             }
             self.credit -= cost;
@@ -303,6 +345,7 @@ impl Pacer {
                 &mut self.sequence,
                 self.ssrc,
                 self.mode.payload,
+                self.playout_delay,
             );
             if !send(&packet[..size]) {
                 self.invalidate(true);
@@ -311,11 +354,12 @@ impl Pacer {
             self.last_timestamp = frame.timestamp;
             self.last_sent_at = now;
             self.packets_sent = self.packets_sent.wrapping_add(1);
-            self.octets_sent = self.octets_sent.wrapping_add((size - 12) as u32);
+            self.octets_sent = self.octets_sent.wrapping_add((size - header) as u32);
             if frame.nal == frame.nals.len() {
                 self.metrics.send_ms = self.metrics.send_ms.max(now - frame.started);
                 self.waiting_key = false;
                 self.queue.pop_front();
+                immediate = false;
                 if let Some(next) = self.queue.front_mut() {
                     next.started = now;
                 }
@@ -445,6 +489,61 @@ mod tests {
             .unwrap();
         assert!(!p.can_read(506.));
         assert_eq!(p.queue.len(), 2);
+    }
+    #[test]
+    fn negotiated_playout_delay_preserves_fu_a_payload_and_packet_bound() {
+        let mut p = Pacer::new(mode(), 42, [0; 6], 0.);
+        p.playout_delay = Some(1);
+        let data = key(4000);
+        p.frame(&data, Meta::default(), 0., 0.).unwrap();
+        let mut packets = Vec::new();
+        for now in 0..100 {
+            p.tick(now as f64, |packet| {
+                packets.push(packet.to_vec());
+                true
+            });
+        }
+        assert!(packets.iter().all(|p| p.len() <= 1192
+            && p[0] == 0x90
+            && p[12..20] == [0xbe, 0xde, 0, 1, 0x12, 0, 0, 0]));
+        let restored: Vec<u8> = std::iter::once(0x65)
+            .chain(packets[2..].iter().flat_map(|p| p[22..].iter().copied()))
+            .collect();
+        assert_eq!(restored, data[16..]);
+        assert_eq!(
+            p.octets_sent,
+            packets.iter().map(|p| (p.len() - 20) as u32).sum::<u32>()
+        );
+        assert!(packets[..packets.len() - 1].iter().all(|p| p[1] & 128 == 0));
+        assert_ne!(packets.last().unwrap()[1] & 128, 0);
+    }
+    #[test]
+    fn typical_delta_is_immediate_but_debt_idr_and_congestion_remain_paced() {
+        let mut p = Pacer::new(mode(), 1, [0; 6], 0.);
+        p.frame(&key(10), Meta::default(), 0., 0.).unwrap();
+        p.tick(10., |_| true);
+        let mut delta = vec![0, 0, 1, 0x41];
+        delta.resize(10004, 255);
+        p.credit = 0.;
+        p.frame(&delta, Meta::default(), 0., 10.).unwrap();
+        let mut bytes = 0;
+        p.tick(10., |packet| {
+            bytes += packet.len() + 48;
+            true
+        });
+        assert!(bytes > p.burst() as usize && bytes <= p.delta_burst() as usize);
+        assert!(p.queue.is_empty() && p.credit < 0.);
+        p.frame(&delta, Meta::default(), 0., 10.).unwrap();
+        let mut sent = 0;
+        p.tick(10., |_| {
+            sent += 1;
+            true
+        });
+        assert_eq!(sent, 0);
+        p.bitrate(3_000_000);
+        p.credit = 0.;
+        p.tick(15., |_| true);
+        assert!(!p.queue.is_empty());
     }
     #[test]
     fn rejects_unnegotiated_profile_and_invalid_parameter_sets() {

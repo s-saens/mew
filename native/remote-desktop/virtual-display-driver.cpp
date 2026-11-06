@@ -68,6 +68,7 @@ struct Monitor {
     std::atomic<uint64_t> render{0};
     uint64_t generation=0;
     bool retiring=false;
+    MewDisplayMode mode=mewDisplayModes[0];
 };
 struct Device {
     WDFDEVICE device=nullptr;
@@ -93,7 +94,8 @@ NTSTATUS Device::remove() {
     if(NT_SUCCESS(status))monitor=nullptr;return status;
 }
 
-// Stable synthetic 1080p EDID, not copied from a physical monitor vendor.
+// Stable synthetic EDID with a 1080p60 preferred timing. The IddCx callbacks
+// enumerate the complete driver-owned mode table independently of this timing.
 static constexpr std::array<BYTE,128> edid() {
     std::array<BYTE,128> e{};
     e[0]=0;e[1]=e[2]=e[3]=e[4]=e[5]=e[6]=255;e[7]=0;
@@ -107,12 +109,6 @@ static constexpr std::array<BYTE,128> edid() {
     unsigned sum=0;for(int i=0;i<127;i++)sum+=e[i];e[127]=static_cast<BYTE>(0-sum);return e;
 }
 static constexpr auto monitorEdid=edid();
-static void signal(DISPLAYCONFIG_VIDEO_SIGNAL_INFO& value,bool monitor) {
-    value={};value.activeSize={1920,1080};value.totalSize={2200,1125};
-    value.pixelRate=148500000;value.hSyncFreq={67500,1};value.vSyncFreq={60,1};
-    value.AdditionalSignalInfo.vSyncFreqDivider=monitor?0:1;value.AdditionalSignalInfo.videoStandard=255;
-    value.scanLineOrdering=DISPLAYCONFIG_SCANLINE_ORDERING_PROGRESSIVE;
-}
 EVT_WDF_DRIVER_DEVICE_ADD addDevice;
 EVT_WDF_DEVICE_D0_ENTRY powerOn;
 EVT_WDF_DEVICE_D0_EXIT powerOff;
@@ -199,6 +195,7 @@ void control(WDFDEVICE object,WDFREQUEST request,size_t output,size_t input,ULON
         MewDisplayRequest* data=nullptr;status=WdfRequestRetrieveInputBuffer(request,sizeof(*data),reinterpret_cast<void**>(&data),nullptr);
         if(NT_SUCCESS(status)) {
             if(data->version!=mewDisplayVersion)status=STATUS_REVISION_MISMATCH;
+            else if(!data->width || !data->height || !data->fps)status=STATUS_INVALID_PARAMETER;
             else if(!state->ready)status=STATUS_DEVICE_NOT_READY;
             else if(state->monitor || !state->lease.acquire(file,GetTickCount64()))status=STATUS_DEVICE_BUSY;
             else {
@@ -214,6 +211,7 @@ void control(WDFDEVICE object,WDFREQUEST request,size_t output,size_t input,ULON
                 IDARG_OUT_MONITORCREATE out{};status=IddCxMonitorCreate(state->adapter,&in,&out);
                 if(NT_SUCCESS(status)) {
                     state->monitor=out.MonitorObject;getMonitor(out.MonitorObject)->value=new Monitor;
+                    getMonitor(out.MonitorObject)->value->mode=selectMewDisplayMode(data->width,data->height,data->fps);
                     IDARG_OUT_MONITORARRIVAL arrival{};status=IddCxMonitorArrival(out.MonitorObject,&arrival);
                     if(!NT_SUCCESS(status)){WdfObjectDelete(out.MonitorObject);state->monitor=nullptr;}
                 }
@@ -227,8 +225,11 @@ void control(WDFDEVICE object,WDFREQUEST request,size_t output,size_t input,ULON
     } else if(code==mewDisplayStatus && !input && output==sizeof(MewDisplayStatus)) {
         MewDisplayStatus* data=nullptr;status=WdfRequestRetrieveOutputBuffer(request,sizeof(*data),reinterpret_cast<void**>(&data),nullptr);
         if(NT_SUCCESS(status)) {
-            *data={mewDisplayVersion,state->lease.owner==file?1u:0u,{}};
-            if(state->monitor && data->active){uint64_t id=getMonitor(state->monitor)->value->render.load();memcpy(&data->render,&id,8);}
+            *data={mewDisplayVersion,state->lease.owner==file?1u:0u,{},0,0,0};
+            if(state->monitor && data->active){
+                auto monitor=getMonitor(state->monitor)->value;uint64_t id=monitor->render.load();memcpy(&data->render,&id,8);
+                data->width=monitor->mode.width;data->height=monitor->mode.height;data->fps=monitor->mode.fps;
+            }
             written=sizeof(*data);
         }
     }
@@ -237,24 +238,36 @@ void control(WDFDEVICE object,WDFREQUEST request,size_t output,size_t input,ULON
 NTSTATUS commitModes(IDDCX_ADAPTER,const IDARG_IN_COMMITMODES*){return STATUS_SUCCESS;}
 NTSTATUS parseModes(const IDARG_IN_PARSEMONITORDESCRIPTION* in,IDARG_OUT_PARSEMONITORDESCRIPTION* out) {
     if(in->MonitorDescription.DataSize!=128 || !in->MonitorDescription.pData || memcmp(in->MonitorDescription.pData,monitorEdid.data(),128))return STATUS_INVALID_PARAMETER;
-    out->MonitorModeBufferOutputCount=1;out->PreferredMonitorModeIdx=0;
+    out->MonitorModeBufferOutputCount=static_cast<UINT>(mewDisplayModes.size());out->PreferredMonitorModeIdx=0;
     if(!in->MonitorModeBufferInputCount)return STATUS_SUCCESS;
+    if(in->MonitorModeBufferInputCount<mewDisplayModes.size())return STATUS_BUFFER_TOO_SMALL;
     if(!in->pMonitorModes)return STATUS_INVALID_PARAMETER;
-    IDDCX_MONITOR_MODE mode{};mode.Size=sizeof(mode);mode.Origin=IDDCX_MONITOR_MODE_ORIGIN_MONITORDESCRIPTOR;
-    signal(mode.MonitorVideoSignalInfo,true);in->pMonitorModes[0]=mode;return STATUS_SUCCESS;
+    for(size_t index=0;index<mewDisplayModes.size();++index) {
+        IDDCX_MONITOR_MODE mode{};mode.Size=sizeof(mode);mode.Origin=IDDCX_MONITOR_MODE_ORIGIN_DRIVER;
+        mewDisplaySignal(mode.MonitorVideoSignalInfo,mewDisplayModes[index],true);in->pMonitorModes[index]=mode;
+    }
+    return STATUS_SUCCESS;
 }
 NTSTATUS defaultModes(IDDCX_MONITOR,const IDARG_IN_GETDEFAULTDESCRIPTIONMODES* in,IDARG_OUT_GETDEFAULTDESCRIPTIONMODES* out) {
-    out->DefaultMonitorModeBufferOutputCount=1;out->PreferredMonitorModeIdx=0;
+    out->DefaultMonitorModeBufferOutputCount=static_cast<UINT>(mewDisplayModes.size());out->PreferredMonitorModeIdx=0;
     if(!in->DefaultMonitorModeBufferInputCount)return STATUS_SUCCESS;
+    if(in->DefaultMonitorModeBufferInputCount<mewDisplayModes.size())return STATUS_BUFFER_TOO_SMALL;
     if(!in->pDefaultMonitorModes)return STATUS_INVALID_PARAMETER;
-    IDDCX_MONITOR_MODE mode{};mode.Size=sizeof(mode);mode.Origin=IDDCX_MONITOR_MODE_ORIGIN_DRIVER;
-    signal(mode.MonitorVideoSignalInfo,true);in->pDefaultMonitorModes[0]=mode;return STATUS_SUCCESS;
+    for(size_t index=0;index<mewDisplayModes.size();++index) {
+        IDDCX_MONITOR_MODE mode{};mode.Size=sizeof(mode);mode.Origin=IDDCX_MONITOR_MODE_ORIGIN_DRIVER;
+        mewDisplaySignal(mode.MonitorVideoSignalInfo,mewDisplayModes[index],true);in->pDefaultMonitorModes[index]=mode;
+    }
+    return STATUS_SUCCESS;
 }
 NTSTATUS targetModes(IDDCX_MONITOR,const IDARG_IN_QUERYTARGETMODES* in,IDARG_OUT_QUERYTARGETMODES* out) {
-    out->TargetModeBufferOutputCount=1;if(!in->TargetModeBufferInputCount)return STATUS_SUCCESS;
+    out->TargetModeBufferOutputCount=static_cast<UINT>(mewDisplayModes.size());if(!in->TargetModeBufferInputCount)return STATUS_SUCCESS;
+    if(in->TargetModeBufferInputCount<mewDisplayModes.size())return STATUS_BUFFER_TOO_SMALL;
     if(!in->pTargetModes)return STATUS_INVALID_PARAMETER;
-    IDDCX_TARGET_MODE mode{};mode.Size=sizeof(mode);signal(mode.TargetVideoSignalInfo.targetVideoSignalInfo,false);
-    in->pTargetModes[0]=mode;return STATUS_SUCCESS;
+    for(size_t index=0;index<mewDisplayModes.size();++index) {
+        IDDCX_TARGET_MODE mode{};mode.Size=sizeof(mode);mewDisplaySignal(mode.TargetVideoSignalInfo.targetVideoSignalInfo,mewDisplayModes[index],false);
+        in->pTargetModes[index]=mode;
+    }
+    return STATUS_SUCCESS;
 }
 NTSTATUS assign(IDDCX_MONITOR object,const IDARG_IN_SETSWAPCHAIN* in) {
     auto state=getMonitor(object)->value;std::unique_ptr<Swapchain> previous;uint64_t generation;

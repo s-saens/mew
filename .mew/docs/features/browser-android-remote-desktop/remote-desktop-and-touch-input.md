@@ -4,11 +4,11 @@ parent: "mew-remote"
 title: "Remote desktop and touch input"
 status: "implemented"
 created: "2026-09-18"
-updated: "2026-10-24"
+updated: "2026-11-04"
 status_hash: "278f4dc5c3b21929284aadc8ff47af89a35f48d29be6a318f5b80773c2f10e81"
 files: ["src/components/remote-desktop.tsx", "src/components/desktop-screen-keyboard.tsx", "src/utils/desktop-screen-keyboard.ts", "src/utils/desktop-input.ts", "src/utils/desktop-video.ts", "server/remote-desktop.ts", "server/remote-desktop-host.ts", "native/remote-desktop/main.mjs", "native/remote-desktop/native-host.mjs", "native/remote-desktop/rust-direct.mjs", "native/remote-desktop/rust/src/engine.rs", "native/remote-desktop/video-settings.mjs", "native/remote-desktop/video-pacer.mjs", "native/remote-desktop/gpu-windows.cpp", "native/remote-desktop/virtual-display-driver.cpp", "server/desktop-resident-host.ts", "mew"]
 commits: []
-description: "Contract for the server desktop's Rust video engine, host preparation, video settings, direct WebRTC video/input, full and gaming keyboards, and touch input. Includes overlapping encoding and transmission at native FHD size, RTT relearning and quality recovery, verification of Windows encoder settings, stage-by-stage diagnostics, and OS and real-device limitations."
+description: "Contract for remote desktop video, direct input, host preparation, keyboards, and touch controls. Covers negotiated Windows virtual display resolution and refresh, bounded transmission, diagnostics, permissions, and real-device verification limits."
 상위파일:
   - "MOC.md"
   - "_browser-android-remote-desktop.md"
@@ -29,6 +29,7 @@ description: "Contract for the server desktop's Rust video engine, host preparat
 - Once video and input are actually ready, display a connection notification once on the PC being accessed remotely.
 - Display cumulative network usage for the current session in the top bar containing the fullscreen button.
 - In settings, select and save HD, FHD, QHD, or 4K, a target of 30, 60, 120, 144, 165, or 240FPS, and Balanced or High Quality. Changes reconnect to the same shared display. Adjust to a mode accepted by the browser and GPU, and show the actual received resolution, decoded FPS, applied target, RTT, Mbps, and transmission wait.
+- When sharing Mew Virtual Display on Windows, select its desktop resolution and refresh from the negotiated video candidate. Physical display settings remain OS-managed. Driver modes and stream fallback follow the [virtual display contract](../../development/remote-desktop-virtual-display.md); actual received FPS can be lower than either target.
 - Limit the pacing queue and frame lifetime so stale transmission frames do not accumulate indefinitely even in High Quality, and adjust bitrate based on congestion. Key and button transitions do not wait for video FPS, while motion is coalesced up to the applied FPS.
 - Overlap transmission with the next encoder operation while preserving native FHD size. Allow at most two compressed frames in total across transmission and waiting, preserving reference order, original transmission limits, and IDR recovery. Relearn normal reception after the RTT baseline rises and recover quality over time. Expose Windows encoder control failures and provide stage-by-stage diagnostics. Details and real-device limitations follow the [FHD transmission contract](../../development/remote-desktop.md#stage-by-stage-diagnostics-and-fhd-verification).
 - For both transmission priorities, a fixed receive-buffer delay alone does not continually reduce quality while reception and decoding remain normal. Increased buffer delay, loss, rising RTT, or transmission backlog lowers encoder and transmission bitrates together. Quality priority also limits its own transmission wait for regular frames to 100ms and allows 500ms for keyframes. This is not an upper bound on total input-to-display latency. Criteria and limitations follow the [transmission contract](../../development/remote-desktop.md#transport-and-latency).
@@ -55,14 +56,14 @@ description: "Contract for the server desktop's Rust video engine, host preparat
 <!-- mew:implementation:start -->
 ## Implementation details
 
-- In the default video path, a dedicated Rust thread in the same Node process handles the existing GPU ABI, Annex-B validation, RTP generation, pacing, and direct WebRTC transmission. Compressed frames and RTP packets are not passed to JS. Input, authentication, OS permissions, and congestion control policy remain in Node, while Rust also enforces the two-frame maximum, IDR recovery, and approval expiration. Follow the [Rust engine and verification contract](../../development/remote-desktop-rust.md).
+- In the default video path, a dedicated Rust thread in the same Node process handles the existing GPU ABI, Annex-B validation, RTP generation, pacing, and direct WebRTC transmission. Compressed frames and RTP packets are not passed to JS. On Windows, Rust validates and injects input snapshots directly from the DataChannel receive path, preserving ordering, permission checks, rate limits, and held-key/button release. Node retains session authentication, clipboard work, and congestion policy; Mac/Linux retain their existing input adapters. Rust also enforces the two-frame maximum, IDR recovery, and approval expiration. Follow the [Rust engine and verification contract](../../development/remote-desktop-rust.md).
 
 - Remote capture receives both keydown and keyup through a shared highest-priority listener installed during module initialization. App listeners for closing, creating, and selecting by number do not intercept remote input even if mounted first. Add mappings for the numeric keypad, Insert, extended function keys, Korean/English, Hanja, and others, and preserve key repeats as reliable release/press transitions. Clean up pressed keys and lock lifetimes on loss of focus, leaving the window or fullscreen, and disconnection.
 - If clipboard sharing through Ctrl/Cmd+V fails, send remote Ctrl/Cmd+V to paste from the existing remote clipboard. Delayed reads check focus and session state, and keys still held are restored after successful sharing. Native paste combinations also restore the key state at that moment so overlapping asynchronous clipboard writes and modifier input do not lose state. Details follow the [keyboard and clipboard contract](../../development/remote-desktop.md#keyboard-lock-and-clipboard).
 
 - Open it from the desktop or mobile hamburger menu according to permissions; do not show it in the Dock.
 
-- Windows capture uses WGC GPU surfaces and hardware H.264. The built-in virtual monitor is maintained only while connected through file-handle ownership and a 10-second lease.
+- Windows capture uses WGC GPU surfaces and hardware H.264. The built-in virtual monitor is maintained only while connected through file-handle ownership and a 10-second lease. Pass the negotiated video candidate's dimensions and FPS to virtual display acquisition, then use the actual activated desktop bounds for cursor and input coordinates. Keep stream dimensions separate when the encoder scales a larger desktop down.
 - Prepare input after actual display coordinates are established, and show the connection as complete only when both the first video decode and the input channel are ready.
 - Readiness confirmation on the reliable channel displays the **mew remote desktop connected** system notification on the host. It appears once per reconnection, and notification errors do not interrupt video or input.
 - The build, signing, and installation contract and verification scope for the built-in driver without StarDesk are recorded in the [virtual display document](../../development/remote-desktop-virtual-display.md).

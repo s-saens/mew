@@ -19,12 +19,16 @@
 #include <windows.graphics.capture.interop.h>
 #include <windows.graphics.directx.direct3d11.interop.h>
 #include "virtual-display-client.h"
+#include "gpu-pipeline.h"
 #include <algorithm>
 #include <cstdint>
 #include <cstring>
 #include <vector>
 #include <atomic>
 #include <memory>
+#include <mutex>
+#include <deque>
+#include <optional>
 
 using Microsoft::WRL::ComPtr;
 using namespace winrt::Windows::Graphics::Capture;
@@ -36,10 +40,65 @@ static_assert(sizeof(Frame)==40);
 enum EncoderOption : uint32_t { LowLatency=1, RateControl=2, Bitrate=4, BufferSize=8, NoBFrames=16, Gop=32 };
 struct FrameTiming { int64_t timestamp; int32_t captureUs; };
 struct Monitor { ComPtr<IDXGIAdapter1> adapter; ComPtr<IDXGIOutput1> output; DXGI_OUTPUT_DESC desc; };
+struct GpuWake {
+    HANDLE signal=CreateEventW(nullptr,FALSE,FALSE,nullptr);
+    std::mutex mutex;
+    std::deque<MewGpuEvent> events;
+    HRESULT error=S_OK;
+    ~GpuWake(){if(signal)CloseHandle(signal);}
+    void notify(){if(signal)SetEvent(signal);}
+    void push(MewGpuEvent event) {
+        std::lock_guard<std::mutex> lock(mutex);
+        if(events.size()<64)events.push_back(event);else error=E_UNEXPECTED;
+        notify();
+    }
+    std::optional<MewGpuEvent> pop() {
+        std::lock_guard<std::mutex> lock(mutex);
+        if(FAILED(error))return MewGpuEvent{MewGpuEventKind::Other,error};
+        if(events.empty())return std::nullopt;
+        auto event=events.front();events.pop_front();return event;
+    }
+};
+// The callback owns no Engine pointer. Revocation detaches its generator before
+// shutdown, and late MFT callbacks can only signal their old session's state.
+class EncoderEvents final : public IMFAsyncCallback {
+    std::atomic<ULONG> refs{1};
+    std::mutex mutex;
+    ComPtr<IMFMediaEventGenerator> generator;
+    std::shared_ptr<GpuWake> wake;
+public:
+    EncoderEvents(IMFMediaEventGenerator* source,std::shared_ptr<GpuWake> state):generator(source),wake(std::move(state)){}
+    HRESULT STDMETHODCALLTYPE QueryInterface(REFIID id,void** out) override {
+        if(!out)return E_POINTER;*out=nullptr;
+        if(id!=IID_IUnknown && id!=__uuidof(IMFAsyncCallback))return E_NOINTERFACE;
+        *out=static_cast<IMFAsyncCallback*>(this);AddRef();return S_OK;
+    }
+    ULONG STDMETHODCALLTYPE AddRef() override{return ++refs;}
+    ULONG STDMETHODCALLTYPE Release() override{auto count=--refs;if(!count)delete this;return count;}
+    HRESULT STDMETHODCALLTYPE GetParameters(DWORD*,DWORD*) override{return E_NOTIMPL;}
+    HRESULT start(){return generator->BeginGetEvent(this,nullptr);}
+    void close(){std::lock_guard<std::mutex> lock(mutex);generator.Reset();}
+    HRESULT STDMETHODCALLTYPE Invoke(IMFAsyncResult* result) override {
+        std::lock_guard<std::mutex> lock(mutex);
+        if(!generator)return S_OK;
+        ComPtr<IMFMediaEvent> event;HRESULT hr=generator->EndGetEvent(result,&event);
+        MediaEventType kind=MEUnknown;
+        if(SUCCEEDED(hr))hr=event->GetType(&kind);
+        HRESULT status=S_OK;if(SUCCEEDED(hr))hr=event->GetStatus(&status);
+        if(SUCCEEDED(hr))hr=status;
+        wake->push({kind==METransformNeedInput ? MewGpuEventKind::Input : kind==METransformHaveOutput ? MewGpuEventKind::Output : MewGpuEventKind::Other,hr});
+        if(SUCCEEDED(hr)) {
+            hr=generator->BeginGetEvent(this,nullptr);
+            if(FAILED(hr))wake->push({MewGpuEventKind::Other,hr});
+        }
+        return S_OK;
+    }
+};
 struct Surface {
     ComPtr<ID3D11Texture2D> texture;
     ComPtr<ID3D11VideoProcessorOutputView> view;
     std::atomic<bool> free{true};
+    std::shared_ptr<GpuWake> wake;
 };
 // IMFTrackedSample calls back only after the encoder releases the input sample.
 class SurfaceReturn final : public IMFAsyncCallback {
@@ -55,7 +114,7 @@ public:
     ULONG STDMETHODCALLTYPE AddRef() override { return ++refs; }
     ULONG STDMETHODCALLTYPE Release() override { const auto count=--refs; if(!count)delete this;return count; }
     HRESULT STDMETHODCALLTYPE GetParameters(DWORD*,DWORD*) override { return E_NOTIMPL; }
-    HRESULT STDMETHODCALLTYPE Invoke(IMFAsyncResult*) override { surface->free.store(true);return S_OK; }
+    HRESULT STDMETHODCALLTYPE Invoke(IMFAsyncResult*) override { surface->free.store(true);if(surface->wake)surface->wake->notify();return S_OK; }
 };
 struct Engine {
     std::vector<Monitor> monitors;
@@ -64,6 +123,11 @@ struct Engine {
     GraphicsCaptureItem item{nullptr};
     Direct3D11CaptureFramePool pool{nullptr};
     GraphicsCaptureSession capture{nullptr};
+    Direct3D11CaptureFrame latestFrame{nullptr};
+    winrt::event_token frameArrived{};
+    bool frameSubscribed=false;
+    std::shared_ptr<GpuWake> wake;
+    ComPtr<EncoderEvents> encoderEvents;
     HANDLE virtualDisplay=INVALID_HANDLE_VALUE;
     DPI_AWARENESS_CONTEXT previousDpi=nullptr;
     Screen current{};
@@ -74,6 +138,8 @@ struct Engine {
     ComPtr<ID3D11VideoProcessorEnumerator> enumerator;
     ComPtr<ID3D11VideoProcessor> processor;
     ComPtr<ID3D11Texture2D> latest;
+    ComPtr<ID3D11Query> captureRead;
+    bool captureReadPending=false;
     ComPtr<ID3D11VideoProcessorInputView> inputView;
     std::vector<std::shared_ptr<Surface>> surfaces;
     ComPtr<IMFSample> outputSample;
@@ -84,7 +150,8 @@ struct Engine {
     ComPtr<ICodecAPI> codec;
     HRESULT error = S_OK;
     LUID deviceLuid{};
-    int selected = -1, width = 0, height = 0, fps = 60, profile = 66, level = 42, inFlight = 0, inputCredits = 0;
+    int selected = -1, width = 0, height = 0, fps = 60, profile = 66, level = 42;
+    MewGpuPipeline pipeline;
     int configuredBitrate=0;
     uint32_t options=0;
     int64_t latestCapture=0;
@@ -94,16 +161,22 @@ struct Engine {
     ~Engine() { stop(); context.Reset(); device.Reset();if(previousDpi)SetThreadDpiAwarenessContext(previousDpi);MFShutdown(); CoUninitialize(); }
     void stop() {
         active = false;
+        if(encoderEvents)encoderEvents->close();
+        if(pool && frameSubscribed){try{pool.FrameArrived(frameArrived);}catch(...){}frameSubscribed=false;}
         if(capture){try{capture.Close();}catch(...){}capture=nullptr;}
+        if(captureReadPending){context->Flush();captureReadPending=false;}
+        inputView.Reset();latest.Reset();
+        if(latestFrame){try{latestFrame.Close();}catch(...){}latestFrame=nullptr;}
         if(pool){try{pool.Close();}catch(...){}pool=nullptr;}item=nullptr;
         if (encoder) {
             encoder->ProcessMessage(MFT_MESSAGE_COMMAND_FLUSH, 0);
             encoder->ProcessMessage(MFT_MESSAGE_NOTIFY_END_STREAMING, 0);
+            MFShutdownObject(encoder.Get());
         }
-        codec.Reset(); events.Reset(); encoder.Reset(); manager.Reset();
+        encoderEvents.Reset();codec.Reset(); events.Reset(); encoder.Reset(); manager.Reset();wake.reset();
         surfaces.clear(); inputView.Reset(); outputSample.Reset(); outputBuffer.Reset();
-        latest.Reset(); processor.Reset(); enumerator.Reset(); videoContext.Reset(); videoDevice.Reset();
-        inputCredits = 0; inFlight = 0; refresh = true; timings.clear(); latestCapture=0;
+        latest.Reset();captureRead.Reset(); processor.Reset(); enumerator.Reset(); videoContext.Reset(); videoDevice.Reset();
+        pipeline={};refresh = true; timings.clear(); latestCapture=0;
         if(virtualDisplay!=INVALID_HANDLE_VALUE){DWORD bytes=0;DeviceIoControl(virtualDisplay,mewDisplayRelease,nullptr,0,nullptr,0,&bytes,nullptr);CloseHandle(virtualDisplay);virtualDisplay=INVALID_HANDLE_VALUE;}
     }
     HRESULT gpuAdapter(IDXGIAdapter1* adapter) {
@@ -207,9 +280,16 @@ static HRESULT encoder(Engine* e, int bitrate) {
                 if(SUCCEEDED(hr))hr=e->applied(e->value(CODECAPI_AVEncMPVDefaultBPictureCount,0),NoBFrames);
                 if(SUCCEEDED(hr))hr=e->applied(e->value(CODECAPI_AVEncMPVGOPSize,e->fps*5),Gop);
                 if(SUCCEEDED(hr))e->readBitrate();
+                if(SUCCEEDED(hr)) {
+                    e->encoderEvents.Attach(new EncoderEvents(e->events.Get(),e->wake));
+                    hr=e->encoderEvents->start();
+                }
                 if(SUCCEEDED(hr))hr = candidate->ProcessMessage(MFT_MESSAGE_NOTIFY_BEGIN_STREAMING, 0);
                 if (SUCCEEDED(hr)) hr = candidate->ProcessMessage(MFT_MESSAGE_NOTIFY_START_OF_STREAM, 0);
                 if (SUCCEEDED(hr)) { last = S_OK; break; }
+                if(e->encoderEvents)e->encoderEvents->close();
+                MFShutdownObject(candidate.Get());e->encoderEvents.Reset();
+                {std::lock_guard<std::mutex> lock(e->wake->mutex);e->wake->events.clear();e->wake->error=S_OK;}
                 e->events.Reset(); e->codec.Reset(); e->encoder.Reset();
             }
         }
@@ -219,7 +299,7 @@ static HRESULT encoder(Engine* e, int bitrate) {
     return last;
 }
 static HRESULT convert(Engine* e, ID3D11Texture2D* source, IMFSample** result, int64_t timestamp) {
-    if(e->surfaces.empty())for(int i=0;i<3;i++)e->surfaces.push_back(std::make_shared<Surface>());
+    if(e->surfaces.empty())for(int i=0;i<3;i++){auto surface=std::make_shared<Surface>();surface->wake=e->wake;e->surfaces.push_back(surface);}
     std::shared_ptr<Surface> slot;
     for(auto& value:e->surfaces){bool free=true;if(value->free.compare_exchange_strong(free,false)){slot=value;break;}}
     if(!slot)return S_FALSE;
@@ -236,6 +316,7 @@ static HRESULT convert(Engine* e, ID3D11Texture2D* source, IMFSample** result, i
     D3D11_VIDEO_PROCESSOR_STREAM stream{}; stream.Enable=TRUE; stream.pInputSurface=e->inputView.Get();
     hr = e->videoContext->VideoProcessorBlt(e->processor.Get(), slot->view.Get(), 0, 1, &stream);
     if (FAILED(hr)) return hr;
+    e->context->End(e->captureRead.Get());e->context->Flush();e->captureReadPending=true;
     ComPtr<IMFMediaBuffer> buffer; ComPtr<IMFSample> sample; ComPtr<IMFTrackedSample> tracked;
     hr = MFCreateDXGISurfaceBuffer(__uuidof(ID3D11Texture2D), slot->texture.Get(), 0, FALSE, &buffer);
     if (SUCCEEDED(hr)) hr = MFCreateTrackedSample(&tracked);
@@ -284,7 +365,7 @@ static HRESULT output(Engine* e, unsigned char* data, int capacity, Frame* frame
     auto timing=std::find_if(e->timings.begin(),e->timings.end(),[time](const auto& value){return value.timestamp==time;});
     if(timing!=e->timings.end()){frame->captureUs=timing->captureUs;e->timings.erase(timing);}
     else if(!e->timings.empty())e->timings.erase(e->timings.begin());
-    e->inFlight=std::max(0, e->inFlight-1); return S_OK;
+    return S_OK;
 }
 
 static bool hardwareH264(LUID id) {
@@ -323,19 +404,20 @@ static HRESULT refreshScreens(Engine* e) {
     return warm ? e->gpuAdapter(warm.Get()) : DXGI_ERROR_NOT_FOUND;
 }
 
-static HRESULT virtualScreen(Engine* e,HMONITOR* monitor) {
+static HRESULT virtualScreen(Engine* e,HMONITOR* monitor,int maxWidth,int maxHeight,int fps) {
     e->virtualDisplay=openMewDisplay();if(e->virtualDisplay==INVALID_HANDLE_VALUE)return HRESULT_FROM_WIN32(GetLastError());
-    MewDisplayRequest request{mewDisplayVersion,e->deviceLuid};DWORD bytes=0;
+    MewDisplayRequest request{mewDisplayVersion,e->deviceLuid,static_cast<uint32_t>(maxWidth),static_cast<uint32_t>(maxHeight),static_cast<uint32_t>(fps)};DWORD bytes=0;
+    const auto selected=selectMewDisplayMode(maxWidth,maxHeight,fps);
     if(!DeviceIoControl(e->virtualDisplay,mewDisplayAcquire,&request,sizeof(request),nullptr,0,&bytes,nullptr))return HRESULT_FROM_WIN32(GetLastError());
     DWORD64 deadline=GetTickCount64()+4000;
     while(GetTickCount64()<deadline) {
         if(!unlocked())return E_ACCESSDENIED;
         if(!DeviceIoControl(e->virtualDisplay,mewDisplayRenew,nullptr,0,nullptr,0,&bytes,nullptr))return HRESULT_FROM_WIN32(GetLastError());
-        LONG layout=activateMewDisplay();
+        LONG layout=activateMewDisplay(maxWidth,maxHeight,fps);
         if(layout!=ERROR_SUCCESS && layout!=ERROR_NOT_FOUND && layout!=ERROR_GEN_FAILURE)return HRESULT_FROM_WIN32(layout);
         auto found=findMewMonitor();
         MewDisplayStatus state{};
-        if(found && DeviceIoControl(e->virtualDisplay,mewDisplayStatus,nullptr,0,&state,sizeof(state),&bytes,nullptr) && state.version==mewDisplayVersion && state.active && (state.render.LowPart || state.render.HighPart)) {
+        if(layout==ERROR_SUCCESS && found && DeviceIoControl(e->virtualDisplay,mewDisplayStatus,nullptr,0,&state,sizeof(state),&bytes,nullptr) && bytes==sizeof(state) && state.version==mewDisplayVersion && state.active && state.width==selected.width && state.height==selected.height && state.fps==selected.fps && (state.render.LowPart || state.render.HighPart)) {
             // The OS may choose a different render GPU. Match that GPU before
             // WGC and MF initialize, rather than copying pixels across GPUs.
             ComPtr<IDXGIFactory4> factory;ComPtr<IDXGIAdapter1> adapter;
@@ -383,7 +465,7 @@ __declspec(dllexport) int mew_gpu_start(void* handle, int index, int maxWidth, i
     auto run=[&]() -> HRESULT {
         if (!unlocked()) return E_ACCESSDENIED;
         HMONITOR monitor=nullptr;HRESULT hr=S_OK;
-        if(index==99)hr=virtualScreen(e,&monitor);
+        if(index==99)hr=virtualScreen(e,&monitor,maxWidth,maxHeight,fps);
         else {hr=e->gpu(index);monitor=e->monitors[index].desc.Monitor;}
         if(FAILED(hr))return hr;
         MONITORINFO info{};info.cbSize=sizeof(info);if(!GetMonitorInfoW(monitor,&info))return HRESULT_FROM_WIN32(GetLastError());
@@ -398,6 +480,9 @@ __declspec(dllexport) int mew_gpu_start(void* handle, int index, int maxWidth, i
         winrt::com_ptr<IInspectable> inspectable;winrt::check_hresult(CreateDirect3D11DeviceFromDXGIDevice(dxgi.Get(),inspectable.put()));
         auto captureDevice=inspectable.as<IDirect3DDevice>();
         e->pool=Direct3D11CaptureFramePool::CreateFreeThreaded(captureDevice,DirectXPixelFormat::B8G8R8A8UIntNormalized,2,size);
+        e->wake=std::make_shared<GpuWake>();if(!e->wake->signal)return HRESULT_FROM_WIN32(GetLastError());
+        auto wake=e->wake;
+        e->frameArrived=e->pool.FrameArrived([wake](auto const&,auto const&){wake->notify();});e->frameSubscribed=true;
         e->capture=e->pool.CreateCaptureSession(e->item);e->capture.IsCursorCaptureEnabled(false);
         hr=e->device.As(&e->videoDevice); if (SUCCEEDED(hr)) hr=e->context.As(&e->videoContext); if (FAILED(hr)) return hr;
         D3D11_VIDEO_PROCESSOR_CONTENT_DESC content{}; content.InputFrameFormat=D3D11_VIDEO_FRAME_FORMAT_PROGRESSIVE;
@@ -407,6 +492,7 @@ __declspec(dllexport) int mew_gpu_start(void* handle, int index, int maxWidth, i
         hr=e->videoDevice->CreateVideoProcessorEnumerator(&content, &e->enumerator);
         if (SUCCEEDED(hr)) hr=e->videoDevice->CreateVideoProcessor(e->enumerator.Get(),0,&e->processor);
         if (FAILED(hr)) return hr;
+        D3D11_QUERY_DESC query{D3D11_QUERY_EVENT,0};hr=e->device->CreateQuery(&query,&e->captureRead);if(FAILED(hr))return hr;
         e->videoContext->VideoProcessorSetStreamFrameFormat(e->processor.Get(),0,D3D11_VIDEO_FRAME_FORMAT_PROGRESSIVE);
         D3D11_VIDEO_PROCESSOR_COLOR_SPACE rgb{}; rgb.RGB_Range=0;
         D3D11_VIDEO_PROCESSOR_COLOR_SPACE yuv{}; yuv.YCbCr_Matrix=1; yuv.Nominal_Range=1;
@@ -426,60 +512,65 @@ __declspec(dllexport) int mew_gpu_poll(void* handle, unsigned char* data, int ca
         if(e->virtualDisplay!=INVALID_HANDLE_VALUE && GetTickCount64()-e->renewed>=1000) {
             DWORD bytes=0;MewDisplayStatus status{};
             if(!DeviceIoControl(e->virtualDisplay,mewDisplayRenew,nullptr,0,nullptr,0,&bytes,nullptr))return HRESULT_FROM_WIN32(GetLastError());
-            if(!DeviceIoControl(e->virtualDisplay,mewDisplayStatus,nullptr,0,&status,sizeof(status),&bytes,nullptr) || !status.active || status.version!=mewDisplayVersion)return E_ACCESSDENIED;
+            if(!DeviceIoControl(e->virtualDisplay,mewDisplayStatus,nullptr,0,&status,sizeof(status),&bytes,nullptr) || bytes!=sizeof(status) || !status.active || status.version!=mewDisplayVersion)return E_ACCESSDENIED;
             if(status.render.LowPart!=e->deviceLuid.LowPart || status.render.HighPart!=e->deviceLuid.HighPart)return DXGI_ERROR_ACCESS_LOST;
             e->renewed=GetTickCount64();
         }
         if(!e->latest && GetTickCount64()>e->firstDeadline)return HRESULT_FROM_WIN32(ERROR_TIMEOUT);
-        for(int n=0;n<16;n++) {
-            ComPtr<IMFMediaEvent> event; HRESULT hr=e->events->GetEvent(MF_EVENT_FLAG_NO_WAIT,&event);
-            if (hr==MF_E_NO_EVENTS_AVAILABLE) break; if (FAILED(hr)) return hr;
-            MediaEventType kind; event->GetType(&kind); HRESULT status=S_OK; event->GetStatus(&status); if(FAILED(status))return status;
-            // Each async event authorizes one sample; coalescing events loses
-            // credits on encoders that advertise several inputs at once.
-            if(kind==METransformNeedInput)e->inputCredits=std::min(16,e->inputCredits+1);
-            if(kind==METransformHaveOutput) { hr=output(e,data,capacity,frame); if(hr==S_OK || FAILED(hr))return hr; }
-        }
-        if (!e->inputCredits || e->inFlight>=3) return S_FALSE;
-        LARGE_INTEGER now; QueryPerformanceCounter(&now);
-        if (now.QuadPart < e->nextInput.QuadPart) return S_FALSE;
-        Direct3D11CaptureFrame newest{nullptr};
-        for(int i=0;i<2;i++){auto next=e->pool.TryGetNextFrame();if(!next)break;if(newest)newest.Close();newest=std::move(next);}
-        HRESULT hr=S_OK;
-        if(newest) {
-            auto size=newest.ContentSize();if(size.Width!=e->sourceWidth || size.Height!=e->sourceHeight)return DXGI_ERROR_ACCESS_LOST;
-            auto access=newest.Surface().as<::Windows::Graphics::DirectX::Direct3D11::IDirect3DDxgiInterfaceAccess>();ComPtr<ID3D11Texture2D> texture;
-            hr=access->GetInterface(IID_PPV_ARGS(&texture));if(FAILED(hr))return hr;
-            D3D11_TEXTURE2D_DESC desc{};texture->GetDesc(&desc);desc.BindFlags=0;desc.MiscFlags=0;
-            if(!e->latest)hr=e->device->CreateTexture2D(&desc,nullptr,&e->latest);
-            if(FAILED(hr))return hr;
-            e->latestCapture=newest.SystemRelativeTime().count();
-            e->context->CopyResource(e->latest.Get(),texture.Get());e->refresh=true;newest.Close();
-        }
-        if (!e->refresh || !e->latest) return S_FALSE;
-        const int64_t timestamp=e->ticks100ns(now.QuadPart-e->origin.QuadPart);
-        ComPtr<IMFSample> sample; hr=convert(e,e->latest.Get(),&sample,timestamp);
-        if(hr==S_FALSE)return S_FALSE;
-        if(FAILED(hr))return hr;
-        hr=e->encoder->ProcessInput(0,sample.Get(),0);
-        if(hr==MF_E_NOTACCEPTING)return S_FALSE;
-        if(FAILED(hr))return hr;
-        const int32_t captureUs=e->latestCapture>0 ? static_cast<int32_t>(std::clamp<int64_t>((e->ticks100ns(now.QuadPart)-e->latestCapture)/10,0,INT32_MAX)) : -1;
-        e->timings.push_back({timestamp,captureUs});
-        e->inputCredits--; e->refresh=false; e->inFlight++;
-        const int64_t interval=e->frequency.QuadPart/e->fps;
-        // Preserve the frame clock through small scheduler delays. A long stall
-        // resets it instead of queuing a burst of obsolete catch-up frames.
-        e->nextInput.QuadPart=e->nextInput.QuadPart && now.QuadPart-e->nextInput.QuadPart<interval
-            ? e->nextInput.QuadPart+interval : now.QuadPart+interval;
-        return S_FALSE;
+        return e->pipeline.poll([&](){return e->wake->pop();},
+          [&](){return output(e,data,capacity,frame);},[&]() -> HRESULT {
+            LARGE_INTEGER now; QueryPerformanceCounter(&now);
+            if(now.QuadPart<e->nextInput.QuadPart)return S_FALSE;
+            if(e->captureReadPending) {
+                HRESULT hr=e->context->GetData(e->captureRead.Get(),nullptr,0,D3D11_ASYNC_GETDATA_DONOTFLUSH);
+                if(hr==S_FALSE)return S_FALSE;if(FAILED(hr))return hr;
+                e->captureReadPending=false;
+            }
+            Direct3D11CaptureFrame newest{nullptr};
+            for(int i=0;i<2;i++){auto next=e->pool.TryGetNextFrame();if(!next)break;if(newest)newest.Close();newest=std::move(next);}
+            HRESULT hr=S_OK;
+            if(newest) {
+                auto size=newest.ContentSize();if(size.Width!=e->sourceWidth || size.Height!=e->sourceHeight)return DXGI_ERROR_ACCESS_LOST;
+                auto access=newest.Surface().as<::Windows::Graphics::DirectX::Direct3D11::IDirect3DDxgiInterfaceAccess>();ComPtr<ID3D11Texture2D> texture;
+                hr=access->GetInterface(IID_PPV_ARGS(&texture));if(FAILED(hr))return hr;
+                e->inputView.Reset();e->latest.Reset();
+                if(e->latestFrame)e->latestFrame.Close();
+                e->latest=std::move(texture);e->latestCapture=newest.SystemRelativeTime().count();
+                e->latestFrame=std::move(newest);e->refresh=true;
+            }
+            if(!e->refresh || !e->latest)return S_FALSE;
+            const int64_t timestamp=e->ticks100ns(now.QuadPart-e->origin.QuadPart);
+            ComPtr<IMFSample> sample;hr=convert(e,e->latest.Get(),&sample,timestamp);
+            if(hr==S_FALSE)return S_FALSE;if(FAILED(hr))return hr;
+            hr=e->encoder->ProcessInput(0,sample.Get(),0);
+            if(hr==MF_E_NOTACCEPTING)return S_FALSE;if(FAILED(hr))return hr;
+            const int32_t captureUs=e->latestCapture>0 ? static_cast<int32_t>(std::clamp<int64_t>((e->ticks100ns(now.QuadPart)-e->latestCapture)/10,0,INT32_MAX)) : -1;
+            e->timings.push_back({timestamp,captureUs});e->refresh=false;
+            const int64_t interval=e->frequency.QuadPart/e->fps;
+            // Preserve cadence without a catch-up burst after a long stall.
+            e->nextInput.QuadPart=e->nextInput.QuadPart && now.QuadPart-e->nextInput.QuadPart<interval
+                ? e->nextInput.QuadPart+interval : now.QuadPart+interval;
+            return S_OK;
+          });
     };
     try{e->error=run();}catch(const winrt::hresult_error& error){e->error=error.code();}catch(...){e->error=E_FAIL;}
     if(FAILED(e->error)){e->stop();return -1;} return frame->bytes;
 }
+// Optional ABI extension: bounded waits keep control, lease and RTP deadlines
+// responsive while WGC/MFT callbacks wake the video thread as soon as work arrives.
+__declspec(dllexport) int mew_gpu_wait(void* handle,int timeoutMs) {
+    auto e=static_cast<Engine*>(handle);if(!e || !e->active || !e->wake)return -1;
+    if(e->pipeline.outputs)return 1;
+    {
+        std::lock_guard<std::mutex> lock(e->wake->mutex);
+        if(FAILED(e->wake->error) || !e->wake->events.empty())return 1;
+    }
+    DWORD result=WaitForSingleObject(e->wake->signal,static_cast<DWORD>(std::clamp(timeoutMs,0,2)));
+    return result==WAIT_OBJECT_0 ? 1 : result==WAIT_TIMEOUT ? 0 : -1;
+}
 __declspec(dllexport) int mew_gpu_keyframe(void* handle) {
     auto e=static_cast<Engine*>(handle); if(!e || !e->active)return -1;
-    e->refresh=true; return SUCCEEDED(e->value(CODECAPI_AVEncVideoForceKeyFrame,1)) ? 0 : -1;
+    e->refresh=true;if(e->wake)e->wake->notify(); return SUCCEEDED(e->value(CODECAPI_AVEncVideoForceKeyFrame,1)) ? 0 : -1;
 }
 __declspec(dllexport) int mew_gpu_bitrate(void* handle,int bitrate) {
     auto e=static_cast<Engine*>(handle); if(!e || !e->active || bitrate<350000 || bitrate>50000000)return -1;

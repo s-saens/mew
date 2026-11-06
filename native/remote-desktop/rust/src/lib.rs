@@ -1,5 +1,9 @@
 mod engine;
 mod gpu;
+mod input;
+#[cfg(any(windows, test))]
+#[cfg_attr(not(windows), allow(dead_code))]
+mod input_windows;
 mod rtc;
 mod rtp;
 
@@ -23,7 +27,9 @@ pub struct Shared {
     closed: AtomicBool,
     overflow: AtomicBool,
     lease: AtomicU64,
+    failed_input_generation: AtomicU64,
     origin: Instant,
+    input: Mutex<Option<Arc<input::Input>>>,
 }
 impl Shared {
     fn new() -> Self {
@@ -32,7 +38,9 @@ impl Shared {
             closed: AtomicBool::new(false),
             overflow: AtomicBool::new(false),
             lease: AtomicU64::new(0),
+            failed_input_generation: AtomicU64::new(0),
             origin: Instant::now(),
+            input: Mutex::new(None),
         }
     }
     fn ms(&self) -> u64 {
@@ -42,6 +50,7 @@ impl Shared {
         !self.closed.load(Ordering::Acquire)
             && !self.overflow.load(Ordering::Acquire)
             && self.epoch.load(Ordering::Acquire) == epoch
+            && self.failed_input_generation.load(Ordering::Acquire) <= epoch
             && self.ms().saturating_sub(self.lease.load(Ordering::Acquire)) <= 8000
     }
 }
@@ -131,12 +140,27 @@ pub unsafe extern "C" fn mew_engine_command(
     let kind = value["type"].as_str().unwrap_or("");
     if matches!(kind, "stop" | "close-peer" | "peer" | "close") {
         engine.shared.epoch.fetch_add(1, Ordering::AcqRel);
+        if let Ok(mut input) = engine.shared.input.lock() {
+            if let Some(input) = input.take() {
+                input.revoke();
+            }
+        }
     }
     if kind == "peer" {
         engine
             .shared
             .lease
             .store(engine.shared.ms(), Ordering::Release);
+    }
+    if kind == "input-release" {
+        if let Ok(input) = engine.shared.input.lock() {
+            if let Some(input) = input.as_ref() {
+                if input.matches(&value) {
+                    input.release();
+                }
+            }
+        }
+        return 0;
     }
     if kind == "close" {
         engine.shared.closed.store(true, Ordering::Release);
@@ -156,6 +180,17 @@ pub unsafe extern "C" fn mew_engine_command(
         return -1;
     }
     0
+}
+
+/// # Safety
+/// The handle must be live and serialized with destruction by its Node owner.
+#[no_mangle]
+pub unsafe extern "C" fn mew_engine_input_sequence(handle: *mut Engine) -> i64 {
+    handle
+        .as_ref()
+        .and_then(|e| e.shared.input.lock().ok())
+        .and_then(|input| input.as_ref().map(|i| i.sequence()))
+        .unwrap_or(-1)
 }
 
 /// Return one JSON event, 0 when empty, or the negative required buffer size.
@@ -233,6 +268,45 @@ pub unsafe extern "C" fn mew_engine_destroy(handle: *mut Engine) -> i32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn stale_synchronous_release_cannot_touch_current_input() {
+        struct Adapter(Arc<Mutex<Vec<input::Action>>>);
+        impl input::Adapter for Adapter {
+            fn allowed(&self) -> bool {
+                true
+            }
+            fn apply(&mut self, action: &input::Action) -> Result<(), String> {
+                self.0.lock().unwrap().push(action.clone());
+                Ok(())
+            }
+        }
+        let shared = Arc::new(Shared::new());
+        let actions = Arc::new(Mutex::new(Vec::new()));
+        let input = Arc::new(
+            input::Input::new(Box::new(Adapter(actions.clone())), 0).scoped("current".into(), 2),
+        );
+        input.message(&serde_json::json!({"type":"input","v":1,"seq":1,"epoch":0,"x":0,"y":0,"wheelX":0,"wheelY":0,"buttons":1,"keys":[]}),true,&shared).unwrap();
+        *shared.input.lock().unwrap() = Some(input);
+        let (tx, _rx) = mpsc::sync_channel(2);
+        let (_events, rx) = mpsc::sync_channel(2);
+        let mut engine = Engine {
+            tx,
+            rx: Mutex::new(rx),
+            pending: Mutex::new(None),
+            shared,
+            thread: None,
+        };
+        for (session, negotiation, expected) in
+            [("old", 2, 1), ("current", 1, 1), ("current", 2, 2)]
+        {
+            let command=serde_json::to_vec(&serde_json::json!({"type":"input-release","session":session,"negotiation":negotiation})).unwrap();
+            assert_eq!(
+                unsafe { mew_engine_command(&mut engine, command.as_ptr(), command.len() as i32) },
+                0
+            );
+            assert_eq!(actions.lock().unwrap().len(), expected);
+        }
+    }
     #[test]
     fn revocation_invalidates_queued_work_and_expires_without_js() {
         let shared = Shared::new();

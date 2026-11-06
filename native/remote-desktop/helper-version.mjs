@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url'
 // One manifest owns both installation copies and readiness. Dependencies are locked.
 export const HELPER_FILES = ['permissions-host.mjs', 'capture-macos.m', 'capture-macos.h', 'capture-macos.mjs', 'install-macos.mjs', 'capture-gdi.mjs', 'cursor-windows.mjs', 'capture-windows.mjs', 'capture-worker.mjs', 'native-capture.mjs', 'capture-start.mjs', 'native-stream.mjs', 'cursor-protocol.mjs', 'relay-adaptation.mjs', 'LICENSE', 'package.json', 'package-lock.json', 'helper-version.mjs', 'install-runtime.mjs', 'windows-session.ps1', 'main.mjs', 'parent-channel.mjs', 'preload.cjs', 'app.html', 'sender.mjs', 'direct-sender.mjs', 'relay-sender.mjs', 'relay-protocol.mjs', 'host-wire.mjs', 'protocol.mjs', 'keys.mjs', 'input-native.mjs', 'input-portal.mjs']
 HELPER_FILES.push('native-host.mjs', 'native-direct.mjs', 'gpu-worker.mjs', 'gpu-windows.mjs', 'gpu-windows.cpp', 'install-windows-gpu.ps1', 'cursor-png.mjs', 'clipboard-windows.mjs')
-HELPER_FILES.push('virtual-display-client.h', 'virtual-display-protocol.h')
+HELPER_FILES.push('virtual-display-client.h', 'virtual-display-protocol.h', 'virtual-display-modes.h', 'gpu-pipeline.h')
 HELPER_FILES.push('connection-notice.mjs', 'notification-windows.mjs', 'notification-windows.cpp')
 HELPER_FILES.push('host-permissions.mjs')
 HELPER_FILES.push('runtime-support.mjs')
@@ -18,6 +18,7 @@ HELPER_FILES.push('install-windows-native.mjs', 'windows-package.mjs', 'extract-
 HELPER_FILES.push('build-windows-package.mjs', 'windows-build-environment.ps1')
 HELPER_FILES.push('video-settings.mjs', 'video-pacer.mjs', 'video-adaptation.mjs', 'video-pump.mjs')
 HELPER_FILES.push('rust-engine.mjs', 'rust-direct.mjs', 'cursor-worker.mjs', 'install-rust-engine.mjs', 'rust-vendor.mjs', 'rust/Cargo.toml', 'rust/Cargo.lock', 'rust/build.rs', 'rust/src/lib.rs', 'rust/src/engine.rs', 'rust/src/gpu.rs', 'rust/src/rtp.rs', 'rust/src/rtc.rs')
+HELPER_FILES.push('rust/src/input.rs', 'rust/src/input_windows.rs')
 export function helperVersion(directory) {
   const hash = createHash('sha256')
   for (const file of HELPER_FILES) hash.update(file).update('\0').update(readFileSync(path.join(directory, file)))

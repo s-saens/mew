@@ -3,6 +3,8 @@
 #include <vector>
 #include <string>
 #include <algorithm>
+#include <cwctype>
+#include <limits>
 #include "virtual-display-protocol.h"
 
 static HANDLE openMewDisplay() {
@@ -41,27 +43,86 @@ static LONG mewDisplayPaths(UINT flags,std::vector<DISPLAYCONFIG_PATH_INFO>& pat
     }
     return ERROR_INSUFFICIENT_BUFFER;
 }
-// Preserve each existing active path; add only our monitor, without saving a new
-// persistent layout or selecting a different primary screen.
-static LONG activateMewDisplay() {
+static bool mewSameAdapter(LUID left,LUID right) {
+    return left.LowPart==right.LowPart && left.HighPart==right.HighPart;
+}
+static bool mewSameSource(const DISPLAYCONFIG_PATH_INFO& left,const DISPLAYCONFIG_PATH_INFO& right) {
+    return left.sourceInfo.id==right.sourceInfo.id && mewSameAdapter(left.sourceInfo.adapterId,right.sourceInfo.adapterId);
+}
+// Supply exact timings for our output and keep every existing output unchanged.
+// Allowing Windows to choose other modes here can silently lower the requested
+// refresh rate or change a physical display, so validation and apply are strict.
+static LONG activateMewDisplay(uint32_t width,uint32_t height,uint32_t fps) {
+    if(!width || !height || !fps)return ERROR_INVALID_PARAMETER;
+    auto selected=selectMewDisplayMode(width,height,fps);
     std::vector<DISPLAYCONFIG_PATH_INFO> paths;std::vector<DISPLAYCONFIG_MODE_INFO> modes;
     LONG status=mewDisplayPaths(QDC_ALL_PATHS,paths,modes);if(status!=ERROR_SUCCESS)return status;
     std::vector<DISPLAYCONFIG_PATH_INFO> active;
-    DISPLAYCONFIG_PATH_INFO added{};bool found=false;
+    DISPLAYCONFIG_PATH_INFO added{};bool found=false;size_t ownIndex=0;
     for(const auto& path:paths) {
         if(path.flags&DISPLAYCONFIG_PATH_ACTIVE)active.push_back(path);
-        if(mewTarget(path)) {
-            if(path.flags&DISPLAYCONFIG_PATH_ACTIVE)return ERROR_SUCCESS;
-            added=path;found=true;
+        if((path.flags&DISPLAYCONFIG_PATH_ACTIVE) && mewTarget(path)) {
+            added=path;found=true;ownIndex=active.size()-1;
         }
     }
+    if(!found)for(const auto& path:paths) {
+        if(!mewTarget(path))continue;
+        bool shared=false;for(const auto& existing:active)if(mewSameSource(path,existing)){shared=true;break;}
+        if(!shared){added=path;found=true;ownIndex=active.size();break;}
+    }
     if(!found)return ERROR_NOT_FOUND;
-    added.flags=DISPLAYCONFIG_PATH_ACTIVE;
-    added.sourceInfo.modeInfoIdx=DISPLAYCONFIG_PATH_MODE_IDX_INVALID;
-    added.targetInfo.modeInfoIdx=DISPLAYCONFIG_PATH_MODE_IDX_INVALID;
-    added.targetInfo.refreshRate={60,1};active.push_back(added);
-    return SetDisplayConfig(static_cast<UINT32>(active.size()),active.data(),static_cast<UINT32>(modes.size()),modes.data(),
-        SDC_USE_SUPPLIED_DISPLAY_CONFIG|SDC_APPLY|SDC_ALLOW_CHANGES);
+    for(size_t index=0;index<active.size();++index)
+        if(index!=ownIndex && mewSameSource(added,active[index]))return ERROR_INVALID_DATA;
+    if(ownIndex<active.size()) {
+        auto s=added.sourceInfo.modeInfoIdx,t=added.targetInfo.modeInfoIdx;
+        if(s<modes.size() && t<modes.size() && modes[s].infoType==DISPLAYCONFIG_MODE_INFO_TYPE_SOURCE && modes[t].infoType==DISPLAYCONFIG_MODE_INFO_TYPE_TARGET) {
+            const auto& source=modes[s].sourceMode;const auto& signal=modes[t].targetMode.targetVideoSignalInfo;
+            if(source.width==selected.width && source.height==selected.height &&
+                signal.activeSize.cx==selected.width && signal.activeSize.cy==selected.height &&
+                signal.vSyncFreq.Denominator && static_cast<uint64_t>(signal.vSyncFreq.Numerator)==static_cast<uint64_t>(selected.fps)*signal.vSyncFreq.Denominator)return ERROR_SUCCESS;
+        }
+    }
+
+    POINTL position{};int64_t right=0;
+    for(size_t index=0;index<active.size();++index) {
+        auto source=active[index].sourceInfo.modeInfoIdx;
+        if(source>=modes.size() || modes[source].infoType!=DISPLAYCONFIG_MODE_INFO_TYPE_SOURCE)return ERROR_INVALID_DATA;
+        const auto& existing=modes[source].sourceMode;
+        if(index==ownIndex)position=existing.position;
+        else right=std::max<int64_t>(right,static_cast<int64_t>(existing.position.x)+existing.width);
+    }
+    if(ownIndex==active.size()) {
+        if(right>std::numeric_limits<LONG>::max()-static_cast<int64_t>(selected.width))return ERROR_INVALID_DATA;
+        position.x=static_cast<LONG>(right);
+    }
+    // Reuse an existing entry for the same source/target identifier. The CCD
+    // mode table must contain each identifier only once, including clone paths.
+    auto putMode=[&](DISPLAYCONFIG_MODE_INFO value) {
+        for(UINT32 index=0;index<modes.size();++index) {
+            const auto& mode=modes[index];
+            if(mode.infoType==value.infoType && mode.id==value.id && mewSameAdapter(mode.adapterId,value.adapterId)) {
+                modes[index]=value;return index;
+            }
+        }
+        modes.push_back(value);return static_cast<UINT32>(modes.size()-1);
+    };
+    DISPLAYCONFIG_MODE_INFO source{};source.infoType=DISPLAYCONFIG_MODE_INFO_TYPE_SOURCE;
+    source.id=added.sourceInfo.id;source.adapterId=added.sourceInfo.adapterId;
+    source.sourceMode.width=selected.width;source.sourceMode.height=selected.height;
+    source.sourceMode.pixelFormat=DISPLAYCONFIG_PIXELFORMAT_32BPP;source.sourceMode.position=position;
+    DISPLAYCONFIG_MODE_INFO target{};target.infoType=DISPLAYCONFIG_MODE_INFO_TYPE_TARGET;
+    target.id=added.targetInfo.id;target.adapterId=added.targetInfo.adapterId;
+    mewDisplaySignal(target.targetMode.targetVideoSignalInfo,selected,false);
+    auto sourceIndex=putMode(source),targetIndex=putMode(target);
+    added.flags|=DISPLAYCONFIG_PATH_ACTIVE;
+    added.sourceInfo.modeInfoIdx=sourceIndex;added.targetInfo.modeInfoIdx=targetIndex;
+    added.targetInfo.refreshRate={selected.fps,1};added.targetInfo.rotation=DISPLAYCONFIG_ROTATION_IDENTITY;
+    added.targetInfo.scaling=DISPLAYCONFIG_SCALING_IDENTITY;added.targetInfo.scanLineOrdering=DISPLAYCONFIG_SCANLINE_ORDERING_PROGRESSIVE;
+    if(ownIndex==active.size())active.push_back(added);else active[ownIndex]=added;
+    auto count=static_cast<UINT32>(active.size()),modeCount=static_cast<UINT32>(modes.size());
+    status=SetDisplayConfig(count,active.data(),modeCount,modes.data(),SDC_USE_SUPPLIED_DISPLAY_CONFIG|SDC_VALIDATE);
+    if(status!=ERROR_SUCCESS)return status;
+    return SetDisplayConfig(count,active.data(),modeCount,modes.data(),SDC_USE_SUPPLIED_DISPLAY_CONFIG|SDC_APPLY);
 }
 static HMONITOR findMewMonitor() {
     std::vector<DISPLAYCONFIG_PATH_INFO> paths;std::vector<DISPLAYCONFIG_MODE_INFO> modes;

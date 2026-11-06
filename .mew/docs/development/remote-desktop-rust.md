@@ -1,6 +1,6 @@
 ---
 title: "Remote Desktop Rust Video Engine"
-description: "Defines capture output, RTP pacing, and direct WebRTC on a dedicated Rust thread that reuses the existing OS GPU ABI, along with Node control boundaries and approval revocation/shutdown contracts. Covers locked dependency sources, maintainer build tools and actionable installation errors, the legacy comparison path, synthetic verification, and unverified actual GPU behavior; links verified Windows prebuilt installation and the separate maintainer toolchain."
+description: "Defines Rust capture, bounded RTP delta bursts, negotiated zero playout delay, and callback-driven Windows input with independent authorization and release checks. Covers Node control boundaries, optional Windows event wakeups, native ABI reuse, installation, regression coverage, and unverified hardware latency; links verified Windows prebuilt installation and the separate maintainer toolchain."
 created: 2026-10-24
 updated: "2026-11-05"
 ---
@@ -11,24 +11,37 @@ The default is `MEW_DESKTOP_ENGINE=rust`. `native-host.mjs` loads the Rust cdyli
 
 ```mermaid
 flowchart LR
-  N[Node 인증·협상·NAT·입력 검사] <-->|제어·진단 JSON| R[Rust 영상 스레드]
-  R <-->|기존 C ABI| G[OS GPU 캡처·H.264]
-  R --> P[Annex-B 검사·RTP 생성·pacing]
+  N[Node authorization, signaling, NAT, clipboard] <-->|Control and diagnostics JSON| R[Rust video thread]
+  R <-->|GPU C ABI| G[OS capture and hardware H.264]
+  R --> P[Annex-B validation, RTP, pacing]
   P --> T[libdatachannel DTLS-SRTP]
-  T <-->|직접 연결| B[브라우저]
-  B -->|입력 DataChannel| T
-  T -->|입력 메시지| N
+  T <-->|Direct connection| B[Browser]
+  B -->|Input DataChannel| T
+  T -->|Windows input snapshots| I[Rust input receiver and SendInput]
+  T -->|Other control and POSIX input| N
 ```
 
-`rust-engine.mjs` provides the existing worker's `postMessage`, `message`, and shutdown interfaces. It retrieves only control events at 4ms intervals; GPU output and RTP packets do not cross this boundary. While active, Rust checks encoder output and performs pacing; while idle, it waits only for control commands. The original 1/2ms GPU polling remains, so this implementation does not wake all capture through OS events.
+`rust-engine.mjs` preserves the worker's `postMessage`, `message`, and shutdown interfaces. Its 4ms poll retrieves control and diagnostics; GPU output, RTP packets, and Windows input snapshots stay in native code. Windows GPU libraries can expose the optional `mew_gpu_wait(handle, timeoutMs)` symbol without changing ABI 5. Rust waits at most 1ms between control/pacer checks and reads GPU output immediately on wake. Libraries without this symbol retain the existing 1/2ms output polling. The optional wait does not make driver calls bounded.
 
-Node retains SDP mode selection, STUN retries, temporary NAT mappings, RTT adaptation policies, and clipboard and input permission checks. `rust-direct.mjs` uses the existing `video-settings.mjs` and `video-adaptation.mjs` and the shared retry lifecycle. The existing JS receiver checks session, lock, rate, and key state before injecting input messages into the OS. The independent Windows cursor is queried in `cursor-worker.mjs`, so video backpressure does not stop the cursor. The Mac TCC app identifier and Node executable remain unchanged; Rust is not started as a separate executable.
+Node retains SDP mode selection, STUN retries, temporary NAT mappings, RTT adaptation, clipboard operations, and session approval. `rust-direct.mjs` reuses `video-settings.mjs`, `video-adaptation.mjs`, and the shared retry lifecycle. Windows sends input snapshots directly from libdatachannel callbacks to Rust's receiver and Win32 input adapter. Mac/Linux retain the existing Node receiver and OS adapters. The separate `cursor-worker.mjs` still queries the Windows cursor; its sequence acknowledgement reads the Rust receiver's current snapshot sequence through FFI. The Mac TCC app identifier and Node executable remain unchanged.
 
 ## Queues and transport
 
-The GPU output buffer is limited to 4MiB. Rust checks Annex-B NALs and the negotiated SPS/PPS profile and level, then queues at most two compressed frames. RTP is generated as single NAL/FU-A in a reusable 1192-byte buffer, without creating JS objects or per-packet timers. libdatachannel handles the actual sockets, encryption, and NACK retransmissions. Rust sends compound RTCP SR and SDES with a mapping between the monotonic clock and RTP clock.
+GPU output is limited to 4MiB. Rust validates Annex-B NALs and the negotiated SPS/PPS profile and level, then queues at most two compressed frames. Single-NAL/FU-A RTP uses a reusable 1192-byte buffer. libdatachannel owns sockets, SRTP encryption, and NACK retransmission. Compound RTCP SR/SDES maps the monotonic and RTP clocks.
 
-Frame order, IDR recovery, burst and lifetime limits, and quality recovery follow the [shared transport contract](remote-desktop.md#transport-and-latency). During IDR transmission, it does not read the next GPU output and preserves the additional keyframe request flag until completion or discard. It changes the encoder bitrate and pacer bitrate together and propagates Windows configuration failures upstream. `queueMs` is measured from when Rust reads the GPU output. Node and Rust clock values are not directly subtracted.
+The offer advertises extension ID 1 for `http://www.webrtc.org/experiments/rtp-hdrext/playout-delay`. Rust emits its RFC 8285 one-byte header only when the receiving video answer accepts that ID and direction. Each packet carries 12-bit minimum and maximum delays of zero; payload capacity shrinks by 8 bytes to preserve the 1192-byte bound. Missing/rejected extensions leave ordinary RTP unchanged. This is a [best-effort request to render promptly](https://webrtc.googlesource.com/src/+/refs/heads/main/docs/native-code/rtp-hdrext/playout-delay/README.md), not a zero-latency guarantee.
+
+The normal pacer retains a 1.15 × bitrate budget and 5ms burst cap, with a two-packet minimum. An uncongested delta frame can complete in one tick when its full wire cost fits two nominal frame budgets, clamped to 2480–131072 bytes. This consumes credit below zero; later frames repay that debt through elapsed-time credit. Debt, larger delta frames, IDRs, and the first second after a bitrate reduction or queue/send failure use normal pacing. Burst allowance never replenishes at frame boundaries. Frame lifetimes and IDR recovery retain the [shared transport contract](remote-desktop.md#transport-and-latency).
+
+While sending an IDR, Rust does not read another GPU frame and preserves additional keyframe requests until completion or discard. Encoder and pacer bitrate change together; Windows setting failures propagate upstream. `queueMs` starts when Rust reads GPU output. Node and Rust clock values are never subtracted.
+
+## Windows input safety
+
+`input.rs` preserves the existing cumulative motion counters, reliable transition epochs, sequence ordering, pending lossy motion, absolute touch coordinates, 4096-unit motion clamps, and held key/button tracking. It rejects malformed snapshots, caps lossy motion at 300 messages per second, and terminates input after more than 256 reliable input/paste messages per second. The selected screen's actual desktop bounds determine absolute coordinates. Win32 scan-code and extended-key behavior use the existing browser-code mapping passed by Node.
+
+Each injected action rechecks the atomic session generation, the 8-second Node lease, and the Windows input desktop name (`Default`). Stop, peer replacement, and shutdown revoke and release held inputs synchronously at FFI entry. Callback errors and channel closure also release held state. An independent native watchdog checks locks, leases, and the 1500ms input heartbeat every 50ms, so Node or video-thread stalls do not alone keep keys held. Release is best effort when Windows rejects input; administrator/UAC and locked desktops remain unsupported.
+
+Clipboard reads/writes, connection notices, feedback, and paste requests still reach Node. Paste releases native held state and sends its modifier/key chord back through the authorized Rust receiver. Node's Windows receiver proxy exposes release, chord, and sequence operations; ordinary snapshots do not pass through its event loop. Session/negotiation-scoped control commands and monotonic lease expiration continue to apply.
 
 ## Authorization and cleanup
 
@@ -55,11 +68,11 @@ Installation verification checks the required native bindings and engine ABI 1 w
 
 ## Verification Scope
 
-Rust unit tests check Annex-B boundaries, FU-A reconstruction, sequence wrap, finite bursts, IDR backpressure, reference recovery, profile rejection, authorization generations, and lease expiration. `cargo clippy --all-targets -- -D warnings` also checks Rust warnings. Existing JS transport, permission, and OS lifecycle regression tests are maintained separately.
+Rust unit tests check Annex-B/FU-A payload reconstruction, sequence wrap, negotiated playout extension rejection/encoding, packet bounds, bounded delta debt, congestion/IDR pacing, and profile rejection. Input regressions cover lossy/reliable ordering, touch coordinates, paste chords, message rates, malformed/partially failed injection, generation/lock/lease/heartbeat release, the independent watchdog, and the Windows INPUT layout. Windows adapter code is type-checked by Linux unit builds without executing Win32 calls. `cargo clippy --all-targets -- -D warnings` also checks Rust warnings. Existing JS transport, permission, and OS lifecycle regression tests are maintained separately.
 
 The opt-in test in `server/remote-desktop-rust.test.ts` returns pregenerated FHD H.264 synthetic video from a separate temporary GPU ABI library. It receives video through actual libdatachannel and Chromium and checks that at least 8 frames are decoded while the Node event loop stalls for 400ms, that the same engine can reconnect after stop confirmation, and that it shuts down independently 8 seconds after lease renewal stops. It then runs the existing resident host integration tests in separate Xvfb and D-Bus environments to also verify XTest input on the synthetic screen, key release on permission revocation, OS locking, reconnection in the same process, and connection notifications. The test's FFmpeg and software encoder are used only to generate synthetic fixtures and are not included in the production path. The Chromium fixture's receiving SDP is set to the supported Baseline level 4.2.
 
-On 2026-10-24, the Rust unit tests, Clippy, and synthetic browser tests above passed on Linux. This provides evidence that video transmission is separated from the JS event loop; it does not measure actual GPU performance, superior image quality, or improvements in input-to-display latency. Actual builds, signing, and execution of the new Rust library on Windows/MSVC and Mac, actual Linux GPUs and Wayland portals, and comparisons over external networks and at high refresh rates are unverified.
+On 2026-10-24, the original Rust unit tests, Clippy, and synthetic browser tests above passed on Linux. On 2026-11-04, the expanded Rust unit tests and Clippy passed locally; the JS Rust signaling/install tests passed with their optional browser/GPU fixture skipped. This provides evidence that video transmission is separated from the JS event loop; it does not measure actual GPU performance, superior image quality, or improvements in input-to-display latency. Actual builds, signing, and execution of the new Rust library on Windows/MSVC and Mac, actual Linux GPUs and Wayland portals, and comparisons over external networks and at high refresh rates are unverified.
 
 Run isolated tests from the repository root as shown below. Do not specify the production installation directory.
 
