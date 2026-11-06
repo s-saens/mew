@@ -156,7 +156,7 @@ test('real Windows PowerShell ZIP writer preserves hidden checksums and vendor p
 test('desktop releases build both native architectures and publish only matching source-hash tags behind approval', async () => {
   const workflow = parseYaml(await fs.readFile(new URL('../../.github/workflows/desktop-release.yml', import.meta.url), 'utf8'))
   assert.deepEqual(workflow.jobs.build.strategy.matrix.include.map(item => item.arch), ['x64', 'arm64'])
-  assert.ok(workflow.jobs.build.steps.some(step => /^npm ci .*--ignore-scripts/.test(step.run || '')))
+  assert.ok(workflow.jobs.build.steps.some(step => step.run === 'node tools/desktop-test-dependencies.mjs'))
   assert.ok(workflow.jobs.build.steps.some(step => step.run?.includes('windows-build-environment.test.mjs')))
   assert.equal(workflow.jobs.release.environment, 'desktop-release')
   assert.match(workflow.jobs.release.if, /github.ref_type == 'tag'/)
