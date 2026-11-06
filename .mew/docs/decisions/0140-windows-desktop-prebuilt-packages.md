@@ -1,13 +1,13 @@
 ---
 title: "Ship verified Windows remote desktop packages"
-description: "Supersedes ADR 0138 with prebuilt Windows helper packages, exact shared-source identities, verified replacement, and a separate protected build/release pipeline. End-user setup installs no development toolchain; initial package publication and clean-Windows acceptance remain pending."
+description: "Supersedes ADR 0138 with prebuilt Windows helper packages, exact shared-source identities, verified replacement, and a separate protected build/release pipeline. End-user setup installs no development toolchain; initial validation packages are published, while complete clean-Windows acceptance remains pending."
 created: "2026-11-05"
-updated: "2026-11-05"
+updated: "2026-11-07"
 ---
 
 ## Status
 
-Accepted. Supersedes [ADR 0138](0138-windows-desktop-build-prerequisites.md) and the Windows end-user build requirement in [ADR 0059](0059-remote-desktop-rust-engine.md). The runtime capture, input, authorization, and transport design is unchanged. Windows package builds, publication, and clean-host acceptance remain release gates.
+Accepted. Supersedes [ADR 0138](0138-windows-desktop-build-prerequisites.md) and the Windows end-user build requirement in [ADR 0059](0059-remote-desktop-rust-engine.md). The runtime capture, input, authorization, and transport design is unchanged. The initial x64/ARM64 builds and validation prerelease publication are complete. Full clean-host and real connection acceptance remain open; see the [verification record](../work/remote-desktop-windows-setup.md#november-7-initial-validation-prerelease).
 
 ## Context
 

@@ -1,7 +1,7 @@
 ---
 title: "CLI Releases and npm Publishing"
-description: "Release procedure for @liiiiv/mew-cli and Linux, macOS, and Windows x64/arm64 runtimes. Covers the signed Windows installation wizard, verified desktop packages, native helpers, browser manifests, checksums, licensing, CI and npm/OIDC gates; publication and hands-on platform checks remain incomplete."
-updated: "2026-11-05"
+description: "Release procedure for @liiiiv/mew-cli and Linux, macOS, and Windows x64/arm64 runtimes. Covers the signed Windows installation wizard, verified desktop packages, native helpers, browser manifests, checksums, licensing, CI and npm/OIDC gates; initial desktop validation packages are published, while hands-on platform acceptance and other initial releases remain incomplete."
+updated: "2026-11-07"
 상위파일:
   - "../../../docs/deployment/native.md"
   - "../development/cli-distribution.md"
@@ -27,7 +27,7 @@ Remote desktop installation scripts and required protocol sources are included. 
 
 The [Windows setup contract](../development/remote-desktop-windows-setup.md) owns package identity, contents, verification, replacement, and host permissions. [ADR 0140](../decisions/0140-windows-desktop-prebuilt-packages.md) moves Windows compilation out of end-user preparation. Development tools are required only on package build workers; package installation never installs them on the user's PC.
 
-Run `node native/remote-desktop/build-windows-package.mjs --output <directory>` on prepared native Windows x64 and ARM64 workers. Each worker supplies Node, Rust stable MSVC, CMake, LLVM/libclang, Perl, Visual Studio C++ tools, and Windows SDK. The builder stages locked production dependencies, GPU/Rust libraries, patched vendored sources, and notices; verifies native bindings and ABIs; and emits `mew-desktop-win32-<arch>.zip` with `.sha256`. It does not install build prerequisites. Never package developer toolchains or unrelated local DLLs.
+Run `node native/remote-desktop/build-windows-package.mjs --output <directory>` on prepared native Windows x64 and ARM64 workers. Each worker supplies Node, Git, Rust stable MSVC, CMake, LLVM/libclang, Perl, Visual Studio C++ tools, and Windows SDK. The builder stages locked production dependencies, GPU/Rust libraries, patched vendored sources, and notices; verifies native bindings and ABIs; and emits `mew-desktop-win32-<arch>.zip` with `.sha256`. It does not install build prerequisites. Never package developer toolchains or unrelated local DLLs.
 
 The dedicated `.github/workflows/desktop-release.yml` builds both architectures and publishes their ZIPs plus `SHA256SUMS` through the protected `desktop-release` environment. Use the full 64-character shared helper-source hash as `mew-desktop-<sourceHash>`; publish to the official `s-saens/mew` repository. Existing release assets are immutable. Configure required reviewers and protections before publication, and preserve corresponding sources and third-party notices inside every archive.
 
@@ -35,7 +35,7 @@ Publish matching helper packages before releasing source revisions that need Win
 
 Before publishing, verify both architectures on a clean Windows host without Rust or other development tools: private Node preparation, package integrity and source rejection, native loading/ABI checks, first installation, repeat installation, and video/input connection. Exercise missing-release errors, corrupt archives, locked DLL replacement failure and rollback, and readiness-marker behavior. Check the archive's complete file list, patched corresponding sources, licenses, and notices. These are release gates; local fixture tests alone do not satisfy them. The optional signed virtual display driver remains a separate distribution and approval path.
 
-Initial Windows helper builds, official package publication, clean-host installation, and real connection acceptance have not been performed. A missing exact-source release must remain a visible setup failure; it must never trigger host tool installation or compilation.
+The initial Windows helper validation prerelease is published; the [setup contract](../development/remote-desktop-windows-setup.md#permissions-and-remaining-gates) identifies its source and download. Both native architecture builds and isolated Windows x64 installer/native-load checks passed. The operator requested this initial preview while complete clean-host and real video/input acceptance remain outstanding; it is a prerelease and does not certify those gates. The [work record](../work/remote-desktop-windows-setup.md#november-7-initial-validation-prerelease) records the actual publication and verification. A missing exact-source release must remain a visible setup failure; it must never trigger host tool installation or compilation.
 
 ## Windows Installation Wizard
 

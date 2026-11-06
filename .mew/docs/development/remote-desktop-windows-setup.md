@@ -1,6 +1,6 @@
 ---
 title: "Windows remote desktop prebuilt setup"
-description: "Defines exact-source Windows/WSL prebuilt installation and readiness without host development tools. Covers C++20 maintainer builds, compiler discovery, build timeout diagnostics, separate npm/Rust native sources, isolated test prerequisites, publication, and acceptance gates."
+description: "Defines exact-source Windows/WSL prebuilt installation and readiness without host development tools. Covers C++20 maintainer builds, compiler discovery, build timeout diagnostics, separate npm/Rust native sources, isolated test prerequisites, the initial validation prerelease, and remaining acceptance gates."
 created: "2026-11-05"
 updated: "2026-11-07"
 ---
@@ -60,4 +60,6 @@ The workflow prepares only the YAML parser needed by package tests, using its ex
 
 Ordinary package preparation does not need elevation to install developer tools. Existing Windows login, WSL interop, Task Scheduler, GPU driver, and [firewall approval](remote-desktop-connectivity.md) requirements remain. The optional [virtual display driver](remote-desktop-virtual-display.md) still needs a separate signed package and explicit administrator approval; its signing and installation are outside this helper archive.
 
-Local manifest and installer regression checks do not establish Windows binary compatibility or a successful remote session. Both architecture builds, official package publication, clean-host setup with no development tools, and real video/input acceptance remain required release gates. The [work record](../work/remote-desktop-windows-setup.md) records checks actually performed.
+Initial x64 and ARM64 packages for helper source `de1e100632ea29e9b41cec72a948af28c5add660ee2420faa68d3c9e5f3c1b42` are available in the [validation prerelease](https://github.com/s-saens/mew/releases/tag/mew-desktop-de1e100632ea29e9b41cec72a948af28c5add660ee2420faa68d3c9e5f3c1b42). Both native Windows builds and ABI probes passed. An isolated Windows x64 installation with only System32 on PATH verified first/repeat setup, checksum/source rejection, and rollback under an actual DLL lock.
+
+This operator-requested prerelease does not establish complete clean-host acceptance or a successful remote video/input session. Those acceptance gates remain open on both architectures; the optional signed driver is separate. The [work record](../work/remote-desktop-windows-setup.md) records build, publication, installation checks, and remaining limits.
