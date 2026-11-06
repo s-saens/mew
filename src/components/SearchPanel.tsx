@@ -1,9 +1,10 @@
+import { useWorkspaceApi } from '../api/workspace-api-context'
 import { canAutoFocusInput, HoverTipLayer, useDialog } from '@mew/ui'
 import { uiText } from '@mew/ui/i18n-core'
 import { useUiLocale } from '@mew/ui/i18n'
 import { Search } from 'iconoir-react'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { replaceInProjectFile, searchFileNames, searchProjectStream, type SearchFileResult, type SearchMatch, type SearchOptions } from '../api/client'
+import { type SearchFileResult, type SearchMatch, type SearchOptions } from '../api/client'
 import type { ExplorerSearch } from '../utils/explorer-search'
 import { ProjectIcon } from './ProjectIcon'
 import { PanelCloseButton } from './panel-close-button'
@@ -27,6 +28,7 @@ export function SearchPanel({ focusSignal, readOnly, project, scope, scopes, mod
   actions?: ReactNode
   children: (search: ExplorerSearch | undefined) => ReactNode
 }) {
+  const { searchFileNames, searchProjectStream, replaceInProjectFile } = useWorkspaceApi()
   useUiLocale()
   const dialogs = useDialog()
   const [query, setQuery] = useState('')
@@ -90,7 +92,7 @@ export function SearchPanel({ focusSignal, readOnly, project, scope, scopes, mod
       clearTimeout(timer)
       if (id === reqId.current) { streamAbort.current = null; setLoading(false) }
     })
-  }, [mode, project])
+  }, [mode, project, searchFileNames, searchProjectStream])
 
   useEffect(() => {
     setResults([])

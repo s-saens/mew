@@ -22,27 +22,34 @@ export interface StoredDrawing extends SavedDrawing {
   svg: string
 }
 
-function scopeQuery(projectRoot?: string): string {
-  return projectRoot ? `?projectRoot=${encodeURIComponent(projectRoot)}` : ''
+export function createDrawingStorage(requestFetch: typeof mewFetch = mewFetch) {
+  const scopedFetch = requestFetch
+
+  function scopeQuery(projectRoot?: string): string {
+    return projectRoot ? `?projectRoot=${encodeURIComponent(projectRoot)}` : ''
+  }
+
+  /** Capture the workspace when the editor opens and pass it to subsequent requests. */
+  function getDrawingScope(projectRoot?: string): Promise<DrawingScope> {
+    return scopedFetch(`/api/agent/drawings${scopeQuery(projectRoot)}`).then(json<DrawingScope>)
+  }
+
+  async function listDrawings(projectRoot?: string): Promise<DrawingSummary[]> {
+    return (await getDrawingScope(projectRoot)).drawings
+  }
+
+  function loadDrawing(id: string, projectRoot?: string): Promise<StoredDrawing> {
+    return scopedFetch(`/api/agent/drawings/${encodeURIComponent(id)}${scopeQuery(projectRoot)}`).then(json<StoredDrawing>)
+  }
+
+  function saveDrawing(svg: string, name: string, projectRoot?: string): Promise<SavedDrawing> {
+    return scopedFetch('/api/agent/drawings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ svg, name, ...(projectRoot ? { projectRoot } : {}) }),
+    }).then(json<SavedDrawing>)
+  }
+  return { getDrawingScope, listDrawings, loadDrawing, saveDrawing }
 }
 
-/** Capture the workspace when the editor opens and pass it to subsequent requests. */
-export function getDrawingScope(projectRoot?: string): Promise<DrawingScope> {
-  return mewFetch(`/api/agent/drawings${scopeQuery(projectRoot)}`).then(json<DrawingScope>)
-}
-
-export async function listDrawings(projectRoot?: string): Promise<DrawingSummary[]> {
-  return (await getDrawingScope(projectRoot)).drawings
-}
-
-export function loadDrawing(id: string, projectRoot?: string): Promise<StoredDrawing> {
-  return mewFetch(`/api/agent/drawings/${encodeURIComponent(id)}${scopeQuery(projectRoot)}`).then(json<StoredDrawing>)
-}
-
-export function saveDrawing(svg: string, name: string, projectRoot?: string): Promise<SavedDrawing> {
-  return mewFetch('/api/agent/drawings', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ svg, name, ...(projectRoot ? { projectRoot } : {}) }),
-  }).then(json<SavedDrawing>)
-}
+export const { getDrawingScope, listDrawings, loadDrawing, saveDrawing } = createDrawingStorage()

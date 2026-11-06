@@ -1,13 +1,29 @@
 import { scopedBrowserStorage } from '@mew/ui/browser-storage-scope'
 import { trimInputHistory, writeBrowserStorage } from '@mew/ui/browser-storage'
-// 에이전트 입력 초안은 서버 세션이 아니라 브라우저 탭 상태다. 탭 id별로 저장해 창을 닫거나
-// 새로고침해도 쓰던 문장이 돌아오게 한다.
+// Drafts belong to a browser account, logical project, working root and tab.
 const DRAFTS_KEY = 'mew:agent-input-drafts'
 const HISTORIES_KEY = 'mew:agent-input-histories'
 const MAX_HISTORY_ITEMS = 100
 
 type DraftMap = Record<string, string>
 type HistoryMap = Record<string, string[]>
+
+export type AgentInputDraftScope = Readonly<{ account: string; projectPath: string; workspacePath: string; migrateLegacy?: boolean }>
+
+export function agentInputOwnerKey(tabId: string, scope?: AgentInputDraftScope): string {
+  return scope ? `v2:${JSON.stringify([scope.account, scope.projectPath, scope.workspacePath, tabId])}` : tabId
+}
+
+/** Only the single-project compatibility view may claim an older tab-only entry. */
+function scopedValue<T>(map: Record<string, T>, tabId: string, scope: AgentInputDraftScope | undefined, save: (map: Record<string, T>) => void): T | undefined {
+  const key = agentInputOwnerKey(tabId, scope)
+  if (scope?.migrateLegacy && !Object.hasOwn(map, key) && Object.hasOwn(map, tabId)) {
+    map[key] = map[tabId]
+    delete map[tabId]
+    save(map)
+  }
+  return Object.hasOwn(map, key) ? map[key] : undefined
+}
 
 function readAll(): DraftMap {
   try {
@@ -53,35 +69,39 @@ function writeHistories(map: HistoryMap): void {
   } catch { /* 히스토리는 편의 기능이다. */ }
 }
 
-export function readAgentInputDraft(tabId: string): string {
-  return readAll()[tabId] ?? ''
+export function readAgentInputDraft(tabId: string, scope?: AgentInputDraftScope): string {
+  return scopedValue(readAll(), tabId, scope, writeAll) ?? ''
 }
 
-export function writeAgentInputDraft(tabId: string, text: string): void {
+export function writeAgentInputDraft(tabId: string, text: string, scope?: AgentInputDraftScope): void {
   const map = readAll()
-  if (text) map[tabId] = text
-  else delete map[tabId]
+  const key = agentInputOwnerKey(tabId, scope)
+  if (scope?.migrateLegacy) delete map[tabId]
+  if (text) map[key] = text
+  else delete map[key]
   writeAll(map)
 }
 
-export function clearAgentInputDraft(tabId: string): void {
-  writeAgentInputDraft(tabId, '')
+export function clearAgentInputDraft(tabId: string, scope?: AgentInputDraftScope): void {
+  writeAgentInputDraft(tabId, '', scope)
   const histories = readHistories()
-  delete histories[tabId]
+  delete histories[agentInputOwnerKey(tabId, scope)]
+  if (scope?.migrateLegacy) delete histories[tabId]
   writeHistories(histories)
 }
 
-export function readAgentInputHistory(tabId: string): string[] {
-  return readHistories()[tabId] ?? []
+export function readAgentInputHistory(tabId: string, scope?: AgentInputDraftScope): string[] {
+  return scopedValue(readHistories(), tabId, scope, writeHistories) ?? []
 }
 
-/** 전송에 성공한 입력만 최근 100개까지 탭별로 보관한다. */
-export function recordAgentInputHistory(tabId: string, text: string): void {
+/** Keep only successful sends, up to the most recent 100 per owner. */
+export function recordAgentInputHistory(tabId: string, text: string, scope?: AgentInputDraftScope): void {
   if (!text.trim()) return
   const histories = readHistories()
-  const previous = histories[tabId] ?? []
-  delete histories[tabId]
-  histories[tabId] = previous[previous.length - 1] === text
+  const key = agentInputOwnerKey(tabId, scope)
+  const previous = scopedValue(histories, tabId, scope, writeHistories) ?? []
+  delete histories[key]
+  histories[key] = previous[previous.length - 1] === text
     ? previous
     : [...previous, text].slice(-MAX_HISTORY_ITEMS)
   writeHistories(histories)

@@ -1,13 +1,15 @@
 import fs from 'node:fs'
+import { AsyncLocalStorage } from 'node:async_hooks'
 import path from 'node:path'
 import { taskDocumentsNeedMigration } from './task-markdown.ts'
 import { TASK_DOCUMENT_DIRECTORIES } from '../shared/task-document-paths.ts'
 import { taskListFile } from './task-list.ts'
 import { readJsonFile } from './dataDir.ts'
 import express from 'express'
-import { authOf, requireAuthenticated } from './reqAuth.ts'
-import { unrestrictedFiles } from './access-policy.ts'
-import { WORKSPACE_PROJECT, workspacePaths } from './paths.ts'
+import { authOf, requireAuthenticated, resolveAuth } from './reqAuth.ts'
+import { accessChanges, unrestrictedFiles } from './access-policy.ts'
+import { WORKSPACE_PROJECT, workspaceContext, workspacePaths } from './paths.ts'
+import { workspaceScopeAllowed } from './workspace-scope.ts'
 import { changeTaskList, readTaskList, readTaskTags, readTaskTagColors, TaskInputError } from './task-list.ts'
 import { TaskConflict } from '../shared/task-list.ts'
 
@@ -27,12 +29,15 @@ export function createTaskListRouter() {
     res.setHeader('X-Accel-Buffering', 'no')
     res.flushHeaders()
     const root = workspacePaths.root
+    const scope = workspaceContext.getStore()
     const watchers = new Map<string, fs.FSWatcher>()
     let timer: ReturnType<typeof setTimeout> | undefined
-    const send = () => {
-      if (root !== workspacePaths.root || !unrestrictedFiles(authOf(req), WORKSPACE_PROJECT, false)) { res.end(); return }
+    const send = AsyncLocalStorage.bind(() => {
+      const auth = resolveAuth(req)
+      if (auth.email !== authOf(req).email || auth.mustChangePassword || root !== workspacePaths.root
+        || (scope && !workspaceScopeAllowed(scope, auth)) || !unrestrictedFiles(auth, WORKSPACE_PROJECT, false)) { res.end(); return }
       res.write('data: changed\n\n')
-    }
+    })
     const notify = () => { clearTimeout(timer); timer = setTimeout(send, 75) }
     const watchDirectories = new Map<string, Set<string> | null>()
     for (const relative of TASK_DOCUMENT_DIRECTORIES) {
@@ -60,7 +65,8 @@ export function createTaskListRouter() {
         } catch { /* Parent watches and polling cover directories not created yet. */ }
       }
     }
-    res.on('close', () => { clearTimeout(timer); clearInterval(heartbeat); for (const watcher of watchers.values()) watcher.close() })
+    accessChanges.on('change', send)
+    res.on('close', () => { accessChanges.off('change', send); clearTimeout(timer); clearInterval(heartbeat); for (const watcher of watchers.values()) watcher.close() })
     const heartbeat = setInterval(send, 15_000)
     attach(); send()
   })

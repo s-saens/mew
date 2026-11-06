@@ -450,5 +450,5 @@ export function attachAgentWebSocket(
             deferWork: url.searchParams.get('deferWork') === '1', turns: url.searchParams.has('turns') ? Number(url.searchParams.get('turns')) : undefined }) : undefined, assistant, debuggerServers)
       })().catch(() => { send(ws, { type: 'fatal', message: 'MEWCAT_CONNECTION_FAILED' }); ws.close() })
     })
-  }))
+  }, AGENT_WS_PATH))
 }

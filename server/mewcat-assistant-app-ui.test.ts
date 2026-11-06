@@ -13,9 +13,10 @@ type Fixture = { assistant: { projectRoot: string | null; onAction: (action: Mew
 
 test('Mewcat tools use real App project switching, Documents tabs and reviewed work-session drafts', { timeout: 30_000 }, async () => {
   const app = await fs.readFile(`${root}/src/App.tsx`, 'utf8')
-  const keep = new Set(['deferredComponent', 'ProjectSwitcher', 'ProjectLoadingOverlay', 'FileTree', 'DockWorkspace', 'ProjectIcon', 'SubprojectLink', 'SidebarCreateButtons', 'MobileDock', 'HeaderMenu'])
+  const keep = new Set(['deferredComponent', 'IconPackProvider', 'ProjectSwitcher', 'ProjectLoadingOverlay', 'FileTree', 'DockWorkspace', 'ProjectIcon', 'SubprojectLink', 'SidebarCreateButtons', 'ScopeToggle', 'MobileDock', 'HeaderMenu'])
   const stubs = new Map<string, string>()
   const fixtureApp = app.replace(/const \w+ = deferredComponent\(async \(\) => \(\{ default: \(await import\('([^']+)'\)\)\.(\w+) \}\)(?:, null)?\)/g, (_match, module, name) => `import { ${name} } from '${module}'`)
+    .replace(/^const AgentPanel = deferredComponent\([^\n]+/m, "import { AgentPanel } from './components/AgentPanel'")
   for (const match of fixtureApp.matchAll(/import \{ ([^\n]+) \} from '(\.\/components\/[^']+)'/g)) {
     const names = match[1].split(',').map(name => name.trim().split(/\s+as\s+/)[0]).filter(name => !name.startsWith('type '))
     if (names.some(name => keep.has(name))) continue
@@ -25,15 +26,19 @@ test('Mewcat tools use real App project switching, Documents tabs and reviewed w
         ? 'export function AgentPanel({requestedTab,onRequestedTabHandled,requestedNoticeTab,onNoticeHandled,agentOpen,onClose}) { window.agentPanelOpen=agentOpen;window.closeAgent=onClose;React.useEffect(()=>{if(requestedNoticeTab){window.noticeTab=requestedNoticeTab;onNoticeHandled()}},[requestedNoticeTab]);React.useEffect(()=>{if(requestedTab){window.workTab=requestedTab;onRequestedTabHandled()}},[requestedTab]);return null }'
         : name === 'EditorPane' || name === 'DeferredEditorPane'
           ? `export function ${name}({pane}) { const active=pane.tabs.find(t=>t.path===pane.activePath);return React.createElement("div",{"data-editor-active":pane.activePath},active?.content||"") }`
-          : `export function ${name}(){return null}`).join('\n'))
+          : name === 'prepareEditorPane' || name === 'prepareEditorView'
+            ? `export async function ${name}(){}`
+            : `export function ${name}(){return null}`).join('\n'))
   }
   const source = `import React from '${root}/node_modules/react/index.js';import {createRoot} from '${root}/node_modules/react-dom/client.js';import App from '${root}/src/AppBootstrap.tsx';import {I18nProvider} from '${root}/src/i18n.tsx';import {publishMewcatNotice,setNotificationPreferences} from '${root}/src/utils/mewcat-notifications.ts';window.notifyApproval=target=>publishMewcatNotice({key:'approval:'+target.tabId,kind:'permission',level:'warning',source:'Codex',target});window.setApprovalAutoOpen=value=>setNotificationPreferences({autoOpenApproval:value});createRoot(document.getElementById('root')).render(<I18nProvider><App/></I18nProvider>);`
-  const bundle = await build({ input: 'virtual:helper-app.tsx', write: false, platform: 'browser', output: { format: 'iife', codeSplitting: false }, transform: { jsx: 'react-jsx', define: { 'process.env.NODE_ENV': JSON.stringify('test') } }, plugins: [{ name: 'fixture', resolveId(id, importer) {
+  const bundle = await build({ input: 'virtual:helper-app.tsx', write: false, platform: 'browser', output: { format: 'iife', codeSplitting: false }, onLog(level, log, handler) { if (log.code !== 'MODULE_LEVEL_DIRECTIVE') handler(level, log) }, transform: { jsx: 'react-jsx', define: { 'process.env.NODE_ENV': JSON.stringify('test') } }, plugins: [{ name: 'fixture', resolveId(id, importer) {
     if (id === 'virtual:helper-app.tsx') return id
+    if (importer === `${root}/src/workspace/workspace-account.tsx` && id === '../components/Mewcat') return 'virtual:assistant-mewcat'
     if (importer === `${root}/src/App.tsx` && stubs.has(id)) return `virtual:stub:${id}`
     if (id.endsWith('.css')) return 'virtual:style'
   }, async load(id) {
     if (id === 'virtual:helper-app.tsx') return source
+    if (id === 'virtual:assistant-mewcat') return 'export function Mewcat({assistant}) { window.assistant=assistant;return null }'
     if (id === `${root}/src/App.tsx`) return fixtureApp
     if (id === 'virtual:style') return ''
     if (id.startsWith('virtual:stub:')) return `import React from '${root}/node_modules/react/index.js';\n${stubs.get(id.slice('virtual:stub:'.length))}`
@@ -48,7 +53,9 @@ test('Mewcat tools use real App project switching, Documents tabs and reviewed w
     const page = await browser.newPage({ viewport: { width: 1100, height: 700 } })
     page.setDefaultTimeout(5000)
     const errors: string[] = []
+    const consoleErrors: string[] = []
     page.on('pageerror', error => errors.push(error.message))
+    page.on('console', message => { if (message.type() === 'error') consoleErrors.push(message.text()) })
     await page.addInitScript(() => {
       localStorage.setItem('mew:locale', 'ko')
       class Socket { static OPEN = 1; readyState = 1; onopen: (() => void) | null = null; constructor() { setTimeout(() => this.onopen?.(), 0) } send() {} close() { this.readyState = 3 } }
@@ -67,7 +74,7 @@ test('Mewcat tools use real App project switching, Documents tabs and reviewed w
           if (path === '/missing') return route.fulfill({ status: 400, json: { error: 'Missing folder' } })
           active = path
         }
-        return json({ path: active, docs: 'docs', docsPath: `${active}/docs`, projects: [] })
+        return json({ path: active, projectPath: active, hasProject: true, docs: 'docs', docsPath: `${active}/docs`, projects: [] })
       }
       if (url.pathname === '/api/project-icons/read') return json({ icons: {} })
       if (url.pathname === '/api/user-ui/root-projects') return json({ state: { paths: ['/alpha'], icons: {}, groups: [] } })
@@ -83,7 +90,7 @@ test('Mewcat tools use real App project switching, Documents tabs and reviewed w
     await page.route('**/mewcat/**', async route => route.fulfill({ contentType: 'image/png', body: await fs.readFile(`${root}/public${new URL(route.request().url()).pathname}`) }))
     await petFiles.route(page)
     await page.goto('http://helper-app.test/')
-    await page.waitForFunction(() => (globalThis as unknown as Fixture).assistant?.projectRoot === '/alpha')
+    await page.waitForFunction(() => (globalThis as unknown as Fixture).assistant?.projectRoot === '/alpha').catch(async error => { throw new Error(error.message + '\n' + JSON.stringify({ errors, consoleErrors, state: await page.evaluate('({assistant:window.assistant,text:document.body.innerText})') })) })
     const run = (action: MewcatAction) => page.evaluate(action => (globalThis as unknown as Fixture).assistant.onAction(action), action)
     await run({ kind: 'open_project', path: '/beta' })
     assert.equal(active, '/beta')
@@ -93,7 +100,7 @@ test('Mewcat tools use real App project switching, Documents tabs and reviewed w
     await run({ kind: 'open_panel', panel: 'documents' })
     assert.equal(await page.locator('[data-explorer-toggle]').getByRole('button', { name: '문서', exact: true }).getAttribute('aria-pressed'), 'true')
     await run({ kind: 'start_project_session', projectRoot: '/beta', runtime: 'codex', request: '메모 작성과 검색 기능을 만들어요.' })
-    const draft = await page.evaluate(() => { const fixture = globalThis as unknown as Fixture; return { tab: fixture.workTab, draft: JSON.parse(localStorage.getItem('mew:agent-input-drafts') ?? '{}')[fixture.workTab.id] } })
+    const draft = await page.evaluate(() => { const fixture = globalThis as unknown as Fixture; return { tab: fixture.workTab, draft: JSON.parse(localStorage.getItem('mew:agent-input-drafts') ?? '{}')['v2:' + JSON.stringify(['helper@test', '/beta', '/beta', fixture.workTab.id])] } })
     assert.equal(draft.tab.cwd, '/beta')
     assert.equal(draft.tab.runtime, 'codex')
     assert.equal(draft.draft, '메모 작성과 검색 기능을 만들어요.')

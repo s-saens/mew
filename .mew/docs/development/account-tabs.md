@@ -1,13 +1,15 @@
 ---
 title: "Real-time account tabs"
-description: "Defines authoritative account-and-project editor, agent, and terminal tabs across devices, single-use fresh editor-tab preparation during project switching, live presence signals, migration, concurrent saves, draft protection, and recovery. Separates shared tab metadata from account-wide desktop editor slots, preferred slot focus, and panel geometry on each browser device."
+description: "Defines authoritative account-and-project editor, agent, and terminal tabs across devices, single-use fresh editor-tab preparation during project switching, live presence signals, migration, concurrent saves, draft protection, and recovery. Separates shared tab metadata from single-project desktop slots and optional scoped multi-project views, preserving logical project identity across worktrees."
 created: "2026-11-04"
-updated: "2026-11-05"
+updated: "2026-11-07"
 ---
 
 Open editor, agent, and terminal tabs and active selection belong to the authenticated account and logical project on one Mew instance. Changes propagate through the existing presence connection. Different accounts and projects keep independent lists. Dock positions, panel sizes, visibility, mobile foreground, and popup geometry retain their [device-local ownership](ui-workspace-layout.md#workspace-panel-layout). See [ADR 0133](../decisions/0133-realtime-account-tabs.md).
 
-On desktop, that device's layout and last focused panel belong to the account across projects under [ADR 0134](../decisions/0134-account-desktop-layout.md). Selecting another project replaces its content inside the existing desktop arrangement. It does not reuse the outgoing project's open files, active document, agent tabs, or terminal tabs. Mobile retains project-specific layout and foreground restoration.
+In single-project desktop mode, that device's layout and last focused panel belong to the account across projects under [ADR 0134](../decisions/0134-account-desktop-layout.md). Selecting another project replaces its content inside the existing desktop arrangement. It does not reuse the outgoing project's open files, active document, agent tabs, or terminal tabs. Mobile retains project-specific layout and foreground restoration.
+
+Concurrent project views retain the same account/logical-project ledgers. Each view reads and writes through its fixed workspace client; its tab controller and draft/cache state do not follow another panel's focus. For a worktree, the request scope identifies the actual directory while the tab API's `workspace`/`workspacePath` identifies the logical project. The server rejects a contradictory ledger path. Mode-specific geometry and view IDs remain outside shared tab metadata. [Scoped workspace sessions](workspace-sessions.md) owns request encoding, events, and compatibility.
 
 ## Editor tabs
 

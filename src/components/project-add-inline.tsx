@@ -1,13 +1,14 @@
+import { useWorkspaceApi } from '../api/workspace-api-context'
 import { useEffect, useId, useRef, useState } from 'react'
 import { ArrowLeft, Check, Folder, FolderPlus, GitBranch, Link, Lock, NavArrowRight, Plus, RefreshDouble, Spark, Xmark } from 'iconoir-react'
 import { canAutoFocusInput, DialogFrame, HoverTipLayer, LoadingIndicator } from '@mew/ui'
-import { cloneManagedProject, fetchConnectedGitRepositories, registerProject, type RegisteredProject } from '../api/client'
+import { type fetchConnectedGitRepositories, type RegisteredProject } from '../api/client'
 import { GIT_CONNECTION_CHANGED } from '../api/git-auth-request'
 import { useI18n } from '../i18n'
 import { GitHubAccount } from './github-account'
 import { LinkProjectDialog } from './LinkProjectDialog'
 import { projectAddCopy } from './project-add-copy'
-import { ProjectCatalogPanel } from './project-catalog-panel'
+import { DeferredProjectCatalogPanel as ProjectCatalogPanel } from './deferred-project-catalog'
 
 type Mode = 'clone' | 'create' | 'workspace'
 const emptyPaths: string[] = []
@@ -31,6 +32,7 @@ export interface ProjectAddInlineProps {
 }
 
 export function ProjectAddInline({ basePath, paths = emptyPaths, onOpen, onProjectsChanged, onCreateWithAgent, canUseAgent = true, canManageFolders = true, beforeMutation, openRequested = false, onOpenRequestHandled, onboarding = false }: ProjectAddInlineProps) {
+  const { fetchConnectedGitRepositories, registerProject, cloneManagedProject } = useWorkspaceApi()
   const { t, locale } = useI18n()
   const copy = projectAddCopy(locale)
   const id = useId()
@@ -99,7 +101,7 @@ export function ProjectAddInline({ basePath, paths = emptyPaths, onOpen, onProje
       if (!controller.signal.aborted) setRepositoryError(err instanceof Error ? err.message : String(err))
     })
     return () => controller.abort()
-  }, [expanded, mode, reload])
+  }, [expanded, mode, reload, fetchConnectedGitRepositories])
   useEffect(() => {
     const changed = () => setReload(value => value + 1)
     window.addEventListener(GIT_CONNECTION_CHANGED, changed)

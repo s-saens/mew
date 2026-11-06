@@ -1,0 +1,12 @@
+/* A compact desktop project uses its own working area, while body portals keep viewport bounds. */
+[data-workspace-view] > .mew-workspace { padding: 0; }
+[data-workspace-presentation="compact"] .workspace-dock-layout {
+  grid-template: "content" minmax(0, 1fr) "dock" auto / minmax(0, 1fr);
+}
+[data-workspace-presentation="compact"] .workspace-dock-layout > .mew-project-sidebar-host { display: none; }
+[data-workspace-presentation="compact"] .workspace-dock-layout > .mew-workspace-content > .fixed { position: absolute; inset: 0; }
+[data-workspace-presentation="compact"] .mobile-dock[data-position]:not([hidden]) {
+  height: 44px; justify-content: space-around; gap: 0; padding: 1px 2px; overflow-x: auto; background: var(--color-surface);
+}
+[data-workspace-presentation="compact"] .mobile-dock button { flex: 0 0 32px; width: 32px; height: 40px; border-radius: 0; }
+[data-workspace-view] > .mew-workspace > [data-project-loading] { position: absolute; }

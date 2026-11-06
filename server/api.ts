@@ -8,7 +8,7 @@ import { createDomBrowserPortsRouter } from './dom-browser-ports.ts'
 import { domBrowserMewPorts, domBrowserBlockedPorts } from './dom-browser.ts'
 import { mergeTaskFrontmatter, TaskFrontmatterConflict } from '../packages/editor/src/utils/task-frontmatter-merge.ts'
 import { isTaskDocumentPath } from '../shared/task-document-paths.ts'
-import { runAccountWorkspace } from './account-workspace.ts'
+import { resolveWorkspaceScope, runRequestWorkspace, WorkspaceScopeError } from './workspace-scope.ts'
 import { recordChangeIp, requestIp } from './change-ip.ts'
 import { DocumentPages, DocumentPageError } from './document-pages.ts'
 import { saveDatabaseRowPage, remapDatabaseRowPages } from './db/rowPageIntegration.ts'
@@ -126,6 +126,7 @@ import { AgentDefaultError, readAgentDefault, writeAgentDefault } from './agentD
 import { AgentCwdError, resolveAgentCwd, suggestAgentCwds } from './agentCwd.ts'
 import { AgentScheduledPromptError, cancelAgentScheduledPrompt, listAgentScheduledPrompts, scheduleAgentPrompt, updateAgentScheduledPrompt } from './agentScheduledPrompts.ts'
 import { AgentTerminalError, startAgentTerminal, stopAgentTerminal } from './agentTerminal.ts'
+import { currentWorkspaceScope } from './workspace-scope.ts'
 import { AgentCommandStore } from './agent-commands.ts'
 import { createAgentCommandRouter } from './agent-command-routes.ts'
 import {
@@ -432,7 +433,13 @@ export function createApiApp() {
   const app = express()
   app.use('/remote-ui', createRemoteUiRouter())
   app.use('/mewpet/skins', createMewpetSkinsRouter())
-  app.use((req, _res, next) => runAccountWorkspace(authOf(req).email, next))
+  app.use((req, res, next) => {
+    try { runRequestWorkspace(req, authOf(req), next) }
+    catch (error) {
+      if (error instanceof WorkspaceScopeError) res.status(error.status).json({ error: error.message })
+      else next(error)
+    }
+  })
   app.use('/agent/drawings', createAgentDrawingsRouter())
   app.use(express.json({ limit: '10mb' }))
   app.use('/public-shares', createPublicSharesRouter())
@@ -751,6 +758,12 @@ export function createApiApp() {
   })
 
   // Account-local project switching; members select registered roots.
+  function selectRequestWorkspace(req: express.Request, target: string, initialProject?: string) {
+    return workspaceContext.getStore()?.explicit
+      ? workspaceContext.run(resolveWorkspaceScope(authOf(req), { workspacePath: target, projectPath: target }), currentWorkspace)
+      : switchWorkspace(target, initialProject)
+  }
+
   app.get('/workspace', requireAuthenticated, (req, res) => {
     try {
       res.json(withWorkspaceUiSnapshot(currentWorkspace(), authOf(req).email!, req.query.include))
@@ -774,9 +787,16 @@ export function createApiApp() {
         res.status(403).json({ error: '등록된 프로젝트만 열 수 있습니다' })
         return
       }
+      const scope = workspaceContext.getStore()
+      if (scope?.explicit) {
+        if (req.body?.worktree === true && req.body?.workspace !== scope.root) { res.status(409).json({ error: '프로젝트가 변경되었습니다. 다시 시도하세요.' }); return }
+        const destination = resolveWorkspaceScope(authOf(req), { workspacePath: resolved, projectPath: req.body?.worktree === true ? scope.projectPath ?? scope.root : resolved })
+        res.json(workspaceContext.run(destination, () => withWorkspaceUiSnapshot(currentWorkspace(), authOf(req).email!, req.query.include)))
+        return
+      }
       const info = req.body?.worktree === true
         ? await switchWorktree(resolveBrowsePath(target), req.body?.workspace)
-        : switchWorkspace(resolved)
+        : selectRequestWorkspace(req, resolved)
       res.json(info)
     } catch (err) {
       handleError(res, err)
@@ -978,7 +998,7 @@ export function createApiApp() {
       const abs = resolveExistingPath((req.body as { path?: unknown }).path)
       if (!fs.statSync(abs).isDirectory()) throw new BrowseError(`폴더가 아닙니다: ${abs}`)
       const registered = projectRegistry.link(authOf(req).email!, abs)
-      const info = switchWorkspace(registered.path, WORKSPACE_PROJECT)
+      const info = selectRequestWorkspace(req, registered.path, WORKSPACE_PROJECT)
       res.json({ ...info, project: WORKSPACE_PROJECT })
     } catch (err) {
       handleError(res, err)
@@ -1001,7 +1021,7 @@ export function createApiApp() {
       const directory = subprojectToOpen(projectOf(req), req.body?.path)
       if (!requireFileView(req, res, req.body.path)) return
       const registered = projectRegistry.link(authOf(req).email!, directory)
-      const info = switchWorkspace(registered.path, WORKSPACE_PROJECT)
+      const info = selectRequestWorkspace(req, registered.path, WORKSPACE_PROJECT)
       res.json(info)
     } catch (err) { handleError(res, err) }
   })
@@ -1135,7 +1155,7 @@ export function createApiApp() {
       }
       importDocs(resolveBrowsePath(from))
       // 폴더가 통째로 바뀌었다 — 옛 폴더를 물고 있는 감시자를 접고 모두에게 다시 받아 가라고 알린다
-      resetTreeWatchers()
+      resetTreeWatchers(workspacePaths.root)
       broadcast({ type: 'tree' })
       res.json({ ok: true })
     } catch (err) {
@@ -2412,7 +2432,8 @@ export function createApiApp() {
   app.post('/agent-runtimes/:id/terminal/:tab', requireFeature('terminal'), (req, res, next) => req.params.id === 'tmux' ? next() : requireFeature('agent')(req, res, next), async (req, res) => {
     try {
       const cwd = resolveAgentCwd(typeof req.body?.cwd === 'string' ? req.body.cwd : '', workspacePaths.root)
-      res.json({ ok: true, ...await startAgentTerminal(tmuxManager, String(req.params.id), String(req.params.tab), cwd) })
+      const scope = currentWorkspaceScope()
+      res.json({ ok: true, ...await startAgentTerminal(tmuxManager, String(req.params.id), String(req.params.tab), cwd, scope ? { ...scope, account: authOf(req).email! } : undefined, { allowLegacy: !workspaceContext.getStore()?.explicit }) })
     } catch (err) {
       handleError(res, err)
     }
@@ -2420,7 +2441,8 @@ export function createApiApp() {
 
   app.delete('/agent-runtimes/:id/terminal/:tab', requireFeature('terminal'), (req, res, next) => req.params.id === 'tmux' ? next() : requireFeature('agent')(req, res, next), async (req, res) => {
     try {
-      await stopAgentTerminal(tmuxManager, String(req.params.id), String(req.params.tab))
+      const scope = currentWorkspaceScope()
+      await stopAgentTerminal(tmuxManager, String(req.params.id), String(req.params.tab), scope ? { ...scope, account: authOf(req).email! } : undefined, { allowLegacy: !workspaceContext.getStore()?.explicit })
       res.json({ ok: true })
     } catch (err) {
       handleError(res, err)
@@ -2747,6 +2769,9 @@ export function createApiApp() {
   // tmux와 동일하게 owner/manager만. 명령 문자열은 언제나 서버가 파일에서 읽고(요청 본문의 명령은 신뢰하지
   // 않음), 실행은 특수 프리픽스 세션(탭에서 숨겨짐)에서 프로젝트 폴더를 cwd로 이뤄진다.
   app.use('/cmd-buttons', requireFeature('terminal'), (req, res, next) => {
+    if (workspaceContext.getStore()?.explicit && req.query.workspacePath !== undefined && req.body?.workspacePath !== undefined && req.query.workspacePath !== req.body.workspacePath) {
+      res.status(409).json({ error: '요청의 프로젝트 범위가 일치하지 않습니다.' }); return
+    }
     const requested = req.query.workspacePath !== undefined ? req.query.workspacePath : req.body?.workspacePath
     if (requested === undefined) { next(); return }
     const auth = authOf(req)
@@ -2758,6 +2783,10 @@ export function createApiApp() {
       const root = fs.realpathSync(requested)
       assertNotServerDataPath(root)
       if (!fs.statSync(root).isDirectory()) throw new UnsafePathError('프로젝트 폴더가 필요합니다')
+      if (workspaceContext.getStore()?.explicit) {
+        if (root !== workspacePaths.root) { res.status(409).json({ error: '요청의 프로젝트 범위가 일치하지 않습니다.' }); return }
+        next(); return
+      }
       workspaceContext.run(pathsForWorkspace(root, auth.email), next)
     } catch (err) {
       if (err instanceof UnsafePathError) handleError(res, err)
@@ -2865,7 +2894,7 @@ export function createApiApp() {
       // 살아 있는 감시자는 옛 규칙으로 만든 트리 서명을 들고 있어 새 규칙을 "변화 없음"으로 흘려버린다.
       // 접어두고 tree 신호를 보내면, 클라이언트가 새로 받아 갈 때 새 규칙으로 다시 등록된다.
       resetTreeWatchers()
-      broadcast({ type: 'tree' })
+      broadcast({ type: 'tree' }, { global: true })
       res.json({ names, defaults: DEFAULT_IGNORE, locked: LOCKED_IGNORE })
     } catch (err) {
       if (err instanceof IgnoreListError) {
@@ -2883,6 +2912,7 @@ export function createApiApp() {
 }
 
 function handleError(res: express.Response, err: unknown) {
+  if (err instanceof WorkspaceScopeError) { res.status(err.status).json({ error: err.message }); return }
   if (err instanceof ProjectRegistryError) { res.status(err.status).json({ error: err.message }); return }
   if (err instanceof ThemeSettingsError) { res.status(400).json({ error: err.message }); return }
   if (err instanceof RowPageError) { res.status(err.status).json({ error: err.message }); return }

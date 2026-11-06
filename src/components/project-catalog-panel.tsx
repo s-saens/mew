@@ -1,7 +1,8 @@
+import { useWorkspaceApi } from '../api/workspace-api-context'
 import { useEffect, useRef, useState } from 'react'
 import { Check, Plus, RefreshDouble, Search } from 'iconoir-react'
 import { HoverTipLayer, LoadingIndicator } from '@mew/ui'
-import { addMyProject, fetchProjectRegistry, type RegisteredProject } from '../api/client'
+import { type RegisteredProject } from '../api/client'
 import { useI18n } from '../i18n'
 import { projectHierarchy } from '../utils/project-hierarchy'
 import { ProjectIcon } from './ProjectIcon'
@@ -14,6 +15,7 @@ export function ProjectCatalogPanel({ paths, onOpen, onProjectsChanged, beforeMu
   beforeMutation?: () => Promise<unknown>
   onBusyChange?: (busy: boolean) => void
 }) {
+  const { fetchProjectRegistry, addMyProject } = useWorkspaceApi()
   const { t, locale } = useI18n()
   const [projects, setProjects] = useState<RegisteredProject[] | null>(null)
   const [search, setSearch] = useState('')
@@ -35,7 +37,7 @@ export function ProjectCatalogPanel({ paths, onOpen, onProjectsChanged, beforeMu
       if (!controller.signal.aborted) setError(err instanceof Error ? err.message : String(err))
     }).finally(() => { if (!controller.signal.aborted) setLoading(false) })
     return () => controller.abort()
-  }, [reload, pathsKey])
+  }, [reload, pathsKey, fetchProjectRegistry])
 
   async function importProject(project: RegisteredProject) {
     if (pending.current) return

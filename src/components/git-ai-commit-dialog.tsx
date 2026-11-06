@@ -1,9 +1,10 @@
+import { useWorkspaceApi } from '../api/workspace-api-context'
 import { uiText, getUiLocale } from '@mew/ui/i18n-core'
 import { useUiLocale } from '@mew/ui/i18n'
 import { useEffect, useRef, useState } from 'react'
 import { DialogFrame } from '@mew/ui'
 import { AgentSetPicker } from './AgentSetPicker'
-import { fetchGitAiCommit, fetchWorkspace, startGitAiCommit, stopGitAiCommit, type AgentSet } from '../api/client'
+import { type AgentSet } from '../api/client'
 import { gitAiCommitActive, type GitAiCommitJob } from '../../shared/git-ai-commit'
 import { uuid } from '../utils/uuid'
 
@@ -13,6 +14,7 @@ export function GitAiCommitDialog({ project, files, onFinished, onClose }: {
   onFinished: () => void
   onClose: () => void
 }) {
+  const { fetchWorkspace, fetchGitAiCommit, startGitAiCommit, stopGitAiCommit } = useWorkspaceApi()
   useUiLocale()
   const [workspace, setWorkspace] = useState<string | null>(null)
   const [job, setJob] = useState<GitAiCommitJob | null>(null)
@@ -50,7 +52,7 @@ export function GitAiCommitDialog({ project, files, onFinished, onClose }: {
     }).catch(err => { if (!disposed) setError(err instanceof Error ? err.message : String(err)) })
       .finally(() => { if (!disposed) setLoading(false) })
     return () => { disposed = true }
-  }, [project, reload])
+  }, [project, reload, fetchWorkspace, fetchGitAiCommit])
   useEffect(() => {
     if (!active || !workspace) return
     let disposed = false
@@ -64,7 +66,7 @@ export function GitAiCommitDialog({ project, files, onFinished, onClose }: {
     }
     timer = setTimeout(poll, 500)
     return () => { disposed = true; clearTimeout(timer) }
-  }, [active, project, workspace])
+  }, [active, project, workspace, fetchGitAiCommit])
   const choose = (set: AgentSet) => { setSelected(set); setChoosing(false); retryId.current = null }
   const generate = async () => {
     if (!workspace || !selected || busy || active) return

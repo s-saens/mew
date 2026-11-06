@@ -1,8 +1,9 @@
+import { useWorkspaceApi } from '../api/workspace-api-context'
 import { canAutoFocusInput, getFixedPopupLayout, LoadingIndicator, useOverlayDismiss } from '@mew/ui'
 import { ArrowRight, Folder, HomeSimple } from 'iconoir-react'
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { createPortal } from 'react-dom'
-import { fetchAgentCwdSuggestions, type ExternalEntriesResult } from '../api/client'
+import { type ExternalEntriesResult } from '../api/client'
 import { useI18n } from '../i18n'
 import { currentFolderPathSuggestions, resolveFileBrowserDraft, type FileBrowserPathSuggestion } from './file-browser-path-suggestions'
 
@@ -15,6 +16,7 @@ export function FileBrowserPath({ draft, result, disabled, autoFocus, label, onD
   onDraftChange: (value: string) => void
   onNavigate: (value: string) => void
 }) {
+  const { fetchAgentCwdSuggestions } = useWorkspaceApi()
   const { t } = useI18n()
   const id = useId()
   const form = useRef<HTMLFormElement>(null)
@@ -53,7 +55,7 @@ export function FileBrowserPath({ draft, result, disabled, autoFocus, label, onD
         if (!cancelled && request === sequence.current) setRemote({ key, dirs: [], error: reason instanceof Error ? reason.message : String(reason) })
       })
     return () => { cancelled = true }
-  }, [expanded, local, draft, base, key])
+  }, [expanded, local, draft, base, key, fetchAgentCwdSuggestions])
 
   useLayoutEffect(() => {
     if (!expanded) return

@@ -2,7 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { isDbConfigured, exec } from './pool.ts'
 import { getView } from './databaseService.ts'
-import { projectRoot, resolveProjectPath } from '../paths.ts'
+import { projectRoot, resolveProjectPath, workspaceContext } from '../paths.ts'
 import { withRowPageDraft, withDeferredRowPageMoves, RowPageError, hasDatabasePageBinding } from './rowPages.ts'
 import type { DocumentPageMove } from '../../shared/document-pages.ts'
 import { remapPagePath } from '../../shared/document-pages.ts'
@@ -35,7 +35,9 @@ export async function saveDatabaseRowPage(project: string, relative: string, con
   let previous = ''
   const file = resolveProjectPath(project, relative)
   try { previous = fs.readFileSync(file, 'utf8') } catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error }
-  if (![content, expected ?? '', previous].some(hasDatabasePageBinding) && !/[0-9a-f-]{36}\.md$/i.test(relative)) return null
+  const bound = [content, expected ?? '', previous].some(hasDatabasePageBinding)
+  if (workspaceContext.getStore()?.explicit && bound) throw new RowPageError('멀티프로젝트모드에서는 연결된 데이터베이스 페이지를 저장할 수 없습니다. 싱글프로젝트모드에서 다시 여세요.', 503)
+  if (!bound && !/[0-9a-f-]{36}\.md$/i.test(relative)) return null
   relative = canonicalPath(project, relative)
   const id = await boundDatabase(project, relative)
   if (!id) return null

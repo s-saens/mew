@@ -7,7 +7,7 @@ const focusable = 'button:not(:disabled), input:not(:disabled), textarea:not(:di
 const frames: HTMLElement[] = []
 
 /** Shared app-owned modal: portal, focus containment/restoration and overlay-stack dismissal. */
-export function DialogFrame({ children, labelledBy, describedBy, onClose, className = 'max-w-md max-h-[90dvh] overflow-y-auto', busy = false, closeOnEscape, size = 'default' }: {
+export function DialogFrame({ children, labelledBy, describedBy, onClose, className = 'max-w-md max-h-[90dvh] overflow-y-auto', busy = false, closeOnEscape, size = 'default', overlayClassName = '', restoreFocus }: {
   children: ReactNode
   labelledBy: string
   describedBy?: string
@@ -16,8 +16,12 @@ export function DialogFrame({ children, labelledBy, describedBy, onClose, classN
   busy?: boolean
   closeOnEscape?: (event: KeyboardEvent) => boolean
   size?: 'default' | 'settings'
+  overlayClassName?: string
+  restoreFocus?: () => HTMLElement | null
 }) {
   const ref = useRef<HTMLDivElement>(null)
+  const restoreFocusRef = useRef(restoreFocus)
+  restoreFocusRef.current = restoreFocus
   useOverlayDismiss(() => { if (!busy) onClose() }, { closeOnEscape })
 
   useEffect(() => {
@@ -37,12 +41,13 @@ export function DialogFrame({ children, labelledBy, describedBy, onClose, classN
     return () => {
       document.removeEventListener('focusin', containFocus)
       frames.splice(frames.indexOf(element), 1)
-      if (previous?.isConnected) previous.focus()
+      const target = restoreFocusRef.current ? restoreFocusRef.current() : previous
+      if (target?.isConnected) target.focus()
     }
   }, [])
 
   return createPortal(
-    <div className="mew-dialog-overlay fixed inset-0 z-[1200] flex flex-col items-center justify-center bg-black/50" data-size={size} onPointerDown={(event) => {
+    <div className={`mew-dialog-overlay fixed inset-0 z-[1200] flex flex-col items-center justify-center bg-black/50 ${overlayClassName}`} data-size={size} onPointerDown={(event) => {
       event.stopPropagation()
       if (event.target === event.currentTarget && !busy) onClose()
     }} onMouseDown={(event) => event.stopPropagation()} onClick={(event) => event.stopPropagation()}>

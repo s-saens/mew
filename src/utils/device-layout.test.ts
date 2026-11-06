@@ -60,3 +60,19 @@ test('accepted account geometry survives blocked storage and empty initial layou
   session.save('/second', { dock: { ratio: .2 }, chrome: { tasksOpen: true } }, true)
   assert.deepEqual(session.restore('/third', { dock: { ratio: .9 } }, true), { dock: { ratio: .2 }, chrome: { tasksOpen: true } })
 })
+
+test('compact project panels retain their own geometry without overwriting single-project desktop or mobile layouts', async () => {
+  const { createDeviceLayoutSession } = await import('./device-layout.ts')
+  attachStorage()
+  saveDeviceLayout('a', '/first', { dock: { desktop: true }, chrome: { sidebarOpen: true } })
+  saveDeviceLayout('a', '/first', { dock: { mobile: true } }, false)
+  const compact = createDeviceLayoutSession('a', 'project-panel')
+  const account = { dock: { server: true }, chrome: { agentOpen: true }, tabs: { shared: true } }
+  assert.deepEqual(compact.restore('/first', account, false), { ...account, dock: null, chrome: null })
+  compact.save('/first', { ...account, dock: { compact: true }, chrome: { gitOpen: true } }, false)
+  assert.deepEqual(createDeviceLayoutSession('a', 'project-panel').restore('/first', account, true), { ...account, dock: { compact: true }, chrome: { gitOpen: true } })
+  assert.deepEqual(compact.restore('/second', account, false), { ...account, dock: null, chrome: null })
+  assert.deepEqual(createDeviceLayoutSession('b', 'project-panel').restore('/first', account, false), { ...account, dock: null, chrome: null })
+  assert.deepEqual(restoreDeviceLayout('a', '/first', {}).dock, { desktop: true })
+  assert.deepEqual(restoreDeviceLayout('a', '/first', {}, false).dock, { mobile: true })
+})

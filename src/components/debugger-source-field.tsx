@@ -1,10 +1,12 @@
+import { useWorkspaceApi } from '../api/workspace-api-context'
 import { useEffect, useState } from 'react'
 import { SelectField } from '@mew/ui'
-import { searchFileNames } from '../api/client'
+
 import { WORKSPACE_PROJECT } from '../utils/active-project'
 import { useI18n } from '../i18n'
 
 export function DebuggerSourceField({ root, value, onChange, label }: { root: string; value: string; onChange: (path: string) => void; label: string }) {
+  const { searchFileNames } = useWorkspaceApi()
   const { t } = useI18n()
   const query = value.trim().replace(/^@/, '')
   const [result, setResult] = useState<{ query: string; root: string; paths: string[]; error?: string } | null>(null)
@@ -19,7 +21,7 @@ export function DebuggerSourceField({ root, value, onChange, label }: { root: st
       })
     }, 180)
     return () => { clearTimeout(timer); controller.abort() }
-  }, [query, root])
+  }, [query, root, searchFileNames])
   const current = result?.query === query && result.root === root ? result : null
   const options = current?.paths.length
     ? current.paths.map(path => ({ value: path, label: path }))

@@ -1,3 +1,4 @@
+import { useWorkspaceApi } from '../api/workspace-api-context'
 // 서버가 도는 기계의 CPU·메모리·GPU 사용량과 온도, 그리고 프로세스별 점유를 보는 팝업 —
 // 도구 줄의 계기판 아이콘으로 연다. 2초마다 다시 읽는다(CPU 사용률은 서버가 이 호출 간격을
 // 구간으로 삼아 계산한다). 추이 그래프는 팝업이 열려 있는 동안 클라이언트가 모은 표본만 쓴다 —
@@ -6,7 +7,7 @@ import { NetworkUsagePanel } from './network-usage-panel'
 import { useEffect, useMemo, useState } from 'react'
 import { Xmark } from 'iconoir-react'
 import { useOverlayDismiss } from '@mew/ui'
-import { fetchSystemStats, type ProcStat, type SystemStats } from '../api/client'
+import { type ProcStat, type SystemStats } from '../api/client'
 import { useI18n } from '../i18n'
 
 const POLL_MS = 2000
@@ -229,6 +230,7 @@ function ProcessDetailModal({
 }
 
 export function SystemStatsModal({ onClose }: { onClose: () => void }) {
+  const { fetchSystemStats } = useWorkspaceApi()
   const { t } = useI18n()
   const [history, setHistory] = useState<Sample[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -259,7 +261,7 @@ export function SystemStatsModal({ onClose }: { onClose: () => void }) {
       cancelled = true
       clearInterval(timer)
     }
-  }, [t])
+  }, [t, fetchSystemStats])
 
   useOverlayDismiss(onClose)
 

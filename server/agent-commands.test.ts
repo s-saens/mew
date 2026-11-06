@@ -14,6 +14,8 @@ import { createTmuxManager } from '@mew/tmux-term/server'
 import { AgentCommandStore, publicCommand } from './agent-commands.ts'
 import { createAgentCommandRouter } from './agent-command-routes.ts'
 import { setFeature } from './access-policy.ts'
+import { pathsForWorkspace, workspaceContext } from './paths.ts'
+import { currentWorkspaceScope } from './workspace-scope.ts'
 
 const exec = promisify(execFile)
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'mew-cli-test-'))
@@ -65,6 +67,54 @@ test('queued cancellation survives reload and retries without launching or becom
   assert.equal(publicCommand({ ...legacy, archived: true }).cancelledBeforeStart, undefined)
   assert.equal(publicCommand({ ...legacy, error: 'host exited' }).cancelledBeforeStart, undefined)
   assert.equal(publicCommand({ ...legacy, startedAt: legacy.startedAt - 1 }).cancelledBeforeStart, undefined)
+})
+
+test('explicit command records isolate same-tab close and history even when conversations share a cwd', async () => {
+  const a = { workspacePath: path.join(temp, 'a'), projectPath: path.join(temp, 'project') }
+  const b = { ...a, workspacePath: path.join(temp, 'worktree') }
+  for (const directory of [a.workspacePath, b.workspacePath, a.projectPath]) fs.mkdirSync(directory)
+  const singleScope = workspaceContext.run({ ...pathsForWorkspace(a.workspacePath, owner), projectPath: a.projectPath }, currentWorkspaceScope)!
+  assert.deepEqual(singleScope, a)
+  const records = [store.prepare(owner, { ...input(), tab: 'same-tab', workspaceScope: singleScope }),
+    store.prepare(owner, { ...input(), tab: 'same-tab', workspaceScope: b }),
+    store.prepare(owner, { ...input(), tab: 'same-tab' })]
+  assert.equal('workspaceScope' in records[0], false, 'workspace ownership is private metadata')
+  assert.deepEqual((await store.list(owner, scope, a)).map(record => record.id), [records[0].id])
+  assert.deepEqual((await store.list(owner, scope, b)).map(record => record.id), [records[1].id])
+  assert.ok(!(await store.list(owner, scope, null)).some(record => records.slice(0, 2).some(scoped => scoped.id === record.id)))
+  assert.throws(() => store.read(owner, records[1].id, a), /찾을 수 없습니다/)
+  assert.throws(() => store.prepare(owner, { ...store.read(owner, records[0].id), workspaceScope: b }), /이미 다른 명령/)
+  await store.stopTab(owner, 'same-tab', a)
+  assert.equal(store.read(owner, records[0].id).state, 'interrupted')
+  assert.equal(store.read(owner, records[1].id).state, 'queued')
+  assert.equal(store.read(owner, records[2].id).state, 'queued')
+
+  const app = express()
+  app.use((req, _res, next) => {
+    req.auth = { role: 'owner', email: owner, mustChangePassword: false }
+    const root = String(req.headers['x-fixture-root'] ?? a.workspacePath)
+    workspaceContext.run({ ...pathsForWorkspace(root, owner), projectPath: a.projectPath, explicit: req.headers['x-fixture-mode'] !== 'single' }, next)
+  })
+  app.use('/commands', createAgentCommandRouter(store))
+  const server = app.listen(0, '127.0.0.1')
+  await once(server, 'listening')
+  const address = server.address(); assert.ok(address && typeof address !== 'string')
+  const base = `http://127.0.0.1:${address.port}/commands`
+  try {
+    assert.deepEqual(((await (await fetch(base + '?' + new URLSearchParams(scope))).json()) as { commands: { id: string }[] }).commands.map(record => record.id), [records[0].id])
+    const singleRecords = ((await (await fetch(base + '?' + new URLSearchParams(scope), { headers: { 'x-fixture-mode': 'single' } })).json()) as { commands: { id: string }[] }).commands.map(record => record.id)
+    assert.ok(singleRecords.includes(records[0].id), 'new single-project commands retain the same qualified identity in both modes')
+    assert.ok(singleRecords.includes(records[2].id), 'single mode additionally retains access to old unmarked records')
+    assert.ok(!singleRecords.includes(records[1].id), 'single mode does not absorb another root qualified records')
+    assert.equal((await fetch(`${base}/${records[1].id}/stop`, { method: 'POST' })).status, 400)
+    assert.equal((await fetch(`${base}/${records[1].id}/output`)).status, 400)
+    assert.equal((await fetch(`${base}/${records[1].id}/archive`)).status, 400)
+    assert.equal((await fetch(`${base}/stop-tab/same-tab`, { method: 'POST' })).status, 200)
+    assert.equal(store.read(owner, records[1].id).state, 'queued')
+    assert.equal((await fetch(`${base}/stop-tab/same-tab`, { method: 'POST', headers: { 'x-fixture-root': b.workspacePath } })).status, 200)
+    assert.equal(store.read(owner, records[1].id).state, 'interrupted')
+    assert.equal(store.read(owner, records[2].id).state, 'queued')
+  } finally { server.closeAllConnections(); server.close() }
 })
 
 test('HTTP requires both agent and terminal features and cannot read another account archive', async () => {

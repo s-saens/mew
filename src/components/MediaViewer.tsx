@@ -1,5 +1,6 @@
+import { useWorkspaceApi } from '../api/workspace-api-context'
 import { lazy, Suspense } from 'react'
-import { downloadUrl, externalDownloadUrl, externalRawUrl, rawUrl } from '../api/client'
+
 import { SheetViewer } from './SheetViewer'
 import { DownloadLink } from './DownloadLink'
 import type { MediaKind } from '../utils/media'
@@ -10,6 +11,7 @@ const PdfViewer = lazy(() => import('./pdf-viewer'))
 
 /** 바이너리 미디어 탭 본문 — 내용은 /api/raw에서 브라우저가 직접 스트리밍한다 */
 export function MediaViewer({ path, kind, project, identity = 'guest', onEdit }: { path: string; kind: MediaKind; project?: string; identity?: string; onEdit?: () => void }) {
+  const { externalRawUrl, rawUrl, externalDownloadUrl, downloadUrl } = useWorkspaceApi()
   const { t } = useI18n()
   const external = isExternalTabPath(path)
   const absolute = externalAbsolutePath(path)

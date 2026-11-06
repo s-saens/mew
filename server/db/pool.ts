@@ -2,6 +2,7 @@
 // DATABASE_URL이 없으면 명확한 에러를 던져 "docker/env 설정을 하라"고 안내한다.
 import pgpkg from 'pg'
 import type { Pool, PoolClient, QueryResult, QueryResultRow } from 'pg'
+import { workspaceContext } from '../paths.ts'
 
 const { Pool: PgPool } = pgpkg
 
@@ -19,10 +20,11 @@ export type Exec = <T extends QueryResultRow = Record<string, unknown>>(
 let pool: Pool | null = null
 
 export function isDbConfigured(): boolean {
-  return typeof process.env.DATABASE_URL === 'string' && process.env.DATABASE_URL.length > 0
+  return !workspaceContext.getStore()?.explicit && typeof process.env.DATABASE_URL === 'string' && process.env.DATABASE_URL.length > 0
 }
 
 export function getPool(): Pool {
+  if (workspaceContext.getStore()?.explicit) throw new DbNotConfiguredError('멀티프로젝트모드의 데이터베이스 지원은 아직 준비되지 않았습니다.')
   if (!isDbConfigured()) {
     throw new DbNotConfiguredError(
       'DATABASE_URL이 설정되지 않았습니다 — `npm run db:up`으로 Postgres 컨테이너를 띄우고 mew/.env를 확인하세요 (.env.example 참고).',

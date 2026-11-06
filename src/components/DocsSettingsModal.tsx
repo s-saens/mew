@@ -1,14 +1,16 @@
+import { useWorkspaceApi } from '../api/workspace-api-context'
 // docs 탭을 우클릭(모바일에선 꾹)하면 뜨는 창 — 어느 폴더를 docs로 쓸지 고르기, 폴더 통째로
 // 가져오기/내보내기. docs는 프로젝트가 아니라 워크스페이스에 하나뿐인 특별 레포라(paths.ts)
 // 이름 바꾸기·삭제가 없다 — 대신 워크스페이스 안의 폴더 아무거나 docs로 지정할 수 있다.
 import { useEffect, useState } from 'react'
 import { DocsAgentContext } from './docs-agent-context'
 import { ConfirmDialog, useOverlayDismiss } from '@mew/ui'
-import { exportDocs, fetchWorkspace, importDocs, setDocsRoot, type WorkspaceInfo } from '../api/client'
+import { type WorkspaceInfo } from '../api/client'
 import { FolderPicker } from './FolderPicker'
 import { useI18n } from '../i18n'
 
 export function DocsSettingsModal({ onDone, onClose }: { onDone: (message: string) => void; onClose: () => void }) {
+  const { fetchWorkspace, importDocs, setDocsRoot, exportDocs } = useWorkspaceApi()
   const { t } = useI18n()
   const [agentContext, setAgentContext] = useState(false)
   const [picking, setPicking] = useState<'root' | 'import' | 'export' | null>(null)
@@ -24,7 +26,7 @@ export function DocsSettingsModal({ onDone, onClose }: { onDone: (message: strin
     fetchWorkspace()
       .then(setWorkspace)
       .catch(() => setWorkspace(null))
-  }, [])
+  }, [fetchWorkspace])
 
   async function run(action: () => Promise<string>) {
     setBusy(true)

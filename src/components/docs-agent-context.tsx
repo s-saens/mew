@@ -1,6 +1,7 @@
+import { useWorkspaceApi } from '../api/workspace-api-context.tsx'
 import { useEffect, useId, useState } from 'react'
 import { DialogFrame } from '@mew/ui'
-import { fetchProjectSetup, previewProjectSetup, saveProjectSetup } from '../api/project-setup'
+
 import { useI18n } from '../i18n'
 import type { ProjectSetupInput, ProjectSetupPlan } from '../../shared/project-agent-context'
 
@@ -8,6 +9,7 @@ const inputClass = 'mt-1 w-full rounded-md border border-edge-bright bg-surface 
 const buttonClass = 'min-h-10 rounded-md border border-edge-bright px-3 py-2 text-sm text-ink hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-50'
 
 export function DocsAgentContext({ onClose, onDone }: { onClose: () => void; onDone: (message: string) => void }) {
+  const { fetchProjectSetup, previewProjectSetup, saveProjectSetup } = useWorkspaceApi()
   const { t } = useI18n()
   const titleId = useId()
   const [input, setInput] = useState<ProjectSetupInput | null>(null)
@@ -23,7 +25,7 @@ export function DocsAgentContext({ onClose, onDone }: { onClose: () => void; onD
       if (active) { setInput(value); setEntries(value.settings.entrypoints.join('\n')); setError('') }
     }).catch(reason => { if (active) setError(String(reason.message ?? reason)) })
     return () => { active = false }
-  }, [reload])
+  }, [reload, fetchProjectSetup])
 
   function change(next: ProjectSetupInput) { setInput(next); setPlan(null); setError('') }
   async function submit(apply: boolean) {

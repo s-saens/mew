@@ -1,14 +1,16 @@
+import { useWorkspaceApi } from '../api/workspace-api-context'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { DialogFrame } from '@mew/ui'
 import { uiText } from '@mew/ui/i18n-core'
 import { useUiLocale } from '@mew/ui/i18n'
-import { fetchDocumentGraph } from '../api/client'
+
 import { DocumentGraphCanvas } from '../utils/document-graph-canvas'
 import type { DocumentGraphData } from '../../shared/document-graph'
 
 const buttonClass = 'flex h-8 shrink-0 items-center justify-center rounded px-2 text-sm text-ink-secondary hover:bg-surface-hover hover:text-ink focus-visible:outline-2 focus-visible:outline-accent'
 
 export function DocumentGraph({ onClose, onOpen, revision }: { onClose: () => void; onOpen: (path: string) => void; revision: number }) {
+  const { fetchDocumentGraph } = useWorkspaceApi()
   useUiLocale()
   const [graph, setGraph] = useState<DocumentGraphData | null>(null)
   const [error, setError] = useState('')
@@ -36,7 +38,7 @@ export function DocumentGraph({ onClose, onOpen, revision }: { onClose: () => vo
     if (revision > 0) timer = setTimeout(load, 180)
     else load()
     return () => { controller.abort(); clearTimeout(timer); window.removeEventListener('mew:permissions-changed', permissions) }
-  }, [revision, reload])
+  }, [revision, reload, fetchDocumentGraph])
 
   useEffect(() => {
     if (!graph || !canvas.current || !graph.nodes.length) return

@@ -1,8 +1,8 @@
 /** Resolve a portalled body to its own tab bar, never another split of the same kind. */
-export function numberedTabPanel(surface: HTMLElement): HTMLElement | undefined {
+export function numberedTabPanel(surface: HTMLElement, scope: ParentNode = surface.closest('[data-project-panel]') ?? surface.ownerDocument): HTMLElement | undefined {
   const group = surface.dataset.dockBody
   return group
-    ? Array.from(document.querySelectorAll<HTMLElement>('[data-dock-panel]')).find(element => element.dataset.dockPanel === group)
+    ? Array.from(scope.querySelectorAll<HTMLElement>('[data-dock-panel]')).find(element => element.dataset.dockPanel === group)
     : surface
 }
 

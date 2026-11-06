@@ -1,10 +1,12 @@
+import { useWorkspaceApi } from '../api/workspace-api-context'
 import { useEffect } from 'react'
-import { fetchChat } from '../api/client'
+
 import { createChatNoticeTracker } from '../utils/chat-notification-rules'
 import { publishMewcatNotice } from '../utils/mewcat-notifications'
 
 /** Keep receiving member chat notices while the chat panel is closed. */
 export function useChatNotifications(enabled: boolean, identity: string | null) {
+  const { fetchChat } = useWorkspaceApi()
   useEffect(() => {
     if (!enabled || !identity) return
     const track = createChatNoticeTracker(identity)
@@ -41,5 +43,5 @@ export function useChatNotifications(enabled: boolean, identity: string | null) 
       window.removeEventListener('mew:remote-reconnected', refresh)
       document.removeEventListener('visibilitychange', onVisible)
     }
-  }, [enabled, identity])
+  }, [enabled, identity, fetchChat])
 }

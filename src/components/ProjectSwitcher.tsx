@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useEffectEvent, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { EditPencil, Folder, Plus, Trash, Xmark } from 'iconoir-react'
 import { ActionMenu, ActionMenuItem, ActionMenuSeparator, DialogFrame, MenuReorderHandle, useDragReorder } from '@mew/ui'
@@ -7,13 +7,14 @@ import { useI18n } from '../i18n'
 import { ProjectIcon } from './ProjectIcon'
 import { CommandButtonMenu } from './CommandButtonMenu'
 import { PanelCloseButton } from './panel-close-button'
-import { ProjectCatalogPanel } from './project-catalog-panel'
+import { DeferredProjectCatalogPanel as ProjectCatalogPanel } from './deferred-project-catalog'
 import { projectPanelCopy } from './project-panel-copy'
 import { projectDeleteCopy } from './project-delete-copy'
 import { ProjectDeleteDialog } from './project-delete-dialog'
 import { ScopeToggle } from './scope-toggle'
 import { WORKSPACE_PROJECT } from '../utils/active-project'
 import { projectHierarchy, type ProjectHierarchyRow } from '../utils/project-hierarchy'
+import { useWorkspaceDesktop, useWorkspaceView } from '../workspace/workspace-view-context'
 
 const IconPicker = lazy(() => import('./IconPicker').then(module => ({ default: module.IconPicker })))
 
@@ -23,7 +24,7 @@ function labelOf(projectPath: string): string {
 }
 
 export function ProjectSwitcher({ paths, activePath, pendingPath, fallbackLabel, canOpen, canChangeIcon, canDelete = false, icons, onActivate, onIconChange, onOpen, onPreview, onRemove, onDelete, onReorder,
-  sidebarHost, sidebarEnabled = false, sidebarOpen = false, onSidebarOpenChange, sidebarWidth = 240, onSidebarResize, onSidebarWidthChange, canUseCommands = false, activeWorkingPath, projectAdd, openRequested = false, onOpenCatalogProject, beforeProjectMutation }: {
+  sidebarHost, sidebarEnabled: sidebarRequested = false, sidebarOpen = false, onSidebarOpenChange, sidebarWidth = 240, onSidebarResize, onSidebarWidthChange, canUseCommands = false, activeWorkingPath, projectAdd, openRequested = false, selectionSignal, onOpenCatalogProject, beforeProjectMutation }: {
   paths: string[]
   activePath: string | null
   pendingPath?: string | null
@@ -50,9 +51,14 @@ export function ProjectSwitcher({ paths, activePath, pendingPath, fallbackLabel,
   activeWorkingPath?: string | null
   projectAdd?: React.ReactNode
   openRequested?: boolean
+  selectionSignal?: number
   onOpenCatalogProject?: (path: string) => Promise<boolean | void> | boolean | void
   beforeProjectMutation?: () => Promise<unknown>
 }) {
+  const view = useWorkspaceView()
+  const mobile = !useWorkspaceDesktop()
+  const active = view?.active ?? true
+  const sidebarEnabled = !view?.compact && sidebarRequested
   const { t, locale } = useI18n()
   const copy = projectPanelCopy(locale)
   const deleteCopy = projectDeleteCopy(locale)
@@ -63,7 +69,7 @@ export function ProjectSwitcher({ paths, activePath, pendingPath, fallbackLabel,
   const sidebarList = useRef<HTMLDivElement>(null)
   const contextMenuElement = useRef<HTMLDivElement>(null)
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
-  const [mobile, setMobile] = useState(() => window.matchMedia('(width < 768px)').matches)
+  const lastSelectionSignal = useRef(0)
   const [contextMenu, setContextMenu] = useState<{ path: string; x: number; y: number; trigger: HTMLElement | null; container: HTMLElement | null } | null>(null)
   const [editingPath, setEditingPath] = useState<string | null>(null)
   const [deleteChoices, setDeleteChoices] = useState(false)
@@ -82,13 +88,6 @@ export function ProjectSwitcher({ paths, activePath, pendingPath, fallbackLabel,
     for (const path of paths) counts.set(labelOf(path), (counts.get(labelOf(path)) ?? 0) + 1)
     return counts
   }, [paths])
-
-  useEffect(() => {
-    const query = window.matchMedia('(width < 768px)')
-    const update = () => setMobile(query.matches)
-    query.addEventListener('change', update)
-    return () => query.removeEventListener('change', update)
-  }, [])
 
   function closeMenu() {
     if (catalogBusy) return
@@ -135,6 +134,7 @@ export function ProjectSwitcher({ paths, activePath, pendingPath, fallbackLabel,
   }
 
   useEffect(() => {
+    if (!active) return
     const select = (event: KeyboardEvent) => {
       if (event.defaultPrevented || !canOpen) return
       const chooseMenu = event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey && !event.isComposing
@@ -165,26 +165,33 @@ export function ProjectSwitcher({ paths, activePath, pendingPath, fallbackLabel,
     }
     window.addEventListener('keydown', select, true)
     return () => window.removeEventListener('keydown', select, true)
-  }, [rows, selectionPath, canOpen, onActivate, sidebarEnabled, sidebarOpen, onSidebarOpenChange, mobile, catalogBusy])
+  }, [rows, selectionPath, canOpen, onActivate, sidebarEnabled, sidebarOpen, onSidebarOpenChange, mobile, catalogBusy, active])
 
   useLayoutEffect(() => {
-    if (showingSidebar) focusList(sidebarList.current)
-  }, [showingSidebar, sidebarHost])
+    if (active && showingSidebar) focusList(sidebarList.current)
+  }, [showingSidebar, sidebarHost, active])
 
   useEffect(() => {
-    if (mobile && menu) focusList(menuElement.current)
-  }, [mobile, menu])
+    if (active && mobile && menu) focusList(menuElement.current)
+  }, [mobile, menu, active])
+
+  const openSelectedMenu = useEffectEvent(() => openMenu(true))
+  useEffect(() => {
+    if (!active || !selectionSignal || selectionSignal === lastSelectionSignal.current) return
+    lastSelectionSignal.current = selectionSignal
+    openSelectedMenu()
+  }, [selectionSignal, active])
 
   useEffect(() => { setMenu(null); setContextMenu(null) }, [sidebarEnabled])
 
   useEffect(() => {
-    if (!openRequested || !canOpen) return
+    if (!active || !openRequested || !canOpen) return
     if (sidebarEnabled) onSidebarOpenChange?.(true)
     else {
       const box = trigger.current?.getBoundingClientRect()
       if (box) setMenu({ x: box.left, y: box.bottom + 4 })
     }
-  }, [openRequested, canOpen, sidebarEnabled, onSidebarOpenChange])
+  }, [openRequested, canOpen, sidebarEnabled, onSidebarOpenChange, active])
 
   useEffect(() => {
     setMenu(null)
@@ -323,7 +330,7 @@ export function ProjectSwitcher({ paths, activePath, pendingPath, fallbackLabel,
           }
         }} />
     </aside>, sidebarHost)}
-    {canOpen && !sidebarEnabled && menu && (mobile ? <DialogFrame labelledBy={mobileTitleId} onClose={closeMenu} busy={catalogBusy} size="settings" className="mew-mobile-project-panel">
+    {canOpen && !sidebarEnabled && menu && (mobile ? <DialogFrame labelledBy={mobileTitleId} onClose={closeMenu} restoreFocus={view?.compact ? view.restoreFocus : undefined} busy={catalogBusy} size="settings" className="mew-mobile-project-panel">
       <div id={panelId} data-mobile-project-panel className="mew-project-sidebar-body min-h-0">
         <div className="mew-project-sidebar-heading">
           <Folder width={14} height={14} aria-hidden="true" />

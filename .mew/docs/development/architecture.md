@@ -1,9 +1,8 @@
 ---
 title: "App Startup, Server Architecture, and State Files"
-description: "Server and CLI entry points, state-file ownership, shared project catalogs, managed cloning, nested discovery, and per-account active roots. Defines personal shortcuts, workspace imports, owner-only permanent deletion, deleted-path tombstones and cross-device cleanup, protected paths, and browser startup ownership."
-updated: "2026-11-06"
+description: "Server and CLI entry points, state-file ownership, shared project catalogs, managed cloning, nested discovery, and per-account active roots. Defines personal shortcuts, project deletion and cleanup, protected paths, browser startup ownership, and legacy account selection alongside explicit workspace sessions."
+updated: "2026-11-07"
 상위파일:
-  - "../MOC.md"
   - "MOC.md"
 ---
 [Installation and execution](../../../docs/guides/getting-started-ko.md)
@@ -123,7 +122,7 @@ Managed names are validated as one safe directory component: no traversal, separ
 
 Managed cloning derives the destination name from the repository basename, rejects an existing destination with 409, and cleans up partial files on failure before registration. It preserves the repository’s files instead of adding initialization files. [Git connections](git-connections.md#managed-project-cloning-and-repository-listing) owns provider, credential, and transport restrictions; [ADR 0124](../decisions/0124-managed-clone-and-project-discovery.md) records the choice.
 
-The project panel uses `ProjectAddInline` for name-only creation, cloning, and importing. Its import branch embeds `ProjectCatalogPanel` for the shared workspace hierarchy or opens `LinkProjectDialog` for server-folder browsing. Empty personal lists show this panel without mounting project tools or the Dock. The secondary agent-assisted action opens `ProjectCreationAgentDialog`, which hosts the normal `AgentPanel` for discovery and documentation after managed creation. [The project feature](../features/projects-files-search/opening-projects-tabs-and-groups.md), [agent sessions](agent-sessions.md#agent-assisted-project-creation), and [ADR 0118](../decisions/0118-shared-project-registry.md) own their behavior and rationale.
+The project selection panel uses `ProjectAddInline` for name-only creation, cloning, and importing. Its import branch embeds `ProjectCatalogPanel` for the shared workspace hierarchy or opens `LinkProjectDialog` for server-folder browsing. Empty personal lists show this panel without mounting project tools or the Dock. The secondary agent-assisted action opens `ProjectCreationAgentDialog`, which hosts the normal `AgentPanel` for discovery and documentation after managed creation. [The project feature](../features/projects-files-search/opening-projects-tabs-and-groups.md), [agent sessions](agent-sessions.md#agent-assisted-project-creation), and [ADR 0118](../decisions/0118-shared-project-registry.md) own their behavior and rationale.
 
 ### Permanent project deletion
 
@@ -146,6 +145,12 @@ Under [ADR 0200](../history/decisions/0200-mew-account-active-workspace.md), the
 `POST /api/workspace` accepts registered project roots for all signed-in accounts and changes the active root without implicitly pinning it. `/api/fs/open-project` links, pins, and opens an existing folder for the caller. Members cannot use an unregistered arbitrary path through `/api/workspace`; owners and managers retain their broader existing switching behavior. `/api/subprojects/open` and worktree operations keep their existing manager/owner checks. Opening an existing subproject also registers and pins it for the caller. Workspace import explicitly pins the chosen catalog entry before opening it. All root changes save only the requesting account's root. `workspace` presence notifications are sent only to the same authenticated account. They do not change the server default root, `MEW_WORKSPACE` settings, other accounts' watchers, or collaborative editing rooms. Existing agent working paths remain fixed, while the default path for new terminals follows the requesting account's root. Documents folder settings remain owned by the project configuration file.
 
 File catalogs, search state, and tree watchers are separated by actual project path, and search SQLite handles by per-root DB path. Project WebSocket connections use the account root at connection time, and collaborative editing rooms include the root in their internal server keys. The wire-level `프로젝트:상대경로` and server-wide shared memo room are retained. Accounts viewing the same actual root share collaborative editing, while files with the same name under different roots remain separate.
+
+### Explicit project workspaces
+
+Concurrent project views use validated explicit workspace scopes before the legacy account-selection fallback. They retain actual working-root and logical-project identities separately. A scoped workspace read or destination resolution does not change the account's saved selection or the server default. Ordinary unscoped selection retains the behavior above.
+
+[Scoped workspace sessions](workspace-sessions.md) owns the canonical wire format, server resolution and reauthorization, immutable clients, cache/event boundaries, and current Postgres restriction. [ADR 0152](../decisions/0152-multi-project-workspace-sessions.md) records the accepted composition; [account tabs](account-tabs.md) retains logical-project ledger ownership. UI acceptance and performance evidence belong to the [implementation record](../work/multi-project-mode.md).
 
 ## Mewpet global skins
 

@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react'
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { canAutoFocusInput, useOverlayDismiss } from '@mew/ui'
+import { canAutoFocusInput, getFixedPopupLayout, useOverlayDismiss } from '@mew/ui'
 import { uiText } from '@mew/ui/i18n-core'
 import { useUiLocale } from '@mew/ui/i18n'
 
@@ -45,7 +45,7 @@ export function HeaderSelect({
   const ref = useRef<HTMLDivElement>(null)
   const buttonRef = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
-  const [menuPosition, setMenuPosition] = useState<{ left: number; bottom: number; width: number; maxHeight: number } | null>(null)
+  const [menuPosition, setMenuPosition] = useState<CSSProperties | null>(null)
   const close = useCallback(() => { setOpen(false); buttonRef.current?.focus({ preventScroll: true }) }, [])
   // Esc·모바일 뒤로가기가 패널 대신 이 드롭다운을 닫게 한다
   useOverlayDismiss(open && close)
@@ -60,26 +60,45 @@ export function HeaderSelect({
     return () => document.removeEventListener('pointerdown', onDown, true)
   }, [open])
 
-  useEffect(() => {
-    if (!open) return
+  useLayoutEffect(() => {
+    if (!open) { setMenuPosition(null); return }
+    const menu = menuRef.current
+    const button = buttonRef.current
+    if (!menu || !button) return
     const placeMenu = () => {
-      const bounds = buttonRef.current?.getBoundingClientRect()
-      if (!bounds) return
-      // 위쪽에 남은 공간만 목록의 최대 높이로 쓴다. 따라서 화면 밖으로 넘어가지 않고 목록만 스크롤된다.
+      const bounds = button.getBoundingClientRect()
+      const layout = getFixedPopupLayout(document.body)
       const gap = 8
-      setMenuPosition({
-        left: Math.max(gap, bounds.left),
-        bottom: Math.max(gap, window.innerHeight - bounds.top + gap),
-        width: bounds.width,
-        maxHeight: Math.max(48, bounds.top - gap * 2),
+      const left = layout.bounds.left + gap, right = layout.bounds.right - gap
+      const top = layout.bounds.top + gap, bottom = layout.bounds.bottom - gap
+      const maxWidth = Math.max(0, right - left)
+      // Apply width limits before measuring content that can be wider than its trigger.
+      const limits = layout.toStyle({ minWidth: Math.min(bounds.width, maxWidth), maxWidth })
+      menu.style.minWidth = `${limits.minWidth}px`
+      menu.style.maxWidth = `${limits.maxWidth}px`
+      const width = menu.getBoundingClientRect().width
+      const anchor = Math.max(top, Math.min(bounds.top - gap, bottom))
+      const next = layout.toStyle({
+        left: Math.max(left, Math.min(bounds.left, right - width)),
+        minWidth: Math.min(bounds.width, maxWidth), maxWidth,
+        maxHeight: Math.max(0, anchor - top),
+        bottom: window.innerHeight - anchor,
       })
+      setMenuPosition(previous => previous && Object.keys(next).every(key => previous[key as keyof CSSProperties] === next[key as keyof CSSProperties]) ? previous : next)
     }
     placeMenu()
+    const observer = new ResizeObserver(placeMenu)
+    observer.observe(button)
+    observer.observe(menu)
+    const mutations = new MutationObserver(placeMenu)
+    mutations.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'style'] })
     window.addEventListener('resize', placeMenu)
     window.addEventListener('scroll', placeMenu, true)
     window.visualViewport?.addEventListener('resize', placeMenu)
     window.visualViewport?.addEventListener('scroll', placeMenu)
     return () => {
+      observer.disconnect()
+      mutations.disconnect()
       window.removeEventListener('resize', placeMenu)
       window.removeEventListener('scroll', placeMenu, true)
       window.visualViewport?.removeEventListener('resize', placeMenu)
@@ -156,7 +175,7 @@ export function HeaderSelect({
         {trigger ?? <span className={caretEnd ? 'min-w-0 flex-1 truncate' : 'truncate'}>{current?.label ?? value}</span>}
         <span className={caretEnd ? 'ml-auto shrink-0' : 'shrink-0'}><CaretGlyph dir={open ? 'down' : 'up'} /></span>
       </button>
-      {open && menuPosition && createPortal(
+      {open && createPortal(
         <div
           ref={menuRef}
           id={listId}
@@ -164,7 +183,7 @@ export function HeaderSelect({
           role="listbox"
           aria-label={title}
           className="fixed z-[1201] flex flex-col overflow-hidden whitespace-nowrap rounded-lg border border-edge-bright bg-surface-raised py-1 shadow-xl"
-          style={{ left: `${menuPosition.left}px`, bottom: `${menuPosition.bottom}px`, minWidth: `${menuPosition.width}px`, maxHeight: `${menuPosition.maxHeight}px` }}
+          style={{ ...menuPosition, width: 'max-content', visibility: menuPosition ? undefined : 'hidden' }}
         >
           {/* 모델 수가 많아도 화면에 맞춰 목록 자체만 스크롤한다. */}
           <div className="min-h-0 flex-1 overflow-y-auto">

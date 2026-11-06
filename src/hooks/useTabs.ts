@@ -1,15 +1,14 @@
-import { registerDatabasePageMutations } from '../utils/database-page-mutations'
+import { useWorkspaceApi } from '../api/workspace-api-context'
 import { scopedBrowserStorage } from '@mew/ui/browser-storage-scope'
-import { mewFetch } from '../utils/remote-transport.ts'
 import { mergeTaskFrontmatter } from '../../packages/editor/src/utils/task-frontmatter-merge'
 import { remapPagePath, rewritePageLinks, type DocumentPageMutation } from '../../shared/document-pages'
 import { editorTabPath } from '../utils/editor-files'
 import { useRefreshTasks } from './use-refresh-tasks'
 import { writeBrowserStorage } from '@mew/ui/browser-storage'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { externalRawUrl, fetchExternalFile, fetchFile, fetchFileAnchorPreview, fetchRules, isArchivedPath, mutateDocumentPage, rawUrl, saveExternalFile, saveFile, type DocRules, type FileVersion } from '../api/client'
+import { type DocRules, type FileVersion } from '../api/client'
 import { mediaKind } from '../utils/media'
-import { dropCachedFile, getCachedFile, loadCachedFile, putCachedFile, type CachedFile } from '../utils/contentCache'
+import type { CachedFile } from '../utils/contentCache'
 import { leaf, normalizeLayout, removeLeaf, splitLeaf, type DropSide } from '../utils/paneTree'
 import { externalAbsolutePath, externalTabPath, isExternalTabPath } from '../utils/externalFiles'
 import { afterFirstPaint, markFileOpen, startFileOpen, type FileOpenTrace } from '../utils/fileOpenPerformance'
@@ -160,6 +159,9 @@ export function useTabs(
   desktopPaneIds?: string[],
   desktopFocusedPaneId?: string,
 ) {
+  const { externalRawUrl, rawUrl, fetchFileAnchorPreview, fetchFile, fetchExternalFile, fetchRules, saveExternalFile, saveFile, isArchivedPath, mutateDocumentPage,
+    cache, fetch: mewFetch, registerDatabasePageMutations, scope: requestScope } = useWorkspaceApi()
+  const { dropCachedFile, getCachedFile, loadCachedFile, putCachedFile } = cache
   const desktopPaneIdsRef = useRef(desktopPaneIds)
   desktopPaneIdsRef.current = desktopPaneIds
   const desktopFocusedPaneIdRef = useRef(desktopFocusedPaneId)
@@ -230,7 +232,8 @@ export function useTabs(
     }
     window.addEventListener('mew:external-file-updated', updated)
     const databaseUpdated = (event: Event) => {
-      const { project: targetProject, path: targetPath, content } = (event as CustomEvent<{ project: string; path: string; content: string }>).detail
+      const { project: targetProject, path: targetPath, content, workspacePath } = (event as CustomEvent<{ project: string; path: string; content: string; workspacePath?: string }>).detail
+      if ((workspacePath !== undefined || requestScope) && workspacePath !== workspaceScope) return
       setStates(all => Object.fromEntries(Object.entries(all).map(([scope, state]) => [scope, {
         ...state, panes: state.panes.map(pane => ({ ...pane, tabs: pane.tabs.map(tab => {
           const file = editorFile(tab.path, scope)
@@ -245,7 +248,7 @@ export function useTabs(
       window.removeEventListener('mew:external-file-updated', updated)
       window.removeEventListener('mew:database-page-updated', databaseUpdated)
     }
-  }, [])
+  }, [workspaceScope, requestScope])
 
   const stateOf = (p: string) => statesRef.current[p] ?? EMPTY
   const paneOf = (p: string, paneId?: string) => {
@@ -319,7 +322,7 @@ export function useTabs(
     }
     window.addEventListener('mew:permissions-changed', revalidate)
     return () => window.removeEventListener('mew:permissions-changed', revalidate)
-  }, [patch, mapTabsAtPath, trackRefresh])
+  }, [patch, mapTabsAtPath, trackRefresh, dropCachedFile, mewFetch])
 
   const setActivePath = useCallback(
     (path: string | null, paneId?: string, tabId?: string) => {
@@ -567,7 +570,7 @@ export function useTabs(
         })
       }
     },
-    [patchPane, mapTabsAtPath, trackRefresh],
+    [patchPane, mapTabsAtPath, trackRefresh, getCachedFile, putCachedFile, dropCachedFile, mewFetch, externalRawUrl, rawUrl, loadCachedFile, fetchFileAnchorPreview, fetchFile, fetchExternalFile, fetchRules],
   )
 
   const openFile = useCallback(
@@ -607,7 +610,7 @@ export function useTabs(
         .finally(() => inFlightSaves.current.delete(navigation))
       inFlightSaves.current.add(navigation)
     },
-    [openFileIn, mapTabsAtPath, workspaceScope],
+    [openFileIn, mapTabsAtPath, workspaceScope, saveExternalFile, saveFile, putCachedFile],
   )
 
   const navigateTab = useCallback((direction: -1 | 1, paneId?: string) => {
@@ -682,7 +685,7 @@ export function useTabs(
     })
     pendingRestoreLoadsRef.current.set(sessionKey, activeLoads)
     setHydratedSession(sessionKey)
-  }, [accountHydrated, accountTabs, project, sessionKey, accountScope, workspaceScope, presentationScope, tabsCacheKey, patch])
+  }, [accountHydrated, accountTabs, project, sessionKey, accountScope, workspaceScope, presentationScope, tabsCacheKey, patch, getCachedFile])
 
   // 위 hydration effect가 만든 모든 탭이 상태에 붙은 뒤 활성 탭만 읽는다. statesRef 동기화 effect가
   // 선언 순서상 먼저 돌기 때문에 openFileIn은 deferred tab을 찾아 본문 요청만 시작한다.
@@ -782,7 +785,7 @@ export function useTabs(
       fileSaveRequests.current.set(saveKey, request)
       inFlightSaves.current.add(request)
     },
-    [mapTabsAtPath, accountScope, workspaceScope],
+    [mapTabsAtPath, accountScope, workspaceScope, isArchivedPath, saveExternalFile, saveFile, putCachedFile],
   )
 
   useEffect(() => {
@@ -866,7 +869,7 @@ export function useTabs(
         }
       }))
     }
-  }, [accountTabs, accountHydrated, states, hydratedSession, sessionKey, tabsCacheKey, patch, autosave, settlePendingSave])
+  }, [accountTabs, accountHydrated, states, hydratedSession, sessionKey, tabsCacheKey, patch, autosave, settlePendingSave, getCachedFile])
 
   // 복원이 끝난(=상태가 만들어진) 프로젝트만 저장한다 — 아직 열어보지 않은 프로젝트의 저장분을
   // 빈 목록으로 덮어쓰지 않는다.
@@ -1014,7 +1017,7 @@ export function useTabs(
         mapTabsAtPath(p, tab.path, (t) => ({ ...t, status: 'error', statusMessage: err instanceof Error ? err.message : String(err) }))
       }
     },
-    [settlePendingSave, mapTabsAtPath, onCommitted, workspaceScope],
+    [settlePendingSave, mapTabsAtPath, onCommitted, workspaceScope, isArchivedPath, saveExternalFile, saveFile, putCachedFile, fetchRules],
   )
 
   // 서버에서 이미 쓰기+커밋까지 끝낸 내용(히스토리 되돌리기)을 탭 상태에 반영 — saveFile을 다시
@@ -1032,7 +1035,7 @@ export function useTabs(
         .then((rules) => mapTabsAtPath(p, path, (t) => ({ ...t, rules })))
         .catch(console.error)
     },
-    [settlePendingSave, mapTabsAtPath, onCommitted],
+    [settlePendingSave, mapTabsAtPath, onCommitted, putCachedFile, fetchRules],
   )
 
   /** 탭을 다른 칸으로 옮긴다 (탭을 끌어 그 칸 가운데에 놓았을 때) */
@@ -1131,7 +1134,7 @@ export function useTabs(
         remapTitlePreviews([{ from: documentAbsolutePath(workspaceScope, workspaceDocsPath, from.project, from.path), to: documentAbsolutePath(workspaceScope, workspaceDocsPath, to.project, to.path), directory: type === 'dir' }])
       }
     },
-    [patch, workspaceScope, workspaceDocsPath],
+    [patch, workspaceScope, workspaceDocsPath, dropCachedFile],
   )
 
   const prepareDocumentPageMutation = useCallback(async (fileProject = 'docs', includeExternal = false, resumeAutosave = true, flushDirty = true) => {
@@ -1180,7 +1183,7 @@ export function useTabs(
       if (workspaceRequestRef.current.epoch !== epoch) throw new Error('프로젝트가 변경되었습니다. 다시 시도하세요.')
       return release
     } catch (error) { release(); throw error }
-  }, [mapTabsAtPath, autosave, workspaceScope])
+  }, [mapTabsAtPath, autosave, workspaceScope, saveExternalFile, saveFile])
 
   const applyDocumentPageMutation = useCallback(async (result: DocumentPageMutation, fileProject = 'docs') => {
     const p = projectRef.current
@@ -1246,7 +1249,7 @@ export function useTabs(
       }
     }))
     for (const path of reads.keys()) setTimeout(() => { if (projectRef.current === p && workspaceRequestRef.current.epoch === epoch) autosave(p, path) }, 500)
-  }, [patch, autosave, mapTabsAtPath, workspaceScope, workspaceDocsPath])
+  }, [patch, autosave, mapTabsAtPath, workspaceScope, workspaceDocsPath, dropCachedFile, fetchFile, putCachedFile])
 
   useEffect(() => registerDatabasePageMutations({
     prepare: prepareDocumentPageMutation,
@@ -1254,7 +1257,7 @@ export function useTabs(
     previewTitle: (fileProject, path, title) => workspaceScope
       ? previewDatabaseDocumentTitle(documentAbsolutePath(workspaceScope, workspaceDocsPath, fileProject, path), title)
       : () => {},
-  }), [prepareDocumentPageMutation, applyDocumentPageMutation, accountScope, workspaceScope, workspaceDocsPath])
+  }), [prepareDocumentPageMutation, applyDocumentPageMutation, accountScope, workspaceScope, workspaceDocsPath, registerDatabasePageMutations])
 
   const refreshTaskDocuments = useCallback(async (changes: TaskDocumentChange[]) => {
     const p = projectRef.current, epoch = workspaceRequestRef.current.epoch
@@ -1341,7 +1344,7 @@ export function useTabs(
     const failed = results.find(result => result.status === 'rejected')
     if (failed) throw failed.reason
     if (workspaceScope && workspaceRequestRef.current.epoch === epoch) for (const change of updates) clearTitlePreviews(`${workspaceScope}/${change.after.path}`, change.after.text)
-  }, [workspaceScope, workspaceDocsPath, patch, mapTabsAtPath, autosave])
+  }, [workspaceScope, workspaceDocsPath, patch, mapTabsAtPath, autosave, dropCachedFile, fetchFile, putCachedFile])
 
   useEffect(() => registerTaskDocumentSync({
     workspace: workspaceScope ?? '', prepare: mode => prepareDocumentPageMutation('*', false, true, mode !== 'read'), apply: refreshTaskDocuments,
@@ -1358,7 +1361,7 @@ export function useTabs(
       try { onCreated?.(result) } finally { await applyDocumentPageMutation(result, file.project) }
       return result
     } finally { release() }
-  }, [prepareDocumentPageMutation, applyDocumentPageMutation])
+  }, [prepareDocumentPageMutation, applyDocumentPageMutation, mutateDocumentPage])
 
   // 파일/폴더 삭제 시 해당 탭 닫기
   const removePaths = useCallback(
@@ -1381,7 +1384,7 @@ export function useTabs(
         })
       })
     },
-    [patch, workspaceScope, workspaceDocsPath],
+    [patch, workspaceScope, workspaceDocsPath, dropCachedFile],
   )
 
   /**

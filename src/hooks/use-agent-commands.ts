@@ -1,6 +1,7 @@
+import { useWorkspaceApi } from '../api/workspace-api-context.tsx'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { AgentCommandRecord, AgentCommandScope } from '../../shared/agent-command'
-import { listAgentCommands, startAgentCommand } from '../api/agent-commands'
+
 import { agentRecoveryDelay } from '../utils/recovery-policy'
 import { isMewTransportSuspended } from '../utils/remote-transport'
 
@@ -18,7 +19,8 @@ function commandId() {
 }
 
 export function useAgentCommands(scope: AgentCommandScope, enabled: boolean) {
-  const key = JSON.stringify(scope)
+  const { listAgentCommands, startAgentCommand, scope: workspaceScope } = useWorkspaceApi()
+  const key = JSON.stringify([workspaceScope ?? null, scope])
   const currentKey = useRef(key)
   currentKey.current = key
   const [snapshot, setSnapshot] = useState<{ key: string; records: AgentCommandRecord[] }>({ key, records: [] })
@@ -59,7 +61,7 @@ export function useAgentCommands(scope: AgentCommandScope, enabled: boolean) {
     return reading.promise
   // The serialized scope is the dependency; object identity changes each render.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, enabled, cancelRead])
+  }, [key, enabled, cancelRead, listAgentCommands])
 
   useEffect(() => {
     let disposed = false
@@ -142,7 +144,7 @@ export function useAgentCommands(scope: AgentCommandScope, enabled: boolean) {
     } finally { pending.current = false; setSubmitting(false) }
   // The serialized scope is the dependency; object identity changes each render.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, enabled])
+  }, [key, enabled, startAgentCommand])
   return { records: enabled && snapshot.key === key ? snapshot.records : EMPTY_RECORDS, submitting, error: error ?? readError, readFailed: !error && readError !== null, recovering, submit, refresh,
     retryRefresh: () => setReadRetry(value => value + 1),
   }

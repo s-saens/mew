@@ -1,9 +1,10 @@
+import { useWorkspaceApi } from '../api/workspace-api-context'
 import { useId, useState, type FormEvent } from 'react'
 import { LogOut, Xmark } from 'iconoir-react'
 import { DialogFrame, HoverTipLayer } from '@mew/ui'
 import { uiText } from '@mew/ui/i18n-core'
 import { useUiLocale } from '@mew/ui/i18n'
-import { changePassword, logout } from '../api/client'
+
 import { useI18n } from '../i18n'
 import { requestMewlinkLogout } from '../utils/remote-app'
 import { AccountProfileForm } from './account-profile-form'
@@ -23,6 +24,7 @@ interface AccountSettingsModalProps {
 }
 
 export function AccountSettingsModal({ email, displayName, avatarDataUrl, hasPassword = true, authenticationMethod, onClose, onLoggedOut, onProfileChanged }: AccountSettingsModalProps) {
+  const { logout } = useWorkspaceApi()
   useUiLocale()
   const { t } = useI18n()
   const titleId = useId()
@@ -62,6 +64,7 @@ export function AccountSettingsModal({ email, displayName, avatarDataUrl, hasPas
 }
 
 function PasswordForm() {
+  const { changePassword } = useWorkspaceApi()
   const { t } = useI18n()
   const titleId = useId()
   const [currentPassword, setCurrentPassword] = useState('')

@@ -1,7 +1,7 @@
 import fs from 'node:fs'
 import { projectRegistry } from './project-registry.ts'
 import { WORKSPACE_ROOT, pathsForWorkspace, workspaceContext } from './paths.ts'
-import { readActiveWorkspace, readRootProjects, writeActiveWorkspace } from './userUiState.ts'
+import { readActiveProjectPath, readActiveWorkspace, readRootProjects, writeActiveWorkspace } from './userUiState.ts'
 
 function isDirectory(directory: string): boolean {
   try { return fs.statSync(directory).isDirectory() } catch (error) {
@@ -16,5 +16,6 @@ export function runAccountWorkspace<T>(account: string | null, action: () => T):
   const saved = account ? readActiveWorkspace(account) : null
   const selected = saved && isDirectory(saved) ? saved : account ? readRootProjects(account)?.paths.find(isDirectory) ?? null : null
   if (selected && account && selected !== saved) writeActiveWorkspace(account, selected)
-  return workspaceContext.run(pathsForWorkspace(selected ?? WORKSPACE_ROOT, account), action)
+  const root = selected ?? WORKSPACE_ROOT
+  return workspaceContext.run({ ...pathsForWorkspace(root, account), projectPath: account ? readActiveProjectPath(account, root) : root }, action)
 }

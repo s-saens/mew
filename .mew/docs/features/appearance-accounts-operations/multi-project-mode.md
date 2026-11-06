@@ -1,14 +1,14 @@
 ---
 title: "Multi-project mode"
-description: "Planned optional desktop mode with independent compact project panels, a shared app header and background, and separate single-project layout restoration. Defines terminology, panel interactions, lifecycle, design defaults, and acceptance criteria; implementation has not started."
-status: planned
+description: "Optional desktop multi-project mode with independent compact workspaces, dedicated movement handles, a shared header/background, and separate mode restoration. Defines selection, lifecycle, geometry, recovery, and the current Postgres limitation; links implementation evidence."
+status: implemented
 created: "2026-11-06"
-updated: "2026-11-06"
+updated: "2026-11-07"
 ---
 
 # Multi-project mode
 
-Status: proposed design; implementation pending. This document owns the proposed behavior. [ADR 0152](../../decisions/0152-multi-project-workspace-sessions.md) explains the architecture, and the [implementation plan](../../work/multi-project-mode.md) defines the sequence and verification gates.
+This document owns the feature's current behavior and acceptance criteria. [ADR 0152](../../decisions/0152-multi-project-workspace-sessions.md) explains the architecture. The [work record](../../work/multi-project-mode.md) separates the original plan, local implementation evidence, and remaining verification limits. See the [user guide](../../../../docs/guides/projects.md#desktop-workspace-modes) for controls.
 
 ## Purpose and terminology
 
@@ -29,6 +29,7 @@ Existing My Projects shortcuts and the set of open project panels serve differen
 ### Modes and initial state
 
 - The desktop Layout control offers both modes. Single-project mode remains the initial mode for existing installations; its saved layouts and presets remain valid.
+- The server must advertise the supported workspace-scope version before multi-project controls or saved board views mount. With older server code, Mew keeps the existing single screen until the operator loads the updated server code; rebuilding browser assets alone does not enable concurrent requests.
 - First entry into multi-project mode opens the current project as one narrow, full-height panel at the left. The remaining workspace shows the shared background, as in the supplied one-panel reference.
 - Additional panels can occupy multiple columns and rows, as in the supplied multi-panel reference. The reference's repeated project and agent screens are examples of placement; real panels can show different projects and tools.
 - The actual mobile viewport continues to show one mobile workspace. A narrow project panel on desktop uses compact presentation while retaining desktop mouse and keyboard behavior.
@@ -46,9 +47,9 @@ Use the existing themed panel surfaces and separators. Paint the page background
 
 ### Project selection, movement, and resizing
 
-The project selection panel remains the owner of My/All browsing and project management. It receives an explicit destination: replace a named project panel, or open a new project panel. The board's compact plus action opens it in the latter mode; the plus inside the selector retains its existing create/import meaning.
+The existing project selection panel retains My/All browsing and project management. Clicking a project-panel name opens that selector for the named panel. The board's compact plus action opens the registered-project catalog to add a panel. Selecting an All catalog entry retains the existing import-to-My action; closing a panel never removes that shortcut. The plus inside the existing selector retains its create/import meaning.
 
-Proposed title interaction: click the project name to choose that panel's project; drag the title area to move the panel. A movement threshold suppresses the click after dragging. Commands, X, and other interactive descendants never start a drag. This interpretation was requested for clarification during design and remains a default until answered.
+Move a project panel using its dedicated six-dot handle, as confirmed after the initial design. Clicking the project name selects a project; it never starts movement. Commands, X, and other controls never start movement. On the handle, arrow keys move between rows or columns. Dragging supports mouse and touch, pointer cancellation, and Esc cancellation. Keyboard-focusable boundary separators resize columns and adjacent rows.
 
 Project panels support column and row arrangement, boundary resizing, and keyboard-accessible movement. Movement changes layout only. It does not reopen a project, reconnect an agent, or transfer document tabs to another project. Initial placement and minimum geometry follow the design defaults below.
 
@@ -62,13 +63,13 @@ Project panels support column and row arrangement, boundary resizing, and keyboa
 - An unavailable or deleted project, lost permission, or failed lazy module affects the relevant panel. Retain a local recovery surface and the ability to choose another project or close the panel. Never silently substitute another root for a failed explicit scope.
 - Account changes dispose the prior account's mounted views, subscriptions, and identity-sensitive caches. Preserve its saved board under its account key, following the storage contract. Existing file, feature, and role permissions remain authoritative.
 
-## Design defaults
+## Layout choices
 
-These defaults fill gaps in the visual references. They are implementation choices, not additional user requirements.
+These choices fill gaps in the visual references and keep geometry independent of project tools.
 
 | Topic | Initial choice and reason |
 | --- | --- |
-| First panel width | Start near 400 CSS pixels, clamped to available width. Tune the exact width with the compact UI fixture. A sole panel does not expand across the whole screen. |
+| First panel width | Start at 400 CSS pixels, clamped to available width. A sole panel does not expand across the whole screen. Minimum column width is 280px and minimum row height is 240px; the board scrolls when needed. |
 | Arrangement | Columns with adjustable widths; rows within each column divide its height by weights. This supports the reference's rows and columns without extending tool docking into a new general window manager. |
 | Adding | Place a new panel in remaining horizontal space; otherwise add a row in the active column. Minimum dimensions take precedence over fitting every panel on screen; the board can scroll. |
 | Duplicate project | In the first version, selecting an already-open logical project focuses its panel. Avoid two local writers for the existing account/project tab ledger. Independent views of the same logical project require a later view-state decision. |
@@ -76,6 +77,12 @@ These defaults fill gaps in the visual references. They are implementation choic
 | Empty board | Closing the last panel leaves the background and a compact add-project-panel action. It does not recreate a closed panel or replace the account's personal project list. |
 | Shared tools | Notes, chat, and remote desktop retain their existing shared or app-level data ownership. Native Browser and login retain one account session and one app-owned viewer under the [browser contract](../../development/browser-desktop.md#permissions-profiles-and-lifecycle). Project Docks invoke that shared surface rather than mounting competing viewers. Localhost app tabs retain their separate proxy/viewer path. |
 | Initial scope | Arrange project panels; reuse the current compact tools inside them. Cross-project document-tab dragging, floating project windows, and arbitrary nested project docking are outside this first version. |
+
+## Current limitation
+
+Postgres databases and DB-bound page saves are unavailable in multi-project panels until their shared catalog is isolated by root. The database entry controls are hidden in compact project views, and explicit requests are blocked before pool access or a DB-bound Markdown write. Ordinary files and Markdown remain supported. Use single-project mode for the existing database workflow. The exact API and file-operation boundaries belong to [Scoped workspace sessions](../../development/workspace-sessions.md#current-postgres-restriction).
+
+Automated browser fixtures establish the recorded local behavior; they do not establish live agent-provider execution, physical-device IME behavior, or production Mewlink recovery. The [work record](../../work/multi-project-mode.md) lists those limits separately from passing checks.
 
 ## Acceptance criteria
 

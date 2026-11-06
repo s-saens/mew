@@ -1,11 +1,13 @@
+import { useWorkspaceApi } from '../api/workspace-api-context'
 import { useEffect, useRef, useState } from 'react'
 import { ArrowUp, Settings, Square } from 'iconoir-react'
 import { LoadingIndicator, SelectField } from '@mew/ui'
 import { useI18n } from '../i18n'
-import { fetchAgentRuntimes, type AgentRuntimeStatus } from '../api/client'
+import { type AgentRuntimeStatus } from '../api/client'
 import type { MewcatAssistantState } from '../hooks/use-mewcat-assistant'
 
 export function MewcatAssistant({ state, runtime, onConnect, onRuntimeChange }: { state: MewcatAssistantState; runtime: string | null; onConnect: () => void; onRuntimeChange: (runtime: string) => void }) {
+  const { fetchAgentRuntimes } = useWorkspaceApi()
   const { t } = useI18n()
   const [draft, setDraft] = useState('')
   const [settings, setSettings] = useState(false)
@@ -28,7 +30,7 @@ export function MewcatAssistant({ state, runtime, onConnect, onRuntimeChange }: 
     let alive = true
     void fetchAgentRuntimes().then(result => { if (alive) setRuntimes(result.runtimes.filter(item => item.surface === 'acp' && item.installed)) }).catch(() => { if (alive) setRuntimes([]) })
     return () => { alive = false }
-  }, [settings, runtime])
+  }, [settings, runtime, fetchAgentRuntimes])
   const submit = () => { if (state.ask(draft.trim())) setDraft('') }
   const allow = state.permission?.options.find(option => option.kind === 'allow_once')
   const deny = state.permission?.options.find(option => option.kind === 'reject_once' || option.kind === 'reject_always')

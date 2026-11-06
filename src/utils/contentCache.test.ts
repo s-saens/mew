@@ -36,6 +36,27 @@ export async function ageRows(){const d=await db();return new Promise(resolve=>{
   const page = await browser.newPage()
   await page.goto(`http://127.0.0.1:${(server.address() as { port: number }).port}`)
 
+  await t.test('bound workspace caches restore concurrent roots without following the focused workspace', async () => {
+    const result = await page.locator('#root').evaluate(async el => {
+      const cache = (el.ownerDocument.defaultView as unknown as { Cache: BrowserCache }).Cache
+      cache.setContentIdentity('panels@example.com')
+      const first = cache.createContentCache('/panel/first')
+      const second = cache.createContentCache('/panel/second')
+      first.putCachedFile('.workspace', 'same.md', { content: 'first', editable: true })
+      second.putCachedFile('.workspace', 'same.md', { content: 'second', editable: true })
+      for (let i = 0; i < 21; i++) first.putCachedFile('.workspace', `filler${i}`, { content: '', editable: true })
+      await cache.flushContentCache()
+      const firstRead = first.loadCachedFile('.workspace', 'same.md')
+      const secondRead = second.loadCachedFile('.workspace', 'same.md')
+      cache.setContentWorkspace('/unrelated-focused-root')
+      const restored = await Promise.all([firstRead, secondRead])
+      first.dropCachedFile('.workspace', 'same.md')
+      await cache.flushContentCache()
+      return { restored, first: await first.loadCachedFile('.workspace', 'same.md'), second: second.getCachedFile('.workspace', 'same.md') }
+    })
+    assert.deepEqual(result, { restored: [{ content: 'first', editable: true }, { content: 'second', editable: true }], first: undefined, second: { content: 'second', editable: true } })
+  })
+
   await t.test('동기 열기는 저장소를 읽지 않고, 본문과 버전은 비동기로 복원한다', async () => {
     const result = await page.locator('#root').evaluate(async el => {
       const cache = (el.ownerDocument.defaultView as unknown as { Cache: BrowserCache }).Cache

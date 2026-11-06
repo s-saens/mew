@@ -23,7 +23,8 @@ import { HoverTipLayer, pathFromDrag, observeEditorViewport, visibleEditorBounds
 import { tags } from '@lezer/highlight'
 import type { Collab } from '../hooks/useCollab'
 import { codeLanguageKey, loadCodeLanguage, preparedCodeLanguage, type CodeLanguage } from '../utils/code-language'
-import { lintFile } from '../api/client'
+import { useWorkspaceApi } from '../api/workspace-api-context'
+import type { WorkspaceClient } from '../api/client'
 import { codeSearchExtensions, refreshCodeSearchLanguage } from '../utils/codeSearch'
 import { codePinchZoom } from '../utils/code-pinch-zoom'
 import { debuggerEditorExtension } from '../utils/debugger-editor'
@@ -91,7 +92,7 @@ function isProse(filePath: string): boolean {
   return ext === 'md' || ext === 'mdx' || ext === 'txt'
 }
 
-function lintExtensions(filePath: string, project: string | undefined, language: CodeLanguage): Extension[] {
+function lintExtensions(filePath: string, project: string | undefined, language: CodeLanguage, api: Pick<WorkspaceClient, 'lintFile'>): Extension[] {
   const ext = extOf(filePath)
   if (OXLINT_EXTS.has(ext)) {
     return [
@@ -99,7 +100,7 @@ function lintExtensions(filePath: string, project: string | undefined, language:
       linter(
         async (view) => {
           try {
-            const { diagnostics } = await lintFile(filePath, view.state.doc.toString(), project)
+            const { diagnostics } = await api.lintFile(filePath, view.state.doc.toString(), project)
             const max = view.state.doc.length
             return diagnostics.map((d) => ({
               from: Math.min(d.from, max),
@@ -264,6 +265,7 @@ type CodePaneProps = {
 }
 
 const PreparedCodePane = forwardRef<CodePaneHandle, CodePaneProps & { language: CodeLanguage }>(function PreparedCodePane({ language, path, project, value, onChange, readOnly, serverLint = true, showMobileKeyBar = false, collab, commentThreads, onCommentClick, onAnnotationOpen, onOpenDatabase, lineOffset = 0, debuggerContext }, ref) {
+  const api = useWorkspaceApi()
   const containerRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
   const mobileLayout = useMobileLayout()
@@ -325,7 +327,7 @@ const PreparedCodePane = forwardRef<CodePaneHandle, CodePaneProps & { language: 
     const container = containerRef.current
     if (!container) return
     const contextSessions = contextSessionsRef.current
-    const debug = debugRoot && debugAccount ? debuggerEditorExtension(debugRoot, debugAccount, path, lineOffset, !readOnly) : undefined
+    const debug = debugRoot && debugAccount ? debuggerEditorExtension(debugRoot, debugAccount, path, lineOffset, !readOnly, api) : undefined
     const state = EditorState.create({
       // collab 모드는 yCollab의 ySync가 마운트 즉시 Y.Text 내용을 반영하므로 빈 문서로 시작한다
       doc: collab ? '' : valueRef.current,
@@ -350,7 +352,7 @@ const PreparedCodePane = forwardRef<CodePaneHandle, CodePaneProps & { language: 
         ...language.extensions,
         ...(['md', 'mdx'].includes(extOf(path)) && databaseLinksEnabled && language.databaseLinks ? language.databaseLinks(reference => onOpenDatabaseRef.current?.(reference)) : []),
         ...(isProse(path) ? [EditorView.lineWrapping] : []),
-        ...(readOnly || !serverLint ? [] : lintExtensions(path, project, language)),
+        ...(readOnly || !serverLint ? [] : lintExtensions(path, project, language, api)),
         EditorState.readOnly.of(readOnly),
         EditorView.editable.of(!readOnly),
         commentField,
@@ -425,7 +427,7 @@ const PreparedCodePane = forwardRef<CodePaneHandle, CodePaneProps & { language: 
       viewRef.current = null
     }
     // 파일이 바뀌면 언어·lint 구성이 달라지므로 뷰를 새로 만든다 (문서 내용은 valueRef로 최신값 사용)
-  }, [project, path, readOnly, serverLint, collab?.ydoc, lineOffset, debugRoot, debugAccount, databaseLinksEnabled, language])
+  }, [project, path, readOnly, serverLint, collab?.ydoc, lineOffset, debugRoot, debugAccount, databaseLinksEnabled, language, api])
 
   // 방을 처음 만든 클라이언트가 이미 로드해 둔 탭 내용으로 Y.Text를 시딩한다 (디스크 재조회 아님) —
   // 이미 누군가 협업 중이던 방이면 ytext가 비어 있지 않으므로 아무 일도 하지 않는다

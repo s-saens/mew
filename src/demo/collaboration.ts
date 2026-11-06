@@ -79,7 +79,7 @@ export function createDemoCollaboration(store: DemoWorkspaceStore): Collaboratio
   return {
     open(identity, onState) {
       if (closed) throw new Error('데모 작업 공간이 닫혔습니다.')
-      const key = identity.project === SHARED_MEMO_PROJECT ? `${SHARED_MEMO_PROJECT}:${identity.path}` : store.canonicalFilePath(identity.path, identity.project)
+      const key = identity.project === SHARED_MEMO_PROJECT ? `${SHARED_MEMO_PROJECT}:${identity.path}` : store.canonicalFilePath(identity.path, identity.project, identity.workspacePath)
       let room = rooms.get(key)
       if (!room) {
         const ydoc = new Y.Doc()

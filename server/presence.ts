@@ -10,6 +10,10 @@ import type { ActiveMewSession } from '../shared/active-sessions.ts'
 import { SESSION_ACTIVITY_MAX_AGE_MS, validRunningAgentCount } from '../shared/active-sessions.ts'
 import { recordPresence, endPresence } from './presence-history.ts'
 import { webSocketOriginAllowed } from './websocket-origin.ts'
+import { runAccountWorkspace } from './account-workspace.ts'
+import { resolveWorkspaceScope, runRequestWorkspace, WorkspaceScopeError } from './workspace-scope.ts'
+import { pathsForWorkspace, workspaceContext, workspacePaths, type WorkspacePaths } from './paths.ts'
+import type { WorkspaceScope } from '../shared/workspace-scope.ts'
 
 const WS_PATH = '/api/presence'
 const FALLBACK_COLOR = '#737373' // 색을 아직 안 보낸(구버전) 클라이언트용 회색 — 정상 경로에서는 나오지 않음
@@ -22,7 +26,31 @@ const wss = new WebSocketServer({ noServer: true })
 const clientState = new Map<WebSocket, {
   path: string | null; color: string; auth: RequestAuth
   session: ActiveMewSession; observedAt: number; alive: boolean; getAuth: () => RequestAuth
+  scope: WorkspacePaths; explicitConnection: boolean
+  subscriptions: WorkspacePaths[]
 }>()
+type ClientState = NonNullable<ReturnType<typeof clientState.get>>
+
+function inClientWorkspace<T>(state: ClientState, action: () => T): T {
+  return state.scope.explicit ? workspaceContext.run(state.scope, action) : runAccountWorkspace(state.auth.email, action)
+}
+
+function clientRoot(state: ClientState): string { return inClientWorkspace(state, () => workspacePaths.root) }
+
+function currentPresenceScope(scope: WorkspacePaths, auth: RequestAuth): WorkspacePaths | undefined {
+  if (scope.account !== auth.email) return undefined
+  if (!scope.explicit) return scope
+  try {
+    const current = resolveWorkspaceScope(auth, { workspacePath: scope.root, projectPath: scope.projectPath ?? scope.root })
+    return current.root === scope.root && current.projectPath === scope.projectPath ? current : undefined
+  } catch { return undefined }
+}
+
+function subscribedScope(state: ClientState, root: string): WorkspacePaths | undefined {
+  const scope = state.subscriptions.find(scope => scope.root === root)
+    ?? (clientRoot(state) === root ? state.scope.explicit ? state.scope : pathsForWorkspace(root, state.auth.email) : undefined)
+  return scope && currentPresenceScope(scope, state.getAuth())
+}
 
 function clientDevice(agent: string): Pick<ActiveMewSession, 'browser' | 'device'> {
   const browser = /Edg(?:e|A|iOS)?\//.test(agent) ? 'Edge'
@@ -41,7 +69,7 @@ function publicSessions(): ActiveMewSession[] {
     const user = email ? getUser(email) : null
     const agents = state.session.agents
     const session = { ...state.session, agents: agents && Date.now() - agents.reportedAt <= SESSION_ACTIVITY_MAX_AGE_MS ? agents : null, email, displayName: email ? user?.displayName?.trim() || email.split('@')[0] : null }
-    recordPresence(session, state.observedAt)
+    inClientWorkspace(state, () => recordPresence(session, state.observedAt))
     return session
   })
 }
@@ -59,20 +87,24 @@ function visibleTo(auth: RequestAuth, qualifiedPath: string): boolean {
   return fileAccess(auth, parsed.project, parsed.relPath).view
 }
 
-function computeParticipants(forAuth: RequestAuth): Record<string, string[]> {
+function computeParticipants(forAuth: RequestAuth, root: string): Record<string, string[]> {
   const participants: Record<string, string[]> = {}
-  for (const { path, color } of clientState.values()) {
-    if (path && visibleTo(forAuth, path)) (participants[path] ??= []).push(color)
+  for (const state of clientState.values()) {
+    if (state.path && clientRoot(state) === root && visibleTo(forAuth, state.path)) (participants[state.path] ??= []).push(state.color)
   }
   return participants
 }
 
 /** presence 소켓에 연결된 모든 세션에 메시지를 보낸다 — 트리 변경 알림(watcher) 등 내용 없는 신호 전용.
  * participants처럼 경로가 담긴 데이터는 이 함수를 쓰지 말고 sendParticipantsTo로 수신자별 필터링해야 한다. */
-export function broadcast(msg: object) {
-  const payload = JSON.stringify(msg)
+export function broadcast(msg: object, options: { global?: boolean } = {}) {
+  const rooted = !options.global && 'type' in msg && ['tree', 'comments', 'workspace'].includes(String(msg.type))
+  const root = workspacePaths.root
+  const payload = JSON.stringify(msg), scopedPayload = JSON.stringify({ ...msg, workspacePath: root })
   for (const client of wss.clients) {
-    if (client.readyState === WebSocket.OPEN) client.send(payload)
+    const state = clientState.get(client)
+    if (rooted && state && !subscribedScope(state, root)) continue
+    if (client.readyState === WebSocket.OPEN) client.send(rooted && state && (state.explicitConnection || state.subscriptions.length) ? scopedPayload : payload)
   }
 }
 
@@ -81,7 +113,8 @@ export function broadcastAccount(email: string, msg: object) {
   const payload = JSON.stringify(msg)
   for (const [client, state] of clientState) {
     const auth = state.getAuth()
-    if (client.readyState === WebSocket.OPEN && !auth.mustChangePassword && auth.email === email) client.send(payload)
+    if (client.readyState === WebSocket.OPEN && !auth.mustChangePassword && auth.email === email
+      && !(state.explicitConnection && 'type' in msg && msg.type === 'workspace')) client.send(payload)
   }
 }
 
@@ -97,36 +130,50 @@ export function treeSignalFor(
 }
 
 export function broadcastTree(msg: { type: 'tree'; project: string; version: number; parents: string[] }) {
-  const scoped = JSON.stringify(msg)
-  const guest = JSON.stringify({ type: 'tree' })
+  const root = workspacePaths.root
   for (const client of wss.clients) {
     if (client.readyState !== WebSocket.OPEN) continue
-    const auth = clientState.get(client)?.auth
-    client.send(auth && treeSignalFor(auth, msg) === msg ? scoped : guest)
+    const state = clientState.get(client)
+    const scope = state && subscribedScope(state, root)
+    if (state && !scope) continue
+    const signal = state && scope ? workspaceContext.run(scope, () => treeSignalFor(state.auth, msg)) : { type: 'tree' }
+    client.send(JSON.stringify(state && (state.explicitConnection || state.subscriptions.length) ? { ...signal, workspacePath: root } : signal))
   }
 }
 
 function sendParticipantsTo(ws: WebSocket, auth: RequestAuth, sessions: ActiveMewSession[]) {
   if (ws.readyState !== WebSocket.OPEN) return
   const state = clientState.get(ws)
+  if (!state) return
+  const root = clientRoot(state)
+  const roots = new Map([...clientState.values()].map(client => [client.session.id, clientRoot(client)]))
   const activeSessions = auth.role !== 'guest' && !auth.mustChangePassword && state
-    ? { selfId: state.session.id, sessions: sessions.map(session => session.project && !fileAccess(auth, session.project, session.path ?? '').view ? { ...session, path: null, workspaceLabel: null, project: null } : session) } : undefined
-  ws.send(JSON.stringify({ type: 'participants', participants: computeParticipants(auth), activeSessions }))
+    ? { selfId: state.session.id, sessions: sessions.map(session => session.project && (roots.get(session.id) !== root || !fileAccess(auth, session.project, session.path ?? '').view) ? { ...session, path: null, workspaceLabel: null, project: null } : session) } : undefined
+  const workspaceParticipants = Object.fromEntries(state.subscriptions.flatMap(saved => {
+    const scope = currentPresenceScope(saved, auth)
+    return scope ? [[scope.root, workspaceContext.run(scope, () => computeParticipants(auth, scope.root))]] : []
+  }))
+  ws.send(JSON.stringify({ type: 'participants', participants: computeParticipants(auth, root), ...(state.subscriptions.length ? { workspaceParticipants } : {}), activeSessions }))
 }
 
 function broadcastParticipants() {
   // Revalidate before sharing identities, including after logout/password changes.
   for (const state of clientState.values()) {
     const auth = state.getAuth()
+    const scope = currentPresenceScope(state.scope, auth)
+    if (scope) state.scope = scope
+    else if (state.scope.explicit) { state.path = null; state.session = { ...state.session, project: null, path: null, workspaceLabel: null } }
     const nextAuth = auth.mustChangePassword ? { ...auth, role: 'guest' as const, email: null } : auth
     state.auth = nextAuth
   }
   const sessions = publicSessions()
-  for (const [ws, state] of clientState) sendParticipantsTo(ws, state.auth, sessions)
+  for (const [ws, state] of clientState) inClientWorkspace(state, () => sendParticipantsTo(ws, state.auth, sessions))
 }
 
 function registerClient(ws: WebSocket, req: IncomingMessage, getAuth: () => RequestAuth) {
+  const scope = { ...(workspaceContext.getStore() ?? pathsForWorkspace(workspacePaths.root, getAuth().email)) }
   clientState.set(ws, {
+    scope, explicitConnection: !!scope.explicit, subscriptions: [],
     path: null, color: FALLBACK_COLOR, auth: getAuth(), observedAt: Date.now(), alive: true, getAuth,
     session: {
       id: randomUUID(), email: null, displayName: null, connectedAt: Date.now(),
@@ -138,21 +185,44 @@ function registerClient(ws: WebSocket, req: IncomingMessage, getAuth: () => Requ
   ws.on('pong', () => { const state = clientState.get(ws); if (state) { state.alive = true; state.observedAt = Date.now() } })
 
   ws.on('message', (raw) => {
-    let msg: { type?: string; path?: unknown; color?: unknown; project?: unknown; workspaceLabel?: unknown; visible?: unknown; runningAgents?: unknown }
+    let msg: { type?: string; path?: unknown; color?: unknown; project?: unknown; workspaceLabel?: unknown; visible?: unknown; runningAgents?: unknown; workspaceScope?: unknown; scopes?: unknown }
     try {
       msg = JSON.parse(raw.toString())
     } catch {
       return
     }
     if (!msg || typeof msg !== 'object') return
+    if (msg.type === 'workspace-subscriptions') {
+      const state = clientState.get(ws)
+      if (!state || !Array.isArray(msg.scopes) || msg.scopes.length > 50) return
+      try {
+        const scopes = msg.scopes.map((requested: WorkspaceScope) => {
+          if (!requested || typeof requested.workspacePath !== 'string' || typeof requested.projectPath !== 'string') throw new Error('Invalid scope')
+          return resolveWorkspaceScope(getAuth(), requested)
+        })
+        state.subscriptions = [...new Map(scopes.map(scope => [scope.root, scope])).values()]
+      } catch { return }
+      broadcastParticipants()
+      return
+    }
     if (msg.type === 'focus' && (typeof msg.path === 'string' || msg.path === null)) {
       if (typeof msg.path === 'string' && msg.path.length > 4096) return
       const color = typeof msg.color === 'string' ? msg.color : FALLBACK_COLOR
       const prev = clientState.get(ws)
       if (!prev) return
+      let scope = prev.scope
+      if (msg.workspaceScope === null) {
+        if (prev.explicitConnection) return
+        scope = runAccountWorkspace(getAuth().email, () => ({ ...workspaceContext.getStore()! }))
+      } else if (msg.workspaceScope !== undefined) {
+        const requested = msg.workspaceScope as WorkspaceScope
+        if (!requested || typeof requested.workspacePath !== 'string' || typeof requested.projectPath !== 'string') return
+        try { scope = resolveWorkspaceScope(getAuth(), requested) } catch { return }
+        if (prev.explicitConnection && (scope.root !== prev.scope.root || scope.projectPath !== prev.scope.projectPath)) return
+      }
       const focused = msg.path ? splitProjectPath(msg.path) : null
       const running = validRunningAgentCount(msg.runningAgents)
-      clientState.set(ws, { ...prev, observedAt: Date.now(), path: msg.path || null, color, session: {
+      clientState.set(ws, { ...prev, scope, observedAt: Date.now(), path: msg.path || null, color, session: {
         ...prev.session,
         project: focused?.project ?? (typeof msg.project === 'string' ? msg.project.slice(0, 200) : null),
         path: focused?.relPath ?? null,
@@ -196,11 +266,17 @@ export function attachPresenceWebSocket(
     // 이 경로가 아니면 손대지 않고 통과시킨다 — tmux·Vite HMR 웹소켓 업그레이드와 공존해야 함
     if (url.pathname !== WS_PATH) return
     if (!webSocketOriginAllowed(req)) { socket.write('HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n'); socket.destroy(); return }
-    wss.handleUpgrade(req, socket, head, (ws) => {
-      clients.add(ws)
-      ws.once('close', () => clients.delete(ws))
-      registerClient(ws, req, () => opts.getAuth ? opts.getAuth(req) : OWNER_AUTH)
-    })
+    const getAuth = () => opts.getAuth ? opts.getAuth(req) : OWNER_AUTH
+    try {
+      runRequestWorkspace(req, getAuth(), () => wss.handleUpgrade(req, socket, head, (ws) => {
+        clients.add(ws)
+        ws.once('close', () => clients.delete(ws))
+        registerClient(ws, req, getAuth)
+      }))
+    } catch (error) {
+      const status = error instanceof WorkspaceScopeError ? error.status : 403
+      if (!socket.destroyed) { socket.write(`HTTP/1.1 ${status} Rejected\r\nConnection: close\r\n\r\n`); socket.destroy() }
+    }
   })
 }
 

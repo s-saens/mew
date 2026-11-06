@@ -1,3 +1,4 @@
+import { useWorkspaceApi } from '../api/workspace-api-context'
 import { RuntimeInstallProgress } from './RuntimeInstallProgress'
 import { subscribeAgentRuntimes } from '../utils/agentPickerCache'
 import { uiText } from '@mew/ui/i18n-core'
@@ -9,17 +10,7 @@ import { useEffect, useId, useState } from 'react'
 import { ConfirmDialog, DialogFrame } from '@mew/ui'
 import { AgentAccountCard } from './AgentAccountCard'
 import { SUBSCRIPTION_URLS } from '../../shared/agent-access'
-import {
-  deleteAgentRuntimeSetting,
-  fetchAgentRuntimes,
-  fetchAgentRuntimeSetting,
-  installAgentRuntime,
-  logoutAgentRuntime,
-  saveAgentRuntimeSetting,
-  type RuntimeSettingView,
-  type AgentRuntimeStatus,
-  uninstallAgentRuntime,
-} from '../api/client'
+import { type RuntimeSettingView, type AgentRuntimeStatus } from '../api/client'
 
 const GEAR_GLYPH = (
   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -54,6 +45,7 @@ export function RuntimeSettingsButton({ runtimeId, label }: { runtimeId: string;
 type EnvRow = { key: string; value: string; secret: boolean }
 
 function RuntimeSettingsModal({ runtimeId, label, onClose }: { runtimeId: string; label: string; onClose: () => void }) {
+  const { fetchAgentRuntimeSetting, fetchAgentRuntimes, saveAgentRuntimeSetting, deleteAgentRuntimeSetting, installAgentRuntime, uninstallAgentRuntime, logoutAgentRuntime } = useWorkspaceApi()
   useUiLocale()
   const titleId = useId()
   const [cmd, setCmd] = useState('')
@@ -97,11 +89,11 @@ function RuntimeSettingsModal({ runtimeId, label, onClose }: { runtimeId: string
     return () => {
       alive = false
     }
-  }, [runtimeId])
+  }, [runtimeId, fetchAgentRuntimeSetting])
 
   useEffect(() => {
     void fetchAgentRuntimes().then(({ runtimes }) => setRuntime(runtimes.find((item) => item.id === runtimeId) ?? null)).catch(() => {})
-  }, [runtimeId])
+  }, [runtimeId, fetchAgentRuntimes])
 
   useEffect(() => subscribeAgentRuntimes(items => setRuntime(items.find(item => item.id === runtimeId) ?? null)), [runtimeId])
 

@@ -14,11 +14,13 @@ registerHooks({ resolve(specifier, context, nextResolve) {
   if (specifier === '@mew/shortcuts') return { url: new URL('../../packages/shortcuts/src/numberedTab.ts', import.meta.url).href, shortCircuit: true }
   if (specifier === '@mew/ui/browser-storage-scope') return { url: new URL('../../packages/ui/src/browser-storage-scope.ts', import.meta.url).href, shortCircuit: true }
   if (specifier === '../utils/numbered-panel-tabs') return { url: new URL('../utils/numbered-panel-tabs.ts', import.meta.url).href, shortCircuit: true }
+  if (specifier === '../workspace/workspace-view-context') return { url: new URL('../workspace/workspace-view-context.ts', import.meta.url).href, shortCircuit: true }
   return nextResolve(specifier, context)
 } })
 const [{ act, createElement, useEffect }, { createRoot }, { useFocusedWorkspacePanel }] = await Promise.all([
   import('react'), import('react-dom/client'), import('./use-focused-workspace-panel.ts'),
 ])
+const { WorkspaceViewProvider } = await import('../workspace/workspace-view-context.ts')
 function Harness() { useFocusedWorkspacePanel(); return null }
 
 test('desktop last panel belongs to the account across projects and remounts without moving DOM focus', async () => {
@@ -216,5 +218,59 @@ test('Alt+Q and Alt+Shift+E cycle tabs in the focused panel and exclude other mo
     assert.equal(selected.length, 8)
   } finally {
     await act(async () => root.unmount()); host.remove()
+  }
+})
+
+test('compact workspace focus, portalled tab headers, and keyboard listeners belong to their active project view', async () => {
+  localStorage.clear()
+  const host = document.createElement('div'); document.body.append(host)
+  const selected: string[] = []
+  for (const id of ['a', 'b']) {
+    const view = document.createElement('div')
+    view.dataset.projectPanel = id
+    view.innerHTML = `<section data-workspace-panel="terminal" data-dock-panel="terminal"><div data-dock-tab-bar><button role="tab">${id}1</button><button role="tab">${id}2</button></div></section><div data-workspace-panel="terminal" data-dock-body="terminal"><textarea></textarea></div><section data-workspace-panel="agent"><textarea></textarea></section><div data-mount></div>`
+    host.append(view)
+    for (const button of view.querySelectorAll('button')) button.addEventListener('click', () => selected.push(button.textContent!))
+  }
+  const views = [...host.children] as HTMLElement[]
+  const roots = views.map(view => createRoot(view.querySelector('[data-mount]')!))
+  const current = new Map<string, ReturnType<typeof useFocusedWorkspacePanel>>()
+  const refs = views.map(view => ({ current: view }))
+  function ScopedHarness({ id }: { id: string }) {
+    const value = useFocusedWorkspacePanel('same-account')
+    useEffect(() => { current.set(id, value) }, [id, value])
+    return null
+  }
+  const render = async (active: 'a' | 'b') => act(async () => {
+    roots.forEach((root, index) => {
+      const id = index ? 'b' : 'a'
+      root.render(createElement(WorkspaceViewProvider, { value: { id, compact: true, active: active === id, root: refs[index] } }, createElement(ScopedHarness, { id })))
+    })
+  })
+  const press = (target: HTMLElement) => {
+    const event = new window.KeyboardEvent('keydown', { key: '2', code: 'Digit2', ctrlKey: true, bubbles: true, cancelable: true })
+    target.dispatchEvent(event)
+    return event
+  }
+  try {
+    await render('a')
+    const firstInput = views[0].querySelector('textarea')!, secondInput = views[1].querySelector('textarea')!
+    await act(async () => { firstInput.focus(); assert.equal(press(firstInput).defaultPrevented, true) })
+    assert.deepEqual(selected, ['a2'])
+    await act(async () => current.get('b')![2]('terminal'))
+    assert.notEqual(document.activeElement, secondInput, 'inactive views cannot steal focus')
+    await render('b')
+    await act(async () => { secondInput.focus(); assert.equal(press(secondInput).defaultPrevented, true) })
+    assert.deepEqual(selected, ['a2', 'b2'], 'duplicate dock IDs resolve the active view header')
+    await act(async () => current.get('b')![2]('agent'))
+    assert.equal(document.activeElement, views[1].querySelectorAll('textarea')[1])
+    await render('a')
+    assert.equal(current.get('a')![0], 'terminal')
+    assert.equal(current.get('b')![0], 'agent', 'view selections are independently retained')
+    await act(async () => current.get('a')![2]('terminal'))
+    assert.equal(document.activeElement, views[0].querySelectorAll('button')[1], 'focus returns inside the requested project')
+  } finally {
+    await act(async () => { roots.forEach(root => root.unmount()) })
+    host.remove(); localStorage.clear()
   }
 })

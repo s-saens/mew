@@ -1,7 +1,10 @@
+import { useSharedWorkspacePresence } from '../workspace/workspace-presence'
+import { useWorkspaceView } from '../workspace/workspace-view-context'
+import { useWorkspaceApi } from '../api/workspace-api-context'
 import { openMewSocket } from '../utils/remote-transport.ts'
 import { writeBrowserStorage } from '@mew/ui/browser-storage'
 import { useEffect, useRef, useState } from 'react'
-import { forgetSavedProject } from '../api/client'
+
 import { identityColor } from '../utils/collabColor'
 import type { ActiveMewSessions } from '../../shared/active-sessions'
 import { SESSION_ACTIVITY_INTERVAL_MS } from '../../shared/active-sessions'
@@ -24,7 +27,16 @@ export function usePresence(
   onWorkspaceChange?: (initialProject?: string) => void,
   workspaceLabel: string | null = null,
   runningAgents = 0,
+  workspacePath?: string | null,
 ): { participants: Record<string, string[]>; activeSessions: ActiveMewSessions | null } {
+  const api = useWorkspaceApi()
+  const { forgetSavedProject } = api
+  const view = useWorkspaceView()
+  const shared = useSharedWorkspacePresence({ scope: api.scope, workspacePath, active: view?.active ?? true,
+    focus: { path: qualify(project, focusedPath), project, workspaceLabel, color: identityColor(authEmail), runningAgents },
+    tree: onTreeChange, workspace: onWorkspaceChange,
+  })
+  const enabled = shared.connection === null
   const [participants, setParticipants] = useState<Record<string, string[]>>({})
   const [activeSessions, setActiveSessions] = useState<ActiveMewSessions | null>(null)
   const wsRef = useRef<WebSocket | null>(null)
@@ -62,6 +74,7 @@ export function usePresence(
   }, [project, focusedPath, workspaceLabel, authEmail, runningAgents])
 
   useEffect(() => {
+    if (!enabled) return
     let cancelled = false
     let ws: WebSocket | null = null
     let retryTimer: ReturnType<typeof setTimeout> | null = null
@@ -159,7 +172,7 @@ export function usePresence(
     }
     // focusMessage only reads refs; reconnect only when the identity changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authEmail])
+  }, [authEmail, enabled])
 
-  return { participants, activeSessions }
+  return shared.connection ? shared.state : { participants, activeSessions }
 }

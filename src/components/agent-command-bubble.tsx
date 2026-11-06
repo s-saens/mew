@@ -1,9 +1,10 @@
+import { useWorkspaceApi } from '../api/workspace-api-context.tsx'
 import { uiText } from '@mew/ui/i18n-core'
 import { useUiLocale } from '@mew/ui/i18n'
 import { useEffect, useState } from 'react'
 import { Terminal as TerminalIcon, NavArrowRight } from 'iconoir-react'
 import type { AgentCommandRecord } from '../../shared/agent-command'
-import { agentCommandArchiveUrl, readAgentCommandOutput, stopAgentCommand } from '../api/agent-commands'
+
 import { formatDuration } from '../utils/agentFold'
 import { SessionTerminalPopup } from './SessionTerminalPopup'
 
@@ -34,6 +35,7 @@ export function AgentCommandBubble({ command, onOpen }: { command: AgentCommandR
 }
 
 export function AgentCommandPopup({ command, onClose, onChanged, onCancel }: { command: AgentCommandRecord; onClose: () => void; onChanged: () => void; onCancel?: () => void }) {
+  const { agentCommandArchiveUrl, readAgentCommandOutput, stopAgentCommand } = useWorkspaceApi()
   useUiLocale()
   const [output, setOutput] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -46,7 +48,7 @@ export function AgentCommandPopup({ command, onClose, onChanged, onCancel }: { c
     void readAgentCommandOutput(command.id).then(result => { if (!disposed) setOutput(result.text) })
       .catch(error => { if (!disposed) setError(error instanceof Error ? error.message : String(error)) })
     return () => { disposed = true }
-  }, [command.id, running, attempt])
+  }, [command.id, running, attempt, readAgentCommandOutput])
   return <SessionTerminalPopup
     title={uiText("CLI 실행")} subtitle={command.command} session={command.session} running={running}
     statusNote={`${stateLabels[command.state]}${command.exitCode === null ? '' : uiText(" · 종료 코드 {p0}", { p0: command.exitCode })}${command.error ? ` · ${command.error}` : ''}`}

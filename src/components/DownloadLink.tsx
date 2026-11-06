@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { ActionMenuItem, useToast } from '@mew/ui'
-import { getAppRuntime, prepareAppResourceUrl } from '../runtime/app-runtime.ts'
+import { useWorkspaceApi } from '../api/workspace-api-context'
 import { createPortal } from 'react-dom'
 import { downloadSize, formatDownloadSize, isLargeDownload, isMobileCellularConnection } from '../utils/largeDownload'
 import { useI18n } from '../i18n'
@@ -14,6 +14,7 @@ interface PendingDownload {
 
 /** 모바일 셀룰러에서만, 100MiB 초과 파일을 실제 내려받기 전에 확인한다. */
 export function DownloadLink({ href, name, className, children, onStarted, overlayContainer, menuIcon }: { href: string; name: string; className?: string; children: ReactNode; onStarted?: () => void; overlayContainer?: HTMLElement | null; menuIcon?: ReactNode }) {
+  const { scopedUrl, prepareResourceUrl, releaseResourceUrl } = useWorkspaceApi()
   const [pending, setPending] = useState<PendingDownload | null>(null)
   const { t } = useI18n()
   const { toast, showToast } = useToast()
@@ -23,16 +24,14 @@ export function DownloadLink({ href, name, className, children, onStarted, overl
   const overlay = (content: ReactNode) => overlayContainer ? createPortal(content, overlayContainer) : content
 
   async function startDownload(target: string, filename: string) {
-    if (!getAppRuntime().prepareResourceUrl) { beginDownload(target, filename, onStarted); return }
     if (preparation.current) return
     const controller = new AbortController()
     preparation.current = controller; setBusy(true)
     try {
-      const prepared = await prepareAppResourceUrl(target, controller.signal)
+      const prepared = await prepareResourceUrl(target, controller.signal)
       controller.signal.throwIfAborted()
       beginDownload(prepared, filename, onStarted)
-      const release = getAppRuntime().releaseResourceUrl
-      if (release) setTimeout(() => release(prepared), 1000)
+      setTimeout(() => releaseResourceUrl(prepared), 1000)
     } catch (error) {
       if (!controller.signal.aborted) showToast(error instanceof Error ? error.message : String(error))
     } finally {
@@ -42,20 +41,23 @@ export function DownloadLink({ href, name, className, children, onStarted, overl
   }
 
   async function requestDownload() {
+    let target: string
+    try { target = scopedUrl(href) }
+    catch (error) { showToast(error instanceof Error ? error.message : String(error)); return }
     if (!isMobileCellularConnection()) {
-      await startDownload(href, name)
+      await startDownload(target, name)
       return
     }
     try {
-      const size = await downloadSize(href)
+      const size = await downloadSize(target)
       if (size !== null && isLargeDownload(size)) {
-        setPending({ href, name, size })
+        setPending({ href: target, name, size })
         return
       }
     } catch {
       // 네트워크·HEAD 제한은 다운로드 자체를 막을 이유가 아니다.
     }
-    await startDownload(href, name)
+    await startDownload(target, name)
   }
 
   return (

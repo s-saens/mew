@@ -1,3 +1,4 @@
+import { useWorkspaceApi } from '../../api/workspace-api-context'
 import { uiText } from '@mew/ui/i18n-core'
 import { useUiLocale } from '@mew/ui/i18n'
 // 홈 탭의 본문 — 프로젝트가 아니라 **워크스페이스 전체**를 보는 화면이다.
@@ -7,7 +8,7 @@ import { useUiLocale } from '@mew/ui/i18n'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useOverlayDismiss } from '@mew/ui'
 import { MoreHoriz, NavArrowDown, NavArrowUp, Refresh } from 'iconoir-react'
-import { createTodo, deleteTodo, fetchTodos, updateTodo, type ProjectInfo, type TodoItem, type TodoStatus, type TodoType } from '../../api/client'
+import { type ProjectInfo, type TodoItem, type TodoStatus, type TodoType } from '../../api/client'
 import { useGridDrag } from '../../hooks/useGridDrag'
 import { useI18n } from '../../i18n'
 import {
@@ -31,6 +32,7 @@ type TodoChange = {
 }
 
 export function HomePanel({ projects }: { projects: ProjectInfo[] }) {
+  const { fetchTodos, createTodo, updateTodo, deleteTodo } = useWorkspaceApi()
   useUiLocale()
   const { t } = useI18n()
   const [items, setItems] = useState<TodoItem[]>([])
@@ -69,7 +71,7 @@ export function HomePanel({ projects }: { projects: ProjectInfo[] }) {
           refreshTodos()
         }
       })
-  }, [])
+  }, [fetchTodos])
 
   useEffect(refresh, [refresh])
 
@@ -140,7 +142,7 @@ export function HomePanel({ projects }: { projects: ProjectInfo[] }) {
         },
       )
     },
-    [enqueueMutation, sortItems],
+    [enqueueMutation, sortItems, createTodo],
   )
 
   const applyChange = useCallback(
@@ -159,7 +161,7 @@ export function HomePanel({ projects }: { projects: ProjectInfo[] }) {
         await updateTodo(serverId, todoChangeFromSnapshot(next))
       }, uiText("고치지 못했습니다"))
     },
-    [enqueueMutation, sortItems],
+    [enqueueMutation, sortItems, updateTodo],
   )
 
   const removeItem = useCallback(
@@ -176,7 +178,7 @@ export function HomePanel({ projects }: { projects: ProjectInfo[] }) {
         serverTodoIdsRef.current.delete(serverId)
       }, uiText("삭제하지 못했습니다"))
     },
-    [enqueueMutation],
+    [enqueueMutation, deleteTodo],
   )
 
   const changeLayout = (next: HomeLayout) => {

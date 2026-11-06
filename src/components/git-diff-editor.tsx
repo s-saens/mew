@@ -1,14 +1,16 @@
+import { useWorkspaceApi } from '../api/workspace-api-context'
 import { useEffect, useState } from 'react'
 import { Page } from 'iconoir-react'
 import { HoverTipLayer } from '@mew/ui'
 import { uiText } from '@mew/ui/i18n-core'
 import { useUiLocale } from '@mew/ui/i18n'
-import { fetchGitDiff, fetchGitWorkingTree, fetchGitWorkingTreeDiff } from '../api/client'
+
 import { gitDiffTarget } from '../utils/git-diff-tabs'
-import { subscribeLive } from '../utils/live-updates'
+
 import { DiffView } from './git-diff-view'
 
 export function GitDiffEditor({ path, visible, onOpenFile }: { path: string; visible: boolean; onOpenFile: (project: string, path: string) => void }) {
+  const { fetchGitWorkingTree, fetchGitDiff, fetchGitWorkingTreeDiff, subscribeLive } = useWorkspaceApi()
   useUiLocale()
   const [diff, setDiff] = useState('')
   const [loading, setLoading] = useState(true)
@@ -49,7 +51,7 @@ export function GitDiffEditor({ path, visible, onOpenFile }: { path: string; vis
       alive = false
       unsubscribe?.()
     }
-  }, [path, visible])
+  }, [path, visible, fetchGitWorkingTree, fetchGitDiff, fetchGitWorkingTreeDiff, subscribeLive])
   if (!target) return null
   return <div data-git-diff-editor className="mew-panel-surface flex min-h-0 min-w-0 flex-1 flex-col bg-surface-raised">
     <HoverTipLayer className="flex h-9 shrink-0 items-center gap-2 border-b border-edge px-2">

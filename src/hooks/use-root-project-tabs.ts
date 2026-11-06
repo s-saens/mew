@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
-import { writeBrowserStorage } from '@mew/ui/browser-storage'
 import { fetchRootProjectTabs, saveRootProjectTabs } from '../api/client.ts'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { writeBrowserStorage } from '@mew/ui/browser-storage'
+
 
 export function useRootProjectTabs(enabled: boolean, trackRefresh: <T>(request: Promise<T>) => Promise<T>) {
   const [paths, setPaths] = useState<string[]>([])
@@ -39,5 +40,5 @@ export function useRootProjectTabs(enabled: boolean, trackRefresh: <T>(request: 
     return () => { current = false }
   }, [enabled, paths, synced])
 
-  return { paths, setPaths, icons, setIcons, synced, saveQueue }
+  return useMemo(() => ({ paths, setPaths, icons, setIcons, synced, saveQueue }), [paths, icons, synced])
 }

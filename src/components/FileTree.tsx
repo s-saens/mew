@@ -1,3 +1,4 @@
+import { useWorkspaceApi } from '../api/workspace-api-context'
 import { scopedBrowserStorage } from '@mew/ui/browser-storage-scope'
 import { ArrowUpRight, Download } from 'iconoir-react'
 import { useI18n } from '../i18n'
@@ -12,7 +13,6 @@ import type { SidebarCreateRequest } from '../hooks/use-sidebar-create'
 import { writeBrowserStorage } from '@mew/ui/browser-storage'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { TreeNode } from '../api/client'
-import { copyFile, copyInto, createSubproject, createFolder, createNewDocument, mutateDocumentPage, deleteFile, downloadUrl, initializeGitRepository, renamePath, uploadInto } from '../api/client'
 import { ConfirmDialog, setPathDragData, useDialog } from '@mew/ui'
 import { getBinding, matchesShortcut } from '@mew/shortcuts'
 import { PresenceDots } from './PresenceDots'
@@ -699,6 +699,7 @@ export function FileTree({
   /** 저장소 폴더의 Git 워크벤치 가상 탭을 연다. */
   onOpenGit?: (path: string) => void
 }) {
+  const { createSubproject, initializeGitRepository, mutateDocumentPage, copyFile, deleteFile, renamePath, createNewDocument, createFolder, copyInto, uploadInto, downloadUrl } = useWorkspaceApi()
   const { t } = useI18n()
   const persistedProject = stateKey ?? project
   const searchActive = search !== undefined

@@ -1,3 +1,9 @@
+import { createPortal } from 'react-dom'
+import { WorkspaceApplication, type ProjectWorkspaceHost } from './workspace/workspace-application'
+import { WorkspaceAccountProvider, WorkspaceMewcat, useWorkspaceAccount, useWorkspaceBrowser } from './workspace/workspace-account'
+import { WorkspacePresenceProvider } from './workspace/workspace-presence'
+import { useWorkspaceDesktop, useWorkspaceView } from './workspace/workspace-view-context'
+import { WorkspaceApiProvider, useWorkspaceApi } from './api/workspace-api-context'
 import { scopedBrowserStorage } from '@mew/ui/browser-storage-scope'
 import { HeaderResources } from './components/header-resources'
 import { RuntimeControls } from './runtime/runtime-controls'
@@ -6,10 +12,10 @@ import { headerIconControlClassName } from './components/header-control'
 import { LayoutPresets } from './components/layout-presets'
 import { factoryLayout, editorIds, layoutPresetsKey, legacyLayoutPresetsKey, normalizeLayoutSnapshot, type LayoutSnapshot } from './utils/layout-presets'
 import { loadFloatingRect, restoreFloatingRect } from './hooks/use-floating-panel'
-import { createDeviceLayoutSession } from './utils/device-layout'
+import { useDeviceLayout } from './hooks/use-device-layout'
 import { useToolPresentation, setToolPresentation } from './hooks/use-tool-presentation'
 import { Clock, Computer, Download, Folder, Globe, Link, Settings, User } from 'iconoir-react'
-import { fetchUpdatesStatus } from './api/client'
+
 import { uuid } from './utils/uuid'
 import type { MewcatAction } from '../shared/mewcat-assistant'
 import { writeAgentInputDraft } from './utils/agentInputDrafts'
@@ -17,7 +23,6 @@ import { GitLoginDialog } from './components/github-account'
 import { uiText } from '@mew/ui/i18n-core'
 import { useUiLocale } from '@mew/ui/i18n'
 import { useRefreshTasks } from './hooks/use-refresh-tasks'
-import { useRootProjectTabs } from './hooks/use-root-project-tabs'
 import { projectWorkspaceView } from './utils/project-workspace-view'
 import { useFocusedWorkspacePanel } from './hooks/use-focused-workspace-panel'
 import { defaultCapabilities } from '../shared/access-policy'
@@ -28,31 +33,7 @@ import { workspaceEditorPreparations } from './utils/workspace-editor-preparatio
 import { createDeferredModulePreparation } from './utils/deferred-module-preparation'
 import { prepareEditorView } from './components/deferred-editor-views'
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import {
-  createEditorApi,
-  fetchAgentTabs,
-  fetchMewUpdateStatus,
-  fetchRootProjectTabs,
-  deleteRegisteredProject,
-  fetchWorkspaceUi,
-  fetchRootProjectIcons,
-  saveRootProjectIcon,
-  fetchWorkspace,
-  fetchFile,
-  fetchTreeV1,
-  isArchivedPath,
-  revertFileToCommit,
-  runMewAction,
-  setProject,
-  saveWorkspaceUi,
-  switchWorkspace,
-  openSubproject,
-  type RegisteredProject,
-  type AuthStatus,
-  type MewUpdateStatus,
-  type TreeNode,
-  type WorkspaceUiState,
-} from './api/client'
+import { workspaceClient, type RegisteredProject, type AuthStatus, type MewUpdateStatus, type TreeNode, type WorkspaceUiState, type WorkspaceInfo } from './api/client'
 import { ProjectSwitcher } from './components/ProjectSwitcher'
 import { ProjectLoadingOverlay } from './components/project-loading-overlay'
 import { projectDeleteCopy } from './components/project-delete-copy'
@@ -64,8 +45,6 @@ import { MobileDock } from './components/mobile-dock'
 import { useDockPreferences } from './hooks/use-dock-preferences'
 import { useMobileKeyboard } from './hooks/use-mobile-keyboard'
 import { adjacentDockPanel, type MobileDockPanel } from './utils/mobile-dock'
-import { useMewcatNotifications } from './hooks/use-mewcat-notifications'
-import { useChatNotifications } from './hooks/use-chat-notifications'
 import { OPEN_NOTICE_EVENT, publishMewcatNotice, type MewcatNotice } from './utils/mewcat-notifications'
 import { SidebarCreateButtons } from './components/sidebar-create-buttons'
 import { ScopeToggle } from './components/scope-toggle'
@@ -78,7 +57,6 @@ import type { RequestedAgentTab } from './utils/agentTabs'
 import { taskAgentFile } from './utils/task-agent'
 import { fileAgentDraft, fileAgentTitle } from './utils/file-agent'
 import { resolveTaskAgentLaunch } from './utils/task-agent-launch'
-import { fetchTaskList } from './api/task-list'
 import { syncTaskDocuments, withTaskDocumentSync } from './utils/task-document-sync'
 import { documentAbsolutePath } from './utils/document-title-preview'
 import { DockWorkspace, DockPanel, type DockHandle } from './components/DockWorkspace'
@@ -114,11 +92,10 @@ import { WORKSPACE_PROJECT } from './utils/active-project'
 import { editorFile, editorTabPath, workspaceDocumentFile } from './utils/editor-files'
 import { useWorkspacePanelDismissals } from './hooks/use-panel-dismissals'
 import { useI18n } from './i18n'
-import { applyFontPreferences, loadFontPreferences, normalizeFontPreferences, saveFontPreferences } from './utils/fontPreferences'
-import { useAccountTheme } from './hooks/use-account-theme'
+import { normalizeFontPreferences } from './utils/fontPreferences'
 import { useAccountEditorTabs } from './hooks/use-account-editor-tabs'
 import { IconPackProvider } from './components/icon-pack-context'
-import { loadMewcatSkin, saveMewcatSkin, loadMewcatHideDesktop, MEWCAT_HIDE_DESKTOP_KEY, type MewcatSkinSelection } from './utils/mewcatSkin'
+import { MEWCAT_HIDE_DESKTOP_KEY } from './utils/mewcatSkin'
 import { externalTabPath, isExternalTabPath } from './utils/externalFiles'
 import { loadSidebarState, saveSidebarState } from './utils/sidebarState'
 import { gitDiffTabPath, gitDiffTarget } from './utils/git-diff-tabs'
@@ -141,12 +118,11 @@ const UpdatesModal = deferredDialog(async () => ({ default: (await import('./com
 const TaskPanel = deferredComponent(async () => ({ default: (await import('./components/task-panel')).TaskPanel }))
 const SharedMemo = deferredComponent(async () => ({ default: (await import('./components/shared-memo')).SharedMemo }))
 const ProjectCreationAgentDialog = deferredDialog(async () => ({ default: (await import('./components/ProjectCreationAgentDialog')).ProjectCreationAgentDialog }), {
-  title: t => t('project.createWithAgent'), className: 'flex h-[min(44rem,90dvh)] max-w-3xl flex-col max-md:h-full max-md:rounded-none',
+  title: t => t('project.createWithAgent'), className: 'flex h-[min(44rem,90dvh)] max-w-3xl flex-col workspace-compact:h-full workspace-compact:rounded-none',
 })
 const ProjectAddInline = deferredComponent(async () => ({ default: (await import('./components/project-add-inline')).ProjectAddInline }), null)
 const DocumentGraph = deferredComponent(async () => ({ default: (await import('./components/DocumentGraph')).DocumentGraph }), null)
 const DocsSettingsModal = deferredComponent(async () => ({ default: (await import('./components/DocsSettingsModal')).DocsSettingsModal }), null)
-const Mewcat = deferredComponent(async () => ({ default: (await import('./components/Mewcat')).Mewcat }), null)
 const ServerFileExplorer = deferredDialog(async () => ({ default: (await import('./components/ServerFileExplorer')).ServerFileExplorer }), { title: t => t('header.fileExplorer'), className: 'flex h-[min(680px,90dvh)] max-w-2xl flex-col' })
 const AccountSettingsModal = deferredDialog(async () => ({ default: (await import('./components/AccountSettingsModal')).AccountSettingsModal }), { title: t => t('settings.myAccount'), className: 'flex max-h-[90dvh] max-w-[520px] flex-col' })
 const SettingsModal = deferredDialog(async () => ({ default: (await import('./components/SettingsModal')).SettingsModal }), { title: t => t('settings.title'), size: 'settings', className: 'flex flex-col', overlayClassName: 'z-[var(--layer-settings)]' })
@@ -167,17 +143,15 @@ const TermButtonBar = deferredComponent(async () => ({ default: (await import('.
 const DebuggerPanel = lazy(() => import('./components/debugger-panel'))
 const BrowserDesktopPanel = deferredComponent(async () => ({ default: (await import('./components/BrowserDesktopPanel')).BrowserDesktopPanel }))
 
-const isDesktop = () => window.matchMedia('(min-width: 768px)').matches
 
-const fetchTreeEntries = (project?: string, path = '') => fetchTreeV1(project, path).then((response) => response.entries)
 
-function mobileForegroundPanelKey(rootProjectPath: string): string {
-  return `mew:mobile-foreground-panel:${rootProjectPath}`
+function mobileForegroundPanelKey(rootProjectPath: string, compactAccount?: string): string {
+  return compactAccount ? `mew:project-panel-foreground:${compactAccount}:${rootProjectPath}` : `mew:mobile-foreground-panel:${rootProjectPath}`
 }
 
-function loadMobileForegroundPanel(rootProjectPath: string): MobileForeground | null {
+function loadWorkspaceForegroundPanel(rootProjectPath: string, compactAccount?: string): MobileForeground | null {
   try {
-    const value = scopedBrowserStorage().getItem(mobileForegroundPanelKey(rootProjectPath))
+    const value = scopedBrowserStorage().getItem(mobileForegroundPanelKey(rootProjectPath, compactAccount))
     if (value === 'editor') return value
     return WORKSPACE_PANEL_IDS.includes(value as WorkspacePanelId) ? value as WorkspacePanelId : null
   } catch {
@@ -185,9 +159,9 @@ function loadMobileForegroundPanel(rootProjectPath: string): MobileForeground | 
   }
 }
 
-function saveMobileForegroundPanel(rootProjectPath: string | null, foreground: MobileForeground): void {
+function saveWorkspaceForegroundPanel(rootProjectPath: string | null, foreground: MobileForeground, compactAccount?: string): void {
   try {
-    if (rootProjectPath) writeBrowserStorage(mobileForegroundPanelKey(rootProjectPath), foreground)
+    if (rootProjectPath) writeBrowserStorage(mobileForegroundPanelKey(rootProjectPath, compactAccount), foreground)
   } catch {
     // 다음 접속의 전면 창 기억이 실패해도 지금 선택한 파일은 에디터로 전달한다.
   }
@@ -242,17 +216,36 @@ export interface EditorAppProps {
   onLoggedOut: () => void
   onRequestLogin: () => void
   onProfileChanged: (profile: { displayName: string; avatarDataUrl: string | null }) => void
+  host?: ProjectWorkspaceHost
+  onWorkspaceReady?: (info: WorkspaceInfo) => void
 }
 
-function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileChanged }: EditorAppProps) {
+function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileChanged, host, onWorkspaceReady }: EditorAppProps) {
+  const hostRef = useRef(host)
+  hostRef.current = host
+  const globalOwner = host?.globalOwner ?? true
+  const view = useWorkspaceView()
+  const accountServices = useWorkspaceAccount()
+  const openSharedBrowser = useWorkspaceBrowser()
+  const desktopMode = useWorkspaceDesktop()
+  const isDesktop = useCallback(() => desktopMode, [desktopMode])
+  const active = view?.active ?? true
+  const compact = view?.compact ?? false
+  const api = useWorkspaceApi()
+  const { setProject, fetchWorkspaceUi, saveWorkspaceUi, fetchMewUpdateStatus, fetchUpdatesStatus, runMewAction, fetchRootProjectIcons, saveRootProjectIcon, fetchWorkspace, fetchAgentTabs, switchWorkspace, fetchRootProjectTabs, openSubproject, createEditorApi, revertFileToCommit, fetchFile, fetchTaskList, isArchivedPath, deleteRegisteredProject } = api
+  const fetchTreeEntries = useCallback((project?: string, path = '') => api.fetchTreeV1(project, path).then(response => response.entries), [api])
   useUiLocale()
   const { pending: refreshingWorkspace, track: trackRefresh } = useRefreshTasks()
   const { t, locale } = useI18n()
   const { role, email: authEmail } = auth
+  const foregroundAccount = compact ? authEmail ?? 'guest' : undefined
+  const loadMobileForegroundPanel = useCallback((path: string) => loadWorkspaceForegroundPanel(path, foregroundAccount), [foregroundAccount])
+  const saveMobileForegroundPanel = useCallback((path: string | null, panel: MobileForeground) => saveWorkspaceForegroundPanel(path, panel, foregroundAccount), [foregroundAccount])
+  const viewStorageKey = useCallback((key: string) => compact ? `mew:project-panel-chrome:${authEmail}:${key}` : key, [compact, authEmail])
   const isGuest = role === 'guest'
   const isOwner = role === 'owner'
   const canOpenProjects = !isGuest
-  const caps = useMemo(() => auth.capabilities ?? defaultCapabilities(role), [auth.capabilities, role])
+  const caps = useMemo(() => ({ ...(auth.capabilities ?? defaultCapabilities(role)), ...(compact ? { database: false } : {}) }), [auth.capabilities, role, compact])
   const canUseTerminal = caps.terminal
   const canDebug = caps.terminal && (auth.role === 'owner' || auth.role === 'manager')
 
@@ -271,7 +264,8 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
   const rootProjectPathRef = useRef(rootProjectPath)
   rootProjectPathRef.current = rootProjectPath
   const toolPresentation = useToolPresentation()
-  const deviceLayout = useMemo(() => createDeviceLayoutSession(authEmail ?? 'guest'), [authEmail])
+  const { session: deviceLayout, scopeKey: deviceLayoutScope, restored: deviceLayoutRestored,
+    restore: restoreWorkspaceLayout, save: saveWorkspaceLayout } = useDeviceLayout(authEmail ?? 'guest', projectUiPath, compact, desktopMode)
   const [workspaceUi, setWorkspaceUi] = useState<WorkspaceUiState>({})
   const [workspaceUiLoaded, setWorkspaceUiLoaded] = useState(false)
   const [workspaceUiRevision, setWorkspaceUiRevision] = useState(0)
@@ -290,27 +284,29 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
   useEffect(() => {
     workspaceUiOwnerAlive.current = true
     return () => { workspaceUiOwnerAlive.current = false }
-  }, [])
+  }, [api])
 
-  const readWorkspaceUi = useCallback(async (path: string, signal: AbortSignal) => (await fetchWorkspaceUi(path, signal)).state ?? {}, [])
+  const readWorkspaceUi = useCallback(async (path: string, signal: AbortSignal) => (await fetchWorkspaceUi(path, signal)).state ?? {}, [fetchWorkspaceUi])
   const prepareWorkspaceUi = useCallback((path: string) => workspaceUiCache.current.load(path, signal => readWorkspaceUi(path, signal)), [readWorkspaceUi])
   const previewRootProject = useCallback((path: string) => {
-    if (!canOpenProjects || path === rootProjectPathRef.current) return
+    if (!canOpenProjects || compact || path === rootProjectPathRef.current) return
     // Only explicitly root-keyed UI metadata is safe before the handoff. Do not
     // let sweeping the list flood the connection used by an actual selection.
     void workspaceUiCache.current.prefetch(path, signal => readWorkspaceUi(path, signal))?.catch(() => {})
-  }, [canOpenProjects, readWorkspaceUi])
+  }, [canOpenProjects, compact, readWorkspaceUi])
   const persistWorkspaceUi = useCallback((path: string, state: WorkspaceUiState) => {
+    if (compact) return
     workspaceUiSaveQueue.current = workspaceUiSaveQueue.current.catch(() => {})
       .then(() => workspaceUiOwnerAlive.current ? saveWorkspaceUi(path, state) : undefined).catch(console.error)
-  }, [])
+  }, [compact, saveWorkspaceUi])
   // My Projects is an account-specific shortcut list in the shared registry.
   const { paths: openProjectPaths, setPaths: setOpenProjectPaths, icons: rootProjectIcons, setIcons: setRootProjectIcons,
-    synced: rootProjectTabsSynced, saveQueue: rootProjectSaveQueue } = useRootProjectTabs(canOpenProjects, trackRefresh)
+    synced: rootProjectTabsSynced, saveQueue: rootProjectSaveQueue } = accountServices.projects
   const projectPaths = useMemo(() => [...new Set(openProjectPaths)], [openProjectPaths])
   const [openProjectDialog, setOpenProjectDialog] = useState(false)
   const [hasProject, setHasProject] = useState<boolean | null>(isGuest ? true : null)
-  const projectView = projectWorkspaceView({ canOpenProjects, shortcutsLoaded: rootProjectTabsSynced, paths: projectPaths, hasProject })
+  const [workspaceError, setWorkspaceError] = useState('')
+  const projectView = projectWorkspaceView({ canOpenProjects, shortcutsLoaded: rootProjectTabsSynced, paths: compact && api.scope ? [api.scope.projectPath] : projectPaths, hasProject })
   const [creationAgentProject, setCreationAgentProject] = useState<RegisteredProject | null>(null)
   const [switchingRootProject, setSwitchingRootProject] = useState(false)
   const [pendingRootProjectPath, setPendingRootProjectPath] = useState<string | null>(null)
@@ -324,7 +320,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     rootProjectSwitchRef.current?.controller.abort()
     rootProjectSwitchRef.current = null
     workspaceUiCache.current.cancelPending()
-  }, [])
+  }, [api])
 
   const [tree, setTree] = useState<TreeNode[]>([])
   // 문서와 일반 파일은 같은 에디터를 사용하며 탐색 목록만 전환한다.
@@ -334,26 +330,19 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
   // 루트가 바뀌는 렌더에서는 이전 프로젝트 상태를 새 키에 쓰지 않도록, 복원 한 프레임을 건너뛴다.
   const sidebarStateRestorePendingRef = useRef<string | null>(null)
   const sidebarStateLoadedRootRef = useRef<string | null>(null)
-  const chromeStateLoadedRootRef = useRef<string | null>(null)
+  const chromeStateLoadedScopeRef = useRef<string | null>(null)
   const chromeStateRestorePendingRef = useRef<string | null>(null)
   // 모바일 전면 창은 화면 크기 의존 상태라 계정 원장이 아니라 이 기기에만 남긴다.
   const mobilePanelStackRestorePendingRef = useRef<string | null>(null)
-  const mobilePanelStackRestoredRootRef = useRef<string | null>(null)
+  const mobilePanelStackRestoredScopeRef = useRef<string | null>(null)
   const [treeInvalidation, setTreeInvalidation] = useState<{ n: number; project: string; version: number; parents: string[] }>({ n: 0, project: '', version: 0, parents: [] })
   const [treeRefreshSignal, setTreeRefreshSignal] = useState(0)
   const [focusedWorkspacePanel, setFocusedWorkspacePanel, focusWorkspacePanel] = useFocusedWorkspacePanel(authEmail ?? 'guest')
-  useEffect(() => captureAppKeyboardLock(), [])
-  const [desktopMode, setDesktopMode] = useState(isDesktop)
+  useEffect(() => active ? captureAppKeyboardLock() : undefined, [active, api])
   const dockPreferences = useDockPreferences()
-  const dockPosition = dockPreferences.positions[desktopMode ? 'desktop' : 'mobile']
+  const dockPosition = compact ? 'bottom' : dockPreferences.positions[desktopMode ? 'desktop' : 'mobile']
   const [editorOpen, setEditorOpen] = useState(true)
   initialEditorPreparationAllowed.current = caps.filesRead && (!desktopMode || editorOpen)
-  useEffect(() => {
-    const query = window.matchMedia('(min-width: 768px)')
-    const update = () => setDesktopMode(query.matches)
-    query.addEventListener('change', update)
-    return () => query.removeEventListener('change', update)
-  }, [])
   const [sidebarOpen, setSidebarOpen] = useState(isDesktop)
   // 터미널·에이전트의 기능 권한과 열림 상태는 독립이다.
   const dockRef = useRef<DockHandle>(null)
@@ -366,28 +355,29 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     setProjectSidebarOpen(open)
     try { scopedBrowserStorage().setItem('mew:project-sidebar-open', open ? '1' : '0') } catch { /* session setting */ }
   }, [])
-  useEffect(() => { setProjectSidebarOpen(scopedBrowserStorage().getItem('mew:project-sidebar-open') === '1') }, [authEmail])
-  const [terminalOpen, setTerminalOpen] = useState(() => canUseTerminal && (scopedBrowserStorage().getItem(TERMINAL_OPEN_KEY) !== null ? scopedBrowserStorage().getItem(TERMINAL_OPEN_KEY) === '1' : scopedBrowserStorage().getItem(LEGACY_TMUX_OPEN_KEY) === '1' || scopedBrowserStorage().getItem(AGENT_OPEN_KEY) === '1'))
+  useEffect(() => { setProjectSidebarOpen(scopedBrowserStorage().getItem('mew:project-sidebar-open') === '1') }, [authEmail, api])
+  const [terminalOpen, setTerminalOpen] = useState(() => canUseTerminal && (scopedBrowserStorage().getItem(viewStorageKey(TERMINAL_OPEN_KEY)) !== null ? scopedBrowserStorage().getItem(viewStorageKey(TERMINAL_OPEN_KEY)) === '1' : scopedBrowserStorage().getItem(viewStorageKey(LEGACY_TMUX_OPEN_KEY)) === '1' || scopedBrowserStorage().getItem(viewStorageKey(AGENT_OPEN_KEY)) === '1'))
   const [debuggerOpen, setDebuggerOpen] = useState(false)
   const canOpenBrowser = !!auth.email && (caps.nativeBrowser || caps.portPreview)
   const [browserOpen, setBrowserOpen] = useState(false)
   const [browserUrl, setBrowserUrl] = useState(caps.nativeBrowser ? 'about:blank' : '')
   const [browserNavigationRequest, setBrowserNavigationRequest] = useState(0)
-  const [agentOpen, setAgentOpen] = useState(() => caps.agent && scopedBrowserStorage().getItem(AGENT_OPEN_KEY) === '1')
+  const [agentOpen, setAgentOpen] = useState(() => caps.agent && scopedBrowserStorage().getItem(viewStorageKey(AGENT_OPEN_KEY)) === '1')
   const gitMounted = useRef(false)
-  const [gitOpen, setGitOpen] = useState(() => caps.git && scopedBrowserStorage().getItem(GIT_OPEN_KEY) === '1')
+  const [gitOpen, setGitOpen] = useState(() => caps.git && scopedBrowserStorage().getItem(viewStorageKey(GIT_OPEN_KEY)) === '1')
   const [remoteDesktopOpen, setRemoteDesktopOpen] = useState(false)
   const [requestedAgentTab, setRequestedAgentTab] = useState<RequestedAgentTab | null>(null)
   const [tasksOpen, setTasksOpen] = useState(false)
   const tasksMounted = useRef(false)
   if (tasksOpen) tasksMounted.current = true
   const taskSession = useTaskList(rootProjectPath, caps.filesRead ? auth.email ?? '' : '', tasksOpen)
-  useEffect(() => { setTasksOpen(false) }, [auth.email, caps.filesRead])
+  const flushTasks = taskSession.flush
+  useEffect(() => { setTasksOpen(false) }, [auth.email, caps.filesRead, api])
   const [memoOpen, setMemoOpen] = useState(false)
   const memoMounted = useRef(false)
   if (memoOpen) memoMounted.current = true
   const [memoFocusSignal, setMemoFocusSignal] = useState(0)
-  useEffect(() => { setMemoOpen(false) }, [auth.email, caps.collaboration])
+  useEffect(() => { setMemoOpen(false) }, [auth.email, caps.collaboration, api])
   const [remoteMewcatHost, setRemoteMewcatHost] = useState<HTMLDivElement | null>(null)
   const [settingsMewcatHost, setSettingsMewcatHost] = useState<HTMLDivElement | null>(null)
   const [remoteDockHost, setRemoteDockHost] = useState<HTMLDivElement | null>(null)
@@ -396,7 +386,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
   // 멤버 채팅 창(Alt+C)은 채팅 기능 권한을 따른다.
   const [chatOpen, setChatOpen] = useState(false)
   const [chatConversationRequest, setChatConversationRequest] = useState<{ conversation: string }>()
-  useEffect(() => { setChatOpen(false); setChatConversationRequest(undefined) }, [authEmail, caps.chat])
+  useEffect(() => { setChatOpen(false); setChatConversationRequest(undefined) }, [authEmail, caps.chat, api])
   // 모바일 보조창은 종류별 예외 없이 이 스택 하나로 전면 순서와 뒤로가기 순서를 공유한다.
   // 새 패널을 WORKSPACE_PANEL_IDS에 넣으면 아래 registry가 빠진 연결을 타입 오류로 알려 준다.
   const [mobilePanelStack, setMobilePanelStack] = useState<WorkspacePanelId[]>(() =>
@@ -416,14 +406,14 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
   useEffect(() => {
     setBrowserOpen(false); setBrowserUrl(caps.nativeBrowser ? 'about:blank' : '')
     setMobilePanelStack(stack => closeMobilePanel(stack, 'browser'))
-  }, [auth.email, caps.portPreview, caps.nativeBrowser])
+  }, [auth.email, caps.portPreview, caps.nativeBrowser, api])
   const [mewcatRuntime, setMewcatRuntime] = useState<string | null>(null)
   const [mewcatPicker, setMewcatPicker] = useState(false)
   const mewcatRuntimeRef = useRef(mewcatRuntime)
   mewcatRuntimeRef.current = mewcatRuntime
   useEffect(() => {
     try { setMewcatRuntime(scopedBrowserStorage().getItem(`mew:assistant-runtime:${auth.email}`)) } catch { setMewcatRuntime(null) }
-  }, [auth.email])
+  }, [auth.email, api])
   const selectMewcatRuntime = useCallback((runtime: string) => {
     setMewcatRuntime(runtime)
     try { scopedBrowserStorage().setItem(`mew:assistant-runtime:${auth.email}`, runtime) } catch { /* Memory-only setting. */ }
@@ -455,9 +445,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     memo: memoOpen,
     debugger: debuggerOpen,
     browser: browserOpen,
-  } satisfies Record<WorkspacePanelId, boolean>), [
-    sidebarOpen, chatOpen, agentOpen, terminalOpen, gitOpen, debuggerOpen, browserOpen, memoOpen, tasksOpen,
-  ])
+  } satisfies Record<WorkspacePanelId, boolean>), [sidebarOpen, chatOpen, agentOpen, terminalOpen, gitOpen, debuggerOpen, browserOpen, memoOpen, tasksOpen])
   const workspacePanelSetters = useMemo(() => ({
     sidebar: setSidebarOpen,
     chat: setChatOpen,
@@ -475,15 +463,16 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     panel === 'projects' ? showProjectSidebar : panel === 'editor' ? editorOpen : panel === 'desktop' ? remoteDesktopOpen : panel === 'memo' ? memoOpen : workspacePanelOpen[panel])
   const focusedDockPanel = focusedWorkspacePanel && openDockPanels.some(panel => panel === focusedWorkspacePanel) ? focusedWorkspacePanel : null
   useEffect(() => {
-    if (!workspaceUiLoaded || chromeStateLoadedRootRef.current !== projectUiPath) return
+    if (!workspaceUiLoaded || !deviceLayoutRestored || chromeStateLoadedScopeRef.current !== deviceLayoutScope) return
     if (focusedWorkspacePanel && !focusedDockPanel) setFocusedWorkspacePanel(null)
-  }, [focusedWorkspacePanel, focusedDockPanel, setFocusedWorkspacePanel, workspaceUiLoaded, projectUiPath])
+  }, [focusedWorkspacePanel, focusedDockPanel, setFocusedWorkspacePanel, workspaceUiLoaded, deviceLayoutRestored, deviceLayoutScope, api])
 
   const openWorkspacePanel = useCallback((panel: WorkspacePanelId) => {
+    if (compact && panel === 'browser' && openSharedBrowser) { openSharedBrowser(); return }
     workspacePanelSetters[panel](true)
     setMobilePanelStack((stack) => bringMobilePanelToFront(stack, panel))
     if (!isDesktop()) saveMobileForegroundPanel(projectUiPath, panel)
-  }, [projectUiPath, workspacePanelSetters])
+  }, [compact, openSharedBrowser, projectUiPath, workspacePanelSetters, isDesktop, saveMobileForegroundPanel])
 
   const closeWorkspacePanel = useCallback((panel: WorkspacePanelId) => {
     workspacePanelSetters[panel](false)
@@ -492,7 +481,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
       if (!isDesktop()) saveMobileForegroundPanel(projectUiPath, next.at(-1) ?? 'editor')
       return next
     })
-  }, [projectUiPath, workspacePanelSetters])
+  }, [projectUiPath, workspacePanelSetters, saveMobileForegroundPanel, isDesktop])
 
   const toggleWorkspacePanel = useCallback((panel: WorkspacePanelId) => {
     const open = workspacePanelOpen[panel]
@@ -507,14 +496,14 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     workspacePanelSetters[panel](next.open)
     setMobilePanelStack(next.stack)
     saveMobileForegroundPanel(projectUiPath, next.stack.at(-1) ?? 'editor')
-  }, [mobilePanelStack, projectUiPath, workspacePanelOpen, workspacePanelSetters])
+  }, [mobilePanelStack, projectUiPath, workspacePanelOpen, workspacePanelSetters, isDesktop, saveMobileForegroundPanel])
 
   const bringWorkspacePanelToFront = useCallback((panel: WorkspacePanelId) => {
     if (!isDesktop() && mobileForegroundPanel !== panel) {
       setMobilePanelStack((stack) => bringMobilePanelToFront(stack, panel))
       saveMobileForegroundPanel(projectUiPath, panel)
     }
-  }, [mobileForegroundPanel, projectUiPath])
+  }, [mobileForegroundPanel, projectUiPath, saveMobileForegroundPanel, isDesktop])
 
   const changeMemoOpen = useCallback((open: boolean) => {
     if (open) { setRemoteDesktopOpen(false); dockRef.current?.restore(); openWorkspacePanel('memo'); setFocusedWorkspacePanel('memo') }
@@ -531,12 +520,12 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
       setMobilePanelStack([])
       saveMobileForegroundPanel(projectUiPath, 'editor')
     }
-  }, [projectUiPath])
+  }, [projectUiPath, isDesktop, saveMobileForegroundPanel])
 
   const mobilePanelLayer = useCallback((panel: WorkspacePanelId) => {
     // 스택에 전면 패널이 없으면 에디터를 보여 준다. 패널은 열려 있는 채라 데스크톱으로
     // 전환하면 다시 보이며, 모바일에서 해당 도구 버튼을 누르면 즉시 다시 전면으로 온다.
-    return mobileForegroundPanel === panel ? 'z-[31]' : 'max-md:hidden z-30'
+    return mobileForegroundPanel === panel ? 'z-[31]' : 'workspace-compact:hidden z-30'
   }, [mobileForegroundPanel])
   // docs 탭을 꾹 누르면 뜨는 폴더 가져오기/내보내기 창 — owner 전용
   const [docsSettingsOpen, setDocsSettingsOpen] = useState(false)
@@ -544,16 +533,12 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
   // 채팅 멘션·에이전트 답변의 파일 링크 — 다른 프로젝트면 옮긴 다음 렌더에서 파일과 줄을 연다
   const [pendingOpen, setPendingOpen] = useState<{ project: string; path: string; line: number | null; options?: { preview?: boolean; forceNewTab?: boolean; replaceActive?: boolean } } | null>(null)
   const [serverFileExplorerOpen, setServerFileExplorerOpen] = useState(false)
-  const [tocOpen, setTocOpen] = useState(() => scopedBrowserStorage().getItem(TOC_KEY) !== '0')
+  const [tocOpen, setTocOpen] = useState(() => scopedBrowserStorage().getItem(viewStorageKey(TOC_KEY)) !== '0')
   const [historyOpen, setHistoryOpen] = useState(false)
-  const [fontPreferences, setFontPreferences] = useState(loadFontPreferences)
-  const [themeSettings, setThemeSettings] = useAccountTheme(isGuest ? null : authEmail, error => showToast(error instanceof Error ? error.message : String(error)))
-  useMewcatNotifications(caps.system, authEmail)
-  useChatNotifications(caps.chat, authEmail)
+  const { fontPreferences, setFontPreferences, themeSettings, setThemeSettings } = accountServices
   const [noticeTarget, setNoticeTarget] = useState<Extract<MewcatNotice['target'], object>>()
   const [readyNoticeTarget, setReadyNoticeTarget] = useState<typeof noticeTarget>()
-  const [mewcatHideDesktop, setMewcatHideDesktop] = useState(loadMewcatHideDesktop)
-  const [mewcatSkin, setMewcatSkin] = useState<MewcatSkinSelection>(loadMewcatSkin)
+  const { mewcatHideDesktop, setMewcatHideDesktop, mewcatSkin, setMewcatSkin } = accountServices
   // Keep the stored search preference compatible with earlier sidebar layouts.
   const [sidebarView, setSidebarView] = useState<'files' | 'content-search'>('files')
   const [projectSearchClearSignal, setProjectSearchClearSignal] = useState(0)
@@ -589,11 +574,11 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     error => showToast(error instanceof Error ? error.message : String(error)))
   const prepareEditorTabs = accountEditorTabs.prepare
 
-  useEffect(() => captureLocalBrowserLinks(url => {
+  useEffect(() => active ? captureLocalBrowserLinks(url => {
     if (!auth.email || !caps.portPreview) { showToast(uiText('localhost 앱에 접근할 권한이 없습니다.')); return }
     try { openLocalPortPreview(url) }
     catch (error) { showToast(error instanceof Error ? error.message : uiText('미리보기를 열지 못했습니다.')) }
-  }), [auth.email, caps.portPreview, showToast])
+  }) : undefined, [active, auth.email, caps.portPreview, showToast, api])
 
   const refreshMewUpdate = useCallback(async (announce = false) => {
     try {
@@ -607,10 +592,10 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     } catch (err) {
       if (announce) showToast(err instanceof Error ? err.message : String(err))
     }
-  }, [showToast])
+  }, [showToast, fetchMewUpdateStatus])
 
   useEffect(() => {
-    if (!caps.system) return
+    if (!caps.system || !globalOwner) return
     let alive = true
     const cancel = afterFirstPaint(() => {
       void Promise.all([fetchMewUpdateStatus(true), fetchUpdatesStatus(true)]).then(([mew, dependencies]) => {
@@ -622,7 +607,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
       }).catch(() => { /* Each failed check remains visible in the update screen. */ })
     })
     return () => { alive = false; cancel() }
-  }, [caps.system, refreshMewUpdate])
+  }, [caps.system, globalOwner, refreshMewUpdate, fetchMewUpdateStatus, fetchUpdatesStatus, api])
 
   const startMewUpdate = useCallback(async () => {
     if (!mewUpdate?.available && mewUpdate?.job?.state !== 'failed') {
@@ -642,7 +627,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
       setMewUpdating(false)
       showToast(err instanceof Error ? err.message : String(err))
     }
-  }, [mewUpdate, refreshMewUpdate, showToast])
+  }, [mewUpdate, refreshMewUpdate, showToast, runMewAction])
 
   useEffect(() => {
     if (!mewUpdating) return
@@ -671,43 +656,43 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
       alive = false
       window.clearInterval(timer)
     }
-  }, [mewUpdating, showToast])
+  }, [mewUpdating, showToast, fetchMewUpdateStatus, api])
 
-  const loadWorkspaceTreeChildren = useCallback((path: string) => fetchTreeEntries(WORKSPACE_PROJECT, path), [])
-  const loadDocsTreeChildren = useCallback((path: string) => fetchTreeEntries(DEFAULT_PROJECT, path), [])
+  const loadWorkspaceTreeChildren = useCallback((path: string) => fetchTreeEntries(WORKSPACE_PROJECT, path), [fetchTreeEntries])
+  const loadDocsTreeChildren = useCallback((path: string) => fetchTreeEntries(DEFAULT_PROJECT, path), [fetchTreeEntries])
 
   useEffect(() => {
     if (!projectUiPath || isGuest) {
-      setWorkspaceUi({})
+      setWorkspaceUi(isGuest ? restoreWorkspaceLayout({}) : {})
       setWorkspaceUiLoaded(isGuest)
       return
     }
     let alive = true
     const cached = workspaceUiCache.current.get(projectUiPath)
     if (cached) {
-      setWorkspaceUi(deviceLayout.restore(projectUiPath, cached, isDesktop()))
+      setWorkspaceUi(restoreWorkspaceLayout(cached))
       setWorkspaceUiLoaded(true)
     } else {
       setWorkspaceUiLoaded(false)
       void trackRefresh(prepareWorkspaceUi(projectUiPath))
         .then(state => {
           if (!alive) return
-          setWorkspaceUi(deviceLayout.restore(projectUiPath, state, isDesktop()))
+          setWorkspaceUi(restoreWorkspaceLayout(state))
           setWorkspaceUiRevision(revision => revision + 1)
           setWorkspaceUiLoaded(true)
         })
         .catch(error => { if (error?.name !== 'AbortError') console.error(error) })
     }
     return () => { alive = false }
-  }, [deviceLayout, isGuest, projectUiPath, workspaceEpoch, prepareWorkspaceUi, trackRefresh])
+  }, [restoreWorkspaceLayout, isGuest, projectUiPath, workspaceEpoch, prepareWorkspaceUi, trackRefresh, api])
 
   useLayoutEffect(() => {
     if (!projectUiPath || isGuest || !workspaceUiLoaded) return
-    deviceLayout.save(projectUiPath, workspaceUi, isDesktop())
-  }, [deviceLayout, isGuest, projectUiPath, workspaceUi.dock, workspaceUi.chrome, workspaceUiLoaded])
+    saveWorkspaceLayout({ dock: workspaceUi.dock, chrome: workspaceUi.chrome })
+  }, [saveWorkspaceLayout, isGuest, projectUiPath, workspaceUi.dock, workspaceUi.chrome, workspaceUiLoaded, api])
 
   useEffect(() => {
-    if (!projectUiPath || isGuest || !workspaceUiLoaded) return
+    if (!projectUiPath || isGuest || !workspaceUiLoaded || !deviceLayoutRestored) return
     workspaceUiCache.current.set(projectUiPath, workspaceUi)
     let saved = false
     const save = () => {
@@ -721,7 +706,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
       // Leaving before the debounce fires must not discard the outgoing tab layout.
       if (projectUiPathRef.current !== projectUiPath) save()
     }
-  }, [isGuest, projectUiPath, workspaceUi, workspaceUiLoaded, persistWorkspaceUi])
+  }, [isGuest, projectUiPath, workspaceUi, workspaceUiLoaded, deviceLayoutRestored, persistWorkspaceUi, api])
 
   useEffect(() => {
     if (!workspaceUiLoaded) return
@@ -732,7 +717,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     sidebarStateLoadedRootRef.current = projectUiPath
     sidebarStateRestorePendingRef.current = projectUiPath
     setDocsExpanded(state.docsExpanded)
-  }, [isGuest, projectUiPath, workspaceUi.sidebar, workspaceUiLoaded])
+  }, [isGuest, projectUiPath, workspaceUi.sidebar, workspaceUiLoaded, api])
 
   useEffect(() => {
     if (!projectUiPath || !workspaceUiLoaded || sidebarStateLoadedRootRef.current !== projectUiPath) return
@@ -742,7 +727,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     }
     saveSidebarState(projectUiPath, { explorerScope: docsExpanded ? 'docs' : 'files', docsExpanded, expandedSubprojects: [] })
     if (!isGuest) setWorkspaceUi((previous) => ({ ...previous, sidebar: { explorerScope: docsExpanded ? 'docs' : 'files', docsExpanded, expandedSubprojects: [] } }))
-  }, [docsExpanded, isGuest, projectUiPath, workspaceUiLoaded])
+  }, [docsExpanded, isGuest, projectUiPath, workspaceUiLoaded, api])
 
   const refreshTree = useCallback((signal?: { project?: string; version?: number; parents?: string[] }) => {
     if (!rootProjectPathRef.current && !isGuest) return Promise.resolve()
@@ -764,7 +749,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     return Promise.all([...scopes].map(read)).then(() => {
       if (epoch === workspaceEpochRef.current) setTreeRefreshSignal(value => value + 1)
     }).catch(console.error)
-  }, [project, isGuest])
+  }, [project, isGuest, fetchTreeEntries])
 
   useEffect(() => {
     const invalidate = () => {
@@ -776,7 +761,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     }
     window.addEventListener('mew:permissions-changed', invalidate)
     return () => window.removeEventListener('mew:permissions-changed', invalidate)
-  }, [])
+  }, [api])
 
   useEffect(() => {
     if (!canOpenProjects || !rootProjectTabsSynced) return
@@ -788,7 +773,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
       if (alive && epoch === workspaceEpochRef.current) setRootProjectIcons(icons)
     }).catch(console.error)
     return () => { alive = false }
-  }, [canOpenProjects, rootProjectTabsSynced, openProjectPaths, projectUiPath, workspaceEpoch])
+  }, [canOpenProjects, rootProjectTabsSynced, openProjectPaths, projectUiPath, workspaceEpoch, fetchRootProjectIcons, api, setRootProjectIcons])
 
   const changeRootProjectIcon = useCallback(async (projectPath: string, icon: string) => {
     try {
@@ -804,7 +789,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
       workspaceEpochRef.current++
       setWorkspaceEpoch(workspaceEpochRef.current)
     } catch (err) { showToast(err instanceof Error ? err.message : String(err)) }
-  }, [showToast])
+  }, [showToast, saveRootProjectIcon, setRootProjectIcons])
 
   const applyWorkspace = useCallback((info: { path: string; projectPath?: string; docsPath?: string; hasProject?: boolean }) => {
     if (info.hasProject === false) {
@@ -814,6 +799,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
       return
     }
     setHasProject(true)
+    onWorkspaceReady?.(info as WorkspaceInfo)
     const previous = workspaceInfoRef.current
     // The POST response and its presence broadcast describe the same handoff.
     // Update refs synchronously so either arrival order applies it exactly once.
@@ -842,7 +828,8 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     // 서버 API의 `.workspace`/`docs` 이름은 모든 루트에서 같으므로, 절대 경로를 클라이언트
     // 탭·본문 캐시의 실제 경계로 사용한다.
     setProject(WORKSPACE_PROJECT)
-    setContentWorkspace(info.path)
+    if (!api.scope) setContentWorkspace(info.path)
+    hostRef.current?.onScopeChanged(info as WorkspaceInfo)
     setActiveProject(WORKSPACE_PROJECT)
     setRootProjectPath(info.path)
     if (!sameProject && !isDesktop()) setDebuggerOpen(false)
@@ -860,7 +847,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     setDocsTree(cachedDocs)
     setPendingOpen(null)
     if (!sameProject) setRequestedAgentTab(null)
-  }, [deviceLayout, workspacePanelSetters])
+  }, [deviceLayout, workspacePanelSetters, setProject, onWorkspaceReady, api, isDesktop, loadMobileForegroundPanel])
 
   const handleWorkspaceBroadcast = useCallback(() => {
     // Resolve notifications after our POST so an older GET cannot undo its result.
@@ -879,12 +866,22 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
           for (const view of workspaceEditorPreparations(state)) void prepareEditorView(view.mode, view.path).catch(() => {})
         }
       }
+      setWorkspaceError('')
       applyWorkspace(info)
     })
-    void (initial ? trackRefresh(reading) : reading).catch(console.error)
-  }, [applyWorkspace, authEmail, trackRefresh])
+    void (initial ? trackRefresh(reading) : reading).catch(error => {
+      if (sequence !== workspaceReadSequence.current || !workspaceUiOwnerAlive.current) return
+      if (initial) setWorkspaceError(error instanceof Error ? error.message : String(error))
+      else showToast(error instanceof Error ? error.message : String(error))
+    })
+  }, [applyWorkspace, trackRefresh, fetchWorkspace, showToast])
 
   const openRootProject = useCallback(async (projectPath: string) => {
+    if (hostRef.current) {
+      const opened = await hostRef.current.onProjectChange(projectPath)
+      if (opened) setOpenProjectDialog(false)
+      return opened
+    }
     if (!canOpenProjects || (projectOpeningRef.current && !rootProjectSwitchRef.current)) return
     if (rootProjectSwitchRef.current?.path === projectPath) return
     if (!rootProjectSwitchRef.current && projectPath === projectUiPathRef.current) {
@@ -937,17 +934,18 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
         }
       }
     }
-  }, [applyWorkspace, caps.agent, caps.terminal, handleWorkspaceBroadcast, canOpenProjects, showToast, prepareWorkspaceUi, prepareEditorTabs])
+  }, [applyWorkspace, caps.agent, caps.terminal, handleWorkspaceBroadcast, canOpenProjects, showToast, prepareWorkspaceUi, prepareEditorTabs, setProject, fetchAgentTabs, switchWorkspace])
 
   const openAddedProject = useCallback(async (path: string) => {
     if (!(await openRootProject(path))) return false
     const { state } = await fetchRootProjectTabs()
     setOpenProjectPaths(state?.paths ?? [])
     return true
-  }, [openRootProject, setOpenProjectPaths])
+  }, [openRootProject, setOpenProjectPaths, fetchRootProjectTabs])
 
   useEffect(() => {
     const open = (event: Event) => {
+      if (!active) return
       const notice = (event as CustomEvent<MewcatNotice>).detail
       if (notice.target === 'updates' && caps.system) setUpdatesOpen(true)
       else if (notice.target === 'system' && caps.system) setSysStatsOpen(true)
@@ -965,7 +963,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     }
     window.addEventListener(OPEN_NOTICE_EVENT, open)
     return () => window.removeEventListener(OPEN_NOTICE_EVENT, open)
-  }, [caps.system, caps.agent, caps.chat, projectUiPath, rootProjectPath, canOpenProjects, openRootProject, openWorkspacePanel])
+  }, [caps.system, caps.agent, caps.chat, projectUiPath, rootProjectPath, canOpenProjects, openRootProject, openWorkspacePanel, api, active])
 
   const openSidebarProject = useCallback(async (scope: string, path: string) => {
     if (!canOpenProjects || !rootProjectPath || projectOpeningRef.current) return
@@ -987,7 +985,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
         handleWorkspaceBroadcast()
       }
     }
-  }, [applyWorkspace, handleWorkspaceBroadcast, canOpenProjects, rootProjectPath, showToast])
+  }, [applyWorkspace, handleWorkspaceBroadcast, canOpenProjects, rootProjectPath, showToast, openSubproject, fetchRootProjectTabs, setOpenProjectPaths])
 
   const {
     hydrated: tabsHydrated,
@@ -1037,12 +1035,12 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
 
   useLayoutEffect(() => {
     if (projectUiPath && caps.filesRead && (!desktopMode || editorOpen)) void prepareEditorPane().catch(() => {})
-  }, [projectUiPath, caps.filesRead, desktopMode, editorOpen])
+  }, [projectUiPath, caps.filesRead, desktopMode, editorOpen, api])
 
   useLayoutEffect(() => {
     const notice = noticeTarget === readyNoticeTarget && !!readyNoticeTarget && [projectUiPath, rootProjectPath].includes(readyNoticeTarget.workspacePath ?? readyNoticeTarget.cwd ?? null)
     if (projectUiPath && (!workspaceUiLoaded || caps.agent && agentOpen || caps.terminal && terminalOpen || requestedAgentTab || mewcatPicker || notice)) agentPanelPreparation.promote()
-  }, [projectUiPath, rootProjectPath, workspaceUiLoaded, caps.agent, caps.terminal, agentOpen, terminalOpen, requestedAgentTab, mewcatPicker, noticeTarget, readyNoticeTarget])
+  }, [projectUiPath, rootProjectPath, workspaceUiLoaded, caps.agent, caps.terminal, agentOpen, terminalOpen, requestedAgentTab, mewcatPicker, noticeTarget, readyNoticeTarget, api])
 
   const sidebarOpenPaths = useMemo(() => {
     const result: Record<string, Set<string>> = {}
@@ -1054,7 +1052,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
   }, [panes, project])
 
   const activeFile = editorFile(activePath ?? '', project)
-  const activeEditorApi = useMemo(() => createEditorApi(activeFile.project), [activeFile.project])
+  const activeEditorApi = useMemo(() => createEditorApi(activeFile.project), [activeFile.project, createEditorApi])
   const activeFileTree = activeFile.project === DEFAULT_PROJECT ? docsTree : tree
 
   const hasOpenFiles = panes.some((pane) => pane.tabs.length > 0)
@@ -1068,7 +1066,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     // 경우에는 그 상태를 덮지 않는다. `editor`도 명시 상태라 빈 스택과 구별한다.
     if (!isDesktop() && loadMobileForegroundPanel(projectUiPath) !== null) return
     openWorkspacePanel('sidebar')
-  }, [project, tabsHydrated, hasOpenFiles, openWorkspacePanel, rootProjectPath, projectUiPath])
+  }, [project, tabsHydrated, hasOpenFiles, openWorkspacePanel, rootProjectPath, projectUiPath, api, loadMobileForegroundPanel, isDesktop])
 
   const registerPaneHandle = useCallback((id: string, handle: PaneHandle | null) => {
     if (handle) paneHandles.current.set(id, handle)
@@ -1179,6 +1177,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     handleWorkspaceBroadcast,
     projectUiPath ? projectLabel(projectUiPath) : null,
     agentActivity?.workspace === projectUiPath ? agentActivity.count : 0,
+    rootProjectPath,
   )
 
   const editorPresence = useMemo(() => Object.fromEntries(Object.entries(tabPresence).map(([path, colors]) => [editorTabPath(activeFile.project, path, project), colors])), [tabPresence, activeFile.project, project])
@@ -1241,8 +1240,8 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     memo: { open: memoOpen, close: memoSession.close },
     debugger: { open: debuggerOpen, close: () => closeWorkspacePanel('debugger') },
     browser: { open: browserOpen, close: () => closeWorkspacePanel('browser') },
-  }, mobileForegroundPanel, {
-    enabled: !isDesktop() && workspaceUiLoaded,
+  }, active ? mobileForegroundPanel : null, {
+    enabled: active && !isDesktop() && workspaceUiLoaded,
     scope: `${auth.email}:${projectUiPath}`,
     screens: {
       git: { key: gitWorkbenchScreenKey(gitView), restore: () => changeGitView(gitView) },
@@ -1279,22 +1278,29 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     } else if (mobileForegroundPanel === 'chat') {
       lastPanelRef.current = 'chat'
     }
-  }, [mobileForegroundPanel])
+  }, [mobileForegroundPanel, api, isDesktop])
   useEffect(() => {
     if (agentOpen) {
       lastPanelRef.current = 'agent'
       activeTabbedSurfaceRef.current = 'agent'
     }
-  }, [agentOpen])
-  useEffect(() => { writeBrowserStorage(TERMINAL_OPEN_KEY, terminalOpen ? '1' : '0') }, [terminalOpen])
-  useEffect(() => { if (terminalOpen) { lastPanelRef.current = 'terminal'; activeTabbedSurfaceRef.current = 'terminal' } }, [terminalOpen])
-  useEffect(() => { writeBrowserStorage(GIT_OPEN_KEY, gitOpen ? '1' : '0'); if (gitOpen) activeTabbedSurfaceRef.current = 'git' }, [gitOpen])
+  }, [agentOpen, api])
+  useEffect(() => {
+    if (!deviceLayoutRestored || chromeStateLoadedScopeRef.current !== deviceLayoutScope || chromeStateRestorePendingRef.current === deviceLayoutScope) return
+    writeBrowserStorage(viewStorageKey(TERMINAL_OPEN_KEY), terminalOpen ? '1' : '0')
+  }, [terminalOpen, deviceLayoutRestored, deviceLayoutScope, viewStorageKey, api])
+  useEffect(() => { if (terminalOpen) { lastPanelRef.current = 'terminal'; activeTabbedSurfaceRef.current = 'terminal' } }, [terminalOpen, api])
+  useEffect(() => {
+    if (!deviceLayoutRestored || chromeStateLoadedScopeRef.current !== deviceLayoutScope || chromeStateRestorePendingRef.current === deviceLayoutScope) return
+    writeBrowserStorage(viewStorageKey(GIT_OPEN_KEY), gitOpen ? '1' : '0')
+    if (gitOpen) activeTabbedSurfaceRef.current = 'git'
+  }, [gitOpen, deviceLayoutRestored, deviceLayoutScope, viewStorageKey, api])
   useEffect(() => {
     if (sidebarOpen) activeTabbedSurfaceRef.current = 'sidebar'
-  }, [sidebarOpen])
+  }, [sidebarOpen, api])
   useEffect(() => {
     if (chatOpen) lastPanelRef.current = 'chat'
-  }, [chatOpen])
+  }, [chatOpen, api])
 
   const mobileKeyboardOpen = useMobileKeyboard()
   const mobileDockPanels: MobileDockPanel[] = ['sidebar', 'editor']
@@ -1308,6 +1314,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
   if (caps.collaboration && auth.email) mobileDockPanels.push('memo')
   const selectDockPanel = (panel: MobileDockPanel, toggle = true) => {
     if (!mobileDockPanels.includes(panel) && !(panel === 'desktop' && caps.desktop)) return
+    if (compact && panel === 'browser' && openSharedBrowser) { openSharedBrowser(); return }
     const closeFocused = isDesktop() && toggle && (remoteDesktopOpen ? panel === 'desktop' : focusedDockPanel === panel)
     dockRef.current?.restore()
     if (panel === 'desktop') { setRemoteDesktopOpen(open => closeFocused ? !open : true); return }
@@ -1425,75 +1432,45 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
       if (activeTab.path.endsWith('.md') && activeTab.viewMode === 'hotview') focusedEditor()?.setRawContent(content)
       applyRevertedContent(activeTab.path, content)
     },
-    [activeTab, activeFile.path, activeFile.project, applyRevertedContent, focusedEditor],
+    [activeTab, activeFile.path, activeFile.project, applyRevertedContent, focusedEditor, revertFileToCommit],
   )
 
-  useEffect(() => {
-    applyFontPreferences(fontPreferences)
-    saveFontPreferences(fontPreferences)
-  }, [fontPreferences])
 
   useEffect(() => {
-    saveMewcatSkin(mewcatSkin)
-  }, [mewcatSkin])
-
-  useEffect(() => {
-    if (!workspaceUiLoaded || chromeStateLoadedRootRef.current === projectUiPath) return
-    const value = workspaceUi.chrome
-    // 계정 원장은 debounce 저장이라 새로고침 직전의 마지막 패널 조작보다 늦을 수 있다.
-    // 모바일 전면 패널은 조작 순간 로컬에 동기 저장하므로, 그 패널만큼은 원장보다 우선해
-    // 열림 상태까지 함께 복원한다.
-    const savedMobileForeground = projectUiPath && !isDesktop()
-      ? loadMobileForegroundPanel(projectUiPath)
-      : null
-    const restoredOpen: Record<WorkspacePanelId, boolean> = {
-      sidebar: sidebarOpen,
-      chat: chatOpen,
-      agent: agentOpen,
-      terminal: terminalOpen,
-        git: gitOpen,
-        tasks: tasksOpen,
-      memo: memoOpen,
-      debugger: debuggerOpen,
-      browser: browserOpen,
+    if (!workspaceUiLoaded || !deviceLayoutRestored || chromeStateLoadedScopeRef.current === deviceLayoutScope) return
+    const localValue = (key: string) => {
+      try { return scopedBrowserStorage().getItem(viewStorageKey(key)) } catch { return null }
     }
-    if (value && typeof value === 'object' && !Array.isArray(value)) {
-      const chrome = value as Record<string, unknown>
-      if (typeof chrome.tocOpen === 'boolean') setTocOpen(chrome.tocOpen)
-      if (typeof chrome.sidebarOpen === 'boolean') {
-        setSidebarOpen(chrome.sidebarOpen)
-        restoredOpen.sidebar = chrome.sidebarOpen
-      }
-      if (chrome.sidebarView === 'files' || chrome.sidebarView === 'content-search') setSidebarView(chrome.sidebarView)
-      else if (chrome.sidebarView === 'search') setSidebarView('files')
-      else if (chrome.sidebarView === 'commands') setSidebarView('files')
-      // 보조 패널은 모바일에서 화면 전체를 덮는 기기별 상태다. 계정 원장의 이전 값으로
-      // 로컬의 방금 연 에이전트를 닫아 버리면 전면 순서를 복원할 수 없으므로, 서버 원장은
-      // 데스크톱 배치에만 적용한다. 모바일은 각 패널의 로컬 열림 상태로 시작한다.
-      if (isDesktop()) {
-        restoredOpen.tasks = !!auth.email && caps.filesRead && chrome.tasksOpen === true
-        setTasksOpen(restoredOpen.tasks)
-        restoredOpen.memo = !!auth.email && caps.collaboration && chrome.memoOpen === true
-        setMemoOpen(restoredOpen.memo)
-        restoredOpen.debugger = canDebug && !!auth.email && chrome.debuggerOpen === true
-        setDebuggerOpen(restoredOpen.debugger)
-        if (caps.agent && typeof chrome.agentOpen === 'boolean') {
-          setAgentOpen(chrome.agentOpen)
-          restoredOpen.agent = chrome.agentOpen
-        }
-        const restoredTerminal = caps.terminal && (typeof chrome.terminalOpen === 'boolean' ? chrome.terminalOpen : chrome.tmuxOpen === true || chrome.agentOpen === true)
-        setTerminalOpen(restoredTerminal)
-        restoredOpen.terminal = restoredTerminal
-        setGitOpen(caps.git && chrome.gitOpen === true)
-        restoredOpen.git = caps.git && chrome.gitOpen === true
-      }
-    } else if (projectUiPath && !isGuest) {
-      // 계정 원장이 처음 비어 있을 때만 이 기기의 기존 화면 상태를 이관한다.
-      setWorkspaceUi((previous) => ({
-        ...previous,
-        chrome: { tocOpen, sidebarOpen, sidebarView, agentOpen, terminalOpen, gitOpen, debuggerOpen, memoOpen, tasksOpen,
-          ...(isDesktop() && tabsHydrated ? { focusedEditorPaneId: focusedPaneId } : {}) },
-      }))
+    const localAgent = caps.agent && localValue(AGENT_OPEN_KEY) === '1'
+    const terminalValue = localValue(TERMINAL_OPEN_KEY)
+    const localTerminal = caps.terminal && (terminalValue !== null ? terminalValue === '1' : localValue(LEGACY_TMUX_OPEN_KEY) === '1' || localAgent)
+    const defaults = { tocOpen: localValue(TOC_KEY) !== '0', sidebarOpen: isDesktop(), sidebarView: 'files',
+      agentOpen: localAgent, terminalOpen: localTerminal, gitOpen: caps.git && localValue(GIT_OPEN_KEY) === '1',
+      debuggerOpen: false, memoOpen: false, tasksOpen: false }
+    const value = workspaceUi.chrome
+    const stored = !!value && typeof value === 'object' && !Array.isArray(value)
+    const chrome: Record<string, unknown> = stored ? value as Record<string, unknown> : defaults
+    const savedMobileForeground = projectUiPath && !isDesktop() ? loadMobileForegroundPanel(projectUiPath) : null
+    const restoredOpen: Record<WorkspacePanelId, boolean> = {
+      sidebar: typeof chrome.sidebarOpen === 'boolean' ? chrome.sidebarOpen : defaults.sidebarOpen,
+      chat: chatOpen, browser: browserOpen, agent: defaults.agentOpen, terminal: defaults.terminalOpen,
+      git: defaults.gitOpen, tasks: false, memo: false, debugger: false,
+    }
+    setTocOpen(typeof chrome.tocOpen === 'boolean' ? chrome.tocOpen : defaults.tocOpen)
+    setSidebarOpen(restoredOpen.sidebar)
+    setSidebarView(chrome.sidebarView === 'content-search' ? 'content-search' : 'files')
+    if (isDesktop() || compact) {
+      restoredOpen.tasks = !!auth.email && caps.filesRead && chrome.tasksOpen === true
+      restoredOpen.memo = !!auth.email && caps.collaboration && chrome.memoOpen === true
+      restoredOpen.debugger = canDebug && !!auth.email && chrome.debuggerOpen === true
+      restoredOpen.agent = caps.agent && (typeof chrome.agentOpen === 'boolean' ? chrome.agentOpen : defaults.agentOpen)
+      restoredOpen.terminal = caps.terminal && (typeof chrome.terminalOpen === 'boolean' ? chrome.terminalOpen : chrome.tmuxOpen === true || restoredOpen.agent)
+      restoredOpen.git = caps.git && chrome.gitOpen === true
+    }
+    for (const panel of ['agent', 'terminal', 'git', 'tasks', 'memo', 'debugger'] as const) workspacePanelSetters[panel](restoredOpen[panel])
+    if (!stored && projectUiPath && !isGuest) {
+      setWorkspaceUi(previous => ({ ...previous, chrome: { ...defaults,
+        ...(isDesktop() && tabsHydrated ? { focusedEditorPaneId: focusedPaneId } : {}) } }))
     }
     if (savedMobileForeground && savedMobileForeground !== 'editor') {
       restoredOpen[savedMobileForeground] = true
@@ -1501,44 +1478,45 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     }
     if (projectUiPath && !isDesktop()) {
       setMobilePanelStack(restoreMobilePanelStack(restoredOpen, savedMobileForeground))
-      // 다음 렌더에서 복원한 스택을 저장한다. 지금의 초기 스택으로 기존 기억을 덮지 않는다.
-      mobilePanelStackRestorePendingRef.current = projectUiPath
+      mobilePanelStackRestorePendingRef.current = deviceLayoutScope
     }
-    chromeStateLoadedRootRef.current = projectUiPath
-    chromeStateRestorePendingRef.current = projectUiPath
-  }, [agentOpen, terminalOpen, gitOpen, debuggerOpen, browserOpen, memoOpen, tasksOpen, canDebug, caps, auth.email, chatOpen, isGuest, projectUiPath, sidebarOpen, sidebarView, tocOpen, workspaceUi.chrome, workspaceUiLoaded, workspacePanelSetters, focusedPaneId, tabsHydrated])
+    chromeStateLoadedScopeRef.current = deviceLayoutScope
+    chromeStateRestorePendingRef.current = deviceLayoutScope
+  }, [deviceLayoutRestored, deviceLayoutScope, compact, isDesktop, loadMobileForegroundPanel, viewStorageKey, browserOpen, canDebug, caps, auth.email, chatOpen, isGuest, projectUiPath,
+    workspaceUi.chrome, workspaceUiLoaded, workspacePanelSetters, focusedPaneId, tabsHydrated, api])
 
   useEffect(() => {
-    if (!noticeTarget || !workspaceUiLoaded || chromeStateLoadedRootRef.current !== projectUiPath
+    if (!noticeTarget || !workspaceUiLoaded || !deviceLayoutRestored || chromeStateLoadedScopeRef.current !== deviceLayoutScope
       || ![projectUiPath, rootProjectPath].includes(noticeTarget.workspacePath ?? noticeTarget.cwd)) return
     // Project chrome restoration must finish before revealing the requested tab.
     setRemoteDesktopOpen(false)
     openWorkspacePanel('agent')
     setReadyNoticeTarget(noticeTarget)
-  }, [noticeTarget, projectUiPath, rootProjectPath, workspaceUiLoaded, openWorkspacePanel])
+  }, [noticeTarget, projectUiPath, rootProjectPath, workspaceUiLoaded, deviceLayoutRestored, deviceLayoutScope, openWorkspacePanel, api])
 
   useEffect(() => {
-    if (!projectUiPath || !workspaceUiLoaded || isDesktop()) return
-    if (mobilePanelStackRestorePendingRef.current === projectUiPath) {
+    if (!projectUiPath || !workspaceUiLoaded || !deviceLayoutRestored || isDesktop() || chromeStateLoadedScopeRef.current !== deviceLayoutScope) return
+    if (mobilePanelStackRestorePendingRef.current === deviceLayoutScope) {
       mobilePanelStackRestorePendingRef.current = null
-      mobilePanelStackRestoredRootRef.current = projectUiPath
+      mobilePanelStackRestoredScopeRef.current = deviceLayoutScope
       return
     }
-    if (mobilePanelStackRestoredRootRef.current !== projectUiPath) return
+    if (mobilePanelStackRestoredScopeRef.current !== deviceLayoutScope) return
     const foreground = mobilePanelStack.at(-1)
     saveMobileForegroundPanel(projectUiPath, foreground ?? 'editor')
-  }, [mobilePanelStack, projectUiPath, workspaceUiLoaded])
+  }, [mobilePanelStack, projectUiPath, workspaceUiLoaded, deviceLayoutRestored, deviceLayoutScope, isDesktop, saveMobileForegroundPanel, api])
 
   useEffect(() => {
-    writeBrowserStorage(TOC_KEY, tocOpen ? '1' : '0')
-  }, [tocOpen])
+    if (!deviceLayoutRestored || chromeStateLoadedScopeRef.current !== deviceLayoutScope || chromeStateRestorePendingRef.current === deviceLayoutScope) return
+    writeBrowserStorage(viewStorageKey(TOC_KEY), tocOpen ? '1' : '0')
+  }, [tocOpen, deviceLayoutRestored, deviceLayoutScope, viewStorageKey, api])
 
-  useEffect(observeWorkspaceViewport, [])
+  useEffect(() => globalOwner ? observeWorkspaceViewport() : undefined, [globalOwner])
 
   useEffect(() => {
     if (isGuest) return
     handleWorkspaceBroadcast()
-  }, [isGuest, handleWorkspaceBroadcast])
+  }, [isGuest, handleWorkspaceBroadcast, api])
 
   // Only issue root-relative requests after the server handoff. Recent first-level
   // listings paint immediately; refresh them without blanking the cached tree.
@@ -1561,17 +1539,18 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     read(DEFAULT_PROJECT, next => { setDocsTree(next); if (project === DEFAULT_PROJECT) setTree(next) })
     if (project !== WORKSPACE_PROJECT && project !== DEFAULT_PROJECT) read(project, setTree)
     return () => { alive = false }
-  }, [isGuest, project, rootProjectPath, workspaceEpoch, trackRefresh])
+  }, [isGuest, project, rootProjectPath, workspaceEpoch, trackRefresh, api, fetchTreeEntries])
 
   // 옛 `/{프로젝트}` 주소로 들어왔으면 주소만 루트로 정리한다 — 프로젝트는 이미 그것으로 시작했다
   useEffect(() => {
     normalizeWorkspaceLocation()
-  }, [])
+  }, [api])
 
   // 모바일 뒤로가기가 전체화면 종료로 해석되지 않게, 전체화면 진입 중에는 히스토리 한 칸을 지킨다.
   // 브라우저가 OS 차원에서 fullscreen을 먼저 해제하는 경우는 다시 요청할 사용자 제스처가 없어 막을 수 없지만,
   // SPA의 popstate·Android WebView 뒤로가기는 여기서 소비된다.
   useEffect(() => {
+    if (!globalOwner) return
     const onFullscreenChange = () => {
       if (document.fullscreenElement && !fullscreenGuardRef.current) {
         history.pushState({ ...(history.state ?? {}), mewFullscreen: true }, '')
@@ -1586,16 +1565,17 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     document.addEventListener('fullscreenchange', onFullscreenChange)
     window.addEventListener('popstate', onPopState)
     return () => { document.removeEventListener('fullscreenchange', onFullscreenChange); window.removeEventListener('popstate', onPopState) }
-  }, [])
+  }, [globalOwner])
 
   useEffect(() => {
-    writeBrowserStorage(AGENT_OPEN_KEY, agentOpen ? '1' : '0')
-  }, [agentOpen])
+    if (!deviceLayoutRestored || chromeStateLoadedScopeRef.current !== deviceLayoutScope || chromeStateRestorePendingRef.current === deviceLayoutScope) return
+    writeBrowserStorage(viewStorageKey(AGENT_OPEN_KEY), agentOpen ? '1' : '0')
+  }, [agentOpen, deviceLayoutRestored, deviceLayoutScope, viewStorageKey, api])
 
 
   useEffect(() => {
-    if (!projectUiPath || isGuest || !workspaceUiLoaded) return
-    if (chromeStateRestorePendingRef.current === projectUiPath) {
+    if (!projectUiPath || isGuest || !workspaceUiLoaded || !deviceLayoutRestored || chromeStateLoadedScopeRef.current !== deviceLayoutScope) return
+    if (chromeStateRestorePendingRef.current === deviceLayoutScope) {
       chromeStateRestorePendingRef.current = null
       return
     }
@@ -1604,7 +1584,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
       chrome: { ...(previous.chrome as Record<string, unknown> | undefined), tocOpen, sidebarOpen, sidebarView, agentOpen, terminalOpen, gitOpen, debuggerOpen, memoOpen, tasksOpen,
         ...(isDesktop() && tabsHydrated ? { focusedEditorPaneId: focusedPaneId } : {}) },
     }))
-  }, [agentOpen, terminalOpen, gitOpen, debuggerOpen, memoOpen, tasksOpen, isGuest, projectUiPath, sidebarOpen, sidebarView, tocOpen, workspaceUiLoaded, focusedPaneId, tabsHydrated])
+  }, [agentOpen, terminalOpen, gitOpen, debuggerOpen, memoOpen, tasksOpen, isGuest, projectUiPath, sidebarOpen, sidebarView, tocOpen, workspaceUiLoaded, deviceLayoutRestored, deviceLayoutScope, isDesktop, focusedPaneId, tabsHydrated, api])
 
   const handleRenamed = useCallback(
     (oldPath: string, newPath: string, type: 'file' | 'dir') => {
@@ -1623,6 +1603,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
   )
 
   useEffect(() => {
+    if (!active) return
     const stopTabShortcuts = captureAppTabShortcuts({
       closeEditorTab: () => { if (activePath) closeTab(activePath, focusedPaneId, activeTab?.id) },
       create: (_event, kind, target) => {
@@ -1749,12 +1730,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
       window.removeEventListener('keydown', handleKeyDown)
     }
     // 보조창 열림 상태는 Ctrl+L이 어디로 보낼지 고를 때 읽는다 — 닫힌 창으로 보내지 않게 최신 값이어야 한다
-  }, [
-    saveCurrentTab, closeTab, activePath, activeTab, activeRelativePath, activeFile.path, activeFile.project, tabs, setActivePath,
-    caps, canUseTerminal, rootProjectPath, auth.email, focusedEditor, isGuest, canOpenProjects, project, sidebarOpen, chatOpen, agentOpen, terminalOpen,
-    mobilePanelStack, openWorkspacePanel, docsExpanded, sidebarCreate,
-    toggleWorkspacePanel, switchCurrentWindowTabRight, switchCurrentWindowTabLeft,
-  ])
+  }, [active, saveCurrentTab, closeTab, activePath, activeTab, activeRelativePath, activeFile.path, activeFile.project, tabs, setActivePath, caps, canUseTerminal, rootProjectPath, auth.email, focusedEditor, isGuest, canOpenProjects, project, sidebarOpen, chatOpen, agentOpen, terminalOpen, mobilePanelStack, openWorkspacePanel, docsExpanded, sidebarCreate, toggleWorkspacePanel, switchCurrentWindowTabRight, switchCurrentWindowTabLeft, api, focusedPaneId])
 
   /** 채팅 멘션·에이전트 로컬 링크 — 같은 mew의 알맞은 프로젝트와 문서 탭으로 연다. */
   const openMentionedFile = useCallback(
@@ -1777,12 +1753,12 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     // Hotview는 원본 줄과 렌더 블록 위치가 일대일이 아니다. 줄 링크는 Plain으로 열어 정확히 이동한다.
     if (pendingOpen.line !== null && pendingOpen.path.endsWith('.md')) setTabViewMode(pendingOpen.path, 'plain')
     setPendingOpen(null)
-  }, [pendingOpen, project, tabsHydrated, openFile, setTabViewMode])
+  }, [pendingOpen, project, tabsHydrated, openFile, setTabViewMode, api])
 
   const mewcatHandledTab = useRef<string | null>(null)
   const mewcatViewRef = useRef({ openRootProject, openMentionedFile, rootProjectPath, activeTab, tabsHydrated, project })
   mewcatViewRef.current = { openRootProject, openMentionedFile, rootProjectPath, activeTab, tabsHydrated, project }
-  const handleMewcatAction = useCallback(async (action: MewcatAction) => {
+  const performMewcatAction = useCallback(async (action: MewcatAction) => {
     if (!caps.agent) throw new Error('MEWCAT_FORBIDDEN')
     const waitForView = async (test: () => boolean) => {
       const deadline = performance.now() + 10_000
@@ -1820,12 +1796,15 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     }
     const id = `mewcat-work-${uuid()}`
     mewcatHandledTab.current = null
-    writeAgentInputDraft(id, action.request)
+    writeAgentInputDraft(id, action.request, { account: auth.email ?? 'guest', projectPath: workspaceInfoRef.current?.projectPath ?? workspaceInfoRef.current?.path ?? action.projectRoot, workspacePath: workspaceInfoRef.current?.path ?? action.projectRoot, migrateLegacy: !api.scope })
     setRequestedAgentTab({ id, label: t('mewcat.assistant.title'), runtime: action.runtime, cwd: action.projectRoot })
     openWorkspacePanel('agent')
     await waitForView(() => mewcatHandledTab.current === id)
     showToast(t('mewcat.assistant.draftReady'))
-  }, [applyWorkspace, caps, canOpenProjects, openWorkspacePanel, refreshTree, showToast, t])
+  }, [applyWorkspace, auth.email, caps, canOpenProjects, openWorkspacePanel, refreshTree, showToast, t, fetchWorkspace, fetchFile, api])
+
+  const handleMewcatAction = useCallback((action: MewcatAction) => hostRef.current?.onAction
+    ? hostRef.current.onAction(action) : performMewcatAction(action), [performMewcatAction])
 
   // 프로젝트 검색 결과 클릭 — 파일을 열고, 위치 점프 정보를 대기시킨다 (내용 로드 후 아래 effect가 처리)
   const openSearchResult = useCallback(
@@ -1874,7 +1853,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     }
     raf = requestAnimationFrame(attempt)
     return () => cancelAnimationFrame(raf)
-  }, [pendingReveal, activeTab, focusedEditor])
+  }, [pendingReveal, activeTab, focusedEditor, api])
 
   const canEditActiveTab = !!activeTab?.editable && !isArchivedPath(activeFile.path, activeFile.project)
 
@@ -1927,7 +1906,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
   const renderEditorPane = (pane: (typeof panes)[number]) => {
     return (
         <DockPanel key={pane.id} id={`editor:${pane.id}`} kind="editor" visible={!desktopMode || editorOpen} tabs={pane.tabs.map(tab => tab.path)} mobileSelected={pane.id === focusedPaneId}>
-        {panes.length > 1 && <div className="flex shrink-0 items-center gap-1 border-b border-edge px-2 md:hidden">
+        {panes.length > 1 && <div className="flex shrink-0 items-center gap-1 border-b border-edge px-2 workspace-wide:hidden">
           <SelectField compact label={t('panel.editorPane')} value={focusedPaneId} onChange={focusPane}
             options={panes.map((item, index) => ({ value: item.id, label: `${index + 1} · ${item.activePath?.split('/').at(-1) ?? t('panel.editorPane')}` }))} />
         </div>}
@@ -2048,13 +2027,22 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     }}
     onOpen={openAddedProject} />
 
-  return (
-    <IconPackProvider value={themeSettings.iconPack}>
-    <div className="mew-workspace flex flex-col overflow-hidden bg-surface text-ink" data-mobile-keyboard={mobileKeyboardOpen || undefined} style={{ height: 'var(--app-height, 100dvh)' }}>
-      {/* 프로젝트 선택기와 도구 버튼은 전체 너비 헤더에, 문서 탭은 각 편집 칸에 둔다. */}
-      <div className="flex flex-col">
-        <header className="flex h-9 items-stretch border-b border-edge pr-2 md:h-11">
-          {projectView === 'workspace' && <ProjectSwitcher
+  useEffect(() => {
+    const target = hostRef.current
+    if (!target) return
+    target.register({ workspacePath: rootProjectPath, performAction: performMewcatAction,
+      isReady: () => mewcatViewRef.current.tabsHydrated && mewcatViewRef.current.rootProjectPath !== null,
+      prepareClose: async () => {
+      const release = await prepareDocumentPageMutation('*', true, false)
+      try { await flushTasks(); return release } catch (error) { release(); throw error }
+    } })
+    return () => target.register(null)
+  }, [host?.id, rootProjectPath, performMewcatAction, prepareDocumentPageMutation, flushTasks, api])
+
+  const workspaceHeader = (<>      <div className="flex flex-col">
+        <header className="flex h-9 items-stretch border-b border-edge pr-2 workspace-wide:h-11">
+          {(projectView === 'workspace' || compact) && <div className={compact ? 'hidden' : 'contents'}><WorkspaceApiProvider client={workspaceClient}><ProjectSwitcher
+            selectionSignal={host?.selectionSignal}
             sidebarHost={projectSidebarHost} sidebarEnabled={desktopMode} sidebarOpen={showProjectSidebar} onSidebarOpenChange={changeProjectSidebarOpen}
             sidebarWidth={projectSidebarWidth} onSidebarResize={startProjectSidebarResize} onSidebarWidthChange={restoreProjectSidebarWidth}
             canUseCommands={canUseTerminal && !isGuest && hasProject === true} activeWorkingPath={rootProjectPath}
@@ -2093,8 +2081,8 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
               catch (err) { showToast(err instanceof Error ? err.message : String(err)) }
             }}
             onOpen={() => setOpenProjectDialog(true)}
-          />}
-          {projectView === 'workspace' && canUseTerminal && !isGuest && !showProjectSidebar && <div className="flex shrink-0 items-center">
+          /></WorkspaceApiProvider></div>}
+          {projectView === 'workspace' && !compact && canUseTerminal && !isGuest && !showProjectSidebar && <div className="flex shrink-0 items-center">
             <CommandButtonMenu
               key={rootProjectPath}
               project={WORKSPACE_PROJECT}
@@ -2115,7 +2103,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
             {caps.system && <HeaderResources key={`header-resources:${authEmail ?? 'guest'}`} onOpen={() => setSysStatsOpen(true)} />}
             <RuntimeControls />
             {!isGuest && <ActiveSessionsButton presence={activeSessions} profile={{ email: authEmail, displayName: auth.displayName, avatarDataUrl: auth.avatarDataUrl }} />}
-            {projectView === 'workspace' && desktopMode && projectUiPath && workspaceUiLoaded && tabsHydrated && <LayoutPresets key={`layout-presets:${authEmail ?? 'guest'}`} storageKey={layoutPresetsKey(authEmail ?? 'guest')} legacyStorageKey={legacyLayoutPresetsKey(authEmail ?? 'guest', projectUiPath)} factory={layoutFactory} capture={captureLayout} onApply={applyLayoutPreset} />}
+            {projectView === 'workspace' && (desktopMode || compact) && projectUiPath && workspaceUiLoaded && tabsHydrated && <LayoutPresets key={`layout-presets:${authEmail ?? 'guest'}`} storageKey={layoutPresetsKey(authEmail ?? 'guest')} legacyStorageKey={legacyLayoutPresetsKey(authEmail ?? 'guest', projectUiPath)} mode={host?.mode} onModeChange={host?.onModeChange} factory={layoutFactory} capture={captureLayout} onApply={applyLayoutPreset} />}
             {(!isGuest || canEditActiveTab) && <HoverTipLayer className="contents" placement="bottom">
               <button type="button" aria-label={uiText("전체화면")} data-tip={uiText("전체화면")} onClick={toggleFullscreen}
                 className={headerIconControlClassName}>
@@ -2128,7 +2116,15 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
               account={!isGuest && authEmail ? { email: authEmail, displayName: auth.displayName, avatarDataUrl: auth.avatarDataUrl, onSelect: () => setAccountSettingsOpen(true) } : undefined} />
           </div>
         </header>
-      </div>
+      </div></>)
+
+  return (
+    <IconPackProvider value={themeSettings.iconPack}>
+    <div className="mew-workspace flex flex-col overflow-hidden bg-surface text-ink" data-mobile-keyboard={mobileKeyboardOpen || undefined} style={{ height: host ? '100%' : 'var(--app-height, 100dvh)' }}>
+      {/* 프로젝트 선택기와 도구 버튼은 전체 너비 헤더에, 문서 탭은 각 편집 칸에 둔다. */}
+      {host?.headerHost ? active && createPortal(workspaceHeader, host.headerHost) : !host && workspaceHeader}
+
+      {workspaceError && <div role="alert" className="p-3 text-sm text-danger-ink">{workspaceError}</div>}
 
       {projectView === 'setup' && <main data-project-empty data-workspace-panel="projects" className="mew-project-empty mew-panel-surface bg-surface-deep">{projectAdd}</main>}
       {projectView === 'workspace' && <div className="workspace-dock-layout" data-dock-position={dockPosition}>
@@ -2147,7 +2143,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
       >
         {hasProject === true && <>
         <button type="button" data-sidebar-toggle aria-expanded={sidebarOpen} aria-label={uiText(sidebarOpen ? '파일 탐색기 닫기' : '파일 탐색기 열기')} data-tip={uiText(sidebarOpen ? '파일 탐색기 닫기' : '파일 탐색기 열기')} onClick={() => toggleWorkspacePanel('sidebar')}
-          className="absolute top-1/2 z-50 hidden h-9 w-5 -translate-y-1/2 items-center justify-center rounded-r border border-edge-strong bg-surface-deep text-ink-secondary hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-accent md:flex"
+          className="absolute top-1/2 z-50 hidden h-9 w-5 -translate-y-1/2 items-center justify-center rounded-r border border-edge-strong bg-surface-deep text-ink-secondary hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-accent workspace-wide:flex"
           style={{ left: sidebarOpen ? sidebarWidth - 1 : 0 }}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d={sidebarOpen ? 'm15 6-6 6 6 6' : 'm9 6 6 6-6 6'} /></svg>
         </button>
@@ -2160,7 +2156,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
             }}
             // 모바일은 프로젝트 탭 아래 작업 영역 전체를 덮는다. 파일 탭은 사이드바가 열린 동안 보이지 않는다.
             // 데스크톱은 기존 고정 칸이다.
-            className={`absolute inset-x-0 top-0 bottom-0 flex bg-surface-deep md:static md:z-auto md:order-first md:shrink-0 ${mobilePanelLayer('sidebar')}`}
+            className={`absolute inset-x-0 top-0 bottom-0 flex bg-surface-deep workspace-wide:static workspace-wide:z-auto workspace-wide:order-first workspace-wide:shrink-0 ${mobilePanelLayer('sidebar')}`}
             style={{ width: isDesktop() ? sidebarWidth : undefined }}
           >
             <div className="flex min-w-0 flex-1 flex-col">
@@ -2240,14 +2236,14 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
             </div>
             <div
               onPointerDown={startSidebarResize}
-              className="hidden w-1 shrink-0 cursor-col-resize touch-none border-l border-edge bg-surface-deep hover:border-accent md:block"
+              className="hidden w-1 shrink-0 cursor-col-resize touch-none border-l border-edge bg-surface-deep hover:border-accent workspace-wide:block"
               aria-hidden="true"
             />
           </div>
         )}
 
         {/* 편집 칸들 — 분할 배치 그대로다. 칸마다 자기 탭 줄·자기 문서·자기 협업 세션을 가진다 */}
-        <DockWorkspace key={desktopMode ? authEmail ?? 'guest' : projectUiPath ?? 'pending-workspace'} apiRef={dockRef} initialLayout={layout} value={workspaceUi.dock} onChange={saveDockLayout} onEditorDrop={handleDockEditorDrop} foreground={mobileForegroundPanel}>
+        <DockWorkspace key={host?.id ?? (desktopMode ? authEmail ?? 'guest' : projectUiPath ?? 'pending-workspace')} apiRef={dockRef} initialLayout={layout} value={workspaceUi.dock} onChange={saveDockLayout} onEditorDrop={handleDockEditorDrop} foreground={mobileForegroundPanel}>
         {panes.map(renderEditorPane)}
 
         {!creationAgentProject && projectUiPath && (caps.agent || caps.terminal) && <AgentPanel
@@ -2305,7 +2301,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
         {rootProjectPath && canDebug && auth.email && <DockPanel id="debugger" kind="debugger" visible={debuggerOpen} mobileSelected onFocus={() => bringWorkspacePanelToFront('debugger')}>
           {debuggerOpen && <Suspense fallback={<div role="status" className="p-2 text-xs text-ink-secondary">…</div>}><DebuggerPanel key={`${auth.email}:${rootProjectPath}`} root={rootProjectPath} onClose={() => closeWorkspacePanel('debugger')} onSettings={() => { setDebuggerSettingsRequested(true); setSettingsOpen(true) }} onOpenFile={(file, line) => { const relative = file.startsWith(rootProjectPath + '/') ? file.slice(rootProjectPath.length + 1) : file; if (!relative.startsWith('/')) openMentionedFile(WORKSPACE_PROJECT, relative, line) }} /></Suspense>}
         </DockPanel>}
-        {canOpenBrowser && <DockPanel id="browser" kind="browser" visible={browserOpen} tabs={['browser']} mobileSelected onFocus={() => bringWorkspacePanelToFront('browser')}>
+        {canOpenBrowser && !compact && <DockPanel id="browser" kind="browser" visible={browserOpen} tabs={['browser']} mobileSelected onFocus={() => bringWorkspacePanelToFront('browser')}>
           {browserOpen && <div data-workspace-panel="browser" data-dom-browser className="h-full min-h-0 min-w-0"><BrowserDesktopPanel key={auth.email} url={browserUrl} navigationRequest={browserNavigationRequest} nativeAllowed={caps.nativeBrowser} previewAllowed={caps.portPreview} onClose={() => closeWorkspacePanel('browser')} /></div>}
         </DockPanel>}
         {rootProjectPath && caps.filesRead && auth.email && <DockPanel floating={toolPresentation.tasks === 'popup'} storageKey={popupKey('tasks')} legacyStorageKey={`mew:popup:${authEmail}:${projectUiPath}:tasks`} id="tasks" kind="tasks" visible={tasksOpen} tabs={['tasks']} mobileSelected onFocus={() => { activeTabbedSurfaceRef.current = 'tasks'; bringWorkspacePanelToFront('tasks') }}>
@@ -2324,9 +2320,9 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
           <div
             data-workspace-panel="chat"
           onPointerDownCapture={() => bringWorkspacePanelToFront('chat')}
-            className={`fixed inset-x-0 top-10 bottom-0 flex md:static md:z-auto md:w-[22rem] md:shrink-0 ${mobilePanelLayer('chat')}`}
+            className={`fixed inset-x-0 top-10 bottom-0 flex workspace-wide:static workspace-wide:z-auto workspace-wide:w-[22rem] workspace-wide:shrink-0 ${mobilePanelLayer('chat')}`}
           >
-            <div className="hidden w-1.5 shrink-0 border-l border-edge md:block" aria-hidden="true" />
+            <div className="hidden w-1.5 shrink-0 border-l border-edge workspace-wide:block" aria-hidden="true" />
             <div className="min-h-0 min-w-0 flex-1 overflow-hidden">
                 <ChatPanel
                   authEmail={authEmail}
@@ -2345,7 +2341,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
       </div>
       </div>}
 
-      <Mewcat onOpenSettings={() => { setMewcatSettingsRequest(request => request + 1); setSettingsOpen(true) }} portalTarget={settingsOpen && !desktopMode ? settingsMewcatHost : remoteDesktopOpen ? remoteMewcatHost : null} hidden={projectView !== 'workspace' || remoteDesktopOpen && mewcatHideDesktop} skin={mewcatSkin} assistant={{ account: auth.email ?? 'guest', enabled: caps.agent, runtime: mewcatRuntime, projectRoot: rootProjectPath, onAction: handleMewcatAction, onRuntimeChange: selectMewcatRuntime, onConnect: () => { setMewcatPicker(true); openWorkspacePanel('agent'); showToast(t('mewcat.assistant.guide')) } }} />
+      {active && <WorkspaceMewcat onOpenSettings={() => { setMewcatSettingsRequest(request => request + 1); setSettingsOpen(true) }} portalTarget={settingsOpen && !desktopMode ? settingsMewcatHost : remoteDesktopOpen ? remoteMewcatHost : null} hidden={projectView !== 'workspace' || remoteDesktopOpen && mewcatHideDesktop} skin={mewcatSkin} assistant={{ account: auth.email ?? 'guest', enabled: caps.agent, runtime: mewcatRuntime, projectRoot: rootProjectPath, onAction: handleMewcatAction, onRuntimeChange: selectMewcatRuntime, onConnect: () => { setMewcatPicker(true); openWorkspacePanel('agent'); showToast(t('mewcat.assistant.guide')) } }} />}
 
       {projectView === 'workspace' && <MobileDock active={remoteDesktopOpen ? 'desktop' : desktopMode ? focusedDockPanel ?? '' : mobileForegroundPanel ?? 'editor'} openPanels={desktopMode ? mobileDockPanels.filter(panel => panel === 'editor' ? editorOpen : panel === 'desktop' ? remoteDesktopOpen : panel === 'memo' ? memoOpen : workspacePanelOpen[panel]) : undefined} available={mobileDockPanels} hidden={mobileKeyboardOpen} portalTarget={remoteDockHost ?? sidebarDockHost}
         position={remoteDockHost ? undefined : dockPosition} onSelect={selectDockPanel} onNavigate={navigateMobileDock} />}
@@ -2447,8 +2443,10 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
 /** Authentication is owned by the lightweight bootstrap; workspace code loads only when needed. */
 function App(props: EditorAppProps) {
   return <>
-    {props.auth.authenticated && <GitLoginDialog key={props.auth.email ?? 'guest'} />}
-    <EditorApp key={props.auth.email ?? 'guest'} {...props} />
+    {props.auth.authenticated && <GitLoginDialog key={`git-login:${props.auth.email ?? 'guest'}`} />}
+    <WorkspaceAccountProvider key={`workspace:${props.auth.email ?? 'guest'}`} auth={props.auth}><WorkspacePresenceProvider>
+      <WorkspaceApplication account={props.auth.email} guest={props.auth.role === 'guest'} renderWorkspace={(host, onWorkspaceReady) => <EditorApp {...props} host={host} onWorkspaceReady={onWorkspaceReady} />} />
+    </WorkspacePresenceProvider></WorkspaceAccountProvider>
   </>
 }
 

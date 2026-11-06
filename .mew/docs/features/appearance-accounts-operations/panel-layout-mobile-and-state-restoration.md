@@ -4,11 +4,11 @@ parent: "mew-settings"
 title: "Panel Layout, Mobile, and State Restoration"
 status: "implemented"
 created: "2026-09-18"
-updated: "2026-11-06"
+updated: "2026-11-07"
 status_hash: "018bca32e486b43c386b29de3e2087d6d1447fae6a33abc99d745367947a9382"
 files: ["src/components/tool-presentation-toggle.tsx", "src/components/SettingsModal.tsx", "src/hooks/use-refresh-tasks.ts", "src/hooks/usePresence.ts", "src/components/project-loading-overlay.tsx", "src/App.tsx", "src/components/DockWorkspace.tsx", "src/components/EditorPane.tsx", "src/components/TabBar.tsx", "src/components/AgentPanel.tsx", "src/components/mobile-dock.tsx", "src/components/layout-presets.tsx", "src/utils/layout-presets.ts", "server/layout-icon-cli.ts", "src/utils/mobile-dock.ts", "src/hooks/use-mobile-keyboard.ts", "src/hooks/use-mobile-panel-swipe.ts", "src/hooks/useTabs.ts", "server/userUiState.ts"]
 commits: []
-description: "Current panel docking, mobile gestures, safe areas, presets, and account/device layout restoration. Separates account-and-project tab synchronization from geometry and links the planned optional multi-project mode."
+description: "Panel docking, mobile gestures, safe areas, presets, and account/device restoration for single-project mode. Separates tab synchronization from geometry and links optional multi-project workspaces and their independent board state."
 상위파일:
   - "MOC.md"
   - "_appearance-accounts-operations.md"
@@ -16,7 +16,7 @@ description: "Current panel docking, mobile gestures, safe areas, presets, and a
 
 ## Requirements
 
-The existing desktop behavior below is the baseline for the planned **single-project mode**. The optional **multi-project mode**, its project panels, and the **project selection panel** terminology are specified separately in [Multi-project mode](multi-project-mode.md). That extension is in design and has not changed the implemented layout described here.
+The desktop behavior below is **single-project mode**. The optional **multi-project mode**, its project panels, independent board restoration, and **project selection panel** terminology are specified in [Multi-project mode](multi-project-mode.md). Both modes are available from Layout; the existing single-project presets remain separate from the multi-project board.
 
 - Keep the installed app header, panels, Dock and full-screen dialogs inside device safe areas in portrait and landscape. Reserve each inset once without shrinking the existing header or touch controls; follow [Device safe areas](../../development/ui-workspace-layout.md#device-safe-areas).
 

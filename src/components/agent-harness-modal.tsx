@@ -1,3 +1,4 @@
+import { useWorkspaceApi } from '../api/workspace-api-context.tsx'
 import { canAutoFocusInput } from '@mew/ui'
 import { uiText } from '@mew/ui/i18n-core'
 import { useUiLocale } from '@mew/ui/i18n'
@@ -5,7 +6,7 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { ArrowLeft, BookStack, PlugTypeA, Xmark, RefreshDouble, Plus, NavArrowRight } from 'iconoir-react'
 import { SelectField, useOverlayDismiss } from '@mew/ui'
-import { fetchHarness, fetchHarnessDetail, mutateHarness } from '../api/agent-harness'
+
 import { SharedMcpConnection } from './shared-mcp-connection'
 import { SkillLibraryManager } from './skill-library-manager'
 import { McpManager } from './mcp-manager'
@@ -38,6 +39,7 @@ export function AgentHarnessModal({ cwd, initialKind, onClose }: { cwd: string; 
 }
 
 export function NativeHarnessModal({ cwd, onClose, onSwitchSkills, onBackToManaged }: { cwd: string; onClose: () => void; onSwitchSkills: () => void; onBackToManaged?: () => void }) {
+  const { fetchHarness, fetchHarnessDetail, mutateHarness } = useWorkspaceApi()
   const copy = mcpManagerCopy[useUiLocale()]
   const kind = 'mcp' as const
   const [inventory, setInventory] = useState<HarnessInventory | null>(null)
@@ -86,7 +88,7 @@ export function NativeHarnessModal({ cwd, onClose, onSwitchSkills, onBackToManag
     setLoading(true); setInventory(null); setError('')
     fetchHarness(cwd, kind, controller.signal).then(setInventory).catch(error => { if (!controller.signal.aborted) setError(error.message) }).finally(() => { if (!controller.signal.aborted) setLoading(false) })
     return () => controller.abort()
-  }, [cwd, kind, reload])
+  }, [cwd, kind, reload, fetchHarness])
   useEffect(() => {
     if (!selected) return
     if (inventory?.locations.find(location => location.id === selected.location)?.agent === 'mew' && !canManageSharedMcp) return
@@ -94,7 +96,7 @@ export function NativeHarnessModal({ cwd, onClose, onSwitchSkills, onBackToManag
     setDetail(null); setError('')
     fetchHarnessDetail(cwd, kind, selected.id, controller.signal).then(value => { setDetail(value); setContent(value.content) }).catch(error => { if (!controller.signal.aborted) setError(error.message) })
     return () => controller.abort()
-  }, [cwd, kind, selected, inventory, canManageSharedMcp])
+  }, [cwd, kind, selected, inventory, canManageSharedMcp, fetchHarnessDetail])
 
   const locationOf = useCallback((item: HarnessItem) => inventory?.locations.find(location => location.id === item.location), [inventory])
   const filtered = inventory?.items.filter(item => {

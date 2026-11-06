@@ -1,3 +1,4 @@
+import { useWorkspaceApi } from '../api/workspace-api-context'
 import type { GitRemoteProgress } from '../../shared/git-remote-progress'
 import { uiText } from '@mew/ui/i18n-core'
 import { useUiLocale } from '@mew/ui/i18n'
@@ -8,7 +9,7 @@ import { Copy, GitBranch, GitCherryPickCommit, Label, ArrowDown, ArrowUp, Check,
 import { relativeCommitTime } from '../utils/git-time'
 import { graphLayout, type GraphRow } from '../utils/git-graph'
 import { graphBranchTargets, type GraphBranchTargets } from '../utils/git-graph-branches'
-import { subscribeLive } from '../utils/live-updates'
+
 import { filterGitChanges } from '../utils/git-change-filter'
 import { filterGitHistory } from '../utils/git-history-filter'
 import type { GitWorkbenchNavigation, GitWorkbenchView } from '../utils/git-workbench-navigation'
@@ -16,24 +17,7 @@ import type { GitDiffTarget } from '../utils/git-diff-tabs'
 import { GitChangesMenu } from './git-changes-menu'
 import { GitBranchPicker } from './git-branch-picker'
 import { GitAiCommitDialog } from './git-ai-commit-dialog'
-import {
-  commitGitWorkingTree,
-  discardGitWorkingTree,
-  fetchGitCommit,
-  fetchGitLog,
-  fetchGitRepository,
-  fetchGitWorkingTree,
-  runGitCommitAction,
-  runGitRemoteAction,
-  runGitBranchAction,
-  type GitBranchRef,
-  type GitChangedFile,
-  type GitCommitAction,
-  type GitCommitDetail,
-  type GitLogEntry,
-  type GitRepositoryInfo,
-  type GitWorkingTreeDetail,
-} from '../api/client'
+import { type GitBranchRef, type GitChangedFile, type GitCommitAction, type GitCommitDetail, type GitLogEntry, type GitRepositoryInfo, type GitWorkingTreeDetail } from '../api/client'
 
 const LANE_GAP = 10
 const ROW_HEIGHT = 28
@@ -345,6 +329,7 @@ export function GitWorkbench({ project, repositoryPath, onNotice, onBack, onOpen
   visible?: boolean
   navigation?: GitWorkbenchNavigation
 }) {
+  const { fetchGitRepository, fetchGitLog, fetchGitWorkingTree, fetchGitCommit, commitGitWorkingTree, discardGitWorkingTree, runGitCommitAction, runGitBranchAction, runGitRemoteAction, subscribeLive } = useWorkspaceApi()
   useUiLocale()
   const [splitRatio, setSplitRatio] = useState(0.5)
   const [now, setNow] = useState(Date.now)
@@ -433,7 +418,7 @@ export function GitWorkbench({ project, repositoryPath, onNotice, onBack, onOpen
     } finally {
       if (version === refreshVersion.current) setLoading(false)
     }
-  }, [project, repositoryPath, setView, workspacePath])
+  }, [project, repositoryPath, setView, workspacePath, fetchGitRepository, fetchGitLog, fetchGitWorkingTree])
 
   useEffect(() => {
     setCommitTitle('')
@@ -471,7 +456,7 @@ export function GitWorkbench({ project, repositoryPath, onNotice, onBack, onOpen
       })
       setRefreshError(null)
     }, err => setRefreshError(err.message))
-  }, [visible, loading, busy, project, repositoryPath, workspacePath])
+  }, [visible, loading, busy, project, repositoryPath, workspacePath, subscribeLive])
 
   useEffect(() => {
     if (view.kind !== 'commit') return
@@ -484,7 +469,7 @@ export function GitWorkbench({ project, repositoryPath, onNotice, onBack, onOpen
       .catch((err: unknown) => { if (alive) setError(err instanceof Error ? err.message : String(err)) })
       .finally(() => { if (alive) setDetailLoading(false) })
     return () => { alive = false }
-  }, [project, repositoryPath, workspacePath, view])
+  }, [project, repositoryPath, workspacePath, view, fetchGitCommit])
 
   useEffect(() => {
     const paths = new Set(workingTree.files.map(file => file.path))

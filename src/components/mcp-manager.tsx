@@ -1,10 +1,11 @@
+import { useWorkspaceApi } from '../api/workspace-api-context.tsx'
 import { useEffect, useId, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { ArrowLeft, Cloud, EditPencil, Folder, NavArrowRight, Plus, PlugTypeA, RefreshDouble, Settings, Trash, Xmark } from 'iconoir-react'
 import { canAutoFocusInput, SelectField, useOverlayDismiss } from '@mew/ui'
 import { uiText } from '@mew/ui/i18n-core'
 import { useUiLocale } from '@mew/ui/i18n'
-import { fetchMcpManagement, mutateMcpManagement } from '../api/mcp-management'
+
 import { SharedMcpConnection } from './shared-mcp-connection'
 import { mcpManagerCopy } from './mcp-manager-copy'
 import { McpCloudflareFields, McpConnectionFields, McpGroupFields } from './mcp-manager-fields'
@@ -21,6 +22,7 @@ type MutationInput = McpManagementMutation extends infer M ? M extends McpManage
 function enabledIn(usage: McpUsageState, scope: McpUsageScope) { return scope === 'common' ? usage.common : usage.project ?? usage.common }
 
 export function McpManager({ cwd, onClose, onSwitchSkills, onOpenSources }: { cwd: string; onClose: () => void; onSwitchSkills: () => void; onOpenSources: () => void }) {
+  const { fetchMcpManagement, mutateMcpManagement } = useWorkspaceApi()
   const copy = mcpManagerCopy[useUiLocale()]
   const [inventory, setInventory] = useState<McpManagementInventory | null>(null)
   const [scope, setScope] = useState<McpUsageScope>('project'), [search, setSearch] = useState('')
@@ -73,7 +75,7 @@ export function McpManager({ cwd, onClose, onSwitchSkills, onOpenSources }: { cw
       setInventory(next); setStatuses({})
     }).catch(cause => { if (!controller.signal.aborted) setError(cause.message) }).finally(() => { if (!controller.signal.aborted) setLoading(false) })
     return () => controller.abort()
-  }, [cwd, reload])
+  }, [cwd, reload, fetchMcpManagement])
   useEffect(() => { if (showingDetail && window.matchMedia('(max-width: 767px)').matches) headingRef.current?.focus() }, [showingDetail, selection?.id, draft])
 
   async function run(action: () => Promise<unknown>, after?: () => void) {

@@ -16,7 +16,7 @@ test('task requests choose a runtime and prepare an editable draft without sendi
     import {DockWorkspace} from '${root}/src/components/DockWorkspace.tsx';
     import {I18nProvider} from '${root}/src/i18n.tsx';
     import {readAgentInputDraft} from '${root}/src/utils/agentInputDrafts.ts';
-    window.messages=[];window.sockets=[];window.readDraft=(id='task-tab')=>readAgentInputDraft(id);
+    window.messages=[];window.sockets=[];
     class Socket {
       static OPEN=1;static CLOSED=3;readyState=0;
       constructor(url){this.url=url;window.sockets.push(this)}
@@ -29,6 +29,7 @@ test('task requests choose a runtime and prepare an editable draft without sendi
     function Fixture(){
       const [version,setVersion]=React.useState(0);
       const [workspace,setWorkspace]=React.useState('/workspace');
+      window.readDraft=(id='task-tab')=>readAgentInputDraft(id,{account:'local',projectPath:workspace,workspacePath:workspace});
       window.switchWorkspace=setWorkspace;
       const taskRequest={id:'task-tab',label:'Task title',renamed:true,cwd:'/workspace',initialDraft:${JSON.stringify(prompt)}};
       const docked=location.search.includes('dock');

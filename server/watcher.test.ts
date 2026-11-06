@@ -1,5 +1,6 @@
 // 트리 감시 대상 디렉터리 선정 — 임시 트리를 만들어 node_modules·dist·build·.git 같은 제외 구역엔
 // 내려가지 않고(감시 폭발·inotify 한계 방지), 소스 폴더와 .mew 는 감시하는지 확인한다.
+import './test-isolated-data.ts'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'

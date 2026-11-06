@@ -1,10 +1,11 @@
+import { useWorkspaceApi } from '../api/workspace-api-context'
 import { GIT_LOGIN_EVENT, GIT_CONNECTION_CHANGED, type GitLoginRequest } from '../api/git-auth-request'
 import { uiText } from '@mew/ui/i18n-core'
 import { useUiLocale } from '@mew/ui/i18n'
 import { useEffect, useId, useRef, useState } from 'react'
 import { copyText, DialogFrame, HoverTipLayer } from '@mew/ui'
 import { Check, Copy, Computer, Github, LinkSlash, OpenNewWindow, Refresh, Xmark, XmarkCircle } from 'iconoir-react'
-import { disconnectGitHub, fetchGitHubAuth, openGitHubLoginBrowser, startGitHubLogin, stopGitHubLogin } from '../api/client'
+
 import { githubLoginPending, type GitHubAuthStatus } from '../../shared/github-auth'
 import { deferredComponent } from './deferred-component'
 
@@ -15,6 +16,7 @@ const iconButton = 'flex h-7 w-7 shrink-0 items-center justify-center rounded te
 const button = 'inline-flex h-7 items-center justify-center gap-1.5 rounded px-2 py-1 text-xs text-ink-secondary hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-40'
 
 export function GitHubAccount({ project, request }: { project: string; request?: GitLoginRequest }) {
+  const { fetchGitHubAuth, disconnectGitHub, startGitHubLogin, stopGitHubLogin, openGitHubLoginBrowser } = useWorkspaceApi()
   useUiLocale()
   const [status, setStatus] = useState<GitHubAuthStatus | null>(null)
   const [open, setOpen] = useState(!!request)
@@ -69,7 +71,7 @@ export function GitHubAccount({ project, request }: { project: string; request?:
     }
     void poll()
     return () => { disposed = true; clearTimeout(timer) }
-  }, [project, reload, active, status?.busy])
+  }, [project, reload, active, status?.busy, fetchGitHubAuth])
 
   const action = async (kind: 'start' | 'stop' | 'browser' | 'disconnect') => {
     if (busy) return

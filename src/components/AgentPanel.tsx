@@ -1,9 +1,12 @@
+import { useWorkspaceApi } from '../api/workspace-api-context'
+import { useWorkspaceDesktop, useWorkspaceView } from '../workspace/workspace-view-context'
 import { useAgentControlSelection } from '../hooks/use-agent-control-selection'
 import { useAgentPromptFeedback } from '../hooks/use-agent-prompt-feedback'
 import { HeaderSelect } from './agent-header-select'
 import { AgentPromptDrafts } from './agent-prompt-drafts'
 import { AgentExecutionToggles } from './agent-execution-toggles'
 import { useAgentExecutionOptions } from '../hooks/use-agent-execution-options'
+import { useAgentInputDraft } from '../hooks/use-agent-input-draft'
 import { RuntimeInstallProgress } from './RuntimeInstallProgress'
 import { AgentAttachmentIcon } from './agent-attachment-icon'
 import { AgentDocumentReferences, AgentDocumentTag } from './agent-document-tag'
@@ -11,7 +14,7 @@ import { attachmentKind, conversationAttachments, documentReferenceTokens, uploa
 import { AgentMediaPreviewDialog } from './agent-media-preview-dialog'
 import { scopedBrowserStorage } from '@mew/ui/browser-storage-scope'
 import { workspaceViewportBottom } from '../utils/workspace-viewport'
-import { isMewTransportSuspended, openMewSocket } from '../utils/remote-transport.ts'
+import { isMewTransportSuspended } from '../utils/remote-transport.ts'
 import { agentRecoveryDelay } from '../utils/recovery-policy'
 import { AgentConnectionWatch } from '../utils/agent-connection-watch.ts'
 import { createAgentTabsSync } from '../utils/agent-tabs-sync.ts'
@@ -69,7 +72,6 @@ import { useAgentTabPreviews } from '../hooks/use-agent-tab-previews'
 import { useAgentSessionPreviews } from '../hooks/use-agent-session-previews'
 import { mergeSessionSearchResults } from '../../shared/agent-session-search'
 import { useScheduledPrompts } from '../hooks/use-scheduled-prompts'
-import { stopAgentTabCommands } from '../api/agent-commands'
 import { commandTimeline } from '../utils/agent-command-timeline'
 import { copyText, keepFocusOnPress, TabScrollArea, useDragReorder, useOverlayDismiss } from '@mew/ui'
 import { useFocusedShortcutScope } from '@mew/shortcuts'
@@ -84,7 +86,7 @@ import {
   markAgentMarkdownCopied,
   renderMarkdown,
 } from '../utils/agentMarkdown'
-import { clearAgentInputDraft, readAgentInputDraft, readAgentInputHistory, recordAgentInputHistory, writeAgentInputDraft } from '../utils/agentInputDrafts'
+import { clearAgentInputDraft, readAgentInputHistory, recordAgentInputHistory, writeAgentInputDraft } from '../utils/agentInputDrafts'
 import {
   clearAgentEventCache,
   clearAgentTabCaches,
@@ -92,38 +94,7 @@ import {
   pruneAgentLocalCaches,
 } from '../utils/agentEventCache'
 import { DEFAULT_RUNTIME_ID, RUNTIMES, runtimeOf } from './agentRuntimes'
-import {
-  cancelAgentScheduledPrompt,
-  fetchAgentAuthTerminalStatus,
-  fetchAgentTabs,
-  fetchAgentCwdSuggestions,
-  fetchProjects,
-  fetchFullTree,
-  fetchSkills,
-  installAgentRuntime,
-  killTmuxSession,
-  resolveAgentCwd,
-  resolveAgentFileLink,
-  rawUrl,
-  runAgentAuthTerminal,
-  openAgentAuthServerBrowser,
-  openLoginDesktop,
-  closeLoginDesktop,
-  submitAgentAuthBrowserInput,
-  saveAgentTabs,
-  scheduleAgentPrompt,
-  startAgentTerminal,
-  stopAgentTerminal,
-  updateAgentScheduledPrompt,
-  uploadInto,
-  type AgentRuntimeStatus,
-  type AgentSessionClaim,
-  type AgentCwdSuggestions,
-  type ProjectInfo,
-  type AgentSet,
-  type AgentScheduledPrompt,
-  type SkillSummary,
-} from '../api/client'
+import { type fetchAgentTabs, type WorkspaceClient, type AgentRuntimeStatus, type AgentSessionClaim, type AgentCwdSuggestions, type ProjectInfo, type AgentSet, type AgentScheduledPrompt, type SkillSummary } from '../api/client'
 import type { MentionInputHandle } from './agent-composer-input'
 import { MentionTextarea, type MentionOption, type TriggerOptionSet } from './MentionTextarea'
 import { agentInputMentionOptions } from '../utils/agentInputMentions'
@@ -414,6 +385,7 @@ function AgentAttachmentTag({ attachment, onPreview }: {
   attachment: AgentAttachment
   onPreview: (file: AgentAttachment) => void
 }) {
+  const { rawUrl } = useWorkspaceApi()
   return (
     <span data-agent-attachment title={attachment.relPath.split('/').pop()} className="mx-0.5 inline-flex h-6 items-center rounded-md bg-surface p-1 align-middle text-xs text-ink-secondary">
       {(attachment.isImage || attachmentKind(attachment.mimeType, attachment.relPath) === 'video') ? <button type="button" onClick={() => onPreview(attachment)}
@@ -622,7 +594,7 @@ function InfoRow({ label, value, title }: { label: string; value: string; title?
 
 type OpenWorkspaceFile = (project: string, path: string, line: number | null) => void
 
-function handleMarkdownClick(e: MouseEvent<HTMLElement>, onOpenFile: OpenWorkspaceFile, onRunCommand?: (command: string) => void) {
+function handleMarkdownClick(e: MouseEvent<HTMLElement>, onOpenFile: OpenWorkspaceFile, resolveAgentFileLink: WorkspaceClient['resolveAgentFileLink'], onRunCommand?: (command: string) => void) {
   const command = commandFromAgentMarkdownClick(e.target)
   if (command !== null) {
     e.preventDefault()
@@ -1092,6 +1064,7 @@ function AgentPathBar({
   onToggleInfo: () => void
   onCommit: (path: string) => void
 }) {
+  const { fetchAgentCwdSuggestions } = useWorkspaceApi()
   useUiLocale()
   const [draft, setDraft] = useState(cwd ?? '')
   const [focused, setFocused] = useState(false)
@@ -1126,7 +1099,7 @@ function AgentPathBar({
       .finally(() => {
         if (suggestionSeqRef.current === seq) setLoadingSuggestions(false)
       })
-  }, [cwd])
+  }, [cwd, fetchAgentCwdSuggestions])
 
   useEffect(() => {
     if (!focused || disabled || !cwd) return
@@ -1299,6 +1272,7 @@ void AgentPathBar
  * "탭 안에서 런타임 갈아타기 금지"를 다시 연다). 목록은 열 때 서버에서 한 번 읽는다.
  */
 function RuntimeDropdown({ current, onSelect }: { current: string; onSelect: (runtime: string) => void }) {
+  const { installAgentRuntime } = useWorkspaceApi()
   useUiLocale()
   const [open, setOpen] = useState(false)
   const [statuses, setStatuses] = useState<AgentRuntimeStatus[] | null>(cachedAgentRuntimes)
@@ -1421,6 +1395,7 @@ function RuntimeDropdown({ current, onSelect }: { current: string; onSelect: (ru
 void RuntimeDropdown
 
 function RuntimePicker({ onSelect, onSelectSet }: { onSelect: (runtime: string) => void; onSelectSet: (set: AgentSet) => void }) {
+  const { installAgentRuntime } = useWorkspaceApi()
   useUiLocale()
   const [statuses, setStatuses] = useState<AgentRuntimeStatus[] | null>(cachedAgentRuntimes)
   const [installing, setInstalling] = useState<string | null>(null)
@@ -1567,6 +1542,16 @@ function RuntimePicker({ onSelect, onSelectSet }: { onSelect: (runtime: string) 
 }
 
 export function AgentPanel({ embedded = false, startupPrompt, requestedPicker = false, onPickerRuntimeChosen, onRuntimeReady, cacheAccount = 'local', notificationFocused = false, trackRestore, onRunningAgentsChange, requestedNoticeTab, onNoticeHandled, preparedTabs, requestedTab, onRequestedTabHandled, allowAgent = true, allowTerminal = true, project, workspacePath, workingPath = workspacePath, tree, focusedFilePath, getSelectedText, renderCommandButtons, onOpenFile, onOpenGuidanceFile, onClose, nextTabSignal = 0, previousTabSignal = 0, closeTabSignal = 0, agentOpen = true, terminalOpen = false, onCloseTerminal, onPanelFocus, foregroundKind }: { embedded?: boolean; startupPrompt?: { tabId: string; text: string; displayText?: string }; requestedPicker?: boolean; onPickerRuntimeChosen?: (runtime: string) => void; onRuntimeReady?: (runtime: string) => void; cacheAccount?: string; notificationFocused?: boolean; trackRestore?: <T>(request: Promise<T>) => Promise<T>; onRunningAgentsChange?: (count: number) => void; requestedNoticeTab?: string; onNoticeHandled?: () => void; preparedTabs?: ReturnType<typeof fetchAgentTabs>; requestedTab?: RequestedAgentTab | null; onRequestedTabHandled?: () => void; allowAgent?: boolean; allowTerminal?: boolean; foregroundKind?: string | null; agentOpen?: boolean; terminalOpen?: boolean; onCloseTerminal?: () => void; onPanelFocus?: (kind: 'agent' | 'terminal') => void; project: string; workspacePath: string | null; workingPath?: string | null; tree: TreeNode[]; focusedFilePath: string | null; getSelectedText?: () => string | null; renderCommandButtons?: (run: (command: string) => void) => ReactNode; onOpenFile: OpenWorkspaceFile; onOpenGuidanceFile?: (path: string) => void; onClose: () => void; nextTabSignal?: number; previousTabSignal?: number; closeTabSignal?: number }) {
+  const api = useWorkspaceApi()
+  const { resolveAgentCwd, fetchAgentTabs, saveAgentTabs, stopAgentTerminal, stopAgentTabCommands } = api
+  const inputScope = useMemo(() => ({ account: cacheAccount,
+    projectPath: api.scope?.projectPath ?? workspacePath ?? workingPath ?? '',
+    workspacePath: api.scope?.workspacePath ?? workingPath ?? workspacePath ?? '',
+    migrateLegacy: !api.scope,
+  }), [api.scope, cacheAccount, workspacePath, workingPath])
+  const workspaceView = useWorkspaceView()
+  const workspaceViewRef = useRef(workspaceView)
+  workspaceViewRef.current = workspaceView
   useUiLocale()
   const { t } = useI18n()
   const inheritedDock = useDock()
@@ -1661,7 +1646,7 @@ export function AgentPanel({ embedded = false, startupPrompt, requestedPicker = 
         setOpenRuntimeError(err instanceof Error ? err.message : String(err))
       })
     return () => { alive = false }
-  }, [workingPath])
+  }, [workingPath, resolveAgentCwd])
 
   useEffect(() => {
     try {
@@ -1757,7 +1742,7 @@ export function AgentPanel({ embedded = false, startupPrompt, requestedPicker = 
       window.removeEventListener('pageshow', onPageShow)
       document.removeEventListener('visibilitychange', onVisibility)
     }
-  }, [workspacePath, docked, preparedTabs, trackRestore, cacheAccount])
+  }, [workspacePath, docked, preparedTabs, trackRestore, cacheAccount, fetchAgentTabs, saveAgentTabs])
 
   useEffect(() => {
     pendingRequestedTab.current = null
@@ -1779,7 +1764,7 @@ export function AgentPanel({ embedded = false, startupPrompt, requestedPicker = 
     }
     pendingRequestedTab.current = null
     const { initialDraft, ...tab } = requestedTab
-    if (initialDraft) writeAgentInputDraft(tab.id, initialDraft)
+    if (initialDraft) writeAgentInputDraft(tab.id, initialDraft, inputScope)
     setTabs(previous => previous.some(existing => existing.id === tab.id) ? previous : [...previous, tab])
     setActiveId(requestedTab.id)
     setOpened(previous => new Set(previous).add(requestedTab.id))
@@ -1789,7 +1774,7 @@ export function AgentPanel({ embedded = false, startupPrompt, requestedPicker = 
     currentDock?.assign(group, requestedTab.id)
     currentDock?.select(group, requestedTab.id)
     onRequestedTabHandled?.()
-  }, [requestedTab, onRequestedTabHandled, tabsSynced, allowAgent, workspacePath])
+  }, [requestedTab, onRequestedTabHandled, tabsSynced, allowAgent, workspacePath, inputScope])
 
   const refreshSessionClaims = useCallback(() => {
     if (!workspacePath) return Promise.resolve()
@@ -1805,7 +1790,7 @@ export function AgentPanel({ embedded = false, startupPrompt, requestedPicker = 
       })
     sessionClaimsRefreshRef.current = { workspacePath, promise: pending }
     return pending
-  }, [workspacePath])
+  }, [workspacePath, fetchAgentTabs])
 
   const activate = (id: string) => {
     pendingRequestedTab.current = null
@@ -1845,7 +1830,7 @@ export function AgentPanel({ embedded = false, startupPrompt, requestedPicker = 
         if (currentWorkspace.current !== requestedWorkspace || request && pendingRequestedTab.current !== request) return
         const { initialDraft, ...requested } = request ?? {}
         const tab = { ...newTab(runtime, preset?.name ?? runtimeOf(runtime).label, cwd, preset), ...requested, runtime, cwd, preset }
-        if (initialDraft) writeAgentInputDraft(tab.id, initialDraft)
+        if (initialDraft) writeAgentInputDraft(tab.id, initialDraft, inputScope)
         if (request) pendingRequestedTab.current = null
         setDefaultCwd(cwd)
         setTabs((prev) => [...prev, tab])
@@ -1862,6 +1847,7 @@ export function AgentPanel({ embedded = false, startupPrompt, requestedPicker = 
 
   useEffect(() => {
     const open = (event: Event) => {
+      if (workspaceViewRef.current?.active === false) return
       const runtime = (event as CustomEvent<unknown>).detail
       if (typeof runtime === 'string' && runtimeOf(runtime).id === runtime) addRuntimeTab(runtime)
     }
@@ -1869,7 +1855,7 @@ export function AgentPanel({ embedded = false, startupPrompt, requestedPicker = 
     return () => window.removeEventListener('mew:open-agent-runtime', open)
   // addRuntimeTab deliberately reads current defaultCwd and creates a fresh tab for each settings click.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [defaultCwd, workingPath])
+  }, [defaultCwd, workingPath, inputScope])
 
   const addSetTab = (set: AgentSet, destination = pickerGroup) => {
     try { writeBrowserStorage(RUNTIME_KEY, set.runtime) } catch { /* 최근 런타임 기억은 선택을 막지 않는다 */ }
@@ -1887,7 +1873,7 @@ export function AgentPanel({ embedded = false, startupPrompt, requestedPicker = 
       if (allowTerminal) void stopAgentTabCommands(id).catch(console.error)
       sendersRef.current.get(id)?.({ type: 'close_session' })
     }
-    clearAgentInputDraft(id)
+    clearAgentInputDraft(id, inputScope)
     // unmount may flush the last events. Remove every runtime/cwd cache after it finishes.
     window.setTimeout(() => clearAgentTabCaches(id, cacheAccount), 0)
     const index = tabs.findIndex((tab) => tab.id === id)
@@ -2030,15 +2016,17 @@ export function AgentPanel({ embedded = false, startupPrompt, requestedPicker = 
 
   useEffect(() => {
     const recordTarget = (event: Event) => {
-      if (event.target instanceof Element) lastShortcutTargetRef.current = event.target
+      if (event.target instanceof Element && (!workspaceViewRef.current || workspaceViewRef.current.root.current?.contains(event.target))) lastShortcutTargetRef.current = event.target
     }
     const clearConversation = (event: KeyboardEvent) => {
+      if (workspaceViewRef.current?.active === false) return
       if (event.defaultPrevented || event.isComposing || event.altKey || event.shiftKey
         || !(event.ctrlKey || event.metaKey) || (event.code !== 'KeyR' && event.key.toLowerCase() !== 'r')) return
       const eventTarget = event.target instanceof Element ? event.target : document.activeElement
       const target = eventTarget === document.body || eventTarget === document.documentElement
         ? lastShortcutTargetRef.current : eventTarget
       if (!target?.isConnected || target.closest('[role="dialog"], [aria-modal="true"], [inert]')) return
+      if (workspaceViewRef.current && !workspaceViewRef.current.root.current?.contains(target)) return
       let id: string | null
       if (dock) {
         const surface = target.closest<HTMLElement>('[data-dock-panel], [data-dock-body]')
@@ -2128,6 +2116,7 @@ export function AgentPanel({ embedded = false, startupPrompt, requestedPicker = 
               key={cacheAccount}
               cacheAccount={cacheAccount}
               notificationWorkspace={workspacePath ?? tab.cwd!}
+              workingWorkspace={workingPath ?? workspacePath ?? tab.cwd!}
               notificationFocused={notificationFocused && agentOpen && isActive}
               allowTerminal={allowTerminal}
               tabId={tab.id}
@@ -2276,6 +2265,7 @@ function AgentTerminalView({
   getSelectedText?: () => string | null
   renderCommandButtons?: (run: (command: string) => void) => ReactNode
 }) {
+  const { startAgentTerminal, openSocket } = useWorkspaceApi()
   useUiLocale()
   const { t } = useI18n()
   const [session, setSession] = useState<string | null>(null)
@@ -2290,9 +2280,9 @@ function AgentTerminalView({
       .then((result) => { if (alive) setSession(result.session) })
       .catch((err: unknown) => { if (alive) setError(err instanceof Error ? err.message : String(err)) })
     return () => { alive = false }
-  }, [cwd, retry, runtime, tabId])
+  }, [cwd, retry, runtime, tabId, startAgentTerminal])
 
-  if (session) return <TmuxTerminal socketFactory={openMewSocket} sessionName={session} inputPlaceholder={t('common.textInput')} activeFilePath={activeFilePath} getSelectedText={getSelectedText} renderCommandButtons={renderCommandButtons} insertRefTarget={active ? runtime === 'tmux' ? 'terminal' : 'agent' : null} />
+  if (session) return <TmuxTerminal socketFactory={openSocket} sessionName={session} inputPlaceholder={t('common.textInput')} activeFilePath={activeFilePath} getSelectedText={getSelectedText} renderCommandButtons={renderCommandButtons} insertRefTarget={active ? runtime === 'tmux' ? 'terminal' : 'agent' : null} />
   return (
     <div className="relative flex h-full items-center justify-center bg-surface-deep text-center">
       {error ? (
@@ -2320,6 +2310,7 @@ function AgentSessionView({
   visible,
   notificationFocused,
   notificationWorkspace,
+  workingWorkspace,
   allowTerminal,
   tabId,
   active,
@@ -2350,6 +2341,7 @@ function AgentSessionView({
   cacheAccount: string
   notificationFocused: boolean
   notificationWorkspace: string
+  workingWorkspace: string
   allowTerminal: boolean
   tabId: string
   /** 입력·단축키 포커스 대상 */
@@ -2381,6 +2373,18 @@ function AgentSessionView({
   showInfo: boolean
   onToggleInfo: () => void
 }) {
+  const api = useWorkspaceApi()
+  const { closeLoginDesktop, killTmuxSession, fetchAgentAuthTerminalStatus, openAgentAuthServerBrowser, uploadInto, scheduleAgentPrompt, cancelAgentScheduledPrompt, updateAgentScheduledPrompt, fetchSkills, fetchProjects, fetchFullTree, openLoginDesktop, submitAgentAuthBrowserInput, runAgentAuthTerminal, rawUrl, openSocket } = api
+  const fileWorkspace = api.scope?.workspacePath ?? workingWorkspace
+  const inputScope = useMemo(() => ({ account: cacheAccount,
+    projectPath: api.scope?.projectPath ?? notificationWorkspace,
+    workspacePath: fileWorkspace,
+    migrateLegacy: !api.scope,
+  }), [api.scope, cacheAccount, notificationWorkspace, fileWorkspace])
+  const workspaceView = useWorkspaceView()
+  const workspaceViewRef = useRef(workspaceView)
+  workspaceViewRef.current = workspaceView
+  const desktop = useWorkspaceDesktop()
   const uiLocale = useUiLocale()
   const { t } = useI18n()
   // 어느 프로젝트를 보고 있든 같은 창이다. 탭별 cwd는 워크스페이스 밖 경로도 될 수 있다(ADR 0077).
@@ -2427,7 +2431,7 @@ function AgentSessionView({
     cancelStartupFeedback(id)
   }, [startupQueue, cancelStartupFeedback])
   const { feedback: clearFeedback, request: requestClear, complete: completeClear, observeQueue: observeClearQueue, cancel: cancelClear } = useAgentClearFeedback()
-  const [draft, setDraft] = useState(() => readAgentInputDraft(tabId).replace(/\[\[mew-upload:[^\]\n]+\]\]/g, ''))
+  const [draft, setDraft] = useAgentInputDraft(tabId, inputScope)
   const [cliMode, setCliMode] = useState(false)
   const [commandPopupId, setCommandPopupId] = useState<string | null>(null)
   const [attaching, setAttaching] = useState(false)
@@ -2481,7 +2485,7 @@ function AgentSessionView({
     pendingAcpUrlRef.current = null
     for (const id of acpLoginSessionsRef.current) void closeLoginDesktop(id).catch(() => {})
     acpLoginSessionsRef.current.clear()
-  }, [])
+  }, [closeLoginDesktop])
   const closeAuthBrowser = useCallback(() => {
     authBrowserDismissedRef.current = true
     authBrowserOpeningRef.current = false
@@ -2493,12 +2497,16 @@ function AgentSessionView({
     }
     authBrowserRef.current = null
     setAuthBrowser(null)
-  }, [])
+  }, [closeLoginDesktop])
   const attachmentInputRef = useRef<HTMLInputElement>(null)
   const attachmentPickerContext = useRef<{ target: 'composer' | 'queue'; version: number; projectRoot: string } | null>(null)
   const agentInputRef = useRef<MentionInputHandle>(null)
   const historyIndexRef = useRef<number | null>(null)
   const historyDraftRef = useRef('')
+  useEffect(() => {
+    historyIndexRef.current = null
+    historyDraftRef.current = ''
+  }, [inputScope, tabId])
   const infoOverlayRef = useRef<HTMLDivElement>(null)
   const cacheSessionIdRef = useRef<string | null>(resumeSessionId)
   const resumeSessionIdRef = useRef<string | null>(resumeSessionId)
@@ -2550,17 +2558,17 @@ function AgentSessionView({
   // 골라 target을 실어 보내므로 에이전트 창 차례일 때만 받고, 탭이 여럿이면 **보이는 탭**만 받아 적는다
   useEffect(() => {
     const onInsertRef = (e: Event) => {
-      const detail = (e as CustomEvent<{ target?: string; text: string }>).detail
-      if (!active || detail.target !== 'agent') return
+      const detail = (e as CustomEvent<{ target?: string; text: string; workspacePath?: string; viewId?: string }>).detail
+      const view = workspaceViewRef.current
+      if (!active || view?.active === false || detail.target !== 'agent'
+        || (detail.workspacePath && detail.workspacePath !== fileWorkspace)
+        || (detail.viewId && detail.viewId !== view?.id)) return
       setDraft((d) => d + detail.text)
     }
     window.addEventListener('mew:insert-ref', onInsertRef)
     return () => window.removeEventListener('mew:insert-ref', onInsertRef)
-  }, [active])
+  }, [active, fileWorkspace, setDraft])
 
-  useEffect(() => {
-    writeAgentInputDraft(tabId, draft)
-  }, [draft, tabId])
   const scrollRef = useRef<HTMLDivElement>(null)
   const questionScrollRef = useRef<{ key: string; top: number } | null>(null)
   const sessionRef = useRef<HTMLDivElement>(null)
@@ -2619,7 +2627,7 @@ function AgentSessionView({
       const bounds = sessionRef.current?.getBoundingClientRect()
       const panelHeight = Math.round(bounds?.height || window.innerHeight)
       const visibleBottom = workspaceViewportBottom()
-      const bottomGuard = isDesktop() ? 0 : MOBILE_AGENT_INPUT_BOTTOM_GUARD_PX
+      const bottomGuard = desktop ? 0 : MOBILE_AGENT_INPUT_BOTTOM_GUARD_PX
       const viewportOverlap = bounds ? Math.max(0, bounds.bottom - visibleBottom) : 0
       // 평상시에는 p-2만 남겨 네 방향 여백을 같게 한다. 안전 간격은 소프트 키보드가
       // 실제로 패널 아래를 덮을 때만 더한다.
@@ -2657,7 +2665,7 @@ function AgentSessionView({
       window.visualViewport?.removeEventListener('scroll', scheduleMeasure)
     }
   // 인증 화면이 composer를 잠시 떼었다 다시 붙일 수 있어, 그 경계에서도 관찰 대상을 새로 잡는다.
-  }, [active, auth, minInputHeight])
+  }, [active, auth, minInputHeight, desktop])
 
   const startInputResize = useCallback((e: ReactPointerEvent<HTMLDivElement>) => {
     if (e.button !== 0) return
@@ -2708,7 +2716,7 @@ function AgentSessionView({
     const input = agentInputRef.current
     if (!input || input.selectionStart !== input.selectionEnd) return false
     if (!input.isOnVisualBoundary?.(direction)) return false
-    const history = readAgentInputHistory(tabId)
+    const history = readAgentInputHistory(tabId, inputScope)
     if (history.length === 0) return false
 
     let index = historyIndexRef.current
@@ -2741,7 +2749,7 @@ function AgentSessionView({
       textarea.setSelectionRange(caret, caret)
     })
     return true
-  }, [draft, tabId])
+  }, [draft, tabId, inputScope, setDraft])
 
   useEffect(() => {
     try { writeBrowserStorage(AGENT_INPUT_HEIGHT_KEY, String(Math.round(inputHeight))) } catch { /* 저장 실패는 UI 동작에 영향 없다 */ }
@@ -2913,7 +2921,7 @@ function AgentSessionView({
         ...(preset?.thinkingId && preset?.thinkingConfigId ? { thinking: preset.thinkingId, thinkingConfig: preset.thinkingConfigId } : {}),
         ...(preset?.role ? { role: preset.role } : {}),
       }).toString()
-      try { ws = openMewSocket(`${proto}//${location.host}/api/agent/ws?${query}`) }
+      try { ws = openSocket(`${proto}//${location.host}/api/agent/ws?${query}`) }
       catch { scheduleReconnect(); return }
       const current = ws
       wsRef.current = current
@@ -3214,7 +3222,7 @@ function AgentSessionView({
     }
     // 런타임을 바꾸면 저쪽 세션으로 갈아탄다 — 이쪽 세션은 서버에 그대로 남아 돌아오면 이어진다
     // (queueEvent는 값이 바뀌지 않는 useCallback이라 여기 있어도 재접속을 부르지 않는다)
-  }, [cacheKey, runtime, tabId, cwd, notificationWorkspace, preset?.modelId, preset?.thinkingId, preset?.thinkingConfigId, preset?.role, queueEvent, setEvents, adoptModels, adoptModes, adoptThinking, closeAuthBrowser, closeAcpLoginSessions, observeClearQueue, completeClear, cancelClear, acceptWorkDetails, resetWorkDetails, acceptSessionPreview, resetSessionPreviews, clearStartupPrompts, resetSelection, acknowledgePromptQueue, replacePromptFeedback, disconnectPromptFeedback])
+  }, [cacheKey, runtime, tabId, cwd, notificationWorkspace, preset?.modelId, preset?.thinkingId, preset?.thinkingConfigId, preset?.role, queueEvent, setEvents, adoptModels, adoptModes, adoptThinking, closeAuthBrowser, closeAcpLoginSessions, observeClearQueue, completeClear, cancelClear, acceptWorkDetails, resetWorkDetails, acceptSessionPreview, resetSessionPreviews, clearStartupPrompts, resetSelection, acknowledgePromptQueue, replacePromptFeedback, disconnectPromptFeedback, openSocket])
 
   // 경과 시간만 흐르게 한다 — 나머지 값은 서버 meta가 밀어 준다
   useEffect(() => {
@@ -3407,7 +3415,7 @@ function AgentSessionView({
       cancelled = true
       if (timer) clearTimeout(timer)
     }
-  }, [authTerminal, closeAuthBrowser, runtime, send, tabId])
+  }, [authTerminal, closeAuthBrowser, runtime, send, tabId, killTmuxSession, fetchAgentAuthTerminalStatus, openAgentAuthServerBrowser])
 
   // 에이전트 화면 종료 때 ACP 인증용 서버 탭을 정리한다.
   useEffect(() => closeAcpLoginSessions, [closeAcpLoginSessions])
@@ -3455,11 +3463,11 @@ function AgentSessionView({
   const [attachingQueued, setAttachingQueued] = useState(false)
   const queuedEditVersionRef = useRef(0)
   const [drawingContext, setDrawingContext] = useState<{ projectRoot: string; target: 'composer' | 'queue'; queueVersion: number } | null>(null)
-  const drawingWorkspaceRef = useRef(notificationWorkspace)
-  drawingWorkspaceRef.current = notificationWorkspace
+  const drawingWorkspaceRef = useRef(fileWorkspace)
+  drawingWorkspaceRef.current = fileWorkspace
   useEffect(() => {
-    if (!visible || drawingContext && drawingContext.projectRoot !== notificationWorkspace) setDrawingContext(null)
-  }, [drawingContext, notificationWorkspace, visible])
+    if (!visible || drawingContext && drawingContext.projectRoot !== fileWorkspace) setDrawingContext(null)
+  }, [drawingContext, fileWorkspace, visible])
   // 대기 큐 재정렬 — 편집 중에는 인덱스를 그대로 지켜야 하므로 큐 전체의 드래그를 잠시 막는다.
   const queueDrag = useGridDrag({
     enabled: connected && !!meta && queued.length > 1 && editingQueued === null,
@@ -3481,7 +3489,7 @@ function AgentSessionView({
     && (!resumeSessionIdRef.current || newConversationPending || startupPrompts.length > 0)
   const openDrawing = () => {
     if (composerCliMode || composerAttaching) return
-    setDrawingContext({ projectRoot: notificationWorkspace, target: editingQueued ? 'queue' : 'composer', queueVersion: queuedEditVersionRef.current })
+    setDrawingContext({ projectRoot: fileWorkspace, target: editingQueued ? 'queue' : 'composer', queueVersion: queuedEditVersionRef.current })
   }
   const clearComposer = () => {
     if (composerAttaching || cli.submitting) return
@@ -3515,10 +3523,10 @@ function AgentSessionView({
       setCliMode(true)
       setScheduleOpen(false)
       setRescheduling(null)
-      recordAgentInputHistory(tabId, command)
+      recordAgentInputHistory(tabId, command, inputScope)
       stickRef.current = true
     })
-  }, [codeRunDisabled, submitCodeCommand, tabId, codeAfterUserCount])
+  }, [codeRunDisabled, submitCodeCommand, tabId, codeAfterUserCount, inputScope])
   const startQueuedEdit = (index: number, text: string) => {
     if (!connected || !meta || editingQueued || text === '/clear' || queueMeta?.queuedKinds?.[index] === 'cli') return
     send({ type: 'begin_edit_queued', index, expect: text })
@@ -3608,7 +3616,7 @@ function AgentSessionView({
       const command = draft
       void cli.submit(tabId, command, usersBefore + items.filter(item => item.kind === 'user').length).then(accepted => {
         if (!accepted) return
-        recordAgentInputHistory(tabId, command)
+        recordAgentInputHistory(tabId, command, inputScope)
         historyIndexRef.current = null
         historyDraftRef.current = ''
         setDraft(current => current === command ? '' : current)
@@ -3628,7 +3636,7 @@ function AgentSessionView({
     if (written === '/clear' && draftAttachments.length === 0) {
       clearStartupPrompts()
       if (connected) send({ type: 'clear_session' })
-      recordAgentInputHistory(tabId, written)
+      recordAgentInputHistory(tabId, written, inputScope)
       historyIndexRef.current = null
       historyDraftRef.current = ''
       setDraft('')
@@ -3660,7 +3668,7 @@ function AgentSessionView({
       if (!send(prompt)) return
       if (!busy) beginPrompt(prompt, items.at(-1)?.key ?? null, queued)
     }
-    recordAgentInputHistory(tabId, written)
+    recordAgentInputHistory(tabId, written, inputScope)
     historyIndexRef.current = null
     historyDraftRef.current = ''
     setDraft('')
@@ -3719,7 +3727,7 @@ function AgentSessionView({
         if (version === queuedEditVersionRef.current) setAttachingQueued(false)
       } else setAttaching(false)
     }
-  }, [attaching, attachingQueued])
+  }, [attaching, attachingQueued, uploadInto, setDraft])
 
   const saveDrawingAttachment = async (file: File) => {
     const context = drawingContext
@@ -3748,7 +3756,7 @@ function AgentSessionView({
       at: new Date(at).toISOString(),
     })
     upsertScheduled(job)
-    recordAgentInputHistory(tabId, draft.trim())
+    recordAgentInputHistory(tabId, draft.trim(), inputScope)
     historyIndexRef.current = null
     historyDraftRef.current = ''
     setDraft('')
@@ -3937,7 +3945,7 @@ function AgentSessionView({
       alive = false
       window.removeEventListener('mew:harness-changed', load)
     }
-  }, [cwd, runtime])
+  }, [cwd, runtime, fetchSkills])
 
   // @ 목록의 하위 프로젝트는 현재 파일 트리만으로는 빠질 수 있어, 역할별 워크스페이스
   // 프로젝트 목록도 함께 쓴다(/api/projects).
@@ -3953,7 +3961,7 @@ function AgentSessionView({
     return () => {
       alive = false
     }
-  }, [])
+  }, [fetchProjects])
 
   const [mentionTrigger, setMentionTrigger] = useState<string | null>(null)
   const [documentsMentionTree, setDocumentsMentionTree] = useState<TreeNode[]>([])
@@ -3975,7 +3983,7 @@ function AgentSessionView({
     refresh()
     window.addEventListener('mew:permissions-changed', refresh)
     return () => { controller?.abort(); window.removeEventListener('mew:permissions-changed', refresh) }
-  }, [mentionTrigger, cliMode, active, notificationWorkspace])
+  }, [mentionTrigger, cliMode, active, notificationWorkspace, fetchFullTree])
 
   const fileMentionOptions = useMemo<MentionOption[]>(
     () => agentInputMentionOptions(tree, project, projects, focusedFilePath, documentsMentionTree, uiLocale),
@@ -4649,7 +4657,7 @@ function AgentSessionView({
               event.target.value = ''
               const context = attachmentPickerContext.current
               attachmentPickerContext.current = null
-              if (!context || context.projectRoot !== notificationWorkspace || context.version !== queuedEditVersionRef.current || context.target !== (editingQueued ? 'queue' : 'composer')) return
+              if (!context || context.projectRoot !== fileWorkspace || context.version !== queuedEditVersionRef.current || context.target !== (editingQueued ? 'queue' : 'composer')) return
               void attachFiles(files, context.target)
             }}
           />
@@ -4675,7 +4683,7 @@ function AgentSessionView({
           <HoverTipLayer className="flex items-stretch">
             <div data-tip={uiText('파일 첨부')} className="flex min-h-8 items-center">
             <button type="button" onPointerDown={keepFocusOnPress} onClick={() => {
-              attachmentPickerContext.current = { target: editingQueued ? 'queue' : 'composer', version: queuedEditVersionRef.current, projectRoot: notificationWorkspace }
+              attachmentPickerContext.current = { target: editingQueued ? 'queue' : 'composer', version: queuedEditVersionRef.current, projectRoot: fileWorkspace }
               attachmentInputRef.current?.click()
             }} disabled={composerCliMode || composerAttaching} className="flex h-6 w-8 items-center justify-center rounded text-ink-secondary hover:bg-surface-raised disabled:opacity-40" aria-label={uiText("파일 첨부")}><PaperclipGlyph /></button>
             </div>
@@ -5029,12 +5037,13 @@ function errorTitle(text: string): string {
 const AgentMarkdownText = memo(function AgentMarkdownText({ text, onOpenFile, onRunCommand, codeRunDisabled }: {
   text: string; onOpenFile: OpenWorkspaceFile; onRunCommand?: (command: string) => void; codeRunDisabled: boolean
 }) {
+  const { resolveAgentFileLink } = useWorkspaceApi()
   const locale = useUiLocale()
   const codeActions = !onRunCommand ? 'hidden' : codeRunDisabled ? 'disabled' : 'enabled'
   const html = useMemo(() => ({ __html: renderMarkdown(text, locale, codeActions) }), [text, locale, codeActions])
   return <div
     className="select-text mew-agent-markdown prose prose-sm max-w-none break-words [overflow-wrap:anywhere] text-ink dark:prose-invert prose-pre:whitespace-pre-wrap prose-pre:break-words prose-pre:[overflow-wrap:anywhere] prose-pre:bg-surface-deep prose-code:text-ink-secondary"
-    onClick={event => handleMarkdownClick(event, onOpenFile, onRunCommand)} dangerouslySetInnerHTML={html}
+    onClick={event => handleMarkdownClick(event, onOpenFile, resolveAgentFileLink, onRunCommand)} dangerouslySetInnerHTML={html}
   />
 })
 
@@ -5057,6 +5066,7 @@ const AgentConversationItem = memo(function AgentConversationItem({ item, expand
   workError?: string
   onLoadWork: (turn: Extract<Item, { kind: 'turn' }>) => void
 }) {
+  const { rawUrl } = useWorkspaceApi()
   useUiLocale()
   const { t } = useI18n()
   const [preview, setPreview] = useState<AgentAttachment | null>(null)
@@ -5313,14 +5323,15 @@ function AgentErrorButton({
 
 
 function AgentErrorDialog({ title, detail, onClose }: { title: string; detail: string; onClose: () => void }) {
+  const workspaceView = useWorkspaceView()
   useUiLocale()
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose()
+      if (!event.defaultPrevented && workspaceView?.active !== false && event.key === 'Escape') onClose()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
+  }, [onClose, workspaceView?.active])
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4" onMouseDown={onClose}>

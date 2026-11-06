@@ -1,9 +1,10 @@
+import { useWorkspaceApi } from '../api/workspace-api-context.tsx'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { HoverTipLayer, SelectField } from '@mew/ui'
 import { ArrowDown, ArrowRight, ArrowUp, Pause, Play, Plus, Settings, Square, Xmark, RefreshDouble, Download, Undo, NavArrowDown } from 'iconoir-react'
 import { useI18n } from '../i18n'
-import { debuggerRequest, type DebuggerStatus } from '../api/debugger'
-import { subscribeLive } from '../utils/live-updates'
+import { type DebuggerStatus } from '../api/debugger'
+
 import { breakpointKey, type DebugConfig, type DebugSnapshot, type DebugVariable, type DebugScope } from '../../shared/debugger'
 import { debuggerCopy } from './debugger-copy'
 import { DockGrip } from './DockWorkspace'
@@ -16,6 +17,7 @@ import { DebuggerInspector } from './debugger-inspector'
 import { DebuggerArtifacts } from './debugger-artifacts'
 
 export default function DebuggerPanel({ root, onClose, onSettings, onOpenFile }: { root: string; onClose: () => void; onSettings: () => void; onOpenFile: (file: string, line: number) => void }) {
+  const { debuggerRequest, subscribeLive } = useWorkspaceApi()
   const { locale } = useI18n(), c = { ...debuggerCopy[locale] ?? debuggerCopy.en, ...debuggerExtra(locale) }
   const [status, setStatus] = useState<DebuggerStatus | null>(null), [error, setError] = useState(''), [busy, setBusy] = useState(false)
   const [file, setFile] = useState(''), [line, setLine] = useState(1), [expression, setExpression] = useState('')
@@ -55,7 +57,7 @@ export default function DebuggerPanel({ root, onClose, onSettings, onOpenFile }:
       configRef.current = value.config; setStatus(value); setError('')
     }, e => setError(e.message))
     return () => { controller.abort(); unsubscribe() }
-  }, [root, c.error])
+  }, [root, c.error, debuggerRequest, subscribeLive])
   const session = status?.session, history = session?.history?.find(h => String(h.id) === historyId), stopped = session?.state === 'stopped' && !history, live = !!session && ['starting', 'running', 'stopped'].includes(session.state), caps = session?.capabilities ?? {}
   const anyLive = status?.sessions?.some(s => ['starting', 'running', 'stopped'].includes(s.state)) ?? live
   const firstFrameId = session?.frames.find(f => f.presentationHint !== 'label')?.id ?? null
@@ -63,7 +65,7 @@ export default function DebuggerPanel({ root, onClose, onSettings, onOpenFile }:
   const commandSession = session?.id, commandConnection = session?.connectionId, commandRevision = session?.stopRevision
   const command = useCallback(async <T = Record<string, unknown>,>(name: string, args: Record<string, unknown> = {}): Promise<T> => {
     return debuggerRequest<T>(root, '/command', { sessionId: commandSession, command: name, arguments: { connectionId: commandConnection, stopRevision: commandRevision, ...args } })
-  }, [root, commandSession, commandConnection, commandRevision])
+  }, [root, commandSession, commandConnection, commandRevision, debuggerRequest])
   useEffect(() => { setHistoryId(''); setMemoryReference(''); setTargets([]); setExtraScopes([]); setGranularity(''); setSingleThread(false); setHex(false); setInputProcess(''); previous.current.clear(); previousWatches.current.clear() }, [session?.id, session?.connectionId])
   const selectedFrame = session?.frames.find(f => f.id === frameId)
   const framePath = selectedFrame?.source?.path, frameName = selectedFrame?.name

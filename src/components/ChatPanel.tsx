@@ -1,20 +1,10 @@
+import { useWorkspaceApi } from '../api/workspace-api-context'
 import { ConfirmDialog } from '@mew/ui'
 import { Trash } from 'iconoir-react'
 import { PanelCloseButton } from './panel-close-button'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { flattenFiles } from '@mew/editor/fuzzy'
-import {
-  fetchChat,
-  deleteChatHistory,
-  fetchMemberProfiles,
-  markChatRead,
-  postChat,
-  GROUP_CHAT,
-  type ChatMessage,
-  type ChatView,
-  type MemberProfile,
-  type TreeNode,
-} from '../api/client'
+import { GROUP_CHAT, type ChatMessage, type ChatView, type MemberProfile, type TreeNode } from '../api/client'
 import { identityColor } from '../utils/collabColor'
 import { useI18n } from '../i18n'
 import { MentionTextarea, type MentionOption } from './MentionTextarea'
@@ -157,6 +147,7 @@ export function ChatPanel({
   onOpenFile: (project: string, path: string) => void
   onClose: () => void
 }) {
+  const { fetchChat, fetchMemberProfiles, markChatRead, postChat, deleteChatHistory } = useWorkspaceApi()
   const { formatDate, t } = useI18n()
   const [view, setView] = useState<ChatView>({ messages: [], unread: {}, dmSupported: true })
   const [members, setMembers] = useState<MemberProfile[]>([])
@@ -183,7 +174,7 @@ export function ChatPanel({
         setError(null)
       })
       .catch((err) => setError(err instanceof Error ? err.message : t('chat.loadFailed')))
-  }, [t])
+  }, [t, fetchChat])
 
   // 대화 상대 목록 — 나는 뺀다. 자주 바뀌지 않아 창이 뜰 때 한 번만 읽는다
   useEffect(() => {
@@ -191,7 +182,7 @@ export function ChatPanel({
     fetchMemberProfiles()
       .then((list) => setMembers(list.filter((member) => member.email !== authEmail)))
       .catch(() => {})
-  }, [authEmail, view.dmSupported])
+  }, [authEmail, view.dmSupported, fetchMemberProfiles])
 
   // 서버가 DM을 모르면 단체방으로 되돌린다 — 그대로 두면 보낸 글이 단체방에 뜬다
   useEffect(() => {
@@ -209,7 +200,7 @@ export function ChatPanel({
   useEffect(() => {
     if ((view.unread[active] ?? 0) === 0) return
     markChatRead(active).catch(() => {})
-  }, [view, active])
+  }, [view, active, markChatRead])
 
   useEffect(() => {
     refresh()

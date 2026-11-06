@@ -1,8 +1,26 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { collectDatabasePageMutations, previewDatabasePageTitle, registerDatabasePageMutations, withDatabasePageMutations } from './database-page-mutations.ts'
+import { createDatabasePageMutationScope, collectDatabasePageMutations, previewDatabasePageTitle, registerDatabasePageMutations, withDatabasePageMutations } from './database-page-mutations.ts'
 
 const mutation = { path: 'Books/_Books.md', moves: [{ from: 'Books.md', to: 'Books/_Books.md' }], changed: ['Books.md', 'Books/_Books.md'] }
+
+test('independent workspace mutation queues never collect or apply another root response', async () => {
+  const first = createDatabasePageMutationScope(), second = createDatabasePageMutationScope()
+  const events: string[] = []
+  first.registerDatabasePageMutations({ async prepare() { return () => {} }, apply(change) { events.push(`a:${change.path}`) } })
+  second.registerDatabasePageMutations({ async prepare() { return () => {} }, apply(change) { events.push(`b:${change.path}`) } })
+  let release!: () => void
+  const gate = new Promise<void>(resolve => { release = resolve })
+  const a = first.withDatabasePageMutations('.workspace', async () => {
+    await gate
+    first.collectDatabasePageMutations({ documentPageMutations: [mutation] })
+  })
+  await second.withDatabasePageMutations('.workspace', async () => {
+    second.collectDatabasePageMutations({ documentPageMutations: [{ ...mutation, path: 'Other.md' }] })
+  })
+  release(); await a
+  assert.deepEqual(events, ['b:Other.md', 'a:Books/_Books.md'])
+})
 
 test('DB file mutations save drafts before requesting and remap tabs before releasing autosave', async () => {
   const events: string[] = []

@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef } from 'react'
 import type { DockDirection } from '../utils/mobile-dock'
+import { useWorkspaceDesktop, useWorkspaceView } from '../workspace/workspace-view-context'
 
 type TabbedPanel = 'sidebar' | 'editor' | 'agent' | 'terminal' | 'git' | 'tasks'
 const tabbedPanels: readonly string[] = ['sidebar', 'editor', 'agent', 'terminal', 'git', 'tasks']
@@ -25,11 +26,13 @@ function swipePanel(target: Element): TabbedPanel | null {
 
 /** Panel bodies own tab swipes; editor source text keeps native horizontal scrolling. */
 export function useMobilePanelSwipe(onSwipe: (panel: TabbedPanel, direction: DockDirection) => void, enabled = true) {
+  const desktop = useWorkspaceDesktop()
+  const active = useWorkspaceView()?.active ?? true
   const root = useRef<HTMLDivElement>(null)
   const callback = useRef(onSwipe)
   useLayoutEffect(() => { callback.current = onSwipe }, [onSwipe])
   useEffect(() => {
-    if (!enabled) return
+    if (!enabled || !active || desktop) return
     const element = root.current
     if (!element) return
     let gesture: { panel: TabbedPanel; target: Element; id: number; x: number; y: number; lastX: number; lastY: number } | null = null
@@ -38,7 +41,7 @@ export function useMobilePanelSwipe(onSwipe: (panel: TabbedPanel, direction: Doc
     const pointer = (event: PointerEvent) => { if (event.pointerType !== 'touch') cancel() }
     const start = (event: TouchEvent) => {
       cancel()
-      if (window.matchMedia('(min-width: 768px)').matches || event.touches.length !== 1 || !(event.target instanceof Element)) return
+      if (event.touches.length !== 1 || !(event.target instanceof Element)) return
       const panel = swipePanel(event.target)
       if (!panel) return
       const touch = event.touches[0]
@@ -96,6 +99,6 @@ export function useMobilePanelSwipe(onSwipe: (panel: TabbedPanel, direction: Doc
       window.removeEventListener('blur', cancel)
       document.removeEventListener('visibilitychange', cancel)
     }
-  }, [enabled])
+  }, [enabled, active, desktop])
   return root
 }

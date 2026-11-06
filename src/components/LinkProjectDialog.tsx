@@ -1,8 +1,9 @@
+import { useWorkspaceApi } from '../api/workspace-api-context'
 import { canAutoFocusInput } from '@mew/ui'
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { ArrowLeft, Check, Folder, FolderPlus, GitBranch, NavArrowRight } from 'iconoir-react'
 import { ConfirmDialog, DialogFrame } from '@mew/ui'
-import { browseDirs, browseExternalEntries, cloneExternalGit, createExternalDirectory, createExternalFolder, initializeExternalGit, MissingDirectoryError, type ExternalEntriesResult } from '../api/client'
+import { MissingDirectoryError, type ExternalEntriesResult } from '../api/client'
 import type { MissingDirectory } from '../../shared/external-path'
 import { useI18n } from '../i18n'
 import { FileBrowser, FileBrowserHeader, fileBrowserButton as button, fileBrowserInput as input } from './file-browser'
@@ -16,6 +17,7 @@ export function LinkProjectDialog({ basePath, onOpen, onClose, canManageFolders 
   onOpen: (path: string) => Promise<void> | void
   onClose: () => void
 }) {
+  const { browseExternalEntries, browseDirs, createExternalFolder, cloneExternalGit, initializeExternalGit, createExternalDirectory } = useWorkspaceApi()
   const { t } = useI18n()
   const id = useId()
   const [path, setPath] = useState(basePath)
@@ -40,7 +42,7 @@ export function LinkProjectDialog({ basePath, onOpen, onClose, canManageFolders 
     if (canManageFolders) return browseExternalEntries(target)
     const result = await browseDirs(target)
     return { ...result, entries: result.dirs.map(entry => ({ ...entry, type: 'dir', size: null })) }
-  }, [canManageFolders])
+  }, [canManageFolders, browseExternalEntries, browseDirs])
   const load = useCallback((nextPath: string, offerCreation = false) => {
     const seq = ++requestSeq.current
     setResult(null)

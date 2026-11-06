@@ -7,6 +7,7 @@ import { createContext, useCallback, useContext, useEffect, useImperativeHandle,
 import { createPortal } from 'react-dom'
 import { useOverlayDismiss } from '@mew/ui'
 import { dockIds, dockRects, insertDock, normalizeDock, pruneDock, closeDockGroup, defaultDockTree, addDockGroup, type DockKind, type DockNode, type DockRect, type DockSide, type DockState } from '../utils/dock-layout'
+import { useWorkspaceDesktop } from '../workspace/workspace-view-context'
 
 type Source = { group: string; tab?: string }
 type Target = { group: string; side: DockSide | 'center' }
@@ -39,7 +40,7 @@ export function DockWorkspace({ children, value, onChange, onEditorDrop, foregro
   const [size, setSize] = useState({ width: 0, height: 0 })
   const [expandedRect, setExpandedRect] = useState<DockRect>({ x: 0, y: 0, width: 0, height: 0 })
   const [maximizedGroup, setMaximizedGroup] = useState<string | null>(null)
-  const [desktop, setDesktop] = useState(() => matchMedia('(min-width: 768px)').matches)
+  const desktop = useWorkspaceDesktop()
   const [registered, setRegistered] = useState<Record<string, Registration>>({})
   const state = useMemo(() => normalizeDock(value), [value])
   const [mobileGroups, setMobileGroups] = useState<Record<string, string>>({})
@@ -96,10 +97,7 @@ export function DockWorkspace({ children, value, onChange, onEditorDrop, foregro
     observer.observe(host)
     if (area !== host) observer.observe(area)
     measure()
-    const query = matchMedia('(min-width: 768px)')
-    const update = () => setDesktop(query.matches)
-    query.addEventListener('change', update)
-    return () => { observer.disconnect(); query.removeEventListener('change', update) }
+    return () => observer.disconnect()
   }, [host])
   useEffect(() => {
     const cancel = () => { source.current = null; setTarget(null) }

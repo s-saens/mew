@@ -2,6 +2,7 @@ import type { Doc } from 'yjs'
 import type { Awareness } from 'y-protocols/awareness'
 import type { AuthStatus } from '../api/auth.ts'
 import type { DesktopConnector } from '../utils/desktop-connection.ts'
+import type { WorkspaceScope } from '../../shared/workspace-scope.ts'
 
 export interface AppTransport {
   readonly resourceGeneration?: number
@@ -19,7 +20,7 @@ export interface CollaborationSession {
 
 export interface CollaborationProvider {
   open(
-    identity: { project: string; path: string; authEmail: string | null },
+    identity: { project: string; path: string; authEmail: string | null } & Partial<WorkspaceScope>,
     onState: (session: CollaborationSession) => void,
   ): { close(): void }
   close(): void

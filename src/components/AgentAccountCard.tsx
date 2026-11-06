@@ -1,6 +1,7 @@
+import { useWorkspaceApi } from '../api/workspace-api-context'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { fetchAgentRuntimeAccount, openLoginDesktop, closeLoginDesktop, type LoginDesktopSession } from '../api/client'
+import { type LoginDesktopSession } from '../api/client'
 import { SUBSCRIPTION_URLS, type AccessIssue, type RuntimeAccount } from '../../shared/agent-access'
 import { LoginDesktopViewer } from './LoginDesktopViewer'
 import { FloatingLoginWindow } from './FloatingLoginWindow'
@@ -15,6 +16,7 @@ const copy = {
 const button = 'rounded border border-edge-bright px-3 py-1.5 text-sm text-ink-secondary hover:bg-surface-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-50'
 
 export function AgentAccountCard({ runtime, issue = null, queued = false, embedded = false }: { runtime: string; issue?: AccessIssue | null; queued?: boolean; embedded?: boolean }) {
+  const { fetchAgentRuntimeAccount } = useWorkspaceApi()
   const { locale } = useI18n()
   const c = copy[locale]
   const [account, setAccount] = useState<RuntimeAccount | null>(null)
@@ -29,7 +31,7 @@ export function AgentAccountCard({ runtime, issue = null, queued = false, embedd
     void fetchAgentRuntimeAccount(runtime).then((result) => { if (alive) setAccount(result.account) })
       .catch(() => { if (alive) setError(true) }).finally(() => { if (alive) setLoading(false) })
     return () => { alive = false }
-  }, [runtime, revision, issue])
+  }, [runtime, revision, issue, fetchAgentRuntimeAccount])
   const problem = issue ?? account?.issue
   const url = account ? account.subscriptionUrl : SUBSCRIPTION_URLS[runtime]
   const unsubscribed = account?.subscription === 'free'
@@ -63,6 +65,7 @@ export function AgentAccountCard({ runtime, issue = null, queued = false, embedd
 }
 
 function SubscriptionBrowser({ url, onClose }: { url: string; onClose: () => void }) {
+  const { openLoginDesktop, closeLoginDesktop } = useWorkspaceApi()
   const { locale } = useI18n()
   const c = copy[locale]
   const [page, setPage] = useState<LoginDesktopSession | null>(null)
@@ -85,7 +88,7 @@ function SubscriptionBrowser({ url, onClose }: { url: string; onClose: () => voi
       for (const tab of ownedTabs) void closeLoginDesktop(tab).catch(() => {})
       previousFocus?.focus()
     }
-  }, [url])
+  }, [url, openLoginDesktop, closeLoginDesktop])
   return createPortal(<FloatingLoginWindow title={c.browser} onClose={onClose}><div ref={dialogRef} className="flex min-h-0 flex-1 flex-col bg-surface-deep text-ink" onKeyDown={(event) => {
     if (event.key !== 'Tab') return
     const nodes = Array.from(dialogRef.current?.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), a[href], [tabindex="0"]') ?? [])

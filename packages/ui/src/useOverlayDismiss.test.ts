@@ -21,11 +21,13 @@ const { registerOverlay } = await import('./useOverlayDismiss.ts')
 // history는 happy-dom 구현에 기대지 않고 직접 센다 — pushState/back 호출 자체가 검증 대상이다
 let pushes = 0
 let backs = 0
+let holdProgrammaticBack = false
 window.history.pushState = () => {
   pushes += 1
 }
 window.history.back = () => {
   backs += 1
+  if (!holdProgrammaticBack) queueMicrotask(() => window.dispatchEvent(new window.Event('popstate')))
 }
 
 /** scheduleSync가 마이크로태스크로 미뤄 두는 히스토리 정리를 흘려보낸다 */
@@ -286,4 +288,62 @@ test('한 커밋에서 A가 닫히고 B가 열리면 history를 건드리지 않
   unregisterB()
   await settle()
   assert.equal(backs, 1)
+})
+
+test('a pending programmatic Back cannot dismiss an overlay opened by another project view', async () => {
+  reset()
+  holdProgrammaticBack = true
+  const closed: string[] = []
+  const unregisterA = registerOverlay({ close: () => closed.push('a'), closeOnEscape: () => true, escapePhase: 'bubble' })
+  let unregisterB: (() => void) | undefined
+  try {
+    await settle()
+    unregisterA()
+    await settle()
+    assert.equal(backs, 1)
+    unregisterB = registerOverlay({ close: () => closed.push('b'), closeOnEscape: () => true, escapePhase: 'bubble' })
+    await settle()
+    assert.equal(pushes, 1, 'a new guard waits for the previous programmatic traversal')
+    window.dispatchEvent(new window.Event('popstate'))
+    await settle()
+    assert.deepEqual(closed, [], 'the removed guard does not navigate the new project panel')
+    assert.equal(pushes, 2, 'the new project receives its own guard after removal settles')
+    window.dispatchEvent(new window.Event('popstate'))
+    assert.deepEqual(closed, ['b'], 'a later user Back still dismisses the current overlay')
+    unregisterB(); unregisterB = undefined
+    await settle()
+    assert.equal(backs, 1, 'a user traversal is not followed by an extra programmatic Back')
+  } finally {
+    holdProgrammaticBack = false
+    unregisterA(); unregisterB?.()
+    await settle()
+    window.dispatchEvent(new window.Event('popstate'))
+    await settle()
+  }
+})
+
+test('the last overlay releases input listeners immediately and its Back listener after guard removal completes', async () => {
+  reset()
+  holdProgrammaticBack = true
+  const removed: string[] = []
+  const remove = window.removeEventListener.bind(window)
+  window.removeEventListener = (type, listener, options) => { removed.push(type); remove(type, listener, options) }
+  const unregister = registerOverlay({ close: () => {}, closeOnEscape: () => true, escapePhase: 'bubble' })
+  try {
+    await settle(); unregister(); await settle()
+    assert.equal(removed.filter(type => type === 'keydown').length, 2)
+    assert.equal(removed.filter(type => type === 'pointerdown').length, 1)
+    assert.equal(removed.includes('popstate'), false, 'the pending traversal still has an owner')
+    window.dispatchEvent(new window.Event('popstate'))
+    await settle()
+    assert.equal(removed.filter(type => type === 'popstate').length, 1, 'no Back listener remains after the empty stack settles')
+    const before = pushes
+    window.dispatchEvent(new window.Event('popstate'))
+    await settle()
+    assert.equal(pushes, before, 'later browser navigation cannot rearm an empty overlay stack')
+  } finally {
+    holdProgrammaticBack = false
+    unregister(); window.dispatchEvent(new window.Event('popstate')); await settle()
+    window.removeEventListener = remove
+  }
 })

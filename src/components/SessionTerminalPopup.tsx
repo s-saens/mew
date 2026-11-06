@@ -1,4 +1,4 @@
-import { openMewSocket } from '../utils/remote-transport.ts'
+import { useWorkspaceApi } from '../api/workspace-api-context'
 // tmux 세션 하나를 붙여 보여주는 팝업 — 명령어 버튼(mewcmd-*)과 예약 작업(mewcmd-job-*)이 함께 쓴다.
 // 두 기능 다 "전용 세션에서 무언가를 돌리고 그 화면을 들여다본다"가 같아서 창을 한 벌만 둔다.
 // [종료]는 세션을 죽이고 닫고, [닫기]는 세션을 살려둔 채 팝업만 닫는다(다음에 다시 열면 이어서 보인다).
@@ -9,7 +9,7 @@ import { openMewSocket } from '../utils/remote-transport.ts'
 import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { useOverlayDismiss } from '@mew/ui'
-import { killTmuxSession } from '../api/client'
+
 import { outsideTerminal } from '../utils/terminalFocus'
 import { useI18n } from '../i18n'
 
@@ -63,6 +63,7 @@ export function SessionTerminalPopup({
   canStop?: boolean
   footerActions?: ReactNode
 }) {
+  const { killTmuxSession, openSocket } = useWorkspaceApi()
   const { t } = useI18n()
   const [started, setStarted] = useState(running)
   const [busy, setBusy] = useState(false)
@@ -163,7 +164,7 @@ export function SessionTerminalPopup({
           {completedContent !== undefined ? completedContent : started ? (
             <div className="h-full">
               <Suspense fallback={<div className="flex h-full items-center justify-center text-xs text-ink-muted" role="status">{t('common.loading')}</div>}>
-                <TmuxTerminal socketFactory={openMewSocket} sessionName={session} inputPlaceholder={t('common.textInput')} />
+                <TmuxTerminal socketFactory={openSocket} sessionName={session} inputPlaceholder={t('common.textInput')} />
               </Suspense>
             </div>
           ) : (

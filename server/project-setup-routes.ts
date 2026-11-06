@@ -51,7 +51,7 @@ export function createProjectSetupRouter() {
       const plan = req.body.action === 'apply' ? applyProjectSetup(input, req.body.revision) : planProjectSetup(input)
       if (req.body.action === 'apply') {
         switchDocsRoot(`${plan.projectRoot}/${plan.settings.docsDir}`)
-        resetTreeWatchers()
+        resetTreeWatchers(workspacePaths.root)
         broadcast({ type: 'tree' })
       }
       res.json(plan)

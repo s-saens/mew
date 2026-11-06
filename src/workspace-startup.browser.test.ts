@@ -7,6 +7,7 @@ import { build } from 'rolldown'
 import { chromium } from 'playwright-core'
 import { domBrowserExecutable } from '../server/browser-dom-executable.ts'
 import { startupCodeSplitting } from '../server/startup-chunks.ts'
+import { DEFAULT_THEME_PALETTE } from '../shared/theme.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 const componentPath = (name: string) => path.join(root, 'src/components', `${name}.tsx`)
@@ -20,6 +21,7 @@ test('workspace chrome remains usable while editor and unopened tools download o
   const bundle = await build({
     input: 'virtual:workspace-startup.tsx', write: false, platform: 'browser', output: { format: 'esm', codeSplitting: startupCodeSplitting },
     transform: { jsx: 'react-jsx', define: { 'process.env.NODE_ENV': JSON.stringify('production'), 'import.meta.hot': 'false' } },
+    onLog(level, log, handler) { if (log.code !== 'MODULE_LEVEL_DIRECTIVE') handler(level, log) },
     plugins: [{ name: 'workspace-startup-fixture', transform(code, id) {
       if (id === path.join(root, 'src/App.tsx')) return code.replace("import('./components/AgentPanel')", "(window.startupAgentImportAt=performance.now(),window.startupPreparationOrder.push('agent'),import('./components/AgentPanel'))")
         .replace('await agentPanelPreparation.prepare(', 'await (window.startupAgentScheduledAt ??= performance.now(), agentPanelPreparation.prepare)(')
@@ -46,13 +48,13 @@ test('workspace chrome remains usable while editor and unopened tools download o
     return `/${chunk.fileName}`
   }
   const editorScript = scriptFor('EditorPane'), settingsScript = scriptFor('SettingsModal'), agentScript = scriptFor('AgentPanel')
-  const closedTools = ['AdminSettingsModal', 'remote-desktop', 'FileHistoryModal', 'project-add-inline', 'project-catalog-panel'].map(scriptFor)
+  const closedTools = ['AdminSettingsModal', 'remote-desktop', 'FileHistoryModal', 'project-add-inline', 'project-catalog-panel'].map(name => ({ name, script: scriptFor(name) }))
   assert.notEqual(editorScript, `/${entry.fileName}`)
   assert.notEqual(editorScript, settingsScript)
-  const styleSources = ['src/App.tsx', 'src/components/ProjectSwitcher.tsx', 'src/components/project-add-inline.tsx', 'src/components/project-catalog-panel.tsx', 'src/components/HeaderMenu.tsx', 'src/components/header-menu-popup.tsx', 'src/components/FileTree.tsx', 'src/components/SearchPanel.tsx', 'src/components/DockWorkspace.tsx', 'src/components/mobile-dock.tsx', 'src/components/SettingsModal.tsx', 'src/components/EditorPane.tsx', 'src/components/startup-screen.tsx', 'src/components/deferred-dialog.tsx', 'src/components/panel-close-button.tsx', 'packages/ui/src/HoverTipLayer.tsx', 'packages/ui/src/select-field.tsx']
+  const styleSources = ['src/App.tsx', 'src/workspace/workspace-application.tsx', 'src/components/project-board.tsx', 'src/components/ProjectSwitcher.tsx', 'src/components/project-add-inline.tsx', 'src/components/project-catalog-panel.tsx', 'src/components/HeaderMenu.tsx', 'src/components/header-menu-popup.tsx', 'src/components/FileTree.tsx', 'src/components/SearchPanel.tsx', 'src/components/DockWorkspace.tsx', 'src/components/mobile-dock.tsx', 'src/components/SettingsModal.tsx', 'src/components/EditorPane.tsx', 'src/components/startup-screen.tsx', 'src/components/deferred-dialog.tsx', 'src/components/panel-close-button.tsx', 'packages/ui/src/HoverTipLayer.tsx', 'packages/ui/src/select-field.tsx']
   const content = (await Promise.all(styleSources.map(file => fs.readFile(path.join(root, file), 'utf8')))).join('\n')
   const compiler = await compile(await fs.readFile(path.join(root, 'src/index.css'), 'utf8'), { base: path.join(root, 'src'), onDependency() {} })
-  const css = compiler.build([...new Set(content.match(/[A-Za-z0-9_@:/.[\]()%,-]+/g))])
+  const css = compiler.build([...new Set(content.match(/[A-Za-z0-9_@:/.[\]()%,-]+/g))]) + '\n' + await fs.readFile(path.join(root, 'src/components/project-board.css'), 'utf8')
   const initialUi = { sidebar: { docsExpanded: false }, chrome: { sidebarOpen: true, sidebarView: 'files' }, tabs: { '.workspace': { panes: [{ id: 'main', tabs: [{ path: 'README.md', preview: false, viewMode: 'plain' }], activePath: 'README.md' }], layout: { kind: 'leaf', pane: 'main' }, focusedPaneId: 'main' } } }
   const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
   t.after(() => browser.close())
@@ -90,8 +92,9 @@ test('workspace chrome remains usable while editor and unopened tools download o
       }
       const json = (value: unknown) => route.fulfill({ json: value })
       if (url.pathname === '/api/auth/me') return json({ authenticated: true, email: 'startup@example.test', role: 'owner', mustChangePassword: false, displayName: 'Startup', avatarDataUrl: null, capabilities: { filesRead: true, filesWrite: true, agent: true, terminal: false, serverFiles: false, collaboration: false, git: true, portPreview: true, desktop: true } })
-      if (url.pathname === '/api/workspace') return json({ path: '/alpha', projects: [], docs: 'docs', docsPath: '/alpha/docs', workspaceUi: { workspacePath: '/alpha', state: initialUi } })
+      if (url.pathname === '/api/workspace') return json({ path: '/alpha', workspaceScopeVersion: 1, projects: [], docs: 'docs', docsPath: '/alpha/docs', workspaceUi: { workspacePath: '/alpha', state: initialUi } })
       if (url.pathname === '/api/user-ui/root-projects') return json({ state: { paths: ['/alpha'], icons: {}, groups: [] } })
+      if (url.pathname === '/api/user-ui/theme') return json({ state: method === 'PUT' ? route.request().postDataJSON().state : { palette: DEFAULT_THEME_PALETTE, custom: [] } })
       if (url.pathname === '/api/user-ui/workspace') return json({ state: method === 'PUT' ? route.request().postDataJSON().state : initialUi })
       if (url.pathname === '/api/tree') return json({ version: 1, state: 'ready', entries: [{ name: 'README.md', path: 'README.md', type: 'file' }] })
       if (url.pathname === '/api/file-access') return json({ view: true, edit: true })
@@ -131,7 +134,7 @@ test('workspace chrome remains usable while editor and unopened tools download o
       await editorRequested
       assert.equal(requested.has(editorScript), true, 'editor code is pending after the real shell appears')
       assert.equal(await page.locator('[data-dock-tab-bar]').count(), 0, 'editor renderer has not mounted')
-      for (const script of [settingsScript, ...closedTools]) assert.equal(requested.has(script), false, `${script} is not downloaded while closed`)
+      for (const { name, script } of [{ name: 'SettingsModal', script: settingsScript }, ...closedTools]) assert.equal(requested.has(script), false, `${name} is not downloaded while closed (${script})`)
 
       await menu.click()
       const popup = page.getByRole('menu', { name: '메뉴', exact: true })
@@ -148,7 +151,7 @@ test('workspace chrome remains usable while editor and unopened tools download o
       await filesScope.click()
       assert.equal(await filesScope.getAttribute('aria-pressed'), 'true')
       assert.equal(await scope.getAttribute('aria-pressed'), 'false')
-      for (const script of closedTools) assert.equal(requested.has(script), false)
+      for (const { name, script } of closedTools) assert.equal(requested.has(script), false, `${name} remains deferred`)
 
       await menu.click()
       await popup.getByText('설정', { exact: true }).click()

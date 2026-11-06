@@ -49,10 +49,11 @@ export class DemoWorkspaceStore {
   private repository?: DemoRepository
   constructor(repository?: DemoRepository) { this.repository = repository; this.reset() }
 
-  canonicalFilePath(path: string, project = '.workspace'): string {
+  canonicalFilePath(path: string, project = '.workspace', workspaceRoot = this.activeRoot): string {
+    if (workspaceRoot !== this.workspacePath && !workspaceRoot.startsWith(`${this.workspacePath}/`)) throw new DemoError('이 폴더는 데모 작업 공간에 없습니다.', 404)
     if (path === this.workspacePath || path.startsWith(`${this.workspacePath}/`)) return normalizePath(path.slice(this.workspacePath.length))
     else if (path.startsWith('/')) throw new DemoError('이 폴더는 데모 작업 공간에 없습니다.', 404)
-    const base = this.activeRoot.slice(this.workspacePath.length).replace(/^\//, '')
+    const base = workspaceRoot.slice(this.workspacePath.length).replace(/^\//, '')
     const prefix = project === 'docs' ? normalizePath(`${base}/docs`) : ['.workspace', 'workspace', 'root', '', 'demo'].includes(project) ? base : normalizePath(`${base}/${project}`)
     return normalizePath(prefix ? `${prefix}/${path}` : path)
   }

@@ -1,10 +1,11 @@
+import { useWorkspaceApi } from '../api/workspace-api-context.tsx'
 import { useEffect, useId, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { ArrowLeft, Download, EditPencil, Plus, RefreshDouble, Trash, Xmark } from 'iconoir-react'
 import { canAutoFocusInput, SelectField, useOverlayDismiss } from '@mew/ui'
 import { uiText } from '@mew/ui/i18n-core'
 import { useUiLocale } from '@mew/ui/i18n'
-import { fetchSkillLibrary, fetchSkillLibraryDetail, mutateSkillLibrary } from '../api/skill-library'
+
 import { skillLibraryCopy } from './skill-library-copy'
 import type { SkillLibraryDetail, SkillLibraryInventory, SkillLibraryItem, SkillLibraryMutation, SkillScope } from '../../shared/skill-library'
 
@@ -14,6 +15,7 @@ const initialContent = '---\nname: my-skill\ndescription: Describe when to use t
 type View = 'installed' | 'external' | 'defaults'
 
 export function SkillLibraryManager({ cwd, onClose, onSwitchMcp }: { cwd: string; onClose: () => void; onSwitchMcp: () => void }) {
+  const { fetchSkillLibrary, fetchSkillLibraryDetail, mutateSkillLibrary } = useWorkspaceApi()
   const copy = skillLibraryCopy[useUiLocale()]
   const [inventory, setInventory] = useState<SkillLibraryInventory | null>(null)
   const [view, setView] = useState<View>('installed'), [search, setSearch] = useState('')
@@ -66,7 +68,7 @@ export function SkillLibraryManager({ cwd, onClose, onSwitchMcp }: { cwd: string
       .catch(error => { if (!controller.signal.aborted) setError(error.message) })
       .finally(() => { if (!controller.signal.aborted) setLoading(false) })
     return () => controller.abort()
-  }, [cwd, reload])
+  }, [cwd, reload, fetchSkillLibrary])
   useEffect(() => {
     if (!selectedId) return
     const controller = new AbortController()
@@ -76,7 +78,7 @@ export function SkillLibraryManager({ cwd, onClose, onSwitchMcp }: { cwd: string
       setScope(value.item?.enabledScope ?? value.candidate?.scope ?? 'common')
     }).catch(error => { if (!controller.signal.aborted) setError(error.message) })
     return () => controller.abort()
-  }, [cwd, selectedId, reload])
+  }, [cwd, selectedId, reload, fetchSkillLibraryDetail])
   useEffect(() => {
     if (showingDetail && (creating || window.matchMedia('(max-width: 767px)').matches)) headingRef.current?.focus()
     else if (!showingDetail && hadDetail.current && canAutoFocusInput()) searchRef.current?.focus()

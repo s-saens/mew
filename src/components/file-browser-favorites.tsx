@@ -1,14 +1,16 @@
+import { useWorkspaceApi } from '../api/workspace-api-context'
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { Cloud, Folder, HomeSimple, RefreshDouble, Star, Xmark, NavArrowDown } from 'iconoir-react'
 import { createPortal } from 'react-dom'
 import { getFixedPopupLayout, useOverlayDismiss } from '@mew/ui'
-import { fetchFileFavorites, setFileFavorite, FILE_FAVORITES_CHANGED } from '../api/client'
+import { FILE_FAVORITES_CHANGED } from '../api/client'
 import { useI18n } from '../i18n'
 import type { FileFavorite } from '../../shared/file-favorites'
 
 export function FileBrowserFavorites({ currentPath, disabled, onSelect, compact = false }: {
   currentPath?: string; disabled: boolean; onSelect: (path: string) => void; compact?: boolean
 }) {
+  const { fetchFileFavorites, setFileFavorite } = useWorkspaceApi()
   const { t } = useI18n()
   const id = useId()
   const [folders, setFolders] = useState<FileFavorite[]>([])
@@ -30,7 +32,7 @@ export function FileBrowserFavorites({ currentPath, disabled, onSelect, compact 
     } finally {
       if (request === sequence.current) setLoading(false)
     }
-  }, [])
+  }, [fetchFileFavorites])
   const invalidate = useCallback(() => { sequence.current++ }, [])
   useEffect(() => { void refresh(); return invalidate }, [refresh, invalidate])
   useEffect(() => {

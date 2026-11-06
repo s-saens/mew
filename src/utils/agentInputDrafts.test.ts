@@ -1,6 +1,6 @@
 import test, { beforeEach } from 'node:test'
 import assert from 'node:assert/strict'
-import { clearAgentInputDraft, readAgentInputDraft, readAgentInputHistory, recordAgentInputHistory, writeAgentInputDraft } from './agentInputDrafts.ts'
+import { agentInputOwnerKey, clearAgentInputDraft, readAgentInputDraft, readAgentInputHistory, recordAgentInputHistory, writeAgentInputDraft } from './agentInputDrafts.ts'
 
 class MemoryStorage {
   private store = new Map<string, string>()
@@ -71,4 +71,73 @@ test('저장값이 손상되면 빈 문자열로 폴백한다', () => {
   mem.setItem(DRAFTS_KEY, '{broken')
 
   assert.equal(readAgentInputDraft('tab-a'), '')
+})
+
+test('identical tab IDs isolate drafts and history by account, logical project and working root', () => {
+  const scope = { account: 'owner', projectPath: '/project', workspacePath: '/project' }
+  const owners = [scope,
+    { ...scope, account: 'member' },
+    { ...scope, projectPath: '/another-project' },
+    { ...scope, workspacePath: '/project-worktree' }]
+  for (const [index, owner] of owners.entries()) {
+    writeAgentInputDraft('same-tab', `draft ${index}`, owner)
+    recordAgentInputHistory('same-tab', `sent ${index}`, owner)
+  }
+  for (const [index, owner] of owners.entries()) {
+    assert.equal(readAgentInputDraft('same-tab', owner), `draft ${index}`)
+    assert.deepEqual(readAgentInputHistory('same-tab', owner), [`sent ${index}`])
+  }
+  clearAgentInputDraft('same-tab', owners[0])
+  assert.equal(readAgentInputDraft('same-tab', owners[0]), '')
+  assert.deepEqual(readAgentInputHistory('same-tab', owners[0]), [])
+  assert.equal(readAgentInputDraft('same-tab', owners[3]), 'draft 3')
+  assert.deepEqual(readAgentInputHistory('same-tab', owners[3]), ['sent 3'])
+})
+
+test('explicit views never claim ambiguous legacy drafts; the compatibility view migrates once', () => {
+  writeAgentInputDraft('tab', 'legacy draft')
+  recordAgentInputHistory('tab', 'legacy sent')
+  const explicit = { account: 'owner', projectPath: '/a', workspacePath: '/a' }
+  assert.equal(readAgentInputDraft('tab', explicit), '')
+  assert.deepEqual(readAgentInputHistory('tab', explicit), [])
+  assert.equal(readAgentInputDraft('tab'), 'legacy draft')
+  assert.deepEqual(readAgentInputHistory('tab'), ['legacy sent'])
+  const compatibility = { ...explicit, migrateLegacy: true }
+  assert.equal(readAgentInputDraft('tab', compatibility), 'legacy draft')
+  assert.deepEqual(readAgentInputHistory('tab', compatibility), ['legacy sent'])
+  assert.equal(readAgentInputDraft('tab'), '')
+  assert.deepEqual(readAgentInputHistory('tab'), [])
+  assert.equal(readAgentInputDraft('tab', { ...compatibility, workspacePath: '/b' }), '')
+  assert.deepEqual(readAgentInputHistory('tab', { ...compatibility, workspacePath: '/b' }), [])
+  const entries = JSON.parse(mem.getItem(DRAFTS_KEY)!) as Record<string, string>
+  assert.deepEqual(Object.keys(entries), [agentInputOwnerKey('tab', explicit)])
+})
+
+test('compatibility writes and close discard obsolete legacy entries without affecting other owners', () => {
+  const scope = { account: 'owner', projectPath: '/a', workspacePath: '/a', migrateLegacy: true }
+  const other = { ...scope, workspacePath: '/b', migrateLegacy: false }
+  writeAgentInputDraft('tab', 'legacy draft')
+  writeAgentInputDraft('tab', 'other draft', other)
+  writeAgentInputDraft('tab', 'new draft', scope)
+  assert.equal(readAgentInputDraft('tab'), '')
+  assert.equal(readAgentInputDraft('tab', scope), 'new draft')
+  recordAgentInputHistory('tab', 'legacy history')
+  recordAgentInputHistory('tab', 'other history', other)
+  clearAgentInputDraft('tab', scope)
+  assert.equal(readAgentInputDraft('tab', scope), '')
+  assert.deepEqual(readAgentInputHistory('tab', scope), [])
+  assert.equal(readAgentInputDraft('tab', other), 'other draft')
+  assert.deepEqual(readAgentInputHistory('tab', other), ['other history'])
+})
+
+test('failed migration writes leave the legacy disk value available for a later compatibility retry', () => {
+  writeAgentInputDraft('tab', 'recoverable')
+  const previous = mem.setItem.bind(mem)
+  mem.setItem = () => { throw new Error('quota') }
+  const scope = { account: 'owner', projectPath: '/a', workspacePath: '/a', migrateLegacy: true }
+  assert.equal(readAgentInputDraft('tab', scope), 'recoverable')
+  assert.equal(readAgentInputDraft('tab'), 'recoverable')
+  mem.setItem = previous
+  assert.equal(readAgentInputDraft('tab', scope), 'recoverable')
+  assert.equal(readAgentInputDraft('tab'), '')
 })

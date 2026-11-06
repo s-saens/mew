@@ -1,7 +1,7 @@
+import { useWorkspaceApi } from '../api/workspace-api-context'
 import { globalSessionStorage } from '@mew/ui/browser-storage-scope'
-import { mewFetch } from '../utils/remote-transport.ts'
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import { fetchTaskList, patchTaskList } from '../api/client'
+
 import { TaskListSession } from '../utils/task-list-session'
 import { uuid } from '../utils/uuid'
 import { syncTaskDocuments, withTaskDocumentSync } from '../utils/task-document-sync'
@@ -9,6 +9,8 @@ import type { TaskBoard, TaskItem } from '../../shared/task-list'
 import { previewDocumentTitle, useTitlePreviews } from '../utils/document-title-preview'
 
 export function useTaskList(workspace: string | null, email: string, open: boolean) {
+  const { fetchTaskList, patchTaskList, fetch: mewFetch, scope: requestScope } = useWorkspaceApi()
+  const requestKey = JSON.stringify(requestScope ?? null)
   const [draftWindow] = useState(() => {
     const id = uuid()
     try {
@@ -21,7 +23,8 @@ export function useTaskList(workspace: string | null, email: string, open: boole
   const sessions = useRef(new Map<string, TaskListSession>())
   const session = useMemo(() => {
     const key = `${email}:${workspace}`
-    let value = sessions.current.get(key)
+    const sessionKey = `${key}:${requestKey}`
+    let value = sessions.current.get(sessionKey)
     if (!value) {
       const confirmed = { tasks: [] as TaskItem[] }
       const receive = async (board: TaskBoard) => {
@@ -36,10 +39,10 @@ export function useTaskList(workspace: string | null, email: string, open: boole
         read: () => withTaskDocumentSync(workspace ?? '', () => fetchTaskList(workspace ?? '', email).then(receive), 'read'),
         save: (changes, colors, deleted) => withTaskDocumentSync(workspace ?? '', () => patchTaskList(workspace ?? '', changes, email, colors, deleted).then(receive)),
       }, `mew:task-draft:${key}:${draftWindow}`)
-      sessions.current.set(key, value)
+      sessions.current.set(sessionKey, value)
     }
     return value
-  }, [email, workspace, draftWindow])
+  }, [email, workspace, draftWindow, requestKey, fetchTaskList, patchTaskList])
   const state = useSyncExternalStore(session.subscribe, session.snapshot)
   const titles = useTitlePreviews()
   const displayed = state.tasks.map(task => {
@@ -84,7 +87,7 @@ export function useTaskList(workspace: string | null, email: string, open: boole
     window.addEventListener('focus', refresh)
     document.addEventListener('visibilitychange', refresh)
     return () => { controller.abort(); clearInterval(timer); window.removeEventListener('focus', refresh); document.removeEventListener('visibilitychange', refresh) }
-  }, [session, open, workspace, email])
+  }, [session, open, workspace, email, mewFetch])
   useEffect(() => {
     for (const [key, value] of sessions.current) if (!key.startsWith(`${email}:`)) { value.dispose(); sessions.current.delete(key) }
   }, [email])

@@ -1,4 +1,4 @@
-import { mewFetch } from '../utils/remote-transport.ts'
+import { useWorkspaceApi } from '../api/workspace-api-context'
 import { canAutoFocusInput } from '@mew/ui'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, useId } from 'react'
 import { NavArrowLeft, NavArrowRight, Minus, Plus, Download, FloppyDisk, EditPencil, Erase, Undo, Redo, Text } from 'iconoir-react'
@@ -18,8 +18,9 @@ const DEFAULT_SIZE = { width: 612, height: 792 }
 const COLORS = ['#202124', '#c5221f', '#185abc', '#137333']
 
 export default function PdfViewer({ src, download, name, identity, onEdit }: { src: string; download: string; name: string; identity: string; onEdit?: () => void }) {
+  const { fetch: requestFetch, scopedUrl } = useWorkspaceApi()
   const { t } = useI18n()
-  const url = src.replace('/raw?', '/pdf?')
+  const url = scopedUrl(src.replace('/raw?', '/pdf?'))
   const draft = useMemo(() => pdfDraft(`${identity}:${url}`), [identity, url])
   const ink = useSyncExternalStore(draft.subscribe, draft.get)
   const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null)
@@ -71,7 +72,7 @@ export default function PdfViewer({ src, download, name, identity, onEdit }: { s
     setPdf(null); setError(null); setPasswordNeeded(false); setProgress(null); setKnown(new Map())
     void (async () => {
       try {
-        const response = await mewFetch(url, { method: 'HEAD', cache: 'no-store', signal: controller.signal })
+        const response = await requestFetch(url, { method: 'HEAD', cache: 'no-store', signal: controller.signal })
         if (!response.ok) throw new Error(`HTTP ${response.status}`)
         const nextRevision = response.headers.get('X-Mew-Pdf-Revision')
         if (!nextRevision) throw new Error('Missing PDF revision')
@@ -96,7 +97,7 @@ export default function PdfViewer({ src, download, name, identity, onEdit }: { s
       }
     })()
     return () => { cancelled = true; controller.abort(); passwordCallback.current = null; void task?.destroy().catch(() => {}) }
-  }, [url, retry, draft, ink.generation])
+  }, [url, retry, draft, ink.generation, requestFetch])
 
   useEffect(() => () => { saveController.current?.abort(); draft.flush(); cancelAnimationFrame(frame.current) }, [draft])
   useEffect(() => {
@@ -164,7 +165,7 @@ export default function PdfViewer({ src, download, name, identity, onEdit }: { s
         link.href = href; link.download = name.replace(/\.pdf$/i, '-annotated.pdf'); link.click()
         setTimeout(() => URL.revokeObjectURL(href), 60_000)
       } else {
-        const response = await mewFetch(url, { method: 'PUT', headers: { 'Content-Type': 'application/pdf', 'If-Match': revision.current }, body: bytes, signal: controller.signal })
+        const response = await requestFetch(url, { method: 'PUT', headers: { 'Content-Type': 'application/pdf', 'If-Match': revision.current }, body: bytes, signal: controller.signal })
         if (!response.ok) { setSaveError(response.status === 409 ? 'pdf.conflict' : response.status === 403 ? 'pdf.forbidden' : response.status === 413 ? 'pdf.tooLarge' : 'pdf.saveFailed'); return }
         const result = await response.json() as { revision: string }
         draft.saved(result.revision, snapshot); setSaved(true)

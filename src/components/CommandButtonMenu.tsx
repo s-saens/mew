@@ -1,3 +1,4 @@
+import { useWorkspaceApi } from '../api/workspace-api-context'
 import { ActionMenuSurface, canAutoFocusInput, getFixedPopupLayout, HoverTipLayer, LoadingIndicator, MenuReorderHandle, useDragReorder, type DragItemProps } from '@mew/ui'
 import { RefreshDouble } from 'iconoir-react'
 import { uiText } from '@mew/ui/i18n-core'
@@ -14,7 +15,7 @@ import { useUiLocale } from '@mew/ui/i18n'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
 import { useOverlayDismiss } from '@mew/ui'
-import { fetchCmdButtons, killTmuxSession, runCmdButton, saveCmdButtons, type CmdButtonState } from '../api/client'
+import { type CmdButtonState } from '../api/client'
 import { ApiResponseError } from '../api/response'
 import { SessionTerminalPopup } from './SessionTerminalPopup'
 import { WORKSPACE_PROJECT } from '../utils/active-project'
@@ -63,6 +64,7 @@ function ScopedCommandButtonMenu({
   alwaysOpen = false,
   triggerRef,
 }: CommandButtonMenuProps) {
+  const { fetchCmdButtons, runCmdButton, killTmuxSession, saveCmdButtons } = useWorkspaceApi()
   useUiLocale()
   const [uncontrolledOpen, setUncontrolledOpen] = useState(false)
   const open = alwaysOpen || (controlledOpen ?? uncontrolledOpen)
@@ -149,7 +151,7 @@ function ScopedCommandButtonMenu({
       .finally(() => {
         if (pendingRefresh.current === sequence) pendingRefresh.current = null
       })
-  }, [project, directory, workspacePath])
+  }, [project, directory, workspacePath, fetchCmdButtons])
 
   const invalidateRefresh = useCallback(() => {
     refreshSequence.current++

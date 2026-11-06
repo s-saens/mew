@@ -1,9 +1,10 @@
+import { useWorkspaceApi } from '../api/workspace-api-context'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { EditPencil, MediaImage, PasteClipboard, User } from 'iconoir-react'
 import { ActionMenu, ActionMenuItem } from '@mew/ui'
 import { uiText } from '@mew/ui/i18n-core'
 import { useUiLocale } from '@mew/ui/i18n'
-import { updateProfile } from '../api/client'
+
 import { useI18n } from '../i18n'
 
 const PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
@@ -15,6 +16,7 @@ export function AccountProfileForm({ email, displayName, avatarDataUrl, hasPassw
   hasPassword?: boolean
   onProfileChanged: (profile: { displayName: string; avatarDataUrl: string | null }) => void
 }) {
+  const { updateProfile } = useWorkspaceApi()
   useUiLocale()
   const { t } = useI18n()
   const [name, setName] = useState(displayName ?? email.split('@')[0] ?? email)

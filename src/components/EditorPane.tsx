@@ -1,4 +1,4 @@
-import { mewFetch } from '../utils/remote-transport.ts'
+import { useWorkspaceApi } from '../api/workspace-api-context'
 import { editorImageUrl } from '../utils/editor-image-url.ts'
 import { PanelCloseButton } from './panel-close-button'
 import { LoadingIndicator, observeEditorViewport, useToast } from '@mew/ui'
@@ -8,22 +8,7 @@ import { useShortcutBindings } from '@mew/shortcuts'
 import { ArrowLeft, ArrowRight, Brain, Database, OpenNewWindow, Quote } from 'iconoir-react'
 import { useDock, DockGrip, DockInlineBody } from './DockWorkspace'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
-import {
-  deleteComment,
-  createEditorApi,
-  externalRawUrl,
-  fetchExternalFile,
-  fetchFile,
-  fetchComments,
-  fetchMembers,
-  isArchivedPath,
-  postComment,
-  rawUrl,
-  updateComment,
-  type CommentThread,
-  type Role,
-  type TreeNode,
-} from '../api/client'
+import { type CommentThread, type Role, type TreeNode } from '../api/client'
 import type { CommentAnchor, EditorContextTarget, EditorDbApi, EditorHandle, EditorOpenLink, EditorOpenLinkOptions, EditorViewAnchor } from '@mew/editor'
 import { AnnotationPopover } from '@mew/editor/annotation-popover'
 import { readSourceAnnotations } from '@mew/editor/annotation-source'
@@ -229,6 +214,8 @@ export function EditorPane({
   onTabDragMove,
   onTabDrop,
 }: EditorPaneProps) {
+  const api = useWorkspaceApi()
+  const { createEditorApi, fetchFile, fetchExternalFile, externalRawUrl, rawUrl, isArchivedPath, fetchComments, fetchMembers, postComment, updateComment, deleteComment, resourceUrl, fetch: requestFetch } = api
   useUiLocale()
   const dock = useDock()
   const { t } = useI18n()
@@ -259,14 +246,14 @@ export function EditorPane({
   const canGoForward = !!navigation && navigation.index < navigation.entries.length - 1
   const editorApi = useMemo(() => ({
     ...createEditorApi(project, file.path),
-    resolveImageUrl: (src: string, documentPath: string) => editorImageUrl(src, documentPath, project, workspace),
+    resolveImageUrl: (src: string, documentPath: string) => editorImageUrl(src, documentPath, project, workspace, resourceUrl),
     fetchFile: (path: string) => {
       const target = editorLinkTabPath(project, path, workspace, tabProject)
       if (isExternalTabPath(target)) return fetchExternalFile(externalAbsolutePath(target))
       const file = editorFile(target, tabProject)
       return fetchFile(file.path, file.project)
     },
-  }), [project, file.path, workspace, tabProject])
+  }), [project, file.path, workspace, tabProject, createEditorApi, fetchExternalFile, fetchFile, resourceUrl])
   const databasePage = useMemo(() => {
     if (activeContent === undefined || loading || revalidating || !activePath?.endsWith('.md') || isExternalTabPath(activePath)) return null
     const fields = splitFrontmatter(activeContent).frontmatter?.fields
@@ -282,7 +269,7 @@ export function EditorPane({
       const current = ++request
       void fetchFile(file.path, project).then(({ content }) => {
         if (!cancelled && current === request) window.dispatchEvent(new CustomEvent('mew:database-page-updated', {
-          detail: { project, path: file.path, content },
+          detail: { workspacePath: api.scope?.workspacePath ?? workspace?.path, project, path: file.path, content },
         }))
       }).catch(() => {})
     }
@@ -293,7 +280,7 @@ export function EditorPane({
     })
     refresh()
     return () => { cancelled = true; unsubscribe() }
-  }, [databaseId, databaseRowId, editorApi.db, file.path, project])
+  }, [databaseId, databaseRowId, editorApi.db, file.path, project, fetchFile, api.scope?.workspacePath, workspace?.path, api])
   const unsupportedFile = !!activeTab && !canOpenEditorFile(activeTab.path)
   const editorRef = useRef<EditorHandle>(null)
   const codePaneRef = useRef<CodePaneHandle>(null)
@@ -336,8 +323,9 @@ export function EditorPane({
     setMediaBytes(null)
     if (!mediaPath) return
     let alive = true
+    const controller = new AbortController()
     const url = isExternalTabPath(mediaPath) ? externalRawUrl(externalAbsolutePath(mediaPath)) : rawUrl(mediaPath, project)
-    mewFetch(url, { method: 'HEAD' })
+    requestFetch(url, { method: 'HEAD', signal: controller.signal })
       .then((res) => {
         const len = Number(res.headers.get('content-length'))
         if (alive && Number.isFinite(len)) setMediaBytes(len)
@@ -345,8 +333,9 @@ export function EditorPane({
       .catch(() => {}) // 크기를 못 구하면 상태줄에서 빼는 것으로 충분하다
     return () => {
       alive = false
+      controller.abort()
     }
-  }, [mediaPath, project])
+  }, [mediaPath, project, externalRawUrl, rawUrl, requestFetch])
   // 상태줄의 전체 본문 순회·UTF-8 버퍼 할당은 첫 표시를 늦추지 않도록 paint 뒤에 한다.
   // 다음 입력이나 탭 전환이 먼저 오면 이전 본문에 예약한 계산을 취소한다.
   const textContent = activeTab && !unsupportedFile && !mediaPath ? activeTab.content : null

@@ -35,7 +35,8 @@ window.cacheReaders={};window.cacheWrites=[];
 export const getCachedFile=()=>undefined;
 export const loadCachedFile=(project,path)=>new Promise(resolve=>{window.cacheReaders[path]=resolve});
 export const putCachedFile=(project,path,file)=>window.cacheWrites.push({path,...file});
-export const dropCachedFile=()=>{};`
+export const dropCachedFile=()=>{};
+export const createContentCache=()=>({getCachedFile,loadCachedFile,putCachedFile,dropCachedFile});`
     } }],
   })
   return bundle.output.find(item => item.type === 'chunk')!.code

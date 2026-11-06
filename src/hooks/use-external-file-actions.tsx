@@ -1,7 +1,8 @@
+import { useWorkspaceApi } from '../api/workspace-api-context'
 import { Download } from 'iconoir-react'
 import { useRef, useState } from 'react'
 import { useDialog } from '@mew/ui'
-import { deleteExternalPath, externalDownloadUrl, pasteExternalPath, renameExternalPath, setFileFavorite, type ExternalEntry } from '../api/client'
+import { type ExternalEntry } from '../api/client'
 import { useI18n } from '../i18n'
 import { FileActionMenu } from '../components/file-action-menu'
 import { DownloadLink } from '../components/DownloadLink'
@@ -18,6 +19,7 @@ export function useExternalFileActions(options: {
   onDeleted?: (path: string, type: ExternalEntry['type']) => void
   onOpenProject?: (path: string) => void
 }) {
+  const { renameExternalPath, deleteExternalPath, pasteExternalPath, setFileFavorite, externalDownloadUrl } = useWorkspaceApi()
   const { t } = useI18n()
   const dialogs = useDialog()
   const callbacks = useRef(options)

@@ -22,20 +22,25 @@ function validBoard(value: unknown): value is TaskBoard {
     && (board.tagColors === undefined || validTagColors(board.tagColors))
 }
 
-async function taskRequest(url: string, init: RequestInit): Promise<TaskBoard> {
-  const signal = AbortSignal.timeout(30_000)
-  const response = await mewFetch(url, { ...init, signal })
-  let board: unknown
-  try { board = await json<unknown>(response) }
-  catch (error) { throw Object.assign(error as Error, { status: response.status }) }
-  if (!validBoard(board)) throw Object.assign(new SyntaxError('잘못된 태스크 변경입니다'), { status: response.status })
-  return board
+export function createTaskListClient(request: typeof mewFetch = mewFetch) {
+  async function taskRequest(url: string, init: RequestInit): Promise<TaskBoard> {
+    const signal = AbortSignal.timeout(30_000)
+    const response = await request(url, { ...init, signal })
+    let board: unknown
+    try { board = await json<unknown>(response) }
+    catch (error) { throw Object.assign(error as Error, { status: response.status }) }
+    if (!validBoard(board)) throw Object.assign(new SyntaxError('잘못된 태스크 변경입니다'), { status: response.status })
+    return board
+  }
+
+  function fetchTaskList(workspace: string, email: string): Promise<TaskBoard> {
+    return taskRequest(`/api/task-list?workspace=${encodeURIComponent(workspace)}`, { headers: { 'X-Mew-Task-Owner': encodeURIComponent(email) } })
+  }
+
+  function patchTaskList(workspace: string, changes: TaskChange[], email: string, tagColorChanges: TaskTagColorChange[] = [], deletedTags: string[] = []): Promise<TaskBoard> {
+    return taskRequest('/api/task-list', { method: 'PATCH', headers: { 'Content-Type': 'application/json', 'X-Mew-Task-Owner': encodeURIComponent(email) }, body: JSON.stringify({ workspace, changes, tagColorChanges, deletedTags }) })
+  }
+  return { fetchTaskList, patchTaskList }
 }
 
-export function fetchTaskList(workspace: string, email: string): Promise<TaskBoard> {
-  return taskRequest(`/api/task-list?workspace=${encodeURIComponent(workspace)}`, { headers: { 'X-Mew-Task-Owner': encodeURIComponent(email) } })
-}
-
-export function patchTaskList(workspace: string, changes: TaskChange[], email: string, tagColorChanges: TaskTagColorChange[] = [], deletedTags: string[] = []): Promise<TaskBoard> {
-  return taskRequest('/api/task-list', { method: 'PATCH', headers: { 'Content-Type': 'application/json', 'X-Mew-Task-Owner': encodeURIComponent(email) }, body: JSON.stringify({ workspace, changes, tagColorChanges, deletedTags }) })
-}
+export const { fetchTaskList, patchTaskList } = createTaskListClient()

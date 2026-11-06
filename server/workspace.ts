@@ -9,9 +9,10 @@ import path from 'node:path'
 import { configFiles } from './config.ts'
 import { ensureDocsRoot, listProjects, setDocsDir, setWorkspaceRoot, workspacePaths } from './paths.ts'
 import { resetTreeWatchers, watchDocsTree } from './watcher.ts'
-import { closeAllRooms } from './collab.ts'
+import { closeWorkspaceDocsRooms } from './collab.ts'
 import { broadcast } from './presence.ts'
 import { simpleGit } from 'simple-git'
+import { WORKSPACE_SCOPE_VERSION } from '../shared/workspace-scope.ts'
 
 export class WorkspaceError extends Error {
   readonly status: number
@@ -19,6 +20,7 @@ export class WorkspaceError extends Error {
 }
 
 export interface WorkspaceInfo {
+  workspaceScopeVersion: typeof WORKSPACE_SCOPE_VERSION
   hasProject: boolean
   path: string
   /** 화면 배치와 실행 중 세션을 유지하는 프로젝트 경로. 파일 작업은 path를 사용한다. */
@@ -32,10 +34,10 @@ export interface WorkspaceInfo {
 }
 
 export function currentWorkspace(): WorkspaceInfo {
-  const account = workspaceContext.getStore()?.account
-  const projectPath = account ? readActiveProjectPath(account, workspacePaths.root) : workspacePaths.root
-  const hasProject = !account || readActiveWorkspace(account) === workspacePaths.root
-  return { hasProject, path: workspacePaths.root, projectPath, projects: listProjects(), docs: workspacePaths.docsDir, docsPath: workspacePaths.docsRoot }
+  const context = workspaceContext.getStore(), account = context?.account
+  const projectPath = context?.explicit ? context.projectPath ?? workspacePaths.root : account ? readActiveProjectPath(account, workspacePaths.root) : workspacePaths.root
+  const hasProject = !!context?.explicit || !account || readActiveWorkspace(account) === workspacePaths.root
+  return { workspaceScopeVersion: WORKSPACE_SCOPE_VERSION, hasProject, path: workspacePaths.root, projectPath, projects: listProjects(), docs: workspacePaths.docsDir, docsPath: workspacePaths.docsRoot }
 }
 
 /** 설정 파일에 그대로 쓸 수 있는 경로인지 — 셸(`. config.env`)과 Node(loadEnvFile) 둘 다 읽는 파일이다 */
@@ -89,6 +91,7 @@ export function switchWorkspace(target: string, initialProject?: string, project
   }
   if (!stat.isDirectory()) throw new WorkspaceError(`폴더가 아닙니다: ${abs}`)
   const context = workspaceContext.getStore()
+  if (context?.explicit) throw new WorkspaceError('명시적 프로젝트 범위는 계정의 프로젝트를 변경할 수 없습니다.', 409)
   if (context?.account) {
     setWorkspaceRoot(abs)
     ensureDocsRoot()
@@ -100,8 +103,7 @@ export function switchWorkspace(target: string, initialProject?: string, project
   if (abs === workspacePaths.root) return currentWorkspace()
 
   // 옛 폴더에 매인 것부터 접는다 — 새 경로가 걸린 뒤에 접으면 엉뚱한 파일을 붙들고 있게 된다
-  resetTreeWatchers()
-  closeAllRooms()
+  resetTreeWatchers(workspacePaths.root)
   // 에이전트 감독은 cwd를 이미 고정해 독립적으로 돈다. 프로젝트 전환은 화면의 활성
   // 루트만 바꾸며, 이전 프로젝트의 작업을 끊지 않는다(ADR 0092).
 
@@ -178,8 +180,8 @@ export function switchDocsRoot(target: string): WorkspaceInfo {
   const settings = readProjectAgentSettings(workspacePaths.root) ?? defaultAgentSettings()
   writeProjectAgentSettings(workspacePaths.root, { ...settings, docsDir: path.relative(workspacePaths.root, abs) })
 
-  resetTreeWatchers()
-  closeAllRooms()
+  resetTreeWatchers(workspacePaths.root)
+  closeWorkspaceDocsRooms(workspacePaths.root)
   setDocsDir(path.relative(workspacePaths.root, abs))
   if (!workspaceContext.getStore()?.account) persist('MEW_DOCS', workspacePaths.docsDir)
   watchDocsTree()

@@ -1,15 +1,17 @@
+import { useWorkspaceApi } from '../api/workspace-api-context'
 import { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { openDropdownOnArrow, canAutoFocusInput, SelectField, useOverlayDismiss } from '@mew/ui'
 import { uiText } from '@mew/ui/i18n-core'
 import { useUiLocale } from '@mew/ui/i18n'
 import { Check, GitBranch, NavArrowDown, Plus, Search, Xmark } from 'iconoir-react'
-import { fetchGitBranches, type GitBranchRef, type GitRepositoryInfo } from '../api/client'
+import { type GitBranchRef, type GitRepositoryInfo } from '../api/client'
 
 export function GitBranchPicker({ info, project, path, disabled, busy, onAction }: {
   info: GitRepositoryInfo | null; project: string; path: string; disabled: boolean; busy: boolean
   onAction: (action: 'switch' | 'create' | 'delete', ref: string, name?: string) => Promise<void>
 }) {
+  const { fetchGitBranches } = useWorkspaceApi()
   useUiLocale()
   const id = useId()
   const trigger = useRef<HTMLButtonElement>(null), popup = useRef<HTMLDivElement>(null), search = useRef<HTMLInputElement>(null), nameField = useRef<HTMLInputElement>(null)

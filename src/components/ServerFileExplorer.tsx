@@ -1,13 +1,8 @@
+import { useWorkspaceApi } from '../api/workspace-api-context'
 import { scopedBrowserStorage } from '@mew/ui/browser-storage-scope'
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { DialogFrame, useDialog } from '@mew/ui'
-import {
-  browseExternalEntries,
-  openExternalProject,
-  setProject,
-  type ExternalEntriesResult,
-  type ExternalEntry,
-} from '../api/client'
+import { type ExternalEntriesResult, type ExternalEntry } from '../api/client'
 import { FileBrowser, FileBrowserEntry, FileBrowserHeader } from './file-browser'
 import { useI18n } from '../i18n'
 
@@ -75,6 +70,7 @@ export function ServerFileExplorer({
   onDeleted: (path: string, type: 'file' | 'dir') => void
   onClose: () => void
 }) {
+  const { browseExternalEntries, openExternalProject, setProject } = useWorkspaceApi()
   const { t } = useI18n()
   const dialogs = useDialog()
   const id = useId()
@@ -105,7 +101,7 @@ export function ServerFileExplorer({
       .catch((err: unknown) => {
         if (requestSeq.current === seq) setError(err instanceof Error ? err.message : t('fileExplorer.loadFailed'))
       })
-  }, [t])
+  }, [t, browseExternalEntries])
 
   const invalidateRequests = useCallback(() => { requestSeq.current++ }, [])
   useEffect(() => { navigate(''); return invalidateRequests }, [navigate, invalidateRequests])
@@ -122,7 +118,7 @@ export function ServerFileExplorer({
         next.delete(path)
         return next
       }))
-  }, [t])
+  }, [t, browseExternalEntries])
 
   const toggle = (entry: ExternalEntry) => {
     setExpanded((old) => {

@@ -1,3 +1,4 @@
+import { useWorkspaceApi } from '../api/workspace-api-context'
 import { uiText, getUiLocale } from '@mew/ui/i18n-core'
 import { useUiLocale } from '@mew/ui/i18n'
 // 예약 에이전트 작업 창 — "언제 / 어느 폴더에서 / 어떤 에이전트셋으로 / 어떤 프롬프트를" 을 GUI로 등록한다.
@@ -8,7 +9,7 @@ import { useUiLocale } from '@mew/ui/i18n'
 import { useCallback, useEffect, useState } from 'react'
 import { SelectField, useOverlayDismiss } from '@mew/ui'
 import { Xmark } from 'iconoir-react'
-import { fetchProjects, fetchSchedules, runSchedule, saveSchedules, type AgentJob, type AgentJobView, type AgentSet } from '../api/client'
+import { type AgentJob, type AgentJobView, type AgentSet } from '../api/client'
 import { dayNames, describeSchedule, fromCron, toCron, type Schedule } from '../utils/cron'
 import { runtimeOf } from './agentRuntimes'
 import { SessionTerminalPopup } from './SessionTerminalPopup'
@@ -133,6 +134,7 @@ function ScheduleFields({ cron, disabled, onChange }: { cron: string; disabled: 
 }
 
 export function ScheduleModal({ onClose }: { onClose: () => void }) {
+  const { fetchSchedules, fetchProjects, saveSchedules, runSchedule } = useWorkspaceApi()
   useUiLocale()
   const [jobs, setJobs] = useState<AgentJobView[] | null>(null)
   const [agentSets, setAgentSets] = useState<AgentSet[]>([])
@@ -163,7 +165,7 @@ export function ScheduleModal({ onClose }: { onClose: () => void }) {
       .catch(() => {
         /* 세션 표시 갱신 실패는 조용히 넘긴다 — 편집 중인 내용은 그대로 둔다 */
       })
-  }, [])
+  }, [fetchSchedules])
 
   useEffect(() => {
     fetchSchedules()
@@ -177,7 +179,7 @@ export function ScheduleModal({ onClose }: { onClose: () => void }) {
     fetchProjects()
       .then((list) => setProjects(list.map((p) => p.name)))
       .catch(() => setProjects([]))
-  }, [])
+  }, [fetchSchedules, fetchProjects])
 
   useOverlayDismiss(() => { if (!busy) onClose() })
 

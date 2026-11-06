@@ -34,7 +34,7 @@ export const DEFAULT_PROJECT = 'docs'
 export let DOCS_DIR = resolveDocsDir(WORKSPACE_ROOT)
 export let DOCS_ROOT = path.join(WORKSPACE_ROOT, DOCS_DIR)
 
-export type WorkspacePaths = { root: string; docsDir: string; docsRoot: string; account: string | null }
+export type WorkspacePaths = { root: string; docsDir: string; docsRoot: string; account: string | null; projectPath?: string; explicit?: boolean }
 export const workspaceContext = new AsyncLocalStorage<WorkspacePaths>()
 
 export function pathsForWorkspace(root: string, account: string | null): WorkspacePaths {
@@ -63,7 +63,10 @@ export const WORKSPACE_PROJECT = '.workspace'
  *  실제 전환 절차(검증·설정 저장·감시자/협업 방 정리)는 workspace.ts가 맡는다. */
 export function setWorkspaceRoot(absolutePath: string): void {
   const context = workspaceContext.getStore()
-  if (context) { Object.assign(context, pathsForWorkspace(path.resolve(absolutePath), context.account)); return }
+  if (context) {
+    if (context.explicit && path.resolve(absolutePath) !== context.root) throw new UnsafePathError('명시적 프로젝트 범위를 변경할 수 없습니다.')
+    Object.assign(context, pathsForWorkspace(path.resolve(absolutePath), context.account)); return
+  }
   WORKSPACE_ROOT = path.resolve(absolutePath)
   DOCS_DIR = resolveDocsDir(WORKSPACE_ROOT)
   DOCS_ROOT = path.join(WORKSPACE_ROOT, DOCS_DIR)

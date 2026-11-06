@@ -1,7 +1,7 @@
-import { mewFetch } from '../utils/remote-transport.ts'
+import { useWorkspaceApi } from '../api/workspace-api-context'
 import { useEffect, useState } from 'react'
 import { TabScrollArea } from '@mew/ui'
-import { downloadUrl, rawUrl } from '../api/client'
+
 import { parseCsv } from '../utils/csv'
 import { parseXlsx, type SheetData } from '../utils/xlsx'
 import { DownloadLink } from './DownloadLink'
@@ -9,6 +9,7 @@ import { useI18n } from '../i18n'
 
 /** 표 탭 본문(xlsx·csv·tsv) — 바이트는 /api/raw에서 받아 브라우저에서 직접 푼다. 읽기 전용이다(편집·수식·서식 없음) */
 export function SheetViewer({ path, rawSrc, downloadSrc }: { path: string; rawSrc?: string; downloadSrc?: string }) {
+  const { rawUrl, downloadUrl, fetch: requestFetch } = useWorkspaceApi()
   const { t } = useI18n()
   const [sheets, setSheets] = useState<SheetData[] | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -17,10 +18,11 @@ export function SheetViewer({ path, rawSrc, downloadSrc }: { path: string; rawSr
 
   useEffect(() => {
     let alive = true
+    const controller = new AbortController()
     setSheets(null)
     setError(null)
     setActive(0)
-    mewFetch(rawSrc ?? rawUrl(path))
+    requestFetch(rawSrc ?? rawUrl(path), { signal: controller.signal })
       .then((res) => (res.ok ? res.arrayBuffer() : Promise.reject(new Error(`HTTP ${res.status}`))))
       // xlsx는 ZIP이라 풀어야 하고(비동기), csv·tsv는 글자라 그 자리에서 갈라 놓는다
       .then((buf) => (path.toLowerCase().endsWith('.xlsx') ? parseXlsx(buf) : parseCsv(buf, path)))
@@ -34,8 +36,9 @@ export function SheetViewer({ path, rawSrc, downloadSrc }: { path: string; rawSr
       })
     return () => {
       alive = false
+      controller.abort()
     }
-  }, [path, rawSrc, t])
+  }, [path, rawSrc, t, rawUrl, requestFetch])
 
   if (error) {
     return (

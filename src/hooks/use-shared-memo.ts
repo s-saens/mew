@@ -4,11 +4,13 @@ import { SHARED_MEMO_PATH, SHARED_MEMO_PROJECT } from '../../shared/shared-memo'
 import { useCollab } from './useCollab'
 import { useMobileKeyboard } from './use-mobile-keyboard'
 import { identityColor } from '../utils/collabColor'
+import { useWorkspaceView } from '../workspace/workspace-view-context'
 
 /** Owned above the project-keyed dock: closing or switching projects keeps the CRDT and pending edits. */
 export function useSharedMemo({ authEmail, open, onOpenChange, focusSignal = 0, onFocus }: {
   authEmail: string; open: boolean; onOpenChange: (open: boolean) => void; focusSignal?: number; onFocus?: () => void
 }) {
+  const active = useWorkspaceView()?.active ?? true
   const keyboardOpen = useMobileKeyboard()
   const [activated, setActivated] = useState(false)
   const [value, setValue] = useState('')
@@ -18,15 +20,17 @@ export function useSharedMemo({ authEmail, open, onOpenChange, focusSignal = 0, 
   const previousFocus = useRef<HTMLElement | null>(null)
   const collab = useCollab(SHARED_MEMO_PROJECT, activated && authEmail ? SHARED_MEMO_PATH : null, authEmail)
   const focusEditor = useCallback(() => {
+    if (!active) return
     const editor = root.current?.querySelector<HTMLElement>(viewMode === 'plain' ? '.cm-content[contenteditable="true"]' : '.tiptap[contenteditable="true"]')
     ;(editor ?? root.current)?.focus({ preventScroll: true })
-  }, [viewMode])
+  }, [viewMode, active])
   const close = useCallback(() => {
     const restore = root.current?.contains(document.activeElement)
     onOpenChange(false)
-    if (restore && previousFocus.current?.isConnected) previousFocus.current.focus({ preventScroll: true })
-  }, [onOpenChange])
+    if (active && restore && previousFocus.current?.isConnected) previousFocus.current.focus({ preventScroll: true })
+  }, [onOpenChange, active])
   useEffect(() => {
+    if (!active) return
     function onKeyDown(event: KeyboardEvent) {
       if (!authEmail || event.isComposing || !matchesShortcut(event, getBinding('toggleMemo'))) return
       event.preventDefault(); event.stopImmediatePropagation()
@@ -38,14 +42,15 @@ export function useSharedMemo({ authEmail, open, onOpenChange, focusSignal = 0, 
     }
     window.addEventListener('keydown', onKeyDown, true)
     return () => window.removeEventListener('keydown', onKeyDown, true)
-  }, [authEmail, open, close, focusEditor, onOpenChange, onFocus])
+  }, [authEmail, open, close, focusEditor, onOpenChange, onFocus, active])
   useLayoutEffect(() => {
     if (!open) return
     setActivated(true)
+    if (!active) return
     if (!root.current?.contains(document.activeElement)) previousFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
     const frame = requestAnimationFrame(() => root.current?.focus({ preventScroll: true }))
     return () => cancelAnimationFrame(frame)
-  }, [open, activated, focusSignal])
+  }, [open, activated, focusSignal, active])
   useEffect(() => {
     const awareness = collab?.awareness
     if (!awareness) return

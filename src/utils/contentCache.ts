@@ -18,7 +18,7 @@ export interface CachedFile {
   version?: FileVersion
 }
 
-type Context = { database: string; identity: string; workspace: string; epoch: number; storage?: Storage; legacyPrefix: string }
+type Context = { database: string; identity: string; workspace: string; bound: boolean; epoch: number; storage?: Storage; legacyPrefix: string }
 type Meta = { key: string; identity: string; workspace: string; savedAt: number; bytes: number }
 const cache = new Map<string, CachedFile>()
 const epochs = new Map<string, number>()
@@ -30,18 +30,19 @@ let queued: Promise<void> = Promise.resolve()
 let opened: Promise<IDBDatabase> | undefined
 let openedName = ''
 
-function context(): Context {
+function context(workspacePath?: string): Context {
   const database = remoteStorageName(DB_NAME)
+  const root = workspacePath ?? workspace
   let storage: Storage | undefined
   try { storage = scopedBrowserStorage() } catch { /* disabled storage */ }
-  return { database, identity, workspace, epoch: epochs.get(database) ?? 0, storage,
-    legacyPrefix: `${PREFIX}${identity}:${workspace ? `${workspace}:` : ''}` }
+  return { database, identity, workspace: root, bound: workspacePath !== undefined, epoch: epochs.get(database) ?? 0, storage,
+    legacyPrefix: `${PREFIX}${identity}:${root ? `${root}:` : ''}` }
 }
 function key(ctx: Context, project: string, path: string) { return JSON.stringify([ctx.identity, ctx.workspace, project, path]) }
 function memoryKey(ctx: Context, id: string) { return JSON.stringify([ctx.database, id]) }
 function valid(ctx: Context) { return (epochs.get(ctx.database) ?? 0) === ctx.epoch }
 function current(ctx: Context) {
-  return valid(ctx) && ctx.database === remoteStorageName(DB_NAME) && ctx.identity === identity && ctx.workspace === workspace
+  return valid(ctx) && ctx.database === remoteStorageName(DB_NAME) && ctx.identity === identity && (ctx.bound || ctx.workspace === workspace)
 }
 function remember(id: string, file: CachedFile) {
   cache.delete(id)
@@ -179,18 +180,18 @@ function clearLegacy(ctx: Context, keepIdentity: boolean) {
 }
 
 /** Memory-only: synchronously opening a file never reads or serializes persistent bodies. */
-export function getCachedFile(project: string, path: string): CachedFile | undefined {
-  const ctx = context(), id = memoryKey(ctx, key(ctx, project, path))
+export function getCachedFile(project: string, path: string, workspacePath?: string): CachedFile | undefined {
+  const ctx = context(workspacePath), id = memoryKey(ctx, key(ctx, project, path))
   const hit = cache.get(id)
   if (hit) remember(id, hit)
   return hit
 }
 
 /** Cold restoration is best effort. A concurrent edit, removal, logout or root switch invalidates the result. */
-export function loadCachedFile(project: string, path: string): Promise<CachedFile | undefined> {
-  const hit = getCachedFile(project, path)
+export function loadCachedFile(project: string, path: string, workspacePath?: string): Promise<CachedFile | undefined> {
+  const hit = getCachedFile(project, path, workspacePath)
   if (hit) return Promise.resolve(hit)
-  const ctx = context(), id = key(ctx, project, path), hotKey = memoryKey(ctx, id)
+  const ctx = context(workspacePath), id = key(ctx, project, path), hotKey = memoryKey(ctx, id)
   const existing = reads.get(hotKey)
   if (existing) return existing.promise
   const pending = { promise: Promise.resolve<CachedFile | undefined>(undefined) }
@@ -227,8 +228,8 @@ export function loadCachedFile(project: string, path: string): Promise<CachedFil
   return pending.promise
 }
 
-export function putCachedFile(project: string, path: string, file: CachedFile) {
-  const ctx = context(), id = key(ctx, project, path), hotKey = memoryKey(ctx, id)
+export function putCachedFile(project: string, path: string, file: CachedFile, workspacePath?: string) {
+  const ctx = context(workspacePath), id = key(ctx, project, path), hotKey = memoryKey(ctx, id)
   reads.delete(hotKey)
   const snapshot = { ...file, ...(file.version ? { version: { ...file.version } } : {}) }
   remember(hotKey, snapshot)
@@ -246,8 +247,8 @@ export function putCachedFile(project: string, path: string, file: CachedFile) {
     if (written) legacyRemove(ctx, project, path)
   })
 }
-export function dropCachedFile(project: string, path: string) {
-  const ctx = context(), id = key(ctx, project, path), hotKey = memoryKey(ctx, id)
+export function dropCachedFile(project: string, path: string, workspacePath?: string) {
+  const ctx = context(workspacePath), id = key(ctx, project, path), hotKey = memoryKey(ctx, id)
   cache.delete(hotKey)
   reads.delete(hotKey)
   writes.delete(hotKey)
@@ -287,3 +288,13 @@ export function setContentIdentity(email: string | null) {
 }
 /** Root switches retain their own entries in the bounded hot cache. */
 export function setContentWorkspace(path: string | null) { workspace = path ?? '' }
+
+/** Workspace views share cache budgets while retaining a fixed root through asynchronous reads. */
+export function createContentCache(workspacePath: string) {
+  return {
+    getCachedFile: (project: string, path: string) => getCachedFile(project, path, workspacePath),
+    loadCachedFile: (project: string, path: string) => loadCachedFile(project, path, workspacePath),
+    putCachedFile: (project: string, path: string, file: CachedFile) => putCachedFile(project, path, file, workspacePath),
+    dropCachedFile: (project: string, path: string) => dropCachedFile(project, path, workspacePath),
+  }
+}

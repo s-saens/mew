@@ -1,3 +1,4 @@
+import { useWorkspaceApi } from '../api/workspace-api-context'
 import { canAutoFocusInput } from '@mew/ui'
 // 터미널 버튼 줄(선택 모드 버튼과 같은 줄)의 명령어 버튼. 목록은 전역 하나
 // (.data/term-button.json)라 모든 프로젝트·모든 터미널 탭이 같은 버튼을 본다 — 프로젝트마다 따로
@@ -9,7 +10,7 @@ import { canAutoFocusInput } from '@mew/ui'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useOverlayDismiss } from '@mew/ui'
-import { fetchTermButtons, saveTermButtons, type TermButton } from '../api/client'
+import { type TermButton } from '../api/client'
 import { IconPicker } from './IconPicker'
 import { ProjectIcon } from './ProjectIcon'
 import { useI18n } from '../i18n'
@@ -24,6 +25,7 @@ let cachedButtons: TermButton[] | null = null
 type Editing = { index: number | null; name: string; command: string; icon: string; iconOnly: boolean }
 
 export function TermButtonBar({ run }: { run: (command: string) => void }) {
+  const { fetchTermButtons, saveTermButtons } = useWorkspaceApi()
   const { t } = useI18n()
   const [buttons, setButtons] = useState<TermButton[] | null>(cachedButtons)
   const [editing, setEditing] = useState<Editing | null>(null)
@@ -35,13 +37,13 @@ export function TermButtonBar({ run }: { run: (command: string) => void }) {
         setButtons(res.buttons)
       })
       .catch(() => setButtons((prev) => prev ?? []))
-  }, [])
+  }, [fetchTermButtons])
 
   const commit = useCallback(async (next: TermButton[]) => {
     const res = await saveTermButtons(next)
     cachedButtons = res.buttons
     setButtons(res.buttons)
-  }, [])
+  }, [saveTermButtons])
 
   return (
     <>

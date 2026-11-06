@@ -1,8 +1,10 @@
+import { useWorkspaceApi } from '../api/workspace-api-context'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { fetchAgentScheduledPrompts, type AgentScheduledPrompt } from '../api/client.ts'
+import { type AgentScheduledPrompt } from '../api/client.ts'
 import { readScheduledCache, writeScheduledCache } from '../utils/agent-scheduled-cache.ts'
 
 export function useScheduledPrompts(account: string, runtime: string, tab: string, cwd: string, connected: boolean) {
+  const { fetchAgentScheduledPrompts } = useWorkspaceApi()
   const key = JSON.stringify([account, runtime, tab, cwd])
   const scope = useMemo(() => ({ key, runtime, tab, cwd, active: false, revision: 0, confirmed: false, jobs: [] as AgentScheduledPrompt[] }), [key, runtime, tab, cwd])
   const [snapshot, setSnapshot] = useState({ key, jobs: [] as AgentScheduledPrompt[] })
@@ -20,7 +22,7 @@ export function useScheduledPrompts(account: string, runtime: string, tab: strin
     scope.confirmed = true
     adopt(jobs)
     void writeScheduledCache(key, jobs)
-  }, [scope, adopt, key, runtime, tab, cwd])
+  }, [scope, adopt, key, runtime, tab, cwd, fetchAgentScheduledPrompts])
 
   useEffect(() => {
     scope.active = true

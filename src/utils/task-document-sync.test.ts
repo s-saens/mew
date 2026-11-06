@@ -2,6 +2,26 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { registerTaskDocumentSync, syncTaskDocuments, withTaskDocumentSync, type TaskDocumentChange } from './task-document-sync.ts'
 
+test('parallel roots retain independent task handlers and do not block each other drafts', async () => {
+  const events: string[] = []
+  const register = (workspace: string) => registerTaskDocumentSync({ workspace,
+    async prepare() { events.push(`prepare:${workspace}`); return () => { events.push(`release:${workspace}`) } },
+    async apply(changes) { events.push(`apply:${workspace}:${changes[0].after?.text}`) },
+  })
+  const offA = register('/a'), offB = register('/b')
+  let release!: () => void
+  const gate = new Promise<void>(resolve => { release = resolve })
+  try {
+    const a = withTaskDocumentSync('/a', async () => { events.push('request:a'); await gate })
+    await new Promise(resolve => setImmediate(resolve))
+    await withTaskDocumentSync('/b', async () => { events.push('request:b') })
+    await syncTaskDocuments('/a', [], [{ id: 'same', text: 'A', done: false, path: 'task.md' }])
+    await syncTaskDocuments('/b', [], [{ id: 'same', text: 'B', done: false, path: 'task.md' }])
+    assert.deepEqual(events, ['prepare:/a', 'request:a', 'prepare:/b', 'request:b', 'release:/b', 'apply:/a:A', 'apply:/b:B'])
+    release(); await a
+  } finally { release(); offA(); offB() }
+})
+
 test('confirmed task updates compare stable IDs and stay within the registered workspace', async () => {
   const updates: TaskDocumentChange[][] = []
   const unregister = registerTaskDocumentSync({ workspace: '/one', prepare: async () => () => {}, apply: async changes => { updates.push(changes) } })

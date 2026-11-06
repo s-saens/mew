@@ -6,15 +6,20 @@ import type { TmuxManager } from '@mew/tmux-term/server'
 import type { AgentCommandRecord, AgentCommandScope } from '../shared/agent-command.ts'
 import { DATA_DIR, writeFileAtomic } from './dataDir.ts'
 import { spawnSpecCommand } from './spawnSpecCommand.ts'
+import type { WorkspaceScope } from '../shared/workspace-scope.ts'
 
-export type StoredAgentCommand = AgentCommandRecord & { owner: string; queueHostPid?: number }
-export type AgentCommandInput = AgentCommandScope & { id: string; tab: string; command: string; afterUserCount: number }
+export type StoredAgentCommand = AgentCommandRecord & { owner: string; queueHostPid?: number; workspaceScope?: WorkspaceScope }
+export type AgentCommandInput = AgentCommandScope & { id: string; tab: string; command: string; afterUserCount: number; workspaceScope?: WorkspaceScope }
 const ID = /^[a-f0-9-]{36}$/
 const TAB = /^[A-Za-z0-9_-]{1,64}$/
 const SESSION = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$/
 const runner = fileURLToPath(new URL('./agent-command-runner.ts', import.meta.url))
 
 export class AgentCommandError extends Error {}
+
+function sameWorkspace(left: WorkspaceScope | undefined, right: WorkspaceScope | null): boolean {
+  return right ? left?.workspacePath === right.workspacePath && left.projectPath === right.projectPath : !left
+}
 
 export function validateCommandScope(value: AgentCommandScope): void {
   if (typeof value.runtime !== 'string' || !TAB.test(value.runtime)
@@ -41,19 +46,20 @@ export class AgentCommandStore {
     return path.join(this.ownerDirectory(owner), id)
   }
 
-  read(owner: string, id: string): StoredAgentCommand {
+  read(owner: string, id: string, workspaceScope?: WorkspaceScope | null, allowLegacy = false): StoredAgentCommand {
     const file = path.join(this.directory(owner, id), 'record.json')
     if (!fs.existsSync(file)) throw new AgentCommandError('명령 기록을 찾을 수 없습니다')
     const record = JSON.parse(fs.readFileSync(file, 'utf8')) as StoredAgentCommand
-    if (record.owner !== owner) throw new AgentCommandError('명령 기록을 찾을 수 없습니다')
+    if (record.owner !== owner || workspaceScope !== undefined && !sameWorkspace(record.workspaceScope, workspaceScope) && !(allowLegacy && !record.workspaceScope)) throw new AgentCommandError('명령 기록을 찾을 수 없습니다')
     return record
   }
 
-  async list(owner: string, scope?: AgentCommandScope): Promise<AgentCommandRecord[]> {
+  async list(owner: string, scope?: AgentCommandScope, workspaceScope?: WorkspaceScope | null, allowLegacy = false): Promise<AgentCommandRecord[]> {
     if (scope) validateCommandScope(scope)
     const directory = this.ownerDirectory(owner)
     if (!fs.existsSync(directory)) return []
     const records = fs.readdirSync(directory).filter(id => ID.test(id)).map(id => this.read(owner, id))
+      .filter(record => workspaceScope === undefined || sameWorkspace(record.workspaceScope, workspaceScope) || allowLegacy && !record.workspaceScope)
       .filter(record => !scope || record.runtime === scope.runtime && record.cwd === scope.cwd && record.sessionId === scope.sessionId)
     for (const record of records) {
       if (record.state !== 'queued' || !record.queueHostPid) continue
@@ -93,7 +99,7 @@ export class AgentCommandStore {
     try { fs.mkdirSync(directory, { mode: 0o700 }) } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error
       const previous = this.read(owner, input.id)
-      if (previous.command !== input.command || previous.runtime !== input.runtime || previous.cwd !== input.cwd || previous.sessionId !== input.sessionId || previous.tab !== input.tab) {
+      if (previous.command !== input.command || previous.runtime !== input.runtime || previous.cwd !== input.cwd || previous.sessionId !== input.sessionId || previous.tab !== input.tab || !sameWorkspace(previous.workspaceScope, input.workspaceScope ?? null)) {
         throw new AgentCommandError('이미 다른 명령에 사용한 ID입니다')
       }
       return publicCommand(previous)
@@ -131,8 +137,8 @@ export class AgentCommandStore {
     return publicCommand(record)
   }
 
-  stop(owner: string, id: string): void {
-    const record = this.read(owner, id)
+  stop(owner: string, id: string, workspaceScope?: WorkspaceScope | null, allowLegacy = false): void {
+    const record = this.read(owner, id, workspaceScope, allowLegacy)
     if (record.state === 'queued') {
       record.cancelledBeforeStart = true
       record.state = 'interrupted'
@@ -152,14 +158,14 @@ export class AgentCommandStore {
     writeFileAtomic(path.join(this.directory(owner, id), 'record.json'), JSON.stringify(record))
   }
 
-  async stopTab(owner: string, tab: string): Promise<void> {
+  async stopTab(owner: string, tab: string, workspaceScope?: WorkspaceScope | null, allowLegacy = false): Promise<void> {
     if (!TAB.test(tab)) throw new AgentCommandError('탭 ID가 올바르지 않습니다')
-    for (const record of await this.list(owner)) if (record.tab === tab) this.stop(owner, record.id)
+    for (const record of await this.list(owner, undefined, workspaceScope, allowLegacy)) if (record.tab === tab) this.stop(owner, record.id, workspaceScope, allowLegacy)
   }
 }
 
 export function publicCommand(record: StoredAgentCommand): AgentCommandRecord {
-  const { owner: _owner, queueHostPid: _queueHostPid, ...result } = record
+  const { owner: _owner, queueHostPid: _queueHostPid, workspaceScope: _workspaceScope, ...result } = record
   // Older queued cancellations used equal timestamps, with no execution output/error.
   // Return a tombstone so polling also replaces an already cached interrupted bubble.
   const legacyCancellation = record.state === 'interrupted' && record.queuedAt !== undefined

@@ -9,6 +9,7 @@ import { compile } from '@tailwindcss/node'
 import { PDFDocument, PDFDict, PDFName, degrees } from 'pdf-lib'
 import { connectTestBrowser } from './test-browser.ts'
 import { registerPdfRoutes } from './pdf.ts'
+import { securityHeaders } from './security-headers.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 
@@ -34,10 +35,8 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><Fixture/><
   const compiler = await compile(await fs.readFile(`${root}/src/index.css`, 'utf8') + '\n' + await fs.readFile(`${root}/src/components/pdf-viewer.css`, 'utf8'), { base: `${root}/src`, onDependency() {} })
   const selectSource = await fs.readFile(`${root}/packages/ui/src/select-field.tsx`, 'utf8')
   const css = compiler.build([...new Set(selectSource.match(/[A-Za-z0-9_@!:/.[\]()%,-]+/g))])
-  const serve = await fs.readFile(`${root}/server/serve.ts`, 'utf8')
-  const csp = /res.setHeader\('Content-Security-Policy', "([^"]+)"\)/.exec(serve)![1]
   const app = express()
-  app.use((_req, res, next) => { res.setHeader('Content-Security-Policy', csp); next() })
+  app.use(securityHeaders)
   const pdfRoutes = express()
   let conflict = false, readonly = false
   app.post('/test/conflict', (_req, res) => { conflict = true; res.end() })

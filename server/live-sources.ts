@@ -1,6 +1,7 @@
 import type { IncomingMessage } from 'node:http'
 import { canUse, unrestrictedFiles } from './access-policy.ts'
 import { runAccountWorkspace } from './account-workspace.ts'
+import { runRequestWorkspace, workspaceScopeAllowed } from './workspace-scope.ts'
 import { resolveAuth, type RequestAuth } from './reqAuth.ts'
 import { pathsForWorkspace, workspaceContext, workspacePaths, WORKSPACE_PROJECT } from './paths.ts'
 import { requestIp } from './change-ip.ts'
@@ -25,13 +26,15 @@ function permitted(auth: RequestAuth, resource: LiveResource): boolean {
 export function createLiveSource(req: IncomingMessage, resource: LiveResource, getAuth = resolveAuth): LiveSource {
   if (!valid(resource)) throw new Error('지원하지 않는 구독입니다.')
   const auth = getAuth(req)
-  return runAccountWorkspace(auth.email, () => {
+  return runRequestWorkspace(req, auth, () => {
     if (!permitted(auth, resource)) throw new Error('구독 권한 또는 프로젝트를 확인하세요.')
-    const scope = pathsForWorkspace(workspacePaths.root, auth.email)
+    const scope = { ...(workspaceContext.getStore() ?? pathsForWorkspace(workspacePaths.root, auth.email)) }
     const ip = requestIp(req)
     const allowed = () => {
       const current = getAuth(req)
-      return current.email === auth.email && runAccountWorkspace(current.email, () => workspacePaths.root === scope.root && workspacePaths.docsRoot === scope.docsRoot && permitted(current, resource))
+      if (current.email !== auth.email) return false
+      if (scope.explicit) return workspaceScopeAllowed(scope, current) && workspaceContext.run(scope, () => permitted(current, resource))
+      return runAccountWorkspace(current.email, () => workspacePaths.root === scope.root && workspacePaths.docsRoot === scope.docsRoot && permitted(current, resource))
     }
     return {
       // Account scopes keep debugger state and authorization isolated. Git IP attribution is per viewer.

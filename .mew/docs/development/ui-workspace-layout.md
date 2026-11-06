@@ -1,8 +1,8 @@
 ---
 title: "UI workspace panels, Dock, and gestures"
-description: "Current workspace geometry, safe areas, Dock layout, tab motion, and mobile gestures. Defines account/device desktop layout and project-specific mobile restoration, and links the planned independent multi-project session and board extension."
+description: "Workspace geometry, safe areas, Dock layout, tab motion, and mobile gestures. Defines separate single-project desktop, multi-project board/compact-view, and physical-mobile restoration, including stable project hosts and dedicated movement handles."
 created: "2026-11-03"
-updated: "2026-11-06"
+updated: "2026-11-07"
 상위파일: "ui-contracts.md"
 ---
 
@@ -58,7 +58,19 @@ In the Git changes list, distinguish ordinary selection through highlighting fro
 
 ## Workspace Panel Layout
 
-The current desktop layout in this section remains the single-project baseline. [Multi-project mode](../features/appearance-accounts-operations/multi-project-mode.md) is a planned optional extension with separate board storage and reusable compact project workspaces. Its [proposed session architecture](../decisions/0152-multi-project-workspace-sessions.md) does not change this implemented contract until the staged work passes its verification gates.
+The desktop docking layout in this section is **single-project mode**. Layout also offers optional [multi-project mode](../features/appearance-accounts-operations/multi-project-mode.md), whose independent project panels reuse compact tools. The [session architecture](../decisions/0152-multi-project-workspace-sessions.md) preserves the single-project geometry and account tab ledgers.
+
+### Multi-project board and compact presentation
+
+`WorkspaceApplication` owns mode selection, validated project handoffs, and retained view descriptors. `project-board.ts` is a pure model for columns, weighted rows, stable panel IDs, and geometry; `ProjectBoard` owns pointer/keyboard interaction and flat keyed host placement. Reordering, resizing, and mode changes move the same mounted project hosts. A confirmed project or worktree replacement changes the workspace controller after pending saves and task writes have crossed their close boundary.
+
+The project-name button opens project selection. Only the dedicated handle moves a project panel. Focusable column/row separators support pointer and keyboard resizing. The board begins with one 400px column; column/row minima are 280×240px, with scrolling when the viewport cannot fit them. New projects use available horizontal space, then a row in the active column. Selecting an already-open logical project focuses its existing panel.
+
+Mode and board records use `mew:workspace-mode:<encoded account>` and `mew:project-board:<encoded account>` under the existing instance/device browser-storage namespace. Compact project geometry and foreground records are separate from single-project desktop and physical-mobile records. Account document/agent tabs retain their logical-project ownership. An intentionally empty board stays empty after refresh. Physical mobile uses one workspace and leaves the saved desktop board intact.
+
+`WorkspaceViewProvider` supplies explicit compact presentation, active state, and DOM ownership. Responsive `workspace-wide`/`workspace-compact` variants follow that presentation; pointer/keyboard capabilities still follow the actual device. Compact project Docks sit at the bottom. Nested workspaces reserve no second safe-area inset. Scoped fixed tool surfaces use their project content bounds; body-portal menus and dialogs retain viewport bounds. The page gradient is painted once by the existing body background.
+
+Account services and shared presence live above the views. Only the active view supplies the global header and project-targeted shortcuts. Project-header command shortcuts are enabled only for the active panel and retain command permissions. Native Browser Dock actions open the single account-owned viewer. [Scoped workspace sessions](workspace-sessions.md) owns request/cache/event boundaries and the current Postgres restriction; [the work record](../work/multi-project-mode.md) owns validation and remaining limits.
 
 Panel tab bars use the shared `h-9` height (`calc(var(--spacing) * 9)`, 36px at the default font size). `DockBody` in Git, agent, terminal, and browser panels uses the same spacing basis to calculate the body start position and remaining height. Changing the browser's default font size or maximizing a panel does not cause the body to overlap the tab bar's bottom or leave a gap between them. Mobile uses the same basis. `dock-maximize-ui.test.ts` validates tab bar/body boundaries and bottom hit tests at font sizes of 14, 16, and 20px, plus maximized and mobile layouts.
 

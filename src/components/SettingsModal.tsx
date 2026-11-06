@@ -1,3 +1,4 @@
+import { useWorkspaceApi } from '../api/workspace-api-context'
 import { createPortal } from 'react-dom'
 import { DockSettingsPanel } from './dock-settings-panel'
 import type { MobileDockPanel } from '../utils/mobile-dock'
@@ -5,7 +6,7 @@ import { uiText } from '@mew/ui/i18n-core'
 import { useUiLocale } from '@mew/ui/i18n'
 import { lazy, Suspense, useEffect, useId, useState, type Ref } from 'react'
 import { SelectField, useOverlayDismiss } from '@mew/ui'
-import { fetchIgnoreList, saveIgnoreList } from '../api/client'
+
 import { DEFAULT_SHORTCUTS, formatKeyCombo, resetAllBindings, resetBinding, setBinding, useShortcutBindings } from '@mew/shortcuts'
 import { LOCALES, LOCALE_NAMES, localizeShortcut, useI18n, type Locale, type TranslationKey } from '../i18n'
 import { DEFAULT_FONT_PREFERENCES, type FontPreferences } from '../utils/fontPreferences'
@@ -230,6 +231,7 @@ function AppearancePanel({
 
 // ── 숨김 목록: 트리·검색에서 건너뛸 폴더·파일 이름 (전역, owner/manager 전용) ──
 function IgnorePanel() {
+  const { fetchIgnoreList, saveIgnoreList } = useWorkspaceApi()
   useUiLocale()
   const [names, setNames] = useState<string[] | null>(null)
   const [defaults, setDefaults] = useState<string[]>([])
@@ -251,7 +253,7 @@ function IgnorePanel() {
     return () => {
       alive = false
     }
-  }, [])
+  }, [fetchIgnoreList])
 
   // 서버가 정규화한 결과(고정 항목 되넣기·중복 제거)를 그대로 화면에 반영한다 — 보낸 값이 아니라 저장된 값
   async function commit(next: string[]) {

@@ -1,6 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { DEFAULT_PROJECT, projectRoot, UnknownProjectError } from './paths.ts'
+import { DEFAULT_PROJECT, projectRoot, UnknownProjectError, workspacePaths } from './paths.ts'
 import { readIgnoreSet } from './ignoreList.ts'
 import { isTreeExcludedSegment } from './tree.ts'
 import { broadcastTree } from './presence.ts'
@@ -80,6 +80,7 @@ export async function collectWatchDirsAsync(root: string, ignore: Set<string> = 
 // 이벤트는 영향 받은 부모·파일만 catalog에 반영한다. 새/삭제 디렉터리의 watch도 그 하위만 맞추며,
 // filename을 잃은 OS 이벤트에서만 안전하게 전체 watch 집합을 다시 확인한다.
 class TreeWatcher {
+  readonly workspace = workspacePaths.root
   private readonly project: string
   private readonly root: string
   private readonly watchers = new Map<string, fs.FSWatcher>() // absDir -> watcher
@@ -241,13 +242,14 @@ export function watchProjectTree(project: string) {
     if (err instanceof UnknownProjectError) return
     throw err
   }
-  if (watchers.has(root)) return
+  const key = JSON.stringify([workspacePaths.root, project, root])
+  if (watchers.has(key)) return
   const watcher = new TreeWatcher(project, root)
-  watchers.set(root, watcher)
+  watchers.set(key, watcher)
   void watcher.start().catch(() => {
     // 권한 변경·삭제·네트워크 드라이브 단절은 트리 응답 자체를 실패시키지 않는다.
     watcher.close()
-    if (watchers.get(root) === watcher) watchers.delete(root)
+    if (watchers.get(key) === watcher) watchers.delete(key)
   })
 }
 
@@ -261,9 +263,12 @@ export function watchDocsTree() {
  * 디렉터리 집합과 catalog snapshot을 옛 규칙으로 들고 있으므로 접어 둔다. 클라이언트가 새 트리를 받을 때
  * 새 규칙으로 watcher·catalog·정확 검색 색인을 다시 만든다.
  */
-export function resetTreeWatchers() {
-  for (const watcher of watchers.values()) watcher.close()
-  watchers.clear()
+export function resetTreeWatchers(workspace?: string) {
+  for (const [key, watcher] of watchers) {
+    if (workspace && watcher.workspace !== workspace) continue
+    watcher.close()
+    watchers.delete(key)
+  }
   resetFileCatalogs()
   resetSearchIndex()
 }

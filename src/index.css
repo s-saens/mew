@@ -4,8 +4,18 @@
 @import '@mew/ui/tab-scroll-area.css';
 @import './components/header-control.css';
 @import './components/project-sidebar.css';
+@import './workspace/workspace-compact.css';
 @plugin '@tailwindcss/typography';
 @variant dark (&:where(.dark, .dark *));
+@custom-variant workspace-wide {
+  @media (width >= 48rem) {
+    &:not(:where([data-workspace-presentation="compact"] *)) { @slot; }
+  }
+}
+@custom-variant workspace-compact {
+  &:where([data-workspace-presentation="compact"] *) { @slot; }
+  @media (width < 48rem) { @slot; }
+}
 
 .agent-loading-bubbles {
   display: flex;

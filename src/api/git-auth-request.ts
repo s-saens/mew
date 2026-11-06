@@ -5,8 +5,8 @@ export const GIT_LOGIN_EVENT = 'mew:git-login-required'
 export const GIT_CONNECTION_CHANGED = 'mew:git-connection-changed'
 export interface GitLoginRequest { project: string; finish: (connected: boolean) => void }
 let pending = false
-export async function gitFetch(url: string, init: RequestInit, project: string): Promise<Response> {
-  const response = await mewFetch(url, init)
+export async function gitFetch(url: string, init: RequestInit, project: string, request = mewFetch): Promise<Response> {
+  const response = await request(url, init)
   if (response.status !== 428) return response
   const challenge = await response.clone().json().catch(() => ({}))
   if (challenge.code !== 'git-auth-required') return response
@@ -23,6 +23,6 @@ export async function gitFetch(url: string, init: RequestInit, project: string):
     const headers = new Headers(init.headers)
     if (challenge.owner) headers.set('X-Mew-Git-Owner', encodeURIComponent(challenge.owner))
     if (challenge.workspace) headers.set('X-Mew-Git-Workspace', encodeURIComponent(challenge.workspace))
-    return await mewFetch(url, { ...init, headers })
+    return await request(url, { ...init, headers })
   } finally { pending = false }
 }

@@ -1,8 +1,9 @@
+import { useWorkspaceApi } from '../api/workspace-api-context'
 import { useEffect, useState } from 'react'
 import { DialogFrame, HoverTipLayer } from '@mew/ui'
 import { uiText } from '@mew/ui/i18n-core'
 import { RefreshDouble, Terminal, Xmark } from 'iconoir-react'
-import { fetchUpdatesStatus, runUpdates, type MewUpdateStatus } from '../api/client'
+import { type MewUpdateStatus } from '../api/client'
 import { resolveMewcatNotice } from '../utils/mewcat-notifications'
 import { batchUpdateIds } from '../../shared/updates'
 import type { UpdatesStatus } from '../../shared/updates'
@@ -16,6 +17,7 @@ function updateStateLabel(state: UpdateState) {
 export function UpdatesModal({ open, mew, mewUpdating, onMewUpdate, onRefreshMew, onClose, canViewSessions = true }: {
   open: boolean; mew: MewUpdateStatus | null; mewUpdating: boolean; onMewUpdate: () => Promise<void>; onRefreshMew: () => Promise<void>; onClose: () => void; canViewSessions?: boolean
 }) {
+  const { fetchUpdatesStatus, runUpdates } = useWorkspaceApi()
   const [status, setStatus] = useState<UpdatesStatus | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -33,7 +35,7 @@ export function UpdatesModal({ open, mew, mewUpdating, onMewUpdate, onRefreshMew
     let alive = true
     fetchUpdatesStatus().then(value => { if (alive) { setStatus(value); setError(null) } }).catch(error => { if (alive) setError(String(error)) })
     return () => { alive = false }
-  }, [open])
+  }, [open, fetchUpdatesStatus])
   useEffect(() => {
     if (!status?.job.running) return
     let alive = true
@@ -41,7 +43,7 @@ export function UpdatesModal({ open, mew, mewUpdating, onMewUpdate, onRefreshMew
       fetchUpdatesStatus().then(next => { if (alive) setStatus(next) }).catch(error => { if (alive) setError(String(error)) })
     }, 2000)
     return () => { alive = false; clearInterval(timer) }
-  }, [status?.job.running])
+  }, [status?.job.running, fetchUpdatesStatus])
   useEffect(() => {
     if (!pendingMew || status?.job.running) return
     setPendingMew(false)

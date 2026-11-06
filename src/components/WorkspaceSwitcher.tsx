@@ -1,3 +1,4 @@
+import { useWorkspaceApi } from '../api/workspace-api-context'
 // 워크스페이스 바꾸기 — 홈 탭을 꾹 누르거나 우클릭하면 열린다(owner 전용).
 //
 // 두 걸음이다: 폴더를 고르고(FolderPicker), 그 안에서 프로젝트로 잡히는 것들을 보여준 뒤 확인받는다.
@@ -5,11 +6,12 @@
 // 바꾸고 나면 열린 탭·트리가 전부 남의 폴더 것이라 페이지를 다시 띄운다.
 import { useEffect, useState } from 'react'
 import { useOverlayDismiss } from '@mew/ui'
-import { browseDirs, fetchWorkspace, forgetSavedProject, switchWorkspace } from '../api/client'
+
 import { FolderPicker } from './FolderPicker'
 import { useI18n } from '../i18n'
 
 export function WorkspaceSwitcher({ onClose }: { onClose: () => void }) {
+  const { fetchWorkspace } = useWorkspaceApi()
   const { t } = useI18n()
   const [current, setCurrent] = useState<string | null>(null)
   const [picked, setPicked] = useState<string | null>(null)
@@ -18,7 +20,7 @@ export function WorkspaceSwitcher({ onClose }: { onClose: () => void }) {
     fetchWorkspace()
       .then((w) => setCurrent(w.path))
       .catch(() => setCurrent(null))
-  }, [])
+  }, [fetchWorkspace])
 
   if (picked) return <ConfirmSwitch target={picked} onBack={() => setPicked(null)} onClose={onClose} />
 
@@ -34,6 +36,7 @@ export function WorkspaceSwitcher({ onClose }: { onClose: () => void }) {
 }
 
 function ConfirmSwitch({ target, onBack, onClose }: { target: string; onBack: () => void; onClose: () => void }) {
+  const { browseDirs, switchWorkspace, forgetSavedProject } = useWorkspaceApi()
   const { t } = useI18n()
   const [projects, setProjects] = useState<string[] | null>(null)
   const [busy, setBusy] = useState(false)
@@ -45,7 +48,7 @@ function ConfirmSwitch({ target, onBack, onClose }: { target: string; onBack: ()
     browseDirs(target)
       .then((r) => setProjects(r.dirs.map((d) => d.name)))
       .catch((e) => setError(e instanceof Error ? e.message : t('workspace.readFolderFailed')))
-  }, [target, t])
+  }, [target, t, browseDirs])
 
   const apply = () => {
     setBusy(true)

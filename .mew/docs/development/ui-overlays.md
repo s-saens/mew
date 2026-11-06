@@ -1,8 +1,8 @@
 ---
 title: "UI overlays, selection controls, and menus"
-description: "Shared popup positioning, custom selection, layering, viewport-level toast portals, dismissal, and action-menu contracts. Defines the compact grouped workspace menu, independent account settings, immediate deferred-dialog shells, keyboard/touch behavior, and focus boundaries."
+description: "Shared popup positioning, custom selection, layering, viewport-level toasts, dismissal, and action menus. Defines asynchronous History-guard handoffs, compact workspace menus, independent account settings, deferred dialogs, keyboard/touch behavior, and focus boundaries."
 created: "2026-11-03"
-updated: "2026-11-06"
+updated: "2026-11-07"
 상위파일: "ui-contracts.md"
 ---
 
@@ -106,9 +106,15 @@ The language and font `SelectField` in settings use the settings backdrop as `po
 
 Commit a titled, dismissible loading frame immediately when a dialog opens; import code and fetch data afterward. `deferredDialog` supplies the initial frame, shared loading indicator, translated close control, local import error, and explicit retry. It reuses prepared public code on warm opens without caching account data. Match the destination frame's dimensions, full-screen mobile settings layout, and `--layer-settings` stacking.
 
+`DialogFrame.overlayClassName` extends the outer backdrop separately from the content's `className`. Deferred dialogs forward it so their loading frame preserves the destination layer and backdrop bounds.
+
 Close, Esc, Back, outside presses, and focus containment/restoration must work during loading and after replacing the temporary frame with the destination dialog. Loading code alone must not set the frame's `busy` flag or disable closing. A dismissed pending dialog cannot reappear when its code or data arrives. Keep independent fields interactive while data-backed regions load. The [startup contract](browser-startup.md#optional-tools-and-public-module-scheduling) owns loading/caching boundaries; [ADR 0149](../decisions/0149-immediate-deferred-dialogs.md) records the decision.
 
 ## Overlay dismissal rules (`useOverlayDismiss`)
+
+Removing the last overlay's browser History guard is asynchronous. Track a pending programmatic `history.back()` until its `popstate` completes. Do not push a new guard during that traversal or deliver its completion to a newly opened panel or dialog. Keep only the required `popstate` listener until completion; remove input listeners when the overlay stack becomes empty. Then rearm for any current overlay. The shared dismissal tests cover a new registration during removal and complete listener cleanup, and the multi-project App fixture covers changing project tools after catalog/modal handoffs.
+
+`DialogFrame` normally restores the invoking element on close. A selection that transfers focus to another retained workspace can provide `restoreFocus: () => HTMLElement | null`; resolve that target at close time. The compact project selector uses the shell's active-panel registry, preventing restoration to the old panel from undoing the new selection. Returning `null` skips restoration when no target remains. Keep the default for ordinary dialogs.
 
 **Whenever you create a popup, modal, or dropdown, you must** `useOverlayDismiss(onClose)`**call this hook.** It collects open overlays into a single app-wide stack so that Esc and **Android hardware Back** always close *only the most recently opened one*. Pressing Back over an unregistered popup closes the terminal or file explorer behind it, or leaves the page, instead of closing that popup.
 

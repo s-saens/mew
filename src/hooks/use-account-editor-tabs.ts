@@ -1,6 +1,8 @@
+import { useWorkspaceApi } from '../api/workspace-api-context.tsx'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { StoredTabs } from '../utils/editor-tab-state.ts'
-import { fetchAccountEditorTabs, saveAccountEditorTabs } from '../api/editor-tabs.ts'
+import type { WorkspaceClient } from '../api/client.ts'
+
 import { createAccountEditorTabsSync, type AccountEditorTabs, type AccountEditorTabsSnapshot } from '../utils/account-editor-tabs.ts'
 
 type Scope = { account: string | null; workspacePath: string | null }
@@ -8,7 +10,9 @@ type State = Scope & { tabs: AccountEditorTabs | undefined; hydrated: boolean }
 type Controller = Scope & { sync: ReturnType<typeof createAccountEditorTabsSync> }
 type Preparation = Scope & { controller: AbortController; promise: Promise<AccountEditorTabsSnapshot>; detach: () => void }
 
-export function useAccountEditorTabs(account: string | null, workspacePath: string | null, onError: (error: unknown) => void) {
+export function useAccountEditorTabs(account: string | null, workspacePath: string | null, onError: (error: unknown) => void, client?: WorkspaceClient) {
+  const context = useWorkspaceApi()
+  const { fetchAccountEditorTabs, saveAccountEditorTabs } = client ?? context
   const [state, setState] = useState<State>({ account, workspacePath, tabs: undefined, hydrated: false })
   const controller = useRef<Controller | null>(null), errorHandler = useRef(onError)
   const preparation = useRef<Preparation | null>(null)
@@ -45,7 +49,7 @@ export function useAccountEditorTabs(account: string | null, workspacePath: stri
     void pending.promise.catch(() => {
       if (preparation.current === pending) discardPreparation()
     })
-  }, [account, discardPreparation])
+  }, [account, discardPreparation, fetchAccountEditorTabs])
 
   useEffect(() => {
     const refresh = () => { discardPreparation(); controller.current?.sync.refresh() }
@@ -101,7 +105,7 @@ export function useAccountEditorTabs(account: string | null, workspacePath: stri
       consumed?.controller.abort()
       controller.current = null
     }
-  }, [account, workspacePath, discardPreparation])
+  }, [account, workspacePath, discardPreparation, fetchAccountEditorTabs, saveAccountEditorTabs])
 
   const change = useCallback((project: string, tabs: StoredTabs) => {
     const current = controller.current

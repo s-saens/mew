@@ -79,5 +79,5 @@ export function attachDbWebSocket(
       watchSocketAccess(ws, req, opts.authorize)
       registerClient(ws, AsyncLocalStorage.bind(project => (opts.authorize?.(req) ?? true) && (opts.authorizeProject?.(req, project) ?? true)))
     })
-  }))
+  }, WS_PATH))
 }

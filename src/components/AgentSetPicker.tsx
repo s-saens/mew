@@ -1,6 +1,7 @@
+import { useWorkspaceApi } from '../api/workspace-api-context'
 import { useEffect, useState } from 'react'
 import { DialogFrame, SelectField } from '@mew/ui'
-import { fetchAgentModels, saveAgentSets, type AgentModelOption, type AgentThinkingOption, type AgentSet } from '../api/client'
+import { type AgentModelOption, type AgentThinkingOption, type AgentSet } from '../api/client'
 import { RUNTIMES, runtimeOf } from './agentRuntimes'
 import { cachedAgentSets, refreshAgentSets, subscribeAgentSets, updateAgentSetsCache } from '../utils/agentPickerCache'
 import { useI18n } from '../i18n'
@@ -11,6 +12,7 @@ const AGENT_SET_RUNTIMES = RUNTIMES.filter((runtime) => runtime.surface === 'acp
 
 /** 새 탭 선택기의 에이전트셋 목록. 셋은 별도 작업자가 아니라 탭 시작 프리셋이다. */
 export function AgentSetPicker({ onSelect, onCreated }: { onSelect: (set: AgentSet) => void; onCreated?: (set: AgentSet) => void }) {
+  const { saveAgentSets } = useWorkspaceApi()
   const { t } = useI18n()
   const [sets, setSets] = useState<AgentSet[] | null>(cachedAgentSets)
   const [editing, setEditing] = useState<AgentSet | null>(null)
@@ -88,6 +90,7 @@ export function AgentSetPicker({ onSelect, onCreated }: { onSelect: (set: AgentS
 }
 
 function AgentSetEditor({ set, error, saving, isNew, onSave, onDelete, onClose }: { set: AgentSet; error: string | null; saving: boolean; isNew: boolean; onSave: (set: AgentSet) => void; onDelete: () => void; onClose: () => void }) {
+  const { fetchAgentModels } = useWorkspaceApi()
   const { t } = useI18n()
   const [form, setForm] = useState(set)
   const [catalog, setCatalog] = useState<{ runtime: string; models: AgentModelOption[]; thinking?: AgentThinkingOption | null; failed: boolean } | null>(null)
@@ -103,7 +106,7 @@ function AgentSetEditor({ set, error, saving, isNew, onSave, onDelete, onClose }
         if (!controller.signal.aborted) setCatalog({ runtime: form.runtime, models: [], failed: true })
       })
     return () => controller.abort()
-  }, [form.runtime, modelRetry])
+  }, [form.runtime, modelRetry, fetchAgentModels])
   const currentCatalog = catalog?.runtime === form.runtime ? catalog : null
   const models = currentCatalog?.models ?? []
   const compositeModel = hasModelEffort(form.runtime)

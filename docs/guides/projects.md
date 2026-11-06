@@ -1,9 +1,8 @@
 ---
 title: "Projects and file navigation"
-description: "Explains Projects My/All scopes, the four-choice setup popup, and Delete choices for removing a personal shortcut or permanently deleting a project folder as owner. Covers confirmation, unavailable-server recovery, project hierarchy and switching, file navigation, Git review, and task controls."
+description: "Explains single- and multi-project desktop modes, independent project panels with movement handles, and project selection through My/All. Covers setup, personal shortcuts, permanent deletion, project hierarchy, files, Git, tasks, and the multi-project database limitation."
 updated: "2026-11-07"
 상위파일:
-  - "../../.mew/docs/MOC.md"
   - "MOC.md"
 ---
 A guide to creating, cloning, or linking projects, finding files, and reviewing Git changes.
@@ -45,6 +44,21 @@ Use the back arrow to return from a form or the workspace catalog directly to th
 The linked-folder picker retains its path field, home/parent navigation, and keyboard navigation. Folder suggestions and favorites appear when your account has the required server-file access. Up/Down and Enter choose a suggestion; Enter without a selected suggestion navigates to the typed path. Relative paths start from the displayed folder, and `~` opens the server user's home. Esc or Back closes suggestions first. Owner and manager folder/Git tools remain available under their existing permissions. Creating a folder or cloning selects the result inside the picker; linking it is a separate action.
 
 `Ctrl/Cmd+Shift+O` opens the project panel and its project setup popup. The separate `Ctrl/Cmd+O` server file explorer requires server-file access and opens a file without switching projects. To upload files from your device, open a project and drag them into the file explorer.
+
+### Desktop workspace modes
+
+Open **Layout** in the top bar to choose **Single-project mode** or **Multi-project mode**. Single-project mode keeps the existing desktop docking layout and presets.
+
+The mode choices appear when the server supports concurrent workspaces. After a source update, the operator must load the updated server code as well as build the browser assets; an older server continues to show the existing single-project layout.
+
+Multi-project mode starts with the current project in one narrow, full-height panel on the left. Use **Add project panel** in the empty area to choose another registered project. Each panel has its own bottom Dock, so one project can show an agent while another shows Git or a document. Resources, active sessions, Layout, fullscreen, and the menu remain in one shared top bar; panels share the page background.
+
+- Click the project name to open that panel's **project selection panel**. Selecting a project already open elsewhere focuses its existing panel.
+- Drag the six-dot handle to move the panel between columns or rows. Arrow keys on the handle also move it. Drag a boundary, or focus it and use arrow keys, to resize.
+- Click **X** in the project header to close that project panel. Running agent and terminal sessions continue; closing a panel does not stop them or remove the project from My projects.
+- Return to single-project mode to work on the active project with the existing desktop layout. Returning to multi-project mode restores its panels and arrangement. Mode and layout are remembered separately in this browser for your account. Phones continue to show one workspace.
+
+Postgres database tools and saves of database-bound pages are currently unavailable in multi-project panels. Use single-project mode for those workflows. Ordinary files and Markdown editing remain available. See the [feature contract](../../.mew/docs/features/appearance-accounts-operations/multi-project-mode.md) for scope and limitations.
 
 ### Switch and organize My projects
 

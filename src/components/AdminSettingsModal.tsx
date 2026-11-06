@@ -1,8 +1,9 @@
+import { useWorkspaceApi } from '../api/workspace-api-context'
 import { MewlinkAccessSettings } from './mewlink-access-settings'
 import { useCallback, useEffect, useId, useState } from 'react'
 import { DialogFrame, HoverTipLayer } from '@mew/ui'
 import { Plus, Xmark } from 'iconoir-react'
-import { addUser, deleteUser, fetchUsers, resetUserPassword, setUserRole, type AdminUser, type Role } from '../api/client'
+import { type AdminUser, type Role } from '../api/client'
 import { AccountAccessMatrix } from './account-access-matrix'
 import { useI18n } from '../i18n'
 import { AccountRoleSelect } from './account-role-select'
@@ -14,6 +15,7 @@ interface AdminSettingsModalProps {
 
 /** owner 계정·역할·권한 관리. */
 export function AdminSettingsModal({ onClose, currentEmail }: AdminSettingsModalProps) {
+  const { fetchUsers, addUser, setUserRole, deleteUser, resetUserPassword } = useWorkspaceApi()
   const { t } = useI18n()
   const titleId = useId()
   const [showAdd, setShowAdd] = useState(false)
@@ -32,7 +34,7 @@ export function AdminSettingsModal({ onClose, currentEmail }: AdminSettingsModal
     try { setUsers(await fetchUsers()); setLoadError(null) }
     catch (err) { setLoadError(err instanceof Error ? err.message : t('admin.usersLoadFailed')) }
     finally { setLoading(false) }
-  }, [t])
+  }, [t, fetchUsers])
   useEffect(() => { void loadUsers() }, [loadUsers])
 
   async function handleAddUser(e: React.FormEvent) {

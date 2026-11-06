@@ -1,3 +1,4 @@
+import { useWorkspaceApi } from '../api/workspace-api-context.tsx'
 import { mewFetch } from '../utils/remote-transport.ts'
 import { useEffect, useEffectEvent, useId, useRef, useState } from 'react'
 import { Settings, Xmark, PageEdit, RefreshDouble, Globe, Folder } from 'iconoir-react'
@@ -12,7 +13,7 @@ import { GuidanceRow } from './agent-guidance-row'
 import { DefaultGuidanceTip } from './agent-default-guidance-tip'
 import { guidanceScopeCopy } from './agent-guidance-scope-copy'
 import { documentationGuidanceCopy } from './agent-documentation-guidance-copy'
-import { fetchProjectSetup, saveProjectGuidance } from '../api/project-setup'
+
 import type { ProjectGuidanceSnapshot } from '../../shared/project-agent-context'
 import './agent-guidance-settings.css'
 
@@ -51,6 +52,7 @@ export function AgentGuidanceButton({ onOpenFile, workspacePath }: { onOpenFile:
 }
 
 export function AgentGuidanceSettings({ onClose, onOpenFile, workspacePath }: { onClose: () => void; onOpenFile: (path: string) => void; workspacePath?: string | null }) {
+  const { fetchProjectSetup, saveProjectGuidance } = useWorkspaceApi()
   const { locale } = useI18n(), text = copy[locale], scopeText = guidanceScopeCopy[locale], docText = documentationGuidanceCopy[locale]
   const titleId = useId()
   const [data, setData] = useState<GuidanceSnapshot | null>(null)

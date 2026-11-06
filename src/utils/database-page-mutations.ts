@@ -5,40 +5,46 @@ type Handler = {
   apply(mutation: DocumentPageMutation, project: string): void | Promise<void>
   previewTitle?(project: string, path: string, title: string): (confirmedTitle?: string) => void
 }
-let handler: Handler | undefined
-let activeChanges: DocumentPageMutation[] | undefined
+export function createDatabasePageMutationScope() {
+  let handler: Handler | undefined
+  let activeChanges: DocumentPageMutation[] | undefined
 
-export function collectDatabasePageMutations(value: unknown): void {
-  if (value && typeof value === 'object' && 'documentPageMutations' in value && Array.isArray(value.documentPageMutations)) activeChanges?.push(...value.documentPageMutations)
-}
-
-let queue: Promise<unknown> = Promise.resolve()
-
-export function registerDatabasePageMutations(next: Handler): () => void {
-  handler = next
-  return () => { if (handler === next) handler = undefined }
-}
-
-export function previewDatabasePageTitle(project: string, path: string, title: string): (confirmedTitle?: string) => void {
-  return handler?.previewTitle?.(project, path, title) ?? (() => {})
-}
-
-/** Save drafts and pause autosave while a DB request may promote its owner document. */
-export async function withDatabasePageMutations<T>(project: string, run: () => Promise<T>): Promise<T> {
-  const current = handler
-  const execute = async () => {
-    if (!current) return run()
-    if (handler !== current) throw new Error('프로젝트가 변경되었습니다. 다시 시도하세요.')
-    const release = await current.prepare(project)
-    const changes: DocumentPageMutation[] = []
-    activeChanges = changes
-    try {
-      const value = await run()
-      if (handler === current) for (const mutation of changes) await current.apply(mutation, project)
-      return value
-    } finally { activeChanges = undefined; release() }
+  function collectDatabasePageMutations(value: unknown): void {
+    if (value && typeof value === 'object' && 'documentPageMutations' in value && Array.isArray(value.documentPageMutations)) activeChanges?.push(...value.documentPageMutations)
   }
-  const result = queue.then(execute, execute)
-  queue = result.catch(() => {})
-  return result
+
+  let queue: Promise<unknown> = Promise.resolve()
+
+  function registerDatabasePageMutations(next: Handler): () => void {
+    handler = next
+    return () => { if (handler === next) handler = undefined }
+  }
+
+  function previewDatabasePageTitle(project: string, path: string, title: string): (confirmedTitle?: string) => void {
+    return handler?.previewTitle?.(project, path, title) ?? (() => {})
+  }
+
+  /** Save drafts and pause autosave while a DB request may promote its owner document. */
+  async function withDatabasePageMutations<T>(project: string, run: () => Promise<T>): Promise<T> {
+    const current = handler
+    const execute = async () => {
+      if (!current) return run()
+      if (handler !== current) throw new Error('프로젝트가 변경되었습니다. 다시 시도하세요.')
+      const release = await current.prepare(project)
+      const changes: DocumentPageMutation[] = []
+      activeChanges = changes
+      try {
+        const value = await run()
+        if (handler === current) for (const mutation of changes) await current.apply(mutation, project)
+        return value
+      } finally { activeChanges = undefined; release() }
+    }
+    const result = queue.then(execute, execute)
+    queue = result.catch(() => {})
+    return result
+  }
+  return { collectDatabasePageMutations, registerDatabasePageMutations, previewDatabasePageTitle, withDatabasePageMutations }
 }
+
+export const databasePageMutations = createDatabasePageMutationScope()
+export const { collectDatabasePageMutations, registerDatabasePageMutations, previewDatabasePageTitle, withDatabasePageMutations } = databasePageMutations

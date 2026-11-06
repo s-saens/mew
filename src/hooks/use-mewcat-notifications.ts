@@ -1,5 +1,6 @@
+import { useWorkspaceApi } from '../api/workspace-api-context'
 import { useEffect, useRef } from 'react'
-import { fetchSystemStats } from '../api/client'
+
 import { useI18n } from '../i18n'
 import { createResourceNoticeTracker } from '../utils/mewcat-notification-rules'
 import { createNotificationDelivery } from '../utils/browser-notifications'
@@ -7,6 +8,7 @@ import { clearMewcatNotices, desktopNotificationPermission, focusMewcatNotice, g
 
 /** Mounted independently of the cat skin and settings dialog. */
 export function useMewcatNotifications(canMonitorResources: boolean, identity: string | null) {
+  const { fetchSystemStats } = useWorkspaceApi()
   const preferences = useNotificationPreferences()
   const { t } = useI18n()
   const current = useRef(t)
@@ -65,5 +67,5 @@ export function useMewcatNotifications(canMonitorResources: boolean, identity: s
     }
     void poll()
     return () => { disposed = true; clearTimeout(timer); controller.abort() }
-  }, [canMonitorResources, preferences.resources, identity])
+  }, [canMonitorResources, preferences.resources, identity, fetchSystemStats])
 }

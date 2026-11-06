@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState, type PointerEvent } from 'react'
+import { useEffect, useId, useRef, useState, type PointerEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { HoverTipLayer, useReorderAnimation, reorderLayoutRect } from '@mew/ui'
 import { useI18n } from '../i18n'
 import { dockIcons, useDockLabel } from './dock-items'
 import { useDockPreferences, setDockOrder } from '../hooks/use-dock-preferences'
 import { visibleDockPanels, moveDockPanel, type DockDirection, type DockPosition, type MobileDockPanel } from '../utils/mobile-dock'
+import { useWorkspaceDesktop, useWorkspaceView } from '../workspace/workspace-view-context'
 
 
 
@@ -22,14 +23,10 @@ export function MobileDock({ active, openPanels, available, hidden, portalTarget
   const { t } = useI18n()
   const labelFor = useDockLabel()
   const preferences = useDockPreferences()
-  const [desktop, setDesktop] = useState(() => window.matchMedia('(min-width: 768px)').matches)
-  useEffect(() => {
-    const media = window.matchMedia('(min-width: 768px)')
-    const update = () => setDesktop(media.matches)
-    media.addEventListener('change', update)
-    return () => media.removeEventListener('change', update)
-  }, [])
-  const verticalLayout = position ? position === 'left' || position === 'right' : desktop && vertical
+  const view = useWorkspaceView(), desktop = useWorkspaceDesktop()
+  const hintId = useId()
+  const dockPosition = view?.compact ? 'bottom' : position
+  const verticalLayout = dockPosition ? dockPosition === 'left' || dockPosition === 'right' : desktop && vertical
   const [draftOrder, setOrder] = useState(preferences.order)
   const [dragging, setDragging] = useState<MobileDockPanel | null>(null)
   const order = dragging ? draftOrder : preferences.order
@@ -70,7 +67,7 @@ export function MobileDock({ active, openPanels, available, hidden, portalTarget
   }, [])
   useEffect(() => { cancel() }, [preferences.order])
   const availableKey = available.join(',') + ':' + preferences.hidden.join(',')
-  useEffect(() => { cancel() }, [hidden, portalTarget, availableKey, position])
+  useEffect(() => { cancel() }, [hidden, portalTarget, availableKey, dockPosition])
   const commit = (next: MobileDockPanel[]) => { setOrder(next); setDockOrder(next) }
   const updatePreview = (x: number, y: number) => {
     const current = gesture.current, dock = root.current
@@ -140,8 +137,8 @@ export function MobileDock({ active, openPanels, available, hidden, portalTarget
   }
   if (hidden || !visible.length) return null
   const DragIcon = dragging ? dockIcons[dragging] : null
-  const content = <HoverTipLayer className="contents" placement={position ? position === 'bottom' ? 'top' : 'bottom' : desktop ? 'bottom' : 'top'} portalTarget={portalTarget?.closest('[role="dialog"]')}><nav ref={root} className="mobile-dock" hidden={hidden} aria-label={t('dock.label')}
-    data-position={position} data-vertical={verticalLayout || undefined} data-reordering={dragging ? true : undefined}
+  const content = <HoverTipLayer className="contents" placement={dockPosition ? dockPosition === 'bottom' ? 'top' : 'bottom' : desktop ? 'bottom' : 'top'} portalTarget={portalTarget?.closest('[role="dialog"]')}><nav ref={root} className="mobile-dock" hidden={hidden} aria-label={t('dock.label')}
+    data-position={dockPosition} data-compact={view?.compact || undefined} data-vertical={verticalLayout || undefined} data-reordering={dragging ? true : undefined}
     onPointerDown={down} onPointerMove={move} onPointerUp={up}
     onPointerCancel={() => { suppressClick.current = true; cancel() }} onLostPointerCapture={() => { if (gesture.current) cancel() }}
     onContextMenu={event => event.preventDefault()}>
@@ -151,7 +148,7 @@ export function MobileDock({ active, openPanels, available, hidden, portalTarget
       return <button key={id} type="button" data-dock-item={id} data-dragging={dragging === id || undefined}
         aria-label={label} data-tip={dragging ? undefined : label} aria-current={active === id ? (openPanels ? 'true' : 'page') : undefined}
         aria-pressed={openPanels ? openPanels.includes(id) : undefined}
-        aria-describedby="mobile-dock-hint"
+        aria-describedby={hintId}
         onClick={event => { if (event.detail === 0 || !suppressClick.current) onSelect(id) }}
         onKeyDown={event => {
           const keys = verticalLayout ? ['ArrowUp', 'ArrowDown'] : ['ArrowLeft', 'ArrowRight']
@@ -165,9 +162,9 @@ export function MobileDock({ active, openPanels, available, hidden, portalTarget
       style={{ left: preview.x, top: preview.y, width: preview.width, height: preview.height }}>
       <DragIcon width={22} height={22} strokeWidth={1.7} />
     </span>}
-    <span id="mobile-dock-hint" className="sr-only">{t(verticalLayout ? 'dock.verticalHint' : 'dock.hint')}</span>
+    <span id={hintId} className="sr-only">{t(verticalLayout ? 'dock.verticalHint' : 'dock.hint')}</span>
   </nav>
-    {notice && createPortal(<div role="status" data-dock-notice style={position === 'top' ? { top: (root.current?.getBoundingClientRect().bottom ?? 0) + 8 } : { bottom: verticalLayout ? 'calc(8px + env(safe-area-inset-bottom, 0px))' : 'calc(56px + env(safe-area-inset-bottom, 0px))', maxWidth: verticalLayout ? 'calc(100vw - 112px)' : undefined }}
+    {notice && createPortal(<div role="status" data-dock-notice style={dockPosition === 'top' ? { top: (root.current?.getBoundingClientRect().bottom ?? 0) + 8 } : { bottom: verticalLayout ? 'calc(8px + env(safe-area-inset-bottom, 0px))' : 'calc(56px + env(safe-area-inset-bottom, 0px))', maxWidth: verticalLayout ? 'calc(100vw - 112px)' : undefined }}
       className="pointer-events-none fixed left-1/2 z-[var(--layer-notice)] max-w-[calc(100vw-16px)] -translate-x-1/2 rounded border border-edge-bright bg-surface-raised px-2 py-1 text-xs text-ink shadow-lg md:hidden">
       {labelFor(notice)}
     </div>, document.body)}

@@ -1,16 +1,10 @@
+import { useWorkspaceApi } from '../api/workspace-api-context'
 import { canAutoFocusInput } from '@mew/ui'
 import { uiText } from '@mew/ui/i18n-core'
 import { useUiLocale } from '@mew/ui/i18n'
 import { useCallback, useEffect, useState } from 'react'
 import { useOverlayDismiss } from '@mew/ui'
-import {
-  createProject,
-  deleteProject,
-  renameProject,
-  setProjectIcon,
-  setProjectLayout,
-  type ProjectInfo,
-} from '../api/client'
+import { type ProjectInfo } from '../api/client'
 import { useGridDrag } from '../hooks/useGridDrag'
 import { hasIcon } from '../utils/projectIcons'
 import { buildPlacement, compactPlacement } from '../utils/projectLayout'
@@ -62,6 +56,7 @@ export function ProjectPicker({
   onProjectRenamed,
   onProjectDeleted,
 }: ProjectPickerProps) {
+  const { setProjectLayout, createProject, renameProject, deleteProject, setProjectIcon } = useWorkspaceApi()
   useUiLocale()
   const [placement, setPlacement] = useState(() => (readOnly ? compactPlacement(projects) : buildPlacement(projects)))
   const [editing, setEditing] = useState<string | null>(null)

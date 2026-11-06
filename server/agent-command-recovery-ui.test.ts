@@ -13,17 +13,17 @@ import {useAgentCommands} from '${root}/src/hooks/use-agent-commands.ts';
 window.reads=0;window.readRequests=[];window.starts=[];window.mode='ready';window.rejectStart=false;
 window.list=async(scope,signal)=>{window.reads++;const request={scope,signal,startedAt:performance.now()};window.readRequests.push(request);if(window.mode==='pending')return new Promise((resolve,reject)=>{request.finish=resolve;request.fail=reject});if(window.mode==='permission')throw Object.assign(new Error('Access denied'),{status:403});if(window.mode==='malformed')throw new SyntaxError('Invalid command response');return {commands:[{id:scope.sessionId==='session'?'existing':'other',startedAt:1}]}};
 window.start=async command=>{window.starts.push(command);if(window.rejectStart)throw new Error('Command rejected');return {command:{id:command.id,startedAt:2}}};
-function Harness(){const [sessionId,setSessionId]=React.useState('session');window.changeScope=setSessionId;window.commands=useAgentCommands({runtime:'codex',cwd:'/workspace',sessionId},true);return null}
+function Harness(){const [sessionId,setSessionId]=React.useState('session'),[,rerender]=React.useReducer(value=>value+1,0);window.changeScope=setSessionId;window.changeWorkspace=scope=>{window.workspaceScope=scope;rerender()};window.commands=useAgentCommands({runtime:'codex',cwd:'/workspace',sessionId},true);return null}
 const app=createRoot(document.getElementById('root'));app.render(React.createElement(Harness));window.unmount=()=>app.unmount();`
   const bundle = await build({ input: 'virtual:agent-command-recovery.ts', write: false, platform: 'browser', output: { format: 'iife', codeSplitting: false }, transform: { define: { 'process.env.NODE_ENV': JSON.stringify('test') } }, plugins: [{
     name: 'fixture', resolveId(id, importer) {
       if (id === 'virtual:agent-command-recovery.ts') return id
       if (id === '../utils/remote-transport' && importer?.endsWith('/use-agent-commands.ts')) return 'virtual:transport'
-      if (id === '../api/agent-commands' && importer?.endsWith('/use-agent-commands.ts')) return 'virtual:commands'
+      if (id === '../api/workspace-api-context.tsx' && importer?.endsWith('/use-agent-commands.ts')) return 'virtual:commands'
     }, load(id) {
       if (id === 'virtual:agent-command-recovery.ts') return source
       if (id === 'virtual:transport') return 'export const isMewTransportSuspended=()=>!!window.suspended'
-      if (id === 'virtual:commands') return 'export const listAgentCommands=(...args)=>window.list(...args);export const startAgentCommand=(...args)=>window.start(...args)'
+      if (id === 'virtual:commands') return 'const listAgentCommands=(...args)=>window.list(...args);const startAgentCommand=(...args)=>window.start(...args);export const useWorkspaceApi=()=>({listAgentCommands,startAgentCommand,scope:window.workspaceScope})'
     },
   }] })
   const code = bundle.output.find(item => item.type === 'chunk')!.code
@@ -100,6 +100,20 @@ const app=createRoot(document.getElementById('root'));app.render(React.createEle
   assert.equal(await page.evaluate('window.previousScope.signal.aborted'), true, 'scope changes abort the previous request')
   await page.evaluate('window.previousScope.finish({commands:[{id:"stale-scope",startedAt:3}]})')
   assert.deepEqual(await page.evaluate('window.commands.records.map(record=>record.id)'), ['existing'], 'returning to an old scope cannot admit its obsolete response')
+  await page.evaluate('window.mode="pending";window.changeWorkspace({workspacePath:"/first",projectPath:"/first"})')
+  await page.waitForFunction('window.commands.records.length===0 && !!window.readRequests.at(-1).finish')
+  await page.evaluate('window.firstWorkspaceRead=window.readRequests.at(-1);window.firstWorkspaceRead.finish({commands:[{id:"first-root",startedAt:3}]})')
+  await page.waitForFunction('window.commands.records[0]?.id==="first-root"')
+  await page.clock.runFor(1500)
+  await page.evaluate('window.obsoleteWorkspaceRead=window.readRequests.at(-1);window.changeWorkspace({workspacePath:"/second",projectPath:"/second"})')
+  await page.waitForFunction('window.commands.records.length===0 && window.readRequests.at(-1)!==window.obsoleteWorkspaceRead')
+  assert.equal(await page.evaluate('window.obsoleteWorkspaceRead.signal.aborted'), true, 'root changes cancel a request even when runtime, cwd and session are unchanged')
+  await page.evaluate('window.obsoleteWorkspaceRead.finish({commands:[{id:"wrong-root",startedAt:4}]});window.readRequests.at(-1).finish({commands:[{id:"second-root",startedAt:4}]})')
+  await page.waitForFunction('window.commands.records[0]?.id==="second-root"')
+  assert.deepEqual(await page.evaluate('window.commands.records.map(record=>record.id)'), ['second-root'], 'command records never merge across workspace roots')
+  await page.evaluate('window.mode="ready";window.changeWorkspace(undefined)')
+  await page.waitForFunction('window.commands.records[0]?.id==="existing"')
+  assert.deepEqual(await page.evaluate('window.commands.records.map(record=>record.id)'), ['existing'], 'the legacy command snapshot is independent of explicit project records')
   await page.evaluate('window.rejectStart=true;window.commands.submit("tab","run once",0)')
   await page.waitForFunction('window.commands.error==="Command rejected"')
   assert.equal(await page.evaluate('window.commands.readFailed'), false, 'a failed operation remains distinct from polling failure')

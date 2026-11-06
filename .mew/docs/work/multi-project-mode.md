@@ -1,15 +1,15 @@
 ---
-title: "Multi-project mode design and implementation plan"
-description: "Design-stage record and phased implementation plan for optional desktop multi-project mode. Maps request, state, compact UI, board, and integration work to regression gates; records read-only findings, pending implementation, and documentation verification separately from runtime application."
+title: "Multi-project mode implementation and verification"
+description: "Original design, staged implementation, and local verification of optional desktop multi-project mode. Records scoped requests and execution, retained compact workspaces, handle-based geometry, lifecycle regressions, synthetic 1/3/10-panel measurements, and database/operational limits."
 created: "2026-11-06"
-updated: "2026-11-06"
+updated: "2026-11-07"
 ---
 
 # Multi-project mode implementation plan
 
 ## Purpose and current state
 
-Add the optional desktop mode described in the [feature specification](../features/appearance-accounts-operations/multi-project-mode.md), using the session architecture proposed in [ADR 0152](../decisions/0152-multi-project-workspace-sessions.md). The user requested design and a maintainable, efficient implementation plan before gradual implementation.
+Add the optional desktop mode described in the [feature specification](../features/appearance-accounts-operations/multi-project-mode.md), using the session architecture accepted in [ADR 0152](../decisions/0152-multi-project-workspace-sessions.md). The user requested design and a maintainable, efficient implementation plan before gradual implementation, then confirmed movement through a dedicated handle and authorized implementation.
 
 On 2026-11-06, the main agent and two read-only reviews inspected the current boundaries. No application files were changed, and no application tests, build, deployment, launcher, or server lifecycle operations were performed during this design stage. The workspace already contained unrelated edits; keep them out of this task's commits.
 
@@ -27,7 +27,7 @@ The referenced `.mew/docs/decisions/README.md` is absent in the current working 
 | Dock, mobile controls, and tools consult viewport media queries; focus helpers search the whole document | Introduce explicit presentation and view ownership before reusing the compact UI on desktop. |
 | Single-project geometry and account/project tab ledgers already have separate owners | Add board storage without migrating existing tabs into another source of truth. |
 
-## Implementation sequence
+## Original implementation sequence
 
 Stages are dependency ordered. Each stage gets a focused diff, meaningful regression tests, canonical documentation updates, required verification, and a logical commit. Keep the multi-project UI unavailable while its scope prerequisites are incomplete. Review the diff and observed results before advancing; elapsed time is not a completion criterion.
 
@@ -122,9 +122,76 @@ Use existing Node unit/integration tests and test-owned Chromium fixtures throug
 
 ## Design-stage evidence
 
-Read-only inspection and two independent architectural reviews are complete. Application implementation and runtime verification are pending.
+At the design checkpoint, read-only inspection and two independent architectural reviews were complete; application implementation and runtime verification were still pending. Preserve the following results as evidence of that checkpoint.
 
 - `npm run check:docs`: description validation passed for 747 documents with zero errors. Link validation failed with 39 missing-target errors outside this task's five changed documents, including existing MOC references and the absent decisions README. These unrelated links remain unchanged.
 - `git diff --check`: passed after the initial design edits. Recheck the final staged diff before committing.
 - The existing link checker, filtered to the five changed documents, reported zero local link errors. No existing heading anchors were renamed; new anchor links were inspected against their target headings.
 - No application tests or build ran: this stage changes documentation only. Future implementation must satisfy each stage's tests and the required build.
+
+## Implementation record — 2026-11-07
+
+The implementation followed the dependency order above: validated server scopes, immutable clients and scoped cache/queue ownership, account services and project views, compact presentation, board geometry, then assembled-App regressions. Independent agents implemented or reviewed the server boundary, client isolation, pure board model, and real browser integration. The original single-project mode remains the default.
+
+The design checkpoint was committed separately. The source changes form one integrated feature commit so the request, client/provider, and rendering contracts ship together after their focused stage checks.
+
+| Area | Result and owning contract |
+| --- | --- |
+| Requests and live sources | Added actual/logical workspace scope to HTTP, resources, sockets, task streams, collaboration, presence, watchers, and authorization. Panel destinations resolve without changing account selection or depending on an unavailable originating root. Server version advertisement gates restoration and exposure of the board; an older server retains the legacy single screen without sending explicit requests. [Workspace sessions](../development/workspace-sessions.md) owns the wire and permission contract. |
+| Client state | Bound delayed saves, images/downloads, editor cache, task-document coordination, agent commands, drawing, and debugger clients to the initiating root. Account tab ledgers retain logical-project ownership. |
+| App composition | Extracted account services, one presence connection, one Mewpet, and one shared native Browser above retained project hosts. Compact tools use explicit presentation and owning DOM roots. Global shortcuts and project command menus target the active view. |
+| Geometry and restoration | Added the optional mode control, dedicated movement handles, columns/weighted rows, accessible resize boundaries, and separate device/account mode and board records. A shared hydration guard prevents outgoing geometry from overwriting incoming compact/single/mobile records. [UI workspace layout](../development/ui-workspace-layout.md#multi-project-board-and-compact-presentation) owns the implementation contract. |
+| Handoffs | A panel becomes inert before the save barrier and remains protected through project replacement or close. Failed transitions restore interaction. Legacy selection is confirmed before binding an unscoped client; responsive fallback retains the single selection independently of board replacement. Shared assistant actions wait for the destination controller to become ready. |
+| Input and execution | Scoped unsent drafts and history by account plus logical/actual roots. Added regressions for identical tab IDs and delayed old-view setters. Terminal and CLI identity changes are documented in [Workspace sessions](../development/workspace-sessions.md). |
+| Shared overlays | Fixed asynchronous History-guard removal consuming a newly opened tool. Added explicit dialog focus-return ownership so choosing an existing project cannot focus the invoking panel again. [Overlay dismissal](../development/ui-overlays.md#overlay-dismissal-rules-useoverlaydismiss) owns those rules. |
+
+### Local verification
+
+Checks below use isolated fixtures and test-owned browsers, without starting an application server. Counts are per command/group and can overlap; they are not a summed coverage claim.
+
+| Check | Observed result |
+| --- | --- |
+| `node --test src/api/client-scope.test.ts src/utils/contentCache.test.ts src/utils/database-page-mutations.test.ts src/utils/task-document-sync.test.ts src/demo/collaboration.test.ts` | 27 tests passed in the final run. Covers captured roots, advertised support, canonicalized paths, delayed responses, resources/sockets, cache separation, root-scoped mutation/task queues, and demo collaboration. |
+| `node --test src/hooks/use-root-project-tabs.test.ts src/workspace-loading.browser.test.ts` | 10 tests passed. Covers account-global project shortcuts and lazy authenticated startup. |
+| `node --test src/utils/device-layout.test.ts src/hooks/use-device-layout.test.ts src/workspace/workspace-presence.test.ts` | Focused checks passed independently: four geometry cases, retained-editor hydration/selection, and single-connection root event/focus routing. Presence also deduplicates running-agent counts by actual root. |
+| Board, compact view, focus, panel dismissal, shared overlay, and browser History regressions | 38 tests passed in the board agent's focused group. Covers mouse/touch handles, cancellation, keyboard movement/resizing, stable hosts, unique IDs, active shortcut routing, and overlay cleanup. |
+| New server scope and execution checks | Earlier scope/live/watcher/file/task/DB guard group: 44 passed. Final terminal/command/scope/account/worktree group: 19 passed. Version/snapshot regressions: 7 passed. New authenticated execution retains the same qualified identity in both modes; unknown-root older artifacts remain legacy-only. |
+| Two real scoped AgentPanels and resource viewers | Resource/draft group: 14 tests passed; task-agent input/draft matrix: 4 passed; existing Mewpet App action fixture: 1 passed. Covers identical tab IDs, active-only references, scoped links/images/CSV/downloads, socket roots, preserved unsent text, and stale-setter rejection. |
+| `node --test server/workspace-tabs-scope-ui.test.ts` | Passed. Real tab/cache/save controllers keep same-name files and delayed writes independent across roots. |
+| `server/agent-command-recovery-ui.test.ts` | Passed after adding a scope-change regression for cached command records, including late-read cancellation and removal of records from the previous scope. |
+| Existing deferred-dialog and PDF fixtures | Both passed. Deferred settings retain their requested outer layer and close/retry/focus behavior; the PDF fixture retains its existing 500-page virtualization check. |
+
+The assembled-App fixture mounts the real shell/controllers, account-tab and save hooks, compact CSS, project selection, command menu, and shared overlay code. Its editor, agent, and Git bodies use small test substitutes. It verifies distinct same-name files, delayed autosave under another active project, independent tools, project-name selection, one active command shortcut, mode changes without editor remount, separate saved chrome, empty/no-project recovery, old-server fallback, and shared assistant delivery after a destination handoff. Final results: shell 12/12 and assembled App 4/4 passed. Startup 3/3, catalog UI 1/1, and the earlier Add/Switcher group 12/12 also passed. The catalog is deferred through one shared component, including existing selection/setup consumers, so a closed catalog does not download during startup.
+
+### Synthetic efficiency sample
+
+One run of the assembled-App fixture in test-owned Chromium used a 1700px desktop viewport, mocked HTTP/socket transport, and substituted tool bodies. Measurements include Playwright overhead and two animation frames; they are observations rather than performance budgets. Explicit garbage collection preceded heap/listener sampling.
+
+| Open project panels | 1 | 3 | 10 |
+| --- | --- | --- | --- |
+| Cumulative mocked API requests | 29 | 70 | 190 |
+| DOM elements | 156 | 346 | 1011 |
+| Event listeners | 877 | 1555 | 3928 |
+| Heap, approximately MB | 10.8 | 12.0 | 14.9 |
+| Pointer selection plus two paints, ms | 95 | 74 | 78 |
+| Single/multi mode round trip, ms | 249 | 350 | 369 |
+
+At every sample there was one global menu and one presence socket, with exactly one editor mount per project and no editor unmount during mode changes. Closing all ten board panels removed their views and Docks, unmounted ten editors, and reduced the sampled listener count to 487. Remaining listeners belong to the still-mounted app/account shell. These figures do not measure live providers, terminal/GPU work, real editor engines, physical IME, or production Mewlink behavior; later source changes can alter request and allocation counts.
+
+Light and midnight-gradient browser fixtures also confirmed three 400px panels, 44px bottom Docks, transparent panel backgrounds, and one continuous backdrop. Tool bodies in those images are substitutes; screenshots were temporary verification artifacts.
+
+### Limits and operational application
+
+- Explicit-scope Postgres remains disabled; DB-bound Markdown saves fail before a write. Ordinary files and Markdown are supported, and the existing database workflow remains in single-project mode. The [canonical restriction](../development/workspace-sessions.md#current-postgres-restriction) specifies the exact boundary.
+- The existing `server/agent-command-ui.test.ts` reached an unrelated composer minimum-height assertion and failed because it expected 117px while the current composer measured 121px. The calculation and associated layout match the saved pre-task AgentPanel content. This task does not rewrite that separate composer change or claim the test passed.
+- An earlier combined startup check exposed the new shell's handling of optional `hasProject` and an account-hook fixture dependency; both were corrected. Account/lazy startup and final real-shell startup then passed.
+- No production database, external AI provider, physical mobile device, Windows host, or deployed Mewlink session was used to establish these results. Automated checks do not establish undo/IME behavior of every real editor engine.
+- No deployment, launcher execution, or application server start/stop/restart was performed. The required build changes browser assets; loading changed server code remains an operator action.
+
+### Completion checks
+
+- `npm run build`: passed in the working checkout and in a separate source export containing only this task's intended commit. Both app and server TypeScript projects were checked by `tsc -b`; Vite retained its chunk-size advisory.
+- The first task-only export exposed two incomplete contracts already referenced by HEAD: `DialogFrame.overlayClassName` in the deferred-dialog caller and one missing agent scroll-label translation. The minimum shared option/label definitions are included as build prerequisites. Other pending image-editor/media changes remain outside this task. The task-only export then built successfully.
+- `npm run lint`: passed with no errors; React and other advisory warnings remain. Focused new fixture lint and `git diff --check` also passed.
+- `npm run check:docs`: 751 descriptions passed with zero metadata errors. Global link validation remains blocked by 37 preexisting missing MOC/README targets outside this task's changed documents. The changed documents' local links were checked separately.
+- Final task-path and staged-diff review exclude unrelated work. The commit includes the feature's source, regression tests, canonical contracts, ADR update, user guide, and this work record. No push or operational application is part of the task.

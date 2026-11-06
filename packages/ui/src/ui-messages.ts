@@ -1,6 +1,16 @@
 // Source-message keys keep shared UI packages independent of the host app.
 // Every entry supplies English, Simplified Chinese and Japanese; the key is Korean.
 export const uiMessages = {
+  "싱글프로젝트모드": ["Single-project mode", "单项目模式", "シングルプロジェクトモード"],
+  "멀티프로젝트모드": ["Multi-project mode", "多项目模式", "マルチプロジェクトモード"],
+  "프로젝트 패널": ["Project panels", "项目面板", "プロジェクトパネル"],
+  "프로젝트 선택패널": ["Project selection panel", "项目选择面板", "プロジェクト選択パネル"],
+  "프로젝트 패널 추가": ["Add project panel", "添加项目面板", "プロジェクトパネルを追加"],
+  "프로젝트 패널 닫기": ["Close project panel", "关闭项目面板", "プロジェクトパネルを閉じる"],
+  "프로젝트 패널 이동": ["Move project panel", "移动项目面板", "プロジェクトパネルを移動"],
+  "프로젝트 패널 너비 조절": ["Resize project column", "调整项目列宽", "プロジェクト列の幅を変更"],
+  "프로젝트 패널 높이 조절": ["Resize project row", "调整项目行高", "プロジェクト行の高さを変更"],
+  "프로젝트를 불러오지 못했습니다. 다른 프로젝트를 선택하거나 패널을 닫아 주세요.": ["Could not load the project. Choose another project or close this panel.", "无法加载项目。请选择其他项目或关闭此面板。", "プロジェクトを読み込めませんでした。別のプロジェクトを選択するか、このパネルを閉じてください。"],
   "음성 녹음": ["Voice recording", "语音录制", "音声録音"],
   "마이크로 녹음하여 오디오로 삽입": ["Record and insert audio", "录制并插入音频", "録音して音声を挿入"],
   "녹음 시작": ["Start recording", "开始录音", "録音を開始"],
@@ -1248,6 +1258,7 @@ export const uiMessages = {
   "두 번 눌러 이름 고치기": ["Double-click to rename","双击重命名","ダブルクリックで名前変更"],
   "터미널 닫기": ["Close terminal","关闭终端","ターミナルを閉じる"],
   "에이전트 닫기": ["Close agent","关闭代理","エージェントを閉じる"],
+  "에이전트 맨 아래로": ["Scroll to bottom","滚动到底部","一番下へ"],
   "워크스페이스 기본 경로에서 에이전트 열기": ["Open agent at workspace root","在工作区默认路径打开代理","ワークスペースの既定パスでエージェントを開く"],
   "워크스페이스 기본 경로로 돌아가기": ["Return to workspace root","返回工作区默认路径","ワークスペースの既定パスに戻る"],
   "에이전트 작업 경로": ["Agent working directory","代理工作目录","エージェントの作業パス"],

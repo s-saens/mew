@@ -20,13 +20,14 @@ const bundle = await build({
     name: 'account-editor-tabs-fixture',
     resolveId(id) {
       if (id === 'virtual:account-editor-tabs.tsx') return id
-      if (id === '../api/editor-tabs.ts') return 'virtual:api'
+      if (id === '../api/workspace-api-context.tsx') return 'virtual:api'
     },
     load(id) {
       if (id === 'virtual:account-editor-tabs.tsx') return source
       if (id === 'virtual:api') return `
         export function fetchAccountEditorTabs(path,signal){return window.fixture.read(path,signal)}
         export async function saveAccountEditorTabs(){throw new Error('unexpected write')}
+        export function useWorkspaceApi(){return {fetchAccountEditorTabs,saveAccountEditorTabs}}
       `
     },
   }],

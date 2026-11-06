@@ -5,10 +5,20 @@ import { readRootProjectIcons } from './projectIcons.ts'
 import { broadcastAccount } from './presence.ts'
 import { saveAgentTabs } from './agent-tab-state.ts'
 import { AgentTabPreviewError, readAgentTabPreview } from './agent-tab-preview.ts'
+import { workspaceContext } from './paths.ts'
 
 /** Account UI persistence uses the request identity and the API's existing error policy. */
 export function createUserUiRouter(handleError: (res: express.Response, error: unknown) => void): express.Router {
   const router = express.Router()
+  router.use((req, res, next) => {
+    const scope = workspaceContext.getStore()
+    if (scope?.explicit && ['/agent-tabs', '/agent-tabs/history', '/editor-tabs', '/workspace'].includes(req.path)) {
+      const expected = scope.projectPath ?? scope.root
+      const requested = req.method === 'GET' ? req.query.workspace : req.body?.workspacePath
+      if (requested !== expected) { res.status(409).json({ error: '요청의 프로젝트 범위가 일치하지 않습니다.' }); return }
+    }
+    next()
+  })
 
   router.get('/theme', requireAuthenticated, (req, res) => {
     try { res.json({ state: readAccountTheme(authOf(req).email!) }) }

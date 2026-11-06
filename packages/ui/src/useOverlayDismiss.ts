@@ -23,8 +23,10 @@ type Entry = {
 /** 열린 순서대로 쌓인다 — 맨 뒤가 "가장 위" */
 const stack: Entry[] = []
 let listening = false
+let listeningBack = false
 /** 뒤로가기가 소비할 더미 History 항목을 지금 얹어 뒀는지 */
 let guardActive = false
+let removingGuard = false
 
 function handleEscape(event: KeyboardEvent, phase: EscapePhase) {
   if (event.key !== 'Escape') return
@@ -51,6 +53,11 @@ function onPointerDownCapture(event: Event) {
 }
 
 function onPopState() {
+  if (removingGuard) {
+    removingGuard = false
+    scheduleSync()
+    return
+  }
   if (!guardActive) return
   // 뒤로가기가 우리 가드 항목을 소비했다 — 페이지를 떠나는 대신 맨 위 오버레이 하나를 닫는다.
   // 아래 오버레이가 남아 있으면 sync()가 가드를 다시 얹는다.
@@ -67,6 +74,18 @@ function onPopState() {
 
 function sync() {
   const anyOpen = stack.length > 0
+  let removeGuard = false
+
+  if (anyOpen && !guardActive && !removingGuard) {
+    guardActive = true
+    window.history.pushState({ mewOverlayGuard: true }, '')
+  } else if (!anyOpen && guardActive) {
+    // Wait for this traversal before guarding a later overlay. Its asynchronous
+    // popstate belongs to the removed guard, even if a different view has opened.
+    guardActive = false
+    removingGuard = true
+    removeGuard = true
+  }
 
   if (anyOpen !== listening) {
     listening = anyOpen
@@ -74,24 +93,20 @@ function sync() {
       window.addEventListener('keydown', onKeyDownCapture, true)
       window.addEventListener('keydown', onKeyDownBubble)
       window.addEventListener('pointerdown', onPointerDownCapture, true)
-      window.addEventListener('popstate', onPopState)
     } else {
       window.removeEventListener('keydown', onKeyDownCapture, true)
       window.removeEventListener('keydown', onKeyDownBubble)
       window.removeEventListener('pointerdown', onPointerDownCapture, true)
-      window.removeEventListener('popstate', onPopState)
     }
   }
 
-  if (anyOpen && !guardActive) {
-    guardActive = true
-    window.history.pushState({ mewOverlayGuard: true }, '')
-  } else if (!anyOpen && guardActive) {
-    // 뒤로가기가 아니라 버튼·바깥 클릭으로 닫혔다 — 얹어둔 가드를 걷어 히스토리를 원래대로 맞춘다.
-    // (guardActive를 먼저 내려야 back()이 부르는 popstate가 오버레이를 또 닫지 않는다)
-    guardActive = false
-    window.history.back()
+  const needsBack = anyOpen || removingGuard
+  if (needsBack !== listeningBack) {
+    listeningBack = needsBack
+    if (needsBack) window.addEventListener('popstate', onPopState)
+    else window.removeEventListener('popstate', onPopState)
   }
+  if (removeGuard) window.history.back()
 }
 
 let syncQueued = false

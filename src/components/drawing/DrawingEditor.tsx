@@ -7,7 +7,8 @@ import { createDocument, createObject, drawingId, DRAWING_MIME, DrawingHistory, 
 import { hitTestObject, normalizePathObject, objectBounds, objectLocalToWorld, resizeObject, resizeObjectFromHandle, resizeSelection, rotateSelection, selectionBounds, translateSelection, type ResizeHandle } from './geometry'
 import { parseSvgDocument, rasterizeSvg, serializeSvg } from './svg'
 import { embeddedDrawingFontCss, loadDrawingFont } from './fonts'
-import { getDrawingScope, loadDrawing, saveDrawing, type DrawingSummary } from './storage'
+import type { DrawingSummary } from './storage'
+import { useWorkspaceApi } from '../../api/workspace-api-context'
 import { DrawingObjectView } from './DrawingObjectView'
 import { DrawingInspector, DrawingPaintPopover, NumberField, PaintButtons, type PaintTarget } from './DrawingInspector'
 import { FreehandSampler, finalizeFreehand } from './freehand'
@@ -32,6 +33,8 @@ const boundedZoom = (zoom: number) => Math.max(.05, Math.min(16, zoom))
 const round = (n: number, step: number) => Math.round(n / step) * step
 
 export function DrawingEditor({ onClose, onSave, context: destination = 'agent', projectRoot: requestedRoot }: { onClose: () => void; onSave: (file: File) => Promise<void>; context?: 'agent' | 'document'; projectRoot?: string }) {
+  const { drawingStorage } = useWorkspaceApi()
+  const { getDrawingScope, loadDrawing, saveDrawing } = drawingStorage
   useUiLocale()
   const titleId = useId(), gridId = useId()
   const history = useRef(new DrawingHistory())
@@ -106,7 +109,7 @@ export function DrawingEditor({ onClose, onSave, context: destination = 'agent',
       projectRoot.current = result.projectRoot; setRecords(result.drawings)
     }).catch(error => { scopePromise.current = null; if (active) setError(String(error instanceof Error ? error.message : error)) }).finally(() => { if (active) setRecordsLoading(false) })
     return () => { active = false }
-  }, [destination, requestedRoot])
+  }, [destination, requestedRoot, getDrawingScope])
   useEffect(() => () => { if (frame.current !== null) cancelAnimationFrame(frame.current) }, [])
 
   useEffect(() => {

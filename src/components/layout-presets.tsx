@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom'
 import { EditPencil, Plus, Refresh, FloppyDisk, Trash } from 'iconoir-react'
 import { ActionMenu, ActionMenuItem, HoverTipLayer, useOverlayDismiss } from '@mew/ui'
 import { useI18n } from '../i18n'
+import { uiText } from '@mew/ui/i18n-core'
 import { headerIconControlClassName } from './header-control'
 import { changeLayoutPreset, layoutFingerprint, layoutIconRects, readLayoutPresets, type LayoutPreset, type LayoutSnapshot } from '../utils/layout-presets'
 
@@ -21,8 +22,9 @@ function menuKeys(event: KeyboardEvent<HTMLElement>) {
   if (next >= 0) { event.preventDefault(); buttons[next]?.focus() }
 }
 
-export function LayoutPresets({ storageKey, legacyStorageKey, factory, capture, onApply }: {
+export function LayoutPresets({ storageKey, legacyStorageKey, factory, capture, onApply, mode = 'single', onModeChange }: {
   storageKey: string; legacyStorageKey?: string; factory: LayoutSnapshot; capture: () => LayoutSnapshot; onApply: (layout: LayoutSnapshot) => void
+  mode?: 'single' | 'multi'; onModeChange?: (mode: 'single' | 'multi') => void
 }) {
   const { t } = useI18n()
   const [presets, setPresets] = useState(() => readLayoutPresets(storageKey, factory, legacyStorageKey))
@@ -100,12 +102,19 @@ export function LayoutPresets({ storageKey, legacyStorageKey, factory, capture, 
   return <>
     <HoverTipLayer className="contents" placement="bottom"><button ref={trigger} type="button" aria-label={t('layout.label')} data-tip={t('layout.label')} aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen(value => !value)}
       className={headerIconControlClassName}>
-      <LayoutIcon layout={current} width={20} />
+      {mode === 'multi' ? <svg width="20" height="16" viewBox="0 0 20 16" fill="currentColor" aria-hidden="true"><rect x="1" y="1" width="5" height="14" rx="1" /><rect x="7.5" y="1" width="5" height="14" rx="1" /><rect x="14" y="1" width="5" height="14" rx="1" /></svg> : <LayoutIcon layout={current} width={20} />}
     </button></HoverTipLayer>
     {open && createPortal(<HoverTipLayer className="contents" placement="bottom">
       <div ref={popup} role="dialog" aria-label={t('layout.label')} onKeyDown={event => { if (!(event.target instanceof HTMLInputElement)) menuKeys(event) }} style={position}
         className="fixed z-[1050] max-h-[calc(100dvh-64px)] max-w-[calc(100vw-16px)] overflow-auto rounded-lg border border-edge-bright bg-surface-raised p-2 shadow-xl">
-        <div className="grid grid-cols-4 gap-1">
+        {onModeChange && <div role="group" aria-label={t('layout.label')} className="mb-2 flex gap-1 border-b border-edge pb-2">
+          {(['single', 'multi'] as const).map(value => <button key={value} type="button" aria-pressed={mode === value}
+            onClick={() => { onModeChange(value); close() }}
+            className="rounded px-2 py-1 text-xs text-ink-secondary hover:bg-surface-hover aria-pressed:bg-surface-hover aria-pressed:text-ink focus-visible:outline-2 focus-visible:outline-accent">
+            {uiText(value === 'single' ? '싱글프로젝트모드' : '멀티프로젝트모드')}
+          </button>)}
+        </div>}
+        {mode === 'single' && <div className="grid grid-cols-4 gap-1">
           {presets.map(preset => <button key={preset.id} type="button" data-layout-preset={preset.id} aria-label={label(preset)} data-tip={label(preset)}
             aria-pressed={fingerprint === layoutFingerprint(preset.layout)}
             onClick={() => { onApply(preset.layout); close() }}
@@ -116,7 +125,7 @@ export function LayoutPresets({ storageKey, legacyStorageKey, factory, capture, 
           </button>)}
           <button type="button" aria-label={t('layout.add')} data-tip={t('layout.add')} onClick={() => update(capture())}
             className="flex min-h-14 min-w-16 items-center justify-center rounded text-ink-secondary hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-accent"><Plus width={20} height={20} aria-hidden="true" /></button>
-        </div>
+        </div>}
         {renaming && <form className="mt-2 flex max-w-80 items-center gap-1" onSubmit={event => {
           event.preventDefault()
           const name = renaming.name.trim()

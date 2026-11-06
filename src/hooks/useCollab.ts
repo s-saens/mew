@@ -1,4 +1,6 @@
 import { openMewSocket } from '../utils/remote-transport.ts'
+import { useWorkspaceApi } from '../api/workspace-api-context'
+import { SHARED_MEMO_PROJECT } from '../../shared/shared-memo.ts'
 import { getAppRuntime, type CollaborationSession } from '../runtime/app-runtime.ts'
 import { useEffect, useState } from 'react'
 import * as Y from 'yjs'
@@ -20,7 +22,11 @@ export type Collab = CollaborationSession
 // 판단해서 넘긴다. 문서 내용 시딩은 이 훅이 하지 않는다 — Y.Text냐 Y.XmlFragment냐에 따라 방식이
 // 달라서 CodePane·Editor 각자가 synced 플래그를 보고 알아서 한다.
 export function useCollab(project: string, path: string | null, authEmail: string | null): Collab | null {
-  const [doc, setDoc] = useState<{ ydoc: Y.Doc; awareness: Awareness; project: string; path: string; authEmail: string | null } | null>(null)
+  const api = useWorkspaceApi()
+  const scope = project === SHARED_MEMO_PROJECT ? undefined : api.scope
+  const openSocket = project === SHARED_MEMO_PROJECT ? openMewSocket : api.openSocket
+  const scopeKey = JSON.stringify(scope ?? null)
+  const [doc, setDoc] = useState<{ ydoc: Y.Doc; awareness: Awareness; project: string; path: string; authEmail: string | null; scopeKey: string } | null>(null)
   const [synced, setSynced] = useState(false)
   const [connected, setConnected] = useState(false)
 
@@ -35,9 +41,9 @@ export function useCollab(project: string, path: string | null, authEmail: strin
     const provider = getAppRuntime().collaboration
     if (provider) {
       let closed = false
-      const connection = provider.open({ project, path, authEmail }, session => {
+      const connection = provider.open({ project, path, authEmail, ...scope }, session => {
         if (closed) return
-        setDoc({ ydoc: session.ydoc, awareness: session.awareness, project, path, authEmail })
+        setDoc({ ydoc: session.ydoc, awareness: session.awareness, project, path, authEmail, scopeKey })
         setSynced(session.synced)
         setConnected(session.connected)
       })
@@ -57,7 +63,7 @@ export function useCollab(project: string, path: string | null, authEmail: strin
 
     const ydoc = new Y.Doc()
     const awareness = new Awareness(ydoc)
-    setDoc({ ydoc, awareness, project, path, authEmail })
+    setDoc({ ydoc, awareness, project, path, authEmail, scopeKey })
     setSynced(false)
     setConnected(false)
 
@@ -116,7 +122,7 @@ export function useCollab(project: string, path: string | null, authEmail: strin
       retryTimer = null
       const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:'
       const roomKey = `${project}:${path}`
-      const socket = openMewSocket(`${protocol}//${location.host}/api/collab?room=${encodeURIComponent(roomKey)}`)
+      const socket = openSocket(`${protocol}//${location.host}/api/collab?room=${encodeURIComponent(roomKey)}`)
       ws = socket
       socket.binaryType = 'arraybuffer'
       // Bound both the WebSocket handshake and the first document response.
@@ -193,8 +199,8 @@ export function useCollab(project: string, path: string | null, authEmail: strin
       awareness.destroy()
       ydoc.destroy()
     }
-  }, [project, path, authEmail])
+  }, [project, path, authEmail, openSocket, scope, scopeKey])
 
-  return doc && doc.project === project && doc.path === path && doc.authEmail === authEmail
+  return doc && doc.project === project && doc.path === path && doc.authEmail === authEmail && doc.scopeKey === scopeKey
     ? { ydoc: doc.ydoc, awareness: doc.awareness, synced, connected } : null
 }

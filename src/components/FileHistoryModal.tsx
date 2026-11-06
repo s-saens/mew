@@ -1,8 +1,9 @@
+import { useWorkspaceApi } from '../api/workspace-api-context'
 import { useEffect, useState } from 'react'
 import { Editor, type EditorApi, type TreeNode } from '@mew/editor'
 import { useOverlayDismiss } from '@mew/ui'
 import { SvgPreview } from './SvgPreview'
-import { fetchFileAtCommit, fetchFileHistory, type FileHistoryEntry } from '../api/client'
+import { type FileHistoryEntry } from '../api/client'
 import { useI18n } from '../i18n'
 
 interface FileHistoryModalProps {
@@ -18,6 +19,7 @@ interface FileHistoryModalProps {
 /** Hotview/Plain 토글 왼쪽의 히스토리 버튼으로 여는 팝업 — 목록에서 커밋을 고르면 그 시점의
  * 내용을 에디터와 같은 뷰어(읽기 전용)로 보여주고, 필요하면 그 버전으로 되돌릴 수 있다 */
 export function FileHistoryModal({ path, project, canRevert, editorApi, tree, onRevert, onClose }: FileHistoryModalProps) {
+  const { fetchFileHistory, fetchFileAtCommit } = useWorkspaceApi()
   const { formatDate, t } = useI18n()
   const [entries, setEntries] = useState<FileHistoryEntry[] | null>(null)
   const [listError, setListError] = useState<string | null>(null)
@@ -41,7 +43,7 @@ export function FileHistoryModal({ path, project, canRevert, editorApi, tree, on
     return () => {
       cancelled = true
     }
-  }, [path, project, t])
+  }, [path, project, t, fetchFileHistory])
 
   useEffect(() => {
     if (!selected) return
@@ -61,7 +63,7 @@ export function FileHistoryModal({ path, project, canRevert, editorApi, tree, on
     return () => {
       cancelled = true
     }
-  }, [path, project, selected, t])
+  }, [path, project, selected, t, fetchFileAtCommit])
 
   async function handleRevert() {
     if (!selected) return

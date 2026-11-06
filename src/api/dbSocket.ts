@@ -1,76 +1,105 @@
-import { openMewSocket } from '../utils/remote-transport.ts'
+import type { WorkspaceScope } from '../../shared/workspace-scope.ts'
 import type { DbEvent } from '@mew/editor'
 import { getProject } from './client'
-
-// /db 실시간 소켓 — 연결 하나로 여러 데이터베이스 룸을 다중화한다(한 문서에 /db 노드가 여럿일 수 있음).
-// 서버(server/db/socket.ts) 프로토콜: 보내기 {type:'subscribe'|'unsubscribe', project, dbId},
-// 받기 {type:'db.event', project, dbId, event}. presence 소켓과 같은 재연결 전략.
+import { createWorkspaceTransport } from './workspace-transport.ts'
 
 type Listener = (event: DbEvent) => void
+type Room = { project: string; dbId: string; set: Set<Listener> }
+type Connection = { subscribe(dbId: string, onEvent: Listener, project: string): () => void }
 
-// project + dbId → { 구독 당시의 프로젝트, 리스너들 }. 프로젝트는 앱 안에서 바뀌므로(프로젝트 탭)
-// 구독한 시점의 값을 붙들고 있어야 재연결·이벤트 필터가 엉뚱한 프로젝트를 보지 않는다.
-const listeners = new Map<string, { project: string; dbId: string; set: Set<Listener> }>()
-let ws: WebSocket | null = null
-let retryTimer: ReturnType<typeof setTimeout> | null = null
+// Multiple views of one root share its connection; identically named rooms in other roots never do.
+const connections = new Map<string, Connection>()
 
-function send(type: 'subscribe' | 'unsubscribe', project: string, dbId: string) {
-  if (ws && ws.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify({ type, project, dbId }))
+function createConnection(scope: Readonly<WorkspaceScope> | undefined, connectionKey: string): Connection {
+  const listeners = new Map<string, Room>()
+  let ws: WebSocket | null = null
+  let retryTimer: ReturnType<typeof setTimeout> | null = null
+  const transport = createWorkspaceTransport(scope)
+
+  function send(type: 'subscribe' | 'unsubscribe', project: string, dbId: string) {
+    if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type, project, dbId }))
+  }
+
+  function ensureSocket() {
+    if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return
+    const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:'
+    const socket = transport.openSocket(`${protocol}//${location.host}/api/db/ws`)
+    ws = socket
+    socket.onopen = () => {
+      if (ws !== socket) return
+      for (const entry of listeners.values()) send('subscribe', entry.project, entry.dbId)
+    }
+    socket.onmessage = event => {
+      if (ws !== socket || typeof event.data !== 'string') return
+      try {
+        const msg = JSON.parse(event.data) as { type?: string; project?: string; dbId?: string; event?: DbEvent }
+        if (msg.type !== 'db.event' || !msg.dbId || !msg.event) return
+        const entry = listeners.get(JSON.stringify([msg.project, msg.dbId]))
+        if (entry && entry.project === msg.project) for (const fn of entry.set) fn(msg.event)
+      } catch { /* Malformed events cannot cross room boundaries. */ }
+    }
+    socket.onclose = () => {
+      if (ws !== socket) return
+      ws = null
+      if (listeners.size > 0 && !retryTimer) {
+        retryTimer = setTimeout(() => {
+          retryTimer = null
+          if (listeners.size > 0) ensureSocket()
+        }, 3000)
+      }
+    }
+  }
+
+  const connection: Connection = {
+    subscribe(dbId, onEvent, project) {
+      connections.set(connectionKey, connection)
+      const key = JSON.stringify([project, dbId])
+      let entry = listeners.get(key)
+      if (!entry) {
+        entry = { project, dbId, set: new Set() }
+        listeners.set(key, entry)
+      }
+      const first = entry.set.size === 0
+      entry.set.add(onEvent)
+      ensureSocket()
+      if (first) send('subscribe', project, dbId)
+      let subscribed = true
+      return () => {
+        if (!subscribed) return
+        subscribed = false
+        const current = listeners.get(key)
+        if (!current) return
+        current.set.delete(onEvent)
+        if (!current.set.size) {
+          listeners.delete(key)
+          send('unsubscribe', project, dbId)
+        }
+        if (!listeners.size) {
+          if (retryTimer) clearTimeout(retryTimer)
+          retryTimer = null
+          const socket = ws
+          ws = null
+          socket?.close()
+          if (connections.get(connectionKey) === connection) connections.delete(connectionKey)
+        }
+      }
+    },
+  }
+  return connection
+}
+
+/** Capture both root identities, while retaining the selected API project for each room. */
+export function createDbSubscriptions(scope?: Readonly<WorkspaceScope>, currentProject = () => getProject()) {
+  const captured = scope ? Object.freeze({ ...scope }) : undefined
+  const key = JSON.stringify(captured ? [captured.workspacePath, captured.projectPath] : [])
+  return (dbId: string, onEvent: Listener, project = currentProject()): (() => void) => {
+    let connection = connections.get(key)
+    if (!connection) {
+      connection = createConnection(captured, key)
+      connections.set(key, connection)
+    }
+    return connection.subscribe(dbId, onEvent, project)
   }
 }
 
-function ensureSocket() {
-  if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return
-  const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:'
-  ws = openMewSocket(`${protocol}//${location.host}/api/db/ws`)
-  ws.onopen = () => {
-    // 재연결 시 활성 룸을 모두 다시 구독한다
-    for (const entry of listeners.values()) send('subscribe', entry.project, entry.dbId)
-  }
-  ws.onmessage = (event) => {
-    if (typeof event.data !== 'string') return
-    try {
-      const msg = JSON.parse(event.data) as { type?: string; project?: string; dbId?: string; event?: DbEvent }
-      if (msg.type !== 'db.event' || !msg.dbId || !msg.event) return
-      const entry = listeners.get(JSON.stringify([msg.project, msg.dbId]))
-      if (entry && entry.project === msg.project) for (const fn of entry.set) fn(msg.event)
-    } catch {
-      // 잘못된 메시지 무시
-    }
-  }
-  ws.onclose = () => {
-    ws = null
-    // 구독자가 남아 있으면 재연결 예약
-    if (listeners.size > 0 && !retryTimer) {
-      retryTimer = setTimeout(() => {
-        retryTimer = null
-        if (listeners.size > 0) ensureSocket()
-      }, 3000)
-    }
-  }
-}
-
-/** 데이터베이스 실시간 구독 — 반환된 함수를 호출하면 해제된다 */
-export function subscribeDb(dbId: string, onEvent: Listener, project = getProject()): () => void {
-  const key = JSON.stringify([project, dbId])
-  let entry = listeners.get(key)
-  if (!entry) {
-    entry = { project, dbId, set: new Set() }
-    listeners.set(key, entry)
-  }
-  const isFirst = entry.set.size === 0
-  entry.set.add(onEvent)
-  ensureSocket()
-  if (isFirst) send('subscribe', entry.project, dbId)
-
-  return () => {
-    const e = listeners.get(key)
-    if (!e) return
-    e.set.delete(onEvent)
-    if (e.set.size === 0) {
-      listeners.delete(key)
-      send('unsubscribe', e.project, dbId)
-    }
-  }
-}
+export const subscribeDb = createDbSubscriptions()

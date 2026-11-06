@@ -1,12 +1,14 @@
+import { useWorkspaceApi } from '../api/workspace-api-context'
 import { useEffect, useId, useState } from 'react'
 import { HoverTipLayer } from '@mew/ui'
-import { fetchSystemStats, type SystemStats } from '../api/client'
+import { type SystemStats } from '../api/client'
 import { useI18n } from '../i18n'
 import { headerIconControlClassName } from './header-control'
 
 const percent = (value: number | null | undefined) => value == null || !Number.isFinite(value) ? '—' : `${Math.round(value)}%`
 
 export function HeaderResources({ onOpen }: { onOpen: () => void }) {
+  const { fetchSystemStats } = useWorkspaceApi()
   const { t } = useI18n()
   const summaryId = useId()
   const [stats, setStats] = useState<SystemStats | null>(null)
@@ -38,7 +40,7 @@ export function HeaderResources({ onOpen }: { onOpen: () => void }) {
       clearInterval(timer)
       document.removeEventListener('visibilitychange', onVisibilityChange)
     }
-  }, [])
+  }, [fetchSystemStats])
 
   const gpuUsage = stats?.gpus.map(gpu => gpu.utilization).filter((value): value is number => value !== null && Number.isFinite(value)) ?? []
   const metrics = [

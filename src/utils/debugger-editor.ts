@@ -1,8 +1,11 @@
 import { RangeSet, StateEffect, StateField, type Extension } from '@codemirror/state'
 import { Decoration, EditorView, GutterMarker, lineNumberMarkers, lineNumbers, hoverTooltip, keymap, type DecorationSet } from '@codemirror/view'
-import { debuggerRequest, type DebuggerStatus } from '../api/debugger'
-import { subscribeLive } from './live-updates'
+import { debuggerRequest as defaultDebuggerRequest, type DebuggerStatus } from '../api/debugger'
+import { subscribeLive as defaultSubscribeLive } from './live-updates'
 import { breakpointKey, type DebugConfig } from '../../shared/debugger'
+
+type DebuggerEnvironment = { debuggerRequest: typeof defaultDebuggerRequest; subscribeLive: typeof defaultSubscribeLive; scope?: { workspacePath: string; projectPath: string } }
+const defaultEnvironment: DebuggerEnvironment = { debuggerRequest: defaultDebuggerRequest, subscribeLive: defaultSubscribeLive }
 
 type Marks = { breakpoints: { line: number; enabled: boolean; verified: boolean; key: string; column?: number }[]; line?: number }
 export const setDebugMarks = StateEffect.define<Marks>()
@@ -24,9 +27,10 @@ class Marker extends GutterMarker {
 }
 interface Store { status?: DebuggerStatus; controller: AbortController; listeners: Set<(status?: DebuggerStatus) => void>; unsubscribe?: () => void; saving: Promise<unknown>; pending: number; revision: number }
 const stores = new Map<string, Store>()
-const storeKey = (root: string, account: string) => JSON.stringify([root, account])
-export function subscribeDebugger(root: string, account: string, listener: (status?: DebuggerStatus) => void) {
-  const key = storeKey(root, account)
+const storeKey = (root: string, account: string, environment: DebuggerEnvironment) => JSON.stringify([root, account, environment.scope?.workspacePath, environment.scope?.projectPath])
+export function subscribeDebugger(root: string, account: string, listener: (status?: DebuggerStatus) => void, environment: DebuggerEnvironment = defaultEnvironment) {
+  const { debuggerRequest, subscribeLive } = environment
+  const key = storeKey(root, account, environment)
   let store = stores.get(key)
   if (!store) { store = { controller: new AbortController(), listeners: new Set(), saving: Promise.resolve(), pending: 0, revision: 0 }; stores.set(key, store) }
   store.listeners.add(listener); listener(store.status)
@@ -44,7 +48,8 @@ export function subscribeDebugger(root: string, account: string, listener: (stat
   }
   return () => { current.listeners.delete(listener); if (!current.listeners.size) { current.controller.abort(); current.unsubscribe?.(); stores.delete(key) } }
 }
-export function debuggerEditorExtension(root: string, account: string, file: string, lineOffset = 0, relocate = false): { extension: Extension; attach: (view: EditorView) => () => void } {
+export function debuggerEditorExtension(root: string, account: string, file: string, lineOffset = 0, relocate = false, environment: DebuggerEnvironment = defaultEnvironment): { extension: Extension; attach: (view: EditorView) => () => void } {
+  const { debuggerRequest } = environment
   let status: DebuggerStatus | undefined
   const absolute = file.startsWith('/') ? file : `${root}/${file}`
   const relative = absolute.startsWith(root + '/') ? absolute.slice(root.length + 1) : file
@@ -55,7 +60,7 @@ export function debuggerEditorExtension(root: string, account: string, file: str
     const el = document.createElement('div'); el.className = 'cm-debugger-error'; el.setAttribute('role', 'alert'); el.textContent = error instanceof Error ? error.message : String(error); view.dom.querySelector('.cm-debugger-error')?.remove(); view.dom.append(el); clearTimeout(errorTimer); errorTimer = setTimeout(() => el.remove(), 6000)
   }
   const save = (change: (c: DebugConfig) => DebugConfig) => {
-    const store = stores.get(storeKey(root, account)); if (!store?.status) return
+    const store = stores.get(storeKey(root, account, environment)); if (!store?.status) return
     const config = change(store.status.config)
     store.status = { ...store.status, config }; ++store.pending; ++store.revision
     for (const callback of store.listeners) callback(store.status)
@@ -111,5 +116,5 @@ export function debuggerEditorExtension(root: string, account: string, file: str
       '.cm-debugger-hover': { maxWidth: '320px', padding: '4px 6px', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', color: 'var(--color-ink)', background: 'var(--color-surface-raised)', fontSize: '12px' },
       '.cm-debugger-error': { position: 'sticky', bottom: '0', padding: '4px 6px', background: 'var(--color-surface-raised)', color: 'var(--color-ink)', fontSize: '12px' }
     })]
-  return { extension, attach(v) { view = v; const unsubscribe = subscribeDebugger(root, account, next => { status = next; const frame = next?.session.state === 'stopped' ? next.session.frames.find(f => matches(f.source?.path ?? '')) : undefined; if (view) view.dispatch({ effects: setDebugMarks.of({ breakpoints: next?.config.breakpoints.filter(b => matches(b.file)).map(b => ({ key: breakpointKey(b), column: b.column, line: b.line - lineOffset, enabled: b.enabled, verified: next.session.breakpoints.some(p => matches(p.file) && p.line === b.line && p.column === b.column && p.verified) })) ?? [], line: frame ? frame.line - lineOffset : undefined }) }) }); return () => { view = undefined; unsubscribe(); clearTimeout(errorTimer) } } }
+  return { extension, attach(v) { view = v; const unsubscribe = subscribeDebugger(root, account, next => { status = next; const frame = next?.session.state === 'stopped' ? next.session.frames.find(f => matches(f.source?.path ?? '')) : undefined; if (view) view.dispatch({ effects: setDebugMarks.of({ breakpoints: next?.config.breakpoints.filter(b => matches(b.file)).map(b => ({ key: breakpointKey(b), column: b.column, line: b.line - lineOffset, enabled: b.enabled, verified: next.session.breakpoints.some(p => matches(p.file) && p.line === b.line && p.column === b.column && p.verified) })) ?? [], line: frame ? frame.line - lineOffset : undefined }) }) }, environment); return () => { view = undefined; unsubscribe(); clearTimeout(errorTimer) } } }
 }

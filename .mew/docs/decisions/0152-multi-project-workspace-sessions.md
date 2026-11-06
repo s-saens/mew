@@ -1,39 +1,37 @@
 ---
 title: "0152 — Compose multi-project workspaces from scoped sessions"
-description: "Proposes one app shell with reusable scoped project sessions and explicit compact presentation for optional desktop multi-project mode. Compares iframe duplication, defines identity and service boundaries, and preserves current single-project and account-tab contracts pending staged implementation."
-status: proposed
+description: "Accepts one application shell with immutable workspace clients, root-scoped state and subscriptions, and explicit compact presentation for optional multi-project mode. Records implementation and local integration evidence, versioned compatibility, Postgres limits, alternatives, and unverified production performance."
+status: accepted
 created: "2026-11-06"
-updated: "2026-11-06"
+updated: "2026-11-07"
 ---
 
 ## Context
 
-The user requested an optional multi-project desktop mode alongside the existing single-project mode. A project panel should reuse the mobile workspace structure, choose its tools independently, and share the page background and global controls. Maintainability, efficient operation, design before implementation, and a staged plan are explicit priorities.
+The user requested an optional multi-project desktop mode alongside the existing single-project mode. A project panel reuses the mobile workspace structure, selects its tools independently, and shares the page background and global controls. Maintainability, efficient operation, design before implementation, and a staged plan are explicit priorities. The later interaction decision uses a dedicated handle to move a project panel, preserving the project name as its selection action.
 
-The current client and server assume one selected root per account. `src/App.tsx` combines account services, project state, layout, and tools. `src/api/client.ts` keeps a mutable default project, and `src/utils/contentCache.ts` selects its workspace through a module variable. Several UI components inspect the browser viewport or query the whole document. On the server, `runAccountWorkspace` selects the account's active root; workspace switching persists that choice and broadcasts it to the account. Rendering multiple copies of the existing workspace would therefore not provide independent project contexts.
+Before this change, client APIs and server defaults assumed one selected root per account. `src/App.tsx` combined account services, project state, layout, and tools. `src/api/client.ts` kept a mutable default project, and `src/utils/contentCache.ts` selected its workspace through a module variable. Several UI components inspected the browser viewport or queried the whole document. Server workspace switching persisted account selection and broadcast it to that account. Repeating the unmodified workspace component could therefore route one project's requests or callbacks through another project's selection.
 
-Worktree support also distinguishes a logical `projectPath` from the actual working root. Shared editor, agent, and terminal tabs belong to the former; file operations and caches must use the latter. A design that carries only one of these paths loses existing behavior after a worktree handoff.
+Worktree support distinguishes a logical `projectPath` from the actual working root. Shared editor, agent, and terminal tabs belong to the former; file operations and caches use the latter. Carrying only one path loses that distinction after a worktree handoff.
 
-## Proposed decision
+## Decision
 
-Use one React application with an app shell, explicit project sessions, and reusable workspace presentation. Introduce request scope before exposing multiple live panels. Keep changes incremental and preserve the existing single-project behavior at every intermediate stage.
+Use one React application with shared account services, explicit workspace clients and state ownership, and reusable workspace presentation. Preserve legacy single-project APIs through an adapter while migrating concurrent views to captured scopes. Keep the changes incremental so request isolation can be checked before relying on the board UI.
 
 ```mermaid
 flowchart TD
-  Shell["AppShell: account services, global header, mode"]
-  Registry["Project session registry"]
+  Account["Account services and shared transport"]
+  Host["Project workspace hosts"]
   Single["Single-project presentation"]
-  Board["ProjectBoard: columns and rows"]
-  Compact["Compact project workspaces"]
-  Scope["Immutable workspace clients and scoped caches"]
-  Server["Validated request context and scoped live events"]
-  Shell --> Registry
-  Shell --> Single
-  Shell --> Board
+  Board["Project board and panel handles"]
+  Compact["Compact workspace presentation"]
+  Scope["Immutable clients and scoped state"]
+  Server["Validated request context and live sources"]
+  Account --> Host
+  Single --> Host
   Board --> Compact
-  Single --> Registry
-  Compact --> Registry
-  Registry --> Scope
+  Compact --> Host
+  Host --> Scope
   Scope --> Server
 ```
 
@@ -41,65 +39,42 @@ flowchart TD
 
 | Owner | Responsibility |
 | --- | --- |
-| App shell | Authentication, runtime/transport, theme, locale, account settings, project catalog, global resources, notifications, Mewpet, mode, and active project-panel identity. |
-| Project session | Server-confirmed logical project and working root, request generation, tab and tree controllers, draft/save lifecycle, and subscriptions to that project's data. Sessions outlive presentation changes. |
-| Workspace view | The visible tool, navigation stack, local focus, scroll, and DOM references. View identity is separate from project identity. |
-| Compact workspace | The shared mobile-style header/content/Dock composition. It consumes a session and explicit presentation settings; it does not initialize another application. |
-| Project board | Stable panel IDs, column/row arrangement, resize/reorder interactions, and device-local restoration. It does not read or save project files. |
+| Account/application shell | Authentication, runtime/transport, theme, locale, account settings, project catalog, global resources, notification collection, Mewpet, and shared native Browser. |
+| Project workspace | Confirmed logical project and actual working root, request generations, tab/tree controllers, drafts and saves, and subscriptions to that project's data. |
+| Workspace view | Visible tool, navigation stack, local focus, scroll, DOM root, and explicit compact presentation. View identity remains separate from project identity. |
+| Project board | Stable panel IDs, columns/rows, handles, resizing, active-panel targeting, and device-local restoration. File I/O stays with the workspace. |
 
-A registry owns one session per open logical project in the first version. Keep controllers cohesive and expose focused interfaces rather than a single context containing every changing field. A change in one project's transcript should not rerender all other project workspaces.
+The [scoped workspace contract](../development/workspace-sessions.md) owns the implemented request encoding, validation, client/cache boundaries, live/event behavior, compact presentation interface, and current database restriction. Keep those details in that canonical source. The [feature](../features/appearance-accounts-operations/multi-project-mode.md) owns panel behavior and defaults; the [workspace layout contract](../development/ui-workspace-layout.md) owns geometry and restoration.
 
-### Identity and requests
+### Implementation choices
 
-Use an immutable scope concept containing the instance/account identity, logical project path, and actual workspace path. Keep UI panel IDs and request generations separate from this identity. Browser identity fields are cache boundaries, never server authorization claims; the server derives the account from authentication.
+`createWorkspaceClient(scope)` captures actual and logical paths for HTTP, resource URLs, and sockets. Existing transports remain shared beneath those clients. The server resolves explicit scopes through one validated `AsyncLocalStorage` boundary and retains its authorization rules. Explicit destination preparation returns a snapshot without changing account selection; legacy selection keeps its existing persistence and signals.
 
-`createWorkspaceClient(scope)` binds HTTP requests, WebSocket handshakes, and DOM resource URLs to the same scope. Existing transports remain shared beneath that client. A captured request never consults the subsequently focused panel. Account-level APIs use an account client and do not inherit an arbitrary project's root.
+Scoped cache operations share bounded infrastructure. Document mutation coordinators and task-document handlers retain workspace ownership. File collaboration and live resource delivery retain captured roots, while account tab metadata remains under [ADR 0133](0133-realtime-account-tabs.md). Global mutable root setters survive only in the compatibility adapter.
 
-Reuse server `AsyncLocalStorage` through one validated scope resolver. Explicit scopes take precedence over the legacy account-selected root. Reject invalid explicit scopes rather than falling back. Preserve registered-project rules for members, owner/manager folder access, feature/file permissions, protected paths, and worktree membership validation. Preserve the distinction between logical project and worktree in snapshots and later requests.
+Use `WorkspaceViewProvider` and scoped compact CSS to reuse the mobile composition. Keep pointer, keyboard, touch, and viewport capabilities separate from presentation. Scope DOM searches and input targets to the owning view. Project-local overlays retain their owner, and account services stay above views. A project panel's dedicated handle owns movement; the feature contract defines project-name selection and close behavior.
 
-Opening or changing a panel resolves a destination and its snapshot in the same validated request context, without persisting the account's single-project selection. The snapshot's project existence and identity must come from that context. Keep the existing selection API and its broadcast semantics for compatible single-project clients during migration. Explicit panels ignore account selection changes while continuing to consume relevant account tab, catalog, permission, and theme signals. Specify the exact HTTP, socket, and resource encoding in the first implementation stage after the transport inventory; it must work through Mewlink without relying on custom headers for browser resource loads.
+Store board descriptors and geometry separately from the existing single-project desktop and physical-mobile records. This extends [ADR 0134](0134-account-desktop-layout.md) with an optional mode. It preserves that decision's single-project desktop geometry and the existing account tab ledgers; neither decision is superseded.
 
-Preserve existing mutation preconditions, including file/task owner and workspace checks, Git owner/root headers, and upload roots. Reject contradictory scope values. Audit endpoints that independently rebind a root, such as command buttons, rather than letting a nested resolver silently override the initiating scope.
+### Compatibility and incomplete boundaries
 
-Pin live sources and mutation jobs to their captured root, while rechecking current authentication and authorization. Review both connection setup and subsequent authorization in `server/reqAuth.ts` and `server/live-sources.ts`. Root-relative event keys, including DB events currently keyed by API project name and database ID, must include actual root identity where that data is project-owned. Preserve intentionally global memo/chat services.
+Explicit Postgres access is currently blocked because the shared pool/catalog has not completed its root-isolation migration. Root-keyed DB events do not establish catalog isolation. The [current Postgres restriction](../development/workspace-sessions.md#current-postgres-restriction) specifies HTTP, socket, Markdown-save, and generic filesystem behavior. The legacy database path remains available under its existing contract.
 
-### State, presentation, and input
-
-The current [account-tab contract](../development/account-tabs.md) remains authoritative for persisted tab metadata. Share cache infrastructure and its limits, but require explicit identities on cache operations. Global mutable root setters may survive only as a temporary single-project compatibility adapter; multi-project sessions must not use them.
-
-Give workspaces an explicit presentation value, such as `docked` or `compact`. Derive compact layout from its host container, with scoped CSS or container queries where useful. Preserve actual pointer, keyboard, and touch capabilities separately: a narrow desktop panel is not a phone. Do not patch `matchMedia`, simulate a mobile user agent, or globally override viewport CSS.
-
-Use one keyboard dispatcher with an active panel target and existing modal/remote-input priority. Scope DOM searches to the owning workspace. Namespace DOM IDs and drag payloads with view identity. A project-local overlay carries its owner and restore-focus target; global settings and account dialogs remain at the app level. Reuse overlay primitives rather than adding a second dismissal system.
-
-Keep sessions and the selected workspace's live editor identity stable during mode changes. Reparenting or remounting an editor can lose undo, selection, or IME state even when its text was saved; validate those details before moving the mode control into normal use. Hidden views can release heavy rendering and live reads when their state has a safe owner, while drafts, save queues, and running sessions remain recoverable.
-
-### Board geometry and storage
-
-Use a focused column/row layout model with stable panel IDs, column widths, and row weights. It supports a narrow first panel, unused background, multiple rows, movement, and resize boundaries. Keep this model separate from tool `DockKind` and existing single-project `DockState`. Extract a shared pure geometry helper only when both consumers need the same behavior; do not introduce a general window-management framework.
-
-Add a versioned multi-project browser record scoped to account and instance, separate from single-project desktop geometry and physical-mobile restoration. Store panel descriptors, geometry, active panel, and per-view tool selection. Keep document contents and tab ledgers in their existing owners. Normalize invalid IDs, impossible dimensions, and unknown versions conservatively; distinguish a missing record from an intentionally empty board.
-
-This proposal extends [ADR 0134](0134-account-desktop-layout.md) with a separate optional mode. Its existing desktop geometry contract remains the single-project contract. It preserves [ADR 0133](0133-realtime-account-tabs.md). No current decision is superseded by this proposed, unimplemented design.
-
-### Efficiency and lifecycle
-
-Run account services once. Reuse the existing transport and root-keyed subscription/cache infrastructure; coalesce identical reads and release listeners when their last consumer leaves. Preserve one browser-session identity in active-session accounting while representing the projects it displays. Native Browser and login keep their [single account session and active viewer](../development/browser-desktop.md#permissions-profiles-and-lifecycle); project Docks invoke the shared viewer rather than creating competing attachments. Localhost app tabs retain their separate viewer/proxy contract.
-
-Load tool code on demand. Pause hidden view rendering and reads under existing visibility rules, without stopping agents or terminals. Isolate loading failures with project-level error boundaries. Avoid per-panel copies of resource polling, authentication, theme synchronization, notification collectors, Mewpet, or storage maintenance.
-
-Measure one, three, and ten panels before calling the implementation efficient. Record mounted heavy tools, retained listeners/subscriptions, request counts, memory, and responsiveness on a documented fixture. Shared service counts and teardown correctness are testable requirements; numerical latency and memory budgets need a measured baseline.
+Keep editor and session ownership stable through presentation changes. Integration checks must establish undo, selection, IME, draft, and live-session retention; accepting this architecture does not claim that every lifecycle path is already verified. The shared native Browser retains its [single account session and active viewer](../development/browser-desktop.md#permissions-profiles-and-lifecycle). Localhost app viewers retain their separate proxy contract.
 
 ## Alternatives
 
 | Alternative | Assessment |
 | --- | --- |
-| Render several current `EditorApp` instances | Small initial markup change, but mutable root state, global events, shortcuts, portals, and server selection remain shared. Reject as the production architecture. |
-| Embed the full app in one iframe per project | Isolates browser globals and reuses viewport CSS, but still needs server request scoping. Duplicates app services and requires another lifecycle, focus, modal, fullscreen, background, and Mewlink bridge contract. Existing framing protections must not be relaxed just for this shortcut. Keep as a considered alternative. |
-| Rewrite all layout and state code at once | Removes old assumptions in one change but makes compatibility failures hard to localize. Reject in favor of small verified extractions. |
-| Scoped sessions and shared compact presentation | Requires more initial separation, but fixes the underlying multi-project boundary, reuses mobile tools, and centralizes global work. Recommended target. |
+| Repeat the unmodified `EditorApp` in each panel | Small markup change, but mutable defaults, global events, shortcuts, portals, and account selection still overlap. Reject without extracting or gating account owners and binding each workspace's dependencies. |
+| Embed the full app in one iframe per project | Isolates browser globals and viewport CSS, but still needs server scope. Duplicates account services and adds lifecycle, focus, modal, fullscreen, background, and Mewlink bridge contracts. Reject for this implementation; preserve existing framing protections. |
+| Rewrite all layout and state code at once | Makes compatibility failures difficult to localize. Reject in favor of verified scope boundaries and incremental composition changes. |
+| Scoped workspaces with shared compact presentation | Requires initial separation across APIs and state, but fixes request ownership, reuses mobile tools, and gives account work one owner. Accept. |
 
 ## Consequences and status
 
-The foundational work crosses client APIs, caches, server request scope, live updates, input routing, and UI composition. It cannot be delivered safely as only a layout toggle. Each stage must remain compatible with the existing application; multi-project mode stays unexposed until the independence tests pass.
+The decision is accepted. Request resolution, immutable clients, scoped cache/queue/event handling, collaboration identity, presentation boundaries, and App integration are implemented in source. The [work record](../work/multi-project-mode.md) records local mode-transition, singleton lifecycle, save/draft, compatibility, and synthetic multi-panel checks. Those checks do not establish production provider/editor performance, physical-device IME behavior, or operational application. An older server that does not advertise the required workspace-scope version retains the existing single screen; browser assets alone cannot enable unsafe concurrent requests.
 
-This ADR records the recommended design, not implementation or verification. The [feature](../features/appearance-accounts-operations/multi-project-mode.md) owns behavior and design defaults. The [work plan](../work/multi-project-mode.md) owns staging, exit criteria, and actual evidence. Change this status when the scope contract and implementation are established.
+Measure one, three, and ten panels before claiming efficient scaling. Record heavy tools, listeners/subscriptions, requests, memory, and responsiveness against a documented fixture. Prefer shared services, coalesced reads, lazy tool loading, and listener teardown over per-panel copies. Hidden rendering may pause under existing visibility rules while recoverable drafts and running execution sessions retain their owners.
+
+The [work record](../work/multi-project-mode.md) owns staged progress, checks actually performed, failures, and remaining gates. The architecture is accepted independently of those checks; the current source-level database restriction remains a deliberate limit until its replacement is implemented and verified.

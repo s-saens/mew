@@ -65,3 +65,36 @@ test('Antigravity ACP 전환은 기존 terminal 프로세스를 종료하지 않
   await assert.rejects(stopAgentTerminal(fake.manager, 'antigravity', 'old-tab'))
   assert.deepEqual(fake.kills, [])
 })
+
+test('explicit terminal identity separates the same tab across accounts, logical projects and working roots', async () => {
+  const fake = fakeTmux()
+  const main = { account: 'owner', projectPath: '/project', workspacePath: '/project' }
+  const identities = [main, { ...main, account: 'member' }, { ...main, projectPath: '/other-project' }, { ...main, workspacePath: '/worktree' }]
+  const sessions = await Promise.all(identities.map(identity => startAgentTerminal(fake.manager, 'tmux', 'same-tab', '/shared-cwd', identity)))
+  assert.equal(new Set(sessions.map(value => value.session)).size, identities.length)
+  assert.ok(!sessions.some(value => value.session === agentTerminalSessionName('tmux', 'same-tab')), 'legacy terminal names remain separate')
+  await startAgentTerminal(fake.manager, 'tmux', 'same-tab', '/shared-cwd', main)
+  assert.equal(fake.creates.length, identities.length, 'reconnect within the same root reuses its terminal')
+  await stopAgentTerminal(fake.manager, 'tmux', 'same-tab', identities[3])
+  assert.deepEqual(fake.kills, [sessions[3].session])
+  assert.equal(fake.sessions.length, identities.length - 1)
+})
+
+test('new single-project terminals retain their execution across modes and old artifacts remain legacy-only', async () => {
+  const fake = fakeTmux()
+  const identity = { account: 'owner', projectPath: '/project', workspacePath: '/worktree' }
+  const single = await startAgentTerminal(fake.manager, 'tmux', 'new-tab', '/shared-cwd', identity, { allowLegacy: true })
+  const multi = await startAgentTerminal(fake.manager, 'tmux', 'new-tab', '/shared-cwd', identity)
+  const returned = await startAgentTerminal(fake.manager, 'tmux', 'new-tab', '/shared-cwd', identity, { allowLegacy: true })
+  assert.equal(multi.session, single.session)
+  assert.equal(returned.session, single.session)
+  assert.equal(fake.creates.length, 1)
+  const legacy = agentTerminalSessionName('tmux', 'old-tab')
+  fake.sessions.push({ name: legacy, createdAt: 1, attached: false, windows: 1 })
+  assert.equal((await startAgentTerminal(fake.manager, 'tmux', 'old-tab', '/shared-cwd', identity, { allowLegacy: true })).session, legacy)
+  const qualified = await startAgentTerminal(fake.manager, 'tmux', 'old-tab', '/shared-cwd', identity)
+  assert.notEqual(qualified.session, legacy, 'unknown-root legacy artifacts are not adopted by explicit scopes')
+  await stopAgentTerminal(fake.manager, 'tmux', 'old-tab', identity)
+  assert.deepEqual(fake.kills, [qualified.session])
+  assert.ok(fake.sessions.some(session => session.name === legacy))
+})

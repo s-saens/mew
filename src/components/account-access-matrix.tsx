@@ -1,7 +1,8 @@
+import { useWorkspaceApi } from '../api/workspace-api-context'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { SelectField, TabScrollArea } from '@mew/ui'
 import { FEATURES, GUEST_FEATURES, type AccessSettings, type Feature } from '../../shared/access-policy'
-import { fetchAccessSettings, fetchAccessPath, resetFeatureAccess, saveFeatureAccess, saveFileAccess, type AccessPathSettings, type AdminUser, type Role } from '../api/client'
+import { type AccessPathSettings, type AdminUser, type Role } from '../api/client'
 import { uiText } from '@mew/ui/i18n-core'
 import { useI18n } from '../i18n'
 import { AccountColumnHeaders } from './account-column-headers'
@@ -15,6 +16,7 @@ export function AccountAccessMatrix({ users, currentEmail, disabled, onRoleChang
   onRoleChange: (email: string, role: Role) => Promise<void>
   onResetPassword: (email: string) => Promise<string>
 }) {
+  const { fetchAccessSettings, fetchAccessPath, saveFeatureAccess, resetFeatureAccess, saveFileAccess } = useWorkspaceApi()
   const { t } = useI18n()
   const [settings, setSettings] = useState<AccessSettings | null>(null)
   const [tab, setTab] = useState<'features' | 'files'>('features')
@@ -31,13 +33,13 @@ export function AccountAccessMatrix({ users, currentEmail, disabled, onRoleChang
     let cancelled = false
     fetchAccessSettings().then(value => { if (!cancelled) setSettings(value) }).catch(err => { if (!cancelled) setError(err.message || t('access.loadFailed')) })
     return () => { cancelled = true }
-  }, [users, t])
+  }, [users, t, fetchAccessSettings])
   const loadPath = useCallback(async () => {
     const version = ++request.current
     setPathSettings(null)
     try { const result = await fetchAccessPath(project, selectedPath); if (version === request.current) setPathSettings(result) }
     catch (err) { if (version === request.current) setError(err instanceof Error ? err.message : t('access.loadFailed')) }
-  }, [project, selectedPath, t])
+  }, [project, selectedPath, t, fetchAccessPath])
   const cancelPathRequest = useCallback(() => { request.current++ }, [])
   useEffect(() => {
     if (tab === 'files') { void loadPath(); setPathInput(selectedPath) }

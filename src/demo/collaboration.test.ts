@@ -41,6 +41,18 @@ test('local collaboration keeps editor documents in sync with the shared workspa
   store.writeFile('src/main.tsx', 'export const demo = true\n')
   assert.equal(code?.ydoc.getText('content').toString(), 'export const demo = true\n')
 
+  store.createDirectory('other')
+  store.writeFile('other/welcome.md', '# Independent project\n')
+  let explicit: CollaborationSession | undefined
+  provider.open({ project: '.workspace', path: 'welcome.md', authEmail: 'visitor@example.test', workspacePath: `${store.workspacePath}/other`, projectPath: `${store.workspacePath}/other` }, session => { explicit = session })
+  const explicitDeadline = Date.now() + 5000
+  while (!explicit?.synced) { assert.ok(Date.now() < explicitDeadline, 'explicit root collaboration initialized'); await new Promise(resolve => setTimeout(resolve, 10)) }
+  assert.notEqual(explicit.ydoc, document.ydoc)
+  assert.equal(explicit.ydoc.getText('content').toString(), '# Independent project\n')
+  let rootAlias: CollaborationSession | undefined
+  provider.open({ project: '.workspace', path: 'welcome.md', authEmail: 'visitor@example.test', workspacePath: `${store.workspacePath}/docs`, projectPath: `${store.workspacePath}/docs` }, session => { rootAlias = session })
+  assert.equal(rootAlias?.ydoc, document.ydoc, 'explicit roots preserve canonical aliases without changing active workspace')
+
   store.openWorkspace(`${store.workspacePath}/docs`)
   const nestedProvider = createDemoCollaboration(store)
   try {

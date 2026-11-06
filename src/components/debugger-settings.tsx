@@ -1,14 +1,16 @@
+import { useWorkspaceApi } from '../api/workspace-api-context.tsx'
 import { useEffect, useId, useState } from 'react'
 import { HoverTipLayer, SelectField } from '@mew/ui'
 import { RefreshDouble, Check, Play, Download } from 'iconoir-react'
 import { useI18n } from '../i18n'
-import { debuggerRequest, type DebuggerStatus } from '../api/debugger'
+import { type DebuggerStatus } from '../api/debugger'
 import { defaultDebugConfig, type DebugAdapterKind, type DebugConfig } from '../../shared/debugger'
 import { debuggerCopy } from './debugger-copy'
 import { debuggerExtra, debugInput, debugPrimaryButton, debugError, debugTextButton } from './debugger-helpers'
 import { DebugSection } from './debugger-controls'
 
 export default function DebuggerSettings({ root, portalContainer, onOpen }: { root: string; portalContainer?: HTMLElement | null; onOpen: () => void }) {
+  const { debuggerRequest } = useWorkspaceApi()
   const { locale } = useI18n(), c = { ...debuggerCopy[locale] ?? debuggerCopy.en, ...debuggerExtra(locale) }
   const transportId = useId()
   const [config, setConfig] = useState<DebugConfig | null>(null)
@@ -24,7 +26,7 @@ export default function DebuggerSettings({ root, portalContainer, onOpen }: { ro
     const controller = new AbortController()
     debuggerRequest<DebuggerStatus>(root, '', undefined, 'GET', controller.signal).then(value => { apply(value.config); setAdapter(value.adapter); setLive(value.sessions?.some(s => ['starting', 'running', 'stopped'].includes(s.state)) ?? ['starting', 'running', 'stopped'].includes(value.session.state)) }, e => { if (!controller.signal.aborted) setError(e.message) })
     return () => controller.abort()
-  }, [root])
+  }, [root, debuggerRequest])
   async function action(kind: 'save' | 'test' | 'install') {
     if (!config) return
     setBusy(true); setError(''); setMessage('')
