@@ -1,8 +1,8 @@
 ---
 title: "Browser startup and deferred loading"
-description: "Browser routes and current startup contracts for runtime authentication, storage scope, initial workspace snapshots, editor and optional module preparation, failure handling, and chunk boundaries. Separates verification contracts from verbatim historical isolated measurements."
+description: "Browser routes and current startup contracts for runtime authentication, storage scope, initial workspace snapshots, editor/optional module preparation, immediate dialog shells with deferred bodies, failure handling, and chunk boundaries. Separates verification contracts from verbatim historical isolated measurements."
 created: "2026-11-03"
-updated: "2026-11-03"
+updated: "2026-11-06"
 ---
 
 ## Application routes and missing pages
@@ -110,14 +110,20 @@ App owns urgent UI conditions and keeps the dynamic import literal. `createDefer
 
 The agent panel also defers the terminal renderer through `DeferredAgentTerminal` until a session surface renders. Background session metadata alone does not download xterm. Pending renderer cancellation cannot open a socket for an old session, and the prepared renderer uses current props when reopened. The [terminal contract](../features/terminals-agents-automation/tmux-shell-terminals.md#implementation-details) owns session and command behavior.
 
-`deferredComponent` gives panels/settings their own Suspense boundaries, preserving the workspace during slow downloads.
+`deferredComponent` keeps optional panel downloads in local boundaries. Menu dialogs instead use `deferredDialog` so opening them immediately commits a dismissible frame with the translated title, close control, and shared loading indicator before the code arrives.
 
 - Download settings, file browsing, login, remote desktop, and history when opened.
 - Load search/tasks/notes on first open; retain their components after closing to preserve state. Focus notes on their first mount after download.
 - Keep agent session restoration/notifications independent of workspace loading.
 - Start the full update check after the workspace has rendered once.
 
-The file explorer's `SearchPanel` uses `deferredComponent(..., undefined, { suspend: false })`. It retains its dynamic import and fallback but renders the loaded component through regular state, avoiding the extra React Suspense retry before the file tree appears. The wrapper ignores completions after unmount, passes current props, and throws current load failures to the existing error boundary. Other deferred tools retain their current Suspense behavior. `src/deferred-component.browser.test.ts` controls the real production React retry timer to compare these paths; authentication and module boundaries are checked by the startup graph and browser regressions.
+The file explorer's `SearchPanel` uses `deferredComponent(..., undefined, { suspend: false })`. It retains its dynamic import and fallback but renders the loaded component through regular state, avoiding the extra React Suspense retry before the file tree appears. The wrapper ignores completions after unmount, passes current props, and throws current load failures to the existing error boundary. Other deferred panels retain their current Suspense behavior. `src/deferred-component.browser.test.ts` controls the real production React retry timer to compare these paths; authentication and module boundaries are checked by the startup graph and browser regressions.
+
+`deferredDialog` starts its import after the loading shell commits and renders the loaded component through ordinary state, avoiding the React Suspense retry delay. Cache only public component code and the shared in-flight preparation; pass current props and preserve component-owned API/permission checks. A warm reopen can render prepared code in its first commit. Do not prefetch closed dialogs or wait for their data before displaying a frame.
+
+Apply this path to Settings, My account, Account management, Server File Explorer, Scheduled Tasks, Updates, Mewlink, databases, and system resources. Match each shell's dimensions and the settings layer. The loaded dialog replaces its temporary frame without consuming the overlay history guard or losing dismissal/focus behavior. While a component's APIs are pending, keep its frame and independent fields usable; fill only the affected body region.
+
+Keep an import failure local to a closable dialog with an explicit Retry action. Retrying clears the failed preparation, rather than replacing the workspace or retrying forever. Ignore UI completions after unmount; a late import may cache public code but cannot reopen a closed dialog. [ADR 0149](../decisions/0149-immediate-deferred-dialogs.md) records this refinement of progressive startup.
 
 The regular API's tmux session filter and the explorer's search utilities are imported through [Pure Package Entry Points](packages.md). The command popup's xterm renderer, video viewer for GitHub login, and connection history are downloaded separately when used. The full project icon selection list is also separated from required initial-screen dependencies, and its display size is maintained while waiting for icons. The rationale is recorded in the [Progressive Startup Decision](../decisions/0003-progressive-startup.md).
 
@@ -171,6 +177,8 @@ The final full-source graph preserves 170 deferred edges and reduces critical ch
 | `src/components/shared-memo-startup.browser.test.ts` | Notes focus on first open and reopen |
 
 The user builds and applies `dist/` for the actual installation.
+
+`server/deferred-dialog-ui.test.ts` holds imports while checking immediate shells, settings/mobile bounds and layering, current props, first-commit warm reuse, close/Esc/Back, canceled loads, local failures/retry, and production rendering with retry timers held. `src/workspace-startup.browser.test.ts` holds actual Settings and editor chunks to check that the Settings frame opens before its module and remains closable while the workspace/editor continue loading. `server/menu-dialog-data-ui.test.ts` holds actual account, administration, permission, Mewlink, and ignore-list APIs to check early frames, editable drafts, incremental body updates, local errors, and late-response cancellation at desktop/mobile widths.
 
 `src/workspace-loading.browser.test.ts`·`src/editor-loading.browser.test.ts` hold the actual production React retry timer and verify mounting after module completion but before timer release. Editor checks compare against the existing `deferredComponent` and also verify account, role, root, and permission version changes, stale completions and failures, unmount, and current load failures. The [Measurement Record](../research/mewlink-startup-latency.md) owns isolated display times for the full source and actual saved files, distinguishing them from timings in these unit checks.
 

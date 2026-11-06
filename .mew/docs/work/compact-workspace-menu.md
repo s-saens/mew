@@ -1,8 +1,8 @@
 ---
 title: "Compact workspace menu implementation"
-description: "Records the November 5 grouped hamburger menu, notification previews, separate account settings, database actions, tool shortcuts, and Android gateway removal. Separates local verification and existing check failures from deployment and physical-device acceptance."
+description: "Records the November 5 grouped hamburger menu, notification previews, separate account settings, database actions, tool shortcuts, and Android gateway removal. Includes the November 6 immediate-popup loading correction and separates local verification and existing check failures from deployment and physical-device acceptance."
 created: "2026-11-05"
-updated: "2026-11-05"
+updated: "2026-11-06"
 ---
 
 ## Purpose and result
@@ -27,3 +27,22 @@ Current contracts remain in the [menu](../development/ui-overlays.md#header-hamb
 The broader `src/ui-localization.test.ts` literal scan remains failing on 551 legacy literals across demo/example data, debugger helpers, and other existing sources; the new workspace controls use all four app locales. Two changed example-data strings remove Android references rather than adding untranslated control labels. The complete demo browser suite also fails in unrelated task-list fixtures before the host flow, and the separate Dock maximize test retains its preexisting 0px-versus-6px context-menu radius expectation. These checks are not reported as passing.
 
 Application servers, the Mew launcher, and deployment were not operated. Browser checks use isolated test-owned Chromium; they do not establish physical-device behavior or a server-side operational rollout. The required build updates local `dist/` assets served by an existing instance, while removed server routes take effect when the user later restarts the server.
+
+## November 6: Show menu dialogs before their code and data
+
+The first-open delay came before API rendering: App wrapped settings/account/admin and other optional dialogs in `deferredComponent(..., null)`, leaving no visible frame while their import graph loaded. The modal components already fetch API data in effects and display their own frames independently; Settings and Account can immediately show existing theme/profile props. React Suspense retries could add another deferred commit after download.
+
+Replaced those dialog boundaries with `deferredDialog`: immediately show a translated, closable loading frame at the destination size/layer; import the optional module in an effect; render the prepared component through ordinary state; reuse public code on warm opens; keep failure/retry inside the dialog; and ignore late UI completions after dismissal. API data remains lazy inside the original components. See the [startup contract](../development/browser-startup.md#optional-tools-and-public-module-scheduling), [overlay contract](../development/ui-overlays.md#opening-deferred-dialogs), and [ADR 0149](../decisions/0149-immediate-deferred-dialogs.md).
+
+Verification for this follow-up:
+
+- `npm run build` passed, including TypeScript checks; the existing large-chunk advisory remains.
+- `npm run lint` passed with existing repository warnings.
+- A serial run of the two new dialog regressions plus account settings, settings navigation, header notifications, workspace menu, prepared-component, and actual workspace-startup suites passed: 10 tests, 0 failures. The immediate-dialog test was rerun after adding its indicator stylesheet to the capture fixture and passed.
+- Controlled production-component imports at 390/1100px verify translated titles/close/loading, dimensions/layering, current props, local error/retry, cached first-commit reopen, close/Esc/Back, retained drafts, and ignored late imports. Inspected the mobile loading-frame capture with its visible shared indicator.
+- Actual account/admin/settings APIs were held at 390/1100px: frames and independent fields remained interactive; body data filled the original dialogs; account failure stayed local; typed profile drafts survived; and closed dialogs did not reopen after late responses.
+- The actual App startup regression holds Settings and editor chunks together: the Settings shell appears before its module, closes while pending, reopens, and replaces its body without dismissing the workspace or its history guard. Closed tools remain deferred.
+- The API and workspace-shell dependency checks passed. The third check in `src/api/client-bundle.test.ts` still fails because it expects the old `packages/editor/src/utils/fuzzy.ts` entry in the explorer graph. The explorer/search sources are unchanged from HEAD, and this unrelated assertion was preserved.
+- `npm run check:docs` validated 739 descriptions without metadata errors, then failed on 41 missing local links outside this follow-up's new references. Existing missing MOC/decision entry points and concurrent database documentation are separate from this fix; new ADR/work/startup/overlay links were checked.
+
+No application server, launcher, or deployment operation was performed. These controlled local checks do not establish a measured latency for the user's connection or physical-device behavior.

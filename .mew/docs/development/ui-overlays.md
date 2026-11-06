@@ -1,8 +1,8 @@
 ---
 title: "UI overlays, selection controls, and menus"
-description: "Shared popup positioning, custom selection, layering, dismissal, and action-menu contracts. Defines the compact grouped workspace menu, independent account settings, keyboard/touch behavior, and focus boundaries."
+description: "Shared popup positioning, custom selection, layering, dismissal, and action-menu contracts. Defines the compact grouped workspace menu, independent account settings, immediate deferred-dialog shells, keyboard/touch behavior, and focus boundaries."
 created: "2026-11-03"
-updated: "2026-11-05"
+updated: "2026-11-06"
 상위파일: "ui-contracts.md"
 ---
 
@@ -99,6 +99,12 @@ On desktop (at least 768px), the settings window has a fixed height of 70% of th
 The settings window is rendered through a portal to `document.body` on the settings layer (`--layer-settings: 1800`). It does not fall behind docking hosts, popup focus ordering, or remote desktop. On mobile (below 768px), Mewpet and speech bubbles are rendered through a portal to a dedicated host inside settings so they remain visible and interactive above settings. Touch and scroll outside the Mewpet image pass through to settings, and clicking or dragging Mewpet does not close settings. Closing settings or switching to desktop width returns Mewpet to the workspace or remote viewer host. The remote viewer hiding setting remains in effect. On desktop, settings appears above regular Mewpet.
 
 The language and font `SelectField` in settings use the settings backdrop as `portalContainer` to display their lists above settings without clipping them to the internal scroll area. Esc and Back close the topmost popup first, such as an open selection list or Mewpet speech bubble. On the mobile settings detail screen (below 768px), `useOverlayDismiss.closeOnBack` clears `mobileSection` and returns `false` to return to the list and re-add the History guard. Pressing Back again from the list closes the settings window. Direct entry to Mewpet or the debugger and changes in screen width are also handled based on the current layout. The on-screen Back button also returns to the list, while Esc, the Close button, and desktop Back close the settings window. Detail regressions are verified in `server/settings-navigation-ui.test.ts`. Closing settings preserves the content and display mode of the notes and tasks underneath.
+
+### Opening deferred dialogs
+
+Commit a titled, dismissible loading frame immediately when a dialog opens; import code and fetch data afterward. `deferredDialog` supplies the initial frame, shared loading indicator, translated close control, local import error, and explicit retry. It reuses prepared public code on warm opens without caching account data. Match the destination frame's dimensions, full-screen mobile settings layout, and `--layer-settings` stacking.
+
+Close, Esc, Back, outside presses, and focus containment/restoration must work during loading and after replacing the temporary frame with the destination dialog. Loading code alone must not set the frame's `busy` flag or disable closing. A dismissed pending dialog cannot reappear when its code or data arrives. Keep independent fields interactive while data-backed regions load. The [startup contract](browser-startup.md#optional-tools-and-public-module-scheduling) owns loading/caching boundaries; [ADR 0149](../decisions/0149-immediate-deferred-dialogs.md) records the decision.
 
 ## Overlay dismissal rules (`useOverlayDismiss`)
 

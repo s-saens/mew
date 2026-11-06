@@ -124,6 +124,7 @@ import { normalizeDirectoryChildren, normalizeTreeCenterAnchor } from './utils/t
 import { observeWorkspaceViewport } from './utils/workspace-viewport'
 import { requestFullscreenWithKeyboard } from '@mew/ui/virtual-keyboard'
 import { deferredComponent } from './components/deferred-component'
+import { deferredDialog } from './components/deferred-dialog'
 import { afterFirstPaint } from './utils/fileOpenPerformance'
 import { captureLocalBrowserLinks, openLocalPortPreview } from './utils/local-browser-links'
 
@@ -132,7 +133,7 @@ function toggleFullscreen() {
   else requestFullscreenWithKeyboard(document.documentElement).catch(() => {})
 }
 
-const UpdatesModal = deferredComponent(async () => ({ default: (await import('./components/updates-modal')).UpdatesModal }), null)
+const UpdatesModal = deferredDialog(async () => ({ default: (await import('./components/updates-modal')).UpdatesModal }), { title: () => uiText('업데이트'), className: 'flex max-h-[90dvh] max-w-3xl flex-col' })
 const TaskPanel = deferredComponent(async () => ({ default: (await import('./components/task-panel')).TaskPanel }))
 const SharedMemo = deferredComponent(async () => ({ default: (await import('./components/shared-memo')).SharedMemo }))
 const ProjectCreationAgentDialog = deferredComponent(async () => ({ default: (await import('./components/ProjectCreationAgentDialog')).ProjectCreationAgentDialog }), null)
@@ -140,14 +141,14 @@ const ProjectAddInline = deferredComponent(async () => ({ default: (await import
 const DocumentGraph = deferredComponent(async () => ({ default: (await import('./components/DocumentGraph')).DocumentGraph }), null)
 const DocsSettingsModal = deferredComponent(async () => ({ default: (await import('./components/DocsSettingsModal')).DocsSettingsModal }), null)
 const Mewcat = deferredComponent(async () => ({ default: (await import('./components/Mewcat')).Mewcat }), null)
-const ServerFileExplorer = deferredComponent(async () => ({ default: (await import('./components/ServerFileExplorer')).ServerFileExplorer }), null)
-const AccountSettingsModal = deferredComponent(async () => ({ default: (await import('./components/AccountSettingsModal')).AccountSettingsModal }), null)
-const SettingsModal = deferredComponent(async () => ({ default: (await import('./components/SettingsModal')).SettingsModal }), null)
-const AdminSettingsModal = deferredComponent(async () => ({ default: (await import('./components/AdminSettingsModal')).AdminSettingsModal }), null)
-const RemoteAccessModal = deferredComponent(async () => ({ default: (await import('./components/remote-access-settings')).RemoteAccessModal }), null)
-const DatabaseListModal = deferredComponent(async () => ({ default: (await import('./components/DatabaseListModal')).DatabaseListModal }), null)
-const SystemStatsModal = deferredComponent(async () => ({ default: (await import('./components/SystemStatsModal')).SystemStatsModal }), null)
-const ScheduleModal = deferredComponent(async () => ({ default: (await import('./components/ScheduleModal')).ScheduleModal }), null)
+const ServerFileExplorer = deferredDialog(async () => ({ default: (await import('./components/ServerFileExplorer')).ServerFileExplorer }), { title: t => t('header.fileExplorer'), className: 'flex h-[min(680px,90dvh)] max-w-2xl flex-col' })
+const AccountSettingsModal = deferredDialog(async () => ({ default: (await import('./components/AccountSettingsModal')).AccountSettingsModal }), { title: t => t('settings.myAccount'), className: 'flex max-h-[90dvh] max-w-[520px] flex-col' })
+const SettingsModal = deferredDialog(async () => ({ default: (await import('./components/SettingsModal')).SettingsModal }), { title: t => t('settings.title'), size: 'settings', className: 'flex flex-col', overlayClassName: 'z-[var(--layer-settings)]' })
+const AdminSettingsModal = deferredDialog(async () => ({ default: (await import('./components/AdminSettingsModal')).AdminSettingsModal }), { title: t => t('admin.title'), size: 'settings', className: 'flex flex-col' })
+const RemoteAccessModal = deferredDialog(async () => ({ default: (await import('./components/remote-access-settings')).RemoteAccessModal }), { title: () => 'Mewlink', className: 'flex max-h-[90dvh] max-w-lg flex-col' })
+const DatabaseListModal = deferredDialog(async () => ({ default: (await import('./components/DatabaseListModal')).DatabaseListModal }), { title: t => t('header.database'), className: 'flex h-[80dvh] max-w-4xl flex-col' })
+const SystemStatsModal = deferredDialog(async () => ({ default: (await import('./components/SystemStatsModal')).SystemStatsModal }), { title: t => t('header.systemResources'), className: 'flex max-h-[80vh] max-w-md flex-col' })
+const ScheduleModal = deferredDialog(async () => ({ default: (await import('./components/ScheduleModal')).ScheduleModal }), { title: t => t('header.scheduledTasks'), className: 'flex max-h-[90dvh] max-w-2xl flex-col' })
 const SearchPanel = deferredComponent(async () => ({ default: (await import('./components/SearchPanel')).SearchPanel }), undefined, { suspend: false })
 type AgentPanelModule = typeof import('./components/AgentPanel.tsx')
 const agentPanelPreparation = createDeferredModulePreparation<AgentPanelModule>(250)
