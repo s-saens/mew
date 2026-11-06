@@ -18,6 +18,58 @@ export function verifyWindowsPackageDependencies(output, adjacentLibraries = [])
   if (external.length) throw new Error(`Desktop DLLs require unbundled build/runtime libraries: ${external.join(', ')}.`)
 }
 
+export const WINDOWS_NATIVE_SOURCE_COMPONENTS = [
+  { name: 'node-datachannel-0.33.4', repository: 'https://github.com/murat-dogan/node-datachannel.git', commit: '5f4365700d4dcc51ab2a3d90eb2d05592bf84c7a' },
+  { name: 'libdatachannel-0.24.5', repository: 'https://github.com/paullouisageneau/libdatachannel.git', commit: '443f6934d9007eb7076ab7825ba330f355fcbead', submodules: true },
+  { name: 'openssl-3.6.4', repository: 'https://github.com/openssl/openssl.git', commit: 'd3c1b1169b3569ff3069e5b399f47b2b28e03d79' },
+  { name: 'vcpkg-openssl-port', repository: 'https://github.com/microsoft/vcpkg.git', commit: '04a9d8e5212d01ee1dd9478eadd9caade4f8b0d4', sparse: ['ports/openssl'] },
+]
+
+/** Preserve the npm binding's own sources; the Rust engine vendors a different version. */
+export async function preserveWindowsNativeSources({ source, destination, components = WINDOWS_NATIVE_SOURCE_COMPONENTS, run = spawnSync, env = process.env }) {
+  const manifest = JSON.parse(await fs.readFile(path.join(source, 'package.json'), 'utf8'))
+  if (manifest.dependencies?.['node-datachannel'] !== '0.33.4') throw new Error('Update Windows npm native source provenance for the selected node-datachannel version.')
+  const origins = []
+  await fs.mkdir(destination, { recursive: true })
+  const git = (directory, args) => {
+    const result = run('git', args, { cwd: directory, env, stdio: 'pipe', encoding: 'utf8', timeout: 10 * 60_000 })
+    if (result.error || result.status !== 0) throw new Error(`Windows native source collection failed: ${result.error?.message || result.stderr || result.signal || result.status}`)
+    return result.stdout.trim()
+  }
+  for (const component of components) {
+    const directory = path.join(destination, component.name)
+    await fs.mkdir(directory)
+    git(directory, ['init', '--quiet'])
+    git(directory, ['config', 'core.autocrlf', 'false'])
+    git(directory, ['config', 'core.longpaths', 'true'])
+    git(directory, ['remote', 'add', 'origin', component.repository])
+    git(directory, ['fetch', '--quiet', '--depth=1', '--filter=blob:none', 'origin', component.commit])
+    if (component.sparse) git(directory, ['sparse-checkout', 'set', ...component.sparse])
+    git(directory, ['checkout', '--quiet', '--detach', 'FETCH_HEAD'])
+    if (git(directory, ['rev-parse', 'HEAD']) !== component.commit) throw new Error(`Windows native source identity mismatch: ${component.name}`)
+    let submodules = ''
+    if (component.submodules) {
+      git(directory, ['-c', 'core.autocrlf=false', '-c', 'core.longpaths=true', 'submodule', 'update', '--init', '--recursive', '--depth=1'])
+      submodules = git(directory, ['submodule', 'status', '--recursive'])
+      if (/^[+\-U]/m.test(submodules)) throw new Error(`Windows native dependency source mismatch: ${component.name}`)
+    }
+    origins.push({ ...component, submoduleCommits: submodules })
+  }
+  async function stripGit(directory) {
+    for (const entry of await fs.readdir(directory, { withFileTypes: true })) {
+      const file = path.join(directory, entry.name)
+      if (entry.name === '.git') await fs.rm(file, { recursive: true, force: true })
+      else if (entry.isDirectory()) await stripGit(file)
+    }
+  }
+  await stripGit(destination)
+  await fs.writeFile(path.join(destination, 'SOURCE-ORIGINS.json'), JSON.stringify({
+    nodeDatachannelVersion: '0.33.4', libdatachannelVersion: '0.24.5', opensslVersion: '3.6.4', components: origins,
+    upstreamBuild: 'https://github.com/murat-dogan/node-datachannel/actions/runs/34694175345',
+    scope: 'Includes recursive libdatachannel dependencies and the exact OpenSSL port/patches. Test-only submodules outside libdatachannel are not fetched.',
+  }, null, 2) + '\n')
+}
+
 function mergeEnvironment(original, additions) {
   const replaced = new Set(Object.keys(additions).map(key => key.toUpperCase()))
   return { ...Object.fromEntries(Object.entries(original).filter(([key]) => !replaced.has(key.toUpperCase()))), ...additions }
@@ -62,7 +114,8 @@ export async function buildWindowsPackage({ source = directory, output, platform
   env = process.env, run = spawnSync, node = process.execPath,
   npmCli = path.join(path.dirname(node), 'node_modules', 'npm', 'bin', 'npm-cli.js'),
   installEngine = installRustEngine, createManifest = createWindowsPackageManifest,
-  inspect, version = helperVersion, files = HELPER_FILES, log = console.log,
+  preserveSources = preserveWindowsNativeSources,
+  inspect, version = helperVersion, files = HELPER_FILES, log = console.log, cleanup = fs.rm,
 } = {}) {
   if (platform !== 'win32' || !['x64', 'arm64'].includes(arch)) throw new Error('Desktop package builds require native Windows x64 or arm64.')
   if (!output) throw new Error('A desktop package output directory is required.')
@@ -75,6 +128,14 @@ export async function buildWindowsPackage({ source = directory, output, platform
     const result = run(command, args, { cwd: target, env, stdio: 'inherit', timeout: 20 * 60_000, ...settings })
     if (result.error || result.status !== 0) throw new Error(`Windows desktop package command failed (${command}: ${result.error?.message || result.signal || result.status}).`)
     return result
+  }
+  let buildError
+  const cleanupStaging = async () => {
+    try { await cleanup(temporary, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 }) }
+    catch (error) {
+      if (!buildError) throw error
+      log(`Could not remove Windows build staging at ${temporary}: ${error.message}. The original build error is preserved.`)
+    }
   }
   try {
     await fs.mkdir(target, { recursive: true })
@@ -99,11 +160,14 @@ export async function buildWindowsPackage({ source = directory, output, platform
       CMAKE_MSVC_RUNTIME_LIBRARY: 'MultiThreaded',
     })
     for (const command of ['rustc', 'cargo']) execute(state.tools.rust, ['run', toolchain, command, '--version'], { env: buildEnv, timeout: 30_000 })
+    const npmSources = path.join(temporary, 'npm-native-sources')
+    log('Preserving the npm native dependencies and their original source notices...')
+    await preserveSources({ source: target, destination: npmSources, run, env: buildEnv })
     log(`Building Windows ${arch} desktop package for ${sourceHash}...`)
     // Use npm's JS entrypoint: Windows .cmd files are not executables for spawn.
     execute(node, [npmCli, 'ci', '--prefix', target, '--omit=dev', '--include=optional', '--ignore-scripts', '--no-audit', '--no-fund'], { env: buildEnv, timeout: 10 * 60_000 })
     execute(powershell, ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', path.join(target, 'install-windows-gpu.ps1'), '-Target', target], { env: buildEnv })
-    installEngine({ target, platform: 'win32', log, run(command, args, options) {
+    installEngine({ target, platform: 'win32', log, buildTimeout: 60 * 60_000, run(command, args, options) {
       return run(command === 'cargo' ? state.tools.rust : command,
         command === 'cargo' ? ['run', toolchain, 'cargo', ...args] : args, { ...options, env: buildEnv })
     } })
@@ -126,13 +190,16 @@ for (const [file, symbol, abi] of [['gpu-windows.dll','mew_gpu_abi',5],['mew-des
       await fs.mkdir(path.dirname(path.join(notices, file)), { recursive: true })
       await fs.copyFile(path.join(target, file), path.join(notices, file))
     }
-    await fs.writeFile(path.join(payload, 'notices', 'README.txt'), 'Mew desktop source is preserved in mew-desktop-source/. Locked Rust dependency sources, including modified datachannel-sys and original notices, are preserved in ../rust/vendor/. Native npm packages retain their original licenses and notices in ../node_modules/. Build toolchains and SDKs are not distributed.\n')
+    await fs.writeFile(path.join(payload, 'notices', 'README.txt'), 'Mew desktop source is preserved in mew-desktop-source/. Locked Rust dependency sources, including modified datachannel-sys and original notices, are preserved in ../rust/vendor/. Native npm package licenses remain in ../node_modules/. node-datachannel-native-sources.zip separately preserves node-datachannel 0.33.4, libdatachannel 0.24.5 and its pinned submodules, OpenSSL 3.6.4, its exact vcpkg port/patches, original notices, and build provenance in SOURCE-ORIGINS.json. The Rust engine uses a different libdatachannel/OpenSSL source tree. Build toolchains and SDKs are not distributed.\n')
     if (version(source) !== sourceHash || version(target) !== sourceHash) throw new Error('Desktop sources changed during the package build.')
-    await createManifest(payload, { sourceHash, arch })
-    const zipScript = path.join(temporary, 'archive.ps1'), name = windowsPackageName(arch)
+    const zipScript = path.join(temporary, 'archive.ps1')
     await fs.writeFile(zipScript, windowsPackageZipScript)
+    execute(powershell, ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', zipScript, '-Source', npmSources, '-Output', path.join(payload, 'notices', 'node-datachannel-native-sources.zip')], { env: buildEnv, timeout: 10 * 60_000 })
+    await createManifest(payload, { sourceHash, arch })
+    const name = windowsPackageName(arch)
     const archive = path.join(temporary, name)
     execute(powershell, ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', zipScript, '-Source', payload, '-Output', archive], { env: buildEnv, timeout: 10 * 60_000 })
+    if (version(source) !== sourceHash || version(target) !== sourceHash) throw new Error('Desktop sources changed during the package build.')
     const checksum = await windowsFileHash(archive)
     await fs.mkdir(output, { recursive: true })
     const destination = path.join(output, name)
@@ -140,7 +207,8 @@ for (const [file, symbol, abi] of [['gpu-windows.dll','mew_gpu_abi',5],['mew-des
     try { await fs.writeFile(`${destination}.sha256`, `${checksum}  ${name}\n`, { flag: 'wx' }) }
     catch (error) { await fs.rm(destination, { force: true }); throw error }
     return { archive: destination, sourceHash, arch, sha256: checksum }
-  } finally { await fs.rm(temporary, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 }) }
+  } catch (error) { buildError = error; throw error }
+  finally { await cleanupStaging() }
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

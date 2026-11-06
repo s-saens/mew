@@ -7,10 +7,10 @@ import { prepareRustVendor } from './rust-vendor.mjs'
 
 /** Compile locally. Keep locked dependency sources and their notices beside the
  * installed binary, including MPL libdatachannel and its bundled libraries. */
-export function installRustEngine({ target, platform = process.platform, run = spawnSync, exists = existsSync, copy = copyFileSync, rename = renameSync, remove = file => rmSync(file, { force: true }), mkdir = directory => mkdirSync(directory, { recursive: true }), prepareVendor = prepareRustVendor, log = console.log }) {
+export function installRustEngine({ target, platform = process.platform, run = spawnSync, exists = existsSync, copy = copyFileSync, rename = renameSync, remove = file => rmSync(file, { force: true }), mkdir = directory => mkdirSync(directory, { recursive: true }), prepareVendor = prepareRustVendor, log = console.log, buildTimeout = 20 * 60_000 }) {
   const manifest = path.join(target, 'rust', 'Cargo.toml'), output = path.join(target, rustLibrary(platform)), temporary = `${output}.tmp`
-  const execute = (command, args) => {
-    const result = run(command, args, { cwd: target, stdio: 'inherit', timeout: 20 * 60 * 1000 })
+  const execute = (command, args, timeout = 20 * 60_000) => {
+    const result = run(command, args, { cwd: target, stdio: 'inherit', timeout })
     if (result.error || result.status !== 0) {
       const phase = command === 'cargo' ? `${command} ${args[0]}` : command
       const detail = result.error ? `${result.error.code ? `${result.error.code}: ` : ''}${result.error.message}` : result.signal ? `signal ${result.signal}` : `exit code ${result.status ?? 'unknown'}`
@@ -28,7 +28,7 @@ export function installRustEngine({ target, platform = process.platform, run = s
     execute('cargo', ['vendor', '--locked', '--versioned-dirs', '--manifest-path', manifest, vendor])
     prepareVendor(vendor, platform)
     execute('cargo', ['build', '--release', '--locked', '--offline', '--manifest-path', manifest,
-      '--config', 'source.crates-io.replace-with="vendored-sources"', '--config', `source.vendored-sources.directory=${JSON.stringify(vendor)}`])
+      '--config', 'source.crates-io.replace-with="vendored-sources"', '--config', `source.vendored-sources.directory=${JSON.stringify(vendor)}`], buildTimeout)
     const binary = path.join(target, 'rust', 'target', 'release', platform === 'win32' ? 'mew_desktop_engine.dll' : rustLibrary(platform))
     if (!exists(binary)) throw new Error('Rust 영상 모듈 파일이 생성되지 않았습니다.')
     copy(binary, temporary)
