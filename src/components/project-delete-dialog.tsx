@@ -2,6 +2,7 @@ import { useId, useRef, useState } from 'react'
 import { DialogFrame } from '@mew/ui'
 import { Trash } from 'iconoir-react'
 import { useI18n } from '../i18n'
+import { ApiResponseError } from '../api/response'
 import { projectDeleteCopy } from './project-delete-copy'
 
 export function ProjectDeleteDialog({ path, onDelete, onClose }: {
@@ -25,7 +26,10 @@ export function ProjectDeleteDialog({ path, onDelete, onClose }: {
       await onDelete(path)
       onClose()
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
+      const message = (err instanceof Error ? err.message : String(err ?? '')).trim()
+      setError(err instanceof ApiResponseError && err.status === 404 && (message === 'HTTP 404' || message === 'Not Found')
+        ? copy.serverUpdateRequired
+        : message || copy.unavailable)
     } finally {
       pending.current = false
       setBusy(false)

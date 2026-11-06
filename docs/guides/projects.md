@@ -1,7 +1,7 @@
 ---
 title: "Projects and file navigation"
-description: "Explains Projects My/All scopes, the plus setup popup, and Delete choices for removing a personal shortcut or permanently deleting a project folder as owner. Covers confirmation, project hierarchy and switching, file navigation, Git review, and task controls."
-updated: "2026-11-06"
+description: "Explains Projects My/All scopes, the plus setup popup, and Delete choices for removing a personal shortcut or permanently deleting a project folder as owner. Covers confirmation, unavailable-server recovery, project hierarchy and switching, file navigation, Git review, and task controls."
+updated: "2026-11-07"
 상위파일:
   - "../../.mew/docs/MOC.md"
   - "MOC.md"
@@ -80,7 +80,7 @@ As you scroll the list, expanded folders and parent documents stack at the top b
 
 Right-click a My project or the current project button, or use its keyboard context menu. Choose **Delete** to see the two deletion choices in the same menu. **Remove from My Projects** removes only your shortcut. Owners also see **Delete permanently**, which deletes the actual folder and all its contents and removes the project and nested projects from the workspace catalog and everyone's shortcuts. This applies to linked folders as well as managed projects.
 
-Choose **Delete permanently** and review the project and folder shown in the confirmation. Cancel is selected initially. Confirm only when you intend to delete those files, including any uncommitted work; Mew cannot undo this operation. Mew protects the filesystem root, the server user's home, instance-data and registry folders, Mew's source root, and parent folders containing them. While deletion runs, the confirmation stays open and cannot be submitted again. If it fails, the error and target remain available for retry. Cancel before submitting deletion to close the confirmation without deleting the folder.
+Choose **Delete permanently** and review the project and folder shown in the confirmation. Cancel is selected initially. Confirm only when you intend to delete those files, including any uncommitted work; Mew cannot undo this operation. Mew protects the filesystem root, the server user's home, instance-data and registry folders, Mew's source root, and parent folders containing them. While deletion runs, the confirmation stays open and cannot be submitted again. If it fails, the error and target remain available for retry. If Mew reports that the deletion API is unavailable, the server operator must update and restart the Mew server before you retry. Rebuilding browser assets alone does not load a new server API. Cancel before submitting deletion to close the confirmation without deleting the folder.
 
 ### Create a missing project path
 

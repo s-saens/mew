@@ -72,7 +72,7 @@ for (const mode of ['assisted', 'onboarding', 'empty-projects', 'missing-active'
     const errors: string[] = []
     page.on('pageerror', error => errors.push(error.message))
     let active = '/alpha', projectPath = '/alpha'
-    let onboardingComplete = false, deletedProject = false
+    let onboardingComplete = false, deletedProject = false, missingDeleteApi = mode === 'delete-project'
     let personalPaths = projectSetup ? mode === 'missing-active' ? ['/alpha'] : [] : mode === 'remove-last' || mode === 'delete-project' ? ['/alpha'] : ['/alpha', '/beta', ...(mode === 'worktree' ? ['/alpha-worktree'] : mode === 'rapid' || desktopLayout ? ['/gamma'] : [])]
     let role = 'owner', serverFiles = keyboardOnly
     let failSwitch = false
@@ -187,6 +187,10 @@ for (const mode of ['assisted', 'onboarding', 'empty-projects', 'missing-active'
       }
       if (url.pathname === '/api/project-registry' && method === 'DELETE') {
         assert.equal(route.request().postDataJSON().path, '/alpha', 'App deletes the project selected in its context menu')
+        if (missingDeleteApi) {
+          missingDeleteApi = false
+          return route.fulfill({ status: 404, body: '' })
+        }
         deletedProject = true
         personalPaths = []
         active = ''
@@ -394,6 +398,10 @@ for (const mode of ['assisted', 'onboarding', 'empty-projects', 'missing-active'
         await page.getByRole('menuitem', { name: '삭제', exact: true }).click()
         await page.getByRole('menuitem', { name: '완전히 삭제하기', exact: true }).click()
         await confirmation.locator('[data-project-delete-confirm]').click()
+        await confirmation.getByRole('alert').filter({ hasText: 'Mew 서버를 업데이트하고 재시작한 뒤 다시 시도하세요.' }).waitFor()
+        assert.equal(deletedProject, false, 'an unavailable deletion API leaves the project intact and explains recovery')
+        assert.equal(await lastProject.isVisible(), true)
+        await confirmation.locator('[data-project-delete-confirm]').click()
       } else {
         await page.getByRole('menuitem', { name: '내 프로젝트에서 삭제하기', exact: true }).click()
       }
@@ -402,7 +410,7 @@ for (const mode of ['assisted', 'onboarding', 'empty-projects', 'missing-active'
       assert.equal(await page.locator('[role=dialog].mew-project-add-dialog').getByRole('button', { name: '프로젝트 가져오기', exact: true }).isVisible(), true)
       assert.deepEqual(workspacePosts, [], 'removal does not issue an unrelated workspace switch')
       const permanentRequests = requests.filter(request => request.path === '/api/project-registry' && request.method === 'DELETE')
-      assert.equal(permanentRequests.length, mode === 'delete-project' ? 1 : 0, 'shortcut removal and permanent deletion use separate mutation paths')
+      assert.equal(permanentRequests.length, mode === 'delete-project' ? 2 : 0, 'shortcut removal and permanent deletion use separate mutation paths')
       if (mode === 'delete-project') {
         assert.equal(deletedProject, true)
         assert.ok(requests.some(request => request.path === '/api/workspace' && request.method === 'GET' && request.time >= permanentRequests[0].time), 'App refreshes its active workspace after confirmed deletion')

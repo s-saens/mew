@@ -39,3 +39,18 @@ test('expired authentication still dispatches the existing auth event before rep
   })
   assert.equal(expired, 1)
 })
+
+test('empty or malformed error responses keep an HTTP message when remote transport omits statusText', async () => {
+  for (const response of [
+    new Response(null, { status: 404 }),
+    new Response('Cannot DELETE /api/project-registry', { status: 404 }),
+    ...[{ error: '' }, { error: '   ' }, { error: 0 }, {}, null].map(body => Response.json(body, { status: 404 })),
+  ]) {
+    await assert.rejects(json(response), error => {
+      assert.ok(error instanceof ApiResponseError)
+      assert.equal(error.message, 'HTTP 404')
+      assert.equal(error.status, 404)
+      return true
+    })
+  }
+})

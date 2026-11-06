@@ -15,7 +15,8 @@ export async function json<T>(res: Response): Promise<T> {
       window.dispatchEvent(new Event('mew:auth-expired'))
     }
     const body = await res.json().catch(() => ({ error: res.statusText }))
-    throw new ApiResponseError(body.error ?? `HTTP ${res.status}`, res.status)
+    const message = typeof body?.error === 'string' ? body.error.trim() : ''
+    throw new ApiResponseError(message || res.statusText.trim() || `HTTP ${res.status}`, res.status)
   }
   return res.json() as Promise<T>
 }

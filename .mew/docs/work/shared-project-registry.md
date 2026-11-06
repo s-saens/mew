@@ -1,8 +1,8 @@
 ---
 title: "Shared projects and project setup"
-description: "Records shared project registry creation, cloning, discovery, and personal project corrections. Includes the November 6 setup popup, My/All scope selector, and separate shortcut-removal/permanent-deletion work with local verification and runtime-application boundaries alongside earlier inline setup history."
+description: "Records shared registry creation, discovery, personal shortcuts, and the November 6 setup and deletion work. Includes the November 7 invisible deletion-error diagnosis and regression verification."
 created: "2026-11-02"
-updated: "2026-11-06"
+updated: "2026-11-07"
 ---
 
 ## Purpose and resulting behavior
@@ -217,3 +217,20 @@ The affected checks passed 41 tests: 31 backend, 5 personal-list hook, and 5 iso
 - `npm run check:docs` validated 743 descriptions with no metadata errors and reported the same 39 existing missing-target links. This change adds no missing target.
 
 Backend filesystem checks use temporary projects, and browser APIs use isolated fixtures. These checks do not establish physical-device behavior or production application. The build updates local `dist/` assets; no deployment, launcher invocation, or application server lifecycle operation was performed.
+
+
+## Invisible deletion error follow-up — November 7
+
+The supplied recording showed permanent deletion returning from its busy state without closing or showing an error. The running source server started at 13:40:15 KST on November 6, before commit `b759aa9` added the deletion API at 14:14:22 KST. This strongly indicates an older running backend behind newer browser assets; no destructive live API probe was performed. An unregistered DELETE receives an empty 404, and Mewlink reconstructs its response without `statusText`.
+
+An isolated Node debugger confirmed the failure chain: `json()` received status 404, empty `statusText`, and an empty fallback error; it threw `ApiResponseError` with an empty message, which the confirmation hid. Response decoding now retains a nonempty status fallback for empty, malformed, or missing server messages. The deletion confirmation always displays an error and gives operator update/restart guidance for generic 404 failures. Specific backend explanations remain visible, and retry retains the selected target.
+
+The [project navigation contract](../development/ui-project-navigation.md#header-project-switcher) owns the confirmation behavior. The local checks below cover the failure and retry path. The running backend still needs an operator restart to load the existing deletion route; no deployment, launcher, or server lifecycle operation was performed.
+
+
+Verification for deletion recovery passed 5 focused tests: the three API response tests, the deletion-dialog browser fixture, and the App permanent-deletion mode. The App fixture checks an unavailable endpoint, actionable feedback without removing the target, and a successful retry returning to project setup. The dialog fixture checks ordinary and empty errors, duplicate prevention, busy dismissal, and retry at 1100/390/320px in both themes.
+
+- The required `npm run build` passed on rerun, including TypeScript. The first attempt found concurrent workspace API migration errors in App and CodePane; those type errors were resolved before rerunning. Vite retained its large-chunk warning.
+- `npm run lint` exited successfully with warnings.
+- `npm run check:docs` validated 750 descriptions without metadata errors and reported 39 existing missing-target links, including absent MOC and decisions entrypoints. No new missing target was introduced; changed links and anchors were inspected.
+- `git diff --check` passed. No live project deletion or physical-device validation was performed.

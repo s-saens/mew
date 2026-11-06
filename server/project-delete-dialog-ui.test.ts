@@ -13,7 +13,7 @@ test('project deletion expands its existing menu and confirms permanent deletion
 import {createRoot} from 'react-dom/client';
 import {ProjectSwitcher} from '${root}/src/components/ProjectSwitcher.tsx';
 import {I18nProvider} from '${root}/src/i18n.tsx';
-window.deletions=[];window.removals=[];window.holdDelete=false;window.failDelete=false;
+window.deletions=[];window.removals=[];window.holdDelete=false;window.failDelete=false;window.emptyError=false;
 function Fixture(){
  const [desktop,setDesktop]=useState(()=>matchMedia('(min-width:768px)').matches);
  const [host,setHost]=useState(null),[open,setOpen]=useState(true),[allowed,setAllowed]=useState(true);
@@ -24,7 +24,7 @@ function Fixture(){
   <ProjectSwitcher paths={paths} activePath="/alpha" fallbackLabel="Workspace" canOpen canChangeIcon canDelete={allowed} icons={{}} onActivate={()=>{}} onIconChange={()=>{}} onOpen={()=>{}}
    sidebarHost={host} sidebarEnabled={desktop} sidebarOpen={open} onSidebarOpenChange={setOpen}
    onRemove={path=>{window.removals.push(path);setPaths(previous=>previous.filter(project=>project!==path))}}
-   onDelete={async path=>{window.deletions.push(path);if(window.holdDelete)await new Promise(resolve=>{window.finishDelete=resolve});if(window.failDelete)throw new Error('Folder is read-only');setPaths(previous=>previous.filter(project=>project!==path))}}/>
+   onDelete={async path=>{window.deletions.push(path);if(window.holdDelete)await new Promise(resolve=>{window.finishDelete=resolve});if(window.failDelete)throw new Error(window.emptyError?'':'Folder is read-only');setPaths(previous=>previous.filter(project=>project!==path))}}/>
  </header><div className="flex min-h-0 flex-1"><div ref={setHost} className="mew-project-sidebar-host"/></div></main>}
 createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18nProvider>);`
   const candidates = [source]
@@ -125,10 +125,14 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     assert.equal(await cancel.isEnabled(), true)
     assert.equal(await confirm.isEnabled(), true)
     assert.equal(await row('/beta').count(), 1, 'a failed deletion leaves the project available')
-    await page.evaluate('window.holdDelete=false;window.failDelete=false')
+    await page.evaluate('window.holdDelete=false;window.emptyError=true')
+    await confirm.click()
+    await dialog.getByRole('alert').filter({ hasText: '지금은 프로젝트를 삭제할 수 없습니다.' }).waitFor()
+    assert.equal(await row('/beta').count(), 1, 'an empty error retains the project and shows retry guidance')
+    await page.evaluate('window.failDelete=false')
     await confirm.click()
     await dialog.waitFor({ state: 'detached' })
-    assert.deepEqual(await page.evaluate('window.deletions'), ['/beta', '/beta'])
+    assert.deepEqual(await page.evaluate('window.deletions'), ['/beta', '/beta', '/beta'])
     assert.equal(await row('/beta').count(), 0, 'a successful retry removes the deleted project')
     assert.equal(await panel.isVisible(), true)
     await page.evaluate('window.setAllowed(false)')
@@ -136,7 +140,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     assert.deepEqual(await managerActions.getByRole('menuitem').allTextContents(), ['내 프로젝트에서 삭제하기'], 'permanent deletion is absent without owner permission')
     await managerActions.getByRole('menuitem', { name: '내 프로젝트에서 삭제하기', exact: true }).click()
     assert.deepEqual(await page.evaluate('window.removals'), ['/alpha'])
-    assert.deepEqual(await page.evaluate('window.deletions'), ['/beta', '/beta'], 'removing a shortcut does not call permanent deletion')
+    assert.deepEqual(await page.evaluate('window.deletions'), ['/beta', '/beta', '/beta'], 'removing a shortcut does not call permanent deletion')
     assert.deepEqual(errors, [])
     await page.close()
   }
