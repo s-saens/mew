@@ -1,8 +1,8 @@
 ---
 title: "Connect project documentation and configure automatic agent guidance"
 created: 2026-09-16
-updated: "2026-11-06"
-description: "Explains project documentation setup, per-account default instructions, and per-message Build/Deploy composer controls. Covers instruction priority and preservation, advanced build settings in View file, tests and documentation, Git automation, model congestion retries, and automatic saving."
+updated: "2026-11-07"
+description: "Explains project documentation setup, per-account default instructions, and per-message Build/Deploy controls beside CLI mode. Covers instruction priority and preservation, advanced build settings in View file, tests and documentation, Git automation, model congestion retries, and automatic saving."
 상위파일: "MOC.md"
 ---
 
@@ -11,7 +11,7 @@ This guide explains how to connect a project's documentation folder or configure
 | What to change | Where to start | Scope |
 | --- | --- | --- |
 | Documents location and document creation | Right-click the **Documents** toggle in the file explorer → **Agent guidance and document settings** | Current project (owner) |
-| Build verification and deployment for the next request | **Build** and **Deploy** icons in the agent composer action row | Current agent tab; captured per message |
+| Build verification and deployment for the next request | **Build** and **Deploy** icons to the right of the CLI command-mode toggle | Current agent tab; captured per message |
 | Git, language, code quality, tests, documentation, and additional instructions | **Default instructions** gear at the top of the agent panel → **Mew global instructions** | All projects for the signed-in Mew account |
 | Model congestion retry interval and count | Same window → **Mew global instructions** | All ACP conversations for the signed-in Mew account |
 | Project-specific instructions and automatic guidance on/off | Same window → **Current project** | Current project (owner) |
@@ -71,7 +71,7 @@ mew automatically appends project, working, and Documents paths, documentation e
 
 ### Build verification
 
-Use the icon-only **Build** and **Deploy** toggles in the agent composer action row. Build starts on; Deploy starts off. Each icon has a translated accessible name and shared tooltip, exposes its pressed state, and shows an on/off toast when changed. Selections survive refresh for the same account, project, and agent tab in that browser. Other tabs keep independent selections.
+Use the icon-only **Build** and **Deploy** toggles immediately to the right of the CLI command-mode toggle, before the model selector. Build starts on; Deploy starts off. Each icon has a translated accessible name and shared tooltip, exposes its pressed state, and shows an on/off toast when changed. Selections survive refresh for the same account, project, and agent tab in that browser. Other tabs keep independent selections.
 
 Each immediate, queued, startup-pending, or scheduled message captures the selected options. Changing the composer afterward does not change messages already accepted. Editing a queued message loads its saved options; saving or canceling restores the separate new-message selection.
 

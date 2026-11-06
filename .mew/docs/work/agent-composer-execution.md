@@ -1,13 +1,13 @@
 ---
 title: "Agent composer Build and Deploy implementation"
-description: "Records the November 6 composer Build/Deploy toggles, per-message execution snapshots, guidance preservation, removal of build settings controls, and follow-up fixes for Dock toast visibility and mobile keyboard reopening. Covers local regression tests, successful builds and lint, and existing documentation-link failures; deployment and server lifecycle operations are outside this work."
+description: "Records the November 6 composer Build/Deploy toggles, per-message execution snapshots, guidance preservation, removal of build settings controls, and follow-up fixes for Dock toast visibility, mobile keyboard reopening, and placement beside CLI mode. Covers local regression tests, successful builds and lint, and existing documentation-link failures; deployment and server lifecycle operations are outside this work."
 created: "2026-11-06"
 updated: "2026-11-07"
 ---
 
 ## Purpose
 
-Make build verification and deployment intent visible in the composer action row while composing an agent request, preserve that intent for delayed messages, and remove the former build selector and details from Default Instructions.
+Make build verification and deployment intent visible beside CLI command mode while composing an agent request, preserve that intent for delayed messages, and remove the former build selector and details from Default Instructions.
 
 ## Resulting behavior
 
@@ -45,6 +45,14 @@ The regression covers both toggles with blurred input, retained focus after keyb
 `npm run build` passed in the primary checkout, including TypeScript and Vite. An earlier isolated build in `.worktrees/verify-agent-toggle-keyboard` also passed while concurrent API/project-board changes temporarily blocked primary-checkout verification. The unrelated intermediate errors were resolved outside this task; those files are excluded from this change. `npm run lint` completed with warnings; targeted lint for the changed component and tests passed without warnings. `npm run check:docs` passed all 750 descriptions and reported the same 39 existing missing links; the two changed documents had no local-link errors. `git diff --check` passed.
 
 Headless Chromium cannot display an OS keyboard, so the tests verify real touch activation, focus requests, and viewport signals; physical-device keyboard animation remains unverified. No deployment or server lifecycle operation was performed.
+
+## Follow-up: placement beside CLI mode
+
+Move Build and Deploy immediately to the right of the CLI command-mode toggle, before Model, in the composer settings row. The floating bottom actions now begin with Clear. Preserve the existing execution snapshots, queue editing, toast portal, disabled state in CLI mode, and mobile keyboard behavior.
+
+The composer regression checks CLI → Build → Deploy → Model geometry, shared row alignment and non-overlapping controls at 1100/390/320px, and removal from the floating action group. `node --test server/agent-build-verification-ui.test.ts server/agent-execution-keyboard-ui.test.ts` passed all 14 reported tests, including existing focus, toast, and captured-option checks. `npm run lint` completed with warnings. Documentation metadata passed for all 750 documents; the full link check retained the 39 existing missing targets, while the four changed documents had no link errors. `git diff --check` passed.
+
+`npm run build` passed in the isolated `.worktrees/verify-agent-toggle-keyboard` checkout using the committed base plus this task's changes. Primary-checkout build verification remains incomplete: concurrent workspace changes first produced unused imports in `src/App.tsx`, then unsupported constructor parameter-property syntax in `src/workspace/workspace-presence.ts`. Those files are outside this task and remain untouched. No isolated assets were copied into the running instance, and no deployment or server lifecycle operation was performed.
 
 ## Application and remaining limits
 

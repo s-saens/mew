@@ -4542,6 +4542,12 @@ function AgentSessionView({
               className={`flex h-7 w-8 shrink-0 items-center justify-center rounded border focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink-secondary disabled:opacity-40 ${composerCliMode ? 'border-accent bg-accent text-ink-on-accent' : 'border-transparent text-ink-secondary hover:bg-surface-raised hover:text-ink'}`}>
               <TerminalIcon width={16} height={16} aria-hidden="true" />
             </button>
+            <AgentExecutionToggles value={editingQueued?.settings.execution ?? execution}
+              disabled={composerCliMode}
+              onChange={next => {
+                if (editingQueued) setEditingQueued(current => current ? { ...current, settings: { ...current.settings, execution: next } } : current)
+                else setExecution(next)
+              }} />
             <HeaderSelect className="flex-1" caretEnd value={composerModelId} options={modelOptions} onPick={(modelId) => { if (editingQueued) editQueueModel(modelId); else send({ type: 'set_model', modelId: selectModel(modelId) }) }} title={uiText("모델")} searchable disabled={!selectableModels || selectableModels.availableModels.length < 2} onReturnToInput={focusComposerInput} onSubmit={submit} />
             <HeaderSelect value={composerThinkingId} options={composerThinkingOptions} onReturnToInput={focusComposerInput} onSubmit={submit} onPick={(value) => {
               if (editingQueued) setEditingQueued(current => current ? { ...current, settings: { ...current.settings, thinkingId: value, thinking: composerThinkingOptions.find(option => option.id === value)?.label ?? value, ...(hasModelEffort(runtime) ? { modelId: modelVariantId(runtime, models?.availableModels ?? [], composerModelId, value) } : {}) } } : current)
@@ -4612,12 +4618,6 @@ function AgentSessionView({
           />
           </div>
           <div ref={composerActionsRef} data-agent-composer-actions className="absolute right-1 bottom-1 z-10 flex w-max max-w-[calc(100%-0.5rem)] flex-wrap items-stretch justify-end gap-1">
-          <AgentExecutionToggles value={editingQueued?.settings.execution ?? execution}
-            disabled={composerCliMode}
-            onChange={next => {
-              if (editingQueued) setEditingQueued(current => current ? { ...current, settings: { ...current.settings, execution: next } } : current)
-              else setExecution(next)
-            }} />
           <HoverTipLayer className="flex items-stretch">
             <div data-tip={uiText('지우기')} className="flex min-h-8 items-center">
             <button type="button" aria-label={uiText('지우기')}

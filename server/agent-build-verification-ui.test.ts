@@ -87,6 +87,19 @@ createRoot(document.getElementById('root')).render(<I18nProvider><AgentPanel pro
       assert.equal(await buildButton.getAttribute('aria-pressed'), 'true')
       assert.equal(await deployButton.getAttribute('aria-pressed'), 'false')
       assert.equal(await buildButton.innerText(), '', 'controls contain icons only')
+      const cliButton = page.getByRole('button', { name: 'CLI 명령 모드', exact: true })
+      const modelControl = page.getByTitle('모델', { exact: true })
+      const toolbar = [cliButton, buildButton, deployButton, modelControl]
+      const bounds = await Promise.all(toolbar.map(control => control.boundingBox()))
+      for (let index = 1; index < bounds.length; index++) {
+        const previous = bounds[index - 1]!, current = bounds[index]!
+        assert.ok(previous.x + previous.width <= current.x + 1, 'toolbar order is CLI, Build, Deploy, Model without overlap')
+        assert.ok(Math.abs(previous.y + previous.height / 2 - current.y - current.height / 2) < 2, 'execution toggles share the CLI row at every tested width')
+      }
+      const actions = page.locator('[data-agent-composer-actions]')
+      assert.equal(await actions.getByRole('button', { name: '빌드', exact: true }).count(), 0)
+      assert.equal(await actions.getByRole('button', { name: '배포', exact: true }).count(), 0)
+
       for (const button of [buildButton, deployButton]) {
         for (let repeat = 0; repeat < 2; repeat++) {
           await input.evaluate(element => { element.blur(); (element.ownerDocument.defaultView as any).inputFocusRequests = [] })

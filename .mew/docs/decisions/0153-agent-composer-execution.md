@@ -1,8 +1,8 @@
 ---
 title: "Per-message composer Build and Deploy controls"
-description: "Places build execution choices in the agent composer action row and snapshots Build/Deploy options per message. Partially supersedes ADR 0116's settings UI placement while preserving account sources, advanced values, and project restrictions."
+description: "Places build execution choices beside CLI mode in the agent composer settings row and snapshots Build/Deploy options per message. Partially supersedes ADR 0116's settings UI placement while preserving account sources, advanced values, and project restrictions."
 created: "2026-11-06"
-updated: "2026-11-06"
+updated: "2026-11-07"
 ---
 
 ## Status
@@ -15,7 +15,7 @@ Build verification applies to individual requests, but its selector was inside a
 
 ## Decision
 
-Place icon-only Build and Deploy toggles in the agent composer action row, with Build on and Deploy off by default. Use translated accessible names and shared tooltips, pressed-state semantics, and on/off feedback. Keep preferences in browser-local storage scoped by account, project, and tab, using a dedicated execution-options key. Refresh restores the tab's choices without coupling independent tabs.
+Place icon-only Build and Deploy toggles immediately after CLI command mode in the agent composer settings row, with Build on and Deploy off by default. Use translated accessible names and shared tooltips, pressed-state semantics, and on/off feedback. Keep preferences in browser-local storage scoped by account, project, and tab, using a dedicated execution-options key. Refresh restores the tab's choices without coupling independent tabs.
 
 Capture `execution: { build, deploy }` with every submitted message, including startup-pending input, queues, and schedules. Carry that snapshot through execution; editing a queued message uses its own options and restores the separate new-message options afterward. Older requests without options retain their existing build behavior and exclude automatic deployment by default.
 
@@ -30,6 +30,8 @@ Keeping build choices only in account-wide settings hides a frequent per-request
 Rewriting account files when toggles change would change revisions and risk replacing custom guidance. Applying an execution snapshot only while constructing effective context preserves the source and lets delayed requests retain their original intent. Reading current composer state at execution time would make accepted messages change unexpectedly.
 
 A runtime build/deploy gate would require a separate execution and permission model. This decision provides agent guidance and visible request state without claiming that Mew executes or verifies those operations itself.
+
+The November 7 placement refinement moves the toggles from the floating bottom actions to the settings row; request snapshots and guidance semantics are unchanged. The [work record](../work/agent-composer-execution.md) records this refinement and verification.
 
 ## Consequences
 
