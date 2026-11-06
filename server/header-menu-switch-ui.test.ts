@@ -27,7 +27,7 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><I18nProvid
     resolveId(id) { if (id === 'virtual:header-switch.tsx') return id; if (id.endsWith('.css')) return 'virtual:style' },
     load(id) { if (id === 'virtual:header-switch.tsx') return source; if (id === 'virtual:style') return '' },
   }] })
-  const content = (await Promise.all(['src/components/ProjectSwitcher.tsx', 'src/components/CommandButtonMenu.tsx', 'packages/ui/src/dialog-frame.tsx'].map(file => fs.readFile(path.join(root, file), 'utf8')))).join('\n')
+  const content = (await Promise.all(['src/components/ProjectSwitcher.tsx', 'src/components/scope-toggle.tsx', 'src/components/CommandButtonMenu.tsx', 'packages/ui/src/dialog-frame.tsx'].map(file => fs.readFile(path.join(root, file), 'utf8')))).join('\n')
   const compiler = await compile(await fs.readFile(`${root}/src/index.css`, 'utf8'), { base: `${root}/src`, onDependency() {} })
   const css = compiler.build([...new Set((source + content).match(/[A-Za-z0-9_@:/.[\]()%,-]+/g))])
   const browser = await connectTestBrowser()
@@ -52,7 +52,7 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><I18nProvid
       for (let index = 1; index < triggers.length; index++) {
         const previous = triggers[index - 1], next = triggers[index]
         assert.equal(await previous.getAttribute('aria-expanded'), 'true')
-        if (width === 390 && previous === project) await press(page.getByRole('button', { name: '내 프로젝트 · 닫기', exact: true }))
+        if (width === 390 && previous === project) await press(page.getByRole('button', { name: '프로젝트 · 닫기', exact: true }))
         await press(next)
         const opened = next === commands ? page.locator('[data-command-menu]') : page.getByRole('menu', { name: next === project ? '프로젝트 선택' : '메뉴', exact: true })
         await opened.waitFor()
@@ -70,7 +70,7 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><I18nProvid
       assert.equal(await project.getAttribute('aria-expanded'), 'false', 'Back dismisses the switched menu')
       for (const trigger of [project, commands, hamburger]) {
         await press(trigger); await popups.waitFor()
-        await press(width === 390 && trigger === project ? page.getByRole('button', { name: '내 프로젝트 · 닫기', exact: true }) : trigger); await popups.waitFor({ state: 'hidden' })
+        await press(width === 390 && trigger === project ? page.getByRole('button', { name: '프로젝트 · 닫기', exact: true }) : trigger); await popups.waitFor({ state: 'hidden' })
         assert.equal(await trigger.getAttribute('aria-expanded'), 'false', 'pressing the same trigger closes its menu')
       }
       await press(width === 390 ? hamburger : project); await popups.waitFor()

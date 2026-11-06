@@ -18,7 +18,7 @@ window.opens=[];window.events=[];window.changes=0;window.addTarget='/projects/ma
 function Fixture(){const [paths,setPaths]=useState(['/projects/main']);const [width,setWidth]=useState(240);const [switcher,setSwitcher]=useState(false);
 window.setPanelWidth=setWidth;window.showSwitcher=setSwitcher;
 return <main className="h-screen bg-surface text-ink"><section id="catalog-host" className={width===390?'mew-mobile-project-panel':''} style={{width,maxWidth:'100%',height:'100%',display:'flex',flexDirection:'column',minWidth:0}}>
-<div>My projects</div><ProjectAddInline paths={paths} basePath="/projects" onOpen={async p=>{window.events.push('open');window.opens.push(p)}} beforeMutation={async()=>{window.events.push('before')}} onProjectsChanged={async()=>{window.events.push('changed');window.changes++;setPaths(prev=>prev.includes(window.addTarget)?prev:[...prev,window.addTarget])}}/>
+<div>Projects</div><ProjectAddInline paths={paths} basePath="/projects" onOpen={async p=>{window.events.push('open');window.opens.push(p)}} beforeMutation={async()=>{window.events.push('before')}} onProjectsChanged={async()=>{window.events.push('changed');window.changes++;setPaths(prev=>prev.includes(window.addTarget)?prev:[...prev,window.addTarget])}}/>
 </section>{switcher&&<header style={{position:'fixed',top:0,right:0}}><ProjectSwitcher paths={['/projects/main/nested','/other','/projects/main','/projects/main/nested/deep']} activePath='/projects/main' fallbackLabel='work' canOpen canChangeIcon={false} icons={{}} onActivate={p=>window.opens.push(p)} onIconChange={()=>{}} onOpen={()=>{}} projectAdd={<ProjectAddInline paths={paths} basePath="/projects" onOpen={p=>{window.opens.push(p)}}/>}/></header>}</main>}
 createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18nProvider>);`
   const bundle = await build({
@@ -27,7 +27,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     plugins: [{ name: 'fixture', resolveId(id) { if (id === 'virtual:project-catalog.tsx') return id; if (id === './LoginDesktopViewer') return 'virtual:login.tsx'; if (id.endsWith('.css')) return 'virtual:style' }, async load(id) { if (id === 'virtual:project-catalog.tsx') return source; if (id === 'virtual:login.tsx') return 'export function LoginDesktopViewer(){return null}'; if (id === 'virtual:style') return ''; if (id.endsWith('?raw')) return 'export default ' + JSON.stringify(await fs.readFile(id.slice(0, -4), 'utf8')) } }],
   })
   const chunk = bundle.output.find(item => item.type === 'chunk')!
-  const content = (await Promise.all(['src/components/project-add-inline.tsx', 'src/components/project-catalog-panel.tsx', 'src/components/ProjectSwitcher.tsx', 'packages/ui/src/dialog-frame.tsx'].map(file => fs.readFile(path.join(root, file), 'utf8')))).join('\n')
+  const content = (await Promise.all(['src/components/project-add-inline.tsx', 'src/components/project-catalog-panel.tsx', 'src/components/ProjectSwitcher.tsx', 'src/components/scope-toggle.tsx', 'packages/ui/src/dialog-frame.tsx'].map(file => fs.readFile(path.join(root, file), 'utf8')))).join('\n')
   const compiler = await compile(await fs.readFile(`${root}/src/index.css`, 'utf8'), { base: `${root}/src`, onDependency() {} })
   const css = compiler.build([...new Set((source + content).match(/[A-Za-z0-9_@!:/.[\]()%,-]+/g))])
   const browser = await connectTestBrowser()
@@ -266,7 +266,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     await page.setViewportSize({ width: 390, height: 700 })
     const switcher = page.locator('[data-project-switcher]')
     await switcher.click()
-    const mobileProjects = page.getByRole('dialog', { name: 'My projects', exact: true })
+    const mobileProjects = page.getByRole('dialog', { name: 'Projects', exact: true })
     await mobileProjects.waitFor()
     const mobileAdd = mobileProjects.getByRole('button', { name: 'Add project', exact: true })
     await mobileAdd.click()
@@ -287,7 +287,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     await page.evaluate('history.back()')
     await nestedAdd.waitFor({ state: 'detached' })
     assert.equal(await mobileProjects.isVisible(), true, 'browser Back closes only the top popup')
-    await mobileProjects.getByRole('button', { name: 'My projects · Close', exact: true }).click()
+    await mobileProjects.getByRole('button', { name: 'Projects · Close', exact: true }).click()
     await mobileProjects.waitFor({ state: 'detached' })
     assert.equal(await switcher.evaluate(element => element === element.ownerDocument.activeElement), true)
     assert.deepEqual(pageErrors, [])

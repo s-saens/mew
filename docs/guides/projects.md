@@ -1,6 +1,6 @@
 ---
 title: "Projects and file navigation"
-description: "Explains empty-list onboarding and the plus-button popup for project creation, Git cloning, and import from the workspace catalog or a server path. Covers popup navigation, personal project hierarchy, switching, file navigation, Git review, task controls, and task reference drafts in agent conversations."
+description: "Explains the Projects panel with My personal shortcuts and All workspace projects, empty-list onboarding, and the plus popup for creation, Git cloning, and server-path import. Covers scope and popup navigation, personal project hierarchy, switching, file navigation, Git review, and task controls."
 updated: "2026-11-06"
 상위파일:
   - "../../.mew/docs/MOC.md"
@@ -19,7 +19,7 @@ The **workspace** contains every project registered with this Mew instance. **My
 
 ### Create a project
 
-In the project panel, the **+** button follows your last personal project. It opens a popup with **New project**, **Git clone**, and **Import project**. The centered **+** button opens the same popup when your list is empty. Choose **New project**, enter a name, and click **Create project** to create and open it. The Git icon inside the field starts enabled; turn it off if you want a regular folder.
+In the Projects panel, the **+** button follows the selected My or All list. It opens a popup with **New project**, **Git clone**, and **Import project**. The centered **+** button opens the same popup when your list is empty. Choose **New project**, enter a name, and click **Create project** to create and open it. The Git icon inside the field starts enabled; turn it off if you want a regular folder.
 
 Mew stores managed projects in `~/.mew/projects/<name>` on the server. It creates `.mew/` for settings and an empty `.mew/docs/` as the initial Documents folder. Git-enabled projects also get `.git/` and `.gitignore`. An existing folder with the same name is never overwritten.
 
@@ -33,7 +33,9 @@ To select an accessible repository, connect GitHub from this popup; no project n
 
 ### Use an existing project
 
-Choose **Import project** in the popup to see two sources:
+In the Projects panel, select **All** to search the registered workspace catalog. Choose a project to add it to My projects and open it. Projects already in your list reuse their shortcut. With My projects empty, use **+ → Import project → From this workspace** from the setup panel instead.
+
+The **+** popup also keeps **Import project**, with two sources:
 
 - **From this workspace** lists registered projects. Choose a project to add it to My projects and open it. Duplicate names show a path detail to distinguish them.
 - **Browse path** opens the server folder picker. Find an existing folder and open it. Linking preserves its location and contents, registers it with the workspace, adds it to My projects, and opens it. It does not copy the folder into managed storage.
@@ -48,15 +50,17 @@ The linked-folder picker retains its path field, home/parent navigation, and key
 
 If your previous project folder is unavailable, Mew restores the first available project in My projects. If none is available, it returns to project setup while preserving the saved entries.
 
-The header shows the current project's icon and name. Clicking it opens **My projects** in a sidebar to the left of the file explorer on desktop, or in a full-screen panel on mobile. The current row is highlighted. Each project shares its icon with the file explorer.
+The header shows the current project's icon and name. Clicking it opens **Projects** in a sidebar to the left of the file explorer on desktop, or in a full-screen panel on mobile. Directly below the panel heading, **My / All** switches between your personal shortcuts and every registered workspace project. The control looks and works like the file explorer's **Documents / Files** switch. My is selected initially; reopening the panel keeps your current scope. The current My row is highlighted. Each project shares its icon with the file explorer.
+
+Use Left/Right on the scope buttons to switch and move focus, Home to select My, and End to select All. All loads its searchable catalog when selected. Choosing a catalog project adds it to My projects before opening it. Scope switching is disabled while that operation runs.
 
 - Select a row to switch projects without refreshing. Document tabs, layout, and scroll positions are restored per project. Your other connected screens follow the switch; other users' active projects stay as they are. Running agents keep their original working directories.
-- Use **+** to open the project setup popup. The workspace catalog is under **Import project → From this workspace**. **Remove from My projects** removes only your shortcut, preserving the project, other users' shortcuts, and all files. If other shortcuts remain, removing the current one first opens another project. Removing your last shortcut returns to the centered project panel. My projects only contains registered catalog entries.
+- Use **+** below either list to open the project setup popup. The workspace catalog is available in **All** and under **Import project → From this workspace** in the popup. **Remove from My projects** removes only your shortcut, preserving the project, other users' shortcuts, and all files. If other shortcuts remain, removing the current one first opens another project. Removing your last shortcut returns to the centered project panel. My projects only contains registered catalog entries.
 - Nested Git/Mew projects are discovered in the shared catalog. Pinned descendants appear beneath their nearest pinned parent in My projects. Select a project when you want to change the active root.
-- Drag the left handle to reorder shortcuts. **↑/↓** on the handle or **Shift+↑/↓** on the row also reorders them. The **Alt+1…9** numbers on the right follow your order.
-- `Alt+P` opens My projects and focuses its first item; `Alt+1…9` switches in personal list order. Up/Down and Home/End navigate, and Enter/Space selects. Existing modal, IME, repeated-key, and remote-screen input boundaries apply. `Ctrl/Cmd+number` selects tabs in the current panel.
+- In My, drag the left handle to reorder shortcuts. **↑/↓** on the handle or **Shift+↑/↓** on the row also reorders them. The **Alt+1…9** numbers on the right follow your order.
+- `Alt+P` opens Projects and focuses its first available item; `Alt+1…9` switches in personal list order. Within My, Up/Down and Home/End navigate, and Enter/Space selects. Existing modal, IME, repeated-key, and remote-screen input boundaries apply. `Ctrl/Cmd+number` selects tabs in the current panel.
 - The desktop sidebar stays open after selection and can be resized from its right border. Its width and open state are remembered in this browser. The mobile panel closes on selection, Close, Esc, or Back and restores focus to the project button.
-- Project command buttons **▶** remain conditional on command access. They open the target project's [commands](commands.md) without switching your current project. Signed-in users can edit icons for registered projects, saving the shared icon to `.mew/project-icon.json`.
+- Project command buttons **▶** in My remain conditional on command access. They open the target project's [commands](commands.md) without switching your current project. Signed-in users can edit icons for registered projects, saving the shared icon to `.mew/project-icon.json`.
 
 Workspace screen state (document tabs, pane layout, scroll positions, expanded tree nodes, and auxiliary panels) is retained in a server ledger per signed-in account and restored on other devices and in private windows. Existing `localStorage` values are used as a migration source only when the account ledger is initially empty, and the internal API identifiers `.workspace` and `docs` for the root project and Documents are retained for compatibility. Values closely tied to the device, such as screen width, theme, language, font, and drafts in progress, remain in the browser.
 

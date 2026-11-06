@@ -66,6 +66,7 @@ import { useMewcatNotifications } from './hooks/use-mewcat-notifications'
 import { useChatNotifications } from './hooks/use-chat-notifications'
 import { OPEN_NOTICE_EVENT, publishMewcatNotice, type MewcatNotice } from './utils/mewcat-notifications'
 import { SidebarCreateButtons } from './components/sidebar-create-buttons'
+import { ScopeToggle } from './components/scope-toggle'
 import { useSidebarCreate } from './hooks/use-sidebar-create'
 import { FileTree, type TreePersistenceState } from './components/FileTree'
 import { CommandButtonMenu } from './components/CommandButtonMenu'
@@ -2064,6 +2065,8 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
             canChangeIcon={canOpenProjects}
             icons={rootProjectIcons}
             onActivate={(projectPath) => void openRootProject(projectPath)}
+            onOpenCatalogProject={openAddedProject}
+            beforeProjectMutation={() => rootProjectSaveQueue.current}
             onPreview={previewRootProject}
             onIconChange={changeRootProjectIcon}
             onReorder={setOpenProjectPaths}
@@ -2163,24 +2166,11 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
                 registerSearchCancel={registerSidebarSearchCancel}
                 onClose={() => closeWorkspacePanel('sidebar')}
                 actions={!isGuest && <div className="flex shrink-0 items-center gap-1 border-b border-edge p-1" data-explorer-toggle>
-                  {!isGuest && <div role="group" aria-label={uiText('탐색 범위')} className="flex min-w-0 flex-1 rounded-md bg-surface p-0.5 text-xs">
-                    {(['docs', 'files'] as const).map(scope => {
-                      const selected = (scope === 'docs') === docsExpanded
-                      return <button key={scope} type="button" aria-pressed={selected}
-                        onClick={() => selectExplorerScope(scope)}
-                        onContextMenu={scope === 'docs' && isOwner ? event => { event.preventDefault(); setDocsSettingsOpen(true) } : undefined}
-                        onKeyDown={event => {
-                          if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
-                          event.preventDefault()
-                          const next = event.key === 'Home' ? 'docs' : event.key === 'End' ? 'files' : scope === 'docs' ? 'files' : 'docs'
-                          selectExplorerScope(next)
-                          event.currentTarget.parentElement?.querySelectorAll('button')[next === 'docs' ? 0 : 1]?.focus()
-                        }}
-                        className={`min-w-0 flex-1 rounded px-3 py-1.5 focus-visible:outline-2 focus-visible:outline-accent ${selected ? 'bg-surface-raised text-ink' : 'text-ink-muted hover:text-ink-secondary'}`}>
-                        {scope === 'docs' ? t('explorer.documents') : t('explorer.files')}
-                      </button>
-                    })}
-                  </div>}
+                  <ScopeToggle<'docs' | 'files'> label={uiText('탐색 범위')} value={docsExpanded ? 'docs' : 'files'} onChange={selectExplorerScope}
+                    options={[
+                      { value: 'docs', label: t('explorer.documents'), onContextMenu: isOwner ? event => { event.preventDefault(); setDocsSettingsOpen(true) } : undefined },
+                      { value: 'files', label: t('explorer.files') },
+                    ]} />
                   {!isGuest && caps.filesRead && caps.filesWrite && <SidebarCreateButtons documents={docsExpanded} onCreate={sidebarCreate.create} disabled={!workspaceUiLoaded || sidebarStateLoadedRootRef.current !== projectUiPath} />}
                 </div>}
               >

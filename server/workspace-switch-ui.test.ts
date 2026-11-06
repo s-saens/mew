@@ -19,7 +19,7 @@ for (const mode of ['assisted', 'onboarding', 'empty-projects', 'missing-active'
   const appSource = await fs.readFile(`${root}/src/App.tsx`, 'utf8')
   // Keep App, useTabs, FileTree, project switching and docking real. Unrelated panels and the
   // editor renderer are inert so this measures handoff work rather than editor startup.
-  const keep = new Set(['deferredComponent', 'deferredDialog', 'ProjectSwitcher', 'ProjectLoadingOverlay', 'FileTree', 'SearchPanel', 'DockWorkspace', 'ProjectIcon', 'SubprojectLink', 'SidebarCreateButtons', 'MobileDock', 'HeaderMenu', 'TaskPanel', 'IconPackProvider'])
+  const keep = new Set(['deferredComponent', 'deferredDialog', 'ProjectSwitcher', 'ProjectLoadingOverlay', 'FileTree', 'SearchPanel', 'DockWorkspace', 'ProjectIcon', 'SubprojectLink', 'SidebarCreateButtons', 'ScopeToggle', 'MobileDock', 'HeaderMenu', 'TaskPanel', 'IconPackProvider'])
   if (keyboardOnly || projectSetup || mode === 'remove-last') { keep.add('ProjectAddInline'); keep.add('ProjectCatalogPanel'); keep.add('ServerFileExplorer') }
   if (assisted) keep.add('ProjectCreationAgentDialog')
   const stubs = new Map<string, string>()
@@ -60,7 +60,7 @@ for (const mode of ['assisted', 'onboarding', 'empty-projects', 'missing-active'
     if (id.endsWith('?raw')) return 'export default ' + JSON.stringify(await fs.readFile(id.slice(0, -4), 'utf8'))
   } }] })
   const chunk = bundle.output.find(item => item.type === 'chunk')!
-  const content = (await Promise.all(['src/components/ProjectSwitcher.tsx', 'src/components/project-loading-overlay.tsx', 'src/components/FileTree.tsx', 'src/components/SearchPanel.tsx', 'src/components/DockWorkspace.tsx', 'src/components/mobile-dock.tsx', 'src/components/HeaderMenu.tsx', 'src/components/project-add-inline.tsx', 'src/components/project-catalog-panel.tsx', 'src/components/LinkProjectDialog.tsx', 'src/components/ServerFileExplorer.tsx', 'src/components/file-browser.tsx', 'src/components/file-browser-favorites.tsx', 'packages/ui/src/HoverTipLayer.tsx', 'packages/ui/src/dialog-frame.tsx', 'packages/ui/src/ConfirmDialog.tsx', 'packages/ui/src/select-field.tsx'].map(file => fs.readFile(path.join(root, file), 'utf8')))).join('\n')
+  const content = (await Promise.all(['src/components/ProjectSwitcher.tsx', 'src/components/scope-toggle.tsx', 'src/components/project-loading-overlay.tsx', 'src/components/FileTree.tsx', 'src/components/SearchPanel.tsx', 'src/components/DockWorkspace.tsx', 'src/components/mobile-dock.tsx', 'src/components/HeaderMenu.tsx', 'src/components/project-add-inline.tsx', 'src/components/project-catalog-panel.tsx', 'src/components/LinkProjectDialog.tsx', 'src/components/ServerFileExplorer.tsx', 'src/components/file-browser.tsx', 'src/components/file-browser-favorites.tsx', 'packages/ui/src/HoverTipLayer.tsx', 'packages/ui/src/dialog-frame.tsx', 'packages/ui/src/ConfirmDialog.tsx', 'packages/ui/src/select-field.tsx'].map(file => fs.readFile(path.join(root, file), 'utf8')))).join('\n')
   const compiler = await compile(await fs.readFile(`${root}/src/index.css`, 'utf8'), { base: `${root}/src`, onDependency() {} })
   const taskContent = await fs.readFile(`${root}/src/components/task-panel.tsx`, 'utf8')
   const dateCss = await fs.readFile(`${root}/packages/ui/src/date-field.css`, 'utf8')
@@ -1449,7 +1449,7 @@ for (const mode of ['assisted', 'onboarding', 'empty-projects', 'missing-active'
     await page.reload()
     await projectsPanel.waitFor()
     assert.equal(Number(await projectResize.getAttribute('aria-valuenow')), savedProjectWidth, 'App restores project panel width and open state across reload')
-    await projectsPanel.getByRole('button', { name: '내 프로젝트 · 닫기', exact: true }).click()
+    await projectsPanel.getByRole('button', { name: '프로젝트 · 닫기', exact: true }).click()
     assert.equal(await page.locator('button[data-project-switcher]').getAttribute('aria-expanded'), 'false')
     await page.reload()
     await page.locator('button[data-project-switcher]').waitFor()

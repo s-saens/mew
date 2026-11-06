@@ -1,6 +1,6 @@
 ---
 title: "Open your first project and document"
-description: "Walks through the plus-button popup for an empty My Projects list, project creation, optional Git cloning or workspace/path import, then editing notes.md with autosave and reviewing Git changes."
+description: "Walks through the plus-button popup for an empty My Projects list, project creation, optional Git cloning or workspace/path import, the Projects My/All selector, then editing notes.md with autosave and reviewing Git changes."
 created: "2026-10-14"
 updated: "2026-11-06"
 상위파일: "MOC.md"
@@ -22,7 +22,7 @@ The secondary **Create with agent** action is available when you want help defin
 
 Creating, cloning, or linking registers the project with the **workspace** and adds it to your **My projects** shortcuts. Importing a workspace project adds your shortcut and opens it. The Dock and header project controls appear once you have a personal project. Other signed-in users can import the same project, subject to file permissions.
 
-To return to a project, click its name in the header and choose it from My projects. Use **+ → Import project → From this workspace** to find projects added by other users. The back arrow returns one step within the popup. X, clicking outside, Esc, or browser Back closes it and returns focus to **+**; a nested folder browser closes first. A running project operation keeps the popup open. Removing a shortcut leaves the folder and workspace registration intact; removing the last one returns to the centered project panel. Nested Git/Mew projects appear beneath their actual parent. [Project management](projects.md#프로젝트-탭).
+To return to a project, click its name in the header to open **Projects** and choose it in **My**. Select **All** to find registered projects added by other users. **+ → Import project → From this workspace** also opens this catalog. The back arrow returns one step within the popup. X, clicking outside, Esc, or browser Back closes it and returns focus to **+**; a nested folder browser closes first. A running project operation keeps the popup open. Removing a shortcut leaves the folder and workspace registration intact; removing the last one returns to the centered project panel. Nested Git/Mew projects appear beneath their actual parent. [Project management](projects.md#프로젝트-탭).
 
 ## 2. Distinguish files from Documents
 

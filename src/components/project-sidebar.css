@@ -66,6 +66,7 @@
 .mew-mobile-project-panel .mew-project-catalog-open, .mew-mobile-project-panel .mew-project-catalog-pin { min-height: 44px; }
 .mew-project-sidebar-content { min-height: 0; flex: 1; overflow-y: auto; }
 .mew-project-sidebar-content > .mew-project-sidebar-list { flex: none; overflow: visible; padding-bottom: 0; }
+.mew-project-sidebar-list[data-project-list-scope="all"] .mew-project-catalog-list { max-height: none; overflow: visible; }
 .mew-project-inline-add { padding: 0 6px 6px; }
 .mew-project-add { min-width: 0; }
 .mew-project-add-trigger { transition: background-color 120ms, color 120ms; }

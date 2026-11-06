@@ -1,6 +1,6 @@
 ---
 title: "Shared projects and project setup"
-description: "Records shared project registry creation, cloning, discovery, and personal project corrections. Includes the November 6 project-add popup and full-width centered plus correction, agent-dialog loading recovery, browser and App regressions, and local verification alongside earlier inline setup history."
+description: "Records shared project registry creation, cloning, discovery, and personal project corrections. Includes the November 6 project-add popup, centered plus correction, agent-dialog loading recovery, and Projects My/All scope selector with browser and App verification alongside earlier inline setup history."
 created: "2026-11-02"
 updated: "2026-11-06"
 ---
@@ -179,3 +179,18 @@ Use the existing deferred-dialog helper to open a titled loading frame immediate
 - `npm run build` passed, including TypeScript, with the existing large-chunk warning. `npm run lint` and `git diff --check` passed. Documentation validation passed 742 descriptions and retained 39 existing missing-target links.
 
 The live reported environment was not inspected directly. Verification used controlled module delay/failure and mocked provider communication, without a real provider login or model request. The local build updates `dist/`; no deployment or application server lifecycle operation was performed.
+
+### Projects My/All scopes — November 6, 2026
+
+Rename the project panel heading to Projects and place My / All directly beneath it. Extract the explorer's existing Documents / Files control into `ScopeToggle`, so both entry points share the same markup, spacing, colors, selected state, accessible pressed state, and Left/Right/Home/End behavior. Preserve the explorer's owner-only Documents context menu. The [project feature](../features/projects-files-search/opening-projects-tabs-and-groups.md#select-and-organize-projects) and [UI navigation contract](../development/ui-project-navigation.md#header-project-switcher) own current behavior.
+
+My retains personal shortcut hierarchy, ordering, commands, and numbered shortcuts. All lazily loads the existing searchable workspace catalog and explicitly adds a personal shortcut before opening a project. The full-width plus remains below either list. Scope remains local to the mounted selector and starts at My; empty-list onboarding keeps its existing heading and plus popup. Desktop sidebars remain open after selection, while mobile panels close and restore focus. Imports block scope changes and release their busy state even if resizing unmounts the catalog before a failed shortcut save completes.
+
+Local verification passed 26 focused tests:
+
+- The scope, catalog, sidebar, header-menu switching, and action-menu browser tests passed 5 tests. Computed geometry, typography, spacing, colors, pressed state, and focus match the explorer control at 200/360px desktop panel widths and 390/320px mobile viewports in dark/light themes. Checks include search ancestry, import ordering, retry without duplicate pinning, busy dismissal, and a failed save after resizing unmounts the catalog.
+- `node --test --test-concurrency=1 server/project-switcher-ui.test.ts server/header-controls-ui.test.ts server/subprojects-ui.test.ts src/components/project-add-inline.test.ts server/project-add-inline-ui.test.ts` passed 14 tests covering existing project navigation, touch, shortcuts, subprojects, and popup creation/import recovery.
+- Seven selected cases in `server/workspace-switch-ui.test.ts` passed: assisted creation, first use, empty personal lists, missing active roots, last-shortcut removal, keyboard aliases, and desktop layout restoration. The actual App fixture keeps and styles the extracted ScopeToggle, preserving its explorer keyboard checks. Owner-only Documents context-menu forwarding was also inspected in source review.
+- `npm run build` passed, including TypeScript, with the existing large-chunk warning. `npm run lint` and `git diff --check` passed. `npm run check:docs` validated 742 descriptions and retained the same 39 existing missing-target links.
+
+Screenshots of desktop and mobile All were inspected. Browser APIs used isolated fixtures; physical devices and live account persistence were not exercised. The build updated local `dist/` assets without deployment or application server lifecycle operations.

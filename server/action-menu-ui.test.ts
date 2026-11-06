@@ -58,7 +58,7 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><I18nProvid
     resolveId(id) { if (id === 'virtual:action-menu.tsx') return id; if (id.endsWith('.css')) return 'virtual:style' },
     load(id) { if (id === 'virtual:action-menu.tsx') return source; if (id === 'virtual:style') return '' },
   }] })
-  const content = (await Promise.all(['src/components/ProjectSwitcher.tsx', 'src/components/CommandButtonMenu.tsx', 'packages/ui/src/dialog-frame.tsx'].map(file => fs.readFile(path.join(root, file), 'utf8')))).join('\n')
+  const content = (await Promise.all(['src/components/ProjectSwitcher.tsx', 'src/components/scope-toggle.tsx', 'src/components/CommandButtonMenu.tsx', 'packages/ui/src/dialog-frame.tsx'].map(file => fs.readFile(path.join(root, file), 'utf8')))).join('\n')
   const compiler = await compile(await fs.readFile(`${root}/src/index.css`, 'utf8'), { base: `${root}/src`, onDependency() {} })
   const css = compiler.build([...new Set((source + content).match(/[A-Za-z0-9_@:/.[\]()%,-]+/g))])
   const browser = await connectTestBrowser()
@@ -147,7 +147,7 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><I18nProvid
       await page.locator('[data-project-switcher]').click(); await menu.waitFor()
       if (width >= 768) assert.deepEqual(await metrics('[data-action-menu]'), reference, 'desktop project dropdown matches hamburger dimensions and typography')
       else {
-        const panel = page.getByRole('dialog', { name: '내 프로젝트', exact: true })
+        const panel = page.getByRole('dialog', { name: '프로젝트', exact: true })
         assert.deepEqual(await panel.boundingBox(), { x: 0, y: 0, width, height: 800 }, 'mobile projects cover the header, workspace, and dock')
         assert.equal(await panel.locator('[data-action-menu]').count(), 0, 'the mobile project list is an inline panel')
       }

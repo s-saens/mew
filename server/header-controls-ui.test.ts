@@ -60,7 +60,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     } }],
   })
   const chunk = bundle.output.find(item => item.type === 'chunk')!
-  const files = ['src/components/header-control.ts', 'src/components/ProjectSwitcher.tsx', 'src/components/ProjectIcon.tsx', 'src/components/HeaderMenu.tsx', 'src/components/header-menu-popup.tsx', 'src/components/header-notifications.tsx', 'src/components/header-resources.tsx', 'src/components/active-sessions-button.tsx', 'src/components/layout-presets.tsx', 'packages/ui/src/dialog-frame.tsx', 'packages/ui/src/HoverTipLayer.tsx', 'packages/ui/src/action-menu.tsx']
+  const files = ['src/components/header-control.ts', 'src/components/ProjectSwitcher.tsx', 'src/components/scope-toggle.tsx', 'src/components/ProjectIcon.tsx', 'src/components/HeaderMenu.tsx', 'src/components/header-menu-popup.tsx', 'src/components/header-notifications.tsx', 'src/components/header-resources.tsx', 'src/components/active-sessions-button.tsx', 'src/components/layout-presets.tsx', 'packages/ui/src/dialog-frame.tsx', 'packages/ui/src/HoverTipLayer.tsx', 'packages/ui/src/action-menu.tsx']
   const content = source + (await Promise.all(files.map(file => fs.readFile(path.join(root, file), 'utf8')))).join('\n')
   const compiler = await compile(await fs.readFile(path.join(root, 'src/index.css'), 'utf8'), { base: path.join(root, 'src'), onDependency() {} })
   const css = compiler.build([...new Set(content.match(/[A-Za-z0-9_@:/.[\]()%,-]+/g))]) + await fs.readFile(path.join(root, 'src/components/workspace-menu.css'), 'utf8')

@@ -55,8 +55,8 @@ export function ProjectCatalogPanel({ paths, onOpen, onProjectsChanged, beforeMu
       if (alive.current) setError(err instanceof Error ? err.message : String(err))
     } finally {
       pending.current = false
+      onBusyChange?.(false)
       if (alive.current) {
-        onBusyChange?.(false)
         setBusy(false)
         requestAnimationFrame(() => {
           const row = Array.from(content.current?.querySelectorAll<HTMLElement>('[data-catalog-project]') ?? []).find(element => element.dataset.catalogProject === project.path)
