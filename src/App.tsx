@@ -136,7 +136,9 @@ function toggleFullscreen() {
 const UpdatesModal = deferredDialog(async () => ({ default: (await import('./components/updates-modal')).UpdatesModal }), { title: () => uiText('업데이트'), className: 'flex max-h-[90dvh] max-w-3xl flex-col' })
 const TaskPanel = deferredComponent(async () => ({ default: (await import('./components/task-panel')).TaskPanel }))
 const SharedMemo = deferredComponent(async () => ({ default: (await import('./components/shared-memo')).SharedMemo }))
-const ProjectCreationAgentDialog = deferredComponent(async () => ({ default: (await import('./components/ProjectCreationAgentDialog')).ProjectCreationAgentDialog }), null)
+const ProjectCreationAgentDialog = deferredDialog(async () => ({ default: (await import('./components/ProjectCreationAgentDialog')).ProjectCreationAgentDialog }), {
+  title: t => t('project.createWithAgent'), className: 'flex h-[min(44rem,90dvh)] max-w-3xl flex-col max-md:h-full max-md:rounded-none',
+})
 const ProjectAddInline = deferredComponent(async () => ({ default: (await import('./components/project-add-inline')).ProjectAddInline }), null)
 const DocumentGraph = deferredComponent(async () => ({ default: (await import('./components/DocumentGraph')).DocumentGraph }), null)
 const DocsSettingsModal = deferredComponent(async () => ({ default: (await import('./components/DocsSettingsModal')).DocsSettingsModal }), null)

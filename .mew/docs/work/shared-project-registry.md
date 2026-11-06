@@ -1,6 +1,6 @@
 ---
 title: "Shared projects and project setup"
-description: "Records shared project registry creation, cloning, discovery, and personal project corrections. Includes the November 6 project-add popup and full-width centered plus correction, browser and App regressions, and local verification alongside earlier inline setup history."
+description: "Records shared project registry creation, cloning, discovery, and personal project corrections. Includes the November 6 project-add popup and full-width centered plus correction, agent-dialog loading recovery, browser and App regressions, and local verification alongside earlier inline setup history."
 created: "2026-11-02"
 updated: "2026-11-06"
 ---
@@ -167,3 +167,15 @@ Expand the plus trigger to 100% of its available container width and center its 
 - `npm run build` and `npm run lint` passed with warnings. `git diff --check` passed. `npm run check:docs` validated 742 descriptions and retained the same 39 existing missing-target links.
 
 Verification used isolated Chromium fixtures and the local build; physical devices and application server lifecycle operations were outside this correction.
+
+### Create with agent loading recovery — November 6, 2026
+
+Investigate the reported nonworking Create with agent action. The existing agent conversation passed its normal runtime-selection and first-prompt checks after correcting a stale fixture helper name. The App entry used a deferred component with a null fallback, leaving no visible progress while its dialog downloaded and no dialog-local recovery for import failures.
+
+Use the existing deferred-dialog helper to open a titled loading frame immediately after project creation and switching. Failed imports show an explicit retry, preserving the created project. The [agent session contract](../development/agent-sessions.md#agent-assisted-project-creation) owns loading, runtime selection, and conversation behavior.
+
+- Added an App regression that clicks Create with agent from onboarding, registers and opens the project, holds the dialog import, checks desktop/mobile frame bounds, rejects and retries the import, and verifies the resulting requested conversation and working directory. Registration occurs only once. The old entry failed the loading-frame assertion.
+- The final serial browser run passed 8 tests across `server/workspace-switch-ui.test.ts` (6 relevant App cases), `server/project-creation-agent-ui.test.ts`, and `server/deferred-dialog-ui.test.ts`. The latter checks include dismissal during loading, retry, ready-content replacement, first-prompt delivery once, reconnection, and conversation preservation. An earlier parallel run timed out in the first-prompt and keyboard tests; both passed individually and in the final serial run.
+- `npm run build` passed, including TypeScript, with the existing large-chunk warning. `npm run lint` and `git diff --check` passed. Documentation validation passed 742 descriptions and retained 39 existing missing-target links.
+
+The live reported environment was not inspected directly. Verification used controlled module delay/failure and mocked provider communication, without a real provider login or model request. The local build updates `dist/`; no deployment or application server lifecycle operation was performed.

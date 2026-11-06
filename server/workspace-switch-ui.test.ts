@@ -9,10 +9,11 @@ import { applyTaskChanges, type TaskItem } from '../shared/task-list.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 
-for (const mode of ['onboarding', 'empty-projects', 'missing-active', 'remove-last', 'keyboard', 'workspace', 'documents', 'permissions', 'panels', 'worktree', 'swipes', 'rapid', 'desktop-layout', 'latency'] as const) test(mode === 'latency' ? 'App prepares fresh editor tabs before handoff and restores warm roots without foreground loading' : mode === 'empty-projects' ? 'App hides project work surfaces for an empty personal list despite a saved active root' : mode === 'missing-active' ? 'App offers project recovery when shortcuts remain without an active root' : mode === 'remove-last' ? 'App returns to project setup after its last personal shortcut is removed' : mode === 'desktop-layout' ? 'App desktop account layout survives project switches with independent document contents' : mode === 'onboarding' ? 'App first-use onboarding creates a named project without exposing the startup workspace' : mode === 'rapid' ? 'App rapid project selections cancel superseded handoffs and restore the latest root' : mode === 'swipes' ? 'App mobile dock swipes select panels and explorer swipes preserve search mode' : mode === 'worktree' ? 'linked worktree swaps retain project layout and sessions and settle outgoing file saves' : mode === 'panels' ? 'App restores Tasks with Alt+T and task sessions survive close and reload' : mode === 'permissions' ? 'permission invalidation replaces pending workspace metadata and ignores the old response' : mode === 'documents' ? 'Files opens Documents as a filesystem folder with a separate navigation arrow' : mode === 'keyboard' ? 'App keyboard aliases open files and projects and create files and folders in the current explorer scope' : 'App overlaps workspace metadata, restores warm roots and ignores duplicate handoffs', { timeout: 60_000 }, async () => {
+for (const mode of ['assisted', 'onboarding', 'empty-projects', 'missing-active', 'remove-last', 'keyboard', 'workspace', 'documents', 'permissions', 'panels', 'worktree', 'swipes', 'rapid', 'desktop-layout', 'latency'] as const) test(mode === 'assisted' ? 'App creates a project and opens its agent setup popup' : mode === 'latency' ? 'App prepares fresh editor tabs before handoff and restores warm roots without foreground loading' : mode === 'empty-projects' ? 'App hides project work surfaces for an empty personal list despite a saved active root' : mode === 'missing-active' ? 'App offers project recovery when shortcuts remain without an active root' : mode === 'remove-last' ? 'App returns to project setup after its last personal shortcut is removed' : mode === 'desktop-layout' ? 'App desktop account layout survives project switches with independent document contents' : mode === 'onboarding' ? 'App first-use onboarding creates a named project without exposing the startup workspace' : mode === 'rapid' ? 'App rapid project selections cancel superseded handoffs and restore the latest root' : mode === 'swipes' ? 'App mobile dock swipes select panels and explorer swipes preserve search mode' : mode === 'worktree' ? 'linked worktree swaps retain project layout and sessions and settle outgoing file saves' : mode === 'panels' ? 'App restores Tasks with Alt+T and task sessions survive close and reload' : mode === 'permissions' ? 'permission invalidation replaces pending workspace metadata and ignores the old response' : mode === 'documents' ? 'Files opens Documents as a filesystem folder with a separate navigation arrow' : mode === 'keyboard' ? 'App keyboard aliases open files and projects and create files and folders in the current explorer scope' : 'App overlaps workspace metadata, restores warm roots and ignores duplicate handoffs', { timeout: 60_000 }, async () => {
   const keyboardOnly = mode === 'keyboard'
   const onboarding = mode === 'onboarding'
-  const projectSetup = onboarding || mode === 'empty-projects' || mode === 'missing-active'
+  const assisted = mode === 'assisted'
+  const projectSetup = assisted || onboarding || mode === 'empty-projects' || mode === 'missing-active'
   const desktopLayout = mode === 'desktop-layout'
   const dockedToolFixture = mode === 'worktree' || desktopLayout
   const appSource = await fs.readFile(`${root}/src/App.tsx`, 'utf8')
@@ -20,8 +21,9 @@ for (const mode of ['onboarding', 'empty-projects', 'missing-active', 'remove-la
   // editor renderer are inert so this measures handoff work rather than editor startup.
   const keep = new Set(['deferredComponent', 'deferredDialog', 'ProjectSwitcher', 'ProjectLoadingOverlay', 'FileTree', 'SearchPanel', 'DockWorkspace', 'ProjectIcon', 'SubprojectLink', 'SidebarCreateButtons', 'MobileDock', 'HeaderMenu', 'TaskPanel', 'IconPackProvider'])
   if (keyboardOnly || projectSetup || mode === 'remove-last') { keep.add('ProjectAddInline'); keep.add('ProjectCatalogPanel'); keep.add('ServerFileExplorer') }
+  if (assisted) keep.add('ProjectCreationAgentDialog')
   const stubs = new Map<string, string>()
-  const componentImports = appSource.replace(/const \w+ = deferredComponent\(async \(\) => \(\{ default: \(await import\('([^']+)'\)\)\.(\w+) \}\)(?:, null)?\)/g, (_match, module, name) => `import { ${name} } from '${module}'`)
+  const componentImports = appSource.replace(/const \w+ = deferredComponent\(async \(\) => \(\{ default: \(await import\('([^']+)'\)\)\.(\w+) \}\)(?:, null)?\)/g, (match, module, name) => assisted && name === 'ProjectCreationAgentDialog' ? match : `import { ${name} } from '${module}'`)
     // AgentPanel wraps its import in module preparation; keep that deferred path inert too.
     + "\nimport { AgentPanel } from './components/AgentPanel'"
   for (const match of componentImports.matchAll(/import \{ ([^\n]+) \} from '(\.\/components\/[^']+)'/g)) {
@@ -44,11 +46,14 @@ for (const mode of ['onboarding', 'empty-projects', 'missing-active', 'remove-la
   const source = `import React from '${root}/node_modules/react/index.js';import {createRoot} from '${root}/node_modules/react-dom/client.js';import App from '${root}/src/AppBootstrap.tsx';import {I18nProvider} from '${root}/src/i18n.tsx';import {setDockPosition} from '${root}/src/hooks/use-dock-preferences.ts';window.fixtureDockPosition=setDockPosition;createRoot(document.getElementById('root')).render(<I18nProvider><App/></I18nProvider>);`
   const bundle = await build({ input: 'virtual:switch.tsx', onLog(level, log, handler) { if (log.code !== 'MODULE_LEVEL_DIRECTIVE') handler(level, log) }, write: false, platform: 'browser', output: { format: 'iife', codeSplitting: false }, transform: { jsx: 'react-jsx', define: { 'process.env.NODE_ENV': JSON.stringify('test') } }, plugins: [{ name: 'fixture', resolveId(id, importer) {
     if (id === 'virtual:switch.tsx') return id
+    if (assisted && importer?.endsWith('/ProjectCreationAgentDialog.tsx') && id === './AgentPanel') return 'virtual:creation-agent-panel.tsx'
     if (importer === `${root}/src/App.tsx` && stubs.has(id)) return `virtual:stub:${id}`
     if (/\/file-type-icon(?:\.tsx)?$/.test(id)) return 'virtual:file-icons'
     if (id.endsWith('.css')) return 'virtual:style'
   }, async load(id) {
     if (id === 'virtual:switch.tsx') return source
+    if (assisted && id === `${root}/src/App.tsx`) return appSource.replace("import('./components/ProjectCreationAgentDialog')", "(async () => { window.creationDialogLoads = (window.creationDialogLoads || 0) + 1; await new Promise((resolve, reject) => { window.releaseCreationDialog = resolve; window.rejectCreationDialog = reject }); return import('./components/ProjectCreationAgentDialog') })()")
+    if (id === 'virtual:creation-agent-panel.tsx') return `import React from 'react';export function AgentPanel({workspacePath,requestedTab,startupPrompt}) {return <div data-test-agent-setup={workspacePath} data-requested-cwd={requestedTab.cwd} data-requested-id={requestedTab.id} data-startup-id={startupPrompt.tabId}>Runtime setup</div>}`
     if (id === 'virtual:style') return ''
     if (id === 'virtual:file-icons') return 'export function FileTypeIcon(){return null} export function FolderTypeIcon(){return null}'
     if (id.startsWith('virtual:stub:')) return `import React from '${root}/node_modules/react/index.js';\n${stubs.get(id.slice('virtual:stub:'.length))}`
@@ -166,7 +171,7 @@ for (const mode of ['onboarding', 'empty-projects', 'missing-active', 'remove-la
           await page.evaluate(() => (globalThis as unknown as { presence: { onmessage: (e: { data: string }) => void } }).presence.onmessage({ data: JSON.stringify({ type: 'workspace' }) }))
           await new Promise(resolve => setTimeout(resolve, 40))
         }
-        return json({ hasProject: !(onboarding || mode === 'missing-active') || onboardingComplete, path: active, projectPath: mode === 'worktree' ? projectPath : active, docs: 'docs', docsPath: active + '/docs', projects: [] })
+        return json({ hasProject: !(onboarding || assisted || mode === 'missing-active') || onboardingComplete, path: active, projectPath: mode === 'worktree' ? projectPath : active, docs: 'docs', docsPath: active + '/docs', projects: [] })
       }
       if (url.pathname === '/api/project-registry' && method === 'GET') return json({ projects: [
         { path: '/alpha', name: 'alpha', managed: true, mine: true, icon: null },
@@ -301,7 +306,7 @@ for (const mode of ['onboarding', 'empty-projects', 'missing-active', 'remove-la
       assert.equal(await dialog.getByRole('button', { name: 'Git 레포로 만들기' }).getAttribute('aria-pressed'), 'true')
       await dialog.getByRole('textbox', { name: '프로젝트 이름', exact: true }).fill('First project')
       if (mode === 'empty-projects') failSwitch = true
-      await dialog.getByRole('button', { name: '프로젝트 만들기', exact: true }).click()
+      await dialog.getByRole('button', { name: assisted ? '에이전트랑 만들기' : '프로젝트 만들기', exact: true }).click()
       if (mode === 'empty-projects') {
         await dialog.getByRole('alert').getByText('프로젝트를 열지 못했습니다. 다시 시도하세요.', { exact: true }).waitFor()
         assert.equal(await page.locator('[data-project-empty]').count(), 1, 'a failed first open retains project setup and its retry form')
@@ -310,6 +315,29 @@ for (const mode of ['onboarding', 'empty-projects', 'missing-active', 'remove-la
         failSwitch = false
         await dialog.getByRole('button', { name: '프로젝트 만들기', exact: true }).click()
         assert.equal(requests.filter(request => request.path === '/api/project-registry' && request.method === 'POST').length, 1, 'retry opens the created project without creating a second folder')
+      }
+      if (assisted) {
+        const loadingDialog = page.getByRole('dialog', { name: '에이전트랑 만들기', exact: true })
+        await loadingDialog.getByRole('status').waitFor()
+        for (const width of [1100, 390]) {
+          await page.setViewportSize({ width, height: 700 })
+          const bounds = await loadingDialog.boundingBox()
+          assert.ok(bounds && bounds.x >= 0 && bounds.x + bounds.width <= width && bounds.height <= 700, 'the loading frame fits desktop and mobile')
+        }
+        await page.evaluate('window.rejectCreationDialog(new Error("Fixture module unavailable"))')
+        await loadingDialog.getByRole('alert').waitFor()
+        await loadingDialog.getByRole('alert').getByRole('button').click()
+        await page.waitForFunction('window.creationDialogLoads === 2')
+        await page.evaluate('window.releaseCreationDialog()')
+        const agentDialog = page.getByRole('dialog', { name: '에이전트랑 만들기 · First project', exact: true })
+        await agentDialog.waitFor()
+        const setup = agentDialog.locator('[data-test-agent-setup="/new-project"]')
+        await setup.waitFor()
+        assert.equal(await setup.getAttribute('data-requested-cwd'), '/new-project')
+        assert.equal(await setup.getAttribute('data-requested-id'), await setup.getAttribute('data-startup-id'))
+        assert.equal(requests.filter(request => request.path === '/api/project-registry' && request.method === 'POST').length, 1)
+        await agentDialog.getByRole('button', { name: '닫기', exact: true }).click()
+        await agentDialog.waitFor({ state: 'detached' })
       }
       while (!releaseUi) await page.waitForTimeout(10)
       uiWaiters.forEach(release => release()); blockUi = false

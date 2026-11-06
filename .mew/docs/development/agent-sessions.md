@@ -1,7 +1,7 @@
 ---
 title: "Agent session and communication contract"
-description: "Runtime sessions, recovery, real-time account agent and terminal tabs, agent-assisted projects, Git AI Commit, CLI, memory, early history lists and saved previews, and MCP bindings selected by scoped usage and saved readiness. Guidance storage, presets, and project-context delivery belong to the linked agent guidance contract."
-updated: "2026-11-05"
+description: "Runtime sessions, recovery, real-time account agent and terminal tabs, agent-assisted project loading and recovery, Git AI Commit, CLI, memory, early history lists and saved previews, and MCP bindings selected by scoped usage and saved readiness. Guidance storage, presets, and project-context delivery belong to the linked agent guidance contract."
+updated: "2026-11-06"
 상위파일:
   - "../_docs.md"
   - "MOC.md"
@@ -16,7 +16,9 @@ See [Agent guidance and context delivery](agent-guidance.md#passing-project-cont
 
 ## Agent-assisted project creation
 
-After managed creation and a successful project switch, `ProjectCreationAgentDialog` embeds the normal `AgentPanel` with the new project root. It requests a named conversation through `RequestedAgentTab`, initially leaving runtime selection to the existing picker. It uses normal account/project context, authentication, permissions, execution settings, transcript storage, queues, and error handling; it does not introduce a separate chat or an agent permission bypass.
+After managed creation and a successful project switch, the app immediately opens a titled, dismissible loading frame while downloading the project-creation agent dialog. Import failures stay in this frame with an explicit retry; retrying the download reuses the created project and does not register another directory. The frame matches the final desktop/mobile dialog size.
+
+Once loaded, `ProjectCreationAgentDialog` embeds the normal `AgentPanel` with the new project root. It requests a named conversation through `RequestedAgentTab`, initially leaving runtime selection to the existing picker. It uses normal account/project context, authentication, permissions, execution settings, transcript storage, queues, and error handling; it does not introduce a separate chat or an agent permission bypass.
 
 The popup supplies a startup prompt only for its newly requested tab. The prompt asks the agent to begin with a focused question about the intended project and wait for the user's answer before generating it. Follow-up questions clarify purpose, users, scope, and technology choices. Once agreed, the agent works in the created directory and documents requirements and implementation in the configured Documents location under the applicable Mew and project instructions, including metadata, decisions, work records, language, and verification where required. Existing `.mew` settings and files must be preserved.
 

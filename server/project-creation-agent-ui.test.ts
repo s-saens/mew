@@ -35,7 +35,7 @@ function Fixture(){
  const [view,setView]=React.useState('before');
  const [preparedAgentTabs,setPreparedAgentTabs]=React.useState(()=>Promise.resolve(staleTabs));
  const [creationAgentProject,setCreationAgentProject]=React.useState(null);
- const openRootProject=async()=>{await new Promise(resolve=>setTimeout(resolve,20));setPreparedAgentTabs(Promise.resolve(staleTabs));return true};
+ const openAddedProject=async()=>{await new Promise(resolve=>setTimeout(resolve,20));setPreparedAgentTabs(Promise.resolve(staleTabs));return true};
  const create=${createWithAgent};const close=${closeCreation};
  window.resume=()=>setView('regular');window.beginSetup=()=>create({path:'/managed/Garden',name:'Garden'});
  return <I18nProvider>{creationAgentProject?<ProjectCreationAgentDialog projectName="Garden" projectPath="/managed/Garden" cacheAccount="account-a" onClose={()=>{close();setView('closed')}}/>:view==='before'||view==='regular'?<AgentPanel preparedTabs={preparedAgentTabs} project=".workspace" workspacePath="/managed/Garden" tree={[]} focusedFilePath={null} onOpenFile={()=>{}} onClose={()=>{}}/>:<div>Closed</div>}</I18nProvider>}
