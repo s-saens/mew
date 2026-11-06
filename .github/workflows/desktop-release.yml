@@ -86,8 +86,8 @@ jobs:
               if ($LASTEXITCODE -ne 0) { throw "CI prerequisite installation failed: $($package.id)" }
             }
           }
-      - run: npm ci
-      - run: node --test native/remote-desktop/windows-package.test.mjs native/remote-desktop/build-windows-package.test.mjs
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: node --test native/remote-desktop/windows-build-environment.test.mjs native/remote-desktop/windows-package.test.mjs native/remote-desktop/build-windows-package.test.mjs
       - name: Build isolated desktop package
         shell: pwsh
         env:

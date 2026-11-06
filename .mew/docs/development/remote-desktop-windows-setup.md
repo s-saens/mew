@@ -1,8 +1,8 @@
 ---
 title: "Windows remote desktop prebuilt setup"
-description: "Defines Windows/WSL helper installation without host development tools, exact source-hash packages, bundled offline archives, verified manifests, staged replacement, readiness, and failure boundaries. Separates maintainer builds, package publication, and Windows acceptance gates."
+description: "Defines Windows/WSL helper installation without host development tools, exact source-hash packages, verified replacement, and readiness. Covers maintainer builds that reuse validated active compiler environments, package publication, and Windows acceptance gates."
 created: "2026-11-05"
-updated: "2026-11-05"
+updated: "2026-11-07"
 ---
 
 ## Preparation boundary
@@ -45,6 +45,8 @@ Browser preparation first stops the resident helper and waits for login-supervis
 `node native/remote-desktop/build-windows-package.mjs --output <directory>` is a maintainer/CI command that runs only on native Windows. Its Windows worker already has Node, Rust stable MSVC, CMake, LLVM/libclang, Perl, Visual Studio C++ tools, and Windows SDK prepared. It runs native dependency preparation, GPU compilation, Rust vendoring/build, and ABI checks in an isolated staging directory. It does not install host tools. The builder preserves patched corresponding sources and notices, emits the manifest and archive checksum, and excludes development toolchains from the package.
 
 The dedicated `desktop-release.yml` workflow builds and verifies x64 and ARM64 packages, then publishes an immutable content-hash release through the protected `desktop-release` environment. The CLI runtime packager accepts an explicitly built, verified package for bundling rather than collecting arbitrary local DLL outputs. The [release runbook](../operations/cli-release.md#windows-remote-desktop-packages) owns publication order and gates.
+
+Build-tool discovery first accepts an activated compiler environment only when `cl.exe`, `link.exe`, `rc.exe`, Windows SDK headers, and UCRT headers are available. An explicit target architecture must match the native package. Otherwise discovery imports a Visual Studio developer environment and repeats the same checks. GPU compilation shares this discovery instead of unconditionally rediscovering Visual Studio. Return only the compiler/SDK environment allowlist, not arbitrary host variables. The workflow installs its test dependencies with npm lifecycle scripts disabled; the isolated package builder separately prepares and verifies the native payload.
 
 ## Permissions and remaining gates
 

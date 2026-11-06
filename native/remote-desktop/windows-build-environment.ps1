@@ -19,14 +19,24 @@ function Find-MewBuildCommand([string]$Name) {
   return $null
 }
 
+function Test-MewCompilerEnvironment {
+  $compilerArchitecture = $env:VSCMD_ARG_TGT_ARCH
+  if ($compilerArchitecture -eq 'amd64') { $compilerArchitecture = 'x64' }
+  if ($compilerArchitecture -and $compilerArchitecture -ne $architecture) { return $false }
+  $headers = @($env:INCLUDE -split ';' | Where-Object { $_ -and (Test-Path -LiteralPath (Join-Path $_ 'Windows.h')) })
+  $ucrt = @($env:INCLUDE -split ';' | Where-Object { $_ -and (Test-Path -LiteralPath (Join-Path $_ 'stdio.h')) -and $_.TrimEnd('\', '/') -match '[\\/]ucrt$' })
+  return [bool]((Find-MewBuildCommand 'cl.exe') -and (Find-MewBuildCommand 'link.exe') -and (Find-MewBuildCommand 'rc.exe') -and $headers.Count -and $ucrt.Count)
+}
+
+$compilerVariables = 'Path INCLUDE LIB LIBPATH VCINSTALLDIR VCToolsInstallDir VSINSTALLDIR VisualStudioVersion WindowsSdkDir WindowsSDKVersion WindowsSdkBinPath WindowsSdkVerBinPath UniversalCRTSdkDir UCRTVersion ExtensionSdkDir VSCMD_ARG_TGT_ARCH VSCMD_ARG_HOST_ARCH VSCMD_VER' -split ' '
 $environment = @{}
-$visualStudio = $false
+$visualStudio = Test-MewCompilerEnvironment
 $buildToolsPath = $null
 $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
 if (Test-Path -LiteralPath $vswhere) {
   $buildToolsPath = & $vswhere -latest -products Microsoft.VisualStudio.Product.BuildTools -version '[17.0,18.0)' -property installationPath
   $installation = & $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
-  if ($LASTEXITCODE -eq 0 -and $installation) {
+  if (-not $visualStudio -and $LASTEXITCODE -eq 0 -and $installation) {
     $devcmd = Join-Path $installation 'Common7\Tools\VsDevCmd.bat'
     if (Test-Path -LiteralPath $devcmd) {
       # Capture only compiler/SDK variables, never serialize the full host env.
@@ -35,16 +45,21 @@ if (Test-Path -LiteralPath $vswhere) {
       finally { Pop-Location }
       if ($LASTEXITCODE -eq 0) {
         foreach ($line in $lines) {
-          if ($line -match '^(Path|INCLUDE|LIB|LIBPATH|VCINSTALLDIR|VCToolsInstallDir|VSINSTALLDIR|VisualStudioVersion|WindowsSdkDir|WindowsSDKVersion|WindowsSdkBinPath|WindowsSdkVerBinPath|UniversalCRTSdkDir|UCRTVersion|ExtensionSdkDir|VSCMD_ARG_TGT_ARCH|VSCMD_ARG_HOST_ARCH|VSCMD_VER)=(.*)$') {
+          if ($line -match '^([^=]+)=(.*)$' -and $compilerVariables -contains $Matches[1]) {
             $environment[$Matches[1]] = $Matches[2]
             [Environment]::SetEnvironmentVariable($Matches[1], $Matches[2], 'Process')
           }
         }
-        $headers = @($env:INCLUDE -split ';' | Where-Object { $_ -and (Test-Path -LiteralPath (Join-Path $_ 'Windows.h')) })
-        $ucrt = @($env:INCLUDE -split ';' | Where-Object { $_ -and (Test-Path -LiteralPath (Join-Path $_ 'stdio.h')) -and $_ -match '[\\/]ucrt$' })
-        $visualStudio = [bool]((Find-MewBuildCommand 'cl.exe') -and (Find-MewBuildCommand 'link.exe') -and (Find-MewBuildCommand 'rc.exe') -and $headers.Count -and $ucrt.Count)
+        $visualStudio = Test-MewCompilerEnvironment
       }
     }
+  }
+}
+
+if ($visualStudio) {
+  foreach ($name in $compilerVariables) {
+    $value = [Environment]::GetEnvironmentVariable($name, 'Process')
+    if ($value) { $environment[$name] = $value }
   }
 }
 
