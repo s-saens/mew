@@ -732,6 +732,8 @@ test('handwritten and damaged build verification blocks stay custom and are neve
   let state = agentGuidanceSettings()
   assert.equal(state.buildVerification?.custom, true)
   assert.ok(readAgentGuidance().startsWith(custom))
+  assert.ok(readAgentGuidance(undefined, { build: false, deploy: false }).startsWith(custom))
+  assert.ok(readAgentGuidance(undefined, { build: true, deploy: true }).startsWith(custom))
   assert.ok(!readAgentGuidance().includes(expected))
   state = updateAgentGuidance({ key: 'language', value: 'en', revision: state.revision })
   assert.equal(state.buildVerification?.custom, true)
@@ -745,6 +747,8 @@ test('handwritten and damaged build verification blocks stay custom and are neve
     fs.writeFileSync(AGENT_GUIDANCE_PATH, content)
     assert.equal(agentGuidanceSettings().buildVerification?.custom, true)
     assert.ok(readAgentGuidance().startsWith(content))
+    assert.ok(readAgentGuidance(undefined, { build: false, deploy: false }).startsWith(content))
+    assert.ok(readAgentGuidance(undefined, { build: true, deploy: true }).startsWith(content))
     assert.ok(!readAgentGuidance().includes(expected))
     assert.equal(fs.readFileSync(AGENT_GUIDANCE_PATH, 'utf8'), content)
   }
@@ -756,8 +760,29 @@ test('handwritten and damaged build verification blocks stay custom and are neve
     state = agentGuidanceSettings()
     assert.equal(state.buildVerification?.custom, true)
     assert.ok(readAgentGuidance().startsWith(broken))
+    assert.ok(readAgentGuidance(undefined, { build: false, deploy: false }).startsWith(broken))
+    assert.ok(readAgentGuidance(undefined, { build: true, deploy: true }).startsWith(broken))
     assert.ok(!readAgentGuidance().includes(expected))
     assert.throws(() => updateAgentGuidance({ key: 'buildVerification', value: defaultAgentBuildVerificationSettings, revision: state.revision }), (error: unknown) => error instanceof GuidanceError && error.status === 409)
     assert.equal(fs.readFileSync(AGENT_GUIDANCE_PATH, 'utf8'), broken)
   }
+})
+
+test('request execution choices override generated build mode while retaining details and source revisions', async () => {
+  const { agentGuidanceSettings, updateAgentGuidance } = await import('./agent-guidance.ts')
+  runWithAgentAccount('request-build-choice@example.test', () => {
+    let state = agentGuidanceSettings()
+    const settings = { mode: 'project' as const, command: 'pnpm build --filter app', scope: 'all' as const, fixFailures: false }
+    state = updateAgentGuidance({ key: 'buildVerification', value: settings, revision: state.revision })
+    const on = readAgentGuidance(undefined, { build: true, deploy: false })
+    assert.ok(on.includes(agentBuildVerificationText({ ...settings, mode: 'required' })))
+    assert.ok(readAgentGuidance(undefined, { build: false, deploy: true }).includes(agentBuildVerificationText(settings)))
+    assert.ok(readAgentGuidance().includes(agentBuildVerificationText(settings)), 'legacy callers retain the stored mode')
+    assert.deepEqual(agentGuidanceSettings(), state, 'request choices never change stored source or revision')
+    state = updateAgentGuidance({ key: 'buildVerification', value: { ...settings, mode: 'required' }, revision: state.revision })
+    const off = readAgentGuidance(undefined, { build: false, deploy: false })
+    assert.ok(off.includes(agentBuildVerificationText(settings)))
+    assert.doesNotMatch(off, /After any project changes|Use the configured build command/)
+    assert.deepEqual(agentGuidanceSettings(), state)
+  })
 })

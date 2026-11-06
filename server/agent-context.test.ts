@@ -58,8 +58,9 @@ new AgentSideConnection(conn => new Agent(conn), ndJsonStream(Writable.toWeb(pro
   const events: AgentEvent[] = []
   session.attach(event => events.push(event))
   const oldId = session.sessionId
-  session.prompt('first')
-  session.prompt('queued')
+  const baseSettings = { model: 'test', thinking: 'test', permission: 'test' }
+  session.prompt('first', 'first', [], [], { ...baseSettings, execution: { build: false, deploy: true } })
+  session.prompt('queued', 'queued', [], [], { ...baseSettings, execution: { build: true, deploy: false } })
   setWorkspaceRoot(b)
   const waitIdle = async (expectedCalls: number) => {
     const until = Date.now() + 7000
@@ -78,6 +79,15 @@ new AgentSideConnection(conn => new Agent(conn), ndJsonStream(Writable.toWeb(pro
     assert.ok(!call.prompt[1].text.includes('B-specific guidance'))
     assert.ok(call.prompt[1].text.includes(path.join(a, 'notes')))
   }
+  assert.match(calls()[0].prompt[1].text, /Build is off/)
+  assert.match(calls()[0].prompt[1].text, /Mandatory project build requirements still apply/)
+  assert.match(calls()[0].prompt[1].text, /Deployment is on/)
+  assert.doesNotMatch(calls()[0].prompt[1].text, /After code, feature, dependency, or build configuration changes/)
+  assert.match(calls()[1].prompt[1].text, /Build is on/)
+  assert.match(calls()[1].prompt[1].text, /Deployment is off/)
+  assert.match(calls()[1].prompt[1].text, /After code, feature, dependency, or build configuration changes/)
+  const messages = events.filter(event => event.type === 'update' && event.update.sessionUpdate === 'user_message_chunk')
+  assert.deepEqual(messages.map(event => 'settings' in event ? event.settings?.execution : undefined), [{ build: false, deploy: true }, { build: true, deploy: false }])
   assert.ok(!JSON.stringify(events).includes('<mew-context'))
   const guidance = agentGuidanceSettings()
   updateAgentGuidance({ key: 'subagents', value: 'automatic', revision: guidance.revision })
@@ -106,6 +116,12 @@ new AgentSideConnection(conn => new Agent(conn), ndJsonStream(Writable.toWeb(pro
   assert.equal(calls().at(-1).prompt.length, 2, 'skill policy remains independent of project-document guidance')
   assert.match(calls().at(-1).prompt[1].text, /skill/i)
   assert.doesNotMatch(calls().at(-1).prompt[1].text, /A updated|Documents folder:/)
+  resumed.prompt('disabled-with-options', 'disabled-with-options', [], [], { ...baseSettings, execution: { build: false, deploy: false } })
+  await waitIdle(7)
+  const disabled = calls().at(-1).prompt[1].text
+  assert.match(disabled, /Build is off/)
+  assert.match(disabled, /Deployment is off/)
+  assert.doesNotMatch(disabled, /A updated|Documents folder:/)
 })
 
 test('context display filtering preserves ordinary messages and removes separate or joined guidance', () => {

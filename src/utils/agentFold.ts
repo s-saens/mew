@@ -1,3 +1,4 @@
+import type { AgentExecutionOptions } from '../../shared/agent-execution-options'
 import type { HistoryPage, HistoryPosition, HistoryPreview } from '../../shared/agent-history.ts'
 import type { AgentAttachmentRef } from '../../shared/agent-attachment.ts'
 import type { AgentConnectionReady, AgentConnectionPong } from '../../shared/agent-connection.ts'
@@ -18,7 +19,7 @@ export type ModelState = { currentModelId: string; availableModels: ModelInfo[] 
 export type ModeInfo = { id: string; name: string; description?: string | null }
 export type ModeState = { currentModeId: string; availableModes: ModeInfo[] }
 export type ThinkingState = { configId: string; currentValue: string; options: ModeInfo[] }
-export type AgentMessageSettings = { model: string; thinking: string; permission: string; modelId?: string; thinkingId?: string; thinkingConfigId?: string; modeId?: string }
+export type AgentMessageSettings = { execution?: AgentExecutionOptions; model: string; thinking: string; permission: string; modelId?: string; thinkingId?: string; thinkingConfigId?: string; modeId?: string }
 
 export type Usage = {
   input: number

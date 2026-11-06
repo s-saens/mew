@@ -6,12 +6,13 @@ import { withDocumentationSkillGuidance } from './documentation-skills.ts'
 import { commitSkillGuidance } from './mew-skills.ts'
 import { listSkills } from './skills.ts'
 import type { AgentContextBinding, ProjectAgentSettings } from '../shared/project-agent-context.ts'
+import { agentExecutionOptionsText, type AgentExecutionOptions } from '../shared/agent-execution-options.ts'
 
 export const CONTEXT_START = '<mew-context version="1">'
 export const CONTEXT_END = '</mew-context>'
 
-export function describeAgentContext(binding: AgentContextBinding, settings: ProjectAgentSettings, cwd: string, locale?: string): string {
-  if (!settings.enabled) return ''
+export function describeAgentContext(binding: AgentContextBinding, settings: ProjectAgentSettings, cwd: string, locale?: string, execution?: AgentExecutionOptions): string {
+  if (!settings.enabled) return execution ? agentExecutionOptionsText(execution) : ''
   const candidates = [path.join(binding.projectRoot, 'AGENTS.md'), path.join(binding.projectRoot, 'README.md'),
     ...['AGENT.md', 'README.md'].map(p => path.join(binding.docsRoot, p)),
     ...settings.entrypoints.map(p => path.join(binding.projectRoot, p))]
@@ -20,7 +21,8 @@ export function describeAgentContext(binding: AgentContextBinding, settings: Pro
   const skills = listSkills(cwd)
   const commit = skills.find(skill => skill.name === 'commit')
   return [
-    withDocumentationSkillGuidance(readAgentGuidance(locale), skills),
+    withDocumentationSkillGuidance(readAgentGuidance(locale, execution), skills),
+    execution ? agentExecutionOptionsText(execution) : '',
     commit ? commitSkillGuidance(commit.path) : '',
     `Change intent recorder: run ${shellQuote(process.execPath)} ${shellQuote(fileURLToPath(new URL('./git-change-intent-cli.ts', import.meta.url)))} --cwd ${shellQuote(binding.projectRoot)} with JSON on stdin: {"purpose":"brief reason for this task's changes","files":["repository-root-relative changed paths"],"verification":"checks actually performed (optional)"}. This writes disposable Git metadata only; it does not stage, commit or authorize a commit.`,
     `Project root: ${JSON.stringify(binding.projectRoot)}`,

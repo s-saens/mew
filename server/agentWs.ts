@@ -4,6 +4,7 @@ import { resolveAuth } from './reqAuth.ts'
 import type { MewcatClientMessage, MewcatActionRequest } from '../shared/mewcat-assistant.ts'
 import { validHistoryRequest, validHistoryDetailsRequest, type HistoryRequest, type HistoryPage, type HistoryPosition, type HistoryPreview, type HistoryDetailsRequest } from '../shared/agent-history.ts'
 import { agentDisplayMessage } from '../shared/agent-display.ts'
+import { isAgentExecutionOptions } from '../shared/agent-execution-options.ts'
 import { validAgentConnectionProbeId, type AgentConnectionPing, type AgentConnectionPong, type AgentConnectionReady } from '../shared/agent-connection.ts'
 import { attachmentPrompt, type AgentAttachmentInput } from '../shared/agent-attachment.ts'
 import { watchSocketAccess } from './access-socket.ts'
@@ -119,7 +120,9 @@ function validSettings(value: unknown): AgentMessageSettings | undefined {
     }
   }
   const uiLocale = (value as AgentMessageSettings).uiLocale
-  return { model, thinking, permission, ...ids, ...(['ko', 'en', 'ja', 'zh-CN'].includes(uiLocale ?? '') ? { uiLocale } : {}) }
+  const execution = (value as AgentMessageSettings).execution
+  if (execution !== undefined && !isAgentExecutionOptions(execution)) return undefined
+  return { model, thinking, permission, ...ids, ...(execution ? { execution: { ...execution } } : {}), ...(['ko', 'en', 'ja', 'zh-CN'].includes(uiLocale ?? '') ? { uiLocale } : {}) }
 }
 
 type ServerMessage =

@@ -7,8 +7,6 @@ import { documentationGuidanceKeys, guidanceOptions, type GuidanceKey, type Guid
 import type { BranchGuidanceSettings } from '../../shared/branch-guidance'
 import { defaultAgentCapacityRetrySettings, type AgentCapacityRetrySettings } from '../../shared/agent-capacity-retry'
 import { AgentCapacityRetryFields, type CapacityRetryDraft } from './agent-capacity-retry-fields'
-import { defaultAgentBuildVerificationSettings, type AgentBuildVerificationSettings } from '../../shared/agent-build-verification'
-import { AgentBuildVerificationFields } from './agent-build-verification-fields'
 import { BranchGuidanceFields } from './agent-branch-guidance'
 import { GuidanceRow } from './agent-guidance-row'
 import { DefaultGuidanceTip } from './agent-default-guidance-tip'
@@ -63,7 +61,6 @@ export function AgentGuidanceSettings({ onClose, onOpenFile, workspacePath }: { 
   const [projectDraft, setProjectDraft] = useState(''), [projectEnabled, setProjectEnabled] = useState(true)
   const [discardAction, setDiscardAction] = useState<(() => void) | null>(null)
   const [branchDirty, setBranchDirty] = useState(false)
-  const [buildDirty, setBuildDirty] = useState(false)
   const [reloadVersion, setReloadVersion] = useState(0)
   const [busy, setBusy] = useState(true), [saving, setSaving] = useState(false), [error, setError] = useState(''), [notice, setNotice] = useState('')
   const [panel, setPanel] = useState<HTMLDivElement | null>(null)
@@ -86,7 +83,7 @@ export function AgentGuidanceSettings({ onClose, onOpenFile, workspacePath }: { 
   const globalDirty = !!data && globalDraft !== (data.instructions ?? '')
   const retryDirty = !!data && JSON.stringify(retryDraft) !== JSON.stringify(capacityRetryDraft(data.capacityRetry ?? defaultAgentCapacityRetrySettings))
   const projectDirty = !!projectData && (projectDraft !== projectData.settings.instructions || projectEnabled !== projectData.settings.enabled)
-  const guard = (action: () => void) => { if (!pending.current) { if (globalDirty || projectDirty || retryDirty || branchDirty || buildDirty) setDiscardAction(() => action); else action() } }
+  const guard = (action: () => void) => { if (!pending.current) { if (globalDirty || projectDirty || retryDirty || branchDirty) setDiscardAction(() => action); else action() } }
   const close = () => guard(onClose)
   const load = async (target = scope) => {
     const version = ++generation.current
@@ -117,7 +114,7 @@ export function AgentGuidanceSettings({ onClose, onOpenFile, workspacePath }: { 
     // Read current account guidance on every open; project guidance loads on selection.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-  async function update(key: GuidanceKey | 'branch' | 'instructions' | 'capacityRetry' | 'buildVerification', value: string | BranchGuidanceSettings | AgentCapacityRetrySettings | AgentBuildVerificationSettings) {
+  async function update(key: GuidanceKey | 'branch' | 'instructions' | 'capacityRetry', value: string | BranchGuidanceSettings | AgentCapacityRetrySettings) {
     if (!data || pending.current || busy) return
     pending.current = true
     parkFocus()
@@ -189,7 +186,6 @@ export function AgentGuidanceSettings({ onClose, onOpenFile, workspacePath }: { 
           {data && <section role="group" aria-label={generalCopy[locale]}>
             <h3 className="mb-1 text-xs font-semibold">{generalCopy[locale]}</h3>
             {(Object.keys(guidanceOptions) as GuidanceKey[]).filter(key => key !== 'commit' && key !== 'commitLanguage' && !documentationKeys.has(key)).map(guidanceField)}
-            <AgentBuildVerificationFields key={`build-${reloadVersion}`} buildVerification={data.buildVerification ?? { value: defaultAgentBuildVerificationSettings, custom: false }} disabled={busy} saveBlocked={!!error} portalContainer={panel} onDirtyChange={setBuildDirty} onEdit={() => { setError(''); setNotice('') }} onSave={value => void update('buildVerification', value)} />
             <AgentCapacityRetryFields key={reloadVersion} draft={retryDraft} dirty={retryDirty} disabled={busy || !!error} onChange={value => { setRetryDraft(value); setNotice('') }} onSave={value => void update('capacityRetry', value)} />
           </section>}
           {data && Object.entries(data.settings).some(([key, value]) => key !== 'commit' && key !== 'commitLanguage' && !documentationKeys.has(key as GuidanceKey) && value === 'custom') && <p className="mt-1 text-xs leading-4 text-ink-secondary">{text.customHint}</p>}

@@ -1,13 +1,15 @@
 ---
 title: "Configurable default agent build verification"
-description: "Makes build verification a configurable, default-on Mew-wide instruction while preserving account guidance, project commands and restrictions, and honest failure reporting. Partially supersedes ADR 0104's exclusion of build verification from global defaults."
+description: "Makes build verification a configurable, default-on Mew-wide instruction while preserving account guidance, project commands and restrictions, and honest failure reporting. Partially supersedes ADR 0104's project-only default scope; ADR 0153 later replaces the settings UI placement while preserving backend values and source files."
 created: "2026-11-02"
-updated: "2026-11-02"
+updated: "2026-11-06"
 ---
 
 ## Status
 
 Accepted at the user's explicit request. Supersedes only the prohibition on Mew-wide build verification guidance in [ADR 0104](0104-required-agent-build-verification.md). That decision's concrete Mew source build command and restrictions on deployment, launcher execution, and server lifecycle operations remain in force.
+
+[ADR 0153](0153-agent-composer-execution.md) supersedes the Default Instructions build selector and details placement below, and defines per-message execution options. The metadata format, configurable command/scope/failure values, preservation rules, and project restrictions remain in effect.
 
 ## Context
 

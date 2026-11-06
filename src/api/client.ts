@@ -1,3 +1,4 @@
+import type { AgentExecutionOptions } from '../../shared/agent-execution-options'
 import { collectDatabasePageMutations, previewDatabasePageTitle, withDatabasePageMutations } from '../utils/database-page-mutations'
 import { json } from './response.ts'
 import type { Role } from './auth.ts'
@@ -222,6 +223,7 @@ export function scheduleAgentPrompt(input: {
   cwd: string
   sessionId: string
   text: string
+  execution?: AgentExecutionOptions
   skills: string[]
   at: string
 }): Promise<{ job: AgentScheduledPrompt }> {
@@ -233,6 +235,7 @@ export function scheduleAgentPrompt(input: {
 }
 
 export interface AgentScheduledPrompt {
+  execution?: AgentExecutionOptions
   id: string
   runtime: string
   tab: string

@@ -6,13 +6,14 @@ import path from 'node:path'
 import { DATA_DIR, readJsonFile, writeFileAtomic } from './dataDir.ts'
 import { composeRuntimePrompt, RUNTIMES } from './agentRuntimes.ts'
 import { listSkills } from './skills.ts'
+import { isAgentExecutionOptions, type AgentExecutionOptions } from '../shared/agent-execution-options.ts'
 
 const FILE = path.join(DATA_DIR, 'agent-scheduled-prompts.json')
 const TAB_ID = /^[A-Za-z0-9_-]{1,64}$/
 const SESSION_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$/
 const MAX_PROMPT = 100_000
 
-export type AgentScheduledPrompt = { account?: string | null; id: string; runtime: string; tab: string; cwd: string; sessionId: string; text: string; skills: string[]; at: string; createdAt: string }
+export type AgentScheduledPrompt = { account?: string | null; id: string; runtime: string; tab: string; cwd: string; sessionId: string; text: string; skills: string[]; execution?: AgentExecutionOptions; at: string; createdAt: string }
 export class AgentScheduledPromptError extends Error {}
 type AgentScheduledPromptScope = Pick<AgentScheduledPrompt, 'runtime' | 'tab' | 'cwd'>
 
@@ -24,12 +25,19 @@ function read(): AgentScheduledPrompt[] {
     const job = item as Partial<AgentScheduledPrompt>
     return typeof job?.id === 'string' && typeof job.runtime === 'string' && typeof job.tab === 'string' && typeof job.cwd === 'string'
       && typeof job.sessionId === 'string' && typeof job.text === 'string' && Array.isArray(job.skills) && typeof job.at === 'string' && typeof job.createdAt === 'string'
+      && (job.execution === undefined || isAgentExecutionOptions(job.execution))
   })
 }
 function belongsToAccount(job: AgentScheduledPrompt): boolean {
   return job.account === undefined || job.account === agentSettingsAccount()
 }
 function write(jobs: AgentScheduledPrompt[]) { writeFileAtomic(FILE, JSON.stringify(jobs, null, 2)) }
+
+function validateExecution(value: unknown): AgentExecutionOptions | undefined {
+  if (value === undefined) return undefined
+  if (!isAgentExecutionOptions(value)) throw new AgentScheduledPromptError('예약 메시지 실행 설정이 올바르지 않습니다')
+  return { ...value }
+}
 
 function validate(input: unknown): Omit<AgentScheduledPrompt, 'id' | 'createdAt'> {
   if (!input || typeof input !== 'object') throw new AgentScheduledPromptError('예약 전송 내용이 올바르지 않습니다')
@@ -41,10 +49,11 @@ function validate(input: unknown): Omit<AgentScheduledPrompt, 'id' | 'createdAt'
   const text = typeof value.text === 'string' ? value.text.trim() : ''
   const when = new Date(typeof value.at === 'string' ? value.at : '')
   const skills = Array.isArray(value.skills) ? value.skills.filter((name): name is string => typeof name === 'string') : []
+  const execution = validateExecution(value.execution)
   if (RUNTIMES[runtime]?.surface !== 'acp' || !TAB_ID.test(tab) || !path.isAbsolute(cwd) || !SESSION_ID.test(sessionId)) throw new AgentScheduledPromptError('예약할 에이전트 세션이 올바르지 않습니다')
   if (!text || text.length > MAX_PROMPT) throw new AgentScheduledPromptError('예약할 메시지를 입력하세요')
   if (Number.isNaN(when.getTime()) || when.getTime() <= Date.now()) throw new AgentScheduledPromptError('미래의 날짜와 시간을 고르세요')
-  return { runtime, tab, cwd, sessionId, text, skills: [...new Set(skills)], at: when.toISOString() }
+  return { runtime, tab, cwd, sessionId, text, skills: [...new Set(skills)], ...(execution ? { execution } : {}), at: when.toISOString() }
 }
 
 function validateScope(input: unknown): AgentScheduledPromptScope {
@@ -73,7 +82,8 @@ async function dispatch(job: AgentScheduledPrompt) {
     const wanted = new Set(job.skills)
     const promptText = wanted.size ? composeRuntimePrompt(job.runtime, job.text, listSkills(job.cwd, job.runtime).filter((skill) => wanted.has(skill.name))) : job.text
     // prompt()는 실행 중인 세션에 자동으로 큐잉한다. 새 감독은 resume 힌트로 원 세션을 먼저 load한다.
-    client.send({ type: 'prompt', text: job.text, promptText, automatic: true })
+    const settings = job.execution ? { model: '', thinking: '', permission: '', execution: { ...job.execution } } : undefined
+    client.send({ type: 'prompt', text: job.text, promptText, automatic: true, ...(settings ? { settings } : {}) })
   } finally { client.close() }
 }
 async function runDue() {
@@ -130,13 +140,14 @@ export function updateAgentScheduledPrompt(input: unknown): AgentScheduledPrompt
   const text = typeof value.text === 'string' ? value.text.trim() : ''
   const at = new Date(typeof value.at === 'string' ? value.at : '')
   const skills = Array.isArray(value.skills) ? value.skills.filter((name): name is string => typeof name === 'string') : []
+  const execution = validateExecution(value.execution)
   if (!id || !text || text.length > MAX_PROMPT) throw new AgentScheduledPromptError('예약할 메시지를 입력하세요')
   if (Number.isNaN(at.getTime()) || at.getTime() <= Date.now()) throw new AgentScheduledPromptError('미래의 날짜와 시간을 고르세요')
   const scope = validateScope(value)
   const jobs = read()
   const index = jobs.findIndex((job) => job.id === id && belongsToAccount(job) && job.runtime === scope.runtime && job.tab === scope.tab && job.cwd === scope.cwd)
   if (index < 0) throw new AgentScheduledPromptError('예약 메시지를 찾을 수 없습니다')
-  const job = { ...jobs[index], account: jobs[index].account ?? agentSettingsAccount(), text, skills: [...new Set(skills)], at: at.toISOString() }
+  const job = { ...jobs[index], account: jobs[index].account ?? agentSettingsAccount(), text, skills: [...new Set(skills)], ...(execution ? { execution } : {}), at: at.toISOString() }
   jobs[index] = job
   write(jobs)
   arm()

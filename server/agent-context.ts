@@ -7,6 +7,7 @@ import { defaultAgentSettings, projectDocsDir, readProjectAgentSettings, SETTING
 import { contextBlock, describeAgentContext } from './project-context-text.ts'
 import type { AgentContextBinding } from '../shared/project-agent-context.ts'
 import { ensureAgentGuidance } from './agent-guidance.ts'
+import type { AgentExecutionOptions } from '../shared/agent-execution-options.ts'
 
 function inside(root: string, target: string): boolean {
   const relative = path.relative(root, target)
@@ -45,10 +46,10 @@ export function refreshAgentContext(binding: AgentContextBinding): AgentContextB
   return { projectRoot: binding.projectRoot, docsRoot: path.join(binding.projectRoot, projectDocsDir(binding.projectRoot, path.relative(binding.projectRoot, binding.docsRoot))) }
 }
 
-export function agentContextText(binding: AgentContextBinding, cwd: string, locale?: string): string {
+export function agentContextText(binding: AgentContextBinding, cwd: string, locale?: string, execution?: AgentExecutionOptions): string {
   const settings = readProjectAgentSettings(binding.projectRoot) ?? defaultAgentSettings(path.relative(binding.projectRoot, binding.docsRoot))
   if (settings.enabled) ensureAgentGuidance()
-  const text = describeAgentContext(binding, settings, cwd, locale)
+  const text = describeAgentContext(binding, settings, cwd, locale, execution)
   return text ? contextBlock(text) : ''
 }
 

@@ -7,191 +7,120 @@ import { compile } from '@tailwindcss/node'
 import { connectTestBrowser } from './test-browser.ts'
 import { defaultBranchGuidance } from '../shared/branch-guidance.ts'
 import { documentationGuidanceKeys } from '../shared/agent-guidance.ts'
-import { defaultAgentBuildVerificationSettings, type AgentBuildVerificationSettings } from '../shared/agent-build-verification.ts'
+import { defaultAgentBuildVerificationSettings } from '../shared/agent-build-verification.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 
-test('build verification settings autosave guidance only, preserve drafts and custom instructions, and fit desktop and mobile themes', { timeout: 120_000 }, async () => {
+test('composer execution toggles capture choices, restore per-tab drafts, announce state, and replace instruction controls', { timeout: 90_000 }, async t => {
   const source = `import React from '${root}/node_modules/react/index.js';
 import {createRoot} from '${root}/node_modules/react-dom/client.js';
-import {AgentGuidanceButton} from '${root}/src/components/agent-guidance-settings.tsx';
+import {AgentPanel} from '${root}/src/components/AgentPanel.tsx';
 import {I18nProvider} from '${root}/src/i18n.tsx';
-import {applyThemePalette,THEME_PRESETS} from '${root}/src/utils/theme-color.ts';
-window.fixtureTheme=dark=>applyThemePalette(THEME_PRESETS.find(theme=>theme.id===(dark?'dark':'light')).palette);
-window.fixtureTheme(false);
-createRoot(document.getElementById('root')).render(<I18nProvider><AgentGuidanceButton workspacePath="/project" onOpenFile={()=>{}}/></I18nProvider>);`
-  const bundle = await build({ input: 'virtual:build-verification.tsx', write: false, platform: 'browser', onwarn(warning, warn) { if (warning.code !== 'MODULE_LEVEL_DIRECTIVE') warn(warning) }, output: { format: 'iife' }, transform: { jsx: 'react-jsx', define: { 'process.env.NODE_ENV': JSON.stringify('test') } }, plugins: [{
-    name: 'fixture', resolveId(id) { if (id === 'virtual:build-verification.tsx') return id; if (id.endsWith('.css')) return 'virtual:style' }, load(id) { if (id === 'virtual:build-verification.tsx') return source; if (id === 'virtual:style') return '' },
+localStorage.setItem('mew:locale','ko'); window.messages=[];
+const meta={sessionId:'conversation',startedAt:new Date().toISOString(),turns:0,busy:false,queued:[],usage:null,canLoad:false,canList:false};
+class Socket {
+ static OPEN=1;readyState=1;
+ constructor(){window.socket=this;setTimeout(()=>{this.onopen?.();this.emit({type:'replay',events:[]});this.emit({type:'models',models:{currentModelId:'test',availableModels:[{modelId:'test',name:'Test'}]}});this.emit({type:'meta',meta})},20)}
+ emit(value){this.onmessage?.({data:JSON.stringify(value)})}
+ send(raw){window.messages.push(JSON.parse(raw))}
+ close(){}
+}
+window.WebSocket=Socket;
+window.queue=()=>window.socket.emit({type:'meta',meta:{...meta,queued:['queued question'],queuedSettings:[{model:'Test',thinking:'—',permission:'—',execution:{build:true,deploy:false}}]}});
+createRoot(document.getElementById('root')).render(<I18nProvider><AgentPanel project="test" workspacePath="/workspace" tree={[]} focusedFilePath={null} onOpenFile={()=>{}} onOpenGuidanceFile={()=>{}} onClose={()=>{}} /></I18nProvider>);`
+  const bundle = await build({ input: 'virtual:connection.tsx', write: false, platform: 'browser', onwarn(warning, warn) { if (warning.code !== 'MODULE_LEVEL_DIRECTIVE') warn(warning) }, output: { format: 'iife' }, transform: { jsx: 'react-jsx', define: { 'process.env.NODE_ENV': JSON.stringify('test') } }, plugins: [{
+    name: 'fixture',
+    async resolveId(id, importer) {
+      if (id === 'virtual:connection.tsx') return id
+      if (id === '@mew/tmux-term') return 'virtual:terminal'
+      if (id.endsWith('.css')) return 'virtual:style'
+      if (id.endsWith('?raw')) { const resolved = await this.resolve(id.slice(0, -4), importer, { skipSelf: true }); if (resolved) return `${resolved.id}?raw` }
+    },
+    async load(id) {
+      if (id === 'virtual:connection.tsx') return source
+      if (id === 'virtual:terminal') return 'export const isHiddenTmuxSession=()=>false;export function TmuxTerminal(){return null}'
+      if (id === 'virtual:style') return ''
+      if (id.endsWith('?raw')) return `export default ${JSON.stringify(await fs.readFile(id.slice(0, -4), 'utf8'))}`
+    },
   }] })
   const chunk = bundle.output.find(item => item.type === 'chunk')!
-  const content = (await Promise.all(['src/components/agent-guidance-settings.tsx', 'src/components/agent-build-verification-fields.tsx', 'src/components/agent-capacity-retry-fields.tsx', 'src/components/agent-branch-guidance.tsx', 'src/components/agent-guidance-row.tsx', 'packages/ui/src/dialog-frame.tsx', 'packages/ui/src/select-field.tsx', 'packages/ui/src/HoverTipLayer.tsx', 'packages/ui/src/ConfirmDialog.tsx'].map(file => fs.readFile(`${root}/${file}`, 'utf8')))).join('\n')
   const compiler = await compile(await fs.readFile(`${root}/src/index.css`, 'utf8'), { base: `${root}/src`, onDependency() {} })
-  const css = compiler.build([...new Set((source + content).match(/[A-Za-z0-9_@:/.[\]()%,-]+/g))]) + await fs.readFile(`${root}/src/components/agent-guidance-settings.css`, 'utf8')
+  const content = (await Promise.all(['src/components/AgentPanel.tsx', 'src/components/agent-execution-toggles.tsx', 'packages/ui/src/Toast.tsx', 'src/components/agent-guidance-settings.tsx', 'src/components/agent-header-select.tsx', 'src/components/MentionTextarea.tsx', 'src/components/DockWorkspace.tsx'].map(file => fs.readFile(`${root}/${file}`, 'utf8')))).join('\n')
+  const css = compiler.build([...new Set((source + content).match(/[A-Za-z0-9_@!:/.[\]()%,-]+/g))])
   const browser = await connectTestBrowser()
-  try {
-    for (const width of [1100, 390, 320]) {
-      const page = await browser.newPage({ viewport: { width, height: 844 }, locale: 'ko-KR', reducedMotion: 'reduce', hasTouch: width < 768, isMobile: width < 768 })
-      page.setDefaultTimeout(4000)
-      let updates = 0, failure: 503 | 409 | undefined
-      let state = {
-        path: '/data/agent-guidance.md', content: '# Guidance', instructions: '', revision: 'initial',
-        settings: { commit: 'inherit', commitLanguage: 'en', language: 'inherit', detail: 'inherit', subagents: 'inherit', debugger: 'enabled', testing: 'required', codeQuality: 'required', ...Object.fromEntries(documentationGuidanceKeys.map(key => [key, 'required'])) },
-        capacityRetry: { delaySeconds: 30, maxRetries: 20 },
-        branch: { value: { ...defaultBranchGuidance }, custom: false },
-        buildVerification: { value: { ...defaultAgentBuildVerificationSettings }, custom: false },
-      }
-      const errors: string[] = [], unexpectedRequests: string[] = []
+  t.after(() => browser.close())
+  for (const width of [1100, 390, 320]) for (const dark of [true, false]) {
+    await t.test(`${width}px ${dark ? 'dark' : 'light'}`, async matrix => {
+      const context = await browser.newContext({ viewport: { width, height: 844 }, hasTouch: width < 768 })
+      matrix.after(() => context.close())
+      const page = await context.newPage()
+      page.setDefaultTimeout(5000)
+      const errors: string[] = [], writes: string[] = []
       page.on('pageerror', error => errors.push(error.message))
-      await page.route('**/*', async route => {
-        const request = route.request(), url = new URL(request.url())
-        if (url.origin !== 'http://mew-build-verification.test') {
-          unexpectedRequests.push(request.url())
-          return route.abort()
+      await page.route('http://mew-execution.test/**', async route => {
+        const pathname = new URL(route.request().url()).pathname
+        if (pathname === '/app.js') return route.fulfill({ contentType: 'text/javascript', body: chunk.code })
+        if (pathname === '/api/user-ui/agent-tabs') return route.fulfill({ json: { state: { tabs: [{ id: 'first', label: 'Codex', runtime: 'codex', cwd: '/workspace' }], activeId: 'first' }, claims: [] } })
+        if (pathname === '/api/agent-cwd') return route.fulfill({ json: { cwd: '/workspace' } })
+        if (pathname === '/api/projects') return route.fulfill({ json: [] })
+        if (pathname === '/api/fs/agent-guidance') {
+          if (route.request().method() !== 'GET') writes.push(route.request().method())
+          return route.fulfill({ json: {
+            path: '/data/agent-guidance.md', content: '# Guidance', instructions: '', revision: 'initial',
+            settings: { commit: 'inherit', commitLanguage: 'en', language: 'inherit', detail: 'inherit', subagents: 'inherit', debugger: 'enabled', testing: 'required', codeQuality: 'required', ...Object.fromEntries(documentationGuidanceKeys.map(key => [key, 'required'])) },
+            capacityRetry: { delaySeconds: 30, maxRetries: 20 }, branch: { value: defaultBranchGuidance, custom: false },
+            buildVerification: { value: defaultAgentBuildVerificationSettings, custom: false },
+          } })
         }
-        if (url.pathname === '/api/fs/agent-guidance') {
-          if (request.method() === 'PUT') {
-            const input = request.postDataJSON()
-            assert.deepEqual(Object.keys(input).sort(), ['key', 'revision', 'value'])
-            assert.equal(input.key, 'buildVerification', 'editing build preferences only updates guidance metadata')
-            assert.equal(input.revision, state.revision)
-            assert.deepEqual(Object.keys(input.value).sort(), Object.keys(defaultAgentBuildVerificationSettings).sort())
-            updates++
-            if (failure) {
-              const status = failure
-              failure = undefined
-              return route.fulfill({ status, json: { error: status === 409 ? '지침 파일이 변경되었습니다. 다시 불러오세요.' : '일시적으로 빌드 지침을 저장할 수 없습니다.' } })
-            }
-            state = { ...state, revision: `saved-${updates}`, buildVerification: { value: input.value as AgentBuildVerificationSettings, custom: false } }
-          }
-          return route.fulfill({ json: state })
-        }
-        if (url.pathname === '/app.js') return route.fulfill({ contentType: 'text/javascript', body: chunk.code })
-        if (url.pathname === '/') return route.fulfill({ contentType: 'text/html', body: `<!doctype html><html lang="ko"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}</style><div id="root"></div><script src="/app.js"></script></html>` })
-        unexpectedRequests.push(`${request.method()} ${url.pathname}`)
-        return route.abort()
+        if (pathname.startsWith('/api/')) return route.fulfill({ json: { settings: null, skills: [], jobs: [], commands: [], runtimes: [] } })
+        return route.fulfill({ contentType: 'text/html', body: `<!doctype html><html class="${dark ? 'dark' : ''}" lang="ko"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}html,body,#root{height:100%;margin:0}</style><div id="root"></div><script src="/app.js"></script></html>` })
       })
-      await page.goto('http://mew-build-verification.test/')
-      const open = page.getByRole('button', { name: '에이전트 기본 지침', exact: true })
+      await page.goto('http://mew-execution.test/')
+      const buildButton = page.getByRole('button', { name: '빌드', exact: true })
+      const deployButton = page.getByRole('button', { name: '배포', exact: true })
+      const input = page.locator('[contenteditable="true"][aria-placeholder="텍스트 입력"]')
+      await buildButton.waitFor()
+      assert.equal(await buildButton.getAttribute('aria-pressed'), 'true')
+      assert.equal(await deployButton.getAttribute('aria-pressed'), 'false')
+      assert.equal(await buildButton.innerText(), '', 'controls contain icons only')
+      await input.fill('capture execution choices')
+      await buildButton.click()
+      await page.getByRole('status').filter({ hasText: '빌드 off' }).waitFor()
+      await deployButton.focus()
+      await deployButton.press('Space')
+      await page.getByRole('status').filter({ hasText: '배포 on' }).waitFor()
+      assert.equal(await buildButton.getAttribute('aria-pressed'), 'false')
+      assert.equal(await deployButton.getAttribute('aria-pressed'), 'true')
+      await input.press('Control+Enter')
+      const sent = await page.evaluate<any>('window.messages.find(message => message.type === "prompt")')
+      assert.equal(sent.text, 'capture execution choices')
+      assert.deepEqual(sent.settings.execution, { build: false, deploy: true })
+      assert.equal(sent.displayText, sent.text, 'execution instructions never pollute the user transcript')
+      for (const button of [buildButton, deployButton]) {
+        const box = (await button.boundingBox())!
+        assert.ok(box.x >= 0 && box.x + box.width <= width && box.y + box.height <= 844, 'toggle stays inside viewport')
+      }
+      await page.reload()
+      await buildButton.waitFor()
+      assert.equal(await buildButton.getAttribute('aria-pressed'), 'false', 'build choice survives refresh')
+      assert.equal(await deployButton.getAttribute('aria-pressed'), 'true', 'deployment choice survives refresh')
+      await page.evaluate('window.queue()')
+      await page.locator('[data-queue-row="0"]').getByRole('button', { name: '편집', exact: true }).click()
+      assert.equal(await buildButton.getAttribute('aria-pressed'), 'true', 'queue editing restores the captured build choice')
+      assert.equal(await deployButton.getAttribute('aria-pressed'), 'false', 'queue editing restores the captured deployment choice')
+      await buildButton.click()
+      await page.getByRole('button', { name: '저장', exact: true }).click()
+      const edited = await page.evaluate<any>('window.messages.find(message => message.type === "edit_queued")')
+      assert.deepEqual(edited.settings.execution, { build: false, deploy: false })
+      assert.equal(await deployButton.getAttribute('aria-pressed'), 'true', 'queue edits leave the normal composer preference intact')
+      await page.getByRole('button', { name: '에이전트 기본 지침', exact: true }).click()
       const dialog = page.getByRole('dialog', { name: '에이전트 기본 지침', exact: true })
-      const field = (name: string) => dialog.getByRole('combobox', { name, exact: true })
-      const command = dialog.getByRole('textbox', { name: '빌드 명령어', exact: true })
-      const summary = dialog.locator('summary', { hasText: '빌드 세부 설정' })
-      const discard = page.getByRole('dialog', { name: '저장하지 않은 지침을 버릴까요?', exact: true })
-      const saved = async () => {
-        await page.waitForTimeout(500)
-        await dialog.getByRole('status').filter({ hasText: '저장했습니다.' }).waitFor()
-      }
-      const choose = async (name: string, option: string) => {
-        const trigger = field(name)
-        await trigger.scrollIntoViewIfNeeded()
-        if (width < 768) {
-          await trigger.tap()
-          await page.getByRole('option', { name: option, exact: true }).tap()
-        } else {
-          await trigger.click()
-          await page.getByRole('option', { name: option, exact: true }).click()
-        }
-      }
-      await open.click()
-      await field('빌드 검증').waitFor()
-      assert.equal(await field('빌드 검증').textContent(), '필수 실행')
-      assert.equal(await dialog.getByRole('group', { name: '일반', exact: true }).getByRole('combobox', { name: '빌드 검증', exact: true }).count(), 1)
-      assert.equal(await page.locator('select,datalist').count(), 0)
-      await summary.click()
-      assert.equal(await command.inputValue(), '')
-      assert.equal(await command.getAttribute('placeholder'), '프로젝트 빌드 명령 자동 선택')
-      assert.equal(await field('실행 대상').textContent(), '구현 변경 후')
-      assert.equal(await field('빌드 실패 시').textContent(), '수정 후 다시 빌드')
-      for (const dark of [false, true]) {
-        await page.evaluate(`window.fixtureTheme(${dark})`)
-        await command.scrollIntoViewIfNeeded()
-        for (const control of [command, field('실행 대상'), field('빌드 실패 시')]) {
-          const bounds = (await control.boundingBox())!
-          assert.ok(bounds.x >= 0 && bounds.x + bounds.width <= width, `build controls fit ${width}px in ${dark ? 'dark' : 'light'} theme`)
-          assert.ok(bounds.height >= (width < 768 ? 36 : 32))
-        }
-        await field('빌드 실패 시').click()
-        const bounds = (await page.getByRole('listbox', { name: '빌드 실패 시', exact: true }).boundingBox())!
-        assert.ok(bounds.x >= 0 && bounds.x + bounds.width <= width && bounds.y >= 0 && bounds.y + bounds.height <= 844)
-        await page.screenshot({ path: `/tmp/mew-build-verification-${width}-${dark ? 'dark' : 'light'}.png` })
-        await page.keyboard.press('Escape')
-        assert.ok(await dialog.evaluate(el => el.ownerDocument.documentElement.scrollWidth <= el.ownerDocument.defaultView!.innerWidth))
-      }
-      await choose('실행 대상', '모든 변경 후'); await saved()
-      assert.equal(state.buildVerification.value.scope, 'all')
-      await choose('빌드 실패 시', '실패 보고'); await saved()
-      assert.equal(state.buildVerification.value.fixFailures, false)
-      const beforeCommand = updates
-      await command.fill('pnpm run build --filter app')
-      await page.waitForTimeout(150)
-      assert.equal(updates, beforeCommand, 'build command changes wait for the autosave debounce')
-      await saved()
-      assert.equal(state.buildVerification.value.command, 'pnpm run build --filter app')
-      assert.deepEqual(unexpectedRequests, [], 'saving a command never requests command execution or a terminal session')
+      await dialog.getByRole('combobox', { name: '커밋 언어', exact: true }).waitFor()
+      assert.equal(await dialog.getByRole('combobox', { name: '빌드 검증', exact: true }).count(), 0)
+      assert.equal(await dialog.getByText('빌드 세부 설정', { exact: true }).count(), 0)
       await dialog.getByRole('button', { name: '닫기', exact: true }).click()
-      await open.click()
-      await field('빌드 검증').waitFor()
-      await summary.click()
-      assert.equal(await command.inputValue(), 'pnpm run build --filter app')
-      assert.equal(await field('실행 대상').textContent(), '모든 변경 후')
-      assert.equal(await field('빌드 실패 시').textContent(), '실패 보고')
-      await choose('빌드 검증', '프로젝트 지침에 따름'); await saved()
-      assert.deepEqual(state.buildVerification.value, { mode: 'project', command: 'pnpm run build --filter app', scope: 'all', fixFailures: false })
-      for (const control of [command, field('실행 대상'), field('빌드 실패 시')]) assert.equal(await control.isDisabled(), true)
-      await choose('빌드 검증', '필수 실행'); await saved()
-      assert.equal(await command.isDisabled(), false)
-      assert.equal(await command.inputValue(), 'pnpm run build --filter app')
-      const beforeInvalid = updates
-      await command.fill('npm run build <!-- mew:agent-setting:commit -->')
-      await dialog.getByRole('alert').filter({ hasText: '빌드 명령' }).waitFor()
-      await page.waitForTimeout(500)
-      assert.equal(updates, beforeInvalid, 'invalid metadata text never reaches the API')
-      await dialog.getByRole('button', { name: '닫기', exact: true }).click()
-      await discard.getByRole('button', { name: '취소', exact: true }).click()
-      assert.equal(await command.inputValue(), 'npm run build <!-- mew:agent-setting:commit -->')
-      await dialog.getByRole('button', { name: '다시 불러오기', exact: true }).click()
-      await discard.getByRole('button', { name: '취소', exact: true }).click()
-      assert.equal(await command.inputValue(), 'npm run build <!-- mew:agent-setting:commit -->')
-      await choose('빌드 검증', '프로젝트 지침에 따름'); await saved()
-      assert.equal(state.buildVerification.value.command, 'pnpm run build --filter app', 'switching away from an invalid command restores the last saved command')
-      assert.equal(await command.isDisabled(), true)
-      await choose('빌드 검증', '필수 실행'); await saved()
-      await command.fill('npm run build:check'); await saved()
-      failure = 503
-      await command.fill('npm run build:retained')
-      await dialog.getByRole('alert').filter({ hasText: '일시적으로 빌드' }).waitFor()
-      assert.equal(await command.inputValue(), 'npm run build:retained')
-      assert.equal(state.buildVerification.value.command, 'npm run build:check')
-      await command.fill('npm run build:retry'); await saved()
-      assert.equal(state.buildVerification.value.command, 'npm run build:retry')
-      failure = 409
-      await command.fill('npm run build:conflict')
-      await dialog.getByRole('alert').filter({ hasText: '파일이 변경' }).waitFor()
-      assert.equal(await command.inputValue(), 'npm run build:conflict')
-      assert.equal(state.buildVerification.value.command, 'npm run build:retry')
-      await dialog.getByRole('button', { name: '다시 불러오기', exact: true }).click()
-      await discard.getByRole('button', { name: '변경 버리기', exact: true }).click()
-      assert.equal(state.buildVerification.value.command, 'npm run build:retry', 'discarding a conflict never saves the rejected draft')
-      await page.waitForFunction("document.querySelector('input[placeholder=\"프로젝트 빌드 명령 자동 선택\"]')?.value === 'npm run build:retry'")
-      await field('빌드 검증').and(page.locator(':enabled')).waitFor()
-      if (!(await command.isVisible())) await summary.click()
-      assert.equal(await command.inputValue(), 'npm run build:retry')
-      state = { ...state, revision: 'custom-build', buildVerification: { ...state.buildVerification, custom: true } }
-      await dialog.getByRole('button', { name: '다시 불러오기', exact: true }).click()
-      await field('빌드 검증').filter({ hasText: '직접 편집한 지침' }).waitFor()
-      await field('빌드 검증').click()
-      assert.equal(await page.getByRole('option', { name: '직접 편집한 지침', exact: true }).getAttribute('aria-disabled'), 'true')
-      await page.keyboard.press('Escape')
-      assert.equal(state.buildVerification.custom, true)
-      if (!(await command.isVisible())) await summary.click()
-      for (const control of [command, field('실행 대상'), field('빌드 실패 시')]) assert.equal(await control.isDisabled(), true, 'custom build instructions stay intact until a mode is chosen')
-      await choose('빌드 검증', '필수 실행'); await saved()
-      assert.deepEqual(state.buildVerification, { value: { ...defaultAgentBuildVerificationSettings }, custom: false })
-      await command.fill('npm run build:replace-custom'); await saved()
-      assert.equal(state.buildVerification.value.command, 'npm run build:replace-custom')
-      assert.deepEqual(unexpectedRequests, [])
+      assert.deepEqual(writes, [], 'toggling execution never rewrites shared instructions')
       assert.deepEqual(errors, [])
-      await page.close()
-    }
-  } finally { await browser.close() }
+    })
+  }
 })

@@ -113,5 +113,26 @@ test('에이전트가 뜨기 전에 보낸 질문도 잃지 않고, 목록은 �
   assert.equal(result.query, '에이전트패널')
   assert.deepEqual(result.sessions.map(item => item.sessionId), ['old-searchable'])
   assert.match(result.sessions[0].snippet!, /에이전트 패널/)
+  const settings = { model: 'chosen model', thinking: 'chosen effort', permission: 'chosen mode' }
+  for (const [index, execution] of [
+    { build: true, deploy: false }, { build: false, deploy: true },
+    { build: 'true', deploy: false }, { build: true }, { build: false, deploy: false, extra: true },
+  ].entries()) {
+    const text = `execution-options-${index}`
+    const echoed = new Promise<{ model: string; execution?: unknown }>(resolve => {
+      const listener = (raw: import('ws').RawData) => {
+        const event = JSON.parse(raw.toString())
+        if (event.type === 'update' && event.update?.sessionUpdate === 'user_message_chunk' && event.update.content?.text === text) {
+          ws.off('message', listener)
+          resolve(event.settings)
+        }
+      }
+      ws.on('message', listener)
+    })
+    ws.send(JSON.stringify({ type: 'prompt', text, settings: { ...settings, execution } }))
+    const received = await echoed
+    assert.deepEqual(received.execution, index < 2 ? execution : undefined, 'only validated execution choices cross the websocket boundary')
+    assert.equal(received.model === settings.model, index < 2, 'malformed settings retain existing session defaults')
+  }
   ws.close()
 })

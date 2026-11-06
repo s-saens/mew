@@ -2,6 +2,8 @@ import { useAgentControlSelection } from '../hooks/use-agent-control-selection'
 import { useAgentPromptFeedback } from '../hooks/use-agent-prompt-feedback'
 import { HeaderSelect } from './agent-header-select'
 import { AgentPromptDrafts } from './agent-prompt-drafts'
+import { AgentExecutionToggles } from './agent-execution-toggles'
+import { useAgentExecutionOptions } from '../hooks/use-agent-execution-options'
 import { RuntimeInstallProgress } from './RuntimeInstallProgress'
 import { AgentAttachmentIcon } from './agent-attachment-icon'
 import { AgentDocumentReferences, AgentDocumentTag } from './agent-document-tag'
@@ -3449,6 +3451,7 @@ function AgentSessionView({
   // original = 고치기 시작할 때 보고 있던 원본. 서버가 이 항목을 잠가 앞 턴이 끝나도 큐를 당기지 않는다.
   const [expandedQueued, setExpandedQueued] = useState<{ index: number; text: string } | null>(null)
   const [editingQueued, setEditingQueued] = useState<QueuedEdit | null>(null)
+  const [execution, setExecution] = useAgentExecutionOptions(cacheAccount, notificationWorkspace, tabId)
   const [attachingQueued, setAttachingQueued] = useState(false)
   const queuedEditVersionRef = useRef(0)
   const [drawingContext, setDrawingContext] = useState<{ projectRoot: string; target: 'composer' | 'queue'; queueVersion: number } | null>(null)
@@ -3740,6 +3743,7 @@ function AgentSessionView({
       cwd,
       sessionId: meta.sessionId,
       text: message,
+      execution,
       skills: selectedSkillNames(message, skills),
       at: new Date(at).toISOString(),
     })
@@ -3822,6 +3826,7 @@ function AgentSessionView({
   const modeOptions = modes?.availableModes.map((mode) => ({ id: mode.id, label: MODE_LABEL[mode.id] ?? mode.name })) ?? [{ id: '', label: uiText("권한") }]
   const messageSettings = useMemo<AgentMessageSettings>(() => ({
     uiLocale,
+    execution,
     modelId: models?.currentModelId,
     thinkingId: thinking?.currentValue,
     thinkingConfigId: thinking?.configId,
@@ -3829,7 +3834,7 @@ function AgentSessionView({
     model: currentModel ?? models?.currentModelId ?? '—',
     thinking: thinking?.options.find((option) => option.id === thinking.currentValue)?.name ?? thinking?.currentValue ?? '—',
     permission: modes ? (MODE_LABEL[modes.currentModeId] ?? modes.currentModeId) : '—',
-  }), [uiLocale, currentModel, models?.currentModelId, modes, thinking])
+  }), [uiLocale, execution, currentModel, models?.currentModelId, modes, thinking])
   useEffect(() => {
     if (!startupReady || !connected || !meta?.sessionId || auth || loadingSession || historyPreview || restoreFailureRef.current) return
     startupQueue.flush(prompt => {
@@ -4607,6 +4612,12 @@ function AgentSessionView({
           />
           </div>
           <div ref={composerActionsRef} data-agent-composer-actions className="absolute right-1 bottom-1 z-10 flex w-max max-w-[calc(100%-0.5rem)] flex-wrap items-stretch justify-end gap-1">
+          <AgentExecutionToggles value={editingQueued?.settings.execution ?? execution}
+            disabled={composerCliMode}
+            onChange={next => {
+              if (editingQueued) setEditingQueued(current => current ? { ...current, settings: { ...current.settings, execution: next } } : current)
+              else setExecution(next)
+            }} />
           <HoverTipLayer className="flex items-stretch">
             <div data-tip={uiText('지우기')} className="flex min-h-8 items-center">
             <button type="button" aria-label={uiText('지우기')}

@@ -10,6 +10,7 @@ import { legacyBranchGuidanceKeys, legacyBranchGuidanceText, type LegacyBranchGu
 import { previousBranchGuidanceText } from '../shared/branch-guidance-v2.ts'
 import { agentCapacityRetryMetadata, agentCapacityRetryValidationError, defaultAgentCapacityRetrySettings, type AgentCapacityRetrySettings } from '../shared/agent-capacity-retry.ts'
 import { agentBuildVerificationText, agentBuildVerificationValidationError, defaultAgentBuildVerificationSettings, type AgentBuildVerificationSettings, type AgentBuildVerificationSnapshot } from '../shared/agent-build-verification.ts'
+import type { AgentExecutionOptions } from '../shared/agent-execution-options.ts'
 
 export const AGENT_GUIDANCE_PATH = path.join(DATA_DIR, 'agent-guidance.md')
 export const agentGuidancePath = () => agentSettingsPath('agent-guidance.md')
@@ -43,11 +44,11 @@ export function ensureAgentGuidance(): string {
 }
 
 /** No cache: edits apply to the next request. Preview alone does not create state. */
-export function readAgentGuidance(locale?: string): string {
-  try { return effectiveGuidance(fs.readFileSync(agentGuidancePath(), 'utf8').trim(), locale) }
+export function readAgentGuidance(locale?: string, execution?: AgentExecutionOptions): string {
+  try { return effectiveGuidance(fs.readFileSync(agentGuidancePath(), 'utf8').trim(), locale, execution) }
   catch (error) {
     if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
-    return effectiveGuidance(seed().toString('utf8').trim(), locale)
+    return effectiveGuidance(seed().toString('utf8').trim(), locale, execution)
   }
 }
 
@@ -60,7 +61,7 @@ export function readAgentCapacityRetrySettings(): AgentCapacityRetrySettings {
   }
 }
 
-function effectiveGuidance(content: string, locale?: string): string {
+function effectiveGuidance(content: string, locale?: string, execution?: AgentExecutionOptions): string {
   // Retry timing belongs to the supervisor, not the agent's instruction text.
   try {
     const retry = isolatedRegion(content, 'capacityRetry')
@@ -69,6 +70,17 @@ function effectiveGuidance(content: string, locale?: string): string {
   let defaults = withDocumentationDefaults(currentDocumentationGuidance(content))
   defaults = withBuildVerificationDefault(withBranchDefault(withTestingDefault(withDebuggerDefault(withCommitLanguageDefault(defaults)))))
   defaults = withCodeQualityDefault(defaults)
+  if (execution) {
+    const build = buildVerificationSnapshot(defaults)
+    if (!build.custom) {
+      const block = isolatedRegion(defaults, 'buildVerification')
+      if (block) {
+        const [start, end] = markers('buildVerification')
+        const text = agentBuildVerificationText({ ...build.value, mode: execution.build ? 'required' : 'project' })
+        defaults = defaults.slice(0, block.from) + `${start}\n${text}\n${end}` + defaults.slice(block.to)
+      }
+    }
+  }
   const branch = branchSnapshot(defaults)
   if (!branch.custom) {
     const block = region(defaults, 'branch')

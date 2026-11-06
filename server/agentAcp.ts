@@ -7,6 +7,7 @@ import { agentDisplayEvent, compactHistoryWork } from '../shared/agent-display.t
 import { randomUUID } from 'node:crypto'
 import { agentGitEnv } from './agent-git-identity.ts'
 import type { AgentAttachmentInput, AgentAttachmentRef } from '../shared/agent-attachment.ts'
+import type { AgentExecutionOptions } from '../shared/agent-execution-options.ts'
 import { splitCodexModelId, splitModelVariant, modelVariantId, MODEL_EFFORT_CONFIG_ID } from '../shared/codex-models.ts'
 // ACP(Agent Client Protocol) 클라이언트 — 에이전트를 child process로 띄우고 **워크스페이스**에 묶는다.
 // 벤더 전환은 spawn 대상 교체다(런타임 등록표 RUNTIMES). 자체 어댑터 인터페이스는 두지 않는다 — ACP가 인터페이스다.
@@ -138,7 +139,7 @@ type AgentImage = { data: string; mimeType: string }
 /** 대화 전사에는 바이트 대신 프로젝트 안의 업로드 경로만 남긴다. */
 export type AgentImageRef = { path: string; mimeType: string }
 /** 사용자가 전송을 누른 순간의 실행 설정. 대화 전사에 남겨 각 질문의 조건을 재현한다. */
-export type AgentMessageSettings = { uiLocale?: string; model: string; thinking: string; permission: string; modelId?: string; thinkingId?: string; thinkingConfigId?: string; modeId?: string }
+export type AgentMessageSettings = { uiLocale?: string; execution?: AgentExecutionOptions; model: string; thinking: string; permission: string; modelId?: string; thinkingId?: string; thinkingConfigId?: string; modeId?: string }
 
 /** 큐 안의 세션 경계. 뒤의 프롬프트는 새 ACP 세션에 전달한다. */
 type QueuedClear = { kind: 'clear'; text: '/clear' }
@@ -1187,7 +1188,7 @@ export class AgentSession {
         const policy = currentSkillPolicy(this.cwd)
         promptText = refreshSelectedRuntimePrompt(this.runtime, promptText, policy.enabled)
         return [
-          agentContextText(this.#context, this.cwd, settings?.uiLocale),
+          agentContextText(this.#context, this.cwd, settings?.uiLocale, settings?.execution),
           contextBlock(skillLibraryPrompt(this.cwd, policy)),
         ].filter(Boolean).join('\n\n')
       })
