@@ -178,7 +178,7 @@ export function ProjectAddInline({ basePath, paths = emptyPaths, onOpen, onProje
     {onboarding && <h2 className="mew-project-add-heading text-center text-base font-medium text-ink">{copy.heading}</h2>}
     <button ref={trigger} type="button" aria-label={copy.add} data-tip={copy.add} aria-haspopup="dialog" aria-expanded={expanded} aria-controls={expanded ? `${id}-setup` : undefined}
       onClick={() => { trigger.current?.focus({ preventScroll: true }); setMode(createdMode); setError(null); setExpanded(true) }}
-      className="mew-project-add-trigger inline-flex h-8 w-8 items-center justify-center rounded-lg text-ink-secondary hover:bg-surface-hover hover:text-ink focus-visible:outline-2 focus-visible:outline-accent">
+      className="mew-project-add-trigger inline-flex h-8 w-full items-center justify-center rounded-lg text-ink-secondary hover:bg-surface-hover hover:text-ink focus-visible:outline-2 focus-visible:outline-accent">
       <Plus width={18} height={18} aria-hidden="true" />
     </button>
     {expanded && <DialogFrame labelledBy={`${id}-title`} onClose={close} busy={busy} className="mew-project-add-dialog flex max-w-[26rem] flex-col">

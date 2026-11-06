@@ -89,7 +89,7 @@
 }
 .mew-project-add-onboarding { width: min(100%, 22rem); margin: auto; text-align: center; }
 .mew-project-add-heading { margin-bottom: 12px; padding-inline: 32px; font-size: 18px; line-height: 26px; }
-.mew-project-add-onboarding .mew-project-add-trigger { width: 44px; height: 44px; color: var(--color-accent); background: color-mix(in srgb, var(--color-accent) 10%, transparent); }
+.mew-project-add-onboarding .mew-project-add-trigger { height: 44px; color: var(--color-accent); background: color-mix(in srgb, var(--color-accent) 10%, transparent); }
 .mew-project-add-onboarding .mew-project-add-trigger:hover { background: color-mix(in srgb, var(--color-accent) 18%, transparent); }
 @media (pointer: coarse), (width < 768px) {
   .mew-project-add-trigger, .mew-project-add-dialog button, .mew-project-add-dialog input, .mew-project-catalog-open, .mew-project-catalog-pin { min-height: 44px; }

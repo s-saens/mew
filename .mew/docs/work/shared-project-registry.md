@@ -1,6 +1,6 @@
 ---
 title: "Shared projects and project setup"
-description: "Records shared project registry creation, cloning, discovery, and personal project corrections. Includes the November 6 icon-only plus trigger and project-add popup, browser and App regressions, and local verification alongside earlier inline setup history."
+description: "Records shared project registry creation, cloning, discovery, and personal project corrections. Includes the November 6 project-add popup and full-width centered plus correction, browser and App regressions, and local verification alongside earlier inline setup history."
 created: "2026-11-02"
 updated: "2026-11-06"
 ---
@@ -158,3 +158,12 @@ Replace the project panel's labelled Add project row and inline setup with an ic
 - `npm run check:docs` validated 742 descriptions and reported 39 existing missing-target links, including `.mew/docs/MOC.md`, `.mew/docs/decisions/MOC.md`, and `.mew/docs/decisions/README.md`. The project guide retains its existing missing parent reference; this task introduces no missing target.
 
 The required build updates local `dist/` assets. No deployment, launcher invocation, application server lifecycle operation, or push was performed. Browser APIs in these checks use isolated fixtures; real Git providers and physical-device interaction were not exercised.
+
+### Full-width plus correction — November 6, 2026
+
+Expand the plus trigger to 100% of its available container width and center its icon horizontally and vertically. Remove the onboarding-specific fixed width so the empty-list trigger follows the same rule. Popup behavior and the existing button heights remain unchanged; the [UI navigation contract](../development/ui-project-navigation.md#shared-ui-for-adding-projects-and-browsing-server-files) owns the layout.
+
+- `node --test server/project-add-inline-ui.test.ts` passed. Added geometry assertions verify full width and icon centering for ordinary and onboarding triggers across 200/240px desktop panels and 390px mobile, in dark and light themes.
+- `npm run build` and `npm run lint` passed with warnings. `git diff --check` passed. `npm run check:docs` validated 742 descriptions and retained the same 39 existing missing-target links.
+
+Verification used isolated Chromium fixtures and the local build; physical devices and application server lifecycle operations were outside this correction.
