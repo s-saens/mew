@@ -1,6 +1,7 @@
-import type { BranchGuidanceSnapshot } from './branch-guidance.ts'
 import type { AgentCapacityRetrySettings } from './agent-capacity-retry.ts'
 import type { AgentBuildVerificationSnapshot } from './agent-build-verification.ts'
+
+export const gitWorkingGuidance = 'Use the repository’s main branch in its existing working folder for ordinary tasks. Do not create task branches or Git worktrees, or perform automatic merges, unless the user explicitly requests them. Before editing, inspect the current branch and Git status. If main is already checked out in another working folder, use that existing checkout rather than creating another one. Preserve all existing staged, unstaged, and untracked work; do not automatically stash, reset, clean, overwrite, or delete existing branches or worktrees to change the working folder. If main is unavailable or cannot be used safely, report the specific blocker instead of inventing a branch workflow. Follow the separate commit preference, and do not push unless the user requests it. Skip this guidance outside Git repositories; explicit user instructions and repository restrictions still apply.'
 
 export const guidanceOptions = {
   commit: {
@@ -90,7 +91,6 @@ export type GuidanceSnapshot = {
   revision: string
   instructions?: string
   settings: Record<GuidanceKey, string>
-  branch: BranchGuidanceSnapshot
   capacityRetry?: AgentCapacityRetrySettings
   buildVerification?: AgentBuildVerificationSnapshot
 }

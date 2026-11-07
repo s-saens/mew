@@ -1,13 +1,13 @@
 ---
 title: "Agent guidance and context delivery"
-description: "Per-account guidance storage, revision APIs, settings presets, and account/project context delivery. Defines per-message Build/Deploy execution options, generated-build suppression, saved-guidance preservation, runtime boundaries, and failure handling for interactive and scheduled sessions."
-updated: "2026-11-06"
+description: "Per-account guidance storage, revision APIs, settings presets, and account/project context delivery. Defines direct work on main, retirement of account branch strategies, per-message Build/Deploy execution options, generated-build suppression, saved-guidance preservation, runtime boundaries, and failure handling for interactive and scheduled sessions."
+updated: "2026-11-07"
 상위파일: "agent-sessions.md"
 ---
 
 ## Passing project context
 
-Retry, branch, additional instructions, and automatic project guidance settings in the default instructions dialog are saved automatically 400 ms after the last change, without a separate save button. Invalid numeric or branch input is not sent to the API. Saves are serialized through the existing revision API, and drafts are preserved on failure or conflict. Other presets are saved immediately upon selection. In the code quality and documentation selectors, the T button beside Apply default guidance displays a localized explanation without changing the selection or stored English instruction.
+Retry, additional instructions, and automatic project guidance settings in the default instructions dialog are saved automatically 400 ms after the last change, without a separate save button. Invalid numeric input is not sent to the API. Saves are serialized through the existing revision API, and drafts are preserved on failure or conflict. Other presets are saved immediately upon selection. In the code quality and documentation selectors, the T button beside Apply default guidance displays a localized explanation without changing the selection or stored English instruction.
 
 Per-project queues, independent tabs, the shared CLI, and completion criteria for feature requests follow [feature-based development](../features/terminals-agents-automation/feature-driven-development-and-markdown-documents.md#실행과-복원). The project and Documents connection captured at submission are passed when the supervisor starts.
 
@@ -19,17 +19,27 @@ Per-project queues, independent tabs, the shared CLI, and completion criteria fo
 
 | API | Contract |
 | --- | --- |
-| `GET /api/fs/agent-guidance` | Requires `serverFiles`; returns `{ path, content, revision, settings, branch, instructions, capacityRetry, buildVerification }` |
+| `GET /api/fs/agent-guidance` | Requires `serverFiles`; returns `{ path, content, revision, settings, instructions, capacityRetry, buildVerification }` |
 | `PUT` with `{ key, value, revision }` | Atomically replaces only that MD settings section; no separate JSON copy |
 | Unknown values | 400 |
 | Revision mismatch or damaged settings | 409 |
 
-Valid keys: `commit`, `commitLanguage`, `language`, `detail`, `subagents`, `debugger`, `testing`, `codeQuality`, `branch`, `instructions`, `capacityRetry`, `buildVerification`, and the documentation items below. Read values from the source.
+Valid keys: `commit`, `commitLanguage`, `language`, `detail`, `subagents`, `debugger`, `testing`, `codeQuality`, `instructions`, `capacityRetry`, `buildVerification`, and the documentation items below. Read values from the source.
 
 - `instructions`: up to 8,000 characters, changing only `mew:agent-setting:instructions`. Reject other settings markers; empty input clears only this section. Preserve existing free-form guidance in place.
 - `subagents`: `inherit`, `automatic`, `explicit`, or `never`, changing only `mew:agent-setting:subagents`. Missing means `inherit`; manual wording means `custom`. Automatic guidance covers independent tasks, shared-file coordination, and review, without changing runtime settings/permissions.
 
 Edit through `/api/fs/file` and external-file tabs. Compare supplied `expectedContent` with the source and return 409 for stale drafts. Settings reads/saves refresh clean tabs via `mew:external-file-updated`, preserving unsaved tabs. Atomic file replacement prevents independent supervisors from reading an empty file during save. The Default Instructions button beside Skills/MCP opens the dialog; see [Shared guidance files](../../../docs/guides/project-setup.md#edit-the-shared-guidance-file) for save/application scope.
+
+### Git working behavior
+
+All accounts receive `gitWorkingGuidance` from `shared/agent-guidance.ts` at request time. Ordinary tasks use `main` in an existing working folder, without automatic task branches, worktrees, or merges. When `main` already has a checkout, use that folder. Preserve staged, unstaged, and untracked changes and existing branches/worktrees. Report an unavailable or unsafe checkout; do not create a replacement workflow. Explicit user requests and repository restrictions govern exceptions. Commit timing and language remain separate account preferences, and pushes require a user request.
+
+`GuidanceSnapshot` no longer returns `branch`, and `PUT` with `key: 'branch'` returns 400 without writing. The UI removes strategy, automation, details, merge, and cleanup controls, and no longer disables the commit selector based on a retired automation choice.
+
+At request time, omit a complete isolated `mew:agent-setting:branch` section, regardless of its version or customized text. Keep the stored MD/TXT and revision unchanged, including when another preference is saved. Continue validating retired markers on writes to avoid consuming other settings. Missing, duplicate, nested, or overlapping branch markers return 409 during context delivery until repaired through View file; do not send ambiguous old automation instructions or discard neighboring text. Unmarked handwritten and project instructions remain unchanged.
+
+New seeds contain no branch-strategy metadata. Interactive sessions, CLI, schedules, and project context use the same reader. Existing supervisors must be reopened after the user applies server-side code; the build updates frontend assets only. [ADR 0156](../decisions/0156-single-main-agent-workflow.md) supersedes the previous account strategy and automation behavior.
 
 ### Account and runtime ownership
 

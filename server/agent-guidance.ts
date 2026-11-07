@@ -4,10 +4,7 @@ import { createHash } from 'node:crypto'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { agentSettingsPath } from './agent-account-settings.ts'
 import { DATA_DIR, writeFileAtomic } from './dataDir.ts'
-import { documentationGuidanceKeys, guidanceOptions, type GuidanceKey, type GuidanceSnapshot } from '../shared/agent-guidance.ts'
-import { branchGuidanceText, branchGuidanceValidationError, defaultBranchGuidance, type BranchGuidanceSettings, type BranchGuidanceSnapshot } from '../shared/branch-guidance.ts'
-import { legacyBranchGuidanceKeys, legacyBranchGuidanceText, type LegacyBranchGuidanceSettings } from '../shared/branch-guidance-v1.ts'
-import { previousBranchGuidanceText } from '../shared/branch-guidance-v2.ts'
+import { documentationGuidanceKeys, gitWorkingGuidance, guidanceOptions, type GuidanceKey, type GuidanceSnapshot } from '../shared/agent-guidance.ts'
 import { agentCapacityRetryMetadata, agentCapacityRetryValidationError, defaultAgentCapacityRetrySettings, type AgentCapacityRetrySettings } from '../shared/agent-capacity-retry.ts'
 import { agentBuildVerificationText, agentBuildVerificationValidationError, defaultAgentBuildVerificationSettings, type AgentBuildVerificationSettings, type AgentBuildVerificationSnapshot } from '../shared/agent-build-verification.ts'
 import type { AgentExecutionOptions } from '../shared/agent-execution-options.ts'
@@ -62,13 +59,14 @@ export function readAgentCapacityRetrySettings(): AgentCapacityRetrySettings {
 }
 
 function effectiveGuidance(content: string, locale?: string, execution?: AgentExecutionOptions): string {
+  content = withoutRetiredBranchGuidance(content)
   // Retry timing belongs to the supervisor, not the agent's instruction text.
   try {
     const retry = isolatedRegion(content, 'capacityRetry')
     if (retry) content = content.slice(0, retry.from) + content.slice(retry.to)
   } catch { /* Preserve handwritten text surrounding damaged markers. */ }
   let defaults = withDocumentationDefaults(currentDocumentationGuidance(content))
-  defaults = withBuildVerificationDefault(withBranchDefault(withTestingDefault(withDebuggerDefault(withCommitLanguageDefault(defaults)))))
+  defaults = withBuildVerificationDefault(withTestingDefault(withDebuggerDefault(withCommitLanguageDefault(defaults))))
   defaults = withCodeQualityDefault(defaults)
   if (execution) {
     const build = buildVerificationSnapshot(defaults)
@@ -81,24 +79,7 @@ function effectiveGuidance(content: string, locale?: string, execution?: AgentEx
       }
     }
   }
-  const branch = branchSnapshot(defaults)
-  if (!branch.custom) {
-    const block = region(defaults, 'branch')
-    if (block && /^<!-- mew:branch-guidance:v[12] /.test(block.text)) {
-      const [start, end] = markers('branch')
-      defaults = defaults.slice(0, block.from) + `${start}\n${branchGuidanceText(branch.value)}\n${end}` + defaults.slice(block.to)
-    }
-  }
-  if (!branch.custom && branch.value.strategy !== 'inherit' && branch.value.workflow !== 'manual') {
-    // Keep saved preferences and handwritten instructions intact; only the
-    // redundant standard commit block is omitted from the request.
-    try {
-      const commit = region(defaults, 'commit')
-      if (commit && Object.values(guidanceOptions.commit).some(text => text === commit.text)) {
-        content = defaults.slice(0, commit.from) + defaults.slice(commit.to)
-      } else content = defaults
-    } catch { content = defaults }
-  } else content = defaults
+  content = `${defaults}\n\n${gitWorkingGuidance}`
   return withCommitLanguageSnapshot(resolveCommitLanguage(resolveGuidanceLanguage(withSkillUsageDefault(content), locale), locale))
 }
 
@@ -264,12 +245,6 @@ function withDebuggerDefault(content: string): string {
   return `${content}${content ? '\n\n' : ''}${start}\n${guidanceOptions.debugger.enabled}\n${end}`
 }
 
-function withBranchDefault(content: string): string {
-  const [start, end] = markers('branch')
-  if (content.includes(start) || content.includes(end)) return content
-  return `${content}${content ? '\n\n' : ''}${start}\n${branchGuidanceText(defaultBranchGuidance)}\n${end}`
-}
-
 function withBuildVerificationDefault(content: string): string {
   const [start, end] = markers('buildVerification')
   if (content.includes(start) || content.includes(end)) return content
@@ -297,31 +272,13 @@ function isolatedRegion(content: string, key: GuidanceRegionKey) {
   return block
 }
 
-function branchSnapshot(content: string): BranchGuidanceSnapshot {
-  const fallback = () => ({ value: { ...defaultBranchGuidance }, custom: true })
-  try {
-    const block = region(content, 'branch')
-    if (!block) return { value: { ...defaultBranchGuidance }, custom: false }
-    for (const key of regionKeys) {
-      if (key === 'branch') continue
-      const other = region(content, key)
-      if (other && other.from < block.to && block.from < other.to) return fallback()
-    }
-    const metadata = block.text.split('\n', 1)[0].match(/^<!-- mew:branch-guidance:v([123]) (.+) -->$/)
-    if (!metadata) return fallback()
-    const decoded: unknown = JSON.parse(metadata[2])
-    if (metadata[1] === '1') {
-      if (!decoded || typeof decoded !== 'object' || Array.isArray(decoded) || Object.keys(decoded).length !== legacyBranchGuidanceKeys.length || legacyBranchGuidanceKeys.some(key => !Object.hasOwn(decoded, key))) return fallback()
-      const value = { ...decoded, workflow: defaultBranchGuidance.workflow }
-      if (branchGuidanceValidationError(value)) return fallback()
-      return { value: value as BranchGuidanceSettings, custom: block.text !== legacyBranchGuidanceText(decoded as LegacyBranchGuidanceSettings) }
-    }
-    const value = decoded
-    if (branchGuidanceValidationError(value)) return fallback()
-    const settings = value as BranchGuidanceSettings
-    const expected = metadata[1] === '2' ? previousBranchGuidanceText(settings) : branchGuidanceText(settings)
-    return { value: settings, custom: block.text !== expected }
-  } catch { return fallback() }
+function withoutRetiredBranchGuidance(content: string): string {
+  const block = isolatedRegion(content, 'branch')
+  if (block) return content.slice(0, block.from) + content.slice(block.to)
+  if (markers('branch').some(marker => content.includes(marker))) {
+    throw new GuidanceError('이전 브랜치 설정 구간이 손상되었습니다. 파일 보기에서 설정 표시를 확인하세요.', 409)
+  }
+  return content
 }
 
 function capacityRetrySettings(content: string): AgentCapacityRetrySettings {
@@ -361,7 +318,7 @@ function snapshot(content: string): GuidanceSnapshot {
   }
   let instructions = ''
   try { instructions = region(content, 'instructions')?.text ?? '' } catch { /* Keep file editing available for damaged markers. */ }
-  return { path: agentGuidancePath(), content, revision: revisionOf(content), instructions, settings, branch: branchSnapshot(content), capacityRetry: capacityRetrySettings(content), buildVerification: buildVerificationSnapshot(content) }
+  return { path: agentGuidancePath(), content, revision: revisionOf(content), instructions, settings, capacityRetry: capacityRetrySettings(content), buildVerification: buildVerificationSnapshot(content) }
 }
 
 export function agentGuidanceSettings(): GuidanceSnapshot {
@@ -370,8 +327,8 @@ export function agentGuidanceSettings(): GuidanceSnapshot {
 
 export function updateAgentGuidance(input: unknown): GuidanceSnapshot {
   const value = input as { key?: unknown; value?: unknown; revision?: unknown } | null
-  if (!value || typeof value.key !== 'string' || (!['branch', 'instructions', 'capacityRetry', 'buildVerification'].includes(value.key) && !Object.hasOwn(guidanceOptions, value.key))) throw new GuidanceError('올바른 설정 항목을 선택하세요.')
-  const key = value.key as GuidanceRegionKey
+  if (!value || typeof value.key !== 'string' || (!['instructions', 'capacityRetry', 'buildVerification'].includes(value.key) && !Object.hasOwn(guidanceOptions, value.key))) throw new GuidanceError('올바른 설정 항목을 선택하세요.')
+  const key = value.key as Exclude<GuidanceRegionKey, 'branch'>
   if (typeof value.revision !== 'string') throw new GuidanceError('올바른 설정값을 선택하세요.')
   let text: string
   if (key === 'instructions') {
@@ -381,10 +338,6 @@ export function updateAgentGuidance(input: unknown): GuidanceSnapshot {
     const validationError = agentCapacityRetryValidationError(value.value)
     if (validationError) throw new GuidanceError(validationError)
     text = agentCapacityRetryMetadata(value.value as AgentCapacityRetrySettings)
-  } else if (key === 'branch') {
-    const validationError = branchGuidanceValidationError(value.value)
-    if (validationError) throw new GuidanceError(validationError)
-    text = branchGuidanceText(value.value as BranchGuidanceSettings)
   } else if (key === 'buildVerification') {
     const validationError = agentBuildVerificationValidationError(value.value)
     if (validationError) throw new GuidanceError(validationError)

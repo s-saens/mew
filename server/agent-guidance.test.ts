@@ -608,7 +608,6 @@ test('Mew-wide additional guidance preserves handwritten rules and other prefere
   state = updateAgentGuidance({ key: 'instructions', value: '  Shared custom rules\n\nKeep this paragraph.  ', revision: state.revision })
   assert.equal(state.instructions, 'Shared custom rules\n\nKeep this paragraph.')
   assert.deepEqual(state.settings, before.settings)
-  assert.deepEqual(state.branch, before.branch)
   assert.ok(state.content.startsWith(handwritten))
   assert.notEqual(state.revision, before.revision)
   assert.throws(() => updateAgentGuidance({ key: 'instructions', value: 'Overwrite', revision: before.revision }), (error: unknown) => error instanceof GuidanceError && error.status === 409)
@@ -622,7 +621,6 @@ test('Mew-wide additional guidance preserves handwritten rules and other prefere
   assert.equal(state.instructions, '')
   assert.doesNotMatch(state.content, /mew:agent-setting:instructions/)
   assert.deepEqual(state.settings, before.settings)
-  assert.deepEqual(state.branch, before.branch)
   assert.ok(state.content.startsWith(handwritten))
 })
 
@@ -696,7 +694,6 @@ test('build verification settings persist per account and apply to every project
     state = updateAgentGuidance({ key: 'buildVerification', value: settings, revision: state.revision })
     assert.deepEqual(state.buildVerification, { value: settings, custom: false })
     assert.deepEqual(state.settings, before.settings)
-    assert.deepEqual(state.branch, before.branch)
     assert.deepEqual(state.capacityRetry, before.capacityRetry)
     assert.notEqual(state.revision, before.revision)
     assert.throws(() => updateAgentGuidance({ key: 'buildVerification', value: defaultAgentBuildVerificationSettings, revision: before.revision }), (error: unknown) => error instanceof GuidanceError && error.status === 409)

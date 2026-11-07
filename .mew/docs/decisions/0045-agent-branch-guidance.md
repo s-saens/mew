@@ -1,11 +1,13 @@
 ---
 title: "Configurable Agent Git Branch Guidance"
-description: "Initial decision defining the default GitHub Flow strategy, detailed GUI behavior, and preservation of existing work. Subsequent decision 0046 extends authorization for automatic handling, and 0054 extends in-repository worktree locations and guidance compatibility."
+description: "Historical decision introducing configurable agent branch strategies. ADR 0156 supersedes generated strategies and automation with direct work on main; the original rationale remains preserved."
 created: "2026-10-22"
-updated: "2026-10-23"
+updated: "2026-11-07"
 ---
 
 ## Status
+
+The configurable agent branch strategy, automation, and generated worktree guidance are superseded by [ADR 0156](0156-single-main-agent-workflow.md). Existing worktree navigation, path handling, and traversal exclusions remain supported.
 
 Adopted.
 

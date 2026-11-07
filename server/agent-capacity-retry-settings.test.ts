@@ -18,7 +18,6 @@ test('capacity retry defaults need no saved state and each account reads its cur
     state = updateAgentGuidance({ key: 'capacityRetry', value: { delaySeconds: 45, maxRetries: 12 }, revision: state.revision })
     assert.ok(state.content.startsWith(original.content))
     assert.deepEqual(state.settings, original.settings)
-    assert.deepEqual(state.branch, original.branch)
     assert.deepEqual(state.capacityRetry, { delaySeconds: 45, maxRetries: 12 })
     assert.deepEqual(readAgentCapacityRetrySettings(), state.capacityRetry)
     assert.match(readAgentGuidance(), /Keep handwritten policy/)

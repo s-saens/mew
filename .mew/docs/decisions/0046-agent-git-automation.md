@@ -1,11 +1,13 @@
 ---
 title: "User-Selected Scope of Agent Git Automation"
-description: "A decision defining Git operation permissions with automatic local merging as the default, preservation of existing settings, and cleanup boundaries. Follow-up 0054 extends worktree locations and v1 and v2 compatibility with v3."
+description: "Historical decision introducing account-selected Git automation. ADR 0156 supersedes this automation and its implicit permissions while preserving ordinary commit preferences and existing work."
 created: "2026-10-22"
-updated: "2026-10-23"
+updated: "2026-11-07"
 ---
 
 ## Status
+
+The configurable agent branch strategy, automation, and generated worktree guidance are superseded by [ADR 0156](0156-single-main-agent-workflow.md). Existing worktree navigation, path handling, and traversal exclusions remain supported.
 
 Adopted. Extends the manual branch and merge preferences in [Decision 0045](0045-agent-branch-guidance.md) with optional automation.
 

@@ -5,10 +5,8 @@ import { Settings, Xmark, PageEdit, RefreshDouble, Globe, Folder } from 'iconoir
 import { ConfirmDialog, DialogFrame, HoverTipLayer, SelectField } from '@mew/ui'
 import { useI18n } from '../i18n'
 import { documentationGuidanceKeys, guidanceOptions, type GuidanceKey, type GuidanceSnapshot } from '../../shared/agent-guidance'
-import type { BranchGuidanceSettings } from '../../shared/branch-guidance'
 import { defaultAgentCapacityRetrySettings, type AgentCapacityRetrySettings } from '../../shared/agent-capacity-retry'
 import { AgentCapacityRetryFields, type CapacityRetryDraft } from './agent-capacity-retry-fields'
-import { BranchGuidanceFields } from './agent-branch-guidance'
 import { GuidanceRow } from './agent-guidance-row'
 import { DefaultGuidanceTip } from './agent-default-guidance-tip'
 import { guidanceScopeCopy } from './agent-guidance-scope-copy'
@@ -28,12 +26,7 @@ const generalCopy = { ko: '일반', en: 'General', ja: '一般', 'zh-CN': '常�
 const codeQualityCopy = { ko: '코드 품질', en: 'Code quality', ja: 'コード品質', 'zh-CN': '代码质量' }
 const capacityRetryDraft = (value: AgentCapacityRetrySettings): CapacityRetryDraft => ({ delaySeconds: String(value.delaySeconds), maxRetries: String(value.maxRetries) })
 const documentationKeys = new Set<GuidanceKey>(documentationGuidanceKeys)
-const managedCommitCopy = {
-  ko: '자동 처리에 커밋이 포함됩니다. 수동 모드에서 바꿀 수 있습니다.',
-  en: 'Automation includes commits. Change this setting in manual mode.',
-  ja: '自動処理にコミットを含みます。手動モードで変更できます。',
-  'zh-CN': '自动处理包含提交，可在手动模式下更改此设置。',
-}
+
 
 async function request(init?: RequestInit): Promise<GuidanceSnapshot> {
   const response = await mewFetch('/api/fs/agent-guidance', { cache: 'no-store', ...init })
@@ -62,7 +55,6 @@ export function AgentGuidanceSettings({ onClose, onOpenFile, workspacePath }: { 
   const [projectData, setProjectData] = useState<ProjectGuidanceSnapshot | null>(null)
   const [projectDraft, setProjectDraft] = useState(''), [projectEnabled, setProjectEnabled] = useState(true)
   const [discardAction, setDiscardAction] = useState<(() => void) | null>(null)
-  const [branchDirty, setBranchDirty] = useState(false)
   const [reloadVersion, setReloadVersion] = useState(0)
   const [busy, setBusy] = useState(true), [saving, setSaving] = useState(false), [error, setError] = useState(''), [notice, setNotice] = useState('')
   const [panel, setPanel] = useState<HTMLDivElement | null>(null)
@@ -85,7 +77,7 @@ export function AgentGuidanceSettings({ onClose, onOpenFile, workspacePath }: { 
   const globalDirty = !!data && globalDraft !== (data.instructions ?? '')
   const retryDirty = !!data && JSON.stringify(retryDraft) !== JSON.stringify(capacityRetryDraft(data.capacityRetry ?? defaultAgentCapacityRetrySettings))
   const projectDirty = !!projectData && (projectDraft !== projectData.settings.instructions || projectEnabled !== projectData.settings.enabled)
-  const guard = (action: () => void) => { if (!pending.current) { if (globalDirty || projectDirty || retryDirty || branchDirty) setDiscardAction(() => action); else action() } }
+  const guard = (action: () => void) => { if (!pending.current) { if (globalDirty || projectDirty || retryDirty) setDiscardAction(() => action); else action() } }
   const close = () => guard(onClose)
   const load = async (target = scope) => {
     const version = ++generation.current
@@ -116,7 +108,7 @@ export function AgentGuidanceSettings({ onClose, onOpenFile, workspacePath }: { 
     // Read current account guidance on every open; project guidance loads on selection.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-  async function update(key: GuidanceKey | 'branch' | 'instructions' | 'capacityRetry', value: string | BranchGuidanceSettings | AgentCapacityRetrySettings) {
+  async function update(key: GuidanceKey | 'instructions' | 'capacityRetry', value: string | AgentCapacityRetrySettings) {
     if (!data || pending.current || busy) return
     pending.current = true
     parkFocus()
@@ -160,10 +152,9 @@ export function AgentGuidanceSettings({ onClose, onOpenFile, workspacePath }: { 
     return () => window.clearTimeout(timer)
   }, [busy, error, globalDirty, globalDraft, projectDirty, projectDraft, projectEnabled, data, projectData])
   const labels: Record<string, string> = { ...text, ko: '한국어', en: 'English', ja: '日本語', zh: '简体中文' }
-  const managedCommit = data && data.settings.commit !== 'custom' && !data.branch.custom && data.branch.value.strategy !== 'inherit' && data.branch.value.workflow !== 'manual'
   const settingLabels: Record<GuidanceKey, string> = { ...text, ...docText, codeQuality: codeQualityCopy[locale] }
-  const guidanceField = (key: GuidanceKey) => data && <GuidanceRow key={key} label={settingLabels[key]} hint={key === 'commit' && (managedCommit ? managedCommitCopy[locale] : data.settings.commit === 'custom' ? text.customHint : undefined)}>
-    <SelectField compact portalContainer={panel} popupWidth={key === 'commitLanguage' ? 280 : undefined} label={settingLabels[key]} value={data.settings[key]} disabled={busy || !!error || (key === 'commit' && !!managedCommit)} onChange={value => void update(key, value)}
+  const guidanceField = (key: GuidanceKey) => data && <GuidanceRow key={key} label={settingLabels[key]} hint={key === 'commit' && data.settings.commit === 'custom' ? text.customHint : undefined}>
+    <SelectField compact portalContainer={panel} popupWidth={key === 'commitLanguage' ? 280 : undefined} label={settingLabels[key]} value={data.settings[key]} disabled={busy || !!error} onChange={value => void update(key, value)}
       options={[
         ...(data.settings[key] === 'custom' ? [{ value: 'custom', label: text.custom, disabled: true }] : []),
         ...Object.keys(guidanceOptions[key]).map(value => ({ value, label: value === 'required' && (documentationKeys.has(key) || key === 'codeQuality') ? docText.required : labels[value],
@@ -193,7 +184,7 @@ export function AgentGuidanceSettings({ onClose, onOpenFile, workspacePath }: { 
           {data && Object.entries(data.settings).some(([key, value]) => key !== 'commit' && key !== 'commitLanguage' && !documentationKeys.has(key as GuidanceKey) && value === 'custom') && <p className="mt-1 text-xs leading-4 text-ink-secondary">{text.customHint}</p>}
           {data && <section role="group" aria-label="Git" className="mt-2 border-t border-edge pt-2">
             <h3 className="mb-1 text-xs font-semibold">Git</h3>
-            <BranchGuidanceFields key={reloadVersion} branch={data.branch} onDirtyChange={setBranchDirty} disabled={busy || !!error} portalContainer={panel} onSave={value => void update('branch', value)} commitField={<>{guidanceField('commit')}{guidanceField('commitLanguage')}</>} />
+            {guidanceField('commit')}{guidanceField('commitLanguage')}
           </section>}
           {data && <details className="agent-guidance-extra"><summary>{docText.title}</summary>
             <section role="group" aria-label={docText.title}>{documentationGuidanceKeys.map(guidanceField)}</section>

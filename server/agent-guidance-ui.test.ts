@@ -5,7 +5,6 @@ import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
 import { connectTestBrowser } from './test-browser.ts'
-import { defaultBranchGuidance } from '../shared/branch-guidance.ts'
 import { defaultAgentBuildVerificationSettings } from '../shared/agent-build-verification.ts'
 import { documentationGuidanceKeys, type DocumentationGuidanceKey } from '../shared/agent-guidance.ts'
 
@@ -26,7 +25,7 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
     name: 'fixture', resolveId(id) { if (id === 'virtual:guidance.tsx') return id; if (id.endsWith('.css')) return 'virtual:style' }, load(id) { if (id === 'virtual:guidance.tsx') return source; if (id === 'virtual:style') return '' },
   }] })
   const chunk = bundle.output.find(item => item.type === 'chunk')!
-  const content = (await Promise.all(['src/components/agent-guidance-settings.tsx', 'src/components/agent-capacity-retry-fields.tsx', 'src/components/agent-branch-guidance.tsx', 'src/components/agent-guidance-row.tsx', 'packages/ui/src/dialog-frame.tsx', 'packages/ui/src/select-field.tsx', 'packages/ui/src/HoverTipLayer.tsx', 'packages/ui/src/ConfirmDialog.tsx'].map(file => fs.readFile(`${root}/${file}`, 'utf8')))).join('\n')
+  const content = (await Promise.all(['src/components/agent-guidance-settings.tsx', 'src/components/agent-capacity-retry-fields.tsx', 'src/components/agent-guidance-row.tsx', 'packages/ui/src/dialog-frame.tsx', 'packages/ui/src/select-field.tsx', 'packages/ui/src/HoverTipLayer.tsx', 'packages/ui/src/ConfirmDialog.tsx'].map(file => fs.readFile(`${root}/${file}`, 'utf8')))).join('\n')
   const compiler = await compile(await fs.readFile(`${root}/src/index.css`, 'utf8'), { base: `${root}/src`, onDependency() {} })
   const css = compiler.build([...new Set((source + content).match(/[A-Za-z0-9_@:/.[\]()%,-]+/g))]) + await fs.readFile(`${root}/src/components/agent-guidance-settings.css`, 'utf8')
   const browser = await connectTestBrowser()
@@ -39,7 +38,7 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
       let releaseSave: (() => void) | undefined, releaseLoad: (() => void) | undefined
       let heldLoad = false
       const documentationSettings = Object.fromEntries(documentationGuidanceKeys.map(key => [key, 'required'])) as Record<DocumentationGuidanceKey, string>
-      let state = { path: '/data/agent-guidance.md', content: '# Guidance', instructions: '', revision: 'first', buildVerification: { value: { ...defaultAgentBuildVerificationSettings }, custom: false }, capacityRetry: { delaySeconds: 30, maxRetries: 20 }, settings: { commit: 'inherit', commitLanguage: 'en', language: 'inherit', detail: 'custom', subagents: 'inherit', debugger: 'enabled', testing: 'required', codeQuality: 'required', ...documentationSettings }, branch: { value: { ...defaultBranchGuidance }, custom: false } }
+      let state = { path: '/data/agent-guidance.md', content: '# Guidance', instructions: '', revision: 'first', buildVerification: { value: { ...defaultAgentBuildVerificationSettings }, custom: false }, capacityRetry: { delaySeconds: 30, maxRetries: 20 }, settings: { commit: 'inherit', commitLanguage: 'en', language: 'inherit', detail: 'custom', subagents: 'inherit', debugger: 'enabled', testing: 'required', codeQuality: 'required', ...documentationSettings } }
       let projectState = { projectRoot: '/project', revision: 'project1', settings: { version: 1, enabled: true, docsDir: 'notes', entrypoints: ['AGENTS.md'], instructions: 'Existing project rule' } }
       const errors: string[] = []
       page.on('pageerror', error => errors.push(error.message))
@@ -64,10 +63,8 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
             }
             assert.equal(input.revision, state.revision)
             updates++
-            if (input.key === 'branch') {
-              assert.deepEqual(Object.keys(input.value).sort(), Object.keys(defaultBranchGuidance).sort(), 'branch writes include the entire preference object')
-              state = { ...state, revision: `updated-${updates}`, branch: { value: input.value, custom: false } }
-            } else if (input.key === 'buildVerification') {
+            assert.notEqual(input.key, 'branch', 'retired branch settings are never submitted')
+            if (input.key === 'buildVerification') {
               assert.deepEqual(Object.keys(input.value).sort(), Object.keys(defaultAgentBuildVerificationSettings).sort())
               state = { ...state, revision: `updated-${updates}`, buildVerification: { value: input.value, custom: false } }
             } else if (input.key === 'capacityRetry') {
@@ -136,7 +133,7 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
           assert.ok(control.x >= 0 && control.x + control.width <= width, `${name} stays inside a ${width}px viewport`)
         }
       }
-      await assertInlineFields(['응답 언어', '답변 길이', '서브에이전트 위임', '디버거 활용', '테스트 작성', '코드 품질', '브랜치 전략', 'Git 자동 처리', '커밋 방식', '커밋 언어'])
+      await assertInlineFields(['응답 언어', '답변 길이', '서브에이전트 위임', '디버거 활용', '테스트 작성', '코드 품질', '커밋 방식', '커밋 언어'])
       await assertInlineFields(['재시도 간격 (초)', '최대 재시도 횟수'], 'spinbutton')
       const languageBounds = (await field('응답 언어').boundingBox())!, debuggerBounds = (await field('디버거 활용').boundingBox())!
       assert.ok(debuggerBounds.y - languageBounds.y <= (width >= 768 ? 120 : 168), 'ordinary settings use a compact, consistently spaced list')
@@ -302,13 +299,14 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
         assert.ok(bounds.x >= 0 && bounds.x + bounds.width <= width && bounds.y >= 0 && bounds.y + bounds.height <= 844)
         await page.keyboard.press('Escape')
         assert.equal(await dialog.count(), 1, 'a narrow-screen dropdown closes before the settings dialog')
-        await page.locator('summary', { hasText: '브랜치 세부 설정' }).click()
-        await assertInlineFields(['작업 폴더', '병합 방식'])
-        await assertInlineFields(['기본 브랜치', '작업 브랜치 접두사'], 'textbox')
-        await page.getByRole('checkbox', { name: '통합 후 로컬 브랜치 정리', exact: true }).scrollIntoViewIfNeeded()
+        assert.equal(await page.locator('summary', { hasText: '브랜치 세부 설정' }).count(), 0)
+        for (const name of ['브랜치 전략', 'Git 자동 처리', '작업 폴더', '병합 방식']) assert.equal(await field(name).count(), 0)
+        await assertInlineFields(['커밋 방식', '커밋 언어'])
+        assert.equal(await field('커밋 방식').isDisabled(), false)
+        await field('커밋 언어').scrollIntoViewIfNeeded()
         for (const dark of [false, true]) {
           await page.evaluate(`window.fixtureTheme(${dark})`)
-          await page.screenshot({ path: `/tmp/mew-guidance-polish-${width}-details-${dark ? 'dark' : 'light'}.png` })
+          await page.screenshot({ path: `/tmp/mew-guidance-polish-${width}-git-${dark ? 'dark' : 'light'}.png` })
         }
         assert.ok(await page.evaluate('document.documentElement.scrollWidth <= window.innerWidth'))
         await page.keyboard.press('Escape')
@@ -349,12 +347,13 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
       await choose('응답 언어', '한국어')
       await page.getByRole('status').filter({ hasText: '저장했습니다.' }).waitFor()
       const gitGroup = page.getByRole('group', { name: 'Git', exact: true })
-      for (const name of ['브랜치 전략', 'Git 자동 처리', '커밋 방식', '커밋 언어']) assert.equal(await gitGroup.getByRole('combobox', { name, exact: true }).count(), 1)
+      for (const name of ['커밋 방식', '커밋 언어']) assert.equal(await gitGroup.getByRole('combobox', { name, exact: true }).count(), 1)
       assert.equal(await gitGroup.getByRole('combobox', { name: '응답 언어', exact: true }).count(), 0)
-      assert.equal(await field('Git 자동 처리').textContent(), '로컬 병합까지 자동 (권장)')
-      assert.equal(await field('커밋 방식').isDisabled(), true)
+      for (const name of ['브랜치 전략', 'Git 자동 처리', '작업 폴더', '병합 방식']) assert.equal(await field(name).count(), 0)
+      assert.equal(await gitGroup.locator('summary').count(), 0, 'branch details are removed')
+      assert.equal(await field('커밋 방식').isDisabled(), false)
       assert.equal(await field('커밋 언어').textContent(), 'English')
-      assert.equal(await field('커밋 언어').isDisabled(), false, 'automation keeps commit language configurable')
+      assert.equal(await field('커밋 언어').isDisabled(), false, 'commit language remains configurable')
       await field('커밋 언어').click()
       assert.deepEqual(await page.getByRole('listbox', { name: '커밋 언어' }).getByRole('option').allTextContents(), ['English', '한국어', '日本語', '简体中文', 'mew 언어 설정에 따름', '에이전트 응답 설정 따르기'])
       for (const dark of [false, true]) {
@@ -373,9 +372,6 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
         await page.evaluate(`window.fixtureTheme(${dark})`)
         await page.screenshot({ path: `/tmp/mew-git-group-${width}-${dark ? 'dark' : 'light'}.png` })
       }
-      await choose('Git 자동 처리', '기존 커밋 설정 사용')
-      await saved()
-      await page.getByRole('status').filter({ hasText: '저장했습니다.' }).waitFor()
       await choose('커밋 방식', '매 변경 완료 후 커밋')
       await page.getByRole('status').filter({ hasText: '저장했습니다.' }).waitFor()
       assert.equal(await field('서브에이전트 위임').textContent(), '별도 지정 안 함')
@@ -424,46 +420,6 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
       }
       await page.keyboard.press('Escape')
       await page.evaluate('window.fixtureTheme(false)')
-      const details = page.locator('details').filter({ has: page.locator('summary', { hasText: '브랜치 세부 설정' }) })
-      const base = page.getByRole('textbox', { name: '기본 브랜치', exact: true })
-      const development = page.getByRole('textbox', { name: '개발 브랜치', exact: true })
-      const prefix = page.getByRole('textbox', { name: '작업 브랜치 접두사', exact: true })
-      const cleanup = page.getByRole('checkbox', { name: '통합 후 로컬 브랜치 정리', exact: true })
-      await choose('브랜치 전략', 'Git Flow'); await saved()
-      await details.locator('summary').click()
-      await base.fill('release/2026.10'); await development.fill('integration/next'); await prefix.fill('task/'); await saved()
-      await choose('작업 폴더', '항상 worktree'); await saved()
-      await choose('병합 방식', 'Merge commit'); await saved()
-      await cleanup.check(); await saved()
-      assert.deepEqual(state.branch.value, { strategy: 'git-flow', baseBranch: 'release/2026.10', developmentBranch: 'integration/next', branchPrefix: 'task/', worktree: 'always', mergeMethod: 'merge', cleanup: true, workflow: 'manual' })
-      const beforeInvalid = updates
-      await base.fill('bad..branch')
-      await page.getByRole('alert').filter({ hasText: '브랜치 이름이나 접두사' }).waitFor()
-      assert.equal(updates, beforeInvalid)
-      await page.getByRole('button', { name: '닫기', exact: true }).click()
-      await discard.getByRole('button', { name: '취소', exact: true }).click()
-      assert.equal(await base.inputValue(), 'bad..branch', 'closing preserves unsaved invalid branch input')
-      const lastValid = { ...state.branch.value }
-      await choose('브랜치 전략', '프로젝트 지침에 따름'); await saved()
-      assert.deepEqual(state.branch.value, { ...lastValid, strategy: 'inherit' })
-      state = { ...state, revision: 'custom-branch', branch: { ...state.branch, custom: true } }
-      await page.getByRole('button', { name: '다시 불러오기' }).click()
-      await field('브랜치 전략').filter({ hasText: '직접 편집한 지침' }).waitFor()
-      await choose('브랜치 전략', 'Git Flow'); await saved()
-      assert.deepEqual(state.branch, { value: { ...defaultBranchGuidance, strategy: 'git-flow' }, custom: false })
-      for (const [option, value] of [['기존 커밋 설정 사용', 'manual'], ['로컬 병합까지 자동 (권장)', 'local'], ['원격 반영까지 자동', 'remote'], ['기존 커밋 설정 사용', 'manual']]) {
-        await choose('Git 자동 처리', option); await saved()
-        assert.equal(state.branch.value.workflow, value)
-      }
-      await details.locator('summary').click()
-      conflict = true
-      await base.fill('release/conflict')
-      await page.getByRole('alert').filter({ hasText: '파일이 변경' }).waitFor()
-      assert.equal(await base.inputValue(), 'release/conflict')
-      conflict = false
-      await page.getByRole('button', { name: '다시 불러오기' }).click()
-      await discard.getByRole('button', { name: '변경 버리기', exact: true }).click()
-      await field('브랜치 전략').and(page.locator(':enabled')).waitFor()
       conflict = true
       await choose('응답 언어', 'English')
       await page.getByRole('alert').filter({ hasText: '파일이 변경' }).waitFor()

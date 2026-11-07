@@ -1,11 +1,13 @@
 ---
 title: "Place worktrees inside the repository and exclude duplicate traversal"
-description: "Collect new worktrees in .worktrees under the main checkout and exclude the copies from Git, browsing, search, and watching. Define preservation of existing paths and work, and v3 compatibility at request time for v1 and v2 guidance."
+description: "Defines internal worktree locations and traversal exclusions. ADR 0156 retires generated worktree guidance and branch-setting upgrades while retaining existing worktree navigation and path handling."
 created: "2026-10-23"
-updated: "2026-10-23"
+updated: "2026-11-07"
 ---
 
 ## Status
+
+The configurable agent branch strategy, automation, and generated worktree guidance are superseded by [ADR 0156](0156-single-main-agent-workflow.md). Existing worktree navigation, path handling, and traversal exclusions remain supported.
 
 Accepted. Extends the worktree location and guidance version compatibility in [decision 0045](0045-agent-branch-guidance.md) and [0046](0046-agent-git-automation.md). Authorization scope for commits, merges, deletion, and remote operations remains unchanged.
 

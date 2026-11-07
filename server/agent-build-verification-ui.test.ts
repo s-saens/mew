@@ -5,7 +5,6 @@ import path from 'node:path'
 import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
 import { connectTestBrowser } from './test-browser.ts'
-import { defaultBranchGuidance } from '../shared/branch-guidance.ts'
 import { documentationGuidanceKeys } from '../shared/agent-guidance.ts'
 import { defaultAgentBuildVerificationSettings } from '../shared/agent-build-verification.ts'
 
@@ -72,7 +71,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><AgentPanel pro
           return route.fulfill({ json: {
             path: '/data/agent-guidance.md', content: '# Guidance', instructions: '', revision: 'initial',
             settings: { commit: 'inherit', commitLanguage: 'en', language: 'inherit', detail: 'inherit', subagents: 'inherit', debugger: 'enabled', testing: 'required', codeQuality: 'required', ...Object.fromEntries(documentationGuidanceKeys.map(key => [key, 'required'])) },
-            capacityRetry: { delaySeconds: 30, maxRetries: 20 }, branch: { value: defaultBranchGuidance, custom: false },
+            capacityRetry: { delaySeconds: 30, maxRetries: 20 },
             buildVerification: { value: defaultAgentBuildVerificationSettings, custom: false },
           } })
         }
