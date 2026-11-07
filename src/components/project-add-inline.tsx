@@ -1,6 +1,6 @@
 import { useWorkspaceApi } from '../api/workspace-api-context'
 import { useEffect, useId, useRef, useState } from 'react'
-import { ArrowLeft, Check, Folder, FolderPlus, GitBranch, Link, Lock, NavArrowRight, Plus, RefreshDouble, Spark, Xmark } from 'iconoir-react'
+import { ArrowLeft, Check, Folder, FolderPlus, GitBranch, Link, Lock, Plus, RefreshDouble, Spark, Xmark } from 'iconoir-react'
 import { canAutoFocusInput, DialogFrame, HoverTipLayer, LoadingIndicator } from '@mew/ui'
 import { type fetchConnectedGitRepositories, type RegisteredProject } from '../api/client'
 import { GIT_CONNECTION_CHANGED } from '../api/git-auth-request'
@@ -183,7 +183,7 @@ export function ProjectAddInline({ basePath, paths = emptyPaths, onOpen, onProje
       className="mew-project-add-trigger inline-flex h-8 w-full items-center justify-center rounded-lg text-ink-secondary hover:bg-surface-hover hover:text-ink focus-visible:outline-2 focus-visible:outline-accent">
       <Plus width={18} height={18} aria-hidden="true" />
     </button>
-    {expanded && <DialogFrame labelledBy={`${id}-title`} onClose={close} busy={busy} className="mew-project-add-dialog flex max-w-[26rem] flex-col">
+    {expanded && <DialogFrame labelledBy={`${id}-title`} onClose={close} busy={busy} className={`mew-project-add-dialog flex flex-col ${mode ? 'max-w-[26rem]' : 'max-w-[34rem]'}`}>
       <HoverTipLayer className="flex min-h-0 flex-col">
       <header className="mew-project-add-header flex shrink-0 items-center gap-2 border-b border-edge px-3 py-2">
         {mode ? <button ref={backTrigger} type="button" data-project-add-back aria-label={copy.back} data-tip={copy.back} disabled={busy} onClick={back} className={iconButton}><ArrowLeft width={18} height={18} aria-hidden="true" /></button>
@@ -192,16 +192,15 @@ export function ProjectAddInline({ basePath, paths = emptyPaths, onOpen, onProje
         <button type="button" data-project-add-close aria-label={t('common.close')} data-tip={t('common.close')} disabled={busy} onClick={close} className={iconButton}><Xmark width={18} height={18} aria-hidden="true" /></button>
       </header>
       <div id={`${id}-setup`} className="mew-project-add-body min-h-0 overflow-y-auto p-3">
-      {mode === null && <nav aria-label={title} className="mew-project-add-choices flex min-w-0 flex-col gap-1.5">
+      {mode === null && <nav aria-label={title} className="mew-project-add-choices grid min-w-0 grid-cols-4 gap-3">
         {choices.map((next, index) => <button key={next} ref={element => { if (next === 'browse') browseTrigger.current = element; else modeTriggers.current[next] = element }} type="button"
           data-project-add-choice={next} data-dialog-autofocus={index === 0 || undefined} aria-label={copy[next]} disabled={busy || !!created && next !== createdMode}
           onClick={() => next === 'browse' ? setLinkOpen(true) : choose(next)}
-          className="mew-project-add-choice flex min-w-0 items-center gap-3 rounded-lg border border-edge px-3 py-2.5 text-left text-ink hover:border-edge-strong hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-40">
-          <span className="mew-project-add-choice-icon flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-accent">
-            {next === 'clone' ? <GitBranch width={20} height={20} aria-hidden="true" /> : next === 'create' ? <FolderPlus width={20} height={20} aria-hidden="true" /> : next === 'browse' ? <Folder width={20} height={20} aria-hidden="true" /> : <Link width={20} height={20} aria-hidden="true" />}
+          className="mew-project-add-choice group flex min-w-0 flex-col items-center gap-2 rounded-lg py-1 text-center text-ink focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-40">
+          <span className="mew-project-add-choice-icon flex aspect-square w-full max-w-24 shrink-0 items-center justify-center rounded-xl border border-edge text-accent group-hover:border-edge-strong group-hover:bg-surface-hover">
+            {next === 'clone' ? <GitBranch width={32} height={32} aria-hidden="true" /> : next === 'create' ? <FolderPlus width={32} height={32} aria-hidden="true" /> : next === 'browse' ? <Folder width={32} height={32} aria-hidden="true" /> : <Link width={32} height={32} aria-hidden="true" />}
           </span>
-          <span className="min-w-0 flex-1"><span className="block text-sm font-medium">{copy[next]}</span><span className="mt-0.5 block text-xs leading-4 text-ink-secondary">{copy[`${next}Hint`]}</span></span>
-          <NavArrowRight width={16} height={16} className="shrink-0 text-ink-secondary" aria-hidden="true" />
+          <span className="mew-project-add-choice-label whitespace-nowrap text-xs font-medium leading-4 sm:text-sm">{copy[next]}</span>
         </button>)}
       </nav>}
       {mode === 'workspace' && <div ref={workspace}><ProjectCatalogPanel paths={paths} beforeMutation={beforeMutation} onProjectsChanged={onProjectsChanged}

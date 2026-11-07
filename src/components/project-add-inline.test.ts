@@ -124,7 +124,7 @@ test('empty onboarding offers an icon trigger and opens project choices in a mod
     assert.equal(dialog.getAttribute('aria-modal'), 'true')
     assert.equal(view.win.document.querySelector('#root')?.contains(dialog), false, 'setup is portaled outside the project panel')
     assert.deepEqual(view.choices(), ['create', 'clone', 'workspace', 'browse'])
-    assert.deepEqual([...view.win.document.querySelectorAll('[data-project-add-choice]')].map(element => element.getAttribute('aria-label')), ['새 프로젝트 만들기', 'Git repo 클론하기', '이 워크스페이스에서 가져오기', '경로 탐색하기'])
+    assert.deepEqual([...view.win.document.querySelectorAll('[data-project-add-choice]')].map(element => element.getAttribute('aria-label')), ['새 프로젝트', 'Git 클론', '워크스페이스', '경로 탐색'])
     assert.equal(view.fixture.calls.length, 0, 'opening project choices does not query or import projects')
     await view.choose('workspace')
     assert.equal(view.step(), 'workspace')

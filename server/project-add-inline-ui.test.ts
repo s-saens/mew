@@ -38,8 +38,8 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
   const css = compiler.build([...new Set(candidates.join('\n').match(/[A-Za-z0-9_@!:/.[\]()%,-]+/g))])
   const browser = await connectTestBrowser()
   t.after(() => browser.close())
-  for (const panelWidth of [200, 240, 390]) for (const theme of ['dark', 'light']) {
-    const mobile = panelWidth === 390, viewport = { width: mobile ? 390 : 1100, height: 844 }
+  for (const panelWidth of [200, 240, 390, 320]) for (const theme of ['dark', 'light']) {
+    const mobile = panelWidth <= 390 && panelWidth >= 320, viewport = { width: mobile ? panelWidth : 1100, height: 844 }
     const page = await browser.newPage({ viewport, hasTouch: mobile })
     page.setDefaultTimeout(7000)
     const errors: string[] = [], mutations: Record<string, unknown>[] = [], authProjects: string[] = []
@@ -97,10 +97,10 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
       assert.ok(Math.abs(icon.y + icon.height / 2 - button.y - button.height / 2) <= 1, 'the plus icon stays vertically centered')
     }
     const dialog = page.locator('[role=dialog].mew-project-add-dialog')
-    const createMode = dialog.getByRole('button', { name: '새 프로젝트 만들기', exact: true })
-    const cloneMode = dialog.getByRole('button', { name: 'Git repo 클론하기', exact: true })
-    const workspaceMode = dialog.getByRole('button', { name: '이 워크스페이스에서 가져오기', exact: true })
-    const browseMode = dialog.getByRole('button', { name: '경로 탐색하기', exact: true })
+    const createMode = dialog.getByRole('button', { name: '새 프로젝트', exact: true })
+    const cloneMode = dialog.getByRole('button', { name: 'Git 클론', exact: true })
+    const workspaceMode = dialog.getByRole('button', { name: '워크스페이스', exact: true })
+    const browseMode = dialog.getByRole('button', { name: '경로 탐색', exact: true })
     const back = dialog.getByRole('button', { name: '이전 선택지로', exact: true })
     const create = dialog.getByRole('button', { name: '프로젝트 만들기', exact: true })
     const clone = dialog.getByRole('button', { name: '저장소 복제', exact: true })
@@ -114,7 +114,16 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     const choices = dialog.getByRole('navigation').getByRole('button')
     assert.equal(await choices.count(), 4)
     const boxes = await choices.evaluateAll(elements => elements.map(element => { const box = element.getBoundingClientRect(); return { x: box.x, y: box.y, width: box.width } }))
-    assert.ok(boxes.every(box => box.x === boxes[0].x) && boxes[0].y < boxes[1].y && boxes[1].y < boxes[2].y && boxes[2].y < boxes[3].y, 'the popup arranges its four choices in one readable column')
+    assert.ok(boxes.every(box => Math.abs(box.y - boxes[0].y) <= 1) && boxes.every((box, index) => index === 0 || box.x > boxes[index - 1].x), 'the four project choices share one horizontal row')
+    for (const choice of await choices.all()) {
+      const icon = await choice.locator('.mew-project-add-choice-icon').boundingBox(), label = await choice.locator('.mew-project-add-choice-label').boundingBox()
+      assert.ok(icon && label)
+      assert.ok(Math.abs(icon.width - icon.height) <= 1 && icon.width >= 56, 'each action has a large square icon container')
+      assert.ok(label.y >= icon.y + icon.height && Math.abs(label.x + label.width / 2 - icon.x - icon.width / 2) <= 1, 'the short name is centered below its icon')
+      assert.equal((await choice.textContent())?.trim(), await choice.getAttribute('aria-label'), 'choices show only their names without explanatory copy')
+      assert.equal(await choice.locator('svg').count(), 1, 'choices omit navigation chevrons')
+    }
+    await page.screenshot({ path: `/tmp/mew-project-tiles-${panelWidth}-${theme}.png` })
     assert.equal(await add.getAttribute('aria-haspopup'), 'dialog')
     assert.equal(await add.getAttribute('aria-expanded'), 'true')
     assert.equal(await add.textContent(), '', 'the project panel trigger contains only the plus icon')
@@ -282,10 +291,12 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     await add.click(); await createMode.click()
     assert.equal(await name.inputValue(), 'Draft')
     await back.click()
-    for (const [locale, labels] of [['en', ['Create new project', 'Clone Git repo', 'Import from this workspace', 'Browse paths']], ['zh-CN', ['新建项目', '克隆 Git 仓库', '从此工作区导入', '浏览路径']], ['ja', ['新規プロジェクトを作成', 'Git リポジトリをクローン', 'このワークスペースから取り込む', 'パスを参照']]] as const) {
+    for (const [locale, labels] of [['en', ['New project', 'Git clone', 'Workspace', 'Browse']], ['zh-CN', ['新建项目', 'Git 克隆', '工作区', '浏览路径']], ['ja', ['新規作成', 'クローン', 'ワークスペース', 'パス参照']]] as const) {
       await page.evaluate(locale => (globalThis as unknown as { locale: (locale: string) => void }).locale(locale), locale)
       for (const label of labels) await dialog.getByRole('navigation').getByRole('button', { name: label, exact: true }).waitFor()
       assert.equal(await dialog.evaluate(element => element.scrollWidth <= element.clientWidth), true)
+      const labelsBoxes = await dialog.locator('.mew-project-add-choice-label').evaluateAll(elements => elements.map(element => { const box = element.getBoundingClientRect(); return { left: box.left, right: box.right } }))
+      assert.ok(labelsBoxes.every((box, index) => index === 0 || box.left >= labelsBoxes[index - 1].right + 2), `${locale} choice names do not overlap at ${viewport.width}px`)
     }
     assert.deepEqual(errors, [])
     await page.close()
