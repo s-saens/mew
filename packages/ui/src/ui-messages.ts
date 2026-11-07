@@ -1303,6 +1303,7 @@ export const uiMessages = {
   '프롬프트 삭제: {text}': ['Delete prompt: {text}', '删除提示词：{text}', 'プロンプトを削除: {text}'],
   '프롬프트 임시저장 실패': ['Could not save prompt draft', '无法暂存提示词', 'プロンプトを一時保存できませんでした'],
   '브라우저 저장 공간을 확인하고 다시 시도하세요.': ['Check browser storage and try again.', '请检查浏览器存储空间后重试。', 'ブラウザーの保存容量を確認して、もう一度お試しください。'],
+  "에이전트 기본값 저장": ["Save agent defaults","保存代理默认设置","エージェントの既定値を保存"],
   "에이전트 기본값 저장 실패": ["Could not save agent defaults","代理默认设置保存失败","エージェントの既定値を保存できませんでした"],
   "대화 비우기": ["Clear conversation","清空对话","会話を消去"],
   "대화 비우는 중…": ["Clearing conversation…","正在清空对话…","会話を消去中…"],

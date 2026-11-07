@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { useWorkspaceApi } from '../api/workspace-api-context'
 import { scopedBrowserStorage } from '@mew/ui/browser-storage-scope'
 import type { AgentExecutionOptions } from '../../shared/agent-execution-options'
 
@@ -12,12 +13,25 @@ function readExecution(key: string): AgentExecutionOptions {
   return { ...defaults }
 }
 
-export function useAgentExecutionOptions(account: string, workspace: string, tab: string) {
+export function useAgentExecutionOptions(account: string, workspace: string, tab: string, runtime: string) {
+  const { fetchAgentDefault } = useWorkspaceApi()
   const key = `mew:agent-execution:${JSON.stringify([account, workspace, tab])}`
+  const touched = useRef(false)
+  useEffect(() => {
+    let active = true
+    touched.current = false
+    let existing = false
+    try { existing = scopedBrowserStorage().getItem(key) !== null } catch { /* Use account defaults when storage is unavailable. */ }
+    if (!existing) void fetchAgentDefault(runtime).then(({ settings }) => {
+      if (active && !touched.current && settings?.execution) setSaved({ key, value: settings.execution })
+    }).catch(() => {})
+    return () => { active = false }
+  }, [fetchAgentDefault, key, runtime])
   const [saved, setSaved] = useState(() => ({ key, value: readExecution(key) }))
   if (saved.key !== key) setSaved({ key, value: readExecution(key) })
   const value = saved.key === key ? saved.value : readExecution(key)
   const change = (next: AgentExecutionOptions) => {
+    touched.current = true
     setSaved({ key, value: next })
     try { scopedBrowserStorage().setItem(key, JSON.stringify(next)) } catch { /* Keep the current draft usable when storage is full. */ }
   }

@@ -59,7 +59,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><AgentPanel pro
   const css = compiler.build([...new Set((source + content).match(/[A-Za-z0-9_@!:/.[\]()%,-]+/g))])
   const browser = await connectTestBrowser()
   try {
-    for (const width of [1100, 390]) for (const initial of ['live', 'paged', 'replay', 'failed-restore']) {
+    for (const width of [1100, 390]) for (const initial of ['live', 'paged', 'replay', 'failed-restore', 'defaults']) {
       const page = await browser.newPage({ viewport: { width, height: 844 } })
       page.setDefaultTimeout(4000)
       const errors: string[] = []
@@ -70,6 +70,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><AgentPanel pro
         const pathname = new URL(route.request().url()).pathname
         if (pathname === '/app.js') return route.fulfill({ contentType: 'text/javascript', body: chunk.code })
         if (pathname === '/api/user-ui/agent-tabs') return route.fulfill({ json: { state: { tabs: [{ id: 'first', label: runtime, runtime, cwd: '/workspace', ...(initial === 'failed-restore' ? { sessionIds: { [JSON.stringify([runtime, '/workspace'])]: 'missing' } } : {}) }], activeId: 'first' }, claims: [] } })
+        if (pathname === `/api/agent-defaults/${runtime}` && initial === 'defaults') return route.fulfill({ json: { settings: { execution: { build: false, deploy: true } } } })
         if (pathname === '/api/agent-cwd') return route.fulfill({ json: { cwd: '/workspace' } })
         if (pathname === '/api/projects') return route.fulfill({ json: [] })
         if (pathname.startsWith('/api/')) return route.fulfill({ json: { settings: null, skills: [], jobs: [], commands: [], runtimes: [] } })
@@ -86,6 +87,10 @@ createRoot(document.getElementById('root')).render(<I18nProvider><AgentPanel pro
       const permission = page.getByTitle('권한', { exact: true })
       await permission.filter({ hasText: '승인 필요' }).waitFor()
       assert.equal(await page.evaluate('window.messages.some(message => message.type === "prompt")'), false, `${initial}: controls load without sending a prompt`)
+      if (initial === 'defaults') {
+        await page.getByRole('button', { name: '빌드', pressed: false }).waitFor()
+        await page.getByRole('button', { name: '배포', pressed: true }).waitFor()
+      }
       if (initial !== 'live') {
         for (const [control, title, options] of [
           [model, '모델', ['Astra', 'Other']],
@@ -127,7 +132,11 @@ createRoot(document.getElementById('root')).render(<I18nProvider><AgentPanel pro
       assert.equal(await draft.innerText(), '보관할 프롬프트', 'explicitly saved prompts survive refresh even after clearing the automatic draft')
       assert.equal(await draft.evaluate(el => el === el.ownerDocument.activeElement), true)
       assert.equal(await page.evaluate('window.messages.some(message => message.type === "prompt")'), false, 'saving and restoring never sends a prompt')
-      assert.deepEqual(defaultWrites, [], 'the prompt button no longer writes runtime defaults')
+      assert.deepEqual(defaultWrites, [], 'the prompt button does not write runtime defaults')
+      const saveDefaults = page.getByRole('button', { name: '에이전트 기본값 저장', exact: true })
+      const [savedRequest] = await Promise.all([page.waitForRequest(request => request.method() === 'PUT' && request.url().includes('/agent-defaults/')), saveDefaults.click()])
+      assert.equal(defaultWrites.length, 1, 'the settings button saves the current runtime defaults')
+      assert.deepEqual(savedRequest.postDataJSON(), { modelId: 'astra[high]', thinkingId: 'high', modeId: 'default', execution: { build: true, deploy: false } })
       await draft.fill('')
       await savePrompt.click()
       await savedPrompts.getByRole('menuitem', { name: '프롬프트 삭제: 보관할 프롬프트', exact: true }).click()

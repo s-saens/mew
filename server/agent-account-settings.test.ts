@@ -30,11 +30,12 @@ test('legacy settings migrate only to the first owner; every account persists in
     assert.doesNotMatch(readAgentGuidance(), /Legacy owner guidance/)
     const initial = agentGuidanceSettings()
     updateAgentGuidance({ key: 'language', value: 'en', revision: initial.revision })
-    writeAgentDefault('codex', { modelId: 'bob-model', thinkingId: 'high' })
+    writeAgentDefault('codex', { modelId: 'bob-model', thinkingId: 'high', execution: { build: false, deploy: true } })
     writeAgentSetting('codex', { env: { OPENAI_API_KEY: 'bob-private-key' } })
   })
   runWithAgentAccount(alice, () => {
     assert.equal(readAgentDefault('codex')?.modelId, 'legacy-model')
+    assert.equal(readAgentDefault('codex')?.execution, undefined)
     assert.equal(readAgentSetting('codex')?.env?.OPENAI_API_KEY, 'legacy-private-key')
     const initial = agentGuidanceSettings()
     assert.equal(initial.content, 'Legacy owner guidance')
@@ -52,6 +53,7 @@ test('legacy settings migrate only to the first owner; every account persists in
   assert.equal(readAgentDefault('codex')?.modelId, 'legacy-model')
   runWithAgentAccount(bob, () => {
     assert.equal(readAgentDefault('codex')?.modelId, 'bob-model')
+    assert.deepEqual(readAgentDefault('codex')?.execution, { build: false, deploy: true })
     assert.equal(resolvedSpec('codex')?.env?.OPENAI_API_KEY, 'bob-private-key')
     const stored = agentSettingsPath('agent-settings.json')
     const value = JSON.parse(fs.readFileSync(stored, 'utf8'))

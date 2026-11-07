@@ -9,6 +9,7 @@ export interface AgentRuntimeDefault {
   modelId?: string
   thinkingId?: string
   modeId?: string
+  execution?: { build: boolean; deploy: boolean }
 }
 
 export class AgentDefaultError extends Error {}
@@ -33,11 +34,19 @@ export function normalizeAgentDefault(input: unknown): AgentRuntimeDefault {
   const modelId = optionalId(rec.modelId, '모델')
   const thinkingId = optionalId(rec.thinkingId, '추론 정도')
   const modeId = optionalId(rec.modeId, '권한 모드')
-  if (!modelId && !thinkingId && !modeId) throw new AgentDefaultError('저장할 모델·추론 정도·권한 모드가 없습니다')
+  let execution: AgentRuntimeDefault['execution']
+  if (rec.execution !== undefined) {
+    if (!rec.execution || typeof rec.execution !== 'object' || Array.isArray(rec.execution)) throw new AgentDefaultError('실행 설정이 올바르지 않습니다')
+    const options = rec.execution as Record<string, unknown>
+    if (typeof options.build !== 'boolean' || typeof options.deploy !== 'boolean') throw new AgentDefaultError('실행 설정이 올바르지 않습니다')
+    execution = { build: options.build, deploy: options.deploy }
+  }
+  if (!modelId && !thinkingId && !modeId && !execution) throw new AgentDefaultError('저장할 모델·추론 정도·권한 모드가 없습니다')
   return {
     ...(modelId ? { modelId } : {}),
     ...(thinkingId ? { thinkingId } : {}),
     ...(modeId ? { modeId } : {}),
+    ...(execution ? { execution } : {}),
   }
 }
 

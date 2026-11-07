@@ -20,7 +20,7 @@ import { AgentConnectionWatch } from '../utils/agent-connection-watch.ts'
 import { createAgentTabsSync } from '../utils/agent-tabs-sync.ts'
 import { PanelCloseButton } from './panel-close-button'
 import { TabActionMenu } from './tab-action-menu'
-import { ConfirmDialog, HoverTipLayer, PanelNotice, canAutoFocusInput } from '@mew/ui'
+import { ConfirmDialog, HoverTipLayer, PanelNotice, useToast, canAutoFocusInput } from '@mew/ui'
 import { historyCacheKey, readHistoryCache, writeHistoryCache, readQueueCache, writeQueueCache, type CachedQueue, type CachedHistory } from '../utils/agent-history-cache'
 import { mergeHistoryPage, appendHistoryEventInPlace } from '../utils/agent-history-state'
 import { useAgentWorkHistory } from '../hooks/use-agent-work-history'
@@ -3459,7 +3459,9 @@ function AgentSessionView({
   // original = 고치기 시작할 때 보고 있던 원본. 서버가 이 항목을 잠가 앞 턴이 끝나도 큐를 당기지 않는다.
   const [expandedQueued, setExpandedQueued] = useState<{ index: number; text: string } | null>(null)
   const [editingQueued, setEditingQueued] = useState<QueuedEdit | null>(null)
-  const [execution, setExecution] = useAgentExecutionOptions(cacheAccount, notificationWorkspace, tabId)
+  const [execution, setExecution] = useAgentExecutionOptions(cacheAccount, notificationWorkspace, tabId, runtime)
+  const { toast: defaultsToast, showToast: showDefaultsToast } = useToast()
+  const [savingDefaults, setSavingDefaults] = useState(false)
   const [attachingQueued, setAttachingQueued] = useState(false)
   const queuedEditVersionRef = useRef(0)
   const [drawingContext, setDrawingContext] = useState<{ projectRoot: string; target: 'composer' | 'queue'; queueVersion: number } | null>(null)
@@ -4565,8 +4567,21 @@ function AgentSessionView({
               if (editingQueued) setEditingQueued(current => current ? { ...current, settings: { ...current.settings, modeId, permission: modeOptions.find(option => option.id === modeId)?.label ?? modeId } } : current)
               else { selectMode(modeId); send({ type: 'set_mode', modeId }) }
             }} title={uiText("권한")} disabled={!modes || modes.availableModes.length < 2} />
+            <HoverTipLayer><div data-tip={uiText("에이전트 기본값 저장")} className="flex min-h-8 items-center">
+              <button type="button" aria-label={uiText("에이전트 기본값 저장")} disabled={savingDefaults || !!editingQueued || composerCliMode || !connected}
+                onPointerDown={keepFocusOnPress} onClick={() => {
+                  setSavingDefaults(true)
+                  void api.saveAgentDefault(runtime, { modelId: models?.currentModelId, thinkingId: thinking?.currentValue, modeId: modes?.currentModeId, execution })
+                    .then(() => showDefaultsToast(uiText("저장했습니다.")))
+                    .catch((error: unknown) => setErrorDetail({ title: uiText("에이전트 기본값 저장 실패"), detail: String(error) }))
+                    .finally(() => setSavingDefaults(false))
+                }} className="flex h-7 w-7 items-center justify-center rounded text-ink-secondary hover:bg-surface-raised hover:text-ink disabled:opacity-40">
+                <SaveGlyph />
+              </button>
+            </div></HoverTipLayer>
           </div>
         </div>
+          {defaultsToast}
           <div data-agent-input className={`relative flex min-h-0 flex-1 rounded bg-surface ${composerCliMode ? 'ring-1 ring-inset ring-accent/40' : ''}`}>
           <div ref={composerEditorRef} className="flex min-h-8 flex-1">
           <MentionTextarea

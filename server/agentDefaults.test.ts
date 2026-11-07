@@ -24,3 +24,14 @@ test('빈 설정과 등록되지 않은 런타임은 저장하지 않는다', ()
   assert.throws(() => writeAgentDefault('codex', {}), AgentDefaultError)
   assert.throws(() => writeAgentDefault('unknown', { modelId: 'x' }), AgentDefaultError)
 })
+
+
+test('execution defaults are validated and isolated by runtime', () => {
+  const codex = { modelId: 'model-a', thinkingId: 'high', modeId: 'default', execution: { build: false, deploy: true } }
+  const claude = { modelId: 'model-b', execution: { build: true, deploy: false } }
+  writeAgentDefault('codex', codex)
+  writeAgentDefault('claude', claude)
+  assert.deepEqual(readAgentDefault('codex'), codex)
+  assert.deepEqual(readAgentDefault('claude'), claude)
+  assert.throws(() => writeAgentDefault('codex', { execution: { build: 'false', deploy: false } }), AgentDefaultError)
+})

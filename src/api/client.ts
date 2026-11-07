@@ -273,6 +273,7 @@ export interface AgentRuntimeDefault {
   modelId?: string
   thinkingId?: string
   modeId?: string
+  execution?: { build: boolean; deploy: boolean }
 }
 
 export interface TodoItem {
