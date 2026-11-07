@@ -11,9 +11,10 @@ import { handleDemoTasks } from './http-tasks.ts'
 import { handleDemoHost } from './http-host.ts'
 import { handleDemoDebugger } from './http-debugger.ts'
 import { handleDemoAdmin } from './http-admin.ts'
+import { handleDemoMemoTabs } from './http-memo-tabs.ts'
 
 type SocketFactory = ((url: string, protocols?: string | string[]) => WebSocket) & { close?: () => void }
-const handlers = [handleDemoProjects, handleDemoTasks, handleDemoFiles, handleDemoGit, handleDemoHost, handleDemoDebugger, handleDemoAdmin, handleDemoSettings, handleDemoDatabase, handleDemoMewpet]
+const handlers = [handleDemoProjects, handleDemoTasks, handleDemoMemoTabs, handleDemoFiles, handleDemoGit, handleDemoHost, handleDemoDebugger, handleDemoAdmin, handleDemoSettings, handleDemoDatabase, handleDemoMewpet]
 
 /** Local HTTP adapter. An unimplemented operation can never fall through to a real server. */
 export async function demoFetch(store: DemoWorkspaceStore, input: RequestInfo | URL, init?: RequestInit): Promise<Response> {

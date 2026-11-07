@@ -1,6 +1,7 @@
 import { DocumentLinkIndex } from './document-link-index.ts'
 import { protectFileResponse } from './file-response.ts'
 import { createPublicSharesRouter } from './public-share-routes.ts'
+import { createMemoTabRouter } from './memo-tab-routes.ts'
 import { decoratePublicShares } from './public-shares.ts'
 import { createDocumentBacklinksRouter } from './document-backlinks-routes.ts'
 import { createDebuggerRouter } from './debugger-routes.ts'
@@ -447,6 +448,7 @@ export function createApiApp() {
   app.use('/presence/history', createPresenceHistoryRouter())
   app.use((_req, res, next) => { res.setHeader('Cache-Control', 'private, no-store'); next() })
   app.use(filePermissionMiddleware)
+  app.use('/memo-tabs', createMemoTabRouter(handleError))
   app.use('/task-list', createTaskListRouter())
   app.use('/debugger', createDebuggerRouter())
   app.use('/dom-browser', createDomBrowserPortsRouter({ mewPorts: domBrowserMewPorts, blockedPorts: domBrowserBlockedPorts }))

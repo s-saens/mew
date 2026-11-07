@@ -47,6 +47,7 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><I18nProvid
   const css = compiler.build([...new Set((source + ui).match(/[A-Za-z0-9_@!:/.[\]()%,-]+/g))]) + '\n' + (await Promise.all(['packages/editor/src/editor/editor.css', 'src/components/shared-memo.css'].map(file => fs.readFile(path.join(root, file), 'utf8')))).join('\n')
   const server = http.createServer((req, res) => {
     if (req.url === '/app.js') { res.setHeader('Content-Type', 'text/javascript'); res.end(chunk.code); return }
+    if (req.url === '/api/memo-tabs') { res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify({ tabs: [], ownerId: 'one@example.test' })); return }
     res.setHeader('Content-Type', 'text/html')
     res.end(`<!doctype html><html class="dark"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}</style><div id="root"></div><script src="/app.js"></script></html>`)
   })

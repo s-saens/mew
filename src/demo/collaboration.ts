@@ -2,7 +2,7 @@ import * as Y from 'yjs'
 import { Awareness } from 'y-protocols/awareness'
 import type { Editor } from '@tiptap/core'
 import { splitFrontmatter } from '@mew/editor/frontmatter'
-import { SHARED_MEMO_PROJECT } from '../../shared/shared-memo.ts'
+import { isMemoProject, isMemoRoom } from '../../shared/shared-memo.ts'
 import type { CollaborationProvider, CollaborationSession } from '../runtime/app-runtime.ts'
 import { identityColor } from '../utils/collabColor.ts'
 import type { DemoWorkspaceStore } from './workspace-store.ts'
@@ -36,7 +36,7 @@ export function createDemoCollaboration(store: DemoWorkspaceStore): Collaboratio
   const notify = (room: Room) => { for (const listener of room.listeners) listener(state(room)) }
 
   function applyFile(room: Room): void {
-    if (room.closed || !room.ready || room.path.startsWith(`${SHARED_MEMO_PROJECT}:`)) return
+    if (room.closed || !room.ready || isMemoRoom(room.path)) return
     let content: string
     try { content = store.readFile(`${store.workspacePath}/${room.path}`).content } catch { return }
     if (content === room.content) return
@@ -50,7 +50,7 @@ export function createDemoCollaboration(store: DemoWorkspaceStore): Collaboratio
   }
 
   async function prepare(room: Room): Promise<void> {
-    const isMemo = room.path.startsWith(`${SHARED_MEMO_PROJECT}:`)
+    const isMemo = isMemoRoom(room.path)
     if (!isMemo && !store.isFileLoaded(`${store.workspacePath}/${room.path}`)) await store.loadFile(`${store.workspacePath}/${room.path}`)
     if (room.path.endsWith('.md')) {
       const [{ Editor: TiptapEditor }, { Collaboration }, { serverEditorExtensions }] = await Promise.all([
@@ -79,7 +79,7 @@ export function createDemoCollaboration(store: DemoWorkspaceStore): Collaboratio
   return {
     open(identity, onState) {
       if (closed) throw new Error('데모 작업 공간이 닫혔습니다.')
-      const key = identity.project === SHARED_MEMO_PROJECT ? `${SHARED_MEMO_PROJECT}:${identity.path}` : store.canonicalFilePath(identity.path, identity.project, identity.workspacePath)
+      const key = isMemoProject(identity.project) ? `${identity.project}:${identity.path}` : store.canonicalFilePath(identity.path, identity.project, identity.workspacePath)
       let room = rooms.get(key)
       if (!room) {
         const ydoc = new Y.Doc()

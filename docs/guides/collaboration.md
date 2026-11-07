@@ -1,7 +1,7 @@
 ---
 title: "Collaborative Editing, Comments, Chat, and Guest Sharing"
-description: "Covers collaborative editing, notes, sessions, comments, mentions, group chat and DMs opened from the Dock, with incoming notifications. Links desktop/mobile browser notification setup and covers permissions, drafts, public links, and guest sharing boundaries."
-updated: "2026-11-05"
+description: "Covers collaborative editing, permanent shared and private memo tabs, sessions, comments, mentions, Dock chat and recipient notifications. Links browser notification setup and covers permissions, drafts, public links, and guest sharing boundaries."
+updated: "2026-11-07"
 상위파일:
   - "../../.mew/docs/MOC.md"
   - "MOC.md"
@@ -30,7 +30,9 @@ Open the **Notes Panel** using the **Notes** icon in the left dock on desktop or
 
 Opening notes or changing the view mode does not automatically focus the input. On mobile, tap the body directly to open the keyboard. A Markdown input appears below the title, participant color dots, and close button. Use the eye (Hotview) and code brackets (Plain) buttons to the right of the title to switch between rendered view and source editing. The selected view persists when closing and reopening notes and when switching projects. On desktop, move the panel with the docking handle to the left of the title and resize it by dragging its boundary with another panel. Double-click the title tab to maximize it, and press Esc to restore it. Panel layout and open state are saved per project, but note contents are shared across the entire server. Separate popup repositioning and edge resizing are not provided. On mobile, notes use the same screen as other work panels and close with Esc, Back, or the close button. Closing the software keyboard also hides the mobile auxiliary keys.
 
-Notes are a single shared space for logged-in users on the same Mew server. They support real-time collaborative editing regardless of project or root project changes and are saved automatically on the server, persisting after everyone closes them or the server restarts. Color dots beside the title indicate the number of users who currently have notes open; multiple windows for the same account count as one. Notes are not available to accounts without collaboration permission or to guests. While connecting, a status is shown and editing is temporarily blocked. Even if you close the panel, unsent changes within the current page are merged on reconnection.
+The first **Shared** tab contains the existing notes shared by everyone on this server. This tab cannot be deleted. Click the **+** tab to create a private memo for your account; the new tab opens immediately. Private memos are visible only to your account and are also available in other browsers signed in to that account. Click a private tab's **×** and confirm to permanently delete it and its contents. Cancel keeps it; deleting the selected tab returns to Shared. The tab strip matches agent and terminal tabs and scrolls when space is limited.
+
+Both shared and private memos save automatically on the server and remain across project changes, panel closes, reloads, and server restarts. Visited tabs keep pending edits and undo history while switching tabs. Changes to the tab list appear in other visible windows within five seconds. Color dots on the selected tab show the accounts viewing that memo; multiple windows of one account count as one. Notes require a login and collaboration permission. While connecting, editing is temporarily blocked and a loading indicator appears. Unsent changes in the current page merge on reconnection, including while another memo tab is selected.
 
 ## Active mew Sessions
 

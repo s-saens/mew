@@ -2,7 +2,8 @@ import { requestWorkspaceScope, resolveWorkspaceScope, runRequestWorkspace, work
 import { workspaceContext } from './paths.ts'
 import type { Duplex } from 'node:stream'
 import type express from 'express'
-import { SHARED_MEMO_ROOM } from '../shared/shared-memo.ts'
+import { SHARED_MEMO_ROOM, isMemoProject, privateMemoOwner } from '../shared/shared-memo.ts'
+import { privateMemoExists } from './private-memos.ts'
 import type { IncomingMessage } from 'node:http'
 import type { AccountRole } from './auth.ts'
 import { sessionFromRequest } from './authRoutes.ts'
@@ -111,7 +112,14 @@ export function authorizeTmux(req: IncomingMessage): boolean {
 export function authorizeCollab(req: IncomingMessage): boolean {
   const auth = resolveAuth(req), url = new URL(req.url ?? '', 'http://localhost')
   const room = url.searchParams.get('room') ?? '', index = room.indexOf(':')
-  return requestScopeAllowed(req) && canUse(auth, 'collaboration') && (room === SHARED_MEMO_ROOM || (index > 0 && fileAccess(auth, room.slice(0, index), room.slice(index + 1)).edit))
+  if (!requestScopeAllowed(req) || !canUse(auth, 'collaboration')) return false
+  if (room === SHARED_MEMO_ROOM) return true
+  const owner = privateMemoOwner(room)
+  if (owner) {
+    try { return auth.email === owner && privateMemoExists(owner, room.slice(room.lastIndexOf('/') + 1)) }
+    catch { return false }
+  }
+  return index > 0 && !isMemoProject(room.slice(0, index)) && fileAccess(auth, room.slice(0, index), room.slice(index + 1)).edit
 }
 
 export function authorizeDatabase(req: IncomingMessage, project = 'docs'): boolean {

@@ -1,13 +1,13 @@
 ---
 id: "mew-shared-memo"
 parent: "mew-collaboration"
-title: "Shared memo"
+title: "Shared and private memo tabs"
 status: "changed"
 created: "2026-09-26"
-updated: "2026-10-28"
-files: ["src/components/shared-memo.tsx", "src/hooks/use-shared-memo.ts", "src/components/DockWorkspace.tsx", "src/components/mobile-dock.tsx", "src/App.tsx", "server/shared-memo.ts", "server/collab.ts"]
+updated: "2026-11-07"
+files: ["src/components/shared-memo.tsx", "src/hooks/use-shared-memo.ts", "src/hooks/use-memo-tabs.ts", "src/hooks/use-memo-documents.ts", "src/utils/collab-connection.ts", "src/components/DockWorkspace.tsx", "src/App.tsx", "server/shared-memo.ts", "server/private-memos.ts", "server/memo-tab-routes.ts", "server/collab.ts"]
 commits: []
-description: "A feature contract covering real-time editing and Hotview/Plain views of a server-wide shared Markdown memo across projects. Explains the DockPanel shared with tasks, including popup/panel switching, movement across the entire workspace, 50% opacity and disabled blur when focus is outside, mobile behavior, shortcuts, participants, and preservation of unsent changes."
+description: "Defines the permanent shared memo tab and account-private tabs with add/delete controls, persistent collaborative editing, and Hotview/Plain views across projects. Covers shared panel styling, popup and dock behavior, focus, participants, and preservation of inactive edits and undo history."
 상위파일:
   - "MOC.md"
   - "_collaboration-comments-chat.md"
@@ -20,9 +20,12 @@ description: "A feature contract covering real-time editing and Hotview/Plain vi
 - The popup can be moved and resized across the entire workspace, including the document explorer, file explorer, and side dock. It remains unclipped and operable beyond the left edge of the central docking area, and saved positions are restored within the same bounds.
 - When focus leaves the popup, reduce its overall opacity, including text, buttons, and background, to 50% and disable background blur on the popup and its internal elements. Clicking it again or moving keyboard focus inside restores the previous opacity and the theme's blur. Pressing the title bar to move it also displays its active appearance. This does not apply to panel mode or mobile.
 
-- Collaboratively edit a single server-wide shared Markdown memo in real time.
+- Keep one permanent **Shared** tab for the existing server-wide collaborative Markdown memo. It is always first, has no delete control, and retains existing content.
+- Add account-private memo tabs with the `+` tab. Select the new tab immediately; name it with the first available memo number. Only the owning account can list, read, edit, or delete these tabs, including when another account has the owner role. The same account can edit a private memo from multiple browsers.
+- Match agent and terminal tabs: 36px header, compact content-width tabs, right borders, shared active/hover colors, `TabScrollArea` overflow arrows, and a 36px-wide `+` tab. Personal tabs have a small `×` delete action; confirmation explains permanent content deletion. Cancel preserves content; deleting the selected tab returns to Shared.
+- Keep private tabs and content across panel closes, project changes, page reloads, and server restarts. Refresh tab metadata while the panel is open, on foregrounding, and after remote recovery. Metadata changes become visible in other windows within five seconds while visible. Visited documents retain their connections and pending changes across tab switches; their editors remain mounted to retain undo and project remote changes into Plain. Account exit or tab deletion cleans up the corresponding sessions.
 - Open the docked panel using the memo icon in the desktop or mobile dock, following existing dock reordering and permission display behavior.
-- Provide a 36px title bar matching the feature and Git panels, a memo icon, participant color dots, a Close button, a Hotview/Markdown source (Plain) view toggle, and an input field. Do not display a character count.
+- Provide the shared tab header, a memo icon, participant color dots on the selected tab, a panel Close button, a Hotview/Markdown source (Plain) view toggle, and an input field. Do not display a character count.
 - Keep the space above the first line of the body at 16px on both desktop and mobile, and remove extra top spacing for the first heading or list.
 - On desktop, move the panel using the shared DockGrip, resize it using split boundaries, and maximize or restore it by double-clicking the title tab. Save the layout and open state in the per-project account UI ledger.
 - On mobile, follow the shared foreground panel stack, dock switching, and Esc/Back paths.
@@ -40,13 +43,15 @@ description: "A feature contract covering real-time editing and Hotview/Plain vi
 
 - Memo opening and dock focus signals focus the non-editable panel root. Connection completion and Hotview/Plain switching do not request editor focus. Explicit keyboard shortcuts that navigate to an already open memo retain body focus.
 
-- Retain Hotview, Yjs, PresenceDots, the server-reserved room, and the atomically saved file. Login and collaboration permissions are required.
+- Retain Hotview, Yjs, PresenceDots, the existing shared room and file. Store private tab metadata and CRDT updates separately per account. Login and collaboration permissions are required; private room authorization additionally checks ownership and tab existence. [ADR 0157](../../decisions/0157-private-memo-tabs.md) records this extension.
 - App-owned `useSharedMemo` maintains the collaboration session, focus, and shortcuts outside the per-project DockWorkspace, while SharedMemo renders the docking header and body.
 - On 2026-10-01, at the user's request, the task panel and API were removed and the memo popup was replaced with a panel. Existing task storage files are preserved, and the feature must not be reintroduced without a separate request. [Removed task history](../../history/project-tasks.md).
 - On 2026-10-03, at the user's request, a new [task panel](../projects-files-search/task-panel-list-calendar-and-gantt.md) is provided separately from the memo. The memo has no task switch button.
 - Dock behavior, docking, mobile foreground state, Esc/Back, and layout restoration were integrated into the shared panel path. Existing popup movement, 8-direction resizing, and viewport position correction were removed.
 
 ## Verification
+
+- Current tab acceptance and verification are recorded in the [memo tab work record](../../work/shared-memo-tabs.md). `server/private-memos.test.ts` covers persistence, ownership, deletion, and stale connections; `server/private-memo-ui.test.ts` covers actual tab controls and multi-browser editing.
 
 - 2026-10-03: Isolated desktop and mobile Chromium verified that the editor does not receive focus on initial opening, connection completion, switching to Plain, or reopening, and verified direct-click editing and focus through explicit shortcuts that navigate to an open memo. Collaborative editing and docking regression UI tests, type checking, targeted lint, UI checks, and documentation link checks passed. Actual mobile OS keyboards are unverified, and no build or server restart was performed.
 

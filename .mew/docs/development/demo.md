@@ -1,8 +1,8 @@
 ---
 title: "Browser demo using the shared UI"
-description: "Defines the browser demo using Mew's shared UI, pinned public file catalog, lazy body loading, size budgets, virtual projects, host fixtures, and in-memory state. Covers transport/CSP boundaries, removed Android fixtures, automated checks, and user-owned application procedures."
+description: "Defines the browser demo using Mew's shared UI, pinned public file catalog, lazy body loading, size budgets, virtual projects, host fixtures, and in-memory memo tabs. Covers transport/CSP boundaries, removed Android fixtures, automated checks, and user-owned application procedures."
 created: "2026-10-19"
-updated: "2026-11-05"
+updated: "2026-11-07"
 ---
 
 # Browser demo using the shared UI
@@ -20,6 +20,7 @@ The demo is a separate entry point for trying Mew without logging in or running 
 - The runtime environment's `basePath` is the basis for project URL interpretation and address normalization. Do not interpret the demo's `/demo/` as a project name or replace it with `/`.
 - Do not scatter demo conditions throughout the shared UI. Select the environment at startup and display available panels according to existing capabilities. The runtime provides the header's `Demo` and reset button.
 - Demo visitors receive all capabilities, exposing features in the hamburger menu, dock, and settings. Features that require a host can also be tried with dummy data in the same UI. The `desktopConnection` provider is selected before actual connection preparation or WebRTC creation, while preserving the normal execution connection path.
+- Memo tab creation/listing/deletion uses `src/demo/http-memo-tabs.ts` and visitor-local `DemoWorkspaceStore` state. Shared and private memo rooms use separate local CRDT documents across virtual project switches. Reset clears the tab index; demo state is not server persistence. `src/demo/memo-tabs.test.ts` checks these boundaries.
 
 ## Single virtual workspace
 

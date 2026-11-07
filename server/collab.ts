@@ -3,8 +3,9 @@ import { workspacePaths } from './paths.ts'
 import { withWorkspaceUpgrade } from './reqAuth.ts'
 import { watchSocketAccess } from './access-socket.ts'
 import { webSocketOriginAllowed } from './websocket-origin.ts'
-import { SHARED_MEMO_ROOM } from '../shared/shared-memo.ts'
+import { SHARED_MEMO_ROOM, isMemoRoom, privateMemoOwner } from '../shared/shared-memo.ts'
 import { createSharedMemoDoc } from './shared-memo.ts'
+import { createPrivateMemoDoc } from './private-memos.ts'
 import { WebSocketServer, WebSocket } from 'ws'
 import type { IncomingMessage } from 'node:http'
 import type { Duplex } from 'node:stream'
@@ -74,7 +75,7 @@ export function setRoomLifecycle(next: RoomLifecycle | null): void {
   lifecycle = next
 }
 
-// 일반 파일 방(room)은 순수 메모리 상태다. 공통 메모 예약 방만 영속 RoomDoc 어댑터를 쓴다.
+// File rooms use in-memory state; shared and account-private memos use persistent RoomDoc adapters.
 // 파일 영속화는 클라이언트가 하는
 // updateTabContent → autosave → PUT /api/file 경로가 전담하며, 원격 Yjs 병합도 로컬 편집과
 // 동일하게 에디터의 onChange를 태우므로 이 서버는 그저 바이트를 중계할 뿐이다.
@@ -109,7 +110,7 @@ function closeRoomIfEmpty(roomKey: string, room: Room) {
   if (realClientCount(room) > 0) return
   // 에이전트 에디터가 방에 매여 있으므로, 상태를 버리기 전에 먼저 떼어낸다
   try {
-    if (roomKey !== SHARED_MEMO_ROOM) lifecycle?.onClose(roomKey, publicRoom(room))
+    if (!isMemoRoom(roomKey)) lifecycle?.onClose(roomKey, publicRoom(room))
   } catch (err) {
     console.error('[mew] collab onClose 실패:', err)
   }
@@ -140,6 +141,7 @@ function admit(room: Room, client: Client) {
 
 /** 상대가 보낸 프레임 하나를 처리한다 (ws·인프로세스 공통 경로) */
 function handleFrame(room: Room, client: Client, bytes: Uint8Array) {
+  if (room.destroyed) return
   const message = decodeMessage(bytes)
   if (!message) return // 알 수 없거나 잘린 프레임 — 무시한다
 
@@ -205,7 +207,8 @@ function getRoom(roomKey: string): Room {
 
   // awareness는 CRDT가 아니라 clock+JSON 맵이라 백엔드와 무관하게 JS에 남는다. Awareness가
   // clientID를 doc에서 얻으므로 그 용도로만 쓰는 빈 Y.Doc을 붙인다 — 방의 내용은 여기 없다.
-  const doc = roomKey === SHARED_MEMO_ROOM ? createSharedMemoDoc() : createRoomDoc()
+  const doc = roomKey === SHARED_MEMO_ROOM ? createSharedMemoDoc()
+    : privateMemoOwner(roomKey) ? createPrivateMemoDoc(roomKey) : createRoomDoc()
   const awareness = new Awareness(new Y.Doc())
   const room: Room = { doc, awareness, clients: new Map(), destroyed: false }
   rooms.set(roomKey, room)
@@ -227,7 +230,7 @@ function getRoom(roomKey: string): Room {
 
   // 방이 완전히 구성된 뒤에 브리지에 알린다
   try {
-    if (roomKey !== SHARED_MEMO_ROOM) lifecycle?.onOpen(roomKey, publicRoom(room))
+    if (!isMemoRoom(roomKey)) lifecycle?.onOpen(roomKey, publicRoom(room))
   } catch (err) {
     console.error('[mew] collab onOpen 실패:', err)
   }
@@ -243,7 +246,7 @@ wss.on('connection', (ws: WebSocket, req: IncomingMessage) => {
   const url = new URL(req.url ?? '', 'http://localhost')
   const wireRoom = url.searchParams.get('room')
   const index = wireRoom?.indexOf(':') ?? -1
-  const roomKey = wireRoom && wireRoom !== SHARED_MEMO_ROOM && index > 0
+  const roomKey = wireRoom && !isMemoRoom(wireRoom) && index > 0
     ? `${workspacePaths.root}\0${wireRoom}` : wireRoom
   if (!roomKey) {
     ws.close()
@@ -276,6 +279,7 @@ wss.on('connection', (ws: WebSocket, req: IncomingMessage) => {
   }))
 
   ws.on('close', AsyncLocalStorage.bind(() => {
+    if (room.destroyed) return
     const owned = room.clients.get(client)
     room.clients.delete(client)
     if (owned && owned.size > 0) removeAwarenessStates(room.awareness, Array.from(owned), null)
@@ -283,11 +287,25 @@ wss.on('connection', (ws: WebSocket, req: IncomingMessage) => {
   }))
 })
 
-/** Explicit global cleanup closes rooted project rooms while preserving the shared memo. */
+/** Explicit global cleanup closes rooted project rooms while preserving account/global memos. */
 export function closeAllRooms(): void {
   for (const ws of wss.clients) {
-    if (socketRooms.get(ws) !== SHARED_MEMO_ROOM) ws.terminate()
+    if (!isMemoRoom(socketRooms.get(ws) ?? '')) ws.terminate()
   }
+}
+
+/** Remove a deleted memo immediately, including in-flight frames and old room handles. */
+export function closeMemoRoom(roomKey: string): void {
+  if (!privateMemoOwner(roomKey)) return
+  const room = rooms.get(roomKey)
+  if (room) {
+    room.destroyed = true
+    room.clients.clear()
+    room.awareness.destroy()
+    room.doc.destroy()
+    rooms.delete(roomKey)
+  }
+  for (const ws of wss.clients) if (socketRooms.get(ws) === roomKey) ws.close(1008, 'memo deleted')
 }
 
 /** Changing Documents invalidates only that root's docs aliases; other sessions remain live. */

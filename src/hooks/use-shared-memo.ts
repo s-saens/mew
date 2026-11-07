@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { getBinding, matchesShortcut } from '@mew/shortcuts'
-import { SHARED_MEMO_PATH, SHARED_MEMO_PROJECT } from '../../shared/shared-memo'
-import { useCollab } from './useCollab'
+import { SHARED_MEMO_PATH } from '../../shared/shared-memo'
+import { useMemoTabs } from './use-memo-tabs'
+import { useMemoDocuments } from './use-memo-documents'
 import { useMobileKeyboard } from './use-mobile-keyboard'
 import { identityColor } from '../utils/collabColor'
 import { useWorkspaceView } from '../workspace/workspace-view-context'
@@ -13,15 +14,22 @@ export function useSharedMemo({ authEmail, open, onOpenChange, focusSignal = 0, 
   const active = useWorkspaceView()?.active ?? true
   const keyboardOpen = useMobileKeyboard()
   const [activated, setActivated] = useState(false)
-  const [value, setValue] = useState('')
+  const [selection, setSelection] = useState({ account: authEmail, id: SHARED_MEMO_PATH, visited: [] as string[] })
   const [viewMode, setViewMode] = useState<'hotview' | 'plain'>('hotview')
   const [colors, setColors] = useState<string[]>([])
   const root = useRef<HTMLDivElement>(null)
   const previousFocus = useRef<HTMLElement | null>(null)
-  const collab = useCollab(SHARED_MEMO_PROJECT, activated && authEmail ? SHARED_MEMO_PATH : null, authEmail)
+  const tabs = useMemoTabs(authEmail, open)
+  const selected = selection.account === authEmail && (!tabs.loaded || selection.id === SHARED_MEMO_PATH || tabs.tabs.some(tab => tab.id === selection.id)) ? selection.id : SHARED_MEMO_PATH
+  const visited = selection.account === authEmail ? selection.visited.filter(id => tabs.tabs.some(tab => tab.id === id)) : []
+  const { collab, value, setValue, documents, setDocumentValue } = useMemoDocuments(authEmail, tabs.ownerId, visited, activated, selected)
+  const selectTab = (id: string) => {
+    setSelection(old => ({ account: authEmail, id, visited: [...new Set([...(old.account === authEmail ? old.visited : []), ...(id === SHARED_MEMO_PATH ? [] : [id])])] }))
+  }
   const focusEditor = useCallback(() => {
     if (!active) return
-    const editor = root.current?.querySelector<HTMLElement>(viewMode === 'plain' ? '.cm-content[contenteditable="true"]' : '.tiptap[contenteditable="true"]')
+    const body = root.current?.querySelector<HTMLElement>('[data-memo-document]:not([hidden])')
+    const editor = body?.querySelector<HTMLElement>(viewMode === 'plain' ? '.cm-content[contenteditable="true"]' : '.tiptap[contenteditable="true"]')
     ;(editor ?? root.current)?.focus({ preventScroll: true })
   }, [viewMode, active])
   const close = useCallback(() => {
@@ -53,21 +61,28 @@ export function useSharedMemo({ authEmail, open, onOpenChange, focusSignal = 0, 
   }, [open, activated, focusSignal, active])
   useEffect(() => {
     const awareness = collab?.awareness
-    if (!awareness) return
-    awareness.setLocalState(open ? { user: { name: authEmail.split('@')[0], color: identityColor(authEmail), memoViewer: authEmail } } : null)
+    for (const [id, document] of Object.entries(documents)) {
+      const awareness = document.collab.awareness, current = awareness.getLocalState()
+      if (open && id === selected) {
+        if (current?.user?.memoViewer !== authEmail) awareness.setLocalState({ ...current,
+          user: { ...current?.user, name: authEmail.split('@')[0], color: identityColor(authEmail), memoViewer: authEmail } })
+      } else if (current !== null) awareness.setLocalState(null)
+    }
+    if (!awareness) { setColors([]); return }
     const update = () => {
       const viewers = new Map<string, string>()
       if (open && collab.connected) for (const state of awareness.getStates().values()) {
         const user = state.user
         if (typeof user?.memoViewer === 'string' && typeof user.color === 'string') viewers.set(user.memoViewer, user.color)
       }
-      setColors([...viewers.values()])
+      const next = [...viewers.values()]
+      setColors(previous => previous.length === next.length && previous.every((color, index) => color === next[index]) ? previous : next)
     }
     update()
     awareness.on('change', update)
     return () => { awareness.off('change', update) }
-  }, [collab?.awareness, collab?.connected, open, authEmail])
+  }, [collab?.awareness, collab?.connected, open, authEmail, documents, selected])
 
-  return { root, value, setValue, viewMode, setViewMode, colors, collab, keyboardOpen, close, activated }
+  return { root, value, setValue, viewMode, setViewMode, colors, collab, keyboardOpen, close, activated, tabs, selected, selectTab, documents, setDocumentValue }
 }
 export type SharedMemoSession = ReturnType<typeof useSharedMemo>

@@ -60,6 +60,7 @@ test('memo preserves focus and content while initial connection and recovery sho
   const memoRequested = new Promise<void>(resolve => { onMemoRequest = resolve })
   await page.route('http://memo-focus.test/**', async route => {
     const path = new URL(route.request().url()).pathname
+    if (path === '/api/memo-tabs') { await route.fulfill({ json: { tabs: [], ownerId: 'fixture@test' } }); return }
     if (path === `/${memoChunk.fileName}`) await new Promise<void>(resolve => { releaseMemo = resolve; onMemoRequest!() })
     const script = scripts.get(path)
     await route.fulfill(script !== undefined ? { contentType: 'text/javascript', body: script }
