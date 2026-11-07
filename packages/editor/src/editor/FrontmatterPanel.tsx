@@ -14,7 +14,7 @@ import type { FileLinkContext } from './file-link'
 // Properties live outside TipTap so editing a value cannot break the YAML structure.
 export function FrontmatterPanel({ data, lineNumbers, onChange, readOnly, docPath = '', fileLinkContext, onOpenLink, optionsApi, fetchBacklinks, databaseApi }: {
   data: FrontmatterData
-  lineNumbers?: { title: number; fields: number[] }
+  lineNumbers?: { title?: number; fields: number[] }
   onChange: (next: FrontmatterData) => void
   readOnly?: boolean
   docPath?: string
@@ -196,7 +196,7 @@ export function FrontmatterPanel({ data, lineNumbers, onChange, readOnly, docPat
   }
 
   return <div className="frontmatter-panel mx-8 mt-12 mb-2 border-b border-edge pb-3">
-    <div className="frontmatter-line flex items-center gap-1" data-mew-line-numbers={lineNumbers?.title ?? 2}>
+    <div className="frontmatter-line flex items-center gap-1" data-mew-line-numbers={lineNumbers?.title}>
       <input value={data.title} onChange={event => onChange({ ...data, title: event.target.value })} readOnly={readOnly}
         placeholder={uiText('제목')} aria-label={uiText('제목')}
         className="min-w-0 flex-1 border-none bg-transparent text-3xl leading-tight font-bold text-ink-bright outline-none placeholder:text-ink-faint" />

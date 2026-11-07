@@ -8,7 +8,7 @@ updated: "2026-11-04"
 status_hash: "2741d359b18c61eecb53b8ce0ba2862f0f42c088d7d02cf55c88a23d1d44a98e"
 files: ["packages/editor/src/editor/FrontmatterSelect.tsx", "server/frontmatter-options.ts", "src/hooks/useTabs.ts", "src/components/EditorPane.tsx", "src/components/markdown-error-boundary.tsx", "packages/editor/src/Editor.tsx", "packages/editor/src/editor/FrontmatterPanel.tsx", "src/components/TableOfContents.tsx"]
 commits: []
-description: "A feature contract covering Markdown Hotview and Plain editing, readable text and rich HTML copying, /voice inline recording with persistent playback and retry, /paint and /그림 drawing insertion with mapped upload positions and document access boundaries, editor-local touch pinch font zoom, per-block caching and virtualization, code-block scrolling, view and cursor restoration, checkboxes, document properties, backlinks, mobile auxiliary keys, and source-saving boundaries."
+description: "Markdown Hotview and Plain editing contract covering document properties including titleless YAML, source saving, copying, voice and drawing insertion, editor navigation, performance, and mobile input."
 상위파일:
   - "MOC.md"
   - "_document-code-media-editing.md"
@@ -26,6 +26,7 @@ description: "A feature contract covering Markdown Hotview and Plain editing, re
 - Hotview code blocks preserve original line breaks, spaces, and tabs. Long lines do not wrap automatically and scroll horizontally within the block, with the same behavior on mobile and in read-only mode. The copy button remains fixed at the block's upper right.
 - Typing `[] ` or `[ ] ` at the beginning of a line creates a checkbox line. Click to toggle completion, press Enter to continue the list, or return to a normal paragraph from an empty item.
 - Provides frontmatter property editing, a document table of contents, and list indentation.
+- A block-style YAML mapping at the start of a document is shown as properties even without `title`. Body and property edits preserve the absence of `title` until a title is entered; the empty title control has no source line number.
 - The diagonal arrow to the right of the frontmatter title opens a list of referencing documents and navigates to the selected document. The list includes permitted documents from external projects and excludes the current document's `상위파일`.
 - `상위파일` is hidden from regular property rows and opened through the ↑ button beside the title. If one parent can be opened, navigation is direct; if multiple parents can be opened, choose one. The source frontmatter is preserved and edited in source mode.
 - Date properties use the same shared calendar as the task panel to select or clear a single date. Direct year and month changes and keyboard navigation are supported, and stored values retain `YYYY-MM-DD`.

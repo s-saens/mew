@@ -3,6 +3,31 @@ import assert from 'node:assert/strict'
 import { parse } from 'yaml'
 import { changeFrontmatterType, frontmatterSelections, frontmatterType, joinFrontmatter, splitFrontmatter, type FrontmatterField } from './frontmatter.ts'
 
+test('titleless frontmatter stays separate and does not gain a title when edited', () => {
+  const header = 'description: "Research description"\ntags:\n  - one\n  - two\ncount: 42 # retained'
+  let content = `---\n${header}\n---\n\n# Body`
+  for (let index = 0; index < 3; index++) {
+    const result = splitFrontmatter(content)
+    assert.ok(result.frontmatter)
+    assert.equal(result.frontmatter.title, '')
+    assert.equal(result.frontmatter.hasTitle, false)
+    assert.deepEqual(result.lineNumbers, { fields: [2, 3, 6] })
+    assert.equal(result.body, index === 0 ? '# Body' : `Edited ${index - 1}`)
+    content = joinFrontmatter(result.frontmatter, `Edited ${index}`)
+    assert.deepEqual(parse(content.split('---')[1]), { description: 'Research description', tags: ['one', 'two'], count: 42 })
+    assert.ok(content.includes('count: 42 # retained'))
+  }
+  const data = splitFrontmatter(content).frontmatter!
+  assert.equal(parse(joinFrontmatter({ ...data, title: 'New title' }, 'Body').split('---')[1]).title, 'New title')
+  assert.equal(splitFrontmatter('---\ndescription: text\n---').body, '')
+})
+
+test('horizontal rules and malformed titleless YAML remain body text', () => {
+  for (const content of ['---\nA heading\n---\nBody', '---\nvalue: [broken\n---\nBody', '---\n{description: text}\n---\nBody']) {
+    assert.deepEqual(splitFrontmatter(content), { frontmatter: null, body: content })
+  }
+})
+
 test('field settings survive serialization, renaming and ordering without changing YAML property values', () => {
   const fields: FrontmatterField[] = [
     { key: 'status', value: 'Draft', type: 'select', options: ['Draft', 'Published', 'With "quotes"', 'Text # mew:field {"type":"text"}'], optionColors: { Draft: 210, Published: 130 } },

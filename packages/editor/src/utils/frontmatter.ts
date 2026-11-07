@@ -1,5 +1,5 @@
 import { uiText } from '@mew/ui/i18n-core'
-import { parseDocument } from 'yaml'
+import { isMap, parseDocument } from 'yaml'
 export const FRONTMATTER_TYPES = ['text', 'link', 'select', 'multi-select', 'date', 'number'] as const
 export type FrontmatterType = typeof FRONTMATTER_TYPES[number]
 export interface FrontmatterField {
@@ -13,12 +13,13 @@ export interface FrontmatterField {
 
 export interface FrontmatterData {
   title: string
+  hasTitle?: boolean
   // desc/created/updated 포함 title 외 전부 — 사용자가 자유롭게 추가·수정·삭제하는 필드들
   fields: FrontmatterField[]
 }
 
 // 닫는 --- 뒤의 개행을 전부 삼킨다 (하나만 삼키면 split→join을 반복할 때마다 빈 줄이 하나씩 늘어남)
-const FRONTMATTER_RE = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n)+/
+const FRONTMATTER_RE = /^---\r?\n([\s\S]*?)\r?\n---(?:(?:\r?\n)+|$)/
 // 키가 비어 있어도 허용한다 — 필드명을 지우고 새로 입력하는 도중(빈 키 상태)에도 필드가
 // 사라지면 안 된다. 필드 삭제는 오직 × 버튼으로만 한다. 값에 콜론이 있어도 첫 콜론까지만 키로 본다.
 const FIELD_LINE_RE = /^([^:\n]*):\s*(.*)$/
@@ -88,14 +89,14 @@ export function changeFrontmatterType(field: FrontmatterField, type: Frontmatter
     ...(['select', 'multi-select'].includes(type) ? { options: [...new Set([...(field.options ?? []), ...selections])] } : {}) }
 }
 
-/** frontmatter가 없거나 title이 없으면 frontmatter: null, body는 원본 그대로. title 외엔 전부 선택 필드. */
-export function splitFrontmatter(content: string): { frontmatter: FrontmatterData | null; body: string; lineNumbers?: { title: number; fields: number[] } } {
+/** Split document properties from the body, including mappings without a title. */
+export function splitFrontmatter(content: string): { frontmatter: FrontmatterData | null; body: string; lineNumbers?: { title?: number; fields: number[] } } {
   const match = FRONTMATTER_RE.exec(content)
   if (!match) return { frontmatter: null, body: content }
 
   let title: string | undefined
   const fields: FrontmatterField[] = []
-  const lineNumbers = { title: 2, fields: [] as number[] }
+  const lineNumbers: { title?: number; fields: number[] } = { fields: [] }
   const lines = match[1].split(/\r?\n/)
   for (let index = 0; index < lines.length; index++) {
     const line = lines[index]
@@ -124,7 +125,13 @@ export function splitFrontmatter(content: string): { frontmatter: FrontmatterDat
       lineNumbers.fields.push(start + 2)
     }
   }
-  if (title === undefined) return { frontmatter: null, body: content }
+  if (title === undefined) {
+    const parsed = parseDocument(match[1])
+    if (parsed.errors.length || !isMap(parsed.contents) || parsed.contents.flow || parsed.contents.items.length !== fields.length) return { frontmatter: null, body: content }
+    for (const [index, field] of fields.entries()) {
+      if (!field.source && !field.type) field.source = { key: field.key, value: field.value, yaml: lines[lineNumbers.fields[index] - 2] }
+    }
+  }
 
   if (fields.some(field => field.key === '_mew_database' && field.value.trim())) {
     const parsed = parseDocument(match[1])
@@ -139,11 +146,11 @@ export function splitFrontmatter(content: string): { frontmatter: FrontmatterDat
     }
   }
 
-  return { frontmatter: { title, fields }, body: content.slice(match[0].length), lineNumbers }
+  return { frontmatter: { title: title ?? '', ...(title === undefined ? { hasTitle: false } : {}), fields }, body: content.slice(match[0].length), lineNumbers }
 }
 
 export function joinFrontmatter(frontmatter: FrontmatterData, body: string): string {
-  const lines = [`title: ${quote(frontmatter.title)}`]
+  const lines = frontmatter.hasTitle === false && !frontmatter.title ? [] : [`title: ${quote(frontmatter.title)}`]
   const databasePage = frontmatter.fields.some(field => field.key === '_mew_database' && field.value.trim())
   for (const f of frontmatter.fields) {
     const settings = f.type ? ` # mew:field ${JSON.stringify({ type: f.type, ...(f.options ? { options: f.options } : {}), ...(f.optionColors ? { optionColors: f.optionColors } : {}) })}` : ''
