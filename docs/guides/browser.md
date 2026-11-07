@@ -1,8 +1,8 @@
 ---
-title: "Login screens and the host browser"
-description: "Explains localhost apps in new proxy tabs, the native Chrome video Browser panel and mobile input, managed browser preparation, the same Browser/login video component and account cookie profile, one Browser permission, and session lifetimes."
+title: "Mew Port, login screens, and the host browser"
+description: "Explains opening host apps with Mew Port, finding them in the menu currently labelled Localhost browser, and the agreed Local apps replacement name. Covers native Chrome browsing, login video, permissions, prerequisites, and session lifetimes."
 created: "2026-09-04"
-updated: "2026-11-06"
+updated: "2026-11-07"
 ---
 
 ## Login screen
@@ -15,6 +15,8 @@ Login screens and the Browser panel below use the same Chrome window, H.264/WebR
 
 ## Find running localhost apps
 
+The app-list menu's agreed name is **Local apps**. It currently displays **Localhost browser**; the UI label change is pending. See the [Mew Port terminology](../../.mew/docs/development/port-preview.md#terminology).
+
 Choose **Menu → Localhost browser** to list ports currently listening on the Mew host. Click a port to open it in a new browser tab through Mew's host-app proxy. The list includes services started outside Mew's command buttons; use refresh to update it. A port labelled **Mew** is disabled, as are reserved ports marked unavailable. Each row shows the app name followed by its port number as a tag, such as **Along** `5173`. When there is no HTML page title, Mew uses the actual process name when available, for example **postgres** `5432` or **sshd** `22`. If neither can be read, the name is **(Unnamed)**. A process name identifies the listener owner; it does not prove what the service does. Long names are shortened to fit; hover over a name to read it. Refresh updates the list and its names. Pages whose title requires JavaScript or app login, HTTPS-only services, and processes hidden by OS permissions may lack a descriptive name. The list shows TCP listeners, so a non-web service may not open as a webpage.
 
 If the list asks you to restart Mew with the latest code, the UI has loaded but the running server does not provide the port-list API. Apply the current server code with your normal server restart procedure, then retry the list. A UI build alone does not reload server routes.
@@ -22,6 +24,8 @@ If the list asks you to restart Mew with the latest code, the UI has loaded but 
 The list itself starts no host browser or app. The **Access localhost Apps** permission controls this menu and app tabs. **Account Management → Feature Permissions → Browser** controls both the native Chrome Browser and login screens. It is independent of **Remote desktop** and **Access localhost Apps**. Owners and managers have browser access by default; members can receive an explicit grant. Guests and temporary-password accounts cannot use it. Agent/Git workflows still require their own permissions.
 
 ## Open host localhost apps
+
+**Mew Port** lets you open an app running on the Mew host through a Mew address, using `{mewAddress}/{port}`.
 
 Click a `http://localhost:3333` link in a document, agent response, or terminal output, or click a command's port number. Mew opens a new tab at `{mewAddress}/3333`, preserving its path, query, and fragment. For example, a host link ending in `:3333/settings?mode=dev#panel` opens through `/3333/settings?mode=dev#panel`. The app must already be running; clicking its link does not start or restart it.
 

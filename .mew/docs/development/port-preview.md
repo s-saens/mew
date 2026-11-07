@@ -1,9 +1,23 @@
 ---
-title: "Localhost app tabs and port previews"
-description: "Defines localhost app routing through authenticated direct/Mewlink port proxies, host port discovery, command detection, URL rewriting, and sandbox boundaries. Only portPreview authorizes proxy sessions and discovery; the common Browser/login uses the independent nativeBrowser feature. The former Android gateway entry is removed."
+title: "Mew Port: local app proxy and port discovery"
+description: "Defines Mew Port terminology, the Local apps menu name, and localhost app routing through authenticated direct/Mewlink proxies, port discovery, URL rewriting, and sandbox boundaries. Only portPreview authorizes proxy sessions and discovery; Browser/login uses the independent nativeBrowser feature."
 created: "2026-10-20"
-updated: "2026-11-06"
+updated: "2026-11-07"
 ---
+
+## Terminology
+
+**Mew Port** opens an app running on the Mew host through `{mewAddress}/{port}`, such as `{mewAddress}/3000`. The port-based address makes the feature name short and recognizable.
+
+| Context | English term | Korean label | Meaning |
+| --- | --- | --- | --- |
+| Feature name | Mew Port | Mew 포트 | Open an app running on the host through a Mew address |
+| App-list menu | Local apps | 로컬 앱 | Find running apps by their listening ports |
+| Implementation | local app proxy | 로컬 앱 프록시 | Forward authenticated app HTTP and WebSocket traffic to the host's loopback service |
+
+Use **Mew Port** in product descriptions, **Local apps** for the app-list menu, and **local app proxy** when explaining the implementation. The existing menu still displays **Localhost browser**; **Local apps** is the agreed replacement label, pending a UI copy change. Usage instructions retain the displayed label until that change is implemented.
+
+Mew Port is separate from the native Chrome **Browser** panel and from **Mewlink**, which connects another device to Mew. Existing `portPreview` permission identifiers, `port-preview` routes/capabilities, source filenames, and document paths remain unchanged by this naming convention. For everyday use, see [Open host localhost apps](../../../docs/guides/browser.md#open-host-localhost-apps).
 
 <a id="internal-dom-browser"></a>
 
