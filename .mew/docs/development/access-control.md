@@ -1,8 +1,8 @@
 ---
 title: "Per-account feature and file permissions"
 created: "2026-09-16"
-updated: "2026-11-06"
-description: "Defines per-account feature and file permissions, first-owner enrollment, live Mewlink revocation, server-data boundaries, public capabilities, and browser/WebSocket checks. Covers the common nativeBrowser permission for login and browsing, independent localhost/desktop access, shared MCP ownership, account preservation, and rejection of obsolete Android grants."
+updated: "2026-11-07"
+description: "Defines per-account feature and file permissions, first-owner enrollment, live Mewlink revocation, server-data boundaries, public capabilities, and browser/WebSocket checks. Covers the common nativeBrowser permission for login and browsing, independent localhost/desktop access, terminal-gated port-process shutdown, shared MCP ownership, account preservation, and rejection of obsolete Android grants."
 상위파일: "MOC.md"
 ---
 
@@ -81,6 +81,8 @@ Terminal, agent, collaborative editing, DB, presence, and live WebSockets compar
 Attachment `/api/asset` cannot be viewed merely by knowing its UUID. View permission for the corresponding `.mew/assets/` file is required, and responses are not cached. When sharing a document with guest, attachment paths must also be allowed separately. Reading the frontmatter shared selection list (`/api/frontmatter-options`) requires project-wide view permission; adding or deleting requires login and project-wide edit permission. Features that return project-wide data, such as Git and DB management, are blocked if the project has partial file restrictions. DB also rechecks the project scope actually used by the router.
 
 The internal Browser and every login screen require the same **Browser** (`nativeBrowser`) feature. Both use one account browser profile and the same Chrome H.264/WebRTC component. Agent and GitHub operations retain their own job permissions, and opening their browser additionally checks `nativeBrowser`. The generic provider-login API requires browser permission without requiring an agent grant. Browser permission is independent of `desktop` and `portPreview`; the latter continues to control localhost app tabs and the port picker. A legacy `browser` override still maps only to `portPreview` and never grants the new capability. See [the native browser contract](browser-desktop.md).
+
+The port picker requires `portPreview`; its **Close port** action additionally requires `terminal` because it terminates host processes. `POST /api/dom-browser/ports/:port/close` rechecks both permissions and the original account before each signal, resolves the listener owner on the server, and protects Mew, its ancestors, and reserved listeners. It cannot accept an arbitrary PID. This uses the server OS user's existing process authority and is not project-scoped. See [the shutdown contract](port-preview.md#close-a-listening-port) and [ADR 0155](../decisions/0155-port-listener-shutdown.md).
 
 File rules apply to the **mew file API**. Server control features such as agents, terminal, native browser, remote desktop, and server file explorer operate with OS permissions and are not sandboxed by file rules. Do not assume file rules can hide secrets from accounts allowed to use these features. This explanation is displayed in account management.
 

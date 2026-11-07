@@ -17,7 +17,7 @@ test('localhost browser start page lists safe ports, blocks Mew and recovers wit
     import {setUiLocale} from ${JSON.stringify(path.join(root, 'packages/ui/src/i18n-core.ts'))};
     import {DomBrowserPorts} from ${JSON.stringify(component)};
     setUiLocale('en');window.opened=[];window.portRequests=[];
-    window.mewFetch=(input,init)=>{const request={url:String(input),aborted:false};window.portRequests.push(request);init.signal.addEventListener('abort',()=>request.aborted=true,{once:true});return fetch(input,{...init,signal:location.search.includes('ignore-abort')?undefined:init.signal})};
+    window.mewFetch=(input,init)=>{const request={url:String(input),aborted:false};window.portRequests.push(request);init?.signal?.addEventListener('abort',()=>request.aborted=true,{once:true});return fetch(input,{...init,signal:location.search.includes('ignore-abort')?undefined:init.signal})};
     function Fixture(){const [open,setOpen]=React.useState(true);return <><button id="toggle" onClick={()=>setOpen(value=>!value)}>Toggle fixture</button><main style={{height:440}}>{open&&<DomBrowserPorts onOpen={url=>window.opened.push(url)}/>}</main></>}
     createRoot(document.getElementById('root')).render(<Fixture/>);`
   const bundle = await build({ input: 'virtual:ports.tsx', write: false, logLevel: 'silent', platform: 'browser', output: { format: 'esm' }, transform: { jsx: 'react-jsx', define: { 'process.env.NODE_ENV': JSON.stringify('production') } }, plugins: [{
@@ -31,9 +31,9 @@ test('localhost browser start page lists safe ports, blocks Mew and recovers wit
   }] })
   const chunks = bundle.output.filter(item => item.type === 'chunk'), entry = chunks.find(item => item.isEntry)!
   const scripts = new Map(chunks.map(item => [`/${item.fileName}`, item.code]))
-  const content = (await Promise.all([component, path.join(root, 'packages/ui/src/HoverTipLayer.tsx')].map(file => fs.readFile(file, 'utf8')))).join('\n')
+  const content = (await Promise.all([component, path.join(root, 'packages/ui/src/HoverTipLayer.tsx'), path.join(root, 'packages/ui/src/ConfirmDialog.tsx'), path.join(root, 'packages/ui/src/dialog-frame.tsx')].map(file => fs.readFile(file, 'utf8')))).join('\n')
   const compiler = await compile(await fs.readFile(path.join(root, 'src/index.css'), 'utf8'), { base: path.join(root, 'src'), onDependency() {} })
-  const css = compiler.build([...new Set(content.match(/[A-Za-z0-9_@:/.[\]()%,-]+/g))]) + await fs.readFile(path.join(root, 'packages/ui/src/loading-indicator.css'), 'utf8')
+  const css = compiler.build([...new Set(content.match(/[A-Za-z0-9_@:/.[\]()%,-]+/g))]) + await fs.readFile(path.join(root, 'packages/ui/src/loading-indicator.css'), 'utf8') + await fs.readFile(path.join(root, 'packages/ui/src/action-menu.css'), 'utf8')
   const browser = await connectTestBrowser()
   t.after(() => browser.close())
 
@@ -45,7 +45,7 @@ test('localhost browser start page lists safe ports, blocks Mew and recovers wit
     await page.route('https://ports.test/**', async route => {
       const pathname = new URL(route.request().url()).pathname
       if (scripts.has(pathname)) { await route.fulfill({ contentType: 'text/javascript', body: scripts.get(pathname)! }); return }
-      if (pathname === '/api/dom-browser/ports') { const index = routes.push(route) - 1; waiters.get(index)?.(route); waiters.delete(index); return }
+      if (pathname.startsWith('/api/dom-browser/ports')) { const index = routes.push(route) - 1; waiters.get(index)?.(route); waiters.delete(index); return }
       await route.fulfill({ contentType: 'text/html', body: `<html class="dark"><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}body{margin:0;background:var(--color-surface-deep);color:var(--color-ink);font-family:system-ui}#toggle{position:fixed;bottom:0}</style></head><body><div id="root"></div><script type="module" src="/${entry.fileName}"></script></body></html>` })
     })
     await page.goto(`https://ports.test/${ignoreAbort ? '?ignore-abort' : ''}`)
@@ -223,6 +223,112 @@ test('localhost browser start page lists safe ports, blocks Mew and recovers wit
       await page.getByRole('button', { name: 'Toggle fixture', exact: true }).click()
       await (await request(1)).fulfill({ json: { ports: [] } })
       await page.getByText('No open ports.', { exact: true }).waitFor()
+      assert.deepEqual(errors, [])
+    } finally { await page.close() }
+  })
+
+  for (const width of [1100, 390]) await t.test(`port actions confirm process termination and refresh all rows at ${width}px`, async () => {
+    const { page, errors, request } = await fixture(width)
+    try {
+      await (await request(0)).fulfill({ json: { canClose: true, ports: [{ port: 5600, kind: 'app', processName: 'node' }, { port: 5601, kind: 'app', processName: 'node' }, { port: 5000, kind: 'mew' }, { port: 9222, kind: 'blocked' }] } })
+      const row = page.getByRole('button', { name: 'node 5600', exact: true })
+      await row.waitFor()
+      assert.equal(await row.getAttribute('aria-haspopup'), 'menu')
+      assert.equal(await page.getByRole('button', { name: 'Mew 5000', exact: true }).getAttribute('aria-haspopup'), null)
+      assert.equal(await page.getByRole('button', { name: '(Unnamed) 9222 Unavailable', exact: true }).getAttribute('aria-haspopup'), null)
+      if (width === 390) {
+        await row.dispatchEvent('pointerdown', { pointerType: 'touch', clientX: 80, clientY: 80 })
+        await page.getByRole('menuitem', { name: 'Close port', exact: true }).waitFor()
+        await row.dispatchEvent('pointerup', { pointerType: 'touch' })
+        await row.dispatchEvent('click')
+      } else await row.click({ button: 'right' })
+      const action = page.getByRole('menuitem', { name: 'Close port', exact: true })
+      await action.waitFor()
+      assert.deepEqual(await page.evaluate('window.opened'), [])
+      const bounds = await page.getByRole('menu').boundingBox()
+      assert.ok(bounds && bounds.x >= 0 && bounds.x + bounds.width <= width)
+      await page.keyboard.press('Escape')
+      await page.getByRole('menu').waitFor({ state: 'detached' })
+      assert.equal(await row.evaluate(element => element === element.ownerDocument.activeElement), true)
+      await row.press('Shift+F10')
+      await action.click()
+      const dialog = page.getByRole('dialog')
+      await dialog.getByText('Close port 5600?', { exact: true }).waitFor()
+      await dialog.getByText('This stops the process using this port and closes its other ports too.', { exact: true }).waitFor()
+      assert.equal(await dialog.getByRole('button', { name: 'Cancel', exact: true }).evaluate(element => element === element.ownerDocument.activeElement), true)
+      await dialog.getByRole('button', { name: 'Cancel', exact: true }).click()
+      assert.equal(await page.evaluate('window.portRequests.length'), 1)
+      await row.click({ button: 'right' })
+      await action.click()
+      await dialog.getByRole('button', { name: 'Close port', exact: true }).click()
+      const close = await request(1)
+      assert.equal(close.request().method(), 'POST')
+      assert.match(close.request().url(), /\/api\/dom-browser\/ports\/5600\/close$/)
+      await page.getByRole('status').getByText('Closing port 5600…', { exact: true }).waitFor()
+      assert.equal(await page.getByRole('button', { name: 'Refresh', exact: true }).isDisabled(), true)
+      assert.equal(await row.isDisabled(), true)
+      await close.fulfill({ json: { port: 5600, closed: true } })
+      await (await request(2)).fulfill({ json: { canClose: true, ports: [{ port: 5000, kind: 'mew' }] } })
+      await row.waitFor({ state: 'detached' })
+      assert.deepEqual(await page.locator('[data-port-badge]').allTextContents(), ['5000'])
+      assert.deepEqual(await page.evaluate('window.opened'), [])
+      assert.deepEqual(errors, [])
+    } finally { await page.close() }
+  })
+
+  await t.test('missing terminal permission and old servers expose no close action', async () => {
+    for (const canClose of [false, undefined]) {
+      const { page, errors, request } = await fixture()
+      try {
+        await (await request(0)).fulfill({ json: { canClose, ports: [{ port: 3000, kind: 'app' }] } })
+        const row = page.getByRole('button', { name: '(Unnamed) 3000', exact: true })
+        await row.waitFor()
+        await row.click({ button: 'right' })
+        await row.press('Shift+F10')
+        assert.equal(await page.getByRole('menu').count(), 0)
+        assert.equal(await row.getAttribute('aria-haspopup'), null)
+        assert.equal(await page.evaluate('window.portRequests.length'), 1)
+        assert.deepEqual(errors, [])
+      } finally { await page.close() }
+    }
+  })
+
+  await t.test('close errors remain visible after refresh and permission revocation removes actions', async () => {
+    for (const failure of [
+      { status: 403, code: 'dom-browser-port-close-forbidden', message: 'Closing ports requires localhost app access and terminal permissions.' },
+      { status: 409, code: 'dom-browser-port-protected', message: 'Ports belonging to Mew or protected services cannot be closed.' },
+      { status: 409, code: 'dom-browser-port-still-open', message: 'The process was asked to stop, but the port is still open. Check its status and try again.' },
+      { status: 404, code: '', message: 'Restart the Mew server with the latest code to close ports.' },
+    ]) {
+      const { page, errors, request } = await fixture(390)
+      try {
+        await (await request(0)).fulfill({ json: { canClose: true, ports: [{ port: 3000, kind: 'app' }] } })
+        const row = page.getByRole('button', { name: '(Unnamed) 3000', exact: true })
+        await row.click({ button: 'right' })
+        await page.getByRole('menuitem', { name: 'Close port', exact: true }).click()
+        await page.getByRole('dialog').getByRole('button', { name: 'Close port', exact: true }).click()
+        await (await request(1)).fulfill({ status: failure.status, json: { code: failure.code } })
+        await (await request(2)).fulfill({ json: { canClose: false, ports: [{ port: 3000, kind: 'app' }] } })
+        await page.getByRole('alert').getByText(failure.message, { exact: true }).waitFor()
+        await row.waitFor({ state: 'visible' })
+        assert.equal(await row.isDisabled(), false)
+        assert.equal(await row.getAttribute('aria-haspopup'), null)
+        assert.deepEqual(errors, [])
+      } finally { await page.close() }
+    }
+  })
+
+  await t.test('unmount cancels a pending close response without requesting another list', async () => {
+    const { page, errors, request } = await fixture()
+    try {
+      await (await request(0)).fulfill({ json: { canClose: true, ports: [{ port: 3000, kind: 'app' }] } })
+      await page.getByRole('button', { name: '(Unnamed) 3000', exact: true }).click({ button: 'right' })
+      await page.getByRole('menuitem', { name: 'Close port', exact: true }).click()
+      await page.getByRole('dialog').getByRole('button', { name: 'Close port', exact: true }).click()
+      await request(1)
+      await page.getByRole('button', { name: 'Toggle fixture', exact: true }).click()
+      assert.equal(await page.evaluate('window.portRequests[1].aborted'), true)
+      assert.equal(await page.evaluate('window.portRequests.length'), 2)
       assert.deepEqual(errors, [])
     } finally { await page.close() }
   })

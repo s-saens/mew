@@ -4,10 +4,10 @@ parent: "mew-remote"
 title: "Virtual login display and DOM browser"
 status: "implemented"
 created: "2026-09-18"
-updated: "2026-11-05"
-files: ["server/dom-browser.ts", "server/browser-dom-executable.ts", "server/dom-browser-ports.ts", "server/dom-browser-port-titles.ts", "server/dom-browser-port-processes.ts", "src/components/DomBrowserPanel.tsx", "src/components/DomBrowserPorts.tsx", "server/login-desktop.ts", "server/port-preview.ts", "server/port-preview-location.ts", "src/components/LoginDesktopViewer.tsx", "src/components/PortPreviewPage.tsx"]
+updated: "2026-11-07"
+files: ["server/dom-browser.ts", "server/browser-dom-executable.ts", "server/dom-browser-ports.ts", "server/dom-browser-port-stop.ts", "server/dom-browser-port-titles.ts", "server/dom-browser-port-processes.ts", "src/components/DomBrowserPanel.tsx", "src/components/DomBrowserPorts.tsx", "server/login-desktop.ts", "server/port-preview.ts", "server/port-preview-location.ts", "src/components/LoginDesktopViewer.tsx", "src/components/PortPreviewPage.tsx"]
 commits: []
-description: "Chromium DOM browsing for loopback apps and ordinary Google Chrome for external HTTP(S) sites and native login video. Defines engine switching, ephemeral state, port discovery, theme synchronization, replay, navigation guards, and verification boundaries."
+description: "Chromium DOM browsing for loopback apps and ordinary Google Chrome for external HTTP(S) sites and native login video. Defines engine switching, ephemeral state, port discovery and terminal-gated process shutdown, theme synchronization, replay, navigation guards, and verification boundaries."
 상위파일: "_browser-android-remote-desktop.md"
 ---
 
@@ -23,6 +23,8 @@ Both host browsers handle HTTP requests, cookies, and WebSocket connections thro
 
 DOM replay does not guarantee compatibility with every site. Canvas/WebGL, nested frames, uploads, native dialogs, media, and drag interactions retain the limits in the [DOM browser contract](../../development/port-preview.md#internal-dom-browser).
 
+The port list also offers **Close port** on app rows through right-click, touch long-press, and keyboard context menus. It requires `portPreview` plus `terminal` and confirms that all ports owned by the listener process can close together. It protects Mew and reserved services, refreshes after every close attempt, and reports failures without forcing termination. The [shutdown contract](../../development/port-preview.md#close-a-listening-port) defines process validation and permission checks.
+
 ## Detailed contracts
 
 - [Usage and prerequisites](../../../../docs/guides/browser.md)
@@ -34,6 +36,7 @@ DOM replay does not guarantee compatibility with every site. Canvas/WebGL, neste
 
 - Localhost document, agent, and terminal links and command port buttons select the Browser panel without opening an external tab or rerunning commands.
 - The hamburger entry always shows the port list on desktop and mobile, even from an existing page. Opening the list launches no host browser; selecting an allowed port opens its app. Mew and reserved ports remain disabled, including manual address and redirect guards. Failed scans support retry without claiming no listeners.
+- Closing a port requires confirmation and current localhost-app and terminal permissions. Mew, its ancestors, protected listeners, unresolvable ownership, stale process identities, and revoked permissions prevent signaling. Desktop right-click, mobile long-press, keyboard access, cancellation, pending states, errors, and refreshed lists have regression coverage.
 - Pages that support automatic dark/light mode follow Mew on initial open, live theme changes, navigation, and reconnect. Host JavaScript and replayed CSS agree, and theme changes preserve the running app state.
 - Names precede numeric port tags and truncate within narrow panels. HTML titles take priority over actual process names; Mew keeps its known name, and missing metadata uses a localized unnamed label without guessing a service from its port. Refresh updates names and ports; blocked ports stay disabled even when their process is identified. Optional title/process lookup failures preserve the port list, authentication, live Mew-port guards, and cancellation without launching a browser.
 - Localhost and loopback navigation uses Chromium; other hosts use ordinary Google Chrome. Address entry, links, redirects, and Back/Forward preserve this selection, existing navigation guards, and per-engine session-memory storage. UI automation always selects Chromium independently of the target URL.

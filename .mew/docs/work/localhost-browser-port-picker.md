@@ -1,8 +1,8 @@
 ---
 title: "Localhost browser entry and host port selection"
-description: "Records the 2026-11-01 hamburger entry, host-wide TCP port list, disabled Mew ports and live navigation guard, browser start-page lifecycle, regression checks, screenshots, the follow-up diagnosis of a stale running port API, restart guidance, and the boundary before user application."
+description: "Records the 2026-11-01 hamburger entry, host-wide TCP port list, disabled Mew ports and live navigation guard, browser start-page lifecycle, regression checks, screenshots, the follow-up diagnosis of a stale running port API, restart guidance, and the November 7 permission-gated listener shutdown, browser-lab cleanup, verification, and user application boundary."
 created: "2026-11-01"
-updated: "2026-11-01"
+updated: "2026-11-07"
 ---
 
 ## Purpose and result
@@ -58,3 +58,21 @@ node --test src/components/dom-browser-ports.browser.test.ts src/components/dom-
 Scoped oxlint and the UI detector passed with no findings. `npm run build` passed with the large-chunk warning after a first attempt encountered a temporary type mismatch in a concurrently edited AgentPanel; no unrelated source was changed for this task. Documentation and diff checks passed.
 
 The diagnostic and error-message fix does not apply server-side code to an already running process. Actual port-list access remains pending the user's server restart under the repository execution rules; no deployment, launcher run, or server start/stop/restart was performed.
+
+
+## 2026-11-07 — Close listener processes from the port list
+
+The user requested shutdown of the six browser-comparison endpoints and a context-menu action to close listening ports. The explicitly authorized operation stopped only `mew-browser-lab.service` and removed its six Tailscale Serve TCP forwarders for 5600–5605. The service reported inactive with no main PID, and `ss` found no listeners in that range. Existing Mew and other Serve routes were preserved. This authorization did not cover applying Mew server changes.
+
+The shared port picker now exposes a permission-aware **Close port** menu for app rows, including desktop right-click, touch long-press, and keyboard context-menu access. Confirmation describes the process-wide effect. The new POST route resolves live listener owners, protects Mew and reserved services, checks process identity and current authority before signaling, and refreshes the list after success or failure. [The implementation contract](../development/port-preview.md#close-a-listening-port), [permission contract](../development/access-control.md), [usage guide](../../../docs/guides/browser.md#find-running-localhost-apps), and [ADR 0155](../decisions/0155-port-listener-shutdown.md) own the current behavior.
+
+Local verification completed:
+
+- `node --test server/dom-browser-port-stop.test.ts server/dom-browser-ports.test.ts`: 23 passed. Injected signals cover authorization, Origin, protected processes, process replacement, partial failure, cancellation, deadlines, and SIGTERM-only behavior. A live Linux fixture resolves its actual owner and refuses to signal itself; no real termination signal is sent by these tests.
+- `node --test src/components/dom-browser-ports.browser.test.ts packages/ui/src/i18n.test.ts src/components/browser-desktop-panel.browser.test.ts src/components/dom-browser-panel.browser.test.ts`: 22 passed. Chromium checks cover desktop/mobile menu access, keyboard focus and dismissal, confirmation/cancel, process-wide refresh, pending states, translated errors, denied permissions, older server responses, and unmount cleanup.
+- `node --test server/command-ports.test.ts`: 7 passed; `node --test src/components/dom-browser-entry.browser.test.ts`: 3 passed. Initial concurrent combined runs had a transient closed-listener assertion and a hidden mobile fixture link; both existing files passed when rerun independently.
+- `npm run build` passed after correcting a missing `canClose` state field found by the first build. Vite retained its large-chunk advisory. `npx tsc -p tsconfig.node.json --noEmit`, scoped oxlint, and the changed-file diff check passed.
+- `npm run check:docs` validated all 755 descriptions but failed on 37 existing links to missing MOC/README targets outside this task. Direct use of the repository's description and link checkers passed for all six changed documents. New heading links were inspected directly.
+- `node --test src/ui-localization.test.ts` still fails its repository-wide literal scan on existing untranslated strings outside the changed port UI. After fixing the newly added error-message literals, the final scan contains no `DomBrowserPorts` findings. Its other Markdown/time localization check passes.
+
+Real macOS/Windows termination, physical-device gestures, external-network Mewlink, and supervisor restart behavior remain unverified. The build updates local UI assets; the user must apply the new backend route through their normal Mew server restart procedure.

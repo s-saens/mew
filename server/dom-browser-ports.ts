@@ -8,6 +8,7 @@ import { commandPortParsers } from './command-ports.ts'
 import { authOf } from './reqAuth.ts'
 import { enrichDomBrowserPortTitles } from './dom-browser-port-titles.ts'
 import { discoverDomBrowserPortProcesses } from './dom-browser-port-processes.ts'
+import { closeDomBrowserPort, DomBrowserPortCloseError } from './dom-browser-port-stop.ts'
 import { encodedPowerShell, powershell } from './platform/windows/storage.ts'
 
 const execute = promisify(execFile)
@@ -33,6 +34,7 @@ export interface DomBrowserPortsOptions {
   scan?: (signal: AbortSignal) => Promise<number[]>
   titles?: typeof enrichDomBrowserPortTitles
   processes?: typeof discoverDomBrowserPortProcesses
+  closePort?: typeof closeDomBrowserPort
   timeoutMs?: number
 }
 
@@ -128,6 +130,35 @@ export async function discoverDomBrowserPorts(options: DomBrowserPortDiscoveryOp
 /** Mount at /api/dom-browser alongside its existing WebSocket endpoint. */
 export function createDomBrowserPortsRouter(options: DomBrowserPortsOptions) {
   const router = express.Router()
+  router.post('/ports/:port/close', async (req, res) => {
+    res.setHeader('Cache-Control', 'no-store')
+    const original = authOf(req)
+    const allowed = () => {
+      const auth = authOf(req)
+      return !!original.email && auth.email === original.email && !auth.mustChangePassword && canUse(auth, 'portPreview') && canUse(auth, 'terminal')
+    }
+    if (!allowed()) { res.status(403).json({ error: '포트를 닫을 권한이 없습니다.', code: 'dom-browser-port-close-forbidden' }); return }
+    const value = req.params.port
+    if (!/^\d{1,5}$/.test(value) || !validPort(Number(value))) { res.status(400).json({ error: '올바른 포트 번호를 입력해 주세요.', code: 'dom-browser-port-invalid' }); return }
+    const port = Number(value)
+    const protectedPorts = () => new Set([...options.mewPorts(), ...options.blockedPorts?.() ?? []])
+    if (protectedPorts().has(port)) { res.status(409).json({ error: '보호된 포트는 닫을 수 없습니다.', code: 'dom-browser-port-protected' }); return }
+    const cancellation = new AbortController()
+    const cancel = () => cancellation.abort()
+    res.once('close', cancel)
+    try {
+      const result = await (options.closePort ?? closeDomBrowserPort)(port, { allowed, protectedPorts, signal: cancellation.signal })
+      if (!allowed()) { res.status(403).json({ error: '포트를 닫을 권한이 없습니다.', code: 'dom-browser-port-close-forbidden' }); return }
+      if (!res.destroyed) res.json(result)
+    } catch (error) {
+      if (res.destroyed) return
+      if (error instanceof DomBrowserPortCloseError) res.status(error.status).json({ error: '포트를 닫지 못했습니다.', code: error.code })
+      else res.status(503).json({ error: '포트를 닫지 못했습니다. 다시 시도해 주세요.', code: 'dom-browser-port-close-unavailable' })
+    } finally {
+      res.off('close', cancel)
+      cancellation.abort()
+    }
+  })
   router.get('/ports', async (req, res) => {
     const original = authOf(req)
     const allowed = () => {
@@ -153,7 +184,7 @@ export function createDomBrowserPortsRouter(options: DomBrowserPortsOptions) {
       ])
       if (!allowed()) { res.status(403).json({ error: '이 기능을 사용할 권한이 없습니다' }); return }
       if (res.destroyed) return
-      res.json({ ports: titled.map(entry => {
+      res.json({ canClose: canUse(authOf(req), 'terminal'), ports: titled.map(entry => {
         const kind = kindOf(entry.port)
         if (kind === 'mew') return { port: entry.port, kind }
         const result: DomBrowserPort = kind === 'app' ? entry : { port: entry.port, kind }

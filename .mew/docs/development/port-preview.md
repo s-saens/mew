@@ -1,6 +1,6 @@
 ---
 title: "Mew Port: local app proxy and port discovery"
-description: "Defines Mew Port terminology, the Local apps menu name, and localhost app routing through authenticated direct/Mewlink proxies, port discovery, URL rewriting, and sandbox boundaries. Only portPreview authorizes proxy sessions and discovery; Browser/login uses the independent nativeBrowser feature."
+description: "Defines Mew Port terminology, the Local apps menu name, and localhost app routing through authenticated direct/Mewlink proxies, port discovery, URL rewriting, and sandbox boundaries. Covers permission-gated listener-process shutdown from the port picker. Only portPreview authorizes proxy sessions and discovery; Browser/login uses the independent nativeBrowser feature."
 created: "2026-10-20"
 updated: "2026-11-07"
 ---
@@ -33,7 +33,7 @@ This routing follows [ADR 0146](../decisions/0146-native-browser-video-and-local
 
 ### Host port discovery
 
-The Browser start page lists host localhost TCP listeners independently of command sessions/projects. `GET /api/dom-browser/ports` returns sorted, deduplicated `{ ports: [{ port, kind, title?, processName? }] }`. `kind` is `app`, `mew`, or `blocked`; only `app` opens its authenticated `/<port>/` preview in a new tab. Explicit paths and external HTTP(S) addresses remain available.
+The Browser start page lists host localhost TCP listeners independently of command sessions/projects. `GET /api/dom-browser/ports` returns `{ canClose, ports: [{ port, kind, title?, processName? }] }` with sorted, deduplicated ports. `canClose` reflects the current additional `terminal` permission; older servers that omit it expose no close action. `kind` is `app`, `mew`, or `blocked`; only `app` opens its authenticated `/<port>/` preview in a new tab. Explicit paths and external HTTP(S) addresses remain available.
 
 Discovery reads Linux `/proc/net/tcp` and `tcp6`, macOS `lsof`, or Windows `Get-NetTCPConnection`. It includes canonical IPv4/IPv6 loopback and wildcard TCP listeners without scanning ranges, probing HTTP, or starting apps. A listener may be non-HTTP; discovery does not prove it serves a website. LAN-only bindings and other network namespaces are excluded. macOS/Windows visibility depends on OS permissions.
 
@@ -50,6 +50,16 @@ Title lookup processes at most 32 eligible ports, with four concurrent workers, 
 Process lookup is best effort, with a 1000 ms batch deadline, partial results, at most 256 requested ports, eight Linux filesystem workers, 4096 PIDs, 512 descriptors per PID, 32768 total readlinks, and 2 MiB per table/tool output. Permission errors, missing tools, races, and metadata deadlines do not fail the port list. Cancellation prevents late metadata from entering the response; native readlink calls can finish after the batch returns. Current access is checked after both metadata lookups. See [ADR 0124](../decisions/0124-localhost-port-service-labels.md) and the [follow-up work record](../work/localhost-port-page-titles.md#follow-up-name-first-port-tags-and-process-fallbacks).
 
 Opening the list starts neither a browser socket nor Chromium. Selecting an allowed port opens its proxy in a new tab. The native Chrome toolbar's **Open ports** control returns to this list; native-browser closure follows its separate persistent-profile lifecycle. See [ADR 0108](../decisions/0108-localhost-browser-port-picker.md) and its [verification record](../work/localhost-browser-port-picker.md).
+
+### Close a listening port
+
+For accounts with both `portPreview` and `terminal`, an app row exposes **Close port** through right-click, touch long-press, or the Context Menu key / Shift+F10. Mew and reserved rows expose no close action. The shared action menu preserves focus, Esc/Back dismissal, and viewport bounds. A confirmation explains that ending the listener process closes its other ports too. While a close request is pending, rows and refresh are disabled; completion or failure triggers a fresh list scan. Errors remain visible after the scan. Closing a panel cancels its pending response handling, which cannot undo a termination already requested.
+
+`POST /api/dom-browser/ports/:port/close` requires current login, no pending password change, `portPreview`, and `terminal`. It inherits the existing HTTP Origin checks and authenticated Mewlink request transport. The server accepts a port number, resolves current OS listener owners itself, and never accepts a client-supplied PID or command. A missing listener is an idempotent success: `{ port, closed: true }`. Responses use `Cache-Control: no-store`.
+
+`server/dom-browser-port-stop.ts` reads Linux socket inodes and `/proc` ownership, macOS `lsof` plus process metadata, or Windows TCP/process metadata. Before each termination request, it rechecks current permissions, protected ports, listener ownership, process identity, and the Mew ancestor chain. It rejects PID 1, Mew itself and its ancestors, and processes that also own a protected port. Missing or incomplete ownership fails closed. It requests `SIGTERM` only, never escalates to `SIGKILL`, and checks for listener disappearance for up to one second, within a five-second total operation deadline. Windows uses Node's immediate process termination semantics rather than a Unix signal handler. Other processes, service supervisors, and Tailscale forwarders are not stopped by this API; a supervisor can reopen a port.
+
+Invalid ports return 400; insufficient permissions return 403; protected processes and ports still listening return 409; unavailable ownership, signaling failures, and timeouts return 503. Machine-readable `dom-browser-port-*` codes drive translated UI errors. A failure can follow a successful signal to one owner, so the UI always refreshes actual listeners. This host-process authority is recorded in [ADR 0155](../decisions/0155-port-listener-shutdown.md) and the [verification record](../work/localhost-browser-port-picker.md#2026-11-07--close-listener-processes-from-the-port-list).
 
 ## Legacy proxy entry and execution
 

@@ -1,6 +1,6 @@
 ---
 title: "Mew Port, login screens, and the host browser"
-description: "Explains opening host apps with Mew Port, finding them in the menu currently labelled Localhost browser, and the agreed Local apps replacement name. Covers native Chrome browsing, login video, permissions, prerequisites, and session lifetimes."
+description: "Explains opening host apps with Mew Port, finding them in the menu currently labelled Localhost browser, and the agreed Local apps replacement name. Covers closing listener processes from the port list, native Chrome browsing, login video, permissions, prerequisites, and session lifetimes."
 created: "2026-09-04"
 updated: "2026-11-07"
 ---
@@ -18,6 +18,8 @@ Login screens and the Browser panel below use the same Chrome window, H.264/WebR
 The app-list menu's agreed name is **Local apps**. It currently displays **Localhost browser**; the UI label change is pending. See the [Mew Port terminology](../../.mew/docs/development/port-preview.md#terminology).
 
 Choose **Menu → Localhost browser** to list ports currently listening on the Mew host. Click a port to open it in a new browser tab through Mew's host-app proxy. The list includes services started outside Mew's command buttons; use refresh to update it. A port labelled **Mew** is disabled, as are reserved ports marked unavailable. Each row shows the app name followed by its port number as a tag, such as **Along** `5173`. When there is no HTML page title, Mew uses the actual process name when available, for example **postgres** `5432` or **sshd** `22`. If neither can be read, the name is **(Unnamed)**. A process name identifies the listener owner; it does not prove what the service does. Long names are shortened to fit; hover over a name to read it. Refresh updates the list and its names. Pages whose title requires JavaScript or app login, HTTPS-only services, and processes hidden by OS permissions may lack a descriptive name. The list shows TCP listeners, so a non-web service may not open as a webpage.
+
+To stop an app, right-click its port row and choose **Close port**. On mobile, press and hold the row; with a keyboard, use Shift+F10 or the Context Menu key. Confirm to stop the process using the port. Its other ports close too, and Mew refreshes the list. This requires both **Access localhost Apps** and **Terminal** permissions. Mew and reserved ports cannot be closed. A process that refuses to stop, belongs to another OS user, or is restarted by a supervisor can leave the port open; Mew shows an error rather than forcing it to stop. This action does not remove separately configured Tailscale forwarding rules.
 
 If the list asks you to restart Mew with the latest code, the UI has loaded but the running server does not provide the port-list API. Apply the current server code with your normal server restart procedure, then retry the list. A UI build alone does not reload server routes.
 
