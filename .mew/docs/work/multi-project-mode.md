@@ -1,6 +1,6 @@
 ---
 title: "Multi-project mode implementation and verification"
-description: "Original design, staged implementation, and local verification of optional desktop multi-project mode. Records scoped requests and execution, retained compact workspaces, handle-based geometry and panel movement animation, lifecycle regressions, synthetic 1/3/10-panel measurements, database/operational limits, and the panel-scoped selector, new-panel creation, and header hover follow-ups."
+description: "Original design, staged implementation, and local verification of optional desktop multi-project mode. Records scoped requests and execution, retained compact workspaces, live panel rearrangement, lifecycle regressions, synthetic 1/3/10-panel measurements, database/operational limits, and selector and header follow-ups."
 created: "2026-11-06"
 updated: "2026-11-08"
 ---
@@ -221,3 +221,9 @@ Local Chromium checks passed in the multi-project application and workspace appl
 The project title and command action now use compact rounded hover surfaces consistent with the close button. The title retains its header-height click target and truncates long names; the command and close buttons remain aligned. The [feature contract](../features/appearance-accounts-operations/multi-project-mode.md#shared-and-local-controls) owns the current behavior.
 
 The multi-project application Chromium fixture passed all 6 tests, including narrow-panel hover geometry, long-name truncation, and title and command actions. A local hover capture was inspected. `npm run build` and `npm run lint` passed with advisory warnings. `npm run check:docs` validated descriptions but reported 37 existing missing links outside these changes. The browser fixture uses mocked transport; physical-device behavior was not checked. No deployment or server lifecycle operation was performed. The build updates the assets served by a running instance.
+
+## Live panel rearrangement — 2026-11-08
+
+The panel movement follow-up previews the target arrangement during dragging, so surrounding panels move as the pointer crosses targets. Release commits the preview; Esc and pointer cancellation restore the original layout. The [feature contract](../features/appearance-accounts-operations/multi-project-mode.md#project-selection-movement-and-resizing) owns the interaction, and [UI workspace layout](../development/ui-workspace-layout.md#multi-project-board-and-compact-presentation) owns its implementation boundaries.
+
+Local verification passed: eight project-board browser tests, ten board model tests, six assembled multi-project browser tests, `npm run build`, and `npm run lint` with advisory warnings. The board tests cover live row and column previews, commit and cancellation, scrolling, reduced motion, and retained drafts. `npm run check:docs` validated 763 descriptions but reported 37 existing missing links outside the changed documents; the changed documents' links passed separately. The build retained its large-chunk advisory. The browser fixtures use mocked transport; physical-device behavior was not checked. No deployment or server lifecycle operation was performed. The build updates the assets served by a running instance.

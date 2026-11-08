@@ -20,6 +20,5 @@
 .mew-project-board-grip:focus-visible, .mew-project-board-name:focus-visible, .mew-project-board-add:focus-visible, .mew-project-board-resize-column:focus-visible, .mew-project-board-resize-row:focus-visible { outline: 2px solid var(--color-ink); outline-offset: -2px; }
 .mew-project-board-add { position: absolute; top: 6px; z-index: 2; display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; padding: 4px; border-radius: 4px; background: var(--color-surface); color: var(--color-ink-secondary); }
 .mew-project-board-add:hover { background: var(--color-surface-raised); color: var(--color-ink); }
-.mew-project-board-drop { position: absolute; z-index: 5; pointer-events: none; background: var(--color-ink-secondary); }
 .mew-project-board[data-presentation="single"] { overflow: hidden; }
 .mew-project-board[data-presentation="single"] .mew-project-board-panel { border: 0; }

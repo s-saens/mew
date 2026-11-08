@@ -126,6 +126,14 @@ test('pointer cancellation and touch grip movement keep project selection separa
   const point = { x: grip.x + 10, y: grip.y + 12 }
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point] })
   for (let step = 1; step <= 8; step++) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: point.x + (200 - point.x) * step / 8, y: point.y + (700 - point.y) * step / 8 }] })
+  await paint(page)
+  assert.ok(await page.locator('[data-project-panel="a"]').evaluate(element => parseFloat((element as HTMLElement).style.height)) < 870, 'touch drag previews the row')
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchCancel', touchPoints: [] })
+  await finishPanelAnimations(page)
+  assert.deepEqual(await columns(page), [['a'], ['b']], 'touch cancellation discards the preview')
+  assert.equal(await page.locator('[data-project-panel="a"]').evaluate(element => parseFloat((element as HTMLElement).style.height)), 870, 'touch cancellation restores the layout')
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point] })
+  for (let step = 1; step <= 8; step++) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: point.x + (200 - point.x) * step / 8, y: point.y + (700 - point.y) * step / 8 }] })
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
   await cdp.detach()
   await paint(page)
@@ -135,7 +143,29 @@ test('pointer cancellation and touch grip movement keep project selection separa
   assert.deepEqual(errors, [])
 })
 
-test('project panel follows its handle and both panels animate from their visual positions after dropping', { timeout: 30_000 }, async t => {
+test('a drag previews successive row and column destinations without remounting panels', { timeout: 30_000 }, async t => {
+  const fixture = await fixtureBundle(), browser = await connectTestBrowser()
+  t.after(() => browser.close())
+  const page = await browser.newPage({ viewport: { width: 1200, height: 900 }, reducedMotion: 'reduce' }), errors = await install(page, fixture)
+  await page.getByRole('button', { name: 'Add project panel', exact: true }).click()
+  await page.getByRole('textbox', { name: 'Draft a', exact: true }).fill('Kept across previews')
+  const grip = (await page.locator('[data-project-panel-handle="b"]').boundingBox())!
+  await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2); await page.mouse.down()
+  await page.mouse.move(200, 700, { steps: 5 }); await paint(page)
+  const a = page.locator('[data-project-panel="a"]')
+  assert.ok(await a.evaluate(element => parseFloat((element as HTMLElement).style.height)) < 870, 'row target is visible while dragging')
+  assert.deepEqual(await columns(page), [['a'], ['b']])
+  await page.mouse.move(25, 200, { steps: 5 }); await paint(page)
+  assert.equal(await a.evaluate(element => parseFloat((element as HTMLElement).style.left)), 404, 'moving again immediately previews a column target')
+  assert.deepEqual(await columns(page), [['a'], ['b']])
+  assert.deepEqual(await page.evaluate('window.mounts'), { a: 1, b: 1 })
+  assert.equal(await page.getByRole('textbox', { name: 'Draft a', exact: true }).inputValue(), 'Kept across previews')
+  await page.mouse.up(); await paint(page)
+  assert.deepEqual(await columns(page), [['b'], ['a']])
+  assert.deepEqual(errors, [])
+})
+
+test('project panels rearrange during a drag and commit only when dropped', { timeout: 30_000 }, async t => {
   const fixture = await fixtureBundle(), browser = await connectTestBrowser()
   t.after(() => browser.close())
   const page = await browser.newPage({ viewport: { width: 1200, height: 900 } }), errors = await install(page, fixture)
@@ -149,6 +179,20 @@ test('project panel follows its handle and both panels animate from their visual
   const dragged = (await second.boundingBox())!
   assert.ok(Math.abs(dragged.x - initial.x - (end.x - start.x)) < 2, 'panel tracks horizontal pointer motion')
   assert.ok(Math.abs(dragged.y - initial.y - (end.y - start.y)) < 2, 'panel tracks vertical pointer motion')
+  assert.deepEqual(await columns(page), [['a'], ['b']], 'preview does not persist the new order')
+  const preview = await page.locator('[data-project-panel="a"]').evaluate(element => {
+    const animation = element.getAnimations()[0]
+    if (!animation) return { left: parseFloat((element as HTMLElement).style.left), animation: false }
+    animation.pause()
+    const duration = Number(animation.effect!.getComputedTiming().duration)
+    const x = (time: number) => { animation.currentTime = time; return element.getBoundingClientRect().x }
+    const result = { left: parseFloat((element as HTMLElement).style.left), animation: true, start: x(0), middle: x(duration / 2), end: x(duration) }
+    animation.play()
+    return result
+  })
+  assert.equal(preview.left, 404, 'the displaced panel is already laid out in its new column')
+  assert.ok(preview.animation && preview.start !== undefined && preview.middle !== undefined && preview.end !== undefined, 'the displaced panel animates while the pointer is still down')
+  assert.ok(preview.middle > preview.start && preview.middle < preview.end, 'the displaced panel interpolates between positions')
   await page.mouse.up()
   assert.deepEqual(await columns(page), [['b'], ['a']])
   const positions = await page.locator('[data-project-panel]').evaluateAll(elements => elements.map(element => {
@@ -159,11 +203,8 @@ test('project panel follows its handle and both panels animate from their visual
     const position = (time: number) => { animation.currentTime = time; const rect = element.getBoundingClientRect(); return { x: rect.x, y: rect.y } }
     return { id: element.getAttribute('data-project-panel'), animation: true, duration, start: position(0), middle: position(duration / 2), end: position(duration) }
   }))
-  const a = positions.find(position => position.id === 'a')!, b = positions.find(position => position.id === 'b')!
-  assert.ok(a.animation && a.start && a.middle && a.end, 'displaced panel animates')
+  const b = positions.find(position => position.id === 'b')!
   assert.ok(b.animation && b.start && b.middle && b.end, 'dragged panel animates to its destination')
-  assert.ok(Math.abs(a.start.x) < 2, 'displaced panel starts at its original position')
-  assert.ok(a.middle.x > a.start.x && a.middle.x < a.end.x, 'displaced panel interpolates between positions')
   assert.ok(Math.abs(b.start.x - dragged.x) < 2 && Math.abs(b.start.y - dragged.y) < 2, 'drop starts at the last visible drag position')
   assert.ok(b.middle.y < b.start.y && b.middle.y > b.end.y, 'dragged panel settles smoothly')
   await finishPanelAnimations(page)
@@ -189,10 +230,11 @@ test('panel remains under the pointer as the board scrolls during a drag', { tim
   const dragged = (await second.boundingBox())!
   assert.ok(Math.abs(dragged.x - original.x - (end.x - start.x)) < 2, 'scrolling does not pull the panel away from the pointer')
   assert.ok(Math.abs(dragged.y - original.y - (end.y - start.y)) < 2)
-  const indicator = (await page.locator('.mew-project-board-drop').boundingBox())!
-  assert.ok(Math.abs(indicator.x - (1212 - scroll)) < 2, 'indicator reflects the destination after scrolling')
+  assert.deepEqual(await columns(page), [['a'], ['b'], ['c'], ['d']], 'scrolling previews without persisting')
+  assert.equal(await page.locator('[data-project-panel="c"]').evaluate(element => parseFloat((element as HTMLElement).style.left)), 404, 'the destination updates after scrolling')
+  const previewOrder = await page.locator('[data-project-panel]').evaluateAll(elements => elements.map(element => ({ id: element.getAttribute('data-project-panel'), x: parseFloat((element as HTMLElement).style.left), y: parseFloat((element as HTMLElement).style.top) })).sort((a, b) => a.x - b.x || a.y - b.y).map(item => [item.id]))
   await page.mouse.up(); await finishPanelAnimations(page)
-  assert.deepEqual(await columns(page), [['a'], ['c'], ['b'], ['d']], 'drop uses the destination shown after scrolling')
+  assert.deepEqual(await columns(page), previewOrder, 'drop commits the destination shown after scrolling')
   assert.deepEqual(errors, [])
 })
 
@@ -205,8 +247,10 @@ test('cancelled project panel movement returns smoothly without changing the boa
   const grip = (await page.locator('[data-project-panel-handle="b"]').boundingBox())!
   const start = { x: grip.x + grip.width / 2, y: grip.y + grip.height / 2 }
   await page.mouse.move(start.x, start.y); await page.mouse.down()
-  await page.mouse.move(start.x - 150, start.y + 100, { steps: 4 }); await paint(page)
+  await page.mouse.move(200, 700, { steps: 4 }); await paint(page)
   const dragged = (await second.boundingBox())!
+  assert.ok(await page.locator('[data-project-panel="a"]').evaluate(element => parseFloat((element as HTMLElement).style.height)) < original.height, 'row insertion previews before cancellation')
+  assert.deepEqual(await columns(page), [['a'], ['b']], 'the preview is not stored')
   await page.keyboard.press('Escape'); await page.mouse.up()
   assert.deepEqual(await columns(page), [['a'], ['b']])
   assert.equal(await page.locator('.mew-project-board-drop').count(), 0)
@@ -236,6 +280,8 @@ test('reduced motion keeps direct dragging and keyboard moves without settling a
   const start = { x: grip.x + grip.width / 2, y: grip.y + grip.height / 2 }, end = { x: 25, y: 200 }
   await page.mouse.move(start.x, start.y); await page.mouse.down(); await page.mouse.move(end.x, end.y, { steps: 5 }); await paint(page)
   assert.ok(Math.abs((await second.boundingBox())!.x - before.x - (end.x - start.x)) < 2, 'direct pointer tracking remains available')
+  assert.equal(await page.locator('[data-project-panel="a"]').evaluate(element => parseFloat((element as HTMLElement).style.left)), 404, 'reduced motion still previews the new order')
+  assert.equal(await page.locator('[data-project-panel]').evaluateAll(elements => elements.flatMap(element => element.getAnimations()).length), 0, 'preview has no animation when motion is reduced')
   await page.mouse.up(); await paint(page)
   assert.deepEqual(await columns(page), [['b'], ['a']])
   assert.equal(await page.locator('[data-project-panel]').evaluateAll(elements => elements.flatMap(element => element.getAnimations()).length), 0)
