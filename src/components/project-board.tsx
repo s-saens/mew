@@ -85,9 +85,11 @@ export function ProjectBoard(props: ProjectBoardProps) {
 
   useLayoutEffect(() => {
     if (!host) return
-    const measure = () => setViewport({ width: host.clientWidth, height: host.clientHeight })
-    const observer = new ResizeObserver(measure)
-    observer.observe(host); measure()
+    const observer = new ResizeObserver(([entry]) => {
+      const { width, height } = entry.contentRect
+      setViewport(previous => previous.width === width && previous.height === height ? previous : { width, height })
+    })
+    observer.observe(host)
     return () => observer.disconnect()
   }, [host])
 

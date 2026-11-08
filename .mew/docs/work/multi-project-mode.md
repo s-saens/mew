@@ -1,6 +1,6 @@
 ---
 title: "Multi-project mode implementation and verification"
-description: "Original design, staged implementation, and local verification of optional desktop multi-project mode. Records scoped requests and execution, retained compact workspaces, live panel rearrangement, lifecycle regressions, synthetic 1/3/10-panel measurements, database/operational limits, and selector and header follow-ups."
+description: "Original design, staged implementation, and local verification of optional desktop multi-project mode. Records scoped requests and execution, retained compact workspaces, fractional zoom sizing, live panel rearrangement, lifecycle regressions, synthetic measurements, operational limits, and selector and header follow-ups."
 created: "2026-11-06"
 updated: "2026-11-08"
 ---
@@ -227,3 +227,9 @@ The multi-project application Chromium fixture passed all 6 tests, including nar
 The panel movement follow-up previews the target arrangement during dragging, so surrounding panels move as the pointer crosses targets. Release commits the preview; Esc and pointer cancellation restore the original layout. The [feature contract](../features/appearance-accounts-operations/multi-project-mode.md#project-selection-movement-and-resizing) owns the interaction, and [UI workspace layout](../development/ui-workspace-layout.md#multi-project-board-and-compact-presentation) owns its implementation boundaries.
 
 Local verification passed: eight project-board browser tests, ten board model tests, six assembled multi-project browser tests, `npm run build`, and `npm run lint` with advisory warnings. The board tests cover live row and column previews, commit and cancellation, scrolling, reduced motion, and retained drafts. `npm run check:docs` validated 763 descriptions but reported 37 existing missing links outside the changed documents; the changed documents' links passed separately. The build retained its large-chunk advisory. The browser fixtures use mocked transport; physical-device behavior was not checked. No deployment or server lifecycle operation was performed. The build updates the assets served by a running instance.
+
+## Fractional board sizing — 2026-11-09
+
+The board previously rounded its available size to integer CSS pixels before assigning the surface and panel geometry. At fractional sizes this left a gap or overflow at the panel edge. It now uses the observed content-box dimensions and ignores unchanged measurements. The current geometry contract is in [UI workspace layout](../development/ui-workspace-layout.md#multi-project-board-and-compact-presentation).
+
+The new isolated Chromium regression failed before the change and passed afterward at CSS zoom 140% and 150%, sampling multiple frames and checking panel alignment and unwanted vertical scrolling at two fractional heights. All 25 project-board browser, board model, and assembled multi-project browser tests passed. `npm run build` and `npm run lint` passed with advisory warnings. `npm run check:docs` validated 764 descriptions and reported 37 existing missing links outside these changes. The fixture uses CSS zoom and mocked content; it does not establish the behavior of the reported live browser session. No deployment or server lifecycle operation was performed. The build updates assets served by a running instance.

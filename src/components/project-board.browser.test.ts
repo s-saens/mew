@@ -45,6 +45,36 @@ const finishPanelAnimations = async (page: Page) => {
   await page.locator('[data-project-panel]').evaluateAll(elements => elements.forEach(element => element.getAnimations().forEach(animation => animation.finish())))
 }
 
+test('fractional zoom keeps project panels aligned with the board without spurious scrolling', { timeout: 30_000 }, async t => {
+  const fixture = await fixtureBundle(), browser = await connectTestBrowser()
+  t.after(() => browser.close())
+  const page = await browser.newPage({ viewport: { width: 1300, height: 1000 } })
+  const errors = await install(page, fixture)
+  for (const zoom of [1.4, 1.5]) {
+    for (const height of [700.3, 700.7]) {
+      await page.locator('#root').evaluate((element, values) => {
+        element.style.zoom = String(values.zoom)
+        element.style.height = `${values.height}px`
+      }, { zoom, height })
+      const samples = await page.locator('[data-project-board]').evaluate(element => new Promise<{ board: number; panel: number; scrollHeight: number; clientHeight: number }[]>(resolve => {
+        const samples: { board: number; panel: number; scrollHeight: number; clientHeight: number }[] = []
+        const sample = () => {
+          const panel = element.querySelector('[data-project-panel]')!
+          samples.push({ board: element.getBoundingClientRect().bottom, panel: panel.getBoundingClientRect().bottom, scrollHeight: element.scrollHeight, clientHeight: element.clientHeight })
+          if (samples.length < 20) element.ownerDocument.defaultView!.requestAnimationFrame(sample)
+          else resolve(samples)
+        }
+        element.ownerDocument.defaultView!.requestAnimationFrame(sample)
+      }))
+      for (const sample of samples.slice(4)) {
+        assert.ok(Math.abs(sample.panel - sample.board) < 0.05, `panel must fit the fractional board at ${zoom} zoom: ${JSON.stringify(sample)}`)
+        assert.equal(sample.scrollHeight, sample.clientHeight, 'a fitting panel must not create vertical scrolling')
+      }
+    }
+  }
+  assert.deepEqual(errors, [])
+})
+
 test('board geometry, grip-only movement, accessible resizing, and mode changes retain live project hosts and drafts', { timeout: 45_000 }, async t => {
   const fixture = await fixtureBundle(), browser = await connectTestBrowser()
   t.after(() => browser.close())
