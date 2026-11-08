@@ -27,9 +27,12 @@ type DockContextValue = {
   followMaximize: (group: string) => void
 }
 const DockContext = createContext<DockContextValue | null>(null)
+const DockBodyVisibleContext = createContext(true)
 // Context and surfaces share one module so consumers cannot create mismatched providers.
 // eslint-disable-next-line react-refresh/only-export-components
 export const useDock = () => useContext(DockContext)
+// eslint-disable-next-line react-refresh/only-export-components
+export const useDockBodyVisible = () => useContext(DockBodyVisibleContext)
 const rectStyle = (r?: DockRect): CSSProperties => r ? { position: 'absolute', left: r.x, top: r.y, width: r.width, height: r.height } : { display: 'none' }
 
 export function DockWorkspace({ children, value, onChange, onEditorDrop, foreground, apiRef, initialLayout }: {
@@ -328,7 +331,7 @@ export function DockBody({ group, active, offset = 'calc(var(--spacing) * 9)', c
   } : { position: 'absolute' as const, inset: `${bodyOffset} 0 0`, zIndex: 11 }
   // Desktop bodies must not trap their menus/dialogs below sibling resize handles.
   // Their rectangles already exclude headers and separators; mobile still needs panel layering.
-  return createPortal(<div data-dock-body={group} data-workspace-panel={kind} className="flex min-h-0 min-w-0 flex-col overflow-hidden bg-surface-deep" onPointerDownCapture={onFocus} onFocusCapture={onFocus} style={{ ...style, zIndex: expanded ? 20 : dock.desktop ? undefined : 11, display: visible ? 'flex' : 'none' }}>{children}</div>, dock.host)
+  return createPortal(<div data-dock-body={group} data-workspace-panel={kind} className="flex min-h-0 min-w-0 flex-col overflow-hidden bg-surface-deep" onPointerDownCapture={onFocus} onFocusCapture={onFocus} style={{ ...style, zIndex: expanded ? 20 : dock.desktop ? undefined : 11, display: visible ? 'flex' : 'none' }}><DockBodyVisibleContext.Provider value={visible}>{children}</DockBodyVisibleContext.Provider></div>, dock.host)
 }
 export function DockGrip({ group }: { group: string }) {
   const dock = useDock()

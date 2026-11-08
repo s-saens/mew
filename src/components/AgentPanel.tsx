@@ -20,7 +20,7 @@ import { AgentConnectionWatch } from '../utils/agent-connection-watch.ts'
 import { createAgentTabsSync } from '../utils/agent-tabs-sync.ts'
 import { PanelCloseButton } from './panel-close-button'
 import { TabActionMenu } from './tab-action-menu'
-import { ConfirmDialog, HoverTipLayer, PanelNotice, useToast, canAutoFocusInput } from '@mew/ui'
+import { ConfirmDialog, DialogFrame, HoverTipLayer, PanelNotice, useToast, canAutoFocusInput } from '@mew/ui'
 import { historyCacheKey, readHistoryCache, writeHistoryCache, readQueueCache, writeQueueCache, type CachedQueue, type CachedHistory } from '../utils/agent-history-cache'
 import { mergeHistoryPage, appendHistoryEventInPlace } from '../utils/agent-history-state'
 import { useAgentWorkHistory } from '../hooks/use-agent-work-history'
@@ -39,7 +39,7 @@ import { uiText, getUiLocale } from '@mew/ui/i18n-core'
 import { useUiLocale } from '@mew/ui/i18n'
 import { createAgentNoticeTracker } from '../utils/mewcat-notification-rules'
 import { publishMewcatNotice, resolveMewcatNotice } from '../utils/mewcat-notifications'
-import { DockBody, DockGrip, DockInlineBody, DockPanel, useDock } from './DockWorkspace'
+import { DockBody, DockGrip, DockInlineBody, DockPanel, useDock, useDockBodyVisible } from './DockWorkspace'
 import { writeBrowserStorage } from '@mew/ui/browser-storage'
 import { LoginDesktopViewer } from './LoginDesktopViewer'
 // 터미널•에이전트패널 — ACP 채팅과 탭별 tmux TUI·셸을 한 탭 체계에서 연다.
@@ -2385,6 +2385,7 @@ function AgentSessionView({
   const workspaceViewRef = useRef(workspaceView)
   workspaceViewRef.current = workspaceView
   const desktop = useWorkspaceDesktop()
+  const dockBodyVisible = useDockBodyVisible()
   const uiLocale = useUiLocale()
   const { t } = useI18n()
   // 어느 프로젝트를 보고 있든 같은 창이다. 탭별 cwd는 워크스페이스 밖 경로도 될 수 있다(ADR 0077).
@@ -4307,7 +4308,7 @@ function AgentSessionView({
       {cli.error && <PanelNotice><HoverTipLayer className="flex items-center gap-2">{cli.error}{cli.readFailed && <button type="button" onClick={cli.retryRefresh} aria-label={uiText("다시 시도")} data-tip={uiText("다시 시도")} className="rounded p-1 text-ink-secondary hover:bg-surface-raised focus-visible:outline-2 focus-visible:outline-ink"><RefreshDouble width={16} height={16} aria-hidden="true" /></button>}</HoverTipLayer></PanelNotice>}
       </div>
 
-      {errorDetail && <AgentErrorDialog title={errorDetail.title} detail={errorDetail.detail} onClose={() => setErrorDetail(null)} />}
+      {errorDetail && visible && dockBodyVisible && workspaceView?.active !== false && <AgentErrorDialog title={errorDetail.title} detail={errorDetail.detail} onClose={() => setErrorDetail(null)} />}
       {commandPopup && <AgentCommandPopup key={commandPopup.id} command={commandPopup} onClose={() => setCommandPopupId(null)} onCancel={() => send({ type: 'cancel' })} onChanged={() => { void cli.refresh().catch(() => {}) }} />}
 
       {!historyPreview && connected && meta?.capacityRetry && <AgentCapacityRetryNotice state={meta.capacityRetry} now={now} onCancel={() => send({ type: 'cancel' })} />}
@@ -5338,25 +5339,12 @@ function AgentErrorButton({
 
 
 function AgentErrorDialog({ title, detail, onClose }: { title: string; detail: string; onClose: () => void }) {
-  const workspaceView = useWorkspaceView()
   useUiLocale()
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (!event.defaultPrevented && workspaceView?.active !== false && event.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onClose, workspaceView?.active])
+  const label = useId()
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4" onMouseDown={onClose}>
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label={uiText("에이전트 오류 상세")}
-        className="flex max-h-[80vh] w-full max-w-2xl flex-col overflow-hidden rounded-lg border border-edge-bright bg-surface shadow-xl"
-        onMouseDown={(event) => event.stopPropagation()}
-      >
+    <DialogFrame labelledBy={label} onClose={onClose} overlayClassName="p-4" className="flex max-h-[80vh] max-w-2xl flex-col rounded-lg">
+        <span id={label} className="sr-only">{uiText("에이전트 오류 상세")}</span>
         <div className="flex shrink-0 items-center gap-2 border-b border-edge px-3 py-2">
           <div className="min-w-0 flex-1 truncate text-sm font-medium text-ink">{title}</div>
           <CopyButton text={detail} label={uiText("오류 상세 복사")} />
@@ -5370,8 +5358,7 @@ function AgentErrorDialog({ title, detail, onClose }: { title: string; detail: s
           </button>
         </div>
         <pre className="min-h-0 flex-1 overflow-auto whitespace-pre-wrap break-words p-3 text-xs text-ink-secondary">{detail}</pre>
-      </div>
-    </div>
+    </DialogFrame>
   )
 }
 

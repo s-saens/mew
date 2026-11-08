@@ -1,8 +1,8 @@
 ---
 title: "UI overlays, selection controls, and menus"
-description: "Shared popup positioning, custom selection, layering, viewport-level toasts, dismissal, and action menus. Defines asynchronous History-guard handoffs, compact workspace menus, independent account settings, deferred dialogs, keyboard/touch behavior, and focus boundaries."
+description: "Shared popup positioning, custom selection, layering, viewport-level toasts and agent errors, dismissal, and action menus. Defines History-guard handoffs, settings, deferred dialogs, keyboard/touch behavior, and focus boundaries."
 created: "2026-11-03"
-updated: "2026-11-07"
+updated: "2026-11-09"
 상위파일: "ui-contracts.md"
 ---
 
@@ -93,6 +93,10 @@ Focus reorders existing floating windows without increasing levels on every clic
 Shared `Toast` messages portal to `document.body` at `var(--layer-notice, 1100)` so panel stacking contexts, transforms, and clipping cannot hide them behind Dock. Keep their fixed viewport position, pointer-event pass-through, polite live announcement, and automatic dismissal; they do not register with the dismissible overlay stack. `server/agent-build-verification-ui.test.ts` verifies overlapping Dock and toast paint order at desktop and mobile widths.
 
 The agent attachment image viewer is displayed through a `document.body` portal to escape panel transforms, local z-index values, and clipping areas. Its backdrop covers Dock and notifications, and Esc and mobile Back close only the topmost viewer through the shared `useOverlayDismiss`. Command editing modals also appear above Dock and regular notifications.
+
+Agent error details, including attachment failures, use the shared `DialogFrame` portal and modal layer so their backdrop and controls appear above Dock even inside project panels. Mount the dialog only while its agent tab, Dock body, and project view are visible; keep the error details available when that view is shown again. The shared frame owns focus containment, outside dismissal, Esc, and Back handling.
+
+When the Clipboard API is unavailable, the shared text-copy fallback places its temporary input in the focused dialog, if any. This keeps it inside the modal's focus boundary; remove it and restore the previous focus after copying.
 
 ## Settings window layer
 

@@ -11,16 +11,21 @@ export async function copyText(text: string): Promise<boolean> {
     }
   }
   try {
+    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    const container = previous?.closest('[role="dialog"]') ?? document.body
     const ta = document.createElement('textarea')
     ta.value = text
     ta.setAttribute('readonly', '')
     ta.style.position = 'fixed'
     ta.style.top = '-9999px'
-    document.body.appendChild(ta)
-    ta.select()
-    const ok = document.execCommand('copy')
-    ta.remove()
-    return ok
+    container.appendChild(ta)
+    try {
+      ta.select()
+      return document.execCommand('copy')
+    } finally {
+      ta.remove()
+      if (previous?.isConnected) previous.focus({ preventScroll: true })
+    }
   } catch {
     return false
   }
