@@ -1,6 +1,6 @@
 ---
 title: "Multi-project mode implementation and verification"
-description: "Original design, staged implementation, and local verification of optional desktop multi-project mode. Records scoped requests and execution, retained compact workspaces, handle-based geometry and panel movement animation, lifecycle regressions, synthetic 1/3/10-panel measurements, and database/operational limits."
+description: "Original design, staged implementation, and local verification of optional desktop multi-project mode. Records scoped requests and execution, retained compact workspaces, handle-based geometry and panel movement animation, lifecycle regressions, synthetic 1/3/10-panel measurements, database/operational limits, and the panel-scoped project selector follow-up."
 created: "2026-11-06"
 updated: "2026-11-08"
 ---
@@ -201,3 +201,9 @@ Light and midnight-gradient browser fixtures also confirmed three 400px panels, 
 The user reported that moving project panels felt abrupt and requested animation. The follow-up makes the dragged panel follow the pointer, animates settling and rearrangement after release, cancellation, or keyboard movement, and honors reduced-motion preferences. The current interaction contract belongs to [UI workspace layout](../development/ui-workspace-layout.md#multi-project-board-and-compact-presentation) and [Multi-project mode](../features/appearance-accounts-operations/multi-project-mode.md#project-selection-movement-and-resizing).
 
 Local verification passed: the project-board browser tests (7), board model tests (10), `npm run build`, and `npm run lint` (with advisory warnings). The browser tests cover direct tracking, drop and cancellation animation, keyboard movement, reduced motion, and scroll-aware placement. `npm run check:docs` passed all 761 descriptions but reported 37 preexisting missing links outside the changed documents; the changed documents' links passed separately. The build reported its existing large-chunk warning. These checks did not deploy or restart the application.
+
+## Panel-scoped project selector — 2026-11-08
+
+The project selector in multi-project mode previously covered the entire viewport. It now covers the invoking project panel, including its header, while other panels remain interactive. Activating another panel closes the selector; Esc closes it and restores focus to the project name. The [feature contract](../features/appearance-accounts-operations/multi-project-mode.md#project-selection-movement-and-resizing) owns the current behavior.
+
+Local Chromium checks passed in `src/workspace/multi-project-app.browser.test.ts` (4 tests), including panel bounds, another panel's editable input, Esc and focus restoration, and project selection. `src/workspace/workspace-view.browser.test.ts` passed (1 test). `npm run build` and `npm run lint` passed with advisory warnings. `npm run check:docs` checked all descriptions without errors but reported 37 preexisting missing links outside these changes. The checks use mocked workspace transport and do not establish physical-device behavior. No deployment or server lifecycle operation was performed; the build updates the assets served by a running instance.

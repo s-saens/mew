@@ -48,6 +48,7 @@
   padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
   box-shadow: none;
 }
+.mew-dialog.mew-project-selection-frame { position: absolute; inset: 0; z-index: 100; width: 100%; padding: 0; overflow: hidden; background: var(--color-surface); color: var(--color-ink); }
 .mew-mobile-project-panel .mew-project-sidebar-heading { height: 44px; }
 .mew-mobile-project-panel .mew-project-sidebar-heading button { width: 36px; height: 36px; }
 .mew-mobile-project-panel .mew-action-menu-item { min-height: 44px; }
