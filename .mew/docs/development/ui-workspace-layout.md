@@ -1,8 +1,8 @@
 ---
 title: "UI workspace panels, Dock, and gestures"
-description: "Workspace geometry, safe areas, Dock layout, tab motion, and mobile gestures. Defines separate single-project desktop, multi-project board/compact-view, and physical-mobile restoration, including stable project hosts and dedicated movement handles."
+description: "Workspace geometry, safe areas, Dock layout, tab motion, and mobile gestures. Defines separate single-project desktop, multi-project board/compact-view, and physical-mobile restoration, including stable project hosts, dedicated movement handles, and animated rearrangement."
 created: "2026-11-03"
-updated: "2026-11-07"
+updated: "2026-11-08"
 상위파일: "ui-contracts.md"
 ---
 
@@ -64,7 +64,7 @@ The desktop docking layout in this section is **single-project mode**. Layout al
 
 `WorkspaceApplication` owns mode selection, validated project handoffs, and retained view descriptors. `project-board.ts` is a pure model for columns, weighted rows, stable panel IDs, and geometry; `ProjectBoard` owns pointer/keyboard interaction and flat keyed host placement. Reordering, resizing, and mode changes move the same mounted project hosts. A confirmed project or worktree replacement changes the workspace controller after pending saves and task writes have crossed their close boundary.
 
-The project-name button opens project selection. Only the dedicated handle moves a project panel. Focusable column/row separators support pointer and keyboard resizing. The board begins with one 400px column; column/row minima are 280×240px, with scrolling when the viewport cannot fit them. New projects use available horizontal space, then a row in the active column. Selecting an already-open logical project focuses its existing panel.
+The project-name button opens project selection. Only the dedicated handle moves a project panel. During a drag, the mounted host follows the pointer. Animate the final placement and other affected hosts on drop, cancellation, and keyboard movement; reduced motion disables the settling animation but keeps direct tracking. Hit testing must use the board layout rather than animated visual offsets. Focusable column/row separators support pointer and keyboard resizing. The board begins with one 400px column; column/row minima are 280×240px, with scrolling when the viewport cannot fit them. New projects use available horizontal space, then a row in the active column. Selecting an already-open logical project focuses its existing panel.
 
 Mode and board records use `mew:workspace-mode:<encoded account>` and `mew:project-board:<encoded account>` under the existing instance/device browser-storage namespace. Compact project geometry and foreground records are separate from single-project desktop and physical-mobile records. Account document/agent tabs retain their logical-project ownership. An intentionally empty board stays empty after refresh. Physical mobile uses one workspace and leaves the saved desktop board intact.
 

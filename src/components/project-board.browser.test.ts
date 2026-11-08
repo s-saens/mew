@@ -40,6 +40,10 @@ async function install(page: Page, fixture: Awaited<ReturnType<typeof fixtureBun
 }
 const paint = (page: Page) => page.locator('body').evaluate(element => new Promise<void>(resolve => element.ownerDocument.defaultView!.requestAnimationFrame(() => element.ownerDocument.defaultView!.requestAnimationFrame(() => resolve()))))
 const columns = (page: Page) => page.evaluate('window.board.columns.map(column=>column.rows.map(row=>row.panelId))')
+const finishPanelAnimations = async (page: Page) => {
+  await paint(page)
+  await page.locator('[data-project-panel]').evaluateAll(elements => elements.forEach(element => element.getAnimations().forEach(animation => animation.finish())))
+}
 
 test('board geometry, grip-only movement, accessible resizing, and mode changes retain live project hosts and drafts', { timeout: 45_000 }, async t => {
   const fixture = await fixtureBundle(), browser = await connectTestBrowser()
@@ -69,6 +73,8 @@ test('board geometry, grip-only movement, accessible resizing, and mode changes 
   await handle.focus(); await handle.press('ArrowLeft')
   assert.deepEqual(await columns(page), [['b', 'a']])
   assert.deepEqual(await page.evaluate('window.mounts'), { a: 1, b: 1 })
+  assert.ok(await second.evaluate(element => element.getAnimations().length > 0), 'keyboard movement animates the panel')
+  await finishPanelAnimations(page)
   const beforeRow = (await second.boundingBox())!.height
   const rowResize = page.getByRole('separator', { name: 'Resize project rows', exact: true })
   await rowResize.focus(); await rowResize.press('ArrowDown')
@@ -88,7 +94,7 @@ test('board geometry, grip-only movement, accessible resizing, and mode changes 
 
   await page.getByRole('button', { name: 'Switch mode', exact: true }).click()
   assert.equal(await first.isVisible(), false)
-  assert.equal((await second.boundingBox())!.width, 1600)
+  assert.ok(Math.abs((await second.boundingBox())!.width - 1600) < 0.01)
   assert.equal(await handle.isVisible(), false)
   await page.getByRole('textbox', { name: 'Draft b', exact: true }).fill('Edited in single mode')
   await page.getByRole('button', { name: 'Switch mode', exact: true }).click()
@@ -115,6 +121,7 @@ test('pointer cancellation and touch grip movement keep project selection separa
   await page.keyboard.press('Escape'); await page.mouse.up()
   assert.deepEqual(await columns(page), [['a'], ['b']])
   assert.equal(await page.locator('.mew-project-board-drop').count(), 0)
+  await finishPanelAnimations(page)
   const cdp = await page.context().newCDPSession(page)
   const point = { x: grip.x + 10, y: grip.y + 12 }
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point] })
@@ -125,6 +132,117 @@ test('pointer cancellation and touch grip movement keep project selection separa
   assert.deepEqual(await columns(page), [['a', 'b']])
   assert.deepEqual(await page.evaluate('window.selected'), [])
   assert.deepEqual(await page.evaluate('window.mounts'), { a: 1, b: 1 })
+  assert.deepEqual(errors, [])
+})
+
+test('project panel follows its handle and both panels animate from their visual positions after dropping', { timeout: 30_000 }, async t => {
+  const fixture = await fixtureBundle(), browser = await connectTestBrowser()
+  t.after(() => browser.close())
+  const page = await browser.newPage({ viewport: { width: 1200, height: 900 } }), errors = await install(page, fixture)
+  await page.getByRole('button', { name: 'Add project panel', exact: true }).click()
+  const second = page.locator('[data-project-panel="b"]')
+  await page.getByRole('textbox', { name: 'Draft b', exact: true }).fill('Unsent while moving')
+  const initial = (await second.boundingBox())!, grip = (await page.locator('[data-project-panel-handle="b"]').boundingBox())!
+  const start = { x: grip.x + grip.width / 2, y: grip.y + grip.height / 2 }, end = { x: 25, y: 200 }
+  await page.mouse.move(start.x, start.y); await page.mouse.down()
+  await page.mouse.move(end.x, end.y, { steps: 5 }); await paint(page)
+  const dragged = (await second.boundingBox())!
+  assert.ok(Math.abs(dragged.x - initial.x - (end.x - start.x)) < 2, 'panel tracks horizontal pointer motion')
+  assert.ok(Math.abs(dragged.y - initial.y - (end.y - start.y)) < 2, 'panel tracks vertical pointer motion')
+  await page.mouse.up()
+  assert.deepEqual(await columns(page), [['b'], ['a']])
+  const positions = await page.locator('[data-project-panel]').evaluateAll(elements => elements.map(element => {
+    const animation = element.getAnimations()[0]
+    if (!animation) return { id: element.getAttribute('data-project-panel'), animation: false }
+    animation.pause()
+    const duration = Number(animation.effect!.getComputedTiming().duration)
+    const position = (time: number) => { animation.currentTime = time; const rect = element.getBoundingClientRect(); return { x: rect.x, y: rect.y } }
+    return { id: element.getAttribute('data-project-panel'), animation: true, duration, start: position(0), middle: position(duration / 2), end: position(duration) }
+  }))
+  const a = positions.find(position => position.id === 'a')!, b = positions.find(position => position.id === 'b')!
+  assert.ok(a.animation && a.start && a.middle && a.end, 'displaced panel animates')
+  assert.ok(b.animation && b.start && b.middle && b.end, 'dragged panel animates to its destination')
+  assert.ok(Math.abs(a.start.x) < 2, 'displaced panel starts at its original position')
+  assert.ok(a.middle.x > a.start.x && a.middle.x < a.end.x, 'displaced panel interpolates between positions')
+  assert.ok(Math.abs(b.start.x - dragged.x) < 2 && Math.abs(b.start.y - dragged.y) < 2, 'drop starts at the last visible drag position')
+  assert.ok(b.middle.y < b.start.y && b.middle.y > b.end.y, 'dragged panel settles smoothly')
+  await finishPanelAnimations(page)
+  assert.equal(await page.getByRole('textbox', { name: 'Draft b', exact: true }).inputValue(), 'Unsent while moving')
+  assert.deepEqual(await page.evaluate('window.mounts'), { a: 1, b: 1 })
+  assert.deepEqual(errors, [])
+})
+
+test('panel remains under the pointer as the board scrolls during a drag', { timeout: 30_000 }, async t => {
+  const fixture = await fixtureBundle(), browser = await connectTestBrowser()
+  t.after(() => browser.close())
+  const page = await browser.newPage({ viewport: { width: 1200, height: 900 } }), errors = await install(page, fixture)
+  const add = page.getByRole('button', { name: 'Add project panel', exact: true })
+  await add.click(); await add.click(); await add.click()
+  const board = page.locator('[data-project-board]'), second = page.locator('[data-project-panel="b"]')
+  await board.evaluate(element => { element.scrollLeft = 0 })
+  const original = (await second.boundingBox())!, grip = (await page.locator('[data-project-panel-handle="b"]').boundingBox())!
+  const start = { x: grip.x + grip.width / 2, y: grip.y + grip.height / 2 }, end = { x: 1190, y: 200 }
+  await page.mouse.move(start.x, start.y); await page.mouse.down()
+  await page.mouse.move(end.x, end.y, { steps: 8 }); await page.mouse.move(end.x, end.y); await paint(page)
+  const scroll = await board.evaluate(element => element.scrollLeft)
+  assert.ok(scroll >= 32, 'dragging near the edge scrolls across the column boundary')
+  const dragged = (await second.boundingBox())!
+  assert.ok(Math.abs(dragged.x - original.x - (end.x - start.x)) < 2, 'scrolling does not pull the panel away from the pointer')
+  assert.ok(Math.abs(dragged.y - original.y - (end.y - start.y)) < 2)
+  const indicator = (await page.locator('.mew-project-board-drop').boundingBox())!
+  assert.ok(Math.abs(indicator.x - (1212 - scroll)) < 2, 'indicator reflects the destination after scrolling')
+  await page.mouse.up(); await finishPanelAnimations(page)
+  assert.deepEqual(await columns(page), [['a'], ['c'], ['b'], ['d']], 'drop uses the destination shown after scrolling')
+  assert.deepEqual(errors, [])
+})
+
+test('cancelled project panel movement returns smoothly without changing the board', { timeout: 30_000 }, async t => {
+  const fixture = await fixtureBundle(), browser = await connectTestBrowser()
+  t.after(() => browser.close())
+  const page = await browser.newPage({ viewport: { width: 1200, height: 900 } }), errors = await install(page, fixture)
+  await page.getByRole('button', { name: 'Add project panel', exact: true }).click()
+  const second = page.locator('[data-project-panel="b"]'), original = (await second.boundingBox())!
+  const grip = (await page.locator('[data-project-panel-handle="b"]').boundingBox())!
+  const start = { x: grip.x + grip.width / 2, y: grip.y + grip.height / 2 }
+  await page.mouse.move(start.x, start.y); await page.mouse.down()
+  await page.mouse.move(start.x - 150, start.y + 100, { steps: 4 }); await paint(page)
+  const dragged = (await second.boundingBox())!
+  await page.keyboard.press('Escape'); await page.mouse.up()
+  assert.deepEqual(await columns(page), [['a'], ['b']])
+  assert.equal(await page.locator('.mew-project-board-drop').count(), 0)
+  const positions = await second.evaluate(element => {
+    const animation = element.getAnimations()[0]
+    if (!animation) return null
+    animation.pause()
+    const duration = Number(animation.effect!.getComputedTiming().duration)
+    const position = (time: number) => { animation.currentTime = time; const rect = element.getBoundingClientRect(); return { x: rect.x, y: rect.y } }
+    return { start: position(0), middle: position(duration / 2), end: position(duration) }
+  })
+  assert.ok(positions, 'cancelled panel animates back')
+  assert.ok(Math.abs(positions.start.x - dragged.x) < 2 && Math.abs(positions.start.y - dragged.y) < 2)
+  assert.ok(positions.middle.x > positions.start.x && positions.middle.x < positions.end.x)
+  assert.ok(Math.abs(positions.end.x - original.x) < 2 && Math.abs(positions.end.y - original.y) < 2)
+  await finishPanelAnimations(page)
+  assert.deepEqual(errors, [])
+})
+
+test('reduced motion keeps direct dragging and keyboard moves without settling animations', { timeout: 30_000 }, async t => {
+  const fixture = await fixtureBundle(), browser = await connectTestBrowser()
+  t.after(() => browser.close())
+  const page = await browser.newPage({ viewport: { width: 1200, height: 900 }, reducedMotion: 'reduce' }), errors = await install(page, fixture)
+  await page.getByRole('button', { name: 'Add project panel', exact: true }).click()
+  const second = page.locator('[data-project-panel="b"]'), before = (await second.boundingBox())!
+  const grip = (await page.locator('[data-project-panel-handle="b"]').boundingBox())!
+  const start = { x: grip.x + grip.width / 2, y: grip.y + grip.height / 2 }, end = { x: 25, y: 200 }
+  await page.mouse.move(start.x, start.y); await page.mouse.down(); await page.mouse.move(end.x, end.y, { steps: 5 }); await paint(page)
+  assert.ok(Math.abs((await second.boundingBox())!.x - before.x - (end.x - start.x)) < 2, 'direct pointer tracking remains available')
+  await page.mouse.up(); await paint(page)
+  assert.deepEqual(await columns(page), [['b'], ['a']])
+  assert.equal(await page.locator('[data-project-panel]').evaluateAll(elements => elements.flatMap(element => element.getAnimations()).length), 0)
+  const handle = page.getByRole('button', { name: 'Move project panel: B', exact: true })
+  await handle.focus(); await handle.press('ArrowRight'); await paint(page)
+  assert.deepEqual(await columns(page), [['b', 'a']])
+  assert.equal(await page.locator('[data-project-panel]').evaluateAll(elements => elements.flatMap(element => element.getAnimations()).length), 0)
   assert.deepEqual(errors, [])
 })
 

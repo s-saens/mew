@@ -1,8 +1,8 @@
 ---
 title: "Multi-project mode implementation and verification"
-description: "Original design, staged implementation, and local verification of optional desktop multi-project mode. Records scoped requests and execution, retained compact workspaces, handle-based geometry, lifecycle regressions, synthetic 1/3/10-panel measurements, and database/operational limits."
+description: "Original design, staged implementation, and local verification of optional desktop multi-project mode. Records scoped requests and execution, retained compact workspaces, handle-based geometry and panel movement animation, lifecycle regressions, synthetic 1/3/10-panel measurements, and database/operational limits."
 created: "2026-11-06"
-updated: "2026-11-07"
+updated: "2026-11-08"
 ---
 
 # Multi-project mode implementation plan
@@ -195,3 +195,9 @@ Light and midnight-gradient browser fixtures also confirmed three 400px panels, 
 - `npm run lint`: passed with no errors; React and other advisory warnings remain. Focused new fixture lint and `git diff --check` also passed.
 - `npm run check:docs`: 751 descriptions passed with zero metadata errors. Global link validation remains blocked by 37 preexisting missing MOC/README targets outside this task's changed documents. The changed documents' local links were checked separately.
 - Final task-path and staged-diff review exclude unrelated work. The commit includes the feature's source, regression tests, canonical contracts, ADR update, user guide, and this work record. No push or operational application is part of the task.
+
+## Panel movement follow-up — 2026-11-08
+
+The user reported that moving project panels felt abrupt and requested animation. The follow-up makes the dragged panel follow the pointer, animates settling and rearrangement after release, cancellation, or keyboard movement, and honors reduced-motion preferences. The current interaction contract belongs to [UI workspace layout](../development/ui-workspace-layout.md#multi-project-board-and-compact-presentation) and [Multi-project mode](../features/appearance-accounts-operations/multi-project-mode.md#project-selection-movement-and-resizing).
+
+Local verification passed: the project-board browser tests (7), board model tests (10), `npm run build`, and `npm run lint` (with advisory warnings). The browser tests cover direct tracking, drop and cancellation animation, keyboard movement, reduced motion, and scroll-aware placement. `npm run check:docs` passed all 761 descriptions but reported 37 preexisting missing links outside the changed documents; the changed documents' links passed separately. The build reported its existing large-chunk warning. These checks did not deploy or restart the application.

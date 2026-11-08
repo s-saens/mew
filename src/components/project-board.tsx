@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ComponentProps, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import { Plus } from 'iconoir-react'
+import { reorderLayoutRect, useReorderAnimation } from '@mew/ui'
 import { PanelCloseButton } from './panel-close-button'
 import { PROJECT_BOARD_GAP, PROJECT_PANEL_MIN_WIDTH, projectBoardGeometry, projectBoardReducer, type ProjectBoardDestination, type ProjectBoardPanel, type ProjectBoardState } from '../utils/project-board'
 import './project-board.css'
@@ -36,6 +37,13 @@ type Gesture = {
   element: HTMLElement
   startX: number
   startY: number
+  clientX: number
+  clientY: number
+  scrollX: number
+  scrollY: number
+  offsetX: number
+  offsetY: number
+  panel: HTMLElement | null
   state: ProjectBoardState
 } & GestureDetail
 
@@ -57,6 +65,14 @@ export function ProjectBoard(props: ProjectBoardProps) {
   useLayoutEffect(() => { latest.current = props })
   const registerPanel = useCallback((id: string, element: HTMLElement | null) => latest.current.onPanelElement?.(id, element), [])
   const geometry = projectBoardGeometry(value, viewport)
+  const captureReorder = useReorderAnimation(() => host?.querySelectorAll<HTMLElement>('[data-project-panel]:not([hidden])') ?? [])
+
+  const updateDraggedPanel = (current: Gesture, board: HTMLDivElement) => {
+    if (current.kind !== 'move' || !current.panel) return
+    const x = current.clientX - current.startX + board.scrollLeft - current.scrollX + current.offsetX
+    const y = current.clientY - current.startY + board.scrollTop - current.scrollY + current.offsetY
+    current.panel.style.translate = `${x}px ${y}px`
+  }
 
   useLayoutEffect(() => {
     if (!host) return
@@ -66,10 +82,24 @@ export function ProjectBoard(props: ProjectBoardProps) {
     return () => observer.disconnect()
   }, [host])
 
-  const cancelGesture = () => {
+  const change = (action: Parameters<typeof projectBoardReducer>[1], animate = false) => {
+    const current = latest.current
+    const next = projectBoardReducer(current.value, action)
+    if (next !== current.value) {
+      if (animate) captureReorder()
+      current.onChange(next)
+    }
+  }
+
+  const cancelGesture = (action?: Parameters<typeof projectBoardReducer>[1]) => {
     const current = gesture.current
     if (!current) return
     gesture.current = null
+    if (current.kind === 'move' && (current.moved || current.offsetX || current.offsetY)) {
+      captureReorder()
+      if (current.panel) current.panel.style.translate = ''
+    }
+    if (action) change(action)
     if (current?.element.hasPointerCapture(current.pointerId)) current.element.releasePointerCapture(current.pointerId)
     setDrop(null); setMoving(null)
   }
@@ -82,6 +112,7 @@ export function ProjectBoard(props: ProjectBoardProps) {
       window.removeEventListener('keydown', key, true)
       window.removeEventListener('blur', cancel)
       const current = gesture.current
+      if (current?.panel) current.panel.style.translate = ''
       if (current?.element.hasPointerCapture(current.pointerId)) current.element.releasePointerCapture(current.pointerId)
     }
   }, [])
@@ -94,11 +125,6 @@ export function ProjectBoard(props: ProjectBoardProps) {
     if (current?.kind === 'move' && !ids.has(current.panelId)) cancelGesture()
   }, [value.panels])
 
-  const change = (action: Parameters<typeof projectBoardReducer>[1]) => {
-    const current = latest.current
-    const next = projectBoardReducer(current.value, action)
-    if (next !== current.value) current.onChange(next)
-  }
   const destinationAt = (x: number, y: number) => {
     if (!host) return null
     const bounds = host.getBoundingClientRect()
@@ -120,12 +146,38 @@ export function ProjectBoard(props: ProjectBoardProps) {
     if (!lastRect || localX > lastRect.x + lastRect.width) return { destination: { type: 'column' as const, index: value.columns.length }, style: { left: lastRect ? lastRect.x + lastRect.width + PROJECT_BOARD_GAP : 0, top: 0, width: 4, height: geometry.height } }
     return null
   }
+  const updateDrop = (x: number, y: number) => {
+    const target = destinationAt(x, y)
+    setDrop(previous => previous?.style.left === target?.style.left && previous?.style.top === target?.style.top && previous?.style.width === target?.style.width && previous?.style.height === target?.style.height ? previous : target)
+  }
+  const updateDropRef = useRef(updateDrop)
+  useLayoutEffect(() => { updateDropRef.current = updateDrop })
+  useEffect(() => {
+    if (!host) return
+    const scroll = () => {
+      const current = gesture.current
+      if (current?.kind !== 'move' || !current.moved) return
+      updateDraggedPanel(current, host)
+      updateDropRef.current(current.clientX, current.clientY)
+    }
+    host.addEventListener('scroll', scroll)
+    return () => host.removeEventListener('scroll', scroll)
+  }, [host])
+
   const begin = (event: ReactPointerEvent<HTMLElement>, detail: GestureDetail) => {
     if (event.button !== 0 || !event.isPrimary) return
     event.preventDefault(); event.stopPropagation()
     cancelGesture()
     event.currentTarget.setPointerCapture(event.pointerId)
-    gesture.current = { ...detail, pointerId: event.pointerId, element: event.currentTarget, startX: event.clientX, startY: event.clientY, state: latest.current.value } as Gesture
+    const panel = detail.kind === 'move' ? event.currentTarget.closest<HTMLElement>('[data-project-panel]') : null
+    let offsetX = 0, offsetY = 0
+    if (panel) {
+      const visual = panel.getBoundingClientRect(), layout = reorderLayoutRect(panel)
+      offsetX = visual.x - layout.x; offsetY = visual.y - layout.y
+      for (const animation of panel.getAnimations()) animation.cancel()
+      if (offsetX || offsetY) { panel.style.translate = `${offsetX}px ${offsetY}px`; setMoving(detail.kind === 'move' ? detail.panelId : null) }
+    }
+    gesture.current = { ...detail, pointerId: event.pointerId, element: event.currentTarget, startX: event.clientX, startY: event.clientY, clientX: event.clientX, clientY: event.clientY, scrollX: host?.scrollLeft ?? 0, scrollY: host?.scrollTop ?? 0, offsetX, offsetY, panel, state: latest.current.value } as Gesture
   }
   const pointerMove = (event: ReactPointerEvent<HTMLElement>) => {
     const current = gesture.current
@@ -134,11 +186,14 @@ export function ProjectBoard(props: ProjectBoardProps) {
     const dx = event.clientX - current.startX, dy = event.clientY - current.startY
     if (current.kind === 'move') {
       if (!current.moved && Math.hypot(dx, dy) < 5) return
-      current.moved = true; setMoving(current.panelId); setDrop(destinationAt(event.clientX, event.clientY))
+      if (!current.moved) { current.moved = true; setMoving(current.panelId) }
+      current.clientX = event.clientX; current.clientY = event.clientY
       if (host) {
         const bounds = host.getBoundingClientRect()
         host.scrollBy({ left: event.clientX > bounds.right - 36 ? 16 : event.clientX < bounds.left + 36 ? -16 : 0, top: event.clientY > bounds.bottom - 36 ? 16 : event.clientY < bounds.top + 36 ? -16 : 0 })
+        updateDraggedPanel(current, host)
       }
+      updateDrop(event.clientX, event.clientY)
     } else {
       const next = projectBoardReducer(current.state, current.kind === 'column' ? { type: 'column-width', columnId: current.columnId, width: current.width + dx } : { type: 'row-resize', columnId: current.columnId, rowIndex: current.rowIndex, delta: dy, height: current.height })
       latest.current.onChange(next)
@@ -149,12 +204,15 @@ export function ProjectBoard(props: ProjectBoardProps) {
     if (!current || current.pointerId !== event.pointerId) return
     event.preventDefault(); event.stopPropagation()
     if (current.kind === 'move' && current.moved) {
+      current.clientX = event.clientX; current.clientY = event.clientY
+      if (host) updateDraggedPanel(current, host)
       const target = destinationAt(event.clientX, event.clientY)
-      if (target) change({ type: 'move', panelId: current.panelId, destination: target.destination })
+      cancelGesture(target ? { type: 'move', panelId: current.panelId, destination: target.destination } : undefined)
+      return
     }
     cancelGesture()
   }
-  const pointerProps = { onPointerMove: pointerMove, onPointerUp: pointerUp, onPointerCancel: cancelGesture, onLostPointerCapture: cancelGesture }
+  const pointerProps = { onPointerMove: pointerMove, onPointerUp: pointerUp, onPointerCancel: () => cancelGesture(), onLostPointerCapture: () => cancelGesture() }
   const active = presentation === 'single' && singlePanelId ? singlePanelId : value.activePanelId ?? value.panels[0]?.id
   const boardIds = new Set(value.panels.map(panel => panel.id))
   const panelIds = new Set(boardIds)
@@ -177,7 +235,7 @@ export function ProjectBoard(props: ProjectBoardProps) {
                 if (event.nativeEvent.isComposing || !event.key.startsWith('Arrow')) return
                 const direction = ({ ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down' } as const)[event.key]
                 if (!direction) return
-                event.preventDefault(); event.stopPropagation(); change({ type: 'move-direction', panelId: panel.id, direction })
+                event.preventDefault(); event.stopPropagation(); change({ type: 'move-direction', panelId: panel.id, direction }, true)
               }}>
               <svg width="12" height="16" viewBox="0 0 12 16" fill="currentColor" aria-hidden="true">{[4, 8, 12].map(y => <g key={y}><circle cx="4" cy={y} r="1" /><circle cx="8" cy={y} r="1" /></g>)}</svg>
             </button>
