@@ -1,7 +1,7 @@
 ---
 title: "Document Editing and Storage Formats"
-description: "Explains document and file editing, previews, mobile navigation, grouped workspace menu, notification history, explorer toolbar and floating editor database actions outside the Dock, and fullscreen controls."
-updated: "2026-11-07"
+description: "Explains document and file editing, attachment storage and Git behavior, previews, mobile navigation, workspace controls, and fullscreen."
+updated: "2026-11-09"
 상위파일:
   - "MOC.md"
 ---
@@ -68,7 +68,7 @@ Relative paths for Markdown images are resolved from the current document's fold
 - Check the destination in the link tooltip. Title and description previews for external sites are currently disabled. Pasting a supported YouTube URL inserts a video node, but playback requires [deployment policy updates](../../.mew/docs/work/deployment-readiness-review.md) because the production CSP does not allow external frames.
 - In Hotview, type `/` and select **Upload File**, or drag a file into the body. Pasting images from the clipboard is also supported. Use an inserted image's resize handles to change its display size.
 - To draw an image in an editable project document, type `/paint` or `/그림` and select **Drawing Editor**. Use **Pen** (`B`) for freehand strokes or **Bézier Pen** (`P`) for curves, and adjust **Stroke Width** beside the lower controls. **Snap Settings**, opened with the magnet button, controls grid visibility, grid spacing, grid snapping, object snapping, and its distance. Hold Alt to bypass snapping; freehand strokes always follow the pointer. **Save** inserts a transparent PNG where the command was entered. Failed uploads keep the drawing available for retry. This document entry point does not require agent access or save editable SVG history. See the [drawing board contract](../../.mew/docs/features/terminals-agents-automation/agent-drawing-editor.md).
-- Body attachments are saved in the project's `.mew/assets/`. Dropping a file in the file explorer saves it in the selected folder under its original name. Conflict handling, shared links, and Git integration follow the [drag-and-drop contract](#dragging-and-dropping-file-explorer-items).
+- Body attachments are saved in the project's `.mew/temp/assets/`. Dropping a file in the file explorer saves it in the selected folder under its original name. Conflict handling, shared links, and Git integration follow the [drag-and-drop contract](#dragging-and-dropping-file-explorer-items).
 
 ## Editing and Copying Tables
 
@@ -198,9 +198,9 @@ When dragging a file or folder, **the meaning depends on where it is dropped**. 
 
 - **During** `dragover`, `getData()` **always returns an empty string** (DataTransfer protected mode). Determine whether the target can accept the drag with `hasPathDrag` (= checking `types`), and read the value (`pathFromDrag`) only during `drop`. Getting this wrong prevents `preventDefault` from being called, so the drop itself never occurs.
 - `effectAllowed` is `copyMove` — allowing only `move` causes editors and terminals that accept drops with `dropEffect='copy'` to reject the drop entirely. Folders in the tree explicitly specify `move` in their own `dragover` handlers to preserve the original meaning.
-- The editor intercepts drags **only when the dedicated MIME type is present**. Images and text dragged in from outside are uploaded to the project's `.mew/assets/` and inserted into the content as links. `/api/asset` links containing a UUID filename and project ID also check file viewing permissions. Guest shares also require viewing permission for the attachment path. New assets that Git does not ignore are automatically committed to the project repository, and migration of the existing 22 R2 links to `.mew/assets/` is complete.
+- The editor intercepts drags **only when the dedicated MIME type is present**. Images and text dragged in from outside are uploaded to the project's `.mew/temp/assets/` and inserted into the content as links. `/api/asset` links containing a UUID filename and project ID also check file viewing permissions. Guest shares also require viewing permission for the attachment path. Temporary uploads are saved without an automatic Git stage or commit; if `.mew/temp/` is not ignored, they may appear as untracked files. Existing `.mew/assets/` links remain readable; the earlier migration of 22 R2 links to that directory is complete.
 
-**Dragging files from outside (the system file explorer) into the file explorer** **saves the files as-is** in the drop folder (empty area = project root) (`POST /api/upload-into`, multipart `file` and `destDir`). This is detected by checking for `'Files'` in `dataTransfer.types`, and only then is `dropEffect='copy'` set. If a name conflicts, the server uses `이름 copy` to avoid it. Multiple dropped files are uploaded **sequentially** (concurrent uploads would select the same available name). Editor content drops save files under UUID names in `.mew/assets/`, whereas file explorer drops preserve the bytes and original names in the drop folder and commit them to Git.
+**Dragging files from outside (the system file explorer) into the file explorer** **saves the files as-is** in the drop folder (empty area = project root) (`POST /api/upload-into`, multipart `file` and `destDir`). This is detected by checking for `'Files'` in `dataTransfer.types`, and only then is `dropEffect='copy'` set. If a name conflicts, the server uses `이름 copy` to avoid it. Multiple dropped files are uploaded **sequentially** (concurrent uploads would select the same available name). Editor content drops use UUID names in `.mew/temp/assets/`. File explorer drops preserve the original bytes and names; outside the temporary attachment directory, the existing incidental Git commit rules apply.
 
 ## Table column widths (.mew/table-layout.json)
 

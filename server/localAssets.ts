@@ -20,6 +20,12 @@ const MIME_EXTENSIONS: Record<string, string> = {
   'video/webm': '.webm',
 }
 
+/** Temporary attachments are stored independently of Git's automatic file commits. */
+export function isTemporaryAssetPath(relPath: string): boolean {
+  const normalized = path.normalize(relPath.replace(/^\/+/, ''))
+  return normalized.startsWith(`${path.normalize(ASSET_DIR)}${path.sep}`)
+}
+
 /** 공개 asset URL이 임의 프로젝트 파일을 읽는 통로가 되지 않도록 UUID 파일만 허용한다. */
 export function isLocalAssetPath(relPath: string): boolean {
   const normalized = relPath.replace(/\\/g, '/')

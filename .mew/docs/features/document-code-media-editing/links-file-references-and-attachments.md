@@ -4,11 +4,11 @@ parent: "mew-editor"
 title: "Links, file references, and attachments"
 status: "implemented"
 created: "2026-09-18"
-updated: "2026-11-01"
+updated: "2026-11-09"
 status_hash: "7de6eaf2f2c15edc7c1f36bdcbbfd8639072863ca76586cd4dcc07f7c56c6cc2"
 files: ["packages/editor/src/editor/LinkTooltip.tsx", "packages/editor/src/editor/file-link.ts", "packages/editor/src/editor/editor.css", "packages/editor/src/ResizableImage.tsx", "packages/editor/src/MediaNodes.ts", "src/components/EditorPane.tsx", "src/utils/editor-image-url.ts", "packages/editor/src/editor/image-source-context.ts", "packages/editor/src/Editor.tsx", "packages/editor/src/types.ts"]
 commits: []
-description: "A feature contract covering Markdown link insertion and editing, internal document navigation with Back/Forward pinned to the upper-left editor edge, querying candidates across all folders and prefix autocomplete for Hotview @ file mentions, passing line ranges, and attachments. Explains internal file link display and selection, path resolution outside Docs and the project, relative image paths and source preservation, attachment permissions, and YouTube playback restrictions."
+description: "Markdown links, file references, and attachments in the editor. Covers navigation, file mentions, relative image paths, attachment permissions, temporary upload storage and Git behavior, and playback restrictions."
 상위파일:
   - "MOC.md"
   - "_document-code-media-editing.md"
@@ -30,6 +30,7 @@ description: "A feature contract covering Markdown link insertion and editing, i
 
 - Inserting a YouTube node and allowing actual playback are separate; deployment CSP restrictions remain.
 - Viewing an attachment also requires file permissions for the attachment itself.
+- New editor attachments are stored under `.mew/temp/assets/` without an incidental Git stage or commit. The project may ignore that directory; otherwise the files can appear as untracked changes. See [Decision 0159](../../decisions/0159-temporary-attachment-git-boundary.md).
 
 ### Detailed contracts
 

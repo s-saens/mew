@@ -4,11 +4,11 @@ parent: "mew-agents"
 title: "Agent Input, Mentions, Skills, and Attachments"
 status: "implemented"
 created: "2026-09-18"
-updated: "2026-11-07"
+updated: "2026-11-09"
 status_hash: "a10e27bcc06cebe98975858548ff907b5953bfbcf197fe2ef971d9294144858f"
 files: ["src/components/AgentPanel.tsx", "src/components/agent-execution-toggles.tsx", "src/hooks/use-agent-execution-options.ts", "shared/agent-execution-options.ts", "src/components/agent-document-tag.tsx", "src/utils/agent-attachments.ts", "src/components/agent-prompt-drafts.tsx", "src/utils/agent-saved-prompts.ts", "src/components/MentionTextarea.tsx", "src/components/agent-composer-input.tsx", "src/components/agent-composer-documents.tsx", "src/components/agent-composer-attachments.tsx", "src/components/agent-media-preview-dialog.tsx", "src/utils/agent-composer-document.ts", "src/components/drawing/DrawingEditor.tsx", "src/utils/clipboard-images.ts", "src/utils/agentInputMentions.ts", "server/skills.ts"]
 commits: []
-description: "Agent input mentions, document reference tags with optional visible titles, skill selection, attachments, media previews, and drawing integration. Covers atomic reference editing, deferred rich input, drafts and history, reference storage and compatibility, queue editing, CLI mode, keyboard submission, and floating composer actions with input clearing and inline relative scheduling, plus Build/Deploy toggles beside CLI mode that preserve mobile keyboard visibility."
+description: "Agent input mentions, document reference tags, skills, attachments, media previews, and drawing integration. Covers temporary attachment storage without incidental Git commits, atomic editing, drafts and queues, CLI mode, keyboard submission, and composer controls."
 상위파일:
   - "MOC.md"
   - "_terminals-agents-automation.md"
@@ -131,7 +131,7 @@ A newly entered `! ` at the very beginning of the input removes the two characte
 
 Switch modes only once even if CodeMirror sends duplicate document and cursor change notifications for the same input before React renders. When processing the prefix, set the opposite of the current mode rather than toggling the mode again for each notification.
 
-Store new attachments in `.mew/temp/assets/`. Continue recognizing historical `.mew/assets/` and `.mew/files/` references, and do not automatically move or delete existing files. Git exclusion follows the `.mew/temp` rule registered in the project's `.gitignore`.
+Store new attachments in `.mew/temp/assets/`. Continue recognizing historical `.mew/assets/` and `.mew/files/` references, and do not automatically move or delete existing files. Uploading a temporary attachment does not stage it or create a Git commit, even when the project does not ignore that path. Projects can exclude `.mew/temp/` through `.gitignore`; otherwise the files may appear as untracked changes. See [Decision 0159](../../decisions/0159-temporary-attachment-git-boundary.md).
 
 <!-- mew:implementation:start -->
 ## Implementation details

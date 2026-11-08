@@ -1,8 +1,8 @@
 ---
 title: "Per-account Git connections and execution"
 created: 2026-09-29
-updated: "2026-11-03"
-description: "Per-account GitHub authorization, encrypted storage, and Git command boundaries. Covers author identity, OAuth cleanup and refresh races, scoped credentials, managed GitHub/GitLab cloning, connected repository pagination, and general-agent commit attribution."
+updated: "2026-11-09"
+description: "Per-account GitHub authorization, encrypted storage, and Git command boundaries. Covers author identity, scoped credentials, incidental commits and the temporary attachment exception, managed cloning, and general-agent commit attribution."
 상위파일: "MOC.md"
 ---
 
@@ -37,7 +37,7 @@ description: "Per-account GitHub authorization, encrypted storage, and Git comma
 
 - Pass the requesting user's author identity per regular, per-file, or AI commit, and committer identity for cherry-pick/revert. GitHub ID/login form `ID+login@users.noreply.github.com`; never modify shared `user.name`/`user.email`. Cherry-picks retain the original author under Git rules.
 - The `simple-git` 4 environment allowlist admits only server-defined author/committer names/emails and AI's temporary `GIT_INDEX_FILE`. Remove inherited `GIT_*`, editor, pager, and authentication-token variables before adding account identity. Retain safeguards for command execution, configuration includes, and abbreviated options. Remote authentication separately adds a server-owned credential socket/fixed configuration path and uses the existing `execFile` route.
-- Incidental commits for creation, copying, moving, deletion, uploads, and replacement require a connected account. Otherwise, or for unsupported remotes, perform the file operation without committing. Explicit save/history-restoration commits check the connection before writing; per-file commits exclude other staged files.
+- Incidental commits for creation, copying, moving, deletion, uploads, and replacement require a connected account. Otherwise, or for unsupported remotes, perform the file operation without committing. Uploads under `.mew/temp/assets/` do not stage or commit files, regardless of the Git connection or ignore rules; see [Decision 0159](../decisions/0159-temporary-attachment-git-boundary.md). Explicit save/history-restoration commits check the connection before writing; per-file commits exclude other staged files.
 - Title bar branch creation and switching (`GET/POST /api/git/branches`) are local operations that check the Git capability, access to all project files, and the workspace in POST requests. They do not require a GitHub connection or remote lookup. Only actual local, remote, and tag refs from `for-each-ref` are allowed as a base; commit hashes are validated separately. `switch` runs without forced switching or stash. Selecting a remote branch directly creates a tracking local branch; creating a differently named branch with a specified base does not automatically set an upstream. Duplicate Pull/Push and branch operations on the same repository are blocked.
 - Account selection follows the branch’s upstream remote → origin → sole remote order. Local repositories without a remote use the GitHub connection. Ambiguity among multiple remotes requires configuration.
 - Pull/Push checks the registered provider and host of the actual fetch/push URL. GitHub SSH addresses are normalized to HTTPS at execution time without changing stored remotes. Arbitrary hosts, local paths, embedded credentials, multiple push URLs, and repository URL rewriting are rejected.

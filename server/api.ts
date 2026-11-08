@@ -68,7 +68,7 @@ import { lintContent } from './lint.ts'
 import { parseTitle } from './frontmatter.ts'
 import { noteAppWrite } from './appWrites.ts'
 import { updateLinkLabelsFor } from './links.ts'
-import { ASSET_DIR, isLocalAssetPath, moveAssetIntoProject } from './localAssets.ts'
+import { ASSET_DIR, isLocalAssetPath, isTemporaryAssetPath, moveAssetIntoProject } from './localAssets.ts'
 import { DATA_DIR } from './dataDir.ts'
 import { createTmuxManager, createTmuxRouter } from '@mew/tmux-term/server'
 import { CmdButtonError, commandSessionName, normalizeCmdButtons, oneShotCommand, readCmdButtons, writeCmdButtons } from './cmdButtons.ts'
@@ -2205,7 +2205,6 @@ export function createApiApp() {
       const relPath = moveAssetIntoProject(project, file.path, file.originalname, file.mimetype)
       noteFileContentChanged(project, relPath)
       await refreshCatalogPaths(project, [relPath])
-      await commitFile(project, relPath, 'add', `${project}: upload ${relPath}`)
       res.json({ path: relPath, name: file.originalname, mimetype: file.mimetype })
     } catch (err) {
       handleError(res, err)
@@ -2257,7 +2256,7 @@ export function createApiApp() {
       await refreshDocumentDatabaseReferences(project, [relPath])
       noteFileContentChanged(project, relPath)
       await refreshCatalogPaths(project, [relPath])
-      const commit = await commitFile(project, relPath, 'add', `${project}: upload ${relPath}`)
+      const commit = isTemporaryAssetPath(relPath) ? null : await commitFile(project, relPath, 'add', `${project}: upload ${relPath}`)
       res.json({ ok: true, relPath, commit, hidden: hiddenFromTree(req, relPath) })
     } catch (err) {
       handleError(res, err)
