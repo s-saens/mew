@@ -139,6 +139,7 @@ test('real workspace controllers isolate same-name editor saves and preserve dra
     await page.goto(origin)
     const alpha = page.getByRole('textbox', { name: 'Editor /alpha', exact: true })
     await alpha.waitFor()
+    await page.waitForFunction(`document.querySelector('[aria-label="Editor /alpha"]')?.value === 'Alpha original'`)
     assert.equal(await alpha.inputValue(), 'Alpha original')
     const layout = page.getByRole('button', { name: /Layout|레이아웃/ }).first()
     await layout.click()
@@ -147,7 +148,7 @@ test('real workspace controllers isolate same-name editor saves and preserve dra
     await page.locator('[data-project-board][data-presentation="board"]').waitFor()
     const add = async (root: string) => {
       await page.locator('.mew-project-board-add').click()
-      await page.locator(`[data-catalog-project="${root}"] .mew-project-catalog-open`).click()
+      await page.locator('[data-project-draft]').locator(`[data-project-option="${root}"]`).click()
       await page.getByRole('textbox', { name: 'Editor ' + root, exact: true }).waitFor()
     }
     await add('/beta'); await add('/gamma')
@@ -226,6 +227,65 @@ test('real workspace controllers isolate same-name editor saves and preserve dra
     const state = await page.locator('[data-project-panel]').evaluateAll(elements => elements.map(element => ({ project: element.getAttribute('data-project-path'), active: element.getAttribute('data-active'), selectedTool: element.querySelector('.mobile-dock [aria-current]')?.getAttribute('data-dock-item') })))
     throw new Error(`${String(error)}\nState: ${JSON.stringify(state)}\nPage errors: ${errors.join('\n')}\nConsole errors: ${consoleErrors.join('\n')}\nRecent requests: ${requests.slice(-30).join(', ')}`, { cause: error })
   } finally { releaseSave() }
+})
+
+test('adding a project opens a panel-scoped picker and handles cancellation and duplicate selection', { timeout: 45_000 }, async t => {
+  const fixture = await bundleOnce(), browser = await connectTestBrowser()
+  t.after(() => browser.close())
+  const page = await browser.newPage({ viewport: { width: 1700, height: 1000 } })
+  const { errors, consoleErrors } = await installApp(page, fixture)
+  await page.goto(origin)
+  const alpha = page.getByRole('textbox', { name: 'Editor /alpha', exact: true })
+  await alpha.waitFor()
+  await page.getByRole('button', { name: /Layout|레이아웃/ }).first().click()
+  await page.getByRole('button', { name: /멀티프로젝트모드|Multi.project mode/ }).first().click()
+  await page.locator('[data-project-board][data-presentation="board"]').waitFor()
+  const add = page.locator('.mew-project-board-add')
+  const draft = page.locator('[data-project-draft]')
+  const picker = draft.locator('[data-mobile-project-panel]')
+  const alphaPanel = page.locator('[data-project-panel][data-project-path="/alpha"]')
+  const openPicker = async () => {
+    await add.click()
+    await picker.waitFor()
+    assert.equal(await draft.count(), 1, 'adding creates a single draft project panel')
+    assert.equal(await page.locator('[role="dialog"][aria-modal="true"]').count(), 0, 'the picker does not block the workspace')
+    const panelBox = await draft.boundingBox(), pickerBox = await picker.boundingBox()
+    assert.ok(panelBox && pickerBox)
+    assert.ok(Math.abs(pickerBox.x - panelBox.x) <= 1 && Math.abs(pickerBox.y - panelBox.y) <= 1, 'the picker covers its project panel from the header')
+    assert.ok(Math.abs(pickerBox.width - panelBox.width) <= 2 && Math.abs(pickerBox.height - panelBox.height) <= 2, 'the picker stays inside its project panel')
+  }
+  await openPicker()
+  await alpha.fill('Alpha remains editable')
+  assert.equal(await alpha.inputValue(), 'Alpha remains editable', 'other project panels remain interactive')
+  assert.equal(await picker.isVisible(), true, 'the draft remains available when another panel is used')
+  await picker.getByRole('button', { name: 'All', exact: true }).click()
+  await picker.locator('[data-project-catalog]').waitFor()
+  await picker.getByRole('textbox', { name: 'Search projects', exact: true }).focus()
+  await page.keyboard.press('Escape')
+  await draft.waitFor({ state: 'detached' })
+  assert.equal(await alphaPanel.isVisible(), true, 'cancelling leaves the existing project panel intact')
+
+  await openPicker()
+  await picker.locator('[data-project-option="/alpha"]').click()
+  await draft.waitFor({ state: 'detached' })
+  assert.equal(await page.locator('[data-project-panel][data-project-path="/alpha"]').count(), 1, 'an existing project is not duplicated')
+  assert.equal(await alphaPanel.getAttribute('data-active'), 'true', 'selecting an existing project focuses its panel')
+  assert.equal(await alpha.inputValue(), 'Alpha remains editable')
+
+  await openPicker()
+  await page.keyboard.press('Alt+2')
+  await draft.waitFor({ state: 'detached' })
+  const beta = page.locator('[data-project-panel][data-project-path="/beta"]')
+  await beta.getByRole('textbox', { name: 'Editor /beta', exact: true }).waitFor()
+  assert.equal(await beta.getAttribute('data-active'), 'true', 'selecting a new project activates the new panel')
+  assert.equal(await alpha.inputValue(), 'Alpha remains editable')
+  await openPicker()
+  await page.reload()
+  await page.locator('[data-project-panel][data-project-path="/beta"]').waitFor()
+  assert.equal(await draft.count(), 0, 'an unselected draft panel is not restored after reload')
+  assert.equal(await page.locator('[data-project-panel][data-project-path="/alpha"]').count(), 1)
+  assert.deepEqual(errors, [])
+  assert.deepEqual(consoleErrors.filter(message => !message.includes('favicon')), [])
 })
 
 test('actual workspace mode round trips retain separate seeded chrome and the same editor draft', { timeout: 40_000 }, async t => {
@@ -314,7 +374,7 @@ test('synthetic one, three, and ten project measurements retain one header and o
       const root = projectRoots[index]
       if (index) {
         await page.locator('.mew-project-board-add').click()
-        await page.locator(`[data-catalog-project="${root}"] .mew-project-catalog-open`).click()
+        await page.locator('[data-project-draft]').locator(`[data-project-option="${root}"]`).click()
         await page.getByRole('textbox', { name: 'Editor ' + root, exact: true }).waitFor()
       }
       if (![1, 3, 10].includes(index + 1)) continue

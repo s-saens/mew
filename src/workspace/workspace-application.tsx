@@ -6,6 +6,7 @@ import { useI18n } from '../i18n'
 import { createWorkspaceClient, workspaceClient, type WorkspaceInfo } from '../api/client'
 import { WorkspaceApiProvider } from '../api/workspace-api-context'
 import { ProjectBoard } from '../components/project-board'
+import { ProjectDraftSelector } from '../components/project-draft-selector'
 import { DeferredProjectCatalogPanel as ProjectCatalogPanel } from '../components/deferred-project-catalog'
 import { ProjectIcon } from '../components/ProjectIcon'
 import { CommandButtonMenu } from '../components/CommandButtonMenu'
@@ -93,6 +94,8 @@ export function WorkspaceApplication({ account, guest, renderWorkspace }: Props)
   const [failed, setFailed] = useState('')
   const [board, setBoard] = useState<ProjectBoardState>(() => createProjectBoard())
   const [retained, setRetained] = useState<ProjectBoardPanel[]>([])
+  const [draft, setDraft] = useState<{ panel: ProjectBoardPanel; board: ProjectBoardState } | null>(null)
+  const draftRef = useRef(draft)
   const [singleId, setSingleId] = useState<string | null>(null)
   const [legacyScope, setLegacyScope] = useState<Pick<ProjectBoardPanel, 'projectPath' | 'workingRoot'> | null>(null)
   const [legacyReady, setLegacyReady] = useState(false)
@@ -205,6 +208,8 @@ export function WorkspaceApplication({ account, guest, renderWorkspace }: Props)
     setSingleId(selected.id)
   }, [multi, legacyScope, board.panels, retained, singleId])
   const changeMode = useCallback((next: WorkspaceMode) => {
+    draftRef.current = null
+    setDraft(null)
     const request = ++modeSequence.current
     const state = current.current
     if (next === 'multi') {
@@ -231,6 +236,7 @@ export function WorkspaceApplication({ account, guest, renderWorkspace }: Props)
   }, [account, boardInitialized, showToast, acceptLegacySelection, beginLegacyHandoff])
 
   const navigate = async (panel: ProjectBoardPanel, path: string, exactRoot = false, workingRoot?: string) => {
+    if (draftRef.current) { draftRef.current = null; setDraft(null) }
     const request = (selectionSequence.current.get(panel.id) ?? 0) + 1
     selectionSequence.current.set(panel.id, request)
     const state = current.current
@@ -263,26 +269,63 @@ export function WorkspaceApplication({ account, guest, renderWorkspace }: Props)
     const finish = beginPanelChange(id)
     try {
       release = await handles.current.get(id)?.prepareClose()
-      setBoard(value => projectBoardReducer(value, { type: 'remove', panelId: id }))
+      const pending = draftRef.current
+      if (pending) updateBoard(projectBoardReducer(pending.board, { type: 'remove', panelId: id }))
+      else setBoard(value => projectBoardReducer(value, { type: 'remove', panelId: id }))
       setRetained(value => value.filter(panel => panel.id !== id))
       if (current.current.singleId === id) setSingleId(null)
     } catch (error) { showToast(error instanceof Error ? error.message : String(error)) }
     finally { release?.(); finish() }
   }
+  const cancelDraft = () => {
+    draftRef.current = null
+    setDraft(null)
+  }
+  const startDraft = () => {
+    if (draftRef.current) return
+    const id = uuid()
+    const panel = { id, projectPath: `draft:${id}`, workingRoot: `draft:${id}` }
+    const next = { panel, board: projectBoardReducer(current.current.board, { type: 'add', panel, availableWidth: headerHost?.clientWidth }) }
+    draftRef.current = next
+    setDraft(next)
+  }
+  const updateBoard = (next: ProjectBoardState) => {
+    const pending = draftRef.current
+    if (!pending) { setBoard(next); return }
+    const updated = { ...pending, board: next }
+    draftRef.current = updated
+    setDraft(updated)
+    setBoard(projectBoardReducer(next, { type: 'remove', panelId: pending.panel.id }))
+  }
   const addProject = async (path: string) => {
+    const pending = draftRef.current
+    if (!pending) return false
+    const focusExisting = (id: string) => {
+      const next = projectBoardReducer(projectBoardReducer(pending.board, { type: 'remove', panelId: pending.panel.id }), { type: 'focus', panelId: id })
+      draftRef.current = null; setDraft(null); setBoard(next)
+      return true
+    }
     const existing = current.current.board.panels.find(panel => panel.projectPath === path)
-    if (existing) { setBoard(value => projectBoardReducer(value, { type: 'focus', panelId: existing.id })); setAdding(false); return true }
-    setOpening(true)
+    if (existing) return focusExisting(existing.id)
     try {
       const client = createWorkspaceClient({ workspacePath: path, projectPath: path })
       const info = await client.fetchWorkspace()
-      const next = current.current.retained.find(panel => panel.projectPath === (info.projectPath ?? info.path) && panel.workingRoot === info.path) ?? panelFor(info)
-      setBoard(value => projectBoardReducer(value, { type: 'add', panel: next, availableWidth: headerHost?.clientWidth }))
-      setBoardInitialized(true); setAdding(false); return true
+      if (draftRef.current?.panel.id !== pending.panel.id) return false
+      const latest = draftRef.current
+      const duplicate = current.current.board.panels.find(panel => panel.projectPath === (info.projectPath ?? info.path))
+      if (duplicate) {
+        const next = projectBoardReducer(projectBoardReducer(latest.board, { type: 'remove', panelId: pending.panel.id }), { type: 'focus', panelId: duplicate.id })
+        draftRef.current = null; setDraft(null); setBoard(next); return true
+      }
+      const selected = current.current.retained.find(panel => panel.projectPath === (info.projectPath ?? info.path) && panel.workingRoot === info.path) ?? { ...panelFor(info), id: pending.panel.id }
+      const next: ProjectBoardState = { ...latest.board, panels: latest.board.panels.map(panel => panel.id === pending.panel.id ? selected : panel),
+        columns: latest.board.columns.map(column => ({ ...column, rows: column.rows.map(row => row.panelId === pending.panel.id ? { ...row, panelId: selected.id } : row) })), activePanelId: selected.id }
+      draftRef.current = null; setDraft(null); setRetained(value => value.filter(panel => panel.id !== selected.id)); setBoard(next)
+      setBoardInitialized(true); return true
     } catch (error) { showToast(error instanceof Error ? error.message : String(error)); return false }
-    finally { setOpening(false) }
   }
   const routeAction = async (origin: ProjectBoardPanel, action: MewcatAction) => {
+    if (draftRef.current) cancelDraft()
     const requestedRoot = action.kind === 'open_panel' ? null : action.kind === 'open_project' ? action.path : action.projectRoot
     const state = current.current
     const panels = [...state.board.panels, ...state.retained]
@@ -314,6 +357,10 @@ export function WorkspaceApplication({ account, guest, renderWorkspace }: Props)
   const activeId = multi ? board.activePanelId : singlePanel?.id ?? null
   const ownerId = board.panels[0]?.id ?? retained[0]?.id
   const renderPanel = (panel: ProjectBoardPanel) => {
+    if (draft?.panel.id === panel.id) return <ProjectDraftSelector paths={services.projects.paths} icons={services.projects.icons}
+      basePath={initial.path} canUseAgent={!!services.capabilities?.agent} canManageFolders={services.role === 'owner' || services.role === 'manager'} onOpen={addProject} onClose={cancelDraft}
+      beforeMutation={async () => { await services.projects.saveQueue.current }} restoreFocus={restoreActiveFocus}
+      onProjectsChanged={async () => { const { state } = await workspaceClient.fetchRootProjectTabs(); services.projects.setPaths(state?.paths ?? []) }} />
     const host: ProjectWorkspaceHost = {
       id: panel.id, panel, active: panel.id === activeId, compact: multi, mode, headerHost,
       selectionSignal: selection[panel.id] ?? 0, globalOwner: panel.id === ownerId,
@@ -322,6 +369,7 @@ export function WorkspaceApplication({ account, guest, renderWorkspace }: Props)
       onScopeChanged: info => {
         const logical = info.projectPath ?? info.path
         if (logical === panel.projectPath && info.path === panel.workingRoot) return
+        if (draftRef.current) cancelDraft()
         const destination = { projectPath: logical, workingRoot: info.path }
         const state = current.current
         if (!multi && panel.id === state.singleId) {
@@ -341,18 +389,18 @@ export function WorkspaceApplication({ account, guest, renderWorkspace }: Props)
     {!activeId && <div className="flex h-11 items-center justify-end border-b border-edge px-2">
       <button type="button" className="px-2 py-1 text-xs" onClick={() => changeMode('single')}>{uiText('싱글프로젝트모드')}</button>
     </div>}
-    <ProjectBoard value={board} retainedPanels={retained} singlePanelId={singleId} onChange={setBoard} presentation={multi ? 'board' : 'single'}
-      renderPanel={renderPanel} getPanelLabel={panel => label(panel.projectPath)} onPanelElement={registerElement}
+    <ProjectBoard value={draft?.board ?? board} retainedPanels={retained} singlePanelId={singleId} onChange={updateBoard} presentation={multi ? 'board' : 'single'}
+      renderPanel={renderPanel} isDraft={panel => panel.id === draft?.panel.id} getPanelLabel={panel => panel.id === draft?.panel.id ? uiText('프로젝트 선택') : label(panel.projectPath)} onPanelElement={registerElement}
       renderProjectIcon={panel => <ProjectIcon icon={services.projects.icons[panel.projectPath] ?? 'i:folder'} size={14} />}
-      renderHeaderActions={services.capabilities?.terminal ? panel => <ProjectHeaderCommands panel={panel} active={multi && panel.id === activeId} /> : undefined}
+      renderHeaderActions={services.capabilities?.terminal ? panel => panel.id === draft?.panel.id ? null : <ProjectHeaderCommands panel={panel} active={multi && panel.id === activeId} /> : undefined}
       onSelectProject={id => setSelection(value => ({ ...value, [id]: (value[id] ?? 0) + 1 }))}
-      onClosePanel={id => { void closePanel(id) }} onAdd={() => { setReplacing(null); setAdding(true) }}
+      onClosePanel={id => { if (draft?.panel.id === id) cancelDraft(); else void closePanel(id) }} onAdd={startDraft}
       labels={{ board: uiText('프로젝트 패널'), add: uiText('프로젝트 패널 추가'), select: uiText('프로젝트 선택'), close: uiText('프로젝트 패널 닫기'), move: uiText('프로젝트 패널 이동'), resizeColumn: uiText('프로젝트 패널 너비 조절'), resizeRow: uiText('프로젝트 패널 높이 조절') }} />
     {adding && <DialogFrame labelledBy={selectorTitle} busy={opening} restoreFocus={restoreActiveFocus} onClose={() => { if (!opening) setAdding(false) }} className="flex max-h-[80dvh] max-w-xl flex-col">
       <header className="flex h-9 items-center border-b border-edge px-2"><span id={selectorTitle} className="flex-1 text-sm">{uiText('프로젝트 선택패널')}</span><PanelCloseButton onClick={() => setAdding(false)} disabled={opening} aria-label={t('common.close')} /></header>
       <ProjectCatalogPanel paths={services.projects.paths} onOpen={async path => {
         const panel = replacing && [...current.current.board.panels, ...current.current.retained].find(candidate => candidate.id === replacing)
-        if (!panel) return addProject(path)
+        if (!panel) return false
         const opened = await navigate(panel, path)
         if (opened) setAdding(false)
         return opened

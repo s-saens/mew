@@ -29,6 +29,7 @@ export type ProjectBoardProps = {
   renderHeaderActions?: (panel: ProjectBoardPanel) => ReactNode
   onClosePanel?: (panelId: string) => void
   onPanelElement?: (panelId: string, element: HTMLElement | null) => void
+  isDraft?: (panel: ProjectBoardPanel) => boolean
   children?: ReactNode
 }
 type GestureDetail = { kind: 'move'; panelId: string; moved: boolean } | { kind: 'column'; columnId: string; width: number } | { kind: 'row'; columnId: string; rowIndex: number; height: number }
@@ -224,7 +225,7 @@ export function ProjectBoard(props: ProjectBoardProps) {
       {panels.map(panel => {
         const label = getPanelLabel(panel), visible = presentation === 'board' ? boardIds.has(panel.id) : panel.id === active
         const rect = geometry.rects[panel.id]
-        return <ProjectPanelHost key={panel.id} panelId={panel.id} onPanelElement={registerPanel} data-project-panel={panel.id} data-project-path={panel.projectPath} data-active={panel.id === active || undefined} data-moving={moving === panel.id || undefined}
+        return <ProjectPanelHost key={panel.id} panelId={panel.id} onPanelElement={registerPanel} data-project-panel={panel.id} data-project-draft={props.isDraft?.(panel) || undefined} data-project-path={panel.projectPath} data-active={panel.id === active || undefined} data-moving={moving === panel.id || undefined}
           className="mew-project-board-panel" aria-label={label} hidden={!visible}
           style={presentation === 'single' ? { inset: 0 } : rect ? rectStyle(rect) : { display: 'none' }}
           onPointerDownCapture={() => change({ type: 'focus', panelId: panel.id })} onFocusCapture={() => change({ type: 'focus', panelId: panel.id })}>

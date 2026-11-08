@@ -137,7 +137,7 @@ export function ProjectSwitcher({ paths, activePath, pendingPath, fallbackLabel,
   useEffect(() => {
     if (!active) return
     const select = (event: KeyboardEvent) => {
-      if (event.defaultPrevented || !canOpen) return
+      if (event.defaultPrevented || !canOpen || event.target instanceof Element && event.target.closest('[data-project-draft]')) return
       const chooseMenu = event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey && !event.isComposing
         && (event.code === 'KeyP' || event.key.toLowerCase() === 'p')
       const index = projectTabIndex(event)

@@ -33,9 +33,9 @@ function useAccountServices(auth: AuthStatus) {
   useChatNotifications(capabilities.chat, auth.email)
   useEffect(() => { applyFontPreferences(fontPreferences); saveFontPreferences(fontPreferences) }, [fontPreferences])
   useEffect(() => { saveMewcatSkin(mewcatSkin) }, [mewcatSkin])
-  const value = useMemo(() => ({ capabilities, themeSettings, setThemeSettings, fontPreferences, setFontPreferences, mewcatSkin, setMewcatSkin,
+  const value = useMemo(() => ({ role: auth.role, capabilities, themeSettings, setThemeSettings, fontPreferences, setFontPreferences, mewcatSkin, setMewcatSkin,
     mewcatHideDesktop, setMewcatHideDesktop, projects }),
-  [capabilities, themeSettings, setThemeSettings, fontPreferences, mewcatSkin, mewcatHideDesktop, projects])
+  [auth.role, capabilities, themeSettings, setThemeSettings, fontPreferences, mewcatSkin, mewcatHideDesktop, projects])
   return { value, toast }
 }
 

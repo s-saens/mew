@@ -1,7 +1,7 @@
 ---
 title: "Projects and file navigation"
 description: "Explains single- and multi-project desktop modes, independent project panels with movement handles, and project selection through My/All. Covers setup, personal shortcuts, permanent deletion, project hierarchy, files, Git, tasks, and the multi-project database limitation."
-updated: "2026-11-07"
+updated: "2026-11-08"
 상위파일:
   - "MOC.md"
 ---
@@ -51,7 +51,7 @@ Open **Layout** in the top bar to choose **Single-project mode** or **Multi-proj
 
 The mode choices appear when the server supports concurrent workspaces. After a source update, the operator must load the updated server code as well as build the browser assets; an older server continues to show the existing single-project layout.
 
-Multi-project mode starts with the current project in one narrow, full-height panel on the left. Use **Add project panel** in the empty area to choose another registered project. Each panel has its own bottom Dock, so one project can show an agent while another shows Git or a document. Resources, active sessions, Layout, fullscreen, and the menu remain in one shared top bar; panels share the page background.
+Multi-project mode starts with the current project in one narrow, full-height panel on the left. Use **Add project panel** in the empty area to open a new panel, then choose a project in its My/All selector. Close the selector to discard the unselected panel. Choosing an already-open project focuses its existing panel. Each panel has its own bottom Dock, so one project can show an agent while another shows Git or a document. Resources, active sessions, Layout, fullscreen, and the menu remain in one shared top bar; panels share the page background.
 
 - Click the project name to open that panel's **project selection panel**. Selecting a project already open elsewhere focuses its existing panel.
 - Drag the six-dot handle to move the panel between columns or rows. Arrow keys on the handle also move it. Drag a boundary, or focus it and use arrow keys, to resize.

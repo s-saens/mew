@@ -1,6 +1,6 @@
 ---
 title: "Multi-project mode implementation and verification"
-description: "Original design, staged implementation, and local verification of optional desktop multi-project mode. Records scoped requests and execution, retained compact workspaces, handle-based geometry and panel movement animation, lifecycle regressions, synthetic 1/3/10-panel measurements, database/operational limits, and the panel-scoped project selector follow-up."
+description: "Original design, staged implementation, and local verification of optional desktop multi-project mode. Records scoped requests and execution, retained compact workspaces, handle-based geometry and panel movement animation, lifecycle regressions, synthetic 1/3/10-panel measurements, database/operational limits, and the panel-scoped selector and new-panel creation follow-ups."
 created: "2026-11-06"
 updated: "2026-11-08"
 ---
@@ -207,3 +207,10 @@ Local verification passed: the project-board browser tests (7), board model test
 The project selector in multi-project mode previously covered the entire viewport. It now covers the invoking project panel, including its header, while other panels remain interactive. Activating another panel closes the selector; Esc closes it and restores focus to the project name. The [feature contract](../features/appearance-accounts-operations/multi-project-mode.md#project-selection-movement-and-resizing) owns the current behavior.
 
 Local Chromium checks passed in `src/workspace/multi-project-app.browser.test.ts` (4 tests), including panel bounds, another panel's editable input, Esc and focus restoration, and project selection. `src/workspace/workspace-view.browser.test.ts` passed (1 test). `npm run build` and `npm run lint` passed with advisory warnings. `npm run check:docs` checked all descriptions without errors but reported 37 preexisting missing links outside these changes. The checks use mocked workspace transport and do not establish physical-device behavior. No deployment or server lifecycle operation was performed; the build updates the assets served by a running instance.
+
+
+## New panel selection — 2026-11-08
+
+The board's add action now creates an unselected panel first and shows the My/All project selector and setup action inside it. Selection opens the project in that slot; cancellation removes the temporary panel, and a duplicate selection focuses the existing project. Temporary panels are excluded from saved layouts. The [feature contract](../features/appearance-accounts-operations/multi-project-mode.md#project-selection-movement-and-resizing) owns the current behavior.
+
+Local Chromium checks passed in the multi-project application and workspace application fixtures (17 tests), covering the panel bounds, other-panel editing, cancellation, duplicates, selection, reload, and adding to an empty board. Project-board browser and model tests passed (17 tests). `npm run build` and `npm run lint` passed with advisory warnings. `npm run check:docs` passed description validation but reported 37 existing missing links outside these changes. Browser fixtures use mocked transport; physical-device behavior was not checked. No deployment or server lifecycle operation was performed. The build updates the assets served by a running instance.

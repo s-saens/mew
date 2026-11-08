@@ -1,6 +1,6 @@
 ---
 title: "Multi-project mode"
-description: "Optional desktop multi-project mode with independent compact workspaces, dedicated movement handles and animated rearrangement, a shared header/background, and separate mode restoration. Defines panel-scoped project selection, lifecycle, geometry, recovery, and the current Postgres limitation; links implementation evidence."
+description: "Optional desktop multi-project mode with independent compact workspaces, dedicated movement handles and animated rearrangement, a shared header/background, and separate mode restoration. Defines panel-scoped project selection and new-panel creation, lifecycle, geometry, recovery, and the current Postgres limitation; links implementation evidence."
 status: implemented
 created: "2026-11-06"
 updated: "2026-11-08"
@@ -47,7 +47,7 @@ Use the existing themed panel surfaces and separators. Paint the page background
 
 ### Project selection, movement, and resizing
 
-The existing project selection panel retains My/All browsing and project management. Clicking a project-panel name opens that selector over the entire named panel, including its header. Other project panels remain visible and interactive; activating one closes the selector. The board's compact plus action opens the registered-project catalog to add a panel. Selecting an All catalog entry retains the existing import-to-My action; closing a panel never removes that shortcut. The plus inside the existing selector retains its create/import meaning.
+The existing project selection panel retains My/All browsing and project management. Clicking a project-panel name opens that selector over the entire named panel, including its header. Other project panels remain visible and interactive; activating one closes the selector. The board's compact plus action immediately opens a new panel containing the same My/All project selector and project setup action. The new panel occupies its eventual board slot; selecting a project opens it there. Closing the selector discards the unselected panel, and choosing an already-open project discards it and focuses that project's panel. Unselected panels are temporary and are not restored after reload or a mode change. Other panels remain usable while the selector is open. Selecting an All catalog entry retains the existing import-to-My action; closing a panel never removes that shortcut. The plus inside the existing selector retains its create/import meaning.
 
 Move a project panel using its dedicated six-dot handle, as confirmed after the initial design. Clicking the project name selects a project; it never starts movement. Commands, X, and other controls never start movement. On the handle, arrow keys move between rows or columns. Dragging supports mouse and touch, pointer cancellation, and Esc cancellation. The dragged panel follows the pointer; on release or cancellation, it settles into place while affected panels animate their rearrangement. Keyboard moves animate as well. Respect reduced-motion preferences while retaining direct pointer tracking. Keyboard-focusable boundary separators resize columns and adjacent rows.
 

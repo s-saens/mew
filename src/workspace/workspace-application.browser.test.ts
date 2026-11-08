@@ -44,6 +44,7 @@ async function fixtureBundle() {
       if (id === sourcePath('./workspace-account.tsx')) return 'const services={capabilities:{terminal:false},projects:{paths:["/a","/b","/c"],setPaths(){},icons:{},saveQueue:{current:Promise.resolve()}}};export function useWorkspaceAccount(){return services}'
       if (id === sourcePath('../components/ProjectIcon.tsx')) return 'export function ProjectIcon(){return null}'
       if (id === sourcePath('../components/CommandButtonMenu.tsx')) return `import React from'react';export function CommandButtonMenu({workspacePath}){return <button data-project-command={workspacePath}>Command</button>}`
+      if (id === sourcePath('../components/project-add-inline.tsx')) return `export function ProjectAddInline(){return null}`
       if (id === sourcePath('../components/project-catalog-panel.tsx')) return `import React from'react';export function ProjectCatalogPanel({onOpen,onBusyChange}){return <div data-fixture-catalog>{['/a','/b','/c','/d','/e'].map(path=><button key={path} data-open-path={path} onClick={async()=>{onBusyChange?.(true);try{await onOpen?.(path)}finally{onBusyChange?.(false)}}}>{path}</button>)}</div>}`
       if (id === sourcePath('../components/startup-screen.tsx')) return `import React from'react';export function StartupScreen(){return <div data-startup>Loading</div>}export const PanelLoading=StartupScreen`
     },
@@ -72,7 +73,9 @@ const paths = (page: Page) => page.locator('[data-project-panel]:visible [data-f
 const workspace = (page: Page, path: string) => page.locator(`[data-fixture-workspace][data-path="${path}"]`)
 async function add(page: Page, path: string) {
   await page.locator('.mew-project-board-add').click()
-  await page.locator(`[data-fixture-catalog] [data-open-path="${path}"]`).click()
+  const draft = page.locator('[data-project-draft]')
+  await draft.getByRole('button', { name: 'All', exact: true }).click()
+  await draft.locator(`[data-fixture-catalog] [data-open-path="${path}"]`).click()
   await workspace(page, path).waitFor({ state: 'visible' })
 }
 
@@ -168,7 +171,7 @@ test('an intentionally empty board restores empty and closing every project can 
   t.after(() => browser.close())
   const page = await browser.newPage({ viewport: { width: 1600, height: 1000 } }), errors = await install(page, fixture)
   await page.locator('[data-mode="multi"]').click()
-  await page.locator('.mew-project-board-header button:last-child').click()
+  await page.locator('[data-project-panel]:visible .mew-project-board-header button:last-child').click()
   await page.locator('[data-project-panel]:visible').waitFor({ state: 'detached' })
   assert.deepEqual(await paths(page), [])
   const switchSingle = page.locator('.mew-workspace-shell > div button').filter({ hasText: /싱글프로젝트모드|Single.project mode/ }).first()
@@ -180,6 +183,10 @@ test('an intentionally empty board restores empty and closing every project can 
   await page.reload()
   await page.locator('.mew-project-board-add').waitFor()
   assert.deepEqual(await paths(page), [], 'refresh does not recreate a deliberately closed panel')
+  await add(page, '/b')
+  assert.deepEqual(await paths(page), ['/b'], 'a project can be added to an empty board')
+  await page.locator('[data-project-panel]:visible .mew-project-board-header button:last-child').click()
+  await page.locator('[data-project-panel]:visible').waitFor({ state: 'detached' })
   await switchSingle.click()
   await page.locator('[data-global-toolbar]').waitFor()
   assert.equal((await paths(page)).length, 1)
