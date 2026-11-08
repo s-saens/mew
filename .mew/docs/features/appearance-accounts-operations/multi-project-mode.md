@@ -1,6 +1,6 @@
 ---
 title: "Multi-project mode"
-description: "Optional desktop multi-project mode with independent compact workspaces, dedicated movement handles and animated rearrangement, a shared header/background, and separate mode restoration. Defines panel-scoped project selection and new-panel creation, lifecycle, geometry, recovery, and the current Postgres limitation; links implementation evidence."
+description: "Optional desktop multi-project mode with independent compact workspaces, dedicated movement handles and animated rearrangement, a shared header/background, and separate mode restoration. Defines compact header controls, panel-scoped project selection and new-panel creation, lifecycle, geometry, recovery, and the current Postgres limitation; links implementation evidence."
 status: implemented
 created: "2026-11-06"
 updated: "2026-11-08"
@@ -39,7 +39,7 @@ Existing My Projects shortcuts and the set of open project panels serve differen
 
 The app header owns resources, runtime controls where available, active sessions, Layout, fullscreen, and the hamburger menu. Render these controls once above the project board. Account settings, notifications, and Mewpet also have one app-level owner.
 
-Each project panel contains its project icon/name, existing project command action when permitted, and an X button. The X closes that project panel. It is distinct from closing a tool or a document tab. Project-specific actions target that panel's working root.
+Each project panel contains its project icon/name, existing project command action when permitted, and an X button. The name has a compact rounded hover surface around its content; the command and close buttons use matching 24px rounded hover surfaces. Long names truncate to keep the controls visible. The X closes that project panel. It is distinct from closing a tool or a document tab. Project-specific actions target that panel's working root.
 
 Each panel has its own tool selection and Dock. For example, project A can show an agent while project B shows Git and project C shows a document. Changing tools or projects in one panel leaves the others' selections and work intact.
 

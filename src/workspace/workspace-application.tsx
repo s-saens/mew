@@ -80,7 +80,7 @@ function ProjectHost({ panel, compact, active, legacy, busy, onRecover, restoreF
 
 function ProjectHeaderCommands({ panel, active }: { panel: ProjectBoardPanel; active: boolean }) {
   const client = useMemo(() => createWorkspaceClient({ workspacePath: panel.workingRoot, projectPath: panel.projectPath }), [panel.workingRoot, panel.projectPath])
-  return <WorkspaceApiProvider client={client}><CommandButtonMenu project=".workspace" workspacePath={panel.workingRoot} shortcutEnabled={active} className="p-1" /></WorkspaceApiProvider>
+  return <WorkspaceApiProvider client={client}><CommandButtonMenu project=".workspace" workspacePath={panel.workingRoot} shortcutEnabled={active} className="mx-1 flex h-6 w-6 shrink-0 items-center justify-center rounded text-ink-secondary hover:bg-surface-raised hover:text-ink focus-visible:outline-2 focus-visible:outline-ink" /></WorkspaceApiProvider>
 }
 
 /** Geometry owns panel slots; project views keep their own controllers and request scope. */

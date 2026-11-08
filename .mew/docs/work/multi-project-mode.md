@@ -1,6 +1,6 @@
 ---
 title: "Multi-project mode implementation and verification"
-description: "Original design, staged implementation, and local verification of optional desktop multi-project mode. Records scoped requests and execution, retained compact workspaces, handle-based geometry and panel movement animation, lifecycle regressions, synthetic 1/3/10-panel measurements, database/operational limits, and the panel-scoped selector and new-panel creation follow-ups."
+description: "Original design, staged implementation, and local verification of optional desktop multi-project mode. Records scoped requests and execution, retained compact workspaces, handle-based geometry and panel movement animation, lifecycle regressions, synthetic 1/3/10-panel measurements, database/operational limits, and the panel-scoped selector, new-panel creation, and header hover follow-ups."
 created: "2026-11-06"
 updated: "2026-11-08"
 ---
@@ -214,3 +214,10 @@ Local Chromium checks passed in `src/workspace/multi-project-app.browser.test.ts
 The board's add action now creates an unselected panel first and shows the My/All project selector and setup action inside it. Selection opens the project in that slot; cancellation removes the temporary panel, and a duplicate selection focuses the existing project. Temporary panels are excluded from saved layouts. The [feature contract](../features/appearance-accounts-operations/multi-project-mode.md#project-selection-movement-and-resizing) owns the current behavior.
 
 Local Chromium checks passed in the multi-project application and workspace application fixtures (17 tests), covering the panel bounds, other-panel editing, cancellation, duplicates, selection, reload, and adding to an empty board. Project-board browser and model tests passed (17 tests). `npm run build` and `npm run lint` passed with advisory warnings. `npm run check:docs` passed description validation but reported 37 existing missing links outside these changes. Browser fixtures use mocked transport; physical-device behavior was not checked. No deployment or server lifecycle operation was performed. The build updates the assets served by a running instance.
+
+
+## Project header hover surfaces — 2026-11-08
+
+The project title and command action now use compact rounded hover surfaces consistent with the close button. The title retains its header-height click target and truncates long names; the command and close buttons remain aligned. The [feature contract](../features/appearance-accounts-operations/multi-project-mode.md#shared-and-local-controls) owns the current behavior.
+
+The multi-project application Chromium fixture passed all 6 tests, including narrow-panel hover geometry, long-name truncation, and title and command actions. A local hover capture was inspected. `npm run build` and `npm run lint` passed with advisory warnings. `npm run check:docs` validated descriptions but reported 37 existing missing links outside these changes. The browser fixture uses mocked transport; physical-device behavior was not checked. No deployment or server lifecycle operation was performed. The build updates the assets served by a running instance.

@@ -288,6 +288,64 @@ test('adding a project opens a panel-scoped picker and handles cancellation and 
   assert.deepEqual(consoleErrors.filter(message => !message.includes('favicon')), [])
 })
 
+test('project header hover controls stay compact, rounded, aligned, and functional', { timeout: 40_000 }, async t => {
+  const fixture = await bundleOnce(), browser = await connectTestBrowser()
+  t.after(() => browser.close())
+  const page = await browser.newPage({ viewport: { width: 1200, height: 900 } })
+  const state = await installApp(page, fixture, ['/alpha', '/beta'])
+  try {
+    await page.goto(origin)
+    await page.getByRole('textbox', { name: 'Editor /alpha', exact: true }).waitFor()
+    await page.getByRole('button', { name: 'Layout', exact: true }).click()
+    await page.getByRole('button', { name: /멀티프로젝트모드|Multi.project mode/ }).first().click()
+    const panel = page.locator('[data-project-panel][data-project-path="/alpha"]')
+    await panel.waitFor()
+    const resize = page.getByRole('separator', { name: 'Resize project column', exact: true })
+    await resize.focus(); await resize.press('Home')
+    const title = panel.locator('.mew-project-board-name')
+    const command = panel.locator('.mew-project-board-header [data-header-menu-trigger]')
+    const close = panel.getByRole('button', { name: 'Close project panel: alpha', exact: true })
+    const headerBox = (await panel.locator('.mew-project-board-header').boundingBox())!
+    const titleBox = (await title.boundingBox())!, commandBox = (await command.boundingBox())!, closeBox = (await close.boundingBox())!
+    assert.ok(titleBox.width < headerBox.width / 2, 'title hover follows its content rather than filling the header')
+    assert.ok(titleBox.height >= closeBox.height, 'the title retains a comfortable click target')
+    assert.ok(commandBox.width === closeBox.width && commandBox.height === closeBox.height, 'command and close affordances share compact dimensions')
+    for (const [label, box] of [['title', titleBox], ['command', commandBox], ['close', closeBox]] as const) {
+      assert.ok(Math.abs(box.y + box.height / 2 - (headerBox.y + headerBox.height / 2)) <= 1, `${label} is vertically centered`)
+      assert.ok(box.x >= headerBox.x && box.x + box.width <= headerBox.x + headerBox.width, `${label} fits the narrow panel`)
+    }
+    assert.ok(titleBox.x + titleBox.width <= commandBox.x && commandBox.x + commandBox.width <= closeBox.x, 'header actions do not overlap')
+    for (const [label, control] of [['title', title], ['command', command], ['close', close]] as const) {
+      await control.hover()
+      const hover = await control.evaluate((element, pseudo) => {
+        const style = getComputedStyle(element, pseudo ? '::before' : null)
+        return { radius: parseFloat(style.borderTopLeftRadius), background: style.backgroundColor, top: parseFloat(style.top), bottom: parseFloat(style.bottom) }
+      }, label === 'title')
+      assert.ok(hover.radius > 0, `${label} hover has rounded corners`)
+      assert.notEqual(hover.background, 'rgba(0, 0, 0, 0)', `${label} has a visible hover background`)
+      if (label === 'title') {
+        assert.ok(hover.top >= 4 && hover.bottom >= 4, 'title hover background is inset from the header')
+      }
+    }
+    const titleText = title.locator('span').last()
+    await titleText.evaluate(element => { element.textContent = 'A very long project name '.repeat(10) })
+    assert.equal(await titleText.evaluate(element => element.scrollWidth > element.clientWidth), true, 'long names truncate within the panel')
+    const longTitleBox = (await title.boundingBox())!, longCommandBox = (await command.boundingBox())!, longCloseBox = (await close.boundingBox())!
+    assert.ok(longTitleBox.x + longTitleBox.width <= longCommandBox.x && longCommandBox.x + longCommandBox.width <= longCloseBox.x, 'long names leave both actions visible')
+    const reads = state.commandReads.length
+    await command.click()
+    await page.locator('[data-command-menu]').waitFor()
+    assert.deepEqual(state.commandReads.slice(reads), ['/alpha'], 'the command action remains scoped to its panel')
+    await page.keyboard.press('Escape')
+    await page.locator('[data-command-menu]').waitFor({ state: 'detached' })
+    await title.click()
+    await panel.locator('[data-mobile-project-panel]').waitFor()
+    await page.keyboard.press('Escape')
+    await panel.locator('[data-mobile-project-panel]').waitFor({ state: 'detached' })
+    assert.deepEqual(state.errors, []); assert.deepEqual(state.consoleErrors, [])
+  } finally { state.releaseSave() }
+})
+
 test('actual workspace mode round trips retain separate seeded chrome and the same editor draft', { timeout: 40_000 }, async t => {
   const fixture = await bundleOnce(), browser = await connectTestBrowser()
   t.after(() => browser.close())
