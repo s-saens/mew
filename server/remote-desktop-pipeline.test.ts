@@ -256,7 +256,7 @@ test('Windows rejects stale ABI, exposes stage timings and propagates encoder co
 })
 
 test('viewer diagnostics deliver FHD sender and receiver stages and stop with the connection', { skip: !domBrowserExecutable() }, async () => {
-  const entry = `export {connectDesktop} from ${JSON.stringify(path.resolve(import.meta.dirname, '../src/utils/desktop-connection.ts'))}`
+  const entry = `export {connectDesktop} from ${JSON.stringify(path.resolve(import.meta.dirname, '../src/utils/desktop-connection.ts'))}; export {setUiLocale} from '@mew/ui/i18n-core'`
   const bundle = await build({ input: 'virtual:diagnostics', plugins: [{ name: 'diagnostics', resolveId: id => id === 'virtual:diagnostics' ? id : undefined,
     load: id => id === 'virtual:diagnostics' ? entry : undefined }], write: false, platform: 'browser', output: { format: 'iife', name: 'Desktop' } })
   const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
@@ -266,13 +266,14 @@ test('viewer diagnostics deliver FHD sender and receiver stages and stop with th
       ? { json: { ready: true } } : { contentType: 'text/html', body: '<html></html>' }))
     await page.goto('http://localhost:48975/')
     await page.addScriptTag({ content: `
-      window.samples=[];
+      window.samples=[];window.displayStats=[];
       window.WebSocket=class {
         static OPEN=1;readyState=1;bufferedAmount=0;
         constructor(){queueMicrotask(()=>{for(const value of [{type:'config',iceServers:[]},{type:'offer',sdp:'fixture',native:true}])this.onmessage({data:JSON.stringify(value)})})}
         send(){}close(){this.readyState=3}
       };
       window.RTCPeerConnection=class {
+        samples=0;
         async setRemoteDescription(){this.remoteDescription={};queueMicrotask(()=>{
           const motion={label:'motion',readyState:'open',bufferedAmount:0,send(){},close(){}};
           const control={...motion,label:'control'};this.ondatachannel({channel:motion});this.ondatachannel({channel:control});
@@ -281,18 +282,22 @@ test('viewer diagnostics deliver FHD sender and receiver stages and stop with th
           motion.onopen();control.onopen();
         })}
         async createAnswer(){return {type:'answer',sdp:'fixture'}}async setLocalDescription(value){this.localDescription=value}
-        async getStats(){return new Map([['video',{id:'video',type:'inbound-rtp',kind:'video',frameWidth:1920,frameHeight:1080,framesDecoded:60,
-          framesDropped:2,packetsReceived:100,packetsLost:0,bytesReceived:20000,totalDecodeTime:.12,jitterBufferDelay:.6,jitterBufferEmittedCount:60,
+        async getStats(){const n=this.samples++;return new Map([['video',{id:'video',type:'inbound-rtp',kind:'video',frameWidth:1920,frameHeight:1080,framesDecoded:60+n*12,
+          framesDropped:2,packetsReceived:100+n*20,packetsLost:0,bytesReceived:20000+n*4000,totalDecodeTime:.12+n*.024,jitterBufferDelay:.6+n*.12,jitterBufferEmittedCount:60+n*12,
           freezeCount:0,timestamp:performance.now()}]])}
         getReceivers(){return []}close(){}
       };
     ` })
     await page.addScriptTag({ content: bundle.output.find(value => value.type === 'chunk')!.code })
-    await page.evaluate(`window.connection=Desktop.connectDesktop({state(){},screens(){},stream(){},relative(){},stats(){},diagnostics(value){window.samples.push(value)}})`)
+    await page.evaluate(`Desktop.setUiLocale('en');window.connection=Desktop.connectDesktop({state(){},screens(){},stream(){},relative(){},stats(value){window.displayStats.push(value)},diagnostics(value){window.samples.push(value)}})`)
     await page.waitForFunction('window.samples.length>0')
     const value = await page.evaluate('window.samples[0]') as { sender: { width: number; encodeMs: number; captureMs: number }; receiver: { height: number; totalDecodeSeconds: number; droppedFrames: number } }
     assert.equal(value.sender.width, 1920); assert.equal(value.sender.encodeMs, 8); assert.equal(value.sender.captureMs, 2)
     assert.equal(value.receiver.height, 1080); assert.equal(value.receiver.totalDecodeSeconds, .12); assert.equal(value.receiver.droppedFrames, 2)
+    assert.equal(await page.evaluate('Object.hasOwn(window.samples[0].receiver,"bufferMs")'), false)
+    await page.waitForFunction('window.displayStats.some(value=>value.includes("Receive buffer 10 ms") && value.includes("Decode 2 ms"))')
+    const timing = await page.evaluate('window.samples.at(-1).receiver') as { bufferMs: number; decodeMs: number }
+    assert.ok(Math.abs(timing.bufferMs - 10) < 1e-9); assert.ok(Math.abs(timing.decodeMs - 2) < 1e-9)
     const count = await page.evaluate('window.connection.close();window.samples.length')
     await page.waitForTimeout(250)
     assert.equal(await page.evaluate('window.samples.length'), count)

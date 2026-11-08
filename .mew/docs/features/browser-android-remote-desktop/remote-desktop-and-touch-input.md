@@ -4,11 +4,11 @@ parent: "mew-remote"
 title: "Remote desktop and touch input"
 status: "implemented"
 created: "2026-09-18"
-updated: "2026-10-24"
+updated: "2026-11-08"
 status_hash: "278f4dc5c3b21929284aadc8ff47af89a35f48d29be6a318f5b80773c2f10e81"
 files: ["src/components/remote-desktop.tsx", "src/components/desktop-screen-keyboard.tsx", "src/utils/desktop-screen-keyboard.ts", "src/utils/desktop-input.ts", "src/utils/desktop-video.ts", "server/remote-desktop.ts", "server/remote-desktop-host.ts", "native/remote-desktop/main.mjs", "native/remote-desktop/native-host.mjs", "native/remote-desktop/rust-direct.mjs", "native/remote-desktop/rust/src/engine.rs", "native/remote-desktop/video-settings.mjs", "native/remote-desktop/video-pacer.mjs", "native/remote-desktop/gpu-windows.cpp", "native/remote-desktop/virtual-display-driver.cpp", "server/desktop-resident-host.ts", "mew"]
 commits: []
-description: "Contract for the server desktop's Rust video engine, host preparation, video settings, direct WebRTC video/input, full and gaming keyboards, and touch input. Includes overlapping encoding and transmission at native FHD size, RTT relearning and quality recovery, verification of Windows encoder settings, stage-by-stage diagnostics, and OS and real-device limitations."
+description: "Contract for remote desktop video, host preparation, keyboard and touch input, including immediate leading motion and transition-only ordering barriers. Covers receiver timing diagnostics, permissions, and hardware verification limits."
 상위파일:
   - "MOC.md"
   - "_browser-android-remote-desktop.md"
@@ -28,8 +28,8 @@ description: "Contract for the server desktop's Rust video engine, host preparat
 - Provide component preparation, display selection, direct WebRTC connections, and mouse, keyboard, and mobile joystick input.
 - Once video and input are actually ready, display a connection notification once on the PC being accessed remotely.
 - Display cumulative network usage for the current session in the top bar containing the fullscreen button.
-- In settings, select and save HD, FHD, QHD, or 4K, a target of 30, 60, 120, 144, 165, or 240FPS, and Balanced or High Quality. Changes reconnect to the same shared display. Adjust to a mode accepted by the browser and GPU, and show the actual received resolution, decoded FPS, applied target, RTT, Mbps, and transmission wait.
-- Limit the pacing queue and frame lifetime so stale transmission frames do not accumulate indefinitely even in High Quality, and adjust bitrate based on congestion. Key and button transitions do not wait for video FPS, while motion is coalesced up to the applied FPS.
+- In settings, select and save HD, FHD, QHD, or 4K, a target of 30, 60, 120, 144, 165, or 240FPS, and Balanced or High Quality. Changes reconnect to the same shared display. Adjust to a mode accepted by the browser and GPU, and show the actual received resolution, decoded FPS, applied target, RTT, Mbps, transmission wait, and available interval receive-buffer/decode time.
+- Limit the pacing queue and frame lifetime so stale transmission frames do not accumulate indefinitely even in High Quality, and adjust bitrate based on congestion. Key and button transitions do not wait for video FPS, while motion is coalesced up to the applied FPS and its leading sample sends immediately when that budget permits. Unchanged heartbeats do not gate newer motion; real key/button transitions retain reliable ordering.
 - Overlap transmission with the next encoder operation while preserving native FHD size. Allow at most two compressed frames in total across transmission and waiting, preserving reference order, original transmission limits, and IDR recovery. Relearn normal reception after the RTT baseline rises and recover quality over time. Expose Windows encoder control failures and provide stage-by-stage diagnostics. Details and real-device limitations follow the [FHD transmission contract](../../development/remote-desktop.md#stage-by-stage-diagnostics-and-fhd-verification).
 - For both transmission priorities, a fixed receive-buffer delay alone does not continually reduce quality while reception and decoding remain normal. Increased buffer delay, loss, rising RTT, or transmission backlog lowers encoder and transmission bitrates together. Quality priority also limits its own transmission wait for regular frames to 100ms and allows 500ms for keyframes. This is not an upper bound on total input-to-display latency. Criteria and limitations follow the [transmission contract](../../development/remote-desktop.md#transport-and-latency).
 - Support fullscreen, 90-degree rotation, cursor acceleration proportional to speed, sensitivity settings (default 3×), and vertical hotkeys movable by a handle. Reduce duplicate discovery, firewall diagnostic waits, and round trips for host startup and display selection during connection startup.

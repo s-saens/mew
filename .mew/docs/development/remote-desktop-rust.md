@@ -1,8 +1,8 @@
 ---
 title: "Remote Desktop Rust Video Engine"
-description: "Defines capture output, RTP pacing, and direct WebRTC on a dedicated Rust thread that reuses the existing OS GPU ABI, along with Node control boundaries and approval revocation/shutdown contracts. Covers locked dependency sources, maintainer build tools and actionable installation errors, the legacy comparison path, synthetic verification, and unverified actual GPU behavior; links verified Windows prebuilt installation and the separate maintainer toolchain."
+description: "Defines Rust capture, RTP pacing, stable RTCP media-clock mapping with encoder-age compensation, and direct WebRTC using the existing GPU ABI. Covers authorization, installation, legacy comparison, and hardware verification limits."
 created: 2026-10-24
-updated: "2026-11-05"
+updated: "2026-11-08"
 ---
 
 ## Execution Path
@@ -26,9 +26,9 @@ Node retains SDP mode selection, STUN retries, temporary NAT mappings, RTT adapt
 
 ## Queues and transport
 
-The GPU output buffer is limited to 4MiB. Rust checks Annex-B NALs and the negotiated SPS/PPS profile and level, then queues at most two compressed frames. RTP is generated as single NAL/FU-A in a reusable 1192-byte buffer, without creating JS objects or per-packet timers. libdatachannel handles the actual sockets, encryption, and NACK retransmissions. Rust sends compound RTCP SR and SDES with a mapping between the monotonic clock and RTP clock.
+The GPU output buffer is limited to 4MiB. Rust checks Annex-B NALs and the negotiated SPS/PPS profile and level, then queues at most two compressed frames. RTP is generated as single NAL/FU-A in a reusable 1192-byte buffer, without creating JS objects or per-packet timers. libdatachannel handles the actual sockets, encryption, and NACK retransmissions. Rust sends compound RTCP SR and SDES with a mapping between the monotonic clock and RTP clock. Its 90 kHz media clock is anchored once to the first accepted GPU output timestamp and Rust read time, before pacing. Windows subtracts the reported input-to-output encoder age when establishing the anchor. POSIX ABI 2 lacks that age, so an initial fixed read offset remains. Report time continues through paced IDRs, idle periods, dropped frames, and timestamp wrap without re-anchoring to packet sends, following [RFC 3550 section 6.4.1](https://www.rfc-editor.org/rfc/rfc3550#section-6.4.1). The explicit legacy engine still delegates reports to libdatachannel; this clock correction applies to Rust.
 
-Frame order, IDR recovery, burst and lifetime limits, and quality recovery follow the [shared transport contract](remote-desktop.md#transport-and-latency). During IDR transmission, it does not read the next GPU output and preserves the additional keyframe request flag until completion or discard. It changes the encoder bitrate and pacer bitrate together and propagates Windows configuration failures upstream. `queueMs` is measured from when Rust reads the GPU output. Node and Rust clock values are not directly subtracted.
+Frame order, IDR recovery, burst and lifetime limits, and quality recovery follow the [shared transport contract](remote-desktop.md#transport-and-latency). During IDR transmission, it does not read the next GPU output and preserves the additional keyframe request flag until completion or discard. It changes the encoder bitrate and pacer bitrate together and propagates Windows configuration failures upstream. `queueMs` is measured from when Rust reads the GPU output. Node and Rust clock values are not directly subtracted. Encoder output retained while an IDR is transmitting can therefore be older than `queueMs`; the two-frame limit does not include all native capture/encoder queues. Discarding those reference frames without coordinated recovery is unsafe. The [follow-up record](../work/remote-desktop-input-feedback-latency.md) tracks this remaining optimization gate.
 
 ## Authorization and cleanup
 

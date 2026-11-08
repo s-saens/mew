@@ -1,9 +1,10 @@
 /** Receiver deltas and our bounded RTP queue control the encoder and pacer together. */
 export function videoAdaptation({ maximum = 6_000_000, priority = 'speed', change, keyframe, now = Date.now }) {
   let rate = maximum, last = -Infinity, recoveryAt = -Infinity, minimumRtt = Infinity, minimumDelay = Infinity, lastCongestion = -Infinity, localCongestion = -Infinity, rttStep
+  let decodeStalledAt, lastDecodeRecovery = -Infinity, previouslyDecoded
   const set = value => { const next = Math.round(Math.max(350_000, Math.min(maximum, value))); if (next !== rate) { rate = next; change(rate) } }
   return {
-    configure(value) { maximum = value; rate = value; last = recoveryAt = -Infinity; minimumRtt = minimumDelay = Infinity; lastCongestion = localCongestion = -Infinity; rttStep = undefined; change(rate) },
+    configure(value) { maximum = value; rate = value; last = recoveryAt = -Infinity; minimumRtt = minimumDelay = Infinity; lastCongestion = localCongestion = -Infinity; rttStep = decodeStalledAt = previouslyDecoded = undefined; lastDecodeRecovery = -Infinity; change(rate) },
     congested(local = true) {
       const time = now()
       if (local) localCongestion = time
@@ -16,8 +17,17 @@ export function videoAdaptation({ maximum = 6_000_000, priority = 'speed', chang
       }
       if (!Number.isFinite(value.loss) || !Number.isFinite(value.delay) || typeof value.decoded !== 'boolean') throw new Error('Invalid video feedback')
       const time = now(); if (time - last < 150) return false; last = time
-      // A static desktop has no incoming frames. Do not mistake it for a decoder stall.
-      if (!value.decoded || value.received > 0 && value.decodedFrames === 0) keyframe()
+      const decodeProgress = value.decodedFrames > 0 || value.decoded && (previouslyDecoded === false ||
+        value.received === undefined && value.decodedFrames === undefined && value.delay > 0)
+      const stalledFrame = value.received > 0 && value.decodedFrames === 0
+      if (decodeProgress) { decodeStalledAt = undefined; lastDecodeRecovery = -Infinity }
+      else if (!value.decoded || stalledFrame) decodeStalledAt ??= time
+      previouslyDecoded = value.decoded
+      // Give the initial IDR time to arrive. A received undecodable frame still
+      // requests prompt recovery, but repeated stats cannot flood the encoder.
+      // Keep a stalled frame pending across idle samples until decoding resumes.
+      if (decodeStalledAt !== undefined && (value.decoded || stalledFrame || time - decodeStalledAt >= 500) &&
+        time - lastDecodeRecovery >= 1000 && keyframe() !== false) lastDecodeRecovery = time
       if (value.rtt !== undefined) minimumRtt = Math.min(minimumRtt, value.rtt)
       // Without frame counters, positive interval delay means the buffer emitted video.
       const progressing = value.decoded && (value.received > 0 && value.decodedFrames > 0 ||

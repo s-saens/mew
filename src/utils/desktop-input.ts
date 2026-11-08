@@ -10,11 +10,15 @@ export function desktopInput(onError: (message: string) => void = () => {}, onPo
   const keyOwners = { physical: new Set<string>(), screen: new Set<string>() }
   const releaseListeners = new Set<() => void>()
   let motion: Channel | null = null, control: Channel | null = null
+  let controlButtons = 0, controlKeys: string[] = []
   let clipboardId = 0
   const clipboardRequests = new Map<number, { resolve: (text: string) => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout> }>()
   let pendingMotion = false, unconfirmedMotion = false, localCursor = false
   let remote: DesktopCursor | undefined, requiredSeq = 0, nextMotionAt = -Infinity, lastActivityAt = 0
-  const activity = () => { pendingMotion = true; requiredSeq = state.seq + 1; lastActivityAt = performance.now() }
+  const activity = () => {
+    pendingMotion = true; requiredSeq = state.seq + 1; lastActivityAt = performance.now()
+    flushMotion(lastActivityAt)
+  }
   const point = (x: number, y: number, joystick: boolean) => {
     const next: [number, number] = [Math.max(0, Math.min(1, x)), Math.max(0, Math.min(1, y))]
     if (localCursor) onPoint(next[0], next[1], joystick)
@@ -27,15 +31,38 @@ export function desktopInput(onError: (message: string) => void = () => {}, onPo
     // Never let movement sit in a network queue; the next snapshot recovers its distance.
     if (!reliable && channel.bufferedAmount > 2048) return
     if (reliable && channel.bufferedAmount > 64 * 1024) { onError(uiText("입력 연결이 지연됐습니다. 다시 연결해 주세요.")); return }
-    if (reliable) state.epoch++
+    if (reliable) {
+      // Only key/button transitions need a barrier against faster motion. A lost
+      // heartbeat or motion recovery must not stall a newer cumulative snapshot.
+      const keysChanged = state.keys.length !== controlKeys.length || state.keys.some(key => !controlKeys.includes(key))
+      if (state.buttons !== controlButtons || keysChanged) state.epoch++
+      // Receivers compare key arrays; owner changes must retain their wire order.
+      if (!keysChanged) state.keys = controlKeys
+    }
     state.seq++
     try {
       // Cursor feedback updates the local drawing position, without authorizing
       // an idle heartbeat or keyboard-only action to move the physical cursor.
       channel.send(JSON.stringify({ ...state, point: includePoint ? state.point : undefined, x: Math.trunc(state.x), y: Math.trunc(state.y), wheelX: Math.trunc(state.wheelX), wheelY: Math.trunc(state.wheelY) }))
-      pendingMotion = false; unconfirmedMotion = !reliable; nextMotionAt = performance.now() + 1000 / motionFps
+      if (reliable) { controlButtons = state.buttons; controlKeys = state.keys }
+      // Idle heartbeats and keyboard-only snapshots must not delay fresh motion.
+      if (pendingMotion) nextMotionAt = performance.now() + 1000 / motionFps
+      pendingMotion = false; unconfirmedMotion = !reliable
     }
     catch { onError(uiText("입력 연결이 종료됐습니다. 다시 연결해 주세요.")) }
+  }
+  const flushMotion = (now?: number) => {
+    // Send the leading sample from its input event when the shared frame budget
+    // allows it; rAF drains coalesced samples without a second timer.
+    // A final reliable snapshot recovers the last lossy movement/scroll, without
+    // waiting for the 250ms lease heartbeat. No per-pointer-event timer.
+    if (now !== undefined && (pendingMotion || unconfirmedMotion) && now - lastActivityAt >= 70) { send(true); return }
+    const interval = 1000 / motionFps
+    if (pendingMotion && (now === undefined || now + .001 >= nextMotionAt)) {
+      const deadline = nextMotionAt
+      send(false)
+      if (!pendingMotion && now !== undefined && Number.isFinite(deadline) && now - deadline < interval) nextMotionAt = deadline + interval
+    }
   }
   return {
     frameRate(value: number) { if (Number.isFinite(value)) motionFps = Math.max(30, Math.min(240, value)) },
@@ -51,17 +78,7 @@ export function desktopInput(onError: (message: string) => void = () => {}, onPo
     },
     point(x: number, y: number) { point(x, y, false) },
     wheel(x: number, y: number) { state.wheelX += x; state.wheelY += y; activity() },
-    flushMotion(now?: number) {
-      // A final reliable snapshot recovers the last lossy movement/scroll, without
-      // waiting for the 250ms lease heartbeat. No per-pointer-event timer.
-      if (now !== undefined && (pendingMotion || unconfirmedMotion) && now - lastActivityAt >= 70) { send(true); return }
-      const interval = 1000 / motionFps
-      if (pendingMotion && (now === undefined || now + .001 >= nextMotionAt)) {
-        const deadline = nextMotionAt
-        send(false)
-        if (!pendingMotion && now !== undefined && Number.isFinite(deadline) && now - deadline < interval) nextMotionAt = deadline + interval
-      }
-    },
+    flushMotion,
     button(bit: number, down: boolean) { state.buttons = down ? state.buttons | bit : state.buttons & ~bit; send(true, true) },
     key(code: string, down: boolean, owner: 'physical' | 'screen' = 'physical') {
       keyOwners[owner].delete(code)

@@ -104,6 +104,25 @@ struct Metrics {
     bitrate: Option<i32>,
 }
 
+#[derive(Default)]
+struct MediaClock {
+    anchor: Option<(u32, f64)>,
+}
+impl MediaClock {
+    fn observe(&mut self, timestamp: u32, read_at: f64, encode_us: i32) {
+        // The GPU timestamp and Rust clock have different origins. Establish
+        // their relationship once, before packet pacing can add variable delay.
+        self.anchor
+            .get_or_insert((timestamp, read_at - encode_us.max(0) as f64 / 1000.));
+    }
+    fn timestamp(&self, now: f64) -> Option<u32> {
+        self.anchor.map(|(timestamp, at)| {
+            let elapsed = ((now - at).max(0.) * 90.).round() as u64;
+            timestamp.wrapping_add(elapsed as u32)
+        })
+    }
+}
+
 pub struct Pacer {
     queue: VecDeque<Frame>,
     mode: Mode,
@@ -122,8 +141,7 @@ pub struct Pacer {
     metrics: Metrics,
     sample_at: f64,
     blocked_at: Option<f64>,
-    pub last_timestamp: u32,
-    last_sent_at: f64,
+    media_clock: MediaClock,
     pub packets_sent: u32,
     pub octets_sent: u32,
 }
@@ -147,8 +165,7 @@ impl Pacer {
             metrics: Metrics::default(),
             sample_at: now,
             blocked_at: None,
-            last_timestamp: 0,
-            last_sent_at: now,
+            media_clock: MediaClock::default(),
             packets_sent: 0,
             octets_sent: 0,
         }
@@ -237,6 +254,13 @@ impl Pacer {
         let timestamp = self
             .base
             .wrapping_add(((meta.timestamp as u128 * 9 + 50) / 100) as u32);
+        // Windows supplies input-to-output age. ABI 2 has no equivalent, so its
+        // initial read delay remains a fixed offset rather than per-frame jitter.
+        self.media_clock.observe(
+            timestamp,
+            now,
+            if cfg!(windows) { meta.encode_us } else { 0 },
+        );
         self.queue.push_back(Frame {
             nals,
             nal: 0,
@@ -308,8 +332,6 @@ impl Pacer {
                 self.invalidate(true);
                 break;
             }
-            self.last_timestamp = frame.timestamp;
-            self.last_sent_at = now;
             self.packets_sent = self.packets_sent.wrapping_add(1);
             self.octets_sent = self.octets_sent.wrapping_add((size - 12) as u32);
             if frame.nal == frame.nals.len() {
@@ -349,9 +371,9 @@ impl Pacer {
         p[..4].copy_from_slice(&[0x80, 200, 0, 6]);
         p[4..8].copy_from_slice(&self.ssrc.to_be_bytes());
         p[8..16].copy_from_slice(&ntp.to_be_bytes());
-        let timestamp = self
-            .last_timestamp
-            .wrapping_add(((now - self.last_sent_at).max(0.) * 90.).round() as u32);
+        // RFC 3550 section 6.4.1: RTP and NTP represent the same report instant,
+        // even while an older access unit is still being transmitted.
+        let timestamp = self.media_clock.timestamp(now).unwrap_or(self.base);
         p[16..20].copy_from_slice(&timestamp.to_be_bytes());
         p[20..24].copy_from_slice(&self.packets_sent.to_be_bytes());
         p[24..28].copy_from_slice(&self.octets_sent.to_be_bytes());
@@ -445,6 +467,80 @@ mod tests {
             .unwrap();
         assert!(!p.can_read(506.));
         assert_eq!(p.queue.len(), 2);
+    }
+    #[test]
+    fn sender_report_clock_ignores_packet_pacing_idle_and_recovery() {
+        let mut fast = Pacer::new(mode(), 42, [0; 6], 0.);
+        let mut slow = Pacer::new(mode(), 42, [0; 6], 0.);
+        for pacer in [&mut fast, &mut slow] {
+            pacer
+                .frame(
+                    &key(100000),
+                    Meta {
+                        timestamp: 1_000_000,
+                        ..Meta::default()
+                    },
+                    0.,
+                    10.,
+                )
+                .unwrap();
+        }
+        for now in 11..=150 {
+            fast.tick(now as f64, |_| true);
+            if now % 50 == 0 {
+                slow.tick(now as f64, |_| true);
+            }
+        }
+        assert!(fast.queue.is_empty());
+        assert!(slow.sending_key());
+        let report_timestamp = |pacer: &Pacer, now| {
+            let report = pacer.sender_report(123, now);
+            assert_eq!(u64::from_be_bytes(report[8..16].try_into().unwrap()), 123);
+            assert_eq!(
+                u32::from_be_bytes(report[20..24].try_into().unwrap()),
+                pacer.packets_sent
+            );
+            u32::from_be_bytes(report[16..20].try_into().unwrap())
+        };
+        // Both senders share one media timeline despite different queue delays.
+        assert_eq!(report_timestamp(&fast, 150.), 102600);
+        assert_eq!(report_timestamp(&slow, 150.), 102600);
+        assert_eq!(report_timestamp(&fast, 600.), 143100);
+        slow.tick(600., |_| true);
+        assert!(slow.queue.is_empty() && slow.need_key);
+        slow.frame(
+            &key(10),
+            Meta {
+                timestamp: 1_591_000,
+                ..Meta::default()
+            },
+            0.,
+            650.,
+        )
+        .unwrap();
+        slow.tick(650., |_| true);
+        // A late replacement frame must not re-anchor the sender's media clock.
+        assert_eq!(report_timestamp(&slow, 700.), 152100);
+    }
+    #[test]
+    fn media_clock_compensates_initial_encoder_age_without_reanchoring() {
+        let mut clock = MediaClock::default();
+        assert_eq!(clock.timestamp(0.), None);
+        clock.observe(90000, 250., 20000);
+        assert_eq!(clock.timestamp(250.), Some(91800));
+        clock.observe(180000, 500., 100000);
+        assert_eq!(clock.timestamp(500.), Some(114300));
+    }
+    #[test]
+    fn media_clock_wraps_after_long_idle_and_ignores_negative_age() {
+        let mut clock = MediaClock::default();
+        clock.observe(u32::MAX - 44, 10., -1);
+        assert_eq!(clock.timestamp(9.), Some(u32::MAX - 44));
+        assert_eq!(clock.timestamp(11.), Some(45));
+        assert_eq!(
+            clock.timestamp(11. + (u32::MAX as f64 + 1.) / 90.),
+            Some(45)
+        );
     }
     #[test]
     fn rejects_unnegotiated_profile_and_invalid_parameter_sets() {

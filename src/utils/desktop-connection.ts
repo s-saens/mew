@@ -5,6 +5,7 @@ import { desktopInput } from './desktop-input.ts'
 import { getAppRuntime } from '../runtime/app-runtime.ts'
 import { prepareDesktop } from './desktop-preparation.ts'
 import { desktopDirect } from './desktop-direct.ts'
+import { desktopVideoTiming, type DesktopVideoTiming } from './desktop-video-timing.ts'
 import { desktopNetworkUsage, type DesktopNetworkUsage } from './desktop-network.ts'
 import { desktopUsageReporter } from './network-usage.ts'
 import { DEFAULT_VIDEO, videoSettings, type DesktopVideoStatus, type DesktopVideoSettings } from '../../native/remote-desktop/video-settings.mjs'
@@ -13,7 +14,7 @@ export type DesktopScreen = { id: string; label: string; width: number; height: 
 export type DesktopState = 'preparing' | 'connecting' | 'connected' | 'error' | 'paused'
 export type DesktopDiagnostics = {
   sender?: DesktopVideoStatus
-  receiver: { width?: number; height?: number; decodedFrames?: number; droppedFrames?: number; totalDecodeSeconds?: number; jitterBufferSeconds?: number; jitterBufferFrames?: number; freezeCount?: number; timestamp: number }
+  receiver: DesktopVideoTiming & { width?: number; height?: number; decodedFrames?: number; droppedFrames?: number; totalDecodeSeconds?: number; jitterBufferSeconds?: number; jitterBufferFrames?: number; freezeCount?: number; timestamp: number }
 }
 export type DesktopEvents = {
   state: (state: DesktopState, message: string) => void
@@ -49,6 +50,7 @@ export function connectDesktop(events: DesktopEvents, preferredScreen?: string, 
   let networkHint = '', negotiation = -1
   let networkStatus: { gathering?: string; srflx?: number; ipv6?: number; public4?: number; mapping?: string } = {}
   let lastBytes = 0, lastTime = 0, lastFrames = 0, motionFrame = 0, statsAt = 0, displayAt = 0, checkingStats = false
+  let sampleTiming = desktopVideoTiming()
   let deadline: ReturnType<typeof setTimeout> | undefined, directDeadline: ReturnType<typeof setTimeout> | undefined
   const pumpMotion = (now: number) => {
     if (closed) return
@@ -91,16 +93,20 @@ export function connectDesktop(events: DesktopEvents, preferredScreen?: string, 
       if (closed || direct !== current || negotiation !== generation) return
       network.sample(report)
       const display = performance.now() - displayAt >= 1000
-      let rate = '', rtt = '', received = '', dimensions = ''
+      let rate = '', rtt = '', received = '', dimensions = '', buffer = '', decode = ''
       report.forEach(value => {
         if (value.type === 'inbound-rtp' && value.kind === 'video') {
           if (value.framesDecoded > 0) { decoded = true; markConnected() }
+          const timing = sampleTiming(value)
           events.diagnostics?.({ sender: current.videoStatus(), receiver: {
+            ...timing,
             width: value.frameWidth, height: value.frameHeight, decodedFrames: value.framesDecoded, droppedFrames: value.framesDropped,
             totalDecodeSeconds: value.totalDecodeTime, jitterBufferSeconds: value.jitterBufferDelay, jitterBufferFrames: value.jitterBufferEmittedCount,
             freezeCount: value.freezeCount, timestamp: value.timestamp,
           } })
           if (display) {
+            if (timing.bufferMs !== undefined) buffer = uiText("수신 대기 {p0} ms", { p0: Math.round(timing.bufferMs) })
+            if (timing.decodeMs !== undefined) decode = uiText("디코딩 {p0} ms", { p0: Math.round(timing.decodeMs) })
             if (lastTime && value.timestamp > lastTime) {
               rate = `${Math.max(0, (value.bytesReceived - lastBytes) * 8 / (value.timestamp - lastTime) / 1000).toFixed(1)} Mbps`
               if (Number.isFinite(value.framesDecoded)) received = uiText("수신 {p0} FPS / 목표 {p1} FPS", { p0: Math.round(Math.max(0, value.framesDecoded - lastFrames) * 1000 / (value.timestamp - lastTime)), p1: current.videoStatus()?.fps ?? video.fps })
@@ -115,7 +121,7 @@ export function connectDesktop(events: DesktopEvents, preferredScreen?: string, 
         displayAt = performance.now()
         publishNetwork()
         const status = current.videoStatus(), queue = status ? uiText("전송 대기 {p0} ms", { p0: status.queueMs }) : ''
-        events.stats([uiText("직접 연결"), dimensions, received, rtt, rate, status ? `H.264 ${status.profile === 'high' ? 'High' : 'Baseline'}` : '', queue].filter(Boolean).join(' · '))
+        events.stats([uiText("직접 연결"), dimensions, received, rtt, rate, status ? `H.264 ${status.profile === 'high' ? 'High' : 'Baseline'}` : '', queue, buffer, decode].filter(Boolean).join(' · '))
       }
     }).catch(() => {}).finally(() => { checkingStats = false })
   }, 100)
@@ -145,6 +151,7 @@ export function connectDesktop(events: DesktopEvents, preferredScreen?: string, 
       const next = Number(value.negotiation ?? 0)
       if (!Number.isInteger(next) || next < 0 || next > 2 || offered && (next !== negotiation + 1 || connected || channelsReady)) throw new Error(uiText("화면 연결 응답이 중복됐습니다."))
       direct?.close(); network.resetPeer(); input.close(); decoded = false; lastBytes = 0; lastTime = 0; lastFrames = 0; networkStatus = {}; negotiation = next; offered = true
+      sampleTiming = desktopVideoTiming()
       clearTimeout(directDeadline)
       directDeadline = setTimeout(directFailed, 20_000)
       try {

@@ -40,9 +40,12 @@ function nativeAttempt(rtc, { iceServers, udpPort, emit, input, keyframe, bitrat
     const reporter = new rtc.RtcpSrReporter(config)
     reporter.addToChain(new rtc.RtcpNackResponder(Math.min(4096, Math.max(512, Math.ceil(videoRate(settings) / 8 / 1180 * .4)))))
     track.setMediaHandler(reporter)
-    const requestKey = () => { if (!closed && now() - lastKey >= 200) { lastKey = now(); keyframe() } }
+    const requestKey = () => {
+      if (closed || now() - lastKey < 200) return false
+      lastKey = now(); keyframe(); return true
+    }
     pacer = videoPacer({ ssrc, payload, bitrate: videoRate(settings), fps: settings.fps, priority: settings.priority, send: packet => !closed && track.isOpen() && track.sendMessageBinary(packet), keyframe: requestKey, congested: () => adaptation.congested(), unsupported: () => fail(new Error('GPU의 영상 프로필·레벨이 브라우저 협상 범위를 초과했습니다. 해상도와 FPS를 낮춰 다시 연결해 주세요.')) })
-    adaptation = videoAdaptation({ maximum: videoRate(settings), priority: settings.priority, now, keyframe: () => { if (!pacer.sendingKeyframe()) requestKey() }, change: value => { pacer.bitrate(value); bitrate(value) } })
+    adaptation = videoAdaptation({ maximum: videoRate(settings), priority: settings.priority, now, keyframe: () => !pacer.sendingKeyframe() && requestKey(), change: value => { pacer.bitrate(value); bitrate(value) } })
     const feedback = value => {
       if (!adaptation.feedback(value)) return
       const control = channels.find(channel => channel.desktopLabel === 'control')

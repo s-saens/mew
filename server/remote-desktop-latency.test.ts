@@ -12,11 +12,11 @@ test('local pointer updates precede network sends; stale corrections never rewin
   let time = 0; t.mock.method(performance, 'now', () => time)
   const positions: unknown[] = [], packets: InputSnapshot[] = []
   const input = desktopInput(() => assert.fail(), (...point) => positions.push(point))
-  const channel = { readyState: 'open' as const, bufferedAmount: 0, send: (raw: string) => packets.push(JSON.parse(raw)) }
+  const channel = { readyState: 'open' as const, bufferedAmount: 0, send: (raw: string) => { assert.ok(positions.length, 'local cursor is drawn before sending input'); packets.push(JSON.parse(raw)) } }
   input.connect('motion', channel); input.connect('control', channel)
   input.remoteCursor(cursor); input.localCursor(true)
   input.point(.8, .7)
-  assert.deepEqual(positions.at(-1), [.8, .7, false]); assert.equal(packets.length, 0)
+  assert.deepEqual(positions.at(-1), [.8, .7, false]); assert.equal(packets.length, 1, 'the leading motion sample does not wait for rAF')
   input.remoteCursor({ ...cursor, x: .2 }); assert.deepEqual(positions.at(-1), [.8, .7, false])
   input.flushMotion(time)
   input.point(.9, .8); input.remoteCursor({ ...cursor, seq: packets[0].seq, x: .8 }); assert.deepEqual(positions.at(-1), [.9, .8, false])
@@ -59,7 +59,7 @@ test('144Hz motion preserves its frame clock and reliable keys overtake coalesce
   assert.ok(motion.length >= 140 && motion.length <= 145, `144Hz motion: ${motion.length}`)
   input.move(10,20); input.key('KeyA',true)
   assert.deepEqual(control.at(-1)!.keys,['KeyA']); assert.equal(control.at(-1)!.x,10)
-  time += 5000; input.point(.9,.5); const before = motion.length; input.flushMotion(time)
+  time += 5000; const before = motion.length; input.point(.9,.5); input.flushMotion(time)
   assert.equal(motion.length,before + 1, 'a scheduler stall sends one current snapshot without a catch-up burst')
 })
 

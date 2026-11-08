@@ -109,6 +109,121 @@ test('congested motion skips a packet and its next snapshot includes all distanc
   assert.deepEqual([packets[0].x, packets[0].y], [105, 46])
 })
 
+for (const kind of ['move', 'point', 'wheel'] as const) {
+  test(`${kind} sends its first sample without waiting for animation or idle reliable input`, t => {
+    let time = 0; t.mock.method(performance, 'now', () => time)
+    const s = setup()
+    s.input.heartbeat(); s.input.key('KeyA', true); s.input.key('KeyA', false)
+    s.input[kind](kind === 'point' ? .5 : 10, kind === 'point' ? .8 : 20)
+    assert.equal(s.motion.length, 1)
+    assert.equal(s.reliable.length, 3, 'motion keeps its unreliable channel')
+    s.input.flushMotion(time)
+    assert.equal(s.motion.length, 1, 'the same animation frame cannot duplicate the sample')
+    time = 10; s.input.heartbeat()
+    time = 17; s.input[kind](kind === 'point' ? .6 : 10, kind === 'point' ? .9 : 20)
+    assert.equal(s.motion.length, 2, 'a heartbeat does not postpone the existing motion deadline')
+  })
+}
+
+test('event-driven motion and animation share the cap while preserving reliable order and recovery', t => {
+  let time = 0; t.mock.method(performance, 'now', () => time)
+  const s = setup()
+  s.input.frameRate(60)
+  s.input.move(1, 0)
+  for (time = 1; time < 17; time++) { s.input.move(1, 0); s.input.flushMotion(time) }
+  assert.equal(s.motion.length, 1, 'high-frequency input coalesces within the frame budget')
+  s.input.flushMotion(time)
+  assert.equal(s.motion.length, 2)
+  assert.equal(s.motion[1].x, 17)
+  s.input.button(1, true)
+  for (time = 18; time < 34; time++) s.input.move(1, 0)
+  s.input.flushMotion(time)
+  assert.equal(s.motion.length, 3)
+  s.receiver.accept(s.motion.at(-1), false)
+  assert.deepEqual(s.events, [], 'new motion cannot overtake the reliable button press')
+  s.receiver.accept(s.reliable[0], true)
+  assert.deepEqual(s.events, [['move', 17, 0], ['button', 1, true], ['move', 16, 0]])
+  s.input.wheel(0, 120)
+  time = 51; s.input.flushMotion(time) // Lose the last unreliable wheel packet.
+  assert.equal(s.reliable.length, 1)
+  time = 104; s.input.flushMotion(time)
+  assert.equal(s.reliable.length, 2)
+  s.receiver.accept(s.reliable[1], true)
+  assert.deepEqual(s.events.at(-1), ['wheel', 0, 120])
+  s.input.release(); s.receiver.accept(s.reliable.at(-1), true)
+  assert.deepEqual(s.events.at(-1), ['button', 1, false])
+})
+
+test('lost idle heartbeats and recovery snapshots do not hold newer cumulative motion', t => {
+  let time = 0; t.mock.method(performance, 'now', () => time)
+  const s = setup()
+  s.input.heartbeat() // Delay the reliable heartbeat until after newer motion.
+  s.input.wheel(0, 120)
+  assert.equal(s.motion[0].epoch, s.reliable[0].epoch)
+  s.receiver.accept(s.motion[0], false)
+  assert.deepEqual(s.events, [['wheel', 0, 120]])
+  s.receiver.accept(s.reliable[0], true)
+  assert.equal(s.events.length, 1, 'a late heartbeat cannot replay input')
+  time = 80; s.input.flushMotion(time) // Delay the final reliable recovery too.
+  assert.equal(s.reliable[1].epoch, 0)
+  time = 100; s.input.move(10, 0)
+  assert.equal(s.motion[1].epoch, 0)
+  assert.ok(s.motion[1].seq > s.reliable[1].seq)
+  s.receiver.accept(s.motion[1], false)
+  assert.deepEqual(s.events.at(-1), ['move', 10, 0])
+  s.receiver.accept(s.reliable[1], true)
+  assert.equal(s.events.length, 2, 'a late recovery cannot rewind cumulative motion')
+  s.time(1400); s.input.heartbeat(); s.receiver.accept(s.reliable.at(-1), true)
+  s.time(2800); assert.equal(s.receiver.tick(), false, 'same-epoch heartbeats still renew the input lease')
+  s.time(2901); assert.equal(s.receiver.tick(), true)
+})
+
+test('modifier and button transitions still gate motion and release across lost heartbeats', t => {
+  let time = 0; t.mock.method(performance, 'now', () => time)
+  const s = setup()
+  s.input.key('ShiftLeft', true); s.input.button(1, true)
+  assert.deepEqual(s.reliable.map(packet => packet.epoch), [1, 2])
+  s.input.move(10, 0)
+  s.receiver.accept(s.motion[0], false)
+  assert.deepEqual(s.events, [], 'motion cannot apply either delayed transition')
+  s.receiver.accept(s.reliable[0], true)
+  assert.deepEqual(s.events, [['key', 'ShiftLeft', true]])
+  s.receiver.accept(s.reliable[1], true)
+  assert.deepEqual(s.events.slice(-2), [['button', 1, true], ['move', 10, 0]])
+  s.input.heartbeat() // Hold this same-state packet while motion keeps arriving.
+  time = 20; s.input.wheel(0, 120)
+  assert.equal(s.motion[1].epoch, 2)
+  s.receiver.accept(s.motion[1], false)
+  assert.deepEqual(s.events.at(-1), ['wheel', 0, 120])
+  s.input.release()
+  assert.equal(s.reliable.at(-1)!.epoch, 3)
+  time = 40; s.input.move(10, 0)
+  s.receiver.accept(s.motion[2], false)
+  assert.equal(s.events.length, 4, 'motion waits for the actual release transition')
+  s.receiver.accept(s.reliable[2], true) // Ordered delivery resumes with heartbeat.
+  s.receiver.accept(s.reliable[3], true)
+  assert.deepEqual(s.events.slice(-3), [['button', 1, false], ['key', 'ShiftLeft', false], ['move', 10, 0]])
+})
+
+test('shared key ownership does not create a transition or reorder unchanged held keys', t => {
+  let time = 0; t.mock.method(performance, 'now', () => time)
+  const s = setup()
+  s.input.key('ShiftLeft', true, 'screen'); s.input.key('KeyW', true, 'screen')
+  for (const packet of s.reliable) s.receiver.accept(packet, true)
+  s.input.key('KeyW', true) // Physical ownership would otherwise move KeyW first.
+  assert.equal(s.reliable[2].epoch, 2)
+  assert.deepEqual(s.reliable[2].keys, ['ShiftLeft', 'KeyW'])
+  s.input.move(10, 0); s.receiver.accept(s.motion[0], false)
+  assert.deepEqual(s.events.at(-1), ['move', 10, 0], 'motion works before the duplicate key snapshot arrives')
+  s.input.releasePhysical()
+  assert.equal(s.reliable.at(-1)!.epoch, 2)
+  time = 20; s.input.wheel(0, 120); s.receiver.accept(s.motion[1], false)
+  assert.deepEqual(s.events.at(-1), ['wheel', 0, 120])
+  s.input.release(); s.receiver.accept(s.reliable.at(-1), true)
+  assert.equal(s.reliable.at(-1)!.epoch, 3)
+  assert.deepEqual(s.events.slice(-2), [['key', 'ShiftLeft', false], ['key', 'KeyW', false]])
+})
+
 for (const [kind, bit] of [['left', 1], ['wheel', 2], ['right', 4]] as const) {
   test(`${kind} tap, immediate movement, hold-drag and cancellation`, () => {
     const events: unknown[][] = [], input = { button: (...args: unknown[]) => events.push(['button', ...args]), click: (...args: unknown[]) => events.push(['click', ...args]), move: (...args: unknown[]) => events.push(['move', ...args]), wheel: (...args: unknown[]) => events.push(['wheel', ...args]) }
