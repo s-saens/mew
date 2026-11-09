@@ -44,7 +44,8 @@ import { ActiveSessionsButton } from './components/active-sessions-button'
 import { MobileDock } from './components/mobile-dock'
 import { useDockPreferences } from './hooks/use-dock-preferences'
 import { useMobileKeyboard } from './hooks/use-mobile-keyboard'
-import { adjacentDockPanel, type MobileDockPanel } from './utils/mobile-dock'
+import { adjacentDockPanel, visibleDockPanels, type MobileDockPanel } from './utils/mobile-dock'
+import { handleDockShortcut } from './utils/dock-shortcuts'
 import { OPEN_NOTICE_EVENT, publishMewcatNotice, type MewcatNotice } from './utils/mewcat-notifications'
 import { SidebarCreateButtons } from './components/sidebar-create-buttons'
 import { ScopeToggle } from './components/scope-toggle'
@@ -1357,6 +1358,14 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     const next = adjacentDockPanel(order, panel, direction)
     if (next) selectDockPanel(next, false)
   }
+
+  useEffect(() => {
+    if (!active || projectView !== 'workspace' || mobileKeyboardOpen) return
+    const panels = visibleDockPanels(dockPreferences.order, mobileDockPanels, dockPreferences.hidden)
+    const onKeyDown = (event: KeyboardEvent) => handleDockShortcut(event, panels, panel => selectDockPanel(panel, false))
+    window.addEventListener('keydown', onKeyDown, true)
+    return () => window.removeEventListener('keydown', onKeyDown, true)
+  })
 
   const switchCurrentWindowTabRight = useCallback(() => {
     let surface = activeTabbedSurfaceRef.current

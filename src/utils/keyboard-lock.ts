@@ -34,6 +34,7 @@ export function requestKeyboardLock({ keys, priority = 0, status = () => {}, key
 export const APP_KEYBOARD_KEYS = [
   'KeyW', 'KeyN', 'KeyT', 'KeyR', 'KeyL', 'KeyP', 'KeyO', 'KeyS', 'KeyF', 'KeyB', 'KeyC',
   'Escape', 'Tab', 'PageUp', 'PageDown',
+  ...Array.from({ length: 12 }, (_, i) => `F${i + 1}`),
   ...Array.from({ length: 9 }, (_, i) => `Digit${i + 1}`),
   ...Array.from({ length: 9 }, (_, i) => `Numpad${i + 1}`),
 ]

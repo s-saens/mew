@@ -1,6 +1,6 @@
 ---
 title: "Appearance, notifications, Dock, and keyboard shortcut settings"
-description: "Explains themes, file icon packs, language and fonts, desktop/mobile browser notifications, Dock positions, and keyboard shortcuts, including Alt+E for server files and Alt+S for schedules. Covers Android permission setup, iPhone/iPad Home Screen requirements, mobile navigation, and implementation links."
+description: "Explains themes, file icons, language, notifications, Dock settings, and keyboard shortcuts, including F1–F12 Dock selection and browser key restrictions. Covers mobile setup and navigation."
 created: 2026-10-22
 updated: "2026-11-05"
 상위파일: "MOC.md"
@@ -67,6 +67,10 @@ Use Header menu → **Settings → Dock** to change the visibility and order of 
 Hiding an icon does not close open panels or task sessions. Hiding all items hides the dock; you can reopen settings from the header menu. Items unavailable due to permissions, login, or project conditions are excluded from both the settings list and the dock. Visibility settings are saved in `mew:mobile-dock-hidden` and ordering in the existing `mew:mobile-dock-order`, with positions in `mew:dock-positions`, per browser, including settings for items excluded by permissions. If storage is unavailable, settings continue to apply on the current page. Changes are synchronized between settings and the dock on the same page and with storage changes from other windows. Existing long-press and keyboard reordering in the dock remain available.
 
 ## Keyboard shortcut settings
+
+`F1` through `F12` select the corresponding visible Dock item in display order, including any custom ordering. Hidden or unavailable items are skipped; keys beyond the last item do nothing. Selecting an open panel focuses it without closing it. These fixed shortcuts work while typing, but dialogs and focused remote screens retain their own input. Modified function keys keep their existing behavior.
+
+Mew prevents browser defaults for function keys that reach the workspace. Browsers or the operating system may reserve some keys, including F11 and F12, before the page receives them. On supported browsers, use Mew's fullscreen button or `Alt+Enter` to request a keyboard lock; availability still depends on the browser and operating system.
 
 View the current key combination for each feature under Header menu → **Settings → Keyboard shortcuts**. By default, `Alt+T` toggles the task panel, and `Ctrl+백틱` opens the terminal. Select a configurable item, then enter the combination to use. Each item's Reset button resets only that item; Reset all restores all custom combinations to their defaults. Fixed shortcuts, such as the editor's undo, redo, link, and document search shortcuts, cannot be changed.
 

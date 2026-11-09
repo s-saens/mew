@@ -1,6 +1,6 @@
 ---
 title: "UI workspace panels, Dock, and gestures"
-description: "Workspace geometry, safe areas, Dock layout, tab motion, and mobile gestures. Defines separate single-project desktop, multi-project board/compact-view, and physical-mobile restoration, including fractional board sizing, stable project hosts, dedicated movement handles, and live animated rearrangement."
+description: "Workspace geometry, safe areas, Dock layout and F1–F12 selection, tab motion, and mobile gestures. Covers single-project and multi-project restoration and board arrangement."
 created: "2026-11-03"
 updated: "2026-11-08"
 상위파일: "ui-contracts.md"
@@ -182,6 +182,8 @@ Editor toggling preserves all panes, tabs, bodies, splits, and mounts. Its deskt
 ### Mobile Dock and Panel Switching
 
 Mobile dock selection only changes the foreground through the shared `openWorkspacePanel` or `showMobileEditor`; pressing the same button again does not close it. On desktop, only an open, focused panel closes through `closeWorkspacePanel`; other open panels receive focus, and closed panels open.
+
+Unmodified F1–F12 select visible Dock items by their current display order in the active workspace. Selection uses the non-toggle path, skips hidden and unavailable items, consumes unmatched keys and repeats, and leaves dialog and remote input alone. The fullscreen app keyboard lock requests these keys; browser and OS reservations may still prevent delivery. See [keyboard shortcuts](../../../docs/configuration/appearance.md#keyboard-shortcut-settings).
 
 Dock swipes select the adjacent panel in the displayed dock order, relative to the mobile foreground panel or desktop focused panel. Left-to-right selects the previous panel (-1), and right-to-left selects the next (+1), triggering once when movement reaches at least 20px and horizontal movement exceeds 1.5 times vertical movement. Hidden and unauthorized items are skipped, and navigation stops at either end. Selected tabs are preserved; this does not switch tabs instead. For chat and Android, which are absent from the dock, use a dock button to select the target panel.
 
