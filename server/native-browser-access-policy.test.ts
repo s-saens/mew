@@ -12,9 +12,9 @@ import type { RequestAuth } from './reqAuth.ts'
 test('native browser defaults and overrides do not inherit desktop, localhost or legacy browser grants', () => {
   for (const role of ['owner', 'manager'] as const) assert.equal(defaultCapabilities(role).nativeBrowser, true)
   for (const role of ['member', 'guest'] as const) assert.equal(defaultCapabilities(role).nativeBrowser, false)
-  assert.deepEqual(normalizeFeatureOverrides({ browser: true, desktop: true }), { desktop: true, portPreview: true })
-  assert.deepEqual(normalizeFeatureOverrides({ browser: true, nativeBrowser: false }), { nativeBrowser: false, portPreview: true })
-  assert.deepEqual(normalizeFeatureOverrides({ browser: false, nativeBrowser: true, portPreview: true }), { nativeBrowser: true, portPreview: true })
+  assert.deepEqual(normalizeFeatureOverrides({ browser: true, desktop: true }), { desktop: true })
+  assert.deepEqual(normalizeFeatureOverrides({ browser: true, nativeBrowser: false }), { nativeBrowser: false })
+  assert.deepEqual(normalizeFeatureOverrides({ browser: false, nativeBrowser: true, portPreview: true }), { nativeBrowser: true })
 })
 
 test('account settings independently grant and revoke the persisted native browser capability', async t => {
@@ -43,17 +43,16 @@ test('account settings independently grant and revoke the persisted native brows
   assert.equal(granted.status, 200)
   const row = ((await granted.json()) as AccessSettings).rows.find(item => item.subject === member)!
   assert.equal(row.capabilities.nativeBrowser, true); assert.equal(row.overrides.nativeBrowser, true)
-  for (const feature of ['desktop', 'portPreview', 'agent', 'git'] as const) assert.equal(row.capabilities[feature], false, feature)
+  for (const feature of ['desktop', 'agent', 'git'] as const) assert.equal(row.capabilities[feature], false, feature)
   assert.equal(canUse(memberAuth, 'nativeBrowser'), true)
   assert.equal(canUse({ ...memberAuth, mustChangePassword: true }, 'nativeBrowser'), false)
   assert.equal((await save('nativeBrowser', true, 'guest')).status, 400)
-  await save('desktop', true); await save('portPreview', true)
+  await save('desktop', true)
   assert.equal((await save('nativeBrowser', false)).status, 200)
   assert.equal(canUse(memberAuth, 'nativeBrowser'), false, 'desktop and localhost grants cannot restore browser access')
   assert.equal(capabilitiesFor(memberAuth).desktop, true)
-  assert.equal(capabilitiesFor(memberAuth).portPreview, true)
   const persisted = JSON.parse(await fs.readFile(path.join(process.env.MEW_DATA_DIR, 'access-policy.json'), 'utf8'))
-  assert.deepEqual(persisted.features[member], { nativeBrowser: false, desktop: true, portPreview: true })
+  assert.deepEqual(persisted.features[member], { nativeBrowser: false, desktop: true })
   requester = memberAuth
   assert.equal((await save('nativeBrowser', true)).status, 403, 'members cannot grant themselves browser access')
   const { attachDomBrowserWebSocket } = await import('./dom-browser.ts')

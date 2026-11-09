@@ -94,7 +94,7 @@ export function WorkspaceApplication({ account, guest, renderWorkspace }: Props)
   const selectorTitle = useId()
   const services = useWorkspaceAccount()
   const fallbackBrowser = useWorkspaceBrowser()
-  const [browserRequest, setBrowserRequest] = useState({ url: '', request: 0 })
+  const [browserRequest, setBrowserRequest] = useState({ url: 'about:blank', request: 0 })
   const desktop = useWorkspaceDesktop()
   const [mode, setMode] = useState(() => readMode(account ?? 'guest'))
   const [initial, setInitial] = useState<WorkspaceInfo | null>(null)
@@ -208,7 +208,7 @@ export function WorkspaceApplication({ account, guest, renderWorkspace }: Props)
   }, [account, board, boardInitialized, initial?.hasProject])
   useEffect(() => {
     if (!services.capabilities) return
-    setBoard(previous => previous.panels.reduce((state, panel) => panel.tool && (panel.tool === 'desktop' ? !services.capabilities?.desktop : !services.capabilities?.portPreview && !services.capabilities?.nativeBrowser) ? projectBoardReducer(state, { type: 'remove', panelId: panel.id }) : state, previous))
+    setBoard(previous => previous.panels.reduce((state, panel) => panel.tool && (panel.tool === 'desktop' ? !services.capabilities?.desktop : !services.capabilities?.nativeBrowser) ? projectBoardReducer(state, { type: 'remove', panelId: panel.id }) : state, previous))
   }, [services.capabilities, boardInitialized])
   useEffect(() => {
     if (multi || !legacyScope) return
@@ -372,7 +372,7 @@ export function WorkspaceApplication({ account, guest, renderWorkspace }: Props)
     const id = `remote-tool:${tool}`
     setBoard(value => projectBoardReducer(value, { type: 'add', panel: { id, projectPath: id, workingRoot: id, tool }, availableWidth: headerHost?.clientWidth }))
   }
-  const openBoardBrowser = (url = '') => {
+  const openBoardBrowser = (url = 'about:blank') => {
     setBrowserRequest(previous => ({ url, request: previous.request + 1 }))
     openTool('browser')
   }
@@ -382,7 +382,7 @@ export function WorkspaceApplication({ account, guest, renderWorkspace }: Props)
   }
   const renderPanel = (panel: ProjectBoardPanel) => {
     if (panel.tool && !multi) return null
-    if (panel.tool === 'browser') return services.capabilities?.portPreview || services.capabilities?.nativeBrowser ? <div data-dom-browser className="h-full min-h-0"><BoardBrowser url={browserRequest.url} navigationRequest={browserRequest.request} nativeAllowed={!!services.capabilities?.nativeBrowser} previewAllowed={!!services.capabilities?.portPreview} onClose={() => closeTool(panel.id)} /></div> : null
+    if (panel.tool === 'browser') return services.capabilities?.nativeBrowser ? <div data-dom-browser className="h-full min-h-0"><BoardBrowser url={browserRequest.url} navigationRequest={browserRequest.request} nativeAllowed={!!services.capabilities?.nativeBrowser} onClose={() => closeTool(panel.id)} /></div> : null
     if (panel.tool === 'desktop') return services.capabilities?.desktop ? <BoardDesktop embedded onClose={() => closeTool(panel.id)} /> : null
     if (draft?.panel.id === panel.id) return <ProjectDraftSelector paths={services.projects.paths} icons={services.projects.icons}
       basePath={initial.path} canUseAgent={!!services.capabilities?.agent} canManageFolders={services.role === 'owner' || services.role === 'manager'} onOpen={addProject} onClose={cancelDraft}

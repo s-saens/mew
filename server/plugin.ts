@@ -7,7 +7,6 @@ import { attachRemoteDesktopWebSocket } from './remote-desktop.ts'
 import type { ViteDevServer } from 'vite'
 import express from 'express'
 import { createApiApp } from './api.ts'
-import { attachPortPreviewWebSocket, createPortPreviewMiddleware } from './port-preview.ts'
 import { createAuthRouter, checkOrigin } from './authRoutes.ts'
 import { attachAuthContext, resolveAuth, authorizeTmux, authorizeCollab, authorizeFeature, authorizeDatabase } from './reqAuth.ts'
 import { attachTmuxWebSocket } from '@mew/tmux-term/server'
@@ -30,7 +29,6 @@ export function configureDocsServer(server: ViteDevServer): void {
   // 미들웨어로 낱개 등록하지 않고 하나의 Express 앱으로 묶어 mount한다.
   const app = express()
   app.use(workspaceSearchPolicy)
-  app.use(createPortPreviewMiddleware())
   app.use(checkOrigin)
   app.use('/api/auth', createAuthRouter())
   app.use('/api', attachAuthContext, createApiApp())
@@ -47,7 +45,6 @@ export function configureDocsServer(server: ViteDevServer): void {
     attachDomBrowserWebSocket(server.httpServer)
     attachBrowserDesktopWebSocket(server.httpServer)
     attachRemoteDesktopWebSocket(server.httpServer)
-    attachPortPreviewWebSocket(server.httpServer)
     // 지난 실행이 SIGKILL로 끊겼다면 그때 남은 에이전트 자식이 아직 램을 물고 있다
     reapOrphanAgents()
     startAgentScheduledPrompts()

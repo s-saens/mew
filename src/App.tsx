@@ -108,7 +108,6 @@ import { requestFullscreenWithKeyboard } from '@mew/ui/virtual-keyboard'
 import { deferredComponent } from './components/deferred-component'
 import { deferredDialog } from './components/deferred-dialog'
 import { afterFirstPaint } from './utils/fileOpenPerformance'
-import { captureLocalBrowserLinks, openLocalPortPreview } from './utils/local-browser-links'
 
 function toggleFullscreen() {
   if (document.fullscreenElement) document.exitFullscreen()
@@ -359,7 +358,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
   useEffect(() => { setProjectSidebarOpen(scopedBrowserStorage().getItem('mew:project-sidebar-open') === '1') }, [authEmail, api])
   const [terminalOpen, setTerminalOpen] = useState(() => canUseTerminal && (scopedBrowserStorage().getItem(viewStorageKey(TERMINAL_OPEN_KEY)) !== null ? scopedBrowserStorage().getItem(viewStorageKey(TERMINAL_OPEN_KEY)) === '1' : scopedBrowserStorage().getItem(viewStorageKey(LEGACY_TMUX_OPEN_KEY)) === '1' || scopedBrowserStorage().getItem(viewStorageKey(AGENT_OPEN_KEY)) === '1'))
   const [debuggerOpen, setDebuggerOpen] = useState(false)
-  const canOpenBrowser = !!auth.email && (caps.nativeBrowser || caps.portPreview)
+  const canOpenBrowser = !!auth.email && caps.nativeBrowser
   const [browserOpen, setBrowserOpen] = useState(false)
   const [browserUrl, setBrowserUrl] = useState(caps.nativeBrowser ? 'about:blank' : '')
   const [browserNavigationRequest, setBrowserNavigationRequest] = useState(0)
@@ -408,7 +407,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
   useEffect(() => {
     setBrowserOpen(false); setBrowserUrl(caps.nativeBrowser ? 'about:blank' : '')
     setMobilePanelStack(stack => closeMobilePanel(stack, 'browser'))
-  }, [auth.email, caps.portPreview, caps.nativeBrowser, api])
+  }, [auth.email, caps.nativeBrowser, api])
   const [mewcatRuntime, setMewcatRuntime] = useState<string | null>(null)
   const [mewcatPicker, setMewcatPicker] = useState(false)
   const mewcatRuntimeRef = useRef(mewcatRuntime)
@@ -575,12 +574,6 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
   const accountEditorTabs = useAccountEditorTabs(isGuest ? null : authEmail, projectUiPath,
     error => showToast(error instanceof Error ? error.message : String(error)))
   const prepareEditorTabs = accountEditorTabs.prepare
-
-  useEffect(() => active ? captureLocalBrowserLinks(url => {
-    if (!auth.email || !caps.portPreview) { showToast(uiText('localhost 앱에 접근할 권한이 없습니다.')); return }
-    try { openLocalPortPreview(url) }
-    catch (error) { showToast(error instanceof Error ? error.message : uiText('미리보기를 열지 못했습니다.')) }
-  }) : undefined, [active, auth.email, caps.portPreview, showToast, api])
 
   const refreshMewUpdate = useCallback(async (announce = false) => {
     try {
@@ -2009,10 +2002,10 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
   const headerMenuItems: HeaderMenuItem[] = [
     ...(isOwner ? [{ id: 'admin', group: 'account' as const, label: t('header.accountManagement'), icon: <User width={16} height={16} />, onSelect: () => setAdminOpen(true) }] : []),
     ...(caps.desktop ? [{ id: 'desktop', group: 'tools' as const, label: t('access.desktop'), icon: <Computer width={16} height={16} />, active: remoteDesktopOpen, onSelect: () => selectDockPanel('desktop') }] : []),
-    ...(caps.portPreview && auth.email ? [{
+    ...(caps.nativeBrowser && auth.email ? [{
       id: 'localhost-browser', group: 'tools' as const, label: t('menu.remoteBrowser'), icon: <Globe width={16} height={16} />,
       onSelect: () => {
-        setBrowserUrl('')
+        setBrowserUrl('about:blank')
         setBrowserNavigationRequest(request => request + 1)
         setRemoteDesktopOpen(false)
         dockRef.current?.restore()
@@ -2313,7 +2306,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
           {debuggerOpen && <Suspense fallback={<div role="status" className="p-2 text-xs text-ink-secondary">…</div>}><DebuggerPanel key={`${auth.email}:${rootProjectPath}`} root={rootProjectPath} onClose={() => closeWorkspacePanel('debugger')} onSettings={() => { setDebuggerSettingsRequested(true); setSettingsOpen(true) }} onOpenFile={(file, line) => { const relative = file.startsWith(rootProjectPath + '/') ? file.slice(rootProjectPath.length + 1) : file; if (!relative.startsWith('/')) openMentionedFile(WORKSPACE_PROJECT, relative, line) }} /></Suspense>}
         </DockPanel>}
         {canOpenBrowser && !compact && <DockPanel id="browser" kind="browser" visible={browserOpen} tabs={['browser']} mobileSelected onFocus={() => bringWorkspacePanelToFront('browser')}>
-          {browserOpen && <div data-workspace-panel="browser" data-dom-browser className="h-full min-h-0 min-w-0"><BrowserDesktopPanel key={auth.email} url={browserUrl} navigationRequest={browserNavigationRequest} nativeAllowed={caps.nativeBrowser} previewAllowed={caps.portPreview} onClose={() => closeWorkspacePanel('browser')} /></div>}
+          {browserOpen && <div data-workspace-panel="browser" data-dom-browser className="h-full min-h-0 min-w-0"><BrowserDesktopPanel key={auth.email} url={browserUrl} navigationRequest={browserNavigationRequest} nativeAllowed={caps.nativeBrowser} onClose={() => closeWorkspacePanel('browser')} /></div>}
         </DockPanel>}
         {rootProjectPath && caps.filesRead && auth.email && <DockPanel floating={toolPresentation.tasks === 'popup'} storageKey={popupKey('tasks')} legacyStorageKey={`mew:popup:${authEmail}:${projectUiPath}:tasks`} id="tasks" kind="tasks" visible={tasksOpen} tabs={['tasks']} mobileSelected onFocus={() => { activeTabbedSurfaceRef.current = 'tasks'; bringWorkspacePanelToFront('tasks') }}>
           {tasksMounted.current && <TaskPanel workspace={rootProjectPath} onOpenFile={path => {

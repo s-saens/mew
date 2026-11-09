@@ -1,6 +1,6 @@
 ---
-title: "Mew Port, login screens, and the host browser"
-description: "Explains opening host apps with Mew Port, finding them in the menu currently labelled Localhost browser, and the agreed Local apps replacement name. Covers closing listener processes from the port list, native Chrome browsing, login video, permissions, prerequisites, and session lifetimes."
+title: "Login screens and the host browser"
+description: "Explains the shared host Chrome browser and login screens, permissions, prerequisites, session lifetimes, and the removal of Mew Port."
 created: "2026-09-04"
 updated: "2026-11-07"
 ---
@@ -13,31 +13,16 @@ Currently supported hosts are Linux/WSL. Ordinary Google Chrome, Xvfb, FFmpeg, P
 
 Login screens and the Browser panel below use the same Chrome window, H.264/WebRTC video component, input, and per-account browser profile. Cookies saved while signing in are available when you return to the Browser, and browsing cookies are available to login screens. This profile belongs to the Mew browser; it is separate from the host user's personal Chrome profile and other Mew accounts. Do not attach CDP or a DOM recorder to login pages. Detailed behavior and lifecycle follow [Login Virtual Screen](../../.mew/docs/development/login-desktop.md). Successful authentication with actual Google and Antigravity accounts must be verified in the user's environment.
 
-## Find running localhost apps
+<a id="find-running-localhost-apps"></a>
+<a id="open-host-localhost-apps"></a>
 
-The app-list menu's agreed name is **Local apps**. It currently displays **Localhost browser**; the UI label change is pending. See the [Mew Port terminology](../../.mew/docs/development/port-preview.md#terminology).
-
-Choose **Menu → Localhost browser** to list ports currently listening on the Mew host. Click a port to open it in a new browser tab through Mew's host-app proxy. The list includes services started outside Mew's command buttons; use refresh to update it. A port labelled **Mew** is disabled, as are reserved ports marked unavailable. Each row shows the app name followed by its port number as a tag, such as **Along** `5173`. When there is no HTML page title, Mew uses the actual process name when available, for example **postgres** `5432` or **sshd** `22`. If neither can be read, the name is **(Unnamed)**. A process name identifies the listener owner; it does not prove what the service does. Long names are shortened to fit; hover over a name to read it. Refresh updates the list and its names. Pages whose title requires JavaScript or app login, HTTPS-only services, and processes hidden by OS permissions may lack a descriptive name. The list shows TCP listeners, so a non-web service may not open as a webpage.
-
-To stop an app, right-click its port row and choose **Close port**. On mobile, press and hold the row; with a keyboard, use Shift+F10 or the Context Menu key. Confirm to stop the process using the port. Its other ports close too, and Mew refreshes the list. This requires both **Access localhost Apps** and **Terminal** permissions. Mew and reserved ports cannot be closed. A process that refuses to stop, belongs to another OS user, or is restarted by a supervisor can leave the port open; Mew shows an error rather than forcing it to stop. This action does not remove separately configured Tailscale forwarding rules.
-
-If the list asks you to restart Mew with the latest code, the UI has loaded but the running server does not provide the port-list API. Apply the current server code with your normal server restart procedure, then retry the list. A UI build alone does not reload server routes.
-
-The list itself starts no host browser or app. The **Access localhost Apps** permission controls this menu and app tabs. **Account Management → Feature Permissions → Browser** controls both the native Chrome Browser and login screens. It is independent of **Remote desktop** and **Access localhost Apps**. Owners and managers have browser access by default; members can receive an explicit grant. Guests and temporary-password accounts cannot use it. Agent/Git workflows still require their own permissions.
-
-## Open host localhost apps
-
-**Mew Port** lets you open an app running on the Mew host through a Mew address, using `{mewAddress}/{port}`.
-
-Click a `http://localhost:3333` link in a document, agent response, or terminal output, or click a command's port number. Mew opens a new tab at `{mewAddress}/3333`, preserving its path, query, and fragment. For example, a host link ending in `:3333/settings?mode=dev#panel` opens through `/3333/settings?mode=dev#panel`. The app must already be running; clicking its link does not start or restart it.
-
-The app runs in your viewing-device browser through the existing authenticated sandbox proxy. This also avoids sending localhost app pixels through the internal Browser video stream. Existing URL rewriting, sandbox, HTTP loopback, and [Mewlink preview prerequisites](../../.mew/docs/development/port-preview.md#mewlink) still apply. HTTPS-only development services may need a compatible HTTP entry; the proxy's protocol was not changed.
+Mew Port and its port list have been removed. Browser and login access remain available with the **Browser** permission.
 
 ## Browse with host Chrome
 
 Choose **Browser** in the dock to open ordinary Google Chrome on a private virtual display. Use Chrome's own address bar, tabs, Back, Forward, and menus. Its real rendered screen reaches your device as encoded H.264 video over WebRTC, and input returns directly. This is not DOM reconstruction or periodic screenshots. It shares the account's browser-only profile with login screens and never takes over the host's actual desktop.
 
-On a phone, tap to click and swipe to scroll. Tap a remote input field and then the keyboard button to type. When localhost app access is allowed, the panel's **Open ports** button returns to its picker. Use **Reconnect** after a connection error; it does not retry automatically. A brief disconnection retains the browser for up to 60 seconds. Explicit close cleans up the virtual screen and Chrome process while keeping the account's browser cookies and profile. Sessions expire after eight hours, and losing browser permission or logging out ends access. Opening another browser/login view takes over the same Chrome window; finishing an older login job cannot close a newer view.
+On a phone, tap to click and swipe to scroll. Tap a remote input field and then the keyboard button to type. Use **Reconnect** after a connection error; it does not retry automatically. A brief disconnection retains the browser for up to 60 seconds. Explicit close cleans up the virtual screen and Chrome process while keeping the account's browser cookies and profile. Sessions expire after eight hours, and losing browser permission or logging out ends access. Opening another browser/login view takes over the same Chrome window; finishing an older login job cannot close a newer view.
 
 The native Browser currently supports Linux/WSL and requires ordinary Google Chrome, Xvfb, FFmpeg with X11 capture and libx264, Python 3, libX11/libXtst, and Mew's existing native WebRTC dependency. `npm run browsers:check` checks browser executables; it does not establish the separate virtual-display and encoder prerequisites. Configure `MEW_CHROME_EXECUTABLE` if ordinary Chrome discovery fails. UI automation continues to use Playwright Chromium.
 

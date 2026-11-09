@@ -3,8 +3,6 @@ import type { Duplex } from 'node:stream'
 import type { AuthenticatedSession } from './auth.ts'
 import type { MewlinkIdentity } from '../shared/mewlink-identity.ts'
 export interface RemoteContext {
-  /** Set by the verified dispatcher for the isolated preview bridge, never from HTTP headers. */
-  capability?: 'port-preview'
   current(): AuthenticatedSession | null
   alive?(): boolean
   sessionToken?(): string | null

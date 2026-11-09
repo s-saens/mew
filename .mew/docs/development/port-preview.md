@@ -1,9 +1,11 @@
 ---
 title: "Mew Port: local app proxy and port discovery"
-description: "Defines Mew Port terminology, the Local apps menu name, and localhost app routing through authenticated direct/Mewlink proxies, port discovery, URL rewriting, and sandbox boundaries. Covers permission-gated listener-process shutdown from the port picker. Only portPreview authorizes proxy sessions and discovery; Browser/login uses the independent nativeBrowser feature."
+description: "Historical Mew Port implementation and compatibility contract, retained after removal of localhost app proxying, port discovery, and listener shutdown. Links the removal decision and current Browser behavior."
 created: "2026-10-20"
 updated: "2026-11-07"
 ---
+
+> **Historical contract:** Mew Port, its proxy, port discovery, and listener shutdown have been removed. The sections below preserve the former behavior and are not current instructions. See [ADR 0160](../decisions/0160-remove-mew-port.md) and the [current Browser contract](browser-desktop.md).
 
 ## Terminology
 

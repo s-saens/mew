@@ -104,7 +104,6 @@ test('DOM browser validates command input and remote transport capability', () =
   assert.deepEqual(parseDomBrowserCommand('{"type":"scroll","generation":1,"id":1,"x":0,"y":100}'), { type: 'scroll', generation: 1, id: 1, x: 0, y: 100 })
   assert.deepEqual(parseDomBrowserCommand('{"type":"key","generation":1,"key":"Enter","ctrlKey":true}'), { type: 'key', generation: 1, key: 'Enter', ctrlKey: true })
   assert.equal(remotePath(DOM_BROWSER_WS, true), true)
-  assert.equal(remotePath(DOM_BROWSER_WS, true, 'port-preview'), false)
 })
 
 test('host DOM relay opens an external HTTP hostname and follows links, redirects, and history without internet access', { timeout: 60_000, skip: !domBrowserExecutable() }, async t => {

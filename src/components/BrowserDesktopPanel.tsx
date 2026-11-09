@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import { ArrowRight, HomeSimple, Refresh } from 'iconoir-react'
+import { ArrowRight, Refresh } from 'iconoir-react'
 import { HoverTipLayer, LoadingIndicator } from '@mew/ui'
 import { uiText } from '@mew/ui/i18n-core'
 import { useUiLocale } from '@mew/ui/i18n'
-import { requestLocalBrowser } from '@mew/ui/local-browser'
 import { useFocusedShortcutScope } from '@mew/shortcuts'
 import { BROWSER_DESKTOP_WS } from '../../shared/browser-desktop'
 import { loginDesktopSize } from '../../shared/login-desktop'
@@ -11,14 +10,13 @@ import { openMewSocket } from '../utils/remote-transport'
 import { browserDesktopPeer } from '../utils/browser-desktop-peer'
 import { bindBrowserDesktopInput } from '../utils/browser-desktop-input'
 import { DockGrip } from './DockWorkspace'
-import { DomBrowserPorts } from './DomBrowserPorts'
 import { DesktopIcon } from './desktop-stick'
 import { PanelCloseButton } from './panel-close-button'
 
 type Connection = 'connecting' | 'ready' | 'error' | 'closed'
 
-export function BrowserDesktopPanel({ url, navigationRequest = 0, nativeAllowed = true, previewAllowed = true, streamUrl, reopen, onReady, embedded = false, onClose }: {
-  url: string; navigationRequest?: number; nativeAllowed?: boolean; previewAllowed?: boolean
+export function BrowserDesktopPanel({ url, navigationRequest = 0, nativeAllowed = true, streamUrl, reopen, onReady, embedded = false, onClose }: {
+  url: string; navigationRequest?: number; nativeAllowed?: boolean
   streamUrl?: string; reopen?: () => Promise<string>; onReady?: () => void; embedded?: boolean; onClose?: () => void
 }) {
   useUiLocale()
@@ -148,7 +146,6 @@ export function BrowserDesktopPanel({ url, navigationRequest = 0, nativeAllowed 
 
   const open = (raw: string) => {
     setAddressError('')
-    if (previewAllowed && requestLocalBrowser(raw)) return
     if (!nativeAllowed) { setAddressError(uiText('권한이 없습니다')); return }
     try {
       const target = new URL(/^[a-z][a-z\d+.-]*:\/\//i.test(raw) ? raw : `https://${raw}`)
@@ -175,7 +172,6 @@ export function BrowserDesktopPanel({ url, navigationRequest = 0, nativeAllowed 
     <div ref={scope} data-browser-desktop-panel data-embedded={embedded || undefined} className="flex h-full min-h-0 min-w-0 flex-col">
       <header className="flex h-8 shrink-0 items-center gap-0.5 border-b border-edge bg-surface px-1">
         {!embedded && <DockGrip group="browser" />}
-        {!embedded && active && previewAllowed && <button type="button" className={iconButton} aria-label={uiText('열려 있는 포트')} data-tip={uiText('열려 있는 포트')} onClick={() => setEntry(current => ({ url: '', request: current.request + 1 }))}><HomeSimple width={15} height={15} aria-hidden="true" /></button>}
         <span className="min-w-0 flex-1 truncate text-xs">{!embedded && uiText('브라우저')}</span>
         {active && <>
           <button type="button" className={iconButton} aria-label={uiText('키보드 입력')} data-tip={uiText('키보드 입력')} disabled={connection !== 'ready'} onClick={() => keyboard.current?.focus({ preventScroll: true })}><DesktopIcon kind="keyboard" /></button>
@@ -189,7 +185,6 @@ export function BrowserDesktopPanel({ url, navigationRequest = 0, nativeAllowed 
           <button type="submit" className={iconButton} aria-label={uiText('이동')} data-tip={uiText('이동')}><ArrowRight width={16} height={16} aria-hidden="true" /></button>
         </form>
         {addressError && <p role="alert" className="px-2 py-1 text-xs text-danger">{addressError}</p>}
-        {previewAllowed && <DomBrowserPorts onOpen={raw => { requestLocalBrowser(raw) }} />}
       </> : <div ref={stage} data-browser-desktop data-login-desktop={embedded || undefined} tabIndex={0} role="application" aria-label={embedded ? uiText('로그인 화면') : uiText('브라우저')} className="relative min-h-0 flex-1 touch-none overflow-hidden bg-black outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-accent">
         <video ref={video} playsInline autoPlay muted disablePictureInPicture className="pointer-events-none absolute inset-0 h-full w-full select-none object-contain" />
         <textarea ref={keyboard} aria-label={embedded ? uiText('로그인 키보드 입력') : uiText('키보드 입력')} autoCapitalize="off" autoCorrect="off" spellCheck={false} className="absolute bottom-0 left-0 h-px w-px opacity-0" />

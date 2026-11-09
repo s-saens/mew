@@ -12,7 +12,6 @@ import { appTabShortcut } from '../utils/app-tab-shortcuts'
 import { bindDomBrowserScroll, type DomBrowserScroll } from '../utils/dom-browser-scroll'
 import { PanelCloseButton } from './panel-close-button'
 import { DockGrip } from './DockWorkspace'
-import { DomBrowserPorts } from './DomBrowserPorts'
 
 type Connection = 'connecting' | 'open' | 'closed'
 
@@ -49,7 +48,6 @@ function DomBrowserStart({ onOpen, onClose }: { onOpen: (url: string) => void; o
       <PanelCloseButton aria-label={uiText('브라우저 닫기')} onClick={onClose} />
     </form>
     {error && <div role="alert" className="border-b border-edge px-2 py-1 text-xs text-danger">{error}</div>}
-    <DomBrowserPorts onOpen={onOpen} />
   </div>
 }
 
@@ -301,7 +299,7 @@ function DomBrowserPage({ url, navigationRequest, onClose, onHome }: { url: stri
   return <div ref={scope} data-dom-browser className="h-full min-h-0 min-w-0"><HoverTipLayer className="flex h-full min-h-0 min-w-0 flex-1 flex-col bg-surface-deep text-ink">
     <form className="flex h-9 shrink-0 items-center gap-0.5 border-b border-edge bg-surface px-1" onSubmit={event => { event.preventDefault(); navigate() }}>
       <DockGrip group="browser" />
-      <button type="button" className={buttonClass} aria-label={uiText('열려 있는 포트')} data-tip={uiText('열려 있는 포트')} onClick={onHome}><HomeSimple width={16} height={16} aria-hidden="true" /></button>
+      <button type="button" className={buttonClass} aria-label={uiText('브라우저 주소')} data-tip={uiText('브라우저 주소')} onClick={onHome}><HomeSimple width={16} height={16} aria-hidden="true" /></button>
       <button type="button" className={buttonClass} disabled={connection !== 'open' || !page.canGoBack} aria-label={uiText('뒤로가기')} data-tip={uiText('뒤로가기')} onClick={() => send({ type: 'back' })}><ArrowLeft width={16} height={16} aria-hidden="true" /></button>
       <button type="button" className={buttonClass} disabled={connection !== 'open' || !page.canGoForward} aria-label={uiText('앞으로가기')} data-tip={uiText('앞으로가기')} onClick={() => send({ type: 'forward' })}><ArrowRight width={16} height={16} aria-hidden="true" /></button>
       <button type="button" className={buttonClass} aria-label={uiText(connection === 'closed' ? '다시 연결' : '새로고침')} data-tip={uiText(connection === 'closed' ? '다시 연결' : '새로고침')} disabled={connection === 'connecting'} onClick={() => { setError(''); if (connection === 'closed') setAttempt(current => current + 1); else send({ type: 'reload' }) }}><Refresh width={16} height={16} aria-hidden="true" /></button>

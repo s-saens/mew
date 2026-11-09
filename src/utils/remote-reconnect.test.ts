@@ -5,7 +5,7 @@ import { exportJWK, generateKeyPair, jwtVerify, SignJWT, type JWK } from 'jose'
 import { connectRemote } from './remote-connection.ts'
 import { activeRemoteTransport, DataChannelTransport, setRemoteTransport } from './remote-transport.ts'
 import { initializeRemoteApp } from './remote-app.ts'
-import { portPreviewUrl } from './port-preview-url.ts'
+import { publicMewBaseUrl } from './port-preview-url.ts'
 import { REMOTE_LIMITS, type RemoteFrame } from '../../shared/remote-access.ts'
 import { AgentConnectionWatch } from './agent-connection-watch.ts'
 
@@ -336,7 +336,7 @@ test('app reconnect controls preserve the MessagePort and announce verified reco
   } } })
   t.after(() => { browser.dispatchEvent(new Event('pagehide')); setRemoteTransport(null); launcherPort?.close(); restore() })
   assert.equal((await initializeRemoteApp()).email, 'user@example.test')
-  assert.equal(portPreviewUrl(5555), 'https://mew.run/user/home/5555')
+  assert.equal(publicMewBaseUrl(), 'https://mew.run/user/home')
   const transport = activeRemoteTransport() as DataChannelTransport
   const pending = assert.rejects(transport.fetch('/api/files', { method: 'POST', body: 'write-once' }), /결과를 확인/)
   await until(() => frames.some(frame => frame.type === 'request' && frame.path === '/api/files'))
@@ -353,7 +353,7 @@ test('app reconnect controls preserve the MessagePort and announce verified reco
   assert.equal(activeRemoteTransport(), transport)
   assert.equal(transport.suspended, false)
   assert.equal((await waitingRead).status, 200)
-  assert.equal(portPreviewUrl(5555), 'https://mew.run/user/home/5555')
+  assert.equal(publicMewBaseUrl(), 'https://mew.run/user/home')
   assert.equal(handshakes, 1)
   const fresh = transport.fetch('/api/auth/me')
   assert.equal((await fresh).status, 200)
@@ -382,7 +382,7 @@ function bootstrapFixture(t: TestContext, reconnecting = false, authStatusPendin
 test('app bootstrap shares the launcher authentication already in flight without another GET', async t => {
   const fixture = bootstrapFixture(t, false, true)
   await until(() => activeRemoteTransport() !== null)
-  assert.throws(() => portPreviewUrl(5555), /기기 주소/)
+  assert.throws(() => publicMewBaseUrl(), /기기 주소/)
   assert.deepEqual(fixture.frames, [])
   fixture.status()
   assert.equal((await fixture.initializing).email, 'user@example.test')

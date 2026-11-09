@@ -20,7 +20,6 @@ import { ApiResponseError } from '../api/response'
 import { SessionTerminalPopup } from './SessionTerminalPopup'
 import { WORKSPACE_PROJECT } from '../utils/active-project'
 import { captureCommandMenuShortcut, focusFirstCommand, navigateCommandMenu } from '../utils/command-menu-keyboard'
-import { requestLocalBrowser } from '@mew/ui/local-browser'
 import { AUTOMATIC_RETRY_LIMIT } from '../utils/recovery-policy'
 
 const LONG_PRESS_MS = 500
@@ -273,15 +272,6 @@ function ScopedCommandButtonMenu({
     }
   }
 
-  function openPort(port: number) {
-    try {
-      if (!Number.isInteger(port) || port < 1 || port > 65535 || !requestLocalBrowser(`http://localhost:${port}/`)) throw new Error(uiText('미리보기를 열지 못했습니다.'))
-      setOpen(false)
-      setError(null)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : uiText("미리보기를 열지 못했습니다."))
-    }
-  }
 
   /** 추가·수정·삭제 모두 목록 전체 저장 한 경로로 처리한다 */
   async function commit(next: { name: string; command: string; oneShot?: boolean }[]) {
@@ -347,7 +337,7 @@ function ScopedCommandButtonMenu({
       {((buttons === null && !loadError) || recovering) && <div role="status" aria-label={uiText("불러오는 중…")} className="flex items-center px-3 py-2 text-ink-muted"><LoadingIndicator size={16} /></div>}
       {buttons !== null && (
         list.map((b, i) => (
-          <CmdRow key={b.name} button={b} shortcut={i < 9 ? String(i + 1) : undefined} dragProps={list.length > 1 ? drag.getItemProps(i) : undefined} dragging={drag.dragIndex === i} onMove={direction => reorder(i, i + direction)} onConsumeClick={drag.consumeClick} busy={busyName === b.name || metadataUnavailable} onRun={() => run(b)} onStop={() => stop(b)} onOpenPort={openPort} onOpenSession={() => { setPopup(b); setOpen(false) }} onEdit={() => startEditing({ index: i, name: b.name, command: b.command, oneShot: b.oneShot })} />
+          <CmdRow key={b.name} button={b} shortcut={i < 9 ? String(i + 1) : undefined} dragProps={list.length > 1 ? drag.getItemProps(i) : undefined} dragging={drag.dragIndex === i} onMove={direction => reorder(i, i + direction)} onConsumeClick={drag.consumeClick} busy={busyName === b.name || metadataUnavailable} onRun={() => run(b)} onStop={() => stop(b)} onOpenSession={() => { setPopup(b); setOpen(false) }} onEdit={() => startEditing({ index: i, name: b.name, command: b.command, oneShot: b.oneShot })} />
         ))
       )}
       {buttons !== null && list.length === 0 && !error && !metadataUnavailable && <div className="px-3 py-2 text-xs text-ink-muted">{uiText("아직 명령이 없습니다.")}</div>}
@@ -439,7 +429,6 @@ function CmdRow({
   busy,
   onRun,
   onStop,
-  onOpenPort,
   onOpenSession,
   onEdit,
 }: {
@@ -453,7 +442,6 @@ function CmdRow({
   onRun: () => void
   /** 실행 중일 때 재생 버튼이 하는 일 — 이 명령의 세션 종료 */
   onStop: () => void
-  onOpenPort: (port: number) => void
   onOpenSession: () => void
   onEdit: () => void
 }) {
@@ -517,16 +505,6 @@ function CmdRow({
       >
         <span className="truncate">{button.name}</span>
       </button>
-      {button.running && !!button.ports?.length && <HoverTipLayer className="mew-action-menu-ports">
-        {button.ports.map(port => <button
-          key={port}
-          type="button"
-          onClick={() => onOpenPort(port)}
-          className="mew-action-menu-item mew-action-menu-port"
-          data-tip={uiText("포트 {p0} 미리보기 열기", { p0: port })}
-          aria-label={uiText("{p0}: 포트 {p1} 미리보기 열기", { p0: button.name, p1: port })}
-        >{port}</button>)}
-      </HoverTipLayer>}
       {/* 실행 중이면 같은 자리가 정지 버튼이 된다 — 누르면 이 명령의 세션이 죽는다 */}
       <button
         type="button"

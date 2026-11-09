@@ -1,4 +1,3 @@
-import { previewRemotePath } from '../../shared/port-preview.ts'
 import { REMOTE_FLOW_CONTROL, REMOTE_LIMITS, REMOTE_REQUEST_HEADERS, parseRemoteFrame, remotePath, type RemoteFrame } from '../../shared/remote-access.ts'
 import { RemoteStreamSlots } from './remote-stream-slots.ts'
 import { decodeRemoteBytes as decode, encodeRemoteBytes as encode } from './remote-codec.ts'
@@ -123,8 +122,7 @@ export class DataChannelTransport implements AppTransport {
     if (this.closed) throw new Error('원격 연결이 종료됐습니다.')
     const request = new Request(input instanceof Request ? input : new URL(String(input), location.origin), init)
     const url = new URL(request.url)
-    const capability = previewRemotePath(url.pathname + url.search) ? 'port-preview' as const : undefined
-    if (url.origin !== location.origin || !remotePath(url.pathname + url.search, false, capability)) throw new Error('이 요청은 원격 접속에서 지원되지 않습니다.')
+    if (url.origin !== location.origin || !remotePath(url.pathname + url.search, false)) throw new Error('이 요청은 원격 접속에서 지원되지 않습니다.')
     const safe = ['GET', 'HEAD'].includes(request.method)
     while (true) {
       if (this.suspended) {
@@ -133,13 +131,13 @@ export class DataChannelTransport implements AppTransport {
       }
       const generation = this.generation
       try {
-        const response = await this.fetchRequest(request, url, capability, generation)
+        const response = await this.fetchRequest(request, url, generation)
         if (!safe || generation === this.generation) return response
       }
       catch (error) { if (!safe || this.closed || request.signal.aborted || generation === this.generation) throw error }
     }
   }
-  private async fetchRequest(request: Request, url: URL, capability: 'port-preview' | undefined, generation: number): Promise<Response> {
+  private async fetchRequest(request: Request, url: URL, generation: number): Promise<Response> {
     const signal = request.signal, release = await this.slots.acquire(signal, 'request', isUiResourceRequest(request.method, url.pathname))
     if (this.closed || this.suspended || generation !== this.generation) { release(); throw new Error('원격 요청이 중단됐습니다. 결과를 확인한 뒤 다시 시도해 주세요.') }
     const id = crypto.randomUUID()
@@ -153,8 +151,8 @@ export class DataChannelTransport implements AppTransport {
       signal.addEventListener('abort', abort, { once: true })
       if (signal.aborted) { abort(); return }
       void (async () => {
-        const headers = Object.fromEntries([...request.headers].filter(([key]) => capability === 'port-preview' ? !['cookie','host','origin','referer','connection','upgrade','content-length','x-mew-session'].includes(key.toLowerCase()) : (REMOTE_REQUEST_HEADERS as readonly string[]).includes(key)))
-        await this.send({ type: 'request', ...(capability ? { capability } : {}), id, method: request.method, path: url.pathname + url.search, headers, responseWindow: REMOTE_LIMITS.responseWindow, flowControl: REMOTE_FLOW_CONTROL })
+        const headers = Object.fromEntries([...request.headers].filter(([key]) => (REMOTE_REQUEST_HEADERS as readonly string[]).includes(key)))
+        await this.send({ type: 'request', id, method: request.method, path: url.pathname + url.search, headers, responseWindow: REMOTE_LIMITS.responseWindow, flowControl: REMOTE_FLOW_CONTROL })
         if (!['GET', 'HEAD'].includes(request.method)) {
           const reader = request.body?.getReader(); let size = 0
           try {
@@ -176,8 +174,7 @@ export class DataChannelTransport implements AppTransport {
   socket(url: string, protocols?: string | string[]) {
     if (this.closed) throw new Error('원격 연결이 종료됐습니다.')
     const parsed = new URL(url, location.origin)
-    const capability = previewRemotePath(parsed.pathname + parsed.search, true) ? 'port-preview' as const : undefined
-    if (parsed.host !== location.host || !remotePath(parsed.pathname + parsed.search, true, capability)) throw new Error('지원하지 않는 원격 소켓입니다.')
+    if (parsed.host !== location.host || !remotePath(parsed.pathname + parsed.search, true)) throw new Error('지원하지 않는 원격 소켓입니다.')
     const requested = typeof protocols === 'string' ? [protocols] : protocols ?? []
     if (requested.length > 16 || new Set(requested).size !== requested.length || requested.some(protocol => typeof protocol !== 'string' || protocol.length > 256 || !/^[!#$%&'*+\-.^_`|~\w]+$/.test(protocol))) throw new DOMException('잘못된 WebSocket 프로토콜입니다.', 'SyntaxError')
     const id = crypto.randomUUID(), socket = new RemoteSocket(this, id, url)
@@ -186,7 +183,7 @@ export class DataChannelTransport implements AppTransport {
       if (socket.readyState !== WebSocket.CONNECTING) { release(); return }
       socket.release = release
       socket.sentAt = performance.now()
-      return this.send({ type: 'socket', ...(capability ? { capability } : {}), id, path: parsed.pathname + parsed.search, ...(requested.length ? { protocols: requested } : {}), flowControl: REMOTE_FLOW_CONTROL }).then(() => socket.markConnectionStarted())
+      return this.send({ type: 'socket', id, path: parsed.pathname + parsed.search, ...(requested.length ? { protocols: requested } : {}), flowControl: REMOTE_FLOW_CONTROL }).then(() => socket.markConnectionStarted())
     }).catch(() => socket.finish(1006))
     return socket as unknown as WebSocket
   }

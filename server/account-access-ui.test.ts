@@ -150,7 +150,7 @@ test('account controls save roles, features and file rules and confirm deletion 
     assert.deepEqual(nativeGrant.request().postDataJSON(), { subject: 'member@example.test', feature: 'nativeBrowser', enabled: true })
     assert.equal(rows[2].capabilities.nativeBrowser, true)
     assert.equal(rows[2].capabilities.desktop, false, 'browser access does not grant the remote desktop')
-    assert.equal(rows[2].capabilities.portPreview, false, 'browser access does not grant localhost app proxy access')
+    assert.equal(Object.hasOwn(rows[2].capabilities, 'portPreview'), false, 'retired localhost app access is absent')
     const ownerIcon = page.getByRole('columnheader').getByRole('button', { name: 'owner (owner@example.test)', exact: true })
     await ownerIcon.click()
     const ownerPopup = page.getByRole('region', { name: '계정: owner', exact: true })

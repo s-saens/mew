@@ -15,7 +15,6 @@ import { fileURLToPath } from 'node:url'
 import type { IncomingMessage } from 'node:http'
 import type { Duplex } from 'node:stream'
 import { createApiApp } from './api.ts'
-import { attachPortPreviewWebSocket, createPortPreviewMiddleware } from './port-preview.ts'
 import { createAuthRouter, checkOrigin } from './authRoutes.ts'
 import { attachAuthContext, resolveAuth, authorizeTmux, authorizeCollab, authorizeFeature, authorizeDatabase } from './reqAuth.ts'
 import { attachTmuxWebSocket } from '@mew/tmux-term/server'
@@ -107,7 +106,6 @@ export const remoteAgent = createRemoteAgent(server)
 app.disable('x-powered-by')
 app.use(workspaceSearchPolicy)
 app.use(securityHeaders)
-app.use(createPortPreviewMiddleware())
 app.use(checkOrigin)
 app.use('/api/auth', createAuthRouter())
 app.use('/api/remote-access', attachAuthContext, remoteAgent.router)
@@ -124,7 +122,6 @@ attachAgentWebSocket(server, { authorize: authorizeFeature('agent') })
 attachDomBrowserWebSocket(server)
 attachBrowserDesktopWebSocket(server)
 attachRemoteDesktopWebSocket(server)
-attachPortPreviewWebSocket(server)
 destroyUnknownUpgrades(server, [
   '/api/tmux/ws',
   '/api/presence',
@@ -135,8 +132,6 @@ destroyUnknownUpgrades(server, [
   DOM_BROWSER_WS,
   BROWSER_DESKTOP_WS,
   DESKTOP_WS,
-  '/__mew_port_preview_ws/',
-  '/api/port-preview/ws',
 ])
 
 // 공개 경계 전환 전의 OAuth bearer token은 다음 spawn에 절대 넘기지 않고 파일에서도 지운다.

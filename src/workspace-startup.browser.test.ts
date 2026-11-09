@@ -91,7 +91,7 @@ test('workspace chrome remains usable while editor and unopened tools download o
         return route.fulfill({ contentType: 'text/javascript', body: scripts.get(url.pathname)! })
       }
       const json = (value: unknown) => route.fulfill({ json: value })
-      if (url.pathname === '/api/auth/me') return json({ authenticated: true, email: 'startup@example.test', role: 'owner', mustChangePassword: false, displayName: 'Startup', avatarDataUrl: null, capabilities: { filesRead: true, filesWrite: true, agent: true, terminal: false, serverFiles: false, collaboration: false, git: true, portPreview: true, desktop: true } })
+      if (url.pathname === '/api/auth/me') return json({ authenticated: true, email: 'startup@example.test', role: 'owner', mustChangePassword: false, displayName: 'Startup', avatarDataUrl: null, capabilities: { filesRead: true, filesWrite: true, agent: true, terminal: false, serverFiles: false, collaboration: false, git: true, desktop: true } })
       if (url.pathname === '/api/workspace') return json({ path: '/alpha', workspaceScopeVersion: 1, projects: [], docs: 'docs', docsPath: '/alpha/docs', workspaceUi: { workspacePath: '/alpha', state: initialUi } })
       if (url.pathname === '/api/user-ui/root-projects') return json({ state: { paths: ['/alpha'], icons: {}, groups: [] } })
       if (url.pathname === '/api/user-ui/theme') return json({ state: method === 'PUT' ? route.request().postDataJSON().state : { palette: DEFAULT_THEME_PALETTE, custom: [] } })

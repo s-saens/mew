@@ -28,7 +28,7 @@ export function remoteDispatcher(server: Server, wire: RemoteWire, current: () =
   const send = async (frame: RemoteFrame, required?: string) => { revalidate(); if (closed || !alive() || (required !== undefined && required !== authority())) throw new Error('permission-revoked'); await wire.send(JSON.stringify(frame)) }
   const close = () => { if (closed) return; closed = true; clearInterval(timer); for (const op of operations.values()) op.close(); operations.clear(); wire.close() }
   const timer = setInterval(() => { if (!alive()) close(); else revalidate() }, 1000); timer.unref()
-  function streams(id: string, transition: () => void, capability?: 'port-preview') {
+  function streams(id: string, transition: () => void) {
     const [client, host] = duplexPair()
     let boundGeneration = sessionGeneration
     const changeAuthentication = <T>(change: () => T): T => {
@@ -56,7 +56,6 @@ export function remoteDispatcher(server: Server, wire: RemoteWire, current: () =
       },
       trustDevice: local.trustDevice ? label => changeAuthentication(() => local.trustDevice!(label)) : undefined,
     } : { current }
-    context.capability = capability
     bindRemoteSocket(host, context)
     server.emit('connection', host)
     return { client, host }
@@ -91,7 +90,7 @@ export function remoteDispatcher(server: Server, wire: RemoteWire, current: () =
         required = authority()
         const operation = operations.get(value.id)
         if (operation) operation.authority = required
-      }, value.capability)
+      })
       if (value.type === 'socket') {
         const window = value.flowControl ? new RemoteSendWindow(REMOTE_LIMITS.responseWindow, value.flowControl.maxWindow) : undefined
         const ws = new WebSocket(`ws://${new URL(origin).host}${value.path}`, value.protocols ?? [], { createConnection: () => client as never, origin, headers: { 'X-Forwarded-Proto': new URL(origin).protocol.slice(0, -1) }, maxPayload: REMOTE_LIMITS.body })
@@ -126,7 +125,7 @@ export function remoteDispatcher(server: Server, wire: RemoteWire, current: () =
         return
       }
       const headers: Record<string, string> = { host: new URL(origin).host, origin, 'x-forwarded-proto': new URL(origin).protocol.slice(0, -1) }
-      for (const [key, val] of Object.entries(value.headers)) if (value.capability === 'port-preview' ? !['cookie','host','origin','referer','connection','upgrade','content-length','x-mew-session','x-forwarded-proto'].includes(key.toLowerCase()) : REQUEST_HEADERS.has(key.toLowerCase())) headers[key.toLowerCase()] = val
+      for (const [key, val] of Object.entries(value.headers)) if (REQUEST_HEADERS.has(key.toLowerCase())) headers[key.toLowerCase()] = val
       delete headers['content-length']
       const req = http.request({ host: new URL(origin).hostname, port: 80, path: value.path, method: value.method, headers, createConnection: () => client as never })
       let size = 0, ended = false, finished = false
@@ -141,19 +140,37 @@ export function remoteDispatcher(server: Server, wire: RemoteWire, current: () =
         write(Buffer.from(frame.data, 'base64'))
       } })
       req.on('response', async res => {
+        const pending: Promise<void>[] = []
+        let sendFailure: Error | undefined, notifyFailure!: () => void
+        const failed = new Promise<void>(resolve => { notifyFailure = resolve })
+        const waitForSend = async () => {
+          await Promise.race([pending[0], failed])
+          if (sendFailure) throw sendFailure
+          pending.shift()
+        }
         try {
           const responseHeaders: Record<string, string> = {}
-          for (const [key, val] of Object.entries(res.headers)) if ((RESPONSE_HEADERS.has(key) || (value.capability === 'port-preview' && !['set-cookie','connection','transfer-encoding','content-security-policy','x-mew-session'].includes(key)) || (key === 'content-encoding' && remoteUiRequest(value.method, value.path))) && typeof val === 'string') responseHeaders[key] = val
+          for (const [key, val] of Object.entries(res.headers)) if ((RESPONSE_HEADERS.has(key) || (key === 'content-encoding' && remoteUiRequest(value.method, value.path))) && typeof val === 'string') responseHeaders[key] = val
           const authSessionResponse = (value.method === 'POST' && ['/api/auth/login', '/api/auth/logout', '/api/auth/change-password', '/api/auth/mewlink/login', '/api/auth/remote-device'].includes(value.path.split('?')[0])) || (value.method === 'GET' && value.path.split('?')[0] === '/api/auth/me')
           if (local && authSessionResponse && typeof res.headers['x-mew-session'] === 'string') responseHeaders['x-mew-session'] = res.headers['x-mew-session']
           await send({ type: 'response', id: value.id, status: res.statusCode ?? 500, headers: responseHeaders, ...(value.responseWindow ? { responseWindow: value.responseWindow } : {}), ...(value.flowControl ? { flowControl: value.flowControl } : {}) }, required)
           for await (const chunk of res) {
             const bytes = Buffer.from(chunk)
-            for (let i = 0; i < bytes.length; i += REMOTE_LIMITS.chunk) { await window.take(); await send({ type: 'chunk', id: value.id, data: bytes.subarray(i, i + REMOTE_LIMITS.chunk).toString('base64') }, required) }
+            for (let i = 0; i < bytes.length; i += REMOTE_LIMITS.chunk) {
+              await window.take()
+              if (finished) throw new Error('cancelled')
+              if (sendFailure) throw sendFailure
+              pending.push(send({ type: 'chunk', id: value.id, data: bytes.subarray(i, i + REMOTE_LIMITS.chunk).toString('base64') }, required).catch(error => {
+                if (!sendFailure) { sendFailure = error instanceof Error ? error : new Error('send-failed'); window.close(); notifyFailure() }
+              }))
+              if (pending.length >= 2) await waitForSend()
+            }
           }
+          while (pending.length) await waitForSend()
+          if (finished) return
           finish()
           await send({ type: 'end', id: value.id }, required)
-        } catch { finish(); if (!closed) await send({ type: 'error', id: value.id, code: 'response-interrupted' }).catch(close) }
+        } catch { const cancelled = finished; finish(); if (!closed && !cancelled) await send({ type: 'error', id: value.id, code: 'response-interrupted' }).catch(close) }
         finally { finish() }
       })
       req.on('error', () => { if (operations.has(value.id)) { finish(); void send({ type: 'error', id: value.id, code: 'request-failed' }).catch(close) } })

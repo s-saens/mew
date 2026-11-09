@@ -1,8 +1,7 @@
 import type { ILink, ILinkProvider, Terminal } from '@xterm/xterm'
-import { localBrowserUrl, requestLocalBrowser } from '@mew/ui/local-browser'
+import { localBrowserUrl } from '@mew/ui/local-browser'
 
 export function activateTerminalHyperlink(_event: MouseEvent, url: string): void {
-  if (requestLocalBrowser(url)) return
   // Preserve xterm's confirmation and opener isolation for ordinary OSC 8 links.
   if (!window.confirm(`Do you want to navigate to ${url}?\n\nWARNING: This link could potentially be dangerous`)) return
   const opened = window.open()
@@ -52,7 +51,7 @@ export function createLocalBrowserLinkProvider(term: Pick<Terminal, 'buffer' | '
           activate: event => {
             if (event.button > 1) return
             event.preventDefault()
-            requestLocalBrowser(raw)
+            activateTerminalHyperlink(event, localBrowserUrl(raw)!)
           },
         })
       }

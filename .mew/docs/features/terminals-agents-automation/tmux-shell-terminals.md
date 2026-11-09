@@ -6,9 +6,9 @@ status: "implemented"
 created: "2026-09-18"
 updated: "2026-11-03"
 status_hash: "b19a2771f0bfb2f727bc14539350c69b524d222b67a2322b322f359fefd6a804"
-files: ["src/components/AgentPanel.tsx", "src/components/TermButtonBar.tsx", "src/components/CommandButtonMenu.tsx", "server/termButtons.ts", "server/command-ports.ts", "packages/tmux-term/src/TmuxTerminal.tsx", "packages/tmux-term/src/server/tmuxWs.ts"]
+files: ["src/components/AgentPanel.tsx", "src/components/TermButtonBar.tsx", "src/components/CommandButtonMenu.tsx", "server/termButtons.ts", "packages/tmux-term/src/TmuxTerminal.tsx", "packages/tmux-term/src/server/tmuxWs.ts"]
 commits: []
-description: "Per-project shell tabs, input, commands and port links, restoration, and connection recovery. Defines deferred rendering, tmux versus Windows psmux/PowerShell, mobile controls and focus, tab operations, and verification limits."
+description: "Per-project shell tabs, input and commands, restoration, and connection recovery. Defines deferred rendering, tmux versus Windows psmux/PowerShell, mobile controls and focus, tab operations, and verification limits."
 상위파일:
   - "MOC.md"
   - "_terminals-agents-automation.md"
@@ -43,10 +43,8 @@ description: "Per-project shell tabs, input, commands and port links, restoratio
 
 - Linux/macOS uses the existing tmux, while native Windows uses psmux and PowerShell. The backend owns the executables and argv for creation, commands, attach, input, capture, and clipboard control, while retaining the existing tmux API and session IDs. Namespaces per Windows state path separate them from user sessions. Implementation, Windows CI, and public support gates follow the [OS execution contract](../../development/windows-native.md).
 
-- The command menu is wider to show more of each name, with smaller text, spacing, and control widths. Port numbers are distinguished by small containers with themed backgrounds and borders, laid out within 90% of the screen width. Specific dimensions follow the [shared UI contract](../../development/ui-overlays.md#dropdowns-and-selection-components).
+- The command menu is wider to show more of each name, with smaller text, spacing, and control widths. Specific dimensions follow the [shared UI contract](../../development/ui-overlays.md#dropdowns-and-selection-components).
 
-- The project command menu displays the running session's `ports` as numbered buttons on the same line as its name, between the name and the stop and terminal icons. The port area is capped at 28% of the row width so long names retain space; it never wraps to a second line. Multiple ports are listed in ascending order, and only that area scrolls horizontally. Shared tooltips and accessible names in four languages are provided, and the existing left/right arrow keys also reach the port buttons. Clicking closes the command menu and opens the internal DOM Browser panel; it does not invoke execution, stopping, or the terminal popup. Terminal localhost URLs, including wrapped output and OSC 8 links, use the same internal browser request. Ordinary external links retain their existing behavior.
-- `GET/PUT /api/cmd-buttons` associates actual listening ports of the pane PID and descendant processes only with running buttons. If port preview permission is unavailable or detection fails, it returns `ports: []` while preserving the command list and execution status. Polling every 3 seconds while the menu is open reflects ports opening and closing. Existing command operations remain available even when older servers omit `ports`. OS-specific detection, URLs, and preview boundaries follow the [port preview contract](../../development/port-preview.md#command-button-port-detection).
 
 - `Ctrl/Cmd+N/T` and `Alt+N` use the same new-terminal flow as the group's `+` through focus registration for the regular shell tab bar and body. The shared `TmuxTerminalPanel` opens the same name input. The keys are not sent to the PTY or used to create a new file, and key repeats, IME input, and modals do not trigger creation. Browser-reserved key conditions, tab closing, and cycling follow the [Shared Keyboard Shortcut Contract](../../development/ui-editor-input.md#focus-based-tab-shortcuts).
 

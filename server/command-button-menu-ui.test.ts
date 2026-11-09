@@ -6,17 +6,15 @@ import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
 import { connectTestBrowser } from './test-browser.ts'
 
-test('command ports open the internal DOM browser without executing commands at compact widths', { timeout: 60_000 }, async t => {
+test('command menu executes and reorders commands at compact widths', { timeout: 60_000 }, async t => {
   const root = path.resolve(import.meta.dirname, '..')
   const source = `
 import React from 'react';import {createRoot} from 'react-dom/client';
 import {I18nProvider} from '${root}/src/i18n.tsx';
 import {CommandButtonMenu} from '${root}/src/components/CommandButtonMenu.tsx';
-import {configurePortPreviewBaseUrl} from '${root}/src/utils/port-preview-url.ts';
 localStorage.setItem('mew:locale','ko');window.opened=[];window.browserRequests=[];
 window.addEventListener('mew:open-local-browser',event=>window.browserRequests.push(event.detail.url));
 window.open=(url,target,features)=>{window.opened.push({url,target,features});return null};
-window.configurePortPreviewBaseUrl=configurePortPreviewBaseUrl;
 createRoot(document.getElementById('root')).render(<I18nProvider><CommandButtonMenu project=".workspace" title="명령 목록"/></I18nProvider>);`
   const bundle = await build({ input: 'virtual:commands.tsx', write: false, platform: 'browser', onwarn(warning, warn) { if (warning.code !== 'MODULE_LEVEL_DIRECTIVE') warn(warning) }, output: { format: 'iife' }, transform: { jsx: 'react-jsx', define: { 'process.env.NODE_ENV': JSON.stringify('test') } }, plugins: [{
     name: 'fixture', resolveId(id) { if (id === 'virtual:commands.tsx') return id; if (id.endsWith('.css')) return 'virtual:style' },
@@ -68,7 +66,6 @@ createRoot(document.getElementById('root')).render(<I18nProvider><CommandButtonM
       </style><div id="root"></div><script>${bundle.output.find(item => item.type === 'chunk')!.code}</script></html>` })
     })
     await page.goto('http://mew-command.test/')
-    const trigger = page.getByRole('button', { name: '명령 목록', exact: true })
     await page.keyboard.press('Alt+r')
     const menu = page.locator('[data-cmd-overlay]'), row = menu.locator('[data-command-row]').first()
     const command = row.getByRole('button', { name: '개발 서버 이름이 길어도 동작', exact: true })
@@ -78,69 +75,13 @@ createRoot(document.getElementById('root')).render(<I18nProvider><CommandButtonM
     assert.equal(await command.getAttribute('aria-keyshortcuts'), '1')
     assert.equal(await menu.locator('.mew-action-menu-port').count(), 0)
     await page.keyboard.press('1')
-    const preview = row.getByRole('button', { name: '개발 서버 이름이 길어도 동작: 포트 5555 미리보기 열기', exact: true })
-    await preview.waitFor()
+    await page.waitForTimeout(150)
     assert.equal(runs, 1)
-    assert.equal(await menu.locator('.mew-action-menu-port').count(), 4, 'stale ports on stopped commands and old API responses do not add buttons')
-    const order = await row.locator('button').allTextContents()
-    assert.deepEqual(order.slice(2, 6), ['3333', '5555', '12345', '65535'], 'the handle precedes the command and its port actions')
-    assert.equal(await row.getAttribute('data-active'), 'true', 'running state highlights the row')
-    const positions = await row.evaluate(el => {
-      const handle = el.querySelector('[data-command-drag-handle]')!.getBoundingClientRect()
-      const name = el.querySelector('[data-command-choice]')!.getBoundingClientRect()
-      const hint = el.querySelector('kbd')!.getBoundingClientRect()
-      const terminal = el.querySelector(':scope > button.mew-action-menu-icon:last-of-type')!.getBoundingClientRect()
-      const port = el.querySelector('.mew-action-menu-port')!.getBoundingClientRect()
-      const ports = el.querySelector('.mew-action-menu-ports')!.getBoundingClientRect()
-      const stop = el.querySelector('.mew-action-menu-icon')!.getBoundingClientRect()
-      return { handleBeforeName: handle.right <= name.left, hintAfterActions: terminal.right <= hint.left,
-        portsInline: Math.abs(port.top + port.height / 2 - name.top - name.height / 2) < 1,
-        portsBetweenNameAndActions: name.right <= ports.left && ports.right <= stop.left }
-    })
-    assert.deepEqual(positions, { handleBeforeName: true, hintAfterActions: true, portsInline: true, portsBetweenNameAndActions: true })
-    assert.equal(await row.locator('.mew-action-menu-ports').evaluate(el => el.scrollWidth > el.clientWidth), true, 'multiple ports scroll within the same row')
+    assert.equal(await menu.locator('.mew-action-menu-port').count(), 0, 'legacy port data does not create preview buttons')
+    assert.equal(await row.getAttribute('data-active'), 'true')
     const bounds = await menu.boundingBox(); assert.ok(bounds)
     assert.ok(bounds.x >= 0 && bounds.x + bounds.width <= width)
-    assert.ok(Math.abs(bounds.width - Math.min(308, width * 0.9)) < 1, 'menu is 40% wider than 220px and never exceeds 90vw')
-    assert.equal(await menu.evaluate(el => el.scrollWidth <= el.clientWidth), true, 'port list scrolls without widening the dropdown')
-    const density = await row.evaluate(el => {
-      const view = el.ownerDocument.defaultView!, name = el.querySelector('[data-command-choice]')!, port = el.querySelector('.mew-action-menu-port')!
-      const text = name.querySelector('span')!, icon = el.querySelector('.mew-action-menu-icon')!
-      const item = view.getComputedStyle(name), badge = view.getComputedStyle(port)
-      return { font: item.fontSize, padding: item.padding, height: name.getBoundingClientRect().height,
-        textWidth: text.getBoundingClientRect().width, iconWidth: icon.getBoundingClientRect().width,
-        portFont: badge.fontSize, border: badge.borderTopWidth, radius: badge.borderRadius, background: badge.backgroundColor,
-        portHeight: port.getBoundingClientRect().height }
-    })
-    assert.equal(density.font, '14px'); assert.equal(density.padding, '6px 10px')
-    assert.equal(density.height, width <= 390 ? 40 : 32)
-    assert.ok(density.textWidth >= 64, 'long command names retain usable width beside four horizontally scrolling ports')
-    assert.equal(density.iconWidth, 32)
-    assert.equal(density.portFont, '12px'); assert.equal(density.border, '1px'); assert.equal(density.radius, '4px')
-    assert.notEqual(density.background, 'rgba(0, 0, 0, 0)', 'port numbers have their own visible surface')
-    assert.equal(density.portHeight, width <= 390 ? 32 : 26)
-    await preview.click()
-    assert.equal(await page.evaluate('window.browserRequests.at(-1)'), 'http://localhost:5555/')
-    await trigger.click()
-    assert.equal(runs, 1); assert.equal(stops, 0)
-    await row.getByRole('button', { name: '개발 서버 이름이 길어도 동작', exact: true }).focus()
-    await page.keyboard.press('ArrowRight')
-    assert.equal(await row.getByRole('button', { name: /포트 3333 미리보기 열기/ }).evaluate(el => el === el.ownerDocument.activeElement), true)
-    await page.keyboard.press('ArrowRight'); await page.keyboard.press('Enter')
-    assert.equal(await page.evaluate('window.browserRequests.at(-1)'), 'http://localhost:5555/')
-    await trigger.click()
-    await page.evaluate("window.configurePortPreviewBaseUrl('https://mew.run/saens/windows')")
-    await preview.click()
-    assert.equal(await page.evaluate('window.browserRequests.at(-1)'), 'http://localhost:5555/')
-    await trigger.click()
-    await page.evaluate('window.configurePortPreviewBaseUrl(null)')
-    await preview.click()
-    assert.equal(await page.evaluate('window.browserRequests.at(-1)'), 'http://localhost:5555/')
-    assert.equal(await page.evaluate('window.opened.length'), 0, 'DOM relay needs no public preview origin or popup')
-    assert.equal(await page.evaluate('window.browserRequests.length'), 4)
-    await trigger.click()
-    assert.equal(runs, 1); assert.equal(stops, 0)
-    await page.evaluate('window.configurePortPreviewBaseUrl()')
+    assert.equal(await menu.evaluate(el => el.scrollWidth <= el.clientWidth), true)
     if (process.env.MEW_COMMAND_PORT_SCREENSHOTS) {
       await fs.mkdir(process.env.MEW_COMMAND_PORT_SCREENSHOTS, { recursive: true })
       await menu.screenshot({ path: path.join(process.env.MEW_COMMAND_PORT_SCREENSHOTS, `commands-${width}-${dark ? 'dark' : 'light'}.png`) })
@@ -152,7 +93,6 @@ createRoot(document.getElementById('root')).render(<I18nProvider><CommandButtonM
       assert.ok(narrow.x >= 0 && narrow.x + narrow.width <= 240)
     }
     await row.getByRole('button', { name: '개발 서버 이름이 길어도 동작 정지', exact: true }).click()
-    await preview.waitFor({ state: 'hidden' })
     assert.equal(stops, 1)
     assert.equal(await menu.locator('.mew-action-menu-port').count(), 0)
     await page.keyboard.press('Escape')

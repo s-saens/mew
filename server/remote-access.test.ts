@@ -24,6 +24,9 @@ function harness(autoCredit = true) {
 async function until(fn: () => boolean) { const deadline = Date.now() + 4000; while (!fn()) { if (Date.now() > deadline) throw new Error('Timed out'); await new Promise(resolve => setTimeout(resolve, 10)) } }
 test('remote request paths cannot reach arbitrary origins, local ports or unsupported auth routes', () => {
   for (const path of ['//evil.test/api/file', 'https://evil.test/api/file', '/api/../auth/login', '/api/auth/signup', '/api/remote-access/register', '/api/%2fsecret', '/__mew_browser/x', '/api/file\nX: true']) assert.equal(remotePath(path), false, path)
+  for (const path of ['/api/port-preview/session', '/api/port-preview/access-url', '/api/port-preview/token/raw/x']) assert.equal(remotePath(path), false)
+  assert.throws(() => parseRemoteFrame(JSON.stringify({ type: 'request', id: 'old', capability: 'port-preview', method: 'GET', path: '/api/file', headers: {} })), /invalid-request/)
+  assert.throws(() => parseRemoteFrame(JSON.stringify({ type: 'socket', id: 'old', capability: 'port-preview', path: '/api/dom-browser/ws' })), /invalid-socket/)
   assert.equal(remotePath('/api/file?project=docs'), true)
   assert.equal(remotePath('/api/browser-desktop/ws', true), true)
   assert.equal(remotePath('/api/browser-desktop/ws?session=fixture', true), true)

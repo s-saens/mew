@@ -59,27 +59,23 @@ test('browser ownership, feature permission, password state and Origin are all r
   assert.equal(browserDesktopAllowed(req, { ...owner, role: 'guest' }), false)
   assert.equal(browserDesktopAllowed({ headers: { host: 'mew.test', origin: 'http://evil.test' } } as IncomingMessage, owner), false)
   assert.equal(browserDesktopAllowed({ headers: { host: 'mew.test' } } as IncomingMessage, owner), false)
-  setFeature(owner.email, 'portPreview', false)
   setFeature(owner.email, 'desktop', false)
   try {
     assert.equal(browserDesktopAllowed(req, owner), true, 'native browser access does not require localhost or remote desktop grants')
     setFeature(owner.email, 'nativeBrowser', false)
     assert.equal(browserDesktopAllowed(req, owner), false)
-  } finally { for (const feature of ['nativeBrowser', 'desktop', 'portPreview'] as const) setFeature(owner.email, feature, null) }
+  } finally { for (const feature of ['nativeBrowser', 'desktop'] as const) setFeature(owner.email, feature, null) }
   const member = { ...owner, email: 'scoped-browser@test', role: 'member' } as const
-  setFeature(member.email, 'portPreview', true)
   try {
-    assert.equal(browserDesktopAllowed(req, member), false, 'a localhost-preview grant does not authorize a full native browser')
     setFeature(member.email, 'desktop', true)
     assert.equal(browserDesktopAllowed(req, member), false, 'a remote desktop grant does not authorize the separately configured browser')
     setFeature(member.email, 'nativeBrowser', true)
     assert.equal(browserDesktopAllowed(req, member), true)
     setFeature(member.email, 'desktop', false)
-    setFeature(member.email, 'portPreview', false)
     assert.equal(browserDesktopAllowed(req, member), true, 'the standalone browser grant remains sufficient')
     setFeature(member.email, 'nativeBrowser', false)
     assert.equal(browserDesktopAllowed(req, member), false, 'revoking browser authority closes browser access')
-  } finally { for (const feature of ['nativeBrowser', 'desktop', 'portPreview'] as const) setFeature(member.email, feature, null) }
+  } finally { for (const feature of ['nativeBrowser', 'desktop'] as const) setFeature(member.email, feature, null) }
 })
 
 test('closing an unauthorized OPEN viewer is idempotent and cannot recurse through state delivery', async () => {

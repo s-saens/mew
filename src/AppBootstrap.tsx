@@ -1,7 +1,6 @@
-import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { scopedBrowserStorage } from '@mew/ui/browser-storage-scope'
 import { useUiLocale } from '@mew/ui/i18n'
-import { uiText } from '@mew/ui/i18n-core'
 import { fetchAuthStatus, type AuthStatus } from './api/auth'
 import { LoginPage } from './components/LoginPage'
 import { useRefreshTasks } from './hooks/use-refresh-tasks'
@@ -10,13 +9,10 @@ import { isRemoteMode } from './utils/remote-transport'
 import { reloadRemoteAppForIdentity } from './utils/remote-app'
 import { StartupScreen } from './components/startup-screen'
 import { getAppRuntime } from './runtime/app-runtime'
-import { portPreviewEntry } from './utils/port-preview-entry'
-import { defaultCapabilities } from '../shared/access-policy'
 import { WorkspaceErrorScreen } from './components/app-error-boundary'
 import { FirstOwnerSetup } from './components/FirstOwnerSetup'
 
 type WorkspaceComponent = typeof import('./App.tsx')['default']
-const PortPreviewPage = lazy(() => import('./components/PortPreviewPage.tsx'))
 const GUEST_AUTH: AuthStatus = { authenticated: false, email: null, role: 'guest', mustChangePassword: false, displayName: null, avatarDataUrl: null }
 const startupScreen = <StartupScreen />
 /** Consume launcher credentials before any workspace or account UI can use the URL. */
@@ -42,8 +38,7 @@ export default function AppBootstrap({ initialAuth }: { initialAuth?: AuthStatus
   const [setupLoginRequired, setSetupLoginRequired] = useState(false)
   const [Workspace, setWorkspace] = useState<WorkspaceComponent | null>(null)
   const [workspaceFailure, setWorkspaceFailure] = useState<string | null>(null)
-  const preview = portPreviewEntry(window.location.search)
-  const workspaceAllowed = !!auth && !auth.setupRequired && !setupLoginRequired && !preview && (!isRemoteMode() || auth.authenticated && !auth.mustChangePassword)
+  const workspaceAllowed = !!auth && !auth.setupRequired && !setupLoginRequired && (!isRemoteMode() || auth.authenticated && !auth.mustChangePassword)
   const workspaceIdentity = auth ? JSON.stringify([auth.email, auth.role, auth.accessRevision, auth.capabilities]) : ''
 
   // Prepare identity and permission-scoped caches before workspace effects restore tabs.
@@ -93,13 +88,8 @@ export default function AppBootstrap({ initialAuth }: { initialAuth?: AuthStatus
 
   if (!auth) return startupScreen
   if (auth.setupRequired) return <FirstOwnerSetup token={setupToken} onSuccess={applyAuth} onInitialized={status => { applyAuth(status); setSetupLoginRequired(!status.authenticated) }} />
-  if ((isRemoteMode() || preview || setupLoginRequired) && (!auth.authenticated || auth.mustChangePassword)) {
+  if ((isRemoteMode() || setupLoginRequired) && (!auth.authenticated || auth.mustChangePassword)) {
     return <LoginPage dismissible={false} initialMustChangePassword={auth.mustChangePassword} onClose={() => {}} onSuccess={status => { setSetupLoginRequired(false); applyAuth(status) }} />
-  }
-
-  if (preview) {
-    const allowed = auth.capabilities?.portPreview ?? defaultCapabilities(auth.role).portPreview
-    return allowed ? <Suspense fallback={startupScreen}><PortPreviewPage entry={preview} /></Suspense> : <main role="alert" className="p-3 text-sm text-danger">{uiText('localhost 앱에 접근할 권한이 없습니다.')}</main>
   }
 
   if (!Workspace) return workspaceFailure === workspaceIdentity

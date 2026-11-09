@@ -8,7 +8,7 @@ import { domBrowserExecutable } from '../server/browser-dom-executable.ts'
 const root = path.resolve(import.meta.dirname, '..')
 const component = path.join(root, 'src/AppBootstrap.tsx')
 const workspace = path.join(root, 'src/App.tsx')
-const owner = { authenticated: true, email: 'first@example.test', role: 'owner', mustChangePassword: false, displayName: null, avatarDataUrl: null, accessRevision: 'first', capabilities: { portPreview: true } }
+const owner = { authenticated: true, email: 'first@example.test', role: 'owner', mustChangePassword: false, displayName: null, avatarDataUrl: null, accessRevision: 'first', capabilities: { nativeBrowser: true } }
 
 test('authenticated workspace mounts without waiting for the lazy retry deadline', { skip: !domBrowserExecutable(), timeout: 45_000 }, async t => {
   const source = `import React, { lazy, Suspense, useEffect, useState } from 'react';
@@ -32,7 +32,6 @@ test('authenticated workspace mounts without waiting for the lazy retry deadline
       if (id.endsWith('/utils/remote-transport') || id.endsWith('/utils/remote-transport.ts')) return 'virtual:transport'
       if (id.endsWith('/utils/contentCache')) return 'virtual:content-identity'
       if (id.endsWith('/components/LoginPage')) return 'virtual:login.tsx'
-      if (id.endsWith('/components/PortPreviewPage.tsx')) return 'virtual:preview.tsx'
     },
     load(id) {
       if (id === 'virtual:style') return ''
@@ -40,7 +39,6 @@ test('authenticated workspace mounts without waiting for the lazy retry deadline
       if (id === 'virtual:transport') return 'export const isRemoteMode=()=>true; export const mewFetch=(...args)=>fetch(...args); export const setRemoteTransport=()=>{}; export class DataChannelTransport {}'
       if (id === 'virtual:content-identity') return 'export function clearFileContentCache(){}; export function setContentIdentity(value){window.fixtureContentIdentity=value}'
       if (id === 'virtual:login.tsx') return 'export function LoginPage(){return <div data-login>Login</div>}'
-      if (id === 'virtual:preview.tsx') return 'export default function Preview(){return <div data-preview>Preview</div>}'
       if (id === workspace) return `import { useEffect } from 'react'; import { scopedBrowserStorage } from '@mew/ui/browser-storage-scope';
         window.fixtureModuleState={identity:window.fixtureContentIdentity,permissions:scopedBrowserStorage().getItem('mew:access-version')};
         export default function Workspace({auth}){useEffect(()=>{fetch('/api/workspace?account='+encodeURIComponent(auth.email)+'&revision='+auth.accessRevision)},[auth.email,auth.accessRevision]);return <button data-workspace>{auth.email}:{auth.accessRevision}</button>}`
@@ -160,7 +158,7 @@ test('authenticated workspace mounts without waiting for the lazy retry deadline
     } finally { await cancelled.page.close() }
   })
 
-  await t.test('expired login, password changes and preview keep their existing gates', async () => {
+  await t.test('expired login and password changes keep their existing gates', async () => {
     for (const status of [{ ...owner, authenticated: false }, { ...owner, mustChangePassword: true }]) {
       const actual = await fixture()
       try {
@@ -170,14 +168,7 @@ test('authenticated workspace mounts without waiting for the lazy retry deadline
         assert.deepEqual(actual.reads, [])
       } finally { await actual.page.close() }
     }
-    const preview = await fixture('?preview=5101')
-    try {
-      preview.releaseAuth(owner)
-      await preview.page.waitForFunction(() => (window as unknown as { fixtureHeldDelays: number[] }).fixtureHeldDelays.length > 0)
-      await preview.page.evaluate(() => (window as unknown as { fixtureReleaseTimers(): void }).fixtureReleaseTimers())
-      await preview.page.locator('[data-preview]').waitFor()
-      assert.equal(preview.moduleRequests(), 0)
-    } finally { await preview.page.close() }
+
   })
 
   await t.test('a failed module shows a bounded error without starting workspace APIs', async () => {

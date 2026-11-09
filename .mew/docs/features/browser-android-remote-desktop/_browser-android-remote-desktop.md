@@ -8,20 +8,20 @@ updated: "2026-11-05"
 status_hash: "fa171a4c0dd4125f3b1ab4b9b1719541e1dfad7e8c2588d363eaf72c977f2e9f"
 files: []
 commits: []
-description: "Parent feature document grouping independent login video, localhost app access, and remote desktop input. Provides child feature scopes and detailed contract links, and distinguishes ownership of individual implementations and verification."
+description: "Parent feature document grouping independent login video, host browsing, and remote desktop input. Provides child feature scopes and detailed contract links, and distinguishes ownership of individual implementations and verification."
 상위파일: "../_features.md"
 ---
 
 ## Requirements
 
-- Access OAuth login, host development apps, and the logged-in server desktop.
+- Access OAuth login, host browsing, and the logged-in server desktop.
 
 - Select the work scope and related implementation in the child features.
 - Check each detailed contract even when changing multiple child features.
 
 ### Child features
 
-- [Virtual login display and localhost app access](server-browser-login-and-popups.md)
+- [Host browser and login screens](server-browser-login-and-popups.md)
 - [Remote Desktop·Touch Input](remote-desktop-and-touch-input.md)
 
 ### Detailed contracts

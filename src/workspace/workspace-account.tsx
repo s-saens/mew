@@ -58,7 +58,7 @@ export function WorkspaceAccountProvider({ auth, children }: { auth: AuthStatus;
     {mascot && <Mewcat {...mascot.props} />}
     {browser && <DialogFrame labelledBy={title} onClose={() => setBrowser(null)} className="flex h-[90dvh] max-w-6xl flex-col">
       <header className="flex h-9 shrink-0 items-center border-b border-edge px-2"><span id={title} className="flex-1 text-sm">{uiText('브라우저')}</span><PanelCloseButton onClick={() => setBrowser(null)} aria-label={uiText('닫기')} /></header>
-      <div className="min-h-0 flex-1"><BrowserDesktopPanel url={browser.url} navigationRequest={browser.request} nativeAllowed={capabilities.nativeBrowser} previewAllowed={capabilities.portPreview} onClose={() => setBrowser(null)} /></div>
+      <div className="min-h-0 flex-1"><BrowserDesktopPanel url={browser.url} navigationRequest={browser.request} nativeAllowed={capabilities.nativeBrowser} onClose={() => setBrowser(null)} /></div>
     </DialogFrame>}
   </BrowserContext.Provider></MascotContext.Provider></AccountContext.Provider>
 }

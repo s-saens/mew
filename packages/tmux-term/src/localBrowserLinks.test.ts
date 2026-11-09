@@ -2,7 +2,6 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { Window } from 'happy-dom'
 import type { ILink, Terminal } from '@xterm/xterm'
-import { LOCAL_BROWSER_OPEN_EVENT } from '@mew/ui/local-browser'
 import { activateTerminalHyperlink, createLocalBrowserLinkProvider } from './localBrowserLinks.ts'
 
 function terminal(lines: { text: string; wrapped?: boolean }[], cols = 80) {
@@ -48,14 +47,14 @@ test('detects local terminal URLs with accurate cell ranges and excludes externa
   assert.equal(links(terminal([{ text: 'http://[::1]:8080/path' }]))[0].text, 'http://[::1]:8080/path')
 })
 
-test('detects localhost links across wrapped terminal rows and opens them through the DOM browser event', async () => {
+test('detects localhost links across wrapped terminal rows and uses the ordinary confirmation before opening them', async () => {
   const browser = new Window()
   Object.defineProperties(globalThis, {
     window: { value: browser, configurable: true },
     CustomEvent: { value: browser.CustomEvent, configurable: true },
   })
-  const opened: string[] = []
-  browser.addEventListener(LOCAL_BROWSER_OPEN_EVENT, event => opened.push((event as unknown as CustomEvent<{ url: string }>).detail.url))
+  const confirmations: string[] = []
+  browser.confirm = message => { confirmations.push(message ?? ''); return false }
   const term = terminal([{ text: 'http://localhost:30' }, { text: '00/path?x=1#part', wrapped: true }], 19)
   try {
     const found = links(term, 2)
@@ -66,11 +65,8 @@ test('detects localhost links across wrapped terminal rows and opens them throug
     found[0].activate(event as unknown as MouseEvent, found[0].text)
     assert.equal(event.defaultPrevented, true)
     activateTerminalHyperlink(event as unknown as MouseEvent, 'http://127.0.0.1:8080/login')
-    assert.deepEqual(opened, ['http://localhost:3000/path?x=1#part', 'http://127.0.0.1:8080/login'])
-    const confirmations: string[] = []
-    browser.confirm = message => { confirmations.push(message ?? ''); return false }
     activateTerminalHyperlink(event as unknown as MouseEvent, 'https://example.com/')
-    assert.equal(confirmations.length, 1, 'external OSC 8 links retain xterm confirmation')
-    assert.equal(opened.length, 2)
+    assert.equal(confirmations.length, 3)
+    assert.match(confirmations[0], /http:\/\/localhost:3000/)
   } finally { await browser.happyDOM.close() }
 })

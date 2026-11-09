@@ -14,7 +14,7 @@ const origin = 'http://multi-project-app.test'
 
 async function fixtureBundle() {
   const source = `import React from'react';import{createRoot}from'react-dom/client';import App from${JSON.stringify(sourcePath('App.tsx'))};import{I18nProvider}from${JSON.stringify(sourcePath('i18n.tsx'))};
-    const auth={authenticated:true,email:'integration@test',role:'owner',mustChangePassword:false,displayName:'Integration',avatarDataUrl:null,capabilities:{filesRead:true,filesWrite:true,agent:true,terminal:true,git:true,collaboration:false,database:false,chat:false,system:false,nativeBrowser:true,portPreview:true,desktop:true,serverFiles:false,schedules:false}};
+    const auth={authenticated:true,email:'integration@test',role:'owner',mustChangePassword:false,displayName:'Integration',avatarDataUrl:null,capabilities:{filesRead:true,filesWrite:true,agent:true,terminal:true,git:true,collaboration:false,database:false,chat:false,system:false,nativeBrowser:true,desktop:true,serverFiles:false,schedules:false}};
     function Fixture(){const [current,setCurrent]=React.useState(auth);window.setCapabilities=changes=>setCurrent(value=>({...value,capabilities:{...value.capabilities,...changes}}));return <I18nProvider><App auth={current} refreshing={false} onLoggedOut={()=>{}} onRequestLogin={()=>{}} onProfileChanged={()=>{}}/></I18nProvider>}
     window.editorMounts={};window.editorUnmounts={};createRoot(document.getElementById('root')).render(<Fixture/>);`
   const editorStub = `import React from'react';export function EditorPane(props){const tab=props.pane.tabs.find(tab=>tab.id===props.pane.activeTabId)??props.pane.tabs.find(tab=>tab.path===props.pane.activePath),root=props.workspace?.path;React.useEffect(()=>{window.editorMounts[root]=(window.editorMounts[root]??0)+1;return()=>{window.editorUnmounts[root]=(window.editorUnmounts[root]??0)+1}},[]);return <div data-test-editor-root={root} style={{display:'flex',height:'100%'}}>{tab&&<textarea aria-label={'Editor '+root} value={tab.content} onFocus={props.onFocus} onChange={event=>props.onChangeContent(tab.path,event.target.value,props.pane.id,tab.id)}/>}</div>}`
@@ -528,7 +528,7 @@ test('remote tools open as independent movable board panels', { timeout: 45_000 
   await page.reload()
   await browserPanel.locator('[data-test-remote-browser]').waitFor()
   await desktopPanel.locator('[data-test-remote-desktop]').waitFor()
-  await page.evaluate('window.setCapabilities({desktop:false,portPreview:false,nativeBrowser:false})')
+  await page.evaluate('window.setCapabilities({desktop:false,nativeBrowser:false})')
   await browserPanel.waitFor({ state: 'detached' })
   await desktopPanel.waitFor({ state: 'detached' })
 })

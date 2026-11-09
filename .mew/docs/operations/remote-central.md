@@ -1,6 +1,6 @@
 ---
 title: "mewlink Cloudflare Deployment"
-description: "Maintainer runbook covering Mewlink's independent Git repository, parent-checkout dependencies, configuration, deployment, secrets recovery, key preservation, access revocation, verification, rollback, and port-preview wildcard DNS with Custom Domain-managed TLS and read-only readiness checks. Links to dated operating records."
+description: "Maintainer runbook covering Mewlink's independent Git repository, parent-checkout dependencies, configuration, deployment, secrets recovery, key preservation, access revocation, verification, rollback, and historical port-preview wildcard DNS and TLS setup, which is no longer required after Mew Port removal. Links to dated operating records."
 created: "2026-10-07"
 updated: "2026-11-02"
 ---
@@ -339,6 +339,8 @@ Browser revocation and device revocation are recorded in the DO first, then D1 i
 Backups include the DO's persistent authorization state along with the central signing key and D1. A D1 export alone cannot restore DO revocation records that have not yet been reflected in D1. Before rolling back to an older version, confirm that revocation records are reflected in D1 and terminate open connections. When restoring state, do not overwrite DO revocations with old active records. Follow [Cloudflare PITR](https://developers.cloudflare.com/durable-objects/api/sqlite-storage-api/#pitr-point-in-time-recovery-api) for DO SQLite recovery capabilities.
 
 ## localhost app preview origin
+
+> Historical: Mew Port has been removed. The following records the former setup; do not use it for current deployment. See [ADR 0160](../decisions/0160-remove-mew-port.md).
 
 Port connections at `mew.run/<user>/<device>/<port>` require `PREVIEW_DOMAIN=preview.mew.run` and the `*.preview.mew.run/*` Worker route. Point proxied wildcard DNS to the same Worker and prepare an HTTPS certificate for `*.preview.mew.run`. The default `*.mew.run` certificate alone does not cover nested subdomains. Each preview uses a separate random hostname, and app assets, APIs, and WebSockets are forwarded over the existing P2P transport.
 
