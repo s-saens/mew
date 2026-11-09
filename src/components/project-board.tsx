@@ -111,7 +111,7 @@ export function ProjectBoard(props: ProjectBoardProps) {
       if (current.panel) current.panel.style.translate = ''
     }
     if (commit && current.kind === 'move' && !samePlacement(current.state, current.draft)) {
-      latest.current.onChange({ ...latest.current.value, columns: current.draft.columns, activePanelId: current.panelId })
+      latest.current.onChange({ ...latest.current.value, columns: current.draft.columns, activePanelId: latest.current.value.panels.find(panel => panel.id === current.panelId)?.tool ? latest.current.value.activePanelId : current.panelId })
     }
     if (current?.element.hasPointerCapture(current.pointerId)) current.element.releasePointerCapture(current.pointerId)
     setDraft(null); setMoving(null)
@@ -262,9 +262,9 @@ export function ProjectBoard(props: ProjectBoardProps) {
               }}>
               <svg width="12" height="16" viewBox="0 0 12 16" fill="currentColor" aria-hidden="true">{[4, 8, 12].map(y => <g key={y}><circle cx="4" cy={y} r="1" /><circle cx="8" cy={y} r="1" /></g>)}</svg>
             </button>
-            <button type="button" className="mew-project-board-name" aria-label={`${labels.select}: ${label}`} data-tip={label} onClick={() => latest.current.onSelectProject(panel.id)}>
+            {panel.tool ? <span className="mew-project-board-name">{renderProjectIcon?.(panel)}<span>{label}</span></span> : <button type="button" className="mew-project-board-name" aria-label={`${labels.select}: ${label}`} data-tip={label} onClick={() => latest.current.onSelectProject(panel.id)}>
               {renderProjectIcon?.(panel)}<span>{label}</span>
-            </button>
+            </button>}
             {renderHeaderActions?.(panel)}
             <PanelCloseButton aria-label={`${labels.close}: ${label}`} onClick={() => latest.current.onClosePanel ? latest.current.onClosePanel(panel.id) : change({ type: 'remove', panelId: panel.id })} />
           </div>

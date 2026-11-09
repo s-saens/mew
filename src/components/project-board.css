@@ -12,7 +12,7 @@
 .mew-project-board-name > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mew-project-board-name:hover, .mew-project-board-grip:hover { color: var(--color-ink); }
 .mew-project-board-name:hover::before, .mew-project-board-grip:hover { background: var(--color-surface-raised); }
-.mew-project-board-body { display: flex; flex: 1; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; }
+.mew-project-board-body { position: relative; display: flex; flex: 1; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; }
 .mew-project-board-resize-column, .mew-project-board-resize-row { position: absolute; z-index: 3; touch-action: none; }
 .mew-project-board-resize-column { width: 8px; cursor: col-resize; }
 .mew-project-board-resize-row { height: 8px; cursor: row-resize; }

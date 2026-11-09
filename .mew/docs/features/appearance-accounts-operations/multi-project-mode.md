@@ -1,9 +1,9 @@
 ---
 title: "Multi-project mode"
-description: "Optional desktop multi-project mode with independent compact workspaces, dedicated movement handles and live animated rearrangement, a shared header/background, and separate mode restoration. Defines compact header controls, panel-scoped project selection and new-panel creation, lifecycle, geometry, recovery, and the current Postgres limitation; links implementation evidence."
+description: "Optional desktop multi-project mode with independent compact workspaces, dedicated movement handles and live animated rearrangement, a shared header/background, independent remote tool panels, and separate mode restoration. Defines compact header controls, panel-scoped project selection and new-panel creation, lifecycle, geometry, recovery, and the current Postgres limitation; links implementation evidence."
 status: implemented
 created: "2026-11-06"
-updated: "2026-11-08"
+updated: "2026-11-09"
 ---
 
 # Multi-project mode
@@ -41,7 +41,7 @@ The app header owns resources, runtime controls where available, active sessions
 
 Each project panel contains its project icon/name, existing project command action when permitted, and an X button. The name has a compact rounded hover surface around its content; the command and close buttons use matching 24px rounded hover surfaces. Long names truncate to keep the controls visible. The X closes that project panel. It is distinct from closing a tool or a document tab. Project-specific actions target that panel's working root.
 
-Each panel has its own tool selection and Dock. For example, project A can show an agent while project B shows Git and project C shows a document. Changing tools or projects in one panel leaves the others' selections and work intact.
+Each project panel has its own tool selection and Dock. For example, project A can show an agent while project B shows Git and project C shows a document. Changing tools or projects in one panel leaves the others' selections and work intact. In multi-project mode, Remote browser and Remote desktop open as independent board panels. They can be moved, resized, and closed without changing or closing a project panel.
 
 Use the existing themed panel surfaces and separators. Paint the page background or gradient once behind the board; individual panels must not restart the gradient. Preserve opaque popup surfaces, theme contrast, translated accessible names, and shared tooltips under the [UI foundations](../../development/ui-foundations.md) and [overlay rules](../../development/ui-overlays.md).
 
@@ -75,7 +75,7 @@ These choices fill gaps in the visual references and keep geometry independent o
 | Duplicate project | In the first version, selecting an already-open logical project focuses its panel. Avoid two local writers for the existing account/project tab ledger. Independent views of the same logical project require a later view-state decision. |
 | Worktrees | One logical project's panel can switch its working root using the existing worktree action. Its tab identity stays with the logical project. Simultaneous independent worktrees of the same logical project are outside the first version. |
 | Empty board | Closing the last panel leaves the background and a compact add-project-panel action. It does not recreate a closed panel or replace the account's personal project list. |
-| Shared tools | Notes, chat, and remote desktop retain their existing shared or app-level data ownership. Native Browser and login retain one account session and one app-owned viewer under the [browser contract](../../development/browser-desktop.md#permissions-profiles-and-lifecycle). Project Docks invoke that shared surface rather than mounting competing viewers. Localhost app tabs retain their separate proxy/viewer path. |
+| Shared tools | Notes and chat retain their existing shared data ownership. Remote browser and remote desktop each use one independent board panel in multi-project mode. Native Browser and login retain one account session under the [browser contract](../../development/browser-desktop.md#permissions-profiles-and-lifecycle). Localhost app tabs retain their separate proxy/viewer path. |
 | Initial scope | Arrange project panels; reuse the current compact tools inside them. Cross-project document-tab dragging, floating project windows, and arbitrary nested project docking are outside this first version. |
 
 ## Current limitation

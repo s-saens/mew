@@ -18,7 +18,7 @@ const BrowserDesktopPanel = deferredComponent(async () => ({ default: (await imp
 type MewcatProps = ComponentProps<typeof Mewcat>
 type MascotEntry = { owner: object; props: MewcatProps }
 const MascotContext = createContext<((entry: MascotEntry | null, owner: object) => void) | null>(null)
-const BrowserContext = createContext<((url?: string) => void) | null>(null)
+export const BrowserContext = createContext<((url?: string) => void) | null>(null)
 
 function useAccountServices(auth: AuthStatus) {
   const { showToast, toast } = useToast()

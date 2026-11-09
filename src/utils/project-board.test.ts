@@ -111,3 +111,17 @@ test('closing a focused panel selects a remaining view and never changes its pro
   assert.deepEqual(next.panels, state.panels.slice(0, 2))
   assert.equal(next.columns.length, 2)
 })
+
+
+test('remote tools retain independent geometry while project focus and restoration remain project scoped', () => {
+  const tool: ProjectBoardPanel = { id: 'remote-tool:browser', projectPath: 'remote-tool:browser', workingRoot: 'remote-tool:browser', tool: 'browser' }
+  let state = projectBoardReducer(initial(), { type: 'add', panel: tool, availableWidth: 1000 })
+  assert.equal(state.activePanelId, 'a')
+  assert.equal(projectBoardReducer(state, { type: 'add', panel: tool }), state)
+  state = projectBoardReducer(state, { type: 'move', panelId: tool.id, destination: { type: 'row', columnId: state.columns[0].id, index: 0 } })
+  assert.equal(state.activePanelId, 'a')
+  assert.deepEqual(normalizeProjectBoard(state), state)
+  state = projectBoardReducer(state, { type: 'remove', panelId: 'a' })
+  assert.equal(state.activePanelId, null)
+  assert.equal(state.panels[0].tool, 'browser')
+})

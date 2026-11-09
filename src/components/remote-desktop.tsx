@@ -22,7 +22,7 @@ import { readDesktopVideo, saveDesktopVideo } from '../utils/desktop-video.ts'
 import { VIDEO_FPS, type DesktopVideoSettings } from '../../native/remote-desktop/video-settings.mjs'
 import './remote-desktop.css'
 
-export function RemoteDesktop({ onClose, dockHostRef, mewcatHostRef, dockHidden = false }: { onClose: () => void; dockHostRef?: Ref<HTMLDivElement>; mewcatHostRef?: Ref<HTMLDivElement>; dockHidden?: boolean }) {
+export function RemoteDesktop({ onClose, dockHostRef, mewcatHostRef, dockHidden = false, embedded = false }: { onClose: () => void; dockHostRef?: Ref<HTMLDivElement>; mewcatHostRef?: Ref<HTMLDivElement>; dockHidden?: boolean; embedded?: boolean }) {
   useUiLocale()
   const root = useRef<HTMLDivElement>(null), stage = useRef<HTMLDivElement>(null), video = useRef<HTMLVideoElement>(null)
   const panel = useRef<HTMLDivElement>(null)
@@ -70,7 +70,7 @@ export function RemoteDesktop({ onClose, dockHostRef, mewcatHostRef, dockHidden 
     else return false
     return true
   }
-  useOverlayDismiss(() => { if (!dismissInner()) close() }, { closeOnBack: () => !dismissInner(), closeOnEscape: event => {
+  useOverlayDismiss(embedded ? false : () => { if (!dismissInner()) close() }, { closeOnBack: () => !dismissInner(), closeOnEscape: event => {
     if (connected && !install.open && !settingsOpen && !pasteOpen && !helpOpen && (event.target === stage.current || event.target === root.current)) return false
     if (dismissInner()) { event.preventDefault(); event.stopPropagation() }
     return false
@@ -109,7 +109,7 @@ export function RemoteDesktop({ onClose, dockHostRef, mewcatHostRef, dockHidden 
     setFullscreenError('')
     try {
       if (document.fullscreenElement) await document.exitFullscreen()
-      else if (typeof document.documentElement.requestFullscreen === 'function') { ownsFullscreen.current = true; await requestFullscreenWithKeyboard(document.documentElement); stage.current?.focus() }
+      else if (typeof document.documentElement.requestFullscreen === 'function') { ownsFullscreen.current = true; await requestFullscreenWithKeyboard(embedded ? root.current! : document.documentElement); stage.current?.focus() }
       else setFullscreenError(uiText("이 브라우저는 전체화면을 지원하지 않습니다. 홈 화면에 추가한 앱으로 열어 주세요."))
     } catch { ownsFullscreen.current = false; setFullscreenError(uiText("전체화면으로 전환하지 못했습니다. 브라우저 권한을 확인하고 다시 눌러 주세요.")) }
   }
@@ -129,13 +129,14 @@ export function RemoteDesktop({ onClose, dockHostRef, mewcatHostRef, dockHidden 
     finally { input.release() }
   }
   useEffect(() => {
+    if (embedded) return
     const previousFocus = document.activeElement as HTMLElement | null
     root.current?.focus()
     const siblings = [...document.body.children].filter(child => child !== root.current && child instanceof HTMLElement) as HTMLElement[]
     const inert = siblings.map(element => element.inert)
     siblings.forEach(element => { element.inert = true })
     return () => { siblings.forEach((element, i) => { element.inert = inert[i] }); previousFocus?.focus() }
-  }, [])
+  }, [embedded])
   useEffect(() => {
     setStats(''); setNetwork({ received: 0, sent: 0 }); setRelative(false); setInstallable(false); setCursorMode(null); setView({ x: 0, y: 0, scale: 1 })
     setTransport('direct'); surface.current = 'direct'
@@ -230,9 +231,9 @@ export function RemoteDesktop({ onClose, dockHostRef, mewcatHostRef, dockHidden 
   const swapped = rotation === 90 || rotation === 270
   const showScreenKeyboard = screenKeyboardOpen && !settingsOpen && !pasteOpen && !helpOpen && !install.open
   const keyboardOnly = showScreenKeyboard && screenKeyboard.keyboardOnly && connected
-  return <>{createPortal(<div ref={root} className="remote-desktop" data-dock={!!dockHostRef && !dockHidden && !fullscreen || undefined} role="dialog" aria-modal="true" aria-labelledby="desktop-title" tabIndex={-1}
+  const viewer = <div ref={root} className="remote-desktop" data-embedded={embedded || undefined} data-dock={!!dockHostRef && !dockHidden && !fullscreen || undefined} role={embedded ? "region" : "dialog"} aria-modal={embedded ? undefined : "true"} aria-labelledby="desktop-title" tabIndex={-1}
     onKeyDown={event => {
-      if (event.key === 'Tab' && (event.target !== root.current && event.target !== stage.current || !connected)) {
+      if (!embedded && event.key === 'Tab' && (event.target !== root.current && event.target !== stage.current || !connected)) {
         const items = root.current!.querySelectorAll<HTMLElement>('button:not(:disabled),select,input,textarea,[tabindex="0"]')
         const first = items[0], last = items[items.length - 1]
         if (event.shiftKey && (document.activeElement === first || document.activeElement === root.current)) { event.preventDefault(); last?.focus() }
@@ -356,5 +357,6 @@ export function RemoteDesktop({ onClose, dockHostRef, mewcatHostRef, dockHidden 
       </div>
     </DesktopFloating>}
     </div>
-  </div>, document.body)}{install.popup}</>
+  </div>
+  return <>{embedded ? viewer : createPortal(viewer, document.body)}{install.popup}</>
 }

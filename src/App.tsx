@@ -367,6 +367,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
   const gitMounted = useRef(false)
   const [gitOpen, setGitOpen] = useState(() => caps.git && scopedBrowserStorage().getItem(viewStorageKey(GIT_OPEN_KEY)) === '1')
   const [remoteDesktopOpen, setRemoteDesktopOpen] = useState(false)
+  useEffect(() => { if (compact) setRemoteDesktopOpen(false) }, [compact])
   const [requestedAgentTab, setRequestedAgentTab] = useState<RequestedAgentTab | null>(null)
   const [tasksOpen, setTasksOpen] = useState(false)
   const tasksMounted = useRef(false)
@@ -1316,6 +1317,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
   const selectDockPanel = (panel: MobileDockPanel, toggle = true) => {
     if (!mobileDockPanels.includes(panel) && !(panel === 'desktop' && caps.desktop)) return
     if (compact && panel === 'browser' && openSharedBrowser) { openSharedBrowser(); return }
+    if (compact && panel === 'desktop' && host) { host.onOpenRemoteDesktop(); return }
     const closeFocused = isDesktop() && toggle && (remoteDesktopOpen ? panel === 'desktop' : focusedDockPanel === panel)
     dockRef.current?.restore()
     if (panel === 'desktop') { setRemoteDesktopOpen(open => closeFocused ? !open : true); return }

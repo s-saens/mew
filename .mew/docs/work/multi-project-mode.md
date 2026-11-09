@@ -1,8 +1,8 @@
 ---
 title: "Multi-project mode implementation and verification"
-description: "Original design, staged implementation, and local verification of optional desktop multi-project mode. Records scoped requests and execution, retained compact workspaces, fractional zoom sizing, live panel rearrangement, lifecycle regressions, synthetic measurements, operational limits, and selector and header follow-ups."
+description: "Original design, staged implementation, and local verification of optional desktop multi-project mode. Records scoped requests and execution, retained compact workspaces, fractional zoom sizing, live panel rearrangement, lifecycle regressions, synthetic measurements, operational limits, selector and header follow-ups, and independent remote tool panels."
 created: "2026-11-06"
-updated: "2026-11-08"
+updated: "2026-11-09"
 ---
 
 # Multi-project mode implementation plan
@@ -233,3 +233,10 @@ Local verification passed: eight project-board browser tests, ten board model te
 The board previously rounded its available size to integer CSS pixels before assigning the surface and panel geometry. At fractional sizes this left a gap or overflow at the panel edge. It now uses the observed content-box dimensions and ignores unchanged measurements. The current geometry contract is in [UI workspace layout](../development/ui-workspace-layout.md#multi-project-board-and-compact-presentation).
 
 The new isolated Chromium regression failed before the change and passed afterward at CSS zoom 140% and 150%, sampling multiple frames and checking panel alignment and unwanted vertical scrolling at two fractional heights. All 25 project-board browser, board model, and assembled multi-project browser tests passed. `npm run build` and `npm run lint` passed with advisory warnings. `npm run check:docs` validated 764 descriptions and reported 37 existing missing links outside these changes. The fixture uses CSS zoom and mocked content; it does not establish the behavior of the reported live browser session. No deployment or server lifecycle operation was performed. The build updates assets served by a running instance.
+
+
+## Independent remote tool panels — 2026-11-09
+
+Remote browser and remote desktop now open as independent multi-project board panels, so closing or changing a project does not close them. They share board movement and sizing while retaining the last active project for project-scoped actions. The [feature contract](../features/appearance-accounts-operations/multi-project-mode.md#shared-and-local-controls) owns the behavior; [workspace layout](../development/ui-workspace-layout.md#multi-project-board-and-compact-presentation) owns the layout.
+
+Local checks passed for the 11 board model tests, a mocked-transport browser fixture for menu entry, movement, restoration, permission revocation, and mode changes, and an embedded remote desktop component fixture. `npm run build` and `npm run lint` passed with warnings. `npm run check:docs` validated 767 descriptions but reported 37 existing missing links outside these changes. Actual remote connections, physical devices, and fullscreen behavior remain unverified. No deployment or server lifecycle operation was performed; the build updates assets served by a running instance.

@@ -4,7 +4,7 @@ export const PROJECT_PANEL_MIN_WIDTH = 280
 export const PROJECT_PANEL_MIN_HEIGHT = 240
 export const PROJECT_BOARD_GAP = 4
 
-export type ProjectBoardPanel = { id: string; projectPath: string; workingRoot: string }
+export type ProjectBoardPanel = { id: string; projectPath: string; workingRoot: string; tool?: 'browser' | 'desktop' }
 export type ProjectBoardRow = { panelId: string; weight: number }
 export type ProjectBoardColumn = { id: string; width: number; rows: ProjectBoardRow[] }
 export type ProjectBoardState = {
@@ -42,7 +42,7 @@ export function normalizeProjectBoard(value: unknown, fallback?: ProjectBoardPan
   for (const panel of value.panels) {
     if (!record(panel) || !text(panel.id) || !text(panel.projectPath) || ids.has(panel.id) || projects.has(panel.projectPath)) continue
     ids.add(panel.id); projects.add(panel.projectPath)
-    panels.push({ id: panel.id, projectPath: panel.projectPath, workingRoot: text(panel.workingRoot) ? panel.workingRoot : panel.projectPath })
+    panels.push({ id: panel.id, projectPath: panel.projectPath, workingRoot: text(panel.workingRoot) ? panel.workingRoot : panel.projectPath, ...(panel.tool === 'browser' || panel.tool === 'desktop' ? { tool: panel.tool } : {}) })
   }
   const columns: ProjectBoardColumn[] = []
   for (const column of value.columns) {
@@ -59,7 +59,7 @@ export function normalizeProjectBoard(value: unknown, fallback?: ProjectBoardPan
     while (columnIds.has(id)) id += ':'
     columnIds.add(id); columns.push({ id, width: PROJECT_PANEL_WIDTH, rows: [{ panelId: panel.id, weight: 1 }] })
   }
-  return { version: PROJECT_BOARD_VERSION, panels, columns, activePanelId: text(value.activePanelId) && ids.has(value.activePanelId) ? value.activePanelId : panels[0]?.id ?? null }
+  return { version: PROJECT_BOARD_VERSION, panels, columns, activePanelId: panels.find(panel => panel.id === value.activePanelId && !panel.tool)?.id ?? panels.find(panel => !panel.tool)?.id ?? null }
 }
 
 export function projectPanelLocation(state: ProjectBoardState, panelId: string) {
@@ -84,11 +84,11 @@ function movePanel(state: ProjectBoardState, panelId: string, destination: Proje
     while (columns.some(column => column.id === id)) id += ':'
     columns.splice(indexAt(destination.index, columns.length), 0, { id, width: source.column.width, rows: [{ panelId, weight: 1 }] })
   }
-  return { ...state, columns: columns.filter(column => column.rows.length), activePanelId: panelId }
+  return { ...state, columns: columns.filter(column => column.rows.length), activePanelId: state.panels.find(panel => panel.id === panelId)?.tool ? state.activePanelId : panelId }
 }
 
 export function projectBoardReducer(state: ProjectBoardState, action: ProjectBoardAction): ProjectBoardState {
-  if (action.type === 'focus') return state.activePanelId === action.panelId || !state.panels.some(panel => panel.id === action.panelId) ? state : { ...state, activePanelId: action.panelId }
+  if (action.type === 'focus') return state.activePanelId === action.panelId || !state.panels.some(panel => panel.id === action.panelId && !panel.tool) ? state : { ...state, activePanelId: action.panelId }
   if (action.type === 'add') {
     const existing = state.panels.find(panel => panel.projectPath === action.panel.projectPath)
     if (existing) return projectBoardReducer(state, { type: 'focus', panelId: existing.id })
@@ -105,7 +105,7 @@ export function projectBoardReducer(state: ProjectBoardState, action: ProjectBoa
       while (columns.some(column => column.id === id)) id += ':'
       columns.push({ id, width: PROJECT_PANEL_WIDTH, rows: [{ panelId: action.panel.id, weight: 1 }] })
     }
-    return { ...state, panels, columns, activePanelId: action.panel.id }
+    return { ...state, panels, columns, activePanelId: action.panel.tool ? state.activePanelId : action.panel.id }
   }
   if (action.type === 'replace') {
     if (!text(action.projectPath) || !text(action.workingRoot) || !state.panels.some(panel => panel.id === action.panelId)) return state
@@ -118,7 +118,7 @@ export function projectBoardReducer(state: ProjectBoardState, action: ProjectBoa
     if (panelIndex === -1) return state
     const panels = state.panels.filter(panel => panel.id !== action.panelId)
     const columns = state.columns.map(column => ({ ...column, rows: column.rows.filter(row => row.panelId !== action.panelId) })).filter(column => column.rows.length)
-    return { ...state, panels, columns, activePanelId: state.activePanelId === action.panelId ? panels[Math.min(panelIndex, panels.length - 1)]?.id ?? null : state.activePanelId }
+    return { ...state, panels, columns, activePanelId: state.activePanelId === action.panelId ? (panels.slice(panelIndex).find(panel => !panel.tool) ?? panels.slice(0, panelIndex).reverse().find(panel => !panel.tool))?.id ?? null : state.activePanelId }
   }
   if (action.type === 'move') return movePanel(state, action.panelId, action.destination)
   if (action.type === 'move-direction') {
