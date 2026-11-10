@@ -51,12 +51,14 @@ createRoot(document.getElementById('root')).render(<TmuxTerminal sessionName="ke
     await page.evaluate('window.sockets[1].connect()')
     await loading.waitFor({ state: 'detached' })
     assert.equal(await draft.inputValue(), 'keep this draft', 'successful recovery keeps the pending input')
+    await draft.evaluate(el => { const win = el.ownerDocument.defaultView! as any; win.focusCalls = 0; const focus = el.focus.bind(el); el.focus = (...args: Parameters<typeof el.focus>) => { win.focusCalls++; return focus(...args) } })
     for (const [label, sequence] of [['Home', '\x1b[H'], ['End', '\x1b[F'], ['Ctrl+C', '\x03'], ['Esc', '\x1b'], ['Tab', '\t'], ['←', '\x1b[D']]) {
       await bar.getByRole('button', { name: label, exact: true }).tap()
       assert.equal(await page.evaluate('window.inputs.at(-1)'), sequence)
       assert.equal(await draft.inputValue(), 'keep this draft')
       assert.equal(await draft.evaluate(el => el === el.ownerDocument.activeElement), true, 'key press keeps the composer focused')
     }
+    assert.equal(await page.evaluate('window.focusCalls'), 0, 'keys do not request focus even when a dismissed keyboard leaves the input focused')
     await bar.getByRole('button', { name: 'Ctrl', exact: true }).tap()
     await bar.getByRole('button', { name: 'Shift', exact: true }).tap()
     await bar.getByRole('button', { name: 'Home', exact: true }).tap()

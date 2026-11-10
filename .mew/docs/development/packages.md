@@ -1,7 +1,7 @@
 ---
 title: "Shared Packages"
-description: "Shared package responsibilities, independent imports, and host APIs. Covers editor metadata including titleless YAML, source mapping, voice recording, terminals, mobile keys, shared UI, diagrams, and verification boundaries."
-updated: "2026-11-04"
+description: "Shared package responsibilities, independent imports, and host APIs. Covers editor metadata, source mapping, voice recording, terminal auxiliary key focus, mobile keys, shared UI, diagrams, and verification boundaries."
+updated: "2026-11-10"
 상위파일:
   - "../MOC.md"
   - "MOC.md"
@@ -114,6 +114,8 @@ The host translates and passes the bottom input hint through the `inputPlacehold
 
 **Terminal keys.** `stretch` and `extraKeys` distribute 11 keys evenly in one row: **Esc · Tab · Ctrl · Shift · ← · ↑ · ↓ · → · Home · End · ^C**. `Home`/`End` send line-start/end and clear toggles after Ctrl/Shift combinations. `^C` sends Ctrl+C to request interruption without sending/deleting the draft or changing focus, keyboard lock, or history arrows. Editors retain their configuration without extra keys or even distribution.
 
+The in-flow key bar marks its buttons as preserving keyboard focus so the enclosing agent or terminal panel does not blur the active input after a press. Keys do not request focus when it is already present or absent; this preserves the current software keyboard state, including when the keyboard was dismissed while input focus remained.
+
 **Layers.** Keep the fixed bar at `z-20`, below fullscreen file explorer/chat/agent/terminal overlays at `z-30`. Using the same `z-30` would place it above the explorer because the editor follows it in DOM order. The bar itself provides no swipe switching.
 
 **Comment action.** `onComment` adds a selected-text comment icon. On mobile it opens the same composer as `Ctrl/Cmd+Shift+C`; the host's `EditorPane.startComment` creates the anchor.
@@ -165,7 +167,7 @@ A body-hosted visual copy follows the pointer while the original leaves a placeh
 
 ## Verification
 
-Terminal auxiliary key verification: `node --test server/terminal-keybar-ui.test.ts`. Using actual xterm and TmuxTerminal with isolated WebSocket recordings, it checks key sequences, Ctrl/Shift release, draft/focus preservation, a single row above the input at 320/390/767px in both themes, no horizontal or vertical overflow, accommodation of buttons and vertical padding, and hiding on desktop. No actual shell process runs.
+Terminal auxiliary key verification: `node --test server/terminal-keybar-ui.test.ts server/terminal-panel-keyboard-ui.test.ts`. The terminal fixture checks key sequences, Ctrl/Shift release, draft and focus preservation, no redundant focus request, and layout. The agent panel fixture checks that key presses retain focused and unfocused input states through the enclosing panel. No actual shell process runs; physical-device keyboard behavior still needs verification.
 
 ## Diagrams
 
