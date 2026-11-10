@@ -5,7 +5,7 @@ import { LoadingIndicator, observeEditorViewport, useToast } from '@mew/ui'
 import { uiText } from '@mew/ui/i18n-core'
 import { useUiLocale } from '@mew/ui/i18n'
 import { useShortcutBindings } from '@mew/shortcuts'
-import { ArrowLeft, ArrowRight, Brain, Database, OpenNewWindow, Quote } from 'iconoir-react'
+import { ArrowLeft, ArrowRight, Brain, Database, Menu, OpenNewWindow, Quote } from 'iconoir-react'
 import { useDock, DockGrip, DockInlineBody } from './DockWorkspace'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
 import { type CommentThread, type Role, type TreeNode } from '../api/client'
@@ -221,6 +221,8 @@ export function EditorPane({
   const { t } = useI18n()
   const { toast: commentToast, showToast } = useToast()
   const [preparingAgent, setPreparingAgent] = useState(false)
+  const [mobileToolsOpen, setMobileToolsOpen] = useState(false)
+  const mobileToolsRef = useRef<HTMLDivElement>(null)
   const agentRequestPending = useRef(false)
   const shortcutBindings = useShortcutBindings()
   const selectedTab = (pane.activeTabId ? pane.tabs.find((t) => t.id === pane.activeTabId) : undefined) ?? pane.tabs.find((t) => t.path === pane.activePath) ?? null
@@ -375,6 +377,19 @@ export function EditorPane({
   }, [workspace?.path, project, activePath, authEmail, canComment, canWriteComment, activeTab?.viewMode])
   const annotationButtonRef = useRef<HTMLButtonElement>(null)
   const [annotationPopup, setAnnotationPopup] = useState<{ num: number | null; identity?: string | null; x: number; y: number } | null>(null)
+  useEffect(() => { setMobileToolsOpen(false) }, [project, activePath])
+  useEffect(() => {
+    if (!mobileToolsOpen || commentListOpen || annotationPopup) return
+    const dismiss = (event: PointerEvent) => {
+      if (!mobileToolsRef.current?.contains(event.target as Node)) setMobileToolsOpen(false)
+    }
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setMobileToolsOpen(false)
+    }
+    document.addEventListener('pointerdown', dismiss)
+    document.addEventListener('keydown', escape)
+    return () => { document.removeEventListener('pointerdown', dismiss); document.removeEventListener('keydown', escape) }
+  }, [mobileToolsOpen, commentListOpen, annotationPopup])
   const annotationEntries = useMemo(() => activeTab?.path.endsWith('.md') ? readSourceAnnotations(activeTab.content) : [], [activeTab?.path, activeTab?.content])
   const annotationReadOnly = loading || revalidating || !activeTab?.editable || !!activeTab?.anchorPreview || (!!activeTab && isArchivedPath(activeTab.path, project))
   const [editorMenu, setEditorMenu] = useState<EditorMenuSession | null>(null)
@@ -863,7 +878,18 @@ export function EditorPane({
                 {showSidebarButton && <SidebarOpenButton onClick={onOpenSidebar} />}
               </div>
               {/* right-5 leaves room for the editor's scrollbar. */}
-              <div data-editor-tools className="absolute right-5 top-3 z-20 flex items-start gap-2">
+              <div ref={mobileToolsRef} data-editor-tools className="absolute right-5 top-3 z-20">
+                <button type="button" aria-label={uiText('에디터 메뉴')} data-tip={uiText('에디터 메뉴')}
+                  aria-expanded={mobileToolsOpen} onClick={() => {
+                    if (mobileToolsOpen) { setCommentListOpen(false); setAnnotationPopup(null) }
+                    setMobileToolsOpen(open => !open)
+                  }}
+                  className="rounded border border-edge-strong bg-surface-raised p-1.5 text-ink-muted shadow-sm hover:bg-surface-hover md:hidden">
+                  <Menu width={14} height={14} aria-hidden="true" />
+                </button>
+                <div data-editor-tool-actions className={`${mobileToolsOpen ? 'flex' : 'hidden'} absolute right-0 top-full mt-2 flex-col items-end gap-2 md:static md:mt-0 md:flex md:flex-row md:items-start`} onClick={event => {
+                  if (!commentToolsRef.current?.contains(event.target as Node)) setMobileToolsOpen(false)
+                }}>
                 {htmlUrl && (
                   <a
                     href={htmlUrl}
@@ -1033,6 +1059,7 @@ export function EditorPane({
                     <Brain width={14} height={14} aria-hidden="true" />
                   </button>
                 )}
+                </div>
               </div>
               {/* 뷰어는 남는 높이를 전부 차지한다 — 그래야 아래 상태줄이 짧은 문서에서도 칸 맨 밑에 선다.
                   min-h-0이 없으면 내용이 긴 문서에서 뷰어가 칸 밖으로 자라 상태줄을 밀어낸다. */}

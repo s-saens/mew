@@ -8,7 +8,7 @@ updated: "2026-10-22"
 status_hash: "ab341935e2410ba0c99243d66dc3d86f79a79d87958f44d2e54bca6974166417"
 files: ["packages/editor/src/editor/footnoteSync.ts", "packages/editor/src/utils/footnotes.ts", "packages/editor/src/editor/annotations.ts", "packages/editor/src/editor/annotationSource.ts"]
 commits: []
-description: "Feature contract covering Markdown footnotes and References, and insertion, popup editing, and the full list of annotations added with Ctrl+' or the body right-click menu. Defines storage as inline markers and an ordered list under $Annotations$, hiding in Hotview, and section removal when the last annotation is deleted."
+description: "Feature contract covering Markdown footnotes and References, and insertion, popup editing, and the full list of annotations, including its mobile editor menu, added with Ctrl+' or the body right-click menu. Defines storage as inline markers and an ordered list under $Annotations$, hiding in Hotview, and section removal when the last annotation is deleted."
 상위파일:
   - "MOC.md"
   - "_document-code-media-editing.md"
@@ -43,7 +43,7 @@ In Markdown Hotview and Plain, pressing `Ctrl+'` inserts an annotation marker at
 
 Adding a marker opens a small popup with one text input. The entered content is included in document autosave. Clicking a superscript marker in Hotview reopens the same popup to edit the content or delete the annotation.
 
-An **Annotations** button shaped like a closing double quotation mark sits directly beside the floating comments button. Use it to view all annotations in the current document and select an item to open its editing popup.
+An **Annotations** button shaped like a closing double quotation mark sits beside the floating comments button. On mobile, both are inside the editor actions menu. Use it to view all annotations in the current document and select an item to open its editing popup.
 
 ### Annotation storage and display
 

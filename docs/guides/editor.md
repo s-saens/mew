@@ -1,6 +1,6 @@
 ---
 title: "Document Editing and Storage Formats"
-description: "Explains document and file editing, attachment storage and Git behavior, previews, mobile navigation, workspace controls, and fullscreen."
+description: "Explains document and file editing, attachment storage and Git behavior, previews, mobile navigation and editor actions, workspace controls, and fullscreen."
 updated: "2026-11-09"
 상위파일:
   - "MOC.md"
@@ -128,6 +128,8 @@ After you dismiss installation guidance, fullscreen guidance follows in supporte
 
 On PCs, a vertical dock appears along the **left edge** of the screen. Hover over an icon to see the tool name. Clicking opens a closed panel, focuses an open but unfocused panel, or closes the panel if its icon is already focused. The editor hides or reappears while preserving its tabs and content. Open panels and the currently focused panel use different levels of emphasis.
 
+On mobile, tap **Editor actions** at the top right of the editor to show its available floating tools, including comments, annotations, and agent actions. Tap it again, tap outside, or press Esc to close the tools.
+
 On mobile, use the **dock** at the bottom of the screen to switch the foreground panel. Tapping the current panel again does not close it. Only tools appropriate for your permissions and current project appear from among File Explorer, Editor, Agent, Terminal, Git, Browser, Features, Debugger, Notes, and Tasks. Change visibility and order in **Settings → Dock**.
 
 **Long-press an icon for 450ms, then drag along the dock to reorder it**. Move up or down in the PC's vertical dock, or left or right in the mobile horizontal dock. Use the placeholder to identify the drop position, and press Esc or cancel the touch to restore the original order. With the keyboard, focus an icon and use `Alt+↑/↓` on PCs or `Alt+←/→` on mobile. Visibility settings and order are saved in this browser.
@@ -139,7 +141,7 @@ Swipe left or right on a mobile panel's body to move to the current panel's prev
 **Features** opens the current project's feature document list. It appears when you have agent permission, and content you are writing persists when you view another panel and return. Close, Esc, and Back check for unsaved content.
 
 
-Open Remote Browser, Server File Explorer, Scheduled Tasks, and Settings from the grouped header menu. Open databases from the explorer toolbar button to the right of the creation controls beside **Documents / Files**, or the floating editor button beside the agent action. Click your profile card in the menu for account settings. When the mobile software keyboard opens, the dock and reserved bottom space are hidden; they return when the keyboard closes. Control panels using the dock and top menu, and switch tabs using the tab bar, keyboard shortcuts, or swipes on the mobile body or Plain auxiliary key bar.
+Open Remote Browser, Server File Explorer, Scheduled Tasks, and Settings from the grouped header menu. Open databases from the explorer toolbar button to the right of the creation controls beside **Documents / Files**, or the floating editor button beside the agent action (inside **Editor actions** on mobile). Click your profile card in the menu for account settings. When the mobile software keyboard opens, the dock and reserved bottom space are hidden; they return when the keyboard closes. Control panels using the dock and top menu, and switch tabs using the tab bar, keyboard shortcuts, or swipes on the mobile body or Plain auxiliary key bar.
 
 The top **Menu** icon carries the unread notification count. Its Notifications section previews up to four compact items; **View all** opens the complete list. The same icon control is used on desktop and mobile.
 
@@ -232,7 +234,7 @@ Tab indents a list item by one level. The default `sinkListItem` moves it **insi
 
 In Markdown Hotview or Plain, place the cursor where you want an annotation and press `Ctrl+'` or choose **Add Annotation** from the right-click menu. If text is selected, the marker is added after it. Enter content in the small input window that opens; it is saved automatically. Small superscripts such as `1)` and `2)` appear in the Hotview content.
 
-Click a superscript to open the same input window and edit or delete its content. View all annotations in the document with the **Annotations** button, shaped like a closing double quotation mark, immediately beside the floating comments button. Clicking an item in the list opens that annotation's input window.
+Click a superscript to open the same input window and edit or delete its content. View all annotations in the document with the **Annotations** button, shaped like a closing double quotation mark, beside the floating comments button, inside **Editor actions** on mobile. Clicking an item in the list opens that annotation's input window.
 
 Annotation content is stored as a numbered list under `# $Annotations$` at the bottom of the file. Hotview hides this storage section; Plain shows both the `^[1]` markers in the content and the storage section. Deleting the last annotation also removes the storage section. `Alt+E` footnotes and `# References` remain separate. See the [annotation feature contract](../../.mew/docs/features/document-code-media-editing/footnotes-and-references.md#annotation-storage-and-display) for the detailed format.
 
