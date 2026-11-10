@@ -19,6 +19,9 @@ test('workspace header, all dock edges and portaled dialogs stay inside safe are
 import {createRoot} from '${root}/node_modules/react-dom/client.js';
 import {I18nProvider} from '${root}/src/i18n.tsx';
 import {MobileDock} from '${root}/src/components/mobile-dock.tsx';
+import {observeWorkspaceViewport} from '${root}/src/utils/workspace-viewport.ts';
+import {setWorkspaceZoom} from '${root}/src/utils/workspace-zoom.ts';
+window.setWorkspaceZoom=setWorkspaceZoom;observeWorkspaceViewport();
 import {DialogFrame} from '${root}/packages/ui/src/dialog-frame.tsx';
 import {SettingsModal} from '${root}/src/components/SettingsModal.tsx';
 function Fixture(){const [position,setPosition]=React.useState('bottom');const [hidden,setHidden]=React.useState(false);const [dialog,setDialog]=React.useState(null);
@@ -49,6 +52,17 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     page.on('pageerror', error => errors.push(error.message))
     await page.route('http://mew-safe-area.test/**', route => route.fulfill({ contentType: 'text/html', body: `<!doctype html><html class="dark"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>${css}</style><div id="root"></div><script>${chunk.code}</script></html>` }))
     await page.goto('http://mew-safe-area.test/')
+    for (const zoom of [50, 80, 100, 125, 200]) {
+      await page.evaluate(value => (globalThis as unknown as { setWorkspaceZoom: (value: number) => void }).setWorkspaceZoom(value), zoom)
+      await page.waitForFunction("Math.abs(document.querySelector('.mew-workspace').getBoundingClientRect().bottom - 844) < 1", undefined, { timeout: 3000 })
+      const workspace = (await page.locator('.mew-workspace').boundingBox())!
+      const dock = (await page.locator('.mobile-dock').boundingBox())!
+      const content = (await page.locator('main').boundingBox())!
+      assert.ok(Math.abs(workspace.width - 390) < 1, `${zoom}% workspace fills the width`)
+      assert.ok(Math.abs(dock.y + dock.height - 844) < 1, `${zoom}% dock stays at the bottom`)
+      assert.ok(Math.abs(content.y + content.height - dock.y) < 1, `${zoom}% content meets the dock`)
+    }
+    await page.evaluate(() => (globalThis as unknown as { setWorkspaceZoom: (value: number) => void }).setWorkspaceZoom(100))
     for (const scenario of [
       { name: 'portrait', width: 390, height: 844, top: 59, right: 0, bottom: 34, left: 0 },
       { name: 'landscape', width: 844, height: 390, top: 0, right: 59, bottom: 21, left: 59 },

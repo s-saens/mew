@@ -1,6 +1,6 @@
 ---
 title: "UI workspace panels, Dock, and gestures"
-description: "Workspace geometry, safe areas, Dock layout and F1–F12 selection, tab motion, and mobile gestures. Covers single-project and multi-project restoration and board arrangement."
+description: "Workspace geometry, zoom-aware viewport height, safe areas, Dock layout and F1–F12 selection, tab motion, and mobile gestures. Covers single-project and multi-project restoration and board arrangement."
 created: "2026-11-03"
 updated: "2026-11-08"
 상위파일: "ui-contracts.md"
@@ -9,6 +9,8 @@ updated: "2026-11-08"
 ## Device safe areas
 
 The direct viewport combines `viewport-fit=cover` with `interactive-widget=resizes-content`. Within `--app-height`, the `.mew-workspace` border box reserves all four `env(safe-area-inset-*, 0px)` values once, protecting the header, panel tabs, and Dock from status bars, cutouts, and the home indicator. Follow orientation and viewport changes, including landscape above the desktop breakpoint. Zero insets preserve desktop geometry.
+
+Workspace zoom converts the visible viewport bottom into zoomed CSS coordinates before setting `--app-height`. Recalculate it when zoom changes as well as when the viewport or keyboard changes, keeping the positioned bottom Dock at the visible workspace edge. The menu zoom uses CSS zoom; browser-controlled zoom can also change media-query breakpoints.
 
 For a positioned Dock (`data-position`), reserve insets only in the workspace. Mobile horizontal docks stay 48px high and vertical docks 48px wide. Protect the panel footer when the Dock is top/side, hidden, or unavailable. The older unpositioned Dock fallback retains its fixed-edge spacing.
 

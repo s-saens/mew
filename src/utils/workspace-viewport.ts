@@ -6,7 +6,8 @@ export function workspaceViewportBottom() {
   // The overflow-hidden root is a separate clipping boundary during fullscreen
   // keyboard transitions, even while the viewport APIs still report older sizes.
   const root = document.documentElement
-  const layoutHeight = root.clientHeight || window.innerHeight
+  const rootZoom = parseFloat(getComputedStyle(root).zoom) || 1
+  const layoutHeight = rootZoom === 1 ? root.clientHeight || window.innerHeight : window.innerHeight
   // On the document root, clientHeight reports the layout viewport rather than
   // the rendered box. Fullscreen can clip that box before any viewport shrinks.
   const rootBottom = root.getBoundingClientRect().bottom || layoutHeight
@@ -32,7 +33,8 @@ export function observeWorkspaceViewport() {
       const overlay = fullscreenKeyboardOverlay() ? true : previousOverlay
       if (keyboard.overlaysContent !== overlay) keyboard.overlaysContent = overlay
     }
-    style.setProperty('--app-height', `${workspaceViewportBottom()}px`)
+    const rootZoom = parseFloat(getComputedStyle(document.documentElement).zoom) || 1
+    style.setProperty('--app-height', `${workspaceViewportBottom() / rootZoom}px`)
   }
   const schedule = () => {
     window.cancelAnimationFrame(frame)
@@ -45,6 +47,7 @@ export function observeWorkspaceViewport() {
   viewport?.addEventListener('scroll', schedule)
   keyboard?.addEventListener('geometrychange', schedule)
   window.addEventListener('resize', schedule)
+  window.addEventListener('mew:workspace-zoom', schedule)
   document.addEventListener('fullscreenchange', schedule)
   return () => {
     window.cancelAnimationFrame(frame)
@@ -53,6 +56,7 @@ export function observeWorkspaceViewport() {
     viewport?.removeEventListener('scroll', schedule)
     keyboard?.removeEventListener('geometrychange', schedule)
     window.removeEventListener('resize', schedule)
+    window.removeEventListener('mew:workspace-zoom', schedule)
     document.removeEventListener('fullscreenchange', schedule)
     if (keyboard && window === window.top) keyboard.overlaysContent = previousOverlay
     if (previous) style.setProperty('--app-height', previous)

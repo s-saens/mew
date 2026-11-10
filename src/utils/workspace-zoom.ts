@@ -10,6 +10,7 @@ export function loadWorkspaceZoom(): number {
 
 export function applyWorkspaceZoom(value: number) {
   document.documentElement.style.zoom = `${value}%`
+  window.dispatchEvent(new Event('mew:workspace-zoom'))
 }
 
 export function setWorkspaceZoom(value: number) {
