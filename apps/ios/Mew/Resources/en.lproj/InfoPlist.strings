@@ -1,0 +1,2 @@
+"NSLocalNetworkUsageDescription" = "Connect to the Mew server you select on your local or private network.";
+"NSMicrophoneUsageDescription" = "Record voice input in your Mew workspace when you request it.";

@@ -1,4 +1,6 @@
 import type { AppTransport } from './remote-transport.ts'
+import { getNativeBridge } from '../runtime/native-bridge.ts'
+import { fetchNativeUiResource } from './native-ui-cache.ts'
 import { REMOTE_UI_REVALIDATION_HEADER, REMOTE_UI_REVALIDATION_LIMIT, REMOTE_UI_REVALIDATION_QUERY_LIMIT, REMOTE_UI_REVALIDATION_AGE, remoteUiCachePath } from '../../shared/remote-ui-revalidation.ts'
 
 const CACHE = 'mew-remote-ui-v1'
@@ -130,6 +132,7 @@ function cacheFreshResponse(cache: Cache | undefined, key: string, response: Res
 
 /** Cached code is usable only after this host confirms its digest over the live P2P link. */
 export async function fetchRemoteUiResource(transport: AppTransport, path: string, init: RequestInit, instance?: string): Promise<Response> {
+  if (getNativeBridge()) return fetchNativeUiResource(transport, path, init, instance)
   const url = new URL(path, location.origin), asset = url.searchParams.get('path') ?? ''
   if (instance && init.method === 'GET' && url.pathname === '/api/remote-ui/file' && asset === '/index.html' && !new Headers(init.headers).has('range')) return fetchIndex(transport, path, init, instance)
   if (!instance || init.method !== 'GET' || url.pathname !== '/api/remote-ui/file' || !remoteUiCachePath(asset) || new Headers(init.headers).has('range') || !globalThis.caches || !crypto.subtle) return transport.fetch(path, init)

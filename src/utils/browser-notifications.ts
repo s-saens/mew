@@ -4,6 +4,8 @@ import {
   requestBrowserNotificationPermission,
   type BrowserNotificationPermission,
 } from '../../shared/browser-notifications.ts'
+import { createNativeNotificationDelivery, nativeNotificationPermission, requestNativeNotificationPermission } from './native-notifications.ts'
+import { getNativeBridge } from '../runtime/native-bridge.ts'
 
 type Pending = { finish(data?: Record<string, unknown>): void }
 type HostedNotifications = {
@@ -22,6 +24,8 @@ const permissions = new Set(['granted', 'denied', 'default', 'unsupported', 'ins
 const emit = () => listeners.forEach(listener => listener())
 
 export function getBrowserNotificationPermission(): BrowserNotificationPermission {
+  const native = nativeNotificationPermission(emit)
+  if (native !== undefined) return native
   if (hosted) return hosted.permission
   // Hosted permission requests must be handled by the trusted top-level connection page.
   if (window.parent !== window) return 'unsupported'
@@ -50,6 +54,7 @@ function request(context: HostedNotifications, type: string, fields: Record<stri
 
 /** Send the permission request immediately, preserving the button's user activation. */
 export async function requestBrowserNotificationPermissionForApp(): Promise<BrowserNotificationPermission> {
+  if (getNativeBridge()) return (await requestNativeNotificationPermission(emit))!
   if (!hosted) return getBrowserNotificationPermission() === 'unsupported' ? 'unsupported' : requestBrowserNotificationPermission()
   const context = hosted
   const response = await request(context, 'mew-notification-permission-request', {}, 60_000)
@@ -58,6 +63,8 @@ export async function requestBrowserNotificationPermissionForApp(): Promise<Brow
 }
 
 export function createNotificationDelivery(onClick: (id: string) => void) {
+  const native = createNativeNotificationDelivery(onClick)
+  if (native) return native
   const context = hosted
   if (!context) return createBrowserNotificationDelivery(onClick)
   let disposed = false

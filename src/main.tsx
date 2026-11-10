@@ -52,12 +52,19 @@ async function startApp() {
   root.render(<StartupScreen />)
 
   try {
+    const nativeAuth = location.protocol === 'mew-app:'
+      ? await import('./runtime/native-runtime.ts').then(module => module.initializeNativeApp())
+      : undefined
+    if (nativeAuth) {
+      applyFontPreferences(loadFontPreferences())
+      applyThemePalette(loadThemeSettings().palette)
+    }
     const remoteApp = document.querySelector('meta[name="mew-p2p-app"]')
     const initialRoute = remoteApp ? 'workspace' : appRoute(location.pathname, getAppRuntime().basePath)
     const bootstrapModule = initialRoute === 'workspace' ? import('./AppBootstrap.tsx') : null
     const [bootstrap, initialAuth] = await Promise.all([
       bootstrapModule,
-      remoteApp ? initializeRemoteApp() : getAppRuntime().initialAuth,
+      remoteApp ? initializeRemoteApp() : nativeAuth ?? getAppRuntime().initialAuth,
     ])
     const sharePath = remoteApp ? new URLSearchParams(location.search).get('sharePath') : location.pathname
     const share = sharePath ? parsePublicSharePath(sharePath) : null

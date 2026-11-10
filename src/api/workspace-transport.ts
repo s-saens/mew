@@ -5,10 +5,10 @@ import { appResourceUrl, getAppRuntime, prepareAppResourceUrl } from '../runtime
 /** Query parameters also work for DOM resources and WebSocket handshakes through Mewlink. */
 export function scopedWorkspaceUrl(input: string, scope?: Readonly<WorkspaceScope>): string {
   if (!scope || /^(?:data|blob):/.test(input)) return input
-  const base = typeof location === 'undefined' ? 'http://mew.local' : location.origin
+  const base = typeof location === 'undefined' ? 'http://mew.local' : location.href || location.origin
   const url = new URL(input, base)
   if (!url.pathname.startsWith('/api/')) return input
-  if (!['http:', 'https:', 'ws:', 'wss:'].includes(url.protocol)) return input
+  if (!['http:', 'https:', 'ws:', 'wss:'].includes(url.protocol) && !(new URL(base).protocol === 'mew-app:' && url.protocol === 'mew-app:')) return input
   const sameHost = url.host === new URL(base).host
   if (!sameHost) return input
   return workspaceScopeUrl(input, scope)

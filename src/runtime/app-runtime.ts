@@ -34,6 +34,8 @@ export interface AppRuntime {
   basePath?: string
   controls?: { label: string; reset(): void }
   onLoggedOut?(): void
+  onAuthChanged?(status: AuthStatus): boolean
+  publicBaseUrl?: string
   resourceUrl?(url: string): string
   prepareResourceUrl?(url: string, signal?: AbortSignal): Promise<string>
   releaseResourceUrl?(url: string): void
@@ -56,6 +58,11 @@ export function getAppRuntime(): AppRuntime {
 /** DOM resource consumers need the same environment boundary as fetch callers. */
 export function appResourceUrl(url: string): string {
   return runtime.resourceUrl?.(url) ?? url
+}
+
+/** Custom-scheme hosts still expose a conventional URL to existing socket callers. */
+export function appSocketUrl(url: string): URL {
+  return new URL(url, location.protocol === 'mew-app:' ? 'https://workspace/' : location.href)
 }
 
 /** Expensive downloads are prepared only after an explicit user action. */

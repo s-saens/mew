@@ -7,6 +7,7 @@ import { useFocusedShortcutScope } from '@mew/shortcuts'
 import { BROWSER_DESKTOP_WS } from '../../shared/browser-desktop'
 import { loginDesktopSize } from '../../shared/login-desktop'
 import { openMewSocket } from '../utils/remote-transport'
+import { appSocketUrl } from '../runtime/app-runtime.ts'
 import { browserDesktopPeer } from '../utils/browser-desktop-peer'
 import { bindBrowserDesktopInput } from '../utils/browser-desktop-input'
 import { DockGrip } from './DockWorkspace'
@@ -86,7 +87,7 @@ export function BrowserDesktopPanel({ url, navigationRequest = 0, nativeAllowed 
     watchFrame()
     let ws: WebSocket
     try {
-      const target = new URL(transport.url, location.href)
+      const target = appSocketUrl(transport.url)
       if (target.protocol === 'https:') target.protocol = 'wss:'
       else if (target.protocol === 'http:') target.protocol = 'ws:'
       else if (!['ws:', 'wss:'].includes(target.protocol)) throw new Error(uiText('브라우저 주소가 올바르지 않습니다'))

@@ -8,6 +8,7 @@ import { useUiLocale } from '@mew/ui/i18n'
 import { useFocusedShortcutScope } from '@mew/shortcuts'
 import { DOM_BROWSER_WS, type DomBrowserCommand, type DomBrowserMessage, type DomBrowserState } from '../../shared/dom-browser'
 import { openMewSocket } from '../utils/remote-transport'
+import { appSocketUrl } from '../runtime/app-runtime.ts'
 import { appTabShortcut } from '../utils/app-tab-shortcuts'
 import { bindDomBrowserScroll, type DomBrowserScroll } from '../utils/dom-browser-scroll'
 import { PanelCloseButton } from './panel-close-button'
@@ -104,7 +105,7 @@ function DomBrowserPage({ url, navigationRequest, onClose, onHome }: { url: stri
     setConnection('connecting'); setError(''); setHasSnapshot(false)
     let ws: WebSocket
     try {
-      const target = new URL(DOM_BROWSER_WS, location.href)
+      const target = appSocketUrl(DOM_BROWSER_WS)
       target.protocol = target.protocol === 'https:' ? 'wss:' : 'ws:'
       ws = openMewSocket(target.href)
     } catch (cause) {

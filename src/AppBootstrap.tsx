@@ -44,7 +44,7 @@ export default function AppBootstrap({ initialAuth }: { initialAuth?: AuthStatus
   // Prepare identity and permission-scoped caches before workspace effects restore tabs.
   const applyAuth = useCallback((status: AuthStatus) => {
     if (!status.setupRequired) { capturedSetupToken = null; setSetupToken(null) }
-    if (reloadRemoteAppForIdentity(status.authenticated ? status.email : null)) { clearFileContentCache(); setAuth(null); return }
+    if (getAppRuntime().onAuthChanged?.(status) || reloadRemoteAppForIdentity(status.authenticated ? status.email : null)) { clearFileContentCache(); setAuth(null); return }
     setContentIdentity(status.email)
     const permissionVersion = JSON.stringify([status.email, status.role, status.accessRevision, status.capabilities])
     try {

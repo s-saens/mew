@@ -1,0 +1,38 @@
+name: iOS client verification
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'apps/ios/**'
+      - '.github/workflows/ios-client.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  simulator:
+    runs-on: macos-15
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select an available iPhone simulator
+        id: simulator
+        run: |
+          device_id="$(xcrun simctl list devices available --json | python3 -c 'import json,sys; d=json.load(sys.stdin); print(next(x["udid"] for k,v in d["devices"].items() if "iOS" in k for x in v if x["name"].startswith("iPhone")))')"
+          echo "destination=platform=iOS Simulator,id=$device_id" >> "$GITHUB_OUTPUT"
+      - name: Build and run native tests
+        run: |
+          xcodebuild test \
+            -project apps/ios/Mew.xcodeproj \
+            -scheme Mew \
+            -destination '${{ steps.simulator.outputs.destination }}' \
+            -resultBundlePath /tmp/Mew-iOS.xcresult \
+            CODE_SIGNING_ALLOWED=NO
+      - name: Preserve simulator test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-test-results
+          path: /tmp/Mew-iOS.xcresult
+          if-no-files-found: ignore

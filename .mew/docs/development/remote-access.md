@@ -1,6 +1,6 @@
 ---
 title: "Mewlink device registration and locally authenticated P2P access contract"
-description: "Defines Mewlink registration, launcher behavior, authentication, browser trust, UI resources, notification permission bridging, microphone delegation, signaling proofs, and transport limits, including bounded response-send pipelining and Mew Port removal. Links recovery and distinguishes host updates, central rollout, and isolated verification; the removed Android gateway has no transport capability."
+description: "Defines Mewlink registration, launcher behavior, authentication, browser trust, UI resources, notification permission bridging, microphone delegation, signaling proofs, and transport limits. Links native iOS storage adaptation, recovery, Mew Port removal, and separate host/central application and verification boundaries."
 created: 2026-10-07
 updated: "2026-11-04"
 ---
@@ -126,6 +126,8 @@ Preliminary code prepares same-origin signaling and a per-device non-extractable
 Inline/external ESM share a same-instance key promise once, checking native promise, version, instance, and actual non-extractable Ed25519 key. Unused slots expire at 10 seconds/pagehide; forged slots or preparation failure use normal key generation. Atomic IDB add/re-query still selects simultaneous-tab winners; no candidate key connects before storage. Public JWK and offer preparation overlap. Normal connect follows a fresh challenge; admitted flight sends in Upgrade. Cancellation prevents late completion from reopening.
 
 ### Host UI Compression and Revalidation
+
+The [iOS client](ios-client.md#mewlink-connection-flow) may use native file storage at this same resource boundary. The browser CacheStorage rules below remain unchanged when no native capability exists. Native storage has its own limits and still requires a live authenticated host digest confirmation before reusing bytes; it does not cache HTML or authorize offline fallback. The central launcher must be rebuilt and applied separately to consume changed shared source.
 
 Vite `base: './'` keeps HTML, modulepreload, CSS, and worker URLs relative at root or temporary P2P prefixes. Matching preload/import URLs avoid duplicate module fetch after `/assets/...` redirect. Worker redirects preserve old absolute builds. See [relative base](https://vite.dev/config/shared-options.html#base) and [modulepreload](https://vite.dev/config/build-options.html#build-modulepreload).
 

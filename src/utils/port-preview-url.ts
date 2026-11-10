@@ -1,3 +1,5 @@
+import { getAppRuntime } from '../runtime/app-runtime.ts'
+
 let previewBaseUrl: string | null | undefined
 
 export function configurePortPreviewBaseUrl(value?: string | null) {
@@ -14,5 +16,5 @@ export function configurePortPreviewBaseUrl(value?: string | null) {
 
 export function publicMewBaseUrl(): string {
   if (previewBaseUrl === null) throw new Error('Mewlink 기기 주소를 확인하지 못했습니다. 페이지를 다시 열어 주세요.')
-  return previewBaseUrl ?? location.origin
+  return previewBaseUrl ?? getAppRuntime().publicBaseUrl ?? location.origin
 }
