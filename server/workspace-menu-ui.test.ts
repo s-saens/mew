@@ -85,6 +85,21 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     }
     await page.keyboard.press('Escape')
     await menu.waitFor({ state: 'detached' })
+    if (width === 1100 && !dark) {
+      await page.evaluate("window.setLocale('en')")
+      await page.getByRole('button', { name: 'Menu', exact: true }).click()
+      await menu.getByRole('menuitem', { name: 'Zoom in', exact: true }).click()
+      assert.equal(await menu.getByRole('menuitem', { name: 'Reset zoom', exact: true }).innerText(), '110%')
+      assert.equal(await page.locator('html').evaluate(el => el.style.zoom), '110%')
+      const zoomBounds = (await menu.boundingBox())!
+      assert.ok(zoomBounds.x >= 0 && zoomBounds.x + zoomBounds.width <= width)
+      assert.equal(await page.evaluate("localStorage.getItem('mew:workspace-zoom')"), '110')
+      await menu.getByRole('menuitem', { name: 'Zoom out', exact: true }).click()
+      assert.equal(await menu.getByRole('menuitem', { name: 'Reset zoom', exact: true }).innerText(), '100%')
+      await menu.getByRole('menuitem', { name: 'Zoom out', exact: true }).click()
+      await menu.getByRole('menuitem', { name: 'Reset zoom', exact: true }).click()
+      assert.equal(await menu.getByRole('menuitem', { name: 'Reset zoom', exact: true }).innerText(), '100%')
+    }
     assert.deepEqual(errors, [])
     await page.close()
   }

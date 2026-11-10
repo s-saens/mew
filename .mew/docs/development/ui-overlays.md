@@ -1,6 +1,6 @@
 ---
 title: "UI overlays, selection controls, and menus"
-description: "Shared popup positioning, custom selection, layering, viewport-level toasts and agent errors, dismissal, and action menus. Defines History-guard handoffs, settings, deferred dialogs, keyboard/touch behavior, and focus boundaries."
+description: "Shared popup positioning, workspace zoom controls, custom selection, layering, viewport-level toasts and agent errors, dismissal, and action menus. Defines History-guard handoffs, settings, deferred dialogs, keyboard/touch behavior, and focus boundaries."
 created: "2026-11-03"
 updated: "2026-11-09"
 상위파일: "ui-contracts.md"
@@ -160,6 +160,8 @@ Validation: `server/action-menu-horizontal-ui.test.ts` checks rendering the same
 ### Header hamburger menu
 
 `HeaderMenuPopup` uses shared `ActionMenu` and `ActionMenuItem` primitives with the compact workspace styling described above. Its sections are User & Account, Notifications, Tools, and Mew. The profile card combines the avatar (initials on missing/failed photos), name, and email, and opens the independent account settings dialog. Owner-only account management follows it. General Settings opens Appearance and has no account section.
+
+The Mew section includes workspace zoom controls. Minus and plus adjust the interface from 50% to 200% in preset steps; selecting the percentage resets it to 100%. The browser stores the choice locally and restores it before the first application render. The setting applies to this Mew page and is independent of browser zoom and editor-local font resizing.
 
 Tools contains Remote Browser, Server File Explorer (`Alt+E`), and Scheduled Tasks (`Alt+S`), filtered by capabilities. Mew contains Updates (`Ctrl+U`), owner-only Mewlink, and Settings (`Ctrl+,`). The redundant Commit, system resources, chat, database, and retired Android entries are absent. System resources remain in the top bar; database actions follow the [database feature contract](../features/document-databases/document-databases-and-catalog.md). Notification content follows the [header notification contract](ui-recovery-feedback.md#header-notifications).
 

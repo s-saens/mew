@@ -1,3 +1,4 @@
+import { applyWorkspaceZoom, loadWorkspaceZoom } from './utils/workspace-zoom'
 import { initializeRemoteApp } from './utils/remote-app'
 import { startBrowserStorageMaintenance } from '@mew/ui/browser-storage'
 import { startInputFocusTracking } from '@mew/ui/input-focus'
@@ -18,6 +19,7 @@ import { parsePublicSharePath } from './utils/public-share-route.ts'
 import { appRoute } from '../shared/app-route.ts'
 import { AppErrorBoundary, WorkspaceErrorScreen } from './components/app-error-boundary.tsx'
 
+applyWorkspaceZoom(loadWorkspaceZoom())
 startAppInstallTracking()
 
 const stopInputFocusTracking = startInputFocusTracking()

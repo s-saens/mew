@@ -24,8 +24,9 @@ export function getFixedPopupLayout(container?: Element | null) {
   let right = left + (viewport?.width ?? view.innerWidth), bottom = top + (viewport?.height ?? view.innerHeight)
   const host = fixedContainingBlock(container)
   const box = host?.getBoundingClientRect()
-  const scaleX = host && host.offsetWidth ? box!.width / host.offsetWidth : 1
-  const scaleY = host && host.offsetHeight ? box!.height / host.offsetHeight : 1
+  const rootZoom = parseFloat(view.getComputedStyle(container.ownerDocument.documentElement).zoom) || 1
+  const scaleX = host && host.offsetWidth ? box!.width / host.offsetWidth : rootZoom
+  const scaleY = host && host.offsetHeight ? box!.height / host.offsetHeight : rootZoom
   const originLeft = host ? box!.left + (host.clientLeft - host.scrollLeft) * scaleX : 0
   const originTop = host ? box!.top + (host.clientTop - host.scrollTop) * scaleY : 0
   const originBottom = host ? originTop + host.clientHeight * scaleY : view.innerHeight

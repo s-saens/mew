@@ -1,10 +1,12 @@
 import { useState, type MouseEvent } from 'react'
 import { ActionMenu, ActionMenuItem, HoverTipLayer } from '@mew/ui'
-import { Check, NavArrowRight, WarningTriangle, Xmark } from 'iconoir-react'
+import { Check, Minus, Plus, NavArrowRight, WarningTriangle, Xmark } from 'iconoir-react'
 import { useI18n } from '../i18n'
+import { uiText } from '@mew/ui/i18n-core'
 import { dismissMewcatNotice, openMewcatNotice, type MewcatNotice } from '../utils/mewcat-notifications'
 import { orderMenuNotices } from './header-notifications'
 import type { HeaderMenuItem } from './HeaderMenu'
+import { loadWorkspaceZoom, setWorkspaceZoom, stepWorkspaceZoom } from '../utils/workspace-zoom'
 import './workspace-menu.css'
 
 export type HeaderMenuAccount = {
@@ -62,6 +64,19 @@ function MenuNotice({ notice }: { notice: MewcatNotice }) {
   </HoverTipLayer></div>
 }
 
+
+function WorkspaceZoom() {
+  const { t } = useI18n()
+  const [zoom, setZoom] = useState(loadWorkspaceZoom)
+  const change = (value: number) => { setWorkspaceZoom(value); setZoom(value) }
+  return <HoverTipLayer className="mew-workspace-menu-zoom">
+    <span>{t('pdf.zoom')}</span>
+    <ActionMenuItem data-workspace-row="zoom" closeOnSelect={false} disabled={zoom === 50} aria-label={t('pdf.zoomOut')} data-tip={t('pdf.zoomOut')} onClick={() => change(stepWorkspaceZoom(zoom, -1))} icon={<Minus />} />
+    <ActionMenuItem data-workspace-row="zoom-value" closeOnSelect={false} aria-label={uiText('확대 비율 초기화')} data-tip={uiText('확대 비율 초기화')} onClick={() => change(100)}>{zoom}%</ActionMenuItem>
+    <ActionMenuItem data-workspace-row="zoom" closeOnSelect={false} disabled={zoom === 200} aria-label={t('pdf.zoomIn')} data-tip={t('pdf.zoomIn')} onClick={() => change(stepWorkspaceZoom(zoom, 1))} icon={<Plus />} />
+  </HoverTipLayer>
+}
+
 const renderItem = (item: HeaderMenuItem) => <ActionMenuItem key={item.id} data-header-menu-item
     disabled={item.disabled} checked={item.active} icon={item.icon} hint={item.hint} onClick={item.onSelect}>
     <span className="mew-action-menu-label">{item.label}</span>
@@ -85,7 +100,7 @@ function WorkspaceMenuSections({ items, account, notices, onViewNotifications }:
       {(['tools', 'mew'] as const).map(group => {
         const actions = items.filter(item => (item.group ?? 'tools') === group)
         return actions.length > 0 && <div className="mew-workspace-menu-section" key={group} role="group" aria-label={group === 'mew' ? 'Mew' : t('menu.tools')}>
-          <div className="mew-workspace-menu-heading">{group === 'mew' ? 'Mew' : t('menu.tools')}</div>{actions.map(renderItem)}
+          <div className="mew-workspace-menu-heading">{group === 'mew' ? 'Mew' : t('menu.tools')}</div>{group === 'mew' && <WorkspaceZoom />}{actions.map(renderItem)}
         </div>
       })}
     </>
