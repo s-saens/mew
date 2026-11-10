@@ -2437,6 +2437,7 @@ function AgentSessionView({
   const [commandPopupId, setCommandPopupId] = useState<string | null>(null)
   const [attaching, setAttaching] = useState(false)
   const [attachments, setAttachments] = useState<AgentAttachment[]>([])
+  const [attachmentProgress, setAttachmentProgress] = useState<Record<string, number>>({})
   const pendingAttachmentResults = useRef(new Map<string, string>())
   const [previewAttachment, setPreviewAttachment] = useState<AgentAttachment | null>(null)
   const initialControls = useMemo(() => readAgentControlCache(runtime, tabId, cwd), [cwd, runtime, tabId])
@@ -3690,6 +3691,7 @@ function AgentSessionView({
     if (target === 'queue') setAttachingQueued(true)
     else setAttaching(true)
     const pending = files.map(() => `[[mew-upload:${uuid()}]]`)
+    setAttachmentProgress(current => ({ ...current, ...Object.fromEntries(pending.map(token => [token, 0])) }))
     agentInputRef.current?.insertText?.(pending.join(''))
     agentInputRef.current?.focus()
     const replacePending = (token: string, text: string) => {
@@ -3705,7 +3707,9 @@ function AgentSessionView({
         const image = await imageForAgent(named)
         if (!isCurrent()) return false
         // 편집 중인 파일의 docs 스코프와 무관하게 현재 루트 프로젝트에 첨부한다.
-        const { relPath } = await uploadInto(named, '.mew/temp/assets', WORKSPACE_PROJECT, projectRoot)
+        const { relPath } = await uploadInto(named, '.mew/temp/assets', WORKSPACE_PROJECT, projectRoot, progress => {
+          setAttachmentProgress(current => current[pending[index]] === progress ? current : { ...current, [pending[index]]: progress })
+        })
         if (!isCurrent()) return false
         const saved = { project: WORKSPACE_PROJECT, mimeType: named.type, relPath, extension: attachmentExtension(relPath), isImage: named.type.startsWith('image/'), image }
         if (target === 'queue') {
@@ -3722,6 +3726,11 @@ function AgentSessionView({
       setErrorDetail({ title: uiText("파일 첨부 실패"), detail: err instanceof Error ? err.message : String(err) })
       return false
     } finally {
+      setAttachmentProgress(current => {
+        const next = { ...current }
+        for (const token of pending) delete next[token]
+        return next
+      })
       for (const token of pending) {
         if (!pendingAttachmentResults.current.has(token)) pendingAttachmentResults.current.set(token, '')
         replacePending(token, '')
@@ -4593,7 +4602,7 @@ function AgentSessionView({
             value={composerDraft}
             resolvePendingToken={token => pendingAttachmentResults.current.get(token)}
             attachmentForToken={composerCliMode ? undefined : token => {
-              if (token.startsWith('[[mew-upload:')) return { name: uiText('첨부 중…'), mimeType: '', pending: true }
+              if (token.startsWith('[[mew-upload:')) return { name: uiText('첨부 중…'), mimeType: '', pending: true, progress: attachmentProgress[token] ?? 0 }
               const ref = uploadedAttachmentTokens(token)[0]!
               const file = (editingQueued?.attachments ?? attachments).find(file => file.project === ref.project && file.relPath === ref.path)
                 ?? { project: ref.project, relPath: ref.path, mimeType: '', extension: attachmentExtension(ref.path), isImage: attachmentKind('', ref.path) === 'image' }

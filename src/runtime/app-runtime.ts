@@ -6,6 +6,7 @@ import type { WorkspaceScope } from '../../shared/workspace-scope.ts'
 export interface AppTransport {
   readonly resourceGeneration?: number
   fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response>
+  upload?(input: string, body: FormData, onProgress: (percent: number) => void): Promise<Response>
   socket(url: string, protocols?: string | string[]): WebSocket
   close(): void
 }

@@ -1,5 +1,5 @@
 import { workspaceScopeUrl, type WorkspaceScope } from '../../shared/workspace-scope.ts'
-import { mewFetch, openMewSocket } from '../utils/remote-transport.ts'
+import { mewFetch, mewUpload, openMewSocket } from '../utils/remote-transport.ts'
 import { appResourceUrl, getAppRuntime, prepareAppResourceUrl } from '../runtime/app-runtime.ts'
 
 /** Query parameters also work for DOM resources and WebSocket handshakes through Mewlink. */
@@ -26,6 +26,7 @@ export function createWorkspaceTransport(scope?: Readonly<WorkspaceScope>) {
   return {
     scopedUrl,
     fetch,
+    upload: (url: string, body: FormData, onProgress: (percent: number) => void) => mewUpload(scopedUrl(url), body, onProgress),
     resourceUrl: (url: string) => appResourceUrl(scopedUrl(url)),
     prepareResourceUrl: (url: string, signal?: AbortSignal) => prepareAppResourceUrl(scopedUrl(url), signal),
     releaseResourceUrl: (url: string) => getAppRuntime().releaseResourceUrl?.(url),

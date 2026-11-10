@@ -64,6 +64,7 @@ window.previewed=[];
 function Fixture(){
   const [value,setValue]=React.useState('');
   const [generation,setGeneration]=React.useState(0);
+  const [progress,setProgress]=React.useState(0);
   const [tab,setTab]=React.useState(0);
   const swipe=useMobilePanelSwipe((panel,direction)=>setTab(current=>current+direction));
   const input=React.useRef(null);
@@ -75,6 +76,7 @@ function Fixture(){
     selected:()=>({from:input.current.selectionStart,to:input.current.selectionEnd}),
     select:(from,to=from)=>{input.current.focus();input.current.setSelectionRange(from,to)},
     insert:text=>input.current.insertText(text),
+    progress:setProgress,
     replace:(token,text)=>{results.current.set(token,text);setValue(current=>current.replace(token,text))},
     coords:position=>{
       const previous={from:input.current.selectionStart,to:input.current.selectionEnd};
@@ -90,7 +92,7 @@ function Fixture(){
       <AgentComposerInput key={generation} value={value} onChange={next=>setValue(next)} onKeyDown={()=>{}}
         inputRef={input} label="첨부 테스트 입력" placeholder="텍스트 입력" style={{height:'100%'}}
         resolvePendingToken={token=>results.current.get(token)}
-        attachmentForToken={token=>({name:token.includes('mew-upload:')?'업로드 중.png':token.slice(2,-2).split('/').at(-1),mimeType:'image/png',pending:token.includes('mew-upload:'),preview:()=>window.previewed.push(token)})}/>
+        attachmentForToken={token=>({name:token.includes('mew-upload:')?'업로드 중.png':token.slice(2,-2).split('/').at(-1),mimeType:'image/png',pending:token.includes('mew-upload:'),progress,preview:()=>window.previewed.push(token)})}/>
     </div>
   </main>;
 }
@@ -176,11 +178,18 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
         await reset(page, 'left right')
         await select(page, 5)
         await page.evaluate(`window.composerFixture.insert(${JSON.stringify(pendingToken)})`)
-        await input.getByRole('status', { name: '첨부 중…', exact: true }).waitFor()
-        const uploading = input.getByRole('status', { name: '첨부 중…', exact: true })
+        await page.evaluate('window.composerFixture.progress(0)')
+        const uploading = input.getByRole('status', { name: '첨부 중… 0%', exact: true })
+        await uploading.waitFor()
         assert.equal(await uploading.locator('.mew-loading-spinner').count(), 1, 'attachment upload uses the circular indicator')
         assert.equal(await uploading.locator('.mew-loading-dot, .mew-loading-logo').count(), 0, 'attachment upload does not use dots or the startup logo')
         assert.equal(await uploading.locator('.mew-loading-spinner').evaluate(el => el.getBoundingClientRect().width), 12)
+        assert.match(await uploading.innerText(), /0%/)
+        await page.evaluate('window.composerFixture.progress(47)')
+        const advanced = input.getByRole('status', { name: '첨부 중… 47%', exact: true })
+        await advanced.waitFor()
+        assert.match(await advanced.innerText(), /47%/, 'progress changes without changing the input document')
+        assert.equal(await rawDocument(page), `left ${pendingToken}right`)
         await select(page, 0)
         await page.keyboard.type('new ')
         await page.evaluate(`window.composerFixture.replace(${JSON.stringify(pendingToken)},${JSON.stringify(photoToken)})`)
@@ -216,7 +225,7 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
             await reset(page, 'left right')
             await select(page, 5)
             await page.evaluate(`window.composerFixture.insert(${JSON.stringify(pendingToken)})`)
-            await input.getByRole('status', { name: '첨부 중…', exact: true }).waitFor()
+            await input.getByRole('status', { name: /첨부 중…/ }).waitFor()
             if (deletion === 'Backspace') await input.press('Backspace')
             else await input.getByRole('button', { name: 'png 첨부 제거', exact: true }).click()
             assert.equal(await rawDocument(page), 'left right')
@@ -248,7 +257,7 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
           await reset(page, 'left right')
           await select(page, 5)
           await page.evaluate(`window.composerFixture.insert(${JSON.stringify(pendingToken)})`)
-          await input.getByRole('status', { name: '첨부 중…', exact: true }).waitFor()
+          await input.getByRole('status', { name: /첨부 중…/ }).waitFor()
           if (deleteBeforeFailure) {
             await input.getByRole('button', { name: 'png 첨부 제거', exact: true }).click()
             assert.equal(await rawDocument(page), 'left right')

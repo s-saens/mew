@@ -19,6 +19,26 @@ export function mewFetch(input: RequestInfo | URL, init?: RequestInit): Promise<
   if (remoteMode) return Promise.reject(new Error('기기 연결이 종료됐습니다. 다시 연결해 주세요.'))
   return globalThis.fetch(input, init)
 }
+export function mewUpload(input: string, body: FormData, onProgress: (percent: number) => void): Promise<Response> {
+  const transport = getAppRuntime().transport ?? remote
+  onProgress(0)
+  if (transport) {
+    if (transport.upload) return transport.upload(input, body, onProgress)
+    return transport.fetch(input, { method: 'POST', body }).then(response => { onProgress(100); return response })
+  }
+  if (remoteMode) return Promise.reject(new Error('기기 연결이 종료됐습니다. 다시 연결해 주세요.'))
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    xhr.open('POST', input)
+    xhr.upload.onprogress = event => {
+      if (event.lengthComputable && event.total > 0) onProgress(Math.min(100, Math.floor(event.loaded / event.total * 100)))
+    }
+    xhr.onload = () => resolve(new Response(xhr.responseText, { status: xhr.status, statusText: xhr.statusText, headers: { 'Content-Type': xhr.getResponseHeader('Content-Type') ?? 'application/json' } }))
+    xhr.onerror = () => reject(new TypeError('Network request failed'))
+    xhr.onabort = () => reject(new DOMException('Aborted', 'AbortError'))
+    xhr.send(body)
+  })
+}
 export function openMewSocket(url: string | URL, protocols?: string | string[]): WebSocket {
   const transport = getAppRuntime().transport ?? remote
   if (transport) return transport.socket(String(url), protocols)
@@ -119,6 +139,14 @@ export class DataChannelTransport implements AppTransport {
     })
   }
   fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    return this.fetchWithProgress(input, init)
+  }
+  upload = async (input: string, body: FormData, onProgress: (percent: number) => void): Promise<Response> => {
+    const serialized = new Response(body)
+    const blob = await serialized.blob()
+    return this.fetchWithProgress(input, { method: 'POST', body: blob, headers: { 'Content-Type': serialized.headers.get('Content-Type')! } }, onProgress, blob.size)
+  }
+  private async fetchWithProgress(input: RequestInfo | URL, init?: RequestInit, onProgress?: (percent: number) => void, total = 0): Promise<Response> {
     if (this.closed) throw new Error('원격 연결이 종료됐습니다.')
     const request = new Request(input instanceof Request ? input : new URL(String(input), location.origin), init)
     const url = new URL(request.url)
@@ -131,13 +159,13 @@ export class DataChannelTransport implements AppTransport {
       }
       const generation = this.generation
       try {
-        const response = await this.fetchRequest(request, url, generation)
+        const response = await this.fetchRequest(request, url, generation, onProgress, total)
         if (!safe || generation === this.generation) return response
       }
       catch (error) { if (!safe || this.closed || request.signal.aborted || generation === this.generation) throw error }
     }
   }
-  private async fetchRequest(request: Request, url: URL, generation: number): Promise<Response> {
+  private async fetchRequest(request: Request, url: URL, generation: number, onProgress?: (percent: number) => void, total = 0): Promise<Response> {
     const signal = request.signal, release = await this.slots.acquire(signal, 'request', isUiResourceRequest(request.method, url.pathname))
     if (this.closed || this.suspended || generation !== this.generation) { release(); throw new Error('원격 요청이 중단됐습니다. 결과를 확인한 뒤 다시 시도해 주세요.') }
     const id = crypto.randomUUID()
@@ -154,7 +182,7 @@ export class DataChannelTransport implements AppTransport {
         const headers = Object.fromEntries([...request.headers].filter(([key]) => (REMOTE_REQUEST_HEADERS as readonly string[]).includes(key)))
         await this.send({ type: 'request', id, method: request.method, path: url.pathname + url.search, headers, responseWindow: REMOTE_LIMITS.responseWindow, flowControl: REMOTE_FLOW_CONTROL })
         if (!['GET', 'HEAD'].includes(request.method)) {
-          const reader = request.body?.getReader(); let size = 0
+          const reader = request.body?.getReader(); let size = 0, sent = 0
           try {
             while (reader) {
               if (signal.aborted || !this.requests.has(id) || this.requests.get(id)?.responded) { await reader.cancel(); break }
@@ -162,7 +190,10 @@ export class DataChannelTransport implements AppTransport {
               size += result.value.byteLength; if (size > REMOTE_LIMITS.body) throw new Error('파일이 전송 한도를 초과했습니다.')
               for (let offset = 0; offset < result.value.byteLength; offset += REMOTE_LIMITS.chunk) {
                 if (signal.aborted || !this.requests.has(id) || this.requests.get(id)?.responded) break
-                await this.send({ type: 'chunk', id, data: encode(result.value.subarray(offset, offset + REMOTE_LIMITS.chunk)) }); progress()
+                const chunk = result.value.subarray(offset, offset + REMOTE_LIMITS.chunk)
+                await this.send({ type: 'chunk', id, data: encode(chunk) }); progress()
+                sent += chunk.byteLength
+                if (total > 0) onProgress?.(Math.min(100, Math.floor(sent / total * 100)))
               }
             }
           } finally { reader?.releaseLock() }

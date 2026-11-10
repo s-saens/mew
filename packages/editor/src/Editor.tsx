@@ -71,6 +71,7 @@ import { InlinePageName, inlinePageNameKey } from './editor/inlinePageName'
 import { InlinePageNameInput } from './editor/InlinePageNameInput'
 import { InlineVoice } from './editor/inlineVoice'
 import { useInlineVoice } from './editor/useInlineVoice'
+import { useUploadProgress } from './editor/useUploadProgress'
 import { AnnotationMarker, Annotations, insertAnnotation, updateAnnotation, deleteAnnotation, scanAnnotations } from './editor/annotations'
 import { prepareProseMirrorContext } from './editor/prosemirrorContext'
 import type { EditorContextTarget } from './editor/contextTarget'
@@ -86,6 +87,7 @@ interface DrawingSession {
   editor: TiptapEditor
   path: string
   api: EditorApi
+  upload: EditorApi['uploadAsset']
   pos: number
   saving: boolean
   dispose: () => void
@@ -369,7 +371,7 @@ export const Editor = forwardRef<
   const editorRef = useRef<TiptapEditor | null>(null)
   const uploadInputRef = useRef<HTMLInputElement>(null)
   const uploadPosRef = useRef<number | null>(null)
-  const [uploading, setUploading] = useState(false)
+  const { uploads, trackedApi } = useUploadProgress(api)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [drawing, setDrawing] = useState<DrawingSession | null>(null)
   const drawingRef = useRef<DrawingSession | null>(null)
@@ -1322,7 +1324,7 @@ export const Editor = forwardRef<
     // collab이 없을 때는 undefined 하나뿐인 안정된 배열이라 기존처럼 인스턴스가 유지된다.
   }, [collab?.ydoc])
 
-  const voice = useInlineVoice(editor, path, api, !!readOnly || !allowVoiceRecording)
+  const voice = useInlineVoice(editor, path, trackedApi, !!readOnly || !allowVoiceRecording)
   const continuity = useRef<{ from: number; to: number; focused: boolean; scrollTop: number } | null>(null)
   // Capture before useEditor destroys the old view in its passive effect.
   useLayoutEffect(() => () => {
@@ -1694,7 +1696,7 @@ export const Editor = forwardRef<
       session.pos = transaction.mapping.map(session.pos, -1)
     }
     const session: DrawingSession = {
-      editor: e, path, api, pos: range.from, saving: false,
+      editor: e, path, api, upload: trackedApi.uploadAsset, pos: range.from, saving: false,
       dispose: () => { e.off('transaction', trackPosition) },
     }
     e.on('transaction', trackPosition)
@@ -1707,7 +1709,7 @@ export const Editor = forwardRef<
     if (session.saving) return
     session.saving = true
     try {
-      const { url, name } = await session.api.uploadAsset(file)
+      const { url, name } = await session.upload(file)
       if (!isCurrentDrawing(session)) throw new Error(uiText('문서가 변경되었습니다. 그림판을 다시 여세요.'))
       session.editor.chain().focus().insertContentAt(session.pos, {
         type: 'image', attrs: { src: url, alt: name.replace(/\.[^.]+$/, '') },
@@ -2138,18 +2140,15 @@ export const Editor = forwardRef<
   // 생성 시점 클로저에 얼어붙어 이 함수를 호출하는데, 그때 캡처된 editor는 아직 null이거나
   // 곧 파괴될 이전 인스턴스라 editor.chain()이 "Cannot read properties of null" 크래시를 냈다.
   async function insertUpload(file: File, pos?: number) {
-    setUploading(true)
     setUploadError(null)
     try {
-      const { url, name, mimetype } = await api.uploadAsset(file)
+      const { url, name, mimetype } = await trackedApi.uploadAsset(file)
       const markdown = markdownForAsset(url, name, mimetype)
       const ed = editorRef.current
       if (pos != null && ed) ed.chain().focus().insertContentAt(pos, markdown).run()
       else ed?.chain().focus().insertContent(markdown).run()
     } catch (err) {
       setUploadError(err instanceof Error ? err.message : uiText("업로드 실패"))
-    } finally {
-      setUploading(false)
     }
   }
 
@@ -2165,18 +2164,15 @@ export const Editor = forwardRef<
 
   // /upload 커맨드 전용 — 어떤 파일이든 항상 순수 링크로 삽입
   async function insertUploadAsLink(file: File, pos: number | null) {
-    setUploading(true)
     setUploadError(null)
     try {
-      const { url, name } = await api.uploadAsset(file)
+      const { url, name } = await trackedApi.uploadAsset(file)
       const markdown = markdownForLink(url, name)
       const ed = editorRef.current
       if (pos != null && ed) ed.chain().focus().insertContentAt(pos, markdown).run()
       else ed?.chain().focus().insertContent(markdown).run()
     } catch (err) {
       setUploadError(err instanceof Error ? err.message : uiText("업로드 실패"))
-    } finally {
-      setUploading(false)
     }
   }
 
@@ -2280,9 +2276,10 @@ export const Editor = forwardRef<
       {pageName && createPortal(<InlinePageNameInput onSubmit={submitPageName} onCancel={() => closePageName()} />, pageName.mount)}
       {voice.portal}
       {drawing && canDraw && renderDrawingEditor?.({ onClose: () => closeDrawing(drawing), onSave: file => saveDrawingImage(drawing, file) })}
-      {uploading && (
-        <div className="absolute bottom-2 right-2 rounded bg-surface-inverse px-2 py-1 text-xs text-ink-inverse">
-          {uiText("업로드 중…")}</div>
+      {uploads.length > 0 && createPortal(
+        <div className="fixed bottom-2 right-2 z-[10000] flex max-w-xs flex-col gap-1 rounded bg-surface-inverse px-2 py-1 text-xs text-ink-inverse shadow-lg" role="status" aria-live="polite">
+          {uploads.map(upload => <div key={upload.id} role="progressbar" aria-label={upload.name} aria-valuemin={0} aria-valuemax={100} aria-valuenow={upload.percent} className="break-words">{uiText('업로드 중…')} {upload.name}: {upload.percent}%</div>)}
+        </div>, document.body,
       )}
       {/* 에러 토스트(toast) — 클릭하면 닫히고, 6초 뒤 자동으로 사라진다 (아래 auto-dismiss effect) */}
       {uploadError && (

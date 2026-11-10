@@ -129,7 +129,7 @@ export interface EditorApi {
   fetchFileCandidates?: (signal?: AbortSignal) => Promise<string[]>
   fetchBacklinks?: (path: string, signal?: AbortSignal) => Promise<DocumentBacklinksData>
   fetchFile: (path: string) => Promise<{ path: string; content: string; editable: boolean }>
-  uploadAsset: (file: File) => Promise<{ url: string; name: string; mimetype: string }>
+  uploadAsset: (file: File, onProgress?: (percent: number) => void) => Promise<{ url: string; name: string; mimetype: string }>
   fetchLinkPreview: (url: string) => Promise<{ title: string | null; description: string | null }>
   /** 표 열 너비 — md가 담지 못하는 레이아웃이라 호스트가 본문 밖(.mew/)에 저장한다 */
   fetchTableLayout?: (path: string) => Promise<TableWidths>

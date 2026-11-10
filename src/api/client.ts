@@ -1580,13 +1580,13 @@ function createApiClient(scope?: Readonly<WorkspaceScope>) {
    * 바깥에서 사이드바로 끌어다 놓은 파일을 프로젝트의 destDir(''=루트) 안에 그대로 저장한다.
    * uploadAsset(.mew/temp/assets 링크)과 달리 바이트를 손대지 않는다 — 사용자가 놓은 그 파일이 그 자리에 생겨야 한다.
    */
-  function uploadInto(file: File, destDir: string, project: string = currentProject, projectRoot?: string): Promise<FileOpResult> {
+  function uploadInto(file: File, destDir: string, project: string = currentProject, projectRoot?: string, onProgress?: (percent: number) => void): Promise<FileOpResult> {
     const body = new FormData()
     body.append('file', file)
     body.append('destDir', destDir)
     body.append('project', project)
     if (projectRoot) body.append('projectRoot', projectRoot)
-    return mewFetch('/api/upload-into', { method: 'POST', body }).then(json<FileOpResult>)
+    return (onProgress ? transport.upload('/api/upload-into', body, onProgress) : mewFetch('/api/upload-into', { method: 'POST', body })).then(json<FileOpResult>)
   }
 
   function downloadUrl(path: string, project: string = currentProject): string {
@@ -1735,13 +1735,13 @@ function createApiClient(scope?: Readonly<WorkspaceScope>) {
     )
   }
 
-  async function uploadAsset(file: File, project: string = currentProject): Promise<{ url: string; name: string; mimetype: string }> {
+  async function uploadAsset(file: File, project: string = currentProject, onProgress?: (percent: number) => void): Promise<{ url: string; name: string; mimetype: string }> {
     // 큰 사진은 여기서 한 번 줄여 올린다 — 서버는 받은 바이트를 그대로 보관하므로 줄일 수 있는
     // 유일한 자리다. 대상이 아니거나 실패하면 원본이 그대로 넘어온다(compressImage는 던지지 않는다).
     const body = new FormData()
     body.append('file', await compressImage(file))
     body.append('project', project)
-    return mewFetch('/api/upload', { method: 'POST', body })
+    return (onProgress ? transport.upload('/api/upload', body, onProgress) : mewFetch('/api/upload', { method: 'POST', body }))
       .then(json<{ path: string; name: string; mimetype: string }>)
       .then(({ path, name, mimetype }) => ({
         url: scopedUrl(`/api/asset?path=${encodeURIComponent(path)}&${projectQs(project)}`),
@@ -1994,7 +1994,7 @@ function createApiClient(scope?: Readonly<WorkspaceScope>) {
 
   // ---- 패키지 컴포넌트에 주입하는 서버 연동 객체 (모듈 상수 = 렌더 간 identity 안정) ----
 
-  const editorApi: EditorApi = { fetchFile, uploadAsset, fetchLinkPreview, fetchTableLayout, saveTableLayout, db: dbApi }
+  const editorApi: EditorApi = { fetchFile, uploadAsset: (file, onProgress) => uploadAsset(file, currentProject, onProgress), fetchLinkPreview, fetchTableLayout, saveTableLayout, db: dbApi }
 
   /** Capture a pane's file scope so background callbacks cannot follow another pane's focus. */
   function createEditorApi(project: string, ownerPath?: string): EditorApi {
@@ -2003,7 +2003,7 @@ function createApiClient(scope?: Readonly<WorkspaceScope>) {
       fetchBacklinks: (path, signal) => mewFetch(`/api/docs/backlinks?path=${encodeURIComponent(path)}&${projectQs(project)}`, { signal })
         .then(json<import('@mew/editor').DocumentBacklinksData>),
       fetchFile: path => fetchFile(path, project),
-      uploadAsset: file => uploadAsset(file, project),
+      uploadAsset: (file, onProgress) => uploadAsset(file, project, onProgress),
       fetchLinkPreview,
       fetchTableLayout: path => fetchTableLayout(path, project),
       saveTableLayout: (path, tables) => saveTableLayout(path, tables, project),
