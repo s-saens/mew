@@ -100,9 +100,10 @@ function WorkspaceMenuSections({ items, account, notices, onViewNotifications }:
       {(['tools', 'mew'] as const).map(group => {
         const actions = items.filter(item => (item.group ?? 'tools') === group)
         return actions.length > 0 && <div className="mew-workspace-menu-section" key={group} role="group" aria-label={group === 'mew' ? 'Mew' : t('menu.tools')}>
-          <div className="mew-workspace-menu-heading">{group === 'mew' ? 'Mew' : t('menu.tools')}</div>{group === 'mew' && <WorkspaceZoom />}{actions.map(renderItem)}
+          <div className="mew-workspace-menu-heading">{group === 'mew' ? 'Mew' : t('menu.tools')}</div>{actions.map(renderItem)}
         </div>
       })}
+      <div className="mew-workspace-menu-section" data-workspace-zoom-section><WorkspaceZoom /></div>
     </>
 }
 

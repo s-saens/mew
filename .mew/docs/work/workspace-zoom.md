@@ -16,3 +16,9 @@ Added minus, percentage reset, and plus controls to the Mew menu so users can re
 - `npm run build` passed, including TypeScript checks. `npm run lint` passed with existing warnings.
 - `npm run check:docs` passed metadata validation but reported 37 missing local links elsewhere in the repository. The links in this record and the changed menu contract were inspected.
 - No application server or launcher was operated. The build updates local assets; physical-device behavior and operational application remain unverified.
+
+## November 10: Place zoom at the bottom
+
+Moved the controls after the Mew actions into a separate section with a divider and no section heading. The [menu contract](../development/ui-overlays.md#header-hamburger-menu) owns the current placement.
+
+The workspace menu Chromium test passed, including section order, divider, and keyboard End navigation. `npm run build` and `npm run lint` passed; lint retained existing warnings. `npm run check:docs` validated metadata and reported 38 missing local links elsewhere. The build changes local assets; no server or launcher was operated, and physical-device behavior was not checked.
