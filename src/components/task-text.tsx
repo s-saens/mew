@@ -6,14 +6,12 @@ import { TaskTagPicker } from './task-tag-picker'
 import { Page } from 'iconoir-react'
 import { useTaskDocuments } from './task-documents'
 
-export function TaskText({ id, text, tags = [], assignees = [], documentPath, onAssigneesChange, knownTags, disabled, inputs, onChange, onKeyDown, onPaste, onBlur }: {
+export function TaskText({ id, text, tags = [], assignees = [], onAssigneesChange, knownTags, disabled, inputs, onChange, onKeyDown, onPaste, onBlur }: {
   id: string; text: string; tags?: string[]; assignees?: string[]; onAssigneesChange?: (assignees: string[]) => void; knownTags: string[]; disabled: boolean
-  documentPath?: string
   inputs?: Map<string, HTMLTextAreaElement>; onChange: (text: string, tags: string[]) => void
   onKeyDown?: (event: KeyboardEvent<HTMLTextAreaElement>) => void
   onPaste?: (event: ClipboardEvent<HTMLTextAreaElement>) => void; onBlur?: () => void; onFilter?: (tag: string) => void
 }) {
-  const documents = useTaskDocuments()
   const [editing, setEditing] = useState(false)
   const ref = useRef<HTMLTextAreaElement>(null)
   useLayoutEffect(() => {
@@ -29,7 +27,6 @@ export function TaskText({ id, text, tags = [], assignees = [], documentPath, on
   }}>
     <TaskTagPicker tags={tags} knownTags={knownTags} disabled={disabled} onChange={next => onChange(text, next)} />
     <TaskAssigneePicker assignees={assignees} disabled={disabled || !onAssigneesChange} onChange={next => onAssigneesChange?.(next)} />
-    {documentPath && documents.open && <button type="button" className="task-tool task-open-document" aria-label={uiText('파일 열기')} data-tip={uiText('파일 열기')} onClick={() => { onBlur?.(); documents.open?.(documentPath) }}><Page width={14} height={14} aria-hidden="true" /></button>}
     <div className="task-text-input">
       <span className="task-text-preview" aria-hidden="true">{text.replace(/\s*\n\s*/g, ' ')}</span>
       <textarea ref={element => { ref.current = element; if (element) inputs?.set(id, element); else inputs?.delete(id) }} rows={1} value={text} readOnly={disabled} maxLength={TASK_TEXT_LIMIT}
@@ -37,4 +34,10 @@ export function TaskText({ id, text, tags = [], assignees = [], documentPath, on
         aria-label={uiText(id === 'draft' ? '새 태스크' : '태스크 내용')} onChange={event => onChange(event.target.value, tags)} onKeyDown={onKeyDown} onPaste={onPaste} />
     </div>
   </div>
+}
+
+export function TaskOpenDocument({ path, onOpen }: { path?: string; onOpen?: () => void }) {
+  const documents = useTaskDocuments()
+  if (!path || !documents.open) return null
+  return <button type="button" className="task-tool task-open-document" aria-label={uiText('파일 열기')} data-tip={uiText('파일 열기')} onClick={() => { onOpen?.(); documents.open?.(path) }}><Page width={14} height={14} aria-hidden="true" /></button>
 }
