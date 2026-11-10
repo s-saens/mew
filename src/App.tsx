@@ -14,7 +14,7 @@ import { factoryLayout, editorIds, layoutPresetsKey, legacyLayoutPresetsKey, nor
 import { loadFloatingRect, restoreFloatingRect } from './hooks/use-floating-panel'
 import { useDeviceLayout } from './hooks/use-device-layout'
 import { useToolPresentation, setToolPresentation } from './hooks/use-tool-presentation'
-import { Clock, Computer, Download, Folder, Globe, Link, Settings, User } from 'iconoir-react'
+import { Clock, Download, Folder, Globe, Link, Settings, User } from 'iconoir-react'
 
 import { uuid } from './utils/uuid'
 import type { MewcatAction } from '../shared/mewcat-assistant'
@@ -96,7 +96,6 @@ import { useI18n } from './i18n'
 import { normalizeFontPreferences } from './utils/fontPreferences'
 import { useAccountEditorTabs } from './hooks/use-account-editor-tabs'
 import { IconPackProvider } from './components/icon-pack-context'
-import { MEWCAT_HIDE_DESKTOP_KEY } from './utils/mewcatSkin'
 import { externalTabPath, isExternalTabPath } from './utils/externalFiles'
 import { loadSidebarState, saveSidebarState } from './utils/sidebarState'
 import { gitDiffTabPath, gitDiffTarget } from './utils/git-diff-tabs'
@@ -138,7 +137,6 @@ const AgentPanel = deferredComponent(async () => ({ default: (await agentPanelPr
 const ChatPanel = deferredComponent(async () => ({ default: (await import('./components/ChatPanel')).ChatPanel }))
 const FileHistoryModal = deferredComponent(async () => ({ default: (await import('./components/FileHistoryModal')).FileHistoryModal }), null)
 const GitPanel = deferredComponent(async () => ({ default: (await import('./components/git-panel')).GitPanel }), null)
-const RemoteDesktop = deferredComponent(async () => ({ default: (await import('./components/remote-desktop')).RemoteDesktop }), null)
 const TermButtonBar = deferredComponent(async () => ({ default: (await import('./components/TermButtonBar')).TermButtonBar }), null)
 const DebuggerPanel = lazy(() => import('./components/debugger-panel'))
 const BrowserDesktopPanel = deferredComponent(async () => ({ default: (await import('./components/BrowserDesktopPanel')).BrowserDesktopPanel }))
@@ -365,8 +363,6 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
   const [agentOpen, setAgentOpen] = useState(() => caps.agent && scopedBrowserStorage().getItem(viewStorageKey(AGENT_OPEN_KEY)) === '1')
   const gitMounted = useRef(false)
   const [gitOpen, setGitOpen] = useState(() => caps.git && scopedBrowserStorage().getItem(viewStorageKey(GIT_OPEN_KEY)) === '1')
-  const [remoteDesktopOpen, setRemoteDesktopOpen] = useState(false)
-  useEffect(() => { if (compact) setRemoteDesktopOpen(false) }, [compact])
   const [requestedAgentTab, setRequestedAgentTab] = useState<RequestedAgentTab | null>(null)
   const [tasksOpen, setTasksOpen] = useState(false)
   const tasksMounted = useRef(false)
@@ -379,9 +375,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
   if (memoOpen) memoMounted.current = true
   const [memoFocusSignal, setMemoFocusSignal] = useState(0)
   useEffect(() => { setMemoOpen(false) }, [auth.email, caps.collaboration, api])
-  const [remoteMewcatHost, setRemoteMewcatHost] = useState<HTMLDivElement | null>(null)
   const [settingsMewcatHost, setSettingsMewcatHost] = useState<HTMLDivElement | null>(null)
-  const [remoteDockHost, setRemoteDockHost] = useState<HTMLDivElement | null>(null)
   const [sidebarDockHost, setSidebarDockHost] = useState<HTMLDivElement | null>(null)
   if (gitOpen) gitMounted.current = true
   // 멤버 채팅 창(Alt+C)은 채팅 기능 권한을 따른다.
@@ -460,8 +454,8 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
   } satisfies Record<WorkspacePanelId, (open: boolean) => void>), [])
 
   const mobileForegroundPanel = mobilePanelStack.at(-1) ?? null
-  const openDockPanels = (['editor', 'desktop', 'projects', ...WORKSPACE_PANEL_IDS] as const).filter(panel =>
-    panel === 'projects' ? showProjectSidebar : panel === 'editor' ? editorOpen : panel === 'desktop' ? remoteDesktopOpen : panel === 'memo' ? memoOpen : workspacePanelOpen[panel])
+  const openDockPanels = (['editor', 'projects', ...WORKSPACE_PANEL_IDS] as const).filter(panel =>
+    panel === 'projects' ? showProjectSidebar : panel === 'editor' ? editorOpen : panel === 'memo' ? memoOpen : workspacePanelOpen[panel])
   const focusedDockPanel = focusedWorkspacePanel && openDockPanels.some(panel => panel === focusedWorkspacePanel) ? focusedWorkspacePanel : null
   useEffect(() => {
     if (!workspaceUiLoaded || !deviceLayoutRestored || chromeStateLoadedScopeRef.current !== deviceLayoutScope) return
@@ -507,10 +501,10 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
   }, [mobileForegroundPanel, projectUiPath, saveMobileForegroundPanel, isDesktop])
 
   const changeMemoOpen = useCallback((open: boolean) => {
-    if (open) { setRemoteDesktopOpen(false); dockRef.current?.restore(); openWorkspacePanel('memo'); setFocusedWorkspacePanel('memo') }
+    if (open) { dockRef.current?.restore(); openWorkspacePanel('memo'); setFocusedWorkspacePanel('memo') }
     else closeWorkspacePanel('memo')
   }, [openWorkspacePanel, closeWorkspacePanel, setFocusedWorkspacePanel])
-  const focusMemo = useCallback(() => { setRemoteDesktopOpen(false); dockRef.current?.restore(); bringWorkspacePanelToFront('memo'); setFocusedWorkspacePanel('memo') }, [bringWorkspacePanelToFront, setFocusedWorkspacePanel])
+  const focusMemo = useCallback(() => { dockRef.current?.restore(); bringWorkspacePanelToFront('memo'); setFocusedWorkspacePanel('memo') }, [bringWorkspacePanelToFront, setFocusedWorkspacePanel])
   const memoSession = useSharedMemo({ authEmail: caps.collaboration ? auth.email ?? '' : '', open: memoOpen, onOpenChange: changeMemoOpen, onFocus: focusMemo, focusSignal: memoFocusSignal })
 
   // 모바일에서 파일을 열 때는 패널의 열림 상태를 바꾸지 않는다. 그래야 화면을 데스크톱으로
@@ -539,7 +533,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
   const { fontPreferences, setFontPreferences, themeSettings, setThemeSettings } = accountServices
   const [noticeTarget, setNoticeTarget] = useState<Extract<MewcatNotice['target'], object>>()
   const [readyNoticeTarget, setReadyNoticeTarget] = useState<typeof noticeTarget>()
-  const { mewcatHideDesktop, setMewcatHideDesktop, mewcatSkin, setMewcatSkin } = accountServices
+  const { mewcatSkin, setMewcatSkin } = accountServices
   // Keep the stored search preference compatible with earlier sidebar layouts.
   const [sidebarView, setSidebarView] = useState<'files' | 'content-search'>('files')
   const [projectSearchClearSignal, setProjectSearchClearSignal] = useState(0)
@@ -1308,13 +1302,10 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
   if (caps.filesRead && auth.email && rootProjectPath) mobileDockPanels.push('tasks')
   if (caps.collaboration && auth.email) mobileDockPanels.push('memo')
   const selectDockPanel = (panel: MobileDockPanel, toggle = true) => {
-    if (!mobileDockPanels.includes(panel) && !(panel === 'desktop' && caps.desktop)) return
+    if (!mobileDockPanels.includes(panel)) return
     if (compact && panel === 'browser' && openSharedBrowser) { openSharedBrowser(); return }
-    if (compact && panel === 'desktop' && host) { host.onOpenRemoteDesktop(); return }
-    const closeFocused = isDesktop() && toggle && (remoteDesktopOpen ? panel === 'desktop' : focusedDockPanel === panel)
+    const closeFocused = isDesktop() && toggle && focusedDockPanel === panel
     dockRef.current?.restore()
-    if (panel === 'desktop') { setRemoteDesktopOpen(open => closeFocused ? !open : true); return }
-    setRemoteDesktopOpen(false)
     if (panel === 'memo') setMemoFocusSignal(value => value + 1)
     if (panel !== 'memo' && panel !== 'debugger' && panel !== 'browser' && panel !== 'chat') activeTabbedSurfaceRef.current = panel
     if (panel === 'editor') {
@@ -1348,7 +1339,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     }
   }
   const navigateMobileDock = (direction: -1 | 1, order: MobileDockPanel[]) => {
-    const panel = remoteDesktopOpen ? 'desktop' : isDesktop() ? focusedDockPanel : mobileForegroundPanel ?? 'editor'
+    const panel = isDesktop() ? focusedDockPanel : mobileForegroundPanel ?? 'editor'
     if (!panel) return
     const next = adjacentDockPanel(order, panel, direction)
     if (next) selectDockPanel(next, false)
@@ -1405,7 +1396,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
   }, [activePath, activeTab?.id, agentOpen, terminalOpen, gitOpen, tasksOpen, focusedPaneId, setActivePath, sidebarOpen, tabs])
 
   const mobileSwipeRoot = useMobilePanelSwipe((panel, direction) => {
-    if (remoteDesktopOpen || panel !== (mobileForegroundPanel ?? 'editor')) return
+    if (panel !== (mobileForegroundPanel ?? 'editor')) return
     activeTabbedSurfaceRef.current = panel
     if (panel === 'sidebar') {
       if (!isGuest && docsExpanded !== (direction < 0)) selectExplorerScope(direction < 0 ? 'docs' : 'files')
@@ -1493,7 +1484,6 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     if (!noticeTarget || !workspaceUiLoaded || !deviceLayoutRestored || chromeStateLoadedScopeRef.current !== deviceLayoutScope
       || ![projectUiPath, rootProjectPath].includes(noticeTarget.workspacePath ?? noticeTarget.cwd)) return
     // Project chrome restoration must finish before revealing the requested tab.
-    setRemoteDesktopOpen(false)
     openWorkspacePanel('agent')
     setReadyNoticeTarget(noticeTarget)
   }, [noticeTarget, projectUiPath, rootProjectPath, workspaceUiLoaded, deviceLayoutRestored, deviceLayoutScope, openWorkspacePanel, api])
@@ -2001,13 +1991,11 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
   }, [isGuest])
   const headerMenuItems: HeaderMenuItem[] = [
     ...(isOwner ? [{ id: 'admin', group: 'account' as const, label: t('header.accountManagement'), icon: <User width={16} height={16} />, onSelect: () => setAdminOpen(true) }] : []),
-    ...(caps.desktop ? [{ id: 'desktop', group: 'tools' as const, label: t('access.desktop'), icon: <Computer width={16} height={16} />, active: remoteDesktopOpen, onSelect: () => selectDockPanel('desktop') }] : []),
     ...(caps.nativeBrowser && auth.email ? [{
       id: 'localhost-browser', group: 'tools' as const, label: t('menu.remoteBrowser'), icon: <Globe width={16} height={16} />,
       onSelect: () => {
         setBrowserUrl('about:blank')
         setBrowserNavigationRequest(request => request + 1)
-        setRemoteDesktopOpen(false)
         dockRef.current?.restore()
         openWorkspacePanel('browser')
         setFocusedWorkspacePanel('browser')
@@ -2256,7 +2244,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
           onPickerRuntimeChosen={runtime => { if (mewcatPicker) { selectMewcatRuntime(runtime); setMewcatPicker(false) } }}
           onRuntimeReady={adoptMewcatRuntime}
           cacheAccount={auth.email ?? 'guest'}
-          notificationFocused={!remoteDesktopOpen && (desktopMode ? focusedDockPanel === 'agent' : mobileForegroundPanel === 'agent')}
+          notificationFocused={desktopMode ? focusedDockPanel === 'agent' : mobileForegroundPanel === 'agent'}
           onRunningAgentsChange={reportRunningAgents}
           requestedNoticeTab={noticeTarget === readyNoticeTarget && [projectUiPath, rootProjectPath].includes(readyNoticeTarget?.workspacePath ?? readyNoticeTarget?.cwd ?? null) ? readyNoticeTarget?.tabId : undefined}
           onNoticeHandled={() => { setNoticeTarget(undefined); setReadyNoticeTarget(undefined) }}
@@ -2345,10 +2333,10 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
       </div>
       </div>}
 
-      {active && <WorkspaceMewcat onOpenSettings={() => { setMewcatSettingsRequest(request => request + 1); setSettingsOpen(true) }} portalTarget={settingsOpen && !desktopMode ? settingsMewcatHost : remoteDesktopOpen ? remoteMewcatHost : null} hidden={projectView !== 'workspace' || remoteDesktopOpen && mewcatHideDesktop} skin={mewcatSkin} assistant={{ account: auth.email ?? 'guest', enabled: caps.agent, runtime: mewcatRuntime, projectRoot: rootProjectPath, onAction: handleMewcatAction, onRuntimeChange: selectMewcatRuntime, onConnect: () => { setMewcatPicker(true); openWorkspacePanel('agent'); showToast(t('mewcat.assistant.guide')) } }} />}
+      {active && <WorkspaceMewcat onOpenSettings={() => { setMewcatSettingsRequest(request => request + 1); setSettingsOpen(true) }} portalTarget={settingsOpen && !desktopMode ? settingsMewcatHost : null} hidden={projectView !== 'workspace'} skin={mewcatSkin} assistant={{ account: auth.email ?? 'guest', enabled: caps.agent, runtime: mewcatRuntime, projectRoot: rootProjectPath, onAction: handleMewcatAction, onRuntimeChange: selectMewcatRuntime, onConnect: () => { setMewcatPicker(true); openWorkspacePanel('agent'); showToast(t('mewcat.assistant.guide')) } }} />}
 
-      {projectView === 'workspace' && <MobileDock active={remoteDesktopOpen ? 'desktop' : desktopMode ? focusedDockPanel ?? '' : mobileForegroundPanel ?? 'editor'} openPanels={desktopMode ? mobileDockPanels.filter(panel => panel === 'editor' ? editorOpen : panel === 'desktop' ? remoteDesktopOpen : panel === 'memo' ? memoOpen : workspacePanelOpen[panel]) : undefined} available={mobileDockPanels} hidden={mobileKeyboardOpen} portalTarget={remoteDockHost ?? sidebarDockHost}
-        position={remoteDockHost ? undefined : dockPosition} onSelect={selectDockPanel} onNavigate={navigateMobileDock} />}
+      {projectView === 'workspace' && <MobileDock active={desktopMode ? focusedDockPanel ?? '' : mobileForegroundPanel ?? 'editor'} openPanels={desktopMode ? mobileDockPanels.filter(panel => panel === 'editor' ? editorOpen : panel === 'memo' ? memoOpen : workspacePanelOpen[panel]) : undefined} available={mobileDockPanels} hidden={mobileKeyboardOpen} portalTarget={sidebarDockHost}
+        position={dockPosition} onSelect={selectDockPanel} onNavigate={navigateMobileDock} />}
 
       {accountSettingsOpen && authEmail && !isGuest && <AccountSettingsModal
         email={authEmail} displayName={auth.displayName} avatarDataUrl={auth.avatarDataUrl}
@@ -2367,11 +2355,6 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
           fontPreferences={fontPreferences}
           themeSettings={themeSettings}
           mewcatSkin={mewcatSkin}
-          mewcatHideDesktop={mewcatHideDesktop}
-          onMewcatHideDesktopChange={value => {
-            setMewcatHideDesktop(value)
-            writeBrowserStorage(MEWCAT_HIDE_DESKTOP_KEY, value ? '1' : '0')
-          }}
           onFontPreferencesChange={setFontPreferences}
           onThemeSettingsChange={setThemeSettings}
           onMewcatSkinChange={setMewcatSkin}
@@ -2422,7 +2405,6 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
 
       {caps.system && updatesOpen && <UpdatesModal open={updatesOpen} mew={mewUpdate} mewUpdating={mewUpdating} onMewUpdate={startMewUpdate} onRefreshMew={refreshMewUpdate} onClose={() => setUpdatesOpen(false)} canViewSessions={caps.terminal} />}
       {sysStatsOpen && caps.system && <SystemStatsModal onClose={() => setSysStatsOpen(false)} />}
-      {remoteDesktopOpen && caps.desktop && <RemoteDesktop onClose={() => setRemoteDesktopOpen(false)} dockHostRef={setRemoteDockHost} mewcatHostRef={setRemoteMewcatHost} dockHidden={mobileKeyboardOpen} />}
       {scheduleOpen && caps.schedules && <ScheduleModal onClose={() => setScheduleOpen(false)} />}
 
       {historyOpen && activeTab && (

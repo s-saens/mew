@@ -3,18 +3,18 @@ import { useUiLocale } from '@mew/ui/i18n'
 import { uiText } from '@mew/ui/i18n-core'
 import { ArrowDown, ArrowUp } from 'iconoir-react'
 import { networkUsage } from '../utils/network-usage.ts'
-import { formatDesktopBytes } from '../utils/desktop-network.ts'
+import { formatNetworkBytes } from '../utils/network-format.ts'
 
-const formatBytes = (bytes: number) => formatDesktopBytes(bytes).replace(/^(\d+) /, '$1.0 ')
+const formatBytes = (bytes: number) => formatNetworkBytes(bytes).replace(/^(\d+) /, '$1.0 ')
 
 export function NetworkUsagePanel() {
   useUiLocale()
   const usage = useSyncExternalStore(networkUsage.subscribe, networkUsage.getSnapshot)
   const titleId = useId()
-  const received = usage.desktop.received + usage.other.received, sent = usage.desktop.sent + usage.other.sent
-  const rate = { received: usage.rate.desktop.received + usage.rate.other.received, sent: usage.rate.desktop.sent + usage.rate.other.sent }
+  const received = usage.other.received, sent = usage.other.sent
+  const rate = { received: usage.rate.other.received, sent: usage.rate.other.sent }
   const sections = [
-    { name: uiText('누적 사용량'), values: { desktop: usage.desktop, other: usage.other, total: { received, sent } }, speed: false },
+    { name: uiText('누적 사용량'), values: { total: { received, sent } }, speed: false },
     { name: uiText('네트워크 속도'), values: { ...usage.rate, total: rate }, speed: true },
   ]
   return <section aria-labelledby={titleId} className="mt-4 border-t border-edge pt-3">
@@ -28,7 +28,7 @@ export function NetworkUsagePanel() {
           <th scope="col" className="py-2 pl-2 text-right font-normal"><span className="inline-flex items-center gap-1"><ArrowUp width={12} height={12} aria-hidden="true" />{uiText('업로드')}</span></th>
           <th scope="col" className="py-2 pl-2 text-right font-normal"><span className="inline-flex items-center gap-1"><ArrowDown width={12} height={12} aria-hidden="true" />{uiText('다운로드')}</span></th>
         </tr></thead>
-        <tbody>{([['desktop', uiText('원격 데스크톱')], ['other', uiText('그 외')], ['total', uiText('전체')]] as const).map(([key, name]) => <tr key={key} className={key === 'total' ? 'border-t border-edge font-medium text-ink' : 'text-ink-secondary'}>
+        <tbody>{([['total', uiText('전체')]] as const).map(([key, name]) => <tr key={key} className={key === 'total' ? 'border-t border-edge font-medium text-ink' : 'text-ink-secondary'}>
           <th scope="row" className="py-2 text-left font-normal">{name}</th>
           <td className="whitespace-nowrap py-2 pl-2 text-right">{format(section.values[key].sent)}</td>
           <td className="whitespace-nowrap py-2 pl-2 text-right">{format(section.values[key].received)}</td>

@@ -1,7 +1,6 @@
 import type { Doc } from 'yjs'
 import type { Awareness } from 'y-protocols/awareness'
 import type { AuthStatus } from '../api/auth.ts'
-import type { DesktopConnector } from '../utils/desktop-connection.ts'
 import type { WorkspaceScope } from '../../shared/workspace-scope.ts'
 
 export interface AppTransport {
@@ -37,7 +36,6 @@ export interface AppRuntime {
   resourceUrl?(url: string): string
   prepareResourceUrl?(url: string, signal?: AbortSignal): Promise<string>
   releaseResourceUrl?(url: string): void
-  desktopConnection?: DesktopConnector
 }
 
 let runtime: AppRuntime = {}

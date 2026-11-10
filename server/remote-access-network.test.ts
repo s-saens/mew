@@ -6,7 +6,7 @@ import path from 'node:path'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { createRemoteNetworkPreparation } from './remote-access-network.ts'
-import { wslPowerShell } from '../native/remote-desktop/wsl-powershell.mjs'
+import { wslPowerShell } from './rtc/wsl-powershell.mjs'
 
 const output = (state: string, reason: string) => ({ stdout: JSON.stringify({ state, reason }) })
 const options = { platform: 'linux' as const, kernel: 'microsoft-standard-WSL2', resolvePowerShell: () => '/fixture/powershell.exe' }

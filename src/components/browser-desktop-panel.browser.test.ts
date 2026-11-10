@@ -66,7 +66,8 @@ test('native browser video negotiates, maps input, releases keys, resizes and re
   await stage.click({ position: { x: bounds.width / 2, y: bounds.height / 2 } })
   assert.equal(await page.evaluate('window.inputs.filter(value=>value.type==="button").length'), 0, 'signaling ready does not enable input before a decoded frame')
   await page.evaluate('window.peers[0].play()')
-  await page.waitForFunction('window.inputs.some(value=>value.type==="viewer-ready")')
+  await page.getByRole('button', { name: 'Keyboard input' }).waitFor({ state: 'visible' })
+  await page.waitForFunction(`!document.querySelector('[aria-label="Keyboard input"]').disabled`)
   assert.equal(await page.evaluate('window.lastReceiver.jitterBufferTarget'), 0)
   await stage.click({ position: { x: bounds.width / 2, y: bounds.height / 2 } })
   const click = await page.evaluate<{ x: number; y: number; channel: string }>('window.inputs.findLast(value=>value.type==="button"&&value.down)')
@@ -117,9 +118,9 @@ test('native browser video negotiates, maps input, releases keys, resizes and re
   const resumeVideo = async (socket: number, negotiation: number) => {
     await page.evaluate(`window.sockets[${socket}].receive({type:'offer',negotiation:${negotiation},sdp:'resumed-offer'})`)
     await page.waitForFunction(`window.signals.some(value=>value.type==='answer'&&value.negotiation===${negotiation})`)
-    const readyBefore = await page.evaluate<number>('window.inputs.filter(value=>value.type==="viewer-ready").length')
+    await page.waitForFunction(`document.querySelector('[aria-label="Keyboard input"]').disabled`)
     await page.evaluate('window.peers.at(-1).play()')
-    await page.waitForFunction(`window.inputs.filter(value=>value.type==='viewer-ready').length>${readyBefore}`)
+    await page.waitForFunction(`!document.querySelector('[aria-label="Keyboard input"]').disabled`)
   }
   await resumeVideo(1, 5)
   await page.evaluate('window.latestControl.bufferedAmount=65537')

@@ -13,14 +13,13 @@ test('native browser access follows its own permission on desktop and mobile', {
   const auth = {
     authenticated: true, email: 'browser-entry@example.test', role: 'owner', mustChangePassword: false,
     displayName: 'Browser entry', avatarDataUrl: null,
-    capabilities: { filesRead: true, filesWrite: true, agent: false, terminal: false, serverFiles: false, collaboration: false, git: false, nativeBrowser: true, desktop: false },
+    capabilities: { filesRead: true, filesWrite: true, agent: false, terminal: false, serverFiles: false, collaboration: false, git: false, nativeBrowser: true },
   }
   const source = `import React from ${JSON.stringify(import.meta.resolve('react'))};
     import {createRoot} from ${JSON.stringify(import.meta.resolve('react-dom/client'))};
     import App from ${JSON.stringify(path.join(root, 'src/App.tsx'))};
     import {I18nProvider} from ${JSON.stringify(path.join(root, 'src/i18n.tsx'))};
     function Fixture(){const [auth,setAuth]=React.useState(${JSON.stringify(auth)});
-      window.setDesktopAllowed=allowed=>setAuth(current=>({...current,capabilities:{...current.capabilities,desktop:allowed}}));
       window.setNativeBrowserAllowed=allowed=>setAuth(current=>({...current,capabilities:{...current.capabilities,nativeBrowser:allowed}}));
       return <I18nProvider><App auth={auth}/></I18nProvider>}
     createRoot(document.getElementById('root')).render(<Fixture/>);`
@@ -106,7 +105,7 @@ test('native browser access follows its own permission on desktop and mobile', {
     try {
       await page.goto('http://mew-browser-entry.test/')
       const link = page.locator('[data-local-link]'), dockButton = page.locator('[data-dock-item="browser"]')
-      await link.waitFor().catch(async error => {
+      await link.waitFor({ state: 'attached' }).catch(async error => {
         throw new Error(`${error instanceof Error ? error.message : String(error)}\n${JSON.stringify(errors)}\n${await page.locator('body').innerText()}`)
       })
       await dockButton.waitFor()
@@ -116,10 +115,6 @@ test('native browser access follows its own permission on desktop and mobile', {
       await nativeBrowser.waitFor({ state: 'visible' })
       assert.equal(await nativeBrowser.getAttribute('data-url'), 'about:blank', 'the Browser dock starts an actual Chrome window with its own native toolbar')
       assert.equal(await nativeBrowser.getAttribute('data-native-allowed'), 'true')
-      await page.evaluate('window.setDesktopAllowed(true)')
-      assert.equal(await nativeBrowser.getAttribute('data-native-allowed'), 'true', 'the remote desktop grant does not own native browser access')
-      await page.evaluate('window.setDesktopAllowed(false)')
-      assert.equal(await nativeBrowser.getAttribute('data-native-allowed'), 'true', 'remote desktop revocation keeps an independently granted browser open')
       await page.evaluate('window.setNativeBrowserAllowed(false)')
       await nativeBrowser.waitFor({ state: 'detached' })
       await dockButton.waitFor({ state: 'detached' })

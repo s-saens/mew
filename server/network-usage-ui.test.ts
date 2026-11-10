@@ -18,9 +18,9 @@ import {SystemStatsModal} from '${root}/src/components/SystemStatsModal.tsx';
 import {ActiveSessionsButton} from '${root}/src/components/active-sessions-button.tsx';
 import {I18nProvider} from '${root}/src/i18n.tsx';
 import {useI18n} from '${root}/src/i18n.tsx';
-import {networkUsage,desktopUsageReporter} from '${root}/src/utils/network-usage.ts';
+import {networkUsage} from '${root}/src/utils/network-usage.ts';
 import {startNetworkTracking} from '${root}/src/utils/network-tracking.ts';
-localStorage.setItem('mew:locale','ko');window.usage=()=>networkUsage.getSnapshot();window.remote=desktopUsageReporter();window.nextRemote=()=>window.remote=desktopUsageReporter();window.stopTracking=startNetworkTracking();
+localStorage.setItem('mew:locale','ko');window.usage=()=>networkUsage.getSnapshot();window.stopTracking=startNetworkTracking();
 function Fixture(){window.locale=useI18n().setLocale;const [open,setOpen]=React.useState(false);return <><header className="flex h-10 items-center gap-1.5 px-2 md:h-12 md:gap-3"><span className="min-w-0 flex-1 truncate">mew</span><HeaderResources onOpen={()=>setOpen(true)}/><ActiveSessionsButton presence={{selfId:'one',sessions:[]}} profile={{email:'owner@example.test',displayName:'Owner',avatarDataUrl:null}}/></header>{open&&<SystemStatsModal onClose={()=>setOpen(false)}/>}</>}
 createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18nProvider>);
 window.socketRoundTrip=url=>new Promise((resolve,reject)=>{const socket=new WebSocket(url);socket.binaryType='arraybuffer';socket.onopen=()=>socket.send('한글');socket.onmessage=()=>{socket.close();resolve()};socket.onerror=reject});
@@ -41,7 +41,7 @@ window.cloneRoundTrip=async()=>{const response=await fetch('/api/stream-finite')
       request.on('close', () => clearTimeout(timer)); return
     }
     if (request.url === '/api/stream-finite') { response.setHeader('Content-Type', 'text/event-stream'); response.end('data: clone\n\n'); return }
-    if (request.url === '/api/payload' || request.url === '/api/remote-desktop/status') { response.setHeader('Content-Type', 'text/plain'); response.end('한글'); return }
+    if (request.url === '/api/payload') { response.setHeader('Content-Type', 'text/plain'); response.end('한글'); return }
     response.setHeader('Content-Type', 'text/html'); response.end(`<!doctype html><html lang="ko"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}</style><div id="root"></div><script src="/app.js"></script></html>`)
   })
   const sockets = new WebSocketServer({ server })
@@ -57,21 +57,13 @@ window.cloneRoundTrip=async()=>{const response=await fetch('/api/stream-finite')
     const usageButton = page.getByRole('button', { name: '시스템 자원 보기', exact: true })
     await usageButton.waitFor()
     await page.waitForTimeout(100)
-    const initial = await page.evaluate('window.usage()') as { other: { received: number; sent: number }; desktop: { received: number; sent: number } }
+    const initial = await page.evaluate('window.usage()') as { other: { received: number; sent: number } }
     assert.ok(initial.other.received > 0, 'initial resource transfer is included')
     await page.evaluate(`fetch('/api/payload',{method:'POST',body:'한글'}).then(response=>response.text())`)
     await page.waitForFunction(`window.usage().other.received >= ${initial.other.received + 6}`)
     assert.equal(await page.evaluate('window.usage().other.sent'), 6)
     await page.evaluate(`window.socketRoundTrip('${base.replace('http:', 'ws:')}/api/collab')`)
     assert.equal(await page.evaluate('window.usage().other.sent'), 12)
-    const beforeRemote = await page.evaluate('window.usage().desktop.received') as number
-    await page.evaluate(`window.socketRoundTrip('${base.replace('http:', 'ws:')}/api/remote-desktop/ws')`)
-    assert.equal(await page.evaluate('window.usage().desktop.received'), beforeRemote, 'remote authenticated socket is counted by its session reporter only')
-    await page.evaluate(`window.remote({received:1000000,sent:2000});window.remote({received:1000000,sent:2000});window.nextRemote();window.remote({received:200000,sent:1000})`)
-    assert.equal(await page.evaluate('window.usage().desktop.received'), 1_200_000)
-    assert.equal(await page.evaluate('window.usage().desktop.sent'), 3000)
-    await page.evaluate(`fetch('/api/remote-desktop/status').then(response=>response.text())`)
-    await page.waitForFunction('window.usage().desktop.received===1200006')
     const beforeStream = await page.evaluate('window.usage().other.received') as number
     await page.evaluate('window.streamRoundTrip()')
     assert.equal(await page.evaluate('window.aborted'), true)
@@ -85,17 +77,13 @@ window.cloneRoundTrip=async()=>{const response=await fetch('/api/stream-finite')
     await usageButton.click()
     const dialog = page.getByRole('dialog', { name: '시스템 자원', exact: true })
     await dialog.waitFor()
-    const row = dialog.getByRole('table', { name: '누적 사용량', exact: true }).getByRole('row', { name: /원격 데스크톱/ })
-    assert.deepEqual(await row.getByRole('cell').allTextContents(), ['3.0 KB', '1.2 MB'])
-    await page.evaluate('window.remote({received:400000,sent:4000})')
-    await row.getByRole('cell', { name: '1.4 MB', exact: true }).first().waitFor()
+    const row = dialog.getByRole('table', { name: '누적 사용량', exact: true }).getByRole('row', { name: /전체/ })
+    assert.equal(await row.getByRole('cell').count(), 2)
+    assert.equal(await dialog.getByRole('rowheader', { name: '원격 데스크톱', exact: true }).count(), 0)
     assert.equal(await page.locator('header').getByRole('button', { name: /^네트워크/ }).count(), 0)
     assert.equal(await dialog.getByRole('columnheader', { name: '업로드', exact: true }).count(), 2)
     assert.equal(await dialog.getByRole('columnheader', { name: '다운로드', exact: true }).count(), 2)
-    await page.waitForFunction('window.usage().rate.desktop.received > 0')
     await dialog.getByRole('table', { name: '네트워크 속도', exact: true }).waitFor()
-    await page.waitForFunction('window.usage().rate.desktop.received === 0')
-    assert.equal(await page.evaluate('window.usage().desktop.received'), 1400006, 'idle speed preserves totals')
 
     await dialog.getByRole('button', { name: '닫기' }).focus()
     await page.keyboard.press('Escape')
@@ -111,7 +99,7 @@ window.cloneRoundTrip=async()=>{const response=await fetch('/api/stream-finite')
       await page.keyboard.press('Escape')
     }
     await usageButton.click()
-    for (const [locale, title, category] of [['en', 'System resources', 'Other'], ['zh-CN', '系统资源', '其他'], ['ja', 'システムリソース', 'その他']] as const) {
+    for (const [locale, title, category] of [['en', 'System resources', 'All'], ['zh-CN', '系统资源', '全部'], ['ja', 'システムリソース', '全体']] as const) {
       await page.evaluate(`window.locale(${JSON.stringify(locale)})`)
       const localized = page.getByRole('dialog', { name: title, exact: true })
       await localized.waitFor(); assert.equal(await localized.getByRole('rowheader', { name: category, exact: true }).count(), 2)

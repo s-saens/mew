@@ -2,7 +2,7 @@ import { execFile } from 'node:child_process'
 import { release } from 'node:os'
 import path from 'node:path'
 import { promisify } from 'node:util'
-import { wslPowerShell } from '../native/remote-desktop/wsl-powershell.mjs'
+import { wslPowerShell } from './rtc/wsl-powershell.mjs'
 import type { RemoteNetworkStatus } from '../shared/remote-access.ts'
 
 type Execute = (file: string, args: string[], options: { timeout: number; windowsHide: boolean; maxBuffer: number; env: NodeJS.ProcessEnv }) => Promise<{ stdout: string | Buffer }>

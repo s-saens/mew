@@ -3,7 +3,6 @@ import { watchSocketAccess } from './access-socket.ts' // 반드시 첫 줄 — 
 import { webSocketOriginAllowed } from './websocket-origin.ts'
 import { attachBrowserDesktopWebSocket } from './browser-desktop.ts'
 import { attachDomBrowserWebSocket } from './dom-browser.ts'
-import { attachRemoteDesktopWebSocket } from './remote-desktop.ts'
 import type { ViteDevServer } from 'vite'
 import express from 'express'
 import { createApiApp } from './api.ts'
@@ -44,7 +43,6 @@ export function configureDocsServer(server: ViteDevServer): void {
     attachAgentWebSocket(server.httpServer, { authorize: authorizeFeature('agent') })
     attachDomBrowserWebSocket(server.httpServer)
     attachBrowserDesktopWebSocket(server.httpServer)
-    attachRemoteDesktopWebSocket(server.httpServer)
     // 지난 실행이 SIGKILL로 끊겼다면 그때 남은 에이전트 자식이 아직 램을 물고 있다
     reapOrphanAgents()
     startAgentScheduledPrompts()

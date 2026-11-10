@@ -112,7 +112,7 @@ The agent panel also defers the terminal renderer through `DeferredAgentTerminal
 
 `deferredComponent` keeps optional panel downloads in local boundaries. Menu dialogs instead use `deferredDialog` so opening them immediately commits a dismissible frame with the translated title, close control, and shared loading indicator before the code arrives.
 
-- Download settings, file browsing, login, remote desktop, and history when opened.
+- Download settings, file browsing, login and history when opened.
 - Load search/tasks/notes on first open; retain their components after closing to preserve state. Focus notes on their first mount after download.
 - Keep agent session restoration/notifications independent of workspace loading.
 - Start the full update check after the workspace has rendered once.

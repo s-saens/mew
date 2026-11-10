@@ -5,7 +5,7 @@ import { resetDockPreferences, setDockOrder, setDockPanelVisible, setDockPositio
 import { DOCK_POSITIONS, MOBILE_DOCK_ORDER, moveDockPanel, visibleDockPanels, type DockPosition, type MobileDockPanel } from '../utils/mobile-dock'
 import { dockIcons, useDockLabel } from './dock-items'
 
-const defaultAvailable = MOBILE_DOCK_ORDER.filter(id => id !== 'desktop')
+const defaultAvailable = MOBILE_DOCK_ORDER
 const actionClass = 'flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-ink-secondary hover:bg-surface-hover hover:text-ink focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-25 disabled:hover:bg-transparent'
 
 export function DockSettingsPanel({ available = defaultAvailable, portalContainer }: { available?: readonly MobileDockPanel[]; portalContainer?: HTMLElement | null }) {

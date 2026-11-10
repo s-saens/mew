@@ -18,6 +18,7 @@ const root = path.resolve(import.meta.dirname, '../..')
 test('the shared demo supports files, tasks, terminals, projects and reset without a backend', { skip: !domBrowserExecutable(), timeout: 120_000 }, async t => {
   const source = `import { initializeDemo } from ${JSON.stringify(path.join(root, 'src/demo/initialize.ts'))};
     const { store } = await initializeDemo(); globalThis.demoWorkspace = store;
+    const { scopedBrowserStorage } = await import('@mew/ui/browser-storage-scope'); scopedBrowserStorage().setItem('mew:mewcat-skin', 'none'); scopedBrowserStorage().setItem('mew:notification-preferences', JSON.stringify({ visual: false, mewcat: false, resources: false }));
     const { getAppRuntime } = await import(${JSON.stringify(path.join(root, 'src/runtime/app-runtime.ts'))});
     const transport = getAppRuntime().transport, fetch = transport.fetch.bind(transport);
     globalThis.demoRuntime = getAppRuntime();

@@ -20,7 +20,7 @@ test('every capability is visible and host fixtures have useful data', async t =
   assert.equal(stats.memory.used + stats.memory.available, stats.memory.total)
   assert.ok(stats.gpus.length && stats.processes.length)
   assert.equal((await data(store, '/api/mew-update/status')).available, true)
-  assert.equal((await data(store, '/api/updates/status')).items.length, 3)
+  assert.equal((await data(store, '/api/updates/status')).items.length, 2)
 })
 
 test('schedule edits, run logs and updates are tab-local and resettable', async t => {
@@ -33,8 +33,8 @@ test('schedule edits, run logs and updates are tab-local and resettable', async 
   assert.match(store.getState(`tmux-session-output:${session}`, ''), /시뮬레이션/)
   assert.ok((await data(store, '/api/schedules')).jobs[0].lastRun)
   assert.notEqual((await data(other, '/api/schedules')).jobs[0].name, jobs[0].name)
-  await data(store, '/api/updates/run', write('POST', { ids: ['demo-desktop'] }))
-  assert.equal((await data(store, '/api/updates/status')).items.find((item: { id: string }) => item.id === 'demo-desktop').available, false)
+  await data(store, '/api/updates/run', write('POST', { ids: ['demo-agent'] }))
+  assert.equal((await data(store, '/api/updates/status')).items.find((item: { id: string }) => item.id === 'demo-agent').available, false)
   await data(store, '/api/mew-actions/update/run', { method: 'POST' })
   assert.equal((await data(store, '/api/mew-update/status')).available, false)
   const scope = { runtime: 'codex', tab: 'demo-agent', cwd: store.workspacePath }
@@ -67,8 +67,8 @@ test('retired Android routes and capability are absent from the demo', async t =
 test('administrator actions and debugger stepping change only mock state', async t => {
   const store = new DemoWorkspaceStore(); t.after(() => store.close())
   await data(store, '/api/admin/users', write('POST', { email: 'new@example.test', role: 'member' }))
-  const settings = await data(store, '/api/admin/access/feature', write('PUT', { subject: 'new@example.test', feature: 'desktop', enabled: true }))
-  assert.equal(settings.rows.find((row: { subject: string }) => row.subject === 'new@example.test').capabilities.desktop, true)
+  const settings = await data(store, '/api/admin/access/feature', write('PUT', { subject: 'new@example.test', feature: 'nativeBrowser', enabled: true }))
+  assert.equal(settings.rows.find((row: { subject: string }) => row.subject === 'new@example.test').capabilities.nativeBrowser, true)
   assert.ok((await data(store, '/api/admin/access/path?project=.workspace&path=src')).entries.length)
   await data(store, '/api/admin/mewlink/requests/demo-request/approve', write('POST', {}))
   assert.equal((await data(store, '/api/admin/mewlink')).links.length, 1)

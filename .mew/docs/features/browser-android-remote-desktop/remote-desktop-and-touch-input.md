@@ -2,17 +2,20 @@
 id: "mew-remote-desktop"
 parent: "mew-remote"
 title: "Remote desktop and touch input"
-status: "implemented"
+status: "removed"
 created: "2026-09-18"
-updated: "2026-11-08"
+updated: "2026-11-10"
 status_hash: "278f4dc5c3b21929284aadc8ff47af89a35f48d29be6a318f5b80773c2f10e81"
 files: ["src/components/remote-desktop.tsx", "src/components/desktop-screen-keyboard.tsx", "src/utils/desktop-screen-keyboard.ts", "src/utils/desktop-input.ts", "src/utils/desktop-video.ts", "server/remote-desktop.ts", "server/remote-desktop-host.ts", "native/remote-desktop/main.mjs", "native/remote-desktop/native-host.mjs", "native/remote-desktop/rust-direct.mjs", "native/remote-desktop/rust/src/engine.rs", "native/remote-desktop/video-settings.mjs", "native/remote-desktop/video-pacer.mjs", "native/remote-desktop/gpu-windows.cpp", "native/remote-desktop/virtual-display-driver.cpp", "server/desktop-resident-host.ts", "mew"]
 commits: []
-description: "Contract for remote desktop video, host preparation, keyboard and touch input, including immediate leading motion and transition-only ordering barriers. Covers receiver timing diagnostics, permissions, and hardware verification limits."
+description: "Historical remote desktop contract retained for prior links; the feature was removed from Mew under ADR 0161."
 상위파일:
   - "MOC.md"
   - "_browser-android-remote-desktop.md"
 ---
+
+> Historical record: Mew removed remote desktop. See [ADR 0161](../../decisions/0161-remove-remote-desktop.md). The instructions below describe the former implementation.
+
 
 ## Requirements
 

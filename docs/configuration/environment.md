@@ -1,6 +1,6 @@
 ---
 title: "Server environment variables and CLI settings"
-description: "Covers host configuration file precedence, environment variables, data locations, Mewlink origin, OAuth, Remote Desktop, and prebuilt CLI options. Development documentation owns the module initialization contract."
+description: "Covers host configuration file precedence, environment variables, data locations, Mewlink origin, OAuth, and prebuilt CLI options. Development documentation owns the module initialization contract."
 updated: "2026-10-29"
 상위파일: "MOC.md"
 ---
@@ -15,17 +15,14 @@ The server configuration file is `~/.config/mew/config.env` on Linux and macOS (
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
+| `MEW_DESKTOP_ICE_SERVERS` | Built-in STUN servers | STUN JSON array used for direct browser video address discovery. Set to `[]` to disable external lookups. |
+| `MEW_DESKTOP_AUTO_NAT` | `1` | Enables temporary automatic NAT mappings for direct browser video connections; set to `0` to disable. |
 | `MEW_WORKSPACE` | Parent of the app folder | Folder containing projects. Can be specified separately from the app installation path |
 | `MEW_GITHUB_CLIENT_ID` | Built-in Mew OAuth app | Optional setting to replace it with your own GitHub OAuth app Client ID. Unset, empty, or whitespace-only values use the default app |
 | `MEW_DATA_DIR` | Linux/macOS: `~/.local/share/mew` (respecting `XDG_DATA_HOME`), Windows: `%LOCALAPPDATA%\mew\data`. An older installation's `<앱>/.data` takes precedence if present | Accounts, sessions, feature/file permissions, and icons |
 | `MEW_AGENT_MEMORY_SCOPE` | `auto` | Applies ACP and CLI task memory limits through the installed systemd slice. `required` refuses execution if it is not installed; `off` disables only OS limits. [Installation and memory protection](../operations/agent-memory.md) |
 | `MEW_REMOTE_ORIGIN` | `https://mew.run` | Central HTTPS origin for new remote registrations. After registration, the saved origin is used. Existing `mew.saens.kr` registrations are maintained through the central service's support for allowed previous origins. To switch to an arbitrary service, unregister and register again. [Central service operations](../../.mew/docs/operations/remote-central.md) |
 | `MEW_TEAM_PORT` | 5000 | Server port |
-| `MEW_DESKTOP_ENGINE` | `rust` | Default Rust video thread. `legacy` is the previous JS worker transmission path for comparison and recovery. Requires restarting the server/resident helper app to take effect. [Engine contract](../../.mew/docs/development/remote-desktop-rust.md) |
-| `MEW_DESKTOP_HELPER_DIR` | Project's `native/remote-desktop`; on WSL, `Mew/remote-desktop` under Windows LocalAppData | Installation path for the [Remote Desktop helper app](../guides/remote-desktop.md). On WSL, use an absolute Windows path |
-| `MEW_DESKTOP_ICE_SERVERS` | `[{"urls":["stun:stun.l.google.com:19302","stun:stun.cloudflare.com:3478"]}]` | STUN JSON array for WebRTC address discovery. Use `[]` to disable external lookups. TURN and video relaying are not supported; direct connections may be impossible depending on NAT/firewall conditions |
-| `MEW_DESKTOP_AUTO_NAT` | `1` | If an active direct connection is delayed, attempts temporary UDP mappings through PCP/NAT-PMP/UPnP on the OS default gateway. Disable with `0`. [Lifetime and OS network approval](../../.mew/docs/development/remote-desktop-connectivity.md) |
-| `MEW_DESKTOP_UDP_PORT` | Automatically selected | Fixed UDP port for Windows/WSL, Mac, and native Linux hosts (1024–65535). Optional operator setting. Default connections use STUN and short-lived automatic NAT mappings without specifying a port |
 | `MEW_BIND` | `127.0.0.1` | Address the server listens on. The published default is loopback; specify an exposed address only when direct LAN access is essential. Keep server deployments on `127.0.0.1` behind an HTTPS proxy or tunnel |
 | `MEW_COLLAB_RUST` | Unset (=JS Yjs) | If `1`, uses Rust (yrs) for collaboration room state — run `npm run build:native` first ([Collaboration rooms](../../.mew/docs/development/collaboration.md)) |
 | `DATABASE_URL` | Unset | Postgres for `/db`. If unset or unreachable, only the `/db` API returns 503 |

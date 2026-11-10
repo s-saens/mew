@@ -168,7 +168,7 @@ test('account capabilities and canonical file rules are enforced across HTTP and
     assert.equal((await request('/agent-runtimes/tmux/models')).status, 400)
     assert.equal((await request('/tmux/sessions')).status, 403)
     assert.equal((await request('/browser-dom/tabs')).status, 404)
-    assert.equal((await request('/remote-desktop/status')).status, 403)
+    assert.equal((await request('/remote-desktop/status')).status, 404, 'removed desktop API is unavailable')
     assert.equal((await request('/admin/access/feature', 'PUT', { subject: 'guest', feature: 'terminal', enabled: true }, 'owner')).status, 400)
     assert.equal((await request('/admin/users/owner%40example.test/role', 'PUT', { role: 'member' }, 'owner')).status, 400)
     policy.setFeature(member.email!, 'agent', null)

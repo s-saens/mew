@@ -1,7 +1,7 @@
 import rtc from 'node-datachannel'
 import { isIP } from 'node:net'
-import { nativeConnectivity } from '../native/remote-desktop/native-connectivity.mjs'
-import { publicV4 } from '../native/remote-desktop/nat-port-map.mjs'
+import { nativeConnectivity } from './rtc/native-connectivity.mjs'
+import { publicV4 } from './rtc/nat-port-map.mjs'
 import { createWslLoopbackCandidate } from './remote-access-ice.ts'
 const loopbackCandidate = createWslLoopbackCandidate()
 const FRAME = 32 * 1024, QUEUE = 512 * 1024

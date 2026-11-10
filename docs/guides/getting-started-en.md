@@ -1,7 +1,7 @@
 ---
 title: "Getting started with mew"
 updated: "2026-11-05"
-description: "Installation, first sign-in, remote access, host browser and remote desktop setup, updates, and data retention for Mew. Covers source setup, first-administrator creation, and Windows wizard/prebuilt release limits."
+description: "Installation, first sign-in, remote access, host browser setup, updates, and data retention for Mew. Covers source setup, first-administrator creation, and Windows wizard/prebuilt release limits."
 ---
 
 # Getting started with mew
@@ -82,7 +82,6 @@ cd mew
 
 Accept the offer to install Node with nvm if prompted. Follow the [setup prompts below](#finish-setup), then open the printed URL in your browser.
 
-Setup also prepares the remote desktop helper. On the Mac running mew, approve **Accessibility** and **Screen Recording** for Electron when System Settings opens. Setup continues once it detects the permissions. See [Mac permission setup](remote-desktop.md#mac-permission-setup) for details.
 
 ### Linux
 
@@ -110,7 +109,7 @@ During setup, enter:
 
 The first administrator is created in the browser after setup, rather than through a terminal email prompt.
 
-Setup installs npm dependencies, prepares ordinary Google Chrome and Playwright Chromium, prepares remote desktop components, builds the app, and starts the server. Browser preparation may need network access and sudo on Linux/WSL; run setup from an interactive terminal with permission to install system packages. The first download can take a few minutes. A remote desktop preparation failure is reported as a warning and does not stop the rest of the installation.
+Setup installs npm dependencies, prepares ordinary Google Chrome and Playwright Chromium, builds the app, and starts the server. Browser preparation may need network access and sudo on Linux/WSL; run setup from an interactive terminal with permission to install system packages. The first download can take a few minutes.
 
 On a fresh installation, open the **private setup link** printed by setup, enter your email, choose a password, and confirm it. Mew creates the administrator and signs you in. Existing installations keep their accounts and show ordinary login. Use **+** in the header to open a project folder, then select a file in the File explorer. [Account setup and recovery](../configuration/accounts.md#first-administrator).
 
@@ -134,7 +133,7 @@ The launcher prepares missing browsers before starting the server; Linux prepara
 
 Supports Linux glibc 2.35+ and macOS 15+, on x64/arm64. On Windows, use Ubuntu 22.04+ inside WSL 2. On a fresh installation, the launcher opens a browser form where you choose the administrator email and password. No temporary-password step is required. Existing accounts, conversations, and device registration are reused. Follow [remote access](#remote-access) to register with Mewlink; the terminal also prints registration and online address QR codes.
 
-Press Ctrl+C to stop. Run the same command again to use the latest release. If your old clone uses `.data/`, pass `--data-dir /path/to/old/mew/.data` and stop the old server first. Remote desktop requires its optional components and OS permissions. [Runtime and data contract](../../.mew/docs/development/cli-distribution.md) · [Release procedure](../../.mew/docs/operations/cli-release.md)
+Press Ctrl+C to stop. Run the same command again to use the latest release. If your old clone uses `.data/`, pass `--data-dir /path/to/old/mew/.data` and stop the old server first. [Runtime and data contract](../../.mew/docs/development/cli-distribution.md) · [Release procedure](../../.mew/docs/operations/cli-release.md)
 
 <a id="remote-access"></a>
 
@@ -244,11 +243,11 @@ Open a terminal or agent from the dock. Install and authenticate your AI runtime
 
 <a id="browser-android-and-remote-desktop"></a>
 
-### Browser and remote desktop
+### Browser
 
-Use the server browser for webpages. Remote desktop needs separate environment preparation, installation, and OS permissions; check its support limits first.
+Use the server browser to open web pages.
 
-[Login screens and browser](browser.md) · [Remote desktop](remote-desktop.md).
+[Login screens and browser](browser.md).
 
 <a id="databases"></a>
 
@@ -304,7 +303,6 @@ Deleting the clone leaves these files in place. Back them up along with your wor
 
 To connect from a phone or another computer, follow [Remote access](#remote-access). The default server binding is local to the host. A personal `./mew start` installation does not register an automatic startup service.
 
-If remote desktop preparation failed during setup, retry with `./mew desktop-setup`. This installs the helper and handles Mac permission setup without building the app or restarting the server. A logged-in desktop and the relevant OS libraries and permissions are still required; see [OS requirements](remote-desktop.md#first-connection).
 
 On macOS, mew repairs a missing execute permission on `node-pty` 1.1.0's `spawn-helper` before opening a terminal. If a terminal stays blank, check the server log for `[mew:tmux]` errors.
 

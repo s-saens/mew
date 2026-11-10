@@ -2,9 +2,12 @@
 title: "External Direct Connectivity and Automatic Network Preparation for Remote Desktop"
 created: 2026-10-02
 updated: 2026-10-24
-description: "Defines direct remote desktop connections over external networks, bounded STUN retries, NAT preparation, Windows firewall settings, and Mac/Linux permissions. Includes Linux asynchronous selected-interface and address validation, cancellation, and measured verification boundaries."
+description: "Historical remote desktop contract retained for prior links; the feature was removed from Mew under ADR 0161."
 상위파일: "MOC.md"
 ---
+
+> Historical record: Mew removed remote desktop. See [ADR 0161](../decisions/0161-remove-remote-desktop.md). The instructions below describe the former implementation.
+
 
 [Shared contract](remote-desktop.md) · [ADR 0189](../history/decisions/0189-mew-desktop-external-direct-connectivity.md)
 

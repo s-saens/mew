@@ -1,9 +1,12 @@
 ---
 title: "Remote Desktop Rust Video Engine"
-description: "Defines Rust capture, RTP pacing, stable RTCP media-clock mapping with encoder-age compensation, and direct WebRTC using the existing GPU ABI. Covers authorization, installation, legacy comparison, and hardware verification limits."
+description: "Historical remote desktop contract retained for prior links; the feature was removed from Mew under ADR 0161."
 created: 2026-10-24
 updated: "2026-11-08"
 ---
+
+> Historical record: Mew removed remote desktop. See [ADR 0161](../decisions/0161-remove-remote-desktop.md). The instructions below describe the former implementation.
+
 
 ## Execution Path
 

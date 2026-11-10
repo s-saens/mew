@@ -12,7 +12,7 @@ test('Hotview gutter follows typing, trailing paragraphs and frontmatter on desk
   const codeContent = '---\ntitle: test\n---\n\n# 제목\n\n```txt\n코드\n```'
   const ruleContent = '앞 문단\n\n---\n\n뒤 문단';
   const tableContent = '앞 문단\n\n| 이름 | 설명 |\n| --- | --- |\n| 항목 | 내용 |\n\n뒤 문단'
-  const listContent = '# Current\n\n기준 문단\n\n- 일반 항목\n- [설정](configuration/MOC.md)\n- [원격 데스크톱 지연·대역폭 개선 연구 — 기준 조사와 세부 구현 확인](research/remote-desktop-latency.md)\n- 상위 항목\n  - [하위](child.md)\n    - 둘째\n      - 셋째\n        - [넷째](deep.md)\n\n앞 문장 [문장 안에서 여러 줄에 걸쳐 자연스럽게 이어지는 긴 내부 파일 링크 설명과 줄바꿈 확인](long.md) 뒤 문장\n\n1. [순서 목록](ordered.md)\n2. 다음 항목\n\n[외부 링크](https://example.com)'
+  const listContent = '# Current\n\n기준 문단\n\n- 일반 항목\n- [설정](configuration/MOC.md)\n- [문서 편집 성능 — 기준 조사와 세부 구현 확인](research/editor-performance.md)\n- 상위 항목\n  - [하위](child.md)\n    - 둘째\n      - 셋째\n        - [넷째](deep.md)\n\n앞 문장 [문장 안에서 여러 줄에 걸쳐 자연스럽게 이어지는 긴 내부 파일 링크 설명과 줄바꿈 확인](long.md) 뒤 문장\n\n1. [순서 목록](ordered.md)\n2. 다음 항목\n\n[외부 링크](https://example.com)'
   const navigationContent = '[문서 규칙](./rules.md)\n\n앞 [문서 규칙](./rules.md) 뒤\n\n[첫 문서](./one.md)[둘째 문서](./two.md)'
   const linkKindsContent = '- [하위문서](./child.md)\n- [다른 내부문서](../other.md)\n- [Docs 밖 소스 파일](../../src/main.ts)\n- [웹](https://example.com)'
   const taskContent = '- [ ] 첫 항목\n- [x] 완료\n  - [ ] 하위 할 일'

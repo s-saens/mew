@@ -55,7 +55,7 @@ test('workspace shell excludes deferred editor, replay, icon catalog and tool mo
   for (const chunk of chunks) if (chunk.isEntry) visit(chunk)
   const modules = chunks.filter(chunk => eager.has(chunk.fileName)).flatMap(chunk => Object.keys(chunk.modules))
   assert.deepEqual(rendererModules(modules), [])
-  assert.deepEqual(modules.filter(id => /\/src\/(?:utils\/project-icon-catalog|components\/(?:IconPicker|EditorPane|AgentPanel|SettingsModal|remote-desktop))\.tsx?$/.test(id)), [])
+  assert.deepEqual(modules.filter(id => /\/src\/(?:utils\/project-icon-catalog|components\/(?:IconPicker|EditorPane|AgentPanel|SettingsModal))\.tsx?$/.test(id)), [])
   assert.ok(modules.some(id => id.endsWith('/src/components/FileTree.tsx')), 'file navigation stays in the first workspace chunk')
 })
 

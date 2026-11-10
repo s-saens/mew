@@ -2,9 +2,12 @@
 title: "Remote desktop architecture and validation"
 created: "2026-09-12"
 updated: "2026-11-08"
-description: "Defines resident Node control and Rust/GPU direct WebRTC, including transition-only input barriers, stable RTP report timing, bounded decode recovery, and receiver interval diagnostics. Covers authorization, mode negotiation, installation, and hardware verification limits."
+description: "Historical remote desktop contract retained for prior links; the feature was removed from Mew under ADR 0161."
 상위파일: "MOC.md"
 ---
+
+> Historical record: Mew removed remote desktop. See [ADR 0161](../decisions/0161-remove-remote-desktop.md). The instructions below describe the former implementation.
+
 
 [Installation and usage](../../../docs/guides/remote-desktop.md) · [Distribution licenses](remote-desktop-distribution.md) · [ADR 0185](../history/decisions/0185-mew-desktop-resident-direct-host.md) · [ADR 0189](../history/decisions/0189-mew-desktop-external-direct-connectivity.md) · [ADR 0144](../history/decisions/0144-mew-desktop-local-cursor.md)
 

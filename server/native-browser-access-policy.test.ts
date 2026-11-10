@@ -9,10 +9,10 @@ import { WebSocket } from 'ws'
 import { defaultCapabilities, normalizeFeatureOverrides, type AccessSettings } from '../shared/access-policy.ts'
 import type { RequestAuth } from './reqAuth.ts'
 
-test('native browser defaults and overrides do not inherit desktop, localhost or legacy browser grants', () => {
+test('native browser defaults and overrides ignore removed desktop, localhost and legacy browser grants', () => {
   for (const role of ['owner', 'manager'] as const) assert.equal(defaultCapabilities(role).nativeBrowser, true)
   for (const role of ['member', 'guest'] as const) assert.equal(defaultCapabilities(role).nativeBrowser, false)
-  assert.deepEqual(normalizeFeatureOverrides({ browser: true, desktop: true }), { desktop: true })
+  assert.deepEqual(normalizeFeatureOverrides({ browser: true, desktop: true }), {})
   assert.deepEqual(normalizeFeatureOverrides({ browser: true, nativeBrowser: false }), { nativeBrowser: false })
   assert.deepEqual(normalizeFeatureOverrides({ browser: false, nativeBrowser: true, portPreview: true }), { nativeBrowser: true })
 })
@@ -23,7 +23,7 @@ test('account settings independently grant and revoke the persisted native brows
   process.env.MEW_WORKSPACE = path.join(temporary, 'workspace')
   await fs.mkdir(path.join(process.env.MEW_WORKSPACE, 'docs'), { recursive: true })
   const { upsertUser } = await import('./auth.ts')
-  const { capabilitiesFor, canUse } = await import('./access-policy.ts')
+  const { canUse } = await import('./access-policy.ts')
   const { createAccessRouter } = await import('./access-routes.ts')
   const owner = 'owner-native@test', member = 'member-native@test'
   for (const [email, role] of [[owner, 'owner'], [member, 'member']] as const) upsertUser(email, { role, hash: 'fixture-only', createdAt: 0, passwordChangedAt: 0, mustChangePassword: false })
@@ -43,16 +43,15 @@ test('account settings independently grant and revoke the persisted native brows
   assert.equal(granted.status, 200)
   const row = ((await granted.json()) as AccessSettings).rows.find(item => item.subject === member)!
   assert.equal(row.capabilities.nativeBrowser, true); assert.equal(row.overrides.nativeBrowser, true)
-  for (const feature of ['desktop', 'agent', 'git'] as const) assert.equal(row.capabilities[feature], false, feature)
+  for (const feature of ['agent', 'git'] as const) assert.equal(row.capabilities[feature], false, feature)
   assert.equal(canUse(memberAuth, 'nativeBrowser'), true)
   assert.equal(canUse({ ...memberAuth, mustChangePassword: true }, 'nativeBrowser'), false)
   assert.equal((await save('nativeBrowser', true, 'guest')).status, 400)
-  await save('desktop', true)
+  assert.equal((await save('desktop', true)).status, 400, 'removed desktop permission cannot be granted')
   assert.equal((await save('nativeBrowser', false)).status, 200)
-  assert.equal(canUse(memberAuth, 'nativeBrowser'), false, 'desktop and localhost grants cannot restore browser access')
-  assert.equal(capabilitiesFor(memberAuth).desktop, true)
+  assert.equal(canUse(memberAuth, 'nativeBrowser'), false, 'revoked browser access stays denied')
   const persisted = JSON.parse(await fs.readFile(path.join(process.env.MEW_DATA_DIR, 'access-policy.json'), 'utf8'))
-  assert.deepEqual(persisted.features[member], { nativeBrowser: false, desktop: true })
+  assert.deepEqual(persisted.features[member], { nativeBrowser: false })
   requester = memberAuth
   assert.equal((await save('nativeBrowser', true)).status, 403, 'members cannot grant themselves browser access')
   const { attachDomBrowserWebSocket } = await import('./dom-browser.ts')

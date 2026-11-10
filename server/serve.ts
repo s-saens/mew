@@ -6,7 +6,6 @@ import { webSocketOriginAllowed } from './websocket-origin.ts'
 import { closeLoginDesktops } from './login-desktop.ts'
 import { attachBrowserDesktopWebSocket, closeBrowserDesktops, BROWSER_DESKTOP_WS } from './browser-desktop.ts'
 import { attachDomBrowserWebSocket, closeDomBrowsers, DOM_BROWSER_WS } from './dom-browser.ts'
-import { attachRemoteDesktopWebSocket, DESKTOP_WS } from './remote-desktop.ts'
 import express from 'express'
 import http from 'node:http'
 import fs from 'node:fs'
@@ -121,7 +120,6 @@ attachDbWebSocket(server, { authorize: authorizeFeature('database'), authorizePr
 attachAgentWebSocket(server, { authorize: authorizeFeature('agent') })
 attachDomBrowserWebSocket(server)
 attachBrowserDesktopWebSocket(server)
-attachRemoteDesktopWebSocket(server)
 destroyUnknownUpgrades(server, [
   '/api/tmux/ws',
   '/api/presence',
@@ -131,7 +129,6 @@ destroyUnknownUpgrades(server, [
   AGENT_WS_PATH,
   DOM_BROWSER_WS,
   BROWSER_DESKTOP_WS,
-  DESKTOP_WS,
 ])
 
 // 공개 경계 전환 전의 OAuth bearer token은 다음 spawn에 절대 넘기지 않고 파일에서도 지운다.

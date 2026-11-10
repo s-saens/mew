@@ -6,9 +6,8 @@ import os from 'node:os'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { createHash } from 'node:crypto'
-import { pathToFileURL } from 'node:url'
 import { parse as parseYaml } from 'yaml'
-import { compileRuntimeSource, stageRuntimeSources, stageWindowsDesktopPackage, validateCompiledImports, validateRuntimeLinks } from './release-runtime.ts'
+import { compileRuntimeSource, stageRuntimeSources, validateCompiledImports, validateRuntimeLinks } from './release-runtime.ts'
 import { verifiedDownload } from './release-tmux.ts'
 import { readDocumentationDependencies } from './documentation-skills.ts'
 import { MEWCAT_HELP_TOPICS } from '../shared/mewcat-assistant.ts'
@@ -93,10 +92,7 @@ console.log(JSON.stringify({value, number, data, worker: worker.pathname.endsWit
   assert.equal(JSON.parse(await fs.readFile(path.join(output, 'mew-runtime.json'), 'utf8')).browserDependencies, 'server/browser-dependencies.js')
   assert.match(await fs.readFile(path.join(output, 'server/browser-dependencies.js'), 'utf8'), /export const install = true/)
   for (const file of Object.keys(files).filter(file => file.startsWith('resources/skills/'))) assert.equal(await fs.readFile(path.join(output, file), 'utf8'), files[file])
-  for (const file of ['Cargo.toml', 'Cargo.lock', 'src/lib.rs']) {
-    const source = `native/remote-desktop/rust/${file}`
-    assert.equal(await fs.readFile(path.join(output, source), 'utf8'), files[source])
-  }
+  await assert.rejects(fs.stat(path.join(output, 'native/remote-desktop')), { code: 'ENOENT' })
   assert.equal(await fs.readFile(path.join(output, 'resources/help/start.md'), 'utf8'), files['resources/help/start.md'])
   for (const file of ['docs/private.md', '.mew/docs/development/contract.md', 'assets/mewpet/capybara/source/source.json']) {
     await assert.rejects(fs.stat(path.join(output, file)), { code: 'ENOENT' })
@@ -124,20 +120,8 @@ test('tmux binary download must match the pinned digest', () => {
   assert.throws(() => verifiedDownload(bytes, '0'.repeat(64)), /checksum mismatch/)
 })
 
-test('only Windows release runtimes build an offline desktop bundle from their staged helper sources', async () => {
-  const calls: { source: string; output: string }[] = []
-  const directory = path.join(os.tmpdir(), 'runtime-desktop-fixture')
-  const build = async (options: { source: string; output: string }) => { calls.push(options) }
-  await stageWindowsDesktopPackage(directory, { platform: 'linux', build })
-  await stageWindowsDesktopPackage(directory, { platform: 'darwin', build })
-  assert.deepEqual(calls, [])
-  await stageWindowsDesktopPackage(directory, { platform: 'win32', build })
-  assert.deepEqual(calls, [{ source: path.join(directory, 'native/remote-desktop'), output: path.join(directory, 'native/remote-desktop/prebuilt') }])
-  await assert.rejects(stageWindowsDesktopPackage(directory, { platform: 'win32', build: async () => { throw new Error('native build failed') } }), /native build failed/)
-})
-
 test('repository source graph stages without missing imports or optional helper resources', async () => fixture(async (root, output) => {
-  for (const directory of ['server', 'shared', 'packages', 'native/remote-desktop', 'public/mewcat', 'resources/help', 'resources/skills']) {
+  for (const directory of ['server', 'shared', 'packages', 'public/mewcat', 'resources/help', 'resources/skills']) {
     const source = path.join(repository, directory)
     await fs.cp(source, path.join(root, directory), { recursive: true, filter: file => !/(?:^|\/)(?:node_modules|\.data|\.git)(?:\/|$)/.test(path.relative(source, file)) })
   }
@@ -148,7 +132,6 @@ test('repository source graph stages without missing imports or optional helper 
   await stageRuntimeSources(root, output, { version: '0.1.0', platform: 'linux', arch: 'x64', nodeMajor: 24, entrypoint: 'server/cli-host.js', browserDependencies: 'server/browser-dependencies.js', tmuxVersion: '3.7c' })
   await validateCompiledImports(output)
   await validateRuntimeLinks(output)
-  const helper = await import(pathToFileURL(path.join(output, 'native/remote-desktop/helper-version.mjs')).href)
   for (const topic of MEWCAT_HELP_TOPICS) {
     const file = `resources/help/${topic}.md`
     const content = await fs.readFile(path.join(output, file), 'utf8')
@@ -170,9 +153,6 @@ test('repository source graph stages without missing imports or optional helper 
       assert.equal(createHash('sha256').update(bytes).digest('hex'), file.sha256, `packaged ${skill.name}/${file.path}`)
     }
   }
-  assert.match(helper.helperVersion(path.join(output, 'native/remote-desktop')), /^[a-f0-9]{64}$/)
-  const originalHelper = await import('../native/remote-desktop/helper-version.mjs')
-  assert.equal(helper.helperVersion(path.join(output, 'native/remote-desktop')), originalHelper.helperVersion(path.join(repository, 'native/remote-desktop')), 'CLI and source installations must share the same desktop artifact identity')
   const checks: Record<string, string[]> = {
     'server/cli-host.js': ['./instance-lock.js', './serve.js'],
     'server/agent-commands.js': ['./agent-command-runner.js'],

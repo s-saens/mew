@@ -138,9 +138,8 @@ Swipe left or right on a mobile panel's body to move to the current panel's prev
 
 **Features** opens the current project's feature document list. It appears when you have agent permission, and content you are writing persists when you view another panel and return. Close, Esc, and Back check for unsaved content.
 
-Open **Remote Desktop** from the header menu. Use the viewer's Close or Back action to return to the previous workspace; on mobile, you can also select another panel from the bottom dock. This ends the remote connection. For connection and control details, see [Remote Desktop](remote-desktop.md).
 
-Open Remote Desktop, Remote Browser, Server File Explorer, Scheduled Tasks, and Settings from the grouped header menu. Open databases from the explorer toolbar button to the right of the creation controls beside **Documents / Files**, or the floating editor button beside the agent action. Click your profile card in the menu for account settings. When the mobile software keyboard opens, the dock and reserved bottom space are hidden; they return when the keyboard closes. Control panels using the dock and top menu, and switch tabs using the tab bar, keyboard shortcuts, or swipes on the mobile body or Plain auxiliary key bar.
+Open Remote Browser, Server File Explorer, Scheduled Tasks, and Settings from the grouped header menu. Open databases from the explorer toolbar button to the right of the creation controls beside **Documents / Files**, or the floating editor button beside the agent action. Click your profile card in the menu for account settings. When the mobile software keyboard opens, the dock and reserved bottom space are hidden; they return when the keyboard closes. Control panels using the dock and top menu, and switch tabs using the tab bar, keyboard shortcuts, or swipes on the mobile body or Plain auxiliary key bar.
 
 The top **Menu** icon carries the unread notification count. Its Notifications section previews up to four compact items; **View all** opens the complete list. The same icon control is used on desktop and mobile.
 

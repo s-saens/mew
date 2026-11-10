@@ -2,9 +2,12 @@
 title: "Windows in-house virtual display and headless GPU capture"
 created: 2026-10-01
 updated: 2026-10-01
-description: "Describes the driver, WGC capture, installation, signing, and lifecycle contracts for the in-house Windows UMDF/IddCx virtual display, along with the remaining requirements for official distribution and headless testing on actual hardware."
+description: "Historical remote desktop contract retained for prior links; the feature was removed from Mew under ADR 0161."
 상위파일: "MOC.md"
 ---
+
+> Historical record: Mew removed remote desktop. See [ADR 0161](../decisions/0161-remove-remote-desktop.md). The instructions below describe the former implementation.
+
 
 [Remote desktop contract](remote-desktop.md) · [Usage](../../../docs/guides/remote-desktop.md) · [ADR 0187](../history/decisions/0187-mew-independent-virtual-display.md)
 

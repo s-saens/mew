@@ -10,7 +10,6 @@ import { openMewSocket } from '../utils/remote-transport'
 import { browserDesktopPeer } from '../utils/browser-desktop-peer'
 import { bindBrowserDesktopInput } from '../utils/browser-desktop-input'
 import { DockGrip } from './DockWorkspace'
-import { DesktopIcon } from './desktop-stick'
 import { PanelCloseButton } from './panel-close-button'
 
 type Connection = 'connecting' | 'ready' | 'error' | 'closed'
@@ -72,7 +71,7 @@ export function BrowserDesktopPanel({ url, navigationRequest = 0, nativeAllowed 
       if (disposed || ended) return
       if (element.videoWidth > 0 && element.videoHeight > 0) {
         dimensions.current = { width: element.videoWidth, height: element.videoHeight }
-        shown.current = true; clearTimeout(startupTimer); setConnection('ready'); peer.ready()
+        shown.current = true; clearTimeout(startupTimer); setConnection('ready')
         if (!notified) { notified = true; readyCallback.current?.() }
       }
     }
@@ -174,7 +173,7 @@ export function BrowserDesktopPanel({ url, navigationRequest = 0, nativeAllowed 
         {!embedded && <DockGrip group="browser" />}
         <span className="min-w-0 flex-1 truncate text-xs">{!embedded && uiText('브라우저')}</span>
         {active && <>
-          <button type="button" className={iconButton} aria-label={uiText('키보드 입력')} data-tip={uiText('키보드 입력')} disabled={connection !== 'ready'} onClick={() => keyboard.current?.focus({ preventScroll: true })}><DesktopIcon kind="keyboard" /></button>
+          <button type="button" className={iconButton} aria-label={uiText('키보드 입력')} data-tip={uiText('키보드 입력')} disabled={connection !== 'ready'} onClick={() => keyboard.current?.focus({ preventScroll: true })}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2" /><path d="M6 9h.01M10 9h.01M14 9h.01M18 9h.01M6 12h.01M10 12h.01M14 12h.01M18 12h.01M7 15h10" /></svg></button>
           <button type="button" className={iconButton} aria-label={uiText('다시 연결')} data-tip={uiText('다시 연결')} disabled={reopening} onClick={() => void reconnect()}><Refresh width={15} height={15} aria-hidden="true" /></button>
         </>}
         {!embedded && onClose && <PanelCloseButton aria-label={uiText('브라우저 닫기')} onClick={onClose} />}

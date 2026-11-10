@@ -1,9 +1,9 @@
 import { createRequire } from 'node:module'
-// @ts-expect-error The installed desktop helper is an independently shipped JavaScript module.
-import { nativeDirect } from '../native/remote-desktop/native-direct.mjs'
-import { videoLevel } from '../native/remote-desktop/video-settings.mjs'
+// @ts-expect-error The browser RTC transport is a JavaScript module.
+import { nativeDirect } from './rtc/native-direct.mjs'
+import { videoLevel } from './rtc/video-settings.mjs'
 
-const requireNative = createRequire(new URL('../native/remote-desktop/package.json', import.meta.url))
+const requireNative = createRequire(new URL('../package.json', import.meta.url))
 const MAX_FRAME_BYTES = 4 * 1024 * 1024
 
 /** FFmpeg stdout chunks do not correspond to pictures. AUD NALs delimit pictures. */
@@ -115,7 +115,7 @@ interface DirectTransport {
   close(): Promise<void>
 }
 
-/** Reuses the desktop's bounded RTP pacer and reliable/unreliable input channels. */
+/** Uses bounded RTP pacing and reliable/unreliable input channels. */
 export class BrowserDesktopVideo {
   private readonly options: VideoOptions
   private direct?: DirectTransport
@@ -133,7 +133,7 @@ export class BrowserDesktopVideo {
     const rtc = requireNative('node-datachannel')
     const direct = nativeDirect(rtc, {
       settings: { resolution: '1080p', fps: 60, quality: 'balanced', priority: 'speed' },
-      iceServers: this.options.iceServers ?? [], autoNat: this.options.autoNat ?? false, localCursor: false,
+      iceServers: this.options.iceServers ?? [], autoNat: this.options.autoNat ?? false,
       emit: this.options.emit,
       input: this.options.input ?? (() => {}),
       keyframe: () => { if (!this.closed) this.options.keyframe() },

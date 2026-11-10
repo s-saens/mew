@@ -1,6 +1,6 @@
 ---
 title: "CLI Releases and npm Publishing"
-description: "Release procedure for @liiiiv/mew-cli and Linux, macOS, and Windows x64/arm64 runtimes. Covers the signed Windows installation wizard, verified desktop packages, native helpers, browser manifests, checksums, licensing, CI and npm/OIDC gates; initial desktop validation packages are published, while hands-on platform acceptance and other initial releases remain incomplete."
+description: "Release procedure for @liiiiv/mew-cli and Linux, macOS, and Windows x64/arm64 runtimes. Covers the signed Windows installation wizard, native helpers, browser manifests, checksums, licensing, CI and npm/OIDC gates; hands-on platform acceptance and initial releases remain incomplete."
 updated: "2026-11-07"
 상위파일:
   - "../../../docs/deployment/native.md"
@@ -21,21 +21,7 @@ Internal Windows workspace links are recorded in `runtime-links.json` instead of
 
 The runtime manifest declares `browserDependencies: "server/browser-dependencies.js"`, and packaging includes that required installer with the pinned Playwright tooling. CLI launch prepares missing browsers before host startup; the [browser dependency contract](../development/browser-dependencies.md) owns platform and privilege requirements. Browser binaries are downloaded on the host and excluded from the archive.
 
-Remote desktop installation scripts and required protocol sources are included. Windows runtimes additionally bundle an explicitly built and verified desktop ZIP with its checksum; arbitrary local capture DLLs are never collected as release inputs. Linux/macOS retain the optional feature's existing source-build setup; WSL can fetch its exact Windows helper package independently. OS permission setup remains separate. Do not include `.env`, `.data`, hidden state, test fixtures, or miscellaneous local native build outputs in releases. Private Mewlink central service sources are also excluded.
-
-## Windows Remote Desktop Packages
-
-The [Windows setup contract](../development/remote-desktop-windows-setup.md) owns package identity, contents, verification, replacement, and host permissions. [ADR 0140](../decisions/0140-windows-desktop-prebuilt-packages.md) moves Windows compilation out of end-user preparation. Development tools are required only on package build workers; package installation never installs them on the user's PC.
-
-Run `node native/remote-desktop/build-windows-package.mjs --output <directory>` on prepared native Windows x64 and ARM64 workers. Each worker supplies Node, Git, Rust stable MSVC, CMake, LLVM/libclang, Perl, Visual Studio C++ tools, and Windows SDK. The builder stages locked production dependencies, GPU/Rust libraries, patched vendored sources, and notices; verifies native bindings and ABIs; and emits `mew-desktop-win32-<arch>.zip` with `.sha256`. It does not install build prerequisites. Never package developer toolchains or unrelated local DLLs.
-
-The dedicated `.github/workflows/desktop-release.yml` builds both architectures and publishes their ZIPs plus `SHA256SUMS` through the protected `desktop-release` environment. Use the full 64-character shared helper-source hash as `mew-desktop-<sourceHash>`; publish to the official `s-saens/mew` repository. Existing release assets are immutable. Configure required reviewers and protections before publication, and preserve corresponding sources and third-party notices inside every archive.
-
-Publish matching helper packages before releasing source revisions that need Windows setup. A CLI Windows runtime bundles the matching archive/checksum under `native/remote-desktop/prebuilt/`; its packager validates this explicit input before staging it. The ordinary helper installer uses the bundled copy first, then the exact official content-hash release when no bundle exists. A bundled package requiring no additional helper download still depends on private Node being available. Linux/WSL runtime archives do not need to carry every Windows architecture: WSL selects its Windows package independently.
-
-Before publishing, verify both architectures on a clean Windows host without Rust or other development tools: private Node preparation, package integrity and source rejection, native loading/ABI checks, first installation, repeat installation, and video/input connection. Exercise missing-release errors, corrupt archives, locked DLL replacement failure and rollback, and readiness-marker behavior. Check the archive's complete file list, patched corresponding sources, licenses, and notices. These are release gates; local fixture tests alone do not satisfy them. The optional signed virtual display driver remains a separate distribution and approval path.
-
-The initial Windows helper validation prerelease is published; the [setup contract](../development/remote-desktop-windows-setup.md#permissions-and-remaining-gates) identifies its source and download. Both native architecture builds and isolated Windows x64 installer/native-load checks passed. The operator requested this initial preview while complete clean-host and real video/input acceptance remain outstanding; it is a prerelease and does not certify those gates. The [work record](../work/remote-desktop-windows-setup.md#november-7-initial-validation-prerelease) records the actual publication and verification. A missing exact-source release must remain a visible setup failure; it must never trigger host tool installation or compilation.
+Do not include `.env`, `.data`, hidden state, test fixtures, or miscellaneous local native build outputs in releases. Private Mewlink central service sources are also excluded.
 
 ## Windows Installation Wizard
 
@@ -56,7 +42,7 @@ Before publication, run this acceptance matrix on clean Windows x64 machines wit
 - Fresh administrator creation, browser closed before creation, expired setup link, repeated shortcut while Mew is already running, and reopen errors. URLs and setup tokens must not appear in installer logs or files.
 - Valid and corrupt cached downloads, offline interruption, incomplete import, failed ownership validation, and missing essential executable files followed by same-version repair.
 - Upgrade/reinstall with existing accounts and projects, controller exit/abnormal termination, Windows localhost forwarding, and concurrent shortcut/setup attempts. Verify application editing, terminal and login-browser behavior, rather than only file markers.
-- Valid Authenticode publisher/timestamp, matching post-sign checksum, Windows security prompts, and uninstall retaining the environment and data. Remote desktop and optional driver acceptance remain under their separate package gates.
+- Valid Authenticode publisher/timestamp, matching post-sign checksum, Windows security prompts, and uninstall retaining the environment and data.
 
 Initial signed installer build, publication, UAC/reboot acceptance, and clean-host application checks have not been performed. Do not advertise a working download until these gates pass. The [guided-installation work record](../work/guided-installation-and-first-owner.md) records the isolated checks actually run.
 
@@ -64,7 +50,7 @@ Initial signed installer build, publication, UAC/reboot acceptance, and clean-ho
 
 New distributions of Mew itself follow the [Mew Source Available License 1.0](../../../LICENSE). Personal use, internal company use, and selling outputs are permitted, but selling Mew or modified versions and providing paid hosting or SaaS are prohibited without separate written permission. Detailed scope and existing MIT grants follow [Decision 0053](../decisions/0053-source-available-license.md); rights for external contributions follow the [Contribution Acceptance Criteria](../../../docs/development/contributing.md).
 
-Before publishing, verify that the full texts of the root `LICENSE`, `apps/cli/LICENSE`, and `native/remote-desktop/LICENSE` are identical. These three packages' package.json files and their own package entries in each lockfile use `SEE LICENSE IN LICENSE`. The CLI npm package must include `LICENSE` and `README.md`; verify this with `npm pack --dry-run --ignore-scripts`. Executable packaging copies the root LICENSE. Individual license, notice, and corresponding source obligations for third-party components remain in effect and are not replaced by this restrictive license.
+Before publishing, verify that the full texts of the root `LICENSE` and `apps/cli/LICENSE` are identical. These packages' package.json files and their own package entries in each lockfile use `SEE LICENSE IN LICENSE`. The CLI npm package must include `LICENSE` and `README.md`; verify this with `npm pack --dry-run --ignore-scripts`. Executable packaging copies the root LICENSE. Individual license, notice, and corresponding source obligations for third-party components remain in effect and are not replaced by this restrictive license.
 
 ## Automated Releases
 
@@ -98,9 +84,8 @@ For the next version, update the CLI package version and the root version in its
 
 - Pass actual native module imports, `tmux -V` or `psmux -V`, and runtime relative import and link checks in all six environments. Job Object, CMD shim, psmux attach, output save/cancel, and compiled host fixtures must also pass on both Windows architectures.
 - Verify the required browser-installer manifest entry and file, preparation before host startup, cancellation, missing/invalid overrides, and a clean-host preparation on each supported platform. Browser download time must not consume the host readiness timeout.
-- Verify the explicit Windows desktop archive/checksum, source identity, manifest, complete file hashes, native binding/ABI probes, and clean-host setup without development tools on x64 and ARM64. Publish the matching desktop release before relying on unbundled WSL/source installation.
 - Verify that distribution files contain no personal data, secrets, or private central service sources and include native component redistribution notices and corresponding sources.
 - In an empty working directory on each supported OS, perform hands-on checks of browser first-owner creation, one-time setup closure, explicit temporary-password automation, editing, terminal use, relaunching, and preservation of account/device registrations. Fixture verification for the current implementation work does not replace these hands-on checks.
-- Check initial Mewlink registration, the online QR code, and local login, editing, and terminal use from an external browser. Other NATs, mobile networks, and remote desktop follow the [existing remote verification scope](../development/remote-access.md#verification-and-remaining-gates).
+- Check initial Mewlink registration, the online QR code, and local login, editing, and terminal use from an external browser. Other NATs and mobile networks follow the [existing remote verification scope](../development/remote-access.md#verification-and-remaining-gates).
 
 The current code and isolated verification are ready; actual CI builds, GitHub Release publication, initial npm package publication, and the hands-on checks above have not been performed.

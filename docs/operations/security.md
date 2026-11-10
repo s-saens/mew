@@ -12,7 +12,7 @@ Before providing an instance to others, review this document to determine which 
 
 ## Before sharing accounts
 
-Mew supports not only file editing but also running commands on the server through terminals and agents. Allowing server control features such as agents, terminals, remote desktop, and the server file explorer grants access within the server OS user's permissions. These features default to manager and owner, but the owner can also allow individual features for members. **Allow server control features only for people you trust enough to give an SSH account.**
+Mew supports not only file editing but also running commands on the server through terminals and agents. Allowing server control features such as agents, terminals, and the server file explorer grants access within the server OS user's permissions. These features default to manager and owner, but the owner can also allow individual features for members. **Allow server control features only for people you trust enough to give an SSH account.**
 
 Per-file permissions apply only to the Mew file API. They do not restrict file access through shells or agents. Do not also allow server control features for accounts from which specific files must be hidden. Run public installations as a dedicated, non-administrator OS user with access only to the required projects.
 
@@ -25,7 +25,7 @@ Roles are guest &lt; member &lt; manager &lt; owner and define **feature default
 | View files and edit contents | Allowed paths only | Allowed | Allowed | Allowed |
 | File creation, deletion, renaming, uploads, and history | Blocked | Allowed | Allowed | Allowed |
 | DB, collaborative editing, comments, and chat | Blocked | Allowed | Allowed | Allowed |
-| Agents, terminals, localhost app access, and remote desktop | Blocked | Blocked | Allowed | Allowed |
+| Agents, terminals, and localhost app access | Blocked | Blocked | Allowed | Allowed |
 | Server file explorer, Git workbench, system, and scheduled tasks | Blocked | Blocked | Allowed | Allowed |
 | Registered projects, My Projects, managed creation, existing-folder linking, and shared icons | Blocked | Allowed | Allowed | Allowed |
 | Arbitrary server folder/Git operations and subproject/worktree switching | Blocked | Blocked | Allowed | Allowed |
@@ -84,12 +84,6 @@ An owner can reset another local password account from its account management po
 Agent file tools and commands run with the permissions of the OS user running the server. They can access files outside the workspace, and there is no separate OS-level isolation. Switching the project being viewed does not isolate execution permissions.
 
 **The default permission mode is “Allow All,” which runs without approval and applies to agent windows and scheduled tasks.** If prompt injection from an untrusted document or webpage succeeds, commands may run without intermediate confirmation. Change the mode for each session in the window or adjust the server default. Runtime installation also runs with the server OS user's permissions. Mode and installation settings follow [agent runtimes](../configuration/agent-runtimes.md), and session and execution contracts follow [agent sessions](../../.mew/docs/development/agent-sessions.md).
-
-## Remote desktop
-
-Remote desktop provides the server's actual logged-in desktop, not a virtual screen for each account, and includes the Windows screen under WSL. A Windows virtual display is also an extended screen of the same logged-in desktop. Each server is limited to one control connection. Multiple servers under the same OS user do not share a control lock, so run only one server for remote control.
-
-OS approval, active users, locking, and input revocation follow the [remote desktop contract](../../.mew/docs/development/remote-desktop.md) and [POSIX contract](../../.mew/docs/development/remote-desktop-posix.md). External direct access allows only temporary connections for active sessions, preserves existing firewall blocks and mappings for other apps, and does not bypass a VPN through an arbitrary physical LAN. Firewall approval and cleanup follow the [connectivity contract](../../.mew/docs/development/remote-desktop-connectivity.md); driver permissions, official signing, and the scope of installation checks on actual hardware follow the [virtual display contract](../../.mew/docs/development/remote-desktop-virtual-display.md).
 
 ## Virtual login screens and localhost apps
 

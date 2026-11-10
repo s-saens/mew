@@ -4,7 +4,7 @@ import { spawnSync } from 'node:child_process'
 import { createRequire } from 'node:module'
 import { domBrowserExecutable, externalBrowserExecutable } from './browser-dom-executable.ts'
 
-const native = createRequire(new URL('../native/remote-desktop/package.json', import.meta.url))
+const native = createRequire(new URL('../package.json', import.meta.url))
 let available = process.platform === 'linux' && !!domBrowserExecutable() && !!externalBrowserExecutable()
 try { native.resolve('node-datachannel') } catch { available = false }
 available &&= ['Xvfb', 'ffmpeg', 'python3'].every(command => spawnSync(command, [command === 'Xvfb' ? '-help' : command === 'ffmpeg' ? '-version' : '--version'], { stdio: 'ignore' }).status === 0)
@@ -32,7 +32,7 @@ const root=await fs.mkdtemp(path.join(os.tmpdir(),'mew-shared-browser-login-'));
 const {attachBrowserDesktopWebSocket,closeBrowserDesktops}=await import(${JSON.stringify(new URL('./browser-desktop.ts', import.meta.url).href)});
 const {createLoginDesktopAuthSession,closeLoginDesktopJob,closeLoginDesktops}=await import(${JSON.stringify(new URL('./login-desktop.ts', import.meta.url).href)});
 const {domBrowserExecutable}=await import(${JSON.stringify(new URL('./browser-dom-executable.ts', import.meta.url).href)});
-const requireNative=createRequire(${JSON.stringify(new URL('../native/remote-desktop/package.json', import.meta.url).href)}),rtc=requireNative('node-datachannel');
+const requireNative=createRequire(${JSON.stringify(new URL('../package.json', import.meta.url).href)}),rtc=requireNative('node-datachannel');
 const account='shared-browser@test',events=[],keys=[],errors=[];let browser,binaryMessages=0;
 const fixture=createServer((req,res)=>{const url=new URL(req.url,'http://localhost');if(url.pathname==='/event'){events.push(Object.fromEntries(url.searchParams));res.end('ok');return}if(url.pathname==='/key-event'){keys.push(Object.fromEntries(url.searchParams));res.end('ok');return}res.setHeader('Content-Type','text/html');res.end(${JSON.stringify(fixtureHtml)})});
 const app=createServer((_req,res)=>{res.setHeader('Content-Type','text/html');res.end(${JSON.stringify(viewerHtml)})});attachBrowserDesktopWebSocket(app,()=>({email:account,role:'owner',mustChangePassword:false}));

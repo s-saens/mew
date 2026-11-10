@@ -48,7 +48,7 @@ test('workspace chrome remains usable while editor and unopened tools download o
     return `/${chunk.fileName}`
   }
   const editorScript = scriptFor('EditorPane'), settingsScript = scriptFor('SettingsModal'), agentScript = scriptFor('AgentPanel')
-  const closedTools = ['AdminSettingsModal', 'remote-desktop', 'FileHistoryModal', 'project-add-inline', 'project-catalog-panel'].map(name => ({ name, script: scriptFor(name) }))
+  const closedTools = ['AdminSettingsModal', 'FileHistoryModal', 'project-add-inline', 'project-catalog-panel'].map(name => ({ name, script: scriptFor(name) }))
   assert.notEqual(editorScript, `/${entry.fileName}`)
   assert.notEqual(editorScript, settingsScript)
   const styleSources = ['src/App.tsx', 'src/workspace/workspace-application.tsx', 'src/components/project-board.tsx', 'src/components/ProjectSwitcher.tsx', 'src/components/project-add-inline.tsx', 'src/components/project-catalog-panel.tsx', 'src/components/HeaderMenu.tsx', 'src/components/header-menu-popup.tsx', 'src/components/FileTree.tsx', 'src/components/SearchPanel.tsx', 'src/components/DockWorkspace.tsx', 'src/components/mobile-dock.tsx', 'src/components/SettingsModal.tsx', 'src/components/EditorPane.tsx', 'src/components/startup-screen.tsx', 'src/components/deferred-dialog.tsx', 'src/components/panel-close-button.tsx', 'packages/ui/src/HoverTipLayer.tsx', 'packages/ui/src/select-field.tsx']

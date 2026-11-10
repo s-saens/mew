@@ -1,20 +1,20 @@
 ---
 id: "mew-remote"
 parent: null
-title: "Browser and remote desktop"
+title: "Browser and login screens"
 status: "implemented"
 created: "2026-09-18"
 updated: "2026-11-05"
 status_hash: "fa171a4c0dd4125f3b1ab4b9b1719541e1dfad7e8c2588d363eaf72c977f2e9f"
 files: []
 commits: []
-description: "Parent feature document grouping independent login video, host browsing, and remote desktop input. Provides child feature scopes and detailed contract links, and distinguishes ownership of individual implementations and verification."
+description: "Parent feature document grouping independent login video and host browsing. Provides child feature scopes and detailed contract links, and distinguishes ownership of individual implementations and verification."
 상위파일: "../_features.md"
 ---
 
 ## Requirements
 
-- Access OAuth login, host browsing, and the logged-in server desktop.
+- Access OAuth login and host browsing.
 
 - Select the work scope and related implementation in the child features.
 - Check each detailed contract even when changing multiple child features.
@@ -22,11 +22,10 @@ description: "Parent feature document grouping independent login video, host bro
 ### Child features
 
 - [Host browser and login screens](server-browser-login-and-popups.md)
-- [Remote Desktop·Touch Input](remote-desktop-and-touch-input.md)
 
 ### Detailed contracts
 
-- [Login screens and browser](../../../../docs/guides/browser.md) · [Remote desktop](../../../../docs/guides/remote-desktop.md)
+- [Login screens and browser](../../../../docs/guides/browser.md)
 
 <!-- mew:implementation:start -->
 ## Implementation details

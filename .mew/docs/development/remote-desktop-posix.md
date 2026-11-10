@@ -2,9 +2,12 @@
 title: "Mac/Linux Resident Native GPU Host"
 created: 2026-10-01
 updated: 2026-10-24
-description: "Defines Mac/Linux resident Node control, the Rust video thread, the existing hardware H.264 GPU ABI, resolution and high refresh rate negotiation, and direct input. Distinguishes common transport policies and OS-specific permissions, installation, and session lifetimes, as well as Rust synthetic verification and the scope of actual GPU behavior that remains unverified."
+description: "Historical remote desktop contract retained for prior links; the feature was removed from Mew under ADR 0161."
 상위파일: "MOC.md"
 ---
+
+> Historical record: Mew removed remote desktop. See [ADR 0161](../decisions/0161-remove-remote-desktop.md). The instructions below describe the former implementation.
+
 
 [Common transport and input contract](remote-desktop.md) · [ADR 0188](../history/decisions/0188-mew-posix-native-desktop.md)
 

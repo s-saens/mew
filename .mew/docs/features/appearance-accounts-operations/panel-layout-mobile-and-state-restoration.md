@@ -84,7 +84,6 @@ The desktop behavior below is **single-project mode**. The optional **multi-proj
 
 - Track switching history separately from the foreground order of open panels. Reselecting the same panel is not recorded, and restoration through Back does not add history. History is kept only in app memory and resets when the account or root project changes.
 
-- Display Remote Desktop in the desktop and mobile hamburger menus and exclude it from the Dock. Do not display the removed browser or Remote Desktop in the dock even if they remain in the saved order.
 
 - During drag reordering, surrounding items move to their new positions using the shared 180ms movement animation. The grabbed item follows the pointer immediately; consecutive reordering and reduced motion settings follow the [shared motion contract](../../development/ui-workspace-layout.md#drag-reordering-motion).
 
@@ -145,7 +144,6 @@ The desktop behavior below is **single-project mode**. The optional **multi-proj
 - On mobile, swiping the content of the file explorer, editor, agent, terminal, Git, or tasks moves to the current panel's previous or next tab, wrapping at either end. Panels with one or no tabs remain unchanged. Tab strips, popups, and separate drag areas retain their existing controls.
 - Touches starting in areas with actual horizontal scrolling, such as tables or code, prioritize internal scrolling and do not switch tabs even at either scroll boundary. Containers without overflow and vertical-only scroll areas retain content swipe tab switching. Detection boundaries and the Plain modifier key bar exception follow the [mobile dock contract](../../development/ui-workspace-layout.md#mobile-dock-and-panel-switching).
 - Editor content swipes are allowed in Markdown Hotview. Regular files and Markdown Plain retain horizontal content scrolling and switch tabs only from the modifier key bar. Plain's modifier key bar is available on mobile regardless of keyboard visibility. Arrow presses, holds, and drags control the cursor instead of switching tabs. Entering an arrow cancels an in-progress content/key-bar tab swipe; ordinary keys retain swipe navigation. See [Mobile auxiliary key bar](../../development/ui-editor-input.md#mobile-auxiliary-key-bar).
-- The dock also appears in the remote desktop viewer and is hidden in fullscreen mode.
 - Selecting another panel from the dock ends the remote connection and switches panels. Closing the viewer returns to the previous workspace screen.
 - The 2026-10-27 [decision to separate dock and content swipes](../../decisions/0079-mobile-panel-swipes.md) replaced the dock's tab-first behavior from 2026-10-03. Gesture thresholds, cancellation, and input preservation follow the [mobile dock contract](../../development/ui-workspace-layout.md#mobile-dock-and-panel-switching).
 - Mouse hover shows a tooltip with the icon name. A touch tap shows a name toast beside the selected dock edge, which disappears after 0.5 seconds.

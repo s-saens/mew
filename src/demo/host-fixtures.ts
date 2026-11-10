@@ -11,7 +11,6 @@ export function demoSystemStats(now = Date.now()): SystemStats {
     processes: [
       { pid: 1200, name: 'mew', cmd: 'node server/index.ts (demo)', cpu: 12 + wave, memMb: 384, gpuMemMb: 0 },
       { pid: 1201, name: 'agent', cmd: 'demo-agent · simulated', cpu: 8, memMb: 256, gpuMemMb: 0 },
-      { pid: 1202, name: 'desktop', cmd: 'demo desktop renderer', cpu: 4, memMb: 96, gpuMemMb: 1280 },
     ],
   }
 }
@@ -21,7 +20,6 @@ export const demoUpdates: UpdatesStatus = {
   checkedAt: 0, job: { running: false, items: [] },
   items: [
     { id: 'demo-agent', label: 'Demo agent', category: 'agent', current: '1.0-demo', latest: '1.1-demo', available: true, canUpdate: true, error: null },
-    { id: 'demo-desktop', label: 'Remote desktop · Demo', category: 'system', current: '1.0-demo', latest: '1.1-demo', available: true, canUpdate: true, error: null },
     { id: 'demo-dependencies', label: 'Mew dependencies · Demo', category: 'dependency', current: 'snapshot.1', latest: 'snapshot.2', available: true, canUpdate: true, error: null },
   ],
 }

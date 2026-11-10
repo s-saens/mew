@@ -59,23 +59,17 @@ test('browser ownership, feature permission, password state and Origin are all r
   assert.equal(browserDesktopAllowed(req, { ...owner, role: 'guest' }), false)
   assert.equal(browserDesktopAllowed({ headers: { host: 'mew.test', origin: 'http://evil.test' } } as IncomingMessage, owner), false)
   assert.equal(browserDesktopAllowed({ headers: { host: 'mew.test' } } as IncomingMessage, owner), false)
-  setFeature(owner.email, 'desktop', false)
   try {
-    assert.equal(browserDesktopAllowed(req, owner), true, 'native browser access does not require localhost or remote desktop grants')
     setFeature(owner.email, 'nativeBrowser', false)
     assert.equal(browserDesktopAllowed(req, owner), false)
-  } finally { for (const feature of ['nativeBrowser', 'desktop'] as const) setFeature(owner.email, feature, null) }
+  } finally { setFeature(owner.email, 'nativeBrowser', null) }
   const member = { ...owner, email: 'scoped-browser@test', role: 'member' } as const
   try {
-    setFeature(member.email, 'desktop', true)
-    assert.equal(browserDesktopAllowed(req, member), false, 'a remote desktop grant does not authorize the separately configured browser')
     setFeature(member.email, 'nativeBrowser', true)
     assert.equal(browserDesktopAllowed(req, member), true)
-    setFeature(member.email, 'desktop', false)
-    assert.equal(browserDesktopAllowed(req, member), true, 'the standalone browser grant remains sufficient')
     setFeature(member.email, 'nativeBrowser', false)
     assert.equal(browserDesktopAllowed(req, member), false, 'revoking browser authority closes browser access')
-  } finally { for (const feature of ['nativeBrowser', 'desktop'] as const) setFeature(member.email, feature, null) }
+  } finally { setFeature(member.email, 'nativeBrowser', null) }
 })
 
 test('closing an unauthorized OPEN viewer is idempotent and cannot recurse through state delivery', async () => {
@@ -174,7 +168,7 @@ test('WebSocket rejects bad authority, commands before open, invalid framing and
   }
 })
 
-const native = createRequire(new URL('../native/remote-desktop/package.json', import.meta.url))
+const native = createRequire(new URL('../package.json', import.meta.url))
 let dependencies = process.platform === 'linux' && !!externalBrowserExecutable() && !!domBrowserExecutable()
 try { native.resolve('node-datachannel') } catch { dependencies = false }
 dependencies &&= ['Xvfb', 'ffmpeg', 'python3'].every(command => spawnSync(command, [command === 'ffmpeg' ? '-version' : command === 'Xvfb' ? '-help' : '--version'], { stdio: 'ignore' }).status === 0)
@@ -198,7 +192,7 @@ process.env.MEW_DESKTOP_ICE_SERVERS='[]';process.env.MEW_DESKTOP_AUTO_NAT='0';
 const {attachBrowserDesktopWebSocket,closeBrowserDesktops}=await import(${JSON.stringify(new URL('./browser-desktop.ts', import.meta.url).href)});
 const {domBrowserExecutable}=await import(${JSON.stringify(new URL('./browser-dom-executable.ts', import.meta.url).href)});
 const {setFeature}=await import(${JSON.stringify(new URL('./access-policy.ts', import.meta.url).href)});
-const requireNative=createRequire(${JSON.stringify(new URL('../native/remote-desktop/package.json', import.meta.url).href)});
+const requireNative=createRequire(${JSON.stringify(new URL('../package.json', import.meta.url).href)});
 const rtc=requireNative('node-datachannel');
 const account='native-browser@test',events=[],errors=[];
 let allowed=true,browser,binaryMessages=0;

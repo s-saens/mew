@@ -18,7 +18,7 @@ description: "Feature contract covering the update screen opened with Ctrl/Cmd+U
 
 - On each connection, check for updates to installed Mew-related dependencies and agent runtimes, and notify the user through Mewcat.
 - Provide current and latest versions, per-item execution and session viewing, and batch updates under **Updates** in the hamburger menu.
-- Users with `system` permission can also open the same screen with **Ctrl/Cmd+U**. The shortcut works even when an editor, input field, or terminal has focus, and does not reopen the screen on key repeat or during IME composition. Screens with dedicated keyboard input enabled, such as remote desktops, give that input priority.
+- Users with `system` permission can also open the same screen with **Ctrl/Cmd+U**. The shortcut works even when an editor, input field, or terminal has focus, and does not reopen the screen on key repeat or during IME composition. Screens with dedicated keyboard input enabled give that input priority.
 
 ### Scope
 

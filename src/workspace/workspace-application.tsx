@@ -23,7 +23,6 @@ import { WORKSPACE_SCOPE_VERSION } from '../../shared/workspace-scope'
 
 
 const BoardBrowser = deferredComponent(async () => ({ default: (await import('../components/BrowserDesktopPanel')).BrowserDesktopPanel }))
-const BoardDesktop = deferredComponent(async () => ({ default: (await import('../components/remote-desktop')).RemoteDesktop }), null)
 
 export type WorkspaceMode = 'single' | 'multi'
 export type ProjectWorkspaceHandle = {
@@ -41,7 +40,6 @@ export type ProjectWorkspaceHost = {
   headerHost: HTMLElement | null
   selectionSignal: number
   globalOwner: boolean
-  onOpenRemoteDesktop: () => void
   onModeChange: (mode: WorkspaceMode) => void
   onProjectChange: (path: string) => Promise<boolean>
   onAction: (action: MewcatAction) => Promise<void>
@@ -208,7 +206,7 @@ export function WorkspaceApplication({ account, guest, renderWorkspace }: Props)
   }, [account, board, boardInitialized, initial?.hasProject])
   useEffect(() => {
     if (!services.capabilities) return
-    setBoard(previous => previous.panels.reduce((state, panel) => panel.tool && (panel.tool === 'desktop' ? !services.capabilities?.desktop : !services.capabilities?.nativeBrowser) ? projectBoardReducer(state, { type: 'remove', panelId: panel.id }) : state, previous))
+    setBoard(previous => previous.panels.reduce((state, panel) => panel.tool && !services.capabilities?.nativeBrowser ? projectBoardReducer(state, { type: 'remove', panelId: panel.id }) : state, previous))
   }, [services.capabilities, boardInitialized])
   useEffect(() => {
     if (multi || !legacyScope) return
@@ -367,7 +365,7 @@ export function WorkspaceApplication({ account, guest, renderWorkspace }: Props)
   const singlePanel = [...board.panels, ...retained].find(panel => panel.id === singleId && legacyScope && sameScope(panel, legacyScope))
   const activeId = multi ? board.activePanelId : singlePanel?.id ?? null
   const ownerId = board.panels.find(panel => !panel.tool)?.id ?? retained[0]?.id
-  const openTool = (tool: 'browser' | 'desktop') => {
+  const openTool = (tool: 'browser') => {
     if (draftRef.current) cancelDraft()
     const id = `remote-tool:${tool}`
     setBoard(value => projectBoardReducer(value, { type: 'add', panel: { id, projectPath: id, workingRoot: id, tool }, availableWidth: headerHost?.clientWidth }))
@@ -383,7 +381,6 @@ export function WorkspaceApplication({ account, guest, renderWorkspace }: Props)
   const renderPanel = (panel: ProjectBoardPanel) => {
     if (panel.tool && !multi) return null
     if (panel.tool === 'browser') return services.capabilities?.nativeBrowser ? <div data-dom-browser className="h-full min-h-0"><BoardBrowser url={browserRequest.url} navigationRequest={browserRequest.request} nativeAllowed={!!services.capabilities?.nativeBrowser} onClose={() => closeTool(panel.id)} /></div> : null
-    if (panel.tool === 'desktop') return services.capabilities?.desktop ? <BoardDesktop embedded onClose={() => closeTool(panel.id)} /> : null
     if (draft?.panel.id === panel.id) return <ProjectDraftSelector paths={services.projects.paths} icons={services.projects.icons}
       basePath={initial.path} canUseAgent={!!services.capabilities?.agent} canManageFolders={services.role === 'owner' || services.role === 'manager'} onOpen={addProject} onClose={cancelDraft}
       beforeMutation={async () => { await services.projects.saveQueue.current }} restoreFocus={restoreActiveFocus}
@@ -391,7 +388,7 @@ export function WorkspaceApplication({ account, guest, renderWorkspace }: Props)
     const host: ProjectWorkspaceHost = {
       id: panel.id, panel, active: panel.id === activeId, compact: multi, mode, headerHost,
       selectionSignal: selection[panel.id] ?? 0, globalOwner: panel.id === ownerId,
-      onOpenRemoteDesktop: () => openTool('desktop'), onModeChange: changeMode, onProjectChange: path => navigate(panel, path),
+      onModeChange: changeMode, onProjectChange: path => navigate(panel, path),
       onAction: action => routeAction(panel, action),
       onScopeChanged: info => {
         const logical = info.projectPath ?? info.path
@@ -417,7 +414,7 @@ export function WorkspaceApplication({ account, guest, renderWorkspace }: Props)
       <button type="button" className="px-2 py-1 text-xs" onClick={() => changeMode('single')}>{uiText('싱글프로젝트모드')}</button>
     </div>}
     <BrowserContext.Provider value={multi ? openBoardBrowser : fallbackBrowser}><ProjectBoard value={draft?.board ?? board} retainedPanels={retained} singlePanelId={singleId} onChange={updateBoard} presentation={multi ? 'board' : 'single'}
-      renderPanel={renderPanel} isDraft={panel => panel.id === draft?.panel.id} getPanelLabel={panel => panel.tool === 'browser' ? t('menu.remoteBrowser') : panel.tool === 'desktop' ? t('access.desktop') : panel.id === draft?.panel.id ? uiText('프로젝트 선택') : label(panel.projectPath)} onPanelElement={registerElement}
+      renderPanel={renderPanel} isDraft={panel => panel.id === draft?.panel.id} getPanelLabel={panel => panel.tool === 'browser' ? t('menu.remoteBrowser') : panel.id === draft?.panel.id ? uiText('프로젝트 선택') : label(panel.projectPath)} onPanelElement={registerElement}
       renderProjectIcon={panel => panel.tool ? null : <ProjectIcon icon={services.projects.icons[panel.projectPath] ?? 'i:folder'} size={14} />}
       renderHeaderActions={services.capabilities?.terminal ? panel => panel.tool || panel.id === draft?.panel.id ? null : <ProjectHeaderCommands panel={panel} active={multi && panel.id === activeId} /> : undefined}
       onSelectProject={id => setSelection(value => ({ ...value, [id]: (value[id] ?? 0) + 1 }))}

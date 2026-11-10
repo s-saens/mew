@@ -13,7 +13,6 @@ test('development API setup never loads Mewlink or mounts its management API', a
     './websocket-origin.ts': ['webSocketOriginAllowed'],
     './browser-desktop.ts': ['attachBrowserDesktopWebSocket'],
     './dom-browser.ts': ['attachDomBrowserWebSocket'],
-    './remote-desktop.ts': ['attachRemoteDesktopWebSocket'],
     './api.ts': ['createApiApp'],
     './authRoutes.ts': ['createAuthRouter', 'checkOrigin'],
     './reqAuth.ts': ['attachAuthContext', 'resolveAuth', 'authorizeTmux', 'authorizeCollab', 'authorizeFeature', 'authorizeDatabase'],

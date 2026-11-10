@@ -2,9 +2,12 @@
 title: "Remote Desktop Distribution and Licensing"
 created: 2026-09-14
 updated: "2026-11-07"
-description: "Defines remote desktop source preservation, licenses, notices, and redistribution boundaries. Distinguishes Windows npm native libdatachannel/OpenSSL sources and exact vcpkg patches from the Rust vendor tree; covers pinned source collection, prebuilt packages, dependency checks, and the end-user toolchain boundary."
+description: "Historical remote desktop contract retained for prior links; the feature was removed from Mew under ADR 0161."
 상위파일: "MOC.md"
 ---
+
+> Historical record: Mew removed remote desktop. See [ADR 0161](../decisions/0161-remove-remote-desktop.md). The instructions below describe the former implementation.
+
 
 [Transport contract](remote-desktop.md) · [ADR 0185](../history/decisions/0185-mew-desktop-resident-direct-host.md)
 

@@ -35,7 +35,6 @@ The demo is a separate entry point for trying Mew without logging in or running 
 | Terminal | Creating, renaming, deleting, and reconnecting sessions; preserving working directories and history; interpreting file and Git commands locally. Package installation, development, and test commands provide example output |
 | Git | Computes changes, diffs, selective commits, history, and reverts from the same files. Does not modify actual Git repositories |
 | Document DB, comments, and chat | Uses example data in per-visitor memory and the existing UI |
-| Remote desktop | Two 960×600 virtual screens; keyboard, paste, virtual clipboard, and pointer input; screen selection, rotation, and settings UI |
 | System resources | Dummy CPU, memory, GPU, temperature, and process values, with graphs that change over time |
 | Scheduled tasks | Editing, adding, and deleting example schedules and prompts, execution history, and in-memory state changes from the virtual terminal and scheduled prompts |
 | Updates and commands | Dummy versions, completion status, and execution logs; simulates command buttons and agent runtime installation, removal, and logout |

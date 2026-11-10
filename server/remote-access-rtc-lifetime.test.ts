@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
 
 const helper = new URL('./remote-access-rtc.mjs', import.meta.url).href
-const connectivity = new URL('../native/remote-desktop/native-connectivity.mjs', import.meta.url).href
+const connectivity = new URL('./rtc/native-connectivity.mjs', import.meta.url).href
 const offer = [
   'v=0', 'o=- 0 0 IN IP4 127.0.0.1', 's=-', 't=0 0', 'a=group:BUNDLE 0',
   'm=application 9 UDP/DTLS/SCTP webrtc-datachannel', 'c=IN IP4 0.0.0.0',

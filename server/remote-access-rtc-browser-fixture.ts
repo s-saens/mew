@@ -11,8 +11,8 @@ import rtc from 'node-datachannel'
 import { chromium } from 'playwright-core'
 import { domBrowserExecutable } from './browser-dom-executable.ts'
 
-const { nativeConnectivity } = await import(new URL('../native/remote-desktop/native-connectivity.mjs', import.meta.url).href)
-const { publicV4 } = await import(new URL('../native/remote-desktop/nat-port-map.mjs', import.meta.url).href)
+const { nativeConnectivity } = await import(new URL('./rtc/native-connectivity.mjs', import.meta.url).href)
+const { publicV4 } = await import(new URL('./rtc/nat-port-map.mjs', import.meta.url).href)
 const chrome = domBrowserExecutable()
 const addresses = Object.values(networkInterfaces()).flat().filter(value => value?.family === 'IPv4' && !value.internal && /^(?:10\.|172\.(?:1[6-9]|2\d|3[01])\.|192\.168\.)/.test(value.address)).map(value => value!.address)
 

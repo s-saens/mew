@@ -18,7 +18,6 @@
     "project:setup": "node server/project-setup-cli.ts",
     "lint": "oxlint",
     "check:docs": "node server/document-descriptions.ts --check --all --repository && node server/document-links.ts --all",
-    "desktop:install": "node native/remote-desktop/install.mjs",
     "browsers:install": "node server/browser-dependencies.ts --install",
     "browsers:check": "node server/browser-dependencies.ts --check",
     "build:native": "cd native/collab && cargo build --release && cp target/release/libmew_collab.so mew-collab.node",
@@ -79,6 +78,7 @@
     "jose": "6.2.12",
     "json5": "2.2.3",
     "jsonc-parser": "3.3.1",
+    "koffi": "3.2.1",
     "markdown-it": "^14.3.3",
     "multer": "^2.4.0",
     "oxlint": "^1.71.0",
@@ -125,7 +125,7 @@
       "postcss-selector-parser": "7.1.6"
     }
   },
-  "description": "My Easy Workspace: The Simplest IDE. self-hosted, web-base, mobile-friendly, AI agents, rich documentation features, fast collaboration, git, remote desktop, task management, debugging, security...",
+  "description": "My Easy Workspace: The Simplest IDE. self-hosted, web-base, mobile-friendly, AI agents, rich documentation features, fast collaboration, git, task management, debugging, security...",
   "directories": {
     "doc": "docs",
     "example": "examples"

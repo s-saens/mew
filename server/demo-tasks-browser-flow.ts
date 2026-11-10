@@ -3,7 +3,7 @@ import type { Page } from 'playwright-core'
 
 export async function verifyDemoTasks(page: Page, width: number): Promise<void> {
   const task = await page.evaluate(async () => {
-    const snapshot = await (await fetch('/api/task-list')).json() as { tasks: { id: string; text: string; path: string; done: boolean }[] }
+    const snapshot = await (await (globalThis as unknown as { demoRuntime: { transport: { fetch: typeof fetch } } }).demoRuntime.transport.fetch('/api/task-list')).json() as { tasks: { id: string; text: string; path: string; done: boolean }[] }
     return snapshot.tasks.find(item => item.text === 'mewlink')
   })
   assert.ok(task)

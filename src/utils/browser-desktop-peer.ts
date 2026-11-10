@@ -1,5 +1,5 @@
 import type { LoginDesktopInput } from '../../shared/login-desktop.ts'
-import { desktopVideoFeedback } from './desktop-video.ts'
+import { desktopVideoFeedback } from './browser-video-feedback.ts'
 
 export function browserDesktopPeer({ signal, stream, failed }: {
   signal: (message: unknown) => void
@@ -7,7 +7,7 @@ export function browserDesktopPeer({ signal, stream, failed }: {
   failed: () => void
 }) {
   let peer: RTCPeerConnection | undefined, control: RTCDataChannel | undefined, motion: RTCDataChannel | undefined
-  let negotiation = -1, closed = false, frameReady = false, pending: Array<{ negotiation: number; candidate: RTCIceCandidateInit }> = []
+  let negotiation = -1, closed = false, pending: Array<{ negotiation: number; candidate: RTCIceCandidateInit }> = []
   let messages = Promise.resolve(), sampling = false
   const feedback = desktopVideoFeedback()
   const send = (channel: RTCDataChannel | undefined, message: unknown, limit = 64 * 1024, reliableInput = false) => {
@@ -38,7 +38,6 @@ export function browserDesktopPeer({ signal, stream, failed }: {
   }, 1000)
   return {
     input(message: LoginDesktopInput) { send(message.type === 'pointer' ? motion : control, message, 64 * 1024, message.type !== 'pointer') },
-    ready() { frameReady = true; send(control, { type: 'viewer-ready' }) },
     message(value: Record<string, unknown>) {
       messages = messages.then(async () => {
         if (closed) return
@@ -50,7 +49,7 @@ export function browserDesktopPeer({ signal, stream, failed }: {
           return
         }
         if (value.type !== 'offer' || generation < negotiation) return
-        disposePeer(); negotiation = generation; frameReady = false
+        disposePeer(); negotiation = generation
         const current = new RTCPeerConnection({ iceServers: [], bundlePolicy: 'max-bundle' })
         peer = current
         current.onicecandidate = event => { if (!closed && peer === current && event.candidate) signal({ type: 'candidate', negotiation: generation, candidate: event.candidate.toJSON() }) }
@@ -65,9 +64,7 @@ export function browserDesktopPeer({ signal, stream, failed }: {
           if (closed || peer !== current || !['motion', 'control'].includes(channel.label)) { channel.close(); return }
           if (channel.label === 'motion') motion = channel
           else control = channel
-          channel.onopen = () => { if (frameReady && channel.label === 'control') send(channel, { type: 'viewer-ready' }) }
           channel.onerror = channel.onclose = () => { if (!closed && peer === current && current.connectionState !== 'closed') failed() }
-          if (channel.readyState === 'open') channel.onopen(new Event('open'))
         }
         current.onconnectionstatechange = () => { if (!closed && peer === current && ['failed', 'disconnected'].includes(current.connectionState)) failed() }
         await current.setRemoteDescription({ type: 'offer', sdp: String(value.sdp) })

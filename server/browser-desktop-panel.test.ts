@@ -17,7 +17,7 @@ process.env.MEW_DESKTOP_AUTO_NAT = '0'
 const { attachBrowserDesktopWebSocket, closeBrowserDesktops } = await import('./browser-desktop.ts')
 const { domBrowserExecutable, externalBrowserExecutable } = await import('./browser-dom-executable.ts')
 const { connectTestBrowser } = await import('./test-browser.ts')
-const native = createRequire(new URL('../native/remote-desktop/package.json', import.meta.url))
+const native = createRequire(new URL('../package.json', import.meta.url))
 let supported = process.platform === 'linux' && !!domBrowserExecutable() && !!externalBrowserExecutable()
 try { native.resolve('node-datachannel') } catch { supported = false }
 supported &&= ['Xvfb', 'ffmpeg', 'python3'].every(command => spawnSync(command, [command === 'ffmpeg' ? '-version' : command === 'Xvfb' ? '-help' : '--version'], { stdio: 'ignore' }).status === 0)

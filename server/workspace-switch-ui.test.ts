@@ -38,7 +38,6 @@ for (const mode of ['assisted', 'onboarding', 'empty-projects', 'missing-active'
         : local === 'AgentPanel' ? `${dockedToolFixture ? `import {DockPanel} from '${root}/src/components/DockWorkspace.tsx';` : ''}function AgentPanel({preparedTabs,workspacePath,agentOpen,terminalOpen}) { React.useEffect(()=>{window.fixtureAgentMounts=(window.fixtureAgentMounts||0)+1},[]);React.useEffect(()=>{window.fixtureAgentRoot=workspacePath},[workspacePath]);React.useEffect(()=>{const prepared=preparedTabs${dockedToolFixture ? `??(workspacePath?fetch('/api/user-ui/agent-tabs?workspace='+encodeURIComponent(workspacePath)).then(response=>response.json()):undefined)` : ''};prepared?.then(value=>{window.preparedAgentRoot=value.workspace})},[preparedTabs,workspacePath]);return ${dockedToolFixture ? `React.createElement(React.Fragment,null,React.createElement(DockPanel,{id:'agent',kind:'agent',visible:agentOpen,tabs:['fixture-agent']},React.createElement('div',{'data-test-agent-root':workspacePath,tabIndex:0},'Existing agent')),React.createElement(DockPanel,{id:'terminal',kind:'terminal',visible:terminalOpen,tabs:['fixture-terminal']},React.createElement('div',{'data-test-terminal-root':workspacePath},'Existing terminal')))` : 'null'} }`
         : local === 'GitPanel' && mode === 'worktree' ? `import {DockPanel} from '${root}/src/components/DockWorkspace.tsx';function GitPanel({onPrepareBranchChange,onOpenWorktree,visible}) {React.useEffect(()=>{window.openFixtureWorktree=async path=>{window.worktreeError=null;try {const release=await onPrepareBranchChange();try {await onOpenWorktree(path);return true}finally{release()}}catch(error){window.worktreeError=error.message;return false}}},[onPrepareBranchChange,onOpenWorktree]);return React.createElement(DockPanel,{id:'git',kind:'git',visible,tabs:[]},React.createElement('button',{'data-test-worktree-trigger':true,onClick:()=>{window.openFixtureWorktree('/alpha-worktree')}},'Open linked worktree'))}`
         : local === 'CommandButtonMenu' ? `function CommandButtonMenu({title,className}) {return React.createElement('button',{'data-test-command':true,'aria-label':title,className},title)}`
-        : local === 'RemoteDesktop' ? `function RemoteDesktop({onClose,dockHostRef}) { return React.createElement('div',{'role':'dialog','aria-label':'Remote desktop fixture',style:{position:'fixed',inset:0,zIndex:100,background:'var(--color-surface)'}},React.createElement('button',{onClick:onClose},'Close remote desktop'),React.createElement('div',{ref:dockHostRef})); }`
         : local.startsWith('prepare') ? `async function ${local}(){}` : `function ${local}(){return null}`
       return `${stub}\nexport { ${local} as ${exported} }`
     }).join('\n'))
@@ -136,7 +135,7 @@ for (const mode of ['assisted', 'onboarding', 'empty-projects', 'missing-active'
       const json = (value: unknown) => route.fulfill({ json: value })
       if (url.pathname === '/api/auth/me') {
         if (blockAuth) await new Promise<void>(resolve => authWaiters.push(resolve))
-        return json({ authenticated: true, email: 'switch@example.test', role, mustChangePassword: false, capabilities: { filesRead: true, filesWrite: true, serverFiles, agent: true, terminal: true, git: true, browser: true, desktop: true } })
+        return json({ authenticated: true, email: 'switch@example.test', role, mustChangePassword: false, capabilities: { filesRead: true, filesWrite: true, serverFiles, agent: true, terminal: true, git: true, browser: true } })
       }
       if (url.pathname === '/api/user-ui/theme') {
         if (method === 'PUT') accountTheme = route.request().postDataJSON().state
@@ -514,6 +513,7 @@ for (const mode of ['assisted', 'onboarding', 'empty-projects', 'missing-active'
           }
         }
       }
+      await page.addStyleTag({ content: '.mewcat-notifications, .mewcat { display: none !important; }' })
       await page.evaluate("window.fixtureDockPosition('desktop','left');window.fixtureDockPosition('mobile','bottom')")
       await page.setViewportSize({ width: 390, height: 700 })
       await page.waitForFunction("document.querySelector('.mobile-dock').dataset.position === 'bottom'")
@@ -1344,14 +1344,6 @@ for (const mode of ['assisted', 'onboarding', 'empty-projects', 'missing-active'
       assert.equal(await button.getAttribute('aria-pressed'), 'false', 'only selecting the focused panel closes it')
       if (before === 'true') await button.click()
     }
-    const openMenuPanel = async (label: string) => {
-      await page.getByRole('button', { name: '메뉴', exact: true }).click()
-      await page.getByRole('menuitemcheckbox', { name: label, exact: true }).click()
-    }
-    await openMenuPanel('원격 데스크톱')
-    await page.getByRole('dialog', { name: 'Remote desktop fixture' }).waitFor()
-    await page.getByRole('button', { name: 'Close remote desktop', exact: true }).click()
-    await page.getByRole('dialog', { name: 'Remote desktop fixture' }).waitFor({ state: 'detached' })
     assert.equal(await dock.locator('[data-dock-item=features]').count(), 0)
     await page.setViewportSize({ width: 390, height: 700 })
     await dock.waitFor()
@@ -1395,10 +1387,6 @@ for (const mode of ['assisted', 'onboarding', 'empty-projects', 'missing-active'
     await swipe(-65)
     assert.equal(await page.locator('[data-test-editor]').getAttribute('data-test-active'), selectedDocument, 'returning to the editor preserves its tab')
     assert.equal(await dock.locator('[data-dock-item=editor]').getAttribute('aria-current'), 'page')
-    await openMenuPanel('원격 데스크톱')
-    await page.getByRole('dialog', { name: 'Remote desktop fixture' }).waitFor()
-    await page.getByRole('button', { name: 'Close remote desktop', exact: true }).click()
-    await page.getByRole('dialog', { name: 'Remote desktop fixture' }).waitFor({ state: 'detached' })
     await page.getByRole('button', { name: '메뉴', exact: true }).click()
     assert.equal(await page.getByRole('menuitemcheckbox', { name: '브라우저', exact: true }).count(), 0)
     await page.keyboard.press('Escape')
@@ -1453,8 +1441,7 @@ for (const mode of ['assisted', 'onboarding', 'empty-projects', 'missing-active'
       for (const [id, label] of [['browser', '브라우저'], ['desktop', '원격 데스크톱']]) {
         assert.equal(await dock.locator(`[data-dock-item=${id}]`).count(), 0)
         const entry = menu.getByRole('menuitemcheckbox', { name: label, exact: true })
-        if (id === 'browser') assert.equal(await entry.count(), 0)
-        else assert.equal(await entry.isVisible(), true)
+        assert.equal(await entry.count(), 0)
       }
       assert.equal(await dock.locator('[data-dock-item=rag]').count(), 0)
       assert.equal(await menu.getByRole('menuitem', { name: 'RAG', exact: true }).count(), 0)

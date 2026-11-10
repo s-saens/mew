@@ -4,8 +4,8 @@ import fs from 'node:fs'
 import { EventEmitter } from 'node:events'
 import { Script } from 'node:vm'
 import { isIP } from 'node:net'
-const { nativeConnectivity } = await import(new URL('../native/remote-desktop/native-connectivity.mjs', import.meta.url).href)
-const { publicV4 } = await import(new URL('../native/remote-desktop/nat-port-map.mjs', import.meta.url).href)
+const { nativeConnectivity } = await import(new URL('./rtc/native-connectivity.mjs', import.meta.url).href)
+const { publicV4 } = await import(new URL('./rtc/nat-port-map.mjs', import.meta.url).href)
 
 const settle = () => new Promise(resolve => setImmediate(resolve))
 const host = 'candidate:fixture 1 UDP 2122317823 192.168.50.2 55001 typ host'

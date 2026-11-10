@@ -125,3 +125,10 @@ test('remote tools retain independent geometry while project focus and restorati
   assert.equal(state.activePanelId, null)
   assert.equal(state.panels[0].tool, 'browser')
 })
+
+test('retired desktop panels are discarded from saved layouts', () => {
+  const saved = { version: 1, panels: [{ id: 'remote-tool:desktop', projectPath: 'remote-tool:desktop', tool: 'desktop' }, { id: 'project', projectPath: '/project' }], columns: [{ id: 'one', rows: [{ panelId: 'remote-tool:desktop' }, { panelId: 'project' }] }], activePanelId: 'remote-tool:desktop' }
+  const restored = normalizeProjectBoard(saved)
+  assert.deepEqual(restored.panels.map(panel => panel.id), ['project'])
+  assert.ok(restored.columns.every(column => column.rows.every(row => row.panelId !== 'remote-tool:desktop')))
+})

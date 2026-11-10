@@ -69,7 +69,7 @@ test('closed video sessions cannot restart capture or accept frames', async () =
   assert.equal(completed, 1); assert.deepEqual(messages, [])
 })
 
-const native = createRequire(new URL('../native/remote-desktop/package.json', import.meta.url))
+const native = createRequire(new URL('../package.json', import.meta.url))
 let nativeAvailable = false
 try { nativeAvailable = !!native.resolve('node-datachannel') } catch { /* Native runtime is optional. */ }
 const ffmpegAvailable = spawnSync('ffmpeg', ['-version'], { stdio: 'ignore' }).status === 0
@@ -81,7 +81,7 @@ import {createRequire} from 'node:module';
 import {spawnSync} from 'node:child_process';
 import {setTimeout as delay} from 'node:timers/promises';
 import {BrowserDesktopVideo,H264AccessUnits,browserVideoFFmpegArgs} from ${JSON.stringify(new URL('./browser-desktop-video.ts', import.meta.url).href)};
-const requireNative=createRequire(${JSON.stringify(new URL('../native/remote-desktop/package.json', import.meta.url).href)});
+const requireNative=createRequire(${JSON.stringify(new URL('../package.json', import.meta.url).href)});
 const rtc=requireNative('node-datachannel');
 const receiver=new rtc.PeerConnection('browser-video-synthetic',{iceServers:[],disableAutoNegotiation:true});
 const channels=[];let packets=0,marked=0,inputs=0,mode,remote=false,video,closed=false,offers=0,queuedSignals=0;const pending=[],errors=[],sample=[];

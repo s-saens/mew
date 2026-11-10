@@ -59,7 +59,6 @@ The default theme in a new browser is Midnight. Change the theme, fonts, and doc
 | Connect AI runtimes and use conversations and terminals | [Terminals and agents](terminal-agents.md) · [Runtime settings](../configuration/agent-runtimes.md) |
 | Coedit documents, comment, chat, and share with guests | [Collaboration and sharing](collaboration.md) |
 | Use login screens and the host browser | [Login screens and host browser](browser.md) |
-| Connect directly to your computer's screen | [Remote desktop](remote-desktop.md) — Requires component installation and OS permissions |
 | Add database tables to documents | [Postgres tables](database.md) — Requires a separate database connection |
 | Set up recurring commands and scheduled tasks | [Command buttons and scheduling](commands.md) |
 

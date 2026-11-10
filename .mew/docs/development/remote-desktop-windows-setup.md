@@ -1,9 +1,12 @@
 ---
 title: "Windows remote desktop prebuilt setup"
-description: "Defines exact-source Windows/WSL prebuilt installation and readiness without host development tools. Covers C++20 maintainer builds, compiler discovery, build timeout diagnostics, separate npm/Rust native sources, isolated test prerequisites, the initial validation prerelease, and remaining acceptance gates."
+description: "Historical remote desktop contract retained for prior links; the feature was removed from Mew under ADR 0161."
 created: "2026-11-05"
 updated: "2026-11-07"
 ---
+
+> Historical record: Mew removed remote desktop. See [ADR 0161](../decisions/0161-remove-remote-desktop.md). The instructions below describe the former implementation.
+
 
 ## Preparation boundary
 

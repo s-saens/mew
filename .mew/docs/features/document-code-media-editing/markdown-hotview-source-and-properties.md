@@ -166,7 +166,7 @@ The [editor package contract](../../development/packages.md#editor-package) owns
 - Use `packages/editor/src/editor/lineFocus.test.ts` and `server/editor-line-numbers-ui.test.ts` to verify line numbers for insertions and deletions in the middle, the final empty paragraph, multiline lists, code, horizontal rules, and property changes.
 - Use `server/editor-view-switch-ui.test.ts` to verify view preservation after switching to Hotview from the property area, delayed collaboration initialization, repeated view switching, preservation of source line 180, reading positions with the cursor offscreen, and source preservation on PC and mobile for guest and logged-in users.
 
-- Use `server/editor-diagram-ui.test.ts` to verify default code display and the image button popup on desktop and mobile, actual remote desktop flowchart rendering, Esc, closing, focus restoration, and syntax errors and recovery. `packages/editor/src/serverExtensions.test.ts` verifies round-trip preservation of Mermaid fences through the collaboration schema.
+- Use `server/editor-diagram-ui.test.ts` to verify default code display and the image button popup on desktop and mobile, Esc, closing, focus restoration, and syntax errors and recovery. `packages/editor/src/serverExtensions.test.ts` verifies round-trip preservation of Mermaid fences through the collaboration schema.
 
 - Use `packages/editor/src/editor/slashMenuPosition.test.ts` to verify placement below, placement above in a keyboard-reduced viewport, viewport movement, height/width limits on narrow screens, and shrinking search results. Keyboard animations on physical devices require user verification.
 

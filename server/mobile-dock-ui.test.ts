@@ -163,7 +163,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     const dock = page.getByRole('navigation', { name: 'Workspace dock' })
     const items = () => dock.locator('[data-dock-item]').evaluateAll(elements => elements.map(el => el.getAttribute('data-dock-item')))
     await dock.waitFor()
-    assert.deepEqual(await items(), ['sidebar', 'editor', 'agent', 'terminal', 'git', 'debugger', 'desktop', 'memo', 'tasks'])
+    assert.deepEqual(await items(), ['sidebar', 'editor', 'agent', 'terminal', 'git', 'debugger', 'memo', 'tasks'])
     assert.equal(await dock.getByRole('button').last().getAttribute('data-dock-item'), 'tasks')
     const tooltip = page.getByRole('tooltip')
     const notice = page.locator('[data-dock-notice]')
@@ -181,8 +181,8 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     await tooltip.waitFor({ state: 'detached' })
     await page.clock.install()
     await page.clock.pauseAt(new Date(Date.now() + 1000))
-    await dock.getByRole('button', { name: 'Remote desktop', exact: true }).tap()
-    assert.deepEqual(await page.evaluate('window.actions'), ['desktop'])
+    await dock.getByRole('button', { name: 'Memo', exact: true }).tap()
+    assert.deepEqual(await page.evaluate('window.actions'), ['memo'])
     await notice.waitFor()
     assert.equal(await tooltip.count(), 0, 'touch does not produce a hover tooltip')
     const desktopNotice = (await notice.boundingBox())!
@@ -212,7 +212,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     assert.deepEqual(await page.evaluate('window.actions'), ['terminal'])
     const box = (await dock.boundingBox())!, y = box.y + box.height / 2
     await touch('touchStart', 170, y); await touch('touchMove', 245, y); await touch('touchEnd')
-    assert.deepEqual(await page.evaluate('window.actions.at(-1)'), { dir: -1, order: ['sidebar', 'editor', 'agent', 'terminal', 'git', 'debugger', 'desktop', 'memo', 'tasks'] })
+    assert.deepEqual(await page.evaluate('window.actions.at(-1)'), { dir: -1, order: ['sidebar', 'editor', 'agent', 'terminal', 'git', 'debugger', 'memo', 'tasks'] })
     await touch('touchStart', 245, y); await touch('touchMove', 170, y); await touch('touchEnd')
     assert.equal(await page.evaluate('window.actions.at(-1).dir'), 1)
     assert.equal(await page.evaluate('window.actions.length'), 3, 'swiping never clicks an icon')
@@ -246,7 +246,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     await page.screenshot({ path: '/tmp/mew-dock-touch-reorder.png' })
     await touch('touchEnd')
     assert.equal(await preview.count(), 0)
-    assert.deepEqual(await items(), ['debugger', 'sidebar', 'editor', 'agent', 'terminal', 'git', 'desktop', 'memo', 'tasks'])
+    assert.deepEqual(await items(), ['debugger', 'sidebar', 'editor', 'agent', 'terminal', 'git', 'memo', 'tasks'])
     assert.equal(await page.evaluate('window.actions.length'), 3, 'reordering does not navigate')
     assert.equal(await notice.count(), 0, 'reordering does not show a touch toast')
     await page.reload(); await dock.waitFor()
@@ -264,7 +264,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     await page.keyboard.press('Enter')
     assert.equal(await page.evaluate('window.actions.at(-1)'), 'debugger')
     await page.emulateMedia({ reducedMotion: 'no-preference' })
-    // The app exposes remote desktop in the menu, leaving eight dock panels at most.
+    // The app uses eight available panels in this fixture.
     await page.evaluate("window.setAvailable(['sidebar','editor','agent','terminal','git','debugger','memo','tasks'])")
     await page.waitForFunction("document.querySelectorAll('.mobile-dock [data-dock-item]').length === 8")
     for (const width of [320, 390, 767]) for (const dark of [true, false]) {
@@ -323,7 +323,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     await page.evaluate("window.setAvailable(['sidebar','editor'])")
     assert.equal(await dock.getByRole('button').count(), 2)
     await page.getByRole('textbox', { name: 'Message' }).blur()
-    await page.evaluate('window.setAvailable([...'+JSON.stringify(['sidebar', 'editor', 'agent', 'terminal', 'git', 'debugger', 'desktop', 'memo', 'tasks'])+'])')
+    await page.evaluate('window.setAvailable([...'+JSON.stringify(['sidebar', 'editor', 'agent', 'terminal', 'git', 'debugger', 'memo', 'tasks'])+'])')
     await page.setViewportSize({ width: 1024, height: 844 })
     await dock.waitFor({ state: 'visible' })
     const assertDesktopCatGround = () => page.waitForFunction(`(() => {

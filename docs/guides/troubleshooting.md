@@ -1,6 +1,6 @@
 ---
 title: "Troubleshooting"
-description: "Provides symptom-specific places to check for login, server access, editing, Git, agents, DB, and remote desktop issues, and distinguishes Windows WSL freezes from repeated WSLg crashes for diagnosis, workarounds, and recovery."
+description: "Provides symptom-specific places to check for login, server access, editing, Git, agents, DB issues, and distinguishes Windows WSL freezes from repeated WSLg crashes for diagnosis, workarounds, and recovery."
 created: 2026-10-11
 updated: "2026-10-15"
 상위파일: "MOC.md"
@@ -18,7 +18,6 @@ Start by checking the feature showing symptoms. Before restarting the server, ch
 | Reports that no Git repository exists | Check whether the current project folder itself is a Git repository. Parent or child repositories are not automatically opened instead | [Git Panel](projects.md#git-operations-panel) |
 | Agent fails to open or authentication fails | Installation, login, and model settings for the selected runtime, and panel errors | [Runtime Settings](../configuration/agent-runtimes.md) |
 | Reports that the database is not configured | The server's `DATABASE_URL` and whether Postgres is running | [DB Setup](database.md#running-only-postgres-with-docker-compose-optional) |
-| Only remote desktop fails to connect | Screen and input permissions on the server OS, the logged-in desktop, and direct UDP connectivity | [Installation and Connection](remote-desktop.md#first-connection) · [Network](remote-desktop.md#network-and-configuration) |
 
 ## When WSL Freezes or Disconnects
 

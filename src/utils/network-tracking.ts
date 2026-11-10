@@ -14,8 +14,8 @@ export function requestBodyBytes(body: BodyInit | null | undefined): number {
   return byteLength(body)
 }
 
-export function networkCategory(url: URL): NetworkCategory {
-  return url.pathname.startsWith('/api/remote-desktop/') ? 'desktop' : 'other'
+export function networkCategory(_url: URL): NetworkCategory {
+  return 'other'
 }
 
 /** Count streaming SSE in place, preserving backpressure, aborts and Response metadata. */
@@ -69,8 +69,7 @@ export function startNetworkTracking() {
     constructor(url: string | URL, protocols?: string | string[]) {
       super(url, protocols)
       const address = new URL(String(url), location.href)
-      // connectDesktop reports its authenticated socket with the media session.
-      this.tracked = local(address) && address.pathname !== '/api/remote-desktop/ws'
+      this.tracked = local(address)
       if (this.tracked) this.addEventListener('message', event => {
         if (active) networkUsage.add('other', 'received', byteLength(event.data))
       })

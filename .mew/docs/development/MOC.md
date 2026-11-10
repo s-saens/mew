@@ -35,14 +35,9 @@ Before changing code, read [Development environment, execution restrictions, and
 - [Per-account Git connections, OAuth, and commit authors](git-connections.md)
 - [Collaboration rooms and member chat](collaboration.md)
 
-## Remote access and desktop
+## Remote access
 
 - [Mewlink, P2P remote access, and authentication](remote-access.md)
 - [Network usage aggregation](network-usage.md)
-- [Remote desktop architecture, video, and input](remote-desktop.md)
-- [Persistent native GPU host for Mac/Linux](remote-desktop-posix.md)
-- [Direct external network connections, NAT, and OS network approval](remote-desktop-connectivity.md)
-- [Windows virtual displays, signing, and headless capture](remote-desktop-virtual-display.md)
-- [Distribution, licensing, and redistribution boundaries](remote-desktop-distribution.md)
 
 Check each document for the current contract and scope of verification on actual devices. Research and work records are preserved in [work](../work/_work.md), and previous implementations in [history](../history/MOC.md).

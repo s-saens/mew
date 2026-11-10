@@ -46,7 +46,6 @@ Executables live in root-owned `/opt/mew/versions/<version>`. Each prepared vers
 
 An interrupted initial import with no distribution registration can quarantine its nonempty environment folder before retrying only when the protected journal identifies the importing phase and no prior active version. It preserves the quarantined files. Marker creation uses a temporary file and rename and can resume an empty, non-symlink directory; arbitrary nonempty directories remain conflicts.
 
-Remote desktop retains its [verified Windows helper package](remote-desktop-windows-setup.md) and existing feature installation/permission flow. The wizard does not install a virtual display driver or silently approve OS permissions.
 
 ## Launch and first use
 

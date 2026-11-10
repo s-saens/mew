@@ -33,8 +33,6 @@ interface SettingsModalProps {
   canEditIgnore: boolean
   fontPreferences: FontPreferences
   themeSettings: ThemeSettings
-  mewcatHideDesktop: boolean
-  onMewcatHideDesktopChange: (value: boolean) => void
   mewcatSkin: MewcatSkinSelection
   onFontPreferencesChange: (fonts: FontPreferences) => void
   onThemeSettingsChange: (settings: ThemeSettings) => void
@@ -53,7 +51,7 @@ const SECTION_LABEL: Record<Section, TranslationKey> = {
 }
 
 /** Workspace appearance, notifications, tools, shortcuts, and shared ignore rules. */
-export function SettingsModal({ mewcatHostRef, mewcatRequest, initialDebugger, debuggerRoot, onOpenDebugger, dockAvailable, canEditIgnore, themeSettings = { palette: DEFAULT_THEME_PALETTE, custom: [] }, fontPreferences, mewcatSkin, mewcatHideDesktop, onMewcatHideDesktopChange, onFontPreferencesChange, onThemeSettingsChange = () => {}, onMewcatSkinChange, onClose }: SettingsModalProps) {
+export function SettingsModal({ mewcatHostRef, mewcatRequest, initialDebugger, debuggerRoot, onOpenDebugger, dockAvailable, canEditIgnore, themeSettings = { palette: DEFAULT_THEME_PALETTE, custom: [] }, fontPreferences, mewcatSkin, onFontPreferencesChange, onThemeSettingsChange = () => {}, onMewcatSkinChange, onClose }: SettingsModalProps) {
   useUiLocale()
   const [portalContainer, setPortalContainer] = useState<HTMLDivElement | null>(null)
   const [section, setSection] = useState<Section>(mewcatRequest ? 'mewcat' : debuggerRoot && initialDebugger ? 'debugger' : 'appearance')
@@ -159,7 +157,7 @@ export function SettingsModal({ mewcatHostRef, mewcatRequest, initialDebugger, d
             {section === 'notifications' && <MewcatNotificationSettings hasCat={mewcatSkin !== null} />}
             {section === 'debugger' && debuggerRoot && <Suspense fallback={<div role="status">…</div>}><DebuggerSettings key={debuggerRoot} root={debuggerRoot} portalContainer={portalContainer} onOpen={onOpenDebugger ?? onClose} /></Suspense>}
             {section === 'dock' && <DockSettingsPanel available={dockAvailable} portalContainer={portalContainer} />}
-            {section === 'mewcat' && <><MewcatSkinSettings skin={mewcatSkin} onChange={onMewcatSkinChange} /><MewcatSizeSettings /><label className="mt-3 flex min-h-11 cursor-pointer items-center gap-2 text-sm text-ink"><input type="checkbox" checked={mewcatHideDesktop} onChange={event => onMewcatHideDesktopChange(event.target.checked)} className="accent-accent" />{uiText("원격 데스크톱에서 뮤펫 숨기기")}</label><MewcatBreakSettings /></>}
+            {section === 'mewcat' && <><MewcatSkinSettings skin={mewcatSkin} onChange={onMewcatSkinChange} /><MewcatSizeSettings /><MewcatBreakSettings /></>}
             {section === 'shortcuts' && <ShortcutsPanel />}
             {section === 'ignore' && <IgnorePanel />}
           </div>

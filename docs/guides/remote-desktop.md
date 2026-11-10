@@ -2,9 +2,12 @@
 title: "Remote Desktop Setup and Controls"
 created: 2026-09-12
 updated: "2026-11-08"
-description: "Explains remote desktop setup, host permissions, video settings, keyboard, clipboard, and touch controls. Covers network RTT versus receive-buffer/decode timing, Windows prebuilt package availability, and hardware verification limits."
+description: "Historical remote desktop contract retained for prior links; the feature was removed from Mew under ADR 0161."
 상위파일: "MOC.md"
 ---
+
+> Historical record: Mew removed remote desktop. See [ADR 0161](../../.mew/docs/decisions/0161-remove-remote-desktop.md). The instructions below describe the former implementation.
+
 
 Click **Remote Desktop** in the hamburger menu on PC or mobile. It does not appear in the Dock. Remote desktop feature permission is required and is granted to managers and owners by default. It fills the entire screen independently of work panels, sharing the logged-in desktop on Mac/Linux servers or the Windows desktop on WSL. Only one connection can be used across the entire server.
 

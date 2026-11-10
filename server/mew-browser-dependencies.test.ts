@@ -15,7 +15,7 @@ test('setup installs browser dependencies before building and aborts when prepar
   t.after(() => fs.rm(directory, { recursive: true, force: true }))
   const script = `set -euo pipefail
     say(){ :; }; need_node(){ :; }; need_build_tools(){ :; }; load_config(){ :; }
-    prepare_desktop(){ echo desktop; }; start_server(){ echo start; }
+    start_server(){ echo start; }
     create_first_owner(){ :; }; url(){ :; }
     npm(){ echo "$*"; if [ "$*" = 'run browsers:install' ]; then return "$TEST_FAILURE"; fi; }
     ${extract('cmd_setup')}
@@ -27,7 +27,7 @@ test('setup installs browser dependencies before building and aborts when prepar
     assert.equal(result.code, failure)
     assert.deepEqual(result.stdout.trim().split('\n'), failure
       ? ['ci --no-audit --no-fund', 'run browsers:install']
-      : ['ci --no-audit --no-fund', 'run browsers:install', 'desktop', 'run build', 'start'])
+      : ['ci --no-audit --no-fund', 'run browsers:install', 'run build', 'start'])
   }
 })
 

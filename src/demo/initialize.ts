@@ -6,7 +6,6 @@ import { createDemoTransport } from './transport.ts'
 import { createDemoCollaboration } from './collaboration.ts'
 import { createDemoSocketFactory } from './socket.ts'
 import { createDemoResources } from './resources.ts'
-import { createDemoDesktop } from './desktop.ts'
 import repositoryIndex from './repository-index.json' with { type: 'json' }
 import { DemoRepository, createDemoRepositoryLoader } from './repository.ts'
 
@@ -21,11 +20,10 @@ export async function initializeDemo() {
   const transport = createDemoTransport(store, sockets)
   const collaboration = createDemoCollaboration(store)
   const resources = createDemoResources(store)
-  const desktop = createDemoDesktop(store)
   const onPageHide = (event: PageTransitionEvent) => { if (!event.persisted) dispose() }
   const dispose = () => {
     window.removeEventListener('pagehide', onPageHide)
-    desktop.close(); collaboration.close(); resources.close(); transport.close(); sockets.close(); storage.clear(); sessionStorage.clear()
+    collaboration.close(); resources.close(); transport.close(); sockets.close(); storage.clear(); sessionStorage.clear()
   }
   const restart = () => { dispose(); location.reload() }
   configureAppRuntime({
@@ -39,7 +37,6 @@ export async function initializeDemo() {
     resourceUrl: resources.url,
     prepareResourceUrl: resources.prepare,
     releaseResourceUrl: resources.release,
-    desktopConnection: desktop.connect,
   })
   window.addEventListener('pagehide', onPageHide)
   if (import.meta.hot) import.meta.hot.dispose(dispose)

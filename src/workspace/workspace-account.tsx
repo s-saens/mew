@@ -9,7 +9,7 @@ import { useRefreshTasks } from '../hooks/use-refresh-tasks'
 import { useMewcatNotifications } from '../hooks/use-mewcat-notifications'
 import { useChatNotifications } from '../hooks/use-chat-notifications'
 import { applyFontPreferences, loadFontPreferences, saveFontPreferences } from '../utils/fontPreferences'
-import { loadMewcatSkin, saveMewcatSkin, loadMewcatHideDesktop } from '../utils/mewcatSkin'
+import { loadMewcatSkin, saveMewcatSkin } from '../utils/mewcatSkin'
 import { deferredComponent } from '../components/deferred-component'
 import { PanelCloseButton } from '../components/panel-close-button'
 
@@ -27,15 +27,14 @@ function useAccountServices(auth: AuthStatus) {
   const [themeSettings, setThemeSettings] = useAccountTheme(auth.role === 'guest' ? null : auth.email, error => showToast(error instanceof Error ? error.message : String(error)))
   const [fontPreferences, setFontPreferences] = useState(loadFontPreferences)
   const [mewcatSkin, setMewcatSkin] = useState(loadMewcatSkin)
-  const [mewcatHideDesktop, setMewcatHideDesktop] = useState(loadMewcatHideDesktop)
   const projects = useRootProjectTabs(auth.role !== 'guest', track)
   useMewcatNotifications(capabilities.system, auth.email)
   useChatNotifications(capabilities.chat, auth.email)
   useEffect(() => { applyFontPreferences(fontPreferences); saveFontPreferences(fontPreferences) }, [fontPreferences])
   useEffect(() => { saveMewcatSkin(mewcatSkin) }, [mewcatSkin])
   const value = useMemo(() => ({ role: auth.role, capabilities, themeSettings, setThemeSettings, fontPreferences, setFontPreferences, mewcatSkin, setMewcatSkin,
-    mewcatHideDesktop, setMewcatHideDesktop, projects }),
-  [auth.role, capabilities, themeSettings, setThemeSettings, fontPreferences, mewcatSkin, mewcatHideDesktop, projects])
+    projects }),
+  [auth.role, capabilities, themeSettings, setThemeSettings, fontPreferences, mewcatSkin, projects])
   return { value, toast }
 }
 

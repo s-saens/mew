@@ -4,7 +4,7 @@ export const PROJECT_PANEL_MIN_WIDTH = 280
 export const PROJECT_PANEL_MIN_HEIGHT = 240
 export const PROJECT_BOARD_GAP = 4
 
-export type ProjectBoardPanel = { id: string; projectPath: string; workingRoot: string; tool?: 'browser' | 'desktop' }
+export type ProjectBoardPanel = { id: string; projectPath: string; workingRoot: string; tool?: 'browser' }
 export type ProjectBoardRow = { panelId: string; weight: number }
 export type ProjectBoardColumn = { id: string; width: number; rows: ProjectBoardRow[] }
 export type ProjectBoardState = {
@@ -40,9 +40,9 @@ export function normalizeProjectBoard(value: unknown, fallback?: ProjectBoardPan
   const ids = new Set<string>(), projects = new Set<string>(), placed = new Set<string>(), columnIds = new Set<string>()
   const panels: ProjectBoardPanel[] = []
   for (const panel of value.panels) {
-    if (!record(panel) || !text(panel.id) || !text(panel.projectPath) || ids.has(panel.id) || projects.has(panel.projectPath)) continue
+    if (!record(panel) || panel.tool === 'desktop' || !text(panel.id) || !text(panel.projectPath) || ids.has(panel.id) || projects.has(panel.projectPath)) continue
     ids.add(panel.id); projects.add(panel.projectPath)
-    panels.push({ id: panel.id, projectPath: panel.projectPath, workingRoot: text(panel.workingRoot) ? panel.workingRoot : panel.projectPath, ...(panel.tool === 'browser' || panel.tool === 'desktop' ? { tool: panel.tool } : {}) })
+    panels.push({ id: panel.id, projectPath: panel.projectPath, workingRoot: text(panel.workingRoot) ? panel.workingRoot : panel.projectPath, ...(panel.tool === 'browser' ? { tool: panel.tool } : {}) })
   }
   const columns: ProjectBoardColumn[] = []
   for (const column of value.columns) {

@@ -47,7 +47,7 @@ flowchart TD
   L --> K
 ```
 
-On Windows/WSL, F consists of Windows Node discovery → Node bridge → PowerShell broker → temporary InteractiveToken task registration and execution → PowerShell launcher in the login session → Electron. The broker also prepares a small C# P/Invoke type using `Add-Type` for each connection. Multiple process launches and task registration were confirmed, but their individual costs have not yet been measured. [Execution path](../../../server/remote-desktop-host.ts), [bridge](../../../native/remote-desktop/windows-bridge.mjs), [broker and launcher](../../../native/remote-desktop/windows-session.ps1)
+On Windows/WSL, F consists of Windows Node discovery → Node bridge → PowerShell broker → temporary InteractiveToken task registration and execution → PowerShell launcher in the login session → Electron. The broker also prepares a small C# P/Invoke type using `Add-Type` for each connection. Multiple process launches and task registration were confirmed, but their individual costs have not yet been measured. Execution path (`server/remote-desktop-host.ts`), bridge (`native/remote-desktop/windows-bridge.mjs`), broker and launcher (`native/remote-desktop/windows-session.ps1`)
 
 ## Delays confirmed in code and improvements already applied
 
@@ -65,7 +65,7 @@ On Windows/WSL, F consists of Windows Node discovery → Node bridge → PowerSh
 | Reconnection | Closing, switching to the background, or changing monitors ends the session and starts a new process | Even a brief return incurs helper startup costs again. Measure waiting for previous helper cleanup separately from a true first connection |
 | Completion criteria | The direct path becomes connected when the two input DataChannels open; the server path becomes connected on the first canvas processing | Measuring only connected currently produces a mismatch with the time when the first screen is actually visible |
 
-Evidence: [Preparation](../../../src/utils/desktop-preparation.ts), [installation fingerprint](../../../native/remote-desktop/helper-version.mjs), [capture startup](../../../native/remote-desktop/main.mjs), [transport selection](../../../src/utils/desktop-connection.ts), [direct reception](../../../src/utils/desktop-direct.ts), [server reception](../../../src/utils/desktop-relay.ts), [session termination](../../../server/remote-desktop.ts).
+Evidence: Preparation (`src/utils/desktop-preparation.ts`), installation fingerprint (`native/remote-desktop/helper-version.mjs`), capture startup (`native/remote-desktop/main.mjs`), transport selection (`src/utils/desktop-connection.ts`), direct reception (`src/utils/desktop-direct.ts`), server reception (`src/utils/desktop-relay.ts`), session termination (`server/remote-desktop.ts`).
 
 25·40·90·95 seconds are upper bounds on waiting in failure cases. They are not normal connection times or fixed waits that can be eliminated. Simply lowering timeouts can turn slow successes into fast failures.
 

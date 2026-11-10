@@ -31,7 +31,6 @@ import { createRemoteUiRouter } from './remote-ui.ts'
 import { createMewpetSkinsRouter } from './mewpet-skin-routes.ts'
 import { createTaskListRouter } from './task-list-routes.ts'
 import { createUserUiRouter } from './user-ui-routes.ts'
-import { createRemoteDesktopRoutes } from './remote-desktop.ts'
 import multer from 'multer'
 import { GitError } from 'simple-git'
 import fs from 'node:fs'
@@ -589,7 +588,6 @@ export function createApiApp() {
   })
 
   app.use('/login-desktop', createLoginDesktopRoutes())
-  app.use('/remote-desktop', createRemoteDesktopRoutes(tmuxManager))
 
   app.get('/updates/status', requireFeature('system'), async (req, res) => {
     try { res.json(await updatesStatus(req.query.refresh === '1')) }

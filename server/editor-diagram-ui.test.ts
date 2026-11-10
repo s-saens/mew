@@ -4,9 +4,8 @@ import fs from 'node:fs/promises'
 import { build } from 'rolldown'
 import { connectTestBrowser } from './test-browser.ts'
 
-test('Mermaid renders the remote desktop diagram, opens on demand and recovers on desktop/mobile', { timeout: 60000 }, async () => {
-  const doc = await fs.readFile(new URL('../.mew/docs/development/remote-desktop.md', import.meta.url), 'utf8')
-  const diagram = doc.match(/```mermaid\n([\s\S]*?)\n```/)![1]
+test('Mermaid renders a diagram, opens on demand and recovers on desktop/mobile', { timeout: 60000 }, async () => {
+  const diagram = 'flowchart LR\n A[Workspace] --> B[Mew server]'
   const modulePath = new URL('../packages/editor/src/editor/diagram-preview.ts', import.meta.url).pathname
   const source = `import {createDiagramPreview} from ${JSON.stringify(modulePath)};
 const dom=document.querySelector('.code-block-wrap'), pre=dom.querySelector('pre');
@@ -32,7 +31,7 @@ document.querySelector('#recover').onclick=()=>view.update('mermaid','flowchart 
       await page.getByRole('button', { name: '다이어그램 보기', exact: true }).click()
       await page.getByRole('dialog').waitFor()
       await page.locator('.diagram-preview svg').waitFor()
-      assert.match(await page.locator('.diagram-preview').textContent() ?? '', /Mew 서버/)
+      assert.match(await page.locator('.diagram-preview').textContent() ?? '', /Mew server/)
       assert.equal(await page.locator('pre').isVisible(), true)
       await page.keyboard.press('Escape')
       assert.equal(await page.getByRole('dialog').count(), 0)

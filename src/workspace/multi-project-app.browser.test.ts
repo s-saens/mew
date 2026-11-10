@@ -14,7 +14,7 @@ const origin = 'http://multi-project-app.test'
 
 async function fixtureBundle() {
   const source = `import React from'react';import{createRoot}from'react-dom/client';import App from${JSON.stringify(sourcePath('App.tsx'))};import{I18nProvider}from${JSON.stringify(sourcePath('i18n.tsx'))};
-    const auth={authenticated:true,email:'integration@test',role:'owner',mustChangePassword:false,displayName:'Integration',avatarDataUrl:null,capabilities:{filesRead:true,filesWrite:true,agent:true,terminal:true,git:true,collaboration:false,database:false,chat:false,system:false,nativeBrowser:true,desktop:true,serverFiles:false,schedules:false}};
+    const auth={authenticated:true,email:'integration@test',role:'owner',mustChangePassword:false,displayName:'Integration',avatarDataUrl:null,capabilities:{filesRead:true,filesWrite:true,agent:true,terminal:true,git:true,collaboration:false,database:false,chat:false,system:false,nativeBrowser:true,serverFiles:false,schedules:false}};
     function Fixture(){const [current,setCurrent]=React.useState(auth);window.setCapabilities=changes=>setCurrent(value=>({...value,capabilities:{...value.capabilities,...changes}}));return <I18nProvider><App auth={current} refreshing={false} onLoggedOut={()=>{}} onRequestLogin={()=>{}} onProfileChanged={()=>{}}/></I18nProvider>}
     window.editorMounts={};window.editorUnmounts={};createRoot(document.getElementById('root')).render(<Fixture/>);`
   const editorStub = `import React from'react';export function EditorPane(props){const tab=props.pane.tabs.find(tab=>tab.id===props.pane.activeTabId)??props.pane.tabs.find(tab=>tab.path===props.pane.activePath),root=props.workspace?.path;React.useEffect(()=>{window.editorMounts[root]=(window.editorMounts[root]??0)+1;return()=>{window.editorUnmounts[root]=(window.editorUnmounts[root]??0)+1}},[]);return <div data-test-editor-root={root} style={{display:'flex',height:'100%'}}>{tab&&<textarea aria-label={'Editor '+root} value={tab.content} onFocus={props.onFocus} onChange={event=>props.onChangeContent(tab.path,event.target.value,props.pane.id,tab.id)}/>}</div>}`
@@ -32,7 +32,6 @@ async function fixtureBundle() {
       if (id.endsWith('.css')) return { code: '', moduleType: 'js' }
       if (id.endsWith('?raw')) return 'export default ' + JSON.stringify(await fs.readFile(id.slice(0, -4), 'utf8'))
       if (id === sourcePath('components/BrowserDesktopPanel.tsx')) return `import React from 'react';export function BrowserDesktopPanel(){return <div data-test-remote-browser>Browser fixture</div>}`
-      if (id === sourcePath('components/remote-desktop.tsx')) return `import React from 'react';export function RemoteDesktop({embedded}){return <div data-test-remote-desktop data-embedded={String(!!embedded)}>Desktop fixture</div>}`
       if (id === sourcePath('components/EditorPane.tsx')) return editorStub
       if (id === sourcePath('components/AgentPanel.tsx')) return agentStub
       if (id === sourcePath('components/git-panel.tsx')) return gitStub
@@ -491,44 +490,31 @@ test('remote tools open as independent movable board panels', { timeout: 45_000 
   await page.getByRole('button', { name: /멀티프로젝트모드|Multi.project mode/ }).first().click()
   const menu = page.getByRole('button', { name: 'Menu', exact: true })
   await menu.click()
+  assert.equal(await page.getByRole('menuitem', { name: 'Remote desktop', exact: true }).count(), 0)
   await page.getByRole('menuitem', { name: 'Remote browser', exact: true }).click()
   const browserPanel = page.locator('[data-project-panel][data-project-path="remote-tool:browser"]')
   await browserPanel.locator('[data-test-remote-browser]').waitFor()
   assert.equal(await page.getByRole('dialog').count(), 0)
   assert.equal(await menu.count(), 1)
   await menu.click()
-  await page.getByText('Remote desktop', { exact: true }).click()
-  const desktopPanel = page.locator('[data-project-panel][data-project-path="remote-tool:desktop"]')
-  await desktopPanel.locator('[data-test-remote-desktop][data-embedded="true"]').waitFor()
-  await desktopPanel.locator('[data-project-panel-handle]').focus()
   await page.keyboard.press('ArrowLeft')
   assert.equal(await menu.count(), 1)
-  await menu.click()
   await page.getByRole('menuitem', { name: 'Remote browser', exact: true }).click()
   assert.equal(await browserPanel.count(), 1)
-  const desktopWidth = await desktopPanel.evaluate(element => element.getBoundingClientRect().width)
-  const columnId = await desktopPanel.locator('[data-project-panel-handle]').getAttribute('data-project-panel-handle')
   const separator = page.locator('[data-project-column-resize]').first()
   await separator.focus()
   await page.keyboard.press('ArrowRight')
-  assert.ok(columnId)
-  assert.ok(desktopWidth > 0)
   await page.getByRole('button', { name: /Layout|레이아웃/ }).first().click()
   await page.getByRole('button', { name: /싱글프로젝트모드|Single.project mode/ }).first().click()
   await page.locator('[data-project-board][data-presentation="single"]').waitFor()
-  assert.equal(await page.locator('[data-test-remote-desktop]').count(), 0)
   await page.getByRole('button', { name: /Layout|레이아웃/ }).first().click()
   await page.getByRole('button', { name: /멀티프로젝트모드|Multi.project mode/ }).first().click()
   await browserPanel.locator('[data-test-remote-browser]').waitFor()
-  await desktopPanel.locator('[data-test-remote-desktop]').waitFor()
   await page.locator('[data-project-panel][data-project-path="/alpha"] .mew-project-board-header button[aria-label^="Close"]').click()
   await page.locator('[data-project-panel][data-project-path="/alpha"]').waitFor({ state: 'detached' })
   assert.equal(await browserPanel.isVisible(), true)
-  assert.equal(await desktopPanel.isVisible(), true)
   await page.reload()
   await browserPanel.locator('[data-test-remote-browser]').waitFor()
-  await desktopPanel.locator('[data-test-remote-desktop]').waitFor()
-  await page.evaluate('window.setCapabilities({desktop:false,nativeBrowser:false})')
+  await page.evaluate('window.setCapabilities({nativeBrowser:false})')
   await browserPanel.waitFor({ state: 'detached' })
-  await desktopPanel.waitFor({ state: 'detached' })
 })
