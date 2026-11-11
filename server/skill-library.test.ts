@@ -25,10 +25,10 @@ function fixture(t: test.TestContext) {
   return { root, home, cwd, libraryDir, store, write, item, environment }
 }
 
-test('initial defaults contain only five entrypoints and discovery does not write files', t => {
+test('initial defaults contain six entrypoints and discovery does not write files', t => {
   const { store, cwd, libraryDir } = fixture(t)
   const list = store.list(cwd)
-  assert.deepEqual(list.items.map(item => item.name), ['chinese-technical-docs', 'commit', 'english-technical-docs', 'japanese-technical-docs', 'korean-technical-docs'])
+  assert.deepEqual(list.items.map(item => item.name), ['chinese-technical-docs', 'commit', 'english-technical-docs', 'japanese-technical-docs', 'korean-technical-docs', 'mew-project-setting'])
   assert.equal(list.candidates.length, 0)
   assert.equal(list.items.every(item => item.enabled && item.source === 'builtin'), true)
   assert.equal(fs.existsSync(libraryDir), false)

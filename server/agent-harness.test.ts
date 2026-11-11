@@ -174,9 +174,9 @@ test('native skills remain import candidates until explicitly registered in the 
     f.skill(path.join(f.cwd, 'apps/other/.agents/skills/sibling/SKILL.md'), 'sibling')
     f.skill(path.join(f.cwd, '.claude/skills/claude-only/SKILL.md'), 'claude-only')
     const skills = listSkills(path.join(f.cwd, 'apps/web'), 'codex', f.home, {})
-    assert.deepEqual(skills.filter(skill => !bundledDocumentationNames.has(skill.name)).map(skill => skill.name), ['commit'])
+    assert.deepEqual(skills.filter(skill => !bundledDocumentationNames.has(skill.name)).map(skill => skill.name), ['commit', 'mew-project-setting'])
     assert.equal(skills.some(skill => skill.name === 'demo' || skill.name === 'sibling'), false)
-    assert.deepEqual(listSkills(f.cwd, 'claude', f.home, {}).filter(skill => !bundledDocumentationNames.has(skill.name)).map(skill => skill.name), ['commit'])
+    assert.deepEqual(listSkills(f.cwd, 'claude', f.home, {}).filter(skill => !bundledDocumentationNames.has(skill.name)).map(skill => skill.name), ['commit', 'mew-project-setting'])
   } finally { f.cleanup() }
 })
 

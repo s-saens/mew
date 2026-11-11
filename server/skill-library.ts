@@ -14,7 +14,7 @@ const COMMIT_SEED = fileURLToPath(new URL('./prompts/commit-skill.txt', import.m
 const STATE_FILE = '.library.json'
 const MAX_TEXT = 2 * 1024 * 1024
 const NAME = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$/
-const DEFAULT_NAMES = ['korean-technical-docs', 'english-technical-docs', 'japanese-technical-docs', 'chinese-technical-docs', 'commit']
+const DEFAULT_NAMES = ['korean-technical-docs', 'english-technical-docs', 'japanese-technical-docs', 'chinese-technical-docs', 'commit', 'mew-project-setting']
 const hash = (value: string | Buffer) => createHash('sha256').update(value).digest('hex')
 const identity = (...parts: string[]) => Buffer.from(JSON.stringify(parts)).toString('base64url')
 

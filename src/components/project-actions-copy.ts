@@ -1,0 +1,65 @@
+import type { UiLocale } from '@mew/ui/i18n-core'
+
+const en = {
+  build: 'Build', deploy: 'Deploy', close: 'Close', add: 'Add action', edit: 'Edit action', editName: 'Edit {name}',
+  discover: 'Discover actions', setup: 'Configure with agent', empty: 'No actions configured.',
+  agent: 'An agent can finish configuring this project.', retry: 'Retry', loading: 'Loading…',
+  name: 'Name', kind: 'Action', variant: 'Variant', debug: 'Debug', release: 'Release', custom: 'Custom',
+  command: 'Command', advanced: 'Advanced settings', previewUrl: 'Preview URL', artifacts: 'Download files',
+  artifactHint: 'One relative file path or glob per line.', save: 'Save', cancel: 'Cancel', delete: 'Delete',
+  running: 'Running', succeeded: 'Succeeded', failed: 'Failed', results: 'Recent results',
+  preview: 'Open preview', download: 'Download', output: 'Output', noOutput: 'No output yet.',
+  loadError: 'Could not load actions.', saveError: 'Could not save actions.', runError: 'Could not start the action.',
+  previewUnavailable: 'Browser is unavailable.',
+  resultUnavailable: 'The running result is no longer available. Reload actions to check again.',
+  busy: 'Another action is being saved or started. Try again shortly.',
+}
+
+const copy: Record<UiLocale, typeof en> = {
+  en,
+  ko: {
+    build: '빌드', deploy: '배포', close: '닫기', add: '작업 추가', edit: '작업 수정', editName: '{name} 수정',
+    discover: '작업 자동 검색', setup: '에이전트로 설정', empty: '설정된 작업이 없습니다.',
+    agent: '에이전트가 프로젝트 설정을 마무리할 수 있습니다.', retry: '다시 시도', loading: '불러오는 중…',
+    name: '이름', kind: '작업 유형', variant: '빌드 유형', debug: '디버그', release: '릴리즈', custom: '사용자 지정',
+    command: '명령어', advanced: '고급 설정', previewUrl: '미리보기 주소', artifacts: '다운로드 파일',
+    artifactHint: '한 줄에 상대 파일 경로나 glob 패턴을 하나씩 입력합니다.', save: '저장', cancel: '취소', delete: '삭제',
+    running: '실행 중', succeeded: '완료', failed: '실패', results: '최근 결과',
+    preview: '미리보기 열기', download: '다운로드', output: '실행 기록', noOutput: '아직 출력이 없습니다.',
+    loadError: '작업을 불러오지 못했습니다.', saveError: '작업을 저장하지 못했습니다.', runError: '작업을 시작하지 못했습니다.',
+    previewUnavailable: '브라우저를 사용할 수 없습니다.',
+    resultUnavailable: '실행 결과를 더 이상 확인할 수 없습니다. 작업을 다시 불러와 확인하세요.',
+    busy: '다른 작업을 저장하거나 시작하고 있습니다. 잠시 후 다시 시도하세요.',
+  },
+  ja: {
+    build: 'ビルド', deploy: 'デプロイ', close: '閉じる', add: 'アクションを追加', edit: 'アクションを編集', editName: '{name}を編集',
+    discover: 'アクションを検出', setup: 'エージェントで設定', empty: 'アクションが設定されていません。',
+    agent: 'エージェントでプロジェクトの設定を完了できます。', retry: '再試行', loading: '読み込み中…',
+    name: '名前', kind: '種類', variant: 'ビルドの種類', debug: 'デバッグ', release: 'リリース', custom: 'カスタム',
+    command: 'コマンド', advanced: '詳細設定', previewUrl: 'プレビューURL', artifacts: 'ダウンロードファイル',
+    artifactHint: '相対ファイルパスまたはglobパターンを1行に1つ入力します。', save: '保存', cancel: 'キャンセル', delete: '削除',
+    running: '実行中', succeeded: '完了', failed: '失敗', results: '最近の結果',
+    preview: 'プレビューを開く', download: 'ダウンロード', output: '出力', noOutput: 'まだ出力はありません。',
+    loadError: 'アクションを読み込めませんでした。', saveError: 'アクションを保存できませんでした。', runError: 'アクションを開始できませんでした。',
+    previewUnavailable: 'ブラウザーを利用できません。',
+    resultUnavailable: '実行結果を確認できなくなりました。アクションを再読み込みしてください。',
+    busy: '別のアクションを保存または開始しています。しばらくしてから再試行してください。',
+  },
+  'zh-CN': {
+    build: '构建', deploy: '部署', close: '关闭', add: '添加操作', edit: '编辑操作', editName: '编辑{name}',
+    discover: '检测操作', setup: '使用代理配置', empty: '尚未配置操作。',
+    agent: '代理可以完成此项目的配置。', retry: '重试', loading: '正在加载…',
+    name: '名称', kind: '操作类型', variant: '构建类型', debug: '调试', release: '发布', custom: '自定义',
+    command: '命令', advanced: '高级设置', previewUrl: '预览地址', artifacts: '下载文件',
+    artifactHint: '每行输入一个相对文件路径或glob模式。', save: '保存', cancel: '取消', delete: '删除',
+    running: '运行中', succeeded: '成功', failed: '失败', results: '最近结果',
+    preview: '打开预览', download: '下载', output: '输出', noOutput: '暂无输出。',
+    loadError: '无法加载操作。', saveError: '无法保存操作。', runError: '无法启动操作。',
+    previewUnavailable: '浏览器不可用。',
+    resultUnavailable: '运行结果已不可用。请重新加载操作后再检查。',
+    busy: '正在保存或启动另一项操作。请稍后重试。',
+  },
+}
+
+export const projectActionsCopy = (locale: UiLocale) => copy[locale]
+export type ProjectActionsCopy = typeof en

@@ -31,6 +31,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><CommandButtonM
     const errors: string[] = []
     page.on('pageerror', error => errors.push(error.message))
     let running = false, ports: number[] = [], runs = 0, stops = 0, writes = 0, failSave = false
+    let releaseStop: (() => void) | undefined
     const runNames: string[] = []
     let entries = [
       { name: '개발 서버 이름이 길어도 동작', command: 'npm run dev', oneShot: false, session: 'mewcmd-dev' },
@@ -48,6 +49,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><CommandButtonM
       }
       if (url.pathname === '/api/tmux/sessions/mewcmd-dev' && route.request().method() === 'DELETE') {
         stops++; running = false; ports = []
+        await new Promise<void>(resolve => { releaseStop = resolve })
         return route.fulfill({ json: { ok: true } })
       }
       if (url.pathname === '/api/cmd-buttons') {
@@ -66,6 +68,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><CommandButtonM
       </style><div id="root"></div><script>${bundle.output.find(item => item.type === 'chunk')!.code}</script></html>` })
     })
     await page.goto('http://mew-command.test/')
+    await page.getByRole('button', { name: '명령 목록', exact: true }).waitFor()
     await page.keyboard.press('Alt+r')
     const menu = page.locator('[data-cmd-overlay]'), row = menu.locator('[data-command-row]').first()
     const command = row.getByRole('button', { name: '개발 서버 이름이 길어도 동작', exact: true })
@@ -99,6 +102,13 @@ createRoot(document.getElementById('root')).render(<I18nProvider><CommandButtonM
     await menu.waitFor({ state: 'hidden' })
     await page.keyboard.press('Alt+r')
     await command.waitFor()
+    assert.equal(await command.isDisabled(), true, 'reopening preserves the pending stop request')
+    assert.ok(releaseStop)
+    releaseStop()
+    const commandElement = await command.elementHandle()
+    assert.ok(commandElement)
+    await page.waitForFunction(element => element === element.ownerDocument.activeElement, commandElement)
+    await commandElement.dispose()
     assert.equal(await command.evaluate(el => el === el.ownerDocument.activeElement), true)
     await menu.getByRole('button', { name: '명령 추가', exact: true }).focus()
     await page.keyboard.press('Control+e')

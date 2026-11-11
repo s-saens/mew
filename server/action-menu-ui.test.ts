@@ -147,7 +147,7 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><I18nProvid
       await page.locator('[data-project-switcher]').click(); await menu.waitFor()
       if (width >= 768) assert.deepEqual(await metrics('[data-action-menu]'), reference, 'desktop project dropdown matches hamburger dimensions and typography')
       else {
-        const panel = page.getByRole('dialog', { name: '프로젝트', exact: true })
+        const panel = page.getByRole('dialog', { name: '프로젝트 선택패널', exact: true })
         assert.deepEqual(await panel.boundingBox(), { x: 0, y: 0, width, height: 800 }, 'mobile projects cover the header, workspace, and dock')
         assert.equal(await panel.locator('[data-action-menu]').count(), 0, 'the mobile project list is an inline panel')
       }

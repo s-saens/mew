@@ -1,4 +1,5 @@
 import type { AgentExecutionOptions } from '../../shared/agent-execution-options'
+import type { ProjectAction, ProjectActionRun, ProjectActionsState } from '../../shared/project-actions'
 import { createDatabasePageMutationScope, databasePageMutations } from '../utils/database-page-mutations'
 import { json } from './response.ts'
 import type { Role } from './auth.ts'
@@ -1806,6 +1807,40 @@ function createApiClient(scope?: Readonly<WorkspaceScope>) {
     }).then(json<{ buttons: CmdButtonState[] }>)
   }
 
+  function projectActionsQuery(project: string, path = '', workspacePath?: string): string {
+    const workspace = workspacePath === undefined ? '' : `&workspacePath=${encodeURIComponent(workspacePath)}`
+    return `${projectQs(project)}&path=${encodeURIComponent(path)}${workspace}`
+  }
+
+  function fetchProjectActions(project: string, path = '', workspacePath?: string): Promise<ProjectActionsState> {
+    return mewFetch(`/api/project-actions?${projectActionsQuery(project, path, workspacePath)}`).then(json<ProjectActionsState>)
+  }
+
+  function saveProjectActions(project: string, actions: ProjectAction[], path = '', workspacePath?: string): Promise<ProjectActionsState> {
+    return mewFetch('/api/project-actions', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ project, actions, path, workspacePath }),
+    }).then(json<ProjectActionsState>)
+  }
+
+  function discoverProjectActions(project: string, path = '', workspacePath?: string): Promise<ProjectActionsState> {
+    return mewFetch('/api/project-actions/discover', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ project, path, workspacePath }),
+    }).then(json<ProjectActionsState>)
+  }
+
+  function runProjectAction(project: string, id: string, path = '', workspacePath?: string): Promise<{ run: ProjectActionRun }> {
+    return mewFetch('/api/project-actions/run', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ project, id, path, workspacePath }),
+    }).then(json<{ run: ProjectActionRun }>)
+  }
+
+  function projectActionArtifactUrl(project: string, runId: string, artifactPath: string, path = '', workspacePath?: string): string {
+    return appResourceUrl(`/api/project-actions/artifacts?${projectActionsQuery(project, path, workspacePath)}&runId=${encodeURIComponent(runId)}&artifactPath=${encodeURIComponent(artifactPath)}`)
+  }
+
   function fetchTermButtons(): Promise<{ buttons: TermButton[] }> {
     return mewFetch('/api/term-buttons').then(json<{ buttons: TermButton[] }>)
   }
@@ -2205,6 +2240,11 @@ function createApiClient(scope?: Readonly<WorkspaceScope>) {
     fetchCmdButtons,
     runCmdButton,
     saveCmdButtons,
+    fetchProjectActions,
+    saveProjectActions,
+    discoverProjectActions,
+    runProjectAction,
+    projectActionArtifactUrl,
     fetchTermButtons,
     saveTermButtons,
     fetchIgnoreList,

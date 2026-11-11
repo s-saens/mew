@@ -2078,6 +2078,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
             <CommandButtonMenu
               key={rootProjectPath}
               project={WORKSPACE_PROJECT}
+              workspacePath={rootProjectPath ?? undefined}
               title={uiText("{p0} 명령어 버튼", { p0: projectLabel(rootProjectPath) })}
               className={headerIconControlClassName}
             />

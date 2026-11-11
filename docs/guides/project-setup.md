@@ -1,8 +1,8 @@
 ---
 title: "Connect project documentation and configure automatic agent guidance"
 created: 2026-09-16
-updated: "2026-11-07"
-description: "Explains project documentation setup, per-account default instructions, and per-message Build/Deploy controls beside CLI mode. Covers instruction priority and preservation, advanced build settings in View file, tests and documentation, direct work on main, commit preferences, model congestion retries, and automatic saving."
+updated: "2026-11-11"
+description: "Explains project documentation and default project-setting skill setup, per-account instructions, and per-message execution choices. Links project Build/Deploy action configuration and covers guidance priority, preservation, verification, tests, documentation, Git, and session lifetime."
 상위파일: "MOC.md"
 ---
 
@@ -11,6 +11,7 @@ This guide explains how to connect a project's documentation folder or configure
 | What to change | Where to start | Scope |
 | --- | --- | --- |
 | Documents location and document creation | Right-click the **Documents** toggle in the file explorer → **Agent guidance and document settings** | Current project (owner) |
+| Project build/deploy buttons, variants, and result access | Project **Build** or **Deploy**, then edit or discover actions | Current project |
 | Build verification and deployment for the next request | **Build** and **Deploy** icons to the right of the CLI command-mode toggle | Current agent tab; captured per message |
 | Git, language, code quality, tests, documentation, and additional instructions | **Default instructions** gear at the top of the agent panel → **Mew global instructions** | All projects for the signed-in Mew account |
 | Model congestion retry interval and count | Same window → **Mew global instructions** | All ACP conversations for the signed-in Mew account |
@@ -18,6 +19,14 @@ This guide explains how to connect a project's documentation folder or configure
 | Documentation skills and MCP servers | Book and plug buttons at the top of the agent panel | Check by source in [Skills and MCP management](../configuration/agent-harness.md) |
 
 Documentation skills are provided as Mew default skills, so you do not need to copy them into each project. User-specified languages and existing file languages take priority; the default language for new documents follows the agent response language setting. See [ADR 0155](../../.mew/docs/history/decisions/0155-mew-project-agent-context.md) for the design rationale.
+
+## Set up project actions with an agent
+
+The default `/mew-project-setting` skill configures [Build and Deploy actions](commands.md#build-and-deploy-a-project), useful result links or downloads, and project documentation from your concept and feature specification. It defaults to writing or updating affected tests before implementation, then running them through failure and success. User instructions and other applicable skills can replace concrete guidance beyond essential Mew action and documentation integration.
+
+Use **Set up with agent** from project actions to adapt an existing project. Agent-assisted project creation asks about the concept first, then applies the enabled setup skill. Automated discovery handles supported manifests; an agent fills gaps without treating a failed setup as a reason to block project creation or editing. Configuring a deployment action does not authorize running it.
+
+The skill follows the normal [managed library](../configuration/agent-harness.md) rules: inspect, disable, remove, restore, or override it for a project. Generated setup prompts respect those choices. Project action buttons execute configured tasks; the agent composer's separate Build/Deploy controls choose what an agent request is authorized to do.
 
 ## What is passed automatically
 

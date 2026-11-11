@@ -61,6 +61,7 @@ interface NodeCtx {
   search?: ExplorerSearch
   searchPaths?: ReadonlyMap<string, string>
   project: string
+  workspacePath?: string | null
   documentTitles: Readonly<Record<string, string>>
   documentPages: boolean
   openPage: (node: TreeNode, opts?: TreeOpenOptions) => void
@@ -532,7 +533,7 @@ function Node({ node, depth, ctx }: { node: TreeNode; depth: number; ctx: NodeCt
             <ArrowUpRight width={14} height={14} aria-hidden="true" />
           </button>}
           {node.git && !projectLink && ctx.openGit && <span className="relative z-10 flex shrink-0"><GitButton onClick={() => ctx.openGit?.(node.path)} title={uiText("{p0} Git 열기", { p0: node.name })} /></span>}
-          {node.project && !projectLink && ctx.canUseCommands && <span className="relative z-10 flex shrink-0"><CommandButtonMenu project={ctx.project} directory={node.path} /></span>}
+          {node.project && !projectLink && ctx.canUseCommands && <span className="relative z-10 flex shrink-0"><CommandButtonMenu project={ctx.project} directory={node.path} workspacePath={ctx.workspacePath ?? undefined} /></span>}
           <PublicShareBadge mode={publicShare} className="relative z-10 ml-auto mr-2" />
         </div>
       </TreeHeader>
@@ -1602,6 +1603,7 @@ export function FileTree({
     search,
     searchPaths: searchTree?.matched,
     project,
+    workspacePath,
     documentTitles,
     documentPages,
     openPage: (node, opts) => {

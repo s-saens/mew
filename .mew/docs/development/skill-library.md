@@ -1,8 +1,8 @@
 ---
 title: "Managed skill library"
-description: "Defines common/project skill resolution, persistent enablement and removal, source-preserving imports, hidden package dependencies, management APIs, and shared prompt/runtime application. Distinguishes native adapter controls from guidance and filesystem access."
+description: "Defines common/project skill resolution, persistent enablement and removal, source-preserving imports, default project setup and documentation skills, management APIs, and shared prompt/runtime application. Distinguishes native adapter controls from guidance and filesystem access."
 created: "2026-11-05"
-updated: "2026-11-05"
+updated: "2026-11-11"
 ---
 
 ## Ownership and resolution
@@ -13,7 +13,9 @@ The library has common and project scopes. Project definitions override same-nam
 
 Common managed files use `<DATA_DIR>/skills/<name>/SKILL.md`; project files use `<project>/.mew/skills/<name>/SKILL.md`. Each scope persists enablement, overrides, and removed-default registrations in its `.library.json`. The nearest ancestor containing `.mew` or `.git` is the project boundary; otherwise use the supplied working directory. Common defaults reference packaged documentation resources without copying their shared dependencies. An existing customized common commit file is preserved.
 
-Only the four language documentation entrypoints and the commit workflow are default registrations. Their packaged helpers, translation resources, and editing dependencies do not become independent suggestions. Removal is persistent; normal reads and runtime startup must not restore a removed registration. Explicit restoration is the recovery operation. Package resources retain their relative links and pinned original bytes.
+The four language documentation entrypoints, the commit workflow, and `mew-project-setting` are default registrations. Their packaged helpers, translation resources, and editing dependencies do not become independent suggestions. Removal is persistent; normal reads and runtime startup must not restore a removed registration. Explicit restoration is the recovery operation. Package resources retain their relative links and pinned original bytes.
+
+The packaged [project-setting skill](../../../resources/skills/mew-project-setting/SKILL.md) configures Mew build/deploy actions and useful results from project evidence, maintains description-based project documentation, and defaults to test-driven development. User instructions or other skills can replace its concrete nonessential workflow defaults, including TDD. The packaged source is read-only; users can provide a same-name project override, disable it, or remove and restore its default registration through normal library operations.
 
 Native source discovery follows supported runtime environment overrides and the current project ancestry. Child and sibling projects must not enter the active inventory or current import list. It never edits native runtime configuration, follows an import outside the selected rediscovered source, or deletes an external original.
 

@@ -21,6 +21,7 @@ import { SessionTerminalPopup } from './SessionTerminalPopup'
 import { WORKSPACE_PROJECT } from '../utils/active-project'
 import { captureCommandMenuShortcut, focusFirstCommand, navigateCommandMenu } from '../utils/command-menu-keyboard'
 import { AUTOMATIC_RETRY_LIMIT } from '../utils/recovery-policy'
+import { ProjectActions } from './ProjectActions'
 
 const LONG_PRESS_MS = 500
 const MENU_WIDTH = 308
@@ -46,7 +47,12 @@ type CommandButtonMenuProps = {
 }
 
 export function CommandButtonMenu(props: CommandButtonMenuProps) {
-  return <ScopedCommandButtonMenu key={JSON.stringify([props.project, props.directory ?? '', props.workspacePath])} {...props} />
+  const key = JSON.stringify([props.project, props.directory ?? '', props.workspacePath])
+  const Container = props.inline || props.alwaysOpen ? 'div' : 'span'
+  return <Container className={props.inline || props.alwaysOpen ? 'min-w-0' : 'inline-flex shrink-0 items-center'}>
+    <ProjectActions key={`actions:${key}`} project={props.project} directory={props.directory} workspacePath={props.workspacePath} inline={props.inline || props.alwaysOpen} />
+    <ScopedCommandButtonMenu key={key} {...props} />
+  </Container>
 }
 
 function ScopedCommandButtonMenu({
@@ -117,10 +123,10 @@ function ScopedCommandButtonMenu({
 
   useEffect(() => {
     if (!open) { focusOnOpen.current = false; return }
-    if (!focusOnOpen.current || buttons === null || (!inline && !anchor)) return
+    if (!focusOnOpen.current || buttons === null || busyName !== null || (!inline && !anchor)) return
     focusFirstCommand(menuRef.current)
     focusOnOpen.current = false
-  }, [open, buttons, inline, anchor])
+  }, [open, buttons, busyName, inline, anchor])
   // Esc·모바일 뒤로가기로 드롭다운을 닫는다. 세션 팝업·편집 창이 떠 있으면 그쪽이 스택 위라 먼저 닫힌다
   useOverlayDismiss(open && !inline && closeMenu)
 

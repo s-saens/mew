@@ -1,8 +1,8 @@
 ---
 title: "Skills and MCP Management"
 created: 2026-09-17
-updated: "2026-11-05"
-description: "Manage common/project skills and grouped MCP connections with separate usage and authentication. Covers service groups, project overrides, safe Cloudflare consolidation, preserved external sources, imports, and removable skill defaults."
+updated: "2026-11-11"
+description: "Manage common/project skills and grouped MCP connections with separate usage and authentication. Covers the default project-setting skill, project overrides, service groups, safe Cloudflare consolidation, imports, and removable skill defaults."
 상위파일: "MOC.md"
 ---
 
@@ -38,7 +38,7 @@ The main list contains one effective row per skill name. Each row shows its scop
 - **Off** keeps the skill and removes it from Mew suggestions and automatic workflow selection. **Delete** removes a managed copy or a default registration after confirmation. External originals remain untouched. Removing a project override does not silently activate its common fallback.
 - **Default skills** lets you explicitly restore a removed default. Normal reads, updates, and session startup do not register removed defaults again.
 
-Mew provides four documentation workflows and a commit workflow. The documentation workflows include their editing and translation helpers; those internal dependencies are not separate active rows. Package documentation files remain read-only, while their registration and enablement are controllable.
+Mew provides four documentation workflows, a commit workflow, and `mew-project-setting`. The documentation workflows include their editing and translation helpers; those internal dependencies are not separate active rows. Packaged sources remain read-only, while their registration and enablement are controllable. A same-name project skill can customize a packaged workflow.
 
 Changes enter the catalog supplied with the next agent request, including queued requests when they execute. Mew's Codex and Claude sessions suppress their native automatic skill catalog; other runtimes receive the same selection policy without verified native suppression. Existing conversation text is retained. This setting does not restrict file tools or change CLIs launched outside Mew.
 
@@ -64,6 +64,14 @@ Scope controls use the shared keyboard/touch selection component. Unsaved edits 
 Common skills and native global settings belong to the server OS user and are shared by Mew accounts. The APIs require the existing `agent` permission. Shared MCP management requires owner access; project MCP usage is available to agent-enabled accounts. See the [access contract](../../.mew/docs/development/access-control.md).
 
 To generate sprites with a local model, optionally [connect the separate project's local-sprites MCP](local-sprites.md). Its generation code, models, and Python dependencies are not included in Mew.
+
+## Mew Project Setting Skill
+
+Use `/mew-project-setting` in the agent composer to configure a new project, adapt an existing one, or repair its setup. The [default skill](../../resources/skills/mew-project-setting/SKILL.md) uses the user's concept and feature specification to configure editable build/deploy buttons and useful results, such as a Browser preview or APK download. It uses existing scripts and configuration first, investigates gaps with the agent, and keeps setup failures from blocking project creation or editing.
+
+The skill maintains Mew documentation through the project's existing owners and document descriptions. It defaults to writing or updating tests before implementation, including tests for changed features. User instructions or other skills can replace concrete guidance beyond the necessary Mew actions and documentation setup, including the default TDD workflow. Existing project rules and execution restrictions still apply; preparing a deployment action does not authorize deploying it.
+
+Manage its enablement, removal, and restoration like other default skills. To customize its instructions for one project, add a project skill named `mew-project-setting`; this overrides the common source without modifying the package.
 
 ## Mew-Specific Commit Skill
 

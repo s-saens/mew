@@ -12,13 +12,17 @@ import { applyFontPreferences, loadFontPreferences, saveFontPreferences } from '
 import { loadMewcatSkin, saveMewcatSkin } from '../utils/mewcatSkin'
 import { deferredComponent } from '../components/deferred-component'
 import { PanelCloseButton } from '../components/panel-close-button'
+import { ProjectActionNoticeHost } from '../components/project-action-notice-host'
+import { BrowserContext } from './workspace-browser-context'
+import { ProjectSetupContext, type ProjectSetupRequest } from './project-setup-context'
+export { BrowserContext, useWorkspaceBrowser } from './workspace-browser-context'
 
 const Mewcat = deferredComponent(async () => ({ default: (await import('../components/Mewcat')).Mewcat }), null)
 const BrowserDesktopPanel = deferredComponent(async () => ({ default: (await import('../components/BrowserDesktopPanel')).BrowserDesktopPanel }))
+const ProjectCreationAgentDialog = deferredComponent(async () => ({ default: (await import('../components/ProjectCreationAgentDialog')).ProjectCreationAgentDialog }))
 type MewcatProps = ComponentProps<typeof Mewcat>
 type MascotEntry = { owner: object; props: MewcatProps }
 const MascotContext = createContext<((entry: MascotEntry | null, owner: object) => void) | null>(null)
-export const BrowserContext = createContext<((url?: string) => void) | null>(null)
 
 function useAccountServices(auth: AuthStatus) {
   const { showToast, toast } = useToast()
@@ -46,20 +50,27 @@ export function WorkspaceAccountProvider({ auth, children }: { auth: AuthStatus;
   const { value: services, toast } = useAccountServices(auth)
   const [mascot, setMascot] = useState<MascotEntry | null>(null)
   const [browser, setBrowser] = useState<{ url: string; request: number } | null>(null)
+  const [projectSetup, setProjectSetup] = useState<ProjectSetupRequest | null>(null)
   const title = useId()
   const capabilities = auth.capabilities ?? defaultCapabilities(auth.role)
   const registerMascot = useCallback((entry: MascotEntry | null, owner: object) => {
     setMascot(previous => entry ?? (previous?.owner === owner ? null : previous))
   }, [])
   const openBrowser = useCallback((url = 'about:blank') => setBrowser(previous => ({ url, request: (previous?.request ?? 0) + 1 })), [])
-  return <AccountContext.Provider value={services}><MascotContext.Provider value={registerMascot}><BrowserContext.Provider value={openBrowser}>
+  return <AccountContext.Provider value={services}><MascotContext.Provider value={registerMascot}><BrowserContext.Provider value={capabilities.nativeBrowser ? openBrowser : null}><ProjectSetupContext.Provider value={capabilities.agent ? setProjectSetup : null}>
     {children}{toast}
+    <ProjectActionNoticeHost enabled={capabilities.terminal} />
+    {projectSetup && capabilities.agent && <ProjectCreationAgentDialog projectPath={projectSetup.projectPath} projectName={projectSetup.projectName}
+      setupTitle={projectSetup.setupTitle} cacheAccount={auth.email ?? 'local'} onClose={() => {
+        setProjectSetup(null)
+        projectSetup.onClose?.()
+      }} />}
     {mascot && <Mewcat {...mascot.props} />}
     {browser && <DialogFrame labelledBy={title} onClose={() => setBrowser(null)} className="flex h-[90dvh] max-w-6xl flex-col">
       <header className="flex h-9 shrink-0 items-center border-b border-edge px-2"><span id={title} className="flex-1 text-sm">{uiText('브라우저')}</span><PanelCloseButton onClick={() => setBrowser(null)} aria-label={uiText('닫기')} /></header>
       <div className="min-h-0 flex-1"><BrowserDesktopPanel url={browser.url} navigationRequest={browser.request} nativeAllowed={capabilities.nativeBrowser} onClose={() => setBrowser(null)} /></div>
     </DialogFrame>}
-  </BrowserContext.Provider></MascotContext.Provider></AccountContext.Provider>
+  </ProjectSetupContext.Provider></BrowserContext.Provider></MascotContext.Provider></AccountContext.Provider>
 }
 
 /** The live mascot stays mounted above the views while its active project callbacks change. */
@@ -73,8 +84,6 @@ export function WorkspaceMewcat(props: MewcatProps) {
   }, [register, props])
   return null
 }
-
-export function useWorkspaceBrowser() { return useContext(BrowserContext) }
 
 export function useWorkspaceAccount() {
   const services = useContext(AccountContext)

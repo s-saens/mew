@@ -4,11 +4,11 @@ parent: "mew-agents"
 title: "Project command button"
 status: "implemented"
 created: "2026-09-18"
-updated: "2026-10-30"
+updated: "2026-11-11"
 status_hash: "11b4825abce468fc30154b3c9ff1e214231099d5c6effbd50778959e7f752969"
 files: ["src/components/CommandButtonMenu.tsx", "src/components/SessionTerminalPopup.tsx", "server/cmdButtons.ts"]
 commits: []
-description: "Contract for registering, running, and stopping per-project commands and viewing output from ▶ in the top bar and desktop project sidebar. Covers quiet metadata recovery with retained cached rows, eleven automatic retries, disabled stale actions, and scoped manual recovery, plus Alt+R, Ctrl+E, number selection, handle-based reordering, running-row highlights, pinned request targets, per-root session isolation, legacy session limitations, and the boundary with global terminal buttons."
+description: "Contract for legacy project command registration, execution, stopping, output, recovery, shortcuts, reordering, and root-isolated sessions. Links separate Build/Deploy actions while preserving command and global terminal button behavior."
 상위파일:
   - "MOC.md"
   - "_terminals-agents-automation.md"
@@ -17,6 +17,7 @@ description: "Contract for registering, running, and stopping per-project comman
 ## Requirements
 
 - Run recurring commands for the current project using buttons and view their output.
+- Named [Build and Deploy actions](project-build-deploy-actions.md) appear beside these controls and own finite runs, completion notices, and result access. Their settings do not replace the legacy command file or shortcuts.
 
 ### Scope
 

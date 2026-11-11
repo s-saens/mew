@@ -145,6 +145,10 @@ test('repository source graph stages without missing imports or optional helper 
     const file = path.join(output, 'resources/skills', `${name}-technical-docs`, 'SKILL.md')
     assert.match(await fs.readFile(file, 'utf8'), /technical-docs-common\/workflow\.md/)
   }
+  for (const file of ['SKILL.md', 'agents/openai.yaml']) {
+    const relative = path.join('resources/skills/mew-project-setting', file)
+    assert.equal(await fs.readFile(path.join(output, relative), 'utf8'), await fs.readFile(path.join(repository, relative), 'utf8'))
+  }
   for (const file of ['workflow.md', 'structure.md', 'translation.md']) await fs.access(path.join(output, 'resources/skills/technical-docs-common', file))
   const dependencies = readDocumentationDependencies(path.join(output, 'resources/skills'))
   for (const skill of dependencies.packages) {

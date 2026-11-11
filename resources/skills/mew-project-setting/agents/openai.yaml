@@ -1,0 +1,4 @@
+interface:
+  display_name: "Mew project setting"
+  short_description: "Configure build/deploy actions, Mew docs, and test-first defaults"
+  default_prompt: "$mew-project-setting: Configure this project for Mew from the user's concept and feature specification."

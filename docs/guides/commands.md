@@ -1,19 +1,32 @@
 ---
 title: "Command Buttons and Scheduled Tasks"
-description: "Covers command buttons in the top bar and project sidebar, running commands in other projects while keeping the current view, opening with Alt+R, selecting by number, reordering with handles, and full-row running status. Also covers adding and stopping commands, opening port apps in the internal DOM browser, terminal input, recurring agent schedules, and the option to close the terminal after completion."
-updated: "2026-10-31"
+description: "Explains project Build and Deploy actions, automatic discovery, agent-assisted setup, completion notifications, result links and artifact downloads. Also covers legacy project and terminal command buttons and recurring agent schedules."
+updated: "2026-11-11"
 상위파일:
-  - "../../.mew/docs/MOC.md"
+  - "../../.mew/docs/_docs.md"
   - "MOC.md"
 ---
 Use this guide to turn frequently run commands into buttons or schedule recurring agent tasks. First open the project you will work in and check the required feature permissions, such as terminals and scheduled tasks. Agent tasks also require [runtime installation and authentication](../configuration/agent-runtimes.md).
 
 | What you want to do | Feature to use |
 | --- | --- |
+| Build a project or deploy a configured target and inspect its results | Project **Build** or **Deploy** |
 | Run builds, development servers, and other commands in a specific project | **▶ Command Button** in the top bar or project sidebar |
 | Type a frequently used string into the shell you are currently viewing | Terminal **Command Buttons** |
 | Run a new agent task at a specified time or interval | Menu → **Scheduled Tasks** |
 | Send a message once later in the current conversation | [Scheduled Message](../../.mew/docs/features/terminals-agents-automation/agent-scheduled-messages.md) in the agent input bar |
+
+## Build and deploy a project
+
+1. Open **Build** or **Deploy** beside the project's command button. Choose the named action, such as a debug or release build.
+2. Follow its status in the results dialog. You can close the dialog or switch projects while it runs; Mew announces completion or failure through your notification preferences while the Mew page remains connected. Select the notification to reopen the results.
+3. Open a completed result to view output, open its configured address in Browser, or download an artifact such as an APK. Failed results retain output for diagnosis and retry.
+
+Mew offers actions from supported project scripts and Android configuration automatically. **Discover** saves supported new actions while keeping your existing settings. Use **Add** or **Edit** to change names, variants, commands, result URLs, and output paths. Advanced settings are also available in the project's `.mew/project-actions.json`; the [action contract](../../.mew/docs/features/terminals-agents-automation/project-build-deploy-actions.md#configuration-and-api) defines its format.
+
+If Mew cannot determine the setup, use **Set up with agent** to investigate the project and complete it in a normal agent conversation. Missing tools, invalid settings, and failed actions leave the project available for editing. Deployment needs an established target and credentials; Mew does not invent them. Set up result URLs and output files from the project's actual settings. Browser links use the existing host Browser permission and do not expose a port publicly.
+
+These actions run commands expected to finish. Use the existing command buttons for interactive or long-running development servers. Recent results and their output survive closing the dialog but are cleared when the Mew server restarts. Configuring an action does not run it.
 
 ## Command buttons — two types
 
