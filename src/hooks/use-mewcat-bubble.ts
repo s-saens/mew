@@ -10,9 +10,30 @@ export function useMewcatBubble(anchor: RefObject<HTMLDivElement | null> | undef
     if (!enabled || !anchor || !bubble) return
     let frame = 0
     let previous = ''
+    let dirty = true
+    let previousCat: HTMLDivElement | null = null
+    let previousTransform = ''
+    const invalidate = () => { dirty = true }
+    const sizes = new ResizeObserver(invalidate)
+    sizes.observe(bubble)
+    if (bubble.firstElementChild) sizes.observe(bubble.firstElementChild)
+    const viewport = window.visualViewport
+    window.addEventListener('resize', invalidate)
+    window.addEventListener('scroll', invalidate, true)
+    viewport?.addEventListener('resize', invalidate)
+    viewport?.addEventListener('scroll', invalidate)
     const place = () => {
       const cat = anchor.current
-      if (cat?.style.transform) {
+      if (cat !== previousCat) {
+        if (previousCat) sizes.unobserve(previousCat)
+        if (cat) sizes.observe(cat)
+        previousCat = cat
+        dirty = true
+      }
+      const transform = cat?.style.transform ?? ''
+      if (cat && transform && (dirty || transform !== previousTransform)) {
+        dirty = false
+        previousTransform = transform
         const viewport = window.visualViewport
         const left = (viewport?.offsetLeft ?? 0) + 12
         const top = (viewport?.offsetTop ?? 0) + 12
@@ -25,8 +46,10 @@ export function useMewcatBubble(anchor: RefObject<HTMLDivElement | null> | undef
         const side = naturalHeight <= above || above >= below ? 'above' : 'below'
         const available = side === 'above' ? above : below
         const bubbleWidth = Math.min(preferredWidth, width)
-        bubble.style.width = `${bubbleWidth}px`
-        bubble.style.maxHeight = constrainHeight ? `${Math.max(0, available - 2)}px` : 'none'
+        const widthStyle = `${bubbleWidth}px`
+        const heightStyle = constrainHeight ? `${Math.max(0, available - 2)}px` : 'none'
+        if (bubble.style.width !== widthStyle) bubble.style.width = widthStyle
+        if (bubble.style.maxHeight !== heightStyle) bubble.style.maxHeight = heightStyle
         const center = box.left + box.width / 2
         const x = clamp(center - bubbleWidth / 2, left, left + width - bubbleWidth)
         const preferredY = side === 'above' ? box.top - 10 - bubble.offsetHeight : box.bottom + 10
@@ -49,6 +72,11 @@ export function useMewcatBubble(anchor: RefObject<HTMLDivElement | null> | undef
     place()
     return () => {
       cancelAnimationFrame(frame)
+      sizes.disconnect()
+      window.removeEventListener('resize', invalidate)
+      window.removeEventListener('scroll', invalidate, true)
+      viewport?.removeEventListener('resize', invalidate)
+      viewport?.removeEventListener('scroll', invalidate)
       for (const name of ['left', 'top', 'right', 'bottom', 'width', 'max-height', 'visibility', '--mewcat-tail-x']) bubble.style.removeProperty(name)
       delete bubble.dataset.placement
     }

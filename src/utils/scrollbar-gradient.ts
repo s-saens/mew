@@ -8,12 +8,18 @@ export function startScrollbarGradientTracking() {
 
   const flush = () => {
     frame = 0
+    const updates: { element: HTMLElement; y: string; x: string }[] = []
     for (const element of pending) {
       if (!element.isConnected) continue
-      element.style.setProperty('--mew-scrollbar-y', percentage(element.scrollTop, element.scrollHeight - element.clientHeight))
+      const y = percentage(element.scrollTop, element.scrollHeight - element.clientHeight)
       const range = element.scrollWidth - element.clientWidth
       const rtl = getComputedStyle(element).direction === 'rtl'
-      element.style.setProperty('--mew-scrollbar-x', percentage(rtl ? range + element.scrollLeft : element.scrollLeft, range))
+      updates.push({ element, y, x: percentage(rtl ? range + element.scrollLeft : element.scrollLeft, range) })
+    }
+    // Measure every scrolling region before invalidating styles in any of them.
+    for (const { element, y, x } of updates) {
+      if (element.style.getPropertyValue('--mew-scrollbar-y') !== y) element.style.setProperty('--mew-scrollbar-y', y)
+      if (element.style.getPropertyValue('--mew-scrollbar-x') !== x) element.style.setProperty('--mew-scrollbar-x', x)
     }
     pending.clear()
   }

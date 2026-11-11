@@ -1,8 +1,8 @@
 ---
 title: "UI foundations, themes, and copy"
-description: "Shared visual foundations for compact layouts, icons, scrollbars, theme colors, UI copy, and translations. Defines reusable presentation rules while feature documents retain their requirements."
+description: "Shared visual foundations for compact layouts, icons, scrollbars with batched geometry reads and deduplicated style writes, theme colors, UI copy, and translations. Defines reusable presentation rules while feature documents retain their requirements."
 created: "2026-11-03"
-updated: "2026-11-03"
+updated: "2026-11-07"
 상위파일: "ui-contracts.md"
 ---
 
@@ -15,7 +15,7 @@ updated: "2026-11-03"
 | Default | 82% background, 18% text | 65% background, 35% text |
 | Hover | 25% text | 45% text |
 
-Hover retains 70% opacity. The brightest point follows scroll position divided by maximum scroll distance (content size − viewport size): top/center/bottom vertically and left/center/right horizontally. Darken the thumb away from that point. `src/utils/scrollbar-gradient.ts` collects nested scroll events and updates only the affected region's CSS variables each frame. Firefox falls back to a thin solid scrollbar using the thumb-end theme color at 70% opacity; `.no-scrollbar` regions remain hidden.
+Hover retains 70% opacity. The brightest point follows scroll position divided by maximum scroll distance (content size − viewport size): top/center/bottom vertically and left/center/right horizontally. Darken the thumb away from that point. `src/utils/scrollbar-gradient.ts` collects nested scroll events and updates only the affected region's CSS variables each frame. Read geometry for all pending regions before writing any styles, and skip CSS variables whose values have not changed. This avoids interleaved layout reads and invalidations when multiple regions scroll together. Firefox falls back to a thin solid scrollbar using the thumb-end theme color at 70% opacity; `.no-scrollbar` regions remain hidden.
 
 Touch dragging uses an invisible 24px-thick thumb target:
 

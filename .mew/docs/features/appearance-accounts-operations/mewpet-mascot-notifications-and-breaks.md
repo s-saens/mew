@@ -4,11 +4,11 @@ parent: "mew-settings"
 title: "Mewpet mascot, notifications, and breaks"
 status: "implemented"
 created: "2026-09-18"
-updated: "2026-11-05"
+updated: "2026-11-07"
 status_hash: "8b1758c7281118da18b267a2c001213bb7c463d4dbd018bb221e192d83f43ec3"
 files: ["server/mewpet-skins.ts", "server/mewpet-skin-routes.ts", "shared/mewpet-skins.ts", "src/components/header-notifications.tsx", "src/components/header-resources.tsx", "src/utils/mewcat-notifications.ts", "src/components/Mewcat.tsx", "src/components/mewcat-skin-settings.tsx", "src/components/mewcat-size-settings.tsx", "src/utils/mewcat-size-preferences.ts", "src/utils/mewcat-sprites.ts", "src/utils/mewcat-sprite-storage.ts", "src/components/mewcat-fullscreen-guide.tsx", "src/hooks/use-startup-guide.ts", "src/utils/app-install.ts", "src/components/mewcat-resources.tsx", "src/components/SettingsModal.tsx", "src/components/mewcat-notifications.tsx", "src/hooks/use-mewcat-notifications.ts", "src/utils/mewcat-notification-rules.ts", "src/components/mewcat-break.tsx", "src/hooks/use-mewcat-break.ts", "src/utils/mewcat-break-rules.ts"]
 commits: []
-description: "Mewpet motion, skins, agent and member-chat notifications, resource gauges, breaks, and startup guidance. Covers compact hamburger previews and full notification history, mobile service-worker browser notifications, Mewlink permission bridging, notification channels, storage, accessibility, and verification limits."
+description: "Mewpet motion, skins, agent and member-chat notifications, resource gauges, breaks, and startup guidance. Covers compact hamburger previews and full notification history, mobile service-worker browser notifications, Mewlink permission bridging, notification channels, storage, accessibility, event-invalidated bubble measurements, and verification limits."
 상위파일:
   - "MOC.md"
   - "_appearance-accounts-operations.md"
@@ -51,6 +51,8 @@ description: "Mewpet motion, skins, agent and member-chat notifications, resourc
 - [Mewpet Assistant](mewpet-assistant-conversations-and-controls.md) owns the popup's conversation functionality.
 
 ## Detailed behavior
+
+`src/hooks/use-mewcat-bubble.ts` follows character transforms without React updates. While character position, bubble size, content size, and viewport remain unchanged, animation frames must not read layout or rewrite dimensions. Resize observers and viewport/scroll events invalidate measurements; movement still updates the bubble position. Disconnect observers and listeners when the bubble closes. `server/rendering-work-ui.test.ts` verifies idle measurement counts, movement, content growth, and viewport clamping.
 
 Display descending sprites at 83% of their original scale to reduce the difference that makes the diagonal body length look larger than during ascent. Keep the bottom-center anchor and apply the same scale to the actual Mewpet, settings preview, and image hit testing. Also apply this scale to descending frames reused when no separate landing image exists. Keep the original images, movement, gravity, and playback durations.
 
