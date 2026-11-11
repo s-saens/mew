@@ -50,7 +50,7 @@ final class NativeBridge: NSObject, WKScriptMessageHandlerWithReply {
         }
         guard origin.protocol == "https", origin.port == 0 || origin.port == 443 else { return false }
         if frame.isMainFrame {
-            return origin.host == "mew.run" && url.path == connection.address.path
+            return origin.host == "link.mew.run" && connection.acceptsMewlinkNavigation(url)
         }
         guard origin.host == "app.mew.run" else { return false }
         return url.path.range(of: #"^/launch/[A-Za-z0-9_-]+/?$"#, options: .regularExpression) != nil

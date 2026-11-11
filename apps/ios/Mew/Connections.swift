@@ -13,7 +13,7 @@ enum ConnectionError: LocalizedError {
         switch self {
         case .invalidAddress: return String(localized: "Enter a server address without credentials, query parameters, or a fragment.")
         case .insecureAddress: return String(localized: "Use HTTPS, or explicitly allow HTTP for a private network address.")
-        case .invalidMewlink: return String(localized: "Enter a Mewlink device address: https://mew.run/username/device.")
+        case .invalidMewlink: return String(localized: "Enter a Mewlink device address: https://link.mew.run/username/device.")
         }
     }
 }
@@ -35,9 +35,10 @@ struct SavedConnection: Identifiable, Codable, Hashable {
         components.host = host
         if (scheme == "https" && components.port == 443) || (scheme == "http" && components.port == 80) { components.port = nil }
         if kind == .mewlink {
-            guard scheme == "https", host == "mew.run", components.port == nil,
+            guard scheme == "https", ["link.mew.run", "mew.run", "mew.saens.kr"].contains(host), components.port == nil,
                   components.path.range(of: #"^/[A-Za-z0-9_-]+/[A-Za-z0-9_-]+/?$"#, options: .regularExpression) != nil
             else { throw ConnectionError.invalidMewlink }
+            components.host = "link.mew.run"
             if components.path.hasSuffix("/") { components.path.removeLast() }
         } else {
             guard components.path.isEmpty || components.path == "/" else { throw ConnectionError.invalidAddress }
@@ -62,6 +63,12 @@ struct SavedConnection: Identifiable, Codable, Hashable {
     }
 
     var namespace: String { kind.rawValue + ":" + address.absoluteString }
+
+    func acceptsMewlinkNavigation(_ url: URL) -> Bool {
+        kind == .mewlink && url.scheme == "https" && url.host == "link.mew.run"
+            && (url.port == nil || url.port == 443) && url.user == nil && url.password == nil
+            && url.path == address.path
+    }
 
     static func isPrivateHost(_ host: String) -> Bool {
         let value = host.trimmingCharacters(in: CharacterSet(charactersIn: "[]")).lowercased()
@@ -93,6 +100,7 @@ final class ConnectionStore: ObservableObject {
         if let data = defaults.data(forKey: Self.key), let saved = try? JSONDecoder().decode([SavedConnection].self, from: data) {
             connections = saved.compactMap { try? SavedConnection(id: $0.id, name: $0.name, kind: $0.kind,
                 address: $0.address.absoluteString, allowsLocalHTTP: $0.allowsLocalHTTP) }
+            if connections != saved { persist() }
         }
     }
 

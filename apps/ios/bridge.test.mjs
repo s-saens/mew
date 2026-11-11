@@ -88,3 +88,15 @@ test('Xcode project references every native source and resource without dangling
     for (const file of ['Localizable', 'InfoPlist']) assert.ok(existsSync(new URL(`Mew/Resources/${locale}.lproj/${file}.strings`, root)))
   }
 })
+
+test('iOS app-bound origins and localized device guidance use the canonical Mewlink host', () => {
+  const plist = readFileSync(new URL('Mew/Info.plist', root), 'utf8')
+  const domains = plist.match(/<key>WKAppBoundDomains<\/key>\s*<array>([\s\S]*?)<\/array>/)?.[1]
+  assert.ok(domains, 'app-bound domain declarations exist')
+  assert.deepEqual([...domains.matchAll(/<string>([^<]+)<\/string>/g)].map(match => match[1]).sort(), ['app.mew.run', 'link.mew.run'])
+  for (const locale of ['en', 'ko', 'ja', 'zh-Hans']) {
+    const strings = readFileSync(new URL(`Mew/Resources/${locale}.lproj/Localizable.strings`, root), 'utf8')
+    assert.ok(strings.includes('https://link.mew.run/username/device.'), `${locale} guidance uses the new origin`)
+    assert.ok(!strings.includes('https://mew.run/username/device'), `${locale} guidance has no old origin`)
+  }
+})

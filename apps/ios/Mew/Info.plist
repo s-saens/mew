@@ -17,5 +17,5 @@
     <key>NSLocalNetworkUsageDescription</key><string>Connect to the Mew server you select on your local or private network.</string>
     <key>NSMicrophoneUsageDescription</key><string>Record voice input in your Mew workspace when you request it.</string>
     <key>NSAppTransportSecurity</key><dict><key>NSAllowsArbitraryLoads</key><true/></dict>
-    <key>WKAppBoundDomains</key><array><string>mew.run</string><string>app.mew.run</string></array>
+    <key>WKAppBoundDomains</key><array><string>link.mew.run</string><string>app.mew.run</string></array>
 </dict></plist>

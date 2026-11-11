@@ -22,4 +22,4 @@
 "Reconnect" = "다시 연결";
 "Enter a server address without credentials, query parameters, or a fragment." = "계정 정보, 쿼리 매개변수, 프래그먼트가 없는 서버 주소를 입력하세요.";
 "Use HTTPS, or explicitly allow HTTP for a private network address." = "HTTPS를 사용하거나 사설 네트워크 주소의 HTTP 연결을 허용하세요.";
-"Enter a Mewlink device address: https://mew.run/username/device." = "Mewlink 기기 주소를 입력하세요: https://mew.run/username/device.";
+"Enter a Mewlink device address: https://link.mew.run/username/device." = "Mewlink 기기 주소를 입력하세요: https://link.mew.run/username/device.";

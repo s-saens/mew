@@ -15,7 +15,7 @@ import { parseMewlinkIdentity } from '../shared/mewlink-identity.ts'
 import { authOf, requireRole } from './reqAuth.ts'
 import { accessChanges, accessRevision } from './access-policy.ts'
 import { createRemoteNetworkPreparation } from './remote-access-network.ts'
-import { resolveRemoteAddress } from './remote-access-address.ts'
+import { MEWLINK_PUBLIC_ORIGIN, remotePublicOrigin, resolveRemoteAddress } from './remote-access-address.ts'
 import { closeRemotePeer, createRemotePeerPool } from './remote-access-peer-pool.ts'
 import { createRemotePreparePool } from './remote-access-prepare-pool.ts'
 import { remoteHostRetryDelay } from './remote-access-retry.ts'
@@ -44,7 +44,7 @@ export function createRemoteAgent(server: Server, options: { network?: ReturnTyp
     }).finally(() => { addressRequest = undefined })
     return addressRequest
   }
-  const snapshot = (): RemoteStatus => ({ ...status, network, ...(registration ? { ...address, deviceName: registration.name, dashboardUrl: address?.dashboardUrl ?? (registration.origin === 'https://mew.saens.kr' ? 'https://mew.run' : registration.origin), addressError } : {}) })
+  const snapshot = (): RemoteStatus => ({ ...status, network, ...(registration ? { ...address, deviceName: registration.name, dashboardUrl: address?.dashboardUrl ?? remotePublicOrigin(registration.origin), addressError } : {}) })
   const prepareNetwork = () => {
     if (preparing) return preparing
     networkVersion++
@@ -247,7 +247,7 @@ export function createRemoteAgent(server: Server, options: { network?: ReturnTyp
       const result = await prepareNetwork()
       if (attempt !== registrationAttempt || stopped) return
       if (result.state !== 'ready' && result.state !== 'unknown') throw new Error(result.error || '직접 연결 준비를 완료하지 못했습니다. Windows 승인 상태를 확인한 뒤 다시 시도해 주세요.')
-      const origin = new URL(process.env.MEW_REMOTE_ORIGIN ?? 'https://mew.run').origin
+      const origin = new URL(process.env.MEW_REMOTE_ORIGIN ?? MEWLINK_PUBLIC_ORIGIN).origin
       if (!origin.startsWith('https://')) throw new Error('중앙 서비스는 HTTPS 주소가 필요합니다.')
       const key = await remoteKeyPair()
       if (attempt !== registrationAttempt || stopped) return

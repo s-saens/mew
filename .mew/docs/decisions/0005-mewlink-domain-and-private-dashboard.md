@@ -1,13 +1,13 @@
 ---
 title: "Mewlink Migration to mew.run and a Private Dashboard"
-description: "The decision to move public device addresses to mew.run and choose a private dashboard under a user path, preservation of existing registrations, identities, and OAuth, an internal app origin within the same site, and a restricted UDP inbound range."
+description: "Earlier mew.run domain decision, with the apex entry and canonical origin superseded by ADR 0167. Preserves the rationale for private dashboards, existing registrations, identities, OAuth, separate app execution, and restricted UDP inbound ports."
 created: 2026-10-15
-updated: 2026-10-16
+updated: "2026-11-11"
 ---
 
 # Mewlink Domain and Dashboard
 
-Status: Approved.
+Status: Approved; canonical public origin and apex entry superseded by [ADR 0167](0167-homepage-and-mewlink-subdomain.md). Other security and migration decisions remain in force.
 
 ## Background
 

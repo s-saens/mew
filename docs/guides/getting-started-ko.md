@@ -1,7 +1,7 @@
 ---
-updated: "2026-11-05"
+updated: "2026-11-11"
 title: "Getting started with mew"
-description: "Installation, first sign-in, remote access, host browser setup, updates, and data retention for Mew. The legacy locale filename is retained for existing links."
+description: "Installation, first sign-in, remote access, host browser setup, updates, and data retention for Mew. Includes the link.mew.run entry; the legacy locale filename is retained for existing links."
 ---
 
 [Current installation guide](getting-started-en.md) · [Documentation](../README.md)
@@ -150,13 +150,13 @@ Exit with Ctrl+C and run the same command again to use the latest version. If yo
 
 #### 1. Mewlink
 
-[Mewlink](https://mew.saens.kr) lets you open mew on your computer from a browser on your phone or another computer. No separate domain or router port forwarding configuration is required. Mewlink handles device registration, management, and connections, while the mew interface and work data are transferred directly between your computer and the connecting browser.
+[Mewlink](https://link.mew.run) lets you open mew on your computer from a browser on your phone or another computer. No separate domain or router port forwarding configuration is required. Mewlink handles device registration, management, and connections, while the mew interface and work data are transferred directly between your computer and the connecting browser.
 
 1. Run mew on your computer and log in as **owner** at the local address (default: `http://localhost:5000`). If you are using a temporary password, change it first.
 2. Click the upper-right menu → **Mewlink → Remote access → Register device**.
 3. Open the displayed **Log in and complete registration** link and log in to Mewlink. If this is your first time, set a username, then choose a device name to complete registration. The Mewlink login used for device registration and management is separate from your local mew email and password.
-4. In local mew, confirm the **Online** status and fixed access address. The address has the format `https://mew.saens.kr/<유저이름>/<기기이름>`.
-5. Opening this address on your phone or another computer displays that computer's mew login screen without requiring a Mewlink login. Log in with your **local mew email and password**. The connecting browser does not need separate registration, and if its saved local login session is valid, you can continue using it on your next visit. Registration, deletion, and list management in [My devices](https://mew.saens.kr/dashboard) require logging in to Mewlink.
+4. In local mew, confirm the **Online** status and fixed access address. The address has the format `https://link.mew.run/<유저이름>/<기기이름>`.
+5. Opening this address on your phone or another computer displays that computer's mew login screen without requiring a Mewlink login. Log in with your **local mew email and password**. The connecting browser does not need separate registration, and if its saved local login session is valid, you can continue using it on your next visit. Registration, deletion, and list management in [My devices](https://link.mew.run/dashboard) require logging in to Mewlink.
 
 Your computer must stay on, with mew running and an active internet connection. You cannot connect while the computer is off or asleep. Networks that block direct connections display a connection failure. See the [remote access contract](../../.mew/docs/development/remote-access.md#verification-and-remaining-gates) for the scope of verification covering provider-specific logins, external mobile networks, sleep, and network switching.
 

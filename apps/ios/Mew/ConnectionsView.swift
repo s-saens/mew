@@ -86,7 +86,7 @@ private struct ConnectionEditor: View {
                     Text("Mewlink").tag(ConnectionKind.mewlink)
                 }.pickerStyle(.segmented)
                 TextField("Name", text: $name)
-                TextField(kind == .mewlink ? "https://mew.run/username/device" : "https://your-server", text: $address)
+                TextField(kind == .mewlink ? "https://link.mew.run/username/device" : "https://your-server", text: $address)
                     .textContentType(.URL).keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled()
                 if kind == .direct {
                     Toggle("Allow HTTP on a private network", isOn: $allowsHTTP)

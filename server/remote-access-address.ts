@@ -1,5 +1,11 @@
+export const MEWLINK_PUBLIC_ORIGIN = 'https://link.mew.run'
+
+export function remotePublicOrigin(origin: string): string {
+  return origin === 'https://mew.run' || origin === 'https://mew.saens.kr' ? MEWLINK_PUBLIC_ORIGIN : origin
+}
+
 export async function resolveRemoteAddress(origin: string, owner: string, name: string): Promise<{ url: string; username: string; dashboardUrl: string }> {
-  const publicOrigin = origin === 'https://mew.saens.kr' ? 'https://mew.run' : origin
+  const publicOrigin = remotePublicOrigin(origin)
   const address = new URL(`/${encodeURIComponent(owner)}/${encodeURIComponent(name)}`, publicOrigin)
   const response = await fetch(address, { method: 'HEAD', redirect: 'manual', signal: AbortSignal.timeout(5000) })
   const location = response.headers.get('location')

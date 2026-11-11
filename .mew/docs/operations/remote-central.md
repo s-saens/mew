@@ -1,11 +1,30 @@
 ---
 title: "mewlink Cloudflare Deployment"
-description: "Maintainer runbook covering Mewlink's independent Git repository, parent-checkout dependencies, configuration, deployment, secrets recovery, key preservation, access revocation, verification, rollback, and historical port-preview wildcard DNS and TLS setup, which is no longer required after Mew Port removal. Links to dated operating records."
+description: "Maintainer runbook for the apex homepage and link.mew.run entry, compatible Custom Domain rollout, independent central Git repository, deployment, secrets/key recovery, revocation, verification, and rollback. Retains historical port-preview DNS/TLS guidance."
 created: "2026-10-07"
-updated: "2026-11-02"
+updated: "2026-11-11"
 ---
 
 Recurring deployment, configuration, and recovery procedures for central service maintainers. Results of changes by date are preserved in the [deployment history](../work/mewlink-deployment-history.md).
+
+## Homepage and Mewlink subdomain rollout
+
+The source configuration now serves `https://mew.run/` as the independent homepage and uses `https://link.mew.run/` for login and the private `/{username}` dashboard. The [homepage specification](../features/mew-run-homepage.md) and [ADR 0167](../decisions/0167-homepage-and-mewlink-subdomain.md) define the split. Source configuration and local builds do not establish production application.
+
+On 2026-11-11, read-only Cloudflare MCP inspection confirmed that the apex and `app.mew.run` belonged to the existing `mewlink` Worker, while `link.mew.run` had no Custom Domain or DNS record. Do not attach the hostname to the old deployment: its exact-origin gate rejects it. Apply compatible code and the Custom Domain together through the existing operator workflow. Cloudflare Custom Domains provision the corresponding DNS and certificate; do not hand-edit Worker-managed `read_only` records. [Custom Domain routing](https://developers.cloudflare.com/workers/configuration/routing/custom-domains/).
+
+The operator can use **Publish Mew.run and Mewlink** in Mew's results/publishing screen or run `npm --prefix mewlink run deploy` from the parent checkout. The configured action invokes the existing script, including demo/central builds, migrations, key-preservation guards, and Worker deployment. **Build homepage and Mewlink** only runs the central frontend build and offers `mewlink/dist/homepage-preview.html` as a downloadable, self-contained visual preview; **Build Mew workspace** is the separate required host build. The published result address is `https://mew.run/`; Mewlink is at `https://link.mew.run/`. No development server is started by these build actions. Agents must not run the publishing action under this repository's execution rules.
+
+1. Preserve the existing D1 database, Durable Object namespace, signing key, provider configuration, and all saved host registration origins. Keep `APP_ORIGIN=https://app.mew.run`, `OAUTH_ORIGIN=https://mew.saens.kr`, and `EMAIL_IDENTITY_ISSUER=https://mew.saens.kr`.
+2. Confirm Wrangler declares `HOMEPAGE_ORIGIN=https://mew.run`, `CENTRAL_ORIGIN=https://link.mew.run`, both previous central origins, and the new `link.mew.run` Custom Domain alongside existing domains. Review any existing remote-only routes before applying configuration; avoid unrelated DNS/route cleanup.
+3. Build and test the matching parent and central sources. Apply host-side changes through the operator's normal lifecycle workflow. Ship updated native iOS origin handling before depending on it; older clients reject the new hostname.
+   The deployment script builds the current local working tree, including pending source changes; committing this task does not select an isolated release snapshot. Review both checkouts before publishing.
+4. Run the central deployment as operator. If Custom Domain provisioning is separate, attach `link.mew.run` to the same production `mewlink` service only after compatible code is active. MCP's Worker domain API can perform this attachment; a DNS CNAME alone is not equivalent. Check binding and certificate status afterward.
+5. Verify apex GET/HEAD, public asset loading, Mewlink login and signed-in root redirect, private owner dashboard, old device/share URL redirects, retained OAuth callbacks, and a new-origin browser connecting to each supported legacy host origin. Inspect external-network and native-device behavior separately.
+
+Expect fresh management login at the new host. Host-only cookies and origin-scoped trusted-device keys do not transfer automatically; never move raw bearers in query parameters or expand cookies to `.mew.run`. The apex `/central/*` and `/auth/*` endpoints remain compatible for saved hosts and callbacks. The homepage's exact assets are selected before legacy redirects, without intercepting a user's ordinary device paths. Old `/demo` links redirect to the canonical demo.
+
+Rollback restores the prior compatible Worker version and origin/domain configuration while retaining D1, DO, keys, and legacy protocols. A frontend-only rollback must not erase the new hostname while hosts or clients depend on it. Recheck both old and new addresses rather than treating a successful deployment command as availability proof. Actual results belong to the [homepage work record](../work/mew-run-homepage.md).
 
 ## What I Need to Do
 
@@ -127,13 +146,13 @@ Run `npm run test:deploy` inside `mewlink/` to check this behavior without Cloud
 
 When the Worker rewrites a page request to `/index.html`, Cloudflare Static Assets' default HTML normalization issues a 307 redirect to `/`. The same handling repeats at `/`, causing an infinite redirect loop. For page routes, the Worker internally requests the canonical URL `/` to retrieve HTML while preserving the dashboard, registration, device, and launch URLs in the browser. [Cloudflare HTML handling](https://developers.cloudflare.com/workers/static-assets/routing/advanced/html-handling/).
 
-With the corrected source, rerun `npm run deploy` from `mewlink/`. After redeployment, verify that `curl -I https://mew.saens.kr/` returns status `200` with no `Location: /`. Regression tests use `public/index.html` and the actual Cloudflare Assets binding instead of build artifacts to check GET and HEAD requests for central pages and internal launch pages.
+With the corrected source, rerun `npm run deploy` from `mewlink/`. After redeployment, verify that `curl -I https://link.mew.run/` returns status `200` with no `Location: /`. Regression tests use `public/index.html` and the actual Cloudflare Assets binding instead of build artifacts to check GET and HEAD requests for central pages and internal launch pages.
 
 ### 5. Connect your mew
 
 1. Build and apply the new version of local mew. Follow the [local installation guide](../../../docs/deployment/native.md).
 2. Log in to local mew as `owner`, then click **Header menu → Mewlink → Remote Access → Register Device**. **Settings → Account** contains personal profile and password settings and has no Remote Access option.
-3. On the `mew.saens.kr` page that opens, log in → enter a device name → approve registration.
+3. On the `link.mew.run` page that opens, log in → enter a device name → approve registration.
 4. Open the registered device link on another PC or phone to verify the connection.
 
 The user performed the initial deployment. Provider login and P2P connections over external networks have not yet been verified. **The user runs the commands listed in this document.**
@@ -173,9 +192,9 @@ A Node process on a production server, internal port `5002`, and an HTTPS revers
 
 ## Access URLs and P2P UI
 
-Users open only `https://mew.saens.kr/{중앙 계정 ID}/{기기 이름}` or `/dashboard`. The address bar retains this path. The internal connection frame opens at `https://mew-ui.saens.kr/launch/{임시 ID}`, and the actual UI within it is received from A starting with `/__mew_ui/{임시 ID}/index.html`. Absolute resource URLs for JS, CSS, and workers are also routed through a connection-specific prefix, binding dynamic imports and worker requests to the same A. Refreshing creates a new connection proof and P2P connection.
+Users open `https://link.mew.run/{username}/{device}` for a public connection, or `https://link.mew.run/` for login and their private dashboard. Legacy `/dashboard` redirects to the signed-in owner’s username path. The address bar retains this path. The internal connection frame opens at `https://app.mew.run/launch/{temporary-id}`, and the actual UI within it is received from A starting with `/__mew_ui/{임시 ID}/index.html`. Absolute resource URLs for JS, CSS, and workers are also routed through a connection-specific prefix, binding dynamic imports and worker requests to the same A. Refreshing creates a new connection proof and P2P connection.
 
-`mew-ui.saens.kr` is an **internal execution origin** attached to the same Worker. It is not a site that separately deploys the entire mew UI. It provides a boundary that separates the login host's `__Host-mew_central` cookie and authentication and account APIs from P2P app code. Merely separating `/user/device` paths under one origin allows JS on that origin to call authentication APIs. The central service's single-use launch proof, valid for 60 seconds, is passed only to the exact internal frame; central cookies and launch proofs are not passed to the actual app.
+`app.mew.run` is an **internal execution origin** attached to the same Worker. It is not a site that separately deploys the entire mew UI. It provides a boundary that separates the login host's `__Host-mew_central` cookie and authentication and account APIs from P2P app code. Merely separating `/user/device` paths under one origin allows JS on that origin to call authentication APIs. The central service's single-use launch proof, valid for 60 seconds, is passed only to the exact internal frame; central cookies and launch proofs are not passed to the actual app.
 
 The resource Service Worker uses only the transport of the exact corresponding connection page and tab. Browser storage is scoped by central account and instance ID. Do not describe the shared app origin as security isolation between mutually untrusted devices. If A is offline or cannot be reached directly, UI and work requests fail; there is no fallback to a central HTTP proxy or TURN.
 
@@ -271,7 +290,7 @@ The default deployment uses Wrangler's browser OAuth login, so a separate Cloudf
 | `CLOUDFLARE_API_TOKEN` | For noninteractive deployment such as CI, issue a token through profile → API Tokens → Create Token in the Dashboard. It must permit Workers, D1, and domain operations for the target account and zone. Omit it when using local browser login. | CI secret store or deployment shell environment variable. Do not put it in the Worker OAuth configuration file |
 | D1 `database_id` | `npm run deploy` looks it up by the name `mewlink`, creates it if absent, and records the UUID. Stops if a different ID is already present. | `mewlink/wrangler.jsonc` |
 | `SIGNING_KEY` | Automatically generates an Ed25519 private JWK during initial deployment when neither a remote nor a local key exists. This value is not issued by an OAuth provider. | JSON string in `mewlink/.secrets.json` and a Worker secret |
-| Central and app origins | `CENTRAL_ORIGIN` and `APP_ORIGIN`, already configured for the current domains. These are not IDs or secrets. | `vars` in `mewlink/wrangler.jsonc` |
+| Public and app origins | `HOMEPAGE_ORIGIN`, `CENTRAL_ORIGIN`, and `APP_ORIGIN`, configured for the homepage, management entry, and isolated app. These are not IDs or secrets. | `vars` in `mewlink/wrangler.jsonc` |
 | Central account ID and device URL | Generated by mewlink after provider login and device registration. Distinct from the OAuth Client ID and Cloudflare Account ID. | Available in the dashboard and device links |
 
 [Find Account and Zone IDs](https://developers.cloudflare.com/fundamentals/account/find-account-and-zone-ids/), [Deployment environment variables](https://developers.cloudflare.com/workers/wrangler/system-environment-variables/), [Issue an API token](https://developers.cloudflare.com/fundamentals/api/get-started/create-token/). Cloudflare credentials authenticate deployment tools, while OAuth secrets from Google and other providers are for user login; they are not interchangeable. If A is already registered, retain the existing key and backups instead of creating a new `SIGNING_KEY`.
@@ -311,7 +330,7 @@ Do not log OAuth callback query/form data, Cookie, launch, registration codes, S
 
 ## Members, configuration, and verification
 
-A's default central address is `https://mew.saens.kr`; `MEW_REMOTE_ORIGIN` changes the initial registration target. After registration, the saved origin and key are used, so changing the address/key requires unregistering and re-registering. CLI `./mew remote-access account` provides guidance only and does not replace owner authorization. The local bind and port are retained.
+A's default central address for new registrations is `https://link.mew.run`; `MEW_REMOTE_ORIGIN` changes the initial registration target. Existing `mew.run` and `mew.saens.kr` registrations retain their saved origin/key, while their displayed public addresses use the new canonical origin. Moving to an arbitrary service or key still requires explicit recovery or re-registration. CLI `./mew remote-access account` provides guidance only and does not replace owner authorization. The local bind and port are retained.
 
 Members first log in to the central service and click their name in the header to copy their account ID. A's owner links this ID to an existing local account under **Member Access**. Temporary passwords, roles, features, and file permissions continue to be checked locally. Revoke access on A; delete the central registration through the owner dashboard or by unregistering A.
 

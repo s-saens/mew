@@ -7,7 +7,7 @@ updated: "2026-11-11"
 
 # Mew.run homepage and Mewlink entry
 
-Status: Design specified before implementation. Local implementation and verification are recorded in the [work record](../work/mew-run-homepage.md); production application remains a separate operator task.
+Status: Designed before implementation; implemented and checked locally. The [work record](../work/mew-run-homepage.md) records actual verification. Production application remains a separate operator task.
 
 ## Purpose and scope
 
@@ -36,7 +36,7 @@ Use a solid translucent fallback when backdrop filtering is unavailable. Avoid n
 
 ## Page composition and copy
 
-1. **Navigation.** Mew wordmark; in-page Workspace and Mewlink links; Source; Get started. The navigation is a small floating glass surface. On narrow screens, retain clear access to Mewlink and getting started without a JavaScript menu.
+1. **Navigation.** Mew wordmark; in-page Workspace link; Mewlink entry; Get started. The navigation is a small floating glass surface. Source links remain in the workflow and footer. On narrow screens, retain clear access to Mewlink and getting started without a JavaScript menu.
 2. **Hero.** Headline: “Make room for your work.” Supporting text: “Documents, code, and AI agents. Together in a browser workspace, with your files on your own machine.” Primary action: Get started. Secondary action: Try in browser. Supporting platform text: “Linux · macOS · Windows via WSL 2.” A small offset glass note introduces the relationship between files, writing, and implementation.
 3. **Product evidence.** Show a real, repository-owned workspace screenshot at its natural aspect ratio. Reuse an existing tracked screenshot; keep the source path explicit in the asset preparation script. Do not fabricate an application screen or add a second browser frame around an image that already includes one. Provide descriptive alt text, intrinsic dimensions, and a compact caption.
 4. **Workflow.** Three numbered editorial rows: “Write it down.”, “Build beside it.”, and “Review what changed.” Explain document editing beside code, terminals and AI agents, and Git review in one short paragraph each. Use rules and typography rather than repeating equal cards.
@@ -68,6 +68,10 @@ Provide a skip link, semantic landmarks, one H1, sequential headings, descriptiv
 Retain the existing Mewlink Workers + Static Assets deployment, D1 database, and per-device Durable Objects. Serve a distinct static homepage entry at the apex; keep the central frontend and P2P runtime independent. This avoids introducing another hosting project merely to serve one page.
 
 The private `mewlink/` Git repository owns homepage source, packaged public assets, and Worker routing. The public parent repository owns host integration and these canonical documents. Version changes in each repository separately. Do not include existing notification or other unrelated edits in task commits.
+
+Implementation entrypoints: `mewlink/public/homepage/index.html` and `styles.css` contain the static page; `mewlink/src/homepage.ts` selects the exact homepage/asset routes before legacy redirects. `mewlink/scripts/homepage-assets.mjs` copies the existing tracked `docs/assets/screenshots/split.png` and IBM Plex Mono font into the central build. The existing launcher build provides Sans fonts, favicon, and font licenses. The Mewlink illustration is decorative HTML/CSS, distinct from the real workspace screenshot.
+
+The parent `.mew/project-actions.json` exposes **Build Mew workspace**, **Build homepage and Mewlink**, and **Publish homepage and Mewlink**. The central build emits `mewlink/dist/homepage-preview.html` as a downloadable single-file preview with inline styles, image, fonts, and font license. It opens without an asset server; published navigation still uses the actual destinations. `.mew/project-pipelines.json` saves the operator's **Publish Mew.run and Mewlink** flow with the real destination URL. The deploy script includes its own builds; the flow does not run redundant build steps or invent an available local preview server.
 
 Configure Mew build/deploy actions only against existing scripts. A configured deployment action is operator-executable; agents must follow the [execution prohibition](../development/getting-started.md#execution-and-verification). Do not mutate live DNS or attach `link.mew.run` before compatible code is deployed: the currently deployed Worker rejects that origin.
 

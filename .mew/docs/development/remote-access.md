@@ -1,6 +1,6 @@
 ---
 title: "Mewlink device registration and locally authenticated P2P access contract"
-description: "Defines Mewlink registration, launcher behavior, authentication, browser trust, UI resources, notification and microphone delegation, signaling proofs, and transport limits, including the bounded speech-transcription response wait. Links native iOS storage, recovery, and separate host/central verification boundaries."
+description: "Defines the link.mew.run entry, apex homepage separation, legacy origin compatibility, Mewlink registration, launcher behavior, authentication, browser trust, UI resources, notification and microphone delegation, signaling proofs, and transport limits, including the bounded speech-transcription response wait. Links native iOS storage, recovery, and separate host/central verification boundaries."
 created: 2026-10-07
 updated: "2026-11-11"
 ---
@@ -13,16 +13,20 @@ On 2026-10-10, the user confirmed public-address UI/agent chat, then reported de
 
 ## Domain migration and device dashboard
 
-Device URL: `https://mew.run/{username}/{device}`; owner dashboard: `https://mew.run/{username}`. Only the centrally logged-in owner receives that device list. Another account gets 404; logged-out users see login without a list request. `/` and former `/dashboard` redirect to the owner's address after login. Public device connections need no central login.
+`https://mew.run/` serves the independent [public homepage](../features/mew-run-homepage.md) without account queries or management scripts. `https://link.mew.run/` is the Mewlink entry: signed-out visitors see login, signed-in users with a username redirect to their private dashboard, and unnamed accounts choose a username. [ADR 0167](../decisions/0167-homepage-and-mewlink-subdomain.md) supersedes the previous canonical origin.
+
+Device URL: `https://link.mew.run/{username}/{device}`; owner dashboard: `https://link.mew.run/{username}`. Only the centrally logged-in owner receives that device list. Another account gets 404; logged-out users see login without a list request. `/` and former `/dashboard` redirect to the owner's address after login. Public device connections need no central login.
 
 
-Execution uses `https://app.mew.run`, a separate origin on the management site to reduce mobile cross-site storage restrictions while isolating central cookies/APIs. Former `mew.saens.kr` screens redirect without changing registration, persistent WSS, signing keys, or device IDs. Central permits only configured previous origins and checks host-proof audience/ticket issuer against the connected host's origin. Browsers accept only configured current/previous issuers and retain signing-key/instance-audience checks. Existing Durable Objects need no new launch RPC. Approved local identities keep the host issuer, and direct-email identities keep their previous namespace to prevent duplicate same-email accounts.
+Execution uses `https://app.mew.run`, a separate origin on the management site to reduce mobile cross-site storage restrictions while isolating central cookies/APIs. Former `mew.run` pages (apart from the apex homepage and exact public asset paths) and `mew.saens.kr` screens redirect without changing registration, persistent WSS, signing keys, or device IDs. Central permits only configured previous origins and checks host-proof audience/ticket issuer against the connected host's origin. Browsers accept only configured current/previous issuers and retain signing-key/instance-audience checks. Existing Durable Objects need no new launch RPC. Approved local identities keep the host issuer, and direct-email identities keep their previous namespace to prevent duplicate same-email accounts.
 
-Legacy provider callbacks use `OAUTH_ORIGIN`. A single-use proof, valid 60 seconds and bound to the new origin's browser verification cookie, issues the new management session only after origin/cookie/expiry checks. The app origin exposes no such route. See the [migration decision](../decisions/0005-mewlink-domain-and-private-dashboard.md).
+New registrations default to `https://link.mew.run`. Host address lookup maps both previous public origins directly to it, but saved registration origins and proof audiences remain unchanged. Central host-only cookies and origin-scoped trusted-device keys do not migrate automatically; renewed central/local sign-in can be required. Do not transfer raw credentials in redirects or broaden cookie scope.
+
+Legacy provider callbacks use `OAUTH_ORIGIN=https://mew.saens.kr`. A single-use proof, valid 60 seconds and bound to the new origin's browser verification cookie, issues the new management session only after origin/cookie/expiry checks. The app origin exposes no such route. See the [migration decision](../decisions/0005-mewlink-domain-and-private-dashboard.md).
 
 ## Launcher touch zoom
 
-`mew.run` connection and `app.mew.run` launcher documents apply the [workspace touch policy](../features/appearance-accounts-operations/panel-layout-mobile-and-state-restoration.md#touch-zoom) before installed UI load. Both must apply it because iframe touch events do not propagate. Dashboard browser zoom is unchanged.
+`link.mew.run` connection and `app.mew.run` launcher documents apply the [workspace touch policy](../features/appearance-accounts-operations/panel-layout-mobile-and-state-restoration.md#touch-zoom) before installed UI load. Both must apply it because iframe touch events do not propagate. Dashboard browser zoom is unchanged.
 
 `mewlink/src/workspace-touch-zoom.ts` reuses `startWorkspacePinchZoom`: append `maximum-scale=1` without losing viewport directives, set root `data-workspace-touch-zoom`, and scope `touch-action: pan-x pan-y` CSS. Disposal restores viewport/root state and removes listeners.
 
@@ -40,7 +44,7 @@ Host builds update browser assets only. Applying the changed direct HTTP header 
 
 ## Public file and folder links
 
-Public links append `/share/f/{id}` or `/share/d/{id}` to `https://mew.run/{username}/{device}`. Central preserves the typed path through parent, launcher, and `mew:context`. After transport initialization, the app opens its standalone public editor without workspace/login UI; direct localhost/custom-domain paths choose the same editor.
+Public links append `/share/f/{id}` or `/share/d/{id}` to `https://link.mew.run/{username}/{device}`. Central preserves the typed path through parent, launcher, and `mew:context`. After transport initialization, the app opens its standalone public editor without workspace/login UI; direct localhost/custom-domain paths choose the same editor.
 
 Vite retains `base: './'` for per-connection resources. Direct SPA fallback `server/direct-ui.ts` rewrites relative startup script/link HTML attributes to host-root paths, letting `/share/f/{id}` and `/share/d/{id}` load `/assets/`. Document links, inline scripts, and saved HTML are unchanged. `/api/remote-ui/file?path=/index.html` reads that artifact for isolated Mewlink entry.
 
@@ -117,7 +121,7 @@ Under [ADR 0050](../decisions/0050-mewlink-startup-preparation.md), successful c
 
 HTML, connection-token paths, public config/keys, Service Workers, APIs, unhashed compatibility files, and errors stay `no-store`. This HTTP cache covers non-personalized central code only. Host code still needs per-device SHA-256/current-P2P validation below; auth results, documents, and sessions are never cached. Disconnection/permission failure cannot launch saved code.
 
-Only public production connect GET status-200 HTML on configured `https://mew.run`→`https://app.mew.run` adds `Link: <https://app.mew.run>; rel=preconnect`. Other origins/roles, HEAD, and errors cannot add it. Never inherit ASSETS Link or include device/instance/admission/query/cookie data. Omit `crossorigin` to match iframe credentials; retain final CSP, `no-referrer`, auth, and limits. Enabled [Cloudflare Early Hints](https://developers.cloudflare.com/cache/advanced-configuration/early-hints/) may start TLS before HTML when cache-ready, without guaranteeing 103 issuance, reuse, or faster production timing. Preload is forbidden because it requests resources before final Referrer-Policy.
+Only public production connect GET status-200 HTML on configured `https://link.mew.run`→`https://app.mew.run` adds `Link: <https://app.mew.run>; rel=preconnect`. Other origins/roles, HEAD, and errors cannot add it. Never inherit ASSETS Link or include device/instance/admission/query/cookie data. Omit `crossorigin` to match iframe credentials; retain final CSP, `no-referrer`, auth, and limits. Enabled [Cloudflare Early Hints](https://developers.cloudflare.com/cache/advanced-configuration/early-hints/) may start TLS before HTML when cache-ready, without guaranteeing 103 issuance, reuse, or faster production timing. Preload is forbidden because it requests resources before final Referrer-Policy.
 
 Connect HTML runs static bootstrap before CSS/external scripts and `modulepreload`s controller/JOSE together. The Worker adds the body's SHA-256 hash to CSP only when trusted ASSETS HTML has exactly one direct-head `script[data-mewlink-prime="v1"]` with matching marker/static body. No `unsafe-inline`; an internal Response WeakMap carries the hash. Dynamic device/admission metadata precedes code, outside its body, and responses specify UTF-8. Invalid markers or older HTML/Worker use the external entry.
 
@@ -211,7 +215,7 @@ Application requires **local mew update and central redeployment**. Agents run t
 
 First central login chooses a username; header account settings (`/account`) changes it. Names are case-insensitive unique, trimmed/lowercased, 3–30 English-letter/digit/hyphen characters, starting/ending alphanumeric. Consecutive hyphens/reserved service words are forbidden. Provider names are not auto-claimed.
 
-Current URL is `https://mew.run/<username>/<device-name>`. D1 `0002_usernames.sql` adds nullable `username` and separate name-ownership history. Atomic batch claim/change ensures one winner under concurrency. Old names remain owned permanently. Old-name, uppercase, and internal-ID URLs redirect 307 to current names; unnamed accounts retain existing URLs until set.
+Current URL is `https://link.mew.run/<username>/<device-name>`. D1 `0002_usernames.sql` adds nullable `username` and separate name-ownership history. Atomic batch claim/change ensures one winner under concurrency. Old names remain owned permanently. Old-name, uppercase, and internal-ID URLs redirect 307 to current names; unnamed accounts retain existing URLs until set.
 
 Provider identities, admin sessions, and device ownership retain immutable central IDs; work permissions/storage use local account + instance. Username aliases transfer neither rights nor storage. Central IDs are management identities, not local login/device-use permission. Stored ID URLs redirect centrally, so renaming needs no re-registration.
 

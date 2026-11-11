@@ -74,13 +74,13 @@ Setup installs dependencies, asks for your workspace folder, then builds and sta
 
 ## Open it from another device
 
-[Mewlink](https://mew.run) helps another browser connect to your running mew instance. It handles device registration and connection setup; workspace data travels directly between the host and the connecting browser. You do not need your own domain or router port forwarding.
+[Mewlink](https://link.mew.run) helps another browser connect to your running mew instance. It handles device registration and connection setup; workspace data travels directly between the host and the connecting browser. You do not need your own domain or router port forwarding.
 
 1. On the host, sign in as owner and open **Menu → Mewlink → Register device**.
 2. Follow the registration link, sign in to Mewlink, and choose your username and device name.
-3. Open the displayed device address on another device, such as `https://mew.run/you/laptop`. Sign in with the host's **local mew email and password**. Opening this address does not require a Mewlink account.
+3. Open the displayed device address on another device, such as `https://link.mew.run/you/laptop`. Sign in with the host's **local mew email and password**. Opening this address does not require a Mewlink account.
 
-Sign in at `https://mew.run/you` to see your registered devices. This dashboard is visible only to its account owner.
+Sign in at `https://link.mew.run/you` to see your registered devices. This dashboard is visible only to its account owner.
 
 Keep the host awake, online, and running mew. Networks that block direct connections can prevent access. Mewlink registration and local mew sign-in are separate; connecting devices do not need registration.
 

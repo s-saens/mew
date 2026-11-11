@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "actions": [
+    { "id": "mew-build", "name": "Build Mew workspace", "kind": "build", "variant": "release", "command": "npm run build" },
+    { "id": "mewlink-build", "name": "Build homepage and Mewlink", "kind": "build", "variant": "release", "command": "npm --prefix mewlink run build", "artifacts": ["mewlink/dist/homepage-preview.html"] },
+    { "id": "mewlink-publish", "name": "Publish homepage and Mewlink", "kind": "deploy", "command": "npm --prefix mewlink run deploy", "previewUrl": "https://mew.run/" }
+  ]
+}

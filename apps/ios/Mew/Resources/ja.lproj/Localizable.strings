@@ -22,4 +22,4 @@
 "Reconnect" = "再接続";
 "Enter a server address without credentials, query parameters, or a fragment." = "認証情報、クエリパラメーター、フラグメントを含まないサーバーアドレスを入力してください。";
 "Use HTTPS, or explicitly allow HTTP for a private network address." = "HTTPSを使うか、プライベートネットワークのアドレスにHTTP接続を明示的に許可してください。";
-"Enter a Mewlink device address: https://mew.run/username/device." = "Mewlinkデバイスのアドレスを入力してください: https://mew.run/username/device.";
+"Enter a Mewlink device address: https://link.mew.run/username/device." = "Mewlinkデバイスのアドレスを入力してください: https://link.mew.run/username/device.";

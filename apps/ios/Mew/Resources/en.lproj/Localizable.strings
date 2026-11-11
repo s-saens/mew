@@ -22,4 +22,4 @@
 "Reconnect" = "Reconnect";
 "Enter a server address without credentials, query parameters, or a fragment." = "Enter a server address without credentials, query parameters, or a fragment.";
 "Use HTTPS, or explicitly allow HTTP for a private network address." = "Use HTTPS, or explicitly allow HTTP for a private network address.";
-"Enter a Mewlink device address: https://mew.run/username/device." = "Enter a Mewlink device address: https://mew.run/username/device.";
+"Enter a Mewlink device address: https://link.mew.run/username/device." = "Enter a Mewlink device address: https://link.mew.run/username/device.";

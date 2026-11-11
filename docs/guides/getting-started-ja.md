@@ -1,7 +1,7 @@
 ---
 title: "Getting started with mew"
-updated: "2026-11-05"
-description: "Installation, first sign-in, remote access, host browser setup, updates, and data retention for Mew. The legacy locale filename is retained for existing links."
+updated: "2026-11-11"
+description: "Installation, first sign-in, remote access, host browser setup, updates, and data retention for Mew. Includes the link.mew.run entry; the legacy locale filename is retained for existing links."
 ---
 
 [Current installation guide](getting-started-en.md) · [Documentation](../README.md)
@@ -150,7 +150,7 @@ You can connect from another browser through Mewlink. Tailscale and Cloudflare T
 
 1. Log in to local mew as owner and change the temporary password. Open **Menu → Mewlink → Remote access → Register device**.
 2. Log in to Mewlink at the registration URL and set a username and device name.
-3. Check the online status and the connection URL `https://mew.saens.kr/<ユーザー名>/<端末名>`.
+3. Check the online status and the connection URL `https://link.mew.run/<ユーザー名>/<端末名>`.
 4. Opening this URL on another device displays the host's mew login screen without requiring a Mewlink login. Log in with **the email address and password for local mew on that computer**. The connecting device does not need to be registered, and a valid saved session can be reused on subsequent visits.
 
 Mewlink login is used to register, list, and delete devices. Create local mew accounts for other users and configure their roles, features, and file permissions. A Mewlink account is not required when logging in with a local password. Access to work data is denied until local login.

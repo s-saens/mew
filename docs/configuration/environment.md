@@ -1,7 +1,7 @@
 ---
 title: "Server environment variables and CLI settings"
-description: "Covers host configuration file precedence, environment variables, data locations, Mewlink origin, OAuth, and prebuilt CLI options. Development documentation owns the module initialization contract."
-updated: "2026-10-29"
+description: "Covers host configuration file precedence, environment variables, data locations, canonical and legacy Mewlink origins, OAuth, and prebuilt CLI options. Development documentation owns the module initialization contract."
+updated: "2026-11-11"
 상위파일: "MOC.md"
 ---
 
@@ -21,7 +21,7 @@ The server configuration file is `~/.config/mew/config.env` on Linux and macOS (
 | `MEW_GITHUB_CLIENT_ID` | Built-in Mew OAuth app | Optional setting to replace it with your own GitHub OAuth app Client ID. Unset, empty, or whitespace-only values use the default app |
 | `MEW_DATA_DIR` | Linux/macOS: `~/.local/share/mew` (respecting `XDG_DATA_HOME`), Windows: `%LOCALAPPDATA%\mew\data`. An older installation's `<앱>/.data` takes precedence if present | Accounts, sessions, feature/file permissions, and icons |
 | `MEW_AGENT_MEMORY_SCOPE` | `auto` | Applies ACP and CLI task memory limits through the installed systemd slice. `required` refuses execution if it is not installed; `off` disables only OS limits. [Installation and memory protection](../operations/agent-memory.md) |
-| `MEW_REMOTE_ORIGIN` | `https://mew.run` | Central HTTPS origin for new remote registrations. After registration, the saved origin is used. Existing `mew.saens.kr` registrations are maintained through the central service's support for allowed previous origins. To switch to an arbitrary service, unregister and register again. [Central service operations](../../.mew/docs/operations/remote-central.md) |
+| `MEW_REMOTE_ORIGIN` | `https://link.mew.run` | Central HTTPS origin for new remote registrations. After registration, the saved origin is used. Existing `mew.run` and `mew.saens.kr` registrations are maintained through the central service's support for allowed previous origins. To switch to an arbitrary service, unregister and register again. [Central service operations](../../.mew/docs/operations/remote-central.md) |
 | `MEW_TEAM_PORT` | 5000 | Server port |
 | `MEW_BIND` | `127.0.0.1` | Address the server listens on. The published default is loopback; specify an exposed address only when direct LAN access is essential. Keep server deployments on `127.0.0.1` behind an HTTPS proxy or tunnel |
 | `MEW_COLLAB_RUST` | Unset (=JS Yjs) | If `1`, uses Rust (yrs) for collaboration room state — run `npm run build:native` first ([Collaboration rooms](../../.mew/docs/development/collaboration.md)) |

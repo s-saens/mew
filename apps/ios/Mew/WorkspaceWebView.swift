@@ -150,7 +150,7 @@ private struct WorkspaceWebView: UIViewRepresentable {
             }
             let allowed = connection.kind == .direct
                 ? expectingLocalHTML && ((url.scheme == "mew-app" && url.host == "workspace" && (url.path.isEmpty || url.path == "/")) || url.absoluteString == "about:blank")
-                : url.scheme == "https" && url.host == "mew.run" && (url.port == nil || url.port == 443) && url.path == connection.address.path
+                : connection.acceptsMewlinkNavigation(url)
             if allowed { decisionHandler(.allow) }
             else {
                 decisionHandler(.cancel)

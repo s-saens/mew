@@ -14,6 +14,7 @@ test('Mewlink prepares direct access only on an owner action and preserves regis
   process.env.MEW_REMOTE_ORIGIN = 'https://central.example.test'
   const { createRemoteAgent } = await import('./remote-access-agent.ts')
   const { saveRemoteRegistration, readRemoteRegistration } = await import('./remote-access-state.ts')
+  const { remotePublicOrigin, resolveRemoteAddress } = await import('./remote-access-address.ts')
   const { remoteKeyPair } = await import('../shared/remote-access-crypto.ts')
   const realFetch = globalThis.fetch
   let registrations = 0
@@ -42,6 +43,22 @@ test('Mewlink prepares direct access only on an owner action and preserves regis
     assert.ok(done(), 'registration settled')
   }
   const ready: RemoteNetworkStatus = { state: 'ready', reason: 'wsl-udp-rule' }
+
+  await t.test('new registrations default to link.mew.run without changing an explicit central override', async t => {
+    delete process.env.MEW_REMOTE_ORIGIN
+    t.mock.method(globalThis, 'fetch', async (input: string | URL | Request, init?: RequestInit) => {
+      assert.equal(String(input), 'https://link.mew.run/central/registrations')
+      assert.equal(new Headers(init?.headers).get('Origin'), 'https://link.mew.run')
+      return Response.json({ code: 'r'.repeat(32), challenge: 'challenge', expires: Date.now() + 300_000, registrationUrl: 'https://link.mew.run/register/' + 'r'.repeat(32) })
+    })
+    const f = await fixture({ check: async () => ready, prepare: async () => ready })
+    try {
+      await f.call('POST', '/register')
+      await until(() => f.agent.status().state !== 'registering' || !!f.agent.status().registrationUrl)
+      assert.equal(f.agent.status().registrationUrl, 'https://link.mew.run/register/' + 'r'.repeat(32))
+      assert.equal(readRemoteRegistration(), null, 'registration is not saved before approval')
+    } finally { await f.close(); process.env.MEW_REMOTE_ORIGIN = 'https://central.example.test' }
+  })
 
   await t.test('inspection and non-owner requests never prompt; registration waits for one preparation', async () => {
     let complete!: (value: RemoteNetworkStatus) => void, preparations = 0
@@ -143,5 +160,23 @@ test('Mewlink prepares direct access only on an owner action and preserves regis
       assert.equal(deleted.username, undefined)
       assert.equal(deleted.deviceName, undefined)
     } finally { await f.close(); saveRemoteRegistration(null) }
+  })
+  await t.test('canonical public addresses preserve both legacy registration origins and proof keys', async t => {
+    const keys = await remoteKeyPair(), central = await remoteKeyPair()
+    t.mock.method(globalThis, 'fetch', async (input: string | URL | Request) => {
+      assert.equal(String(input), 'https://link.mew.run/legacy-owner/home')
+      return new Response(null, { status: 307, headers: { location: 'https://link.mew.run/alice/home' } })
+    })
+    try {
+      for (const origin of ['https://mew.run', 'https://mew.saens.kr']) {
+        const registration = { origin, instance: 'legacy-instance', owner: 'legacy-owner', name: 'home', ...keys, centralKey: central.publicKey, accounts: { 'legacy-owner': 'owner@example.test' } }
+        saveRemoteRegistration(registration)
+        assert.equal(remotePublicOrigin(origin), 'https://link.mew.run')
+        assert.deepEqual(await resolveRemoteAddress(registration.origin, registration.owner, registration.name), {
+          username: 'alice', url: 'https://link.mew.run/alice/home', dashboardUrl: 'https://link.mew.run/alice',
+        })
+        assert.deepEqual(readRemoteRegistration(), registration)
+      }
+    } finally { saveRemoteRegistration(null) }
   })
 })

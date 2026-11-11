@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "pipelines": [
+    {
+      "id": "mew-public-site",
+      "name": "Publish Mew.run and Mewlink",
+      "purpose": "publish",
+      "steps": [ { "id": "publish", "name": "Build and publish", "type": "action", "actionId": "mewlink-publish" } ],
+      "resultUrl": "https://mew.run/"
+    }
+  ]
+}

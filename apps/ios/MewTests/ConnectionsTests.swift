@@ -20,12 +20,44 @@ final class ConnectionsTests: XCTestCase {
     }
 
     func testMewlinkRequiresExactPublicDeviceAddress() throws {
-        let connection = try SavedConnection(name: "Laptop", kind: .mewlink, address: "https://mew.run/alice/laptop/")
-        XCTAssertEqual(connection.address.absoluteString, "https://mew.run/alice/laptop")
+        for host in ["link.mew.run", "mew.run", "mew.saens.kr"] {
+            let connection = try SavedConnection(name: "Laptop", kind: .mewlink, address: "https://\(host)/alice/laptop/")
+            XCTAssertEqual(connection.address.absoluteString, "https://link.mew.run/alice/laptop")
+            XCTAssertEqual(connection.origin, "https://link.mew.run")
+        }
         XCTAssertEqual(try SavedConnection(name: "Default port", kind: .direct, address: "https://example.com:443").origin, "https://example.com")
-        for address in ["https://evil.com/alice/laptop", "https://app.mew.run/launch/id", "http://mew.run/alice/laptop", "https://mew.run/alice", "https://mew.run/alice/laptop/api"] {
+        for address in ["https://evil.com/alice/laptop", "https://app.mew.run/launch/id", "http://link.mew.run/alice/laptop", "https://link.mew.run/alice", "https://link.mew.run/alice/laptop/api", "https://link.mew.run:444/alice/laptop", "https://mew.run.evil.com/alice/laptop", "https://user:secret@link.mew.run/alice/laptop", "https://link.mew.run/alice/laptop?token=secret", "https://mew.saens.kr/alice/laptop#secret"] {
             XCTAssertThrowsError(try SavedConnection(name: "test", kind: .mewlink, address: address))
         }
+    }
+
+    func testMewlinkNavigationStaysOnCanonicalDeviceAddress() throws {
+        let connection = try SavedConnection(name: "Laptop", kind: .mewlink, address: "https://mew.run/alice/laptop")
+        XCTAssertTrue(connection.acceptsMewlinkNavigation(URL(string: "https://link.mew.run/alice/laptop")!))
+        XCTAssertTrue(connection.acceptsMewlinkNavigation(URL(string: "https://link.mew.run:443/alice/laptop")!))
+        for address in ["http://link.mew.run/alice/laptop", "https://mew.run/alice/laptop", "https://mew.saens.kr/alice/laptop", "https://app.mew.run/launch/id", "https://link.mew.run/bob/laptop", "https://link.mew.run/alice/other", "https://link.mew.run/alice/laptop/api", "https://link.mew.run:444/alice/laptop", "https://user:secret@link.mew.run/alice/laptop", "https://link.mew.run.evil.com/alice/laptop"] {
+            XCTAssertFalse(connection.acceptsMewlinkNavigation(URL(string: address)!))
+        }
+        let direct = try SavedConnection(name: "Direct", kind: .direct, address: "https://link.mew.run")
+        XCTAssertFalse(direct.acceptsMewlinkNavigation(connection.address))
+    }
+
+    @MainActor func testStoreMigratesLegacyMewlinkURLsWithoutChangingConnectionIdentity() throws {
+        let suite = "MewTests-" + UUID().uuidString
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let identifiers = [UUID(), UUID()]
+        let saved = zip(identifiers, ["mew.run", "mew.saens.kr"]).map { id, host in
+            ["id": id.uuidString, "name": "Laptop", "kind": "mewlink", "address": "https://\(host)/alice/laptop", "allowsLocalHTTP": false] as [String: Any]
+        }
+        defaults.set(try JSONSerialization.data(withJSONObject: saved), forKey: "mew.saved-connections.v1")
+        let store = ConnectionStore(defaults: defaults)
+        XCTAssertEqual(store.connections.map(\.id), identifiers)
+        XCTAssertEqual(store.connections.map(\.name), ["Laptop", "Laptop"])
+        XCTAssertTrue(store.connections.allSatisfy { $0.address.absoluteString == "https://link.mew.run/alice/laptop" })
+        let persisted = try JSONSerialization.jsonObject(with: defaults.data(forKey: "mew.saved-connections.v1")!) as! [[String: Any]]
+        XCTAssertTrue(persisted.allSatisfy { $0["address"] as? String == "https://link.mew.run/alice/laptop" })
+        XCTAssertEqual(ConnectionStore(defaults: defaults).connections, store.connections)
     }
 
     @MainActor func testOnlyOwnedLocalMainDocumentGetsDirectBridge() {

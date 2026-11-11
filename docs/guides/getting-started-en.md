@@ -1,7 +1,7 @@
 ---
 title: "Getting started with mew"
-updated: "2026-11-05"
-description: "Installation, first sign-in, remote access, host browser setup, updates, and data retention for Mew. Covers source setup, first-administrator creation, and Windows wizard/prebuilt release limits."
+updated: "2026-11-11"
+description: "Installation, first sign-in, remote access, host browser setup, updates, and data retention for Mew. Covers source setup, first-administrator creation, the link.mew.run entry, and Windows wizard/prebuilt release limits."
 ---
 
 # Getting started with mew
@@ -145,10 +145,10 @@ Use Mewlink to connect from another browser, or choose Tailscale or Cloudflare T
 
 1. Sign in as owner on your local mew. Change any administrator-issued temporary password if required.
 2. Open **Menu → Mewlink → Register device**. Follow the one-time URL, sign in to Mewlink, and choose your username and device name.
-3. Wait for Online and copy the fixed URL, `https://mew.saens.kr/<username>/<device-name>`.
+3. Wait for Online and copy the fixed URL, `https://link.mew.run/<username>/<device-name>`.
 4. Open that URL from another PC or phone. It connects without a Mewlink sign-in and shows the host's mew login screen. Sign in with **that computer's local mew email and password**. Connecting browsers need no registration. A valid saved local session can resume on later visits.
 
-Mewlink sign-in is used for registration, your device list and device removal. To give someone access, create their local mew account and configure its role, features and file permissions; a Mewlink account is not needed for local password sign-in. Application data remains blocked until local sign-in succeeds.
+Open [Mewlink](https://link.mew.run/) to sign in; a signed-in account enters its private `/{username}` device dashboard. The public [Mew homepage](https://mew.run/) introduces the product. Mewlink sign-in is used for registration, your device list and device removal. To give someone access, create their local mew account and configure its role, features and file permissions; a Mewlink account is not needed for local password sign-in. Application data remains blocked until local sign-in succeeds.
 
 The host must stay running and online. Networks that block direct connections show an error. Run `./mew remote-access account` to see the registration instructions again. Operators should follow [Central service setup](../../.mew/docs/operations/remote-central.md). Applying this authentication change requires updating local mew and redeploying Mewlink; real external-network validation is separate.
 

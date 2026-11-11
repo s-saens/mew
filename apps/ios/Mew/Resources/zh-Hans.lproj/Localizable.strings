@@ -22,4 +22,4 @@
 "Reconnect" = "重新连接";
 "Enter a server address without credentials, query parameters, or a fragment." = "请输入不含凭据、查询参数或片段的服务器地址。";
 "Use HTTPS, or explicitly allow HTTP for a private network address." = "请使用 HTTPS，或明确允许专用网络地址使用 HTTP。";
-"Enter a Mewlink device address: https://mew.run/username/device." = "请输入 Mewlink 设备地址：https://mew.run/username/device。";
+"Enter a Mewlink device address: https://link.mew.run/username/device." = "请输入 Mewlink 设备地址：https://link.mew.run/username/device。";

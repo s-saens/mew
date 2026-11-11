@@ -1,6 +1,6 @@
 ---
 title: "iOS client implementation contract"
-description: "Defines the standalone iOS hybrid client's ownership, direct local runtime, Mewlink native asset cache, bridge protocol, identity isolation, notifications, and bounded speech-transcription waits. Includes failure rules and automated versus physical-device verification."
+description: "Defines the standalone iOS hybrid client's ownership, direct local runtime, Mewlink subdomain and saved-address migration, native asset cache, bridge protocol, identity isolation, notifications, and bounded speech-transcription waits. Includes failure rules and automated versus physical-device verification."
 created: "2026-11-10"
 updated: "2026-11-11"
 ---
@@ -57,11 +57,11 @@ Direct mode changes the document origin. Audit new code for direct `location.ori
 
 ## Mewlink connection flow
 
-Use the selected public device URL in the existing origin/frame chain. Keep `mew.run` and `app.mew.run` as declared app-bound domains. The existing [remote access contract](remote-access.md) and [recovery contract](remote-access-recovery.md) continue to own proof verification, local login, trusted devices, lease renewal, reconnect, and identity changes.
+Use the selected public device URL in the existing origin/frame chain. Keep `link.mew.run` and `app.mew.run` as declared app-bound domains. New and loaded saved Mewlink addresses normalize the previous `mew.run` and `mew.saens.kr` hosts to `link.mew.run`, preserving connection IDs and labels; changed lists are persisted. Main-frame navigation and native-bridge access require the canonical origin and the selected device path. App-origin child frames retain their existing launch-path restriction. See [ADR 0167](../decisions/0167-homepage-and-mewlink-subdomain.md). The existing [remote access contract](remote-access.md) and [recovery contract](remote-access-recovery.md) continue to own proof verification, local login, trusted devices, lease renewal, reconnect, and identity changes.
 
 `remote-resources.ts` calls `fetchRemoteUiResource` in the launcher document, where a native message bridge can be available. If that capability exists, `native-ui-cache.ts` handles eligible files; otherwise the existing browser CacheStorage implementation is unchanged. The resource service worker itself never calls native handlers.
 
-Native Mewlink cache lookup uses the current verified instance as the logical scope. Native storage adds the selected endpoint namespace. Rehash every loaded body and compare both its recorded hexadecimal SHA-256 and the host's strong SHA-256 ETag. Send the current host a conditional request. Only a matching live 304 response permits reuse. Use current response security headers. A mismatch causes an unconditional live read; offline, denied, revoked, or failed requests never fall back to cached code.
+Native Mewlink cache lookup uses the current verified instance as the logical scope. Native storage adds the selected endpoint namespace. Migrated endpoints therefore use a new namespace and revalidate/download static resources again; previous central and local browser authentication may require sign-in. This does not rewrite host registrations, proof issuers, or local identity links. Rehash every loaded body and compare both its recorded hexadecimal SHA-256 and the host's strong SHA-256 ETag. Send the current host a conditional request. Only a matching live 304 response permits reuse. Use current response security headers. A mismatch causes an unconditional live read; offline, denied, revoked, or failed requests never fall back to cached code.
 
 The initial HTML still travels live. The native path currently uses per-file revalidation rather than the browser path's small index inventory batch. This trades small round trips for native storage without changing the wire protocol or central authority.
 
