@@ -74,9 +74,7 @@ Reuse the existing Mewpet speech bubble position and theme, and stop the cat whi
 
 `server/app-install-ui.test.ts` checks installation guide priority, display without Mewpet, independent storage and restoration after reload for each checkbox, the iOS manual path and language switching, desktop installation events, and guide hiding on installation acceptance, cancellation, and app launch modes. `server/app-install-manifest.test.ts` checks direct-access metadata, the manifest, and actual PNG dimensions.
 
-Enabling **Hide Mewpet in remote desktop** under Settings → Mewpet hides the cat, speech bubbles, and break display while the remote viewer is open and restores them when it closes. It is off by default and saved per browser in `mew:mewcat-hide-desktop`. Notification collection, OS notifications, and break timers continue running.
 
-Mewpet and speech bubbles displayed in remote desktop are portaled into a host inside the viewer, so background `inert` does not affect them. Mewpet handles clicks, dragging, and keyboard interactions without forwarding them as remote input.
 
 When settings open on mobile (below 768px), move Mewpet and its speech bubble to a dedicated host inside settings and display them above the settings window. Users can immediately view the actual Mewpet while changing its skin or default size, and can click, drag, and release it. Settings inputs and scrolling outside the image remain available, and interacting with Mewpet does not close settings. If a speech bubble is open, Esc or back navigation closes it first; the next input closes settings. When settings close or the viewport switches to desktop width, return to the original workspace or remote viewer host, and continue applying the remote viewer hide setting. On desktop, settings appear in front of the normal Mewpet.
 
@@ -445,9 +443,7 @@ Questions and answers below recent notifications, agent connections, and automat
 
 - Automatic notification bodies, including updates, display their full content without a height limit or internal scrolling. If space around the cat is insufficient, the bubble position is adjusted to remain within the screen. Scrolling in the expanded notification list is retained.
 
-- Mewpet and speech bubbles displayed in remote desktop are portaled into a host inside the viewer, so background `inert` does not affect them. Mewpet handles clicks, dragging, and keyboard interactions without forwarding them as remote input.
 
-- Enabling **Hide Mewpet in remote desktop** under Settings → Mewpet hides the cat, speech bubbles, and break display while the remote viewer is open and restores them when it closes. It is off by default and saved per browser in `mew:mewcat-hide-desktop`. Notification collection, OS notifications, and break timers continue running.
 
 - Previously, a silhouette with only a black body and white eyes became the default, and the default SVG and fur-color settings were removed. Following the final follow-up request on 2026-10-09, only the capybara remains as a built-in skin; Russian Blue, black cat, Korean Shorthair, Siamese, and penguin were removed. Selections of removed built-in skins are restored as the capybara. Previews, the large break Mewpet, and remote viewers use the same sprite.
 - Disconnection notifications were removed at the user's request to reduce repeated interruptions and will not be reintroduced unless requested.

@@ -42,7 +42,7 @@ Edit documents together, leave comments, chat, and share documents with guests. 
 
 [Collaboration and sharing](docs/guides/collaboration.md) · [Mobile controls](docs/guides/editor.md#mobile-and-fullscreen)
 
-Also available: [PDF annotation](docs/guides/editor.md#reading-and-annotating-pdfs), [remote browser and localhost apps](docs/guides/browser.md), [Postgres tables](docs/guides/database.md), and [command buttons and schedules](docs/guides/commands.md). Database tables need a Postgres connection.
+Also available: [PDF annotation](docs/guides/editor.md#reading-and-annotating-pdfs), [remote browser](docs/guides/browser.md), [Postgres tables](docs/guides/database.md), and [command buttons and schedules](docs/guides/commands.md). Database tables need a Postgres connection.
 
 ## Get started
 
@@ -103,7 +103,7 @@ Project documentation is maintained in English. Earlier locale-specific guide pa
 
 - Passwords use salted hashes. Login attempts are rate limited, and password changes invalidate existing password sessions.
 - The server enforces file and feature permissions and rechecks active connections when access changes.
-- Origin checks protect state-changing requests and browser WebSocket connections. Raw file views and localhost app previews use sandboxing or separate origins.
+- Origin checks protect state-changing requests and browser WebSocket connections. Raw file views use sandboxing or separate origins.
 - Workspace file APIs block access to server account data. Stored GitHub tokens are encrypted and removed when an account is deleted.
 
 Terminal and agent access uses the server user's OS permissions. Read [Security](docs/operations/security.md) before sharing an instance.
