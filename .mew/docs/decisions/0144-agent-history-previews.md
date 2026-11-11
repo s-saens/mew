@@ -1,13 +1,13 @@
 ---
 title: "0144 — Prepare history lists and saved content before provider loading"
-description: "Extends saved agent previews to history results through the authenticated connection, local recent-list warming, and partial search responses. Preserves provider authority, occupancy checks, temporary-display restrictions, and bounded preview preparation."
+description: "Extends saved agent previews to history results through the authenticated connection, local recent-list warming, and partial search responses. Preserves provider authority, occupancy checks, temporary-display restrictions, and bounded preview preparation; ADR 0169 supersedes eager browser body prefetch."
 created: "2026-11-05"
-updated: "2026-11-05"
+updated: "2026-11-11"
 ---
 
 ## Status
 
-Accepted. Extends [ADR 0084](0084-agent-history-search.md) and [ADR 0141](0141-agent-tab-history-previews.md). Provider restoration, writer ownership, and authoritative history synchronization remain unchanged.
+Accepted; browser body-prefetch timing is superseded by [ADR 0169](0169-on-demand-history-previews.md). Extends [ADR 0084](0084-agent-history-search.md) and [ADR 0141](0141-agent-tab-history-previews.md). Provider restoration, writer ownership, and authoritative history synchronization remain unchanged.
 
 ## Context
 

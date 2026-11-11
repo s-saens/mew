@@ -6,7 +6,7 @@ import type { SessionInfo } from '../utils/agentFold.ts'
 type Pending = { resolve: (preview: AgentTabPreview | null) => void; release: () => void }
 
 /** Prepare history rows without changing the live provider session or its authoritative cursor. */
-export function useAgentSessionPreviews(cacheKey: string, runtime: string, cwd: string, socket: RefObject<WebSocket | null>, sessions: SessionInfo[] | null, enabled: boolean) {
+export function useAgentSessionPreviews(cacheKey: string, runtime: string, cwd: string, socket: RefObject<WebSocket | null>, sessions: SessionInfo[] | null, enabled: boolean, active: boolean) {
   const [revision, refresh] = useState(0)
   const [focusedId, focus] = useState<string | null>(null)
   const scope = useMemo(() => ({ cacheKey, pending: new Map<string, Pending>() }), [cacheKey])
@@ -27,8 +27,8 @@ export function useAgentSessionPreviews(cacheKey: string, runtime: string, cwd: 
   const signature = JSON.stringify(recent)
   useEffect(() => {
     const ids = JSON.parse(signature) as string[]
-    previews.update(enabled ? ids.map(target) : [], focusedId, { retainCached: enabled })
-  }, [previews, enabled, signature, focusedId, target])
+    previews.update(enabled && active ? ids.map(target) : [], focusedId, { retainCached: enabled })
+  }, [previews, enabled, active, signature, focusedId, target])
   const reset = useCallback(() => {
     previews.dispose()
     for (const pending of scope.pending.values()) { pending.release(); pending.resolve(null) }

@@ -1,8 +1,8 @@
 ---
 title: "Fast agent history lists and saved conversation previews"
-description: "Records the November 5 history-loading change: local recent-list warming, partial source results, and bounded saved transcript prefetch before selection. Separates verification and remaining latency limits from application to the running server."
+description: "Records the November 5 history-loading change: local recent-list warming, partial source results, and bounded saved transcript prefetch before selection. Also records the November 11 change to read history-result bodies only while history is open, with startup fanout evidence, verification, and latency limits."
 created: "2026-11-05"
-updated: "2026-11-05"
+updated: "2026-11-11"
 ---
 
 ## Purpose and resulting behavior
@@ -31,3 +31,19 @@ The browser prepares the first 6 listed saved transcripts, prioritizes hovered o
 No deployment, launcher execution, or server start, stop, or restart was performed as part of this work. Applying server-side protocol changes to the running instance remains the user's operation.
 
 Provider-only history without a Mew transcript still uses normal restoration. Preview misses, budgets, failed reads, or immediate selection before preparation finishes retain that fallback. Provider readiness, actual remote latency, and latency across all stored conversations are separate from saved-display preparation and have not been established by the contract alone.
+
+## November 11: keep closed history out of startup body reads
+
+A report described roughly one minute of loading after returning to four project panels. Source inspection found that every connected panel fetched up to six history-result transcripts even with history closed: up to 24 optional reads alongside current-session restoration. Recent completed local provider phase timings were only a few seconds; they do not establish the cause or duration of the reported overall delay.
+
+History-result body preparation now follows the open picker in a visible agent tab. Closing the picker or hiding the tab stops queued reads and invalidates unfinished client requests while retaining completed previews. Local metadata warming and current-session display previews remain available during startup. An accepted server read may still finish, and its late response is ignored. [ADR 0169](../decisions/0169-on-demand-history-previews.md) records this change; current behavior belongs in the [saved-preview contract](../development/conversation-storage.md#saved-previews-for-history-results).
+
+Local verification and limits:
+
+- The focused scheduler, saved-tab API, history Worker, authenticated WS, and search-service checks passed 41 tests.
+- Four isolated Chromium tests passed at 1100px and 390px. Three preserve saved-tab prefetch, late device-cache display, and early restoration previews. The updated history test restores four real agent panels with no history-result preview requests, opens history in only one connection, holds initial restoration, verifies two-read scheduling for a stable query, cancels unfinished and queued reads on closure, reuses completed previews on reopening and search changes, and retains draft/selection/synchronization checks. Together with the focused server/unit checks, 45 tests passed.
+- `npm run browsers:check` confirmed the required browser dependencies.
+- The project build and lint checks passed; the build retained the existing large-chunk warning and lint retained existing React warnings.
+- Documentation validation found 804 descriptions with no errors, then 39 existing missing-link errors outside this task's documents. A filtered check of the six changed documents found no local link errors; their referenced headings were inspected directly. `git diff --check` passed for the task changes.
+
+The requested build updates local `dist/` assets. No deployment, launcher, or application server lifecycle operation was performed. Full end-to-end reproduction of the reported minute-long delay, physical-device behavior, and external-network timings remain unverified.

@@ -671,6 +671,8 @@ function SessionPicker({
   hasConversation,
   disabled = false,
   onOpen,
+  open,
+  onOpenChange: setOpen,
   onSearch,
   onPick,
   onPrepare,
@@ -691,6 +693,8 @@ function SessionPicker({
   disabled?: boolean
   /** 드롭다운을 열었다 — 여기서 목록을 받아 온다 */
   onOpen: (query: string) => void | Promise<void>
+  open: boolean
+  onOpenChange: (open: boolean) => void
   onSearch: (query: string) => void
   onPick: (session: SessionInfo) => void
   onPrepare: (sessionId: string) => void
@@ -701,7 +705,6 @@ function SessionPicker({
 }) {
   useUiLocale()
   const { t } = useI18n()
-  const [open, setOpen] = useState(false)
   const [searchInput, setSearchInput] = useState('')
   const [composing, setComposing] = useState(false)
   const [requestedQuery, setRequestedQuery] = useState('')
@@ -721,7 +724,7 @@ function SessionPicker({
     return () => clearTimeout(timeout)
   }, [open, query, composing, requestedQuery])
   const ref = useRef<HTMLDivElement>(null)
-  const close = useCallback(() => setOpen(false), [])
+  const close = useCallback(() => setOpen(false), [setOpen])
   // Esc·모바일 뒤로가기가 패널 대신 이 드롭다운을 닫게 한다
   useOverlayDismiss(open && close)
 
@@ -734,7 +737,7 @@ function SessionPicker({
     }
     document.addEventListener('pointerdown', onDown, true)
     return () => document.removeEventListener('pointerdown', onDown, true)
-  }, [open])
+  }, [open, setOpen])
 
   return (
     <div ref={ref} className="relative text-xs">
@@ -746,7 +749,7 @@ function SessionPicker({
             setRequestedQuery(query)
             void onOpen(query)
           }
-          setOpen((v) => !v)
+          setOpen(!open)
         }}
         aria-controls={open ? pickerId : undefined}
         aria-expanded={open}
@@ -2419,6 +2422,7 @@ function AgentSessionView({
     disconnect: disconnectPromptFeedback, clear: clearPromptFeedback } = useAgentPromptFeedback(items)
   const [connected, setConnected] = useState(false)
   const [connectionFailed, setConnectionFailed] = useState(false)
+  const [historyPickerOpen, setHistoryPickerOpen] = useState(false)
   const [startupQueue] = useState(() => new AgentStartupQueue<StartupPrompt>())
   const [startupPrompts, setStartupPrompts] = useState(startupQueue.snapshot())
   const [startupReady, setStartupReady] = useState(false)
@@ -2807,7 +2811,7 @@ function AgentSessionView({
   })
   const { revision: sessionPreviewRevision, get: getSessionPreview, prepare: prepareSessionPreview,
     accept: acceptSessionPreview, reset: resetSessionPreviews } = useAgentSessionPreviews(
-    cacheKey, runtime, cwd, wsRef, sessions, connected && sessionPreviewsSupported)
+    cacheKey, runtime, cwd, wsRef, sessions, connected && sessionPreviewsSupported, visible && historyPickerOpen)
   useEffect(() => {
     if (!loadingSession || previewTargetRef.current !== loadingSession) return
     const preview = getSessionPreview(loadingSession)
@@ -4046,6 +4050,8 @@ function AgentSessionView({
               ? t('agent.history.wait')
               : undefined}
           onSearch={searchSessions}
+          open={historyPickerOpen}
+          onOpenChange={setHistoryPickerOpen}
           onPrepare={prepareSessionPreview}
           onOpen={async (query) => {
             const request = ++sessionClaimsRequestRef.current

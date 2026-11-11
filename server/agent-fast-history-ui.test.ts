@@ -7,25 +7,26 @@ import { compile } from '@tailwindcss/node'
 import { connectTestBrowser } from './test-browser.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
+const paint = (page: import('playwright-core').Page) => page.locator('body').evaluate(element => new Promise<void>(resolve => element.ownerDocument.defaultView!.requestAnimationFrame(() => element.ownerDocument.defaultView!.requestAnimationFrame(() => resolve()))))
 
-test('history warms saved lists and previews before opening, and displays local search before provider completion', { timeout: 40_000 }, async t => {
+test('history warms saved lists without preview fanout until opened, and displays local search before provider completion', { timeout: 40_000 }, async t => {
   const source = `import React from '${root}/node_modules/react/index.js';
 import {createRoot} from '${root}/node_modules/react-dom/client.js';
 import {AgentPanel} from '${root}/src/components/AgentPanel.tsx';
 import {I18nProvider} from '${root}/src/i18n.tsx';
-localStorage.setItem('mew:locale','ko');window.messages=[];window.previewReleases={};window.previewInFlight=0;window.maxPreviewInFlight=0;
+localStorage.setItem('mew:locale','ko');window.messages=[];window.sockets=[];window.previewReleases={};window.previewInFlight=0;window.maxPreviewInFlight=0;window.panelCount=new URLSearchParams(location.search).has('four')?4:1;
 const message=(role,text)=>({type:'update',update:{sessionUpdate:role+'_message_chunk',content:{type:'text',text}}});
 const saved=id=>[message('user','Saved '+id+' question'),{type:'turn_start'},message('agent','Saved '+id+' answer')];
 const current=[message('user','Current question'),message('agent','Current answer')];
-const recent=['first','second','third'].map(sessionId=>({sessionId,title:'Recent '+sessionId+' conversation',updatedAt:new Date().toISOString()}));
+const recent=['first','second','third','fourth','fifth'].map(sessionId=>({sessionId,title:'Recent '+sessionId+' conversation',updatedAt:new Date().toISOString()}));
 const history=(sessionId,events)=>({type:'history',page:{generation:'live-'+sessionId,sessionId,start:0,end:events.length,total:events.length,usersBefore:0,mode:'replace',events,controls:[]}});
 const meta=sessionId=>({type:'meta',meta:{sessionId,startedAt:new Date().toISOString(),turns:1,busy:false,queued:[],usage:null,canLoad:true,canList:true}});
 class Socket {
  static OPEN=1;static CLOSED=3;readyState=0;bufferedAmount=0;
- constructor(){window.socket=this;setTimeout(()=>{this.readyState=1;this.onopen?.();this.emit({type:'ready',cwd:'/workspace',connectionProbe:true,sessionHistoryPreviews:true});this.emit(history('current',current));this.emit(meta('current'))},10)}
+ constructor(){window.socket=this;this.index=window.sockets.length;window.sockets.push(this);setTimeout(()=>{this.readyState=1;this.onopen?.();this.emit({type:'ready',cwd:'/workspace',connectionProbe:true,sessionHistoryPreviews:true});window.finishInitialRestore=()=>{this.emit(history('current',current));this.emit(meta('current'))};if(window.panelCount===4)window.finishInitialRestore()},10)}
  emit(event){this.onmessage?.({data:JSON.stringify(event)})}
  send(raw){
-  const request=JSON.parse(raw);window.messages.push(request);
+  const request=JSON.parse(raw);window.messages.push({...request,socketIndex:this.index});
   if(request.type==='ping')return this.emit({type:'pong',id:request.id});
   if(request.type==='list_sessions'){
    const respond=(sessions,pending=false)=>this.emit({type:'sessions',requestId:request.requestId,query:request.query,sessions,pending});
@@ -43,7 +44,7 @@ class Socket {
  close(){this.readyState=3;this.onclose?.()}
 }
 window.WebSocket=Socket;
-createRoot(document.getElementById('root')).render(<I18nProvider><div style={{height:'100vh',display:'flex'}}><AgentPanel cacheAccount="alice" project="test" workspacePath="/workspace" tree={[]} focusedFilePath={null} onOpenFile={()=>{}} onClose={()=>{}} /></div></I18nProvider>);`
+createRoot(document.getElementById('root')).render(<I18nProvider><div style={{height:'100vh',display:'flex'}}>{Array.from({length:window.panelCount},(_,index)=><AgentPanel key={index} cacheAccount="alice" project="test" workspacePath={index===0?'/workspace':'/workspace-'+index} tree={[]} focusedFilePath={null} onOpenFile={()=>{}} onClose={()=>{}} />)}</div></I18nProvider>);`
   const bundle = await build({ input: 'virtual:fast-history.tsx', write: false, platform: 'browser', onwarn(warning, warn) { if (warning.code !== 'MODULE_LEVEL_DIRECTIVE') warn(warning) }, output: { format: 'iife' }, transform: { jsx: 'react-jsx', define: { 'process.env.NODE_ENV': JSON.stringify('test') } }, plugins: [{
     name: 'fast-history-fixture',
     async resolveId(id, importer) {
@@ -72,9 +73,11 @@ createRoot(document.getElementById('root')).render(<I18nProvider><div style={{he
     let tabState = { tabs: [{ id: 'history', label: 'History', renamed: true, runtime: 'codex', cwd: '/workspace', sessionIds: { [JSON.stringify(['codex', '/workspace'])]: 'current' } }], activeId: 'history' }
     page.on('pageerror', error => errors.push(error.message))
     await page.route('http://mew-fast-history.test/**', async route => {
-      const request = route.request(), pathname = new URL(request.url()).pathname
+      const request = route.request(), url = new URL(request.url()), pathname = url.pathname
       if (pathname === '/app.js') return route.fulfill({ contentType: 'text/javascript', body: chunk.code })
       if (pathname === '/api/user-ui/agent-tabs') {
+        const workspace = url.searchParams.get('workspace') ?? '/workspace'
+        if (workspace !== '/workspace') return route.fulfill({ json: { state: { tabs: [{ ...tabState.tabs[0], id: `history-${workspace.slice(-1)}`, cwd: workspace, sessionIds: { [JSON.stringify(['codex', workspace])]: 'current' } }], activeId: `history-${workspace.slice(-1)}` }, claims: [] } })
         if (request.method() === 'PUT') {
           tabState = request.postDataJSON()
           for (const tab of tabState.tabs) savedPointers.push(...Object.values(tab.sessionIds ?? {}))
@@ -87,7 +90,25 @@ createRoot(document.getElementById('root')).render(<I18nProvider><div style={{he
       if (pathname.startsWith('/api/')) return route.fulfill({ json: { settings: null, skills: [], jobs: [], commands: [], runtimes: [] } })
       return route.fulfill({ contentType: 'text/html', body: `<!doctype html><html class="${width === 390 ? 'dark' : ''}"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}html,body,#root{height:100%;margin:0}</style><div id="root"></div><script src="/app.js"></script></html>` })
     })
+    await page.goto('http://mew-fast-history.test/?four')
+    await page.waitForFunction('window.messages.filter(request=>request.type==="list_sessions"&&request.localOnly===true).length===4')
+    await page.getByText('Current question', { exact: true }).nth(3).waitFor({ state: 'attached' })
+    await paint(page)
+    assert.equal(await page.evaluate('window.sockets.length'), 4, 'four projects restore independent agent connections')
+    assert.equal(await page.evaluate('window.messages.filter(request=>request.type==="preview_session").length'), 0,
+      'four restored project panels do not fan out into optional saved-history transcript reads')
+    await page.getByRole('button', { name: '히스토리', exact: true }).first().click()
+    await page.waitForFunction('window.messages.filter(request=>request.type==="preview_session").length===2')
+    assert.equal(await page.evaluate('new Set(window.messages.filter(request=>request.type==="preview_session").map(request=>request.socketIndex)).size'), 1,
+      'opening one project history prepares previews only through its own connection')
+    assert.equal(await page.evaluate('window.maxPreviewInFlight'), 2)
     await page.goto('http://mew-fast-history.test/')
+    await page.waitForFunction('window.messages.some(request=>request.type==="list_sessions"&&request.localOnly===true&&request.query==="")')
+    await page.waitForFunction('typeof window.finishInitialRestore==="function"')
+    await paint(page)
+    assert.equal(await page.evaluate('window.messages.filter(request=>request.type==="preview_session").length'), 0,
+      'restoring the current conversation does not start optional history-preview reads')
+    await page.evaluate('window.finishInitialRestore()')
     await page.getByText('Current question', { exact: true }).waitFor()
     const history = page.getByRole('button', { name: '히스토리', exact: true })
     const region = page.getByRole('region', { name: '지난 세션', exact: true })
@@ -95,17 +116,39 @@ createRoot(document.getElementById('root')).render(<I18nProvider><div style={{he
     const composer = page.locator('[data-keep-keyboard] [contenteditable="true"]')
     const send = page.getByRole('button', { name: '전송', exact: true })
     await composer.fill('Draft survives saved-history selection')
-    await page.waitForFunction('window.messages.some(request=>request.type==="list_sessions"&&request.localOnly===true&&request.query==="")')
+    assert.equal(await page.evaluate('window.messages.filter(request=>request.type==="preview_session").length'), 0,
+      'a synchronized conversation keeps optional history previews idle before the picker opens')
+    assert.equal(await region.count(), 0, 'saved list metadata warms without opening the picker')
+    await history.click()
+    await region.getByRole('button', { name: 'Recent first conversation' }).waitFor()
     await page.waitForFunction('window.messages.filter(request=>request.type==="preview_session").length===2')
     assert.equal(await page.evaluate('window.previewInFlight'), 2, 'saved transcript warming has only two concurrent reads')
     assert.equal(await page.evaluate('window.messages.some(request=>request.type==="load_session")'), false, 'warming never restores historical ACP sessions')
-    assert.equal(await region.count(), 0, 'saved history is prepared before its first opening')
     await page.evaluate('window.previewReleases.first()')
     await page.waitForFunction('!!window.previewReleases.third')
-    await page.evaluate('window.previewReleases.second();window.previewReleases.third()')
-    assert.equal(await page.evaluate('window.maxPreviewInFlight'), 2)
+    await page.evaluate('window.previewReleases.second()')
+    await page.waitForFunction('!!window.previewReleases.fourth')
+    assert.equal(await page.evaluate('window.maxPreviewInFlight'), 2, 'an open picker keeps a stable recent query at two concurrent preview reads')
+    await history.click()
+    await region.waitFor({ state: 'detached' })
+    await paint(page)
+    await page.evaluate('window.previewReleases.third();window.previewReleases.fourth()')
+    await paint(page)
+    assert.equal(await page.evaluate('window.messages.filter(request=>request.type==="preview_session").length'), 4,
+      'closing the picker stops queued preview reads even when canceled in-flight responses arrive')
+    assert.equal(await page.evaluate('!!window.previewReleases.fifth'), false)
     await history.click()
     await region.getByRole('button', { name: 'Recent first conversation' }).waitFor()
+    await page.waitForFunction('!!window.previewReleases.third&&!!window.previewReleases.fourth')
+    assert.equal(await page.evaluate('window.messages.filter(request=>request.type==="preview_session"&&request.sessionId==="first").length'), 1,
+      'reopening reuses the completed preview while restarting canceled reads')
+    await page.evaluate('window.previewReleases.third();window.previewReleases.fourth()')
+    await page.waitForFunction('!!window.previewReleases.fifth')
+    await page.evaluate('window.previewReleases.fifth()')
+    await paint(page)
+    await page.evaluate('for(const release of Object.values(window.previewReleases))release()')
+    await paint(page)
+    const completedSecondReads = await page.evaluate('window.messages.filter(request=>request.type==="preview_session"&&request.sessionId==="second").length')
     await page.waitForFunction('typeof window.finishRecent==="function"')
     assert.equal(await region.getByText('Provider-only conversation', { exact: true }).count(), 0)
     assert.equal(await region.getByRole('button', { name: 'Recent first conversation' }).isVisible(), true, 'fresh provider listing does not hide the warmed list')
@@ -145,7 +188,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><div style={{he
     await page.evaluate('window.finishSearch()')
     await region.getByRole('button', { name: 'Provider needle match' }).waitFor()
     const secondReads = await page.evaluate('window.messages.filter(request=>request.type==="preview_session"&&request.sessionId==="second").length')
-    assert.equal(secondReads, 1, 'the second recent conversation was warmed once before searching')
+    assert.equal(secondReads, completedSecondReads, 'searching reuses the second preview completed in the reopened picker')
     await search.fill('')
     await search.press('Enter')
     const second = region.getByRole('button', { name: 'Recent second conversation' })
@@ -168,7 +211,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><div style={{he
     assert.equal(await send.isEnabled(), true)
     assert.equal(await composer.innerText(), 'Draft survives saved-history selection')
     assert.deepEqual(errors, [])
-    t.diagnostic(`${width}px: warmed first opening, partial local search, bounded preview reads, read-only selection, and preview reuse after query changes verified`)
+    t.diagnostic(`${width}px: metadata-only startup, picker-scoped bounded preview reads and cancellation, partial local search, read-only selection, and completed-preview reuse verified`)
     await page.close()
   }
 })

@@ -1,7 +1,7 @@
 ---
 title: "Agent session and communication contract"
-description: "Runtime sessions, recovery, real-time account agent and terminal tabs, agent-assisted project loading and recovery, Git AI Commit, CLI, memory, early history lists and saved previews, and MCP bindings selected by scoped usage and saved readiness. Guidance storage, presets, and project-context delivery belong to the linked agent guidance contract."
-updated: "2026-11-06"
+description: "Runtime sessions, recovery, real-time account agent and terminal tabs, agent-assisted project loading and recovery, Git AI Commit, CLI, memory, early history lists and on-demand saved history previews, and MCP bindings selected by scoped usage and saved readiness. Guidance storage, presets, and project-context delivery belong to the linked agent guidance contract."
+updated: "2026-11-11"
 상위파일:
   - "../_docs.md"
   - "MOC.md"
@@ -128,7 +128,7 @@ When the authenticated relay advertises `ready.sessionHistoryPreviews: true`, th
 
 Normal list and search requests collect local history and provider listing independently. As soon as one source finishes, the server publishes its available results with `pending:true`, then sends the merged final result after both finish. Partial and final responses carry the same request ID and query. An unfinished provider list therefore does not hide completed local results. Keep existing rows visible during refresh, and allow their selection after occupancy is confirmed and ordinary switching restrictions pass; list loading alone does not lock them. If sources fail, retain successful results with `error` and finish the request rather than reporting an empty successful search.
 
-The browser prefetches saved recent-result transcripts through `preview_session` on the same authenticated connection and can display them immediately when selected while `load_session` proceeds. The [saved-preview contract](conversation-storage.md#saved-previews-for-history-results) owns messages, limits, cache scope, and temporary-display restrictions. Previews change neither agent context nor session pointers.
+While history is open in a visible agent tab, the browser prefetches saved recent-result transcripts through `preview_session` on the same authenticated connection and can display them immediately when selected while `load_session` proceeds. The [saved-preview contract](conversation-storage.md#saved-previews-for-history-results) owns messages, limits, cache scope, and temporary-display restrictions. Previews change neither agent context nor session pointers.
 
 Exact and partial session ID matches come first, followed by sorting by title/body search score and recency. Bodies and search terms are compared after Unicode normalization and normalization of differences in case, spacing, and symbols. Key Mew terms are expanded with Korean-English synonyms, so `에이전트패널` finds conversations related to `에이전트 패널` and `agent panel`. No embedding models, vector DBs, or external APIs are used; semantic search that arbitrarily infers unregistered synonyms or context is outside the scope.
 

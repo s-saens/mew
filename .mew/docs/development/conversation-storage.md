@@ -1,8 +1,8 @@
 ---
 title: "Conversation Storage and Range Synchronization"
 created: 2026-09-30
-updated: "2026-11-05"
-description: "Conversation persistence and recovery contracts: SQLite originals, attachments, range/work-detail synchronization, and temporary transcript display before ACP readiness. Defines account-tab and history-result preview prefetch, late IndexedDB display, cache and queue scope, limits, authority, and incremental rendering."
+updated: "2026-11-11"
+description: "Conversation persistence and recovery contracts: SQLite originals, attachments, range/work-detail synchronization, and temporary transcript display before ACP readiness. Defines account-tab previews, on-demand history-result prefetch, late IndexedDB display, cache and queue scope, limits, authority, and incremental rendering."
 상위파일: "MOC.md"
 ---
 
@@ -142,11 +142,13 @@ A connection advertising `ready.sessionHistoryPreviews: true` accepts `{type:'pr
 
 This request does not call `session/load`, acquire a provider writer, change the current session pointer, or alter agent context. Its access scope matches history listing on the existing connection; it introduces no cross-runtime or arbitrary-cwd lookup. Provider-only sessions without a Mew transcript retain ordinary restoration. Older relays without the capability keep the existing list and load path.
 
-After receiving a list, `use-agent-session-previews.ts` prepares previews for its first 6 sessions. It reuses the saved-tab preview scheduler with at most 2 concurrent requests, a 5-second request deadline, and an estimated 32MiB memory budget. Hovering or keyboard-focusing a result prioritizes that session among waiting reads. Completed previews survive query changes, with at most 128 retained entries; obsolete pending reads are cancelled. Returning to recent history can therefore reuse prepared content. Requests and cached entries are scoped to account, tab, runtime, cwd, and session ID. Closing or replacing the connection invalidates outstanding request IDs and scope, so late responses cannot populate a later connection's preview cache.
+While history is open in a visible agent tab, `use-agent-session-previews.ts` prepares previews for the first 6 listed sessions. Keeping history closed during startup starts no history-result transcript reads. Closing history or hiding its agent tab cancels unfinished client requests and stops queued reads while retaining completed previews. An already accepted server read may finish, but its obsolete response is ignored.
+
+Preparation reuses the saved-tab preview scheduler with at most 2 concurrent requests, a 5-second request deadline, and an estimated 32MiB memory budget. Hovering or keyboard-focusing a result prioritizes that session among waiting reads. Completed previews survive query changes, with at most 128 retained entries; obsolete pending reads are cancelled. Returning to recent history can therefore reuse prepared content. Requests and cached entries are scoped to account, tab, runtime, cwd, and session ID. Closing or replacing the connection invalidates outstanding request IDs and scope, so late responses cannot populate a later connection's preview cache.
 
 Selecting a history result displays an available matching preview immediately while the existing `load_session` proceeds. Keep these events in temporary display state, separate from the authoritative transcript, device cache, reconnection cursors, session pointer, and work-detail requests. Drafts remain intact, and sending, approval, and earlier-range requests remain blocked until authoritative restoration completes. Final synchronization replaces the preview; errors and invalidation follow the temporary-display rules below. Selection remains subject to current-session, occupancy, busy, approval, and queue restrictions even when a preview is already available.
 
-The [session contract](agent-sessions.md#history-search) owns recent-list warming and partial results; [ADR 0144](../decisions/0144-agent-history-previews.md) records the protocol extension, and the [work record](../work/agent-history-loading.md) records verification and application limits.
+The [session contract](agent-sessions.md#history-search) owns recent-list warming and partial results; [ADR 0144](../decisions/0144-agent-history-previews.md) records the protocol extension. [ADR 0169](../decisions/0169-on-demand-history-previews.md) narrows browser prefetch to open history. The [work record](../work/agent-history-loading.md) records verification and application limits.
 
 ### Early Display of Server Transcripts During ACP Restoration
 
