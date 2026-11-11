@@ -7,4 +7,4 @@ updated: "2026-11-06"
 
 Add icon-only Build and Deploy toggles to the agent input instead of configuring these choices in the agent instructions dialog. Clicking each toggle should show a toast such as “Deploy on” or “Build off.”
 
-Implemented in the composer action row, with request-specific choices preserved for immediate, queued, and scheduled messages. See the [work record](../docs/work/agent-composer-execution.md) for behavior, verification, and remaining limits.
+Implemented in the composer action row, with request-specific choices preserved for immediate, queued, and scheduled messages. See the [work record](../../docs/work/agent-composer-execution.md) for behavior, verification, and remaining limits.
