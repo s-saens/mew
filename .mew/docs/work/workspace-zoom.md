@@ -28,3 +28,9 @@ The workspace menu Chromium test passed, including section order, divider, and k
 Root CSS zoom scaled the workspace height a second time, leaving a gap at reduced levels and clipping the bottom at increased levels. The viewport observer now converts the measured visible bottom to zoomed CSS coordinates and updates when the menu changes zoom. The [workspace layout contract](../development/ui-workspace-layout.md#device-safe-areas) describes the geometry. CSS zoom does not change media-query breakpoints like browser-controlled zoom.
 
 The Chromium safe-area fixture passed at 50%, 80%, 100%, 125%, and 200%, checking the real Dock and workspace boundaries; existing fullscreen and keyboard viewport tests passed. The menu and zoom unit tests also passed. `npm run build` and `npm run lint` passed, with existing warnings. `npm run check:docs` found no description errors and reported 40 missing local links elsewhere. No server or launcher was operated. Physical Android/Brave and device keyboard behavior remain unverified.
+
+## November 11: Place zoom at the top
+
+Moved the separate, untitled zoom section to the top of the menu, before account and other actions. The [menu contract](../development/ui-overlays.md#header-hamburger-menu) owns its current placement.
+
+The workspace menu Chromium test passed, including section order, divider, and Home/End navigation. `npm run build` and `npm run lint` passed; lint retained existing warnings. `npm run check:docs` validated descriptions and reported 39 missing local links elsewhere. The build updates local assets; no server or launcher was operated. Physical-device behavior was not checked.

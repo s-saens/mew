@@ -85,6 +85,7 @@ const renderItem = (item: HeaderMenuItem) => <ActionMenuItem key={item.id} data-
 function WorkspaceMenuSections({ items, account, notices, onViewNotifications }: Pick<HeaderMenuPopupProps, 'items' | 'account' | 'notices' | 'onViewNotifications'>) {
   const { t } = useI18n()
   return <>
+      <div className="mew-workspace-menu-section" data-workspace-zoom-section><WorkspaceZoom /></div>
       {(account || items.some(item => item.group === 'account')) && <div className="mew-workspace-menu-section" role="group" aria-label={t('menu.userAccount')}>
         <div className="mew-workspace-menu-heading">{t('menu.userAccount')}</div>
         {account && <AccountCard account={account} />}
@@ -103,7 +104,6 @@ function WorkspaceMenuSections({ items, account, notices, onViewNotifications }:
           <div className="mew-workspace-menu-heading">{group === 'mew' ? 'Mew' : t('menu.tools')}</div>{actions.map(renderItem)}
         </div>
       })}
-      <div className="mew-workspace-menu-section" data-workspace-zoom-section><WorkspaceZoom /></div>
     </>
 }
 
