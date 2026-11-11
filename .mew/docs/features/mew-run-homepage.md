@@ -1,13 +1,13 @@
 ---
 title: "Mew.run homepage and Mewlink entry"
-description: "Design specification for Mew's single-page public homepage: frosted surfaces, product-led composition, content, accessibility, delivery ownership, and acceptance criteria for the separate link.mew.run sign-in entry."
+description: "Design and implemented contract for the deployed Mew homepage: frosted surfaces, product-led composition, content, accessibility, delivery ownership, and acceptance criteria for the separate link.mew.run sign-in entry."
 created: "2026-11-11"
 updated: "2026-11-11"
 ---
 
 # Mew.run homepage and Mewlink entry
 
-Status: Designed before implementation; implemented and checked locally. The [work record](../work/mew-run-homepage.md) records actual verification. Production application follows the request authorization in the [execution rules](../development/getting-started.md#execution-and-verification).
+Status: Designed before implementation, checked locally, and deployed on 2026-11-11. The [work record](../work/mew-run-homepage.md#2026-11-11-authorized-production-deployment) records production verification and remaining account/native-device gates. Future application follows the request authorization in the [execution rules](../development/getting-started.md#execution-and-verification).
 
 ## Purpose and scope
 

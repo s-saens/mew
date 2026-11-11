@@ -1,6 +1,6 @@
 ---
 title: "Mew.run homepage and Mewlink subdomain work"
-description: "Records the design-first homepage and Mewlink origin split, read-only infrastructure findings, implementation stages, actual local checks, and operator-owned domain/deployment and native-device limits."
+description: "Records the design-first homepage and Mewlink origin split, local verification, the authorized production deployment and domain/DNS checks, clean source packaging, and remaining authenticated-login, host-runtime, and native-device limits."
 created: "2026-11-11"
 updated: "2026-11-11"
 ---
@@ -52,8 +52,35 @@ The full parent test suite and the full central browser/P2P suite were not run. 
 
 The private central implementation is recorded in commit `ad25e62`. The parent records host/native compatibility, Mew actions, and canonical documentation separately. Mixed files were staged by task-only patches; existing notification, image, documentation, and other pending changes were preserved. No push was performed.
 
-## Remaining operational boundaries
+## Initial operational boundary (superseded)
 
-The repository prohibits agent deployments, launcher execution, and server lifecycle operations. Live domain attachment before compatible code is applied would expose a rejected origin. Domain/certificate application and production acceptance belong to the operator. Central and host builds are separate; native iOS physical-device and signed release checks require the appropriate platform.
+At the first handoff, the repository prohibited agent deployments, launcher execution, and server lifecycle operations. Live domain attachment before compatible code was applied would have exposed a rejected origin, so domain/certificate application was left to the operator. The user subsequently requested correcting that priority and deploying; [ADR 0168](../decisions/0168-request-build-deploy-authorization.md) replaces the build/deploy prohibition. Separate server lifecycle and native-platform boundaries remain.
 
 This Linux environment has neither Swift nor Xcode. XCTest, native iOS builds, and physical-device login/P2P checks were not run. The added native tests remain a release gate rather than a claimed pass.
+
+## 2026-11-11 authorized production deployment
+
+After explicitly requesting that Deploy on authorize deployment, the user requested publishing this site. The agent ran the documented `npm --prefix mewlink run deploy` workflow, including the demo build, central frontend build, D1 migration check, reserved-username check, and signing-key guard. The command completed successfully at approximately 10:03 UTC (19:03 KST).
+
+Deployment used exported committed sources: parent `7beca9b2298884a83a8498a8b07abdfd740f77ea` and private central `8c0f5d6ba1709d742ec9204ad42d1e6fec04ac2b` (including homepage implementation `ad25e62`). The exports were plain protected temporary directories, with no new branch or Git worktree. Third-party dependencies were reused while `@mew/*` resolved only to exported packages; the original Git object store supplied pinned demo blobs. Existing uncommitted notification, editor, image, and other source changes were excluded from publication and preserved in the original working folders.
+
+Protected credential/state copies used mode 0600 and were removed after deployment. The saved signing fingerprint was unchanged, and deployment state was reconciled without printing credential values or rotating keys. No push, launcher invocation, or host server lifecycle operation occurred.
+
+Cloudflare production version: `48d8d26e-95c8-404e-bcae-1371a113bf70`, receiving 100% of traffic. MCP verification confirmed `link.mew.run` as a production Custom Domain on the existing `mewlink` Worker, its proxied Worker-managed DNS record, the existing four domains, and preservation of `*.preview.mew.run/*`. Runtime origins now match the committed configuration: homepage at the apex, central at `link`, original app origin, both legacy central origins, and unchanged OAuth/email identity namespaces.
+
+| Production/local check actually performed | Result |
+| --- | --- |
+| Documented deployment from committed exports | Completed successfully; no pending D1 migrations, existing DB/key retained |
+| Exported central `npm run check` and seven focused suites | Passed; 42 tests |
+| Apex GET/HEAD | 200, correct homepage, empty HEAD body, retained `script-src 'none'` policy |
+| Six homepage image/style/font/favicon assets | All 200 |
+| `link.mew.run` GET/HEAD and anonymous account endpoint | 200; anonymous account is `null` |
+| Ten legacy dashboard/device/share/demo and asset-name-collision redirects | 308 with path and query preserved |
+| Internal app configuration | Canonical `link.mew.run`; unchanged `app.mew.run` |
+| Public signing keys at current and two legacy origins | All match the predeployment pinned fingerprint |
+| Real Chromium over public HTTPS | Homepage and real screenshot load at desktop/mobile width; no horizontal overflow; Mewlink shows login with no device list or page exceptions |
+| Cloudflare MCP | Production deployment/version, domain, DNS, public origin settings, and retained preview route confirmed |
+
+The live browser receives the existing Cloudflare Insights beacon injected by the provider. An initial smoke assertion counting every DOM script therefore failed; inspection identified that provider beacon. The site ships no application or account script, and the corrected live check distinguishes provider injection from application bundles without weakening CSP or changing analytics settings.
+
+Signed-in root redirection and private-dashboard authorization were verified by automated Worker tests, not by logging into a real user account. Actual provider login, external-network P2P, and iOS runtime/release checks remain unperformed. Host address and agent-context server modules require the normal separately authorized host application/restart procedure to load; this central deployment does not restart local Mew. Repository guidance/configuration is saved for subsequent context reads.

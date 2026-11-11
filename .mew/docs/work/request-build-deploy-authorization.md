@@ -20,3 +20,5 @@ Regression-first checks produced four expected failures for the previous priorit
 ## Application scope
 
 The current request explicitly authorizes the homepage deployment. Context files are read at request construction, while changed server modules require the host's normal application/restart procedure. No launcher or host server lifecycle operation is authorized merely by the deployment toggle. Actual public-site deployment evidence belongs to the [homepage work record](mew-run-homepage.md).
+
+The authorization correction is committed as `7beca9b`. The homepage and `link.mew.run` were subsequently deployed and verified over public HTTPS; the central production version is recorded in that work record. Local Mew was not restarted, so this records saved guidance and tested server source rather than a claim that the existing host process reloaded its modules.

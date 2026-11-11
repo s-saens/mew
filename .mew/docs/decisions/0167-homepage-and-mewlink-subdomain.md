@@ -7,13 +7,13 @@ updated: "2026-11-11"
 
 # Separate the Mew homepage and Mewlink entry
 
-Status: Accepted for implementation; production rollout pending.
+Status: Accepted and deployed on 2026-11-11. See the [production verification record](../work/mew-run-homepage.md#2026-11-11-authorized-production-deployment). Execution authorization follows ADR 0168.
 
 ## Context
 
 The user requested a public one-page homepage at `mew.run`, with polished translucent and blurred surfaces, and a separate Mewlink login entry at `link.mew.run`. The previous [domain decision](0005-mewlink-domain-and-private-dashboard.md) assigned the apex to Mewlink. Saved host registrations bind proofs, tickets, and approved identities to their original central origin. The existing native iOS client also restricts navigation to known origins.
 
-Read-only Cloudflare inspection on 2026-11-11 found the apex and `app.mew.run` attached to the existing `mewlink` Worker. `link.mew.run` has neither a DNS record nor a Custom Domain binding. Attaching it before compatible code is applied would return 404.
+Read-only Cloudflare inspection before the 2026-11-11 rollout found the apex and `app.mew.run` attached to the existing `mewlink` Worker. At that inspection, `link.mew.run` had neither a DNS record nor a Custom Domain binding. Attaching it before compatible code was applied would have returned 404.
 
 ## Decision
 
