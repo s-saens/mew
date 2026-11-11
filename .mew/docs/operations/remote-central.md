@@ -1,6 +1,6 @@
 ---
 title: "mewlink Cloudflare Deployment"
-description: "Maintainer runbook for the apex homepage and link.mew.run entry, compatible Custom Domain rollout, independent central Git repository, deployment, secrets/key recovery, revocation, verification, and rollback. Retains historical port-preview DNS/TLS guidance."
+description: "Maintainer runbook for the apex homepage and link.mew.run entry, request-authorized Custom Domain rollout, independent central Git repository, deployment, secrets/key recovery, revocation, verification, and rollback. Retains historical port-preview DNS/TLS guidance."
 created: "2026-10-07"
 updated: "2026-11-11"
 ---
@@ -13,13 +13,13 @@ The source configuration now serves `https://mew.run/` as the independent homepa
 
 On 2026-11-11, read-only Cloudflare MCP inspection confirmed that the apex and `app.mew.run` belonged to the existing `mewlink` Worker, while `link.mew.run` had no Custom Domain or DNS record. Do not attach the hostname to the old deployment: its exact-origin gate rejects it. Apply compatible code and the Custom Domain together through the existing operator workflow. Cloudflare Custom Domains provision the corresponding DNS and certificate; do not hand-edit Worker-managed `read_only` records. [Custom Domain routing](https://developers.cloudflare.com/workers/configuration/routing/custom-domains/).
 
-The operator can use **Publish Mew.run and Mewlink** in Mew's results/publishing screen or run `npm --prefix mewlink run deploy` from the parent checkout. The configured action invokes the existing script, including demo/central builds, migrations, key-preservation guards, and Worker deployment. **Build homepage and Mewlink** only runs the central frontend build and offers `mewlink/dist/homepage-preview.html` as a downloadable, self-contained visual preview; **Build Mew workspace** is the separate required host build. The published result address is `https://mew.run/`; Mewlink is at `https://link.mew.run/`. No development server is started by these build actions. Agents must not run the publishing action under this repository's execution rules.
+The operator can use **Publish Mew.run and Mewlink** in Mew's results/publishing screen or run `npm --prefix mewlink run deploy` from the parent checkout. The configured action invokes the existing script, including demo/central builds, migrations, key-preservation guards, and Worker deployment. **Build homepage and Mewlink** only runs the central frontend build and offers `mewlink/dist/homepage-preview.html` as a downloadable, self-contained visual preview; **Build Mew workspace** is the separate required host build. The published result address is `https://mew.run/`; Mewlink is at `https://link.mew.run/`. No development server is started by these build actions. Deploy on or an explicit user request authorizes an agent to run this task’s publishing action after verification under the [execution rules](../development/getting-started.md#execution-and-verification). No additional confirmation is needed merely because an older saved rule prohibited deployment.
 
 1. Preserve the existing D1 database, Durable Object namespace, signing key, provider configuration, and all saved host registration origins. Keep `APP_ORIGIN=https://app.mew.run`, `OAUTH_ORIGIN=https://mew.saens.kr`, and `EMAIL_IDENTITY_ISSUER=https://mew.saens.kr`.
 2. Confirm Wrangler declares `HOMEPAGE_ORIGIN=https://mew.run`, `CENTRAL_ORIGIN=https://link.mew.run`, both previous central origins, and the new `link.mew.run` Custom Domain alongside existing domains. Review any existing remote-only routes before applying configuration; avoid unrelated DNS/route cleanup.
 3. Build and test the matching parent and central sources. Apply host-side changes through the operator's normal lifecycle workflow. Ship updated native iOS origin handling before depending on it; older clients reject the new hostname.
    The deployment script builds the current local working tree, including pending source changes; committing this task does not select an isolated release snapshot. Review both checkouts before publishing.
-4. Run the central deployment as operator. If Custom Domain provisioning is separate, attach `link.mew.run` to the same production `mewlink` service only after compatible code is active. MCP's Worker domain API can perform this attachment; a DNS CNAME alone is not equivalent. Check binding and certificate status afterward.
+4. Run the central deployment as operator or as an explicitly authorized agent. If Custom Domain provisioning is separate, attach `link.mew.run` to the same production `mewlink` service only after compatible code is active. MCP's Worker domain API can perform this attachment; a DNS CNAME alone is not equivalent. Check binding and certificate status afterward.
 5. Verify apex GET/HEAD, public asset loading, Mewlink login and signed-in root redirect, private owner dashboard, old device/share URL redirects, retained OAuth callbacks, and a new-origin browser connecting to each supported legacy host origin. Inspect external-network and native-device behavior separately.
 
 Expect fresh management login at the new host. Host-only cookies and origin-scoped trusted-device keys do not transfer automatically; never move raw bearers in query parameters or expand cookies to `.mew.run`. The apex `/central/*` and `/auth/*` endpoints remain compatible for saved hosts and callbacks. The homepage's exact assets are selected before legacy redirects, without intercepting a user's ordinary device paths. Old `/demo` links redirect to the canonical demo.
@@ -155,7 +155,7 @@ With the corrected source, rerun `npm run deploy` from `mewlink/`. After redeplo
 3. On the `link.mew.run` page that opens, log in → enter a device name → approve registration.
 4. Open the registered device link on another PC or phone to verify the connection.
 
-The user performed the initial deployment. Provider login and P2P connections over external networks have not yet been verified. **The user runs the commands listed in this document.**
+The user performed the initial deployment. Provider login and P2P connections over external networks have not yet been verified. **Operators or agents authorized through Deploy on or an explicit request run deployment commands; interactive provider sign-in remains a user action.**
 
 ---
 

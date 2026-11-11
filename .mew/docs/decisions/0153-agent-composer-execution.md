@@ -1,13 +1,13 @@
 ---
 title: "Per-message composer Build and Deploy controls"
-description: "Places build execution choices beside CLI mode in the agent composer settings row and snapshots Build/Deploy options per message. Partially supersedes ADR 0116's settings UI placement while preserving account sources, advanced values, and project restrictions."
+description: "Places build execution choices beside CLI mode in the agent composer settings row and snapshots Build/Deploy options per message. Partially supersedes ADR 0116's settings UI placement while preserving account sources, advanced values, and the original project restrictions; ADR 0168 supersedes its build/deploy priority."
 created: "2026-11-06"
-updated: "2026-11-07"
+updated: "2026-11-11"
 ---
 
 ## Status
 
-Accepted. Partially supersedes [ADR 0116](0116-configurable-agent-build-verification.md): replace its Default Instructions build selector and Build details with composer controls. Preserve its backend settings, account-source compatibility, honest verification reporting, and project-owned execution restrictions.
+Accepted; build/deploy execution priority superseded by [ADR 0168](0168-request-build-deploy-authorization.md). The original decision below is preserved. Partially supersedes [ADR 0116](0116-configurable-agent-build-verification.md): replace its Default Instructions build selector and Build details with composer controls. Preserve its backend settings, account-source compatibility, honest verification reporting, and project-owned execution restrictions.
 
 ## Context
 

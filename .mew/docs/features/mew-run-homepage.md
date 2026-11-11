@@ -7,7 +7,7 @@ updated: "2026-11-11"
 
 # Mew.run homepage and Mewlink entry
 
-Status: Designed before implementation; implemented and checked locally. The [work record](../work/mew-run-homepage.md) records actual verification. Production application remains a separate operator task.
+Status: Designed before implementation; implemented and checked locally. The [work record](../work/mew-run-homepage.md) records actual verification. Production application follows the request authorization in the [execution rules](../development/getting-started.md#execution-and-verification).
 
 ## Purpose and scope
 
@@ -73,7 +73,7 @@ Implementation entrypoints: `mewlink/public/homepage/index.html` and `styles.css
 
 The parent `.mew/project-actions.json` exposes **Build Mew workspace**, **Build homepage and Mewlink**, and **Publish homepage and Mewlink**. The central build emits `mewlink/dist/homepage-preview.html` as a downloadable single-file preview with inline styles, image, fonts, and font license. It opens without an asset server; published navigation still uses the actual destinations. `.mew/project-pipelines.json` saves the operator's **Publish Mew.run and Mewlink** flow with the real destination URL. The deploy script includes its own builds; the flow does not run redundant build steps or invent an available local preview server.
 
-Configure Mew build/deploy actions only against existing scripts. A configured deployment action is operator-executable; agents must follow the [execution prohibition](../development/getting-started.md#execution-and-verification). Do not mutate live DNS or attach `link.mew.run` before compatible code is deployed: the currently deployed Worker rejects that origin.
+Configure Mew build/deploy actions only against existing scripts. A configured action alone does not execute deployment. Deploy on or an explicit request authorizes the task’s documented deployment under the [execution rules](../development/getting-started.md#execution-and-verification). Do not mutate live DNS or attach `link.mew.run` before compatible code is deployed: the currently deployed Worker rejects that origin.
 
 ## Acceptance criteria
 

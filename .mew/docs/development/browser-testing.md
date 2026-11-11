@@ -1,8 +1,8 @@
 ---
 title: "UI browser testing with Chromium"
-description: "Defines managed Chromium prerequisites, MEW_CHROMIUM_EXECUTABLE, and the shared Playwright helper for test-owned headless browsers. Separates UI automation from ordinary Chrome, and covers cleanup and execution limits."
+description: "Defines managed Chromium prerequisites, MEW_CHROMIUM_EXECUTABLE, and the shared Playwright helper for test-owned headless browsers. Separates UI automation from ordinary Chrome, and covers cleanup, per-request deployment authorization, and separate server lifecycle limits."
 created: "2026-11-04"
-updated: "2026-11-05"
+updated: "2026-11-11"
 ---
 
 Mew's normal UI tests under `server/*-ui.test.ts` use Playwright's Chromium or an installed Chromium executable through Playwright. `server/test-browser.ts` owns the shared `connectTestBrowser()` helper. Each call launches an isolated headless browser with Chromium sandboxing enabled and a 15-second startup timeout. The caller owns the returned browser and must close it during test cleanup.
@@ -27,7 +27,7 @@ const page = await browser.newPage()
 
 Closing this browser closes its contexts and terminates the test-owned browser process. Tests can also close individual contexts or pages earlier. The helper does not attach to an existing browser or manage an external browser service.
 
-Run the focused Node test files relevant to the change. Browser tests may launch their isolated test browsers; follow the repository's [execution rules](getting-started.md#execution-and-verification). Agents must not deploy, run the Mew launcher, or start, stop, or restart application servers. Implementation work still requires `npm run build` and applicable tests, lint, and [document checks](../README.md).
+Run the focused Node test files relevant to the change. Browser tests may launch their isolated test browsers; follow the repository's [execution rules](getting-started.md#execution-and-verification). Build/Deploy selections authorize their corresponding operations under those rules. They do not authorize the Mew launcher or application server start/stop/restart. Run the selected project build and applicable tests, lint, and [document checks](../README.md).
 
 Tests under `server/` use the Node TypeScript configuration without DOM globals. In Playwright callbacks, obtain the document through the evaluated element's `ownerDocument`, as required by the [development rules](getting-started.md#execution-and-verification).
 

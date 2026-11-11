@@ -80,7 +80,7 @@ new AgentSideConnection(conn => new Agent(conn), ndJsonStream(Writable.toWeb(pro
     assert.ok(call.prompt[1].text.includes(path.join(a, 'notes')))
   }
   assert.match(calls()[0].prompt[1].text, /Build is off/)
-  assert.match(calls()[0].prompt[1].text, /Mandatory project build requirements still apply/)
+  assert.match(calls()[0].prompt[1].text, /Do not run the project build for this request/)
   assert.match(calls()[0].prompt[1].text, /Deployment is on/)
   assert.doesNotMatch(calls()[0].prompt[1].text, /After code, feature, dependency, or build configuration changes/)
   assert.match(calls()[1].prompt[1].text, /Build is on/)

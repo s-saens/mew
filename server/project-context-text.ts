@@ -22,7 +22,6 @@ export function describeAgentContext(binding: AgentContextBinding, settings: Pro
   const commit = skills.find(skill => skill.name === 'commit')
   return [
     withDocumentationSkillGuidance(readAgentGuidance(locale, execution), skills),
-    execution ? agentExecutionOptionsText(execution) : '',
     commit ? commitSkillGuidance(commit.path) : '',
     `Change intent recorder: run ${shellQuote(process.execPath)} ${shellQuote(fileURLToPath(new URL('./git-change-intent-cli.ts', import.meta.url)))} --cwd ${shellQuote(binding.projectRoot)} with JSON on stdin: {"purpose":"brief reason for this task's changes","files":["repository-root-relative changed paths"],"verification":"checks actually performed (optional)"}. This writes disposable Git metadata only; it does not stage, commit or authorize a commit.`,
     `Project root: ${JSON.stringify(binding.projectRoot)}`,
@@ -32,6 +31,7 @@ export function describeAgentContext(binding: AgentContextBinding, settings: Pro
     entries.length ? `Existing entrypoints (paths, not document contents):\n${entries.map(p => `- ${JSON.stringify(p)}`).join('\n')}` : 'No entrypoint documents found yet. Use the existing project structure; Documents setup is available from its settings in mew.',
     settings.entrypoints.length ? `Configured entrypoints (report missing files):\n${settings.entrypoints.map(p => `- ${JSON.stringify(path.join(binding.projectRoot, p))}`).join('\n')}` : '',
     settings.instructions ? `Additional project guidance:\nThese instructions apply only to this project and take precedence over conflicting Mew-wide preferences. Explicit user requests and applicable project instructions still apply.\n${settings.instructions}` : '',
+    execution ? agentExecutionOptionsText(execution) : '',
   ].filter(Boolean).join('\n\n')
 }
 

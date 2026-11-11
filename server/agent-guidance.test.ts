@@ -773,13 +773,34 @@ test('request execution choices override generated build mode while retaining de
     state = updateAgentGuidance({ key: 'buildVerification', value: settings, revision: state.revision })
     const on = readAgentGuidance(undefined, { build: true, deploy: false })
     assert.ok(on.includes(agentBuildVerificationText({ ...settings, mode: 'required' })))
-    assert.ok(readAgentGuidance(undefined, { build: false, deploy: true }).includes(agentBuildVerificationText(settings)))
+    assert.doesNotMatch(readAgentGuidance(undefined, { build: false, deploy: true }), /mew:agent-setting:buildVerification|Follow the project's build verification requirements/)
     assert.ok(readAgentGuidance().includes(agentBuildVerificationText(settings)), 'legacy callers retain the stored mode')
     assert.deepEqual(agentGuidanceSettings(), state, 'request choices never change stored source or revision')
     state = updateAgentGuidance({ key: 'buildVerification', value: { ...settings, mode: 'required' }, revision: state.revision })
     const off = readAgentGuidance(undefined, { build: false, deploy: false })
-    assert.ok(off.includes(agentBuildVerificationText(settings)))
+    assert.doesNotMatch(off, /mew:agent-setting:buildVerification|Follow the project's build verification requirements/)
     assert.doesNotMatch(off, /After any project changes|Use the configured build command/)
     assert.deepEqual(agentGuidanceSettings(), state)
+  })
+})
+
+test('request execution choices follow saved project prohibitions without rewriting guidance', () => {
+  runWithAgentAccount('request-execution-precedence@example.test', () => {
+    const root = path.join(DATA_DIR, 'request-execution-precedence')
+    fs.mkdirSync(root, { recursive: true })
+    const settings = { ...defaultAgentSettings(), instructions: 'Never build or deploy. Never restart the local server.' }
+    writeProjectAgentSettings(root, settings)
+    const binding = { projectRoot: root, docsRoot: path.join(root, 'docs') }
+    const legacy = describeAgentContext(binding, settings, root)
+    assert.match(legacy, /take precedence over conflicting Mew-wide preferences/)
+    assert.doesNotMatch(legacy, /Execution choices for this request/)
+    for (const build of [true, false]) for (const deploy of [true, false]) {
+      const text = describeAgentContext(binding, settings, root, undefined, { build, deploy })
+      assert.ok(text.indexOf('Execution choices for this request:') > text.indexOf(settings.instructions), 'the current request decision follows the older project instructions')
+      assert.match(text, /override older saved project or Mew guidance that requires or forbids builds or deployment/)
+      assert.match(text, /Latest explicit user instructions take precedence/)
+      assert.match(text, /Separate restrictions on the Mew launcher and server start, stop, or restart operations remain in effect/)
+      assert.equal(fs.readFileSync(path.join(root, '.mew/agent-context.json'), 'utf8').includes(settings.instructions), true)
+    }
   })
 })

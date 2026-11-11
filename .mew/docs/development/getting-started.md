@@ -1,8 +1,8 @@
 ---
 title: "Development setup and rules"
 created: 2026-09-29
-updated: "2026-11-04"
-description: "Repository execution restrictions, required build and verification commands, and UI implementation rules. Links Chromium UI testing, isolated Postgres and CLI checks, and Mew's documentation ownership."
+updated: "2026-11-11"
+description: "Repository execution rules: per-message Build/Deploy authorization, npm build and verification commands, separate launcher/server lifecycle restrictions, and required UI rules. Links isolated browser, Postgres, and CLI checks."
 상위파일:
   - "../MOC.md"
   - "MOC.md"
@@ -14,18 +14,24 @@ These rules govern **this Mew source repository**, not other projects opened in 
 
 ## Execution and verification
 
-**Agents must not deploy, run the `mew` launcher, or start, stop, or restart servers.** The user performs those operations. Prohibited examples include `npm start`, `npm run serve`, `npm run dev`, `./mew start|stop|restart|update`, background server starts, and killing server processes.
+**The current message's Build and Deploy selections are explicit user instructions.** They override older saved build/deploy requirements or prohibitions. The latest explicit user request takes precedence. Preserve saved account/project guidance when applying a selection; do not rewrite it merely to execute one message.
+
+- **Build on:** use `npm run build` after implementation changes, fix failures, and rerun before completion. With **Build off**, do not run the project build, even if an older saved default requires it. Requests without execution options retain the repository's required-build default below.
+- **Deploy on:** the user authorizes the task's documented deployment after applicable verification. Confirm the actual destination and credentials, perform the deployment, and verify its result. An older blanket deployment ban is not a reason to ask again. **Deploy off** excludes deployment unless the latest explicit user request directs it. Missing procedures, credentials, or provider permission remain real blockers.
+- **Separate lifecycle operations:** neither selection authorizes the `mew` launcher or server start, stop, or restart. Those operations require a separate explicit user request. Examples include `npm start`, `npm run serve`, `npm run dev`, `./mew start|stop|restart|update`, background server starts, and killing server processes. Do not append them to a build or deployment.
+
+Applicable tests, type checks, lint, documentation checks, target restrictions, and credential protection remain in force. Do not invent deployment commands or claim availability from command success alone. [ADR 0168](../decisions/0168-request-build-deploy-authorization.md) records the authorization correction.
 
 | Change | Required verification |
 | --- | --- |
-| Code, features, dependencies, or build configuration | `npm run build`, plus applicable tests, type checks, lint, and documentation checks |
+| Code, features, dependencies, or build configuration | `npm run build` unless the current message disables it, plus applicable tests, type checks, lint, and documentation checks |
 | Documentation only | `npm run check:docs`; no application build required |
 
-Fix build failures and rerun the build. If a failure or missing prerequisite blocks verification, report the actual blocker and leave the work explicitly incomplete. Other checks do not replace the build.
+When a build is selected or required by the legacy default, fix failures and rerun it. If a failure or missing prerequisite blocks verification, report the actual blocker and leave the work explicitly incomplete. Other checks do not replace a selected build; a deliberately disabled build is reported as skipped.
 
 The running server serves `dist/` directly: a build updates UI assets without restarting the server or reloading server-side code. Do not chain a server operation to the build. Keep any development server private.
 
-Mew's [configurable default build guidance](../../../docs/guides/project-setup.md#build-verification) serves other projects; this repository owns the concrete command and stricter execution restrictions. The former duplicate rule in `.mew/agent-context.json` was removed.
+Mew's [configurable build guidance](../../../docs/guides/project-setup.md#build-verification) defines request selections across projects; this repository owns its concrete command, deployment workflows, and separate lifecycle restrictions. `.mew/agent-context.json` links this contract in additional project guidance.
 
 Run repository-owned checks from the root:
 

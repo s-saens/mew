@@ -74,7 +74,7 @@ The first connection settings can require an administrator or agent to identify 
 - Tests verify configuration preservation, sequential execution, first-failure skipping, root/account isolation, concurrent-start rejection, frozen targets, durable recovery, and no automatic replay.
 - Provider tests verify exact execution IDs, authenticated requests, response bounds, uncertain dispatch, safe URLs, and token-free public state.
 - Browser tests cover mobile/desktop, light/dark, publishing review, actual run progress, downloads, and error recovery.
-- Required build, relevant tests, lint, metadata, and links are checked locally. Operational deployment remains user-owned.
+- Required build, relevant tests, lint, metadata, and links are checked locally. Operational deployment requires Deploy on or an explicit user request, with destination, credential, and result verification under the [execution rules](getting-started.md#execution-and-verification).
 
 ## Sources
 

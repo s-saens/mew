@@ -1,6 +1,6 @@
 ---
 title: "Separate the Mew homepage and Mewlink entry"
-description: "Decision to serve the one-page Mew homepage at mew.run and move canonical Mewlink entry to link.mew.run, preserving the app origin, legacy host protocols, identity namespaces, and operator-owned rollout."
+description: "Decision to serve the one-page Mew homepage at mew.run and move canonical Mewlink entry to link.mew.run, preserving the app origin, legacy host protocols, identity namespaces, and request-authorized rollout, with execution priority updated by ADR 0168."
 created: "2026-11-11"
 updated: "2026-11-11"
 ---
@@ -33,7 +33,7 @@ Keep `APP_ORIGIN`, `OAUTH_ORIGIN=https://mew.saens.kr`, and `EMAIL_IDENTITY_ISSU
 
 Keep host-only secure management cookies and existing browser-key isolation. A new central origin can require fresh central and local sign-in. Do not transfer raw credentials through URLs or broaden cookie scope to `.mew.run`. Update native iOS allowlists and saved-link normalization; shipping those changes and real-device acceptance remain release requirements.
 
-Use Cloudflare Worker Custom Domains to establish the new hostname, DNS, and certificate. Do not hand-edit Worker-managed DNS. The operator applies the compatible deployment and domain configuration together; agents do not deploy or perform server lifecycle operations. MCP inspection is read-only until the application and project authorization allow a safe operational change.
+Use Cloudflare Worker Custom Domains to establish the new hostname, DNS, and certificate. Do not hand-edit Worker-managed DNS. Apply compatible code and domain configuration together. [ADR 0168](0168-request-build-deploy-authorization.md) supersedes the original agent deployment ban: Deploy on or an explicit request authorizes this documented rollout, including necessary domain operations. Separate launcher/server lifecycle operations remain outside that selection.
 
 ## Alternatives
 

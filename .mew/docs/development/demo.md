@@ -1,8 +1,8 @@
 ---
 title: "Browser demo using the shared UI"
-description: "Defines the browser demo using Mew's shared UI, pinned public file catalog, lazy body loading, size budgets, virtual projects, host fixtures, and in-memory memo tabs. Covers transport/CSP boundaries, removed Android fixtures, automated checks, and user-owned application procedures."
+description: "Defines the browser demo using Mew's shared UI, pinned public file catalog, lazy body loading, size budgets, virtual projects, host fixtures, and in-memory memo tabs. Covers transport/CSP boundaries, removed Android fixtures, automated checks, and request-authorized build/deployment and separate server lifecycle procedures."
 created: "2026-10-19"
-updated: "2026-11-07"
+updated: "2026-11-11"
 ---
 
 # Browser demo using the shared UI
@@ -112,7 +112,7 @@ The public `shared/mewlink-demo.ts` owns routing, static paths, CSP, and reserve
 
 Central deployment copies demo artifacts to the central `dist/demo/` and renames `demo.html` to `index.html`. `tools/demo-distribution.mjs` checks source hashes before and after the build and the artifact manifest, including original-content files. Deployment fails for stale or modified artifacts. After modifying the Mew UI, central demo deployment must also be completed to update the public screen.
 
-Agents must run the required build after implementation changes under the [execution rules](getting-started.md). The user runs development servers and deployments; agents must not start, stop, or restart servers or deploy. The commands below distinguish demo development, build verification, and deployment.
+Follow the current message’s Build/Deploy authorization under the [execution rules](getting-started.md). Deploy on or an explicit request authorizes the documented central deployment after verification. Starting, stopping, or restarting servers requires a separate explicit request. The commands below distinguish demo development, build verification, and deployment.
 
 ```bash
 # 데모 전용 개발 서버: 기존 Mew 서버·API를 띄우지 않음

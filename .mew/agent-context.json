@@ -3,5 +3,5 @@
   "enabled": true,
   "docsDir": ".mew/docs",
   "entrypoints": [],
-  "instructions": "- Agents must not deploy, run the mew launcher, or start, stop, or restart servers. The user performs those operations.\n- Type checks, tests, lint, and documentation checks are also required as applicable.\n- These instructions apply only to the Mew source repository. Follow .mew/docs/development/getting-started.md for details."
+  "instructions": "- Treat the current message's Build/Deploy selections as explicit user instructions overriding older saved build/deploy requirements or prohibitions; the latest explicit user request takes precedence. Build on uses npm run build here; Build off skips it. Deploy on authorizes the documented task deployment after verification without another confirmation.\n- Verify deployment target, credentials, and results. Type checks, tests, lint, and documentation checks remain applicable.\n- Build/Deploy selections do not authorize the Mew launcher or server start, stop, or restart; those need a separate explicit user request.\n- These rules apply to the Mew source repository. Follow .mew/docs/development/getting-started.md for details."
 }

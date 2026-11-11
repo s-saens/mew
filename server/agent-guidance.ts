@@ -74,8 +74,10 @@ function effectiveGuidance(content: string, locale?: string, execution?: AgentEx
       const block = isolatedRegion(defaults, 'buildVerification')
       if (block) {
         const [start, end] = markers('buildVerification')
-        const text = agentBuildVerificationText({ ...build.value, mode: execution.build ? 'required' : 'project' })
-        defaults = defaults.slice(0, block.from) + `${start}\n${text}\n${end}` + defaults.slice(block.to)
+        const replacement = execution.build
+          ? `${start}\n${agentBuildVerificationText({ ...build.value, mode: 'required' })}\n${end}`
+          : ''
+        defaults = defaults.slice(0, block.from) + replacement + defaults.slice(block.to)
       }
     }
   }

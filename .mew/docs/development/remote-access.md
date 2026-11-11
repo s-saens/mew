@@ -32,7 +32,7 @@ Legacy provider callbacks use `OAUTH_ORIGIN=https://mew.saens.kr`. A single-use 
 
 Cancel native multi-touch/gesture defaults only; preserve propagation for editor-local font resizing. One-finger input, Ctrl/Cmd+wheel, keyboard zoom, and third-party policies remain. Launcher whole-page enlargement is restricted, with accessibility/device limits in [ADR 0112](../decisions/0112-workspace-touch-zoom.md).
 
-This central **source contract** does not establish a live `mew.run` change. Host builds cannot publish launcher assets; central application is user-owned and separate. The [work record](../work/mewlink-touch-zoom.md) records local checks and remaining rollout limits.
+This central **source contract** does not establish a live `mew.run` change. Host builds cannot publish launcher assets; central deployment is separate and follows the [request execution rules](getting-started.md#execution-and-verification). The [work record](../work/mewlink-touch-zoom.md) records local checks and remaining rollout limits.
 
 ## Microphone permission
 
@@ -221,7 +221,7 @@ Provider identities, admin sessions, and device ownership retain immutable centr
 
 `PUT /central/account` requires central origin/login: invalid names return 400, another owner's name 409. App origins remain blocked. Users deploy frontend/Worker/D1 migrations together with `npm --prefix mewlink run deploy`; username-only changes need no local build/restart.
 
-`mewlink/test/username.test.ts` covers concurrent claims, casing/reserved names/history, session/owner preservation, origin, and old redirects. `mewlink/test/p2p.browser.test.ts` covers setup, duplicate recovery, rename, native P2P through current/old URLs, and mobile widths. Actual deployment is user-owned.
+`mewlink/test/username.test.ts` covers concurrent claims, casing/reserved names/history, session/owner preservation, origin, and old redirects. `mewlink/test/p2p.browser.test.ts` covers setup, duplicate recovery, rename, native P2P through current/old URLs, and mobile widths. Actual deployment requires Deploy on or an explicit request under the [execution rules](getting-started.md#execution-and-verification).
 
 ## Direct Email Login
 

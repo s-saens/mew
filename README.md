@@ -123,7 +123,7 @@ npm run lint
 npm run check:docs
 ```
 
-The server serves `dist/` directly, so a build changes the UI assets a running instance serves. Mew's [default build verification guidance](docs/guides/project-setup.md#build-verification) requires a project build after implementation changes and provides options for the command, change scope, and failure handling. In this source repository, agents must use `npm run build`, fix failures, and rerun it before reporting completion. Agents must not deploy, run the launcher, or start, stop, or restart servers; the user performs those operations. The concrete command and execution restrictions apply only to this repository.
+The server serves `dist/` directly, so a build changes the UI assets a running instance serves. The agent composer's [Build and Deploy selections](docs/guides/project-setup.md#build-verification) are explicit instructions for the submitted message and override older saved build/deploy requirements or prohibitions. Build on uses `npm run build` in this repository, with failure repair and rechecking; Build off skips that build. Deploy on authorizes the task's documented deployment after verification. Requests without selections retain the required-build default and do not authorize automatic deployment. Neither selection authorizes the launcher or server start, stop, or restart; those operations require a separate explicit request. Follow the [execution rules](.mew/docs/development/getting-started.md#execution-and-verification).
 
 For documentation work, follow the [writing rules](.mew/docs/README.md); agents start at [.mew/docs/AGENT.md](.mew/docs/AGENT.md).
 
