@@ -1,20 +1,33 @@
 ---
 title: "Command Buttons and Scheduled Tasks"
-description: "Explains project Build and Deploy actions, automatic output discovery, completion notices, file and ZIP downloads, and Browser links. Also covers project and terminal command buttons and recurring agent schedules."
+description: "Explains the project results/publishing screen, workflow setup, provider connections, and existing Build/Deploy result downloads. Also covers project and terminal command buttons and recurring agent schedules."
 updated: "2026-11-11"
 상위파일:
   - "../../.mew/docs/_docs.md"
   - "MOC.md"
 ---
-Use this guide to turn frequently run commands into buttons or schedule recurring agent tasks. First open the project you will work in and check the required feature permissions, such as terminals and scheduled tasks. Agent tasks also require [runtime installation and authentication](../configuration/agent-runtimes.md).
+Use this guide to view project results, publish a configured project, run frequent commands, or schedule agent tasks. First open the project you will work in and check the required feature permissions, such as terminals and scheduled tasks. Agent tasks also require [runtime installation and authentication](../configuration/agent-runtimes.md).
 
 | What you want to do | Feature to use |
 | --- | --- |
+| See what you made or publish it using configured steps | Project **Results & release** |
 | Build a project or deploy a configured target and inspect its results | Project **Build** or **Deploy** |
 | Run builds, development servers, and other commands in a specific project | **▶ Command Button** in the top bar or project sidebar |
 | Type a frequently used string into the shell you are currently viewing | Terminal **Command Buttons** |
 | Run a new agent task at a specified time or interval | Menu → **Scheduled Tasks** |
 | Send a message once later in the current conversation | [Scheduled Message](../../.mew/docs/features/terminals-agents-automation/agent-scheduled-messages.md) in the agent input bar |
+
+## Results and publishing
+
+1. Open **Results & release** for the project. **View result** opens an available address or shows downloadable files. Select **Make a new result** to run its configured preparation steps.
+2. To publish, select the named publishing flow and choose **Publish**. Review its destination and branch, then choose **Publish now**. Nothing is published just by opening this review. If its settings changed, reopen the review before starting.
+3. Follow the actual steps, then open the resulting site, provider console, or files. You can close the dialog or switch projects; completion notices return to the original project while the Mew page remains connected.
+
+When no destination is ready, choose **Connect a service** or **Configure with agent**. The first connections support a dispatchable GitHub Actions workflow, an existing Git-connected Cloudflare Pages project, or a Google Cloud Build trigger. In the connection settings, supply the destination and a token with the necessary permission. The token is stored encrypted on the Mew server and is not included in shared project files. Saving credentials does not verify access or publish anything; Google tokens may expire and need replacement.
+
+Under **Advanced settings**, edit the named flows, choose existing steps, or open the original build/deployment settings. Connect a service to add its supported publishing flow, or add one explicitly. For unfamiliar project configuration, an agent can help investigate the actual settings. The [pipeline contract](../../.mew/docs/features/terminals-agents-automation/project-delivery-pipelines.md) defines the editable file format and recovery behavior.
+
+Pipeline history survives a server restart. An unfinished run is marked interrupted and is not automatically repeated; inspect its destination before starting again. An external status refresh checks the recorded execution and does not resume later steps. Result files can be changed or removed by later builds, so old downloads are not guaranteed to remain available. A static web build is downloadable; automatically executing it inside Mew remains separate work.
 
 ## Build and deploy a project
 

@@ -107,6 +107,43 @@ test('project action archive download retains project and workspace scope throug
   assert.equal(mapped.length, 1)
 })
 
+test('delivery API calls retain their original workspace and do not dispatch work on reads or saves', async t => {
+  installGlobals(t)
+  const api = await fixture()
+  const calls: { url: URL; init?: RequestInit }[] = []
+  api.configureAppRuntime({ transport: {
+    fetch(input, init) { calls.push({ url: new URL(String(input), 'https://device.test'), init }); return Promise.resolve(Response.json({})) },
+    socket() { throw new Error('No socket expected') }, close() {},
+  } })
+  const client = api.createWorkspaceClient({ workspacePath: '/original', projectPath: '/original' })
+  const invoke = async (name: string, ...args: unknown[]) => {
+    const method = Reflect.get(client, name)
+    assert.equal(typeof method, 'function', name)
+    return method(...args)
+  }
+  await invoke('fetchProjectPipelines', '.workspace', 'app', '/original')
+  await invoke('saveProjectPipelines', '.workspace', [], 'app', '/original')
+  await invoke('runProjectPipeline', '.workspace', 'publish', 'app', '/original', 'reviewed-revision')
+  await invoke('fetchReleaseProviders', '.workspace', 'app', '/original')
+  await invoke('saveReleaseConnection', '.workspace', { config: { provider: 'cloudflare-pages', label: 'Website', accountId: 'a', projectName: 'site', branch: 'main' }, token: 'fixture-token' }, 'app', '/original')
+  await invoke('removeReleaseConnection', '.workspace', 'connection', 'app', '/original')
+  await invoke('refreshReleaseProvider', '.workspace', 'run', 'app', '/original')
+  assert.deepEqual(calls.map(({ url, init }) => [url.pathname, init?.method ?? 'GET']), [
+    ['/api/project-pipelines', 'GET'], ['/api/project-pipelines', 'PUT'], ['/api/project-pipelines/run', 'POST'],
+    ['/api/release-providers', 'GET'], ['/api/release-providers/connection', 'PUT'],
+    ['/api/release-providers/connection/connection', 'DELETE'], ['/api/release-providers/refresh', 'POST'],
+  ])
+  assert.equal(JSON.parse(String(calls[2].init?.body)).expectedRevision, 'reviewed-revision')
+  for (const { url, init } of calls) {
+    assert.equal(url.searchParams.get('mewWorkspacePath'), '/original')
+    assert.equal(url.searchParams.get('mewProjectPath'), '/original')
+    const scope = init?.body ? JSON.parse(String(init.body)) : Object.fromEntries(url.searchParams)
+    assert.equal(scope.project, '.workspace')
+    assert.equal(scope.path, 'app')
+    assert.equal(scope.workspacePath, '/original')
+  }
+})
+
 test('explicit workspace reads require advertised scope support while accepting canonical server paths', async t => {
   installGlobals(t)
   const api = await fixture()

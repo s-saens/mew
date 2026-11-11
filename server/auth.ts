@@ -4,6 +4,7 @@ import path from 'node:path'
 import { DATA_DIR, DataFileError, readJsonFile, writeFileAtomic } from './dataDir.ts'
 import type { MewlinkAccessRequest, MewlinkIdentityLink } from '../shared/mewlink-identity.ts'
 import { gitConnections } from './git-connections.ts'
+import { removeReleaseProviderAccount } from './release-providers.ts'
 import { gitProviders } from './git-providers.ts'
 import { sealOwnerSetup, withAccountStorageLock } from './account-storage.ts'
 
@@ -361,6 +362,7 @@ export function upsertUser(accountId: string, record: UserRecord) {
 export function revokeAccountCredentials(accountId: string): void {
   const key = normalizeEmail(accountId)
   for (const provider of gitProviders) gitConnections.remove(key, provider.id, provider.host)
+  removeReleaseProviderAccount(key)
   fs.rmSync(path.join(DATA_DIR, 'speech-accounts', crypto.createHash('sha256').update(key).digest('hex')), { recursive: true, force: true })
   revokeUserSessions(key)
 }

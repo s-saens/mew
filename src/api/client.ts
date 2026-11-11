@@ -1,5 +1,7 @@
 import type { AgentExecutionOptions } from '../../shared/agent-execution-options'
 import type { ProjectAction, ProjectActionRun, ProjectActionsState } from '../../shared/project-actions'
+import type { ProjectPipeline, ProjectPipelineRun, ProjectPipelinesState } from '../../shared/project-pipelines'
+import type { ReleaseProviderRun, ReleaseProvidersState, SaveReleaseConnection } from '../../shared/release-providers'
 import { createDatabasePageMutationScope, databasePageMutations } from '../utils/database-page-mutations'
 import { json } from './response.ts'
 import type { Role } from './auth.ts'
@@ -1845,6 +1847,48 @@ function createApiClient(scope?: Readonly<WorkspaceScope>) {
     return appResourceUrl(`/api/project-actions/archive?${projectActionsQuery(project, path, workspacePath)}&runId=${encodeURIComponent(runId)}`)
   }
 
+  function fetchProjectPipelines(project: string, path = '', workspacePath?: string): Promise<ProjectPipelinesState> {
+    return mewFetch(`/api/project-pipelines?${projectActionsQuery(project, path, workspacePath)}`).then(json<ProjectPipelinesState>)
+  }
+
+  function saveProjectPipelines(project: string, pipelines: ProjectPipeline[], path = '', workspacePath?: string): Promise<ProjectPipelinesState> {
+    return mewFetch('/api/project-pipelines', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ project, path, workspacePath, pipelines }),
+    }).then(json<ProjectPipelinesState>)
+  }
+
+  function discoverProjectPipelines(project: string, path = '', workspacePath?: string): Promise<ProjectPipelinesState> {
+    return mewFetch('/api/project-pipelines/discover', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ project, path, workspacePath }),
+    }).then(json<ProjectPipelinesState>)
+  }
+
+  function runProjectPipeline(project: string, id: string, path = '', workspacePath?: string, expectedRevision?: string): Promise<{ run: ProjectPipelineRun }> {
+    return mewFetch('/api/project-pipelines/run', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ project, path, workspacePath, id, expectedRevision }),
+    }).then(json<{ run: ProjectPipelineRun }>)
+  }
+
+  function fetchReleaseProviders(project: string, path = '', workspacePath?: string): Promise<ReleaseProvidersState> {
+    return mewFetch(`/api/release-providers?${projectActionsQuery(project, path, workspacePath)}`).then(json<ReleaseProvidersState>)
+  }
+
+  function saveReleaseConnection(project: string, input: SaveReleaseConnection, path = '', workspacePath?: string): Promise<ReleaseProvidersState> {
+    return mewFetch('/api/release-providers/connection', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...input, project, path, workspacePath }),
+    }).then(json<ReleaseProvidersState>)
+  }
+
+  function removeReleaseConnection(project: string, id: string, path = '', workspacePath?: string): Promise<ReleaseProvidersState> {
+    return mewFetch(`/api/release-providers/connection/${encodeURIComponent(id)}?${projectActionsQuery(project, path, workspacePath)}`, { method: 'DELETE' }).then(json<ReleaseProvidersState>)
+  }
+
+  function refreshReleaseProvider(project: string, runId: string, path = '', workspacePath?: string): Promise<ReleaseProviderRun> {
+    return mewFetch('/api/release-providers/refresh', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ project, path, workspacePath, runId }),
+    }).then(json<ReleaseProviderRun>)
+  }
+
   function fetchTermButtons(): Promise<{ buttons: TermButton[] }> {
     return mewFetch('/api/term-buttons').then(json<{ buttons: TermButton[] }>)
   }
@@ -2250,6 +2294,14 @@ function createApiClient(scope?: Readonly<WorkspaceScope>) {
     runProjectAction,
     projectActionArtifactUrl,
     projectActionArchiveUrl,
+    fetchProjectPipelines,
+    saveProjectPipelines,
+    discoverProjectPipelines,
+    runProjectPipeline,
+    fetchReleaseProviders,
+    saveReleaseConnection,
+    removeReleaseConnection,
+    refreshReleaseProvider,
     fetchTermButtons,
     saveTermButtons,
     fetchIgnoreList,

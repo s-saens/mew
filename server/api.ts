@@ -71,6 +71,8 @@ import { DATA_DIR } from './dataDir.ts'
 import { createTmuxManager, createTmuxRouter } from '@mew/tmux-term/server'
 import { CmdButtonError, commandSessionName, normalizeCmdButtons, oneShotCommand, readCmdButtons, writeCmdButtons } from './cmdButtons.ts'
 import { createProjectActionsRouter } from './project-actions-routes.ts'
+import { createProjectPipelinesRouter } from './project-pipelines-routes.ts'
+import { createReleaseProvidersRouter } from './release-providers-routes.ts'
 import { normalizeTermButtons, readTermButtons, TermButtonError, writeTermButtons } from './termButtons.ts'
 import { readTableLayout, TableLayoutError, writeTableLayout } from './tableLayout.ts'
 import { readFrontmatterOptions, readFrontmatterOptionColors, updateFrontmatterOptions, FrontmatterOptionsError } from './frontmatter-options.ts'
@@ -2753,6 +2755,8 @@ export function createApiApp() {
   })
 
   app.use('/project-actions', createProjectActionsRouter())
+  app.use('/project-pipelines', createProjectPipelinesRouter())
+  app.use('/release-providers', createReleaseProvidersRouter())
 
   // 명령어 버튼 — <프로젝트>/.mew/cmd-button.json 을 읽어 목록·실행 상태를 준다. 임의 명령 실행이므로
   // tmux와 동일하게 owner/manager만. 명령 문자열은 언제나 서버가 파일에서 읽고(요청 본문의 명령은 신뢰하지

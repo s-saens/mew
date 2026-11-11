@@ -1,6 +1,6 @@
 ---
 title: "Project build and deployment actions"
-description: "Editable project Build and Deploy controls, conservative action and output discovery, nonblocking setup, run results, notifications, Browser links, and scoped file and ZIP downloads. Defines configuration, execution, and result boundaries."
+description: "Editable project Build and Deploy controls, conservative discovery, nonblocking setup, run results, notifications, Browser links, and scoped file/ZIP downloads. Defines individual actions reused by the results and publishing pipelines."
 created: "2026-11-11"
 updated: "2026-11-11"
 ---
@@ -8,6 +8,8 @@ updated: "2026-11-11"
 ## Behavior
 
 Provide named **Build** and **Deploy** controls beside the existing project [command button](project-command-buttons.md). Users choose an outcome such as a debug or release build without entering a command. Editing an action exposes its name, kind, variant, command, optional result URL, and downloadable output paths. Legacy command buttons remain independently configurable.
+
+The [results and publishing screen](project-delivery-pipelines.md) composes these actions into ordered workflows and retains completed pipeline results across restarts. This document owns the individual action and artifact behavior.
 
 Controls target the selected row's actual project directory, including a subproject or worktree, without switching the active editor. All reads, saves, runs, result reads, and downloads retain that scope. Execution requires the existing owner/manager terminal boundary; a configured result URL opens the existing host Browser under its independent permission.
 
@@ -24,6 +26,8 @@ The account provider owns the setup dialog and checks the agent capability. Ligh
 ### Runs and results
 
 Run only the server-resolved action identified by its stable ID. Record a run independently of the current configuration so edits cannot rewrite a completed result. Capture bounded output, timestamps, and the real process exit status. A launch error or nonzero exit produces a failed result. Prevent duplicate execution of the same running action in the same root.
+
+Finite actions have a 30-minute deadline. Stop their owned process group on timeout and retain the failure output. A pipeline reserves its project root, so manual action starts cannot overlap it. After interrupted pipeline recovery, a recorded live process group also blocks manual starts until it exits. Existing command buttons remain the entry for interactive and long-running processes.
 
 Keep recent run results available in the action dialog. Closing the dialog does not stop the process. A page-level watcher retains the captured project root after its controls unmount, so completion and failure notifications continue while the Mew page remains connected. The account-level notification host opens the retained results even after switching projects. Existing results remain inspectable after reopening the dialog; old completed runs must not generate repeated notices.
 

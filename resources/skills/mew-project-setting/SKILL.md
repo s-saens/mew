@@ -1,6 +1,6 @@
 ---
 name: mew-project-setting
-description: "Set up or update a project for Mew from the user's concept and feature specification: configure editable build/deploy actions and useful results, maintain Mew documentation, and use test-first development by default. Apply when creating a project, adapting an existing project, or repairing project setup."
+description: "Set up or update a project for Mew from the user's concept: configure build/deploy actions, results and publishing pipelines, useful outputs, and Mew documentation with test-first development by default. Apply when creating, adapting, or repairing project setup."
 ---
 
 # Configure a project for Mew
@@ -38,6 +38,18 @@ The configuration contains `{ "version": 1, "actions": [...] }`. Each action use
 | `artifacts` | Optional array of project-relative file paths or globs for downloadable results. |
 
 Mew discovery recognizes explicit Node build/deploy scripts and Android wrapper build variants. It does not establish an unknown hosting target, credentials, or server URL. Inspect the underlying project configuration before filling gaps.
+
+## Configure results and publishing
+
+Use the results/publishing screen as the ordinary user entry. A result should offer a real address or useful files, and publishing should name the actual destination. Keep shell commands and service identifiers in the settings used by the actions and flows.
+
+Mew can offer read-only default flows from actions and connected services. When a project needs a custom order, maintain `.mew/project-pipelines.json` as `{ "version": 1, "pipelines": [...] }`. Each pipeline has a stable `id`, a user-facing `name`, a `purpose` of `preview` or `publish`, and ordered `steps`. Each step has an `id`, a `name`, and either `{ "type": "action", "actionId": "existing-action-id" }` or `{ "type": "provider", "connectionId": "existing-private-connection-id" }`. An optional `resultUrl` names an established HTTP(S) result address. Preserve saved empty lists, custom names, and user edits.
+
+Only add steps supported by project evidence. A test command can be configured as an existing action and selected before a build; do not display a test step that does not actually run. Preview flows must not contain deployment actions or external publishing connections. Missing steps or credentials should lead to setup, not prevent project work.
+
+Initial remote connections support dispatchable GitHub Actions workflows, Git-connected Cloudflare Pages deployments, and existing Google Cloud Build triggers. Credentials belong in Mew's private connection settings, never project JSON, workflow inputs, command text, logs, or documentation. Connections are account- and project-specific; a copied connection ID does not grant access. Do not create provider resources, grant permissions, or execute deployment merely to finish configuration.
+
+Explain the source being published. Remote workflows use the selected provider repository/reference; local changes are not automatically committed, pushed, or uploaded. A local command can deploy to a remote service, so its execution computer is not its publishing destination. A successful workflow does not prove that a website is available. Static output downloads do not themselves run an app inside Mew. Document unresolved preview, hosting, credentials, and token-expiry prerequisites accurately.
 
 ## Maintain Mew documentation
 

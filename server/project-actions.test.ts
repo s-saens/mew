@@ -18,6 +18,53 @@ function fixture(t: test.TestContext) {
 }
 const build = { id: 'build', name: 'Build', kind: 'build' as const, command: 'npm run build' }
 
+test('pipeline reservations protect manual actions and run immutable action snapshots', async t => {
+  const { root } = fixture(t)
+  const commands: string[] = []
+  const service = new ProjectActionsService({ runner: async input => { commands.push(input.command); input.onOutput('built'); return { exitCode: 0 } } })
+  service.save(root, [build])
+  service.reserve(root, 'pipeline-one')
+  assert.throws(() => service.run(root, build.id), /실행 중/)
+  assert.throws(() => service.reserve(root, 'pipeline-two'), /실행 중/)
+  service.save(root, [{ ...build, command: 'changed' }])
+  const started = service.runSnapshot(root, build, 'pipeline-one')
+  const completed = await service.wait(root, started.id)
+  assert.equal(completed.status, 'succeeded')
+  assert.equal(completed.output, 'built')
+  assert.deepEqual(commands, [build.command])
+  service.release(root, 'pipeline-one')
+  assert.equal(service.run(root, build.id).status, 'running')
+  await service.wait(root, service.state(root).runs[0].id)
+})
+
+test('completed action records restore scoped artifact and archive access after restart', async t => {
+  const { root, write } = fixture(t)
+  write('package.json', { scripts: { build: 'vite build' } })
+  const service = new ProjectActionsService({ runner: async () => { write('dist/index.html', 'built'); return { exitCode: 0 } } })
+  const started = service.run(root, 'npm:build')
+  await service.wait(root, started.id)
+  const record = service.exportRun(root, started.id)
+  const restored = new ProjectActionsService()
+  restored.restoreRun(root, record)
+  assert.equal(restored.artifact(root, started.id, 'dist/index.html'), path.join(root, 'dist/index.html'))
+  assert.equal(restored.archive(root, started.id).files.length, 1)
+  const other = fixture(t)
+  assert.throws(() => restored.artifact(other.root, started.id, 'dist/index.html'))
+  write('dist/index.html', 'other')
+  assert.throws(() => restored.archive(root, started.id), /変更|변경|사용/)
+})
+
+test('finite action deadlines stop their owned process group before releasing the project', async t => {
+  const { root } = fixture(t)
+  const service = new ProjectActionsService({ timeoutMs: 80 })
+  const script = "process.stdout.write('running');setInterval(()=>{},1000)"
+  service.save(root, [{ ...build, command: `${JSON.stringify(process.execPath)} -e ${JSON.stringify(script)}` }])
+  const run = await service.wait(root, service.run(root, build.id).id)
+  assert.equal(run.status, 'failed')
+  assert.match(run.output, /시간.*초과/)
+  assert.ok(run.finishedAt)
+})
+
 async function finished(service: ProjectActionsService, root: string) {
   for (let attempt = 0; attempt < 100; attempt++) {
     const run = service.state(root).runs[0]

@@ -12,15 +12,18 @@ import { ProjectActionsEditor } from './ProjectActionsEditor'
 import { ProjectActionsResults } from './ProjectActionsResults'
 import { projectActionsStore, recentProjectActionRuns, type ProjectActionsScope } from './ProjectActionsState'
 import { projectActionsCopy } from './project-actions-copy'
+import { ProjectReleaseDialog } from './ProjectReleaseDialog'
+import { projectReleaseCopy } from './project-release-copy'
 
 export function ProjectActions({ project, directory = '', workspacePath, inline = false }: Partial<Pick<ProjectActionsScope, 'directory' | 'workspacePath'>> & { project: string; inline?: boolean }) {
   const api = useWorkspaceApi(), browser = useWorkspaceBrowser()
   const setup = useProjectSetup()
-  const copy = projectActionsCopy(useUiLocale()), title = useId()
+  const locale = useUiLocale(), copy = projectActionsCopy(locale), releaseCopy = projectReleaseCopy(locale), title = useId()
   const store = useMemo(() => projectActionsStore(api, { project, directory, workspacePath }), [api, project, directory, workspacePath])
   const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot)
   const { state, error, loading, busy } = snapshot
   const [kind, setKind] = useState<ProjectAction['kind'] | null>(null)
+  const [releaseOpen, setReleaseOpen] = useState(false)
   const [editing, setEditing] = useState<{ action: ProjectAction; isNew: boolean } | null>(null)
   const [portal, setPortal] = useState<HTMLDivElement | null>(null)
   useEffect(() => { if (kind) void store.load() }, [kind, store])
@@ -28,10 +31,14 @@ export function ProjectActions({ project, directory = '', workspacePath, inline 
   const runs = recentProjectActionRuns((state?.runs ?? []).filter(run => run.kind === kind))
   return <>
     <span data-project-actions className={`inline-flex shrink-0 items-center gap-0.5 ${inline ? 'mb-1 w-full border-b border-edge pb-1' : ''}`}>
+      <button type="button" data-header-menu-trigger data-project-release-trigger aria-haspopup="dialog" aria-expanded={releaseOpen}
+        onClick={event => { event.stopPropagation(); setReleaseOpen(true) }}
+        className="rounded px-1.5 py-1 text-xs font-medium text-ink hover:bg-surface-raised focus-visible:outline-2 focus-visible:outline-ink">{releaseCopy.entry}</button>
       {(['build', 'deploy'] as const).map(value => <button type="button" key={value} data-header-menu-trigger data-project-action-trigger={value}
         aria-haspopup="dialog" aria-expanded={kind === value} onClick={event => { event.stopPropagation(); setKind(value) }}
         className="rounded px-1.5 py-1 text-xs text-ink-secondary hover:bg-surface-raised hover:text-ink focus-visible:outline-2 focus-visible:outline-ink">{copy[value]}</button>)}
     </span>
+    {releaseOpen && <ProjectReleaseDialog scope={{ project, directory, workspacePath }} onClose={() => setReleaseOpen(false)} onAdvanced={value => { setReleaseOpen(false); setKind(value) }} />}
     {kind && <DialogFrame labelledBy={title} onClose={() => setKind(null)} className="max-h-[90dvh] max-w-lg overflow-y-auto max-sm:max-w-[calc(100vw-16px)]">
       <HoverTipLayer portalTarget={portal}><div ref={setPortal} className="p-3" data-project-actions-dialog>
         <header className="mb-3 flex items-center gap-2">
