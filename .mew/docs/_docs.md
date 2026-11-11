@@ -1,10 +1,11 @@
 ---
-title: "Mew project documentation"
+title: "Mew Docs"
 created: "2026-09-11"
 updated: "2026-10-29"
 description: "Connects the Mew project's current features, implementation contracts, decisions, and maintenance with tasks, work, investigations, and history. Directs readers to a separate documentation home for public installation and usage guides."
 상위파일: "../../README.md"
 ---
+
 # Mew project documentation
 
 The project documentation home for finding current features, shared implementation contracts, decisions, maintenance procedures, and evidence from work and investigations. For installation, operation, and configuration, follow the [public documentation](../../docs/README.md).

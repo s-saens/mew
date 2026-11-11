@@ -1,4 +1,4 @@
-Mew is an independent project. This repository's instructions and documentation are authoritative; Liiiiv workspace instructions and documentation update procedures do not apply.
+Mew is an independent project. This repository's instructions and documentation are authoritative.
 
 For an introduction and usage instructions, follow [README.md](README.md); for documentation navigation and writing, follow [.mew/docs/AGENT.md](.mew/docs/AGENT.md) and [Documentation rules](.mew/docs/README.md). Use `node server/document-descriptions.ts` to read document `description` values and select only the relevant body text. There is no requirement to navigate or register MOCs.
 

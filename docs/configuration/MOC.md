@@ -5,9 +5,14 @@ updated: "2026-10-29"
 description: "Links appearance, accounts, environment variables, AI runtime installation and authentication, Skills·MCP, and search settings by purpose."
 상위파일: "../README.md"
 ---
+
 # Settings
 
 Find app and server settings by the topic you need.
+
+[Accounts·Roles·Feature Permissions·Guest Sharing](../../.mew/docs/features/appearance-accounts-operations/accounts-roles-feature-permissions-and-guest-sharing.md)
+
+<br/>
 
 | What you want to change | Reference document |
 | --- | --- |

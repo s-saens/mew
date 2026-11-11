@@ -1,11 +1,12 @@
 ---
 title: "Browser Storage and Automatic Cleanup"
 description: "Defines explorer anchor restoration; storage scopes by local user ID and instance verified through current P2P authentication results; password and external login session boundaries; per-device persistent login; access revocation; automatic recovery; origin cache budgets; 7-day lifetimes; automatic cleanup; draft/settings preservation; server storage of account themes; cross-device synchronization; browser cache migration; DB popup view settings; preservation of old shortcut values; and global skin migration. Also describes individual dismissal settings for installation and fullscreen startup guidance, a separate IndexedDB cache for file bodies and migration from localStorage, static code revalidation caches, and the demo's in-memory storage boundaries. Stored values for the removed internal browser are preserved but unused, and compatibility reads do not create default shortcuts."
-updated: "2026-10-26"
+updated: "2026-10-29"
 상위파일:
   - "../MOC.md"
   - "MOC.md"
 ---
+
 [ADR 0133](../history/decisions/0133-mew-browser-cache-budget-and-retention.md)
 
 `@mew/ui/browser-storage` manages shared budgets and lifetimes for localStorage caches that can be regenerated from the server. Settings, open tabs, splits, and drafts in progress are not subject to cache cleanup. Authentication cookies, other apps' keys, server sessions, and actual files are not deleted either. Cleanup does not use `localStorage.clear()`.
@@ -108,6 +109,5 @@ The cache budget of 2MiB and total origin budget of 4MiB aggregate all remote sc
 - `server/editor-pane-ui.test.ts`: Opening files after initial browser cleanup and keeping the editor alive when saving fails.
 
 Browser data is specific to each user device. Code changes alone do not change storage in older pages that are currently open; first-run cleanup applies when the user builds and refreshes.
-
 
 Fast restoration of root projects uses a limited in-memory snapshot inside the logged-in App, separate from this disk cache. Lifetime, capacity, permission invalidation, and server requery criteria follow the [Fast Switching Contract](ui-contracts.md#fast-root-project-switching).
