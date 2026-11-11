@@ -357,10 +357,11 @@ export function upsertUser(accountId: string, record: UserRecord) {
   })
 }
 
-/** Revoke stored sessions and Git credentials, including after an atomic account merge. */
+/** Revoke stored sessions and integration credentials, including after an atomic account merge. */
 export function revokeAccountCredentials(accountId: string): void {
   const key = normalizeEmail(accountId)
   for (const provider of gitProviders) gitConnections.remove(key, provider.id, provider.host)
+  fs.rmSync(path.join(DATA_DIR, 'speech-accounts', crypto.createHash('sha256').update(key).digest('hex')), { recursive: true, force: true })
   revokeUserSessions(key)
 }
 

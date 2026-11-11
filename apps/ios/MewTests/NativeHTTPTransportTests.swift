@@ -17,6 +17,13 @@ final class NativeHTTPTransportTests: XCTestCase {
         XCTAssertTrue(NativeHTTPTransport.validPath("/api/remote-access/register"))
     }
 
+    func testSpeechTimeoutIsScopedToTranscriptionPost() {
+        XCTAssertEqual(NativeHTTPTransport.requestTimeout(method: "POST", path: "/api/speech/transcribe"), 310)
+        XCTAssertEqual(NativeHTTPTransport.requestTimeout(method: "POST", path: "/api/speech/transcribe?project=one"), 310)
+        XCTAssertEqual(NativeHTTPTransport.requestTimeout(method: "GET", path: "/api/speech/transcribe"), 60)
+        XCTAssertEqual(NativeHTTPTransport.requestTimeout(method: "POST", path: "/api/speech/transcribe-other"), 60)
+    }
+
     func testOnlyKnownWorkspaceSocketsAreAccepted() {
         for path in ["/api/tmux/ws", "/api/agent/ws?session=one", "/api/presence", "/api/live/ws", "/api/collab", "/api/db/ws", "/api/browser-desktop/ws", "/api/dom-browser/ws"] {
             XCTAssertTrue(NativeHTTPTransport.validPath(path, socket: true), path)

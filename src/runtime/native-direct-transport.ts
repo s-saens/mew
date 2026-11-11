@@ -3,6 +3,7 @@ import { base64ToBytes, bytesToBase64, type NativeDirectBridge } from './native-
 import { nativeDirectPath } from './native-direct-path.ts'
 import { NativeDirectSocket } from './native-direct-socket.ts'
 import { uuid } from '../utils/uuid.ts'
+import { requestResponseTimeout } from '../utils/request-response-timeout.ts'
 
 export const NATIVE_HTTP_LIMIT = 32 * 1024 * 1024
 const MAX_REQUESTS = 16
@@ -58,7 +59,7 @@ export class NativeDirectTransport implements AppTransport {
     this.pending.set(id, cancel)
     const abort = () => cancel(request.signal.reason instanceof Error ? request.signal.reason : new DOMException('Aborted', 'AbortError'))
     request.signal.addEventListener('abort', abort, { once: true })
-    const timer = setTimeout(() => cancel(new Error('Native network request timed out')), 30_000)
+    const timer = setTimeout(() => cancel(new Error('Native network request timed out')), requestResponseTimeout(request.method, path))
     try {
       const response = await Promise.race([cancelled, (async () => {
         const bytes = await readBody(request, operation.signal)

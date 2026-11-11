@@ -30,6 +30,7 @@ import { codePinchZoom } from '../utils/code-pinch-zoom'
 import { debuggerEditorExtension } from '../utils/debugger-editor'
 import type { DatabaseLink } from '../utils/database-links'
 import { prepareCodeContext, type CodeContextSession } from '../utils/code-context-target'
+import { prepareCodeTextInsertion } from '../utils/code-text-insertion'
 import type { EditorContextTarget } from '@mew/editor/context-target'
 import { makeCommentAnchor, resolveCommentAnchor, type CommentAnchor } from '@mew/editor/comment-anchor'
 import type { CommentThreadInput, EditorViewAnchor } from '@mew/editor'
@@ -216,6 +217,7 @@ const theme = EditorView.theme({
 })
 
 export interface CodePaneHandle {
+  prepareTextInsertion: () => ((text: string) => boolean) | null
   prepareContextMenu: (x: number, y: number) => EditorContextTarget | null
   startAnnotation: () => void
   getAnnotationIdentity: (num: number) => string | null
@@ -460,6 +462,10 @@ const PreparedCodePane = forwardRef<CodePaneHandle, CodePaneProps & { language: 
   useImperativeHandle(
     ref,
     () => ({
+      prepareTextInsertion() {
+        const view = viewRef.current
+        return view && !view.state.readOnly ? prepareCodeTextInsertion(view, () => viewRef.current === view) : null
+      },
       prepareContextMenu(x, y) {
         const view = viewRef.current
         if (!view) return null

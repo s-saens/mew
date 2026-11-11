@@ -4,11 +4,11 @@ parent: "mew-editor"
 title: "Markdown Hotview, source, and document properties"
 status: "implemented"
 created: "2026-09-18"
-updated: "2026-11-04"
+updated: "2026-11-11"
 status_hash: "2741d359b18c61eecb53b8ce0ba2862f0f42c088d7d02cf55c88a23d1d44a98e"
 files: ["packages/editor/src/editor/FrontmatterSelect.tsx", "server/frontmatter-options.ts", "src/hooks/useTabs.ts", "src/components/EditorPane.tsx", "src/components/markdown-error-boundary.tsx", "packages/editor/src/Editor.tsx", "packages/editor/src/editor/FrontmatterPanel.tsx", "src/components/TableOfContents.tsx"]
 commits: []
-description: "Markdown Hotview and Plain editing contract covering document properties including titleless YAML, source saving, copying, voice and drawing insertion, editor navigation, performance, and mobile input."
+description: "Markdown Hotview and Plain editing contract covering document properties including titleless YAML, source saving, copying, recorded audio, reviewed speech-to-text and drawing insertion, editor navigation, performance, and mobile input."
 상위파일:
   - "MOC.md"
   - "_document-code-media-editing.md"
@@ -47,6 +47,12 @@ description: "Markdown Hotview and Plain editing contract covering document prop
 In editable project Markdown, type `/paint` or `/그림` and choose **Drawing Editor** to open the shared [drawing board](../terminals-agents-automation/agent-drawing-editor.md). Saving inserts a transparent PNG through the current document's `EditorApi.uploadAsset`; it needs document upload permission and does not call agent drawing APIs. Document context has no SVG history picker or persisted editable original. Read-only documents, hosts without the renderer, and external server-file tabs do not offer this command.
 
 Selecting the command removes its slash text and records an insertion position. Map that position through subsequent transactions while the board or upload is open, so moving the caret does not redirect the image. Closing without saving restores focus at that position and leaves the rest of the document intact. Upload failures keep the board and drawing available for retry. A path, API, editor, or editability change invalidates the session; a late upload cannot insert into a different document. The host owns the popup and the editor package owns insertion, as recorded in [ADR 0115](../../decisions/0115-hotview-drawing.md).
+
+### Speech input
+
+The toolbar microphone opens shared [speech input](../../development/speech-input.md) in editable Markdown Hotview and Plain for authorized owner/manager accounts. Recording produces an editable final transcript; **Insert** applies literal text to the selection captured when the dialog opened. A changed document, read-only state, closed editor, or different destination invalidates that insertion target. Keep the transcript in the dialog when insertion is rejected so the user can recover it. Insertion participates in ordinary undo and autosave; it does not save an audio attachment or send an agent message.
+
+Engine setup, host versus browser processing, permissions, audio limits, microphone cleanup, and cancellation follow the shared contract. See the [configuration guide](../../../../docs/configuration/speech-input.md) for setup and the [work record](../../work/speech-input.md) for actual checks and remaining device acceptance.
 
 ### Voice recording
 

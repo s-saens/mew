@@ -1,7 +1,7 @@
 ---
 title: "Terminal and Agent Tabs"
-description: "Covers opening a shell with Ctrl+backtick, starting AI conversations and preparing runtimes, selecting with number keys, live tab positions, duplicate default names, and reordering by dragging, closing tabs and panels, saved prompt drafts, the waiting queue and restoring history by topic, content, or session ID, and entry points for the CLI, Paint, agent sets, skills, and MCP."
-updated: "2026-10-31"
+description: "Covers shell and AI tabs, runtime preparation, tab selection and arrangement, saved prompt drafts, reviewed speech input, queues and history, and entry points for the CLI, Paint, agent sets, skills, and MCP."
+updated: "2026-11-11"
 상위파일:
   - "../../.mew/docs/MOC.md"
   - "MOC.md"
@@ -28,6 +28,7 @@ In the `+` runtime list, press `1`–`9` to open a new tab with the installed ru
 When the tab bar or input field has focus, use `Ctrl/Cmd+N/T` or `Alt+N` to create a new agent or terminal tab in the same group. `Ctrl/Cmd+Shift+T` reopens tabs in that panel, starting with the most recently closed. Agents resume saved conversations, while terminals open a new shell with the same name and working directory. Closed-tab history is cleared on refresh or project switching. `Ctrl/Cmd+W` closes the current tab, and `Ctrl/Cmd+1…9` and `Ctrl/Cmd+Tab` select and switch tabs. Chrome-reserved shortcuts can only be received after entering fullscreen with the **mew fullscreen button**. See [Shortcut Settings](../configuration/appearance.md#keyboard-shortcut-settings) for detailed conditions.
 
 - Enter a prompt in the ACP input field and send it with the send button or `Ctrl+Enter`. For `@` references, `/` skills, attachments, and input history, see [Input Usage](../../.mew/docs/features/terminals-agents-automation/agent-input-mentions-skills-and-attachments.md).
+- To dictate a draft, choose the composer's microphone, record and stop, then review the text and choose **Insert**. Send the message separately when ready. Keep the same draft open and unchanged while transcribing. This action is unavailable in CLI mode and history-only views and requires [speech setup and permissions](../configuration/speech-input.md).
 - Open the [Drawing Board](../../.mew/docs/features/terminals-agents-automation/agent-drawing-editor.md) with the **Open Drawing Board** icon at the bottom right inside the input field or with `Ctrl/Cmd+Alt+D`. Draw shapes and text or paste a screenshot, then select **Save** to retain an SVG record and attach a PNG to the input. Edit the original again from **Drawing History** in the drawing board.
 - Hints in terminal and agent input fields consistently use **Enter text**. The same short phrase is used while working, awaiting approval, or with the keyboard locked, and appears as `Enter text` in English, `テキスト入力` in Japanese, or `输入文本` in Chinese according to the interface language.
 - Mobile terminal modifier keys appear in a single row **directly above the text input field**. **Home, End, and ^C** join Esc, Tab, Ctrl, Shift, and the arrow keys to fill the horizontal space. Home/End move the terminal cursor to the beginning/end of the line, and ^C requests execution interruption with Ctrl+C. Unsent input is retained.

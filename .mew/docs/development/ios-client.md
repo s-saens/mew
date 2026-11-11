@@ -1,8 +1,8 @@
 ---
 title: "iOS client implementation contract"
-description: "Defines the standalone iOS hybrid client's ownership, direct local runtime, Mewlink native asset cache, bridge protocol, identity isolation, and notification boundary. Includes failure rules, source entrypoints, and automated versus physical-device verification."
+description: "Defines the standalone iOS hybrid client's ownership, direct local runtime, Mewlink native asset cache, bridge protocol, identity isolation, notifications, and bounded speech-transcription waits. Includes failure rules and automated versus physical-device verification."
 created: "2026-11-10"
-updated: "2026-11-10"
+updated: "2026-11-11"
 ---
 
 # iOS client implementation contract
@@ -84,7 +84,7 @@ The Swift handler accepts versioned operation messages and responds with `{ok:tr
 
 Native asset `sha256` is lowercase hexadecimal over decoded bytes. Mewlink ETags are quoted `sha256-<base64url>` values, optionally with the existing gzip variant suffix. Base64 holds binary bytes only, never arbitrary JSON string conversion. Native returns decoded bodies; content-encoding/content-length are reconstructed or removed as appropriate.
 
-Direct HTTP currently buffers each request and response, with a 32 MiB decoded body cap, 16 concurrent API requests, and a 30-second JavaScript deadline. It does not expose incremental fetch streaming or unlimited media transfers. Sockets have separate message, pending-byte and connection bounds. These restrictions need device/performance acceptance and a future streaming protocol before claiming full parity for large or long-running transfers.
+Direct HTTP currently buffers each request and response, with a 32 MiB decoded body cap, 16 concurrent API requests, and a 30-second JavaScript deadline for ordinary requests. The exact `POST /api/speech/transcribe` operation has a 310-second JavaScript deadline and native URLSession request timeout to accommodate the [speech engine's bounded inference/model download](speech-input.md). Other URLSession requests retain their existing 60-second timeout. Cancellation still uses the request identity, and no write is automatically replayed. It does not expose incremental fetch streaming or unlimited media transfers. Sockets have separate message, pending-byte and connection bounds. These restrictions need device/performance acceptance and a future streaming protocol before claiming full parity for large or long-running transfers.
 
 Do not grant the bridge to arbitrary external navigation, raw file HTML, user shares, or unrelated child frames. Open external browsing through the operating system. Never pass central management cookies, proof keys, or native authentication material into the installed UI.
 
@@ -114,6 +114,8 @@ These are local notifications generated while Mew code is receiving events. Rece
 ## Verification boundaries
 
 Node regressions cover native cache integrity, live authorization, denied/offline behavior, ineligible paths, native limits, notification ownership, and direct bridge HTTP/socket behavior. Existing remote-resource and browser-notification regressions verify absent-capability behavior. Run `npm run build`, applicable type checks/lint, and `npm run check:docs` after implementation.
+
+The speech deadline has TypeScript clock-controlled transport checks and a Swift XCTest assertion. The Swift check was added but not executed in the Linux speech implementation environment because `xcodebuild` was unavailable. Applying that native timeout change requires a separate native build and app update; host browser assets alone cannot change URLSession behavior. See the [speech work record](../work/speech-input.md) for actual local checks and the remaining physical-device gate.
 
 Xcode compilation and XCTest require macOS/Xcode. Physical iPhone acceptance must separately check local custom-scheme module/CSS loading, PDF/editor workers, direct cookies/login/logout, uploads and downloads, long-lived sockets, Mewlink service-worker/frame behavior, OS keyboard/selection, process termination, app switching, native storage reuse and updates, notification permission/taps, and TLS failures. Passing Node tests does not establish any of these device results. Record actual outcomes in the [work record](../work/ios-client.md).
 

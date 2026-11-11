@@ -66,6 +66,11 @@ final class NativeHTTPTransport: NSObject, URLSessionTaskDelegate, URLSessionWeb
         return true
     }
 
+    nonisolated static func requestTimeout(method: String, path: String) -> TimeInterval {
+        let pathname = String(path.split(separator: "?", maxSplits: 1, omittingEmptySubsequences: false)[0])
+        return method == "POST" && pathname == "/api/speech/transcribe" ? 310 : 60
+    }
+
     nonisolated static func validStaticPath(_ value: String) -> Bool {
         guard value.utf8.count <= 1024, !value.contains("%"), !value.contains("?"), !value.contains("#"), !value.contains("\\"),
               !value.split(separator: "/").contains(where: { $0.hasPrefix(".") }),
@@ -110,6 +115,7 @@ final class NativeHTTPTransport: NSObject, URLSessionTaskDelegate, URLSessionWeb
         guard requests[id] == nil, requests.count < 64, let url = URL(string: path, relativeTo: baseURL)?.absoluteURL,
               Self.sameOrigin(url, baseURL) else { throw NativeTransportError.capacityExceeded }
         var request = URLRequest(url: url)
+        request.timeoutInterval = Self.requestTimeout(method: method, path: path)
         request.httpMethod = method
         request.httpBody = body
         for pair in headers {

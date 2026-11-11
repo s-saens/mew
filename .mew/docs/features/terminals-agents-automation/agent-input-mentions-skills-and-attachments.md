@@ -4,11 +4,11 @@ parent: "mew-agents"
 title: "Agent Input, Mentions, Skills, and Attachments"
 status: "implemented"
 created: "2026-09-18"
-updated: "2026-11-10"
+updated: "2026-11-11"
 status_hash: "a10e27bcc06cebe98975858548ff907b5953bfbcf197fe2ef971d9294144858f"
 files: ["src/components/AgentPanel.tsx", "src/components/agent-execution-toggles.tsx", "src/hooks/use-agent-execution-options.ts", "shared/agent-execution-options.ts", "src/components/agent-document-tag.tsx", "src/utils/agent-attachments.ts", "src/components/agent-prompt-drafts.tsx", "src/utils/agent-saved-prompts.ts", "src/components/MentionTextarea.tsx", "src/components/agent-composer-input.tsx", "src/components/agent-composer-documents.tsx", "src/components/agent-composer-attachments.tsx", "src/components/agent-media-preview-dialog.tsx", "src/utils/agent-composer-document.ts", "src/components/drawing/DrawingEditor.tsx", "src/utils/clipboard-images.ts", "src/utils/agentInputMentions.ts", "server/skills.ts"]
 commits: []
-description: "Agent input mentions, document reference tags, skills, attachments, media previews, and drawing integration. Covers per-file upload progress, temporary attachment storage without incidental Git commits, atomic editing, drafts and queues, CLI mode, keyboard submission, and composer controls."
+description: "Agent input mentions, document reference tags, skills, attachments, media previews, drawing, and reviewed speech input. Covers per-file upload progress, temporary attachment storage without incidental Git commits, atomic editing, drafts and queues, CLI mode, keyboard submission, and composer controls."
 상위파일:
   - "MOC.md"
   - "_terminals-agents-automation.md"
@@ -37,6 +37,12 @@ description: "Agent input mentions, document reference tags, skills, attachments
 - [Vector drawing tool and saved history](agent-drawing-editor.md)
 
 ## Detailed behavior
+
+### Speech input
+
+The microphone action opens the shared [speech dialog](../../development/speech-input.md) for the active writable non-CLI composer when the account has speech access. It captures the current input identity, canonical draft text, and selection before recording. The user reviews or edits the final transcript and chooses **Insert**; this changes only the draft and never submits, schedules, or executes it.
+
+If the draft changes, its input is replaced, the active conversation/queue-edit identity changes, or the target closes, reject insertion and retain the transcript in the dialog for recovery. An existing new-message draft and a queued-message edit have separate targets. History-only and CLI inputs do not offer the action. Engine setup, microphone cleanup, cancellation, and account/host permissions follow the shared contract; the [configuration guide](../../../../docs/configuration/speech-input.md) and [work record](../../work/speech-input.md) own usage and verification.
 
 ### Saved prompt drafts
 
@@ -83,7 +89,7 @@ Query Documents only while the input field's `@` menu is open. Existing candidat
 
 `@` results show only items that **start with** the entered string. If there is a last-focused editor file, show it first; otherwise, prioritize **subprojects → folders → files**, with each type sorted in ascending Korean alphabetical order. Subprojects combine the role-specific list from `GET /api/projects` with subprojects discovered in the current tree. Thus, guests see only projects visible to their role, while managers and owners who can use the agent window see all workspace projects. Selecting a project inserts `[프로젝트명]` and places the cursor on the next line, then renames the current agent tab to `프로젝트명` without brackets. If a tab already has that name, append the smallest available number, as in `프로젝트명 (1)`. Use `@` to reference folders and files directly.
 
-The settings row above the full-width input surface is ordered left to right: CLI command mode, Build, Deploy, model, reasoning level, and permission. A transparent button group floats 4px from the bottom and right edges of that surface, ordered left to right: Clear, Drawing, Save prompt, Attach, Schedule, Send. Keyboard focus follows the same order. There is no separate right action column. Keep the existing button sizes and colors; the 32px Send button has 12px corners and an outlined arrow pointing right. During queue editing, hide Schedule and use the final button to save the queued message. Existing CLI, upload, and queue-edit restrictions still apply.
+The settings row above the full-width input surface is ordered left to right: CLI command mode, Build, Deploy, model, reasoning level, and permission. A transparent button group floats 4px from the bottom and right edges of that surface, ordered left to right: Speech input when available, Clear, Drawing, Save prompt, Attach, Schedule, Send. Keyboard focus follows the same order. There is no separate right action column. Keep the existing button sizes and colors; the 32px Send button has 12px corners and an outlined arrow pointing right. During queue editing, hide Schedule and use the final button to save the queued message. Existing CLI, upload, and queue-edit restrictions still apply.
 
 The × Clear button immediately to the left of Drawing empties the active input, including attachment and document tags, then returns focus to the editor. For a queued-message edit it clears only that edit; the separate new-message draft and its attachments are preserved. Clearing does not send, save, remove a queued message, or clear conversation history. It preserves CLI mode and the selected runtime settings, resets input-history navigation for a new-message draft, and closes inline scheduling controls. Disable Clear when the input is empty, attachments are uploading, or a CLI submission is pending. Uploaded files and saved prompt entries remain stored.
 

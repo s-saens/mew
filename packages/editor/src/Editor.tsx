@@ -71,6 +71,7 @@ import { InlinePageName, inlinePageNameKey } from './editor/inlinePageName'
 import { InlinePageNameInput } from './editor/InlinePageNameInput'
 import { InlineVoice } from './editor/inlineVoice'
 import { useInlineVoice } from './editor/useInlineVoice'
+import { prepareTextInsertion } from './editor/textInsertion'
 import { useUploadProgress } from './editor/useUploadProgress'
 import { AnnotationMarker, Annotations, insertAnnotation, updateAnnotation, deleteAnnotation, scanAnnotations } from './editor/annotations'
 import { prepareProseMirrorContext } from './editor/prosemirrorContext'
@@ -94,6 +95,7 @@ interface DrawingSession {
 }
 
 export interface EditorHandle {
+  prepareTextInsertion: () => ((text: string) => boolean) | null
   prepareContextMenu: (x: number, y: number) => EditorContextTarget | null
   startAnnotation: () => void
   getAnnotationIdentity: (num: number) => string | null
@@ -1976,6 +1978,9 @@ export const Editor = forwardRef<
   useImperativeHandle(
     ref,
     () => ({
+      prepareTextInsertion() {
+        return editor && !readOnlyRef.current ? prepareTextInsertion(editor, () => !readOnlyRef.current) : null
+      },
       prepareContextMenu(x, y) {
         if (!editor) return null
         const target = prepareProseMirrorContext(editor, x, y)

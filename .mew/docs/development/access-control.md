@@ -1,8 +1,8 @@
 ---
 title: "Per-account feature and file permissions"
 created: "2026-09-16"
-updated: "2026-11-07"
-description: "Defines per-account feature and file permissions, first-owner enrollment, live Mewlink revocation, server-data boundaries, public capabilities, and browser/WebSocket checks. Covers the common nativeBrowser permission for login and browsing, Mew Port removal, shared MCP ownership, account preservation, and rejection of obsolete Android grants."
+updated: "2026-11-11"
+description: "Defines per-account feature and file permissions, first-owner enrollment, live Mewlink revocation, server-data boundaries, public capabilities, and browser/WebSocket checks. Covers Browser, privileged speech engines, Mew Port removal, shared MCP ownership, account preservation, and rejection of obsolete Android grants."
 상위파일: "MOC.md"
 ---
 
@@ -84,6 +84,10 @@ The internal Browser and every login screen require the same **Browser** (`nativ
 
 
 File rules apply to the **mew file API**. Server control features such as agents, terminal, native browser and server file explorer operate with OS permissions and are not sandboxed by file rules. Do not assume file rules can hide secrets from accounts allowed to use these features. This explanation is displayed in account management.
+
+## Speech engines
+
+[Speech input](speech-input.md) requires an authenticated owner or manager with the terminal feature for status, private settings, connection checks, and transcription. Installing its fixed managed runtime additionally requires owner role. External endpoints are reached from the Mew host, including user-configured private/loopback services, and local inference runs under the server OS account. Document file ACLs do not sandbox those capabilities. Settings and API keys are scoped to the authenticated account; responses omit stored keys, and account deletion or merge-source credential revocation removes its speech credentials without transferring them. The managed runtime/cache and generic installation status are installation-wide. Destination document edit and agent permissions still apply to transcript insertion.
 
 ## External debugger
 

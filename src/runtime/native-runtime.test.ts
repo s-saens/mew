@@ -226,3 +226,38 @@ test('native endpoint spelling may retain IPv6 or default-port forms without los
   const foreignPath = { ...host.bridge, connection: { ...host.bridge.connection, endpoint: 'https://host.test/subpath', scope: 'direct:https://host.test/subpath' } }
   assert.equal(isNativeDirectHost(foreignPath, 'mew-app://workspace/'), false)
 })
+
+test('native speech requests have a bounded extended deadline while ordinary requests and cancellation stay unchanged', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] })
+  const f = fixture(t), controller = new AbortController()
+  f.direct.fetch = async value => { f.calls.push({ method: 'fetch', value }); return new Promise(() => {}) }
+  let speechDone = false, ordinaryDone = false
+  const speech = f.transport.fetch('/api/speech/transcribe?project=one', { method: 'POST', body: 'audio', signal: controller.signal }).catch(() => { speechDone = true })
+  const ordinary = f.transport.fetch('/api/file').catch(() => { ordinaryDone = true })
+  for (let i = 0; i < 10 && f.calls.filter(call => call.method === 'fetch').length < 2; i++) await settle()
+  assert.equal(f.calls.filter(call => call.method === 'fetch').length, 2)
+  t.mock.timers.tick(30_001)
+  await ordinary
+  assert.equal(ordinaryDone, true)
+  assert.equal(speechDone, false)
+  controller.abort()
+  await speech
+  assert.equal(speechDone, true)
+  assert.equal(f.calls.filter(call => call.method === 'cancel').length, 2)
+})
+
+test('native speech request cancels when its 310-second deadline expires', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] })
+  const f = fixture(t)
+  f.direct.fetch = async value => { f.calls.push({ method: 'fetch', value }); return new Promise(() => {}) }
+  let done = false
+  const pending = f.transport.fetch('/api/speech/transcribe', { method: 'POST', body: 'audio' }).catch(() => { done = true })
+  for (let i = 0; i < 10 && !f.calls.some(call => call.method === 'fetch'); i++) await settle()
+  assert.equal(f.calls.some(call => call.method === 'fetch'), true)
+  t.mock.timers.tick(309_999)
+  assert.equal(done, false)
+  t.mock.timers.tick(1)
+  await pending
+  assert.equal(done, true)
+  assert.equal(f.calls.filter(call => call.method === 'cancel').length, 1)
+})

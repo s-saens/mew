@@ -1,7 +1,7 @@
 ---
 title: "Document Editing and Storage Formats"
-description: "Explains document and file editing, attachment storage and Git behavior, previews, mobile navigation and editor actions, workspace controls, and fullscreen."
-updated: "2026-11-09"
+description: "Explains document and file editing, reviewed speech-to-text input, attachment storage and Git behavior, previews, mobile navigation and editor actions, workspace controls, and fullscreen."
+updated: "2026-11-11"
 상위파일:
   - "MOC.md"
 ---
@@ -39,6 +39,10 @@ Copy, Cut, and Delete are disabled when no text is selected. Actions that modify
 If copying, cutting, or pasting fails, follow the guidance to use `Ctrl/Cmd+C`·`Ctrl/Cmd+X`·`Ctrl/Cmd+V`. Cut deletes the selected content only after it has been successfully copied to the clipboard.
 
 Copy from **Hotview** to paste readable text without Markdown syntax. Apps that accept rich text can retain headings, emphasis, links, lists, and tables. Text-only destinations receive readable lists and checkboxes, code with its original whitespace, and tables with tab-separated columns. To copy the Markdown source, switch to **Plain** first. Code files and explicit table export actions keep their existing copy formats.
+
+### Dictate text
+
+In an editable Markdown, source, or code/text document, place the cursor or select text and choose the toolbar microphone. Record, stop, then review the final transcript and choose **Insert**. Text replaces the captured selection and can be undone normally. Keep the document unchanged while transcribing; if the target changes, Mew rejects insertion so it cannot write into another document. Set up your engine first under **Settings → Speech recognition**. See [speech setup and permissions](../configuration/speech-input.md).
 
 ### Record voice
 

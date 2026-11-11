@@ -2,6 +2,7 @@ import { REMOTE_FLOW_CONTROL, REMOTE_LIMITS, REMOTE_REQUEST_HEADERS, parseRemote
 import { RemoteStreamSlots } from './remote-stream-slots.ts'
 import { decodeRemoteBytes as decode, encodeRemoteBytes as encode } from './remote-codec.ts'
 import { RemoteReceiveWindow } from './remote-receive-window.ts'
+import { requestResponseTimeout } from './request-response-timeout.ts'
 import { getAppRuntime, type AppTransport } from '../runtime/app-runtime.ts'
 export type { AppTransport } from '../runtime/app-runtime.ts'
 let remote: AppTransport | null = null
@@ -171,8 +172,9 @@ export class DataChannelTransport implements AppTransport {
     const id = crypto.randomUUID()
     return new Promise<Response>((resolve, reject) => {
       const abort = () => { const pending = this.requests.get(id); pending?.controller?.error(new DOMException('취소됐습니다.', 'AbortError')); pending?.reject(new DOMException('취소됐습니다.', 'AbortError')); this.requests.delete(id); void this.send({ type: 'cancel', id }).catch(() => {}).finally(cleanup) }
-      let timer = setTimeout(abort, 30_000)
-      const progress = () => { if (!this.requests.get(id)?.responded) { clearTimeout(timer); timer = setTimeout(abort, 30_000) } }
+      const timeout = requestResponseTimeout(request.method, url.pathname)
+      let timer = setTimeout(abort, timeout)
+      const progress = () => { if (!this.requests.get(id)?.responded) { clearTimeout(timer); timer = setTimeout(abort, timeout) } }
       const cleanup = () => { pending.flow?.close(); clearTimeout(timer); signal.removeEventListener('abort', abort); release() }
       const pending: PendingRequest = { resolve, reject, cleanup, responseStarted: () => clearTimeout(timer), responded: false, sentAt: performance.now() }
       this.requests.set(id, pending)

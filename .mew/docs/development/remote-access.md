@@ -1,8 +1,8 @@
 ---
 title: "Mewlink device registration and locally authenticated P2P access contract"
-description: "Defines Mewlink registration, launcher behavior, authentication, browser trust, UI resources, notification permission bridging, microphone delegation, signaling proofs, and transport limits. Links native iOS storage adaptation, recovery, Mew Port removal, and separate host/central application and verification boundaries."
+description: "Defines Mewlink registration, launcher behavior, authentication, browser trust, UI resources, notification and microphone delegation, signaling proofs, and transport limits, including the bounded speech-transcription response wait. Links native iOS storage, recovery, and separate host/central verification boundaries."
 created: 2026-10-07
-updated: "2026-11-04"
+updated: "2026-11-11"
 ---
 
 [Work and release criteria](<../work/remote-access.md>) · [Central service installation](../operations/remote-central.md) · [ADR 0195](../history/decisions/0195-mew-account-based-p2p-remote-access.md) · [Follow-up ADR 0203](../history/decisions/0203-mewlink-workers-p2p-ui.md) · [Local authentication ADR 0207](../history/decisions/0207-mewlink-device-access-local-auth.md) · [Permissions](access-control.md)
@@ -32,7 +32,7 @@ This central **source contract** does not establish a live `mew.run` change. Hos
 
 ## Microphone permission
 
-Hotview voice recording uses the connecting browser's microphone. The direct host's `server/security-headers.ts` permits `microphone=(self)` while retaining camera, geolocation, and payment denial. Browser permission and a secure context (HTTPS or a browser-trusted loopback origin) remain required.
+Hotview voice recording and [speech input](speech-input.md) use the connecting browser's microphone. The direct host's `server/security-headers.ts` permits `microphone=(self)` while retaining camera, geolocation, and payment denial. Browser permission and a secure context (HTTPS or a browser-trusted loopback origin) remain required.
 
 The Mewlink connection page delegates `microphone 'src'` to its configured app-origin iframe. Both the prepared frame (`mewlink/src/connection-frame.ts`) and fallback frame (`connection-parent.ts`) set this policy. The app launcher (`app-launcher.ts`) delegates the same permission to the installed UI frame. This permits the configured frame origins without granting unrelated origins or camera access. See [ADR 0131](../decisions/0131-hotview-voice-recording.md).
 
@@ -429,9 +429,11 @@ The protocol version is **1** in `shared/remote-access.ts`. It is checked in the
 | HTTP upload / single WS message and queue | At most 25 MiB each. Lower limits in existing APIs also apply |
 | A's total in-flight HTTP bodies and WS assembly/send data | 64 MiB. Not a RAM limit for the entire OS process |
 | Signaling message / pending processing / ICE count | 96 KiB / 128 per connection / 256 total in both directions per app connection |
-| No initial HTTP response or upload progress | 30 seconds. After the response, streams end through cancellation or channel/authentication lifetime limits |
+| No initial HTTP response or upload progress | 30 seconds for ordinary requests; 310 seconds for `POST /api/speech/transcribe` to allow its bounded inference/model download. After the response, streams end through cancellation or channel/authentication lifetime limits |
 
 App MessagePort and launcher/resources share actual-DataChannel admission. Negotiated `flowControl.separateStreams: true` gives HTTP and WS 16 slots each; blocked WS cannot hold free HTTP slots. Unnegotiated peers share 16, and older versions retain shared FIFO. Current HTTP bulk/ordinary classes retain their own FIFO under the [bulk-resource reservation](#host-ui-compression-and-revalidation) above. HTTP holds slots through body completion, WS through close. Cancel/close/termination removes unsent queued work; bounds/timeouts error. Server completion frees work before its end frame; browser cancel frees slots after its cancel frame. Writes never auto-retransmit.
+
+The speech exception changes only the exact POST endpoint's response/progress deadline. It preserves upload limits, admission, authentication, and explicit cancellation. `src/utils/remote-speech-timeout.test.ts` checks the extended wait, ordinary-request timeout, and cancel frame with a fake transport and clock; it does not establish real-device microphone or external-network performance.
 
 Forwarded `request`, chunks, `end`, `cancel`, and credit share per-work send FIFO. Close/cancel cannot overtake RTC-backpressured chunks. Pre-admission cancellation discards unsent body; started work sends prior frames then cancel before slot release. Late completed-work credit is discarded.
 

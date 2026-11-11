@@ -4,11 +4,11 @@ parent: "mew-editor"
 title: "Code and text editing and in-document search"
 status: "implemented"
 created: "2026-09-18"
-updated: "2026-11-03"
+updated: "2026-11-11"
 status_hash: "4d8fe6026b3341576de674bb4b2ae85cd1124f3eb3638b2e33e15d8697ed1fc1"
 files: ["src/components/EditorPane.tsx", "src/hooks/useTabs.ts", "src/components/CodePane.tsx", "src/utils/codeSearch.ts", "src/utils/code-search-panel.ts", "src/utils/code-pinch-zoom.ts", "packages/editor/src/editor/EditorSearchBar.tsx"]
 commits: []
-description: "Plain/code editing, syntax and diagnostics, Find/Replace, and document search controls. Covers mobile keyboard activation, editor-local font zoom, floating auxiliary keys, and tab gestures that preserve horizontal scrolling."
+description: "Plain/code editing, syntax and diagnostics, Find/Replace, and document search controls. Covers reviewed speech-to-text insertion, mobile keyboard activation, editor-local font zoom, floating auxiliary keys, and tab gestures that preserve horizontal scrolling."
 상위파일:
   - "MOC.md"
   - "_document-code-media-editing.md"
@@ -30,6 +30,8 @@ description: "Plain/code editing, syntax and diagnostics, Find/Replace, and docu
 - The mobile Plain editor displays the shared auxiliary keys before editor focus and after blur or keyboard dismissal. The file-size and selection status row sits below the auxiliary keys and above the Dock or keyboard. The body continues behind the floating keys, and gaps between buttons remain available for document interaction. Trailing scroll space keeps the final cursor line reachable above the keys. Esc, Tab, Ctrl, Shift, and undo and redo for editable files appear as individual rounded translucent floating buttons without an enclosing bar surface. The arrow keys sit at the far right in an inverted T, with Up above Left/Down/Right. Layout and focus follow [Mobile auxiliary key bar](../../development/ui-editor-input.md#mobile-auxiliary-key-bar). Horizontal scrolling in the body does not switch tabs; only swiping left or right on the auxiliary-key area selects the previous or next tab. Markdown Plain follows the same rules.
 
 ### Boundaries and limitations
+
+- The toolbar microphone offers [speech input](../../development/speech-input.md) in editable Plain/code text for authorized owner/manager accounts. The user reviews the final transcript and explicitly inserts literal text at the captured selection. Any intervening document change, editor replacement, or loss of editability invalidates the target instead of applying the result to a different file. Successful insertion uses ordinary undo and autosave. Engine setup and actual checks belong to the [configuration guide](../../../../docs/configuration/speech-input.md) and [work record](../../work/speech-input.md).
 
 - Language-specific support is limited to extensions that are actually registered.
 - Project-wide search is covered by the project and search features.

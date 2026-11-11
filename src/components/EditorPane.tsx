@@ -42,6 +42,8 @@ import { MarkdownErrorBoundary } from './markdown-error-boundary'
 import { useI18n } from '../i18n'
 
 import { DeferredDrawingEditor } from './drawing/deferred-drawing-editor'
+import { SpeechInputButton } from '../speech/SpeechInputButton'
+import { speechText } from '../speech/labels'
 
 const DatabaseListModal = deferredComponent(async () => ({ default: (await import('./DatabaseListModal')).DatabaseListModal }), null, { suspend: false })
 
@@ -218,7 +220,7 @@ export function EditorPane({
   const { createEditorApi, fetchFile, fetchExternalFile, externalRawUrl, rawUrl, isArchivedPath, fetchComments, fetchMembers, postComment, updateComment, deleteComment, resourceUrl, fetch: requestFetch } = api
   useUiLocale()
   const dock = useDock()
-  const { t } = useI18n()
+  const { t, locale } = useI18n()
   const { toast: commentToast, showToast } = useToast()
   const [preparingAgent, setPreparingAgent] = useState(false)
   const [mobileToolsOpen, setMobileToolsOpen] = useState(false)
@@ -285,6 +287,7 @@ export function EditorPane({
   }, [databaseId, databaseRowId, editorApi.db, file.path, project, fetchFile, api.scope?.workspacePath, workspace?.path, api])
   const unsupportedFile = !!activeTab && !canOpenEditorFile(activeTab.path)
   const editorRef = useRef<EditorHandle>(null)
+  const speechInsertion = useRef<((text: string) => boolean) | null>(null)
   const codePaneRef = useRef<CodePaneHandle>(null)
   const [databasePopup, setDatabasePopup] = useState<(DatabaseLink & { api: EditorDbApi; project: string; onOpenPage: EditorOpenLink }) | null>(null)
   useEffect(() => setDatabasePopup(null), [project, activePath])
@@ -964,6 +967,18 @@ export function EditorPane({
                       </button>
                     </div>
                   </>
+                )}
+                {(role === 'owner' || role === 'manager') && activeTab.editable && !annotationReadOnly && !collaborationPending && !diffTarget && !unsupportedFile && !mediaKind(activeTab.path) && (activeTab.viewMode === 'plain' || isMd) && (
+                  <SpeechInputButton key={JSON.stringify([authEmail, api.scope?.workspacePath ?? workspace?.path, api.scope?.projectPath, project, activeTab.path, activeTab.viewMode])}
+                    restoreFocus={() => editorMenuRoot.current?.querySelector<HTMLElement>('.ProseMirror, .cm-content') ?? null}
+                    onSessionStart={() => {
+                      const target = activeTab.viewMode === 'plain' ? codePaneRef.current : editorRef.current
+                      const insert = target?.prepareTextInsertion()
+                      speechInsertion.current = insert ? text => (activeTab.viewMode === 'plain' ? codePaneRef.current : editorRef.current) === target && insert(text) : null
+                    }}
+                    onTranscript={text => {
+                      if (!speechInsertion.current?.(text)) throw new Error(speechText(locale, 'documentChanged'))
+                    }} />
                 )}
                 {(canComment || (isMd && !diffTarget && !loading && !revalidating)) && <div ref={commentToolsRef} className="flex items-center gap-2">
                 {/* 댓글 목록 — 목차 버튼 **왼쪽**의 플로팅 버튼. 목차와 달리 md가 아니어도,

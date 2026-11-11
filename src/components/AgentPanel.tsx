@@ -12,6 +12,9 @@ import { AgentAttachmentIcon } from './agent-attachment-icon'
 import { AgentDocumentReferences, AgentDocumentTag } from './agent-document-tag'
 import { attachmentKind, conversationAttachments, documentReferenceTokens, uploadedAttachmentTokens, withoutAttachmentTokens } from '../utils/agent-attachments'
 import { AgentMediaPreviewDialog } from './agent-media-preview-dialog'
+import { SpeechInputButton } from '../speech/SpeechInputButton'
+import { speechText } from '../speech/labels'
+import { prepareDraftTextInsertion } from '../utils/draft-text-insertion'
 import { scopedBrowserStorage } from '@mew/ui/browser-storage-scope'
 import { workspaceViewportBottom } from '../utils/workspace-viewport'
 import { isMewTransportSuspended } from '../utils/remote-transport.ts'
@@ -2503,6 +2506,7 @@ function AgentSessionView({
   const attachmentInputRef = useRef<HTMLInputElement>(null)
   const attachmentPickerContext = useRef<{ target: 'composer' | 'queue'; version: number; projectRoot: string } | null>(null)
   const agentInputRef = useRef<MentionInputHandle>(null)
+  const speechInsertion = useRef<((text: string) => boolean) | null>(null)
   const historyIndexRef = useRef<number | null>(null)
   const historyDraftRef = useRef('')
   useEffect(() => {
@@ -4651,6 +4655,19 @@ function AgentSessionView({
           />
           </div>
           <div ref={composerActionsRef} data-agent-composer-actions className="absolute right-1 bottom-1 z-10 flex w-max max-w-[calc(100%-0.5rem)] flex-wrap items-stretch justify-end gap-1">
+          {allowTerminal && visible && active && !historyPreview && !composerCliMode && <SpeechInputButton
+            key={JSON.stringify([cacheAccount, fileWorkspace, tabId, editingQueued?.index ?? 'draft'])}
+            disabled={composerAttaching || cli.submitting}
+            restoreFocus={() => agentInputRef.current?.element ?? null}
+            onSessionStart={() => {
+              const input = agentInputRef.current
+              if (!input) { speechInsertion.current = null; return }
+              speechInsertion.current = prepareDraftTextInsertion(input, () => agentInputRef.current === input)
+            }}
+            onTranscript={text => {
+              if (!speechInsertion.current?.(text)) throw new Error(speechText(uiLocale, 'draftChanged'))
+              speechInsertion.current = null
+            }} />}
           <HoverTipLayer className="flex items-stretch">
             <div data-tip={uiText('지우기')} className="flex min-h-8 items-center">
             <button type="button" aria-label={uiText('지우기')}

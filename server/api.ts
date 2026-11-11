@@ -5,6 +5,7 @@ import { createMemoTabRouter } from './memo-tab-routes.ts'
 import { decoratePublicShares } from './public-shares.ts'
 import { createDocumentBacklinksRouter } from './document-backlinks-routes.ts'
 import { createDebuggerRouter } from './debugger-routes.ts'
+import { createSpeechRouter } from './speech-routes.ts'
 import { mergeTaskFrontmatter, TaskFrontmatterConflict } from '../packages/editor/src/utils/task-frontmatter-merge.ts'
 import { isTaskDocumentPath } from '../shared/task-document-paths.ts'
 import { resolveWorkspaceScope, runRequestWorkspace, WorkspaceScopeError } from './workspace-scope.ts'
@@ -438,6 +439,7 @@ export function createApiApp() {
   app.use('/memo-tabs', createMemoTabRouter(handleError))
   app.use('/task-list', createTaskListRouter())
   app.use('/debugger', createDebuggerRouter())
+  app.use('/speech', createSpeechRouter())
   const documentLinks = new DocumentLinkIndex()
   app.use(createDocumentBacklinksRouter(documentLinks))
   app.use((req, res, next) => {

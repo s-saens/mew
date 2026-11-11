@@ -17,10 +17,12 @@ import { MewcatSkinSettings } from './mewcat-skin-settings'
 import { MewcatSizeSettings } from './mewcat-size-settings'
 import { MewcatNotificationSettings } from './mewcat-notifications'
 import { MewcatBreakSettings } from './mewcat-break'
+import { SpeechSettings } from '../speech/SpeechSettings'
+import { speechLabels } from '../speech/labels'
 
 const DebuggerSettings = lazy(() => import('./debugger-settings'))
 
-type Section = 'debugger' | 'appearance' | 'notifications' | 'dock' | 'mewcat' | 'shortcuts' | 'ignore'
+type Section = 'debugger' | 'appearance' | 'notifications' | 'dock' | 'mewcat' | 'shortcuts' | 'ignore' | 'speech'
 
 interface SettingsModalProps {
   mewcatHostRef?: Ref<HTMLDivElement>
@@ -40,7 +42,7 @@ interface SettingsModalProps {
   onClose: () => void
 }
 
-const SECTION_LABEL: Record<Section, TranslationKey> = {
+const SECTION_LABEL: Record<Exclude<Section, 'speech'>, TranslationKey> = {
   debugger: 'settings.debugger',
   appearance: 'settings.appearance',
   dock: 'settings.dock',
@@ -57,7 +59,8 @@ export function SettingsModal({ mewcatHostRef, mewcatRequest, initialDebugger, d
   const [section, setSection] = useState<Section>(mewcatRequest ? 'mewcat' : debuggerRoot && initialDebugger ? 'debugger' : 'appearance')
   // Mobile begins with the category list; the selected panel is a second screen.
   const [mobileSection, setMobileSection] = useState<Section | null>(section === 'debugger' || mewcatRequest ? section : null)
-  const { t } = useI18n()
+  const { t, locale } = useI18n()
+  const sectionLabel = (id: Section) => id === 'speech' ? speechLabels(locale).title : t(SECTION_LABEL[id])
   const [previousMewcatRequest, setPreviousMewcatRequest] = useState(mewcatRequest)
   if (previousMewcatRequest !== mewcatRequest) {
     setPreviousMewcatRequest(mewcatRequest)
@@ -84,6 +87,7 @@ export function SettingsModal({ mewcatHostRef, mewcatRequest, initialDebugger, d
     ...(debuggerRoot ? (['debugger'] as Section[]) : []),
     'mewcat',
     'shortcuts',
+    ...(canEditIgnore ? (['speech'] as Section[]) : []),
     ...(canEditIgnore ? (['ignore'] as Section[]) : []),
   ]
 
@@ -117,7 +121,7 @@ export function SettingsModal({ mewcatHostRef, mewcatRequest, initialDebugger, d
                 section === id ? 'bg-surface-raised font-medium text-ink' : 'text-ink-secondary hover:bg-surface-raised hover:text-ink'
               }`}
             >
-              {t(SECTION_LABEL[id])}
+              {sectionLabel(id)}
             </button>
           ))}
         </nav>
@@ -133,7 +137,7 @@ export function SettingsModal({ mewcatHostRef, mewcatRequest, initialDebugger, d
               >
                 ←
               </button>
-              <div className="truncate text-sm font-semibold text-ink-bright">{t(SECTION_LABEL[section])}</div>
+              <div className="truncate text-sm font-semibold text-ink-bright">{sectionLabel(section)}</div>
             </div>
             <button
               type="button"
@@ -160,6 +164,7 @@ export function SettingsModal({ mewcatHostRef, mewcatRequest, initialDebugger, d
             {section === 'mewcat' && <><MewcatSkinSettings skin={mewcatSkin} onChange={onMewcatSkinChange} /><MewcatSizeSettings /><MewcatBreakSettings /></>}
             {section === 'shortcuts' && <ShortcutsPanel />}
             {section === 'ignore' && <IgnorePanel />}
+            {section === 'speech' && <SpeechSettings portalContainer={portalContainer} />}
           </div>
         </div>
       </div>
